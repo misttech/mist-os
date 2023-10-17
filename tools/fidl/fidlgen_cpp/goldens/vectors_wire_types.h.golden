@@ -53,7 +53,6 @@ struct TypeTraits<::test_vectors::wire::ExampleUseOfVectors> {
   static constexpr uint32_t kPrimarySize = 32;
   [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 4294967295;
   static constexpr bool kHasFlexibleEnvelope = false;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = true;
 };
 

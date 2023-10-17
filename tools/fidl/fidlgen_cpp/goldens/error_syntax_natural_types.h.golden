@@ -321,7 +321,6 @@ struct TypeTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailReq
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 4294967295;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = true;
 };
 
@@ -343,7 +342,6 @@ struct TypeTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRes
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = 8;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
 
@@ -365,7 +363,6 @@ struct TypeTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRes
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 8;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 

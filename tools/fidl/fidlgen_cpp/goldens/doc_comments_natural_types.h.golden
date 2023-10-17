@@ -428,7 +428,6 @@ struct TypeTraits<::test_doccomments::Struct> {
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = 4;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
 
@@ -450,7 +449,6 @@ struct TypeTraits<::test_doccomments::Table> {
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 8;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -471,7 +469,6 @@ struct TypeTraits<::test_doccomments::StrictUnion> {
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -493,7 +490,6 @@ struct TypeTraits<::test_doccomments::FlexibleUnion> {
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 

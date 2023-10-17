@@ -660,8 +660,7 @@ std::unique_ptr<coded::StructType> CodedTypesGenerator::CompileStructDecl(
   auto typeshape_v2 = struct_decl->typeshape(WireFormat::kV2);
 
   return std::make_unique<coded::StructType>(std::move(name), std::vector<coded::StructElement>(),
-                                             typeshape_v2.inline_size, typeshape_v2.has_envelope,
-                                             std::move(qname));
+                                             typeshape_v2.inline_size, std::move(qname));
 }
 
 std::unique_ptr<coded::UnionType> CodedTypesGenerator::CompileUnionDecl(

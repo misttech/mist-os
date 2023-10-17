@@ -279,7 +279,6 @@ TEST(Struct, Traits) {
   static_assert(!fidl::IsStruct<test_types::FlexibleBits>::value);
   static_assert(fidl::TypeTraits<test_types::EmptyStruct>::kPrimarySize == 1);
   static_assert(fidl::TypeTraits<test_types::EmptyStruct>::kMaxOutOfLine == 0);
-  static_assert(!fidl::TypeTraits<test_types::EmptyStruct>::kHasEnvelope);
 }
 
 }  // namespace

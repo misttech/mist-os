@@ -52,7 +52,6 @@
               "max_handles": 0,
               "max_out_of_line": 0,
               "has_padding": false,
-              "has_envelope": false,
               "has_flexible_envelope": false
             }
           },
@@ -86,7 +85,6 @@
                 "max_handles": 0,
                 "max_out_of_line": 0,
                 "has_padding": false,
-                "has_envelope": false,
                 "has_flexible_envelope": false
               }
             },
@@ -104,7 +102,6 @@
               "max_handles": 0,
               "max_out_of_line": 8,
               "has_padding": false,
-              "has_envelope": false,
               "has_flexible_envelope": false
             }
           },
@@ -133,7 +130,6 @@
                 "max_handles": 0,
                 "max_out_of_line": 0,
                 "has_padding": false,
-                "has_envelope": false,
                 "has_flexible_envelope": false
               }
             },
@@ -150,7 +146,6 @@
               "max_handles": 0,
               "max_out_of_line": 0,
               "has_padding": false,
-              "has_envelope": false,
               "has_flexible_envelope": false
             }
           },
@@ -181,7 +176,6 @@
                   "max_handles": 0,
                   "max_out_of_line": 0,
                   "has_padding": false,
-                  "has_envelope": false,
                   "has_flexible_envelope": false
                 }
               },
@@ -199,7 +193,6 @@
                 "max_handles": 0,
                 "max_out_of_line": 8,
                 "has_padding": false,
-                "has_envelope": false,
                 "has_flexible_envelope": false
               }
             },
@@ -211,7 +204,6 @@
               "max_handles": 0,
               "max_out_of_line": 4294967295,
               "has_padding": false,
-              "has_envelope": false,
               "has_flexible_envelope": false
             }
           },
@@ -242,7 +234,6 @@
                   "max_handles": 0,
                   "max_out_of_line": 0,
                   "has_padding": false,
-                  "has_envelope": false,
                   "has_flexible_envelope": false
                 }
               },
@@ -259,7 +250,6 @@
                 "max_handles": 0,
                 "max_out_of_line": 0,
                 "has_padding": false,
-                "has_envelope": false,
                 "has_flexible_envelope": false
               }
             },
@@ -271,7 +261,6 @@
               "max_handles": 0,
               "max_out_of_line": 4294967295,
               "has_padding": false,
-              "has_envelope": false,
               "has_flexible_envelope": false
             }
           },
@@ -302,7 +291,6 @@
                   "max_handles": 0,
                   "max_out_of_line": 0,
                   "has_padding": false,
-                  "has_envelope": false,
                   "has_flexible_envelope": false
                 }
               },
@@ -320,7 +308,6 @@
                 "max_handles": 0,
                 "max_out_of_line": 8,
                 "has_padding": false,
-                "has_envelope": false,
                 "has_flexible_envelope": false
               }
             },
@@ -332,7 +319,6 @@
               "max_handles": 0,
               "max_out_of_line": 32,
               "has_padding": false,
-              "has_envelope": false,
               "has_flexible_envelope": false
             }
           },
@@ -363,7 +349,6 @@
                   "max_handles": 0,
                   "max_out_of_line": 0,
                   "has_padding": false,
-                  "has_envelope": false,
                   "has_flexible_envelope": false
                 }
               },
@@ -380,7 +365,6 @@
                 "max_handles": 0,
                 "max_out_of_line": 0,
                 "has_padding": false,
-                "has_envelope": false,
                 "has_flexible_envelope": false
               }
             },
@@ -392,7 +376,6 @@
               "max_handles": 0,
               "max_out_of_line": 0,
               "has_padding": false,
-              "has_envelope": false,
               "has_flexible_envelope": false
             }
           },
@@ -421,7 +404,6 @@
                 "max_handles": 0,
                 "max_out_of_line": 0,
                 "has_padding": false,
-                "has_envelope": false,
                 "has_flexible_envelope": false
               }
             },
@@ -433,7 +415,6 @@
               "max_handles": 0,
               "max_out_of_line": 4294967295,
               "has_padding": false,
-              "has_envelope": false,
               "has_flexible_envelope": false
             }
           },
@@ -469,7 +450,6 @@
                   "max_handles": 0,
                   "max_out_of_line": 0,
                   "has_padding": false,
-                  "has_envelope": false,
                   "has_flexible_envelope": false
                 }
               },
@@ -481,7 +461,6 @@
                 "max_handles": 0,
                 "max_out_of_line": 4294967295,
                 "has_padding": false,
-                "has_envelope": false,
                 "has_flexible_envelope": false
               }
             },
@@ -498,7 +477,6 @@
               "max_handles": 0,
               "max_out_of_line": 4294967295,
               "has_padding": false,
-              "has_envelope": false,
               "has_flexible_envelope": false
             }
           },
@@ -529,7 +507,6 @@
                   "max_handles": 0,
                   "max_out_of_line": 0,
                   "has_padding": false,
-                  "has_envelope": false,
                   "has_flexible_envelope": false
                 }
               },
@@ -541,7 +518,6 @@
                 "max_handles": 0,
                 "max_out_of_line": 4294967295,
                 "has_padding": false,
-                "has_envelope": false,
                 "has_flexible_envelope": false
               }
             },
@@ -558,7 +534,6 @@
               "max_handles": 0,
               "max_out_of_line": 4294967295,
               "has_padding": false,
-              "has_envelope": false,
               "has_flexible_envelope": false
             }
           },
@@ -587,7 +562,6 @@
                 "max_handles": 0,
                 "max_out_of_line": 0,
                 "has_padding": false,
-                "has_envelope": false,
                 "has_flexible_envelope": false
               }
             },
@@ -599,7 +573,6 @@
               "max_handles": 0,
               "max_out_of_line": 0,
               "has_padding": false,
-              "has_envelope": false,
               "has_flexible_envelope": false
             }
           },
@@ -635,7 +608,6 @@
                   "max_handles": 0,
                   "max_out_of_line": 0,
                   "has_padding": false,
-                  "has_envelope": false,
                   "has_flexible_envelope": false
                 }
               },
@@ -647,7 +619,6 @@
                 "max_handles": 0,
                 "max_out_of_line": 0,
                 "has_padding": false,
-                "has_envelope": false,
                 "has_flexible_envelope": false
               }
             },
@@ -664,7 +635,6 @@
               "max_handles": 0,
               "max_out_of_line": 4294967295,
               "has_padding": false,
-              "has_envelope": false,
               "has_flexible_envelope": false
             }
           },
@@ -695,7 +665,6 @@
                   "max_handles": 0,
                   "max_out_of_line": 0,
                   "has_padding": false,
-                  "has_envelope": false,
                   "has_flexible_envelope": false
                 }
               },
@@ -707,7 +676,6 @@
                 "max_handles": 0,
                 "max_out_of_line": 0,
                 "has_padding": false,
-                "has_envelope": false,
                 "has_flexible_envelope": false
               }
             },
@@ -724,7 +692,6 @@
               "max_handles": 0,
               "max_out_of_line": 0,
               "has_padding": false,
-              "has_envelope": false,
               "has_flexible_envelope": false
             }
           },
@@ -753,7 +720,6 @@
               "max_handles": 1,
               "max_out_of_line": 0,
               "has_padding": false,
-              "has_envelope": false,
               "has_flexible_envelope": false
             }
           },
@@ -789,7 +755,6 @@
                 "max_handles": 1,
                 "max_out_of_line": 0,
                 "has_padding": false,
-                "has_envelope": false,
                 "has_flexible_envelope": false
               }
             },
@@ -806,7 +771,6 @@
               "max_handles": 4294967295,
               "max_out_of_line": 4294967295,
               "has_padding": true,
-              "has_envelope": false,
               "has_flexible_envelope": false
             }
           },
@@ -837,7 +801,6 @@
                 "max_handles": 1,
                 "max_out_of_line": 0,
                 "has_padding": false,
-                "has_envelope": false,
                 "has_flexible_envelope": false
               }
             },
@@ -854,7 +817,6 @@
               "max_handles": 4,
               "max_out_of_line": 0,
               "has_padding": false,
-              "has_envelope": false,
               "has_flexible_envelope": false
             }
           },
@@ -883,7 +845,6 @@
                 "max_handles": 0,
                 "max_out_of_line": 0,
                 "has_padding": false,
-                "has_envelope": false,
                 "has_flexible_envelope": false
               }
             },
@@ -895,7 +856,6 @@
               "max_handles": 0,
               "max_out_of_line": 4294967295,
               "has_padding": true,
-              "has_envelope": false,
               "has_flexible_envelope": false
             }
           },
@@ -931,7 +891,6 @@
                   "max_handles": 0,
                   "max_out_of_line": 0,
                   "has_padding": false,
-                  "has_envelope": false,
                   "has_flexible_envelope": false
                 }
               },
@@ -943,7 +902,6 @@
                 "max_handles": 0,
                 "max_out_of_line": 4294967295,
                 "has_padding": true,
-                "has_envelope": false,
                 "has_flexible_envelope": false
               }
             },
@@ -960,7 +918,6 @@
               "max_handles": 0,
               "max_out_of_line": 4294967295,
               "has_padding": true,
-              "has_envelope": false,
               "has_flexible_envelope": false
             }
           },
@@ -991,7 +948,6 @@
                   "max_handles": 0,
                   "max_out_of_line": 0,
                   "has_padding": false,
-                  "has_envelope": false,
                   "has_flexible_envelope": false
                 }
               },
@@ -1003,7 +959,6 @@
                 "max_handles": 0,
                 "max_out_of_line": 4294967295,
                 "has_padding": true,
-                "has_envelope": false,
                 "has_flexible_envelope": false
               }
             },
@@ -1020,7 +975,6 @@
               "max_handles": 0,
               "max_out_of_line": 4294967295,
               "has_padding": true,
-              "has_envelope": false,
               "has_flexible_envelope": false
             }
           },
@@ -1047,7 +1001,6 @@
               "max_handles": 0,
               "max_out_of_line": 4294967295,
               "has_padding": true,
-              "has_envelope": false,
               "has_flexible_envelope": false
             }
           },
@@ -1081,7 +1034,6 @@
                 "max_handles": 0,
                 "max_out_of_line": 4294967295,
                 "has_padding": true,
-                "has_envelope": false,
                 "has_flexible_envelope": false
               }
             },
@@ -1098,7 +1050,6 @@
               "max_handles": 0,
               "max_out_of_line": 4294967295,
               "has_padding": true,
-              "has_envelope": false,
               "has_flexible_envelope": false
             }
           },
@@ -1127,7 +1078,6 @@
                 "max_handles": 0,
                 "max_out_of_line": 4294967295,
                 "has_padding": true,
-                "has_envelope": false,
                 "has_flexible_envelope": false
               }
             },
@@ -1144,7 +1094,6 @@
               "max_handles": 0,
               "max_out_of_line": 4294967295,
               "has_padding": true,
-              "has_envelope": false,
               "has_flexible_envelope": false
             }
           },
@@ -1173,7 +1122,6 @@
                 "max_handles": 0,
                 "max_out_of_line": 0,
                 "has_padding": false,
-                "has_envelope": false,
                 "has_flexible_envelope": false
               }
             },
@@ -1191,7 +1139,6 @@
               "max_handles": 0,
               "max_out_of_line": 16,
               "has_padding": false,
-              "has_envelope": false,
               "has_flexible_envelope": false
             }
           },
@@ -1227,7 +1174,6 @@
                   "max_handles": 0,
                   "max_out_of_line": 0,
                   "has_padding": false,
-                  "has_envelope": false,
                   "has_flexible_envelope": false
                 }
               },
@@ -1245,7 +1191,6 @@
                 "max_handles": 0,
                 "max_out_of_line": 16,
                 "has_padding": false,
-                "has_envelope": false,
                 "has_flexible_envelope": false
               }
             },
@@ -1263,7 +1208,6 @@
               "max_handles": 0,
               "max_out_of_line": 96,
               "has_padding": false,
-              "has_envelope": false,
               "has_flexible_envelope": false
             }
           },
@@ -1294,7 +1238,6 @@
                   "max_handles": 0,
                   "max_out_of_line": 0,
                   "has_padding": false,
-                  "has_envelope": false,
                   "has_flexible_envelope": false
                 }
               },
@@ -1312,7 +1255,6 @@
                 "max_handles": 0,
                 "max_out_of_line": 16,
                 "has_padding": false,
-                "has_envelope": false,
                 "has_flexible_envelope": false
               }
             },
@@ -1329,7 +1271,6 @@
               "max_handles": 0,
               "max_out_of_line": 48,
               "has_padding": false,
-              "has_envelope": false,
               "has_flexible_envelope": false
             }
           },
@@ -1358,7 +1299,6 @@
                 "max_handles": 0,
                 "max_out_of_line": 0,
                 "has_padding": false,
-                "has_envelope": false,
                 "has_flexible_envelope": false
               }
             },
@@ -1375,7 +1315,6 @@
               "max_handles": 0,
               "max_out_of_line": 0,
               "has_padding": false,
-              "has_envelope": false,
               "has_flexible_envelope": false
             }
           },
@@ -1411,7 +1350,6 @@
                   "max_handles": 0,
                   "max_out_of_line": 0,
                   "has_padding": false,
-                  "has_envelope": false,
                   "has_flexible_envelope": false
                 }
               },
@@ -1428,7 +1366,6 @@
                 "max_handles": 0,
                 "max_out_of_line": 0,
                 "has_padding": false,
-                "has_envelope": false,
                 "has_flexible_envelope": false
               }
             },
@@ -1446,7 +1383,6 @@
               "max_handles": 0,
               "max_out_of_line": 48,
               "has_padding": false,
-              "has_envelope": false,
               "has_flexible_envelope": false
             }
           },
@@ -1477,7 +1413,6 @@
                   "max_handles": 0,
                   "max_out_of_line": 0,
                   "has_padding": false,
-                  "has_envelope": false,
                   "has_flexible_envelope": false
                 }
               },
@@ -1494,7 +1429,6 @@
                 "max_handles": 0,
                 "max_out_of_line": 0,
                 "has_padding": false,
-                "has_envelope": false,
                 "has_flexible_envelope": false
               }
             },
@@ -1511,7 +1445,6 @@
               "max_handles": 0,
               "max_out_of_line": 0,
               "has_padding": false,
-              "has_envelope": false,
               "has_flexible_envelope": false
             }
           },
@@ -1537,7 +1470,6 @@
         "max_handles": 4294967295,
         "max_out_of_line": 4294967295,
         "has_padding": true,
-        "has_envelope": false,
         "has_flexible_envelope": false
       }
     }

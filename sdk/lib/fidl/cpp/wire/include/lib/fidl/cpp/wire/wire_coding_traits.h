@@ -790,9 +790,8 @@ fit::result<fidl::Error, WireEncoder::Result> WireEncode(
 // In case of success, handle values will be embedded in the decoded bytes; the caller
 // needs to adopt them into a |DecodedValue|.
 // This is the top-level function to call to perform decoding using coding traits.
-fidl::Status WireDecode(::fidl::WireFormatMetadata metadata, bool contains_envelope,
-                        size_t inline_size, TopLevelDecodeFn decode_fn,
-                        ::fidl::EncodedMessage& message);
+fidl::Status WireDecode(::fidl::WireFormatMetadata metadata, size_t inline_size,
+                        TopLevelDecodeFn decode_fn, ::fidl::EncodedMessage& message);
 
 // Checks that the |metadata| is supported.
 fidl::Status EnsureSupportedWireFormat(::fidl::WireFormatMetadata metadata);

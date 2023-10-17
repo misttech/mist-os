@@ -118,7 +118,7 @@ class EncodedMessage {
   friend class IncomingHeaderAndMessage;
   friend class internal::NaturalDecoder;
   friend fidl::Status fidl::internal::WireDecode(::fidl::WireFormatMetadata metadata,
-                                                 bool contains_envelope, size_t inline_size,
+                                                 size_t inline_size,
                                                  ::fidl::internal::TopLevelDecodeFn decode_fn,
                                                  ::fidl::EncodedMessage& message);
 

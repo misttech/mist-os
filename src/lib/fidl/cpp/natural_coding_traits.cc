@@ -8,9 +8,9 @@
 
 namespace fidl::internal {
 
-fidl::Status NaturalDecode(::fidl::WireFormatMetadata metadata, bool contains_envelope,
-                           size_t inline_size, NaturalTopLevelDecodeFn decode_fn,
-                           ::fidl::EncodedMessage& message, void* value) {
+fidl::Status NaturalDecode(::fidl::WireFormatMetadata metadata, size_t inline_size,
+                           NaturalTopLevelDecodeFn decode_fn, ::fidl::EncodedMessage& message,
+                           void* value) {
   if (fidl::Status status = EnsureSupportedWireFormat(metadata); !status.ok()) {
     std::move(message).CloseHandles();
     return status;

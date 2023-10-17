@@ -24,13 +24,11 @@ constexpr uint32_t kResponsePayload = 5678;
 constexpr uint64_t kTwoWayTxid = 100;
 constexpr uint64_t kTwoWayOrdinal = 200;
 
-const struct FidlCodedStruct CodingTableStruct = {
-    .tag = kFidlTypeStruct,
-    .contains_envelope = kFidlContainsEnvelope_DoesNotContainEnvelope,
-    .element_count = 0u,
-    .size_v2 = 8u,
-    .elements = nullptr,
-    .name = "integration/TwoWayMessage"};
+const struct FidlCodedStruct CodingTableStruct = {.tag = kFidlTypeStruct,
+                                                  .element_count = 0u,
+                                                  .size_v2 = 8u,
+                                                  .elements = nullptr,
+                                                  .name = "integration/TwoWayMessage"};
 
 struct TwoWayRequest {
   fidl_message_header_t header;
@@ -49,7 +47,6 @@ struct fidl::TypeTraits<TwoWayRequest> {
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kRequest;
   static constexpr bool kHasFlexibleEnvelope = false;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
 
@@ -80,7 +77,6 @@ struct fidl::TypeTraits<TwoWayResponseBody> {
   static constexpr uint32_t kPrimarySize = 4;
   static constexpr uint32_t kPrimarySizeV1 = 4;
   static constexpr uint32_t kMaxOutOfLineV1 = 0;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
 
@@ -114,7 +110,6 @@ struct fidl::TypeTraits<TwoWayResponse> {
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kResponse;
   static constexpr bool kHasFlexibleEnvelope = false;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
 

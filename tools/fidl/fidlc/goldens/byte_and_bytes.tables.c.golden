@@ -7,5 +7,5 @@ __LOCAL extern const struct FidlCodedStruct test_byteandbytes_ByteAndBytesTable;
 
 
 
-const struct FidlCodedStruct test_byteandbytes_ByteAndBytesTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=1u, .name="test.byteandbytes/ByteAndBytes"};
+const struct FidlCodedStruct test_byteandbytes_ByteAndBytesTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=1u, .name="test.byteandbytes/ByteAndBytes"};
 

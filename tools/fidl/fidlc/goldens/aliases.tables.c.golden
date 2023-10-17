@@ -46,5 +46,5 @@ static const struct FidlStructElement Fields34test_aliases_ExampleOfUseOfAliases
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=80u, .field_type=(fidl_type_t*)(&Handlechannel2147483648nullableTable)}},
     /*FidlStructPadding*/{.padding=/*FidlStructPadding*/{.offset_v2=84u, .header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Padding32,.is_resource=kFidlIsResource_NotResource},.mask_32=4294967295u}}
 };
-const struct FidlCodedStruct test_aliases_ExampleOfUseOfAliasesTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields34test_aliases_ExampleOfUseOfAliases, .element_count=9u, .size_v2=88u, .name="test.aliases/ExampleOfUseOfAliases"};
+const struct FidlCodedStruct test_aliases_ExampleOfUseOfAliasesTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields34test_aliases_ExampleOfUseOfAliases, .element_count=9u, .size_v2=88u, .name="test.aliases/ExampleOfUseOfAliases"};
 

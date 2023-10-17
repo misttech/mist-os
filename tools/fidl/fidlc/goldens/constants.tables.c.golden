@@ -48,5 +48,5 @@ static const struct FidlStructElement Fields21test_constants_Struct[] = {
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=32u, .field_type=(fidl_type_t*)(&test_constants_BitsTable)}},
     /*FidlStructPadding*/{.padding=/*FidlStructPadding*/{.offset_v2=36u, .header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Padding32,.is_resource=kFidlIsResource_NotResource},.mask_32=4294967295u}}
 };
-const struct FidlCodedStruct test_constants_StructTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields21test_constants_Struct, .element_count=6u, .size_v2=40u, .name="test.constants/Struct"};
+const struct FidlCodedStruct test_constants_StructTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields21test_constants_Struct, .element_count=6u, .size_v2=40u, .name="test.constants/Struct"};
 

@@ -329,7 +329,6 @@ struct TypeTraits<::test_driverhandle::ClientEndWrapper> {
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = 4;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
 
@@ -357,7 +356,6 @@ struct TypeTraits<::test_driverhandle::ServerEndWrapper> {
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = 4;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
 
@@ -385,7 +383,6 @@ struct TypeTraits<::test_driverhandle::HandlesInProtocolSendHandlesRequest> {
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 16;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -413,7 +410,6 @@ struct TypeTraits<::test_driverhandle::T> {
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 16;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 

@@ -38,7 +38,6 @@ struct Expected {
   uint32_t max_handles = 0;
   uint32_t depth = 0;
   bool has_padding = false;
-  bool has_envelope = false;
   bool has_flexible_envelope = false;
 };
 
@@ -49,7 +48,6 @@ void CheckTypeShape(const fidl::TypeShape& actual, Expected expected) {
   EXPECT_EQ(expected.max_handles, actual.max_handles);
   EXPECT_EQ(expected.depth, actual.depth);
   EXPECT_EQ(expected.has_padding, actual.has_padding);
-  EXPECT_EQ(expected.has_envelope, actual.has_envelope);
   EXPECT_EQ(expected.has_flexible_envelope, actual.has_flexible_envelope);
 }
 
@@ -226,7 +224,6 @@ type NewUnionOfThings = UnionOfThings;
                                                                 .max_out_of_line = 16,
                                                                 .depth = 2,
                                                                 .has_padding = true,
-                                                                .has_envelope = true,
                                                                 .has_flexible_envelope = true,
                                                             }));
 
@@ -238,7 +235,6 @@ type NewUnionOfThings = UnionOfThings;
                                                    .max_out_of_line = 16,
                                                    .depth = 1,
                                                    .has_padding = true,
-                                                   .has_envelope = true,
                                                }));
 }
 
@@ -434,7 +430,6 @@ type TableWithBoolAndU64 = table {
                                                     .alignment = 8,
                                                     .depth = 1,
                                                     .has_padding = false,
-                                                    .has_envelope = true,
                                                     .has_flexible_envelope = true,
                                                 }));
 
@@ -446,7 +441,6 @@ type TableWithBoolAndU64 = table {
                                                   .max_out_of_line = 8,
                                                   .depth = 2,
                                                   .has_padding = true,
-                                                  .has_envelope = true,
                                                   .has_flexible_envelope = true,
                                               }));
 
@@ -458,7 +452,6 @@ type TableWithBoolAndU64 = table {
                                                    .max_out_of_line = 16,
                                                    .depth = 2,
                                                    .has_padding = true,
-                                                   .has_envelope = true,
                                                    .has_flexible_envelope = true,
                                                }));
 
@@ -470,7 +463,6 @@ type TableWithBoolAndU64 = table {
                                                       .max_out_of_line = 16,
                                                       .depth = 2,
                                                       .has_padding = true,
-                                                      .has_envelope = true,
                                                       .has_flexible_envelope = true,
                                                   }));
 
@@ -482,7 +474,6 @@ type TableWithBoolAndU64 = table {
                                                       .max_out_of_line = 24,
                                                       .depth = 2,
                                                       .has_padding = true,
-                                                      .has_envelope = true,
                                                       .has_flexible_envelope = true,
                                                   }));
 }
@@ -530,7 +521,6 @@ type OneReserved = table {
                                                        .max_out_of_line = 24,
                                                        .depth = 2,
                                                        .has_padding = true,
-                                                       .has_envelope = true,
                                                        .has_flexible_envelope = true,
                                                    }));
 
@@ -542,7 +532,6 @@ type OneReserved = table {
                                                            .max_out_of_line = 24,
                                                            .depth = 2,
                                                            .has_padding = true,
-                                                           .has_envelope = true,
                                                            .has_flexible_envelope = true,
                                                        }));
 
@@ -554,7 +543,6 @@ type OneReserved = table {
                                                        .max_out_of_line = 16,
                                                        .depth = 2,
                                                        .has_padding = true,
-                                                       .has_envelope = true,
                                                        .has_flexible_envelope = true,
                                                    }));
 
@@ -566,7 +554,6 @@ type OneReserved = table {
                                                       .max_out_of_line = 0,
                                                       .depth = 1,
                                                       .has_padding = false,
-                                                      .has_envelope = true,
                                                       .has_flexible_envelope = true,
                                                   }));
 
@@ -578,7 +565,6 @@ type OneReserved = table {
                                                       .max_out_of_line = 0,
                                                       .depth = 1,
                                                       .has_padding = false,
-                                                      .has_envelope = true,
                                                       .has_flexible_envelope = true,
                                                   }));
 }
@@ -605,7 +591,6 @@ type TableWithOneHandle = resource table {
                                                     .max_handles = 1,
                                                     .depth = 2,
                                                     .has_padding = true,
-                                                    .has_envelope = true,
                                                     .has_flexible_envelope = true,
                                                 }));
 }
@@ -776,7 +761,6 @@ type TableWithOptionalTableWithBoolAndU64 = table {
                                                   .max_out_of_line = 8,
                                                   .depth = 2,
                                                   .has_padding = true,
-                                                  .has_envelope = true,
                                                   .has_flexible_envelope = true,
                                               }));
 
@@ -788,7 +772,6 @@ type TableWithOptionalTableWithBoolAndU64 = table {
                                                              .max_out_of_line = 32,
                                                              .depth = 4,
                                                              .has_padding = true,
-                                                             .has_envelope = true,
                                                              .has_flexible_envelope = true,
                                                          }));
 
@@ -800,7 +783,6 @@ type TableWithOptionalTableWithBoolAndU64 = table {
                                                    .max_out_of_line = 8,
                                                    .depth = 2,
                                                    .has_padding = true,
-                                                   .has_envelope = true,
                                                    .has_flexible_envelope = true,
                                                }));
 
@@ -812,7 +794,6 @@ type TableWithOptionalTableWithBoolAndU64 = table {
                                                               .max_out_of_line = 40,
                                                               .depth = 4,
                                                               .has_padding = true,
-                                                              .has_envelope = true,
                                                               .has_flexible_envelope = true,
                                                           }));
 
@@ -824,7 +805,6 @@ type TableWithOptionalTableWithBoolAndU64 = table {
                                                       .max_out_of_line = 16,
                                                       .depth = 2,
                                                       .has_padding = true,
-                                                      .has_envelope = true,
                                                       .has_flexible_envelope = true,
                                                   }));
 
@@ -836,7 +816,6 @@ type TableWithOptionalTableWithBoolAndU64 = table {
                                                                  .max_out_of_line = 40,
                                                                  .depth = 4,
                                                                  .has_padding = true,
-                                                                 .has_envelope = true,
                                                                  .has_flexible_envelope = true,
                                                              }));
 
@@ -848,7 +827,6 @@ type TableWithOptionalTableWithBoolAndU64 = table {
                                                       .max_out_of_line = 24,
                                                       .depth = 2,
                                                       .has_padding = true,
-                                                      .has_envelope = true,
                                                       .has_flexible_envelope = true,
                                                   }));
 
@@ -860,7 +838,6 @@ type TableWithOptionalTableWithBoolAndU64 = table {
                                                                  .max_out_of_line = 48,
                                                                  .depth = 4,
                                                                  .has_padding = true,
-                                                                 .has_envelope = true,
                                                                  .has_flexible_envelope = true,
                                                              }));
 }
@@ -907,7 +884,6 @@ type TableWithOptionalUnion = table {
                                                                 .max_out_of_line = 16,
                                                                 .depth = 2,
                                                                 .has_padding = true,
-                                                                .has_envelope = true,
                                                             }));
 
   auto a_union = test_library.LookupUnion("UnionOfThings");
@@ -918,7 +894,6 @@ type TableWithOptionalUnion = table {
                                                  .max_out_of_line = 16,
                                                  .depth = 1,
                                                  .has_padding = true,
-                                                 .has_envelope = true,
                                              }));
   ASSERT_EQ(a_union->members.size(), 2);
   ASSERT_NOT_NULL(a_union->members[0].maybe_used);
@@ -939,7 +914,6 @@ type TableWithOptionalUnion = table {
                                          .max_out_of_line = 16,
                                          .depth = 1,
                                          .has_padding = true,
-                                         .has_envelope = true,
                                      }));
 
   auto table_with_optional_union = test_library.LookupTable("TableWithOptionalUnion");
@@ -950,7 +924,6 @@ type TableWithOptionalUnion = table {
                                                                    .max_out_of_line = 40,
                                                                    .depth = 3,
                                                                    .has_padding = true,
-                                                                   .has_envelope = true,
                                                                    .has_flexible_envelope = true,
                                                                }));
 }
@@ -985,7 +958,6 @@ type ManyHandleUnion = strict resource union {
                                                           .max_handles = 1,
                                                           .depth = 1,
                                                           .has_padding = true,
-                                                          .has_envelope = true,
                                                       }));
   ASSERT_EQ(one_handle_union->members.size(), 3);
   ASSERT_NOT_NULL(one_handle_union->members[0].maybe_used);
@@ -1013,7 +985,6 @@ type ManyHandleUnion = strict resource union {
                                                            .max_handles = 8,
                                                            .depth = 2,
                                                            .has_padding = true,
-                                                           .has_envelope = true,
                                                        }));
   ASSERT_EQ(many_handle_union->members.size(), 3);
   ASSERT_NOT_NULL(many_handle_union->members[1].maybe_used);
@@ -1060,7 +1031,6 @@ type BoolOverlayStruct = struct {
                                                                .max_out_of_line = 256,
                                                                .depth = 1,
                                                                .has_padding = true,
-                                                               .has_envelope = false,
                                                            }));
   EXPECT_NO_FAILURES(CheckFieldShape(*bool_or_string_or_u64->members[0].maybe_used,
                                      ExpectedField{.offset = 8, .padding = 15}));
@@ -1078,7 +1048,6 @@ type BoolOverlayStruct = struct {
                                                       .max_out_of_line = 0,
                                                       .depth = 0,
                                                       .has_padding = true,
-                                                      .has_envelope = false,
                                                   }));
   EXPECT_NO_FAILURES(CheckFieldShape(*bool_overlay->members[0].maybe_used,
                                      ExpectedField{.offset = 8, .padding = 7}));
@@ -1088,7 +1057,6 @@ type BoolOverlayStruct = struct {
                                                          .max_out_of_line = 0,
                                                          .depth = 0,
                                                          .has_padding = true,
-                                                         .has_envelope = false,
                                                      }));
 
   auto bool_overlay_struct = test_library.LookupStruct("BoolOverlayStruct");
@@ -1183,7 +1151,6 @@ type TableWithUnboundedVectors = table {
                                         .max_out_of_line = 40,
                                         .depth = 3,
                                         .has_padding = true,
-                                        .has_envelope = true,
                                         .has_flexible_envelope = true,
                                     }));
 
@@ -1196,7 +1163,6 @@ type TableWithUnboundedVectors = table {
                                         .max_out_of_line = std::numeric_limits<uint32_t>::max(),
                                         .depth = 3,
                                         .has_padding = true,
-                                        .has_envelope = true,
                                         .has_flexible_envelope = true,
                                     }));
 
@@ -1209,7 +1175,6 @@ type TableWithUnboundedVectors = table {
                                         .max_out_of_line = std::numeric_limits<uint32_t>::max(),
                                         .depth = 3,
                                         .has_padding = true,
-                                        .has_envelope = true,
                                         .has_flexible_envelope = true,
                                     }));
 }
@@ -1308,7 +1273,6 @@ type TableWithHandleStructVector = resource table {
                                         .max_handles = std::numeric_limits<uint32_t>::max(),
                                         .depth = 3,
                                         .has_padding = true,
-                                        .has_envelope = true,
                                         .has_flexible_envelope = true,
                                     }));
 
@@ -1332,7 +1296,6 @@ type TableWithHandleStructVector = resource table {
                                                              .max_handles = 8,
                                                              .depth = 3,
                                                              .has_padding = true,
-                                                             .has_envelope = true,
                                                              .has_flexible_envelope = true,
                                                          }));
 
@@ -1346,7 +1309,6 @@ type TableWithHandleStructVector = resource table {
                                                           .max_handles = 8,
                                                           .depth = 3,
                                                           .has_padding = true,
-                                                          .has_envelope = true,
                                                           .has_flexible_envelope = true,
                                                       }));
 }
@@ -1401,7 +1363,6 @@ type TableWithUnboundedString = table {
                                                                  .max_out_of_line = 32,
                                                                  .depth = 3,
                                                                  .has_padding = true,
-                                                                 .has_envelope = true,
                                                                  .has_flexible_envelope = true,
                                                              }));
 
@@ -1414,7 +1375,6 @@ type TableWithUnboundedString = table {
                                         .max_out_of_line = std::numeric_limits<uint32_t>::max(),
                                         .depth = 3,
                                         .has_padding = true,
-                                        .has_envelope = true,
                                         .has_flexible_envelope = true,
                                     }));
 }
@@ -1478,7 +1438,6 @@ type TableWithAnInt32ArrayNoPadding = table {
                                                              .max_out_of_line = 48,
                                                              .depth = 2,
                                                              .has_padding = false,
-                                                             .has_envelope = true,
                                                              .has_flexible_envelope = true,
                                                          }));
 
@@ -1492,7 +1451,6 @@ type TableWithAnInt32ArrayNoPadding = table {
                                                                  .max_out_of_line = 24,
                                                                  .depth = 2,
                                                                  .has_padding = true,
-                                                                 .has_envelope = true,
                                                                  .has_flexible_envelope = true,
                                                              }));
 
@@ -1506,7 +1464,6 @@ type TableWithAnInt32ArrayNoPadding = table {
                                                                .max_out_of_line = 24,
                                                                .depth = 2,
                                                                .has_padding = false,
-                                                               .has_envelope = true,
                                                                .has_flexible_envelope = true,
                                                            }));
 }
@@ -1553,7 +1510,6 @@ type TableWithNullableHandleArray = resource table {
                                                                  .max_handles = 8,
                                                                  .depth = 2,
                                                                  .has_padding = false,
-                                                                 .has_envelope = true,
                                                                  .has_flexible_envelope = true,
                                                              }));
 
@@ -1575,7 +1531,6 @@ type TableWithNullableHandleArray = resource table {
                                                            .max_handles = 8,
                                                            .depth = 2,
                                                            .has_padding = false,
-                                                           .has_envelope = true,
                                                            .has_flexible_envelope = true,
                                                        }));
 }
@@ -1634,7 +1589,6 @@ type PaddingCheck = flexible union {
                                                   .max_out_of_line = 0,
                                                   .depth = 1,
                                                   .has_padding = true,
-                                                  .has_envelope = true,
                                                   .has_flexible_envelope = true,
                                               }));
   ASSERT_EQ(one_bool->members.size(), 1);
@@ -1650,7 +1604,6 @@ type PaddingCheck = flexible union {
                                                       .max_out_of_line = 0,
                                                       .depth = 1,
                                                       .has_padding = true,
-                                                      .has_envelope = true,
                                                       .has_flexible_envelope = true,
                                                   }));
 
@@ -1662,7 +1615,6 @@ type PaddingCheck = flexible union {
                                             .max_out_of_line = 256,
                                             .depth = 3,
                                             .has_padding = true,
-                                            .has_envelope = true,
                                             .has_flexible_envelope = true,
                                         }));
 
@@ -1675,7 +1627,6 @@ type PaddingCheck = flexible union {
                                     .max_out_of_line = std::numeric_limits<uint32_t>::max(),
                                     .depth = 2,
                                     .has_padding = true,
-                                    .has_envelope = true,
                                     .has_flexible_envelope = true,
                                 }));
 
@@ -1691,7 +1642,6 @@ type PaddingCheck = flexible union {
                                  // TODO(fxbug.dev/7970): increase the ordinal size to 64 bits, such
                                  // that there is no padding.
                                  .has_padding = true,
-                                 .has_envelope = true,
                                  .has_flexible_envelope = true,
                              }));
 
@@ -1703,7 +1653,6 @@ type PaddingCheck = flexible union {
                                                        .max_out_of_line = 8,
                                                        .depth = 1,
                                                        .has_padding = true,
-                                                       .has_envelope = true,
                                                        .has_flexible_envelope = true,
                                                    }));
   ASSERT_EQ(padding_check->members.size(), 2);
@@ -1757,7 +1706,6 @@ type StrictUnionOfFlexibleTable = strict union {
                                                       .max_out_of_line = 8,
                                                       .depth = 1,
                                                       .has_padding = true,
-                                                      .has_envelope = true,
                                                   }));
 
   auto flexible_union = test_library.LookupUnion("FlexibleLeafUnion");
@@ -1768,7 +1716,6 @@ type StrictUnionOfFlexibleTable = strict union {
                                                         .max_out_of_line = 8,
                                                         .depth = 1,
                                                         .has_padding = true,
-                                                        .has_envelope = true,
                                                         .has_flexible_envelope = true,
                                                     }));
 
@@ -1780,7 +1727,6 @@ type StrictUnionOfFlexibleTable = strict union {
                                                             .max_out_of_line = 24,
                                                             .depth = 2,
                                                             .has_padding = true,
-                                                            .has_envelope = true,
                                                             .has_flexible_envelope = true,
                                                         }));
 
@@ -1792,7 +1738,6 @@ type StrictUnionOfFlexibleTable = strict union {
                                                               .max_out_of_line = 24,
                                                               .depth = 2,
                                                               .has_padding = true,
-                                                              .has_envelope = true,
                                                               .has_flexible_envelope = true,
                                                           }));
 
@@ -1804,7 +1749,6 @@ type StrictUnionOfFlexibleTable = strict union {
                                                           .max_out_of_line = 24,
                                                           .depth = 2,
                                                           .has_padding = true,
-                                                          .has_envelope = true,
                                                       }));
 
   auto strict_of_flexible = test_library.LookupUnion("StrictUnionOfFlexibleUnion");
@@ -1815,7 +1759,6 @@ type StrictUnionOfFlexibleTable = strict union {
                                                             .max_out_of_line = 24,
                                                             .depth = 2,
                                                             .has_padding = true,
-                                                            .has_envelope = true,
                                                             .has_flexible_envelope = true,
                                                         }));
 
@@ -1827,7 +1770,6 @@ type StrictUnionOfFlexibleTable = strict union {
                                                         .max_out_of_line = 0,
                                                         .depth = 1,
                                                         .has_padding = false,
-                                                        .has_envelope = true,
                                                         .has_flexible_envelope = true,
                                                     }));
 
@@ -1840,7 +1782,6 @@ type StrictUnionOfFlexibleTable = strict union {
                                                          .max_out_of_line = 16,
                                                          .depth = 2,
                                                          .has_padding = true,
-                                                         .has_envelope = true,
                                                          .has_flexible_envelope = true,
                                                      }));
 }
@@ -2555,7 +2496,6 @@ type Sandwich = struct {
                                                   .max_handles = 0,
                                                   .depth = 1,
                                                   .has_padding = true,
-                                                  .has_envelope = true,
                                               }));
   ASSERT_EQ(sandwich->members.size(), 3);
   ASSERT_NO_FAILURES(CheckFieldShape(sandwich->members[0],  // before
@@ -2599,7 +2539,6 @@ type Sandwich = struct {
                                                   .max_handles = 0,
                                                   .depth = 1,
                                                   .has_padding = true,
-                                                  .has_envelope = true,
                                               }));
   ASSERT_EQ(sandwich->members.size(), 3);
   ASSERT_NO_FAILURES(CheckFieldShape(sandwich->members[0],  // before
@@ -2648,7 +2587,6 @@ type Sandwich = struct {
                                                   .max_handles = 0,
                                                   .depth = 1,
                                                   .has_padding = true,
-                                                  .has_envelope = true,
                                               }));
   ASSERT_EQ(sandwich->members.size(), 3);
   ASSERT_NO_FAILURES(CheckFieldShape(sandwich->members[0],  // before
@@ -2692,7 +2630,6 @@ type Sandwich = struct {
                                                   .max_handles = 0,
                                                   .depth = 1,
                                                   .has_padding = true,
-                                                  .has_envelope = true,
                                               }));
   ASSERT_EQ(sandwich->members.size(), 3);
   ASSERT_NO_FAILURES(CheckFieldShape(sandwich->members[0],  // before

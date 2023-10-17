@@ -365,11 +365,9 @@ template <typename FidlType>
     EncodedMessage message, WireFormatMetadata metadata) {
   static_assert(IsFidlType<FidlType>::value, "Only FIDL types are supported");
 
-  bool contains_envelope = TypeTraits<FidlType>::kHasEnvelope;
   size_t inline_size = internal::TopLevelCodingTraits<FidlType>::inline_size;
   const internal::TopLevelDecodeFn decode_fn = internal::MakeTopLevelDecodeFn<FidlType>();
-  const Status status =
-      internal::WireDecode(metadata, contains_envelope, inline_size, decode_fn, message);
+  const Status status = internal::WireDecode(metadata, inline_size, decode_fn, message);
 
   if (!status.ok()) {
     return ::fit::error(status);

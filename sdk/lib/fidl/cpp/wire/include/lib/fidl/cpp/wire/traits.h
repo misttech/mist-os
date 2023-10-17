@@ -125,8 +125,6 @@ struct IsResource : public std::false_type {
 //                        unbounded.
 // |kHasFlexibleEnvelope| is a bool specifying if this message contains a
 //                        flexible union or a flexible table.
-// |kHasEnvelope|         is a boolean specifying if the structure contains
-//                        envelopes.
 // |kHasPointer|          is a boolean specifying if the structure contains
 //                        pointer indirections, hence requires linearization
 //                        when sending.

@@ -604,7 +604,6 @@ struct TypeTraits<::test_requestflexibleenvelope::ProtocolRequestStrictResponseF
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 4294967295;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -626,7 +625,6 @@ struct TypeTraits<::test_requestflexibleenvelope::ProtocolRequestStrictResponseF
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 4294967295;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -648,7 +646,6 @@ struct TypeTraits<::test_requestflexibleenvelope::ProtocolRequestFlexibleRespons
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 4294967295;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -670,7 +667,6 @@ struct TypeTraits<::test_requestflexibleenvelope::ProtocolRequestFlexibleRespons
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 4294967295;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -692,7 +688,6 @@ struct TypeTraits<::test_requestflexibleenvelope::FlexibleFoo> {
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 4294967295;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -714,7 +709,6 @@ struct TypeTraits<::test_requestflexibleenvelope::StrictFoo> {
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 4294967295;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 

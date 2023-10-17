@@ -93,7 +93,6 @@ type Vectors = struct {
   ASSERT_TRUE(type_some_struct_struct->is_empty);
   ASSERT_EQ(0, type_some_struct_struct->elements.size());
   EXPECT_STREQ("example/SomeStruct", type_some_struct_struct->qname.c_str());
-  EXPECT_FALSE(type_some_struct_struct->contains_envelope);
   EXPECT_NULL(type_some_struct_struct->maybe_reference_type);
   EXPECT_EQ(1, type_some_struct_struct->size_v2);
 
@@ -241,7 +240,6 @@ protocol UseOfProtocol {
   EXPECT_EQ(4, type2->size_v2);
   ASSERT_EQ(fidl::coded::Type::Kind::kStruct, type2->kind);
   auto type2_message = static_cast<const fidl::coded::StructType*>(type2);
-  EXPECT_FALSE(type2_message->contains_envelope);
   EXPECT_STREQ("example/UseOfProtocolCallRequestMessage", type2_message->qname.c_str());
   EXPECT_EQ(1, type2_message->elements.size());
   EXPECT_EQ(0, field(type2_message->elements.at(0)).offset_v2);
@@ -257,7 +255,6 @@ protocol UseOfProtocol {
   ASSERT_EQ(fidl::coded::Type::Kind::kStruct, type_named_payload->kind);
   auto type_named_payload_message = static_cast<const fidl::coded::StructType*>(type_named_payload);
   ASSERT_FALSE(type_named_payload_message->is_empty);
-  EXPECT_FALSE(type_named_payload_message->contains_envelope);
   EXPECT_NULL(type_named_payload_message->maybe_reference_type);
   EXPECT_STREQ("example/OnReceivePayload", type_named_payload_message->qname.c_str());
   ASSERT_EQ(1, type_named_payload_message->elements.size());
@@ -325,7 +322,6 @@ protocol UseOfProtocol {
   ASSERT_EQ(fidl::coded::Type::Kind::kStruct, type_anon_payload->kind);
   auto type_anon_payload_message = static_cast<const fidl::coded::StructType*>(type_anon_payload);
   ASSERT_FALSE(type_anon_payload_message->is_empty);
-  EXPECT_FALSE(type_anon_payload_message->contains_envelope);
   EXPECT_NULL(type_anon_payload_message->maybe_reference_type);
   EXPECT_STREQ("example/UseOfProtocol_Method_Response", type_anon_payload_message->qname.c_str());
   ASSERT_EQ(1, type_anon_payload_message->elements.size());
@@ -358,8 +354,6 @@ protocol ErrorSyntaxProtocol {
   EXPECT_STREQ("example_ErrorSyntaxProtocolErrorSyntaxMethodResponseMessage",
                type2->coded_name.c_str());
   EXPECT_EQ(16, type2->size_v2);
-  auto type2_message = static_cast<const fidl::coded::StructType*>(type2);
-  EXPECT_TRUE(type2_message->contains_envelope);
 }
 
 TEST(CodedTypesGeneratorTests, GoodCodedTypesOfProtocolEnds) {
@@ -402,7 +396,6 @@ protocol UseOfProtocolEnds {
   EXPECT_EQ(4, type1->size_v2);
   ASSERT_EQ(fidl::coded::Type::Kind::kStruct, type1->kind);
   auto type1_message = static_cast<const fidl::coded::StructType*>(type1);
-  EXPECT_FALSE(type1_message->contains_envelope);
   EXPECT_STREQ("example/UseOfProtocolEndsClientEndsRequestMessage", type1_message->qname.c_str());
   EXPECT_EQ(1, type1_message->elements.size());
   EXPECT_EQ(0, field(type1_message->elements.at(0)).offset_v2);
@@ -424,7 +417,6 @@ protocol UseOfProtocolEnds {
   EXPECT_EQ(4, type3->size_v2);
   ASSERT_EQ(fidl::coded::Type::Kind::kStruct, type3->kind);
   auto type3_message = static_cast<const fidl::coded::StructType*>(type3);
-  EXPECT_FALSE(type3_message->contains_envelope);
   EXPECT_STREQ("example/UseOfProtocolEndsClientEndsResponseMessage", type3_message->qname.c_str());
   EXPECT_EQ(1, type3_message->elements.size());
   EXPECT_EQ(0, field(type3_message->elements.at(0)).offset_v2);
@@ -446,7 +438,6 @@ protocol UseOfProtocolEnds {
   EXPECT_EQ(4, type5->size_v2);
   ASSERT_EQ(fidl::coded::Type::Kind::kStruct, type5->kind);
   auto type5_message = static_cast<const fidl::coded::StructType*>(type5);
-  EXPECT_FALSE(type5_message->contains_envelope);
   EXPECT_STREQ("example/UseOfProtocolEndsServerEndsRequestMessage", type5_message->qname.c_str());
   EXPECT_EQ(1, type5_message->elements.size());
   EXPECT_EQ(0, field(type5_message->elements.at(0)).offset_v2);
@@ -468,7 +459,6 @@ protocol UseOfProtocolEnds {
   EXPECT_EQ(4, type7->size_v2);
   ASSERT_EQ(fidl::coded::Type::Kind::kStruct, type7->kind);
   auto type7_message = static_cast<const fidl::coded::StructType*>(type7);
-  EXPECT_FALSE(type7_message->contains_envelope);
   EXPECT_STREQ("example/UseOfProtocolEndsServerEndsResponseMessage", type7_message->qname.c_str());
   EXPECT_EQ(1, type7_message->elements.size());
   EXPECT_EQ(0, field(type7_message->elements.at(0)).offset_v2);
@@ -546,7 +536,6 @@ type MyUnionStruct = struct {
   ASSERT_EQ(fidl::coded::Type::Kind::kStruct, struct_type->kind);
   auto struct_type_struct = static_cast<const fidl::coded::StructType*>(struct_type);
   ASSERT_FALSE(struct_type_struct->is_empty);
-  EXPECT_TRUE(struct_type_struct->contains_envelope);
 }
 
 // The code between |CodedTypesOfUnions| and |CodedTypesOfNullableUnions| is now very similar
@@ -1359,7 +1348,6 @@ protocol UseOfProtocol {
   ASSERT_EQ(fidl::coded::Type::Kind::kStruct, anon_payload->kind);
   auto anon_payload_message = static_cast<const fidl::coded::StructType*>(anon_payload);
   ASSERT_FALSE(anon_payload_message->is_empty);
-  EXPECT_FALSE(anon_payload_message->contains_envelope);
   EXPECT_NULL(anon_payload_message->maybe_reference_type);
   EXPECT_STREQ("example/UseOfProtocolCallRequestMessage", anon_payload_message->qname.c_str());
   ASSERT_EQ(2, anon_payload_message->elements.size());
@@ -1376,7 +1364,6 @@ protocol UseOfProtocol {
   ASSERT_EQ(fidl::coded::Type::Kind::kStruct, type_named_payload->kind);
   auto type_named_payload_message = static_cast<const fidl::coded::StructType*>(type_named_payload);
   ASSERT_FALSE(type_named_payload_message->is_empty);
-  EXPECT_FALSE(type_named_payload_message->contains_envelope);
   EXPECT_NULL(type_named_payload_message->maybe_reference_type);
   EXPECT_STREQ("example/OnReceivePayload", type_named_payload_message->qname.c_str());
   EXPECT_EQ(1, type_named_payload_message->elements.size());
@@ -1438,7 +1425,6 @@ protocol UseOfProtocol {
   ASSERT_EQ(fidl::coded::Type::Kind::kStruct, type_anon_payload->kind);
   auto type_anon_payload_message = static_cast<const fidl::coded::StructType*>(type_anon_payload);
   ASSERT_FALSE(type_anon_payload_message->is_empty);
-  EXPECT_FALSE(type_anon_payload_message->contains_envelope);
   EXPECT_NULL(type_anon_payload_message->maybe_reference_type);
   EXPECT_STREQ("example/UseOfProtocol_Method_Response", type_anon_payload_message->qname.c_str());
   ASSERT_EQ(2, type_anon_payload_message->elements.size());

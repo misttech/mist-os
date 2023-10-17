@@ -633,7 +633,6 @@ struct TypeTraits<::test_encapsulatedstructs::Int8Int32> {
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = 8;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
 
@@ -655,7 +654,6 @@ struct TypeTraits<::test_encapsulatedstructs::Int16Int8> {
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = 4;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
 
@@ -677,7 +675,6 @@ struct TypeTraits<::test_encapsulatedstructs::ArrayInt16Int8> {
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = 12;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
 
@@ -699,7 +696,6 @@ struct TypeTraits<::test_encapsulatedstructs::StructPaddingTestStruct> {
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = 24;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
 
@@ -725,7 +721,6 @@ struct TypeTraits<::test_encapsulatedstructs::NonInlineStructTestStruct> {
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 8;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = true;
 };
 
@@ -753,7 +748,6 @@ struct TypeTraits<::test_encapsulatedstructs::TopLevelStruct> {
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 40;
   static constexpr uint32_t kMaxOutOfLine = 8;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = true;
 };
 

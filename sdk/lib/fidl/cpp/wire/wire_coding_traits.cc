@@ -63,9 +63,8 @@ fit::result<fidl::Error, WireEncoder::Result> WireEncode(
   return encoder.Finish();
 }
 
-fidl::Status WireDecode(::fidl::WireFormatMetadata metadata, bool contains_envelope,
-                        size_t inline_size, TopLevelDecodeFn decode_fn,
-                        ::fidl::EncodedMessage& message) {
+fidl::Status WireDecode(::fidl::WireFormatMetadata metadata, size_t inline_size,
+                        TopLevelDecodeFn decode_fn, ::fidl::EncodedMessage& message) {
   if (fidl::Status status = EnsureSupportedWireFormat(metadata); !status.ok()) {
     std::move(message).CloseHandles();
     return status;

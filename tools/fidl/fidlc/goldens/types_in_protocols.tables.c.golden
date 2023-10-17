@@ -202,7 +202,7 @@ static const struct FidlStructElement Fields36test_typesinprotocols_VectorOption
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=32u, .field_type=(fidl_type_t*)(&Vector4294967295nullable28test_typesinprotocols_StructTable)}},
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=48u, .field_type=(fidl_type_t*)(&Vector4294967295nullable37Pointer28test_typesinprotocols_StructTable)}}
 };
-const struct FidlCodedStruct test_typesinprotocols_VectorOptionalTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields36test_typesinprotocols_VectorOptional, .element_count=4u, .size_v2=64u, .name="test.typesinprotocols/VectorOptional"};
+const struct FidlCodedStruct test_typesinprotocols_VectorOptionalTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields36test_typesinprotocols_VectorOptional, .element_count=4u, .size_v2=64u, .name="test.typesinprotocols/VectorOptional"};
 
 static const struct FidlUnionField Fields57test_typesinprotocols_Protocol_ErrorVectorOptional_Result[] = {
     /*FidlUnionField*/{.type=(fidl_type_t*)(&test_typesinprotocols_VectorOptionalTable)},
@@ -228,7 +228,7 @@ static const struct FidlStructElement Fields33test_typesinprotocols_VectorBasic[
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=160u, .field_type=(fidl_type_t*)(&Vector4294967295nonnullable27String4294967295nonnullableTable)}},
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=176u, .field_type=(fidl_type_t*)(&Vector4294967295nonnullable24String4294967295nullableTable)}}
 };
-const struct FidlCodedStruct test_typesinprotocols_VectorBasicTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields33test_typesinprotocols_VectorBasic, .element_count=12u, .size_v2=192u, .name="test.typesinprotocols/VectorBasic"};
+const struct FidlCodedStruct test_typesinprotocols_VectorBasicTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields33test_typesinprotocols_VectorBasic, .element_count=12u, .size_v2=192u, .name="test.typesinprotocols/VectorBasic"};
 
 static const struct FidlUnionField Fields54test_typesinprotocols_Protocol_ErrorVectorBasic_Result[] = {
     /*FidlUnionField*/{.type=(fidl_type_t*)(&test_typesinprotocols_VectorBasicTable)},
@@ -250,7 +250,7 @@ static const struct FidlUnionField Fields38test_typesinprotocols_UnionNullableRe
 const struct FidlCodedUnion test_typesinprotocols_UnionNullableRefTable = {.tag=kFidlTypeUnion, .field_count=1u, .fields=Fields38test_typesinprotocols_UnionNullableRef, .nullable=kFidlNullability_Nullable, .name="test.typesinprotocols/Union", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_NotResource};
 const struct FidlCodedTable test_typesinprotocols_TableTable = {.tag=kFidlTypeTable, .fields=NULL, .field_count=0u, .is_resource=kFidlIsResource_NotResource, .name="test.typesinprotocols/Table"};
 
-const struct FidlCodedStruct test_typesinprotocols_StructTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsEmpty, .elements=NULL, .element_count=0u, .size_v2=1u, .name="test.typesinprotocols/Struct"};
+const struct FidlCodedStruct test_typesinprotocols_StructTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsEmpty, .elements=NULL, .element_count=0u, .size_v2=1u, .name="test.typesinprotocols/Struct"};
 
 static const struct FidlUnionField Fields35test_typesinprotocols_ResourceUnion[] = {
     /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kBoolTable)}
@@ -262,7 +262,7 @@ static const struct FidlUnionField Fields46test_typesinprotocols_ResourceUnionNu
 const struct FidlCodedUnion test_typesinprotocols_ResourceUnionNullableRefTable = {.tag=kFidlTypeUnion, .field_count=1u, .fields=Fields46test_typesinprotocols_ResourceUnionNullableRef, .nullable=kFidlNullability_Nullable, .name="test.typesinprotocols/ResourceUnion", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_Resource};
 const struct FidlCodedTable test_typesinprotocols_ResourceTableTable = {.tag=kFidlTypeTable, .fields=NULL, .field_count=0u, .is_resource=kFidlIsResource_Resource, .name="test.typesinprotocols/ResourceTable"};
 
-const struct FidlCodedStruct test_typesinprotocols_ResourceStructTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsEmpty, .elements=NULL, .element_count=0u, .size_v2=1u, .name="test.typesinprotocols/ResourceStruct"};
+const struct FidlCodedStruct test_typesinprotocols_ResourceStructTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsEmpty, .elements=NULL, .element_count=0u, .size_v2=1u, .name="test.typesinprotocols/ResourceStruct"};
 
 static const struct FidlStructElement Fields30test_typesinprotocols_Resource[] = {
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=0u, .field_type=(fidl_type_t*)(&Handlehandle2147483648nonnullableTable)}},
@@ -293,7 +293,7 @@ static const struct FidlStructElement Fields30test_typesinprotocols_Resource[] =
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=424u, .field_type=(fidl_type_t*)(&Vector4294967295nonnullable35test_typesinprotocols_ResourceTableTable)}},
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=440u, .field_type=(fidl_type_t*)(&Vector4294967295nonnullable35test_typesinprotocols_ResourceUnionTable)}}
 };
-const struct FidlCodedStruct test_typesinprotocols_ResourceTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields30test_typesinprotocols_Resource, .element_count=27u, .size_v2=456u, .name="test.typesinprotocols/Resource"};
+const struct FidlCodedStruct test_typesinprotocols_ResourceTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields30test_typesinprotocols_Resource, .element_count=27u, .size_v2=456u, .name="test.typesinprotocols/Resource"};
 
 static const struct FidlUnionField Fields51test_typesinprotocols_Protocol_ErrorResource_Result[] = {
     /*FidlUnionField*/{.type=(fidl_type_t*)(&test_typesinprotocols_ResourceTable)},
@@ -318,7 +318,7 @@ static const struct FidlStructElement Fields36test_typesinprotocols_VectorCompou
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=80u, .field_type=(fidl_type_t*)(&Vector4294967295nonnullable37Pointer28test_typesinprotocols_StructTable)}},
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=96u, .field_type=(fidl_type_t*)(&Vector4294967295nonnullable38test_typesinprotocols_UnionNullableRefTable)}}
 };
-const struct FidlCodedStruct test_typesinprotocols_VectorCompoundTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields36test_typesinprotocols_VectorCompound, .element_count=7u, .size_v2=112u, .name="test.typesinprotocols/VectorCompound"};
+const struct FidlCodedStruct test_typesinprotocols_VectorCompoundTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields36test_typesinprotocols_VectorCompound, .element_count=7u, .size_v2=112u, .name="test.typesinprotocols/VectorCompound"};
 
 static const struct FidlUnionField Fields57test_typesinprotocols_Protocol_ErrorVectorCompound_Result[] = {
     /*FidlUnionField*/{.type=(fidl_type_t*)(&test_typesinprotocols_VectorCompoundTable)},
@@ -339,7 +339,7 @@ static const struct FidlStructElement Fields30test_typesinprotocols_Compound[] =
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=48u, .field_type=(fidl_type_t*)(&Pointer28test_typesinprotocols_StructTable)}},
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=56u, .field_type=(fidl_type_t*)(&test_typesinprotocols_UnionNullableRefTable)}}
 };
-const struct FidlCodedStruct test_typesinprotocols_CompoundTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields30test_typesinprotocols_Compound, .element_count=7u, .size_v2=72u, .name="test.typesinprotocols/Compound"};
+const struct FidlCodedStruct test_typesinprotocols_CompoundTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields30test_typesinprotocols_Compound, .element_count=7u, .size_v2=72u, .name="test.typesinprotocols/Compound"};
 
 static const struct FidlUnionField Fields51test_typesinprotocols_Protocol_ErrorCompound_Result[] = {
     /*FidlUnionField*/{.type=(fidl_type_t*)(&test_typesinprotocols_CompoundTable)},
@@ -360,7 +360,7 @@ static const struct FidlStructElement Fields35test_typesinprotocols_ArrayCompoun
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=208u, .field_type=(fidl_type_t*)(&Array40_37Pointer28test_typesinprotocols_StructTable)}},
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=248u, .field_type=(fidl_type_t*)(&Array80_38test_typesinprotocols_UnionNullableRefTable)}}
 };
-const struct FidlCodedStruct test_typesinprotocols_ArrayCompoundTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields35test_typesinprotocols_ArrayCompound, .element_count=7u, .size_v2=328u, .name="test.typesinprotocols/ArrayCompound"};
+const struct FidlCodedStruct test_typesinprotocols_ArrayCompoundTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields35test_typesinprotocols_ArrayCompound, .element_count=7u, .size_v2=328u, .name="test.typesinprotocols/ArrayCompound"};
 
 static const struct FidlUnionField Fields56test_typesinprotocols_Protocol_ErrorArrayCompound_Result[] = {
     /*FidlUnionField*/{.type=(fidl_type_t*)(&test_typesinprotocols_ArrayCompoundTable)},
@@ -379,7 +379,7 @@ static const struct FidlStructElement Fields27test_typesinprotocols_Basic[] = {
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=48u, .field_type=(fidl_type_t*)(&String4294967295nonnullableTable)}},
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=64u, .field_type=(fidl_type_t*)(&String4294967295nullableTable)}}
 };
-const struct FidlCodedStruct test_typesinprotocols_BasicTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields27test_typesinprotocols_Basic, .element_count=5u, .size_v2=80u, .name="test.typesinprotocols/Basic"};
+const struct FidlCodedStruct test_typesinprotocols_BasicTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields27test_typesinprotocols_Basic, .element_count=5u, .size_v2=80u, .name="test.typesinprotocols/Basic"};
 
 static const struct FidlUnionField Fields48test_typesinprotocols_Protocol_ErrorBasic_Result[] = {
     /*FidlUnionField*/{.type=(fidl_type_t*)(&test_typesinprotocols_BasicTable)},
@@ -397,7 +397,7 @@ static const struct FidlStructElement Fields39test_typesinprotocols_ArrayVectorN
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=112u, .field_type=(fidl_type_t*)(&Vector4294967295nonnullable13Array5_5uint8Table)}},
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=128u, .field_type=(fidl_type_t*)(&Vector4294967295nonnullable33Vector4294967295nonnullable5uint8Table)}}
 };
-const struct FidlCodedStruct test_typesinprotocols_ArrayVectorNestedTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields39test_typesinprotocols_ArrayVectorNested, .element_count=4u, .size_v2=144u, .name="test.typesinprotocols/ArrayVectorNested"};
+const struct FidlCodedStruct test_typesinprotocols_ArrayVectorNestedTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields39test_typesinprotocols_ArrayVectorNested, .element_count=4u, .size_v2=144u, .name="test.typesinprotocols/ArrayVectorNested"};
 
 static const struct FidlUnionField Fields60test_typesinprotocols_Protocol_ErrorArrayVectorNested_Result[] = {
     /*FidlUnionField*/{.type=(fidl_type_t*)(&test_typesinprotocols_ArrayVectorNestedTable)},
@@ -418,7 +418,7 @@ static const struct FidlStructElement Fields32test_typesinprotocols_ArrayBasic[]
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=224u, .field_type=(fidl_type_t*)(&Array80_27String4294967295nonnullableTable)}},
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=304u, .field_type=(fidl_type_t*)(&Array80_24String4294967295nullableTable)}}
 };
-const struct FidlCodedStruct test_typesinprotocols_ArrayBasicTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields32test_typesinprotocols_ArrayBasic, .element_count=7u, .size_v2=384u, .name="test.typesinprotocols/ArrayBasic"};
+const struct FidlCodedStruct test_typesinprotocols_ArrayBasicTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields32test_typesinprotocols_ArrayBasic, .element_count=7u, .size_v2=384u, .name="test.typesinprotocols/ArrayBasic"};
 
 static const struct FidlUnionField Fields53test_typesinprotocols_Protocol_ErrorArrayBasic_Result[] = {
     /*FidlUnionField*/{.type=(fidl_type_t*)(&test_typesinprotocols_ArrayBasicTable)},

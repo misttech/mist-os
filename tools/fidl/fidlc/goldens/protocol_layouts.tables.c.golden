@@ -103,9 +103,9 @@ __LOCAL extern const struct FidlCodedUnion test_protocollayouts_MainProtocolOnAn
 
 
 
-const struct FidlCodedStruct test_protocollayouts_OpenProtocolFlexibleOneWayRequestMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=4u, .name="test.protocollayouts/OpenProtocolFlexibleOneWayRequestMessage"};
+const struct FidlCodedStruct test_protocollayouts_OpenProtocolFlexibleOneWayRequestMessageTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=4u, .name="test.protocollayouts/OpenProtocolFlexibleOneWayRequestMessage"};
 
-const struct FidlCodedStruct test_protocollayouts_OpenProtocolFlexibleTwoWayNoErrorRequestMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=4u, .name="test.protocollayouts/OpenProtocolFlexibleTwoWayNoErrorRequestMessage"};
+const struct FidlCodedStruct test_protocollayouts_OpenProtocolFlexibleTwoWayNoErrorRequestMessageTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=4u, .name="test.protocollayouts/OpenProtocolFlexibleTwoWayNoErrorRequestMessage"};
 
 static const struct FidlUnionField Fields69test_protocollayouts_OpenProtocolFlexibleTwoWayNoErrorResponseMessage[] = {
     /*FidlUnionField*/{.type=(fidl_type_t*)(&test_protocollayouts_imported_ComposedOpenProtocol_FlexibleTwoWayNoError_ResponseTable)},
@@ -113,7 +113,7 @@ static const struct FidlUnionField Fields69test_protocollayouts_OpenProtocolFlex
     /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kTransportErrTable)}
 };
 const struct FidlCodedUnion test_protocollayouts_OpenProtocolFlexibleTwoWayNoErrorResponseMessageTable = {.tag=kFidlTypeUnion, .field_count=3u, .fields=Fields69test_protocollayouts_OpenProtocolFlexibleTwoWayNoErrorResponseMessage, .nullable=kFidlNullability_Nonnullable, .name="test.protocollayouts/OpenProtocolFlexibleTwoWayNoErrorResponseMessage", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-const struct FidlCodedStruct test_protocollayouts_OpenProtocolFlexibleTwoWayWithErrorRequestMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=4u, .name="test.protocollayouts/OpenProtocolFlexibleTwoWayWithErrorRequestMessage"};
+const struct FidlCodedStruct test_protocollayouts_OpenProtocolFlexibleTwoWayWithErrorRequestMessageTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=4u, .name="test.protocollayouts/OpenProtocolFlexibleTwoWayWithErrorRequestMessage"};
 
 static const struct FidlUnionField Fields71test_protocollayouts_OpenProtocolFlexibleTwoWayWithErrorResponseMessage[] = {
     /*FidlUnionField*/{.type=(fidl_type_t*)(&test_protocollayouts_imported_ComposedOpenProtocol_FlexibleTwoWayWithError_ResponseTable)},
@@ -121,22 +121,22 @@ static const struct FidlUnionField Fields71test_protocollayouts_OpenProtocolFlex
     /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kTransportErrTable)}
 };
 const struct FidlCodedUnion test_protocollayouts_OpenProtocolFlexibleTwoWayWithErrorResponseMessageTable = {.tag=kFidlTypeUnion, .field_count=3u, .fields=Fields71test_protocollayouts_OpenProtocolFlexibleTwoWayWithErrorResponseMessage, .nullable=kFidlNullability_Nonnullable, .name="test.protocollayouts/OpenProtocolFlexibleTwoWayWithErrorResponseMessage", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-const struct FidlCodedStruct test_protocollayouts_OpenProtocolFlexibleEventEventMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=4u, .name="test.protocollayouts/OpenProtocolFlexibleEventEventMessage"};
+const struct FidlCodedStruct test_protocollayouts_OpenProtocolFlexibleEventEventMessageTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=4u, .name="test.protocollayouts/OpenProtocolFlexibleEventEventMessage"};
 
-const struct FidlCodedStruct test_protocollayouts_OpenProtocolStrictOneWayRequestMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=4u, .name="test.protocollayouts/OpenProtocolStrictOneWayRequestMessage"};
+const struct FidlCodedStruct test_protocollayouts_OpenProtocolStrictOneWayRequestMessageTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=4u, .name="test.protocollayouts/OpenProtocolStrictOneWayRequestMessage"};
 
-const struct FidlCodedStruct test_protocollayouts_OpenProtocolStrictTwoWayNoErrorRequestMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=4u, .name="test.protocollayouts/OpenProtocolStrictTwoWayNoErrorRequestMessage"};
+const struct FidlCodedStruct test_protocollayouts_OpenProtocolStrictTwoWayNoErrorRequestMessageTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=4u, .name="test.protocollayouts/OpenProtocolStrictTwoWayNoErrorRequestMessage"};
 
-const struct FidlCodedStruct test_protocollayouts_OpenProtocolStrictTwoWayNoErrorResponseMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=4u, .name="test.protocollayouts/OpenProtocolStrictTwoWayNoErrorResponseMessage"};
+const struct FidlCodedStruct test_protocollayouts_OpenProtocolStrictTwoWayNoErrorResponseMessageTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=4u, .name="test.protocollayouts/OpenProtocolStrictTwoWayNoErrorResponseMessage"};
 
-const struct FidlCodedStruct test_protocollayouts_OpenProtocolStrictTwoWayWithErrorRequestMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=4u, .name="test.protocollayouts/OpenProtocolStrictTwoWayWithErrorRequestMessage"};
+const struct FidlCodedStruct test_protocollayouts_OpenProtocolStrictTwoWayWithErrorRequestMessageTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=4u, .name="test.protocollayouts/OpenProtocolStrictTwoWayWithErrorRequestMessage"};
 
 static const struct FidlUnionField Fields69test_protocollayouts_OpenProtocolStrictTwoWayWithErrorResponseMessage[] = {
     /*FidlUnionField*/{.type=(fidl_type_t*)(&test_protocollayouts_imported_ComposedOpenProtocol_StrictTwoWayWithError_ResponseTable)},
     /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)}
 };
 const struct FidlCodedUnion test_protocollayouts_OpenProtocolStrictTwoWayWithErrorResponseMessageTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields69test_protocollayouts_OpenProtocolStrictTwoWayWithErrorResponseMessage, .nullable=kFidlNullability_Nonnullable, .name="test.protocollayouts/OpenProtocolStrictTwoWayWithErrorResponseMessage", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-const struct FidlCodedStruct test_protocollayouts_OpenProtocolStrictEventEventMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=4u, .name="test.protocollayouts/OpenProtocolStrictEventEventMessage"};
+const struct FidlCodedStruct test_protocollayouts_OpenProtocolStrictEventEventMessageTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=4u, .name="test.protocollayouts/OpenProtocolStrictEventEventMessage"};
 
 static const struct FidlUnionField Fields62test_protocollayouts_MainProtocol_TwoWayImportWithError_Result[] = {
     /*FidlUnionField*/{.type=(fidl_type_t*)(&test_protocollayouts_imported_ImportUnionPayloadTable)},

@@ -235,7 +235,6 @@ struct TypeTraits<::test_requestflexibleenvelope::wire::ProtocolRequestStrictRes
   static constexpr uint32_t kPrimarySize = 16;
   [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 4294967295;
   static constexpr bool kHasFlexibleEnvelope = false;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -281,7 +280,6 @@ struct TypeTraits<::test_requestflexibleenvelope::wire::ProtocolRequestStrictRes
   static constexpr uint32_t kPrimarySize = 16;
   [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 4294967295;
   static constexpr bool kHasFlexibleEnvelope = true;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -327,7 +325,6 @@ struct TypeTraits<::test_requestflexibleenvelope::wire::ProtocolRequestFlexibleR
   static constexpr uint32_t kPrimarySize = 16;
   [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 4294967295;
   static constexpr bool kHasFlexibleEnvelope = true;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -373,7 +370,6 @@ struct TypeTraits<::test_requestflexibleenvelope::wire::ProtocolRequestFlexibleR
   static constexpr uint32_t kPrimarySize = 16;
   [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 4294967295;
   static constexpr bool kHasFlexibleEnvelope = false;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -419,7 +415,6 @@ struct TypeTraits<::test_requestflexibleenvelope::wire::FlexibleFoo> {
   static constexpr uint32_t kPrimarySize = 16;
   [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 4294967295;
   static constexpr bool kHasFlexibleEnvelope = true;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -541,7 +536,6 @@ struct TypeTraits<::test_requestflexibleenvelope::wire::StrictFoo> {
   static constexpr uint32_t kPrimarySize = 16;
   [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 4294967295;
   static constexpr bool kHasFlexibleEnvelope = false;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 

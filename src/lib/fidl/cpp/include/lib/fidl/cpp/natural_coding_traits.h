@@ -684,9 +684,9 @@ constexpr NaturalTopLevelDecodeFn MakeNaturalTopLevelDecodeFn() {
 // must ensure that |value| points to an instance of default constructed natural type that
 // matches the one decoded by |decode_fn|.
 // This is the top-level function to call to perform decoding using coding traits.
-fidl::Status NaturalDecode(::fidl::WireFormatMetadata metadata, bool contains_envelope,
-                           size_t inline_size, NaturalTopLevelDecodeFn decode_fn,
-                           ::fidl::EncodedMessage& message, void* value);
+fidl::Status NaturalDecode(::fidl::WireFormatMetadata metadata, size_t inline_size,
+                           NaturalTopLevelDecodeFn decode_fn, ::fidl::EncodedMessage& message,
+                           void* value);
 
 }  // namespace fidl::internal
 

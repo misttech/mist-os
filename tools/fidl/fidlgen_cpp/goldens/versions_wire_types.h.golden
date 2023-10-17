@@ -345,7 +345,6 @@ struct TypeTraits<::test_versions::wire::Struct> {
   static constexpr uint32_t kPrimarySize = 4;
   [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 0;
   static constexpr bool kHasFlexibleEnvelope = false;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
 
@@ -391,7 +390,6 @@ struct TypeTraits<::test_versions::wire::Table> {
   static constexpr uint32_t kPrimarySize = 16;
   [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 8;
   static constexpr bool kHasFlexibleEnvelope = true;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -478,7 +476,6 @@ struct TypeTraits<::test_versions::wire::Union> {
   static constexpr uint32_t kPrimarySize = 16;
   [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 0;
   static constexpr bool kHasFlexibleEnvelope = true;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 

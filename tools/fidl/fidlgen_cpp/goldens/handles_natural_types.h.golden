@@ -951,7 +951,6 @@ struct TypeTraits<::test_handles::Handles> {
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = 136;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
 
@@ -979,7 +978,6 @@ struct TypeTraits<::test_handles::FdfHandles> {
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = 12;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
 

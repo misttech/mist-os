@@ -4805,7 +4805,6 @@ namespace fidl {
     static constexpr uint32_t kMaxDepth = 1;
     static constexpr uint32_t kPrimarySize = 16;
     static constexpr uint32_t kMaxOutOfLine = 4294967295;
-    static constexpr bool kHasEnvelope = false;
     static constexpr bool kHasPointer = true;
   };
 
@@ -4831,7 +4830,6 @@ namespace fidl {
     static constexpr uint32_t kMaxDepth = 1;
     static constexpr uint32_t kPrimarySize = 16;
     static constexpr uint32_t kMaxOutOfLine = 4294967295;
-    static constexpr bool kHasEnvelope = false;
     static constexpr bool kHasPointer = true;
   };
 
@@ -4857,7 +4855,6 @@ namespace fidl {
     static constexpr uint32_t kMaxDepth = 1;
     static constexpr uint32_t kPrimarySize = 16;
     static constexpr uint32_t kMaxOutOfLine = 4294967295;
-    static constexpr bool kHasEnvelope = false;
     static constexpr bool kHasPointer = true;
   };
 
@@ -4883,7 +4880,6 @@ namespace fidl {
     static constexpr uint32_t kMaxDepth = 1;
     static constexpr uint32_t kPrimarySize = 16;
     static constexpr uint32_t kMaxOutOfLine = 4294967295;
-    static constexpr bool kHasEnvelope = false;
     static constexpr bool kHasPointer = true;
   };
 
@@ -4909,7 +4905,6 @@ namespace fidl {
     static constexpr uint32_t kMaxDepth = 1;
     static constexpr uint32_t kPrimarySize = 16;
     static constexpr uint32_t kMaxOutOfLine = 4294967295;
-    static constexpr bool kHasEnvelope = false;
     static constexpr bool kHasPointer = true;
   };
 
@@ -4935,7 +4930,6 @@ namespace fidl {
     static constexpr uint32_t kMaxDepth = 1;
     static constexpr uint32_t kPrimarySize = 16;
     static constexpr uint32_t kMaxOutOfLine = 4294967295;
-    static constexpr bool kHasEnvelope = false;
     static constexpr bool kHasPointer = true;
   };
 
@@ -4961,7 +4955,6 @@ namespace fidl {
     static constexpr uint32_t kMaxDepth = 0;
     static constexpr uint32_t kPrimarySize = 24;
     static constexpr uint32_t kMaxOutOfLine = 0;
-    static constexpr bool kHasEnvelope = false;
     static constexpr bool kHasPointer = false;
   };
 
@@ -4987,7 +4980,6 @@ namespace fidl {
     static constexpr uint32_t kMaxDepth = 0;
     static constexpr uint32_t kPrimarySize = 1;
     static constexpr uint32_t kMaxOutOfLine = 0;
-    static constexpr bool kHasEnvelope = false;
     static constexpr bool kHasPointer = false;
   };
 
@@ -5013,7 +5005,6 @@ namespace fidl {
     static constexpr uint32_t kMaxDepth = 0;
     static constexpr uint32_t kPrimarySize = 1;
     static constexpr uint32_t kMaxOutOfLine = 0;
-    static constexpr bool kHasEnvelope = false;
     static constexpr bool kHasPointer = false;
   };
 
@@ -5043,7 +5034,6 @@ namespace fidl {
     static constexpr uint32_t kMaxDepth = 0;
     static constexpr uint32_t kPrimarySize = 4;
     static constexpr uint32_t kMaxOutOfLine = 0;
-    static constexpr bool kHasEnvelope = false;
     static constexpr bool kHasPointer = false;
   };
 
@@ -5072,7 +5062,6 @@ namespace fidl {
     static constexpr uint32_t kMaxDepth = 0;
     static constexpr uint32_t kPrimarySize = 16;
     static constexpr uint32_t kMaxOutOfLine = 0;
-    static constexpr bool kHasEnvelope = false;
     static constexpr bool kHasPointer = false;
   };
 
@@ -5098,7 +5087,6 @@ namespace fidl {
     static constexpr uint32_t kMaxDepth = 0;
     static constexpr uint32_t kPrimarySize = 16;
     static constexpr uint32_t kMaxOutOfLine = 0;
-    static constexpr bool kHasEnvelope = false;
     static constexpr bool kHasPointer = false;
   };
 
@@ -5124,7 +5112,6 @@ namespace fidl {
     static constexpr uint32_t kMaxDepth = 0;
     static constexpr uint32_t kPrimarySize = 16;
     static constexpr uint32_t kMaxOutOfLine = 0;
-    static constexpr bool kHasEnvelope = false;
     static constexpr bool kHasPointer = false;
   };
 
@@ -5150,7 +5137,6 @@ namespace fidl {
     static constexpr uint32_t kMaxDepth = 0;
     static constexpr uint32_t kPrimarySize = 8;
     static constexpr uint32_t kMaxOutOfLine = 0;
-    static constexpr bool kHasEnvelope = false;
     static constexpr bool kHasPointer = false;
   };
 
@@ -5180,7 +5166,6 @@ namespace fidl {
     static constexpr uint32_t kMaxDepth = 0;
     static constexpr uint32_t kPrimarySize = 4;
     static constexpr uint32_t kMaxOutOfLine = 0;
-    static constexpr bool kHasEnvelope = false;
     static constexpr bool kHasPointer = false;
   };
 
@@ -5213,7 +5198,6 @@ namespace fidl {
     static constexpr uint32_t kMaxDepth = 0;
     static constexpr uint32_t kPrimarySize = 4;
     static constexpr uint32_t kMaxOutOfLine = 0;
-    static constexpr bool kHasEnvelope = false;
     static constexpr bool kHasPointer = false;
   };
 
@@ -5246,7 +5230,6 @@ namespace fidl {
     static constexpr uint32_t kMaxDepth = 0;
     static constexpr uint32_t kPrimarySize = 4;
     static constexpr uint32_t kMaxOutOfLine = 0;
-    static constexpr bool kHasEnvelope = false;
     static constexpr bool kHasPointer = false;
   };
 
@@ -5275,7 +5258,6 @@ namespace fidl {
     static constexpr uint32_t kMaxDepth = 0;
     static constexpr uint32_t kPrimarySize = 16;
     static constexpr uint32_t kMaxOutOfLine = 0;
-    static constexpr bool kHasEnvelope = false;
     static constexpr bool kHasPointer = false;
   };
 
@@ -5301,7 +5283,6 @@ namespace fidl {
     static constexpr uint32_t kMaxDepth = 0;
     static constexpr uint32_t kPrimarySize = 8;
     static constexpr uint32_t kMaxOutOfLine = 0;
-    static constexpr bool kHasEnvelope = false;
     static constexpr bool kHasPointer = false;
   };
 
@@ -5327,7 +5308,6 @@ namespace fidl {
     static constexpr uint32_t kMaxDepth = 0;
     static constexpr uint32_t kPrimarySize = 8;
     static constexpr uint32_t kMaxOutOfLine = 0;
-    static constexpr bool kHasEnvelope = false;
     static constexpr bool kHasPointer = false;
   };
 
@@ -5353,7 +5333,6 @@ namespace fidl {
     static constexpr uint32_t kMaxDepth = 0;
     static constexpr uint32_t kPrimarySize = 8;
     static constexpr uint32_t kMaxOutOfLine = 0;
-    static constexpr bool kHasEnvelope = false;
     static constexpr bool kHasPointer = false;
   };
 
@@ -5379,7 +5358,6 @@ namespace fidl {
     static constexpr uint32_t kMaxDepth = 0;
     static constexpr uint32_t kPrimarySize = 8;
     static constexpr uint32_t kMaxOutOfLine = 0;
-    static constexpr bool kHasEnvelope = false;
     static constexpr bool kHasPointer = false;
   };
 
@@ -5409,7 +5387,6 @@ namespace fidl {
     static constexpr uint32_t kMaxDepth = 0;
     static constexpr uint32_t kPrimarySize = 4;
     static constexpr uint32_t kMaxOutOfLine = 0;
-    static constexpr bool kHasEnvelope = false;
     static constexpr bool kHasPointer = false;
   };
 
@@ -5442,7 +5419,6 @@ namespace fidl {
     static constexpr uint32_t kMaxDepth = 0;
     static constexpr uint32_t kPrimarySize = 4;
     static constexpr uint32_t kMaxOutOfLine = 0;
-    static constexpr bool kHasEnvelope = false;
     static constexpr bool kHasPointer = false;
   };
 
@@ -5475,7 +5451,6 @@ namespace fidl {
     static constexpr uint32_t kMaxDepth = 0;
     static constexpr uint32_t kPrimarySize = 4;
     static constexpr uint32_t kMaxOutOfLine = 0;
-    static constexpr bool kHasEnvelope = false;
     static constexpr bool kHasPointer = false;
   };
 
@@ -5508,7 +5483,6 @@ namespace fidl {
     static constexpr uint32_t kMaxDepth = 0;
     static constexpr uint32_t kPrimarySize = 4;
     static constexpr uint32_t kMaxOutOfLine = 0;
-    static constexpr bool kHasEnvelope = false;
     static constexpr bool kHasPointer = false;
   };
 
@@ -5541,7 +5515,6 @@ namespace fidl {
     static constexpr uint32_t kMaxDepth = 0;
     static constexpr uint32_t kPrimarySize = 16;
     static constexpr uint32_t kMaxOutOfLine = 0;
-    static constexpr bool kHasEnvelope = false;
     static constexpr bool kHasPointer = false;
   };
 
@@ -5574,7 +5547,6 @@ namespace fidl {
     static constexpr uint32_t kMaxDepth = 0;
     static constexpr uint32_t kPrimarySize = 4;
     static constexpr uint32_t kMaxOutOfLine = 0;
-    static constexpr bool kHasEnvelope = false;
     static constexpr bool kHasPointer = false;
   };
 
@@ -5607,7 +5579,6 @@ namespace fidl {
     static constexpr uint32_t kMaxDepth = 0;
     static constexpr uint32_t kPrimarySize = 4;
     static constexpr uint32_t kMaxOutOfLine = 0;
-    static constexpr bool kHasEnvelope = false;
     static constexpr bool kHasPointer = false;
   };
 
@@ -5640,7 +5611,6 @@ namespace fidl {
     static constexpr uint32_t kMaxDepth = 0;
     static constexpr uint32_t kPrimarySize = 4;
     static constexpr uint32_t kMaxOutOfLine = 0;
-    static constexpr bool kHasEnvelope = false;
     static constexpr bool kHasPointer = false;
   };
 
@@ -5673,7 +5643,6 @@ namespace fidl {
     static constexpr uint32_t kMaxDepth = 0;
     static constexpr uint32_t kPrimarySize = 4;
     static constexpr uint32_t kMaxOutOfLine = 0;
-    static constexpr bool kHasEnvelope = false;
     static constexpr bool kHasPointer = false;
   };
 
@@ -5706,7 +5675,6 @@ namespace fidl {
     static constexpr uint32_t kMaxDepth = 0;
     static constexpr uint32_t kPrimarySize = 16;
     static constexpr uint32_t kMaxOutOfLine = 0;
-    static constexpr bool kHasEnvelope = false;
     static constexpr bool kHasPointer = false;
   };
 
@@ -5739,7 +5707,6 @@ namespace fidl {
     static constexpr uint32_t kMaxDepth = 0;
     static constexpr uint32_t kPrimarySize = 16;
     static constexpr uint32_t kMaxOutOfLine = 0;
-    static constexpr bool kHasEnvelope = false;
     static constexpr bool kHasPointer = false;
   };
 
@@ -5768,7 +5735,6 @@ namespace fidl {
     static constexpr uint32_t kMaxDepth = 0;
     static constexpr uint32_t kPrimarySize = 15;
     static constexpr uint32_t kMaxOutOfLine = 0;
-    static constexpr bool kHasEnvelope = false;
     static constexpr bool kHasPointer = false;
   };
 
@@ -5794,7 +5760,6 @@ namespace fidl {
     static constexpr uint32_t kMaxDepth = 1;
     static constexpr uint32_t kPrimarySize = 16;
     static constexpr uint32_t kMaxOutOfLine = 0;
-    static constexpr bool kHasEnvelope = true;
     static constexpr bool kHasPointer = true;
   };
 
@@ -5820,7 +5785,6 @@ namespace fidl {
     static constexpr uint32_t kMaxDepth = 1;
     static constexpr uint32_t kPrimarySize = 16;
     static constexpr uint32_t kMaxOutOfLine = 0;
-    static constexpr bool kHasEnvelope = true;
     static constexpr bool kHasPointer = true;
   };
 
@@ -5848,7 +5812,6 @@ namespace fidl {
     static constexpr uint32_t kMaxDepth = 1;
     static constexpr uint32_t kPrimarySize = 16;
     static constexpr uint32_t kMaxOutOfLine = 24;
-    static constexpr bool kHasEnvelope = true;
     static constexpr bool kHasPointer = true;
   };
 
@@ -5874,7 +5837,6 @@ namespace fidl {
     static constexpr uint32_t kMaxDepth = 1;
     static constexpr uint32_t kPrimarySize = 16;
     static constexpr uint32_t kMaxOutOfLine = 0;
-    static constexpr bool kHasEnvelope = true;
     static constexpr bool kHasPointer = true;
   };
 
@@ -5900,7 +5862,6 @@ namespace fidl {
     static constexpr uint32_t kMaxDepth = 1;
     static constexpr uint32_t kPrimarySize = 16;
     static constexpr uint32_t kMaxOutOfLine = 0;
-    static constexpr bool kHasEnvelope = true;
     static constexpr bool kHasPointer = true;
   };
 
@@ -5930,7 +5891,6 @@ namespace fidl {
     static constexpr uint32_t kMaxDepth = 1;
     static constexpr uint32_t kPrimarySize = 16;
     static constexpr uint32_t kMaxOutOfLine = 0;
-    static constexpr bool kHasEnvelope = true;
     static constexpr bool kHasPointer = true;
   };
 
@@ -5959,7 +5919,6 @@ namespace fidl {
     static constexpr uint32_t kMaxDepth = 1;
     static constexpr uint32_t kPrimarySize = 16;
     static constexpr uint32_t kMaxOutOfLine = 0;
-    static constexpr bool kHasEnvelope = true;
     static constexpr bool kHasPointer = true;
   };
 

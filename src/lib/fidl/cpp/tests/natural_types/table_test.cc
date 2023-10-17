@@ -215,7 +215,6 @@ TEST(Table, Traits) {
   static_assert(fidl::TypeTraits<test_types::SampleTable>::kPrimarySize == sizeof(fidl_table_t));
   static_assert(fidl::TypeTraits<test_types::SampleTable>::kMaxOutOfLine ==
                 std::numeric_limits<uint32_t>::max());
-  static_assert(fidl::TypeTraits<test_types::SampleTable>::kHasEnvelope);
 }
 
 }  // namespace

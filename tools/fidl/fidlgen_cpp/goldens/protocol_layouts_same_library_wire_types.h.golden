@@ -3037,7 +3037,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::TablePayload> {
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 8;
   static constexpr bool kHasFlexibleEnvelope = true;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -3128,7 +3127,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolOneWa
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 8;
   static constexpr bool kHasFlexibleEnvelope = true;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -3219,7 +3217,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWa
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 8;
   static constexpr bool kHasFlexibleEnvelope = true;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -3310,7 +3307,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWa
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 8;
   static constexpr bool kHasFlexibleEnvelope = true;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -3401,7 +3397,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAno
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 8;
   static constexpr bool kHasFlexibleEnvelope = true;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -3492,7 +3487,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::MainProtocolOneWayAno
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 8;
   static constexpr bool kHasFlexibleEnvelope = true;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -3583,7 +3577,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAno
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 8;
   static constexpr bool kHasFlexibleEnvelope = true;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -3674,7 +3667,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAno
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 8;
   static constexpr bool kHasFlexibleEnvelope = true;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -3765,7 +3757,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWit
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 8;
   static constexpr bool kHasFlexibleEnvelope = true;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -3857,7 +3848,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::UnionPayload> {
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 0;
   static constexpr bool kHasFlexibleEnvelope = false;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -3971,7 +3961,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWa
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 0;
   static constexpr bool kHasFlexibleEnvelope = false;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -4085,7 +4074,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWa
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 0;
   static constexpr bool kHasFlexibleEnvelope = false;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -4199,7 +4187,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWa
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 16;
   static constexpr bool kHasFlexibleEnvelope = false;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -4325,7 +4312,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAno
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 0;
   static constexpr bool kHasFlexibleEnvelope = false;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -4439,7 +4425,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAno
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 24;
   static constexpr bool kHasFlexibleEnvelope = true;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -4565,7 +4550,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWa
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 16;
   static constexpr bool kHasFlexibleEnvelope = false;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -4691,7 +4675,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNam
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 24;
   static constexpr bool kHasFlexibleEnvelope = true;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -4817,7 +4800,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayLoc
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 16;
   static constexpr bool kHasFlexibleEnvelope = false;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -4943,7 +4925,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::MainProtocolOnLocalWi
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 24;
   static constexpr bool kHasFlexibleEnvelope = true;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -5069,7 +5050,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAno
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 0;
   static constexpr bool kHasFlexibleEnvelope = true;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -5183,7 +5163,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAno
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 0;
   static constexpr bool kHasFlexibleEnvelope = true;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -5297,7 +5276,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAno
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 16;
   static constexpr bool kHasFlexibleEnvelope = true;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -5423,7 +5401,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonReq
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 0;
   static constexpr bool kHasFlexibleEnvelope = true;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -5537,7 +5514,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWit
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 24;
   static constexpr bool kHasFlexibleEnvelope = true;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 

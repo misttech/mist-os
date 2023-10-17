@@ -554,7 +554,6 @@ struct TypeTraits<::test_handlesintypes::HandlesInTypes> {
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = 96;
   static constexpr uint32_t kMaxOutOfLine = 4294967295;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -582,7 +581,6 @@ struct TypeTraits<::test_handlesintypes::EmptyResourceStruct> {
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = 1;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
 
@@ -610,7 +608,6 @@ struct TypeTraits<::test_handlesintypes::TableWithHandle> {
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 8;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -637,7 +634,6 @@ struct TypeTraits<::test_handlesintypes::EmptyResourceTable> {
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -664,7 +660,6 @@ struct TypeTraits<::test_handlesintypes::UnionWithHandle> {
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -692,7 +687,6 @@ struct TypeTraits<::test_handlesintypes::EmptyResourceUnion> {
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 

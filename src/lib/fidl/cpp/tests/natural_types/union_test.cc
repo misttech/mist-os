@@ -208,7 +208,6 @@ TEST(Union, Traits) {
                 sizeof(fidl_xunion_v2_t));
   static_assert(fidl::TypeTraits<test_types::TestStrictXUnion>::kMaxOutOfLine ==
                 0);  // Envelope inlining
-  static_assert(fidl::TypeTraits<test_types::TestStrictXUnion>::kHasEnvelope);
 }
 
 }  // namespace

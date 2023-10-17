@@ -58,11 +58,11 @@ static const struct FidlStructElement Fields34test_handlesintypes_HandlesInTypes
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=64u, .field_type=(fidl_type_t*)(&test_handlesintypes_TableWithHandleTable)}},
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=80u, .field_type=(fidl_type_t*)(&test_handlesintypes_UnionWithHandleTable)}}
 };
-const struct FidlCodedStruct test_handlesintypes_HandlesInTypesTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields34test_handlesintypes_HandlesInTypes, .element_count=8u, .size_v2=96u, .name="test.handlesintypes/HandlesInTypes"};
+const struct FidlCodedStruct test_handlesintypes_HandlesInTypesTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields34test_handlesintypes_HandlesInTypes, .element_count=8u, .size_v2=96u, .name="test.handlesintypes/HandlesInTypes"};
 
 const struct FidlCodedUnion test_handlesintypes_EmptyResourceUnionTable = {.tag=kFidlTypeUnion, .field_count=0u, .fields=NULL, .nullable=kFidlNullability_Nonnullable, .name="test.handlesintypes/EmptyResourceUnion", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_Resource};
 const struct FidlCodedUnion test_handlesintypes_EmptyResourceUnionNullableRefTable = {.tag=kFidlTypeUnion, .field_count=0u, .fields=NULL, .nullable=kFidlNullability_Nullable, .name="test.handlesintypes/EmptyResourceUnion", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_Resource};
 const struct FidlCodedTable test_handlesintypes_EmptyResourceTableTable = {.tag=kFidlTypeTable, .fields=NULL, .field_count=0u, .is_resource=kFidlIsResource_Resource, .name="test.handlesintypes/EmptyResourceTable"};
 
-const struct FidlCodedStruct test_handlesintypes_EmptyResourceStructTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsEmpty, .elements=NULL, .element_count=0u, .size_v2=1u, .name="test.handlesintypes/EmptyResourceStruct"};
+const struct FidlCodedStruct test_handlesintypes_EmptyResourceStructTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsEmpty, .elements=NULL, .element_count=0u, .size_v2=1u, .name="test.handlesintypes/EmptyResourceStruct"};
 

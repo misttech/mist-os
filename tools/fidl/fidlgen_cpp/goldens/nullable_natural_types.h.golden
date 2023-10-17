@@ -946,7 +946,6 @@ struct TypeTraits<::test_nullable::StructWithNullableString> {
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 4294967295;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = true;
 };
 
@@ -968,7 +967,6 @@ struct TypeTraits<::test_nullable::StructWithNullableVector> {
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 4294967295;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = true;
 };
 
@@ -994,7 +992,6 @@ struct TypeTraits<::test_nullable::StructWithNullableHandle> {
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = 4;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
 
@@ -1018,7 +1015,6 @@ struct TypeTraits<::test_nullable::SimpleProtocolAddRequest> {
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = 8;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
 
@@ -1040,7 +1036,6 @@ struct TypeTraits<::test_nullable::SimpleProtocolAddResponse> {
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = 4;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
 
@@ -1066,7 +1061,6 @@ struct TypeTraits<::test_nullable::StructWithNullableProtocol> {
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = 4;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
 
@@ -1094,7 +1088,6 @@ struct TypeTraits<::test_nullable::StructWithNullableRequest> {
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = 4;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
 
@@ -1118,7 +1111,6 @@ struct TypeTraits<::test_nullable::Int32Wrapper> {
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = 4;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
 
@@ -1140,7 +1132,6 @@ struct TypeTraits<::test_nullable::StructWithNullableStruct> {
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 8;
   static constexpr uint32_t kMaxOutOfLine = 8;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = true;
 };
 
@@ -1162,7 +1153,6 @@ struct TypeTraits<::test_nullable::StructWithNullableUnion> {
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -1184,7 +1174,6 @@ struct TypeTraits<::test_nullable::SimpleUnion> {
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 

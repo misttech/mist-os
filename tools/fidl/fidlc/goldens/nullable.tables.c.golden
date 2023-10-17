@@ -36,37 +36,37 @@ static const struct FidlCodedHandle Handlevmo2147483648nullableTable = {.tag=kFi
 static const struct FidlStructElement Fields38test_nullable_StructWithNullableVector[] = {
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&Vector4294967295nullable5int32Table)}}
 };
-const struct FidlCodedStruct test_nullable_StructWithNullableVectorTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields38test_nullable_StructWithNullableVector, .element_count=1u, .size_v2=16u, .name="test.nullable/StructWithNullableVector"};
+const struct FidlCodedStruct test_nullable_StructWithNullableVectorTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields38test_nullable_StructWithNullableVector, .element_count=1u, .size_v2=16u, .name="test.nullable/StructWithNullableVector"};
 
 static const struct FidlStructElement Fields37test_nullable_StructWithNullableUnion[] = {
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_nullable_SimpleUnionNullableRefTable)}}
 };
-const struct FidlCodedStruct test_nullable_StructWithNullableUnionTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields37test_nullable_StructWithNullableUnion, .element_count=1u, .size_v2=16u, .name="test.nullable/StructWithNullableUnion"};
+const struct FidlCodedStruct test_nullable_StructWithNullableUnionTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields37test_nullable_StructWithNullableUnion, .element_count=1u, .size_v2=16u, .name="test.nullable/StructWithNullableUnion"};
 
 static const struct FidlStructElement Fields38test_nullable_StructWithNullableStruct[] = {
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&Pointer26test_nullable_Int32WrapperTable)}}
 };
-const struct FidlCodedStruct test_nullable_StructWithNullableStructTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields38test_nullable_StructWithNullableStruct, .element_count=1u, .size_v2=8u, .name="test.nullable/StructWithNullableStruct"};
+const struct FidlCodedStruct test_nullable_StructWithNullableStructTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields38test_nullable_StructWithNullableStruct, .element_count=1u, .size_v2=8u, .name="test.nullable/StructWithNullableStruct"};
 
 static const struct FidlStructElement Fields38test_nullable_StructWithNullableString[] = {
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&String4294967295nullableTable)}}
 };
-const struct FidlCodedStruct test_nullable_StructWithNullableStringTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields38test_nullable_StructWithNullableString, .element_count=1u, .size_v2=16u, .name="test.nullable/StructWithNullableString"};
+const struct FidlCodedStruct test_nullable_StructWithNullableStringTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields38test_nullable_StructWithNullableString, .element_count=1u, .size_v2=16u, .name="test.nullable/StructWithNullableString"};
 
 static const struct FidlStructElement Fields39test_nullable_StructWithNullableRequest[] = {
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=0u, .field_type=(fidl_type_t*)(&Request28test_nullable_SimpleProtocolnullableTable)}}
 };
-const struct FidlCodedStruct test_nullable_StructWithNullableRequestTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields39test_nullable_StructWithNullableRequest, .element_count=1u, .size_v2=4u, .name="test.nullable/StructWithNullableRequest"};
+const struct FidlCodedStruct test_nullable_StructWithNullableRequestTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields39test_nullable_StructWithNullableRequest, .element_count=1u, .size_v2=4u, .name="test.nullable/StructWithNullableRequest"};
 
 static const struct FidlStructElement Fields40test_nullable_StructWithNullableProtocol[] = {
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=0u, .field_type=(fidl_type_t*)(&Protocol28test_nullable_SimpleProtocolnullableTable)}}
 };
-const struct FidlCodedStruct test_nullable_StructWithNullableProtocolTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields40test_nullable_StructWithNullableProtocol, .element_count=1u, .size_v2=4u, .name="test.nullable/StructWithNullableProtocol"};
+const struct FidlCodedStruct test_nullable_StructWithNullableProtocolTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields40test_nullable_StructWithNullableProtocol, .element_count=1u, .size_v2=4u, .name="test.nullable/StructWithNullableProtocol"};
 
 static const struct FidlStructElement Fields38test_nullable_StructWithNullableHandle[] = {
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=0u, .field_type=(fidl_type_t*)(&Handlevmo2147483648nullableTable)}}
 };
-const struct FidlCodedStruct test_nullable_StructWithNullableHandleTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields38test_nullable_StructWithNullableHandle, .element_count=1u, .size_v2=4u, .name="test.nullable/StructWithNullableHandle"};
+const struct FidlCodedStruct test_nullable_StructWithNullableHandleTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields38test_nullable_StructWithNullableHandle, .element_count=1u, .size_v2=4u, .name="test.nullable/StructWithNullableHandle"};
 
 static const struct FidlUnionField Fields25test_nullable_SimpleUnion[] = {
     /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)},
@@ -78,13 +78,13 @@ static const struct FidlUnionField Fields36test_nullable_SimpleUnionNullableRef[
     /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kFloat32Table)}
 };
 const struct FidlCodedUnion test_nullable_SimpleUnionNullableRefTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields36test_nullable_SimpleUnionNullableRef, .nullable=kFidlNullability_Nullable, .name="test.nullable/SimpleUnion", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-const struct FidlCodedStruct test_nullable_SimpleProtocolAddResponseTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=4u, .name="test.nullable/SimpleProtocolAddResponse"};
+const struct FidlCodedStruct test_nullable_SimpleProtocolAddResponseTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=4u, .name="test.nullable/SimpleProtocolAddResponse"};
 
-const struct FidlCodedStruct test_nullable_SimpleProtocolAddRequestTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=8u, .name="test.nullable/SimpleProtocolAddRequest"};
+const struct FidlCodedStruct test_nullable_SimpleProtocolAddRequestTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=8u, .name="test.nullable/SimpleProtocolAddRequest"};
 
-const struct FidlCodedStruct test_nullable_SimpleProtocolAddRequestMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=8u, .name="test.nullable/SimpleProtocolAddRequestMessage"};
+const struct FidlCodedStruct test_nullable_SimpleProtocolAddRequestMessageTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=8u, .name="test.nullable/SimpleProtocolAddRequestMessage"};
 
-const struct FidlCodedStruct test_nullable_SimpleProtocolAddResponseMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=4u, .name="test.nullable/SimpleProtocolAddResponseMessage"};
+const struct FidlCodedStruct test_nullable_SimpleProtocolAddResponseMessageTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=4u, .name="test.nullable/SimpleProtocolAddResponseMessage"};
 
-const struct FidlCodedStruct test_nullable_Int32WrapperTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=4u, .name="test.nullable/Int32Wrapper"};
+const struct FidlCodedStruct test_nullable_Int32WrapperTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=4u, .name="test.nullable/Int32Wrapper"};
 

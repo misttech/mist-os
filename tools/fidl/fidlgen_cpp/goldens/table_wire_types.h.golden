@@ -6957,7 +6957,6 @@ struct TypeTraits<::test_table::wire::EmptyTable> {
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 0;
   static constexpr bool kHasFlexibleEnvelope = true;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -7036,7 +7035,6 @@ struct TypeTraits<::test_table::wire::SimpleTable> {
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 56;
   static constexpr bool kHasFlexibleEnvelope = true;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -7139,7 +7137,6 @@ struct TypeTraits<::test_table::wire::OlderSimpleTable> {
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 16;
   static constexpr bool kHasFlexibleEnvelope = true;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -7230,7 +7227,6 @@ struct TypeTraits<::test_table::wire::NewerSimpleTable> {
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 72;
   static constexpr bool kHasFlexibleEnvelope = true;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -7345,7 +7341,6 @@ struct TypeTraits<::test_table::wire::ReverseOrdinalTable> {
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 48;
   static constexpr bool kHasFlexibleEnvelope = true;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -7460,7 +7455,6 @@ struct TypeTraits<::test_table::wire::TableWithAttributes> {
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 16;
   static constexpr bool kHasFlexibleEnvelope = true;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -7551,7 +7545,6 @@ struct TypeTraits<::test_table::wire::ExtensionTable> {
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 0;
   static constexpr bool kHasFlexibleEnvelope = true;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -7630,7 +7623,6 @@ struct TypeTraits<::test_table::wire::SixtyFourOrdinalTable> {
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 1032;
   static constexpr bool kHasFlexibleEnvelope = true;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 

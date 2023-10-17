@@ -40,17 +40,17 @@ const struct FidlCodedTable test_newtype_TableTable = {.tag=kFidlTypeTable, .fie
 static const struct FidlStructElement Fields19test_newtype_Struct[] = {
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_NotResource},.offset_v2=0u, .field_type=(fidl_type_t*)(&String4294967295nonnullableTable)}}
 };
-const struct FidlCodedStruct test_newtype_StructTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields19test_newtype_Struct, .element_count=1u, .size_v2=16u, .name="test.newtype/Struct"};
+const struct FidlCodedStruct test_newtype_StructTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields19test_newtype_Struct, .element_count=1u, .size_v2=16u, .name="test.newtype/Struct"};
 
 const struct FidlCodedEnum test_newtype_EnumTable = {.tag=kFidlTypeEnum, .underlying_type=kFidlCodedPrimitiveSubtype_Uint32, .strictness=kFidlStrictness_Flexible, .validate=NULL, .name="test.newtype/Enum"};
 
-const struct FidlCodedStruct test_newtype_CalculatorAddResponseTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=4u, .name="test.newtype/CalculatorAddResponse"};
+const struct FidlCodedStruct test_newtype_CalculatorAddResponseTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=4u, .name="test.newtype/CalculatorAddResponse"};
 
-const struct FidlCodedStruct test_newtype_CalculatorAddRequestTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=8u, .name="test.newtype/CalculatorAddRequest"};
+const struct FidlCodedStruct test_newtype_CalculatorAddRequestTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=8u, .name="test.newtype/CalculatorAddRequest"};
 
-const struct FidlCodedStruct test_newtype_CalculatorAddRequestMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=8u, .name="test.newtype/CalculatorAddRequestMessage"};
+const struct FidlCodedStruct test_newtype_CalculatorAddRequestMessageTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=8u, .name="test.newtype/CalculatorAddRequestMessage"};
 
-const struct FidlCodedStruct test_newtype_CalculatorAddResponseMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=4u, .name="test.newtype/CalculatorAddResponseMessage"};
+const struct FidlCodedStruct test_newtype_CalculatorAddResponseMessageTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=4u, .name="test.newtype/CalculatorAddResponseMessage"};
 
 const struct FidlCodedBits test_newtype_BitsTable = {.tag=kFidlTypeBits, .underlying_type=kFidlCodedPrimitiveSubtype_Uint32, .strictness=kFidlStrictness_Flexible, .mask=1ul, .name="test.newtype/Bits"};
 

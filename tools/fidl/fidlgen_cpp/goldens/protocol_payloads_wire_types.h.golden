@@ -591,7 +591,6 @@ struct TypeTraits<::test_protocolpayloads::wire::LocalStructPayload> {
   static constexpr uint32_t kPrimarySize = 8;
   [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 0;
   static constexpr bool kHasFlexibleEnvelope = false;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
 
@@ -641,7 +640,6 @@ struct TypeTraits<::test_protocolpayloads::wire::MainProtocolOneWayAnonRequest> 
   static constexpr uint32_t kPrimarySize = 8;
   [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 0;
   static constexpr bool kHasFlexibleEnvelope = false;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
 
@@ -691,7 +689,6 @@ struct TypeTraits<::test_protocolpayloads::wire::MainProtocolTwoWayAnonRequest> 
   static constexpr uint32_t kPrimarySize = 8;
   [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 0;
   static constexpr bool kHasFlexibleEnvelope = false;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
 
@@ -741,7 +738,6 @@ struct TypeTraits<::test_protocolpayloads::wire::MainProtocolTwoWayAnonResponse>
   static constexpr uint32_t kPrimarySize = 8;
   [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 0;
   static constexpr bool kHasFlexibleEnvelope = false;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
 
@@ -791,7 +787,6 @@ struct TypeTraits<::test_protocolpayloads::wire::MainProtocolTwoWayAnonWithError
   static constexpr uint32_t kPrimarySize = 8;
   [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 0;
   static constexpr bool kHasFlexibleEnvelope = false;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
 
@@ -841,7 +836,6 @@ struct TypeTraits<::test_protocolpayloads::wire::MainProtocolTwoWayAnonWithError
   static constexpr uint32_t kPrimarySize = 8;
   [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 0;
   static constexpr bool kHasFlexibleEnvelope = false;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
 
@@ -891,7 +885,6 @@ struct TypeTraits<::test_protocolpayloads::wire::MainProtocolOnAnonRequest> {
   static constexpr uint32_t kPrimarySize = 8;
   [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 0;
   static constexpr bool kHasFlexibleEnvelope = false;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
 
@@ -941,7 +934,6 @@ struct TypeTraits<::test_protocolpayloads::wire::MainProtocolOnAnonWithErrorResp
   static constexpr uint32_t kPrimarySize = 8;
   [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 0;
   static constexpr bool kHasFlexibleEnvelope = false;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
 
@@ -991,7 +983,6 @@ struct TypeTraits<::test_protocolpayloads::wire::MainProtocolTwoWayLocalWithErro
   static constexpr uint32_t kPrimarySize = 16;
   [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 8;
   static constexpr bool kHasFlexibleEnvelope = false;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -1113,7 +1104,6 @@ struct TypeTraits<::test_protocolpayloads::wire::MainProtocolOnLocalWithErrorRes
   static constexpr uint32_t kPrimarySize = 16;
   [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 8;
   static constexpr bool kHasFlexibleEnvelope = false;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -1235,7 +1225,6 @@ struct TypeTraits<::test_protocolpayloads::wire::MainProtocolTwoWayAnonWithError
   static constexpr uint32_t kPrimarySize = 16;
   [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 8;
   static constexpr bool kHasFlexibleEnvelope = false;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -1357,7 +1346,6 @@ struct TypeTraits<::test_protocolpayloads::wire::MainProtocolOnAnonWithErrorResu
   static constexpr uint32_t kPrimarySize = 16;
   [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 8;
   static constexpr bool kHasFlexibleEnvelope = false;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -1479,7 +1467,6 @@ struct TypeTraits<::test_protocolpayloads::wire::MainProtocolTwoWayImportWithErr
   static constexpr uint32_t kPrimarySize = 16;
   [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 0;
   static constexpr bool kHasFlexibleEnvelope = false;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -1601,7 +1588,6 @@ struct TypeTraits<::test_protocolpayloads::wire::MainProtocolOnImportWithErrorRe
   static constexpr uint32_t kPrimarySize = 16;
   [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 0;
   static constexpr bool kHasFlexibleEnvelope = false;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 

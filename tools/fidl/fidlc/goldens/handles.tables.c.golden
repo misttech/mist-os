@@ -115,12 +115,12 @@ static const struct FidlStructElement Fields20test_handles_Handles[] = {
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=128u, .field_type=(fidl_type_t*)(&Protocol25test_handles_SomeProtocolnonnullableTable)}},
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=132u, .field_type=(fidl_type_t*)(&Request25test_handles_SomeProtocolnonnullableTable)}}
 };
-const struct FidlCodedStruct test_handles_HandlesTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields20test_handles_Handles, .element_count=34u, .size_v2=136u, .name="test.handles/Handles"};
+const struct FidlCodedStruct test_handles_HandlesTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields20test_handles_Handles, .element_count=34u, .size_v2=136u, .name="test.handles/Handles"};
 
 static const struct FidlStructElement Fields23test_handles_FdfHandles[] = {
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=0u, .field_type=(fidl_type_t*)(&Handlechannel2147483648nonnullableTable)}},
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=4u, .field_type=(fidl_type_t*)(&Protocol27test_handles_DriverProtocolnonnullableTable)}},
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=8u, .field_type=(fidl_type_t*)(&Request27test_handles_DriverProtocolnonnullableTable)}}
 };
-const struct FidlCodedStruct test_handles_FdfHandlesTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields23test_handles_FdfHandles, .element_count=3u, .size_v2=12u, .name="test.handles/FdfHandles"};
+const struct FidlCodedStruct test_handles_FdfHandlesTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields23test_handles_FdfHandles, .element_count=3u, .size_v2=12u, .name="test.handles/FdfHandles"};
 

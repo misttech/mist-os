@@ -74,7 +74,6 @@ struct fidl::TypeTraits<Input> {
   static constexpr uint32_t kMaxOutOfLine = 0;
   static constexpr uint32_t kPrimarySizeV1 = 4;
   static constexpr uint32_t kMaxOutOfLineV1 = 0;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
 

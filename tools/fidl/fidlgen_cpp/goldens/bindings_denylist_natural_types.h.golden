@@ -1702,7 +1702,6 @@ struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyDartRequest> {
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = 1;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
 
@@ -1724,7 +1723,6 @@ struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResponse> 
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = 4;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
 
@@ -1746,7 +1744,6 @@ struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoRequest> {
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = 1;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
 
@@ -1768,7 +1765,6 @@ struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse> {
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = 4;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
 
@@ -1790,7 +1786,6 @@ struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerReque
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = 1;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
 
@@ -1812,7 +1807,6 @@ struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRespo
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = 4;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
 
@@ -1834,7 +1828,6 @@ struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustRequest> {
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = 1;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
 
@@ -1856,7 +1849,6 @@ struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResponse> 
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = 4;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
 
@@ -1878,7 +1870,6 @@ struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerReque
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = 1;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
 
@@ -1900,7 +1891,6 @@ struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerRespo
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = 4;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
 
@@ -1922,7 +1912,6 @@ struct TypeTraits<::test_bindingsdenylist::MemberOnlyAppearsInImportingLibrary> 
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = 1;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
 
@@ -1944,7 +1933,6 @@ struct TypeTraits<::test_bindingsdenylist::OnlyAppearsInImportingLibrary> {
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = 1;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
 
@@ -1966,7 +1954,6 @@ struct TypeTraits<::test_bindingsdenylist::OnlyLlcpp> {
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -1988,7 +1975,6 @@ struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResult> {
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -2010,7 +1996,6 @@ struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResult> {
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -2032,7 +2017,6 @@ struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResul
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -2054,7 +2038,6 @@ struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResult> {
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -2076,7 +2059,6 @@ struct TypeTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResul
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 

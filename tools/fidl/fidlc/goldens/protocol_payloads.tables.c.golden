@@ -54,7 +54,7 @@ static const struct FidlUnionField Fields74test_protocolpayloads_MainProtocol_Tw
     /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
 const struct FidlCodedUnion test_protocolpayloads_MainProtocol_TwoWayImportWithError_ResultNullableRefTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields74test_protocolpayloads_MainProtocol_TwoWayImportWithError_ResultNullableRef, .nullable=kFidlNullability_Nullable, .name="test.protocolpayloads/MainProtocol_TwoWayImportWithError_Result", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-const struct FidlCodedStruct test_protocolpayloads_MainProtocol_TwoWayAnonWithError_ResponseTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=8u, .name="test.protocolpayloads/MainProtocol_TwoWayAnonWithError_Response"};
+const struct FidlCodedStruct test_protocolpayloads_MainProtocol_TwoWayAnonWithError_ResponseTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=8u, .name="test.protocolpayloads/MainProtocol_TwoWayAnonWithError_Response"};
 
 static const struct FidlUnionField Fields61test_protocolpayloads_MainProtocol_TwoWayAnonWithError_Result[] = {
     /*FidlUnionField*/{.type=(fidl_type_t*)(&test_protocolpayloads_MainProtocol_TwoWayAnonWithError_ResponseTable)},
@@ -76,7 +76,7 @@ static const struct FidlUnionField Fields70test_protocolpayloads_MainProtocol_On
     /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
 const struct FidlCodedUnion test_protocolpayloads_MainProtocol_OnImportWithError_ResultNullableRefTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields70test_protocolpayloads_MainProtocol_OnImportWithError_ResultNullableRef, .nullable=kFidlNullability_Nullable, .name="test.protocolpayloads/MainProtocol_OnImportWithError_Result", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-const struct FidlCodedStruct test_protocolpayloads_MainProtocol_OnAnonWithError_ResponseTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=8u, .name="test.protocolpayloads/MainProtocol_OnAnonWithError_Response"};
+const struct FidlCodedStruct test_protocolpayloads_MainProtocol_OnAnonWithError_ResponseTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=8u, .name="test.protocolpayloads/MainProtocol_OnAnonWithError_Response"};
 
 static const struct FidlUnionField Fields57test_protocolpayloads_MainProtocol_OnAnonWithError_Result[] = {
     /*FidlUnionField*/{.type=(fidl_type_t*)(&test_protocolpayloads_MainProtocol_OnAnonWithError_ResponseTable)},
@@ -88,17 +88,17 @@ static const struct FidlUnionField Fields68test_protocolpayloads_MainProtocol_On
     /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
 const struct FidlCodedUnion test_protocolpayloads_MainProtocol_OnAnonWithError_ResultNullableRefTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields68test_protocolpayloads_MainProtocol_OnAnonWithError_ResultNullableRef, .nullable=kFidlNullability_Nullable, .name="test.protocolpayloads/MainProtocol_OnAnonWithError_Result", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-const struct FidlCodedStruct test_protocolpayloads_MainProtocolTwoWayAnonWithErrorRequestTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=8u, .name="test.protocolpayloads/MainProtocolTwoWayAnonWithErrorRequest"};
+const struct FidlCodedStruct test_protocolpayloads_MainProtocolTwoWayAnonWithErrorRequestTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=8u, .name="test.protocolpayloads/MainProtocolTwoWayAnonWithErrorRequest"};
 
-const struct FidlCodedStruct test_protocolpayloads_MainProtocolTwoWayAnonResponseTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=8u, .name="test.protocolpayloads/MainProtocolTwoWayAnonResponse"};
+const struct FidlCodedStruct test_protocolpayloads_MainProtocolTwoWayAnonResponseTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=8u, .name="test.protocolpayloads/MainProtocolTwoWayAnonResponse"};
 
-const struct FidlCodedStruct test_protocolpayloads_MainProtocolTwoWayAnonRequestTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=8u, .name="test.protocolpayloads/MainProtocolTwoWayAnonRequest"};
+const struct FidlCodedStruct test_protocolpayloads_MainProtocolTwoWayAnonRequestTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=8u, .name="test.protocolpayloads/MainProtocolTwoWayAnonRequest"};
 
-const struct FidlCodedStruct test_protocolpayloads_MainProtocolOneWayAnonRequestTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=8u, .name="test.protocolpayloads/MainProtocolOneWayAnonRequest"};
+const struct FidlCodedStruct test_protocolpayloads_MainProtocolOneWayAnonRequestTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=8u, .name="test.protocolpayloads/MainProtocolOneWayAnonRequest"};
 
-const struct FidlCodedStruct test_protocolpayloads_MainProtocolOnAnonRequestTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=8u, .name="test.protocolpayloads/MainProtocolOnAnonRequest"};
+const struct FidlCodedStruct test_protocolpayloads_MainProtocolOnAnonRequestTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=8u, .name="test.protocolpayloads/MainProtocolOnAnonRequest"};
 
-const struct FidlCodedStruct test_protocolpayloads_LocalStructPayloadTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=8u, .name="test.protocolpayloads/LocalStructPayload"};
+const struct FidlCodedStruct test_protocolpayloads_LocalStructPayloadTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=8u, .name="test.protocolpayloads/LocalStructPayload"};
 
 static const struct FidlUnionField Fields62test_protocolpayloads_MainProtocol_TwoWayLocalWithError_Result[] = {
     /*FidlUnionField*/{.type=(fidl_type_t*)(&test_protocolpayloads_LocalStructPayloadTable)},
@@ -150,20 +150,20 @@ static const struct FidlUnionField Fields63test_protocolpayloads_MainProtocolOnI
     /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
 const struct FidlCodedUnion test_protocolpayloads_MainProtocolOnImportWithErrorEventMessageTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields63test_protocolpayloads_MainProtocolOnImportWithErrorEventMessage, .nullable=kFidlNullability_Nonnullable, .name="test.protocolpayloads/MainProtocolOnImportWithErrorEventMessage", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-const struct FidlCodedStruct test_protocolpayloads_MainProtocolOneWayAnonRequestMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=8u, .name="test.protocolpayloads/MainProtocolOneWayAnonRequestMessage"};
+const struct FidlCodedStruct test_protocolpayloads_MainProtocolOneWayAnonRequestMessageTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=8u, .name="test.protocolpayloads/MainProtocolOneWayAnonRequestMessage"};
 
-const struct FidlCodedStruct test_protocolpayloads_MainProtocolTwoWayAnonRequestMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=8u, .name="test.protocolpayloads/MainProtocolTwoWayAnonRequestMessage"};
+const struct FidlCodedStruct test_protocolpayloads_MainProtocolTwoWayAnonRequestMessageTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=8u, .name="test.protocolpayloads/MainProtocolTwoWayAnonRequestMessage"};
 
-const struct FidlCodedStruct test_protocolpayloads_MainProtocolTwoWayAnonResponseMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=8u, .name="test.protocolpayloads/MainProtocolTwoWayAnonResponseMessage"};
+const struct FidlCodedStruct test_protocolpayloads_MainProtocolTwoWayAnonResponseMessageTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=8u, .name="test.protocolpayloads/MainProtocolTwoWayAnonResponseMessage"};
 
-const struct FidlCodedStruct test_protocolpayloads_MainProtocolTwoWayAnonWithErrorRequestMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=8u, .name="test.protocolpayloads/MainProtocolTwoWayAnonWithErrorRequestMessage"};
+const struct FidlCodedStruct test_protocolpayloads_MainProtocolTwoWayAnonWithErrorRequestMessageTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=8u, .name="test.protocolpayloads/MainProtocolTwoWayAnonWithErrorRequestMessage"};
 
 static const struct FidlUnionField Fields68test_protocolpayloads_MainProtocolTwoWayAnonWithErrorResponseMessage[] = {
     /*FidlUnionField*/{.type=(fidl_type_t*)(&test_protocolpayloads_MainProtocol_TwoWayAnonWithError_ResponseTable)},
     /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
 const struct FidlCodedUnion test_protocolpayloads_MainProtocolTwoWayAnonWithErrorResponseMessageTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields68test_protocolpayloads_MainProtocolTwoWayAnonWithErrorResponseMessage, .nullable=kFidlNullability_Nonnullable, .name="test.protocolpayloads/MainProtocolTwoWayAnonWithErrorResponseMessage", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-const struct FidlCodedStruct test_protocolpayloads_MainProtocolOnAnonEventMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=8u, .name="test.protocolpayloads/MainProtocolOnAnonEventMessage"};
+const struct FidlCodedStruct test_protocolpayloads_MainProtocolOnAnonEventMessageTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=8u, .name="test.protocolpayloads/MainProtocolOnAnonEventMessage"};
 
 static const struct FidlUnionField Fields61test_protocolpayloads_MainProtocolOnAnonWithErrorEventMessage[] = {
     /*FidlUnionField*/{.type=(fidl_type_t*)(&test_protocolpayloads_MainProtocol_OnAnonWithError_ResponseTable)},

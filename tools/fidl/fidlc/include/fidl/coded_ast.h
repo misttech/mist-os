@@ -233,18 +233,16 @@ struct StructPointerType;
 
 struct StructType : public Type {
   StructType(std::string name, std::vector<StructElement> elements, uint32_t size_v2,
-             bool contains_envelope, std::string qname)
+             std::string qname)
       : Type(Kind::kStruct, std::move(name), size_v2, true, false),
         elements(std::move(elements)),
-        qname(std::move(qname)),
-        contains_envelope(contains_envelope) {
+        qname(std::move(qname)) {
     ZX_ASSERT_MSG(this->elements.size() <= std::numeric_limits<uint16_t>::max(),
                   "coding table stores element_count in uint16_t");
   }
 
   std::vector<StructElement> elements;
   std::string qname;
-  bool contains_envelope;
   bool is_empty = false;
   StructPointerType* maybe_reference_type = nullptr;
 };

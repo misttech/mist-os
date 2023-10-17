@@ -1410,7 +1410,6 @@ TypeShape::TypeShape(const flat::Object& object, WireFormat wire_format)
       max_handles(::MaxHandles(object)),
       max_out_of_line(::MaxOutOfLine(object, wire_format)),
       has_padding(::HasPadding(object, wire_format)),
-      has_envelope(::HasEnvelope(object, wire_format)),
       has_flexible_envelope(::HasFlexibleEnvelope(object, wire_format)) {}
 
 TypeShape::TypeShape(const flat::Object* object, WireFormat wire_format)

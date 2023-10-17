@@ -95,11 +95,6 @@ typedef bool FidlMemcpyCompatibility;
 static const FidlMemcpyCompatibility kFidlMemcpyCompatibility_CannotMemcpy = false;
 static const FidlMemcpyCompatibility kFidlMemcpyCompatibility_CanMemcpy = true;
 
-// Indicates if a struct contains an envelope recursively within it.
-typedef bool FidlContainsEnvelope;
-static const FidlContainsEnvelope kFidlContainsEnvelope_DoesNotContainEnvelope = false;
-static const FidlContainsEnvelope kFidlContainsEnvelope_ContainsEnvelope = true;
-
 // Indicates if a struct is empty.
 typedef bool FidlEmpty;
 static const FidlEmpty kFidlEmpty_IsNotEmpty = false;
@@ -415,11 +410,6 @@ struct FidlCodedBits FIDL_INTERNAL_INHERIT_TYPE_T {
 // the purview of this library. It's easier for the compiler to stash it.
 struct FidlCodedStruct FIDL_INTERNAL_INHERIT_TYPE_T {
   const FidlTypeTag tag;
-  // Indicates if the struct recursively contains an envelope.
-  // Intended to be temporarily used in the FIDL transformer for the duration
-  // of the envelope wire format migration.
-  // TODO(fxbug.dev/79584) Remove this once the migration is complete.
-  const FidlContainsEnvelope contains_envelope;
   const FidlEmpty is_empty;
   // element_count should be a uint32_t, but for the sake of binary size
   // a uint16_t is used (all existing values fit within this size).
@@ -603,7 +593,7 @@ static_assert(offsetof(struct FidlCodedHandle, tag) == 0, "");
 static_assert(sizeof(struct FidlCodedPrimitive) == 2, "");
 static_assert(sizeof(struct FidlCodedEnum) == 24, "");
 static_assert(sizeof(struct FidlCodedBits) == 24, "");
-static_assert(sizeof(struct FidlCodedStruct) == 32, "");
+static_assert(sizeof(struct FidlCodedStruct) == 24, "");
 static_assert(sizeof(struct FidlCodedStructPointer) == 16, "");
 static_assert(sizeof(struct FidlCodedUnion) == 24, "");
 static_assert(sizeof(struct FidlCodedArray) == 16, "");

@@ -1768,7 +1768,6 @@
                 "max_handles",
                 "max_out_of_line",
                 "has_padding",
-                "has_envelope",
                 "has_flexible_envelope"
             ],
             "type": "object"

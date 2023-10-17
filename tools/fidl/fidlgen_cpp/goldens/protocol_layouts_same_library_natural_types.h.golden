@@ -2308,7 +2308,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::TablePayload> {
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 8;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -2329,7 +2328,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::ComposedProtocolOneWayAnonC
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 8;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -2350,7 +2348,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonC
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 8;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -2371,7 +2368,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonC
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 8;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -2392,7 +2388,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::ComposedProtocolOnAnonCompo
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 8;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -2413,7 +2408,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::MainProtocolOneWayAnonReque
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 8;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -2434,7 +2428,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonRespo
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 8;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -2455,7 +2448,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithE
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 8;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -2476,7 +2468,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::MainProtocolOnAnonWithError
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 8;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -2497,7 +2488,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::UnionPayload> {
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -2519,7 +2509,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonC
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -2541,7 +2530,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonC
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -2563,7 +2551,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonC
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 16;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -2585,7 +2572,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::ComposedProtocolOnAnonCompo
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -2607,7 +2593,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::ComposedProtocolOnAnonCompo
   static constexpr uint32_t kMaxDepth = 3;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 24;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -2629,7 +2614,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayNamed
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 16;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -2651,7 +2635,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComp
   static constexpr uint32_t kMaxDepth = 3;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 24;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -2673,7 +2656,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::MainProtocolTwoWayLocalWith
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 16;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -2695,7 +2677,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::MainProtocolOnLocalWithErro
   static constexpr uint32_t kMaxDepth = 3;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 24;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -2717,7 +2698,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonReque
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -2739,7 +2719,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithE
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -2761,7 +2740,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithE
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 16;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -2783,7 +2761,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::MainProtocolOnAnonRequest> 
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 
@@ -2805,7 +2782,6 @@ struct TypeTraits<::test_protocollayoutssamelibrary::MainProtocolOnAnonWithError
   static constexpr uint32_t kMaxDepth = 3;
   static constexpr uint32_t kPrimarySize = 16;
   static constexpr uint32_t kMaxOutOfLine = 24;
-  static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
 

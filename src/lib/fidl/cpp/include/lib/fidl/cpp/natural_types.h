@@ -210,14 +210,13 @@ template <typename FidlType>
   static_assert(::fidl::IsFidlType<FidlType>::value, "Only FIDL types are supported");
   FidlType value{internal::DefaultConstructPossiblyInvalidObjectTag{}};
 
-  bool contains_envelope = TypeTraits<FidlType>::kHasEnvelope;
   const size_t inline_size =
       internal::NaturalCodingTraits<FidlType,
                                     internal::NaturalCodingConstraintEmpty>::inline_size_v2;
   const internal::NaturalTopLevelDecodeFn decode_fn =
       internal::MakeNaturalTopLevelDecodeFn<FidlType>();
-  const Status status = internal::NaturalDecode(metadata, contains_envelope, inline_size, decode_fn,
-                                                message, static_cast<void*>(&value));
+  const Status status = internal::NaturalDecode(metadata, inline_size, decode_fn, message,
+                                                static_cast<void*>(&value));
 
   if (!status.ok()) {
     return ::fit::error(status);

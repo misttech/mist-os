@@ -137,7 +137,6 @@ struct TypeTraits<::test_vectors::ExampleUseOfVectors> {
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = 32;
   static constexpr uint32_t kMaxOutOfLine = 4294967295;
-  static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = true;
 };
 

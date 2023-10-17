@@ -28,20 +28,20 @@ const struct FidlCodedTable test_driverhandle_TTable = {.tag=kFidlTypeTable, .fi
 static const struct FidlStructElement Fields53test_driverhandle_HandlesInProtocolSendHandlesRequest[] = {
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_driverhandle_TTable)}}
 };
-const struct FidlCodedStruct test_driverhandle_HandlesInProtocolSendHandlesRequestTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields53test_driverhandle_HandlesInProtocolSendHandlesRequest, .element_count=1u, .size_v2=16u, .name="test.driverhandle/HandlesInProtocolSendHandlesRequest"};
+const struct FidlCodedStruct test_driverhandle_HandlesInProtocolSendHandlesRequestTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields53test_driverhandle_HandlesInProtocolSendHandlesRequest, .element_count=1u, .size_v2=16u, .name="test.driverhandle/HandlesInProtocolSendHandlesRequest"};
 
 static const struct FidlStructElement Fields60test_driverhandle_HandlesInProtocolSendHandlesRequestMessage[] = {
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_driverhandle_TTable)}}
 };
-const struct FidlCodedStruct test_driverhandle_HandlesInProtocolSendHandlesRequestMessageTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields60test_driverhandle_HandlesInProtocolSendHandlesRequestMessage, .element_count=1u, .size_v2=16u, .name="test.driverhandle/HandlesInProtocolSendHandlesRequestMessage"};
+const struct FidlCodedStruct test_driverhandle_HandlesInProtocolSendHandlesRequestMessageTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields60test_driverhandle_HandlesInProtocolSendHandlesRequestMessage, .element_count=1u, .size_v2=16u, .name="test.driverhandle/HandlesInProtocolSendHandlesRequestMessage"};
 
 static const struct FidlStructElement Fields34test_driverhandle_ServerEndWrapper[] = {
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=0u, .field_type=(fidl_type_t*)(&Request32test_driverhandle_DriverProtocolnonnullableTable)}}
 };
-const struct FidlCodedStruct test_driverhandle_ServerEndWrapperTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields34test_driverhandle_ServerEndWrapper, .element_count=1u, .size_v2=4u, .name="test.driverhandle/ServerEndWrapper"};
+const struct FidlCodedStruct test_driverhandle_ServerEndWrapperTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields34test_driverhandle_ServerEndWrapper, .element_count=1u, .size_v2=4u, .name="test.driverhandle/ServerEndWrapper"};
 
 static const struct FidlStructElement Fields34test_driverhandle_ClientEndWrapper[] = {
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=0u, .field_type=(fidl_type_t*)(&Protocol32test_driverhandle_DriverProtocolnonnullableTable)}}
 };
-const struct FidlCodedStruct test_driverhandle_ClientEndWrapperTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields34test_driverhandle_ClientEndWrapper, .element_count=1u, .size_v2=4u, .name="test.driverhandle/ClientEndWrapper"};
+const struct FidlCodedStruct test_driverhandle_ClientEndWrapperTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields34test_driverhandle_ClientEndWrapper, .element_count=1u, .size_v2=4u, .name="test.driverhandle/ClientEndWrapper"};
 
