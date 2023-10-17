@@ -28,7 +28,6 @@ void main(List<String> args) {
     'open': '--benchmark_filter_internal=all',
     'open_read_close': '--benchmark_filter_internal=all',
     'poll': '--benchmark_filter_internal=all',
-    'select': '--benchmark_filter_internal=all',
     'signal': '--benchmark_filter_internal=all',
     'stat': '--benchmark_filter_internal=all',
     // TODO(b/275745984): Update to all when BM_ThreadSwitch passes.
