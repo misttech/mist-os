@@ -4,8 +4,8 @@
 
 use {
     crate::{
-        get_and_verify_packages, replace_retained_packages, verify_packages_cached, write_meta_far,
-        write_needed_blobs, TestEnv,
+        replace_retained_packages, verify_packages_cached, write_meta_far, write_needed_blobs,
+        TestEnv,
     },
     assert_matches::assert_matches,
     fidl_fuchsia_io as fio,
@@ -119,46 +119,4 @@ async fn packages_are_retained_gc_mid_process() {
 
     let () = get_fut.await.unwrap().unwrap();
     let () = package.verify_contents(&dir).await.unwrap();
-}
-
-#[fuchsia_async::run_singlethreaded(test)]
-async fn cached_and_released_packages_are_removed() {
-    let env = TestEnv::builder().build().await;
-    let packages = vec![
-        PackageBuilder::new("pkg-a").build().await.unwrap(),
-        PackageBuilder::new("multi-pkg-a")
-            .add_resource_at("bin/foo", "a-bin-foo".as_bytes())
-            .add_resource_at("data/content", "a-data-content".as_bytes())
-            .build()
-            .await
-            .unwrap(),
-    ];
-    let blob_ids = packages.iter().map(|pkg| BlobId::from(*pkg.hash())).collect::<Vec<_>>();
-
-    // Mark packages as retained.
-    replace_retained_packages(&env.proxies.retained_packages, blob_ids.as_slice()).await;
-
-    // Cache the packages.
-    let () = get_and_verify_packages(&env.proxies.package_cache, &packages).await;
-
-    assert_matches!(env.proxies.space_manager.gc().await, Ok(Ok(())));
-
-    // Verify no retained package blobs are deleted, directly from blobfs.
-    for pkg in packages.iter() {
-        assert!(env.blobfs.client().has_blob(pkg.hash()).await);
-    }
-
-    // Verify no retained package blobs are deleted, using PackageCache API.
-    verify_packages_cached(&env.proxies.package_cache, &packages).await;
-
-    // Clear all retained blobs and GC.
-    assert_matches!(env.proxies.retained_packages.clear().await, Ok(()));
-    assert_matches!(env.proxies.space_manager.gc().await, Ok(Ok(())));
-
-    for package in packages.iter() {
-        assert_matches!(
-            env.get_already_cached(&package.hash().to_string()).await,
-            Err(e) if e.was_not_cached()
-        );
-    }
 }

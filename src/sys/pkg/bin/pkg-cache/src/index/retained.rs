@@ -33,11 +33,6 @@ impl RetainedIndex {
         Default::default()
     }
 
-    /// Determines if the given meta_hash is tracked by this index.
-    pub fn contains_package(&self, meta_hash: &Hash) -> bool {
-        self.packages.contains_key(meta_hash)
-    }
-
     /// The packages protected by this index.
     pub fn retained_packages(&self) -> impl Iterator<Item = &Hash> {
         self.packages.keys()
@@ -160,22 +155,6 @@ mod tests {
 
     fn hash(n: u8) -> Hash {
         Hash::from([n; 32])
-    }
-
-    #[test]
-    fn contains_package_returns_true_on_any_known_state() {
-        let index = RetainedIndex::from_packages(hashmap! {
-            hash(0) => None,
-            hash(1) => Some(HashSet::new()),
-            hash(2) => Some(HashSet::from_iter([hash(7), hash(8), hash(9)])),
-        });
-
-        assert!(index.contains_package(&hash(0)));
-        assert!(index.contains_package(&hash(1)));
-        assert!(index.contains_package(&hash(2)));
-
-        assert!(!index.contains_package(&hash(3)));
-        assert!(!index.contains_package(&hash(7)));
     }
 
     #[test]

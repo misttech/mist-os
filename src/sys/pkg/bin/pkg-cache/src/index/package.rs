@@ -48,17 +48,8 @@ impl PackageIndex {
             // and instead to rely entirely on the client (the system-updater) to protect the
             // package using the Retained index. This allows the system-updater to meet the GC
             // requirements of the OTA process.
-            fpkg::GcProtection::Retained => return,
-            fpkg::GcProtection::OpenPackageTracking => {
-                if self.retained.contains_package(&package_hash) {
-                    // The retained index intends to track this package, but the first event it
-                    // wants to take action on is when the meta far is readable. Nothing to do now.
-                    // This package wasn't already in the dynamic index, so don't add it to it.
-                    return;
-                }
-
-                self.dynamic.start_install(package_hash);
-            }
+            fpkg::GcProtection::Retained => (),
+            fpkg::GcProtection::OpenPackageTracking => self.dynamic.start_install(package_hash),
         }
     }
 
@@ -72,16 +63,7 @@ impl PackageIndex {
             // The content blobs will be added by a subsequent call to `add_blobs`.
             fpkg::GcProtection::Retained => Ok(()),
             fpkg::GcProtection::OpenPackageTracking => {
-                let is_retained = self.retained.contains_package(&package_hash);
-                // Transition the dynamic index state if it is interested in this package. Report
-                // an error if the package is not tracked by any index.
-                let () = match self.dynamic.fulfill_meta_far(package_hash, package_path) {
-                    Err(crate::index::dynamic::FulfillNotNeededBlobError { .. }) if is_retained => {
-                        Ok(())
-                    }
-                    Err(e @ crate::index::dynamic::FulfillNotNeededBlobError { .. }) => Err(e),
-                    Ok(()) => Ok(()),
-                }?;
+                let () = self.dynamic.fulfill_meta_far(package_hash, package_path)?;
                 Ok(())
             }
         }
@@ -95,17 +77,15 @@ impl PackageIndex {
         additional_blobs: HashSet<Hash>,
         gc_protection: fpkg::GcProtection,
     ) -> Result<(), AddBlobsError> {
-        // Notify the retained index if it is interested in this package.
-        let is_retained = self.retained.add_blobs(&package_hash, &additional_blobs);
-
-        if gc_protection == fpkg::GcProtection::OpenPackageTracking {
-            match self.dynamic.add_blobs(package_hash, &additional_blobs) {
-                Ok(()) => (),
-                Err(crate::index::dynamic::AddBlobsError::UnknownPackage) if is_retained => (),
-                Err(e) => return Err(e),
+        // Always give the retained index information about dependent blobs to improve OTA forward
+        // progress.
+        let _: bool = self.retained.add_blobs(&package_hash, &additional_blobs);
+        match gc_protection {
+            fpkg::GcProtection::Retained => Ok(()),
+            fpkg::GcProtection::OpenPackageTracking => {
+                self.dynamic.add_blobs(package_hash, &additional_blobs)
             }
         }
-        Ok(())
     }
 
     /// Notifies the appropriate indices that the package with the given hash has completed
@@ -115,25 +95,21 @@ impl PackageIndex {
         package_hash: Hash,
         gc_protection: fpkg::GcProtection,
     ) -> Result<crate::cache_service::PackageStatus, CompleteInstallError> {
-        let is_retained = self.retained.contains_package(&package_hash);
-
         match gc_protection {
-            fpkg::GcProtection::OpenPackageTracking => {
-                match self.dynamic.complete_install(package_hash) {
-                    Err(_) if is_retained => Ok(crate::cache_service::PackageStatus::Other),
-                    Err(e) => Err(e),
-                    Ok(()) => Ok(crate::cache_service::PackageStatus::Active),
-                }
-            }
             fpkg::GcProtection::Retained => Ok(crate::cache_service::PackageStatus::Other),
+            fpkg::GcProtection::OpenPackageTracking => self
+                .dynamic
+                .complete_install(package_hash)
+                .map(|()| crate::cache_service::PackageStatus::Active),
         }
     }
 
     /// Notifies the appropriate indices that the installation for the package with the given hash
     /// has been cancelled.
     pub fn cancel_install(&mut self, package_hash: &Hash, gc_protection: fpkg::GcProtection) {
-        if gc_protection == fpkg::GcProtection::OpenPackageTracking {
-            self.dynamic.cancel_install(package_hash)
+        match gc_protection {
+            fpkg::GcProtection::Retained => (),
+            fpkg::GcProtection::OpenPackageTracking => self.dynamic.cancel_install(package_hash),
         }
     }
 
@@ -399,40 +375,6 @@ mod tests {
     }
 
     #[test]
-    fn set_retained_index_with_no_dynamic_package_entry_puts_package_in_retained_only() {
-        let mut index = PackageIndex::new();
-
-        index.set_retained_index(RetainedIndex::from_packages(hashmap! {
-            hash(0) => None,
-        }));
-
-        index.start_install(hash(0), fpkg::GcProtection::OpenPackageTracking);
-        index
-            .fulfill_meta_far(
-                hash(0),
-                path("retaiendonly"),
-                fpkg::GcProtection::OpenPackageTracking,
-            )
-            .unwrap();
-        index
-            .add_blobs(hash(0), HashSet::from([hash(123)]), fpkg::GcProtection::OpenPackageTracking)
-            .unwrap();
-        assert_eq!(
-            index.complete_install(hash(0), fpkg::GcProtection::OpenPackageTracking).unwrap(),
-            PackageStatus::Other
-        );
-
-        assert_eq!(
-            index.retained.packages(),
-            hashmap! {
-                hash(0) => Some(HashSet::from_iter([hash(123)])),
-            }
-        );
-        assert_eq!(index.dynamic.active_packages(), hashmap! {});
-        assert_eq!(index.dynamic.packages(), hashmap! {});
-    }
-
-    #[test]
     fn retained_index_is_not_informed_of_packages_it_does_not_track() {
         let mut index = PackageIndex::new();
 
@@ -587,28 +529,50 @@ mod tests {
     }
 
     #[test]
-    fn add_blobs_ignores_missing_dynamic_if_retained() {
+    fn retained_index_does_not_prevent_addition_to_dynamic_index() {
         let mut index = PackageIndex::new();
 
         index.set_retained_index(RetainedIndex::from_packages(hashmap! {
-            hash(2) => Some(HashSet::from_iter([hash(10)])),
+            hash(2) => None,
         }));
+
         index.start_install(hash(2), fpkg::GcProtection::OpenPackageTracking);
+        assert_eq!(
+            index.dynamic.packages(),
+            hashmap! {
+                hash(2) => Package::Pending
+            }
+        );
+
         index
             .fulfill_meta_far(hash(2), path("some-path"), fpkg::GcProtection::OpenPackageTracking)
             .unwrap();
-
         index
-            .add_blobs(hash(2), HashSet::from([hash(11)]), fpkg::GcProtection::OpenPackageTracking)
+            .add_blobs(hash(2), HashSet::from([hash(10)]), fpkg::GcProtection::OpenPackageTracking)
             .unwrap();
-
         assert_eq!(
-            index.retained.packages(),
+            index.dynamic.packages(),
             hashmap! {
-                hash(2) => Some(HashSet::from([hash(10), hash(11)]))
+                hash(2) => Package::WithMetaFar {
+                    path: path("some-path"),
+                    required_blobs: HashSet::from([hash(10)]),
+                }
             }
         );
-        assert_eq!(index.dynamic.packages(), hashmap! {});
+
+        assert_eq!(
+            index.complete_install(hash(2), fpkg::GcProtection::OpenPackageTracking).unwrap(),
+            PackageStatus::Active
+        );
+        assert_eq!(
+            index.dynamic.packages(),
+            hashmap! {
+                hash(2) => Package::Active {
+                    path: path("some-path"),
+                    required_blobs: HashSet::from([hash(10)]),
+                }
+            }
+        );
     }
 
     #[test]
