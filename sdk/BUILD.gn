@@ -575,6 +575,21 @@ if (is_host) {
   }
 }
 
+# Host tools necessary to build the IDK. Keep this minimal, so IDK subbuilds can
+# start running as quickly as possible.
+group("idk_build_tools") {
+  deps = [
+    "//src/sys/pkg/bin/package-tool($host_toolchain)",
+    "//tools/fidl/fidl_api_summarize($host_toolchain)",
+    "//tools/fidl/fidlc:fidl-format($host_toolchain)",
+    "//tools/fidl/fidlc:fidl-lint($host_toolchain)",
+    "//tools/fidl/fidlc($host_toolchain)",
+    "//tools/fidl/fidlgen_cpp($host_toolchain)",
+    "//tools/fidl/fidlgen_rust($host_toolchain)",
+    "//zircon/tools/zither($host_toolchain)",
+  ]
+}
+
 # Firmware IDK. See /src/firmware/README.md
 generate_final_idk("firmware") {
   output_name = "firmware"
