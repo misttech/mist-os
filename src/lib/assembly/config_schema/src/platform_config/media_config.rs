@@ -15,6 +15,9 @@ pub struct PlatformMediaConfig {
 
     #[serde(default)]
     pub audio: Option<AudioConfig>,
+
+    #[serde(default)]
+    pub camera: CameraConfig,
 }
 
 /// The audio stack to use in the platform.
@@ -35,4 +38,11 @@ pub struct AudioCoreConfig {
     /// Route the ADC device to audio_core.
     #[serde(default)]
     pub use_adc_device: bool,
+}
+
+/// The camera settings for the platform.
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+pub struct CameraConfig {
+    #[serde(default)]
+    pub enabled: bool,
 }

@@ -42,6 +42,10 @@ impl DefineSubsystemConfiguration<PlatformMediaConfig> for MediaSubsystem {
             }
         }
 
+        if media_config.camera.enabled {
+            builder.platform_bundle("camera");
+        }
+
         Ok(())
     }
 }
