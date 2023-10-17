@@ -15,9 +15,11 @@ import fuchsia_controller_py as fc
 
 class _QueueWrapper(object):
     def __init__(self):
-        self.queue = asyncio.Queue()
+        self.queue: asyncio.Queue[int] = asyncio.Queue()
         try:
-            self.loop = asyncio.get_running_loop()
+            self.loop: asyncio.AbstractEventLoop | None = (
+                asyncio.get_running_loop()
+            )
         except RuntimeError:
             self.loop = None
 

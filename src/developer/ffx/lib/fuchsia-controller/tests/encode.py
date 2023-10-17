@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+# Import needed for tests to work
+import typing
 import unittest  # NOQA
 
 import common
@@ -59,7 +61,7 @@ class Encode(common.FuchsiaControllerTest):
         EXPECTED = bytearray.fromhex(
             "4d00000002000001b8220000000000000300000000000000ffffffffffffffff0000004000000100180000000000000018000000000000000600000000000000ffffffffffffffff666f6f6261720000030000000000000008000000000000000500000000000000"
         )
-        obj = EncodeObj()
+        obj = typing.cast(typing.Any, EncodeObj())
         setattr(obj, "tab", EncodeObj())
         setattr(obj.tab, "dub", 2.0)
         setattr(obj.tab, "str", "foobar")
@@ -93,7 +95,7 @@ class Encode(common.FuchsiaControllerTest):
         self.assertEqual(h, [])
 
     def test_encode_decode_table_and_union(self):
-        obj = EncodeObj()
+        obj = typing.cast(typing.Any, EncodeObj())
         setattr(obj, "tab", EncodeObj())
         setattr(obj.tab, "dub", 2.0)
         setattr(obj.tab, "str", "foobar")

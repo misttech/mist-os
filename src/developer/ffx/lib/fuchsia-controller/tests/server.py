@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 import asyncio
+import typing
 import unittest
 
 import fidl.fuchsia_controller_test as fc_test
@@ -124,7 +125,7 @@ class ServerTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_target_iterator(self):
         (reader_client_channel, reader_server_channel) = Channel.create()
-        target_list = []
+        target_list: typing.List[typing.Any] = []
         server = TargetCollectionReaderImpl(reader_server_channel, target_list)
         (tc_client_channel, tc_server_channel) = Channel.create()
         target_collection_server = TargetCollectionImpl(tc_server_channel)

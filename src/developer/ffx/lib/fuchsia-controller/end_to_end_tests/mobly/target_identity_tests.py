@@ -33,6 +33,7 @@ class FuchsiaControllerTests(base_test.BaseTestClass):
         -- call that results in simple output.
         -- calls a non-SDK protocol (daemon protocols are not explicitly in the SDK).
         """
+        assert self.device.ctx is not None
         target_proxy = ffx.Target.Client(self.device.ctx.connect_target_proxy())
         res = await target_proxy.identity()
         target_info = res.target_info
@@ -46,6 +47,7 @@ class FuchsiaControllerTests(base_test.BaseTestClass):
         -- calls a FIDL API on the Fuchsia target from the host.
         -- call that results in simple output.
         """
+        assert self.device.ctx is not None
         device_proxy = device.NameProvider.Client(
             self.device.ctx.connect_device_proxy(
                 "/bootstrap/device_name_provider", device.NameProvider.MARKER
@@ -72,6 +74,7 @@ class FuchsiaControllerTests(base_test.BaseTestClass):
             collection_timeout_per_data=(2 * 60 * 10**9),
             response_channel=server.take(),
         )
+        assert self.device.ctx is not None
         ch = self.device.ctx.connect_device_proxy(
             "/core/feedback", "fuchsia.feedback.DataProvider"
         )

@@ -25,7 +25,7 @@ class AsyncSocket:
         waker: (Optional) the HandleWaker implementation (defaults to GlobalHandleWaker).
     """
 
-    def __init__(self, socket: fc.Socket, waker: HandleWaker = None):
+    def __init__(self, socket: fc.Socket, waker: HandleWaker | None = None):
         self.socket = socket
         if waker is None:
             self.waker = GlobalHandleWaker()

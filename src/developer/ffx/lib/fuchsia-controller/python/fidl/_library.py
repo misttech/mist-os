@@ -12,6 +12,7 @@ import keyword
 import os
 import sys
 import types
+import typing
 from typing import (
     Any,
     Callable,
@@ -51,7 +52,7 @@ class Method(dict):
         super().__init__(json_dict)
         self.parent_ir = parent_ir
 
-    def __getitem__(self, key) -> IR:
+    def __getitem__(self, key) -> typing.Any:
         res = super().__getitem__(key)
         if key == "identifier":
             return normalize_identifier(res)
@@ -73,7 +74,7 @@ class Method(dict):
         """
         return bool(self["has_error"])
 
-    def request_payload_identifier(self) -> Optional[str]:
+    def request_payload_identifier(self) -> str | None:
         """Attempts to lookup the payload identifier if it exists.
 
         Returns:
@@ -85,7 +86,7 @@ class Method(dict):
             return None
         return payload.identifier()
 
-    def response_payload_raw_identifier(self) -> Optional[str]:
+    def response_payload_raw_identifier(self) -> str | None:
         """Attempts to lookup the response payload identifier  if it exists.
 
         Returns:
@@ -93,14 +94,15 @@ class Method(dict):
         """
         if not "maybe_response_payload" in self:
             return None
-        return self.maybe_response_payload().raw_identifier()
+        payload = self.maybe_response_payload()
+        return payload.raw_identifier() if payload is not None else None
 
-    def maybe_response_payload(self) -> Optional[IR]:
+    def maybe_response_payload(self) -> IR | None:
         if not "maybe_response_payload" in self:
             return None
         return IR(self.parent_ir, self["maybe_response_payload"])
 
-    def maybe_request_payload(self) -> Optional[IR]:
+    def maybe_request_payload(self) -> IR | None:
         if not "maybe_request_payload" in self:
             return None
         return IR(self.parent_ir, self["maybe_request_payload"])
@@ -360,7 +362,7 @@ def type_annotation(type_ir, root_ir, recurse_guard=None) -> type:
         ident_kind = get_kind_by_identifier(ident, root_ir)
         ty = get_type_by_identifier(ident, root_ir, recurse_guard)
         if ident_kind == "bits":
-            Union[ty, Set[ty]]
+            ty = Union[ty, Set[ty]]
         return wrap_optional(ty)
     elif kind == "primitive":
         return string_to_basetype(type_ir["subtype"])

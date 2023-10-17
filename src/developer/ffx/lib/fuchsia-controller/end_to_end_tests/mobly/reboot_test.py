@@ -3,6 +3,8 @@
 # found in the LICENSE file.
 
 
+import typing
+
 import fidl.fuchsia_hardware_power_statecontrol as power_statecontrol
 from fuchsia_controller_py import ZxStatus
 from mobly import base_test
@@ -13,7 +15,7 @@ from mobly_controller.fuchsia_device import asynctest
 
 class FuchsiaControllerTests(base_test.BaseTestClass):
     def setup_class(self) -> None:
-        self.fuchsia_devices: List[
+        self.fuchsia_devices: typing.List[
             fuchsia_device.FuchsiaDevice
         ] = self.register_controller(fuchsia_device)
         self.device = self.fuchsia_devices[0]

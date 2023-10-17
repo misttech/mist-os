@@ -8,7 +8,7 @@ import logging
 import os
 import os.path
 import time
-from typing import Any, Awaitable, Callable, Dict, List
+from typing import Any, Callable, Coroutine, Dict, List
 
 import fidl.fuchsia_developer_ffx as ffx
 from fuchsia_controller_py import Context
@@ -33,7 +33,7 @@ class FuchsiaDevice(object):
             )
         self.target = target
         self.config = config
-        self.ctx = None
+        self.ctx: Context | None = None
 
     def set_ctx(self, test: base_test.BaseTestClass):
         log_dir = test.log_path
@@ -71,6 +71,7 @@ class FuchsiaDevice(object):
                 logging.debug(
                     f"Attempting to get proxy info from {self.config['name']}"
                 )
+                assert self.ctx is not None
                 target = ffx.Target.Client(self.ctx.connect_target_proxy())
                 info = await target.identity()
                 if info.target_info.rcs_state != ffx.RemoteControlState.UP:
@@ -104,6 +105,7 @@ class FuchsiaDevice(object):
             is considered online.
         """
         try:
+            assert self.ctx is not None
             self.ctx.target_wait(timeout)
         except ZxStatus:
             raise TimeoutError()
@@ -151,7 +153,9 @@ def get_info(fuchsia_devices: List[FuchsiaDevice]) -> List[Dict[str, Any]]:
     return res
 
 
-def asynctest(func: Callable[[base_test.BaseTestClass], Awaitable[None]]):
+def asynctest(
+    func: Callable[[base_test.BaseTestClass], Coroutine[Any, Any, None]]
+):
     """Simple wrapper around async tests.
 
     Args:

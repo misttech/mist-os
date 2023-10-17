@@ -10,9 +10,11 @@ import sys
 import typing
 from typing import List, Tuple
 
+import fuchsia_controller_py as fc
+
 # These can be updated to use TypeAlias when python is updated to 3.10+
 TXID_Type = int
-FidlMessage = Tuple[bytearray, List[int]]
+FidlMessage = Tuple[bytearray, List[fc.Channel]]
 
 # The number of bytes in a FIDL header.
 FIDL_HEADER_SIZE = 8
@@ -35,7 +37,7 @@ class GenericResult:
     fidl_type: str
     response: typing.Optional[object] = None
     err: typing.Optional[object] = None
-    transport_err: TransportError = None
+    transport_err: TransportError | None = None
 
     @property
     def __fidl_type__(self):
@@ -78,7 +80,9 @@ def make_default_obj_from_ident(ident):
     return make_default_obj(obj_ty)
 
 
-def construct_response_object(response_ident: str, response_obj):
+def construct_response_object(
+    response_ident: str | None, response_obj: typing.Any | None
+):
     obj = make_default_obj_from_ident(response_ident)
     if obj is not None:
         construct_result(obj, response_obj)
@@ -185,7 +189,7 @@ def make_default_obj(object_ty):
     where all fields are set to None, regardless what the field type is.
     """
     sig = inspect.signature(object_ty.__init__)
-    args = {}
+    args: typing.Dict[str, typing.Any | None] = {}
     for arg in sig.parameters:
         if str(arg) == "self":
             continue
