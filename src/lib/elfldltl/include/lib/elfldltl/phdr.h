@@ -387,6 +387,9 @@ using PhdrEhFrameHdrObserver = PhdrMetadataObserver<Elf, ElfPhdrType::kEhFrameHd
 template <class Elf>
 using PhdrRelroObserver = PhdrSingletonObserver<Elf, ElfPhdrType::kRelro>;
 
+template <class Elf>
+using PhdrTlsObserver = PhdrSingletonObserver<Elf, ElfPhdrType::kTls>;
+
 // PT_LOAD validation policy. Subsequent values extend previous ones.
 enum class PhdrLoadPolicy {
   // Universal checks for all phdrs are made here (beyond universal checks

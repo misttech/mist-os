@@ -29,9 +29,9 @@ class LinkMapList {
 
  public:
   using value_type = ElementType;
+  using pointer = value_type*;
   using reference = value_type&;
   using const_reference = const value_type&;
-  using pointer = value_type*;
   using difference_type = ptrdiff_t;
   using size_type = size_t;
 
@@ -163,10 +163,10 @@ template <typename ElementType, class Traits>
 template <bool Reverse, bool Const>
 class LinkMapList<ElementType, Traits>::IteratorImpl {
  public:
-  using value_type = LinkMapList<ElementType, Traits>::value_type;
-  using reference = LinkMapList<ElementType, Traits>::reference;
-  using pointer = LinkMapList<ElementType, Traits>::pointer;
-  using difference_type = LinkMapList<ElementType, Traits>::difference_type;
+  using value_type = LinkMapList::value_type;
+  using pointer = LinkMapList::pointer;
+  using reference = LinkMapList::reference;
+  using difference_type = LinkMapList::difference_type;
   using iterator_category = std::bidirectional_iterator_tag;
 
   constexpr IteratorImpl() = default;

@@ -59,6 +59,7 @@ constexpr void SetModuleLoadInfo(AbiModule<Elf>& module, const typename Elf::Ehd
 template <class Elf = elfldltl::Elf<>>
 struct ModulePhdrInfo {
   std::optional<typename Elf::Phdr> dyn_phdr;
+  std::optional<typename Elf::Phdr> tls_phdr;
   std::optional<typename Elf::size_type> stack_size;
 };
 
@@ -77,6 +78,7 @@ constexpr ModulePhdrInfo<Elf> DecodeModulePhdrs(Diagnostics& diag,
                                                 PhdrObservers&&... phdr_observers) {
   ModulePhdrInfo<Elf> result;
   elfldltl::DecodePhdrs(diag, phdrs, elfldltl::PhdrDynamicObserver<Elf>(result.dyn_phdr),
+                        elfldltl::PhdrTlsObserver<Elf>(result.tls_phdr),
                         elfldltl::PhdrStackObserver<Elf>(result.stack_size),
                         std::forward<PhdrObservers>(phdr_observers)...);
   return result;

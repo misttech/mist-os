@@ -10,6 +10,7 @@
 #include <lib/elfldltl/soname.h>
 #include <lib/ld/abi.h>
 #include <lib/ld/module.h>
+#include <lib/ld/tls.h>
 
 #include <cassert>
 #include <functional>
@@ -52,10 +53,12 @@ class LoadModule {
   using Elf = ElfLayout;
   using size_type = typename Elf::size_type;
   using Module = typename abi::Abi<Elf>::Module;
+  using TlsModule = typename abi::Abi<Elf>::TlsModule;
   using LoadInfo = elfldltl::LoadInfo<Elf, SegmentContainer>;
   using RelocationInfo = elfldltl::RelocationInfo<Elf>;
   using Soname = elfldltl::Soname<Elf>;
   using Ref = LoadModuleRef<LoadModule>;
+  using Phdr = typename Elf::Phdr;
   using Sym = typename Elf::Sym;
 
   constexpr LoadModule() = default;
@@ -85,7 +88,7 @@ class LoadModule {
   // For convenient container searches, equality comparison against a (hashed)
   // name checks both name fields.  An unloaded module only has a load name.
   // A loaded module may also have a SONAME.
-  constexpr bool operator==(const Soname& name) {
+  constexpr bool operator==(const Soname& name) const {
     return name == name_ || (module_ && name == module_->soname);
   }
 
@@ -140,6 +143,50 @@ class LoadModule {
     return reloc_info_;
   }
 
+  // Set up the Abi<>::TlsModule in tls_module() based on the PT_TLS segment.
+  template <class Diagnostics, class Memory>
+  bool SetTls(Diagnostics& diag, Memory& memory, size_type modid, const Phdr& tls_phdr) {
+    using PhdrError = elfldltl::internal::PhdrError<elfldltl::ElfPhdrType::kTls>;
+
+    assert(modid != 0);
+    module().tls_modid = modid;
+
+    size_type alignment = std::max<size_type>(tls_phdr.align, 1);
+    if (!cpp20::has_single_bit(alignment)) [[unlikely]] {
+      if (!diag.FormatError(PhdrError::kBadAlignment)) {
+        return false;
+      }
+    } else {
+      tls_module_.tls_alignment = alignment;
+    }
+
+    if (tls_phdr.filesz > tls_phdr.memsz) [[unlikely]] {
+      if (!diag.FormatError("PT_TLS header `p_filesz > p_memsz`")) {
+        return false;
+      }
+    } else {
+      tls_module_.tls_bss_size = tls_phdr.memsz - tls_phdr.filesz;
+    }
+
+    auto initial_data = memory.template ReadArray<std::byte>(tls_phdr.vaddr, tls_phdr.filesz);
+    if (!initial_data) [[unlikely]] {
+      return diag.FormatError("PT_TLS has invalid p_vaddr", elfldltl::FileAddress{tls_phdr.vaddr},
+                              " or p_filesz ", tls_phdr.filesz());
+    }
+    tls_module_.tls_initial_data = *initial_data;
+
+    return true;
+  }
+
+  // This returns the TLS module ID assigned by SetTls, or zero if none is set.
+  size_type tls_modid() const { return module().tls_modid; }
+
+  // This should only be called after SetTls.
+  const TlsModule& tls_module() const {
+    assert(tls_modid() != 0);
+    return tls_module_;
+  }
+
   // The following methods satisfy the Module template API for use with
   // elfldltl::ResolverDefinition (see <lib/elfldltl/resolve.h>).
 
@@ -181,10 +228,10 @@ class LoadModule {
       std::conditional_t<WithRelocInfo == LoadModuleRelocInfo::kYes, RelocationInfo, Empty>;
 
   Soname name_;
-
   ModuleStorage module_{};
   LoadInfo load_info_;
   [[no_unique_address]] RelocInfoStorage reloc_info_;
+  TlsModule tls_module_;
 };
 
 // This object is returned by the name_ref() and soname_ref() methods of

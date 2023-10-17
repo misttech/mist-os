@@ -112,12 +112,11 @@ struct Abi<Elf, AbiTraits>::Module {
   // program exit or when it's dynamically unloaded (if that's possible).
   Type<elfldltl::InitFiniInfo> fini;
 
-  // TODO(fxbug.dev/128502): TLS module ID
-
-  // This is true if the module participates in symbolic resolution. If false,
-  // the module will still be part of the unwinding domain, and therefore will
-  // still be visible to dl_iterate_phdr.
-  bool symbols_visible = false;
+  // Each module that has a PT_TLS segment of its own is assigned a module ID,
+  // which is a nonzero index.  This value is zero if the module has no PT_TLS.
+  // Note that a module's code might use TLS relocations (resolved to external
+  // symbols) even if that module has no PT_TLS segment of its own.
+  Addr tls_modid = 0;
 
   // Each and every module gets a "module ID" number that's used in symbolizer
   // markup contextual elements describing the module.  These are expected to
@@ -136,6 +135,11 @@ struct Abi<Elf, AbiTraits>::Module {
   // presumably point to read-only data in the module's load image, which can
   // always be repeated; this just caches the parsing result from load time.
   Span<const std::byte> build_id;
+
+  // This is true if the module participates in symbolic resolution. If false,
+  // the module will still be part of the unwinding domain, and therefore will
+  // still be visible to dl_iterate_phdr.
+  bool symbols_visible = false;
 };
 
 }  // namespace abi

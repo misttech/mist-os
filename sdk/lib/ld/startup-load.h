@@ -22,6 +22,7 @@
 #include <fbl/intrusive_double_list.h>
 
 #include "allocator.h"
+#include "bootstrap.h"
 #include "diagnostics.h"
 #include "mutable-abi.h"
 
@@ -99,7 +100,8 @@ struct StartupLoadModule : public StartupLoadModuleBase,
   // mutable allocations at a time, so the caller must then promptly splice it
   // into the link_map list before the next Load call allocates the next one.
   template <class Allocator, class File>
-  StartupLoadResult Load(Diagnostics& diag, Allocator& allocator, File&& file) {
+  StartupLoadResult Load(Diagnostics& diag, Allocator& allocator, File&& file,
+                         Elf::size_type& max_tls_modid) {
     // Diagnostics sent to diag during loading will be prefixed with the module
     // name, unless the name is empty as it is for the main executable.
     ModuleDiagnostics module_diag(diag, this->name().str());
@@ -116,7 +118,7 @@ struct StartupLoadModule : public StartupLoadModuleBase,
 
     // Decode phdrs to fill LoadInfo and other things.
     std::optional<Phdr> relro_phdr;
-    auto [dyn_phdr, stack_size] =
+    auto [dyn_phdr, tls_phdr, stack_size] =
         DecodeModulePhdrs(diag, phdrs, this->load_info().GetPhdrObserver(loader_.page_size()),
                           elfldltl::PhdrRelroObserver<elfldltl::Elf<>>(relro_phdr));
     set_relro(relro_phdr);
@@ -145,6 +147,11 @@ struct StartupLoadModule : public StartupLoadModuleBase,
     // might remain empty if the phdrs aren't in the load image, so keep using
     // the stack copy read from the file instead.
     SetModuleLoadInfo(this->module(), ehdr, this->load_info(), loader_.load_bias(), memory());
+
+    // If there was a PT_TLS, fill in tls_module() to be published later.
+    if (tls_phdr) {
+      SetTls(diag, memory(), ++max_tls_modid, *tls_phdr);
+    }
 
     // A second phdr scan is needed to decode notes now that they can be
     // accessed in memory.
@@ -221,14 +228,18 @@ struct StartupLoadModule : public StartupLoadModuleBase,
     List preloaded_modules =
         MakePreloadedList(diag, scratch, preloaded_module_list, loader_args...);
 
+    // This will be incremented by each Load() of a module that has a PT_TLS.
+    Elf::size_type max_tls_modid = main_executable->tls_modid();
+
     LoadDeps(diag, scratch, initial_exec, modules, preloaded_modules, executable_needed_count,
-             std::forward<GetDepFile>(get_dep_file), loader_args...);
+             std::forward<GetDepFile>(get_dep_file), max_tls_modid, loader_args...);
     CheckErrors(diag);
 
     RelocateModules(diag, modules);
     CheckErrors(diag);
 
-    PopulateLdAbi(modules, std::move(preloaded_modules));
+    PopulateAbiLoadedModules(modules, std::move(preloaded_modules));
+    PopulateAbiTls(diag, initial_exec, modules, max_tls_modid);
 
     CommitModules(diag, std::move(modules));
   }
@@ -282,6 +293,7 @@ struct StartupLoadModule : public StartupLoadModuleBase,
   void EnqueueDeps(Diagnostics& diag, Allocator& allocator, List& modules, List& preloaded_modules,
                    size_t needed_count, LoaderArgs&&... loader_args) {
     auto handle_needed = [&](std::string_view soname_str) {
+      assert(needed_count > 0);
       elfldltl::Soname<> soname{soname_str};
       if (!FindModule(modules, preloaded_modules, soname)) {
         modules.push_back(New(diag, allocator, soname, loader_args...));
@@ -293,32 +305,35 @@ struct StartupLoadModule : public StartupLoadModuleBase,
     elfldltl::DecodeDynamic(diag, memory(), dynamic_, observer);
   }
 
-  // `get_dep_file` takes a `string_view` and should return an `std::optional<File>`. `File`
-  // must meet the requirements of a File type described in lib/elfldltl/memory.h.
+  // `get_dep_file` is called as `std::optional<File>(std::string_view)`.
+  // File must meet the requirements of a File type described in
+  // lib/elfldltl/memory.h.
   template <typename ScratchAllocator, typename InitialExecAllocator, typename GetDepFile,
             typename... LoaderArgs>
   static void LoadDeps(Diagnostics& diag, ScratchAllocator& scratch,
                        InitialExecAllocator& initial_exec, List& modules, List& preloaded_modules,
                        size_t needed_count, GetDepFile&& get_dep_file,
-                       LoaderArgs&&... loader_args) {
-    // Note, this assumes that ModuleList iterators are not invalidated after push_back(), done
-    // by `EnqueueDeps`. This is true of lists and StaticVector. No assumptions are made on the
-    // validity of the end() iterator, so it is checked at every iteration.
+                       Elf::size_type& max_tls_modid, LoaderArgs&&... loader_args) {
+    // Note, this assumes that ModuleList iterators are not invalidated after
+    // push_back(), done by `EnqueueDeps`. This is true of lists and
+    // StaticVector. No assumptions are made on the validity of the end()
+    // iterator, so it is checked at every iteration.
     for (auto it = modules.begin(); it != modules.end(); it++) {
       const bool was_already_loaded = it->IsLoaded();
       if (!was_already_loaded) {
         if (auto file = get_dep_file(it->name())) {
-          it->Load(diag, initial_exec, *file);
+          it->Load(diag, initial_exec, *file, max_tls_modid);
           assert(it->IsLoaded());
         } else {
           diag.MissingDependency(it->name().str());
         }
       }
-      // The main executable is always first in the list, it is already added to the passive abi.
+      // The main executable is always first in the list, so its prev is
+      // already correct and adding the second module will set its next.
       if (it != modules.begin()) {
         it->AddToPassiveAbi(std::prev(it), true);
-        // Referenced preloaded modules can't have DT_NEEDED, do don't bother enqueuing their
-        // deps.
+        // Referenced preloaded modules can't have DT_NEEDED, do don't bother
+        // enqueuing their deps.
         if (was_already_loaded) {
           continue;
         }
@@ -339,11 +354,14 @@ struct StartupLoadModule : public StartupLoadModuleBase,
     while (!modules.is_empty()) {
       auto* module = modules.pop_front();
       std::move(*module).Commit();
+      // The `operator delete` this calls does nothing since the scratch
+      // allocator doesn't support deallocation per se since the scratch
+      // memory will be deallocated en masse, but this calls destructors.
       delete module;
     }
   }
 
-  static void PopulateLdAbi(List& modules, List preloaded_modules) {
+  static void PopulateAbiLoadedModules(List& modules, List preloaded_modules) {
     // We want to add the remaining modules to the list. Their symbols aren't visible for symbolic
     // resolution, but the program can still use their functions even with no relocations resolving
     // to their symbols. Therefore, we need to add these modules to the global module list so they
@@ -359,6 +377,42 @@ struct StartupLoadModule : public StartupLoadModuleBase,
     }
 
     ld::mutable_abi.loaded_modules = &modules.begin()->module();
+  }
+
+  // The passive ABI's TlsModule structs are allocated in a contiguous array
+  // indexed by TLS module ID, so they cannot be built up piecemeal in their
+  // final locations.  Instead, they're stored directly in the LoadModule when
+  // a module has one.  This collects all those and copies them into the
+  // passive ABI's array.
+  template <typename InitialExecAllocator>
+  static void PopulateAbiTls(Diagnostics& diag, InitialExecAllocator& initial_exec_allocator,
+                             const List& modules, Elf::size_type max_tls_modid) {
+    if (max_tls_modid > 0) {
+      fbl::AllocChecker ac;
+      TlsModule* storage = new (initial_exec_allocator, ac) TlsModule[max_tls_modid];
+      CheckAlloc(diag, ac, "passive ABI for TLS modules");
+      cpp20::span<TlsModule> tls_modules{storage, max_tls_modid};
+      PopulateAbiStaticTlsModules(modules, tls_modules);
+    }
+  }
+
+  static void PopulateAbiStaticTlsModules(const List& modules, cpp20::span<TlsModule> tls_modules) {
+    for (const StartupLoadModule& module : modules) {
+      if (const size_type modid = module.tls_modid(); modid != 0) {
+        tls_modules[modid - 1] = module.tls_module();
+#ifdef NDEBUG
+        if (modid == tls_modules.size()) {
+          // Don't keep scanning the list if there aren't any more, but skip
+          // this optimization if it would prevent a later iteration from
+          // hitting an assertion failure if there's a bug that causes an
+          // invalid index into the span.
+          break;
+        }
+#endif
+      }
+    }
+
+    mutable_abi.static_tls_modules = tls_modules;
   }
 
   Loader loader_;  // Must be initialized by constructor.

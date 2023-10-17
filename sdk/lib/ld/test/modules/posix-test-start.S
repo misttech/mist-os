@@ -43,15 +43,11 @@
 #elif defined(__x86_64__)
 
   mov %rsp, %rdi
-  // If called by ld-startup-tests.cc code, the return address is already in
-  // the word just below %rsp.  If started otherwise, that word will be zero.
-  // Either way %rsp needs to be adjusted down to 8 mod 16 as a call would do
-  // by pushing the return address for the C calling convention.  Instead of a
-  // call followed by a trap if it ever did return, just adjust %rsp down and
-  // jump so that either an original return address or a fault-inducing zero is
-  // the callee's return address.
-  sub $8, %rsp
 #ifdef IN_PROCESS_TEST
+  // If called by ld-startup-tests.cc code, the return address is already in
+  // the word just below %rsp.  Simulate what calling TestStart directly would
+  // do so its value is returned to the caller.
+  sub $8, %rsp
   jmp TestStart
 #else
   call TestStart

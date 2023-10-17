@@ -64,7 +64,10 @@ LoadExecutableResult LoadExecutable(Diagnostics& diag, StartupData& startup,
     diag.SystemError("no executable VMO in bootstrap message");
   } else {
     elfldltl::UnownedVmoFile file{vmo.borrow(), diag};
-    static_cast<StartupLoadResult&>(result) = result.module->Load(diag, initial_exec, file);
+    Elf::size_type max_tls_modid = 0;
+    static_cast<StartupLoadResult&>(result) =
+        result.module->Load(diag, initial_exec, file, max_tls_modid);
+    assert(max_tls_modid <= 1);
   }
   return result;
 }

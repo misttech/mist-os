@@ -47,7 +47,7 @@ namespace elfldltl {
 //
 //   This is like ReadFromFile, but for an array of T[count].  The const
 //   Result& referring to the return value's value() is implicitly convertible
-//   to cpp20::span<T>, but it might own the data.  Any particular File
+//   to cpp20::span<const T>, but it might own the data.  Any particular File
 //   implementation is free to ignore `allocator` instead always return its own
 //   result type that may or may not be an owning type.
 //
@@ -56,13 +56,13 @@ namespace elfldltl {
 // respect to T.
 //
 //  * template <typename T>
-//    std::optional<cpp20::span<T>> ReadArray(uintptr_t address, size_t count);
+//    std::optional<cpp20::span<const T>> ReadArray(uintptr_t address, size_t count);
 //
 //   This returns a view of T[count] if that's accessible at the address.  The
 //   data must be permanently accessible for the lifetime of the Memory object.
 //
 //  * template <typename T>
-//    std::optional<cpp20::span<T>> ReadArray(uintptr_t address);
+//    std::optional<cpp20::span<const T>> ReadArray(uintptr_t address);
 //
 //   This is the same but for when the caller doesn't know the size of the
 //   array.  So this returns a view of T[n] for some n > 0 that is accessible,
@@ -99,7 +99,7 @@ namespace elfldltl {
 // DirectMemory or other implementations that never call it.
 template <typename T>
 struct NoArrayFromFile {
-  using Result = cpp20::span<T>;
+  using Result = cpp20::span<const T>;
 
   std::optional<Result> operator()(size_t size) const { return std::nullopt; }
 };

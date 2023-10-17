@@ -1,0 +1,31 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+#ifndef LIB_LD_TEST_MODULES_TLS_DEP_H_
+#define LIB_LD_TEST_MODULES_TLS_DEP_H_
+
+#include <cstddef>
+
+constexpr size_t kTlsDepAlign = 32;
+constexpr int kTlsDepDataValue = 42;
+
+extern thread_local int tls_dep_data;
+extern thread_local char tls_dep_bss[2];
+
+// Since tls_dep_bss is what's aligned, the tls_bss_size includes the alignment
+// padding between the end of .tdata (containing only tls_dep_data) and the
+// aligned start of .tbss (containing tls_dep_bss).
+constexpr size_t kTlsDepBssSize = kTlsDepAlign - sizeof(tls_dep_data) + sizeof(tls_dep_bss);
+
+template <class ModuleList>
+inline const auto& FindTlsDep(const ModuleList& modules) {
+  for (const auto& module : modules) {
+    if (module.soname.str() == "libtls-dep.so") {
+      return module;
+    }
+  }
+  __builtin_trap();
+}
+
+#endif  // LIB_LD_TEST_MODULES_TLS_DEP_H_

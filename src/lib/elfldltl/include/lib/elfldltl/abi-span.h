@@ -35,7 +35,7 @@ class AbiSpan : public internal::AbiSpanImpl<T, N, Elf, Traits> {
   constexpr AbiSpan(const AbiSpan&) = default;
 
   constexpr AbiSpan(Ptr ptr, size_type size) noexcept
-      : internal::AbiSpanImpl<T, N, Elf, Traits>{ptr} {
+      : internal::AbiSpanImpl<T, N, Elf, Traits>(ptr) {
     assert(size == N);
   }
 
@@ -44,7 +44,13 @@ class AbiSpan : public internal::AbiSpanImpl<T, N, Elf, Traits> {
   // already allows the other direction because AbiSpan has data() and size().
   template <typename P = T*, typename = std::enable_if_t<std::is_constructible_v<Ptr, P>>>
   constexpr AbiSpan(cpp20::span<T, N> other)
-      : internal::AbiSpanImpl<T, N, Elf, Traits>{Ptr{other.data()}} {}
+      : internal::AbiSpanImpl<T, N, Elf, Traits>(Ptr{other.data()}) {}
+
+  template <typename TT = T, typename = std::enable_if_t<std::is_constructible_v<Ptr, TT*>>>
+  constexpr AbiSpan& operator=(cpp20::span<T, N> other) {
+    *this = AbiSpan{other};
+    return *this;
+  }
 
   constexpr size_type size() const { return static_cast<size_type>(N); }
 };
@@ -71,6 +77,12 @@ class AbiSpan<T, cpp20::dynamic_extent, Elf, Traits>
         size_{static_cast<size_type>(other.size())} {}
 
   constexpr AbiSpan& operator=(const AbiSpan&) = default;
+
+  template <typename TT = T, typename = std::enable_if_t<std::is_constructible_v<Ptr, TT*>>>
+  constexpr AbiSpan& operator=(cpp20::span<T> other) {
+    *this = AbiSpan{other};
+    return *this;
+  }
 
   constexpr size_type size() const { return size_; }
 

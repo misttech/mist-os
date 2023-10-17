@@ -34,6 +34,7 @@ library_headers("abi-headers") {
   headers = [
     "lib/ld/abi.h",
     "lib/ld/module.h",
+    "lib/ld/tls.h",
   ]
 
   public_deps = [

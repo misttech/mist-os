@@ -55,8 +55,9 @@ struct Abi {
   template <template <class, class> class Class>
   using Type = Class<Elf, AbiTraits>;
 
-  // Forward declaration for type declared in module.h.
+  // Forward declarations for types declared in module.h and tls.h.
   struct Module;
+  struct TlsModule;
 
   // This lists all the initial-exec modules.  Embedded `link_map::l_prev` and
   // `link_map::l_next` form a doubly-linked list in load order, which is a
@@ -65,7 +66,12 @@ struct Abi {
   // (except for any redundancies).
   Ptr<const Module> loaded_modules;
 
-  // TODO(fxbug.dev/128502): TLS layout details
+  // TLS details for initial-exec modules that have PT_TLS segments.  The entry
+  // at index `.tls_mod_id - 1` describes that module's PT_TLS.  A module with
+  // `.tls_mod_id == 0` has no PT_TLS segment.  TLS module ID numbers above
+  // static_tls_modules.size() are not used at startup but may be assigned to
+  // dynamically-loaded modules later.
+  Span<const TlsModule> static_tls_modules;
 };
 
 // This is the DT_SONAME value representing the ABI declared in this file.

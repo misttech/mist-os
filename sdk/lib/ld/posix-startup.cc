@@ -124,6 +124,10 @@ std::pair<StartupModule*, size_t> LoadExecutable(Diagnostics& diag, StartupData&
   // the executable image, but the object will never be destroyed anyway.
   main_executable->memory() = ModuleMemory{module};
 
+  if (phdr_info.tls_phdr) {
+    main_executable->SetTls(diag, main_executable->memory(), 1, *phdr_info.tls_phdr);
+  }
+
   size_t needed_count = main_executable->DecodeDynamic(diag, phdr_info.dyn_phdr);
 
   return {main_executable, needed_count};

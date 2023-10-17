@@ -4,7 +4,7 @@
 
 #include <lib/ld/abi.h>
 #include <lib/ld/module.h>
-#include <string.h>
+#include <lib/ld/tls.h>
 
 #include <array>
 #include <type_traits>

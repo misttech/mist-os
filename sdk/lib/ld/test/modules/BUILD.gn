@@ -9,26 +9,25 @@ import("//build/toolchain/zircon/user_basic_redirect.gni")
 # This only gets instantiated in the environment where the test modules are
 # meant to be built.
 
-executables = [
+# Everything in this list has can_be_in_process = true.
+in_process_executables = [
   ":ret17",
-  ":ret17.in-process",
   ":relative-reloc",
-  ":relative-reloc.in-process",
   ":symbolic-reloc",
-  ":symbolic-reloc.in-process",
   ":ld-dep",
-  ":ld-dep.in-process",
   ":basic-dep",
-  ":basic-dep.in-process",
   ":passive-abi-basic",
-  ":passive-abi-basic.in-process",
   ":symbolic-namespace",
-  ":symbolic-namespace.in-process",
   ":many-deps",
-  ":many-deps.in-process",
   ":init-fini",
-  ":init-fini.in-process",
+  ":tls-exec-only",
+  ":tls-shlib-only",
+  ":tls-exec-shlib",
 ]
+
+# Everything in this list does not have can_be_in_process = true.
+executables = []
+
 shlibs = [
   ":ld-dep-a",
   ":ld-dep-b",
@@ -36,8 +35,17 @@ shlibs = [
   ":ld-dep-d",
   ":ld-dep-e",
   ":ld-dep-f",
+  ":tls-dep",
 ]
+
 modules = []
+
+foreach(label, in_process_executables) {
+  executables += [
+    label,
+    "$label.in-process",
+  ]
+}
 
 if (is_fuchsia) {
   assert(toolchain_environment == "user.basic",
@@ -360,4 +368,34 @@ test_executable("init-fini") {
   can_be_in_process = true
   sources = [ "init-fini.cc" ]
   deps = [ "../.." ]
+}
+
+test_executable("tls-exec-only") {
+  can_be_in_process = true
+  sources = [ "tls-exec-only.cc" ]
+  deps = [ "../.." ]
+}
+
+test_executable("tls-shlib-only") {
+  can_be_in_process = true
+  sources = [ "tls-shlib-only.cc" ]
+  deps = [
+    ":tls-dep",
+    "../..",
+  ]
+}
+
+test_shared_library("tls-dep") {
+  public = [ "tls-dep.h" ]
+  sources = [ "tls-dep.cc" ]
+  deps = [ "//zircon/system/public" ]
+}
+
+test_executable("tls-exec-shlib") {
+  can_be_in_process = true
+  sources = [ "tls-exec-shlib.cc" ]
+  deps = [
+    ":tls-dep",
+    "../..",
+  ]
 }
