@@ -148,7 +148,7 @@ impl SignalState {
     /// Sets the signal mask of the state, and returns the old signal mask.
     pub fn set_mask(&mut self, signal_mask: SigSet) -> SigSet {
         let old_mask = self.mask;
-        self.mask = signal_mask.with_sigset_removed(UNBLOCKABLE_SIGNALS);
+        self.mask = signal_mask & !UNBLOCKABLE_SIGNALS;
         old_mask
     }
 
@@ -159,7 +159,7 @@ impl SignalState {
     pub fn set_temporary_mask(&mut self, signal_mask: SigSet) {
         assert!(self.saved_mask.is_none());
         self.saved_mask = Some(self.mask);
-        self.mask = signal_mask.with_sigset_removed(UNBLOCKABLE_SIGNALS);
+        self.mask = signal_mask & !UNBLOCKABLE_SIGNALS;
     }
 
     /// Restores the signal mask to what it was before the previous call to `set_temporary_mask`.

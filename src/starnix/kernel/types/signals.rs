@@ -6,6 +6,7 @@ use static_assertions::assert_eq_size;
 use std::{
     convert::{From, TryFrom},
     fmt,
+    ops::{BitAnd, BitOr, Not},
 };
 
 use crate::types::*;
@@ -189,29 +190,31 @@ impl SigSet {
     pub fn has_signal(&self, signal: Signal) -> bool {
         (self.0 & (signal.mask() as std::os::raw::c_ulong)) != 0
     }
+}
 
-    pub fn to_inverted(self) -> SigSet {
+impl BitAnd for SigSet {
+    type Output = Self;
+
+    // rhs is the "right-hand side" of the expression `a & b`
+    fn bitand(self, rhs: Self) -> Self::Output {
+        Self(self.0 & rhs.0)
+    }
+}
+
+impl BitOr for SigSet {
+    type Output = Self;
+
+    // rhs is the "right-hand side" of the expression `a | b`
+    fn bitor(self, rhs: Self) -> Self::Output {
+        Self(self.0 | rhs.0)
+    }
+}
+
+impl Not for SigSet {
+    type Output = Self;
+
+    fn not(self) -> Self::Output {
         SigSet(!self.0)
-    }
-
-    /// Returns a new SigSet with the given signal added.
-    pub fn with_signal_added(&self, to_add: Signal) -> SigSet {
-        SigSet(self.0 | (to_add.mask() as std::os::raw::c_ulong))
-    }
-
-    /// Returns a new SigSet with the given signals added.
-    pub fn with_sigset_added(&self, to_add: SigSet) -> SigSet {
-        SigSet(self.0 | to_add.0)
-    }
-
-    /// Returns a new SigSet with the given signal removed.
-    pub fn with_signal_removed(&self, to_remove: Signal) -> SigSet {
-        SigSet(self.0 & !(to_remove.mask() as std::os::raw::c_ulong))
-    }
-
-    /// Returns a new SigSet with the given signals removed.
-    pub fn with_sigset_removed(&self, to_remove: SigSet) -> SigSet {
-        SigSet(self.0 & !to_remove.0)
     }
 }
 

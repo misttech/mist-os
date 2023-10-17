@@ -129,7 +129,7 @@ impl FileOps for SignalFd {
         current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
         let mut events = FdEvents::empty();
-        if current_task.read().signals.is_any_allowed_by_mask(self.mask.lock().to_inverted()) {
+        if current_task.read().signals.is_any_allowed_by_mask(!*self.mask.lock()) {
             events |= FdEvents::POLLIN;
         }
         Ok(events)

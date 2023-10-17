@@ -97,8 +97,8 @@ pub fn sys_rt_sigprocmask(
     }
 
     let signal_mask = match how {
-        SIG_BLOCK => signal_mask.with_sigset_added(new_mask),
-        SIG_UNBLOCK => signal_mask.with_sigset_removed(new_mask),
+        SIG_BLOCK => signal_mask | new_mask,
+        SIG_UNBLOCK => signal_mask & !new_mask,
         SIG_SETMASK => new_mask,
         // Arguments have already been verified, this should never match.
         _ => return error!(EINVAL),
@@ -186,7 +186,7 @@ pub fn sys_rt_sigtimedwait(
     }
 
     let mask = current_task.read_object(set_addr)?;
-    let mask = mask.with_sigset_removed(UNBLOCKABLE_SIGNALS);
+    let mask = mask & !UNBLOCKABLE_SIGNALS;
     let deadline = if timeout_addr.is_null() {
         zx::Time::INFINITE
     } else {
@@ -1099,7 +1099,7 @@ mod tests {
 
         let old_mask = current_task.read_object(old_set).expect("failed to read mask");
         assert_eq!(old_mask, original_mask);
-        assert_eq!(current_task.read().signals.mask(), new_mask.with_sigset_added(original_mask));
+        assert_eq!(current_task.read().signals.mask(), new_mask | original_mask);
     }
 
     /// Calling st_sigprocmask with a how of SIG_UNBLOCK should remove from the existing set.
@@ -1112,7 +1112,7 @@ mod tests {
             .write_memory(addr, &[0u8; std::mem::size_of::<SigSet>() * 2])
             .expect("failed to clear struct");
 
-        let original_mask = SigSet::from(SIGTRAP).with_signal_added(SIGIO);
+        let original_mask = SigSet::from(SIGTRAP) | SigSet::from(SIGIO);
         {
             current_task.write().signals.set_mask(original_mask);
         }
@@ -1245,7 +1245,7 @@ mod tests {
             .write_memory(addr, &[0u8; std::mem::size_of::<sigaction_t>()])
             .expect("failed to clear struct");
 
-        let org_mask = SigSet::from(SIGHUP).with_signal_added(SIGINT);
+        let org_mask = SigSet::from(SIGHUP) | SigSet::from(SIGINT);
         let original_action = sigaction_t { sa_mask: org_mask, ..sigaction_t::default() };
 
         {
@@ -1277,7 +1277,7 @@ mod tests {
             .write_memory(addr, &[0u8; std::mem::size_of::<sigaction_t>()])
             .expect("failed to clear struct");
 
-        let org_mask = SigSet::from(SIGHUP).with_signal_added(SIGINT);
+        let org_mask = SigSet::from(SIGHUP) | SigSet::from(SIGINT);
         let original_action = sigaction_t { sa_mask: org_mask, ..sigaction_t::default() };
         let set_action_ref = UserRef::<sigaction_t>::new(addr);
         current_task
@@ -1474,7 +1474,7 @@ mod tests {
             let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
             let user_ref = UserRef::<SigSet>::new(addr);
 
-            let sigset = SigSet::from(SIGHUP).to_inverted();
+            let sigset = !SigSet::from(SIGHUP);
             current_task.write_object(user_ref, &sigset).expect("failed to set action");
 
             assert_eq!(

@@ -175,9 +175,7 @@ pub fn deliver_signal(
                         || masked_signals.has_signal(SIGSEGV)
                         || action == DeliveryAction::Ignore
                     {
-                        task_state
-                            .signals
-                            .set_mask(masked_signals.with_sigset_removed(SIGSEGV.into()));
+                        task_state.signals.set_mask(masked_signals & !SigSet::from(SIGSEGV));
                         task.thread_group.signal_actions.set(SIGSEGV, sigaction_t::default());
                     }
 
