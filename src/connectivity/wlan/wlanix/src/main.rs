@@ -506,6 +506,9 @@ async fn handle_nl80211_message<I: IfaceManager>(
     };
     let deserialized = GenlMessage::<Nl80211>::deserialize(&NetlinkHeader::default(), &payload[..]);
     let Ok(message) = deserialized else {
+        responder
+            .send(Err(zx::sys::ZX_ERR_INTERNAL))
+            .context("sending error status on failing to parse nl80211 message")?;
         bail!("Failed to parse nl80211 message: {}", deserialized.unwrap_err())
     };
     match message.payload.cmd {
@@ -593,7 +596,12 @@ async fn handle_nl80211_message<I: IfaceManager>(
                             .context("Failed to send NewScanResults")?;
                     }
                 }
-                None => bail!("TriggerScan did not include an iface id"),
+                None => {
+                    responder
+                        .send(Err(zx::sys::ZX_ERR_INVALID_ARGS))
+                        .context("sending error status due to missing iface id on TriggerScan")?;
+                    bail!("TriggerScan did not include an iface id")
+                }
             }
         }
         Nl80211Cmd::GetScan => {
@@ -615,7 +623,12 @@ async fn handle_nl80211_message<I: IfaceManager>(
                         .send(Ok(nl80211_message_resp(resp)))
                         .context("Failed to send scan results")?;
                 }
-                None => bail!("TriggerScan did not include an iface id"),
+                None => {
+                    responder
+                        .send(Err(zx::sys::ZX_ERR_INVALID_ARGS))
+                        .context("sending error status due to missing iface id on GetScan")?;
+                    bail!("GetScan did not include an iface id");
+                }
             }
         }
         _ => {
@@ -1244,6 +1257,69 @@ mod tests {
     }
 
     #[test]
+    fn unsupported_nl80211_command() {
+        #[derive(Debug)]
+        struct TestNl80211 {
+            cmd: u8,
+            attrs: Vec<Nl80211Attr>,
+        }
+
+        impl netlink_packet_generic::GenlFamily for TestNl80211 {
+            fn family_name() -> &'static str {
+                "nl80211"
+            }
+
+            fn command(&self) -> u8 {
+                self.cmd
+            }
+
+            fn version(&self) -> u8 {
+                1
+            }
+        }
+
+        impl netlink_packet_utils::Emitable for TestNl80211 {
+            fn emit(&self, buffer: &mut [u8]) {
+                self.attrs.as_slice().emit(buffer)
+            }
+
+            fn buffer_len(&self) -> usize {
+                self.attrs.as_slice().buffer_len()
+            }
+        }
+
+        let mut exec = fasync::TestExecutor::new();
+        let (proxy, stream) =
+            create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>().expect("Failed to get proxy");
+
+        let state = Arc::new(Mutex::new(WifiState::default()));
+        let iface_manager = Arc::new(TestIfaceManager::new_with_client());
+        let nl80211_fut = serve_nl80211(stream, state, iface_manager);
+        pin_mut!(nl80211_fut);
+
+        // Create an nl80211 message with invalid command
+        let genl_message = GenlMessage::from_payload(TestNl80211 { cmd: 255, attrs: vec![] });
+        let mut buffer = vec![0u8; genl_message.buffer_len()];
+        genl_message.serialize(&mut buffer);
+        let invalid_message = fidl_wlanix::Nl80211Message {
+            message_type: Some(fidl_wlanix::Nl80211MessageType::Message),
+            payload: Some(buffer),
+            ..Default::default()
+        };
+
+        let query_resp_fut = proxy.message(fidl_wlanix::Nl80211MessageRequest {
+            message: Some(invalid_message),
+            ..Default::default()
+        });
+        pin_mut!(query_resp_fut);
+        assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
+        assert_variant!(
+            exec.run_until_stalled(&mut query_resp_fut),
+            Poll::Ready(Ok(Err(zx::sys::ZX_ERR_INTERNAL))),
+        );
+    }
+
+    #[test]
     fn get_interface() {
         let mut exec = fasync::TestExecutor::new();
         let (proxy, stream) =
@@ -1332,6 +1408,31 @@ mod tests {
     }
 
     #[test]
+    fn trigger_scan_no_iface_arg() {
+        let mut exec = fasync::TestExecutor::new();
+        let (proxy, stream) =
+            create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>().expect("Failed to get proxy");
+
+        let state = Arc::new(Mutex::new(WifiState::default()));
+        let iface_manager = Arc::new(TestIfaceManager::new_with_client());
+        let nl80211_fut = serve_nl80211(stream, state, iface_manager);
+        pin_mut!(nl80211_fut);
+
+        let trigger_scan_message = build_nl80211_message(Nl80211Cmd::TriggerScan, vec![]);
+        let trigger_scan_fut = proxy.message(fidl_wlanix::Nl80211MessageRequest {
+            message: Some(trigger_scan_message),
+            ..Default::default()
+        });
+
+        pin_mut!(trigger_scan_fut);
+        assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
+        assert_variant!(
+            exec.run_until_stalled(&mut trigger_scan_fut),
+            Poll::Ready(Ok(Err(zx::sys::ZX_ERR_INVALID_ARGS))),
+        );
+    }
+
+    #[test]
     fn get_scan_results() {
         let mut exec = fasync::TestExecutor::new();
         let (proxy, stream) =
@@ -1358,5 +1459,30 @@ mod tests {
         assert_eq!(responses.len(), 2);
         assert_eq!(responses[0].message_type, Some(fidl_wlanix::Nl80211MessageType::Message));
         assert_eq!(responses[1].message_type, Some(fidl_wlanix::Nl80211MessageType::Done));
+    }
+
+    #[test]
+    fn get_scan_results_no_iface_args() {
+        let mut exec = fasync::TestExecutor::new();
+        let (proxy, stream) =
+            create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>().expect("Failed to get proxy");
+
+        let state = Arc::new(Mutex::new(WifiState::default()));
+        let iface_manager = Arc::new(TestIfaceManager::new_with_client());
+        let nl80211_fut = serve_nl80211(stream, state, iface_manager);
+        pin_mut!(nl80211_fut);
+
+        let get_scan_message = build_nl80211_message(Nl80211Cmd::GetScan, vec![]);
+        let get_scan_fut = proxy.message(fidl_wlanix::Nl80211MessageRequest {
+            message: Some(get_scan_message),
+            ..Default::default()
+        });
+
+        pin_mut!(get_scan_fut);
+        assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
+        assert_variant!(
+            exec.run_until_stalled(&mut get_scan_fut),
+            Poll::Ready(Ok(Err(zx::sys::ZX_ERR_INVALID_ARGS))),
+        );
     }
 }
