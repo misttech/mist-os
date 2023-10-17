@@ -54,8 +54,6 @@ impl Seeder {
         }
     }
 
-    // TODO(fxbug.dev/78962) Ensure we also track a control_handle in case we need
-    // to send an epitaph back across the stream without a responder.
     pub(crate) fn seed<J, E, E2, T>(&self, source: T)
     where
         Job: TryFrom<J, Error = E2>,

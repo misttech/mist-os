@@ -87,7 +87,13 @@ where
                     panic!("should not have received a different payload type:{payload:?}");
                 }
             },
-            _ => Err(crate::handler::base::Error::CommunicationError),
+            _ => {
+                tracing::warn!(
+                    "An error occurred while independent job was executing for request:{:?}",
+                    self.request.clone()
+                );
+                Err(crate::handler::base::Error::CommunicationError)
+            }
         }));
     }
 }
