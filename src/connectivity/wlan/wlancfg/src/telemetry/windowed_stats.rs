@@ -50,7 +50,7 @@ impl<T: Default + SaturatingAdd> WindowedStats<T> {
 mod tests {
     use super::*;
 
-    #[test]
+    #[fuchsia::test]
     fn windowed_stats_some_windows_populated() {
         let mut windowed_stats = WindowedStats::<u32>::new(3);
         windowed_stats.saturating_add(&1u32);
@@ -62,7 +62,7 @@ mod tests {
         assert_eq!(windowed_stats.windowed_stat(None), 6u32);
     }
 
-    #[test]
+    #[fuchsia::test]
     fn windowed_stats_all_windows_populated() {
         let mut windowed_stats = WindowedStats::<u32>::new(3);
         windowed_stats.saturating_add(&1u32);
@@ -82,7 +82,7 @@ mod tests {
         assert_eq!(windowed_stats.windowed_stat(None), 15u32);
     }
 
-    #[test]
+    #[fuchsia::test]
     fn windowed_stats_large_number() {
         let mut windowed_stats = WindowedStats::<u32>::new(3);
         windowed_stats.saturating_add(&10u32);
@@ -99,7 +99,7 @@ mod tests {
         assert_eq!(windowed_stats.windowed_stat(None), u32::MAX - 1);
     }
 
-    #[test]
+    #[fuchsia::test]
     fn windowed_stats_test_overflow() {
         let mut windowed_stats = WindowedStats::<u32>::new(3);
         // Overflow in a single window
@@ -118,7 +118,7 @@ mod tests {
         assert_eq!(windowed_stats.windowed_stat(None), 18u32);
     }
 
-    #[test]
+    #[fuchsia::test]
     fn windowed_stats_n_arg() {
         let mut windowed_stats = WindowedStats::<u32>::new(3);
         windowed_stats.saturating_add(&1u32);

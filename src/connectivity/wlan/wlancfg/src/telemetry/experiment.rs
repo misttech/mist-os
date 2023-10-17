@@ -114,7 +114,7 @@ mod tests {
         assert_eq!(ExperimentId::from(ps_type), expected)
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_experiments_initialization() {
         // Ensure that the experiment IDs are initialized properly
         let experiments = Experiments::new();
@@ -123,7 +123,7 @@ mod tests {
         assert_eq!(experiments.get_experiment_ids(), vec![CONTROL_POWER_EXPERIMENT_ID.0]);
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_power_save_update() {
         let mut experiments = Experiments::new();
 

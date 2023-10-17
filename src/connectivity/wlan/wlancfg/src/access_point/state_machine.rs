@@ -2157,7 +2157,7 @@ mod tests {
         assert_variant!(poll_sme_req(&mut exec, &mut sme_fut), Poll::Pending);
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_no_notification_when_sme_fails_while_stopped() {
         let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
@@ -2188,7 +2188,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_failure_notification_when_configured() {
         let mut exec = fasync::TestExecutor::new();
         let mut test_values = test_setup();
@@ -2263,7 +2263,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_state_tracker_reset() {
         let _exec = fasync::TestExecutor::new();
         let (sender, mut receiver) = mpsc::unbounded();
@@ -2320,7 +2320,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_state_tracker_consume_sme_update() {
         let _exec = fasync::TestExecutor::new();
         let (sender, mut receiver) = mpsc::unbounded();
@@ -2383,7 +2383,7 @@ mod tests {
         });
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_state_tracker_update_operating_state() {
         let _exec = fasync::TestExecutor::new();
         let (sender, mut receiver) = mpsc::unbounded();
@@ -2462,7 +2462,7 @@ mod tests {
         });
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_state_tracker_set_stopped_state() {
         let _exec = fasync::TestExecutor::new();
         let (sender, mut receiver) = mpsc::unbounded();
@@ -2495,7 +2495,7 @@ mod tests {
         });
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_state_tracker_failure_modes() {
         let _exec = fasync::TestExecutor::new();
         let (sender, receiver) = mpsc::unbounded();

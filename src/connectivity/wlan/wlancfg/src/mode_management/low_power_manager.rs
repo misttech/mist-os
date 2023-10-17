@@ -122,7 +122,7 @@ mod tests {
         TestValues { phy_manager, telemetry_sender, telemetry_receiver, watcher_proxy, watcher_svc }
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_no_wlan_power_config() {
         let mut exec = fuchsia_async::TestExecutor::new();
         let test_vals = test_setup();
@@ -144,7 +144,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()))
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_power_watcher_drops() {
         let mut exec = fuchsia_async::TestExecutor::new();
         let mut test_vals = test_setup();
@@ -189,7 +189,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_applying_power_setting_fails() {
         let mut exec = fuchsia_async::TestExecutor::new();
         let mut test_vals = test_setup();

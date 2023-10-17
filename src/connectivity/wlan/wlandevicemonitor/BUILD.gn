@@ -62,6 +62,7 @@ wlandevicemonitor_test_deps = [
   "//src/connectivity/wlan/lib/common/rust/:wlan-common",
   "//src/connectivity/wlan/lib/ieee80211",
   "//src/connectivity/wlan/testing/wlantap-client",
+  "//src/lib/fuchsia",
   "//src/lib/fuchsia-component",
   "//third_party/rust_crates:test-case",
   "//third_party/rust_crates:zerocopy",

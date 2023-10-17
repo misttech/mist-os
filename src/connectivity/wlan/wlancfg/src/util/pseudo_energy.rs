@@ -178,7 +178,7 @@ mod tests {
         assert!(calculate_pseudodecibel_velocity(vec![-60.0, 20.0]).is_err());
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_calculate_negative_velocity() {
         assert_eq!(
             calculate_pseudodecibel_velocity(vec![-60.0, -75.0]).expect("failed to calculate"),
@@ -191,7 +191,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_calculate_positive_velocity() {
         assert_eq!(
             calculate_pseudodecibel_velocity(vec![-48.0, -45.0]).expect("failed to calculate"),
@@ -204,7 +204,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_calculate_constant_zero_velocity() {
         assert_eq!(
             calculate_pseudodecibel_velocity(vec![-25.0, -25.0, -25.0, -25.0, -25.0, -25.0])
@@ -213,7 +213,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_calculate_oscillating_zero_velocity() {
         assert_eq!(
             calculate_pseudodecibel_velocity(
@@ -224,7 +224,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_calculate_min_max_velocity() {
         assert_eq!(
             calculate_pseudodecibel_velocity(vec![-1.0, -128.0]).expect("failed to calculate"),
@@ -236,7 +236,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_update_with_new_measurements() {
         let mut signal_data = SignalData::new(-40, 30, 10, 3);
         signal_data.update_with_new_measurement(-60, 15);

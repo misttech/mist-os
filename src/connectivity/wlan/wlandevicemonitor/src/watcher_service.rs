@@ -224,7 +224,7 @@ mod tests {
     use futures::{pin_mut, task::Poll};
     use std::mem;
 
-    #[test]
+    #[fuchsia::test]
     fn reap_watchers() {
         let exec = &mut fasync::TestExecutor::new();
         let (helper, future) = setup();
@@ -250,7 +250,7 @@ mod tests {
         assert_eq!(0, helper.service.inner.lock().watchers.len());
     }
 
-    #[test]
+    #[fuchsia::test]
     fn add_remove_phys() {
         let exec = &mut fasync::TestExecutor::new();
         let (helper, future) = setup();
@@ -285,7 +285,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[fuchsia::test]
     fn add_remove_ifaces() {
         let exec = &mut fasync::TestExecutor::new();
         let (helper, future) = setup();
@@ -314,7 +314,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[fuchsia::test]
     fn snapshot_phys() {
         let exec = &mut fasync::TestExecutor::new();
         let (helper, future) = setup();
@@ -342,7 +342,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[fuchsia::test]
     fn snapshot_ifaces() {
         let exec = &mut fasync::TestExecutor::new();
         let (helper, future) = setup();
@@ -370,7 +370,7 @@ mod tests {
         }
     }
 
-    #[test]
+    #[fuchsia::test]
     fn two_watchers() {
         let exec = &mut fasync::TestExecutor::new();
         let (helper, future) = setup();
@@ -401,7 +401,7 @@ mod tests {
         assert_eq!(1, events_two.len());
     }
 
-    #[test]
+    #[fuchsia::test]
     fn remove_watcher_on_send_error() {
         let exec = &mut fasync::TestExecutor::new();
         let (helper, future) = setup();

@@ -799,7 +799,7 @@ mod tests {
         wlan_common::{assert_variant, fake_bss_description},
     };
 
-    #[test]
+    #[fuchsia::test]
     fn negotiate_authentication() {
         let bss = fake_bss_description!(Open);
         assert_eq!(
@@ -861,7 +861,7 @@ mod tests {
         ));
     }
 
-    #[test]
+    #[fuchsia::test]
     fn destroy_iface() {
         let mut exec = fasync::TestExecutor::new();
         let (monitor_svc_local, monitor_svc_remote) =
@@ -883,7 +883,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_country_input() {
         assert!(is_valid_country_str(&"RS".to_string()));
         assert!(is_valid_country_str(&"00".to_string()));
@@ -895,7 +895,7 @@ mod tests {
         assert!(!is_valid_country_str(&"❤".to_string()));
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_get_country() {
         let mut exec = fasync::TestExecutor::new();
         let (monitor_svc_local, monitor_svc_remote) =
@@ -922,7 +922,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_set_country() {
         let mut exec = fasync::TestExecutor::new();
         let (monitor_svc_local, monitor_svc_remote) =
@@ -946,7 +946,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_clear_country() {
         let mut exec = fasync::TestExecutor::new();
         let (monitor_svc_local, monitor_svc_remote) =
@@ -968,7 +968,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_get_power_save_mode() {
         let mut exec = fasync::TestExecutor::new();
         let (monitor_svc_local, monitor_svc_remote) =
@@ -995,7 +995,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_set_power_save_mode() {
         let mut exec = fasync::TestExecutor::new();
         let (monitor_svc_local, monitor_svc_remote) =
@@ -1020,7 +1020,7 @@ mod tests {
             }
         );
     }
-    #[test]
+    #[fuchsia::test]
     fn test_generate_psk() {
         assert_eq!(
             generate_psk("12345678", "coolnet").unwrap(),
@@ -1033,7 +1033,7 @@ mod tests {
         error.chain().any(|cause| cause.to_string() == message)
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_error_from_sme_raw_status() {
         let not_found = error_from_sme_raw_status(
             zx_status::Status::NOT_FOUND.into_raw(),
@@ -1068,7 +1068,7 @@ mod tests {
         ));
     }
 
-    #[test]
+    #[fuchsia::test]
     fn reject_connect_ssid_too_long() {
         let mut exec = fasync::TestExecutor::new();
         let (monitor_local, monitor_remote) =
@@ -1093,7 +1093,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut monitor_stream.next()), Poll::Pending);
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_wmm_status() {
         let mut exec = fasync::TestExecutor::new();
         let (monitor_local, monitor_remote) =

@@ -626,7 +626,7 @@ mod tests {
         wlandevicemonitor_config::Config { wep_supported: false, wpa1_supported: false }
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_list_phys() {
         let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
@@ -691,7 +691,7 @@ mod tests {
         });
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_list_ifaces() {
         let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
@@ -747,7 +747,7 @@ mod tests {
         });
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_get_dev_path_success() {
         let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
@@ -785,7 +785,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_get_dev_path_phy_not_found() {
         let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
@@ -815,7 +815,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut query_fut), Poll::Ready(Ok(None)));
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_get_mac_roles_success() {
         let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
@@ -863,7 +863,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_get_mac_roles_phy_not_found() {
         let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
@@ -896,7 +896,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_watch_devices_add_remove_phy() {
         let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
@@ -952,7 +952,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_watch_devices_remove_existing_phy() {
         let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
@@ -1011,7 +1011,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_watch_devices_add_remove_iface() {
         let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
@@ -1075,7 +1075,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_watch_devices_remove_existing_iface() {
         let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
@@ -1142,7 +1142,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_set_country_succeeds() {
         // Setup environment
         let mut exec = fasync::TestExecutor::new();
@@ -1173,7 +1173,7 @@ mod tests {
         assert_eq!(exec.run_until_stalled(&mut req_fut), Poll::Ready(zx::Status::OK));
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_set_country_fails() {
         // Setup environment
         let mut exec = fasync::TestExecutor::new();
@@ -1206,7 +1206,7 @@ mod tests {
         assert_eq!(Poll::Ready(zx::Status::NOT_SUPPORTED), exec.run_until_stalled(&mut req_fut));
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_get_country_succeeds() {
         // Setup environment
         let mut exec = fasync::TestExecutor::new();
@@ -1239,7 +1239,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_get_country_fails() {
         // Setup environment
         let mut exec = fasync::TestExecutor::new();
@@ -1267,7 +1267,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut req_fut), Poll::Ready(Err(_)));
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_clear_country_succeeds() {
         // Setup environment
         let mut exec = fasync::TestExecutor::new();
@@ -1296,7 +1296,7 @@ mod tests {
         assert_eq!(exec.run_until_stalled(&mut req_fut), Poll::Ready(zx::Status::OK));
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_clear_country_fails() {
         // Setup environment
         let mut exec = fasync::TestExecutor::new();
@@ -1327,7 +1327,7 @@ mod tests {
         assert_eq!(Poll::Ready(zx::Status::NOT_SUPPORTED), exec.run_until_stalled(&mut req_fut));
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_set_power_save_mode_succeeds() {
         // Setup environment
         let mut exec = fasync::TestExecutor::new();
@@ -1360,7 +1360,7 @@ mod tests {
         assert_eq!(exec.run_until_stalled(&mut req_fut), Poll::Ready(zx::Status::OK));
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_set_power_save_mode_fails() {
         // Setup environment
         let mut exec = fasync::TestExecutor::new();
@@ -1395,7 +1395,7 @@ mod tests {
         assert_eq!(Poll::Ready(zx::Status::NOT_SUPPORTED), exec.run_until_stalled(&mut req_fut));
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_get_power_save_mode_succeeds() {
         // Setup environment
         let mut exec = fasync::TestExecutor::new();
@@ -1429,7 +1429,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_get_power_save_mode_fails() {
         // Setup environment
         let mut exec = fasync::TestExecutor::new();
@@ -1457,7 +1457,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut req_fut), Poll::Ready(Err(_)));
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_iface_counter() {
         let iface_counter = IfaceCounter::new();
         assert_eq!(0, iface_counter.next_iface_id());
@@ -1561,7 +1561,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_create_multiple_ifaces() {
         let mut exec = fasync::TestExecutor::new();
         let mut test_values = test_setup();
@@ -1658,7 +1658,7 @@ mod tests {
         });
     }
 
-    #[test]
+    #[fuchsia::test]
     fn create_iface_on_invalid_phy_id() {
         let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
@@ -1707,7 +1707,7 @@ mod tests {
         phy_stream
     }
 
-    #[test]
+    #[fuchsia::test]
     fn destroy_iface_success() {
         let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
@@ -1736,7 +1736,7 @@ mod tests {
         assert!(test_values.ifaces.get(&42u16).is_none(), "iface expected to be deleted");
     }
 
-    #[test]
+    #[fuchsia::test]
     fn destroy_iface_failure() {
         let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
@@ -1768,7 +1768,7 @@ mod tests {
         assert!(test_values.ifaces.get(&42u16).is_some(), "iface expected to not be deleted");
     }
 
-    #[test]
+    #[fuchsia::test]
     fn destroy_iface_recovery() {
         let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
@@ -1806,7 +1806,7 @@ mod tests {
         assert!(test_values.ifaces.get(&42u16).is_none(), "iface should have been removed.");
     }
 
-    #[test]
+    #[fuchsia::test]
     fn destroy_iface_not_found() {
         let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
@@ -1822,7 +1822,7 @@ mod tests {
         assert_eq!(Poll::Ready(Err(zx::Status::NOT_FOUND)), exec.run_until_stalled(&mut fut));
     }
 
-    #[test]
+    #[fuchsia::test]
     fn destroy_iface_phy_not_found() {
         let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
@@ -1853,7 +1853,7 @@ mod tests {
         assert!(test_values.ifaces.get(&1).is_none());
     }
 
-    #[test]
+    #[fuchsia::test]
     fn get_client_sme() {
         let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
@@ -1900,7 +1900,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[fuchsia::test]
     fn get_client_sme_fails() {
         let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
@@ -1938,7 +1938,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut req_fut), Poll::Ready(Err(_)));
     }
 
-    #[test]
+    #[fuchsia::test]
     fn get_client_sme_invalid_iface() {
         let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
@@ -1966,7 +1966,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut req_fut), Poll::Ready(Err(_)));
     }
 
-    #[test]
+    #[fuchsia::test]
     fn get_feature_support() {
         let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
@@ -2003,7 +2003,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut req_fut), Poll::Ready(Ok(_)));
     }
 
-    #[test]
+    #[fuchsia::test]
     fn query_iface() {
         let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();

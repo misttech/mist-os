@@ -106,7 +106,7 @@ mod tests {
     use super::*;
     use wlan_common::assert_variant;
 
-    #[test]
+    #[fuchsia::test]
     fn insert_remove_get() {
         let (map, _recv) = WatchableMap::new();
         map.insert(3u16, "foo");
@@ -115,7 +115,7 @@ mod tests {
         assert_eq!(None, map.get(&3u16));
     }
 
-    #[test]
+    #[fuchsia::test]
     fn get_snapshot() {
         let (map, _recv) = WatchableMap::new();
         map.insert(3u16, "foo");
@@ -134,7 +134,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[fuchsia::test]
     fn events() {
         let (map, mut recv) = WatchableMap::new();
         map.insert(3u16, "foo");

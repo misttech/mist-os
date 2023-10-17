@@ -138,7 +138,7 @@ mod tests {
         wlan_common::{assert_variant, test_utils::ExpectWithin},
     };
 
-    #[test]
+    #[fuchsia::test]
     fn test_serve_phys_exits_when_watching_devices_fails() {
         let mut exec = fasync::TestExecutor::new();
         let (phys, _phy_events) = PhyMap::new();
@@ -150,7 +150,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_serve_phy_adds_and_removes_phy() {
         let mut exec = fasync::TestExecutor::new();
         let (phys, mut phy_events) = PhyMap::new();
