@@ -36,18 +36,13 @@
 mod zbi_format;
 
 use bitflags::bitflags;
-use core::fmt::{Debug, Display, Formatter};
-use core::mem::{size_of, take};
-use core::ops::DerefMut;
+use core::{
+    fmt::{Debug, Display, Formatter},
+    mem::{size_of, take},
+    ops::DerefMut,
+};
 use zbi_format::*;
-use zerocopy::{AsBytes, ByteSlice, ByteSliceMut};
-
-// This code is also required to run in Android tree. And it contains only `zerocopy-0.6` at the
-// moment. So we have this feature to make sure it works with both versions.
-#[cfg(not(feature = "zerocopy_0_6"))]
-use zerocopy::Ref;
-#[cfg(feature = "zerocopy_0_6")]
-type Ref<B, T> = zerocopy::LayoutVerified<B, T>;
+use zerocopy::{AsBytes, ByteSlice, ByteSliceMut, Ref};
 
 type ZbiResult<T> = Result<T, ZbiError>;
 

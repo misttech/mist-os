@@ -30,10 +30,7 @@ readonly RAW_LINES="// Copyright 2023 The Fuchsia Authors. All rights reserved.
 #![allow(non_snake_case)]
 #![allow(clippy::undocumented_unsafe_blocks)]
 
-use zerocopy::{AsBytes, FromBytes};
-
-#[cfg(not(feature = \"zerocopy_0_6\"))]
-use zerocopy::FromZeroes;
+use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
 // Configure linkage for MacOS.
 #[cfg(target_os = \"macos\")]
@@ -47,9 +44,6 @@ readonly INPUT=( \
 	"${FUCHSIA_DIR}/sdk/lib/zbi-format/include/lib/zbi-format/kernel.h" \
 	"${FUCHSIA_DIR}/sdk/lib/zbi-format/include/lib/zbi-format/zbi.h" \
 )
-
-# TODO(sergiip) figure out how to make  zbi_header_t have following derives:
-# #[derive(Debug, Default, Copy, Clone, FromBytes, AsBytes, FromZeroes)]
 
 tmp="$(mktemp --suffix=.h)"
 trap "rm ${tmp}" EXIT
