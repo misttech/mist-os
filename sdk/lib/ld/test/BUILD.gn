@@ -87,6 +87,8 @@ source_set("load-tests") {
       "ld-load-zircon-ldsvc-tests-base.h",
       "ld-load-zircon-process-tests-base.cc",
       "ld-load-zircon-process-tests-base.h",
+      "ld-remote-process-tests.cc",
+      "ld-remote-process-tests.h",
       "ld-startup-create-process-tests.cc",
       "ld-startup-create-process-tests.h",
       "ld-startup-in-process-tests-zircon.cc",

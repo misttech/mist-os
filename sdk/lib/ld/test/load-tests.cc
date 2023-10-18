@@ -8,6 +8,7 @@
 #include "ld-startup-create-process-tests.h"
 #include "ld-startup-in-process-tests-zircon.h"
 #include "ld-startup-spawn-process-tests-zircon.h"
+#include "lib/ld/test/ld-remote-process-tests.h"
 #else
 #include "ld-startup-in-process-tests-posix.h"
 #include "ld-startup-spawn-process-tests-posix.h"
@@ -23,7 +24,7 @@ using LoadTypes = ::testing::Types<
 // relocation so they can make the syscall to exit. The spawn-process
 // tests also need a loader service to get ld.so.1 itself.
 #ifdef __Fuchsia__
-    ld::testing::LdStartupCreateProcessTests<>,
+    ld::testing::LdStartupCreateProcessTests<>, ld::testing::LdRemoteProcessTests,
 #else
     ld::testing::LdStartupSpawnProcessTests,
 #endif
