@@ -33,6 +33,7 @@ source_set("common_srcs") {
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
     "//src/devices/lib/mmio",
+    "//src/graphics/display/lib/api-types-cpp",
     "//src/graphics/display/lib/designware:hdmi-dw",
     "//src/graphics/display/lib/hdmi",
     "//src/lib/ddk",

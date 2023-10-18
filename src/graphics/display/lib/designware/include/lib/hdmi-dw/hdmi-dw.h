@@ -9,6 +9,8 @@
 #include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
 #include <lib/hdmi/base.h>
 
+#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
+
 namespace hdmi_dw {
 
 using fuchsia_hardware_hdmi::wire::DisplayMode;
@@ -28,7 +30,8 @@ class HdmiDw {
   zx_status_t InitHw();
   zx_status_t EdidTransfer(const i2c_impl_op_t* op_list, size_t op_count);
 
-  virtual void ConfigHdmitx(const DisplayMode& mode, const hdmi_param_tx& p);
+  virtual void ConfigHdmitx(const fuchsia_hardware_hdmi::wire::ColorParam& color_param,
+                            const display::DisplayTiming& mode, const hdmi_param_tx& p);
   virtual void SetupInterrupts();
   virtual void Reset();
   virtual void SetupScdc(bool is4k);
@@ -46,7 +49,7 @@ class HdmiDw {
   void ScdcWrite(uint8_t addr, uint8_t val);
   void ScdcRead(uint8_t addr, uint8_t* val);
 
-  void ConfigCsc(const DisplayMode& mode);
+  void ConfigCsc(const fuchsia_hardware_hdmi::wire::ColorParam& color_param);
 
   HdmiIpBase* base_;
 };

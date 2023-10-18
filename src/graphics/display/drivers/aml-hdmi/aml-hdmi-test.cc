@@ -14,6 +14,7 @@
 #include <gtest/gtest.h>
 #include <mock-mmio-range/mock-mmio-range.h>
 
+#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 #include "src/lib/testing/predicates/status.h"
 
 namespace aml_hdmi {
@@ -39,8 +40,8 @@ class FakeHdmiDw : public hdmi_dw::HdmiDw {
  public:
   explicit FakeHdmiDw(HdmiIpBase* base, AmlHdmiTest* test) : HdmiDw(base), test_(test) {}
 
-  void ConfigHdmitx(const fuchsia_hardware_hdmi::wire::DisplayMode& mode,
-                    const hdmi_dw::hdmi_param_tx& p) override;
+  void ConfigHdmitx(const fuchsia_hardware_hdmi::wire::ColorParam& color_param,
+                    const display::DisplayTiming& mode, const hdmi_dw::hdmi_param_tx& p) override;
   void SetupInterrupts() override;
   void Reset() override;
   void SetupScdc(bool is4k) override;
@@ -128,8 +129,8 @@ class AmlHdmiTest : public testing::Test {
   std::queue<HdmiDwFn> expected_dw_calls_;
 };
 
-void FakeHdmiDw::ConfigHdmitx(const fuchsia_hardware_hdmi::wire::DisplayMode& mode,
-                              const hdmi_dw::hdmi_param_tx& p) {
+void FakeHdmiDw::ConfigHdmitx(const fuchsia_hardware_hdmi::wire::ColorParam& color_param,
+                              const display::DisplayTiming& mode, const hdmi_dw::hdmi_param_tx& p) {
   test_->HdmiDwCall(HdmiDwFn::kConfigHdmitx);
 }
 

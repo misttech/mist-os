@@ -9,6 +9,8 @@
 #include <gtest/gtest.h>
 #include <mock-mmio-range/mock-mmio-range.h>
 
+#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
+
 // The MMIO register addresses here are from the Synopsis DesignWare Cores HDMI
 // Transmitter Controller Databook, which is distributed by Synopsis.
 //
@@ -319,26 +321,25 @@ TEST_F(HdmiDwTest, EdidTransferTest) {
 
 TEST_F(HdmiDwTest, ConfigHdmitxTest) {
   fidl::Arena allocator;
-  StandardDisplayMode standard_display_mode{
-      .pixel_clock_khz = 300,
-      .h_addressable = 24,
-      .h_front_porch = 15,
-      .h_sync_pulse = 50,
-      .h_blanking = 93,
-      .v_addressable = 75,
-      .v_front_porch = 104,
-      .v_sync_pulse = 49,
-      .v_blanking = 83,
-      .flags = 0,
+  display::DisplayTiming display_timing = {
+      .horizontal_active_px = 24,
+      .horizontal_front_porch_px = 15,
+      .horizontal_sync_width_px = 50,
+      .horizontal_back_porch_px = 28,
+      .vertical_active_lines = 75,
+      .vertical_front_porch_lines = 104,
+      .vertical_sync_width_lines = 49,
+      .vertical_back_porch_lines = 83,
+      .pixel_clock_frequency_khz = 300,
+      .fields_per_frame = display::FieldsPerFrame::kProgressive,
+      .hsync_polarity = display::SyncPolarity::kNegative,
+      .vsync_polarity = display::SyncPolarity::kNegative,
   };
   ColorParam color{
       .input_color_format = ColorFormat::kCfRgb,
       .output_color_format = ColorFormat::kCf444,
       .color_depth = ColorDepth::kCd30B,
   };
-  DisplayMode mode(allocator);
-  mode.set_mode(allocator, standard_display_mode);
-  mode.set_color(color);
 
   hdmi_param_tx p{
       .vic = 9,
@@ -407,7 +408,7 @@ TEST_F(HdmiDwTest, ConfigHdmitxTest) {
       {.address = kFcInhblank1Offset, .value = 0, .write = true},
       {.address = kFcInvactiv0Offset, .value = 75, .write = true},
       {.address = kFcInvactiv1Offset, .value = 0, .write = true},
-      {.address = kFcInvblankOffset, .value = 83, .write = true},
+      {.address = kFcInvblankOffset, .value = 236, .write = true},
       {.address = kFcHsyncindelay0Offset, .value = 15, .write = true},
       {.address = kFcHsyncindelay1Offset, .value = 0, .write = true},
       {.address = kFcHsyncinwidth0Offset, .value = 50, .write = true},
@@ -448,7 +449,7 @@ TEST_F(HdmiDwTest, ConfigHdmitxTest) {
       {.address = kHdcp22regStatOffset, .value = 0b1111'1111, .write = true},
   }));
 
-  hdmi_dw_->ConfigHdmitx(mode, p);
+  hdmi_dw_->ConfigHdmitx(color, display_timing, p);
 }
 
 TEST_F(HdmiDwTest, SetupInterruptsTest) {

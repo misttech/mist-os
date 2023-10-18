@@ -20,6 +20,7 @@
 #include <fbl/auto_lock.h>
 
 #include "src/graphics/display/drivers/aml-hdmi/top-regs.h"
+#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 
 #define HDMI_ASPECT_RATIO_NONE 0
 #define HDMI_ASPECT_RATIO_4x3 1
@@ -160,13 +161,12 @@ void AmlHdmiDevice::Reset(ResetRequestView request, ResetCompleter::Sync& comple
   }
 }
 
-void CalculateTxParam(const fuchsia_hardware_hdmi::wire::DisplayMode& mode,
-                      hdmi_dw::hdmi_param_tx* p) {
-  p->is4K = mode.mode().pixel_clock_khz > 500'000;
+void CalculateTxParam(const display::DisplayTiming& display_timing, hdmi_dw::hdmi_param_tx* p) {
+  p->is4K = display_timing.pixel_clock_frequency_khz > 500'000;
 
-  if (mode.mode().h_addressable * 3 == mode.mode().v_addressable * 4) {
+  if (display_timing.horizontal_active_px * 3 == display_timing.vertical_active_lines * 4) {
     p->aspect_ratio = HDMI_ASPECT_RATIO_4x3;
-  } else if (mode.mode().h_addressable * 9 == mode.mode().v_addressable * 16) {
+  } else if (display_timing.horizontal_active_px * 9 == display_timing.vertical_active_lines * 16) {
     p->aspect_ratio = HDMI_ASPECT_RATIO_16x9;
   } else {
     p->aspect_ratio = HDMI_ASPECT_RATIO_NONE;
@@ -193,16 +193,19 @@ zx_status_t AmlHdmiDevice::InitializeHdcp14() {
 
 void AmlHdmiDevice::ModeSet(ModeSetRequestView request, ModeSetCompleter::Sync& completer) {
   ZX_DEBUG_ASSERT(request->display_id == 1);  // only supports 1 display for now
+  ZX_DEBUG_ASSERT(request->mode.has_color());
+  ZX_DEBUG_ASSERT(request->mode.has_mode());
+  const display::DisplayTiming display_timing = display::ToDisplayTiming(request->mode.mode());
 
   hdmi_dw::hdmi_param_tx p;
-  CalculateTxParam(request->mode, &p);
+  CalculateTxParam(display_timing, &p);
 
   // Output normal TMDS Data
   WriteReg(HDMITX_TOP_BIST_CNTL, 1 << 12);
 
   // Configure HDMI TX IP
   fbl::AutoLock lock(&dw_lock_);
-  hdmi_dw_->ConfigHdmitx(request->mode, p);
+  hdmi_dw_->ConfigHdmitx(request->mode.color(), display_timing, p);
 
   // Initialize HDCP 1.4.
   //
