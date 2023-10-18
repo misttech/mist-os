@@ -133,16 +133,17 @@ class WlanSoftmacBridgeImpl : public fidl::WireServer<fuchsia_wlan_softmac::Wlan
     impl_ptr->binding_ref_.emplace(std::move(binding_ref));
   }
 
+  // TODO(issues.fuchsia.dev/306181180): This method should probably trigger
+  // shutdown of the device if called outside of a normal shutdown sequence.
   void OnUnbound(fidl::UnbindInfo info,
                  fidl::ServerEnd<fuchsia_wlan_softmac::WlanSoftmacBridge> server_end) {
     if (info.is_user_initiated()) {
-      return;
-    }
-    if (info.is_peer_closed()) {
+      // This is part of the normal shutdown sequence.
+    } else if (info.is_peer_closed()) {
       linfo("WlanSoftmacBridge client disconnected");
-      return;
+    } else {
+      lerror("WlanSoftmacBridge server error: %s", info.status_string());
     }
-    lerror("WlanSoftmacBridge server error: %s", info.status_string());
   }
 
  private:
