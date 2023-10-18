@@ -24,6 +24,7 @@
 #include "src/graphics/display/drivers/intel-i915/tiling.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
+#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 
 namespace {
 
@@ -286,19 +287,19 @@ void Pipe::AttachToDisplay(display::DisplayId id, bool is_edp) {
   attached_edp_ = is_edp;
 }
 
-void Pipe::ApplyModeConfig(const display_mode_t& mode) {
+void Pipe::ApplyModeConfig(const display::DisplayTiming& mode) {
   registers::TranscoderRegs trans_regs(connected_transcoder_id());
 
   // Configure the rest of the transcoder
-  uint32_t h_active = mode.h_addressable - 1;
-  uint32_t h_sync_start = h_active + mode.h_front_porch;
-  uint32_t h_sync_end = h_sync_start + mode.h_sync_pulse;
-  uint32_t h_total = h_active + mode.h_blanking;
+  uint32_t h_active = mode.horizontal_active_px - 1;
+  uint32_t h_sync_start = h_active + mode.horizontal_front_porch_px;
+  uint32_t h_sync_end = h_sync_start + mode.horizontal_sync_width_px;
+  uint32_t h_total = h_active + mode.horizontal_blank_px();
 
-  uint32_t v_active = mode.v_addressable - 1;
-  uint32_t v_sync_start = v_active + mode.v_front_porch;
-  uint32_t v_sync_end = v_sync_start + mode.v_sync_pulse;
-  uint32_t v_total = v_active + mode.v_blanking;
+  uint32_t v_active = mode.vertical_active_lines - 1;
+  uint32_t v_sync_start = v_active + mode.vertical_front_porch_lines;
+  uint32_t v_sync_end = v_sync_start + mode.vertical_sync_width_lines;
+  uint32_t v_total = v_active + mode.vertical_blank_lines();
 
   auto h_total_reg = trans_regs.HTotal().FromValue(0);
   h_total_reg.set_count_total(h_total);
@@ -330,12 +331,12 @@ void Pipe::ApplyModeConfig(const display_mode_t& mode) {
 
   registers::PipeRegs pipe_regs(pipe_id());
   auto pipe_size = pipe_regs.PipeSourceSize().FromValue(0);
-  pipe_size.set_horizontal_source_size_minus_one(mode.h_addressable - 1);
-  pipe_size.set_vertical_source_size_minus_one(mode.v_addressable - 1);
+  pipe_size.set_horizontal_source_size_minus_one(mode.horizontal_active_px - 1);
+  pipe_size.set_vertical_source_size_minus_one(mode.vertical_active_lines - 1);
   pipe_size.WriteTo(mmio_space_);
 }
 
-void Pipe::LoadActiveMode(display_mode_t* mode) {
+void Pipe::LoadActiveMode(display::DisplayTiming* mode) {
   registers::TranscoderRegs trans_regs(connected_transcoder_id());
 
   auto h_total_reg = trans_regs.HTotal().ReadFrom(mmio_space_);
@@ -352,34 +353,35 @@ void Pipe::LoadActiveMode(display_mode_t* mode) {
   uint32_t v_sync_start = v_sync_reg.sync_start();
   uint32_t v_sync_end = v_sync_reg.sync_end();
 
-  mode->h_addressable = h_active + 1;
-  mode->h_front_porch = h_sync_start - h_active;
-  mode->h_sync_pulse = h_sync_end - h_sync_start;
-  mode->h_blanking = h_total - h_active;
+  mode->horizontal_active_px = h_active + 1;
+  mode->horizontal_front_porch_px = h_sync_start - h_active;
+  mode->horizontal_sync_width_px = h_sync_end - h_sync_start;
+  mode->horizontal_back_porch_px = h_total - h_sync_end;
 
-  mode->v_addressable = v_active + 1;
-  mode->v_front_porch = v_sync_start - v_active;
-  mode->v_sync_pulse = v_sync_end - v_sync_start;
-  mode->v_blanking = v_total - v_active;
+  mode->vertical_active_lines = v_active + 1;
+  mode->vertical_front_porch_lines = v_sync_start - v_active;
+  mode->vertical_sync_width_lines = v_sync_end - v_sync_start;
+  mode->vertical_back_porch_lines = v_total - v_sync_end;
 
-  mode->flags = 0;
   auto transcoder_ddi_control = trans_regs.DdiControl().ReadFrom(mmio_space_);
-  if (transcoder_ddi_control.vsync_polarity_not_inverted()) {
-    mode->flags |= MODE_FLAG_VSYNC_POSITIVE;
-  }
-  if (transcoder_ddi_control.hsync_polarity_not_inverted()) {
-    mode->flags |= MODE_FLAG_HSYNC_POSITIVE;
-  }
-  if (trans_regs.Config().ReadFrom(mmio_space_).interlaced_display()) {
-    mode->flags |= MODE_FLAG_INTERLACED;
-  }
+  mode->fields_per_frame = trans_regs.Config().ReadFrom(mmio_space_).interlaced_display()
+                               ? display::FieldsPerFrame::kInterlaced
+                               : display::FieldsPerFrame::kProgressive;
+  mode->vsync_polarity = transcoder_ddi_control.vsync_polarity_not_inverted()
+                             ? display::SyncPolarity::kPositive
+                             : display::SyncPolarity::kNegative;
+  mode->hsync_polarity = transcoder_ddi_control.hsync_polarity_not_inverted()
+                             ? display::SyncPolarity::kPositive
+                             : display::SyncPolarity::kNegative;
+  mode->vblank_alternates = false;
+  mode->pixel_repetition = 0;
 
   // If we're reusing hardware state, make sure the pipe source size matches
   // the display mode size, since we never scale pipes.
   registers::PipeRegs pipe_regs(pipe_id_);
   auto pipe_size = pipe_regs.PipeSourceSize().FromValue(0);
-  pipe_size.set_horizontal_source_size_minus_one(mode->h_addressable - 1);
-  pipe_size.set_vertical_source_size_minus_one(mode->v_addressable - 1);
+  pipe_size.set_horizontal_source_size_minus_one(mode->horizontal_active_px - 1);
+  pipe_size.set_vertical_source_size_minus_one(mode->vertical_active_lines - 1);
   pipe_size.WriteTo(mmio_space_);
 }
 

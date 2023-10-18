@@ -43,6 +43,7 @@
 #include "src/graphics/display/drivers/intel-i915/registers-transcoder.h"
 #include "src/graphics/display/drivers/intel-i915/registers-typec.h"
 #include "src/graphics/display/drivers/intel-i915/registers.h"
+#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 
 namespace i915 {
 namespace {
@@ -1915,9 +1916,9 @@ DdiPllConfig DpDisplay::ComputeDdiPllConfig(int32_t pixel_clock_khz) {
   };
 }
 
-bool DpDisplay::DdiModeset(const display_mode_t& mode) { return true; }
+bool DpDisplay::DdiModeset(const display::DisplayTiming& mode) { return true; }
 
-bool DpDisplay::PipeConfigPreamble(const display_mode_t& mode, PipeId pipe_id,
+bool DpDisplay::PipeConfigPreamble(const display::DisplayTiming& mode, PipeId pipe_id,
                                    TranscoderId transcoder_id) {
   registers::TranscoderRegs transcoder_regs(transcoder_id);
 
@@ -1961,7 +1962,7 @@ bool DpDisplay::PipeConfigPreamble(const display_mode_t& mode, PipeId pipe_id,
 
   // Pixel clock rate: The rate at which pixels are sent, in pixels per
   // second, divided by 1000 (kHz).
-  int64_t pixel_clock_rate_khz = mode.pixel_clock_khz;
+  int64_t pixel_clock_rate_khz = mode.pixel_clock_frequency_khz;
 
   // This is the rate at which bits are sent on a single DisplayPort
   // lane, in raw bits per second, divided by 1000 (kbps).
@@ -2010,7 +2011,7 @@ bool DpDisplay::PipeConfigPreamble(const display_mode_t& mode, PipeId pipe_id,
   return true;
 }
 
-bool DpDisplay::PipeConfigEpilogue(const display_mode_t& mode, PipeId pipe_id,
+bool DpDisplay::PipeConfigEpilogue(const display::DisplayTiming& mode, PipeId pipe_id,
                                    TranscoderId transcoder_id) {
   registers::TranscoderRegs transcoder_regs(transcoder_id);
   auto main_stream_attribute_misc = transcoder_regs.MainStreamAttributeMisc().FromValue(0);
@@ -2048,8 +2049,8 @@ bool DpDisplay::PipeConfigEpilogue(const display_mode_t& mode, PipeId pipe_id,
   //                        configuration and display capabilities.
   transcoder_ddi_control.set_ddi_mode(registers::TranscoderDdiControl::kModeDisplayPortSingleStream)
       .set_bits_per_color(registers::TranscoderDdiControl::k8bpc)
-      .set_vsync_polarity_not_inverted((mode.flags & MODE_FLAG_VSYNC_POSITIVE) != 0)
-      .set_hsync_polarity_not_inverted((mode.flags & MODE_FLAG_HSYNC_POSITIVE) != 0);
+      .set_vsync_polarity_not_inverted(mode.vsync_polarity == display::SyncPolarity::kPositive)
+      .set_hsync_polarity_not_inverted(mode.hsync_polarity == display::SyncPolarity::kPositive);
 
   if (!is_tgl(controller()->device_id())) {
     // Fields that only exist on Kaby Lake and Skylake.
@@ -2068,7 +2069,7 @@ bool DpDisplay::PipeConfigEpilogue(const display_mode_t& mode, PipeId pipe_id,
 
   auto transcoder_config = transcoder_regs.Config().FromValue(0);
   transcoder_config.set_enabled_target(true)
-      .set_interlaced_display((mode.flags & MODE_FLAG_INTERLACED) != 0)
+      .set_interlaced_display(mode.fields_per_frame == display::FieldsPerFrame::kInterlaced)
       .WriteTo(mmio_space());
 
   return true;

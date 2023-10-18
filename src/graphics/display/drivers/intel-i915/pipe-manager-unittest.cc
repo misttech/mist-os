@@ -21,6 +21,7 @@
 #include "src/graphics/display/drivers/intel-i915/registers-ddi.h"
 #include "src/graphics/display/drivers/intel-i915/registers-pipe.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
+#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 
 namespace i915 {
 
@@ -62,12 +63,12 @@ class FakeDisplay : public DisplayDevice {
  private:
   // DisplayDevice overrides:
   bool InitDdi() final { return true; }
-  bool DdiModeset(const display_mode_t& mode) final { return true; }
-  bool PipeConfigPreamble(const display_mode_t& mode, PipeId pipe_id,
+  bool DdiModeset(const display::DisplayTiming& mode) final { return true; }
+  bool PipeConfigPreamble(const display::DisplayTiming& mode, PipeId pipe_id,
                           TranscoderId transcoder_id) final {
     return true;
   }
-  bool PipeConfigEpilogue(const display_mode_t& mode, PipeId pipe_id,
+  bool PipeConfigEpilogue(const display::DisplayTiming& mode, PipeId pipe_id,
                           TranscoderId transcoder_id) final {
     return true;
   }

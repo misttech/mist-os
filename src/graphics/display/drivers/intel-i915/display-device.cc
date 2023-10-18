@@ -24,6 +24,7 @@
 #include "src/graphics/display/drivers/intel-i915/tiling.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
+#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 
 namespace i915 {
 
@@ -154,15 +155,19 @@ bool DisplayDevice::Resume() {
 
 void DisplayDevice::LoadActiveMode() {
   pipe_->LoadActiveMode(&info_);
-  info_.pixel_clock_khz = LoadPixelRateForTranscoderKhz(pipe_->connected_transcoder_id());
-  zxlogf(INFO, "Active pixel clock: %u kHz", info_.pixel_clock_khz);
+  info_.pixel_clock_frequency_khz = LoadPixelRateForTranscoderKhz(pipe_->connected_transcoder_id());
+  zxlogf(INFO, "Active pixel clock: %u kHz", info_.pixel_clock_frequency_khz);
 }
 
-bool DisplayDevice::CheckNeedsModeset(const display_mode_t* mode) {
+bool DisplayDevice::CheckNeedsModeset(const display::DisplayTiming& mode) {
   // Check the clock and the flags later
-  size_t cmp_start = offsetof(display_mode_t, h_addressable);
-  size_t cmp_end = offsetof(display_mode_t, flags);
-  if (memcmp(&mode->h_addressable, &info_.h_addressable, cmp_end - cmp_start) != 0) {
+  display::DisplayTiming mode_without_clock_or_flags = mode;
+  mode_without_clock_or_flags.pixel_clock_frequency_khz = info_.pixel_clock_frequency_khz;
+  mode_without_clock_or_flags.hsync_polarity = info_.hsync_polarity;
+  mode_without_clock_or_flags.vsync_polarity = info_.vsync_polarity;
+  mode_without_clock_or_flags.pixel_repetition = info_.pixel_repetition;
+  mode_without_clock_or_flags.vblank_alternates = info_.vblank_alternates;
+  if (mode_without_clock_or_flags != info_) {
     // Modeset is necessary if display params other than the clock frequency differ
     zxlogf(DEBUG, "Modeset necessary for display params");
     return true;
@@ -172,12 +177,12 @@ bool DisplayDevice::CheckNeedsModeset(const display_mode_t* mode) {
   // the display than we are. The BIOS seems to not always set the hsync/vsync polarity, so
   // don't include that in the check for already initialized displays. Once we're better at
   // initializing displays, merge the flags check back into the above memcmp.
-  if ((mode->flags & MODE_FLAG_INTERLACED) != (info_.flags & MODE_FLAG_INTERLACED)) {
+  if (mode.fields_per_frame != info_.fields_per_frame) {
     zxlogf(DEBUG, "Modeset necessary for display flags");
     return true;
   }
 
-  if (mode->pixel_clock_khz == info_.pixel_clock_khz) {
+  if (mode.pixel_clock_frequency_khz == info_.pixel_clock_frequency_khz) {
     // Modeset is necessary not necessary if all display params are the same
     return false;
   }
@@ -186,7 +191,7 @@ bool DisplayDevice::CheckNeedsModeset(const display_mode_t* mode) {
   // prevent unnecessary modesetting at startup. The extra work this adds to regular
   // modesetting is negligible.
   DdiPllConfig desired_pll_config =
-      ComputeDdiPllConfig(static_cast<int32_t>(info_.pixel_clock_khz));
+      ComputeDdiPllConfig(static_cast<int32_t>(info_.pixel_clock_frequency_khz));
   ZX_DEBUG_ASSERT_MSG(desired_pll_config.IsEmpty(),
                       "CheckDisplayMode() should have rejected unattainable pixel rates");
   return !controller()->dpll_manager()->DdiPllMatchesConfig(ddi_id(), desired_pll_config);
@@ -196,17 +201,19 @@ void DisplayDevice::ApplyConfiguration(const display_config_t* banjo_display_con
                                        display::ConfigStamp config_stamp) {
   ZX_ASSERT(banjo_display_config);
 
-  if (CheckNeedsModeset(&banjo_display_config->mode)) {
+  const display::DisplayTiming display_timing_params =
+      display::ToDisplayTiming(banjo_display_config->mode);
+  if (CheckNeedsModeset(display_timing_params)) {
     if (pipe_) {
       // TODO(fxbug.dev/116009): When ApplyConfiguration() early returns on the
       // following error conditions, we should reset the DDI, pipe and transcoder
       // so that they can be possibly reused.
-      if (!DdiModeset(banjo_display_config->mode)) {
+      if (!DdiModeset(display_timing_params)) {
         zxlogf(ERROR, "Display %lu: Modeset failed; ApplyConfiguration() aborted.", id().value());
         return;
       }
 
-      if (!PipeConfigPreamble(banjo_display_config->mode, pipe_->pipe_id(),
+      if (!PipeConfigPreamble(display_timing_params, pipe_->pipe_id(),
                               pipe_->connected_transcoder_id())) {
         zxlogf(ERROR,
                "Display %lu: Transcoder configuration failed before pipe setup; "
@@ -214,8 +221,8 @@ void DisplayDevice::ApplyConfiguration(const display_config_t* banjo_display_con
                id().value());
         return;
       }
-      pipe_->ApplyModeConfig(banjo_display_config->mode);
-      if (!PipeConfigEpilogue(banjo_display_config->mode, pipe_->pipe_id(),
+      pipe_->ApplyModeConfig(display_timing_params);
+      if (!PipeConfigEpilogue(display_timing_params, pipe_->pipe_id(),
                               pipe_->connected_transcoder_id())) {
         zxlogf(ERROR,
                "Display %lu: Transcoder configuration failed after pipe setup; "
@@ -224,7 +231,7 @@ void DisplayDevice::ApplyConfiguration(const display_config_t* banjo_display_con
         return;
       }
     }
-    info_ = banjo_display_config->mode;
+    info_ = display_timing_params;
   }
 
   if (pipe_) {

@@ -22,6 +22,7 @@
 #include "src/graphics/display/drivers/intel-i915/power.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
+#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 
 namespace i915 {
 
@@ -134,7 +135,7 @@ class DisplayDevice : public fidl::WireServer<FidlBacklight::Device> {
   virtual bool InitBacklightHw() { return false; }
 
   // Configures the hardware to display content at the given resolution.
-  virtual bool DdiModeset(const display_mode_t& mode) = 0;
+  virtual bool DdiModeset(const display::DisplayTiming& mode) = 0;
 
   // Returns an empty configuration if the desired pixel clock is unattainable.
   // Otherwise, the returned configuration is guaranteed to be valid.
@@ -150,15 +151,15 @@ class DisplayDevice : public fidl::WireServer<FidlBacklight::Device> {
   // 3 steps. The second step is generic pipe configuration, whereas PipeConfigPreamble
   // and PipeConfigEpilogue are responsible for display-type-specific configuration that
   // must be done before and after the generic configuration.
-  virtual bool PipeConfigPreamble(const display_mode_t& mode, PipeId pipe_id,
+  virtual bool PipeConfigPreamble(const display::DisplayTiming& mode, PipeId pipe_id,
                                   TranscoderId transcoder_id) = 0;
-  virtual bool PipeConfigEpilogue(const display_mode_t& mode, PipeId pipe_id,
+  virtual bool PipeConfigEpilogue(const display::DisplayTiming& mode, PipeId pipe_id,
                                   TranscoderId transcoder_id) = 0;
 
   fdf::MmioBuffer* mmio_space() const;
 
  private:
-  bool CheckNeedsModeset(const display_mode_t* mode);
+  bool CheckNeedsModeset(const display::DisplayTiming& mode);
 
   // Borrowed reference to Controller instance
   Controller* controller_;
@@ -174,7 +175,7 @@ class DisplayDevice : public fidl::WireServer<FidlBacklight::Device> {
   PowerWellRef ddi_io_power_;
 
   bool inited_ = false;
-  display_mode_t info_ = {};
+  display::DisplayTiming info_ = {};
 
   Type type_;
 

@@ -18,6 +18,7 @@
 #include "src/graphics/display/drivers/intel-i915/dpll.h"
 #include "src/graphics/display/drivers/intel-i915/hardware-common.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
+#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 
 namespace i915 {
 
@@ -36,10 +37,10 @@ class HdmiDisplay : public DisplayDevice {
  private:
   bool InitDdi() final;
   bool Query() final;
-  bool DdiModeset(const display_mode_t& mode) final;
-  bool PipeConfigPreamble(const display_mode_t& mode, PipeId pipe_id,
+  bool DdiModeset(const display::DisplayTiming& mode) final;
+  bool PipeConfigPreamble(const display::DisplayTiming& mode, PipeId pipe_id,
                           TranscoderId transcoder_id) final;
-  bool PipeConfigEpilogue(const display_mode_t& mode, PipeId pipe_id,
+  bool PipeConfigEpilogue(const display::DisplayTiming& mode, PipeId pipe_id,
                           TranscoderId transcoder_id) final;
   DdiPllConfig ComputeDdiPllConfig(int32_t pixel_clock_khz) final;
   // Hdmi doesn't need the clock rate when changing the transcoder

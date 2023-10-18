@@ -34,6 +34,7 @@
 #include "src/graphics/display/drivers/intel-i915/registers-pipe.h"
 #include "src/graphics/display/drivers/intel-i915/registers-transcoder.h"
 #include "src/graphics/display/drivers/intel-i915/registers.h"
+#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 
 namespace i915 {
 
@@ -140,12 +141,12 @@ bool HdmiDisplay::InitDdi() {
   return true;
 }
 
-bool HdmiDisplay::DdiModeset(const display_mode_t& mode) {
+bool HdmiDisplay::DdiModeset(const display::DisplayTiming& mode) {
   pipe()->Reset();
   controller()->ResetDdi(ddi_id(), pipe()->connected_transcoder_id());
 
   DdiPllConfig pll_config = {
-      .ddi_clock_khz = static_cast<int32_t>(mode.pixel_clock_khz) * 5,
+      .ddi_clock_khz = static_cast<int32_t>(mode.pixel_clock_frequency_khz) * 5,
       .spread_spectrum_clocking = false,
       .admits_display_port = false,
       .admits_hdmi = true,
@@ -175,7 +176,7 @@ bool HdmiDisplay::DdiModeset(const display_mode_t& mode) {
   return true;
 }
 
-bool HdmiDisplay::PipeConfigPreamble(const display_mode_t& mode, PipeId pipe_id,
+bool HdmiDisplay::PipeConfigPreamble(const display::DisplayTiming& mode, PipeId pipe_id,
                                      TranscoderId transcoder_id) {
   ZX_DEBUG_ASSERT_MSG(transcoder_id != TranscoderId::TRANSCODER_EDP,
                       "The EDP transcoder doesn't do HDMI");
@@ -194,7 +195,7 @@ bool HdmiDisplay::PipeConfigPreamble(const display_mode_t& mode, PipeId pipe_id,
   return true;
 }
 
-bool HdmiDisplay::PipeConfigEpilogue(const display_mode_t& mode, PipeId pipe_id,
+bool HdmiDisplay::PipeConfigEpilogue(const display::DisplayTiming& mode, PipeId pipe_id,
                                      TranscoderId transcoder_id) {
   ZX_DEBUG_ASSERT(type() == DisplayDevice::Type::kHdmi || type() == DisplayDevice::Type::kDvi);
   ZX_DEBUG_ASSERT_MSG(transcoder_id != TranscoderId::TRANSCODER_EDP,
@@ -213,15 +214,15 @@ bool HdmiDisplay::PipeConfigEpilogue(const display_mode_t& mode, PipeId pipe_id,
                                           ? registers::TranscoderDdiControl::kModeHdmi
                                           : registers::TranscoderDdiControl::kModeDvi);
   transcoder_ddi_control.set_bits_per_color(registers::TranscoderDdiControl::k8bpc)
-      .set_vsync_polarity_not_inverted((mode.flags & MODE_FLAG_VSYNC_POSITIVE) != 0)
-      .set_hsync_polarity_not_inverted((mode.flags & MODE_FLAG_HSYNC_POSITIVE) != 0)
+      .set_vsync_polarity_not_inverted(mode.vsync_polarity == display::SyncPolarity::kPositive)
+      .set_hsync_polarity_not_inverted(mode.hsync_polarity == display::SyncPolarity::kPositive)
       .set_is_port_sync_secondary_kaby_lake(false)
       .set_allocate_display_port_virtual_circuit_payload(false)
       .WriteTo(mmio_space());
 
   auto transcoder_config = transcoder_regs.Config().ReadFrom(mmio_space());
   transcoder_config.set_enabled_target(true)
-      .set_interlaced_display((mode.flags & MODE_FLAG_INTERLACED) != 0)
+      .set_interlaced_display(mode.fields_per_frame == display::FieldsPerFrame::kInterlaced)
       .WriteTo(mmio_space());
 
   // Configure voltage swing and related IO settings.

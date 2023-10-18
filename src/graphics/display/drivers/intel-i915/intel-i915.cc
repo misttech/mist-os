@@ -63,6 +63,7 @@
 #include "src/graphics/display/drivers/intel-i915/tiling.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
+#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/fxl/strings/string_printf.h"
@@ -1518,9 +1519,13 @@ bool Controller::CheckDisplayLimits(
                                            banjo_display_config->layer_count);
     client_composition_opcodes_offset += banjo_display_config->layer_count;
 
+    const display::DisplayTiming display_timing =
+        display::ToDisplayTiming(banjo_display_config->mode);
     // The intel display controller doesn't support these flags
-    if (banjo_display_config->mode.flags &
-        (MODE_FLAG_ALTERNATING_VBLANK | MODE_FLAG_DOUBLE_CLOCKED)) {
+    if (display_timing.vblank_alternates) {
+      return false;
+    }
+    if (display_timing.pixel_repetition > 0) {
       return false;
     }
 
@@ -1533,8 +1538,7 @@ bool Controller::CheckDisplayLimits(
     // Pipes don't support height of more than 4096. They support a width of up to
     // 2^14 - 1. However, planes don't support a width of more than 8192 and we need
     // to always be able to accept a single plane, fullscreen configuration.
-    if (banjo_display_config->mode.v_addressable > 4096 ||
-        banjo_display_config->mode.h_addressable > 8192) {
+    if (display_timing.vertical_active_lines > 4096 || display_timing.horizontal_active_px > 8192) {
       return false;
     }
 

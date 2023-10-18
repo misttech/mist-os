@@ -27,6 +27,7 @@
 #include "src/graphics/display/drivers/intel-i915/registers-transcoder.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
+#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 
 namespace i915 {
 
@@ -47,7 +48,7 @@ class Pipe {
   void AttachToDisplay(display::DisplayId display_id, bool is_edp);
   void Detach();
 
-  void ApplyModeConfig(const display_mode_t& mode);
+  void ApplyModeConfig(const display::DisplayTiming& mode);
 
   using GetImagePixelFormatFunc = fit::function<PixelFormatAndModifier(const image_t* image)>;
   using SetupGttImageFunc =
@@ -67,7 +68,7 @@ class Pipe {
   static void ResetTranscoder(TranscoderId transcoder_id, registers::Platform platform,
                               fdf::MmioBuffer* mmio_space);
 
-  void LoadActiveMode(display_mode_t* mode);
+  void LoadActiveMode(display::DisplayTiming* mode);
 
   PipeId pipe_id() const { return pipe_id_; }
 
