@@ -39,7 +39,9 @@ zx::result<Manager> Manager::CreateFromNamespace(fdf::Namespace& ns) {
   fidl::VectorView items = result->value()->retrieved_items;
   if (items.count() != 1) {
     FDF_LOG(ERROR, "Found wrong number of devicetrees: wanted 1, got %zu", items.count());
-    return zx::error(ZX_ERR_INVALID_ARGS);
+    // Temporary hack for u-boot changes on vim3. See b/297919767.
+    // For now will continue execution and use the first devicetree.
+    // return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
   fuchsia_boot::wire::RetrievedItems& dt = result->value()->retrieved_items[0];

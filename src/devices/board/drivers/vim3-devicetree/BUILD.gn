@@ -22,8 +22,13 @@ devicetree_fragment("amlogic-a311d") {
 }
 
 devicetree("vim3") {
-  sources = [ "dts/khadas-vim3.dts" ]
-  deps = [ ":amlogic-a311d" ]
+  sources = [ "dts/khadas-vim3.dts.S" ]
+  deps = [
+    ":amlogic-a311d",
+    "//zircon/system/ulib/ddk-platform-defs",
+  ]
+  visitors =
+      [ "//sdk/lib/driver/devicetree/visitors/drivers/sysmem:sysmem-visitor" ]
   golden = "dts/khadas-vim3.golden.dts"
 }
 
@@ -54,7 +59,7 @@ fuchsia_driver("vim3-devicetree-driver") {
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",
     "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/driver/devicetree/manager",
-    "//sdk/lib/driver/devicetree/visitors/default",
+    "//sdk/lib/driver/devicetree/visitors:load-visitors",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//src/devices/bin/driver_runtime",
   ]
@@ -64,6 +69,7 @@ fuchsia_driver_component("vim3-devicetree") {
   deps = [
     ":vim3",
     ":vim3-devicetree-driver",
+    ":vim3.visitors",
   ]
   info = "vim3-devicetree-info.json"
   manifest = "meta/vim3-devicetree.cml"

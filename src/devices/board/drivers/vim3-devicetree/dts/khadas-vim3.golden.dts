@@ -10,4 +10,23 @@
 		compatible = "amlogic,g12b-clk";
 		reg = <0x00 0xff63c000 0x00 0x2000 0x00 0xff620000 0x00 0x10000 0x00 0xffd18000 0x00 0x1000>;
 	};
+
+	iommu {
+		#iommu-cells = <0x01>;
+		phandle = <0x01>;
+	};
+
+	reserved-memory {
+		#address-cells = <0x02>;
+		#size-cells = <0x02>;
+		ranges;
+
+		fuchsia,contiguous {
+			compatible = "sysmem";
+			iommus = <0x01 0x01>;
+			pid = <0x06>;
+			size = <0x00 0xc800000>;
+			vid = <0x05>;
+		};
+	};
 };

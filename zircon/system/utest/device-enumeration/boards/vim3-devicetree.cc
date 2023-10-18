@@ -14,6 +14,7 @@ TEST_F(DeviceEnumerationTest, Vim3DeviceTreeTest) {
       "sys/platform/pt",
       "sys/platform/00:00:32",
       "sys/platform/00:00:32:1",
+      "sys/platform/00:00:32:4/sysmem",
   };
 
   ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));
