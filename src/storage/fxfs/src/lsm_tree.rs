@@ -22,6 +22,7 @@ use {
     std::{
         fmt,
         future::Future,
+        iter::IntoIterator,
         ops::Bound,
         sync::{Arc, RwLock},
     },
@@ -37,10 +38,10 @@ const SKIP_LIST_LAYER_ITEMS: usize = 512;
 pub use simple_persistent_layer::LayerInfo;
 
 pub async fn layers_from_handles<K: Key, V: Value>(
-    handles: Box<[impl ReadObjectHandle + 'static]>,
+    handles: impl IntoIterator<Item = impl ReadObjectHandle + 'static>,
 ) -> Result<Vec<Arc<dyn Layer<K, V>>>, Error> {
     let mut layers = Vec::new();
-    for handle in Vec::from(handles) {
+    for handle in handles {
         layers.push(
             simple_persistent_layer::SimplePersistentLayer::open(handle).await?
                 as Arc<dyn Layer<K, V>>,
@@ -92,7 +93,7 @@ impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
     /// Opens an existing tree from the provided handles to the layer objects.
     pub async fn open(
         merge_fn: merge::MergeFn<K, V>,
-        handles: Box<[impl ReadObjectHandle + 'static]>,
+        handles: impl IntoIterator<Item = impl ReadObjectHandle + 'static>,
         cache: Box<dyn ObjectCache<K, V>>,
     ) -> Result<Self, Error> {
         Ok(LSMTree {
@@ -115,7 +116,7 @@ impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
     /// to be used after replay when we are opening a tree and we have discovered the base layers.
     pub async fn append_layers(
         &self,
-        handles: Box<[impl ReadObjectHandle + 'static]>,
+        handles: impl IntoIterator<Item = impl ReadObjectHandle + 'static>,
     ) -> Result<(), Error> {
         let mut layers = layers_from_handles(handles).await?;
         self.data.write().unwrap().layers.append(&mut layers);
@@ -490,11 +491,9 @@ mod tests {
                 .await
                 .expect("compact failed");
         }
-        tree.set_layers(
-            layers_from_handles(Box::new([handle])).await.expect("layers_from_handles failed"),
-        );
+        tree.set_layers(layers_from_handles([handle]).await.expect("layers_from_handles failed"));
         let handle = FakeObjectHandle::new(object.clone());
-        let tree = LSMTree::open(emit_left_merge_fn, [handle].into(), Box::new(NullCache {}))
+        let tree = LSMTree::open(emit_left_merge_fn, [handle], Box::new(NullCache {}))
             .await
             .expect("open failed");
 
@@ -545,9 +544,7 @@ mod tests {
                 .await
                 .expect("compact failed");
         }
-        tree.set_layers(
-            layers_from_handles(Box::new([handle])).await.expect("layers_from_handles failed"),
-        );
+        tree.set_layers(layers_from_handles([handle]).await.expect("layers_from_handles failed"));
         let found_item = tree.find(&item.key).await.expect("find failed").expect("not found");
         assert_eq!(found_item, item);
         assert!(tree.find(&TestKey(2..2)).await.expect("find failed").is_none());

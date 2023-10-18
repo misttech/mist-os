@@ -1358,7 +1358,7 @@ impl ObjectStore {
             let object_layers = self.open_layers(object_tree_layer_object_ids, None).await?;
             let size: u64 = object_layers.iter().map(|h| h.get_size()).sum();
             self.tree
-                .append_layers(object_layers.into())
+                .append_layers(object_layers)
                 .await
                 .context("Failed to read object store layers")?;
             *self.lock_state.lock().unwrap() = LockState::Unencrypted;
@@ -1442,9 +1442,7 @@ impl ObjectStore {
 
         self.tree
             .append_layers(
-                self.open_layers(store_info.layers.iter().cloned(), Some(crypt.clone()))
-                    .await?
-                    .into(),
+                self.open_layers(store_info.layers.iter().cloned(), Some(crypt.clone())).await?,
             )
             .await
             .context("Failed to read object tree layer file contents")?;

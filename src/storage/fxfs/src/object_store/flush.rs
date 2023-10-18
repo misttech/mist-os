@@ -211,8 +211,7 @@ impl ObjectStore {
         let (layers_to_keep, old_layers) = tree::flush(&self.tree, writer).await?;
 
         let mut new_layers =
-            layers_from_handles(Box::new([CachingObjectHandle::new(new_object_tree_layer)]))
-                .await?;
+            layers_from_handles([CachingObjectHandle::new(new_object_tree_layer)]).await?;
         new_layers.extend(layers_to_keep.iter().map(|l| (*l).clone()));
 
         new_store_info.layers = Vec::new();

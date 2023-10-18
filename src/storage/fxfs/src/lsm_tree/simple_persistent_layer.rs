@@ -84,7 +84,7 @@ pub struct LayerInfo {
 /// Implements a very primitive persistent layer where items are packed into blocks and searching
 /// for items is done via a simple binary search.
 pub struct SimplePersistentLayer {
-    object_handle: Arc<dyn ReadObjectHandle>,
+    object_handle: Box<dyn ReadObjectHandle>,
     layer_info: LayerInfo,
     size: u64,
     seek_table: Option<Vec<u64>>,
@@ -333,7 +333,7 @@ impl SimplePersistentLayer {
         let (seek_table, data_size) = parse_seek_table(&object_handle, &layer_info, buffer).await?;
 
         Ok(Arc::new(SimplePersistentLayer {
-            object_handle: Arc::new(object_handle),
+            object_handle: Box::new(object_handle),
             layer_info,
             size: data_size,
             seek_table,

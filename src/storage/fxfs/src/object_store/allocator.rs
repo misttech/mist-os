@@ -757,10 +757,7 @@ impl SimpleAllocator {
             let layer_file_sizes =
                 handles.iter().map(ReadObjectHandle::get_size).collect::<Vec<u64>>();
             self.counters.lock().unwrap().persistent_layer_file_sizes = layer_file_sizes;
-            self.tree
-                .append_layers(handles.into_boxed_slice())
-                .await
-                .context("Failed to append allocator layers")?;
+            self.tree.append_layers(handles).await.context("Failed to append allocator layers")?;
             self.filesystem.upgrade().unwrap().object_manager().update_reservation(
                 self.object_id,
                 tree::reservation_amount_from_layer_size(total_size),
@@ -1624,8 +1621,7 @@ impl JournalingObject for SimpleAllocator {
         );
         root_store.remove_from_graveyard(&mut transaction, object_id);
 
-        let layers =
-            layers_from_handles(Box::new([CachingObjectHandle::new(layer_object_handle)])).await?;
+        let layers = layers_from_handles([CachingObjectHandle::new(layer_object_handle)]).await?;
         transaction
             .commit_with_callback(|_| {
                 self.tree.set_layers(layers);
