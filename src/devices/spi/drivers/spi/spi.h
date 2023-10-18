@@ -5,9 +5,12 @@
 #ifndef SRC_DEVICES_SPI_DRIVERS_SPI_SPI_H_
 #define SRC_DEVICES_SPI_DRIVERS_SPI_SPI_H_
 
+#include <fidl/fuchsia.hardware.spiimpl/cpp/wire.h>
 #include <fuchsia/hardware/spiimpl/cpp/banjo.h>
 
 #include <ddktl/device.h>
+
+#include "src/devices/spi/drivers/spi/spi-impl-client.h"
 
 namespace spi {
 
@@ -19,13 +22,20 @@ class SpiDevice : public SpiDeviceType {
   SpiDevice(zx_device_t* parent, uint32_t bus_id) : SpiDeviceType(parent), bus_id_(bus_id) {}
 
   static zx_status_t Create(void* ctx, zx_device_t* parent, async_dispatcher_t* dispatcher);
+  zx_status_t Init();
 
   void DdkRelease();
 
  private:
-  void AddChildren(const ddk::SpiImplProtocolClient& spi, async_dispatcher_t* dispatcher);
+  void AddChildren(async_dispatcher_t* dispatcher);
+
+  SpiImplClient* GetSpiImpl() {
+    return std::visit([](auto&& impl) { return static_cast<SpiImplClient*>(&impl); },
+                      spi_impl_.value());
+  }
 
   const uint32_t bus_id_;
+  std::optional<std::variant<FidlSpiImplClient, BanjoSpiImplClient>> spi_impl_;
 };
 
 }  // namespace spi

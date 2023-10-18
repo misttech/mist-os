@@ -7,8 +7,7 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/trace/event.h>
 #include <lib/trace-engine/types.h>
-
-#include <variant>
+#include <zircon/errors.h>
 
 #include <ddktl/fidl.h>
 #include <fbl/vector.h>
@@ -19,110 +18,139 @@ void SpiChild::OpenSession(OpenSessionRequestView request, OpenSessionCompleter:
   Bind(dispatcher_, std::move(request->session));
 }
 
-void SpiChild::TransmitVector(TransmitVectorRequestView request,
+void SpiChild::TransmitVector(TransmitVectorRequest& request,
                               TransmitVectorCompleter::Sync& completer) {
-  size_t rx_actual;
-  zx_status_t status =
-      spi_.Exchange(cs_, request->data.data(), request->data.count(), nullptr, 0, &rx_actual);
-  if (status == ZX_OK) {
+  auto result = spi_->TransmitVector(cs_, request.data());
+  if (result.is_ok()) {
     completer.Reply(ZX_OK);
   } else {
-    completer.Reply(status);
+    completer.Reply(result.error_value());
   }
 }
 
-void SpiChild::ReceiveVector(ReceiveVectorRequestView request,
+void SpiChild::ReceiveVector(ReceiveVectorRequest& request,
                              ReceiveVectorCompleter::Sync& completer) {
-  fbl::Vector<uint8_t> rxdata;
-  rxdata.reserve(request->size);
-  size_t rx_actual;
-  zx_status_t status = spi_.Exchange(cs_, nullptr, 0, rxdata.begin(), request->size, &rx_actual);
-  if (status == ZX_OK && rx_actual == request->size) {
-    auto rx_vector = fidl::VectorView<uint8_t>::FromExternal(rxdata.data(), request->size);
-    completer.Reply(ZX_OK, rx_vector);
+  auto result = spi_->ReceiveVector(cs_, request.size());
+  if (result.is_ok() && result.value().size() == request.size()) {
+    completer.Reply({ZX_OK, std::move(result.value())});
   } else {
-    completer.Reply(status == ZX_OK ? ZX_ERR_INTERNAL : status, fidl::VectorView<uint8_t>());
+    completer.Reply({result.status_value() == ZX_OK ? ZX_ERR_INTERNAL : result.error_value(),
+                     std::vector<uint8_t>()});
   }
 }
 
-void SpiChild::ExchangeVector(ExchangeVectorRequestView request,
+void SpiChild::ExchangeVector(ExchangeVectorRequest& request,
                               ExchangeVectorCompleter::Sync& completer) {
-  fbl::Vector<uint8_t> rxdata;
-  const size_t size = request->txdata.count();
-  rxdata.reserve(size);
-  size_t rx_actual;
-  zx_status_t status =
-      spi_.Exchange(cs_, request->txdata.data(), size, rxdata.begin(), size, &rx_actual);
-  if (status == ZX_OK && rx_actual == size) {
-    auto rx_vector = fidl::VectorView<uint8_t>::FromExternal(rxdata.data(), size);
-    completer.Reply(ZX_OK, rx_vector);
+  auto result = spi_->ExchangeVector(cs_, request.txdata());
+  if (result.is_ok() && result.value().size() == request.txdata().size()) {
+    completer.Reply({ZX_OK, std::move(result.value())});
   } else {
-    completer.Reply(status == ZX_OK ? ZX_ERR_INTERNAL : status, fidl::VectorView<uint8_t>());
+    completer.Reply({result.status_value() == ZX_OK ? ZX_ERR_INTERNAL : result.error_value(),
+                     std::vector<uint8_t>()});
   }
 }
 
-void SpiChild::RegisterVmo(RegisterVmoRequestView request, RegisterVmoCompleter::Sync& completer) {
-  zx_status_t status =
-      spi_.RegisterVmo(cs_, request->vmo_id, std::move(request->vmo.vmo), request->vmo.offset,
-                       request->vmo.size, static_cast<uint32_t>(request->rights));
-  if (status == ZX_OK) {
-    completer.ReplySuccess();
+void SpiChild::RegisterVmo(RegisterVmoRequest& request, RegisterVmoCompleter::Sync& completer) {
+  auto result =
+      spi_->RegisterVmo(cs_, request.vmo_id(), std::move(request.vmo()), request.rights());
+  if (result.is_ok()) {
+    completer.Reply(fit::ok());
   } else {
-    completer.ReplyError(status);
+    completer.Reply(fit::error(result.error_value()));
   }
 }
 
-void SpiChild::UnregisterVmo(UnregisterVmoRequestView request,
+void SpiChild::UnregisterVmo(UnregisterVmoRequest& request,
                              UnregisterVmoCompleter::Sync& completer) {
-  zx::vmo vmo;
-  if (zx_status_t status = spi_.UnregisterVmo(cs_, request->vmo_id, &vmo); status != ZX_OK) {
-    completer.ReplyError(status);
+  auto result = spi_->UnregisterVmo(cs_, request.vmo_id());
+  if (!result.is_ok()) {
+    completer.Reply(fit::error(result.error_value()));
     return;
   }
-  completer.ReplySuccess(std::move(vmo));
+  completer.Reply(fit::ok(std::move(result.value())));
 }
 
-void SpiChild::Transmit(TransmitRequestView request, TransmitCompleter::Sync& completer) {
-  TRACE_DURATION("spi", "Transmit", "cs", cs_, "size", request->buffer.size);
-  zx_status_t status =
-      spi_.TransmitVmo(cs_, request->buffer.vmo_id, request->buffer.offset, request->buffer.size);
-  completer.Reply(zx::make_result(status));
-}
-
-void SpiChild::Receive(ReceiveRequestView request, ReceiveCompleter::Sync& completer) {
-  TRACE_DURATION("spi", "Receive", "cs", cs_, "size", request->buffer.size);
-  zx_status_t status =
-      spi_.ReceiveVmo(cs_, request->buffer.vmo_id, request->buffer.offset, request->buffer.size);
-  completer.Reply(zx::make_result(status));
-}
-
-void SpiChild::Exchange(ExchangeRequestView request, ExchangeCompleter::Sync& completer) {
-  if (request->tx_buffer.size != request->rx_buffer.size) {
-    completer.ReplyError(ZX_ERR_INVALID_ARGS);
+void SpiChild::Transmit(TransmitRequest& request, TransmitCompleter::Sync& completer) {
+  TRACE_DURATION("spi", "Transmit", "cs", cs_, "size", request.buffer().size());
+  auto result = spi_->TransmitVmo(cs_, request.buffer());
+  if (result.is_ok()) {
+    completer.Reply(fit::ok());
     return;
   }
-  TRACE_DURATION("spi", "Exchange", "cs", cs_, "size", request->tx_buffer.size);
-  zx_status_t status = spi_.ExchangeVmo(cs_, request->tx_buffer.vmo_id, request->tx_buffer.offset,
-                                        request->rx_buffer.vmo_id, request->rx_buffer.offset,
-                                        request->tx_buffer.size);
-  completer.Reply(zx::make_result(status));
+  completer.Reply(fit::error(result.error_value()));
+}
+
+void SpiChild::Receive(ReceiveRequest& request, ReceiveCompleter::Sync& completer) {
+  TRACE_DURATION("spi", "Receive", "cs", cs_, "size", request.buffer().size());
+  auto result = spi_->ReceiveVmo(cs_, request.buffer());
+  if (result.is_ok()) {
+    completer.Reply(fit::ok());
+    return;
+  }
+  completer.Reply(fit::error(result.error_value()));
+}
+
+void SpiChild::Exchange(ExchangeRequest& request, ExchangeCompleter::Sync& completer) {
+  if (request.tx_buffer().size() != request.rx_buffer().size()) {
+    completer.Reply(fit::error(ZX_ERR_INVALID_ARGS));
+    return;
+  }
+  TRACE_DURATION("spi", "Exchange", "cs", cs_, "size", request.tx_buffer().size());
+  auto result = spi_->ExchangeVmo(cs_, request.tx_buffer(), request.rx_buffer());
+  if (result.is_ok()) {
+    completer.Reply(fit::ok());
+    return;
+  }
+  completer.Reply(fit::error(result.error_value()));
 }
 
 zx_status_t SpiChild::SpiTransmit(const uint8_t* txdata_list, size_t txdata_count) {
-  size_t actual;
-  spi_.Exchange(cs_, txdata_list, txdata_count, nullptr, 0, &actual);
-  return ZX_OK;
+  auto result = spi_->TransmitVector(
+      cs_, std::vector<uint8_t>(const_cast<uint8_t*>(txdata_list),
+                                const_cast<uint8_t*>(txdata_list) + txdata_count));
+  return result.status_value();
 }
+
 zx_status_t SpiChild::SpiReceive(uint32_t size, uint8_t* out_rxdata_list, size_t rxdata_count,
                                  size_t* out_rxdata_actual) {
-  spi_.Exchange(cs_, nullptr, 0, out_rxdata_list, rxdata_count, out_rxdata_actual);
+  if (size > rxdata_count) {
+    return ZX_ERR_BUFFER_TOO_SMALL;
+  }
+
+  auto result = spi_->ReceiveVector(cs_, size);
+  if (!result.is_ok()) {
+    return result.error_value();
+  }
+  if (result.value().size() != size) {
+    return ZX_ERR_INTERNAL;
+  }
+
+  *out_rxdata_actual = result.value().size();
+  memcpy(out_rxdata_list, result.value().data(), *out_rxdata_actual);
+
   return ZX_OK;
 }
 
 zx_status_t SpiChild::SpiExchange(const uint8_t* txdata_list, size_t txdata_count,
                                   uint8_t* out_rxdata_list, size_t rxdata_count,
                                   size_t* out_rxdata_actual) {
-  spi_.Exchange(cs_, txdata_list, txdata_count, out_rxdata_list, rxdata_count, out_rxdata_actual);
+  if (txdata_count != rxdata_count) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  auto result = spi_->ExchangeVector(
+      cs_, std::vector<uint8_t>(const_cast<uint8_t*>(txdata_list),
+                                const_cast<uint8_t*>(txdata_list) + txdata_count));
+  if (!result.is_ok()) {
+    return result.error_value();
+  }
+  if (result.value().size() != rxdata_count) {
+    return ZX_ERR_INTERNAL;
+  }
+
+  *out_rxdata_actual = result.value().size();
+  memcpy(out_rxdata_list, result.value().data(), *out_rxdata_actual);
+
   return ZX_OK;
 }
 
@@ -133,17 +161,19 @@ void SpiChild::CanAssertCs(CanAssertCsCompleter::Sync& completer) {
 void SpiChild::AssertCs(AssertCsCompleter::Sync& completer) {
   if (has_siblings_) {
     completer.Reply(ZX_ERR_NOT_SUPPORTED);
-  } else {
-    completer.Reply(spi_.LockBus(cs_));
+    return;
   }
+
+  completer.Reply(spi_->LockBus(cs_).status_value());
 }
 
 void SpiChild::DeassertCs(DeassertCsCompleter::Sync& completer) {
   if (has_siblings_) {
     completer.Reply(ZX_ERR_NOT_SUPPORTED);
-  } else {
-    completer.Reply(spi_.UnlockBus(cs_));
+    return;
   }
+
+  completer.Reply(spi_->UnlockBus(cs_).status_value());
 }
 
 void SpiChild::Bind(async_dispatcher_t* dispatcher,
@@ -159,7 +189,7 @@ void SpiChild::Bind(async_dispatcher_t* dispatcher,
             std::optional opt = std::exchange(self->binding_, {});
             ZX_ASSERT(opt.has_value());
 
-            self->spi_.ReleaseRegisteredVmos(self->cs_);
+            self->spi_->ReleaseRegisteredVmos(self->cs_);
 
             // If the server is unbinding because DdkUnbind is being called, then reply to the
             // unbind transaction so that it completes.

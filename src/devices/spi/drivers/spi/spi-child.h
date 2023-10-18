@@ -5,14 +5,13 @@
 #ifndef SRC_DEVICES_SPI_DRIVERS_SPI_SPI_CHILD_H_
 #define SRC_DEVICES_SPI_DRIVERS_SPI_SPI_CHILD_H_
 
-#include <fidl/fuchsia.hardware.spi/cpp/wire.h>
+#include <fidl/fuchsia.hardware.spi/cpp/fidl.h>
 #include <fuchsia/hardware/spi/cpp/banjo.h>
-#include <fuchsia/hardware/spiimpl/cpp/banjo.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 
-#include <variant>
-
 #include <ddktl/device.h>
+
+#include "spi-impl-client.h"
 
 namespace spi {
 
@@ -25,10 +24,10 @@ using SpiChildType =
 
 class SpiChild : public SpiChildType,
                  public ddk::SpiProtocol<SpiChild, ddk::base_protocol>,
-                 public fidl::WireServer<fuchsia_hardware_spi::Device> {
+                 public fidl::Server<fuchsia_hardware_spi::Device> {
  public:
-  SpiChild(zx_device_t* parent, ddk::SpiImplProtocolClient spi, uint32_t chip_select,
-           bool has_siblings, async_dispatcher_t* dispatcher)
+  SpiChild(zx_device_t* parent, SpiImplClient* spi, uint32_t chip_select, bool has_siblings,
+           async_dispatcher_t* dispatcher)
       : SpiChildType(parent),
         spi_(spi),
         cs_(chip_select),
@@ -41,20 +40,20 @@ class SpiChild : public SpiChildType,
 
   void OpenSession(OpenSessionRequestView request, OpenSessionCompleter::Sync& completer) override;
 
-  void TransmitVector(TransmitVectorRequestView request,
+  void TransmitVector(TransmitVectorRequest& request,
                       TransmitVectorCompleter::Sync& completer) override;
-  void ReceiveVector(ReceiveVectorRequestView request,
+  void ReceiveVector(ReceiveVectorRequest& request,
                      ReceiveVectorCompleter::Sync& completer) override;
-  void ExchangeVector(ExchangeVectorRequestView request,
+  void ExchangeVector(ExchangeVectorRequest& request,
                       ExchangeVectorCompleter::Sync& completer) override;
 
-  void RegisterVmo(RegisterVmoRequestView request, RegisterVmoCompleter::Sync& completer) override;
-  void UnregisterVmo(UnregisterVmoRequestView request,
+  void RegisterVmo(RegisterVmoRequest& request, RegisterVmoCompleter::Sync& completer) override;
+  void UnregisterVmo(UnregisterVmoRequest& request,
                      UnregisterVmoCompleter::Sync& completer) override;
 
-  void Transmit(TransmitRequestView request, TransmitCompleter::Sync& completer) override;
-  void Receive(ReceiveRequestView request, ReceiveCompleter::Sync& completer) override;
-  void Exchange(ExchangeRequestView request, ExchangeCompleter::Sync& completer) override;
+  void Transmit(TransmitRequest& request, TransmitCompleter::Sync& completer) override;
+  void Receive(ReceiveRequest& request, ReceiveCompleter::Sync& completer) override;
+  void Exchange(ExchangeRequest& request, ExchangeCompleter::Sync& completer) override;
 
   void CanAssertCs(CanAssertCsCompleter::Sync& completer) override;
   void AssertCs(AssertCsCompleter::Sync& completer) override;
@@ -72,7 +71,7 @@ class SpiChild : public SpiChildType,
   zx_status_t ServeOutgoingDirectory(fidl::ServerEnd<fuchsia_io::Directory> server_end);
 
  private:
-  const ddk::SpiImplProtocolClient spi_;
+  SpiImplClient* spi_;
   const uint32_t cs_;
   // False if this child is the only device on the bus.
   const bool has_siblings_;

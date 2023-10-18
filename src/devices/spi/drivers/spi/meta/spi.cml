@@ -17,6 +17,9 @@
     capabilities: [
         { service: 'fuchsia.hardware.spi.Service' },
     ],
+    use: [
+        { service: "fuchsia.hardware.spiimpl.Service" },
+    ],
     expose: [
         {
             service: 'fuchsia.hardware.spi.Service',

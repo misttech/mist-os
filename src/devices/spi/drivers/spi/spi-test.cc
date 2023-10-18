@@ -4,8 +4,11 @@
 
 #include "spi.h"
 
+#include <fidl/fuchsia.hardware.spiimpl/cpp/wire_test_base.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/async/default.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/incoming/cpp/service.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
@@ -26,13 +29,10 @@
 namespace spi {
 using spi_channel_t = fidl_metadata::spi::Channel;
 
-class FakeDdkSpiImpl;
-
-class FakeDdkSpiImpl : public ddk::SpiImplProtocol<FakeDdkSpiImpl, ddk::base_protocol> {
+// Base class for fake SpiImpl implementations--Banjo or FIDL.
+class FakeSpiImplBase {
  public:
-  spi_impl_protocol_ops_t* ops() { return &spi_impl_protocol_ops_; }
-
-  uint32_t SpiImplGetChipSelectCount() { return 2; }
+  const uint8_t kChipSelectCount = 2;
 
   zx_status_t SpiImplExchange(uint32_t cs, const uint8_t* txdata, size_t txdata_size,
                               uint8_t* out_rxdata, size_t rxdata_size, size_t* out_rxdata_actual) {
@@ -165,16 +165,6 @@ class FakeDdkSpiImpl : public ddk::SpiImplProtocol<FakeDdkSpiImpl, ddk::base_pro
     return std::get<1>(*rx_it).write(buf, rx_offset, std::max(size, sizeof(buf)));
   }
 
-  bool vmos_released_since_last_call() {
-    const bool value = vmos_released_since_last_call_;
-    vmos_released_since_last_call_ = false;
-    return value;
-  }
-
-  zx_status_t SpiImplLockBus(uint32_t chip_select) { return ZX_OK; }
-  zx_status_t SpiImplUnlockBus(uint32_t chip_select) { return ZX_OK; }
-
-  SpiDevice* bus_device_;
   uint32_t current_test_cs_ = 0;
   bool corrupt_rx_actual_ = false;
   bool vmos_released_since_last_call_ = false;
@@ -185,11 +175,6 @@ class FakeDdkSpiImpl : public ddk::SpiImplProtocol<FakeDdkSpiImpl, ddk::base_pro
     kExchange,
   } test_mode_;
 
-  static constexpr uint32_t kTestBusId = 0;
-  static constexpr spi_channel_t kSpiChannels[] = {
-      {.bus_id = 0, .cs = 0, .vid = 0, .pid = 0, .did = 0},
-      {.bus_id = 0, .cs = 1, .vid = 0, .pid = 0, .did = 0}};
-
   std::map<uint32_t, zx::vmo> cs0_vmos;
   std::map<uint32_t, zx::vmo> cs1_vmos;
 
@@ -197,9 +182,12 @@ class FakeDdkSpiImpl : public ddk::SpiImplProtocol<FakeDdkSpiImpl, ddk::base_pro
   static constexpr uint8_t kTestData[] = {1, 2, 3, 4, 5, 6, 7};
 };
 
+template <class FakeSpiImplClass>
 class SpiDeviceTest : public zxtest::Test {
  protected:
-  SpiDeviceTest() : loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {}
+  SpiDeviceTest()
+      : loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
+        incoming_loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {}
 
   static constexpr uint32_t kTestBusId = 0;
   static constexpr spi_channel_t kSpiChannels[] = {
@@ -207,13 +195,16 @@ class SpiDeviceTest : public zxtest::Test {
       {.bus_id = 0, .cs = 1, .vid = 0, .pid = 0, .did = 0},
   };
 
+  virtual void SetUpSpiImpl() = 0;
+
   void SetUp() override {
+    ASSERT_OK(incoming_loop_.StartThread("incoming-loop"));
+
     // TODO(fxb/124464): Migrate test to use dispatcher integration.
     parent_ = MockDevice::FakeRootParentNoDispatcherIntegrationDEPRECATED();
     ASSERT_OK(loop_.StartThread("spi-test-thread"));
 
-    parent_->AddProtocol(ZX_PROTOCOL_SPI_IMPL, spi_impl_.ops(), &spi_impl_);
-
+    SetUpSpiImpl();
     SetSpiChannelMetadata(kSpiChannels, std::size(kSpiChannels));
     parent_->SetMetadata(DEVICE_METADATA_PRIVATE, &kTestBusId, sizeof(kTestBusId));
   }
@@ -252,11 +243,48 @@ class SpiDeviceTest : public zxtest::Test {
   }
 
   std::shared_ptr<MockDevice> parent_;
-  FakeDdkSpiImpl spi_impl_;
   async::Loop loop_;
+
+  // Helper Methods that access fake_spi_impl
+  void set_current_test_cs(uint32_t i) {
+    ns_.SyncCall([i](IncomingNamespace* ns) { ns->fake_spi_impl.current_test_cs_ = i; });
+  }
+  void set_test_mode(FakeSpiImplBase::SpiTestMode test_mode) {
+    ns_.SyncCall([test_mode](IncomingNamespace* ns) { ns->fake_spi_impl.test_mode_ = test_mode; });
+  }
+  void set_corrupt_rx_actual(bool actual) {
+    ns_.SyncCall(
+        [actual](IncomingNamespace* ns) { ns->fake_spi_impl.corrupt_rx_actual_ = actual; });
+  }
+  bool vmos_released_since_last_call() {
+    return ns_.SyncCall([](IncomingNamespace* ns) {
+      const bool value = ns->fake_spi_impl.vmos_released_since_last_call_;
+      ns->fake_spi_impl.vmos_released_since_last_call_ = false;
+      return value;
+    });
+  }
+
+  // Test Methods
+  void SpiTest();
+  void SpiFidlVmoTest();
+  void SpiFidlVectorTest();
+  void SpiFidlVectorErrorTest();
+  void AssertCsWithSiblingTest();
+  void AssertCsNoSiblingTest();
+  void OneClient();
+  void DdkLifecycle();
+
+  async::Loop incoming_loop_;
+  struct IncomingNamespace {
+    FakeSpiImplClass fake_spi_impl;
+    component::OutgoingDirectory outgoing{async_get_default_dispatcher()};
+  };
+  async_patterns::TestDispatcherBound<IncomingNamespace> ns_{incoming_loop_.dispatcher(),
+                                                             std::in_place};
 };
 
-TEST_F(SpiDeviceTest, SpiTest) {
+template <class FakeSpiImplClass>
+void SpiDeviceTest<FakeSpiImplClass>::SpiTest() {
   CreateSpiDevice();
   auto* const spi_bus = parent_->GetLatestChild();
   ASSERT_NOT_NULL(spi_bus);
@@ -268,20 +296,20 @@ TEST_F(SpiDeviceTest, SpiTest) {
 
   uint32_t i = 0;
   for (auto it = spi_bus->children().begin(); it != spi_bus->children().end(); it++, i++) {
-    spi_impl_.current_test_cs_ = i;
+    set_current_test_cs(i);
 
     zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_spi::Device>();
     ASSERT_OK(endpoints);
     auto& [client, server] = endpoints.value();
     fidl::BindServer(loop_.dispatcher(), std::move(server), (*it)->GetDeviceContext<SpiChild>());
 
-    spi_impl_.test_mode_ = FakeDdkSpiImpl::SpiTestMode::kTransmit;
+    set_test_mode(FakeSpiImplBase::SpiTestMode::kTransmit);
     EXPECT_OK(spilib_transmit(client, txbuf, sizeof txbuf));
 
-    spi_impl_.test_mode_ = FakeDdkSpiImpl::SpiTestMode::kReceive;
+    set_test_mode(FakeSpiImplBase::SpiTestMode::kReceive);
     EXPECT_OK(spilib_receive(client, rxbuf, sizeof rxbuf));
 
-    spi_impl_.test_mode_ = FakeDdkSpiImpl::SpiTestMode::kExchange;
+    set_test_mode(FakeSpiImplBase::SpiTestMode::kExchange);
     EXPECT_OK(spilib_exchange(client, txbuf, rxbuf, sizeof txbuf));
   }
 
@@ -289,7 +317,8 @@ TEST_F(SpiDeviceTest, SpiTest) {
   EXPECT_EQ(parent_->descendant_count(), 0);
 }
 
-TEST_F(SpiDeviceTest, SpiFidlVmoTest) {
+template <class FakeSpiImplClass>
+void SpiDeviceTest<FakeSpiImplClass>::SpiFidlVmoTest() {
   using fuchsia_hardware_sharedmemory::wire::SharedVmoRight;
 
   constexpr uint8_t kTestData[] = {1, 2, 3, 4, 5, 6, 7};
@@ -399,7 +428,8 @@ TEST_F(SpiDeviceTest, SpiFidlVmoTest) {
   EXPECT_EQ(parent_->descendant_count(), 0);
 }
 
-TEST_F(SpiDeviceTest, SpiFidlVectorTest) {
+template <class FakeSpiImplClass>
+void SpiDeviceTest<FakeSpiImplClass>::SpiFidlVectorTest() {
   fidl::WireSharedClient<fuchsia_hardware_spi::Device> cs0_client, cs1_client;
 
   CreateSpiDevice();
@@ -423,8 +453,8 @@ TEST_F(SpiDeviceTest, SpiFidlVectorTest) {
 
   uint8_t test_data[] = {1, 2, 3, 4, 5, 6, 7};
 
-  spi_impl_.current_test_cs_ = 0;
-  spi_impl_.test_mode_ = FakeDdkSpiImpl::SpiTestMode::kTransmit;
+  set_current_test_cs(0);
+  set_test_mode(FakeSpiImplBase::SpiTestMode::kTransmit);
   {
     auto tx_buffer = fidl::VectorView<uint8_t>::FromExternal(test_data);
     auto result = cs0_client.sync()->TransmitVector(tx_buffer);
@@ -432,8 +462,8 @@ TEST_F(SpiDeviceTest, SpiFidlVectorTest) {
     EXPECT_OK(result.value().status);
   }
 
-  spi_impl_.current_test_cs_ = 1;
-  spi_impl_.test_mode_ = FakeDdkSpiImpl::SpiTestMode::kReceive;
+  set_current_test_cs(1);
+  set_test_mode(FakeSpiImplBase::SpiTestMode::kReceive);
   {
     auto result = cs1_client.sync()->ReceiveVector(sizeof(test_data));
     ASSERT_OK(result.status());
@@ -442,8 +472,8 @@ TEST_F(SpiDeviceTest, SpiFidlVectorTest) {
     EXPECT_BYTES_EQ(result.value().data.data(), test_data, sizeof(test_data));
   }
 
-  spi_impl_.current_test_cs_ = 0;
-  spi_impl_.test_mode_ = FakeDdkSpiImpl::SpiTestMode::kExchange;
+  set_current_test_cs(0);
+  set_test_mode(FakeSpiImplBase::SpiTestMode::kExchange);
   {
     auto tx_buffer = fidl::VectorView<uint8_t>::FromExternal(test_data);
     auto result = cs0_client.sync()->ExchangeVector(tx_buffer);
@@ -457,7 +487,8 @@ TEST_F(SpiDeviceTest, SpiFidlVectorTest) {
   EXPECT_EQ(parent_->descendant_count(), 0);
 }
 
-TEST_F(SpiDeviceTest, SpiFidlVectorErrorTest) {
+template <class FakeSpiImplClass>
+void SpiDeviceTest<FakeSpiImplClass>::SpiFidlVectorErrorTest() {
   fidl::WireSharedClient<fuchsia_hardware_spi::Device> cs0_client, cs1_client;
 
   CreateSpiDevice();
@@ -479,12 +510,12 @@ TEST_F(SpiDeviceTest, SpiFidlVectorErrorTest) {
     cs1_client.Bind(std::move(client.value()), loop_.dispatcher());
   }
 
-  spi_impl_.corrupt_rx_actual_ = true;
+  set_corrupt_rx_actual(true);
 
   uint8_t test_data[] = {1, 2, 3, 4, 5, 6, 7};
 
-  spi_impl_.current_test_cs_ = 0;
-  spi_impl_.test_mode_ = FakeDdkSpiImpl::SpiTestMode::kTransmit;
+  set_current_test_cs(0);
+  set_test_mode(FakeSpiImplBase::SpiTestMode::kTransmit);
   {
     auto tx_buffer = fidl::VectorView<uint8_t>::FromExternal(test_data);
     auto result = cs0_client.sync()->TransmitVector(tx_buffer);
@@ -492,8 +523,8 @@ TEST_F(SpiDeviceTest, SpiFidlVectorErrorTest) {
     EXPECT_OK(result.value().status);
   }
 
-  spi_impl_.current_test_cs_ = 1;
-  spi_impl_.test_mode_ = FakeDdkSpiImpl::SpiTestMode::kReceive;
+  set_current_test_cs(1);
+  set_test_mode(FakeSpiImplBase::SpiTestMode::kReceive);
   {
     auto result = cs1_client.sync()->ReceiveVector(sizeof(test_data));
     ASSERT_OK(result.status());
@@ -501,8 +532,8 @@ TEST_F(SpiDeviceTest, SpiFidlVectorErrorTest) {
     EXPECT_EQ(result.value().data.count(), 0);
   }
 
-  spi_impl_.current_test_cs_ = 0;
-  spi_impl_.test_mode_ = FakeDdkSpiImpl::SpiTestMode::kExchange;
+  set_current_test_cs(0);
+  set_test_mode(FakeSpiImplBase::SpiTestMode::kExchange);
   {
     auto tx_buffer = fidl::VectorView<uint8_t>::FromExternal(test_data);
     auto result = cs0_client.sync()->ExchangeVector(tx_buffer);
@@ -515,7 +546,8 @@ TEST_F(SpiDeviceTest, SpiFidlVectorErrorTest) {
   EXPECT_EQ(parent_->descendant_count(), 0);
 }
 
-TEST_F(SpiDeviceTest, AssertCsWithSiblingTest) {
+template <class FakeSpiImplClass>
+void SpiDeviceTest<FakeSpiImplClass>::AssertCsWithSiblingTest() {
   fidl::WireSharedClient<fuchsia_hardware_spi::Device> cs0_client, cs1_client;
 
   CreateSpiDevice();
@@ -577,7 +609,8 @@ TEST_F(SpiDeviceTest, AssertCsWithSiblingTest) {
   EXPECT_EQ(parent_->descendant_count(), 0);
 }
 
-TEST_F(SpiDeviceTest, AssertCsNoSiblingTest) {
+template <class FakeSpiImplClass>
+void SpiDeviceTest<FakeSpiImplClass>::AssertCsNoSiblingTest() {
   SetSpiChannelMetadata(kSpiChannels, 1);
 
   fidl::WireSharedClient<fuchsia_hardware_spi::Device> cs0_client;
@@ -616,7 +649,8 @@ TEST_F(SpiDeviceTest, AssertCsNoSiblingTest) {
   EXPECT_EQ(parent_->descendant_count(), 0);
 }
 
-TEST_F(SpiDeviceTest, OneClient) {
+template <class FakeSpiImplClass>
+void SpiDeviceTest<FakeSpiImplClass>::OneClient() {
   SetSpiChannelMetadata(kSpiChannels, 1);
 
   fidl::WireSyncClient<fuchsia_hardware_spi::Device> cs0_client;
@@ -656,7 +690,7 @@ TEST_F(SpiDeviceTest, OneClient) {
     EXPECT_STATUS(cs0_client_1->CanAssertCs().status(), ZX_ERR_PEER_CLOSED);
   }
 
-  EXPECT_FALSE(spi_impl_.vmos_released_since_last_call());
+  EXPECT_FALSE(vmos_released_since_last_call());
 
   // Close the first client so that another one can connect.
   cs0_client = {};
@@ -676,7 +710,7 @@ TEST_F(SpiDeviceTest, OneClient) {
     cs0_client = {};
   }
 
-  EXPECT_TRUE(spi_impl_.vmos_released_since_last_call());
+  EXPECT_TRUE(vmos_released_since_last_call());
 
   // OpenSession should fail when another client is connected.
   {
@@ -716,7 +750,7 @@ TEST_F(SpiDeviceTest, OneClient) {
     }
   }
 
-  EXPECT_TRUE(spi_impl_.vmos_released_since_last_call());
+  EXPECT_TRUE(vmos_released_since_last_call());
 
   // FIDL clients shouldn't be able to connect, and calling OpenSession a second time should fail.
   {
@@ -755,13 +789,14 @@ TEST_F(SpiDeviceTest, OneClient) {
     }
   }
 
-  EXPECT_TRUE(spi_impl_.vmos_released_since_last_call());
+  EXPECT_TRUE(vmos_released_since_last_call());
 
   RemoveDevice(spi_bus);
   EXPECT_EQ(parent_->descendant_count(), 0);
 }
 
-TEST_F(SpiDeviceTest, DdkLifecycle) {
+template <class FakeSpiImplClass>
+void SpiDeviceTest<FakeSpiImplClass>::DdkLifecycle() {
   SetSpiChannelMetadata(kSpiChannels, 1);
 
   fidl::WireSyncClient<fuchsia_hardware_spi::Device> cs0_client;
@@ -801,5 +836,239 @@ TEST_F(SpiDeviceTest, DdkLifecycle) {
     EXPECT_STATUS(result.status(), ZX_ERR_PEER_CLOSED);
   }
 }
+
+// Banjo Tests
+namespace {
+
+class FakeDdkSpiImpl : public ddk::SpiImplProtocol<FakeDdkSpiImpl, ddk::base_protocol>,
+                       public FakeSpiImplBase {
+ public:
+  spi_impl_protocol_ops_t* ops() { return &spi_impl_protocol_ops_; }
+
+  uint32_t SpiImplGetChipSelectCount() { return kChipSelectCount; }
+
+  zx_status_t SpiImplExchange(uint32_t cs, const uint8_t* txdata, size_t txdata_size,
+                              uint8_t* out_rxdata, size_t rxdata_size, size_t* out_rxdata_actual) {
+    return FakeSpiImplBase::SpiImplExchange(cs, txdata, txdata_size, out_rxdata, rxdata_size,
+                                            out_rxdata_actual);
+  }
+
+  zx_status_t SpiImplRegisterVmo(uint32_t chip_select, uint32_t vmo_id, zx::vmo vmo,
+                                 uint64_t offset, uint64_t size, uint32_t rights) {
+    return FakeSpiImplBase::SpiImplRegisterVmo(chip_select, vmo_id, std::move(vmo), offset, size,
+                                               rights);
+  }
+
+  zx_status_t SpiImplUnregisterVmo(uint32_t chip_select, uint32_t vmo_id, zx::vmo* out_vmo) {
+    return FakeSpiImplBase::SpiImplUnregisterVmo(chip_select, vmo_id, out_vmo);
+  }
+
+  void SpiImplReleaseRegisteredVmos(uint32_t chip_select) {
+    FakeSpiImplBase::SpiImplReleaseRegisteredVmos(chip_select);
+  }
+
+  zx_status_t SpiImplTransmitVmo(uint32_t chip_select, uint32_t vmo_id, uint64_t offset,
+                                 uint64_t size) {
+    return FakeSpiImplBase::SpiImplTransmitVmo(chip_select, vmo_id, offset, size);
+  }
+
+  zx_status_t SpiImplReceiveVmo(uint32_t chip_select, uint32_t vmo_id, uint64_t offset,
+                                uint64_t size) {
+    return FakeSpiImplBase::SpiImplReceiveVmo(chip_select, vmo_id, offset, size);
+  }
+
+  zx_status_t SpiImplExchangeVmo(uint32_t chip_select, uint32_t tx_vmo_id, uint64_t tx_offset,
+                                 uint32_t rx_vmo_id, uint64_t rx_offset, uint64_t size) {
+    return FakeSpiImplBase::SpiImplExchangeVmo(chip_select, tx_vmo_id, tx_offset, rx_vmo_id,
+                                               rx_offset, size);
+  }
+
+  zx_status_t SpiImplLockBus(uint32_t chip_select) { return ZX_OK; }
+  zx_status_t SpiImplUnlockBus(uint32_t chip_select) { return ZX_OK; }
+};
+
+class BanjoSpiDeviceTest : public SpiDeviceTest<FakeDdkSpiImpl> {
+ protected:
+  void SetUpSpiImpl() override {
+    ns_.SyncCall([this](IncomingNamespace* ns) {
+      parent_->AddProtocol(ZX_PROTOCOL_SPI_IMPL, ns->fake_spi_impl.ops(), &ns->fake_spi_impl);
+    });
+  }
+};
+
+TEST_F(BanjoSpiDeviceTest, SpiTest) { SpiTest(); }
+TEST_F(BanjoSpiDeviceTest, SpiFidlVmoTest) { SpiFidlVmoTest(); }
+TEST_F(BanjoSpiDeviceTest, SpiFidlVectorTest) { SpiFidlVectorTest(); }
+TEST_F(BanjoSpiDeviceTest, SpiFidlVectorErrorTest) { SpiFidlVectorErrorTest(); }
+TEST_F(BanjoSpiDeviceTest, AssertCsWithSiblingTest) { AssertCsWithSiblingTest(); }
+TEST_F(BanjoSpiDeviceTest, AssertCsNoSiblingTest) { AssertCsNoSiblingTest(); }
+TEST_F(BanjoSpiDeviceTest, OneClient) { OneClient(); }
+TEST_F(BanjoSpiDeviceTest, DdkLifecycle) { DdkLifecycle(); }
+
+}  // namespace
+
+// FIDL Tests
+namespace {
+
+class FakeSpiImplServer : public fidl::testing::WireTestBase<fuchsia_hardware_spiimpl::SpiImpl>,
+                          public FakeSpiImplBase {
+ public:
+  fidl::ProtocolHandler<fuchsia_hardware_spiimpl::SpiImpl> GetHandler() {
+    return bindings_.CreateHandler(this, async_get_default_dispatcher(),
+                                   std::mem_fn(&FakeSpiImplServer::OnClosed));
+  }
+
+  // fuchsia_hardware_spiimpl::SpiImpl methods
+  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) final {
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
+  }
+  void GetChipSelectCount(GetChipSelectCountCompleter::Sync& completer) override {
+    completer.Reply(kChipSelectCount);
+  }
+  void TransmitVector(fuchsia_hardware_spiimpl::wire::SpiImplTransmitVectorRequest* request,
+                      TransmitVectorCompleter::Sync& completer) override {
+    size_t actual;
+    auto status = FakeSpiImplBase::SpiImplExchange(request->chip_select, request->data.data(),
+                                                   request->data.count(), nullptr, 0, &actual);
+    if (status != ZX_OK) {
+      completer.ReplyError(status);
+      return;
+    }
+    completer.ReplySuccess();
+  }
+  void ReceiveVector(fuchsia_hardware_spiimpl::wire::SpiImplReceiveVectorRequest* request,
+                     ReceiveVectorCompleter::Sync& completer) override {
+    std::vector<uint8_t> rxdata(request->size);
+    size_t actual;
+    auto status = FakeSpiImplBase::SpiImplExchange(request->chip_select, nullptr, 0, rxdata.data(),
+                                                   rxdata.size(), &actual);
+    if (status != ZX_OK) {
+      completer.ReplyError(status);
+      return;
+    }
+    rxdata.resize(actual);
+    completer.ReplySuccess(fidl::VectorView<uint8_t>::FromExternal(rxdata));
+  }
+  void ExchangeVector(fuchsia_hardware_spiimpl::wire::SpiImplExchangeVectorRequest* request,
+                      ExchangeVectorCompleter::Sync& completer) override {
+    std::vector<uint8_t> rxdata(request->txdata.count());
+    size_t actual;
+    auto status = FakeSpiImplBase::SpiImplExchange(request->chip_select, request->txdata.data(),
+                                                   request->txdata.count(), rxdata.data(),
+                                                   rxdata.size(), &actual);
+    if (status != ZX_OK) {
+      completer.ReplyError(status);
+      return;
+    }
+    rxdata.resize(actual);
+    completer.ReplySuccess(fidl::VectorView<uint8_t>::FromExternal(rxdata));
+  }
+  void LockBus(fuchsia_hardware_spiimpl::wire::SpiImplLockBusRequest* request,
+               LockBusCompleter::Sync& completer) override {
+    completer.ReplySuccess();
+  }
+  void UnlockBus(fuchsia_hardware_spiimpl::wire::SpiImplUnlockBusRequest* request,
+                 UnlockBusCompleter::Sync& completer) override {
+    completer.ReplySuccess();
+  }
+  void RegisterVmo(fuchsia_hardware_spiimpl::wire::SpiImplRegisterVmoRequest* request,
+                   RegisterVmoCompleter::Sync& completer) override {
+    auto status = FakeSpiImplBase::SpiImplRegisterVmo(
+        request->chip_select, request->vmo_id, std::move(request->vmo.vmo), request->vmo.offset,
+        request->vmo.size, static_cast<uint32_t>(request->rights));
+    if (status != ZX_OK) {
+      completer.ReplyError(status);
+      return;
+    }
+    completer.ReplySuccess();
+  }
+  void UnregisterVmo(fuchsia_hardware_spiimpl::wire::SpiImplUnregisterVmoRequest* request,
+                     UnregisterVmoCompleter::Sync& completer) override {
+    zx::vmo vmo;
+    auto status =
+        FakeSpiImplBase::SpiImplUnregisterVmo(request->chip_select, request->vmo_id, &vmo);
+    if (status != ZX_OK) {
+      completer.ReplyError(status);
+      return;
+    }
+    completer.ReplySuccess(std::move(vmo));
+  }
+  void ReleaseRegisteredVmos(
+      fuchsia_hardware_spiimpl::wire::SpiImplReleaseRegisteredVmosRequest* request,
+      ReleaseRegisteredVmosCompleter::Sync& completer) override {
+    FakeSpiImplBase::SpiImplReleaseRegisteredVmos(request->chip_select);
+  }
+  void TransmitVmo(fuchsia_hardware_spiimpl::wire::SpiImplTransmitVmoRequest* request,
+                   TransmitVmoCompleter::Sync& completer) override {
+    auto status = FakeSpiImplBase::SpiImplTransmitVmo(request->chip_select, request->buffer.vmo_id,
+                                                      request->buffer.offset, request->buffer.size);
+    if (status != ZX_OK) {
+      completer.ReplyError(status);
+      return;
+    }
+    completer.ReplySuccess();
+  }
+  void ReceiveVmo(fuchsia_hardware_spiimpl::wire::SpiImplReceiveVmoRequest* request,
+                  ReceiveVmoCompleter::Sync& completer) override {
+    auto status = FakeSpiImplBase::SpiImplReceiveVmo(request->chip_select, request->buffer.vmo_id,
+                                                     request->buffer.offset, request->buffer.size);
+    if (status != ZX_OK) {
+      completer.ReplyError(status);
+      return;
+    }
+    completer.ReplySuccess();
+  }
+  void ExchangeVmo(fuchsia_hardware_spiimpl::wire::SpiImplExchangeVmoRequest* request,
+                   ExchangeVmoCompleter::Sync& completer) override {
+    ASSERT_EQ(request->tx_buffer.size, request->rx_buffer.size);
+    auto status = FakeSpiImplBase::SpiImplExchangeVmo(
+        request->chip_select, request->tx_buffer.vmo_id, request->tx_buffer.offset,
+        request->rx_buffer.vmo_id, request->rx_buffer.offset, request->tx_buffer.size);
+    if (status != ZX_OK) {
+      completer.ReplyError(status);
+      return;
+    }
+    completer.ReplySuccess();
+  }
+
+ private:
+  void OnClosed(fidl::UnbindInfo info) {
+    // Called when a connection to this server is closed.
+    // This is provided to the binding group during |CreateHandler|.
+  }
+
+  fidl::ServerBindingGroup<fuchsia_hardware_spiimpl::SpiImpl> bindings_;
+};
+
+class FidlSpiDeviceTest : public SpiDeviceTest<FakeSpiImplServer> {
+ protected:
+  void SetUpSpiImpl() override {
+    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ZX_ASSERT(endpoints.is_ok());
+
+    ns_.SyncCall([&](IncomingNamespace* ns) {
+      auto service_result = ns->outgoing.AddService<fuchsia_hardware_spiimpl::Service>(
+          fuchsia_hardware_spiimpl::Service::InstanceHandler({
+              .device = ns->fake_spi_impl.GetHandler(),
+          }));
+      ZX_ASSERT(service_result.is_ok());
+
+      ZX_ASSERT(ns->outgoing.Serve(std::move(endpoints->server)).is_ok());
+    });
+
+    parent_->AddFidlService(fuchsia_hardware_spiimpl::Service::Name, std::move(endpoints->client));
+  }
+};
+
+TEST_F(FidlSpiDeviceTest, SpiTest) { SpiTest(); }
+TEST_F(FidlSpiDeviceTest, SpiFidlVmoTest) { SpiFidlVmoTest(); }
+TEST_F(FidlSpiDeviceTest, SpiFidlVectorTest) { SpiFidlVectorTest(); }
+TEST_F(FidlSpiDeviceTest, SpiFidlVectorErrorTest) { SpiFidlVectorErrorTest(); }
+TEST_F(FidlSpiDeviceTest, AssertCsWithSiblingTest) { AssertCsWithSiblingTest(); }
+TEST_F(FidlSpiDeviceTest, AssertCsNoSiblingTest) { AssertCsNoSiblingTest(); }
+TEST_F(FidlSpiDeviceTest, OneClient) { OneClient(); }
+TEST_F(FidlSpiDeviceTest, DdkLifecycle) { DdkLifecycle(); }
+
+}  // namespace
 
 }  // namespace spi

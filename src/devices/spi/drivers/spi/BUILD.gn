@@ -11,7 +11,10 @@ driver_bind_rules("spi_bind") {
   rules = "spi.bind"
   bind_output = "spi.bindbc"
   tests = "tests.json"
-  deps = [ "//src/devices/bind/fuchsia.spi" ]
+  deps = [
+    "//sdk/fidl/fuchsia.hardware.spiimpl:fuchsia.hardware.spiimpl_bindlib",
+    "//src/devices/bind/fuchsia.spi",
+  ]
 }
 
 group("tests") {
@@ -19,6 +22,25 @@ group("tests") {
   deps = [
     ":spi-test",
     ":spi_bind_test",
+  ]
+}
+
+group("common") {
+  public_deps = [
+    ":spi_bind",
+    "//sdk/banjo/fuchsia.hardware.spi:fuchsia.hardware.spi_banjo_cpp",
+    "//sdk/banjo/fuchsia.hardware.spiimpl:fuchsia.hardware.spiimpl_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.spi:fuchsia.hardware.spi_cpp",
+    "//sdk/fidl/fuchsia.hardware.spi.businfo:fuchsia.hardware.spi.businfo_cpp",
+    "//sdk/fidl/fuchsia.hardware.spiimpl:fuchsia.hardware.spiimpl_cpp",
+    "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/driver/runtime:driver_runtime_cpp",
+    "//src/devices/lib/driver:driver_runtime",
+    "//src/lib/ddk",
+    "//src/lib/ddktl",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/trace",
+    "//zircon/system/ulib/zx",
   ]
 }
 
@@ -30,23 +52,12 @@ fuchsia_driver("spi-driver") {
   ]
   sources = [
     "spi-child.cc",
+    "spi-impl-client.cc",
     "spi.cc",
   ]
   deps = [
-    ":spi_bind",
-    "//sdk/banjo/fuchsia.hardware.spi:fuchsia.hardware.spi_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.spiimpl:fuchsia.hardware.spiimpl_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.spi:fuchsia.hardware.spi_cpp",
-    "//sdk/fidl/fuchsia.hardware.spi.businfo:fuchsia.hardware.spi.businfo_cpp",
-    "//sdk/lib/component/outgoing/cpp",
-    "//sdk/lib/driver/runtime:driver_runtime_cpp",
+    ":common",
     "//src/devices/lib/driver",
-    "//src/devices/lib/driver:driver_runtime",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/trace",
-    "//zircon/system/ulib/zx",
   ]
 }
 
@@ -67,35 +78,32 @@ test("spi-test-bin") {
   output_name = "spi-test"
   sources = [
     "spi-child.cc",
+    "spi-impl-client.cc",
     "spi-test.cc",
     "spi.cc",
   ]
   deps = [
-    ":spi_bind",
-    "//sdk/banjo/fuchsia.hardware.spi:fuchsia.hardware.spi_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.spiimpl:fuchsia.hardware.spiimpl_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.spi:fuchsia.hardware.spi_cpp",
-    "//sdk/fidl/fuchsia.hardware.spi.businfo:fuchsia.hardware.spi.businfo_cpp",
-    "//sdk/lib/component/outgoing/cpp",
-    "//sdk/lib/driver/runtime:driver_runtime_cpp",
-    "//src/devices/lib/driver:driver_runtime",
+    ":common",
+    "//sdk/lib/async_patterns/testing/cpp",
     "//src/devices/lib/fidl-metadata",
     "//src/devices/testing/driver-runtime-main:zxtest",
     "//src/devices/testing/mock-ddk",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
+    "//zircon/system/ulib/async-default",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/spi",
     "//zircon/system/ulib/sync",
-    "//zircon/system/ulib/trace",
     "//zircon/system/ulib/zircon-internal",
-    "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]
 }
 
 fuchsia_unittest_package("spi-test") {
   deps = [ ":spi-test-bin" ]
+  test_specs = {
+    environments = basic_envs
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }
