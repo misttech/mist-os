@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 use {
     crate::{receiver::Message, AnyCast, Capability, CloneError},
-    fidl::endpoints::create_request_stream,
+    fidl::endpoints::{create_request_stream, ServerEnd},
     fidl_fuchsia_component_sandbox as fsandbox, fuchsia_async as fasync,
     fuchsia_zircon::{self as zx, HandleBased},
     futures::{channel::mpsc, future::BoxFuture, FutureExt, TryStreamExt},
@@ -63,8 +63,19 @@ impl Sender {
                 fsandbox::SenderRequest::Send_ { capability, control_handle: _ } => {
                     self.send(capability);
                 }
-                fsandbox::SenderRequest::Clone { server_end, control_handle: _ } => {
+                fsandbox::SenderRequest::Open {
+                    flags: _,
+                    mode: _,
+                    path: _,
+                    object,
+                    control_handle: _,
+                } => {
+                    self.send(object.into());
+                }
+                fsandbox::SenderRequest::Clone2 { request, control_handle: _ } => {
                     let sender = self.clone();
+                    let server_end: ServerEnd<fsandbox::SenderMarker> =
+                        ServerEnd::new(request.into_channel());
                     let stream = server_end.into_stream().unwrap();
                     let task = fasync::Task::spawn(sender.serve_sender(stream));
                     self.send_internal(Message::Task(task));

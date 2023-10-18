@@ -10,6 +10,7 @@ use std::sync::{Arc, Weak};
 use thiserror::Error;
 
 mod decl;
+mod fidl;
 mod route2;
 
 struct InterfaceInner {

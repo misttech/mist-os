@@ -4,6 +4,8 @@
 library fuchsia.component.sandbox;
 
 using zx;
+using fuchsia.io;
+using fuchsia.unknown;
 
 /// A capability of unknown type.
 alias Capability = zx.Handle;
@@ -60,15 +62,12 @@ closed protocol Dict {
 };
 
 closed protocol Sender {
+    compose fuchsia.io.Openable;
+    compose fuchsia.unknown.Cloneable;
+
     /// Sends a single Capability handle over this sender.
     strict Send(resource struct {
         capability Capability;
-    });
-    /// Clones this Sender. Calls to the cloned Sender will
-    /// go to the same Receiver.
-    // TODO(fxbug.dev/298112397): Should we compose fuchsia.unknown.Cloneable instead?
-    strict Clone(resource struct {
-        server_end server_end:Sender;
     });
 };
 

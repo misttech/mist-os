@@ -21,19 +21,29 @@ rustc_test("bin") {
   edition = "2021"
 
   deps = [
+    "//examples/components/routing/fidl:echo_rust",
+    "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
+    "//sdk/fidl/fuchsia.component.sandbox:fuchsia.component.sandbox_rust",
+    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-component",
     "//src/lib/replace-with",
     "//src/sys/component_manager/lib/sandbox",
+    "//src/sys/component_manager/lib/serve_processargs",
     "//src/sys/lib/cm_types",
     "//src/sys/lib/moniker",
+    "//src/sys/lib/namespace",
     "//src/sys/lib/routing",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:thiserror",
   ]
 
   sources = [
     "src/decl.rs",
+    "src/fidl.rs",
     "src/lib.rs",
     "src/route2/component.rs",
     "src/route2/mod.rs",
