@@ -23,8 +23,10 @@ use {
     },
 };
 
-fn remove_duplicates<T: Eq + std::hash::Hash>(v: Vec<T>) -> Vec<T> {
-    <HashSet<T> as IntoIterator>::into_iter(HashSet::from_iter(v.into_iter())).into_iter().collect()
+fn remove_duplicates<T: Ord>(mut v: Vec<T>) -> Vec<T> {
+    v.sort();
+    v.dedup();
+    v
 }
 
 fn merge_option<T, F>(left: Option<T>, right: Option<T>, merge_fn: F) -> Result<Option<T>, Error>
@@ -61,7 +63,7 @@ macro_rules! merge_vec {
     ($target:ident, $other:expr, $field:ident) => {
         merge_option($target.$field, $other.$field, |mut l, mut r| {
             l.append(&mut r);
-            Ok(l)
+            Ok(remove_duplicates(l))
         })?
     };
 }
@@ -1102,11 +1104,6 @@ mod tests {
 
         let mut combined = CapabilityAllowlistEntry::merge_vecs(left, right).unwrap();
         combined.sort();
-        for entry in &mut combined {
-            if let Some(moniker) = entry.target_monikers.as_mut() {
-                moniker.sort();
-            }
-        }
 
         assert_eq!(combined, expected_combine);
     }
@@ -1136,12 +1133,6 @@ mod tests {
 
         let mut combined = CapabilityAllowlistEntry::merge_vecs(left, right).unwrap();
         combined.sort();
-        for entry in &mut combined {
-            if let Some(moniker) = entry.target_monikers.as_mut() {
-                moniker.sort();
-            }
-        }
-
         assert_eq!(combined, expected_combine);
     }
 }
