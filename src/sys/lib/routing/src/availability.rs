@@ -4,13 +4,12 @@
 
 use {
     crate::error::AvailabilityRoutingError,
-    crate::RouteBundle,
     cm_rust::{
         Availability, DirectoryDecl, EventStreamDecl, ExposeDeclCommon, ExposeDirectoryDecl,
         ExposeProtocolDecl, ExposeRunnerDecl, ExposeServiceDecl, ExposeSource, OfferDeclCommon,
         OfferDirectoryDecl, OfferEventStreamDecl, OfferProtocolDecl, OfferRunnerDecl,
         OfferServiceDecl, OfferSource, OfferStorageDecl, ProtocolDecl, RunnerDecl, ServiceDecl,
-        StorageDecl, UseDeclCommon,
+        StorageDecl,
     },
     std::convert::From,
 };
@@ -121,20 +120,8 @@ macro_rules! make_availability_visitor {
         pub struct $name(pub AvailabilityState);
 
         impl $name {
-            pub fn new<U>(use_decl: &U) -> Self where U: UseDeclCommon {
-                Self(use_decl.availability().clone().into())
-            }
-
-            pub fn new_from_offer<O>(offer_decl: &O) -> Self where O: OfferDeclCommon {
-                Self(offer_decl.availability().unwrap_or(&Availability::Required).clone().into())
-            }
-
-            pub fn new_from_expose<E>(expose_decl: &E) -> Self where E: ExposeDeclCommon {
-                Self(expose_decl.availability().clone().into())
-            }
-
-            pub fn new_from_expose_bundle<E>(bundle: &RouteBundle<E>) -> Self where E: ExposeDeclCommon + Clone {
-                Self(bundle.availability().clone().into())
+            pub fn new(availability: Availability) -> Self {
+                Self(availability.into())
             }
         }
 
