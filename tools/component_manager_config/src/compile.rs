@@ -299,7 +299,7 @@ impl CapabilityAllowlistEntry {
             source: Option<CapabilityFrom>,
             capability: Option<CapabilityTypeName>,
         }
-        Ok(some
+        let mut combined: Vec<_> = some
             .into_iter()
             .chain(another.into_iter())
             .map(|mut entry| {
@@ -334,7 +334,10 @@ impl CapabilityAllowlistEntry {
                     None => None,
                 },
             })
-            .collect())
+            .collect();
+        // Unstable sorts are faster, and we shouldn't have items that have equal values anyway.
+        combined.sort_unstable();
+        Ok(combined)
     }
 }
 
@@ -1102,9 +1105,7 @@ mod tests {
             },
         ];
 
-        let mut combined = CapabilityAllowlistEntry::merge_vecs(left, right).unwrap();
-        combined.sort();
-
+        let combined = CapabilityAllowlistEntry::merge_vecs(left, right).unwrap();
         assert_eq!(combined, expected_combine);
     }
 
@@ -1131,8 +1132,7 @@ mod tests {
 
         let expected_combine = left.clone();
 
-        let mut combined = CapabilityAllowlistEntry::merge_vecs(left, right).unwrap();
-        combined.sort();
+        let combined = CapabilityAllowlistEntry::merge_vecs(left, right).unwrap();
         assert_eq!(combined, expected_combine);
     }
 }
