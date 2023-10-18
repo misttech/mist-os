@@ -23,7 +23,7 @@ use {
         object_handle::{GetProperties, ObjectHandle, ReadObjectHandle, WriteObjectHandle},
         object_store::{
             directory::{replace_child, ReplacedChild},
-            transaction::{lock_keys, LockKey, Options, TransactionHandler},
+            transaction::{lock_keys, LockKey, Options},
             ObjectDescriptor, Timestamp,
         },
     },

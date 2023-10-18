@@ -15,7 +15,7 @@ use {
                 ChildValue, ObjectAttributes, ObjectDescriptor, ObjectItem, ObjectKey,
                 ObjectKeyData, ObjectKind, ObjectValue, PosixAttributes, Timestamp,
             },
-            transaction::{LockKey, LockKeys, Mutation, Options, Transaction, TransactionHandler},
+            transaction::{LockKey, LockKeys, Mutation, Options, Transaction},
             DataObjectHandle, HandleOptions, HandleOwner, ObjectStore, SetExtendedAttributeMode,
             StoreObjectHandle,
         },
@@ -849,7 +849,7 @@ mod tests {
             object_store::{
                 directory::{replace_child, Directory, ReplacedChild},
                 object_record::Timestamp,
-                transaction::{lock_keys, Options, TransactionHandler},
+                transaction::{lock_keys, Options},
                 volume::root_volume,
                 HandleOptions, LockKey, ObjectDescriptor, ObjectStore, SetExtendedAttributeMode,
             },

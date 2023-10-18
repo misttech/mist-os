@@ -51,7 +51,7 @@ use {
             key_manager::KeyManager,
             transaction::{
                 lock_keys, AssocObj, AssociatedObject, LockKey, ObjectStoreMutation, Operation,
-                Options, Transaction, TransactionHandler, UpdateMutationsKey,
+                Options, Transaction, UpdateMutationsKey,
             },
         },
         range::RangeExt,
@@ -2109,7 +2109,7 @@ mod tests {
             object_store::{
                 directory::Directory,
                 object_record::{ObjectKey, ObjectValue},
-                transaction::{lock_keys, Options, TransactionHandler},
+                transaction::{lock_keys, Options},
                 volume::root_volume,
                 HandleOptions, LockKey, ObjectStore,
             },

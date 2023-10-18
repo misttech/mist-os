@@ -18,7 +18,7 @@ use {
             allocator::{Allocator, AllocatorKey, AllocatorValue, CoalescingIterator},
             journal::super_block::SuperBlockInstance,
             load_store_info,
-            transaction::{lock_keys, LockKey, TransactionHandler},
+            transaction::{lock_keys, LockKey},
             volume::root_volume,
         },
     },

@@ -22,7 +22,7 @@ use {
             store_object_handle::NeedsTrim,
             transaction::{
                 self, lock_keys, AssocObj, AssociatedObject, LockKey, Mutation,
-                ObjectStoreMutation, Options, Transaction, TransactionHandler,
+                ObjectStoreMutation, Options, Transaction,
             },
             HandleOptions, HandleOwner, ObjectStore, StoreObjectHandle, TrimMode, TrimResult,
         },
@@ -1150,7 +1150,7 @@ mod tests {
                 allocator::Allocator,
                 directory::replace_child,
                 object_record::{ObjectKey, ObjectValue, Timestamp},
-                transaction::{lock_keys, Mutation, Options, TransactionHandler},
+                transaction::{lock_keys, Mutation, Options},
                 volume::root_volume,
                 DataObjectHandle, Directory, HandleOptions, LockKey, ObjectStore, PosixAttributes,
                 TRANSACTION_MUTATION_THRESHOLD,

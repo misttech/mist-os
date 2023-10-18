@@ -13,9 +13,7 @@ use {
         object_store::{
             allocator::{self, Allocator},
             object_record::{AttributeKey, Timestamp},
-            transaction::{
-                lock_keys, LockKey, Options, TransactionHandler, TRANSACTION_METADATA_MAX_AMOUNT,
-            },
+            transaction::{lock_keys, LockKey, Options, TRANSACTION_METADATA_MAX_AMOUNT},
             writeback_cache::{FlushableMetadata, StorageReservation, WritebackCache},
             AssocObj, DataObjectHandle, HandleOwner, Mutation, ObjectKey, ObjectStore, ObjectValue,
             TrimMode, TrimResult,
@@ -464,7 +462,7 @@ mod tests {
                 allocator::Allocator,
                 directory::Directory,
                 object_record::{ObjectKey, ObjectKeyData, ObjectValue, Timestamp},
-                transaction::{lock_keys, Options, TransactionHandler},
+                transaction::{lock_keys, Options},
                 CachingObjectHandle, HandleOptions, LockKey, ObjectStore,
                 TRANSACTION_MUTATION_THRESHOLD,
             },

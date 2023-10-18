@@ -5,6 +5,7 @@
 use {
     crate::{
         debug_assert_not_too_long,
+        filesystem::FxFilesystem,
         log::*,
         lsm_tree::types::Item,
         object_handle::INVALID_OBJECT_ID,
@@ -19,7 +20,6 @@ use {
         serialized_types::{migrate_nodefault, migrate_to_version, Migrate, Versioned},
     },
     anyhow::Error,
-    async_trait::async_trait,
     either::{Either, Left, Right},
     fprint::TypeFingerprint,
     futures::{future::poll_fn, pin_mut},
@@ -42,8 +42,6 @@ use {
     },
 };
 
-/// `Options` are provided to types that expose the `TransactionHandler` trait.
-///
 /// This allows for special handling of certain transactions such as deletes and the
 /// extension of Journal extents. For most other use cases it is appropriate to use
 /// `default()` here.
@@ -83,37 +81,6 @@ impl TransactionLocks<'_> {
     pub async fn commit_prepare(&self) {
         self.0.manager.commit_prepare_keys(&self.0.lock_keys).await;
     }
-}
-
-#[async_trait]
-pub trait TransactionHandler: Send + Sync {
-    /// Initiates a new transaction.  Implementations should check to see that a transaction can be
-    /// created (for example, by checking to see that the journaling system can accept more
-    /// transactions), and then call Transaction::new.
-    async fn new_transaction<'a>(
-        self: Arc<Self>,
-        lock_keys: LockKeys,
-        options: Options<'a>,
-    ) -> Result<Transaction<'a>, Error>;
-
-    /// Implementations should perform any required journaling and then apply the mutations via
-    /// ObjectManager's apply_mutation method.  Any mutations within the transaction should be
-    /// removed so that drop_transaction can tell that the transaction was committed.  If
-    /// successful, returns the journal offset that the transaction was written to.  `callback` will
-    /// be called if the transaction commits successfully and whilst locks are held.  See the
-    /// comment in Transaction::commit_with_callback for the reason why it's the type that it is.
-    async fn commit_transaction(
-        self: Arc<Self>,
-        transaction: &mut Transaction<'_>,
-        callback: &mut (dyn FnMut(u64) + Send),
-    ) -> Result<u64, Error>;
-
-    /// Drops a transaction (rolling back if not committed).  Committing a transaction should have
-    /// removed the mutations.  This is called automatically when Transaction is dropped, which is
-    /// why this isn't async.
-    fn drop_transaction(&self, transaction: &mut Transaction<'_>);
-
-    fn lock_manager(&self) -> &LockManager;
 }
 
 /// The journal consists of these records which will be replayed at mount time.  Within a
@@ -702,7 +669,7 @@ pub enum MetadataReservation {
 
 /// A transaction groups mutation records to be committed as a group.
 pub struct Transaction<'a> {
-    handler: Arc<dyn TransactionHandler>,
+    fs: Arc<FxFilesystem>,
 
     // The mutations that make up this transaction.
     mutations: BTreeSet<TxnMutation<'a>>,
@@ -725,17 +692,17 @@ pub struct Transaction<'a> {
 }
 
 impl<'a> Transaction<'a> {
-    /// Creates a new transaction.  This should typically be called by a TransactionHandler's
-    /// implementation of new_transaction.  The read locks are acquired before the transaction
-    /// locks (see LockManager for the semantics of the different kinds of locks).
+    /// Creates a new transaction.  This should typically be called by the filesystem's
+    /// implementation of new_transaction.  The read locks are acquired before the transaction locks
+    /// (see LockManager for the semantics of the different kinds of locks).
     pub async fn new(
-        handler: Arc<dyn TransactionHandler + 'static>,
+        fs: Arc<FxFilesystem>,
         metadata_reservation: MetadataReservation,
         read_locks: LockKeys,
         txn_locks: LockKeys,
     ) -> Transaction<'a> {
         let (read_locks, txn_locks) = {
-            let lock_manager = handler.lock_manager();
+            let lock_manager = fs.lock_manager();
             let mut read_guard = lock_manager.read_lock(read_locks).await;
             let mut write_guard = lock_manager.txn_lock(txn_locks).await;
             (
@@ -744,7 +711,7 @@ impl<'a> Transaction<'a> {
             )
         };
         Transaction {
-            handler,
+            fs,
             mutations: BTreeSet::new(),
             txn_locks,
             read_locks,
@@ -934,7 +901,7 @@ impl<'a> Transaction<'a> {
     /// Commits a transaction.  If successful, returns the journal offset of the transaction.
     pub async fn commit(mut self) -> Result<u64, Error> {
         debug!(txn = ?&self, "Commit");
-        self.handler.clone().commit_transaction(&mut self, &mut |_| {}).await
+        self.fs.clone().commit_transaction(&mut self, &mut |_| {}).await
     }
 
     /// Commits and then runs the callback whilst locks are held.  The callback accepts a single
@@ -948,7 +915,7 @@ impl<'a> Transaction<'a> {
         // do that (for performance reasons), hence the reason for the following.
         let mut f = Some(f);
         let mut result = None;
-        self.handler
+        self.fs
             .clone()
             .commit_transaction(&mut self, &mut |offset| {
                 result = Some(f.take().unwrap()(offset));
@@ -961,19 +928,19 @@ impl<'a> Transaction<'a> {
     /// dropped (but transaction locks will get downgraded to read locks).
     pub async fn commit_and_continue(&mut self) -> Result<(), Error> {
         debug!(txn = ?self, "Commit");
-        self.handler.clone().commit_transaction(self, &mut |_| {}).await?;
+        self.fs.clone().commit_transaction(self, &mut |_| {}).await?;
         assert!(self.mutations.is_empty());
-        self.handler.lock_manager().downgrade_locks(&self.txn_locks);
+        self.fs.lock_manager().downgrade_locks(&self.txn_locks);
         Ok(())
     }
 }
 
 impl Drop for Transaction<'_> {
     fn drop(&mut self) {
-        // Call the TransactionHandler implementation of drop_transaction which should, as a
-        // minimum, call LockManager's drop_transaction to ensure the locks are released.
+        // Call the filesystem implementation of drop_transaction which should, as a minimum, call
+        // LockManager's drop_transaction to ensure the locks are released.
         debug!(txn = ?&self, "Drop");
-        self.handler.clone().drop_transaction(self);
+        self.fs.clone().drop_transaction(self);
     }
 }
 
@@ -1184,8 +1151,8 @@ impl LockManager {
     }
 
     /// Acquires the locks.  It is the caller's responsibility to ensure that drop_transaction is
-    /// called when a transaction is dropped i.e. implementers of TransactionHandler's
-    /// drop_transaction method should call LockManager's drop_transaction method.
+    /// called when a transaction is dropped i.e. the filesystem's drop_transaction method should
+    /// call LockManager's drop_transaction method.
     pub async fn txn_lock<'a>(&'a self, lock_keys: LockKeys) -> TransactionLocks<'a> {
         TransactionLocks(
             debug_assert_not_too_long!(self.lock(lock_keys, LockState::Locked)).right().unwrap(),
@@ -1282,7 +1249,7 @@ impl LockManager {
         guard
     }
 
-    /// This should be called by a TransactionHandler drop_transaction implementation.
+    /// This should be called by the filesystem's drop_transaction implementation.
     pub fn drop_transaction(&self, transaction: &mut Transaction<'_>) {
         let mut locks = self.locks.lock().unwrap();
         locks.drop_write_locks(std::mem::take(&mut transaction.txn_locks));
@@ -1514,10 +1481,7 @@ impl fmt::Debug for WriteGuard<'_> {
 #[cfg(test)]
 mod tests {
     use {
-        super::{
-            lock_keys, LockKey, LockKeys, LockManager, LockState, Mutation, Options,
-            TransactionHandler,
-        },
+        super::{lock_keys, LockKey, LockKeys, LockManager, LockState, Mutation, Options},
         crate::filesystem::FxFilesystem,
         fuchsia_async as fasync,
         futures::{

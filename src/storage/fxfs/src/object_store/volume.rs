@@ -10,7 +10,7 @@ use {
             allocator::Allocator,
             directory::Directory,
             load_store_info,
-            transaction::{lock_keys, Options, Transaction, TransactionHandler},
+            transaction::{lock_keys, Options, Transaction},
             tree_cache::TreeCache,
             LockKey, NewChildStoreOptions, ObjectDescriptor, ObjectStore,
         },
@@ -200,7 +200,7 @@ mod tests {
             object_store::{
                 allocator::Allocator,
                 directory::Directory,
-                transaction::{lock_keys, Options, TransactionHandler},
+                transaction::{lock_keys, Options},
                 LockKey,
             },
         },

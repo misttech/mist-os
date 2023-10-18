@@ -17,9 +17,7 @@ use {
         object_store::{
             allocator::{Allocator, AllocatorKey, AllocatorValue, CoalescingIterator},
             directory::Directory,
-            transaction::{
-                self, lock_keys, LockKey, ObjectStoreMutation, Options, TransactionHandler,
-            },
+            transaction::{self, lock_keys, LockKey, ObjectStoreMutation, Options},
             volume::root_volume,
             AttributeKey, ChildValue, EncryptionKeys, ExtentValue, HandleOptions, Mutation,
             ObjectAttributes, ObjectDescriptor, ObjectKey, ObjectKeyData, ObjectKind, ObjectStore,

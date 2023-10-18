@@ -316,7 +316,7 @@ mod tests {
         crate::{
             filesystem::FxFilesystem,
             object_store::object_record::ObjectValue,
-            object_store::transaction::{lock_keys, Options, TransactionHandler},
+            object_store::transaction::{lock_keys, Options},
         },
         assert_matches::assert_matches,
         storage_device::{fake_device::FakeDevice, DeviceHolder},

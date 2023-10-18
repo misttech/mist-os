@@ -14,7 +14,7 @@ use {
         object_handle::{GetProperties, WriteBytes},
         object_store::{
             directory::Directory,
-            transaction::{lock_keys, LockKey, TransactionHandler},
+            transaction::{lock_keys, LockKey},
             volume::root_volume,
             DirectWriter, ObjectStore, BLOB_MERKLE_ATTRIBUTE_ID,
         },

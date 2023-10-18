@@ -13,7 +13,7 @@ use {
         errors::FxfsError,
         object_handle::{ObjectHandle, ObjectProperties},
         object_store::{
-            transaction::{lock_keys, LockKey, Options, TransactionHandler},
+            transaction::{lock_keys, LockKey, Options},
             HandleOptions, ObjectAttributes, ObjectDescriptor, ObjectKey, ObjectKind, ObjectValue,
             StoreObjectHandle,
         },

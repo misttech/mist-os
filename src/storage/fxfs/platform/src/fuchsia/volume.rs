@@ -652,7 +652,7 @@ mod tests {
             fsck::{fsck, fsck_volume},
             object_handle::{ObjectHandle, ObjectHandleExt},
             object_store::{
-                transaction::{lock_keys, Options, TransactionHandler},
+                transaction::{lock_keys, Options},
                 volume::root_volume,
                 HandleOptions, ObjectDescriptor, ObjectStore,
             },

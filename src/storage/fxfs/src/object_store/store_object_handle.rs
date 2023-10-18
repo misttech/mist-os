@@ -19,7 +19,7 @@ use {
             },
             transaction::{
                 lock_keys, AssocObj, AssociatedObject, LockKey, Mutation, ObjectStoreMutation,
-                Options, ReadGuard, Transaction, TransactionHandler,
+                Options, ReadGuard, Transaction,
             },
             HandleOptions, HandleOwner, ObjectStore, TrimMode, TrimResult,
         },
@@ -1322,7 +1322,7 @@ mod tests {
             filesystem::{FxFilesystem, OpenFxFilesystem},
             object_handle::ObjectHandle,
             object_store::{
-                transaction::{lock_keys, Mutation, Options, TransactionHandler},
+                transaction::{lock_keys, Mutation, Options},
                 AttributeKey, DataObjectHandle, Directory, HandleOptions, LockKey, ObjectKey,
                 ObjectStore, ObjectValue, SetExtendedAttributeMode, StoreObjectHandle,
             },

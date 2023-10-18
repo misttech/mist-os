@@ -46,8 +46,8 @@ use {
             object_record::{AttributeKey, ObjectKey, ObjectKeyData, ObjectValue},
             transaction::{
                 lock_keys, AllocatorMutation, Mutation, MutationV20, MutationV25, MutationV29,
-                MutationV30, MutationV31, ObjectStoreMutation, Options, Transaction,
-                TransactionHandler, TxnMutation, TRANSACTION_MAX_JOURNAL_USAGE,
+                MutationV30, MutationV31, ObjectStoreMutation, Options, Transaction, TxnMutation,
+                TRANSACTION_MAX_JOURNAL_USAGE,
             },
             DataObjectHandle, HandleOptions, HandleOwner, Item, ItemRef, LastObjectId, LockState,
             NewChildStoreOptions, ObjectStore, INVALID_OBJECT_ID,
@@ -1412,7 +1412,7 @@ impl Journal {
     /// This task will flush journal data to the device when there is data that needs flushing, and
     /// trigger compactions when short of journal space.  It will return after the terminate method
     /// has been called, or an error is encountered with either flushing or compaction.
-    pub async fn flush_task(&self) {
+    pub async fn flush_task(self: Arc<Self>) {
         let mut flush_fut = None;
         let mut compact_fut = None;
         let mut flush_error = false;
@@ -1584,10 +1584,8 @@ mod tests {
             fsck::fsck,
             object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle},
             object_store::{
-                directory::Directory,
-                lock_keys,
-                transaction::{Options, TransactionHandler},
-                HandleOptions, LockKey, ObjectStore,
+                directory::Directory, lock_keys, transaction::Options, HandleOptions, LockKey,
+                ObjectStore,
             },
         },
         storage_device::{fake_device::FakeDevice, DeviceHolder},

@@ -18,7 +18,7 @@ use {
         object_store::{
             allocator::{Allocator, Reservation, ReservationOwner, SimpleAllocator},
             transaction::{
-                lock_keys, AssocObj, LockKey, Mutation, Options, Transaction, TransactionHandler,
+                lock_keys, AssocObj, LockKey, Mutation, Options, Transaction,
                 TRANSACTION_METADATA_MAX_AMOUNT,
             },
             AttributeKey, DataObjectHandle, ObjectKey, ObjectStore, ObjectValue, StoreObjectHandle,

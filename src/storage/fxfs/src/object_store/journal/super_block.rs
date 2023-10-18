@@ -650,7 +650,7 @@ mod tests {
             object_store::{
                 allocator::Allocator,
                 journal::JournalCheckpoint,
-                transaction::{lock_keys, Options, TransactionHandler},
+                transaction::{lock_keys, Options},
                 DataObjectHandle, HandleOptions, ObjectHandle, ObjectKey, ObjectStore,
             },
             serialized_types::LATEST_VERSION,

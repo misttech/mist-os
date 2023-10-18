@@ -26,7 +26,6 @@ use {
             object_manager::ReservationUpdate,
             transaction::{
                 lock_keys, AllocatorMutation, AssocObj, LockKey, Mutation, Options, Transaction,
-                TransactionHandler,
             },
             tree, CachingObjectHandle, DirectWriter, HandleOptions, ObjectStore,
         },
@@ -1737,7 +1736,7 @@ mod tests {
                     SimpleAllocator,
                 },
                 // testing::fake_filesystem::FakeFilesystem,
-                transaction::{lock_keys, Options, TransactionHandler},
+                transaction::{lock_keys, Options},
                 ObjectStore,
             },
             range::RangeExt,

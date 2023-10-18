@@ -389,7 +389,7 @@ mod tests {
         crate::fuse_fs::FuseFs,
         fxfs::{
             object_handle::ObjectHandle,
-            object_store::transaction::{lock_keys, LockKey, Options, TransactionHandler},
+            object_store::transaction::{lock_keys, LockKey, Options},
         },
     };
 

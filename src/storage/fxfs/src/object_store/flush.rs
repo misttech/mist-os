@@ -18,7 +18,7 @@ use {
             layer_size_from_encrypted_mutations_size,
             object_manager::{ObjectManager, ReservationUpdate},
             object_record::{ObjectKey, ObjectValue},
-            transaction::{lock_keys, AssociatedObject, LockKey, Mutation, TransactionHandler},
+            transaction::{lock_keys, AssociatedObject, LockKey, Mutation},
             tree, AssocObj, CachingObjectHandle, DirectWriter, EncryptedMutations, HandleOptions,
             LockState, ObjectStore, Options, StoreInfo, Transaction, MAX_ENCRYPTED_MUTATIONS_SIZE,
         },
@@ -436,7 +436,7 @@ mod tests {
             object_handle::ObjectHandle,
             object_store::{
                 directory::Directory,
-                transaction::{lock_keys, Options, TransactionHandler},
+                transaction::{lock_keys, Options},
                 volume::root_volume,
                 HandleOptions, LockKey, ObjectStore,
             },

@@ -30,7 +30,7 @@ use {
         metrics,
         object_store::{
             allocator::Allocator,
-            transaction::{lock_keys, LockKey, Options, TransactionHandler},
+            transaction::{lock_keys, LockKey, Options},
             volume::RootVolume,
             Directory, ObjectDescriptor, ObjectStore,
         },

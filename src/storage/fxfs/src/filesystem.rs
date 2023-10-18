@@ -19,7 +19,7 @@ use {
             object_manager::ObjectManager,
             transaction::{
                 self, lock_keys, AssocObj, LockKey, LockKeys, LockManager, MetadataReservation,
-                Mutation, Transaction, TransactionHandler, TRANSACTION_METADATA_MAX_AMOUNT,
+                Mutation, Transaction, TRANSACTION_METADATA_MAX_AMOUNT,
             },
             volume::{root_volume, VOLUMES_DIRECTORY},
             ObjectStore,
@@ -525,6 +525,88 @@ impl FxFilesystem {
         &self.options
     }
 
+    pub async fn new_transaction<'a>(
+        self: Arc<Self>,
+        locks: LockKeys,
+        options: transaction::Options<'a>,
+    ) -> Result<Transaction<'a>, Error> {
+        self.add_transaction(options.skip_journal_checks).await;
+        let guard = scopeguard::guard((), |_| self.sub_transaction());
+        let (metadata_reservation, allocator_reservation, hold) =
+            self.reservation_for_transaction(options).await?;
+        let mut transaction = Transaction::new(
+            self.clone(),
+            metadata_reservation,
+            lock_keys![LockKey::Filesystem],
+            locks,
+        )
+        .await;
+
+        ScopeGuard::into_inner(guard);
+        hold.map(|h| h.forget()); // Transaction takes ownership from here on.
+        transaction.allocator_reservation = allocator_reservation;
+        Ok(transaction)
+    }
+
+    pub async fn commit_transaction(
+        self: Arc<Self>,
+        transaction: &mut Transaction<'_>,
+        callback: &mut (dyn FnMut(u64) + Send),
+    ) -> Result<u64, Error> {
+        trace_duration!("FxFilesystem::commit_transaction");
+        if let Some(hook) = self.options.pre_commit_hook.as_ref() {
+            hook(transaction)?;
+        }
+        debug_assert_not_too_long!(self.lock_manager.commit_prepare(&transaction));
+        self.maybe_start_flush_task();
+        let _guard = debug_assert_not_too_long!(self.commit_mutex.lock());
+        let journal_offset = self.journal.commit(transaction).await?;
+        self.completed_transactions.add(1);
+
+        // For now, call the callback whilst holding the lock.  Technically, we don't need to do
+        // that except if there's a post-commit-hook (which there usually won't be).  We can
+        // consider changing this if we need to for performance, but we'd need to double check that
+        // callers don't depend on this.
+        callback(journal_offset);
+
+        if let Some(hook) = self.options.post_commit_hook.as_ref() {
+            hook().await;
+        }
+
+        Ok(journal_offset)
+    }
+
+    pub fn drop_transaction(&self, transaction: &mut Transaction<'_>) {
+        if !matches!(transaction.metadata_reservation, MetadataReservation::None) {
+            self.sub_transaction();
+        }
+        // If we placed a hold for metadata space, return it now.
+        if let MetadataReservation::Hold(hold_amount) =
+            std::mem::replace(&mut transaction.metadata_reservation, MetadataReservation::None)
+        {
+            let hold = transaction
+                .allocator_reservation
+                .unwrap()
+                .reserve(0)
+                .expect("Zero should always succeed.");
+            hold.add(hold_amount);
+        }
+        self.objects.drop_transaction(transaction);
+        self.lock_manager.drop_transaction(transaction);
+    }
+
+    pub fn lock_manager(&self) -> &LockManager {
+        &self.lock_manager
+    }
+
+    fn maybe_start_flush_task(&self) {
+        let mut flush_task = self.flush_task.lock().unwrap();
+        if flush_task.is_none() {
+            let journal = self.journal.clone();
+            *flush_task = Some(fasync::Task::spawn(journal.flush_task()));
+        }
+    }
+
     async fn reservation_for_transaction<'a>(
         self: &Arc<Self>,
         options: transaction::Options<'a>,
@@ -609,91 +691,6 @@ impl FxFilesystem {
     }
 }
 
-#[async_trait]
-impl TransactionHandler for FxFilesystem {
-    async fn new_transaction<'a>(
-        self: Arc<Self>,
-        locks: LockKeys,
-        options: transaction::Options<'a>,
-    ) -> Result<Transaction<'a>, Error> {
-        self.add_transaction(options.skip_journal_checks).await;
-        let guard = scopeguard::guard((), |_| self.sub_transaction());
-        let (metadata_reservation, allocator_reservation, hold) =
-            self.reservation_for_transaction(options).await?;
-        let mut transaction = Transaction::new(
-            self.clone(),
-            metadata_reservation,
-            lock_keys![LockKey::Filesystem],
-            locks,
-        )
-        .await;
-
-        ScopeGuard::into_inner(guard);
-        hold.map(|h| h.forget()); // Transaction takes ownership from here on.
-        transaction.allocator_reservation = allocator_reservation;
-        Ok(transaction)
-    }
-
-    async fn commit_transaction(
-        self: Arc<Self>,
-        transaction: &mut Transaction<'_>,
-        callback: &mut (dyn FnMut(u64) + Send),
-    ) -> Result<u64, Error> {
-        trace_duration!("FxFilesystem::commit_transaction");
-        if let Some(hook) = self.options.pre_commit_hook.as_ref() {
-            hook(transaction)?;
-        }
-        debug_assert_not_too_long!(self.lock_manager.commit_prepare(&transaction));
-        {
-            let mut flush_task = self.flush_task.lock().unwrap();
-            if flush_task.is_none() {
-                let this = self.clone();
-                *flush_task = Some(fasync::Task::spawn(async move {
-                    this.journal.flush_task().await;
-                }));
-            }
-        }
-        let _guard = debug_assert_not_too_long!(self.commit_mutex.lock());
-        let journal_offset = self.journal.commit(transaction).await?;
-        self.completed_transactions.add(1);
-
-        // For now, call the callback whilst holding the lock.  Technically, we don't need to do
-        // that except if there's a post-commit-hook (which there usually won't be).  We can
-        // consider changing this if we need to for performance, but we'd need to double check that
-        // callers don't depend on this.
-        callback(journal_offset);
-
-        if let Some(hook) = self.options.post_commit_hook.as_ref() {
-            hook().await;
-        }
-
-        Ok(journal_offset)
-    }
-
-    fn drop_transaction(&self, transaction: &mut Transaction<'_>) {
-        if !matches!(transaction.metadata_reservation, MetadataReservation::None) {
-            self.sub_transaction();
-        }
-        // If we placed a hold for metadata space, return it now.
-        if let MetadataReservation::Hold(hold_amount) =
-            std::mem::replace(&mut transaction.metadata_reservation, MetadataReservation::None)
-        {
-            let hold = transaction
-                .allocator_reservation
-                .unwrap()
-                .reserve(0)
-                .expect("Zero should always succeed.");
-            hold.add(hold_amount);
-        }
-        self.objects.drop_transaction(transaction);
-        self.lock_manager.drop_transaction(transaction);
-    }
-
-    fn lock_manager(&self) -> &LockManager {
-        &self.lock_manager
-    }
-}
-
 /// Helper method for making a new filesystem.
 pub async fn mkfs(device: DeviceHolder) -> Result<(), Error> {
     let fs = FxFilesystem::new_empty(device).await?;
@@ -765,7 +762,7 @@ mod tests {
                 directory::replace_child,
                 directory::Directory,
                 journal::JournalOptions,
-                transaction::{lock_keys, LockKey, Options, TransactionHandler},
+                transaction::{lock_keys, LockKey, Options},
             },
         },
         fuchsia_async as fasync,
@@ -991,7 +988,7 @@ mod tests {
         }
 
         // Trying to create another one should be blocked.
-        let mut fut = fs.clone().new_transaction(lock_keys![], Options::default());
+        let mut fut = std::pin::pin!(fs.clone().new_transaction(lock_keys![], Options::default()));
         assert!(futures::poll!(&mut fut).is_pending());
 
         // Dropping one should allow it to proceed.

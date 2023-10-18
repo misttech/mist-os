@@ -23,7 +23,7 @@ use {
         log::*,
         object_handle::{ObjectHandle, ObjectProperties, ReadObjectHandle},
         object_store::{
-            transaction::{lock_keys, LockKey, Options, TransactionHandler},
+            transaction::{lock_keys, LockKey, Options},
             DataObjectHandle, ObjectDescriptor, Timestamp,
         },
         round::round_up,
