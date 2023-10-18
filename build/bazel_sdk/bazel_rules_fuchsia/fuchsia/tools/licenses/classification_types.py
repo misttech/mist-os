@@ -10,7 +10,7 @@ import json
 from fuchsia.tools.licenses.common_types import *
 from fuchsia.tools.licenses.spdx_types import *
 from hashlib import md5
-from typing import Any, Callable, ClassVar, Dict, Pattern, List
+from typing import Any, Callable, ClassVar, Collection, Dict, Pattern, List
 
 
 @dataclasses.dataclass(frozen=True)
@@ -25,9 +25,9 @@ class IdentifiedSnippet:
     start_line: int
     end_line: int
 
-    condition: str = None
+    conditions: Set[str] = dataclasses.field(default_factory=set)
     # Conditions from overriding rules
-    overriden_conditions: List[str] = None
+    overriden_conditions: Set[str] = dataclasses.field(default_factory=set)
     # Optional public source code mirroring urls (supplied by some override rules)
     public_source_mirrors: List[str] = None
     # Whether the project is shipped.
@@ -37,13 +37,22 @@ class IdentifiedSnippet:
     # Whether source code is shipped.
     is_source_code_shipped: bool = None
     # Dependents that were not matched by any rule
-    dependents_unmatched_by_overriding_rules: List[str] = None
+    dependents_unmatched_by_overriding_rules: Set[str] = dataclasses.field(
+        default_factory=set
+    )
+    # Conditions that were not matched by any rule
+    conditions_unmatched_by_overriding_rules: Set[str] = dataclasses.field(
+        default_factory=set
+    )
     # all rules that matched this IdentifiedSnippet
-    overriding_rules: List["ConditionOverrideRule"] = None
+    overriding_rules: List["ConditionOverrideRule"] = dataclasses.field(
+        default_factory=list
+    )
 
     # verification results
     verified: bool = None
     verification_message: str = None
+    verified_conditions: Set[str] = None
 
     # checksum for snippet text
     snippet_checksum: str = None
@@ -58,7 +67,7 @@ class IdentifiedSnippet:
             confidence=1.0,
             start_line=1,
             end_line=len(extracted_text_lines) + 1,
-            condition=condition,
+            conditions=set([condition]),
         )
 
     def from_identify_license_dict(
@@ -91,34 +100,45 @@ class IdentifiedSnippet:
         except LicenseException:
             confidence = float(r.get("Confidence", expected_type=int))
 
+        # License classifier may return a string that is multiple conditions separated by ' '
         condition = r.get_or("Condition", expected_type=str, default=None)
         if not condition:
-            condition = default_condition
+            conditions = set([default_condition])
+        else:
+            conditions = set(condition.split(" "))
 
         return IdentifiedSnippet(
             identified_as=identified_as,
             confidence=confidence,
             start_line=r.get("StartLine", expected_type=int),
             end_line=r.get("EndLine", expected_type=int),
-            condition=condition,
+            conditions=conditions,
         )
 
     def to_json_dict(self):
         # The fields are output in a certain order to produce a more readable output.
         out = {
             "identified_as": self.identified_as,
-            "condition": self.condition,
+            "conditions": sorted(list(self.conditions)),
             "verified": self.verified,
         }
 
         if self.verification_message:
             out["verification_message"] = self.verification_message
+        if self.verified_conditions:
+            out["verified_conditions"] = sorted(list(self.verified_conditions))
         if self.overriden_conditions:
-            out["overriden_conditions"] = self.overriden_conditions
+            out["overriden_conditions"] = sorted(
+                list(self.overriden_conditions)
+            )
+        if self.conditions_unmatched_by_overriding_rules:
+            out["conditions_unmatched_by_overriding_rules"] = sorted(
+                list(self.conditions_unmatched_by_overriding_rules)
+            )
         if self.dependents_unmatched_by_overriding_rules:
-            out[
-                "dependents_unmatched_by_overriding_rules"
-            ] = self.dependents_unmatched_by_overriding_rules
+            out["dependents_unmatched_by_overriding_rules"] = sorted(
+                list(self.dependents_unmatched_by_overriding_rules)
+            )
         if self.overriding_rules:
             out["overriding_rules"] = [
                 r.to_json_dict() for r in self.overriding_rules
@@ -163,13 +183,14 @@ class IdentifiedSnippet:
 
         return IdentifiedSnippet(
             identified_as=reader.get("identified_as"),
-            condition=reader.get("condition"),
+            conditions=reader.get_string_set("conditions"),
             verified=reader.get_or("verified", default=False),
             verification_message=reader.get_or(
                 "verification_message", default=None
             ),
-            overriden_conditions=reader.get_or(
-                "overriden_conditions", default=None, expected_type=list
+            verified_conditions=reader.get_string_set("verified_conditions"),
+            overriden_conditions=set(
+                reader.get_string_list("overriden_conditions")
             ),
             public_source_mirrors=reader.get_or(
                 "public_source_mirrors", default=None, expected_type=list
@@ -183,10 +204,11 @@ class IdentifiedSnippet:
             is_source_code_shipped=reader.get_or(
                 "is_source_code_shipped", default=None, expected_type=bool
             ),
-            dependents_unmatched_by_overriding_rules=reader.get_or(
-                "dependents_unmatched_by_overriding_rules",
-                default=None,
-                expected_type=list,
+            conditions_unmatched_by_overriding_rules=reader.get_string_set(
+                "conditions_unmatched_by_overriding_rules"
+            ),
+            dependents_unmatched_by_overriding_rules=reader.get_string_set(
+                "dependents_unmatched_by_overriding_rules"
             ),
             overriding_rules=overriding_rules,
             suggested_override_rule=suggested_override_rule,
@@ -247,47 +269,52 @@ class IdentifiedSnippet:
         new_conditions = set()
         public_source_mirrors = set()
 
+        remaining_conditions = set(self.conditions)
         remaining_dependents = set(license.dependents)
         for rule in rules:
             # Check that the in optimization in LicenseClassification was applied
             assert rule.match_license_names.matches(license.name)
 
-            # Match identification, checksome, condition
+            # Match identification, checksome, condition, dependents
             if not rule.match_identifications.matches(self.identified_as):
                 continue
             if not rule.match_snippet_checksums.matches(self.snippet_checksum):
                 continue
-            if not rule.match_conditions.matches(self.condition):
+            if not rule.match_conditions.matches_any(self.conditions):
+                continue
+            if not rule.match_dependents.matches_any(license.dependents):
                 continue
 
-            # Match dependents
-            some_matching_dependents = rule.match_dependents.get_matches(
-                license.dependents
+            # Matched!
+            all_matching_rules.append(rule)
+            remaining_conditions.difference_update(
+                rule.match_conditions.get_matches(self.conditions)
             )
-            if not some_matching_dependents:
-                continue
-
+            remaining_dependents.difference_update(
+                rule.match_dependents.get_matches(license.dependents)
+            )
             new_conditions.add(rule.override_condition_to)
             if rule.public_source_mirrors:
                 public_source_mirrors.update(rule.public_source_mirrors)
 
-            all_matching_rules.append(rule)
-            for d in some_matching_dependents:
-                if d in remaining_dependents:
-                    remaining_dependents.remove(d)
-
         if all_matching_rules:
             return dataclasses.replace(
                 self,
-                overriden_conditions=sorted(list(new_conditions)),
-                dependents_unmatched_by_overriding_rules=sorted(
-                    list(remaining_dependents)
-                ),
+                overriden_conditions=set(new_conditions),
+                conditions_unmatched_by_overriding_rules=remaining_conditions,
+                dependents_unmatched_by_overriding_rules=remaining_dependents,
                 overriding_rules=all_matching_rules,
                 public_source_mirrors=sorted(list(public_source_mirrors)),
             )
         else:
             return self
+
+    def _format_conditions(self, conditions: Set[str]) -> str:
+        assert conditions, f"{conditions} cannot be empty"
+        l = list(conditions)
+        if len(l) == 1:
+            return f"'{l[0]}'"
+        return str(sorted(l))
 
     def verify_conditions(
         self, license: "LicenseClassification", allowed_conditions: Set[str]
@@ -295,46 +322,64 @@ class IdentifiedSnippet:
         """Sets the 'verified' and 'verification_message' fields"""
         verified = True
         message = None
-        diallowed_override_conditions = []
-        if self.overriden_conditions:
-            diallowed_override_conditions = [
-                c
-                for c in self.overriden_conditions
-                if c not in allowed_conditions
-            ]
+        disallowed_conditions = self.conditions.difference(allowed_conditions)
+        disallowed_overriden_conditions = self.overriden_conditions.difference(
+            allowed_conditions
+        )
+        disallowed_remaining_conditions = (
+            self.conditions_unmatched_by_overriding_rules.difference(
+                allowed_conditions
+            )
+        )
+
         if not self.overriding_rules:
             # Simple case: No overriding rules were involved.
-            if self.condition not in allowed_conditions:
+            if disallowed_conditions:
                 verified = False
-                message = f"'{self.condition}' condition is not an allowed"
-        elif diallowed_override_conditions:
+                message = f"{self._format_conditions(disallowed_conditions)} condition is not an allowed."
+        elif disallowed_remaining_conditions:
+            verified = False
+            rule_paths = [r.rule_file_path for r in self.overriding_rules]
+            message = (
+                f"The condition {self._format_conditions(disallowed_remaining_conditions)} is not allowed and"
+                f" was not matched by any of these rules: {rule_paths}"
+            )
+        elif disallowed_overriden_conditions:
             # Some overriding rules were involved: Check their overriding conditions.
             rule_paths = [
                 r.rule_file_path
                 for r in self.overriding_rules
-                if r.override_condition_to in diallowed_override_conditions
+                if r.override_condition_to in disallowed_overriden_conditions
             ]
             verified = False
             message = (
-                f"The conditions {diallowed_override_conditions} are not allowed."
+                f"The condition {self._format_conditions(disallowed_overriden_conditions)} is not allowed."
                 f" They were introduced by these rules: {rule_paths}."
             )
         elif self.dependents_unmatched_by_overriding_rules:
             # Some license dependents didn't match any rule. Check the original
             # conditions.
-            rule_paths = [r.rule_file_path for r in self.overriding_rules]
-            if self.condition not in allowed_conditions:
+            if disallowed_conditions:
+                rule_paths = [r.rule_file_path for r in self.overriding_rules]
                 verified = False
                 message = (
                     f"The overriding rules {rule_paths} changed the conditions to "
-                    f"{self.overriden_conditions} but the rules don't match the dependencies "
+                    f"{self._format_conditions(self.overriden_conditions)} but the rules don't match the dependencies "
                     f"{self.dependents_unmatched_by_overriding_rules} that remain with the "
-                    f"condition '{self.condition} that is not allowed'."
+                    f"condition {self._format_conditions(disallowed_conditions)} which is not allowed'."
                 )
 
         if verified:
             assert message == None
             suggested_override_rule = None
+            verified_conditions = self.conditions
+            if self.overriding_rules:
+                verified_conditions = self.overriden_conditions.union(
+                    self.conditions_unmatched_by_overriding_rules
+                )
+            assert not verified_conditions.difference(
+                allowed_conditions
+            ), f"Verified conditions have disallowed conditions"
         else:
             assert message != None
             suggested_override_rule = (
@@ -342,11 +387,13 @@ class IdentifiedSnippet:
                     license, self, allowed_conditions
                 )
             )
+            verified_conditions = set()
 
         return dataclasses.replace(
             self,
             verified=verified,
             verification_message=message,
+            verified_conditions=verified_conditions,
             suggested_override_rule=suggested_override_rule,
         )
 
@@ -366,7 +413,7 @@ class IdentifiedSnippet:
             snippet = snippet[0:max_snippet_length] + "<TRUNCATED>"
 
         message = f"""
-License '{license.name}' has a snippet identified as '{self.identified_as}' [{self.condition}].
+License '{license.name}' has a snippet identified as '{self.identified_as}' with conditions {self.conditions}.
 
 Verification message:
 {self.verification_message}
@@ -845,7 +892,7 @@ class StringMatcher:
         """
         return [i for i in inputs if self.matches(i)]
 
-    def matches_any(self, inputs: List[str]) -> bool:
+    def matches_any(self, inputs: Collection[str]) -> bool:
         """
         Matches all the inputs against the internal expressions.
 
@@ -935,22 +982,6 @@ class ConditionOverrideRule:
             "snippet_checksums", expected_type=list, default=None
         )
 
-        if match_identifications.matches(
-            IdentifiedSnippet.UNIDENTIFIED_IDENTIFICATION
-        ):
-            if not match_snippet_checksums:
-                raise LicenseException(
-                    f"Rules that match license_names `{IdentifiedSnippet.UNIDENTIFIED_IDENTIFICATION}`"
-                    "must also set `snippet_checksum`",
-                    rule_file_path,
-                )
-            if [s for s in match_snippet_checksums if "*" in s]:
-                raise LicenseException(
-                    "Rules that license_names "
-                    f" `{IdentifiedSnippet.UNIDENTIFIED_IDENTIFICATION}`"
-                    " cannot have `*` expressions in `match_snippet_checksum`",
-                    rule_file_path,
-                )
         if match_snippet_checksums == None:
             match_snippet_checksums = StringMatcher.create_match_everything()
         else:
@@ -1007,10 +1038,13 @@ class ConditionOverrideRule:
         snippet: IdentifiedSnippet,
         allowed_conditions: Set[str],
     ) -> "ConditionOverrideRule":
-        """Creates a an override rule suggestion for the given license snippet"""
+        """Creates an override rule suggestion for the given license snippet"""
         dependents = license.dependents
         if snippet.dependents_unmatched_by_overriding_rules:
             dependents = snippet.dependents_unmatched_by_overriding_rules
+        conditions = snippet.conditions
+        if snippet.conditions_unmatched_by_overriding_rules:
+            conditions = snippet.conditions_unmatched_by_overriding_rules
         return ConditionOverrideRule(
             rule_file_path=None,
             override_condition_to="<CHOOSE ONE OF "
@@ -1024,8 +1058,10 @@ class ConditionOverrideRule:
                 [snippet.snippet_checksum]
             ),
             match_identifications=StringMatcher.create([snippet.identified_as]),
-            match_conditions=StringMatcher.create([snippet.condition]),
-            match_dependents=StringMatcher.create(dependents),
+            match_conditions=StringMatcher.create(
+                list(conditions.difference(allowed_conditions))
+            ),
+            match_dependents=StringMatcher.create(list(dependents)),
         )
 
 

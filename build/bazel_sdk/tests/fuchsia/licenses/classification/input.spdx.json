@@ -21,6 +21,12 @@
             "name": "Package B",
             "licenseConcluded": "LicenseRef-Baz",
             "copyrightText": "copyright B"
+        },
+        {
+            "SPDXID": "SPDXRef-Package-3",
+            "name": "Package C",
+            "licenseConcluded": "LicenseRef-Multi-A AND LicenseRef-Multi-B AND LicenseRef-Multi-C",
+            "copyrightText": "copyright C"
         }
     ],
     "hasExtractedLicensingInfos": [
@@ -46,6 +52,21 @@
             "name": "Qux",
             "licenseId": "LicenseRef-Quz",
             "extractedText": "Some unknown\ntest license 3"
+        },
+        {
+            "name": "Multi-conditions-none-overriden",
+            "licenseId": "LicenseRef-Multi-A",
+            "extractedText": "Test license 4"
+        },
+        {
+            "name": "Multi-conditions-some-overriden",
+            "licenseId": "LicenseRef-Multi-B",
+            "extractedText": "Test license 5"
+        },
+        {
+            "name": "Multi-conditions-not-enough-overriden",
+            "licenseId": "LicenseRef-Multi-C",
+            "extractedText": "Test license 6"
         }
     ]
 }

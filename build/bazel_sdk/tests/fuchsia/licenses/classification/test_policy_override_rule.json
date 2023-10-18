@@ -1,6 +1,6 @@
 [
     {
-        "override_condition_to": "allowed condition",
+        "override_condition_to": "allowed-condition",
         "bug": "fxb/123",
         "comment": [
             "This is a test override rule"
@@ -21,7 +21,7 @@
         }
     },
     {
-        "override_condition_to": "allowed condition",
+        "override_condition_to": "allowed-condition",
         "bug": "fxb/456",
         "comment": [
             "This is another test override rule"
@@ -42,6 +42,54 @@
             ],
             "conditions": [
                 "*"
+            ]
+        }
+    },
+    {
+        "override_condition_to": "allowed-condition",
+        "bug": "fxb/789",
+        "comment": [
+            "Yet another test override rule"
+        ],
+        "match_criteria": {
+            "license_names": [
+                "Multi-conditions-some-overriden"
+            ],
+            "identifications": [
+                "License Kind 5"
+            ],
+            "conditions": [
+                "disallowed-condition"
+            ],
+            "snippet_checksums": [
+                "*"
+            ],
+            "dependents": [
+                "Package C"
+            ]
+        }
+    },
+    {
+        "override_condition_to": "allowed-condition",
+        "bug": "fxb/101",
+        "comment": [
+            "Only matches one of the conditions"
+        ],
+        "match_criteria": {
+            "license_names": [
+                "Multi-conditions-not-enough-overriden"
+            ],
+            "identifications": [
+                "License Kind 6"
+            ],
+            "conditions": [
+                "disallowed-condition-1"
+            ],
+            "snippet_checksums": [
+                "*"
+            ],
+            "dependents": [
+                "Package C"
             ]
         }
     }

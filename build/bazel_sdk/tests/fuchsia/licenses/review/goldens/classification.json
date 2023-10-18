@@ -11,8 +11,13 @@
         "identifications": [
             {
                 "identified_as": "License Kind 1",
-                "condition": "allowed condition",
+                "conditions": [
+                    "allowed_condition"
+                ],
                 "verified": true,
+                "verified_conditions": [
+                    "allowed_condition"
+                ],
                 "confidence": 1.0,
                 "start_line": 1,
                 "end_line": 2,
@@ -21,7 +26,12 @@
             },
             {
                 "identified_as": "License Kind 2",
-                "condition": "forbidden condition",
+                "conditions": [
+                    "forbidden_condition"
+                ],
+                "verified_conditions": [
+                    "allowed_condition"
+                ],
                 "verified": true,
                 "confidence": 1.0,
                 "start_line": 3,
@@ -65,11 +75,14 @@
             },
             {
                 "identified_as": "License Kind 3",
-                "condition": "forbidden condition",
+                "conditions": [
+                    "forbidden_condition"
+                ],
                 "verified": false,
-                "verification_message": "'forbidden condition' condition is not an allowed",
+                "verified_conditions": [],
+                "verification_message": "'forbidden_condition' condition is not an allowed",
                 "suggested_override_rule": {
-                    "override_condition_to": "<CHOOSE ONE OF 'allowed condition'>",
+                    "override_condition_to": "<CHOOSE ONE OF 'allowed_condition'>",
                     "bug": "<INSERT TICKET URL>",
                     "comment": [
                         "<INSERT DOCUMENTATION FOR OVERRIDE RULE>"
@@ -82,7 +95,7 @@
                             "License Kind 2"
                         ],
                         "conditions": [
-                            "forbidden condition"
+                            "forbidden_condition"
                         ],
                         "snippet_checksums": [
                             "80c12e04fe66d3cf50eb6a4e8e2185fc"

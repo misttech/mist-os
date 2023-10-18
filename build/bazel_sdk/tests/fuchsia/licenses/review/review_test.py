@@ -43,7 +43,17 @@ class TestReview(unittest.TestCase):
                         diff = difflib.unified_diff(expected_text, actual_text)
                         diff_text = "".join(diff)
                         self.fail(
-                            f"Files {expected_file_name} and {input_file}:{actual_file_name} don't match. Here is the diff:\n{diff_text}"
+                            f"""Files {expected_file_name} (golden) and {input_file}:{actual_file_name} (actual) don't match.
+If the diff is expected, you may update the golden files via:
+```
+cp -a \\
+   ~/fuchsia/build/bazel_sdk/tests/bazel-bin/fuchsia/licenses/review/review.zip.unzipped/. \\
+   ~/fuchsia/build/bazel_sdk/tests/fuchsia/licenses/review/goldens/
+```
+
+Here is the diff:
+{diff_text}
+"""
                         )
 
 

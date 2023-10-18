@@ -92,7 +92,6 @@ def _write_summary_csv(
             identifications = []
             conditions = []
             identifications_and_conditions = []
-            overriden_conditions = []
             detailed_identifications = []
             detailed_overrides = []
             tracking_issues = []
@@ -105,7 +104,7 @@ def _write_summary_csv(
                 license_classification = classifications.classifications_by_id[
                     license_id
                 ]
-                overriden_conditions = []
+                final_conditions = []
 
                 identification_stats = {
                     "_size_bytes": license_classification.size_bytes,
@@ -121,21 +120,22 @@ def _write_summary_csv(
 
                 for i in license_classification.identifications:
                     identifications.append(i.identified_as)
-                    conditions.append(i.condition)
+                    conditions.extend(i.conditions)
 
+                    conditions_str = ",".join(list(i.conditions))
                     identifications_and_conditions.append(
-                        f"{i.identified_as} ({i.condition})"
+                        f"{i.identified_as} ({conditions_str})"
                     )
 
                     detailed_identifications.append(
-                        f"{i.identified_as} at lines {i.start_line}-{i.end_line}: {i.condition}"
+                        f"{i.identified_as} at lines {i.start_line}-{i.end_line}: {conditions_str}"
                     )
-                    if i.overriden_conditions:
-                        overriden_conditions.extend(i.overriden_conditions)
+                    if i.verified_conditions:
+                        final_conditions.extend(i.verified_conditions)
                     if i.overriding_rules:
                         for r in i.overriding_rules:
                             detailed_overrides.append(
-                                f"{i.identified_as} ({i.condition}) at {i.start_line}-{i.end_line} overriden to ({r.override_condition_to}) by {r.rule_file_path}"
+                                f"{i.identified_as} ({conditions_str}) at {i.start_line}-{i.end_line} overriden to ({r.override_condition_to}) by {r.rule_file_path}"
                             )
                             tracking_issues.append(r.bug)
                             comment = "{matched_identifications} ({matched_conditions}) -> ({overriden_condition})\n{comment_text}".format(
@@ -162,7 +162,7 @@ def _write_summary_csv(
                 "identifications_and_conditions": ",\n".join(
                     _dedup(identifications_and_conditions)
                 ),
-                "overriden_conditions": ",".join(_dedup(overriden_conditions)),
+                "overriden_conditions": ",".join(_dedup(final_conditions)),
                 "tracking_issues": "\n".join(_dedup(tracking_issues)),
                 "comments": "\n==============\n".join(_dedup(comments)),
                 "public_source_mirrors": "\n".join(
@@ -201,7 +201,8 @@ def _write_detailed_csv(
                 "start_line",
                 "end_line",
                 "total_lines",
-                "condition",
+                "conditions",
+                "verified_conditions",
                 "overriden_conditions",
                 "overriding_rules",
                 "tracking_issues",
@@ -229,14 +230,19 @@ def _write_detailed_csv(
                         "start_line": identification.start_line,
                         "end_line": identification.end_line,
                         "total_lines": identification.number_of_lines(),
-                        "condition": identification.condition,
+                        "conditions": "\n".join(
+                            sorted(list(identification.conditions))
+                        ),
+                        "verified_conditions": "\n".join(
+                            sorted(list(identification.verified_conditions))
+                        ),
                         "snippet_checksum": identification.snippet_checksum,
                         "snippet_text": identification.snippet_text,
                     }
 
                     if identification.overriden_conditions:
                         row["overriden_conditions"] = "\n".join(
-                            identification.overriden_conditions
+                            sorted(list(identification.overriden_conditions))
                         )
 
                     if identification.overriding_rules:

@@ -179,19 +179,27 @@ class SpdxExtractedLicensingInfo:
     def from_json_dict(input: DictReader):
         license_id = input.get("licenseId")
         name = input.get("name")
-        # TODO(fxb/117652#c2): Remove fallback to license_id once Fuchsia produces names for all licenses.
+
+        cross_refs = [
+            ref_dict.get("url")
+            for ref_dict in input.get_readers_list("crossRefs")
+        ]
+        cross_refs = [s for s in cross_refs if s]
+
+        # 'seeAlso' sometimes appears as 'seeAlsos'
+        see_also = input.get_or(
+            "seeAlso", default=input.get_or("seeAlsos", default=[])
+        )
+        see_also = [s for s in see_also if s]
+
+        extracted_text = input.get("extractedText")
+
         return SpdxExtractedLicensingInfo(
             license_id=license_id,
             name=name,
-            extracted_text=input.get("extractedText"),
-            cross_refs=[
-                ref_dict.get("url")
-                for ref_dict in input.get_readers_list("crossRefs")
-            ],
-            # 'seeAlso' sometimes appears as 'seeAlsos'
-            see_also=input.get_or(
-                "seeAlso", default=input.get_or("seeAlsos", default=[])
-            ),
+            extracted_text=extracted_text,
+            cross_refs=cross_refs,
+            see_also=see_also,
         )
 
     def merge_with(self, other: "SpdxExtractedLicensingInfo"):

@@ -15,6 +15,10 @@ fuchsia_licenses_review(
     spdx_input = "input.spdx.json",
 )
 
+# When the goldens don't match, you may update them via:
+# cp -a \
+#   ~/fuchsia/build/bazel_sdk/tests/bazel-bin/fuchsia/licenses/review/review.zip.unzipped/. \
+#   ~/fuchsia/build/bazel_sdk/tests/fuchsia/licenses/review/goldens/
 py_test(
     name = "review_test",
     srcs = ["review_test.py"],

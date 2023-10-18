@@ -10,14 +10,18 @@ load("@bazel_skylib//rules:diff_test.bzl", "diff_test")
 
 fuchsia_licenses_classification(
     name = "actual_classification.json",
-    allowed_conditions = ["allowed condition"],
-    default_condition = "default condition",
+    allowed_conditions = ["allowed-condition"],
+    default_condition = "default-condition",
     fail_on_disallowed_conditions = False,
     identify_license = "mock_identify_license.sh",
     policy_override_rules = ["test_policy_override_rule.json"],
     spdx_input = "input.spdx.json",
 )
 
+# To update the expected file:
+# cp \
+# ~/fuchsia/build/bazel_sdk/tests/bazel-bin/fuchsia/licenses/classification/actual_classification.json \
+# ~/fuchsia/build/bazel_sdk/tests/fuchsia/licenses/classification/expected_classification.json
 diff_test(
     name = "classification_test",
     file1 = ":actual_classification.json",

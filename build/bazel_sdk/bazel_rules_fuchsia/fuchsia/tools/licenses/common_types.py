@@ -4,7 +4,7 @@
 """Common definitions used in license processing"""
 
 import json
-from typing import Any, Callable, Dict, List, Type
+from typing import Any, Callable, Dict, List, Set, Type
 
 
 class LicenseException(Exception):
@@ -134,17 +134,22 @@ class DictReader:
         return [DictReader(v, self._key_location(key)) for v in output]
 
     def get_string_list(self, key) -> List[str]:
-        def _verify_string_list(value):
-            if not isinstance(value, list):
-                return "Expected list value"
-            for v in value:
-                if not isinstance(v, str):
-                    return f"Expected str value but got {type(v)}"
-            return None
-
         return self.get_or(
             key, expected_type=list, default=[], verify=_verify_string_list
         )
+
+    def get_string_set(self, key) -> Set[str]:
+        """Reads a list of strings and converts to a Set"""
+        return set(self.get_string_list(key))
+
+
+def _verify_string_list(value):
+    if not isinstance(value, list):
+        return "Expected list value"
+    for v in value:
+        if not isinstance(v, str):
+            return f"Expected str value but got {type(v)}"
+    return None
 
 
 def trim_long_str_list(items: List, max_len: int) -> List:
