@@ -41,7 +41,11 @@ use timeout::timeout;
 use usb_bulk::AsyncInterface as Interface;
 
 mod identity;
-pub use self::identity::{Identity, IdentityCmp};
+mod update;
+pub use self::{
+    identity::{Identity, IdentityCmp},
+    update::{TargetUpdate, TargetUpdateBuilder},
+};
 
 const IDENTIFY_HOST_TIMEOUT_MILLIS: u64 = 10000;
 const DEFAULT_SSH_PORT: u16 = 22;
@@ -50,7 +54,7 @@ const CONFIG_HOST_PIPE_SSH_TIMEOUT: &str = "daemon.host_pipe_ssh_timeout";
 pub(crate) type SharedIdentity = Rc<Identity>;
 pub(crate) type WeakIdentity = Weak<Identity>;
 
-#[derive(Debug, Clone, Hash)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum TargetAddrType {
     Ssh,
     Manual(Option<SystemTime>),
@@ -104,6 +108,32 @@ impl Ord for TargetAddrEntry {
 impl PartialOrd for TargetAddrEntry {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum TargetProtocol {
+    Ssh,
+    Netsvc,
+    Fastboot,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum TargetTransport {
+    Network,
+    // Kept to describe Fastboot over UDP.
+    // Otherwise we don't need this granularity.
+    NetworkUdp,
+    Usb,
+}
+
+impl Into<FastbootInterface> for TargetTransport {
+    fn into(self) -> FastbootInterface {
+        match self {
+            TargetTransport::Network => FastbootInterface::Tcp,
+            TargetTransport::NetworkUdp => FastbootInterface::Udp,
+            TargetTransport::Usb => FastbootInterface::Usb,
+        }
     }
 }
 

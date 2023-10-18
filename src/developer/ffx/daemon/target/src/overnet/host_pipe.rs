@@ -80,7 +80,7 @@ impl LogBuffer {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HostAddr(String);
 
 impl fmt::Display for HostAddr {

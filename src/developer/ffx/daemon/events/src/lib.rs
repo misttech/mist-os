@@ -16,7 +16,7 @@ pub trait TryIntoTargetInfo: Sized {
     fn try_into_target_info(self, src: SocketAddr) -> Result<TargetInfo, Self::Error>;
 }
 
-#[derive(Debug, Hash, Clone, PartialEq, Eq)]
+#[derive(Debug, Hash, Copy, Clone, PartialEq, Eq)]
 pub enum FastbootInterface {
     Usb,
     Udp,
