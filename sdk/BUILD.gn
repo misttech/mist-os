@@ -150,25 +150,31 @@ sdk_molecule("fuchsia_idk_atoms") {
   visibility += [ "//vendor/*" ]
 
   # Prebulilt libraries and packages must be built and included for all API
-  # levels they support. The sysroot molecule must also be built.
+  # levels they support. The sysroot includes prebuilt libraries.
   deps = [
-    ":core_cc_prebuilt_library",
-    ":core_loadable_module",
+    ":core_cc_prebuilt_libraries",
+    ":core_loadable_modules",
     ":core_packages",
     ":core_sysroot",
   ]
 
   if (!sdk_inside_supported_api_sub_build) {
+    # TODO(fxbug.dev/300271055): assert_no_deps that these targets do not
+    # depend on API level core_cc_source_libraries would be an exception.
+
     deps += [
       ":core_bindlib",
-      ":core_cc_source_library",
+
+      # The C++ source libraries must be buildable at each supported API level
+      # but are only built once.
+      ":core_cc_source_libraries",
       ":core_dart_library",
       ":core_data",
       ":core_documentation",
-      ":core_license",
+      ":core_licenses",
       ":version_history",
-      "devices",
-      "docs",
+      "//sdk/devices",
+      "//sdk/docs",
       "//sdk/fidl",
     ]
   }
@@ -187,8 +193,8 @@ group("tests_no_e2e") {
   assert_no_deps = e2e_test_libs
 
   deps = [
-    "ctf/plasa:tests",
-    "lib:tests",
+    "//sdk/ctf/plasa:tests",
+    "//sdk/lib:tests",
   ]
 }
 
@@ -201,7 +207,7 @@ group("tests") {
 
     # `testing:tests` contains unit tests for sl4f, which depend on sl4f so it
     # can't live inside `test_no_e2e`.
-    "testing:tests",
+    "//sdk/testing:tests",
   ]
 }
 
@@ -379,6 +385,7 @@ sdk_molecule("core_packages") {
 
 sdk_molecule("core_data") {
   deps = [
+    # TODO(ddorwin): Rename these to make it clear that they are data (e.g., _shards).
     "//sdk/lib/inspect",
     "//sdk/lib/sys/component:realm_builder_shard_sdk",
     "//sdk/lib/syslog",
@@ -391,7 +398,7 @@ sdk_molecule("core_documentation") {
   deps = [ "//third_party/Vulkan-Loader:vulkan_license" ]
 }
 
-sdk_molecule("core_loadable_module") {
+sdk_molecule("core_loadable_modules") {
   deps = [ "//src/lib/vulkan:vulkan_layers" ]
 }
 
@@ -399,7 +406,9 @@ sdk_molecule("core_dart_library") {
   deps = [ "//sdk/testing/sl4f/client:client_sdk($dart_toolchain)" ]
 }
 
-sdk_molecule("core_cc_prebuilt_library") {
+# C/C++ code that must be provided as prebuilt libraries for each supported API
+# level. Must export symbols with C linkage.
+sdk_molecule("core_cc_prebuilt_libraries") {
   deps = [
     "//sdk/lib/fdio:fdio_sdk",
     "//sdk/lib/svc:svc_sdk",
@@ -423,7 +432,10 @@ sdk_molecule("core_cc_prebuilt_library") {
   }
 }
 
-sdk_molecule("core_cc_source_library") {
+# C++ code that is provided as source in the SDK. Must be buildable at each
+# supported API level, though this is not part of the build.
+# Prefer providing source code if all dependencies are available in the SDK.
+sdk_molecule("core_cc_source_libraries") {
   deps = [
     "//sdk/lib/async-loop-testing/cpp:cpp_sdk",
     "//sdk/lib/component/incoming/cpp:cpp_sdk",
@@ -469,7 +481,7 @@ sdk_molecule("core_sysroot") {
 }
 
 # License/copyright files for the SDK.
-sdk_molecule("core_license") {
+sdk_molecule("core_licenses") {
   deps = [
     ":musl_license",
     ":open_source",
