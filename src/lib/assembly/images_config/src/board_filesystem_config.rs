@@ -126,6 +126,12 @@ pub struct Fxfs {
     /// normal usage of the image.
     #[serde(default)]
     pub size_bytes: Option<u64>,
+
+    /// The maximum number of bytes we can place in Fxfs during assembly.
+    /// This value must be smaller than `size_bytes` which is the absolute maximum amount of space
+    /// we can use in Fxfs.
+    #[serde(default)]
+    pub size_checker_maximum_bytes: Option<u64>,
 }
 
 /// The parameters describing how to create a FVM image.

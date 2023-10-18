@@ -369,6 +369,12 @@ pub struct Fxfs {
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub size_bytes: Option<u64>,
+
+    /// Maximum amount of contents for an assembled Fxfs image.  Must be no greater than
+    /// `size_bytes`.
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub maximum_contents_size: Option<u64>,
 }
 
 impl ImagesConfig {
@@ -410,7 +416,10 @@ impl ImagesConfig {
             match &product.volume {
                 pfc::VolumeConfig::Fxfs => {
                     let size_bytes = board.fxfs.size_bytes;
-                    images.push(Image::Fxfs(Fxfs { size_bytes }));
+                    images.push(Image::Fxfs(Fxfs {
+                        size_bytes,
+                        maximum_contents_size: board.fxfs.size_checker_maximum_bytes,
+                    }));
                 }
                 pfc::VolumeConfig::Fvm(fvm) => {
                     let slice_size = board.fvm.slice_size.0;
@@ -520,7 +529,7 @@ mod tests {
                 key_metadata: "path/to/metadata".into(),
                 additional_descriptors: vec![],
             }),
-            fxfs: bfc::Fxfs { size_bytes: Some(1234) },
+            fxfs: bfc::Fxfs { size_bytes: Some(1234), size_checker_maximum_bytes: Some(5678) },
             fvm: bfc::Fvm {
                 slice_size: bfc::FvmSliceSize(5678),
                 truncate_to_length: None,
@@ -557,7 +566,7 @@ mod tests {
                 key_metadata: "path/to/metadata".into(),
                 additional_descriptors: vec![],
             }),
-            fxfs: bfc::Fxfs { size_bytes: Some(1234) },
+            fxfs: bfc::Fxfs { size_bytes: Some(1234), size_checker_maximum_bytes: Some(5678) },
             fvm: bfc::Fvm {
                 slice_size: bfc::FvmSliceSize(5678),
                 truncate_to_length: None,
@@ -651,7 +660,7 @@ mod tests {
                         key_metadata: "path/to/metadata".into(),
                         additional_descriptors: vec![],
                     }),
-                    Image::Fxfs(Fxfs { size_bytes: Some(1234) }),
+                    Image::Fxfs(Fxfs { size_bytes: Some(1234), maximum_contents_size: Some(5678) }),
                 ],
             }
         );

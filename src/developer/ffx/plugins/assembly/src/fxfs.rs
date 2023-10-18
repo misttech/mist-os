@@ -31,6 +31,7 @@ pub async fn construct_fxfs(
     fxfs_config: &Fxfs,
 ) -> Result<ConstructedFxfs> {
     let mut contents = BlobfsContents::default();
+    contents.maximum_contents_size = fxfs_config.maximum_contents_size;
     let mut fxfs_builder = FxfsBuilder::new();
     if let Some(size) = fxfs_config.size_bytes {
         fxfs_builder.set_size(size);
@@ -169,9 +170,15 @@ mod tests {
         let size_byteses = vec![None, Some(32 * 1024 * 1024)];
         for size_bytes in size_byteses {
             let ConstructedFxfs { image_path, sparse_image_path, contents: blobs } =
-                construct_fxfs(dir, dir, &image_config, &base_package, &Fxfs { size_bytes })
-                    .await
-                    .unwrap();
+                construct_fxfs(
+                    dir,
+                    dir,
+                    &image_config,
+                    &base_package,
+                    &Fxfs { size_bytes, maximum_contents_size: None },
+                )
+                .await
+                .unwrap();
 
             // Ensure something was created.
             assert!(image_path.exists());
