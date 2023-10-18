@@ -17,14 +17,11 @@ namespace f2fs {
 class Page;
 class VnodeF2fs;
 
-using sector_t = uint64_t;
 using block_t = uint32_t;
 using f2fs_hash_t = uint32_t;
-using gfp_t = uint32_t;
 using nid_t = uint32_t;
 using ino_t = uint32_t;
 using pgoff_t = uint64_t;
-using atomic_t = std::atomic_int;
 using umode_t = uint16_t;
 using VnodeCallback = fit::function<zx_status_t(fbl::RefPtr<VnodeF2fs> &)>;
 using PageCallback = fit::function<zx_status_t(fbl::RefPtr<Page>)>;
@@ -62,21 +59,11 @@ inline uint32_t CpuToLe(uint32_t x) { return x; }
 inline uint64_t CpuToLe(uint64_t x) { return x; }
 #endif
 
-constexpr uint32_t kPageSize = 4096;
+constexpr uint32_t kPageSize = PAGE_SIZE;
 constexpr uint32_t kBitsPerByte = 8;
-constexpr uint32_t kPageCacheShift = 12;
 constexpr uint32_t kF2fsSuperMagic = 0xF2F52010;
 constexpr uint32_t kCrcPolyLe = 0xedb88320;
 constexpr size_t kWriteTimeOut = 60;  // in seconds
-
-constexpr uint32_t kRead = 0x0;
-constexpr uint32_t kWrite = 0x1;
-constexpr uint32_t kFlush = 0x2;
-constexpr uint32_t kFua = 0x4;
-constexpr uint32_t kSync = 0x10;
-constexpr uint32_t kReadSync = (kRead | kSync);
-constexpr uint32_t kWriteSync = (kWrite | kSync);
-constexpr uint32_t kWriteFlushFua = (kWrite | kSync | kFlush | kFua);
 
 }  // namespace f2fs
 

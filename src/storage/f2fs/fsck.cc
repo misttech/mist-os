@@ -691,7 +691,7 @@ zx_status_t FsckWorker::Init() {
   fsck_ = FsckInfo{};
   fsck_.nr_main_blocks = segment_manager_->GetMainSegmentsCount()
                          << superblock_info_.GetLogBlocksPerSeg();
-  fsck_.main_area_bitmap_size = (fsck_.nr_main_blocks + kBitsPerByte - 1) / kBitsPerByte;
+  fsck_.main_area_bitmap_size = CheckedDivRoundUp<uint64_t>(fsck_.nr_main_blocks, kBitsPerByte);
   ZX_ASSERT(fsck_.main_area_bitmap_size == sit_area_bitmap_size_);
   fsck_.main_area_bitmap = std::make_unique<uint8_t[]>(fsck_.main_area_bitmap_size);
   if (fsck_.main_area_bitmap == nullptr) {

@@ -902,7 +902,7 @@ zx_status_t NodeManager::NewNodePage(VnodeF2fs &vnode, nid_t nid, uint32_t ofs, 
   return ZX_OK;
 }
 
-zx::result<LockedPage> NodeManager::ReadNodePage(LockedPage page, nid_t nid, int type) {
+zx::result<LockedPage> NodeManager::ReadNodePage(LockedPage page, nid_t nid) {
   NodeInfo ni;
   GetNodeInfo(nid, ni);
   if (ni.blk_addr == kNullAddr) {
@@ -925,7 +925,7 @@ zx_status_t NodeManager::GetNodePage(nid_t nid, LockedPage *out) {
     return ret;
   }
 
-  auto page_or = ReadNodePage(std::move(page), nid, kReadSync);
+  auto page_or = ReadNodePage(std::move(page), nid);
   if (page_or.is_error()) {
     return page_or.status_value();
   }

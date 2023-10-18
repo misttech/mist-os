@@ -15,7 +15,7 @@ uint8_t *Dir::InlineDentryBitmap(Page *page) {
 }
 
 uint64_t Dir::InlineDentryBitmapSize() const {
-  return (MaxInlineDentry() + kBitsPerByte - 1) / kBitsPerByte;
+  return CheckedDivRoundUp<uint64_t>(MaxInlineDentry(), kBitsPerByte);
 }
 
 DirEntry *Dir::InlineDentryArray(Page *page, VnodeF2fs &vnode) {

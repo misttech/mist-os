@@ -481,7 +481,7 @@ class SuperblockInfo {
   block_t alloc_valid_block_count_ = 0;  // # of allocated blocks
   block_t last_valid_block_count_ = 0;   // for recovery
   uint32_t s_next_generation_ = 0;       // for NFS support
-  atomic_t nr_pages_[static_cast<int>(CountType::kNrCountType)] = {
+  std::atomic<int> nr_pages_[static_cast<int>(CountType::kNrCountType)] = {
       0};                   // # of pages, see count_type
   uint64_t mount_opt_ = 0;  // set with kMountOptxxxx bits according to F2fs::mount_options_
 

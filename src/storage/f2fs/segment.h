@@ -366,9 +366,7 @@ class SegmentManager {
   uint32_t SitEntryOffset(uint32_t segno) { return segno % sit_info_->sents_per_block; }
   static block_t SitBlockOffset(uint32_t segno) { return segno / kSitEntryPerBlock; }
   static block_t StartSegNo(uint32_t segno) { return SitBlockOffset(segno) * kSitEntryPerBlock; }
-  static uint32_t BitmapSize(uint32_t nr) {
-    return static_cast<uint32_t>(BitsToLongs(nr) * sizeof(uint64_t));
-  }
+  static uint32_t BitmapSize(uint32_t nr) { return CheckedDivRoundUp<uint32_t>(nr, CHAR_BIT); }
 
   block_t TotalSegs() const { return main_segments_; }
 

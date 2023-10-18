@@ -339,8 +339,9 @@ zx_status_t VnodeF2fs::GetNewDataPage(pgoff_t index, bool new_i_size, LockedPage
                   page->GetKey(), data_blkaddr);
   }
 
-  if (new_i_size && GetSize() < ((index + 1) << kPageCacheShift)) {
-    SetSize((index + 1) << kPageCacheShift);
+  size_t new_size = (index + 1) * kPageSize;
+  if (new_i_size && GetSize() < new_size) {
+    SetSize(new_size);
     // TODO: mark sync when fdatasync is available.
     SetFlag(InodeInfoFlag::kUpdateDir);
     SetDirty();
@@ -447,7 +448,7 @@ zx::result<block_t> VnodeF2fs::GetBlockAddrForDataPage(LockedPage &page) {
 }
 
 zx::result<block_t> VnodeF2fs::GetBlockAddrForDirtyDataPage(LockedPage &page, bool is_reclaim) {
-  const pgoff_t end_index = (GetSize() >> kPageCacheShift);
+  const pgoff_t end_index = GetSize() * kPageSize;
   block_t blk_addr = kNullAddr;
 
   if (page->GetIndex() >= end_index) {

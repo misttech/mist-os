@@ -157,10 +157,6 @@ inline T CheckedDivRoundUp(const T n, const T d) {
   return safemath::CheckDiv<T>(fbl::round_up(n, d), d).ValueOrDie();
 }
 
-inline size_t BitsToLongs(size_t nr) {
-  return CheckedDivRoundUp<size_t>(nr, kBitsPerByte * sizeof(long));
-}
-
 constexpr uint32_t kBlockSize = 4096;  // F2fs block size in byte
 template <typename T = uint8_t>
 class FsBlock {

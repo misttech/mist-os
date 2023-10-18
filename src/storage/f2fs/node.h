@@ -105,7 +105,7 @@ class NodeManager {
   void NodeInfoFromRawNat(NodeInfo &ni, RawNatEntry &raw_ne);
   zx_status_t BuildNodeManager();
   void DestroyNodeManager();
-  zx::result<LockedPage> ReadNodePage(LockedPage page, nid_t nid, int type);
+  zx::result<LockedPage> ReadNodePage(LockedPage page, nid_t nid);
   zx_status_t GetNodePage(nid_t nid, LockedPage *out);
   // If the node page at |start| doesn't hit in the cache, do readahead node pages
   // from |start| in |parent|.
