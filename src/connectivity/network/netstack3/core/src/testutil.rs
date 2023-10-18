@@ -19,14 +19,14 @@ use core::{
 
 use net_types::{
     ethernet::Mac,
-    ip::{AddrSubnetEither, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet, SubnetEither},
+    ip::{
+        AddrSubnetEither, Ip, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet,
+        SubnetEither,
+    },
     UnicastAddr, Witness,
 };
 #[cfg(test)]
-use net_types::{
-    ip::{IpAddr, IpInvariant},
-    MulticastAddr, SpecifiedAddr,
-};
+use net_types::{ip::IpAddr, MulticastAddr, SpecifiedAddr};
 use packet::{Buf, BufferMut};
 #[cfg(test)]
 use packet_formats::ip::IpProto;
@@ -201,8 +201,29 @@ pub(crate) mod benchmarks {
 pub struct FakeNonSyncCtxState {
     icmpv4_replies: HashMap<crate::ip::icmp::SocketId<Ipv4>, Vec<Vec<u8>>>,
     icmpv6_replies: HashMap<crate::ip::icmp::SocketId<Ipv6>, Vec<Vec<u8>>>,
+    udpv4_received: HashMap<crate::transport::udp::SocketId<Ipv4>, Vec<Vec<u8>>>,
+    udpv6_received: HashMap<crate::transport::udp::SocketId<Ipv6>, Vec<Vec<u8>>>,
     pub(crate) rx_available: Vec<LoopbackDeviceId<FakeNonSyncCtx>>,
     pub(crate) tx_available: Vec<DeviceId<FakeNonSyncCtx>>,
+}
+
+impl FakeNonSyncCtxState {
+    pub(crate) fn udp_state_mut<I: Ip>(
+        &mut self,
+    ) -> &mut HashMap<crate::transport::udp::SocketId<I>, Vec<Vec<u8>>> {
+        use net_types::ip::GenericOverIp;
+        #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
+        struct Wrapper<'a, I: Ip>(
+            &'a mut HashMap<crate::transport::udp::SocketId<I>, Vec<Vec<u8>>>,
+        );
+        let Wrapper(map) = I::map_ip::<_, Wrapper<'_, I>>(
+            IpInvariant(self),
+            |IpInvariant(this)| Wrapper(&mut this.udpv4_received),
+            |IpInvariant(this)| Wrapper(&mut this.udpv6_received),
+        );
+        map
+    }
 }
 
 /// Shorthand for [`Ctx`] with a [`FakeNonSyncCtx`].
@@ -339,6 +360,14 @@ impl FakeNonSyncCtx {
         )
         .into_inner()
         .unwrap_or_else(Vec::default)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn take_udp_received<I: Ip>(
+        &mut self,
+        conn: crate::transport::udp::SocketId<I>,
+    ) -> Vec<Vec<u8>> {
+        self.state_mut().udp_state_mut::<I>().remove(&conn).unwrap_or_else(Vec::default)
     }
 }
 
@@ -1111,12 +1140,14 @@ impl<I: IcmpIpExt> udp::NonSyncContext<I> for FakeNonSyncCtx {
 impl<I: crate::ip::IpExt, B: BufferMut> udp::BufferNonSyncContext<I, B> for FakeNonSyncCtx {
     fn receive_udp(
         &mut self,
-        _id: udp::SocketId<I>,
-        _dst_addr: (<I>::Addr, core::num::NonZeroU16),
-        _src_addr: (<I>::Addr, Option<core::num::NonZeroU16>),
-        _body: &B,
+        id: udp::SocketId<I>,
+        _dst_addr: (I::Addr, core::num::NonZeroU16),
+        _src_addr: (I::Addr, Option<core::num::NonZeroU16>),
+        body: &B,
     ) {
-        unimplemented!()
+        let mut state = self.state_mut();
+        let received = (&mut *state).udp_state_mut::<I>().entry(id).or_insert_with(Vec::default);
+        received.push(body.as_ref().to_owned());
     }
 }
 

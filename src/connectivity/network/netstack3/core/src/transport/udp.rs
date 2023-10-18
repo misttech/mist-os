@@ -7501,4 +7501,56 @@ mod tests {
             }
         }
     }
+
+    #[ip_test]
+    #[test_case(true; "bind to device")]
+    #[test_case(false; "no bind to device")]
+    fn loopback_bind_to_device<I: Ip + IpExt + crate::testutil::TestIpExt>(bind_to_device: bool) {
+        set_logger_for_test();
+        const HELLO: &'static [u8] = b"Hello";
+        let (mut ctx, local_device_ids) = I::FAKE_CONFIG.into_builder().build();
+        let crate::testutil::Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
+        let loopback_device_id: crate::DeviceId<crate::testutil::FakeNonSyncCtx> =
+            crate::device::add_loopback_device(
+                sync_ctx,
+                net_types::ip::Mtu::new(u16::MAX as u32),
+                crate::testutil::DEFAULT_INTERFACE_METRIC,
+            )
+            .expect("create the loopback interface")
+            .into();
+        crate::device::testutil::enable_device(sync_ctx, non_sync_ctx, &loopback_device_id);
+        let socket = create_udp::<I, _>(sync_ctx);
+        listen_udp(sync_ctx, non_sync_ctx, &socket, None, NonZeroU16::new(1234)).unwrap();
+        if bind_to_device {
+            set_udp_device(
+                sync_ctx,
+                non_sync_ctx,
+                &socket,
+                Some(&local_device_ids[0].clone().into()),
+            )
+            .unwrap();
+        }
+        send_udp_to(
+            sync_ctx,
+            non_sync_ctx,
+            &socket,
+            Some(SocketZonedIpAddr::from(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip))),
+            NonZeroU16::new(1234).unwrap(),
+            Buf::new(HELLO.to_vec(), ..),
+        )
+        .unwrap();
+        crate::testutil::handle_queued_rx_packets(sync_ctx, non_sync_ctx);
+
+        // TODO(https://fxbug.dev/135041): They should both be non-empty. The
+        // socket map should allow a looped back packet to be delivered despite
+        // it being bound to a device other than loopback.
+        if bind_to_device {
+            assert_matches!(&non_sync_ctx.take_udp_received(socket)[..], []);
+        } else {
+            assert_matches!(
+                &non_sync_ctx.take_udp_received(socket)[..],
+                [packet] => assert_eq!(packet, HELLO)
+            );
+        }
+    }
 }
