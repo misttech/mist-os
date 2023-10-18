@@ -208,6 +208,7 @@
                 "fuchsia.net.interfaces.admin.Installer",
                 "fuchsia.net.interfaces.State",
                 "fuchsia.net.multicast.admin.Ipv6RoutingTableController",
+                "fuchsia.net.name.DnsServerWatcher",
                 "fuchsia.net.routes.admin.SetProviderV4",
                 "fuchsia.net.routes.admin.SetProviderV6",
                 "fuchsia.net.routes.State",

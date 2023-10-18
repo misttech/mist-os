@@ -15,6 +15,7 @@
             protocol: [
                 "fuchsia.net.interfaces.admin.Installer",
                 "fuchsia.net.interfaces.State",
+                "fuchsia.net.name.DnsServerWatcher",
                 "fuchsia.net.stack.Stack",
             ],
             from: "#netstack",
@@ -36,6 +37,7 @@
             protocol: [
                 "fuchsia.net.debug.Interfaces",
                 "fuchsia.net.interfaces.State",
+                "fuchsia.net.name.DnsServerWatcher",
                 "fuchsia.net.root.Interfaces",
                 "fuchsia.net.routes.StateV4",
                 "fuchsia.net.routes.StateV6",
