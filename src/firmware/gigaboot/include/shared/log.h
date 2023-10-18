@@ -8,6 +8,10 @@
 #include <stdio.h>
 #include <xefi.h>
 
+#ifndef DEBUG_LOGGING
+#define DEBUG_LOGGING 0
+#endif
+
 // LOG/WLOG/ELOG are always printed, the only difference is that WLOG and ELOG
 // are prefixed with "Warning" and "Error" strings.
 //

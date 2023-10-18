@@ -2,10 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef DEBUG_LOGGING
-#define DEBUG_LOGGING 0
-#endif
-
 #include "tcp.h"
 
 #include <log.h>
@@ -17,6 +13,7 @@
 #include <efi/boot-services.h>
 #include <efi/protocol/tcp6.h>
 
+#include "efi/types.h"
 #include "inet6.h"
 
 static efi_guid kTcp6ServiceBindingProtocolGuid = EFI_TCP6_SERVICE_BINDING_PROTOCOL_GUID;
@@ -271,13 +268,7 @@ tcp6_result tcp6_accept(tcp6_socket* socket) {
   return result;
 }
 
-tcp6_result tcp6_read(tcp6_socket* socket, void* data, uint32_t size) {
-  if (socket->client_protocol == NULL) {
-    ELOG("No TCP client to read from");
-    return TCP6_RESULT_ERROR;
-  }
-
-  // If there isn't a read in progress, start a new one.
+static tcp6_result set_up_socket_read(tcp6_socket* socket, void* data, uint32_t size) {
   if (socket->read_token.CompletionToken.Event == NULL) {
     DLOG("Creating TCP6 read event");
     efi_status status = socket->boot_services->CreateEvent(
@@ -288,8 +279,7 @@ tcp6_result tcp6_read(tcp6_socket* socket, void* data, uint32_t size) {
     }
 
     // Store the original read end so that we can internally handle partial
-    // reads. The EFI documentation isn't clear whether drivers can give us
-    // partial reads or not, so assume that they will.
+    // reads. Partial reads absolutely happen for large transfers.
     socket->read_end = (uint8_t*)data + size;
     socket->read_data.UrgentFlag = false;
     socket->read_data.DataLength = size;
@@ -306,15 +296,65 @@ tcp6_result tcp6_read(tcp6_socket* socket, void* data, uint32_t size) {
     }
   }
 
-  // The interrupt rate can be pretty slow (10-20ms) which really hurts
-  // performance on larger transfers, so manually poll whenever we're waiting
-  // for a read.
-  socket->client_protocol->Poll(socket->client_protocol);
+  return TCP6_RESULT_SUCCESS;
+}
 
-  tcp6_result result = check_token(socket->boot_services, &socket->read_token.CompletionToken);
-  if (result == TCP6_RESULT_SUCCESS) {
+static tcp6_result wait_for_read_completion(tcp6_socket* socket) {
+  tcp6_result result;
+  efi_event timer;
+  if (socket->boot_services->CreateEvent(EVT_TIMER, TPL_APPLICATION, NULL, NULL, &timer) !=
+      EFI_SUCCESS) {
+    ELOG("couldn't create read timeout timer");
+    return TCP6_RESULT_ERROR;
+  }
+
+  // Timer ticks are in 100ns, so timeout is 4 seconds.
+  const uint64_t timeout = (uint64_t)4 * 10000000;
+  if (socket->boot_services->SetTimer(timer, TimerRelative, timeout) != EFI_SUCCESS) {
+    ELOG("failed to set read timeout timer");
+    socket->boot_services->CloseEvent(timer);
+    return TCP6_RESULT_ERROR;
+  }
+
+  do {
+    // The interrupt rate can be pretty slow (10-20ms) which really hurts
+    // performance on larger transfers, so manually poll whenever we're waiting
+    // for a read.
+    socket->client_protocol->Poll(socket->client_protocol);
+    result = check_token(socket->boot_services, &socket->read_token.CompletionToken);
+  } while (result == TCP6_RESULT_PENDING &&
+           socket->boot_services->CheckEvent(timer) == EFI_NOT_READY);
+
+  socket->boot_services->CloseEvent(timer);
+  return result;
+}
+
+tcp6_result tcp6_read(tcp6_socket* socket, void* data, uint32_t size) {
+  if (socket->client_protocol == NULL) {
+    ELOG("No TCP client to read from");
+    return TCP6_RESULT_ERROR;
+  }
+
+  while (true) {
+    // If there isn't a read in progress, or a partial read has occurred, start a new one.
+    //
+    // Note: the token creation is inside the loop because the event may be reset.
+    tcp6_result result = set_up_socket_read(socket, data, size);
+    if (result == TCP6_RESULT_ERROR) {
+      return result;
+    }
+    result = wait_for_read_completion(socket);
+    if (result == TCP6_RESULT_ERROR || result == TCP6_RESULT_DISCONNECTED) {
+      ELOG("TCP6 read error or endpoint disconnected");
+      return result;
+    }
+    if (result == TCP6_RESULT_PENDING) {
+      // The read timed out due to a laggy connection or buggy or malicious peer.
+      ELOG("TCP6 read timed out");
+      return TCP6_RESULT_ERROR;
+    }
+
     DLOG("TCP6 read: %u bytes\n", socket->read_token.Packet.RxData->DataLength);
-
     // Check if we're done with the read.
     uint8_t* end = (uint8_t*)socket->read_token.Packet.RxData->FragmentTable[0].FragmentBuffer +
                    socket->read_token.Packet.RxData->FragmentTable[0].FragmentLength;
@@ -329,12 +369,21 @@ tcp6_result tcp6_read(tcp6_socket* socket, void* data, uint32_t size) {
 
       // 32-bit cast is safe because we calculated read_end by adding a 32-bit
       // size in the first place, so the difference must be < 32 bits.
+      //
+      // Note: turning on logging can cause very large reads to time out.
+      //       Partial reads tend to be between 1-2 KiB, and printing all of those
+      //       can cause timers to expire that cause the read to fail, even
+      //       if all bytes are successfully transferred.
       uint32_t remaining = (uint32_t)(socket->read_end - end);
       DLOG("TCP6 partial read; starting again on the next %u bytes", remaining);
-      return tcp6_read(socket, end, remaining);
+      data = end;
+      size = remaining;
+      continue;
     }
+
+    // Normal, read success
+    return result;
   }
-  return result;
 }
 
 tcp6_result tcp6_write(tcp6_socket* socket, const void* data, uint32_t size) {

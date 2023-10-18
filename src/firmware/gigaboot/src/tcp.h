@@ -113,12 +113,14 @@ tcp6_result tcp6_accept(tcp6_socket* socket);
 //
 // Only a single in-flight read is supported. |data| and |size| are cached
 // when starting a new read, and cannot be changed until the read completes.
+// Partial reads are handled internally.
 //
 // On SUCCESS it is guaranteed that exactly |size| bytes have been read.
 //
+// This is a blocking function.
+//
 // Returns:
 //   TCP6_RESULT_SUCCESS
-//   TCP6_RESULT_PENDING
 //   TCP6_RESULT_DISCONNECTED
 //   TCP6_RESULT_ERROR
 tcp6_result tcp6_read(tcp6_socket* socket, void* data, uint32_t size);
