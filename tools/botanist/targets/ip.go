@@ -32,7 +32,7 @@ func getLocalDomain(nodename string) string {
 // It makes a best effort at returning *both* the IPv4 and IPv6 addresses, but if
 // both interfaces do not come up within a reasonable amount of time, it returns
 // only the first one that it finds (and no error).
-func resolveIP(ctx context.Context, nodename string) (net.IP, net.IPAddr, error) {
+func ResolveIP(ctx context.Context, nodename string) (net.IP, net.IPAddr, error) {
 	// Keep track of the start time to log the duration after which a timeout
 	// occurred.
 	startTime := time.Now()

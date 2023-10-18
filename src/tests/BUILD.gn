@@ -22,6 +22,10 @@ group("tests") {
     # component_tool is an e2e test for all products.
     "end_to_end/component_tool:tests",
 
+    # These are host interaction tests, that bring up their own emulator and
+    # verify the coverage data produced by early boot.
+    "early-boot-coverage:tests",
+
     # fidlcat is an e2e test for all products.
     "end_to_end/fidlcat:tests",
     "end_to_end/package_manager:tests",

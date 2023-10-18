@@ -76,7 +76,7 @@ template("_cuckoo_kernel_zbi_test") {
     if (fxfs_blob) {
       product_assembly_config_label =
           "//build/testing:cuckoo-product-configuration-fxblob"
-      generate_fxfs = !bootfs_only
+      generate_fxfs = true
     } else {
       if (data_filesystem_format == "fxfs") {
         product_assembly_config_label =
@@ -85,7 +85,7 @@ template("_cuckoo_kernel_zbi_test") {
         product_assembly_config_label =
             "//build/testing:cuckoo-product-configuration-minfs"
       }
-      generate_fvm = !bootfs_only
+      generate_fvm = true
       generate_fvm_fastboot = generate_fvm && assembly_generate_fvm_fastboot
       generate_fvm_nand = generate_fvm && assembly_generate_fvm_nand
     }
@@ -133,7 +133,11 @@ template("cuckoo_kernel_zbi_test") {
           fvm = label_for_images_with_toolchain
         }
       }
-      environments = [ emu_env ]
+      if (defined(invoker.environments)) {
+        environments = invoker.environments
+      } else {
+        environments = [ emu_env ]
+      }
       isolated = true
     }
   }

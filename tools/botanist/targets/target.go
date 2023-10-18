@@ -242,7 +242,7 @@ func (t *genericFuchsiaTarget) StartSerialServer() error {
 func (t *genericFuchsiaTarget) resolveIP() error {
 	ctx, cancel := context.WithTimeout(t.targetCtx, 2*time.Minute)
 	defer cancel()
-	ipv4, ipv6, err := resolveIP(ctx, t.nodename)
+	ipv4, ipv6, err := ResolveIP(ctx, t.nodename)
 	if err != nil {
 		return err
 	}

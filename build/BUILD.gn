@@ -173,7 +173,10 @@ group("non_hermetic_deps") {
   # management becomes a hermetic process.
   visibility += [ "//tools/check-licenses/util/cmd/gn/*" ]
 
-  visibility += [ "//zircon/kernel/lib/userabi/userboot/tests:*" ]
+  visibility += [
+    "//src/tests/early-boot-coverage/*",
+    "//zircon/kernel/lib/userabi/userboot/tests:*",
+  ]
 }
 
 # Build targets that use the legacy zx_library and zx_host_tool templates

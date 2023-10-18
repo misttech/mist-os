@@ -16,65 +16,66 @@ core_realm_definition("cuckoo-core-realm") {
   }
 }
 
-product_assembly_configuration("cuckoo-product-configuration-fxfs") {
-  testonly = true
-  platform = {
-    #feature_set_level = "minimal"
-    build_type = "eng"
-    storage = {
-      configure_fshost = true
-      filesystems = {
-        volume = {
-          fvm = {
-            data = {
-            }
-            blob = {
-            }
-          }
+# Generates a product_assembly_configuration for a cukoo tests with a set of
+# default settings. Some of these settings may be overridden, see the list
+# of parameters for more details.
+#
+#  Parameters:
+#     filesystems: (Required)
+#         (scope) Must me a valid filesystems scope that will be forwarded to
+#          product_assembly_configuration template.
+template("cuckoo_product_assembly_config") {
+  product_assembly_configuration(target_name) {
+    assert(defined(invoker.filesystems))
+    testonly = true
+    platform = {
+      build_type = "eng"
+      storage = {
+        configure_fshost = true
+        filesystems = invoker.filesystems
+      }
+      development_support = {
+        authorized_ssh_keys_path =
+            rebase_path("//.ssh/pkey.pub", root_build_dir)
+      }
+    }
+    product = {
+    }
+  }
+}
+
+# Default Fxfs for the data partition.
+cuckoo_product_assembly_config("cuckoo-product-configuration-fxfs") {
+  filesystems = {
+    volume = {
+      fvm = {
+        data = {
+        }
+        blob = {
         }
       }
     }
   }
-  product = {
-  }
 }
 
-product_assembly_configuration("cuckoo-product-configuration-minfs") {
-  testonly = true
-  platform = {
-    #feature_set_level = "minimal"
-    build_type = "eng"
-    storage = {
-      configure_fshost = true
-      filesystems = {
-        volume = {
-          fvm = {
-            data = {
-              data_filesystem_format = "minfs"
-            }
-            blob = {
-            }
-          }
+# Override fxfs and use minfs for data partition.
+cuckoo_product_assembly_config("cuckoo-product-configuration-minfs") {
+  filesystems = {
+    volume = {
+      fvm = {
+        data = {
+          data_filesystem_format = "minfs"
+        }
+        blob = {
         }
       }
     }
   }
-  product = {
-  }
 }
 
-product_assembly_configuration("cuckoo-product-configuration-fxblob") {
-  testonly = true
-  platform = {
-    #feature_set_level = "minimal"
-    build_type = "eng"
-    storage = {
-      configure_fshost = true
-      filesystems = {
-        volume = "fxfs"
-      }
-    }
-  }
-  product = {
+# Replace FVM, blobfs and minfs with fxfs (both volume manage, blob and data).
+cuckoo_product_assembly_config("cuckoo-product-configuration-fxblob") {
+  filesystems = {
+    volume = "fxfs"
   }
 }

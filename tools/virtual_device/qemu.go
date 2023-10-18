@@ -50,7 +50,7 @@ func QEMUCommand(b *qemu.QEMUCommandBuilder, fvd *fvdpb.VirtualDevice, images bu
 			kernel = image.Path
 		case image.Name == fvd.Initrd && image.Type == "zbi":
 			initrd = image.Path
-		case fvd.Drive != nil && image.Name == fvd.Drive.Image && image.Type == "blk":
+		case fvd.Drive != nil && image.Name == fvd.Drive.Image && (image.Type == "blk" || image.Type == "fxfs-blk"):
 			drive = image.Path
 		}
 	}
