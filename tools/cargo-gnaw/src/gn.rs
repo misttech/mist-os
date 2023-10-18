@@ -17,6 +17,7 @@ use {
     std::io::{self, Write},
     std::path::Path,
     std::string::ToString,
+    walkdir::WalkDir,
 };
 
 /// Utility to add a version suffix to a GN target name.
@@ -542,24 +543,22 @@ pub fn write_rule<W: io::Write>(
         // Disabled in unit tests, where package_root always fails.
         let mut license_files = vec![];
 
-        for entry in target.package_root().read_dir_utf8().unwrap() {
+        for entry in WalkDir::new(target.package_root()).follow_links(false).into_iter() {
             let entry = entry.unwrap();
-            let path = entry.path();
-            if !path.is_file() {
-                continue;
-            }
-            let file_name_lower = path.file_name().unwrap().to_lowercase();
+            let file_name_lower = entry.file_name().to_string_lossy().to_lowercase();
             if file_name_lower.starts_with("license")
                 || file_name_lower.starts_with("licence")
                 || file_name_lower.starts_with("copyright")
             {
                 let license_file_label = format!(
                     "//{}",
-                    path.canonicalize_utf8()
+                    entry
+                        .path()
+                        .canonicalize()
                         .unwrap()
                         .strip_prefix(project_root)
                         .unwrap()
-                        .to_string()
+                        .to_string_lossy()
                 );
                 license_files.push(license_file_label);
                 license_files_found = true;

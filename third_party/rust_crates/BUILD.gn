@@ -2390,6 +2390,7 @@ license("bstr-v1_5_0.license") {
   license_files = [
     "//third_party/rust_crates/vendor/bstr-1.5.0/LICENSE-APACHE",
     "//third_party/rust_crates/vendor/bstr-1.5.0/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/bstr-1.5.0/src/unicode/data/LICENSE-UNICODE",
   ]
 }
 
@@ -6138,8 +6139,10 @@ rust_library("half-v1_6_0") {
 
 license("handlebars-v4_3_5.license") {
   public_package_name = "handlebars"
-  license_files =
-      [ "//third_party/rust_crates/vendor/handlebars-4.3.5/LICENSE" ]
+  license_files = [
+    "//third_party/rust_crates/vendor/handlebars-4.3.5/LICENSE",
+    "//third_party/rust_crates/vendor/handlebars-4.3.5/wasm/LICENSE",
+  ]
 }
 
 rust_library("handlebars-v4_3_5") {
@@ -11940,6 +11943,7 @@ license("regex-v1_5_6.license") {
   license_files = [
     "//third_party/rust_crates/vendor/regex-1.5.6/LICENSE-APACHE",
     "//third_party/rust_crates/vendor/regex-1.5.6/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/regex-1.5.6/src/testdata/LICENSE",
   ]
 }
 
@@ -11987,8 +11991,11 @@ rust_library("regex-v1_5_6") {
 
 license("regex-automata-v0_1_9.license") {
   public_package_name = "regex_automata"
-  license_files =
-      [ "//third_party/rust_crates/ask2patch/regex-automata/LICENSE-MIT" ]
+  license_files = [
+    "//third_party/rust_crates/ask2patch/regex-automata/LICENSE-MIT",
+    "//third_party/rust_crates/ask2patch/regex-automata/data/fowler-tests/LICENSE",
+    "//third_party/rust_crates/ask2patch/regex-automata/data/tests/fowler/LICENSE",
+  ]
 }
 
 rust_library("regex-automata-v0_1_9") {
@@ -12023,6 +12030,7 @@ license("regex-syntax-v0_6_26.license") {
   license_files = [
     "//third_party/rust_crates/vendor/regex-syntax-0.6.26/LICENSE-APACHE",
     "//third_party/rust_crates/vendor/regex-syntax-0.6.26/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/regex-syntax-0.6.26/src/unicode_tables/LICENSE-UNICODE",
   ]
 }
 
@@ -12126,7 +12134,10 @@ rust_library("rfc6979-v0_3_1") {
 
 license("ring-v0_16_16.license") {
   public_package_name = "ring"
-  license_files = [ "//third_party/rust_crates/vendor/ring-0.16.16/LICENSE" ]
+  license_files = [
+    "//third_party/rust_crates/vendor/ring-0.16.16/LICENSE",
+    "//third_party/rust_crates/vendor/ring-0.16.16/third_party/fiat/LICENSE",
+  ]
 }
 
 rust_library("ring-v0_16_16") {
@@ -13465,7 +13476,10 @@ rust_library("serde_json-v1_0_87") {
 
 license("serde_json5-v0_1_0.license") {
   public_package_name = "serde_json5"
-  license_files = [ "//third_party/rust_crates/mirrors/serde_json5/LICENSE" ]
+  license_files = [
+    "//third_party/rust_crates/mirrors/serde_json5/LICENSE",
+    "//third_party/rust_crates/mirrors/serde_json5/third_party/LICENSE",
+  ]
 }
 
 rust_library("serde_json5-v0_1_0") {
@@ -16795,7 +16809,10 @@ rust_library("uuid-v1_1_2") {
 
 license("valico-v2_4_2.license") {
   public_package_name = "valico"
-  license_files = [ "//third_party/rust_crates/forks/valico/LICENSE" ]
+  license_files = [
+    "//third_party/rust_crates/forks/valico/LICENSE",
+    "//third_party/rust_crates/forks/valico/tests/schema/JSON-Schema-Test-Suite/LICENSE",
+  ]
 }
 
 rust_library("valico-v2_4_2") {
@@ -17345,7 +17362,10 @@ rust_library("web-sys-v0_3_40") {
 
 license("webpki-v0_21_0.license") {
   public_package_name = "webpki"
-  license_files = [ "//third_party/rust_crates/vendor/webpki-0.21.0/LICENSE" ]
+  license_files = [
+    "//third_party/rust_crates/vendor/webpki-0.21.0/LICENSE",
+    "//third_party/rust_crates/vendor/webpki-0.21.0/third-party/chromium/LICENSE",
+  ]
 }
 
 rust_library("webpki-v0_21_0") {
@@ -17658,7 +17678,11 @@ rust_library("xml-rs-v0_8_0") {
 
 license("zerocopy-v0_7_11.license") {
   public_package_name = "zerocopy"
-  license_files = [ "//third_party/rust_crates/vendor/zerocopy-0.7.11/LICENSE" ]
+  license_files = [
+    "//third_party/rust_crates/vendor/zerocopy-0.7.11/LICENSE",
+    "//third_party/rust_crates/vendor/zerocopy-0.7.11/src/third_party/rust/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/zerocopy-0.7.11/src/third_party/rust/LICENSE-MIT",
+  ]
 }
 
 rust_library("zerocopy-v0_7_11") {

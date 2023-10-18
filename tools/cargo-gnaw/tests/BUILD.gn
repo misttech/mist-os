@@ -174,6 +174,7 @@ if (is_host) {
       "simple_deps/vendor/anyhow/LICENSE-MIT",
       "simple_deps/vendor/anyhow/README.md",
       "simple_deps/vendor/anyhow/build.rs",
+      "simple_deps/vendor/anyhow/src/LICENSE-FOR-TESTING",
       "simple_deps/vendor/anyhow/src/backtrace.rs",
       "simple_deps/vendor/anyhow/src/chain.rs",
       "simple_deps/vendor/anyhow/src/context.rs",

@@ -18,6 +18,7 @@ license("anyhow-v1_0_27.license") {
   license_files = [
     "//simple_deps/vendor/anyhow/LICENSE-APACHE",
     "//simple_deps/vendor/anyhow/LICENSE-MIT",
+    "//simple_deps/vendor/anyhow/src/LICENSE-FOR-TESTING",
   ]
 }
 
@@ -46,6 +47,15 @@ rust_library("anyhow-v1_0_27") {
   applicable_licenses = [ ":anyhow-v1_0_27.license" ]
 }
 
+license("simple_deps-v0_1_0.license") {
+  public_package_name = "simple_deps"
+  license_files = [
+    "//simple_deps/vendor/anyhow/LICENSE-APACHE",
+    "//simple_deps/vendor/anyhow/LICENSE-MIT",
+    "//simple_deps/vendor/anyhow/src/LICENSE-FOR-TESTING",
+  ]
+}
+
 rust_library("simple_deps-v0_1_0") {
   crate_name = "simple_deps"
   crate_root = "//simple_deps/src/lib.rs"
@@ -65,5 +75,5 @@ rust_library("simple_deps-v0_1_0") {
 
   visibility = [ ":*" ]
 
-  applicable_licenses = []
+  applicable_licenses = [ ":simple_deps-v0_1_0.license" ]
 }
