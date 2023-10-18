@@ -1,4 +1,4 @@
-`# Fuchsia Bazel SDK Tests
+# Fuchsia Bazel SDK Tests
 
 This directory contains tests meant to test the Fuchsia Bazel SDK.
 These currently require to be in a Fuchsia checkout.
