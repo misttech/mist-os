@@ -6,7 +6,6 @@
 #define SRC_DEVICES_BIN_DRIVER_MANAGER_COMPOSITE_NODE_SPEC_COMPOSITE_NODE_SPEC_MANAGER_H_
 
 #include <fidl/fuchsia.driver.framework/cpp/wire.h>
-#include <fidl/fuchsia.driver.index/cpp/fidl.h>
 #include <lib/zx/result.h>
 
 #include <unordered_map>
@@ -14,12 +13,12 @@
 #include "src/devices/bin/driver_manager/composite_node_spec/composite_manager_bridge.h"
 
 struct CompositeNodeAndDriver {
-  fuchsia_driver_index::wire::MatchedDriverInfo driver;
+  fuchsia_driver_framework::wire::CompositeDriverInfo driver;
   DeviceOrNode node;
 };
 
 struct BindSpecResult {
-  std::vector<fuchsia_driver_index::wire::MatchedCompositeNodeSpecInfo> bound_spec_infos;
+  fidl::VectorView<fuchsia_driver_framework::wire::CompositeParent> bound_composite_parents;
   std::vector<CompositeNodeAndDriver> completed_node_and_drivers;
 };
 
@@ -44,20 +43,22 @@ class CompositeNodeSpecManager {
   // on the implementation, completed_node_and_drivers will return an empty vector or a list of
   // completed CompositeNodeAndDrivers.
   zx::result<BindSpecResult> BindParentSpec(
-      fuchsia_driver_index::wire::MatchedCompositeNodeParentInfo match_info,
+      fidl::AnyArena& arena,
+      fidl::VectorView<fuchsia_driver_framework::wire::CompositeParent> composite_parents,
       const DeviceOrNode& device_or_node, bool enable_multibind = false);
 
-  // Same as |BindParentSpec| but it takes in a natural typed |match_info|.
+  // Same as |BindParentSpec| but it takes in a natural typed |composite_parents|.
   // Does not return the |BindSpecResult| like the wire type variant as the data in
   // |BindSpecResult| will not outlive the call since the allocator used for them is
   // local to this call.
-  zx::result<> BindParentSpec(fuchsia_driver_index::MatchedCompositeNodeParentInfo match_info,
-                              const DeviceOrNode& device_or_node, bool enable_multibind = false);
+  zx::result<> BindParentSpec(
+      std::vector<fuchsia_driver_framework::CompositeParent> composite_parents,
+      const DeviceOrNode& device_or_node, bool enable_multibind = false);
 
   void Rebind(std::string spec_name, std::optional<std::string> restart_driver_url_suffix,
               fit::callback<void(zx::result<>)> rebind_spec_completer);
 
-  std::vector<fuchsia_driver_development::wire::CompositeInfo> GetCompositeInfo(
+  std::vector<fuchsia_driver_development::wire::CompositeNodeInfo> GetCompositeInfo(
       fidl::AnyArena& arena) const;
 
   // Exposed for testing only.

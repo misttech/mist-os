@@ -69,7 +69,6 @@ rustc_library("lib") {
             ] + _host_or_test
   }
   test_deps = [
-                "//sdk/fidl/fuchsia.driver.index:fuchsia.driver.index_rust",
                 "//sdk/fidl/fuchsia.input:fuchsia.input_rust",
                 "//src/lib/fuchsia",
                 "//src/lib/fuchsia-async",

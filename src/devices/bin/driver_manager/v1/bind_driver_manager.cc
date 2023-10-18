@@ -18,7 +18,8 @@ BindDriverManager::~BindDriverManager() {}
 
 zx_status_t BindDriverManager::BindDriverToDevice(const MatchedDriver& driver,
                                                   const fbl::RefPtr<Device>& dev) {
-  if (auto info = std::get_if<fdi::MatchedCompositeNodeParentInfo>(&driver); info) {
+  if (auto info = std::get_if<std::vector<fuchsia_driver_framework::CompositeParent>>(&driver);
+      info) {
     auto device_ptr = std::shared_ptr<DeviceV1Wrapper>(new DeviceV1Wrapper{
         .device = dev,
     });
@@ -212,7 +213,7 @@ zx_status_t BindDriverManager::MatchAndBindCompositeNodeSpec(const fbl::RefPtr<D
 
   auto matched_drivers = std::move(result.value());
   for (auto driver : matched_drivers) {
-    if (!std::holds_alternative<fdi::MatchedCompositeNodeParentInfo>(driver)) {
+    if (!std::holds_alternative<std::vector<fuchsia_driver_framework::CompositeParent>>(driver)) {
       continue;
     }
 
@@ -222,7 +223,8 @@ zx_status_t BindDriverManager::MatchAndBindCompositeNodeSpec(const fbl::RefPtr<D
 
     bool is_composite_multibind = dev->flags & DEV_CTX_ALLOW_MULTI_COMPOSITE;
     auto bind_result = coordinator_->composite_node_spec_manager().BindParentSpec(
-        std::get<fdi::MatchedCompositeNodeParentInfo>(driver), device_ptr, is_composite_multibind);
+        std::get<std::vector<fuchsia_driver_framework::CompositeParent>>(driver), device_ptr,
+        is_composite_multibind);
     if (bind_result.is_error() && bind_result.status_value() != ZX_ERR_NOT_FOUND) {
       LOGF(WARNING, "Failed to bind parent: %s", bind_result.status_string());
     }

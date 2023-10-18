@@ -173,7 +173,7 @@ void BindManager::BindInternal(BindRequest request,
   }
 
   // Check the DFv1 composites first.
-  std::vector<fdd::CompositeInfo> bound_legacy_composite_info =
+  std::vector<fdd::LegacyCompositeParent> bound_legacy_composite_info =
       legacy_composite_manager_.BindNode(node);
   if (!bound_legacy_composite_info.empty()) {
     bind_node_set_.RemoveOrphanedNode(node->MakeComponentMoniker());
@@ -217,7 +217,7 @@ void BindManager::BindInternal(BindRequest request,
 
 void BindManager::OnMatchDriverCallback(
     BindRequest request, fidl::WireUnownedResult<fdi::DriverIndex::MatchDriver>& result,
-    const std::vector<fdd::CompositeInfo>& bound_legacy_composite_infos,
+    const std::vector<fdd::LegacyCompositeParent>& bound_legacy_composite_infos,
     BindMatchCompleteCallback match_complete_callback) {
   auto report_no_bind = fit::defer([&request, &match_complete_callback]() mutable {
     if (request.tracker) {
@@ -258,9 +258,9 @@ void BindManager::OnMatchDriverCallback(
         ZX_ASSERT(bound_legacy_composite_infos.empty());
         request.tracker->ReportSuccessfulBind(node_moniker, bind_result.driver_url());
 
-      } else if (bind_result.is_composite_specs()) {
+      } else if (bind_result.is_composite_parents()) {
         request.tracker->ReportSuccessfulBind(node_moniker, bound_legacy_composite_infos,
-                                              bind_result.composite_specs());
+                                              bind_result.composite_parents());
       } else {
         LOGF(ERROR, "Unknown bind result type for %s.", node_moniker.c_str());
       }
@@ -293,12 +293,12 @@ BindResult BindManager::BindNodeToResult(
     return BindResult();
   }
 
-  auto& matched_driver = result->value()->driver;
-  if (composite_only && !matched_driver.is_parent_spec()) {
+  auto& matched_driver = result->value();
+  if (composite_only && !matched_driver->is_composite_parents()) {
     return BindResult();
   }
 
-  if (!matched_driver.is_driver() && !matched_driver.is_parent_spec()) {
+  if (!matched_driver->is_driver() && !matched_driver->is_composite_parents()) {
     LOGF(WARNING,
          "Failed to match Node '%s', the MatchedDriver is not a normal driver or a "
          "parent spec.",
@@ -306,30 +306,26 @@ BindResult BindManager::BindNodeToResult(
     return BindResult();
   }
 
-  if (matched_driver.is_parent_spec() && !matched_driver.parent_spec().has_specs()) {
-    LOGF(WARNING,
-         "Failed to match Node '%s', the MatchedDriver is missing the composite node specs in the "
-         "parent spec.",
-         node.name().c_str());
-    return BindResult();
-  }
-
-  if (matched_driver.is_parent_spec()) {
-    auto result = BindNodeToSpec(node, matched_driver.parent_spec());
+  if (matched_driver->is_composite_parents()) {
+    fidl::Arena arena;
+    auto result = BindNodeToSpec(arena, node, matched_driver->composite_parents());
     if (!result.is_ok()) {
       return BindResult();
     }
-    return BindResult(result.value());
+
+    auto owned_result = fidl::ToNatural(result.value());
+    ZX_ASSERT(owned_result.has_value());
+    return BindResult(owned_result.value());
   }
 
-  ZX_ASSERT(matched_driver.is_driver());
+  ZX_ASSERT(matched_driver->is_driver());
 
   // If the node is already part of a composite, it should not bind to a driver.
   if (bind_node_set_.MultibindContains(node.MakeComponentMoniker())) {
     return BindResult();
   }
 
-  auto start_result = bridge_->StartDriver(node, matched_driver.driver());
+  auto start_result = bridge_->StartDriver(node, matched_driver->driver());
   if (start_result.is_error()) {
     LOGF(ERROR, "Failed to start driver '%s': %s", node.name().c_str(),
          zx_status_get_string(start_result.error_value()));
@@ -340,14 +336,14 @@ BindResult BindManager::BindNodeToResult(
   return BindResult(start_result.value());
 }
 
-zx::result<std::vector<fdi::wire::MatchedCompositeNodeSpecInfo>> BindManager::BindNodeToSpec(
-    Node& node, fdi::wire::MatchedCompositeNodeParentInfo parents) {
+zx::result<CompositeParents> BindManager::BindNodeToSpec(fidl::AnyArena& arena, Node& node,
+                                                         CompositeParents parents) {
   if (node.can_multibind_composites()) {
     bind_node_set_.AddOrMoveMultibindNode(node);
   }
 
-  auto result =
-      bridge_->BindToParentSpec(parents, node.weak_from_this(), node.can_multibind_composites());
+  auto result = bridge_->BindToParentSpec(arena, parents, node.weak_from_this(),
+                                          node.can_multibind_composites());
   if (result.is_error()) {
     if (result.error_value() != ZX_ERR_NOT_FOUND) {
       LOGF(ERROR, "Failed to bind node '%s' to any of the matched parent specs.",
@@ -360,7 +356,7 @@ zx::result<std::vector<fdi::wire::MatchedCompositeNodeSpecInfo>> BindManager::Bi
     auto weak_composite_node = std::get<std::weak_ptr<dfv2::Node>>(composite.node);
     std::shared_ptr composite_node = weak_composite_node.lock();
     ZX_ASSERT(composite_node);
-    auto start_result = bridge_->StartDriver(*composite_node, composite.driver);
+    auto start_result = bridge_->StartDriver(*composite_node, composite.driver.driver_info());
     if (start_result.is_error()) {
       LOGF(ERROR, "Failed to start driver '%s': %s", node.name().c_str(),
            zx_status_get_string(start_result.error_value()));
@@ -369,7 +365,7 @@ zx::result<std::vector<fdi::wire::MatchedCompositeNodeSpecInfo>> BindManager::Bi
     composite_node->OnBind();
   }
 
-  return zx::ok(result.value().bound_spec_infos);
+  return zx::ok(result.value().bound_composite_parents);
 }
 
 void BindManager::ProcessPendingBindRequests() {
@@ -457,7 +453,7 @@ void BindManager::RecordInspect(inspect::Inspector& inspector) const {
   inspector.GetRoot().Record(std::move(dfv1_composites));
 }
 
-std::vector<fdd::wire::CompositeInfo> BindManager::GetCompositeListInfo(
+std::vector<fdd::wire::CompositeNodeInfo> BindManager::GetCompositeListInfo(
     fidl::AnyArena& arena) const {
   // TODO(fxb/119947): Add composite node specs to the list.
   return legacy_composite_manager_.GetCompositeListInfo(arena);

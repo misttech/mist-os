@@ -13,7 +13,6 @@ use {
     futures::join,
     std::{
         collections::{HashMap, HashSet},
-        fmt::Write as OtherWrite,
         io::Write,
         iter::FromIterator,
     },
@@ -38,33 +37,15 @@ pub async fn list(
         // Await the futures concurrently.
         let (driver_info, device_info) = join!(driver_info, device_info);
 
-        let loaded_driver_set: HashSet<String> =
-            HashSet::from_iter(device_info?.into_iter().filter_map(|device_info| {
-                let device: Device = device_info.into();
-                let key = match device {
-                    Device::V1(ref info) => &info.0.bound_driver_libname,
-                    Device::V2(ref info) => {
-                        // DFv2 nodes do not have a bound driver libname so the
-                        // bound driver URL is selected instead.
-                        &info.0.bound_driver_url
-                    }
-                };
-                match key {
-                    Some(key) => Some(key.to_owned()),
-                    None => None,
-                }
-            }));
+        let loaded_driver_set: HashSet<String> = HashSet::from_iter(
+            device_info?.into_iter().filter_map(|device_info| device_info.bound_driver_url),
+        );
 
         // Filter the driver list by the hash set.
         driver_info?
             .into_iter()
             .filter(|driver| {
                 let mut loaded = false;
-                if let Some(ref libname) = driver.libname {
-                    if loaded_driver_set.contains(libname) {
-                        loaded = true;
-                    }
-                }
                 if let Some(ref url) = driver.url {
                     if loaded_driver_set.contains(url) {
                         loaded = true
@@ -88,14 +69,11 @@ pub async fn list(
 
         let mut driver_to_devices = HashMap::<String, Vec<String>>::new();
         for device in device_info.into_iter() {
+            let driver = device.bound_driver_url.clone();
             let device: Device = device.into();
-            let (driver, device_name) = match device {
-                Device::V1(ref info) => (&info.0.bound_driver_libname, &info.0.topological_path),
-                Device::V2(ref info) => {
-                    // DFv2 nodes do not have a bound driver libname so the
-                    // bound driver URL is selected instead.
-                    (&info.0.bound_driver_url, &info.0.moniker)
-                }
+            let device_name = match device {
+                Device::V1(ref info) => &info.0.topological_path,
+                Device::V2(ref info) => &info.0.moniker,
             };
             if let (Some(driver), Some(device_name)) = (driver, device_name) {
                 driver_to_devices
@@ -113,12 +91,6 @@ pub async fn list(
             if let Some(url) = driver.url {
                 writeln!(writer, "{0: <10}: {1}", "URL", url)?;
                 if let Some(devices) = driver_to_devices.get(&url) {
-                    writeln!(writer, "{0: <10}:\n  {1}", "Devices", devices.join("\n  "))?;
-                }
-            }
-            if let Some(libname) = driver.libname {
-                writeln!(writer, "{0: <10}: {1}", "Driver", libname)?;
-                if let Some(devices) = driver_to_devices.get(&libname) {
                     writeln!(writer, "{0: <10}:\n  {1}", "Devices", devices.join("\n  "))?;
                 }
             }
@@ -144,25 +116,9 @@ pub async fn list(
                 }
                 writeln!(writer, "]")?;
             }
-            if let Some(package_hash) = driver.package_hash {
-                let mut merkle_root = String::with_capacity(package_hash.merkle_root.len() * 2);
-                for byte in package_hash.merkle_root.iter() {
-                    write!(merkle_root, "{:02x}", byte)?;
-                }
-                writeln!(writer, "{0: <10}: {1}", "Merkle Root", &merkle_root)?;
-            }
-            match driver.bind_rules {
-                Some(fdd::BindRulesBytecode::BytecodeV1(bytecode)) => {
-                    writeln!(writer, "{0: <10}: {1}", "Bytecode Version", 1)?;
-                    writeln!(
-                        writer,
-                        "{0: <10}({1} bytes): {2:?}",
-                        "Bytecode:",
-                        bytecode.len(),
-                        bytecode
-                    )?;
-                }
-                Some(fdd::BindRulesBytecode::BytecodeV2(bytecode)) => {
+            // TODO(b/303084353): Once the merkle_root is available, write it here.
+            match driver.bind_rules_bytecode {
+                Some(bytecode) => {
                     writeln!(writer, "{0: <10}: {1}", "Bytecode Version", 2)?;
                     writeln!(writer, "{0: <10}({1} bytes): ", "Bytecode:", bytecode.len())?;
                     match dump_bind_rules(bytecode.clone()) {
@@ -183,11 +139,11 @@ pub async fn list(
     } else {
         for driver in driver_info {
             if let Some(name) = driver.name {
-                let libname_or_url = driver.libname.or(driver.url).unwrap_or("".to_string());
-                writeln!(writer, "{:<20}: {}", name, libname_or_url)?;
+                let url = driver.url.unwrap_or_default();
+                writeln!(writer, "{:<20}: {}", name, url)?;
             } else {
-                let url_or_libname = driver.url.or(driver.libname).unwrap_or("".to_string());
-                writeln!(writer, "{}", url_or_libname)?;
+                let url = driver.url.unwrap_or_default();
+                writeln!(writer, "{}", url)?;
             }
         }
     }
@@ -200,7 +156,7 @@ mod tests {
         super::*,
         argh::FromArgs,
         fidl::endpoints::ServerEnd,
-        fidl_fuchsia_driver_index as fdi, fidl_fuchsia_pkg as fpkg, fuchsia_async as fasync,
+        fidl_fuchsia_driver_framework as fdf, fuchsia_async as fasync,
         futures::{
             future::{Future, FutureExt},
             stream::StreamExt,
@@ -241,7 +197,7 @@ mod tests {
     }
 
     async fn run_driver_info_iterator_server(
-        mut driver_infos: Vec<fdd::DriverInfo>,
+        mut driver_infos: Vec<fdf::DriverInfo>,
         iterator: ServerEnd<fdd::DriverInfoIteratorMarker>,
     ) -> Result<()> {
         let mut iterator =
@@ -291,25 +247,17 @@ mod tests {
                     iterator,
                     control_handle: _,
                 } => run_driver_info_iterator_server(
-                    vec![fdd::DriverInfo {
-                        libname: Some("foo.so".to_owned()),
+                    vec![fdf::DriverInfo {
                         name: Some("foo".to_owned()),
                         url: Some("fuchsia-pkg://fuchsia.com/foo-package#meta/foo.cm".to_owned()),
-                        bind_rules: None,
-                        package_type: Some(fdi::DriverPackageType::Base),
-                        package_hash: Some(fpkg::BlobId {
-                            merkle_root: [
-                                1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
-                                20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
-                            ],
-                        }),
+                        package_type: Some(fdf::DriverPackageType::Base),
                         device_categories: Some(vec![
-                            fdi::DeviceCategory {
+                            fdf::DeviceCategory {
                                 category: Some("connectivity".to_string()),
                                 subcategory: Some("ethernet".to_string()),
                                 ..Default::default()
                             },
-                            fdi::DeviceCategory {
+                            fdf::DeviceCategory {
                                 category: Some("usb".to_string()),
                                 subcategory: None,
                                 ..Default::default()
@@ -351,9 +299,7 @@ mod tests {
 URL       : fuchsia-pkg://fuchsia.com/foo-package#meta/foo.cm
 Devices   :
   dev.sys.foo
-Driver    : foo.so
 Device Categories: [connectivity::ethernet, usb]
-Merkle Root: 0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20
 Bytecode Version: Unknown
 
 "#

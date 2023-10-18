@@ -4,94 +4,16 @@
 library fuchsia.driver.index;
 
 using fuchsia.driver.framework;
-using fuchsia.url;
 
 using zx;
 
-/// The type of Fuchsia package that a driver component is inside of.
-type DriverPackageType = flexible enum : uint8 {
-    /// BOOT packages are inside the Zircon boot image.
-    BOOT = 0;
-    /// BASE packages are included in the Fuchsia build as static local packages.
-    BASE = 1;
-    /// CACHED packages are BASE packages that can be updated during a resolve.
-    CACHED = 2;
-    /// UNIVERSE packages get onto the device only when resolved by the package resolver.
-    UNIVERSE = 3;
-};
-
-type DeviceCategory = table {
-    1: category string:MAX;
-    2: subcategory string:MAX;
-};
-
-/// Information for a driver matched by the driver index. This is used by
-/// normal and composite drivers.
-type MatchedDriverInfo = table {
-    /// URL of the driver component.
-    1: url string:fuchsia.url.MAX_URL_LENGTH;
-
-    /// URL of the driver library. This should only be used by DriverManager
-    /// before Drivers-As-Components.
-    2: driver_url string:fuchsia.url.MAX_URL_LENGTH;
-
-    /// If this is true then the driver should be colocated in its parent's DriverHost.
-    3: colocate bool;
-
-    /// The type of package this driver is in.
-    4: package_type DriverPackageType;
-
-    /// If this is true then the driver is a fallback driver.
-    5: is_fallback bool;
-
-    /// Device categories
-    6: device_categories vector<DeviceCategory>:MAX;
-};
-
-/// Information for a composite driver matched by the driver index.
-type MatchedCompositeInfo = table {
-    /// The name of the composite device.
-    1: composite_name string:MAX;
-
-    /// Information of the driver info.
-    2: driver_info MatchedDriverInfo;
-};
-
-/// Information for a composite node spec that contains a matched node.
-type MatchedCompositeNodeSpecInfo = table {
-    /// The composite node spec's name.
-    1: name string:MAX;
-
-    /// The node's index in its composite node spec.
-    2: node_index uint32;
-
-    /// The composite info of the driver that matches to the transform of this composite node spec.
-    3: composite MatchedCompositeInfo;
-
-    /// Total number of nodes in the composite node spec.
-    4: num_nodes uint32;
-
-    /// A list of all the node names for this composite node spec.
-    /// These are ordered according to index.
-    5: node_names vector<string:MAX>:MAX;
-
-    /// The primary node index.
-    6: primary_index uint32;
-};
-
-/// Information for a composite node spec node that's matched by the driver index.
-type MatchedCompositeNodeParentInfo = table {
-    /// A list of composite node specs that contain the matched node.
-    1: specs vector<MatchedCompositeNodeSpecInfo>:MAX;
-};
-
 /// Driver matched by the driver index.
-type MatchedDriver = flexible union {
+type MatchDriverResult = flexible union {
     /// Information for a normal driver.
-    1: driver MatchedDriverInfo;
+    1: driver fuchsia.driver.framework.DriverInfo;
 
     /// Information for a parent spec.
-    2: parent_spec MatchedCompositeNodeParentInfo;
+    2: composite_parents vector<fuchsia.driver.framework.CompositeParent>:MAX;
 };
 
 type MatchDriverArgs = table {
@@ -112,9 +34,7 @@ closed protocol DriverIndex {
     /// Match a set of device arguments to a driver package URL.
     strict MatchDriver(struct {
         args MatchDriverArgs;
-    }) -> (struct {
-        driver MatchedDriver;
-    }) error zx.Status;
+    }) -> (MatchDriverResult) error zx.Status;
 
     /// Hanging get function that replies when a boot or base driver is loaded
     /// into the Driver Index.

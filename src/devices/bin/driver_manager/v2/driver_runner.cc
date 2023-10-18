@@ -19,9 +19,11 @@
 #include <zircon/status.h>
 
 #include <forward_list>
+#include <queue>
 #include <random>
 #include <stack>
 
+#include "src/devices/bin/driver_manager/v2/composite_node_spec_v2.h"
 #include "src/devices/lib/log/log.h"
 #include "src/lib/fxl/strings/join_strings.h"
 #include "src/storage/lib/vfs/cpp/service.h"
@@ -142,14 +144,14 @@ fidl::StringView CollectionName(Collection collection) {
       return "full-pkg-drivers";
   }
 }
-Collection ToCollection(fdi::DriverPackageType package) {
+Collection ToCollection(fdf::DriverPackageType package) {
   switch (package) {
-    case fdi::DriverPackageType::kBoot:
+    case fdf::DriverPackageType::kBoot:
       return Collection::kBoot;
-    case fdi::DriverPackageType::kBase:
+    case fdf::DriverPackageType::kBase:
       return Collection::kPackage;
-    case fdi::DriverPackageType::kCached:
-    case fdi::DriverPackageType::kUniverse:
+    case fdf::DriverPackageType::kCached:
+    case fdf::DriverPackageType::kUniverse:
       return Collection::kFullPackage;
     default:
       return Collection::kNone;
@@ -186,7 +188,7 @@ void PerformBFS(const std::shared_ptr<Node>& starting_node,
 
 }  // namespace
 
-Collection ToCollection(const Node& node, fdi::DriverPackageType package_type) {
+Collection ToCollection(const Node& node, fdf::DriverPackageType package_type) {
   Collection collection = ToCollection(package_type);
   for (const auto& parent : node.parents()) {
     auto parent_ptr = parent.lock();
@@ -304,7 +306,7 @@ fpromise::promise<inspect::Inspector> DriverRunner::Inspect() const {
   return fpromise::make_ok_promise(inspector);
 }
 
-std::vector<fdd::wire::CompositeInfo> DriverRunner::GetCompositeListInfo(
+std::vector<fdd::wire::CompositeNodeInfo> DriverRunner::GetCompositeListInfo(
     fidl::AnyArena& arena) const {
   auto spec_composite_list = composite_node_spec_manager_.GetCompositeInfo(arena);
   auto list = bind_manager_.GetCompositeListInfo(arena);
@@ -326,9 +328,9 @@ void DriverRunner::PublishComponentRunner(component::OutgoingDirectory& outgoing
 }
 
 zx::result<> DriverRunner::StartRootDriver(std::string_view url) {
-  fdi::DriverPackageType package = cpp20::starts_with(url, kBootScheme)
-                                       ? fdi::DriverPackageType::kBoot
-                                       : fdi::DriverPackageType::kBase;
+  fdf::DriverPackageType package = cpp20::starts_with(url, kBootScheme)
+                                       ? fdf::DriverPackageType::kBoot
+                                       : fdf::DriverPackageType::kBase;
   return StartDriver(*root_node_, url, package);
 }
 
@@ -356,8 +358,9 @@ void DriverRunner::TryBindAllAvailable(NodeBindingInfoResultCallback result_call
 }
 
 zx::result<> DriverRunner::StartDriver(Node& node, std::string_view url,
-                                       fdi::DriverPackageType package_type) {
+                                       fdf::DriverPackageType package_type) {
   node.set_collection(ToCollection(node, package_type));
+  node.set_driver_package_type(package_type);
 
   std::weak_ptr node_weak = node.shared_from_this();
   runner_.StartDriverComponent(
@@ -455,7 +458,7 @@ bool DriverRunner::IsDriverHostValid(DriverHost* driver_host) const {
 }
 
 zx::result<std::string> DriverRunner::StartDriver(
-    Node& node, fuchsia_driver_index::wire::MatchedDriverInfo driver_info) {
+    Node& node, fuchsia_driver_framework::wire::DriverInfo driver_info) {
   if (!driver_info.has_url()) {
     LOGF(ERROR, "Failed to start driver for node '%s', the driver URL is missing",
          node.name().c_str());
@@ -463,7 +466,7 @@ zx::result<std::string> DriverRunner::StartDriver(
   }
 
   auto pkg_type =
-      driver_info.has_package_type() ? driver_info.package_type() : fdi::DriverPackageType::kBase;
+      driver_info.has_package_type() ? driver_info.package_type() : fdf::DriverPackageType::kBase;
   auto result = StartDriver(node, driver_info.url().get(), pkg_type);
   if (result.is_error()) {
     return result.take_error();
@@ -471,10 +474,12 @@ zx::result<std::string> DriverRunner::StartDriver(
   return zx::ok(std::string(driver_info.url().get()));
 }
 
-zx::result<BindSpecResult> DriverRunner::BindToParentSpec(
-    fuchsia_driver_index::wire::MatchedCompositeNodeParentInfo match_info, std::weak_ptr<Node> node,
-    bool enable_multibind) {
-  return this->composite_node_spec_manager_.BindParentSpec(match_info, node, enable_multibind);
+zx::result<BindSpecResult> DriverRunner::BindToParentSpec(fidl::AnyArena& arena,
+                                                          CompositeParents composite_parents,
+                                                          std::weak_ptr<Node> node,
+                                                          bool enable_multibind) {
+  return this->composite_node_spec_manager_.BindParentSpec(arena, composite_parents, node,
+                                                           enable_multibind);
 }
 
 void DriverRunner::RequestMatchFromDriverIndex(

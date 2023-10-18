@@ -604,8 +604,8 @@ zx_status_t Coordinator::AttemptBind(const MatchedDriverInfo matched_driver,
   }
 
   const bool use_full_resolver =
-      matched_driver.package_type == fuchsia_driver_index::DriverPackageType::kCached ||
-      matched_driver.package_type == fuchsia_driver_index::DriverPackageType::kUniverse;
+      matched_driver.package_type == fuchsia_driver_framework::DriverPackageType::kCached ||
+      matched_driver.package_type == fuchsia_driver_framework::DriverPackageType::kUniverse;
 
   const Driver* driver_ptr =
       driver_loader_.LoadDriverUrl(matched_driver.component_url, use_full_resolver);
@@ -699,7 +699,7 @@ zx_status_t Coordinator::AddCompositeNodeSpec(
 
   auto spec_result = composite_node_specs::CompositeNodeSpecV1::Create(
       CompositeNodeSpecCreateInfo{
-          .name = std::string(name.data()),
+          .name = std::string(name),
           .size = spec.parents.count(),
       },
       spec, *device_manager_);

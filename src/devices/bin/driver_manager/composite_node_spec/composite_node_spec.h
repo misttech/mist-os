@@ -37,10 +37,10 @@ class CompositeNodeSpec {
   // Returns ZX_ERR_ALREADY_BOUND if it's already bound. See BindParentImpl() for return type
   // details.
   zx::result<std::optional<DeviceOrNode>> BindParent(
-      fuchsia_driver_index::wire::MatchedCompositeNodeSpecInfo info,
+      fuchsia_driver_framework::wire::CompositeParent composite_parent,
       const DeviceOrNode& device_or_node);
 
-  virtual fuchsia_driver_development::wire::CompositeInfo GetCompositeInfo(
+  virtual fuchsia_driver_development::wire::CompositeNodeInfo GetCompositeInfo(
       fidl::AnyArena& arena) const = 0;
 
   // Remove the underlying composite node and unmatch all of its parents. Called for
@@ -59,7 +59,7 @@ class CompositeNodeSpec {
   // Otherwise, it returns std::nullopt. The lifetime of this node object is managed by
   // the parent nodes.
   virtual zx::result<std::optional<DeviceOrNode>> BindParentImpl(
-      fuchsia_driver_index::wire::MatchedCompositeNodeSpecInfo info,
+      fuchsia_driver_framework::wire::CompositeParent composite_parent,
       const DeviceOrNode& device_or_node) = 0;
 
   // Subclass implementation for Remove(). Subclasses are expected to remove the underlying

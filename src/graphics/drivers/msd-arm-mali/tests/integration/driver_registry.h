@@ -37,7 +37,7 @@ class RegisteredTestDriver {
       // Exactly one driver should be available, since the test doesn't work with 0 drivers, and
       // having both will clash because they have identical bind rules.
       ASSERT_EQ(first_driver_info->drivers().size(), 1u);
-      fuchsia_driver_development::DriverInfo& driver = first_driver_info->drivers()[0];
+      fuchsia_driver_framework::DriverInfo& driver = first_driver_info->drivers()[0];
       ASSERT_TRUE(driver.url().has_value());
 
       is_dfv2_ = driver.url() == kDFv2DriverManifestUrl;

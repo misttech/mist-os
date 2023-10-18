@@ -53,7 +53,7 @@ class NodeManager {
   }
 
   virtual zx::result<> StartDriver(Node& node, std::string_view url,
-                                   fuchsia_driver_index::DriverPackageType package_type) {
+                                   fuchsia_driver_framework::DriverPackageType package_type) {
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
@@ -261,6 +261,10 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
 
   const Collection& collection() const { return collection_; }
 
+  const fuchsia_driver_framework::DriverPackageType& driver_package_type() const {
+    return driver_package_type_;
+  }
+
   DevfsDevice& devfs_device() { return devfs_device_; }
 
   // Exposed for testing.
@@ -272,6 +276,11 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   bool can_multibind_composites() const { return can_multibind_composites_; }
 
   void set_collection(Collection collection) { collection_ = collection; }
+
+  void set_driver_package_type(fuchsia_driver_framework::DriverPackageType driver_package_type) {
+    driver_package_type_ = driver_package_type;
+  }
+
   void set_offers(std::vector<fuchsia_component_decl::wire::Offer> offers) {
     offers_ = std::move(offers);
   }
@@ -399,6 +408,7 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   std::vector<fuchsia_driver_framework::wire::NodeProperty> properties_;
 
   Collection collection_ = Collection::kNone;
+  fuchsia_driver_framework::DriverPackageType driver_package_type_;
   fit::nullable<DriverHost*> driver_host_;
 
   NodeState node_state_ = NodeState::kRunning;

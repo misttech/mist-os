@@ -23,13 +23,15 @@
 
 namespace {
 
-bool VerifyMatchedCompositeNodeParentInfo(fdi::wire::MatchedCompositeNodeParentInfo info) {
-  if (!info.has_specs() || info.specs().empty()) {
+bool VerifyMatchedCompositeNodeParentInfo(fidl::VectorView<fdf::wire::CompositeParent> info) {
+  if (info.empty()) {
     return false;
   }
 
-  for (auto& spec : info.specs()) {
-    if (!spec.has_name() || spec.name().empty() || !spec.has_node_index()) {
+  for (auto& spec : info) {
+    if (!spec.has_composite() || !spec.composite().has_spec() ||
+        !spec.composite().spec().has_name() || spec.composite().spec().name().empty() ||
+        !spec.has_index()) {
       return false;
     }
   }
@@ -203,24 +205,23 @@ const std::vector<MatchedDriver> DriverLoader::MatchPropertiesDriverIndex(
     return matched_drivers;
   }
 
-  const auto& driver = result->value()->driver;
-
-  if (driver.is_parent_spec()) {
-    if (!VerifyMatchedCompositeNodeParentInfo(driver.parent_spec())) {
+  const auto& match_driver_result = result->value();
+  if (match_driver_result->is_composite_parents()) {
+    if (!VerifyMatchedCompositeNodeParentInfo(match_driver_result->composite_parents())) {
       LOGF(ERROR,
            "DriverIndex: MatchDriverV1 response is missing fields in MatchedCompositeNodeSpecInfo");
       return matched_drivers;
     }
 
-    matched_drivers.push_back(fidl::ToNatural(driver.parent_spec()));
+    matched_drivers.push_back(fidl::ToNatural(match_driver_result->composite_parents()).value());
     return matched_drivers;
   }
 
-  ZX_ASSERT(driver.is_driver());
+  ZX_ASSERT(match_driver_result->is_driver());
 
   MatchedDriverInfo matched_driver_info = {};
 
-  auto fidl_driver_info = driver.driver();
+  auto fidl_driver_info = match_driver_result->driver();
   if (!fidl_driver_info.has_url()) {
     LOGF(ERROR, "DriverIndex: MatchDriversV1 response is missing url");
     return matched_drivers;
@@ -234,10 +235,10 @@ const std::vector<MatchedDriver> DriverLoader::MatchPropertiesDriverIndex(
     matched_driver_info.package_type = fidl_driver_info.package_type();
   }
 
-  // If we have a driver_url we are a DFv1 driver. Otherwise are are DFv2.
-  if (!fidl_driver_info.has_driver_url()) {
-    matched_driver_info.is_dfv2 = true;
+  if (fidl_driver_info.has_driver_framework_version()) {
+    matched_driver_info.is_dfv2 = fidl_driver_info.driver_framework_version() == 2;
   }
+
   if (fidl_driver_info.has_package_type()) {
     matched_driver_info.package_type = fidl_driver_info.package_type();
   }

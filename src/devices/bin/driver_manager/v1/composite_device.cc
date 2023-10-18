@@ -91,7 +91,7 @@ CompositeDevice::CompositeDevice(fbl::String name, fbl::Array<const zx_device_pr
                                  uint32_t fragments_count, uint32_t primary_fragment_index,
                                  std::optional<bool> legacy_colocate_flag,
                                  fbl::Array<std::unique_ptr<Metadata>> metadata,
-                                 Coordinator& coordinator, bool from_composite_node_spec)
+                                 Coordinator& coordinator)
     : name_(std::move(name)),
       properties_(std::move(properties)),
       str_properties_(std::move(str_properties)),
@@ -99,7 +99,6 @@ CompositeDevice::CompositeDevice(fbl::String name, fbl::Array<const zx_device_pr
       primary_fragment_index_(primary_fragment_index),
       legacy_colocate_flag_(legacy_colocate_flag),
       metadata_(std::move(metadata)),
-      from_composite_node_spec_(from_composite_node_spec),
       coordinator_(coordinator) {}
 
 CompositeDevice::~CompositeDevice() = default;
@@ -139,7 +138,7 @@ zx_status_t CompositeDevice::Create(std::string_view name,
   auto dev = std::make_unique<CompositeDevice>(
       std::move(name), std::move(properties), std::move(str_properties),
       comp_desc.fragments.count(), comp_desc.primary_fragment_index, comp_desc.spawn_colocated,
-      std::move(metadata), coordinator, false);
+      std::move(metadata), coordinator);
   for (uint32_t i = 0; i < comp_desc.fragments.count(); ++i) {
     const auto& fidl_fragment = comp_desc.fragments[i];
     size_t parts_count = fidl_fragment.parts.count();
@@ -168,27 +167,53 @@ zx_status_t CompositeDevice::Create(std::string_view name,
 }
 
 std::unique_ptr<CompositeDevice> CompositeDevice::CreateFromSpec(
-    CompositeNodeSpecInfo composite_info, fbl::Array<std::unique_ptr<Metadata>> metadata,
-    Coordinator& coordinator) {
-  uint32_t num_parents = static_cast<uint32_t>(composite_info.parent_names.size());
+    fuchsia_driver_framework::CompositeInfo composite_info,
+    fbl::Array<std::unique_ptr<Metadata>> metadata, Coordinator& coordinator) {
+  auto& matched_driver = composite_info.matched_driver();
+  ZX_ASSERT(matched_driver.has_value());
+  auto& composite_driver = matched_driver.value().composite_driver();
+  ZX_ASSERT(composite_driver.has_value());
+  auto& driver_info = composite_driver.value().driver_info();
+  ZX_ASSERT(driver_info.has_value());
+  auto& parent_names = matched_driver.value().parent_names();
+  ZX_ASSERT(parent_names.has_value());
+  auto& spec = composite_info.spec();
+  ZX_ASSERT(spec.has_value());
+  auto& spec_name = spec.value().name();
+  ZX_ASSERT(spec_name.has_value());
+  auto& primary_index = matched_driver.value().primary_parent_index();
+  auto& url = driver_info.value().url();
+  ZX_ASSERT(url.has_value());
+
+  uint32_t num_parents = static_cast<uint32_t>(parent_names.value().size());
 
   auto dev = std::make_unique<CompositeDevice>(
-      fbl::String(composite_info.composite_name), fbl::Array<const zx_device_prop_t>(),
-      fbl::Array<const StrProperty>(), num_parents, composite_info.primary_index, std::nullopt,
-      std::move(metadata), coordinator, true);
+      fbl::String(spec_name.value()), fbl::Array<const zx_device_prop_t>(),
+      fbl::Array<const StrProperty>(), num_parents, primary_index.value_or(0), std::nullopt,
+      std::move(metadata), coordinator);
 
   for (uint32_t i = 0; i < num_parents; ++i) {
-    std::string name = composite_info.parent_names[i];
-    auto fragment = std::make_unique<CompositeDeviceFragment>(dev.get(), std::string(name), i,
+    std::string& parent_name = parent_names.value().at(i);
+    auto fragment = std::make_unique<CompositeDeviceFragment>(dev.get(), parent_name, i,
                                                               fbl::Array<const zx_bind_inst_t>());
     dev->fragments_.push_back(std::move(fragment));
   }
-  dev->driver_.emplace(composite_info.driver);
+
+  MatchedDriverInfo matched_driver_info{
+      .colocate = driver_info.value().colocate().value_or(false),
+      .is_dfv2 = driver_info.value().driver_framework_version().value_or(1) == 2,
+      .is_fallback = driver_info.value().is_fallback().value_or(false),
+      .package_type = driver_info.value().package_type().value_or(
+          fuchsia_driver_framework::DriverPackageType::kBase),
+      .component_url = url.value(),
+  };
+  dev->driver_.emplace(matched_driver_info);
+  dev->composite_info_.emplace(std::move(composite_info));
   return dev;
 }
 
 bool CompositeDevice::IsFragmentMatch(const fbl::RefPtr<Device>& dev, size_t* index_out) const {
-  if (from_composite_node_spec_) {
+  if (FromCompositeNodeSpec()) {
     return false;
   }
 
@@ -226,7 +251,7 @@ bool CompositeDevice::IsFragmentMatch(const fbl::RefPtr<Device>& dev, size_t* in
 
 zx::result<> CompositeDevice::MatchDriverToComposite() {
   ZX_ASSERT(!driver_.has_value());
-  ZX_ASSERT(!from_composite_node_spec_);
+  ZX_ASSERT(!FromCompositeNodeSpec());
 
   auto match_result = coordinator_.bind_driver_manager().MatchCompositeDevice(
       *this, DriverLoader::MatchDeviceConfig{});
@@ -243,7 +268,7 @@ zx::result<> CompositeDevice::MatchDriverToComposite() {
 }
 
 zx_status_t CompositeDevice::TryMatchBindFragments(const fbl::RefPtr<Device>& dev) {
-  if (from_composite_node_spec_) {
+  if (FromCompositeNodeSpec()) {
     return ZX_OK;
   }
 
@@ -471,61 +496,88 @@ void CompositeDevice::Remove() {
   driver_host_ = nullptr;
 }
 
-fdd::wire::CompositeInfo CompositeDevice::GetCompositeInfo(fidl::AnyArena& arena) const {
-  auto composite_info = fdd::wire::CompositeInfo::Builder(arena)
-                            .name(fidl::StringView(arena, name_.c_str()))
-                            .primary_index(primary_fragment_index_);
+fdd::wire::CompositeNodeInfo CompositeDevice::GetCompositeInfo(fidl::AnyArena& arena) const {
+  if (FromCompositeNodeSpec()) {
+    return GetRegularCompositeInfo(arena);
+  }
+
+  return GetLegacyCompositeInfo(arena);
+}
+
+TopologicalInfo CompositeDevice::GetTopologicalInfo(fidl::AnyArena& arena) const {
+  fidl::VectorView<fidl::StringView> parent_topological_paths(arena, fragments_count_);
+  uint32_t index = 0;
+  for (auto& fragment : fragments_) {
+    if (fragment.IsBound()) {
+      parent_topological_paths[index++] =
+          fidl::StringView(arena, fragment.bound_device()->MakeTopologicalPath());
+      continue;
+    }
+
+    parent_topological_paths[index++] = fidl::StringView();
+  }
+
+  return TopologicalInfo{.path = fidl::StringView(arena, device_->MakeTopologicalPath()),
+                         .parent_paths = parent_topological_paths};
+}
+
+fdd::wire::CompositeNodeInfo CompositeDevice::GetLegacyCompositeInfo(fidl::AnyArena& arena) const {
+  auto composite_info = fdd::wire::CompositeNodeInfo::Builder(arena);
+  if (device_) {
+    composite_info = composite_info.topological_path(device_->MakeTopologicalPath());
+  }
+
+  auto legacy_info = fdd::wire::LegacyCompositeInfo::Builder(arena)
+                         .properties(ConvertToNodeProperties(arena, properties_, str_properties_))
+                         .name(fidl::StringView(arena, name_.c_str()))
+                         .primary_fragment_index(primary_fragment_index_);
 
   if (driver_.has_value()) {
-    composite_info.driver(driver_->component_url);
+    auto matched_driver = fdf::wire::DriverInfo::Builder(arena)
+                              .url(driver_->component_url)
+                              .package_type(driver_->package_type)
+                              .colocate(driver_->colocate)
+                              .is_fallback(driver_->is_fallback)
+                              .Build();
+
+    legacy_info = legacy_info.matched_driver(matched_driver);
   }
 
-  if (from_composite_node_spec_) {
-    composite_info.node_info(
-        fdd::wire::CompositeNodeInfo::WithParents(arena, GetParentInfo(arena)));
-  } else {
-    composite_info.node_info(
-        fdd::wire::CompositeNodeInfo::WithLegacy(arena, GetLegacyCompositeInfo(arena)));
-  }
+  fidl::VectorView<fdd::wire::LegacyCompositeFragmentInfo> fragments(arena, fragments_count_);
+  fidl::VectorView<fidl::StringView> parent_topological_paths(arena, fragments_count_);
+  uint32_t index = 0;
+  for (auto& fragment : fragments_) {
+    fragments[index] = fragment.GetCompositeFragmentInfo(arena);
 
-  if (device_) {
-    composite_info.topological_path(device_->MakeTopologicalPath());
+    if (fragment.IsBound()) {
+      parent_topological_paths[index] =
+          fidl::StringView(arena, fragment.bound_device()->MakeTopologicalPath());
+    } else {
+      parent_topological_paths[index] = fidl::StringView();
+    }
+
+    index++;
   }
+  legacy_info.fragments(fragments);
+
+  composite_info.composite(
+      fdd::wire::CompositeInfo::WithLegacyComposite(arena, legacy_info.Build()));
+
+  composite_info.parent_topological_paths(parent_topological_paths);
 
   return composite_info.Build();
 }
 
-fdd::wire::LegacyCompositeNodeInfo CompositeDevice::GetLegacyCompositeInfo(
-    fidl::AnyArena& arena) const {
-  auto legacy_info = fdd::wire::LegacyCompositeNodeInfo::Builder(arena).properties(
-      ConvertToNodeProperties(arena, properties_, str_properties_));
-
-  fidl::VectorView<fdd::wire::LegacyCompositeFragmentInfo> fragments(arena, fragments_count_);
-  uint32_t index = 0;
-  for (auto& fragment : fragments_) {
-    fragments[index] = fragment.GetCompositeFragmentInfo(arena);
-    index++;
-  }
-  legacy_info.fragments(fragments);
-  return legacy_info.Build();
-}
-
-fidl::VectorView<fdd::wire::CompositeParentNodeInfo> CompositeDevice::GetParentInfo(
-    fidl::AnyArena& arena) const {
-  fidl::VectorView<fdd::wire::CompositeParentNodeInfo> parents(arena, fragments_count_);
-  uint32_t index = 0;
-  for (auto& fragment : fragments_) {
-    auto parent = fdd::wire::CompositeParentNodeInfo::Builder(arena).name(
-        fidl::StringView(arena, std::string(fragment.name())));
-
-    if (fragment.bound_device()) {
-      parent.device(arena, fragment.bound_device()->MakeTopologicalPath());
-    }
-
-    parents[index] = parent.Build();
-    index++;
-  }
-  return parents;
+fdd::wire::CompositeNodeInfo CompositeDevice::GetRegularCompositeInfo(fidl::AnyArena& arena) const {
+  ZX_ASSERT(composite_info_.has_value());
+  auto topological_info = GetTopologicalInfo(arena);
+  auto composite_info = fdd::wire::CompositeNodeInfo::Builder(arena)
+                            .composite(fdd::wire::CompositeInfo::WithComposite(
+                                arena, fidl::ToWire(arena, composite_info_.value())))
+                            .parent_topological_paths(topological_info.parent_paths)
+                            .topological_path(topological_info.path)
+                            .Build();
+  return composite_info;
 }
 
 CompositeDeviceFragment* CompositeDevice::GetPrimaryFragment() {

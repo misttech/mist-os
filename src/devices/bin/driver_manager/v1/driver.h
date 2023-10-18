@@ -57,14 +57,14 @@ struct MatchedDriverInfo {
   bool is_fallback = false;
 
   // The type of package the driver is in.
-  fuchsia_driver_index::DriverPackageType package_type;
+  fuchsia_driver_framework::DriverPackageType package_type;
 
   // The url for the driver component.
   std::string component_url;
 };
 
 using MatchedDriver =
-    std::variant<MatchedDriverInfo, fuchsia_driver_index::MatchedCompositeNodeParentInfo>;
+    std::variant<MatchedDriverInfo, std::vector<fuchsia_driver_framework::CompositeParent>>;
 
 #define DRIVER_NAME_LEN_MAX 64
 

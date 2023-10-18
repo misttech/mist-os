@@ -5,7 +5,7 @@
 #ifndef SRC_DEVICES_BIN_DRIVER_MANAGER_V1_COMPOSITE_NODE_SPEC_V1_H_
 #define SRC_DEVICES_BIN_DRIVER_MANAGER_V1_COMPOSITE_NODE_SPEC_V1_H_
 
-#include "src/devices/bin/driver_manager/composite_node_spec/composite_manager_bridge.h"
+#include "src/devices/bin/driver_manager/composite_node_spec/composite_node_spec.h"
 #include "src/devices/bin/driver_manager/v1/composite_device.h"
 #include "src/devices/bin/driver_manager/v1/device_manager.h"
 
@@ -35,16 +35,16 @@ class CompositeNodeSpecV1 : public CompositeNodeSpec {
  private:
   // CompositeNodeSpec interface:
   zx::result<std::optional<DeviceOrNode>> BindParentImpl(
-      fuchsia_driver_index::wire::MatchedCompositeNodeSpecInfo info,
+      fuchsia_driver_framework::wire::CompositeParent composite_parent,
       const DeviceOrNode& device_or_node) override;
 
-  fuchsia_driver_development::wire::CompositeInfo GetCompositeInfo(
+  fuchsia_driver_development::wire::CompositeNodeInfo GetCompositeInfo(
       fidl::AnyArena& arena) const override;
 
   void RemoveImpl(RemoveCompositeNodeCallback callback) override;
 
   // Should only be called when |has_composite_device_| is false.
-  void SetupCompositeDevice(fuchsia_driver_index::wire::MatchedCompositeNodeSpecInfo info);
+  void SetupCompositeDevice(fuchsia_driver_framework::wire::CompositeParent composite_parent);
 
   // Used to create the CompositeDevice object. Set to empty once the object is created.
   fbl::Array<std::unique_ptr<Metadata>> metadata_;
@@ -55,6 +55,10 @@ class CompositeNodeSpecV1 : public CompositeNodeSpec {
   // True if a CompositeDevice object is created for the spec. Set true by SetupCompositeDevice()
   // after the first BindParentImpl() call.
   bool has_composite_device_;
+
+  // Storing the CompositeInfo so we can return it in GetCompositeInfo.
+  // Set by SetupCompositeDevice()
+  fuchsia_driver_framework::CompositeInfo composite_info_ = {};
 
   // Must outlive CompositeNodeSpecV1.
   DeviceManager& device_manager_;

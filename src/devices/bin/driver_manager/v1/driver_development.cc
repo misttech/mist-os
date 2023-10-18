@@ -67,6 +67,11 @@ zx::result<std::vector<fdd::wire::DeviceInfo>> GetDeviceInfo(
 
     device_info.topological_path(device->MakeTopologicalPath());
 
+    auto bound_driver_component_url = device->bound_driver_component_url();
+    if (bound_driver_component_url.has_value()) {
+      device_info.bound_driver_url(fidl::StringView(allocator, bound_driver_component_url.value()));
+    }
+
     device_info.bound_driver_libname(fidl::StringView(allocator, device->parent_driver_url()));
 
     fidl::VectorView<fuchsia_driver_legacy::wire::DeviceProperty> props(allocator,

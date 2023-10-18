@@ -25,10 +25,6 @@ fdd::wire::LegacyCompositeFragmentInfo CompositeDeviceFragment::GetCompositeFrag
   auto fragment_info = fdd::wire::LegacyCompositeFragmentInfo::Builder(arena).name(
       fidl::StringView(arena, name_.c_str()));
 
-  if (bound_device_) {
-    fragment_info.device(bound_device_->MakeTopologicalPath());
-  }
-
   fidl::VectorView<fuchsia_driver_legacy::wire::BindInstruction> bind_rules(arena,
                                                                             bind_rules_.size());
   for (size_t i = 0; i < bind_rules_.size(); i++) {

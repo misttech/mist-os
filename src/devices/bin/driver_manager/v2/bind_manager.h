@@ -8,7 +8,6 @@
 #include <lib/fit/defer.h>
 #include <lib/fit/function.h>
 
-#include <queue>
 #include <unordered_map>
 
 #include "src/devices/bin/driver_manager/composite_node_spec/composite_node_spec_manager.h"
@@ -16,6 +15,9 @@
 #include "src/devices/bin/driver_manager/v2/composite_assembler.h"
 
 namespace dfv2 {
+
+using CompositeParents = fidl::VectorView<fuchsia_driver_framework::wire::CompositeParent>;
+using OwnedCompositeParents = std::vector<fuchsia_driver_framework::CompositeParent>;
 
 class DriverRunner;
 
@@ -27,44 +29,44 @@ struct BindRequest {
 };
 
 class BindResult {
-  using CompositeSpecs = std::vector<fuchsia_driver_index::wire::MatchedCompositeNodeSpecInfo>;
-
  public:
   BindResult() : data_(std::monostate{}) {}
 
   explicit BindResult(std::string_view driver_url) : data_(std::string(driver_url)) {}
 
-  explicit BindResult(CompositeSpecs composite_specs) : data_(std::move(composite_specs)) {}
+  explicit BindResult(OwnedCompositeParents composite_parents)
+      : data_(std::move(composite_parents)) {}
 
   bool bound() const { return !std::holds_alternative<std::monostate>(data_); }
 
   bool is_driver_url() const { return std::holds_alternative<std::string>(data_); }
 
-  bool is_composite_specs() const { return std::holds_alternative<CompositeSpecs>(data_); }
+  bool is_composite_parents() const { return std::holds_alternative<OwnedCompositeParents>(data_); }
 
   std::string_view driver_url() const {
     ZX_ASSERT(is_driver_url());
     return std::get<std::string>(data_);
   }
 
-  const CompositeSpecs& composite_specs() const {
-    ZX_ASSERT(is_composite_specs());
-    return std::get<CompositeSpecs>(data_);
+  const OwnedCompositeParents& composite_parents() const {
+    ZX_ASSERT(is_composite_parents());
+    return std::get<OwnedCompositeParents>(data_);
   }
 
  private:
-  std::variant<std::monostate, std::string, CompositeSpecs> data_;
+  std::variant<std::monostate, std::string, OwnedCompositeParents> data_;
 };
 
 // Bridge class for driver manager related interactions.
 class BindManagerBridge {
  public:
-  virtual zx::result<BindSpecResult> BindToParentSpec(
-      fuchsia_driver_index::wire::MatchedCompositeNodeParentInfo match_info,
-      std::weak_ptr<Node> node, bool enable_multibind) = 0;
+  virtual zx::result<BindSpecResult> BindToParentSpec(fidl::AnyArena& arena,
+                                                      CompositeParents composite_parents,
+                                                      std::weak_ptr<Node> node,
+                                                      bool enable_multibind) = 0;
 
   virtual zx::result<std::string> StartDriver(
-      Node& node, fuchsia_driver_index::wire::MatchedDriverInfo driver_info) = 0;
+      Node& node, fuchsia_driver_framework::wire::DriverInfo driver_info) = 0;
 
   virtual void RequestMatchFromDriverIndex(
       fuchsia_driver_index::wire::MatchDriverArgs args,
@@ -154,7 +156,7 @@ class BindManager {
 
   void RecordInspect(inspect::Inspector& inspector) const;
 
-  std::vector<fuchsia_driver_development::wire::CompositeInfo> GetCompositeListInfo(
+  std::vector<fuchsia_driver_development::wire::CompositeNodeInfo> GetCompositeListInfo(
       fidl::AnyArena& arena) const;
 
   // Exposed for testing.
@@ -194,7 +196,8 @@ class BindManager {
   void OnMatchDriverCallback(
       BindRequest request,
       fidl::WireUnownedResult<fuchsia_driver_index::DriverIndex::MatchDriver>& result,
-      const std::vector<fuchsia_driver_development::CompositeInfo>& bound_legacy_composite_info,
+      const std::vector<fuchsia_driver_development::LegacyCompositeParent>&
+          bound_legacy_composite_info,
       BindMatchCompleteCallback match_complete_callback);
 
   // Binds |node| to |result|.
@@ -205,8 +208,8 @@ class BindManager {
       fidl::WireUnownedResult<fuchsia_driver_index::DriverIndex::MatchDriver>& result,
       bool has_tracker);
 
-  zx::result<std::vector<fuchsia_driver_index::wire::MatchedCompositeNodeSpecInfo>> BindNodeToSpec(
-      Node& node, fuchsia_driver_index::wire::MatchedCompositeNodeParentInfo parents);
+  zx::result<CompositeParents> BindNodeToSpec(fidl::AnyArena& arena, Node& node,
+                                              CompositeParents composite_parents);
 
   // Queue of TryBindAllAvailable() callbacks pending for the next TryBindAllAvailable() trigger.
   std::vector<NodeBindingInfoResultCallback> pending_orphan_rebind_callbacks_;

@@ -57,7 +57,7 @@ class FakeDriverLoaderIndex final : public fidl::WireServer<fdi::DriverIndex> {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
 
-  std::optional<fdi::wire::MatchedDriver> driver;
+  std::optional<fdi::wire::MatchDriverResult> driver;
 };
 
 class DriverLoaderTest : public zxtest::Test {
@@ -83,8 +83,8 @@ TEST_F(DriverLoaderTest, TestUrl) {
   std::string name = "fuchsia-boot:///#driver1.cm";
 
   fidl::Arena arena;
-  auto driver_info = fdi::wire::MatchedDriverInfo::Builder(arena).url(name).is_fallback(false);
-  driver_index_server.driver = fdi::wire::MatchedDriver::WithDriver(arena, driver_info.Build());
+  auto driver_info = fdf::wire::DriverInfo::Builder(arena).url(name).is_fallback(false);
+  driver_index_server.driver = fdi::wire::MatchDriverResult::WithDriver(arena, driver_info.Build());
 
   std::unique_ptr driver = std::make_unique<Driver>();
   driver->url = name;
@@ -106,8 +106,8 @@ TEST_F(DriverLoaderTest, TestRelativeUrl) {
   std::string name = "fuchsia-boot:///#driver.cm";
 
   fidl::Arena arena;
-  auto driver_info = fdi::wire::MatchedDriverInfo::Builder(arena).url(name).is_fallback(false);
-  driver_index_server.driver = fdi::wire::MatchedDriver::WithDriver(arena, driver_info.Build());
+  auto driver_info = fdf::wire::DriverInfo::Builder(arena).url(name).is_fallback(false);
+  driver_index_server.driver = fdi::wire::MatchDriverResult::WithDriver(arena, driver_info.Build());
 
   std::unique_ptr driver = std::make_unique<Driver>();
   driver->url = name;
@@ -144,8 +144,8 @@ TEST_F(DriverLoaderTest, TestTooLongRelativeUrl) {
   std::string long_name = std::string(name.length() + 1, 'a');
 
   fidl::Arena arena;
-  auto driver_info = fdi::wire::MatchedDriverInfo::Builder(arena).url(name).is_fallback(false);
-  driver_index_server.driver = fdi::wire::MatchedDriver::WithDriver(arena, driver_info.Build());
+  auto driver_info = fdf::wire::DriverInfo::Builder(arena).url(name).is_fallback(false);
+  driver_index_server.driver = fdi::wire::MatchDriverResult::WithDriver(arena, driver_info.Build());
 
   auto driver = std::make_unique<Driver>();
   driver->url = name;
@@ -166,23 +166,27 @@ TEST_F(DriverLoaderTest, TestTooLongRelativeUrl) {
 TEST_F(DriverLoaderTest, TestReturnOnlyNodeGroups) {
   fidl::Arena allocator;
 
-  std::vector<fdi::wire::MatchedCompositeNodeSpecInfo> specs;
+  fidl::VectorView<fdf::wire::CompositeParent> specs(allocator, 2);
 
   // Add first composite node spec.
-  auto spec_1 = fdi::wire::MatchedCompositeNodeSpecInfo::Builder(allocator);
-  spec_1.node_index(1);
-  spec_1.name(fidl::ObjectView<fidl::StringView>(allocator, allocator, "spec_1"));
-  specs.push_back(spec_1.Build());
+  auto spec_1 = fdf::wire::CompositeParent::Builder(allocator);
+  spec_1.index(1);
+  spec_1.composite(
+      fdf::wire::CompositeInfo::Builder(allocator)
+          .spec(fdf::wire::CompositeNodeSpec::Builder(allocator).name(allocator, "spec_1").Build())
+          .Build());
+  specs[0] = spec_1.Build();
 
   // Add second composite node spec.
-  auto spec_2 = fdi::wire::MatchedCompositeNodeSpecInfo::Builder(allocator);
-  spec_2.node_index(0);
-  spec_2.name(fidl::ObjectView<fidl::StringView>(allocator, allocator, "spec_2"));
-  specs.push_back(spec_2.Build());
+  auto spec_2 = fdf::wire::CompositeParent::Builder(allocator);
+  spec_2.index(0);
+  spec_2.composite(
+      fdf::wire::CompositeInfo::Builder(allocator)
+          .spec(fdf::wire::CompositeNodeSpec::Builder(allocator).name(allocator, "spec_2").Build())
+          .Build());
+  specs[1] = spec_2.Build();
 
-  driver_index_server.driver = fdi::wire::MatchedDriver::WithParentSpec(
-      allocator,
-      fdi::wire::MatchedCompositeNodeParentInfo::Builder(allocator).specs(specs).Build());
+  driver_index_server.driver = fdi::wire::MatchDriverResult::WithCompositeParents(allocator, specs);
 
   DriverLoader driver_loader(nullptr, std::move(driver_index), &resolver, loop.dispatcher(),
                              nullptr);
@@ -194,26 +198,24 @@ TEST_F(DriverLoaderTest, TestReturnOnlyNodeGroups) {
 
   ASSERT_EQ(drivers.size(), 1);
 
-  auto spec_result = std::get<fdi::MatchedCompositeNodeParentInfo>(drivers[0]);
-  ASSERT_EQ(2, spec_result.specs().value().size());
-  ASSERT_STREQ("spec_1", spec_result.specs().value().at(0).name().value());
-  ASSERT_EQ(1, spec_result.specs().value().at(0).node_index());
-  ASSERT_STREQ("spec_2", spec_result.specs().value().at(1).name().value());
-  ASSERT_EQ(0, spec_result.specs().value().at(1).node_index());
+  auto spec_result = std::get<std::vector<fuchsia_driver_framework::CompositeParent>>(drivers[0]);
+  ASSERT_EQ(2, spec_result.size());
+  ASSERT_STREQ("spec_1", spec_result.at(0).composite().value().spec().value().name().value());
+  ASSERT_EQ(1, spec_result.at(0).index());
+  ASSERT_STREQ("spec_2", spec_result.at(1).composite().value().spec().value().name().value());
+  ASSERT_EQ(0, spec_result.at(1).index());
 }
 
 TEST_F(DriverLoaderTest, TestReturnNodeGroupNoTopologicalPath) {
   fidl::Arena allocator;
 
-  auto spec = fdi::wire::MatchedCompositeNodeSpecInfo::Builder(allocator);
-  spec.node_index(1);
+  auto spec = fdf::wire::CompositeParent::Builder(allocator);
+  spec.index(1);
 
-  fidl::VectorView<fdi::wire::MatchedCompositeNodeSpecInfo> specs(allocator, 1);
+  fidl::VectorView<fdf::wire::CompositeParent> specs(allocator, 1);
   specs[0] = spec.Build();
 
-  auto parent_spec = fdi::wire::MatchedCompositeNodeParentInfo::Builder(allocator).specs(specs);
-  driver_index_server.driver =
-      fdi::wire::MatchedDriver::WithParentSpec(allocator, parent_spec.Build());
+  driver_index_server.driver = fdi::wire::MatchDriverResult::WithCompositeParents(allocator, specs);
 
   DriverLoader driver_loader(nullptr, std::move(driver_index), &resolver, loop.dispatcher(),
                              nullptr);
@@ -228,12 +230,8 @@ TEST_F(DriverLoaderTest, TestReturnNodeGroupNoTopologicalPath) {
 TEST_F(DriverLoaderTest, TestReturnNodeGroupNoNodes) {
   fidl::Arena allocator;
 
-  fidl::VectorView<fdi::wire::MatchedCompositeNodeSpecInfo> specs(allocator, 0);
-  auto parent_spec = fdi::wire::MatchedCompositeNodeParentInfo::Builder(allocator);
-  parent_spec.specs(fidl::ObjectView<fidl::VectorView<fdi::wire::MatchedCompositeNodeSpecInfo>>(
-      allocator, specs));
-  driver_index_server.driver =
-      fdi::wire::MatchedDriver::WithParentSpec(allocator, parent_spec.Build());
+  fidl::VectorView<fdf::wire::CompositeParent> specs(allocator, 0);
+  driver_index_server.driver = fdi::wire::MatchDriverResult::WithCompositeParents(allocator, specs);
 
   DriverLoader driver_loader(nullptr, std::move(driver_index), &resolver, loop.dispatcher(),
                              nullptr);
@@ -248,21 +246,25 @@ TEST_F(DriverLoaderTest, TestReturnNodeGroupNoNodes) {
 TEST_F(DriverLoaderTest, TestReturnNodeGroupMultipleNodes) {
   fidl::Arena allocator;
 
-  auto spec_1 = fdi::wire::MatchedCompositeNodeSpecInfo::Builder(allocator);
-  spec_1.node_index(1);
-  spec_1.name(fidl::ObjectView<fidl::StringView>(allocator, allocator, "spec_1"));
+  auto spec_1 = fdf::wire::CompositeParent::Builder(allocator);
+  spec_1.index(1);
+  spec_1.composite(
+      fdf::wire::CompositeInfo::Builder(allocator)
+          .spec(fdf::wire::CompositeNodeSpec::Builder(allocator).name(allocator, "spec_1").Build())
+          .Build());
 
-  auto spec_2 = fdi::wire::MatchedCompositeNodeSpecInfo::Builder(allocator);
-  spec_2.node_index(3);
-  spec_2.name(fidl::ObjectView<fidl::StringView>(allocator, allocator, "spec_2"));
+  auto spec_2 = fdf::wire::CompositeParent::Builder(allocator);
+  spec_2.index(3);
+  spec_2.composite(
+      fdf::wire::CompositeInfo::Builder(allocator)
+          .spec(fdf::wire::CompositeNodeSpec::Builder(allocator).name(allocator, "spec_2").Build())
+          .Build());
 
-  fidl::VectorView<fdi::wire::MatchedCompositeNodeSpecInfo> specs(allocator, 2);
+  fidl::VectorView<fdf::wire::CompositeParent> specs(allocator, 2);
   specs[0] = spec_1.Build();
   specs[1] = spec_2.Build();
 
-  auto parent_spec = fdi::wire::MatchedCompositeNodeParentInfo::Builder(allocator).specs(specs);
-  driver_index_server.driver =
-      fdi::wire::MatchedDriver::WithParentSpec(allocator, parent_spec.Build());
+  driver_index_server.driver = fdi::wire::MatchDriverResult::WithCompositeParents(allocator, specs);
 
   DriverLoader driver_loader(nullptr, std::move(driver_index), &resolver, loop.dispatcher(),
                              nullptr);
@@ -274,12 +276,12 @@ TEST_F(DriverLoaderTest, TestReturnNodeGroupMultipleNodes) {
 
   ASSERT_EQ(drivers.size(), 1);
 
-  auto spec_result = std::get<fdi::MatchedCompositeNodeParentInfo>(drivers[0]);
-  ASSERT_EQ(2, spec_result.specs().value().size());
-  ASSERT_STREQ("spec_1", spec_result.specs().value().at(0).name().value());
-  ASSERT_EQ(1, spec_result.specs().value().at(0).node_index().value());
-  ASSERT_STREQ("spec_2", spec_result.specs().value().at(1).name().value());
-  ASSERT_EQ(3, spec_result.specs().value().at(1).node_index().value());
+  auto spec_result = std::get<std::vector<fuchsia_driver_framework::CompositeParent>>(drivers[0]);
+  ASSERT_EQ(2, spec_result.size());
+  ASSERT_STREQ("spec_1", spec_result.at(0).composite().value().spec().value().name().value());
+  ASSERT_EQ(1, spec_result.at(0).index().value());
+  ASSERT_STREQ("spec_2", spec_result.at(1).composite().value().spec().value().name().value());
+  ASSERT_EQ(3, spec_result.at(1).index().value());
 }
 
 TEST_F(DriverLoaderTest, TestEphemeralDriver) {
@@ -287,9 +289,9 @@ TEST_F(DriverLoaderTest, TestEphemeralDriver) {
 
   fidl::Arena arena;
   auto driver_info =
-      fdi::wire::MatchedDriverInfo::Builder(arena).url(name).is_fallback(false).package_type(
-          fdi::wire::DriverPackageType::kUniverse);
-  driver_index_server.driver = fdi::wire::MatchedDriver::WithDriver(arena, driver_info.Build());
+      fdf::wire::DriverInfo::Builder(arena).url(name).is_fallback(false).package_type(
+          fdf::wire::DriverPackageType::kUniverse);
+  driver_index_server.driver = fdi::wire::MatchDriverResult::WithDriver(arena, driver_info.Build());
 
   // Add driver 1 to universe resolver since it is a universe driver.
   auto driver1 = std::make_unique<Driver>();
@@ -314,8 +316,10 @@ TEST_F(DriverLoaderTest, TestV2Driver) {
   std::string name = "fuchsia-boot:///#driver1.cm";
 
   fidl::Arena arena;
-  auto driver_info = fdi::wire::MatchedDriverInfo::Builder(arena).url(name).is_fallback(false);
-  driver_index_server.driver = fdi::wire::MatchedDriver::WithDriver(arena, driver_info.Build());
+  auto driver_info =
+      fdf::wire::DriverInfo::Builder(arena).url(name).is_fallback(false).driver_framework_version(
+          2);
+  driver_index_server.driver = fdi::wire::MatchDriverResult::WithDriver(arena, driver_info.Build());
 
   DriverLoader driver_loader(nullptr, std::move(driver_index), &resolver, loop.dispatcher(),
                              &universe_resolver);

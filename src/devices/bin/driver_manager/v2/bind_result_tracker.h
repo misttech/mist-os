@@ -6,7 +6,6 @@
 #define SRC_DEVICES_BIN_DRIVER_MANAGER_V2_BIND_RESULT_TRACKER_H_
 
 #include <fidl/fuchsia.driver.development/cpp/fidl.h>
-#include <fidl/fuchsia.driver.index/cpp/wire.h>
 #include <lib/zircon-internal/thread_annotations.h>
 
 namespace dfv2 {
@@ -24,9 +23,9 @@ class BindResultTracker {
   void ReportSuccessfulBind(const std::string_view& node_name, const std::string_view& driver);
   void ReportSuccessfulBind(
       const std::string_view& node_name,
-      const std::vector<fuchsia_driver_development::CompositeInfo>& legacy_composite_infos,
-      const std::vector<fuchsia_driver_index::wire::MatchedCompositeNodeSpecInfo>&
-          composite_spec_infos);
+      const std::vector<fuchsia_driver_development::LegacyCompositeParent>&
+          legacy_composite_parents,
+      const std::vector<fuchsia_driver_framework::CompositeParent>& composite_parents);
   void ReportNoBind();
 
  private:

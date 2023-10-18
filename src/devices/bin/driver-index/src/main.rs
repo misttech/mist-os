@@ -10,6 +10,7 @@ use {
     anyhow::Context,
     driver_index_config::Config,
     fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_driver_development as fdd,
+    fidl_fuchsia_driver_framework as fdf,
     fidl_fuchsia_driver_index::{DriverIndexRequest, DriverIndexRequestStream},
     fidl_fuchsia_driver_registrar as fdr, fidl_fuchsia_io as fio, fuchsia_async as fasync,
     fuchsia_component::client,
@@ -82,7 +83,7 @@ fn create_and_setup_index(boot_drivers: Vec<ResolvedDriver>, config: &Config) ->
 }
 
 async fn run_driver_info_iterator_server(
-    driver_info: Arc<Mutex<Vec<fdd::DriverInfo>>>,
+    driver_info: Arc<Mutex<Vec<fdf::DriverInfo>>>,
     stream: fdd::DriverInfoIteratorRequestStream,
 ) -> Result<(), anyhow::Error> {
     stream
@@ -110,7 +111,7 @@ async fn run_driver_info_iterator_server(
 }
 
 async fn run_composite_node_specs_iterator_server(
-    specs: Arc<Mutex<Vec<fdd::CompositeNodeSpecInfo>>>,
+    specs: Arc<Mutex<Vec<fdf::CompositeInfo>>>,
     stream: fdd::CompositeNodeSpecIteratorRequestStream,
 ) -> Result<(), anyhow::Error> {
     stream
@@ -470,27 +471,26 @@ mod tests {
         std::collections::HashMap,
     };
 
-    fn create_matched_driver_info(
+    fn create_driver_info(
         url: String,
-        driver_url: String,
         colocate: bool,
-        device_categories: Vec<fdi::DeviceCategory>,
+        device_categories: Vec<fdf::DeviceCategory>,
         package_type: DriverPackageType,
         fallback: bool,
-    ) -> fdi::MatchedDriverInfo {
-        fdi::MatchedDriverInfo {
+    ) -> fdf::DriverInfo {
+        fdf::DriverInfo {
             url: Some(url),
-            driver_url: Some(driver_url),
             colocate: Some(colocate),
             device_categories: Some(device_categories),
-            package_type: fdi::DriverPackageType::from_primitive(package_type as u8),
+            package_type: fdf::DriverPackageType::from_primitive(package_type as u8),
             is_fallback: Some(fallback),
+            bind_rules_bytecode: Some(vec![]),
             ..Default::default()
         }
     }
 
-    fn create_default_device_category() -> fdi::DeviceCategory {
-        fdi::DeviceCategory {
+    fn create_default_device_category() -> fdf::DeviceCategory {
+        fdf::DeviceCategory {
             category: Some(resolved_driver::DEFAULT_DEVICE_CATEGORY.to_string()),
             subcategory: None,
             ..Default::default()
@@ -500,7 +500,7 @@ mod tests {
     async fn get_driver_info_proxy(
         development_proxy: &fdd::DriverIndexProxy,
         driver_filter: &[String],
-    ) -> Vec<fdd::DriverInfo> {
+    ) -> Vec<fdf::DriverInfo> {
         let (info_iterator, info_iterator_server) =
             fidl::endpoints::create_proxy::<fdd::DriverInfoIteratorMarker>().unwrap();
         development_proxy.get_driver_info(driver_filter, info_iterator_server).unwrap();
@@ -656,19 +656,22 @@ mod tests {
             let expected_url =
                 "fuchsia-pkg://fuchsia.com/driver-index-unittests#meta/test-bind-component.cm"
                     .to_string();
-            let expected_driver_url =
-                "fuchsia-pkg://fuchsia.com/driver-index-unittests#driver/fake-driver.so"
-                    .to_string();
-            let expected_result = fdi::MatchedDriver::Driver(create_matched_driver_info(
-                expected_url,
-                expected_driver_url,
-                true,
-                vec![create_default_device_category()],
-                DriverPackageType::Base,
-                false,
-            ));
-
-            assert_eq!(expected_result, result);
+            match result {
+                fdi::MatchDriverResult::Driver(d) => {
+                    assert_eq!(expected_url, d.url.unwrap());
+                    assert_eq!(true, d.colocate.unwrap());
+                    assert_eq!(false, d.is_fallback.unwrap());
+                    assert_eq!(fdf::DriverPackageType::Base, d.package_type.unwrap());
+                    assert_eq!(
+                        vec![create_default_device_category()],
+                        d.device_categories.unwrap()
+                    );
+                }
+                fdi::MatchDriverResult::CompositeParents(p) => {
+                    panic!("Bad match driver: {:#?}", p);
+                }
+                _ => panic!("Bad case"),
+            }
 
             // Check the value from the 'test-bind2' binary. This should match my-driver2.cm
             let property = fdf::NodeProperty {
@@ -682,18 +685,22 @@ mod tests {
             let expected_url =
                 "fuchsia-pkg://fuchsia.com/driver-index-unittests#meta/test-bind2-component.cm"
                     .to_string();
-            let expected_driver_url =
-                "fuchsia-pkg://fuchsia.com/driver-index-unittests#driver/fake-driver2.so"
-                    .to_string();
-            let expected_result = fdi::MatchedDriver::Driver(create_matched_driver_info(
-                expected_url,
-                expected_driver_url,
-                false,
-                vec![create_default_device_category()],
-                DriverPackageType::Base,
-                false,
-            ));
-            assert_eq!(expected_result, result);
+            match result {
+                fdi::MatchDriverResult::Driver(d) => {
+                    assert_eq!(expected_url, d.url.unwrap());
+                    assert_eq!(false, d.colocate.unwrap());
+                    assert_eq!(false, d.is_fallback.unwrap());
+                    assert_eq!(fdf::DriverPackageType::Base, d.package_type.unwrap());
+                    assert_eq!(
+                        vec![create_default_device_category()],
+                        d.device_categories.unwrap()
+                    );
+                }
+                fdi::MatchDriverResult::CompositeParents(p) => {
+                    panic!("Bad match driver: {:#?}", p);
+                }
+                _ => panic!("Bad case"),
+            }
 
             // Check an unknown value. This should return the NOT_FOUND error.
             let property = fdf::NodeProperty {
@@ -740,7 +747,6 @@ mod tests {
         let base_repo = BaseRepo::Resolved(std::vec![ResolvedDriver {
             component_url: url::Url::parse("fuchsia-pkg://fuchsia.com/package#driver/my-driver.cm")
                 .unwrap(),
-            v1_driver_path: None,
             bind_rules: always_match.clone(),
             bind_bytecode: vec![],
             colocate: false,
@@ -748,6 +754,7 @@ mod tests {
             fallback: false,
             package_type: DriverPackageType::Base,
             package_hash: None,
+            is_dfv2: None,
         },]);
 
         let (proxy, stream) =
@@ -766,12 +773,13 @@ mod tests {
 
             let result = proxy.match_driver(&args).await.unwrap().unwrap();
 
-            let expected_result = fdi::MatchedDriver::Driver(fdi::MatchedDriverInfo {
+            let expected_result = fdi::MatchDriverResult::Driver(fdf::DriverInfo {
                 url: Some("fuchsia-pkg://fuchsia.com/package#driver/my-driver.cm".to_string()),
                 colocate: Some(false),
                 device_categories: Some(vec![]),
-                package_type: Some(fdi::DriverPackageType::Base),
+                package_type: Some(fdf::DriverPackageType::Base),
                 is_fallback: Some(false),
+                bind_rules_bytecode: Some(vec![]),
                 ..Default::default()
             });
 
@@ -812,7 +820,6 @@ mod tests {
         let base_repo = BaseRepo::Resolved(std::vec![ResolvedDriver {
             component_url: url::Url::parse("fuchsia-pkg://fuchsia.com/package#driver/my-driver.cm")
                 .unwrap(),
-            v1_driver_path: None,
             bind_rules: always_match.clone(),
             bind_bytecode: vec![],
             colocate: false,
@@ -820,6 +827,7 @@ mod tests {
             fallback: false,
             package_type: DriverPackageType::Base,
             package_hash: None,
+            is_dfv2: None,
         },]);
 
         let (proxy, stream) =
@@ -838,12 +846,13 @@ mod tests {
 
             let result = proxy.match_driver(&args).await.unwrap().unwrap();
 
-            let expected_result = fdi::MatchedDriver::Driver(fdi::MatchedDriverInfo {
+            let expected_result = fdi::MatchDriverResult::Driver(fdf::DriverInfo {
                 url: Some("fuchsia-pkg://fuchsia.com/package#driver/my-driver.cm".to_string()),
                 colocate: Some(false),
-                package_type: Some(fdi::DriverPackageType::Base),
+                package_type: Some(fdf::DriverPackageType::Base),
                 is_fallback: Some(false),
                 device_categories: Some(vec![]),
+                bind_rules_bytecode: Some(vec![]),
                 ..Default::default()
             });
 
@@ -877,7 +886,6 @@ mod tests {
         let boot_repo = vec![
             ResolvedDriver {
                 component_url: url::Url::parse("fuchsia-boot:///#meta/driver-1.cm").unwrap(),
-                v1_driver_path: Some("fuchsia-boot:///#driver/driver-1.so".to_owned()),
                 bind_rules: always_match.clone(),
                 bind_bytecode: vec![],
                 colocate: false,
@@ -885,10 +893,10 @@ mod tests {
                 fallback: false,
                 package_type: DriverPackageType::Boot,
                 package_hash: None,
+                is_dfv2: None,
             },
             ResolvedDriver {
                 component_url: url::Url::parse("fuchsia-boot:///#meta/driver-2.cm").unwrap(),
-                v1_driver_path: Some("fuchsia-boot:///#driver/driver-2.so".to_owned()),
                 bind_rules: always_match.clone(),
                 bind_bytecode: vec![],
                 colocate: false,
@@ -896,6 +904,7 @@ mod tests {
                 fallback: false,
                 package_type: DriverPackageType::Boot,
                 package_hash: None,
+                is_dfv2: None,
             },
         ];
 
@@ -945,7 +954,6 @@ mod tests {
         let boot_repo = vec![
             ResolvedDriver {
                 component_url: url::Url::parse("fuchsia-boot:///#meta/driver-1.cm").unwrap(),
-                v1_driver_path: Some("fuchsia-boot:///#driver/driver-1.so".to_owned()),
                 bind_rules: always_match.clone(),
                 bind_bytecode: vec![],
                 colocate: false,
@@ -953,10 +961,10 @@ mod tests {
                 fallback: false,
                 package_type: DriverPackageType::Boot,
                 package_hash: None,
+                is_dfv2: None,
             },
             ResolvedDriver {
                 component_url: url::Url::parse("fuchsia-boot:///#meta/driver-2.cm").unwrap(),
-                v1_driver_path: Some("fuchsia-boot:///#driver/driver-2.so".to_owned()),
                 bind_rules: always_match.clone(),
                 bind_bytecode: vec![],
                 colocate: false,
@@ -964,6 +972,7 @@ mod tests {
                 fallback: false,
                 package_type: DriverPackageType::Boot,
                 package_hash: None,
+                is_dfv2: None,
             },
         ];
 
@@ -986,10 +995,10 @@ mod tests {
 
             let result = proxy.match_driver(&args).await.unwrap().unwrap();
             match result {
-                fdi::MatchedDriver::Driver(d) => {
+                fdi::MatchDriverResult::Driver(d) => {
                     assert_eq!("fuchsia-boot:///#meta/driver-1.cm", d.url.unwrap());
                 }
-                fdi::MatchedDriver::ParentSpec(p) => {
+                fdi::MatchDriverResult::CompositeParents(p) => {
                     panic!("Bad match driver: {:#?}", p);
                 }
                 _ => panic!("Bad case"),
@@ -1002,10 +1011,10 @@ mod tests {
             };
             let result = proxy.match_driver(&args).await.unwrap().unwrap();
             match result {
-                fdi::MatchedDriver::Driver(d) => {
+                fdi::MatchDriverResult::Driver(d) => {
                     assert_eq!("fuchsia-boot:///#meta/driver-2.cm", d.url.unwrap());
                 }
-                fdi::MatchedDriver::ParentSpec(p) => {
+                fdi::MatchDriverResult::CompositeParents(p) => {
                     panic!("Bad match driver: {:#?}", p);
                 }
                 _ => panic!("Bad case"),
@@ -1048,7 +1057,6 @@ mod tests {
         let boot_repo = vec![
             ResolvedDriver {
                 component_url: url::Url::parse("fuchsia-boot:///#meta/driver-1.cm").unwrap(),
-                v1_driver_path: Some("fuchsia-boot:///#driver/driver-1.so".to_owned()),
                 bind_rules: always_match.clone(),
                 bind_bytecode: vec![],
                 colocate: false,
@@ -1056,10 +1064,10 @@ mod tests {
                 fallback: false,
                 package_type: DriverPackageType::Boot,
                 package_hash: None,
+                is_dfv2: None,
             },
             ResolvedDriver {
                 component_url: url::Url::parse("fuchsia-boot:///#meta/driver-2.cm").unwrap(),
-                v1_driver_path: Some("fuchsia-boot:///#driver/driver-2.so".to_owned()),
                 bind_rules: always_match.clone(),
                 bind_bytecode: vec![],
                 colocate: false,
@@ -1067,6 +1075,7 @@ mod tests {
                 fallback: false,
                 package_type: DriverPackageType::Boot,
                 package_hash: None,
+                is_dfv2: None,
             },
         ];
 
@@ -1095,10 +1104,10 @@ mod tests {
             // Ask for driver-1 and it should give that to us.
             let result = proxy.match_driver(&args).await.unwrap().unwrap();
             match result {
-                fdi::MatchedDriver::Driver(d) => {
+                fdi::MatchDriverResult::Driver(d) => {
                     assert_eq!("fuchsia-boot:///#meta/driver-1.cm", d.url.unwrap());
                 }
-                fdi::MatchedDriver::ParentSpec(p) => {
+                fdi::MatchDriverResult::CompositeParents(p) => {
                     panic!("Bad match driver: {:#?}", p);
                 }
                 _ => panic!("Bad case"),
@@ -1124,10 +1133,10 @@ mod tests {
             // Ask for any and we should get driver-2, since driver-1 is disabled.
             let result = proxy.match_driver(&args).await.unwrap().unwrap();
             match result {
-                fdi::MatchedDriver::Driver(d) => {
+                fdi::MatchDriverResult::Driver(d) => {
                     assert_eq!("fuchsia-boot:///#meta/driver-2.cm", d.url.unwrap());
                 }
-                fdi::MatchedDriver::ParentSpec(p) => {
+                fdi::MatchDriverResult::CompositeParents(p) => {
                     panic!("Bad match driver: {:#?}", p);
                 }
                 _ => panic!("Bad case"),
@@ -1150,10 +1159,10 @@ mod tests {
             // Ask for driver-1 and it should give that to us since it's not disabled anymore.
             let result = proxy.match_driver(&args).await.unwrap().unwrap();
             match result {
-                fdi::MatchedDriver::Driver(d) => {
+                fdi::MatchDriverResult::Driver(d) => {
                     assert_eq!("fuchsia-boot:///#meta/driver-1.cm", d.url.unwrap());
                 }
-                fdi::MatchedDriver::ParentSpec(p) => {
+                fdi::MatchDriverResult::CompositeParents(p) => {
                     panic!("Bad match driver: {:#?}", p);
                 }
                 _ => panic!("Bad case"),
@@ -1177,10 +1186,8 @@ mod tests {
     async fn test_match_driver_non_fallback_boot_priority() {
         const FALLBACK_BOOT_DRIVER_COMPONENT_URL: &str =
             "fuchsia-pkg://fuchsia.com/package#driver/fallback-boot.cm";
-        const FALLBACK_BOOT_DRIVER_V1_DRIVER_PATH: &str = "meta/fallback-boot.so";
         const NON_FALLBACK_BOOT_DRIVER_COMPONENT_URL: &str =
             "fuchsia-pkg://fuchsia.com/package#driver/non-fallback-base.cm";
-        const NON_FALLBACK_BOOT_DRIVER_V1_DRIVER_PATH: &str = "meta/non-fallback-base.so";
 
         // Make the bind instructions.
         let always_match = bind::compiler::BindRules {
@@ -1197,7 +1204,6 @@ mod tests {
         let boot_repo = vec![
             ResolvedDriver {
                 component_url: url::Url::parse(FALLBACK_BOOT_DRIVER_COMPONENT_URL).unwrap(),
-                v1_driver_path: Some(FALLBACK_BOOT_DRIVER_V1_DRIVER_PATH.to_owned()),
                 bind_rules: always_match.clone(),
                 bind_bytecode: vec![],
                 colocate: false,
@@ -1205,10 +1211,10 @@ mod tests {
                 fallback: true,
                 package_type: DriverPackageType::Boot,
                 package_hash: None,
+                is_dfv2: None,
             },
             ResolvedDriver {
                 component_url: url::Url::parse(NON_FALLBACK_BOOT_DRIVER_COMPONENT_URL).unwrap(),
-                v1_driver_path: Some(NON_FALLBACK_BOOT_DRIVER_V1_DRIVER_PATH.to_owned()),
                 bind_rules: always_match.clone(),
                 bind_bytecode: vec![],
                 colocate: false,
@@ -1216,6 +1222,7 @@ mod tests {
                 fallback: false,
                 package_type: DriverPackageType::Boot,
                 package_hash: None,
+                is_dfv2: None,
             },
         ];
 
@@ -1235,12 +1242,8 @@ mod tests {
 
             let result = proxy.match_driver(&args).await.unwrap().unwrap();
 
-            let expected_result = fdi::MatchedDriver::Driver(create_matched_driver_info(
-                NON_FALLBACK_BOOT_DRIVER_COMPONENT_URL.to_owned(),
-                format!(
-                    "fuchsia-pkg://fuchsia.com/package#{}",
-                    NON_FALLBACK_BOOT_DRIVER_V1_DRIVER_PATH
-                ),
+            let expected_result = fdi::MatchDriverResult::Driver(create_driver_info(
+                NON_FALLBACK_BOOT_DRIVER_COMPONENT_URL.to_string(),
                 false,
                 vec![],
                 DriverPackageType::Boot,
@@ -1266,13 +1269,10 @@ mod tests {
     async fn test_match_driver_non_fallback_base_priority() {
         const FALLBACK_BOOT_DRIVER_COMPONENT_URL: &str =
             "fuchsia-pkg://fuchsia.com/package#driver/fallback-boot.cm";
-        const FALLBACK_BOOT_DRIVER_V1_DRIVER_PATH: &str = "meta/fallback-boot.so";
         const NON_FALLBACK_BASE_DRIVER_COMPONENT_URL: &str =
             "fuchsia-pkg://fuchsia.com/package#driver/non-fallback-base.cm";
-        const NON_FALLBACK_BASE_DRIVER_V1_DRIVER_PATH: &str = "meta/non-fallback-base.so";
         const FALLBACK_BASE_DRIVER_COMPONENT_URL: &str =
             "fuchsia-pkg://fuchsia.com/package#driver/fallback-base.cm";
-        const FALLBACK_BASE_DRIVER_V1_DRIVER_PATH: &str = "meta/fallback-base.so";
 
         // Make the bind instructions.
         let always_match = bind::compiler::BindRules {
@@ -1288,7 +1288,6 @@ mod tests {
 
         let boot_repo = vec![ResolvedDriver {
             component_url: url::Url::parse(FALLBACK_BOOT_DRIVER_COMPONENT_URL).unwrap(),
-            v1_driver_path: Some(FALLBACK_BOOT_DRIVER_V1_DRIVER_PATH.to_owned()),
             bind_rules: always_match.clone(),
             bind_bytecode: vec![],
             colocate: false,
@@ -1296,12 +1295,12 @@ mod tests {
             fallback: true,
             package_type: DriverPackageType::Boot,
             package_hash: None,
+            is_dfv2: None,
         }];
 
         let base_repo = BaseRepo::Resolved(std::vec![
             ResolvedDriver {
                 component_url: url::Url::parse(FALLBACK_BASE_DRIVER_COMPONENT_URL).unwrap(),
-                v1_driver_path: Some(FALLBACK_BASE_DRIVER_V1_DRIVER_PATH.to_owned()),
                 bind_rules: always_match.clone(),
                 bind_bytecode: vec![],
                 colocate: false,
@@ -1309,10 +1308,10 @@ mod tests {
                 fallback: true,
                 package_type: DriverPackageType::Base,
                 package_hash: None,
+                is_dfv2: None,
             },
             ResolvedDriver {
                 component_url: url::Url::parse(NON_FALLBACK_BASE_DRIVER_COMPONENT_URL).unwrap(),
-                v1_driver_path: Some(NON_FALLBACK_BASE_DRIVER_V1_DRIVER_PATH.to_owned()),
                 bind_rules: always_match.clone(),
                 bind_bytecode: vec![],
                 colocate: false,
@@ -1320,6 +1319,7 @@ mod tests {
                 fallback: false,
                 package_type: DriverPackageType::Base,
                 package_hash: None,
+                is_dfv2: None,
             },
         ]);
 
@@ -1339,12 +1339,8 @@ mod tests {
 
             let result = proxy.match_driver(&args).await.unwrap().unwrap();
 
-            let expected_result = fdi::MatchedDriver::Driver(create_matched_driver_info(
-                NON_FALLBACK_BASE_DRIVER_COMPONENT_URL.to_owned(),
-                format!(
-                    "fuchsia-pkg://fuchsia.com/package#{}",
-                    NON_FALLBACK_BASE_DRIVER_V1_DRIVER_PATH
-                ),
+            let expected_result = fdi::MatchDriverResult::Driver(create_driver_info(
+                NON_FALLBACK_BASE_DRIVER_COMPONENT_URL.to_string(),
                 false,
                 vec![],
                 DriverPackageType::Base,
@@ -1598,7 +1594,6 @@ mod tests {
         let always_match = create_always_match_bind_rules();
         let boot_repo = vec![ResolvedDriver {
             component_url: url::Url::parse("fuchsia-boot:///#driver/fallback-boot.cm").unwrap(),
-            v1_driver_path: Some("meta/fallback-boot.so".to_owned()),
             bind_rules: always_match.clone(),
             bind_bytecode: vec![],
             colocate: false,
@@ -1606,6 +1601,7 @@ mod tests {
             fallback: true,
             package_type: DriverPackageType::Boot,
             package_hash: None,
+            is_dfv2: None,
         }];
         let index = Indexer::new(boot_repo, BaseRepo::NotResolved, true);
         let (proxy, stream) =
@@ -1628,12 +1624,10 @@ mod tests {
     #[fuchsia::test]
     async fn test_match_driver_when_require_system_false_and_base_repo_not_resolved() {
         const FALLBACK_BOOT_DRIVER_COMPONENT_URL: &str = "fuchsia-boot:///#driver/fallback-boot.cm";
-        const FALLBACK_BOOT_DRIVER_V1_DRIVER_PATH: &str = "meta/fallback-boot.so";
 
         let always_match = create_always_match_bind_rules();
         let boot_repo = vec![ResolvedDriver {
             component_url: url::Url::parse(FALLBACK_BOOT_DRIVER_COMPONENT_URL).unwrap(),
-            v1_driver_path: Some(FALLBACK_BOOT_DRIVER_V1_DRIVER_PATH.to_owned()),
             bind_rules: always_match.clone(),
             bind_bytecode: vec![],
             colocate: false,
@@ -1641,6 +1635,7 @@ mod tests {
             fallback: true,
             package_type: DriverPackageType::Boot,
             package_hash: None,
+            is_dfv2: None,
         }];
         let index = Indexer::new(boot_repo, BaseRepo::NotResolved, false);
         let (proxy, stream) =
@@ -1655,9 +1650,8 @@ mod tests {
                 fdi::MatchDriverArgs { properties: Some(vec![property]), ..Default::default() };
             let result = proxy.match_driver(&args).await.unwrap().unwrap();
 
-            let expected_result = fdi::MatchedDriver::Driver(create_matched_driver_info(
-                FALLBACK_BOOT_DRIVER_COMPONENT_URL.to_owned(),
-                format!("fuchsia-boot:///#{}", FALLBACK_BOOT_DRIVER_V1_DRIVER_PATH),
+            let expected_result = fdi::MatchDriverResult::Driver(create_driver_info(
+                FALLBACK_BOOT_DRIVER_COMPONENT_URL.to_string(),
                 false,
                 vec![],
                 DriverPackageType::Boot,
@@ -1694,16 +1688,18 @@ mod tests {
             let result = proxy.match_driver(&args).await.unwrap().unwrap();
 
             let expected_url = "fuchsia-boot:///#meta/test-bind-component.cm".to_string();
-            let expected_driver_url = "fuchsia-boot:///#driver/fake-driver.so".to_string();
-            let expected_result = fdi::MatchedDriver::Driver(create_matched_driver_info(
-                expected_url,
-                expected_driver_url,
-                true,
-                vec![create_default_device_category()],
-                DriverPackageType::Boot,
-                false,
-            ));
-            assert_eq!(expected_result, result);
+            match result {
+                fdi::MatchDriverResult::Driver(d) => {
+                    assert_eq!(expected_url, d.url.unwrap());
+                    assert_eq!(true, d.colocate.unwrap());
+                    assert_eq!(false, d.is_fallback.unwrap());
+                    assert_eq!(fdf::DriverPackageType::Boot, d.package_type.unwrap());
+                }
+                fdi::MatchDriverResult::CompositeParents(p) => {
+                    panic!("Bad match driver: {:#?}", p);
+                }
+                _ => panic!("Bad case"),
+            }
 
             // Check the value from the 'test-bind2' binary. This should match my-driver2.cm
             let property = fdf::NodeProperty {
@@ -1715,16 +1711,18 @@ mod tests {
             let result = proxy.match_driver(&args).await.unwrap().unwrap();
 
             let expected_url = "fuchsia-boot:///#meta/test-bind2-component.cm".to_string();
-            let expected_driver_url = "fuchsia-boot:///#driver/fake-driver2.so".to_string();
-            let expected_result = fdi::MatchedDriver::Driver(create_matched_driver_info(
-                expected_url,
-                expected_driver_url,
-                false,
-                vec![create_default_device_category()],
-                DriverPackageType::Boot,
-                false,
-            ));
-            assert_eq!(expected_result, result);
+            match result {
+                fdi::MatchDriverResult::Driver(d) => {
+                    assert_eq!(expected_url, d.url.unwrap());
+                    assert_eq!(false, d.colocate.unwrap());
+                    assert_eq!(false, d.is_fallback.unwrap());
+                    assert_eq!(fdf::DriverPackageType::Boot, d.package_type.unwrap());
+                }
+                fdi::MatchDriverResult::CompositeParents(p) => {
+                    panic!("Bad match driver: {:#?}", p);
+                }
+                _ => panic!("Bad case"),
+            }
 
             // Check an unknown value. This should return the NOT_FOUND error.
             let property = fdf::NodeProperty {
@@ -1778,20 +1776,16 @@ mod tests {
                 value: fdf::NodePropertyValue::StringValue("thrasher".to_string()),
             }];
 
-            assert_eq!(
-                Ok(()),
-                proxy
-                    .add_composite_node_spec(&fdf::CompositeNodeSpec {
-                        name: Some("test_group".to_string()),
-                        parents: Some(vec![fdf::ParentSpec {
-                            bind_rules: bind_rules,
-                            properties: properties,
-                        }]),
-                        ..Default::default()
-                    })
-                    .await
-                    .unwrap()
-            );
+            let composite_sepc = fdf::CompositeNodeSpec {
+                name: Some("test_group".to_string()),
+                parents: Some(vec![fdf::ParentSpec {
+                    bind_rules: bind_rules,
+                    properties: properties,
+                }]),
+                ..Default::default()
+            };
+
+            assert_eq!(Ok(()), proxy.add_composite_node_spec(&composite_sepc).await.unwrap());
 
             let device_properties_match = vec![
                 fdf::NodeProperty {
@@ -1810,15 +1804,14 @@ mod tests {
 
             let result = proxy.match_driver(&match_args).await.unwrap().unwrap();
             assert_eq!(
-                fdi::MatchedDriver::ParentSpec(fdi::MatchedCompositeNodeParentInfo {
-                    specs: Some(vec![fdi::MatchedCompositeNodeSpecInfo {
-                        name: Some("test_group".to_string()),
-                        node_index: Some(0),
-                        num_nodes: Some(1),
+                fdi::MatchDriverResult::CompositeParents(vec![fdf::CompositeParent {
+                    composite: Some(fdf::CompositeInfo {
+                        spec: Some(composite_sepc.clone()),
                         ..Default::default()
-                    }]),
+                    }),
+                    index: Some(0),
                     ..Default::default()
-                }),
+                }]),
                 result
             );
 
@@ -1903,7 +1896,6 @@ mod tests {
                 .unwrap();
         let base_repo = BaseRepo::Resolved(std::vec![ResolvedDriver {
             component_url: url.clone(),
-            v1_driver_path: None,
             bind_rules: rules,
             bind_bytecode: vec![],
             colocate: false,
@@ -1911,6 +1903,7 @@ mod tests {
             fallback: false,
             package_type: DriverPackageType::Base,
             package_hash: None,
+            is_dfv2: None,
         },]);
 
         let (proxy, stream) =
@@ -2105,7 +2098,6 @@ mod tests {
                 .unwrap();
         let base_repo = BaseRepo::Resolved(std::vec![ResolvedDriver {
             component_url: url.clone(),
-            v1_driver_path: None,
             bind_rules: rules,
             bind_bytecode: vec![],
             colocate: false,
@@ -2113,6 +2105,7 @@ mod tests {
             fallback: false,
             package_type: DriverPackageType::Base,
             package_hash: None,
+            is_dfv2: None,
         },]);
 
         let (proxy, stream) =
@@ -2307,7 +2300,6 @@ mod tests {
                 .unwrap();
         let base_repo = BaseRepo::Resolved(std::vec![ResolvedDriver {
             component_url: url.clone(),
-            v1_driver_path: None,
             bind_rules: rules,
             bind_bytecode: vec![],
             colocate: false,
@@ -2315,6 +2307,7 @@ mod tests {
             fallback: false,
             package_type: DriverPackageType::Base,
             package_hash: None,
+            is_dfv2: None,
         },]);
 
         let (proxy, stream) =
@@ -2543,10 +2536,10 @@ mod tests {
                 ..Default::default()
             };
 
-            // We can see the spec comes back without a matched composite.
+            // We can see the spec comes back without a matched driver.
             let match_result = proxy.match_driver(&match_args).await.unwrap().unwrap();
-            if let fdi::MatchedDriver::ParentSpec(info) = match_result {
-                assert_eq!(None, info.specs.unwrap()[0].composite);
+            if let fdi::MatchDriverResult::CompositeParents(info) = match_result {
+                assert_eq!(None, info[0].composite.as_ref().unwrap().matched_driver);
             } else {
                 assert!(false, "Did not get back a spec.");
             }
@@ -2557,7 +2550,6 @@ mod tests {
                     index.composite_node_spec_manager.borrow_mut();
                 composite_node_spec_manager.new_driver_available(ResolvedDriver {
                     component_url: url.clone(),
-                    v1_driver_path: None,
                     bind_rules: rules,
                     bind_bytecode: vec![],
                     colocate: false,
@@ -2565,16 +2557,23 @@ mod tests {
                     fallback: false,
                     package_type: DriverPackageType::Base,
                     package_hash: None,
+                    is_dfv2: None,
                 });
             }
 
             // Now when we get it back, it has the matching composite driver on it.
             let match_result = proxy.match_driver(&match_args).await.unwrap().unwrap();
-            if let fdi::MatchedDriver::ParentSpec(info) = match_result {
+            if let fdi::MatchDriverResult::CompositeParents(info) = match_result {
                 assert_eq!(
                     &"mimid".to_string(),
-                    info.specs.unwrap()[0]
+                    info[0]
                         .composite
+                        .as_ref()
+                        .unwrap()
+                        .matched_driver
+                        .as_ref()
+                        .unwrap()
+                        .composite_driver
                         .as_ref()
                         .unwrap()
                         .composite_name
@@ -2741,10 +2740,10 @@ mod tests {
                 ..Default::default()
             };
 
-            // We can see the spec comes back without a matched composite.
+            // We can see the spec comes back without a matched drive.
             let match_result = proxy.match_driver(&match_args).await.unwrap().unwrap();
-            if let fdi::MatchedDriver::ParentSpec(info) = match_result {
-                assert_eq!(None, info.specs.unwrap()[0].composite);
+            if let fdi::MatchDriverResult::CompositeParents(info) = match_result {
+                assert_eq!(None, info[0].composite.as_ref().unwrap().matched_driver);
             } else {
                 assert!(false, "Did not get back a spec.");
             }
@@ -2755,7 +2754,6 @@ mod tests {
                     index.composite_node_spec_manager.borrow_mut();
                 composite_node_spec_manager.new_driver_available(ResolvedDriver {
                     component_url: url.clone(),
-                    v1_driver_path: None,
                     bind_rules: rules,
                     bind_bytecode: vec![],
                     colocate: false,
@@ -2763,16 +2761,23 @@ mod tests {
                     fallback: false,
                     package_type: DriverPackageType::Base,
                     package_hash: None,
+                    is_dfv2: None,
                 });
             }
 
             // Now when we get it back, it has the matching composite driver on it.
             let match_result = proxy.match_driver(&match_args).await.unwrap().unwrap();
-            if let fdi::MatchedDriver::ParentSpec(info) = match_result {
+            if let fdi::MatchDriverResult::CompositeParents(info) = match_result {
                 assert_eq!(
                     &"mimid".to_string(),
-                    info.specs.unwrap()[0]
+                    info[0]
                         .composite
+                        .as_ref()
+                        .unwrap()
+                        .matched_driver
+                        .as_ref()
+                        .unwrap()
+                        .composite_driver
                         .as_ref()
                         .unwrap()
                         .composite_name
@@ -2950,8 +2955,8 @@ mod tests {
 
             // We can see the spec comes back without a matched composite.
             let match_result = proxy.match_driver(&match_args).await.unwrap().unwrap();
-            if let fdi::MatchedDriver::ParentSpec(info) = match_result {
-                assert_eq!(None, info.specs.unwrap()[0].composite);
+            if let fdi::MatchDriverResult::CompositeParents(info) = match_result {
+                assert_eq!(None, info[0].composite.as_ref().unwrap().matched_driver);
             } else {
                 assert!(false, "Did not get back a spec.");
             }
@@ -2962,7 +2967,6 @@ mod tests {
                     index.composite_node_spec_manager.borrow_mut();
                 composite_node_spec_manager.new_driver_available(ResolvedDriver {
                     component_url: url.clone(),
-                    v1_driver_path: None,
                     bind_rules: rules,
                     bind_bytecode: vec![],
                     colocate: false,
@@ -2970,16 +2974,23 @@ mod tests {
                     fallback: false,
                     package_type: DriverPackageType::Base,
                     package_hash: None,
+                    is_dfv2: None,
                 });
             }
 
             // Now when we get it back, it has the matching composite driver on it.
             let match_result = proxy.match_driver(&match_args).await.unwrap().unwrap();
-            if let fdi::MatchedDriver::ParentSpec(info) = match_result {
+            if let fdi::MatchDriverResult::CompositeParents(info) = match_result {
                 assert_eq!(
                     &"mimid".to_string(),
-                    info.specs.unwrap()[0]
+                    info[0]
                         .composite
+                        .as_ref()
+                        .unwrap()
+                        .matched_driver
+                        .as_ref()
+                        .unwrap()
+                        .composite_driver
                         .as_ref()
                         .unwrap()
                         .composite_name
@@ -3017,7 +3028,6 @@ mod tests {
         let base_repo = BaseRepo::Resolved(std::vec![ResolvedDriver {
             component_url: url::Url::parse("fuchsia-pkg://fuchsia.com/package#driver/my-driver.cm")
                 .unwrap(),
-            v1_driver_path: None,
             bind_rules: always_match,
             bind_bytecode: vec![],
             colocate: false,
@@ -3025,6 +3035,7 @@ mod tests {
             fallback: false,
             package_type: DriverPackageType::Base,
             package_hash: None,
+            is_dfv2: None,
         },]);
 
         let (proxy, stream) =
@@ -3118,7 +3129,6 @@ mod tests {
         let base_repo = BaseRepo::Resolved(std::vec![ResolvedDriver {
             component_url: url::Url::parse("fuchsia-pkg://fuchsia.com/package#driver/my-driver.cm")
                 .unwrap(),
-            v1_driver_path: None,
             bind_rules: always_match,
             bind_bytecode: vec![],
             colocate: false,
@@ -3126,6 +3136,7 @@ mod tests {
             fallback: false,
             package_type: DriverPackageType::Base,
             package_hash: None,
+            is_dfv2: None,
         },]);
 
         let (proxy, stream) =
@@ -3183,8 +3194,6 @@ mod tests {
     async fn test_register_and_match_ephemeral_driver() {
         let component_manifest_url =
             "fuchsia-pkg://fuchsia.com/driver-index-unittests#meta/test-bind-component.cm";
-        let driver_library_url =
-            "fuchsia-pkg://fuchsia.com/driver-index-unittests#driver/fake-driver.so";
 
         let (proxy, stream) =
             fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>().unwrap();
@@ -3227,17 +3236,19 @@ mod tests {
 
             // Match succeeds now.
             let result = proxy.match_driver(&args).await.unwrap().unwrap();
-            let expected_url = component_manifest_url.to_string();
-            let expected_driver_url = driver_library_url.to_string();
-            let expected_result = fdi::MatchedDriver::Driver(create_matched_driver_info(
-                expected_url,
-                expected_driver_url,
-                true,
-                vec![create_default_device_category()],
-                DriverPackageType::Universe,
-                false,
-            ));
-            assert_eq!(expected_result, result);
+            let expected_url =
+                "fuchsia-pkg://fuchsia.com/driver-index-unittests#meta/test-bind-component.cm"
+                    .to_string();
+
+            match result {
+                fdi::MatchDriverResult::Driver(d) => {
+                    assert_eq!(expected_url, d.url.unwrap());
+                }
+                fdi::MatchDriverResult::CompositeParents(p) => {
+                    panic!("Bad match driver: {:#?}", p);
+                }
+                _ => panic!("Bad case"),
+            }
         }
         .fuse();
 
@@ -3260,8 +3271,6 @@ mod tests {
     async fn test_register_and_get_ephemeral_driver() {
         let component_manifest_url =
             "fuchsia-pkg://fuchsia.com/driver-index-unittests#meta/test-bind-component.cm";
-        let driver_library_url =
-            "fuchsia-pkg://fuchsia.com/driver-index-unittests#driver/fake-driver.so";
 
         let (registrar_proxy, registrar_stream) =
             fidl::endpoints::create_proxy_and_stream::<fdr::DriverRegistrarMarker>().unwrap();
@@ -3301,7 +3310,7 @@ mod tests {
                 get_driver_info_proxy(&development_proxy, &[component_manifest_url.to_string()])
                     .await;
             assert_eq!(1, driver_infos.len());
-            assert_eq!(&driver_library_url.to_string(), driver_infos[0].libname.as_ref().unwrap());
+            assert_eq!(&component_manifest_url.to_string(), driver_infos[0].url.as_ref().unwrap());
         }
         .fuse();
 
@@ -3347,7 +3356,6 @@ mod tests {
         let boot_repo = std::vec![];
         let base_repo = BaseRepo::Resolved(vec![ResolvedDriver {
             component_url: url::Url::parse(component_manifest_url).unwrap(),
-            v1_driver_path: Some("meta/fake-driver.so".to_string()),
             bind_rules: always_match.clone(),
             bind_bytecode: vec![],
             colocate: false,
@@ -3355,6 +3363,7 @@ mod tests {
             fallback: false,
             package_type: DriverPackageType::Base,
             package_hash: None,
+            is_dfv2: None,
         }]);
 
         let index = Rc::new(Indexer::new(boot_repo, base_repo, false));
@@ -3410,7 +3419,6 @@ mod tests {
 
         let boot_repo = vec![ResolvedDriver {
             component_url: url::Url::parse(component_manifest_url).unwrap(),
-            v1_driver_path: Some("meta/fake-driver.so".to_string()),
             bind_rules: always_match.clone(),
             bind_bytecode: vec![],
             colocate: false,
@@ -3418,6 +3426,7 @@ mod tests {
             fallback: false,
             package_type: DriverPackageType::Boot,
             package_hash: None,
+            is_dfv2: None,
         }];
 
         let base_repo = BaseRepo::Resolved(std::vec![]);
@@ -3478,12 +3487,12 @@ mod tests {
                 }
             ]),
             vec![
-                fdi::DeviceCategory {
+                fdf::DeviceCategory {
                     category: Some("usb".to_string()),
                     subcategory: None,
                     ..Default::default()
                 },
-                fdi::DeviceCategory {
+                fdf::DeviceCategory {
                     category: Some("connectivity".to_string()),
                     subcategory: Some("ethernet".to_string()),
                     ..Default::default()

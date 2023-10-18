@@ -26,8 +26,9 @@ class DeviceInfoIterator : public fidl::WireServer<fuchsia_driver_development::D
 class CompositeInfoIterator
     : public fidl::WireServer<fuchsia_driver_development::CompositeInfoIterator> {
  public:
-  explicit CompositeInfoIterator(std::unique_ptr<fidl::Arena<512>> arena,
-                                 std::vector<fuchsia_driver_development::wire::CompositeInfo> list)
+  explicit CompositeInfoIterator(
+      std::unique_ptr<fidl::Arena<512>> arena,
+      std::vector<fuchsia_driver_development::wire::CompositeNodeInfo> list)
       : arena_(std::move(arena)), list_(std::move(list)) {}
 
   void GetNext(GetNextCompleter::Sync& completer) override;
@@ -35,7 +36,7 @@ class CompositeInfoIterator
  private:
   size_t offset_ = 0;
   std::unique_ptr<fidl::Arena<512>> arena_;
-  std::vector<fuchsia_driver_development::wire::CompositeInfo> list_;
+  std::vector<fuchsia_driver_development::wire::CompositeNodeInfo> list_;
 };
 
 }  // namespace driver_development

@@ -4,7 +4,7 @@
 
 use {
     anyhow::{anyhow, Result},
-    fidl_fuchsia_driver_development as fdd,
+    fidl_fuchsia_driver_framework as fdf,
     serde::Deserialize,
     std::collections::{HashMap, HashSet},
     std::str::FromStr,
@@ -107,7 +107,7 @@ pub trait FilterTests {
     fn tests_by_url(&self, filter: &[String]) -> Result<HashSet<TestInfo>>;
     fn tests_by_test_type(&self, filter: &[String]) -> Result<HashSet<TestInfo>>;
     fn tests_by_device_category(&self, filter: &[DeviceCategory]) -> Result<HashSet<TestInfo>>;
-    fn tests_by_driver(&self, driver: &fdd::DriverInfo) -> Result<HashSet<TestInfo>>;
+    fn tests_by_driver(&self, driver: &fdf::DriverInfo) -> Result<HashSet<TestInfo>>;
 }
 
 impl FilterTests for TestMetadata {
@@ -179,7 +179,7 @@ impl FilterTests for TestMetadata {
     }
 
     /// Gets list of tests that can be run against the given driver.
-    fn tests_by_driver(&self, driver: &fdd::DriverInfo) -> Result<HashSet<TestInfo>> {
+    fn tests_by_driver(&self, driver: &fdf::DriverInfo) -> Result<HashSet<TestInfo>> {
         if let Some(device_categories) = &driver.device_categories {
             let mut category_list: HashSet<DeviceCategory> = HashSet::new();
             for cats in device_categories.iter() {
@@ -222,7 +222,6 @@ impl FilterTests for TestMetadata {
 pub mod test {
     use super::*;
     use crate::*;
-    use fidl_fuchsia_driver_index as fdi;
 
     pub fn init_metadata() -> parser::TestMetadata {
         serde_json::from_str(
@@ -399,17 +398,17 @@ pub mod test {
     fn test_tests_by_driver() {
         let meta = init_metadata();
 
-        let test0 = meta.tests_by_driver(&fdd::DriverInfo::default());
+        let test0 = meta.tests_by_driver(&fdf::DriverInfo::default());
         assert!(test0.is_err());
 
-        let test1 = meta.tests_by_driver(&fdd::DriverInfo {
-            device_categories: Some(vec![fdi::DeviceCategory::default()]),
+        let test1 = meta.tests_by_driver(&fdf::DriverInfo {
+            device_categories: Some(vec![fdf::DeviceCategory::default()]),
             ..Default::default()
         });
         assert!(test1.is_err());
 
-        let test2 = meta.tests_by_driver(&fdd::DriverInfo {
-            device_categories: Some(vec![fdi::DeviceCategory {
+        let test2 = meta.tests_by_driver(&fdf::DriverInfo {
+            device_categories: Some(vec![fdf::DeviceCategory {
                 category: Some("misc".to_string()),
                 subcategory: None,
                 ..Default::default()
@@ -419,14 +418,14 @@ pub mod test {
         assert!(test2.is_ok());
         assert_eq!(test2.unwrap().len(), 1);
 
-        let test3 = meta.tests_by_driver(&fdd::DriverInfo {
+        let test3 = meta.tests_by_driver(&fdf::DriverInfo {
             device_categories: Some(vec![
-                fdi::DeviceCategory {
+                fdf::DeviceCategory {
                     category: Some("input".to_string()),
                     subcategory: Some("touchpad".to_string()),
                     ..Default::default()
                 },
-                fdi::DeviceCategory {
+                fdf::DeviceCategory {
                     category: Some("imaging".to_string()),
                     subcategory: Some("camera".to_string()),
                     ..Default::default()
@@ -437,8 +436,8 @@ pub mod test {
         assert!(test3.is_ok());
         assert_eq!(test3.unwrap().len(), 2);
 
-        let test4 = meta.tests_by_driver(&fdd::DriverInfo {
-            device_categories: Some(vec![fdi::DeviceCategory {
+        let test4 = meta.tests_by_driver(&fdf::DriverInfo {
+            device_categories: Some(vec![fdf::DeviceCategory {
                 category: Some("bike".to_string()),
                 subcategory: None,
                 ..Default::default()
@@ -447,8 +446,8 @@ pub mod test {
         });
         assert!(test4.is_err());
 
-        let test5 = meta.tests_by_driver(&fdd::DriverInfo {
-            device_categories: Some(vec![fdi::DeviceCategory {
+        let test5 = meta.tests_by_driver(&fdf::DriverInfo {
+            device_categories: Some(vec![fdf::DeviceCategory {
                 category: Some("input".to_string()),
                 subcategory: Some("pogo".to_string()),
                 ..Default::default()

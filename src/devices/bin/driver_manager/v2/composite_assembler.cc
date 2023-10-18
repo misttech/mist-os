@@ -66,11 +66,6 @@ fdd::LegacyCompositeFragmentInfo CompositeDeviceFragment::GetCompositeFragmentIn
   fdd::LegacyCompositeFragmentInfo fragment_info;
   fragment_info.name() = name_;
 
-  auto bound_node = bound_node_.lock();
-  if (auto bound_node = bound_node_.lock()) {
-    fragment_info.device() = bound_node->MakeTopologicalPath();
-  }
-
   std::vector<fuchsia_driver_legacy::BindInstruction> bind_rules(bind_rules_.size());
   for (size_t i = 0; i < bind_rules_.size(); i++) {
     bind_rules[i] = fuchsia_driver_legacy::BindInstruction{{
@@ -81,6 +76,14 @@ fdd::LegacyCompositeFragmentInfo CompositeDeviceFragment::GetCompositeFragmentIn
   }
   fragment_info.bind_rules() = std::move(bind_rules);
   return fragment_info;
+}
+
+std::optional<std::string> CompositeDeviceFragment::GetTopologicalPath() const {
+  if (auto node = bound_node_.lock()) {
+    return node->MakeTopologicalPath();
+  }
+
+  return std::nullopt;
 }
 
 bool CompositeDeviceFragment::BindNode(std::shared_ptr<Node> node) {
@@ -114,33 +117,62 @@ void CompositeDeviceFragment::Inspect(inspect::Node& root) const {
   root.RecordString(name_, moniker);
 }
 
-fdd::CompositeInfo CompositeDeviceAssembler::GetCompositeInfo() const {
-  auto info = fdd::CompositeInfo();
-  info.name() = name_;
+fdd::CompositeNodeInfo CompositeDeviceAssembler::GetCompositeInfo() const {
+  std::vector<std::optional<std::string>> parent_topological_paths;
+  parent_topological_paths.reserve(fragments_.size());
+  for (auto& fragment : fragments_) {
+    parent_topological_paths.push_back(fragment.GetTopologicalPath());
+  }
 
-  // The first fragment is always the primary index.
-  info.primary_index() = 0;
+  std::optional<std::string> topological_path = std::nullopt;
+  if (assembled_node_.has_value()) {
+    if (auto node_ptr = assembled_node_->lock()) {
+      topological_path = node_ptr->MakeTopologicalPath();
+    }
+  }
 
+  auto info = fdd::CompositeNodeInfo({
+      .parent_topological_paths = parent_topological_paths,
+      .topological_path = topological_path,
+      .composite = fdd::CompositeInfo::WithLegacyComposite(GetLegacyCompositeInfo()),
+  });
+
+  return info;
+}
+
+fuchsia_driver_development::LegacyCompositeInfo CompositeDeviceAssembler::GetLegacyCompositeInfo()
+    const {
   std::vector<fdd::LegacyCompositeFragmentInfo> fragments;
   fragments.reserve(fragments_.size());
   for (auto& fragment : fragments_) {
     fragments.push_back(fragment.GetCompositeFragmentInfo());
   }
-  info.node_info() = fdd::CompositeNodeInfo::WithLegacy(fdd::LegacyCompositeNodeInfo{{
-      .fragments = std::move(fragments),
-  }});
 
-  if (!assembled_node_.has_value()) {
-    return info;
+  std::vector<fdf::NodeProperty> properties;
+  properties.reserve(properties_.size());
+  for (auto& prop : properties_) {
+    properties.push_back(fidl::ToNatural(prop));
   }
 
-  auto node_ptr = assembled_node_->lock();
-  if (auto node_ptr = assembled_node_->lock()) {
-    info.driver() = node_ptr->driver_url();
-    info.topological_path() = node_ptr->MakeTopologicalPath();
+  std::optional<fdf::DriverInfo> driver_info = std::nullopt;
+  if (assembled_node_.has_value()) {
+    if (auto node_ptr = assembled_node_->lock()) {
+      driver_info = fdf::DriverInfo({
+          .url = node_ptr->driver_url(),
+          .package_type = node_ptr->driver_package_type(),
+      });
+    }
   }
 
-  return info;
+  fdd::LegacyCompositeInfo legacy_composite_info({
+      .name = name_,
+      .fragments = fragments,
+      .properties = properties,
+      .matched_driver = driver_info,
+      .primary_fragment_index = 0,  // The first fragment is always the primary index.
+  });
+
+  return legacy_composite_info;
 }
 
 zx::result<std::unique_ptr<CompositeDeviceAssembler>> CompositeDeviceAssembler::Create(
@@ -216,24 +248,27 @@ zx::result<std::unique_ptr<CompositeDeviceAssembler>> CompositeDeviceAssembler::
   return zx::ok(std::move(assembler));
 }
 
-bool CompositeDeviceAssembler::BindNode(std::shared_ptr<Node> node) {
-  bool matched = false;
+std::optional<uint32_t> CompositeDeviceAssembler::BindNode(std::shared_ptr<Node> node) {
+  std::optional<uint32_t> matched = std::nullopt;
+  uint32_t i = 0;
   for (auto& fragment : fragments_) {
     if (fragment.BindNode(node)) {
-      matched = true;
+      matched = i;
       LOGF(DEBUG, "Found a match for composite device '%s': fragment %s: device '%s'",
            name_.c_str(), std::string(fragment.name()).c_str(),
            node->MakeComponentMoniker().c_str());
       break;
     }
+
+    i++;
   }
 
-  if (!matched) {
-    return false;
+  if (!matched.has_value()) {
+    return std::nullopt;
   }
 
   TryToAssemble();
-  return true;
+  return matched;
 }
 
 void CompositeDeviceAssembler::TryToAssemble() {
@@ -301,14 +336,16 @@ zx_status_t CompositeDeviceManager::AddCompositeDevice(
   return ZX_OK;
 }
 
-std::vector<fdd::CompositeInfo> CompositeDeviceManager::BindNode(std::shared_ptr<Node> node) {
-  std::vector<fdd::CompositeInfo> result_info;
+std::vector<fdd::LegacyCompositeParent> CompositeDeviceManager::BindNode(
+    std::shared_ptr<Node> node) {
+  std::vector<fdd::LegacyCompositeParent> result_info;
   for (auto& assembler : assemblers_) {
-    if (!assembler->BindNode(node)) {
+    std::optional<uint32_t> bound = assembler->BindNode(node);
+    if (!bound.has_value()) {
       continue;
     }
 
-    result_info.push_back(assembler->GetCompositeInfo());
+    result_info.push_back(fdd::LegacyCompositeParent({assembler->GetLegacyCompositeInfo(), bound}));
 
     // If the node cannot multibind, then it should only be matched with one
     // legacy composite.
@@ -333,9 +370,9 @@ void CompositeDeviceManager::Inspect(inspect::Node& root) const {
   }
 }
 
-std::vector<fdd::wire::CompositeInfo> CompositeDeviceManager::GetCompositeListInfo(
+std::vector<fdd::wire::CompositeNodeInfo> CompositeDeviceManager::GetCompositeListInfo(
     fidl::AnyArena& arena) const {
-  std::vector<fdd::wire::CompositeInfo> composite_list;
+  std::vector<fdd::wire::CompositeNodeInfo> composite_list;
   composite_list.reserve(assemblers_.size());
   for (auto& assembler : assemblers_) {
     composite_list.push_back(fidl::ToWire(arena, assembler->GetCompositeInfo()));

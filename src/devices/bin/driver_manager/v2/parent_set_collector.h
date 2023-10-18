@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.driver.index/cpp/wire.h>
 
 #include "src/devices/bin/driver_manager/v2/node.h"
-#include "src/devices/lib/log/log.h"
 
 namespace dfv2 {
 
@@ -19,7 +18,7 @@ class ParentSetCollector {
  public:
   explicit ParentSetCollector(std::string composite_name, std::vector<std::string> parent_names,
                               uint32_t primary_index)
-      : composite_name_(composite_name),
+      : composite_name_(std::move(composite_name)),
         parents_(parent_names.size()),
         parent_names_(std::move(parent_names)),
         primary_index_(primary_index) {}
@@ -34,8 +33,7 @@ class ParentSetCollector {
   zx::result<std::shared_ptr<Node>> TryToAssemble(NodeManager* node_manager,
                                                   async_dispatcher_t* dispatcher);
 
-  fidl::VectorView<fuchsia_driver_development::wire::CompositeParentNodeInfo> GetParentInfo(
-      fidl::AnyArena& arena) const;
+  fidl::VectorView<fidl::StringView> GetParentTopologicalPaths(fidl::AnyArena& arena) const;
 
   const std::weak_ptr<Node>& get(uint32_t index) const { return parents_[index]; }
 

@@ -10,8 +10,8 @@ use {
     },
     cm_rust::FidlIntoNative,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_resolution as fresolution,
-    fidl_fuchsia_driver_development as fdd, fidl_fuchsia_driver_index as fdi,
-    fidl_fuchsia_io as fio, fidl_fuchsia_pkg as fpkg,
+    fidl_fuchsia_driver_framework as fdf, fidl_fuchsia_driver_index as fdi, fidl_fuchsia_io as fio,
+    fidl_fuchsia_pkg as fpkg,
     fuchsia_pkg::{OpenRights, PackageDirectory},
     futures::TryFutureExt,
 };
@@ -31,14 +31,14 @@ pub enum DriverPackageType {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ResolvedDriver {
     pub component_url: url::Url,
-    pub v1_driver_path: Option<String>,
     pub bind_rules: DecodedRules,
     pub bind_bytecode: Vec<u8>,
     pub colocate: bool,
-    pub device_categories: Vec<fdi::DeviceCategory>,
+    pub device_categories: Vec<fdf::DeviceCategory>,
     pub fallback: bool,
     pub package_type: DriverPackageType,
     pub package_hash: Option<fpkg::BlobId>,
+    pub is_dfv2: Option<bool>,
 }
 
 impl std::fmt::Display for ResolvedDriver {
@@ -48,11 +48,6 @@ impl std::fmt::Display for ResolvedDriver {
 }
 
 impl ResolvedDriver {
-    pub fn get_libname(&self) -> String {
-        let mut libname = self.component_url.clone();
-        libname.set_fragment(self.v1_driver_path.as_deref());
-        libname.into()
-    }
     pub async fn resolve(
         component_url: url::Url,
         resolver: &fresolution::ResolverProxy,
@@ -111,7 +106,7 @@ impl ResolvedDriver {
     pub fn matches(
         &self,
         properties: &DeviceProperties,
-    ) -> Result<Option<fdi::MatchedDriver>, bind::interpreter::common::BytecodeError> {
+    ) -> Result<Option<fdi::MatchDriverResult>, bind::interpreter::common::BytecodeError> {
         if let DecodedRules::Normal(rules) = &self.bind_rules {
             let matches = match_bind(
                 MatchBindData {
@@ -129,42 +124,25 @@ impl ResolvedDriver {
                 return Ok(None);
             }
 
-            return Ok(Some(fdi::MatchedDriver::Driver(self.create_matched_driver_info())));
+            return Ok(Some(fdi::MatchDriverResult::Driver(self.create_driver_info())));
         }
 
         Ok(None)
     }
 
-    fn get_driver_url(&self) -> Option<String> {
-        match self.v1_driver_path.as_ref() {
-            Some(p) => {
-                let mut driver_url = self.component_url.clone();
-                driver_url.set_fragment(Some(p));
-                Some(driver_url.to_string())
-            }
-            None => None,
-        }
-    }
-    pub fn create_matched_driver_info(&self) -> fdi::MatchedDriverInfo {
-        fdi::MatchedDriverInfo {
-            url: Some(self.component_url.as_str().to_string()),
-            driver_url: self.get_driver_url(),
-            colocate: Some(self.colocate),
-            device_categories: Some(self.device_categories.clone()),
-            package_type: fdi::DriverPackageType::from_primitive(self.package_type as u8),
-            is_fallback: Some(self.fallback),
-            ..Default::default()
-        }
-    }
-
-    pub fn create_driver_info(&self) -> fdd::DriverInfo {
-        fdd::DriverInfo {
+    pub fn create_driver_info(&self) -> fdf::DriverInfo {
+        fdf::DriverInfo {
             url: Some(self.component_url.clone().to_string()),
-            libname: Some(self.get_libname()),
-            bind_rules: Some(fdd::BindRulesBytecode::BytecodeV2(self.bind_bytecode.clone())),
-            package_type: fdi::DriverPackageType::from_primitive(self.package_type as u8),
-            package_hash: self.package_hash,
+            colocate: Some(self.colocate),
+            package_type: fdf::DriverPackageType::from_primitive(self.package_type as u8),
+            is_fallback: Some(self.fallback),
             device_categories: Some(self.device_categories.clone()),
+            bind_rules_bytecode: Some(self.bind_bytecode.clone()),
+            driver_framework_version: match self.is_dfv2 {
+                Some(true) => Some(2),
+                Some(false) => Some(1),
+                None => None,
+            },
             ..Default::default()
         }
     }
@@ -251,9 +229,10 @@ pub async fn load_driver(
     };
 
     let device_categories = get_rules_device_categories_vec(&component).unwrap();
+    let is_dfv2 = Some(v1_driver_path.is_none());
+
     Ok(ResolvedDriver {
         component_url: component_url,
-        v1_driver_path: v1_driver_path,
         bind_rules: bind_rules,
         bind_bytecode: bind,
         colocate: colocate,
@@ -261,6 +240,7 @@ pub async fn load_driver(
         fallback: fallback,
         package_type,
         package_hash,
+        is_dfv2,
     })
 }
 
@@ -282,8 +262,8 @@ fn get_rules_string_value(component: &cm_rust::ComponentDecl, key: &str) -> Opti
 
 fn get_rules_device_categories_vec(
     component: &cm_rust::ComponentDecl,
-) -> Option<Vec<fdi::DeviceCategory>> {
-    let default_val = Some(vec![fdi::DeviceCategory {
+) -> Option<Vec<fdf::DeviceCategory>> {
+    let default_val = Some(vec![fdf::DeviceCategory {
         category: Some(DEFAULT_DEVICE_CATEGORY.to_string()),
         subcategory: None,
         ..Default::default()
@@ -307,13 +287,13 @@ fn get_rules_device_categories_vec(
 
 pub fn get_device_categories_from_component_data(
     dictionaries: &Vec<fidl_fuchsia_data::Dictionary>,
-) -> Vec<fdi::DeviceCategory> {
+) -> Vec<fdf::DeviceCategory> {
     let mut categories = Vec::new();
     for dictionary in dictionaries {
         if let Some(entries) = &dictionary.entries {
             let category = get_dictionary_string_value(entries, "category");
             let subcategory = get_dictionary_string_value(entries, "subcategory");
-            categories.push(fdi::DeviceCategory { category, subcategory, ..Default::default() });
+            categories.push(fdf::DeviceCategory { category, subcategory, ..Default::default() });
         }
     }
     categories

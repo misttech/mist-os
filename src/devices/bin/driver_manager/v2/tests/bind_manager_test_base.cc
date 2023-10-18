@@ -52,7 +52,7 @@ zx::result<fidl::ClientEnd<fdi::DriverIndex>> TestDriverIndex::Connect() {
   return zx::ok(std::move(endpoints->client));
 }
 
-void TestDriverIndex::ReplyWithMatch(uint32_t id, zx::result<fdi::MatchedDriver> result) {
+void TestDriverIndex::ReplyWithMatch(uint32_t id, zx::result<fdi::MatchDriverResult> result) {
   ASSERT_FALSE(completers_[id].empty());
   auto completer = std::move(completers_[id].front());
   completers_[id].pop();
@@ -79,25 +79,25 @@ void TestBindManagerBridge::AddCompositeNodeSpec(std::string composite,
                                                  std::vector<std::string> parent_names,
                                                  std::vector<fdf::ParentSpec> parents,
                                                  std::unique_ptr<dfv2::CompositeNodeSpecV2> spec) {
-  auto composite_info = fdi::MatchedCompositeInfo{{
-      .composite_name = composite,
-      .driver_info = fdi::MatchedDriverInfo{{.url = "fuchsia-boot:///#meta/test.cm"}},
-  }};
-  auto fidl_spec_info = fdi::MatchedCompositeNodeSpecInfo{{
-      .name = composite,
-      .composite = composite_info,
-      .num_nodes = parents.size(),
-      .node_names = parent_names,
-      .primary_index = 0,
-  }};
+  fidl::Arena arena;
+  auto fidl_spec = fdf::CompositeNodeSpec{{.name = composite, .parents = std::move(parents)}};
   specs_.emplace(composite, CompositeNodeSpecData{
                                 .spec = spec.get(),
-                                .fidl_info = fidl_spec_info,
+                                .fidl_info = fdf::CompositeInfo{{
+                                    .spec = fidl_spec,
+                                    .matched_driver = fdf::CompositeDriverMatch{{
+                                        .composite_driver = fdf::CompositeDriverInfo{{
+                                            .driver_info = fdf::DriverInfo{{
+                                                .url = "fuchsia-boot:///#meta/test.cm",
+                                            }},
+                                        }},
+                                        .parent_names = std::move(parent_names),
+                                        .primary_parent_index = 0,
+                                    }},
+                                }},
                             });
 
-  fidl::Arena arena;
-  auto fidl_data = fdf::CompositeNodeSpec{{.name = composite, .parents = std::move(parents)}};
-  auto result = composite_manager_.AddSpec(fidl::ToWire(arena, fidl_data), std::move(spec));
+  auto result = composite_manager_.AddSpec(fidl::ToWire(arena, fidl_spec), std::move(spec));
   ASSERT_TRUE(result.is_ok());
 }
 
@@ -323,26 +323,27 @@ void BindManagerTestBase::InvokeTryBindAllAvailable_EXPECT_QUEUED() {
 
 void BindManagerTestBase::DriverIndexReplyWithDriver(std::string node) {
   ASSERT_NE(instance_ids_.find(node), instance_ids_.end());
-  auto driver_info = fdi::MatchedDriverInfo{{.driver_url = "fuchsia-boot:///#meta/test.cm"}};
+  auto driver_info = fdf::DriverInfo{{.url = "fuchsia-boot:///#meta/test.cm"}};
   driver_index_->ReplyWithMatch(instance_ids_[node],
-                                zx::ok(fdi::MatchedDriver::WithDriver(driver_info)));
+                                zx::ok(fdi::MatchDriverResult::WithDriver(driver_info)));
   RunLoopUntilIdle();
 }
 
 void BindManagerTestBase::DriverIndexReplyWithComposite(
     std::string node, std::vector<std::pair<std::string, size_t>> matched_specs) {
-  std::vector<fdi::MatchedCompositeNodeSpecInfo> fidl_specs;
-  fidl_specs.reserve(matched_specs.size());
+  std::vector<fdf::CompositeParent> parents;
+  parents.reserve(matched_specs.size());
   for (auto& [name, index] : matched_specs) {
     auto match_info = bridge_->specs().at(name).fidl_info;
-    match_info.node_index() = index;
-    fidl_specs.push_back(match_info);
+    parents.push_back(fdf::CompositeParent{{
+        .composite = match_info,
+        .index = index,
+    }});
   }
 
   driver_index_->ReplyWithMatch(
       instance_ids_[node],
-      zx::ok(fdi::MatchedDriver::WithParentSpec(
-          fdi::MatchedCompositeNodeParentInfo{{.specs = std::move(fidl_specs)}})));
+      zx::ok(fdi::MatchDriverResult::WithCompositeParents(std::move(parents))));
   RunLoopUntilIdle();
 }
 

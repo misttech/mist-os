@@ -191,12 +191,18 @@ zx_status_t DeviceManager::AddCompositeDevice(const fbl::RefPtr<Device>& dev, st
   return ZX_OK;
 }
 
-void DeviceManager::AddCompositeDeviceFromSpec(CompositeNodeSpecInfo info,
+void DeviceManager::AddCompositeDeviceFromSpec(fuchsia_driver_framework::CompositeInfo info,
                                                fbl::Array<std::unique_ptr<Metadata>> metadata) {
-  ZX_ASSERT(composites_from_specs_.count(info.spec_name) == 0);
+  auto& spec = info.spec();
+  ZX_ASSERT(spec.has_value());
+  auto& spec_name = spec.value().name();
+  ZX_ASSERT(spec_name.has_value());
+  auto spec_name_value = spec_name.value();
+
+  ZX_ASSERT(composites_from_specs_.count(spec_name_value) == 0);
   std::unique_ptr<CompositeDevice> new_device =
-      CompositeDevice::CreateFromSpec(info, std::move(metadata), *coordinator_);
-  composites_from_specs_[info.spec_name] = std::move(new_device);
+      CompositeDevice::CreateFromSpec(std::move(info), std::move(metadata), *coordinator_);
+  composites_from_specs_[spec_name_value] = std::move(new_device);
 }
 
 zx::result<> DeviceManager::BindFragmentForSpec(const fbl::RefPtr<Device>& dev,
@@ -418,20 +424,20 @@ zx_status_t DeviceManager::RemoveDevice(const fbl::RefPtr<Device>& dev, bool for
   return ZX_OK;
 }
 
-std::vector<fdd::wire::CompositeInfo> DeviceManager::GetLegacyCompositeInfoList(
+std::vector<fdd::wire::CompositeNodeInfo> DeviceManager::GetLegacyCompositeInfoList(
     fidl::AnyArena& arena) const {
-  std::vector<fuchsia_driver_development::wire::CompositeInfo> list;
+  std::vector<fuchsia_driver_development::wire::CompositeNodeInfo> list;
   for (auto& composite : composite_devices_) {
     list.push_back(composite.GetCompositeInfo(arena));
   }
   return list;
 }
 
-zx::result<fdd::wire::CompositeInfo> DeviceManager::GetCompositeInfoForSpec(
-    fidl::AnyArena& arena, std::string spec) const {
-  if (const auto& composite = composites_from_specs_.find(spec);
-      composite == composites_from_specs_.end()) {
-    return zx::ok(composite->second->GetCompositeInfo(arena));
+zx::result<TopologicalInfo> DeviceManager::GetTopologicalInfo(fidl::AnyArena& arena,
+                                                              const std::string& spec) const {
+  const auto& composite = composites_from_specs_.find(spec);
+  if (composite != composites_from_specs_.end()) {
+    return zx::ok(composite->second->GetTopologicalInfo(arena));
   }
   return zx::error(ZX_ERR_NOT_FOUND);
 }

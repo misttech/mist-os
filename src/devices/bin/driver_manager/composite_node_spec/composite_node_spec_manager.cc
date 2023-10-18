@@ -9,7 +9,6 @@
 #include "src/devices/lib/log/log.h"
 
 namespace fdd = fuchsia_driver_development;
-namespace fdi = fuchsia_driver_index;
 namespace fdfw = fuchsia_driver_framework;
 
 CompositeNodeSpecManager::CompositeNodeSpecManager(CompositeManagerBridge *bridge)
@@ -47,41 +46,65 @@ fit::result<fdfw::CompositeNodeSpecError> CompositeNodeSpecManager::AddSpec(
 }
 
 zx::result<BindSpecResult> CompositeNodeSpecManager::BindParentSpec(
-    fdi::wire::MatchedCompositeNodeParentInfo match_info, const DeviceOrNode &device_or_node,
-    bool enable_multibind) {
-  if (!match_info.has_specs() || match_info.specs().empty()) {
-    LOGF(ERROR, "MatchedCompositeNodeParentInfo needs to contain as least one composite node spec");
+    fidl::AnyArena &arena,
+    fidl::VectorView<fuchsia_driver_framework::wire::CompositeParent> composite_parents,
+    const DeviceOrNode &device_or_node, bool enable_multibind) {
+  if (composite_parents.empty()) {
+    LOGF(ERROR, "composite_parents needs to contain as least one composite parent.");
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
   // Go through each spec until we find an available one with an unbound parent. If
   // |enable_multibind| is true, then we will go through every spec.
-  std::vector<fuchsia_driver_index::wire::MatchedCompositeNodeSpecInfo> bound_spec_infos;
+  std::vector<fdfw::wire::CompositeParent> bound_composite_parents;
   std::vector<CompositeNodeAndDriver> node_and_drivers;
-  for (auto spec_info : match_info.specs()) {
-    if (!spec_info.has_composite()) {
+  for (auto composite_parent : composite_parents) {
+    if (!composite_parent.has_composite()) {
+      LOGF(WARNING, "CompositeParent missing composite.");
       continue;
     }
 
-    if (!spec_info.has_name() || !spec_info.has_node_index() || !spec_info.has_num_nodes() ||
-        !spec_info.has_node_names()) {
-      LOGF(WARNING, "MatchedCompositeNodeSpecInfo missing field(s)");
+    if (!composite_parent.has_index()) {
+      LOGF(WARNING, "CompositeParent missing index.");
+      continue;
+    }
+
+    auto &composite = composite_parent.composite();
+    auto &index = composite_parent.index();
+
+    if (!composite.has_matched_driver()) {
+      continue;
+    }
+
+    auto &matched_driver = composite.matched_driver();
+
+    if (!matched_driver.has_composite_driver() || !matched_driver.has_parent_names()) {
+      LOGF(WARNING, "CompositeDriverMatch does not have all needed fields.");
+      continue;
+    }
+
+    if (!composite.has_spec()) {
+      LOGF(WARNING, "CompositeInfo missing spec.");
+      continue;
+    }
+
+    auto &spec_info = composite.spec();
+
+    if (!spec_info.has_name() || !spec_info.has_parents()) {
+      LOGF(WARNING, "CompositeNodeSpec missing name or parents.");
       continue;
     }
 
     auto &name = spec_info.name();
-    auto &node_index = spec_info.node_index();
-    auto &num_nodes = spec_info.num_nodes();
-    auto &driver = spec_info.composite();
-    auto &node_names = spec_info.node_names();
+    auto &parents = spec_info.parents();
 
-    if (node_index >= num_nodes) {
-      LOGF(WARNING, "MatchedCompositeNodeSpecInfo node_index is out of bounds.");
+    if (index >= parents.count()) {
+      LOGF(WARNING, "CompositeParent index is out of bounds.");
       continue;
     }
 
-    if (node_names.count() != num_nodes) {
-      LOGF(WARNING, "MatchedCompositeNodeSpecInfo num_nodes doesn't match node_names count.");
+    if (matched_driver.parent_names().count() != parents.count()) {
+      LOGF(WARNING, "Parent names count does not match the spec parent count.");
       continue;
     }
 
@@ -97,7 +120,7 @@ zx::result<BindSpecResult> CompositeNodeSpecManager::BindParentSpec(
     }
 
     auto &spec = specs_[name_val];
-    auto result = spec->BindParent(spec_info, device_or_node);
+    auto result = spec->BindParent(composite_parent, device_or_node);
 
     if (result.is_error()) {
       if (result.error_value() != ZX_ERR_ALREADY_BOUND) {
@@ -106,32 +129,40 @@ zx::result<BindSpecResult> CompositeNodeSpecManager::BindParentSpec(
       continue;
     }
 
-    bound_spec_infos.push_back(spec_info);
+    bound_composite_parents.push_back(composite_parent);
     auto composite_node = result.value();
-    if (composite_node.has_value() && driver.has_driver_info()) {
-      node_and_drivers.push_back(
-          CompositeNodeAndDriver{.driver = driver.driver_info(), .node = composite_node.value()});
+    if (composite_node.has_value()) {
+      node_and_drivers.push_back(CompositeNodeAndDriver{.driver = matched_driver.composite_driver(),
+                                                        .node = composite_node.value()});
     }
 
     if (!enable_multibind) {
-      return zx::ok(BindSpecResult{bound_spec_infos, std::move(node_and_drivers)});
+      break;
     }
   }
 
-  if (!bound_spec_infos.empty()) {
-    return zx::ok(BindSpecResult{bound_spec_infos, std::move(node_and_drivers)});
+  // Copy the content into a new wire vector view since we had it stored in a std::vector.
+  auto wire_parents =
+      fidl::VectorView<fdfw::wire::CompositeParent>(arena, bound_composite_parents.size());
+  int i = 0;
+  for (auto &bound_composite_parent : bound_composite_parents) {
+    wire_parents[i++] = bound_composite_parent;
+  }
+
+  if (!wire_parents.empty()) {
+    return zx::ok(BindSpecResult{wire_parents, std::move(node_and_drivers)});
   }
 
   return zx::error(ZX_ERR_NOT_FOUND);
 }
 
 zx::result<> CompositeNodeSpecManager::BindParentSpec(
-    fdi::MatchedCompositeNodeParentInfo match_info, const DeviceOrNode &device_or_node,
-    bool enable_multibind) {
+    std::vector<fuchsia_driver_framework::CompositeParent> composite_parents,
+    const DeviceOrNode &device_or_node, bool enable_multibind) {
   fidl::Arena<> arena;
-  return zx::make_result(
-      BindParentSpec(fidl::ToWire(arena, std::move(match_info)), device_or_node, enable_multibind)
-          .status_value());
+  return zx::make_result(BindParentSpec(arena, fidl::ToWire(arena, std::move(composite_parents)),
+                                        device_or_node, enable_multibind)
+                             .status_value());
 }
 
 void CompositeNodeSpecManager::Rebind(std::string spec_name,
@@ -156,9 +187,9 @@ void CompositeNodeSpecManager::Rebind(std::string spec_name,
                                         std::move(rebind_request_callback));
 }
 
-std::vector<fdd::wire::CompositeInfo> CompositeNodeSpecManager::GetCompositeInfo(
+std::vector<fdd::wire::CompositeNodeInfo> CompositeNodeSpecManager::GetCompositeInfo(
     fidl::AnyArena &arena) const {
-  std::vector<fdd::wire::CompositeInfo> composites;
+  std::vector<fdd::wire::CompositeNodeInfo> composites;
   for (auto &[name, spec] : specs_) {
     if (spec) {
       composites.push_back(spec->GetCompositeInfo(arena));

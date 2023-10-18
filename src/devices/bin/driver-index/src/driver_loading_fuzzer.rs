@@ -103,7 +103,6 @@ mod tests {
                 &format!("fuchsia-boot:///#meta/{}.cm", name).to_owned(),
             )
             .unwrap(),
-            v1_driver_path: Some(format!("fuchsia-boot:///#meta/{}.cm", name).to_owned()),
             bind_rules: decoded_rules,
             bind_bytecode: vec![],
             colocate: false,
@@ -111,6 +110,7 @@ mod tests {
             fallback: false,
             package_type: DriverPackageType::Boot,
             package_hash: None,
+            is_dfv2: None,
         }
     }
 

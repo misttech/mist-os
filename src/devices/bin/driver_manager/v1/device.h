@@ -310,6 +310,14 @@ class Device final
   const fbl::String& name() const { return name_; }
   const std::string& parent_driver_url() const { return parent_driver_url_; }
 
+  std::optional<std::string> bound_driver_component_url() const {
+    if (bound_driver_ != nullptr) {
+      return bound_driver_->url.c_str();
+    }
+
+    return std::nullopt;
+  }
+
   Coordinator* coordinator;
   uint32_t flags = 0;
 

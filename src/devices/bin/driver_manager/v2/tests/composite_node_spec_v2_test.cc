@@ -27,17 +27,25 @@ class CompositeNodeSpecV2Test : public DriverManagerTestBase {
   zx::result<std::optional<DeviceOrNode>> MatchAndBindParentSpec(
       dfv2::CompositeNodeSpecV2& spec, std::weak_ptr<dfv2::Node> parent_node,
       std::vector<std::string> parent_names, uint32_t node_index, uint32_t primary_index = 0) {
-    auto matched_composite = fuchsia_driver_index::MatchedCompositeInfo(
-        {.composite_name = "test-composite",
-         .driver_info = fuchsia_driver_index::MatchedDriverInfo(
-             {.url = "fuchsia-boot:///#meta/composite-driver.cm", .colocate = true})});
-    auto matched_parent = fuchsia_driver_index::MatchedCompositeNodeSpecInfo({
-        .name = spec.name(),
-        .node_index = node_index,
-        .composite = matched_composite,
-        .num_nodes = parent_names.size(),
-        .node_names = parent_names,
-        .primary_index = primary_index,
+    fuchsia_driver_framework::CompositeParent matched_parent({
+        .composite = fuchsia_driver_framework::CompositeInfo{{
+            .spec = fuchsia_driver_framework::CompositeNodeSpec{{
+                .name = spec.name(),
+                .parents = std::vector<fuchsia_driver_framework::ParentSpec>(parent_names.size()),
+            }},
+            .matched_driver = fuchsia_driver_framework::CompositeDriverMatch{{
+                .composite_driver = fuchsia_driver_framework::CompositeDriverInfo{{
+                    .composite_name = "test-composite",
+                    .driver_info = fuchsia_driver_framework::DriverInfo{{
+                        .url = "fuchsia-boot:///#meta/composite-driver.cm",
+                        .colocate = true,
+                    }},
+                }},
+                .parent_names = parent_names,
+                .primary_parent_index = primary_index,
+            }},
+        }},
+        .index = node_index,
     });
 
     return spec.BindParent(fidl::ToWire(*arena_, matched_parent), parent_node);

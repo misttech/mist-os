@@ -4,7 +4,7 @@
 
 #include "src/devices/bin/driver_manager/v2/parent_set_collector.h"
 
-namespace fdd = fuchsia_driver_development;
+#include "src/devices/lib/log/log.h"
 
 namespace dfv2 {
 
@@ -43,19 +43,17 @@ zx::result<std::shared_ptr<Node>> ParentSetCollector::TryToAssemble(
   return zx::ok(result.value());
 }
 
-fidl::VectorView<fdd::wire::CompositeParentNodeInfo> ParentSetCollector::GetParentInfo(
+fidl::VectorView<fidl::StringView> ParentSetCollector::GetParentTopologicalPaths(
     fidl::AnyArena& arena) const {
-  fidl::VectorView<fdd::wire::CompositeParentNodeInfo> parents(arena, parents_.size());
+  fidl::VectorView<fidl::StringView> parent_topological_paths(arena, parents_.size());
   for (uint32_t i = 0; i < parents_.size(); i++) {
-    auto parent_info = fdd::wire::CompositeParentNodeInfo::Builder(arena).name(
-        fidl::StringView(arena, std::string(parent_names_[i])));
     if (auto node = parents_[i].lock(); node) {
-      parent_info.device(arena, node->MakeTopologicalPath());
+      parent_topological_paths[i] = fidl::StringView(arena, node->MakeTopologicalPath());
+    } else {
+      parent_topological_paths[i] = fidl::StringView();
     }
-
-    parents[i] = parent_info.Build();
   }
-  return parents;
+  return parent_topological_paths;
 }
 
 }  // namespace dfv2

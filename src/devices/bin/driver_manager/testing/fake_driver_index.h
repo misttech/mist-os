@@ -17,7 +17,7 @@ class FakeDriverIndex final : public fidl::WireServer<fuchsia_driver_index::Driv
  public:
   struct MatchResult {
     std::string url;
-    std::optional<fuchsia_driver_index::MatchedCompositeNodeSpecInfo> spec;
+    std::optional<fuchsia_driver_framework::CompositeParent> spec;
     bool is_fallback = false;
     bool colocate = false;
   };
@@ -83,29 +83,25 @@ class FakeDriverIndex final : public fidl::WireServer<fuchsia_driver_index::Driv
   }
 
  private:
-  static fuchsia_driver_index::wire::MatchedDriver GetMatchedDriver(fidl::AnyArena& arena,
-                                                                    MatchResult match) {
+  static fuchsia_driver_index::wire::MatchDriverResult GetMatchedDriver(fidl::AnyArena& arena,
+                                                                        MatchResult match) {
     if (match.spec) {
-      fuchsia_driver_index::MatchedCompositeNodeParentInfo const result(
-          {.specs = std::vector<fuchsia_driver_index::MatchedCompositeNodeSpecInfo>{
-               match.spec.value()}});
-      return fuchsia_driver_index::wire::MatchedDriver::WithParentSpec(arena,
-                                                                       fidl::ToWire(arena, result));
+      return fuchsia_driver_index::wire::MatchDriverResult::WithCompositeParents(
+          arena, fidl::ToWire(arena, std::vector<fuchsia_driver_framework::CompositeParent>{
+                                         match.spec.value()}));
     }
 
     auto driver_info = GetDriverInfo(arena, match);
-    return fuchsia_driver_index::wire::MatchedDriver::WithDriver(
-        fidl::ObjectView<fuchsia_driver_index::wire::MatchedDriverInfo>(arena, driver_info));
+    return fuchsia_driver_index::wire::MatchDriverResult::WithDriver(arena, driver_info);
   }
 
-  static fuchsia_driver_index::wire::MatchedDriverInfo GetDriverInfo(fidl::AnyArena& arena,
-                                                                     MatchResult match) {
-    return fuchsia_driver_index::wire::MatchedDriverInfo::Builder(arena)
-        .driver_url(fidl::ObjectView<fidl::StringView>(arena, arena, match.url))
+  static fuchsia_driver_framework::wire::DriverInfo GetDriverInfo(fidl::AnyArena& arena,
+                                                                  MatchResult match) {
+    return fuchsia_driver_framework::wire::DriverInfo::Builder(arena)
         .url(fidl::ObjectView<fidl::StringView>(arena, arena, match.url))
         .is_fallback(match.is_fallback)
         .colocate(match.colocate)
-        .package_type(fuchsia_driver_index::DriverPackageType::kBoot)
+        .package_type(fuchsia_driver_framework::DriverPackageType::kBoot)
         .Build();
   }
 

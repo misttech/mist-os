@@ -8,9 +8,8 @@ use {
     crate::match_common::{node_to_device_property, node_to_device_property_no_autobind},
     crate::resolved_driver::{DriverPackageType, ResolvedDriver},
     bind::interpreter::decode_bind_rules::DecodedRules,
-    fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_driver_development as fdd,
-    fidl_fuchsia_driver_framework as fdf, fidl_fuchsia_driver_index as fdi,
-    fuchsia_async as fasync,
+    fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_driver_framework as fdf,
+    fidl_fuchsia_driver_index as fdi, fuchsia_async as fasync,
     fuchsia_zircon::Status,
     futures::StreamExt,
     std::{
@@ -205,8 +204,8 @@ impl Indexer {
         let driver_list = self.list_drivers();
 
         let (mut fallback, mut non_fallback): (
-            Vec<(bool, fdi::MatchedDriver)>,
-            Vec<(bool, fdi::MatchedDriver)>,
+            Vec<(bool, fdi::MatchDriverResult)>,
+            Vec<(bool, fdi::MatchDriverResult)>,
         ) = driver_list
             .iter()
             .filter_map(|driver| {
@@ -283,11 +282,12 @@ impl Indexer {
             .rebind_composites_with_driver(driver, composite_drivers)
     }
 
-    pub fn get_driver_info(&self, driver_filter: Vec<String>) -> Vec<fdd::DriverInfo> {
+    pub fn get_driver_info(&self, driver_filter: Vec<String>) -> Vec<fdf::DriverInfo> {
         let mut driver_info = Vec::new();
 
         for driver in self.boot_repo.borrow().iter() {
-            if driver_filter.len() == 0 || driver_filter.iter().any(|f| f == &driver.get_libname())
+            if driver_filter.len() == 0
+                || driver_filter.iter().any(|f| f == driver.component_url.as_str())
             {
                 driver_info.push(driver.create_driver_info());
             }

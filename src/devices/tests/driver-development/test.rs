@@ -15,7 +15,6 @@ use {
 };
 
 const SAMPLE_DRIVER_URL: &str = "fuchsia-boot:///#meta/sample-driver.cm";
-const SAMPLE_DRIVER_LIBNAME: &str = "fuchsia-boot:///#driver/sample-driver.so";
 const PARENT_DRIVER_URL: &str = "fuchsia-boot:///#meta/test-parent-sys.cm";
 const FAKE_DRIVER_URL: &str = "fuchsia-boot:///#meta/driver-test-realm-fake-driver.cm";
 
@@ -115,7 +114,7 @@ fn send_get_driver_info_request(
 async fn get_driver_info(
     service: &fdd::DriverDevelopmentProxy,
     driver_filter: &[&str],
-) -> Result<Vec<fdd::DriverInfo>> {
+) -> Result<Vec<fdf::DriverInfo>> {
     let iterator = send_get_driver_info_request(service, driver_filter)?;
 
     let mut driver_infos = Vec::new();
@@ -159,7 +158,7 @@ async fn set_up_test_driver_realm(
     Ok((instance, driver_dev))
 }
 
-fn assert_contains_driver_url(driver_infos: &Vec<fdd::DriverInfo>, expected_driver_url: &str) {
+fn assert_contains_driver_url(driver_infos: &Vec<fdf::DriverInfo>, expected_driver_url: &str) {
     assert!(driver_infos
         .iter()
         .find(|driver_info| driver_info.url.as_ref().expect("Missing device URL")
@@ -183,7 +182,7 @@ async fn test_get_driver_info_no_filter_dfv1() -> Result<()> {
 
 #[fasync::run_singlethreaded(test)]
 async fn test_get_driver_info_with_filter_dfv1() -> Result<()> {
-    const DRIVER_FILTER: [&str; 1] = [SAMPLE_DRIVER_LIBNAME];
+    const DRIVER_FILTER: [&str; 1] = [SAMPLE_DRIVER_URL];
 
     let (_instance, driver_dev) = set_up_test_driver_realm(false).await?;
     let driver_infos = get_driver_info(&driver_dev, &DRIVER_FILTER).await?;
@@ -195,7 +194,7 @@ async fn test_get_driver_info_with_filter_dfv1() -> Result<()> {
 
 #[fasync::run_singlethreaded(test)]
 async fn test_get_driver_info_with_mixed_filter_dfv1() -> Result<()> {
-    const DRIVER_FILTER: [&str; 2] = [SAMPLE_DRIVER_URL, "foo"];
+    const DRIVER_FILTER: [&str; 2] = ["fuchsia-boot:///#driver/sample-driver.so", "foo"];
 
     let (_instance, driver_dev) = set_up_test_driver_realm(false).await?;
     let iterator = send_get_driver_info_request(&driver_dev, &DRIVER_FILTER)?;
@@ -244,7 +243,7 @@ async fn test_get_driver_info_no_filter_dfv2() -> Result<()> {
 
 #[fasync::run_singlethreaded(test)]
 async fn test_get_driver_info_with_filter_dfv2() -> Result<()> {
-    const DRIVER_FILTER: [&str; 1] = [SAMPLE_DRIVER_LIBNAME];
+    const DRIVER_FILTER: [&str; 1] = [SAMPLE_DRIVER_URL];
 
     let (_instance, driver_dev) = set_up_test_driver_realm(true).await?;
     let driver_infos = get_driver_info(&driver_dev, &DRIVER_FILTER).await?;
@@ -256,7 +255,7 @@ async fn test_get_driver_info_with_filter_dfv2() -> Result<()> {
 
 #[fasync::run_singlethreaded(test)]
 async fn test_get_driver_info_with_duplicate_filter_dfv2() -> Result<()> {
-    const DRIVER_FILTER: [&str; 2] = [SAMPLE_DRIVER_LIBNAME, SAMPLE_DRIVER_LIBNAME];
+    const DRIVER_FILTER: [&str; 2] = [SAMPLE_DRIVER_URL, SAMPLE_DRIVER_URL];
 
     let (_instance, driver_dev) = set_up_test_driver_realm(true).await?;
     let driver_infos = get_driver_info(&driver_dev, &DRIVER_FILTER).await?;
@@ -269,7 +268,7 @@ async fn test_get_driver_info_with_duplicate_filter_dfv2() -> Result<()> {
 
 #[fasync::run_singlethreaded(test)]
 async fn test_get_driver_info_with_mixed_filter_dfv2() -> Result<()> {
-    const DRIVER_FILTER: [&str; 2] = [SAMPLE_DRIVER_LIBNAME, "foo"];
+    const DRIVER_FILTER: [&str; 2] = [SAMPLE_DRIVER_URL, "foo"];
 
     let (_instance, driver_dev) = set_up_test_driver_realm(true).await?;
     let driver_infos = get_driver_info(&driver_dev, &DRIVER_FILTER).await?;

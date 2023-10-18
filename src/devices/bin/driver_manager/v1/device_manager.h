@@ -42,7 +42,7 @@ class DeviceManager {
   zx_status_t AddCompositeDevice(const fbl::RefPtr<Device>& dev, std::string_view name,
                                  fuchsia_device_manager::wire::CompositeDeviceDescriptor comp_desc);
 
-  void AddCompositeDeviceFromSpec(CompositeNodeSpecInfo info,
+  void AddCompositeDeviceFromSpec(fuchsia_driver_framework::CompositeInfo info,
                                   fbl::Array<std::unique_ptr<Metadata>> metadata);
   zx::result<> BindFragmentForSpec(const fbl::RefPtr<Device>& dev, const std::string& spec,
                                    size_t fragment_idx);
@@ -68,11 +68,11 @@ class DeviceManager {
   // Pushes |new_device| to |devices_|.
   void AddToDevices(fbl::RefPtr<Device> new_device);
 
-  std::vector<fuchsia_driver_development::wire::CompositeInfo> GetLegacyCompositeInfoList(
+  std::vector<fuchsia_driver_development::wire::CompositeNodeInfo> GetLegacyCompositeInfoList(
       fidl::AnyArena& arena) const;
 
-  zx::result<fuchsia_driver_development::wire::CompositeInfo> GetCompositeInfoForSpec(
-      fidl::AnyArena& arena, std::string spec) const;
+  zx::result<TopologicalInfo> GetTopologicalInfo(fidl::AnyArena& arena,
+                                                 const std::string& spec) const;
 
   fbl::TaggedDoublyLinkedList<fbl::RefPtr<Device>, Device::AllDevicesListTag>& devices() {
     return devices_;

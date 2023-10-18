@@ -575,23 +575,8 @@ void Node::FinishRestart() {
     return;
   }
 
-  fuchsia_driver_index::DriverPackageType pkg_type;
-  switch (collection_) {
-    case Collection::kNone:
-      pkg_type = fuchsia_driver_index::DriverPackageType::Unknown();
-      break;
-    case Collection::kBoot:
-      pkg_type = fuchsia_driver_index::DriverPackageType::kBoot;
-      break;
-    case Collection::kPackage:
-      pkg_type = fuchsia_driver_index::DriverPackageType::kBase;
-      break;
-    case Collection::kFullPackage:
-      pkg_type = fuchsia_driver_index::DriverPackageType::kUniverse;
-      break;
-  }
-
-  zx::result start_result = node_manager_.value()->StartDriver(*this, previous_url, pkg_type);
+  zx::result start_result =
+      node_manager_.value()->StartDriver(*this, previous_url, driver_package_type_);
   if (start_result.is_error()) {
     LOGF(ERROR, "Failed to start driver '%s': %s", name().c_str(), start_result.status_string());
   }

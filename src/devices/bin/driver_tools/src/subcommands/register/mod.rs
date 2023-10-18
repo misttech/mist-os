@@ -74,8 +74,8 @@ pub async fn register(
                         "Node '{}':\nDriver '{:#?}'\nComposite Specs '{:#?}'\nLegacy Composites '{:#?}'",
                         info.node_name.unwrap_or("<NA>".to_string()),
                         info.driver_url,
-                        info.composite_specs,
-                        info.legacy_composites,
+                        info.composite_parents,
+                        info.legacy_composite_parents,
                     )?;
                 }
             }

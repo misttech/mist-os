@@ -29,17 +29,10 @@ struct StrProperty {
   StrPropertyValue value;
 };
 
-// Contains the information to create a CompositeDevice from a spec.
-struct CompositeNodeSpecInfo {
-  // The name of the spec.
-  std::string spec_name;
-  MatchedDriverInfo driver;
-
-  // The name of the composite node.
-  std::string composite_name;
-
-  uint32_t primary_index;
-  std::vector<std::string> parent_names;
+// Contains the device path information.
+struct TopologicalInfo {
+  fidl::StringView path;
+  fidl::VectorView<fidl::StringView> parent_paths;
 };
 
 // A device composed of other devices.
@@ -52,8 +45,7 @@ class CompositeDevice : public fbl::DoublyLinkedListable<std::unique_ptr<Composi
   CompositeDevice(fbl::String name, fbl::Array<const zx_device_prop_t> properties,
                   fbl::Array<const StrProperty> str_properties, uint32_t fragments_count,
                   uint32_t primary_fragment_index, std::optional<bool> legacy_colocate_flag,
-                  fbl::Array<std::unique_ptr<Metadata>> metadata, Coordinator& coordinator,
-                  bool from_driver_index);
+                  fbl::Array<std::unique_ptr<Metadata>> metadata, Coordinator& coordinator);
 
   CompositeDevice(CompositeDevice&&) = delete;
   CompositeDevice& operator=(CompositeDevice&&) = delete;
@@ -68,7 +60,7 @@ class CompositeDevice : public fbl::DoublyLinkedListable<std::unique_ptr<Composi
                             Coordinator& coordinator, std::unique_ptr<CompositeDevice>* out);
 
   static std::unique_ptr<CompositeDevice> CreateFromSpec(
-      CompositeNodeSpecInfo driver_info, fbl::Array<std::unique_ptr<Metadata>> metadata,
+      fuchsia_driver_framework::CompositeInfo info, fbl::Array<std::unique_ptr<Metadata>> metadata,
       Coordinator& coordinator);
 
   // Attempt to match and bind any of the unbound fragments against |dev|.
@@ -97,12 +89,16 @@ class CompositeDevice : public fbl::DoublyLinkedListable<std::unique_ptr<Composi
   // is invoked after this, it will reassemble the device.
   void Remove();
 
-  fuchsia_driver_development::wire::CompositeInfo GetCompositeInfo(fidl::AnyArena& arena) const;
+  fuchsia_driver_development::wire::CompositeNodeInfo GetCompositeInfo(fidl::AnyArena& arena) const;
+
+  TopologicalInfo GetTopologicalInfo(fidl::AnyArena& arena) const;
 
   CompositeDeviceFragment* GetPrimaryFragment();
   const CompositeDeviceFragment* GetPrimaryFragment() const;
 
   bool HasDriver() const { return driver_.has_value(); }
+
+  bool FromCompositeNodeSpec() const { return composite_info_.has_value(); }
 
   const fbl::String& name() const { return name_; }
   const fbl::Array<const zx_device_prop_t>& properties() const { return properties_; }
@@ -121,10 +117,10 @@ class CompositeDevice : public fbl::DoublyLinkedListable<std::unique_ptr<Composi
   // will create a new one.
   zx::result<fbl::RefPtr<DriverHost>> GetDriverHost();
 
-  fuchsia_driver_development::wire::LegacyCompositeNodeInfo GetLegacyCompositeInfo(
+  fuchsia_driver_development::wire::CompositeNodeInfo GetLegacyCompositeInfo(
       fidl::AnyArena& arena) const;
 
-  fidl::VectorView<fuchsia_driver_development::wire::CompositeParentNodeInfo> GetParentInfo(
+  fuchsia_driver_development::wire::CompositeNodeInfo GetRegularCompositeInfo(
       fidl::AnyArena& arena) const;
 
   // Returns true if a fragment matches |dev|. Sets |*index_out| will be set to the
@@ -148,8 +144,9 @@ class CompositeDevice : public fbl::DoublyLinkedListable<std::unique_ptr<Composi
 
   const fbl::Array<std::unique_ptr<Metadata>> metadata_;
 
-  // Set true if CompositeDevice was created from CreateFromSpec().
-  const bool from_composite_node_spec_;
+  // This is only available if the CompositeDevice is for a composite node spec.
+  // This is set during creation in CreateFromSpec().
+  std::optional<fuchsia_driver_framework::CompositeInfo> composite_info_;
 
   // The driver that binds to actual device created by CompositeDevice. Only set by
   // CreateFromSpec(), SetDriver(), or MatchDriverToComposite().

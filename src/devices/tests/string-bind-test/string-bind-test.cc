@@ -19,7 +19,7 @@
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 
 const std::string kDriverBaseUrl = "fuchsia-boot:///#driver";
-const std::string kStringBindDriverLibPath = kDriverBaseUrl + "/string-bind-child.so";
+const std::string kStringBindDriverUrl = "fuchsia-boot:///#meta/string-bind-child.cm";
 const std::string kChildDevicePath = "/dev/sys/test/parent";
 
 class StringBindTest : public gtest::TestLoopFixture {
@@ -64,12 +64,12 @@ class StringBindTest : public gtest::TestLoopFixture {
 // Get the bind program of the test driver and check that it has the expected instructions.
 TEST_F(StringBindTest, DriverBytecode) {
   fuchsia::driver::development::DriverInfoIteratorSyncPtr iterator;
-  ASSERT_EQ(ZX_OK, driver_dev_->GetDriverInfo({kStringBindDriverLibPath}, iterator.NewRequest()));
+  ASSERT_EQ(ZX_OK, driver_dev_->GetDriverInfo({kStringBindDriverUrl}, iterator.NewRequest()));
 
-  std::vector<fuchsia::driver::development::DriverInfo> drivers;
+  std::vector<fuchsia::driver::framework::DriverInfo> drivers;
   ASSERT_EQ(iterator->GetNext(&drivers), ZX_OK);
   ASSERT_EQ(drivers.size(), 1u);
-  auto bytecode = drivers[0].bind_rules().bytecode_v2();
+  auto bytecode = drivers[0].bind_rules_bytecode();
 
   const uint8_t kExpectedBytecode[] = {
       0x42, 0x49, 0x4E, 0x44, 0x02, 0x0,  0x0,  0x0,               // Bind header

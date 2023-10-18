@@ -17,6 +17,7 @@ rustc_test("driver_register_test") {
   sources = [ "test.rs" ]
   deps = [
     "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development_rust",
+    "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_rust",
     "//sdk/fidl/fuchsia.driver.registrar:fuchsia.driver.registrar_rust",
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_rust",
     "//sdk/fidl/fuchsia.pkg:fuchsia.pkg_rust",

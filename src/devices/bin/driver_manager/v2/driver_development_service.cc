@@ -182,7 +182,7 @@ void DriverDevelopmentService::GetDeviceInfo(GetDeviceInfoRequestView request,
 void DriverDevelopmentService::GetCompositeInfo(GetCompositeInfoRequestView request,
                                                 GetCompositeInfoCompleter::Sync& completer) {
   auto arena = std::make_unique<fidl::Arena<512>>();
-  std::vector<fdd::wire::CompositeInfo> list = driver_runner_.GetCompositeListInfo(*arena);
+  std::vector<fdd::wire::CompositeNodeInfo> list = driver_runner_.GetCompositeListInfo(*arena);
   auto iterator = std::make_unique<driver_development::CompositeInfoIterator>(std::move(arena),
                                                                               std::move(list));
   fidl::BindServer(this->dispatcher_, std::move(request->iterator), std::move(iterator),

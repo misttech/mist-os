@@ -7,6 +7,8 @@
 
 #include <fidl/fuchsia.driver.index/cpp/fidl.h>
 
+#include <queue>
+
 #include "src/devices/bin/driver_manager/v2/bind_manager.h"
 #include "src/devices/bin/driver_manager/v2/composite_node_spec_v2.h"
 #include "src/devices/bin/driver_manager/v2/tests/driver_manager_test_base.h"
@@ -51,7 +53,7 @@ class TestDriverIndex final : public fidl::WireServer<fuchsia_driver_index::Driv
   zx::result<fidl::ClientEnd<fuchsia_driver_index::DriverIndex>> Connect();
 
   // Pop the next completer with the |id| in |completers_| and reply with |result|.
-  void ReplyWithMatch(uint32_t id, zx::result<fuchsia_driver_index::MatchedDriver> result);
+  void ReplyWithMatch(uint32_t id, zx::result<fuchsia_driver_index::MatchDriverResult> result);
 
   void VerifyRequestCount(uint32_t id, size_t expected_count);
   size_t NumOfMatchRequests() const { return match_request_count_; }
@@ -70,7 +72,7 @@ class TestBindManagerBridge final : public dfv2::BindManagerBridge, public Compo
  public:
   struct CompositeNodeSpecData {
     dfv2::CompositeNodeSpecV2* spec;
-    fuchsia_driver_index::MatchedCompositeNodeSpecInfo fidl_info;
+    fuchsia_driver_framework::CompositeInfo fidl_info;
   };
 
   explicit TestBindManagerBridge(fidl::WireClient<fuchsia_driver_index::DriverIndex> client)
@@ -78,14 +80,15 @@ class TestBindManagerBridge final : public dfv2::BindManagerBridge, public Compo
   ~TestBindManagerBridge() = default;
 
   // BindManagerBridge implementation:
-  zx::result<BindSpecResult> BindToParentSpec(
-      fuchsia_driver_index::wire::MatchedCompositeNodeParentInfo match_info,
-      std::weak_ptr<dfv2::Node> node, bool enable_multibind) override {
-    return composite_manager_.BindParentSpec(match_info, node, enable_multibind);
+  zx::result<BindSpecResult> BindToParentSpec(fidl::AnyArena& arena,
+                                              dfv2::CompositeParents composite_parents,
+                                              std::weak_ptr<dfv2::Node> node,
+                                              bool enable_multibind) override {
+    return composite_manager_.BindParentSpec(arena, composite_parents, node, enable_multibind);
   }
 
   zx::result<std::string> StartDriver(
-      dfv2::Node& node, fuchsia_driver_index::wire::MatchedDriverInfo driver_info) override {
+      dfv2::Node& node, fuchsia_driver_framework::wire::DriverInfo driver_info) override {
     return zx::ok("");
   }
 

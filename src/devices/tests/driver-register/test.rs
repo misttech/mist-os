@@ -4,8 +4,9 @@
 
 use {
     anyhow::{anyhow, Context, Result},
-    fidl_fuchsia_driver_development as fdd, fidl_fuchsia_driver_registrar as fdr,
-    fidl_fuchsia_driver_test as fdt, fidl_fuchsia_pkg as fpkg,
+    fidl_fuchsia_driver_development as fdd, fidl_fuchsia_driver_framework as fdf,
+    fidl_fuchsia_driver_registrar as fdr, fidl_fuchsia_driver_test as fdt,
+    fidl_fuchsia_pkg as fpkg,
     fuchsia_async::{self as fasync},
     fuchsia_component_test::{RealmBuilder, RealmInstance},
     fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
@@ -74,7 +75,7 @@ fn send_get_driver_info_request(
 async fn get_driver_info(
     service: &fdd::DriverDevelopmentProxy,
     driver_filter: &[String],
-) -> Result<Vec<fdd::DriverInfo>> {
+) -> Result<Vec<fdf::DriverInfo>> {
     let iterator = send_get_driver_info_request(service, driver_filter)?;
 
     let mut driver_infos = Vec::new();
@@ -89,7 +90,7 @@ async fn get_driver_info(
     Ok(driver_infos)
 }
 
-fn assert_contains_driver_url(driver_infos: &Vec<fdd::DriverInfo>, expected_driver_url: &str) {
+fn assert_contains_driver_url(driver_infos: &Vec<fdf::DriverInfo>, expected_driver_url: &str) {
     assert!(driver_infos
         .iter()
         .find(|driver_info| driver_info.url.as_ref().expect("Missing device URL")

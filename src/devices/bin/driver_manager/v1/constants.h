@@ -17,14 +17,14 @@ constexpr std::string_view kFragmentProxyDriverUrl = "#meta/fragment.proxy.cm";
 const MatchedDriverInfo kFragmentDriverInfo = {
     .colocate = true,
     .is_dfv2 = false,
-    .package_type = fuchsia_driver_index::DriverPackageType::kBoot,
+    .package_type = fuchsia_driver_framework::DriverPackageType::kBoot,
     .component_url = std::string(kFragmentDriverUrl),
 };
 
 const MatchedDriverInfo kFragmentProxyDriverInfo = {
     .colocate = true,
     .is_dfv2 = false,
-    .package_type = fuchsia_driver_index::DriverPackageType::kBoot,
+    .package_type = fuchsia_driver_framework::DriverPackageType::kBoot,
     .component_url = std::string(kFragmentProxyDriverUrl),
 };
 

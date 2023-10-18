@@ -6,7 +6,8 @@ use {
     anyhow::{Context, Error, Result},
     fidl::endpoints::DiscoverableProtocolMarker,
     fidl_fuchsia_boot as fboot, fidl_fuchsia_driver_development as fdd,
-    fidl_fuchsia_driver_test as fdt, fidl_fuchsia_io as fio, fuchsia_async as fasync,
+    fidl_fuchsia_driver_framework as fdf, fidl_fuchsia_driver_test as fdt, fidl_fuchsia_io as fio,
+    fuchsia_async as fasync,
     fuchsia_component_test::{
         Capability, ChildOptions, ChildRef, LocalComponentHandles, RealmBuilder, Route,
     },
@@ -19,7 +20,7 @@ use {
 async fn get_driver_info(
     service: &fdd::DriverDevelopmentProxy,
     driver_filter: &[String],
-) -> Result<Vec<fdd::DriverInfo>> {
+) -> Result<Vec<fdf::DriverInfo>> {
     let (iterator, iterator_server) =
         fidl::endpoints::create_proxy::<fdd::DriverInfoIteratorMarker>()?;
 

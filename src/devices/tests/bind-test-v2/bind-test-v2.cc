@@ -17,7 +17,7 @@
 #include "lib/fidl/cpp/synchronous_interface_ptr.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 
-const char kDriverUrl[] = "fuchsia-boot:///#driver/bind-test-v2-driver.so";
+const char kDriverUrl[] = "fuchsia-boot:///#meta/bind-test-v2-driver.cm";
 const char kDriverLibname[] = "bind-test-v2-driver.cm";
 const char kChildDeviceName[] = "child";
 
@@ -100,7 +100,7 @@ TEST_F(BindCompilerV2Test, InvalidDriver) {
   fuchsia::driver::development::DriverInfoIteratorSyncPtr iterator;
   ASSERT_EQ(driver_dev_->GetDriverInfo({"abc"}, iterator.NewRequest()), ZX_OK);
 
-  std::vector<fuchsia::driver::development::DriverInfo> drivers;
+  std::vector<fuchsia::driver::framework::DriverInfo> drivers;
   ASSERT_NE(iterator->GetNext(&drivers), ZX_OK);
 }
 
@@ -109,11 +109,11 @@ TEST_F(BindCompilerV2Test, ValidDriver) {
   fuchsia::driver::development::DriverInfoIteratorSyncPtr iterator;
   ASSERT_EQ(driver_dev_->GetDriverInfo({kDriverUrl}, iterator.NewRequest()), ZX_OK);
 
-  std::vector<fuchsia::driver::development::DriverInfo> drivers;
+  std::vector<fuchsia::driver::framework::DriverInfo> drivers;
   ASSERT_EQ(iterator->GetNext(&drivers), ZX_OK);
 
   ASSERT_EQ(drivers.size(), 1u);
-  auto bytecode = drivers[0].bind_rules().bytecode_v2();
+  auto bytecode = drivers[0].bind_rules_bytecode();
 
   // clang-format off
   uint8_t expected_bytecode[] = {

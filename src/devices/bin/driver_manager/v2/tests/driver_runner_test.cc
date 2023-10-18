@@ -18,6 +18,7 @@
 #include <bind/fuchsia/platform/cpp/bind.h>
 
 #include "src/devices/bin/driver_manager/testing/fake_driver_index.h"
+#include "src/devices/bin/driver_manager/v2/composite_node_spec_v2.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 
 namespace fdata = fuchsia_data;
@@ -406,39 +407,51 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
 
       if (args.name().get() == "dev-group-0") {
         return zx::ok(FakeDriverIndex::MatchResult{
-            .spec = fuchsia_driver_index::MatchedCompositeNodeSpecInfo({
-                .name = "test-group",
-                .node_index = 0,
-                .composite = fuchsia_driver_index::MatchedCompositeInfo({
-                    .composite_name = "test-composite",
-                    .driver_info = fuchsia_driver_index::MatchedDriverInfo({
-                        .url = "fuchsia-boot:///#meta/composite-driver.cm",
-                        .colocate = true,
-                        .package_type = fuchsia_driver_index::DriverPackageType::kBoot,
-                    }),
-                }),
-                .num_nodes = 2,
-                .node_names = {{"node-0", "node-1"}},
-                .primary_index = 1,
+            .spec = fdfw::CompositeParent({
+                .composite = fdfw::CompositeInfo{{
+                    .spec = fdfw::CompositeNodeSpec{{
+                        .name = "test-group",
+                        .parents = std::vector<fdfw::ParentSpec>(2),
+                    }},
+                    .matched_driver = fdfw::CompositeDriverMatch{{
+                        .composite_driver = fdfw::CompositeDriverInfo{{
+                            .composite_name = "test-composite",
+                            .driver_info = fdfw::DriverInfo{{
+                                .url = "fuchsia-boot:///#meta/composite-driver.cm",
+                                .colocate = true,
+                                .package_type = fdfw::DriverPackageType::kBoot,
+                            }},
+                        }},
+                        .parent_names = {{"node-0", "node-1"}},
+                        .primary_parent_index = 1,
+                    }},
+                }},
+                .index = 0,
             })});
       }
 
       if (args.name().get() == "dev-group-1") {
         return zx::ok(FakeDriverIndex::MatchResult{
-            .spec = fuchsia_driver_index::MatchedCompositeNodeSpecInfo({
-                .name = "test-group",
-                .node_index = 1,
-                .composite = fuchsia_driver_index::MatchedCompositeInfo({
-                    .composite_name = "test-composite",
-                    .driver_info = fuchsia_driver_index::MatchedDriverInfo({
-                        .url = "fuchsia-boot:///#meta/composite-driver.cm",
-                        .colocate = true,
-                        .package_type = fuchsia_driver_index::DriverPackageType::kBoot,
-                    }),
-                }),
-                .num_nodes = 2,
-                .node_names = {{"node-0", "node-1"}},
-                .primary_index = 1,
+            .spec = fdfw::CompositeParent({
+                .composite = fdfw::CompositeInfo{{
+                    .spec = fdfw::CompositeNodeSpec{{
+                        .name = "test-group",
+                        .parents = std::vector<fdfw::ParentSpec>(2),
+                    }},
+                    .matched_driver = fdfw::CompositeDriverMatch{{
+                        .composite_driver = fdfw::CompositeDriverInfo{{
+                            .composite_name = "test-composite",
+                            .driver_info = fdfw::DriverInfo{{
+                                .url = "fuchsia-boot:///#meta/composite-driver.cm",
+                                .colocate = true,
+                                .package_type = fdfw::DriverPackageType::kBoot,
+                            }},
+                        }},
+                        .parent_names = {{"node-0", "node-1"}},
+                        .primary_parent_index = 1,
+                    }},
+                }},
+                .index = 1,
             })});
       }
 
@@ -1929,8 +1942,10 @@ TEST_F(DriverRunnerTest, TestBindResultTracker) {
       [callback_called_ptr](
           fidl::VectorView<fuchsia_driver_development::wire::NodeBindingInfo> results) {
         ASSERT_EQ(std::string_view("node_name"), results[0].node_name().get());
-        ASSERT_EQ(std::string_view("test_spec"), results[0].composite_specs()[0].name().get());
-        ASSERT_EQ(std::string_view("test_spec_2"), results[0].composite_specs()[1].name().get());
+        ASSERT_EQ(std::string_view("test_spec"),
+                  results[0].composite_parents()[0].composite().spec().name().get());
+        ASSERT_EQ(std::string_view("test_spec_2"),
+                  results[0].composite_parents()[1].composite().spec().name().get());
         ASSERT_EQ(1ul, results.count());
         *callback_called_ptr = true;
       };
@@ -1943,17 +1958,23 @@ TEST_F(DriverRunnerTest, TestBindResultTracker) {
   ASSERT_EQ(false, callback_called);
 
   {
-    fidl::Arena arena;
-    tracker_three.ReportSuccessfulBind(
-        std::string_view("node_name"), {},
-        std::vector{
-            fuchsia_driver_index::wire::MatchedCompositeNodeSpecInfo::Builder(arena)
-                .name("test_spec")
-                .Build(),
-            fuchsia_driver_index::wire::MatchedCompositeNodeSpecInfo::Builder(arena)
-                .name("test_spec_2")
-                .Build(),
-        });
+    tracker_three.ReportSuccessfulBind(std::string_view("node_name"), {},
+                                       std::vector{
+                                           fdfw::CompositeParent{{
+                                               .composite = fdfw::CompositeInfo{{
+                                                   .spec = fdfw::CompositeNodeSpec{{
+                                                       .name = "test_spec",
+                                                   }},
+                                               }},
+                                           }},
+                                           fdfw::CompositeParent{{
+                                               .composite = fdfw::CompositeInfo{{
+                                                   .spec = fdfw::CompositeNodeSpec{{
+                                                       .name = "test_spec_2",
+                                                   }},
+                                               }},
+                                           }},
+                                       });
   }
 
   ASSERT_EQ(true, callback_called);
@@ -2119,62 +2140,62 @@ TEST(NodeTest, ToCollection) {
       inspect.CreateDevice(kChild2Name, zx::vmo{}, kProtocolId), 0, NodeType::kComposite);
 
   // Test parentless
-  EXPECT_EQ(ToCollection(*parent, fdi::DriverPackageType::kBoot), Collection::kBoot);
-  EXPECT_EQ(ToCollection(*parent, fdi::DriverPackageType::kBase), Collection::kPackage);
-  EXPECT_EQ(ToCollection(*parent, fdi::DriverPackageType::kCached), Collection::kFullPackage);
-  EXPECT_EQ(ToCollection(*parent, fdi::DriverPackageType::kUniverse), Collection::kFullPackage);
+  EXPECT_EQ(ToCollection(*parent, fdfw::DriverPackageType::kBoot), Collection::kBoot);
+  EXPECT_EQ(ToCollection(*parent, fdfw::DriverPackageType::kBase), Collection::kPackage);
+  EXPECT_EQ(ToCollection(*parent, fdfw::DriverPackageType::kCached), Collection::kFullPackage);
+  EXPECT_EQ(ToCollection(*parent, fdfw::DriverPackageType::kUniverse), Collection::kFullPackage);
 
   // // Test single parent
   parent->set_collection(Collection::kNone);
-  EXPECT_EQ(ToCollection(*child1, fdi::DriverPackageType::kBoot), Collection::kBoot);
-  EXPECT_EQ(ToCollection(*child1, fdi::DriverPackageType::kBase), Collection::kPackage);
-  EXPECT_EQ(ToCollection(*child1, fdi::DriverPackageType::kCached), Collection::kFullPackage);
-  EXPECT_EQ(ToCollection(*child1, fdi::DriverPackageType::kUniverse), Collection::kFullPackage);
+  EXPECT_EQ(ToCollection(*child1, fdfw::DriverPackageType::kBoot), Collection::kBoot);
+  EXPECT_EQ(ToCollection(*child1, fdfw::DriverPackageType::kBase), Collection::kPackage);
+  EXPECT_EQ(ToCollection(*child1, fdfw::DriverPackageType::kCached), Collection::kFullPackage);
+  EXPECT_EQ(ToCollection(*child1, fdfw::DriverPackageType::kUniverse), Collection::kFullPackage);
 
   parent->set_collection(Collection::kBoot);
-  EXPECT_EQ(ToCollection(*child1, fdi::DriverPackageType::kBoot), Collection::kBoot);
-  EXPECT_EQ(ToCollection(*child1, fdi::DriverPackageType::kBase), Collection::kPackage);
-  EXPECT_EQ(ToCollection(*child1, fdi::DriverPackageType::kCached), Collection::kFullPackage);
-  EXPECT_EQ(ToCollection(*child1, fdi::DriverPackageType::kUniverse), Collection::kFullPackage);
+  EXPECT_EQ(ToCollection(*child1, fdfw::DriverPackageType::kBoot), Collection::kBoot);
+  EXPECT_EQ(ToCollection(*child1, fdfw::DriverPackageType::kBase), Collection::kPackage);
+  EXPECT_EQ(ToCollection(*child1, fdfw::DriverPackageType::kCached), Collection::kFullPackage);
+  EXPECT_EQ(ToCollection(*child1, fdfw::DriverPackageType::kUniverse), Collection::kFullPackage);
 
   parent->set_collection(Collection::kPackage);
-  EXPECT_EQ(ToCollection(*child1, fdi::DriverPackageType::kBoot), Collection::kPackage);
-  EXPECT_EQ(ToCollection(*child1, fdi::DriverPackageType::kBase), Collection::kPackage);
-  EXPECT_EQ(ToCollection(*child1, fdi::DriverPackageType::kCached), Collection::kFullPackage);
-  EXPECT_EQ(ToCollection(*child1, fdi::DriverPackageType::kUniverse), Collection::kFullPackage);
+  EXPECT_EQ(ToCollection(*child1, fdfw::DriverPackageType::kBoot), Collection::kPackage);
+  EXPECT_EQ(ToCollection(*child1, fdfw::DriverPackageType::kBase), Collection::kPackage);
+  EXPECT_EQ(ToCollection(*child1, fdfw::DriverPackageType::kCached), Collection::kFullPackage);
+  EXPECT_EQ(ToCollection(*child1, fdfw::DriverPackageType::kUniverse), Collection::kFullPackage);
 
   parent->set_collection(Collection::kFullPackage);
-  EXPECT_EQ(ToCollection(*child1, fdi::DriverPackageType::kBoot), Collection::kFullPackage);
-  EXPECT_EQ(ToCollection(*child1, fdi::DriverPackageType::kBase), Collection::kFullPackage);
-  EXPECT_EQ(ToCollection(*child1, fdi::DriverPackageType::kCached), Collection::kFullPackage);
-  EXPECT_EQ(ToCollection(*child1, fdi::DriverPackageType::kUniverse), Collection::kFullPackage);
+  EXPECT_EQ(ToCollection(*child1, fdfw::DriverPackageType::kBoot), Collection::kFullPackage);
+  EXPECT_EQ(ToCollection(*child1, fdfw::DriverPackageType::kBase), Collection::kFullPackage);
+  EXPECT_EQ(ToCollection(*child1, fdfw::DriverPackageType::kCached), Collection::kFullPackage);
+  EXPECT_EQ(ToCollection(*child1, fdfw::DriverPackageType::kUniverse), Collection::kFullPackage);
 
   // Test multi parent
   parent->set_collection(Collection::kNone);
   child1->set_collection(Collection::kNone);
-  EXPECT_EQ(ToCollection(*child2, fdi::DriverPackageType::kBoot), Collection::kBoot);
-  EXPECT_EQ(ToCollection(*child2, fdi::DriverPackageType::kBase), Collection::kPackage);
-  EXPECT_EQ(ToCollection(*child2, fdi::DriverPackageType::kCached), Collection::kFullPackage);
-  EXPECT_EQ(ToCollection(*child2, fdi::DriverPackageType::kUniverse), Collection::kFullPackage);
+  EXPECT_EQ(ToCollection(*child2, fdfw::DriverPackageType::kBoot), Collection::kBoot);
+  EXPECT_EQ(ToCollection(*child2, fdfw::DriverPackageType::kBase), Collection::kPackage);
+  EXPECT_EQ(ToCollection(*child2, fdfw::DriverPackageType::kCached), Collection::kFullPackage);
+  EXPECT_EQ(ToCollection(*child2, fdfw::DriverPackageType::kUniverse), Collection::kFullPackage);
 
   parent->set_collection(Collection::kBoot);
   child1->set_collection(Collection::kNone);
-  EXPECT_EQ(ToCollection(*child2, fdi::DriverPackageType::kBoot), Collection::kBoot);
-  EXPECT_EQ(ToCollection(*child2, fdi::DriverPackageType::kBase), Collection::kPackage);
-  EXPECT_EQ(ToCollection(*child2, fdi::DriverPackageType::kCached), Collection::kFullPackage);
-  EXPECT_EQ(ToCollection(*child2, fdi::DriverPackageType::kUniverse), Collection::kFullPackage);
+  EXPECT_EQ(ToCollection(*child2, fdfw::DriverPackageType::kBoot), Collection::kBoot);
+  EXPECT_EQ(ToCollection(*child2, fdfw::DriverPackageType::kBase), Collection::kPackage);
+  EXPECT_EQ(ToCollection(*child2, fdfw::DriverPackageType::kCached), Collection::kFullPackage);
+  EXPECT_EQ(ToCollection(*child2, fdfw::DriverPackageType::kUniverse), Collection::kFullPackage);
 
   parent->set_collection(Collection::kNone);
   child1->set_collection(Collection::kPackage);
-  EXPECT_EQ(ToCollection(*child2, fdi::DriverPackageType::kBoot), Collection::kPackage);
-  EXPECT_EQ(ToCollection(*child2, fdi::DriverPackageType::kBase), Collection::kPackage);
-  EXPECT_EQ(ToCollection(*child2, fdi::DriverPackageType::kCached), Collection::kFullPackage);
-  EXPECT_EQ(ToCollection(*child2, fdi::DriverPackageType::kUniverse), Collection::kFullPackage);
+  EXPECT_EQ(ToCollection(*child2, fdfw::DriverPackageType::kBoot), Collection::kPackage);
+  EXPECT_EQ(ToCollection(*child2, fdfw::DriverPackageType::kBase), Collection::kPackage);
+  EXPECT_EQ(ToCollection(*child2, fdfw::DriverPackageType::kCached), Collection::kFullPackage);
+  EXPECT_EQ(ToCollection(*child2, fdfw::DriverPackageType::kUniverse), Collection::kFullPackage);
 
   parent->set_collection(Collection::kFullPackage);
   child1->set_collection(Collection::kFullPackage);
-  EXPECT_EQ(ToCollection(*child2, fdi::DriverPackageType::kBoot), Collection::kFullPackage);
-  EXPECT_EQ(ToCollection(*child2, fdi::DriverPackageType::kBase), Collection::kFullPackage);
-  EXPECT_EQ(ToCollection(*child2, fdi::DriverPackageType::kCached), Collection::kFullPackage);
-  EXPECT_EQ(ToCollection(*child2, fdi::DriverPackageType::kUniverse), Collection::kFullPackage);
+  EXPECT_EQ(ToCollection(*child2, fdfw::DriverPackageType::kBoot), Collection::kFullPackage);
+  EXPECT_EQ(ToCollection(*child2, fdfw::DriverPackageType::kBase), Collection::kFullPackage);
+  EXPECT_EQ(ToCollection(*child2, fdfw::DriverPackageType::kCached), Collection::kFullPackage);
+  EXPECT_EQ(ToCollection(*child2, fdfw::DriverPackageType::kUniverse), Collection::kFullPackage);
 }

@@ -4,7 +4,7 @@
 
 use {
     anyhow::{anyhow, format_err, Context, Result},
-    fidl_fuchsia_driver_development as fdd, futures,
+    fidl_fuchsia_driver_development as fdd, fidl_fuchsia_driver_framework as fdf, futures,
 };
 
 #[derive(Debug)]
@@ -125,7 +125,7 @@ pub async fn get_device_info(
 pub async fn get_driver_info(
     service: &fdd::DriverDevelopmentProxy,
     driver_filter: &[String],
-) -> Result<Vec<fdd::DriverInfo>> {
+) -> Result<Vec<fdf::DriverInfo>> {
     let (iterator, iterator_server) =
         fidl::endpoints::create_proxy::<fdd::DriverInfoIteratorMarker>()?;
 
@@ -149,7 +149,7 @@ pub async fn get_driver_info(
 pub async fn get_composite_node_specs(
     service: &fdd::DriverDevelopmentProxy,
     name_filter: Option<String>,
-) -> Result<Vec<fdd::CompositeNodeSpecInfo>> {
+) -> Result<Vec<fdf::CompositeInfo>> {
     let (iterator, iterator_server) =
         fidl::endpoints::create_proxy::<fdd::CompositeNodeSpecIteratorMarker>()?;
 
@@ -171,15 +171,15 @@ pub async fn get_composite_node_specs(
 
 /// Gets the desired DriverInfo instance.
 ///
-/// Filter based on either the driver's libname or its URL.
-/// For example: "fuchsia-pkg://domain/driver#driver/foo.so" or "fuchsia-boot://domain/#meta/foo.cm"
+/// Filter based on the driver's URL.
+/// For example: "fuchsia-boot://domain/#meta/foo.cm"
 ///
 /// # Arguments
 /// * `driver_filter` - Filter to the driver that matches the given filter.
 pub async fn get_driver_by_filter(
     driver_filter: &String,
     driver_development_proxy: &fdd::DriverDevelopmentProxy,
-) -> Result<fdd::DriverInfo> {
+) -> Result<fdf::DriverInfo> {
     let filter_list: [String; 1] = [driver_filter.to_string()];
     let driver_list = get_driver_info(&driver_development_proxy, &filter_list).await?;
     if driver_list.len() != 1 {
@@ -189,15 +189,11 @@ pub async fn get_driver_by_filter(
             driver_list.len()
         ));
     }
-    let mut driver_info: Option<fdd::DriverInfo> = None;
+    let mut driver_info: Option<fdf::DriverInfo> = None;
 
     // Confirm this is the correct match.
     let driver = &driver_list[0];
-    if let Some(ref libname) = driver.libname {
-        if libname == driver_filter {
-            driver_info = Some(driver.clone());
-        }
-    } else if let Some(ref url) = driver.url {
+    if let Some(ref url) = driver.url {
         if url == driver_filter {
             driver_info = Some(driver.clone());
         }
@@ -218,7 +214,7 @@ pub async fn get_driver_by_filter(
 pub async fn get_driver_by_device(
     device_topo_path: &String,
     driver_development_proxy: &fdd::DriverDevelopmentProxy,
-) -> Result<fdd::DriverInfo> {
+) -> Result<fdf::DriverInfo> {
     let device_filter: [String; 1] = [device_topo_path.to_string()];
     let mut device_list =
         get_device_info(&driver_development_proxy, &device_filter, /* exact_match= */ true).await?;
@@ -243,24 +239,8 @@ pub async fn get_driver_by_device(
         device_list = fuzzy_device_list;
     }
 
-    let found_device: Device = device_list.remove(0).into();
-
-    let mut found_driver: Option<String> = None;
-
-    match found_device {
-        Device::V1(ref info) => {
-            if let Some(libname) = &info.0.bound_driver_libname {
-                found_driver = Some(libname.to_string());
-            }
-        }
-        Device::V2(ref info) => {
-            // TODO(fxb/112785): Querying V2 is not supported for now. This is untested.
-            if let Some(url) = &info.0.bound_driver_url {
-                found_driver = Some(url.to_string());
-            }
-        }
-    }
-    match found_driver {
+    let found_device = device_list.remove(0);
+    match found_device.bound_driver_url {
         Some(ref driver_filter) => {
             get_driver_by_filter(&driver_filter, &driver_development_proxy).await
         }
@@ -270,8 +250,8 @@ pub async fn get_driver_by_device(
 
 /// Gets the devices that are bound to the given driver.
 ///
-/// Filter based on either the driver's libname or its URL.
-/// For example: "fuchsia-pkg://domain/driver#driver/foo.so" or "fuchsia-boot://domain/#meta/foo.cm"
+/// Filter based on the driver's URL.
+/// For example: "fuchsia-boot://domain/#meta/foo.cm"
 ///
 /// # Arguments
 /// * `driver_filter` - Filter to the driver that matches the given filter.
@@ -290,26 +270,13 @@ pub async fn get_devices_by_driver(
     let mut matches: Vec<Device> = Vec::new();
     for device_item in device_list.into_iter() {
         let device: Device = device_item.into();
-        match device {
-            Device::V1(ref info) => {
-                if let (Some(bound_driver_libname), Some(libname)) =
-                    (&info.0.bound_driver_libname, &driver_info.libname)
-                {
-                    if &libname == &bound_driver_libname {
-                        matches.push(device);
-                    }
-                }
+        if let (Some(bound_driver_url), Some(url)) =
+            (&device.get_device_info().bound_driver_url, &driver_info.url)
+        {
+            if &url == &bound_driver_url {
+                matches.push(device);
             }
-            Device::V2(ref info) => {
-                if let (Some(bound_driver_url), Some(url)) =
-                    (&info.0.bound_driver_url, &driver_info.url)
-                {
-                    if &url == &bound_driver_url {
-                        matches.push(device);
-                    }
-                }
-            }
-        };
+        }
     }
     Ok(matches)
 }

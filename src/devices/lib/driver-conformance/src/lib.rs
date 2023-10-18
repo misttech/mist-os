@@ -11,7 +11,7 @@ use {
     args::{ConformanceCommand, ConformanceSubCommand, TestCommand},
     driver_connector::DriverConnector,
     errors::ffx_bail,
-    ffx_config, fidl_fuchsia_driver_development as fdd, fidl_fuchsia_test_manager as ftm,
+    ffx_config, fidl_fuchsia_driver_framework as fdf, fidl_fuchsia_test_manager as ftm,
     fuchsia_driver_dev::{
         get_devices_by_driver, get_driver_by_device, get_driver_by_filter, Device,
     },
@@ -198,8 +198,8 @@ fn parse_metadata(cmd: &TestCommand) -> Result<parser::TestMetadata> {
 async fn get_driver_and_devices(
     cmd: &TestCommand,
     driver_connector: &dyn DriverConnector,
-) -> Result<(Box<fdd::DriverInfo>, Box<Vec<Device>>)> {
-    let mut driver_info: Option<Box<fdd::DriverInfo>> = None;
+) -> Result<(Box<fdf::DriverInfo>, Box<Vec<Device>>)> {
+    let mut driver_info: Option<Box<fdf::DriverInfo>> = None;
     let mut device_list: Option<Box<Vec<Device>>> = None;
     let driver_service = driver_connector.get_driver_development_proxy(false).await?;
     if let Some(device) = &cmd.device {
@@ -210,9 +210,9 @@ async fn get_driver_and_devices(
         driver_info = Some(Box::new(get_driver_by_filter(&driver, &driver_service).await?));
         device_list = Some(Box::new(get_devices_by_driver(&driver, &driver_service).await?));
     } else if let Some(driver) = &driver_info {
-        if let Some(driver_libname) = &driver.libname {
+        if let Some(driver_url) = &driver.url {
             device_list =
-                Some(Box::new(get_devices_by_driver(&driver_libname, &driver_service).await?));
+                Some(Box::new(get_devices_by_driver(&driver_url, &driver_service).await?));
         }
     }
 
@@ -220,7 +220,7 @@ async fn get_driver_and_devices(
         (Some(driver), Some(devices)) => {
             println!(
                 "Identified driver {} associated with {} device(s).",
-                driver.libname.as_ref().unwrap_or(&"".to_string()),
+                driver.url.as_ref().unwrap_or(&"".to_string()),
                 devices.len()
             );
             return Ok((driver, devices));
