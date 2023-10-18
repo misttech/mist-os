@@ -303,19 +303,12 @@ def _build_fuchsia_package_impl(ctx):
     )
 
     # Create the meta/package file
-    ctx.actions.run(
-        executable = sdk.pm,
-        arguments = [
-            "-o",  # output directory
-            manifest.dirname,
-            "-n",  # name of the package
-            ctx.attr.package_name,
-            "init",
-        ],
-        outputs = [
-            meta_package,
-        ],
-        mnemonic = "FuchsiaPmInit",
+    ctx.actions.write(
+        meta_package,
+        content = json.encode_indent({
+            "name": ctx.attr.package_name,
+            "version": "0",
+        }),
     )
 
     # The only input to the build step is the manifest but we need to
