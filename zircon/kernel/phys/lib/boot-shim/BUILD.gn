@@ -51,6 +51,9 @@ zx_library("boot-shim") {
 
     # <lib/boot-shim/devicetree-boot-shim> has include <fbl/macros.h>
     "//zircon/system/ulib/fbl",
+
+    # <lib/boot-shim/devicetree.h> exposes memalloc::Range.
+    "//zircon/kernel/phys/lib/memalloc",
   ]
 
   sources = [
@@ -61,10 +64,10 @@ zx_library("boot-shim") {
     "devicetree-arm-gic-item.cc",
     "devicetree-arm-psci-item.cc",
     "devicetree-arm-timer-item.cc",
-    "devicetree-chosen-item.cc",
+    "devicetree-chosen-matcher.cc",
     "devicetree-cpu-topology-item.cc",
     "devicetree-irq-resolver.cc",
-    "devicetree-memory-item.cc",
+    "devicetree-memory-matcher.cc",
     "devicetree-riscv-plic-item.cc",
     "devicetree-riscv-timer-item.cc",
     "efi-boot-shim.cc",
@@ -76,7 +79,6 @@ zx_library("boot-shim") {
   deps = [
     "//zircon/kernel/lib/acpi_lite",
     "//zircon/kernel/lib/boot-options",
-    "//zircon/kernel/phys/lib/memalloc",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/pretty",
     "//zircon/system/ulib/uart",
@@ -90,6 +92,8 @@ if (!is_kernel) {
   group("tests") {
     testonly = true
     deps = [
+      ":boot-shim-devicetree-tests",
+      ":boot-shim-devicetree-unittests($host_toolchain)",
       ":boot-shim-tests",
       ":boot-shim-unittests($host_toolchain)",
     ]
@@ -108,14 +112,45 @@ if (!is_kernel) {
     ]
   }
 
+  source_set("devicetree-test-fixture") {
+    testonly = true
+    sources = [ "devicetree-test-fixture.cc" ]
+    public = [ "devicetree-test-fixture.h" ]
+    public_deps = [
+      "//sdk/lib/zbi-format",
+      "//zircon/kernel/lib/devicetree/testing",
+      "//zircon/system/ulib/zxtest",
+    ]
+  }
+
+  test("boot-shim-devicetree-unittests") {
+    defines = [ "UART_ALL_DRIVERS=1" ]
+    sources = [
+      "devicetree-arm-cpu-topology-item-test.cc",
+      "devicetree-arm-gic-item-test.cc",
+      "devicetree-arm-psci-item-test.cc",
+      "devicetree-arm-timer-item-test.cc",
+      "devicetree-boot-shim-tests.cc",
+      "devicetree-chosen-matcher-test.cc",
+      "devicetree-memory-matcher-test.cc",
+      "devicetree-riscv-cpu-topology-item-test.cc",
+      "devicetree-riscv-plic-item-test.cc",
+      "devicetree-riscv-timer-item-test.cc",
+    ]
+    deps = [
+      ":boot-shim",
+      ":devicetree-test-fixture",
+      "//sdk/lib/fit",
+      "//src/lib/zbitl",
+    ]
+  }
+
   test("boot-shim-unittests") {
     defines = [ "UART_ALL_DRIVERS=1" ]
     sources = [
       "acpi-tests.cc",
       "boot-shim-tests.cc",
       "debugdata-tests.cc",
-      "devicetree-boot-shim-tests.cc",
-      "devicetree-tests.cc",
       "efi-boot-shim-tests.cc",
       "efi-tests.cc",
       "pool-mem-config-tests.cc",
@@ -135,5 +170,9 @@ if (!is_kernel) {
 
   fuchsia_unittest_package("boot-shim-tests") {
     deps = [ ":boot-shim-unittests" ]
+  }
+
+  fuchsia_unittest_package("boot-shim-devicetree-tests") {
+    deps = [ ":boot-shim-devicetree-unittests" ]
   }
 }
