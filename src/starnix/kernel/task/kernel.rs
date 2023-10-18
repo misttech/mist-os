@@ -93,7 +93,7 @@ pub struct Kernel {
     pub proc_fs: OnceCell<FileSystemHandle>,
     // Owned by sysfs.rs
     pub sys_fs: OnceCell<FileSystemHandle>,
-    // Owned by selinux.rs
+    // Owned by selinux/fs.rs
     pub selinux_fs: OnceCell<FileSystemHandle>,
     // Owned by tracefs/fs.rs
     pub trace_fs: OnceCell<FileSystemHandle>,
@@ -209,7 +209,7 @@ impl InterfacesHandlerImpl {
         let Self(rc) = self;
         let Some(rc) = rc.upgrade() else {
             // The kernel may be getting torn-down.
-            return
+            return;
         };
         f(&rc.netstack_devices, rc.proc_fs.get(), rc.sys_fs.get())
     }
