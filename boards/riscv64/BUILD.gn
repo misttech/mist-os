@@ -23,6 +23,8 @@ board_configuration("riscv64") {
       sparse_output = {
       }
     }
+    fxfs = {
+    }
   }
 }
 

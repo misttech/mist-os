@@ -49,6 +49,9 @@ board_configuration("vim3") {
         truncate_to_length = 3439329280
       }
     }
+    fxfs = {
+      size_checker_maximum_bytes = 5216665600
+    }
   }
 }
 

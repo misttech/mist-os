@@ -35,6 +35,9 @@ board_configuration("qemu-x64") {
         truncate_to_length = 17179869184
       }
     }
+    fxfs = {
+      size_checker_maximum_bytes = 5216665600
+    }
     gpt_all = true
   }
 }

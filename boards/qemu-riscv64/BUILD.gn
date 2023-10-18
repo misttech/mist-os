@@ -21,5 +21,8 @@ board_configuration("qemu-riscv64") {
       sparse_output = {
       }
     }
+    fxfs = {
+      size_checker_maximum_bytes = 5216665600
+    }
   }
 }
