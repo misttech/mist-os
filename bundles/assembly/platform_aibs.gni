@@ -59,9 +59,6 @@ bootstrap_userdebug_platform_aib_names = [
 
   # Kernel args
   "kernel_args_userdebug",
-
-  # SWD (Software Delivery)
-  "no_update_checker",
 ]
 
 # These are the eng-buildtype-safe platform AIBs that are used by bootstrap
@@ -74,9 +71,6 @@ bootstrap_eng_platform_aib_names = [
   # Kernel args
   "kernel_args_eng",
   "kernel_pmm_checker_enabled",
-
-  # SWD (Software Delivery)
-  "no_update_checker",
 ]
 
 # The names of all of the platform's 'testonly=false' Assembly Input Bundles

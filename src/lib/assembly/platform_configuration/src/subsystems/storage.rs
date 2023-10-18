@@ -43,6 +43,24 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
         // each subsystem under the top-level assembly gen directory.
         let gendir = context.get_gendir().context("Getting gendir for storage subsystem")?;
 
+        // Set the storage security policy/configuration for zxcrypt
+        let zxcrypt_config_path = gendir.join("zxcrypt");
+
+        if context.board_info.provides_feature("fuchsia::keysafe_ta") {
+            std::fs::write(&zxcrypt_config_path, "tee")
+        } else {
+            std::fs::write(&zxcrypt_config_path, "null")
+        }
+        .context("Could not write zxcrypt configuration")?;
+
+        builder
+            .bootfs()
+            .file(FileEntry {
+                source: zxcrypt_config_path,
+                destination: "config/zxcrypt".to_string(),
+            })
+            .context("Adding zxcrypt config to bootfs")?;
+
         // Build the component id index and add it as a bootfs file.
         let index_path = index_builder.build(&gendir).context("Building component id index")?;
         builder

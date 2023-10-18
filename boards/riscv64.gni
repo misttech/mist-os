@@ -25,7 +25,6 @@ board_bootfs_labels += [
 
   # Configs
   "//src/power/power-manager:base_config",
-  "//src/security/policy/zxcrypt:null",
 ]
 board_bootfs_labels += _imports.virtio_drivers
 

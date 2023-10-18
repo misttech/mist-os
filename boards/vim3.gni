@@ -29,7 +29,6 @@ bazel_product_bundle_board = "vim3"
 _common_bootfs_deps = [
   "//boards/kernel_cmdline:vim3",
   "//src/power/power-manager/thermal_config:vim3",
-  "//src/security/policy/zxcrypt:null",
 ]
 
 board_bootfs_labels =

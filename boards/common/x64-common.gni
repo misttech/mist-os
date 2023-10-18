@@ -52,7 +52,6 @@ _bootfs_deps = [
 
   # Configs
   "//src/power/power-manager:base_config",
-  "//src/security/policy/zxcrypt:null",
 ]
 
 # Additional drivers to support running as a virtualization guest.

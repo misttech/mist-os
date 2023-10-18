@@ -672,7 +672,6 @@ impl ConfigurationContext<'_> {
     /// Return a new gendir that is nested under the top-level gendir
     /// Subsystems can use this to generate files before adding them to the
     /// builder.
-    #[allow(dead_code)]
     pub fn get_gendir(&self) -> Result<Utf8PathBuf> {
         let gendir =
             TempDir::new_in(&self.gendir).map_err(|e| anyhow!("preparing new gendir: {}", e))?;
@@ -683,7 +682,6 @@ impl ConfigurationContext<'_> {
 
     /// Retrieve the full path to a platform resource identified by a path into
     /// the resource directory.
-    #[allow(dead_code)]
     pub fn get_resource(&self, path: impl AsRef<Utf8Path>) -> Utf8PathBuf {
         self.resource_dir.join(path.as_ref())
     }
