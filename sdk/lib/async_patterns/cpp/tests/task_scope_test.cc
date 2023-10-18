@@ -36,38 +36,59 @@ TEST(TaskScope, Post) {
 TEST(TaskScope, PostCanceledOnDestruction) {
   async::Loop loop{&kAsyncLoopConfigNeverAttachToThread};
 
-  bool ok = false;
+  enum Action : uint8_t {
+    TASK_SCOPE_DESTROYED = 1,
+    TASK_DESTROYED,
+    TASK_RUN,
+  };
+  std::vector<Action> actions;
   {
+    auto task_scope_destroyed = fit::defer([&] { actions.push_back(TASK_SCOPE_DESTROYED); });
     async_patterns::TaskScope tasks{loop.dispatcher()};
-    tasks.Post([&] { ok = true; });
+    auto task_destroyed = fit::defer([&] { actions.push_back(TASK_DESTROYED); });
+    tasks.Post([&, _ = std::move(task_destroyed)] { actions.push_back(TASK_RUN); });
   }
 
+  std::vector<Action> expectation = {
+      TASK_DESTROYED,
+      TASK_SCOPE_DESTROYED,
+  };
+  EXPECT_EQ(actions, expectation);
   ASSERT_OK(loop.RunUntilIdle());
-  EXPECT_FALSE(ok);
+  EXPECT_EQ(actions, expectation);
 }
 
 TEST(TaskScope, PostCanceledOnDestructionTaskDestructorPostTask) {
   async::Loop loop{&kAsyncLoopConfigNeverAttachToThread};
 
-  bool ok = false;
-  bool destroyed = false;
+  enum Action : uint8_t {
+    TASK_SCOPE_DESTROYED = 1,
+    FIRST_TASK_DESTROYED,
+    FIRST_TASK_RUN,
+    REENTRANT_TASK_DESTROYED,
+    REENTRANT_TASK_RUN,
+  };
+  std::vector<Action> actions;
   {
+    auto task_scope_destroyed = fit::defer([&] { actions.push_back(TASK_SCOPE_DESTROYED); });
     async_patterns::TaskScope tasks{loop.dispatcher()};
     auto deferred = fit::defer([&] {
-      destroyed = true;
-      tasks.Post([&] { ok = true; });
+      actions.push_back(FIRST_TASK_DESTROYED);
+      auto deferred = fit::defer([&] { actions.push_back(REENTRANT_TASK_DESTROYED); });
+      tasks.Post([&, _ = std::move(deferred)] { actions.push_back(REENTRANT_TASK_RUN); });
     });
-    tasks.Post([&, deferred = std::move(deferred)]() mutable {
-      ok = true;
-      deferred.cancel();
-    });
-    EXPECT_FALSE(ok);
-    EXPECT_FALSE(destroyed);
+    tasks.Post([&, _ = std::move(deferred)] { actions.push_back(FIRST_TASK_RUN); });
+    EXPECT_EQ(actions.size(), 0u);
   }
 
-  EXPECT_TRUE(destroyed);
+  std::vector<Action> expectation = {
+      FIRST_TASK_DESTROYED,
+      REENTRANT_TASK_DESTROYED,
+      TASK_SCOPE_DESTROYED,
+  };
+  EXPECT_EQ(actions, expectation);
   ASSERT_OK(loop.RunUntilIdle());
-  EXPECT_FALSE(ok);
+  EXPECT_EQ(actions, expectation);
 }
 
 TEST(TaskScope, PostCanceledOnShutdown) {
@@ -75,32 +96,43 @@ TEST(TaskScope, PostCanceledOnShutdown) {
   async_patterns::TaskScope tasks{loop.dispatcher()};
 
   bool ok = false;
-  tasks.Post([&] { ok = true; });
+  bool destroyed = false;
+  auto deferred = fit::defer([&] { destroyed = true; });
+  tasks.Post([&, _ = std::move(deferred)] { ok = true; });
 
+  EXPECT_FALSE(ok);
+  EXPECT_FALSE(destroyed);
   loop.Shutdown();
   EXPECT_FALSE(ok);
+  EXPECT_TRUE(destroyed);
 }
 
 TEST(TaskScope, PostCanceledOnShutdownTaskDestructorPostTask) {
   async::Loop loop{&kAsyncLoopConfigNeverAttachToThread};
 
-  bool ok = false;
-  bool destroyed = false;
+  enum Action : uint8_t {
+    FIRST_TASK_DESTROYED = 1,
+    FIRST_TASK_RUN,
+    REENTRANT_TASK_DESTROYED,
+    REENTRANT_TASK_RUN,
+  };
+  std::vector<Action> actions;
   async_patterns::TaskScope tasks{loop.dispatcher()};
   auto deferred = fit::defer([&] {
-    destroyed = true;
-    tasks.Post([&] { ok = true; });
+    actions.push_back(FIRST_TASK_DESTROYED);
+    auto deferred = fit::defer([&] { actions.push_back(REENTRANT_TASK_DESTROYED); });
+    tasks.Post([&, _ = std::move(deferred)] { actions.push_back(REENTRANT_TASK_RUN); });
   });
-  tasks.Post([&, deferred = std::move(deferred)]() mutable {
-    ok = true;
-    deferred.cancel();
-  });
-  EXPECT_FALSE(ok);
-  EXPECT_FALSE(destroyed);
+  tasks.Post([&, _ = std::move(deferred)] { actions.push_back(FIRST_TASK_RUN); });
+  EXPECT_EQ(actions.size(), 0u);
 
   loop.Shutdown();
-  EXPECT_TRUE(destroyed);
-  EXPECT_FALSE(ok);
+
+  std::vector<Action> expectation = {
+      FIRST_TASK_DESTROYED,
+      REENTRANT_TASK_DESTROYED,
+  };
+  EXPECT_EQ(actions, expectation);
 }
 
 TEST(TaskScope, PostDelayed) {
@@ -125,40 +157,63 @@ TEST(TaskScope, PostDelayed) {
 TEST(TaskScope, PostDelayedCanceledOnDestruction) {
   async::TestLoop loop;
 
-  bool ok = false;
+  enum Action : uint8_t {
+    TASK_SCOPE_DESTROYED = 1,
+    TASK_DESTROYED,
+    TASK_RUN,
+  };
+  std::vector<Action> actions;
   {
+    auto task_scope_destroyed = fit::defer([&] { actions.push_back(TASK_SCOPE_DESTROYED); });
     async_patterns::TaskScope tasks{loop.dispatcher()};
-    tasks.PostDelayed([&] { ok = true; }, zx::sec(1));
+
+    auto task_destroyed = fit::defer([&] { actions.push_back(TASK_DESTROYED); });
+    tasks.PostDelayed([&, _ = std::move(task_destroyed)] { actions.push_back(TASK_RUN); },
+                      zx::sec(1));
   }
 
+  std::vector<Action> expectation = {
+      TASK_DESTROYED,
+      TASK_SCOPE_DESTROYED,
+  };
+  EXPECT_EQ(actions, expectation);
   loop.RunFor(zx::sec(3));
-  EXPECT_FALSE(ok);
+  EXPECT_EQ(actions, expectation);
 }
 
 TEST(TaskScope, PostDelayedCanceledOnDestructionTaskDestructorPostTask) {
   async::TestLoop loop;
 
-  bool ok = false;
-  bool destroyed = false;
+  enum Action : uint8_t {
+    TASK_SCOPE_DESTROYED = 1,
+    FIRST_TASK_DESTROYED,
+    FIRST_TASK_RUN,
+    REENTRANT_TASK_DESTROYED,
+    REENTRANT_TASK_RUN,
+  };
+  std::vector<Action> actions;
   {
+    auto task_scope_destroyed = fit::defer([&] { actions.push_back(TASK_SCOPE_DESTROYED); });
     async_patterns::TaskScope tasks{loop.dispatcher()};
     auto deferred = fit::defer([&] {
-      destroyed = true;
-      tasks.PostDelayed([&] { ok = true; }, zx::sec(1));
+      actions.push_back(FIRST_TASK_DESTROYED);
+      auto deferred = fit::defer([&] { actions.push_back(REENTRANT_TASK_DESTROYED); });
+      tasks.PostDelayed([&, _ = std::move(deferred)] { actions.push_back(REENTRANT_TASK_RUN); },
+                        zx::sec(1));
     });
-    tasks.PostDelayed(
-        [&, deferred = std::move(deferred)]() mutable {
-          ok = true;
-          deferred.cancel();
-        },
-        zx::sec(1));
-    EXPECT_FALSE(ok);
-    EXPECT_FALSE(destroyed);
+    tasks.PostDelayed([&, _ = std::move(deferred)] { actions.push_back(FIRST_TASK_RUN); },
+                      zx::sec(1));
+    EXPECT_EQ(actions.size(), 0u);
   }
 
-  EXPECT_TRUE(destroyed);
+  std::vector<Action> expectation = {
+      FIRST_TASK_DESTROYED,
+      REENTRANT_TASK_DESTROYED,
+      TASK_SCOPE_DESTROYED,
+  };
+  EXPECT_EQ(actions, expectation);
   loop.RunFor(zx::sec(10));
-  EXPECT_FALSE(ok);
+  EXPECT_EQ(actions, expectation);
 }
 
 TEST(TaskScope, PostDelayedCanceledOnShutdown) {
@@ -166,35 +221,45 @@ TEST(TaskScope, PostDelayedCanceledOnShutdown) {
   async_patterns::TaskScope tasks{loop.dispatcher()};
 
   bool ok = false;
-  tasks.PostDelayed([&]() mutable { ok = true; }, zx::sec(1));
+  bool destroyed = false;
+  auto deferred = fit::defer([&] { destroyed = true; });
+  tasks.PostDelayed([&, _ = std::move(deferred)] { ok = true; }, zx::sec(1));
   EXPECT_FALSE(ok);
+  EXPECT_FALSE(destroyed);
 
   loop.Shutdown();
   EXPECT_FALSE(ok);
+  EXPECT_TRUE(destroyed);
 }
 
 TEST(TaskScope, PostDelayedCanceledOnShutdownTaskDestructorPostTask) {
   async::Loop loop{&kAsyncLoopConfigNeverAttachToThread};
 
-  bool ok = false;
-  bool destroyed = false;
+  enum Action : uint8_t {
+    FIRST_TASK_DESTROYED = 1,
+    FIRST_TASK_RUN,
+    REENTRANT_TASK_DESTROYED,
+    REENTRANT_TASK_RUN,
+  };
+  std::vector<Action> actions;
   async_patterns::TaskScope tasks{loop.dispatcher()};
   auto deferred = fit::defer([&] {
-    destroyed = true;
-    tasks.PostDelayed([&] { ok = true; }, zx::sec(1));
+    actions.push_back(FIRST_TASK_DESTROYED);
+    auto deferred = fit::defer([&] { actions.push_back(REENTRANT_TASK_DESTROYED); });
+    tasks.PostDelayed([&, _ = std::move(deferred)] { actions.push_back(REENTRANT_TASK_RUN); },
+                      zx::sec(1));
   });
-  tasks.PostDelayed(
-      [&, deferred = std::move(deferred)]() mutable {
-        ok = true;
-        deferred.cancel();
-      },
-      zx::sec(1));
-  EXPECT_FALSE(ok);
-  EXPECT_FALSE(destroyed);
+  tasks.PostDelayed([&, _ = std::move(deferred)] { actions.push_back(FIRST_TASK_RUN); },
+                    zx::sec(1));
+  EXPECT_EQ(actions.size(), 0u);
 
   loop.Shutdown();
-  EXPECT_TRUE(destroyed);
-  EXPECT_FALSE(ok);
+
+  std::vector<Action> expectation = {
+      FIRST_TASK_DESTROYED,
+      REENTRANT_TASK_DESTROYED,
+  };
+  EXPECT_EQ(actions, expectation);
 }
 
 TEST(TaskScope, PostForTime) {
@@ -219,40 +284,63 @@ TEST(TaskScope, PostForTime) {
 TEST(TaskScope, PostForTimeCanceledOnDestruction) {
   async::TestLoop loop;
 
-  bool ok = false;
+  enum Action : uint8_t {
+    TASK_SCOPE_DESTROYED = 1,
+    TASK_DESTROYED,
+    TASK_RUN,
+  };
+  std::vector<Action> actions;
   {
+    auto task_scope_destroyed = fit::defer([&] { actions.push_back(TASK_SCOPE_DESTROYED); });
     async_patterns::TaskScope tasks{loop.dispatcher()};
-    tasks.PostForTime([&] { ok = true; }, async::Now(loop.dispatcher()) + zx::sec(1));
+
+    auto deferred = fit::defer([&] { actions.push_back(TASK_DESTROYED); });
+    tasks.PostForTime([&, _ = std::move(deferred)] { actions.push_back(TASK_DESTROYED); },
+                      async::Now(loop.dispatcher()) + zx::sec(1));
   }
 
+  std::vector<Action> expectation = {
+      TASK_DESTROYED,
+      TASK_SCOPE_DESTROYED,
+  };
+  EXPECT_EQ(actions, expectation);
   loop.RunFor(zx::sec(3));
-  EXPECT_FALSE(ok);
+  EXPECT_EQ(actions, expectation);
 }
 
 TEST(TaskScope, PostForTimeCanceledOnDestructionTaskDestructorPostTask) {
   async::TestLoop loop;
 
-  bool ok = false;
-  bool destroyed = false;
+  enum Action : uint8_t {
+    TASK_SCOPE_DESTROYED = 1,
+    FIRST_TASK_DESTROYED,
+    FIRST_TASK_RUN,
+    REENTRANT_TASK_DESTROYED,
+    REENTRANT_TASK_RUN,
+  };
+  std::vector<Action> actions;
   {
+    auto task_scope_destroyed = fit::defer([&] { actions.push_back(TASK_SCOPE_DESTROYED); });
     async_patterns::TaskScope tasks{loop.dispatcher()};
     auto deferred = fit::defer([&] {
-      destroyed = true;
-      tasks.PostForTime([&] { ok = true; }, async::Now(loop.dispatcher()) + zx::sec(1));
+      actions.push_back(FIRST_TASK_DESTROYED);
+      auto deferred = fit::defer([&] { actions.push_back(REENTRANT_TASK_DESTROYED); });
+      tasks.PostForTime([&, _ = std::move(deferred)] { actions.push_back(REENTRANT_TASK_RUN); },
+                        async::Now(loop.dispatcher()) + zx::sec(1));
     });
-    tasks.PostForTime(
-        [&, deferred = std::move(deferred)]() mutable {
-          ok = true;
-          deferred.cancel();
-        },
-        async::Now(loop.dispatcher()) + zx::sec(1));
-    EXPECT_FALSE(ok);
-    EXPECT_FALSE(destroyed);
+    tasks.PostForTime([&, _ = std::move(deferred)] { actions.push_back(FIRST_TASK_RUN); },
+                      async::Now(loop.dispatcher()) + zx::sec(1));
+    EXPECT_EQ(actions.size(), 0u);
   }
 
-  EXPECT_TRUE(destroyed);
+  std::vector<Action> expectation = {
+      FIRST_TASK_DESTROYED,
+      REENTRANT_TASK_DESTROYED,
+      TASK_SCOPE_DESTROYED,
+  };
+  EXPECT_EQ(actions, expectation);
   loop.RunFor(zx::sec(10));
-  EXPECT_FALSE(ok);
+  EXPECT_EQ(actions, expectation);
 }
 
 TEST(TaskScope, PostForTimeCanceledOnShutdown) {
@@ -260,35 +348,47 @@ TEST(TaskScope, PostForTimeCanceledOnShutdown) {
   async_patterns::TaskScope tasks{loop.dispatcher()};
 
   bool ok = false;
-  tasks.PostForTime([&]() mutable { ok = true; }, async::Now(loop.dispatcher()) + zx::sec(1));
+  bool destroyed = false;
+  auto deferred = fit::defer([&] { destroyed = true; });
+  tasks.PostForTime([&, _ = std::move(deferred)] { ok = true; },
+                    async::Now(loop.dispatcher()) + zx::sec(1));
   EXPECT_FALSE(ok);
+  EXPECT_FALSE(destroyed);
 
   loop.Shutdown();
+
   EXPECT_FALSE(ok);
+  EXPECT_TRUE(destroyed);
 }
 
 TEST(TaskScope, PostForTimeCanceledOnShutdownTaskDestructorPostTask) {
   async::Loop loop{&kAsyncLoopConfigNeverAttachToThread};
 
-  bool ok = false;
-  bool destroyed = false;
+  enum Action : uint8_t {
+    FIRST_TASK_DESTROYED = 1,
+    FIRST_TASK_RUN,
+    REENTRANT_TASK_DESTROYED,
+    REENTRANT_TASK_RUN,
+  };
+  std::vector<Action> actions;
   async_patterns::TaskScope tasks{loop.dispatcher()};
   auto deferred = fit::defer([&] {
-    destroyed = true;
-    tasks.PostForTime([&] { ok = true; }, async::Now(loop.dispatcher()) + zx::sec(1));
+    actions.push_back(FIRST_TASK_DESTROYED);
+    auto deferred = fit::defer([&] { actions.push_back(REENTRANT_TASK_DESTROYED); });
+    tasks.PostForTime([&, _ = std::move(deferred)] { actions.push_back(REENTRANT_TASK_RUN); },
+                      async::Now(loop.dispatcher()) + zx::sec(1));
   });
-  tasks.PostForTime(
-      [&, deferred = std::move(deferred)]() mutable {
-        ok = true;
-        deferred.cancel();
-      },
-      async::Now(loop.dispatcher()) + zx::sec(1));
-  EXPECT_FALSE(ok);
-  EXPECT_FALSE(destroyed);
+  tasks.PostForTime([&, deferred = std::move(deferred)] { actions.push_back(FIRST_TASK_RUN); },
+                    async::Now(loop.dispatcher()) + zx::sec(1));
+  EXPECT_EQ(actions.size(), 0u);
 
   loop.Shutdown();
-  EXPECT_TRUE(destroyed);
-  EXPECT_FALSE(ok);
+
+  std::vector<Action> expectation = {
+      FIRST_TASK_DESTROYED,
+      REENTRANT_TASK_DESTROYED,
+  };
+  EXPECT_EQ(actions, expectation);
 }
 
 TEST(TaskScope, Mixture) {

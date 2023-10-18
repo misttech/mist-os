@@ -72,6 +72,8 @@ class TaskScope {
   //
   // The handler will not run if |TaskScope| is destroyed before it comes due.
   // The handler will not run if the dispatcher shuts down before it comes due.
+  // In both cases, the handler will be synchronously destroyed during task scope
+  // destruction/dispatcher shutdown.
   //
   // This is a drop-in replacement for |async::PostTask|.
   template <typename Closure>
@@ -85,6 +87,8 @@ class TaskScope {
   //
   // The handler will not run if |TaskScope| is destroyed before it comes due.
   // The handler will not run if the dispatcher shuts down before it comes due.
+  // In both cases, the handler will be synchronously destroyed during task scope
+  // destruction/dispatcher shutdown.
   //
   // This is a drop-in replacement for |async::PostDelayedTask|.
   template <typename Closure>
@@ -98,6 +102,8 @@ class TaskScope {
   //
   // The handler will not run if |TaskScope| is destroyed before it comes due.
   // The handler will not run if the dispatcher shuts down before it comes due.
+  // In both cases, the handler will be synchronously destroyed during task scope
+  // destruction/dispatcher shutdown.
   //
   // This is a drop-in replacement for |async::PostTaskForTime|.
   template <typename Closure>
