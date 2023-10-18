@@ -45,7 +45,7 @@ impl DebugAgentSocket {
 
         // Create a FIDL socket to the debug_agent on the device.
         let (fidl_left, fidl_right) = fidl::Socket::create_stream();
-        Status::ok(self.debugger_proxy.connect(fidl_right).await?)?;
+        self.debugger_proxy.connect(fidl_right).await?.map_err(Status::from_raw)?;
         let fidl_conn = fidl::AsyncSocket::from_socket(fidl_left)?;
 
         let (mut unix_rx, mut unix_tx) = unix_conn.split();

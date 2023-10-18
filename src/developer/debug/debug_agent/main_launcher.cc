@@ -43,7 +43,12 @@ class DebugAgentLauncher : public fidl::Server<fuchsia_debugger::DebugAgent> {
     if (status != ZX_OK) {
       FX_PLOGS(ERROR, status) << "Failed to launch debug_agent: " << err_msg;
     }
-    completer.Reply(status);
+    completer.Reply(zx::make_result(status));
+  }
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_debugger::DebugAgent> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {
+    FX_LOGS(WARNING) << "Unknown method: " << metadata.method_ordinal;
   }
 };
 
