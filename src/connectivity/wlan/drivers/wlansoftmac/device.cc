@@ -126,11 +126,8 @@ class WlanSoftmacBridgeImpl : public fidl::WireServer<fuchsia_wlan_softmac::Wlan
       async_dispatcher_t* dispatcher, DeviceInterface* device,
       fidl::ServerEnd<fuchsia_wlan_softmac::WlanSoftmacBridge> server_end) {
     std::unique_ptr impl = std::make_unique<WlanSoftmacBridgeImpl>(device);
-    WlanSoftmacBridgeImpl* impl_ptr = impl.get();
-    fidl::ServerBindingRef binding_ref =
-        fidl::BindServer(dispatcher, std::move(server_end), std::move(impl),
-                         std::mem_fn(&WlanSoftmacBridgeImpl::OnUnbound));
-    impl_ptr->binding_ref_.emplace(std::move(binding_ref));
+    fidl::BindServer(dispatcher, std::move(server_end), std::move(impl),
+                     std::mem_fn(&WlanSoftmacBridgeImpl::OnUnbound));
   }
 
   // TODO(issues.fuchsia.dev/306181180): This method should probably trigger
@@ -148,7 +145,6 @@ class WlanSoftmacBridgeImpl : public fidl::WireServer<fuchsia_wlan_softmac::Wlan
 
  private:
   DeviceInterface* device_;
-  std::optional<fidl::ServerBindingRef<fuchsia_wlan_softmac::WlanSoftmacBridge>> binding_ref_;
 };
 
 zx_status_t WlanSoftmacHandle::Init() {
