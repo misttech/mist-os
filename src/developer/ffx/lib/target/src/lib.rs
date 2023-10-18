@@ -200,7 +200,89 @@ pub async fn knock_target(target: &TargetProxy) -> Result<(), KnockError> {
         .map_err(|e| KnockError::NonCriticalError(anyhow::anyhow!("{e:?}")))
 }
 
+/// Get the default target.  This uses the normal config mechanism which
+/// supports flexible config values: it can be a string naming the target, or
+/// a list of strings, in which case the first valid entry is used. (The most
+/// common use of this functionality would be to specify an array of environment
+/// variables, e.g. ["$FUCHSIA_TARGET_ADDR", "FUCHSIA_NODENAME"])
 pub async fn get_default_target(context: &EnvironmentContext) -> Result<Option<String>> {
     let target = ffx_config::query(TARGET_DEFAULT_KEY).context(Some(context)).get().await?;
     Ok(target)
+}
+
+#[cfg(test)]
+mod test {
+    use ffx_config::{macro_deps::serde_json::Value, test_init, ConfigLevel};
+
+    use super::*;
+
+    #[fuchsia::test]
+    async fn test_get_empty_default_target() {
+        let env = test_init().await.unwrap();
+        let target = get_default_target(&env.context).await.unwrap();
+        assert_eq!(target, None);
+    }
+
+    #[fuchsia::test]
+    async fn test_set_default_target() {
+        let env = test_init().await.unwrap();
+        env.context
+            .query(TARGET_DEFAULT_KEY)
+            .level(Some(ConfigLevel::User))
+            .set(Value::String("some_target".to_owned()))
+            .await
+            .unwrap();
+
+        let target = get_default_target(&env.context).await.unwrap();
+        assert_eq!(target, Some("some_target".to_owned()));
+    }
+
+    #[fuchsia::test]
+    async fn test_default_first_target_in_array() {
+        let env = test_init().await.unwrap();
+        let ts: Vec<Value> = ["t1", "t2"].iter().map(|s| Value::String(s.to_string())).collect();
+        env.context
+            .query(TARGET_DEFAULT_KEY)
+            .level(Some(ConfigLevel::User))
+            .set(Value::Array(ts))
+            .await
+            .unwrap();
+
+        let target = get_default_target(&env.context).await.unwrap();
+        assert_eq!(target, Some("t1".to_owned()));
+    }
+
+    #[fuchsia::test]
+    async fn test_default_missing_env_ignored() {
+        let env = test_init().await.unwrap();
+        let ts: Vec<Value> =
+            ["$THIS_BETTER_NOT_EXIST", "t2"].iter().map(|s| Value::String(s.to_string())).collect();
+        env.context
+            .query(TARGET_DEFAULT_KEY)
+            .level(Some(ConfigLevel::User))
+            .set(Value::Array(ts))
+            .await
+            .unwrap();
+
+        let target = get_default_target(&env.context).await.unwrap();
+        assert_eq!(target, Some("t2".to_owned()));
+    }
+
+    #[fuchsia::test]
+    async fn test_default_env_present() {
+        std::env::set_var("MY_LITTLE_TMPKEY", "t1");
+        let env = test_init().await.unwrap();
+        let ts: Vec<Value> =
+            ["$MY_LITTLE_TMPKEY", "t2"].iter().map(|s| Value::String(s.to_string())).collect();
+        env.context
+            .query(TARGET_DEFAULT_KEY)
+            .level(Some(ConfigLevel::User))
+            .set(Value::Array(ts))
+            .await
+            .unwrap();
+
+        let target = get_default_target(&env.context).await.unwrap();
+        assert_eq!(target, Some("t1".to_owned()));
+        std::env::remove_var("MY_LITTLE_TMPKEY");
+    }
 }

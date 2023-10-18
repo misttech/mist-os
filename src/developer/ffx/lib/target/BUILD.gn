@@ -25,6 +25,8 @@ if (is_host) {
       "//third_party/rust_crates:tracing",
     ]
 
+    test_deps = [ "//src/lib/fuchsia" ]
+
     sources = [ "src/lib.rs" ]
   }
 }

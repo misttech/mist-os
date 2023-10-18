@@ -18,5 +18,11 @@
     },
     "proxy": {
         "timeout_secs": 10.0
+    },
+    "target": {
+        "default": [
+            "$FUCHSIA_DEVICE_ADDR",
+            "$FUCHSIA_NODENAME"
+        ]
     }
 }
