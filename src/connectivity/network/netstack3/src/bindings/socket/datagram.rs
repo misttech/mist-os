@@ -1362,7 +1362,7 @@ where
                             IpVersion::V4 => false,
                         }
                         .then_some(())
-                        .ok_or(fposix::Errno::Eopnotsupp),
+                        .ok_or(fposix::Errno::Enoprotoopt),
                     )
                     .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
