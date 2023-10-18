@@ -169,6 +169,7 @@ fn get_selinux_context(path: &FsStr) -> FsString {
 }
 
 pub fn sys_bpf(
+    _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     cmd: bpf_cmd,
     attr_addr: UserAddress,

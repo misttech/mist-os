@@ -9,6 +9,7 @@ use fidl_fuchsia_process as fprocess;
 use fuchsia_inspect::NumericProperty;
 use fuchsia_runtime::{HandleInfo, HandleType};
 use fuchsia_zircon::{self as zx};
+use lock_sequence::{Locked, Unlocked};
 use std::{convert::TryFrom, sync::Arc};
 
 use crate::{
@@ -57,6 +58,7 @@ pub struct TaskInfo {
 /// Returns an `ErrorContext` if the system call returned an error.
 #[inline(never)] // Inlining this function breaks the CFI directives used to unwind into user code.
 pub fn execute_syscall(
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
     syscall_decl: SyscallDecl,
 ) -> Option<ErrorContext> {
@@ -76,10 +78,10 @@ pub fn execute_syscall(
             if let Some(res) = current_task.run_seccomp_filters(&syscall) {
                 res
             } else {
-                dispatch_syscall(current_task, &syscall)
+                dispatch_syscall(locked, current_task, &syscall)
             }
         } else {
-            dispatch_syscall(current_task, &syscall)
+            dispatch_syscall(locked, current_task, &syscall)
         };
 
     match result {

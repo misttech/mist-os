@@ -6,13 +6,13 @@ use paste::paste;
 
 use crate::{
     arch::syscalls::*,
-    syscalls::{decls::Syscall, CurrentTask, SyscallResult},
+    syscalls::{decls::Syscall, CurrentTask, Locked, SyscallResult, Unlocked},
     types::Errno,
 };
 
 macro_rules! syscall_match {
     {
-        $current_task:ident; $syscall_number:expr; $args:ident;
+        $locked:ident; $current_task:ident; $syscall_number:expr; $args:ident;
         $($(#[$match:meta])? $call:ident [$num_args:tt],)*
     } => {
         paste! {
@@ -21,27 +21,28 @@ macro_rules! syscall_match {
                     $(#[$match])?
                     crate::types::[<__NR_ $call>] => {
                         profile_duration!(stringify!($call));
-                        match syscall_match!(@call $current_task; $args; [<sys_ $call>][$num_args]) {
+                        match syscall_match!(@call $locked; $current_task; $args; [<sys_ $call>][$num_args]) {
                             Ok(x) => Ok(SyscallResult::from(x)),
                             Err(err) => Err(err),
                         }
                     },
                 )*
-                _ => sys_unknown($current_task, $syscall_number),
+                _ => sys_unknown($locked, $current_task, $syscall_number),
             }
         }
     };
 
-    (@call $current_task:ident; $args:ident; $func:ident [0]) => ($func($current_task));
-    (@call $current_task:ident; $args:ident; $func:ident [1]) => ($func($current_task, $args.0.into()));
-    (@call $current_task:ident; $args:ident; $func:ident [2]) => ($func($current_task, $args.0.into(), $args.1.into()));
-    (@call $current_task:ident; $args:ident; $func:ident [3]) => ($func($current_task, $args.0.into(), $args.1.into(), $args.2.into()));
-    (@call $current_task:ident; $args:ident; $func:ident [4]) => ($func($current_task, $args.0.into(), $args.1.into(), $args.2.into(), $args.3.into()));
-    (@call $current_task:ident; $args:ident; $func:ident [5]) => ($func($current_task, $args.0.into(), $args.1.into(), $args.2.into(), $args.3.into(), $args.4.into()));
-    (@call $current_task:ident; $args:ident; $func:ident [6]) => ($func($current_task, $args.0.into(), $args.1.into(), $args.2.into(), $args.3.into(), $args.4.into(), $args.5.into()));
+    (@call $locked:ident; $current_task:ident; $args:ident; $func:ident [0]) => ($func($locked, $current_task));
+    (@call $locked:ident; $current_task:ident; $args:ident; $func:ident [1]) => ($func($locked, $current_task, $args.0.into()));
+    (@call $locked:ident; $current_task:ident; $args:ident; $func:ident [2]) => ($func($locked, $current_task, $args.0.into(), $args.1.into()));
+    (@call $locked:ident; $current_task:ident; $args:ident; $func:ident [3]) => ($func($locked, $current_task, $args.0.into(), $args.1.into(), $args.2.into()));
+    (@call $locked:ident; $current_task:ident; $args:ident; $func:ident [4]) => ($func($locked, $current_task, $args.0.into(), $args.1.into(), $args.2.into(), $args.3.into()));
+    (@call $locked:ident; $current_task:ident; $args:ident; $func:ident [5]) => ($func($locked, $current_task, $args.0.into(), $args.1.into(), $args.2.into(), $args.3.into(), $args.4.into()));
+    (@call $locked:ident; $current_task:ident; $args:ident; $func:ident [6]) => ($func($locked, $current_task, $args.0.into(), $args.1.into(), $args.2.into(), $args.3.into(), $args.4.into(), $args.5.into()));
 }
 
 pub fn dispatch_syscall(
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
     syscall: &Syscall,
 ) -> Result<SyscallResult, Errno> {
@@ -56,7 +57,7 @@ pub fn dispatch_syscall(
 
     let args = (syscall.arg0, syscall.arg1, syscall.arg2, syscall.arg3, syscall.arg4, syscall.arg5);
     syscall_match! {
-        current_task; syscall.decl.number; args;
+        locked; current_task; syscall.decl.number; args;
         accept4[4],
         accept[3],
         #[cfg(target_arch = "x86_64")] alarm[1],

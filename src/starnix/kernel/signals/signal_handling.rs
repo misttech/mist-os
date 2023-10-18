@@ -18,6 +18,7 @@ use crate::{
     task::*,
     types::*,
 };
+use lock_sequence::{Locked, Unlocked};
 
 pub fn send_signal(task: &Task, siginfo: SignalInfo) {
     let mut task_state = task.write();
@@ -330,7 +331,10 @@ fn prepare_to_restart_syscall(registers: &mut RegisterState, sigaction: Option<s
     );
 }
 
-pub fn sys_restart_syscall(current_task: &mut CurrentTask) -> Result<SyscallResult, Errno> {
+pub fn sys_restart_syscall(
+    _locked: &mut Locked<'_, Unlocked>,
+    current_task: &mut CurrentTask,
+) -> Result<SyscallResult, Errno> {
     match current_task.syscall_restart_func.take() {
         Some(f) => f(current_task),
         None => {

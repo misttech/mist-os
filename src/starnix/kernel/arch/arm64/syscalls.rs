@@ -7,9 +7,11 @@ use crate::{
     task::{syscalls::do_clone, CurrentTask},
     types::{clone_args, pid_t, Errno, UserAddress, UserCString, UserRef, CSIGNAL},
 };
+use lock_sequence::{Locked, Unlocked};
 
 /// The parameter order for `clone` varies by architecture.
 pub fn sys_clone(
+    _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     flags: u64,
     user_stack: UserAddress,
@@ -34,11 +36,12 @@ pub fn sys_clone(
 }
 
 pub fn sys_renameat(
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     old_dir_fd: FdNumber,
     old_user_path: UserCString,
     new_dir_fd: FdNumber,
     new_user_path: UserCString,
 ) -> Result<(), Errno> {
-    sys_renameat2(current_task, old_dir_fd, old_user_path, new_dir_fd, new_user_path, 0)
+    sys_renameat2(locked, current_task, old_dir_fd, old_user_path, new_dir_fd, new_user_path, 0)
 }

@@ -39,22 +39,31 @@ fn create_pkgfs(kernel: &Arc<Kernel>) -> FileSystemHandle {
     .unwrap()
 }
 
-/// Creates a `Kernel` and `Task` with the package file system for testing purposes.
+/// Creates a `Kernel`, `Task`, and `Locked<Unlocked>` with the package file system for testing purposes.
 ///
 /// The `Task` is backed by a real process, and can be used to test syscalls.
-pub fn create_kernel_and_task_with_pkgfs() -> (Arc<Kernel>, AutoReleasableTask) {
-    create_kernel_and_task_with_fs(create_pkgfs)
+pub fn create_kernel_task_and_unlocked_with_pkgfs<'l>(
+) -> (Arc<Kernel>, AutoReleasableTask, Locked<'l, Unlocked>) {
+    create_kernel_task_and_unlocked_with_fs(create_pkgfs)
 }
 
 pub fn create_kernel_and_task() -> (Arc<Kernel>, AutoReleasableTask) {
-    create_kernel_and_task_with_fs(TmpFs::new_fs)
+    let (kernel, task, _) = create_kernel_task_and_unlocked();
+    (kernel, task)
 }
-/// Creates a `Kernel` and `Task` for testing purposes.
+
+pub fn create_kernel_task_and_unlocked<'l>(
+) -> (Arc<Kernel>, AutoReleasableTask, Locked<'l, Unlocked>) {
+    create_kernel_task_and_unlocked_with_fs(TmpFs::new_fs)
+}
+
+/// Creates a `Kernel`, `Task`, and `Locked<Unlocked>` for testing purposes.
 ///
 /// The `Task` is backed by a real process, and can be used to test syscalls.
-fn create_kernel_and_task_with_fs(
+fn create_kernel_task_and_unlocked_with_fs<'l>(
     create_fs: impl FnOnce(&Arc<Kernel>) -> FileSystemHandle,
-) -> (Arc<Kernel>, AutoReleasableTask) {
+) -> (Arc<Kernel>, AutoReleasableTask, Locked<'l, Unlocked>) {
+    let unlocked = Unlocked::new();
     let kernel = Kernel::new(
         b"test-kernel",
         b"".into(),
@@ -83,7 +92,7 @@ fn create_kernel_and_task_with_fs(
         let _l2 = task.read();
     }
 
-    (kernel, task.into())
+    (kernel, task.into(), unlocked)
 }
 
 /// Creates a new `Task` in the provided kernel.
@@ -154,6 +163,7 @@ pub fn map_memory_with_flags(
 /// Convenience wrapper around [`sys_mremap`] which extracts the returned [`UserAddress`] from
 /// the generic [`SyscallResult`].
 pub fn remap_memory(
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     old_addr: UserAddress,
     old_length: u64,
@@ -161,7 +171,15 @@ pub fn remap_memory(
     flags: u32,
     new_addr: UserAddress,
 ) -> Result<UserAddress, Errno> {
-    sys_mremap(current_task, old_addr, old_length as usize, new_length as usize, flags, new_addr)
+    sys_mremap(
+        locked,
+        current_task,
+        old_addr,
+        old_length as usize,
+        new_length as usize,
+        flags,
+        new_addr,
+    )
 }
 
 /// Fills one page in the `current_task`'s address space starting at `addr` with the ASCII character

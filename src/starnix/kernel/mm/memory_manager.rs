@@ -3267,7 +3267,7 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_set_vma_name() {
-        let (_kernel, mut current_task) = create_kernel_and_task();
+        let (_kernel, mut current_task, mut locked) = create_kernel_task_and_unlocked();
 
         let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
 
@@ -3277,6 +3277,7 @@ mod tests {
         let mapping_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
 
         sys_prctl(
+            &mut locked,
             &mut current_task,
             PR_SET_VMA,
             PR_SET_VMA_ANON_NAME as u64,
@@ -3291,7 +3292,7 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_set_vma_name_adjacent_mappings() {
-        let (_kernel, mut current_task) = create_kernel_and_task();
+        let (_kernel, mut current_task, mut locked) = create_kernel_task_and_unlocked();
 
         let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
@@ -3310,6 +3311,7 @@ mod tests {
         assert_eq!(first_mapping_addr + *PAGE_SIZE, second_mapping_addr);
 
         sys_prctl(
+            &mut locked,
             &mut current_task,
             PR_SET_VMA,
             PR_SET_VMA_ANON_NAME as u64,
@@ -3333,7 +3335,7 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_set_vma_name_beyond_end() {
-        let (_kernel, mut current_task) = create_kernel_and_task();
+        let (_kernel, mut current_task, mut locked) = create_kernel_task_and_unlocked();
 
         let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
@@ -3349,6 +3351,7 @@ mod tests {
         // This should fail with ENOMEM since it extends past the end of the mapping into unmapped memory.
         assert_eq!(
             sys_prctl(
+                &mut locked,
                 &mut current_task,
                 PR_SET_VMA,
                 PR_SET_VMA_ANON_NAME as u64,
@@ -3370,7 +3373,7 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_set_vma_name_before_start() {
-        let (_kernel, mut current_task) = create_kernel_and_task();
+        let (_kernel, mut current_task, mut locked) = create_kernel_task_and_unlocked();
 
         let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
@@ -3386,6 +3389,7 @@ mod tests {
         // This should fail with ENOMEM since the start of the range is in unmapped memory.
         assert_eq!(
             sys_prctl(
+                &mut locked,
                 &mut current_task,
                 PR_SET_VMA,
                 PR_SET_VMA_ANON_NAME as u64,
@@ -3408,7 +3412,7 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_set_vma_name_partial() {
-        let (_kernel, mut current_task) = create_kernel_and_task();
+        let (_kernel, mut current_task, mut locked) = create_kernel_task_and_unlocked();
 
         let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
@@ -3420,6 +3424,7 @@ mod tests {
 
         assert_eq!(
             sys_prctl(
+                &mut locked,
                 &mut current_task,
                 PR_SET_VMA,
                 PR_SET_VMA_ANON_NAME as u64,
@@ -3447,7 +3452,7 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_preserve_name_snapshot() {
-        let (kernel, mut current_task) = create_kernel_and_task();
+        let (kernel, mut current_task, mut locked) = create_kernel_task_and_unlocked();
 
         let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
@@ -3459,6 +3464,7 @@ mod tests {
 
         assert_eq!(
             sys_prctl(
+                &mut locked,
                 &mut current_task,
                 PR_SET_VMA,
                 PR_SET_VMA_ANON_NAME as u64,

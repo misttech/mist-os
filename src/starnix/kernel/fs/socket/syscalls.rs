@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use fuchsia_zircon as zx;
+use lock_sequence::{Locked, Unlocked};
 use std::{convert::TryInto, mem::size_of};
 
 use super::*;
@@ -15,6 +16,7 @@ use crate::{
 };
 
 pub fn sys_socket(
+    _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     domain: u32,
     socket_type: u32,
@@ -126,6 +128,7 @@ fn generate_autobind_address() -> Vec<u8> {
 }
 
 pub fn sys_bind(
+    _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     user_socket_address: UserAddress,
@@ -188,7 +191,12 @@ pub fn sys_bind(
     Ok(())
 }
 
-pub fn sys_listen(current_task: &CurrentTask, fd: FdNumber, backlog: i32) -> Result<(), Errno> {
+pub fn sys_listen(
+    _locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    fd: FdNumber,
+    backlog: i32,
+) -> Result<(), Errno> {
     let file = current_task.files.get(fd)?;
     let socket = file.node().socket().ok_or_else(|| errno!(ENOTSOCK))?;
     socket.listen(backlog, current_task.as_ucred())?;
@@ -196,15 +204,17 @@ pub fn sys_listen(current_task: &CurrentTask, fd: FdNumber, backlog: i32) -> Res
 }
 
 pub fn sys_accept(
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     user_socket_address: UserAddress,
     user_address_length: UserRef<socklen_t>,
 ) -> Result<FdNumber, Errno> {
-    sys_accept4(current_task, fd, user_socket_address, user_address_length, 0)
+    sys_accept4(locked, current_task, fd, user_socket_address, user_address_length, 0)
 }
 
 pub fn sys_accept4(
+    _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     user_socket_address: UserAddress,
@@ -236,6 +246,7 @@ pub fn sys_accept4(
 }
 
 pub fn sys_connect(
+    _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     user_socket_address: UserAddress,
@@ -315,6 +326,7 @@ fn write_socket_address(
 }
 
 pub fn sys_getsockname(
+    _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     user_socket_address: UserAddress,
@@ -330,6 +342,7 @@ pub fn sys_getsockname(
 }
 
 pub fn sys_getpeername(
+    _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     user_socket_address: UserAddress,
@@ -345,6 +358,7 @@ pub fn sys_getpeername(
 }
 
 pub fn sys_socketpair(
+    _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     domain: u32,
     socket_type: u32,
@@ -486,6 +500,7 @@ fn recvmsg_internal(
 }
 
 pub fn sys_recvmsg(
+    _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     user_message_header: UserRef<msghdr>,
@@ -499,6 +514,7 @@ pub fn sys_recvmsg(
 }
 
 pub fn sys_recvmmsg(
+    _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     user_mmsgvec: UserRef<mmsghdr>,
@@ -548,6 +564,7 @@ pub fn sys_recvmmsg(
 }
 
 pub fn sys_recvfrom(
+    _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     user_buffer: UserAddress,
@@ -642,6 +659,7 @@ fn sendmsg_internal(
 }
 
 pub fn sys_sendmsg(
+    _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     user_message_header: UserRef<msghdr>,
@@ -655,6 +673,7 @@ pub fn sys_sendmsg(
 }
 
 pub fn sys_sendmmsg(
+    _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     user_mmsgvec: UserRef<mmsghdr>,
@@ -694,6 +713,7 @@ pub fn sys_sendmmsg(
 }
 
 pub fn sys_sendto(
+    _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     user_buffer: UserAddress,
@@ -717,6 +737,7 @@ pub fn sys_sendto(
 }
 
 pub fn sys_getsockopt(
+    _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     level: u32,
@@ -747,6 +768,7 @@ pub fn sys_getsockopt(
 }
 
 pub fn sys_setsockopt(
+    _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     level: u32,
@@ -765,7 +787,12 @@ pub fn sys_setsockopt(
     }
 }
 
-pub fn sys_shutdown(current_task: &CurrentTask, fd: FdNumber, how: u32) -> Result<(), Errno> {
+pub fn sys_shutdown(
+    _locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    fd: FdNumber,
+    how: u32,
+) -> Result<(), Errno> {
     let file = current_task.files.get(fd)?;
     let socket = file.node().socket().ok_or_else(|| errno!(ENOTSOCK))?;
     let how = match how {
@@ -785,9 +812,10 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_socketpair_invalid_arguments() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         assert_eq!(
             sys_socketpair(
+                &mut locked,
                 &current_task,
                 AF_INET as u32,
                 SOCK_STREAM,
@@ -798,6 +826,7 @@ mod tests {
         );
         assert_eq!(
             sys_socketpair(
+                &mut locked,
                 &current_task,
                 AF_UNIX as u32,
                 7,
@@ -808,6 +837,7 @@ mod tests {
         );
         assert_eq!(
             sys_socketpair(
+                &mut locked,
                 &current_task,
                 AF_UNIX as u32,
                 SOCK_STREAM,

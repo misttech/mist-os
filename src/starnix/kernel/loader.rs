@@ -609,7 +609,7 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_load_hello_starnix() {
-        let (_kernel, mut current_task) = create_kernel_and_task_with_pkgfs();
+        let (_kernel, mut current_task, _) = create_kernel_task_and_unlocked_with_pkgfs();
         exec_hello_starnix(&mut current_task).expect("failed to load executable");
         assert!(current_task.mm.get_mapping_count() > 0);
     }
@@ -618,7 +618,7 @@ mod tests {
     #[cfg(target_arch = "x86_64")]
     #[::fuchsia::test]
     async fn test_snapshot_hello_starnix() {
-        let (kernel, mut current_task) = create_kernel_and_task_with_pkgfs();
+        let (kernel, mut current_task, _) = create_kernel_task_and_unlocked_with_pkgfs();
         exec_hello_starnix(&mut current_task).expect("failed to load executable");
 
         let current2 = create_task(&kernel, "another-task");

@@ -7,6 +7,7 @@ use std::ffi::CString;
 use std::ops::DerefMut;
 use std::sync::{Arc, Mutex};
 
+use lock_sequence::Unlocked;
 use perfetto_consumer_proto::perfetto::protos::{
     ipc_frame, trace_config::buffer_config::FillPolicy, trace_config::BufferConfig,
     trace_config::DataSource, DataSourceConfig, DisableTracingRequest, EnableTracingRequest,
@@ -118,7 +119,9 @@ impl PerfettoConnection {
     /// Opens a socket sonnection to the specified socket path and initializes the requisite
     /// bookkeeping information.
     fn new(current_task: &CurrentTask, socket_path: &[u8]) -> Result<Self, anyhow::Error> {
-        let conn_fd = sys_socket(current_task, AF_UNIX.into(), SOCK_STREAM, 0)?;
+        // TODO: Don't use syscall here, extract the needed logic somewhere else
+        let mut locked = Unlocked::new();
+        let conn_fd = sys_socket(&mut locked, current_task, AF_UNIX.into(), SOCK_STREAM, 0)?;
         let conn_file = current_task.files.get(conn_fd)?;
         let conn_socket = conn_file.node().socket().ok_or_else(|| errno!(ENOTSOCK))?;
         let peer = SocketPeer::Handle(resolve_unix_socket_address(current_task, socket_path)?);

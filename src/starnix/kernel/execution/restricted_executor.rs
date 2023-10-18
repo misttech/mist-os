@@ -20,6 +20,7 @@ use crate::{
 use anyhow::{format_err, Error};
 use fuchsia_inspect_contrib::ProfileDuration;
 use fuchsia_zircon::{self as zx, AsHandleRef};
+use lock_sequence::{Locked, Unlocked};
 use std::{os::unix::thread::JoinHandleExt, sync::Arc};
 
 extern "C" {
@@ -172,7 +173,10 @@ const RESTRICTED_ENTER_OPTIONS: u32 = 0;
 /// TODO(https://fxbug.dev/117302): Note, cross-process shared resources allocated in this function
 /// that aren't freed by the Zircon kernel upon thread and/or process termination (like mappings in
 /// the shared region) should be freed in `Task::destroy_do_not_use_outside_of_drop_if_possible()`.
-fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
+fn run_task(
+    locked: &mut Locked<'_, Unlocked>,
+    current_task: &mut CurrentTask,
+) -> Result<ExitStatus, Error> {
     let mut profiling_guard = ProfileDuration::enter("TaskLoopSetup");
 
     set_zx_name(&fuchsia_runtime::thread_self(), current_task.command().as_bytes());
@@ -261,7 +265,8 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
                 // stack.
                 generate_cfi_directives!(state);
 
-                if let Some(new_error_context) = execute_syscall(current_task, syscall_decl) {
+                if let Some(new_error_context) = execute_syscall(locked, current_task, syscall_decl)
+                {
                     error_context = Some(new_error_context);
                 }
 
@@ -368,7 +373,8 @@ where
     let join_handle = std::thread::Builder::new()
         .name("user-thread".to_string())
         .spawn(move || {
-            let run_result = match run_task(&mut current_task) {
+            let mut locked = Unlocked::new();
+            let run_result = match run_task(&mut locked, &mut current_task) {
                 Err(error) => {
                     log_warn!("Died unexpectedly from {:?}! treating as SIGKILL", error);
                     let exit_status = ExitStatus::Kill(SignalInfo::default(SIGKILL));

@@ -174,7 +174,7 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_chdir() {
-        let (_kernel, current_task) = create_kernel_and_task_with_pkgfs();
+        let (_kernel, current_task, _) = create_kernel_task_and_unlocked_with_pkgfs();
 
         assert_eq!(b"/".to_vec(), current_task.fs().cwd().path_escaping_chroot());
 

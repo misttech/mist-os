@@ -3,11 +3,13 @@
 // found in the LICENSE file.
 
 use fuchsia_zircon::{self as zx, Task};
+use lock_sequence::{Locked, Unlocked};
 use starnix_sync::{InterruptibleEvent, WakeReason};
 
 use crate::{mm::MemoryAccessorExt, signals::RunState, syscalls::*, task::*, time::utc::*};
 
 pub fn sys_clock_getres(
+    _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     which_clock: i32,
     tp_addr: UserRef<timespec>,
@@ -41,6 +43,7 @@ pub fn sys_clock_getres(
 }
 
 pub fn sys_clock_gettime(
+    _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     which_clock: i32,
     tp_addr: UserRef<timespec>,
@@ -64,6 +67,7 @@ pub fn sys_clock_gettime(
 }
 
 pub fn sys_gettimeofday(
+    _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     user_tv: UserRef<timeval>,
     user_tz: UserRef<timezone>,
@@ -79,6 +83,7 @@ pub fn sys_gettimeofday(
 }
 
 pub fn sys_clock_nanosleep(
+    _locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
     which_clock: ClockId,
     flags: u32,
@@ -211,11 +216,19 @@ fn clock_nanosleep_monotonic_with_deadline(
 }
 
 pub fn sys_nanosleep(
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
     user_request: UserRef<timespec>,
     user_remaining: UserRef<timespec>,
 ) -> Result<(), Errno> {
-    sys_clock_nanosleep(current_task, CLOCK_REALTIME as ClockId, 0, user_request, user_remaining)
+    sys_clock_nanosleep(
+        locked,
+        current_task,
+        CLOCK_REALTIME as ClockId,
+        0,
+        user_request,
+        user_remaining,
+    )
 }
 
 /// Returns the cpu time for the task with the given `pid`.
@@ -298,6 +311,7 @@ fn get_dynamic_clock(current_task: &CurrentTask, which_clock: i32) -> Result<i64
 }
 
 pub fn sys_timer_create(
+    _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     clock_id: ClockId,
     event: UserRef<sigevent>,
@@ -315,6 +329,7 @@ pub fn sys_timer_create(
 }
 
 pub fn sys_timer_delete(
+    _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     id: uapi::__kernel_timer_t,
 ) -> Result<(), Errno> {
@@ -323,6 +338,7 @@ pub fn sys_timer_delete(
 }
 
 pub fn sys_timer_gettime(
+    _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     id: uapi::__kernel_timer_t,
     curr_value: UserRef<itimerspec>,
@@ -333,6 +349,7 @@ pub fn sys_timer_gettime(
 }
 
 pub fn sys_timer_getoverrun(
+    _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     id: uapi::__kernel_timer_t,
 ) -> Result<i32, Errno> {
@@ -341,6 +358,7 @@ pub fn sys_timer_getoverrun(
 }
 
 pub fn sys_timer_settime(
+    _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     id: uapi::__kernel_timer_t,
     flags: i32,
@@ -353,6 +371,7 @@ pub fn sys_timer_settime(
 }
 
 pub fn sys_getitimer(
+    _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     which: u32,
     user_curr_value: UserRef<itimerval>,
@@ -363,6 +382,7 @@ pub fn sys_getitimer(
 }
 
 pub fn sys_setitimer(
+    _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     which: u32,
     user_new_value: UserRef<itimerval>,
@@ -379,7 +399,11 @@ pub fn sys_setitimer(
     Ok(())
 }
 
-pub fn sys_times(current_task: &CurrentTask, buf: UserRef<tms>) -> Result<i64, Errno> {
+pub fn sys_times(
+    _locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    buf: UserRef<tms>,
+) -> Result<i64, Errno> {
     if !buf.is_null() {
         let thread_group = &current_task.thread_group;
         let process_time_stats = thread_group.time_stats();
@@ -405,7 +429,7 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_nanosleep_without_remainder() {
-        let (_kernel, mut current_task) = create_kernel_and_task();
+        let (_kernel, mut current_task, mut locked) = create_kernel_task_and_unlocked();
 
         let thread = std::thread::spawn({
             let task = current_task.weak_task();
@@ -430,7 +454,7 @@ mod test {
         // nanosleep will be interrupted by the current thread and should not fail with EFAULT
         // because the remainder pointer is null.
         assert_eq!(
-            sys_nanosleep(&mut current_task, address.into(), UserRef::default()),
+            sys_nanosleep(&mut locked, &mut current_task, address.into(), UserRef::default()),
             error!(ERESTART_RESTARTBLOCK)
         );
 
@@ -439,7 +463,7 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_clock_nanosleep_relative_to_slow_clock() {
-        let (_kernel, mut current_task) = create_kernel_and_task();
+        let (_kernel, mut current_task, _) = create_kernel_task_and_unlocked();
 
         let test_clock = zx::Clock::create(zx::ClockOpts::AUTO_START, None).unwrap();
         let _test_clock_guard = UtcClockOverrideGuard::new(
@@ -463,7 +487,7 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_clock_nanosleep_interrupted_relative_to_fast_utc_clock() {
-        let (_kernel, mut current_task) = create_kernel_and_task();
+        let (_kernel, mut current_task, _) = create_kernel_task_and_unlocked();
 
         let test_clock = zx::Clock::create(zx::ClockOpts::AUTO_START, None).unwrap();
         let _test_clock_guard = UtcClockOverrideGuard::new(
