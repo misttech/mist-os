@@ -648,22 +648,26 @@ fpromise::result<fuchsia_sysmem2::BufferCollectionInfo> BufferCollection::CloneR
     return fpromise::error();
   }
   auto v2_b = clone_result.take_value();
-  if (is_usage && node_properties().is_weak()) {
-    // replace no-vmo VmoBuffer(s) with VmoBuffer(s) having both a sysmem weak VMO handle and a
-    // close_weak_asap client end
+  if (node_properties().is_weak()) {
+    // replace no-vmo VmoBuffer(s) with VmoBuffer(s) having both a sysmem weak VMO handle (if
+    // is_usage) and a close_weak_asap client end
     for (uint32_t buffer_index = 0; buffer_index < buffer_collection_info.buffers()->size();
          ++buffer_index) {
       fuchsia_sysmem2::VmoBuffer vmo_buffer = std::move(v2_b.buffers()->at(buffer_index));
-      // If zero strong VMO handles remain, this will be success but with no VMO handle.
-      auto weak_vmo_result = logical_buffer_collection().CreateWeakVmo(
-          buffer_index, node_properties().client_debug_info());
-      if (weak_vmo_result.is_error()) {
-        FailAsync(FROM_HERE, weak_vmo_result.error_value(), "CreateWeakVmo() failed");
-        return fpromise::error();
+      if (is_usage) {
+        // If zero strong VMO handles remain, this will be success but with no VMO handle.
+        auto weak_vmo_result = logical_buffer_collection().CreateWeakVmo(
+            buffer_index, node_properties().client_debug_info());
+        if (weak_vmo_result.is_error()) {
+          FailAsync(FROM_HERE, weak_vmo_result.error_value(), "CreateWeakVmo() failed");
+          return fpromise::error();
+        }
+        // This is moving std::optional<zx::vmo>; if zero strong VMO handles remain, the moved-into
+        // optional will be !has_value().
+        vmo_buffer.vmo() = std::move(weak_vmo_result.value());
+      } else {
+        ZX_DEBUG_ASSERT(!vmo_buffer.vmo().has_value());
       }
-      // This is moving std::optional<zx::vmo>; if zero strong VMO handles remain, the moved-into
-      // optional will be !has_value().
-      vmo_buffer.vmo() = std::move(weak_vmo_result.value());
       auto close_weak_asap = logical_buffer_collection().DupCloseWeakAsapClientEnd(buffer_index);
       if (close_weak_asap.is_error()) {
         FailAsync(FROM_HERE, close_weak_asap.error_value(), "DupCloseWeakAsapClientEnd() failed");
@@ -675,7 +679,7 @@ fpromise::result<fuchsia_sysmem2::BufferCollectionInfo> BufferCollection::CloneR
       // If we're giving out a sysmem weak VMO handle then we're also giving out a close_weak_asap,
       // since any client holding a sysmem weak VMO handle needs to know when to close that handle
       // asap.
-      ZX_DEBUG_ASSERT(vmo_buffer.vmo().has_value() == vmo_buffer.close_weak_asap().has_value());
+      ZX_DEBUG_ASSERT(!vmo_buffer.vmo().has_value() || vmo_buffer.close_weak_asap().has_value());
       auto attenuated_vmo_buffer_result =
           sysmem::V2CloneVmoBuffer(vmo_buffer, GetClientVmoRights());
       if (attenuated_vmo_buffer_result.is_error()) {

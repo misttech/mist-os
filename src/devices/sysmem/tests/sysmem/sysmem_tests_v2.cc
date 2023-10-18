@@ -6088,8 +6088,36 @@ TEST(Sysmem, SetWeakOk_ForChildNodesAlso) {
   auto child2_wait_result = child2_collection->WaitForAllBuffersAllocated();
   ASSERT_TRUE(child2_wait_result.is_ok());
 
+  ASSERT_FALSE(
+      parent_wait_result->buffer_collection_info()->buffers()->at(0).close_weak_asap().has_value());
+  ASSERT_TRUE(
+      child1_wait_result->buffer_collection_info()->buffers()->at(0).close_weak_asap().has_value());
+  ASSERT_TRUE(
+      child2_wait_result->buffer_collection_info()->buffers()->at(0).close_weak_asap().has_value());
+
   // allocation success means child2 didn't cause LogicalBufferCollection failure, despite not
   // sending SetWeakOk itself, thanks to child1 sending SetWeakOk(for_child_nodes_also=true)
+}
+
+TEST(Sysmem, SetWeak_NoUsage_HasCloseWeakAsap) {
+  auto parent_token = create_initial_token_v2();
+  auto child_token = create_token_under_token_v2(parent_token);
+  auto parent_collection = convert_token_to_collection_v2(std::move(parent_token));
+  auto child_collection = convert_token_to_collection_v2(std::move(child_token));
+  ASSERT_TRUE(child_collection->SetWeak().is_ok());
+  set_min_camping_constraints_v2(parent_collection, 1);
+  set_empty_constraints_v2(child_collection);
+
+  auto parent_wait_result = parent_collection->WaitForAllBuffersAllocated();
+  ASSERT_TRUE(parent_wait_result.is_ok());
+  auto child_wait_result = child_collection->WaitForAllBuffersAllocated();
+  ASSERT_TRUE(child_wait_result.is_ok());
+
+  auto& vmo_buffer = child_wait_result->buffer_collection_info()->buffers()->at(0);
+  // empty constraints; no usage bits; no vmo provided
+  ASSERT_FALSE(vmo_buffer.vmo().has_value());
+  // despite empty constraints, weak --> we get close_weak_asap
+  ASSERT_TRUE(vmo_buffer.close_weak_asap().has_value());
 }
 
 // This test is too likely to cause an OOM which would be treated as a flake. For now we can enable
