@@ -3,8 +3,14 @@
 // found in the LICENSE file.
 
 using fuchsia.platform;
+using fuchsia.devicetree;
 
-fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
 fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.platform.BIND_PLATFORM_DEV_VID.GENERIC;
-fuchsia.BIND_PLATFORM_DEV_PID == 0; // PDEV_PID_GENERIC
-fuchsia.BIND_PLATFORM_DEV_DID == 41; // PDEV_DID_REGISTERS
+
+if fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.platform.BIND_PLATFORM_DEV_DID.DEVICETREE {
+  fuchsia.devicetree.FIRST_COMPATIBLE == "fuchsia,registers";
+} else {
+  fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PLATFORM_DEV_PID == 0; // PDEV_PID_GENERIC
+  fuchsia.BIND_PLATFORM_DEV_DID == 41; // PDEV_DID_REGISTERS
+}

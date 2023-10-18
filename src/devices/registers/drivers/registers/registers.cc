@@ -272,6 +272,7 @@ zx_status_t Bind(void* ctx, zx_device_t* parent) {
   // Get metadata
   auto decoded = ddk::GetEncodedMetadata<Metadata>(parent, DEVICE_METADATA_REGISTERS);
   if (!decoded.is_ok()) {
+    zxlogf(ERROR, "Metadata not found");
     return decoded.error_value();
   }
 
