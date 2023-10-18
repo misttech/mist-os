@@ -221,7 +221,7 @@ App::App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspe
           /*set_minimum_rgb*/
           display::SetMinimumRgbFunc([this](const uint8_t minimum_rgb) {
             FX_DCHECK(flatland_compositor_);
-            flatland_compositor_->SetMinimumRgb(minimum_rgb);
+            return flatland_compositor_->SetMinimumRgb(minimum_rgb);
           })),
       geometry_provider_(),
       observer_registry_(geometry_provider_),

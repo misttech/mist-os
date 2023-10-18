@@ -59,8 +59,7 @@ void ColorConverter::SetValues(fuchsia::ui::display::color::ConversionProperties
 }
 
 void ColorConverter::SetMinimumRgb(uint8_t minimum_rgb, SetMinimumRgbCallback callback) {
-  set_minimum_rgb_(minimum_rgb);
-  callback(ZX_OK);
+  callback(set_minimum_rgb_(minimum_rgb));
 }
 
 }  // namespace scenic_impl::display
