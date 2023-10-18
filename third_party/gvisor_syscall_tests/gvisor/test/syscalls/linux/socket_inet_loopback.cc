@@ -161,15 +161,15 @@ TEST_P(DualStackSocketTest, AddressOperations) {
 
       if (operation == Operation::SendTo) {
         EXPECT_EQ(sock_addr_in6->sin6_family, AF_INET6);
-        EXPECT_TRUE(IN6_IS_ADDR_UNSPECIFIED(sock_addr_in6->sin6_addr.s6_addr32))
+        EXPECT_TRUE(IN6_IS_ADDR_UNSPECIFIED(&sock_addr_in6->sin6_addr))
             << OperationToString(operation)
             << " getsocknam=" << GetAddrStr(AsSockAddr(&sock_addr));
 
         EXPECT_NE(sock_addr_in6->sin6_port, 0);
       } else if (IN6_IS_ADDR_V4MAPPED(
-                     reinterpret_cast<const sockaddr_in6*>(addr_in)
-                         ->sin6_addr.s6_addr32)) {
-        EXPECT_TRUE(IN6_IS_ADDR_V4MAPPED(sock_addr_in6->sin6_addr.s6_addr32))
+                     &(reinterpret_cast<const sockaddr_in6*>(addr_in)
+                           ->sin6_addr))) {
+        EXPECT_TRUE(IN6_IS_ADDR_V4MAPPED(&sock_addr_in6->sin6_addr))
             << OperationToString(operation)
             << " getsocknam=" << GetAddrStr(AsSockAddr(&sock_addr));
       }
@@ -183,11 +183,10 @@ TEST_P(DualStackSocketTest, AddressOperations) {
       ASSERT_EQ(addrlen, sizeof(struct sockaddr_in6));
 
       if (addr.family() == AF_INET ||
-          IN6_IS_ADDR_V4MAPPED(reinterpret_cast<const sockaddr_in6*>(addr_in)
-                                   ->sin6_addr.s6_addr32)) {
+          IN6_IS_ADDR_V4MAPPED(
+              &(reinterpret_cast<const sockaddr_in6*>(addr_in)->sin6_addr))) {
         EXPECT_TRUE(IN6_IS_ADDR_V4MAPPED(
-            reinterpret_cast<const sockaddr_in6*>(&peer_addr)
-                ->sin6_addr.s6_addr32))
+            &(reinterpret_cast<const sockaddr_in6*>(&peer_addr)->sin6_addr)))
             << OperationToString(operation)
             << " getpeername=" << GetAddrStr(AsSockAddr(&peer_addr));
       }
@@ -438,6 +437,157 @@ TEST_P(SocketInetLoopbackTest, TCPListenClose) {
   }
 }
 
+TEST_P(SocketInetLoopbackTest, TCPUnblockWaitOnLocalRdHUp) {
+  SocketInetTestParam const& param = GetParam();
+  TestAddress const& listener = param.listener;
+  TestAddress const& connector = param.connector;
+  constexpr int kTimeout = 100000;
+
+  // Setup listening socket
+  FileDescriptor const listen_fd = ASSERT_NO_ERRNO_AND_VALUE(
+      Socket(listener.family(), SOCK_STREAM, IPPROTO_TCP));
+  sockaddr_storage listen_addr = listener.addr;
+  FileDescriptor accepted;
+
+  // Bind and listen on socket
+  ASSERT_THAT(
+      bind(listen_fd.get(), AsSockAddr(&listen_addr), listener.addr_len),
+      SyscallSucceeds());
+  ASSERT_THAT(listen(listen_fd.get(), SOMAXCONN), SyscallSucceeds());
+
+  ScopedThread t1([&] {
+    // Accept connections
+    accepted =
+        ASSERT_NO_ERRNO_AND_VALUE(Accept(listen_fd.get(), nullptr, nullptr));
+    int data = 1234;
+    ASSERT_THAT(RetryEINTR(recv)(accepted.get(), &data, sizeof(data), 0),
+                SyscallSucceedsWithValue(0));
+  });
+
+  ScopedThread t2([&] {
+    // Get the port bound by the listening socket.
+    socklen_t addrlen = listener.addr_len;
+    ASSERT_THAT(
+        getsockname(listen_fd.get(), AsSockAddr(&listen_addr), &addrlen),
+        SyscallSucceeds());
+    uint16_t const port =
+        ASSERT_NO_ERRNO_AND_VALUE(AddrPort(listener.family(), listen_addr));
+    FileDescriptor conn_fd = ASSERT_NO_ERRNO_AND_VALUE(
+        Socket(connector.family(), SOCK_STREAM, IPPROTO_TCP));
+    sockaddr_storage conn_addr = connector.addr;
+    ASSERT_NO_ERRNO(SetAddrPort(connector.family(), &conn_addr, port));
+
+    for (int i = 0; i < 10; i++) {
+      // Connect to listening socket
+      int ret;
+      ASSERT_THAT(
+          ret = RetryEINTR(connect)(conn_fd.get(), AsSockAddr(&conn_addr),
+                                    connector.addr_len),
+          SyscallSucceeds());
+      if (ret == 0) {
+        // Connect succeeded
+        break;
+      }
+
+      // Connect failed
+      EXPECT_THAT(ret, SyscallFailsWithErrno(EINPROGRESS));
+      // Sleep to wait for Accept on another thread
+      // since we got errno=Connection refused
+      absl::SleepFor(absl::Milliseconds(50));
+    }
+
+    // Shutdown read
+    shutdown(accepted.get(), SHUT_RD);
+  });
+  t1.Join();
+  t2.Join();
+  // Poll accepted fd for POLLRDHUP
+  struct pollfd pfd = {
+      .fd = accepted.get(),
+      .events = POLLIN | POLLRDHUP,
+  };
+  ASSERT_THAT(RetryEINTR(poll)(&pfd, 1, kTimeout), SyscallSucceedsWithValue(1));
+  ASSERT_EQ(pfd.revents, POLLIN | POLLRDHUP);
+}
+
+TEST_P(SocketInetLoopbackTest, TCPUnblockWaitOnRemoteRdHUp) {
+  SocketInetTestParam const& param = GetParam();
+  TestAddress const& listener = param.listener;
+  TestAddress const& connector = param.connector;
+  constexpr int kTimeout = 10000;
+
+  // Setup listening socket
+  FileDescriptor const listen_fd = ASSERT_NO_ERRNO_AND_VALUE(
+      Socket(listener.family(), SOCK_STREAM, IPPROTO_TCP));
+  sockaddr_storage listen_addr = listener.addr;
+  FileDescriptor accepted;
+
+  // Bind and listen on socket
+  ASSERT_THAT(
+      bind(listen_fd.get(), AsSockAddr(&listen_addr), listener.addr_len),
+      SyscallSucceeds());
+  ASSERT_THAT(listen(listen_fd.get(), SOMAXCONN), SyscallSucceeds());
+
+  ScopedThread t1([&] {
+    // Accept connections
+    auto accepted =
+        ASSERT_NO_ERRNO_AND_VALUE(Accept(listen_fd.get(), nullptr, nullptr));
+    int data = 1234;
+    ASSERT_THAT(RetryEINTR(recv)(accepted.get(), &data, sizeof(data), 0),
+                SyscallSucceedsWithValue(0));
+    // Poll accepted fd for POLLRDHUP
+    // Thread is unblocked at this point
+    struct pollfd pfd = {
+        .fd = accepted.get(),
+        .events = POLLIN | POLLRDHUP,
+    };
+    ASSERT_THAT(RetryEINTR(poll)(&pfd, 1, kTimeout),
+                SyscallSucceedsWithValue(1));
+    ASSERT_EQ(pfd.revents, POLLIN | POLLRDHUP);
+  });
+
+  ScopedThread t2([&] {
+    // Sleep to wait for Accept on another thread
+    // otherwise the test may fail on connect with errno=Connection refused
+    absl::SleepFor(absl::Milliseconds(500));
+    // Get the port bound by the listening socket.
+    socklen_t addrlen = listener.addr_len;
+    ASSERT_THAT(
+        getsockname(listen_fd.get(), AsSockAddr(&listen_addr), &addrlen),
+        SyscallSucceeds());
+    uint16_t const port =
+        ASSERT_NO_ERRNO_AND_VALUE(AddrPort(listener.family(), listen_addr));
+    FileDescriptor conn_fd = ASSERT_NO_ERRNO_AND_VALUE(
+        Socket(connector.family(), SOCK_STREAM, IPPROTO_TCP));
+    sockaddr_storage conn_addr = connector.addr;
+    ASSERT_NO_ERRNO(SetAddrPort(connector.family(), &conn_addr, port));
+
+    for (int i = 0; i < 10; i++) {
+      // Connect to listening socket
+      int ret;
+      ASSERT_THAT(
+          ret = RetryEINTR(connect)(conn_fd.get(), AsSockAddr(&conn_addr),
+                                    connector.addr_len),
+          SyscallSucceeds());
+      if (ret == 0) {
+        // Connect succeeded
+        break;
+      }
+
+      // Connect failed
+      EXPECT_THAT(ret, SyscallFailsWithErrno(EINPROGRESS));
+      // Sleep to wait for Accept on another thread
+      // since we got errno=Connection refused
+      absl::SleepFor(absl::Milliseconds(50));
+    }
+
+    // Shutdown write
+    shutdown(conn_fd.get(), SHUT_WR);
+  });
+  t1.Join();
+  t2.Join();
+}
+
 // Test the protocol state information returned by TCPINFO.
 TEST_P(SocketInetLoopbackTest, TCPInfoState) {
   SocketInetTestParam const& param = GetParam();
@@ -498,13 +648,7 @@ TEST_P(SocketInetLoopbackTest, TCPInfoState) {
   int n = poll(&pfd, 1, kTimeout);
   ASSERT_GE(n, 0) << strerror(errno);
   ASSERT_EQ(n, 1);
-  if (IsRunningOnGvisor() && !IsRunningWithHostinet() &&
-      GvisorPlatform() != Platform::kFuchsia) {
-    // TODO(gvisor.dev/issue/6015): Notify POLLRDHUP on incoming FIN.
-    ASSERT_EQ(pfd.revents, POLLIN);
-  } else {
-    ASSERT_EQ(pfd.revents, POLLIN | POLLRDHUP);
-  }
+  ASSERT_EQ(pfd.revents, POLLIN | POLLRDHUP);
 
   ASSERT_THAT(state(conn_fd.get()), TCP_CLOSE_WAIT);
   ASSERT_THAT(close(conn_fd.release()), SyscallSucceeds());
@@ -752,14 +896,7 @@ TEST_P(SocketInetLoopbackTest, TCPNonBlockingConnectClose) {
     int n = poll(&pfd, 1, kTimeout);
     ASSERT_GE(n, 0) << strerror(errno);
     ASSERT_EQ(n, 1);
-
-    if (IsRunningOnGvisor() && !IsRunningWithHostinet() &&
-        GvisorPlatform() != Platform::kFuchsia) {
-      // TODO(gvisor.dev/issue/6015): Notify POLLRDHUP on incoming FIN.
-      ASSERT_EQ(pfd.revents, POLLIN);
-    } else {
-      ASSERT_EQ(pfd.revents, POLLIN | POLLRDHUP);
-    }
+    ASSERT_EQ(pfd.revents, POLLIN | POLLRDHUP);
     ASSERT_THAT(close(accepted.release()), SyscallSucceeds());
   }
 }
@@ -1730,7 +1867,9 @@ INSTANTIATE_TEST_SUITE_P(
 using SocketMultiProtocolInetLoopbackTest =
     ::testing::TestWithParam<ProtocolTestParam>;
 
-TEST_P(SocketMultiProtocolInetLoopbackTest, V4MappedLoopbackOnlyReservesV4) {
+// TODO: b/298680322 - Investigate why this fails on newer kernel versions.
+TEST_P(SocketMultiProtocolInetLoopbackTest,
+       DISABLED_V4MappedLoopbackOnlyReservesV4) {
   ProtocolTestParam const& param = GetParam();
 
   for (int i = 0; true; i++) {
@@ -1779,7 +1918,9 @@ TEST_P(SocketMultiProtocolInetLoopbackTest, V4MappedLoopbackOnlyReservesV4) {
   }
 }
 
-TEST_P(SocketMultiProtocolInetLoopbackTest, V4MappedAnyOnlyReservesV4) {
+// TODO: b/298680322 - Investigate why this fails on newer kernel versions.
+TEST_P(SocketMultiProtocolInetLoopbackTest,
+       DISABLED_V4MappedAnyOnlyReservesV4) {
   ProtocolTestParam const& param = GetParam();
 
   for (int i = 0; true; i++) {
@@ -2172,7 +2313,9 @@ TEST_P(SocketMultiProtocolInetLoopbackTest, V6EphemeralPortReserved) {
   }
 }
 
-TEST_P(SocketMultiProtocolInetLoopbackTest, V4MappedEphemeralPortReserved) {
+// TODO: b/298680322 - Investigate why this fails on newer kernel versions.
+TEST_P(SocketMultiProtocolInetLoopbackTest,
+       DISABLED_V4MappedEphemeralPortReserved) {
   ProtocolTestParam const& param = GetParam();
 
   for (int i = 0; true; i++) {
@@ -2544,5 +2687,12 @@ TEST_F(SocketInetLoopbackTest, LoopbackAddressRangeConnect) {
   }
 }
 
+TEST_P(SocketInetLoopbackTest, UdpIPV6Only) {
+  TestAddress const& listener = V4Any();
+  auto fd = ASSERT_NO_ERRNO_AND_VALUE(Socket(listener.family(), SOCK_DGRAM, 0));
+  EXPECT_THAT(setsockopt(fd.get(), IPPROTO_IPV6, IPV6_V6ONLY, &kSockOptOn,
+                         sizeof(kSockOptOn)),
+              SyscallFailsWithErrno(ENOPROTOOPT));
+}
 }  // namespace testing
 }  // namespace gvisor

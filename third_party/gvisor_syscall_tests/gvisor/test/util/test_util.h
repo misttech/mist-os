@@ -193,6 +193,13 @@
 #include "test/util/posix_error.h"
 #include "test/util/save_util.h"
 
+// Android's libc, Bionic, specifies that many syscall arguments are _Nonnull,
+// causing tests that specifically test for syscall behavior on null arguments
+// to fail to build.
+#if defined(__BIONIC__) && defined(__clang__)
+#pragma clang diagnostic ignored "-Wnonnull"
+#endif
+
 namespace gvisor {
 namespace testing {
 
@@ -219,6 +226,7 @@ constexpr char kNative[] = "native";
 constexpr char kPtrace[] = "ptrace";
 constexpr char kKVM[] = "kvm";
 constexpr char kFuchsia[] = "fuchsia";
+constexpr char kStarnix[] = "starnix";
 constexpr char kSystrap[] = "systrap";
 }  // namespace Platform
 
@@ -730,7 +738,7 @@ std::vector<T> VecCat(Args&&... args) {
   } while (false)
 
 // Fill the given buffer with random bytes.
-void RandomizeBuffer(void* buffer, size_t len);
+void RandomizeBuffer(char* buffer, size_t len);
 
 template <typename T>
 inline PosixErrorOr<T> Atoi(absl::string_view str) {
