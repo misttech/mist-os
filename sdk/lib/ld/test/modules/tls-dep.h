@@ -18,6 +18,10 @@ extern thread_local char tls_dep_bss[2];
 // aligned start of .tbss (containing tls_dep_bss).
 constexpr size_t kTlsDepBssSize = kTlsDepAlign - sizeof(tls_dep_data) + sizeof(tls_dep_bss);
 
+constexpr size_t kTlsDepTotalSize = sizeof(tls_dep_data) + kTlsDepBssSize;
+
+constexpr size_t kTlsDepAlignedTotalSize = (kTlsDepTotalSize + kTlsDepAlign - 1) & -kTlsDepAlign;
+
 template <class ModuleList>
 inline const auto& FindTlsDep(const ModuleList& modules) {
   for (const auto& module : modules) {

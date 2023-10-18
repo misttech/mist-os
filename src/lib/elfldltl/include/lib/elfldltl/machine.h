@@ -9,6 +9,7 @@
 #include <optional>
 
 #include "constants.h"
+#include "layout.h"
 
 namespace elfldltl {
 
@@ -221,6 +222,67 @@ struct RelocationTraits<ElfMachine::kRiscv> {
   // getting it specified.
   static constexpr std::optional<uint32_t> kTlsDesc = std::nullopt;
 };
+
+// This is specialized to give the machine-specific details on dynamic
+// linking for TLS.  This is only what relocation needs to handle, not
+// the whole thread-pointer ABI for the machine.  The ElfMachine::kNone
+// specialization is an exemplar documenting the template API.
+template <class Elf = Elf<>, ElfMachine Machine = ElfMachine::kNative>
+struct TlsTraits;
+
+template <class Elf>
+struct TlsTraits<Elf, ElfMachine::kNone> {
+  // Each module in the initial exec set that has a PT_TLS segment gets
+  // assigned an offset from the thread pointer where its PT_TLS block will
+  // appear in each thread's static TLS area.  If the main executable has a
+  // PT_TLS segment, then it will have module ID 1 and its Local Exec
+  // relocations will have been assigned statically by the linker.
+  //
+  // The psABI sets a starting offset from the thread pointer that the main
+  // executable's PT_TLS segment will be assigned.  The actual offset the
+  // linker uses is rounded up based on the p_align of that PT_TLS segment.  So
+  // the entire block is expected to be aligned such that the thread pointer's
+  // value has the maximum alignment of any PT_TLS segment in the static TLS
+  // area, and then the linker will align offsets up as necessary.  The Local
+  // Exec offset is the offset that the first PT_TLS segment (the executable's
+  // if it has one) would be assigned if p_align were 1.
+  //
+  // Note that this area is always reserved, even the main executable has no
+  // PT_TLS and no Local Exec accesses will be made.  The runtime always lays
+  // out the thread pointer memory with this space reserved for private uses,
+  // and puts the first PT_TLS segment after it.
+  static constexpr typename Elf::size_type kTlsLocalExecOffset = 0;
+
+  // If true, TLS offsets from the thread pointer are negative.  The
+  // calculations for thread pointer alignment are the same whether
+  // offsets are positive or negative: that the first PT_TLS segment
+  // (the executable's if it has one) has the offset closest to zero
+  // that is aligned to p_align and >= p_memsz.
+  static constexpr bool kTlsNegative = false;
+};
+
+// AArch64 puts TLS above TP after a two-word reserved area.
+template <class Elf>
+struct TlsTraits<Elf, ElfMachine::kAarch64> {
+  using size_type = typename Elf::size_type;
+
+  static constexpr size_type kTlsLocalExecOffset = 2 * sizeof(size_type);
+  static constexpr bool kTlsNegative = false;
+};
+
+// RISC-V puts TLS above TP with no offset, as shown in the exemplar.
+template <class Elf>
+struct TlsTraits<Elf, ElfMachine::kRiscv> : public TlsTraits<Elf, ElfMachine::kNone> {};
+
+// X86 puts TLS below TP.
+template <class Elf>
+struct TlsTraits<Elf, ElfMachine::kX86_64> {
+  static constexpr typename Elf::size_type kTlsLocalExecOffset = 0;
+  static constexpr bool kTlsNegative = true;
+};
+
+template <class Elf>
+struct TlsTraits<Elf, ElfMachine::k386> : public TlsTraits<Elf, ElfMachine::kX86_64> {};
 
 // This should list all the fully-defined specializations except for kNone.
 template <template <ElfMachine...> class Template>

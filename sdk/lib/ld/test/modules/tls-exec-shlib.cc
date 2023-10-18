@@ -11,6 +11,25 @@
 [[gnu::used, gnu::retain]] alignas(64) thread_local int tls_data = 23;
 [[gnu::used, gnu::retain]] thread_local int tls_bss;
 
+using Traits = elfldltl::TlsTraits<>;
+
+constexpr size_t kExpectedAlign = 64;
+static_assert(kExpectedAlign >= kTlsDepAlign);
+
+constexpr size_t kAlignedExecOffset =
+    Traits::kTlsLocalExecOffset == 0
+        ? 0
+        : (Traits::kTlsLocalExecOffset + kExpectedAlign - 1) & -kExpectedAlign;
+
+constexpr size_t kExecOffset = Traits::kTlsNegative ? -kExpectedAlign : kAlignedExecOffset;
+
+constexpr size_t kShlibOffset =
+    Traits::kTlsNegative ? -(kExpectedAlign + kTlsDepAlignedTotalSize)
+                         : ((kExecOffset + sizeof(int) * 2 + kTlsDepAlign - 1) & -kTlsDepAlign);
+
+constexpr size_t kExpectedSize = Traits::kTlsNegative ? kExpectedAlign + kTlsDepAlignedTotalSize
+                                                      : kShlibOffset + kTlsDepTotalSize;
+
 extern "C" int64_t TestStart() {
   const auto modules = ld::AbiLoadedModules(ld::abi::_ld_abi);
 
@@ -62,6 +81,26 @@ extern "C" int64_t TestStart() {
 
   if (shlib_tls.tls_alignment != kTlsDepAlign) {
     return 11;
+  }
+
+  if (ld::abi::_ld_abi.static_tls_offsets.size() != 2) {
+    return 12;
+  }
+
+  if (ld::abi::_ld_abi.static_tls_offsets.front() != kExecOffset) {
+    return 13;
+  }
+
+  if (ld::abi::_ld_abi.static_tls_offsets.back() != kShlibOffset) {
+    return 14;
+  }
+
+  if (ld::abi::_ld_abi.static_tls_layout.alignment() != kExpectedAlign) {
+    return 15;
+  }
+
+  if (ld::abi::_ld_abi.static_tls_layout.size_bytes() != kExpectedSize) {
+    return 16;
   }
 
   return 17;

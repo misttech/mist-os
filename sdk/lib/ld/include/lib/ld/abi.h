@@ -28,6 +28,7 @@
 #include <lib/elfldltl/soname.h>
 #include <lib/elfldltl/svr4-abi.h>
 #include <lib/elfldltl/symbol.h>
+#include <lib/elfldltl/tls-layout.h>
 
 #include <string_view>
 
@@ -72,6 +73,43 @@ struct Abi {
   // static_tls_modules.size() are not used at startup but may be assigned to
   // dynamically-loaded modules later.
   Span<const TlsModule> static_tls_modules;
+
+  // This is a parallel array to `static_tls_modules` indexed the same way.  It
+  // holds the offset from the thread pointer to each module's segment in the
+  // static TLS block.  The entry at index `.tls_mod_id - 1` is the offset of
+  // that module's PT_TLS segment.
+  //
+  // This is kept in a simple flat array rather than in a member in each
+  // TlsModule so that very simple and efficient code can look up the offsets,
+  // perhaps implemented in assembly (such as in TLSDESC hook code or an
+  // implementation of __tls_get_addr).  TlsModule describes strictly the
+  // information extracted from the module's PT_TLS segment itself and is only
+  // used when initializing new thread's static TLS area.  The offsets are
+  // dynamically assigned by the dynamic linker at startup, and are referenced
+  // by each GD/LD access callback into the runtime.
+  //
+  // This offset is actually a negative number on some machines like x86, but
+  // it's always calculated using address-sized unsigned arithmetic.  On some
+  // machines where it's non-negative, there is a nonempty psABI-specified
+  // reserved region right after the thread pointer, so a real offset is never
+  // zero; other machines like RISC-V do start the first module at offset zero.
+  // The ordering of offsets after the first is theoretically arbitrary but is
+  // in fact ascending.  When the main executable has a PT_TLS it must have
+  // `.tls_mod_id` of 1 and it must have the smallest offset since this is
+  // statically calculated by the linker for Local-Exec model accesses based
+  // only on the psABI's fixed offset and the PT_TLS alignment requirement.
+  Span<const Addr> static_tls_offsets;
+
+  // This gives the required size and alignment of the overall static TLS area.
+  // The alignment matches the max of static_tls_modules[...].tls_alignment and
+  // any psABI-specified minimum alignment.  The runtime is responsible for
+  // adding in space and adjusting alignment as needed for any private data
+  // structures or ABI-mandated fixed-offset slots (e.g. stack canary value,
+  // secondary stack pointer pseudo-register).  When the thread pointer points
+  // to (or after, e.g. on x86) memory of at least this size and alignment,
+  // then `$tp + .static_tls_offsets[tls_modid - 1]` will yield a pointer with
+  // the space and alignment expected by that module's PT_TLS.
+  elfldltl::TlsLayout<Elf> static_tls_layout;
 };
 
 // This is the DT_SONAME value representing the ABI declared in this file.

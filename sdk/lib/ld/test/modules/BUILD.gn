@@ -402,7 +402,10 @@ test_executable("init-fini") {
 test_executable("tls-exec-only") {
   can_be_in_process = true
   sources = [ "tls-exec-only.cc" ]
-  deps = [ "../.." ]
+  deps = [
+    "../..",
+    "//src/lib/elfldltl",
+  ]
 }
 
 test_executable("tls-shlib-only") {

@@ -39,6 +39,7 @@ static_assert(kMaxPhdrs > kMaxSegments);
 
 // The startup dynamic linker always uses the default ELF layout.
 using Elf = elfldltl::Elf<>;
+using Addr = typename Elf::Addr;
 using Ehdr = typename Elf::Ehdr;
 using Phdr = typename Elf::Phdr;
 using Sym = typename Elf::Sym;
@@ -388,11 +389,20 @@ struct StartupLoadModule : public StartupLoadModuleBase,
   static void PopulateAbiTls(Diagnostics& diag, InitialExecAllocator& initial_exec_allocator,
                              const List& modules, Elf::size_type max_tls_modid) {
     if (max_tls_modid > 0) {
-      fbl::AllocChecker ac;
-      TlsModule* storage = new (initial_exec_allocator, ac) TlsModule[max_tls_modid];
-      CheckAlloc(diag, ac, "passive ABI for TLS modules");
-      cpp20::span<TlsModule> tls_modules{storage, max_tls_modid};
+      auto new_array = [&diag, &initial_exec_allocator, max_tls_modid](auto& result) {
+        using T = typename std::decay_t<decltype(result.front())>;
+        fbl::AllocChecker ac;
+        T* array = new (initial_exec_allocator, ac) T[max_tls_modid];
+        CheckAlloc(diag, ac, "passive ABI for TLS modules");
+        result = {array, max_tls_modid};
+      };
+      cpp20::span<TlsModule> tls_modules;
+      new_array(tls_modules);
       PopulateAbiStaticTlsModules(modules, tls_modules);
+
+      cpp20::span<Addr> tls_offsets;
+      new_array(tls_offsets);
+      PopulateAbiStaticTlsLayout(tls_modules, tls_offsets);
     }
   }
 
@@ -413,6 +423,18 @@ struct StartupLoadModule : public StartupLoadModuleBase,
     }
 
     mutable_abi.static_tls_modules = tls_modules;
+  }
+
+  static void PopulateAbiStaticTlsLayout(cpp20::span<const TlsModule> tls_modules,
+                                         cpp20::span<Addr> tls_offsets) {
+    assert(tls_offsets.size() == tls_modules.size());
+    auto next_offset = tls_offsets.begin();
+    for (const TlsModule& module : tls_modules) {
+      const size_type memsz = module.tls_size();
+      const size_type align = module.tls_alignment;
+      *next_offset++ = mutable_abi.static_tls_layout.Assign(memsz, align);
+    }
+    mutable_abi.static_tls_offsets = tls_offsets;
   }
 
   Loader loader_;  // Must be initialized by constructor.

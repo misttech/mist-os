@@ -2,12 +2,27 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/elfldltl/machine.h>
 #include <lib/ld/abi.h>
 #include <lib/ld/module.h>
 #include <lib/ld/tls.h>
 
 [[gnu::used, gnu::retain]] alignas(64) thread_local int tls_data = 23;
 [[gnu::used, gnu::retain]] thread_local int tls_bss;
+
+using Traits = elfldltl::TlsTraits<>;
+
+constexpr size_t kExpectedAlign = 64;
+
+constexpr size_t kAlignedExecOffset =
+    Traits::kTlsLocalExecOffset == 0
+        ? 0
+        : (Traits::kTlsLocalExecOffset + kExpectedAlign - 1) & -kExpectedAlign;
+
+constexpr size_t kExpectedOffset = Traits::kTlsNegative ? -kExpectedAlign : kAlignedExecOffset;
+
+constexpr size_t kExpectedSize =
+    Traits::kTlsNegative ? kExpectedAlign : kAlignedExecOffset + sizeof(int) * 2;
 
 extern "C" int64_t TestStart() {
   const auto modules = ld::AbiLoadedModules(ld::abi::_ld_abi);
@@ -36,8 +51,24 @@ extern "C" int64_t TestStart() {
     return 5;
   }
 
-  if (exec_tls.tls_alignment != 64) {
+  if (exec_tls.tls_alignment != kExpectedAlign) {
     return 6;
+  }
+
+  if (ld::abi::_ld_abi.static_tls_offsets.size() != 1) {
+    return 7;
+  }
+
+  if (ld::abi::_ld_abi.static_tls_offsets.front() != kExpectedOffset) {
+    return 8;
+  }
+
+  if (ld::abi::_ld_abi.static_tls_layout.alignment() != kExpectedAlign) {
+    return 9;
+  }
+
+  if (ld::abi::_ld_abi.static_tls_layout.size_bytes() != kExpectedSize) {
+    return 10;
   }
 
   return 17;
