@@ -55,12 +55,6 @@ pub struct ObjectProperties {
 }
 
 #[async_trait]
-pub trait GetProperties {
-    /// Gets the object's properties.
-    async fn get_properties(&self) -> Result<ObjectProperties, Error>;
-}
-
-#[async_trait]
 pub trait ReadObjectHandle: ObjectHandle {
     /// Fills |buf| with up to |buf.len()| bytes read from |offset| on the underlying device.
     /// |offset| and |buf| must both be block-aligned.

@@ -4,9 +4,7 @@
 
 use {
     crate::{
-        object_handle::{
-            GetProperties, ObjectHandle, ObjectProperties, ReadObjectHandle, WriteObjectHandle,
-        },
+        object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle},
         object_store::{journal::JournalHandle, Timestamp},
     },
     anyhow::Error,
@@ -88,24 +86,6 @@ impl ObjectHandle for FakeObjectHandle {
 
     fn allocate_buffer(&self, size: usize) -> Buffer<'_> {
         self.allocator.allocate_buffer(size)
-    }
-}
-
-#[async_trait]
-impl GetProperties for FakeObjectHandle {
-    async fn get_properties(&self) -> Result<ObjectProperties, Error> {
-        let size = self.object.get_size();
-        Ok(ObjectProperties {
-            refs: 1u64,
-            allocated_size: size,
-            data_attribute_size: size,
-            creation_time: Timestamp::zero(),
-            modification_time: Timestamp::zero(),
-            access_time: Timestamp::zero(),
-            change_time: Timestamp::zero(),
-            sub_dirs: 0,
-            posix_attributes: None,
-        })
     }
 }
 

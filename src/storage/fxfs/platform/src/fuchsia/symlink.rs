@@ -41,6 +41,46 @@ impl FxSymlink {
             ),
         }
     }
+
+    async fn get_properties(&self) -> Result<ObjectProperties, Error> {
+        let store = self.handle.store();
+        let fs = store.filesystem();
+        let _guard = fs
+            .lock_manager()
+            .read_lock(lock_keys![LockKey::object(store.store_object_id(), self.object_id())])
+            .await;
+        let item = store
+            .tree()
+            .find(&ObjectKey::object(self.object_id()))
+            .await?
+            .expect("Unable to find object record");
+        match item.value {
+            ObjectValue::Object {
+                kind: ObjectKind::Symlink { refs, .. },
+                attributes:
+                    ObjectAttributes {
+                        creation_time,
+                        modification_time,
+                        posix_attributes,
+                        access_time,
+                        change_time,
+                        ..
+                    },
+            } => Ok(ObjectProperties {
+                refs,
+                allocated_size: 0,
+                data_attribute_size: 0,
+                creation_time,
+                modification_time,
+                access_time,
+                change_time,
+                sub_dirs: 0,
+                posix_attributes,
+            }),
+            ObjectValue::None => Err(FxfsError::NotFound.into()),
+            _ => Err(FxfsError::NotFile.into()),
+        }
+    }
 }
 
 #[async_trait]
@@ -146,46 +186,6 @@ impl FxNode for FxSymlink {
     fn set_parent(&self, _parent: Arc<FxDirectory>) {}
     fn open_count_add_one(&self) {}
     fn open_count_sub_one(self: Arc<Self>) {}
-
-    async fn get_properties(&self) -> Result<ObjectProperties, Error> {
-        let store = self.handle.store();
-        let fs = store.filesystem();
-        let _guard = fs
-            .lock_manager()
-            .read_lock(lock_keys![LockKey::object(store.store_object_id(), self.object_id())])
-            .await;
-        let item = store
-            .tree()
-            .find(&ObjectKey::object(self.object_id()))
-            .await?
-            .expect("Unable to find object record");
-        match item.value {
-            ObjectValue::Object {
-                kind: ObjectKind::Symlink { refs, .. },
-                attributes:
-                    ObjectAttributes {
-                        creation_time,
-                        modification_time,
-                        posix_attributes,
-                        access_time,
-                        change_time,
-                        ..
-                    },
-            } => Ok(ObjectProperties {
-                refs,
-                allocated_size: 0,
-                data_attribute_size: 0,
-                creation_time,
-                modification_time,
-                access_time,
-                change_time,
-                sub_dirs: 0,
-                posix_attributes,
-            }),
-            ObjectValue::None => Err(FxfsError::NotFound.into()),
-            _ => Err(FxfsError::NotFile.into()),
-        }
-    }
 
     fn object_descriptor(&self) -> ObjectDescriptor {
         ObjectDescriptor::Symlink

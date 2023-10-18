@@ -21,7 +21,7 @@ use {
         async_enter,
         filesystem::SyncOptions,
         log::*,
-        object_handle::{ObjectHandle, ObjectProperties, ReadObjectHandle},
+        object_handle::{ObjectHandle, ReadObjectHandle},
         object_store::{
             transaction::{lock_keys, LockKey, Options},
             DataObjectHandle, ObjectDescriptor, Timestamp,
@@ -230,10 +230,6 @@ impl FxNode for FxFile {
         self.open_count_sub_one_and_maybe_flush(true);
     }
 
-    async fn get_properties(&self) -> Result<ObjectProperties, Error> {
-        self.handle.get_properties().await
-    }
-
     fn object_descriptor(&self) -> ObjectDescriptor {
         ObjectDescriptor::File
     }
@@ -269,7 +265,7 @@ impl DirectoryEntry for FxFile {
 #[async_trait]
 impl vfs::node::Node for FxFile {
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
-        let props = self.get_properties().await.map_err(map_to_status)?;
+        let props = self.handle.get_properties().await.map_err(map_to_status)?;
         Ok(fio::NodeAttributes {
             mode: fio::MODE_TYPE_FILE
                 | rights_to_posix_mode_bits(/*r*/ true, /*w*/ true, /*x*/ false),
@@ -286,7 +282,7 @@ impl vfs::node::Node for FxFile {
         &self,
         requested_attributes: fio::NodeAttributesQuery,
     ) -> Result<fio::NodeAttributes2, zx::Status> {
-        let props = self.get_properties().await.map_err(map_to_status)?;
+        let props = self.handle.get_properties().await.map_err(map_to_status)?;
         Ok(attributes!(
             requested_attributes,
             Mutable {

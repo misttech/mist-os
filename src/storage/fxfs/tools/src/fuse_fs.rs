@@ -13,7 +13,7 @@ use {
         errors::FxfsError,
         filesystem::{FxFilesystem, OpenFxFilesystem},
         log::info,
-        object_handle::{GetProperties, ObjectProperties},
+        object_handle::ObjectProperties,
         object_store::{
             volume::root_volume, DataObjectHandle, Directory, HandleOptions, ObjectDescriptor,
             ObjectKey, ObjectKind, ObjectStore, ObjectValue, Timestamp,

@@ -11,7 +11,7 @@ use {
     fxfs::{
         errors::FxfsError,
         filesystem::{FxFilesystem, SyncOptions},
-        object_handle::{GetProperties, WriteBytes},
+        object_handle::WriteBytes,
         object_store::{
             directory::Directory,
             transaction::{lock_keys, LockKey},

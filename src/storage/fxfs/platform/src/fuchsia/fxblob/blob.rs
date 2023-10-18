@@ -22,7 +22,7 @@ use {
     fxfs::{
         async_enter,
         errors::FxfsError,
-        object_handle::{ObjectHandle, ObjectProperties, ReadObjectHandle},
+        object_handle::{ObjectHandle, ReadObjectHandle},
         object_store::{DataObjectHandle, ObjectDescriptor},
         round::{round_down, round_up},
     },
@@ -133,10 +133,6 @@ impl FxNode for FxBlob {
 
     fn set_parent(&self, _parent: Arc<FxDirectory>) {
         // NOP
-    }
-
-    async fn get_properties(&self) -> Result<ObjectProperties, Error> {
-        unimplemented!()
     }
 
     fn open_count_add_one(&self) {

@@ -20,7 +20,7 @@ use {
         errors::FxfsError,
         filesystem::SyncOptions,
         log::info,
-        object_handle::{GetProperties, ObjectHandle, ReadObjectHandle, WriteObjectHandle},
+        object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle},
         object_store::{
             directory::{replace_child, ReplacedChild},
             transaction::{lock_keys, LockKey, Options},

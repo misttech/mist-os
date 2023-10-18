@@ -7,9 +7,7 @@ use {
         debug_assert_not_too_long,
         errors::FxfsError,
         log::*,
-        object_handle::{
-            GetProperties, ObjectHandle, ObjectProperties, ReadObjectHandle, WriteObjectHandle,
-        },
+        object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle},
         object_store::{
             allocator::{self, Allocator},
             object_record::{AttributeKey, Timestamp},
@@ -369,23 +367,6 @@ impl<S: HandleOwner> ObjectHandle for CachingObjectHandle<S> {
 }
 
 #[async_trait]
-impl<S: HandleOwner> GetProperties for CachingObjectHandle<S> {
-    async fn get_properties(&self) -> Result<ObjectProperties, Error> {
-        // TODO(fxbug.dev/95354): This could be optimized to skip getting the underlying handle's
-        // properties if the cache has all of the timestamps we need.
-        let mut props = self.handle.get_properties().await?;
-        let cached_metadata = self.cache.cached_metadata();
-        props.allocated_size = props.allocated_size + cached_metadata.dirty_bytes;
-        props.data_attribute_size = cached_metadata.content_size;
-        props.creation_time =
-            cached_metadata.creation_time.map(|t| t.into()).unwrap_or(props.creation_time);
-        props.modification_time =
-            cached_metadata.modification_time.map(|t| t.into()).unwrap_or(props.modification_time);
-        Ok(props)
-    }
-}
-
-#[async_trait]
 impl<S: HandleOwner> ReadObjectHandle for CachingObjectHandle<S> {
     async fn read(&self, offset: u64, mut buf: MutableBufferRef<'_>) -> Result<usize, Error> {
         self.cache.read(offset, buf.as_mut_slice(), &self.handle).await
@@ -457,11 +438,11 @@ mod tests {
             filesystem::{FxFilesystem, OpenFxFilesystem},
             fsck::{fsck_with_options, FsckOptions},
             lsm_tree::types::{ItemRef, LayerIterator},
-            object_handle::{GetProperties, ObjectHandle, ReadObjectHandle, WriteObjectHandle},
+            object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle},
             object_store::{
                 allocator::Allocator,
                 directory::Directory,
-                object_record::{ObjectKey, ObjectKeyData, ObjectValue, Timestamp},
+                object_record::{ObjectKey, ObjectKeyData, ObjectValue},
                 transaction::{lock_keys, Options},
                 CachingObjectHandle, HandleOptions, LockKey, ObjectStore,
                 TRANSACTION_MUTATION_THRESHOLD,
@@ -834,36 +815,6 @@ mod tests {
             object.truncate(0).await.expect("truncate failed");
             object.flush().await.expect("flush failed");
         }
-        fs.close().await.expect("Close failed");
-    }
-
-    #[fuchsia::test]
-    async fn test_properties() {
-        let (fs, object) = test_filesystem_and_object().await;
-        let crtime = Timestamp::from_nanos(1234u64);
-        let mtime = Timestamp::from_nanos(5678u64);
-
-        object
-            .write_timestamps(Some(crtime.clone()), None)
-            .await
-            .expect("update_timestamps failed");
-        let properties = object.get_properties().await.expect("get_properties failed");
-        assert_eq!(properties.creation_time, crtime);
-        assert_ne!(properties.modification_time, mtime);
-
-        object.write_timestamps(None, Some(mtime.clone())).await.expect("update_timestamps failed");
-        let properties = object.get_properties().await.expect("get_properties failed");
-        assert_eq!(properties.creation_time, crtime);
-        assert_eq!(properties.modification_time, mtime);
-
-        // Writes should update mtime.
-        let mut buf = object.allocate_buffer(5);
-        buf.as_mut_slice().copy_from_slice(b"hello");
-        object.write_or_append(Some(0), buf.as_ref()).await.expect("write failed");
-
-        let properties = object.get_properties().await.expect("get_properties failed");
-        assert_eq!(properties.creation_time, crtime);
-        assert_ne!(properties.modification_time, mtime);
         fs.close().await.expect("Close failed");
     }
 

@@ -845,7 +845,7 @@ mod tests {
         crate::{
             errors::FxfsError,
             filesystem::{FxFilesystem, JournalingObject, SyncOptions},
-            object_handle::{GetProperties, ObjectHandle, ReadObjectHandle, WriteObjectHandle},
+            object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle},
             object_store::{
                 directory::{replace_child, Directory, ReplacedChild},
                 object_record::Timestamp,

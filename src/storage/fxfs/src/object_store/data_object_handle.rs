@@ -8,8 +8,7 @@ use {
         log::*,
         lsm_tree::types::{ItemRef, LayerIterator},
         object_handle::{
-            GetProperties, ObjectHandle, ObjectProperties, ReadObjectHandle, WriteBytes,
-            WriteObjectHandle,
+            ObjectHandle, ObjectProperties, ReadObjectHandle, WriteBytes, WriteObjectHandle,
         },
         object_store::{
             allocator::Allocator,
@@ -914,41 +913,8 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         transaction.commit().await?;
         Ok(())
     }
-}
 
-impl<S: HandleOwner> AssociatedObject for DataObjectHandle<S> {
-    fn will_apply_mutation(&self, mutation: &Mutation, _object_id: u64, _manager: &ObjectManager) {
-        match mutation {
-            Mutation::ObjectStore(ObjectStoreMutation {
-                item: ObjectItem { value: ObjectValue::Attribute { size }, .. },
-                ..
-            }) => self.content_size.store(*size, atomic::Ordering::Relaxed),
-            _ => {}
-        }
-    }
-}
-
-impl<S: HandleOwner> ObjectHandle for DataObjectHandle<S> {
-    fn set_trace(&self, v: bool) {
-        self.handle.set_trace(v)
-    }
-
-    fn object_id(&self) -> u64 {
-        self.handle.object_id()
-    }
-
-    fn allocate_buffer(&self, size: usize) -> Buffer<'_> {
-        self.handle.allocate_buffer(size)
-    }
-
-    fn block_size(&self) -> u64 {
-        self.handle.block_size()
-    }
-}
-
-#[async_trait]
-impl<S: HandleOwner> GetProperties for DataObjectHandle<S> {
-    async fn get_properties(&self) -> Result<ObjectProperties, Error> {
+    pub async fn get_properties(&self) -> Result<ObjectProperties, Error> {
         // We don't take a read guard here since the object properties are contained in a single
         // object, which cannot be inconsistent with itself. The LSM tree does not return
         // intermediate states for a single object.
@@ -984,6 +950,36 @@ impl<S: HandleOwner> GetProperties for DataObjectHandle<S> {
             }),
             _ => bail!(FxfsError::NotFile),
         }
+    }
+}
+
+impl<S: HandleOwner> AssociatedObject for DataObjectHandle<S> {
+    fn will_apply_mutation(&self, mutation: &Mutation, _object_id: u64, _manager: &ObjectManager) {
+        match mutation {
+            Mutation::ObjectStore(ObjectStoreMutation {
+                item: ObjectItem { value: ObjectValue::Attribute { size }, .. },
+                ..
+            }) => self.content_size.store(*size, atomic::Ordering::Relaxed),
+            _ => {}
+        }
+    }
+}
+
+impl<S: HandleOwner> ObjectHandle for DataObjectHandle<S> {
+    fn set_trace(&self, v: bool) {
+        self.handle.set_trace(v)
+    }
+
+    fn object_id(&self) -> u64 {
+        self.handle.object_id()
+    }
+
+    fn allocate_buffer(&self, size: usize) -> Buffer<'_> {
+        self.handle.allocate_buffer(size)
+    }
+
+    fn block_size(&self) -> u64 {
+        self.handle.block_size()
     }
 }
 
@@ -1143,9 +1139,7 @@ mod tests {
                 FxFilesystem, FxFilesystemBuilder, JournalingObject, OpenFxFilesystem, SyncOptions,
             },
             fsck::{fsck_volume_with_options, fsck_with_options, FsckOptions},
-            object_handle::{
-                GetProperties, ObjectHandle, ObjectProperties, ReadObjectHandle, WriteObjectHandle,
-            },
+            object_handle::{ObjectHandle, ObjectProperties, ReadObjectHandle, WriteObjectHandle},
             object_store::{
                 allocator::Allocator,
                 directory::replace_child,

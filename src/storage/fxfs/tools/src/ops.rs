@@ -9,7 +9,7 @@ use {
         errors::FxfsError,
         filesystem::OpenFxFilesystem,
         fsck,
-        object_handle::{GetProperties, ObjectHandle, ReadObjectHandle, WriteObjectHandle},
+        object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle},
         object_store::{
             directory::{replace_child, ReplacedChild},
             transaction::{lock_keys, LockKey, Options},

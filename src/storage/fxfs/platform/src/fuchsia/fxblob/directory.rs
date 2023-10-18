@@ -35,7 +35,7 @@ use {
     fxfs::{
         errors::FxfsError,
         log::*,
-        object_handle::{ObjectProperties, ReadObjectHandle},
+        object_handle::ReadObjectHandle,
         object_store::{
             self,
             transaction::{lock_keys, LockKey, Options},
@@ -428,10 +428,6 @@ impl FxNode for BlobDirectory {
     fn set_parent(&self, _parent: Arc<FxDirectory>) {
         // This directory can't be renamed.
         unreachable!();
-    }
-
-    async fn get_properties(&self) -> Result<ObjectProperties, Error> {
-        self.directory.get_properties().await
     }
 
     fn open_count_add_one(&self) {}

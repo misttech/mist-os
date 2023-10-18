@@ -154,9 +154,8 @@ fn linked_hash_map_with_capacity(
 mod tests {
     use {
         crate::fuchsia::{directory::FxDirectory, dirent_cache::DirentCache, node::FxNode},
-        anyhow::Error,
         async_trait::async_trait,
-        fxfs::{object_handle::ObjectProperties, object_store::ObjectDescriptor},
+        fxfs::object_store::ObjectDescriptor,
         std::sync::Arc,
     };
 
@@ -174,9 +173,6 @@ mod tests {
         }
         fn open_count_add_one(&self) {}
         fn open_count_sub_one(self: Arc<Self>) {}
-        async fn get_properties(&self) -> Result<ObjectProperties, Error> {
-            unreachable!();
-        }
 
         fn object_descriptor(&self) -> ObjectDescriptor {
             ObjectDescriptor::File

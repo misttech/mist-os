@@ -21,7 +21,6 @@ use {
         errors::FxfsError,
         filesystem::SyncOptions,
         log::*,
-        object_handle::ObjectProperties,
         object_store::{
             self,
             directory::{self, ReplacedChild},
@@ -341,9 +340,6 @@ impl FxNode for FxDirectory {
     fn open_count_add_one(&self) {}
     fn open_count_sub_one(self: Arc<Self>) {}
 
-    async fn get_properties(&self) -> Result<ObjectProperties, Error> {
-        self.directory.get_properties().await
-    }
     fn object_descriptor(&self) -> ObjectDescriptor {
         ObjectDescriptor::Directory
     }
@@ -767,7 +763,7 @@ impl DirectoryEntry for FxDirectory {
 #[async_trait]
 impl vfs::node::Node for FxDirectory {
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
-        let props = self.get_properties().await.map_err(map_to_status)?;
+        let props = self.directory.get_properties().await.map_err(map_to_status)?;
         Ok(fio::NodeAttributes {
             mode: fio::MODE_TYPE_DIRECTORY
                 | rights_to_posix_mode_bits(/*r*/ true, /*w*/ true, /*x*/ false),
@@ -785,7 +781,7 @@ impl vfs::node::Node for FxDirectory {
         &self,
         requested_attributes: fio::NodeAttributesQuery,
     ) -> Result<fio::NodeAttributes2, zx::Status> {
-        let props = self.get_properties().await.map_err(map_to_status)?;
+        let props = self.directory.get_properties().await.map_err(map_to_status)?;
         Ok(attributes!(
             requested_attributes,
             Mutable {

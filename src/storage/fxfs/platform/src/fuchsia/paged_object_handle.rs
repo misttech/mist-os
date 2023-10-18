@@ -14,7 +14,7 @@ use {
         errors::FxfsError,
         filesystem::MAX_FILE_SIZE,
         log::*,
-        object_handle::{GetProperties, ObjectHandle, ObjectProperties, ReadObjectHandle},
+        object_handle::{ObjectHandle, ObjectProperties, ReadObjectHandle},
         object_store::{
             allocator::{Allocator, Reservation, ReservationOwner, SimpleAllocator},
             transaction::{

@@ -23,7 +23,7 @@ use {
     fxfs::{
         errors::FxfsError,
         log::*,
-        object_handle::{ObjectHandle, ObjectProperties, WriteObjectHandle},
+        object_handle::{ObjectHandle, WriteObjectHandle},
         object_store::{
             directory::{replace_child_with_object, ReplacedChild},
             DataObjectHandle, ObjectDescriptor, Timestamp, BLOB_MERKLE_ATTRIBUTE_ID,
@@ -298,10 +298,6 @@ impl FxNode for FxDeliveryBlob {
 
     fn set_parent(&self, _parent: Arc<FxDirectory>) {
         unreachable!()
-    }
-
-    async fn get_properties(&self) -> Result<ObjectProperties, Error> {
-        unimplemented!()
     }
 
     fn open_count_add_one(&self) {
