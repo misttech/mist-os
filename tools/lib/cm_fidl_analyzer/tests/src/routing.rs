@@ -21,11 +21,10 @@ use {
         Availability, CapabilityDecl, CapabilityTypeName, ChildRef, ComponentDecl, DependencyType,
         ExposeDecl, ExposeDeclCommon, ExposeDirectoryDecl, ExposeProtocolDecl, ExposeResolverDecl,
         ExposeServiceDecl, ExposeSource, ExposeTarget, OfferDecl, OfferDirectoryDecl,
-        OfferEventStreamDecl, OfferProtocolDecl, OfferServiceDecl, OfferSource, OfferStorageDecl,
-        OfferTarget, RegistrationSource, ResolverDecl, ResolverRegistration, RunnerDecl,
-        RunnerRegistration, ServiceDecl, StorageDecl, StorageDirectorySource, UseDecl,
-        UseDirectoryDecl, UseEventStreamDecl, UseProtocolDecl, UseServiceDecl, UseSource,
-        UseStorageDecl,
+        OfferProtocolDecl, OfferServiceDecl, OfferSource, OfferStorageDecl, OfferTarget,
+        RegistrationSource, ResolverDecl, ResolverRegistration, RunnerDecl, RunnerRegistration,
+        ServiceDecl, StorageDecl, StorageDirectorySource, UseDecl, UseDirectoryDecl,
+        UseEventStreamDecl, UseProtocolDecl, UseServiceDecl, UseSource, UseStorageDecl,
     },
     cm_rust_testing::{
         ChildDeclBuilder, ComponentDeclBuilder, DirectoryDeclBuilder, EnvironmentDeclBuilder,
@@ -37,7 +36,7 @@ use {
     moniker::{ChildNameBase, Moniker, MonikerBase},
     routing::{
         component_instance::ComponentInstanceInterface, environment::RunnerRegistry,
-        error::RoutingError, mapper::RouteSegment, RegistrationDecl, RouteInfo,
+        error::RoutingError, mapper::RouteSegment, RegistrationDecl,
     },
     routing_test_helpers::{
         CheckUse, ComponentEventRoute, ExpectedResult, RoutingTestModel, RoutingTestModelBuilder,
@@ -227,9 +226,11 @@ impl RoutingTestForAnalyzer {
         target: &Arc<ComponentInstanceForAnalyzer>,
     ) {
         // Perform secondary routing to find scope
-        let mut map = vec![];
-        let (result, _) =
-            ComponentModelForAnalyzer::route_event_stream_sync(use_decl.clone(), &target, &mut map);
+        let (result, mut segments) = ComponentModelForAnalyzer::route_event_stream_sync(
+            use_decl.clone(),
+            &target,
+            &mut vec![],
+        );
         result.expect("Expected event_stream routing to succeed.");
 
         let mut route = use_decl
@@ -253,9 +254,9 @@ impl RoutingTestForAnalyzer {
                 vec![route]
             })
             .unwrap_or_default();
-        map.reverse();
+        segments.reverse();
         // Generate a unified route from the component topology
-        generate_unified_route(map, &mut route);
+        generate_unified_route(&segments, &mut route);
         assert_eq!(scope, &route);
     }
 
@@ -362,44 +363,40 @@ impl RoutingTestForAnalyzer {
     }
 }
 
-/// Converts a component framework route to a strongly-typed stringified route
-/// which can be compared against a string of paths for testing purposes.
-fn generate_unified_route(
-    map: Vec<RouteInfo<ComponentInstanceForAnalyzer, OfferEventStreamDecl, ()>>,
-    route: &mut Vec<ComponentEventRoute>,
-) {
-    for component in &map {
-        add_component_to_route(&component, route);
-    }
+fn segment_to_component_event_route(segment: &RouteSegment) -> Option<ComponentEventRoute> {
+    let (moniker, offer) = match segment {
+        RouteSegment::OfferBy { moniker, capability } => (moniker, capability),
+        _ => return None,
+    };
+    let event_stream_offer = match offer {
+        OfferDecl::EventStream(o) => o,
+        _ => return None,
+    };
+    let scopes = match &event_stream_offer.scope {
+        Some(scope) => Some(
+            scope
+                .iter()
+                .map(|s| match s {
+                    cm_rust::EventScope::Child(child) => child.name.to_string(),
+                    cm_rust::EventScope::Collection(collection) => collection.to_string(),
+                })
+                .collect(),
+        ),
+        None => None,
+    };
+    let moniker_name = match moniker.leaf() {
+        Some(l) => l.name().to_string(),
+        None => "/".to_string(),
+    };
+    Some(ComponentEventRoute { component: moniker_name, scope: scopes })
 }
 
-/// Adds a specified component to the route
-fn add_component_to_route(
-    component: &RouteInfo<ComponentInstanceForAnalyzer, OfferEventStreamDecl, ()>,
-    route: &mut Vec<ComponentEventRoute>,
-) {
-    let mut component_route = ComponentEventRoute {
-        component: if let Some(moniker) = component.component.child_moniker() {
-            moniker.name().to_string()
-        } else {
-            "/".to_string()
-        },
-        scope: None,
-    };
-    if let Some(ref stream) = component.offer {
-        if let Some(scopes) = &stream.scope {
-            component_route.scope = Some(
-                scopes
-                    .iter()
-                    .map(|s| match s {
-                        cm_rust::EventScope::Child(child) => child.name.to_string(),
-                        cm_rust::EventScope::Collection(collection) => collection.to_string(),
-                    })
-                    .collect(),
-            );
+fn generate_unified_route(segments: &Vec<RouteSegment>, routes: &mut Vec<ComponentEventRoute>) {
+    for segment in segments {
+        if let Some(route) = segment_to_component_event_route(segment) {
+            routes.push(route)
         }
     }
-    route.push(component_route);
 }
 
 #[async_trait]
