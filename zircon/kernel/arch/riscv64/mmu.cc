@@ -26,6 +26,7 @@
 #include <arch/riscv64/mmu.h>
 #include <arch/riscv64/sbi.h>
 #include <fbl/auto_lock.h>
+#include <kernel/mp.h>
 #include <kernel/mutex.h>
 #include <ktl/algorithm.h>
 #include <phys/arch/arch-handoff.h>
@@ -230,6 +231,51 @@ paddr_t kernel_virt_to_phys(const void* va) {
   pa += get_kernel_base_phys() - kernel_relocated_base;
 
   return pa;
+}
+
+// Argument to SfenceVma.  Used to perform TLB invalidation on an optional range
+// with an optional ASID.  When no range is present, the target is all
+// addresses.  When no ASID is present the target is invalidated for all ASIDs.
+struct SfenceVmaArgs {
+  struct Range {
+    vaddr_t base;
+    size_t size;
+  };
+  ktl::optional<Range> range;
+  ktl::optional<uint16_t> asid;
+};
+
+// Issues a sequence of sfence.vma instructions as specified by SfenceVmaArgs.
+void SfenceVma(void* _args) {
+  DEBUG_ASSERT(arch_ints_disabled());
+  auto* args = reinterpret_cast<SfenceVmaArgs*>(_args);
+
+  if (args->range.has_value()) {
+    // With range.
+    const vaddr_t base = args->range->base;
+    const vaddr_t end = base + args->range->size;
+    if (args->asid.has_value()) {
+      // With range, one ASID.
+      const uint16_t asid = args->asid.value();
+      for (vaddr_t va = base; va < end; va += PAGE_SIZE) {
+        riscv64_tlb_flush_address_one_asid(va, asid);
+      }
+    } else {
+      // With range, all ASIDs.
+      for (vaddr_t va = base; va < end; va += PAGE_SIZE) {
+        riscv64_tlb_flush_address_all_asids(va);
+      }
+    }
+  } else {
+    if (args->asid.has_value()) {
+      // All addresses, one ASID.
+      const uint16_t asid = args->asid.value();
+      riscv64_tlb_flush_asid(asid);
+    } else {
+      // All addresses, all ASIDs.
+      riscv64_tlb_flush_all();
+    }
+  }
 }
 
 }  // namespace
@@ -534,23 +580,15 @@ void Riscv64ArchVmAspace::FlushTLBEntryRun(vaddr_t vaddr, size_t count) const {
 
   // Future optimization here and FlushAsid() when asids are disabled:
   // Based on which cpu has the aspace active, only send IPIs (either directly
-  // or via SBI) to the other cores from that list to shoot down TLBs.
-  const cpu_mask_t cpu_mask = mask_all_but_one(arch_curr_cpu_num());
+  // or via SBI) to the cores from that list to shoot down TLBs.
+  const size_t size = count * PAGE_SIZE;
   if (IsKernel()) {
-    // Flush all ASIDs with this address
-    for (size_t i = 0; i < count; i++) {
-      riscv64_tlb_flush_address_all_asids(vaddr);
-      vaddr += PAGE_SIZE;
-    }
-    sbi_remote_sfence_vma(cpu_mask, vaddr, count * PAGE_SIZE);
+    SfenceVmaArgs args{SfenceVmaArgs::Range{vaddr, size}};
+    mp_sync_exec(MP_IPI_TARGET_ALL, /* cpu_mask */ 0, &SfenceVma, &args);
   } else if (IsUser()) {
     // Flush just the aspace's asid
-    const uint16_t asid = asid_;
-    for (size_t i = 0; i < count; i++) {
-      riscv64_tlb_flush_address_one_asid(vaddr, asid);
-      vaddr += PAGE_SIZE;
-    }
-    sbi_remote_sfence_vma_asid(cpu_mask, vaddr, count * PAGE_SIZE, asid_);
+    SfenceVmaArgs args{SfenceVmaArgs::Range{vaddr, size}, asid_};
+    mp_sync_exec(MP_IPI_TARGET_ALL, /* cpu_mask */ 0, &SfenceVma, &args);
   } else {
     PANIC_UNIMPLEMENTED;
   }
@@ -560,18 +598,15 @@ void Riscv64ArchVmAspace::FlushTLBEntryRun(vaddr_t vaddr, size_t count) const {
 void Riscv64ArchVmAspace::FlushAsid() const {
   LTRACEF("asid %#hx, kernel %u\n", asid_, IsKernel());
 
-  const cpu_mask_t cpu_mask = mask_all_but_one(arch_curr_cpu_num());
   if (IsKernel()) {
     // Perform a full flush of all cpus across all ASIDs
-    riscv64_tlb_flush_all();
-
-    sbi_remote_sfence_vma(cpu_mask, 0, -1);
+    SfenceVmaArgs args{};
+    mp_sync_exec(MP_IPI_TARGET_ALL, /* cpu_mask */ 0, &SfenceVma, &args);
     kcounter_add(cm_global_invalidate, 1);
   } else {
     // Perform a full flush of all cpus of a single ASID
-    riscv64_tlb_flush_asid(asid_);
-
-    sbi_remote_sfence_vma_asid(cpu_mask, 0, -1, asid_);
+    SfenceVmaArgs args{.asid = asid_};
+    mp_sync_exec(MP_IPI_TARGET_ALL, /* cpu_mask */ 0, &SfenceVma, &args);
     kcounter_add(cm_asid_invalidate, 1);
   }
 }

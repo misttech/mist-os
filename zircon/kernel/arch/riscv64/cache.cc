@@ -34,6 +34,9 @@ void arch_sync_cache_range(vaddr_t start, size_t len) {
 
   // Send the shootdown to the rest of the cores.
   const cpu_mask_t cpu_mask = mask_all_but_one(arch_curr_cpu_num());
+  // TODO(maniscalco): Use an mp_sync_task instead of an SBI remote call to ensure that we properly
+  // handle the case where one or more CPUs in the mask has transitioned to offline.  See also
+  // fxbug.dev/135398.
   sbi_remote_fencei(cpu_mask);
 }
 
