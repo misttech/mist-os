@@ -248,7 +248,7 @@ where
             route_directory(use_directory_decl, target, mapper).await
         }
         RouteRequest::UseEventStream(use_event_stream_decl) => {
-            route_event_stream(use_event_stream_decl, target, mapper, &mut vec![]).await
+            route_event_stream(use_event_stream_decl, target, mapper).await
         }
         RouteRequest::UseProtocol(use_protocol_decl) => {
             route_protocol(use_protocol_decl, target, mapper).await
@@ -1108,7 +1108,6 @@ pub async fn route_event_stream<C, M>(
     use_decl: UseEventStreamDecl,
     target: &Arc<C>,
     mapper: &mut M,
-    route: &mut Vec<RouteInfo<C, OfferEventStreamDecl, ()>>,
 ) -> Result<RouteSource<C>, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
@@ -1122,7 +1121,7 @@ where
         allowed_sources,
         &mut availability_visitor,
         mapper,
-        route,
+        &mut vec![],
     )
     .await?;
     target.policy_checker().can_route_capability(&source, target.moniker())?;

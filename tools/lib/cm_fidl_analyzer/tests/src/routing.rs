@@ -226,11 +226,8 @@ impl RoutingTestForAnalyzer {
         target: &Arc<ComponentInstanceForAnalyzer>,
     ) {
         // Perform secondary routing to find scope
-        let (result, mut segments) = ComponentModelForAnalyzer::route_event_stream_sync(
-            use_decl.clone(),
-            &target,
-            &mut vec![],
-        );
+        let (result, mut segments) =
+            ComponentModelForAnalyzer::route_event_stream_sync(use_decl.clone(), &target);
         result.expect("Expected event_stream routing to succeed.");
 
         let mut route = use_decl

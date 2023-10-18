@@ -13,9 +13,8 @@ use {
     cm_config::RuntimeConfig,
     cm_rust::{
         CapabilityDecl, CapabilityTypeName, ComponentDecl, ExposeDecl, ExposeDeclCommon, OfferDecl,
-        OfferDeclCommon, OfferEventStreamDecl, OfferTarget, ProgramDecl, ResolverRegistration,
-        SourceName, UseDecl, UseDeclCommon, UseEventStreamDecl, UseRunnerDecl, UseSource,
-        UseStorageDecl,
+        OfferDeclCommon, OfferTarget, ProgramDecl, ResolverRegistration, SourceName, UseDecl,
+        UseDeclCommon, UseEventStreamDecl, UseRunnerDecl, UseSource, UseStorageDecl,
     },
     config_encoder::ConfigFields,
     fidl::prelude::*,
@@ -37,7 +36,7 @@ use {
         policy::GlobalPolicyChecker,
         route_capability, route_event_stream,
         router::RouteBundle,
-        RouteInfo, RouteRequest, RouteSource,
+        RouteRequest, RouteSource,
     },
     serde::{Deserialize, Serialize},
     std::{
@@ -1140,10 +1139,9 @@ impl ComponentModelForAnalyzer {
     pub fn route_event_stream_sync(
         request: UseEventStreamDecl,
         target: &Arc<ComponentInstanceForAnalyzer>,
-        map: &mut Vec<RouteInfo<ComponentInstanceForAnalyzer, OfferEventStreamDecl, ()>>,
     ) -> (Result<RouteSource<ComponentInstanceForAnalyzer>, RoutingError>, Vec<RouteSegment>) {
         let mut mapper = RouteMapper::new();
-        let result = route_event_stream(request, target, &mut mapper, map)
+        let result = route_event_stream(request, target, &mut mapper)
             .now_or_never()
             .expect("future was not ready immediately");
         (result, mapper.get_route())

@@ -20,11 +20,14 @@ use {
         },
     },
     ::routing::{
-        capability_source::InternalCapability, component_instance::ComponentInstanceInterface,
-        event::EventFilter, mapper::NoopRouteMapper, route_event_stream,
+        capability_source::InternalCapability,
+        component_instance::ComponentInstanceInterface,
+        event::EventFilter,
+        mapper::{RouteMapper, RouteSegment},
+        route_event_stream,
     },
     async_trait::async_trait,
-    cm_rust::{ChildRef, EventScope, UseDecl, UseEventStreamDecl},
+    cm_rust::{ChildRef, EventScope, OfferDecl, UseDecl, UseEventStreamDecl},
     cm_types::Name,
     flyweights::FlyStr,
     futures::lock::Mutex,
@@ -119,6 +122,19 @@ pub struct ComponentEventRoute {
     pub component: ChildRef,
     /// A list of scopes that this route applies to
     pub scope: Option<Vec<EventScope>>,
+}
+
+impl ComponentEventRoute {
+    fn from_moniker(moniker: &Moniker, scope: Option<Vec<EventScope>>) -> ComponentEventRoute {
+        let component = match moniker.leaf() {
+            Some(leaf) => ChildRef {
+                name: FlyStr::new(leaf.name.to_string()),
+                collection: leaf.collection.clone(),
+            },
+            None => ChildRef { name: FlyStr::new("<root>"), collection: None },
+        };
+        ComponentEventRoute { component, scope }
+    }
 }
 
 impl EventRegistry {
@@ -328,18 +344,12 @@ impl EventRegistry {
         event_decl: UseEventStreamDecl,
         component: &Arc<ComponentInstance>,
     ) -> Result<(Name, ExtendedMoniker, Vec<ComponentEventRoute>), ModelError> {
-        let mut components = vec![];
         let mut route = vec![];
-        let route_source = route_event_stream(
-            event_decl.clone(),
-            component,
-            &mut NoopRouteMapper,
-            &mut components,
-        )
-        .await?;
+        let mut mapper = RouteMapper::new();
+        let route_source = route_event_stream(event_decl.clone(), component, &mut mapper).await?;
         // Handle scope in "use" clause
 
-        let mut search_name: Name = event_decl.source_name;
+        let _search_name: Name = event_decl.source_name;
         if let Some(moniker) = component.child_moniker() {
             route.push(ComponentEventRoute {
                 component: ChildRef {
@@ -349,25 +359,17 @@ impl EventRegistry {
                 scope: event_decl.scope,
             });
         }
-        for component in components {
-            let mut component_route = ComponentEventRoute {
-                component: if let Some(moniker) = component.component.child_moniker() {
-                    ChildRef {
-                        name: FlyStr::new(moniker.name.to_string()),
-                        collection: moniker.collection.clone(),
-                    }
-                } else {
-                    ChildRef { name: FlyStr::new("<root>"), collection: None }
-                },
-                scope: None,
+        // Add the OfferEventStreamDecls that we found during the route.
+        for segment in mapper.get_route() {
+            let (moniker, offer) = match segment {
+                RouteSegment::OfferBy { moniker, capability } => (moniker, capability),
+                _ => continue,
             };
-            if let Some(stream) = component.offer {
-                if stream.target_name == search_name {
-                    search_name = stream.source_name;
-                    component_route.scope = stream.scope;
-                }
-            }
-            route.push(component_route);
+            let offer = match offer {
+                OfferDecl::EventStream(o) => o,
+                _ => continue,
+            };
+            route.push(ComponentEventRoute::from_moniker(&moniker, offer.scope));
         }
         match route_source {
             RouteSource {
