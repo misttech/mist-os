@@ -33,7 +33,7 @@ use {
         },
         error::RoutingError,
         mapper::DebugRouteMapper,
-        RegistrationDecl, RouteInfo,
+        RegistrationDecl,
     },
     cm_rust::{
         Availability, CapabilityDecl, CapabilityDeclCommon, ExposeDecl, ExposeDeclCommon,
@@ -61,7 +61,6 @@ pub async fn route_from_use<U, O, E, C, S, V, M>(
     sources: S,
     visitor: &mut V,
     mapper: &mut M,
-    route: &mut Vec<RouteInfo<C, O, E>>,
 ) -> Result<CapabilitySource<C>, RoutingError>
 where
     U: UseDeclCommon
@@ -94,7 +93,7 @@ where
     match Use::route(use_decl, use_target.clone(), &sources, visitor, mapper).await? {
         UseResult::Source(source) => return Ok(source),
         UseResult::OfferFromParent(offer, component) => {
-            route_from_offer(offer, component, sources, visitor, mapper, route).await
+            route_from_offer(offer, component, sources, visitor, mapper).await
         }
         UseResult::ExposeFromChild(use_decl, child_component) => {
             let child_exposes = child_component.lock_resolved_state().await?.exposes();
@@ -108,7 +107,7 @@ where
                         use_decl.source_name().clone(),
                     )
                 })?;
-            route_from_expose(child_exposes, child_component, sources, visitor, mapper, route).await
+            route_from_expose(child_exposes, child_component, sources, visitor, mapper).await
         }
     }
 }
@@ -125,7 +124,6 @@ pub async fn route_from_registration<R, O, E, C, S, V, M>(
     sources: S,
     visitor: &mut V,
     mapper: &mut M,
-    route: &mut Vec<RouteInfo<C, O, E>>,
 ) -> Result<CapabilitySource<C>, RoutingError>
 where
     R: RegistrationDeclCommon
@@ -160,10 +158,10 @@ where
     {
         RegistrationResult::Source(source) => return Ok(source),
         RegistrationResult::FromParent(offer, component) => {
-            route_from_offer(offer, component, sources, visitor, mapper, route).await
+            route_from_offer(offer, component, sources, visitor, mapper).await
         }
         RegistrationResult::FromChild(expose, component) => {
-            route_from_expose(expose, component, sources, visitor, mapper, route).await
+            route_from_expose(expose, component, sources, visitor, mapper).await
         }
     }
 }
@@ -180,7 +178,6 @@ pub async fn route_from_offer<O, E, C, S, V, M>(
     sources: S,
     visitor: &mut V,
     mapper: &mut M,
-    route: &mut Vec<RouteInfo<C, O, E>>,
 ) -> Result<CapabilitySource<C>, RoutingError>
 where
     O: OfferDeclCommon
@@ -204,7 +201,7 @@ where
     V: Clone + Send + Sync + 'static,
     M: DebugRouteMapper + 'static,
 {
-    match Offer::route(offer, offer_target, &sources, visitor, mapper, route).await? {
+    match Offer::route(offer, offer_target, &sources, visitor, mapper).await? {
         OfferResult::Source(source) => return Ok(source),
         OfferResult::OfferFromChild(offer, component) => {
             let offer_decl: OfferDecl = offer.clone().into();
@@ -212,7 +209,7 @@ where
             let (exposes, component) = change_directions::<C, O, E>(offer, component).await?;
 
             let capability_source =
-                route_from_expose(exposes, component, sources, visitor, mapper, route).await?;
+                route_from_expose(exposes, component, sources, visitor, mapper).await?;
             if let OfferDecl::Service(offer_service_decl) = offer_decl {
                 if offer_service_decl.source_instance_filter.is_some()
                     || offer_service_decl.renamed_instances.is_some()
@@ -339,13 +336,12 @@ where
 /// `sources` defines what are the valid sources of the capability. See [`AllowedSourcesBuilder`].
 /// `visitor` is invoked for each `Expose` declaration in the routing path, as well as the final
 /// `Capability` declaration if `sources` permits.
-pub async fn route_from_expose<E, C, S, V, M, O>(
+pub async fn route_from_expose<E, C, S, V, M>(
     expose: RouteBundle<E>,
     expose_target: Arc<C>,
     sources: S,
     visitor: &mut V,
     mapper: &mut M,
-    route: &mut Vec<RouteInfo<C, O, E>>,
 ) -> Result<CapabilitySource<C>, RoutingError>
 where
     E: ExposeDeclCommon
@@ -361,7 +357,7 @@ where
     V: Clone + Send + Sync + 'static,
     M: DebugRouteMapper + 'static,
 {
-    match Expose::route(expose, expose_target, &sources, visitor, mapper, route).await? {
+    match Expose::route(expose, expose_target, &sources, visitor, mapper).await? {
         ExposeResult::Source(source) => Ok(source),
         ExposeResult::ExposeFromAnonymizedAggregate(expose, aggregation_component) => {
             let mut collections = vec![];
@@ -449,7 +445,6 @@ pub async fn route_from_use_without_expose<U, O, C, S, V, M>(
     sources: S,
     visitor: &mut V,
     mapper: &mut M,
-    route: &mut Vec<RouteInfo<C, O, ()>>,
 ) -> Result<CapabilitySource<C>, RoutingError>
 where
     U: UseDeclCommon + ErrorNotFoundFromParent + Into<UseDecl> + Clone,
@@ -463,7 +458,7 @@ where
     match Use::route(use_decl, use_target, &sources, visitor, mapper).await? {
         UseResult::Source(source) => return Ok(source),
         UseResult::OfferFromParent(offer, component) => {
-            route_from_offer_without_expose(offer, component, sources, visitor, mapper, route).await
+            route_from_offer_without_expose(offer, component, sources, visitor, mapper).await
         }
         UseResult::ExposeFromChild(_, _) => {
             unreachable!("found use from child but capability cannot be exposed")
@@ -485,7 +480,6 @@ pub async fn route_from_offer_without_expose<O, C, S, V, M>(
     sources: S,
     visitor: &mut V,
     mapper: &mut M,
-    route: &mut Vec<RouteInfo<C, O, ()>>,
 ) -> Result<CapabilitySource<C>, RoutingError>
 where
     O: OfferDeclCommon + ErrorNotFoundFromParent + FromEnum<OfferDecl> + Into<OfferDecl> + Clone,
@@ -495,7 +489,7 @@ where
     V: CapabilityVisitor<CapabilityDecl = S::CapabilityDecl>,
     M: DebugRouteMapper,
 {
-    match Offer::route(offer, offer_target, &sources, visitor, mapper, route).await? {
+    match Offer::route(offer, offer_target, &sources, visitor, mapper).await? {
         OfferResult::Source(source) => Ok(source),
         OfferResult::OfferFromChild(_, _) => {
             // This condition should not happen since cm_fidl_validator ensures
@@ -1091,13 +1085,12 @@ where
 {
     /// Routes the capability starting from the `offer` declaration at `target` to either a valid
     /// source (as defined by `sources`) or the declaration that ends this phase of routing.
-    async fn route<C, S, V, M, E>(
+    async fn route<C, S, V, M>(
         mut offer_bundle: RouteBundle<O>,
         mut target: Arc<C>,
         sources: &S,
         visitor: &mut V,
         mapper: &mut M,
-        route: &mut Vec<RouteInfo<C, O, E>>,
     ) -> Result<OfferResult<C, O>, RoutingError>
     where
         C: ComponentInstanceInterface + 'static,
@@ -1121,11 +1114,6 @@ where
             if let Some(visit_offer) = visit_offer {
                 mapper.add_offer(target.moniker().clone(), visit_offer.clone().into());
                 OfferVisitor::visit(visitor, &visit_offer)?;
-                route.push(RouteInfo {
-                    component: target.clone(),
-                    offer: Some(visit_offer.clone()),
-                    expose: None,
-                });
             }
 
             fn is_filtered_offer<O>(o: &O) -> bool
@@ -1520,13 +1508,12 @@ where
 {
     /// Routes the capability starting from the `expose` declaration at `target` to a valid source
     /// (as defined by `sources`).
-    async fn route<C, S, V, M, O>(
+    async fn route<C, S, V, M>(
         mut expose_bundle: RouteBundle<E>,
         mut target: Arc<C>,
         sources: &S,
         visitor: &mut V,
         mapper: &mut M,
-        route: &mut Vec<RouteInfo<C, O, E>>,
     ) -> Result<ExposeResult<C, E>, RoutingError>
     where
         C: ComponentInstanceInterface,
@@ -1550,11 +1537,6 @@ where
             if let Some(visit_expose) = visit_expose {
                 mapper.add_expose(target.moniker().clone(), visit_expose.clone().into());
                 ExposeVisitor::visit(visitor, &visit_expose)?;
-                route.push(RouteInfo {
-                    component: target.clone(),
-                    expose: Some(visit_expose.clone()),
-                    offer: None,
-                });
             }
 
             match expose_bundle {

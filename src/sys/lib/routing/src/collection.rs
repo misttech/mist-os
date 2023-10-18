@@ -17,7 +17,6 @@ use {
             self, CapabilityVisitor, ErrorNotFoundFromParent, ErrorNotFoundInChild, ExposeVisitor,
             OfferVisitor, RouteBundle, Sources,
         },
-        Never, RouteInfo,
     },
     async_trait::async_trait,
     cm_rust::{
@@ -149,7 +148,6 @@ where
             self.sources.clone(),
             &mut self.visitor.clone(),
             &mut self.mapper.clone(),
-            &mut vec![] as &mut Vec<RouteInfo<_, Never, _>>,
         )
         .await
     }
@@ -367,7 +365,6 @@ where
                     self.sources.clone(),
                     &mut self.visitor.clone(),
                     &mut self.mapper.clone(),
-                    &mut vec![],
                 )
                 .await?;
                 Ok(FilteredAggregateCapabilityRouteData { capability_source, instance_filter })

@@ -290,19 +290,6 @@ where
 
 pub enum Never {}
 
-/// Route information regarding an offer/expose or collection hop
-/// in the component topology.
-pub struct RouteInfo<C, O, E> {
-    /// The component this route info refers to.
-    pub component: Arc<C>,
-
-    /// The offer decl in the route.
-    pub offer: Option<O>,
-
-    /// The expose decl in the route.
-    pub expose: Option<E>,
-}
-
 /// Routes a Protocol capability from `target` to its source, starting from `offer_decl`.
 async fn route_protocol_from_offer<C, M>(
     offer_decl: OfferProtocolDecl,
@@ -326,7 +313,6 @@ where
         allowed_sources,
         &mut availability_visitor,
         mapper,
-        &mut vec![],
     )
     .await?;
     Ok(RouteSource::new(source))
@@ -359,7 +345,6 @@ where
         allowed_sources,
         &mut state,
         mapper,
-        &mut vec![],
     )
     .await?;
     Ok(RouteSource::new_with_relative_path(source, state.subdir))
@@ -386,7 +371,6 @@ where
         allowed_sources,
         &mut availability_visitor,
         mapper,
-        &mut vec![],
     )
     .await?;
     Ok(RouteSource::new(source))
@@ -411,7 +395,6 @@ where
         allowed_sources,
         &mut availability_visitor,
         mapper,
-        &mut vec![],
     )
     .await?;
     Ok(RouteSource::new(source))
@@ -434,7 +417,6 @@ where
         allowed_sources,
         &mut availability_visitor,
         mapper,
-        &mut vec![],
     )
     .await?;
     Ok(RouteSource::new(source))
@@ -456,7 +438,6 @@ where
         allowed_sources,
         &mut RunnerVisitor,
         mapper,
-        &mut vec![],
     )
     .await?;
     Ok(RouteSource::new(source))
@@ -478,7 +459,6 @@ where
         allowed_sources,
         &mut ResolverVisitor,
         mapper,
-        &mut vec![],
     )
     .await?;
     Ok(RouteSource::new(source))
@@ -550,7 +530,6 @@ where
                 allowed_sources,
                 &mut availability_visitor,
                 mapper,
-                &mut vec![],
             )
             .await
             .map_err(|err| {
@@ -588,7 +567,6 @@ where
                 allowed_sources,
                 &mut availability_visitor,
                 mapper,
-                &mut vec![],
             )
             .await?;
 
@@ -622,7 +600,6 @@ where
         allowed_sources,
         &mut availability_visitor,
         mapper,
-        &mut vec![] as &mut Vec<RouteInfo<_, Never, _>>,
     )
     .await?;
 
@@ -662,7 +639,6 @@ where
                 allowed_sources,
                 &mut availability_visitor,
                 mapper,
-                &mut vec![],
             )
             .await?;
 
@@ -690,7 +666,6 @@ where
         allowed_sources,
         &mut availability_visitor,
         mapper,
-        &mut vec![] as &mut Vec<RouteInfo<_, Never, _>>,
     )
     .await?;
 
@@ -827,7 +802,6 @@ where
                 allowed_sources,
                 &mut state,
                 mapper,
-                &mut vec![],
             )
             .await?;
 
@@ -864,7 +838,6 @@ where
         allowed_sources,
         &mut state,
         mapper,
-        &mut vec![] as &mut Vec<RouteInfo<_, Never, _>>,
     )
     .await?;
 
@@ -920,7 +893,6 @@ where
         allowed_sources,
         &mut availability_visitor,
         mapper,
-        &mut vec![],
     )
     .await?;
     Ok(source)
@@ -963,7 +935,6 @@ where
         allowed_sources,
         &mut state,
         mapper,
-        &mut vec![],
     )
     .await?;
 
@@ -999,7 +970,6 @@ where
                 allowed_sources,
                 &mut RunnerVisitor,
                 mapper,
-                &mut vec![],
             )
             .await
         }
@@ -1059,7 +1029,6 @@ where
                 allowed_sources,
                 &mut availability_visitor,
                 mapper,
-                &mut vec![],
             )
             .await?;
 
@@ -1092,7 +1061,6 @@ where
         allowed_sources,
         &mut ResolverVisitor,
         mapper,
-        &mut vec![],
     )
     .await?;
 
@@ -1121,7 +1089,6 @@ where
         allowed_sources,
         &mut availability_visitor,
         mapper,
-        &mut vec![],
     )
     .await?;
     target.policy_checker().can_route_capability(&source, target.moniker())?;
