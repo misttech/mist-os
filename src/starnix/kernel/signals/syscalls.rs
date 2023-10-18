@@ -328,12 +328,17 @@ pub fn sys_kill(
                 }
             };
 
-            let target = TempRef::into_static(
-                target_thread_group
-                    .read()
-                    .get_signal_target(&unchecked_signal)
-                    .ok_or_else(|| errno!(ESRCH))?,
-            );
+            let target_thread_group_lock = target_thread_group.read();
+            let target = match target_thread_group_lock.get_signal_target(&unchecked_signal) {
+                Some(task) => task,
+
+                // The task is a zombine by now, so the signal can be dropped.
+                None => return Ok(()),
+            };
+
+            let target = TempRef::into_static(target);
+            std::mem::drop(target_thread_group_lock);
+
             if !current_task.can_signal(&target, &unchecked_signal) {
                 return error!(EPERM);
             }
@@ -659,7 +664,7 @@ fn wait_on_pid(
             // with respect to changes to the task's waitable state; otherwise,
             // we see missing notifications. We do that by holding the task lock.
             // This next line checks for waitable traces without holding the
-            // task lock, because constructing ZombieProcess objects requires
+            // task lock, because constructing WaitResult objects requires
             // holding all sorts of locks that are incompatible with holding the
             // task lock.  We therefore have to check to see if a tracee has
             // become waitable again, after we acquire the lock.

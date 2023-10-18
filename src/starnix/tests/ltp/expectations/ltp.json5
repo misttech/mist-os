@@ -309,9 +309,6 @@
                 "rename14",
                 "select03",
 
-                // Flaky test, see fxbug.dev/134633
-                "sigwait01",
-
                 // Causes an OOM when /dev/loop-control is available.
                 "fallocate05",
 
