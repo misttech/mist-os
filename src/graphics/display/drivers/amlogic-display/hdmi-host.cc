@@ -15,55 +15,46 @@
 #include "src/graphics/display/drivers/amlogic-display/hhi-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/power-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/vpu-regs.h"
+#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 
 namespace amlogic_display {
 
 namespace {
 
 fuchsia_hardware_hdmi::wire::DisplayMode ToHdmiFidlDisplayMode(
-    fidl::AnyArena& allocator, const display_mode_t& banjo_display_mode,
+    fidl::AnyArena& allocator, const display::DisplayTiming& display_timing_params,
     const fuchsia_hardware_hdmi::wire::ColorParam& color) {
-  fuchsia_hardware_hdmi::wire::StandardDisplayMode mode{
-      .pixel_clock_khz = banjo_display_mode.pixel_clock_khz,
-      .h_addressable = banjo_display_mode.h_addressable,
-      .h_front_porch = banjo_display_mode.h_front_porch,
-      .h_sync_pulse = banjo_display_mode.h_sync_pulse,
-      .h_blanking = banjo_display_mode.h_blanking,
-      .v_addressable = banjo_display_mode.v_addressable,
-      .v_front_porch = banjo_display_mode.v_front_porch,
-      .v_sync_pulse = banjo_display_mode.v_sync_pulse,
-      .v_blanking = banjo_display_mode.v_blanking,
-      .flags = banjo_display_mode.flags,
-  };
+  fuchsia_hardware_hdmi::wire::StandardDisplayMode mode =
+      display::ToHdmiFidlStandardDisplayMode(display_timing_params);
   return fuchsia_hardware_hdmi::wire::DisplayMode::Builder(allocator)
       .mode(mode)
       .color(color)
       .Build();
 }
 
-// `mode` must be a mode supported by `HdmiHost`.
-cea_timing CalculateDisplayTimings(const display_mode_t& mode) {
+// `timing` must be a timing supported by `HdmiHost`.
+cea_timing CalculateDisplayTimings(const display::DisplayTiming& timing) {
   cea_timing timings;
 
-  timings.interlace_mode = mode.flags & MODE_FLAG_INTERLACED;
-  timings.pfreq_khz = mode.pixel_clock_khz;
+  timings.interlace_mode = timing.fields_per_frame == display::FieldsPerFrame::kInterlaced;
+  timings.pfreq_khz = timing.pixel_clock_frequency_khz;
   // TODO: pixel repetition is 0 for most progressive. We don't support interlaced
   timings.pixel_repeat = false;
-  timings.hactive = static_cast<int>(mode.h_addressable);
-  timings.hblank = static_cast<int>(mode.h_blanking);
-  timings.hfront = static_cast<int>(mode.h_front_porch);
-  timings.hsync = static_cast<int>(mode.h_sync_pulse);
-  timings.htotal = (timings.hactive) + (timings.hblank);
-  timings.hback = (timings.hblank) - (timings.hfront + timings.hsync);
-  timings.hpol = mode.flags & MODE_FLAG_HSYNC_POSITIVE;
+  timings.hactive = timing.horizontal_active_px;
+  timings.hblank = timing.horizontal_blank_px();
+  timings.hfront = timing.horizontal_front_porch_px;
+  timings.hsync = timing.horizontal_sync_width_px;
+  timings.htotal = timing.horizontal_total_px();
+  timings.hback = timing.horizontal_back_porch_px;
+  timings.hpol = timing.hsync_polarity == display::SyncPolarity::kPositive;
 
-  timings.vactive = static_cast<int>(mode.v_addressable);
-  timings.vblank0 = static_cast<int>(mode.v_blanking);
-  timings.vfront = static_cast<int>(mode.v_front_porch);
-  timings.vsync = static_cast<int>(mode.v_sync_pulse);
-  timings.vtotal = (timings.vactive) + (timings.vblank0);
-  timings.vback = (timings.vblank0) - (timings.vfront + timings.vsync);
-  timings.vpol = mode.flags & MODE_FLAG_VSYNC_POSITIVE;
+  timings.vactive = timing.vertical_active_lines;
+  timings.vblank0 = timing.vertical_blank_lines();
+  timings.vfront = timing.vertical_front_porch_lines;
+  timings.vsync = timing.vertical_sync_width_lines;
+  timings.vtotal = timing.vertical_total_lines();
+  timings.vback = timing.vertical_back_porch_lines;
+  timings.vpol = timing.vsync_polarity == display::SyncPolarity::kPositive;
 
   // FIXE: VENC Repeat is undocumented. It seems to be only needed for the following
   // resolutions: 1280x720p60, 1280x720p50, 720x480p60, 720x480i60, 720x576p50, 720x576i50
@@ -73,8 +64,8 @@ cea_timing CalculateDisplayTimings(const display_mode_t& mode) {
   return timings;
 }
 
-// `mode` must be a mode supported by `HdmiHost`.
-pll_param CalculateClockParameters(const display_mode_t& mode) {
+// `timing` must be a timing supported by `HdmiHost`.
+pll_param CalculateClockParameters(const display::DisplayTiming& timing) {
   pll_param params;
 
   // TODO: We probably need a more sophisticated method for calculating
@@ -89,7 +80,7 @@ pll_param CalculateClockParameters(const display_mode_t& mode) {
   params.od2 = 1;
   params.od3 = 1;
 
-  params.hpll_clk_out = (mode.pixel_clock_khz * 10);
+  params.hpll_clk_out = (timing.pixel_clock_frequency_khz * 10);
   while (params.hpll_clk_out < 2900000) {
     if (params.od1 < 4) {
       params.od1 *= 2;
@@ -103,15 +94,15 @@ pll_param CalculateClockParameters(const display_mode_t& mode) {
     } else {
       ZX_DEBUG_ASSERT_MSG(false,
                           "Failed to set HDMI PLL to a valid VCO frequency range for pixel clock "
-                          "%d kHz. This should never happen since IsDisplayModeSupported() "
+                          "%d kHz. This should never happen since IsDisplayTimingSupported() "
                           "returned true.",
-                          mode.pixel_clock_khz);
+                          timing.pixel_clock_frequency_khz);
     }
   }
   ZX_DEBUG_ASSERT_MSG(params.hpll_clk_out <= 6000000,
                       "Calculated HDMI PLL VCO frequency (%" PRIu32
                       " kHz) exceeds the VCO frequency limit 6GHz. This should never happen since "
-                      "IsDisplayModeSupported() returned true.",
+                      "IsDisplayTimingSupported() returned true.",
                       params.hpll_clk_out);
   return params;
 }
@@ -199,17 +190,20 @@ void HdmiHost::HostOff() {
   }
 }
 
-zx_status_t HdmiHost::ModeSet(const display_mode_t& mode) {
-  if (!IsDisplayModeSupported(mode)) {
+zx_status_t HdmiHost::ModeSet(const display::DisplayTiming& timing) {
+  if (!IsDisplayTimingSupported(timing)) {
     zxlogf(ERROR,
-           "Display mode (%" PRIu32 " x %" PRIu32 " @ pixel rate %" PRIu32
+           "Display timing (%" PRIu32 " x %" PRIu32 " @ pixel rate %" PRIu32
            " kHz) is not supported.",
-           mode.h_addressable, mode.v_addressable, mode.pixel_clock_khz);
+           timing.horizontal_active_px, timing.vertical_active_lines,
+           timing.pixel_clock_frequency_khz);
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  cea_timing timings = CalculateDisplayTimings(mode);
-  pll_param clock_params = CalculateClockParameters(mode);
+  // TODO(fxbug.dev/135377): Do not use cea_timing; use display::DisplayTiming
+  // directly instead.
+  cea_timing encoder_timing = CalculateDisplayTimings(timing);
+  pll_param clock_params = CalculateClockParameters(timing);
   ConfigurePll(clock_params);
 
   WRITE32_REG(VPU, VPU_ENCP_VIDEO_EN, 0);
@@ -233,15 +227,16 @@ zx_status_t HdmiHost::ModeSet(const display_mode_t& mode) {
   WRITE32_REG(VPU, VPU_ENCP_VIDEO_EN, 1);
 
   WRITE32_REG(VPU, VPU_ENCP_VIDEO_MAX_PXCNT,
-              (timings.venc_pixel_repeat) ? ((timings.htotal << 1) - 1) : (timings.htotal - 1));
-  WRITE32_REG(VPU, VPU_ENCP_VIDEO_MAX_LNCNT, timings.vtotal - 1);
+              (encoder_timing.venc_pixel_repeat) ? ((encoder_timing.htotal << 1) - 1)
+                                                 : (encoder_timing.htotal - 1));
+  WRITE32_REG(VPU, VPU_ENCP_VIDEO_MAX_LNCNT, encoder_timing.vtotal - 1);
 
-  if (timings.venc_pixel_repeat) {
+  if (encoder_timing.venc_pixel_repeat) {
     SET_BIT32(VPU, VPU_ENCP_VIDEO_MODE_ADV, 1, 0, 1);
   }
 
   // Configure Encoder with detailed timing info (based on resolution)
-  ConfigEncoder(timings);
+  ConfigEncoder(encoder_timing);
 
   // Configure VDAC
   WRITE32_REG(HHI, HHI_VDAC_CNTL0_G12A, 0);
@@ -249,7 +244,7 @@ zx_status_t HdmiHost::ModeSet(const display_mode_t& mode) {
 
   fidl::Arena<2048> allocator;
   fuchsia_hardware_hdmi::wire::DisplayMode hdmi_fidl_mode =
-      ToHdmiFidlDisplayMode(allocator, mode, color_);
+      ToHdmiFidlDisplayMode(allocator, timing, color_);
   auto res = hdmi_->ModeSet(1, hdmi_fidl_mode);  // only supports 1 display for now
   if ((res.status() != ZX_OK) || res->is_error()) {
     zxlogf(ERROR, "Unable to initialize interface");
@@ -398,22 +393,34 @@ bool IsPixelClockSupported(int pixel_clock_khz) {
 
 }  // namespace
 
-bool HdmiHost::IsDisplayModeSupported(const display_mode_t& mode) const {
+bool HdmiHost::IsDisplayTimingSupported(const display::DisplayTiming& timing) const {
   // TODO(fxbug.dev/124984): High-resolution display modes (4K or more) are not
   // supported.
-  const int kMaximumAllowedWidth = 2560;
-  const int kMaximumAllowedHeight = 1600;
+  const int kMaximumAllowedWidthPixels = 2560;
+  const int kMaximumAllowedHeightPixels = 1600;
 
-  if (mode.h_addressable > kMaximumAllowedWidth || mode.v_addressable > kMaximumAllowedHeight) {
+  if (timing.horizontal_active_px > kMaximumAllowedWidthPixels ||
+      timing.vertical_active_lines > kMaximumAllowedHeightPixels) {
     return false;
   }
 
   // TODO(fxbug.dev/133248): Interlaced modes are not supported.
-  if (mode.flags & MODE_FLAG_INTERLACED) {
+  if (timing.fields_per_frame == display::FieldsPerFrame::kInterlaced) {
     return false;
   }
 
-  if (!IsPixelClockSupported(mode.pixel_clock_khz)) {
+  // TODO(fxbug.dev/133248): Interlaced modes with alternating vblanks are not
+  // supported.
+  if (timing.vblank_alternates) {
+    return false;
+  }
+
+  // TODO(fxbug.dev/134708): Modes with pixel repetition are not supported.
+  if (timing.pixel_repetition != 0) {
+    return false;
+  }
+
+  if (!IsPixelClockSupported(timing.pixel_clock_frequency_khz)) {
     return false;
   }
 

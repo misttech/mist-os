@@ -12,6 +12,7 @@
 #include <lib/mmio/mmio.h>
 
 #include "src/graphics/display/drivers/amlogic-display/common.h"
+#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 
 namespace amlogic_display {
 
@@ -94,11 +95,11 @@ class HdmiHost {
   zx_status_t HostOn();
   void HostOff();
 
-  // Configures the HDMI clock, encoder and physical layer to given `mode`.
+  // Configures the HDMI clock, encoder and physical layer to given `timing`.
   //
   // Returns ZX_OK and configures the video output module iff the display
-  // timing and clock of `mode` is supported.
-  zx_status_t ModeSet(const display_mode_t& mode);
+  // timing and clock of `timing` is supported.
+  zx_status_t ModeSet(const display::DisplayTiming& timing);
 
   zx_status_t EdidTransfer(const i2c_impl_op_t* op_list, size_t op_count);
 
@@ -106,9 +107,9 @@ class HdmiHost {
     color_.output_color_format = output_color_format;
   }
 
-  // Returns true iff a display mode (timing) is supported by the display
-  // engine driver and can be used in a display configuration.
-  bool IsDisplayModeSupported(const display_mode_t& mode) const;
+  // Returns true iff a display timing is supported by the display engine driver
+  // and can be used in a display configuration.
+  bool IsDisplayTimingSupported(const display::DisplayTiming& timing) const;
 
  private:
   void ConfigurePll(const pll_param& pll_params);

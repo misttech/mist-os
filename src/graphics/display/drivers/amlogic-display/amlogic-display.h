@@ -38,6 +38,7 @@
 #include "src/graphics/display/drivers/amlogic-display/osd.h"
 #include "src/graphics/display/drivers/amlogic-display/vout.h"
 #include "src/graphics/display/drivers/amlogic-display/vpu.h"
+#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 
 namespace amlogic_display {
@@ -255,9 +256,9 @@ class AmlogicDisplay
   // `vout_` must be initialized.
   bool IgnoreDisplayMode() const;
 
-  // Whether `mode` is a new display mode different from the mode currently
-  // applied to the display.
-  bool IsNewDisplayMode(const display_mode_t& mode);
+  // Whether `timing` is a new display timing different from the timing
+  // currently applied to the display.
+  bool IsNewDisplayTiming(const display::DisplayTiming& timing) TA_REQ(display_mutex_);
 
   // Zircon handles
   zx::bti bti_;
@@ -322,7 +323,7 @@ class AmlogicDisplay
   //
   // Default-constructed if no configuration is applied to the display yet or
   // DisplayMode is ignored.
-  display_mode_t current_display_mode_ TA_GUARDED(display_mutex_) = {};
+  display::DisplayTiming current_display_timing_ TA_GUARDED(display_mutex_) = {};
 
   // Hot Plug Detection
   fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> hpd_gpio_;
