@@ -1408,6 +1408,8 @@ pub(crate) struct IpCountersInner {
     pub(crate) dispatch_receive_ip_packet_other_host: Counter,
     /// Count of incoming IP packets received by the stack.
     pub(crate) receive_ip_packet: Counter,
+    /// Count of sent outgoing IP packets.
+    pub(crate) send_ip_packet: Counter,
     // Count of packets to be forwarded which are instead dropped because
     // routing is disabled.
     pub(crate) routing_disabled_per_device: Counter,

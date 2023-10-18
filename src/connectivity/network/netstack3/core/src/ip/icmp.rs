@@ -3953,6 +3953,7 @@ mod tests {
         context::testutil::{
             FakeCtxWithSyncCtx, FakeInstant, FakeNonSyncCtx, FakeSyncCtx, Wrapped,
         },
+        context::CounterContext2,
         device::{
             testutil::{set_forwarding_enabled, FakeDeviceId, FakeWeakDeviceId},
             DeviceId, FrameDestination,
@@ -3966,7 +3967,7 @@ mod tests {
             socket::testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx},
             socket::IpSockCreationError,
             testutil::DualStackSendIpPacketMeta,
-            ResolveRouteError, SendIpPacketMeta,
+            IpCounters, ResolveRouteError, SendIpPacketMeta,
         },
         testutil::{
             assert_empty, get_counter_val, handle_queued_rx_packets, Ctx, TestIpExt,
@@ -3989,6 +3990,26 @@ mod tests {
         DualStackSendIpPacketMeta<FakeDeviceId>,
         FakeDeviceId,
     >;
+
+    impl<I: Ip, D> CounterContext2<IpCounters<I>>
+        for FakeSyncCtx<FakeDualStackIpSocketCtx<D>, DualStackSendIpPacketMeta<D>, D>
+    {
+        fn with_counters<O, F: FnOnce(&IpCounters<I>) -> O>(&self, cb: F) -> O {
+            cb(self.get_ref().get_common_counters::<I>())
+        }
+    }
+
+    impl<Inner, I: Ip, D> CounterContext2<IpCounters<I>>
+        for Wrapped<
+            Inner,
+            FakeSyncCtx<FakeDualStackIpSocketCtx<D>, DualStackSendIpPacketMeta<D>, D>,
+        >
+    {
+        fn with_counters<O, F: FnOnce(&IpCounters<I>) -> O>(&self, cb: F) -> O {
+            cb(self.as_ref().get_ref().get_common_counters::<I>())
+        }
+    }
+
     /// `FakeSyncCtx` specialized for ICMP.
     type FakeIcmpSyncCtx<I> =
         Wrapped<SocketsState<I, FakeWeakDeviceId<FakeDeviceId>>, FakeIcmpInnerSyncCtx<I>>;
@@ -4249,7 +4270,21 @@ mod tests {
         }
 
         for counter in assert_counters {
-            assert!(get_counter_val(&non_sync_ctx, counter) > 0, "counter at zero: {}", counter);
+            // TODO(http://fxbug.dev/134635): Redesign iterating through
+            // assert_counters once CounterContext is removed.
+            match *counter {
+                "send_ipv4_packet" => assert!(
+                    sync_ctx.state.ipv4.inner.counters.send_ip_packet.get() > 0,
+                    "counter at zero: {}",
+                    counter
+                ),
+                "send_ipv6_packet" => assert!(
+                    sync_ctx.state.ipv6.inner.counters.send_ip_packet.get() > 0,
+                    "counter at zero: {}",
+                    counter
+                ),
+                c => assert!(get_counter_val(&non_sync_ctx, c) > 0, "counter at zero: {}", c),
+            }
         }
 
         if let Some((expect_message, expect_code)) = expect_message_code {

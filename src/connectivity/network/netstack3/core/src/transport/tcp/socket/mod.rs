@@ -3406,7 +3406,7 @@ mod tests {
                 InstantAndData, PendingFrameData, StepResult, WithFakeFrameContext,
                 WithFakeTimerContext, WrappedFakeSyncCtx,
             },
-            InstantContext as _, SendFrameContext,
+            CounterContext2, InstantContext as _, SendFrameContext,
         },
         device::{
             link::LinkDevice,
@@ -3429,8 +3429,8 @@ mod tests {
                 SendOptions,
             },
             types::ResolvedRoute,
-            BufferIpTransportContext as _, HopLimits, IpTransportContext, ResolveRouteError,
-            SendIpPacketMeta, TransportIpContext,
+            BufferIpTransportContext as _, HopLimits, IpCounters, IpTransportContext,
+            ResolveRouteError, SendIpPacketMeta, TransportIpContext,
         },
         sync::Mutex,
         testutil::ContextPair,
@@ -3632,6 +3632,14 @@ mod tests {
 
         fn default_buffer_sizes() -> BufferSizes {
             BufferSizes::default()
+        }
+    }
+
+    impl<I: TcpTestIpExt, D: FakeStrongDeviceId, C: TcpBindingsTypes> CounterContext2<IpCounters<I>>
+        for TcpSyncCtx<I, D, C>
+    {
+        fn with_counters<O, F: FnOnce(&IpCounters<I>) -> O>(&self, cb: F) -> O {
+            cb(&self.as_ref().state.counters)
         }
     }
 
