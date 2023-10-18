@@ -40,9 +40,15 @@ use std::{
 use timeout::timeout;
 use usb_bulk::AsyncInterface as Interface;
 
+mod identity;
+pub use self::identity::{Identity, IdentityCmp};
+
 const IDENTIFY_HOST_TIMEOUT_MILLIS: u64 = 10000;
 const DEFAULT_SSH_PORT: u16 = 22;
 const CONFIG_HOST_PIPE_SSH_TIMEOUT: &str = "daemon.host_pipe_ssh_timeout";
+
+pub(crate) type SharedIdentity = Rc<Identity>;
+pub(crate) type WeakIdentity = Weak<Identity>;
 
 #[derive(Debug, Clone, Hash)]
 pub enum TargetAddrType {
@@ -142,7 +148,8 @@ pub struct Target {
     // ids keeps track of additional ids discovered over Overnet, these could
     // come from old Daemons, or other Daemons. The set should be used
     ids: RefCell<HashSet<u64>>,
-    nodename: RefCell<Option<String>>,
+    // Shared identity across duplicated targets. Not all targets have an identity.
+    identity: Cell<Option<SharedIdentity>>,
     state: RefCell<TargetConnectionState>,
     // Discovered targets default to disabled and are marked as enabled during OpenTarget.
     // Manually added targets are always considered enabled.
@@ -160,8 +167,6 @@ pub struct Target {
     // ssh_port if set overrides the global default configuration for ssh port,
     // for this target.
     ssh_port: RefCell<Option<u16>>,
-    // used for Fastboot
-    pub(crate) serial: RefCell<Option<String>>,
     pub(crate) fastboot_interface: RefCell<Option<FastbootInterface>>,
     pub(crate) build_config: RefCell<Option<BuildConfig>>,
     boot_timestamp_nanos: RefCell<Option<u64>>,
@@ -178,18 +183,17 @@ pub struct Target {
 }
 
 impl Target {
-    pub fn new() -> Rc<Self> {
+    pub(crate) fn new_with_id(id: u64) -> Rc<Self> {
         let target_event_synthesizer = Rc::new(TargetEventSynthesizer::default());
         let events = events::Queue::new(&target_event_synthesizer);
 
-        let id = random::<u64>();
         let mut ids = HashSet::new();
         ids.insert(id);
 
         let target = Rc::new(Self {
             id,
             ids: RefCell::new(ids),
-            nodename: RefCell::new(None),
+            identity: None.into(),
             last_response: RefCell::new(Utc::now()),
             state: RefCell::new(Default::default()),
             enabled: Cell::new(false),
@@ -197,7 +201,6 @@ impl Target {
             keep_alive: Cell::new(Weak::new()),
             addrs: RefCell::new(BTreeSet::new()),
             ssh_port: RefCell::new(None),
-            serial: RefCell::new(None),
             boot_timestamp_nanos: RefCell::new(None),
             build_config: Default::default(),
             events,
@@ -213,12 +216,16 @@ impl Target {
         target
     }
 
+    pub fn new() -> Rc<Self> {
+        Self::new_with_id(random::<u64>())
+    }
+
     pub fn new_named<S>(nodename: S) -> Rc<Self>
     where
         S: Into<String>,
     {
         let target = Self::new();
-        target.nodename.replace(Some(nodename.into()));
+        target.replace_identity(Identity::from_name(nodename.into()));
         target
     }
 
@@ -236,7 +243,9 @@ impl Target {
         S: Into<String>,
     {
         let target = Self::new();
-        target.nodename.replace(nodename.map(Into::into));
+        if let Some(nodename) = nodename {
+            target.replace_identity(Identity::from_name(nodename));
+        }
         let now = Utc::now();
         target.addrs_extend(
             addrs.iter().map(|addr| TargetAddrEntry::new(*addr, now.clone(), TargetAddrType::Ssh)),
@@ -250,7 +259,9 @@ impl Target {
         I: Iterator<Item = TargetAddrEntry>,
     {
         let target = Self::new();
-        target.nodename.replace(nodename.map(Into::into));
+        if let Some(nodename) = nodename {
+            target.replace_identity(Identity::from_name(nodename));
+        }
         target.addrs.replace(BTreeSet::from_iter(entries));
         target
     }
@@ -265,8 +276,13 @@ impl Target {
         S: Into<String>,
     {
         let target = Self::new();
-        target.nodename.replace(nodename.map(Into::into));
-        target.serial.replace(serial);
+
+        let identity = Identity::try_from_name_serial(nodename, serial);
+
+        if let Some(identity) = identity {
+            target.replace_identity(identity);
+        }
+
         target.addrs.replace(
             addrs
                 .iter()
@@ -289,7 +305,9 @@ impl Target {
         S: Into<String>,
     {
         let target = Self::new();
-        target.nodename.replace(nodename.map(Into::into));
+        if let Some(nodename) = nodename {
+            target.replace_identity(Identity::from_name(nodename));
+        }
         target.addrs.replace(
             addrs
                 .iter()
@@ -304,7 +322,7 @@ impl Target {
     /// Assumes the Target is in Fastboot mode and connected via USB
     pub fn new_for_usb(serial: &str) -> Rc<Self> {
         let target = Self::new();
-        target.serial.replace(Some(serial.to_string()));
+        target.replace_identity(Identity::from_serial(serial));
         target.fastboot_interface.replace(Some(FastbootInterface::Usb));
         target.update_connection_state(|_| TargetConnectionState::Fastboot(Instant::now()));
         target
@@ -373,7 +391,7 @@ impl Target {
                 } else {
                     // We did not get any addresses that were fastboot addresses
                     // do we have a serial number? If so throw it as USB
-                    if self.serial.borrow().is_some() {
+                    if self.identity().as_deref().map(Identity::serial).flatten().is_some() {
                         Some(FastbootInterface::Usb)
                     } else {
                         None
@@ -428,6 +446,41 @@ impl Target {
         for id in new_ids {
             my_ids.insert(*id);
         }
+    }
+
+    pub(crate) fn replace_identity(&self, ident: Identity) {
+        self.identity.replace(Some(Rc::new(ident.into())));
+    }
+
+    pub(crate) fn take_identity(&self) -> Option<Identity> {
+        self.identity.take().map(|rc| Rc::try_unwrap(rc).unwrap_or_else(|rc| (*rc).clone()))
+    }
+
+    pub(crate) fn replace_shared_identity(&self, ident: SharedIdentity) {
+        self.identity.replace(Some(ident));
+    }
+
+    pub(crate) fn try_with_identity<F: FnOnce(&SharedIdentity) -> T, T>(&self, f: F) -> Option<T> {
+        let id = self.identity.take()?;
+        let res = f(&id);
+        self.identity.replace(Some(id));
+        Some(res)
+    }
+
+    pub fn has_identity(&self) -> bool {
+        self.try_with_identity(|_| ()).is_some()
+    }
+
+    pub fn identity(&self) -> Option<SharedIdentity> {
+        self.try_with_identity(Rc::clone)
+    }
+
+    pub fn identity_matches(&self, other: &Target) -> bool {
+        self.try_with_identity(|self_id| {
+            other.try_with_identity(|other_id| self_id.is_same(other_id))
+        })
+        .flatten()
+        .unwrap_or(false)
     }
 
     /// ssh_address returns the SocketAddr of the next SSH address to connect to for this target.
@@ -566,23 +619,11 @@ impl Target {
     }
 
     pub fn nodename(&self) -> Option<String> {
-        self.nodename.borrow().clone()
+        self.try_with_identity(|id| id.name().map(String::from)).flatten()
     }
 
     pub fn nodename_str(&self) -> String {
-        self.nodename.borrow().clone().unwrap_or("<unknown>".to_owned())
-    }
-
-    pub fn set_nodename(&self, nodename: String) {
-        if let Some(current_name) = self.nodename() {
-            if nodename != current_name {
-                tracing::debug!(
-                    "Changing target {} nodename from {current_name} to {nodename}",
-                    self.id()
-                );
-            }
-        }
-        self.nodename.borrow_mut().replace(nodename);
+        self.nodename().unwrap_or("<unknown>".to_owned())
     }
 
     pub fn boot_timestamp_nanos(&self) -> Option<u64> {
@@ -594,7 +635,7 @@ impl Target {
     }
 
     pub fn serial(&self) -> Option<String> {
-        self.serial.borrow().clone()
+        self.try_with_identity(|id| id.serial().map(String::from)).flatten()
     }
 
     pub fn get_compatibility_status(&self) -> Option<CompatibilityInfo> {
@@ -701,8 +742,9 @@ impl Target {
             // The following states are unconditional transitions, as they're states that are
             // difficult to otherwise interrogate, but also states that are known to invalidate all
             // other states.
-            TargetConnectionState::Fastboot(_) => {}
-            TargetConnectionState::Zedboot(_) => {}
+            TargetConnectionState::Fastboot(_) | TargetConnectionState::Zedboot(_) => {
+                self.update_last_response(Utc::now());
+            }
         }
 
         if former_state == new_state {
@@ -787,7 +829,8 @@ impl Target {
             return Err(anyhow!("Cannot open USB interface for disabled target"));
         }
 
-        match self.serial.borrow().as_ref() {
+        let id = self.identity();
+        match id.as_ref().and_then(|i| i.serial()) {
             Some(s) => Ok((
                 s.to_string(),
                 open_interface_with_serial(s).await.with_context(|| {
@@ -956,7 +999,12 @@ impl Target {
         };
 
         tracing::debug!("Got nodename {nodename}");
-        let target = Target::new_named(nodename);
+        let target = Target::new();
+
+        let identity =
+            Identity::try_from_name_serial(Some(nodename), identify.serial_number).unwrap();
+        target.replace_identity(identity);
+
         target.update_last_response(Utc::now().into());
         if let Some(ids) = identify.ids {
             target.merge_ids(ids.iter());
@@ -970,9 +1018,6 @@ impl Target {
                 None
             };
 
-        if let Some(serial) = identify.serial_number {
-            target.serial.borrow_mut().replace(serial);
-        }
         if let Some(t) = identify.boot_timestamp_nanos {
             target.boot_timestamp_nanos.borrow_mut().replace(t);
         }
@@ -1266,7 +1311,7 @@ impl Target {
     }
 
     pub fn is_waiting_for_rcs_identity(&self) -> bool {
-        self.is_manual() && self.is_host_pipe_running() && self.nodename.borrow().is_none()
+        self.is_manual() && self.is_host_pipe_running() && self.identity().is_none()
     }
 
     pub fn disconnect(&self) {
@@ -1340,14 +1385,13 @@ impl Debug for Target {
         f.debug_struct("Target")
             .field("id", &self.id)
             .field("ids", &self.ids.borrow().clone())
-            .field("nodename", &self.nodename.borrow().clone())
+            .field("identity", &self.identity())
             .field("enabled", &self.enabled.get())
             .field("transient", &self.transient.get())
             .field("state", &self.state.borrow().clone())
             .field("last_response", &self.last_response.borrow().clone())
             .field("addrs", &self.addrs.borrow().clone())
             .field("ssh_port", &self.ssh_port.borrow().clone())
-            .field("serial", &self.serial.borrow().clone())
             .field("boot_timestamp_nanos", &self.boot_timestamp_nanos.borrow().clone())
             .field("compatibility_status", &self.compatibility_status.borrow().clone())
             .finish()

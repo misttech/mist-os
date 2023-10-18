@@ -75,6 +75,7 @@ rustc_library("lib") {
     "src/overnet/host_pipe.rs",
     "src/overnet/mod.rs",
     "src/target.rs",
+    "src/target/identity.rs",
     "src/target_collection.rs",
     "src/zedboot.rs",
   ]
