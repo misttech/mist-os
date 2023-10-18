@@ -565,6 +565,117 @@ class TestMagmaSyncFile : public testing::Test {
     }
   }
 
+  // Tests import of a merged sync file into a (parent) magma semaphore.
+  void TestImportMergedMultiPoll(uint32_t count) {
+    struct SyncFile {
+      int fd = -1;
+      std::vector<magma_semaphore_t> child_semaphores;
+      magma_semaphore_t parent_semaphore = 0;
+
+      void release(magma_connection_t connection) {
+        close(fd);
+        magma_connection_release_semaphore(connection, parent_semaphore);
+        for (auto& semaphore : child_semaphores) {
+          magma_connection_release_semaphore(connection, semaphore);
+        }
+      }
+    };
+
+    std::vector<SyncFile> sync_files(count);
+
+    for (auto& sf : sync_files) {
+      sf.fd = CreateMergedSyncFile(TestMergeType::NONE_SIGNALED, &sf.child_semaphores);
+      ASSERT_TRUE(is_valid_handle(sf.fd));
+
+      int import_fd = dup(sf.fd);
+      ASSERT_TRUE(is_valid_handle(import_fd));
+
+      magma_semaphore_id_t semaphore_id = 0;
+      magma_handle_t handle = import_fd;
+      uint64_t flags = 0;
+      ASSERT_EQ(MAGMA_STATUS_OK,
+                magma_connection_import_semaphore2(connection(), handle, flags,
+                                                   &sf.parent_semaphore, &semaphore_id));
+    }
+
+    std::vector<struct pollfd> pfds;
+    std::vector<magma_poll_item_t> pitems;
+    std::vector<int> indices;
+
+    {
+      int index = 0;
+
+      for (auto& sf : sync_files) {
+        pfds.push_back(pollfd{
+            .fd = sf.fd,
+            .events = POLLIN,
+            .revents = 0,
+        });
+
+        pitems.push_back(magma_poll_item_t{
+            .semaphore = sf.parent_semaphore,
+            .type = MAGMA_POLL_TYPE_SEMAPHORE,
+            .condition = MAGMA_POLL_CONDITION_SIGNALED,
+            .result = 0,
+        });
+
+        indices.push_back(index);
+        index++;
+      }
+    }
+
+    std::shuffle(indices.begin(), indices.end(), std::default_random_engine());
+
+    {
+      int signaled_count = 0;
+
+      // Check the sync file status with poll
+      for (int index : indices) {
+        magma_semaphore_signal(sync_files[index].child_semaphores[0]);
+
+        ASSERT_EQ(signaled_count, poll(pfds.data(), pfds.size(), /*timeout=*/0));
+        ASSERT_EQ(pfds[index].revents, 0);
+
+        magma_semaphore_signal(sync_files[index].child_semaphores[1]);
+
+        signaled_count += 1;
+
+        ASSERT_EQ(signaled_count, poll(pfds.data(), pfds.size(), /*timeout=*/0));
+        ASSERT_EQ(pfds[index].revents, pfds[index].events);
+      }
+    }
+
+    // Reset the sync file semaphores
+    for (auto& sf : sync_files) {
+      magma_semaphore_reset(sf.parent_semaphore);
+    }
+
+    {
+      magma_status_t status = MAGMA_STATUS_TIMED_OUT;
+
+      // Check the parent semaphore status with magma_poll
+      for (int index : indices) {
+        magma_semaphore_signal(sync_files[index].child_semaphores[0]);
+
+        ASSERT_EQ(status, magma_poll(pitems.data(), count, /*timeout=*/0));
+        ASSERT_EQ(pitems[index].condition, MAGMA_POLL_CONDITION_SIGNALED);
+        ASSERT_EQ(pitems[index].result, 0u);
+
+        magma_semaphore_signal(sync_files[index].child_semaphores[1]);
+
+        status = MAGMA_STATUS_OK;
+
+        ASSERT_EQ(status, magma_poll(pitems.data(), count, /*timeout=*/0));
+        ASSERT_EQ(pitems[index].condition, MAGMA_POLL_CONDITION_SIGNALED);
+        ASSERT_EQ(pitems[index].result, MAGMA_POLL_CONDITION_SIGNALED);
+      }
+    }
+
+    for (auto& sf : sync_files) {
+      sf.release(connection());
+    }
+  }
+
  private:
   std::string device_name_;
   int fd_ = -1;
@@ -621,6 +732,11 @@ TEST_P(TestMagmaSyncFileWithCount, MultiEpollWait) {
 TEST_P(TestMagmaSyncFileWithCount, MultiMergedEpollCancel) {
   uint32_t count = GetParam();
   TestMultiMergedEpollCancel(count);
+}
+
+TEST_P(TestMagmaSyncFileWithCount, ImportMergedMultiPoll) {
+  uint32_t count = GetParam();
+  TestImportMergedMultiPoll(count);
 }
 
 INSTANTIATE_TEST_SUITE_P(TestMagmaSyncFileWithCount, TestMagmaSyncFileWithCount,

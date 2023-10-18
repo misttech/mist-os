@@ -351,7 +351,7 @@ pub struct StarnixPollItem {
     pub type_: u32,
     pub condition: u32,
     pub result: u32,
-    pub unused: [u8; 4usize],
+    pub unused: u32,
 }
 
 impl StarnixPollItem {
@@ -368,7 +368,7 @@ impl StarnixPollItem {
             type_: poll_item.type_,
             condition: poll_item.condition,
             result: poll_item.result,
-            unused: [0; 4],
+            unused: 0,
         }
     }
 
@@ -385,7 +385,7 @@ impl StarnixPollItem {
             type_: self.type_,
             condition: self.condition,
             result: self.result,
-            unused: 0,
+            unused: self.unused,
         }
     }
 }

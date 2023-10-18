@@ -652,13 +652,15 @@ class TestConnection {
         .condition = MAGMA_POLL_CONDITION_READABLE,
     });
 
-    constexpr int64_t kTimeoutNs = ms_to_ns(100);
+    constexpr int64_t kTimeoutMs = 100;
     auto start = std::chrono::steady_clock::now();
     EXPECT_EQ(MAGMA_STATUS_TIMED_OUT,
-              magma_poll(items.data(), to_uint32(items.size()), kTimeoutNs));
-    EXPECT_LE(kTimeoutNs, std::chrono::duration_cast<std::chrono::nanoseconds>(
-                              std::chrono::steady_clock::now() - start)
-                              .count());
+              magma_poll(items.data(), to_uint32(items.size()), ms_to_ns(kTimeoutMs)));
+    // TODO(fxbug.dev/49103) - remove this adjustment for magma_poll timeout truncation in ns to ms
+    // conversion
+    EXPECT_LE(kTimeoutMs - 1, std::chrono::duration_cast<std::chrono::milliseconds>(
+                                  std::chrono::steady_clock::now() - start)
+                                  .count());
 
     if (semaphore_count == 0)
       return;
@@ -673,10 +675,12 @@ class TestConnection {
 
     start = std::chrono::steady_clock::now();
     EXPECT_EQ(MAGMA_STATUS_TIMED_OUT,
-              magma_poll(items.data(), to_uint32(items.size()), kTimeoutNs));
-    EXPECT_LE(kTimeoutNs, std::chrono::duration_cast<std::chrono::nanoseconds>(
-                              std::chrono::steady_clock::now() - start)
-                              .count());
+              magma_poll(items.data(), to_uint32(items.size()), ms_to_ns(kTimeoutMs)));
+    // TODO(fxbug.dev/49103) - remove this adjustment for magma_poll timeout truncation in ns to ms
+    // conversion
+    EXPECT_LE(kTimeoutMs - 1, std::chrono::duration_cast<std::chrono::milliseconds>(
+                                  std::chrono::steady_clock::now() - start)
+                                  .count());
 
     for (uint32_t i = 0; i < semaphore_count; i++) {
       magma_semaphore_signal(items[i].semaphore);
@@ -833,11 +837,12 @@ class TestConnection {
 #endif
   }
 
-  void SemaphoreExport(magma_handle_t* handle_out, magma_semaphore_id_t* id_out) {
+  void SemaphoreExport(magma_handle_t* handle_out) {
     ASSERT_TRUE(connection_);
 
     magma_semaphore_t semaphore;
-    ASSERT_EQ(magma_connection_create_semaphore(connection_, &semaphore, id_out), MAGMA_STATUS_OK);
+    magma_semaphore_id_t id;
+    ASSERT_EQ(magma_connection_create_semaphore(connection_, &semaphore, &id), MAGMA_STATUS_OK);
     EXPECT_EQ(magma_semaphore_export(semaphore, handle_out), MAGMA_STATUS_OK);
 
     EXPECT_NO_FATAL_FAILURE(CheckNativeHandle(*handle_out, false));
@@ -849,8 +854,7 @@ class TestConnection {
     magma_connection_release_semaphore(connection_, semaphore);
   }
 
-  void SemaphoreImport2(magma_handle_t handle, magma_semaphore_id_t exported_id,
-                        bool one_shot = false) {
+  void SemaphoreImport2(magma_handle_t handle, bool one_shot = false) {
     ASSERT_TRUE(connection_);
 
     magma_semaphore_t semaphore;
@@ -858,7 +862,6 @@ class TestConnection {
     uint64_t flags = one_shot ? MAGMA_IMPORT_SEMAPHORE_ONE_SHOT : 0;
     ASSERT_EQ(magma_connection_import_semaphore2(connection_, handle, flags, &semaphore, &id),
               MAGMA_STATUS_OK);
-    EXPECT_NE(id, exported_id);
 
     {
       magma_poll_item_t item = {
@@ -901,14 +904,6 @@ class TestConnection {
     magma_connection_release_semaphore(connection_, semaphore);
   }
 
-  static void SemaphoreImportExport2(TestConnection* test1, TestConnection* test2,
-                                     bool one_shot = false) {
-    magma_handle_t handle;
-    magma_semaphore_id_t exported_id;
-    test1->SemaphoreExport(&handle, &exported_id);
-    test2->SemaphoreImport2(handle, exported_id, one_shot);
-  }
-
   void ImmediateCommands() {
     ASSERT_TRUE(connection_);
 
@@ -925,10 +920,14 @@ class TestConnection {
         .semaphore_count = 1,
     };
 
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_execute_immediate_commands(
-                                   connection_, context_id, 1, &inline_command_buffer));
-    // Invalid semaphore ID prevents execution of pattern data
-    EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS, magma_connection_flush(connection_));
+    magma_status_t status = magma_connection_execute_immediate_commands(connection_, context_id, 1,
+                                                                        &inline_command_buffer);
+    if (status == MAGMA_STATUS_OK) {
+      // Invalid semaphore ID prevents execution of pattern data
+      EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS, magma_connection_flush(connection_));
+    } else {
+      EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS, status);
+    }
 
     magma_connection_release_context(connection_, context_id);
   }
@@ -1392,24 +1391,40 @@ class TestConnectionWithContext : public TestConnection {
 
   uint32_t context_id() { return context_id_; }
 
-  void ExecuteCommand(uint32_t resource_count) {
+  void ExecuteCommand(uint32_t resource_count, uint32_t wait_semaphore_count = 0,
+                      uint32_t signal_semaphore_count = 0) {
     ASSERT_TRUE(connection());
 
     magma_exec_command_buffer command_buffer = {.resource_index = 0, .start_offset = 0};
 
-    magma_exec_resource resources[resource_count];
-    memset(resources, 0, sizeof(magma_exec_resource) * resource_count);
+    std::vector<magma_exec_resource> resources(resource_count);
+    memset(resources.data(), 0, sizeof(magma_exec_resource) * resources.size());
+
+    std::vector<magma_semaphore_t> semaphores(signal_semaphore_count + wait_semaphore_count);
+    std::vector<magma_semaphore_id_t> semaphore_ids(signal_semaphore_count + wait_semaphore_count);
+
+    for (uint32_t i = 0; i < signal_semaphore_count + wait_semaphore_count; i++) {
+      ASSERT_EQ(MAGMA_STATUS_OK,
+                magma_connection_create_semaphore(connection(), &semaphores[i], &semaphore_ids[i]));
+    }
 
     magma_command_descriptor descriptor = {.resource_count = resource_count,
                                            .command_buffer_count = 1,
-                                           .resources = resources,
-                                           .command_buffers = &command_buffer};
+                                           .wait_semaphore_count = wait_semaphore_count,
+                                           .signal_semaphore_count = signal_semaphore_count,
+                                           .resources = resources.data(),
+                                           .command_buffers = &command_buffer,
+                                           .semaphore_ids = semaphore_ids.data()};
 
     EXPECT_EQ(MAGMA_STATUS_OK,
               magma_connection_execute_command(connection(), context_id(), &descriptor));
 
     // Command buffer is mostly zeros, so we expect an error here
     EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS, magma_connection_flush(connection()));
+
+    for (uint32_t i = 0; i < signal_semaphore_count + wait_semaphore_count; i++) {
+      magma_connection_release_semaphore(connection(), semaphores[i]);
+    }
   }
 
   void ExecuteCommandNoResources() {
@@ -1589,16 +1604,20 @@ TEST_F(Magma, Semaphore) {
   test.Semaphore(3);
 }
 
-TEST_F(Magma, SemaphoreImportExport2) {
+TEST_F(Magma, SemaphoreExportImport2) {
   TestConnection test1;
   TestConnection test2;
-  TestConnection::SemaphoreImportExport2(&test1, &test2);
+  magma_handle_t handle;
+  test1.SemaphoreExport(&handle);
+  test2.SemaphoreImport2(handle);
 }
 
-TEST_F(Magma, SemaphoreImportExportOneShot) {
+TEST_F(Magma, SemaphoreExportImportOneShot) {
   TestConnection test1;
   TestConnection test2;
-  TestConnection::SemaphoreImportExport2(&test1, &test2, /*one_shot=*/true);
+  magma_handle_t handle;
+  test1.SemaphoreExport(&handle);
+  test2.SemaphoreImport2(handle, /*one_shot=*/true);
 }
 
 TEST_F(Magma, ImmediateCommands) { TestConnection().ImmediateCommands(); }
@@ -1629,6 +1648,15 @@ TEST_F(Magma, SysmemLinearFormatModifier) {
 TEST_F(Magma, FromC) { EXPECT_TRUE(test_magma_from_c(TestConnection().device_name().c_str())); }
 
 TEST_F(Magma, ExecuteCommand) { TestConnectionWithContext().ExecuteCommand(5); }
+
+TEST_F(Magma, ExecuteCommandWaitSemaphore) {
+  TestConnectionWithContext().ExecuteCommand(5, /*wait_semaphore_count=*/1);
+}
+
+TEST_F(Magma, ExecuteCommandSignalSemaphore) {
+  TestConnectionWithContext().ExecuteCommand(5, /*wait_semaphore_count=*/0,
+                                             /*signal_semaphore_count=*/1);
+}
 
 TEST_F(Magma, ExecuteCommandNoResources) {
   TestConnectionWithContext().ExecuteCommandNoResources();
