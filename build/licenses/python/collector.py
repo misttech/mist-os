@@ -54,14 +54,62 @@ class CollectorErrorKind(enum.Enum):
     THIRD_PARTY_TARGET_WITHOUT_APPLICABLE_LICENSES = 1
 
     LICENSE_FILE_IN_README_NOT_FOUND = 2
-
     NO_LICENSE_FILE_IN_README = 3
+    NO_PACKAGE_NAME_IN_README = 4
 
-    THIRD_PARTY_GOLIB_WITHOUT_LICENSES = 4
+    THIRD_PARTY_GOLIB_WITHOUT_LICENSES = 5
 
-    APPLICABLE_LICENSE_REFERENCE_DOES_NOT_EXIST = 5
+    APPLICABLE_LICENSE_REFERENCE_DOES_NOT_EXIST = 6
 
-    THIRD_PARTY_RESOURCE_WITHOUT_LICENSE = 6
+    THIRD_PARTY_RESOURCE_WITHOUT_LICENSE = 7
+
+    def explanation(self) -> str:
+        messages = {
+            CollectorErrorKind.THIRD_PARTY_TARGET_WITHOUT_APPLICABLE_LICENSES: """
+The target has no `applicable_licenses` argument, no associated valid README.fuchsia file.
+
+To add applicable_licenses argument, see //build/licenses/license.gni.
+
+To add README.fuchsia file, see:
+https://fuchsia.dev/fuchsia-src/development/source_code/third-party-metadata.
+
+If either one was done and you still see this error, there might be other
+errors, which should be printed above/below.
+""",
+            CollectorErrorKind.LICENSE_FILE_IN_README_NOT_FOUND: """
+The `License File: ...` specified in the README.fuchsia file does not exist.
+""",
+            CollectorErrorKind.NO_LICENSE_FILE_IN_README: """
+The README.fuchsia file of the target is missing a `License File: ...` value.
+""",
+            CollectorErrorKind.NO_PACKAGE_NAME_IN_README: """
+The README.fuchsia file of the target is missing a `Name: [package name]` value.
+""",
+            CollectorErrorKind.THIRD_PARTY_GOLIB_WITHOUT_LICENSES: """
+No license found in the golib source folder. We look for files named
+LICENSE*, COPYRIGHT* and NOTICE*.
+""",
+            CollectorErrorKind.APPLICABLE_LICENSE_REFERENCE_DOES_NOT_EXIST: """
+`applicable_licenses` refers to a label that does not exist or is not
+a `build/licenses/license.gni` target.
+""",
+            CollectorErrorKind.THIRD_PARTY_RESOURCE_WITHOUT_LICENSE: """
+Could not find a licenes that applies to the 3rd party resource.
+The resource is referenced directly by a target but the target has
+no `applicable_licenses` argument. Alternatively, the resource may
+not have an associated README.fuchsia file.
+
+To add `applicable_licenses` argument, see //build/licenses/license.gni.
+
+To add README.fuchsia file, see:
+https://fuchsia.dev/fuchsia-src/development/source_code/third-party-metadata.
+
+If either one was done and you still see this error, there might be other
+errors, which should be printed above/below.
+""",
+        }
+
+        return messages[self]
 
 
 @dataclasses.dataclass(frozen=True)
@@ -151,7 +199,25 @@ class Collector:
     def _add_license_from_readme(
         self, readme: Readme, used_by_target: GnLabel
     ) -> bool:
-        assert readme.license_files
+        if not readme.package_name:
+            self._add_error(
+                CollectorError(
+                    kind=CollectorErrorKind.NO_PACKAGE_NAME_IN_README,
+                    target_label=used_by_target,
+                    debug_hint=f"In {readme.readme_label}",
+                )
+            )
+            return False
+
+        if not readme.license_files:
+            self._add_error(
+                CollectorError(
+                    kind=CollectorErrorKind.NO_LICENSE_FILE_IN_README,
+                    target_label=used_by_target,
+                    debug_hint=f"In {readme.readme_label}",
+                )
+            )
+            return False
 
         # Ensure files actually exist:
         for lic_file in readme.license_files:
@@ -163,7 +229,7 @@ class Collector:
                         debug_hint=f"Looking for {lic_file} specified in {readme.readme_label}",
                     )
                 )
-                return
+                return False
 
         license = CollectedLicense.create(
             public_name=readme.package_name,
@@ -173,6 +239,7 @@ class Collector:
 
         self.stats.licenses_from_readmes += len(readme.license_files)
         self._add_license(license)
+        return True
 
     def _add_licenses_for_golib(
         self, label: GnLabel, original_label=None
@@ -265,17 +332,9 @@ class Collector:
         if not license_found:
             readme = self.readmes_db.find_readme_for_label(label)
             if readme:
-                if readme.license_files:
-                    license_found = True
-                    self._add_license_from_readme(readme, used_by_target=label)
-                else:
-                    self._add_error(
-                        CollectorError(
-                            kind=CollectorErrorKind.NO_LICENSE_FILE_IN_README,
-                            target_label=label,
-                            debug_hint=f"At {readme.readme_label}",
-                        )
-                    )
+                license_found = self._add_license_from_readme(
+                    readme, used_by_target=label
+                )
 
         if (
             not license_found
@@ -320,7 +379,7 @@ class Collector:
         ) in self.metadata_db.applicable_licenses_by_target.values():
             self._scan_label(target_metadata.target_label)
 
-    def log_errors(self, log_level: int = logging.ERROR):
+    def log_errors(self, log_level: int, is_full_report: bool):
         errors_by_kind: Dict[
             CollectorErrorKind, List[CollectorError]
         ] = defaultdict(list)
@@ -328,14 +387,29 @@ class Collector:
         for error in self.errors:
             errors_by_kind[error.kind].append(error)
 
-        message_lines = [
+        message_lines = []
+
+        message_lines.append(
             f"Encountered {len(self.errors)} license collection errors."
-        ]
+        )
 
         for kind in errors_by_kind.keys():
             sub_errors = errors_by_kind[kind]
             count = len(sub_errors)
-            message_lines.append(f"There are {count} {kind.name} errors for:")
+            message_lines.append(
+                f"There are {count} targets or resources with the {kind.name} error."
+            )
+
+            if not is_full_report:
+                continue
+
+            explanation = kind.explanation()
+            for explanation_line in explanation.split("\n"):
+                message_lines.append(f"  {explanation_line}")
+
+            message_lines.append(
+                f"  Here are the {count} targets or resources:"
+            )
 
             sub_message_lines = []
             for e in sub_errors:
@@ -344,14 +418,14 @@ class Collector:
                 )
             sub_message_lines.sort()
 
-            max_lines = 100
+            max_lines = 10
             if max_lines < len(sub_message_lines):
                 trim_message = (
                     f"  (and {len(sub_message_lines) - max_lines} more)"
                 )
                 sub_message_lines = sub_message_lines[0:max_lines]
                 sub_message_lines.append(trim_message)
-
             message_lines.extend(sub_message_lines)
+            message_lines.append("\n")
 
         logging.log(log_level, "\n".join(message_lines))

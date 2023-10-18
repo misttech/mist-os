@@ -20,14 +20,20 @@ import("//build/python/python_action.gni")
 #     correspond with a stable, developer-friendly, short name of
 #     the target.
 #
-#   compare_with_legacy_spdx (optional)
+#   compare_with_legacy_spdx (resource, optional)
 #     Compares the output to reference spdx file.
 #
-#   debug_hints (optional)
+#   ignore_comparison_errors (bool, optional)
+#     Ignores comparison errors when comparing with a legacy spdx file.
+#
+#   debug_hints (bool, optional)
 #     Will add "_hint" elements to output spdx for debugging purposes.
 #     Default is false.
 #
-#   ignore_licenses_errors (optional)
+#   log_level (str, optional)
+#     Tool logging level. Defaults to WARN.
+#
+#   ignore_collection_errors (bool, optional)
 #     When true, generation will ignore license collection errors
 #     and only log them as warnings.
 #
@@ -93,13 +99,25 @@ template("generated_licenses_spdx") {
       ]
     }
 
+    if (defined(invoker.ignore_comparison_errors) &&
+        invoker.ignore_comparison_errors) {
+      args += [ "--ignore_comparison_errors" ]
+    }
+
     if (defined(invoker.debug_hints) && invoker.debug_hints) {
       args += [ "--debug-hints" ]
     }
 
-    if (defined(invoker.ignore_licenses_errors) &&
-        invoker.ignore_licenses_errors) {
-      args += [ "--ignore-licenses-errors" ]
+    if (defined(invoker.ignore_collection_errors) &&
+        invoker.ignore_collection_errors) {
+      args += [ "--ignore-collection-errors" ]
+    }
+
+    if (defined(invoker.log_level)) {
+      args += [
+        "--log-level",
+        invoker.log_level,
+      ]
     }
 
     if (!defined(deps)) {

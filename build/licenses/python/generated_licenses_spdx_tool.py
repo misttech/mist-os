@@ -52,7 +52,7 @@ def main():
         help="Path to the generated dep file",
     )
     parser.add_argument(
-        "--ignore-licenses-errors",
+        "--ignore-collection-errors",
         action="store_true",
         default=False,
         help="Tool will fail when encountering license collection errors",
@@ -70,11 +70,26 @@ def main():
         default=None,
         help="The tool will compare the contents of the actual spdx output with the given legacy file",
     )
+    parser.add_argument(
+        "--ignore-comparison-errors",
+        action="store_true",
+        default=False,
+        help="Tool will fail when comparison with the legacy spdx finds missing licenses",
+    )
+
+    parser.add_argument(
+        "--log-level",
+        type=str,
+        default="WARN",
+        help="Python logging level",
+    )
 
     args = parser.parse_args()
 
+    log_level = args.log_level.upper()
+
     logging.basicConfig(
-        level=logging.INFO, force="format='%(levelname)s:%(message)s'"
+        level=log_level, force="format='%(levelname)s:%(message)s'"
     )
 
     fuchsia_source_path = Path(args.fuchsia_source_path).expanduser()
@@ -96,10 +111,13 @@ def main():
     collector.collect()
 
     if collector.errors:
-        if args.ignore_licenses_errors:
-            collector.log_errors(log_level=logging.WARNING)
+        if args.ignore_collection_errors:
+            collector.log_errors(log_level=logging.WARN, is_full_report=False)
+            logging.warning(
+                "Errors are ignored because --ignore_collection_errors is True. "
+            )
         else:
-            collector.log_errors(log_level=logging.ERROR)
+            collector.log_errors(log_level=logging.ERROR, is_full_report=True)
             return -1
 
     logging.info(f"Collection stats: {collector.stats}")
@@ -135,8 +153,14 @@ def main():
         )
         comparator.compare()
         if comparator.found_differences():
-            comparator.log_differences(logging.ERROR)
-            return -1
+            if args.ignore_comparison_errors:
+                comparator.log_differences(logging.WARN, is_full_report=False)
+                logging.warning(
+                    "Differences are ignored because --ignore_comparison_errors is True. "
+                )
+            else:
+                comparator.log_differences(logging.ERROR, is_full_report=True)
+                return -1
 
     # Generate a GN depfile
     dep_file_path = Path(args.dep_file)

@@ -122,7 +122,7 @@ class _ExtractedLicense:
 _expected_missing: List[re.Pattern] = [
     re.compile(s)
     for s in [
-        # COPYING and UNLICENSE files are not licenses
+        # COPYING and UNLICENSE files are not rust licenses
         "third_party/rust_crates/.*/COPYING",
         "third_party/rust_crates/.*/UNLICENSE",
         # Dart added by check-licenses, although not in build graph
@@ -131,21 +131,6 @@ _expected_missing: List[re.Pattern] = [
         ".*/third_party/kissfft/COPYING",
         # Only libsparse actually used from android platform system
         "third_party/android/platform/system",
-        # TODO(132724): Also handle rust nested 3p licenses
-        "third_party/rust_crates/compat/crc/LICENSE-APACHE",
-        "third_party/rust_crates/compat/crc/LICENSE-MIT",
-        "third_party/rust_crates/compat/valico/LICENSE",
-        "third_party/rust_crates/forks/nix/LICENSE",
-        "third_party/rust_crates/mirrors/serde_json5/third_party/LICENSE",
-        "third_party/rust_crates/vendor/bstr-1.5.0/src/unicode/data/LICENSE-UNICODE",
-        "third_party/rust_crates/vendor/handlebars-4.3.5/wasm/LICENSE",
-        "third_party/rust_crates/vendor/regex-syntax-0.6.26/src/unicode_tables/LICENSE-UNICODE",
-        "third_party/rust_crates/vendor/webpki-0.21.0/third-party/chromium/LICENSE",
-        # TODO(132724): Also handle golibs nested 3p licenses
-        "third_party/golibs/vendor/cloud.google.com/go/compute/LICENSE",
-        "third_party/golibs/vendor/google.golang.org/api/internal/third_party/uritemplates/LICENSE",
-        "third_party/golibs/vendor/google.golang.org/grpc/cmd/protoc-gen-go-grpc/LICENSE",
-        "third_party/golibs/vendor/google.golang.org/grpc/NOTICE.txt",
         # Python and Rust host tools
         "prebuilt/third_party/python3/linux-x64/.*",
         "prebuilt/third_party/rust/linux-x64/.*",
@@ -216,10 +201,18 @@ class SpdxComparator:
     def found_differences(self) -> bool:
         return self.added or self.missing
 
-    def log_differences(self, log_level: int):
+    def log_differences(self, log_level: int, is_full_report: bool):
         message_lines = []
+
+        def report(s: str):
+            message_lines.append(s)
+
+        def full_report(s: str):
+            if is_full_report:
+                report(s)
+
         if self.added or self.missing:
-            message_lines.append(
+            report(
                 f"{self.current_file} has DIFFERENT licenses then {self.legacy_file}:"
             )
 
@@ -245,20 +238,18 @@ class SpdxComparator:
             if el.debug_hint:
                 msg += f" hint={el.debug_hint}"
 
-            message_lines.append(msg)
+            full_report(msg)
 
-        message_lines.append(f"Key:")
-        message_lines.append(f"      Same: {len(self.in_both)}")
-        message_lines.append(
-            f"  ~   Similar: {round(len(self.in_both_but_different) / 2)}"
+        full_report(
+            """Key:
+      Same: {len(self.in_both)}
+  ~   Similar: {round(len(self.in_both_but_different) / 2)}
+  #   Expected Missing: {len(self.expected_missing)}
+  +   Added: {len(self.added)}
+  -   Missing: {len(self.missing)}"""
         )
-        message_lines.append(
-            f"  #   Expected Missing: {len(self.expected_missing)}"
-        )
-        message_lines.append(f"  +   Added: {len(self.added)}")
-        message_lines.append(f"  -   Missing: {len(self.missing)}")
 
         for missing in sorted(list(self.missing)):
-            message_lines.append(f"Missing {missing.path}")
+            report(f"Missing {missing.path}")
 
         logging.log(log_level, "\n".join(message_lines))

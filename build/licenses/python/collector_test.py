@@ -52,7 +52,7 @@ class CollectorTest(unittest.TestCase):
         self.temp_dir.cleanup()
         return super().tearDown()
 
-    def _assert_licenses(
+    def _collect_and_assert_licenses(
         self, expected_names_and_licenses: Dict[str, List[str]]
     ):
         self.collector.collect()
@@ -70,7 +70,9 @@ class CollectorTest(unittest.TestCase):
         self.maxDiff = None
         self.assertSetEqual(actual, expected)
 
-    def _assert_errors(self, expected_error_kinds: List[CollectorErrorKind]):
+    def _collect_and_assert_errors(
+        self, expected_error_kinds: List[CollectorErrorKind]
+    ):
         self.collector.collect()
 
         actual = [e.kind for e in self.collector.errors]
@@ -135,7 +137,9 @@ class CollectorTest(unittest.TestCase):
             target="//third_party/foo", licenses=["//third_party/foo:license"]
         )
 
-        self._assert_licenses({"Foo": ["//third_party/foo/license.txt"]})
+        self._collect_and_assert_licenses(
+            {"Foo": ["//third_party/foo/license.txt"]}
+        )
 
     def test_target_with_metadata_but_no_applicable_licenses(self):
         self._add_license_metadata(
@@ -147,7 +151,7 @@ class CollectorTest(unittest.TestCase):
             target="//third_party/foo", licenses=[]
         )
 
-        self._assert_errors(
+        self._collect_and_assert_errors(
             [CollectorErrorKind.THIRD_PARTY_TARGET_WITHOUT_APPLICABLE_LICENSES]
         )
 
@@ -156,14 +160,14 @@ class CollectorTest(unittest.TestCase):
             target="//third_party/foo", licenses=["//third_party/foo:license"]
         )
 
-        self._assert_errors(
+        self._collect_and_assert_errors(
             [CollectorErrorKind.APPLICABLE_LICENSE_REFERENCE_DOES_NOT_EXIST]
         )
 
     def test_non_third_party_target_without_licenses_does_not_error(self):
         self._add_applicable_licenses_metadata(target="//foo/bar", licenses=[])
 
-        self._assert_licenses({})
+        self._collect_and_assert_licenses({})
 
     def test_non_third_party_target_with_license(self):
         self._add_license_metadata(
@@ -173,7 +177,7 @@ class CollectorTest(unittest.TestCase):
             target="//foo/bar", licenses=["//foo/bar:license"]
         )
 
-        self._assert_licenses({"Bar": ["//foo/bar/license.txt"]})
+        self._collect_and_assert_licenses({"Bar": ["//foo/bar/license.txt"]})
 
     ########################### readme tests:
 
@@ -181,7 +185,9 @@ class CollectorTest(unittest.TestCase):
         self, file_path: str, name: str, license_files: List[str]
     ):
         path = self.temp_dir_path / file_path
-        content = [f"NAME: {name}"]
+        content = []
+        if name:
+            content.append(f"NAME: {name}")
         for l in license_files:
             content.append(f"LICENSE FILE: {l}")
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -197,7 +203,9 @@ class CollectorTest(unittest.TestCase):
             name="Foo",
             license_files=["license.txt"],
         )
-        self._assert_licenses({"Foo": ["//third_party/foo/license.txt"]})
+        self._collect_and_assert_licenses(
+            {"Foo": ["//third_party/foo/license.txt"]}
+        )
 
     def test_target_with_readme_without_license_specified(self):
         target = "//third_party/foo"
@@ -205,7 +213,7 @@ class CollectorTest(unittest.TestCase):
         self._add_readme_file(
             "third_party/foo/README.fuchsia", name="Foo", license_files=[]
         )
-        self._assert_errors(
+        self._collect_and_assert_errors(
             [
                 CollectorErrorKind.NO_LICENSE_FILE_IN_README,
                 CollectorErrorKind.THIRD_PARTY_TARGET_WITHOUT_APPLICABLE_LICENSES,
@@ -220,9 +228,26 @@ class CollectorTest(unittest.TestCase):
             name="Foo",
             license_files=["missing_file"],
         )
-        self._assert_errors(
+        self._collect_and_assert_errors(
             [
                 CollectorErrorKind.LICENSE_FILE_IN_README_NOT_FOUND,
+                CollectorErrorKind.THIRD_PARTY_TARGET_WITHOUT_APPLICABLE_LICENSES,
+            ]
+        )
+
+    def test_target_with_readme_but_license_name_missing(self):
+        target = "//third_party/foo"
+        self._add_applicable_licenses_metadata(target=target, licenses=[])
+        self._add_files(["third_party/foo/license.txt"])
+        self._add_readme_file(
+            "third_party/foo/README.fuchsia",
+            name=None,
+            license_files=["license.txt"],
+        )
+        self._collect_and_assert_errors(
+            [
+                CollectorErrorKind.NO_PACKAGE_NAME_IN_README,
+                CollectorErrorKind.THIRD_PARTY_TARGET_WITHOUT_APPLICABLE_LICENSES,
             ]
         )
 
@@ -236,7 +261,7 @@ class CollectorTest(unittest.TestCase):
             target="//third_party/golibs:foo/bar", licenses=[]
         )
         self._add_golib_vendor_files(["foo/bar/lib.go", "foo/bar/LICENSE"])
-        self._assert_licenses(
+        self._collect_and_assert_licenses(
             {"bar": ["//third_party/golibs/vendor/foo/bar/LICENSE"]}
         )
 
@@ -245,7 +270,7 @@ class CollectorTest(unittest.TestCase):
             target="//third_party/golibs:foo/bar", licenses=[]
         )
         self._add_golib_vendor_files(["foo/bar/lib.go", "foo/bar/LICENSE"])
-        self._assert_licenses(
+        self._collect_and_assert_licenses(
             {"bar": ["//third_party/golibs/vendor/foo/bar/LICENSE"]}
         )
 
@@ -254,7 +279,7 @@ class CollectorTest(unittest.TestCase):
             target="//third_party/golibs:foo/bar", licenses=[]
         )
         self._add_golib_vendor_files(["foo/bar/lib.go", "foo/LICENSE"])
-        self._assert_licenses(
+        self._collect_and_assert_licenses(
             {"foo": ["//third_party/golibs/vendor/foo/LICENSE"]}
         )
 
@@ -263,7 +288,7 @@ class CollectorTest(unittest.TestCase):
             target="//third_party/golibs:foo", licenses=[]
         )
         self._add_golib_vendor_files(["foo/bar/lib.go", "foo/bar/baz/LICENSE"])
-        self._assert_licenses(
+        self._collect_and_assert_licenses(
             {"foo": ["//third_party/golibs/vendor/foo/bar/baz/LICENSE"]}
         )
 
@@ -282,7 +307,7 @@ class CollectorTest(unittest.TestCase):
                 "foo/COPYING",  # Not a license
             ]
         )
-        self._assert_licenses(
+        self._collect_and_assert_licenses(
             {
                 "foo": [
                     "//third_party/golibs/vendor/foo/license",
@@ -299,7 +324,7 @@ class CollectorTest(unittest.TestCase):
         self._add_applicable_licenses_metadata(target=target, licenses=[])
         self._add_golib_vendor_files(["foo/lib.go"])
 
-        self._assert_errors(
+        self._collect_and_assert_errors(
             [
                 CollectorErrorKind.THIRD_PARTY_GOLIB_WITHOUT_LICENSES,
                 CollectorErrorKind.THIRD_PARTY_TARGET_WITHOUT_APPLICABLE_LICENSES,

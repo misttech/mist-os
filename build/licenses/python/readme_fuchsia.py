@@ -35,11 +35,6 @@ class Readme:
                     )
                     license_files.append(license_file)
 
-        if not package_name:
-            raise RuntimeError(
-                f"File {readme_label} does not contain `Name: [the public name of the package]"
-            )
-
         return Readme(
             readme_label=readme_label,
             package_name=package_name,
