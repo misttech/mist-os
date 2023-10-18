@@ -9,8 +9,7 @@
 #include <fidl/fuchsia.hardware.sdmmc/cpp/driver/fidl.h>
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <fuchsia/hardware/sdmmc/cpp/banjo.h>
-#include <lib/ddk/phys-iter.h>
-#include <lib/driver/outgoing/cpp/outgoing_directory.h>
+#include <lib/ddk/io-buffer.h>  // TODO(b/301003087): For DFv2, maybe templatize ddk::IoBuffer.
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/mmio/mmio.h>
 #include <lib/stdcompat/span.h>
@@ -23,31 +22,23 @@
 #include <limits>
 #include <vector>
 
-#include <ddktl/device.h>
+#include <ddktl/device.h>  // TODO(b/301003087): For DFv2, maybe templatize ddk::base_protocol.
 #include <fbl/auto_lock.h>
 #include <soc/aml-common/aml-sdmmc.h>
 
 #include "src/lib/vmo_store/vmo_store.h"
 
-namespace sdmmc {
+namespace aml_sdmmc {
 
-class AmlSdmmc;
-using AmlSdmmcType = ddk::Device<AmlSdmmc, ddk::Suspendable>;
-
-class AmlSdmmc : public AmlSdmmcType,
-                 public ddk::SdmmcProtocol<AmlSdmmc, ddk::base_protocol>,
+class AmlSdmmc : public ddk::SdmmcProtocol<AmlSdmmc, ddk::base_protocol>,
                  public fdf::WireServer<fuchsia_hardware_sdmmc::Sdmmc> {
  public:
   // Limit maximum number of descriptors to 512 for now
   static constexpr size_t kMaxDmaDescriptors = 512;
 
-  AmlSdmmc(zx_device_t* parent, zx::bti bti, fdf::MmioBuffer mmio, aml_sdmmc_config_t config,
-           zx::interrupt irq, fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> reset_gpio,
-           ddk::IoBuffer descs_buffer)
-      : AmlSdmmcType(parent),
-        dispatcher_(fdf::Dispatcher::GetCurrent()->get()),
-        outgoing_dir_(fdf::OutgoingDirectory::Create(dispatcher_)),
-        mmio_(std::move(mmio)),
+  AmlSdmmc(zx::bti bti, fdf::MmioBuffer mmio, aml_sdmmc_config_t config, zx::interrupt irq,
+           fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> reset_gpio, ddk::IoBuffer descs_buffer)
+      : mmio_(std::move(mmio)),
         bti_(std::move(bti)),
         irq_(std::move(irq)),
         board_config_(config),
@@ -69,12 +60,11 @@ class AmlSdmmc : public AmlSdmmcType,
     }
   }
 
-  virtual ~AmlSdmmc() = default;
-  static zx_status_t Create(void* ctx, zx_device_t* parent);
-
-  // Device protocol implementation
-  void DdkRelease();
-  void DdkSuspend(ddk::SuspendTxn txn);
+  ~AmlSdmmc() override {
+    if (irq_.is_valid()) {
+      irq_.destroy();
+    }
+  }
 
   // ddk::SdmmcProtocol implementation
   zx_status_t SdmmcHostInfo(sdmmc_host_info_t* out_info);
@@ -104,7 +94,7 @@ class AmlSdmmc : public AmlSdmmcType,
                  SetTimingCompleter::Sync& completer) override;
   void HwReset(fdf::Arena& arena, HwResetCompleter::Sync& completer) override;
   void PerformTuning(PerformTuningRequestView request, fdf::Arena& arena,
-                     PerformTuningCompleter::Sync& completer) TA_EXCL(tuning_lock_) override;
+                     PerformTuningCompleter::Sync& completer) override;
   void RegisterInBandInterrupt(RegisterInBandInterruptRequestView request, fdf::Arena& arena,
                                RegisterInBandInterruptCompleter::Sync& completer) override;
   void AckInBandInterrupt(fdf::Arena& arena,
@@ -123,8 +113,7 @@ class AmlSdmmc : public AmlSdmmcType,
   void set_board_config(const aml_sdmmc_config_t& board_config) { board_config_ = board_config; }
 
  protected:
-  // Visible for tests
-  zx_status_t Bind();
+  void ShutDown() TA_EXCL(lock_);
 
   virtual zx_status_t WaitForInterruptImpl();
   virtual void WaitForBus() const;
@@ -236,13 +225,6 @@ class AmlSdmmc : public AmlSdmmcType,
   zx::result<std::array<uint32_t, kResponseCount>> WaitForInterrupt(const sdmmc_req_t& req)
       TA_REQ(lock_);
 
-  void ShutDown() TA_EXCL(lock_);
-
-  // Dispatcher for being a FIDL server serving Sdmmc requests.
-  fdf_dispatcher_t* dispatcher_;
-  // Serves fuchsia_hardware_sdmmc::SdmmcService.
-  fdf::OutgoingDirectory outgoing_dir_;
-
   fdf::MmioBuffer mmio_ TA_GUARDED(lock_);
 
   zx::bti bti_;
@@ -264,9 +246,10 @@ class AmlSdmmc : public AmlSdmmcType,
   uint64_t consecutive_cmd_errors_ = 0;
   uint64_t consecutive_data_errors_ = 0;
 
+  // TODO(b/301003087): Migrate this to DFv2.
   Inspect inspect_;
 };
 
-}  // namespace sdmmc
+}  // namespace aml_sdmmc
 
 #endif  // SRC_DEVICES_BLOCK_DRIVERS_AML_SDMMC_AML_SDMMC_H_

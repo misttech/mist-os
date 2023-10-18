@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "aml-sdmmc.h"
-
 #include <lib/ddk/platform-defs.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/fzl/vmo-mapper.h>
@@ -22,29 +20,30 @@
 #include <zxtest/zxtest.h>
 
 #include "aml-sdmmc-regs.h"
+#include "dfv1-driver.h"
 #include "src/devices/lib/mmio/test-helper.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
-namespace sdmmc {
+namespace aml_sdmmc {
 
-class TestAmlSdmmc : public AmlSdmmc {
+class TestDfv1Driver : public Dfv1Driver {
  public:
-  TestAmlSdmmc(zx_device_t* parent, fdf::MmioBuffer mmio, zx::bti bti, fdf::MmioView view,
-               ddk::IoBuffer descs_buffer)
-      // Pass BTI ownership to AmlSdmmc, but keep a copy of the handle so we can get a list of VMOs
-      // that are pinned when a request is made.
-      : AmlSdmmc(parent, zx::bti(bti.get()), std::move(mmio),
-                 aml_sdmmc_config_t{
-                     .min_freq = 400000,
-                     .max_freq = 120000000,
-                     .version_3 = true,
-                     .prefs = 0,
-                 },
-                 zx::interrupt(ZX_HANDLE_INVALID), {}, std::move(descs_buffer)),
+  TestDfv1Driver(zx_device_t* parent, fdf::MmioBuffer mmio, zx::bti bti, fdf::MmioView view,
+                 ddk::IoBuffer descs_buffer)
+      // Pass BTI ownership to Dfv1Driver, but keep a copy of the handle so we can get a list of
+      // VMOs that are pinned when a request is made.
+      : Dfv1Driver(parent, zx::bti(bti.get()), std::move(mmio),
+                   aml_sdmmc_config_t{
+                       .min_freq = 400000,
+                       .max_freq = 120000000,
+                       .version_3 = true,
+                       .prefs = 0,
+                   },
+                   zx::interrupt(ZX_HANDLE_INVALID), {}, std::move(descs_buffer)),
         bti_(bti.release()),
         view_(view) {}
 
-  using AmlSdmmc::Bind;
+  using Dfv1Driver::Bind;
 
   const inspect::Hierarchy* GetInspectRoot(const std::string& suffix) {
     const zx::vmo inspect_vmo = GetInspectVmo();
@@ -56,7 +55,7 @@ class TestAmlSdmmc : public AmlSdmmc {
     return inspector_.hierarchy().GetByPath({"aml-sdmmc-port" + suffix});
   }
 
-  void DdkRelease() { AmlSdmmc::DdkRelease(); }
+  void DdkRelease() { Dfv1Driver::DdkRelease(); }
 
   zx_status_t WaitForInterruptImpl() override {
     fake_bti_pinned_vmo_info_t pinned_vmos[2];
@@ -150,8 +149,8 @@ class AmlSdmmcTest : public zxtest::Test {
                                 IO_BUFFER_RW | IO_BUFFER_CONTIG));
     descs_ = descs_buffer.virt();
 
-    dut_ = new TestAmlSdmmc(root_.get(), std::move(mmio_buffer), std::move(bti), *mmio_,
-                            std::move(descs_buffer));
+    dut_ = new TestDfv1Driver(root_.get(), std::move(mmio_buffer), std::move(bti), *mmio_,
+                              std::move(descs_buffer));
     ASSERT_OK(dut_->Bind());
     ASSERT_EQ(1, root_->child_count());
     mock_dev_ = root_->GetLatestChild();
@@ -232,8 +231,8 @@ class AmlSdmmcTest : public zxtest::Test {
                                 IO_BUFFER_RW | IO_BUFFER_CONTIG));
     descs_ = descs_buffer.virt();
 
-    dut_ = new TestAmlSdmmc(root_.get(), CreateMmioBufferAndUpdateView(S912_SD_EMMC_B_LENGTH),
-                            std::move(bti), *mmio_, std::move(descs_buffer));
+    dut_ = new TestDfv1Driver(root_.get(), CreateMmioBufferAndUpdateView(S912_SD_EMMC_B_LENGTH),
+                              std::move(bti), *mmio_, std::move(descs_buffer));
     ASSERT_OK(dut_->Bind());
     ASSERT_EQ(1, root_->child_count());
     mock_dev_ = root_->GetLatestChild();
@@ -245,7 +244,7 @@ class AmlSdmmcTest : public zxtest::Test {
 
   std::optional<fdf::MmioView> mmio_;
   std::shared_ptr<MockDevice> root_;
-  TestAmlSdmmc* dut_;
+  TestDfv1Driver* dut_;
   MockDevice* mock_dev_;
 
  private:
@@ -2099,4 +2098,4 @@ TEST_F(AmlSdmmcTest, ConsecutiveErrorLogging) {
   EXPECT_EQ(ZX_ERR_TIMED_OUT, dut_->SdmmcRequest(&request, unused_response));
 }
 
-}  // namespace sdmmc
+}  // namespace aml_sdmmc
