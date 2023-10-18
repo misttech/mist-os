@@ -39,13 +39,6 @@ kernel_cmdline("kernel.render-dlog-to-crashlog--true") {
   args = [ "kernel.render-dlog-to-crashlog=true" ]
 }
 
-# TODO(b/304593652): Remove once no products depend on it.
-# Assembly adds this to all user build products in:
-#   //bundles/assembly:kernel_args_user
-kernel_cmdline("kernel.serial--none") {
-  args = []
-}
-
 kernel_cmdline("virtcon.hide-on-boot") {
   args = [ "virtcon.hide-on-boot" ]
 }
