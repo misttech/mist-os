@@ -381,8 +381,8 @@ mod tests {
                 layers_from_handles,
                 merge::{MergeLayerIterator, MergeResult},
                 types::{
-                    BoxedLayerIterator, Item, ItemRef, Key, Layer, LayerIterator,
-                    LayerIteratorFilter, LayerKey, OrdLowerBound, OrdUpperBound, SortByU64, Value,
+                    BoxedLayerIterator, Item, ItemRef, Key, Layer, LayerIterator, LayerKey,
+                    OrdLowerBound, OrdUpperBound, SortByU64, Value,
                 },
             },
             object_handle::ObjectHandle,
@@ -571,8 +571,10 @@ mod tests {
         let mut merger = layers.merger();
 
         // Filter out odd keys (which also guarantees we skip the first key which is an edge case).
-        let mut iter = (Box::new(merger.seek(Bound::Unbounded).await.expect("seek failed"))
-            as Box<dyn LayerIterator<_, _>>)
+        let mut iter = merger
+            .seek(Bound::Unbounded)
+            .await
+            .expect("seek failed")
             .filter(|item: ItemRef<'_, TestKey, u64>| item.key.0.start % 2 == 0)
             .await
             .expect("filter failed");

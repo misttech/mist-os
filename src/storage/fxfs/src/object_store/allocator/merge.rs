@@ -9,9 +9,9 @@ use {
                 ItemOp::{Discard, Keep, Replace},
                 MergeLayerIterator, MergeResult,
             },
-            types::{Item, LayerIteratorFilter},
+            types::{Item, LayerIterator},
         },
-        object_store::allocator::{AllocatorKey, AllocatorValue, BoxedLayerIterator},
+        object_store::allocator::{AllocatorKey, AllocatorValue},
     },
     anyhow::Error,
     std::collections::HashSet,
@@ -139,25 +139,24 @@ pub fn merge(
 }
 
 pub async fn filter_tombstones(
-    iter: BoxedLayerIterator<'_, AllocatorKey, AllocatorValue>,
-) -> Result<BoxedLayerIterator<'_, AllocatorKey, AllocatorValue>, Error> {
-    Ok(Box::new(iter.filter(|i| *i.value != AllocatorValue::None).await?))
+    iter: impl LayerIterator<AllocatorKey, AllocatorValue>,
+) -> Result<impl LayerIterator<AllocatorKey, AllocatorValue>, Error> {
+    Ok(iter.filter(|i| *i.value != AllocatorValue::None).await?)
 }
 
 pub async fn filter_marked_for_deletion(
-    iter: BoxedLayerIterator<'_, AllocatorKey, AllocatorValue>,
+    iter: impl LayerIterator<AllocatorKey, AllocatorValue>,
     marked_for_deletion: HashSet<u64>,
-) -> Result<BoxedLayerIterator<'_, AllocatorKey, AllocatorValue>, Error> {
-    Ok(Box::new(
-        iter.filter(move |i| {
+) -> Result<impl LayerIterator<AllocatorKey, AllocatorValue>, Error> {
+    Ok(iter
+        .filter(move |i| {
             if let AllocatorValue::Abs { owner_object_id, .. } = i.value {
                 !marked_for_deletion.contains(owner_object_id)
             } else {
                 true
             }
         })
-        .await?,
-    ))
+        .await?)
 }
 
 #[cfg(test)]
@@ -195,10 +194,9 @@ mod tests {
             .expect("insert error");
         let layer_set = tree.layer_set();
         let mut merger = layer_set.merger();
-        let mut iter =
-            filter_tombstones(Box::new(merger.seek(Bound::Unbounded).await.expect("seek failed")))
-                .await
-                .expect("filter failed");
+        let mut iter = filter_tombstones(merger.seek(Bound::Unbounded).await.expect("seek failed"))
+            .await
+            .expect("filter failed");
         for e in expected {
             let ItemRef { key, value, .. } = iter.get().expect("get failed");
             assert_eq!((key, value), (&AllocatorKey { device_range: e.0.clone() }, &e.1));
@@ -413,10 +411,9 @@ mod tests {
         .expect("insert error");
         let layer_set = tree.layer_set();
         let mut merger = layer_set.merger();
-        let mut iter =
-            filter_tombstones(Box::new(merger.seek(Bound::Unbounded).await.expect("seek failed")))
-                .await
-                .expect("filter failed");
+        let mut iter = filter_tombstones(merger.seek(Bound::Unbounded).await.expect("seek failed"))
+            .await
+            .expect("filter failed");
         assert_eq!(iter.get().unwrap().key, &AllocatorKey { device_range: 0..25 });
         assert_eq!(
             iter.get().unwrap().value,

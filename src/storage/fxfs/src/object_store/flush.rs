@@ -9,7 +9,7 @@ use {
         log::*,
         lsm_tree::{
             layers_from_handles,
-            types::{BoxedLayerIterator, ItemRef, LayerIteratorFilter},
+            types::{BoxedLayerIterator, ItemRef, LayerIterator},
             LSMTree,
         },
         object_handle::{ObjectHandle, ReadObjectHandle, INVALID_OBJECT_ID},

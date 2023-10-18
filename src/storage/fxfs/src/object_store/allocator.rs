@@ -13,11 +13,10 @@ use {
         lsm_tree::{
             cache::NullCache,
             layers_from_handles,
-            merge::Merger,
             skip_list_layer::SkipListLayer,
             types::{
-                BoxedLayerIterator, Item, ItemRef, Layer, LayerIterator, LayerKey, MergeType,
-                MutableLayer, OrdLowerBound, OrdUpperBound, RangeKey, SortByU64,
+                Item, ItemRef, Layer, LayerIterator, LayerKey, MergeType, MutableLayer,
+                OrdLowerBound, OrdUpperBound, RangeKey, SortByU64,
             },
             LSMTree, LayerSet,
         },
@@ -645,17 +644,13 @@ impl SimpleAllocator {
 
     /// Returns an iterator that yields all allocations, filtering out tombstones and any
     /// owner_object_id that have been marked as deleted.
-    pub async fn iter<'a>(
-        &'a self,
-        merger: &'a mut Merger<'_, AllocatorKey, AllocatorValue>,
-        bound: Bound<&AllocatorKey>,
-    ) -> Result<Box<dyn LayerIterator<AllocatorKey, AllocatorValue> + 'a>, Error> {
+    pub async fn filter(
+        &self,
+        iter: impl LayerIterator<AllocatorKey, AllocatorValue>,
+    ) -> Result<impl LayerIterator<AllocatorKey, AllocatorValue>, Error> {
         let marked_for_deletion = self.inner.lock().unwrap().info.marked_for_deletion.clone();
-        let iter = filter_marked_for_deletion(
-            filter_tombstones(Box::new(merger.seek(bound).await?)).await?,
-            marked_for_deletion,
-        )
-        .await?;
+        let iter =
+            filter_marked_for_deletion(filter_tombstones(iter).await?, marked_for_deletion).await?;
         Ok(iter)
     }
 
@@ -1005,7 +1000,7 @@ impl Allocator for SimpleAllocator {
         let result = {
             let layer_set = self.layer_set();
             let mut merger = layer_set.merger();
-            let mut iter = self.iter(&mut merger, Bound::Unbounded).await?;
+            let mut iter = self.filter(merger.seek(Bound::Unbounded).await?).await?;
             let mut last_offset = 0;
             loop {
                 match iter.get() {
@@ -1147,9 +1142,12 @@ impl Allocator for SimpleAllocator {
         // key).  The upper bound is used to search each individual layer, and we want to start with
         // an extent that covers the first byte of the range we're deallocating.
         let mut iter = self
-            .iter(
-                &mut merger,
-                Bound::Included(&AllocatorKey { device_range: 0..dealloc_range.start + 1 }),
+            .filter(
+                merger
+                    .seek(Bound::Included(&AllocatorKey {
+                        device_range: 0..dealloc_range.start + 1,
+                    }))
+                    .await?,
             )
             .await?;
         let mut deallocated = 0;
@@ -1559,7 +1557,7 @@ impl JournalingObject for SimpleAllocator {
         let layer_set = self.tree.immutable_layer_set();
         {
             let mut merger = layer_set.merger();
-            let iter = self.iter(&mut merger, Bound::Unbounded).await?;
+            let iter = self.filter(merger.seek(Bound::Unbounded).await?).await?;
             let iter = CoalescingIterator::new(iter).await?;
             self.tree
                 .compact_with_iterator(
@@ -1669,15 +1667,13 @@ impl JournalingObject for SimpleAllocator {
 // records cannot overlap, so it's just a question of merging adjacent records if they happen to
 // have the same delta and object_id.
 
-pub struct CoalescingIterator<'a> {
-    iter: BoxedLayerIterator<'a, AllocatorKey, AllocatorValue>,
+pub struct CoalescingIterator<I> {
+    iter: I,
     item: Option<AllocatorItem>,
 }
 
-impl<'a> CoalescingIterator<'a> {
-    pub async fn new(
-        iter: BoxedLayerIterator<'a, AllocatorKey, AllocatorValue>,
-    ) -> Result<CoalescingIterator<'a>, Error> {
+impl<I: LayerIterator<AllocatorKey, AllocatorValue>> CoalescingIterator<I> {
+    pub async fn new(iter: I) -> Result<CoalescingIterator<I>, Error> {
         let mut iter = Self { iter, item: None };
         iter.advance().await?;
         Ok(iter)
@@ -1685,7 +1681,9 @@ impl<'a> CoalescingIterator<'a> {
 }
 
 #[async_trait]
-impl LayerIterator<AllocatorKey, AllocatorValue> for CoalescingIterator<'_> {
+impl<I: LayerIterator<AllocatorKey, AllocatorValue>> LayerIterator<AllocatorKey, AllocatorValue>
+    for CoalescingIterator<I>
+{
     async fn advance(&mut self) -> Result<(), Error> {
         self.item = self.iter.get().map(|x| x.cloned());
         if self.item.is_none() {
@@ -1801,11 +1799,10 @@ mod tests {
 
         let layer_set = lsm_tree.layer_set();
         let mut merger = layer_set.merger();
-        let mut iter = CoalescingIterator::new(Box::new(
-            merger.seek(Bound::Unbounded).await.expect("seek failed"),
-        ))
-        .await
-        .expect("new failed");
+        let mut iter =
+            CoalescingIterator::new(merger.seek(Bound::Unbounded).await.expect("seek failed"))
+                .await
+                .expect("new failed");
         let ItemRef { key, value, .. } = iter.get().expect("get failed");
         assert_eq!(
             (key, value),
@@ -1839,11 +1836,10 @@ mod tests {
 
         let layer_set = lsm_tree.layer_set();
         let mut merger = layer_set.merger();
-        let mut iter = CoalescingIterator::new(Box::new(
-            merger.seek(Bound::Unbounded).await.expect("seek failed"),
-        ))
-        .await
-        .expect("new failed");
+        let mut iter =
+            CoalescingIterator::new(merger.seek(Bound::Unbounded).await.expect("seek failed"))
+                .await
+                .expect("new failed");
         let ItemRef { key, value, .. } = iter.get().expect("get failed");
         assert_eq!(
             (key, value),
@@ -1876,7 +1872,10 @@ mod tests {
     async fn collect_allocations(allocator: &SimpleAllocator) -> Vec<Range<u64>> {
         let layer_set = allocator.tree.layer_set();
         let mut merger = layer_set.merger();
-        let mut iter = allocator.iter(&mut merger, Bound::Unbounded).await.expect("build iterator");
+        let mut iter = allocator
+            .filter(merger.seek(Bound::Unbounded).await.expect("seek failed"))
+            .await
+            .expect("build iterator");
         let mut allocations: Vec<Range<u64>> = Vec::new();
         while let Some(ItemRef { key: AllocatorKey { device_range }, .. }) = iter.get() {
             if let Some(r) = allocations.last() {
@@ -1891,7 +1890,10 @@ mod tests {
     async fn check_allocations(allocator: &SimpleAllocator, expected_allocations: &[Range<u64>]) {
         let layer_set = allocator.tree.layer_set();
         let mut merger = layer_set.merger();
-        let mut iter = allocator.iter(&mut merger, Bound::Unbounded).await.expect("build iterator");
+        let mut iter = allocator
+            .filter(merger.seek(Bound::Unbounded).await.expect("seek failed"))
+            .await
+            .expect("build iterator");
         let mut found = 0;
         while let Some(ItemRef { key: AllocatorKey { device_range }, .. }) = iter.get() {
             let mut l = device_range.length().expect("Invalid range");

@@ -445,7 +445,7 @@ impl<'a> Fsck<'a> {
         let layer_set = allocator.tree().layer_set();
         let mut merger = layer_set.merger();
         let mut stored_allocations =
-            CoalescingIterator::new(allocator.iter(&mut merger, Bound::Unbounded).await?)
+            CoalescingIterator::new(allocator.filter(merger.seek(Bound::Unbounded).await?).await?)
                 .await
                 .expect("filter failed");
         let mut observed_allocations =

@@ -534,7 +534,10 @@ async fn test_allocation_mismatch() {
         let range = {
             let layer_set = allocator.tree().layer_set();
             let mut merger = layer_set.merger();
-            let iter = allocator.iter(&mut merger, Bound::Unbounded).await.expect("iter failed");
+            let iter = allocator
+                .filter(merger.seek(Bound::Unbounded).await.expect("seek failed"))
+                .await
+                .expect("iter failed");
             let ItemRef { key: AllocatorKey { device_range }, .. } =
                 iter.get().expect("missing item");
             device_range.clone()
@@ -614,8 +617,10 @@ async fn test_volume_allocation_mismatch() {
         let range = {
             let layer_set = allocator.tree().layer_set();
             let mut merger = layer_set.merger();
-            let mut iter =
-                allocator.iter(&mut merger, Bound::Unbounded).await.expect("iter failed");
+            let mut iter = allocator
+                .filter(merger.seek(Bound::Unbounded).await.expect("seek failed"))
+                .await
+                .expect("iter failed");
             loop {
                 if let ItemRef {
                     key: AllocatorKey { device_range },
@@ -669,7 +674,10 @@ async fn test_missing_allocation() {
         let key = {
             let layer_set = allocator.tree().layer_set();
             let mut merger = layer_set.merger();
-            let iter = allocator.iter(&mut merger, Bound::Unbounded).await.expect("iter failed");
+            let iter = allocator
+                .filter(merger.seek(Bound::Unbounded).await.expect("seek failed"))
+                .await
+                .expect("iter failed");
             let iter = CoalescingIterator::new(iter).await.expect("filter failed");
             let ItemRef { key, .. } = iter.get().expect("missing item");
             // 'key' points at the first allocation record, which will be for the super blocks.
