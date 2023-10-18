@@ -68,10 +68,6 @@
 
                 // Read after shutdown.
                 "ReadAfterShutdownTests/ReadAfterShutdownTest.Success/IPv*_Datagram_Self_SHUT_RD_NonBlockingRead_NoPendingData",
-
-                // ICMP sockets.
-                "NetSocket/IcmpSocketTest.GetSockoptSoProtocol/*",
-                "NetSocket/IcmpSocketTest.PayloadIdentIgnored/*",
             ],
         },
         {
@@ -94,7 +90,6 @@
             matchers: [
                 "NoNetworkTest.NonBlockingConnect*V*",
                 "LocalhostTest/ReuseTest.AllowsAddressReuse/StreamLoopback",
-                "NetSocket/IcmpSocketTest.PayloadIdentIgnored*",
             ],
         },
     ],

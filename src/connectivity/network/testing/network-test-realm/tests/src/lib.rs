@@ -1225,6 +1225,8 @@ const IPV6_LINK_LOCAL_ADDRESS_CONFIG: PingAddressConfig = PingAddressConfig {
         IPV6_LINK_LOCAL_ADDRESS_CONFIG,
         PingOptions {
             interface_name:  Some(INTERFACE1_NAME.to_string()),
+            // TODO(https://fxbug.dev/133573): Fix and use the default timeout.
+            timeout: zx::Duration::from_seconds(5),
             ..PingOptions::default()
         },
         fntr::Netstack::V3,

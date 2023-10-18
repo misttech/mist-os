@@ -5,7 +5,7 @@
 //! Datagram socket bindings.
 
 use std::{
-    convert::TryInto as _,
+    convert::{Infallible as Never, TryInto as _},
     fmt::Debug,
     marker::PhantomData,
     num::{NonZeroU16, NonZeroU64, NonZeroU8, TryFromIntError},
@@ -30,13 +30,14 @@ use net_types::{
 };
 use netstack3_core::{
     device::{DeviceId, WeakDeviceId},
-    error::{LocalAddressError, SocketError},
-    ip::{icmp, IpExt},
+    error::{LocalAddressError, NotSupportedError, SocketError},
+    ip::{icmp, socket::IpSockCreateAndSendError, IpExt},
     socket::{
         address::SocketZonedIpAddr,
         datagram::{
-            ConnectError, ExpectedConnError, ExpectedUnboundError, MulticastInterfaceSelector,
-            MulticastMembershipInterfaceSelector, SetMulticastMembershipError, ShutdownType,
+            self as core_datagram, ConnectError, ExpectedConnError, ExpectedUnboundError,
+            MulticastInterfaceSelector, MulticastMembershipInterfaceSelector,
+            SetMulticastMembershipError, ShutdownType,
         },
     },
     sync::{Mutex as CoreMutex, RwLock as CoreRwLock},
@@ -68,6 +69,7 @@ use super::{
 #[derive(Debug)]
 pub(crate) enum DatagramProtocol {
     Udp,
+    IcmpEcho,
 }
 
 /// A minimal abstraction over transport protocols that allows bindings-side state to be stored.
@@ -218,6 +220,7 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
     type SetMulticastMembershipError: IntoErrno;
     type SetReusePortError: IntoErrno;
     type ShutdownError: IntoErrno;
+    type SetIpTransparentError: IntoErrno;
     type LocalIdentifier: OptionFromU16 + Into<u16> + Send;
     type RemoteIdentifier: OptionFromU16 + Into<u16> + Send;
     type SocketInfo<C: NonSyncContext>: IntoFidl<LocalAddress<I, WeakDeviceId<C>, Self::LocalIdentifier>>
@@ -336,7 +339,7 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
         sync_ctx: &SyncCtx<C>,
         id: &Self::SocketId,
         value: bool,
-    );
+    ) -> Result<(), Self::SetIpTransparentError>;
 
     fn get_ip_transparent<C: NonSyncContext>(sync_ctx: &SyncCtx<C>, id: &Self::SocketId) -> bool;
 }
@@ -384,6 +387,7 @@ impl<I: IpExt> TransportState<I> for Udp {
     type SetSocketDeviceError = SocketError;
     type SetMulticastMembershipError = SetMulticastMembershipError;
     type SetReusePortError = ExpectedUnboundError;
+    type SetIpTransparentError = Never;
     type LocalIdentifier = NonZeroU16;
     type RemoteIdentifier = NonZeroU16;
     type SocketInfo<C: NonSyncContext> = udp::SocketInfo<I::Addr, WeakDeviceId<C>>;
@@ -545,8 +549,8 @@ impl<I: IpExt> TransportState<I> for Udp {
         sync_ctx: &SyncCtx<C>,
         id: &Self::SocketId,
         value: bool,
-    ) {
-        udp::set_udp_transparent(sync_ctx, id, value);
+    ) -> Result<(), Self::SetIpTransparentError> {
+        Ok(udp::set_udp_transparent(sync_ctx, id, value))
     }
 
     fn get_ip_transparent<C: NonSyncContext>(sync_ctx: &SyncCtx<C>, id: &Self::SocketId) -> bool {
@@ -584,6 +588,8 @@ impl<I: IpExt + IpSockAddrExt, B: BufferMut> BufferTransportState<I, B> for Udp 
 
 impl<I: icmp::IcmpIpExt> udp::NonSyncContext<I> for SocketCollection<I, Udp> {
     fn receive_icmp_error(&mut self, id: udp::SocketId<I>, err: I::ErrorCode) {
+        // TODO(https://fxbug.dev/135413): Handle incoming ICMP errors in
+        // Bindings.
         warn!("unimplemented receive_icmp_error {:?} on {:?}", err, id)
     }
 }
@@ -603,6 +609,279 @@ impl<I: IpExt, B: BufferMut> udp::BufferNonSyncContext<I, B> for SocketCollectio
             destination_addr: dst_ip,
             destination_port: dst_port.get(),
             data: body.as_ref().to_vec(),
+            _marker: PhantomData,
+        })
+    }
+}
+
+#[derive(Debug)]
+pub(crate) enum IcmpEcho {}
+
+impl<I: Ip> Transport<I> for IcmpEcho {
+    const PROTOCOL: DatagramProtocol = DatagramProtocol::IcmpEcho;
+    type SocketId = icmp::SocketId<I>;
+}
+
+impl OptionFromU16 for u16 {
+    fn from_u16(t: u16) -> Option<Self> {
+        Some(t)
+    }
+}
+
+impl<I: IpExt> TransportState<I> for IcmpEcho {
+    type ConnectError = ConnectError;
+    type ListenError = Either<ExpectedUnboundError, LocalAddressError>;
+    type DisconnectError = ExpectedConnError;
+    type ShutdownError = ExpectedConnError;
+    type SetSocketDeviceError = SocketError;
+    type SetMulticastMembershipError = NotSupportedError;
+    type SetReusePortError = NotSupportedError;
+    type SetIpTransparentError = NotSupportedError;
+    type LocalIdentifier = NonZeroU16;
+    type RemoteIdentifier = u16;
+    type SocketInfo<C: NonSyncContext> = icmp::SocketInfo<I::Addr, WeakDeviceId<C>>;
+
+    fn create_unbound<C: NonSyncContext>(ctx: &SyncCtx<C>) -> Self::SocketId {
+        icmp::new_socket(ctx)
+    }
+
+    fn connect<C: NonSyncContext>(
+        sync_ctx: &SyncCtx<C>,
+        ctx: &mut C,
+        id: &Self::SocketId,
+        remote_ip: Option<SocketZonedIpAddr<I::Addr, DeviceId<C>>>,
+        remote_id: Self::RemoteIdentifier,
+    ) -> Result<(), Self::ConnectError> {
+        icmp::connect(sync_ctx, ctx, id, remote_ip, remote_id)
+    }
+
+    fn bind<C: NonSyncContext>(
+        sync_ctx: &SyncCtx<C>,
+        ctx: &mut C,
+        id: &Self::SocketId,
+        addr: Option<SocketZonedIpAddr<<I as Ip>::Addr, DeviceId<C>>>,
+        port: Option<Self::LocalIdentifier>,
+    ) -> Result<(), Self::ListenError> {
+        icmp::bind(sync_ctx, ctx, id, addr, port)
+    }
+
+    fn disconnect<C: NonSyncContext>(
+        sync_ctx: &SyncCtx<C>,
+        ctx: &mut C,
+        id: &Self::SocketId,
+    ) -> Result<(), Self::DisconnectError> {
+        icmp::disconnect(sync_ctx, ctx, id)
+    }
+
+    fn shutdown<C: NonSyncContext>(
+        sync_ctx: &SyncCtx<C>,
+        ctx: &C,
+        id: &Self::SocketId,
+        which: ShutdownType,
+    ) -> Result<(), Self::ShutdownError> {
+        icmp::shutdown(sync_ctx, ctx, id, which)
+    }
+
+    fn get_shutdown<C: NonSyncContext>(
+        sync_ctx: &SyncCtx<C>,
+        ctx: &C,
+        id: &Self::SocketId,
+    ) -> Option<ShutdownType> {
+        icmp::get_shutdown(sync_ctx, ctx, id)
+    }
+
+    fn get_socket_info<C: NonSyncContext>(
+        sync_ctx: &SyncCtx<C>,
+        ctx: &mut C,
+        id: &Self::SocketId,
+    ) -> Self::SocketInfo<C> {
+        icmp::get_info(sync_ctx, ctx, id)
+    }
+
+    fn remove<C: NonSyncContext>(sync_ctx: &SyncCtx<C>, ctx: &mut C, id: Self::SocketId) {
+        icmp::remove(sync_ctx, ctx, id)
+    }
+
+    fn set_socket_device<C: NonSyncContext>(
+        sync_ctx: &SyncCtx<C>,
+        ctx: &mut C,
+        id: &Self::SocketId,
+        device: Option<&DeviceId<C>>,
+    ) -> Result<(), Self::SetSocketDeviceError> {
+        icmp::set_device(sync_ctx, ctx, id, device)
+    }
+
+    fn get_bound_device<C: NonSyncContext>(
+        sync_ctx: &SyncCtx<C>,
+        ctx: &C,
+        id: &Self::SocketId,
+    ) -> Option<WeakDeviceId<C>> {
+        icmp::get_bound_device(sync_ctx, ctx, id)
+    }
+
+    fn set_reuse_port<C: NonSyncContext>(
+        _sync_ctx: &SyncCtx<C>,
+        _ctx: &mut C,
+        _id: &Self::SocketId,
+        _reuse_port: bool,
+    ) -> Result<(), Self::SetReusePortError> {
+        Err(NotSupportedError)
+    }
+
+    fn get_reuse_port<C: NonSyncContext>(
+        _sync_ctx: &SyncCtx<C>,
+        _ctx: &C,
+        _id: &Self::SocketId,
+    ) -> bool {
+        false
+    }
+
+    fn set_multicast_membership<C: NonSyncContext>(
+        _sync_ctx: &SyncCtx<C>,
+        _ctx: &mut C,
+        _id: &Self::SocketId,
+        _multicast_group: MulticastAddr<I::Addr>,
+        _interface: MulticastMembershipInterfaceSelector<I::Addr, DeviceId<C>>,
+        _want_membership: bool,
+    ) -> Result<(), Self::SetMulticastMembershipError> {
+        Err(NotSupportedError)
+    }
+
+    fn set_unicast_hop_limit<C: NonSyncContext>(
+        sync_ctx: &SyncCtx<C>,
+        ctx: &mut C,
+        id: &Self::SocketId,
+        hop_limit: Option<NonZeroU8>,
+    ) {
+        icmp::set_unicast_hop_limit(sync_ctx, ctx, id, hop_limit)
+    }
+
+    fn set_multicast_hop_limit<C: NonSyncContext>(
+        sync_ctx: &SyncCtx<C>,
+        ctx: &mut C,
+        id: &Self::SocketId,
+        hop_limit: Option<NonZeroU8>,
+    ) {
+        icmp::set_multicast_hop_limit(sync_ctx, ctx, id, hop_limit)
+    }
+
+    fn get_unicast_hop_limit<C: NonSyncContext>(
+        sync_ctx: &SyncCtx<C>,
+        ctx: &C,
+        id: &Self::SocketId,
+    ) -> NonZeroU8 {
+        icmp::get_unicast_hop_limit(sync_ctx, ctx, id)
+    }
+
+    fn get_multicast_hop_limit<C: NonSyncContext>(
+        sync_ctx: &SyncCtx<C>,
+        ctx: &C,
+        id: &Self::SocketId,
+    ) -> NonZeroU8 {
+        icmp::get_multicast_hop_limit(sync_ctx, ctx, id)
+    }
+
+    fn set_ip_transparent<C: NonSyncContext>(
+        _sync_ctx: &SyncCtx<C>,
+        _id: &Self::SocketId,
+        _value: bool,
+    ) -> Result<(), Self::SetIpTransparentError> {
+        Err(NotSupportedError)
+    }
+
+    fn get_ip_transparent<C: NonSyncContext>(_sync_ctx: &SyncCtx<C>, _id: &Self::SocketId) -> bool {
+        false
+    }
+}
+
+impl<E> IntoErrno for core_datagram::SendError<E> {
+    fn into_errno(self) -> fposix::Errno {
+        match self {
+            core_datagram::SendError::NotConnected => fposix::Errno::Edestaddrreq,
+            core_datagram::SendError::NotWriteable => fposix::Errno::Epipe,
+            core_datagram::SendError::IpSock(err) => err.into_errno(),
+            core_datagram::SendError::SerializeError(_e) => fposix::Errno::Einval,
+        }
+    }
+}
+
+impl<E> IntoErrno for core_datagram::SendToError<E> {
+    fn into_errno(self) -> fposix::Errno {
+        match self {
+            core_datagram::SendToError::NotWriteable => fposix::Errno::Epipe,
+            core_datagram::SendToError::Zone(err) => err.into_errno(),
+            core_datagram::SendToError::CreateAndSend(IpSockCreateAndSendError::Mtu) => {
+                fposix::Errno::Emsgsize
+            }
+            core_datagram::SendToError::CreateAndSend(IpSockCreateAndSendError::Create(err)) => {
+                err.into_errno()
+            }
+            core_datagram::SendToError::RemoteUnexpectedlyMapped => fposix::Errno::Einval,
+            core_datagram::SendToError::SerializeError(_e) => fposix::Errno::Einval,
+        }
+    }
+}
+
+impl<I: IpExt + IpSockAddrExt, B: BufferMut> BufferTransportState<I, B> for IcmpEcho {
+    type SendError = core_datagram::SendError<packet_formats::error::ParseError>;
+    type SendToError = either::Either<
+        LocalAddressError,
+        core_datagram::SendToError<packet_formats::error::ParseError>,
+    >;
+
+    fn send<C: BufferNonSyncContext<B>>(
+        sync_ctx: &SyncCtx<C>,
+        ctx: &mut C,
+        id: &Self::SocketId,
+        body: B,
+    ) -> Result<(), Self::SendError> {
+        icmp::send(sync_ctx, ctx, id, body)
+    }
+
+    fn send_to<C: BufferNonSyncContext<B>>(
+        sync_ctx: &SyncCtx<C>,
+        ctx: &mut C,
+        id: &Self::SocketId,
+        (remote_ip, _remote_id): (
+            Option<SocketZonedIpAddr<<I as Ip>::Addr, DeviceId<C>>>,
+            Self::RemoteIdentifier,
+        ),
+        body: B,
+    ) -> Result<(), Self::SendToError> {
+        icmp::send_to(sync_ctx, ctx, id, remote_ip, body)
+    }
+}
+
+impl<I: IpExt> icmp::IcmpContext<I> for SocketCollection<I, IcmpEcho> {
+    fn receive_icmp_error(
+        &mut self,
+        conn: icmp::SocketId<I>,
+        seq_num: u16,
+        err: <I as icmp::IcmpIpExt>::ErrorCode,
+    ) {
+        // TODO(https://fxbug.dev/135413): Handle incoming ICMP errors in
+        // Bindings.
+        warn!("unimplemented receive_icmp_error {:?} on {:?}, seq_num={}", err, conn, seq_num)
+    }
+}
+
+impl<I: IpExt, B: BufferMut> icmp::BufferIcmpContext<I, B> for SocketCollection<I, IcmpEcho> {
+    fn receive_icmp_echo_reply(
+        &mut self,
+        conn: icmp::SocketId<I>,
+        src_ip: I::Addr,
+        dst_ip: I::Addr,
+        id: u16,
+        data: B,
+    ) {
+        tracing::debug!("Received ICMP echo reply in binding: {:?}, id: {id}", I::VERSION);
+        let queue = self.received.get(conn.get_key_index()).unwrap();
+        queue.lock().receive(AvailableMessage {
+            source_addr: src_ip,
+            source_port: 0,
+            destination_addr: dst_ip,
+            destination_port: id,
+            data: data.as_ref().to_vec(),
             _marker: PhantomData,
         })
     }
@@ -690,7 +969,10 @@ pub(crate) struct SocketControlInfo<I: Ip, T: Transport<I>> {
 }
 
 pub(crate) trait SocketWorkerDispatcher:
-    RequestHandlerDispatcher<Ipv4, Udp> + RequestHandlerDispatcher<Ipv6, Udp>
+    RequestHandlerDispatcher<Ipv4, Udp>
+    + RequestHandlerDispatcher<Ipv6, Udp>
+    + RequestHandlerDispatcher<Ipv4, IcmpEcho>
+    + RequestHandlerDispatcher<Ipv6, IcmpEcho>
 {
 }
 
@@ -698,6 +980,8 @@ impl<T> SocketWorkerDispatcher for T
 where
     T: RequestHandlerDispatcher<Ipv4, Udp>,
     T: RequestHandlerDispatcher<Ipv6, Udp>,
+    T: RequestHandlerDispatcher<Ipv4, IcmpEcho>,
+    T: RequestHandlerDispatcher<Ipv6, IcmpEcho>,
 {
 }
 
@@ -732,10 +1016,28 @@ pub(super) fn spawn_worker(
             ));
             Ok(())
         }
-        (
-            fposix_socket::Domain::Ipv4 | fposix_socket::Domain::Ipv6,
-            fposix_socket::DatagramSocketProtocol::IcmpEcho,
-        ) => Err(fposix::Errno::Enoprotoopt),
+        (fposix_socket::Domain::Ipv4, fposix_socket::DatagramSocketProtocol::IcmpEcho) => {
+            spawner.spawn(SocketWorker::serve_stream_with(
+                ctx,
+                BindingData::<Ipv4, IcmpEcho>::new,
+                properties,
+                events,
+                (),
+                spawner.clone(),
+            ));
+            Ok(())
+        }
+        (fposix_socket::Domain::Ipv6, fposix_socket::DatagramSocketProtocol::IcmpEcho) => {
+            spawner.spawn(SocketWorker::serve_stream_with(
+                ctx,
+                BindingData::<Ipv6, IcmpEcho>::new,
+                properties,
+                events,
+                (),
+                spawner.clone(),
+            ));
+            Ok(())
+        }
     }
 }
 
@@ -1198,9 +1500,8 @@ where
                 value,
                 responder,
             } => {
-                self.set_ip_transparent(value);
                 responder
-                    .send(Ok(()))
+                    .send(self.set_ip_transparent(value).map_err(IntoErrno::into_errno))
                     .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetIpTransparent {
@@ -1444,6 +1745,7 @@ where
         };
         let protocol = match <T as Transport<I>>::PROTOCOL {
             DatagramProtocol::Udp => fposix_socket::DatagramSocketProtocol::Udp,
+            DatagramProtocol::IcmpEcho => fposix_socket::DatagramSocketProtocol::IcmpEcho,
         };
 
         Ok((domain, protocol))
@@ -1872,7 +2174,7 @@ where
         Ok(T::get_multicast_hop_limit(sync_ctx, non_sync_ctx, id).get())
     }
 
-    fn set_ip_transparent(self, value: bool) {
+    fn set_ip_transparent(self, value: bool) -> Result<(), T::SetIpTransparentError> {
         let Self {
             ctx,
             data:
@@ -1915,6 +2217,12 @@ impl IntoErrno for ExpectedConnError {
     }
 }
 
+impl IntoErrno for NotSupportedError {
+    fn into_errno(self) -> fposix::Errno {
+        fposix::Errno::Eopnotsupp
+    }
+}
+
 impl<I: Ip, D> IntoFidl<LocalAddress<I, D, NonZeroU16>> for udp::SocketInfo<I::Addr, D> {
     fn into_fidl(self) -> LocalAddress<I, D, NonZeroU16> {
         let (local_ip, local_port) = match self {
@@ -1944,6 +2252,46 @@ impl<I: Ip, D> TryIntoFidl<RemoteAddress<I, D, NonZeroU16>> for udp::SocketInfo<
                 remote_ip,
                 remote_port,
             }) => Ok(RemoteAddress { address: remote_ip, identifier: remote_port }),
+        }
+    }
+}
+
+impl<I: Ip, D: Clone> IntoFidl<LocalAddress<I, D, NonZeroU16>> for icmp::SocketInfo<I::Addr, D> {
+    fn into_fidl(self) -> LocalAddress<I, D, NonZeroU16> {
+        let (address, identifier) = match self {
+            Self::Unbound => (None, None),
+            Self::Bound { local_ip, id, device } => (
+                local_ip.map(|addr| {
+                    SocketZonedIpAddr::new_with_zone(addr, || {
+                        device.expect("device must be bound for addresses that require zones")
+                    })
+                }),
+                Some(id),
+            ),
+            Self::Connected { local_ip, id, remote_ip: _, remote_id: _, device } => (
+                Some(SocketZonedIpAddr::new_with_zone(local_ip, || {
+                    device.expect("device must be bound for addresses that require zones")
+                })),
+                Some(id),
+            ),
+        };
+        LocalAddress { address, identifier }
+    }
+}
+
+impl<I: Ip, D: Clone> TryIntoFidl<RemoteAddress<I, D, u16>> for icmp::SocketInfo<I::Addr, D> {
+    type Error = fposix::Errno;
+    fn try_into_fidl(self) -> Result<RemoteAddress<I, D, u16>, Self::Error> {
+        match self {
+            Self::Unbound | Self::Bound { .. } => Err(fposix::Errno::Enotconn),
+            Self::Connected { local_ip: _, id: _, remote_ip, remote_id, device } => {
+                Ok(RemoteAddress {
+                    address: SocketZonedIpAddr::new_with_zone(remote_ip, || {
+                        device.expect("device must be bound for addresses that require zones")
+                    }),
+                    identifier: remote_id,
+                })
+            }
         }
     }
 }
@@ -1993,6 +2341,8 @@ mod tests {
     use fuchsia_async as fasync;
     use fuchsia_zircon::{self as zx, AsHandleRef};
     use futures::StreamExt;
+    use packet::Serializer as _;
+    use packet_formats::icmp::IcmpIpExt;
 
     use crate::bindings::socket::{
         queue::MIN_OUTSTANDING_APPLICATION_MESSAGES_SIZE, testutil::TestSockAddr,
@@ -2078,6 +2428,24 @@ mod tests {
                     )
                     .await
                 }
+
+                $(#[$icmp_attributes])*
+                #[fasync::run_singlethreaded(test)]
+                async fn icmp_v4() {
+                    $test_fn::<fnet::Ipv4SocketAddress, IcmpEcho>(
+                        fposix_socket::DatagramSocketProtocol::IcmpEcho,
+                    )
+                    .await
+                }
+
+                $(#[$icmp_attributes])*
+                #[fasync::run_singlethreaded(test)]
+                async fn icmp_v6() {
+                    $test_fn::<fnet::Ipv6SocketAddress, IcmpEcho>(
+                        fposix_socket::DatagramSocketProtocol::IcmpEcho,
+                    )
+                    .await
+                }
             }
         };
         ($test_fn:ident) => {
@@ -2104,7 +2472,7 @@ mod tests {
                 assert_eq!(res, Err(fposix::Errno::Econnrefused));
             }
             fposix_socket::DatagramSocketProtocol::IcmpEcho => {
-                todo!("https://fxbug.dev/125482: implement ICMP sockets")
+                assert_eq!(res, Ok(()))
             }
         };
 
@@ -2119,10 +2487,7 @@ mod tests {
         t
     }
 
-    declare_tests!(
-        connect_failure,
-        icmp #[should_panic = "not yet implemented: https://fxbug.dev/47321: needs Core implementation"]
-    );
+    declare_tests!(connect_failure);
 
     #[fixture::teardown(TestSetup::shutdown)]
     async fn connect<A: TestSockAddr, T>(proto: fposix_socket::DatagramSocketProtocol) {
@@ -2143,10 +2508,7 @@ mod tests {
         t
     }
 
-    declare_tests!(
-        connect,
-        icmp #[should_panic = "not yet implemented: https://fxbug.dev/47321: needs Core implementation"]
-    );
+    declare_tests!(connect);
 
     #[fixture::teardown(TestSetup::shutdown)]
     async fn connect_loopback<A: TestSockAddr, T>(proto: fposix_socket::DatagramSocketProtocol) {
@@ -2186,10 +2548,7 @@ mod tests {
         t
     }
 
-    declare_tests!(
-        connect_any,
-        icmp #[should_panic = "not yet implemented: https://fxbug.dev/47321: needs Core implementation"]
-    );
+    declare_tests!(connect_any);
 
     #[fixture::teardown(TestSetup::shutdown)]
     async fn bind<A: TestSockAddr, T>(proto: fposix_socket::DatagramSocketProtocol) {
@@ -2218,9 +2577,7 @@ mod tests {
         t
     }
 
-    declare_tests!(bind,
-        icmp #[should_panic = "not yet implemented: https://fxbug.dev/47321: needs Core implementation"]
-    );
+    declare_tests!(bind);
 
     #[fixture::teardown(TestSetup::shutdown)]
     async fn bind_then_connect<A: TestSockAddr, T>(proto: fposix_socket::DatagramSocketProtocol) {
@@ -2237,10 +2594,7 @@ mod tests {
         t
     }
 
-    declare_tests!(
-        bind_then_connect,
-        icmp #[should_panic = "not yet implemented: https://fxbug.dev/47321: needs Core implementation"]
-    );
+    declare_tests!(bind_then_connect);
 
     #[fixture::teardown(TestSetup::shutdown)]
     async fn connect_then_disconnect<A: TestSockAddr, T>(
@@ -2265,9 +2619,68 @@ mod tests {
         t
     }
 
-    declare_tests!(connect_then_disconnect,
-        icmp #[should_panic = "not yet implemented: https://fxbug.dev/47321: needs Core implementation"]
-    );
+    /// ICMP echo sockets require the buffer to be a valid ICMP echo request,
+    /// this function performs transformations allowing the majority of the
+    /// sending logic to be common with UDP.
+    fn prepare_buffer_to_send<A: TestSockAddr>(
+        proto: fposix_socket::DatagramSocketProtocol,
+        buf: Vec<u8>,
+    ) -> Vec<u8>
+    where
+        <A::AddrType as IpAddress>::Version: IcmpIpExt,
+    {
+        match proto {
+            fposix_socket::DatagramSocketProtocol::Udp => buf,
+            fposix_socket::DatagramSocketProtocol::IcmpEcho => Buf::new(buf, ..)
+                .encapsulate(packet_formats::icmp::IcmpPacketBuilder::<
+                    <A::AddrType as IpAddress>::Version,
+                    _,
+                >::new(
+                    <<A::AddrType as IpAddress>::Version as Ip>::LOOPBACK_ADDRESS.get(),
+                    <<A::AddrType as IpAddress>::Version as Ip>::LOOPBACK_ADDRESS.get(),
+                    packet_formats::icmp::IcmpUnusedCode,
+                    packet_formats::icmp::IcmpEchoRequest::new(0, 1),
+                ))
+                .serialize_vec_outer()
+                .unwrap()
+                .into_inner()
+                .into_inner(),
+        }
+    }
+
+    /// ICMP echo sockets receive a buffer that is an ICMP echo reply, this
+    /// function performs transformations allowing the majority of the receiving
+    /// logic to be common with UDP.
+    fn expected_buffer_to_receive<A: TestSockAddr>(
+        proto: fposix_socket::DatagramSocketProtocol,
+        buf: Vec<u8>,
+        id: u16,
+        src_ip: A::AddrType,
+        dst_ip: A::AddrType,
+    ) -> Vec<u8>
+    where
+        <A::AddrType as IpAddress>::Version: IcmpIpExt,
+    {
+        match proto {
+            fposix_socket::DatagramSocketProtocol::Udp => buf,
+            fposix_socket::DatagramSocketProtocol::IcmpEcho => Buf::new(buf, ..)
+                .encapsulate(packet_formats::icmp::IcmpPacketBuilder::<
+                    <A::AddrType as IpAddress>::Version,
+                    _,
+                >::new(
+                    src_ip,
+                    dst_ip,
+                    packet_formats::icmp::IcmpUnusedCode,
+                    packet_formats::icmp::IcmpEchoReply::new(id, 1),
+                ))
+                .serialize_vec_outer()
+                .unwrap()
+                .into_inner()
+                .into_inner(),
+        }
+    }
+
+    declare_tests!(connect_then_disconnect);
 
     /// Tests a simple UDP setup with a client and a server, where the client
     /// can send data to the server and the server receives it.
@@ -2275,7 +2688,10 @@ mod tests {
     // writing it crashes before reaching the wrong parts, but we will need to specialize the body
     // of this test for ICMP before calling the feature complete.
     #[fixture::teardown(TestSetup::shutdown)]
-    async fn hello<A: TestSockAddr, T>(proto: fposix_socket::DatagramSocketProtocol) {
+    async fn hello<A: TestSockAddr, T>(proto: fposix_socket::DatagramSocketProtocol)
+    where
+        <A::AddrType as IpAddress>::Version: IcmpIpExt,
+    {
         // We create two stacks, Alice (server listening on LOCAL_ADDR:200), and
         // Bob (client, bound on REMOTE_ADDR:300). After setup, Bob connects to
         // Alice and sends a datagram. Finally, we verify that Alice receives
@@ -2376,6 +2792,11 @@ mod tests {
             .unwrap()
             .expect("Connect succeeds");
 
+        // Verify that Bob still has the right local socket name.
+        assert_eq!(
+            bob_socket.get_sock_name().await.unwrap().expect("bob getsockname suceeds"),
+            A::create(A::REMOTE_ADDR, 300)
+        );
         // Verify that Bob has the peer socket set correctly
         assert_eq!(
             bob_socket.get_peer_name().await.unwrap().expect("bob getpeername suceeds"),
@@ -2391,49 +2812,71 @@ mod tests {
         // Send datagram from Bob's socket.
         println!("Writing datagram to bob");
         let body = "Hello".as_bytes();
+        let to_send = prepare_buffer_to_send::<A>(proto, body.to_vec());
         assert_eq!(
             bob_socket
                 .send_msg(
                     None,
-                    &body,
+                    &to_send,
                     &fposix_socket::DatagramSocketSendControlData::default(),
                     fposix_socket::SendMsgFlags::empty()
                 )
                 .await
                 .unwrap()
                 .expect("sendmsg suceeds"),
-            body.len() as i64
+            to_send.len() as i64
         );
 
-        // Wait for datagram to arrive on Alice's socket:
+        let (events, socket, port, expected_src_ip) = match proto {
+            fposix_socket::DatagramSocketProtocol::Udp => {
+                (&alice_events, &alice_socket, 300, A::REMOTE_ADDR)
+            }
+            fposix_socket::DatagramSocketProtocol::IcmpEcho => {
+                (&bob_events, &bob_socket, 0, A::LOCAL_ADDR)
+            }
+        };
 
         println!("Waiting for signals");
         assert_eq!(
-            fasync::OnSignals::new(&alice_events, ZXSIO_SIGNAL_INCOMING).await,
+            fasync::OnSignals::new(events, ZXSIO_SIGNAL_INCOMING).await,
             Ok(ZXSIO_SIGNAL_INCOMING | ZXSIO_SIGNAL_OUTGOING)
         );
 
-        let (from, data, _, truncated) = alice_socket
+        let to_recv = expected_buffer_to_receive::<A>(
+            proto,
+            body.to_vec(),
+            300,
+            A::LOCAL_ADDR,
+            A::REMOTE_ADDR,
+        );
+        let (from, data, _, truncated) = socket
             .recv_msg(true, 2048, false, fposix_socket::RecvMsgFlags::empty())
             .await
             .unwrap()
             .expect("recvmsg suceeeds");
         let source = A::from_sock_addr(*from.expect("socket address returned"))
             .expect("bad socket address return");
-        assert_eq!(source.addr(), A::REMOTE_ADDR);
-        assert_eq!(source.port(), 300);
+        assert_eq!(source.addr(), expected_src_ip);
+        assert_eq!(source.port(), port);
         assert_eq!(truncated, 0);
-        assert_eq!(&data[..], body);
-
+        assert_eq!(&data[..], to_recv);
         t
     }
 
-    declare_tests!(
-        hello,
-        icmp #[should_panic = "not yet implemented: https://fxbug.dev/47321: needs Core implementation"]
-    );
+    declare_tests!(hello);
 
     #[fixture::teardown(TestSetup::shutdown)]
+    #[test_case::test_matrix(
+        [
+            fposix_socket::Domain::Ipv4,
+            fposix_socket::Domain::Ipv6,
+        ],
+        [
+            fposix_socket::DatagramSocketProtocol::Udp,
+            fposix_socket::DatagramSocketProtocol::IcmpEcho,
+        ]
+    )]
+    #[fasync::run_singlethreaded(test)]
     async fn socket_describe(
         domain: fposix_socket::Domain,
         proto: fposix_socket::DatagramSocketProtocol,
@@ -2460,19 +2903,18 @@ mod tests {
         t
     }
 
-    #[fasync::run_singlethreaded(test)]
-    async fn udp_v4_socket_describe() {
-        socket_describe(fposix_socket::Domain::Ipv4, fposix_socket::DatagramSocketProtocol::Udp)
-            .await
-    }
-
-    #[fasync::run_singlethreaded(test)]
-    async fn udp_v6_socket_describe() {
-        socket_describe(fposix_socket::Domain::Ipv6, fposix_socket::DatagramSocketProtocol::Udp)
-            .await
-    }
-
     #[fixture::teardown(TestSetup::shutdown)]
+    #[test_case::test_matrix(
+        [
+            fposix_socket::Domain::Ipv4,
+            fposix_socket::Domain::Ipv6,
+        ],
+        [
+            fposix_socket::DatagramSocketProtocol::Udp,
+            fposix_socket::DatagramSocketProtocol::IcmpEcho,
+        ]
+    )]
+    #[fasync::run_singlethreaded(test)]
     async fn socket_get_info(
         domain: fposix_socket::Domain,
         proto: fposix_socket::DatagramSocketProtocol,
@@ -2499,18 +2941,6 @@ mod tests {
         t
     }
 
-    #[fasync::run_singlethreaded(test)]
-    async fn udp_v4_socket_get_info() {
-        socket_get_info(fposix_socket::Domain::Ipv4, fposix_socket::DatagramSocketProtocol::Udp)
-            .await
-    }
-
-    #[fasync::run_singlethreaded(test)]
-    async fn udp_v6_socket_get_info() {
-        socket_get_info(fposix_socket::Domain::Ipv6, fposix_socket::DatagramSocketProtocol::Udp)
-            .await
-    }
-
     fn socket_clone(
         socket: &fposix_socket::SynchronousDatagramSocketProxy,
     ) -> fposix_socket::SynchronousDatagramSocketProxy {
@@ -2526,6 +2956,7 @@ mod tests {
     async fn clone<A: TestSockAddr, T>(proto: fposix_socket::DatagramSocketProtocol)
     where
         <A::AddrType as IpAddress>::Version: SocketCollectionIpExt<T>,
+        <A::AddrType as IpAddress>::Version: IcmpIpExt,
         T: Transport<Ipv4>,
         T: Transport<Ipv6>,
         T: Transport<<A::AddrType as IpAddress>::Version>,
@@ -2576,37 +3007,54 @@ mod tests {
         );
 
         let body = "Hello".as_bytes();
+        let to_send = prepare_buffer_to_send::<A>(proto, body.to_vec());
         assert_eq!(
             alice_socket
                 .send_msg(
                     Some(&A::create(A::REMOTE_ADDR, 200)),
-                    &body,
+                    &to_send,
                     &fposix_socket::DatagramSocketSendControlData::default(),
                     fposix_socket::SendMsgFlags::empty()
                 )
                 .await
                 .unwrap()
                 .expect("failed to send_msg"),
-            body.len() as i64
+            to_send.len() as i64
         );
 
+        let (cloned_events, cloned_socket, expected_from) = match proto {
+            fposix_socket::DatagramSocketProtocol::Udp => {
+                (&bob_events, &bob_cloned, A::create(A::LOCAL_ADDR, 200))
+            }
+            fposix_socket::DatagramSocketProtocol::IcmpEcho => {
+                (&alice_events, &alice_cloned, A::create(A::REMOTE_ADDR, 0))
+            }
+        };
+
         assert_eq!(
-            fasync::OnSignals::new(&bob_events, ZXSIO_SIGNAL_INCOMING).await,
+            fasync::OnSignals::new(cloned_events, ZXSIO_SIGNAL_INCOMING).await,
             Ok(ZXSIO_SIGNAL_INCOMING | ZXSIO_SIGNAL_OUTGOING)
         );
 
         // Receive from the cloned socket.
-        let (from, data, _, truncated) = bob_cloned
+        let (from, data, _, truncated) = cloned_socket
             .recv_msg(true, 2048, false, fposix_socket::RecvMsgFlags::empty())
             .await
             .unwrap()
             .expect("failed to recv_msg");
-        assert_eq!(&data[..], body);
+        let to_recv = expected_buffer_to_receive::<A>(
+            proto,
+            body.to_vec(),
+            200,
+            A::REMOTE_ADDR,
+            A::LOCAL_ADDR,
+        );
+        assert_eq!(&data[..], to_recv);
         assert_eq!(truncated, 0);
-        assert_eq!(from.map(|a| *a), Some(A::create(A::LOCAL_ADDR, 200)));
+        assert_eq!(from.map(|a| *a), Some(expected_from));
         // The data have already been received on the cloned socket
         assert_eq!(
-            bob_socket
+            cloned_socket
                 .recv_msg(false, 2048, false, fposix_socket::RecvMsgFlags::empty())
                 .await
                 .unwrap()
@@ -2614,92 +3062,107 @@ mod tests {
             fposix::Errno::Eagain
         );
 
-        // Close the socket should not invalidate the cloned socket.
-        let () = bob_socket
-            .close()
-            .await
-            .expect("FIDL error")
-            .map_err(zx::Status::from_raw)
-            .expect("close failed");
+        match proto {
+            fposix_socket::DatagramSocketProtocol::Udp => {
+                // Close the socket should not invalidate the cloned socket.
+                let () = bob_socket
+                    .close()
+                    .await
+                    .expect("FIDL error")
+                    .map_err(zx::Status::from_raw)
+                    .expect("close failed");
 
-        assert_eq!(
-            bob_cloned
-                .send_msg(
-                    Some(&A::create(A::LOCAL_ADDR, 200)),
-                    &body,
-                    &fposix_socket::DatagramSocketSendControlData::default(),
-                    fposix_socket::SendMsgFlags::empty()
-                )
-                .await
-                .unwrap()
-                .expect("failed to send_msg"),
-            body.len() as i64
-        );
+                assert_eq!(
+                    bob_cloned
+                        .send_msg(
+                            Some(&A::create(A::LOCAL_ADDR, 200)),
+                            &body,
+                            &fposix_socket::DatagramSocketSendControlData::default(),
+                            fposix_socket::SendMsgFlags::empty()
+                        )
+                        .await
+                        .unwrap()
+                        .expect("failed to send_msg"),
+                    body.len() as i64
+                );
 
-        let () = alice_cloned
-            .close()
-            .await
-            .expect("FIDL error")
-            .map_err(zx::Status::from_raw)
-            .expect("close failed");
-        assert_eq!(
-            fasync::OnSignals::new(&alice_events, ZXSIO_SIGNAL_INCOMING).await,
-            Ok(ZXSIO_SIGNAL_INCOMING | ZXSIO_SIGNAL_OUTGOING)
-        );
+                let () = alice_cloned
+                    .close()
+                    .await
+                    .expect("FIDL error")
+                    .map_err(zx::Status::from_raw)
+                    .expect("close failed");
+                assert_eq!(
+                    fasync::OnSignals::new(&alice_events, ZXSIO_SIGNAL_INCOMING).await,
+                    Ok(ZXSIO_SIGNAL_INCOMING | ZXSIO_SIGNAL_OUTGOING)
+                );
 
-        let (from, data, _, truncated) = alice_socket
-            .recv_msg(true, 2048, false, fposix_socket::RecvMsgFlags::empty())
-            .await
-            .unwrap()
-            .expect("failed to recv_msg");
-        assert_eq!(&data[..], body);
-        assert_eq!(truncated, 0);
-        assert_eq!(from.map(|a| *a), Some(A::create(A::REMOTE_ADDR, 200)));
+                let (from, data, _, truncated) = alice_socket
+                    .recv_msg(true, 2048, false, fposix_socket::RecvMsgFlags::empty())
+                    .await
+                    .unwrap()
+                    .expect("failed to recv_msg");
+                assert_eq!(&data[..], body);
+                assert_eq!(truncated, 0);
+                assert_eq!(from.map(|a| *a), Some(A::create(A::REMOTE_ADDR, 200)));
 
-        // Make sure the sockets are still in the stack.
-        for i in 0..2 {
-            t.get(i).with_ctx(|ctx| {
-                <A::AddrType as IpAddress>::Version::with_collection(
-                    ctx.non_sync_ctx(),
-                    |SocketCollection { received }| {
-                        assert_matches!(received.key_ordered_iter().collect::<Vec<_>>()[..], [_]);
-                    },
-                )
-            });
-        }
+                // Make sure the sockets are still in the stack.
+                for i in 0..2 {
+                    t.get(i).with_ctx(|ctx| {
+                        <A::AddrType as IpAddress>::Version::with_collection(
+                            ctx.non_sync_ctx(),
+                            |SocketCollection { received }| {
+                                assert_matches!(
+                                    received.key_ordered_iter().collect::<Vec<_>>()[..],
+                                    [_]
+                                );
+                            },
+                        )
+                    });
+                }
 
-        let () = alice_socket
-            .close()
-            .await
-            .expect("FIDL error")
-            .map_err(zx::Status::from_raw)
-            .expect("close failed");
-        let () = bob_cloned
-            .close()
-            .await
-            .expect("FIDL error")
-            .map_err(zx::Status::from_raw)
-            .expect("close failed");
+                let () = alice_socket
+                    .close()
+                    .await
+                    .expect("FIDL error")
+                    .map_err(zx::Status::from_raw)
+                    .expect("close failed");
+                let () = bob_cloned
+                    .close()
+                    .await
+                    .expect("FIDL error")
+                    .map_err(zx::Status::from_raw)
+                    .expect("close failed");
 
-        // But the sockets should have gone here.
-        for i in 0..2 {
-            t.get(i).with_ctx(|ctx| {
-                <A::AddrType as IpAddress>::Version::with_collection(
-                    ctx.non_sync_ctx(),
-                    |SocketCollection { received }| {
-                        assert_matches!(received.key_ordered_iter().collect::<Vec<_>>()[..], []);
-                    },
-                )
-            });
+                // But the sockets should have gone here.
+                for i in 0..2 {
+                    t.get(i).with_ctx(|ctx| {
+                        <A::AddrType as IpAddress>::Version::with_collection(
+                            ctx.non_sync_ctx(),
+                            |SocketCollection { received }| {
+                                assert_matches!(
+                                    received.key_ordered_iter().collect::<Vec<_>>()[..],
+                                    []
+                                );
+                            },
+                        )
+                    });
+                }
+            }
+            fposix_socket::DatagramSocketProtocol::IcmpEcho => {
+                // For ICMP sockets, the sending and receiving socket are the
+                // the same socket, so the above test for UDP will not apply -
+                // closing alice_socket and bob_cloned will keep both sockets
+                // alive, but closing bob_socket and bob_cloned will actually
+                // close bob. There is no interesting behavior to test for a
+                // closed socket.
+            }
         }
 
         t
     }
 
-    declare_tests!(
-        clone,
-        icmp #[should_panic = "not yet implemented: https://fxbug.dev/47321: needs Core implementation"]
-    );
+    declare_tests!(clone);
 
     #[fixture::teardown(TestSetup::shutdown)]
     async fn close_twice<A: TestSockAddr, T>(proto: fposix_socket::DatagramSocketProtocol)
@@ -2892,11 +3355,22 @@ mod tests {
             fposix::Errno::Epipe,
         );
         let invalid_addr = A::create(A::REMOTE_ADDR, 0);
+        let errno = match proto {
+            fposix_socket::DatagramSocketProtocol::Udp => fposix::Errno::Einval,
+            fposix_socket::DatagramSocketProtocol::IcmpEcho => fposix::Errno::Epipe,
+        };
         assert_eq!(
-            socket.send_msg(Some(&invalid_addr), &body, &fposix_socket::DatagramSocketSendControlData::default(), fposix_socket::SendMsgFlags::empty()).await.unwrap().expect_err(
-                "writing to an invalid address (port 0) should fail with EINVAL instead of EPIPE"
-            ),
-            fposix::Errno::Einval,
+            socket
+                .send_msg(
+                    Some(&invalid_addr),
+                    &body,
+                    &fposix_socket::DatagramSocketSendControlData::default(),
+                    fposix_socket::SendMsgFlags::empty()
+                )
+                .await
+                .unwrap()
+                .expect_err("writing to port 0 should fail"),
+            errno
         );
 
         let left = async {
@@ -2940,16 +3414,18 @@ mod tests {
         t
     }
 
-    declare_tests!(
-        shutdown,
-        icmp #[should_panic = "not yet implemented: https://fxbug.dev/47321: needs Core implementation"]
-    );
+    declare_tests!(shutdown);
 
     #[fixture::teardown(TestSetup::shutdown)]
-    async fn set_receive_buffer_after_delivery<A: TestSockAddr, T>(
+    async fn set_receive_buffer_after_delivery<
+        A: TestSockAddr,
+        T: Transport<<A::AddrType as IpAddress>::Version> + Transport<Ipv4> + Transport<Ipv6>,
+    >(
         proto: fposix_socket::DatagramSocketProtocol,
     ) where
-        <A::AddrType as IpAddress>::Version: SocketCollectionIpExt<Udp>,
+        <A::AddrType as IpAddress>::Version: SocketCollectionIpExt<T>,
+        <A::AddrType as IpAddress>::Version: IcmpIpExt,
+        BindingsNonSyncCtxImpl: AsRef<SocketCollectionPair<T>>,
     {
         let mut t = TestSetupBuilder::new().add_stack(StackSetupBuilder::new()).build().await;
 
@@ -2960,7 +3436,10 @@ mod tests {
 
         const SENT_PACKETS: u8 = 10;
         for i in 0..SENT_PACKETS {
-            let buf = [i; MIN_OUTSTANDING_APPLICATION_MESSAGES_SIZE];
+            let buf = prepare_buffer_to_send::<A>(
+                proto,
+                vec![i; MIN_OUTSTANDING_APPLICATION_MESSAGES_SIZE],
+            );
             let sent: usize = socket
                 .send_msg(
                     Some(&addr),
@@ -2973,7 +3452,7 @@ mod tests {
                 .expect("send_msg should succeed")
                 .try_into()
                 .unwrap();
-            assert_eq!(sent, MIN_OUTSTANDING_APPLICATION_MESSAGES_SIZE);
+            assert_eq!(sent, buf.len());
         }
 
         // Wait for all packets to be delivered before changing the buffer size.
@@ -2982,18 +3461,18 @@ mod tests {
             messages.available_messages().len() == usize::from(SENT_PACKETS)
         };
         loop {
-            let all_delivered =
-                stack.with_ctx(|ctx| {
-                    let non_sync_ctx = ctx.non_sync_ctx_mut();
-                    <<A::AddrType as IpAddress>::Version as SocketCollectionIpExt<
-                        Udp,
-                    >>::with_collection(non_sync_ctx, |SocketCollection { received }| {
+            let all_delivered = stack.with_ctx(|ctx| {
+                let non_sync_ctx = ctx.non_sync_ctx_mut();
+                <<A::AddrType as IpAddress>::Version as SocketCollectionIpExt<T>>::with_collection(
+                    non_sync_ctx,
+                    |SocketCollection { received }| {
                         // Check the lone socket to see if the packets were
                         // received.
                         let (_index, messages) = received.key_ordered_iter().next().unwrap();
                         has_all_delivered(&messages.lock())
-                    })
-                });
+                    },
+                )
+            });
             if all_delivered {
                 break;
             }
@@ -3030,7 +3509,13 @@ mod tests {
         .map(|(i, data)| {
             assert_eq!(
                 &data,
-                &[u8::try_from(i).unwrap(); MIN_OUTSTANDING_APPLICATION_MESSAGES_SIZE]
+                &expected_buffer_to_receive::<A>(
+                    proto,
+                    vec![u8::try_from(i).unwrap(); MIN_OUTSTANDING_APPLICATION_MESSAGES_SIZE],
+                    200,
+                    <<A::AddrType as IpAddress>::Version as Ip>::LOOPBACK_ADDRESS.get(),
+                    <<A::AddrType as IpAddress>::Version as Ip>::LOOPBACK_ADDRESS.get(),
+                )
             )
         })
         .count()
@@ -3040,15 +3525,14 @@ mod tests {
         t
     }
 
-    declare_tests!(
-        set_receive_buffer_after_delivery,
-        icmp #[should_panic = "not yet implemented: https://fxbug.dev/47321: needs Core implementation"]
-    );
+    declare_tests!(set_receive_buffer_after_delivery);
 
     #[fixture::teardown(TestSetup::shutdown)]
     async fn send_recv_loopback_peek<A: TestSockAddr, T>(
         proto: fposix_socket::DatagramSocketProtocol,
-    ) {
+    ) where
+        <A::AddrType as IpAddress>::Version: IcmpIpExt,
+    {
         let (t, proxy, _event) = prepare_test::<A>(proto).await;
         let addr =
             A::create(<<A::AddrType as IpAddress>::Version as Ip>::LOOPBACK_ADDRESS.get(), 100);
@@ -3057,12 +3541,13 @@ mod tests {
         let () = proxy.connect(&addr).await.unwrap().expect("connect succeeds");
 
         const DATA: &[u8] = &[1, 2, 3, 4, 5];
+        let to_send = prepare_buffer_to_send::<A>(proto, DATA.to_vec());
         assert_eq!(
             usize::try_from(
                 proxy
                     .send_msg(
                         None,
-                        DATA,
+                        &to_send,
                         &fposix_socket::DatagramSocketSendControlData::default(),
                         fposix_socket::SendMsgFlags::empty()
                     )
@@ -3071,7 +3556,7 @@ mod tests {
                     .expect("send_msg should succeed"),
             )
             .unwrap(),
-            DATA.len()
+            to_send.len()
         );
 
         // First try receiving the message with PEEK set.
@@ -3090,8 +3575,15 @@ mod tests {
                 Err(e) => panic!("unexpected error: {e:?}"),
             }
         };
+        let expected = expected_buffer_to_receive::<A>(
+            proto,
+            DATA.to_vec(),
+            100,
+            <<A::AddrType as IpAddress>::Version as Ip>::LOOPBACK_ADDRESS.get(),
+            <<A::AddrType as IpAddress>::Version as Ip>::LOOPBACK_ADDRESS.get(),
+        );
         assert_eq!(truncated, 0);
-        assert_eq!(data.as_slice(), DATA);
+        assert_eq!(data.as_slice(), expected,);
 
         // Now that the message has for sure been received, it can be retrieved
         // without checking for Eagain.
@@ -3101,15 +3593,12 @@ mod tests {
             .unwrap()
             .expect("recv should succeed");
         assert_eq!(truncated, 0);
-        assert_eq!(data.as_slice(), DATA);
+        assert_eq!(data.as_slice(), expected);
 
         t
     }
 
-    declare_tests!(
-        send_recv_loopback_peek,
-        icmp #[should_panic = "not yet implemented: https://fxbug.dev/47321: needs Core implementation"]
-    );
+    declare_tests!(send_recv_loopback_peek);
 
     // TODO(https://fxbug.dev/92678): add a syscall test to exercise this
     // behavior.
@@ -3187,7 +3676,7 @@ mod tests {
 
     declare_tests!(
         multicast_join_receive,
-        icmp #[should_panic = "not yet implemented: https://fxbug.dev/47321: needs Core implementation"]
+        icmp #[should_panic = "Eopnotsupp"]
     );
 
     #[fixture::teardown(TestSetup::shutdown)]
@@ -3219,10 +3708,7 @@ mod tests {
         t
     }
 
-    declare_tests!(
-        set_get_hop_limit_unicast,
-        icmp #[should_panic = "not yet implemented: https://fxbug.dev/47321: needs Core implementation"]
-    );
+    declare_tests!(set_get_hop_limit_unicast);
 
     #[fixture::teardown(TestSetup::shutdown)]
     async fn set_get_hop_limit_multicast<A: TestSockAddr, T>(
@@ -3253,10 +3739,7 @@ mod tests {
         t
     }
 
-    declare_tests!(
-        set_get_hop_limit_multicast,
-        icmp #[should_panic = "not yet implemented: https://fxbug.dev/47321: needs Core implementation"]
-    );
+    declare_tests!(set_get_hop_limit_multicast);
 
     // TODO(https://fxbug.dev/21198): Change this when dual-stack socket support
     // is added since dual-stack sockets should allow setting options for both
@@ -3496,5 +3979,12 @@ mod tests {
         t
     }
 
-    declare_tests!(receive_original_destination_address);
+    declare_tests!(
+        receive_original_destination_address,
+        icmp #[ignore] // ICMP sockets' send/recv are different from what UDP
+        // does, i.e., alice doesn't receive what bob sends, but rather bob
+        // receives the echo reply for the echo request they send. If we need
+        // this option for ICMP sockets, we should write a dedicated test for
+        // ICMP.
+    );
 }

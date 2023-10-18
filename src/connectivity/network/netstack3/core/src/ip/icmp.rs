@@ -73,7 +73,8 @@ use crate::{
         },
         datagram::{
             self, DatagramBoundStateContext, DatagramFlowId, DatagramSocketMapSpec,
-            DatagramSocketSpec, DatagramStateContext, ExpectedUnboundError,
+            DatagramSocketSpec, DatagramStateContext, ExpectedUnboundError, ShutdownType,
+            SocketHopLimits,
         },
         AddrVec, IncompatibleError, InsertError, ListenerAddrInfo, SocketMapAddrSpec,
         SocketMapAddrStateSpec, SocketMapConflictPolicy, SocketMapStateSpec,
@@ -890,7 +891,7 @@ impl DatagramSocketSpec for Icmp {
     // Store the remote port/id set by `connect`. This does not participate in
     // demuxing, so not part of the socketmap, but we need to store it so that
     // it can be reported later.
-    type ConnStateExtra = NonZeroU16;
+    type ConnStateExtra = u16;
 
     fn conn_addr_from_state<I: datagram::IpExt, D: Clone + Debug + Eq + core::hash::Hash>(
         state: &Self::ConnState<I, D>,
@@ -3316,7 +3317,7 @@ pub(crate) trait SocketHandler<I: datagram::IpExt, C>: DeviceIdContext<AnyDevice
         ctx: &mut C,
         id: &SocketId<I>,
         remote_ip: Option<SocketZonedIpAddr<I::Addr, Self::DeviceId>>,
-        remote_id: NonZeroU16,
+        remote_id: u16,
     ) -> Result<(), datagram::ConnectError>;
 
     /// Binds an ICMP socket to a local IP address and a local ID to send/recv
@@ -3344,6 +3345,49 @@ pub(crate) trait SocketHandler<I: datagram::IpExt, C>: DeviceIdContext<AnyDevice
     ) -> Result<(), SocketError>;
 
     fn get_bound_device(&mut self, ctx: &C, id: &SocketId<I>) -> Option<Self::WeakDeviceId>;
+
+    /// Disconnects an ICMP socket.
+    fn disconnect(
+        &mut self,
+        ctx: &mut C,
+        id: &SocketId<I>,
+    ) -> Result<(), datagram::ExpectedConnError>;
+
+    /// Shuts down an ICMP socket.
+    fn shutdown(
+        &mut self,
+        ctx: &C,
+        id: &SocketId<I>,
+        shutdown_type: ShutdownType,
+    ) -> Result<(), datagram::ExpectedConnError>;
+
+    /// Gets the current shutdown state of the ICMP socket.
+    fn get_shutdown(&mut self, ctx: &C, id: &SocketId<I>) -> Option<ShutdownType>;
+
+    /// Removes the ICMP socket.
+    fn remove(&mut self, ctx: &mut C, id: SocketId<I>);
+
+    /// Gets the unicast hop limit.
+    fn get_unicast_hop_limit(&mut self, ctx: &C, id: &SocketId<I>) -> NonZeroU8;
+
+    /// Gets the multicast hop limit.
+    fn get_multicast_hop_limit(&mut self, ctx: &C, id: &SocketId<I>) -> NonZeroU8;
+
+    /// Sets the unicast hop limit.
+    fn set_unicast_hop_limit(
+        &mut self,
+        ctx: &mut C,
+        id: &SocketId<I>,
+        hop_limit: Option<NonZeroU8>,
+    );
+
+    /// Sets the multicast hop limit.
+    fn set_multicast_hop_limit(
+        &mut self,
+        ctx: &mut C,
+        id: &SocketId<I>,
+        hop_limit: Option<NonZeroU8>,
+    );
 }
 
 /// A handler trait for ICMP sockets that also allows sending/receiving on the
@@ -3383,7 +3427,7 @@ impl<I: datagram::IpExt, C: IcmpNonSyncCtx<I>, SC: StateContext<I, C> + IcmpStat
         ctx: &mut C,
         id: &SocketId<I>,
         remote_ip: Option<SocketZonedIpAddr<I::Addr, Self::DeviceId>>,
-        remote_id: NonZeroU16,
+        remote_id: u16,
     ) -> Result<(), datagram::ConnectError> {
         datagram::connect(self, ctx, id.clone(), remote_ip, (), remote_id)
     }
@@ -3457,6 +3501,67 @@ impl<I: datagram::IpExt, C: IcmpNonSyncCtx<I>, SC: StateContext<I, C> + IcmpStat
     fn get_bound_device(&mut self, ctx: &C, id: &SocketId<I>) -> Option<Self::WeakDeviceId> {
         datagram::get_bound_device(self, ctx, id.clone())
     }
+
+    fn disconnect(
+        &mut self,
+        ctx: &mut C,
+        id: &SocketId<I>,
+    ) -> Result<(), datagram::ExpectedConnError> {
+        datagram::disconnect_connected(self, ctx, id.clone())
+    }
+
+    fn shutdown(
+        &mut self,
+        ctx: &C,
+        id: &SocketId<I>,
+        shutdown_type: ShutdownType,
+    ) -> Result<(), datagram::ExpectedConnError> {
+        datagram::shutdown_connected(self, ctx, id.clone(), shutdown_type)
+    }
+
+    fn get_shutdown(&mut self, ctx: &C, id: &SocketId<I>) -> Option<ShutdownType> {
+        datagram::get_shutdown_connected(self, ctx, id.clone())
+    }
+
+    fn remove(&mut self, ctx: &mut C, id: SocketId<I>) {
+        let _: datagram::SocketInfo<_, _, _> = datagram::remove(self, ctx, id);
+    }
+
+    fn get_unicast_hop_limit(&mut self, ctx: &C, id: &SocketId<I>) -> NonZeroU8 {
+        datagram::get_ip_hop_limits(self, ctx, id.clone()).unicast
+    }
+
+    fn get_multicast_hop_limit(&mut self, ctx: &C, id: &SocketId<I>) -> NonZeroU8 {
+        datagram::get_ip_hop_limits(self, ctx, id.clone()).multicast
+    }
+
+    fn set_unicast_hop_limit(
+        &mut self,
+        ctx: &mut C,
+        id: &SocketId<I>,
+        hop_limit: Option<NonZeroU8>,
+    ) {
+        datagram::update_ip_hop_limit(
+            self,
+            ctx,
+            id.clone(),
+            SocketHopLimits::set_unicast(hop_limit),
+        )
+    }
+
+    fn set_multicast_hop_limit(
+        &mut self,
+        ctx: &mut C,
+        id: &SocketId<I>,
+        hop_limit: Option<NonZeroU8>,
+    ) {
+        datagram::update_ip_hop_limit(
+            self,
+            ctx,
+            id.clone(),
+            SocketHopLimits::set_multicast(hop_limit),
+        )
+    }
 }
 
 impl<
@@ -3508,7 +3613,7 @@ pub fn connect<I: Ip, C: NonSyncContext>(
     ctx: &mut C,
     id: &SocketId<I>,
     remote_ip: Option<SocketZonedIpAddr<I::Addr, crate::DeviceId<C>>>,
-    remote_id: NonZeroU16,
+    remote_id: u16,
 ) -> Result<(), datagram::ConnectError> {
     let IpInvariant(result) = net_types::map_ip_twice!(
         I,
@@ -3626,7 +3731,7 @@ pub enum SocketInfo<A: IpAddress, D> {
         device: Option<D>,
         /// Unused when sending/receiving packets, but will be reported back to
         /// user.
-        remote_id: NonZeroU16,
+        remote_id: u16,
     },
 }
 
@@ -3685,9 +3790,137 @@ pub fn get_bound_device<I: Ip, C: crate::NonSyncContext>(
                 ctx,
                 id,
             ))
-        },
+        }
     );
     device
+}
+
+/// Disconnects an ICMP socket.
+pub fn disconnect<I: Ip, C: NonSyncContext>(
+    sync_ctx: &SyncCtx<C>,
+    ctx: &mut C,
+    id: &SocketId<I>,
+) -> Result<(), datagram::ExpectedConnError> {
+    net_types::map_ip_twice!(I, (IpInvariant((sync_ctx, ctx)), id), |(
+        IpInvariant((sync_ctx, ctx)),
+        id,
+    )| {
+        SocketHandler::<I, C>::disconnect(&mut Locked::new(sync_ctx), ctx, id)
+    })
+}
+
+/// Shuts down an ICMP socket.
+pub fn shutdown<I: Ip, C: NonSyncContext>(
+    sync_ctx: &SyncCtx<C>,
+    ctx: &C,
+    id: &SocketId<I>,
+    shutdown_type: ShutdownType,
+) -> Result<(), datagram::ExpectedConnError> {
+    net_types::map_ip_twice!(I, (IpInvariant((sync_ctx, ctx, shutdown_type)), id), |(
+        IpInvariant((sync_ctx, ctx, shutdown_type)),
+        id,
+    )| {
+        SocketHandler::<I, C>::shutdown(&mut Locked::new(sync_ctx), ctx, id, shutdown_type)
+    })
+}
+
+/// Gets the current shutdown state of an ICMP socket.
+pub fn get_shutdown<I: Ip, C: NonSyncContext>(
+    sync_ctx: &SyncCtx<C>,
+    ctx: &C,
+    id: &SocketId<I>,
+) -> Option<ShutdownType> {
+    net_types::map_ip_twice!(I, (IpInvariant((sync_ctx, ctx)), id), |(
+        IpInvariant((sync_ctx, ctx)),
+        id,
+    )| {
+        SocketHandler::<I, C>::get_shutdown(&mut Locked::new(sync_ctx), ctx, id)
+    })
+}
+
+/// Removes an ICMP socket.
+pub fn remove<I: Ip, C: NonSyncContext>(sync_ctx: &SyncCtx<C>, ctx: &mut C, id: SocketId<I>) {
+    net_types::map_ip_twice!(I, (IpInvariant((sync_ctx, ctx)), id), |(
+        IpInvariant((sync_ctx, ctx)),
+        id,
+    )| {
+        SocketHandler::<I, C>::remove(&mut Locked::new(sync_ctx), ctx, id)
+    })
+}
+
+/// Sets unicast IP hop limit for ICMP sockets.
+pub fn set_unicast_hop_limit<I: Ip, C: NonSyncContext>(
+    sync_ctx: &SyncCtx<C>,
+    ctx: &mut C,
+    id: &SocketId<I>,
+    hop_limit: Option<NonZeroU8>,
+) {
+    net_types::map_ip_twice!(I, (IpInvariant((sync_ctx, ctx, hop_limit)), id), |(
+        IpInvariant((sync_ctx, ctx, hop_limit)),
+        id,
+    )| {
+        SocketHandler::<I, C>::set_unicast_hop_limit(&mut Locked::new(sync_ctx), ctx, id, hop_limit)
+    })
+}
+
+/// Sets multicast IP hop limit for ICMP sockets.
+pub fn set_multicast_hop_limit<I: Ip, C: NonSyncContext>(
+    sync_ctx: &SyncCtx<C>,
+    ctx: &mut C,
+    id: &SocketId<I>,
+    hop_limit: Option<NonZeroU8>,
+) {
+    net_types::map_ip_twice!(I, (IpInvariant((sync_ctx, ctx, hop_limit)), id), |(
+        IpInvariant((sync_ctx, ctx, hop_limit)),
+        id,
+    )| {
+        SocketHandler::<I, C>::set_multicast_hop_limit(
+            &mut Locked::new(sync_ctx),
+            ctx,
+            id,
+            hop_limit,
+        )
+    })
+}
+
+/// Gets unicast IP hop limit for ICMP sockets.
+pub fn get_unicast_hop_limit<I: Ip, C: NonSyncContext>(
+    sync_ctx: &SyncCtx<C>,
+    ctx: &C,
+    id: &SocketId<I>,
+) -> NonZeroU8 {
+    let IpInvariant(hop_limit) = net_types::map_ip_twice!(
+        I,
+        (IpInvariant((sync_ctx, ctx)), id),
+        |(IpInvariant((sync_ctx, ctx)), id)| {
+            IpInvariant(SocketHandler::<I, C>::get_unicast_hop_limit(
+                &mut Locked::new(sync_ctx),
+                ctx,
+                id,
+            ))
+        }
+    );
+    hop_limit
+}
+
+/// Gets multicast IP hop limit for ICMP sockets.
+pub fn get_multicast_hop_limit<I: Ip, C: NonSyncContext>(
+    sync_ctx: &SyncCtx<C>,
+    ctx: &C,
+    id: &SocketId<I>,
+) -> NonZeroU8 {
+    let IpInvariant(hop_limit) = net_types::map_ip_twice!(
+        I,
+        (IpInvariant((sync_ctx, ctx)), id),
+        |(IpInvariant((sync_ctx, ctx)), id)| {
+            IpInvariant(SocketHandler::<I, C>::get_multicast_hop_limit(
+                &mut Locked::new(sync_ctx),
+                ctx,
+                id,
+            ))
+        }
+    );
+    hop_limit
 }
 #[cfg(test)]
 mod tests {
@@ -4930,7 +5163,7 @@ mod tests {
         }
     }
 
-    const REMOTE_ID: NonZeroU16 = const_unwrap::const_unwrap_option(NonZeroU16::new(1));
+    const REMOTE_ID: u16 = 1;
 
     #[test]
     fn test_receive_icmpv4_error() {

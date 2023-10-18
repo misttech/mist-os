@@ -10,17 +10,11 @@
             ],
         },
         {
-            type: "expect_failure_with_err_logs",
+            type: "expect_failure",
             matchers: [
-                // TODO(https://fxbug.dev/47321): Implement ICMP sockets in Netstack3.
-                "ping::ipv?_netstack3",
-                "ping::ipv?*_bind_to_non_existent_interface_netstack3",
-                "ping::ipv?*_bind_to_existing_interface_netstack3",
-                "ping::oversized_payload_length_netstack3",
-                "ping::host_unreachable_netstack3",
-                "ping::no_timeout*_netstack3",
-                "ping::timeout_exceeded_netstack3",
-                "ping_with_no_added_interface*netstack3*",
+                // TODO(https://fxbug.dev/133573): Include zone in the address returned
+                // by `recvfrom` to enable the following test.
+                "ping::ipv6_link_local_bind_to_existing_interface_netstack3",
             ],
         },
         {

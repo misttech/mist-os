@@ -270,11 +270,13 @@ const DEFAULT_LOW_PRIORITY_METRIC: u32 = 99999;
 const DEFAULT_INTERFACE_METRIC: u32 = 100;
 
 type UdpSockets = socket::datagram::SocketCollectionPair<socket::datagram::Udp>;
+type IcmpEchoSockets = socket::datagram::SocketCollectionPair<socket::datagram::IcmpEcho>;
 
 pub(crate) struct BindingsNonSyncCtxImplInner {
     timers: timers::TimerDispatcher<TimerId<BindingsNonSyncCtxImpl>>,
     devices: Devices<DeviceId<BindingsNonSyncCtxImpl>>,
     udp_sockets: UdpSockets,
+    icmp_echo_sockets: IcmpEchoSockets,
     routes: routes::ChangeSink,
 }
 
@@ -284,6 +286,7 @@ impl BindingsNonSyncCtxImplInner {
             timers: Default::default(),
             devices: Default::default(),
             udp_sockets: Default::default(),
+            icmp_echo_sockets: Default::default(),
             routes: routes_change_sink,
         }
     }
@@ -304,6 +307,12 @@ impl AsRef<Devices<DeviceId<BindingsNonSyncCtxImpl>>> for BindingsNonSyncCtxImpl
 impl AsRef<UdpSockets> for BindingsNonSyncCtxImpl {
     fn as_ref(&self) -> &UdpSockets {
         &self.udp_sockets
+    }
+}
+
+impl AsRef<IcmpEchoSockets> for BindingsNonSyncCtxImpl {
+    fn as_ref(&self) -> &IcmpEchoSockets {
+        &self.icmp_echo_sockets
     }
 }
 
@@ -519,22 +528,33 @@ impl DeviceLayerEventDispatcher for BindingsNonSyncCtxImpl {
     }
 }
 
-impl<I: icmp::IcmpIpExt> icmp::IcmpContext<I> for BindingsNonSyncCtxImpl {
-    fn receive_icmp_error(&mut self, _conn: icmp::SocketId<I>, _seq_num: u16, _err: I::ErrorCode) {
-        unimplemented!("TODO(https://fxbug.dev/125482): implement ICMP sockets")
+impl<
+        I: socket::datagram::SocketCollectionIpExt<socket::datagram::IcmpEcho>
+            + icmp::IcmpIpExt
+            + IpExt,
+    > icmp::IcmpContext<I> for BindingsNonSyncCtxImpl
+{
+    fn receive_icmp_error(&mut self, conn: icmp::SocketId<I>, seq_num: u16, err: I::ErrorCode) {
+        I::with_collection_mut(self, |c| c.receive_icmp_error(conn, seq_num, err))
     }
 }
 
-impl<I: icmp::IcmpIpExt, B: BufferMut> icmp::BufferIcmpContext<I, B> for BindingsNonSyncCtxImpl {
+impl<
+        I: socket::datagram::SocketCollectionIpExt<socket::datagram::IcmpEcho>
+            + icmp::IcmpIpExt
+            + IpExt,
+        B: BufferMut,
+    > icmp::BufferIcmpContext<I, B> for BindingsNonSyncCtxImpl
+{
     fn receive_icmp_echo_reply(
         &mut self,
-        _conn: icmp::SocketId<I>,
-        _src_ip: I::Addr,
-        _dst_ip: I::Addr,
-        _id: u16,
-        _data: B,
+        conn: icmp::SocketId<I>,
+        src_ip: I::Addr,
+        dst_ip: I::Addr,
+        id: u16,
+        data: B,
     ) {
-        unimplemented!("TODO(https://fxbug.dev/125482): implement ICMP sockets")
+        I::with_collection_mut(self, |c| c.receive_icmp_echo_reply(conn, src_ip, dst_ip, id, data))
     }
 }
 

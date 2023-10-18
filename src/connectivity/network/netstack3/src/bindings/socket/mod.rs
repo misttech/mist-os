@@ -4,7 +4,7 @@
 
 //! Socket features exposed by netstack3.
 
-use std::num::NonZeroU64;
+use std::{convert::Infallible as Never, num::NonZeroU64};
 
 use const_unwrap::const_unwrap_option;
 use either::Either;
@@ -536,6 +536,12 @@ pub(crate) trait IntoErrno {
 impl IntoErrno for Errno {
     fn into_errno(self) -> Errno {
         self
+    }
+}
+
+impl IntoErrno for Never {
+    fn into_errno(self) -> Errno {
+        match self {}
     }
 }
 
