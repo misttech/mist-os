@@ -544,8 +544,13 @@ func (c *Client) RegisterPackageRepository(
 				ruleTemplate += `{
 					"host_match":"fuchsia.com",
 					"host_replacement":"%[1]v",
-					"path_prefix_match":"/` + p + `/",
-					"path_prefix_replacement":"/` + p + `/"
+					"path_prefix_match":"/` + p + `",
+					"path_prefix_replacement":"/` + p + `"
+				}, {
+					"host_match":"fuchsia.com",
+					"host_replacement":"%[1]v",
+					"path_prefix_match":"/` + p + `/0",
+					"path_prefix_replacement":"/` + p + `/0"
 				}`
 			}
 			ruleTemplate += `]}'`
