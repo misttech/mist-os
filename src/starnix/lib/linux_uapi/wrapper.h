@@ -72,6 +72,7 @@
 #include <linux/time.h>
 #include <linux/timerfd.h>
 #include <linux/times.h>
+#include <linux/uinput.h>
 #include <linux/uio.h>
 #include <linux/un.h>
 #include <linux/unistd.h>

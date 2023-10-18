@@ -4339,6 +4339,12 @@ pub const TFD_TIMER_ABSTIME: u32 = 1;
 pub const TFD_TIMER_CANCEL_ON_SET: u32 = 2;
 pub const TFD_CLOEXEC: u32 = 524288;
 pub const TFD_NONBLOCK: u32 = 2048;
+pub const UINPUT_VERSION: u32 = 5;
+pub const UINPUT_MAX_NAME_SIZE: u32 = 80;
+pub const UINPUT_IOCTL_BASE: u8 = 85u8;
+pub const EV_UINPUT: u32 = 257;
+pub const UI_FF_UPLOAD: u32 = 1;
+pub const UI_FF_ERASE: u32 = 2;
 pub const UIO_FASTIOV: u32 = 8;
 pub const UIO_MAXIOV: u32 = 1024;
 pub const UNIX_PATH_MAX: u32 = 108;
@@ -12348,6 +12354,73 @@ pub struct tms {
     pub tms_cstime: __kernel_clock_t,
 }
 #[repr(C)]
+#[derive(Copy, Clone)]
+pub struct uinput_ff_upload {
+    pub request_id: __u32,
+    pub retval: __s32,
+    pub effect: ff_effect,
+    pub old: ff_effect,
+}
+impl Default for uinput_ff_upload {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+pub struct uinput_ff_erase {
+    pub request_id: __u32,
+    pub retval: __s32,
+    pub effect_id: __u32,
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+pub struct uinput_setup {
+    pub id: input_id,
+    pub name: [crate::types::c_char; 80usize],
+    pub ff_effects_max: __u32,
+}
+impl Default for uinput_setup {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+pub struct uinput_abs_setup {
+    pub code: __u16,
+    pub __bindgen_padding_0: [u8; 2usize],
+    pub absinfo: input_absinfo,
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+pub struct uinput_user_dev {
+    pub name: [crate::types::c_char; 80usize],
+    pub id: input_id,
+    pub ff_effects_max: __u32,
+    pub absmax: [__s32; 64usize],
+    pub absmin: [__s32; 64usize],
+    pub absfuzz: [__s32; 64usize],
+    pub absflat: [__s32; 64usize],
+}
+impl Default for uinput_user_dev {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
 #[derive(Debug, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
 pub struct iovec {
     pub iov_base: uaddr,
@@ -12530,6 +12603,46 @@ pub const _FS_IOC_MEASURE_VERITY: __u32 = 3221513862;
 pub const FS_IOC_MEASURE_VERITY: __u32 = 3221513862;
 pub const _FS_IOC_READ_VERITY_METADATA: __u32 = 3223873159;
 pub const FS_IOC_READ_VERITY_METADATA: __u32 = 3223873159;
+pub const _UI_DEV_CREATE: __u32 = 21761;
+pub const UI_DEV_CREATE: __u32 = 21761;
+pub const _UI_DEV_DESTROY: __u32 = 21762;
+pub const UI_DEV_DESTROY: __u32 = 21762;
+pub const _UI_DEV_SETUP: __u32 = 1079792899;
+pub const UI_DEV_SETUP: __u32 = 1079792899;
+pub const _UI_ABS_SETUP: __u32 = 1075598596;
+pub const UI_ABS_SETUP: __u32 = 1075598596;
+pub const _UI_SET_EVBIT: __u32 = 1074025828;
+pub const UI_SET_EVBIT: __u32 = 1074025828;
+pub const _UI_SET_KEYBIT: __u32 = 1074025829;
+pub const UI_SET_KEYBIT: __u32 = 1074025829;
+pub const _UI_SET_RELBIT: __u32 = 1074025830;
+pub const UI_SET_RELBIT: __u32 = 1074025830;
+pub const _UI_SET_ABSBIT: __u32 = 1074025831;
+pub const UI_SET_ABSBIT: __u32 = 1074025831;
+pub const _UI_SET_MSCBIT: __u32 = 1074025832;
+pub const UI_SET_MSCBIT: __u32 = 1074025832;
+pub const _UI_SET_LEDBIT: __u32 = 1074025833;
+pub const UI_SET_LEDBIT: __u32 = 1074025833;
+pub const _UI_SET_SNDBIT: __u32 = 1074025834;
+pub const UI_SET_SNDBIT: __u32 = 1074025834;
+pub const _UI_SET_FFBIT: __u32 = 1074025835;
+pub const UI_SET_FFBIT: __u32 = 1074025835;
+pub const _UI_SET_PHYS: __u32 = 1074287980;
+pub const UI_SET_PHYS: __u32 = 1074287980;
+pub const _UI_SET_SWBIT: __u32 = 1074025837;
+pub const UI_SET_SWBIT: __u32 = 1074025837;
+pub const _UI_SET_PROPBIT: __u32 = 1074025838;
+pub const UI_SET_PROPBIT: __u32 = 1074025838;
+pub const _UI_BEGIN_FF_UPLOAD: __u32 = 3228063176;
+pub const UI_BEGIN_FF_UPLOAD: __u32 = 3228063176;
+pub const _UI_END_FF_UPLOAD: __u32 = 1080579529;
+pub const UI_END_FF_UPLOAD: __u32 = 1080579529;
+pub const _UI_BEGIN_FF_ERASE: __u32 = 3222033866;
+pub const UI_BEGIN_FF_ERASE: __u32 = 3222033866;
+pub const _UI_END_FF_ERASE: __u32 = 1074550219;
+pub const UI_END_FF_ERASE: __u32 = 1074550219;
+pub const _UI_GET_VERSION: __u32 = 2147767597;
+pub const UI_GET_VERSION: __u32 = 2147767597;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
 pub struct xt_match {
