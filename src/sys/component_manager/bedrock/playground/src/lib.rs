@@ -351,7 +351,6 @@ fn transform_availability(
         let lazy: Lazy = cap.try_into().unwrap();
         let availability = availability.to_owned();
         let lazy_transformed = Box::new(lazy.map(move |cap| {
-            let availability = availability.clone();
             async move { transform(cap, &availability).map_err(Error::from) }.boxed()
         }));
         Ok(lazy_transformed)

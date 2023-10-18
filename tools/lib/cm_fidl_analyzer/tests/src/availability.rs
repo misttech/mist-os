@@ -85,7 +85,7 @@ mod tests {
                             source_dictionary: None,
                             target_name: "fuchsia.examples.EchoService".parse().unwrap(),
                             target: ExposeTarget::Parent,
-                            availability: test_case.expose_availability.clone(),
+                            availability: test_case.expose_availability,
                         }))
                         .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                             source: ExposeSource::Child("b".to_owned()),
@@ -93,7 +93,7 @@ mod tests {
                             source_dictionary: None,
                             target_name: "fuchsia.examples.Echo".parse().unwrap(),
                             target: ExposeTarget::Parent,
-                            availability: test_case.expose_availability.clone(),
+                            availability: test_case.expose_availability,
                         }))
                         .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                             source: ExposeSource::Child("b".to_owned()),
@@ -103,7 +103,7 @@ mod tests {
                             target: ExposeTarget::Parent,
                             rights: None,
                             subdir: None,
-                            availability: test_case.expose_availability.clone(),
+                            availability: test_case.expose_availability,
                         }))
                         .add_lazy_child("b")
                         .build(),

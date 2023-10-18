@@ -90,7 +90,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             target: OfferTarget::static_child("c".to_string()),
                             source_instance_filter: None,
                             renamed_instances: None,
-                            availability: test_case.provider_availability.clone(),
+                            availability: test_case.provider_availability,
                         }))
                         .offer(OfferDecl::Protocol(OfferProtocolDecl {
                             source: OfferSource::static_child("b".to_string()),
@@ -99,7 +99,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             target_name: "fuchsia.examples.Echo".parse().unwrap(),
                             target: OfferTarget::static_child("c".to_string()),
                             dependency_type: DependencyType::Strong,
-                            availability: test_case.provider_availability.clone(),
+                            availability: test_case.provider_availability,
                         }))
                         .offer(OfferDecl::Directory(OfferDirectoryDecl {
                             source: OfferSource::static_child("b".to_string()),
@@ -110,7 +110,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             rights: Some(fio::R_STAR_DIR),
                             subdir: None,
                             dependency_type: DependencyType::Strong,
-                            availability: test_case.provider_availability.clone(),
+                            availability: test_case.provider_availability,
                         }))
                         .directory(
                             DirectoryDeclBuilder::new("data")
@@ -130,7 +130,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             target: OfferTarget::static_child("c".to_string()),
                             source_name: "cache".parse().unwrap(),
                             target_name: "cache".parse().unwrap(),
-                            availability: test_case.provider_availability.clone(),
+                            availability: test_case.provider_availability,
                         }))
                         .offer(OfferDecl::EventStream(OfferEventStreamDecl {
                             source: OfferSource::Parent,
@@ -141,7 +141,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                                 collection: None,
                             }),
                             target_name: "started".parse().unwrap(),
-                            availability: test_case.provider_availability.clone(),
+                            availability: test_case.provider_availability,
                         }))
                         .add_lazy_child("b")
                         .add_lazy_child("c")
@@ -202,7 +202,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             source_dictionary: None,
                             target_path: "/svc/fuchsia.examples.EchoService".parse().unwrap(),
                             dependency_type: DependencyType::Strong,
-                            availability: test_case.use_availability.clone(),
+                            availability: test_case.use_availability,
                         }))
                         .use_(UseDecl::Protocol(UseProtocolDecl {
                             source: UseSource::Parent,
@@ -210,7 +210,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             source_dictionary: None,
                             target_path: "/svc/fuchsia.examples.Echo".parse().unwrap(),
                             dependency_type: DependencyType::Strong,
-                            availability: test_case.use_availability.clone(),
+                            availability: test_case.use_availability,
                         }))
                         .use_(UseDecl::Directory(UseDirectoryDecl {
                             source: UseSource::Parent,
@@ -220,12 +220,12 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             rights: fio::R_STAR_DIR,
                             subdir: None,
                             dependency_type: DependencyType::Strong,
-                            availability: test_case.use_availability.clone(),
+                            availability: test_case.use_availability,
                         }))
                         .use_(UseDecl::Storage(UseStorageDecl {
                             source_name: "cache".parse().unwrap(),
                             target_path: "/storage".parse().unwrap(),
-                            availability: test_case.use_availability.clone(),
+                            availability: test_case.use_availability,
                         }))
                         .use_(UseDecl::EventStream(UseEventStreamDecl {
                             source: UseSource::Parent,
@@ -233,7 +233,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             target_path: "/event/stream".parse().unwrap(),
                             scope: None,
                             filter: None,
-                            availability: test_case.use_availability.clone(),
+                            availability: test_case.use_availability,
                         }))
                         .build(),
                 ),
@@ -333,7 +333,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             target: OfferTarget::static_child("c".to_string()),
                             source_instance_filter: None,
                             renamed_instances: None,
-                            availability: test_case.offer_availability.clone(),
+                            availability: test_case.offer_availability,
                         }))
                         .offer(OfferDecl::Protocol(OfferProtocolDecl {
                             source: test_case.source.clone(),
@@ -342,7 +342,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             target_name: "fuchsia.examples.Echo".parse().unwrap(),
                             target: OfferTarget::static_child("c".to_string()),
                             dependency_type: DependencyType::Strong,
-                            availability: test_case.offer_availability.clone(),
+                            availability: test_case.offer_availability,
                         }))
                         .offer(OfferDecl::Directory(OfferDirectoryDecl {
                             source: test_case.source.clone(),
@@ -353,7 +353,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             rights: Some(fio::Operations::CONNECT),
                             subdir: None,
                             dependency_type: DependencyType::Strong,
-                            availability: test_case.offer_availability.clone(),
+                            availability: test_case.offer_availability,
                         }))
                         .offer(OfferDecl::Storage(OfferStorageDecl {
                             source: test_case
@@ -364,7 +364,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             source_name: "data".parse().unwrap(),
                             target_name: "data".parse().unwrap(),
                             target: OfferTarget::static_child("c".to_string()),
-                            availability: test_case.offer_availability.clone(),
+                            availability: test_case.offer_availability,
                         }))
                         .storage(StorageDecl {
                             name: "data".parse().unwrap(),
@@ -432,7 +432,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             source_dictionary: None,
                             target_path: "/svc/fuchsia.examples.EchoService".parse().unwrap(),
                             dependency_type: DependencyType::Strong,
-                            availability: test_case.use_availability.clone(),
+                            availability: test_case.use_availability,
                         }))
                         .use_(UseDecl::Protocol(UseProtocolDecl {
                             source: UseSource::Parent,
@@ -440,7 +440,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             source_dictionary: None,
                             target_path: "/svc/fuchsia.examples.Echo".parse().unwrap(),
                             dependency_type: DependencyType::Strong,
-                            availability: test_case.use_availability.clone(),
+                            availability: test_case.use_availability,
                         }))
                         .use_(UseDecl::Directory(UseDirectoryDecl {
                             source: UseSource::Parent,
@@ -450,12 +450,12 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             rights: fio::Operations::CONNECT,
                             subdir: None,
                             dependency_type: DependencyType::Strong,
-                            availability: test_case.use_availability.clone(),
+                            availability: test_case.use_availability,
                         }))
                         .use_(UseDecl::Storage(UseStorageDecl {
                             source_name: "data".parse().unwrap(),
                             target_path: "/data".parse().unwrap(),
-                            availability: test_case.use_availability.clone(),
+                            availability: test_case.use_availability,
                         }))
                         .build(),
                 ),
@@ -516,7 +516,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             )
                             .unwrap(),
                             dependency_type: DependencyType::Strong,
-                            availability: test_case.use_availability.clone(),
+                            availability: test_case.use_availability,
                         }))
                         .use_(UseDecl::Protocol(UseProtocolDecl {
                             source: UseSource::Child("b".to_owned()),
@@ -524,7 +524,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             source_dictionary: None,
                             target_path: "/svc/fuchsia.examples.Echo_a".parse().unwrap(),
                             dependency_type: DependencyType::Strong,
-                            availability: test_case.use_availability.clone(),
+                            availability: test_case.use_availability,
                         }))
                         .use_(UseDecl::Directory(UseDirectoryDecl {
                             source: UseSource::Child("b".to_owned()),
@@ -534,7 +534,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             rights: fio::R_STAR_DIR,
                             subdir: None,
                             dependency_type: DependencyType::Strong,
-                            availability: test_case.use_availability.clone(),
+                            availability: test_case.use_availability,
                         }))
                         .add_lazy_child("b")
                         .build(),
@@ -552,7 +552,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             source_dictionary: None,
                             target_name: "fuchsia.examples.EchoService".parse().unwrap(),
                             target: ExposeTarget::Parent,
-                            availability: test_case.provider_availability.clone(),
+                            availability: test_case.provider_availability,
                         }))
                         .protocol(
                             ProtocolDeclBuilder::new("fuchsia.examples.Echo")
@@ -565,7 +565,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             source_dictionary: None,
                             target_name: "fuchsia.examples.Echo".parse().unwrap(),
                             target: ExposeTarget::Parent,
-                            availability: test_case.provider_availability.clone(),
+                            availability: test_case.provider_availability,
                         }))
                         .directory(
                             DirectoryDeclBuilder::new("dir")
@@ -581,7 +581,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             target: ExposeTarget::Parent,
                             rights: None,
                             subdir: None,
-                            availability: test_case.provider_availability.clone(),
+                            availability: test_case.provider_availability,
                         }))
                         .build(),
                 ),
@@ -692,7 +692,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             )
                             .unwrap(),
                             dependency_type: DependencyType::Strong,
-                            availability: test_case.use_availability.clone(),
+                            availability: test_case.use_availability,
                         }))
                         .use_(UseDecl::Protocol(UseProtocolDecl {
                             source: UseSource::Child("b".to_owned()),
@@ -700,7 +700,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             source_dictionary: None,
                             target_path: "/svc/fuchsia.examples.Echo_a".parse().unwrap(),
                             dependency_type: DependencyType::Strong,
-                            availability: test_case.use_availability.clone(),
+                            availability: test_case.use_availability,
                         }))
                         .use_(UseDecl::Directory(UseDirectoryDecl {
                             source: UseSource::Child("b".to_owned()),
@@ -710,7 +710,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             rights: fio::R_STAR_DIR,
                             subdir: None,
                             dependency_type: DependencyType::Strong,
-                            availability: test_case.use_availability.clone(),
+                            availability: test_case.use_availability,
                         }))
                         .add_lazy_child("b")
                         .build(),
@@ -728,7 +728,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             source_dictionary: None,
                             target_name: "fuchsia.examples.EchoService".parse().unwrap(),
                             target: ExposeTarget::Parent,
-                            availability: test_case.expose_availability.clone(),
+                            availability: test_case.expose_availability,
                         }))
                         .protocol(
                             ProtocolDeclBuilder::new("fuchsia.examples.Echo")
@@ -741,7 +741,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             source_dictionary: None,
                             target_name: "fuchsia.examples.Echo".parse().unwrap(),
                             target: ExposeTarget::Parent,
-                            availability: test_case.expose_availability.clone(),
+                            availability: test_case.expose_availability,
                         }))
                         .directory(
                             DirectoryDeclBuilder::new("dir")
@@ -757,7 +757,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             target: ExposeTarget::Parent,
                             rights: None,
                             subdir: None,
-                            availability: test_case.expose_availability.clone(),
+                            availability: test_case.expose_availability,
                         }))
                         .build(),
                 ),

@@ -81,7 +81,7 @@ impl AvailabilityState {
             //
             // For the purpose of availability checking, we will skip any checks until we encounter
             // a route declaration that has a known availability.
-            (Availability::SameAsTarget, _) => self.0 = next_availability.clone(),
+            (Availability::SameAsTarget, _) => self.0 = *next_availability,
 
             // If our availability doesn't change, there's nothing to do.
             (Availability::Required, Availability::Required)
@@ -97,7 +97,7 @@ impl AvailabilityState {
             (Availability::Optional, Availability::Required)
             | (Availability::Transitional, Availability::Required)
             | (Availability::Transitional, Availability::Optional) =>
-                self.0 = next_availability.clone(),
+                self.0 = *next_availability,
 
             // Decreasing the strength of availability is not allowed, as that could lead to
             // unsanctioned broken routes.
