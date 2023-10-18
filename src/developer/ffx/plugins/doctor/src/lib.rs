@@ -1310,7 +1310,7 @@ mod test {
     use fidl_fuchsia_developer_ffx::{
         DaemonProxy, DaemonRequest, OpenTargetError, RemoteControlState, TargetCollectionRequest,
         TargetCollectionRequestStream, TargetConnectionError, TargetInfo, TargetRequest,
-        TargetState, TargetType,
+        TargetState,
     };
     use fidl_fuchsia_developer_remotecontrol::{
         IdentifyHostResponse, RemoteControlMarker, RemoteControlRequest,
@@ -1807,7 +1807,6 @@ mod test {
                                 addresses: Some(vec![]),
                                 age_ms: Some(0),
                                 rcs_state: Some(RemoteControlState::Unknown),
-                                target_type: Some(TargetType::Unknown),
                                 target_state: Some(TargetState::Fastboot),
                                 ..Default::default()
                             }]
@@ -1865,7 +1864,6 @@ mod test {
                                         addresses: Some(vec![]),
                                         age_ms: Some(0),
                                         rcs_state: Some(RemoteControlState::Unknown),
-                                        target_type: Some(TargetType::Unknown),
                                         target_state: Some(TargetState::Unknown),
                                         ..Default::default()
                                     }]
@@ -1875,7 +1873,6 @@ mod test {
                                         addresses: Some(vec![]),
                                         age_ms: Some(0),
                                         rcs_state: Some(RemoteControlState::Unknown),
-                                        target_type: Some(TargetType::Unknown),
                                         target_state: Some(TargetState::Unknown),
                                         ..Default::default()
                                     }]
@@ -1886,7 +1883,6 @@ mod test {
                                             addresses: Some(vec![]),
                                             age_ms: Some(0),
                                             rcs_state: Some(RemoteControlState::Unknown),
-                                            target_type: Some(TargetType::Unknown),
                                             target_state: Some(TargetState::Unknown),
                                             ..Default::default()
                                         },
@@ -1895,7 +1891,6 @@ mod test {
                                             addresses: Some(vec![]),
                                             age_ms: Some(0),
                                             rcs_state: Some(RemoteControlState::Unknown),
-                                            target_type: Some(TargetType::Unknown),
                                             target_state: Some(TargetState::Unknown),
                                             ..Default::default()
                                         },

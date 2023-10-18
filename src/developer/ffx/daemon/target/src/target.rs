@@ -1362,8 +1362,6 @@ impl From<&Target> for ffx::TargetInfo {
                 TargetConnectionState::Zedboot(_) => TargetState::Zedboot,
             }),
             ssh_address: target.ssh_address_info(),
-            // TODO(awdavies): Gather more information here when possible.
-            target_type: Some(ffx::TargetType::Unknown),
             ssh_host_address: target.ssh_host_address_info(),
             fastboot_interface: match fastboot_interface {
                 None => None,

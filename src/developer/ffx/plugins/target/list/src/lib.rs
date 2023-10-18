@@ -122,7 +122,7 @@ mod test {
     use ffx_writer::TestBuffers;
     use fidl_fuchsia_developer_ffx as ffx;
     use fidl_fuchsia_developer_ffx::{
-        RemoteControlState, TargetInfo as FidlTargetInfo, TargetState, TargetType,
+        RemoteControlState, TargetInfo as FidlTargetInfo, TargetState,
     };
     use regex::Regex;
     use std::net::IpAddr;
@@ -142,7 +142,6 @@ mod test {
             addresses: Some(vec![addr.into()]),
             age_ms: Some(101),
             rcs_state: Some(RemoteControlState::Up),
-            target_type: Some(TargetType::Unknown),
             target_state: Some(TargetState::Unknown),
             ..Default::default()
         }

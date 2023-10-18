@@ -413,7 +413,6 @@ make_structs_and_support_functions!(
 pub enum StringifyError {
     MissingAddresses,
     MissingRcsState,
-    MissingTargetType,
     MissingTargetState,
 }
 
@@ -452,13 +451,9 @@ impl StringifiedTarget {
         }
     }
 
-    fn from_target_type(
-        board_config: Option<&str>,
-        product_config: Option<&str>,
-        t: ffx::TargetType,
-    ) -> String {
+    fn from_target_type(board_config: Option<&str>, product_config: Option<&str>) -> String {
         match (board_config, product_config) {
-            (None, None) => format!("{:?}", t),
+            (None, None) => String::from("Unknown"),
             (board, product) => {
                 format!("{}.{}", product.unwrap_or(UNKNOWN), board.unwrap_or(UNKNOWN))
             }
@@ -483,7 +478,6 @@ impl TryFrom<(Option<usize>, ffx::TargetInfo)> for StringifiedTarget {
         let target_type = StringifiedTarget::from_target_type(
             target.board_config.as_deref(),
             target.product_config.as_deref(),
-            target.target_type.ok_or(StringifyError::MissingTargetType)?,
         );
         Ok(Self {
             nodename: StringifiedField::String(nodename_to_string(index, target.nodename)),
@@ -522,7 +516,6 @@ impl TryFrom<(Option<usize>, ffx::TargetInfo)> for JsonTarget {
             target_type: json!(StringifiedTarget::from_target_type(
                 target.board_config.as_deref(),
                 target.product_config.as_deref(),
-                target.target_type.ok_or(StringifyError::MissingTargetType)?,
             )),
             target_state: json!(StringifiedTarget::from_target_state(
                 target.target_state.ok_or(StringifyError::MissingTargetState)?,
@@ -646,7 +639,6 @@ mod test {
                 }),
             ]),
             rcs_state: Some(ffx::RemoteControlState::Unknown),
-            target_type: Some(ffx::TargetType::Unknown),
             target_state: Some(ffx::TargetState::Unknown),
             ..Default::default()
         }
@@ -660,7 +652,6 @@ mod test {
                 scope_id: 186,
             })]),
             rcs_state: Some(ffx::RemoteControlState::Unknown),
-            target_type: Some(ffx::TargetType::Unknown),
             target_state: Some(ffx::TargetState::Unknown),
             ..Default::default()
         }
@@ -688,7 +679,6 @@ mod test {
                     scope_id: 137,
                 })]),
                 rcs_state: Some(ffx::RemoteControlState::Unknown),
-                target_type: Some(ffx::TargetType::Unknown),
                 target_state: Some(ffx::TargetState::Unknown),
                 ..Default::default()
             },
@@ -716,7 +706,6 @@ mod test {
                     scope_id: 137,
                 })]),
                 rcs_state: Some(ffx::RemoteControlState::Unknown),
-                target_type: Some(ffx::TargetType::Unknown),
                 target_state: Some(ffx::TargetState::Unknown),
                 serial_number: Some("cereal".to_owned()),
                 ..Default::default()
@@ -745,7 +734,6 @@ mod test {
                     scope_id: 137,
                 })]),
                 rcs_state: Some(ffx::RemoteControlState::Unknown),
-                target_type: Some(ffx::TargetType::Unknown),
                 target_state: Some(ffx::TargetState::Unknown),
                 serial_number: Some("cereal".to_owned()),
                 ..Default::default()
@@ -759,7 +747,6 @@ mod test {
                     scope_id: 42,
                 })]),
                 rcs_state: Some(ffx::RemoteControlState::Unknown),
-                target_type: Some(ffx::TargetType::Unknown),
                 target_state: Some(ffx::TargetState::Unknown),
                 ..Default::default()
             },
@@ -786,7 +773,6 @@ mod test {
                     scope_id: 137,
                 })]),
                 rcs_state: Some(ffx::RemoteControlState::Unknown),
-                target_type: Some(ffx::TargetType::Unknown),
                 target_state: Some(ffx::TargetState::Unknown),
                 ..Default::default()
             },
@@ -816,7 +802,6 @@ mod test {
 
         targets[1].addresses = None;
         targets[3].rcs_state = None;
-        targets[4].target_type = None;
 
         let formatter = SimpleTargetFormatter::try_from(targets).unwrap();
         assert_eq!(formatter.targets.len(), 5);
@@ -835,7 +820,6 @@ mod test {
                     scope_id: 137,
                 })]),
                 rcs_state: Some(ffx::RemoteControlState::Unknown),
-                target_type: Some(ffx::TargetType::Unknown),
                 target_state: Some(ffx::TargetState::Unknown),
                 ..Default::default()
             },
@@ -863,7 +847,6 @@ mod test {
                     scope_id: 137,
                 })]),
                 rcs_state: Some(ffx::RemoteControlState::Unknown),
-                target_type: Some(ffx::TargetType::Unknown),
                 target_state: Some(ffx::TargetState::Unknown),
                 ..Default::default()
             },
@@ -876,7 +859,6 @@ mod test {
                     scope_id: 42,
                 })]),
                 rcs_state: Some(ffx::RemoteControlState::Unknown),
-                target_type: Some(ffx::TargetType::Unknown),
                 target_state: Some(ffx::TargetState::Unknown),
                 ..Default::default()
             },
@@ -912,7 +894,6 @@ mod test {
 
         targets[1].addresses = None;
         targets[3].rcs_state = None;
-        targets[4].target_type = None;
 
         let formatter = NameOnlyTargetFormatter::try_from(targets).unwrap();
         // NameOnlyTargetFormatter is infalliable
@@ -924,13 +905,6 @@ mod test {
         let mut t = make_valid_target();
         t.target_state = None;
         assert_eq!(StringifiedTarget::try_from((None, t)), Err(StringifyError::MissingTargetState));
-    }
-
-    #[test]
-    fn test_stringified_target_missing_target_type() {
-        let mut t = make_valid_target();
-        t.target_type = None;
-        assert_eq!(StringifiedTarget::try_from((None, t)), Err(StringifyError::MissingTargetType));
     }
 
     #[test]
@@ -1139,10 +1113,9 @@ mod test {
 
         targets[1].target_state = None;
         targets[3].rcs_state = None;
-        targets[4].target_type = None;
 
         let formatter = JsonTargetFormatter::try_from(targets).unwrap();
-        assert_eq!(formatter.targets.len(), 3);
+        assert_eq!(formatter.targets.len(), 4);
     }
 
     #[test]

@@ -34,11 +34,6 @@ type TargetState = strict enum {
     ZEDBOOT = 5;
 };
 
-// TODO(awdavies): Add more target types. Hardware? Product state?
-type TargetType = strict enum {
-    UNKNOWN = 1;
-};
-
 /// Address of the ssh host address from the perspective of the target.
 type SshHostAddrInfo = struct {
     address string:256;
@@ -90,24 +85,23 @@ type TargetInfo = table {
     2: addresses vector<TargetAddrInfo>:256;
     3: age_ms uint64;
     4: rcs_state RemoteControlState;
-    5: target_type TargetType;
-    6: target_state TargetState;
+    5: target_state TargetState;
     // Contains the string used for the product in `fx set`, for example
     // `fx set core.x64` would make this value "core".
-    7: product_config string:fuchsia.buildinfo.MAX_STRING_LENGTH;
+    6: product_config string:fuchsia.buildinfo.MAX_STRING_LENGTH;
     // Contains the string used for the board in `fx set`, for example
     // `fx set core.x64` would make this value "x64".
-    8: board_config string:fuchsia.buildinfo.MAX_STRING_LENGTH;
-    9: serial_number string:256;
+    7: board_config string:fuchsia.buildinfo.MAX_STRING_LENGTH;
+    8: serial_number string:256;
     /// ssh_address is the preferred address to use to connect to the
     /// device over SSH, and will include a port number if a custom SSH
     /// port number has been set.
-   10: ssh_address TargetAddrInfo;
-   11: fastboot_interface FastbootInterface;
+    9: ssh_address TargetAddrInfo;
+   10: fastboot_interface FastbootInterface;
     /// The address of the ssh host as seen by the target.
-   12: ssh_host_address SshHostAddrInfo;
+   11: ssh_host_address SshHostAddrInfo;
     /// Compatibility status between host tools and target.
-   13: compatibility CompatibilityInfo;
+   12: compatibility CompatibilityInfo;
 };
 
 type TargetRebootError = strict enum {
