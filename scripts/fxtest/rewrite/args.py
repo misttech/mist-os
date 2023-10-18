@@ -35,6 +35,7 @@ class Flags:
     limit: int | None
     min_severity_logs: typing.List[str]
     timeout: float | None
+    test_filter: typing.List[str]
     fail: bool
     use_package_hash: bool
     restrict_logs: bool
@@ -207,6 +208,13 @@ def parse_args(cli_args: typing.List[str] | None = None) -> Flags:
         "--timeout",
         type=float,
         help="Terminate tests that take longer than this number of seconds to complete. Default is no timeout.",
+    )
+    execution.add_argument(
+        "--test-filter",
+        type=str,
+        default=[],
+        nargs="*",
+        help="Run specific test cases in a test suite. Can be specified multiple times to pass in multiple patterns.",
     )
     execution.add_argument(
         "--count",

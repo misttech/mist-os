@@ -134,6 +134,8 @@ class TestExecution:
                     "--parallel",
                     str(self._test.build.test.parallel),
                 ]
+            for test_filter in self._flags.test_filter:
+                extra_args += ["--test-filter", test_filter]
             if self._flags.also_run_disabled_tests:
                 extra_args += ["--run-disabled"]
 
