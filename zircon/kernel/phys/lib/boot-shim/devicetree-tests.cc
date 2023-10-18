@@ -134,9 +134,10 @@ class TestMixin : public zxtest::Test, public Base... {
   }
 };
 
-class ArmDevicetreePsciItemTest : public zxtest::Test {
+class ArmDevicetreePsciItemTest : public TestMixin<ArmDevicetreeTest> {
  public:
   static void SetUpTestSuite() {
+    Mixin::SetUpTestSuite();
     auto loaded_dtb = LoadDtb("psci-hvc.dtb");
     ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
     psci_hvc_dtb_ = std::move(loaded_dtb).value();
@@ -149,6 +150,7 @@ class ArmDevicetreePsciItemTest : public zxtest::Test {
   static void TearDownTestSuite() {
     psci_hvc_dtb_ = std::nullopt;
     psci_smc_dtb_ = std::nullopt;
+    Mixin::TearDownTestSuite();
   }
 
   devicetree::Devicetree psci_hvc() { return psci_hvc_dtb_->fdt(); }
@@ -200,6 +202,56 @@ TEST_F(ArmDevicetreePsciItemTest, ParseHvc) {
   EXPECT_TRUE(shim.AppendItems(image).is_ok());
 
   // Look for a gic 2 driver.
+  bool present = false;
+  for (auto [header, payload] : image) {
+    if (header->type == ZBI_TYPE_KERNEL_DRIVER && header->extra == ZBI_KERNEL_DRIVER_ARM_PSCI) {
+      present = true;
+      ASSERT_EQ(payload.size(), sizeof(zbi_dcfg_arm_psci_driver_t));
+      const auto* dcfg = reinterpret_cast<const zbi_dcfg_arm_psci_driver_t*>(payload.data());
+      EXPECT_TRUE(dcfg->use_hvc);
+      break;
+    }
+  }
+  image.ignore_error();
+  ASSERT_TRUE(present, "ZBI Driver for PSCI missing.");
+}
+
+TEST_F(ArmDevicetreePsciItemTest, ParseQemu) {
+  std::array<std::byte, 256> image_buffer;
+  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  ASSERT_TRUE(image.clear().is_ok());
+
+  auto fdt = qemu_arm_gic3();
+  boot_shim::DevicetreeBootShim<boot_shim::ArmDevicetreePsciItem> shim("test", fdt);
+
+  shim.Init();
+  EXPECT_TRUE(shim.AppendItems(image).is_ok());
+
+  bool present = false;
+  for (auto [header, payload] : image) {
+    if (header->type == ZBI_TYPE_KERNEL_DRIVER && header->extra == ZBI_KERNEL_DRIVER_ARM_PSCI) {
+      present = true;
+      ASSERT_EQ(payload.size(), sizeof(zbi_dcfg_arm_psci_driver_t));
+      const auto* dcfg = reinterpret_cast<const zbi_dcfg_arm_psci_driver_t*>(payload.data());
+      EXPECT_FALSE(dcfg->use_hvc);
+      break;
+    }
+  }
+  image.ignore_error();
+  ASSERT_TRUE(present, "ZBI Driver for PSCI missing.");
+}
+
+TEST_F(ArmDevicetreePsciItemTest, ParseCrosvm) {
+  std::array<std::byte, 256> image_buffer;
+  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  ASSERT_TRUE(image.clear().is_ok());
+
+  auto fdt = crosvm_arm();
+  boot_shim::DevicetreeBootShim<boot_shim::ArmDevicetreePsciItem> shim("test", fdt);
+
+  shim.Init();
+  EXPECT_TRUE(shim.AppendItems(image).is_ok());
+
   bool present = false;
   for (auto [header, payload] : image) {
     if (header->type == ZBI_TYPE_KERNEL_DRIVER && header->extra == ZBI_KERNEL_DRIVER_ARM_PSCI) {
@@ -344,7 +396,7 @@ class ArmDevicetreeTimerItemTest : public TestMixin<ArmDevicetreeTest> {
 std::optional<LoadedDtb> ArmDevicetreeTimerItemTest::timer_ = std::nullopt;
 std::optional<LoadedDtb> ArmDevicetreeTimerItemTest::timer_no_frequency_override_ = std::nullopt;
 
-TEST_F(ArmDevicetreeTimerItemTest, ParseTimer) {
+TEST_F(ArmDevicetreeTimerItemTest, TimerWithFrequencyOverride) {
   std::array<std::byte, 1024> image_buffer;
   std::vector<void*> allocs;
   zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
@@ -373,7 +425,7 @@ TEST_F(ArmDevicetreeTimerItemTest, ParseTimer) {
   ASSERT_TRUE(present);
 }
 
-TEST_F(ArmDevicetreeTimerItemTest, ParseTimerNoFrequencyOverride) {
+TEST_F(ArmDevicetreeTimerItemTest, TimerWithoutFrequencyOverride) {
   std::array<std::byte, 1024> image_buffer;
   std::vector<void*> allocs;
   zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
@@ -402,13 +454,42 @@ TEST_F(ArmDevicetreeTimerItemTest, ParseTimerNoFrequencyOverride) {
   ASSERT_TRUE(present);
 }
 
-TEST_F(ArmDevicetreeTimerItemTest, ParseQemu) {
+TEST_F(ArmDevicetreeTimerItemTest, Qemu) {
   std::array<std::byte, 1024> image_buffer;
   std::vector<void*> allocs;
   zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
   ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = qemu_arm_gic3();
+  boot_shim::DevicetreeBootShim<boot_shim::ArmDevicetreeTimerItem> shim("test", fdt);
+
+  shim.Init();
+
+  auto clear_errors = fit::defer([&]() { image.ignore_error(); });
+  ASSERT_TRUE(shim.AppendItems(image).is_ok());
+  bool present = false;
+  for (auto [header, payload] : image) {
+    if (header->type == ZBI_TYPE_KERNEL_DRIVER &&
+        header->extra == ZBI_KERNEL_DRIVER_ARM_GENERIC_TIMER) {
+      ASSERT_GE(payload.size_bytes(), sizeof(zbi_dcfg_arm_generic_timer_driver_t));
+      auto* timer_item = reinterpret_cast<zbi_dcfg_arm_generic_timer_driver_t*>(payload.data());
+      EXPECT_EQ(timer_item->freq_override, 0);
+      EXPECT_EQ(timer_item->irq_phys, 30);
+      EXPECT_EQ(timer_item->irq_sphys, 29);
+      EXPECT_EQ(timer_item->irq_virt, 27);
+      present = true;
+    }
+  }
+  ASSERT_TRUE(present);
+}
+
+TEST_F(ArmDevicetreeTimerItemTest, Crosvm) {
+  std::array<std::byte, 1024> image_buffer;
+  std::vector<void*> allocs;
+  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  ASSERT_TRUE(image.clear().is_ok());
+
+  auto fdt = crosvm_arm();
   boot_shim::DevicetreeBootShim<boot_shim::ArmDevicetreeTimerItem> shim("test", fdt);
 
   shim.Init();
@@ -1469,9 +1550,10 @@ TEST_F(ChosenNodeMatcherTest, VisionFive2) {
                      });
 }
 
-class MemoryItemTest : public zxtest::Test {
+class MemoryMatcherTest : public TestMixin<ArmDevicetreeTest, RiscvDevicetreeTest> {
  public:
   static void SetUpTestSuite() {
+    Mixin::SetUpTestSuite();
     auto loaded_dtb = LoadDtb("memory.dtb");
     ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
     memory_ = std::move(loaded_dtb).value();
@@ -1494,6 +1576,7 @@ class MemoryItemTest : public zxtest::Test {
     reserved_memory_ = std::nullopt;
     memreserve_ = std::nullopt;
     complex_ = std::nullopt;
+    Mixin::TearDownTestSuite();
   }
 
   devicetree::Devicetree memory() { return memory_->fdt(); }
@@ -1508,12 +1591,12 @@ class MemoryItemTest : public zxtest::Test {
   static std::optional<LoadedDtb> complex_;
 };
 
-std::optional<LoadedDtb> MemoryItemTest::memory_ = std::nullopt;
-std::optional<LoadedDtb> MemoryItemTest::reserved_memory_ = std::nullopt;
-std::optional<LoadedDtb> MemoryItemTest::memreserve_ = std::nullopt;
-std::optional<LoadedDtb> MemoryItemTest::complex_ = std::nullopt;
+std::optional<LoadedDtb> MemoryMatcherTest::memory_ = std::nullopt;
+std::optional<LoadedDtb> MemoryMatcherTest::reserved_memory_ = std::nullopt;
+std::optional<LoadedDtb> MemoryMatcherTest::memreserve_ = std::nullopt;
+std::optional<LoadedDtb> MemoryMatcherTest::complex_ = std::nullopt;
 
-TEST_F(MemoryItemTest, ReservationsWithoutExclusions) {
+TEST_F(MemoryMatcherTest, ParseMemreserves) {
   std::vector<MemoryReservation> reservations;
 
   auto fdt = memreserve();
@@ -1547,7 +1630,7 @@ TEST_F(MemoryItemTest, ReservationsWithoutExclusions) {
   EXPECT_EQ(reservations[3].size, 0x400000000);
 }
 
-TEST_F(MemoryItemTest, ReservationsWithNonOverlappingExclusions) {
+TEST_F(MemoryMatcherTest, ReservationsWithNonOverlappingExclusions) {
   std::vector<MemoryReservation> reservations;
 
   constexpr std::array kExclusions = {
@@ -1590,7 +1673,7 @@ TEST_F(MemoryItemTest, ReservationsWithNonOverlappingExclusions) {
   EXPECT_EQ(reservations[3].size, 0x400000000);
 }
 
-TEST_F(MemoryItemTest, ReservationsWithOverlappingExclusions) {
+TEST_F(MemoryMatcherTest, ReservationsWithOverlappingExclusions) {
   std::vector<MemoryReservation> reservations;
 
   constexpr std::array kExclusions = {
@@ -1643,8 +1726,8 @@ TEST_F(MemoryItemTest, ReservationsWithOverlappingExclusions) {
   EXPECT_EQ(reservations[3].size, 0x4fffe0000);
 }
 
-TEST_F(MemoryItemTest, ParseMemoryNodes) {
-  std::vector<memalloc::Range> storage(4);
+TEST_F(MemoryMatcherTest, ParseMemoryNodes) {
+  std::vector<memalloc::Range> storage(5);
 
   auto fdt = memory();
   boot_shim::DevicetreeMemoryMatcher memory_matcher("test", stdout, storage);
@@ -1671,8 +1754,8 @@ TEST_F(MemoryItemTest, ParseMemoryNodes) {
   EXPECT_EQ(ranges[3].type, memalloc::Type::kFreeRam);
 }
 
-TEST_F(MemoryItemTest, ParseReservedMemoryNodes) {
-  std::vector<memalloc::Range> storage(2);
+TEST_F(MemoryMatcherTest, ParseReservedMemoryNodes) {
+  std::vector<memalloc::Range> storage(3);
 
   auto fdt = reserved_memory();
   boot_shim::DevicetreeMemoryMatcher memory_matcher("test", stdout, storage);
@@ -1691,8 +1774,8 @@ TEST_F(MemoryItemTest, ParseReservedMemoryNodes) {
   EXPECT_EQ(ranges[1].type, memalloc::Type::kReserved);
 }
 
-TEST_F(MemoryItemTest, ParseAll) {
-  std::vector<memalloc::Range> storage(6);
+TEST_F(MemoryMatcherTest, ParseAll) {
+  std::vector<memalloc::Range> storage(11);
 
   auto fdt = complex();
   boot_shim::DevicetreeMemoryMatcher memory_matcher("test", stdout, storage);
@@ -1726,6 +1809,115 @@ TEST_F(MemoryItemTest, ParseAll) {
   EXPECT_EQ(ranges[5].addr, 0x76000000);
   EXPECT_EQ(ranges[5].size, 0x400000);
   EXPECT_EQ(ranges[5].type, memalloc::Type::kReserved);
+}
+
+TEST_F(MemoryMatcherTest, QemuRiscv) {
+  std::vector<memalloc::Range> storage(3);
+
+  auto fdt = qemu_riscv();
+  boot_shim::DevicetreeMemoryMatcher memory_matcher("test", stdout, storage);
+
+  ASSERT_TRUE(devicetree::Match(fdt, memory_matcher));
+  auto ranges = memory_matcher.ranges();
+  ASSERT_EQ(ranges.size(), 2);
+
+  // Account for the devicetree in use.
+  EXPECT_EQ(ranges[0].addr, 0x80000000);
+  EXPECT_EQ(ranges[0].size, 0x80000);
+  EXPECT_EQ(ranges[0].type, memalloc::Type::kReserved);
+
+  EXPECT_EQ(ranges[1].addr, 0x80000000);
+  EXPECT_EQ(ranges[1].size, 0x100000000);
+  EXPECT_EQ(ranges[1].type, memalloc::Type::kFreeRam);
+}
+
+TEST_F(MemoryMatcherTest, VisionFive2) {
+  std::vector<memalloc::Range> storage(9);
+
+  auto fdt = vision_five_2();
+  boot_shim::DevicetreeMemoryMatcher memory_matcher("test", stdout, storage);
+
+  ASSERT_TRUE(devicetree::Match(fdt, memory_matcher));
+  auto ranges = memory_matcher.ranges();
+  ASSERT_EQ(ranges.size(), 7);
+
+  EXPECT_EQ(ranges[0].addr, 0x40000000);
+  EXPECT_EQ(ranges[0].size, 0x200000000);
+  EXPECT_EQ(ranges[0].type, memalloc::Type::kFreeRam);
+
+  EXPECT_EQ(ranges[1].addr, 0x40000000);
+  EXPECT_EQ(ranges[1].size, 0x80000);
+  EXPECT_EQ(ranges[1].type, memalloc::Type::kReserved);
+
+  EXPECT_EQ(ranges[2].addr, 0xc0110000);
+  EXPECT_EQ(ranges[2].size, 0xf0000);
+  EXPECT_EQ(ranges[2].type, memalloc::Type::kReserved);
+
+  EXPECT_EQ(ranges[3].addr, 0xf0000000);
+  // Techincally is 0x1ffffff but its needs to be aligned to page boundary.
+  EXPECT_EQ(ranges[3].size, 0x2000000);
+  EXPECT_EQ(ranges[3].type, memalloc::Type::kReserved);
+
+  EXPECT_EQ(ranges[4].addr, 0xf2000000);
+  EXPECT_EQ(ranges[4].size, 0x1000);
+  EXPECT_EQ(ranges[4].type, memalloc::Type::kReserved);
+
+  EXPECT_EQ(ranges[5].addr, 0xf2001000);
+  EXPECT_EQ(ranges[5].size, 0xfff000);
+  EXPECT_EQ(ranges[5].type, memalloc::Type::kReserved);
+
+  EXPECT_EQ(ranges[6].addr, 0xf3000000);
+  EXPECT_EQ(ranges[6].size, 0x1000);
+  EXPECT_EQ(ranges[6].type, memalloc::Type::kReserved);
+}
+
+TEST_F(MemoryMatcherTest, SifiveHifiveUnmatched) {
+  std::vector<memalloc::Range> storage(3);
+
+  auto fdt = sifive_hifive_unmatched();
+  boot_shim::DevicetreeMemoryMatcher memory_matcher("test", stdout, storage);
+
+  ASSERT_TRUE(devicetree::Match(fdt, memory_matcher));
+  auto ranges = memory_matcher.ranges();
+  ASSERT_EQ(ranges.size(), 2);
+
+  EXPECT_EQ(ranges[0].addr, 0x80000000);
+  EXPECT_EQ(ranges[0].size, 0x400000000);
+  EXPECT_EQ(ranges[0].type, memalloc::Type::kFreeRam);
+
+  EXPECT_EQ(ranges[1].addr, 0x80000000);
+  EXPECT_EQ(ranges[1].size, 0x80000);
+  EXPECT_EQ(ranges[1].type, memalloc::Type::kReserved);
+}
+
+TEST_F(MemoryMatcherTest, QemuArm) {
+  std::vector<memalloc::Range> storage(2);
+
+  auto fdt = qemu_arm_gic3();
+  boot_shim::DevicetreeMemoryMatcher memory_matcher("test", stdout, storage);
+
+  ASSERT_TRUE(devicetree::Match(fdt, memory_matcher));
+  auto ranges = memory_matcher.ranges();
+  ASSERT_EQ(ranges.size(), 1);
+
+  EXPECT_EQ(ranges[0].addr, 0x40000000);
+  EXPECT_EQ(ranges[0].size, 0x200000000);
+  EXPECT_EQ(ranges[0].type, memalloc::Type::kFreeRam);
+}
+
+TEST_F(MemoryMatcherTest, CrosvmArm) {
+  std::vector<memalloc::Range> storage(2);
+
+  auto fdt = crosvm_arm();
+  boot_shim::DevicetreeMemoryMatcher memory_matcher("test", stdout, storage);
+
+  ASSERT_TRUE(devicetree::Match(fdt, memory_matcher));
+  auto ranges = memory_matcher.ranges();
+  ASSERT_EQ(ranges.size(), 1);
+
+  EXPECT_EQ(ranges[0].addr, 0x80000000);
+  EXPECT_EQ(ranges[0].size, 0x25800000);
+  EXPECT_EQ(ranges[0].type, memalloc::Type::kFreeRam);
 }
 
 class RiscvDevicetreeTimerItemTest : public TestMixin<RiscvDevicetreeTest> {
@@ -1816,6 +2008,30 @@ TEST_F(RiscvDevicetreeTimerItemTest, VisionFive2) {
       EXPECT_GE(payload.size(), sizeof(zbi_dcfg_riscv_generic_timer_driver_t));
       auto* dcfg = reinterpret_cast<zbi_dcfg_riscv_generic_timer_driver_t*>(payload.data());
       EXPECT_EQ(dcfg->freq_hz, 0x3D0900);
+      present = true;
+    }
+  }
+  ASSERT_TRUE(present);
+}
+
+TEST_F(RiscvDevicetreeTimerItemTest, SifiveHifiveUnmatched) {
+  std::array<std::byte, 512> image_buffer;
+  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  ASSERT_TRUE(image.clear().is_ok());
+
+  auto fdt = sifive_hifive_unmatched();
+  boot_shim::DevicetreeBootShim<boot_shim::RiscvDevicetreeTimerItem> shim("test", fdt);
+  shim.Init();
+  ASSERT_TRUE(shim.AppendItems(image).is_ok());
+
+  bool present = false;
+  auto clear_err = fit::defer([&]() { image.ignore_error(); });
+  for (auto [header, payload] : image) {
+    if (header->type == ZBI_TYPE_KERNEL_DRIVER &&
+        header->extra == ZBI_KERNEL_DRIVER_RISCV_GENERIC_TIMER) {
+      EXPECT_GE(payload.size(), sizeof(zbi_dcfg_riscv_generic_timer_driver_t));
+      auto* dcfg = reinterpret_cast<zbi_dcfg_riscv_generic_timer_driver_t*>(payload.data());
+      EXPECT_EQ(dcfg->freq_hz, 0xF4240);
       present = true;
     }
   }
@@ -2867,7 +3083,7 @@ class RiscvDevicetreePlicItemTest : public TestMixin<RiscvDevicetreeTest> {
 
 std::optional<LoadedDtb> RiscvDevicetreePlicItemTest::plic_dtb_ = std::nullopt;
 
-TEST_F(RiscvDevicetreePlicItemTest, ParsePlic) {
+TEST_F(RiscvDevicetreePlicItemTest, BasicPlic) {
   std::array<std::byte, 512> image_buffer;
   zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
   ASSERT_TRUE(image.clear().is_ok());
