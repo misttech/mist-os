@@ -28,6 +28,10 @@ class FileAccessTest(unittest.TestCase):
         file_path2 = self.temp_dir_path / "bar"
         file_path2.write_text("BAR")
 
+        (self.temp_dir_path / "child").mkdir()
+        file_path3 = self.temp_dir_path / "child" / "baz"
+        file_path3.write_text("BAZ")
+
         return super().setUp()
 
     def tearDown(self) -> None:
@@ -49,12 +53,27 @@ class FileAccessTest(unittest.TestCase):
             self.file_access.file_exists(GnLabel.from_str("//baz"))
         )
 
-    def test_list_directory(self):
-        children = self.file_access.list_directory(GnLabel.from_str("//"))
+    def test_search_directory(self):
+        children = self.file_access.search_directory(
+            GnLabel.from_str("//"), path_predicate=lambda _: True
+        )
         children.sort()
         self.assertEqual(
-            children, [GnLabel.from_str("//bar"), GnLabel.from_str("//foo")]
+            children,
+            [
+                GnLabel.from_str("//bar"),
+                GnLabel.from_str("//child/baz"),
+                GnLabel.from_str("//foo"),
+            ],
         )
+
+    def test_search_directory_with_predicate(self):
+        children = self.file_access.search_directory(
+            GnLabel.from_str("//"),
+            path_predicate=lambda path: path.name == "bar",
+        )
+        children.sort()
+        self.assertEqual(children, [GnLabel.from_str("//bar")])
 
     def test_read_file(self):
         self.assertEqual(
@@ -84,8 +103,10 @@ class FileAccessTest(unittest.TestCase):
         self.file_access.directory_exists(GnLabel.from_str("//"))
         self._assert_depfile(f"""main:\\\n    {self.temp_dir_path}""")
 
-    def test_write_depfile_after_list_directory(self):
-        self.file_access.list_directory(GnLabel.from_str("//"))
+    def test_write_depfile_after_search_directory(self):
+        self.file_access.search_directory(
+            GnLabel.from_str("//"), path_predicate=lambda _: True
+        )
         self._assert_depfile(f"""main:\\\n    {self.temp_dir_path}""")
 
 

@@ -7,6 +7,7 @@
 from collections import defaultdict
 import enum
 import logging
+from pathlib import Path
 from readme_fuchsia import ReadmesDB, Readme
 from gn_license_metadata import (
     GnApplicableLicensesMetadata,
@@ -191,14 +192,17 @@ class Collector:
 
         public_package_name = label.name.split("/")[-1]
 
-        for f in self.file_access.list_directory(source_dir):
-            file_name_upper = f.name.upper()
-            if file_name_upper in (
+        def license_file_predicate(path: Path) -> bool:
+            file_name_upper = path.name.upper()
+            return file_name_upper in (
                 "LICENSE",
                 "COPYRIGHT",
                 "NOTICE",
-            ) or file_name_upper.startswith(("LICENSE.", "LICENSE-")):
-                license_files.append(f)
+            ) or file_name_upper.startswith(("LICENSE.", "LICENSE-", "NOTICE."))
+
+        license_files = self.file_access.search_directory(
+            source_dir, path_predicate=license_file_predicate
+        )
 
         if license_files:
             self.stats.licenses_from_golibs += len(license_files)

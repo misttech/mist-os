@@ -4,10 +4,10 @@
 # found in the LICENSE file.
 
 from pathlib import Path
-from typing import List, Set
-
+from typing import Callable, List, Set
 from gn_label import GnLabel
 import dataclasses
+import os
 
 
 @dataclasses.dataclass(frozen=False)
@@ -42,14 +42,29 @@ class FileAccess:
             return True
         return False
 
-    def list_directory(self, label: GnLabel) -> List[GnLabel]:
-        """Lists the files in a directory corresponding with `label`"""
+    def search_directory(
+        self, label: GnLabel, path_predicate: Callable[[Path], bool]
+    ) -> List[GnLabel]:
+        """Lists the files in a directory corresponding with `label` (including files in subdirs) matching `path_predicate`"""
         GnLabel.check_type(label)
         path = self.fuchsia_source_path / label.path
         self.visited_files.add(path)
-        return [
-            label.create_child_from_str(child.name) for child in path.iterdir()
-        ]
+
+        output = []
+
+        for root, _, files in os.walk(path):
+            root_path = Path(root)
+            for file in files:
+                file_path = root_path / file
+                if path_predicate(file_path):
+                    relative_to_label = file_path.relative_to(
+                        self.fuchsia_source_path
+                    ).relative_to(label.path)
+                    output.append(
+                        label.create_child_from_str(str(relative_to_label))
+                    )
+
+        return output
 
     def write_depfile(self, dep_file_path: Path, main_entry: Path):
         if not dep_file_path.parent.exists():

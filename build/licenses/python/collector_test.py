@@ -258,6 +258,15 @@ class CollectorTest(unittest.TestCase):
             {"foo": ["//third_party/golibs/vendor/foo/LICENSE"]}
         )
 
+    def test_golib_license_when_child_dir_has_the_license(self):
+        self._add_applicable_licenses_metadata(
+            target="//third_party/golibs:foo", licenses=[]
+        )
+        self._add_golib_vendor_files(["foo/bar/lib.go", "foo/bar/baz/LICENSE"])
+        self._assert_licenses(
+            {"foo": ["//third_party/golibs/vendor/foo/bar/baz/LICENSE"]}
+        )
+
     def test_golib_license_with_different_names_of_license_files(self):
         self._add_applicable_licenses_metadata(
             target="//third_party/golibs:foo", licenses=[]
