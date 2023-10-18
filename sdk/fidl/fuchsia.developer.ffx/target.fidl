@@ -131,14 +131,6 @@ type TargetRebootState = strict enum {
     RECOVERY = 3;
 };
 
-@discoverable
-closed protocol TargetControl {
-    @deprecated("Please use target collection -> target handle instead.")
-    strict Reboot(struct {
-        state TargetRebootState;
-    }) -> () error TargetRebootError;
-};
-
 /// An iterator for which the client handles calls to the `Next` function. When
 /// a client calls `ListTargets` in the `TargetCollection` protocol, the targets
 /// will be sent to the client via the `Next` function, with acknowledgements
