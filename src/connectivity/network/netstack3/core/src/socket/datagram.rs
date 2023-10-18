@@ -1511,7 +1511,7 @@ pub(crate) enum SocketInfo<I: Ip + DualStackIpExt, D, S: DatagramSocketSpec> {
     Connected(ConnAddr<S::ConnIpAddr<I>, D>),
 }
 
-pub(crate) fn remove<
+pub(crate) fn close<
     I: IpExt,
     S: DatagramSocketSpec,
     C: DatagramStateNonSyncContext<I, S>,

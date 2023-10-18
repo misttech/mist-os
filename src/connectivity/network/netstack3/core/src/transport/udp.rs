@@ -1588,11 +1588,7 @@ pub(crate) trait SocketHandler<I: IpExt, C>: DeviceIdContext<AnyDevice> {
 
     fn get_shutdown(&mut self, ctx: &C, id: SocketId<I>) -> Option<ShutdownType>;
 
-    fn remove_udp(
-        &mut self,
-        ctx: &mut C,
-        id: SocketId<I>,
-    ) -> SocketInfo<I::Addr, Self::WeakDeviceId>;
+    fn close(&mut self, ctx: &mut C, id: SocketId<I>) -> SocketInfo<I::Addr, Self::WeakDeviceId>;
 
     fn get_udp_info(
         &mut self,
@@ -1782,12 +1778,8 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> SocketHandler<
         datagram::get_shutdown_connected(self, ctx, id)
     }
 
-    fn remove_udp(
-        &mut self,
-        ctx: &mut C,
-        id: SocketId<I>,
-    ) -> SocketInfo<I::Addr, Self::WeakDeviceId> {
-        datagram::remove(self, ctx, id).into()
+    fn close(&mut self, ctx: &mut C, id: SocketId<I>) -> SocketInfo<I::Addr, Self::WeakDeviceId> {
+        datagram::close(self, ctx, id).into()
     }
 
     fn get_udp_info(
@@ -2632,7 +2624,7 @@ pub fn get_udp_info<I: Ip, C: crate::NonSyncContext>(
 /// # Panics
 ///
 /// Panics if `id` is not a valid [`SocketId`].
-pub fn remove_udp<I: Ip, C: crate::NonSyncContext>(
+pub fn close<I: Ip, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: SocketId<I>,
@@ -2640,12 +2632,8 @@ pub fn remove_udp<I: Ip, C: crate::NonSyncContext>(
     let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx)), id.clone()),
-        |(IpInvariant((sync_ctx, ctx)), id)| {
-            SocketHandler::<Ipv4, _>::remove_udp(sync_ctx, ctx, id)
-        },
-        |(IpInvariant((sync_ctx, ctx)), id)| {
-            SocketHandler::<Ipv6, _>::remove_udp(sync_ctx, ctx, id)
-        },
+        |(IpInvariant((sync_ctx, ctx)), id)| SocketHandler::<Ipv4, _>::close(sync_ctx, ctx, id),
+        |(IpInvariant((sync_ctx, ctx)), id)| SocketHandler::<Ipv6, _>::close(sync_ctx, ctx, id),
     )
 }
 
@@ -5164,7 +5152,7 @@ mod tests {
         // Once the first listener is removed, the second socket can be
         // connected.
         let _: SocketInfo<I::Addr, _> =
-            SocketHandler::remove_udp(&mut sync_ctx, &mut non_sync_ctx, listener);
+            SocketHandler::close(&mut sync_ctx, &mut non_sync_ctx, listener);
 
         listen_unbound(&mut sync_ctx, &mut non_sync_ctx, unbound).expect("listen should succeed");
     }
@@ -5341,7 +5329,7 @@ mod tests {
             remote_port,
         )
         .expect("connect failed");
-        let info = SocketHandler::remove_udp(&mut sync_ctx, &mut non_sync_ctx, socket);
+        let info = SocketHandler::close(&mut sync_ctx, &mut non_sync_ctx, socket);
         let info = assert_matches!(info, SocketInfo::Connected(info) => info);
         // Assert that the info gotten back matches what was expected.
         assert_eq!(info.local_ip, local_ip.into_inner().map_zone(FakeWeakDeviceId).into());
@@ -5373,7 +5361,7 @@ mod tests {
             Some(local_port),
         )
         .expect("listen_udp failed");
-        let info = SocketHandler::remove_udp(&mut sync_ctx, &mut non_sync_ctx, specified);
+        let info = SocketHandler::close(&mut sync_ctx, &mut non_sync_ctx, specified);
         let info = assert_matches!(info, SocketInfo::Listener(info) => info);
         assert_eq!(info.local_ip.unwrap(), local_ip.into_inner().map_zone(FakeWeakDeviceId).into());
         assert_eq!(info.local_port, local_port);
@@ -5390,7 +5378,7 @@ mod tests {
             Some(local_port),
         )
         .expect("listen_udp failed");
-        let info = SocketHandler::remove_udp(&mut sync_ctx, &mut non_sync_ctx, wildcard);
+        let info = SocketHandler::close(&mut sync_ctx, &mut non_sync_ctx, wildcard);
         let info = assert_matches!(info, SocketInfo::Listener(info) => info);
         assert_eq!(info.local_ip, None);
         assert_eq!(info.local_port, local_port);
@@ -5623,7 +5611,7 @@ mod tests {
         );
 
         let _: SocketInfo<I::Addr, _> =
-            SocketHandler::remove_udp(&mut sync_ctx, &mut non_sync_ctx, unbound);
+            SocketHandler::close(&mut sync_ctx, &mut non_sync_ctx, unbound);
         assert_eq!(sync_ctx.inner.inner.get_ref().multicast_memberships::<I>(), HashMap::default());
     }
 
@@ -5676,7 +5664,7 @@ mod tests {
         );
 
         let _: SocketInfo<I::Addr, _> =
-            SocketHandler::remove_udp(&mut sync_ctx, &mut non_sync_ctx, socket);
+            SocketHandler::close(&mut sync_ctx, &mut non_sync_ctx, socket);
         assert_eq!(sync_ctx.inner.inner.get_ref().multicast_memberships::<I>(), HashMap::default());
     }
 
@@ -5729,7 +5717,7 @@ mod tests {
         );
 
         let _: SocketInfo<I::Addr, _> =
-            SocketHandler::remove_udp(&mut sync_ctx, &mut non_sync_ctx, socket);
+            SocketHandler::close(&mut sync_ctx, &mut non_sync_ctx, socket);
         assert_eq!(sync_ctx.inner.inner.get_ref().multicast_memberships::<I>(), HashMap::default());
     }
 
@@ -5861,8 +5849,7 @@ mod tests {
             SocketHandler::get_udp_posix_reuse_port(&mut sync_ctx, &non_sync_ctx, first),
             true
         );
-        let _: SocketInfo<_, _> =
-            SocketHandler::remove_udp(&mut sync_ctx, &mut non_sync_ctx, first);
+        let _: SocketInfo<_, _> = SocketHandler::close(&mut sync_ctx, &mut non_sync_ctx, first);
 
         let second = SocketHandler::<I, _>::create_udp(&mut sync_ctx);
         SocketHandler::set_udp_posix_reuse_port(&mut sync_ctx, &mut non_sync_ctx, second, true)
@@ -6676,8 +6663,7 @@ mod tests {
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
             UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::new_fake_device::<I>());
         let unbound = SocketHandler::<I, _>::create_udp(&mut sync_ctx);
-        let _: SocketInfo<_, _> =
-            SocketHandler::remove_udp(&mut sync_ctx, &mut non_sync_ctx, unbound);
+        let _: SocketInfo<_, _> = SocketHandler::close(&mut sync_ctx, &mut non_sync_ctx, unbound);
 
         let Wrapped { outer: sockets_state, inner: _ } = &sync_ctx;
         assert_matches!(sockets_state.as_ref().get_socket_state(&unbound), None)
@@ -7077,7 +7063,7 @@ mod tests {
             );
 
             assert_eq!(
-                SocketHandler::<Ipv6, _>::remove_udp(&mut sync_ctx, &mut non_sync_ctx, listener),
+                SocketHandler::<Ipv6, _>::close(&mut sync_ctx, &mut non_sync_ctx, listener),
                 SocketInfo::Listener(ListenerInfo {
                     local_ip: bind_addr.map(|a| ZonedAddr::Unzoned(a).into()),
                     local_port: LOCAL_PORT,

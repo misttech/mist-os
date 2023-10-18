@@ -3364,8 +3364,8 @@ pub(crate) trait SocketHandler<I: datagram::IpExt, C>: DeviceIdContext<AnyDevice
     /// Gets the current shutdown state of the ICMP socket.
     fn get_shutdown(&mut self, ctx: &C, id: &SocketId<I>) -> Option<ShutdownType>;
 
-    /// Removes the ICMP socket.
-    fn remove(&mut self, ctx: &mut C, id: SocketId<I>);
+    /// Closes the ICMP socket.
+    fn close(&mut self, ctx: &mut C, id: SocketId<I>);
 
     /// Gets the unicast hop limit.
     fn get_unicast_hop_limit(&mut self, ctx: &C, id: &SocketId<I>) -> NonZeroU8;
@@ -3523,8 +3523,8 @@ impl<I: datagram::IpExt, C: IcmpNonSyncCtx<I>, SC: StateContext<I, C> + IcmpStat
         datagram::get_shutdown_connected(self, ctx, id.clone())
     }
 
-    fn remove(&mut self, ctx: &mut C, id: SocketId<I>) {
-        let _: datagram::SocketInfo<_, _, _> = datagram::remove(self, ctx, id);
+    fn close(&mut self, ctx: &mut C, id: SocketId<I>) {
+        let _: datagram::SocketInfo<_, _, _> = datagram::close(self, ctx, id);
     }
 
     fn get_unicast_hop_limit(&mut self, ctx: &C, id: &SocketId<I>) -> NonZeroU8 {
@@ -3838,13 +3838,13 @@ pub fn get_shutdown<I: Ip, C: NonSyncContext>(
     })
 }
 
-/// Removes an ICMP socket.
-pub fn remove<I: Ip, C: NonSyncContext>(sync_ctx: &SyncCtx<C>, ctx: &mut C, id: SocketId<I>) {
+/// closes an ICMP socket.
+pub fn close<I: Ip, C: NonSyncContext>(sync_ctx: &SyncCtx<C>, ctx: &mut C, id: SocketId<I>) {
     net_types::map_ip_twice!(I, (IpInvariant((sync_ctx, ctx)), id), |(
         IpInvariant((sync_ctx, ctx)),
         id,
     )| {
-        SocketHandler::<I, C>::remove(&mut Locked::new(sync_ctx), ctx, id)
+        SocketHandler::<I, C>::close(&mut Locked::new(sync_ctx), ctx, id)
     })
 }
 

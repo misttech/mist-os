@@ -272,7 +272,7 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
         id: &Self::SocketId,
     ) -> Self::SocketInfo<C>;
 
-    fn remove<C: NonSyncContext>(sync_ctx: &SyncCtx<C>, ctx: &mut C, id: Self::SocketId);
+    fn close<C: NonSyncContext>(sync_ctx: &SyncCtx<C>, ctx: &mut C, id: Self::SocketId);
 
     fn set_socket_device<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
@@ -449,8 +449,8 @@ impl<I: IpExt> TransportState<I> for Udp {
         udp::get_udp_info(sync_ctx, ctx, id)
     }
 
-    fn remove<C: NonSyncContext>(sync_ctx: &SyncCtx<C>, ctx: &mut C, id: Self::SocketId) {
-        let _: Self::SocketInfo<C> = udp::remove_udp(sync_ctx, ctx, id);
+    fn close<C: NonSyncContext>(sync_ctx: &SyncCtx<C>, ctx: &mut C, id: Self::SocketId) {
+        let _: Self::SocketInfo<C> = udp::close(sync_ctx, ctx, id);
     }
 
     fn set_socket_device<C: NonSyncContext>(
@@ -698,8 +698,8 @@ impl<I: IpExt> TransportState<I> for IcmpEcho {
         icmp::get_info(sync_ctx, ctx, id)
     }
 
-    fn remove<C: NonSyncContext>(sync_ctx: &SyncCtx<C>, ctx: &mut C, id: Self::SocketId) {
-        icmp::remove(sync_ctx, ctx, id)
+    fn close<C: NonSyncContext>(sync_ctx: &SyncCtx<C>, ctx: &mut C, id: Self::SocketId) {
+        icmp::close(sync_ctx, ctx, id)
     }
 
     fn set_socket_device<C: NonSyncContext>(
@@ -1084,7 +1084,7 @@ where
         let id = self.info.id;
         let _: Option<_> =
             I::with_collection_mut(non_sync_ctx, |c| c.received.remove(id.get_key_index()));
-        T::remove(sync_ctx, non_sync_ctx, id);
+        T::close(sync_ctx, non_sync_ctx, id);
     }
 }
 
