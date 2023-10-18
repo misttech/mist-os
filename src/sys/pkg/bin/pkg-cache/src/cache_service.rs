@@ -139,7 +139,7 @@ async fn get_package_status(
     package_index: &async_lock::RwLock<PackageIndex>,
     package: &fuchsia_hash::Hash,
 ) -> PackageStatus {
-    if base_packages.is_base_package(*package) {
+    if base_packages.is_package(*package) {
         return PackageStatus::Base;
     }
 
