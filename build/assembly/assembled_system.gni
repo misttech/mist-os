@@ -209,7 +209,6 @@ template("assembled_system") {
   not_needed(invoker,
              [
                "include_component_id_index",
-               "use_assembly_fshost",
                "skip_fshost_validator",
              ])
 

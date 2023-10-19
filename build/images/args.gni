@@ -172,10 +172,6 @@ declare_args() {
   # assembled_system().  See documentation there.
   include_shell_commands_package = false
 
-  # Skip configuring fshost in GN and do it via Assembly instead.
-  # Used as a parameter to assembled_system().
-  assembly_fshost = false
-
   # If true, the images.json build API modules will only include images
   # identified by bazel_product_bundle_target and its dependencies.
   #

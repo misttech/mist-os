@@ -58,7 +58,6 @@ if (is_fuchsia) {
 
     bootfs_labels = []
     generate_fvm = true
-    use_assembly_fshost = true
   }
 
   bazel_product_bundle("bazel_pb") {
