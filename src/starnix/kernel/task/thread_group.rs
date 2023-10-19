@@ -69,9 +69,6 @@ pub struct ThreadGroupMutableState {
 
     pub did_exec: bool,
 
-    /// Whether the process is currently stopped.
-    pub stopped: StopState,
-
     /// Wait queue for updates to `stopped`.
     pub stopped_waiters: WaitQueue,
 
@@ -140,6 +137,11 @@ pub struct ThreadGroup {
 
     /// A mechanism to be notified when this `ThreadGroup` is destroyed.
     pub drop_notifier: DropNotifier,
+
+    /// Whether the process is currently stopped.
+    ///
+    /// Must only be set when the `mutable_state` write lock is held.
+    stop_state: AtomicStopState,
 
     /// The mutable state of the ThreadGroup.
     mutable_state: RwLock<ThreadGroupMutableState>,
@@ -289,6 +291,7 @@ impl ThreadGroup {
             ),
             next_seccomp_filter_id: Default::default(),
             ptracees: Default::default(),
+            stop_state: AtomicStopState::new(StopState::Awake),
             mutable_state: RwLock::new(ThreadGroupMutableState {
                 parent: parent.as_ref().map(|p| Arc::clone(p.base)),
                 tasks: BTreeMap::new(),
@@ -299,7 +302,6 @@ impl ThreadGroup {
                 process_group: Arc::clone(&process_group),
                 timers,
                 did_exec: false,
-                stopped: StopState::Awake,
                 stopped_waiters: WaitQueue::default(),
                 waitable: None,
                 leader_exit_info: None,
@@ -322,6 +324,26 @@ impl ThreadGroup {
     }
 
     state_accessor!(ThreadGroup, mutable_state);
+
+    pub fn load_stopped(&self) -> StopState {
+        self.stop_state.load(Ordering::Relaxed)
+    }
+
+    fn check_mutable_state_lock_held(&self, guard: &mut ThreadGroupMutableState) {
+        // We don't actually use the guard but we require it to enforce that the
+        // caller holds the thread group's mutable state lock (identified by
+        // mutable access to the thread group's mutable state).
+        let _ = guard;
+        // Ideally we would assert `!self.mutable_state.is_locked_exclusive()`
+        // but this tries to take the lock underneath which triggers a lock
+        // dependency check, resulting in a panic.
+    }
+
+    fn store_stopped(&self, state: StopState, guard: &mut ThreadGroupMutableState) {
+        self.check_mutable_state_lock_held(guard);
+
+        self.stop_state.store(state, Ordering::Relaxed)
+    }
 
     pub fn exit(self: &Arc<Self>, exit_status: ExitStatus) {
         let mut state = self.write();
@@ -348,7 +370,7 @@ impl ThreadGroup {
         }
 
         for task in tasks {
-            task.write().exit_status = Some(exit_status.clone());
+            task.set_exit_status(&mut *task.write(), exit_status.clone());
             send_signal(&task, SignalInfo::default(SIGKILL));
         }
     }
@@ -378,7 +400,7 @@ impl ThreadGroup {
             };
 
         if task.id == self.leader {
-            let exit_status = task.read().exit_status.clone().unwrap_or_else(|| {
+            let exit_status = task.exit_status().unwrap_or_else(|| {
                 log_error!("Exiting without an exit code.");
                 ExitStatus::Exit(u8::MAX)
             });
@@ -623,23 +645,40 @@ impl ThreadGroup {
     /// Returns the latest stop state after any changes.
     pub fn set_stopped(
         self: &Arc<Self>,
-        stopped: StopState,
+        new_stopped: StopState,
         siginfo: Option<SignalInfo>,
         finalize_only: bool,
     ) -> StopState {
-        let (parent, stopped) = {
+        let early_return_check = || {
+            let stopped = self.load_stopped();
+            if finalize_only && !stopped.is_stopping_or_stopped() {
+                return Some(stopped);
+            }
+
+            if stopped.is_illegal_transition(new_stopped) {
+                return Some(stopped);
+            }
+
+            return None;
+        };
+
+        // Perform an early return check to see if we can avoid taking the lock.
+        if let Some(stopped) = early_return_check() {
+            return stopped;
+        }
+
+        let parent = {
             let mut state = self.write();
-            if finalize_only && !state.stopped.is_stopping_or_stopped() {
-                return state.stopped;
+            // Perform the early return check again in case the stop state has
+            // changed.
+            if let Some(stopped) = early_return_check() {
+                return stopped;
             }
 
-            if state.stopped.is_illegal_transition(stopped) {
-                return state.stopped;
-            }
-
-            // TODO(qsr): When task can be stopped inside user code, task will need to be
-            // either restarted or stopped here.
-            state.stopped = stopped;
+            // TODO(https://g-issues.fuchsia.dev/issues/306438676): When thread
+            // group can be stopped inside user code, tasks/thread groups will
+            // need to be either restarted or stopped here.
+            self.store_stopped(new_stopped, &mut *state);
             if let Some(signal) = &siginfo {
                 // We don't want waiters to think the process was unstopped
                 // because of a sigkill.  They will get woken when the
@@ -648,21 +687,18 @@ impl ThreadGroup {
                     state.waitable = siginfo;
                 }
             }
-            if state.stopped == StopState::Waking || state.stopped == StopState::ForceWaking {
+            if new_stopped == StopState::Waking || new_stopped == StopState::ForceWaking {
                 state.stopped_waiters.notify_all();
             };
 
-            (
-                (!state.stopped.is_in_progress()).then(|| state.parent.clone()).flatten(),
-                state.stopped,
-            )
+            (!new_stopped.is_in_progress()).then(|| state.parent.clone()).flatten()
         };
 
         if let Some(parent) = parent {
             parent.write().child_status_waiters.notify_all();
         }
 
-        stopped
+        new_stopped
     }
 
     /// Ensures |session| is the controlling session inside of |controlling_session|, and returns a
@@ -945,16 +981,16 @@ impl ThreadGroup {
                 let exit_signal = info.exit_signal();
                 let time_stats =
                     process_state.base.time_stats() + process_state.children_time_stats;
-                let task_stopped = task_state.stopped;
+                let task_stopped = task_ref.load_stopped();
 
                 if process_state.waitable.is_some() {
                     // The information for processes, if we were in group stop.
                     let mut exit_status_fn: Option<&dyn Fn(SignalInfo) -> ExitStatus> = None;
-                    if process_state.stopped == StopState::Awake && options.wait_for_continued {
+                    let process_stopped = process_state.base.load_stopped();
+                    if process_stopped == StopState::Awake && options.wait_for_continued {
                         exit_status_fn = Some(&ExitStatus::Continue);
                     }
-                    if process_state.stopped == StopState::GroupStopped && options.wait_for_stopped
-                    {
+                    if process_stopped == StopState::GroupStopped && options.wait_for_stopped {
                         exit_status_fn = Some(&ExitStatus::Stop);
                     }
                     if let Some(mut exit_status_fn) = exit_status_fn {
@@ -1197,10 +1233,11 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
                         time_stats: child.base.time_stats() + child.children_time_stats,
                     }
                 };
-                if child.stopped == StopState::Awake && options.wait_for_continued {
+                let child_stopped = child.base.load_stopped();
+                if child_stopped == StopState::Awake && options.wait_for_continued {
                     return Ok(Some(build_wait_result(child, &ExitStatus::Continue)));
                 }
-                if child.stopped == StopState::GroupStopped && options.wait_for_stopped {
+                if child_stopped == StopState::GroupStopped && options.wait_for_stopped {
                     return Ok(Some(build_wait_result(child, &ExitStatus::Stop)));
                 }
             }

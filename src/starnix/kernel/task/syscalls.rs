@@ -627,7 +627,8 @@ pub fn sys_exit(
 ) -> Result<(), Errno> {
     // Only change the current exit status if this has not been already set by exit_group, as
     // otherwise it has priority.
-    current_task.write().exit_status.get_or_insert(ExitStatus::Exit(code as u8));
+    current_task
+        .set_exit_status_if_not_already(&mut *current_task.write(), ExitStatus::Exit(code as u8));
     Ok(())
 }
 

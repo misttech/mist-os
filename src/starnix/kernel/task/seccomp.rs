@@ -382,9 +382,15 @@ impl SeccompState {
 
                 if is_last_thread {
                     task_state.dump_on_exit = true;
-                    task_state.exit_status.get_or_insert(ExitStatus::CoreDump(siginfo));
+                    current_task.set_exit_status_if_not_already(
+                        &mut *task_state,
+                        ExitStatus::CoreDump(siginfo),
+                    );
                 } else {
-                    task_state.exit_status.get_or_insert(ExitStatus::Kill(siginfo));
+                    current_task.set_exit_status_if_not_already(
+                        &mut *task_state,
+                        ExitStatus::Kill(siginfo),
+                    );
                 }
                 Some(Err(errno_from_code!(0)))
             }

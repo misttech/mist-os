@@ -188,6 +188,10 @@ impl SignalState {
         }
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.queue.is_empty()
+    }
+
     /// Finds the next queued signal where the given function returns true, removes it from the
     /// queue, and returns it.
     pub fn take_next_where<F>(&mut self, predicate: F) -> Option<SignalInfo>

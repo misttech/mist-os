@@ -60,13 +60,13 @@ fn ptrace_cont(tracee: &Task, data: &UserAddress, detach: bool) -> Result<(), Er
         send_signal(&tracee, siginfo);
     }
     let mut state = tracee.write();
-    if state.stopped.is_waking_or_awake() {
+    if tracee.load_stopped().is_waking_or_awake() {
         if detach {
             state.set_ptrace(None)?;
         }
         return error!(EIO);
     }
-    state.set_stopped(StopState::Waking, None);
+    tracee.set_stopped(&mut *state, StopState::Waking, None);
     if detach {
         state.set_ptrace(None)?;
     }
@@ -126,8 +126,7 @@ pub fn ptrace_dispatch(
     }
 
     // The remaining requests (to be added) require the thread to be stopped.
-    let state = tracee.write();
-    if state.stopped.is_waking_or_awake() {
+    if tracee.load_stopped().is_waking_or_awake() {
         return error!(ESRCH);
     }
 

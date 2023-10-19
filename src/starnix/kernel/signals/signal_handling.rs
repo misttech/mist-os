@@ -35,6 +35,7 @@ pub fn send_signal(task: &Task, siginfo: SignalInfo) {
     // If it is ptraced, enqueue it, so it can do the signal-delivery-stop.
     if is_masked || was_masked || action != DeliveryAction::Ignore || task_state.is_ptraced() {
         task_state.signals.enqueue(siginfo.clone());
+        task.set_flags(&mut *task_state, TaskFlags::SIGNALS_AVAILABLE, true);
     }
 
     drop(task_state);
@@ -51,10 +52,10 @@ pub fn send_signal(task: &Task, siginfo: SignalInfo) {
     // a stopped process.
     if siginfo.signal == SIGCONT {
         task.thread_group.set_stopped(StopState::Waking, Some(siginfo), false);
-        task.write().set_stopped(StopState::Waking, None);
+        task.set_stopped(&mut *task.write(), StopState::Waking, None);
     } else if siginfo.signal == SIGKILL {
         task.thread_group.set_stopped(StopState::ForceWaking, Some(siginfo), false);
-        task.write().set_stopped(StopState::ForceWaking, None);
+        task.set_stopped(&mut *task.write(), StopState::ForceWaking, None);
     }
 }
 
@@ -127,13 +128,25 @@ pub fn dequeue_signal(
     // A syscall may have been waiting with a temporary mask which should be used to dequeue the
     // signal, but after the signal has been dequeued the old mask should be restored.
     task_state.signals.restore_mask();
+    {
+        let (clear, set) = if task_state.signals.is_empty() {
+            (TaskFlags::SIGNALS_AVAILABLE, TaskFlags::empty())
+        } else {
+            (TaskFlags::empty(), TaskFlags::SIGNALS_AVAILABLE)
+        };
+        task.update_flags(&mut *task_state, clear | TaskFlags::TEMPORARY_SIGNAL_MASK, set);
+    };
 
     if let Some(ref siginfo) = siginfo {
         if is_ptraced && siginfo.signal != SIGKILL {
             // Indicate we will be stopping for ptrace at the next opportunity.
             // Whether you actually deliver the signal is now up to ptrace, so
             // we can return.
-            task_state.set_stopped(StopState::SignalDeliveryStopping, Some(siginfo.clone()));
+            task.set_stopped(
+                &mut *task_state,
+                StopState::SignalDeliveryStopping,
+                Some(siginfo.clone()),
+            );
             return;
         }
     }

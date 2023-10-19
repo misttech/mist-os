@@ -107,14 +107,19 @@ pub fn process_completed_restricted_exit(
 ) -> Result<Option<ExitStatus>, Errno> {
     // Checking for a signal might cause the task to exit, so check before processing exit
     {
-        let CurrentTask { task, registers, .. } = current_task;
-        let task_state = task.write();
-        if task_state.exit_status.is_none() {
-            dequeue_signal(task, task_state, registers);
+        let flags = current_task.flags();
+        if flags.contains(TaskFlags::TEMPORARY_SIGNAL_MASK)
+            || (!flags.contains(TaskFlags::EXITED) && flags.contains(TaskFlags::SIGNALS_AVAILABLE))
+        {
+            let CurrentTask { task, registers, .. } = current_task;
+            let task_state = task.write();
+            if !task.is_exitted() {
+                dequeue_signal(task, task_state, registers);
+            }
         }
     }
 
-    let exit_status = current_task.read().exit_status.clone();
+    let exit_status = current_task.exit_status();
     if let Some(exit_status) = exit_status {
         log_trace!("exiting with status {:?}", exit_status);
         if let Some(error_context) = error_context {
@@ -241,9 +246,9 @@ fn block_while_stopped(current_task: &mut CurrentTask) {
     loop {
         // If we've exited, unstop the threads and return without notifying
         // waiters.
-        if current_task.read().exit_status.is_some() {
+        if current_task.is_exitted() {
             current_task.thread_group.set_stopped(StopState::ForceAwake, None, false);
-            current_task.write().set_stopped(StopState::ForceAwake, None);
+            current_task.set_stopped(&mut *current_task.write(), StopState::ForceAwake, None);
             return;
         }
 
