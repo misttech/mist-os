@@ -256,7 +256,7 @@ class [[nodiscard]] DispatcherBound<T>::AsyncCallBuilder {
     constexpr bool kReceiverMatchesReturnValue =
         std::is_invocable_v<decltype(on_result), TaskResult>;
     static_assert(kReceiverMatchesReturnValue,
-                  "The |async_patterns::Callback<R>| must accept the return value "
+                  "The |async_patterns::Callback<void(R)>| must accept the return value "
                   "of the |Member| being called.");
     if constexpr (kReceiverMatchesReturnValue) {
       Call(std::move(on_result));

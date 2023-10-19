@@ -311,7 +311,7 @@ TEST_F(DispatcherBound, AsyncCallWithReply) {
       // Passing incompatible types is not allowed.
 #if 0
       background_.AsyncCall(&Background::Concat, std::string("def"))
-          .Then(receiver_.Once([] (Owner*, int not_a_string) {}));
+          .Then(receiver_.Once([](Owner*, int not_a_string) {}));
 #endif
     }
 
@@ -467,6 +467,29 @@ TEST_F(DispatcherBound, MakeDispatcherBound) {
   EXPECT_EQ(0, object_count->load());
   loop().RunUntilIdle();
   EXPECT_EQ(1, object_count->load());
+}
+
+TEST(DispatcherBoundDeathTest, DispatcherIsNotSynchronized) {
+  struct Object {
+    void Method() {}
+  };
+
+  // Construct the object on the main thread.
+  async::Loop loop{&kAsyncLoopConfigNeverAttachToThread};
+  async_patterns::DispatcherBound<Object> object(loop.dispatcher());
+  object.emplace();
+
+  ASSERT_OK(loop.RunUntilIdle());
+
+  // Call a member method, while the loop is now run from thread B.
+  // This should panic while running the loop.
+  object.AsyncCall(&Object::Method);
+  std::thread thread_b([&] {
+    ASSERT_DEATH(loop.RunUntilIdle(),
+                 "\\|async_patterns::DispatcherBound\\| is meant to manage thread-unsafe "
+                 "asynchronous objects.");
+  });
+  thread_b.join();
 }
 
 }  // namespace
