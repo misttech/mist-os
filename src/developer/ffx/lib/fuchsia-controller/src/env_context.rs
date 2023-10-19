@@ -119,7 +119,7 @@ impl EnvContext {
         let daemon = self.injector.daemon_factory().await?;
         let timeout = self.context.get_proxy_timeout().await?;
         let proxy =
-            ffx_target::get_remote_proxy(target, is_default_target, daemon, timeout).await?;
+            ffx_target::get_remote_proxy(target, is_default_target, daemon, timeout, None).await?;
         let hdl = proxy.into_channel().map_err(fxe)?.into_zx_channel();
         let res = hdl.raw_handle();
         std::mem::forget(hdl);

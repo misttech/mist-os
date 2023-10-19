@@ -17,7 +17,7 @@ use ffx_target::{get_remote_proxy, open_target_with_fut, TargetKind};
 use ffx_writer::{Format, Writer};
 use fidl::endpoints::{create_proxy, Proxy};
 use fidl_fuchsia_developer_ffx::{
-    DaemonError, DaemonProxy, FastbootMarker, FastbootProxy, TargetProxy, VersionInfo,
+    DaemonError, DaemonProxy, FastbootMarker, FastbootProxy, TargetInfo, TargetProxy, VersionInfo,
 };
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use futures::FutureExt;
@@ -95,11 +95,21 @@ impl Injection {
     }
 
     #[tracing::instrument]
-    async fn init_remote_proxy(&self) -> Result<RemoteControlProxy> {
+    async fn init_remote_proxy(
+        &self,
+        target_info: &mut Option<TargetInfo>,
+    ) -> Result<RemoteControlProxy> {
         let daemon_proxy = self.daemon_factory().await?;
         let target = self.target.clone();
         let proxy_timeout = self.env_context.get_proxy_timeout().await?;
-        get_remote_proxy(target, self.is_default_target(), daemon_proxy, proxy_timeout).await
+        get_remote_proxy(
+            target,
+            self.is_default_target(),
+            daemon_proxy,
+            proxy_timeout,
+            Some(target_info),
+        )
+        .await
     }
 
     #[tracing::instrument]
@@ -132,13 +142,13 @@ impl Injection {
         Ok(target_proxy)
     }
 
-    async fn daemon_timeout_error(&self) -> Result<FfxError> {
+    fn daemon_timeout_error(&self) -> FfxError {
         let target = self.target.as_ref().map(ToString::to_string);
-        Ok(FfxError::DaemonError {
+        FfxError::DaemonError {
             err: DaemonError::Timeout,
             target,
             is_default_target: self.is_default_target(),
-        })
+        }
     }
 }
 
@@ -181,7 +191,7 @@ impl Injector for Injection {
     #[tracing::instrument]
     async fn fastboot_factory(&self) -> Result<FastbootProxy> {
         let target = self.target.clone();
-        let timeout_error = self.daemon_timeout_error().await?;
+        let timeout_error = self.daemon_timeout_error();
         let proxy_timeout = self.env_context.get_proxy_timeout().await?;
         timeout(proxy_timeout, self.fastboot_factory_inner()).await.map_err(|_| {
             tracing::warn!("Timed out getting fastboot proxy for: {:?}", target);
@@ -192,7 +202,7 @@ impl Injector for Injection {
     #[tracing::instrument]
     async fn target_factory(&self) -> Result<TargetProxy> {
         let target = self.target.clone();
-        let timeout_error = self.daemon_timeout_error().await?;
+        let timeout_error = self.daemon_timeout_error();
         let proxy_timeout = self.env_context.get_proxy_timeout().await?;
         timeout(proxy_timeout, self.target_factory_inner()).await.map_err(|_| {
             tracing::warn!("Timed out getting fastboot proxy for: {:?}", target);
@@ -203,18 +213,26 @@ impl Injector for Injection {
     #[tracing::instrument]
     async fn remote_factory(&self) -> Result<RemoteControlProxy> {
         let target = self.target.clone();
-        let timeout_error = self.daemon_timeout_error().await?;
+        let timeout_error = self.daemon_timeout_error();
         let proxy_timeout = self.env_context.get_proxy_timeout().await?;
+        let mut target_info = None;
         let proxy = timeout(proxy_timeout, async {
             self.remote_once
-                .get_or_try_init(self.init_remote_proxy())
+                .get_or_try_init(self.init_remote_proxy(&mut target_info))
                 .await
                 .map(|proxy| proxy.clone())
         })
         .await
         .map_err(|_| {
             tracing::warn!("Timed out getting remote control proxy for: {:?}", target);
-            timeout_error
+            match target_info {
+                Some(TargetInfo { nodename: Some(name), .. }) => FfxError::DaemonError {
+                    err: DaemonError::Timeout,
+                    target: Some(name),
+                    is_default_target: self.is_default_target(),
+                },
+                _ => timeout_error,
+            }
         })?;
 
         if let Ok(proxy) = proxy.as_ref() {
@@ -361,12 +379,14 @@ mod test {
     use ascendd;
     use async_lock::Mutex;
     use async_net::unix::UnixListener;
-    use fidl::endpoints::{DiscoverableProtocolMarker, RequestStream};
+    use fidl::endpoints::{DiscoverableProtocolMarker, RequestStream, ServerEnd};
     use fidl_fuchsia_developer_ffx::{
-        DaemonMarker, DaemonRequest, DaemonRequestStream, VersionInfo,
+        DaemonMarker, DaemonRequest, DaemonRequestStream, TargetCollectionMarker,
+        TargetCollectionRequest, TargetCollectionRequestStream, TargetMarker, TargetRequest,
+        VersionInfo,
     };
     use fuchsia_async::Task;
-    use futures::{AsyncReadExt, FutureExt, StreamExt, TryStreamExt};
+    use futures::{AsyncReadExt, Future, FutureExt, StreamExt, TryStreamExt};
     use std::time::Duration;
     use std::{path::PathBuf, sync::Arc};
 
@@ -450,12 +470,17 @@ mod test {
         assert!(str.contains("ffx doctor"));
     }
 
-    async fn test_daemon(
+    async fn test_daemon_custom<F, R>(
         local_node: Arc<overnet_core::Router>,
         sockpath: PathBuf,
         build_id: &str,
         sleep_secs: u64,
-    ) -> Task<()> {
+        handler: F,
+    ) -> Task<()>
+    where
+        F: Fn(DaemonRequest) -> R + 'static,
+        F::Output: Future<Output = Result<(), fidl::Error>>,
+    {
         let version_info = VersionInfo {
             exec_path: Some(std::env::current_exe().unwrap().to_string_lossy().to_string()),
             build_id: Some(build_id.to_owned()),
@@ -518,7 +543,7 @@ mod test {
                             return;
                         }
                         _ => {
-                            panic!("unimplemented stub for request: {:?}", request);
+                            handler(request).await.unwrap();
                         }
                     }
                 }
@@ -527,6 +552,18 @@ mod test {
             // early.
             drop(local_link_task);
         })
+    }
+
+    async fn test_daemon(
+        local_node: Arc<overnet_core::Router>,
+        sockpath: PathBuf,
+        build_id: &str,
+        sleep_secs: u64,
+    ) -> Task<()> {
+        test_daemon_custom(local_node, sockpath, build_id, sleep_secs, |request| async move {
+            panic!("unimplemented stub for request: {:?}", request);
+        })
+        .await
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -632,5 +669,108 @@ mod test {
         let str = format!("{:?}", err);
         assert!(str.contains("Timed out"));
         assert!(str.contains("ffx doctor"));
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_remote_proxy_timeout() {
+        let test_env = ffx_config::test_init().await.expect("Failed to initialize test env");
+        let sockpath = test_env.context.get_ascendd_path().await.expect("No ascendd path");
+        let local_node = overnet_core::Router::new(None).unwrap();
+
+        fn start_target_task(target_handle: ServerEnd<TargetMarker>) -> Task<()> {
+            let mut stream = target_handle.into_stream().unwrap();
+
+            Task::local(async move {
+                while let Some(request) = stream.try_next().await.unwrap() {
+                    match request {
+                        TargetRequest::Identity { responder } => {
+                            responder
+                                .send(&TargetInfo {
+                                    nodename: Some("target_name".into()),
+                                    ..TargetInfo::default()
+                                })
+                                .unwrap();
+                        }
+                        // Hang forever to trigger a timeout
+                        request @ TargetRequest::OpenRemoteControl { .. } => {
+                            Task::local(async move {
+                                let _request = request;
+                                futures::future::pending::<()>().await;
+                            })
+                            .detach();
+                        }
+                        _ => panic!("unhandled: {request:?}"),
+                    }
+                }
+            })
+        }
+
+        fn start_target_collection_task(channel: fidl::AsyncChannel) -> Task<()> {
+            let mut stream = TargetCollectionRequestStream::from_channel(channel);
+
+            Task::local(async move {
+                while let Some(request) = stream.try_next().await.unwrap() {
+                    eprintln!("{request:?}");
+                    match request {
+                        TargetCollectionRequest::OpenTarget {
+                            query: _,
+                            target_handle,
+                            responder,
+                        } => {
+                            start_target_task(target_handle).detach();
+
+                            responder.send(Ok(())).unwrap();
+                        }
+                        _ => panic!("unhandled: {request:?}"),
+                    }
+                }
+            })
+        }
+
+        let daemon_request_handler = move |request| async move {
+            match request {
+                DaemonRequest::ConnectToProtocol { name, server_end, responder }
+                    if name == TargetCollectionMarker::PROTOCOL_NAME =>
+                {
+                    start_target_collection_task(
+                        fidl::AsyncChannel::from_channel(server_end).unwrap(),
+                    )
+                    .detach();
+
+                    responder.send(Ok(()))?;
+                }
+                _ => panic!("unhandled request: {request:?}"),
+            }
+            Ok(())
+        };
+
+        let sockpath1 = sockpath.to_owned();
+        let local_node1 = Arc::clone(&local_node);
+        test_daemon_custom(
+            local_node1,
+            sockpath1.to_owned(),
+            "testcurrenthash",
+            0,
+            daemon_request_handler,
+        )
+        .await
+        .detach();
+
+        let injection = Injection::new(
+            test_env.context.clone(),
+            DaemonVersionCheck::SameBuildId("testcurrenthash".to_owned()),
+            local_node,
+            None,
+            Some(TargetKind::Normal("".into())),
+        );
+
+        let error = injection.remote_factory().await.unwrap_err();
+
+        match error.downcast::<FfxError>().unwrap() {
+            FfxError::DaemonError { err: DaemonError::Timeout, target, is_default_target: _ } => {
+                assert_eq!(target.as_deref(), Some("target_name"));
+            }
+            err => panic!("Unexpected: {err}"),
+        }
     }
 }

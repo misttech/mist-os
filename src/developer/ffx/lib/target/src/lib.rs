@@ -7,7 +7,7 @@ use errors::FfxError;
 use ffx_config::{keys::TARGET_DEFAULT_KEY, EnvironmentContext};
 use fidl::{endpoints::create_proxy, prelude::*};
 use fidl_fuchsia_developer_ffx::{
-    DaemonError, DaemonProxy, TargetCollectionMarker, TargetMarker, TargetQuery,
+    DaemonError, DaemonProxy, TargetCollectionMarker, TargetInfo, TargetMarker, TargetQuery,
 };
 use fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlProxy};
 use futures::{select, Future, FutureExt};
@@ -45,6 +45,7 @@ pub async fn get_remote_proxy(
     is_default_target: bool,
     daemon_proxy: DaemonProxy,
     proxy_timeout: Duration,
+    mut target_info: Option<&mut Option<TargetInfo>>,
 ) -> Result<RemoteControlProxy> {
     let (target_proxy, target_proxy_fut) =
         open_target_with_fut(target.clone(), is_default_target, daemon_proxy, proxy_timeout)?;
@@ -69,7 +70,10 @@ pub async fn get_remote_proxy(
                 }
             }
             res = target_proxy_fut => {
-                res?
+                res?;
+                if let Some(ref mut info_out) = target_info {
+                    **info_out = Some(target_proxy.identity().await?);
+                }
             }
         }
     };

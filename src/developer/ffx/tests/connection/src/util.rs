@@ -139,6 +139,7 @@ async fn connect_to_rcs(
         false,
         daemon_proxy,
         TARGET_TIMEOUT,
+        None,
     )
     .await?;
     Ok((rcs_proxy, daemon_task))
