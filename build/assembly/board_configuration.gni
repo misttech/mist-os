@@ -18,6 +18,14 @@ import("//build/python/python_action.gni")
 #
 #  Board
 #
+#  name (optional)
+#    [string] The name of the board, defaults to '$target_name'
+#
+#  hardware_info (optional)
+#    [scope]  Data provided via the 'fuchsia.hwinfo.Board' protocol.  Fields:
+#      - name [string] - The board name to provide via hwinfo, if different from
+#                        the name in build info (provided above).
+#
 #  provided_features (optional)
 #    [list, strings] A list of strings which are named features, capabilities,
 #    or requirements that are used by assembly to include optional portions of
@@ -261,6 +269,10 @@ template("board_configuration") {
 
   base_info_contents = {
     name = board_name
+
+    if (defined(invoker.hardware_info)) {
+      hardware_info = invoker.hardware_info
+    }
 
     if (defined(_filesystems)) {
       filesystems = _filesystems

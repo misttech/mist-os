@@ -17,6 +17,10 @@ pub struct BoardInformation {
     /// The name of the board.
     pub name: String,
 
+    /// Metadata about the board that's provided by the 'fuchsia.hwinfo.Board'
+    /// protocol.
+    pub hardware_info: Option<HardwareInfo>,
+
     /// The "features" that this board provides to the product.
     ///
     /// NOTE: This is a still-evolving, loosely-coupled, set of identifiers.
@@ -67,6 +71,11 @@ pub struct BoardInputBundle {
     pub kernel_boot_args: BTreeSet<String>,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub struct HardwareInfo {
+    pub name: String,
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -92,6 +101,9 @@ mod test {
 
         let json = serde_json::json!({
             "name": "sample board",
+            "hardware_info": {
+                "name": "hwinfo_name"
+            },
             "provided_features": [
                 "feature_a",
                 "feature_b"
@@ -107,6 +119,7 @@ mod test {
 
         let expected = BoardInformation {
             name: "sample board".to_owned(),
+            hardware_info: Some(HardwareInfo { name: "hwinfo_name".into() }),
             provided_features: vec!["feature_a".into(), "feature_b".into()],
             input_bundles: vec![
                 FileRelativePathBuf::Resolved("some/path/to/board/bundle_a".into()),
