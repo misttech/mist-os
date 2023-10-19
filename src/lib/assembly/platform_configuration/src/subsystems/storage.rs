@@ -71,9 +71,7 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
             })
             .with_context(|| format!("Adding bootfs file {}", &index_path))?;
 
-        if storage_config.factory_data.enabled
-            && context.board_info.provides_feature("fuchsia::factory_data")
-        {
+        if storage_config.factory_data.enabled {
             builder.platform_bundle("factory_data");
         }
 
