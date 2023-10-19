@@ -259,7 +259,9 @@ closed protocol RealmQuery {
         config fuchsia.component.config.ResolvedConfig;
     }) error GetStructuredConfigError;
 
-    /// Returns an iterator over all instances in this realm.
+    /// Returns an iterator over all component instances in this realm and instances within resolved
+    /// children, recursively. Unresolved child components will be included in this list, but
+    /// children of unresolved children will not be.
     @available(added=11)
     strict GetAllInstances() -> (resource struct {
         iterator client_end:InstanceIterator;

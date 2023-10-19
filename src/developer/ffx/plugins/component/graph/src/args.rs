@@ -11,8 +11,8 @@ use ffx_core::ffx_command;
 #[argh(
     subcommand,
     name = "graph",
-    description = "Outputs a Graphviz dot graph for the component topology",
-    example = "To graph all components in the topology:
+    description = "Outputs a Graphviz dot graph for the components in the component topology. Children of unresolved components are not included in this list.",
+    example = "To graph components in the topology:
 
     $ ffx component graph
 

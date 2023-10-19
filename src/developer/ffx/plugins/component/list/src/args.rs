@@ -11,8 +11,8 @@ use ffx_core::ffx_command;
 #[argh(
     subcommand,
     name = "list",
-    description = "Lists all components in the component topology",
-    example = "To list all components in the topology:
+    description = "Lists components in the component topology. Children of unresolved components are not included in this list.",
+    example = "To list components in the topology:
 
     $ ffx component list
 
