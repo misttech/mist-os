@@ -221,7 +221,6 @@ source_set("ddktl") {
     "//src/devices/registers/drivers/registers:*",
     "//src/devices/rtc/drivers/aml-rtc:*",
     "//src/devices/rtc/drivers/intel-rtc:*",
-    "//src/devices/rtc/drivers/nxp:*",
     "//src/devices/rtc/drivers/pl031-rtc:*",
     "//src/devices/serial/drivers/aml-uart:*",
     "//src/devices/serial/drivers/ftdi:*",
