@@ -18,7 +18,7 @@ constexpr bool kLogClockAdjustment = true;
 constexpr bool kLogClockAdjustmentWithPidCoefficients = false;
 // Within LogCLockAdjustment, log every kLogClockAdjustmentStride or if the position error
 // exceeds kLogClockAdjustmentPositionErrorThreshold.
-constexpr int64_t kLogClockAdjustmentStride = 197;  // prime, to avoid periodicity
+constexpr int64_t kLogClockAdjustmentStride = 1009;  // prime, to avoid periodicity
 constexpr zx::duration kLogClockAdjustmentPositionErrorThreshold = zx::nsec(500);
 constexpr int64_t kLogClockAdjustmentRateChangeThresholdPpm = 500;
 }  // namespace
