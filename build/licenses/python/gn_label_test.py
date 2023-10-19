@@ -164,8 +164,15 @@ class GnLabelTest(unittest.TestCase):
 
         self.assertFalse(is_3p("//foo:bar"))
         self.assertTrue(is_3p("//third_party/foo"))
+        self.assertTrue(is_3p("//thirdparty/foo"))
         self.assertTrue(is_3p("//foo:third_party"))
         self.assertTrue(is_3p("//foo/third_party/bar"))
+
+    def test_is_prebuilt(self):
+        self.assertFalse(GnLabel.from_str("//foo:bar").is_prebuilt())
+        self.assertTrue(GnLabel.from_str("//prebuilt/foo:bar").is_prebuilt())
+        self.assertTrue(GnLabel.from_str("//foo/prebuilt/bar").is_prebuilt())
+        self.assertTrue(GnLabel.from_str("//foo/bar:prebuilt").is_prebuilt())
 
     def test_is_3p_rust_crate(self):
         self.assertFalse(GnLabel.from_str("//foo:bar").is_3p_rust_crate())

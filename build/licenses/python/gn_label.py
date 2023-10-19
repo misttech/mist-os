@@ -134,7 +134,10 @@ class GnLabel:
         return self.toolchain and self.toolchain.name.startswith("host_")
 
     def is_3rd_party(self) -> bool:
-        return "third_party" in self.gn_str
+        return "third_party" in self.gn_str or "thirdparty" in self.gn_str
+
+    def is_prebuilt(self) -> bool:
+        return "prebuilt" in self.gn_str
 
     def is_3p_rust_crate(self) -> bool:
         return self.gn_str.startswith("//third_party/rust_crates:")

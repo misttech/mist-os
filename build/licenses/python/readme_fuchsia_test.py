@@ -44,6 +44,21 @@ Some text
             ),
         )
 
+    def test_readme_from_text_missing_fields(self):
+        readme = Readme.from_text(
+            readme_label=GnLabel.from_str("//some/path/README.fuchsia"),
+            applicable_target=GnLabel.from_str("//some/other/path:to_target"),
+            file_text="""
+X: 123
+Y: abc
+
+Some text
+""",
+        )
+
+        self.assertIsNone(readme.package_name)
+        self.assertEqual(readme.license_files, tuple())
+
 
 @dataclasses.dataclass
 class MockFileAccess(FileAccess):

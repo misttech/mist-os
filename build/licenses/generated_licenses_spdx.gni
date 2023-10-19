@@ -101,7 +101,7 @@ template("generated_licenses_spdx") {
 
     if (defined(invoker.ignore_comparison_errors) &&
         invoker.ignore_comparison_errors) {
-      args += [ "--ignore_comparison_errors" ]
+      args += [ "--ignore-comparison-errors" ]
     }
 
     if (defined(invoker.debug_hints) && invoker.debug_hints) {

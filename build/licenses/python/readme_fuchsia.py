@@ -27,6 +27,8 @@ class Readme:
                 splitted_line = [s.strip() for s in l.split(":")]
                 key = splitted_line[0].upper()
                 value = splitted_line[1]
+                if not value:
+                    continue
                 if key == "NAME":
                     package_name = value
                 elif key == "LICENSE FILE":

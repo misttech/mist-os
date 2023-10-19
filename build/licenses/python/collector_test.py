@@ -57,6 +57,9 @@ class CollectorTest(unittest.TestCase):
     ):
         self.collector.collect()
 
+        errors = set([e.kind for e in self.collector.errors])
+        self.assertSetEqual(errors, set(), msg="No errors are expected")
+
         # Convert expected into a set of (name, license) tuples
         expected = set()
         for name in expected_names_and_licenses.keys():
@@ -69,6 +72,21 @@ class CollectorTest(unittest.TestCase):
                 actual.add((collected_license.public_name, str(lic)))
         self.maxDiff = None
         self.assertSetEqual(actual, expected)
+
+    def _collect_and_assert_errors_and_targets(
+        self, expected_targets_by_error: Dict[CollectorErrorKind, str]
+    ):
+        self.collector.collect()
+
+        actual = {}
+        for error in self.collector.errors:
+            actual[error.kind] = str(error.target_label)
+        self.assertDictEqual(
+            actual,
+            expected_targets_by_error,
+            # Adding custom message since assert diff for dicts is hard to read
+            msg=f"Actual {actual} and expected {expected_targets_by_error} are different",
+        )
 
     def _collect_and_assert_errors(
         self, expected_error_kinds: List[CollectorErrorKind]
@@ -141,14 +159,18 @@ class CollectorTest(unittest.TestCase):
             {"Foo": ["//third_party/foo/license.txt"]}
         )
 
-    def test_target_with_metadata_but_no_applicable_licenses(self):
-        self._add_license_metadata(
-            target="//third_party/foo:license",
-            name="Foo",
-            files=["license.txt"],
-        )
+    def test_3p_target_with_metadata_but_no_applicable_licenses(self):
         self._add_applicable_licenses_metadata(
             target="//third_party/foo", licenses=[]
+        )
+
+        self._collect_and_assert_errors(
+            [CollectorErrorKind.THIRD_PARTY_TARGET_WITHOUT_APPLICABLE_LICENSES]
+        )
+
+    def test_prebuilt_target_with_metadata_but_no_applicable_licenses(self):
+        self._add_applicable_licenses_metadata(
+            target="//prebuilt/foo", licenses=[]
         )
 
         self._collect_and_assert_errors(
@@ -235,7 +257,7 @@ class CollectorTest(unittest.TestCase):
             ]
         )
 
-    def test_target_with_readme_but_license_name_missing(self):
+    def test_target_with_readme_but_license_name_missing_is_ok(self):
         target = "//third_party/foo"
         self._add_applicable_licenses_metadata(target=target, licenses=[])
         self._add_files(["third_party/foo/license.txt"])
@@ -250,6 +272,159 @@ class CollectorTest(unittest.TestCase):
                 CollectorErrorKind.THIRD_PARTY_TARGET_WITHOUT_APPLICABLE_LICENSES,
             ]
         )
+
+    def test_3p_group_target_with_readme_but_license_name_missing(self):
+        target = "//third_party/foo"
+        self._add_applicable_licenses_metadata(
+            target=target, licenses=[], target_type="group"
+        )
+        self._add_files(["third_party/foo/license.txt"])
+        self._add_readme_file(
+            "third_party/foo/README.fuchsia",
+            name=None,
+            license_files=["license.txt"],
+        )
+        self._collect_and_assert_licenses({})
+
+    def test_3p_group_target_with_3p_resource_and_readme_but_license_name_missing(
+        self,
+    ):
+        target = "//third_party/foo"
+        resource = "//third_party/bar/baz"
+        self._add_applicable_licenses_metadata(
+            target=target,
+            licenses=[],
+            target_type="group",
+            third_party_resources=[resource],
+        )
+        self._add_files(["third_party/foo/license.txt"])
+        self._add_readme_file(
+            "third_party/foo/README.fuchsia",
+            name=None,
+            license_files=["license.txt"],
+        )
+        self._collect_and_assert_errors_and_targets(
+            {
+                CollectorErrorKind.NO_PACKAGE_NAME_IN_README: target,
+                CollectorErrorKind.THIRD_PARTY_RESOURCE_WITHOUT_LICENSE: resource,
+                CollectorErrorKind.THIRD_PARTY_TARGET_WITHOUT_APPLICABLE_LICENSES: target,
+            }
+        )
+
+    def test_non_3p_group_target_with_3p_resource_and_readme_but_license_name_missing(
+        self,
+    ):
+        target = "//foo"
+        resource = "//third_party/bar/baz"
+        self._add_applicable_licenses_metadata(
+            target=target,
+            licenses=[],
+            target_type="group",
+            third_party_resources=[resource],
+        )
+        self._add_files(["third_party/foo/license.txt"])
+        self._add_readme_file(
+            "third_party/foo/README.fuchsia",
+            name=None,
+            license_files=["license.txt"],
+        )
+        self._collect_and_assert_errors_and_targets(
+            {
+                CollectorErrorKind.THIRD_PARTY_RESOURCE_WITHOUT_LICENSE: resource,
+            }
+        )
+
+    ########################### resources tests:
+
+    def test_target_with_3p_resource_without_licenses(self):
+        target = "//foo"
+        self._add_applicable_licenses_metadata(
+            target=target,
+            licenses=[],
+            third_party_resources=["//third_party/bar/baz"],
+        )
+        self._add_files(["third_party/bar/license.txt"])
+        self._add_readme_file(
+            "third_party/bar/README.fuchsia",
+            name="bar",
+            license_files=["license.txt"],
+        )
+        self._collect_and_assert_licenses(
+            {"bar": ["//third_party/bar/license.txt"]}
+        )
+
+    def test_3p_target_with_3p_resource_and_no_license_but_resource_has_license(
+        self,
+    ):
+        target = "//third_party/foo"
+        self._add_applicable_licenses_metadata(
+            target=target,
+            licenses=[],
+            third_party_resources=["//third_party/bar/baz"],
+        )
+        self._add_files(["third_party/bar/license.txt"])
+        self._add_readme_file(
+            "third_party/bar/README.fuchsia",
+            name="bar",
+            license_files=["license.txt"],
+        )
+        self._collect_and_assert_errors(
+            [CollectorErrorKind.THIRD_PARTY_TARGET_WITHOUT_APPLICABLE_LICENSES]
+        )
+
+    def test_3p_group_target_with_3p_resource_and_no_license_but_resource_has_license(
+        self,
+    ):
+        target = "//third_party/foo"
+        self._add_applicable_licenses_metadata(
+            target=target,
+            licenses=[],
+            target_type="group",
+            third_party_resources=["//third_party/bar/baz"],
+        )
+        self._add_files(["third_party/bar/license.txt"])
+        self._add_readme_file(
+            "third_party/bar/README.fuchsia",
+            name="bar",
+            license_files=["license.txt"],
+        )
+        self._collect_and_assert_licenses(
+            {"bar": ["//third_party/bar/license.txt"]}
+        )
+
+    def test_3p_target_with_3p_resource_with_different_licenses(self):
+        target = "//third_party/foo"
+        self._add_license_metadata(
+            target="//third_party/foo:license",
+            name="foo",
+            files=["//third_party/foo/license.txt"],
+        )
+        self._add_applicable_licenses_metadata(
+            target=target,
+            licenses=["//third_party/foo:license"],
+            third_party_resources=["//third_party/bar/baz"],
+        )
+        self._add_files(["third_party/foo/license.txt"])
+        self._add_files(["third_party/bar/license.txt"])
+        self._add_readme_file(
+            "third_party/bar/README.fuchsia",
+            name="bar",
+            license_files=["license.txt"],
+        )
+        self._collect_and_assert_licenses(
+            {
+                "bar": ["//third_party/bar/license.txt"],
+                "foo": ["//third_party/foo/license.txt"],
+            }
+        )
+
+    def test_3p_group_target_without_resources_or_licenses(self):
+        self._add_applicable_licenses_metadata(
+            target="//third_party/foo", target_type="group", licenses=[]
+        )
+
+        # groupless 3p groups don't need a license: No errors.
+        self._collect_and_assert_licenses({})
 
     ########################### golib tests:
 
