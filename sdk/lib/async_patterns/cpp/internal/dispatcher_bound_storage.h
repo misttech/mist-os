@@ -111,24 +111,17 @@ class DispatcherBoundStorage final {
                           ForwardOrPassDispatcher(dispatcher, std::forward<Args>(args))...));
   }
 
-  template <typename T, typename Callable, typename... Args>
-  void AsyncCall(async_dispatcher_t* dispatcher, Callable&& callable, Args&&... args) {
-    void* raw_ptr = op_fn_(Operation::kGetPointer);
-    auto* ptr = static_cast<Synchronized<T>*>(raw_ptr);
-    CallInternal(dispatcher,
-                 BindForSending(ptr->Bind(std::forward<Callable>(callable)),
-                                ForwardOrPassDispatcher(dispatcher, std::forward<Args>(args))...));
-  }
-
-  template <template <typename> typename Builder, typename T, typename Callable, typename... Args>
-  auto AsyncCallWithReply(async_dispatcher_t* dispatcher, Callable&& callable, Args&&... args) {
+  template <template <typename, typename, typename> typename Builder, typename Result, typename T,
+            typename Callable, typename... Args>
+  auto AsyncCall(async_dispatcher_t* dispatcher, Callable&& callable, Args&&... args) {
     void* raw_ptr = op_fn_(Operation::kGetPointer);
     Synchronized<T>* ptr = static_cast<Synchronized<T>*>(raw_ptr);
     auto make_task = [&] {
       return BindForSending(ptr->Bind(std::forward<Callable>(callable)),
                             ForwardOrPassDispatcher(dispatcher, std::forward<Args>(args))...);
     };
-    return Builder<decltype(make_task())>(this, dispatcher, make_task());
+    return Builder<Result, decltype(make_task()), SubmitWithDispatcherBoundStorage>(
+        make_task(), SubmitWithDispatcherBoundStorage{this, dispatcher}, Tag<Result>());
   }
 
   template <typename Arg>
@@ -153,6 +146,29 @@ class DispatcherBoundStorage final {
   void CallInternal(async_dispatcher_t* dispatcher, fit::callback<void()> member);
 
  private:
+  // A type that submits tasks using |DispatcherBoundStorage| that is meant to work
+  // together with |PendingCall|.
+  class SubmitWithDispatcherBoundStorage {
+   public:
+    SubmitWithDispatcherBoundStorage(DispatcherBoundStorage* storage,
+                                     async_dispatcher_t* dispatcher)
+        : storage_(storage), dispatcher_(dispatcher) {}
+
+    template <typename Task>
+    void operator()(Task&& task) {
+      ZX_DEBUG_ASSERT(storage_);
+      storage_->CallInternal(dispatcher_, std::forward<Task>(task));
+      reset();
+    }
+
+    bool has_value() const { return storage_; }
+    void reset() { storage_ = nullptr; }
+
+   private:
+    DispatcherBoundStorage* storage_;
+    async_dispatcher_t* dispatcher_;
+  };
+
   // |op_fn_| type-erases the managed object so |DispatcherBoundStorage| avoids
   // template bloat. See |DispatcherBoundStorage::Construct|.
   //

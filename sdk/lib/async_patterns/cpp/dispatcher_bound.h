@@ -7,6 +7,7 @@
 
 #include <lib/async/dispatcher.h>
 #include <lib/async_patterns/cpp/internal/dispatcher_bound_storage.h>
+#include <lib/async_patterns/cpp/pending_call.h>
 #include <lib/fit/function.h>
 #include <lib/fit/function_traits.h>
 #include <lib/stdcompat/functional.h>
@@ -133,14 +134,20 @@ class DispatcherBound {
   // Asynchronously calls |member|, a pointer to member function of |T|, using
   // the provided |args|.
   //
-  // If |member| returns void, then |AsyncCall| returns void. The behavior is
-  // fire-and-forget.
+  // |AsyncCall| returns a |PendingCall| object that lets you asynchronously
+  // monitor the result. You may either:
   //
-  // If |member| returns some |R| type, then |AsyncCall| returns a builder
-  // object where one must attach an |async_patterns::Callback<void(R')>| by
-  // calling |Then|. |R'| could be identical to |R| or some other compatible type
-  // such as |const R&|. Typically, the owner will declare a |Receiver| to mint
-  // those callbacks:
+  // - Make a fire-and-forget call, by discarding the returned object, or
+  // - Get a promise carrying the return value of the function by calling
+  //   `promise()` on the object, yielding a |fpromise::promise<ReturnType>|, or
+  // - Call `Then()` on the object and pass a |Callback<void(ReturnType)>|.
+  //
+  // See |PendingCall| for details.
+  //
+  // In particular, if |member| returns void, you could attach promises/callbacks
+  // that take void to asynchronously get notified when |member| has finished execution.
+  //
+  // Example:
   //
   //     class Owner {
   //      public:
@@ -213,21 +220,13 @@ class DispatcherBound {
   bool has_value() const { return storage_.has_value(); }
 
  protected:
-  template <typename Task>
-  class [[nodiscard]] AsyncCallBuilder;
-
   // Calls an arbitrary |callable| asynchronously on the |dispatcher_|.
-  template <template <typename> typename Builder = AsyncCallBuilder, typename Callable,
-            typename... Args>
+  template <template <typename, typename, typename> typename Builder = PendingCall,
+            typename Callable, typename... Args>
   auto UnsafeAsyncCallImpl(Callable&& callable, Args&&... args) {
     using Result = std::invoke_result_t<Callable, T*, Args...>;
-    if constexpr (std::is_void_v<Result>) {
-      return storage_.AsyncCall<T>(dispatcher_, std::forward<Callable>(callable),
-                                   std::forward<Args>(args)...);
-    } else {
-      return storage_.AsyncCallWithReply<Builder, T>(dispatcher_, std::forward<Callable>(callable),
-                                                     std::forward<Args>(args)...);
-    }
+    return storage_.AsyncCall<Builder, Result, T>(dispatcher_, std::forward<Callable>(callable),
+                                                  std::forward<Args>(args)...);
   }
 
   template <typename... Args>
@@ -238,57 +237,6 @@ class DispatcherBound {
  private:
   async_dispatcher_t* dispatcher_;
   internal::DispatcherBoundStorage storage_;
-};
-
-// The return type of |DispatcherBound<T>::AsyncCall| when the method has a
-// return value. Supports chaining a callback via |Then|.
-template <typename T>
-template <typename Task>
-class [[nodiscard]] DispatcherBound<T>::AsyncCallBuilder {
- protected:
-  using TaskResult = std::invoke_result_t<Task>;
-
- public:
-  // Arranges the |on_result| callback to be called with the result of the async
-  // call. See |DispatcherBound<T>::AsyncCall| for documentation.
-  template <typename R>
-  void Then(async_patterns::Callback<void(R)> on_result) && {
-    constexpr bool kReceiverMatchesReturnValue =
-        std::is_invocable_v<decltype(on_result), TaskResult>;
-    static_assert(kReceiverMatchesReturnValue,
-                  "The |async_patterns::Callback<void(R)>| must accept the return value "
-                  "of the |Member| being called.");
-    if constexpr (kReceiverMatchesReturnValue) {
-      Call(std::move(on_result));
-    }
-  }
-
-  AsyncCallBuilder(internal::DispatcherBoundStorage* storage, async_dispatcher_t* dispatcher,
-                   Task task)
-      : storage_(storage), dispatcher_(dispatcher), task_(std::move(task)) {}
-
-  ~AsyncCallBuilder() { ZX_DEBUG_ASSERT(!storage_); }
-
- protected:
-  template <typename Continuation>
-  void Call(Continuation&& continuation) {
-    ZX_DEBUG_ASSERT(storage_);
-    storage_->CallInternal(dispatcher_, [task = std::move(task_),
-                                         continuation = std::forward<Continuation>(
-                                             continuation)]() mutable { continuation(task()); });
-    storage_ = nullptr;
-  }
-
- private:
-  AsyncCallBuilder(const AsyncCallBuilder&) = delete;
-  AsyncCallBuilder& operator=(const AsyncCallBuilder&) = delete;
-
-  AsyncCallBuilder(AsyncCallBuilder&&) = delete;
-  AsyncCallBuilder& operator=(AsyncCallBuilder&&) = delete;
-
-  internal::DispatcherBoundStorage* storage_;
-  async_dispatcher_t* dispatcher_;
-  Task task_;
 };
 
 // Constructs a |DispatcherBound<T>| that holds an instance of |T| by sending

@@ -5,8 +5,9 @@
 #ifndef LIB_ASYNC_PATTERNS_CPP_FUNCTION_H_
 #define LIB_ASYNC_PATTERNS_CPP_FUNCTION_H_
 
-#include <lib/async_patterns/cpp/internal/promise_adaptor.h>
+#include <lib/async_patterns/cpp/internal/tag.h>
 #include <lib/async_patterns/cpp/internal/task_queue.h>
+#include <lib/async_patterns/cpp/pending_call.h>
 #include <lib/async_patterns/cpp/sendable.h>
 #include <lib/fit/function.h>
 #include <zircon/assert.h>
@@ -40,11 +41,14 @@ class Function<ReturnType(Args...)> {
   //
   // See |async_patterns::BindForSending| for detailed requirements on |args|.
   //
-  // This operator returns an adaptor object. You may either:
+  // This operator returns a pending call. You may either:
   //
-  // - Make a fire-and-forget call, by discarding the returned adaptor, or
+  // - Make a fire-and-forget call, by discarding the returned object, or
   // - Get a promise carrying the return value of the function by calling
-  //   `promise()` on the adaptor, yielding a |fpromise::promise<ReturnType>|.
+  //   `promise()` on the object, yielding a |fpromise::promise<ReturnType>|, or
+  // - Call `Then()` on the object and pass a |Callback<void(ReturnType)>|
+  //
+  // See |async_patterns::PendingCall| for details.
   //
   // Example:
   //
@@ -59,10 +63,10 @@ class Function<ReturnType(Args...)> {
   //
   auto operator()(Args... args) {
     ZX_DEBUG_ASSERT(task_queue_handle_.has_value());
-    return internal::PromiseAdaptor{
+    return PendingCall{
         BindForSending([f = function_](auto&&... args) { return (*f)(std::move(args)...); },
                        std::forward<Args>(args)...),
-        task_queue_handle_, internal::Tag<ReturnType>{}};
+        internal::SubmitWithTaskQueueHandle{task_queue_handle_}, internal::Tag<ReturnType>{}};
   }
 
   // Returns a functor that performs the same actions as this |Function|, but returns

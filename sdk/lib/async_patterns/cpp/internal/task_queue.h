@@ -133,6 +133,25 @@ class TaskQueueHandle {
   std::shared_ptr<TaskQueue> queue_;
 };
 
+// A type that submits tasks using |TaskQueueHandle| that is meant to work
+// together with |PendingCall|.
+class SubmitWithTaskQueueHandle {
+ public:
+  explicit SubmitWithTaskQueueHandle(TaskQueueHandle handle) : handle_(std::move(handle)) {}
+
+  template <typename Task>
+  void operator()(Task&& task) {
+    handle_.Add(std::forward<Task>(task));
+    reset();
+  }
+
+  bool has_value() const { return handle_.has_value(); }
+  void reset() { handle_.reset(); }
+
+ private:
+  TaskQueueHandle handle_;
+};
+
 }  // namespace async_patterns::internal
 
 #endif  // LIB_ASYNC_PATTERNS_CPP_INTERNAL_TASK_QUEUE_H_

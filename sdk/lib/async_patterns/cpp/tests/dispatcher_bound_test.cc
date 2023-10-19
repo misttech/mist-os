@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/async/cpp/executor.h>
 #include <lib/async_patterns/cpp/dispatcher_bound.h>
 #include <lib/sync/cpp/completion.h>
 
@@ -374,6 +375,74 @@ TEST_F(DispatcherBound, AsyncCallOverloaded) {
 
   loop().RunUntilIdle();
   EXPECT_EQ(2, owner.count);
+}
+
+namespace {
+
+// This is shared among the next few tests.
+class Background {
+ public:
+  explicit Background(std::shared_ptr<int> count) : count_(std::move(count)) {}
+
+  std::string Concat(const std::string& arg) {
+    (*count_)++;
+    return arg;
+  }
+
+ private:
+  std::shared_ptr<int> count_;
+};
+
+TEST_F(DispatcherBound, AsyncCallFireAndForget) {
+  std::shared_ptr<int> count = std::make_shared<int>(0);
+  async_patterns::DispatcherBound<Background> obj{loop().dispatcher(), std::in_place, count};
+  obj.AsyncCall(&Background::Concat, std::string("foo"));
+  EXPECT_EQ(*count, 0);
+  loop().RunUntilIdle();
+  EXPECT_EQ(*count, 1);
+}
+
+TEST_F(DispatcherBound, AsyncCallToPromise) {
+  std::shared_ptr<int> count = std::make_shared<int>(0);
+  async_patterns::DispatcherBound<Background> obj{loop().dispatcher(), std::in_place, count};
+  auto promise = obj.AsyncCall(&Background::Concat, std::string("foo")).promise();
+  async::Executor executor(loop().dispatcher());
+  bool received = false;
+  executor.schedule_task(promise.and_then([&](std::string& result) {
+    EXPECT_EQ(result, "foo");
+    received = true;
+  }));
+  EXPECT_EQ(*count, 0);
+  EXPECT_FALSE(received);
+  loop().RunUntilIdle();
+  EXPECT_EQ(*count, 1);
+  EXPECT_TRUE(received);
+}
+
+}  // namespace
+
+TEST_F(DispatcherBound, WaitForVoidAsyncCallToFinish) {
+  class Background {
+   public:
+    explicit Background(std::shared_ptr<int> count) : count_(std::move(count)) {}
+
+    void DoThing() { (*count_)++; }
+
+   private:
+    std::shared_ptr<int> count_;
+  };
+
+  std::shared_ptr<int> count = std::make_shared<int>(0);
+  async_patterns::DispatcherBound<Background> obj{loop().dispatcher(), std::in_place, count};
+  auto promise = obj.AsyncCall(&Background::DoThing).promise();
+  async::Executor executor(loop().dispatcher());
+  bool received = false;
+  executor.schedule_task(promise.and_then([&]() { received = true; }));
+  EXPECT_EQ(*count, 0);
+  EXPECT_FALSE(received);
+  loop().RunUntilIdle();
+  EXPECT_EQ(*count, 1);
+  EXPECT_TRUE(received);
 }
 
 TEST_F(DispatcherBound, PassDispatcherInConstructor) {
