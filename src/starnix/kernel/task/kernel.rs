@@ -435,8 +435,7 @@ impl Kernel {
     }
 
     pub fn mock_selinux(&self) -> bool {
-        // TODO: remove `selinux_enabled` feature once replaced by `mock_selinux`.
-        self.features.contains("mock_selinux") || self.features.contains("selinux_enabled")
+        self.features.contains("mock_selinux")
     }
 
     fn get_thread_groups_inspect(&self) -> fuchsia_inspect::Inspector {

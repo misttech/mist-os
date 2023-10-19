@@ -31,7 +31,6 @@ pub fn run_features(entries: &Vec<String>, kernel: &Arc<Kernel>) -> Result<(), E
         let entry_type = entry.split_once(':').map(|(ty, _)| ty).unwrap_or(entry);
         match entry_type {
             "mock_selinux" => {}
-            "selinux_enabled" => {}
             "selinux" => {}
             "framebuffer" => {
                 fb_device_init(kernel);
@@ -111,7 +110,6 @@ pub fn run_component_features(
             "binder" => {}
             "logd" => {}
             "mock_selinux" => {}
-            "selinux_enabled" => {}
             "selinux" => {}
             "magma" => {}
             "test_data" => {}
