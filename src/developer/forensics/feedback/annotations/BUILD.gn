@@ -185,6 +185,8 @@ source_set("time_provider") {
     "//src/developer/forensics/feedback/annotations",
     "//src/lib/timekeeper",
   ]
+
+  deps = [ "//sdk/fidl/fuchsia.time:fuchsia.time_hlcpp" ]
 }
 
 source_set("ui_state_provider") {

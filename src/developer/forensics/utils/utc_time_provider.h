@@ -13,14 +13,14 @@
 
 namespace forensics {
 
-// Provides the UTC time only if the device's UTC clock has started.
+// Provides the UTC time only if the device's UTC clock has synced.
 //
 // Can be configured to record the UTC-monotonic difference from the previous boot by providing a
 // non-nullopt |utc_monotonic_difference_path|.
 class UtcTimeProvider {
  public:
-  UtcTimeProvider(UtcClockReadyWatcher* utc_clock_ready_watcher, timekeeper::Clock* clock);
-  UtcTimeProvider(UtcClockReadyWatcher* utc_clock_ready_watcher, timekeeper::Clock* clock,
+  UtcTimeProvider(UtcClockReadyWatcherBase* utc_clock_ready_watcher, timekeeper::Clock* clock);
+  UtcTimeProvider(UtcClockReadyWatcherBase* utc_clock_ready_watcher, timekeeper::Clock* clock,
                   PreviousBootFile utc_monotonic_difference_file);
 
   // Returns the current UTC time if the device's UTC time is accurate, std::nullopt otherwise.
@@ -34,11 +34,11 @@ class UtcTimeProvider {
   std::optional<zx::duration> PreviousBootUtcMonotonicDifference() const;
 
  private:
-  UtcTimeProvider(UtcClockReadyWatcher* utc_clock_ready_watcher, timekeeper::Clock* clock,
+  UtcTimeProvider(UtcClockReadyWatcherBase* utc_clock_ready_watcher, timekeeper::Clock* clock,
                   std::optional<PreviousBootFile> utc_monotonic_difference_file);
 
-  // Keep waiting on the clock handle until the clock has started.
-  void OnClockStart();
+  // Keep waiting on the clock handle until the clock has synced.
+  void OnClockSync();
 
   timekeeper::Clock* clock_;
 
@@ -47,7 +47,7 @@ class UtcTimeProvider {
   // The last difference between the UTC and monotonic clocks in the previous boot.
   std::optional<zx::duration> previous_boot_utc_monotonic_difference_;
 
-  UtcClockReadyWatcher* utc_clock_ready_watcher_;
+  UtcClockReadyWatcherBase* utc_clock_ready_watcher_;
 };
 
 }  // namespace forensics

@@ -5,6 +5,8 @@
 #include "src/developer/forensics/feedback/crash_reports.h"
 
 #include <fuchsia/feedback/cpp/fidl.h>
+#include <lib/zx/clock.h>
+#include <zircon/utc.h>
 
 #include <utility>
 
@@ -52,8 +54,9 @@ CrashReports::CrashReports(async_dispatcher_t* dispatcher,
                                     options.snapshot_persistence_max_cache_size),
                     kGarbageCollectedSnapshotsPath, options.snapshot_store_max_archives_size),
       crash_register_(info_context_, kCrashRegisterPath),
-      crash_reporter_(dispatcher, services, clock, info_context_, options.build_type_config,
-                      &crash_register_, &tags_, &crash_server_, &report_store_, data_provider,
+      crash_reporter_(dispatcher, services, clock, zx::unowned_clock(zx_utc_reference_get()),
+                      info_context_, options.build_type_config, &crash_register_, &tags_,
+                      &crash_server_, &report_store_, data_provider,
                       options.snapshot_collector_window_duration) {}
 
 fuchsia::feedback::CrashReporter* CrashReports::CrashReporter() { return &crash_reporter_; }

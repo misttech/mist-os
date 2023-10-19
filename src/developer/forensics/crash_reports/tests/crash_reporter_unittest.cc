@@ -7,8 +7,10 @@
 #include <fuchsia/feedback/cpp/fidl.h>
 #include <fuchsia/mem/cpp/fidl.h>
 #include <fuchsia/settings/cpp/fidl.h>
+#include <fuchsia/time/cpp/fidl.h>
 #include <lib/fpromise/result.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/zx/clock.h>
 #include <lib/zx/time.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
@@ -195,10 +197,21 @@ class CrashReporterTest : public UnitTestFixture {
         .enable_hourly_snapshots = enable_hourly_snapshots,
     };
 
+    zx_clock_create_args_v1_t clock_args{.backstop_time = 0};
+    FX_CHECK(zx::clock::create(0u, &clock_args, &clock_handle_) == ZX_OK);
+
+    if (const zx_status_t status =
+            clock_handle_.signal(/*clear_mask=*/0,
+                                 /*set_mask=*/fuchsia::time::SIGNAL_UTC_CLOCK_SYNCHRONIZED);
+        status != ZX_OK) {
+      FX_PLOGS(FATAL, status) << "Failed to sync clock";
+    }
+
     crash_reporter_ = std::make_unique<CrashReporter>(
-        dispatcher(), services(), &clock_, info_context_, build_type_config, crash_register_.get(),
-        &tags_, crash_server_.get(), &report_store_->GetReportStore(), data_provider_server_.get(),
-        kSnapshotSharedRequestWindow, kResetOffset);
+        dispatcher(), services(), &clock_, zx::unowned_clock(clock_handle_.get_handle()),
+        info_context_, build_type_config, crash_register_.get(), &tags_, crash_server_.get(),
+        &report_store_->GetReportStore(), data_provider_server_.get(), kSnapshotSharedRequestWindow,
+        kResetOffset);
     FX_CHECK(crash_reporter_);
   }
 
@@ -431,6 +444,7 @@ class CrashReporterTest : public UnitTestFixture {
  private:
   std::shared_ptr<InfoContext> info_context_;
   std::unique_ptr<ScopedTestReportStore> report_store_;
+  zx::clock clock_handle_;
 
  protected:
   std::unique_ptr<feedback::AnnotationManager> annotation_manager_;
@@ -986,54 +1000,6 @@ TEST_F(CrashReporterTest, Crash_UploadDisabledWithQuota) {
             /*enable_hourly_snapshots=*/true);
       },
       HasSubstr("quota is 100"));
-}
-
-// Test fixture that replaces the runtime clock before starting.
-class CrashReporterTestWithClock : public CrashReporterTest {
- public:
-  CrashReporterTestWithClock() {
-    // Create a |test_clock_|.
-    zx_clock_create_args_v1_t clock_args{.backstop_time = 0};
-    FX_CHECK(zx::clock::create(0u, &clock_args, &test_clock_) == ZX_OK);
-
-    // Duplicate |test_clock| into |tmp_clock|.
-    zx::clock tmp_clock;
-    zx_info_handle_basic_t clock_info;
-    FX_CHECK(test_clock_.get_info(ZX_INFO_HANDLE_BASIC, &clock_info, sizeof(clock_info), nullptr,
-                                  nullptr) == ZX_OK);
-    FX_CHECK(test_clock_.duplicate(clock_info.rights, &tmp_clock) == ZX_OK);
-
-    // Install |tmp_clock_| and save the old clock in |old_clock_|.
-    FX_CHECK(zx_utc_reference_swap(tmp_clock.release(), old_clock_.reset_and_get_address()) ==
-             ZX_OK);
-  }
-
-  ~CrashReporterTestWithClock() {
-    // Swapping clocks while |crash_reporter_| is waiting on |test_clock_| causes a crash.
-    crash_reporter_.reset();
-
-    // Reinstall the old clock.
-    zx::clock tmp_clock;
-    FX_CHECK(zx_utc_reference_swap(old_clock_.release(), tmp_clock.reset_and_get_address()) ==
-             ZX_OK);
-  }
-
- private:
-  zx::clock test_clock_;
-  zx::clock old_clock_;
-};
-
-TEST_F(CrashReporterTestWithClock, Check_UtcTimeIsNotReady) {
-  SetUpDataProviderServer(
-      std::make_unique<stubs::DataProvider>(kFeedbackAnnotations, kDefaultAttachmentBundleKey));
-  SetUpCrashReporterDefaultConfig({kUploadSuccessful});
-
-  ASSERT_TRUE(FileOneCrashReport().is_response());
-  CheckAttachmentsOnServer({kDefaultAttachmentBundleKey});
-
-  EXPECT_FALSE(crash_server_->latest_annotations().Contains("reportTimeMillis"));
-  ASSERT_TRUE(crash_server_->latest_annotations().Contains("debug.report-time.set"));
-  EXPECT_EQ(crash_server_->latest_annotations().Get("debug.report-time.set"), "false");
 }
 
 }  // namespace

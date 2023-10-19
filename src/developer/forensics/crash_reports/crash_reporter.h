@@ -9,6 +9,7 @@
 #include <lib/async/cpp/executor.h>
 #include <lib/async/dispatcher.h>
 #include <lib/sys/cpp/service_directory.h>
+#include <lib/zx/clock.h>
 
 #include <memory>
 #include <string>
@@ -36,7 +37,7 @@ class CrashReporter : public fuchsia::feedback::CrashReporter {
  public:
   CrashReporter(async_dispatcher_t* dispatcher,
                 const std::shared_ptr<sys::ServiceDirectory>& services, timekeeper::Clock* clock,
-                const std::shared_ptr<InfoContext>& info_context,
+                zx::unowned_clock clock_handle, const std::shared_ptr<InfoContext>& info_context,
                 feedback::BuildTypeConfig build_type_config, CrashRegister* crash_register,
                 LogTags* tags, CrashServer* crash_server, ReportStore* report_store,
                 feedback_data::DataProviderInternal* data_provider,

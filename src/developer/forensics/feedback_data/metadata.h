@@ -23,7 +23,8 @@ namespace feedback_data {
 // Constructs metadata describing the rest of the content of the snapshot archive.
 class Metadata {
  public:
-  Metadata(async_dispatcher_t* dispatcher, timekeeper::Clock* clock, RedactorBase* redactor,
+  Metadata(async_dispatcher_t* dispatcher, timekeeper::Clock* clock,
+           UtcClockReadyWatcherBase* utc_clock_ready_watcher, RedactorBase* redactor,
            bool is_first_instance, const std::set<std::string>& annotation_allowlist,
            const feedback::AttachmentKeys& attachment_allowlist);
 
@@ -43,7 +44,6 @@ class Metadata {
   std::set<std::string> annotation_allowlist_;
   feedback::AttachmentKeys attachment_allowlist_;
 
-  UtcClockReadyWatcher utc_clock_ready_watcher_;
   UtcTimeProvider utc_provider_;
 };
 

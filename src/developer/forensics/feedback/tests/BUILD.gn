@@ -502,6 +502,7 @@ executable("time_provider_unittest_exe") {
   sources = [ "time_provider_unittest.cc" ]
 
   deps = [
+    "//sdk/fidl/fuchsia.time:fuchsia.time_hlcpp",
     "//src/developer/forensics/feedback/annotations:time_provider",
     "//src/developer/forensics/testing:gtest_with_syslog_main",
     "//src/developer/forensics/testing:unit_test_fixture",

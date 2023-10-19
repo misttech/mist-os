@@ -28,13 +28,13 @@ class TimeProvider : public DynamicSyncAnnotationProvider {
   Annotations Get() override;
 
  private:
-  // Keep waiting on the clock handle until the clock has started.
-  void OnClockStart(async_dispatcher_t* dispatcher, async::WaitBase* wait, zx_status_t status,
-                    const zx_packet_signal_t* signal);
+  // Keep waiting on the clock handle until the clock has synced.
+  void OnClockSync(async_dispatcher_t* dispatcher, async::WaitBase* wait, zx_status_t status,
+                   const zx_packet_signal_t* signal);
 
   std::unique_ptr<timekeeper::Clock> clock_;
   bool is_utc_time_accurate_ = false;
-  async::WaitMethod<TimeProvider, &TimeProvider::OnClockStart> wait_for_clock_start_;
+  async::WaitMethod<TimeProvider, &TimeProvider::OnClockSync> wait_for_clock_sync_;
 };
 
 }  // namespace forensics::feedback

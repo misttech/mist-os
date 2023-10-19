@@ -24,6 +24,7 @@
 #include "src/developer/forensics/feedback_data/metadata.h"
 #include "src/developer/forensics/utils/cobalt/logger.h"
 #include "src/developer/forensics/utils/redact/redactor.h"
+#include "src/developer/forensics/utils/utc_clock_ready_watcher.h"
 #include "src/lib/fsl/vmo/sized_vmo.h"
 #include "src/lib/timekeeper/clock.h"
 
@@ -88,6 +89,7 @@ class DataProvider : public fuchsia::feedback::DataProvider, public DataProvider
 
   async_dispatcher_t* dispatcher_;
   std::shared_ptr<sys::ServiceDirectory> services_;
+  UtcClockReadyWatcher utc_clock_ready_watcher_;
   Metadata metadata_;
   cobalt::Logger* cobalt_;
 

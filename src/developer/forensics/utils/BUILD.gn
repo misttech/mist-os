@@ -151,5 +151,8 @@ source_set("utc_clock_ready_watcher") {
     "//zircon/system/ulib/zx",
   ]
 
-  deps = [ "//sdk/lib/syslog/cpp" ]
+  deps = [
+    "//sdk/fidl/fuchsia.time:fuchsia.time_hlcpp",
+    "//sdk/lib/syslog/cpp",
+  ]
 }

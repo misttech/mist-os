@@ -12,6 +12,7 @@
 #include <zircon/errors.h>
 #include <zircon/status.h>
 #include <zircon/types.h>
+#include <zircon/utc.h>
 
 #include <map>
 #include <memory>
@@ -27,6 +28,7 @@
 #include "src/developer/forensics/feedback_data/screenshot.h"
 #include "src/developer/forensics/utils/archive.h"
 #include "src/developer/forensics/utils/cobalt/metrics.h"
+#include "src/developer/forensics/utils/utc_clock_ready_watcher.h"
 #include "src/lib/fsl/vmo/sized_vmo.h"
 #include "src/lib/fsl/vmo/vector.h"
 #include "src/lib/uuid/uuid.h"
@@ -63,8 +65,9 @@ DataProvider::DataProvider(async_dispatcher_t* dispatcher,
                            InspectDataBudget* inspect_data_budget)
     : dispatcher_(dispatcher),
       services_(std::move(services)),
-      metadata_(dispatcher_, clock, redactor, is_first_instance, annotation_allowlist,
-                attachment_allowlist),
+      utc_clock_ready_watcher_(dispatcher_, zx::unowned_clock(zx_utc_reference_get())),
+      metadata_(dispatcher_, clock, &utc_clock_ready_watcher_, redactor, is_first_instance,
+                annotation_allowlist, attachment_allowlist),
       cobalt_(cobalt),
       annotation_manager_(annotation_manager),
       annotation_metrics_(cobalt_),
