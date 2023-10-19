@@ -37,6 +37,14 @@ per-file .gitmodules = file:/third_party/OWNERS
 # Add owners to source related files
 per-file .gitignore,.gitmodules = file:/infra/OWNERS
 
+# OSS Compliance:
+per-file **/README.fuchsia = file:/build/licenses/OWNERS
+per-file **/*LICENSE* = file:/build/licenses/OWNERS
+per-file **/*LICENCE* = file:/build/licenses/OWNERS
+per-file **/*NOTICE* = file:/build/licenses/OWNERS
+per-file **/*COPYRIGHT* = file:/build/licenses/OWNERS
+per-file **/*COPYING* = file:/build/licenses/OWNERS
+
 # For the LSC to migrate platform components into Software Assembly, add the
 # following special-cased ownership.  This should be re-evaluated for removal
 # quarterly, the next review at the start of 2023Q4: 2023-10-01
