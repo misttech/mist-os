@@ -64,9 +64,15 @@ class CxxActionTests(unittest.TestCase):
         )
         self.assertTrue(c.dialect_is_cxx)
         self.assertFalse(c.dialect_is_c)
+        self.assertIsNone(c.use_ld)
+        self.assertIsNone(c.unwindlib)
+        self.assertEqual(c.linker_driver_flags, [])
         self.assertIsNone(c.depfile)
         self.assertIsNone(c.sysroot)
         self.assertIsNone(c.profile_list)
+        self.assertEqual(c.sanitizers, set())
+        self.assertFalse(c.using_asan)
+        self.assertFalse(c.using_ubsan)
         self.assertEqual(list(c.input_files()), [source])
         self.assertEqual(list(c.output_files()), [output])
         self.assertEqual(list(c.output_dirs()), [])
@@ -262,6 +268,99 @@ class CxxActionTests(unittest.TestCase):
         self.assertFalse(c.dialect_is_cxx)
         self.assertFalse(c.dialect_is_c)
         self.assertIsNone(c.crash_diagnostics_dir)
+
+    def test_fuse_ld(self):
+        source = Path("hello.o")
+        output = Path("hello")
+        linker = "lld"
+        c = cxx.CxxAction(
+            _strs(["clang++", f"-fuse-ld={linker}", source, "-o", output])
+        )
+        self.assertEqual(c.use_ld, linker)
+
+    def test_asan(self):
+        source = Path("hello.o")
+        output = Path("hello")
+        c = cxx.CxxAction(
+            _strs(["clang++", "-fsanitize=address", source, "-o", output])
+        )
+        self.assertEqual(c.sanitizers, {"address"})
+        self.assertTrue(c.using_asan)
+        self.assertFalse(c.using_ubsan)
+
+    def test_no_sanitize(self):
+        source = Path("hello.o")
+        output = Path("hello")
+        c = cxx.CxxAction(
+            _strs(
+                [
+                    "clang++",
+                    "-fsanitize=address",
+                    "-fno-sanitize=address",
+                    source,
+                    "-o",
+                    output,
+                ]
+            )
+        )
+        self.assertEqual(c.sanitizers, set())
+        self.assertFalse(c.using_asan)
+        self.assertFalse(c.using_ubsan)
+
+    def test_ubsan(self):
+        source = Path("hello.o")
+        output = Path("hello")
+        c = cxx.CxxAction(
+            _strs(["clang++", "-fsanitize=undefined", source, "-o", output])
+        )
+        self.assertEqual(c.sanitizers, {"undefined"})
+        self.assertFalse(c.using_asan)
+        self.assertTrue(c.using_ubsan)
+
+    def test_unwindlib(self):
+        source = Path("hello.o")
+        output = Path("hello")
+        c = cxx.CxxAction(
+            _strs(["clang++", "-unwindlib=libunwind", source, "-o", output])
+        )
+        self.assertEqual(c.unwindlib, "libunwind")
+
+    def test_unknown_linker_driver_flag(self):
+        source = Path("hello.o")
+        output = Path("hello")
+        flag = "--unknown-flag=foobar"
+        c = cxx.CxxAction(
+            _strs(["clang++", f"-Wl,{flag}", source, "-o", output])
+        )
+        self.assertEqual(c.linker_driver_flags, [flag])
+
+    def test_linker_mapfile(self):
+        source = Path("hello.o")
+        output = Path("hello")
+        mapfile = Path("hello.map")
+        c = cxx.CxxAction(
+            _strs(["clang++", f"-Wl,--Map={mapfile}", source, "-o", output])
+        )
+        self.assertEqual(c.linker_mapfile, mapfile)
+        self.assertEqual(list(c.linker_output_files()), [output, mapfile])
+
+    def test_linker_depfile(self):
+        source = Path("hello.o")
+        output = Path("hello")
+        depfile = Path("hello.d")
+        c = cxx.CxxAction(
+            _strs(
+                [
+                    "clang++",
+                    f"-Wl,--dependency-file={depfile}",
+                    source,
+                    "-o",
+                    output,
+                ]
+            )
+        )
+        self.assertEqual(c.linker_depfile, depfile)
+        self.assertEqual(list(c.linker_output_files()), [output, depfile])
 
     def test_simple_gcc_cxx(self):
         source = Path("hello.cc")

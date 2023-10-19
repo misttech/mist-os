@@ -3,6 +3,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import argparse
 import contextlib
 import filecmp
 import io
@@ -274,6 +275,79 @@ class RemoveHashCommentsTests(unittest.TestCase):
             ),
             ["--foo", "", "--bar=baz"],
         )
+
+
+class StringSetArgparseActionTests(unittest.TestCase):
+    def _parser(self) -> argparse.ArgumentParser:
+        parser = argparse.ArgumentParser(
+            description="For testing", add_help=False
+        )
+        parser.add_argument(
+            "--add",
+            type=str,
+            dest="strset",
+            default=set(),
+            action=cl_utils.StringSetAdd,
+            help="add to set",
+        )
+        parser.add_argument(
+            "--remove",
+            type=str,
+            dest="strset",
+            action=cl_utils.StringSetRemove,
+            help="remove from set",
+        )
+        return parser
+
+    def test_set_default(self):
+        parser = self._parser()
+        (attrs, others) = parser.parse_known_args([])
+        self.assertEqual(attrs.strset, set())
+
+    def test_set_add(self):
+        parser = self._parser()
+        (attrs, others) = parser.parse_known_args(["--add", "AAA"])
+        self.assertEqual(attrs.strset, {"AAA"})
+
+    def test_set_add_dupe(self):
+        parser = self._parser()
+        (attrs, others) = parser.parse_known_args(
+            ["--add", "AAA", "--add", "AAA"]
+        )
+        self.assertEqual(attrs.strset, {"AAA"})
+
+    def test_set_add_different(self):
+        parser = self._parser()
+        (attrs, others) = parser.parse_known_args(
+            ["--add", "AAA", "--add", "YYY"]
+        )
+        self.assertEqual(attrs.strset, {"AAA", "YYY"})
+
+    def test_set_remove_nonexisting(self):
+        parser = self._parser()
+        (attrs, others) = parser.parse_known_args(["--remove", "BBB"])
+        self.assertEqual(attrs.strset, set())
+
+    def test_set_add_then_remove(self):
+        parser = self._parser()
+        (attrs, others) = parser.parse_known_args(
+            ["--add", "DDD", "--remove", "DDD"]
+        )
+        self.assertEqual(attrs.strset, set())
+
+    def test_set_remove_then_add(self):
+        parser = self._parser()
+        (attrs, others) = parser.parse_known_args(
+            ["--remove", "EEE", "--add", "EEE"]
+        )
+        self.assertEqual(attrs.strset, {"EEE"})
+
+    def test_set_remove_all(self):
+        parser = self._parser()
+        (attrs, others) = parser.parse_known_args(
+            ["--add", "AAA", "--add", "YYY", "--remove=all"]
+        )
+        self.assertEqual(attrs.strset, set())
 
 
 class ExpandResponseFilesTests(unittest.TestCase):

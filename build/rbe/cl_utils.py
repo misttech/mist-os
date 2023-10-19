@@ -317,6 +317,41 @@ def fuse_expanded_flags(
         yield tok
 
 
+class StringSetAdd(argparse.Action):
+    """An argparse.Action for adding an element to a set of strings."""
+
+    def __init__(self, option_strings, dest, nargs=None, **kwargs):
+        if nargs is not None:
+            raise ValueError("nargs not allowed")
+        super().__init__(option_strings, dest, **kwargs)
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        collection = getattr(namespace, self.dest).copy()
+        collection.add(values)
+        setattr(namespace, self.dest, collection)
+
+
+class StringSetRemove(argparse.Action):
+    """An argparse.Action for removing an element from a set of strings."""
+
+    def __init__(self, option_strings, dest, nargs=None, **kwargs):
+        if nargs is not None:
+            raise ValueError("nargs not allowed")
+        super().__init__(option_strings, dest, **kwargs)
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        collection = getattr(namespace, self.dest).copy()
+        # special case: values == "all", clear entire set
+        if values == "all":
+            setattr(namespace, self.dest, set())
+            return
+        try:
+            collection.remove(values)
+        except KeyError:
+            pass
+        setattr(namespace, self.dest, collection)
+
+
 def expand_paths_from_files(files: Iterable[Path]) -> Iterable[Path]:
     """Expand paths from files that list other paths."""
     for path_list in files:
