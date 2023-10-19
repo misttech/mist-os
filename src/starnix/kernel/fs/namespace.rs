@@ -650,7 +650,7 @@ impl Kernel {
             b"sysfs" => sys_fs(self, options).clone(),
             b"tmpfs" => {
                 let fs = TmpFs::new_fs_with_options(self, options)?;
-                if self.selinux_enabled() {
+                if self.mock_selinux() {
                     let label = b"u:object_r:tmpfs:s0";
                     fs.selinux_context.set(label.to_vec()).unwrap();
                 }

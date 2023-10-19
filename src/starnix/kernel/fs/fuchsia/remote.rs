@@ -201,7 +201,7 @@ impl RemoteFs {
         // NOTE: This mount option exists for now to workaround selinux issues.  The `defcontext`
         // option operates similarly to Linux's equivalent, but it's not exactly the same.  When our
         // selinux support is further along, we might want to remove this mount option.
-        let context = if kernel.selinux_enabled() {
+        let context = if kernel.mock_selinux() {
             fs_args::generic_parse_mount_options(&options.params)
                 .get(&b"defcontext"[..])
                 .map(|c| c.to_vec())

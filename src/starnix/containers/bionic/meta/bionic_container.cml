@@ -7,7 +7,7 @@
         runner: "starnix",
         features: [
             "binder",
-            "selinux_enabled",
+            "mock_selinux",
             "test_data",
         ],
         init: [ "/system/bin/init" ],
