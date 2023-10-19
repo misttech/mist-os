@@ -204,3 +204,24 @@ product_assembly_configuration("core_with_netstack3") {
   base_driver_packages = _base_driver_packages
   deps = [ "//build/info:build_info_files" ]
 }
+
+product_assembly_configuration("core_with_dfv2_fuzzing") {
+  testonly = true
+  platform = {
+    forward_variables_from(_platform_configuration_base, "*")
+    forward_variables_from(_storage_default, "*")
+
+    driver_framework = {
+      driver_load_config = {
+        enable_fuzzer = true
+        max_delay_ms = 300
+      }
+    }
+  }
+  product = {
+    build_info = default_product_build_info
+  }
+
+  base_driver_packages = _base_driver_packages
+  deps = [ "//build/info:build_info_files" ]
+}
