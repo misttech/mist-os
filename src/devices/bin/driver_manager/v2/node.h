@@ -158,6 +158,10 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
                 fidl::ServerEnd<fuchsia_driver_framework::Node> node,
                 AddNodeResultCallback callback);
 
+  // Add this Node to its parents. This should be called when the node is created. Exposed for
+  // testing.
+  void AddToParents();
+
   // Begins the process of restarting the node. Restarting a node includes stopping and removing
   // all children nodes, stopping the driver that is bound to the node, and asking the NodeManager
   // to bind the node again. The restart operation is very similar to the Remove operation, the
@@ -346,9 +350,6 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   void AddChild(AddChildRequestView request, AddChildCompleter::Sync& completer) override;
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_driver_framework::Node> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) override;
-
-  // Add this Node to its parents. This should be called when the node is created.
-  void AddToParents();
 
   // Shutdown helpers:
   // Remove a child from this parent

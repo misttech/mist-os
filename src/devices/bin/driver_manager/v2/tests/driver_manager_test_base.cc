@@ -20,6 +20,17 @@ std::shared_ptr<dfv2::Node> DriverManagerTestBase::CreateNode(const std::string 
   return node;
 }
 
+std::shared_ptr<dfv2::Node> DriverManagerTestBase::CreateNode(const std::string name,
+                                                              std::weak_ptr<dfv2::Node> parent) {
+  std::vector<std::weak_ptr<dfv2::Node>> parents = {parent};
+  auto node = std::make_shared<dfv2::Node>(name, parents, GetNodeManager(), dispatcher(),
+                                           inspect_.CreateDevice(name, zx::vmo(), 0));
+  node->AddToDevfsForTesting(root_devnode_.value());
+  node->devfs_device().publish();
+  node->AddToParents();
+  return node;
+}
+
 std::shared_ptr<dfv2::Node> DriverManagerTestBase::CreateCompositeNode(
     std::string_view name, std::vector<std::weak_ptr<dfv2::Node>> parents, bool is_legacy,
     uint32_t primary_index) {

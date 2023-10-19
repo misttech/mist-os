@@ -1109,6 +1109,10 @@ void Node::StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_
 
         if (result.is_error()) {
           node_ptr->driver_component_.reset();
+          if (node_ptr->node_state_ == NodeState::kWaitingOnDriver) {
+            node_ptr->node_state_ = NodeState::kWaitingOnDriverComponent;
+            node_ptr->FinishRemoval();
+          }
         }
         cb(result);
       });

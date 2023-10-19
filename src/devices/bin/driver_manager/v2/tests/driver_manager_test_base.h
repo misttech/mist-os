@@ -30,6 +30,10 @@ class DriverManagerTestBase : public gtest::TestLoopFixture {
 
  protected:
   std::shared_ptr<dfv2::Node> CreateNode(const std::string name);
+
+  // Creates a DFv2 node and add it to the given parent.
+  std::shared_ptr<dfv2::Node> CreateNode(const std::string name, std::weak_ptr<dfv2::Node> parent);
+
   std::shared_ptr<dfv2::Node> CreateCompositeNode(std::string_view name,
                                                   std::vector<std::weak_ptr<dfv2::Node>> parents,
                                                   bool is_legacy, uint32_t primary_index = 0);
