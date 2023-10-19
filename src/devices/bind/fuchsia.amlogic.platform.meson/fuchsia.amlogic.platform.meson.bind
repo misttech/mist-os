@@ -16,7 +16,8 @@ uint G12A_CLK_ID {
   CLK_SYS_CPU_CLK = 1048576,
 };
 
-// Values taken from <soc/aml-meson/g12b-clk.h>
+// Values taken from <soc/aml-meson/g12b-clk.h> and
+// src/devices/clock/drivers/amlogic-clk/aml-g12b-blocks.h
 // g12b_clk_gates (0x10000 + array index), g12b_cpu_clks (0x100000 + array index)
 uint G12B_CLK_ID {
   // SYS CPU Clocks
@@ -35,6 +36,7 @@ uint G12B_CLK_ID {
   CLK_DOS = 0x10007,
 
   CLK_AUDIO = 0x1000b,
+  CLK_HIFI_PLL = 0x1000c,
 
   // CPU Clocks
   CLK_SYS_CPU_BIG_CLK = 0x100000,
