@@ -49,6 +49,7 @@ example:
 options:
   --cfg FILE: reclient config for reproxy
   --bindir DIR: location of reproxy tools
+  -v | --verbose: print events verbosely
   All other flags before -- are forwarded to the reproxy bootstrap.
 
 environment variables:
@@ -58,6 +59,7 @@ environment variables:
 EOF
 }
 
+verbose=0
 bootstrap_options=()
 # Extract script options before --
 for opt
@@ -82,6 +84,7 @@ do
     --cfg) prev_opt=config ;;
     --bindir=*) reclient_bindir="$optarg" ;;
     --bindir) prev_opt=reclient_bindir ;;
+    -v | --verbose) verbose=1 ;;
     # stop option processing
     --) shift; break ;;
     # Forward all other options to reproxy
@@ -257,7 +260,12 @@ function cleanup() {
   --re_proxy="$reproxy" \
   --cfg="$reproxy_cfg" \
   "${auth_option[@]}" \
-  "${bootstrap_options[@]}"
+  "${bootstrap_options[@]}" > "$reproxy_logdir"/bootstrap.stdout
+[[ "$verbose" != 1 ]] || {
+  cat "$reproxy_logdir"/bootstrap.stdout
+  echo "logs: $reproxy_logdir"
+  echo "socket: $socket_path"
+}
 
 test "$BUILD_METRICS_ENABLED" = 0 || {
   # Pre-authenticate for uploading metrics and logs
@@ -272,7 +280,10 @@ shutdown() {
   "${bootstrap_env[@]}" \
     "$bootstrap" \
     --shutdown \
-    --cfg="$reproxy_cfg"
+    --cfg="$reproxy_cfg" > "$reproxy_logdir"/shutdown.stdout
+  [[ "$verbose" != 1 ]] || {
+    cat "$reproxy_logdir"/shutdown.stdout
+  }
 
   cleanup
 
