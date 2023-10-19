@@ -77,15 +77,6 @@ pub trait WriteObjectHandle: ObjectHandle {
     /// the truncate.
     async fn truncate(&self, size: u64) -> Result<(), Error>;
 
-    /// Updates the timestamps for the object.
-    /// The truncate may be cached, in which case a later call to |flush| is necessary to persist
-    /// the truncate.
-    async fn write_timestamps<'a>(
-        &'a self,
-        crtime: Option<Timestamp>,
-        mtime: Option<Timestamp>,
-    ) -> Result<(), Error>;
-
     /// Flushes all pending data and metadata updates for the object.
     async fn flush(&self) -> Result<(), Error>;
 }

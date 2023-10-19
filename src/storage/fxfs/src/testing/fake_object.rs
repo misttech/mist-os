@@ -5,7 +5,7 @@
 use {
     crate::{
         object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle},
-        object_store::{journal::JournalHandle, Timestamp},
+        object_store::journal::JournalHandle,
     },
     anyhow::Error,
     async_trait::async_trait,
@@ -108,14 +108,6 @@ impl WriteObjectHandle for FakeObjectHandle {
 
     async fn truncate(&self, size: u64) -> Result<(), Error> {
         self.object.truncate(size);
-        Ok(())
-    }
-
-    async fn write_timestamps<'a>(
-        &'a self,
-        _crtime: Option<Timestamp>,
-        _mtime: Option<Timestamp>,
-    ) -> Result<(), Error> {
         Ok(())
     }
 

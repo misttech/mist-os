@@ -20,7 +20,6 @@ group("tests") {
     "disk_inspector:tests",
     "fs_management:tests",
     "ftl:tests",
-    "interval_tree:tests",
     "key-bag:tests",
     "paver:tests",
     "ramdevice_client:tests",

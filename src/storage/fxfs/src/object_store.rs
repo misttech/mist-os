@@ -20,7 +20,6 @@ pub mod transaction;
 mod tree;
 mod tree_cache;
 pub mod volume;
-pub mod writeback_cache;
 
 pub use caching_object_handle::CachingObjectHandle;
 pub use data_object_handle::{DataObjectHandle, DirectWriter};

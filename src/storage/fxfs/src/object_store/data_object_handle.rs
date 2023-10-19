@@ -1026,20 +1026,6 @@ impl<S: HandleOwner> WriteObjectHandle for DataObjectHandle<S> {
         self.truncate_with_options(self.default_transaction_options(), size).await
     }
 
-    async fn write_timestamps(
-        &self,
-        crtime: Option<Timestamp>,
-        mtime: Option<Timestamp>,
-    ) -> Result<(), Error> {
-        if let (None, None) = (crtime.as_ref(), mtime.as_ref()) {
-            return Ok(());
-        }
-        let mut transaction = self.new_transaction().await?;
-        DataObjectHandle::write_timestamps(self, &mut transaction, crtime, mtime).await?;
-        transaction.commit().await?;
-        Ok(())
-    }
-
     async fn flush(&self) -> Result<(), Error> {
         Ok(())
     }
