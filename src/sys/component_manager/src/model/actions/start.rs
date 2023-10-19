@@ -104,74 +104,57 @@ async fn do_start(
 
     let (diagnostics_sender, diagnostics_receiver) = oneshot::channel();
 
-    let result = async move {
-        // Resolve the component.
-        let component_info = component.resolve().await.map_err(|err| {
-            StartActionError::ResolveActionError { moniker: component.moniker.clone(), err }
-        })?;
+    // Resolve the component.
+    let resolved_component = component.resolve().await.map_err(|err| {
+        StartActionError::ResolveActionError { moniker: component.moniker.clone(), err }
+    })?;
 
-        // Find the runner to use.
-        let runner = component.resolve_runner().await.map_err(|err| {
-            warn!(moniker = %component.moniker, %err, "Failed to resolve runner.");
-            err
-        })?;
+    // Find the runner to use.
+    let runner = component.resolve_runner().await.map_err(|err| {
+        warn!(moniker = %component.moniker, %err, "Failed to resolve runner.");
+        err
+    })?;
 
-        // Generate the Runtime which will be set in the Execution.
-        let checker = component.policy_checker();
-        let (pending_runtime, start_info, break_on_start) = make_execution_runtime(
-            &component,
-            &checker,
-            component_info.resolved_url.clone(),
-            component_info.package.as_ref(),
-            &component_info.decl,
-            component_info.config,
-            start_reason.clone(),
-            execution_controller_task,
-            numbered_handles,
-            additional_namespace_entries,
-        )
-        .await?;
+    // Generate the Runtime which will be set in the Execution.
+    let (pending_runtime, start_info, break_on_start) = make_execution_runtime(
+        &component,
+        component.policy_checker(),
+        resolved_component.resolved_url.clone(),
+        resolved_component.package.as_ref(),
+        &resolved_component.decl,
+        resolved_component.config,
+        start_reason.clone(),
+        execution_controller_task,
+        numbered_handles,
+        additional_namespace_entries,
+    )
+    .await?;
 
-        Ok((
-            StartContext { runner, start_info, diagnostics_sender },
-            component_info.decl,
-            pending_runtime,
-            break_on_start,
-        ))
-    }
-    .await;
+    let start_context = StartContext { runner, start_info, diagnostics_sender };
 
     // Dispatch the Started and the DebugStarted event.
-    let (start_context, pending_runtime) = match result {
-        Ok((start_context, component_decl, pending_runtime, break_on_start)) => {
-            component
-                .hooks
-                .dispatch(&Event::new_with_timestamp(
-                    component,
-                    EventPayload::Started {
-                        runtime: RuntimeInfo::from_runtime(&pending_runtime, diagnostics_receiver),
-                        component_decl,
-                    },
-                    pending_runtime.timestamp,
-                ))
-                .await;
-            component
-                .hooks
-                .dispatch(&Event::new_with_timestamp(
-                    component,
-                    EventPayload::DebugStarted {
-                        runtime_dir: pending_runtime.runtime_dir.clone(),
-                        break_on_start: Arc::new(break_on_start),
-                    },
-                    pending_runtime.timestamp,
-                ))
-                .await;
-            (start_context, pending_runtime)
-        }
-        Err(e) => {
-            return Err(e);
-        }
-    };
+    component
+        .hooks
+        .dispatch(&Event::new_with_timestamp(
+            component,
+            EventPayload::Started {
+                runtime: RuntimeInfo::from_runtime(&pending_runtime, diagnostics_receiver),
+                component_decl: resolved_component.decl,
+            },
+            pending_runtime.timestamp,
+        ))
+        .await;
+    component
+        .hooks
+        .dispatch(&Event::new_with_timestamp(
+            component,
+            EventPayload::DebugStarted {
+                runtime_dir: pending_runtime.runtime_dir.clone(),
+                break_on_start: Arc::new(break_on_start),
+            },
+            pending_runtime.timestamp,
+        ))
+        .await;
 
     let res = start_component(&component, pending_runtime, start_context).await;
     match res {
