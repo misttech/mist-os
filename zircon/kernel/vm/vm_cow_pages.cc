@@ -1864,14 +1864,18 @@ zx_status_t VmCowPages::CloneCowPageLocked(uint64_t offset, list_node_t* alloc_l
       *out_page = nullptr;
       return ZX_ERR_NO_MEMORY;
     }
+    // We should not be trying to fork at this offset if something already existed.
+    DEBUG_ASSERT(slot->IsEmpty());
+
     // From this point on, we should ensure that the slot gets used to hold a page, or it is
     // returned if empty.
-    VmPageOrMarker* cur_page = slot;
-    auto page_is_used = fit::defer([&cur_page] {
-      // TODO(johngro): remove this explicit unused-capture warning suppression
-      // when https://bugs.llvm.org/show_bug.cgi?id=35450 gets fixed.
-      (void)cur_page;  // used only in DEBUG_ASSERT
-      DEBUG_ASSERT(!cur_page || cur_page->IsPage());
+    const VmPageOrMarker* cur_page = slot;
+    auto return_empty_slot = fit::defer([cur, cur_offset, cur_page] {
+      if (!cur_page->IsPage()) {
+        AssertHeld(cur->lock_ref());
+        // If we did not use the slot to hold a page, it could only have remained empty.
+        cur->page_list_.ReturnEmptySlot(cur_offset);
+      }
     });
 
     if (target_page_owner->IsUniAccessibleLocked(target_page, target_page_offset)) {
@@ -1903,9 +1907,6 @@ zx_status_t VmCowPages::CloneCowPageLocked(uint64_t offset, list_node_t* alloc_l
       alloc_status =
           AllocateCopyPage(pmm_alloc_flags_, page->paddr(), alloc_list, page_request, &cover_page);
       if (alloc_status != ZX_OK) {
-        // Return the empty slot we had allocated in preparation for the fork.
-        cur->page_list_.ReturnEmptySlot(cur_offset);
-        cur_page = nullptr;
         break;
       }
 
