@@ -65,8 +65,13 @@ constexpr auto PassDispatcher = internal::PassDispatcherT{};
 //      public:
 //       // Asynchronously constructs a |Background| object on its dispatcher.
 //       // Code in |Owner| and code in |Background| may run concurrently.
+//       //
+//       // The dispatcher will not be attached to the current thread, but will
+//       // be attached to the loop thread. This way, the |Background| object
+//       // can obtain a dispatcher from its constructor using
+//       // |async_get_default_dispatcher|.
 //       explicit Owner() :
-//           background_loop_(&kAsyncLoopConfigAttachToCurrentThread),
+//           background_loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
 //           background_{background_loop_.dispatcher(), std::in_place} {}
 //
 //      private:
@@ -132,10 +137,10 @@ class DispatcherBound {
   // fire-and-forget.
   //
   // If |member| returns some |R| type, then |AsyncCall| returns a builder
-  // object where one must attach an |async_patterns::Callback<R'>| by calling
-  // |Then|. |R'| could be identical to |R| or some other compatible type such
-  // as |const R&|. Typically, the owner will declare a |Receiver| to mint those
-  // callbacks:
+  // object where one must attach an |async_patterns::Callback<void(R')>| by
+  // calling |Then|. |R'| could be identical to |R| or some other compatible type
+  // such as |const R&|. Typically, the owner will declare a |Receiver| to mint
+  // those callbacks:
   //
   //     class Owner {
   //      public:
