@@ -47,7 +47,7 @@ fuchsia_component("f2fs-crash") {
   manifest = "f2fs/meta/crash.cml"
   deps = [
     "genericfs:stressor-bin",
-    "//src/storage/bin/f2fs:f2fs-component",
+    "//src/storage/f2fs/bin:f2fs-component",
   ]
 }
 
@@ -56,7 +56,7 @@ fuchsia_component("f2fs-no-crash") {
   manifest = "f2fs/meta/no-crash.cml"
   deps = [
     "genericfs:stressor-bin",
-    "//src/storage/bin/f2fs:f2fs-component",
+    "//src/storage/f2fs/bin:f2fs-component",
   ]
 }
 
@@ -129,7 +129,7 @@ fuchsia_component("f2fs-short") {
   manifest = "f2fs/meta/short.cml"
   deps = [
     "genericfs:stressor-bin",
-    "//src/storage/bin/f2fs:f2fs-component",
+    "//src/storage/f2fs/bin:f2fs-component",
   ]
 }
 
