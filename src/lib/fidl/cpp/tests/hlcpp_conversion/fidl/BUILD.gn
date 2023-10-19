@@ -17,3 +17,9 @@ fidl("test.enums.xyz") {
   sources = [ "enums.xyz.test.fidl" ]
   enable_hlcpp = true
 }
+
+fidl("test.protocols") {
+  testonly = true
+  sources = [ "protocols.test.fidl" ]
+  enable_hlcpp = true
+}

@@ -8,6 +8,7 @@
 #include <lib/fidl/cpp/box.h>
 #include <lib/fidl/cpp/enum.h>
 #include <lib/fidl/cpp/string.h>
+#include <lib/fidl/cpp/transport_err.h>
 #include <lib/fidl/cpp/wire/wire_types.h>
 
 #include <optional>
@@ -78,6 +79,16 @@ template <typename HLCPP>
 struct HLCPPToNaturalTraits<HLCPP, std::enable_if_t<std::is_base_of_v<zx::object_base, HLCPP>>>
     final : public HLCPPToNaturalTraitsIdentical<HLCPP> {};
 #endif
+
+/* Natural to HLCPP types for transport errors */
+template <>
+struct NaturalToHLCPPTraits<::fidl::internal::TransportErr> final
+    : public NaturalToHLCPPTraitsIdentical<::fidl::internal::TransportErr> {};
+
+/* HLCPP to Natural types for transport errors */
+template <>
+struct HLCPPToNaturalTraits<::fidl::internal::TransportErr> final
+    : public HLCPPToNaturalTraitsIdentical<::fidl::internal::TransportErr> {};
 
 /* Natural to HLCPP traits for strings. */
 template <>
