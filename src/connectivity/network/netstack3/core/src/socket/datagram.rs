@@ -2607,13 +2607,7 @@ where
         *entry.get_mut() = SocketState::Bound(BoundSocketState::Connected {
             state: match sync_ctx.dual_stack_context() {
                 MaybeDualStack::DualStack(dual_stack) => {
-                    if dual_stack.dual_stack_enabled(ip_options) {
-                        todo!("https://fxbug.dev/21198: Support dual-stack connect");
-                    } else {
-                        dual_stack
-                            .converter()
-                            .convert_back(DualStackConnState::ThisStack(conn_state))
-                    }
+                    dual_stack.converter().convert_back(DualStackConnState::ThisStack(conn_state))
                 }
                 MaybeDualStack::NotDualStack(not_dual_stack) => {
                     not_dual_stack.converter().convert_back(conn_state)

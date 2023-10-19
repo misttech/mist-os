@@ -7054,6 +7054,38 @@ mod tests {
         bind_listener();
     }
 
+    // TODO(https://fxbug.dev/135204): Expand the test cases once dual-stack
+    // connect is supported.
+    #[test_case(true; "connect to this stack with dual stack enabled")]
+    #[test_case(false; "connect to this stack with dual stack disabled")]
+    fn dual_stack_connect(enable_dual_stack: bool) {
+        let FakeCtxWithSyncCtx { mut sync_ctx, mut non_sync_ctx } =
+            FakeCtxWithSyncCtx::with_sync_ctx(FakeUdpSyncCtx::with_local_remote_ip_addrs(
+                vec![Ipv6::FAKE_CONFIG.local_ip],
+                vec![Ipv6::FAKE_CONFIG.remote_ip],
+            ));
+
+        let connected = SocketHandler::<Ipv6, _>::create_udp(&mut sync_ctx);
+        SocketHandler::<Ipv6, _>::set_dual_stack_enabled(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            connected,
+            enable_dual_stack,
+        )
+        .expect("can set dual-stack enabled");
+
+        assert_eq!(
+            SocketHandler::connect(
+                &mut sync_ctx,
+                &mut non_sync_ctx,
+                connected,
+                Some(ZonedAddr::Unzoned(Ipv6::FAKE_CONFIG.remote_ip).into()),
+                REMOTE_PORT,
+            ),
+            Ok(())
+        );
+    }
+
     #[test]
     fn test_icmp_error() {
         struct InitializedContext<I: TestIpExt> {
