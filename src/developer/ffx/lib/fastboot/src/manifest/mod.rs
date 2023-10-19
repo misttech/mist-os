@@ -8,7 +8,7 @@ use crate::{
         fastboot_interface::FastbootInterface,
         prepare, Boot, Flash, Unlock,
     },
-    file_resolver::resolvers::Resolver,
+    file_resolver::resolvers::{Resolver, ZipArchiveResolver},
     file_resolver::FileResolver,
     manifest::{
         resolvers::{
@@ -34,13 +34,11 @@ use serde::{Deserialize, Serialize};
 use serde_json::{from_value, to_value, Value};
 use std::{
     collections::BTreeMap,
-    fs::{create_dir_all, File},
-    io::{copy, BufReader, Read, Write},
+    fs::File,
+    io::{BufReader, Read, Write},
     path::PathBuf,
 };
-use tempfile::{tempdir, TempDir};
 use termion::{color, style};
-use zip::read::ZipArchive;
 
 pub mod resolvers;
 pub mod sdk;
@@ -486,52 +484,31 @@ pub async fn from_local_product_bundle<W: Write, F: FastbootInterface>(
     fastboot_interface: &mut F,
     cmd: ManifestParams,
 ) -> Result<()> {
-    let tempdir = tempdir()?;
     tracing::debug!("fastboot manifest from_local_product_bundle");
-    // TODO(b/303650362): Cleanup
-    let pb_dir =
-        if path.is_file() && path.extension().is_some() && path.extension().unwrap() == "zip" {
-            extract_product_bundle_zip(&tempdir, path)?
-        } else {
-            path
-        };
-    let product_bundle = ProductBundle::try_load_from(Utf8Path::from_path(&*pb_dir).unwrap())?;
-    let result = FlashManifest {
-        resolver: Resolver::new(pb_dir)?,
-        version: FlashManifestVersion::from_product_bundle(&product_bundle)?,
-    }
-    .flash(writer, fastboot_interface, cmd)
-    .await;
-    drop(tempdir);
-    result
-}
+    let path = Utf8Path::from_path(&*path).ok_or_else(|| anyhow!("Error getting path"))?;
+    let product_bundle = ProductBundle::try_load_from(path)?;
 
-pub fn extract_product_bundle_zip(tempdir: &TempDir, path: PathBuf) -> Result<PathBuf> {
-    let extracted_dir = tempdir.path();
-    let file =
-        File::open(path.clone()).map_err(|e| ffx_error!("Could not open archive file: {}", e))?;
-    let mut archive =
-        ZipArchive::new(file).map_err(|e| ffx_error!("Could not read archive: {}", e))?;
+    let flash_manifest_version = FlashManifestVersion::from_product_bundle(&product_bundle)?;
 
-    for i in 0..archive.len() {
-        let mut archive_file = archive.by_index(i)?;
-        let outpath = archive_file.sanitized_name();
-        let extracted_path = extracted_dir.join(outpath);
-
-        if (*archive_file.name()).ends_with('/') {
-            create_dir_all(&extracted_path)?;
-        } else {
-            if let Some(p) = extracted_path.parent() {
-                if p.exists() {
-                    continue;
-                }
-                create_dir_all(&p)?;
+    match (path.is_file(), path.extension()) {
+        (true, Some("zip")) => {
+            FlashManifest {
+                resolver: ZipArchiveResolver::new(writer, path.into())?,
+                version: flash_manifest_version,
             }
-            let mut extracted_file = File::create(&extracted_path)?;
-            copy(&mut archive_file, &mut extracted_file)?;
+            .flash(writer, fastboot_interface, cmd)
+            .await
+        }
+        (true, extension) => Err(anyhow!(
+            "Attempting to flash using a Product Bundle file with unsupported extension: {:#?}",
+            extension
+        )),
+        (false, _) => {
+            FlashManifest { resolver: Resolver::new(path.into())?, version: flash_manifest_version }
+                .flash(writer, fastboot_interface, cmd)
+                .await
         }
     }
-    Ok(extracted_dir.join("product_bundle"))
 }
 
 pub async fn from_in_tree<W: Write, T: FastbootInterface>(
