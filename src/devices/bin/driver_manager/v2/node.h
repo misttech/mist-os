@@ -20,6 +20,7 @@
 #include "src/devices/bin/driver_manager/inspect.h"
 #include "src/devices/bin/driver_manager/v2/bind_result_tracker.h"
 #include "src/devices/bin/driver_manager/v2/driver_host.h"
+#include "src/devices/bin/driver_manager/v2/shutdown_helper.h"
 
 namespace dfv2 {
 
@@ -30,7 +31,6 @@ std::optional<fuchsia_component_decl::wire::Offer> CreateCompositeServiceOffer(
 
 class Node;
 class NodeRemovalTracker;
-using NodeId = uint32_t;
 
 using AddNodeResultCallback = fit::callback<void(
     fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>>)>;
@@ -84,29 +84,6 @@ enum class Collection : uint8_t {
   kFullPackage,
 };
 
-enum class RemovalSet {
-  kAll,      // Remove the boot drivers and the package drivers
-  kPackage,  // Remove the package drivers
-};
-
-// Represents the actions of the node after shutdown is completed.
-enum class ShutdownIntent {
-  kRemoval,          // Removes the node from the topology. The default shutdown intention.
-  kRestart,          // Restarts the node and attempts to bind it to a new driver.
-  kRebindComposite,  // Removes the composite node from the topology for rebind. Only invoked if the
-                     // node is a composite.
-};
-
-enum class NodeState {
-  kRunning,                   // Normal running state.
-  kPrestop,                   // Still running, but will remove soon. usually because
-                              //  Received Remove(kPackage), but is a boot driver.
-  kWaitingOnChildren,         // Received Remove, and waiting for children to be removed.
-  kWaitingOnDriver,           // Waiting for driver to respond from Stop() command.
-  kWaitingOnDriverComponent,  // Waiting driver component to be destroyed.
-  kStopping,                  // finishing shutdown of node.
-};
-
 enum class NodeType {
   kNormal,           // Normal non-composite node.
   kLegacyComposite,  // Composite node created from the legacy system.
@@ -118,7 +95,8 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
              public fidl::WireServer<fuchsia_component_runner::ComponentController>,
              public fidl::WireServer<fuchsia_device::Controller>,
              public fidl::WireAsyncEventHandler<fuchsia_driver_host::Driver>,
-             public std::enable_shared_from_this<Node> {
+             public std::enable_shared_from_this<Node>,
+             public NodeShutdownBridge {
  public:
   Node(std::string_view name, std::vector<std::weak_ptr<Node>> parents, NodeManager* node_manager,
        async_dispatcher_t* dispatcher, DeviceInspect inspect, uint32_t primary_index = 0,
@@ -132,6 +110,12 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
       const std::vector<fuchsia_driver_framework::wire::NodeProperty>& properties,
       NodeManager* driver_binder, async_dispatcher_t* dispatcher, bool is_legacy,
       uint32_t primary_index = 0);
+
+  // NodeShutdownBridge
+  // Exposed for testing.
+  bool HasDriverComponent() const override {
+    return driver_component_.has_value() && !driver_component_->is_destroyed;
+  }
 
   void OnBind() const;
 
@@ -148,8 +132,6 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   // once with |removal_set| == kPackage, and once with |removal_set| == kAll.
   // Errors and disconnects that are unrecoverable should call Remove(kAll, nullptr).
   void Remove(RemovalSet removal_set, NodeRemovalTracker* removal_tracker);
-  static void Remove(std::stack<std::shared_ptr<Node>> nodes, RemovalSet removal_set,
-                     NodeRemovalTracker* removal_tracker);
 
   // `callback` is invoked once the node has finished being added or an error
   // has occurred.
@@ -226,6 +208,10 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   // requests that may have originated from the node.
   void CompleteBind(zx::result<> result);
 
+  ShutdownHelper& GetShutdownHelper();
+
+  NodeState GetNodeState() { return GetShutdownHelper().node_state(); }
+
   const std::string& name() const { return name_; }
 
   NodeType type() const { return type_; }
@@ -271,12 +257,6 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
 
   DevfsDevice& devfs_device() { return devfs_device_; }
 
-  // Exposed for testing.
-  bool has_driver_component() { return driver_component_.has_value(); }
-
-  // Exposed for testing.
-  NodeState node_state() const { return node_state_; }
-
   bool can_multibind_composites() const { return can_multibind_composites_; }
 
   void set_collection(Collection collection) { collection_ = collection; }
@@ -301,7 +281,7 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
     can_multibind_composites_ = can_multibind_composites;
   }
 
-  ShutdownIntent shutdown_intent() const { return shutdown_intent_; }
+  ShutdownIntent shutdown_intent() { return GetShutdownHelper().shutdown_intent(); }
 
  private:
   struct DriverComponent {
@@ -315,6 +295,9 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
     fidl::ServerBinding<fuchsia_component_runner::ComponentController> component_controller_ref;
     fidl::WireClient<fuchsia_driver_host::Driver> driver;
     std::string driver_url;
+
+    // Set to true when the component is destroyed.
+    bool is_destroyed = false;
   };
 
   // fidl::WireServer<fuchsia_device::Controller>
@@ -336,33 +319,39 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
 
   // This is called when fuchsia_driver_host::Driver is closed.
   void on_fidl_error(fidl::UnbindInfo info) override;
+
   // fidl::WireServer<fuchsia_component_runner::ComponentController>
   // We ignore these signals.
   void Stop(StopCompleter::Sync& completer) override;
   void Kill(KillCompleter::Sync& completer) override;
+
   // fidl::WireServer<fuchsia_driver_framework::NodeController>
   void Remove(RemoveCompleter::Sync& completer) override;
   void RequestBind(RequestBindRequestView request, RequestBindCompleter::Sync& completer) override;
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_driver_framework::NodeController> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;
+
   // fidl::WireServer<fuchsia_driver_framework::Node>
   void AddChild(AddChildRequestView request, AddChildCompleter::Sync& completer) override;
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_driver_framework::Node> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) override;
 
+  // NodeShutdownBridge
+  std::pair<std::string, Collection> GetRemovalTrackerInfo() override;
+  void StopDriver() override;
+  void StopDriverComponent() override;
+  void FinishShutdown() override;
+  void OnShutdownComplete() override;
+  bool HasChildren() const override { return !children_.empty(); }
+  bool HasDriver() const override {
+    return driver_component_.has_value() && driver_component_->driver;
+  }
+
   // Shutdown helpers:
   // Remove a child from this parent
   void RemoveChild(const std::shared_ptr<Node>& child);
-  // Check to see if all children have been removed.  If so, move on to stopping driver.
-  void CheckForRemoval();
-  // Close the component connection to signal to CF that the component has
-  // stopped and ensure the component is destroyed.
-  void ScheduleStopComponent();
-  // Cleanup and remove node. Called by `ScheduleStopComponent` once the
-  // associated component has been removed. If |node_restarting_|, it will start the driver
-  // of the node again instead of removing it from the node topology.
-  void FinishRemoval();
+
   // Start the node's driver back up.
   void FinishRestart();
   // Call `callback` once child node with the name `name` has been removed.
@@ -412,12 +401,6 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   fuchsia_driver_framework::DriverPackageType driver_package_type_;
   fit::nullable<DriverHost*> driver_host_;
 
-  NodeState node_state_ = NodeState::kRunning;
-  std::optional<NodeId> removal_id_;
-  NodeRemovalTracker* removal_tracker_ = nullptr;
-
-  ShutdownIntent shutdown_intent_ = ShutdownIntent::kRemoval;
-
   // An outstanding rebind request.
   std::optional<fit::callback<void(zx::result<>)>> pending_bind_completer_;
 
@@ -435,6 +418,8 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
 
   // The device's inspect information.
   DeviceInspect inspect_;
+
+  std::unique_ptr<ShutdownHelper> shutdown_helper_;
 
   // This represents the node's presence in devfs, both it's topological path and it's class path.
   DevfsDevice devfs_device_;

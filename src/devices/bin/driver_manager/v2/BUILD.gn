@@ -27,6 +27,8 @@ source_set("driver_runner") {
     "parent_set_collector.h",
     "runner.cc",
     "runner.h",
+    "shutdown_helper.cc",
+    "shutdown_helper.h",
     "shutdown_manager.cc",
     "shutdown_manager.h",
   ]

@@ -33,23 +33,6 @@ const std::string kUnboundUrl = "unbound";
 // to the new Rebind() behavior and this is fully implemented on both DFv1 and DFv2.
 constexpr bool kEnableCompositeNodeSpecRebind = false;
 
-const char* State2String(NodeState state) {
-  switch (state) {
-    case NodeState::kRunning:
-      return "kRunning";
-    case NodeState::kPrestop:
-      return "kPrestop";
-    case NodeState::kWaitingOnChildren:
-      return "kWaitingOnChildren";
-    case NodeState::kWaitingOnDriver:
-      return "kWaitingOnDriver";
-    case NodeState::kWaitingOnDriverComponent:
-      return "kWaitingOnDriverComponent";
-    case NodeState::kStopping:
-      return "kStopping";
-  }
-}
-
 template <typename R, typename F>
 std::optional<R> VisitOffer(fdecl::Offer& offer, F apply) {
   // Note, we access each field of the union as mutable, so that `apply` can
@@ -84,19 +67,6 @@ const char* CollectionName(Collection collection) {
       return "pkg-drivers";
     case Collection::kFullPackage:
       return "full-pkg-drivers";
-  }
-}
-
-bool NodeStateIsExiting(NodeState node_state) {
-  switch (node_state) {
-    case NodeState::kRunning:
-      return false;
-    case NodeState::kPrestop:
-    case NodeState::kWaitingOnChildren:
-    case NodeState::kWaitingOnDriver:
-    case NodeState::kWaitingOnDriverComponent:
-    case NodeState::kStopping:
-      return true;
   }
 }
 
@@ -381,12 +351,15 @@ zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
 }
 
 Node::~Node() {
-  if (node_state_ != NodeState::kStopping) {
-    LOGF(INFO, "Node deallocating while at state %s", State2String(node_state_));
+  // TODO(fxb/135416): Notify the NodeRemovalTracker if the node is deallocated before shutdown is
+  // complete.
+  if (GetNodeState() != NodeState::kStopped) {
+    LOGF(INFO, "Node deallocating while at state %s", GetShutdownHelper().NodeStateAsString());
   }
 
   CloseIfExists(controller_ref_);
   CloseIfExists(node_ref_);
+
   if (pending_bind_completer_.has_value()) {
     pending_bind_completer_.value()(zx::error(ZX_ERR_CANCELED));
     pending_bind_completer_.reset();
@@ -454,13 +427,7 @@ void Node::CompleteBind(zx::result<> result) {
     completer.value()(result);
   }
 
-  // Remove() might be call while binding is in progress. If bind fails and the node is in the
-  // state where it's waiting for the driver to stop, transition to the next step of the removal
-  // process.
-  if (!driver_component_ && this->node_state_ == NodeState::kWaitingOnDriver) {
-    this->node_state_ = NodeState::kWaitingOnDriverComponent;
-    this->FinishRemoval();
-  }
+  GetShutdownHelper().CheckNodeState();
 }
 
 void Node::AddToParents() {
@@ -474,59 +441,32 @@ void Node::AddToParents() {
   }
 }
 
+ShutdownHelper& Node::GetShutdownHelper() {
+  if (!shutdown_helper_) {
+    shutdown_helper_ = std::make_unique<ShutdownHelper>(this);
+  }
+  return *shutdown_helper_.get();
+}
+
 // TODO(fxb/124976): If the node invoking this function cannot multibind to composites,
 // is parenting one composite node, and is not in a state for removal, then it
 // should attempt to bind to something else.
 void Node::RemoveChild(const std::shared_ptr<Node>& child) {
   LOGF(DEBUG, "RemoveChild %s from parent %s", child->name().c_str(), name().c_str());
   children_.erase(std::find(children_.begin(), children_.end(), child));
-  // If we are waiting for children, see if that is done:
-  if (node_state_ != NodeState::kPrestop && node_state_ != NodeState::kRunning) {
-    CheckForRemoval();
-  }
+  GetShutdownHelper().CheckNodeState();
 }
 
-void Node::CheckForRemoval() {
-  if (node_state_ != NodeState::kWaitingOnChildren) {
-    LOGF(DEBUG, "Node: %s CheckForRemoval: not waiting on children.", name().c_str());
+void Node::FinishShutdown() {
+  ZX_ASSERT_MSG(GetNodeState() == NodeState::kWaitingOnDriverComponent,
+                "FinishShutdown called in invalid node state: %s",
+                GetShutdownHelper().NodeStateAsString());
+  if (shutdown_intent() == ShutdownIntent::kRestart) {
     return;
   }
 
-  LOGF(DEBUG, "Node: %s Checking for removal", name().c_str());
-  if (!children_.empty()) {
-    return;
-  }
-  node_state_ = NodeState::kWaitingOnDriver;
-  if (removal_tracker_ && removal_id_.has_value()) {
-    removal_tracker_->Notify(removal_id_.value(), node_state_);
-  }
-  LOGF(DEBUG, "Node::Remove(): %s children are empty", name().c_str());
-  if (driver_component_ && driver_component_->driver) {
-    fidl::OneWayStatus result = driver_component_->driver->Stop();
-    if (result.ok()) {
-      return;  // We'll now wait for the channel to close
-    }
-    LOGF(ERROR, "Node: %s failed to stop driver: %s", name().c_str(),
-         result.FormatDescription().data());
-    // We'd better continue to close, since we can't talk to the driver.
-  }
-
-  ScheduleStopComponent();
-}
-
-void Node::FinishRemoval() {
-  LOGF(INFO, "Node: %s Finishing removal", name().c_str());
-  ZX_ASSERT_MSG(node_state_ == NodeState::kWaitingOnDriverComponent,
-                "FinishRemoval called in invalid node state: %s", State2String(node_state_));
-
-  if (shutdown_intent_ == ShutdownIntent::kRestart) {
-    FinishRestart();
-    return;
-  }
-
-  // Get an extra shared_ptr to ourselves so we are not freed halfway through this function.
+  // Store a shared_ptr to ourselves so we won't be freed halfway through this function.
   std::shared_ptr this_node = shared_from_this();
-  node_state_ = NodeState::kStopping;
   driver_component_.reset();
   for (auto& parent : parents()) {
     if (auto ptr = parent.lock(); ptr) {
@@ -541,14 +481,24 @@ void Node::FinishRemoval() {
   CloseIfExists(controller_ref_);
   CloseIfExists(node_ref_);
   devfs_device_.unpublish();
-  if (removal_tracker_ && removal_id_.has_value()) {
-    removal_tracker_->Notify(removal_id_.value(), node_state_);
+}
+
+void Node::OnShutdownComplete() {
+  ZX_ASSERT_MSG(GetNodeState() == NodeState::kStopped,
+                "FinishShutdown called in invalid node state: %s",
+                GetShutdownHelper().NodeStateAsString());
+  LOGF(INFO, "Node: %s shutdown complete", name().c_str());
+
+  if (shutdown_intent() == ShutdownIntent::kRestart) {
+    FinishRestart();
+    return;
   }
+
   if (remove_complete_callback_) {
     remove_complete_callback_();
   }
 
-  if (shutdown_intent_ == ShutdownIntent::kRebindComposite && composite_rebind_completer_ &&
+  if (shutdown_intent() == ShutdownIntent::kRebindComposite && composite_rebind_completer_ &&
       composite_rebind_completer_.value()) {
     composite_rebind_completer_.value()(zx::ok());
     composite_rebind_completer_.reset();
@@ -556,10 +506,10 @@ void Node::FinishRemoval() {
 }
 
 void Node::FinishRestart() {
-  ZX_ASSERT_MSG(shutdown_intent_ == ShutdownIntent::kRestart,
+  ZX_ASSERT_MSG(shutdown_intent() == ShutdownIntent::kRestart,
                 "FinishRestart called when node is not restarting.");
-  shutdown_intent_ = ShutdownIntent::kRemoval;
-  node_state_ = NodeState::kRunning;
+
+  GetShutdownHelper().ResetShutdown();
 
   // Store previous url before we reset the driver_component_.
   std::string previous_url = driver_url();
@@ -601,84 +551,11 @@ void Node::FinishRestart() {
 // a removal is taking place, but this node will not be removed yet, even if all its children
 // are removed.
 void Node::Remove(RemovalSet removal_set, NodeRemovalTracker* removal_tracker) {
-  Remove(std::stack<std::shared_ptr<Node>>({shared_from_this()}), removal_set, removal_tracker);
-}
-
-void Node::Remove(std::stack<std::shared_ptr<Node>> nodes, RemovalSet removal_set,
-                  NodeRemovalTracker* removal_tracker) {
-  std::stack<std::shared_ptr<Node>> nodes_to_check_for_removal;
-  while (!nodes.empty()) {
-    std::shared_ptr<Node> node = nodes.top();
-    nodes.pop();
-    if (!removal_tracker && node->removal_tracker_) {
-      // TODO(fxbug.dev/115171): Change this to an error when we track shutdown steps better.
-      LOGF(WARNING, "Untracked Node::Remove() called on %s, indicating an error during shutdown",
-           node->MakeTopologicalPath().c_str());
-    }
-
-    if (removal_tracker) {
-      if (node->removal_tracker_) {
-        // We should never have two competing trackers
-        ZX_ASSERT(node->removal_tracker_ == removal_tracker);
-      } else {
-        // We are getting a removal tracker for the first time so register ourselves.
-        node->removal_tracker_ = removal_tracker;
-        node->removal_id_ = node->removal_tracker_->RegisterNode(NodeRemovalTracker::Node{
-            .name = node->MakeComponentMoniker(),
-            .collection = node->collection_,
-            .state = node->node_state_,
-        });
-      }
-    }
-
-    LOGF(DEBUG, "Remove called on Node: %s", node->name().c_str());
-    // Two cases where we will transition state and take action:
-    // Removing kAll, and state is Running or Prestop
-    // Removing kPkg, and state is Running
-    if ((node->node_state_ != NodeState::kPrestop && node->node_state_ != NodeState::kRunning) ||
-        (node->node_state_ == NodeState::kPrestop && removal_set == RemovalSet::kPackage)) {
-      if (node->parents_.size() <= 1) {
-        LOGF(WARNING, "Node::Remove() %s called late, already in state %s",
-             node->MakeComponentMoniker().c_str(), State2String(node->node_state_));
-      }
-      continue;
-    }
-
-    // Now, the cases where we do something:
-    // Set the new state
-    if (removal_set == RemovalSet::kPackage &&
-        (node->collection_ == Collection::kBoot || node->collection_ == Collection::kNone)) {
-      node->node_state_ = NodeState::kPrestop;
-    } else {
-      // Either removing kAll, or is package driver and removing kPackage.
-      node->node_state_ = NodeState::kWaitingOnChildren;
-      // All children should be removed regardless as they block removal of this node.
-      removal_set = RemovalSet::kAll;
-    }
-
-    // Propagate removal message to children
-    if (node->removal_tracker_ && node->removal_id_.has_value()) {
-      node->removal_tracker_->Notify(node->removal_id_.value(), node->node_state_);
-    }
-
-    // Ask each of our children to remove themselves.
-    for (auto& child : node->children_) {
-      LOGF(DEBUG, "Node: %s calling remove on child: %s", node->name().c_str(),
-           child->name().c_str());
-      nodes.push(child);
-    }
-    nodes_to_check_for_removal.push(std::move(node));
-  }
-
-  // In case we had no children, or they removed themselves synchronously:
-  while (!nodes_to_check_for_removal.empty()) {
-    nodes_to_check_for_removal.top()->CheckForRemoval();
-    nodes_to_check_for_removal.pop();
-  }
+  GetShutdownHelper().Remove(shared_from_this(), removal_set, removal_tracker);
 }
 
 void Node::RestartNode() {
-  shutdown_intent_ = ShutdownIntent::kRestart;
+  GetShutdownHelper().set_shutdown_intent(ShutdownIntent::kRestart);
   Remove(RemovalSet::kAll, nullptr);
 }
 
@@ -712,7 +589,7 @@ void Node::RemoveCompositeNodeForRebind(fit::callback<void(zx::result<>)> comple
   }
 
   composite_rebind_completer_ = std::move(completer);
-  shutdown_intent_ = ShutdownIntent::kRebindComposite;
+  GetShutdownHelper().set_shutdown_intent(ShutdownIntent::kRebindComposite);
   Remove(RemovalSet::kAll, nullptr);
 }
 
@@ -745,7 +622,7 @@ fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> No
     LOGF(WARNING, "Failed to add Node, as this Node '%s' was removed", name().data());
     return fit::as_error(fdf::wire::NodeError::kNodeRemoved);
   }
-  if (NodeStateIsExiting(node_state_)) {
+  if (GetShutdownHelper().IsShuttingDown()) {
     LOGF(WARNING, "Failed to add Node, as this Node '%s' is being removed", name().c_str());
     return fit::as_error(fdf::wire::NodeError::kNodeRemoved);
   }
@@ -875,7 +752,7 @@ void Node::WaitForChildToExit(
     if (child->name() != name) {
       continue;
     }
-    if (!NodeStateIsExiting(child->node_state_)) {
+    if (!child->GetShutdownHelper().IsShuttingDown()) {
       LOGF(ERROR, "Failed to add Node '%.*s', name already exists among siblings",
            static_cast<int>(name.size()), name.data());
       callback(fit::as_error(fdf::wire::NodeError::kNameAlreadyExists));
@@ -1071,7 +948,7 @@ void Node::StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_
           return;
         }
 
-        if (node->node_state_ == NodeState::kRunning) {
+        if (node->GetNodeState() == NodeState::kRunning) {
           // If the node is running but this node closure has happened, then we want to restart
           // the node if it has the host_restart_on_crash_ enabled on it.
           if (node->host_restart_on_crash_) {
@@ -1109,10 +986,7 @@ void Node::StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_
 
         if (result.is_error()) {
           node_ptr->driver_component_.reset();
-          if (node_ptr->node_state_ == NodeState::kWaitingOnDriver) {
-            node_ptr->node_state_ = NodeState::kWaitingOnDriverComponent;
-            node_ptr->FinishRemoval();
-          }
+          node_ptr->GetShutdownHelper().CheckNodeState();
         }
         cb(result);
       });
@@ -1143,16 +1017,38 @@ bool Node::EvaluateRematchFlags(fuchsia_driver_development::RematchFlags rematch
   return true;
 }
 
-void Node::ScheduleStopComponent() {
-  ZX_ASSERT_MSG(node_state_ == NodeState::kWaitingOnDriver,
-                "ScheduleStopComponent called in invalid node state: %s",
-                State2String(node_state_));
-  node_state_ = NodeState::kWaitingOnDriverComponent;
-  if (!driver_component_) {
-    // TODO(fxb/130850): Move this call to an async task.
-    FinishRemoval();
+std::pair<std::string, Collection> Node::GetRemovalTrackerInfo() {
+  return {MakeComponentMoniker(), collection_};
+}
+
+void Node::StopDriver() {
+  ZX_ASSERT_MSG(GetNodeState() == NodeState::kWaitingOnChildren,
+                "StopDriverComponent called in invalid node state: %s",
+                GetShutdownHelper().NodeStateAsString());
+  if (!driver_component_ || !driver_component_->driver) {
     return;
   }
+
+  fidl::OneWayStatus result = driver_component_->driver->Stop();
+  if (result.ok()) {
+    return;  // We'll now wait for the channel to close
+  }
+
+  LOGF(ERROR, "Node: %s failed to stop driver: %s", name().c_str(),
+       result.FormatDescription().data());
+  // Continue to clear out the driver, since we can't talk to it.
+  driver_component_->driver = {};
+}
+
+void Node::StopDriverComponent() {
+  ZX_ASSERT_MSG(GetNodeState() == NodeState::kWaitingOnDriver,
+                "StopDriverComponent called in invalid node state: %s",
+                GetShutdownHelper().NodeStateAsString());
+
+  if (!driver_component_) {
+    return;
+  }
+
   // Send an epitaph to the component manager and close the connection. The
   // server of a `ComponentController` protocol is expected to send an epitaph
   // before closing the associated connection.
@@ -1174,7 +1070,10 @@ void Node::ScheduleStopComponent() {
           LOGF(ERROR, "Node: %.*s: Failed to destroy driver component: %u",
                static_cast<int>(self->name_.size()), self->name_.data(), result->error_value());
         }
-        self->FinishRemoval();
+
+        LOGF(INFO, "Destroyed driver component for %s", self->MakeComponentMoniker().c_str());
+        self->driver_component_->is_destroyed = true;
+        self->GetShutdownHelper().CheckNodeState();
       });
 }
 
@@ -1182,29 +1081,38 @@ void Node::on_fidl_error(fidl::UnbindInfo info) {
   if (driver_component_) {
     driver_component_->driver = {};
   }
+
   // The only valid way a driver host should shut down the Driver channel
   // is with the ZX_OK epitaph.
   if (info.reason() != fidl::Reason::kPeerClosedWhileReading || info.status() != ZX_OK) {
     LOGF(ERROR, "Node: %s: driver channel shutdown with: %s", name().c_str(),
          info.FormatDescription().data());
   }
-  if (node_state_ == NodeState::kWaitingOnDriver) {
+
+  if (GetNodeState() == NodeState::kWaitingOnDriver) {
     LOGF(INFO, "Node: %s: realm channel had expected shutdown.", MakeComponentMoniker().c_str());
-    ScheduleStopComponent();
-  } else if (node_state_ == NodeState::kWaitingOnDriverComponent) {
-    LOGF(DEBUG, "Node: %s: driver channel had expected shutdown.", name().c_str());
-    FinishRemoval();
-  } else {
-    if (host_restart_on_crash_) {
-      LOGF(WARNING, "Restarting node %s because of unexpected driver channel shutdown.",
-           name().c_str());
-      RestartNode();
-    } else {
-      LOGF(WARNING, "Removing node %s because of unexpected driver channel shutdown.",
-           name().c_str());
-      Remove(RemovalSet::kAll, nullptr);
-    }
+    GetShutdownHelper().CheckNodeState();
+    return;
   }
+
+  if (GetNodeState() == NodeState::kWaitingOnDriverComponent) {
+    LOGF(DEBUG, "Node: %s: driver channel had expected shutdown.", name().c_str());
+    if (driver_component_) {
+      driver_component_->is_destroyed = true;
+    }
+    GetShutdownHelper().CheckNodeState();
+    return;
+  }
+
+  if (host_restart_on_crash_) {
+    LOGF(WARNING, "Restarting node %s because of unexpected driver channel shutdown.",
+         name().c_str());
+    RestartNode();
+    return;
+  }
+
+  LOGF(WARNING, "Removing node %s because of unexpected driver channel shutdown.", name().c_str());
+  Remove(RemovalSet::kAll, nullptr);
 }
 
 Node::DriverComponent::DriverComponent(

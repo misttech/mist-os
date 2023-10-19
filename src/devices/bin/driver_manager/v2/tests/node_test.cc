@@ -168,15 +168,15 @@ class Dfv2NodeTest : public DriverManagerTestBase {
 TEST_F(Dfv2NodeTest, RemoveDuringFailedBind) {
   auto node = CreateNode("test");
   StartTestDriver(node);
-  ASSERT_TRUE(node->has_driver_component());
-  ASSERT_EQ(dfv2::NodeState::kRunning, node->node_state());
+  ASSERT_TRUE(node->HasDriverComponent());
+  ASSERT_EQ(dfv2::NodeState::kRunning, node->GetNodeState());
 
   node->Remove(dfv2::RemovalSet::kAll, nullptr);
-  ASSERT_EQ(dfv2::NodeState::kWaitingOnDriver, node->node_state());
+  ASSERT_EQ(dfv2::NodeState::kWaitingOnDriver, node->GetNodeState());
 
   node->CompleteBind(zx::error(ZX_ERR_NOT_FOUND));
-  ASSERT_FALSE(node->has_driver_component());
-  ASSERT_EQ(dfv2::NodeState::kStopping, node->node_state());
+  ASSERT_FALSE(node->HasDriverComponent());
+  ASSERT_EQ(dfv2::NodeState::kStopped, node->GetNodeState());
 }
 
 TEST_F(Dfv2NodeTest, TestEvaluateRematchFlags) {
@@ -228,19 +228,19 @@ TEST_F(Dfv2NodeTest, TestEvaluateRematchFlags) {
 TEST_F(Dfv2NodeTest, RemoveCompositeNodeForRebind) {
   auto parent_node_1 = CreateNode("parent_1");
   StartTestDriver(parent_node_1);
-  ASSERT_TRUE(parent_node_1->has_driver_component());
-  ASSERT_EQ(dfv2::NodeState::kRunning, parent_node_1->node_state());
+  ASSERT_TRUE(parent_node_1->HasDriverComponent());
+  ASSERT_EQ(dfv2::NodeState::kRunning, parent_node_1->GetNodeState());
 
   auto parent_node_2 = CreateNode("parent_2");
   StartTestDriver(parent_node_2);
-  ASSERT_TRUE(parent_node_2->has_driver_component());
-  ASSERT_EQ(dfv2::NodeState::kRunning, parent_node_2->node_state());
+  ASSERT_TRUE(parent_node_2->HasDriverComponent());
+  ASSERT_EQ(dfv2::NodeState::kRunning, parent_node_2->GetNodeState());
 
   auto composite =
       CreateCompositeNode("composite", {parent_node_1, parent_node_2}, /* is_legacy*/ false);
   StartTestDriver(composite);
-  ASSERT_TRUE(composite->has_driver_component());
-  ASSERT_EQ(dfv2::NodeState::kRunning, composite->node_state());
+  ASSERT_TRUE(composite->HasDriverComponent());
+  ASSERT_EQ(dfv2::NodeState::kRunning, composite->GetNodeState());
 
   ASSERT_EQ(1u, parent_node_1->children().size());
   ASSERT_EQ(1u, parent_node_2->children().size());
@@ -251,14 +251,14 @@ TEST_F(Dfv2NodeTest, RemoveCompositeNodeForRebind) {
       remove_callback_succeeded = true;
     }
   });
-  ASSERT_EQ(dfv2::NodeState::kWaitingOnDriver, composite->node_state());
+  ASSERT_EQ(dfv2::NodeState::kWaitingOnDriver, composite->GetNodeState());
   ASSERT_EQ(dfv2::ShutdownIntent::kRebindComposite, composite->shutdown_intent());
 
   node_manager->CloseDriverForNode("composite");
   RunLoopUntilIdle();
   ASSERT_TRUE(remove_callback_succeeded);
 
-  ASSERT_EQ(dfv2::NodeState::kStopping, composite->node_state());
+  ASSERT_EQ(dfv2::NodeState::kStopped, composite->GetNodeState());
 }
 
 // Verify that we receives a callback for composite rebind if the node is deallocated
@@ -266,19 +266,19 @@ TEST_F(Dfv2NodeTest, RemoveCompositeNodeForRebind) {
 TEST_F(Dfv2NodeTest, RemoveCompositeNodeForRebind_Dealloc) {
   auto parent_node_1 = CreateNode("parent_1");
   StartTestDriver(parent_node_1);
-  ASSERT_TRUE(parent_node_1->has_driver_component());
-  ASSERT_EQ(dfv2::NodeState::kRunning, parent_node_1->node_state());
+  ASSERT_TRUE(parent_node_1->HasDriverComponent());
+  ASSERT_EQ(dfv2::NodeState::kRunning, parent_node_1->GetNodeState());
 
   auto parent_node_2 = CreateNode("parent_2");
   StartTestDriver(parent_node_2);
-  ASSERT_TRUE(parent_node_2->has_driver_component());
-  ASSERT_EQ(dfv2::NodeState::kRunning, parent_node_2->node_state());
+  ASSERT_TRUE(parent_node_2->HasDriverComponent());
+  ASSERT_EQ(dfv2::NodeState::kRunning, parent_node_2->GetNodeState());
 
   auto composite =
       CreateCompositeNode("composite", {parent_node_1, parent_node_2}, /* is_legacy*/ false);
   StartTestDriver(composite);
-  ASSERT_TRUE(composite->has_driver_component());
-  ASSERT_EQ(dfv2::NodeState::kRunning, composite->node_state());
+  ASSERT_TRUE(composite->HasDriverComponent());
+  ASSERT_EQ(dfv2::NodeState::kRunning, composite->GetNodeState());
 
   ASSERT_EQ(1u, parent_node_1->children().size());
   ASSERT_EQ(1u, parent_node_2->children().size());
@@ -289,7 +289,7 @@ TEST_F(Dfv2NodeTest, RemoveCompositeNodeForRebind_Dealloc) {
       remove_callback_succeeded = true;
     }
   });
-  ASSERT_EQ(dfv2::NodeState::kWaitingOnDriver, composite->node_state());
+  ASSERT_EQ(dfv2::NodeState::kWaitingOnDriver, composite->GetNodeState());
   ASSERT_EQ(dfv2::ShutdownIntent::kRebindComposite, composite->shutdown_intent());
 
   parent_node_1.reset();
@@ -302,20 +302,20 @@ TEST_F(Dfv2NodeTest, RemoveCompositeNodeForRebind_Dealloc) {
 TEST_F(Dfv2NodeTest, RestartOnCrashComposite) {
   auto parent_node_1 = CreateNode("parent_1");
   StartTestDriver(parent_node_1);
-  ASSERT_TRUE(parent_node_1->has_driver_component());
-  ASSERT_EQ(dfv2::NodeState::kRunning, parent_node_1->node_state());
+  ASSERT_TRUE(parent_node_1->HasDriverComponent());
+  ASSERT_EQ(dfv2::NodeState::kRunning, parent_node_1->GetNodeState());
 
   auto parent_node_2 = CreateNode("parent_2");
   StartTestDriver(parent_node_2);
-  ASSERT_TRUE(parent_node_2->has_driver_component());
-  ASSERT_EQ(dfv2::NodeState::kRunning, parent_node_2->node_state());
+  ASSERT_TRUE(parent_node_2->HasDriverComponent());
+  ASSERT_EQ(dfv2::NodeState::kRunning, parent_node_2->GetNodeState());
 
   auto composite =
       CreateCompositeNode("composite", {parent_node_1, parent_node_2}, /* is_legacy*/ false);
   StartTestDriver(composite, {.host_restart_on_crash = true});
 
-  ASSERT_TRUE(composite->has_driver_component());
-  ASSERT_EQ(dfv2::NodeState::kRunning, composite->node_state());
+  ASSERT_TRUE(composite->HasDriverComponent());
+  ASSERT_EQ(dfv2::NodeState::kRunning, composite->GetNodeState());
 
   ASSERT_EQ(1u, parent_node_1->children().size());
   ASSERT_EQ(1u, parent_node_2->children().size());
@@ -325,5 +325,5 @@ TEST_F(Dfv2NodeTest, RestartOnCrashComposite) {
   RunLoopUntilIdle();
 
   // The node should come back to running state.
-  ASSERT_EQ(dfv2::NodeState::kRunning, composite->node_state());
+  ASSERT_EQ(dfv2::NodeState::kRunning, composite->GetNodeState());
 }

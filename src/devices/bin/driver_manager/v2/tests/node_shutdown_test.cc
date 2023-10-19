@@ -243,7 +243,7 @@ class NodeShutdownTest : public DriverManagerTestBase {
   void VerifyState(std::string node_name, NodeState expected_state) {
     auto node = nodes_[node_name].lock();
     ASSERT_TRUE(node);
-    ASSERT_EQ(expected_state, node->node_state());
+    ASSERT_EQ(expected_state, node->GetShutdownHelper().node_state());
   }
 
   void VerifyStates(std::map<std::string, NodeState> expected_states) {

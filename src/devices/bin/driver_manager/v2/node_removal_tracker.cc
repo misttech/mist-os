@@ -28,7 +28,7 @@ void NodeRemovalTracker::Notify(NodeId id, NodeState state) {
     return;
   }
   itr->second.state = state;
-  if (state != NodeState::kStopping) {
+  if (state != NodeState::kStopped) {
     return;
   }
 
