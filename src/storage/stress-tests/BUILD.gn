@@ -65,7 +65,7 @@ fuchsia_component("blobfs-crash") {
   manifest = "blobfs/meta/crash.cml"
   deps = [
     "blobfs:stressor-bin",
-    "//src/storage/bin/blobfs:blobfs-component",
+    "//src/storage/blobfs/bin:blobfs-component",
   ]
 }
 
@@ -74,7 +74,7 @@ fuchsia_component("blobfs-no-crash") {
   manifest = "blobfs/meta/no-crash.cml"
   deps = [
     "blobfs:stressor-bin",
-    "//src/storage/bin/blobfs:blobfs-component",
+    "//src/storage/blobfs/bin:blobfs-component",
   ]
 }
 
@@ -95,7 +95,7 @@ fuchsia_component("blobfs-short") {
   manifest = "blobfs/meta/short.cml"
   deps = [
     "blobfs:stressor-bin",
-    "//src/storage/bin/blobfs:blobfs-component",
+    "//src/storage/blobfs/bin:blobfs-component",
   ]
 }
 

@@ -47,7 +47,7 @@ fuchsia_package("blackout-blobfs-checkerboard-target") {
   testonly = true
   deps = [
     ":blackout-blobfs-checkerboard-target-component",
-    "//src/storage/bin/blobfs:blobfs-component",
+    "//src/storage/blobfs/bin:blobfs-component",
   ]
 }
 

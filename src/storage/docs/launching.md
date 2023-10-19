@@ -128,7 +128,7 @@ components. It's intended for filesystem developers - if you just want to mount 
 code, see the previous section.
 
 There is currently one filesystem that supports being launched as a component, blobfs. The cml file
-for blobfs is in //src/storage/bin/blobfs-component/meta/blobfs.cml.
+for blobfs is in //src/storage/blobfs/bin-component/meta/blobfs.cml.
 
 When a filesystem component is launched, it starts in a partially configured state. They serve one
 protocol - `fuchsia.fs.startup.Startup`. This is served from the path

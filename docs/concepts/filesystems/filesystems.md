@@ -205,7 +205,7 @@ filesystems to a namespace from the command line.
 
 ### Blobfs: An immutable, integrity-verifying package storage filesystem
 
-[Blobfs](/src/storage/bin/blobfs/)
+[Blobfs](/src/storage/blobfs/bin/)
 is a simple, flat filesystem optimized for “write-once, then read-only” [signed
 data](/docs/concepts/packages/merkleroot.md), such as
 [packages](/docs/concepts/packages/package.md).

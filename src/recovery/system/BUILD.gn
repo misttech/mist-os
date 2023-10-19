@@ -276,7 +276,7 @@ fuchsia_component("component_ota") {
   cm_label = ":manifest_ota"
   deps = [
     ":bin_ota",
-    "//src/storage/bin/blobfs:blobfs-component",
+    "//src/storage/blobfs/bin:blobfs-component",
     "//src/sys/pkg/lib/isolated-swd:pkg-component",
   ]
 }

@@ -357,8 +357,8 @@ fuchsia_test_package("storage-volume-image-adapter-integration-tests") {
   }
   test_components = [ ":adapter-integration-test-component" ]
   deps = [
-    "//src/storage/bin/blobfs:component",
     "//src/storage/bin/minfs:minfs-component",
+    "//src/storage/blobfs/bin:component",
   ]
 }
 

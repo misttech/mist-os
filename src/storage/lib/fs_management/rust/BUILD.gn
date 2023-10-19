@@ -54,9 +54,9 @@ storage_driver_test_realm_v2_component("fs-management-rust-tests-component") {
   component_name = "fs-management-rust-tests"
   deps = [
     ":fs_management_test",
-    "//src/storage/bin/blobfs:blobfs-component",
     "//src/storage/bin/f2fs:f2fs-component",
     "//src/storage/bin/minfs:minfs-component",
+    "//src/storage/blobfs/bin:blobfs-component",
     "//src/storage/fxfs:fxfs_component",
     "//src/storage/fxfs:test_fxfs_component_manifest_shard",
   ]
@@ -96,8 +96,8 @@ fuchsia_unittest_component("static-child-test-component") {
   manifest = "meta/static_child_test.cml"
   deps = [
     ":static-child-test",
-    "//src/storage/bin/blobfs:component",
     "//src/storage/bin/minfs:minfs-component",
+    "//src/storage/blobfs/bin:component",
     "//src/storage/fxfs:fxfs_component",
     "//src/storage/testing:storage_driver_test_realm",
   ]

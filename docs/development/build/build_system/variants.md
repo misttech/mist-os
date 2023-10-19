@@ -149,7 +149,7 @@ example of a Fuchsia binary compiled for x64 using the "asan-ubsan" variant:
     "debug": "x64-asan-ubsan/exe.unstripped/blobfs",
     "dist": "x64-asan-ubsan/blobfs",
     "elf_build_id": "x64-asan-ubsan/blobfs.build-id.stamp",
-    "label": "//src/storage/bin/blobfs:blobfs(//build/toolchain/fuchsia:x64-asan-ubsan)",
+    "label": "//src/storage/blobfs/bin:blobfs(//build/toolchain/fuchsia:x64-asan-ubsan)",
     "os": "fuchsia",
     "type": "executable"
   },

@@ -12,7 +12,7 @@
 #include <zircon/process.h>
 #include <zircon/processargs.h>
 
-#include "src/storage/bin/blobfs/blobfs_component_config.h"
+#include "src/storage/blobfs/bin/blobfs_component_config.h"
 #include "src/storage/blobfs/mount.h"
 
 namespace {

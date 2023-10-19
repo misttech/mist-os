@@ -212,8 +212,8 @@ fuchsia_test_package("fvm-sparse-image-reader-tests") {
   }
   test_components = [ ":fvm-sparse-image-reader-tests-component" ]
   deps = [
-    "//src/storage/bin/blobfs:component",
     "//src/storage/bin/minfs:minfs-component",
+    "//src/storage/blobfs/bin:component",
   ]
 }
 

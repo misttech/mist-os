@@ -120,7 +120,7 @@ if (is_fuchsia) {
     fxfs_deps += [ "//src/lib/debug/rust" ]
   }
   fxfs_test_deps += [
-    "//src/storage/bin/blobfs:blobfs-component",
+    "//src/storage/blobfs/bin:blobfs-component",
     "//third_party/zstd",
   ]
 }
