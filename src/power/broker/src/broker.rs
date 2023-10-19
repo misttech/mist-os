@@ -19,12 +19,8 @@ pub struct Broker {
 }
 
 impl Broker {
-    pub fn new(topology: Topology) -> Self {
-        Broker {
-            lease_catalog: Catalog::new(topology),
-            current: Levels::new(),
-            required: Levels::new(),
-        }
+    pub fn new() -> Self {
+        Broker { lease_catalog: Catalog::new(), current: Levels::new(), required: Levels::new() }
     }
 
     pub fn get_current_level(&self, id: &ElementID) -> Result<PowerLevel, PowerLevelError> {
@@ -46,13 +42,12 @@ impl Broker {
         self.current.subscribe(id)
     }
 
+    #[allow(dead_code)]
     pub fn get_required_level(&self, id: &ElementID) -> PowerLevel {
         // TODO(b/299637587): Support different Power Levels
         self.required.get(id).unwrap_or(PowerLevel::Binary(BinaryPowerLevel::Off))
     }
 
-    // TODO(b/299485602): Use this in PowerControl::GetRequiredLevelUpdate
-    #[allow(dead_code)]
     pub fn subscribe_required_level(
         &mut self,
         id: &ElementID,
@@ -82,6 +77,25 @@ impl Broker {
                 self.lease_catalog.calc_min_level(&claim.dependency.requires.element);
             self.required.update(&claim.dependency.requires.element, &new_min_level);
         }
+    }
+
+    pub fn add_element(&mut self, name: &str, _dependencies: Vec<Dependency>) -> ElementID {
+        self.lease_catalog.topology.add_element(name)
+    }
+
+    pub fn remove_element(&mut self, element: &ElementID) -> Result<(), RemoveElementError> {
+        self.lease_catalog.topology.remove_element(element)
+    }
+
+    pub fn add_dependency(&mut self, dependency: &Dependency) -> Result<(), AddDependencyError> {
+        self.lease_catalog.topology.add_direct_dep(dependency)
+    }
+
+    pub fn remove_dependency(
+        &mut self,
+        dependency: &Dependency,
+    ) -> Result<(), RemoveDependencyError> {
+        self.lease_catalog.topology.remove_direct_dep(dependency)
     }
 }
 
@@ -129,9 +143,9 @@ struct Catalog {
 }
 
 impl Catalog {
-    fn new(topology: Topology) -> Self {
+    fn new() -> Self {
         Catalog {
-            topology,
+            topology: Topology::new(),
             leases: HashMap::new(),
             claims: HashMap::new(),
             claims_by_element: HashMap::new(),
@@ -202,7 +216,7 @@ impl Catalog {
             claims.push(dep_lease);
         }
         for claim in claims.iter() {
-            tracing::info!("adding claim: {:?}", &claim);
+            tracing::debug!("adding claim: {:?}", &claim);
             self.add_claim(claim.clone());
         }
         Ok((lease, claims))
@@ -217,14 +231,14 @@ impl Catalog {
             .get(&lease.id)
             .ok_or(anyhow!("{} not found by originator id", lease_id))?
             .clone();
-        tracing::info!("claim_ids: {:?}", &claim_ids);
+        tracing::debug!("claim_ids: {:?}", &claim_ids);
         // Drop all claims created for the transitive dependencies.
         // TODO(b/302381778): Do this in the proper order.
         let mut claims = Vec::new();
         for id in claim_ids.into_iter() {
             let res = self.remove_claim(&id);
             if let Some(removed) = res {
-                tracing::info!("removing claim: {:?}", &removed);
+                tracing::debug!("removing claim: {:?}", &removed);
                 claims.push(removed)
             } else {
                 tracing::error!("remove_claim not found: {}", id);
@@ -250,17 +264,27 @@ impl Levels {
     }
 
     fn update(&mut self, id: &ElementID, level: &PowerLevel) {
-        tracing::info!("update({:?}): {:?}", &id, &level);
+        tracing::debug!("Levels.update({:?}): {:?}", &id, &level);
         self.level_map.insert(id.clone(), level.clone());
-        if let Some(senders) = self.channels.get(id) {
-            for sender in senders.into_iter() {
-                // TODO: Prune dead channels.
-                tracing::info!("send: {:?}", level.clone());
+        let mut senders_to_retain = Vec::new();
+        if let Some(senders) = self.channels.remove(id) {
+            for sender in senders {
+                tracing::debug!("Levels.update send: {:?}", level.clone());
                 if let Err(err) = sender.unbounded_send(Some(level.clone())) {
-                    tracing::error!("send failed: {:?}", err)
+                    if err.is_disconnected() {
+                        tracing::debug!(
+                            "Levels.update sender disconnected, will be pruned: {:?}",
+                            &sender
+                        );
+                        continue;
+                    }
+                    tracing::error!("Levels.update send failed: {:?}", err)
                 }
+                senders_to_retain.push(sender);
             }
         }
+        // Prune invalid senders.
+        self.channels.insert(id.clone(), senders_to_retain);
     }
 
     fn subscribe(&mut self, id: &ElementID) -> UnboundedReceiver<Option<PowerLevel>> {
@@ -294,7 +318,6 @@ mod tests {
     fn test_levels_subscribe() {
         let mut levels = Levels::new();
 
-        tracing::info!("subscribing A and B");
         let mut receiver_a = levels.subscribe(&"A".into());
         let mut receiver_b = levels.subscribe(&"B".into());
 
@@ -306,7 +329,6 @@ mod tests {
         levels.update(&"B".into(), &PowerLevel::Binary(BinaryPowerLevel::On));
         assert_eq!(levels.get(&"A".into()), Some(PowerLevel::Binary(BinaryPowerLevel::Off)));
         assert_eq!(levels.get(&"B".into()), Some(PowerLevel::Binary(BinaryPowerLevel::On)));
-        tracing::info!("updates done");
 
         let mut received_a = Vec::new();
         while let Ok(Some(level)) = receiver_a.try_next() {
@@ -331,31 +353,36 @@ mod tests {
     fn test_catalog_acquire_drop_direct() {
         // Create a topology of a child element with two direct dependencies.
         // P1 <- C -> P2
-        let mut topology = Topology::new();
-        let child: ElementID = "C".into();
-        let parent1: ElementID = "P1".into();
-        let parent2: ElementID = "P2".into();
-        topology.add_direct_dep(&Dependency {
-            level: ElementLevel {
-                element: child.clone(),
-                level: PowerLevel::Binary(BinaryPowerLevel::On),
-            },
-            requires: ElementLevel {
-                element: parent1.clone(),
-                level: PowerLevel::Binary(BinaryPowerLevel::On),
-            },
-        });
-        topology.add_direct_dep(&Dependency {
-            level: ElementLevel {
-                element: child.clone(),
-                level: PowerLevel::Binary(BinaryPowerLevel::On),
-            },
-            requires: ElementLevel {
-                element: parent2.clone(),
-                level: PowerLevel::Binary(BinaryPowerLevel::On),
-            },
-        });
-        let mut catalog = Catalog::new(topology);
+        let mut catalog = Catalog::new();
+        let child: ElementID = catalog.topology.add_element("C");
+        let parent1: ElementID = catalog.topology.add_element("P1");
+        let parent2: ElementID = catalog.topology.add_element("P2");
+        catalog
+            .topology
+            .add_direct_dep(&Dependency {
+                level: ElementLevel {
+                    element: child.clone(),
+                    level: PowerLevel::Binary(BinaryPowerLevel::On),
+                },
+                requires: ElementLevel {
+                    element: parent1.clone(),
+                    level: PowerLevel::Binary(BinaryPowerLevel::On),
+                },
+            })
+            .expect("add_direct_dep failed");
+        catalog
+            .topology
+            .add_direct_dep(&Dependency {
+                level: ElementLevel {
+                    element: child.clone(),
+                    level: PowerLevel::Binary(BinaryPowerLevel::On),
+                },
+                requires: ElementLevel {
+                    element: parent2.clone(),
+                    level: PowerLevel::Binary(BinaryPowerLevel::On),
+                },
+            })
+            .expect("add_direct_dep failed");
         assert_eq!(
             catalog.calc_min_level(&parent1.clone()),
             PowerLevel::Binary(BinaryPowerLevel::Off),
@@ -437,31 +464,36 @@ mod tests {
         // Create a topology of a child element with two chained transitive
         // dependencies.
         // C -> P -> GP
-        let mut topology = Topology::new();
-        let child: ElementID = "C".into();
-        let parent: ElementID = "P".into();
-        let grandparent: ElementID = "GP".into();
-        topology.add_direct_dep(&Dependency {
-            level: ElementLevel {
-                element: child.clone(),
-                level: PowerLevel::Binary(BinaryPowerLevel::On),
-            },
-            requires: ElementLevel {
-                element: parent.clone(),
-                level: PowerLevel::Binary(BinaryPowerLevel::On),
-            },
-        });
-        topology.add_direct_dep(&Dependency {
-            level: ElementLevel {
-                element: parent.clone(),
-                level: PowerLevel::Binary(BinaryPowerLevel::On),
-            },
-            requires: ElementLevel {
-                element: grandparent.clone(),
-                level: PowerLevel::Binary(BinaryPowerLevel::On),
-            },
-        });
-        let mut catalog = Catalog::new(topology);
+        let mut catalog = Catalog::new();
+        let child: ElementID = catalog.topology.add_element("C");
+        let parent: ElementID = catalog.topology.add_element("P");
+        let grandparent: ElementID = catalog.topology.add_element("GP");
+        catalog
+            .topology
+            .add_direct_dep(&Dependency {
+                level: ElementLevel {
+                    element: child.clone(),
+                    level: PowerLevel::Binary(BinaryPowerLevel::On),
+                },
+                requires: ElementLevel {
+                    element: parent.clone(),
+                    level: PowerLevel::Binary(BinaryPowerLevel::On),
+                },
+            })
+            .expect("add_direct_dep failed");
+        catalog
+            .topology
+            .add_direct_dep(&Dependency {
+                level: ElementLevel {
+                    element: parent.clone(),
+                    level: PowerLevel::Binary(BinaryPowerLevel::On),
+                },
+                requires: ElementLevel {
+                    element: grandparent.clone(),
+                    level: PowerLevel::Binary(BinaryPowerLevel::On),
+                },
+            })
+            .expect("add_direct_dep failed");
         assert_eq!(
             catalog.calc_min_level(&parent.clone()),
             PowerLevel::Binary(BinaryPowerLevel::Off),
@@ -555,42 +587,50 @@ mod tests {
         // C1 \
         //     > P -> GP
         // C2 /
-        let mut topology = Topology::new();
-        let child1: ElementID = "C1".into();
-        let child2: ElementID = "C2".into();
-        let parent: ElementID = "P".into();
-        let grandparent: ElementID = "GP".into();
-        topology.add_direct_dep(&Dependency {
-            level: ElementLevel {
-                element: child1.clone(),
-                level: PowerLevel::Binary(BinaryPowerLevel::On),
-            },
-            requires: ElementLevel {
-                element: parent.clone(),
-                level: PowerLevel::Binary(BinaryPowerLevel::On),
-            },
-        });
-        topology.add_direct_dep(&Dependency {
-            level: ElementLevel {
-                element: child2.clone(),
-                level: PowerLevel::Binary(BinaryPowerLevel::On),
-            },
-            requires: ElementLevel {
-                element: parent.clone(),
-                level: PowerLevel::Binary(BinaryPowerLevel::On),
-            },
-        });
-        topology.add_direct_dep(&Dependency {
-            level: ElementLevel {
-                element: parent.clone(),
-                level: PowerLevel::Binary(BinaryPowerLevel::On),
-            },
-            requires: ElementLevel {
-                element: grandparent.clone(),
-                level: PowerLevel::Binary(BinaryPowerLevel::On),
-            },
-        });
-        let mut catalog = Catalog::new(topology);
+        let mut catalog = Catalog::new();
+        let child1: ElementID = catalog.topology.add_element("C1");
+        let child2: ElementID = catalog.topology.add_element("C2");
+        let parent: ElementID = catalog.topology.add_element("P");
+        let grandparent: ElementID = catalog.topology.add_element("GP");
+        catalog
+            .topology
+            .add_direct_dep(&Dependency {
+                level: ElementLevel {
+                    element: child1.clone(),
+                    level: PowerLevel::Binary(BinaryPowerLevel::On),
+                },
+                requires: ElementLevel {
+                    element: parent.clone(),
+                    level: PowerLevel::Binary(BinaryPowerLevel::On),
+                },
+            })
+            .expect("add_direct_dep failed");
+        catalog
+            .topology
+            .add_direct_dep(&Dependency {
+                level: ElementLevel {
+                    element: child2.clone(),
+                    level: PowerLevel::Binary(BinaryPowerLevel::On),
+                },
+                requires: ElementLevel {
+                    element: parent.clone(),
+                    level: PowerLevel::Binary(BinaryPowerLevel::On),
+                },
+            })
+            .expect("add_direct_dep failed");
+        catalog
+            .topology
+            .add_direct_dep(&Dependency {
+                level: ElementLevel {
+                    element: parent.clone(),
+                    level: PowerLevel::Binary(BinaryPowerLevel::On),
+                },
+                requires: ElementLevel {
+                    element: grandparent.clone(),
+                    level: PowerLevel::Binary(BinaryPowerLevel::On),
+                },
+            })
+            .expect("add_direct_dep failed");
         assert_eq!(
             catalog.calc_min_level(&parent.clone()),
             PowerLevel::Binary(BinaryPowerLevel::Off),

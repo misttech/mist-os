@@ -10,4 +10,22 @@
     program: {
         binary: "bin/power_broker_test",
     },
+    use: [
+        {
+            protocol: "fuchsia.power.broker.LevelControl",
+            from: "self",
+        },
+        {
+            protocol: "fuchsia.power.broker.Lessor",
+            from: "self",
+        },
+        {
+            protocol: "fuchsia.power.broker.Status",
+            from: "self",
+        },
+        {
+            protocol: "fuchsia.power.broker.Topology",
+            from: "self",
+        },
+    ],
 }

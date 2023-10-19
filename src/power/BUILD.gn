@@ -38,6 +38,7 @@ group("tests") {
     "battery-manager",
     "battery-manager:tests",
     "battery-manager/battery-cli:tests",
+    "broker:tests",
     "fake-battery:tests",
     "fidl/testing",
     "power-manager:tests",

@@ -28,7 +28,10 @@ group("power-broker") {
 
 group("tests") {
   testonly = true
-  deps = [ ":power-broker-unittests" ]
+  deps = [
+    ":power-broker-unittests",
+    "tests/integration:tests",
+  ]
 }
 
 rustc_binary("bin") {

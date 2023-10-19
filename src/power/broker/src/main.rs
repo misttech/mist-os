@@ -2,21 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{self, Context, Error};
+use anyhow::{Context as _, Error};
 use fidl_fuchsia_power_broker::{
     BinaryPowerLevel, LessorRequest, LessorRequestStream, LevelControlRequest,
-    LevelControlRequestStream, PowerLevel, StatusRequest, StatusRequestStream,
+    LevelControlRequestStream, PowerLevel, StatusRequest, StatusRequestStream, TopologyRequest,
+    TopologyRequestStream,
 };
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::{component, health::Reporter};
 use futures::prelude::*;
-use std::{
-    sync::{Arc, Mutex},
-    thread, time,
-};
+use std::sync::{Arc, Mutex};
 
 use crate::broker::Broker;
-use crate::topology::{Dependency, ElementLevel, Topology};
 
 mod broker;
 mod topology;
@@ -24,9 +21,10 @@ mod topology;
 /// Wraps all hosted protocols into a single type that can be matched against
 /// and dispatched.
 enum IncomingRequest {
-    LevelControl(LevelControlRequestStream),
     Lessor(LessorRequestStream),
+    LevelControl(LevelControlRequestStream),
     Status(StatusRequestStream),
+    Topology(TopologyRequestStream),
 }
 
 struct BrokerSvc {
@@ -40,20 +38,34 @@ impl BrokerSvc {
             .try_for_each(|request| async move {
                 match request {
                     StatusRequest::GetPowerLevel { element, responder } => {
+                        tracing::debug!("GetPowerLevel({:?})", &element);
                         let broker: std::sync::MutexGuard<'_, Broker> = self.broker.lock().unwrap();
-                        let result = broker.get_current_level(&element.into());
+                        let result = broker.get_current_level(&element.clone().into());
+                        tracing::debug!("get_current_level({:?}) = {:?}", &element, &result);
                         if let Ok(power_level) = result {
+                            tracing::debug!("GetPowerLevel responder.send({:?})", &power_level);
                             responder.send(Ok(&power_level)).context("response failed")
                         } else {
+                            tracing::debug!("GetPowerLevel responder.send err({:?})", &result);
                             responder.send(Err(result.err().unwrap())).context("response failed")
                         }
                     }
                     StatusRequest::WatchPowerLevel { element, last_level, responder } => {
-                        let mut broker: std::sync::MutexGuard<'_, Broker> =
-                            self.broker.lock().unwrap();
-                        let mut receiver = broker.subscribe_current_level(&element.into());
+                        tracing::debug!("WatchPowerLevel({:?}, {:?})", &element, last_level);
+                        let mut receiver = {
+                            let mut broker: std::sync::MutexGuard<'_, Broker> =
+                                self.broker.lock().unwrap();
+                            tracing::debug!("subscribe_current_level({:?})", &element);
+                            broker.subscribe_current_level(&element.into())
+                        };
                         while let Some(Some(power_level)) = receiver.next().await {
+                            tracing::debug!(
+                                "receiver.next() = {:?} last_level = {:?}",
+                                &power_level,
+                                &last_level
+                            );
                             if power_level != last_level {
+                                tracing::debug!("responder.send({:?})", &power_level);
                                 return responder.send(Ok(&power_level)).context("response failed");
                             }
                         }
@@ -71,12 +83,15 @@ impl BrokerSvc {
             .try_for_each(|request| async move {
                 match request {
                     LessorRequest::Lease { element, level, responder } => {
+                        tracing::debug!("Lease({:?}, {:?})", &element, &level);
                         let mut broker = self.broker.lock().unwrap();
                         let resp = broker.acquire_lease(&element.into(), &level);
                         let lease = resp.expect("acquire_lease failed");
+                        tracing::debug!("responder.send({:?})", &lease);
                         responder.send(&lease.id).context("send failed")
                     }
                     LessorRequest::DropLease { lease_id, .. } => {
+                        tracing::debug!("DropLease({:?})", &lease_id);
                         let mut broker = self.broker.lock().unwrap();
                         broker.drop_lease(&lease_id.into()).expect("drop_lease failed");
                         Ok(())
@@ -97,38 +112,116 @@ impl BrokerSvc {
                         last_required_level,
                         responder,
                     } => {
-                        // TODO(b/299485602): Make this event-driven using Broker::subscribe_required_level()
-                        let start: time::Instant = time::Instant::now();
-                        // TODO: Running into an issue where FIDL services not being run in parallel
-                        // Adding this timeout allows other calls to sneak in. Fix concurrency issue.
-                        let timeout = time::Duration::from_millis(5);
-                        loop {
-                            {
-                                let broker: std::sync::MutexGuard<'_, Broker> =
-                                    self.broker.lock().unwrap();
-                                let required_level =
-                                    broker.get_required_level(&element.clone().into());
-                                if Some(Box::new(required_level)) != last_required_level
-                                    || time::Instant::now().duration_since(start) > timeout
-                                {
-                                    return responder.send(&required_level).context("send failed");
-                                }
-                                drop(broker);
+                        tracing::debug!(
+                            "WatchRequiredLevel({:?}, {:?})",
+                            &element,
+                            &last_required_level
+                        );
+                        let mut receiver = {
+                            let mut broker: std::sync::MutexGuard<'_, Broker> =
+                                self.broker.lock().unwrap();
+                            broker.subscribe_required_level(&element.clone().into())
+                        };
+                        while let Some(next) = receiver.next().await {
+                            tracing::debug!(
+                                "receiver.next({:?}) = {:?}, last_required_level = {:?}",
+                                &element,
+                                &next,
+                                last_required_level
+                            );
+                            // TODO(b/299637587): support other power level types.
+                            let required_level = next.unwrap_or(PowerLevel::Binary(BinaryPowerLevel::Off));
+                            if last_required_level.is_some() && last_required_level.clone().unwrap().as_ref() == &required_level {
+                                tracing::debug!(
+                                    "WatchRequiredLevel({:?}), level has not changed, watching for next update...",
+                                    &element,
+                                );
+                                continue;
+                            } else {
+                                tracing::debug!(
+                                    "WatchRequiredLevel({:?}), sending new level: {:?}",
+                                    &element,
+                                    &required_level,
+                                );
+                                return responder.send(&required_level).context("send failed");
                             }
-                            thread::sleep(time::Duration::from_millis(1));
                         }
+                        Err(anyhow::anyhow!("receiver closed unexpectedly"))
                     }
                     LevelControlRequest::UpdateCurrentPowerLevel {
                         element,
                         current_level,
                         responder,
                     } => {
+                        tracing::debug!(
+                            "UpdateCurrentPowerLevel({:?}, {:?})",
+                            &element,
+                            &current_level
+                        );
                         let mut broker: std::sync::MutexGuard<'_, Broker> =
                             self.broker.lock().unwrap();
                         broker.update_current_level(&element.clone().into(), &current_level);
+                        tracing::debug!("UpdateCurrentPowerLevel: responder.send(Ok(()))");
                         return responder.send(Ok(())).context("send failed");
                     }
                     LevelControlRequest::_UnknownMethod { .. } => todo!(),
+                }
+            })
+            .await
+    }
+
+    async fn run_topology(&self, stream: TopologyRequestStream) -> Result<(), Error> {
+        stream
+            .map(|result| result.context("failed request"))
+            .try_for_each(|request| async move {
+                match request {
+                    TopologyRequest::AddElement { element_name, dependencies, responder } => {
+                        tracing::debug!("AddElement({:?}, {:?})", &element_name, &dependencies);
+                        let mut broker: std::sync::MutexGuard<'_, Broker> =
+                            self.broker.lock().unwrap();
+                        let deps = dependencies.into_iter().map(|d| d.into()).collect();
+                        let element_id = broker.add_element(&element_name, deps);
+                        let element_id_str: String = element_id.into();
+                        tracing::debug!("AddElement responder.send({:?})", &element_id_str);
+                        responder.send(&element_id_str).context("send failed")
+                    }
+                    TopologyRequest::RemoveElement { element, responder } => {
+                        tracing::debug!("RemoveElement({:?})", &element);
+                        let mut broker: std::sync::MutexGuard<'_, Broker> =
+                            self.broker.lock().unwrap();
+                        let res = broker.remove_element(&element.into());
+                        tracing::debug!("RemoveElement remove_element = {:?}", &res);
+                        if let Err(err) = res {
+                            responder.send(Err(err.into())).context("send failed")
+                        } else {
+                            responder.send(Ok(())).context("send failed")
+                        }
+                    }
+                    TopologyRequest::AddDependency { dependency, responder } => {
+                        tracing::debug!("AddDependency({:?})", &dependency);
+                        let mut broker: std::sync::MutexGuard<'_, Broker> =
+                            self.broker.lock().unwrap();
+                        let res = broker.add_dependency(&dependency.into());
+                        tracing::debug!("AddDependency add_dependency = ({:?})", &res);
+                        if let Err(err) = res {
+                            responder.send(Err(err.into())).context("send failed")
+                        } else {
+                            responder.send(Ok(())).context("send failed")
+                        }
+                    }
+                    TopologyRequest::RemoveDependency { dependency, responder } => {
+                        tracing::debug!("RemoveDependency({:?})", &dependency);
+                        let mut broker: std::sync::MutexGuard<'_, Broker> =
+                            self.broker.lock().unwrap();
+                        let res = broker.remove_dependency(&dependency.into());
+                        tracing::debug!("RemoveDependency remove_dependency = ({:?})", &res);
+                        if let Err(err) = res {
+                            responder.send(Err(err.into())).context("send failed")
+                        } else {
+                            responder.send(Ok(())).context("send failed")
+                        }
+                    }
+                    TopologyRequest::_UnknownMethod { .. } => todo!(),
                 }
             })
             .await
@@ -150,65 +243,31 @@ async fn main() -> Result<(), anyhow::Error> {
     // ```
     // service_fs.dir("svc").add_fidl_service(IncomingRequest::MyProtocol);
     // ```
-    service_fs.dir("svc").add_fidl_service(IncomingRequest::LevelControl);
     service_fs.dir("svc").add_fidl_service(IncomingRequest::Lessor);
+    service_fs.dir("svc").add_fidl_service(IncomingRequest::LevelControl);
     service_fs.dir("svc").add_fidl_service(IncomingRequest::Status);
+    service_fs.dir("svc").add_fidl_service(IncomingRequest::Topology);
 
     service_fs.take_and_serve_directory_handle().context("failed to serve outgoing namespace")?;
 
     component::health().set_ok();
 
-    // TODO(b/299463665): Remove hard-coded topology once we have protocols
-    // for specifying the topology
-    // A <- B <- C -> D
-    let mut topology = Topology::new();
-    let ba = Dependency {
-        level: ElementLevel {
-            element: "B".into(),
-            level: PowerLevel::Binary(BinaryPowerLevel::On),
-        },
-        requires: ElementLevel {
-            element: "A".into(),
-            level: PowerLevel::Binary(BinaryPowerLevel::On),
-        },
-    };
-    topology.add_direct_dep(&ba);
-    let cb = Dependency {
-        level: ElementLevel {
-            element: "C".into(),
-            level: PowerLevel::Binary(BinaryPowerLevel::On),
-        },
-        requires: ElementLevel {
-            element: "B".into(),
-            level: PowerLevel::Binary(BinaryPowerLevel::On),
-        },
-    };
-    topology.add_direct_dep(&cb);
-    let cd = Dependency {
-        level: ElementLevel {
-            element: "C".into(),
-            level: PowerLevel::Binary(BinaryPowerLevel::On),
-        },
-        requires: ElementLevel {
-            element: "D".into(),
-            level: PowerLevel::Binary(BinaryPowerLevel::On),
-        },
-    };
-    topology.add_direct_dep(&cd);
-
-    let svc: BrokerSvc = BrokerSvc { broker: Arc::new(Mutex::new(Broker::new(topology))) };
+    let svc: BrokerSvc = BrokerSvc { broker: Arc::new(Mutex::new(Broker::new())) };
 
     service_fs
         .for_each_concurrent(None, |request: IncomingRequest| async {
             match request {
-                IncomingRequest::LevelControl(stream) => {
-                    let _ = svc.run_level_control(stream).await;
-                }
                 IncomingRequest::Lessor(stream) => {
-                    let _ = svc.run_lessor(stream).await;
+                    svc.run_lessor(stream).await.expect("run_lessor failed");
+                }
+                IncomingRequest::LevelControl(stream) => {
+                    svc.run_level_control(stream).await.expect("run_level_control failed");
                 }
                 IncomingRequest::Status(stream) => {
-                    let _ = svc.run_status(stream).await;
+                    svc.run_status(stream).await.expect("run_status failed");
+                }
+                IncomingRequest::Topology(stream) => {
+                    svc.run_topology(stream).await.expect("run_topology failed");
                 }
             }
             ()

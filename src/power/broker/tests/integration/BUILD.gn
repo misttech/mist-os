@@ -12,18 +12,27 @@ group("integration") {
   deps = [ ":power_broker-test" ]
 }
 
+group("tests") {
+  testonly = true
+  deps = [ ":integration" ]
+}
+
 rustc_test("bin") {
   edition = "2021"
   source_root = "src/main.rs"
-  sources = [ source_root ]
+  sources = [
+    "src/main.rs",
+    "src/mock_power_element.rs",
+  ]
   name = "power_broker_test"
   deps = [
     "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component-test",
     "//src/power/broker:fuchsia.power.broker_rust",
-    "//src/power/broker/tests/testing/fake-driver",
-    "//src/power/broker/tests/testing/fake-driver:component",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:tracing",
   ]
 }
 
@@ -35,11 +44,5 @@ fuchsia_component("test-root") {
 
 fuchsia_test_package("power_broker-test") {
   test_components = [ ":test-root" ]
-  subpackages = [
-    "//src/power/broker:package",
-    "//src/power/broker/tests/testing/fake-driver:package",
-  ]
-
-  # TODO(b/299348427): Remove when config from fake-driver:package is included:
-  validate_structured_config = false
+  subpackages = [ "//src/power/broker:package" ]
 }

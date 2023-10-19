@@ -110,3 +110,64 @@ open protocol Status {
         new_level PowerLevel;
     }) error PowerLevelError;
 };
+
+type RemoveElementError = flexible enum {
+    NOT_FOUND = 0;
+};
+
+type AddDependencyError = flexible enum {
+    ALREADY_EXISTS = 0;
+    ELEMENT_NOT_FOUND = 1;
+    REQUIRED_ELEMENT_NOT_FOUND = 2;
+};
+
+type RemoveDependencyError = flexible enum {
+    NOT_FOUND = 0;
+};
+
+type ElementLevel = resource struct {
+    element ElementId;
+    level PowerLevel;
+};
+
+/// Power dependency from one element's PowerLevel to another.
+/// The Element and PowerLevel specified by `level` depends on
+/// the Element and PowerLevel specified by `requires`.
+type Dependency = resource struct {
+    level ElementLevel;
+    requires ElementLevel;
+};
+
+/// Offered by the Power Broker to allow Power Element owners to register
+/// Power Elements and dependencies.
+@discoverable
+open protocol Topology {
+    /// Made by a Power Element owner to register a new Power Element.
+    flexible AddElement(resource struct {
+        /// Human-readable name for logging and debug purposes.
+        element_name string:1024;
+        /// List of dependencies for this element.
+        /// Empty ElementIds will be treated as referring to this Element.
+        dependencies vector<Dependency>:128;
+    }) -> (resource struct {
+        /// Unique ID for this element (and access tokens).
+        element ElementId;
+    });
+
+    /// Made by a Power Element owner to remove their Power Element.
+    /// Removing a Power Element also removes all associated Dependencies.
+    flexible RemoveElement(resource struct {
+        element ElementId;
+    }) -> () error RemoveElementError;
+
+    /// Made by a Power Element owner to register a dependency on or for an
+    /// existing Power Element.
+    flexible AddDependency(resource struct {
+        dependency Dependency;
+    }) -> () error AddDependencyError;
+
+    /// Made by a Power Element owner to remove a dependency from a Power Element.
+    flexible RemoveDependency(resource struct {
+        dependency Dependency;
+    }) -> () error RemoveDependencyError;
+};

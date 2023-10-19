@@ -27,20 +27,7 @@
         { protocol: "fuchsia.power.broker.LevelControl" },
         { protocol: "fuchsia.power.broker.Lessor" },
         { protocol: "fuchsia.power.broker.Status" },
-    ],
-    use: [
-        {
-            protocol: "fuchsia.power.broker.LevelControl",
-            from: "self",
-        },
-        {
-            protocol: "fuchsia.power.broker.Lessor",
-            from: "self",
-        },
-        {
-            protocol: "fuchsia.power.broker.Status",
-            from: "self",
-        },
+        { protocol: "fuchsia.power.broker.Topology" },
     ],
     expose: [
         {
@@ -53,6 +40,10 @@
         },
         {
             protocol: "fuchsia.power.broker.Status",
+            from: "self",
+        },
+        {
+            protocol: "fuchsia.power.broker.Topology",
             from: "self",
         },
     ],
