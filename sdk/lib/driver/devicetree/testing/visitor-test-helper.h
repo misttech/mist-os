@@ -9,7 +9,7 @@
 
 namespace fdf_devicetree::testing {
 
-template <typename VisitorImpl>
+template <class VisitorImpl>
 class VisitorTestHelper : public VisitorImpl, public ManagerTestHelper {
   static_assert(std::is_base_of_v<Visitor, VisitorImpl>, "VisitorImpl has to inherit from Visitor");
 

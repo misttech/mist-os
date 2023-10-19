@@ -5,19 +5,26 @@
 	#size-cells = <0x02>;
 	compatible = "fuchsia,sample-dt";
 
-	iommu {
-		#iommu-cells = <0x01>;
-		phandle = <0x01>;
+	property2-child {
+		compatible = "fuchsia,property2-child";
+		property2 = <0x01>;
 	};
 
-	sample-bti-device {
-		compatible = "fuchsia,sample-bti-device";
-		iommus = <0x01 0x02>;
+	reference-parent {
+		#property1-cells = <0x01>;
+		#property2-cells = <0x00>;
+		compatible = "fuchsia,reference-parent";
+		phandle = <0x01>;
 	};
 
 	sample-device@0 {
 		compatible = "fuchsia,sample-device";
 		device_specific_prop = <0x03>;
 		reg = <0x00 0xaaaaaaaa 0x00 0x2000>;
+	};
+
+	sample-property1-child {
+		compatible = "fuchsia,property1-child";
+		property1 = <0x01 0x04>;
 	};
 };

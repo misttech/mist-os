@@ -10,22 +10,43 @@ namespace fdf_devicetree {
 
 constexpr const char kCompatibleProp[] = "compatible";
 
-zx::result<> DriverVisitor::Visit(Node& node, const devicetree::PropertyDecoder& decoder) {
-  auto property = node.properties().find(kCompatibleProp);
-  if (property == node.properties().end()) {
-    return zx::ok();
+bool DriverVisitor::is_match(
+    const std::unordered_map<std::string_view, devicetree::PropertyValue>& properties) {
+  auto property = properties.find(kCompatibleProp);
+  if (property == properties.end()) {
+    return false;
   }
 
   // Make sure value is a string.
   if (property->second.AsStringList() == std::nullopt) {
-    FDF_SLOG(WARNING, "Node has invalid compatible property", KV("node_name", node.name()),
+    FDF_SLOG(WARNING, "Node has invalid compatible property",
              KV("prop_len", property->second.AsBytes().size()));
-    return zx::ok();
+    return false;
   }
 
-  if (compatible_matcher_(*property->second.AsStringList()->begin())) {
-    [[maybe_unused]] auto status = DriverVisit(node, decoder);
-    return zx::ok();
+  return compatible_matcher_(*property->second.AsStringList()->begin());
+}
+
+zx::result<> DriverVisitor::Visit(Node& node, const devicetree::PropertyDecoder& decoder) {
+  // Call all registered reference property parsers.
+  for (auto reference_parser : reference_parsers_) {
+    zx::result result = reference_parser->Visit(node, decoder);
+    if (result.is_error()) {
+      return result.take_error();
+    }
+  }
+
+  // If this node matches the driver, call the visitor.
+  if (is_match(node.properties())) {
+    return DriverVisit(node, decoder);
+  }
+
+  return zx::ok();
+}
+
+zx::result<> DriverVisitor::FinalizeNode(Node& node) {
+  if (is_match(node.properties())) {
+    return DriverFinalizeNode(node);
   }
 
   return zx::ok();

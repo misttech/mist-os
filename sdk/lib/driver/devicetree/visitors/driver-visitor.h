@@ -6,8 +6,10 @@
 #define LIB_DRIVER_DEVICETREE_VISITORS_DRIVER_VISITOR_H_
 
 #include <lib/driver/devicetree/manager/visitor.h>
+#include <lib/driver/devicetree/visitors/reference-property.h>
 #include <lib/fit/function.h>
 #include <lib/zx/result.h>
+#include <zircon/assert.h>
 
 #include <memory>
 #include <string_view>
@@ -40,12 +42,25 @@ class DriverVisitor : public Visitor {
   DriverVisitor(DriverVisitor&& other) = default;
   DriverVisitor& operator=(DriverVisitor&& other) = default;
 
-  zx::result<> Visit(Node& node, const devicetree::PropertyDecoder& decoder) override final;
+  zx::result<> Visit(Node& node, const devicetree::PropertyDecoder& decoder) final;
+
+  zx::result<> FinalizeNode(Node& node) final;
+
+  void AddReferencePropertyParser(ReferencePropertyParser* reference_parser) {
+    ZX_ASSERT(reference_parser != nullptr);
+    reference_parsers_.emplace_back(reference_parser);
+  }
 
   virtual zx::result<> DriverVisit(Node& node, const devicetree::PropertyDecoder& decoder) = 0;
 
+  virtual zx::result<> DriverFinalizeNode(Node& node) { return zx::ok(); }
+
+ protected:
+  bool is_match(const std::unordered_map<std::string_view, devicetree::PropertyValue>& node);
+
  private:
   MatchCallback compatible_matcher_;
+  std::vector<ReferencePropertyParser*> reference_parsers_;
 };
 
 }  // namespace fdf_devicetree

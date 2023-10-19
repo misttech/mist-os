@@ -3,7 +3,10 @@
 # found in the LICENSE file.
 
 group("tests") {
-  deps = [ "mmio:tests" ]
+  deps = [
+    "bti:tests",
+    "mmio:tests",
+  ]
   testonly = true
 }
 

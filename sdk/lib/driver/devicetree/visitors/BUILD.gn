@@ -34,6 +34,7 @@ source_set("driver-visitor") {
   public = [ "driver-visitor.h" ]
   deps = [ "//sdk/lib/driver/logging/cpp" ]
   public_deps = [
+    ":reference-property",
     "//sdk/lib/driver/devicetree/manager:headers",
     "//zircon/system/ulib/zx",
   ]
@@ -49,5 +50,15 @@ source_set("registration") {
   public_deps = [
     "//sdk/lib/driver/devicetree/manager:headers",
     "//sdk/lib/driver/logging/cpp",
+  ]
+}
+
+source_set("reference-property") {
+  sources = [ "reference-property.cc" ]
+  public = [ "reference-property.h" ]
+  deps = [ "//sdk/lib/driver/logging/cpp" ]
+  public_deps = [
+    "//sdk/lib/driver/devicetree/manager",
+    "//zircon/system/ulib/zx",
   ]
 }

@@ -35,8 +35,19 @@ class MultiVisitor : public Visitor {
 
   zx::result<> Visit(Node& node, const devicetree::PropertyDecoder& decoder) override {
     zx::result<> final_status = zx::ok();
-    for (size_t i = 0; i < visitors_.size(); i++) {
-      auto status = visitors_[i]->Visit(node, decoder);
+    for (const auto& visitor : visitors_) {
+      auto status = visitor->Visit(node, decoder);
+      if (status.is_error()) {
+        final_status = zx::error(ZX_ERR_INTERNAL);
+      }
+    }
+    return final_status;
+  }
+
+  zx::result<> FinalizeNode(Node& node) override {
+    zx::result<> final_status = zx::ok();
+    for (const auto& visitor : visitors_) {
+      auto status = visitor->FinalizeNode(node);
       if (status.is_error()) {
         final_status = zx::error(ZX_ERR_INTERNAL);
       }

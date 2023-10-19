@@ -19,8 +19,19 @@ class VisitorRegistry : public fdf_devicetree::Visitor {
 
   zx::result<> Visit(Node& node, const devicetree::PropertyDecoder& decoder) override {
     zx::result<> final_status = zx::ok();
-    for (auto& visitor : visitors_) {
+    for (const auto& visitor : visitors_) {
       auto status = visitor->Visit(node, decoder);
+      if (status.is_error()) {
+        final_status = zx::error(ZX_ERR_INTERNAL);
+      }
+    }
+    return final_status;
+  }
+
+  zx::result<> FinalizeNode(Node& node) override {
+    zx::result<> final_status = zx::ok();
+    for (const auto& visitor : visitors_) {
+      auto status = visitor->FinalizeNode(node);
       if (status.is_error()) {
         final_status = zx::error(ZX_ERR_INTERNAL);
       }

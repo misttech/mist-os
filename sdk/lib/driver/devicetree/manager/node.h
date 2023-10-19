@@ -8,15 +8,33 @@
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <lib/devicetree/devicetree.h>
+#include <zircon/errors.h>
 
+#include <cstdint>
+#include <optional>
 #include <string_view>
+#include <unordered_map>
+#include <vector>
 
 namespace fdf_devicetree {
+
+using Phandle = uint32_t;
+
+class Visitor;
+class ReferenceNode;
+
+// Defines interface that an entity managing the Node should implement.
+class NodeManager {
+ public:
+  // Returns node with phandle |id|.
+  virtual zx::result<ReferenceNode> GetReferenceNode(Phandle id) = 0;
+};
 
 // Node represents the nodes in the device tree along with it's properties.
 class Node {
  public:
-  explicit Node(std::string_view name, devicetree::Properties properties, uint32_t id);
+  explicit Node(std::string_view name, devicetree::Properties properties, uint32_t id,
+                NodeManager* manager);
 
   // Add |prop| as a bind property of the device, when it is eventually published.
   void AddBindProperty(fuchsia_driver_framework::NodeProperty prop);
@@ -38,9 +56,15 @@ class Node {
     return properties_;
   }
 
+  zx::result<ReferenceNode> GetReferenceNode(Phandle parent);
+
+  std::optional<Phandle> phandle() { return phandle_; }
+
  private:
   const std::string_view name_;
   std::unordered_map<std::string_view, devicetree::PropertyValue> properties_;
+
+  std::optional<Phandle> phandle_;
 
   // Platform bus node.
   fuchsia_hardware_platform_bus::Node pbus_node_;
@@ -58,6 +82,23 @@ class Node {
   // Boolean to indicate if a composite node spec needs to added.
   // TODO(fxbug.dev/129706): Add proper support for composite.
   bool composite_ = false;
+
+  // Storing handle to manager. This is ok as the manager always outlives the node instance.
+  NodeManager* manager_;
+};
+
+class ReferenceNode {
+ public:
+  explicit ReferenceNode(Node* node) : node_(node) { ZX_ASSERT(node_); }
+
+  const std::unordered_map<std::string_view, devicetree::PropertyValue>& properties() const {
+    return node_->properties();
+  }
+
+  std::string_view name() const { return node_->name(); }
+
+ private:
+  Node* node_;
 };
 
 }  // namespace fdf_devicetree

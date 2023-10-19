@@ -8,6 +8,8 @@
 #include <lib/devicetree/devicetree.h>
 #include <lib/zx/result.h>
 
+#include <string_view>
+
 #include "node.h"
 
 namespace fdf_devicetree {
@@ -18,7 +20,14 @@ class Visitor {
  public:
   explicit Visitor() = default;
   virtual ~Visitor() = default;
+
+  // Visit method called during devicetree walk.
   virtual zx::result<> Visit(Node& node, const devicetree::PropertyDecoder& decoder) = 0;
+
+  // Method called after all visitors have visited the node once and
+  // all references are registered. Any final updates to the node metadata
+  // can be done in this method.
+  virtual zx::result<> FinalizeNode(Node& node) { return zx::ok(); }
 };
 
 }  // namespace fdf_devicetree

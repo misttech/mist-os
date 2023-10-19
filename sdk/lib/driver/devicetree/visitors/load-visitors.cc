@@ -34,7 +34,7 @@ struct dirent_t {
 zx::result<zx::vmo> SetVmoName(zx::vmo vmo, std::string_view vmo_name) {
   if (zx_status_t status = vmo.set_property(ZX_PROP_NAME, vmo_name.data(), vmo_name.size());
       status != ZX_OK) {
-    FDF_LOG(ERROR, "Cannot set name on visitor VMO '%.*s' %s", (int)vmo_name.length(),
+    FDF_LOG(ERROR, "Cannot set name on visitor VMO '%.*s' %s", static_cast<int>(vmo_name.length()),
             vmo_name.data(), zx_status_get_string(status));
     return zx::error(status);
   }
@@ -57,7 +57,7 @@ zx::result<zx::vmo> LoadVisitorVmo(fdf::Namespace& incoming, std::string_view vi
                     fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kRightExecutable,
                     endpoints->server.TakeChannel());
   if (status.is_error()) {
-    FDF_LOG(ERROR, "Failed to open visitor '%.*s': %s", (int)visitor_file.length(),
+    FDF_LOG(ERROR, "Failed to open visitor '%.*s': %s", static_cast<int>(visitor_file.length()),
             visitor_file.data(), status.status_string());
     return status.take_error();
   }
@@ -65,13 +65,13 @@ zx::result<zx::vmo> LoadVisitorVmo(fdf::Namespace& incoming, std::string_view vi
   fidl::WireSyncClient file_client{std::move(endpoints->client)};
   fidl::WireResult file_res = file_client->GetBackingMemory(KVisitorVmoFlag);
   if (!file_res.ok()) {
-    FDF_LOG(ERROR, "Failed to get visitor '%.*s' vmo: %s", (int)visitor_file.length(),
+    FDF_LOG(ERROR, "Failed to get visitor '%.*s' vmo: %s", static_cast<int>(visitor_file.length()),
             visitor_file.data(), file_res.FormatDescription().c_str());
     return zx::error(ZX_ERR_INTERNAL);
   }
 
   if (file_res->is_error()) {
-    FDF_LOG(ERROR, "Failed to get visitor '%.*s' vmo: %s", (int)visitor_file.length(),
+    FDF_LOG(ERROR, "Failed to get visitor '%.*s' vmo: %s", static_cast<int>(visitor_file.length()),
             visitor_file.data(), zx_status_get_string(file_res->error_value()));
     return zx::error(ZX_ERR_INTERNAL);
   }

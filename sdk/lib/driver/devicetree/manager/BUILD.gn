@@ -65,6 +65,7 @@ test("devicetree-manager-test") {
   deps = [
     ":manager-test-helper",
     "//sdk/lib/driver/devicetree/visitors:driver-visitor",
+    "//sdk/lib/driver/devicetree/visitors:registry",
     "//sdk/lib/driver/devicetree/visitors/default",
     "//sdk/lib/driver/legacy-bind-constants",
     "//src/devices/bind/fuchsia.devicetree:fuchsia.devicetree_cpp",

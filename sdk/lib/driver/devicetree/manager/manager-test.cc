@@ -7,7 +7,9 @@
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <lib/driver/devicetree/visitors/default/default.h>
 #include <lib/driver/devicetree/visitors/driver-visitor.h>
+#include <lib/driver/devicetree/visitors/registry.h>
 
+#include <memory>
 #include <unordered_set>
 
 #include <bind/fuchsia/devicetree/cpp/bind.h>
@@ -104,25 +106,6 @@ TEST_F(ManagerTest, TestPublishesSimpleNode) {
       *pbus_node.properties()));
 }
 
-TEST_F(ManagerTest, TestBtiProperty) {
-  Manager manager(testing::LoadTestBlob("/pkg/test-data/basic-properties.dtb"));
-  DefaultVisitors<> default_visitors;
-  ASSERT_EQ(ZX_OK, manager.Walk(default_visitors).status_value());
-
-  ASSERT_TRUE(DoPublish(manager).is_ok());
-
-  // First node is devicetree root. Second one is the sample-device.
-  // Third is sample-bti-device.
-  // Check BTI of sample-bti-device.
-  auto bti = env().SyncCall(&testing::FakeEnvWrapper::pbus_nodes_at, 2).bti();
-
-  // Test BTI properties.
-  ASSERT_TRUE(bti);
-  ASSERT_EQ(1lu, bti->size());
-  ASSERT_EQ((uint32_t)TEST_IOMMU_PHANDLE, *(*bti)[0].iommu_index());
-  ASSERT_EQ((uint32_t)TEST_BTI_ID, *(*bti)[0].bti_id());
-}
-
 TEST_F(ManagerTest, DriverVisitorTest) {
   Manager manager(testing::LoadTestBlob("/pkg/test-data/basic-properties.dtb"));
 
@@ -172,7 +155,7 @@ TEST_F(ManagerTest, TestMetadata) {
 
   ASSERT_TRUE(DoPublish(manager).is_ok());
 
-  ASSERT_EQ(3lu, env().SyncCall(&testing::FakeEnvWrapper::pbus_node_size));
+  ASSERT_EQ(5lu, env().SyncCall(&testing::FakeEnvWrapper::pbus_node_size));
 
   // First node is devicetree root. Second one is the sample-device. Check
   // metadata of sample-device.
@@ -183,6 +166,82 @@ TEST_F(ManagerTest, TestMetadata) {
   ASSERT_EQ(1lu, metadata->size());
   ASSERT_EQ((uint32_t)DEVICE_SPECIFIC_PROP_VALUE,
             *reinterpret_cast<uint32_t*>((*(*metadata)[0].data()).data()));
+}
+
+TEST_F(ManagerTest, TestReferences) {
+  Manager manager(testing::LoadTestBlob("/pkg/test-data/basic-properties.dtb"));
+
+  class ReferenceParentVisitor final : public DriverVisitor {
+   public:
+    using Property1Specifier = devicetree::PropEncodedArrayElement<PROPERTY1_CELLS>;
+
+    ReferenceParentVisitor() : DriverVisitor("fuchsia,reference-parent") {
+      parser1_ = std::make_unique<ReferencePropertyParser>(
+          "property1", "#property1-cells",
+          [this](ReferenceNode& node) { return this->is_match(node.properties()); },
+          [this](Node& child, ReferenceNode& parent, devicetree::ByteView reference_cells) {
+            return this->Property1ReferenceChildVisit(child, parent, reference_cells);
+          });
+      parser2_ = std::make_unique<ReferencePropertyParser>(
+          "property2", "#property2-cells",
+          [this](ReferenceNode& node) { return this->is_match(node.properties()); },
+          [this](Node& child, ReferenceNode& parent, devicetree::ByteView reference_cells) {
+            return this->Property2ReferenceChildVisit(child, parent, reference_cells);
+          });
+      DriverVisitor::AddReferencePropertyParser(parser1_.get());
+      DriverVisitor::AddReferencePropertyParser(parser2_.get());
+    }
+
+    zx::result<> DriverVisit(Node& node, const devicetree::PropertyDecoder& decoder) override {
+      visit_called++;
+      return zx::ok();
+    }
+
+    zx::result<> DriverFinalizeNode(Node& node) override {
+      ZX_ASSERT(reference1_count == 1u);
+      ZX_ASSERT(reference2_count == 1u);
+      finalize_called++;
+      return zx::ok();
+    }
+
+    zx::result<> Property1ReferenceChildVisit(Node& child, ReferenceNode& parent,
+                                              PropertyCells reference_cells) {
+      reference1_specifier = devicetree::PropEncodedArray<Property1Specifier>(reference_cells, 1);
+      reference1_count++;
+      return zx::ok();
+    }
+
+    zx::result<> Property2ReferenceChildVisit(Node& child, ReferenceNode& parent,
+                                              PropertyCells reference_cells) {
+      reference2_count++;
+      return zx::ok();
+    }
+
+    size_t visit_called = 0;
+    size_t finalize_called = 0;
+    size_t reference1_count = 0;
+    size_t reference2_count = 0;
+    devicetree::PropEncodedArray<Property1Specifier> reference1_specifier;
+
+   private:
+    std::unique_ptr<ReferencePropertyParser> parser1_;
+    std::unique_ptr<ReferencePropertyParser> parser2_;
+  };
+
+  auto parent_visitor = std::make_unique<ReferenceParentVisitor>();
+  ReferenceParentVisitor* parent_visitor_ptr = parent_visitor.get();
+
+  VisitorRegistry visitors;
+  ASSERT_TRUE(visitors.RegisterVisitor(std::move(parent_visitor)).is_ok());
+
+  ASSERT_EQ(ZX_OK, manager.Walk(visitors).status_value());
+
+  ASSERT_EQ(parent_visitor_ptr->visit_called, 1u);
+  ASSERT_EQ(parent_visitor_ptr->finalize_called, 1u);
+  ASSERT_EQ(parent_visitor_ptr->reference1_specifier.size(), 1u);
+  ASSERT_EQ(parent_visitor_ptr->reference1_specifier[0][0], PROPERTY1_SPECIFIER);
+
+  ASSERT_TRUE(DoPublish(manager).is_ok());
 }
 
 }  // namespace

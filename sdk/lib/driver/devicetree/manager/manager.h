@@ -19,7 +19,7 @@
 
 namespace fdf_devicetree {
 
-class Manager {
+class Manager final : public NodeManager {
  public:
   static zx::result<Manager> CreateFromNamespace(fdf::Namespace& ns);
 
@@ -53,6 +53,9 @@ class Manager {
 
   const std::vector<std::unique_ptr<Node>>& nodes() { return nodes_publish_order_; }
 
+  // Returns node with phandle |id|.
+  zx::result<ReferenceNode> GetReferenceNode(Phandle id) override;
+
  private:
   std::vector<uint8_t> fdt_blob_;
   devicetree::Devicetree tree_;
@@ -60,7 +63,9 @@ class Manager {
   // List of nodes, in the order that they were seen in the tree.
   std::vector<std::unique_ptr<Node>> nodes_publish_order_;
   // Nodes by phandle. Note that not every node in the tree has a phandle.
-  std::unordered_map<uint32_t, Node*> nodes_by_phandle_;
+  std::unordered_map<Phandle, Node*> nodes_by_phandle_;
+  // Nodes by path.
+  std::unordered_map<std::string, Node*> nodes_by_path_;
   uint32_t node_id_ = 0;
 };
 

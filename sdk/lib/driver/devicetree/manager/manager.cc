@@ -14,9 +14,22 @@ namespace fdf {
 using namespace fuchsia_driver_framework;
 }
 
-namespace fdf_devicetree {
+namespace {
+std::string GetPath(const devicetree::NodePath& node_path) {
+  std::string path;
 
-constexpr const char kPhandleProp[] = "phandle";
+  for (std::string_view p : node_path) {
+    // Skip adding '/' for the root node.
+    if (path.length() != 1) {
+      path.append("/");
+    }
+    path.append(p);
+  }
+  return path;
+}
+}  // namespace
+
+namespace fdf_devicetree {
 
 zx::result<Manager> Manager::CreateFromNamespace(fdf::Namespace& ns) {
   zx::result client_end = ns.Connect<fuchsia_boot::Items>();
@@ -59,39 +72,59 @@ zx::result<Manager> Manager::CreateFromNamespace(fdf::Namespace& ns) {
 }
 
 zx::result<> Manager::Walk(Visitor& visitor) {
+  // Walk the tree and create all nodes before calling the visitor. This is required for
+  // |GetReferenceNode| method to work properly.
+  tree_.Walk([&, this](const devicetree::NodePath& path,
+                       const devicetree::PropertyDecoder& decoder) {
+    FDF_LOG(DEBUG, "Found node - %.*s", static_cast<int>(path.back().length()), path.back().data());
+
+    // Create a node.
+    const devicetree::Properties& properties = decoder.properties();
+    auto node = std::make_unique<Node>(path.back(), properties, node_id_++, this);
+    Node* ptr = node.get();
+    nodes_publish_order_.emplace_back(std::move(node));
+    FDF_LOG(DEBUG, "Node[%d] - %s added for publishing", node_id_, path.back().data());
+
+    if (ptr->phandle()) {
+      nodes_by_phandle_.emplace(*(ptr->phandle()), ptr);
+    }
+    nodes_by_path_.emplace(GetPath(path), ptr);
+    return true;
+  });
+
   zx::result<> visit_status = zx::ok();
   tree_.Walk(
       [&, this](const devicetree::NodePath& path, const devicetree::PropertyDecoder& decoder) {
-        FDF_LOG(DEBUG, "Found node - %s", path.back().data());
-
-        // Create a node.
-        const devicetree::Properties& properties = decoder.properties();
-        auto node = std::make_unique<Node>(path.back(), properties, node_id_++);
-        Node* ptr = node.get();
-        nodes_publish_order_.emplace_back(std::move(node));
-        FDF_LOG(DEBUG, "Node[%d] - %s added for publishing", node_id_, path.back().data());
-
-        // If the node has a phandle, record it.
-        const auto phandle_prop = ptr->properties().find(kPhandleProp);
-        if (phandle_prop != ptr->properties().end() &&
-            phandle_prop->second.AsUint32() != std::nullopt) {
-          nodes_by_phandle_.emplace(phandle_prop->second.AsUint32().value(), ptr);
-        } else if (phandle_prop != ptr->properties().end()) {
-          FDF_SLOG(WARNING, "Node has invalid phandle property", KV("node_name", node->name()),
-                   KV("prop_len", phandle_prop->second.AsBytes().size()));
-        }
-
-        visit_status = visitor.Visit(*ptr, decoder);
+        FDF_LOG(DEBUG, "Visit node - %.*s", static_cast<int>(path.back().length()),
+                path.back().data());
+        auto node = nodes_by_path_[GetPath(path)];
+        visit_status = visitor.Visit(*node, decoder);
         if (visit_status.is_error()) {
           FDF_SLOG(ERROR, "Node visit failed.", KV("node_name", node->name()),
                    KV("status_str", visit_status.status_string()));
           return false;
         }
-
         return true;
       });
+  if (visit_status.is_error()) {
+    return visit_status;
+  }
 
-  return visit_status;
+  // Call |FinalizeNode| method of the visitor on all nodes to complete the parsing. At this point
+  // all references to the node is known and so the visitor can use that information to update any
+  // Node properties if needed.
+  for (auto& node : nodes_publish_order_) {
+    FDF_LOG(DEBUG, "Finalize node - %.*s", static_cast<int>(node->name().length()),
+            node->name().data());
+    zx::result finalize_status = visitor.FinalizeNode(*node);
+    if (finalize_status.is_error()) {
+      FDF_SLOG(ERROR, "Node finalize failed.", KV("node_name", node->name()),
+               KV("status_str", finalize_status.status_string()));
+      return finalize_status;
+    }
+  }
+
+  return zx::ok();
 }
 
 zx::result<> Manager::PublishDevices(
@@ -108,6 +141,15 @@ zx::result<> Manager::PublishDevices(
   }
 
   return zx::ok();
+}
+
+zx::result<ReferenceNode> Manager::GetReferenceNode(Phandle id) {
+  auto node = nodes_by_phandle_.find(id);
+  if (node == nodes_by_phandle_.end()) {
+    return zx::error(ZX_ERR_NOT_FOUND);
+  }
+
+  return zx::ok(ReferenceNode(node->second));
 }
 
 }  // namespace fdf_devicetree

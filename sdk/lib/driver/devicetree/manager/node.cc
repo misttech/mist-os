@@ -7,7 +7,9 @@
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
 #include <lib/driver/logging/cpp/logger.h>
+#include <zircon/errors.h>
 
+#include <optional>
 #include <string>
 
 #include <bind/fuchsia/platform/cpp/bind.h>
@@ -20,8 +22,12 @@ using namespace fuchsia_driver_framework;
 
 namespace fdf_devicetree {
 
-Node::Node(const std::string_view name, devicetree::Properties properties, uint32_t id)
-    : name_(name), id_(id) {
+constexpr const char kPhandleProp[] = "phandle";
+
+Node::Node(const std::string_view name, devicetree::Properties properties, uint32_t id,
+           NodeManager *manager)
+    : name_(name), id_(id), manager_(manager) {
+  ZX_ASSERT(manager_);
   pbus_node_.did() = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_DEVICETREE;
   pbus_node_.vid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_GENERIC;
   pbus_node_.instance_id() = id;
@@ -29,6 +35,17 @@ Node::Node(const std::string_view name, devicetree::Properties properties, uint3
 
   for (auto property : properties) {
     properties_.emplace(property.name, property.value);
+  }
+
+  // Get phandle if exists.
+  const auto phandle_prop = properties_.find(kPhandleProp);
+  if (phandle_prop != properties_.end()) {
+    if (phandle_prop->second.AsUint32() != std::nullopt) {
+      phandle_ = phandle_prop->second.AsUint32();
+    } else {
+      FDF_LOG(WARNING, "Node '%.*s' has invalid phandle property", static_cast<int>(name_.size()),
+              name_.data());
+    }
   }
 }
 
@@ -61,7 +78,7 @@ zx::result<> Node::Publish(fdf::WireSyncClient<fuchsia_hardware_platform_bus::Pl
                            fidl::SyncClient<fuchsia_driver_framework::CompositeNodeManager> &mgr) {
   if (node_properties_.empty()) {
     FDF_LOG(DEBUG, "Not publishing node '%.*s' because it has no bind properties.",
-            (int)name().size(), name().data());
+            static_cast<int>(name().size()), name().data());
     return zx::ok();
   }
 
@@ -70,7 +87,7 @@ zx::result<> Node::Publish(fdf::WireSyncClient<fuchsia_hardware_platform_bus::Pl
     pbus_node_.properties() = node_properties_;
   }
 
-  FDF_LOG(DEBUG, "Adding node '%.*s' to pbus with instance id %d.", (int)name().size(),
+  FDF_LOG(DEBUG, "Adding node '%.*s' to pbus with instance id %d.", static_cast<int>(name().size()),
           name().data(), id_);
   fdf::Arena arena('PBUS');
   fidl::Arena fidl_arena;
@@ -122,6 +139,10 @@ zx::result<> Node::Publish(fdf::WireSyncClient<fuchsia_hardware_platform_bus::Pl
   }
 
   return zx::ok();
+}
+
+zx::result<ReferenceNode> Node::GetReferenceNode(Phandle parent) {
+  return manager_->GetReferenceNode(parent);
 }
 
 }  // namespace fdf_devicetree

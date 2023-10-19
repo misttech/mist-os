@@ -18,15 +18,19 @@
         device_specific_prop = <DEVICE_SPECIFIC_PROP_VALUE>;
     };
 
-    dummy_iommu:iommu {
-        #iommu-cells = <1>;
-        // phandle is optional, but set here for testing purpose.
-        phandle = <TEST_IOMMU_PHANDLE>;
+    sample_parent:reference-parent {
+        compatible = "fuchsia,reference-parent";
+        #property1-cells = <PROPERTY1_CELLS>;
+        #property2-cells = <PROPERTY2_CELLS>;
     };
 
-    sample-bti-device {
-        compatible = "fuchsia,sample-bti-device";
-        iommus = <&dummy_iommu TEST_BTI_ID>;
+    sample-property1-child {
+        compatible = "fuchsia,property1-child";
+        property1 = <&sample_parent PROPERTY1_SPECIFIER>;
     };
 
+    property2-child {
+        compatible = "fuchsia,property2-child";
+        property2 = <&sample_parent>;
+    };
 };

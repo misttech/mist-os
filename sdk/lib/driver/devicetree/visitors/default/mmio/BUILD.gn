@@ -16,10 +16,7 @@ source_set("mmio") {
     "mmio.cc",
     "mmio.h",
   ]
-  deps = [
-    "//sdk/lib/driver/logging/cpp",
-    "//src/devices/bind/fuchsia.devicetree:fuchsia.devicetree_cpp",
-  ]
+  deps = [ "//sdk/lib/driver/logging/cpp" ]
 
   public_deps = [
     "//sdk/lib/driver/devicetree/manager:headers",
