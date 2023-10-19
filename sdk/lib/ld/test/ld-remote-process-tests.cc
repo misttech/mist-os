@@ -26,6 +26,10 @@ class LdRemoteProcessTests::MockLoader {
   ::testing::InSequence sequence_guard_;
 };
 
+void LdRemoteProcessTests::SetUp() {
+  GTEST_SKIP() << "TODO(fxb/134320): Skip until remote loading is implemented.";
+}
+
 LdRemoteProcessTests::LdRemoteProcessTests() = default;
 
 LdRemoteProcessTests::~LdRemoteProcessTests() = default;
@@ -52,20 +56,16 @@ void LdRemoteProcessTests::Init(std::initializer_list<std::string_view> args) {
 }
 
 void LdRemoteProcessTests::Needed(std::initializer_list<std::string_view> names) {
-  GTEST_SKIP() << "TODO(fxbug.dev/134320): Skip until remote loading is implemented.";
   for (std::string_view name : names) {
     mock_loader_->ExpectLoadObject(name);
   }
 }
 
 void LdRemoteProcessTests::Load(std::string_view executable_name) {
-  GTEST_SKIP() << "TODO(fxbug.dev/134320): Skip until remote loading is implemented.";
+  // TODO(fxbug.dev/134320): implement remote loading.
 }
 
 int64_t LdRemoteProcessTests::Run() {
-  // GTEST_SKIP() returns early from the function, but because Run() returns an
-  // int64, we must do so here as well. Return the kReturnValue (17) used in tests.
-  GTEST_SKIP() << "TODO(fxb/134320): Skip until remote loading is implemented.", 17;
   return LdLoadZirconProcessTestsBase::Run(nullptr, stack_size_, thread_, entry_, vdso_base_,
                                            root_vmar());
 }

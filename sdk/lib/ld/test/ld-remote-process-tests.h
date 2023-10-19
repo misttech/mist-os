@@ -26,6 +26,8 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
   LdRemoteProcessTests();
   ~LdRemoteProcessTests();
 
+  void SetUp() override;
+
   void Init(std::initializer_list<std::string_view> args = {});
 
   void Needed(std::initializer_list<std::string_view> names);
