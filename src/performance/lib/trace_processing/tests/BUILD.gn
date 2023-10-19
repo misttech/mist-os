@@ -1,0 +1,50 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/python/python_host_test.gni")
+import("//build/testing/host_test_data.gni")
+
+if (is_host) {
+  host_test_data("trace_importing_test_data") {
+    sources = [
+      "data/chrome_metadata.json",
+      "data/flow_event_binding.json",
+      "data/flow_ids.json",
+      "data/id2_async.json",
+      "data/model.json",
+    ]
+
+    outputs = [ "$target_gen_dir/runtime_deps/{{source_file_part}}" ]
+  }
+
+  python_host_test("trace_importing_test") {
+    main_source = "trace_importing_test.py"
+    sources = [ "test_utils.py" ]
+    libraries = [ "//src/performance/lib/trace_processing" ]
+    test_dir = "$target_gen_dir"
+    deps = [ ":trace_importing_test_data" ]
+  }
+
+  python_host_test("trace_model_test") {
+    main_source = "trace_model_test.py"
+    sources = [ "test_utils.py" ]
+    libraries = [ "//src/performance/lib/trace_processing" ]
+    test_dir = "$target_gen_dir"
+  }
+
+  python_host_test("trace_utils_test") {
+    main_source = "trace_utils_test.py"
+    libraries = [ "//src/performance/lib/trace_processing" ]
+    test_dir = "$target_gen_dir"
+  }
+}
+
+group("tests") {
+  testonly = true
+  public_deps = [
+    ":trace_importing_test($host_toolchain)",
+    ":trace_model_test($host_toolchain)",
+    ":trace_utils_test($host_toolchain)",
+  ]
+}

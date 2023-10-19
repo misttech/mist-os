@@ -7,6 +7,7 @@ group("tests") {
   deps = [
     "fxt:tests",
     "perfmon:tests",
+    "trace_processing:tests",
   ]
   if (current_cpu == "arm64" || current_cpu == "x64") {
     deps += [ "gperftools:tests" ]
