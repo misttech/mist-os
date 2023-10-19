@@ -695,7 +695,7 @@ impl SimpleAllocator {
                 .contents(MAX_ALLOCATOR_INFO_SERIALIZED_SIZE)
                 .await
                 .context("Failed to read AllocatorInfo")?;
-            let mut cursor = std::io::Cursor::new(&serialized_info[..]);
+            let mut cursor = std::io::Cursor::new(serialized_info);
             let (mut info, _version) = AllocatorInfo::deserialize_with_version(&mut cursor)
                 .context("Failed to deserialize AllocatorInfo")?;
 

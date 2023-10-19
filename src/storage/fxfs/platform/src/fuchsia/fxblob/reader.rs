@@ -38,13 +38,14 @@ mod tests {
         fidl_fuchsia_io::{self as fio},
         fuchsia_async as fasync,
         fuchsia_component::client::connect_to_protocol_at_dir_svc,
+        std::vec::Vec,
     };
 
     /// Read a blob using BlobReader API and return its contents as a boxed slice.
     async fn read_blob(
         blob_volume_outgoing_dir: &fio::DirectoryProxy,
         hash: Hash,
-    ) -> Result<Box<[u8]>, Error> {
+    ) -> Result<Vec<u8>, Error> {
         let blob_proxy = connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::BlobReaderMarker>(
             &blob_volume_outgoing_dir,
         )
@@ -55,10 +56,9 @@ mod tests {
             .expect("transport error on blobreader")
             .map_err(zx::Status::from_raw)?;
         let vmo_size = vmo.get_content_size().expect("failed to get vmo size") as usize;
-        let mut buf = Vec::with_capacity(vmo_size);
-        buf.resize(vmo_size, 0);
+        let mut buf = vec![0; vmo_size];
         vmo.read(&mut buf[..], 0)?;
-        Ok(buf.into_boxed_slice())
+        Ok(buf)
     }
 
     #[fasync::run(10, test)]

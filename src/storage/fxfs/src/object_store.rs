@@ -2084,7 +2084,7 @@ pub async fn load_store_info(
 
     Ok(if handle.get_size() > 0 {
         let serialized_info = handle.contents(MAX_STORE_INFO_SERIALIZED_SIZE).await?;
-        let mut cursor = std::io::Cursor::new(&serialized_info[..]);
+        let mut cursor = std::io::Cursor::new(serialized_info);
         let (store_info, _) = StoreInfo::deserialize_with_version(&mut cursor)
             .context("Failed to deserialize StoreInfo")?;
         store_info

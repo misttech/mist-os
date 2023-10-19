@@ -100,9 +100,7 @@ pub trait ObjectHandleExt: ReadObjectHandle {
         }
         let mut buf = self.allocate_buffer(size as usize);
         self.read(0u64, buf.as_mut()).await?;
-        let mut vec = vec![0; size as usize];
-        vec.copy_from_slice(&buf.as_slice());
-        Ok(vec.into())
+        Ok(buf.as_slice().into())
     }
 }
 
