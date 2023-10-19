@@ -89,6 +89,28 @@ correctly, have large unsafe APIs with insufficient documentation, or perform
 many operations from safe code that could cause undefined behavior.
 """
 
+[[audits.aes]]
+who = "Joshua Liebow-Feeser <joshlf@google.com>"
+criteria = ["safe-to-deploy", "ub-risk-2"]
+delta = "0.7.5 -> 0.8.2"
+notes = """
+Note for reviewers of future updates to this crate: There exist
+internal APIs such as [1] which are safe but have undocumented safety
+invariants.
+
+[1] https://fuchsia-review.git.corp.google.com/c/fuchsia/+/711365/comment/7a8cdc16_9e9f45ca/
+"""
+
+[[audits.aes-gcm]]
+who = "Joshua Liebow-Feeser <joshlf@google.com>"
+criteria = ["safe-to-deploy", "ub-risk-2"]
+delta = "0.9.4 -> 0.8.2"
+
+[[audits.aes-gcm-siv]]
+who = "Joshua Liebow-Feeser <joshlf@google.com>"
+criteria = ["safe-to-deploy", "ub-risk-2"]
+delta = "0.10.3 -> 0.11.1"
+
 [[audits.ash]]
 who = "David Koloski <dkoloski@google.com>"
 criteria = ["ub-risk-4", "safe-to-deploy"]
@@ -123,6 +145,11 @@ notes = "Reviewed on https://fxrev.dev/906795"
 who = "David Koloski <dkoloski@google.com>"
 criteria = "safe-to-deploy"
 delta = "0.1.56 -> 0.1.68"
+
+[[audits.chacha20]]
+who = "Joshua Liebow-Feeser <joshlf@google.com>"
+criteria = ["safe-to-deploy", "ub-risk-2"]
+delta = "0.8.1 -> 0.9.0"
 
 [[audits.http-body]]
 who = "Erick Tryzelaar <etryzelaar@google.com>"
@@ -227,4 +254,3 @@ who = "David Koloski <dkoloski@google.com>"
 criteria = ["safe-to-deploy", "ub-risk-2"]
 version = "0.2.1"
 notes = "Reviewed on https://fxrev.dev/904811"
-
