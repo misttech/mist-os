@@ -2,12 +2,21 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/licenses/license.gni")
+
 import("//build/cpp/sdk_source_set.gni")
 config("sparse-includes") {
   include_dirs = [
     "core/libsparse",
     "core/libsparse/include",
   ]
+}
+
+license("sparse_format_license") {
+  public_package_name = "sparse_format"
+
+  # Extracted the license headers of sparse_defs.h and sparse_format.h into a license file.
+  license_files = [ "SPARSE_FORMAT_LICENSE" ]
 }
 
 sdk_source_set("sparse_format") {
@@ -20,4 +29,5 @@ sdk_source_set("sparse_format") {
   ]
 
   public_configs = [ ":sparse-includes" ]
+  applicable_licenses = [ ":sparse_format_license" ]
 }

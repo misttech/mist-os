@@ -7,7 +7,24 @@
 # More advanced usages of might require more sophisticated
 # build rules
 
+import("//build/licenses/license.gni")
+
 ring_crate = "../../vendor/ring-0.16.16"
+
+license("ring_license") {
+  public_package_name = "ring"
+  license_files = [ "${ring_crate}/LICENSE" ]
+}
+
+license("fiat_license") {
+  public_package_name = "fiat"
+  license_files = [ "${ring_crate}/third_party/fiat/LICENSE" ]
+}
+
+applicable_licenses = [
+  ":ring_license",
+  ":fiat_license",
+]
 
 config("ring-config") {
   if (current_cpu == "riscv64") {

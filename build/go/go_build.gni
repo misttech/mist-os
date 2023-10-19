@@ -165,7 +165,11 @@ template("go_build") {
       "${target_gen_dir}/${output_name}.hermetic_inputs"
   hermetic_inputs_action(hermetic_inputs_target_name) {
     visibility = [ ":${main_target_name}" ]
-    forward_variables_from(invoker, [ "testonly" ])
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "applicable_licenses",
+                           ])
 
     script = "//build/go/gen_hermetic_inputs.py"
     sources = [ "//build/go/gen_library_metadata.py" ]
@@ -197,6 +201,7 @@ template("go_build") {
 
     forward_variables_from(invoker,
                            [
+                             "applicable_licenses",
                              "testonly",
                              "visibility",
                            ])

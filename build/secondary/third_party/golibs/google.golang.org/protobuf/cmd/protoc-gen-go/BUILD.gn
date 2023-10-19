@@ -4,12 +4,20 @@
 
 import("//build/go/go_binary.gni")
 import("//build/host.gni")
+import("//build/licenses/license.gni")
 
 assert(is_host)
+
+license("license") {
+  public_package_name = "protobuf"
+  license_files =
+      [ "//third_party/golibs/vendor/google.golang.org/protobuf/LICENSE" ]
+}
 
 go_binary("protoc-gen-go") {
   gopackage = "google.golang.org/protobuf/cmd/protoc-gen-go"
   deps = [ "//third_party/golibs:google.golang.org/protobuf" ]
+  applicable_licenses = [ ":license" ]
 }
 
 install_host_tools("host") {
