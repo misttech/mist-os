@@ -403,10 +403,6 @@ if (is_fuchsia) {
     sources = [ "${files.outdir}/legacy" ]
 
     deps = [ ":fuchsia_assembly" ]
-
-    # Add the product configs and their dependencies.
-    product_configs = [ files.product_assembly_config_file ]
-    deps += [ fuchsia_product_assembly_config_label ]
   }
 
   ##################################################

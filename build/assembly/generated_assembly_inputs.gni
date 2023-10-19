@@ -10,7 +10,7 @@ import("//bundles/assembly/platform_aibs.gni")
 #
 # Arguments
 #
-#   product_configs (required)
+#   product_configs (optional)
 #     [list] List of paths to the product configs.
 #
 #   output_path (required)
@@ -20,7 +20,6 @@ import("//bundles/assembly/platform_aibs.gni")
 #     [list of str] Additional files or directories to list as inputs.
 #
 template("generated_assembly_inputs") {
-  assert(defined(invoker.product_configs), "Need to define product_configs")
   assert(defined(invoker.output_path), "Need to define output_path")
 
   labels = {
@@ -74,7 +73,7 @@ template("generated_assembly_inputs") {
     depfile = depfile_path
 
     outputs = [ invoker.output_path ]
-    inputs = [ files.platform_aibs ] + invoker.product_configs
+    inputs = [ files.platform_aibs ]
 
     args = [
       "--assembly-input-bundles",
@@ -85,9 +84,12 @@ template("generated_assembly_inputs") {
       rebase_path(depfile_path, root_build_dir),
     ]
 
-    args += [ "--product-config" ]
-    foreach(product_config, invoker.product_configs) {
-      args += [ rebase_path(product_config, root_build_dir) ]
+    if (defined(invoker.product_configs)) {
+      inputs += invoker.product_configs
+      args += [ "--product-config" ]
+      foreach(product_config, invoker.product_configs) {
+        args += [ rebase_path(product_config, root_build_dir) ]
+      }
     }
 
     if (defined(invoker.sources)) {

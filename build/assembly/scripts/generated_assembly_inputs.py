@@ -18,10 +18,7 @@ def main():
         description="Create a flat list of files included in the images. This is used to inform infrastructure what files to upload"
     )
     parser.add_argument(
-        "--product-config",
-        type=argparse.FileType("r"),
-        nargs="+",
-        required=True,
+        "--product-config", type=argparse.FileType("r"), nargs="+"
     )
     parser.add_argument(
         "--assembly-input-bundles", type=argparse.FileType("r"), required=True
@@ -78,8 +75,9 @@ def main():
                 for package in packages.get("cache", []):
                     add_package(package)
 
-    for product_config in args.product_config:
-        add_product_config(product_config)
+    if args.product_config:
+        for product_config in args.product_config:
+            add_product_config(product_config)
 
     # Add the assembly input bundles
     assembly_input_bundles = json.load(args.assembly_input_bundles)
