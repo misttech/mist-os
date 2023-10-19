@@ -10,8 +10,6 @@ namespace fs_management {
 
 namespace {
 
-const std::string kTestBinary = "/test/binary";
-
 void AssertStartOptionsEqual(const fuchsia_fs_startup::wire::StartOptions& a,
                              const fuchsia_fs_startup::wire::StartOptions& b) {
   ASSERT_EQ(a.read_only, b.read_only);
