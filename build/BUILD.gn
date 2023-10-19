@@ -163,6 +163,7 @@ group("non_hermetic_deps") {
     "//src/chromium:web_runner_pkg",
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:iwlwifi",
     "//src/connectivity/wlan/tools/third_party/broadcom:wl_pkg",
+    "//src/devices/rtc/drivers/nxp:pcf8563",
     "//src/graphics/drivers/arm-mali/icd:libvulkan_arm_g52_r0p0",
     "//src/media/codec/codecs/vaapi:codec_runner_intel_gen",
     "//src/ui/backlight/drivers:chromebook-keyboard-backlight",

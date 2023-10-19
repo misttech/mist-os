@@ -4,6 +4,7 @@
 
 import("//build/bind/bind.gni")
 import("//build/drivers.gni")
+import("//build/packages/prebuilt_package.gni")
 
 driver_bind_rules("pcf8563_rtc_bind") {
   rules = "pcf8563_rtc.bind"
@@ -43,4 +44,10 @@ fuchsia_driver_package("nxp-pkg") {
 group("tests") {
   testonly = true
   deps = [ ":pcf8563_rtc_bind_test" ]
+}
+
+# This is the OOT built RTC driver
+prebuilt_package("pcf8563") {
+  package_name = "pcf8563"
+  archive = "//prebuilt/drivers/rtc/pcf8563/pcf8563"
 }
