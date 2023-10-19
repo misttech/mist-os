@@ -192,6 +192,7 @@ class NodeProperties : public std::enable_shared_from_this<NodeProperties> {
 
   void SetWeak();
   [[nodiscard]] bool is_weak() const { return is_weak_; }
+  [[nodiscard]] bool is_weak_ok_from_parent() const { return is_weak_ok_from_parent_; }
 
   void SetWeakOk(bool for_child_nodes_also);
   [[nodiscard]] bool is_weak_ok() const { return is_weak_ok_; }
@@ -263,8 +264,19 @@ class NodeProperties : public std::enable_shared_from_this<NodeProperties> {
 
   bool is_weak_ = false;
 
+  // The Node's client has acknowledged, or a parent Node has acknowledged on this Node's behalf,
+  // that close_weak_asap PEER_CLOSED will be noticed and remaining weak VMO handles will be closed
+  // asap after that signal.
   bool is_weak_ok_ = false;
+  // propagate is_weak_ok_ true to child nodes created after this field becomes true
   bool is_weak_ok_for_child_nodes_also_ = false;
+  // false if !is_weak_ok_. When true, this means for_child_nodes_also=true is the only reason this
+  // node has is_weak_ok_ true - in this case we allow sysmem(1) since a parent Node (using sysmem2)
+  // has taken responsibility for paying attention to close_weak_asap, so the inability to deliver
+  // close_weak_asap via sysmem(1) to this Node's client is not a problem since the parent Node's
+  // client will take care of telling this Node's client to close its VMOs when close_weak_asap
+  // ZX_EVENTPAIR_PEER_CLOSED is seen by the parent Node's client.
+  bool is_weak_ok_from_parent_ = false;
 
   // Constraints as set by:
   //

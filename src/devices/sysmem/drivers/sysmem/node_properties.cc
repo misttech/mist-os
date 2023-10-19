@@ -71,9 +71,11 @@ NodeProperties* NodeProperties::NewChild(LogicalBufferCollection* logical_buffer
 
   // is_weak_ok_ doesn't propagate to children by default
   if (is_weak_ok_for_child_nodes_also_) {
+    ZX_DEBUG_ASSERT(is_weak_ok_);
     // propagation to all descendents of the child as well
     result_ptr->is_weak_ok_for_child_nodes_also_ = true;
     result_ptr->is_weak_ok_ = is_weak_ok_;
+    result_ptr->is_weak_ok_from_parent_ = true;
   }
 
   return result_ptr;

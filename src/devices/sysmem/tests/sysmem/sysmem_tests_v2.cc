@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fcntl.h>
+#include <fidl/fuchsia.sysmem/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/cpp/caller.h>
@@ -6118,6 +6119,60 @@ TEST(Sysmem, SetWeak_NoUsage_HasCloseWeakAsap) {
   ASSERT_FALSE(vmo_buffer.vmo().has_value());
   // despite empty constraints, weak --> we get close_weak_asap
   ASSERT_TRUE(vmo_buffer.close_weak_asap().has_value());
+}
+
+TEST(Sysmem, SetWeakOk_ForChildNodesAlso_AllowsSysmem1Child) {
+  auto parent_token = create_initial_token_v2();
+  auto child_token = create_token_under_token_v2(parent_token);
+
+  // The implicit SetWeakOk as part of SetWeak is only for this node.
+  ASSERT_TRUE(child_token->SetWeak().is_ok());
+  // Explicitly SetWeakOk to get the for_child_nodes_also=true.
+  fuchsia_sysmem2::NodeSetWeakOkRequest set_weak_ok_request;
+  set_weak_ok_request.for_child_nodes_also() = true;
+  ASSERT_TRUE(child_token->SetWeakOk(std::move(set_weak_ok_request)).is_ok());
+
+  // This token must be created after for_child_nodes_also=true above, for that
+  // to take effect for this node.
+  auto child_token_v2 = create_token_under_token_v2(child_token);
+
+  // Treat v2 token channel as v1 token (server serves both protocols on the same channel).
+  auto child_token_v1 = fidl::SyncClient<fuchsia_sysmem::BufferCollectionToken>(
+      fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>(
+          child_token_v2.TakeClientEnd().TakeChannel()));
+
+  // Convert child_token_v1 into v1 BufferCollection.
+  auto v1_collection_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
+  ASSERT_TRUE(v1_collection_endpoints.is_ok());
+  auto child_collection_v1 = fidl::SyncClient(std::move(v1_collection_endpoints->client));
+  auto allocator_result = component::Connect<fuchsia_sysmem::Allocator>();
+  ASSERT_OK(allocator_result.status_value());
+  auto allocator = fidl::SyncClient(std::move(allocator_result.value()));
+  fuchsia_sysmem::AllocatorBindSharedCollectionRequest bind_shared_request;
+  bind_shared_request.token() = child_token_v1.TakeClientEnd();
+  bind_shared_request.buffer_collection_request() = std::move(v1_collection_endpoints->server);
+  ASSERT_TRUE(allocator->BindSharedCollection(std::move(bind_shared_request)).is_ok());
+
+  auto parent_collection = convert_token_to_collection_v2(std::move(parent_token));
+  auto child_collection = convert_token_to_collection_v2(std::move(child_token));
+
+  set_min_camping_constraints_v2(parent_collection, 1);
+  set_min_camping_constraints_v2(child_collection, 1);
+
+  fuchsia_sysmem::BufferCollectionSetConstraintsRequest set_constraints_request;
+  set_constraints_request.has_constraints() = false;
+  ASSERT_TRUE(child_collection_v1->SetConstraints(std::move(set_constraints_request)).is_ok());
+
+  auto parent_wait_result = parent_collection->WaitForAllBuffersAllocated();
+  ASSERT_TRUE(parent_wait_result.is_ok());
+  auto child_wait_result = child_collection->WaitForAllBuffersAllocated();
+  ASSERT_TRUE(child_wait_result.is_ok());
+  auto child_v1_wait_result = child_collection_v1->WaitForBuffersAllocated();
+  ASSERT_TRUE(child_v1_wait_result.is_ok());
+
+  // Despite inability to deliver close_weak_asap to a v1 Node that's weak, because the weak v1
+  // Node is covered by a v2 parent node that SetWeakOk(for_child_nodes_also=true), the v1 weak
+  // child Node did not cause allocation failure.
 }
 
 // This test is too likely to cause an OOM which would be treated as a flake. For now we can enable

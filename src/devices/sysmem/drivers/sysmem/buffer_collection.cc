@@ -695,10 +695,11 @@ fpromise::result<fuchsia_sysmem2::BufferCollectionInfo> BufferCollection::CloneR
 
 fpromise::result<fuchsia_sysmem::BufferCollectionInfo2> BufferCollection::CloneResultForSendingV1(
     const fuchsia_sysmem2::BufferCollectionInfo& buffer_collection_info) {
-  if (node_properties().is_weak()) {
+  if (node_properties().is_weak() && !node_properties().is_weak_ok_from_parent()) {
     // To avoid this failure, consider migrating to sysmem2 (a sysmem (1) token client_end can be
     // used directly as a sysmem2 token).
-    FailAsync(FROM_HERE, ZX_ERR_INVALID_ARGS, "sysmem v1 can't do weak (1)");
+    FailAsync(FROM_HERE, ZX_ERR_INVALID_ARGS,
+              "sysmem v1 can't do weak unless for_child_nodes_also=true from parent Node");
     return fpromise::error();
   }
   auto v2_result = CloneResultForSendingV2(buffer_collection_info);
