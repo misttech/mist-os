@@ -38,17 +38,18 @@ func writeFiles(dir string, pathsToContents map[string]string) error {
 
 func TestRecordingOfOutputs(t *testing.T) {
 	start := time.Unix(0, 0)
-	testOutputDir := t.TempDir()
+	dataDir := t.TempDir()
+	outDir := filepath.Join(dataDir, "out")
 	suiteOutputDir := "suite_outputs"
 	suiteOutputFile1 := filepath.Join(suiteOutputDir, "file1")
 	suiteOutputFile2 := filepath.Join(suiteOutputDir, "file2")
-	caseOutputFile := "case_outputs"
+	caseOutputFile := filepath.Join("case1", "case_outputs")
 	origOutputs := map[string]string{
 		suiteOutputFile1: "test outputs",
 		suiteOutputFile2: "test outputs 2",
 		caseOutputFile:   "testcase outputs",
 	}
-	if err := writeFiles(testOutputDir, origOutputs); err != nil {
+	if err := writeFiles(outDir, origOutputs); err != nil {
 		t.Errorf("failed to write output files: %s", err)
 	}
 	results := []TestResult{
@@ -79,13 +80,13 @@ func TestRecordingOfOutputs(t *testing.T) {
 					Status:      runtests.TestFailure,
 					Format:      "FTF",
 					// Test having the OutputFile be a filename.
-					OutputFiles: []string{caseOutputFile},
-					OutputDir:   testOutputDir,
+					OutputFiles: []string{filepath.Base(caseOutputFile)},
+					OutputDir:   filepath.Join(outDir, "case1"),
 				},
 			},
 			// Test having the OutputFile be a directory name.
 			OutputFiles: []string{suiteOutputDir},
-			OutputDir:   testOutputDir,
+			OutputDir:   outDir,
 			Stdio:       []byte("STDOUT_A"),
 		},
 		{
@@ -98,9 +99,6 @@ func TestRecordingOfOutputs(t *testing.T) {
 		},
 	}
 
-	dataDir := t.TempDir()
-	outDir := filepath.Join(dataDir, "out")
-
 	var buf bytes.Buffer
 	producer := tap.NewProducer(&buf)
 	producer.Plan(len(results))
@@ -110,19 +108,8 @@ func TestRecordingOfOutputs(t *testing.T) {
 	}
 	defer o.Close()
 
-	outputFileA := func(filename string) string {
-		return filepath.Join(url.PathEscape("fuchsia-pkg//foo#test_a"), "0", filename)
-	}
-
-	outputFileB := func(filename string) string {
-		return filepath.Join("test_b", "0", filename)
-	}
-
-	testAStdout := outputFileA("stdout-and-stderr.txt")
-	testASuiteOutputFile1 := outputFileA(suiteOutputFile1)
-	testASuiteOutputFile2 := outputFileA(suiteOutputFile2)
-	testACaseOutputFile := outputFileA(filepath.Join("case1", caseOutputFile))
-	testBStdout := outputFileB("stdout-and-stderr.txt")
+	testAStdout := filepath.Join(url.PathEscape("fuchsia-pkg//foo#test_a"), "0", "stdout-and-stderr.txt")
+	testBStdout := filepath.Join("test_b", "0", "stdout-and-stderr.txt")
 	expectedSummary := runtests.TestSummary{
 		Tests: []runtests.TestDetails{{
 			Name:    "fuchsia-pkg://foo#test_a",
@@ -130,7 +117,7 @@ func TestRecordingOfOutputs(t *testing.T) {
 			// The expected OutputFiles in TestSummary should contain only files.
 			// If any of the TestResult OutputFiles point to directories, TestOutputs.Record()
 			// should list out all the files in those directories here.
-			OutputFiles:    []string{testASuiteOutputFile1, testASuiteOutputFile2, testAStdout},
+			OutputFiles:    []string{suiteOutputFile1, suiteOutputFile2, testAStdout},
 			Result:         runtests.TestFailure,
 			StartTime:      start,
 			DurationMillis: 5,
@@ -152,7 +139,7 @@ func TestRecordingOfOutputs(t *testing.T) {
 					CaseName:    "case1",
 					Status:      runtests.TestFailure,
 					Format:      "FTF",
-					OutputFiles: []string{testACaseOutputFile},
+					OutputFiles: []string{caseOutputFile},
 				},
 			},
 		}, {
@@ -187,12 +174,12 @@ func TestRecordingOfOutputs(t *testing.T) {
 
 	// Populate all of the expected output files.
 	expectedContents := map[string]string{
-		testAStdout:           "STDOUT_A",
-		testBStdout:           "STDERR_B",
-		testASuiteOutputFile1: origOutputs[suiteOutputFile1],
-		testASuiteOutputFile2: origOutputs[suiteOutputFile2],
-		testACaseOutputFile:   origOutputs[caseOutputFile],
-		"summary.json":        string(summaryBytes),
+		testAStdout:      "STDOUT_A",
+		testBStdout:      "STDERR_B",
+		suiteOutputFile1: origOutputs[suiteOutputFile1],
+		suiteOutputFile2: origOutputs[suiteOutputFile2],
+		caseOutputFile:   origOutputs[caseOutputFile],
+		"summary.json":   string(summaryBytes),
 	}
 	for name, content := range expectedSinks {
 		// Add sinks to expectedContents.

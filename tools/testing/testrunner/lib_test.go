@@ -36,9 +36,17 @@ const (
 )
 
 type fakeTester struct {
-	runTest   func(context.Context, testsharder.Test, io.Writer, io.Writer) (runtests.TestResult, error)
+	runTest   func(context.Context, testsharder.Test, io.Writer, io.Writer, string) (*TestResult, error)
 	funcCalls []string
 	outDirs   map[string]bool
+}
+
+func testResult(test testsharder.Test, result runtests.TestResult) *TestResult {
+	return &TestResult{
+		Name:    test.Name,
+		GNLabel: test.Label,
+		Result:  result,
+	}
 }
 
 func (t *fakeTester) Test(ctx context.Context, test testsharder.Test, stdout, stderr io.Writer, outDir string) (*TestResult, error) {
@@ -48,19 +56,11 @@ func (t *fakeTester) Test(ctx context.Context, test testsharder.Test, stdout, st
 	}
 	t.outDirs[outDir] = true
 	result := runtests.TestSuccess
-	var err error
 	if t.runTest != nil {
-		result, err = t.runTest(ctx, test, stdout, stderr)
-	}
-	if err != nil {
-		return nil, err
+		return t.runTest(ctx, test, stdout, stderr, outDir)
 	}
 
-	return &TestResult{
-		Name:    test.Name,
-		GNLabel: test.Label,
-		Result:  result,
-	}, nil
+	return testResult(test, result), nil
 }
 
 func (t *fakeTester) Close() error {
@@ -200,7 +200,11 @@ func TestValidateTest(t *testing.T) {
 }
 
 func stdioPath(testName string, runIndex int) string {
-	return filepath.Join(testName, strconv.Itoa(runIndex), runtests.TestOutputFilename)
+	return filepath.Join(testOutDir(testName, runIndex), runtests.TestOutputFilename)
+}
+
+func testOutDir(testName string, runIndex int) string {
+	return filepath.Join(testName, strconv.Itoa(runIndex))
 }
 
 func testDetails(name string, runIndex int, duration time.Duration, result runtests.TestResult) runtests.TestDetails {
@@ -243,6 +247,8 @@ func TestRunAndOutputTests(t *testing.T) {
 		duration time.Duration
 		// Data that the test should emit to stdout and stderr.
 		stdout, stderr string
+		// A file to write to the test out dir.
+		outputfile string
 	}
 
 	testCases := []struct {
@@ -699,6 +705,40 @@ func TestRunAndOutputTests(t *testing.T) {
 			},
 		},
 		{
+			name: "collects outputfiles",
+			tests: []testsharder.Test{
+				{
+					Test:         build.Test{Name: "foo"},
+					RunAlgorithm: testsharder.StopOnSuccess,
+					Runs:         5,
+				},
+				{
+					Test:         build.Test{Name: "bar"},
+					RunAlgorithm: testsharder.StopOnSuccess,
+					Runs:         5,
+				},
+			},
+			behavior: map[string]testBehavior{
+				"foo/0": {stdout: "stdout0\n", stderr: "stderr0\n", outputfile: "outputfile"},
+				"bar/0": {stdout: "bar-stdout0\n", stderr: "bar-stderr0\n"},
+			},
+			expectedResults: []runtests.TestDetails{
+				func() runtests.TestDetails {
+					d := succeededTest("foo", 0, defaultDuration)
+					// The output files found in the test out dir will
+					// appear first in the list.
+					d.OutputFiles = append([]string{filepath.Join(testOutDir("foo", 0), "outputfile")}, d.OutputFiles...)
+					return d
+				}(),
+				succeededTest("bar", 0, defaultDuration),
+			},
+			expectedOutputs: map[string]string{
+				stdioPath("foo", 0): "stdout0\nstderr0\n",
+				stdioPath("bar", 0): "bar-stdout0\nbar-stderr0\n",
+				filepath.Join(testOutDir("foo", 0), "outputfile"): "outputs",
+			},
+		},
+		{
 			name: "affected test",
 			tests: []testsharder.Test{
 				{
@@ -749,13 +789,22 @@ func TestRunAndOutputTests(t *testing.T) {
 
 			runCounts := make(map[string]int)
 			testerForTest := func(testsharder.Test) (Tester, *[]runtests.DataSinkReference, error) {
-				return &fakeTester{runTest: func(ctx context.Context, test testsharder.Test, stdout, stderr io.Writer) (runtests.TestResult, error) {
+				return &fakeTester{runTest: func(ctx context.Context, test testsharder.Test, stdout, stderr io.Writer, outdir string) (*TestResult, error) {
 					runIndex := runCounts[test.Name]
 					runCounts[test.Name]++
 					behavior := tc.behavior[fmt.Sprintf("%s/%d", test.Name, runIndex)]
 
 					stdout.Write([]byte(behavior.stdout))
 					stderr.Write([]byte(behavior.stderr))
+
+					result := testResult(test, runtests.TestSuccess)
+
+					if behavior.outputfile != "" {
+						os.MkdirAll(outdir, os.ModePerm)
+						os.WriteFile(filepath.Join(outdir, behavior.outputfile), []byte("outputs"), os.ModePerm)
+						result.OutputDir = outdir
+						result.OutputFiles = []string{behavior.outputfile}
+					}
 
 					if behavior.duration == 0 {
 						behavior.duration = defaultDuration
@@ -769,11 +818,14 @@ func TestRunAndOutputTests(t *testing.T) {
 						c := make(chan struct{})
 						t.Cleanup(func() { close(c) })
 						<-c
-						return runtests.TestAborted, nil
+						result.Result = runtests.TestAborted
+						return result, nil
 					} else if behavior.fatal {
-						return "", fmt.Errorf("fatal error")
+						result.Result = ""
+						return result, fmt.Errorf("fatal error")
 					} else if behavior.fail {
-						return runtests.TestFailure, nil
+						result.Result = runtests.TestFailure
+						return result, nil
 					}
 
 					if timeout > 0 && behavior.duration >= timeout {
@@ -785,7 +837,7 @@ func TestRunAndOutputTests(t *testing.T) {
 						// triggering.
 						<-ctx.Done()
 					}
-					return runtests.TestSuccess, nil
+					return result, nil
 				}}, &[]runtests.DataSinkReference{}, nil
 			}
 
@@ -795,7 +847,7 @@ func TestRunAndOutputTests(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			err = runAndOutputTests(ctx, tc.tests, testerForTest, outputs, mkdtemp(t, "outputs"))
+			err = runAndOutputTests(ctx, tc.tests, testerForTest, outputs, resultsDir)
 			if tc.wantErr != (err != nil) {
 				t.Errorf("want err: %t, got %s", tc.wantErr, err)
 			}

@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"net"
 	"net/url"
@@ -604,8 +605,39 @@ func runTestOnce(
 
 	// Record the test details in the summary.
 	result.Stdio = stdio.buf.Bytes()
-	if len(result.Cases) == 0 {
+	// Only the FFXTester handles cases and output files on its own. Otherwise,
+	// parse the stdout for test cases and check the outdir for output files.
+	if len(result.Cases) == 0 && len(result.OutputFiles) == 0 {
 		result.Cases = testparser.Parse(stdout.Bytes())
+		caseOutputFiles := []string{}
+		for _, tc := range result.Cases {
+			for _, of := range tc.OutputFiles {
+				caseOutputFiles = append(caseOutputFiles, filepath.Join(tc.OutputDir, of))
+			}
+		}
+
+		if err := filepath.WalkDir(outDir, func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if d.IsDir() {
+				return nil
+			}
+			relPath, err := filepath.Rel(outDir, path)
+			if err != nil {
+				return err
+			}
+			// Don't include the file if it's already recorded as a test case output file.
+			if !strings.Contains(strings.Join(caseOutputFiles, " "), path) {
+				result.OutputFiles = append(result.OutputFiles, relPath)
+			}
+			return nil
+		}); err != nil {
+			logger.Errorf(ctx, "unable to record output files: %s", err)
+		}
+		if len(result.OutputFiles) > 0 {
+			result.OutputDir = outDir
+		}
 	}
 	if result.StartTime.IsZero() {
 		result.StartTime = startTime

@@ -12,7 +12,6 @@ import (
 	"io"
 	"io/fs"
 	"net/url"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -40,12 +39,11 @@ func CreateTestOutputs(producer *tap.Producer, outdir string) (*TestOutputs, err
 	}, nil
 }
 
-// moveOutputFiles takes the list of outputFiles and moves them to newRelDir.
-// If an `output file` refers to a directory, the files in that directory will
-// be moved to newRelDir while preserving the directory's structure, but the
-// individual files will be returned in the list of renamed outputs.
-func (o *TestOutputs) moveOutputFiles(outputFiles []string, outputDir string, newRelDir string) ([]string, error) {
-	var movedOutputs []string
+// rebaseOutputFiles takes the list of outputFiles and rebases them against the
+// global OutDir. If an `output file` refers to a directory, all the files in that
+// directory will be returned in the list of outputs.
+func (o *TestOutputs) rebaseOutputFiles(outputFiles []string, outputDir string) ([]string, error) {
+	var allOutputs []string
 	for _, outputFilePath := range outputFiles {
 		outputFilePath = filepath.Join(outputDir, outputFilePath)
 		if err := filepath.Walk(outputFilePath, func(path string, info fs.FileInfo, err error) error {
@@ -53,24 +51,18 @@ func (o *TestOutputs) moveOutputFiles(outputFiles []string, outputDir string, ne
 				return err
 			}
 			if !info.IsDir() {
-				oldPathRel, err := filepath.Rel(outputDir, path)
+				pathRel, err := filepath.Rel(o.OutDir, path)
 				if err != nil {
-					return fmt.Errorf("failed to get relative path of %s to %s: %w", path, outputDir, err)
+					return fmt.Errorf("failed to get relative path of %s to %s: %w", path, o.OutDir, err)
 				}
-				newPathRel := filepath.Join(newRelDir, oldPathRel)
-				newPathAbs := filepath.Join(o.OutDir, newPathRel)
-				os.MkdirAll(filepath.Dir(newPathAbs), os.ModePerm)
-				if err := os.Rename(path, newPathAbs); err != nil {
-					return fmt.Errorf("failed to move %s to %s: %w", path, newPathAbs, err)
-				}
-				movedOutputs = append(movedOutputs, newPathRel)
+				allOutputs = append(allOutputs, pathRel)
 			}
 			return nil
 		}); err != nil {
 			return nil, err
 		}
 	}
-	return movedOutputs, nil
+	return allOutputs, nil
 }
 
 // Record writes the test result to initialized outputs.
@@ -88,14 +80,14 @@ func (o *TestOutputs) Record(ctx context.Context, result TestResult) error {
 		return fmt.Errorf("test %q must have non-negative duration: (start, end) = (%s, %s)", result.Name, result.StartTime, result.EndTime)
 	}
 
-	// Move outputs from test over into the relative path.
-	suiteOutputFiles, err := o.moveOutputFiles(result.OutputFiles, result.OutputDir, outputRelPath)
+	// Rebase outputs from test against the global outdir.
+	suiteOutputFiles, err := o.rebaseOutputFiles(result.OutputFiles, result.OutputDir)
 	if err != nil {
-		return fmt.Errorf("error moving output files: %w", err)
+		return fmt.Errorf("error rebasing output files: %w", err)
 	}
 	containsStdio := false
 	for _, outputFile := range suiteOutputFiles {
-		if outputFile == stdioPath {
+		if filepath.Base(outputFile) == runtests.TestOutputFilename {
 			containsStdio = true
 			break
 		}
@@ -121,15 +113,10 @@ func (o *TestOutputs) Record(ctx context.Context, result TestResult) error {
 	}
 
 	var cases []runtests.TestCaseResult
-	for i, testCase := range result.Cases {
-		// TODO(ihuh): Using the testCase.DisplayName in the new path name
-		// can cause errors if the name is too long. Find a better way to
-		// display test case output files.
-		nameForPath := fmt.Sprintf("case%d", i+1)
-		caseRelPath := filepath.Join(outputRelPath, nameForPath)
-		caseOutputFiles, err := o.moveOutputFiles(testCase.OutputFiles, testCase.OutputDir, caseRelPath)
+	for _, testCase := range result.Cases {
+		caseOutputFiles, err := o.rebaseOutputFiles(testCase.OutputFiles, testCase.OutputDir)
 		if err != nil {
-			return fmt.Errorf("error moving output files: %w", err)
+			return fmt.Errorf("error rebasing output files: %w", err)
 		}
 		newCase := testCase
 		newCase.OutputFiles = caseOutputFiles
