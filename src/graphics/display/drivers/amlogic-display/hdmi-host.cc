@@ -38,8 +38,8 @@ ValidDcoFrequencyRange GetHdmiPllValidDcoFrequencyRange(int pixel_clock_khz) {
   // tested and has fewer display glitches than using 5.8 GHz. So, we use
   // 2.9 GHz rather than 3 GHz as the minimum valid DCO frequency for default
   // cases.
-  constexpr int kDefaultMinimumValidHdmiPllDcoFrequencyKhz = 2'900'000;
-  constexpr int kDefaultMaximumValidHdmiPllDcoFrequencyKhz = 6'000'000;
+  static constexpr int kDefaultMinimumValidHdmiPllDcoFrequencyKhz = 2'900'000;
+  static constexpr int kDefaultMaximumValidHdmiPllDcoFrequencyKhz = 6'000'000;
 
   // For display timings with a very low pixel clock rate (for example, on
   // Surenoo SUR480480Y021A, it has a pixel clock of 16.96 MHz), in our
@@ -52,8 +52,8 @@ ValidDcoFrequencyRange GetHdmiPllValidDcoFrequencyRange(int pixel_clock_khz) {
   // the pixel clock is lower than 20 MHz (which is lower than the pixel clock
   // of DMT timing of 640x480p@60Hz) so that it won't affect "normal" display
   // modes.
-  constexpr int kLowPixelClockMinimumValidHdmiPllDcoFrequencyKhz = 2'700'000;
-  constexpr int kLowPixelClockThresholdKhz = 20'000;
+  static constexpr int kLowPixelClockMinimumValidHdmiPllDcoFrequencyKhz = 2'700'000;
+  static constexpr int kLowPixelClockThresholdKhz = 20'000;
   if (pixel_clock_khz <= kLowPixelClockThresholdKhz) {
     return {
         .minimum_frequency_khz = kLowPixelClockMinimumValidHdmiPllDcoFrequencyKhz,
