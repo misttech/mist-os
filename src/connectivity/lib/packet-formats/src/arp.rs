@@ -368,12 +368,7 @@ mod tests {
     }
 
     fn header_to_bytes(header: Header) -> [u8; ARP_HDR_LEN] {
-        let mut bytes = [0; ARP_HDR_LEN];
-        {
-            let mut r = Ref::<_, Header>::new_unaligned(&mut bytes[..]).unwrap();
-            *r = header;
-        }
-        bytes
+        zerocopy::transmute!(header)
     }
 
     // Return a new Header for an Ethernet/IPv4 ARP request.

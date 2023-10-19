@@ -1224,12 +1224,7 @@ mod tests {
     }
 
     fn hdr_prefix_to_bytes(hdr_prefix: HeaderPrefix) -> [u8; HDR_PREFIX_LEN] {
-        let mut bytes = [0; HDR_PREFIX_LEN];
-        {
-            let mut r = Ref::<_, HeaderPrefix>::new_unaligned(&mut bytes[..]).unwrap();
-            *r = hdr_prefix;
-        }
-        bytes
+        zerocopy::transmute!(hdr_prefix)
     }
 
     // Return a new HeaderPrefix with reasonable defaults, including a valid

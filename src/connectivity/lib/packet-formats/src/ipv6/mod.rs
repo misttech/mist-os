@@ -1276,12 +1276,7 @@ mod tests {
     }
 
     fn fixed_hdr_to_bytes(fixed_hdr: FixedHeader) -> [u8; IPV6_FIXED_HDR_LEN] {
-        let mut bytes = [0; IPV6_FIXED_HDR_LEN];
-        {
-            let mut r = Ref::<_, FixedHeader>::new_unaligned(&mut bytes[..]).unwrap();
-            *r = fixed_hdr;
-        }
-        bytes
+        zerocopy::transmute!(fixed_hdr)
     }
 
     // Return a new FixedHeader with reasonable defaults.
