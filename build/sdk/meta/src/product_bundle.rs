@@ -161,7 +161,12 @@ const PRODUCT_BUNDLE_SCHEMA_V1: &str =
 
 impl ProductBundle {
     pub fn try_load_from(path: impl AsRef<Utf8Path>) -> Result<Self> {
-        LoadedProductBundle::try_load_from(path).map(|v| v.into())
+        let path = path.as_ref();
+        if path.is_file() && path.extension() == Some("zip") {
+            ZipLoadedProductBundle::try_load_from(path).map(|v| v.into())
+        } else {
+            LoadedProductBundle::try_load_from(path).map(|v| v.into())
+        }
     }
 
     /// Write a product bundle to a directory on disk at `path`.
@@ -424,6 +429,36 @@ mod tests {
 
         check_deref(&pb);
         assert!(matches!(*pb.deref(), ProductBundle::V1 { .. }));
+        Ok(())
+    }
+
+    #[test]
+    fn test_product_bundle_try_load_from_for_zip() -> anyhow::Result<()> {
+        let tmp = TempDir::new().unwrap();
+
+        let pb = make_sample_pbv1("generic-x64");
+        let pb_filename = tmp.into_path().join("pb.zip");
+        let pb_file = File::create(pb_filename.clone())?;
+
+        let mut zip = ZipWriter::new(pb_file);
+        let options = FileOptions::default().compression_method(CompressionMethod::Stored);
+        zip.start_file("product_bundle.json", options)?;
+        let buf = serde_json::to_vec(&pb)?;
+        let _ = zip.write(&buf)?;
+        zip.flush()?;
+        let _ = zip.finish()?;
+
+        // This should detect zip file and load from the zip
+        let _ = ProductBundle::try_load_from(Utf8Path::from_path(&pb_filename).unwrap())?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_product_bundle_try_load_from_for_dir() -> anyhow::Result<()> {
+        let tmp = TempDir::new().unwrap();
+        let pb_dir = make_pb_v1_in!(tmp, "generic-x64");
+        let _ = ProductBundle::try_load_from(pb_dir).unwrap();
         Ok(())
     }
 }
