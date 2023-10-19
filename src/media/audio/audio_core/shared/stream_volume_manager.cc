@@ -120,9 +120,6 @@ void StreamVolumeManager::RemoveStream(StreamVolume* stream_volume) {
 
 void StreamVolumeManager::SetUsageVolume(fuchsia::media::Usage usage, float volume) {
   if (volume != usage_volume_settings_.GetUsageVolume(std::move(usage))) {
-    if constexpr (kLogVolumeCalls) {
-      FX_LOGS(INFO) << StreamUsageFromFidlUsage(usage).ToString() << " volume=" << volume;
-    }
     usage_volume_settings_.SetUsageVolume(fidl::Clone(usage), volume);
     UpdateStreamsWithUsage(std::move(usage));
   }
