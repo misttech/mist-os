@@ -65,7 +65,9 @@ class CxxActionTests(unittest.TestCase):
         self.assertTrue(c.dialect_is_cxx)
         self.assertFalse(c.dialect_is_c)
         self.assertIsNone(c.use_ld)
+        self.assertIsNone(c.rtlib)
         self.assertIsNone(c.unwindlib)
+        self.assertFalse(c.static_libstdcxx)
         self.assertEqual(c.linker_driver_flags, [])
         self.assertIsNone(c.depfile)
         self.assertIsNone(c.sysroot)
@@ -324,6 +326,22 @@ class CxxActionTests(unittest.TestCase):
             _strs(["clang++", "-unwindlib=libunwind", source, "-o", output])
         )
         self.assertEqual(c.unwindlib, "libunwind")
+
+    def test_rtlib(self):
+        source = Path("hello.o")
+        output = Path("hello")
+        c = cxx.CxxAction(
+            _strs(["clang++", "-rtlib=compiler-rt", source, "-o", output])
+        )
+        self.assertEqual(c.rtlib, "compiler-rt")
+
+    def test_static_libstdcxx(self):
+        source = Path("hello.o")
+        output = Path("hello")
+        c = cxx.CxxAction(
+            _strs(["clang++", "-static-libstdc++", source, "-o", output])
+        )
+        self.assertTrue(c.static_libstdcxx)
 
     def test_unknown_linker_driver_flag(self):
         source = Path("hello.o")

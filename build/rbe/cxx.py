@@ -103,6 +103,20 @@ def _cxx_command_scanner() -> argparse.ArgumentParser:
         help="unwind library (e.g. libunwind)",
     )
     parser.add_argument(
+        "-rtlib",
+        type=str,
+        default=None,
+        metavar="LIB",
+        help="run-time library (e.g. compiler-rt)",
+    )
+    parser.add_argument(
+        "-static-libstdc++",
+        dest="static_libstdcxx",
+        default=False,
+        action="store_true",
+        help="Link with static C++ standard library",
+    )
+    parser.add_argument(
         "-W",
         dest="driver_flags",
         type=str,
@@ -147,6 +161,14 @@ def _compile_action_sources(command: Iterable[str]) -> Iterable[Source]:
             yield Source(file=Path(tok), dialect=SourceLanguage.ASM)
         if tok.endswith(".mm"):
             yield Source(file=Path(tok), dialect=SourceLanguage.OBJC)
+
+
+def _link_direct_inputs(command: Iterable[str]) -> Iterable[Path]:
+    for tok in command:
+        if any(
+            tok.endswith(ext) for ext in (".o", ".obj", ".so", ".a", ".dylib")
+        ):
+            yield Path(tok)
 
 
 def _infer_dialect_from_sources(sources: Iterable[Source]) -> SourceLanguage:
@@ -363,7 +385,7 @@ class CxxAction(object):
         rsp_expanded_args = cl_utils.expand_response_files(command, rsp_files)
         self._response_files = rsp_files
 
-        # Expand some difficult-to-parse flags like -W...
+        # Expand some difficult-to-parse flags like -Wl...
         argparseable_args = list(
             expand_forwarded_driver_flags(rsp_expanded_args)
         )
@@ -371,11 +393,12 @@ class CxxAction(object):
         # Parse the full compiler command.
         (
             self._attributes,
-            unused_remaining_args,
+            remaining_args,
         ) = _CXX_COMMAND_SCANNER.parse_known_args(argparseable_args)
         self._compiler = _find_compiler_from_command(argparseable_args)
-        self._sources = list(_compile_action_sources(argparseable_args))
+        self._sources = list(_compile_action_sources(remaining_args))
         self._dialect = _infer_dialect_from_sources(self._sources)
+        self._linker_inputs = list(_link_direct_inputs(remaining_args))
 
         # Handle -W driver flags.
         self._preprocessor_driver_flags = []
@@ -442,8 +465,20 @@ class CxxAction(object):
         return self._sources
 
     @property
+    def linker_inputs(self) -> Sequence[Path]:
+        return self._linker_inputs
+
+    @property
     def response_files(self) -> Sequence[Path]:
         return self._response_files
+
+    @property
+    def preprocessor_driver_flags(self) -> Sequence[str]:
+        return self._preprocessor_driver_flags
+
+    @property
+    def assembler_driver_flags(self) -> Sequence[str]:
+        return self._assembler_driver_flags
 
     @property
     def linker_driver_flags(self) -> Sequence[str]:
@@ -456,6 +491,14 @@ class CxxAction(object):
     @property
     def linker_mapfile(self) -> Optional[Path]:
         return self._linker_attributes.mapfile
+
+    @property
+    def rtlib(self) -> Optional[str]:
+        return self._attributes.rtlib
+
+    @property
+    def static_libstdcxx(self) -> bool:
+        return self._attributes.static_libstdcxx
 
     @property
     def save_temps(self) -> bool:

@@ -413,6 +413,19 @@ class ExpandResponseFilesTests(unittest.TestCase):
             )
             self.assertEqual(set(rspfiles), {rsp1, rsp2})
 
+    def test_multitoken_lines(self):
+        with tempfile.TemporaryDirectory() as td:
+            tdp = Path(td)
+            rsp = tdp / "args.rsp"
+            rsp.write_text(" a  b \nc    d  \n")
+            command = ["tool.sh", f"@{rsp}", "-o", "space.out"]
+            rspfiles = []
+            self.assertEqual(
+                list(cl_utils.expand_response_files(command, rspfiles)),
+                ["tool.sh", "a", "b", "c", "d", "-o", "space.out"],
+            )
+            self.assertEqual(rspfiles, [rsp])
+
 
 class ExpandFusedFlagsTests(unittest.TestCase):
     def test_empty(self):

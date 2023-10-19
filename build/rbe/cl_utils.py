@@ -252,7 +252,8 @@ def expand_response_files(
             filtered_lines = remove_hash_comments(
                 line for line in rsp_lines_stripped if line
             )
-            yield from expand_response_files(filtered_lines, rspfiles)
+            for line in filtered_lines:
+                yield from expand_response_files(shlex.split(line), rspfiles)
         else:
             yield tok
 
