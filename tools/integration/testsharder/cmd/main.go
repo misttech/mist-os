@@ -357,8 +357,8 @@ func execute(ctx context.Context, flags testsharderFlags, m buildModules) error 
 		defer f.Close()
 	}
 
-	slices.SortFunc(shards, func(a, b *testsharder.Shard) bool {
-		return a.Name < b.Name
+	slices.SortFunc(shards, func(a, b *testsharder.Shard) int {
+		return strings.Compare(a.Name, b.Name)
 	})
 
 	encoder := json.NewEncoder(f)

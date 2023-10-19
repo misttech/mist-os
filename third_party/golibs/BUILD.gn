@@ -837,6 +837,8 @@ go_library("golang.org/x/crypto") {
     "chacha20/chacha_s390x.s",
     "chacha20/xor.go",
     "curve25519/curve25519.go",
+    "curve25519/curve25519_compat.go",
+    "curve25519/curve25519_go120.go",
     "curve25519/internal/field/fe.go",
     "curve25519/internal/field/fe_amd64.go",
     "curve25519/internal/field/fe_amd64.s",
@@ -845,7 +847,6 @@ go_library("golang.org/x/crypto") {
     "curve25519/internal/field/fe_arm64.s",
     "curve25519/internal/field/fe_arm64_noasm.go",
     "curve25519/internal/field/fe_generic.go",
-    "ed25519/ed25519.go",
     "internal/alias/alias.go",
     "internal/alias/alias_purego.go",
     "internal/poly1305/bits_compat.go",
@@ -926,9 +927,10 @@ go_library("golang.org/x/exp") {
   sources = [
     "constraints/constraints.go",
     "maps/maps.go",
+    "slices/cmp.go",
     "slices/slices.go",
     "slices/sort.go",
-    "slices/zsortfunc.go",
+    "slices/zsortanyfunc.go",
     "slices/zsortordered.go",
   ]
 }
@@ -984,6 +986,7 @@ go_library("golang.org/x/net") {
     "http2/writesched.go",
     "http2/writesched_priority.go",
     "http2/writesched_random.go",
+    "http2/writesched_roundrobin.go",
     "idna/go118.go",
     "idna/idna10.0.0.go",
     "idna/idna9.0.0.go",
@@ -993,8 +996,11 @@ go_library("golang.org/x/net") {
     "idna/tables11.0.0.go",
     "idna/tables12.0.0.go",
     "idna/tables13.0.0.go",
+    "idna/tables15.0.0.go",
     "idna/tables9.0.0.go",
     "idna/trie.go",
+    "idna/trie12.0.0.go",
+    "idna/trie13.0.0.go",
     "idna/trieval.go",
     "internal/iana/const.go",
     "internal/socket/cmsghdr.go",
@@ -1243,7 +1249,10 @@ go_library("golang.org/x/net") {
 go_library("golang.org/x/time") {
   name = "golang.org/x/time/..."
   source_dir = "vendor/golang.org/x/time"
-  sources = [ "rate/rate.go" ]
+  sources = [
+    "rate/rate.go",
+    "rate/sometimes.go",
+  ]
 }
 
 go_library("golang.org/x/oauth2") {
@@ -1289,7 +1298,11 @@ go_library("golang.org/x/oauth2") {
 go_library("golang.org/x/sync") {
   name = "golang.org/x/sync/..."
   source_dir = "vendor/golang.org/x/sync"
-  sources = [ "errgroup/errgroup.go" ]
+  sources = [
+    "errgroup/errgroup.go",
+    "errgroup/go120.go",
+    "errgroup/pre_go120.go",
+  ]
 }
 
 go_library("golang.org/x/sys") {
@@ -1336,12 +1349,15 @@ go_library("golang.org/x/sys") {
     "cpu/cpu_x86.s",
     "cpu/cpu_zos.go",
     "cpu/cpu_zos_s390x.go",
+    "cpu/endian_big.go",
+    "cpu/endian_little.go",
     "cpu/hwcap_linux.go",
     "cpu/parse.go",
     "cpu/proc_cpuinfo_linux.go",
+    "cpu/runtime_auxv.go",
+    "cpu/runtime_auxv_go121.go",
     "cpu/syscall_aix_gccgo.go",
     "cpu/syscall_aix_ppc64_gc.go",
-    "internal/unsafeheader/unsafeheader.go",
     "unix/affinity_linux.go",
     "unix/aliases.go",
     "unix/asm_aix_ppc64.s",
@@ -1389,9 +1405,12 @@ go_library("golang.org/x/sys") {
     "unix/gccgo.go",
     "unix/gccgo_linux_amd64.go",
     "unix/ifreq_linux.go",
-    "unix/ioctl.go",
     "unix/ioctl_linux.go",
+    "unix/ioctl_signed.go",
+    "unix/ioctl_unsigned.go",
     "unix/ioctl_zos.go",
+    "unix/mmap_nomremap.go",
+    "unix/mremap.go",
     "unix/pagesize_unix.go",
     "unix/pledge_openbsd.go",
     "unix/ptrace_darwin.go",
@@ -1689,6 +1708,7 @@ go_library("golang.org/x/text") {
     "unicode/bidi/tables11.0.0.go",
     "unicode/bidi/tables12.0.0.go",
     "unicode/bidi/tables13.0.0.go",
+    "unicode/bidi/tables15.0.0.go",
     "unicode/bidi/tables9.0.0.go",
     "unicode/bidi/trieval.go",
     "unicode/norm/composition.go",
@@ -1701,6 +1721,7 @@ go_library("golang.org/x/text") {
     "unicode/norm/tables11.0.0.go",
     "unicode/norm/tables12.0.0.go",
     "unicode/norm/tables13.0.0.go",
+    "unicode/norm/tables15.0.0.go",
     "unicode/norm/tables9.0.0.go",
     "unicode/norm/transform.go",
     "unicode/norm/trie.go",
@@ -2207,6 +2228,9 @@ go_library("google.golang.org/protobuf") {
     "reflect/protodesc/desc_resolve.go",
     "reflect/protodesc/desc_validate.go",
     "reflect/protodesc/proto.go",
+    "reflect/protopath/path.go",
+    "reflect/protopath/step.go",
+    "reflect/protorange/range.go",
     "reflect/protoreflect/methods.go",
     "reflect/protoreflect/proto.go",
     "reflect/protoreflect/source.go",
@@ -2226,6 +2250,8 @@ go_library("google.golang.org/protobuf") {
     "testing/protocmp/util.go",
     "testing/protocmp/xform.go",
     "types/descriptorpb/descriptor.pb.go",
+    "types/dynamicpb/dynamic.go",
+    "types/dynamicpb/types.go",
     "types/known/anypb/any.pb.go",
     "types/known/durationpb/duration.pb.go",
     "types/known/emptypb/empty.pb.go",
@@ -2334,6 +2360,9 @@ go_library("gvisor.dev/gvisor") {
     "pkg/sync/aliases.go",
     "pkg/sync/checklocks_off_unsafe.go",
     "pkg/sync/checklocks_on_unsafe.go",
+    "pkg/sync/fence.go",
+    "pkg/sync/fence_amd64.s",
+    "pkg/sync/fence_arm64.s",
     "pkg/sync/gate_unsafe.go",
     "pkg/sync/goyield_go113_unsafe.go",
     "pkg/sync/goyield_unsafe.go",
@@ -2361,11 +2390,8 @@ go_library("gvisor.dev/gvisor") {
     "pkg/sync/seqcount.go",
     "pkg/sync/sync.go",
     "pkg/tcpip/checksum/checksum.go",
-    "pkg/tcpip/checksum/checksum_amd64.go",
-    "pkg/tcpip/checksum/checksum_amd64.s",
-    "pkg/tcpip/checksum/checksum_amd64_state_autogen.go",
-    "pkg/tcpip/checksum/checksum_noasm_unsafe.go",
     "pkg/tcpip/checksum/checksum_state_autogen.go",
+    "pkg/tcpip/checksum/checksum_unsafe.go",
     "pkg/tcpip/checksum/checksum_unsafe_state_autogen.go",
     "pkg/tcpip/errors.go",
     "pkg/tcpip/faketime/faketime.go",
