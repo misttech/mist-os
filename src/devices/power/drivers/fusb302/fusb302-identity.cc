@@ -5,7 +5,7 @@
 #include "src/devices/power/drivers/fusb302/fusb302-identity.h"
 
 #include <fidl/fuchsia.hardware.i2c/cpp/wire.h>
-#include <lib/ddk/debug.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/zx/result.h>
 #include <zircon/assert.h>
 #include <zircon/types.h>
@@ -31,7 +31,7 @@ zx::result<> Fusb302Identity::ReadIdentity() {
   chip_version.append("_rev");
   chip_version.push_back(device_id.RevisionCharacter());
 
-  zxlogf(INFO, "Reporting %s - %s", chip_version.c_str(), device_id.ProductString());
+  FDF_LOG(INFO, "Reporting %s - %s", chip_version.c_str(), device_id.ProductString());
 
   root_node_.RecordString("Product", device_id.ProductString());
   root_node_.RecordString("Version", chip_version);

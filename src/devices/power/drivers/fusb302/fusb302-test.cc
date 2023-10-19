@@ -40,7 +40,9 @@ class Fusb302Test : public inspect::InspectTestHelper, public zxtest::Test {
     zx::interrupt gpio_interrupt;
     ASSERT_OK(
         zx::interrupt::create(zx::resource(), /*vector=*/0, ZX_INTERRUPT_VIRTUAL, &gpio_interrupt));
-    device_.emplace(nullptr, std::move(mock_i2c_client), std::move(gpio_interrupt));
+
+    device_.emplace(fdf::SynchronizedDispatcher(), std::move(mock_i2c_client),
+                    std::move(gpio_interrupt));
   }
 
   void ExpectInspectPropertyEquals(const char* node_name, const char* property_name,

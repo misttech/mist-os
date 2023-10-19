@@ -5,7 +5,7 @@
 #include "src/devices/power/drivers/fusb302/fusb302-fifos.h"
 
 #include <fidl/fuchsia.hardware.i2c/cpp/wire.h>
-#include <lib/ddk/debug.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/fidl/cpp/wire/arena.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
@@ -43,15 +43,15 @@ zx::result<std::optional<usb_pd::Message>> Fusb302Fifos::ReadReceivedMessage() {
   uint8_t message_start_bytes[3];
   zx::result<> result = FifoI2cRead(message_start_bytes);
   if (result.is_error()) {
-    zxlogf(ERROR, "Failed to read packet start from Fifos register: %s", result.status_string());
+    FDF_LOG(ERROR, "Failed to read packet start from Fifos register: %s", result.status_string());
     return result.take_error();
   }
-  zxlogf(TRACE, "Received SOP token and header bytes - 0x%02x 0x%02x 0x%02x",
-         message_start_bytes[0], message_start_bytes[1], message_start_bytes[2]);
+  FDF_LOG(TRACE, "Received SOP token and header bytes - 0x%02x 0x%02x 0x%02x",
+          message_start_bytes[0], message_start_bytes[1], message_start_bytes[2]);
 
   const ReceiveTokenType token_type = FifosReg::AsReceiveTokenType(message_start_bytes[0]);
   if (token_type == ReceiveTokenType::kUndocumented) {
-    zxlogf(ERROR, "Receive FIFO produced undocumented SOP token: 0x%02x", message_start_bytes[0]);
+    FDF_LOG(ERROR, "Receive FIFO produced undocumented SOP token: 0x%02x", message_start_bytes[0]);
 
     // TODO(costan): Flush the RX queue?
     return zx::error(ZX_ERR_INTERNAL);
@@ -59,9 +59,9 @@ zx::result<std::optional<usb_pd::Message>> Fusb302Fifos::ReadReceivedMessage() {
 
   usb_pd::Header header =
       usb_pd::Header::CreateFromBytes(message_start_bytes[1], message_start_bytes[2]);
-  zxlogf(TRACE, "Received header - %s, %d data objects, message ID: %" PRIu8 ", extended: %s ",
-         usb_pd::MessageTypeToString(header.message_type()), header.data_object_count(),
-         static_cast<uint8_t>(header.message_id()), header.is_extended() ? "yes" : "no");
+  FDF_LOG(TRACE, "Received header - %s, %d data objects, message ID: %" PRIu8 ", extended: %s ",
+          usb_pd::MessageTypeToString(header.message_type()), header.data_object_count(),
+          static_cast<uint8_t>(header.message_id()), header.is_extended() ? "yes" : "no");
 
   // Read the data objects and CRC.
   static constexpr int kCrcSize = 4;
@@ -74,23 +74,23 @@ zx::result<std::optional<usb_pd::Message>> Fusb302Fifos::ReadReceivedMessage() {
   result = FifoI2cRead(
       cpp20::span(reinterpret_cast<uint8_t*>(data_objects.data()), payload_plus_crc_size));
   if (result.is_error()) {
-    zxlogf(ERROR, "Failed to read packet data from Fifos register: %s", result.status_string());
+    FDF_LOG(ERROR, "Failed to read packet data from Fifos register: %s", result.status_string());
     return result.take_error();
   }
 
-  if (zxlog_level_enabled(TRACE)) {
+  if (fdf::Logger::GlobalInstance()->GetSeverity() <= FUCHSIA_LOG_TRACE) {
     static constexpr int kMaxStringSize = usb_pd::Header::kMaxDataObjectCount * 11;
     fbl::StringBuffer<kMaxStringSize> data_objects_string;
     for (size_t i = 0; i < header.data_object_count(); ++i) {
       data_objects_string.AppendPrintf("0x%08x ", data_objects[i]);
     }
-    zxlogf(TRACE, "Received %d data objects - %s", header.data_object_count(),
-           data_objects_string.c_str());
+    FDF_LOG(TRACE, "Received %d data objects - %s", header.data_object_count(),
+            data_objects_string.c_str());
   }
 
   // The CRC was already checked by the PD layer in the FUSB302. We ignore it
   // after logging (in case it aids debugging).
-  zxlogf(TRACE, "Received CRC - 0x%08x", data_objects[header.data_object_count()]);
+  FDF_LOG(TRACE, "Received CRC - 0x%08x", data_objects[header.data_object_count()]);
 
   return zx::ok(
       usb_pd::Message(header, cpp20::span(data_objects.data(), header.data_object_count())));
@@ -118,11 +118,11 @@ zx::result<> Fusb302Fifos::FifoI2cRead(cpp20::span<uint8_t> read_output) {
     return zx::error_result(response.value().error_value());
   }
   if (response.value().value()->read_data.count() != 1) {
-    zxlogf(ERROR, "I2C Read request succeeded, but returned an incorrect item count");
+    FDF_LOG(ERROR, "I2C Read request succeeded, but returned an incorrect item count");
     return zx::error_result(ZX_ERR_BAD_STATE);
   }
   if (response.value().value()->read_data[0].count() != read_output.size()) {
-    zxlogf(ERROR, "I2C Read request succeeded, but returned an incorrect byte count");
+    FDF_LOG(ERROR, "I2C Read request succeeded, but returned an incorrect byte count");
     return zx::error_result(ZX_ERR_BAD_STATE);
   }
 
@@ -178,20 +178,20 @@ zx::result<> Fusb302Fifos::TransmitMessage(const usb_pd::Message& main_message) 
   i2c_write_bytes[0] = FifosReg::Get().addr();
   size_t i2c_write_offset = kI2cHeaderSize;
 
-  zxlogf(TRACE, "Transmitting header - %s, %d data objects, message ID: %" PRIu8 ", extended: %s ",
-         usb_pd::MessageTypeToString(main_message.header().message_type()),
-         main_message.header().data_object_count(),
-         static_cast<uint8_t>(main_message.header().message_id()),
-         main_message.header().is_extended() ? "yes" : "no");
+  FDF_LOG(TRACE, "Transmitting header - %s, %d data objects, message ID: %" PRIu8 ", extended: %s ",
+          usb_pd::MessageTypeToString(main_message.header().message_type()),
+          main_message.header().data_object_count(),
+          static_cast<uint8_t>(main_message.header().message_id()),
+          main_message.header().is_extended() ? "yes" : "no");
 
-  if (zxlog_level_enabled(TRACE)) {
+  if (fdf::Logger::GlobalInstance()->GetSeverity() <= FUCHSIA_LOG_TRACE) {
     static constexpr int kMaxStringSize = usb_pd::Header::kMaxDataObjectCount * 11;
     fbl::StringBuffer<kMaxStringSize> data_objects_string;
     for (size_t i = 0; i < main_message.header().data_object_count(); ++i) {
       data_objects_string.AppendPrintf("0x%08x ", main_message.data_objects()[i]);
     }
-    zxlogf(TRACE, "Transmitting %d data objects - %s", main_message.header().data_object_count(),
-           data_objects_string.c_str());
+    FDF_LOG(TRACE, "Transmitting %d data objects - %s", main_message.header().data_object_count(),
+            data_objects_string.c_str());
   }
 
   const size_t message_size = SerializedMessageSize(main_message);
@@ -203,13 +203,13 @@ zx::result<> Fusb302Fifos::TransmitMessage(const usb_pd::Message& main_message) 
   i2c_write_bytes[i2c_write_offset + 1] = TransmitToken::kTxOn;
   i2c_write_offset += 2;
 
-  if (zxlog_level_enabled(TRACE)) {
+  if (fdf::Logger::GlobalInstance()->GetSeverity() <= FUCHSIA_LOG_TRACE) {
     static constexpr int kMaxStringSize = sizeof(i2c_write_bytes) * 3;
     fbl::StringBuffer<kMaxStringSize> fifo_bytes_string;
     for (size_t i = 0; i < i2c_write_offset; ++i) {
       fifo_bytes_string.AppendPrintf("%02x ", i2c_write_bytes[i]);
     }
-    zxlogf(TRACE, "I2C write bytes - %s", fifo_bytes_string.c_str());
+    FDF_LOG(TRACE, "I2C write bytes - %s", fifo_bytes_string.c_str());
   }
 
   zx::result<> result = FifoI2cWrite(cpp20::span(i2c_write_bytes, i2c_write_offset));
@@ -217,8 +217,8 @@ zx::result<> Fusb302Fifos::TransmitMessage(const usb_pd::Message& main_message) 
     auto control0 = Control0Reg::ReadFrom(i2c_);
     zx_status_t status = control0.set_tx_flush(true).WriteTo(i2c_);
     if (status != ZX_OK) {
-      zxlogf(ERROR, "Failed to flush Transmitter FIFO after I/O error: %s",
-             zx_status_get_string(status));
+      FDF_LOG(ERROR, "Failed to flush Transmitter FIFO after I/O error: %s",
+              zx_status_get_string(status));
     }
   }
   return result;
@@ -238,7 +238,7 @@ zx::result<> Fusb302Fifos::FifoI2cWrite(cpp20::span<uint8_t> i2c_write_bytes) {
   }
 
   // Make sure we're not transmitting at the same time as the port partner.
-  // This check needs to happen after any zxlogf().
+  // This check needs to happen after any FDF_LOG().
   //
   // FUSB302 drivers that use automated GoodCRC replies don't need this check,
   // because they only use the transmitter FIFO when it's clearly their turn to

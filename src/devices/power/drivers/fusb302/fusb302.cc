@@ -4,9 +4,8 @@
 
 #include "src/devices/power/drivers/fusb302/fusb302.h"
 
-#include <fuchsia/hardware/gpio/cpp/banjo.h>
-#include <lib/ddk/binding_driver.h>
-#include <lib/ddk/debug.h>
+#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
+#include <lib/driver/component/cpp/driver_export.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/profile.h>
 #include <lib/zx/result.h>
@@ -33,70 +32,18 @@
 
 namespace fusb302 {
 
-namespace {
-
-constexpr uint64_t kPortPacketKeyInterrupt = 1;
-constexpr uint64_t kPortPacketKeyTimer = 2;
-
-}  // namespace
-
-zx::result<> Fusb302::PumpIrqPort() {
-  zx_port_packet_t packet;
-  zx_status_t status = port_.wait(zx::time(ZX_TIME_INFINITE), &packet);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "zx::port::wait() failed: %s", zx_status_get_string(status));
-    return zx::error_result(status);
-  }
-
-  HardwareStateChanges changes;
-  switch (packet.key) {
-    case kPortPacketKeyInterrupt:
-      changes = signals_.ServiceInterrupts();
-      break;
-
-    case kPortPacketKeyTimer:
-      zxlogf(TRACE, "State machine timer fired off");
-      changes.timer_signaled = true;
-      break;
-
-    default:
-      zxlogf(ERROR, "Unrecognized packet key: %" PRIu64, packet.key);
-      return zx::error_result(ZX_ERR_INTERNAL);
-  }
-
-  ProcessStateChanges(changes);
-
-  if (packet.key == kPortPacketKeyInterrupt) {
-    status = irq_.ack();
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "IRQ ack() failed: %s", zx_status_get_string(status));
-      return zx::error_result(status);
-    }
-  }
-
-  return zx::ok();
+void Fusb302::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_status_t status,
+                        const zx_packet_interrupt_t* interrupt) {
+  ProcessStateChanges(signals_.ServiceInterrupts());
+  irq_.ack();
 }
 
-zx_status_t Fusb302::IrqThreadEntryPoint() {
-  zx_status_t status = ZX_OK;
-
-  {
-    const char* role_name = "fuchsia.devices.power.drivers.fusb302.interrupt";
-    status = device_set_profile_by_role(parent_, thrd_get_zx_handle(irq_thread_), role_name,
-                                        strlen(role_name));
-    if (status != ZX_OK) {
-      zxlogf(WARNING, "Failed to apply role to interrupt thread: %s", zx_status_get_string(status));
-    }
-  }
-
-  zx::result<> last_pump_result = zx::ok();
-  while (last_pump_result.is_ok()) {
-    last_pump_result = PumpIrqPort();
-  }
-
-  is_thread_running_ = false;
-  zxlogf(ERROR, "IRQ thread failed: %s", zx_status_get_string(status));
-  return status;
+void Fusb302::HandleTimeout(async_dispatcher_t*, async::WaitBase*, zx_status_t status,
+                            const zx_packet_signal_t*) {
+  HardwareStateChanges changes;
+  FDF_LOG(TRACE, "State machine timer fired off");
+  changes.timer_signaled = true;
+  ProcessStateChanges(changes);
 }
 
 void Fusb302::ProcessStateChanges(HardwareStateChanges changes) {
@@ -133,7 +80,7 @@ void Fusb302::ProcessStateChanges(HardwareStateChanges changes) {
 zx_status_t Fusb302::ResetHardwareAndStartPowerRoleDetection() {
   auto status = ResetReg::Get().FromValue(0).set_sw_res(true).WriteTo(i2c_);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to write Reset register: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "Failed to write Reset register: %s", zx_status_get_string(status));
     return status;
   }
 
@@ -153,106 +100,96 @@ zx_status_t Fusb302::ResetHardwareAndStartPowerRoleDetection() {
 zx_status_t Fusb302::Init() {
   zx::result<> result = identity_.ReadIdentity();
   if (result.is_error()) {
-    zxlogf(ERROR, "Failed to initialize inspect: %s", result.status_string());
+    FDF_LOG(ERROR, "Failed to initialize inspect: %s", result.status_string());
     return result.error_value();
   }
 
   zx_status_t status = ResetHardwareAndStartPowerRoleDetection();
   if (status != ZX_OK) {
-    zxlogf(ERROR, "ResetHardwareAndStartPowerRoleDetection() failed: %s",
-           zx_status_get_string(status));
+    FDF_LOG(ERROR, "ResetHardwareAndStartPowerRoleDetection() failed: %s",
+            zx_status_get_string(status));
     return status;
   }
 
-  status = zx::port::create(ZX_PORT_BIND_TO_INTERRUPT, &port_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "zx::port::create() failed: %s", zx_status_get_string(status));
-    return status;
-  }
-  irq_.bind(port_, kPortPacketKeyInterrupt, /*options=*/0);
-  status = thrd_status_to_zx_status(thrd_create_with_name(
-      &irq_thread_,
-      [](void* ctx) -> int { return reinterpret_cast<Fusb302*>(ctx)->IrqThreadEntryPoint(); }, this,
-      "fusb302-irq-thread"));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to start thread: %s", zx_status_get_string(status));
-    return status;
-  }
-  is_thread_running_ = true;
+  irq_handler_.set_object(irq_.get());
+  irq_handler_.Begin(dispatcher_.async_dispatcher());
 
   return ZX_OK;
 }
-
-// static
-zx_status_t Fusb302::Create(void* context, zx_device_t* parent) {
-  auto client_end =
-      DdkConnectFragmentFidlProtocol<fuchsia_hardware_i2c::Service::Device>(parent, "i2c");
-  if (client_end.is_error()) {
-    zxlogf(ERROR, "Failed to get I2C bus for registers: %s", client_end.status_string());
-    return client_end.status_value();
-  }
-
-  ddk::GpioProtocolClient gpio;
-  zx_status_t status = ddk::GpioProtocolClient::CreateFromDevice(parent, "gpio", &gpio);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to get GPIO for interrupt pin: %s", zx_status_get_string(status));
-    return status;
-  }
-  status = gpio.ConfigIn(GPIO_PULL_UP);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "GPIO ConfigIn() failed: %s", zx_status_get_string(status));
-  }
-  zx::interrupt irq;
-  status = gpio.GetInterrupt(ZX_INTERRUPT_MODE_LEVEL_LOW, &irq);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "GPIO GetInterrupt() failed: %s", zx_status_get_string(status));
-  }
-
-  fbl::AllocChecker alloc_checker;
-  auto device = fbl::make_unique_checked<Fusb302>(&alloc_checker, parent, std::move(*client_end),
-                                                  std::move(irq));
-  if (!alloc_checker.check()) {
-    return ZX_ERR_NO_MEMORY;
-  }
-
-  status = device->Init();
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Init() failed: %s", zx_status_get_string(status));
-    return status;
-  }
-
-  status = device->DdkAdd(
-      ddk::DeviceAddArgs("fusb302").set_inspect_vmo(device->inspect_.DuplicateVmo()));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "DdkAdd() failed: %s", zx_status_get_string(status));
-    return status;
-  }
-
-  // The device manager now owns `device`.
-  [[maybe_unused]] auto* dropped_ptr = device.release();
-  return ZX_OK;
-}
-
-void Fusb302::DdkRelease() { delete this; }
 
 zx::result<> Fusb302::WaitAsyncForTimer(zx::timer& timer) {
-  const zx_status_t status =
-      timer.wait_async(port_, kPortPacketKeyTimer, ZX_TIMER_SIGNALED, /*options=*/0);
+  timeout_handler_.set_object(timer.get());
+  timeout_handler_.set_trigger(ZX_TIMER_SIGNALED);
+  auto status = timeout_handler_.Begin(dispatcher_.async_dispatcher(),
+                                       fit::bind_member(this, &Fusb302::HandleTimeout));
   if (status != ZX_OK) {
-    zxlogf(WARNING, "Failed to wait on timer: %s", zx_status_get_string(status));
+    FDF_LOG(WARNING, "Failed to wait on timer: %s", zx_status_get_string(status));
   }
   return zx::make_result(status);
 }
 
-namespace {
+zx::result<> Fusb302Device::Start() {
+  // Map hardware resources.
+  fidl::ClientEnd<fuchsia_hardware_i2c::Device> i2c;
+  zx::interrupt irq;
+  {
+    zx::result result = incoming()->Connect<fuchsia_hardware_i2c::Service::Device>("i2c");
+    if (result.is_error()) {
+      FDF_LOG(ERROR, "Failed to open i2c service: %s", result.status_string());
+      return result.take_error();
+    }
+    i2c = std::move(result.value());
+  }
+  {
+    zx::result result = incoming()->Connect<fuchsia_hardware_gpio::Service::Device>("gpio");
+    if (result.is_error()) {
+      FDF_LOG(ERROR, "Failed to open gpio service: %s", result.status_string());
+      return result.take_error();
+    }
 
-constexpr zx_driver_ops_t kDriverOps = {
-    .version = DRIVER_OPS_VERSION,
-    .bind = fusb302::Fusb302::Create,
-};
+    auto gpio = fidl::WireSyncClient(std::move(result.value()));
+    if (auto result = gpio->ConfigIn(fuchsia_hardware_gpio::GpioFlags::kPullUp);
+        !result.ok() || result->is_error()) {
+      FDF_LOG(ERROR, "GPIO ConfigIn() failed: %s",
+              result.ok() ? zx_status_get_string(result->error_value())
+                          : result.FormatDescription().c_str());
+    }
+    if (auto result = gpio->GetInterrupt(ZX_INTERRUPT_MODE_LEVEL_LOW);
+        !result.ok() || result->is_error()) {
+      FDF_LOG(ERROR, "GPIO GetInterrupt() failed: %s",
+              result.ok() ? zx_status_get_string(result->error_value())
+                          : result.FormatDescription().c_str());
+    } else {
+      irq = std::move(result->value()->irq);
+    }
+  }
 
-}  // namespace
+  auto fusb302_dispatcher = fdf::SynchronizedDispatcher::Create(
+      {}, "fusb302", [&](fdf_dispatcher_t*) {}, "fuchsia.devices.power.drivers.fusb302.interrupt");
+  ZX_ASSERT_MSG(!fusb302_dispatcher.is_error(), "Creating dispatcher error: %s",
+                zx_status_get_string(fusb302_dispatcher.status_value()));
+
+  device_ = std::make_unique<fusb302::Fusb302>(std::move(*fusb302_dispatcher), std::move(i2c),
+                                               std::move(irq));
+  auto status = device_->Init();
+  if (status != ZX_OK) {
+    FDF_LOG(ERROR, "Init() failed: %s", zx_status_get_string(status));
+    return zx::error(status);
+  }
+
+  auto result = outgoing()->component().AddUnmanagedProtocol<fuchsia_hardware_powersource::Source>(
+      source_bindings_.CreateHandler(device_.get(), dispatcher(), fidl::kIgnoreBindingClosure),
+      kDeviceName);
+  if (result.is_error()) {
+    FDF_LOG(ERROR, "Failed to add Device service %s", result.status_string());
+    return result.take_error();
+  }
+
+  return zx::ok();
+}
+
+void Fusb302Device::Stop() { device_.reset(); }
 
 }  // namespace fusb302
 
-ZIRCON_DRIVER(fusb302, fusb302::kDriverOps, "zircon", "0.1");
+FUCHSIA_DRIVER_EXPORT(fusb302::Fusb302Device);

@@ -5,7 +5,7 @@
 #include "src/devices/power/drivers/fusb302/fusb302-sensors.h"
 
 #include <fidl/fuchsia.hardware.i2c/cpp/wire.h>
-#include <lib/ddk/debug.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/zx/result.h>
 #include <zircon/assert.h>
 #include <zircon/types.h>
@@ -43,8 +43,8 @@ bool Fusb302Sensors::UpdateComparatorsResult() {
   } else if (configured_power_role_ == usb_pd::PowerRole::kSink) {
     cc_termination = ConfigChannelTerminationFromFixedComparatorResult(status0.bc_lvl());
     if (cc_termination == usb_pd::ConfigChannelTermination::kRp3000mA && status0.comp()) {
-      zxlogf(DEBUG, "%s pin voltage exceeds 2.05V (c/o variable comparator)",
-             ConfigChannelPinSwitchToString(configured_wired_cc_pin_));
+      FDF_LOG(DEBUG, "%s pin voltage exceeds 2.05V (c/o variable comparator)",
+              ConfigChannelPinSwitchToString(configured_wired_cc_pin_));
       cc_termination = usb_pd::ConfigChannelTermination::kUnknown;
     }
   } else {
@@ -52,9 +52,9 @@ bool Fusb302Sensors::UpdateComparatorsResult() {
     cc_termination = usb_pd::ConfigChannelTermination::kUnknown;
   }
 
-  zxlogf(TRACE, "Voltage comparators result: VBUS %s, CC wire termination %s",
-         vbus_power_good ? ">= 4.0 V" : "< 4.0 V",
-         ConfigChannelTerminationToString(cc_termination));
+  FDF_LOG(TRACE, "Voltage comparators result: VBUS %s, CC wire termination %s",
+          vbus_power_good ? ">= 4.0 V" : "< 4.0 V",
+          ConfigChannelTerminationToString(cc_termination));
 
   const bool state_changed =
       (vbus_power_good_.get() != vbus_power_good) || (cc_termination_.get() != cc_termination);
@@ -66,8 +66,8 @@ bool Fusb302Sensors::UpdateComparatorsResult() {
 bool Fusb302Sensors::UpdatePowerRoleDetectionResult() {
   const PowerRoleDetectionState power_role_detection_state = Status1AReg::ReadFrom(i2c_).togss();
 
-  zxlogf(TRACE, "Power role detection state: %s",
-         PowerRoleDetectionStateToString(power_role_detection_state));
+  FDF_LOG(TRACE, "Power role detection state: %s",
+          PowerRoleDetectionStateToString(power_role_detection_state));
 
   const bool state_changed = power_role_detection_state_.get() != power_role_detection_state;
   power_role_detection_state_.set(power_role_detection_state);
@@ -84,7 +84,7 @@ void Fusb302Sensors::SyncDerivedPowerRoleDetectionState() {
   detected_wired_cc_pin_.set(wired_cc_pin);
 
   if (wired_cc_pin == usb_pd::ConfigChannelPinSwitch::kNone) {
-    zxlogf(TRACE, "Power role detection result: running");
+    FDF_LOG(TRACE, "Power role detection result: running");
     detected_power_role_.set(usb_pd::PowerRole::kSink);
     return;
   }
@@ -94,10 +94,10 @@ void Fusb302Sensors::SyncDerivedPowerRoleDetectionState() {
   const usb_pd::PowerRole power_role = PowerRoleFromDetectionState(power_role_detection_state);
   detected_power_role_.set(power_role);
 
-  zxlogf(TRACE, "Power role detection result: state 0x%02x, power %s, Config Channel on %s",
-         static_cast<unsigned int>(power_role_detection_state),
-         usb_pd::PowerRoleToString(power_role),
-         usb_pd::ConfigChannelPinSwitchToString(wired_cc_pin));
+  FDF_LOG(TRACE, "Power role detection result: state 0x%02x, power %s, Config Channel on %s",
+          static_cast<unsigned int>(power_role_detection_state),
+          usb_pd::PowerRoleToString(power_role),
+          usb_pd::ConfigChannelPinSwitchToString(wired_cc_pin));
 }
 
 }  // namespace fusb302

@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.hardware.i2c/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/mock-i2c/mock-i2c.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
@@ -50,6 +51,7 @@ constexpr uint8_t kSopRxToken = 0b1110'0000;
 class Fusb302ProtocolTest : public zxtest::Test {
  public:
   void SetUp() override {
+    fdf::Logger::SetGlobalInstance(&logger_);
     auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
     EXPECT_TRUE(endpoints.is_ok());
     mock_i2c_client_ = std::move(endpoints->client);
@@ -62,7 +64,10 @@ class Fusb302ProtocolTest : public zxtest::Test {
     protocol_.emplace(fifos_.value());
   }
 
-  void TearDown() override { mock_i2c_.VerifyAndClear(); }
+  void TearDown() override {
+    fdf::Logger::SetGlobalInstance(nullptr);
+    mock_i2c_.VerifyAndClear();
+  }
 
  protected:
   void MockReceiveSourceCapabilities(usb_pd::MessageId message_id) {
@@ -168,6 +173,9 @@ class Fusb302ProtocolTest : public zxtest::Test {
   void MockNoBmcTransmissionDetected() {
     mock_i2c_.ExpectWrite({kStatus0Address}).ExpectReadStop({0x80});
   }
+
+  fdf::Logger logger_{"fusb302-protocol-test", FUCHSIA_LOG_DEBUG, zx::socket{},
+                      fidl::WireClient<fuchsia_logger::LogSink>()};
 
   async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
   mock_i2c::MockI2c mock_i2c_;

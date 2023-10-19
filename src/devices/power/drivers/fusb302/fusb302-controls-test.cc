@@ -39,6 +39,8 @@ constexpr int kControl4Address = 0x10;
 class Fusb302ControlsTest : public inspect::InspectTestHelper, public zxtest::Test {
  public:
   void SetUp() override {
+    fdf::Logger::SetGlobalInstance(&logger_);
+
     auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
     EXPECT_TRUE(endpoints.is_ok());
     mock_i2c_client_ = std::move(endpoints->client);
@@ -52,8 +54,12 @@ class Fusb302ControlsTest : public inspect::InspectTestHelper, public zxtest::Te
                       inspect_.GetRoot().CreateChild("Controls"));
   }
 
+  void TearDown() override { fdf::Logger::SetGlobalInstance(nullptr); }
+
  protected:
   inspect::Inspector inspect_;
+  fdf::Logger logger_{"fusb302-controls-test", FUCHSIA_LOG_DEBUG, zx::socket{},
+                      fidl::WireClient<fuchsia_logger::LogSink>()};
 
   async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
   mock_i2c::MockI2c mock_i2c_;

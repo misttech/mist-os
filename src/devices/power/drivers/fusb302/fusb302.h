@@ -7,7 +7,9 @@
 
 #include <fidl/fuchsia.hardware.i2c/cpp/wire.h>
 #include <fidl/fuchsia.hardware.powersource/cpp/wire.h>
-#include <lib/ddk/debug.h>
+#include <lib/async/cpp/irq.h>
+#include <lib/async/cpp/wait.h>
+#include <lib/driver/component/cpp/driver_base.h>
 #include <lib/inspect/cpp/inspector.h>
 #include <lib/zx/interrupt.h>
 #include <lib/zx/result.h>
@@ -16,11 +18,7 @@
 #include <zircon/status.h>
 #include <zircon/types.h>
 
-#include <cstdint>
-
-#include <ddktl/device.h>
-#include <ddktl/fidl.h>
-
+#include "lib/fdf/cpp/dispatcher.h"
 #include "src/devices/power/drivers/fusb302/fusb302-controls.h"
 #include "src/devices/power/drivers/fusb302/fusb302-fifos.h"
 #include "src/devices/power/drivers/fusb302/fusb302-identity.h"
@@ -33,16 +31,13 @@
 
 namespace fusb302 {
 
-class Fusb302;
-using DeviceType =
-    ddk::Device<Fusb302, ddk::Messageable<fuchsia_hardware_powersource::Source>::Mixin>;
-
 // Fusb302: Device that keeps track of the state of the HW, services FIDL requests, and runs the IRQ
 // thread, which in turn runs StateMachine when called on.
-class Fusb302 : public DeviceType {
+class Fusb302 : public fidl::WireServer<fuchsia_hardware_powersource::Source> {
  public:
-  Fusb302(zx_device_t* parent, fidl::ClientEnd<fuchsia_hardware_i2c::Device> i2c, zx::interrupt irq)
-      : DeviceType(parent),
+  Fusb302(fdf::Dispatcher dispatcher, fidl::ClientEnd<fuchsia_hardware_i2c::Device> i2c,
+          zx::interrupt irq)
+      : dispatcher_(std::move(dispatcher)),
         i2c_(std::move(i2c)),
         irq_(std::move(irq)),
         identity_(i2c_, inspect_.GetRoot().CreateChild("Identity")),
@@ -63,19 +58,16 @@ class Fusb302 : public DeviceType {
   Fusb302& operator=(const Fusb302&) = delete;
 
   ~Fusb302() override {
+    irq_handler_.Cancel();
     const zx_status_t status = irq_.destroy();
     if (status != ZX_OK) {
-      zxlogf(WARNING, "zx::interrupt::destroy() failed: %s", zx_status_get_string(status));
+      FDF_LOG(WARNING, "zx::interrupt::destroy() failed: %s", zx_status_get_string(status));
     }
-    if (is_thread_running_) {
-      thrd_join(irq_thread_, nullptr);
-      is_thread_running_ = false;
-    }
+    timeout_handler_.Cancel();
   }
 
-  static zx_status_t Create(void* context, zx_device_t* parent);
-
-  void DdkRelease();
+  // Initialization Functions and Variables
+  zx_status_t Init();
 
   // TODO (rdzhuang): change power FIDL to supply required values in SourceInfo
   void GetPowerInfo(GetPowerInfoCompleter::Sync& completer) override {
@@ -101,25 +93,21 @@ class Fusb302 : public DeviceType {
   zx::result<> WaitAsyncForTimer(zx::timer& timer);
 
  private:
-  // Initialization Functions and Variables
-  zx_status_t Init();
   zx_status_t ResetHardwareAndStartPowerRoleDetection();
 
-  // Initial routine / entry point for the IRQ handling thread.
-  zx_status_t IrqThreadEntryPoint();
-
-  // Reads one packet from the interrupt request port, and services it.
-  //
-  // Returns an error iff it's not safe to continue pumping the port.
-  zx::result<> PumpIrqPort();
+  void HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_status_t status,
+                 const zx_packet_interrupt_t* interrupt);
+  void HandleTimeout(async_dispatcher_t*, async::WaitBase*, zx_status_t status,
+                     const zx_packet_signal_t*);
 
   void ProcessStateChanges(HardwareStateChanges changes);
 
+  fdf::Dispatcher dispatcher_;
+
   fidl::ClientEnd<fuchsia_hardware_i2c::Device> i2c_;
   zx::interrupt irq_;
-  zx::port port_;
-  std::atomic_bool is_thread_running_ = false;
-  thrd_t irq_thread_;
+  async::IrqMethod<Fusb302, &Fusb302::HandleIrq> irq_handler_{this};
+  async::WaitOnce timeout_handler_;
 
   inspect::Inspector inspect_;
 
@@ -134,6 +122,27 @@ class Fusb302 : public DeviceType {
 
   TypeCPortStateMachine port_state_machine_;
   SinkPolicyEngineStateMachine pd_state_machine_;
+};
+
+constexpr char kDeviceName[] = "fusb302";
+
+class Fusb302Device : public fdf::DriverBase {
+ public:
+  Fusb302Device(fdf::DriverStartArgs start_args,
+                fdf::UnownedSynchronizedDispatcher driver_dispatcher)
+      : fdf::DriverBase(kDeviceName, std::move(start_args), std::move(driver_dispatcher)) {}
+
+  zx::result<> Start() override;
+  void Stop() override;
+
+ private:
+  void Serve(fidl::ServerEnd<fuchsia_hardware_powersource::Source> server) {
+    source_bindings_.AddBinding(dispatcher(), std::move(server), device_.get(),
+                                fidl::kIgnoreBindingClosure);
+  }
+
+  std::unique_ptr<Fusb302> device_;
+  fidl::ServerBindingGroup<fuchsia_hardware_powersource::Source> source_bindings_;
 };
 
 }  // namespace fusb302

@@ -4,7 +4,7 @@
 
 #include "src/devices/power/drivers/fusb302/usb-pd-sink-policy.h"
 
-#include <lib/ddk/debug.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <zircon/assert.h>
 
 #include <cinttypes>
@@ -85,8 +85,8 @@ PowerRequestData SinkPolicy::GetPowerRequest() const {
         break;
       }
       default:
-        zxlogf(WARNING, "Skipping unsupported power type %" PRIu8,
-               static_cast<unsigned char>(power_data.supply_type()));
+        FDF_LOG(WARNING, "Skipping unsupported power type %" PRIu8,
+                static_cast<unsigned char>(power_data.supply_type()));
         break;
     }
   }

@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.hardware.i2c/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/inspect/testing/cpp/zxtest/inspect.h>
 #include <lib/mock-i2c/mock-i2c.h>
 
@@ -25,6 +26,8 @@ constexpr int kDeviceIdAddress = 0x01;
 class Fusb302IdentityTest : public inspect::InspectTestHelper, public zxtest::Test {
  public:
   void SetUp() override {
+    fdf::Logger::SetGlobalInstance(&logger_);
+
     auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
     EXPECT_TRUE(endpoints.is_ok());
     mock_i2c_client_ = std::move(endpoints->client);
@@ -36,6 +39,8 @@ class Fusb302IdentityTest : public inspect::InspectTestHelper, public zxtest::Te
     identity_.emplace(mock_i2c_client_, inspect_.GetRoot().CreateChild("Identity"));
   }
 
+  void TearDown() override { fdf::Logger::SetGlobalInstance(nullptr); }
+
   void ExpectInspectPropertyEquals(const char* property_name, const std::string& expected_value) {
     ASSERT_NO_FATAL_FAILURE(ReadInspect(inspect_.DuplicateVmo()));
     auto* identity_root = hierarchy().GetByPath({"Identity"});
@@ -46,6 +51,9 @@ class Fusb302IdentityTest : public inspect::InspectTestHelper, public zxtest::Te
 
  protected:
   inspect::Inspector inspect_;
+
+  fdf::Logger logger_{"fusb302-identity-test", FUCHSIA_LOG_DEBUG, zx::socket{},
+                      fidl::WireClient<fuchsia_logger::LogSink>()};
 
   async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
   mock_i2c::MockI2c mock_i2c_;

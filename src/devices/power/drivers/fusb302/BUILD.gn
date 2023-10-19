@@ -23,11 +23,10 @@ driver_bind_rules("fusb302-bind") {
 group("common") {
   public_deps = [
     ":fusb302-bind",
-    "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
     "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_cpp",
     "//sdk/fidl/fuchsia.hardware.powersource:fuchsia.hardware.powersource_cpp",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
+    "//sdk/lib/driver/component/cpp:cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg-i2c",
     "//zircon/system/ulib/inspect",
@@ -54,7 +53,7 @@ fuchsia_driver("fusb302-driver") {
   configs += [ "//build/config:all_source" ]
   deps = [
     ":common",
-    "//src/devices/lib/driver",
+    "//src/devices/lib/driver:driver_runtime",
   ]
 
   # TODO: delete the below and fix compiler errors.

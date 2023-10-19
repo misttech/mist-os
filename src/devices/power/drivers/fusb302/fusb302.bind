@@ -8,7 +8,7 @@ using fuchsia.i2c;
 using fuchsia.gpio;
 
 primary node "gpio" {
-  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.gpio.BIND_FIDL_PROTOCOL.SERVICE;
   fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.USB_POWER_DELIVERY;
 }
 
