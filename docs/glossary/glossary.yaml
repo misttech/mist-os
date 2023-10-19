@@ -25,8 +25,8 @@
   of each partition on disk. By convention, the slots used for normal updates are denoted A and B,
   and the corresponding partitions are labeled with a suffix of \"_a\" or \"_b\".
   The slot used for recovery is denoted R which is chosen when neither A nor B is bootable.</p>"
-  see_also: ["<a href=\"/docs/development/packages/ota.md\">OTA updates</a>"]
-  related_guides: [""]
+  see_also: ["<a href=\"/docs/glossary#ota\">OTA</a>"]
+  related_guides: ["<a href=\"/docs/concepts/packages/ota.md\">OTA updates</a>"]
   area: ["System", "Zircon"]
 
 - term: "Action key"
