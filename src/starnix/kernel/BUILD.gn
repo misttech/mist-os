@@ -331,6 +331,7 @@ rustc_binary("starnix_kernel_bin") {
     "power/suspend_stats.rs",
     "selinux/fs.rs",
     "selinux/mod.rs",
+    "selinux/security_server.rs",
     "signals/mod.rs",
     "signals/signal_handling.rs",
     "signals/signalfd.rs",

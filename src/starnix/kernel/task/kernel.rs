@@ -42,6 +42,7 @@ use crate::{
     logging::{log_error, set_zx_name},
     mm::{FutexTable, SharedFutexKey},
     power::PowerManager,
+    selinux::SecurityServer,
     task::*,
     types::{DeviceType, Errno, OpenFlags, *},
     vdso::vdso_loader::Vdso,
@@ -95,6 +96,8 @@ pub struct Kernel {
     pub sys_fs: OnceCell<FileSystemHandle>,
     // Owned by selinux/fs.rs
     pub selinux_fs: OnceCell<FileSystemHandle>,
+    // The SELinux security server. Initialized if SELinux is enabled.
+    pub security_server: Option<SecurityServer>,
     // Owned by tracefs/fs.rs
     pub trace_fs: OnceCell<FileSystemHandle>,
 
@@ -245,6 +248,8 @@ impl Kernel {
 
         let core_dumps = CoreDumpList::new(inspect_node.create_child("coredumps"));
 
+        let security_server = features.contains("selinux").then(|| SecurityServer::new());
+
         let this = Arc::new(Kernel {
             job,
             kthreads: KernelThreads::default(),
@@ -262,6 +267,7 @@ impl Kernel {
             socket_fs: OnceCell::new(),
             sys_fs: OnceCell::new(),
             selinux_fs: OnceCell::new(),
+            security_server,
             trace_fs: OnceCell::new(),
             device_registry: DeviceRegistry::new(),
             features,
