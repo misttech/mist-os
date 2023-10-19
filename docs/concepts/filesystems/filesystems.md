@@ -194,7 +194,7 @@ unwrapped into user-accessible Vnodes at boot (these files are accessible in
 
 ### MinFS: A persistent filesystem
 
-[MinFS](/src/storage/bin/minfs/)
+[MinFS](/src/storage/minfs/bin/)
 is a simple, traditional filesystem that is capable of storing files
 persistently. Like MemFS, it makes extensive use of the VFS layers mentioned
 earlier, but unlike MemFS, it requires an additional handle to a block device

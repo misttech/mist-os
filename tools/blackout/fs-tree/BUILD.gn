@@ -50,7 +50,7 @@ fuchsia_package("blackout-minfs-tree-target") {
   testonly = true
   deps = [
     ":blackout-minfs-tree-target-component",
-    "//src/storage/bin/minfs:minfs-component",
+    "//src/storage/minfs/bin:minfs-component",
   ]
 }
 

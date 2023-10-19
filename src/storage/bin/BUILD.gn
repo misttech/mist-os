@@ -9,7 +9,6 @@ group("tests") {
   deps = [
     "disk-pave:tests",
     "f2fs:tests",
-    "minfs:tests",
   ]
 }
 

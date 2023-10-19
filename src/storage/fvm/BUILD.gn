@@ -184,5 +184,5 @@ fuchsia_test_package("fvm-integration-test") {
       max_severity = "ERROR"
     }
   }
-  deps = [ "//src/storage/bin/minfs:minfs-component" ]
+  deps = [ "//src/storage/minfs/bin:minfs-component" ]
 }

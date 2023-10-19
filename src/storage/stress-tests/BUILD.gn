@@ -9,7 +9,7 @@ fuchsia_component("minfs-crash") {
   manifest = "minfs/meta/crash.cml"
   deps = [
     "genericfs:stressor-bin",
-    "//src/storage/bin/minfs:minfs-component",
+    "//src/storage/minfs/bin:minfs-component",
   ]
 }
 
@@ -18,7 +18,7 @@ fuchsia_component("minfs-no-crash") {
   manifest = "minfs/meta/no-crash.cml"
   deps = [
     "genericfs:stressor-bin",
-    "//src/storage/bin/minfs:minfs-component",
+    "//src/storage/minfs/bin:minfs-component",
   ]
 }
 
@@ -110,7 +110,7 @@ fuchsia_component("minfs-short") {
   manifest = "minfs/meta/short.cml"
   deps = [
     "genericfs:stressor-bin",
-    "//src/storage/bin/minfs:minfs-component",
+    "//src/storage/minfs/bin:minfs-component",
   ]
 }
 

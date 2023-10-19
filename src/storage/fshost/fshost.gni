@@ -74,7 +74,7 @@ template("fshost_cml") {
         "//src/storage/memfs:memfs_component",
 
         # For now, we always need minfs to support migration
-        "//src/storage/bin/minfs:minfs-component",
+        "//src/storage/minfs/bin:minfs-component",
       ]
 
       if (options.data_filesystem_format == "fxfs") {

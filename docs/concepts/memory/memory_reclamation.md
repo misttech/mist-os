@@ -404,7 +404,7 @@ memory-pressure: pausing for 8s after OOM mem signal
 [00028.317] 02811:03481> [fshost] INFO: [fs-manager.cc(281)] filesystem shutdown initiated
 [00028.317] 02811:38032> [fshost] INFO: [fs-manager.cc(310)] Shutting down /data
 [00028.318] 12900:12902> [minfs] INFO: [minfs.cc(1471)] Shutting down
-[00028.340] 12900:12902> [minfs] WARNING: [src/storage/bin/minfs/main.cc(53)] Unmounted
+[00028.340] 12900:12902> [minfs] WARNING: [src/storage/minfs/bin/main.cc(53)] Unmounted
 [00028.341] 02811:03481> [fshost] INFO: [admin-server.cc(39)] shutdown complete
 [00028.342] 02811:02813> [fshost] INFO: [main.cc(309)] terminating
 [00028.342] 02687:02689> [driver_manager.cm] INFO: [suspend_handler.cc(205)] Successfully waited for VFS exit completion
