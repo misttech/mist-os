@@ -161,6 +161,15 @@ func TestExecuteWithSink(t *testing.T) {
 			"transfer_manifest_path": "obj/build/images/fuchsia/transfer.json",
 			"transfer_manifest_url": "file://obj/build/images/fuchsia/transfer.json"
 		  }]`),
+		"builds/123/build_api/build_info.json": []byte(`{
+			"configurations": [
+			  {
+				"board": "x64",
+				"product": "fake_product"
+			  }
+			],
+			"version": "fake_version"
+		  }`),
 		"builds/456/build_api/product_bundles.json": []byte(`[{
 			"label": "//build/images/fuchsia:product_bundle(//build/toolchain/fuchsia:x64)",
 			"path": "obj/build/images/fuchsia/product_bundle",
