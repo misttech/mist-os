@@ -232,6 +232,9 @@ where
 /// A decorator for proxy types in [`crate::FfxTool`] implementations so you can
 /// specify the moniker for the component exposing the proxy you're loading.
 ///
+/// This is actually an alias to [`toolbox_or`], so it will also try
+/// your tool's default toolbox first.
+///
 /// Example:
 ///
 /// ```rust
@@ -241,12 +244,8 @@ where
 ///     foo_proxy: FooProxy,
 /// }
 /// ```
-pub fn moniker<P: Proxy>(moniker: impl AsRef<str>) -> WithMoniker<P> {
-    WithMoniker {
-        moniker: moniker.as_ref().to_owned(),
-        timeout: DEFAULT_PROXY_TIMEOUT,
-        _p: Default::default(),
-    }
+pub fn moniker<P: Proxy>(moniker: impl AsRef<str>) -> WithToolbox<P> {
+    toolbox_or(moniker)
 }
 
 /// Like [`moniker`], but lets you also specify an override for the default
