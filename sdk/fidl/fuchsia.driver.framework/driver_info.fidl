@@ -7,7 +7,7 @@ using fuchsia.url;
 
 /// The type of Fuchsia package that a driver component is inside of.
 /// More details about the various package categories are available at:
-/// https://fuchsia.dev/fuchsia-src/concepts/packages/package?hl=en#types_of_packages
+/// https://fuchsia.dev/fuchsia-src/concepts/packages/package#types_of_packages
 @available(added=16)
 type DriverPackageType = flexible enum : uint8 {
     /// BOOT packages are inside the Zircon boot image.
