@@ -144,6 +144,7 @@ fidl::StringView CollectionName(Collection collection) {
       return "full-pkg-drivers";
   }
 }
+
 Collection ToCollection(fdf::DriverPackageType package) {
   switch (package) {
     case fdf::DriverPackageType::kBoot:
@@ -158,7 +159,42 @@ Collection ToCollection(fdf::DriverPackageType package) {
   }
 }
 
-// Perfrom a Breadth-First-Search (BFS) over the node topology, applying the visitor function on
+// Choose the highest ranked collection between `collection` and `node`'s
+// parents. If one of `node`'s parent's collection is none then check the
+// parent's parents and so on.
+Collection GetHighestRankingCollection(const Node& node, Collection collection) {
+  std::stack<const std::weak_ptr<Node>> ancestors;
+  for (const auto& parent : node.parents()) {
+    ancestors.emplace(parent);
+  }
+
+  // Find the highest ranked collection out of `node`'s parent nodes. If a
+  // node's collection is none then check that node's parents and so on.
+  while (!ancestors.empty()) {
+    auto ancestor = ancestors.top();
+    ancestors.pop();
+    auto ancestor_ptr = ancestor.lock();
+    if (!ancestor_ptr) {
+      LOGF(WARNING, "Ancestor node released");
+      continue;
+    }
+
+    auto ancestor_collection = ancestor_ptr->collection();
+    if (ancestor_collection == Collection::kNone) {
+      // Check ancestor's parents to see what the collection of the ancestor
+      // should be.
+      for (const auto& parent : ancestor_ptr->parents()) {
+        ancestors.emplace(parent);
+      }
+    } else if (ancestor_collection > collection) {
+      collection = ancestor_collection;
+    }
+  }
+
+  return collection;
+}
+
+// Perform a Breadth-First-Search (BFS) over the node topology, applying the visitor function on
 // the node being visited.
 // The return value of the visitor function is a boolean for whether the children of the node
 // should be visited. If it returns false, the children will be skipped.
@@ -190,17 +226,7 @@ void PerformBFS(const std::shared_ptr<Node>& starting_node,
 
 Collection ToCollection(const Node& node, fdf::DriverPackageType package_type) {
   Collection collection = ToCollection(package_type);
-  for (const auto& parent : node.parents()) {
-    auto parent_ptr = parent.lock();
-    if (!parent_ptr) {
-      LOGF(WARNING, "Parent node released");
-      continue;
-    }
-    if (parent_ptr->collection() > collection) {
-      collection = parent_ptr->collection();
-    }
-  }
-  return collection;
+  return GetHighestRankingCollection(node, collection);
 }
 
 DriverRunner::DriverRunner(fidl::ClientEnd<fcomponent::Realm> realm,
@@ -359,6 +385,14 @@ void DriverRunner::TryBindAllAvailable(NodeBindingInfoResultCallback result_call
 
 zx::result<> DriverRunner::StartDriver(Node& node, std::string_view url,
                                        fdf::DriverPackageType package_type) {
+  // Ensure `node`'s collection is equal to or higher ranked than its ancestor
+  // nodes' collections. This is to avoid node components having a dependency
+  // cycle with each other. For example, node components in the boot driver
+  // collection depend on the devfs component which ultimately depends on all
+  // components within the package driver collection. If a package driver
+  // component depended on a component in the boot driver collection (a lower
+  // ranked collection than the package driver collection) then a cyclic
+  // dependency would occur.
   node.set_collection(ToCollection(node, package_type));
   node.set_driver_package_type(package_type);
 

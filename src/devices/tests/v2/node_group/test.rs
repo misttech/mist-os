@@ -58,7 +58,7 @@ async fn test_nodegroup() -> Result<()> {
 
     let offers = vec![fdt::Offer {
         protocol_name: ft::WaiterMarker::PROTOCOL_NAME.to_string(),
-        collection: fdt::Collection::BootDrivers,
+        collection: fdt::Collection::PackageDrivers,
     }];
 
     // Start the DriverTestRealm.
