@@ -11,6 +11,7 @@ autogen_warning = """
 
 include_guard = "SRC_CONNECTIVITY_WLAN_DRIVERS_WLANSOFTMAC_RUST_DRIVER_C_BINDING_BINDINGS_H_"
 language = "C"
+style = "type"
 
 sys_includes = [
     "zircon/types.h",
@@ -55,6 +56,9 @@ exclude = [
     "WlanTxInfo",
     "WlanTxPacket",
     "WlanTxResult",
+
+    # Unused types.
+    "LinkStatus",
 
     # Voided types.
     "DriverEventSink",

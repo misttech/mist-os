@@ -13,7 +13,7 @@ expose a public C API.
 There are four steps to create/update the `bindings.h` header:
 
 1. Link the Fuchsia (or nightly) Rust toolchain.
-1. Install cbindgen 0.15.0.
+1. Install cbindgen 0.26.0.
 1. Generate the local `Cargo.toml` manifest for `wlansoftmac-c`.
 1. Create/update the `bindings.h` header.
 1. Format the `bindings.h` header.
@@ -31,13 +31,13 @@ rustup toolchain link fuchsia "$FUCHSIA_DIR/prebuilt/third_party/rust/linux-x64"
 If you cannot link this toolchain in your environment, you may
 alternately use the nightly Rust toolchain instead.
 
-## Install cbindgen 0.15.0
+## Install cbindgen 0.26.0
 
-We currently pin cbindgen at version 0.15.0 to avoid unexpected
+We currently pin cbindgen at version 0.26.0 to avoid unexpected
 behavior with cbindgen updates. You can install it with the following:
 
 ```
-cargo install --version 0.15.0 --force cbindgen
+cargo install --version 0.26.0 --force cbindgen
 ```
 
 ## Generate the local `Cargo.toml` manifest for `wlansoftmac-c`
