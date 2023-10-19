@@ -6754,6 +6754,27 @@ mod tests {
     const V4_LOCAL_IP_MAPPED: Ipv6Addr = net_ip_v6!("::ffff:192.168.1.10");
     const V6_LOCAL_IP: Ipv6Addr = net_ip_v6!("2201::1");
 
+    /// Enables dual stack operations on the given unbound socket.
+    ///
+    /// # Panics
+    ///
+    /// Panics if dual stack operations could not be enabled. Note that this
+    /// operation will always fail for bound sockets.
+    fn enable_dual_stack_for_test<C, SC: SocketHandler<Ipv6, C>>(
+        sync_ctx: &mut SC,
+        non_sync_ctx: &mut C,
+        socket: SocketId<Ipv6>,
+    ) {
+        // TODO(https://fxbug.dev/21198): Remove this fn once IPv6 sockets are
+        // dual-stack-enabled by default.
+        SocketHandler::<Ipv6, _>::set_dual_stack_enabled(sync_ctx, non_sync_ctx, socket, true)
+            .expect("can set dual-stack enabled");
+        assert_eq!(
+            SocketHandler::<Ipv6, _>::get_dual_stack_enabled(sync_ctx, non_sync_ctx, socket),
+            Ok(true)
+        );
+    }
+
     #[test_case(DualStackBindAddr::Any; "dual-stack")]
     #[test_case(DualStackBindAddr::V4Any; "v4 any")]
     #[test_case(DualStackBindAddr::V4Specific; "v4 specific")]
@@ -6768,15 +6789,7 @@ mod tests {
             ));
 
         let listener = SocketHandler::<Ipv6, _>::create_udp(&mut sync_ctx);
-        // TODO(https://fxbug.dev/21198): Remove this once IPv6 sockets are
-        // dual-stack-enabled by default.
-        SocketHandler::<Ipv6, _>::set_dual_stack_enabled(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
-            listener,
-            true,
-        )
-        .expect("can enable");
+        enable_dual_stack_for_test(&mut sync_ctx, &mut non_sync_ctx, listener);
         SocketHandler::listen_udp(
             &mut sync_ctx,
             &mut non_sync_ctx,
@@ -6832,15 +6845,8 @@ mod tests {
 
         let v4_listener = SocketHandler::<Ipv4, _>::create_udp(&mut sync_ctx);
         let v6_listener = SocketHandler::<Ipv6, _>::create_udp(&mut sync_ctx);
-        // TODO(https://fxbug.dev/21198): Remove this once IPv6 sockets are
-        // dual-stack-enabled by default.
-        SocketHandler::<Ipv6, _>::set_dual_stack_enabled(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
-            v6_listener,
-            true,
-        )
-        .expect("can enable");
+
+        enable_dual_stack_for_test(&mut sync_ctx, &mut non_sync_ctx, v6_listener);
 
         let bind_v4 = |sync_ctx, non_sync_ctx| {
             SocketHandler::listen_udp(
@@ -6906,21 +6912,7 @@ mod tests {
             ),
             Err(Either::Right(LocalAddressError::CannotBindToAddress))
         );
-        SocketHandler::<Ipv6, _>::set_dual_stack_enabled(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
-            listener,
-            true,
-        )
-        .expect("can set dual-stack enabled");
-        assert_eq!(
-            SocketHandler::<Ipv6, _>::get_dual_stack_enabled(
-                &mut sync_ctx,
-                &mut non_sync_ctx,
-                listener
-            ),
-            Ok(true)
-        );
+        enable_dual_stack_for_test(&mut sync_ctx, &mut non_sync_ctx, listener);
         // Try again now that dual-stack sockets are enabled.
         assert_eq!(
             SocketHandler::listen_udp(
@@ -6944,23 +6936,7 @@ mod tests {
             ));
 
         let listener = SocketHandler::<Ipv6, _>::create_udp(&mut sync_ctx);
-        // TODO(https://fxbug.dev/21198): Remove this once IPv6 sockets are
-        // dual-stack enabled by default;
-        SocketHandler::<Ipv6, _>::set_dual_stack_enabled(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
-            listener,
-            true,
-        )
-        .expect("can set dual-stack enabled");
-        assert_eq!(
-            SocketHandler::<Ipv6, _>::get_dual_stack_enabled(
-                &mut sync_ctx,
-                &mut non_sync_ctx,
-                listener
-            ),
-            Ok(true)
-        );
+        enable_dual_stack_for_test(&mut sync_ctx, &mut non_sync_ctx, listener);
         assert_eq!(
             SocketHandler::listen_udp(
                 &mut sync_ctx,
