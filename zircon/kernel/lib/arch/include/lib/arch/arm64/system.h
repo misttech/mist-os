@@ -401,9 +401,9 @@ ARCH_ARM64_SYSREG(ArmVbarEl2, "vbar_el2");
 struct ArmVbarEl3 : public arch::SysRegDerived<ArmVbarEl3, ArmVectorBaseAddressRegister> {};
 ARCH_ARM64_SYSREG(ArmVbarEl3, "vbar_el3");
 
-// [arm/sysreg]/elr_el1: Vector Base Address Register (EL1)
-// [arm/sysreg]/elr_el2: Vector Base Address Register (EL2)
-// [arm/sysreg]/elr_el3: Vector Base Address Register (EL3)
+// [arm/sysreg]/elr_el1: Exception Link Register (EL1)
+// [arm/sysreg]/elr_el2: Exception Link Register (EL2)
+// [arm/sysreg]/elr_el3: Exception Link Register (EL3)
 struct ArmVectorExceptionLinkRegister : public SysRegDerivedBase<ArmVectorExceptionLinkRegister> {
   DEF_FIELD(63, 0, pc);
 };
