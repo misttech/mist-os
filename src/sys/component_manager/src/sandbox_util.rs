@@ -8,13 +8,14 @@ use {
     fuchsia_zircon as zx,
     futures::future::BoxFuture,
     lazy_static::lazy_static,
-    sandbox::{Capability, Dict, Message, Receiver, Sender},
+    sandbox::{Capability, Data, Dict, Message, Receiver, Sender},
     tracing::warn,
 };
 
 lazy_static! {
     static ref SENDER: Name = "sender".parse().unwrap();
     static ref RECEIVER: Name = "receiver".parse().unwrap();
+    static ref AVAILABILITY: Name = "availability".parse().unwrap();
 }
 
 // TODO: use the `Name` type in `Dict`, so that sandboxes aren't holding duplicate strings.
@@ -84,6 +85,14 @@ impl<'a> CapabilityDict<'a> {
     pub fn get_receiver(&self) -> Option<&Receiver> {
         self.inner.entries.get(&RECEIVER.as_str().to_string()).and_then(|v| v.try_into().ok())
     }
+
+    pub fn get_availability(&self) -> Option<&cm_rust::Availability> {
+        self.inner
+            .entries
+            .get(&AVAILABILITY.as_str().to_string())
+            .and_then(|v| v.try_into().ok())
+            .map(|d: &Data<cm_rust::Availability>| &d.value)
+    }
 }
 
 /// A mutable dict for a single capability.
@@ -108,6 +117,21 @@ impl<'a> CapabilityDictMut<'a> {
     #[allow(unused)]
     pub fn insert_receiver(&mut self, receiver: Receiver) {
         self.inner.entries.insert(RECEIVER.as_str().to_string(), Box::new(receiver));
+    }
+
+    #[allow(unused)]
+    pub fn get_availability(&mut self) -> Option<&mut cm_rust::Availability> {
+        self.inner
+            .entries
+            .get_mut(&AVAILABILITY.as_str().to_string())
+            .and_then(|v| v.try_into().ok())
+            .map(|d: &mut Data<cm_rust::Availability>| &mut d.value)
+    }
+
+    pub fn insert_availability(&mut self, availability: cm_rust::Availability) {
+        self.inner
+            .entries
+            .insert(AVAILABILITY.as_str().to_string(), Box::new(Data { value: availability }));
     }
 
     /// Sends the handle to the sender in this capability dict. If that fails, returns the handle.

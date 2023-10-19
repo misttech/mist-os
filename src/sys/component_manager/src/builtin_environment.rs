@@ -379,7 +379,9 @@ impl BuiltinSandboxBuilder {
         }
         let receiver = Receiver::new();
         let sender = receiver.new_sender();
-        self.sandbox.get_or_insert_protocol(name.clone()).insert_sender(sender);
+        let mut cap_sandbox = self.sandbox.get_or_insert_protocol(name.clone());
+        cap_sandbox.insert_sender(sender);
+        cap_sandbox.insert_availability(cm_rust::Availability::Required);
         self.builtin_task_launchers.push(LaunchTaskOnReceive::new(
             self.task_group.as_weak(),
             name,
@@ -1156,7 +1158,10 @@ impl BuiltinEnvironment {
         tracing::warn!("adding builtin capability {} to root sandbox", name);
         let receiver = Receiver::new();
         let sender = receiver.new_sender();
-        self.sandbox.get_or_insert_protocol(name.clone()).insert_sender(sender);
+
+        let mut cap_sandbox = self.sandbox.get_or_insert_protocol(name.clone());
+        cap_sandbox.insert_sender(sender);
+        cap_sandbox.insert_availability(cm_rust::Availability::Required);
 
         let launch_task_on_receive = LaunchTaskOnReceive::new(
             self.model.top_instance().task_group().as_weak(),

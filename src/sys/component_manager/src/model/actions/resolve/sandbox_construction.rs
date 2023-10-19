@@ -4,10 +4,10 @@
 
 use {
     crate::sandbox_util::Sandbox,
-    cm_rust::{self, OfferDeclCommon, SourceName, UseDeclCommon},
+    cm_rust::{self, Availability, OfferDeclCommon, SourceName, UseDeclCommon},
     cm_types::Name,
     std::collections::HashMap,
-    tracing::debug,
+    tracing::{debug, warn},
 };
 
 /// The sandboxes a component holds once it has been resolved.
@@ -131,18 +131,72 @@ fn extend_dict_with_offer(
     let target_name = offer.target_name();
     match offer.source() {
         cm_rust::OfferSource::Parent => {
-            if let Some(cap_sandbox) = sandbox_from_parent.get_protocol(source_name) {
-                if let Some(sender) = cap_sandbox.get_sender() {
-                    target_sandbox
-                        .get_or_insert_protocol(target_name.clone())
-                        .insert_sender(sender.clone());
+            if let Some(source_cap_sandbox) = sandbox_from_parent.get_protocol(source_name) {
+                if let Some(sender) = source_cap_sandbox.get_sender() {
+                    let old_availability = source_cap_sandbox
+                        .get_availability()
+                        .expect("protocol dictionary is missing availability");
+                    let new_availability = offer
+                        .availability()
+                        .expect("availability should always be set for protocols");
+                    if let Some(new_availability) =
+                        get_next_availability(*old_availability, *new_availability)
+                    {
+                        let mut target_cap_sandbox =
+                            target_sandbox.get_or_insert_protocol(target_name.clone());
+                        target_cap_sandbox.insert_sender(sender.clone());
+                        target_cap_sandbox.insert_availability(new_availability);
+                    }
                 }
             }
         }
         cm_rust::OfferSource::Void => {
             // Intentionally do nothing, because we've been explicitly instructed to NOT grant
             // access to the target.
+
+            // TODO: We want to signify to the child that we've intentionally not given it the
+            // capability. Setting something in the sandbox to this effect makes sense. What
+            // exactly though?
         }
         _ => (), // unsupported
+    }
+}
+
+fn get_next_availability(
+    source: cm_rust::Availability,
+    target: cm_rust::Availability,
+) -> Option<cm_rust::Availability> {
+    match (source, target) {
+        // This is only possible if the uppermost offer in a route chain is set to `SameAsTarget`,
+        // as then `SameAsTarget` will be set in the target sandbox as we step down the tree until
+        // we encounter a concrete availability.
+        (Availability::SameAsTarget, _) => Some(target),
+
+        // If our availability doesn't change, there's nothing to do.
+        (Availability::Required, Availability::Required)
+        | (Availability::Optional, Availability::Optional)
+        | (Availability::Transitional, Availability::Transitional) => Some(target),
+
+        // If the next availability is explicitly a pass-through, let's mark the availability the
+        // same as the source.
+        (Availability::Required, Availability::SameAsTarget)
+        | (Availability::Optional, Availability::SameAsTarget)
+        | (Availability::Transitional, Availability::SameAsTarget) => Some(source),
+
+        // Decreasing the strength of availability as we travel toward the target is allowed.
+        (Availability::Required, Availability::Optional)
+        | (Availability::Required, Availability::Transitional)
+        | (Availability::Optional, Availability::Transitional) => Some(target),
+
+        // Increasing the strength of availability as we travel toward the target is not allowed,
+        // as that could lead to unsanctioned broken routes.
+        (Availability::Transitional, Availability::Optional)
+        | (Availability::Transitional, Availability::Required)
+        | (Availability::Optional, Availability::Required) => {
+            warn!(
+                "not populating sandbox with capability because of invalid availability settings"
+            );
+            None
+        }
     }
 }
