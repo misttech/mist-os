@@ -135,27 +135,6 @@ injected that way can override that option's setting in this list.
 
 From //build/config/sanitizers/sanitizer_default_options.gni:16
 
-### assembly_fshost
-
-Skip configuring fshost in GN and do it via Assembly instead.
-Used as a parameter to assembled_system().
-
-**Current value for `target_cpu = "arm64"`:** `true`
-
-From //products/bringup.gni:9
-
-**Overridden from the default:** `false`
-
-From //build/images/args.gni:177
-
-**Current value for `target_cpu = "x64"`:** `true`
-
-From //products/bringup.gni:9
-
-**Overridden from the default:** `false`
-
-From //build/images/args.gni:177
-
 ### assembly_generate_fvm_fastboot
 
 The size in bytes of the FVM partition on the target eMMC devices.
@@ -251,7 +230,7 @@ be visible to Driver Manager. These package labels are also considered to be in 
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/bringup.gni:16
+From //products/bringup.gni:14
 
 **Overridden from the default:** `[]`
 
@@ -259,7 +238,7 @@ From //BUILD.gn:39
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/bringup.gni:16
+From //products/bringup.gni:14
 
 **Overridden from the default:** `[]`
 
@@ -328,7 +307,7 @@ From //boards/arm64.gni:47
 
 **Overridden from the default:** `false`
 
-From //build/images/args.gni:205
+From //build/images/args.gni:201
 
 **Current value for `target_cpu = "x64"`:** `"x64"`
 
@@ -336,7 +315,7 @@ From //boards/x64.gni:35
 
 **Overridden from the default:** `false`
 
-From //build/images/args.gni:205
+From //build/images/args.gni:201
 
 ### bazel_product_bundle_prefix
 
@@ -361,7 +340,7 @@ The actual bazel_product_bundle used for Bazel assembly is:
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:204
+From //build/images/args.gni:200
 
 ### bazel_quiet
 
@@ -3043,7 +3022,7 @@ useful for including verification and other Bazel assembly specific targets.
 
 **Current value (from the default):** `[]`
 
-From //build/images/args.gni:209
+From //build/images/args.gni:205
 
 ### extra_gn_labels_for_bazel_inputs
 
@@ -5286,7 +5265,7 @@ package flavors.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/bringup.gni:17
+From //products/bringup.gni:15
 
 **Overridden from the default:** `[]`
 
@@ -5294,7 +5273,7 @@ From //build/packages/prebuilt_package_with_flavors.gni:29
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/bringup.gni:17
+From //products/bringup.gni:15
 
 **Overridden from the default:** `[]`
 
@@ -5474,7 +5453,7 @@ A list of binary labels to include in ZBIs built for this product.
 
 **Current value for `target_cpu = "arm64"`:** `["//products/kernel_cmdline:kernel.oom.behavior--jobkill", "//products/kernel_cmdline:oom.reboot-timeout--low", "//src/sys/component_manager:component_manager_bootfs_config"]`
 
-From //products/bringup.gni:20
+From //products/bringup.gni:18
 
 **Overridden from the default:** `[]`
 
@@ -5482,7 +5461,7 @@ From //build/product.gni:14
 
 **Current value for `target_cpu = "x64"`:** `["//products/kernel_cmdline:kernel.oom.behavior--jobkill", "//products/kernel_cmdline:oom.reboot-timeout--low", "//src/sys/component_manager:component_manager_bootfs_config"]`
 
-From //products/bringup.gni:20
+From //products/bringup.gni:18
 
 **Overridden from the default:** `[]`
 
@@ -7649,7 +7628,7 @@ bits outside of the main repository.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/bringup.gni:18
+From //products/bringup.gni:16
 
 **Overridden from the default:** `[]`
 
@@ -7657,7 +7636,7 @@ From //BUILD.gn:132
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/bringup.gni:18
+From //products/bringup.gni:16
 
 **Overridden from the default:** `[]`
 
@@ -8443,7 +8422,7 @@ exactly what you are doing.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:184
+From //build/images/args.gni:180
 
 ### use_blink
 
@@ -8980,7 +8959,7 @@ The product assembly config used to configure the Zedboot image.
 
 **Current value for `target_cpu = "arm64"`:** `"//products/zedboot"`
 
-From //products/bringup.gni:26
+From //products/bringup.gni:24
 
 **Overridden from the default:** `false`
 
@@ -8988,7 +8967,7 @@ From //build/product.gni:44
 
 **Current value for `target_cpu = "x64"`:** `"//products/zedboot"`
 
-From //products/bringup.gni:26
+From //products/bringup.gni:24
 
 **Overridden from the default:** `false`
 
