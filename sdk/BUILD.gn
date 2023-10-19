@@ -154,7 +154,6 @@ sdk_molecule("fuchsia_idk_atoms") {
   deps = [
     ":core_cc_prebuilt_libraries",
     ":core_loadable_modules",
-    ":core_packages",
     ":core_sysroot",
   ]
 
@@ -176,6 +175,11 @@ sdk_molecule("fuchsia_idk_atoms") {
       "//sdk/devices",
       "//sdk/docs",
       "//sdk/fidl",
+
+      # TODO(fxbug.dev/133231): Move this to the `deps` section of
+      # `fuchsia_idk_atoms` once we can actually build the packages at
+      # individual API levels.
+      ":core_packages",
     ]
   }
 
@@ -372,15 +376,10 @@ sdk_molecule("core_bindlib") {
 }
 
 sdk_molecule("core_packages") {
-  deps = [ "//src/performance/memory/heapdump/collector:collector_sdk" ]
-
-  if (!sdk_inside_supported_api_sub_build) {
-    deps += [
-      # TODO(https://fxbug.dev/133231): Fix compilation of the following atoms
-      # when targeting older API levels and move to the list above.
-      "//src/lib/fuchsia-component-test/realm_builder_server:realm_builder_server_sdk",
-    ]
-  }
+  deps = [
+    "//src/lib/fuchsia-component-test/realm_builder_server:realm_builder_server_sdk",
+    "//src/performance/memory/heapdump/collector:collector_sdk",
+  ]
 }
 
 sdk_molecule("core_data") {
