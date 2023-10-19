@@ -13,9 +13,6 @@ fuchsia_component("component") {
   component_name = "virtual-console"
   manifest = "meta/virtual-console.cml"
   deps = [ ":bin" ]
-
-  # The includes checker wants the inspect shard but it doesn't use insepct.
-  check_includes = false
 }
 
 fuchsia_package("package") {
