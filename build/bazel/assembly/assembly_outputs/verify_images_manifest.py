@@ -47,6 +47,11 @@ def strip_manifest_path(package):
     return package
 
 
+def has_packages(image):
+    """Whether the given image contains a package manifest"""
+    return "contents" in image and "packages" in image["contents"]
+
+
 def vbmeta_info_no_hash(python_path, avbtool_path, image_path):
     cmd = [python_path, avbtool_path, "info_image", "--image", image_path]
     res = subprocess.run(cmd, text=True, capture_output=True)
@@ -105,7 +110,7 @@ def normalize(
         # of sorting the list by item for diffing.
         image["path"] = os.path.basename(image["path"])
 
-        if image.get("name") == "blob":
+        if has_packages(image):
             pkgs = image["contents"]["packages"]
             for pkg_set in ("base", "cache"):
                 # Sort the blobs in-place for when we print the file for
@@ -278,10 +283,8 @@ def main():
     # These files are very large and single-threaded difflib is too slow when in the quadratic case
 
     # First diff the package blobs, if they're there.
-    blob1 = get_first(lambda image: image["name"] == "blob", images_manifest_gn)
-    blob2 = get_first(
-        lambda image: image["name"] == "blob", images_manifest_bzl
-    )
+    blob1 = get_first(lambda image: has_packages(image), images_manifest_gn)
+    blob2 = get_first(lambda image: has_packages(image), images_manifest_bzl)
     if blob1 and blob2:
         diffs = get_diffs(
             blob1["contents"]["packages"]["base"]
