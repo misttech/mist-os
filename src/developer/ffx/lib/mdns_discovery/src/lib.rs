@@ -152,6 +152,42 @@ impl MdnsEnabledChecker for MdnsEnabled {
     }
 }
 
+/// Returns a Vec<TargetInfo> of Fuchsia targets discovered via mDNS during the given `duration`
+pub async fn discover_targets(
+    listen_duration: Duration,
+    mdns_port: u16,
+) -> Result<Vec<ffx::TargetInfo>> {
+    let (sender, receiver) = async_channel::bounded::<ffx::MdnsEventType>(1);
+    let inner = Rc::new(MdnsProtocol {
+        events_in: receiver,
+        events_out: sender,
+        target_cache: Default::default(),
+    });
+
+    let inner_mv = Rc::downgrade(&inner);
+
+    let discover_task = discovery_loop(
+        DiscoveryConfig {
+            socket_tasks: Default::default(),
+            mdns_protocol: inner_mv,
+            discovery_interval: MDNS_INTERFACE_DISCOVERY_INTERVAL,
+            query_interval: MDNS_BROADCAST_INTERVAL,
+            ttl: MDNS_TTL,
+            mdns_port,
+        },
+        MdnsEnabled {},
+    )
+    .fuse();
+    let discover_task = Box::pin(discover_task);
+
+    let timeout = fuchsia_async::Timer::new(listen_duration).fuse();
+
+    // Wait on either the discovery or the timeout
+    futures::future::select(discover_task, timeout).await;
+
+    Ok(inner.as_ref().target_cache())
+}
+
 // discovery_loop iterates over all multicast interfaces and adds them to
 // the socket_tasks if there is not already a task for that interface.
 pub async fn discovery_loop(config: DiscoveryConfig, checker: impl MdnsEnabledChecker + 'static) {

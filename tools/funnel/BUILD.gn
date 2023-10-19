@@ -42,3 +42,8 @@ group("funnel") {
     ":funnel_bin_test($host_toolchain)",
   ]
 }
+
+install_host_tools("host") {
+  deps = [ ":funnel_bin" ]
+  outputs = [ "funnel" ]
+}
