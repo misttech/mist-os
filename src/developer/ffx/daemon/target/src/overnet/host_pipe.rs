@@ -4,27 +4,41 @@
 
 use crate::{target::Target, RETRY_DELAY};
 use anyhow::{anyhow, Context};
-use async_io::Async;
 use async_trait::async_trait;
 use compat_info::{CompatibilityInfo, ConnectionInfo};
 use ffx_daemon_core::events;
 use ffx_daemon_events::{HostPipeErr, TargetEvent};
 use ffx_ssh::ssh::build_ssh_command_with_ssh_path;
 use fuchsia_async::{unblock, Task, TimeoutExt, Timer};
-use futures::io::{copy_buf, AsyncBufRead, AsyncRead, BufReader};
-use futures::{AsyncReadExt, FutureExt};
+use futures::{
+    io::{ReadHalf, WriteHalf},
+    FutureExt,
+};
 use futures_lite::stream::StreamExt;
-use shared_child::SharedChild;
+use nix::{
+    sys::{
+        signal::{kill, Signal::SIGKILL},
+        wait::waitpid,
+    },
+    unistd::Pid,
+};
+use pin_project::pin_project;
 use std::{
     cell::RefCell,
     collections::VecDeque,
     fmt, io,
     io::Write,
     net::SocketAddr,
+    pin::Pin,
     process::Stdio,
     rc::{Rc, Weak},
     sync::Arc,
+    task::Poll,
     time::Duration,
+};
+use tokio::{
+    io::{copy_buf, AsyncBufRead, AsyncRead, AsyncReadExt, AsyncWrite, BufReader, ReadBuf},
+    process::Child,
 };
 
 const BUFFER_SIZE: usize = 65536;
@@ -77,6 +91,79 @@ impl LogBuffer {
     pub fn clear(&self) {
         let mut buf = self.buf.borrow_mut();
         buf.truncate(0);
+    }
+}
+
+// TODO(b/287551486): Remove when Overnet is moved fully
+// to Tokio.
+/// Makes WriteHalf from Overnet work with Tokio.
+#[pin_project]
+struct ReadHalfWrapper<T> {
+    #[pin]
+    writer: ReadHalf<T>,
+}
+
+impl<T> ReadHalfWrapper<T> {
+    fn new(writer: ReadHalf<T>) -> Self {
+        ReadHalfWrapper { writer }
+    }
+}
+
+impl<T> AsyncRead for ReadHalfWrapper<T>
+where
+    T: futures::io::AsyncRead,
+{
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        let this = self.project();
+        futures::io::AsyncRead::poll_read(this.writer, cx, buf.initialize_unfilled())
+            .map(|value| value.map(|size| buf.advance(size)))
+    }
+}
+
+/// Makes WriteHalf from Overnet work with Tokio.
+#[pin_project]
+struct WriteHalfWrapper<T> {
+    #[pin]
+    writer: WriteHalf<T>,
+}
+
+impl<T> WriteHalfWrapper<T> {
+    fn new(writer: WriteHalf<T>) -> Self {
+        WriteHalfWrapper { writer }
+    }
+}
+
+impl<T> AsyncWrite for WriteHalfWrapper<T>
+where
+    T: futures::io::AsyncWrite,
+{
+    fn poll_write(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+        buf: &[u8],
+    ) -> std::task::Poll<Result<usize, io::Error>> {
+        let this = self.project();
+        futures::io::AsyncWrite::poll_write(this.writer, cx, buf)
+    }
+
+    fn poll_flush(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Result<(), io::Error>> {
+        let this = self.project();
+        futures::io::AsyncWrite::poll_flush(this.writer, cx)
+    }
+
+    fn poll_shutdown(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Result<(), io::Error>> {
+        let this = self.project();
+        futures::io::AsyncWrite::poll_close(this.writer, cx)
     }
 }
 
@@ -162,7 +249,7 @@ impl HostPipeChildBuilder for HostPipeChildDefaultBuilder<'_> {
 
 #[derive(Debug)]
 pub(crate) struct HostPipeChild {
-    inner: SharedChild,
+    inner: Child,
     task: Option<Task<()>>,
     pub(crate) compatibility_status: Option<CompatibilityInfo>,
 }
@@ -328,9 +415,11 @@ impl HostPipeChild {
             args.insert(0, "-v");
         }
 
-        let mut ssh = build_ssh_command_with_ssh_path(ssh_path, addr, args)
-            .await
-            .map_err(|e| PipeError::Error(e.to_string()))?;
+        let mut ssh = tokio::process::Command::from(
+            build_ssh_command_with_ssh_path(ssh_path, addr, args)
+                .await
+                .map_err(|e| PipeError::Error(e.to_string()))?,
+        );
 
         tracing::debug!("Spawning new ssh instance: {:?}", ssh);
 
@@ -338,35 +427,36 @@ impl HostPipeChild {
             setup_watchdogs();
         }
 
-        let mut ssh_cmd = ssh.stdout(Stdio::piped()).stdin(Stdio::piped()).stderr(Stdio::piped());
+        let ssh_cmd = ssh.stdout(Stdio::piped()).stdin(Stdio::piped()).stderr(Stdio::piped());
 
-        let ssh =
-            SharedChild::spawn(&mut ssh_cmd).map_err(|e| PipeError::SpawnError(e.to_string()))?;
+        let mut ssh = ssh_cmd.spawn().map_err(|e| PipeError::SpawnError(e.to_string()))?;
 
         let mut error_message = String::from("");
 
-        let (pipe_rx, mut pipe_tx) =
-            futures::AsyncReadExt::split(overnet_pipe(node).map_err(|e| {
-                PipeError::PipeCreationFailed(
-                    format!("creating local overnet pipe: {e}"),
-                    addr.to_string(),
-                )
-            })?);
+        let (pipe_rx, pipe_tx) = futures::AsyncReadExt::split(overnet_pipe(node).map_err(|e| {
+            PipeError::PipeCreationFailed(
+                format!("creating local overnet pipe: {e}"),
+                addr.to_string(),
+            )
+        })?);
 
-        let stdout = Async::new(
-            ssh.take_stdout()
-                .ok_or(PipeError::Error("unable to get stdout from target pipe".into()))?,
-        )?;
+        let mut pipe_tx = WriteHalfWrapper::new(pipe_tx);
+        let pipe_rx = ReadHalfWrapper::new(pipe_rx);
 
-        let mut stdin = Async::new(
-            ssh.take_stdin()
-                .ok_or(PipeError::Error("unable to get stdin from target pipe".into()))?,
-        )?;
+        let stdout = ssh
+            .stdout
+            .take()
+            .ok_or(PipeError::Error("unable to get stdout from target pipe".into()))?;
 
-        let mut stderr = Async::new(
-            ssh.take_stderr()
-                .ok_or(PipeError::Error("unable to stderr from target pipe".into()))?,
-        )?;
+        let mut stdin = ssh
+            .stdin
+            .take()
+            .ok_or(PipeError::Error("unable to get stdin from target pipe".into()))?;
+
+        let mut stderr = ssh
+            .stderr
+            .take()
+            .ok_or(PipeError::Error("unable to stderr from target pipe".into()))?;
 
         // Read the first line. This can be either either be an empty string "",
         // which signifies the STDOUT has been closed, or the $SSH_CONNECTION
@@ -413,7 +503,7 @@ impl HostPipeChild {
                     PipeError::ConnectionFailed(format!("{:?}", l))
                 };
 
-                ssh.kill()?;
+                ssh.kill().await?;
                 while let Ok(line) = read_ssh_line(&mut lb, &mut stderr).await {
                     tracing::error!("SSH stderr: {line}");
                 }
@@ -432,13 +522,13 @@ impl HostPipeChild {
         }
 
         let copy_in = async move {
-            if let Err(e) = copy_buf(stdout, &mut pipe_tx).await {
+            if let Err(e) = copy_buf(&mut stdout, &mut pipe_tx).await {
                 tracing::error!("SSH stdout read failure: {:?}", e);
             }
         };
         let copy_out = async move {
             if let Err(e) =
-                copy_buf(BufReader::with_capacity(BUFFER_SIZE, pipe_rx), &mut stdin).await
+                copy_buf(&mut BufReader::with_capacity(BUFFER_SIZE, pipe_rx), &mut stdin).await
             {
                 tracing::error!("SSH stdin write failure: {:?}", e);
             }
@@ -492,14 +582,6 @@ impl HostPipeChild {
         } else {
             return Err(PipeError::ConnectionFailed(error_message));
         }
-    }
-
-    fn kill(&self) -> io::Result<()> {
-        self.inner.kill()
-    }
-
-    fn wait(&self) -> io::Result<std::process::ExitStatus> {
-        self.inner.wait()
     }
 }
 
@@ -704,26 +786,22 @@ fn parse_ssh_connection_legacy(
 
 impl Drop for HostPipeChild {
     fn drop(&mut self) {
+        let pid = Pid::from_raw(self.inner.id().unwrap() as i32);
         match self.inner.try_wait() {
             Ok(Some(result)) => {
                 tracing::info!("HostPipeChild exited with {}", result);
             }
             Ok(None) => {
-                let _ = self
-                    .kill()
+                let _ = kill(pid, SIGKILL)
                     .map_err(|e| tracing::warn!("failed to kill HostPipeChild: {:?}", e));
-                let _ = self
-                    .wait()
+                let _ = waitpid(pid, None)
                     .map_err(|e| tracing::warn!("failed to clean up HostPipeChild: {:?}", e));
             }
             Err(e) => {
                 tracing::warn!("failed to soft-wait HostPipeChild: {:?}", e);
-                // defensive kill & wait, both may fail.
-                let _ = self
-                    .kill()
+                let _ = kill(pid, SIGKILL)
                     .map_err(|e| tracing::warn!("failed to kill HostPipeChild: {:?}", e));
-                let _ = self
-                    .wait()
+                let _ = waitpid(pid, None)
                     .map_err(|e| tracing::warn!("failed to clean up HostPipeChild: {:?}", e));
             }
         };
@@ -750,8 +828,9 @@ where
     T: HostPipeChildBuilder + Copy,
 {
     fn drop(&mut self) {
-        let res = self.inner.kill();
-        tracing::info!("killed inner {:?}", res)
+        let pid = Pid::from_raw(self.inner.inner.id().unwrap() as i32);
+        let res = kill(pid, SIGKILL);
+        tracing::info!("killed inner {:?}", res);
     }
 }
 
@@ -850,15 +929,9 @@ where
             // due to peer dropping) then will set the target to disconnected
             // state. If there was an error running the command for some reason,
             // then continue and attempt to run the command again.
+            let pid = Pid::from_raw(self.inner.inner.id().unwrap() as i32);
             let target_nodename = self.target.nodename();
-            let clone = self.inner.clone();
-            let res = unblock(move || clone.wait()).await.map_err(|e| {
-                anyhow!(
-                    "host-pipe error to target {:?} running try-wait: {}",
-                    target_nodename,
-                    e.to_string()
-                )
-            });
+            let res = unblock(move || waitpid(pid, None)).await;
 
             tracing::debug!("host-pipe command res: {:?}", res);
 
@@ -912,8 +985,9 @@ fn overnet_pipe(node: Arc<overnet_core::Router>) -> Result<fidl::AsyncSocket, io
         futures::future::join(
             async move {
                 if let Err(e) = async move {
-                    let (mut rx, mut tx) =
-                        fuchsia_async::Socket::from_socket(remote_socket)?.split();
+                    let (mut rx, mut tx) = futures::AsyncReadExt::split(
+                        fuchsia_async::Socket::from_socket(remote_socket)?,
+                    );
                     circuit::multi_stream::multi_stream_node_connection_to_async(
                         node.circuit_node(),
                         &mut rx,
@@ -953,8 +1027,8 @@ mod test {
     use serde_json::json;
     use std::fs;
     use std::os::unix::prelude::PermissionsExt;
-    use std::process::Command;
     use std::{rc::Rc, str::FromStr};
+    use tokio::process::Command;
 
     const ERR_CTX: &'static str = "running fake host-pipe command for test";
 
@@ -963,8 +1037,11 @@ mod test {
         /// closing. The reader and writer handles don't do anything other than
         /// spin until they receive a message to stop.
         pub fn fake_new(child: &mut Command) -> Self {
-            let child = SharedChild::spawn(child).expect(ERR_CTX);
-            Self { inner: child, task: Some(Task::local(async {})), compatibility_status: None }
+            Self {
+                inner: child.spawn().unwrap(),
+                task: Some(Task::local(async {})),
+                compatibility_status: None,
+            }
         }
     }
 
@@ -1036,7 +1113,7 @@ mod test {
         Ok((
             Some(HostAddr("127.0.0.1".to_string())),
             HostPipeChild::fake_new(
-                std::process::Command::new("echo")
+                tokio::process::Command::new("echo")
                     .arg("127.0.0.1 44315 192.168.1.1 22")
                     .stdout(Stdio::piped())
                     .stdin(Stdio::piped()),
@@ -1063,7 +1140,7 @@ mod test {
         Ok((
             Some(HostAddr("127.0.0.1".to_string())),
             HostPipeChild::fake_new(
-                std::process::Command::new("echo")
+                tokio::process::Command::new("echo")
                     .arg("127.0.0.1 44315 192.168.1.1 22")
                     .stdout(Stdio::piped())
                     .stdin(Stdio::piped()),
