@@ -67,6 +67,8 @@ python_c_extension("fidl_codec") {
     "cpp/fidl_codec/object_converter.cc",
     "cpp/fidl_codec/object_converter.h",
     "cpp/fidl_codec/python_dict_visitor.h",
+    "cpp/python/py_header.h",
+    "cpp/raii/py_wrapper.h",
   ]
 
   deps = [
@@ -95,6 +97,8 @@ python_c_extension("fuchsia_controller_py") {
     "cpp/abi/mod.h",
     "cpp/abi/socket.cc",
     "cpp/abi/socket.h",
+    "cpp/python/py_header.h",
+    "cpp/raii/py_wrapper.h",
   ]
 
   deps = [

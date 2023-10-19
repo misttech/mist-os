@@ -5,13 +5,8 @@
 #ifndef SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_FIDL_CODEC_OBJECT_CONVERTER_H_
 #define SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_FIDL_CODEC_OBJECT_CONVERTER_H_
 
-#include <iostream>
-#include <string>
-
+#include "src/developer/ffx/lib/fuchsia-controller/cpp/python/py_header.h"
 #include "src/lib/fidl_codec/type_visitor.h"
-
-#define PY_SSIZE_T_CLEAN
-#include <Python.h>
 
 namespace converter {
 

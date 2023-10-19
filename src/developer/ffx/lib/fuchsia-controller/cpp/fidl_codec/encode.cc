@@ -4,7 +4,6 @@
 
 #include "encode.h"
 
-#include <iostream>
 #include <string>
 
 #include "mod.h"
@@ -36,11 +35,11 @@ std::unique_ptr<fidl_codec::Type> GetPayloadType(GetPayloadTypeArgs args) {
   if (args.obj == Py_None) {
     return std::make_unique<fidl_codec::EmptyPayloadType>();
   }
-  const char *lib_c_str = PyUnicode_AsUTF8(args.library_obj);
+  const char *lib_c_str = PyUnicode_AsUTF8AndSize(args.library_obj, nullptr);
   if (lib_c_str == nullptr) {
     return nullptr;
   }
-  const char *type_name_c_str = PyUnicode_AsUTF8(args.type_name_obj);
+  const char *type_name_c_str = PyUnicode_AsUTF8AndSize(args.type_name_obj, nullptr);
   if (type_name_c_str == nullptr) {
     return nullptr;
   }
@@ -118,7 +117,7 @@ PyObject *encode_fidl_message(PyObject *self, PyObject *args, PyObject *kwds) {
   if (handles_list == nullptr) {
     return nullptr;
   }
-  PyTuple_SET_ITEM(res.get(), 0, buf.take());
+  PyTuple_SetItem(res.get(), 0, buf.take());
   for (uint64_t i = 0; i < msg.handles.size(); ++i) {
     // This is currently done as a tuple, could also be done as a dict for better readability.
     auto handle_tuple = py::Object(PyTuple_New(5));
@@ -127,30 +126,30 @@ PyObject *encode_fidl_message(PyObject *self, PyObject *args, PyObject *kwds) {
     if (operation == nullptr) {
       return nullptr;
     }
-    PyTuple_SET_ITEM(handle_tuple.get(), 0, operation.take());
+    PyTuple_SetItem(handle_tuple.get(), 0, operation.take());
     auto handle_value = py::Object(PyLong_FromLong(handle_disp.handle));
     if (handle_value == nullptr) {
       return nullptr;
     }
-    PyTuple_SET_ITEM(handle_tuple.get(), 1, handle_value.take());
+    PyTuple_SetItem(handle_tuple.get(), 1, handle_value.take());
     auto type = py::Object(PyLong_FromLong(handle_disp.type));
     if (type == nullptr) {
       return nullptr;
     }
-    PyTuple_SET_ITEM(handle_tuple.get(), 2, type.take());
+    PyTuple_SetItem(handle_tuple.get(), 2, type.take());
     auto rights = py::Object(PyLong_FromLong(handle_disp.rights));
     if (rights == nullptr) {
       return nullptr;
     }
-    PyTuple_SET_ITEM(handle_tuple.get(), 3, rights.take());
+    PyTuple_SetItem(handle_tuple.get(), 3, rights.take());
     auto result = py::Object(PyLong_FromLong(handle_disp.result));
     if (result == nullptr) {
       return nullptr;
     }
-    PyTuple_SET_ITEM(handle_tuple.get(), 4, result.take());
-    PyList_SET_ITEM(handles_list.get(), static_cast<Py_ssize_t>(i), handle_tuple.take());
+    PyTuple_SetItem(handle_tuple.get(), 4, result.take());
+    PyList_SetItem(handles_list.get(), static_cast<Py_ssize_t>(i), handle_tuple.take());
   }
-  PyTuple_SET_ITEM(res.get(), 1, handles_list.take());
+  PyTuple_SetItem(res.get(), 1, handles_list.take());
   return res.take();
 }
 

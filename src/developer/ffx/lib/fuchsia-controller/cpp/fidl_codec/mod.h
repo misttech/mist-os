@@ -5,12 +5,10 @@
 #ifndef SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_FIDL_CODEC_MOD_H_
 #define SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_FIDL_CODEC_MOD_H_
 
-#include <Python.h>
-
-#include <map>
 #include <sstream>
 #include <string>
 
+#include "src/developer/ffx/lib/fuchsia-controller/cpp/python/py_header.h"
 #include "src/lib/fidl_codec/library_loader.h"
 
 namespace mod {

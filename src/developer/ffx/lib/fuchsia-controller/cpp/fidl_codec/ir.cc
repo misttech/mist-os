@@ -3,16 +3,9 @@
 // found in the LICENSE file.
 #include "ir.h"
 
-#include <Python.h>
-
-#include <fstream>
-#include <iostream>
-
 #include "mod.h"
 #include "pyerrors.h"
-#include "rapidjson/document.h"
 #include "rapidjson/error/en.h"
-#include "src/developer/ffx/lib/fuchsia-controller/cpp/raii/py_wrapper.h"
 
 namespace ir {
 
@@ -93,7 +86,7 @@ PyObject *get_method_ordinal(PyObject *self, PyObject *args, PyObject *kwds) {  
 }
 
 PyObject *add_ir_path(PyObject *self, PyObject *path_obj) {  // NOLINT
-  const char *c_path = PyUnicode_AsUTF8(path_obj);
+  const char *c_path = PyUnicode_AsUTF8AndSize(path_obj, nullptr);
   if (c_path == nullptr) {
     return nullptr;
   }
@@ -104,7 +97,7 @@ PyObject *add_ir_path(PyObject *self, PyObject *path_obj) {  // NOLINT
 }
 
 PyObject *get_ir_path(PyObject *self, PyObject *library_name) {  // NOLINT
-  const char *c_lib = PyUnicode_AsUTF8(library_name);
+  const char *c_lib = PyUnicode_AsUTF8AndSize(library_name, nullptr);
   if (c_lib == nullptr) {
     return nullptr;
   }
@@ -138,7 +131,7 @@ PyObject *add_ir_paths(PyObject *self, PyObject *path_list) {  // NOLINT
     if (elmnt == nullptr) {
       return nullptr;
     }
-    const char *elmnt_str = PyUnicode_AsUTF8(elmnt);
+    const char *elmnt_str = PyUnicode_AsUTF8AndSize(elmnt, nullptr);
     if (elmnt_str == nullptr) {
       return nullptr;
     }

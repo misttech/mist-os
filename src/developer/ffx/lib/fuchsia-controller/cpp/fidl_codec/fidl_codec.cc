@@ -3,18 +3,13 @@
 // found in the LICENSE file.
 #define PY_SSIZE_T_CLEAN
 
-#include <Python.h>
-
-#include <fstream>
-#include <string>
-
 #include "decode.h"
 #include "encode.h"
 #include "ir.h"
 #include "mod.h"
 #include "src/developer/ffx/lib/fuchsia-controller/cpp/abi/macros.h"
+#include "src/developer/ffx/lib/fuchsia-controller/cpp/python/py_header.h"
 #include "src/developer/ffx/lib/fuchsia-controller/cpp/raii/py_wrapper.h"
-#include "src/lib/fidl_codec/library_loader.h"
 
 extern struct PyModuleDef fidl_codec_mod;
 

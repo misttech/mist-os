@@ -35,7 +35,7 @@ class ChannelTests(unittest.TestCase):
         a.write((bytearray(), [(0, c.take(), 0, 0, 0)]))
         _, hdls = b.read()
         self.assertEqual(len(hdls), 1)
-        new_c = hdls[0]
+        new_c = Channel(hdls[0])
         new_c.write((bytearray([1, 2, 3]), []))
         buf, d_hdls = d.read()
         self.assertEqual(buf, bytearray([1, 2, 3]))

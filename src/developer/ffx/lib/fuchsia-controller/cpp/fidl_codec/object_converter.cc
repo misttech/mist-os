@@ -56,7 +56,7 @@ void ObjectConverter::VisitStringType(const fidl_codec::StringType* type) {
   if (HandleNone(type)) {
     return;
   }
-  const char* str = PyUnicode_AsUTF8(obj_);
+  const char* str = PyUnicode_AsUTF8AndSize(obj_, nullptr);
   if (str) {
     result_ = std::make_unique<fidl_codec::StringValue>(std::string(str));
   }
@@ -262,7 +262,7 @@ void ObjectConverter::VisitEnumType(const fidl_codec::EnumType* type) {
   }
   auto str = py::Object(PyObject_Str(obj_));
   PyErr_Format(PyExc_TypeError, "Unexpected enum value: %s == %" PRIu64,
-               PyUnicode_AsUTF8(str.get()), as_int);
+               PyUnicode_AsUTF8AndSize(str.get(), nullptr), as_int);
 }
 
 void ObjectConverter::VisitBitsType(const fidl_codec::BitsType* type) {

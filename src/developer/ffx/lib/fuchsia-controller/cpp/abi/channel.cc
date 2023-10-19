@@ -6,10 +6,16 @@
 
 #include "convert.h"
 #include "error.h"
+#include "handle.h"
 #include "mod.h"
 #include "src/developer/ffx/lib/fuchsia-controller/cpp/raii/py_wrapper.h"
 
 namespace channel {
+
+void Channel_dealloc(Channel *self) {
+  ffx_close_handle(self->handle);
+  PyObject_Free(self);
+}
 
 int Channel_init(Channel *self, PyObject *args, PyObject *kwds) {
   static const char *kwlist[] = {"handle", nullptr};
@@ -17,7 +23,7 @@ int Channel_init(Channel *self, PyObject *args, PyObject *kwds) {
   if (!PyArg_ParseTupleAndKeywords(args, kwds, "O", const_cast<char **>(kwlist), &handle)) {
     return -1;
   }
-  bool is_handle = PyObject_IsInstance(handle, reinterpret_cast<PyObject *>(&handle::HandleType));
+  bool is_handle = PyObject_IsInstance(handle, PyObjCast(handle::HandleType));
   bool is_long = PyLong_Check(handle);
   if (!is_handle && !is_long) {
     PyErr_SetString(PyExc_TypeError,
@@ -33,11 +39,11 @@ int Channel_init(Channel *self, PyObject *args, PyObject *kwds) {
     if (converted_handle == convert::MINUS_ONE_U32 && PyErr_Occurred()) {
       return -1;
     }
-    self->super.handle = converted_handle;
+    self->handle = converted_handle;
   }
   if (is_handle) {
     auto f_handle = reinterpret_cast<handle::Handle *>(handle);
-    self->super.handle = f_handle->handle;
+    self->handle = f_handle->handle;
     // Nullifies the previous handle, preventing it from closing this channel.
     f_handle->handle = 0;
   }
@@ -123,12 +129,12 @@ PyObject *Channel_write(Channel *self, PyObject *buf) {
   if (PyObject_GetBuffer(bytes, &view, PyBUF_CONTIG_RO) < 0) {
     return nullptr;
   }
-  auto status = ffx_channel_write_etc(mod::get_module_state()->ctx, self->super.handle,
+  auto status = ffx_channel_write_etc(mod::get_module_state()->ctx, self->handle,
                                       reinterpret_cast<const char *>(view.buf),
                                       static_cast<uint64_t>(view.len), c_handles, handles_len);
   if (status != ZX_OK) {
-    PyErr_SetObject(reinterpret_cast<PyObject *>(error::ZxStatusType), PyLong_FromLong(status));
     PyBuffer_Release(&view);
+    PyErr_SetObject(PyObjCast(error::ZxStatusType), PyLong_FromLong(status));
     return nullptr;
   }
   PyBuffer_Release(&view);
@@ -144,11 +150,11 @@ PyObject *Channel_read(Channel *self, PyObject *Py_UNUSED(arg)) {
   static uint64_t actual_bytes_count = 0;
   static uint64_t actual_handles_count = 0;
 
-  auto status = ffx_channel_read(mod::get_module_state()->ctx, self->super.handle, c_buf, c_buf_len,
+  auto status = ffx_channel_read(mod::get_module_state()->ctx, self->handle, c_buf, c_buf_len,
                                  handles, handles_len, &actual_bytes_count, &actual_handles_count);
   if (status != ZX_OK) {
     static_assert(sizeof(long) >= sizeof(status));  // NOLINT
-    PyErr_SetObject(reinterpret_cast<PyObject *>(error::ZxStatusType), PyLong_FromLong(status));
+    PyErr_SetObject(PyObjCast(error::ZxStatusType), PyLong_FromLong(status));
     return nullptr;
   }
   auto res = py::Object(PyTuple_New(2));
@@ -164,22 +170,21 @@ PyObject *Channel_read(Channel *self, PyObject *Py_UNUSED(arg)) {
   if (handles_list == nullptr) {
     return nullptr;
   }
-  PyTuple_SET_ITEM(res.get(), 0, buf.take());
+  PyTuple_SetItem(res.get(), 0, buf.take());
   for (uint64_t i = 0; i < actual_handles_count; ++i) {
     zx_handle_t handle = handles[i];
-    auto handle_obj = PyObject_CallFunction(
-        PyObject_Type(reinterpret_cast<PyObject *>(&(self->super))), "I", handle);
+    auto handle_obj = PyObject_CallFunction(PyObjCast(handle::HandleType), "I", handle);
     if (handle_obj == nullptr) {
       return nullptr;
     }
-    PyList_SET_ITEM(handles_list.get(), static_cast<Py_ssize_t>(i), handle_obj);
+    PyList_SetItem(handles_list.get(), static_cast<Py_ssize_t>(i), handle_obj);
   }
-  PyTuple_SET_ITEM(res.get(), 1, handles_list.take());
+  PyTuple_SetItem(res.get(), 1, handles_list.take());
   return res.take();
 }
 
 PyObject *Channel_as_int(Channel *self, PyObject *Py_UNUSED(arg)) {
-  return PyLong_FromUnsignedLongLong(self->super.handle);
+  return PyLong_FromUnsignedLongLong(self->handle);
 }
 
 // First arg in this function is ChannelType.
@@ -199,20 +204,20 @@ PyObject *Channel_create(PyObject *cls, PyObject *Py_UNUSED(arg)) {
   if (handle_obj1 == nullptr) {
     return nullptr;
   }
-  PyTuple_SET_ITEM(tuple.get(), 0, handle_obj0.take());
-  PyTuple_SET_ITEM(tuple.get(), 1, handle_obj1.take());
+  PyTuple_SetItem(tuple.get(), 0, handle_obj0.take());
+  PyTuple_SetItem(tuple.get(), 1, handle_obj1.take());
   return tuple.take();
 }
 
 PyObject *Channel_take(Channel *self, PyObject *Py_UNUSED(arg)) {
-  auto result = PyLong_FromUnsignedLongLong(self->super.handle);
-  self->super.handle = 0;
+  auto result = PyLong_FromUnsignedLongLong(self->handle);
+  self->handle = 0;
   return result;
 }
 
 PyObject *Channel_close(Channel *self, PyObject *Py_UNUSED(arg)) {
-  ffx_close_handle(self->super.handle);
-  self->super.handle = 0;
+  ffx_close_handle(self->handle);
+  self->handle = 0;
   Py_RETURN_NONE;
 }
 
@@ -229,20 +234,28 @@ PyMethodDef Channel_methods[] = {
      "classmethod for creating a pair of FIDL channels. These are connected bidirectionally."},
     {nullptr, nullptr, 0, nullptr}};
 
-DES_MIX PyTypeObject ChannelType = {
-    PyVarObject_HEAD_INIT(nullptr, 0)
-
-        .tp_name = "fuchsia_controller_py.Channel",
-    .tp_flags = Py_TPFLAGS_DEFAULT,
-    .tp_doc =
-        "Fuchsia controller FIDL channel. This can be read from and written to.\n"
-        "\n"
-        "Can be constructed from a Handle object, but keep in mind that this will mark\n"
-        "the caller's handle invalid, leaving this channel to be the only owner of the underlying\n"
-        "handle.",
-    .tp_methods = Channel_methods,
-    .tp_base = &handle::HandleType,
-    .tp_init = reinterpret_cast<initproc>(Channel_init),
+PyType_Slot Channel_slots[]{
+    {Py_tp_doc,
+     reinterpret_cast<void *>(const_cast<char *>(
+         "Fuchsia controller FIDL channel. This can be read from and written to.\n"
+         "\n"
+         "Can be constructed from a Handle object, but keep in mind that this will mark\n"
+         "the caller's handle invalid, leaving this channel to be the only owner of the underlying\n"
+         "handle."))},
+    {Py_tp_methods, reinterpret_cast<void *>(Channel_methods)},
+    {Py_tp_init, reinterpret_cast<void *>(Channel_init)},
+    {Py_tp_dealloc, reinterpret_cast<void *>(Channel_dealloc)},
+    {0, nullptr},
 };
+
+PyType_Spec ChannelType_Spec = {
+    .name = "fuchsia_controller_py.Channel",
+    .basicsize = sizeof(Channel),
+    .slots = Channel_slots,
+};
+
+PyTypeObject *ChannelType = nullptr;
+
+int ChannelTypeInit() { return mod::GenericTypeInit(&ChannelType, &ChannelType_Spec); }
 
 }  // namespace channel

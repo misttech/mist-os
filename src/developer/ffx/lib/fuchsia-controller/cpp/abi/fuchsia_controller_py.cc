@@ -2,17 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#define PY_SSIZE_T_CLEAN
-
-#include <Python.h>
-
 #include "channel.h"
 #include "error.h"
 #include "fuchsia_controller.h"
+#include "handle.h"
 #include "isolate_directory.h"
 #include "macros.h"
 #include "mod.h"
 #include "socket.h"
+#include "src/developer/ffx/lib/fuchsia-controller/cpp/python/py_header.h"
 #include "src/developer/ffx/lib/fuchsia-controller/cpp/raii/py_wrapper.h"
 
 extern struct PyModuleDef fuchsia_controller_py;
@@ -31,7 +29,7 @@ using Context = struct {
 void Context_dealloc(Context *self) {
   destroy_ffx_env_context(self->env_context);
   Py_XDECREF(self->isolate_dir);
-  Py_TYPE(self)->tp_free(reinterpret_cast<PyObject *>(self));
+  PyObject_Free(self);
 }
 
 std::pair<std::unique_ptr<ffx_config_t[]>, Py_ssize_t> build_config(PyObject *config,
@@ -47,7 +45,7 @@ std::pair<std::unique_ptr<ffx_config_t[]>, Py_ssize_t> build_config(PyObject *co
         PyExc_RuntimeError,
         "Context `target` parameter set to '%s', but "
         "config also contains 'target.default' value set to '%s'. You must only specify one",
-        target, PyUnicode_AsUTF8(maybe_target));
+        target, PyUnicode_AsUTF8AndSize(maybe_target, nullptr));
     return std::make_pair(nullptr, 0);
   }
   Py_ssize_t config_len = PyDict_Size(config);
@@ -70,7 +68,7 @@ std::pair<std::unique_ptr<ffx_config_t[]>, Py_ssize_t> build_config(PyObject *co
       PyErr_SetString(PyExc_TypeError, TYPE_ERROR);
       return std::make_pair(nullptr, 0);
     }
-    const char *key = PyUnicode_AsUTF8(py_key);
+    const char *key = PyUnicode_AsUTF8AndSize(py_key, nullptr);
     if (key == nullptr) {
       return std::make_pair(nullptr, 0);
     }
@@ -78,7 +76,7 @@ std::pair<std::unique_ptr<ffx_config_t[]>, Py_ssize_t> build_config(PyObject *co
       PyErr_SetString(PyExc_TypeError, TYPE_ERROR);
       return std::make_pair(nullptr, 0);
     }
-    const char *value = PyUnicode_AsUTF8(py_value);
+    const char *value = PyUnicode_AsUTF8AndSize(py_value, nullptr);
     if (value == nullptr) {
       return std::make_pair(nullptr, 0);
     }
@@ -105,8 +103,7 @@ int Context_init(Context *self, PyObject *args, PyObject *kwds) {
                                    &isolate, &target)) {
     return -1;
   }
-  if (isolate &&
-      !PyObject_IsInstance(isolate, reinterpret_cast<PyObject *>(&isolate::IsolateDirType))) {
+  if (isolate && !PyObject_IsInstance(isolate, PyObjCast(isolate::IsolateDirType))) {
     PyErr_SetString(PyExc_TypeError, "isolate must be a fuchsia_controller_py.IsolateDir type");
     Py_XDECREF(config);
     Py_XDECREF(isolate);
@@ -148,7 +145,7 @@ int Context_init(Context *self, PyObject *args, PyObject *kwds) {
 }
 
 PyObject *Context_connect_daemon_protocol(Context *self, PyObject *protocol) {
-  const char *c_protocol = PyUnicode_AsUTF8(protocol);
+  const char *c_protocol = PyUnicode_AsUTF8AndSize(protocol, nullptr);
   if (c_protocol == nullptr) {
     return nullptr;
   }
@@ -157,7 +154,7 @@ PyObject *Context_connect_daemon_protocol(Context *self, PyObject *protocol) {
     mod::dump_python_err();
     return nullptr;
   }
-  return PyObject_CallFunction(reinterpret_cast<PyObject *>(&channel::ChannelType), "I", handle);
+  return PyObject_CallFunction(PyObjCast(channel::ChannelType), "I", handle);
 }
 
 PyObject *Context_connect_target_proxy(Context *self, PyObject *Py_UNUSED(unused)) {
@@ -166,7 +163,7 @@ PyObject *Context_connect_target_proxy(Context *self, PyObject *Py_UNUSED(unused
     mod::dump_python_err();
     return nullptr;
   }
-  return PyObject_CallFunction(reinterpret_cast<PyObject *>(&channel::ChannelType), "I", handle);
+  return PyObject_CallFunction(PyObjCast(channel::ChannelType), "I", handle);
 }
 
 PyObject *Context_connect_device_proxy(Context *self, PyObject *args) {
@@ -180,7 +177,7 @@ PyObject *Context_connect_device_proxy(Context *self, PyObject *args) {
     mod::dump_python_err();
     return nullptr;
   }
-  return PyObject_CallFunction(reinterpret_cast<PyObject *>(&channel::ChannelType), "I", handle);
+  return PyObject_CallFunction(PyObjCast(channel::ChannelType), "I", handle);
 }
 
 PyObject *Context_connect_remote_control_proxy(Context *self, PyObject *args) {
@@ -189,7 +186,7 @@ PyObject *Context_connect_remote_control_proxy(Context *self, PyObject *args) {
     mod::dump_python_err();
     return nullptr;
   }
-  return PyObject_CallFunction(reinterpret_cast<PyObject *>(&channel::ChannelType), "I", handle);
+  return PyObject_CallFunction(PyObjCast(channel::ChannelType), "I", handle);
 }
 
 PyObject *Context_target_wait(Context *self, PyObject *args) {
@@ -215,20 +212,26 @@ PyMethodDef Context_methods[] = {
      reinterpret_cast<PyCFunction>(Context_connect_remote_control_proxy), METH_NOARGS, nullptr},
     SENTINEL};
 
-DES_MIX PyTypeObject ContextType = {
-    PyVarObject_HEAD_INIT(nullptr, 0)
-
-        .tp_name = "fuchsia_controller_py.Context",
-    .tp_basicsize = sizeof(Context),
-    .tp_itemsize = 0,
-    .tp_dealloc = reinterpret_cast<destructor>(Context_dealloc),
-    .tp_flags = Py_TPFLAGS_DEFAULT,
-    .tp_doc =
-        "Fuchsia controller context. This is the necessary object for interacting with a Fuchsia device.",
-    .tp_methods = Context_methods,
-    .tp_init = reinterpret_cast<initproc>(Context_init),
-    .tp_new = PyType_GenericNew,
+PyType_Slot ContextType_slots[] = {
+    {Py_tp_dealloc, reinterpret_cast<void *>(Context_dealloc)},
+    {Py_tp_doc,
+     reinterpret_cast<void *>(const_cast<char *>(
+         "Fuchsia controller context. This is the necessary object for interacting with a Fuchsia device."))},
+    {Py_tp_methods, reinterpret_cast<void *>(Context_methods)},
+    {Py_tp_init, reinterpret_cast<void *>(Context_init)},
+    {0, nullptr},
 };
+
+PyType_Spec ContextType_Spec = {
+    .name = "fuchsia_controller_py.Context",
+    .basicsize = sizeof(Context),
+    .itemsize = 0,
+    .slots = ContextType_slots,
+};
+
+PyTypeObject *ContextType = nullptr;
+
+int ContextTypeInit() { return mod::GenericTypeInit(&ContextType, &ContextType_Spec); }
 
 PyObject *connect_handle_notifier(PyObject *self, PyObject *Py_UNUSED(arg)) {
   auto descriptor = ffx_connect_handle_notifier(mod::get_module_state()->ctx);
@@ -252,58 +255,58 @@ int FuchsiaControllerModule_clear(PyObject *m) {
 }
 
 PyMODINIT_FUNC __attribute__((visibility("default"))) PyInit_fuchsia_controller_py() {
-  if (PyType_Ready(&ContextType) < 0) {
+  if (ContextTypeInit() < 0) {
     return nullptr;
   }
-  if (PyType_Ready(&handle::HandleType) < 0) {
+  if (handle::HandleTypeInit() < 0) {
     return nullptr;
   }
-  if (PyType_Ready(&channel::ChannelType) < 0) {
+  if (channel::ChannelTypeInit() < 0) {
     return nullptr;
   }
-  if (PyType_Ready(&socket::SocketType) < 0) {
+  if (socket::SocketTypeInit() < 0) {
     return nullptr;
   }
-  if (PyType_Ready(&isolate::IsolateDirType) < 0) {
+  if (isolate::IsolateDirTypeInit() < 0) {
     return nullptr;
   }
   auto m = py::Object(PyModule_Create(&fuchsia_controller_py));
   if (m == nullptr) {
     return nullptr;
   }
+  auto zx_status_type = error::ZxStatusType_Create();
+  if (zx_status_type == nullptr) {
+    return nullptr;
+  }
   auto state = reinterpret_cast<mod::FuchsiaControllerState *>(PyModule_GetState(m.get()));
   create_ffx_lib_context(&state->ctx, state->ERR_SCRATCH, mod::ERR_SCRATCH_LEN);
-  Py_INCREF(&ContextType);
-  if (PyModule_AddObject(m.get(), "Context", reinterpret_cast<PyObject *>(&ContextType)) < 0) {
+  Py_IncRef(PyObjCast(ContextType));
+  if (PyModule_AddObject(m.get(), "Context", PyObjCast(ContextType)) < 0) {
     Py_DECREF(&ContextType);
     return nullptr;
   }
-  if (PyModule_AddObject(m.get(), "IsolateDir",
-                         reinterpret_cast<PyObject *>(&isolate::IsolateDirType)) < 0) {
-    Py_DECREF(&isolate::IsolateDirType);
+  Py_IncRef(PyObjCast(isolate::IsolateDirType));
+  if (PyModule_AddObject(m.get(), "IsolateDir", PyObjCast(isolate::IsolateDirType)) < 0) {
+    Py_DECREF(isolate::IsolateDirType);
     return nullptr;
   }
-  auto zx_status_type = error::ZxStatusType_Create();
-  if (PyModule_AddObject(m.get(), "ZxStatus", reinterpret_cast<PyObject *>(zx_status_type)) < 0) {
+  if (PyModule_AddObject(m.get(), "ZxStatus", PyObjCast(zx_status_type)) < 0) {
     Py_DECREF(zx_status_type);
     return nullptr;
   }
-  Py_INCREF(&handle::HandleType);
-  if (PyModule_AddObject(m.get(), "Handle", reinterpret_cast<PyObject *>(&handle::HandleType)) <
-      0) {
-    Py_DECREF(&handle::HandleType);
+  Py_IncRef(PyObjCast(handle::HandleType));
+  if (PyModule_AddObject(m.get(), "Handle", PyObjCast(handle::HandleType)) < 0) {
+    Py_DECREF(handle::HandleType);
     return nullptr;
   }
-  Py_INCREF(&channel::ChannelType);
-  if (PyModule_AddObject(m.get(), "Channel", reinterpret_cast<PyObject *>(&channel::ChannelType)) <
-      0) {
-    Py_DECREF(&channel::ChannelType);
+  Py_IncRef(PyObjCast(channel::ChannelType));
+  if (PyModule_AddObject(m.get(), "Channel", PyObjCast(channel::ChannelType)) < 0) {
+    Py_DECREF(channel::ChannelType);
     return nullptr;
   }
-  Py_INCREF(&socket::SocketType);
-  if (PyModule_AddObject(m.get(), "Socket", reinterpret_cast<PyObject *>(&socket::SocketType)) <
-      0) {
-    Py_DECREF(&socket::SocketType);
+  Py_IncRef(PyObjCast(socket::SocketType));
+  if (PyModule_AddObject(m.get(), "Socket", PyObjCast(socket::SocketType)) < 0) {
+    Py_DECREF(socket::SocketType);
     return nullptr;
   }
   return m.take();

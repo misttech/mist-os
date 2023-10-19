@@ -74,18 +74,25 @@ PyMethodDef IsolateDir_methods[] = {
      "Returns a string representing the directory to which this IsolateDir points. The IsolateDir will create it upon initialization."},
     {nullptr, nullptr, 0, nullptr}};
 
-DES_MIX PyTypeObject IsolateDirType = {
-    PyVarObject_HEAD_INIT(nullptr, 0)
-
-        .tp_name = "fuchsia_controller_py.IsolateDir",
-    .tp_basicsize = sizeof(IsolateDir),
-    .tp_itemsize = 0,
-    .tp_dealloc = reinterpret_cast<destructor>(IsolateDir_dealloc),
-    .tp_doc =
-        "Fuchsia controller Isolate Directory. Represents an Isolate Directory path to be used by the fuchsia controller Context object. This object cleans up the Isolate Directory (if it exists) once it goes out of scope.",
-    .tp_methods = IsolateDir_methods,
-    .tp_init = reinterpret_cast<initproc>(IsolateDir_init),
-    .tp_new = PyType_GenericNew,
+PyType_Slot IsolateDir_slots[] = {
+    {Py_tp_dealloc, reinterpret_cast<void *>(IsolateDir_dealloc)},
+    {Py_tp_doc,
+     reinterpret_cast<void *>(const_cast<char *>(
+         "Fuchsia controller Isolate Directory. Represents an Isolate Directory path to be used by the fuchsia controller Context object. This object cleans up the Isolate Directory (if it exists) once it goes out of scope."))},
+    {Py_tp_methods, reinterpret_cast<void *>(IsolateDir_methods)},
+    {Py_tp_init, reinterpret_cast<void *>(IsolateDir_init)},
+    {0, nullptr},
 };
+
+PyType_Spec IsolateDirType_Spec = {
+    .name = "fuchsia_controller_py.IsolateDir",
+    .basicsize = sizeof(IsolateDir),
+    .itemsize = 0,
+    .slots = IsolateDir_slots,
+};
+
+PyTypeObject *IsolateDirType = nullptr;
+
+int IsolateDirTypeInit() { return mod::GenericTypeInit(&IsolateDirType, &IsolateDirType_Spec); }
 
 }  // namespace isolate

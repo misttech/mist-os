@@ -174,7 +174,7 @@ class EndToEnd(unittest.IsolatedAsyncioTestCase):
         tc_proxy.list_targets(query=query, reader=list_client.take())
         buf, hdls = tc_server.read()
         self.assertEqual(len(hdls), 1)
-        new_list_client = hdls[0]
+        new_list_client = Channel(hdls[0])
         new_list_client.write((bytearray([5, 6, 7]), []))
         list_buf, list_hdls = list_server.read()
         self.assertEqual(len(list_hdls), 0)

@@ -42,7 +42,7 @@ PyObject *decode_fidl_message(PyObject *self, PyObject *args, PyObject *kwds,  /
   if (c_bytes == nullptr) {
     return nullptr;
   }
-  Py_ssize_t c_bytes_len = PyByteArray_GET_SIZE(bytes);
+  Py_ssize_t c_bytes_len = PyByteArray_Size(bytes);
   Py_ssize_t c_handles_len = PyList_Size(handles);
   std::unique_ptr<zx_handle_disposition_t[]> c_handles =
       std::make_unique<zx_handle_disposition_t[]>(c_handles_len);

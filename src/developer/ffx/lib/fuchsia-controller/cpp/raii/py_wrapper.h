@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 #ifndef SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_RAII_PY_WRAPPER_H_
 #define SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_RAII_PY_WRAPPER_H_
-#include <Python.h>
+#include "src/developer/ffx/lib/fuchsia-controller/cpp/python/py_header.h"
 
 namespace py {
 

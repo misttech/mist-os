@@ -5,7 +5,6 @@
 
 #include <structmember.h>  // PyMemberDef.
 
-#include <iostream>
 #include <sstream>
 
 namespace error {
@@ -130,7 +129,8 @@ std::string ZxStatus_reprstr_helper(PyObject *self) {
   return ss.str();
 }
 
-PyObject *ZxStatus_repr(PyObject *self) {
+PyObject *ZxStatus_repr(PyObject *self, PyTypeObject *defining_class, PyObject *const *args,
+                        Py_ssize_t nargs, PyObject *kwnames) {
   return PyUnicode_FromString(ZxStatus_reprstr_helper(self).c_str());
 }
 
@@ -140,10 +140,29 @@ PyObject *ZxStatus_str(PyObject *self) {
   return PyUnicode_FromString(ss.str().c_str());
 }
 
+PyMethodDef ZxStatus_repr_def = {
+    "__repr__",
+    reinterpret_cast<PyCFunction>(ZxStatus_repr),
+    METH_METHOD | METH_FASTCALL | METH_KEYWORDS,
+    nullptr,
+};
+
+PyMethodDef ZxStatus_str_def = {
+    "__str__",
+    reinterpret_cast<PyCFunction>(ZxStatus_str),
+    METH_METHOD | METH_FASTCALL | METH_KEYWORDS,
+    nullptr,
+};
+
 // This was copied and macro'd from the rust fuchsia_zircon_status files.
 PyObject *ZxStatus_make_constants() {
-  auto dict = PyDict_New();
-  PyDict_SetItemString(dict, "ZX_OK", PyLong_FromLong(ZX_OK));
+  PyObject *dict = PyDict_New();
+  if (dict == nullptr) {
+    return nullptr;
+  }
+  if (PyDict_SetItemString(dict, "ZX_OK", PyLong_FromLong(ZX_OK)) < 0) {
+    return nullptr;
+  }
   PyDict_SetItemString(dict, "ZX_ERR_INTERNAL", PyLong_FromLong(ZX_ERR_INTERNAL));
   PyDict_SetItemString(dict, "ZX_ERR_NOT_SUPPORTED", PyLong_FromLong(ZX_ERR_NOT_SUPPORTED));
   PyDict_SetItemString(dict, "ZX_ERR_NO_RESOURCES", PyLong_FromLong(ZX_ERR_NO_RESOURCES));
@@ -204,12 +223,31 @@ PyTypeObject *ZxStatusType = nullptr;
 // of the Python error subclass will result in segfaulting.
 PyTypeObject *ZxStatusType_Create() {
   assert(ZxStatusType == nullptr);
-  auto res = reinterpret_cast<PyTypeObject *>(
-      PyErr_NewException("fuchsia_controller_py.ZxStatus", nullptr, ZxStatus_make_constants()));
-  res->tp_repr = ZxStatus_repr;
-  res->tp_str = ZxStatus_str;
+  auto constants = ZxStatus_make_constants();
+  if (constants == nullptr) {
+    return nullptr;
+  }
+  auto res =
+      PyTypeCast(PyErr_NewException("fuchsia_controller_py.ZxStatus", PyExc_Exception, constants));
+  if (res == nullptr) {
+    return nullptr;
+  }
+  auto repr = PyDescr_NewMethod(res, &ZxStatus_repr_def);
+  if (repr == nullptr) {
+    return nullptr;
+  }
+  if (PyObject_SetAttrString(PyObjCast(res), "__repr__", repr) < 0) {
+    return nullptr;
+  }
+  auto str = PyDescr_NewMethod(res, &ZxStatus_str_def);
+  if (str == nullptr) {
+    return nullptr;
+  }
+  if (PyObject_SetAttrString(PyObjCast(res), "__str__", str) < 0) {
+    return nullptr;
+  }
+  Py_IncRef(PyObjCast(res));
   ZxStatusType = res;
-  Py_INCREF(res);
   return res;
 }
 

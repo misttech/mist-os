@@ -5,18 +5,21 @@
 #ifndef SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_ABI_CHANNEL_H_
 #define SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_ABI_CHANNEL_H_
 
-#include <Python.h>
+#include <zircon/types.h>
 
-#include "handle.h"
 #include "macros.h"
+#include "src/developer/ffx/lib/fuchsia-controller/cpp/python/py_header.h"
 
 namespace channel {
 
-extern PyTypeObject ChannelType;
+extern PyTypeObject *ChannelType;
+
+int ChannelTypeInit();
 
 IGNORE_EXTRA_SC
 using Channel = struct {
-  handle::Handle super;
+  PyObject_HEAD;
+  zx_handle_t handle;
 };
 
 }  // namespace channel
