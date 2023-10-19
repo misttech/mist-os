@@ -1,0 +1,323 @@
+{
+    enable_introspection: true,
+    security_policy: {
+        capability_policy: [
+            {
+                source_moniker: "<component_manager>",
+                source: "component",
+                source_name: "fuchsia.boot.RootResource",
+                capability: "protocol",
+                target_monikers: [
+                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // capability no longer run in the sshd realm.
+                    "/core/sshd-host/shell:**",
+                ],
+            },
+            {
+                source_moniker: "<component_manager>",
+                source: "component",
+                source_name: "fuchsia.kernel.CpuResource",
+                capability: "protocol",
+                target_monikers: [
+                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // capability no longer run in the sshd realm.
+                    "/core/sshd-host/shell:**",
+                ],
+            },
+            {
+                source_moniker: "<component_manager>",
+                source: "component",
+                source_name: "fuchsia.kernel.DebugResource",
+                capability: "protocol",
+                target_monikers: [
+                    "/bootstrap",
+                    "/bootstrap/console",
+
+                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // capability no longer run in the sshd realm.
+                    "/core/sshd-host/shell:**",
+                ],
+            },
+            {
+                source_moniker: "<component_manager>",
+                source: "component",
+                source_name: "fuchsia.kernel.HypervisorResource",
+                capability: "protocol",
+                target_monikers: [
+                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // capability no longer run in the sshd realm.
+                    "/core/sshd-host/shell:**",
+                ],
+            },
+            {
+                source_moniker: "<component_manager>",
+                source: "component",
+                source_name: "fuchsia.kernel.InfoResource",
+                capability: "protocol",
+                target_monikers: [
+                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // capability no longer run in the sshd realm.
+                    "/core/sshd-host/shell:**",
+                ],
+            },
+            {
+                source_moniker: "<component_manager>",
+                source: "component",
+                source_name: "fuchsia.kernel.IoportResource",
+                capability: "protocol",
+                target_monikers: [
+                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // capability no longer run in the sshd realm.
+                    "/core/sshd-host/shell:**",
+                ],
+            },
+            {
+                source_moniker: "<component_manager>",
+                source: "component",
+                source_name: "fuchsia.kernel.IrqResource",
+                capability: "protocol",
+                target_monikers: [
+                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // capability no longer run in the sshd realm.
+                    "/core/sshd-host/shell:**",
+                ],
+            },
+            {
+                source_moniker: "<component_manager>",
+                source: "component",
+                source_name: "fuchsia.kernel.MmioResource",
+                capability: "protocol",
+                target_monikers: [
+                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // capability no longer run in the sshd realm.
+                    "/core/sshd-host/shell:**",
+                ],
+            },
+            {
+                source_moniker: "<component_manager>",
+                source: "component",
+                source_name: "fuchsia.kernel.PowerResource",
+                capability: "protocol",
+                target_monikers: [
+                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // capability no longer run in the sshd realm.
+                    "/core/sshd-host/shell:**",
+                ],
+            },
+            {
+                source_moniker: "<component_manager>",
+                source: "component",
+                source_name: "fuchsia.kernel.RootJob",
+                capability: "protocol",
+                target_monikers: [
+                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // capability no longer run in the sshd realm.
+                    "/core/sshd-host/shell:**",
+                ],
+            },
+            {
+                source_moniker: "<component_manager>",
+                source: "component",
+                source_name: "fuchsia.kernel.RootJobForInspect",
+                capability: "protocol",
+                target_monikers: [
+                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // capability no longer run in the sshd realm.
+                    "/core/sshd-host/shell:**",
+                ],
+            },
+            {
+                source_moniker: "<component_manager>",
+                source: "component",
+                source_name: "fuchsia.kernel.SmcResource",
+                capability: "protocol",
+                target_monikers: [
+                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // capability no longer run in the sshd realm.
+                    "/core/sshd-host/shell:**",
+                ],
+            },
+            {
+                source_moniker: "<component_manager>",
+                source: "component",
+                source_name: "fuchsia.kernel.VmexResource",
+                capability: "protocol",
+                target_monikers: [
+                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // capability no longer run in the sshd realm.
+                    "/core/sshd-host/shell:**",
+                ],
+            },
+            {
+                source_moniker: "/bootstrap/fshost",
+                source: "component",
+                source_name: "bin",
+                capability: "directory",
+                target_monikers: [
+                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // capability no longer run in the sshd realm.
+                    "/core/sshd-host/shell:**",
+                ],
+            },
+            {
+                source_moniker: "/bootstrap/fshost",
+                source: "component",
+                source_name: "blob",
+                capability: "directory",
+                target_monikers: [
+                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // capability no longer run in the sshd realm.
+                    "/core/sshd-host/shell:**",
+                ],
+            },
+            {
+                source_moniker: "/bootstrap/fshost",
+                source: "component",
+                source_name: "data",
+                capability: "directory",
+                target_monikers: [
+                    "/core/sshd-host",
+
+                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // capability no longer run in the sshd realm.
+                    "/core/sshd-host/shell:**",
+                ],
+            },
+            {
+                source_moniker: "/bootstrap/fshost",
+                source: "component",
+                source_name: "system",
+                capability: "directory",
+                target_monikers: [
+                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // capability no longer run in the sshd realm.
+                    "/core/sshd-host/shell:**",
+                ],
+            },
+            {
+                source_moniker: "/bootstrap/fshost",
+                source: "component",
+                source_name: "tmp",
+                capability: "directory",
+                target_monikers: [
+                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // capability no longer run in the sshd realm.
+                    "/core/sshd-host/shell:**",
+                ],
+            },
+            {
+                source_moniker: "/bootstrap/fshost",
+                source: "component",
+                source_name: "build-info",
+                capability: "directory",
+                target_monikers: [
+                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // capability no longer run in the sshd realm.
+                    "/core/sshd-host/shell:**",
+                ],
+            },
+            {
+                source_moniker: "/core/pkg-resolver",
+                source: "component",
+                source_name: "fuchsia.pkg.PackageResolver",
+                capability: "protocol",
+                target_monikers: [
+                    "/core/pkg-resolver",
+                    "/core/process_resolver",
+                    "/bootstrap/full_resolver",
+
+                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // capability no longer run in the sshd realm.
+                    "/core/sshd-host/shell:**",
+                ],
+            },
+            {
+                source_moniker: "/bootstrap/pkg-cache",
+                source: "component",
+                source_name: "pkgfs",
+                capability: "directory",
+                target_monikers: [
+                    "/bootstrap",
+                    "/bootstrap/console-launcher",
+                    "/bootstrap/pkg-cache",
+
+                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // capability no longer run in the sshd realm.
+                    "/core/sshd-host/shell:**",
+                ],
+            },
+            {
+                source_moniker: "/bootstrap/pkg-cache",
+                source: "component",
+                source_name: "fuchsia.pkg.PackageCache",
+                capability: "protocol",
+                target_monikers: [
+                    "/bootstrap",
+                    "/bootstrap/pkg-cache",
+                    "/core/pkg-resolver",
+                    "/core/system-updater",
+                    "/core/system-update/system-updater",
+                ],
+            },
+            {
+                source_moniker: "/bootstrap/pkg-cache",
+                source: "component",
+                source_name: "fuchsia.pkg.RetainedPackages",
+                capability: "protocol",
+                target_monikers: [
+                    "/bootstrap",
+                    "/bootstrap/pkg-cache",
+                    "/core/system-updater",
+                    "/core/system-update/system-updater",
+                ],
+            },
+            {
+                // We restrict access to base_resolver's Resolver protocol because we
+                // expect only parts of component framework to be able to access it.
+                source_moniker: "/bootstrap/base_resolver",
+                source: "component",
+                source_name: "fuchsia.component.resolution.Resolver",
+                capability: "protocol",
+                target_monikers: [
+                    "/bootstrap",
+                    "/bootstrap/base_resolver",
+                    "/bootstrap/driver_index",
+                    "/bootstrap/driver_manager",
+                ],
+            },
+            {
+                source_moniker: "/core/lowpanservice",
+                source: "component",
+                source_name: "fuchsia.factory.lowpan.FactoryLookup",
+                capability: "protocol",
+                target_monikers: [
+                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // capability no longer run in the sshd realm.
+                    "/core/sshd-host/shell:**",
+                ],
+            },
+            {
+                source_moniker: "/core/lowpanservice",
+                source: "component",
+                source_name: "fuchsia.lowpan.device.DeviceExtraConnector",
+                capability: "protocol",
+                target_monikers: [
+                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // capability no longer run in the sshd realm.
+                    "/core/sshd-host/shell:**",
+                ],
+            },
+            {
+                source_moniker: "/core/lowpanservice",
+                source: "component",
+                source_name: "fuchsia.lowpan.device.DeviceRouterExtraConnector",
+                capability: "protocol",
+                target_monikers: [
+                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // capability no longer run in the sshd realm.
+                    "/core/sshd-host/shell:**",
+                ],
+            },
+        ],
+    },
+}

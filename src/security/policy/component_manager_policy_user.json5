@@ -1,0 +1,69 @@
+{
+    security_policy: {
+        capability_policy: [
+            {
+                source_moniker: "/core/pkg-resolver",
+                source: "component",
+                source_name: "fuchsia.pkg.PackageResolver",
+                capability: "protocol",
+                target_monikers: [
+                    "/core/pkg-resolver",
+                    "/bootstrap/full_resolver",
+                ],
+            },
+            {
+                source_moniker: "/bootstrap/pkg-cache",
+                source: "component",
+                source_name: "pkgfs",
+                capability: "directory",
+                target_monikers: [
+                    "/bootstrap",
+                    "/bootstrap/pkg-cache",
+
+                    // TODO(fxbug.dev/294908859) Use optional routing to remove this route on user
+                    // builds.
+                    "/bootstrap/console-launcher",
+                ],
+            },
+            {
+                source_moniker: "/bootstrap/pkg-cache",
+                source: "component",
+                source_name: "fuchsia.pkg.PackageCache",
+                capability: "protocol",
+                target_monikers: [
+                    "/bootstrap",
+                    "/bootstrap/pkg-cache",
+                    "/core/pkg-resolver",
+                    "/core/system-updater",
+                    "/core/system-update/system-updater",
+                ],
+            },
+            {
+                source_moniker: "/bootstrap/pkg-cache",
+                source: "component",
+                source_name: "fuchsia.pkg.RetainedPackages",
+                capability: "protocol",
+                target_monikers: [
+                    "/bootstrap",
+                    "/bootstrap/pkg-cache",
+                    "/core/system-updater",
+                    "/core/system-update/system-updater",
+                ],
+            },
+            {
+                // We restrict access to base_resolver's Resolver protocol because we
+                // expect only parts of component framework to be able to access it.
+                source_moniker: "/bootstrap/base_resolver",
+                source: "component",
+                source_name: "fuchsia.component.resolution.Resolver",
+                capability: "protocol",
+                target_monikers: [
+                    "/bootstrap",
+                    "/bootstrap/base_resolver",
+                    "/bootstrap/driver_index",
+                    "/bootstrap/driver_manager",
+                ],
+            },
+        ],
+    },
+}
