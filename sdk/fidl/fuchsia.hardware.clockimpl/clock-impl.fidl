@@ -1,0 +1,66 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+library fuchsia.hardware.clockimpl;
+
+using zx;
+
+/// Each method in this protocol has a corresponding method in clock.fidl
+/// with an additional ID parameter.
+/// The ID parameter in each method below designates the clock in the system
+/// that the call is intended to target.
+/// Conversely, each instance of ZX_PROTOCOL_CLOCK pertains to only one clock
+/// in the system.
+/// See clock.fidl for documentation for each method.
+@transport("Driver")
+open protocol ClockImpl {
+    /// Clock Gating Control.
+    strict Enable(struct {
+        id uint32;
+    }) -> () error zx.Status;
+    strict Disable(struct {
+        id uint32;
+    }) -> () error zx.Status;
+    strict IsEnabled(struct {
+        id uint32;
+    }) -> (struct {
+        enabled bool;
+    }) error zx.Status;
+
+    /// Clock Frequency Scaling Control.
+    strict SetRate(struct {
+        id uint32;
+        hz uint64;
+    }) -> () error zx.Status;
+    strict QuerySupportedRate(struct {
+        id uint32;
+        hz uint64;
+    }) -> (struct {
+        hz uint64;
+    }) error zx.Status;
+    strict GetRate(struct {
+        id uint32;
+    }) -> (struct {
+        hz uint64;
+    }) error zx.Status;
+
+    /// Clock input control.
+    strict SetInput(struct {
+        id uint32;
+        idx uint32;
+    }) -> () error zx.Status;
+    strict GetNumInputs(struct {
+        id uint32;
+    }) -> (struct {
+        n uint32;
+    }) error zx.Status;
+    strict GetInput(struct {
+        id uint32;
+    }) -> (struct {
+        index uint32;
+    }) error zx.Status;
+};
+
+service Service {
+    device client_end:ClockImpl;
+};
