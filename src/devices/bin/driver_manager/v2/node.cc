@@ -344,7 +344,7 @@ zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
                 composite->MakeTopologicalPath().c_str());
 
   primary->devfs_device_.topological_node().value().add_child(
-      composite->name_, std::nullopt, composite->CreateControllerOnlyDevfsPassthrough(),
+      composite->name_, std::nullopt, composite->CreateDevfsPassthrough(std::nullopt, std::nullopt),
       composite->devfs_device_);
   composite->devfs_device_.publish();
   return zx::ok(std::move(composite));
@@ -704,19 +704,16 @@ fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> No
 
   Devnode::Target devfs_target;
   std::optional<std::string_view> devfs_class_path;
-  if (args.devfs_args().has_value() && args.devfs_args()->connector().has_value()) {
-    if (args.devfs_args()->class_name().has_value()) {
-      devfs_class_path = args.devfs_args()->class_name();
+  auto& devfs_args = args.devfs_args();
+  if (devfs_args.has_value()) {
+    if (devfs_args->class_name().has_value()) {
+      devfs_class_path = devfs_args->class_name();
     }
-    fidl::WireSharedClient<fuchsia_device_fs::Connector> connector(
-        std::move(args.devfs_args().value().connector().value()), dispatcher_);
-    devfs_target =
-        Devnode::PassThrough([connector = std::move(connector), name = child->name()](
-                                 zx::channel server, Devnode::PassThrough::ConnectionType type) {
-          return connector->Connect(std::move(server)).status();
-        });
+
+    devfs_target = child->CreateDevfsPassthrough(std::move(devfs_args->connector()),
+                                                 devfs_args->connector_supports());
   } else {
-    devfs_target = child->CreateControllerOnlyDevfsPassthrough();
+    devfs_target = child->CreateDevfsPassthrough(std::nullopt, std::nullopt);
   }
   ZX_ASSERT(devfs_device_.topological_node().has_value());
   zx_status_t status = devfs_device_.topological_node()->add_child(
@@ -1219,15 +1216,27 @@ void Node::SetPerformanceState(SetPerformanceStateRequestView request,
   completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
-Devnode::Target Node::CreateControllerOnlyDevfsPassthrough() {
+Devnode::Target Node::CreateDevfsPassthrough(
+    std::optional<fidl::ClientEnd<fuchsia_device_fs::Connector>> connector,
+    std::optional<fuchsia_device_fs::ConnectionType> connector_supports) {
+  // TODO(https://fxbug.dev/112484): Once multiplexing is not needed anymore, the default
+  // can be kDevice only.
+  auto supported_by_connector = connector_supports.value_or(
+      fuchsia_device_fs::ConnectionType::kDevice | fuchsia_device_fs::ConnectionType::kController |
+      fuchsia_device_fs::ConnectionType::kNode);
   return Devnode::PassThrough(
-      [node = weak_from_this(), node_name = name_](zx::channel server_end,
-                                                   Devnode::PassThrough::ConnectionType type) {
-        if (type.include_device || type.include_node) {
+      [connector = std::move(connector), supported_by_connector, node = weak_from_this(),
+       node_name = name_](zx::channel server_end, fuchsia_device_fs::ConnectionType type) {
+        // If the connector supports all of the requested types, connect with the connector.
+        if (connector.has_value() && type == (supported_by_connector & type)) {
+          return fidl::WireCall(connector.value())->Connect(std::move(server_end)).status();
+        }
+        if (type & fuchsia_device_fs::ConnectionType::kDevice ||
+            type & fuchsia_device_fs::ConnectionType::kNode) {
           LOGF(WARNING, "Cannot include device or node for %s.", node_name.c_str());
         }
 
-        if (!type.include_controller) {
+        if (!(type & fuchsia_device_fs::ConnectionType::kController)) {
           LOGF(ERROR, "Controller not requested for %s.", node_name.c_str());
           return ZX_ERR_NOT_SUPPORTED;
         }

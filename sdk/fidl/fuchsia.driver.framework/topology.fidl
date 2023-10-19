@@ -75,6 +75,15 @@ type DevfsAddArgs = resource table {
     /// This is a vmo of inspect data that will be installed in devfs.
     /// Optional: If this is not provided then the devfs's inspect data will be empty.
     3: inspect zx.Handle:VMO;
+
+    /// The connection types that are supported by the |connector| given.
+    /// The driver framework should handle connection types that are not supported by the
+    /// connector.
+    /// If not provided, all connection types will be assumed as supported by the connector.
+    /// TODO(https://fxbug.dev/112484): No longer assume all 3 is supported when we no longer
+    /// rely on multiplexing. Only the Device type should be assumed.
+    @available(added=16)
+    4: connector_supports fuchsia.device.fs.ConnectionType;
 };
 
 /// Arguments for adding a node.

@@ -372,8 +372,11 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   void SetAndPublishInspect();
 
   // Creates a passthrough for the associated devfs node that will connect to
-  // the device controller of this node.
-  Devnode::Target CreateControllerOnlyDevfsPassthrough();
+  // the device controller of this node if no connector provided, or the connection
+  // type is not supported.
+  Devnode::Target CreateDevfsPassthrough(
+      std::optional<fidl::ClientEnd<fuchsia_device_fs::Connector>> connector,
+      std::optional<fuchsia_device_fs::ConnectionType> connector_supports);
 
   std::string name_;
 

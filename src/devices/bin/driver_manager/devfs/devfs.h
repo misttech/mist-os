@@ -31,15 +31,8 @@ class Devnode {
   // This class represents a device in devfs. It is called "passthrough" because it sends
   // the channel and the connection type to a callback function.
   struct PassThrough {
-    struct ConnectionType {
-      // If true, the connection should serve `fuchsia.io/Node`.
-      bool include_node = false;
-      // If true, the connection should serve `fuchsia.device/Controller`.
-      bool include_controller = false;
-      // If true, the connection should serve the device's FIDL.
-      bool include_device = false;
-    };
-    using ConnectCallback = fit::function<zx_status_t(zx::channel, ConnectionType)>;
+    using ConnectCallback =
+        fit::function<zx_status_t(zx::channel, fuchsia_device_fs::ConnectionType)>;
 
     // Create a Passthrough class. The client must make sure that any captures in the callback
     // live as long as the passthrough class (for this reason it's strongly recommended to use
@@ -49,9 +42,8 @@ class Devnode {
 
     PassThrough Clone() { return *this; }
 
-    ConnectionType default_connection_type = ConnectionType{
-        .include_device = true,
-    };
+    fuchsia_device_fs::ConnectionType default_connection_type =
+        fuchsia_device_fs::ConnectionType::kDevice;
     std::shared_ptr<ConnectCallback> connect;
   };
 

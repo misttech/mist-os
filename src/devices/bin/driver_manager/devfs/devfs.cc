@@ -195,16 +195,14 @@ Devnode::Devnode(Devfs& devfs, PseudoDir& parent, Target target, fbl::String nam
     children().AddEntry(
         fuchsia_device_fs::wire::kDeviceControllerName,
         fbl::MakeRefCounted<fs::Service>([passthrough = target->Clone()](zx::channel channel) {
-          return (*passthrough.connect.get())(std::move(channel), PassThrough::ConnectionType{
-                                                                      .include_controller = true,
-                                                                  });
+          return (*passthrough.connect.get())(std::move(channel),
+                                              fuchsia_device_fs::ConnectionType::kController);
         }));
     children().AddEntry(
         fuchsia_device_fs::wire::kDeviceProtocolName,
         fbl::MakeRefCounted<fs::Service>([passthrough = target->Clone()](zx::channel channel) {
-          return (*passthrough.connect.get())(std::move(channel), PassThrough::ConnectionType{
-                                                                      .include_device = true,
-                                                                  });
+          return (*passthrough.connect.get())(std::move(channel),
+                                              fuchsia_device_fs::ConnectionType::kDevice);
         }));
   }
 }
@@ -348,12 +346,18 @@ zx_status_t Devnode::add_child(std::string_view name, std::optional<std::string_
   // Set the FIDL multiplexing of the node based on the class name.
   if (target.has_value()) {
     if (class_name.has_value()) {
-      target->default_connection_type.include_node = AllowMultiplexingNode(class_name.value());
-      target->default_connection_type.include_controller = false;
+      if (AllowMultiplexingNode(class_name.value())) {
+        target->default_connection_type |= fuchsia_device_fs::ConnectionType::kNode;
+      } else {
+        target->default_connection_type -= fuchsia_device_fs::ConnectionType::kNode;
+      }
+
+      target->default_connection_type -= fuchsia_device_fs::ConnectionType::kController;
     } else {
       // TODO(https://fxbug.dev/112484): Remove this multiplexing after clients have migrated.
-      target->default_connection_type.include_node = true;
-      target->default_connection_type.include_controller = true;
+      target->default_connection_type |=
+          fuchsia_device_fs::ConnectionType::kNode |
+          fuchsia_device_fs::ConnectionType::kController;
     }
   }
 

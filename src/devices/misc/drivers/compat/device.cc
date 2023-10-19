@@ -542,8 +542,12 @@ zx_status_t Device::CreateNode() {
                topological_path_.c_str(), connector.status_string());
       return connector.error_value();
     }
-    auto devfs_args =
-        fdf::wire::DevfsAddArgs::Builder(arena).connector(std::move(connector.value()));
+
+    auto devfs_args = fdf::wire::DevfsAddArgs::Builder(arena)
+                          .connector(std::move(connector.value()))
+                          .connector_supports(fuchsia_device_fs::ConnectionType::kDevice |
+                                              fuchsia_device_fs::ConnectionType::kNode |
+                                              fuchsia_device_fs::ConnectionType::kController);
     fidl::StringView class_name = ProtocolIdToClassName(device_server_.proto_id());
     if (!class_name.empty()) {
       devfs_args.class_name(class_name);

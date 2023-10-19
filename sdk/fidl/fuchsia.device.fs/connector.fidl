@@ -6,6 +6,16 @@ library fuchsia.device.fs;
 
 using zx;
 
+@available(added=16)
+type ConnectionType = flexible bits : uint8 {
+    /// Represents the fuchsia.io/Node protocol.
+    NODE = 0b001;
+    /// Represents the fuchsia.device/Controller protocol.
+    CONTROLLER = 0b010;
+    /// Represents the device specific FIDL.
+    DEVICE = 0b100;
+};
+
 /// A connector lets a client forward the server end of a protocol.
 closed protocol Connector {
     /// Forward a server end of a protocol so that it can be connected.

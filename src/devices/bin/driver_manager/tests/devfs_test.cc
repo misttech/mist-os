@@ -183,9 +183,9 @@ TEST(Devfs, PassthroughTarget) {
   std::optional<Devnode> root_slot;
   Devfs devfs(root_slot);
   ASSERT_TRUE(root_slot.has_value());
-  Devnode::PassThrough::ConnectionType connection_type;
+  fuchsia_device_fs::ConnectionType connection_type;
   Devnode::PassThrough passthrough({
-      [&loop, &connection_type](zx::channel server, Devnode::PassThrough::ConnectionType type) {
+      [&loop, &connection_type](zx::channel server, fuchsia_device_fs::ConnectionType type) {
         connection_type = type;
         loop.Quit();
         return ZX_OK;
@@ -201,36 +201,23 @@ TEST(Devfs, PassthroughTarget) {
 
   struct TestRun {
     const char* file_name;
-    Devnode::PassThrough::ConnectionType expected;
+    fuchsia_device_fs::ConnectionType expected;
   };
 
   const TestRun tests[] = {
       {
           .file_name = "test",
-          .expected =
-              {
-                  .include_node = true,
-                  .include_controller = true,
-                  .include_device = true,
-              },
+          .expected = fuchsia_device_fs::ConnectionType::kController |
+                      fuchsia_device_fs::ConnectionType::kDevice |
+                      fuchsia_device_fs::ConnectionType::kNode,
       },
       {
           .file_name = "test/device_controller",
-          .expected =
-              {
-                  .include_node = false,
-                  .include_controller = true,
-                  .include_device = false,
-              },
+          .expected = fuchsia_device_fs::ConnectionType::kController,
       },
       {
           .file_name = "test/device_protocol",
-          .expected =
-              {
-                  .include_node = false,
-                  .include_controller = false,
-                  .include_device = true,
-              },
+          .expected = fuchsia_device_fs::ConnectionType::kDevice,
       },
   };
 
@@ -247,9 +234,7 @@ TEST(Devfs, PassthroughTarget) {
     loop.Run();
     loop.ResetQuit();
 
-    ASSERT_EQ(connection_type.include_device, test.expected.include_device);
-    ASSERT_EQ(connection_type.include_controller, test.expected.include_controller);
-    ASSERT_EQ(connection_type.include_node, test.expected.include_node);
+    ASSERT_EQ(connection_type, test.expected);
   }
 }
 
