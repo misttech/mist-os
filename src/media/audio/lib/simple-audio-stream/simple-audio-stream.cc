@@ -11,6 +11,7 @@
 #include <lib/zx/process.h>
 #include <lib/zx/thread.h>
 #include <zircon/device/audio.h>
+#include <zircon/errors.h>
 
 #include <utility>
 
@@ -444,7 +445,11 @@ void SimpleAudioStream::CreateRingBuffer(
 
 void SimpleAudioStream::WatchGainState(StreamChannel* channel,
                                        StreamChannel::WatchGainStateCompleter::Sync& completer) {
-  ZX_ASSERT(!channel->gain_completer_);
+  if (channel->gain_completer_) {
+    completer.Close(ZX_ERR_BAD_STATE);
+    channel->gain_completer_.reset();
+    return;
+  }
   channel->gain_completer_ = completer.ToAsync();
 
   ScopedToken t(domain_token());
@@ -467,7 +472,11 @@ void SimpleAudioStream::WatchGainState(StreamChannel* channel,
 
 void SimpleAudioStream::WatchPlugState(StreamChannel* channel,
                                        StreamChannel::WatchPlugStateCompleter::Sync& completer) {
-  ZX_ASSERT(!channel->plug_completer_);
+  if (channel->plug_completer_) {
+    completer.Close(ZX_ERR_BAD_STATE);
+    channel->plug_completer_.reset();
+    return;
+  }
   channel->plug_completer_ = completer.ToAsync();
 
   ScopedToken t(domain_token());
@@ -488,12 +497,26 @@ void SimpleAudioStream::WatchPlugState(StreamChannel* channel,
 void SimpleAudioStream::WatchClockRecoveryPositionInfo(
     WatchClockRecoveryPositionInfoCompleter::Sync& completer) {
   fbl::AutoLock position_lock(&position_lock_);
+
+  if (position_completer_) {
+    completer.Close(ZX_ERR_BAD_STATE);
+    position_completer_.reset();
+    return;
+  }
+
   position_request_time_.Set(zx::clock::get_monotonic().get());
   position_completer_ = completer.ToAsync();
 }
 
 void SimpleAudioStream::WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) {
   ScopedToken t(domain_token());
+
+  if (delay_completer_) {
+    completer.Close(ZX_ERR_BAD_STATE);
+    delay_completer_.reset();
+    return;
+  }
+
   if (!delay_info_updated_) {
     delay_info_updated_ = true;
     fidl::Arena allocator;

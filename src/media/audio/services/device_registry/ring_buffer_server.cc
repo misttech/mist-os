@@ -92,7 +92,8 @@ void RingBufferServer::SetActiveChannels(SetActiveChannelsRequest& request,
 
   if (active_channels_completer_) {
     ADR_WARN_OBJECT() << "previous `SetActiveChannels` request has not yet completed";
-    active_channels_completer_->Close(ZX_ERR_SHOULD_WAIT);
+    active_channels_completer_->Close(ZX_ERR_BAD_STATE);
+    active_channels_completer_.reset();
     return;
   }
 
@@ -149,7 +150,8 @@ void RingBufferServer::Start(StartRequest& request, StartCompleter::Sync& comple
 
   if (start_completer_) {
     ADR_WARN_OBJECT() << "previous `Start` request has not yet completed";
-    start_completer_->Close(ZX_ERR_SHOULD_WAIT);
+    start_completer_->Close(ZX_ERR_BAD_STATE);
+    start_completer_.reset();
     return;
   }
 
@@ -191,7 +193,8 @@ void RingBufferServer::Stop(StopRequest& request, StopCompleter::Sync& completer
 
   if (stop_completer_) {
     ADR_WARN_OBJECT() << "previous `Stop` request has not yet completed";
-    stop_completer_->Close(ZX_ERR_SHOULD_WAIT);
+    stop_completer_->Close(ZX_ERR_BAD_STATE);
+    stop_completer_.reset();
     return;
   }
 

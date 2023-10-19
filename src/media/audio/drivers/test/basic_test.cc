@@ -102,6 +102,12 @@ void BasicTest::GetHealthState(fuchsia::hardware::audio::Health::GetHealthStateC
 //    If SignalProcessingConnect not supported earlier, SKIP.
 //    Retrieve elements. If closes with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
 //    WatchElementState(badId) returns ZX_ERR_INVALID_ARGS and does not close. Fail on other error.
+// WatchElementStateWhilePending
+//    If SignalProcessingConnect not supported earlier, SKIP.
+//    If WatchElementState closes channel with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
+//    Else set a static var for this driver instance that SignalProcessing is supported.
+//    WatchElementState immediately returns when initially called.
+//    WatchElementState (again) closes the protocol channel with ZX_ERR_BAD_STATE
 
 // AdminTest cases:
 // SetTopologySupported

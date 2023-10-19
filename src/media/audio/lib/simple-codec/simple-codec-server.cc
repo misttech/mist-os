@@ -5,6 +5,7 @@
 #include <lib/ddk/binding.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/simple-codec/simple-codec-server.h>
+#include <zircon/errors.h>
 
 #include <algorithm>
 #include <memory>
@@ -393,7 +394,8 @@ void SimpleCodecServerInternal<T>::WatchElementState(
       } else {
         // The client called WatchElementState when another hanging get was pending.
         // This is an error condition and hence we unbind and remove the instance.
-        instance->binding_.Unbind();
+        instance->binding_.Close(ZX_ERR_BAD_STATE);
+        instance->gain_callback_.reset();
         fbl::AutoLock lock(&instances_lock_);
         instances_.erase(*instance);
       }
@@ -411,7 +413,8 @@ void SimpleCodecServerInternal<T>::WatchElementState(
       } else {
         // The client called WatchElementState when another hanging get was pending.
         // This is an error condition and hence we unbind and remove the instance.
-        instance->binding_.Unbind();
+        instance->binding_.Close(ZX_ERR_BAD_STATE);
+        instance->mute_callback_.reset();
         fbl::AutoLock lock(&instances_lock_);
         instances_.erase(*instance);
       }
@@ -429,11 +432,16 @@ void SimpleCodecServerInternal<T>::WatchElementState(
       } else {
         // The client called WatchElementState when another hanging get was pending.
         // This is an error condition and hence we unbind and remove the instance.
-        instance->binding_.Unbind();
+        instance->binding_.Close(ZX_ERR_BAD_STATE);
+        instance->agc_callback_.reset();
         fbl::AutoLock lock(&instances_lock_);
         instances_.erase(*instance);
       }
       break;
+
+    default:
+      zxlogf(ERROR, "Ignoring WatchElementState for unknown processing_element_id: %zx",
+             processing_element_id);
   }
 }
 
@@ -482,7 +490,16 @@ void SimpleCodecServerInternal<T>::SetTopology(
 template <class T>
 void SimpleCodecServerInternal<T>::WatchPlugState(Codec::WatchPlugStateCallback callback,
                                                   SimpleCodecServerInstance<T>* instance) {
-  // Since the library only advertsises a hardwired codec, it returns that the codec is always
+  if (instance->plug_callback_) {
+    // The client called WatchPlugState when another hanging get was pending.
+    // This is an error condition and hence we unbind and remove the instance.
+    instance->binding_.Close(ZX_ERR_BAD_STATE);
+    instance->plug_callback_.reset();
+    fbl::AutoLock lock(&instances_lock_);
+    instances_.erase(*instance);
+  }
+
+  // Since the library only advertises a hardwired codec, it returns that the codec is always
   // plugged and only replies to this hanging-get with the plugged state once per instance.
   // Hence for the first WatchPlugState call reply immediately, otherwise do not reply.
   if (instance->plug_state_updated_) {

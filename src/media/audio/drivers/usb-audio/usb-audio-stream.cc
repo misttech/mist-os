@@ -579,7 +579,13 @@ void UsbAudioStream::CreateRingBuffer(StreamChannel* channel, audio_fidl::wire::
 
 void UsbAudioStream::WatchGainState(StreamChannel* channel,
                                     StreamChannel::WatchGainStateCompleter::Sync& completer) {
-  ZX_DEBUG_ASSERT(!channel->gain_completer_);
+  if (channel->gain_completer_) {
+    completer.Close(ZX_ERR_BAD_STATE);
+    channel->gain_completer_.reset();
+    channel->last_reported_gain_state_ = {};
+    return;
+  }
+
   channel->gain_completer_ = completer.ToAsync();
 
   ZX_DEBUG_ASSERT(ifc_->path() != nullptr);
@@ -614,11 +620,24 @@ void UsbAudioStream::WatchGainState(StreamChannel* channel,
 void UsbAudioStream::WatchClockRecoveryPositionInfo(
     WatchClockRecoveryPositionInfoCompleter::Sync& completer) {
   fbl::AutoLock req_lock(&req_lock_);
+
+  if (position_completer_) {
+    completer.Close(ZX_ERR_BAD_STATE);
+    position_completer_.reset();
+    return;
+  }
+
   position_completer_ = completer.ToAsync();
   position_request_time_.Set(zx::clock::get_monotonic().get());
 }
 
 void UsbAudioStream::WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) {
+  if (delay_completer_) {
+    completer.Close(ZX_ERR_BAD_STATE);
+    delay_completer_.reset();
+    return;
+  }
+
   if (!delay_info_updated_) {
     delay_info_updated_ = true;
     fidl::Arena allocator;
@@ -626,6 +645,7 @@ void UsbAudioStream::WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) {
     // No external delay information is provided by this driver.
     delay_info.internal_delay(internal_delay_nsec_);
     completer.Reply(delay_info.Build());
+    return;
   }
   // All completers must either Reply, Close, or ToAsync(+persist until Unbind).
   delay_completer_ = completer.ToAsync();
@@ -667,7 +687,13 @@ void UsbAudioStream::SetGain(audio_fidl::wire::GainState state,
 
 void UsbAudioStream::WatchPlugState(StreamChannel* channel,
                                     StreamChannel::WatchPlugStateCompleter::Sync& completer) {
-  ZX_DEBUG_ASSERT(!channel->plug_completer_);
+  if (channel->plug_completer_) {
+    completer.Close(ZX_ERR_BAD_STATE);
+    channel->plug_completer_.reset();
+    channel->last_reported_plugged_state_ = StreamChannel::Plugged::kNotReported;
+    return;
+  }
+
   channel->plug_completer_ = completer.ToAsync();
 
   // As long as the usb device is present, we are plugged. A second reply is delayed indefinitely

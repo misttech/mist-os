@@ -176,6 +176,7 @@ class SimpleCodecServerInstance
       signal_processing_binding_;
 
   bool plug_state_updated_ = true;  // Return the current plug state on the first call.
+  std::optional<fuchsia::hardware::audio::Codec::WatchPlugStateCallback> plug_callback_;
 
   bool gain_updated_ = true;  // Return the current gain state on the first call.
   std::optional<

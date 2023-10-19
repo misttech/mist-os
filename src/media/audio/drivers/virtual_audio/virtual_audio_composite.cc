@@ -410,7 +410,7 @@ void VirtualAudioComposite::Stop(StopCompleter::Sync& completer) {
   auto parent = parent_.lock();
   ZX_ASSERT(parent);
   zx_time_t now = zx::clock::get_monotonic().get();
-  // TODO(fxbug.dev/124865): Add support for position, now we always report 0.
+  // TODO(fxbug.dev/124865): Add support for 'stop' position, now we always report 0.
   parent->NotifyStop(now, 0);
   completer.Reply();
   ring_buffer_started_ = false;
@@ -421,7 +421,7 @@ void VirtualAudioComposite::WatchClockRecoveryPositionInfo(
   if (!watch_position_replied_) {
     fuchsia_hardware_audio::RingBufferPositionInfo position_info;
     position_info.timestamp(zx::clock::get_monotonic().get());
-    // TODO(fxbug.dev/124865): Add support for position, now we always report 0.
+    // TODO(fxbug.dev/124865): Add support for current position; for now we always report 0.
     position_info.position(0);
     completer.Reply(std::move(position_info));
     watch_position_replied_ = true;
@@ -433,14 +433,15 @@ void VirtualAudioComposite::WatchClockRecoveryPositionInfo(
     zxlogf(ERROR,
            "WatchClockRecoveryPositionInfo called when another hanging get was pending, unbinding");
     completer.Close(ZX_ERR_BAD_STATE);
+    position_info_completer_.reset();
+    watch_position_replied_ = false;
   }
 }
 
 void VirtualAudioComposite::WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) {
   if (!watch_delay_replied_) {
-    fuchsia_hardware_audio::DelayInfo delay_info;
-    // TODO(fxbug.dev/124865): Add support for position, now we always report 0.
     auto& ring_buffer = GetRingBuffer(kRingBufferId);
+    fuchsia_hardware_audio::DelayInfo delay_info;
     delay_info.internal_delay(ring_buffer.internal_delay());
     delay_info.external_delay(ring_buffer.external_delay());
     completer.Reply(std::move(delay_info));
@@ -452,6 +453,8 @@ void VirtualAudioComposite::WatchDelayInfo(WatchDelayInfoCompleter::Sync& comple
     // This is an error condition and hence we unbind the channel.
     zxlogf(ERROR, "WatchDelayInfo called when another hanging get was pending, unbinding");
     completer.Close(ZX_ERR_BAD_STATE);
+    delay_info_completer_.reset();
+    watch_delay_replied_ = false;
   }
 }
 
@@ -550,6 +553,10 @@ void VirtualAudioComposite::WatchElementState(WatchElementStateRequest& request,
     // This is an error condition and hence we unbind the channel.
     zxlogf(ERROR, "WatchElementState called when another hanging get was pending, unbinding");
     completer.Close(ZX_ERR_BAD_STATE);
+    element_state_completer_[0].reset();
+    element_state_completer_[1].reset();
+    watch_element_replied_[0] = false;
+    watch_element_replied_[1] = false;
   }
 }
 
@@ -582,10 +589,14 @@ void VirtualAudioComposite::GetTopologies(GetTopologiesCompleter::Sync& complete
 
 void VirtualAudioComposite::SetTopology(SetTopologyRequest& request,
                                         SetTopologyCompleter::Sync& completer) {
-  // This driver is limited to a single ring buffer and a single DAI interconnect.
-  // TODO(fxbug.dev/124865): Add support for more topologies allowing their configuration and
-  // observability via the virtual audio FIDL APIs.
-  completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+  if (request.topology_id() == kTopologyId) {
+    completer.Reply(zx::ok());
+  } else {
+    // This driver is limited to a single ring buffer and a single DAI interconnect.
+    // TODO(fxbug.dev/124865): Add support for more topologies allowing their configuration and
+    // observability via the virtual audio FIDL APIs.
+    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+  }
 }
 
 }  // namespace virtual_audio

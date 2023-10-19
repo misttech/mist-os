@@ -40,7 +40,8 @@ fbl::RefPtr<IntelHDAStream> IntelHDAStream::Create(Type type, uint16_t id,
                                                    const fbl::RefPtr<RefCountedBti>& pci_bti,
                                                    fbl::RefPtr<fzl::VmarManager> vmar_manager) {
   fbl::AllocChecker ac;
-  auto ret = fbl::AdoptRef(new (&ac) IntelHDAStream(type, id, regs, pci_bti, vmar_manager));
+  auto ret =
+      fbl::AdoptRef(new (&ac) IntelHDAStream(type, id, regs, pci_bti, std::move(vmar_manager)));
   if (!ac.check()) {
     return nullptr;
   }
@@ -274,6 +275,7 @@ void IntelHDAStream::DeactivateLocked() {
   {
     fbl::AutoLock notif_lock(&notif_lock_);
     irq_channel_ = nullptr;
+    position_completer_.reset();
   }
 
   // If we have a connection to a client, close it.
@@ -285,6 +287,7 @@ void IntelHDAStream::DeactivateLocked() {
   // We are now stopped and unconfigured.
   running_ = false;
   delay_info_updated_ = false;
+  delay_completer_.reset();
   driver_transfer_bytes_ = 0;
   bytes_per_frame_ = 0;
 
@@ -605,10 +608,22 @@ void IntelHDAStream::Stop(StopCompleter::Sync& completer) {
 void IntelHDAStream::WatchClockRecoveryPositionInfo(
     WatchClockRecoveryPositionInfoCompleter::Sync& completer) {
   fbl::AutoLock lock(&notif_lock_);
+
+  if (position_completer_) {
+    completer.Close(ZX_ERR_BAD_STATE);
+    position_completer_.reset();
+    return;
+  }
   position_completer_ = completer.ToAsync();
 }
 
 void IntelHDAStream::WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) {
+  if (delay_completer_) {
+    completer.Close(ZX_ERR_BAD_STATE);
+    delay_completer_.reset();
+    return;
+  }
+
   if (!delay_info_updated_) {
     delay_info_updated_ = true;
     fidl::Arena allocator;
@@ -616,6 +631,7 @@ void IntelHDAStream::WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) {
     // No external delay information is provided by this driver.
     delay_info.internal_delay(internal_delay_nsec_);
     completer.Reply(delay_info.Build());
+    return;
   }
   // All completers must either Reply, Close, or ToAsync(+persist until Unbind).
   delay_completer_ = completer.ToAsync();

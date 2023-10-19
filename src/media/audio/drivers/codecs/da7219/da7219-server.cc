@@ -5,6 +5,7 @@
 #include "da7219-server.h"
 
 #include <lib/zx/clock.h>
+#include <zircon/errors.h>
 
 #include "da7219-regs.h"
 
@@ -450,6 +451,8 @@ void Server::WatchPlugState(WatchPlugStateCompleter::Sync& completer) {
     plug_state_completer_.emplace(completer.ToAsync());
   } else {
     DA7219_LOG(WARNING, "Client called WatchPlugState when another hanging get was pending");
+    completer.Close(ZX_ERR_BAD_STATE);
+    plug_state_completer_.reset();
   }
 }
 
@@ -536,8 +539,8 @@ void Server::WatchElementState(WatchElementStateRequestView request,
       // The client called WatchElementState when another hanging get was pending.
       // This is an error condition and hence we unbind the channel.
       signal_->Close(ZX_ERR_BAD_STATE);
+      signal_.reset();
     }
-
   } else {
     DA7219_LOG(ERROR, "Watch element state is not supported on input");
     completer.Close(ZX_ERR_NOT_SUPPORTED);

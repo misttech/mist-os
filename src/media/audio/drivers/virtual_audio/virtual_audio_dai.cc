@@ -336,6 +336,8 @@ void VirtualAudioDai::WatchClockRecoveryPositionInfo(
     zxlogf(ERROR,
            "WatchClockRecoveryPositionInfo called when another hanging get was pending, unbinding");
     completer.Close(ZX_ERR_BAD_STATE);
+    position_info_completer_.reset();
+    watch_position_replied_ = false;
   }
 }
 
@@ -354,6 +356,8 @@ void VirtualAudioDai::WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) {
     // This is an error condition and hence we unbind the channel.
     zxlogf(ERROR, "WatchDelayInfo called when another hanging get was pending, unbinding");
     completer.Close(ZX_ERR_BAD_STATE);
+    delay_info_completer_.reset();
+    watch_delay_replied_ = false;
   }
 }
 

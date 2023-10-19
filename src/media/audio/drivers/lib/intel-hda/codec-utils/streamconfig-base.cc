@@ -228,7 +228,12 @@ void IntelHDAStreamConfigBase::CreateRingBuffer(
 
 void IntelHDAStreamConfigBase::WatchGainState(
     StreamChannel* channel, StreamChannel::WatchGainStateCompleter::Sync& completer) {
-  ZX_DEBUG_ASSERT(!channel->gain_completer_);
+  if (channel->gain_completer_) {
+    completer.Close(ZX_ERR_BAD_STATE);
+    channel->gain_completer_.reset();
+    channel->last_reported_gain_state_ = {};
+    return;
+  }
   channel->gain_completer_ = completer.ToAsync();
 
   OnGetGainLocked(&cur_gain_state_);
@@ -309,7 +314,12 @@ void IntelHDAStreamConfigBase::SetGain(audio_fidl::wire::GainState target_state,
 
 void IntelHDAStreamConfigBase::WatchPlugState(
     StreamChannel* channel, StreamChannel::WatchPlugStateCompleter::Sync& completer) {
-  ZX_DEBUG_ASSERT(!channel->plug_completer_);
+  if (channel->plug_completer_) {
+    completer.Close(ZX_ERR_BAD_STATE);
+    channel->plug_completer_.reset();
+    channel->last_reported_plugged_state_ = StreamChannel::Plugged::kNotReported;
+    return;
+  }
   channel->plug_completer_ = completer.ToAsync();
 
   audio_proto::PlugDetectResp plug = {};
