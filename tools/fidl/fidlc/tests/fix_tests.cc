@@ -24,7 +24,6 @@ namespace {
 using namespace fidl;
 using namespace fidl::fix;
 
-static const std::string kBadFileName = "bad.fidl";
 static const std::string kGoodFileName = "good.fidl";
 
 template <typename T, Fixable::Kind Fixing>

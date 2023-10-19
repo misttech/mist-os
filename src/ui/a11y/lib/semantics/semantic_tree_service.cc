@@ -22,8 +22,6 @@ namespace {
 
 using fuchsia::accessibility::semantics::Node;
 
-const std::string kNewLine = "\n";
-
 }  // namespace
 
 SemanticTreeService::SemanticTreeService(
