@@ -13,3 +13,7 @@ pub mod net {
 }
 
 pub use nix::Error;
+
+pub mod unistd {
+    pub use nix::unistd::fsync;
+}
