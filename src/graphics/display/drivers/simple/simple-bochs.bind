@@ -2,12 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+composite goldfish_address_space;
+
+using fuchsia.acpi;
 using fuchsia.pci;
+using fuchsia.sysmem;
 
-fuchsia.BIND_FIDL_PROTOCOL == fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE;
+primary node "pci" {
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE;
 
-// QEMU_GFX_VID
-fuchsia.BIND_PCI_VID == 0x1234;
-// QEMU_VGA_DID
-fuchsia.BIND_PCI_DID == 0x1111;
-fuchsia.BIND_COMPOSITE == 1;
+  // QEMU_GFX_VID
+  fuchsia.BIND_PCI_VID == 0x1234;
+  // QEMU_VGA_DID
+  fuchsia.BIND_PCI_DID == 0x1111;
+}
+
+optional node "sysmem" {
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.sysmem.BIND_FIDL_PROTOCOL.DEVICE;
+}
+
+optional node "acpi" {
+  fuchsia.BIND_PROTOCOL == fuchsia.acpi.BIND_PROTOCOL.DEVICE;
+}

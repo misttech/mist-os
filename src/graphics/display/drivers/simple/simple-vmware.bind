@@ -2,11 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+composite simple_vmware;
+
+using fuchsia.acpi;
 using fuchsia.pci;
+using fuchsia.sysmem;
 
-fuchsia.BIND_FIDL_PROTOCOL == fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE;
-// VMWARE_GFX
-fuchsia.BIND_PCI_VID == 0x15ad;
-fuchsia.BIND_PCI_CLASS == fuchsia.pci.BIND_PCI_CLASS.DISPLAY;
+primary node "pci" {
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE;
+  // VMWARE_GFX
+  fuchsia.BIND_PCI_VID == 0x15ad;
+  fuchsia.BIND_PCI_CLASS == fuchsia.pci.BIND_PCI_CLASS.DISPLAY;
+}
 
-fuchsia.BIND_COMPOSITE == 1;
+optional node "sysmem" {
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.sysmem.BIND_FIDL_PROTOCOL.DEVICE;
+}
+
+optional node "acpi" {
+  fuchsia.BIND_PROTOCOL == fuchsia.acpi.BIND_PROTOCOL.DEVICE;
+}

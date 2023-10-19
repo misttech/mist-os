@@ -22,7 +22,7 @@ TEST_F(DeviceEnumerationTest, AemuX64Test) {
   static const char* kAemuDevicePaths[] = {
       "sys/platform/pt/PCI0/bus/00:01.0/00_01_0/virtio-input",
       "sys/platform/pt/PCI0/bus/00:02.0/00_02_0/virtio-input",
-      "sys/platform/pt/PCI0/bus/00:0b.0/00:0b.0/goldfish-address-space",
+      "sys/platform/pt/PCI0/bus/00:0b.0/00_0b_0/goldfish-address-space",
 
       // Verify goldfish pipe root device created.
       "sys/platform/pt/acpi/acpi-_SB_/acpi-GFPP/pt/acpi-GFPP-composite/goldfish-pipe",
