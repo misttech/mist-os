@@ -381,7 +381,6 @@ where
 
         let semaphore_count =
             (descriptors[i].semaphore_size / core::mem::size_of::<u64>() as u64) as u32;
-        commands[i].semaphore_count = semaphore_count;
 
         let mut child_semaphore_ids: Vec<u64> = vec![];
         if semaphore_count > 0 {
@@ -406,6 +405,7 @@ where
                 }
             }
         }
+        commands[i].semaphore_count = child_semaphore_ids.len() as u32;
         semaphore_ids_vec.push(child_semaphore_ids);
     }
 
