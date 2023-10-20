@@ -112,7 +112,7 @@ void EnablePagingForEl(const AddressSpace& aspace) {
 // of the processor.
 void AddressSpace::ArchInstall() const {
   // Set up page table for EL1 or EL2, depending on which mode we are running in.
-  const auto current_el = arch::ArmCurrentEl::Read().el();
+  const auto current_el = arch::ArmDropEl3().el();
   switch (current_el) {
     case 1:
       return EnablePagingForEl<arch::ArmTcrEl1, arch::ArmSctlrEl1, arch::ArmTtbr0El1,

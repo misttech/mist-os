@@ -67,6 +67,11 @@ struct ArmCurrentEl : public SysRegBase<ArmCurrentEl, uint64_t> {
 };
 ARCH_ARM64_SYSREG(ArmCurrentEl, "CurrentEL");
 
+// This is only available on actual AArch64 hardware.  This fetches the current
+// EL, and if it's EL3 then drops to EL2 (if possible) or EL1.  It returns the
+// newly-current EL that ArmCurrentEl::Read() will return afterwards.
+ArmCurrentEl ArmDropEl3();
+
 // This type covers three register formats:
 //  * [arm/sysreg]/sctlr_el1: System Control Register (EL1)
 //  * [arm/sysreg]/sctlr_el2: System Control Register (EL2)
@@ -143,6 +148,45 @@ ARCH_ARM64_SYSREG(ArmSctlrEl2, "sctlr_el2");
 
 struct ArmSctlrEl3 : public arch::SysRegDerived<ArmSctlrEl3, ArmSystemControlRegister> {};
 ARCH_ARM64_SYSREG(ArmSctlrEl3, "sctlr_el3");
+
+// [arm/sysreg]/scr_el3: Secure Configuration Register
+struct ArmScrEl3 : public SysRegBase<ArmScrEl3, uint64_t> {
+  DEF_RSVDZ_FIELD(63, 39);
+  DEF_BIT(38, hxen);
+  DEF_BIT(37, aden);
+  DEF_BIT(36, enas0);
+  DEF_BIT(35, amvoffen);
+  DEF_RSVDZ_BIT(34);
+  DEF_FIELD(33, 30, twedel);
+  DEF_BIT(29, tweden);
+  DEF_BIT(28, ecven);
+  DEF_BIT(27, fgten);
+  DEF_BIT(26, ata);
+  DEF_BIT(25, enscxt);
+  DEF_RSVDZ_FIELD(24, 22);
+  DEF_BIT(21, fien);
+  DEF_BIT(20, nmea);
+  DEF_BIT(19, ease);
+  DEF_BIT(18, eel2);
+  DEF_BIT(17, api);
+  DEF_BIT(16, apk);
+  DEF_BIT(15, terr);
+  DEF_BIT(14, tlor);
+  DEF_BIT(13, twe);
+  DEF_BIT(12, twi);
+  DEF_BIT(11, st);
+  DEF_BIT(10, rw);
+  DEF_BIT(9, sif);
+  DEF_BIT(8, hce);
+  DEF_BIT(7, smd);
+  DEF_RSVDZ_BIT(6);
+  // Bits 5:4 are RES1 (reserved, always one).
+  DEF_BIT(3, ea);
+  DEF_BIT(2, fiq);
+  DEF_BIT(1, irq);
+  DEF_BIT(0, ns);
+};
+ARCH_ARM64_SYSREG(ArmScrEl3, "scr_el3");
 
 // Granule size values for the TCR_EL1 and TCR_EL2 fields.
 //
