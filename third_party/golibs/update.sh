@@ -105,7 +105,7 @@ fi
 $GO mod tidy
 $GO mod vendor
 
-"${PREBUILT_PYTHON3_DIR}/bin/python3.8" update_sources.py \
+"$FUCHSIA_DIR/scripts/fuchsia-vendored-python" update_sources.py \
   --build-file='BUILD.gn' \
   --golibs-dir='.' > "${TMP}/BUILD.gn"
 mv "${TMP}/BUILD.gn" 'BUILD.gn'
