@@ -5,9 +5,6 @@
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 
-group("wlan") {
-}
-
 fuchsia_shell_package("wlan-dev") {
   package_name = "wlan"
   deps = [ "cli:bin" ]
