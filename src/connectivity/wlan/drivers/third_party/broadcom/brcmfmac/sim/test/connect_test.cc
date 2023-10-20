@@ -648,10 +648,15 @@ void ConnectTest::DisassocClient(const common::MacAddr& mac_addr) {
 }
 
 void ConnectTest::DeauthClient() {
-  wlan_fullmac_wire::WlanFullmacDeauthReq deauth_req = {.reason_code = kDefaultClientDeauthReason};
+  auto builder =
+      fuchsia_wlan_fullmac::wire::WlanFullmacImplDeauthRequest::Builder(client_ifc_.test_arena_);
 
-  std::memcpy(deauth_req.peer_sta_address.data(), context_.bssid.byte, ETH_ALEN);
-  auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->DeauthReq(deauth_req);
+  ::fidl::Array<uint8_t, ETH_ALEN> peer_sta_address;
+  std::memcpy(peer_sta_address.data(), context_.bssid.byte, ETH_ALEN);
+  builder.peer_sta_address(peer_sta_address);
+  builder.reason_code(kDefaultClientDeauthReason);
+
+  auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->Deauth(builder.Build());
   EXPECT_TRUE(result.ok());
 }
 

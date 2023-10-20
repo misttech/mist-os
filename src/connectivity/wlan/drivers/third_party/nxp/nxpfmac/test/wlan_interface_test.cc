@@ -721,12 +721,16 @@ TEST_F(WlanInterfaceTest, WlanFullmacImplConnectDisconnectReq) {
   EXPECT_EQ(ifc_results_.report_ind_.rssi_dbm, kTestRssi);
   EXPECT_EQ(ifc_results_.report_ind_.snr_db, kTestSnr);
 
+  auto deauth_builder =
+      fuchsia_wlan_fullmac::wire::WlanFullmacImplDeauthRequest::Builder(test_arena_);
   constexpr uint8_t kTestPeerAddr[] = {1, 2, 3, 4, 5, 6};
-  fuchsia_wlan_fullmac::wire::WlanFullmacDeauthReq deauth_req;
-  memcpy(deauth_req.peer_sta_address.data(), kTestPeerAddr, sizeof(kTestPeerAddr));
+  ::fidl::Array<uint8_t, ETH_ALEN> peer_sta_address;
+  std::memcpy(peer_sta_address.data(), kTestPeerAddr, ETH_ALEN);
+  deauth_builder.peer_sta_address(peer_sta_address);
+  deauth_builder.reason_code(fuchsia_wlan_ieee80211::ReasonCode::kUnspecifiedReason);
 
   {
-    auto result = client_.buffer(test_arena_)->DeauthReq(deauth_req);
+    auto result = client_.buffer(test_arena_)->Deauth(deauth_builder.Build());
     ASSERT_TRUE(result.ok());
   }
 
@@ -1169,11 +1173,14 @@ TEST_F(WlanInterfaceTest, SoftApStaLocalDisconnect) {
   EXPECT_EQ(ifc_results_.assoc_ind_.listen_interval, 0);
 
   // Send a deauth request to disconnect the STA
-  fuchsia_wlan_fullmac::wire::WlanFullmacDeauthReq deauth_req;
-  memcpy(deauth_req.peer_sta_address.data(), kTestSoftApClient, ETH_ALEN);
+  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplDeauthRequest::Builder(test_arena_);
+  ::fidl::Array<uint8_t, ETH_ALEN> peer_sta_address;
+  std::memcpy(peer_sta_address.data(), kTestSoftApClient, ETH_ALEN);
+  builder.peer_sta_address(peer_sta_address);
+  builder.reason_code(fuchsia_wlan_ieee80211::ReasonCode::kUnspecifiedReason);
 
   env_.ScheduleNotification(
-      [&]() { EXPECT_TRUE(client_.buffer(test_arena_)->DeauthReq(deauth_req).ok()); },
+      [&]() { EXPECT_TRUE(client_.buffer(test_arena_)->Deauth(builder.Build()).ok()); },
       zx::msec(10));
   // We currently do not have a way to send the deauth event at the appropriate time. So let the
   // deauth request timeout waiting for the event and send a deauth conf.

@@ -485,14 +485,19 @@ void WlanInterface::AuthResp(AuthRespRequestView request, fdf::Arena& arena,
   completer.buffer(arena).Reply();
 }
 
-void WlanInterface::DeauthReq(DeauthReqRequestView request, fdf::Arena& arena,
-                              DeauthReqCompleter::Sync& completer) {
+void WlanInterface::Deauth(DeauthRequestView request, fdf::Arena& arena,
+                           DeauthCompleter::Sync& completer) {
   std::lock_guard lock(mutex_);
 
+  if (!request->has_peer_sta_address() || !request->has_reason_code()) {
+    NXPF_ERR("Deauth Req does not contain all the required fields peer addr: %d reason code: %d",
+             request->has_peer_sta_address(), request->has_reason_code());
+    return;
+  }
   if (role_ == fuchsia_wlan_common::wire::WlanMacRole::kAp) {
     // Deauth the specified client associated to the SoftAP.
-    zx_status_t status = soft_ap_.DeauthSta(request->req.peer_sta_address.data(),
-                                            fidl::ToUnderlying(request->req.reason_code));
+    zx_status_t status = soft_ap_.DeauthSta(request->peer_sta_address().data(),
+                                            fidl::ToUnderlying(request->reason_code()));
     if (status != ZX_OK) {
       auto arena = fdf::Arena::Create(0, 0);
       if (arena.is_error()) {
@@ -501,7 +506,7 @@ void WlanInterface::DeauthReq(DeauthReqRequestView request, fdf::Arena& arena,
       }
 
       auto resp = fuchsia_wlan_fullmac_wire::WlanFullmacImplIfcDeauthConfRequest::Builder(*arena)
-                      .peer_sta_address(request->req.peer_sta_address)
+                      .peer_sta_address(request->peer_sta_address())
                       .Build();
 
       auto result = fullmac_ifc_.buffer(*arena)->DeauthConf(resp);
@@ -523,8 +528,8 @@ void WlanInterface::DeauthReq(DeauthReqRequestView request, fdf::Arena& arena,
     ConfirmDeauth();
   };
 
-  zx_status_t status = client_connection_.Disconnect(request->req.peer_sta_address.data(),
-                                                     fidl::ToUnderlying(request->req.reason_code),
+  zx_status_t status = client_connection_.Disconnect(request->peer_sta_address().data(),
+                                                     fidl::ToUnderlying(request->reason_code()),
                                                      std::move(on_disconnect));
   if (status != ZX_OK) {
     // The request didn't work, send the notification right away.

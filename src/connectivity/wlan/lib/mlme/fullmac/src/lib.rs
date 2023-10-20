@@ -372,7 +372,7 @@ impl FullmacMlme {
             AuthResponse(resp) => self.device.auth_resp(convert_authenticate_response(&resp)),
             Deauthenticate(req) => {
                 self.device.set_link_state(fidl_mlme::ControlledPortState::Closed);
-                self.device.deauth_req(convert_deauthenticate_request(&req))
+                self.device.deauth(convert_deauthenticate_request(&req))
             }
             AssocResponse(resp) => self.device.assoc_resp(convert_associate_response(&resp)),
             Disassociate(req) => self.device.disassoc_req(convert_disassociate_request(&req)),

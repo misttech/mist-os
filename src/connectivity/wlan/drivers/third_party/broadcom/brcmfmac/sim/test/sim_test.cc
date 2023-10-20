@@ -369,10 +369,13 @@ void SimInterface::DeauthenticateFrom(const common::MacAddr& bssid,
   // This should only be performed on a Client interface
   ZX_ASSERT(role_ == wlan_common::WlanMacRole::kClient);
 
-  wlan_fullmac_wire::WlanFullmacDeauthReq deauth_req = {.reason_code = reason};
-  memcpy(deauth_req.peer_sta_address.data(), bssid.byte, ETH_ALEN);
+  auto builder = wlan_fullmac_wire::WlanFullmacImplDeauthRequest::Builder(test_arena_);
+  ::fidl::Array<uint8_t, ETH_ALEN> peer_sta_address;
+  std::memcpy(peer_sta_address.data(), bssid.byte, ETH_ALEN);
+  builder.peer_sta_address(peer_sta_address);
+  builder.reason_code(reason);
 
-  auto result = client_.buffer(test_arena_)->DeauthReq(deauth_req);
+  auto result = client_.buffer(test_arena_)->Deauth(builder.Build());
   ZX_ASSERT(result.ok());
 }
 

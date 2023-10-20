@@ -37,11 +37,6 @@ type WlanFullmacAuthInd = struct {
     auth_type WlanAuthType;
 };
 
-type WlanFullmacDeauthReq = struct {
-    peer_sta_address ieee80211.MacAddr;
-    reason_code ieee80211.ReasonCode;
-};
-
 type WlanFullmacAssocInd = struct {
     peer_sta_address ieee80211.MacAddr;
     // Interval specified in time units.
@@ -686,8 +681,9 @@ closed protocol WlanFullmacImpl {
         1: peer_sta_address ieee80211.MacAddr;
         2: result_code WlanAuthResult;
     }) -> ();
-    strict DeauthReq(struct {
-        req WlanFullmacDeauthReq;
+    strict Deauth(table {
+        1: peer_sta_address ieee80211.MacAddr;
+        2: reason_code ieee80211.ReasonCode;
     }) -> ();
     strict AssocResp(struct {
         resp WlanFullmacAssocResp;

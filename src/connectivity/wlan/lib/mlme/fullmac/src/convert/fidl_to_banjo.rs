@@ -234,8 +234,8 @@ pub fn convert_authenticate_response(
 
 pub fn convert_deauthenticate_request(
     req: &fidl_mlme::DeauthenticateRequest,
-) -> banjo_wlan_fullmac::WlanFullmacDeauthReq {
-    banjo_wlan_fullmac::WlanFullmacDeauthReq {
+) -> banjo_wlan_fullmac::WlanFullmacImplDeauthRequest {
+    banjo_wlan_fullmac::WlanFullmacImplDeauthRequest {
         peer_sta_address: req.peer_sta_address,
         reason_code: banjo_wlan_ieee80211::ReasonCode(req.reason_code.into_primitive()),
     }

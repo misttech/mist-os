@@ -618,7 +618,7 @@ void brcmf_if_reconnect_req(net_device* ndev,
 void brcmf_if_auth_resp(net_device* ndev,
                         const fuchsia_wlan_fullmac_wire::WlanFullmacImplAuthRespRequest* ind);
 void brcmf_if_deauth_req(net_device* ndev,
-                         const fuchsia_wlan_fullmac_wire::WlanFullmacDeauthReq* req);
+                         const fuchsia_wlan_fullmac_wire::WlanFullmacImplDeauthRequest* req);
 void brcmf_if_assoc_resp(net_device* ndev,
                          const fuchsia_wlan_fullmac_wire::WlanFullmacAssocResp* ind);
 void brcmf_if_disassoc_req(net_device* ndev,

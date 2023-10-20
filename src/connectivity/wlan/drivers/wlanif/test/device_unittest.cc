@@ -144,8 +144,12 @@ struct WlanifDeviceTest : public ::zxtest::Test,
     EXPECT_EQ(request->has_result_code(), true);
     completer.buffer(arena).Reply();
   }
-  void DeauthReq(DeauthReqRequestView request, fdf::Arena& arena,
-                 DeauthReqCompleter::Sync& completer) override {}
+  void Deauth(DeauthRequestView request, fdf::Arena& arena,
+              DeauthCompleter::Sync& completer) override {
+    EXPECT_EQ(request->has_peer_sta_address(), true);
+    EXPECT_EQ(request->has_reason_code(), true);
+    completer.buffer(arena).Reply();
+  }
   void AssocResp(AssocRespRequestView request, fdf::Arena& arena,
                  AssocRespCompleter::Sync& completer) override {}
   void DisassocReq(DisassocReqRequestView request, fdf::Arena& arena,
@@ -258,6 +262,14 @@ TEST_F(WlanifDeviceTest, CheckReconnReq) {
   wlan_fullmac_impl_reconnect_request_t req;
   memcpy(req.peer_sta_address, kPeerStaAddress, sizeof(kPeerStaAddress));
   device_->Reconnect(&req);
+}
+
+TEST_F(WlanifDeviceTest, CheckDeauthReq) {
+  device_->AddDevice();
+  device_->DdkAsyncRemove();
+  wlan_fullmac_impl_deauth_request_t req = {.reason_code = REASON_CODE_AP_INITIATED};
+  memcpy(req.peer_sta_address, kPeerStaAddress, sizeof(kPeerStaAddress));
+  device_->Deauthenticate(&req);
 }
 
 TEST_F(WlanifDeviceTest, CheckAuthResp) {

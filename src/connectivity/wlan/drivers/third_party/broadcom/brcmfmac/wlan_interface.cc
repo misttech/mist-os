@@ -336,12 +336,11 @@ void WlanInterface::AuthResp(AuthRespRequestView request, fdf::Arena& arena,
   completer.buffer(arena).Reply();
 }
 
-void WlanInterface::DeauthReq(DeauthReqRequestView request, fdf::Arena& arena,
-                              DeauthReqCompleter::Sync& completer) {
+void WlanInterface::Deauth(DeauthRequestView request, fdf::Arena& arena,
+                           DeauthCompleter::Sync& completer) {
   std::shared_lock<std::shared_mutex> guard(lock_);
-  const fuchsia_wlan_fullmac::wire::WlanFullmacDeauthReq req = request->req;
   if (wdev_ != nullptr) {
-    brcmf_if_deauth_req(wdev_->netdev, &req);
+    brcmf_if_deauth_req(wdev_->netdev, request);
   }
   completer.buffer(arena).Reply();
 }

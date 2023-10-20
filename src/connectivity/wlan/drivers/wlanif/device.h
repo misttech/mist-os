@@ -45,7 +45,7 @@ class Device : public ddk::Device<Device, ddk::Unbindable>,
   void Connect(const wlan_fullmac_impl_connect_request_t* req);
   void Reconnect(const wlan_fullmac_impl_reconnect_request_t* req);
   void AuthenticateResp(const wlan_fullmac_impl_auth_resp_request_t* resp);
-  void DeauthenticateReq(const wlan_fullmac_deauth_req_t* req);
+  void Deauthenticate(const wlan_fullmac_impl_deauth_request_t* req);
   void AssociateResp(const wlan_fullmac_assoc_resp_t* resp);
   void DisassociateReq(const wlan_fullmac_disassoc_req_t* req);
   void ResetReq(const wlan_fullmac_reset_req_t* req);

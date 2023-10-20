@@ -403,11 +403,15 @@ void CreateSoftAPTest::TxDeauthReq(common::MacAddr client_mac) {
 }
 
 void CreateSoftAPTest::DeauthClient(common::MacAddr client_mac) {
-  wlan_fullmac_wire::WlanFullmacDeauthReq req;
+  auto builder =
+      fuchsia_wlan_fullmac::wire::WlanFullmacImplDeauthRequest::Builder(softap_ifc_.test_arena_);
 
-  memcpy(req.peer_sta_address.data(), client_mac.byte, ETH_ALEN);
+  ::fidl::Array<uint8_t, ETH_ALEN> peer_sta_address;
+  std::memcpy(peer_sta_address.data(), client_mac.byte, ETH_ALEN);
+  builder.peer_sta_address(peer_sta_address);
+  builder.reason_code(fuchsia_wlan_ieee80211::ReasonCode::kUnspecifiedReason);
 
-  auto result = softap_ifc_.client_.buffer(softap_ifc_.test_arena_)->DeauthReq(req);
+  auto result = softap_ifc_.client_.buffer(softap_ifc_.test_arena_)->Deauth(builder.Build());
   EXPECT_TRUE(result.ok());
 }
 

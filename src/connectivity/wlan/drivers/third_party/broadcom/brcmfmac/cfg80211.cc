@@ -3863,17 +3863,23 @@ void brcmf_if_auth_resp(net_device* ndev,
 // MLME-DEAUTHENTICATE.confirm on completion (or failure), even though there is no status
 // reported.
 void brcmf_if_deauth_req(net_device* ndev,
-                         const fuchsia_wlan_fullmac_wire::WlanFullmacDeauthReq* req) {
+                         const fuchsia_wlan_fullmac_wire::WlanFullmacImplDeauthRequest* req) {
   struct brcmf_if* ifp = ndev_to_if(ndev);
-  BRCMF_IFDBG(WLANIF, ndev, "Deauth request from SME. reason: %" PRIu16 "", req->reason_code);
+
+  if (!req->has_peer_sta_address() || !req->has_reason_code()) {
+    BRCMF_ERR("Deauth Req does not contain all the required fields peer addr: %d reason code: %d",
+              req->has_peer_sta_address(), req->has_reason_code());
+    return;
+  }
+  BRCMF_IFDBG(WLANIF, ndev, "Deauth request from SME. reason: %" PRIu16 "", req->reason_code());
 
   if (brcmf_is_apmode(ifp->vif)) {
     struct brcmf_scb_val_le scbval;
     bcme_status_t fw_err = BCME_OK;
 
-    memcpy(&scbval.ea, req->peer_sta_address.data(), ETH_ALEN);
+    memcpy(&scbval.ea, req->peer_sta_address().data(), ETH_ALEN);
     // The FIDL reason code is defined in uint16_t, so no information will be lost.
-    scbval.val = fidl::ToUnderlying(req->reason_code);
+    scbval.val = fidl::ToUnderlying(req->reason_code());
     zx_status_t status = brcmf_fil_cmd_data_set(ifp, BRCMF_C_SCB_DEAUTHENTICATE_FOR_REASON, &scbval,
                                                 sizeof(scbval), &fw_err);
     if (status != ZX_OK) {
@@ -3885,10 +3891,10 @@ void brcmf_if_deauth_req(net_device* ndev,
   }
 
   // Client IF processing
-  if (brcmf_cfg80211_disconnect(ndev, req->peer_sta_address.data(),
-                                fidl::ToUnderlying(req->reason_code), true) != ZX_OK) {
+  if (brcmf_cfg80211_disconnect(ndev, req->peer_sta_address().data(),
+                                fidl::ToUnderlying(req->reason_code()), true) != ZX_OK) {
     // Request to disconnect failed, so respond immediately
-    brcmf_notify_deauth(ndev, req->peer_sta_address.data());
+    brcmf_notify_deauth(ndev, req->peer_sta_address().data());
   }  // else wait for disconnect to complete before sending response
 
   // Workaround for fxbug.dev/28829: allow time for disconnect to complete

@@ -311,23 +311,21 @@ void Device::AuthenticateResp(const wlan_fullmac_impl_auth_resp_request_t* resp)
   }
 }
 
-void Device::DeauthenticateReq(const wlan_fullmac_deauth_req_t* req) {
+void Device::Deauthenticate(const wlan_fullmac_impl_deauth_request_t* req) {
   OnLinkStateChanged(false);
-  fuchsia_wlan_fullmac::wire::WlanFullmacDeauthReq deauth_req = {};
-
-  // peer_sta_address
-  std::memcpy(deauth_req.peer_sta_address.data(), req->peer_sta_address, ETH_ALEN);
-
-  // reason_code
-  deauth_req.reason_code = static_cast<fuchsia_wlan_ieee80211::wire::ReasonCode>(req->reason_code);
-
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     lerror("Arena creation failed: %s", arena.status_string());
     return;
   }
+  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplDeauthRequest::Builder(*arena);
 
-  auto result = client_.buffer(*arena)->DeauthReq(deauth_req);
+  ::fidl::Array<uint8_t, ETH_ALEN> peer_sta_address;
+  std::memcpy(peer_sta_address.data(), req->peer_sta_address, ETH_ALEN);
+  builder.peer_sta_address(peer_sta_address);
+  builder.reason_code(fuchsia_wlan_ieee80211::ReasonCode(req->reason_code));
+
+  auto result = client_.buffer(*arena)->Deauth(builder.Build());
 
   if (!result.ok()) {
     lerror("DeauthReq failed FIDL error: %s", result.status_string());
