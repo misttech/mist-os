@@ -9,15 +9,24 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/component/cpp/composite_node_spec.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 
+#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
+#include <bind/fuchsia/clock/cpp/bind.h>
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/power/cpp/bind.h>
 #include <soc/aml-a311d/a311d-hw.h>
 #include <soc/aml-a311d/a311d-power.h>
 #include <soc/aml-common/aml-cpu-metadata.h>
 #include <soc/aml-meson/g12b-clk.h>
 
-#include "src/devices/board/drivers/vim3/vim3-cpu-bind.h"
 #include "src/devices/board/drivers/vim3/vim3.h"
 #include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
+
+namespace fdf {
+using namespace fuchsia_driver_framework;
+}  // namespace fdf
 
 namespace {
 namespace fpbus = fuchsia_hardware_platform_bus;
@@ -82,13 +91,27 @@ const std::vector<fpbus::Metadata> cpu_metadata{
 const fpbus::Node cpu_dev = []() {
   fpbus::Node result = {};
   result.name() = "aml-cpu";
-  result.vid() = PDEV_VID_AMLOGIC;
-  result.pid() = PDEV_PID_AMLOGIC_A311D;
-  result.did() = PDEV_DID_AMLOGIC_CPU;
+  result.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
+  result.pid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_A311D;
+  result.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_CPU;
   result.metadata() = cpu_metadata;
   result.mmio() = cpu_mmios;
   return result;
 }();
+
+const std::map<A311dPowerDomains, std::string> kCpuPowerDomains = {
+    {A311dPowerDomains::kArmCoreBig, bind_fuchsia_power::POWER_DOMAIN_ARM_CORE_BIG},
+    {A311dPowerDomains::kArmCoreLittle, bind_fuchsia_power::POWER_DOMAIN_ARM_CORE_LITTLE},
+};
+
+const std::map<uint32_t, std::string> kClockFunctionMap = {
+    {g12b_clk::G12B_CLK_SYS_PLL_DIV16, bind_fuchsia_clock::FUNCTION_SYS_PLL_DIV16},
+    {g12b_clk::G12B_CLK_SYS_CPU_CLK_DIV16, bind_fuchsia_clock::FUNCTION_SYS_CPU_DIV16},
+    {g12b_clk::CLK_SYS_CPU_BIG_CLK, bind_fuchsia_clock::FUNCTION_SYS_CPU_BIG_CLK},
+    {g12b_clk::G12B_CLK_SYS_PLLB_DIV16, bind_fuchsia_clock::FUNCTION_SYS_PLLB_DIV16},
+    {g12b_clk::G12B_CLK_SYS_CPUB_CLK_DIV16, bind_fuchsia_clock::FUNCTION_SYS_CPUB_DIV16},
+    {g12b_clk::CLK_SYS_CPU_LITTLE_CLK, bind_fuchsia_clock::FUNCTION_SYS_CPU_LITTLE_CLK},
+};
 
 }  // namespace
 
@@ -97,18 +120,49 @@ namespace vim3 {
 zx_status_t Vim3::CpuInit() {
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('CPU_');
-  auto result = pbus_.buffer(arena)->AddComposite(
+
+  std::vector<fdf::ParentSpec> parents;
+  parents.reserve(kClockFunctionMap.size() + kCpuPowerDomains.size());
+
+  for (auto& [board, generic] : kCpuPowerDomains) {
+    auto power_rules = std::vector{
+        fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                                bind_fuchsia_power::BIND_FIDL_PROTOCOL_DEVICE),
+        fdf::MakeAcceptBindRule(bind_fuchsia::POWER_DOMAIN, static_cast<uint32_t>(board)),
+    };
+    auto power_properties = std::vector{
+        fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                          bind_fuchsia_power::BIND_FIDL_PROTOCOL_DEVICE),
+        fdf::MakeProperty(bind_fuchsia_power::POWER_DOMAIN, generic),
+    };
+    parents.push_back(fdf::ParentSpec{{power_rules, power_properties}});
+  }
+
+  for (auto& [clock_id, function] : kClockFunctionMap) {
+    auto rules = std::vector{
+        fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                                bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
+        fdf::MakeAcceptBindRule(bind_fuchsia::CLOCK_ID, clock_id),
+    };
+    auto properties = std::vector{
+        fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                          bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
+        fdf::MakeProperty(bind_fuchsia_clock::FUNCTION, function),
+    };
+    parents.push_back(fdf::ParentSpec{{rules, properties}});
+  }
+
+  auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, cpu_dev),
-      platform_bus_composite::MakeFidlFragment(fidl_arena, vim3_cpu_fragments,
-                                               std::size(vim3_cpu_fragments)),
-      "power-01");
+      fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
+                                   {.name = "aml_cpu", .parents = parents}}));
   if (!result.ok()) {
-    zxlogf(ERROR, "Cpu(cpu_dev)Init: AddComposite Cpu(cpu_dev) request failed: %s",
+    zxlogf(ERROR, "Cpu(cpu_dev)Init: AddCompositeNodeSpec Cpu(cpu_dev) request failed: %s",
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "Cpu(cpu_dev)Init: AddComposite Cpu(cpu_dev) failed: %s",
+    zxlogf(ERROR, "Cpu(cpu_dev)Init: AddCompositeNodeSpec Cpu(cpu_dev) failed: %s",
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }

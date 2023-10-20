@@ -25,24 +25,6 @@ driver_bind_rules("astro-bind") {
   ]
 }
 
-driver_bind_rules("astro-cpu-bind") {
-  rules = "bind/astro-cpu.bind"
-  header_output = "astro-cpu-bind.h"
-  bind_output = "astro-cpu-bind.bc"
-  tests = "bind-tests/astro-cpu-test.json"
-  deps = [
-    "//src/devices/bind/fuchsia.amlogic.platform",
-    "//src/devices/bind/fuchsia.amlogic.platform.meson",
-    "//src/devices/bind/fuchsia.amlogic.platform.s905d2",
-    "//src/devices/bind/fuchsia.clock",
-    "//src/devices/bind/fuchsia.google.platform",
-    "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.power",
-    "//src/devices/bind/fuchsia.sysmem",
-    "//src/devices/bind/fuchsia.tee",
-  ]
-}
-
 driver_bind_rules("astro-pwm-bind") {
   rules = "bind/astro-pwm.bind"
   header_output = "astro-pwm-bind.h"
@@ -221,7 +203,6 @@ fuchsia_driver("astro-driver") {
     ":astro-aml-sdio-bind_header",
     ":astro-aml-usb-phy-v2-bind_header",
     ":astro-bind",
-    ":astro-cpu-bind_header",
     ":astro-dwc2-phy-bind_header",
     ":astro-pwm-bind_header",
     ":astro-securemem-bind_header",
@@ -249,12 +230,15 @@ fuchsia_driver("astro-driver") {
     "//src/devices/bind/fuchsia.amlogic.platform.s905d2:fuchsia.amlogic.platform.s905d2_cpp",
     "//src/devices/bind/fuchsia.ams.platform:fuchsia.ams.platform_cpp",
     "//src/devices/bind/fuchsia.arm.platform:fuchsia.arm.platform_cpp",
+    "//src/devices/bind/fuchsia.clock:fuchsia.clock_cpp",
     "//src/devices/bind/fuchsia.codec:fuchsia.codec_cpp",
     "//src/devices/bind/fuchsia.display.dsi:fuchsia.display.dsi_cpp",
     "//src/devices/bind/fuchsia.focaltech.platform:fuchsia.focaltech.platform_cpp",
     "//src/devices/bind/fuchsia.goodix.platform:fuchsia.goodix.platform_cpp",
+    "//src/devices/bind/fuchsia.google.platform:fuchsia.google.platform_cpp",
     "//src/devices/bind/fuchsia.gpio:fuchsia.gpio_cpp",
     "//src/devices/bind/fuchsia.i2c:fuchsia.i2c_cpp",
+    "//src/devices/bind/fuchsia.power:fuchsia.power_cpp",
     "//src/devices/bind/fuchsia.pwm:fuchsia.pwm_cpp",
     "//src/devices/bind/fuchsia.register:fuchsia.register_cpp",
     "//src/devices/bind/fuchsia.sysmem:fuchsia.sysmem_cpp",
@@ -310,7 +294,6 @@ group("tests") {
     ":astro-aml-sdio-bind_test",
     ":astro-aml-usb-phy-v2-bind_test",
     ":astro-bind_test",
-    ":astro-cpu-bind_test",
     ":astro-dwc2-phy-bind_test",
     ":astro-pwm-bind_test",
     ":astro-securemem-bind_test",
