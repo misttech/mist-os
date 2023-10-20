@@ -13,35 +13,11 @@
 #include <fbl/unique_fd.h>
 
 #include "src/lib/fxl/command_line.h"
-#include "src/performance/ktrace_provider/device_reader.h"
 #include "src/performance/ktrace_provider/log_importer.h"
 
 namespace ktrace_provider {
 
 std::vector<trace::KnownCategory> GetKnownCategories();
-
-struct DrainContext {
-  DrainContext(zx::time start, trace_prolonged_context_t* context)
-      : start(start), context(context) {}
-
-  static std::unique_ptr<DrainContext> Create(const std::shared_ptr<sys::ServiceDirectory>& svc) {
-    auto context = trace_acquire_prolonged_context();
-    if (context == nullptr) {
-      return nullptr;
-    }
-    auto out = std::make_unique<DrainContext>(zx::clock::get_monotonic(), context);
-    if (zx_status_t result = out->reader.Init(svc); result != ZX_OK) {
-      return nullptr;
-    }
-
-    return out;
-  }
-
-  ~DrainContext() { trace_release_prolonged_context(context); }
-  zx::time start;
-  DeviceReader reader;
-  trace_prolonged_context_t* context;
-};
 
 class App {
  public:

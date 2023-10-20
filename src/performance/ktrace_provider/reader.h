@@ -8,7 +8,6 @@
 #include <lib/zircon-internal/ktrace.h>
 
 #include <iterator>
-#include <optional>
 
 namespace ktrace_provider {
 
@@ -18,7 +17,6 @@ class Reader {
   virtual ~Reader() = default;
 
   const uint64_t* ReadNextRecord();
-  std::optional<uint64_t> PeekNextHeader();
 
   size_t number_bytes_read() const { return number_bytes_read_; }
   size_t number_records_read() const { return number_records_read_; }

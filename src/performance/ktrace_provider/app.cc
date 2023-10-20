@@ -5,7 +5,6 @@
 #include "src/performance/ktrace_provider/app.h"
 
 #include <fuchsia/tracing/kernel/cpp/fidl.h>
-#include <lib/async/cpp/task.h>
 #include <lib/async/default.h>
 #include <lib/fxt/fields.h>
 #include <lib/syslog/cpp/macros.h>
@@ -18,7 +17,6 @@
 
 #include <iterator>
 
-#include "lib/fit/defer.h"
 #include "src/performance/ktrace_provider/device_reader.h"
 
 namespace ktrace_provider {
@@ -193,71 +191,10 @@ void App::StartKTrace(uint32_t group_mask, trace_buffering_mode_t buffering_mode
   FX_VLOGS(1) << "Ktrace started";
 }
 
-void DrainBuffer(std::unique_ptr<DrainContext> drain_context) {
-  if (!drain_context) {
-    return;
-  }
-
-  trace_context_t* buffer_context = trace_acquire_context();
-  (void)fit::defer([buffer_context]() { trace_release_context(buffer_context); });
-  for (std::optional<uint64_t> fxt_header = drain_context->reader.PeekNextHeader();
-       fxt_header.has_value(); fxt_header = drain_context->reader.PeekNextHeader()) {
-    size_t record_size_bytes = fxt::RecordFields::RecordSize::Get<size_t>(*fxt_header) * 8;
-    // We try to be a bit too clever here and check that there is enough space before writing a
-    // record to the buffer. If we're in streaming mode, and there isn't space for the record, this
-    // will show up as a dropped record even though we retry later. Unfortunately, there isn't
-    // currently a good api exposed.
-    //
-    // TODO(issues.fuchsia.dev/304532640): Investigate a method to allow trace providers to wait on
-    // a full buffer
-    if (void* dst = trace_context_alloc_record(buffer_context, record_size_bytes); dst != nullptr) {
-      const uint64_t* record = drain_context->reader.ReadNextRecord();
-      memcpy(dst, reinterpret_cast<const char*>(record), record_size_bytes);
-    } else {
-      if (trace_context_get_buffering_mode(buffer_context) == TRACE_BUFFERING_MODE_STREAMING) {
-        // We are writing out our data on the async loop. Notifying the trace manager to begin
-        // saving the data also requires the context and occurs on the loop. If we run out of space,
-        // we'll release the loop and reschedule ourself to allow the buffer saving to begin.
-        //
-        // We are memcpy'ing data here and trace_manager is writing the buffer to a socket (likely
-        // shared with ffx), the cost to copy the kernel buffer to the trace buffer here pales in
-        // comparison to the cost of what trace_manager is doing. We'll poll here with a slight
-        // delay until the buffer is ready.
-        async::PostDelayedTask(
-            async_get_default_dispatcher(),
-            [drain_context = std::move(drain_context)]() mutable {
-              DrainBuffer(std::move(drain_context));
-            },
-            zx::msec(100));
-        return;
-      }
-      // Outside of streaming mode, we aren't going to get more space. We'll need to read in this
-      // record and just drop it. Rather than immediately exiting, we allow the loop to continue so
-      // that we correctly enumerate all the dropped records for statistical reporting.
-      drain_context->reader.ReadNextRecord();
-    }
-  }
-
-  // Done writing trace data
-  size_t bytes_read = drain_context->reader.number_bytes_read();
-  zx::duration time_taken = zx::clock::get_monotonic() - drain_context->start;
-  double bytes_per_sec = static_cast<double>(bytes_read) /
-                         static_cast<double>(std::max(int64_t{1}, time_taken.to_usecs()));
-  FX_LOGS(INFO) << "Import of " << drain_context->reader.number_records_read() << " kernel records"
-                << "(" << bytes_read << " bytes) took: " << time_taken.to_msecs()
-                << "ms. MBytes/sec: " << bytes_per_sec;
-  FX_VLOGS(1) << "Ktrace stopped";
-}
-
 void App::StopKTrace() {
   if (!context_) {
     return;  // not currently tracing
   }
-  (void)fit::defer([this]() {
-    trace_release_prolonged_context(context_);
-    context_ = nullptr;
-    current_group_mask_ = 0u;
-  });
   FX_DCHECK(current_group_mask_);
 
   FX_LOGS(INFO) << "Stopping ktrace";
@@ -271,18 +208,32 @@ void App::StopKTrace() {
     RequestKtraceStop(*ktrace_controller);
   }
 
-  auto drain_context = DrainContext::Create(svc_);
-  if (!drain_context) {
-    FX_LOGS(ERROR) << "Failed to start reading kernel buffer";
-    return;
+  // Acquire a context for writing to the trace buffer.
+  auto buffer_context = trace_acquire_context();
+
+  DeviceReader reader;
+  if (reader.Init(svc_) == ZX_OK) {
+    zx::time start = zx::clock::get_monotonic();
+    while (const uint64_t* fxt_header = reader.ReadNextRecord()) {
+      size_t record_size_bytes = fxt::RecordFields::RecordSize::Get<size_t>(*fxt_header) * 8;
+      void* dst = trace_context_alloc_record(buffer_context, record_size_bytes);
+      if (dst != nullptr) {
+        memcpy(dst, reinterpret_cast<const char*>(fxt_header), record_size_bytes);
+      }
+    }
+    FX_LOGS(INFO) << "Import of " << reader.number_records_read() << " kernel records"
+                  << "(" << reader.number_bytes_read()
+                  << " bytes) took: " << (zx::clock::get_monotonic() - start).to_usecs() << "us";
+  } else {
+    FX_LOGS(ERROR) << "Failed to initialize ktrace reader";
   }
-  zx_status_t result = async::PostTask(async_get_default_dispatcher(),
-                                       [drain_context = std::move(drain_context)]() mutable {
-                                         DrainBuffer(std::move(drain_context));
-                                       });
-  if (result != ZX_OK) {
-    FX_PLOGS(ERROR, result) << "Failed to schedule buffer writer";
-  }
+
+  trace_release_context(buffer_context);
+  trace_release_prolonged_context(context_);
+  context_ = nullptr;
+  current_group_mask_ = 0u;
+
+  FX_VLOGS(1) << "Ktrace stopped";
 }
 
 }  // namespace ktrace_provider
