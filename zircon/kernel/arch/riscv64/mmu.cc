@@ -23,6 +23,7 @@
 
 #include <arch/aspace.h>
 #include <arch/ops.h>
+#include <arch/riscv64/feature.h>
 #include <arch/riscv64/mmu.h>
 #include <arch/riscv64/sbi.h>
 #include <fbl/auto_lock.h>
@@ -126,7 +127,7 @@ constexpr uintptr_t page_size_per_level(uint level) {
 constexpr uintptr_t page_mask_per_level(uint level) { return page_size_per_level(level) - 1; }
 
 // Convert user level mmu flags to flags that go in leaf descriptors.
-constexpr pte_t mmu_flags_to_pte_attr(uint flags, bool global) {
+pte_t mmu_flags_to_pte_attr(uint flags, bool global) {
   pte_t attr = RISCV64_PTE_V;
   attr |= RISCV64_PTE_A | RISCV64_PTE_D;
   attr |= (flags & ARCH_MMU_FLAG_PERM_USER) ? RISCV64_PTE_U : 0;
@@ -134,6 +135,22 @@ constexpr pte_t mmu_flags_to_pte_attr(uint flags, bool global) {
   attr |= (flags & ARCH_MMU_FLAG_PERM_WRITE) ? RISCV64_PTE_W : 0;
   attr |= (flags & ARCH_MMU_FLAG_PERM_EXECUTE) ? RISCV64_PTE_X : 0;
   attr |= (global) ? RISCV64_PTE_G : 0;
+
+  // Svpbmt support
+  if (riscv_feature_svpbmt) {
+    switch (flags & ARCH_MMU_FLAG_CACHE_MASK) {
+      case ARCH_MMU_FLAG_CACHED:
+        attr |= RISCV64_PTE_PBMT_PMA;
+        break;
+      case ARCH_MMU_FLAG_UNCACHED:
+      case ARCH_MMU_FLAG_WRITE_COMBINING:
+        attr |= RISCV64_PTE_PBMT_NC;
+        break;
+      case ARCH_MMU_FLAG_UNCACHED_DEVICE:
+        attr |= RISCV64_PTE_PBMT_IO;
+        break;
+    }
+  }
 
   return attr;
 }
@@ -428,6 +445,26 @@ uint Riscv64ArchVmAspace::MmuFlagsFromPte(pte_t pte) {
   mmu_flags |= (pte & RISCV64_PTE_R) ? ARCH_MMU_FLAG_PERM_READ : 0;
   mmu_flags |= (pte & RISCV64_PTE_W) ? ARCH_MMU_FLAG_PERM_WRITE : 0;
   mmu_flags |= (pte & RISCV64_PTE_X) ? ARCH_MMU_FLAG_PERM_EXECUTE : 0;
+
+  // Svpbmt feature
+  if (riscv_feature_svpbmt) {
+    switch (pte & RISCV64_PTE_PBMT_MASK) {
+      case RISCV64_PTE_PBMT_PMA:
+        // PMA state basically means default cache paramaters, as determined by physical address.
+        // Don't actually report it as CACHED here since we can't know here what the actual
+        // underlying physical range's type is.
+        break;
+      case RISCV64_PTE_PBMT_NC:
+        mmu_flags |= ARCH_MMU_FLAG_UNCACHED;
+        break;
+      case RISCV64_PTE_PBMT_IO:
+        mmu_flags |= ARCH_MMU_FLAG_UNCACHED_DEVICE;
+        break;
+      default:
+        panic("unexpected pte value %" PRIx64, pte);
+    }
+  }
+
   return mmu_flags;
 }
 

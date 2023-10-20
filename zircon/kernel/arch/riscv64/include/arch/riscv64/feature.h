@@ -10,6 +10,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+// RISC-V features
+extern bool riscv_feature_svpbmt;
+
 void riscv64_feature_early_init();
 void riscv64_feature_init();
 

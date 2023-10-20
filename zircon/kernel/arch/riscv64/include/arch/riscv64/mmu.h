@@ -44,6 +44,15 @@
 #define RISCV64_PTE_PPN_MASK \
   (((1ul << (RISCV64_MMU_PPN_BITS - PAGE_SIZE_SHIFT)) - 1) << RISCV64_PTE_PPN_SHIFT)
 
+// Svpbmt (Page based memory types) extension
+// Normal memory
+#define RISCV64_PTE_PBMT_PMA (0ul << 61)
+// Non-cacheable, idempotent, weakly-ordered (RVWMO), main memory
+#define RISCV64_PTE_PBMT_NC (1ul << 61)
+// Non-cacheable, non-idempotent, strongly-ordered (I/O ordering), I/O
+#define RISCV64_PTE_PBMT_IO (2ul << 61)
+#define RISCV64_PTE_PBMT_MASK (3ul << 61)
+
 // SATP register, contains the current mmu mode, address space id, and
 // pointer to root page table
 #define RISCV64_SATP_MODE_NONE (0ul)

@@ -12,11 +12,13 @@
 using ArchLowerPagingTraits = arch::RiscvSv39PagingTraits;
 using ArchUpperPagingTraits = ArchLowerPagingTraits;
 
-inline constexpr auto kArchNormalMemoryType = arch::RiscvMemoryType::kPma;
+// Assume Svpbmt feature is present but add a conditional switch to compile
+// time disable its use.
+inline constexpr auto kRiscvSvpbmtEnabled = true;
 
-// TODO(fxbug.dev/129979): Conditionally set to kIo once we can determine
-// whether the svpbmt extension is supported.
-inline constexpr auto kArchMmioMemoryType = arch::RiscvMemoryType::kPma;
+inline constexpr auto kArchNormalMemoryType = arch::RiscvMemoryType::kPma;
+inline constexpr auto kArchMmioMemoryType =
+    kRiscvSvpbmtEnabled ? arch::RiscvMemoryType::kIo : arch::RiscvMemoryType::kPma;
 
 inline arch::RiscvPagingTraitsBase::SystemState ArchCreatePagingState() { return {}; }
 
