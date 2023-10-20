@@ -35,7 +35,8 @@ use {
         rights::Rights,
         router::{
             AllowedSourcesBuilder, CapabilityVisitor, ErrorNotFoundFromParent,
-            ErrorNotFoundInChild, ExposeVisitor, OfferVisitor, RouteBundle, Sources,
+            ErrorNotFoundInChild, ExposeVisitor, NoopResolverVisitor, NoopRunnerVisitor,
+            OfferVisitor, RouteBundle, Sources,
         },
         walk_state::WalkState,
     },
@@ -44,10 +45,9 @@ use {
         ExposeRunnerDecl, ExposeServiceDecl, ExposeSource, OfferDirectoryDecl,
         OfferEventStreamDecl, OfferProtocolDecl, OfferResolverDecl, OfferRunnerDecl,
         OfferServiceDecl, OfferSource, OfferStorageDecl, RegistrationDeclCommon,
-        RegistrationSource, ResolverDecl, ResolverRegistration, RunnerDecl, RunnerRegistration,
-        SourceName, StorageDecl, StorageDirectorySource, UseDeclCommon, UseDirectoryDecl,
-        UseEventStreamDecl, UseProtocolDecl, UseRunnerDecl, UseServiceDecl, UseSource,
-        UseStorageDecl,
+        RegistrationSource, ResolverRegistration, RunnerDecl, RunnerRegistration, SourceName,
+        StorageDecl, StorageDirectorySource, UseDeclCommon, UseDirectoryDecl, UseEventStreamDecl,
+        UseProtocolDecl, UseRunnerDecl, UseServiceDecl, UseSource, UseStorageDecl,
     },
     cm_types::Name,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio,
@@ -431,12 +431,13 @@ where
     C: ComponentInstanceInterface + 'static,
     M: DebugRouteMapper + 'static,
 {
-    let allowed_sources = AllowedSourcesBuilder::new().builtin().component();
+    let allowed_sources: AllowedSourcesBuilder<RunnerDecl> =
+        AllowedSourcesBuilder::new().builtin().component();
     let source = router::route_from_offer(
         RouteBundle::from_offer(offer_decl),
         target.clone(),
         allowed_sources,
-        &mut RunnerVisitor,
+        &mut NoopRunnerVisitor::new(),
         mapper,
     )
     .await?;
@@ -457,7 +458,7 @@ where
         RouteBundle::from_offer(offer_decl),
         target.clone(),
         allowed_sources,
-        &mut ResolverVisitor,
+        &mut NoopResolverVisitor::new(),
         mapper,
     )
     .await?;
@@ -943,12 +944,6 @@ where
     Ok(RouteSource::new_with_relative_path(source, state.subdir))
 }
 
-make_noop_visitor!(RunnerVisitor, {
-    OfferDecl => OfferRunnerDecl,
-    ExposeDecl => ExposeRunnerDecl,
-    CapabilityDecl => RunnerDecl,
-});
-
 /// Finds a Runner capability that matches `runner` in the `target`'s environment, and then
 /// routes the Runner capability from the environment's component instance to its source.
 async fn route_runner_from_environment<C, M>(
@@ -968,7 +963,7 @@ where
                 registration_decl,
                 env_component_instance,
                 allowed_sources,
-                &mut RunnerVisitor,
+                &mut NoopRunnerVisitor::new(),
                 mapper,
             )
             .await
@@ -979,7 +974,7 @@ where
                 .find_builtin_source(
                     reg.source_name(),
                     top_instance.builtin_capabilities(),
-                    &mut RunnerVisitor,
+                    &mut NoopRunnerVisitor::new(),
                     mapper,
                 )?
                 .ok_or(RoutingError::register_from_component_manager_not_found(
@@ -1038,12 +1033,6 @@ where
     }
 }
 
-make_noop_visitor!(ResolverVisitor, {
-    OfferDecl => OfferResolverDecl,
-    ExposeDecl => ExposeResolverDecl,
-    CapabilityDecl => ResolverDecl,
-});
-
 /// Routes a Resolver capability from `target` to its source, starting from `registration_decl`.
 async fn route_resolver<C, M>(
     registration: ResolverRegistration,
@@ -1059,7 +1048,7 @@ where
         registration,
         target.clone(),
         allowed_sources,
-        &mut ResolverVisitor,
+        &mut NoopResolverVisitor::new(),
         mapper,
     )
     .await?;

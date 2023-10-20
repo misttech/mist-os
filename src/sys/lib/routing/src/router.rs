@@ -1755,51 +1755,57 @@ pub trait ErrorNotFoundInChild {
     ) -> RoutingError;
 }
 
-/// Creates a unit struct that implements a visitor for each declared type.
-#[macro_export]
-macro_rules! make_noop_visitor {
-    ($name:ident, {
-        $(OfferDecl => $offer_decl:ty,)*
-        $(ExposeDecl => $expose_decl:ty,)*
-        $(CapabilityDecl => $cap_decl:ty,)*
-    }) => {
-        #[derive(Clone)]
-        pub struct $name;
-
-        $(
-            impl $crate::router::OfferVisitor for $name {
-                type OfferDecl = $offer_decl;
-
-                fn visit(&mut self, _decl: &Self::OfferDecl) -> Result<(), $crate::error::RoutingError> {
-                    Ok(())
-                }
-            }
-        )*
-
-        $(
-            impl $crate::router::ExposeVisitor for $name {
-                type ExposeDecl = $expose_decl;
-
-                fn visit(&mut self, _decl: &Self::ExposeDecl) -> Result<(), $crate::error::RoutingError> {
-                    Ok(())
-                }
-            }
-        )*
-
-        $(
-            impl $crate::router::CapabilityVisitor for $name {
-                type CapabilityDecl = $cap_decl;
-
-                fn visit(
-                    &mut self,
-                    _decl: &Self::CapabilityDecl
-                ) -> Result<(), $crate::error::RoutingError> {
-                    Ok(())
-                }
-            }
-        )*
-    };
+#[derive(Clone)]
+pub struct NoopVisitor<O, E, C> {
+    phantom_offer: std::marker::PhantomData<O>,
+    phantom_expose: std::marker::PhantomData<E>,
+    phantom_capability: std::marker::PhantomData<C>,
 }
+
+impl<O, E, C> NoopVisitor<O, E, C> {
+    pub fn new() -> NoopVisitor<O, E, C> {
+        NoopVisitor {
+            phantom_offer: PhantomData,
+            phantom_expose: PhantomData,
+            phantom_capability: PhantomData,
+        }
+    }
+}
+
+impl<O, E, C> crate::router::OfferVisitor for NoopVisitor<O, E, C>
+where
+    O: OfferDeclCommon,
+{
+    type OfferDecl = O;
+    fn visit(&mut self, _: &Self::OfferDecl) -> Result<(), RoutingError> {
+        Ok(())
+    }
+}
+
+impl<O, E, C> crate::router::ExposeVisitor for NoopVisitor<O, E, C>
+where
+    E: ExposeDeclCommon,
+{
+    type ExposeDecl = E;
+    fn visit(&mut self, _: &Self::ExposeDecl) -> Result<(), RoutingError> {
+        Ok(())
+    }
+}
+
+impl<O, E, C> crate::router::CapabilityVisitor for NoopVisitor<O, E, C>
+where
+    C: CapabilityDeclCommon,
+{
+    type CapabilityDecl = C;
+    fn visit(&mut self, _: &Self::CapabilityDecl) -> Result<(), RoutingError> {
+        Ok(())
+    }
+}
+
+pub type NoopRunnerVisitor =
+    NoopVisitor<cm_rust::OfferRunnerDecl, cm_rust::ExposeRunnerDecl, cm_rust::RunnerDecl>;
+pub type NoopResolverVisitor =
+    NoopVisitor<cm_rust::OfferResolverDecl, cm_rust::ExposeResolverDecl, cm_rust::ResolverDecl>;
 
 #[cfg(test)]
 mod tests {
