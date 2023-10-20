@@ -230,7 +230,7 @@ template("board_input_bundle") {
       ]
     }
   }
-  ffx_action(target_name) {
+  ffx_action(labels.main_target) {
     forward_variables_from(invoker,
                            [
                              "testonly",
@@ -264,6 +264,16 @@ template("board_input_bundle") {
              "--depfile",
              rebase_path(files.depfile, root_build_dir),
            ] + creation_args
+
+    metadata = {
+      board_input_bundles = [
+        {
+          label =
+              get_label_info(":${labels.main_target}", "label_with_toolchain")
+          outdir = rebase_path(files.bundle_dir, root_build_dir)
+        },
+      ]
+    }
   }
 
   # Make board configuration and board input bundle available to Bazel

@@ -189,6 +189,7 @@ build_api_module("api") {
     ":assembly_manifests",
     ":bazel_sdk_info",
     ":binaries",
+    ":boards",
     ":build_info",
     ":checkout_artifacts",
     ":cipd_assembly_artifacts",
@@ -419,6 +420,40 @@ build_api_module("binaries") {
   testonly = true
   data_keys = [ "binaries" ]
   deps = [ ":default" ]
+}
+
+# Lists the board configurations that are defined in this build.
+#
+# Type: list (scope)
+#
+#  label
+#    Required: The GN label for the board_configuration target
+#
+#  outdir
+#    Required: The path (relative to the root out dir) of the directory that
+#    contains the board configuration.
+#
+build_api_module("boards") {
+  testonly = true
+  data_keys = [ "board_configs" ]
+  deps = [ "//boards" ]
+}
+
+# Lists the board input bundles that are defined in this build.
+#
+# Type: list (scope)
+#
+#  label
+#    Required: The GN label for the board_configuration target
+#
+#  outdir
+#    Required: The path (relative to the root out dir) of the directory that
+#    contains the board input bundle.
+#
+build_api_module("board_input_bundles") {
+  testonly = true
+  data_keys = [ "board_input_bundles" ]
+  deps = [ "//boards" ]
 }
 
 # Describes the configuration of the build in the file:

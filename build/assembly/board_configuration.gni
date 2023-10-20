@@ -296,7 +296,7 @@ template("board_configuration") {
     contents = base_info_contents
   }
 
-  group(target_name) {
+  group(labels.main_target) {
     forward_variables_from(invoker,
                            [
                              "testonly",
@@ -304,6 +304,16 @@ template("board_configuration") {
                            ])
     public_deps = [ ":${labels.base_info}" ]
     deps = creation_deps
+
+    metadata = {
+      board_configs = [
+        {
+          label =
+              get_label_info(":${labels.main_target}", "label_with_toolchain")
+          outdir = rebase_path(files.board_configuration_dir, root_build_dir)
+        },
+      ]
+    }
   }
 
   # Make board configuration and hardware support bundle available to Bazel
