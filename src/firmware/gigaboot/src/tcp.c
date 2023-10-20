@@ -2,9 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef DEBUG_LOGGING
 #define DEBUG_LOGGING 0
-#endif
 
 #include "tcp.h"
 
@@ -15,7 +13,6 @@
 #include <zircon/compiler.h>
 
 #include <efi/boot-services.h>
-#include <efi/protocol/tcp6.h>
 
 #include "inet6.h"
 
@@ -444,11 +441,6 @@ tcp6_result tcp6_disconnect(tcp6_socket* socket) {
     socket->client_handle = NULL;
     socket->client_protocol = NULL;
   }
-
-  socket->boot_services->CloseEvent(socket->read_token.CompletionToken.Event);
-  socket->read_token.CompletionToken.Event = NULL;
-  socket->boot_services->CloseEvent(socket->write_token.CompletionToken.Event);
-  socket->write_token.CompletionToken.Event = NULL;
   return result;
 }
 
