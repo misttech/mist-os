@@ -24,4 +24,5 @@ pub mod mem;
 pub mod misc;
 pub mod starnix;
 pub mod terminal;
+pub mod uinput;
 pub mod wayland;

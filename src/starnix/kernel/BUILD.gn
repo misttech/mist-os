@@ -222,6 +222,7 @@ rustc_binary("starnix_kernel_bin") {
     "device/starnix.rs",
     "device/sync_file.rs",
     "device/terminal.rs",
+    "device/uinput.rs",
     "device/wayland/image_file.rs",
     "device/wayland/mod.rs",
     "device/wayland/vulkan.rs",

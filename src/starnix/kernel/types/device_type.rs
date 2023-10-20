@@ -39,6 +39,7 @@ impl DeviceType {
 
     // MISC
     pub const HW_RANDOM: DeviceType = DeviceType::new(MISC_MAJOR, 183);
+    pub const UINPUT: DeviceType = DeviceType::new(MISC_MAJOR, 223);
     pub const FUSE: DeviceType = DeviceType::new(MISC_MAJOR, 229);
     pub const DEVICE_MAPPER: DeviceType = DeviceType::new(MISC_MAJOR, 236);
     pub const LOOP_CONTROL: DeviceType = DeviceType::new(MISC_MAJOR, 237);

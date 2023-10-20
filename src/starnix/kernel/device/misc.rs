@@ -5,7 +5,7 @@
 use crate::{
     device::{
         create_unknown_device, loop_device::create_loop_control_device, mem::DevRandom,
-        simple_device_ops, DeviceMode,
+        simple_device_ops, uinput::create_uinput_device, DeviceMode,
     },
     fs::{
         fuse::DevFuse,
@@ -63,5 +63,15 @@ pub fn misc_device_init(kernel: &Arc<Kernel>) {
             DeviceMode::Char,
         ),
         create_loop_control_device,
+    );
+    kernel.add_and_register_device(
+        KObjectDeviceAttribute::new(
+            Some(misc_class.clone()),
+            b"uinput",
+            b"uinput",
+            DeviceType::UINPUT,
+            DeviceMode::Char,
+        ),
+        create_uinput_device,
     );
 }
