@@ -110,89 +110,72 @@ impl AvailabilityState {
     }
 }
 
-macro_rules! make_availability_visitor {
-    ($name:ident, {
-        $(OfferDecl => $offer_decl:ty,)*
-        $(ExposeDecl => $expose_decl:ty,)*
-        $(CapabilityDecl => $cap_decl:ty,)*
-    }) => {
-        #[derive(Debug, PartialEq, Eq, Clone)]
-        pub struct $name(pub AvailabilityState);
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct AvailabilityVisitor<O, E, C> {
+    phantom_offer: std::marker::PhantomData<O>,
+    phantom_expose: std::marker::PhantomData<E>,
+    phantom_capability: std::marker::PhantomData<C>,
 
-        impl $name {
-            pub fn new(availability: Availability) -> Self {
-                Self(availability.into())
-            }
-        }
-
-        $(
-            impl $crate::router::OfferVisitor for $name {
-                type OfferDecl = $offer_decl;
-
-                fn visit(&mut self, offer: &Self::OfferDecl) -> Result<(), $crate::error::RoutingError> {
-                    self.0.advance_with_offer(offer).map_err(Into::into)
-                }
-            }
-        )*
-
-        $(
-            impl $crate::router::ExposeVisitor for $name {
-                type ExposeDecl = $expose_decl;
-
-                fn visit(&mut self, expose: &Self::ExposeDecl) -> Result<(), $crate::error::RoutingError> {
-                    self.0.advance_with_expose(expose).map_err(Into::into)
-                }
-            }
-        )*
-
-        $(
-            impl $crate::router::CapabilityVisitor for $name {
-                type CapabilityDecl = $cap_decl;
-
-                fn visit(
-                    &mut self,
-                    _decl: &Self::CapabilityDecl
-                ) -> Result<(), $crate::error::RoutingError> {
-                    Ok(())
-                }
-            }
-        )*
-    };
+    pub state: AvailabilityState,
 }
 
-make_availability_visitor!(AvailabilityServiceVisitor, {
-    OfferDecl => OfferServiceDecl,
-    ExposeDecl => ExposeServiceDecl,
-    CapabilityDecl => ServiceDecl,
-});
+impl<O, E, C> AvailabilityVisitor<O, E, C> {
+    pub fn new(availability: Availability) -> AvailabilityVisitor<O, E, C> {
+        AvailabilityVisitor {
+            phantom_offer: std::marker::PhantomData,
+            phantom_expose: std::marker::PhantomData,
+            phantom_capability: std::marker::PhantomData,
+            state: AvailabilityState(availability),
+        }
+    }
+}
 
-make_availability_visitor!(AvailabilityProtocolVisitor, {
-    OfferDecl => OfferProtocolDecl,
-    ExposeDecl => ExposeProtocolDecl,
-    CapabilityDecl => ProtocolDecl,
-});
+impl<O, E, C> crate::router::OfferVisitor for AvailabilityVisitor<O, E, C>
+where
+    O: OfferDeclCommon,
+{
+    type OfferDecl = O;
+    fn visit(&mut self, offer: &Self::OfferDecl) -> Result<(), crate::RoutingError> {
+        self.state.advance_with_offer(offer).map_err(Into::into)
+    }
+}
 
-make_availability_visitor!(AvailabilityDirectoryVisitor, {
-    OfferDecl => OfferDirectoryDecl,
-    ExposeDecl => ExposeDirectoryDecl,
-    CapabilityDecl => DirectoryDecl,
-});
+impl<O, E, C> crate::router::ExposeVisitor for AvailabilityVisitor<O, E, C>
+where
+    E: ExposeDeclCommon,
+{
+    type ExposeDecl = E;
+    fn visit(&mut self, expose: &Self::ExposeDecl) -> Result<(), crate::RoutingError> {
+        self.state.advance_with_expose(expose).map_err(Into::into)
+    }
+}
 
-make_availability_visitor!(AvailabilityStorageVisitor, {
-    OfferDecl => OfferStorageDecl,
-    CapabilityDecl => StorageDecl,
-});
+impl<O, E, C> crate::router::CapabilityVisitor for AvailabilityVisitor<O, E, C>
+where
+    C: cm_rust::CapabilityDeclCommon,
+{
+    type CapabilityDecl = C;
+    fn visit(&mut self, _: &Self::CapabilityDecl) -> Result<(), crate::RoutingError> {
+        Ok(())
+    }
+}
 
-make_availability_visitor!(AvailabilityEventStreamVisitor, {
-    OfferDecl => OfferEventStreamDecl,
-    CapabilityDecl => EventStreamDecl,
-});
+pub type AvailabilityProtocolVisitor =
+    AvailabilityVisitor<OfferProtocolDecl, ExposeProtocolDecl, ProtocolDecl>;
 
-make_availability_visitor!(AvailabilityRunnerVisitor, {
-    OfferDecl => OfferRunnerDecl,
-    ExposeDecl => ExposeRunnerDecl,
-    CapabilityDecl => RunnerDecl,
-});
+pub type AvailabilityServiceVisitor =
+    AvailabilityVisitor<OfferServiceDecl, ExposeServiceDecl, ServiceDecl>;
+
+pub type AvailabilityDirectoryVisitor =
+    AvailabilityVisitor<OfferDirectoryDecl, ExposeDirectoryDecl, DirectoryDecl>;
+
+pub type AvailabilityStorageVisitor = AvailabilityVisitor<OfferStorageDecl, (), StorageDecl>;
+
+pub type AvailabilityEventStreamVisitor =
+    AvailabilityVisitor<OfferEventStreamDecl, (), EventStreamDecl>;
+
+pub type AvailabilityRunnerVisitor =
+    AvailabilityVisitor<OfferRunnerDecl, ExposeRunnerDecl, RunnerDecl>;
 
 #[cfg(test)]
 mod tests {
