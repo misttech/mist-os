@@ -27,8 +27,10 @@ static_assert(static_cast<uint64_t>(MapFlags::kWrite) == MAGMA_MAP_FLAG_WRITE, "
 static_assert(static_cast<uint64_t>(MapFlags::kExecute) == MAGMA_MAP_FLAG_EXECUTE, "mismatch");
 static_assert(static_cast<uint64_t>(MapFlags::kGrowable) == MAGMA_MAP_FLAG_GROWABLE, "mismatch");
 static_assert(static_cast<uint64_t>(MapFlags::kVendorFlag0) == MAGMA_MAP_FLAG_VENDOR_0, "mismatch");
+#if __Fuchsia_API_level__ >= 13
 using fuchsia_gpu_magma::wire::ImportFlags;
 static_assert(static_cast<uint64_t>(ImportFlags::kSemaphoreOneShot) == MAGMA_IMPORT_SEMAPHORE_ONE_SHOT, "mismatch");
+#endif
 
 // clang-format on
 
@@ -155,8 +157,10 @@ PrimaryWrapper::PrimaryWrapper(zx::channel channel, uint64_t max_inflight_messag
   }
 }
 
+#if __Fuchsia_API_level__ >= 13
 static_assert(static_cast<uint32_t>(magma::PlatformObject::SEMAPHORE) ==
               static_cast<uint32_t>(fuchsia_gpu_magma::wire::ObjectType::kSemaphore));
+#endif
 static_assert(static_cast<uint32_t>(magma::PlatformObject::BUFFER) ==
               static_cast<uint32_t>(fuchsia_gpu_magma::wire::ObjectType::kBuffer));
 
@@ -171,6 +175,7 @@ magma_status_t PrimaryWrapper::ImportObject(zx::handle handle, uint64_t flags,
       return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "Invalid handle");
   }
 
+#if __Fuchsia_API_level__ >= 13
   uint64_t size = 0;
   auto wire_object = fuchsia_gpu_magma::wire::Object();
 
@@ -215,6 +220,9 @@ magma_status_t PrimaryWrapper::ImportObject(zx::handle handle, uint64_t flags,
     UpdateFlowControl(size);
   }
   return magma::FromZxStatus(status).get();
+#else
+  return DRET_MSG(MAGMA_STATUS_UNIMPLEMENTED, "Unimplemented for this API level");
+#endif  // #if __Fuchsia_API_level__ >= 13
 }
 
 magma_status_t PrimaryWrapper::ReleaseObject(uint64_t object_id,
