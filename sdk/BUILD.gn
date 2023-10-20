@@ -671,11 +671,6 @@ sdk_molecule("bind") {
   ]
 }
 
-# Controls the maximum number of simultaneous subbuilds.
-pool("subbuild_pool") {
-  depth = sdk_max_simultaneous_sub_builds
-}
-
 # WARNING (fxbug.dev/116642): the driver SDK will soon be removed.
 # DO NOT ADD anything here!
 sdk_molecule("driver_fidl") {

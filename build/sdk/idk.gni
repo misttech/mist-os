@@ -88,8 +88,6 @@ template("_subbuild") {
       }
     }
 
-    pool = "//sdk:subbuild_pool"
-
     # This script cannot be hermetic.
     hermetic_deps = false
 
@@ -97,6 +95,7 @@ template("_subbuild") {
                            [
                              "testonly",
                              "visibility",
+                             "pool",
                            ])
   }
 }
