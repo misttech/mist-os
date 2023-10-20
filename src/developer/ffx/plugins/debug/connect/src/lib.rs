@@ -98,7 +98,7 @@ async fn connect_tool_impl(cmd: ConnectCommand, debugger_proxy: DebugAgentProxy)
     };
 
     // Spawn the task that doing the forwarding in the background.
-    spawn_forward_task(socket);
+    let _task = spawn_forward_task(socket);
 
     if let Some(exit_code) = unblock(move || zxdb.wait()).await?.code() {
         if exit_code == 0 {

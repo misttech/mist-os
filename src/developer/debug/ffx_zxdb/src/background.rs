@@ -4,6 +4,7 @@
 
 use anyhow::Result;
 use async_io::Async;
+use fuchsia_async::Task;
 use futures_util::{future::FutureExt, io::AsyncReadExt};
 use signal_hook::{
     consts::signal::{SIGINT, SIGTERM},
@@ -13,12 +14,12 @@ use std::os::unix::net::UnixStream;
 
 use crate::debug_agent::DebugAgentSocket;
 
-pub fn spawn_forward_task(socket: DebugAgentSocket) {
-    let _task = fuchsia_async::Task::local(async move {
+pub fn spawn_forward_task(socket: DebugAgentSocket) -> Task<()> {
+    fuchsia_async::Task::local(async move {
         let _ = socket.forward_one_connection().await.map_err(|e| {
             eprintln!("Connection to debug_agent broken: {}", e);
         });
-    });
+    })
 }
 
 pub async fn forward_to_agent(socket: DebugAgentSocket) -> Result<()> {
