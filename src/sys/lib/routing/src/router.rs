@@ -266,7 +266,6 @@ where
                     capability_name: first_offer.source_name().clone(),
                     sources: sources.clone(),
                     visitor: visitor.clone(),
-                    mapper: mapper.clone(),
                 }),
                 collections,
                 children,
@@ -323,7 +322,6 @@ where
                     aggregation_component.as_weak(),
                     sources.clone(),
                     visitor.clone(),
-                    mapper.clone(),
                 )),
             })
         }
@@ -388,7 +386,6 @@ where
                     capability_name: first_expose.source_name().clone(),
                     sources: sources.clone(),
                     visitor: visitor.clone(),
-                    mapper: mapper.clone(),
                 }),
                 collections,
                 children,

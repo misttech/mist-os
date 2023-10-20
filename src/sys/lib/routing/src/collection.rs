@@ -12,7 +12,7 @@ use {
             ComponentInstanceInterface, ResolvedInstanceInterface, WeakComponentInstanceInterface,
         },
         error::RoutingError,
-        mapper::DebugRouteMapper,
+        mapper::NoopRouteMapper,
         router::{
             self, CapabilityVisitor, ErrorNotFoundFromParent, ErrorNotFoundInChild, ExposeVisitor,
             OfferVisitor, RouteBundle, Sources,
@@ -38,8 +38,8 @@ use {
 ///
 /// This is used during collection routing from anonymized aggregate service instances.
 #[derive(Derivative)]
-#[derivative(Clone(bound = "E: Clone, S: Clone, V: Clone, M: Clone"))]
-pub(super) struct AnonymizedAggregateServiceProvider<C: ComponentInstanceInterface, E, S, V, M> {
+#[derivative(Clone(bound = "E: Clone, S: Clone, V: Clone"))]
+pub(super) struct AnonymizedAggregateServiceProvider<C: ComponentInstanceInterface, E, S, V> {
     /// Component that defines the aggregate.
     pub containing_component: WeakComponentInstanceInterface<C>,
 
@@ -56,12 +56,11 @@ pub(super) struct AnonymizedAggregateServiceProvider<C: ComponentInstanceInterfa
 
     pub sources: S,
     pub visitor: V,
-    pub mapper: M,
 }
 
 #[async_trait]
-impl<C, E, S, V, M> AnonymizedAggregateCapabilityProvider<C>
-    for AnonymizedAggregateServiceProvider<C, E, S, V, M>
+impl<C, E, S, V> AnonymizedAggregateCapabilityProvider<C>
+    for AnonymizedAggregateServiceProvider<C, E, S, V>
 where
     C: ComponentInstanceInterface + 'static,
     E: ExposeDeclCommon
@@ -74,7 +73,6 @@ where
     V: ExposeVisitor<ExposeDecl = E>,
     V: CapabilityVisitor<CapabilityDecl = S::CapabilityDecl>,
     V: Clone + Send + Sync + 'static,
-    M: DebugRouteMapper + Send + Sync + Clone + 'static,
 {
     /// Returns a list of instances of capabilities in this provider.
     ///
@@ -147,7 +145,7 @@ where
             child_component,
             self.sources.clone(),
             &mut self.visitor.clone(),
-            &mut self.mapper.clone(),
+            &mut NoopRouteMapper,
         )
         .await
     }
@@ -250,8 +248,8 @@ fn get_instance_filter(offer_decl: &OfferServiceDecl) -> Vec<NameMapping> {
 }
 
 #[derive(Derivative)]
-#[derivative(Clone(bound = "S: Clone, M: Clone, V: Clone"))]
-pub(super) struct OfferAggregateServiceProvider<C: ComponentInstanceInterface, O, E, S, M, V> {
+#[derivative(Clone(bound = "S: Clone, V: Clone"))]
+pub(super) struct OfferAggregateServiceProvider<C: ComponentInstanceInterface, O, E, S, V> {
     /// Component that offered the aggregate service
     component: WeakComponentInstanceInterface<C>,
 
@@ -263,10 +261,9 @@ pub(super) struct OfferAggregateServiceProvider<C: ComponentInstanceInterface, O
 
     sources: S,
     visitor: V,
-    mapper: M,
 }
 
-impl<C, O, E, S, M, V> OfferAggregateServiceProvider<C, O, E, S, M, V>
+impl<C, O, E, S, V> OfferAggregateServiceProvider<C, O, E, S, V>
 where
     C: ComponentInstanceInterface + 'static,
     E: ExposeDeclCommon
@@ -287,14 +284,12 @@ where
         + ExposeVisitor<ExposeDecl = E>
         + CapabilityVisitor<CapabilityDecl = S::CapabilityDecl>,
     V: Send + Sync + Clone + 'static,
-    M: DebugRouteMapper + Send + Sync + Clone + 'static,
 {
     pub(super) fn new(
         offer_decls: Vec<OfferServiceDecl>,
         component: WeakComponentInstanceInterface<C>,
         sources: S,
         visitor: V,
-        mapper: M,
     ) -> Self {
         Self {
             offer_decls,
@@ -303,13 +298,12 @@ where
             sources,
             visitor,
             component,
-            mapper,
         }
     }
 }
 
-impl<C, O, E, S, M, V> FilteredAggregateCapabilityProvider<C>
-    for OfferAggregateServiceProvider<C, O, E, S, M, V>
+impl<C, O, E, S, V> FilteredAggregateCapabilityProvider<C>
+    for OfferAggregateServiceProvider<C, O, E, S, V>
 where
     C: ComponentInstanceInterface + 'static,
     E: ExposeDeclCommon
@@ -330,7 +324,6 @@ where
         + ExposeVisitor<ExposeDecl = E>
         + CapabilityVisitor<CapabilityDecl = S::CapabilityDecl>,
     V: Send + Sync + Clone + 'static,
-    M: DebugRouteMapper + Send + Sync + Clone + 'static,
 {
     fn route_instances(
         &self,
@@ -364,7 +357,7 @@ where
                     component,
                     self.sources.clone(),
                     &mut self.visitor.clone(),
-                    &mut self.mapper.clone(),
+                    &mut NoopRouteMapper,
                 )
                 .await?;
                 Ok(FilteredAggregateCapabilityRouteData { capability_source, instance_filter })

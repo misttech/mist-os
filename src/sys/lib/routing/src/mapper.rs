@@ -169,7 +169,7 @@ pub struct NoopRouteMapper;
 impl DebugRouteMapper for NoopRouteMapper {}
 
 /// Provides methods to record and retrieve a summary of a capability route.
-pub trait DebugRouteMapper: Send + Sync + Clone {
+pub trait DebugRouteMapper: Send + Sync {
     #[allow(unused_variables)]
     fn add_use(&mut self, moniker: Moniker, use_decl: UseDecl) {}
 
