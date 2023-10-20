@@ -196,7 +196,7 @@ From //build/images/vbmeta.gni:20
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/android/platform/external/avb/test/data/atx_metadata.bin"`
 
-From //boards/common/x64-common.gni:101
+From //boards/common/x64-common.gni:100
 
 **Overridden from the default:** `""`
 
@@ -216,7 +216,7 @@ From //build/images/vbmeta.gni:17
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/android/platform/external/avb/test/data/testkey_atx_psk.pem"`
 
-From //boards/common/x64-common.gni:99
+From //boards/common/x64-common.gni:98
 
 **Overridden from the default:** `""`
 
@@ -377,7 +377,7 @@ From //build/images/filesystem_limits.gni:17
 
 **Current value for `target_cpu = "x64"`:** `10485760000`
 
-From //boards/common/x64-common.gni:103
+From //boards/common/x64-common.gni:102
 
 **Overridden from the default:** `false`
 
@@ -615,19 +615,7 @@ From //build/board.gni:11
 A list of package labels to include in the 'base' package set. Used by the
 board definition rather than the product definition.
 
-**Current value for `target_cpu = "arm64"`:** `["//src/hwinfo:default_board_config"]`
-
-From //boards/common/arm64-common.gni:28
-
-**Overridden from the default:** `[]`
-
-From //build/board.gni:29
-
-**Current value for `target_cpu = "x64"`:** `["//src/factory/factory_store_providers/config/qemu", "//src/hwinfo:default_board_config"]`
-
-From //boards/common/x64-common.gni:82
-
-**Overridden from the default:** `[]`
+**Current value (from the default):** `[]`
 
 From //build/board.gni:29
 
@@ -912,7 +900,7 @@ From //build/images/args.gni:29
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/common/x64-common.gni:107
+From //boards/common/x64-common.gni:106
 
 **Overridden from the default:** `false`
 
@@ -4531,7 +4519,7 @@ From //build/images/filesystem_limits.gni:12
 
 **Current value for `target_cpu = "x64"`:** `5216665600`
 
-From //boards/common/x64-common.gni:105
+From //boards/common/x64-common.gni:104
 
 **Overridden from the default:** `false`
 
@@ -5291,7 +5279,7 @@ From //build/board.gni:94
 
 **Current value for `target_cpu = "x64"`:** `["//out/not-default/fuchsia.esp.blk"]`
 
-From //boards/common/x64-common.gni:95
+From //boards/common/x64-common.gni:94
 
 **Overridden from the default:** `[]`
 
@@ -5312,7 +5300,7 @@ From //build/board.gni:93
 
 **Current value for `target_cpu = "x64"`:** `"//boards/partitions:x64"`
 
-From //boards/common/x64-common.gni:94
+From //boards/common/x64-common.gni:93
 
 **Overridden from the default:** `false`
 
@@ -8514,7 +8502,7 @@ From //build/images/args.gni:26
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/common/x64-common.gni:108
+From //boards/common/x64-common.gni:107
 
 **Overridden from the default:** `false`
 
@@ -8693,7 +8681,7 @@ From //build/images/vbmeta.gni:14
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/common/x64-common.gni:97
+From //boards/common/x64-common.gni:96
 
 **Overridden from the default:** `false`
 
