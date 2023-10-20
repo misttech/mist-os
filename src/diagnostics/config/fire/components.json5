@@ -519,4 +519,99 @@
         label: "Updater",
         moniker: "core/system-update/system-updater",
     },
+    {
+        id: 238,
+        label: "Decompressor",
+        moniker: "bootstrap/fshost/blobfs/decompressor",
+    },
+    {
+        id: 239,
+        label: "Package Cache",
+        moniker: "bootstrap/pkg-cache",
+    },
+    {
+        id: 240,
+        label: "Font Server",
+        moniker: "core/font_provider/font-server",
+    },
+    {
+        id: 241,
+        label: "Primary Timesource",
+        moniker: "core/timekeeper/timesource:primary",
+    },
+    {
+        id: 242,
+        label: "Text Manager CFv2",
+        moniker: "core/ui/text_manager",
+    },
+    {
+        id: 243,
+        label: "DevFS",
+        moniker: "bootstrap/devfs",
+    },
+    {
+        id: 244,
+        label: "DevFS With Pkg",
+        moniker: "bootstrap/devfs-with-pkg",
+    },
+    {
+        id: 245,
+        label: "MinFS",
+        moniker: "bootstrap/fshost/minfs",
+    },
+    {
+        id: 246,
+        label: "TmpFS",
+        moniker: "bootstrap/fshost/tmpfs",
+    },
+    {
+        id: 247,
+        label: "Camera Device Watcher",
+        moniker: "core/camera_device_watcher",
+    },
+    {
+        id: 248,
+        label: "LoWPAN Monitor",
+        moniker: "core/lowpan-monitor",
+    },
+    {
+        id: 249,
+        label: "LoWPAN OT Driver",
+        moniker: "core/lowpan-ot-driver",
+    },
+    {
+        id: 250,
+        label: "Radar Proxy",
+        moniker: "core/radar-proxy",
+    },
+    {
+        id: 251,
+        label: "Session",
+        moniker: "core/session-manager/session:session",
+    },
+    {
+        id: 252,
+        label: "Storage Cache Manager",
+        moniker: "core/storage_cache_manager",
+    },
+    {
+        id: 253,
+        label: "SysUpdate Config",
+        moniker: "core/system-update/system-update-configurator",
+    },
+    {
+        id: 254,
+        label: "TZ Info Service",
+        moniker: "core/time-zone-info-service",
+    },
+    {
+        id: 255,
+        label: "Display Coordinator",
+        moniker: "core/ui/display-coordinator-connector",
+    },
+    {
+        id: 256,
+        label: "Virtual Keyboard",
+        moniker: "core/ui/virtual_keyboard_manager",
+    },
 ]
