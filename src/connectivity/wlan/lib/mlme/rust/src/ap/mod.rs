@@ -624,9 +624,9 @@ mod tests {
     }
 
     fn mock_rx_info(ap: &Ap<FakeDevice>) -> banjo_wlan_softmac::WlanRxInfo {
-        let channel = banjo_common::WlanChannel {
+        let channel = fidl_common::WlanChannel {
             primary: ap.bss.as_ref().unwrap().channel,
-            cbw: banjo_common::ChannelBandwidth::CBW20,
+            cbw: fidl_common::ChannelBandwidth::Cbw20,
             secondary80: 0,
         };
         MockWlanRxInfo::with_channel(channel).into()
@@ -926,10 +926,10 @@ mod tests {
         assert!(ap.bss.is_some());
         assert_eq!(
             fake_device_state.lock().unwrap().wlan_channel,
-            banjo_common::WlanChannel {
+            fidl_common::WlanChannel {
                 primary: 2,
                 // TODO(fxbug.dev/40917): Correctly support this.
-                cbw: banjo_common::ChannelBandwidth::CBW20,
+                cbw: fidl_common::ChannelBandwidth::Cbw20,
                 secondary80: 0,
             }
         );

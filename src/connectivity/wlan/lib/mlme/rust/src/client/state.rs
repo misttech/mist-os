@@ -355,7 +355,7 @@ impl Associating {
             // In the association request we sent out earlier, listen_interval is always set to 0,
             // indicating the client never enters power save mode.
             listen_interval: Some(0),
-            channel: Some(ddk::fidl_channel_from_ddk(main_channel)),
+            channel: Some(main_channel),
             qos: Some(qos),
             wmm_params: None,
             rates: Some(negotiated_cap.rates.iter().map(|r| r.0).collect()),
@@ -3288,9 +3288,9 @@ mod tests {
 
         sta.ctx
             .device
-            .set_channel(banjo_common::WlanChannel {
+            .set_channel(fidl_common::WlanChannel {
                 primary: 42,
-                cbw: banjo_common::ChannelBandwidth::CBW20,
+                cbw: fidl_common::ChannelBandwidth::Cbw20,
                 secondary80: 0,
             })
             .expect("fake device is obedient");

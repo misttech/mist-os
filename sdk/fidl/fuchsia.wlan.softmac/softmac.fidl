@@ -469,6 +469,19 @@ closed protocol WlanSoftmacBridge {
     @available(added=HEAD)
     @selector("fuchsia.wlan.softmac/WlanSoftmac.Query")
     strict Query() -> (WlanSoftmacQueryResponse) error zx.Status;
+
+    /// Set the primary radio channel, e.g. in response to a channel switch event.
+    /// If successful, this will trigger the channel switch immediately. This may
+    /// impact the transmission of any frames that are in-flight, and might also
+    /// interfere with an ongoing scan request.
+    ///
+    /// Common errors include: \
+    ///   ZX_ERR_NOT_SUPPORTED: The device cannot switch to the requested channel.
+    @available(added=HEAD)
+    @selector("fuchsia.wlan.softmac/WlanSoftmac.SetChannel")
+    strict SetChannel(table {
+        1: channel fuchsia.wlan.common.WlanChannel;
+    }) -> () error zx.Status;
 };
 
 @discoverable
@@ -560,7 +573,7 @@ closed protocol WlanSoftmac {
     ///
     /// Common errors include: \
     ///   ZX_ERR_NOT_SUPPORTED: The device cannot switch to the requested channel.
-    @available(added=15)
+    @available(added=15, removed=HEAD)
     strict SetChannel(table {
         1: channel fuchsia.wlan.common.WlanChannel;
     }) -> () error zx.Status;

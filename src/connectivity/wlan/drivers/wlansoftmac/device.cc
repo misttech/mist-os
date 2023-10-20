@@ -128,6 +128,10 @@ class WlanSoftmacBridgeImpl : public fidl::WireServer<fuchsia_wlan_softmac::Wlan
     completer.ReplySuccess(response);
   }
 
+  void SetChannel(SetChannelRequestView request, SetChannelCompleter::Sync& completer) override {
+    completer.Reply(device_->SetChannel(request));
+  }
+
   static void BindSelfManagedServer(
       async_dispatcher_t* dispatcher, DeviceInterface* device,
       fidl::ServerEnd<fuchsia_wlan_softmac::WlanSoftmacBridge> server_end) {
@@ -177,12 +181,6 @@ zx_status_t WlanSoftmacHandle::Init() {
       },
       .set_ethernet_status = [](void* device, uint32_t status) -> zx_status_t {
         return DEVICE(device)->SetEthernetStatus(status);
-      },
-      .get_wlan_channel = [](void* device) -> wlan_channel_t {
-        return DEVICE(device)->GetState()->channel();
-      },
-      .set_wlan_channel = [](void* device, wlan_channel_t channel) -> zx_status_t {
-        return DEVICE(device)->SetChannel(channel);
       },
       .set_key = [](void* device, wlan_key_configuration_t* key) -> zx_status_t {
         return DEVICE(device)->InstallKey(key);
@@ -688,51 +686,31 @@ zx_status_t Device::QueueTx(std::unique_ptr<Packet> packet, wlan_tx_info_t tx_in
 // would be wrong, but there's no way to convince the compiler that the lock is
 // held.
 
-// TODO(tkilbourn): figure out how to make sure we have the lock for accessing
-// dispatcher_.
-zx_status_t Device::SetChannel(wlan_channel_t channel) __TA_NO_THREAD_SAFETY_ANALYSIS {
-  // TODO(porce): Implement == operator for wlan_channel_t, or an equality test
-  // function.
+// TODO(tkilbourn): Figure out how to make sure we have the lock for accessing
+//                  `dispatcher_`.
+fidl::Response<fuchsia_wlan_softmac::WlanSoftmacBridge::SetChannel> Device::SetChannel(
+    fuchsia_wlan_softmac::wire::WlanSoftmacBridgeSetChannelRequest* request)
+    __TA_NO_THREAD_SAFETY_ANALYSIS {
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     lerror("Arena creation failed: %s", arena.status_string());
-    return ZX_ERR_INTERNAL;
+    return fit::error(ZX_ERR_INTERNAL);
   }
-
-  char buf[80];
-  zx_status_t status = ZX_OK;
-  fuchsia_wlan_common::wire::WlanChannel current_channel;
-  if ((status = ConvertChannel(state_->channel(), &current_channel)) != ZX_OK) {
-    lerror("WlanChannel conversion failed: %s", zx_status_get_string(status));
-    return status;
-  }
-
-  fuchsia_wlan_common::wire::WlanChannel new_channel;
-  if ((status = ConvertChannel(channel, &new_channel)) != ZX_OK) {
-    lerror("WlanChannel conversion failed: %s", zx_status_get_string(status));
-    return status;
-  }
-
-  snprintf(buf, sizeof(buf), "SetChannel: from %s to %s", common::ChanStr(current_channel).c_str(),
-           common::ChanStr(new_channel).c_str());
 
   fidl::Arena fidl_arena;
-  auto builder = fuchsia_wlan_softmac::wire::WlanSoftmacSetChannelRequest::Builder(fidl_arena);
-  builder.channel(new_channel);
+  auto builder =
+      fuchsia_wlan_softmac::wire::WlanSoftmacBridgeSetChannelRequest::Builder(fidl_arena);
+  builder.channel(request->channel());
   auto result = client_.sync().buffer(*std::move(arena))->SetChannel(builder.Build());
   if (!result.ok()) {
-    lerror("%s failed (FIDL error %s)", buf, result.status_string());
-    return result.status();
+    lerror("SetChannel failed (FIDL error %s)", result.status_string());
+    return fit::error(result.status());
   }
   if (result->is_error()) {
-    lerror("%s failed (status %s)", buf, zx_status_get_string(result->error_value()));
-    return result->error_value();
+    lerror("SetChannel failed (status %s)", zx_status_get_string(result->error_value()));
+    return fit::error(result->error_value());
   }
-
-  state_->set_channel(channel);
-
-  verbosef("%s succeeded", buf);
-  return ZX_OK;
+  return fit::success();
 }
 
 zx_status_t Device::SetEthernetStatus(uint32_t status) {

@@ -79,15 +79,6 @@ typedef struct {
    */
   int32_t (*set_ethernet_status)(void *device, uint32_t status);
   /**
-   * Returns the currently set WLAN channel.
-   */
-  wlan_channel_t (*get_wlan_channel)(void *device);
-  /**
-   * Request the PHY to change its channel. If successful, get_wlan_channel will return the
-   * chosen channel.
-   */
-  int32_t (*set_wlan_channel)(void *device, wlan_channel_t channel);
-  /**
    * Set a key on the device.
    * |key| is mutable because the underlying API does not take a const wlan_key_configuration_t.
    */

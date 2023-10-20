@@ -10,8 +10,8 @@ use {
     anyhow::format_err,
     banjo_fuchsia_wlan_common as banjo_common, banjo_fuchsia_wlan_ieee80211 as banjo_ieee80211,
     banjo_fuchsia_wlan_softmac::{self as banjo_wlan_softmac, WlanRxPacket, WlanTxPacket},
-    fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_softmac as fidl_softmac,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_mlme as fidl_mlme,
+    fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_zircon as zx,
     futures::channel::mpsc,
     ieee80211::{MacAddr, MacAddrBytes},
     std::{ffi::c_void, sync::Arc},
@@ -90,8 +90,7 @@ pub trait DeviceOps {
         self.set_ethernet_status(LinkStatus::DOWN)
     }
 
-    fn set_channel(&mut self, channel: banjo_common::WlanChannel) -> Result<(), zx::Status>;
-    fn channel(&mut self) -> banjo_common::WlanChannel;
+    fn set_channel(&mut self, channel: fidl_common::WlanChannel) -> Result<(), zx::Status>;
     fn set_key(&mut self, key: key::KeyConfig) -> Result<(), zx::Status>;
     fn start_passive_scan(&mut self, passive_scan_args: PassiveScanArgs)
         -> Result<u64, zx::Status>;
@@ -237,8 +236,20 @@ impl DeviceOps for Device {
         zx::ok((self.raw_device.set_ethernet_status)(self.raw_device.device, status.0))
     }
 
-    fn set_channel(&mut self, channel: banjo_common::WlanChannel) -> Result<(), zx::Status> {
-        zx::ok((self.raw_device.set_wlan_channel)(self.raw_device.device, channel))
+    fn set_channel(&mut self, channel: fidl_common::WlanChannel) -> Result<(), zx::Status> {
+        self.wlan_softmac_bridge_proxy
+            .set_channel(
+                &fidl_softmac::WlanSoftmacBridgeSetChannelRequest {
+                    channel: Some(channel),
+                    ..Default::default()
+                },
+                zx::Time::INFINITE,
+            )
+            .map_err(|error| {
+                error!("SetChannel failed with FIDL error: {:?}", error);
+                zx::Status::INTERNAL
+            })?
+            .map_err(zx::Status::from_raw)
     }
 
     fn set_key(&mut self, key: key::KeyConfig) -> Result<(), zx::Status> {
@@ -295,10 +306,6 @@ impl DeviceOps for Device {
 
     fn cancel_scan(&mut self, scan_id: u64) -> Result<(), zx::Status> {
         zx::ok((self.raw_device.cancel_scan)(self.raw_device.device, scan_id))
-    }
-
-    fn channel(&mut self) -> banjo_common::WlanChannel {
-        (self.raw_device.get_wlan_channel)(self.raw_device.device)
     }
 
     fn join_bss(&mut self, mut cfg: banjo_common::JoinBssRequest) -> Result<(), zx::Status> {
@@ -598,11 +605,6 @@ pub struct DeviceInterface {
     ) -> i32,
     /// Reports the current status to the ethernet driver.
     set_ethernet_status: extern "C" fn(device: *mut c_void, status: u32) -> i32,
-    /// Returns the currently set WLAN channel.
-    get_wlan_channel: extern "C" fn(device: *mut c_void) -> banjo_common::WlanChannel,
-    /// Request the PHY to change its channel. If successful, get_wlan_channel will return the
-    /// chosen channel.
-    set_wlan_channel: extern "C" fn(device: *mut c_void, channel: banjo_common::WlanChannel) -> i32,
     /// Set a key on the device.
     /// |key| is mutable because the underlying API does not take a const wlan_key_configuration_t.
     set_key: extern "C" fn(
@@ -799,7 +801,7 @@ pub mod test_utils {
             Option<fidl::endpoints::ClientEnd<fidl_sme::UsmeBootstrapMarker>>,
         pub usme_bootstrap_server_end:
             Option<fidl::endpoints::ServerEnd<fidl_sme::UsmeBootstrapMarker>>,
-        pub wlan_channel: banjo_common::WlanChannel,
+        pub wlan_channel: fidl_common::WlanChannel,
         pub keys: Vec<key::KeyConfig>,
         pub next_scan_id: u64,
         pub captured_passive_scan_args: Option<PassiveScanArgs>,
@@ -857,9 +859,9 @@ pub mod test_utils {
                 mlme_request_stream: Some(mlme_request_stream),
                 usme_bootstrap_client_end: Some(usme_bootstrap_client_end),
                 usme_bootstrap_server_end: Some(usme_bootstrap_server_end),
-                wlan_channel: banjo_common::WlanChannel {
+                wlan_channel: fidl_common::WlanChannel {
                     primary: 0,
-                    cbw: banjo_common::ChannelBandwidth::CBW20,
+                    cbw: fidl_common::ChannelBandwidth::Cbw20,
                     secondary80: 0,
                 },
                 next_scan_id: 0,
@@ -963,14 +965,10 @@ pub mod test_utils {
 
         fn set_channel(
             &mut self,
-            wlan_channel: banjo_common::WlanChannel,
+            wlan_channel: fidl_common::WlanChannel,
         ) -> Result<(), zx::Status> {
             self.state.lock().unwrap().wlan_channel = wlan_channel;
             Ok(())
-        }
-
-        fn channel(&mut self) -> banjo_common::WlanChannel {
-            self.state.lock().unwrap().wlan_channel
         }
 
         fn set_key(&mut self, key: key::KeyConfig) -> Result<(), zx::Status> {
@@ -1411,31 +1409,22 @@ mod tests {
     }
 
     #[test]
-    fn get_set_channel() {
+    fn set_channel() {
         let exec = fasync::TestExecutor::new();
         let (mut fake_device, fake_device_state) = FakeDevice::new(&exec);
         fake_device
-            .set_channel(banjo_common::WlanChannel {
+            .set_channel(fidl_common::WlanChannel {
                 primary: 2,
-                cbw: banjo_common::ChannelBandwidth::CBW80P80,
+                cbw: fidl_common::ChannelBandwidth::Cbw80P80,
                 secondary80: 4,
             })
             .expect("set_channel failed?");
         // Check the internal state.
         assert_eq!(
             fake_device_state.lock().unwrap().wlan_channel,
-            banjo_common::WlanChannel {
+            fidl_common::WlanChannel {
                 primary: 2,
-                cbw: banjo_common::ChannelBandwidth::CBW80P80,
-                secondary80: 4
-            }
-        );
-        // Check the external view of the internal state.
-        assert_eq!(
-            fake_device.channel(),
-            banjo_common::WlanChannel {
-                primary: 2,
-                cbw: banjo_common::ChannelBandwidth::CBW80P80,
+                cbw: fidl_common::ChannelBandwidth::Cbw80P80,
                 secondary80: 4
             }
         );

@@ -32,15 +32,11 @@ class DeviceState : public fbl::RefCounted<DeviceState> {
   const common::MacAddr& address() const { return addr_; }
   void set_address(const common::MacAddr& addr) { addr_ = addr; }
 
-  wlan_channel_t channel() const { return chan_; }
-  void set_channel(const wlan_channel_t& channel) { chan_ = channel; }
-
   bool online() { return online_; }
   void set_online(bool online) { online_ = online; }
 
  private:
   common::MacAddr addr_;
-  wlan_channel_t chan_ = {.cbw = CHANNEL_BANDWIDTH_CBW20};
   bool online_ = false;
 };
 
@@ -56,7 +52,8 @@ class DeviceInterface {
   virtual zx_status_t DeliverEthernet(cpp20::span<const uint8_t> eth_frame) = 0;
   virtual zx_status_t QueueTx(std::unique_ptr<Packet> packet, wlan_tx_info_t tx_info) = 0;
 
-  virtual zx_status_t SetChannel(wlan_channel_t channel) = 0;
+  virtual fidl::Response<fuchsia_wlan_softmac::WlanSoftmacBridge::SetChannel> SetChannel(
+      fuchsia_wlan_softmac::wire::WlanSoftmacBridgeSetChannelRequest* request) = 0;
   virtual zx_status_t SetEthernetStatus(uint32_t status) = 0;
   virtual zx_status_t JoinBss(join_bss_request_t* cfg) = 0;
   virtual zx_status_t EnableBeaconing(wlan_softmac_enable_beaconing_request_t* request) = 0;

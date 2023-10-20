@@ -229,7 +229,7 @@ impl<D: DeviceOps> ClientMlme<D> {
 
     pub fn set_main_channel(
         &mut self,
-        channel: banjo_common::WlanChannel,
+        channel: fidl_common::WlanChannel,
     ) -> Result<(), zx::Status> {
         self.channel_state.bind(&mut self.ctx, &mut self.scanner).set_main_channel(channel)
     }
@@ -419,10 +419,7 @@ impl<D: DeviceOps> ClientMlme<D> {
                 )
             })?;
 
-        let channel = ddk_converter::ddk_channel_from_fidl(bss.channel.into())
-            .map_err(|e| Error::Internal(e))?;
-
-        self.set_main_channel(channel)
+        self.set_main_channel(bss.channel.into())
             .map_err(|status| Error::Status(format!("Error setting device channel"), status))?;
 
         let bss_config = banjo_common::JoinBssRequest {
@@ -455,7 +452,7 @@ impl<D: DeviceOps> ClientMlme<D> {
         responder: wlan_sme::responder::Responder<fidl_common::DiscoverySupport>,
     ) -> Result<(), Error> {
         let ddk_support = self.ctx.device.discovery_support();
-        let support = crate::ddk_converter::convert_ddk_discovery_support(ddk_support)?;
+        let support = ddk_converter::convert_ddk_discovery_support(ddk_support)?;
         responder.respond(support);
         Ok(())
     }
@@ -465,7 +462,7 @@ impl<D: DeviceOps> ClientMlme<D> {
         responder: wlan_sme::responder::Responder<fidl_common::MacSublayerSupport>,
     ) -> Result<(), Error> {
         let ddk_support = self.ctx.device.mac_sublayer_support();
-        let support = crate::ddk_converter::convert_ddk_mac_sublayer_support(ddk_support)?;
+        let support = ddk_converter::convert_ddk_mac_sublayer_support(ddk_support)?;
         responder.respond(support);
         Ok(())
     }
@@ -475,7 +472,7 @@ impl<D: DeviceOps> ClientMlme<D> {
         responder: wlan_sme::responder::Responder<fidl_common::SecuritySupport>,
     ) -> Result<(), Error> {
         let ddk_support = self.ctx.device.security_support();
-        let support = crate::ddk_converter::convert_ddk_security_support(ddk_support)?;
+        let support = ddk_converter::convert_ddk_security_support(ddk_support)?;
         responder.respond(support);
         Ok(())
     }
@@ -485,7 +482,7 @@ impl<D: DeviceOps> ClientMlme<D> {
         responder: wlan_sme::responder::Responder<fidl_common::SpectrumManagementSupport>,
     ) -> Result<(), Error> {
         let ddk_support = self.ctx.device.spectrum_management_support();
-        let support = crate::ddk_converter::convert_ddk_spectrum_management_support(ddk_support)?;
+        let support = ddk_converter::convert_ddk_spectrum_management_support(ddk_support)?;
         responder.respond(support);
         Ok(())
     }
@@ -1656,7 +1653,10 @@ mod tests {
                 valid_fields: banjo_fuchsia_wlan_softmac::WlanRxInfoValid(0),
                 phy: banjo_common::WlanPhyType::DSSS,
                 data_rate: 0,
-                channel: mlme.channel_state.get_main_channel().unwrap(),
+                channel: ddk_converter::ddk_channel_from_fidl(
+                    mlme.channel_state.get_main_channel().unwrap(),
+                )
+                .unwrap(),
                 mcs: 0,
                 rssi_dbm: 0,
                 snr_dbh: 0,

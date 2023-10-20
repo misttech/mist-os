@@ -15,7 +15,7 @@ use {
         key::KeyConfig,
     },
     anyhow::format_err,
-    banjo_fuchsia_wlan_common as banjo_common, fidl_fuchsia_wlan_mlme as fidl_mlme,
+    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_mlme as fidl_mlme,
     fuchsia_zircon as zx,
     ieee80211::{MacAddr, MacAddrBytes, Ssid},
     std::collections::{HashMap, VecDeque},
@@ -87,11 +87,11 @@ impl InfraBss {
         };
 
         ctx.device
-            .set_channel(banjo_common::WlanChannel {
+            .set_channel(fidl_common::WlanChannel {
                 primary: channel,
 
                 // TODO(fxbug.dev/40917): Correctly support this.
-                cbw: banjo_common::ChannelBandwidth::CBW20,
+                cbw: fidl_common::ChannelBandwidth::Cbw20,
                 secondary80: 0,
             })
             .map_err(|s| Error::Status(format!("failed to set channel"), s))?;
@@ -671,9 +671,9 @@ mod tests {
 
         assert_eq!(
             fake_device_state.lock().unwrap().wlan_channel,
-            banjo_common::WlanChannel {
+            fidl_common::WlanChannel {
                 primary: 1,
-                cbw: banjo_common::ChannelBandwidth::CBW20,
+                cbw: fidl_common::ChannelBandwidth::Cbw20,
                 secondary80: 0
             }
         );

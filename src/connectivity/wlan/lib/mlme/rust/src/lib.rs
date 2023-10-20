@@ -282,7 +282,8 @@ pub mod test_utils {
     use {
         super::*,
         crate::device::FakeDevice,
-        banjo_fuchsia_wlan_common as banjo_common, fidl_fuchsia_wlan_mlme as fidl_mlme,
+        banjo_fuchsia_wlan_common as banjo_common, fidl_fuchsia_wlan_common as fidl_common,
+        fidl_fuchsia_wlan_mlme as fidl_mlme,
         ieee80211::{MacAddr, MacAddrBytes},
         wlan_common::channel,
     };
@@ -347,14 +348,14 @@ pub mod test_utils {
         pub valid_fields: banjo_wlan_softmac::WlanRxInfoValid,
         pub phy: banjo_common::WlanPhyType,
         pub data_rate: u32,
-        pub channel: banjo_common::WlanChannel,
+        pub channel: fidl_common::WlanChannel,
         pub mcs: u8,
         pub rssi_dbm: i8,
         pub snr_dbh: i16,
     }
 
     impl MockWlanRxInfo {
-        pub(crate) fn with_channel(channel: banjo_common::WlanChannel) -> Self {
+        pub(crate) fn with_channel(channel: fidl_common::WlanChannel) -> Self {
             Self {
                 valid_fields: banjo_wlan_softmac::WlanRxInfoValid(
                     banjo_wlan_softmac::WlanRxInfoValid::CHAN_WIDTH.0
@@ -382,7 +383,7 @@ pub mod test_utils {
                 valid_fields: mock_rx_info.valid_fields,
                 phy: mock_rx_info.phy,
                 data_rate: mock_rx_info.data_rate,
-                channel: mock_rx_info.channel,
+                channel: ddk_converter::ddk_channel_from_fidl(mock_rx_info.channel).unwrap(),
                 mcs: mock_rx_info.mcs,
                 rssi_dbm: mock_rx_info.rssi_dbm,
                 snr_dbh: mock_rx_info.snr_dbh,
