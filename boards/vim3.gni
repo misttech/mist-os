@@ -28,15 +28,13 @@ bazel_product_bundle_board = "vim3"
 
 _common_bootfs_deps = [
   "//boards/kernel_cmdline:vim3",
+  "//src/power/power-manager:vim3_config",
   "//src/power/power-manager/thermal_config:vim3",
 ]
 
-board_bootfs_labels =
-    _common_bootfs_deps + [ "//src/power/power-manager:vim3_config" ]
-board_zedboot_bootfs_labels =
-    _common_bootfs_deps + [ "//src/power/power-manager:base_config" ]
-board_recovery_bootfs_labels =
-    _common_bootfs_deps + [ "//src/power/power-manager:base_config" ]
+board_bootfs_labels = _common_bootfs_deps
+board_zedboot_bootfs_labels = _common_bootfs_deps
+board_recovery_bootfs_labels = _common_bootfs_deps
 
 board_package_labels = [ "//src/graphics/drivers/msd-arm-mali:msd-config" ]
 
