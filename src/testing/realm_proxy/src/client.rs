@@ -4,50 +4,10 @@
 
 use {
     anyhow::{bail, Error, Result},
-    fidl::endpoints::{create_endpoints, create_proxy, ClientEnd, DiscoverableProtocolMarker},
-    fidl_fuchsia_testing_harness::{
-        RealmFactoryMarker, RealmFactoryProxy, RealmProxy_Marker, RealmProxy_Proxy,
-    },
+    fidl::endpoints::{create_endpoints, ClientEnd, DiscoverableProtocolMarker},
+    fidl_fuchsia_testing_harness::{RealmProxy_Marker, RealmProxy_Proxy},
     fuchsia_component::client::connect_to_protocol,
 };
-
-// RealmFactoryClient is a client for fuchsia.testing.harness.RealmFactory.
-//
-// The calling component must have a handle to the RealmFactory protocol in
-// order to use this struct.
-//
-// # Example Usage
-//
-// ```
-// let realm_factory = RealmFactoryClient::connect()?;
-// let realm_proxy = realm_factory.create_realm().await?;
-// ```
-pub struct RealmFactoryClient {
-    inner: RealmFactoryProxy,
-}
-
-impl RealmFactoryClient {
-    pub fn connect() -> Result<Self, Error> {
-        let inner = connect_to_protocol::<RealmFactoryMarker>()?;
-        Ok(Self { inner })
-    }
-
-    pub async fn create_realm(&self) -> Result<RealmProxyClient, Error> {
-        let (realm_proxy, realm_server) = create_proxy::<RealmProxy_Marker>()?;
-        let result = self.inner.create_realm(realm_server).await;
-
-        if result.is_err() {
-            bail!("fidl error {:?}", result.unwrap_err());
-        }
-
-        let result = result.unwrap();
-        if result.is_err() {
-            bail!("operation error {:?}", result.unwrap_err());
-        }
-
-        Ok(RealmProxyClient::from(realm_proxy))
-    }
-}
 
 // RealmProxyClient is a client for fuchsia.testing.harness.RealmProxy.
 //

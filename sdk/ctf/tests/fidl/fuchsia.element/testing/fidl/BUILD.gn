@@ -4,8 +4,9 @@
 
 import("//build/fidl/fidl.gni")
 
-fidl("fuchsia.test") {
-  sdk_category = "internal"
-  sources = [ "realm_proxy.test.fidl" ]
-  public_deps = [ "//zircon/vdso/zx" ]
+fidl("fuchsia.element.test") {
+  testonly = true
+  sources = [ "realm_factory.test.fidl" ]
+  enable_hlcpp = true
+  public_deps = [ "//sdk/fidl/fuchsia.testing.harness" ]
 }

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fuchsia/element/cpp/fidl.h>
+#include <fuchsia/element/test/cpp/fidl.h>
 #include <fuchsia/testing/harness/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
@@ -24,6 +25,9 @@ TEST_F(ElementManagerTest, ProposeElement) {
 
   fuchsia::testing::harness::RealmProxySyncPtr realm;
   EXPECT_EQ(ZX_OK, context->svc()->Connect(realm.NewRequest()));
+
+  // TODO(306488288): Call RealmFactory/CreateRealm instead of expecting
+  // RealmProxy/ConnectToNamedProtocol to create the realm.
 
   // TODO(kjharland): Create a helper macro to shorten this to one line.
   zx::channel local;

@@ -5,44 +5,40 @@
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 
-rustc_binary("main") {
+rustc_binary("bin") {
   testonly = true
   edition = "2021"
-  name = "default_test_realm_proxy"
+  name = "fuchsia-element-test-realm-factory"
   sources = [ "src/main.rs" ]
   deps = [
-    ":config_lib",
+    "../fidl:fuchsia.element.test_rust",
+    "//sdk/fidl/fuchsia.element:fuchsia.element_rust",
     "//sdk/fidl/fuchsia.testing.harness:fuchsia.testing.harness_rust",
-    "//src/lib/fidl_server",
+    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-component-test",
+    "//src/lib/zircon/rust:fuchsia-zircon-status",
     "//src/testing/realm_proxy",
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:tracing",
   ]
 }
 
-fuchsia_component_manifest("manifest") {
+fuchsia_component("realm-factory-component") {
   testonly = true
-  component_name = "default"
-  manifest = "meta/default.cml"
+  component_name = "fuchsia-element-test-realm-factory"
+  manifest = "meta/realm-factory.cml"
+  deps = [ ":bin" ]
 }
 
-fuchsia_structured_config_rust_lib("config_lib") {
+fuchsia_package("realm-factory") {
+  package_name = "fuchsia-element-test-realm-factory"
   testonly = true
-  cm_label = ":manifest"
-}
-
-fuchsia_component("component") {
-  testonly = true
-  cm_label = ":manifest"
-  deps = [ ":main" ]
-}
-
-group("tests") {
-  testonly = true
-  deps = [ "tests" ]
+  deps = [
+    ":realm-factory-component",
+    "session:reference-session",
+  ]
 }

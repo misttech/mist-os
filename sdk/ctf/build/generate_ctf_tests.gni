@@ -172,7 +172,7 @@ template("generate_fuchsia-element-tests") {
     test_component_name = "test-root.cm"
     subpackages = [
       test_info.target_label,
-      "//sdk/ctf/tests/fidl/fuchsia.element:test-realm-proxy",
+      "//sdk/ctf/tests/fidl/fuchsia.element/testing/realm-factory:realm-factory",
     ]
     test_component = "//sdk/ctf/tests/fidl/fuchsia.element:test-root"
   }
