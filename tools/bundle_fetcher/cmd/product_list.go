@@ -11,7 +11,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
+	"path"
 	"strings"
 
 	"go.fuchsia.dev/fuchsia/tools/build"
@@ -55,6 +55,7 @@ const (
 	buildsDirName          = "builds"
 	buildApiDirName        = "build_api"
 	buildInfoJSONName      = "build_info.json"
+	productBundlesDirName  = "product_bundles"
 	productBundlesJSONName = "product_bundles.json"
 	transferJSONName       = "transfer.json"
 )
@@ -129,18 +130,20 @@ func (cmd *productListCmd) executeWithSink(ctx context.Context, sink bundler.Dat
 	buildIDsList := strings.Split(cmd.buildIDs, ",")
 	for _, buildID := range buildIDsList {
 		buildID = strings.TrimSpace(buildID)
-		productBundlePath := filepath.Join(buildsDirName, buildID, buildApiDirName, productBundlesJSONName)
+		productBundlePath := path.Join(buildsDirName, buildID, buildApiDirName, productBundlesJSONName)
 		logger.Debugf(ctx, "Build %s contains the product bundles in path %s", buildID, productBundlePath)
 		productBundles, err := getProductListFromJSON(ctx, sink, productBundlePath)
 		if err != nil {
 			return fmt.Errorf("unable to read product bundle metdadata for build_id %s: %s %w", buildID, productBundlePath, err)
 		}
 
-		buildInfoPath := filepath.Join(buildsDirName, buildID, buildApiDirName, buildInfoJSONName)
+		buildInfoPath := path.Join(buildsDirName, buildID, buildApiDirName, buildInfoJSONName)
 		productName, err := getProductNameFromJSON(ctx, sink, buildInfoPath)
 		if err != nil {
 			return fmt.Errorf("unable to read build info for build_id %s: %s %w", buildID, buildInfoPath, err)
 		}
+
+		transferManifestUrl := getTransferManifestPath(ctx, sink, cmd.gcsBucket, buildsDirName, buildID, productName)
 
 		for _, productBundle := range *productBundles {
 			// Only include "main" product bundle of each build
@@ -151,12 +154,12 @@ func (cmd *productListCmd) executeWithSink(ctx context.Context, sink bundler.Dat
 				// Entries for Label and TransferManifestPath are not needed.
 				Name:                productBundle.Name,
 				ProductVersion:      productBundle.ProductVersion,
-				TransferManifestUrl: fmt.Sprintf("gs://%s/%s/%s/%s", cmd.gcsBucket, buildsDirName, buildID, transferJSONName),
+				TransferManifestUrl: transferManifestUrl,
 			}
 			productList = append(productList, productEntry)
 		}
 	}
-	outputFilePath := filepath.Join(cmd.outDir, cmd.outputProductListFileName)
+	outputFilePath := path.Join(cmd.outDir, cmd.outputProductListFileName)
 	logger.Debugf(ctx, "writing final product list file to: %s", outputFilePath)
 	f, err := os.Create(outputFilePath)
 	if err != nil {
@@ -172,6 +175,19 @@ func (cmd *productListCmd) executeWithSink(ctx context.Context, sink bundler.Dat
 		errs = errors.Join(errs, err)
 	}
 	return errs
+}
+
+// getTransferManifestPath will build the transfer manifest path. This path will
+// be builds/<buildid>/product_bundles/<product_name>/transfer.json if the path
+// exists. If not, the path will fallback to legacy location
+// builds/<buildid>/transfer.json
+func getTransferManifestPath(ctx context.Context, sink bundler.DataSink, gcsBucket, buildsDirName, buildID, productName string) string {
+	transferManifestPath := path.Join(buildsDirName, buildID, productBundlesDirName, productName, transferJSONName)
+	exist, err := sink.DoesPathExist(ctx, transferManifestPath)
+	if !exist || err != nil {
+		transferManifestPath = path.Join(buildsDirName, buildID, transferJSONName)
+	}
+	return fmt.Sprintf("gs://%s/%s", gcsBucket, transferManifestPath)
 }
 
 // Read the product_bundles.json from GCS and returns them as a

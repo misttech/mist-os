@@ -9,7 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
+	"path"
 	"reflect"
 	"testing"
 
@@ -22,7 +22,7 @@ func TestProductListParseFlags(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unable to create temp dir")
 	}
-	tmpfn := filepath.Join(dir, "tmpfile")
+	tmpfn := path.Join(dir, "tmpfile")
 	if err := os.WriteFile(tmpfn, []byte("hello world"), 0644); err != nil {
 		t.Fatalf("unable to create temp file")
 	}
@@ -170,6 +170,9 @@ func TestExecuteWithSink(t *testing.T) {
 			],
 			"version": "fake_version"
 		  }`),
+		"builds/123/product_bundles/fake_product.x64/transfer.json": []byte(`{
+			"content": "fake"
+		  }`),
 		"builds/456/build_api/product_bundles.json": []byte(`[{
 			"label": "//build/images/fuchsia:product_bundle(//build/toolchain/fuchsia:x64)",
 			"path": "obj/build/images/fuchsia/product_bundle",
@@ -197,7 +200,7 @@ func TestExecuteWithSink(t *testing.T) {
 				build.ProductBundle{
 					Name:                "fake_product.x64",
 					ProductVersion:      "fake_version",
-					TransferManifestUrl: "gs://orange/builds/123/transfer.json",
+					TransferManifestUrl: "gs://orange/builds/123/product_bundles/fake_product.x64/transfer.json",
 				},
 			},
 		},
@@ -217,12 +220,12 @@ func TestExecuteWithSink(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unable to create temp dir")
 	}
-	tmpfn := filepath.Join(dir, "tmpfile")
+	tmpfn := path.Join(dir, "tmpfile")
 	if err := os.WriteFile(tmpfn, []byte("hello world"), 0644); err != nil {
 		t.Fatalf("unable to create temp file")
 	}
 	defer os.RemoveAll(dir)
-	temp_pb_output := filepath.Join(dir, productBundlesJSONName)
+	temp_pb_output := path.Join(dir, productBundlesJSONName)
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
