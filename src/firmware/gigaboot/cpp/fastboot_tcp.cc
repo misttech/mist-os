@@ -7,7 +7,6 @@
 
 #include <lib/fit/result.h>
 #include <lib/zx/time.h>
-#include <log.h>
 #include <stdio.h>
 #include <stdlib.h>
 
