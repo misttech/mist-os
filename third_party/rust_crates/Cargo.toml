@@ -153,7 +153,7 @@ nom_locate = "2.0.0"
 num = { version = "0.4.0", features = ["rand"] }
 num-derive = "0.3"
 num-traits = "0.2"
-once_cell = { version = "1.2.0", features = ["parking_lot"] }
+once_cell = { version = "1.17.0", features = ["parking_lot"] }
 p256 = { version = "0.11.1", features = ["pem", "serde"] }
 pkcs8 = "0.9.0"
 parking_lot = "0.9"
@@ -213,9 +213,9 @@ thiserror = "1.0.23"
 tokio-rustls = "0.22.0"
 toml = "0.5"
 toml_edit = "0.2.1"
-tracing = { version = "0.1.29", default-features = false, features = ["std", "attributes"] }
+tracing = { version = "0.1.37", default-features = false, features = ["std", "attributes"] }
 tracing-core = "0.1.31"
-tracing-log = "0.1.2"
+tracing-log = "0.1.3"
 tracing-mutex = { version = "0.3.0", features = ["lockapi", "parkinglot"] }
 typed-builder = "0.10.0"
 unicase = "2.2.0"
@@ -718,7 +718,7 @@ rustflags = [
 # tracing macros also emit log events and binaries with setting up a
 # log::Logger receive tracing events as logs. On Fuchsia we don't need that
 # since all binaries set up a tracing Subscriber.
-[gn.package.tracing."0.1.34".platform."cfg(not(target_os = \"fuchsia\"))"]
+[gn.package.tracing."0.1.37".platform."cfg(not(target_os = \"fuchsia\"))"]
 deps = [ ":log-v0_4_20" ]
 rustflags = [
   "--cfg=feature=\\\"log\\\"",

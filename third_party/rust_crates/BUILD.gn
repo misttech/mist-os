@@ -989,7 +989,7 @@ group("toml_edit") {
 }
 
 group("tracing") {
-  public_deps = [ ":tracing-v0_1_34" ]
+  public_deps = [ ":tracing-v0_1_37" ]
 }
 
 group("tracing-core") {
@@ -997,7 +997,7 @@ group("tracing-core") {
 }
 
 group("tracing-log") {
-  public_deps = [ ":tracing-log-v0_1_2" ]
+  public_deps = [ ":tracing-log-v0_1_3" ]
 }
 
 group("tracing-mutex") {
@@ -5383,7 +5383,7 @@ rust_library("fuse3-v0_6_1") {
   deps += [ ":serde-v1_0_147" ]
   deps += [ ":slab-v0_4_7" ]
   deps += [ ":tokio-v1_20_5" ]
-  deps += [ ":tracing-v0_1_34" ]
+  deps += [ ":tracing-v0_1_37" ]
   deps += [ ":which-v4_0_2" ]
 
   rustenv = []
@@ -6632,7 +6632,7 @@ rust_library("hyper-v0_14_19") {
   deps += [ ":pin-project-lite-v0_2_9" ]
   deps += [ ":tokio-v1_20_5" ]
   deps += [ ":tower-service-v0_3_0" ]
-  deps += [ ":tracing-v0_1_34" ]
+  deps += [ ":tracing-v0_1_37" ]
   deps += [ ":want-v0_3_0" ]
 
   rustenv = []
@@ -7646,7 +7646,7 @@ rust_library("loom-v0_7_0") {
   deps += [ ":cfg-if-v1_0_0" ]
   deps += [ ":generator-v0_7_5" ]
   deps += [ ":scoped-tls-v1_0_1" ]
-  deps += [ ":tracing-v0_1_34" ]
+  deps += [ ":tracing-v0_1_37" ]
   deps += [ ":tracing-subscriber-v0_3_15" ]
   deps += [ "//build/validate:non_production_tag" ]
   rustenv = []
@@ -15450,21 +15450,21 @@ rust_library("tower-service-v0_3_0") {
   applicable_licenses = [ ":tower-service-v0_3_0.license" ]
 }
 
-license("tracing-v0_1_34.license") {
+license("tracing-v0_1_37.license") {
   public_package_name = "tracing"
-  license_files = [ "//third_party/rust_crates/vendor/tracing-0.1.34/LICENSE" ]
+  license_files = [ "//third_party/rust_crates/vendor/tracing-0.1.37/LICENSE" ]
 }
 
-rust_library("tracing-v0_1_34") {
+rust_library("tracing-v0_1_37") {
   crate_name = "tracing"
-  crate_root = "//third_party/rust_crates/vendor/tracing-0.1.34/src/lib.rs"
-  output_name = "tracing-5bf51f3eb026ae27"
+  crate_root = "//third_party/rust_crates/vendor/tracing-0.1.37/src/lib.rs"
+  output_name = "tracing-979babe725aa0770"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
   deps += [ ":cfg-if-v1_0_0" ]
   deps += [ ":pin-project-lite-v0_2_9" ]
-  deps += [ ":tracing-attributes-v0_1_22($host_toolchain)" ]
+  deps += [ ":tracing-attributes-v0_1_26($host_toolchain)" ]
   deps += [ ":tracing-core-v0_1_31" ]
   if (!(current_os == "fuchsia")) {
     deps += [ ":log-v0_4_20" ]
@@ -15475,8 +15475,8 @@ rust_library("tracing-v0_1_34") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=5bf51f3eb026ae27",
-    "-Cextra-filename=-5bf51f3eb026ae27",
+    "-Cmetadata=979babe725aa0770",
+    "-Cextra-filename=-979babe725aa0770",
     "--cfg=feature=\"attributes\"",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"std\"",
@@ -15488,39 +15488,39 @@ rust_library("tracing-v0_1_34") {
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":tracing-v0_1_34.license" ]
+  applicable_licenses = [ ":tracing-v0_1_37.license" ]
 }
 
-license("tracing-attributes-v0_1_22.license") {
+license("tracing-attributes-v0_1_26.license") {
   public_package_name = "tracing_attributes"
   license_files =
-      [ "//third_party/rust_crates/vendor/tracing-attributes-0.1.22/LICENSE" ]
+      [ "//third_party/rust_crates/vendor/tracing-attributes-0.1.26/LICENSE" ]
 }
 
-rust_proc_macro("tracing-attributes-v0_1_22") {
+rust_proc_macro("tracing-attributes-v0_1_26") {
   crate_name = "tracing_attributes"
   crate_root =
-      "//third_party/rust_crates/vendor/tracing-attributes-0.1.22/src/lib.rs"
-  output_name = "tracing_attributes-9a1fd8618adb4c31"
+      "//third_party/rust_crates/vendor/tracing-attributes-0.1.26/src/lib.rs"
+  output_name = "tracing_attributes-840fac0ef0237bd9"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
   deps += [ ":proc-macro2-v1_0_63" ]
   deps += [ ":quote-v1_0_29" ]
-  deps += [ ":syn-v1_0_98" ]
+  deps += [ ":syn-v2_0_32" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=9a1fd8618adb4c31",
-    "-Cextra-filename=-9a1fd8618adb4c31",
+    "-Cmetadata=840fac0ef0237bd9",
+    "-Cextra-filename=-840fac0ef0237bd9",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":tracing-attributes-v0_1_22.license" ]
+  applicable_licenses = [ ":tracing-attributes-v0_1_26.license" ]
 }
 
 license("tracing-core-v0_1_31.license") {
@@ -15558,16 +15558,16 @@ rust_library("tracing-core-v0_1_31") {
   applicable_licenses = [ ":tracing-core-v0_1_31.license" ]
 }
 
-license("tracing-log-v0_1_2.license") {
+license("tracing-log-v0_1_3.license") {
   public_package_name = "tracing_log"
   license_files =
-      [ "//third_party/rust_crates/vendor/tracing-log-0.1.2/LICENSE" ]
+      [ "//third_party/rust_crates/vendor/tracing-log-0.1.3/LICENSE" ]
 }
 
-rust_library("tracing-log-v0_1_2") {
+rust_library("tracing-log-v0_1_3") {
   crate_name = "tracing_log"
-  crate_root = "//third_party/rust_crates/vendor/tracing-log-0.1.2/src/lib.rs"
-  output_name = "tracing_log-ccb7308262919f5b"
+  crate_root = "//third_party/rust_crates/vendor/tracing-log-0.1.3/src/lib.rs"
+  output_name = "tracing_log-419a5251c4973e5b"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -15580,8 +15580,8 @@ rust_library("tracing-log-v0_1_2") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=ccb7308262919f5b",
-    "-Cextra-filename=-ccb7308262919f5b",
+    "-Cmetadata=419a5251c4973e5b",
+    "-Cextra-filename=-419a5251c4973e5b",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"log-tracer\"",
     "--cfg=feature=\"std\"",
@@ -15590,7 +15590,7 @@ rust_library("tracing-log-v0_1_2") {
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":tracing-log-v0_1_2.license" ]
+  applicable_licenses = [ ":tracing-log-v0_1_3.license" ]
 }
 
 license("tracing-mutex-v0_3_0.license") {
@@ -15652,9 +15652,9 @@ rust_library("tracing-subscriber-v0_3_15") {
   deps += [ ":sharded-slab-v0_1_4" ]
   deps += [ ":smallvec-v1_8_0" ]
   deps += [ ":thread_local-v1_1_7" ]
-  deps += [ ":tracing-v0_1_34" ]
+  deps += [ ":tracing-v0_1_37" ]
   deps += [ ":tracing-core-v0_1_31" ]
-  deps += [ ":tracing-log-v0_1_2" ]
+  deps += [ ":tracing-log-v0_1_3" ]
 
   rustenv = []
 
@@ -15743,7 +15743,7 @@ rust_library("trust-dns-proto-v0_22_0") {
   deps += [ ":smallvec-v1_8_0" ]
   deps += [ ":thiserror-v1_0_23" ]
   deps += [ ":tinyvec-v1_3_1" ]
-  deps += [ ":tracing-v0_1_34" ]
+  deps += [ ":tracing-v0_1_37" ]
   deps += [ ":url-v2_3_1" ]
 
   rustenv = []
@@ -15784,7 +15784,7 @@ rust_library("trust-dns-resolver-v0_22_0") {
   deps += [ ":parking_lot-v0_12_0" ]
   deps += [ ":smallvec-v1_8_0" ]
   deps += [ ":thiserror-v1_0_23" ]
-  deps += [ ":tracing-v0_1_34" ]
+  deps += [ ":tracing-v0_1_37" ]
   deps += [ ":trust-dns-proto-v0_22_0" ]
 
   rustenv = [ "CARGO_PKG_VERSION=\"0.22.0\"" ]
