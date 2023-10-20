@@ -351,7 +351,7 @@ std::optional<FieldType> ReadOptionalField(const StructType* s, FieldType Struct
   // Use memcpy because some fields are misaligned and direct access to
   // misaligned fields is undefined behavior.  It should get optimized away.
   FieldType value;
-  memcpy(&value, &(s->*field), sizeof(value));
+  memcpy(&value, reinterpret_cast<const std::byte*>(&(s->*field)), sizeof(value));
   return value;
 }
 
