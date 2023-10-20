@@ -36,7 +36,10 @@ board_bootfs_labels = _common_bootfs_deps
 board_zedboot_bootfs_labels = _common_bootfs_deps
 board_recovery_bootfs_labels = _common_bootfs_deps
 
-board_package_labels = [ "//src/graphics/drivers/msd-arm-mali:msd-config" ]
+board_package_labels = [
+  "//src/hwinfo:default_board_config",
+  "//src/graphics/drivers/msd-arm-mali:msd-config",
+]
 
 # Board file adds vulkan VCD that lets vulkan tests work on systems with Mali
 # GPUs.
