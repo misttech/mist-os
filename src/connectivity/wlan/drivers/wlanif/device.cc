@@ -354,22 +354,21 @@ void Device::AssociateResp(const wlan_fullmac_impl_assoc_resp_request_t* resp) {
   }
 }
 
-void Device::DisassociateReq(const wlan_fullmac_disassoc_req_t* req) {
+void Device::Disassociate(const wlan_fullmac_impl_disassoc_request_t* req) {
   OnLinkStateChanged(false);
-
-  fuchsia_wlan_fullmac::wire::WlanFullmacDisassocReq disassoc_req;
-
-  std::memcpy(disassoc_req.peer_sta_address.data(), req->peer_sta_address, ETH_ALEN);
-  disassoc_req.reason_code =
-      static_cast<fuchsia_wlan_ieee80211::wire::ReasonCode>(req->reason_code);
-
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     lerror("Arena creation failed: %s", arena.status_string());
     return;
   }
 
-  auto result = client_.buffer(*arena)->DisassocReq(disassoc_req);
+  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplDisassocRequest::Builder(*arena);
+  ::fidl::Array<uint8_t, ETH_ALEN> peer_sta_address;
+  std::memcpy(peer_sta_address.data(), req->peer_sta_address, ETH_ALEN);
+  builder.peer_sta_address(peer_sta_address);
+  builder.reason_code(static_cast<fuchsia_wlan_ieee80211::wire::ReasonCode>(req->reason_code));
+
+  auto result = client_.buffer(*arena)->Disassoc(builder.Build());
 
   if (!result.ok()) {
     lerror("DisassocReq failed FIDL error: %s", result.status_string());

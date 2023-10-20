@@ -97,8 +97,8 @@ class WlanInterface : public ddk::Device<WlanInterface, ddk::Unbindable>,
               DeauthCompleter::Sync& completer) override;
   void AssocResp(AssocRespRequestView request, fdf::Arena& arena,
                  AssocRespCompleter::Sync& completer) override;
-  void DisassocReq(DisassocReqRequestView request, fdf::Arena& arena,
-                   DisassocReqCompleter::Sync& completer) override;
+  void Disassoc(DisassocRequestView request, fdf::Arena& arena,
+                DisassocCompleter::Sync& completer) override;
   void ResetReq(ResetReqRequestView request, fdf::Arena& arena,
                 ResetReqCompleter::Sync& completer) override;
   void StartReq(StartReqRequestView request, fdf::Arena& arena,

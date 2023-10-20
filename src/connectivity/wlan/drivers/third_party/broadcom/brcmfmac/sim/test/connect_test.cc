@@ -68,6 +68,7 @@ const uint8_t kIes[] = {
 const common::MacAddr kDefaultBssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc});
 const common::MacAddr kMadeupClient({0xde, 0xad, 0xbe, 0xef, 0x00, 0x01});
 constexpr auto kDefaultApDisassocReason = wlan_ieee80211::ReasonCode::kUnspecifiedReason;
+constexpr auto kDefaultClientDisassocReason = wlan_ieee80211::ReasonCode::kUnspecifiedReason;
 constexpr auto kDefaultApDeauthReason = wlan_ieee80211::ReasonCode::kInvalidAuthentication;
 constexpr auto kDefaultClientDeauthReason = wlan_ieee80211::ReasonCode::kLeavingNetworkDisassoc;
 // Sim firmware returns these values for SNR and RSSI.
@@ -640,10 +641,15 @@ void ConnectTest::StartDeauth() {
 }
 
 void ConnectTest::DisassocClient(const common::MacAddr& mac_addr) {
-  wlan_fullmac_wire::WlanFullmacDisassocReq disassoc_req;
+  auto builder =
+      fuchsia_wlan_fullmac::wire::WlanFullmacImplDisassocRequest::Builder(client_ifc_.test_arena_);
 
-  std::memcpy(disassoc_req.peer_sta_address.data(), mac_addr.byte, ETH_ALEN);
-  auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->DisassocReq(disassoc_req);
+  ::fidl::Array<uint8_t, ETH_ALEN> peer_sta_address;
+  std::memcpy(peer_sta_address.data(), mac_addr.byte, ETH_ALEN);
+  builder.peer_sta_address(peer_sta_address);
+  builder.reason_code(kDefaultClientDisassocReason);
+
+  auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->Disassoc(builder.Build());
   EXPECT_TRUE(result.ok());
 }
 

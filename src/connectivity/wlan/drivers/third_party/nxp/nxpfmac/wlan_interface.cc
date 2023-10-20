@@ -544,11 +544,15 @@ void WlanInterface::AssocResp(AssocRespRequestView request, fdf::Arena& arena,
   completer.buffer(arena).Reply();
 }
 
-void WlanInterface::DisassocReq(DisassocReqRequestView request, fdf::Arena& arena,
-                                DisassocReqCompleter::Sync& completer) {
-  NXPF_ERR("%s called", __func__);
+void WlanInterface::Disassoc(DisassocRequestView request, fdf::Arena& arena,
+                             DisassocCompleter::Sync& completer) {
   std::lock_guard lock(mutex_);
 
+  if (!request->has_reason_code() || !request->has_peer_sta_address()) {
+    NXPF_ERR("Disassoc req does not contain all fields reason: %d sta address: %d",
+             request->has_reason_code(), request->has_peer_sta_address());
+    return;
+  }
   auto on_disconnect = [this](IoctlStatus io_status) __TA_EXCLUDES(mutex_) {
     zx_status_t status = ZX_OK;
     switch (io_status) {
@@ -571,8 +575,8 @@ void WlanInterface::DisassocReq(DisassocReqRequestView request, fdf::Arena& aren
     ConfirmDisassoc(status);
   };
 
-  zx_status_t status = client_connection_.Disconnect(request->req.peer_sta_address.data(),
-                                                     fidl::ToUnderlying(request->req.reason_code),
+  zx_status_t status = client_connection_.Disconnect(request->peer_sta_address().data(),
+                                                     fidl::ToUnderlying(request->reason_code()),
                                                      std::move(on_disconnect));
   if (status != ZX_OK) {
     // The request didn't work, send the notification right away.

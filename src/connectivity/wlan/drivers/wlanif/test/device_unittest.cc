@@ -157,8 +157,12 @@ struct WlanifDeviceTest : public ::zxtest::Test,
     EXPECT_EQ(request->has_association_id(), true);
     completer.buffer(arena).Reply();
   }
-  void DisassocReq(DisassocReqRequestView request, fdf::Arena& arena,
-                   DisassocReqCompleter::Sync& completer) override {}
+  void Disassoc(DisassocRequestView request, fdf::Arena& arena,
+                DisassocCompleter::Sync& completer) override {
+    EXPECT_EQ(request->has_peer_sta_address(), true);
+    EXPECT_EQ(request->has_reason_code(), true);
+    completer.buffer(arena).Reply();
+  }
   void ResetReq(ResetReqRequestView request, fdf::Arena& arena,
                 ResetReqCompleter::Sync& completer) override {}
   void StartReq(StartReqRequestView request, fdf::Arena& arena,
@@ -292,6 +296,14 @@ TEST_F(WlanifDeviceTest, CheckAssocResp) {
                                                .association_id = 42};
   memcpy(resp.peer_sta_address, kPeerStaAddress, sizeof(kPeerStaAddress));
   device_->AssociateResp(&resp);
+}
+
+TEST_F(WlanifDeviceTest, CheckDisassoc) {
+  device_->AddDevice();
+  device_->DdkAsyncRemove();
+  wlan_fullmac_impl_disassoc_request_t req = {.reason_code = REASON_CODE_LEAVING_NETWORK_DISASSOC};
+  memcpy(req.peer_sta_address, kPeerStaAddress, sizeof(kPeerStaAddress));
+  device_->Disassociate(&req);
 }
 
 // Call DeauthConf on WlanFullmacImplIfc and verify that it calls deauth_conf on the given

@@ -375,7 +375,7 @@ impl FullmacMlme {
                 self.device.deauth(convert_deauthenticate_request(&req))
             }
             AssocResponse(resp) => self.device.assoc_resp(convert_associate_response(&resp)),
-            Disassociate(req) => self.device.disassoc_req(convert_disassociate_request(&req)),
+            Disassociate(req) => self.device.disassoc(convert_disassociate_request(&req)),
             Reset(req) => self.device.reset_req(convert_reset_request(&req)),
             Start(req) => self.device.start_req(convert_start_request(&req)),
             Stop(req) => self.device.stop_req(convert_stop_request(&req)),
@@ -1008,7 +1008,7 @@ mod handle_mlme_request_tests {
 
         let mut driver_calls = h.fake_device.captured_driver_calls.iter();
         let driver_req =
-            assert_variant!(driver_calls.next(), Some(DriverCall::DisassocReq { req }) => req);
+            assert_variant!(driver_calls.next(), Some(DriverCall::Disassoc{ req }) => req);
         assert_eq!(driver_req.peer_sta_address, [1u8; 6]);
         assert_eq!(
             driver_req.reason_code,

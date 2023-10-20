@@ -347,8 +347,10 @@ pub struct FullmacDeviceInterface {
         device: *mut c_void,
         resp: *mut banjo_wlan_fullmac::WlanFullmacImplAssocRespRequest,
     ),
-    disassoc_req:
-        extern "C" fn(device: *mut c_void, req: *mut banjo_wlan_fullmac::WlanFullmacDisassocReq),
+    disassoc: extern "C" fn(
+        device: *mut c_void,
+        req: *mut banjo_wlan_fullmac::WlanFullmacImplDisassocRequest,
+    ),
     reset_req:
         extern "C" fn(device: *mut c_void, req: *mut banjo_wlan_fullmac::WlanFullmacResetReq),
     start_req:
@@ -449,10 +451,10 @@ impl FullmacDeviceInterface {
             &mut resp as *mut banjo_wlan_fullmac::WlanFullmacImplAssocRespRequest,
         )
     }
-    pub fn disassoc_req(&self, mut req: banjo_wlan_fullmac::WlanFullmacDisassocReq) {
-        (self.disassoc_req)(
+    pub fn disassoc(&self, mut req: banjo_wlan_fullmac::WlanFullmacImplDisassocRequest) {
+        (self.disassoc)(
             self.device,
-            &mut req as *mut banjo_wlan_fullmac::WlanFullmacDisassocReq,
+            &mut req as *mut banjo_wlan_fullmac::WlanFullmacImplDisassocRequest,
         )
     }
     pub fn reset_req(&self, mut req: banjo_wlan_fullmac::WlanFullmacResetReq) {
@@ -554,8 +556,8 @@ pub mod test_utils {
         AssocResp {
             resp: banjo_wlan_fullmac::WlanFullmacImplAssocRespRequest,
         },
-        DisassocReq {
-            req: banjo_wlan_fullmac::WlanFullmacDisassocReq,
+        Disassoc {
+            req: banjo_wlan_fullmac::WlanFullmacImplDisassocRequest,
         },
         ResetReq {
             req: banjo_wlan_fullmac::WlanFullmacResetReq,
@@ -672,7 +674,7 @@ pub mod test_utils {
                 auth_resp: Self::auth_resp,
                 deauth: Self::deauth,
                 assoc_resp: Self::assoc_resp,
-                disassoc_req: Self::disassoc_req,
+                disassoc: Self::disassoc,
                 reset_req: Self::reset_req,
                 start_req: Self::start_req,
                 stop_req: Self::stop_req,
@@ -827,13 +829,13 @@ pub mod test_utils {
         }
         // Cannot mark fn unsafe because it has to match fn signature in FullDeviceInterface
         #[allow(clippy::not_unsafe_ptr_arg_deref)]
-        pub extern "C" fn disassoc_req(
+        pub extern "C" fn disassoc(
             device: *mut c_void,
-            req: *mut banjo_wlan_fullmac::WlanFullmacDisassocReq,
+            req: *mut banjo_wlan_fullmac::WlanFullmacImplDisassocRequest,
         ) {
             let device = unsafe { &mut *(device as *mut Self) };
             let req = unsafe { *req };
-            device.captured_driver_calls.push(DriverCall::DisassocReq { req });
+            device.captured_driver_calls.push(DriverCall::Disassoc { req });
         }
         // Cannot mark fn unsafe because it has to match fn signature in FullDeviceInterface
         #[allow(clippy::not_unsafe_ptr_arg_deref)]

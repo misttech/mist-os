@@ -3952,13 +3952,18 @@ void brcmf_if_assoc_resp(net_device* ndev,
 }
 
 void brcmf_if_disassoc_req(net_device* ndev,
-                           const fuchsia_wlan_fullmac_wire::WlanFullmacDisassocReq* req) {
-  BRCMF_IFDBG(WLANIF, ndev, "Disassoc request from SME. reason: %" PRIu16, req->reason_code);
+                           const fuchsia_wlan_fullmac_wire::WlanFullmacImplDisassocRequest* req) {
+  if (!req->has_reason_code() || !req->has_peer_sta_address()) {
+    BRCMF_ERR("Disassoc req does not contain all fields reason: %d sta address: %d",
+              req->has_reason_code(), req->has_peer_sta_address());
+    return;
+  }
+  BRCMF_IFDBG(WLANIF, ndev, "Disassoc request from SME. reason: %" PRIu16, req->reason_code());
 #if !defined(NDEBUG)
-  BRCMF_IFDBG(WLANIF, ndev, "  address: " FMT_MAC, FMT_MAC_ARGS(req->peer_sta_address));
+  BRCMF_IFDBG(WLANIF, ndev, "  address: " FMT_MAC, FMT_MAC_ARGS(req->peer_sta_address().data()));
 #endif /* !defined(NDEBUG) */
-  zx_status_t status = brcmf_cfg80211_disconnect(ndev, req->peer_sta_address.data(),
-                                                 fidl::ToUnderlying(req->reason_code), false);
+  zx_status_t status = brcmf_cfg80211_disconnect(ndev, req->peer_sta_address().data(),
+                                                 fidl::ToUnderlying(req->reason_code()), false);
   if (status != ZX_OK) {
     brcmf_notify_disassoc(ndev, status);
   }  // else notification will happen asynchronously

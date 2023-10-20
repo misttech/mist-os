@@ -280,8 +280,8 @@ pub fn convert_associate_response(
 
 pub fn convert_disassociate_request(
     req: &fidl_mlme::DisassociateRequest,
-) -> banjo_wlan_fullmac::WlanFullmacDisassocReq {
-    banjo_wlan_fullmac::WlanFullmacDisassocReq {
+) -> banjo_wlan_fullmac::WlanFullmacImplDisassocRequest {
+    banjo_wlan_fullmac::WlanFullmacImplDisassocRequest {
         peer_sta_address: req.peer_sta_address,
         reason_code: banjo_wlan_ieee80211::ReasonCode(req.reason_code.into_primitive()),
     }
