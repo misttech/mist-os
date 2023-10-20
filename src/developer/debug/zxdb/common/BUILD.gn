@@ -6,20 +6,9 @@
 # the "client" and "symbols", but which doesn't below in the symbol library
 # itself.
 
-import("//build/info/info.gni")
-
-action("version_inc") {
-  script = "generate_version_inc.sh"
-  inputs = [ build_info_files.version ]
-  outputs = [ "$target_gen_dir/version.inc" ]
-  args = rebase_path(inputs + outputs, root_build_dir)
-  deps = [ "//build/info:build_info_files" ]
-}
-
 source_set("version") {
   public = [ "version.h" ]
   sources = [ "version.cc" ]
-  deps = [ ":version_inc" ]
 }
 
 static_library("common") {

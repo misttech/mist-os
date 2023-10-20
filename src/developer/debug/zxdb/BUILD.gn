@@ -19,6 +19,7 @@ if (is_host) {
   executable("zxdb") {
     sources = [ "main.cc" ]
     deps = [
+      "//src/developer/debug/ipc",
       "//src/developer/debug/zxdb/client",
       "//src/developer/debug/zxdb/console",
       "//src/developer/debug/zxdb/debug_adapter",

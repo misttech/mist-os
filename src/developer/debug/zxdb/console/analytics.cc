@@ -4,8 +4,8 @@
 
 #include "src/developer/debug/zxdb/console/analytics.h"
 
+#include "src/developer/debug/ipc/protocol.h"
 #include "src/developer/debug/zxdb/client/setting_schema_definition.h"
-#include "src/developer/debug/zxdb/common/version.h"
 #include "src/lib/analytics/cpp/core_dev_tools/general_parameters.h"
 #include "src/lib/analytics/cpp/core_dev_tools/system_info.h"
 
@@ -31,7 +31,7 @@ void Analytics::IfEnabledSendInvokeEvent(Session* session) {
   if (IsEnabled(session)) {
     GeneralParameters parameters;
     parameters.SetOsVersion(GetOsVersion());
-    parameters.SetApplicationVersion(kBuildVersion);
+    parameters.SetApplicationVersion(std::to_string(debug_ipc::kCurrentProtocolVersion));
 
     // Set an empty application name (an) to make application version (av) usable. Otherwise, the
     // hit will be treated as invalid by Google Analytics.

@@ -8,12 +8,12 @@
 #include <cstdlib>
 #include <memory>
 
+#include "src/developer/debug/ipc/protocol.h"
 #include "src/developer/debug/shared/logging/logging.h"
 #include "src/developer/debug/shared/message_loop_poll.h"
 #include "src/developer/debug/zxdb/client/session.h"
 #include "src/developer/debug/zxdb/client/setting_schema_definition.h"
 #include "src/developer/debug/zxdb/common/curl.h"
-#include "src/developer/debug/zxdb/common/version.h"
 #include "src/developer/debug/zxdb/console/analytics.h"
 #include "src/developer/debug/zxdb/console/command_line_options.h"
 #include "src/developer/debug/zxdb/console/command_sequence.h"
@@ -107,7 +107,7 @@ int ConsoleMain(int argc, const char* argv[]) {
   }
 
   if (options.requested_version) {
-    printf("Version: %s\n", kBuildVersion);
+    printf("Version: %d\n", debug_ipc::kCurrentProtocolVersion);
     return 0;
   }
 

@@ -4,15 +4,10 @@
 
 #include "src/developer/debug/zxdb/common/version.h"
 
-// Generated file with BUILD_VERSION is created at build-time.
-#include "src/developer/debug/zxdb/common/version.inc"
-
-#ifndef BUILD_VERSION
-#error "BUILD_VERSION must be defined"
-#endif
-
 namespace zxdb {
 
-const char* kBuildVersion = BUILD_VERSION;
+// TODO(b/306473682): Remove this when the dependency in //src/lib/analytics/cpp/core_dev_tools is
+// removed.
+const char* kBuildVersion = "1.0";
 
 }  // namespace zxdb
