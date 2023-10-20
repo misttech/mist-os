@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/lib/config"
+	"golang.org/x/exp/slices"
 )
 
 func Merge(input []All) All {
@@ -23,65 +23,80 @@ func Merge(input []All) All {
 	return output
 }
 
-func FilterByBinding(input All, binding string) All {
-	shouldKeep := func(binding string, allowlist *LanguageList, denylist *LanguageList) bool {
-		if denylist != nil && denylist.Includes(binding) {
+func FilterByLanguage(input All, language Language) All {
+	shouldKeep := func(allowlist *[]Language, denylist *[]Language) bool {
+		if denylist != nil && slices.Contains(*denylist, language) {
 			return false
 		}
 		if allowlist != nil {
-			return allowlist.Includes(binding)
+			return slices.Contains(*allowlist, language)
 		}
-		if LanguageList(config.DefaultBindingsDenylist).Includes(binding) {
+		if _, ok := defaultDenyLanguages[language]; ok {
 			return false
 		}
 		return true
 	}
 	var output All
 	for _, def := range input.EncodeSuccess {
-		if shouldKeep(binding, def.BindingsAllowlist, def.BindingsDenylist) {
+		if shouldKeep(def.BindingsAllowlist, def.BindingsDenylist) {
 			output.EncodeSuccess = append(output.EncodeSuccess, def)
 		}
 	}
 	for _, def := range input.DecodeSuccess {
-		if shouldKeep(binding, def.BindingsAllowlist, def.BindingsDenylist) {
+		if shouldKeep(def.BindingsAllowlist, def.BindingsDenylist) {
 			output.DecodeSuccess = append(output.DecodeSuccess, def)
 		}
 	}
 	for _, def := range input.EncodeFailure {
-		if shouldKeep(binding, def.BindingsAllowlist, def.BindingsDenylist) {
+		if shouldKeep(def.BindingsAllowlist, def.BindingsDenylist) {
 			output.EncodeFailure = append(output.EncodeFailure, def)
 		}
 	}
 	for _, def := range input.DecodeFailure {
-		if shouldKeep(binding, def.BindingsAllowlist, def.BindingsDenylist) {
+		if shouldKeep(def.BindingsAllowlist, def.BindingsDenylist) {
 			output.DecodeFailure = append(output.DecodeFailure, def)
 		}
 	}
 	for _, def := range input.Benchmark {
-		if shouldKeep(binding, def.BindingsAllowlist, def.BindingsDenylist) {
+		if shouldKeep(def.BindingsAllowlist, def.BindingsDenylist) {
 			output.Benchmark = append(output.Benchmark, def)
 		}
 	}
 	return output
 }
 
-func ValidateAllType(input All, generatorType string) {
-	forbid := func(fields ...interface{}) {
-		for _, field := range fields {
-			if reflect.ValueOf(field).Len() > 0 {
-				panic("illegal field specified")
+type OutputType string
+
+const (
+	OutputTypeConformance OutputType = "conformance"
+	OutputTypeBenchmark   OutputType = "benchmark"
+	OutputTypeMeasureTape OutputType = "measure_tape"
+)
+
+func ValidateByOutputType(input All, outputType OutputType) error {
+	forbid := func(fields map[string]any) error {
+		for name, field := range fields {
+			value := reflect.ValueOf(field)
+			if value.Len() > 0 {
+				return fmt.Errorf("encountered %s which is invalid for output type %q", name, outputType)
 			}
 		}
+		return nil
 	}
-	switch generatorType {
-	case "conformance":
-		forbid(input.Benchmark)
-	case "benchmark":
-		forbid(input.EncodeSuccess, input.DecodeSuccess, input.EncodeFailure, input.DecodeFailure)
-	case "measure_tape":
-		forbid(input.Benchmark)
+	switch outputType {
+	case OutputTypeConformance, OutputTypeMeasureTape:
+		return forbid(map[string]any{
+			"Benchmark": input.Benchmark,
+		})
+	case OutputTypeBenchmark:
+		return forbid(map[string]any{
+			"EncodeSuccess": input.EncodeSuccess,
+			"DecodeSuccess": input.DecodeSuccess,
+			"EncodeFailure": input.EncodeFailure,
+			"DecodeFailure": input.DecodeFailure,
+		})
 	default:
-		panic(fmt.Sprintf("unexpected generator type: %s", generatorType))
+		panic(fmt.Sprintf("unexpected output type: %s", outputType))
 	}
 }
 

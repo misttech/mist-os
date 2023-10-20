@@ -207,7 +207,7 @@ func decodeFailureCases(gidlDecodeFailures []ir.DecodeFailure, schema mixer.Sche
 }
 
 func wireFormatEnum(wireFormat ir.WireFormat) string {
-	return fmt.Sprintf("fidl::internal::WireFormatVersion::k%s", fidlgen.ToUpperCamelCase(wireFormat.String()))
+	return fmt.Sprintf("fidl::internal::WireFormatVersion::k%s", fidlgen.ToUpperCamelCase(string(wireFormat)))
 }
 
 var supportedWireFormats = []ir.WireFormat{
@@ -225,7 +225,7 @@ func wireFormatSupported(wireFormat ir.WireFormat) bool {
 
 func testCaseName(baseName string, wireFormat ir.WireFormat) string {
 	return fmt.Sprintf("%s_%s", baseName,
-		fidlgen.ToUpperCamelCase(wireFormat.String()))
+		fidlgen.ToUpperCamelCase(string(wireFormat)))
 }
 
 func cppErrorCode(code ir.ErrorCode) string {

@@ -4,11 +4,7 @@
 
 package config
 
-// List of bindings that are on the deny list by default.
-// Add them to an allowlist to enable.
-var DefaultBindingsDenylist = []string{"reference"}
-
-// A config passed to generators.
+// GeneratorConfig is used to configure generators.
 type GeneratorConfig struct {
 	// RustBenchmarksFidlLibrary is the name for the fidl library used in rust benchmarks.
 	RustBenchmarksFidlLibrary string

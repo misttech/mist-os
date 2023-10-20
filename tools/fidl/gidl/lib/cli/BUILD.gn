@@ -1,4 +1,4 @@
-# Copyright 2022 The Fuchsia Authors. All rights reserved.
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
@@ -6,16 +6,12 @@ import("//build/go/go_library.gni")
 
 assert(is_host, "GIDL only runs on host")
 
-go_library("ir") {
+go_library("cli") {
   deps = [
-    "//third_party/golibs:golang.org/x/exp",
     "//tools/fidl/gidl/lib/config",
+    "//tools/fidl/gidl/lib/ir",
+    "//tools/fidl/gidl/lib/parser",
     "//tools/fidl/lib/fidlgen",
   ]
-  sources = [
-    "error.go",
-    "test_case.go",
-    "util.go",
-    "value.go",
-  ]
+  sources = [ "cli.go" ]
 }

@@ -5,8 +5,6 @@
 package ir
 
 import (
-	"strings"
-
 	"go.fuchsia.dev/fuchsia/tools/fidl/lib/fidlgen"
 )
 
@@ -23,8 +21,8 @@ type EncodeSuccess struct {
 	Value             RecordLike
 	Encodings         []HandleDispositionEncoding
 	HandleDefs        []HandleDef
-	BindingsAllowlist *LanguageList
-	BindingsDenylist  *LanguageList
+	BindingsAllowlist *[]Language
+	BindingsDenylist  *[]Language
 	// CheckHandleRights is true for standalone "encode_success" tests providing
 	// "handle_dispositions", but false for bidirectional "success" tests
 	// because they provide only "handles" with no rights information.
@@ -36,8 +34,8 @@ type DecodeSuccess struct {
 	Value             RecordLike
 	Encodings         []Encoding
 	HandleDefs        []HandleDef
-	BindingsAllowlist *LanguageList
-	BindingsDenylist  *LanguageList
+	BindingsAllowlist *[]Language
+	BindingsDenylist  *[]Language
 }
 
 type EncodeFailure struct {
@@ -45,8 +43,8 @@ type EncodeFailure struct {
 	Value             RecordLike
 	HandleDefs        []HandleDef
 	Err               ErrorCode
-	BindingsAllowlist *LanguageList
-	BindingsDenylist  *LanguageList
+	BindingsAllowlist *[]Language
+	BindingsDenylist  *[]Language
 }
 
 type DecodeFailure struct {
@@ -55,29 +53,55 @@ type DecodeFailure struct {
 	Encodings         []Encoding
 	HandleDefs        []HandleDef
 	Err               ErrorCode
-	BindingsAllowlist *LanguageList
-	BindingsDenylist  *LanguageList
+	BindingsAllowlist *[]Language
+	BindingsDenylist  *[]Language
 }
 
 type Benchmark struct {
 	Name                     string
 	Value                    RecordLike
 	HandleDefs               []HandleDef
-	BindingsAllowlist        *LanguageList
-	BindingsDenylist         *LanguageList
+	BindingsAllowlist        *[]Language
+	BindingsDenylist         *[]Language
 	EnableSendEventBenchmark bool
 	EnableEchoCallBenchmark  bool
 }
 
-type LanguageList []string
+type Language string
 
-func (list LanguageList) Includes(targetLanguage string) bool {
-	for _, language := range list {
-		if language == targetLanguage {
-			return true
-		}
+const (
+	LanguageCpp          Language = "cpp"
+	LanguageDart         Language = "dart"
+	LanguageDriverCpp    Language = "driver_cpp"
+	LanguageDriverLlcpp  Language = "driver_llcpp"
+	LanguageDynfidl      Language = "dynfidl"
+	LanguageFuzzerCorpus Language = "fuzzer_corpus"
+	LanguageGo           Language = "go"
+	LanguageHlcpp        Language = "hlcpp"
+	LanguageLlcpp        Language = "llcpp"
+	LanguageReference    Language = "reference"
+	LanguageRust         Language = "rust"
+)
+
+func AllLanguages() []Language {
+	return []Language{
+		LanguageCpp,
+		LanguageDart,
+		LanguageDriverCpp,
+		LanguageDriverLlcpp,
+		LanguageDynfidl,
+		LanguageFuzzerCorpus,
+		LanguageGo,
+		LanguageHlcpp,
+		LanguageLlcpp,
+		LanguageReference,
+		LanguageRust,
 	}
-	return false
+}
+
+// Languages which are denied unless present in bindings_allowlist.
+var defaultDenyLanguages = map[Language]struct{}{
+	LanguageReference: {},
 }
 
 type HandleDef struct {
@@ -143,7 +167,6 @@ func init() {
 	handleRightsByName["io"] = combinedHandleRights("read", "write")
 	handleRightsByName["channel_default"] = combinedHandleRights("transfer", "wait", "inspect", "io", "signal", "signal_peer")
 	handleRightsByName["event_default"] = combinedHandleRights("basic", "signal")
-
 }
 
 func HandleRightsByName(rightsName string) (fidlgen.HandleRights, bool) {
@@ -175,28 +198,6 @@ const (
 	V2WireFormat WireFormat = "v2"
 )
 
-func (wf WireFormat) String() string {
-	return string(wf)
-}
-
-type WireFormatList []WireFormat
-
-func (list WireFormatList) Includes(wireFormat WireFormat) bool {
-	for _, wf := range list {
-		if wf == wireFormat {
-			return true
-		}
-	}
-	return false
-}
-
-func (list WireFormatList) Join(sep string) string {
-	var b strings.Builder
-	for i, wf := range list {
-		if i != 0 {
-			b.WriteString(sep)
-		}
-		b.WriteString(string(wf))
-	}
-	return b.String()
+func AllWireFormats() []WireFormat {
+	return []WireFormat{V2WireFormat}
 }

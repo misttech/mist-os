@@ -7,5 +7,5 @@ import("//build/go/go_library.gni")
 assert(is_host, "GIDL only runs on host")
 
 go_library("config") {
-  sources = [ "defaults.go" ]
+  sources = [ "config.go" ]
 }

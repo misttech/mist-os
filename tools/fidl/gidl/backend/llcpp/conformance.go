@@ -220,9 +220,9 @@ func wireFormatSupported(wireFormat ir.WireFormat) bool {
 }
 
 func wireFormatVersionName(wireFormat ir.WireFormat) string {
-	return fmt.Sprintf("::fidl::internal::WireFormatVersion::k%s", fidlgen.ToUpperCamelCase(wireFormat.String()))
+	return fmt.Sprintf("::fidl::internal::WireFormatVersion::k%s", fidlgen.ToUpperCamelCase(string(wireFormat)))
 }
 
 func testCaseName(baseName string, wireFormat ir.WireFormat) string {
-	return fmt.Sprintf("%s_%s", baseName, fidlgen.ToUpperCamelCase(wireFormat.String()))
+	return fmt.Sprintf("%s_%s", baseName, fidlgen.ToUpperCamelCase(string(wireFormat)))
 }

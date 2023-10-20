@@ -4,9 +4,9 @@
 
 package util
 
-// Tries to find a repeating pattern in the value bytes, e.g: 1, 2, 3, 1, 2, 3, 1.
-// This will not always succeed in finding a repeating pattern when one exists as it
-// searches greedily.
+// FindRepeatingPeriod tries to find a repeating pattern in value.
+// For example, for []uint64{1, 2, 3, 1, 2, 3, 1} it returns 3, true.
+// It searches greedily and will not always succeed in finding a pattern.
 func FindRepeatingPeriod(value []uint64) (int, bool) {
 	if len(value) == 0 {
 		return 0, false

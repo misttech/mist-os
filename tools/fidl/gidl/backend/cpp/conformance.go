@@ -205,7 +205,7 @@ func wireFormatSupported(wireFormat ir.WireFormat) bool {
 }
 
 func wireFormatVersionName(wireFormat ir.WireFormat) string {
-	return fmt.Sprintf("::fidl::internal::WireFormatVersion::k%s", fidlgen.ToUpperCamelCase(wireFormat.String()))
+	return fmt.Sprintf("::fidl::internal::WireFormatVersion::k%s", fidlgen.ToUpperCamelCase(string(wireFormat)))
 }
 
 func conformanceType(gidlTypeString string) string {
@@ -215,7 +215,7 @@ func conformanceType(gidlTypeString string) string {
 
 func testCaseName(baseName string, wireFormat ir.WireFormat) string {
 	return fmt.Sprintf("%s_%s", baseName,
-		fidlgen.ToUpperCamelCase(wireFormat.String()))
+		fidlgen.ToUpperCamelCase(string(wireFormat)))
 }
 
 func buildHandleDef(def ir.HandleDef) string {

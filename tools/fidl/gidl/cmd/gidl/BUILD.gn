@@ -20,10 +20,8 @@ go_library("main") {
     "//tools/fidl/gidl/backend/llcpp",
     "//tools/fidl/gidl/backend/reference",
     "//tools/fidl/gidl/backend/rust",
-    "//tools/fidl/gidl/lib/config",
+    "//tools/fidl/gidl/lib/cli",
     "//tools/fidl/gidl/lib/ir",
-    "//tools/fidl/gidl/lib/parser",
-    "//tools/fidl/lib/fidlgen",
   ]
   sources = [ "main.go" ]
 }

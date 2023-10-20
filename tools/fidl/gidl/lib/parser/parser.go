@@ -14,6 +14,7 @@ import (
 
 	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/lib/ir"
 	"go.fuchsia.dev/fuchsia/tools/fidl/lib/fidlgen"
+	"golang.org/x/exp/slices"
 )
 
 type Parser struct {
@@ -26,9 +27,9 @@ type Parser struct {
 
 type Config struct {
 	// All supported languages, used to validate bindings allowlist/denylist.
-	Languages ir.LanguageList
+	Languages []ir.Language
 	// All supported wire formats, used to validate `bytes` sections.
-	WireFormats ir.WireFormatList
+	WireFormats []ir.WireFormat
 }
 
 type handleInfo struct {
@@ -54,7 +55,7 @@ func mergeHandleInfo(a, b handleInfo) handleInfo {
 
 func NewParser(name string, input io.Reader, config Config) *Parser {
 	var p Parser
-	p.scanner.Position.Filename = name
+	p.scanner.Filename = name
 	p.scanner.Init(input)
 	p.config = config
 	// This is reset in parseSection. We need to set it here too so that tests
@@ -254,8 +255,8 @@ type body struct {
 	Encodings                []encodingData
 	HandleDefs               []ir.HandleDef
 	Err                      ir.ErrorCode
-	BindingsAllowlist        *ir.LanguageList
-	BindingsDenylist         *ir.LanguageList
+	BindingsAllowlist        *[]ir.Language
+	BindingsDenylist         *[]ir.Language
 	EnableSendEventBenchmark bool
 	EnableEchoCallBenchmark  bool
 }
@@ -1125,18 +1126,24 @@ func (p *Parser) parseTextSlice() ([]string, error) {
 	return result, nil
 }
 
-func (p *Parser) parseLanguageList() (ir.LanguageList, error) {
-	var result ir.LanguageList
+func (p *Parser) parseLanguageList() ([]ir.Language, error) {
+	var result []ir.Language
 	err := p.parseCommaSeparated(tLsquare, tRsquare, func() error {
-		if tok, err := p.consumeToken(tText); err != nil {
+		tok, err := p.consumeToken(tText)
+		if err != nil {
 			return err
-		} else if !p.config.Languages.Includes(tok.value) {
-			return p.newParseError(tok, "invalid language '%s'; must be one of: %s",
-				tok.value, strings.Join(p.config.Languages, ", "))
-		} else {
-			result = append(result, tok.value)
-			return nil
 		}
+		language := ir.Language(tok.value)
+		if !slices.Contains(p.config.Languages, language) {
+			var strs []string
+			for _, language := range p.config.Languages {
+				strs = append(strs, string(language))
+			}
+			return p.newParseError(tok, "invalid language '%s'; must be one of: %s",
+				tok.value, strings.Join(strs, ", "))
+		}
+		result = append(result, language)
+		return nil
 	})
 	if err != nil {
 		return nil, err
@@ -1488,9 +1495,13 @@ func (p *Parser) parseWireFormatMapping(handler func([]ir.WireFormat) error) err
 				return err
 			}
 			wf := ir.WireFormat(tok.value)
-			if !p.config.WireFormats.Includes(wf) {
+			if !slices.Contains(p.config.WireFormats, wf) {
+				var strs []string
+				for _, wireFormat := range p.config.WireFormats {
+					strs = append(strs, string(wireFormat))
+				}
 				return p.newParseError(tok, "invalid wire format '%s'; must be one of: %s",
-					tok.value, p.config.WireFormats.Join(", "))
+					tok.value, strings.Join(strs, ", "))
 			}
 			if _, ok := seenWireFormats[wf]; ok {
 				return p.newParseError(tok, "duplicate wire format: %s", tok.value)

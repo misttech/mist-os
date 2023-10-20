@@ -1116,7 +1116,7 @@ func TestParseSucceedsBindingsAllowlistAndDenylist(t *testing.T) {
 		bindings_denylist = [dart],
 	}`
 	p := NewParser("", strings.NewReader(gidl), Config{
-		Languages:   []string{"go", "rust", "dart"},
+		Languages:   []ir.Language{"go", "rust", "dart"},
 		WireFormats: []ir.WireFormat{ir.V2WireFormat},
 	})
 	var all ir.All
@@ -1143,8 +1143,8 @@ func TestParseSucceedsBindingsAllowlistAndDenylist(t *testing.T) {
 						255, 255, 255, 255, 255, 255, 255, 255, // alloc present
 					},
 				}},
-				BindingsAllowlist: &ir.LanguageList{"go", "rust"},
-				BindingsDenylist:  &ir.LanguageList{"dart"},
+				BindingsAllowlist: &[]ir.Language{"go", "rust"},
+				BindingsDenylist:  &[]ir.Language{"dart"},
 				CheckHandleRights: false,
 			},
 		},
@@ -1169,8 +1169,8 @@ func TestParseSucceedsBindingsAllowlistAndDenylist(t *testing.T) {
 						255, 255, 255, 255, 255, 255, 255, 255, // alloc present
 					},
 				}},
-				BindingsAllowlist: &ir.LanguageList{"go", "rust"},
-				BindingsDenylist:  &ir.LanguageList{"dart"},
+				BindingsAllowlist: &[]ir.Language{"go", "rust"},
+				BindingsDenylist:  &[]ir.Language{"dart"},
 			},
 		},
 	}
@@ -1193,7 +1193,7 @@ func TestParseFailsBindingsAllowlist(t *testing.T) {
 		bindings_denylist = [dart],
 	}`
 	p := NewParser("", strings.NewReader(gidl), Config{
-		Languages:   []string{"rust", "dart"},
+		Languages:   []ir.Language{"rust", "dart"},
 		WireFormats: []ir.WireFormat{ir.V2WireFormat},
 	})
 	var all ir.All
@@ -1217,7 +1217,7 @@ func TestParseFailsBindingsDenylist(t *testing.T) {
 		bindings_denylist = [dart],
 	}`
 	p := NewParser("", strings.NewReader(gidl), Config{
-		Languages:   []string{"rust", "go"},
+		Languages:   []ir.Language{"rust", "go"},
 		WireFormats: []ir.WireFormat{ir.V2WireFormat},
 	})
 	var all ir.All

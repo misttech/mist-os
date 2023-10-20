@@ -10,37 +10,14 @@ import (
 	"os"
 	"path/filepath"
 
-	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/lib/config"
 	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/lib/ir"
 	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/lib/parser"
+	"golang.org/x/exp/slices"
 )
 
-var corpusPaths = map[string]string{
-	"conformance": "src/tests/fidl/conformance_suite",
-	"benchmark":   "src/tests/benchmarks/fidl/benchmark_suite",
-}
-
-var corpusLanguages = map[string][]string{
-	"conformance": {
-		"go",
-		"llcpp",
-		"hlcpp",
-		"dart",
-		"rust",
-		"fuzzer_corpus",
-	},
-	"benchmark": {
-		"go",
-		"llcpp",
-		"hlcpp",
-		"rust",
-		"dart",
-		"reference",
-	},
-}
-
-var allWireFormats = []ir.WireFormat{
-	ir.V2WireFormat,
+var corpusPaths = map[ir.OutputType]string{
+	ir.OutputTypeConformance: "src/tests/fidl/conformance_suite",
+	ir.OutputTypeBenchmark:   "src/tests/benchmarks/fidl/benchmark_suite",
 }
 
 type auditFlags struct {
@@ -49,12 +26,9 @@ type auditFlags struct {
 }
 
 func (f auditFlags) valid() bool {
-	if _, ok := corpusPaths[*f.corpusName]; !ok {
+	if _, ok := corpusPaths[ir.OutputType(*f.corpusName)]; !ok {
 		fmt.Printf("unknown corpus name %s\n", *f.corpusName)
 		return false
-	}
-	if _, ok := corpusLanguages[*f.corpusName]; !ok {
-		panic("corpus listed in corpusPaths but not corpusLanguages")
 	}
 	if *f.language == "" {
 		fmt.Printf("-language must be specified\n")
@@ -76,23 +50,25 @@ func main() {
 		os.Exit(1)
 	}
 
+	outputType := ir.OutputType(*flags.corpusName)
+	language := ir.Language(*flags.language)
+
 	fuchsiaDir, ok := os.LookupEnv("FUCHSIA_DIR")
 	if !ok {
 		fmt.Printf("FUCHSIA_DIR environment variable must be set")
 		os.Exit(1)
 	}
 
-	globPattern := fuchsiaDir + "/" + corpusPaths[*flags.corpusName] + "/*.gidl"
+	globPattern := fuchsiaDir + "/" + corpusPaths[outputType] + "/*.gidl"
 	gidlFiles, err := filepath.Glob(globPattern)
 	if err != nil {
 		fmt.Printf("failed to match glob pattern %q when looking for GIDL files\n", globPattern)
 		os.Exit(1)
 	}
 	all := parseAllGidlIr(gidlFiles)
+	filtered := filter(all, language)
 
-	filtered := filter(all, *flags.language)
-
-	fmt.Printf("Disabled tests for %s\n", *flags.language)
+	fmt.Printf("Disabled tests for %s\n", language)
 	fmt.Printf("***************************************\n")
 
 	if len(filtered.EncodeSuccess) > 0 {
@@ -141,9 +117,10 @@ func parseGidlIr(filename string) ir.All {
 	if err != nil {
 		panic(err)
 	}
+	defer f.Close()
 	config := parser.Config{
-		Languages:   corpusLanguages[*flags.corpusName],
-		WireFormats: allWireFormats,
+		Languages:   ir.AllLanguages(),
+		WireFormats: ir.AllWireFormats(),
 	}
 	result, err := parser.NewParser(filename, f, config).Parse()
 	if err != nil {
@@ -160,15 +137,16 @@ func parseAllGidlIr(paths []string) ir.All {
 	return ir.Merge(parsedGidlFiles)
 }
 
-func filter(input ir.All, language string) ir.All {
-	shouldKeep := func(allowlist *ir.LanguageList, denylist *ir.LanguageList) bool {
-		if denylist != nil && denylist.Includes(language) {
+// This is the opposite of ir.FilterByLanguage.
+func filter(input ir.All, language ir.Language) ir.All {
+	shouldKeep := func(allowlist *[]ir.Language, denylist *[]ir.Language) bool {
+		if denylist != nil && slices.Contains(*denylist, language) {
 			return true
 		}
 		if allowlist != nil {
-			return !allowlist.Includes(language)
+			return !slices.Contains(*allowlist, language)
 		}
-		return ir.LanguageList(config.DefaultBindingsDenylist).Includes(language)
+		return false
 	}
 	var output ir.All
 	for _, def := range input.EncodeSuccess {
