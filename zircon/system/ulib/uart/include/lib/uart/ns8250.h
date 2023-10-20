@@ -27,18 +27,20 @@ constexpr uint32_t kMaxBaudRate = 115200;
 
 constexpr uint8_t kFifoDepth16750 = 64;
 constexpr uint8_t kFifoDepth16550A = 16;
+constexpr uint8_t kFifoDepthDw8250Minimum = 16;
 constexpr uint8_t kFifoDepthGeneric = 1;
 
 // Traditional COM1 configuration.
 constexpr zbi_dcfg_simple_pio_t kLegacyConfig{.base = 0x3f8, .irq = 4};
 
 enum class InterruptType : uint8_t {
-  kNone = 0b0001,
-  kRxLineStatus = 0b0110,
-  kRxDataAvailable = 0b0100,
-  kCharTimeout = 0b1100,
-  kTxEmpty = 0b0010,
   kModemStatus = 0b0000,
+  kNone = 0b0001,
+  kTxEmpty = 0b0010,
+  kRxDataAvailable = 0b0100,
+  kRxLineStatus = 0b0110,
+  kDw8250BusyDetect = 0b0111,  // dw8250 only
+  kCharTimeout = 0b1100,
 };
 
 class RxBufferRegister : public hwreg::RegisterBase<RxBufferRegister, uint8_t> {
@@ -75,6 +77,7 @@ class InterruptIdentRegister : public hwreg::RegisterBase<InterruptIdentRegister
 class FifoControlRegister : public hwreg::RegisterBase<FifoControlRegister, uint8_t> {
  public:
   DEF_FIELD(7, 6, receiver_trigger);
+  // Note: dw8250 has a TX IRQ trigger field in 5...4.
   DEF_BIT(5, extended_fifo_enable);
   DEF_RSVDZ_BIT(4);
   DEF_BIT(3, dma_mode);
@@ -164,6 +167,19 @@ class DivisorLatchUpperRegister : public hwreg::RegisterBase<DivisorLatchUpperRe
   static auto Get() { return hwreg::RegisterAddr<DivisorLatchUpperRegister>(1); }
 };
 
+// dW8250 only
+class UartStatusRegister : public hwreg::RegisterBase<UartStatusRegister, uint32_t> {
+ public:
+  DEF_RSVDZ_FIELD(31, 5);
+  // Bits 4...1 are optionally configured in the dw8250 core.
+  DEF_BIT(4, receive_fifo_full);
+  DEF_BIT(3, receive_fifo_not_empty);
+  DEF_BIT(2, transmit_fifo_empty);
+  DEF_BIT(1, transmit_fifo_not_full);
+  DEF_BIT(0, uart_busy);
+  static auto Get() { return hwreg::RegisterAddr<UartStatusRegister>(0x7c / 4); }
+};
+
 // Determines the flavor of the MMIO access to be performed by the |BasicIoProvider| for MMIO
 // access. When this is 0, an unscaled access is perfomed, that is byte aligned 1 byte regions.
 //
@@ -209,6 +225,9 @@ class DriverImpl : public DriverBase<DriverImpl<KdrvExtra, KdrvConfig>, KdrvExtr
 #endif
     if constexpr (KdrvExtra == ZBI_KERNEL_DRIVER_I8250_MMIO8_UART) {
       return "ns8250-8bit";
+    }
+    if constexpr (KdrvExtra == ZBI_KERNEL_DRIVER_DW8250_UART) {
+      return "dw8250";
     }
     return "ns8250";
   }
@@ -282,12 +301,17 @@ class DriverImpl : public DriverBase<DriverImpl<KdrvExtra, KdrvConfig>, KdrvExtr
     lcr.set_divisor_latch_access(true).WriteTo(io.io());
 
     auto fcr = FifoControlRegister::Get().FromValue(0);
-    fcr.set_fifo_enable(true)
-        .set_rx_fifo_reset(true)
-        .set_tx_fifo_reset(true)
-        .set_receiver_trigger(FifoControlRegister::kMaxTriggerLevel)
-        .set_extended_fifo_enable(true)
-        .WriteTo(io.io());
+    fcr.set_fifo_enable(true).set_rx_fifo_reset(true).set_tx_fifo_reset(true).set_receiver_trigger(
+        FifoControlRegister::kMaxTriggerLevel);
+
+    if constexpr (KdrvExtra == ZBI_KERNEL_DRIVER_DW8250_UART) {
+      // dw8250 does not have an extended fifo enable bit in bit 5, but
+      // instead has a TX fifo threshold field in bits 4-5. Leave these
+      // as zero by not setting it here.
+    } else {
+      fcr.set_extended_fifo_enable(true);
+    }
+    fcr.WriteTo(io.io());
 
     // Commit divisor by clearing the latch.
     lcr.set_divisor_latch_access(false).WriteTo(io.io());
@@ -299,8 +323,14 @@ class DriverImpl : public DriverBase<DriverImpl<KdrvExtra, KdrvConfig>, KdrvExtr
     // Figure out the FIFO depth.
     auto iir = InterruptIdentRegister::Get().ReadFrom(io.io());
     if (iir.fifos_enabled()) {
-      // This is a 16750 or a 16550A.
-      fifo_depth_ = iir.extended_fifo_enabled() ? kFifoDepth16750 : kFifoDepth16550A;
+      if constexpr (KdrvExtra == ZBI_KERNEL_DRIVER_DW8250_UART) {
+        // The fifo depth isn't easily known on the dw8250, but it
+        // must be at least 16 bytes if the fifo is enabled.
+        fifo_depth_ = kFifoDepthDw8250Minimum;
+      } else {
+        // This is a 16750 or a 16550A.
+        fifo_depth_ = iir.extended_fifo_enabled() ? kFifoDepth16750 : kFifoDepth16550A;
+      }
     } else {
       fifo_depth_ = kFifoDepthGeneric;
     }
@@ -443,6 +473,17 @@ class DriverImpl : public DriverBase<DriverImpl<KdrvExtra, KdrvConfig>, KdrvExtr
         case InterruptType::kRxLineStatus:
           LineStatusRegister::Get().ReadFrom(io.io());
           break;
+
+        case InterruptType::kDw8250BusyDetect:
+          if constexpr (KdrvExtra == ZBI_KERNEL_DRIVER_DW8250_UART) {
+            // dw8250 only. From the manual:
+            // "Master has tried to write to the Line Control Register while the DW_apb_uart is busy
+            // (USR[0] is set to one)." Read the UART Status Register to clear it.
+            UartStatusRegister::Get().ReadFrom(io.io());
+            break;
+          }
+          // If not a dw8250...
+          [[fallthrough]];
 
         default:
           ZX_PANIC("unhandled interrupt ID %#x", static_cast<unsigned int>(id));

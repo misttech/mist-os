@@ -529,6 +529,10 @@ void Uart16550::HandleInterrupts() {
         }
         break;
       }
+      case InterruptType::kDw8250BusyDetect: {
+        // dw8250 only, supposed to read from a USR register which is not present in 16550
+        break;
+      }
     }
   }
 }
