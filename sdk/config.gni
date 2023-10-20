@@ -15,5 +15,5 @@ declare_args() {
   # Set to true to build IDK atoms for all supported API levels that are
   # listed in fuchsia_platform.supported_fuchsia_api_levels. This impacts
   # the behavior of the generate_final_idk() template.
-  sdk_with_all_supported_api_levels = false
+  sdk_with_all_supported_api_levels = true
 }
