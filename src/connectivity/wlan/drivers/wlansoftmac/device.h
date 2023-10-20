@@ -67,7 +67,9 @@ class Device : public DeviceInterface,
 
   // ddk device methods
   void EthUnbind();
-  void EthRelease();
+  // Releases the corresponding Ethernet device and `delete`s the `Device`
+  // (`this`).
+  void EthReleaseAndDeleteThis();
   void DdkInit(ddk::InitTxn txn);
   void DdkUnbind(ddk::UnbindTxn txn);
   void DdkRelease();
@@ -104,7 +106,7 @@ class Device : public DeviceInterface,
                               uint64_t* out_scan_id) final;
   zx_status_t CancelScan(uint64_t scan_id) final;
   fbl::RefPtr<DeviceState> GetState() final;
-  const wlan_softmac_query_response_t& GetWlanSoftmacQueryResponse() const final;
+  const fuchsia_wlan_softmac::WlanSoftmacQueryResponse& GetWlanSoftmacQueryResponse() const final;
   const discovery_support_t& GetDiscoverySupport() const final;
   const mac_sublayer_support_t& GetMacSublayerSupport() const final;
   const security_support_t& GetSecuritySupport() const final;
@@ -137,8 +139,6 @@ class Device : public DeviceInterface,
     return packet;
   }
 
-  // Waits the main loop to finish and frees itself afterwards.
-  void DestroySelf();
   // Informs the message loop to shut down. Calling this function more than once
   // has no effect.
   void ShutdownMainLoop();
@@ -155,7 +155,13 @@ class Device : public DeviceInterface,
   std::unique_ptr<wlan_softmac_ifc_protocol_ops_t> wlan_softmac_ifc_protocol_ops_;
   std::unique_ptr<wlan_softmac_ifc_protocol_t> wlan_softmac_ifc_protocol_;
 
-  wlan_softmac_query_response_t wlan_softmac_query_response_ = {};
+  // TODO(fxbug.dev/135358): Do not cache feature support in the generic driver.
+  //                         This will cause more queries into the vendor
+  //                         driver, but these calls seem inexpensive, these
+  //                         calls have not been profiled, and this behavior is
+  //                         not documented in the SDK. Moreover, caching
+  //                         introduces opportunities for subtle bugs.
+  fuchsia_wlan_softmac::WlanSoftmacQueryResponse wlan_softmac_query_response_ = {};
   discovery_support_t discovery_support_ = {};
   mac_sublayer_support_t mac_sublayer_support_ = {};
   security_support_t security_support_ = {};

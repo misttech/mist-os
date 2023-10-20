@@ -12,7 +12,6 @@ rustc_library("wlansoftmac-rust") {
   edition = "2021"
 
   deps = [
-    "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_banjo_rust",
     "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_rust",
     "//sdk/fidl/fuchsia.wlan.sme:fuchsia.wlan.sme_rust",
     "//sdk/fidl/fuchsia.wlan.softmac:fuchsia.wlan.softmac_rust",
@@ -33,6 +32,7 @@ rustc_library("wlansoftmac-rust") {
   sources = [ "src/lib.rs" ]
 
   test_deps = [
+    "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_banjo_rust",
     "//src/connectivity/wlan/lib/common/rust:wlan-common",
     "//third_party/rust_crates:pin-utils",
   ]

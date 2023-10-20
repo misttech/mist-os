@@ -74,7 +74,7 @@ static constexpr inline Device* DEV(void* ctx) { return static_cast<Device*>(ctx
 static zx_protocol_device_t eth_device_ops = {
     .version = DEVICE_OPS_VERSION,
     .unbind = [](void* ctx) { DEV(ctx)->EthUnbind(); },
-    .release = [](void* ctx) { DEV(ctx)->EthRelease(); },
+    .release = [](void* ctx) { DEV(ctx)->EthReleaseAndDeleteThis(); },
 };
 
 static ethernet_impl_protocol_ops_t ethernet_impl_ops = {
@@ -120,6 +120,12 @@ class WlanSoftmacBridgeImpl : public fidl::WireServer<fuchsia_wlan_softmac::Wlan
   void NotifyAssociationComplete(NotifyAssociationCompleteRequestView request,
                                  NotifyAssociationCompleteCompleter::Sync& completer) override {
     completer.Reply(device_->NotifyAssociationComplete(request));
+  }
+
+  void Query(QueryCompleter::Sync& completer) override {
+    auto arena = fidl::Arena();
+    auto response = fidl::ToWire(arena, device_->GetWlanSoftmacQueryResponse());
+    completer.ReplySuccess(response);
   }
 
   static void BindSelfManagedServer(
@@ -190,9 +196,6 @@ zx_status_t WlanSoftmacHandle::Init() {
                               const wlan_softmac_start_active_scan_request_t* active_scan_args,
                               uint64_t* out_scan_id) -> zx_status_t {
         return DEVICE(device)->StartActiveScan(active_scan_args, out_scan_id);
-      },
-      .get_wlan_softmac_query_response = [](void* device) -> wlan_softmac_query_response_t {
-        return DEVICE(device)->GetWlanSoftmacQueryResponse();
       },
       .get_discovery_support = [](void* device) -> discovery_support_t {
         return DEVICE(device)->GetDiscoverySupport();
@@ -319,28 +322,18 @@ zx_status_t Device::Bind() __TA_NO_THREAD_SAFETY_ANALYSIS {
     return ZX_ERR_INTERNAL;
   }
 
-  auto result = client_.sync().buffer(*std::move(arena))->Query();
-  if (!result.ok()) {
-    lerror("Failed getting query result (FIDL error %s)", result.status_string());
-    return result.status();
+  auto query_result = client_.sync().buffer(*std::move(arena))->Query();
+  if (!query_result.ok()) {
+    lerror("Failed getting query result (FIDL error %s)", query_result.status_string());
+    return query_result.status();
   }
-  if (result->is_error()) {
-    lerror("Failed getting query result (status %s)", zx_status_get_string(result->error_value()));
-    return result->error_value();
+  if (query_result->is_error()) {
+    lerror("Failed getting query result (status %s)",
+           zx_status_get_string(query_result->error_value()));
+    return query_result->error_value();
   }
-
-  // Allocating memory for lists since banjo converts FIDL vectors into a pointer and count without
-  // memory to back it.
-  wlan_softmac_query_response_.supported_phys_list = static_cast<wlan_phy_type_t*>(
-      calloc(fuchsia_wlan_common_MAX_SUPPORTED_PHY_TYPES,
-             sizeof(*wlan_softmac_query_response_.supported_phys_list)));
-  wlan_softmac_query_response_.band_caps_list = static_cast<wlan_softmac_band_capability_t*>(
-      calloc(fuchsia_wlan_common_MAX_BANDS, sizeof(*wlan_softmac_query_response_.band_caps_list)));
-  if ((status = ConvertWlanSoftmacQueryResponse(*result->value(), &wlan_softmac_query_response_)) !=
-      ZX_OK) {
-    lerror("WlanSoftmacQueryResponse conversion failed (%s)", zx_status_get_string(status));
-    return status;
-  }
+  // Take ownership of the data in the wire representation's arena.
+  wlan_softmac_query_response_ = fidl::ToNatural(*(query_result->value()));
 
   auto discovery_arena = fdf::Arena::Create(0, 0);
   if (discovery_arena.is_error()) {
@@ -412,7 +405,7 @@ zx_status_t Device::Bind() __TA_NO_THREAD_SAFETY_ANALYSIS {
 
   /* End of data type conversion. */
 
-  state_->set_address(common::MacAddr(wlan_softmac_query_response_.sta_addr));
+  state_->set_address(common::MacAddr(wlan_softmac_query_response_.sta_addr().value()));
 
   softmac_handle_.reset(new WlanSoftmacHandle(this));
   status = softmac_handle_->Init();
@@ -460,14 +453,6 @@ std::unique_ptr<Packet> Device::PreparePacket(const void* data, size_t length, P
   return packet;
 }
 
-// Our Device instance is leaked deliberately during the driver bind procedure, so we
-// manually take ownership here.
-void Device::DestroySelf() {
-  free(wlan_softmac_query_response_.supported_phys_list);
-  free(wlan_softmac_query_response_.band_caps_list);
-  delete this;
-}
-
 void Device::ShutdownMainLoop() {
   if (main_loop_dead_) {
     lerror("ShutdownMainLoop called while main loop was not running");
@@ -485,12 +470,12 @@ void Device::EthUnbind() {
   client_dispatcher_.ShutdownAsync();
 }
 
-void Device::EthRelease() {
+void Device::EthReleaseAndDeleteThis() {
   ldebug(0, NULL, "Entering.");
   // The lifetime of this device is managed by the parent ethernet device, but we don't
   // have a mechanism to make this explicit. EthUnbind is already called at this point,
   // so it's safe to clean up our memory usage.
-  DestroySelf();
+  delete this;
 }
 
 void Device::DdkInit(ddk::InitTxn txn) {}
@@ -511,7 +496,7 @@ zx_status_t Device::EthernetImplQuery(uint32_t options, ethernet_info_t* info) {
     return ZX_ERR_INVALID_ARGS;
 
   memset(info, 0, sizeof(*info));
-  memcpy(info->mac, wlan_softmac_query_response_.sta_addr, ETH_MAC_SIZE);
+  std::memcpy(info->mac, wlan_softmac_query_response_.sta_addr().value().begin(), ETH_MAC_SIZE);
   info->features = ETHERNET_FEATURE_WLAN;
 
   auto arena = fdf::Arena::Create(0, 0);
@@ -633,7 +618,7 @@ zx_status_t Device::Start(const rust_wlan_softmac_ifc_protocol_copy_t* ifc,
   // called in the handler functions of FIDL server end.
   wlan_softmac_ifc_protocol_ops_.reset(new wlan_softmac_ifc_protocol_ops_t{
       .recv = ifc->ops->recv,
-      .report_tx_result = ifc->ops->report_tx_result,
+      .report_tx_result = ifc->ops->report_tx_status,
       .notify_scan_complete = ifc->ops->scan_complete,
   });
 
@@ -970,7 +955,7 @@ zx_status_t Device::ClearAssociation(const uint8_t peer_addr[fuchsia_wlan_ieee80
 
   auto builder = fuchsia_wlan_softmac::wire::WlanSoftmacClearAssociationRequest::Builder(*arena);
   fidl::Array<uint8_t, fuchsia_wlan_ieee80211::wire::kMacAddrLen> fidl_peer_addr;
-  memcpy(fidl_peer_addr.begin(), peer_addr, fuchsia_wlan_ieee80211::wire::kMacAddrLen);
+  std::memcpy(fidl_peer_addr.begin(), peer_addr, fuchsia_wlan_ieee80211::wire::kMacAddrLen);
   builder.peer_addr(fidl_peer_addr);
 
   auto result = client_.sync().buffer(*std::move(arena))->ClearAssociation(builder.Build());
@@ -1041,7 +1026,7 @@ void Device::NotifyScanComplete(NotifyScanCompleteRequestView request, fdf::Aren
 
 fbl::RefPtr<DeviceState> Device::GetState() { return state_; }
 
-const wlan_softmac_query_response_t& Device::GetWlanSoftmacQueryResponse() const {
+const fuchsia_wlan_softmac::WlanSoftmacQueryResponse& Device::GetWlanSoftmacQueryResponse() const {
   return wlan_softmac_query_response_;
 }
 

@@ -24,11 +24,6 @@ namespace wlan_ieee80211 = fuchsia_wlan_ieee80211::wire;
 
 // Fake metadata -- general
 static constexpr uint8_t kFakeMacAddr[wlan_ieee80211::kMacAddrLen] = {6, 5, 4, 3, 2, 2};
-static constexpr uint8_t kFakeRate = 206;
-static constexpr uint8_t kFakeHtCapBytes[wlan_ieee80211::kHtCapLen] = {
-    3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5, 8, 9, 7, 9, 3, 2, 3, 8, 4, 6, 2, 6, 4, 3, 3};
-static constexpr uint8_t kFakeVhtCapBytes[wlan_ieee80211::kVhtCapLen] = {8, 3, 2, 7, 9, 5,
-                                                                         0, 2, 8, 8, 4, 1};
 static constexpr uint8_t kFakeOui[wlan_ieee80211::kOuiLen] = {9, 7, 1};
 static constexpr uint8_t kFakeChannel = 15;
 static constexpr zx_duration_t kFakeDuration = 4567;
@@ -49,10 +44,6 @@ static constexpr int16_t kRandomPopulaterInt16 = -24679;
 // Fake metadata -- FIDL
 static constexpr wlan_common::WlanMacRole kFakeFidlMacRole = wlan_common::WlanMacRole::kAp;
 static constexpr wlan_common::WlanPhyType kFakeFidlPhyType = wlan_common::WlanPhyType::kErp;
-static constexpr wlan_common::WlanSoftmacHardwareCapabilityBit
-    kFakeFidlSoftmacHardwareCapabilityBit =
-        wlan_common::WlanSoftmacHardwareCapabilityBit::kSpectrumMgmt;
-static constexpr wlan_common::WlanBand kFakeFidlBand = wlan_common::WlanBand::kFiveGhz;
 static constexpr wlan_common::ChannelBandwidth kFakeFidlChannelBandwidth =
     wlan_common::ChannelBandwidth::kCbw160;
 static constexpr wlan_softmac::WlanProtection kFakeFidlProtection =
@@ -73,9 +64,6 @@ static constexpr wlan_softmac::WlanRxInfoValid kFakeRxValid =
 // Fake metadata -- banjo
 static constexpr uint32_t kFakeBanjoMacRole = WLAN_MAC_ROLE_AP;
 static constexpr uint32_t kFakeBanjoPhyType = WLAN_PHY_TYPE_ERP;
-static constexpr uint32_t kFakeBanjoSoftmacHardwareCapabilityBit =
-    WLAN_SOFTMAC_HARDWARE_CAPABILITY_BIT_SPECTRUM_MGMT;
-static constexpr uint8_t kFakeBanjoBand = WLAN_BAND_FIVE_GHZ;
 static constexpr uint32_t kFakeBanjoChannelBandwidth = CHANNEL_BANDWIDTH_CBW160;
 static constexpr uint8_t kFakeBanjoProtection = WLAN_PROTECTION_RX_TX;
 static constexpr uint8_t kFakeBanjoKeyType = WLAN_KEY_TYPE_GROUP;
@@ -89,97 +77,6 @@ static constexpr uint8_t kFakeBanjoMacImplementationType = MAC_IMPLEMENTATION_TY
 class ConvertTest : public LogTest {};
 
 // FIDL to banjo types tests.
-TEST_F(ConvertTest, ToBanjoWlanSoftmacQueryResponse) {
-  log::Instance::Init(0);
-  // Build WlanSoftmacQueryResponse
-  fidl::Arena arena;
-  auto builder = wlan_softmac::WlanSoftmacQueryResponse::Builder(arena);
-
-  fidl::Array<uint8_t, wlan_ieee80211::kMacAddrLen> sta_addr;
-  memcpy(sta_addr.begin(), kFakeMacAddr, sta_addr.size());
-  builder.sta_addr(sta_addr);
-
-  builder.mac_role(kFakeFidlMacRole);
-
-  std::vector<wlan_common::WlanPhyType> phy_vec;
-  for (size_t i = 0; i < wlan_common::kMaxSupportedPhyTypes; i++) {
-    phy_vec.push_back(kFakeFidlPhyType);
-  }
-  builder.supported_phys(fidl::VectorView<wlan_common::WlanPhyType>(arena, phy_vec));
-
-  builder.hardware_capability((uint32_t)kFakeFidlSoftmacHardwareCapabilityBit);
-
-  fuchsia_wlan_softmac::wire::WlanSoftmacBandCapability band_caps_buffer[wlan_common::kMaxBands];
-  for (size_t i = 0; i < wlan_common::kMaxBands; i++) {
-    auto band_cap_builder = wlan_softmac::WlanSoftmacBandCapability::Builder(arena);
-
-    band_cap_builder.band(kFakeFidlBand);
-
-    fidl::Array<uint8_t, wlan_ieee80211::kMaxSupportedBasicRates> basic_rate_array;
-    for (size_t j = 0; j < wlan_ieee80211::kMaxSupportedBasicRates; j++) {
-      basic_rate_array[j] = kFakeRate;
-    }
-    band_cap_builder.basic_rate_list(basic_rate_array);
-    band_cap_builder.basic_rate_count(wlan_ieee80211::kMaxSupportedBasicRates);
-
-    wlan_ieee80211::HtCapabilities ht_caps;
-    memcpy(ht_caps.bytes.begin(), kFakeHtCapBytes, wlan_ieee80211::kHtCapLen);
-    band_cap_builder.ht_caps(ht_caps);
-    band_cap_builder.ht_supported(kPopulaterBool);
-
-    wlan_ieee80211::VhtCapabilities vht_caps;
-    memcpy(vht_caps.bytes.begin(), kFakeVhtCapBytes, wlan_ieee80211::kVhtCapLen);
-    band_cap_builder.vht_caps(vht_caps);
-    band_cap_builder.vht_supported(kPopulaterBool);
-
-    fidl::Array<uint8_t, wlan_ieee80211::kMaxUniqueChannelNumbers> operating_channel_array;
-    for (size_t j = 0; j < wlan_ieee80211::kMaxUniqueChannelNumbers; j++) {
-      operating_channel_array[j] = kFakeChannel;
-    }
-    band_cap_builder.operating_channel_list(operating_channel_array);
-    band_cap_builder.operating_channel_count(wlan_ieee80211::kMaxUniqueChannelNumbers);
-    band_caps_buffer[i] = band_cap_builder.Build();
-  }
-
-  builder.band_caps(
-      fidl::VectorView<wlan_softmac::WlanSoftmacBandCapability>(arena, band_caps_buffer));
-  auto in = builder.Build();
-
-  // Conduct conversion
-  wlan_phy_type_t supported_phys[wlan_common::kMaxSupportedPhyTypes];
-  wlan_softmac_band_capability_t band_caps[wlan_common::kMaxBands];
-  wlan_softmac_query_response_t out;
-  out.supported_phys_list = supported_phys;
-  out.band_caps_list = band_caps;
-  ConvertWlanSoftmacQueryResponse(in, &out);
-
-  // Verify outputs
-  EXPECT_EQ(0, memcmp(out.sta_addr, kFakeMacAddr, wlan_ieee80211::kMacAddrLen));
-  EXPECT_EQ(kFakeBanjoMacRole, out.mac_role);
-  EXPECT_EQ(wlan_common::kMaxSupportedPhyTypes, out.supported_phys_count);
-  for (size_t i = 0; i < out.supported_phys_count; i++) {
-    EXPECT_EQ(kFakeBanjoPhyType, out.supported_phys_list[i]);
-  }
-  EXPECT_EQ(kFakeBanjoSoftmacHardwareCapabilityBit, out.hardware_capability);
-
-  EXPECT_EQ(wlan_common::kMaxBands, out.band_caps_count);
-  for (size_t i = 0; i < wlan_common::kMaxBands; i++) {
-    auto band_cap = out.band_caps_list[i];
-    EXPECT_EQ(kFakeBanjoBand, band_cap.band);
-    EXPECT_EQ(wlan_ieee80211::kMaxSupportedBasicRates, band_cap.basic_rate_count);
-    for (size_t j = 0; j < wlan_ieee80211::kMaxSupportedBasicRates; j++) {
-      EXPECT_EQ(kFakeRate, band_cap.basic_rate_list[j]);
-    }
-    EXPECT_EQ(kPopulaterBool, band_cap.ht_supported);
-    EXPECT_EQ(0, memcmp(band_cap.ht_caps.bytes, kFakeHtCapBytes, wlan_ieee80211::kHtCapLen));
-    EXPECT_EQ(kPopulaterBool, band_cap.vht_supported);
-    EXPECT_EQ(0, memcmp(band_cap.vht_caps.bytes, kFakeVhtCapBytes, wlan_ieee80211::kVhtCapLen));
-    EXPECT_EQ(wlan_ieee80211::kMaxUniqueChannelNumbers, band_cap.operating_channel_count);
-    for (size_t j = 0; j < wlan_ieee80211::kMaxUniqueChannelNumbers; j++) {
-      EXPECT_EQ(kFakeChannel, band_cap.operating_channel_list[j]);
-    }
-  }
-}
 
 TEST_F(ConvertTest, ToBanjoDiscoverySuppport) {
   log::Instance::Init(0);

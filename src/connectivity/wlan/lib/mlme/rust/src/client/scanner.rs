@@ -6,13 +6,15 @@ use {
     crate::{
         client::{convert_beacon::construct_bss_description, Context},
         ddk_converter::cssid_from_ssid_unchecked,
-        device::{ActiveScanArgs, DeviceOps, PassiveScanArgs, QueryResponse},
+        device::{ActiveScanArgs, DeviceOps, PassiveScanArgs},
         error::Error,
+        WlanSoftmacBandCapabilityExt as _,
     },
     anyhow::format_err,
-    banjo_fuchsia_wlan_common as banjo_common, banjo_fuchsia_wlan_ieee80211 as banjo_ieee80211,
-    banjo_fuchsia_wlan_softmac as banjo_wlan_softmac, fidl_fuchsia_wlan_internal as fidl_internal,
-    fidl_fuchsia_wlan_mlme as fidl_mlme, fuchsia_zircon as zx,
+    banjo_fuchsia_wlan_ieee80211 as banjo_ieee80211,
+    banjo_fuchsia_wlan_softmac as banjo_wlan_softmac, fidl_fuchsia_wlan_common as fidl_common,
+    fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_mlme as fidl_mlme,
+    fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_zircon as zx,
     ieee80211::{Bssid, MacAddr},
     thiserror::Error,
     tracing::{error, warn},
@@ -125,7 +127,7 @@ impl OngoingScan {
 }
 
 struct ChannelList {
-    band: banjo_common::WlanBand,
+    band: fidl_common::WlanBand,
     channels: Vec<u8>,
 }
 
@@ -176,7 +178,11 @@ impl<'a, D: DeviceOps> BoundScanner<'a, D> {
             return Err(Error::ScanError(ScanError::MaxChannelTimeLtMin));
         }
 
-        let query_response = self.ctx.device.wlan_softmac_query_response();
+        let query_response = self
+            .ctx
+            .device
+            .wlan_softmac_query_response()
+            .map_err(|status| Error::Status(String::from("Failed to query device."), status))?;
         let discovery_support = self.ctx.device.discovery_support();
 
         // The else of this branch is an "MLME scan" which is implemented by calling SetChannel
@@ -221,7 +227,7 @@ impl<'a, D: DeviceOps> BoundScanner<'a, D> {
     fn start_active_scan(
         &mut self,
         req: fidl_mlme::ScanRequest,
-        query_response: &QueryResponse,
+        query_response: &fidl_softmac::WlanSoftmacQueryResponse,
     ) -> Result<OngoingScan, Error> {
         let ssids_list = req
             .ssid_list
@@ -401,28 +407,38 @@ impl<'a, D: DeviceOps> BoundScanner<'a, D> {
 }
 
 fn band_cap_for_band(
-    query_response: &QueryResponse,
-    band: banjo_common::WlanBand,
-) -> Option<&banjo_wlan_softmac::WlanSoftmacBandCapability> {
-    query_response.band_caps().iter().filter(|b| b.band == band).next()
+    query_response: &fidl_softmac::WlanSoftmacQueryResponse,
+    band: fidl_common::WlanBand,
+) -> Option<&fidl_softmac::WlanSoftmacBandCapability> {
+    query_response
+        .band_caps
+        .as_ref()
+        .map(|band_caps| band_caps.iter())
+        .into_iter()
+        .flatten()
+        .filter(|band_cap| band_cap.band == Some(band))
+        .next()
 }
 
 // TODO(fxbug.dev/91036): Zero should not mark a null rate.
 fn supported_rates_for_band(
-    query_response: &QueryResponse,
-    band: banjo_common::WlanBand,
+    query_response: &fidl_softmac::WlanSoftmacQueryResponse,
+    band: fidl_common::WlanBand,
 ) -> Result<Vec<u8>, Error> {
-    let band_cap = band_cap_for_band(&query_response, band)
-        .ok_or(format_err!("no band found for band {:?}", band))?;
-    Ok(band_cap.basic_rate_list[..band_cap.basic_rate_count as usize].to_vec())
+    let rates = band_cap_for_band(&query_response, band)
+        .ok_or(format_err!("no capabilities found for band {:?}", band))?
+        .basic_rates()
+        .map(From::from)
+        .ok_or_else(|| format_err!("no basic rates found for band capabilities"))?;
+    Ok(rates)
 }
 
 // TODO(fxbug.dev/91038): This is not correct. Channel numbers do not imply band.
-fn band_from_channel_number(channel_number: u8) -> banjo_common::WlanBand {
+fn band_from_channel_number(channel_number: u8) -> fidl_common::WlanBand {
     if channel_number > 14 {
-        banjo_common::WlanBand::FIVE_GHZ
+        fidl_common::WlanBand::FiveGhz
     } else {
-        banjo_common::WlanBand::TWO_GHZ
+        fidl_common::WlanBand::TwoGhz
     }
 }
 
@@ -434,20 +450,20 @@ fn active_scan_args_series(
     max_probes_per_channel: u8,
     ssids_list: Vec<banjo_ieee80211::CSsid>,
     mac_header: Vec<u8>,
-    query_response: &QueryResponse,
+    query_response: &fidl_softmac::WlanSoftmacQueryResponse,
     channel_list: Vec<u8>,
 ) -> Result<Vec<ActiveScanArgs>, Error> {
     // TODO(fxbug.dev/91038): The fuchsia.wlan.mlme/MLME API assumes channels numbers imply bands
-    // and so partitioning channels must be done internally.
+    //                        and so partitioning channels must be done internally.
     let channel_lists: [ChannelList; 2] = channel_list.into_iter().fold(
         [
-            ChannelList { band: banjo_common::WlanBand::FIVE_GHZ, channels: vec![] },
-            ChannelList { band: banjo_common::WlanBand::TWO_GHZ, channels: vec![] },
+            ChannelList { band: fidl_common::WlanBand::FiveGhz, channels: vec![] },
+            ChannelList { band: fidl_common::WlanBand::TwoGhz, channels: vec![] },
         ],
-        |mut channel_lists, c| {
-            for cl in &mut channel_lists {
-                if band_from_channel_number(c) == cl.band {
-                    cl.channels.push(c);
+        |mut channel_lists, channel| {
+            for channel_list in &mut channel_lists {
+                if band_from_channel_number(channel) == channel_list.band {
+                    channel_list.channels.push(channel);
                 }
             }
             channel_lists
@@ -455,9 +471,9 @@ fn active_scan_args_series(
     );
 
     let mut active_scan_args_series = vec![];
-    for cl in channel_lists {
-        if !cl.channels.is_empty() {
-            let supported_rates = supported_rates_for_band(query_response, cl.band)?;
+    for channel_list in channel_lists {
+        if !channel_list.channels.is_empty() {
+            let supported_rates = supported_rates_for_band(query_response, channel_list.band)?;
             active_scan_args_series.push(ActiveScanArgs {
                 min_channel_time,
                 max_channel_time,
@@ -466,9 +482,8 @@ fn active_scan_args_series(
                 max_probes_per_channel,
                 ssids_list: ssids_list.clone(),
                 mac_header: mac_header.clone(),
-                channels: cl.channels,
-                // Exclude the SSID IE because the device driver will generate
-                // using ssids_list.
+                channels: channel_list.channels,
+                // Exclude the SSID IE because the device driver will generate using ssids_list.
                 ies: write_frame_with_dynamic_buf!(vec![], {
                     ies: {
                         supported_rates: supported_rates,

@@ -15,7 +15,8 @@ use {
         akm_algorithm,
         block_ack::BlockAckTx,
         buffer::{BufferProvider, OutBuf},
-        device::DeviceOps,
+        ddk_converter,
+        device::{self, DeviceOps},
         disconnect::LocallyInitiated,
         error::Error,
         logger,
@@ -123,11 +124,11 @@ impl<D: DeviceOps> crate::MlmeImpl for ClientMlme<D> {
         device: Self::Device,
         buf_provider: BufferProvider,
         timer: Timer<TimedEvent>,
-    ) -> Self {
-        Self::new(config, device, buf_provider, timer)
+    ) -> Result<Self, anyhow::Error> {
+        Self::new(config, device, buf_provider, timer).map_err(From::from)
     }
     fn handle_mlme_request(&mut self, req: wlan_sme::MlmeRequest) -> Result<(), anyhow::Error> {
-        Self::handle_mlme_req(self, req).map_err(|e| e.into())
+        Self::handle_mlme_req(self, req).map_err(From::from)
     }
     fn handle_mac_frame_rx(
         &mut self,
@@ -137,7 +138,7 @@ impl<D: DeviceOps> crate::MlmeImpl for ClientMlme<D> {
         Self::on_mac_frame_rx(self, bytes, rx_info)
     }
     fn handle_eth_frame_tx(&mut self, bytes: &[u8]) -> Result<(), anyhow::Error> {
-        Self::on_eth_frame_tx(self, bytes).map_err(|e| e.into())
+        Self::on_eth_frame_tx(self, bytes).map_err(From::from)
     }
     fn handle_scan_complete(&mut self, status: zx::Status, scan_id: u64) {
         Self::handle_scan_complete(self, status, scan_id);
@@ -208,11 +209,11 @@ impl<D: DeviceOps> ClientMlme<D> {
         mut device: D,
         buf_provider: BufferProvider,
         timer: Timer<TimedEvent>,
-    ) -> Self {
+    ) -> Result<Self, Error> {
         logger::init();
 
-        let iface_mac = device.wlan_softmac_query_response().sta_addr();
-        Self {
+        let iface_mac = device::try_query_iface_mac(&mut device)?;
+        Ok(Self {
             sta: None,
             ctx: Context {
                 _config: config,
@@ -221,9 +222,9 @@ impl<D: DeviceOps> ClientMlme<D> {
                 timer,
                 seq_mgr: SequenceManager::new(),
             },
-            scanner: Scanner::new(iface_mac),
+            scanner: Scanner::new(iface_mac.into()),
             channel_state: Default::default(),
-        }
+        })
     }
 
     pub fn set_main_channel(
@@ -381,7 +382,7 @@ impl<D: DeviceOps> ClientMlme<D> {
             Ok((req, client_capabilities)) => {
                 self.sta.replace(Client::new(
                     req,
-                    self.ctx.device.wlan_softmac_query_response().sta_addr(),
+                    device::try_query_iface_mac(&mut self.ctx.device)?,
                     client_capabilities,
                 ));
                 if let Some(sta) = &mut self.sta {
@@ -408,7 +409,8 @@ impl<D: DeviceOps> ClientMlme<D> {
     }
 
     fn join_device(&mut self, bss: &BssDescription) -> Result<ClientCapabilities, Error> {
-        let info = self.ctx.device.wlan_softmac_query_response().try_into()?;
+        let info =
+            ddk_converter::mlme_device_info_from_softmac(device::try_query(&mut self.ctx.device)?)?;
         let join_caps = derive_join_capabilities(Channel::from(bss.channel), bss.rates(), &info)
             .map_err(|e| {
                 Error::Status(
@@ -417,7 +419,7 @@ impl<D: DeviceOps> ClientMlme<D> {
                 )
             })?;
 
-        let channel = crate::ddk_converter::ddk_channel_from_fidl(bss.channel.into())
+        let channel = ddk_converter::ddk_channel_from_fidl(bss.channel.into())
             .map_err(|e| Error::Internal(e))?;
 
         self.set_main_channel(channel)
@@ -442,7 +444,8 @@ impl<D: DeviceOps> ClientMlme<D> {
         &mut self,
         responder: wlan_sme::responder::Responder<fidl_mlme::DeviceInfo>,
     ) -> Result<(), Error> {
-        let info = self.ctx.device.wlan_softmac_query_response().try_into()?;
+        let info =
+            ddk_converter::mlme_device_info_from_softmac(device::try_query(&mut self.ctx.device)?)?;
         responder.respond(info);
         Ok(())
     }
@@ -1259,10 +1262,7 @@ mod tests {
             block_ack::{self, BlockAckState, Closed, ADDBA_REQ_FRAME_LEN, ADDBA_RESP_FRAME_LEN},
             buffer::FakeBufferProvider,
             client::{lost_bss::LostBssCounter, test_utils::drain_timeouts},
-            device::{
-                test_utils::fake_fidl_band_caps, FakeDevice, FakeDeviceConfig, FakeDeviceState,
-                LinkStatus,
-            },
+            device::{test_utils, FakeDevice, FakeDeviceConfig, FakeDeviceState, LinkStatus},
             test_utils::{fake_wlan_channel, MockWlanRxInfo},
         },
         fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_internal as fidl_internal,
@@ -1335,8 +1335,8 @@ mod tests {
             let (fake_device, fake_device_state) = FakeDevice::new_with_config(
                 executor,
                 FakeDeviceConfig {
-                    mac_role: banjo_common::WlanMacRole::CLIENT,
-                    sta_addr: (*IFACE_MAC).into(),
+                    mac_role: fidl_common::WlanMacRole::Client,
+                    sta_addr: Bssid::from(*IFACE_MAC),
                     ..Default::default()
                 },
             );
@@ -1349,7 +1349,8 @@ mod tests {
                 self.fake_device.clone(),
                 FakeBufferProvider::new(),
                 self.timer.take().unwrap(),
-            );
+            )
+            .expect("Failed to create client MLME.");
             mlme.set_main_channel(fake_wlan_channel().into()).expect("unable to set main channel");
             mlme
         }
@@ -2636,7 +2637,7 @@ mod tests {
             fidl_mlme::DeviceInfo {
                 sta_addr: IFACE_MAC.to_array(),
                 role: fidl_common::WlanMacRole::Client,
-                bands: fake_fidl_band_caps(),
+                bands: test_utils::fake_mlme_band_caps(),
                 softmac_hardware_capability: 0,
                 qos_capable: false,
             }

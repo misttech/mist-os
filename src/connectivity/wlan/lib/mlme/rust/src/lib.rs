@@ -30,18 +30,62 @@ use {
     anyhow::{bail, Error},
     banjo_fuchsia_wlan_common as banjo_common, banjo_fuchsia_wlan_softmac as banjo_wlan_softmac,
     device::DeviceOps,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_zircon as zx,
     futures::{
         channel::{mpsc, oneshot},
         select, StreamExt,
     },
     parking_lot::Mutex,
-    std::sync::Arc,
-    std::time::Duration,
+    std::{cmp, sync::Arc, time::Duration},
     tracing::{error, info},
     wlan_sme,
 };
 pub use {ddk_converter::*, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, wlan_common as common};
+
+// TODO(fxbug.dev/135356): This trait is migratory and reads both newer and deprecated fields that
+//                         encode the same information (and prioritizes the newer fields). Remove
+//                         this trait and directly access fields once the deprecated fields for
+//                         basic rates and operating channels are removed from the SoftMAC FIDL
+//                         APIs and the platform version for WLAN is bumped to or beyond the
+//                         removal.
+// These extension methods cannot enforce that client code reads fields in a manner that is
+// backwards-compatible, but in exchange churn is greatly reduced (compared to the introduction of
+// additional types, for example).
+/// SDK backwards-compatiblity extensions for band capabilitites.
+trait WlanSoftmacBandCapabilityExt {
+    /// Gets supported basic rates with SDK backwards-compatibility.
+    fn basic_rates(&self) -> Option<&[u8]>;
+
+    /// Gets supported operating channels with SDK backwards-compatibility.
+    fn operating_channels(&self) -> Option<&[u8]>;
+}
+
+impl WlanSoftmacBandCapabilityExt for fidl_softmac::WlanSoftmacBandCapability {
+    fn basic_rates(&self) -> Option<&[u8]> {
+        match (&self.basic_rates, (&self.basic_rate_count, &self.basic_rate_list)) {
+            // Prefer the newer `basic_rates` field in the SoftMAC FIDL API.
+            (Some(basic_rates), _) => Some(basic_rates),
+            (None, (Some(n), Some(basic_rates))) => {
+                Some(&basic_rates[..cmp::min(usize::from(*n), basic_rates.len())])
+            }
+            _ => None,
+        }
+    }
+
+    fn operating_channels(&self) -> Option<&[u8]> {
+        match (
+            &self.operating_channels,
+            (&self.operating_channel_count, &self.operating_channel_list),
+        ) {
+            // Prefer the newer `operating_channels` field in the SoftMAC FIDL API.
+            (Some(operating_channels), _) => Some(operating_channels),
+            (None, (Some(n), Some(operating_channels))) => {
+                Some(&operating_channels[..cmp::min(usize::from(*n), operating_channels.len())])
+            }
+            _ => None,
+        }
+    }
+}
 
 pub trait MlmeImpl {
     type Config: Send;
@@ -52,7 +96,9 @@ pub trait MlmeImpl {
         device: Self::Device,
         buf_provider: buffer::BufferProvider,
         scheduler: common::timer::Timer<Self::TimerEvent>,
-    ) -> Self;
+    ) -> Result<Self, Error>
+    where
+        Self: Sized;
     fn handle_mlme_request(&mut self, msg: wlan_sme::MlmeRequest) -> Result<(), Error>;
     fn handle_mac_frame_rx(&mut self, bytes: &[u8], rx_info: banjo_wlan_softmac::WlanRxInfo);
     fn handle_eth_frame_tx(&mut self, bytes: &[u8]) -> Result<(), Error>;
@@ -142,7 +188,9 @@ pub async fn mlme_main_loop<T: MlmeImpl>(
     };
     let (timer, time_stream) = common::timer::create_timer();
 
-    let mlme_impl = T::new(config, device, buf_provider, timer);
+    // Failure to create MLME likely indicates a problem querying the device. There is no recovery
+    // path if this occurs.
+    let mlme_impl = T::new(config, device, buf_provider, timer).expect("Failed to create MLME.");
 
     // Startup is complete. Signal the main thread to proceed.
     // Failure to unwrap indicates a critical failure in the driver init thread.
@@ -253,8 +301,8 @@ pub mod test_utils {
             device: Self::Device,
             _buf_provider: buffer::BufferProvider,
             _scheduler: wlan_common::timer::Timer<Self::TimerEvent>,
-        ) -> Self {
-            Self { device }
+        ) -> Result<Self, Error> {
+            Ok(Self { device })
         }
 
         fn handle_mlme_request(

@@ -7,48 +7,129 @@ using fuchsia.wlan.common;
 using fuchsia.wlan.ieee80211 as ieee80211;
 using zx;
 
+/// Describes the capabilities of a SoftMAC on a particular band.
 @available(added=15)
 type WlanSoftmacBandCapability = table {
-    /// The values of this struct apply to the band indicated in this field.
-    /// This field is required.
+    /// Band to which the capabilities described by this datagram apply.
     1: band fuchsia.wlan.common.WlanBand;
 
-    /// Basic rates supported in units of 500 kbit/s (as defined in
-    /// IEEE Std 802.11-2016, 9.4.2.3), e.g., 0x02 represents 1 Mbps.
-    /// The value returned by this type indicates all the non-HT rates
-    /// the device supports transmitting and receiving.
+    /// Count of supported basic rates. If the `basic_rate_list` field is
+    /// present, then this field **must** also be present and **must** be
+    /// consistent with the `basic_rate_list` field.
     ///
-    /// The basic_rate_count field is required, and if its value is > 0, then
-    /// the basic_rate_list field is required as well.
+    /// # Deprecation
+    ///
+    /// This field has been replaced by `basic_rates`. Servers (i.e., drivers)
+    /// that target platform versions wherein `basic_rate_count` is deprecated
+    /// should omit it and write basic rates to the `basic_rates` field instead.
+    /// Clients attempt to read `basic_rates` before `basic_rate_count`.
+    // TODO(fxbug.dev/135356): Remove this deprecated field.
+    @available(deprecated=15)
     2: basic_rate_count uint8;
+    /// Set of supported basic rates in units of 500 Kbit/s (as defined in IEEE
+    /// Std 802.11-2016, 9.4.2.3), e.g., 0x02 represents 1 Mbps. This set
+    /// represents all of the non-HT rates that the device supports for both
+    /// transmitting and receiving.
+    ///
+    /// The count of rates present in this field **must** be consistent with the
+    /// `basic_rate_count` field when present.
+    ///
+    /// # Deprecation
+    ///
+    /// This field has been replaced by `basic_rates`. Servers (i.e., drivers)
+    /// that target platform versions wherein `basic_rate_list` is deprecated
+    /// should omit it and write basic rates to the `basic_rates` field instead.
+    /// Clients attempt to read `basic_rates` before `basic_rate_list`.
+    // TODO(fxbug.dev/135356): Remove this deprecated field.
+    @available(deprecated=15)
     3: basic_rate_list array<uint8, ieee80211.MAX_SUPPORTED_BASIC_RATES>;
 
-    /// If the device supports HT PHY mode, then ht_supported must be set to 'true' and ht_caps
-    /// must be populated. If this mode is not supported, then ht_supported must be set to 'false'
-    /// and ht_caps must be left unpopulated.
+    /// Determines if the `ht_caps` fields should be read by clients. If the
+    /// device supports HT PHY mode, then `ht_supported` **must** be true and
+    /// the `ht_caps` field **must** be set and provide data that describes HT
+    /// capabilities. Any other configuration of these fields means that the
+    /// device does **not** support HT PHY mode. See `HtCapabilities`.
+    ///
+    /// # Deprecation
+    ///
+    /// This field determines whether or not the `ht_caps` field is read by
+    /// clients, but is not strictly necessary as table fields like `ht_caps`
+    /// may be set or unset. Servers (i.e., drivers) that target platform
+    /// versions wherein `ht_supported` is deprecated should always set the
+    /// field to true and set `ht_caps` if the device supports HT PHY mode or
+    /// unset `ht_caps` if the device does not.
+    // TODO(fxbug.dev/135357): Remove this deprecated field.
+    @available(deprecated=15)
     4: ht_supported bool;
     5: ht_caps ieee80211.HtCapabilities;
 
-    /// If the device supports VHT PHY mode, then vht_supported must be set to 'true' and vht_caps
-    /// must be populated. If this mode is not supported, then vht_supported must be set to 'false'
-    /// and vht_caps must be left unpopulated.
+    /// Determines if the `vht_caps` fields should be read by clients. If the
+    /// device supports VHT PHY mode, then `vht_supported` **must** be true and
+    /// the `vht_caps` field **must** be set and provide data that describes VHT
+    /// capabilities. Any other configuration of these fields means that the
+    /// device does **not** support VHT PHY mode. See `VhtCapabilities`.
+    ///
+    /// # Deprecation
+    ///
+    /// This field determines whether or not the `vht_caps` field is read by
+    /// clients, but is not strictly necessary as table fields like `vht_caps`
+    /// may be set or unset. Servers (i.e., drivers) that target platform
+    /// versions wherein `vht_supported` is deprecated should always set the
+    /// field to true and set `vht_caps` if the device supports VHT PHY mode or
+    /// unset `vht_caps` if the device does not.
+    // TODO(fxbug.dev/135357): Remove this deprecated field.
+    @available(deprecated=15)
     6: vht_supported bool;
     7: vht_caps ieee80211.VhtCapabilities;
 
-    /// A list of operating channels considered valid by hardware, in the context of
-    /// regulatory information known to the device driver, at the time of its
-    /// construction during iface creation. In this context, an operating channel
-    /// means a channel which APs may transmit Beacon frames on in the current
-    /// regulatory domain.
+    /// Count of operating channels. If the `operating_channel_list` field is
+    /// present, then this field **must** also be present and **must** be
+    /// consistent with the `operating_channel_list` field.
     ///
-    /// This list should be used to determine efficacy of subsequent requests to
-    /// scan a subset of channels using the iface, or to determine which operating
-    /// channel to use when starting an AP.
+    /// # Deprecation
     ///
-    /// The operating_channel_count field is required, and if its value is > 0, then
-    /// the operating_channel_list field is required as well.
+    /// This field has been replaced by `operating_channels`. Servers (i.e.,
+    /// drivers) that target platform versions wherein `operating_channel_count`
+    /// is deprecated should omit it and write operating channels to the
+    /// `operating_channels` field instead. Clients attempt to read
+    /// `operating_channels` before `operating_channel_count`.
+    // TODO(fxbug.dev/135356): Remove this deprecated field.
+    @available(deprecated=15)
     8: operating_channel_count uint16;
+    /// Set of valid operating channels per regulatory information as determined
+    /// by the device driver during iface creation. An operating channel refers
+    /// to a channel on which APs may transmit beacon frames.
+    ///
+    /// The count of channels present in this field **must** be consistent with
+    /// the `operating_channel_count` field when present.
+    ///
+    /// # Deprecation
+    ///
+    /// This field has been replaced by `operating_channels`. Servers (i.e.,
+    /// drivers) that target platform versions wherein `operating_channel_list`
+    /// is deprecated should omit it and write operating channels to the
+    /// `operating_channels` field instead. Clients attempt to read
+    /// `operating_channels` before `operating_channel_list`.
+    // TODO(fxbug.dev/135356): Remove this deprecated field.
+    @available(deprecated=15)
     9: operating_channel_list array<uint8, ieee80211.MAX_UNIQUE_CHANNEL_NUMBERS>;
+
+    /// Set of supported basic rates in units of 500 Kbit/s (as defined in IEEE
+    /// Std 802.11-2016, 9.4.2.3), e.g., 0x02 represents 1 Mbps. This set
+    /// represents all of the non-HT rates that the device supports for both
+    /// transmitting and receiving.
+    @available(added=15)
+   10: basic_rates vector<uint8>:ieee80211.MAX_SUPPORTED_BASIC_RATES;
+
+    /// Set of valid operating channels per regulatory information as determined
+    /// by the device driver during iface creation. An operating channel refers
+    /// to a channel on which APs may transmit beacon frames.
+    ///
+    /// The client must use this set to determine the efficacy of subsequent
+    /// requests to scan a subset of channels using the iface or to determine
+    /// which operating channel to use when starting an AP.
+    @available(added=15)
+   11: operating_channels vector<uint8>:ieee80211.MAX_UNIQUE_CHANNEL_NUMBERS;
 };
 
 /// High-level information describing the state of a running softmac.
@@ -345,34 +426,49 @@ type WlanAssociationConfig = table {
    12: vht_op ieee80211.VhtOperation;
 };
 
-/// The wlansoftmac C++ driver establishes a FIDL channel serving the WlanSoftmacBridge
-/// protocol to the wlan-mlme Rust library. The WlanSoftmacBridge protocol is similar to
-/// WlanSoftmac but may not contain methods where the additional FIDL channel hinders
-/// performance.
+// NOTE: Some methods in this protocol use a `selector` attribute to maintain
+//       their ordinal following migration from `WlanSoftmac` into this
+//       protocol. This is necessary to preserve API compatibility.
+// TODO(fxbug.dev/126613): Merge `WlanSoftmacBridge` into `WlanSoftmac` when
+//                         FIDL supports generating multiple transports for the
+//                         same protocol or generating Rust bindings for driver-
+//                         transported protocols.
+// TODO(fxbug.dev/124830): This protocol allows `wlansoftmac` to migrate from
+//                         Banjo to FIDL and eventually completely remove Banjo.
+//                         This TODO comment will remain until the migration to
+//                         FIDL is complete.
+// TODO(fxbug.dev/135499): Revisit documentation about safety and when methods
+//                         can be called for clarity. See for example `Query`.
+/// The `wlansoftmac` C++ driver establishes a FIDL channel serving the
+/// `WlanSoftmacBridge` protocol to the `wlan-mlme` Rust library. The
+/// `WlanSoftmacBridge` protocol is similar to `WlanSoftmac`, but may not
+/// contain methods where the additional FIDL channel hinders performance.
 ///
-/// WlanSoftmac composes a subset of its methods from WlanSoftmacBridge so
-/// the wlansoftmac driver can trivially convert messages between the Zircon channel
-/// transported WlanSoftmacBridge messages to the Driver transported WlanSoftmac messages.
-///
-/// TODO(fxbug.dev/126613): Merge WlanSoftmacBridge into WlanSoftmac when FIDL supports
-/// generating multiple transports for the same protocol, or generating Rust bindings
-/// for Driver transported protocols.
-///
-/// TODO(fxbug.dev/124830): This protocol allows wlansoftmac to eventually delete the
-/// use of Banjo from wlansoftmac. This TODO comment will exist until the migration off
-/// Banjo is complete.
+/// `WlanSoftmac` composes a subset of its methods from `WlanSoftmacBridge` so
+/// that the `wlansoftmac` driver can trivially convert between
+/// `WlanSoftmacBridge` messages transported via the Zircon channel and
+/// `WlanSoftmac` messages transported via the driver framework channel.
 @available(added=15)
 closed protocol WlanSoftmacBridge {
-    /// Notify the device of a successful association and configure additional
-    /// parameters necessary to participate in that association.
+    /// Notifies the device of a successful association and configures
+    /// additional parameters necessary to participate in that association.
+    ///
+    /// # Errors
     ///
     /// Common errors include:
-    ///   ZX_ERR_BAD_STATE: The device was not previously informed of this BSS
-    ///       via WlanSoftmac.JoinBss().
+    ///
+    /// - `ZX_ERR_BAD_STATE`: The device was not previously informed of this BSS
+    ///                       via `WlanSoftmac.JoinBss`.
     @available(added=15)
     strict NotifyAssociationComplete(struct {
         assoc_cfg WlanAssociationConfig;
     }) -> () error zx.Status;
+
+    /// Gets general information about the device and its supported features.
+    /// This method is safe to call even when the SoftMAC has not yet started.
+    @available(added=HEAD)
+    @selector("fuchsia.wlan.softmac/WlanSoftmac.Query")
+    strict Query() -> (WlanSoftmacQueryResponse) error zx.Status;
 };
 
 @discoverable
@@ -386,9 +482,9 @@ closed protocol WlanSoftmac {
     // passed individually, which makes the code harder to read. Once all Query responses switch to
     // tables, this can beconsidered.
 
-    /// Obtain information about the device and supported features
-    /// Safe to call when the softmac is not started.
-    @available(added=15)
+    /// Gets general information about the device and its supported features.
+    /// This method is safe to call even when the SoftMAC has not yet started.
+    @available(added=15, removed=HEAD)
     strict Query() -> (WlanSoftmacQueryResponse) error zx.Status;
 
     /// Query the underlying device for feature support related to station

@@ -74,7 +74,8 @@ class DeviceInterface {
   virtual zx_status_t ClearAssociation(const uint8_t[fuchsia_wlan_ieee80211_MAC_ADDR_LEN]) = 0;
 
   virtual fbl::RefPtr<DeviceState> GetState() = 0;
-  virtual const wlan_softmac_query_response_t& GetWlanSoftmacQueryResponse() const = 0;
+  virtual const fuchsia_wlan_softmac::WlanSoftmacQueryResponse& GetWlanSoftmacQueryResponse()
+      const = 0;
   virtual const discovery_support_t& GetDiscoverySupport() const = 0;
   virtual const mac_sublayer_support_t& GetMacSublayerSupport() const = 0;
   virtual const security_support_t& GetSecuritySupport() const = 0;

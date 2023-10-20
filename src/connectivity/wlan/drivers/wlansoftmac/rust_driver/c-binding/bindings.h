@@ -24,7 +24,7 @@ typedef struct wlansoftmac_handle_t wlansoftmac_handle_t;
 typedef struct {
   void (*recv)(void *ctx, const wlan_rx_packet_t *packet);
   void (*complete_tx)(void *ctx, const wlan_tx_packet_t *packet, int32_t status);
-  void (*report_tx_result)(void *ctx, const wlan_tx_result_t *tx_result);
+  void (*report_tx_status)(void *ctx, const wlan_tx_result_t *tx_status);
   void (*scan_complete)(void *ctx, int32_t status, uint64_t scan_id);
 } rust_wlan_softmac_ifc_protocol_ops_copy_t;
 
@@ -108,10 +108,6 @@ typedef struct {
    * Cancel ongoing scan in the driver
    */
   zx_status_t (*cancel_scan)(void *device, uint64_t scan_id);
-  /**
-   * Get information and capabilities of this WLAN interface
-   */
-  wlan_softmac_query_response_t (*get_wlan_softmac_query_response)(void *device);
   /**
    * Get discovery features supported by this WLAN interface
    */

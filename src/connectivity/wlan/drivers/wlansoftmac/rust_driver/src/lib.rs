@@ -4,9 +4,8 @@
 
 use {
     anyhow::{self, bail, format_err},
-    banjo_fuchsia_wlan_common as banjo_common, fidl_fuchsia_wlan_common as fidl_common,
-    fidl_fuchsia_wlan_sme as fidl_sme, fidl_fuchsia_wlan_softmac as fidl_softmac,
-    fuchsia_async as fasync,
+    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_sme as fidl_sme,
+    fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_async as fasync,
     fuchsia_inspect::{self, Inspector},
     fuchsia_inspect_contrib::auto_persist,
     fuchsia_zircon as zx,
@@ -18,7 +17,7 @@ use {
     tracing::{error, info},
     wlan_mlme::{
         buffer::BufferProvider,
-        device::{Device, DeviceInterface, DeviceOps, WlanSoftmacIfcProtocol},
+        device::{self, Device, DeviceInterface, DeviceOps, WlanSoftmacIfcProtocol},
     },
     wlan_sme::{self, serve::create_sme},
 };
@@ -204,8 +203,9 @@ async fn wlansoftmac_thread<D: DeviceOps>(
         }
     };
 
-    let softmac_info = device.wlan_softmac_query_response();
-    let device_info = match (&softmac_info).try_into() {
+    let softmac_info = device::try_query(&mut device).unwrap();
+    let sta_addr = softmac_info.sta_addr;
+    let device_info = match wlan_mlme::mlme_device_info_from_softmac(softmac_info) {
         Ok(info) => info,
         Err(e) => {
             startup_sender.send(Err(format_err!("Failed to get MLME device info: {}", e))).unwrap();
@@ -304,8 +304,8 @@ async fn wlansoftmac_thread<D: DeviceOps>(
         }
     };
 
-    let mlme_fut: Pin<Box<dyn Future<Output = ()>>> = match softmac_info.mac_role() {
-        banjo_common::WlanMacRole::CLIENT => {
+    let mlme_fut: Pin<Box<dyn Future<Output = ()>>> = match device_info.role {
+        fidl_common::WlanMacRole::Client => {
             info!("Running wlansoftmac with client role");
             let config = wlan_mlme::client::ClientConfig {
                 ensure_on_channel_time: fasync::Duration::from_millis(500).into_nanos(),
@@ -319,9 +319,18 @@ async fn wlansoftmac_thread<D: DeviceOps>(
                 startup_sender,
             ))
         }
-        banjo_common::WlanMacRole::AP => {
+        fidl_common::WlanMacRole::Ap => {
             info!("Running wlansoftmac with AP role");
-            let config = ieee80211::Bssid::from(softmac_info.sta_addr());
+            let sta_addr = match sta_addr {
+                Some(sta_addr) => sta_addr,
+                None => {
+                    startup_sender
+                        .send(Err(format_err!("Driver provided no STA address.")))
+                        .unwrap();
+                    return;
+                }
+            };
+            let config = ieee80211::Bssid::from(sta_addr);
             Box::pin(wlan_mlme::mlme_main_loop::<wlan_mlme::ap::Ap<D>>(
                 config,
                 device,
@@ -347,6 +356,7 @@ async fn wlansoftmac_thread<D: DeviceOps>(
 mod tests {
     use {
         super::*,
+        banjo_fuchsia_wlan_common as banjo_common,
         fidl::endpoints::Proxy,
         pin_utils::pin_mut,
         std::task::Poll,

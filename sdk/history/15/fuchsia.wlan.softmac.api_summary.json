@@ -486,6 +486,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacBandCapability.basic_rates",
+        "ordinal": "10",
+        "type": "vector<uint8>:12"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.wlan.softmac/WlanSoftmacBandCapability.ht_caps",
         "ordinal": "5",
         "type": "fuchsia.wlan.ieee80211/HtCapabilities"
@@ -507,6 +513,12 @@
         "name": "fuchsia.wlan.softmac/WlanSoftmacBandCapability.operating_channel_list",
         "ordinal": "9",
         "type": "array<uint8,256>"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacBandCapability.operating_channels",
+        "ordinal": "11",
+        "type": "vector<uint8>:256"
     },
     {
         "kind": "table/member",

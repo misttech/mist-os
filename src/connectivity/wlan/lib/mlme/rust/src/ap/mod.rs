@@ -10,7 +10,8 @@ mod remote_client;
 use {
     crate::{
         buffer::{BufferProvider, InBuf},
-        device::DeviceOps,
+        ddk_converter,
+        device::{self, DeviceOps},
         error::Error,
         logger,
     },
@@ -136,8 +137,11 @@ impl<D: DeviceOps> crate::MlmeImpl for Ap<D> {
         device: D,
         buf_provider: BufferProvider,
         timer: Timer<TimedEvent>,
-    ) -> Self {
-        Self::new(device, buf_provider, timer, config)
+    ) -> Result<Self, anyhow::Error>
+    where
+        Self: Sized,
+    {
+        Ok(Self::new(device, buf_provider, timer, config))
     }
     fn handle_mlme_request(&mut self, req: wlan_sme::MlmeRequest) -> Result<(), anyhow::Error> {
         Self::handle_mlme_req(self, req).map_err(|e| e.into())
@@ -284,7 +288,8 @@ impl<D: DeviceOps> Ap<D> {
         &mut self,
         responder: wlan_sme::responder::Responder<fidl_mlme::DeviceInfo>,
     ) -> Result<(), Error> {
-        let info = self.ctx.device.wlan_softmac_query_response().try_into()?;
+        let info =
+            ddk_converter::mlme_device_info_from_softmac(device::try_query(&mut self.ctx.device)?)?;
         responder.respond(info);
         Ok(())
     }
@@ -294,7 +299,7 @@ impl<D: DeviceOps> Ap<D> {
         responder: wlan_sme::responder::Responder<fidl_common::DiscoverySupport>,
     ) -> Result<(), Error> {
         let ddk_support = self.ctx.device.discovery_support();
-        let support = crate::ddk_converter::convert_ddk_discovery_support(ddk_support)?;
+        let support = ddk_converter::convert_ddk_discovery_support(ddk_support)?;
         responder.respond(support);
         Ok(())
     }
@@ -304,7 +309,7 @@ impl<D: DeviceOps> Ap<D> {
         responder: wlan_sme::responder::Responder<fidl_common::MacSublayerSupport>,
     ) -> Result<(), Error> {
         let ddk_support = self.ctx.device.mac_sublayer_support();
-        let support = crate::ddk_converter::convert_ddk_mac_sublayer_support(ddk_support)?;
+        let support = ddk_converter::convert_ddk_mac_sublayer_support(ddk_support)?;
         responder.respond(support);
         Ok(())
     }
@@ -314,7 +319,7 @@ impl<D: DeviceOps> Ap<D> {
         responder: wlan_sme::responder::Responder<fidl_common::SecuritySupport>,
     ) -> Result<(), Error> {
         let ddk_support = self.ctx.device.security_support();
-        let support = crate::ddk_converter::convert_ddk_security_support(ddk_support)?;
+        let support = ddk_converter::convert_ddk_security_support(ddk_support)?;
         responder.respond(support);
         Ok(())
     }
@@ -324,7 +329,7 @@ impl<D: DeviceOps> Ap<D> {
         responder: wlan_sme::responder::Responder<fidl_common::SpectrumManagementSupport>,
     ) -> Result<(), Error> {
         let ddk_support = self.ctx.device.spectrum_management_support();
-        let support = crate::ddk_converter::convert_ddk_spectrum_management_support(ddk_support)?;
+        let support = ddk_converter::convert_ddk_spectrum_management_support(ddk_support)?;
         responder.respond(support);
         Ok(())
     }
@@ -464,9 +469,7 @@ mod tests {
         super::*,
         crate::{
             buffer::FakeBufferProvider,
-            device::{
-                test_utils::fake_fidl_band_caps, FakeDevice, FakeDeviceConfig, FakeDeviceState,
-            },
+            device::{test_utils, FakeDevice, FakeDeviceConfig, FakeDeviceState},
             test_utils::MockWlanRxInfo,
         },
         banjo_fuchsia_wlan_common as banjo_common, fidl_fuchsia_wlan_common as fidl_common,
@@ -520,7 +523,7 @@ mod tests {
         let (fake_device, fake_device_state) = FakeDevice::new_with_config(
             &exec,
             FakeDeviceConfig {
-                mac_role: banjo_common::WlanMacRole::AP,
+                mac_role: fidl_common::WlanMacRole::Ap,
                 sta_addr: *BSSID,
                 ..Default::default()
             },
@@ -1473,7 +1476,7 @@ mod tests {
             fidl_mlme::DeviceInfo {
                 sta_addr: BSSID.to_array(),
                 role: fidl_common::WlanMacRole::Ap,
-                bands: fake_fidl_band_caps(),
+                bands: test_utils::fake_mlme_band_caps(),
                 softmac_hardware_capability: 0,
                 qos_capable: false,
             }
