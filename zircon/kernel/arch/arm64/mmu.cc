@@ -586,7 +586,8 @@ zx_status_t ArmArchVmAspace::QueryLocked(vaddr_t vaddr, paddr_t* paddr, uint* mm
     LTRACEF("va %#" PRIxPTR ", index %lu, index_shift %u, rem %#" PRIxPTR ", pte %#" PRIx64 "\n",
             vaddr, index, index_shift, vaddr_rem, pte);
 
-    if (descriptor_type == MMU_PTE_DESCRIPTOR_INVALID) {
+    if ((pte & MMU_PTE_VALID) == 0) {
+      ASSERT_MSG(pte == 0, "invalid pte should be zero %#" PRIx64 "\n", pte);
       return ZX_ERR_NOT_FOUND;
     }
 

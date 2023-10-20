@@ -185,6 +185,8 @@
 
 #define MMU_MAIR_ATTR(index, attr)              BM(index * 8, 8, (attr))
 
+// Bit 0 is valid, also part of the descriptor field
+#define MMU_PTE_VALID                           BM(0, 1, 1)
 
 // L0/L1/L2/L3 descriptor types
 #define MMU_PTE_DESCRIPTOR_INVALID              BM(0, 2, 0)
