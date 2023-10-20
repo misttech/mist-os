@@ -3801,7 +3801,16 @@ mod test {
     struct Tag;
 
     #[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
-    struct Sharing;
+
+    enum Sharing {
+        #[default]
+        NoConflicts,
+        // Any attempt to insert a connection with the following remote port
+        // will conflict.
+        ConnectionConflicts {
+            remote_port: char,
+        },
+    }
 
     #[derive(Copy, Clone, Debug, Derivative)]
     #[derivative(Eq(bound = ""), PartialEq(bound = ""))]
@@ -3896,17 +3905,55 @@ mod test {
         type ReceivingId = Id;
     }
 
-    impl<A, I: IpExt, D: device::WeakId> SocketMapConflictPolicy<A, Sharing, I, D, FakeAddrSpec>
-        for (FakeStateSpec, I, D)
+    impl<I: IpExt, D: device::WeakId>
+        SocketMapConflictPolicy<
+            ConnAddr<ConnIpAddr<I::Addr, u8, char>, D>,
+            Sharing,
+            I,
+            D,
+            FakeAddrSpec,
+        > for (FakeStateSpec, I, D)
     {
         fn check_insert_conflicts(
-            _new_sharing_state: &Sharing,
-            _addr: &A,
+            sharing: &Sharing,
+            addr: &ConnAddr<ConnIpAddr<I::Addr, u8, char>, D>,
             _socketmap: &SocketMap<AddrVec<I, D, FakeAddrSpec>, Bound<Self>>,
         ) -> Result<(), InsertError> {
-            // Addresses are completely independent and shadowing doesn't cause
-            // conflicts.
-            Ok(())
+            let ConnAddr { ip: ConnIpAddr { local: _, remote: (_remote_ip, port) }, device: _ } =
+                addr;
+            match sharing {
+                Sharing::NoConflicts => Ok(()),
+                Sharing::ConnectionConflicts { remote_port } => {
+                    if remote_port == port {
+                        Err(InsertError::Exists)
+                    } else {
+                        Ok(())
+                    }
+                }
+            }
+        }
+    }
+
+    impl<I: IpExt, D: device::WeakId>
+        SocketMapConflictPolicy<
+            ListenerAddr<ListenerIpAddr<I::Addr, u8>, D>,
+            Sharing,
+            I,
+            D,
+            FakeAddrSpec,
+        > for (FakeStateSpec, I, D)
+    {
+        fn check_insert_conflicts(
+            sharing: &Sharing,
+            _addr: &ListenerAddr<ListenerIpAddr<I::Addr, u8>, D>,
+            _socketmap: &SocketMap<AddrVec<I, D, FakeAddrSpec>, Bound<Self>>,
+        ) -> Result<(), InsertError> {
+            match sharing {
+                Sharing::NoConflicts => Ok(()),
+                // Since this implementation is strictly for ListenerAddr,
+                // ignore connection conflicts.
+                Sharing::ConnectionConflicts { remote_port: _ } => Ok(()),
+            }
         }
     }
 
@@ -4495,5 +4542,106 @@ mod test {
         set_ip_transparent(&mut sync_ctx, unbound.clone(), false);
 
         assert!(!get_ip_transparent(&mut sync_ctx, unbound.clone()));
+    }
+
+    enum OriginalSocketState {
+        Unbound,
+        Listener,
+        Connected,
+    }
+
+    #[ip_test]
+    #[test_case(OriginalSocketState::Unbound; "reinsert_unbound")]
+    #[test_case(OriginalSocketState::Listener; "reinsert_listener")]
+    #[test_case(OriginalSocketState::Connected; "reinsert_connected")]
+    fn connect_reinserts_on_failure<I: Ip + DatagramIpExt + IpLayerIpExt>(
+        original: OriginalSocketState,
+    ) {
+        let mut sync_ctx = FakeSyncCtx::<I, _> {
+            outer: FakeSocketsState::default(),
+            inner: WrappedFakeSyncCtx::with_inner_and_outer_state(
+                FakeDualStackIpSocketCtx::new([FakeDeviceConfig::<_, SpecifiedAddr<I::Addr>> {
+                    device: FakeDeviceId,
+                    local_ips: vec![I::FAKE_CONFIG.local_ip],
+                    remote_ips: vec![I::FAKE_CONFIG.remote_ip],
+                }]),
+                Default::default(),
+            ),
+        };
+        let mut non_sync_ctx = FakeNonSyncCtx::default();
+
+        let socket = create(&mut sync_ctx);
+        const LOCAL_PORT: u8 = 10;
+        const ORIGINAL_REMOTE_PORT: char = 'a';
+        const NEW_REMOTE_PORT: char = 'b';
+
+        // Setup the original socket state.
+        match original {
+            OriginalSocketState::Unbound => {}
+            OriginalSocketState::Listener => listen(
+                &mut sync_ctx,
+                &mut non_sync_ctx,
+                socket,
+                Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()),
+                Some(LOCAL_PORT),
+            )
+            .expect("listen should succeed"),
+            OriginalSocketState::Connected => connect(
+                &mut sync_ctx,
+                &mut non_sync_ctx,
+                socket,
+                Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into()),
+                ORIGINAL_REMOTE_PORT,
+                Default::default(),
+            )
+            .expect("connect should succeed"),
+        }
+
+        // Update the sharing state to generate conflicts during the call to `connect`.
+        sync_ctx.with_sockets_state_mut(|_sync_ctx, state| {
+            let sharing = match state.get_mut(socket.get_key_index()).expect("socket not found") {
+                SocketState::Unbound(UnboundSocketState { device: _, sharing, ip_options: _ }) => {
+                    sharing
+                }
+                SocketState::Bound(BoundSocketState::Connected { state: _, sharing }) => sharing,
+                SocketState::Bound(BoundSocketState::Listener { state: _, sharing }) => sharing,
+            };
+            *sharing = Sharing::ConnectionConflicts { remote_port: NEW_REMOTE_PORT };
+        });
+
+        // Try to connect and observe a conflict error.
+        assert_matches!(
+            connect(
+                &mut sync_ctx,
+                &mut non_sync_ctx,
+                socket,
+                Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into()),
+                NEW_REMOTE_PORT,
+                Default::default(),
+            ),
+            Err(ConnectError::SockAddrConflict)
+        );
+
+        // Verify the original socket state is intact.
+        let info = get_info(&mut sync_ctx, &mut non_sync_ctx, socket);
+        match original {
+            OriginalSocketState::Unbound => assert_matches!(info, SocketInfo::Unbound),
+            OriginalSocketState::Listener => {
+                assert_matches!(
+                    info,
+                    SocketInfo::Listener(
+                        ListenerAddr { ip: ListenerIpAddr { addr: _, identifier }, device: _ }
+                    ) if identifier == LOCAL_PORT
+                )
+            }
+            OriginalSocketState::Connected => {
+                assert_matches!(
+                    info,
+                    SocketInfo::Connected(
+                        ConnAddr { ip: ConnIpAddr { local : _, remote: (_addr, id) }, device: _ }
+                    ) if id == ORIGINAL_REMOTE_PORT
+                )
+            }
+        }
     }
 }
