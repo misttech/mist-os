@@ -135,9 +135,13 @@ fn run_bind_test_specs<'a>(
         let mut device_specification = DeviceSpecification::new();
         println!("[ RUN      ] {}", test.name);
         for (key, value) in &test.device {
-            device_specification
+            let result = device_specification
                 .add_property(&key, &value)
-                .map_err(TestError::DeviceSpecParserError)?;
+                .map_err(TestError::DeviceSpecParserError);
+            if let Err(e) = result {
+                println!("Failed to add specification {key}:{value}");
+                return Err(e);
+            }
         }
 
         let result =
