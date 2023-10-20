@@ -11,7 +11,7 @@
 FCT_SRC="$FUCHSIA_DIR/src/developer/ffx/lib/fuchsia-controller"
 
 VENV_ROOT_PATH="$FCT_SRC/.venvs"
-VENV_NAME="fuchsia_python_venv"
+VENV_NAME="fuchsia_python_venv_deps"
 VENV_PATH="$VENV_ROOT_PATH/$VENV_NAME"
 
 set -e
@@ -39,18 +39,17 @@ fuchsia-vendored-python -m venv $VENV_PATH
 echo "Activating the virtual environment..."
 source $VENV_PATH/bin/activate
 
-# Install pip
-echo "Installing pip..."
-python -m ensurepip --upgrade
-
-echo "Installing tool dependencies..."
-python -m pip install -r base-tooling-requirements.txt --require-hashes
-
-# install fuchsia controller
-echo "Installing 'fuchsia controller' dependencies..."
 cd $FCT_SRC
-python -m pip install -r requirements.txt --require-hashes
+
+echo "Installing tooling dependencies..."
+python -m pip install --require-hashes -r base-tooling-requirements.txt
+
+echo "Regenerating requirements.txt..."
+pip-compile pyproject.toml --extra test --extra guidelines --resolver backtracking --generate-hashes
+
+# deactivate venv
+deactivate
+echo "Rerunning install..."
+./scripts/install.sh
 
 cd $STARTING_DIR
-
-echo -e "Installation successful...\n"
