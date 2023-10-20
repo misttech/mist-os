@@ -25,6 +25,7 @@ template("build_type_config_data") {
     config_data(original_target_name + "_" + build_type) {
       forward_variables_from(invoker,
                              [
+                               "deps",
                                "for_pkg",
                                "testonly",
                                "visibility",
@@ -41,6 +42,7 @@ template("build_type_config_data") {
                              "testonly",
                              "visibility",
                            ])
+    deps = [ "//build/validate:non_production_tag" ]
   }
 
   config_data_for_build_type("userdebug") {
@@ -50,6 +52,7 @@ template("build_type_config_data") {
                              "testonly",
                              "visibility",
                            ])
+    deps = [ "//build/validate:non_production_tag" ]
   }
 
   config_data_for_build_type("user") {
