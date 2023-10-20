@@ -3,28 +3,21 @@
 // found in the LICENSE file.
 
 use anyhow::{Context, Result};
-use async_io::Async;
 use async_trait::async_trait;
 use errors::{ffx_bail, ffx_error};
 use ffx_debug_connect_args::ConnectCommand;
 use fho::{moniker, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_debugger::DebugAgentProxy;
 use fuchsia_async::unblock;
-use futures_util::{future::FutureExt, io::AsyncReadExt};
-use signal_hook::{
-    consts::signal::{SIGINT, SIGTERM},
-    low_level::pipe,
-};
+use signal_hook::consts::signal::SIGINT;
 use std::{
-    ffi::OsStr,
-    os::unix::net::UnixStream,
     process::Command,
     sync::{atomic::AtomicBool, Arc},
 };
 
-mod debug_agent;
-
-pub use debug_agent::DebugAgentSocket;
+pub use ffx_zxdb::{
+    debug_agent::DebugAgentSocket, forward_to_agent, spawn_forward_task, CommandBuilder,
+};
 
 #[derive(FfxTool)]
 pub struct ConnectTool {
@@ -51,35 +44,7 @@ async fn connect_tool_impl(cmd: ConnectCommand, debugger_proxy: DebugAgentProxy)
 
     if cmd.agent_only {
         println!("{}", socket.unix_socket_path().display());
-
-        // We have to construct these Async objects ourselves instead of using
-        // async_net::UnixStream to force the use of std::os::unix::UnixStream,
-        // which implements IntoRawFd - a requirement for the pipe::register
-        // calls below.
-        let (mut sigterm_receiver, sigterm_sender) = Async::<UnixStream>::pair()?;
-        let (mut sigint_receiver, sigint_sender) = Async::<UnixStream>::pair()?;
-
-        // Note: This does not remove the non-blocking nature of Async from the
-        // UnixStream objects or file descriptors.
-        pipe::register(SIGTERM, sigterm_sender.into_inner()?)?;
-        pipe::register(SIGINT, sigint_sender.into_inner()?)?;
-
-        let _forward_task = fuchsia_async::Task::local(async move {
-            loop {
-                let _ = socket.forward_one_connection().await.map_err(|e| {
-                    eprintln!("Connection to debug_agent broken: {}", e);
-                });
-            }
-        });
-
-        let mut sigterm_buf = [0u8; 4];
-        let mut sigint_buf = [0u8; 4];
-
-        futures::select! {
-            res = sigterm_receiver.read(&mut sigterm_buf).fuse() => res?,
-            res = sigint_receiver.read(&mut sigint_buf).fuse() => res?,
-        };
-
+        forward_to_agent(socket).await?;
         return Ok(());
     }
 
@@ -93,23 +58,16 @@ async fn connect_tool_impl(cmd: ConnectCommand, debugger_proxy: DebugAgentProxy)
 
     let zxdb_path = sdk.get_host_tool("zxdb")?;
 
-    let mut args: Vec<&OsStr> = vec!["--unix-connect".as_ref(), socket.unix_socket_path().as_ref()];
+    let mut command_builder = CommandBuilder::new(zxdb_path.clone());
+    command_builder.connect(&socket);
 
     if cmd.no_auto_attach_limbo {
-        args.push("--no-auto-attach-limbo".as_ref());
+        command_builder.push_str("--no-auto-attach-limbo");
     }
 
-    for attach in cmd.attach.iter() {
-        args.push("--attach".as_ref());
-        args.push(attach.as_ref());
-    }
-
-    for execute in cmd.execute.iter() {
-        args.push("--execute".as_ref());
-        args.push(execute.as_ref());
-    }
-
-    args.extend(cmd.zxdb_args.iter().map(|s| AsRef::<OsStr>::as_ref(s)));
+    command_builder.attach_each(&cmd.attach);
+    command_builder.execute_each(&cmd.execute);
+    command_builder.extend(&cmd.zxdb_args);
 
     let mut zxdb = match cmd.debugger {
         Some(debugger) => {
@@ -133,18 +91,14 @@ async fn connect_tool_impl(cmd: ConnectCommand, debugger_proxy: DebugAgentProxy)
                 .current_dir(sdk.get_path_prefix())
                 .arg(debugger_arg)
                 .arg(zxdb_unstripped_path)
-                .args(args)
+                .args(command_builder.into_args())
                 .spawn()?
         }
-        None => Command::new(zxdb_path).args(args).spawn()?,
+        None => command_builder.build().spawn()?,
     };
 
     // Spawn the task that doing the forwarding in the background.
-    let _task = fuchsia_async::Task::local(async move {
-        let _ = socket.forward_one_connection().await.map_err(|e| {
-            eprintln!("Connection to debug_agent broken: {}", e);
-        });
-    });
+    spawn_forward_task(socket);
 
     if let Some(exit_code) = unblock(move || zxdb.wait()).await?.code() {
         if exit_code == 0 {
