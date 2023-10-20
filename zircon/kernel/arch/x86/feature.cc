@@ -601,19 +601,26 @@ static uint64_t zen_tsc_freq() {
   return amd_compute_p_state_clock(p0_state);
 }
 
-static void unknown_reboot_system(void) { return; }
+static void unknown_reboot_system() {}
 
-static void unknown_reboot_reason(uint64_t) { return; }
+static void unknown_reboot_reason(uint64_t reason) {
+  // Write the boot reason to cmos, which should be present on all PCs.
+  bootbyte_set_reason(reason);
+}
 
-static void hsw_reboot_system(void) {
+static void cf9_reboot_system() {
   // 100-Series Chipset Reset Control Register: CPU + SYS Reset
+  // AMD Bulldozer+ defines this the same way
   outp(0xcf9, 0x06);
 }
 
-static void hsw_reboot_reason(uint64_t reason) {
+static void cf9_reboot_reason(uint64_t reason) {
+  // Write the boot reason to cmos, which should be present on all PCs.
   bootbyte_set_reason(reason);
 
   // 100-Series Chipset Reset Control Register: CPU + SYS Reset
+  // AMD Bulldozer+ defines this the same way
+
   // clear PCI reset sequence
   outp(0xcf9, 0x02);
   // discarded reads acting as a small delay on the bus
@@ -628,8 +635,8 @@ static const x86_microarch_config_t icelake_config{
 
     .get_apic_freq = default_apic_freq,
     .get_tsc_freq = intel_tsc_freq,
-    .reboot_system = hsw_reboot_system,
-    .reboot_reason = hsw_reboot_reason,
+    .reboot_system = cf9_reboot_system,
+    .reboot_reason = cf9_reboot_reason,
     .disable_c1e = true,
     .idle_prefer_hlt = false,
     .idle_states =
@@ -643,8 +650,8 @@ static const x86_microarch_config_t tiger_lake_config{
     .x86_microarch = X86_MICROARCH_INTEL_TIGERLAKE,
     .get_apic_freq = default_apic_freq,
     .get_tsc_freq = intel_tsc_freq,
-    .reboot_system = hsw_reboot_system,
-    .reboot_reason = hsw_reboot_reason,
+    .reboot_system = cf9_reboot_system,
+    .reboot_reason = cf9_reboot_reason,
     .disable_c1e = true,
     .idle_prefer_hlt = false,
     .idle_states =
@@ -662,8 +669,8 @@ static const x86_microarch_config_t alder_lake_config{
     .x86_microarch = X86_MICROARCH_INTEL_ALDERLAKE,
     .get_apic_freq = default_apic_freq,
     .get_tsc_freq = intel_tsc_freq,
-    .reboot_system = hsw_reboot_system,
-    .reboot_reason = hsw_reboot_reason,
+    .reboot_system = cf9_reboot_system,
+    .reboot_reason = cf9_reboot_reason,
     .disable_c1e = true,
     .idle_prefer_hlt = false,
     .idle_states =
@@ -681,8 +688,8 @@ static const x86_microarch_config_t cannon_lake_config{
     .x86_microarch = X86_MICROARCH_INTEL_CANNONLAKE,
     .get_apic_freq = default_apic_freq,
     .get_tsc_freq = intel_tsc_freq,
-    .reboot_system = hsw_reboot_system,
-    .reboot_reason = hsw_reboot_reason,
+    .reboot_system = cf9_reboot_system,
+    .reboot_reason = cf9_reboot_reason,
     .disable_c1e = true,
     .idle_prefer_hlt = false,
     .idle_states =
@@ -699,8 +706,8 @@ static const x86_microarch_config_t skylake_config{
     .x86_microarch = X86_MICROARCH_INTEL_SKYLAKE,
     .get_apic_freq = skl_apic_freq,
     .get_tsc_freq = intel_tsc_freq,
-    .reboot_system = hsw_reboot_system,
-    .reboot_reason = hsw_reboot_reason,
+    .reboot_system = cf9_reboot_system,
+    .reboot_reason = cf9_reboot_reason,
     .disable_c1e = true,
     .idle_prefer_hlt = false,
     .idle_states =
@@ -723,8 +730,8 @@ static const x86_microarch_config_t skylake_x_config{
     .x86_microarch = X86_MICROARCH_INTEL_SKYLAKE,
     .get_apic_freq = skl_x_apic_freq,
     .get_tsc_freq = intel_tsc_freq,
-    .reboot_system = hsw_reboot_system,
-    .reboot_reason = hsw_reboot_reason,
+    .reboot_system = cf9_reboot_system,
+    .reboot_reason = cf9_reboot_reason,
     .disable_c1e = true,
     .idle_prefer_hlt = false,
     .idle_states =
@@ -738,8 +745,8 @@ static const x86_microarch_config_t broadwell_config{
     .x86_microarch = X86_MICROARCH_INTEL_BROADWELL,
     .get_apic_freq = bdw_apic_freq,
     .get_tsc_freq = intel_tsc_freq,
-    .reboot_system = hsw_reboot_system,
-    .reboot_reason = hsw_reboot_reason,
+    .reboot_system = cf9_reboot_system,
+    .reboot_reason = cf9_reboot_reason,
     .disable_c1e = true,
     .idle_prefer_hlt = false,
     .idle_states =
@@ -752,8 +759,8 @@ static const x86_microarch_config_t haswell_config{
     .x86_microarch = X86_MICROARCH_INTEL_HASWELL,
     .get_apic_freq = bdw_apic_freq,
     .get_tsc_freq = intel_tsc_freq,
-    .reboot_system = hsw_reboot_system,
-    .reboot_reason = hsw_reboot_reason,
+    .reboot_system = cf9_reboot_system,
+    .reboot_reason = cf9_reboot_reason,
     .disable_c1e = true,
     .idle_prefer_hlt = false,
     .idle_states =
@@ -836,8 +843,8 @@ static const x86_microarch_config_t goldmont_config{
     .x86_microarch = X86_MICROARCH_INTEL_GOLDMONT,
     .get_apic_freq = default_apic_freq,
     .get_tsc_freq = intel_tsc_freq,
-    .reboot_system = hsw_reboot_system,
-    .reboot_reason = hsw_reboot_reason,
+    .reboot_system = cf9_reboot_system,
+    .reboot_reason = cf9_reboot_reason,
     .disable_c1e = false,
     // [APL30] Apollo Lake SOCs (Goldmont) have an errata which causes stores to not always wake
     // MWAIT-ing cores. Prefer HLT to avoid the issue.
@@ -892,8 +899,8 @@ static const x86_microarch_config_t zen_config{
     .x86_microarch = X86_MICROARCH_AMD_ZEN,
     .get_apic_freq = unknown_freq,
     .get_tsc_freq = zen_tsc_freq,
-    .reboot_system = unknown_reboot_system,
-    .reboot_reason = unknown_reboot_reason,
+    .reboot_system = cf9_reboot_system,
+    .reboot_reason = cf9_reboot_reason,
     .disable_c1e = false,
     // Zen SOCs save substantial power using HLT instead of MWAIT.
     // TODO(fxbug.dev/61265): Use a predictor/selection to use mwait for short sleeps.
@@ -908,8 +915,8 @@ static const x86_microarch_config_t jaguar_config{
     .x86_microarch = X86_MICROARCH_AMD_JAGUAR,
     .get_apic_freq = unknown_freq,
     .get_tsc_freq = unknown_freq,
-    .reboot_system = unknown_reboot_system,
-    .reboot_reason = unknown_reboot_reason,
+    .reboot_system = cf9_reboot_system,
+    .reboot_reason = cf9_reboot_reason,
     .disable_c1e = false,
     .idle_prefer_hlt = false,
     .idle_states =
@@ -922,8 +929,8 @@ static const x86_microarch_config_t bulldozer_config{
     .x86_microarch = X86_MICROARCH_AMD_BULLDOZER,
     .get_apic_freq = bulldozer_apic_freq,
     .get_tsc_freq = unknown_freq,
-    .reboot_system = unknown_reboot_system,
-    .reboot_reason = unknown_reboot_reason,
+    .reboot_system = cf9_reboot_system,
+    .reboot_reason = cf9_reboot_reason,
     .disable_c1e = false,
     // Excavator SOCs in particular save substantial power using HLT instead of MWAIT
     .idle_prefer_hlt = true,
@@ -937,8 +944,8 @@ static const x86_microarch_config_t amd_default_config{
     .x86_microarch = X86_MICROARCH_UNKNOWN,
     .get_apic_freq = unknown_freq,
     .get_tsc_freq = unknown_freq,
-    .reboot_system = unknown_reboot_system,
-    .reboot_reason = unknown_reboot_reason,
+    .reboot_system = cf9_reboot_system,
+    .reboot_reason = cf9_reboot_reason,
     .disable_c1e = false,
     .idle_prefer_hlt = false,
     .idle_states =
