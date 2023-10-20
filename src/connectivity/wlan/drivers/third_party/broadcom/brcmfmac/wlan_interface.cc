@@ -348,9 +348,8 @@ void WlanInterface::Deauth(DeauthRequestView request, fdf::Arena& arena,
 void WlanInterface::AssocResp(AssocRespRequestView request, fdf::Arena& arena,
                               AssocRespCompleter::Sync& completer) {
   std::shared_lock<std::shared_mutex> guard(lock_);
-  const fuchsia_wlan_fullmac::wire::WlanFullmacAssocResp resp = request->resp;
   if (wdev_ != nullptr) {
-    brcmf_if_assoc_resp(wdev_->netdev, &resp);
+    brcmf_if_assoc_resp(wdev_->netdev, request);
   }
   completer.buffer(arena).Reply();
 }

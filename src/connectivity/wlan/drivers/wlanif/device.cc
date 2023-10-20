@@ -333,20 +333,20 @@ void Device::Deauthenticate(const wlan_fullmac_impl_deauth_request_t* req) {
   }
 }
 
-void Device::AssociateResp(const wlan_fullmac_assoc_resp_t* resp) {
-  fuchsia_wlan_fullmac::wire::WlanFullmacAssocResp assoc_resp;
-
-  std::memcpy(assoc_resp.peer_sta_address.data(), resp->peer_sta_address, ETH_ALEN);
-  assoc_resp.result_code = ConvertAssocResult(resp->result_code);
-  assoc_resp.association_id = resp->association_id;
-
+void Device::AssociateResp(const wlan_fullmac_impl_assoc_resp_request_t* resp) {
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     lerror("Arena creation failed: %s", arena.status_string());
     return;
   }
+  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplAssocRespRequest::Builder(*arena);
+  ::fidl::Array<uint8_t, ETH_ALEN> peer_sta_address;
+  std::memcpy(peer_sta_address.data(), resp->peer_sta_address, ETH_ALEN);
+  builder.peer_sta_address(peer_sta_address);
+  builder.result_code(ConvertAssocResult(resp->result_code));
+  builder.association_id(resp->association_id);
 
-  auto result = client_.buffer(*arena)->AssocResp(assoc_resp);
+  auto result = client_.buffer(*arena)->AssocResp(builder.Build());
 
   if (!result.ok()) {
     lerror("AssocResp failed FIDL error: %s", result.status_string());

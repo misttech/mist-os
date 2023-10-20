@@ -232,11 +232,6 @@ type WlanAssocResult = strict enum : uint8 {
     REFUSED_TEMPORARILY = 8;
 };
 
-type WlanFullmacAssocResp = struct {
-    peer_sta_address ieee80211.MacAddr;
-    result_code WlanAssocResult;
-    association_id uint16;
-};
 
 type WlanFullmacDisassocConfirm = struct {
     status zx.Status;
@@ -685,8 +680,10 @@ closed protocol WlanFullmacImpl {
         1: peer_sta_address ieee80211.MacAddr;
         2: reason_code ieee80211.ReasonCode;
     }) -> ();
-    strict AssocResp(struct {
-        resp WlanFullmacAssocResp;
+    strict AssocResp(table {
+        1: peer_sta_address ieee80211.MacAddr;
+        2: result_code WlanAssocResult;
+        3: association_id uint16;
     }) -> ();
     strict DisassocReq(struct {
         req WlanFullmacDisassocReq;

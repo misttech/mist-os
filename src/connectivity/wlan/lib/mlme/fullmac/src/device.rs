@@ -343,8 +343,10 @@ pub struct FullmacDeviceInterface {
         device: *mut c_void,
         req: *mut banjo_wlan_fullmac::WlanFullmacImplDeauthRequest,
     ),
-    assoc_resp:
-        extern "C" fn(device: *mut c_void, resp: *mut banjo_wlan_fullmac::WlanFullmacAssocResp),
+    assoc_resp: extern "C" fn(
+        device: *mut c_void,
+        resp: *mut banjo_wlan_fullmac::WlanFullmacImplAssocRespRequest,
+    ),
     disassoc_req:
         extern "C" fn(device: *mut c_void, req: *mut banjo_wlan_fullmac::WlanFullmacDisassocReq),
     reset_req:
@@ -441,8 +443,11 @@ impl FullmacDeviceInterface {
             &mut req as *mut banjo_wlan_fullmac::WlanFullmacImplDeauthRequest,
         )
     }
-    pub fn assoc_resp(&self, mut resp: banjo_wlan_fullmac::WlanFullmacAssocResp) {
-        (self.assoc_resp)(self.device, &mut resp as *mut banjo_wlan_fullmac::WlanFullmacAssocResp)
+    pub fn assoc_resp(&self, mut resp: banjo_wlan_fullmac::WlanFullmacImplAssocRespRequest) {
+        (self.assoc_resp)(
+            self.device,
+            &mut resp as *mut banjo_wlan_fullmac::WlanFullmacImplAssocRespRequest,
+        )
     }
     pub fn disassoc_req(&self, mut req: banjo_wlan_fullmac::WlanFullmacDisassocReq) {
         (self.disassoc_req)(
@@ -547,7 +552,7 @@ pub mod test_utils {
             req: banjo_wlan_fullmac::WlanFullmacImplDeauthRequest,
         },
         AssocResp {
-            resp: banjo_wlan_fullmac::WlanFullmacAssocResp,
+            resp: banjo_wlan_fullmac::WlanFullmacImplAssocRespRequest,
         },
         DisassocReq {
             req: banjo_wlan_fullmac::WlanFullmacDisassocReq,
@@ -814,7 +819,7 @@ pub mod test_utils {
         #[allow(clippy::not_unsafe_ptr_arg_deref)]
         pub extern "C" fn assoc_resp(
             device: *mut c_void,
-            resp: *mut banjo_wlan_fullmac::WlanFullmacAssocResp,
+            resp: *mut banjo_wlan_fullmac::WlanFullmacImplAssocRespRequest,
         ) {
             let device = unsafe { &mut *(device as *mut Self) };
             let resp = unsafe { *resp };

@@ -3902,13 +3902,18 @@ void brcmf_if_deauth_req(net_device* ndev,
 }
 
 void brcmf_if_assoc_resp(net_device* ndev,
-                         const fuchsia_wlan_fullmac_wire::WlanFullmacAssocResp* ind) {
+                         const fuchsia_wlan_fullmac_wire::WlanFullmacImplAssocRespRequest* req) {
   struct brcmf_if* ifp = ndev_to_if(ndev);
 
+  if (!req->has_result_code() || !req->has_association_id() || !req->has_peer_sta_address()) {
+    BRCMF_ERR("Assoc resp does not contain all fields reason: %d id: peer addr: %d",
+              req->has_result_code(), req->has_association_id(), req->has_peer_sta_address());
+    return;
+  }
   BRCMF_IFDBG(WLANIF, ndev, "Assoc response from SME. result: %" PRIu8 ", aid: %" PRIu16,
-              ind->result_code, ind->association_id);
+              req->result_code(), req->association_id());
 #if !defined(NDEBUG)
-  BRCMF_IFDBG(WLANIF, ndev, "  address: " FMT_MAC, FMT_MAC_ARGS(ind->peer_sta_address));
+  BRCMF_IFDBG(WLANIF, ndev, "  address: " FMT_MAC, FMT_MAC_ARGS(req->peer_sta_address().data()));
 #endif /* !defined(NDEBUG) */
 
   if (!brcmf_is_apmode(ifp->vif)) {
@@ -3916,8 +3921,8 @@ void brcmf_if_assoc_resp(net_device* ndev,
     return;
   }
 
-  if (ind->result_code == fuchsia_wlan_fullmac_wire::WlanAssocResult::kSuccess) {
-    const uint8_t* mac = ind->peer_sta_address.data();
+  if (req->result_code() == fuchsia_wlan_fullmac_wire::WlanAssocResult::kSuccess) {
+    const uint8_t* mac = req->peer_sta_address().data();
     BRCMF_DBG(CONN, "Successfully associated client " FMT_MAC, FMT_MAC_ARGS(mac));
     return;
   }
@@ -3925,7 +3930,7 @@ void brcmf_if_assoc_resp(net_device* ndev,
   // TODO(fxb/62115): The translation here is poor because the set of result codes
   // available for an association response is too small.
   fuchsia_wlan_ieee80211::ReasonCode reason = {};
-  switch (ind->result_code) {
+  switch (req->result_code()) {
     case fuchsia_wlan_fullmac_wire::WlanAssocResult::kRefusedNotAuthenticated:
       reason = fuchsia_wlan_ieee80211::ReasonCode::kNotAuthenticated;
       break;
@@ -3943,7 +3948,7 @@ void brcmf_if_assoc_resp(net_device* ndev,
       break;
   }
   // The copy removed, why we want to copy before passing it into the next function?
-  brcmf_cfg80211_del_station(ndev, ind->peer_sta_address.data(), reason);
+  brcmf_cfg80211_del_station(ndev, req->peer_sta_address().data(), reason);
 }
 
 void brcmf_if_disassoc_req(net_device* ndev,

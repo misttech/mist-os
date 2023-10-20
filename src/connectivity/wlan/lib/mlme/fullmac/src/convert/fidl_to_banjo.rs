@@ -243,9 +243,9 @@ pub fn convert_deauthenticate_request(
 
 pub fn convert_associate_response(
     resp: &fidl_mlme::AssociateResponse,
-) -> banjo_wlan_fullmac::WlanFullmacAssocResp {
+) -> banjo_wlan_fullmac::WlanFullmacImplAssocRespRequest {
     use banjo_wlan_fullmac::WlanAssocResult;
-    banjo_wlan_fullmac::WlanFullmacAssocResp {
+    banjo_wlan_fullmac::WlanFullmacImplAssocRespRequest {
         peer_sta_address: resp.peer_sta_address,
         result_code: match resp.result_code {
             fidl_mlme::AssociateResultCode::Success => WlanAssocResult::SUCCESS,

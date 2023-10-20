@@ -151,7 +151,12 @@ struct WlanifDeviceTest : public ::zxtest::Test,
     completer.buffer(arena).Reply();
   }
   void AssocResp(AssocRespRequestView request, fdf::Arena& arena,
-                 AssocRespCompleter::Sync& completer) override {}
+                 AssocRespCompleter::Sync& completer) override {
+    EXPECT_EQ(request->has_peer_sta_address(), true);
+    EXPECT_EQ(request->has_result_code(), true);
+    EXPECT_EQ(request->has_association_id(), true);
+    completer.buffer(arena).Reply();
+  }
   void DisassocReq(DisassocReqRequestView request, fdf::Arena& arena,
                    DisassocReqCompleter::Sync& completer) override {}
   void ResetReq(ResetReqRequestView request, fdf::Arena& arena,
@@ -278,6 +283,15 @@ TEST_F(WlanifDeviceTest, CheckAuthResp) {
   wlan_fullmac_impl_auth_resp_request_t resp = {.result_code = WLAN_AUTH_RESULT_SUCCESS};
   memcpy(resp.peer_sta_address, kPeerStaAddress, sizeof(kPeerStaAddress));
   device_->AuthenticateResp(&resp);
+}
+
+TEST_F(WlanifDeviceTest, CheckAssocResp) {
+  device_->AddDevice();
+  device_->DdkAsyncRemove();
+  wlan_fullmac_impl_assoc_resp_request resp = {.result_code = WLAN_ASSOC_RESULT_SUCCESS,
+                                               .association_id = 42};
+  memcpy(resp.peer_sta_address, kPeerStaAddress, sizeof(kPeerStaAddress));
+  device_->AssociateResp(&resp);
 }
 
 // Call DeauthConf on WlanFullmacImplIfc and verify that it calls deauth_conf on the given
