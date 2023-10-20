@@ -44,6 +44,7 @@ class CollectorTest(unittest.TestCase):
             file_access=file_access,
             metadata_db=self.metadata_db,
             readmes_db=ReadmesDB(file_access),
+            include_host_tools=True,
         )
 
         return super().setUp()

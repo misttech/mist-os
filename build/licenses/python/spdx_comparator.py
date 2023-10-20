@@ -241,7 +241,7 @@ class SpdxComparator:
             full_report(msg)
 
         full_report(
-            """Key:
+            f"""Key:
       Same: {len(self.in_both)}
   ~   Similar: {round(len(self.in_both_but_different) / 2)}
   #   Expected Missing: {len(self.expected_missing)}
@@ -250,6 +250,8 @@ class SpdxComparator:
         )
 
         for missing in sorted(list(self.missing)):
-            report(f"Missing {missing.path}")
+            report(
+                f"Missing {missing.path} name={missing.name} hint={missing.debug_hint}"
+            )
 
         logging.log(log_level, "\n".join(message_lines))

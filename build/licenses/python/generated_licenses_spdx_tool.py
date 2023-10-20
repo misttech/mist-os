@@ -58,6 +58,12 @@ def main():
         help="Tool will fail when encountering license collection errors",
     )
     parser.add_argument(
+        "--include-host-tools",
+        action="store_true",
+        default=False,
+        help="Whether to include licenses of targets that are host tools",
+    )
+    parser.add_argument(
         "--debug-hints",
         action="store_true",
         default=False,
@@ -106,6 +112,7 @@ def main():
             Path(args.generated_license_metadata)
         ),
         readmes_db=readmes_db,
+        include_host_tools=args.include_host_tools,
     )
 
     collector.collect()

@@ -33,6 +33,10 @@ import("//build/python/python_action.gni")
 #   log_level (str, optional)
 #     Tool logging level. Defaults to WARN.
 #
+#   include_host_tools (bool, optional)
+#     Include host tools' licenses. Defaults to false as these tools don't ship with most software.
+#     Set to true when generating spdx for the tools themselves.
+#
 #   ignore_collection_errors (bool, optional)
 #     When true, generation will ignore license collection errors
 #     and only log them as warnings.
@@ -55,12 +59,22 @@ template("generated_licenses_spdx") {
     generated_depfile = "${target_gen_dir}/${target_name}.d"
   }
 
+  _include_host_tools = false
+  if (defined(invoker.include_host_tools)) {
+    _include_host_tools = invoker.include_host_tools
+  }
+
   generated_file(_targets.generated_metadata) {
     outputs = [ _files.generated_metadata ]
     data_keys = [
       "license",
       "applicable_licenses",
     ]
+
+    if (!_include_host_tools) {
+      walk_keys = [ "applicable_licenses_host_barrier" ]
+    }
+
     deps = [ invoker.target ]
     output_conversion = "json"
   }
@@ -106,6 +120,10 @@ template("generated_licenses_spdx") {
 
     if (defined(invoker.debug_hints) && invoker.debug_hints) {
       args += [ "--debug-hints" ]
+    }
+
+    if (_include_host_tools) {
+      args += [ "--include-host-tools" ]
     }
 
     if (defined(invoker.ignore_collection_errors) &&

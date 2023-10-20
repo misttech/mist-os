@@ -28,7 +28,9 @@ class CollectedLicense:
     debug_hint: str = dataclasses.field(hash=False, compare=False)
 
     def create(
-        public_name: str, license_files: Tuple[GnLabel], collection_hint: str
+        public_name: str,
+        license_files: Tuple[GnLabel],
+        collection_hint: str,
     ) -> "CollectedLicense":
         assert type(public_name) is str
         assert type(license_files) is tuple
@@ -143,7 +145,10 @@ class Collector:
     file_access: FileAccess
     metadata_db: GnLicenseMetadataDB
     readmes_db: ReadmesDB
-    unique_labels: Set[GnLabel] = dataclasses.field(default_factory=set)
+    include_host_tools: bool
+    scan_result_by_label: Dict[GnLabel, bool] = dataclasses.field(
+        default_factory=dict
+    )
     unique_licenses: Set[CollectedLicense] = dataclasses.field(
         default_factory=set
     )
@@ -322,11 +327,13 @@ class Collector:
         resource_of: GnLabel = None,
         is_resource_of_target_with_licenses: bool = False,
     ) -> bool:
-        if label in self.unique_labels:
-            return
-        else:
-            self.unique_labels.add(label)
-            self.stats.unique_labels += 1
+        if label in self.scan_result_by_label:
+            return self.scan_result_by_label[label]
+        elif not self.include_host_tools and label.is_host_target():
+            logging.debug(
+                "Skipping host target %s since include_host_tools=False", label
+            )
+            return False
 
         license_found = False
         is_group_target = False
@@ -410,6 +417,9 @@ class Collector:
                         debug_hint=None,
                     )
                 )
+
+        self.scan_result_by_label[label] = license_found
+        self.stats.unique_labels += 1
 
         return license_found
 

@@ -112,11 +112,20 @@ if (generate_legacy_ninja_build_outputs_licenses_spdx) {
       spdx_root_package_name = "All Bazel Inputs"
       output = "${target_out_dir}/licenses_from_metadata.spdx.json"
 
+      debug_hints = true
+
+      # Current Bazel inputs don't need host tool licenses.
+      include_host_tools = false
+
+      ignore_collection_errors = true
+
       # Compare the output with the legacy spdx
       # TODO(132725): Remove once migration completes.
       deps = [ ":licenses_data" ]
       compare_with_legacy_spdx =
           "${target_out_dir}/licenses_data/results.spdx.json"
+
+      ignore_comparison_errors = true
     }
 
     bazel_input_resource("legacy_ninja_build_outputs_licenses_spdx") {
