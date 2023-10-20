@@ -425,10 +425,11 @@ func WithTargetDuration(
 	shards []*Shard,
 	targetDuration time.Duration,
 	targetTestCount,
+	maxShardSize,
 	maxShardsPerEnvironment int,
 	testDurations TestDurationsMap,
 ) ([]*Shard, time.Duration) {
-	if targetDuration <= 0 && targetTestCount <= 0 {
+	if targetDuration <= 0 && targetTestCount <= 0 && maxShardSize <= 0 {
 		return shards, targetDuration
 	}
 	if maxShardsPerEnvironment <= 0 {
@@ -436,13 +437,18 @@ func WithTargetDuration(
 	}
 
 	shardsPerEnv := make(map[string][]*Shard)
+	targetDurationPerEnv := make(map[string]time.Duration)
 	for _, shard := range shards {
 		envName := environmentName(shard.Env)
 		shardsPerEnv[envName] = append(shardsPerEnv[envName], shard)
+		targetDurationPerEnv[envName] = targetDuration
 	}
 
+	largestTargetDuration := time.Duration(0)
 	if targetDuration > 0 {
-		for _, shards := range shardsPerEnv {
+		for env, shards := range shardsPerEnv {
+			totalTestsPerEnv := 0
+			targetDurationForEnv := targetDuration
 			var shardDuration time.Duration
 			for _, shard := range shards {
 				// If any single test is expected to take longer than `targetDuration`,
@@ -451,20 +457,42 @@ func WithTargetDuration(
 				// expected duration as the target duration.
 				for _, t := range shard.Tests {
 					duration := testDurations.Get(t).MedianDuration
-					if duration > targetDuration {
-						targetDuration = duration
+					if duration > targetDurationForEnv {
+						targetDurationForEnv = duration
 					}
 					shardDuration += duration * time.Duration(t.minRequiredRuns())
 				}
+				totalTestsPerEnv += len(shard.Tests)
 			}
-			// If any environment would exceed the maximum shard count, then its
+
+			// If any environment would exceed the maximum shard count (either because the total
+			// shard duration is too long or the total test count is too big), then its
 			// shard durations will exceed the specified target duration. So
-			// increase the target duration accordingly for the other
-			// environments.
-			subShardCount := divRoundUp(int(shardDuration), int(targetDuration))
+			// increase the target duration accordingly.
+			subShardCount := divRoundUp(int(shardDuration), int(targetDurationForEnv))
 			if subShardCount > maxShardsPerEnvironment {
-				targetDuration = time.Duration(divRoundUp(int(shardDuration), maxShardsPerEnvironment))
+				subShardCount = maxShardsPerEnvironment
+			} else if subShardCount > 0 {
+				// If the number of shards does not exceed the max shards per env,
+				// then check that the average tests per shards wouldn't exceed
+				// the max shard size. If it does, increase the expected number
+				// of shards to try to respect the maxShardSize as long as it fits
+				// within the max shards per env.
+				avgTestsPerShard := divRoundUp(totalTestsPerEnv, subShardCount)
+				if maxShardSize > 0 && avgTestsPerShard > maxShardSize {
+					subShardCount = divRoundUp(totalTestsPerEnv, maxShardSize)
+					if subShardCount > maxShardsPerEnvironment {
+						subShardCount = maxShardsPerEnvironment
+					}
+				}
 			}
+			if subShardCount > 0 {
+				targetDurationForEnv = time.Duration(divRoundUp(int(shardDuration), subShardCount))
+			}
+			if targetDurationForEnv > largestTargetDuration {
+				largestTargetDuration = targetDurationForEnv
+			}
+			targetDurationPerEnv[env] = targetDurationForEnv
 		}
 	}
 
@@ -472,11 +500,19 @@ func WithTargetDuration(
 	for _, shard := range shards {
 		numNewShards := 0
 		if targetDuration > 0 {
+			var targetDurationForShard time.Duration
+			if maxShardSize > 0 {
+				// If we're limiting by max shard size, then the target duration per env might be different.
+				targetDurationForShard = targetDurationPerEnv[environmentName(shard.Env)]
+			} else {
+				// Otherwise use the largest duration size.
+				targetDurationForShard = largestTargetDuration
+			}
 			var total time.Duration
 			for _, t := range shard.Tests {
 				total += testDurations.Get(t).MedianDuration * time.Duration(t.minRequiredRuns())
 			}
-			numNewShards = divRoundUp(int(total), int(targetDuration))
+			numNewShards = divRoundUp(int(total), int(targetDurationForShard))
 		} else {
 			var total int
 			for _, t := range shard.Tests {

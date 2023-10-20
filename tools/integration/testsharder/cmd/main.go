@@ -43,6 +43,7 @@ type testsharderFlags struct {
 	targetDurationSecs             int
 	perTestTimeoutSecs             int
 	maxShardsPerEnvironment        int
+	maxShardSize                   int
 	affectedTestsPath              string
 	affectedTestsMaxAttempts       int
 	affectedTestsMultiplyThreshold int
@@ -65,13 +66,14 @@ func parseFlags() testsharderFlags {
 	flag.StringVar(&flags.modifiersPath, "modifiers", "", "path to the json manifest containing tests to modify")
 	flag.IntVar(&flags.targetDurationSecs, "target-duration-secs", 0, "approximate duration that each shard should run in")
 	flag.IntVar(&flags.maxShardsPerEnvironment, "max-shards-per-env", 8, "maximum shards allowed per environment. If <= 0, no max will be set")
+	flag.IntVar(&flags.maxShardSize, "max-shard-size", 0, "target max number of tests per shard. It will only have effect if used with target-duration-secs to further "+
+		"limit the number of tests per shard if the calculated average tests per shard would exceed max-shard-size after sharding by duration. This is only a soft "+
+		"maximum and is used to make the average shard size not exceed the max size, but ultimately the shards will be sharded by duration, so some shards may have "+
+		"more than the max number of tests while others will have less. However, if max-shards-per-env is set, that will take precedence over max-shard-size, which "+
+		"may result in all shards exceeding the max size in order to fit within the max number of shards per environment.")
 	// TODO(fxbug.dev/10456): Support different timeouts for different tests.
 	flag.IntVar(&flags.perTestTimeoutSecs, "per-test-timeout-secs", 0, "per-test timeout, applied to all tests. If <= 0, no timeout will be set")
-	// Despite being a misnomer, this argument is still called -max-shard-size
-	// for legacy reasons. If it becomes confusing, we can create a new
-	// target_test_count fuchsia.proto field and do a soft transition with the
-	// recipes to start setting the renamed argument instead.
-	flag.IntVar(&flags.targetTestCount, "max-shard-size", 0, "target number of tests per shard. If <= 0, will be ignored. Otherwise, tests will be placed into more, smaller shards")
+	flag.IntVar(&flags.targetTestCount, "target-test-count", 0, "target number of tests per shard. If <= 0, will be ignored. Otherwise, tests will be placed into more, smaller shards")
 	flag.StringVar(&flags.affectedTestsPath, "affected-tests", "", "path to a file containing names of tests affected by the change being tested. One test name per line.")
 	flag.IntVar(&flags.affectedTestsMaxAttempts, "affected-tests-max-attempts", 2, "maximum attempts for each affected test. Only applied to tests that are not multiplied")
 	flag.IntVar(&flags.affectedTestsMultiplyThreshold, "affected-tests-multiply-threshold", 0, "if there are <= this many tests in -affected-tests, they may be multplied "+
@@ -136,6 +138,17 @@ func execute(ctx context.Context, flags testsharderFlags, m buildModules) error 
 	targetDuration := time.Duration(flags.targetDurationSecs) * time.Second
 	if flags.targetTestCount > 0 && targetDuration > 0 {
 		return fmt.Errorf("max-shard-size and target-duration-secs cannot both be set")
+	}
+
+	if flags.maxShardSize > 0 {
+		if flags.targetTestCount > 0 {
+			return fmt.Errorf("max-shard-size has no effect when used with target-test-count")
+		}
+		if targetDuration == 0 {
+			// If no target duration is set, then max shard size will effectively just
+			// become the target test count.
+			flags.targetTestCount = flags.maxShardSize
+		}
 	}
 
 	perTestTimeout := time.Duration(flags.perTestTimeoutSecs) * time.Second
@@ -283,7 +296,7 @@ func execute(ctx context.Context, flags testsharderFlags, m buildModules) error 
 		shards = append(shards, nonhermeticShards...)
 	}
 
-	shards, newTargetDuration := testsharder.WithTargetDuration(shards, targetDuration, flags.targetTestCount, flags.maxShardsPerEnvironment, testDurations)
+	shards, newTargetDuration := testsharder.WithTargetDuration(shards, targetDuration, flags.targetTestCount, flags.maxShardSize, flags.maxShardsPerEnvironment, testDurations)
 
 	// Add the multiplied shards back into the list of shards to run.
 	if newTargetDuration > targetDuration {
