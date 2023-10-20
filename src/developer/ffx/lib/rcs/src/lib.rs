@@ -10,7 +10,10 @@ use fidl_fuchsia_developer_remotecontrol::{
     ConnectCapabilityError, IdentifyHostError, RemoteControlMarker, RemoteControlProxy,
 };
 use fidl_fuchsia_overnet_protocol::NodeId;
-use fidl_fuchsia_sys2::{RealmQueryMarker, RealmQueryProxy};
+use fidl_fuchsia_sys2::{
+    LifecycleControllerMarker, LifecycleControllerProxy, RealmQueryMarker, RealmQueryProxy,
+    RouteValidatorMarker, RouteValidatorProxy,
+};
 use futures::{StreamExt, TryFutureExt};
 use std::{
     hash::{Hash, Hasher},
@@ -281,19 +284,40 @@ pub async fn open_with_timeout<P: DiscoverableProtocolMarker>(
         .await
 }
 
-pub async fn root_realm_query(
+async fn get_cf_root_from_namespace<M: fidl::endpoints::DiscoverableProtocolMarker>(
     rcs_proxy: &RemoteControlProxy,
     timeout: Duration,
-) -> Result<RealmQueryProxy> {
-    let (proxy, server_end) = fidl::endpoints::create_proxy::<RealmQueryMarker>()?;
+) -> Result<M::Proxy> {
+    let (proxy, server_end) = fidl::endpoints::create_proxy::<M>()?;
     open_with_timeout_at(
         timeout,
         REMOTE_CONTROL_MONIKER,
         OpenDirType::NamespaceDir,
-        &format!("svc/{}.root", RealmQueryMarker::PROTOCOL_NAME),
+        &format!("svc/{}.root", M::PROTOCOL_NAME),
         rcs_proxy,
         server_end.into_channel(),
     )
     .await?;
     Ok(proxy)
+}
+
+pub async fn root_realm_query(
+    rcs_proxy: &RemoteControlProxy,
+    timeout: Duration,
+) -> Result<RealmQueryProxy> {
+    get_cf_root_from_namespace::<RealmQueryMarker>(rcs_proxy, timeout).await
+}
+
+pub async fn root_lifecycle_controller(
+    rcs_proxy: &RemoteControlProxy,
+    timeout: Duration,
+) -> Result<LifecycleControllerProxy> {
+    get_cf_root_from_namespace::<LifecycleControllerMarker>(rcs_proxy, timeout).await
+}
+
+pub async fn root_route_validator(
+    rcs_proxy: &RemoteControlProxy,
+    timeout: Duration,
+) -> Result<RouteValidatorProxy> {
+    get_cf_root_from_namespace::<RouteValidatorMarker>(rcs_proxy, timeout).await
 }

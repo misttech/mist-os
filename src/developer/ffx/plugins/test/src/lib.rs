@@ -491,7 +491,11 @@ mod test {
                         } => {
                             assert_eq!(moniker, "core/remote-control");
                             assert_eq!(capability_set, fsys::OpenDirType::NamespaceDir);
-                            assert_eq!(capability_name, "svc/fuchsia.sys2.RealmQuery.root");
+                            assert!(
+                                capability_name == "svc/fuchsia.sys2.RealmQuery.root"
+                                    || capability_name
+                                        == "svc/fuchsia.sys2.LifecycleController.root"
+                            );
                             server_channels.push(server_channel);
                             responder.send(Ok(())).expect("error sending EchoString response");
                         }

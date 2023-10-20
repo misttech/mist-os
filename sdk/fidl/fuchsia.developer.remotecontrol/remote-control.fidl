@@ -52,11 +52,15 @@ open protocol RemoteControl {
     }) -> () error zx.Status;
 
     /// Connects to the root [`fuchsia.sys2/LifecycleController`] protocol.
+    @deprecated(
+            "Please use `OpenCapability` to connect to `fuchsia.sys2.LifecycleController.root` in the namespace of `core/remote-control`")
     flexible RootLifecycleController(resource struct {
         server server_end:sys2.LifecycleController;
     }) -> () error zx.Status;
 
     /// Connects to the root [`fuchsia.sys2/RouteValidator`] protocol.
+    @deprecated(
+            "Please use `OpenCapability` to connect to `fuchsia.sys2.RouteValidator.root` in the namespace of `core/remote-control`")
     flexible RootRouteValidator(resource struct {
         server server_end:sys2.RouteValidator;
     }) -> () error zx.Status;
