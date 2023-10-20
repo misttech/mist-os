@@ -11,6 +11,7 @@
 
 #include <optional>
 #include <string>
+#include <vector>
 
 #include <bind/fuchsia/platform/cpp/bind.h>
 #include <sdk/lib/driver/component/cpp/composite_node_spec.h>
@@ -24,10 +25,15 @@ namespace fdf_devicetree {
 
 constexpr const char kPhandleProp[] = "phandle";
 
-Node::Node(const std::string_view name, devicetree::Properties properties, uint32_t id,
-           NodeManager *manager)
-    : name_(name), id_(id), manager_(manager) {
+Node::Node(Node *parent, const std::string_view name, devicetree::Properties properties,
+           uint32_t id, NodeManager *manager)
+    : parent_(parent), name_(name), id_(id), manager_(manager) {
   ZX_ASSERT(manager_);
+
+  if (parent_) {
+    parent_->children_.push_back(this);
+  }
+
   pbus_node_.did() = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_DEVICETREE;
   pbus_node_.vid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_GENERIC;
   pbus_node_.instance_id() = id;
@@ -143,6 +149,17 @@ zx::result<> Node::Publish(fdf::WireSyncClient<fuchsia_hardware_platform_bus::Pl
 
 zx::result<ReferenceNode> Node::GetReferenceNode(Phandle parent) {
   return manager_->GetReferenceNode(parent);
+}
+
+ParentNode Node::parent() { return ParentNode(parent_); }
+
+std::vector<ChildNode> Node::children() {
+  std::vector<ChildNode> children;
+  children.reserve(children_.size());
+  for (Node *child : children_) {
+    children.emplace_back(child);
+  }
+  return children;
 }
 
 }  // namespace fdf_devicetree

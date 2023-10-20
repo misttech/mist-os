@@ -22,6 +22,8 @@ using Phandle = uint32_t;
 
 class Visitor;
 class ReferenceNode;
+class ParentNode;
+class ChildNode;
 
 // Defines interface that an entity managing the Node should implement.
 class NodeManager {
@@ -33,7 +35,7 @@ class NodeManager {
 // Node represents the nodes in the device tree along with it's properties.
 class Node {
  public:
-  explicit Node(std::string_view name, devicetree::Properties properties, uint32_t id,
+  explicit Node(Node* parent, std::string_view name, devicetree::Properties properties, uint32_t id,
                 NodeManager* manager);
 
   // Add |prop| as a bind property of the device, when it is eventually published.
@@ -52,6 +54,10 @@ class Node {
 
   std::string_view name() const { return name_; }
 
+  ParentNode parent();
+
+  std::vector<ChildNode> children();
+
   const std::unordered_map<std::string_view, devicetree::PropertyValue>& properties() const {
     return properties_;
   }
@@ -61,10 +67,11 @@ class Node {
   std::optional<Phandle> phandle() { return phandle_; }
 
  private:
+  Node* parent_;
   const std::string_view name_;
   std::unordered_map<std::string_view, devicetree::PropertyValue> properties_;
-
   std::optional<Phandle> phandle_;
+  std::vector<Node*> children_;
 
   // Platform bus node.
   fuchsia_hardware_platform_bus::Node pbus_node_;
@@ -98,7 +105,31 @@ class ReferenceNode {
   std::string_view name() const { return node_->name(); }
 
  private:
-  Node* node_;
+  const Node* node_;
+};
+
+class ParentNode {
+ public:
+  explicit ParentNode(Node* node) : node_(node) {}
+
+  std::string_view name() const { return node_->name(); }
+
+  explicit operator bool() const { return (node_ != nullptr); }
+
+ private:
+  const Node* node_;
+};
+
+class ChildNode {
+ public:
+  explicit ChildNode(Node* node) : node_(node) {}
+
+  std::string_view name() const { return node_->name(); }
+
+  explicit operator bool() const { return (node_ != nullptr); }
+
+ private:
+  const Node* node_;
 };
 
 }  // namespace fdf_devicetree

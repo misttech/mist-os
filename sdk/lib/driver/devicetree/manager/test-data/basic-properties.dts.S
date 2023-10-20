@@ -33,4 +33,14 @@
         compatible = "fuchsia,property2-child";
         property2 = <&sample_parent>;
     };
+
+    parent-device {
+        compatible = "fuchsia,parent";
+        child1 {
+            compatible = "fuchsia,child";
+        };
+        child2 {
+            compatible = "fuchsia,child";
+        };
+    };
 };

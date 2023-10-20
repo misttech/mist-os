@@ -5,6 +5,18 @@
 	#size-cells = <0x02>;
 	compatible = "fuchsia,sample-dt";
 
+	parent-device {
+		compatible = "fuchsia,parent";
+
+		child1 {
+			compatible = "fuchsia,child";
+		};
+
+		child2 {
+			compatible = "fuchsia,child";
+		};
+	};
+
 	property2-child {
 		compatible = "fuchsia,property2-child";
 		property2 = <0x01>;

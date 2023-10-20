@@ -10,6 +10,9 @@
 #include <lib/zbi-format/zbi.h>
 #include <lib/zx/result.h>
 
+#include <cstddef>
+#include <list>
+
 namespace fdf {
 using namespace fuchsia_driver_framework;
 }
@@ -17,7 +20,6 @@ using namespace fuchsia_driver_framework;
 namespace {
 std::string GetPath(const devicetree::NodePath& node_path) {
   std::string path;
-
   for (std::string_view p : node_path) {
     // Skip adding '/' for the root node.
     if (path.length() != 1) {
@@ -27,6 +29,25 @@ std::string GetPath(const devicetree::NodePath& node_path) {
   }
   return path;
 }
+
+std::string GetParentPath(const devicetree::NodePath& node_path) {
+  if (node_path.size() <= 1) {
+    // root node.
+    return "";
+  }
+
+  std::string path;
+  auto it = node_path.begin();
+  for (size_t i = 0; i < (node_path.size() - 1); i++, it++) {
+    // Skip adding '/' for the root node.
+    if (path.length() != 1) {
+      path.append("/");
+    }
+    path.append(it->data());
+  }
+  return path;
+}
+
 }  // namespace
 
 namespace fdf_devicetree {
@@ -78,9 +99,14 @@ zx::result<> Manager::Walk(Visitor& visitor) {
                        const devicetree::PropertyDecoder& decoder) {
     FDF_LOG(DEBUG, "Found node - %.*s", static_cast<int>(path.back().length()), path.back().data());
 
+    Node* parent = nullptr;
+    if (path != "/") {
+      parent = nodes_by_path_[GetParentPath(path)];
+    }
+
     // Create a node.
     const devicetree::Properties& properties = decoder.properties();
-    auto node = std::make_unique<Node>(path.back(), properties, node_id_++, this);
+    auto node = std::make_unique<Node>(parent, path.back(), properties, node_id_++, this);
     Node* ptr = node.get();
     nodes_publish_order_.emplace_back(std::move(node));
     FDF_LOG(DEBUG, "Node[%d] - %s added for publishing", node_id_, path.back().data());

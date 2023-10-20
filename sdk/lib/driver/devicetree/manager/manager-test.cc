@@ -8,9 +8,12 @@
 #include <lib/driver/devicetree/visitors/default/default.h>
 #include <lib/driver/devicetree/visitors/driver-visitor.h>
 #include <lib/driver/devicetree/visitors/registry.h>
+#include <zircon/errors.h>
 
+#include <cstddef>
 #include <memory>
 #include <unordered_set>
+#include <vector>
 
 #include <bind/fuchsia/devicetree/cpp/bind.h>
 #include <bind/fuchsia/platform/cpp/bind.h>
@@ -155,7 +158,7 @@ TEST_F(ManagerTest, TestMetadata) {
 
   ASSERT_TRUE(DoPublish(manager).is_ok());
 
-  ASSERT_EQ(5lu, env().SyncCall(&testing::FakeEnvWrapper::pbus_node_size));
+  ASSERT_EQ(8lu, env().SyncCall(&testing::FakeEnvWrapper::pbus_node_size));
 
   // First node is devicetree root. Second one is the sample-device. Check
   // metadata of sample-device.
@@ -240,6 +243,74 @@ TEST_F(ManagerTest, TestReferences) {
   ASSERT_EQ(parent_visitor_ptr->finalize_called, 1u);
   ASSERT_EQ(parent_visitor_ptr->reference1_specifier.size(), 1u);
   ASSERT_EQ(parent_visitor_ptr->reference1_specifier[0][0], PROPERTY1_SPECIFIER);
+
+  ASSERT_TRUE(DoPublish(manager).is_ok());
+}
+
+TEST_F(ManagerTest, TestParentChild) {
+  Manager manager(testing::LoadTestBlob("/pkg/test-data/basic-properties.dtb"));
+
+  class ParentVisitor final : public DriverVisitor {
+   public:
+    ParentVisitor() : DriverVisitor("fuchsia,parent") {}
+
+    zx::result<> DriverVisit(Node& node, const devicetree::PropertyDecoder& decoder) override {
+      auto children = node.children();
+      child_count = children.size();
+      for (ChildNode& child : children) {
+        child_names.push_back(child.name());
+      }
+      name = node.name();
+      return zx::ok();
+    }
+    size_t child_count = 0;
+    std::vector<std::string_view> child_names;
+    std::string_view name;
+  };
+
+  class ChildVisitor final : public DriverVisitor {
+   public:
+    ChildVisitor() : DriverVisitor("fuchsia,child") {}
+
+    zx::result<> DriverVisit(Node& node, const devicetree::PropertyDecoder& decoder) override {
+      count++;
+      if (!parent_name.empty() && parent_name != node.parent().name()) {
+        return zx::error(ZX_ERR_INTERNAL);
+      }
+      parent_name = node.parent().name();
+      names.push_back(node.name());
+      return zx::ok();
+    }
+    size_t count = 0;
+    std::vector<std::string_view> names;
+    std::string_view parent_name;
+  };
+
+  auto parent_visitor = std::make_unique<ParentVisitor>();
+  ParentVisitor* parent_visitor_ptr = parent_visitor.get();
+
+  auto child_visitor = std::make_unique<ChildVisitor>();
+  ChildVisitor* child_visitor_ptr = child_visitor.get();
+
+  VisitorRegistry visitors;
+  ASSERT_TRUE(visitors.RegisterVisitor(std::move(parent_visitor)).is_ok());
+  ASSERT_TRUE(visitors.RegisterVisitor(std::move(child_visitor)).is_ok());
+
+  ASSERT_EQ(ZX_OK, manager.Walk(visitors).status_value());
+
+  EXPECT_EQ(parent_visitor_ptr->child_count, child_visitor_ptr->count);
+  EXPECT_EQ(child_visitor_ptr->count, 2u);
+  for (auto child_name : parent_visitor_ptr->child_names) {
+    bool matched = false;
+    for (auto name : child_visitor_ptr->names) {
+      if (name == child_name) {
+        matched = true;
+        break;
+      }
+    }
+    EXPECT_TRUE(matched);
+  }
+  EXPECT_EQ(child_visitor_ptr->parent_name, parent_visitor_ptr->name);
 
   ASSERT_TRUE(DoPublish(manager).is_ok());
 }
