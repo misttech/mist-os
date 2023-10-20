@@ -25,6 +25,17 @@ archives.
 
 From //build/images/args.gni:119
 
+### additional_boards
+
+Additional boards (such as vendor boards) that are to be added to the build
+graph, and built when all boards for a given architecture are built.  These
+boards MUST be valid in the configured default_toolchain, and be for the
+current 'target_cpu'.
+
+**Current value (from the default):** `[]`
+
+From //boards/BUILD.gn:13
+
 ### additional_boot_args
 
 List of arguments to add to /boot/config/additional_boot_args.
@@ -79,7 +90,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2083
+From //build/config/BUILDCONFIG.gn:2087
 
 ### allowed_test_device_types
 
@@ -196,7 +207,7 @@ From //build/images/vbmeta.gni:20
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/android/platform/external/avb/test/data/atx_metadata.bin"`
 
-From //boards/common/x64-common.gni:100
+From //boards/common/x64-common.gni:101
 
 **Overridden from the default:** `""`
 
@@ -216,7 +227,7 @@ From //build/images/vbmeta.gni:17
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/android/platform/external/avb/test/data/testkey_atx_psk.pem"`
 
-From //boards/common/x64-common.gni:98
+From //boards/common/x64-common.gni:99
 
 **Overridden from the default:** `""`
 
@@ -377,7 +388,7 @@ From //build/images/filesystem_limits.gni:17
 
 **Current value for `target_cpu = "x64"`:** `10485760000`
 
-From //boards/common/x64-common.gni:102
+From //boards/common/x64-common.gni:103
 
 **Overridden from the default:** `false`
 
@@ -615,7 +626,19 @@ From //build/board.gni:11
 A list of package labels to include in the 'base' package set. Used by the
 board definition rather than the product definition.
 
-**Current value (from the default):** `[]`
+**Current value for `target_cpu = "arm64"`:** `["//src/hwinfo:default_board_config"]`
+
+From //boards/common/arm64-common.gni:28
+
+**Overridden from the default:** `[]`
+
+From //build/board.gni:29
+
+**Current value for `target_cpu = "x64"`:** `["//src/factory/factory_store_providers/config/qemu", "//src/hwinfo:default_board_config"]`
+
+From //boards/common/x64-common.gni:82
+
+**Overridden from the default:** `[]`
 
 From //build/board.gni:29
 
@@ -900,7 +923,7 @@ From //build/images/args.gni:29
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/common/x64-common.gni:106
+From //boards/common/x64-common.gni:107
 
 **Overridden from the default:** `false`
 
@@ -3078,7 +3101,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1818
+From //build/config/BUILDCONFIG.gn:1822
 
 ### extra_vbmeta_descriptors
 
@@ -4300,7 +4323,7 @@ Each element of the list is one variant, which is a scope defining:
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1623
+From //build/config/BUILDCONFIG.gn:1627
 
 ### legacy_base_driver_package_labels
 
@@ -4519,7 +4542,7 @@ From //build/images/filesystem_limits.gni:12
 
 **Current value for `target_cpu = "x64"`:** `5216665600`
 
-From //boards/common/x64-common.gni:104
+From //boards/common/x64-common.gni:105
 
 **Overridden from the default:** `false`
 
@@ -5279,7 +5302,7 @@ From //build/board.gni:94
 
 **Current value for `target_cpu = "x64"`:** `["//out/not-default/fuchsia.esp.blk"]`
 
-From //boards/common/x64-common.gni:94
+From //boards/common/x64-common.gni:95
 
 **Overridden from the default:** `[]`
 
@@ -5300,7 +5323,7 @@ From //build/board.gni:93
 
 **Current value for `target_cpu = "x64"`:** `"//boards/partitions:x64"`
 
-From //boards/common/x64-common.gni:93
+From //boards/common/x64-common.gni:94
 
 **Overridden from the default:** `false`
 
@@ -7770,7 +7793,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2073
+From //build/config/BUILDCONFIG.gn:2077
 
 ### select_variant_canonical
 
@@ -7780,7 +7803,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2078
+From //build/config/BUILDCONFIG.gn:2082
 
 ### select_variant_shortcuts
 
@@ -7838,7 +7861,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1864
+From //build/config/BUILDCONFIG.gn:1868
 
 ### size_checker_input
 
@@ -8329,7 +8352,7 @@ From //build/config/sanitizers/sanitizer_default_options.gni:47
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1848
+From //build/config/BUILDCONFIG.gn:1852
 
 ### universe_package_labels
 
@@ -8502,7 +8525,7 @@ From //build/images/args.gni:26
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/common/x64-common.gni:107
+From //boards/common/x64-common.gni:108
 
 **Overridden from the default:** `false`
 
@@ -8681,7 +8704,7 @@ From //build/images/vbmeta.gni:14
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/common/x64-common.gni:96
+From //boards/common/x64-common.gni:97
 
 **Overridden from the default:** `false`
 
@@ -9088,6 +9111,15 @@ TODO(fxbug.dev/87237): move this to boards.
 **Current value (from the default):** `true`
 
 From //build/config/arm.gni:9
+
+### disable_prebuilt_arm_mali_vulkan
+
+Disable packaging a prebuilt ARM Mali Vulkan ICD. This can save space if a
+test ICD is being used instead.
+
+**Current value (from the default):** `false`
+
+From //src/graphics/drivers/arm-mali/icd/prebuilt_arm_mali.gni:8
 
 ## `target_cpu = "x64"`
 
