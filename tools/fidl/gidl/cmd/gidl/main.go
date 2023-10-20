@@ -6,7 +6,6 @@ package main
 
 import (
 	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/backend/cpp"
-	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/backend/dart"
 	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/backend/driver_cpp"
 	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/backend/driver_llcpp"
 	"go.fuchsia.dev/fuchsia/tools/fidl/gidl/backend/dynfidl"
@@ -23,7 +22,6 @@ import (
 var generators = map[ir.OutputType]map[ir.Language]cli.Generator{
 	ir.OutputTypeConformance: {
 		ir.LanguageCpp:          cpp.GenerateConformanceTests,
-		ir.LanguageDart:         dart.GenerateConformanceTests,
 		ir.LanguageDynfidl:      dynfidl.GenerateConformanceTests,
 		ir.LanguageFuzzerCorpus: fuzzer_corpus.GenerateConformanceTests,
 		ir.LanguageGo:           golang.GenerateConformanceTests,
@@ -33,7 +31,6 @@ var generators = map[ir.OutputType]map[ir.Language]cli.Generator{
 	},
 	ir.OutputTypeBenchmark: {
 		ir.LanguageCpp:         cpp.GenerateBenchmarks,
-		ir.LanguageDart:        dart.GenerateBenchmarks,
 		ir.LanguageDriverCpp:   driver_cpp.GenerateBenchmarks,
 		ir.LanguageDriverLlcpp: driver_llcpp.GenerateBenchmarks,
 		ir.LanguageGo:          golang.GenerateBenchmarks,

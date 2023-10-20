@@ -45,10 +45,6 @@ conformance_golden_items = [
     language = "dynfidl"
     extension = "rs"
   },
-  {
-    language = "dart"
-    extension = "dart"
-  },
 ]
 
 foreach(item, conformance_golden_items) {
