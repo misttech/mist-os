@@ -5,6 +5,7 @@
 use {
     anyhow::Context as _,
     serde::{Deserialize, Serialize},
+    std::collections::HashSet,
     std::io::{Seek, SeekFrom},
     std::{fs, io, path},
 };
@@ -358,6 +359,33 @@ impl<'a> FileBackedConfig<'a> {
 pub enum NameGenerationError<'a> {
     GenerationError(anyhow::Error),
     FileUpdateError { name: &'a str, err: anyhow::Error },
+}
+
+// TODO(fxbug.dev/135094): Add interface matchers for naming policy
+#[derive(Debug, Deserialize, Eq, Hash, PartialEq)]
+#[serde(deny_unknown_fields, rename_all = "lowercase")]
+pub enum MatchingRule {}
+
+// TODO(fxbug.dev/135097): Create framework for meta/static naming rules
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields, rename_all = "lowercase")]
+pub enum NameCompositionRule {}
+
+/// A rule that dictates how interfaces that align with the property matching
+/// rules should be named.
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields, rename_all = "lowercase")]
+pub struct NamingRule {
+    // TODO(fxbug.dev/135094): Add and use interface matching rules
+    /// A set of rules to check against an interface's properties. All rules
+    /// must apply for the naming scheme to take effect.
+    #[allow(unused)]
+    pub matchers: HashSet<MatchingRule>,
+    // TODO(fxbug.dev/135098): Add static naming rules
+    // TODO(fxbug.dev/135106): Add meta naming rules
+    /// The rules to apply to the interface to produce the interface's name.
+    #[allow(unused)]
+    pub naming_scheme: Vec<NameCompositionRule>,
 }
 
 #[cfg(test)]

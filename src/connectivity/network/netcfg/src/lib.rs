@@ -367,6 +367,8 @@ struct Config {
     pub install_only: bool,
     #[serde(default)]
     pub interface_name_prefix: String,
+    #[serde(default)]
+    pub interface_naming_policy: Vec<interface::NamingRule>,
 }
 
 impl Config {
@@ -590,6 +592,10 @@ pub struct NetCfg<'a> {
     install_only: bool,
     // Makes sure that all interfaces added by netcfg have the specified prefix.
     interface_name_prefix: String,
+    // TODO(fxbug.dev/135109): Begin using configuration based naming policy
+    // Policy configuration to determine the name of an interface.
+    #[allow(unused)]
+    interface_naming_policy: Vec<interface::NamingRule>,
 }
 
 /// Returns a [`fnet_name::DnsServer_`] with a static source from a [`std::net::IpAddr`].
@@ -783,6 +789,7 @@ impl<'a> NetCfg<'a> {
         allowed_upstream_device_classes: &'a HashSet<DeviceClass>,
         install_only: bool,
         interface_name_prefix: String,
+        interface_naming_policy: Vec<interface::NamingRule>,
     ) -> Result<NetCfg<'a>, anyhow::Error> {
         let svc_dir = clone_namespace_svc().context("error cloning svc directory handle")?;
         let stack = svc_connect::<fnet_stack::StackMarker>(&svc_dir)
@@ -846,6 +853,7 @@ impl<'a> NetCfg<'a> {
             allowed_upstream_device_classes,
             install_only,
             interface_name_prefix,
+            interface_naming_policy,
         })
     }
 
@@ -2743,6 +2751,7 @@ pub async fn run<M: Mode>() -> Result<(), anyhow::Error> {
         forwarded_device_classes,
         install_only,
         interface_name_prefix,
+        interface_naming_policy,
     } = Config::load(config_data)?;
 
     let mut netcfg = NetCfg::new(
@@ -2753,6 +2762,7 @@ pub async fn run<M: Mode>() -> Result<(), anyhow::Error> {
         &allowed_upstream_device_classes,
         install_only,
         interface_name_prefix,
+        interface_naming_policy,
     )
     .await
     .context("error creating new netcfg instance")?;
@@ -3011,6 +3021,7 @@ mod tests {
                 dhcpv6_prefixes_streams: dhcpv6::PrefixesStreamMap::empty(),
                 install_only: false,
                 interface_name_prefix: String::new(),
+                interface_naming_policy: Default::default(),
             },
             ServerEnds {
                 stack: stack_server
@@ -4494,7 +4505,8 @@ mod tests {
   "enable_dhcpv6": true,
   "forwarded_device_classes": { "ipv4": [ "ethernet" ], "ipv6": [ "wlan" ] },
   "install_only": false,
-  "interface_name_prefix": "hello"
+  "interface_name_prefix": "hello",
+  "interface_naming_policy": [ { "matchers": [], "naming_scheme": [] } ]
 }
 "#;
 
@@ -4509,6 +4521,7 @@ mod tests {
             forwarded_device_classes,
             install_only,
             interface_name_prefix,
+            interface_naming_policy,
         } = Config::load_str(config_str).unwrap();
 
         assert_eq!(vec!["8.8.8.8".parse::<std::net::IpAddr>().unwrap()], servers);
@@ -4542,6 +4555,12 @@ mod tests {
 
         assert_eq!(install_only, false);
         assert_eq!(interface_name_prefix, "hello".to_string());
+
+        let expected_naming_policy = Vec::from([interface::NamingRule {
+            matchers: HashSet::new(),
+            naming_scheme: Vec::new(),
+        }]);
+        assert_eq!(interface_naming_policy, expected_naming_policy);
     }
 
     #[test]
@@ -4569,6 +4588,7 @@ mod tests {
             forwarded_device_classes: _,
             install_only,
             interface_name_prefix,
+            interface_naming_policy,
         } = Config::load_str(config_str).unwrap();
 
         assert_eq!(allowed_upstream_device_classes, Default::default());
@@ -4577,6 +4597,7 @@ mod tests {
         assert_eq!(enable_dhcpv6, true);
         assert_eq!(install_only, false);
         assert_eq!(interface_name_prefix, "".to_string());
+        assert_eq!(interface_naming_policy.len(), 0);
     }
 
     #[test_case(
@@ -4617,6 +4638,7 @@ mod tests {
             forwarded_device_classes: _,
             install_only: _,
             interface_name_prefix: _,
+            interface_naming_policy: _,
         } = Config::load_str(&config_str).unwrap();
 
         let expected_metrics = InterfaceMetrics { wlan_metric, eth_metric };
@@ -4736,6 +4758,20 @@ mod tests {
   "filter_enabled_interface_types": [],
   "allowed_upstream_device_classes": [],
   "forwarded_device_classes": { "ipv4": [], "ipv6": [], "speling": [] }
+}
+"#,
+            r#"
+{
+  "dns_config": { "servers": [] },
+  "filter_config": {
+    "rules": [],
+    "nat_rules": [],
+    "rdr_rules": []
+  },
+  "filter_enabled_interface_types": [],
+  "allowed_upstream_device_classes": [],
+  "forwarded_device_classes": { "ipv4": [], "ipv6": [] },
+  "interface_naming_policy": [ { "matchers": [], "naming_scheme": [], "speling": [] } ]
 }
 "#,
         ];
