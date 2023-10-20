@@ -73,7 +73,7 @@ struct ExpectedChosen {
 };
 
 using AllUartDrivers =
-    std::variant<uart::null::Driver, uart::ns8250::LegacyDw8250Driver, uart::pl011::Driver,
+    std::variant<uart::null::Driver, uart::ns8250::Dw8250Driver, uart::pl011::Driver,
                  uart::ns8250::Mmio8Driver, uart::ns8250::Mmio32Driver>;
 
 template <typename ChosenItemType>
@@ -301,7 +301,7 @@ TEST_F(ChosenNodeMatcherTest, VisionFive2) {
                          .ramdisk_start = 0x48100000,
                          .ramdisk_end = 0x48fb3df5,
                          .cmdline = kCmdline,
-                         .uart_config_name = uart::ns8250::LegacyDw8250Driver::config_name(),
+                         .uart_config_name = uart::ns8250::Dw8250Driver::config_name(),
                          .uart_config =
                              {
                                  .mmio_phys = 0x10000000,

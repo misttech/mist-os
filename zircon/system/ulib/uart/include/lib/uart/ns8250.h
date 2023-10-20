@@ -506,7 +506,7 @@ using Mmio8Driver = DriverImpl<ZBI_KERNEL_DRIVER_I8250_MMIO8_UART, zbi_dcfg_simp
 using PioDriver = DriverImpl<ZBI_KERNEL_DRIVER_I8250_PIO_UART, zbi_dcfg_simple_pio_t>;
 
 // uart::KernelDriver UartDriver API for PIO via MMIO using legacy item type.
-using LegacyDw8250Driver = DriverImpl<ZBI_KERNEL_DRIVER_DW8250_UART, zbi_dcfg_simple_t>;
+using Dw8250Driver = DriverImpl<ZBI_KERNEL_DRIVER_DW8250_UART, zbi_dcfg_simple_t>;
 
 }  // namespace ns8250
 }  // namespace uart

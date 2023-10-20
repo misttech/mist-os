@@ -223,8 +223,8 @@ struct PropertyBuilder {
 TEST(UartTests, MatchCompatible) {
   using AllDrivers =
       std::variant<uart::null::Driver, uart::pl011::Driver, uart::ns8250::Mmio32Driver,
-                   uart::ns8250::Mmio8Driver, uart::ns8250::LegacyDw8250Driver,
-                   uart::ns8250::PioDriver, uart::amlogic::Driver>;
+                   uart::ns8250::Mmio8Driver, uart::ns8250::Dw8250Driver, uart::ns8250::PioDriver,
+                   uart::amlogic::Driver>;
   using AllDriver =
       uart::all::KernelDriver<uart::mock::IoProvider, uart::UnsynchronizedPolicy, AllDrivers>;
 
@@ -297,7 +297,7 @@ TEST(UartTests, MatchCompatible) {
     }));
   }
 
-  // Match DWLegacy8250
+  // Match Dw8250
   constexpr std::array kDwCompatibles = {"foo,bar"sv, "snps,dw-apb-uart"sv};
   {
     PropertyBuilder builder;
@@ -325,7 +325,7 @@ TEST(UartTests, MatchCompatible) {
 
     driver.Visit(visit([&](auto&& driver) {
       EXPECT_EQ(driver.uart().extra(), ZBI_KERNEL_DRIVER_DW8250_UART);
-      EXPECT_EQ(driver.uart().config_name(), uart::ns8250::LegacyDw8250Driver::config_name());
+      EXPECT_EQ(driver.uart().config_name(), uart::ns8250::Dw8250Driver::config_name());
       EXPECT_EQ(driver.uart().config().mmio_phys, 1);
       EXPECT_EQ(driver.uart().config().irq, 2);
     }));
