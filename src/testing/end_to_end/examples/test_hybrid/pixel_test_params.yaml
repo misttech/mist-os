@@ -3,5 +3,5 @@ ffx_test_options:
   - FATAL
   - --realm
   - /core/testing:starnix-tests
-ffx_test_url: fuchsia-pkg://fuchsia.com/generic_watch_pixel_test#meta/pixel_test.cm
+ffx_test_url: fuchsia-pkg://fuchsia.com/hermetic_test#meta/hermetic_test.cm
 timeout_sec: 600
