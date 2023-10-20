@@ -151,6 +151,26 @@ who = "Joshua Liebow-Feeser <joshlf@google.com>"
 criteria = ["safe-to-deploy", "ub-risk-2"]
 delta = "0.8.1 -> 0.9.0"
 
+[[audits.ecdsa]]
+who = "Joshua Liebow-Feeser <joshlf@google.com>"
+criteria = ["safe-to-deploy", "ub-risk-2"]
+delta = "0.13.4 -> 0.14.8"
+
+[[audits.elliptic-curve]]
+who = "Joshua Liebow-Feeser <joshlf@google.com>"
+criteria = ["safe-to-deploy", "ub-risk-2"]
+delta = "0.11.12 -> 0.12.3"
+
+[[audits.hkdf]]
+who = "Joshua Liebow-Feeser <joshlf@google.com>"
+criteria = ["safe-to-deploy", "ub-risk-2"]
+delta = "0.11.0 -> 0.12.3"
+
+[[audits.hmac]]
+who = "Joshua Liebow-Feeser <joshlf@google.com>"
+criteria = ["safe-to-deploy", "ub-risk-2"]
+delta = "0.11.0 -> 0.12.1"
+
 [[audits.http-body]]
 who = "Erick Tryzelaar <etryzelaar@google.com>"
 criteria = ["ub-risk-2", "safe-to-run"]
@@ -187,6 +207,21 @@ Issues:
 - https://github.com/nix-rust/nix/pull/1992
 - https://github.com/nix-rust/nix/pull/1993
 """
+
+[[audits.p256]]
+who = "Joshua Liebow-Feeser <joshlf@google.com>"
+criteria = ["safe-to-deploy", "ub-risk-2"]
+delta = "0.10.1 -> 0.11.1"
+
+[[audits.password-hash]]
+who = "Joshua Liebow-Feeser <joshlf@google.com>"
+criteria = ["safe-to-deploy", "ub-risk-2"]
+delta = "0.3.2 -> 0.4.2"
+
+[[audits.pbkdf2]]
+who = "Joshua Liebow-Feeser <joshlf@google.com>"
+criteria = ["safe-to-deploy", "ub-risk-2"]
+delta = "0.9.0 -> 0.11.0"
 
 [[audits.pin-project-lite]]
 who = "David Koloski <dkoloski@google.com>"
