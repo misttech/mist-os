@@ -64,9 +64,8 @@ as an example on how to use the registers driver.
 
    Metadata format is declared in [metadata.fidl][metadata.fidl].
 
-   In the registers board driver (i.e. [vim3-registers][vim3-registers] –
-   if the desired board does not have a board driver for buttons, add
-   one.), make the following changes.
+   In the board driver (i.e. [vim3-registers][vim3-registers]), make the
+   following changes.
 
    a. MMIO
 
