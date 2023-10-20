@@ -128,6 +128,15 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
             let has_softmac = context.board_info.provides_feature("fuchsia::wlan_softmac");
             if has_fullmac || has_softmac {
                 builder.platform_bundle("wlan_base");
+
+                // Add development support on eng and userdebug systems if we have wlan.
+                match context.build_type {
+                    BuildType::Eng | BuildType::UserDebug => {
+                        builder.platform_bundle("wlan_development")
+                    }
+                    _ => {}
+                }
+
                 // Some products require legacy security types to be supported.
                 // Otherwise, they are disabled by default.
                 if connectivity_config.wlan.legacy_privacy_support {

@@ -238,6 +238,7 @@ _userdebug_aib_names = bootstrap_userdebug_platform_aib_names + [
                          "mdns_fuchsia_device_wired_service",
                          "radar_proxy_with_injector",
                          "sl4f",
+                         "wlan_development",
                        ]
 
 # LINT.ThenChange(platform_aib_names.bzl)

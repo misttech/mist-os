@@ -2192,6 +2192,21 @@ assembly_input_bundle("wlan_base") {
   ]
 }
 
+# WLAN development support
+#
+# feature_set_levels: utility, minimal
+# build-types: eng, userdebug
+#
+assembly_input_bundle("wlan_development") {
+  base_packages = [ "//src/connectivity/wlan/tools/wlantool:wlan-dev" ]
+  shell_commands = [
+    {
+      package = "wlan"
+      components = [ "wlan-dev" ]
+    },
+  ]
+}
+
 # WLAN support for WEP and WPA
 #
 # feature_set_levels: utility, minimal

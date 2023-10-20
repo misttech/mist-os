@@ -95,10 +95,7 @@ group("tests") {
 }
 
 group("tools") {
-  deps = [
-    "tools/wlantool:wlan",
-    "wlancfg/tool:donut",
-  ]
+  deps = [ "wlancfg/tool:donut" ]
 }
 
 # (fxbug.dev/127513) Remove after transition that includes WLAN in assembly for most builds.
