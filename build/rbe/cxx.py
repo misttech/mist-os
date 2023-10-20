@@ -409,7 +409,7 @@ class CxxAction(object):
             if driver_flag.startswith("p,"):
                 self._preprocessor_driver_flags.extend(forwarded_flags)
             elif driver_flag.startswith("a,"):
-                self._asssembler_driver_flags.extend(forwarded_flags)
+                self._assembler_driver_flags.extend(forwarded_flags)
             elif driver_flag.startswith("l,"):
                 self._linker_driver_flags.extend(forwarded_flags)
 
