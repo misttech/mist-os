@@ -39,6 +39,7 @@ zx_status_t CopyBufferToPhysicalRegion(UfsMockDevice &mock_device,
 
     auto data_buffer = PrdtMapAndGetVirtualAddress(mock_device, prdt_upiu);
     if (data_buffer.is_error()) {
+      zxlogf(ERROR, "UFS MOCK: Faild to map the data buffer.");
       return data_buffer.status_value();
     }
 
@@ -117,7 +118,11 @@ zx_status_t ScsiCommandProcessor::HandleScsiCommand(
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  return CopyBufferToPhysicalRegion(mock_device_, prdt_upius, data);
+  zx_status_t status = ZX_OK;
+  if (command_upiu.header_flags_r()) {
+    status = CopyBufferToPhysicalRegion(mock_device_, prdt_upius, data);
+  }
+  return status;
 }
 
 zx::result<std::vector<uint8_t>> ScsiCommandProcessor::DefaultRequestSenseHandler(
@@ -135,6 +140,7 @@ zx::result<std::vector<uint8_t>> ScsiCommandProcessor::DefaultRequestSenseHandle
   sense_data->set_valid(0);
   sense_data->set_sense_key(0);
 
+  ZX_DEBUG_ASSERT(command_upiu.header_flags_r());
   if (auto status = CopyBufferToPhysicalRegion(mock_device, prdt_upius, data_buffer);
       status != ZX_OK) {
     zxlogf(ERROR, "UFS MOCK: scsi command, Failed to CopyBufferToPhysicalRegion");
@@ -167,6 +173,7 @@ zx::result<std::vector<uint8_t>> ScsiCommandProcessor::DefaultRead10Handler(
     return zx::error(status);
   }
 
+  ZX_DEBUG_ASSERT(command_upiu.header_flags_r());
   if (auto status = CopyBufferToPhysicalRegion(mock_device, prdt_upius, data_buffer);
       status != ZX_OK) {
     return zx::error(status);
@@ -191,6 +198,7 @@ zx::result<std::vector<uint8_t>> ScsiCommandProcessor::DefaultWrite10Handler(
 
   std::vector<uint8_t> data_buffer(write10_command.GetTransferBytes());
 
+  ZX_DEBUG_ASSERT(command_upiu.header_flags_w());
   if (auto status = CopyPhysicalRegionToBuffer(mock_device, data_buffer, prdt_upius);
       status != ZX_OK) {
     return zx::error(status);
@@ -218,6 +226,7 @@ zx::result<std::vector<uint8_t>> ScsiCommandProcessor::DefaultReadCapacity10Hand
       htobe32((kMockTotalDeviceCapacity / kMockBlockSize) - 1);
   read_capacity_data->block_length_in_bytes = htobe32(kMockBlockSize);
 
+  ZX_DEBUG_ASSERT(command_upiu.header_flags_r());
   if (auto status = CopyBufferToPhysicalRegion(mock_device, prdt_upius, data_buffer);
       status != ZX_OK) {
     zxlogf(ERROR, "UFS MOCK: scsi command, Failed to CopyBufferToPhysicalRegion");

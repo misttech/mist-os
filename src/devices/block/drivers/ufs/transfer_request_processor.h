@@ -13,6 +13,14 @@
 namespace ufs {
 
 constexpr uint8_t kMaxTransferRequestListSize = kMaxRequestListSize;
+// Currently, the UFS driver has two threads for submitting commands. One is the ufs driver thread
+// that submits the admin command when the driver is initialized, and the other is the I/O thread
+// that submits the requested I/O command from the block server.
+// These two threads should hold a lock to access the shared resource RequestList slot. However, if
+// we separate the Admin slot and the I/O slot, we do not need to lock the slot. Therefore, slots 0
+// ~ 30 are used by the I/O thread, and slot 31 is used for the Admin command.
+constexpr uint8_t kAdminCommandSlotCount = 1;
+constexpr uint8_t kAdminCommandSlotNumber = kMaxTransferRequestListSize - kAdminCommandSlotCount;
 
 // Owns and processes the UTP transfer request list.
 class TransferRequestProcessor : public RequestProcessor {
@@ -26,26 +34,33 @@ class TransferRequestProcessor : public RequestProcessor {
   ~TransferRequestProcessor() override = default;
 
   zx::result<> Init() override;
+  // Allocate a slot to submit an I/O command. Use slots 0 ~ 30 to avoid conflicts with Admin
+  // commands.
   zx::result<uint8_t> ReserveSlot() override;
+  // Allocate a slot to submit an Admin command. Use slot 31 to avoid conflicts with I/O commands.
+  zx::result<uint8_t> ReserveAdminSlot();
 
-  zx::result<> RingRequestDoorbell(uint8_t slot, bool sync) override;
+  zx::result<> RingRequestDoorbell(uint8_t slot) override;
   uint32_t RequestCompletion() override;
 
   // |SendScsiUpiu| allocates a slot for SCSI command UPIU and calls SendRequestUsingSlot.
+  // If it is an admin command, the |io_cmd| is nullptr.
   zx::result<std::unique_ptr<ResponseUpiu>> SendScsiUpiu(
-      ScsiCommandUpiu &request, uint8_t lun, const std::vector<zx_paddr_t> &buffer_phys);
+      ScsiCommandUpiu &request, uint8_t lun, std::optional<zx::unowned_vmo> data = std::nullopt,
+      IoCommand *io_cmd = nullptr);
 
   // |SendRequestUpiu| allocates a slot for request UPIU and calls SendRequestUsingSlot.
+  // This function is only ever used for admin commands.
   template <class RequestType, class ResponseType>
   zx::result<std::unique_ptr<ResponseType>> SendRequestUpiu(RequestType &request, uint8_t lun = 0) {
-    zx::result<uint8_t> slot = ReserveSlot();
+    zx::result<uint8_t> slot = ReserveAdminSlot();
     if (slot.is_error()) {
       return zx::error(ZX_ERR_NO_RESOURCES);
     }
 
-    std::vector<zx_paddr_t> empty_buffer_phys;
     zx::result<void *> response;
-    if (response = SendRequestUsingSlot<RequestType>(request, lun, slot.value(), empty_buffer_phys);
+    if (response = SendRequestUsingSlot<RequestType>(request, lun, slot.value(), std::nullopt,
+                                                     nullptr, /*is_sync*/ true);
         response.is_error()) {
       return response.take_error();
     }
@@ -74,21 +89,22 @@ class TransferRequestProcessor : public RequestProcessor {
 
   template <class RequestType>
   zx::result<void *> SendRequestUsingSlot(RequestType &request, uint8_t lun, uint8_t slot,
-                                          const std::vector<zx_paddr_t> &buffer_phys);
+                                          std::optional<zx::unowned_vmo> data_vmo,
+                                          IoCommand *io_cmd, bool is_sync);
 
  private:
   friend class UfsTest;
 
-  zx::result<> FillDescriptorAndSendRequest(uint8_t slot,
-                                            TransferRequestDescriptorDataDirection data_dir,
+  zx::result<> FillDescriptorAndSendRequest(uint8_t slot, DataDirection data_dir,
                                             uint16_t response_offset, uint16_t response_length,
-                                            uint16_t prdt_offset, uint32_t prdt_entry_count,
-                                            bool sync);
+                                            uint16_t prdt_offset, uint32_t prdt_entry_count);
   zx::result<> GetResponseStatus(TransferRequestDescriptor *descriptor,
                                  AbstractResponseUpiu &response, uint8_t transaction_type);
 
-  void ScsiCompletion(uint8_t slot_num, RequestSlot &request_slot,
-                      TransferRequestDescriptor *descriptor) TA_REQ(request_list_lock_);
+  zx::result<> ScsiCompletion(uint8_t slot_num, RequestSlot &request_slot,
+                              TransferRequestDescriptor *descriptor);
+
+  zx::result<> ClearSlot(RequestSlot &request_slot);
 
   uint32_t slot_mask_;
 };

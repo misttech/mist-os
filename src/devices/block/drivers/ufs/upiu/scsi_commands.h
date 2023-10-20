@@ -75,7 +75,8 @@ class ScsiCommandUpiu : public CommandUpiu {
   } __PACKED;
 
  public:
-  explicit ScsiCommandUpiu(scsi::Opcode opcode) : CommandUpiu(UpiuCommandSetType::kScsi) {
+  explicit ScsiCommandUpiu(scsi::Opcode opcode, DataDirection data_direction)
+      : CommandUpiu(UpiuCommandSetType::kScsi, data_direction) {
     scsi_cdb_->opcode = opcode;
   }
 
@@ -103,9 +104,7 @@ class ScsiRead10Upiu : public ScsiCommandUpiu {
  public:
   explicit ScsiRead10Upiu(uint32_t start, uint16_t length, uint32_t block_size, bool fua,
                           uint8_t group_num)
-      : ScsiCommandUpiu(scsi::Opcode::READ_10), block_size_(block_size) {
-    GetData<CommandUpiuData>()->set_header_flags_r(1);
-
+      : ScsiCommandUpiu(scsi::Opcode::READ_10, GetDataDirection()), block_size_(block_size) {
     UnalignedStore32(&scsi_cdb_->logical_block_address, htobe32(start));
     UnalignedStore16(&scsi_cdb_->transfer_length, htobe16(length));
 
@@ -117,9 +116,7 @@ class ScsiRead10Upiu : public ScsiCommandUpiu {
     }
   }
 
-  TransferRequestDescriptorDataDirection GetDataDirection() const override {
-    return TransferRequestDescriptorDataDirection::kDeviceToHost;
-  }
+  DataDirection GetDataDirection() const override { return DataDirection::kDeviceToHost; }
 
   std::optional<uint32_t> GetStartLba() const override {
     return betoh32(UnalignedLoad32(&scsi_cdb_->logical_block_address));
@@ -140,14 +137,13 @@ class ScsiRead10Upiu : public ScsiCommandUpiu {
 // UFS Specification Version 3.1, section 11.3.8 "READ CAPACITY (10) Command".
 class ScsiReadCapacity10Upiu : public ScsiCommandUpiu {
  public:
-  explicit ScsiReadCapacity10Upiu() : ScsiCommandUpiu(scsi::Opcode::READ_CAPACITY_10) {
+  explicit ScsiReadCapacity10Upiu()
+      : ScsiCommandUpiu(scsi::Opcode::READ_CAPACITY_10, GetDataDirection()) {
     scsi_cdb_->obsolete = 0;
     scsi_cdb_->control = 0;
   }
 
-  TransferRequestDescriptorDataDirection GetDataDirection() const override {
-    return TransferRequestDescriptorDataDirection::kDeviceToHost;
-  }
+  DataDirection GetDataDirection() const override { return DataDirection::kDeviceToHost; }
 
   uint32_t GetTransferBytes() const override { return sizeof(scsi::ReadCapacity10ParameterData); }
 
@@ -162,7 +158,7 @@ class ScsiReadCapacity10Upiu : public ScsiCommandUpiu {
 class ScsiStartStopUnitUpiu : public ScsiCommandUpiu {
  public:
   explicit ScsiStartStopUnitUpiu(uint8_t power_condition, uint8_t start)
-      : ScsiCommandUpiu(scsi::Opcode::START_STOP_UNIT) {
+      : ScsiCommandUpiu(scsi::Opcode::START_STOP_UNIT, GetDataDirection()) {
     scsi_cdb_->set_power_conditions(power_condition);
     scsi_cdb_->set_start(start);
   }
@@ -175,7 +171,8 @@ class ScsiStartStopUnitUpiu : public ScsiCommandUpiu {
 // UFS Specification Version 3.1, section 11.3.11 "TEST UNIT READY Command".
 class ScsiTestUnitReadyUpiu : public ScsiCommandUpiu {
  public:
-  explicit ScsiTestUnitReadyUpiu() : ScsiCommandUpiu(scsi::Opcode::TEST_UNIT_READY) {
+  explicit ScsiTestUnitReadyUpiu()
+      : ScsiCommandUpiu(scsi::Opcode::TEST_UNIT_READY, GetDataDirection()) {
     scsi_cdb_->control = 0;
   }
 
@@ -189,9 +186,7 @@ class ScsiWrite10Upiu : public ScsiCommandUpiu {
  public:
   explicit ScsiWrite10Upiu(uint32_t start, uint16_t length, uint32_t block_size, bool fua,
                            uint8_t group_num)
-      : ScsiCommandUpiu(scsi::Opcode::WRITE_10), block_size_(block_size) {
-    GetData<CommandUpiuData>()->set_header_flags_w(1);
-
+      : ScsiCommandUpiu(scsi::Opcode::WRITE_10, GetDataDirection()), block_size_(block_size) {
     UnalignedStore32(&scsi_cdb_->logical_block_address, htobe32(start));
     UnalignedStore16(&scsi_cdb_->transfer_length, htobe16(length));
 
@@ -203,9 +198,7 @@ class ScsiWrite10Upiu : public ScsiCommandUpiu {
     }
   }
 
-  TransferRequestDescriptorDataDirection GetDataDirection() const override {
-    return TransferRequestDescriptorDataDirection::kHostToDevice;
-  }
+  DataDirection GetDataDirection() const override { return DataDirection::kHostToDevice; }
 
   std::optional<uint32_t> GetStartLba() const override {
     return betoh32(UnalignedLoad32(&scsi_cdb_->logical_block_address));
@@ -227,14 +220,13 @@ class ScsiWrite10Upiu : public ScsiCommandUpiu {
 // UFS Specification Version 3.1, section 11.3.17 "REQUEST SENSE Command".
 class ScsiRequestSenseUpiu : public ScsiCommandUpiu {
  public:
-  explicit ScsiRequestSenseUpiu() : ScsiCommandUpiu(scsi::Opcode::REQUEST_SENSE) {
+  explicit ScsiRequestSenseUpiu()
+      : ScsiCommandUpiu(scsi::Opcode::REQUEST_SENSE, GetDataDirection()) {
     scsi_cdb_->desc = 0;
     scsi_cdb_->allocation_length = sizeof(scsi::FixedFormatSenseDataHeader);
   }
 
-  TransferRequestDescriptorDataDirection GetDataDirection() const override {
-    return TransferRequestDescriptorDataDirection::kDeviceToHost;
-  }
+  DataDirection GetDataDirection() const override { return DataDirection::kDeviceToHost; }
 
   uint32_t GetTransferBytes() const override { return scsi_cdb_->allocation_length; }
 
@@ -254,7 +246,7 @@ class ScsiRequestSenseUpiu : public ScsiCommandUpiu {
 class ScsiSecurityProtocolInUpiu : public ScsiCommandUpiu {
  public:
   explicit ScsiSecurityProtocolInUpiu(uint16_t length)
-      : ScsiCommandUpiu(scsi::Opcode::SECURITY_PROTOCOL_IN) {
+      : ScsiCommandUpiu(scsi::Opcode::SECURITY_PROTOCOL_IN, GetDataDirection()) {
     // 0xec: JEDEC UFS application
     scsi_cdb_->security_protocol = 0xec;
 
@@ -262,9 +254,7 @@ class ScsiSecurityProtocolInUpiu : public ScsiCommandUpiu {
     UnalignedStore32(&scsi_cdb_->allocation_length, htobe32(length));
   }
 
-  TransferRequestDescriptorDataDirection GetDataDirection() const override {
-    return TransferRequestDescriptorDataDirection::kDeviceToHost;
-  }
+  DataDirection GetDataDirection() const override { return DataDirection::kDeviceToHost; }
 
   uint32_t GetTransferBytes() const override {
     return betoh32(UnalignedLoad32(&scsi_cdb_->allocation_length)) *
@@ -280,7 +270,7 @@ class ScsiSecurityProtocolInUpiu : public ScsiCommandUpiu {
 class ScsiSecurityProtocolOutUpiu : public ScsiCommandUpiu {
  public:
   explicit ScsiSecurityProtocolOutUpiu(uint16_t length)
-      : ScsiCommandUpiu(scsi::Opcode::SECURITY_PROTOCOL_OUT) {
+      : ScsiCommandUpiu(scsi::Opcode::SECURITY_PROTOCOL_OUT, GetDataDirection()) {
     // |security_protocol| is a field that indicates which security protocol is used. For UFS, use
     // 0xec, which is the JEDEC UFS application.
     scsi_cdb_->security_protocol = 0xec;
@@ -292,9 +282,7 @@ class ScsiSecurityProtocolOutUpiu : public ScsiCommandUpiu {
     UnalignedStore32(&scsi_cdb_->transfer_length, htobe32(length));
   }
 
-  TransferRequestDescriptorDataDirection GetDataDirection() const override {
-    return TransferRequestDescriptorDataDirection::kHostToDevice;
-  }
+  DataDirection GetDataDirection() const override { return DataDirection::kHostToDevice; }
 
   uint32_t GetTransferBytes() const override {
     return betoh32(UnalignedLoad32(&scsi_cdb_->transfer_length)) * (scsi_cdb_->inc_512() ? 512 : 1);
@@ -309,13 +297,9 @@ class ScsiSecurityProtocolOutUpiu : public ScsiCommandUpiu {
 class ScsiSynchronizeCache10Upiu : public ScsiCommandUpiu {
  public:
   explicit ScsiSynchronizeCache10Upiu(uint32_t start, uint16_t length)
-      : ScsiCommandUpiu(scsi::Opcode::SYNCHRONIZE_CACHE_10) {
+      : ScsiCommandUpiu(scsi::Opcode::SYNCHRONIZE_CACHE_10, GetDataDirection()) {
     UnalignedStore32(&scsi_cdb_->logical_block_address, htobe32(start));
     UnalignedStore16(&scsi_cdb_->num_blocks, htobe16(length));
-  }
-
-  TransferRequestDescriptorDataDirection GetDataDirection() const override {
-    return TransferRequestDescriptorDataDirection::kNone;
   }
 
  private:
@@ -326,16 +310,15 @@ class ScsiSynchronizeCache10Upiu : public ScsiCommandUpiu {
 // UFS Specification Version 3.1, section 11.3.26 "UNMAP Command".
 class ScsiUnmapUpiu : public ScsiCommandUpiu {
  public:
-  explicit ScsiUnmapUpiu(uint16_t param_len) : ScsiCommandUpiu(scsi::Opcode::UNMAP) {
+  explicit ScsiUnmapUpiu(uint16_t param_len)
+      : ScsiCommandUpiu(scsi::Opcode::UNMAP, GetDataDirection()) {
     scsi_cdb_->set_anchor(0);
     scsi_cdb_->set_group_number(0);
 
     UnalignedStore16(&scsi_cdb_->parameter_list_length, htobe16(param_len));
   }
 
-  TransferRequestDescriptorDataDirection GetDataDirection() const override {
-    return TransferRequestDescriptorDataDirection::kHostToDevice;
-  }
+  DataDirection GetDataDirection() const override { return DataDirection::kHostToDevice; }
 
   uint32_t GetTransferBytes() const override {
     return betoh16(UnalignedLoad16(&scsi_cdb_->parameter_list_length));
@@ -354,7 +337,8 @@ class ScsiWriteBufferUpiu : public ScsiCommandUpiu {
     kDownloadMicrocode = 0x0e,
   };
 
-  explicit ScsiWriteBufferUpiu(uint32_t length) : ScsiCommandUpiu(scsi::Opcode::WRITE_BUFFER) {
+  explicit ScsiWriteBufferUpiu(uint32_t length)
+      : ScsiCommandUpiu(scsi::Opcode::WRITE_BUFFER, GetDataDirection()) {
     // For now, the WriteBuffer command will only be used for FW downloads.
     scsi_cdb_->set_mode(Mode::kDownloadMicrocode);
     scsi_cdb_->buffer_id = 0;
@@ -367,9 +351,7 @@ class ScsiWriteBufferUpiu : public ScsiCommandUpiu {
     UnalignedStore24(parameter_list_length, htobe24(length));            // in bytes
   }
 
-  TransferRequestDescriptorDataDirection GetDataDirection() const override {
-    return TransferRequestDescriptorDataDirection::kHostToDevice;
-  }
+  DataDirection GetDataDirection() const override { return DataDirection::kHostToDevice; }
 
   uint32_t GetTransferBytes() const override {
     const uint24_t *parameter_list_length =

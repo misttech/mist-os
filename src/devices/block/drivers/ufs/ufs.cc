@@ -77,16 +77,13 @@ void Ufs::ProcessIoSubmissions() {
 
     zx::pmt pmt;
     std::unique_ptr<ScsiCommandUpiu> upiu;
-    std::vector<zx_paddr_t> data_paddrs;
+    std::optional<zx::unowned_vmo> vmo;
 
     const uint32_t opcode = io_cmd->op.command.opcode;
     switch (opcode) {
       case BLOCK_OPCODE_READ:
       case BLOCK_OPCODE_WRITE: {
-        zx::unowned_vmo vmo(io_cmd->op.rw.vmo);
-        const uint32_t block_size = io_cmd->block_size_bytes;
-        const uint64_t length = io_cmd->op.rw.length * block_size;
-        const uint32_t kPageSize = zx_system_get_page_size();
+        vmo = zx::unowned_vmo(io_cmd->op.rw.vmo);
 
         // TODO(fxbug.dev/124835): Support the use of READ(16), WRITE(16) CDBs
         if ((io_cmd->op.rw.offset_dev > UINT32_MAX) || (io_cmd->op.rw.length > UINT16_MAX)) {
@@ -96,8 +93,9 @@ void Ufs::ProcessIoSubmissions() {
           return;
         }
 
-        const uint32_t block_offset = static_cast<uint32_t>(io_cmd->op.rw.offset_dev);
-        const uint16_t block_length = static_cast<uint16_t>(io_cmd->op.rw.length);
+        const uint32_t block_offset = safemath::checked_cast<uint32_t>(io_cmd->op.rw.offset_dev);
+        const uint16_t block_length = safemath::checked_cast<uint16_t>(io_cmd->op.rw.length);
+        const uint32_t block_size = io_cmd->block_size_bytes;
 
         if (opcode == BLOCK_OPCODE_READ) {
           upiu = std::make_unique<ScsiRead10Upiu>(block_offset, block_length, block_size,
@@ -107,20 +105,6 @@ void Ufs::ProcessIoSubmissions() {
                                                    /*fua=*/false, 0);
         }
 
-        // Assign physical addresses(pin) to data vmo. The return value is the physical address of
-        // the pinned memory.
-        uint32_t option = (opcode == BLOCK_OPCODE_READ) ? ZX_BTI_PERM_WRITE : ZX_BTI_PERM_READ;
-        ZX_DEBUG_ASSERT(length % kPageSize == 0);
-        data_paddrs.resize(length / kPageSize, 0);
-        if (zx_status_t status = bti_.pin(option, *vmo, io_cmd->op.rw.offset_vmo * block_size,
-                                          length, data_paddrs.data(), length / kPageSize, &pmt);
-            status != ZX_OK) {
-          zxlogf(ERROR, "Failed to pin IO buffer: %s", zx_status_get_string(status));
-          io_cmd->Complete(ZX_ERR_IO);
-          return;
-        }
-        // There shouldn't be any returning after the pinning, since the unpinning follows after the
-        // switch statement.
       } break;
       case BLOCK_OPCODE_TRIM: {
         if (io_cmd->op.trim.length > UINT16_MAX) {
@@ -137,13 +121,9 @@ void Ufs::ProcessIoSubmissions() {
         // TODO(fxbug.dev/124835): Use break;
         return;
     }
-    auto unpin = fit::defer([&] {
-      if (pmt.is_valid()) {
-        pmt.unpin();
-      }
-    });
 
-    auto response = transfer_request_processor_->SendScsiUpiu(*upiu, io_cmd->lun_id, data_paddrs);
+    auto response =
+        transfer_request_processor_->SendScsiUpiu(*upiu, io_cmd->lun_id, std::move(vmo), io_cmd);
     if (response.is_error()) {
       if (response.error_value() == ZX_ERR_NO_RESOURCES) {
         fbl::AutoLock lock(&commands_lock_);
@@ -152,13 +132,12 @@ void Ufs::ProcessIoSubmissions() {
       }
       zxlogf(ERROR, "Failed to submit SCSI command (command %p): %s", io_cmd,
              response.status_string());
-      io_cmd->Complete(ZX_ERR_INTERNAL);
+      io_cmd->Complete(response.error_value());
     }
-
-    // TODO(fxbug.dev/124835): We should respond with the actual status of the command.
-    io_cmd->Complete(ZX_OK);
   }
 }
+
+void Ufs::ProcessCompletions() { transfer_request_processor_->RequestCompletion(); }
 
 zx::result<> Ufs::Isr() {
   auto interrupt_status = InterruptStatusReg::Get().ReadFrom(&mmio_);
@@ -191,7 +170,7 @@ zx::result<> Ufs::Isr() {
   if (interrupt_status.utp_transfer_request_completion_status()) {
     InterruptStatusReg::Get().FromValue(0).set_utp_transfer_request_completion_status(true).WriteTo(
         &mmio_);
-    transfer_request_processor_->RequestCompletion();
+    sync_completion_signal(&io_signal_);
   }
   if (interrupt_status.utp_task_management_request_completion_status()) {
     // TODO(fxbug.dev/124835): Handle UTMR completion
@@ -250,6 +229,9 @@ int Ufs::IoLoop() {
 
     // TODO(fxbug.dev/124835): Process async completions
 
+    if (!disable_completion_) {
+      ProcessCompletions();
+    }
     ProcessIoSubmissions();
   }
   return thrd_success;
@@ -271,21 +253,13 @@ zx_status_t Ufs::Init() {
     return result.error_value();
   }
 
-  if (int thrd_status = thrd_create_with_name(
-          &io_thread_, [](void* ctx) { return static_cast<Ufs*>(ctx)->IoLoop(); }, this,
-          "ufs-io-thread");
-      thrd_status) {
-    zx_status_t status = thrd_status_to_zx_status(thrd_status);
-    zxlogf(ERROR, " Failed to create IO thread: %s", zx_status_get_string(status));
-    return status;
-  }
-  io_thread_started_ = true;
-
   if (zx::result<> result = GetControllerDescriptor(); result.is_error()) {
+    zxlogf(ERROR, "Failed to get controller descriptor: %s", result.status_string());
     return result.error_value();
   }
 
   if (zx::result<> result = ScanLogicalUnits(); result.is_error()) {
+    zxlogf(ERROR, "Failed to scan logical units: %s", result.status_string());
     return result.error_value();
   }
 
@@ -368,6 +342,16 @@ zx::result<> Ufs::InitController() {
     return transfer_request_processor.take_error();
   }
   transfer_request_processor_ = std::move(*transfer_request_processor);
+
+  if (int thrd_status = thrd_create_with_name(
+          &io_thread_, [](void* ctx) { return static_cast<Ufs*>(ctx)->IoLoop(); }, this,
+          "ufs-io-thread");
+      thrd_status) {
+    zx_status_t status = thrd_status_to_zx_status(thrd_status);
+    zxlogf(ERROR, " Failed to create IO thread: %s", zx_status_get_string(status));
+    return zx::error(status);
+  }
+  io_thread_started_ = true;
 
   // TODO(fxbug.dev/124835): We need to check if retry is needed in the real HW and remove it if
   // not.
@@ -602,29 +586,12 @@ zx::result<> Ufs::ScanLogicalUnits() {
     return zx::error(status);
   }
 
-  zx::unowned_vmo unowned_vmo(data_vmo);
-  fzl::VmoMapper mapper;
-  zx::pmt pmt;
-
   // Allocate a buffer for SCSI response data.
-  if (zx_status_t status = mapper.Map(*unowned_vmo, 0, kPageSize); status != ZX_OK) {
+  fzl::VmoMapper mapper;
+  if (zx_status_t status = mapper.Map(data_vmo, 0, kPageSize); status != ZX_OK) {
     zxlogf(ERROR, "Failed to map IO buffer: %s", zx_status_get_string(status));
     return zx::error(status);
   }
-
-  const size_t paddr_count = 1;
-  std::vector<zx_paddr_t> data_paddrs(paddr_count);
-  if (zx_status_t status = bti_.pin(ZX_BTI_PERM_WRITE, *unowned_vmo, 0, kPageSize,
-                                    data_paddrs.data(), paddr_count, &pmt);
-      status != ZX_OK) {
-    zxlogf(ERROR, "Failed to pin IO buffer: %s", zx_status_get_string(status));
-    return zx::error(status);
-  }
-  auto unpin = fit::defer([&] {
-    if (pmt.is_valid()) {
-      pmt.unpin();
-    }
-  });
 
   for (uint8_t i = 0; i < max_luns; ++i) {
     ReadDescriptorUpiu read_unit_desc_upiu(DescriptorType::kUnit, i);
@@ -671,8 +638,8 @@ zx::result<> Ufs::ScanLogicalUnits() {
 
     // Checks for block size consistency.
     ScsiReadCapacity10Upiu read_capacity_upiu;
-    if (auto response =
-            transfer_request_processor_->SendScsiUpiu(read_capacity_upiu, i, data_paddrs);
+    if (auto response = transfer_request_processor_->SendScsiUpiu(read_capacity_upiu, i,
+                                                                  zx::unowned_vmo(data_vmo));
         response.is_error()) {
       zxlogf(ERROR, "Failed to send SCSI READ CAPACITY 10 command: %s", response.status_string());
       return response.take_error();
@@ -701,7 +668,8 @@ zx::result<> Ufs::ScanLogicalUnits() {
 
     // Verify that the Lun is ready. This command expects a unit attention error.
     ScsiTestUnitReadyUpiu unit_ready_upiu;
-    if (auto response = transfer_request_processor_->SendScsiUpiu(unit_ready_upiu, i, data_paddrs);
+    if (auto response = transfer_request_processor_->SendScsiUpiu(unit_ready_upiu, i,
+                                                                  zx::unowned_vmo(data_vmo));
         response.is_error()) {
       auto* response_data = reinterpret_cast<scsi::FixedFormatSenseDataHeader*>(mapper.start());
       if (response_data->sense_key() == static_cast<uint8_t>(scsi::SenseKey::UNIT_ATTENTION)) {
@@ -717,15 +685,16 @@ zx::result<> Ufs::ScanLogicalUnits() {
     // This command will get sense data, but ignore it for now because our goal is to clear the
     // UAC.
     ScsiRequestSenseUpiu request_sense_upiu;
-    if (auto response =
-            transfer_request_processor_->SendScsiUpiu(request_sense_upiu, i, data_paddrs);
+    if (auto response = transfer_request_processor_->SendScsiUpiu(request_sense_upiu, i,
+                                                                  zx::unowned_vmo(data_vmo));
         response.is_error()) {
       zxlogf(ERROR, "Failed to send SCSI command: %s", response.status_string());
       return response.take_error();
     }
 
     // Verify that the Lun is ready. This command expects a success.
-    if (auto response = transfer_request_processor_->SendScsiUpiu(unit_ready_upiu, i, data_paddrs);
+    if (auto response = transfer_request_processor_->SendScsiUpiu(unit_ready_upiu, i,
+                                                                  zx::unowned_vmo(data_vmo));
         response.is_error()) {
       zxlogf(ERROR, "Failed to send SCSI command: %s", response.status_string());
       return response.take_error();

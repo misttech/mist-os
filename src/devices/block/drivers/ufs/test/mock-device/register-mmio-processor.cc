@@ -88,6 +88,13 @@ void RegisterMmioProcessor::DefaultUTRLDBRHandler(UfsMockDevice& mock_device, ui
     mock_device.GetTransferRequestProcessor().HandleTransferRequest(
         transfer_request_descriptors[slot]);
   }
+
+  uint32_t prev_completion =
+      UtrListCompletionNotificationReg::Get().ReadFrom(mock_device.GetRegisters()).notification();
+  UtrListCompletionNotificationReg::Get()
+      .FromValue(0)
+      .set_notification(prev_completion | value)
+      .WriteTo(mock_device.GetRegisters());
 }
 
 void RegisterMmioProcessor::DefaultUTRLRSRHandler(UfsMockDevice& mock_device, uint32_t value) {
@@ -101,6 +108,15 @@ void RegisterMmioProcessor::DefaultUTRLRSRHandler(UfsMockDevice& mock_device, ui
         .set_value(value)
         .WriteTo(mock_device.GetRegisters());
   }
+}
+
+void RegisterMmioProcessor::DefaultUTRLCNRHandler(UfsMockDevice& mock_device, uint32_t value) {
+  uint32_t notification =
+      UtrListCompletionNotificationReg::Get().ReadFrom(mock_device.GetRegisters()).notification();
+  notification &= (~value);
+  UtrListCompletionNotificationReg::Get()
+      .FromValue(notification)
+      .WriteTo(mock_device.GetRegisters());
 }
 
 void RegisterMmioProcessor::DefaultUICCMDHandler(UfsMockDevice& mock_device, uint32_t value) {

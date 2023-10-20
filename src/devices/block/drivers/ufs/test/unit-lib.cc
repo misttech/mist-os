@@ -47,34 +47,33 @@ void UfsTest::TearDown() {
   EXPECT_OK(mock_ddk::ReleaseFlaggedDevices(device_));
 }
 
-zx::result<> UfsTest::FillDescriptorAndSendRequest(uint8_t slot,
-                                                   TransferRequestDescriptorDataDirection ddir,
+zx::result<> UfsTest::FillDescriptorAndSendRequest(uint8_t slot, DataDirection ddir,
                                                    uint16_t resp_offset, uint16_t resp_len,
-                                                   uint16_t prdt_offset, uint16_t prdt_entry_count,
-                                                   bool sync) {
+                                                   uint16_t prdt_offset,
+                                                   uint16_t prdt_entry_count) {
   return ufs_->GetTransferRequestProcessor().FillDescriptorAndSendRequest(
-      slot, ddir, resp_offset, resp_len, prdt_offset, prdt_entry_count, sync);
+      slot, ddir, resp_offset, resp_len, prdt_offset, prdt_entry_count);
 }
 
-zx::result<std::vector<zx_paddr_t>> UfsTest::MapAndPinVmo(uint32_t option, zx::unowned_vmo &vmo,
-                                                          fzl::VmoMapper &mapper, zx::pmt &pmt,
-                                                          uint64_t offset, uint64_t length) {
+zx::result<> UfsTest::MapVmo(uint32_t option, zx::unowned_vmo &vmo, fzl::VmoMapper &mapper,
+                             uint64_t offset, uint64_t length) {
   if (zx_status_t status = mapper.Map(*vmo, offset, length); status != ZX_OK) {
     zxlogf(ERROR, "Failed to map IO buffer: %s", zx_status_get_string(status));
     return zx::error(status);
   }
+  return zx::ok();
+}
 
-  const uint32_t kPageSize = zx_system_get_page_size();
-  std::vector<zx_paddr_t> paddrs;
-  ZX_DEBUG_ASSERT(length % kPageSize == 0);
-  paddrs.resize(length / kPageSize, 0);
-  if (zx_status_t status = mock_device_->GetFakeBti().pin(option, *vmo, offset, length,
-                                                          paddrs.data(), length / kPageSize, &pmt);
-      status != ZX_OK) {
-    zxlogf(ERROR, "Failed to pin IO buffer: %s", zx_status_get_string(status));
-    return zx::error(status);
+uint8_t UfsTest::GetSlotStateCount(SlotState slot_state) {
+  uint8_t count = 0;
+  for (uint8_t slot_num = 0;
+       slot_num < ufs_->GetTransferRequestProcessor().request_list_.GetSlotCount(); ++slot_num) {
+    auto &slot = ufs_->GetTransferRequestProcessor().request_list_.GetSlot(slot_num);
+    if (slot.state == slot_state) {
+      ++count;
+    }
   }
-  return zx::ok(std::move(paddrs));
+  return count;
 }
 
 }  // namespace ufs

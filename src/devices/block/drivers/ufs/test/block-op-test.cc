@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <bitset>
+
 #include "src/devices/block/drivers/ufs/logical_unit.h"
 #include "unit-lib.h"
 
@@ -279,6 +281,87 @@ TEST_F(BlockOpTest, TransferSizeTest) {
   }
 
   ASSERT_OK(zx::vmar::root_self()->unmap(vaddr, kMaxTransferSize1MiB));
+}
+
+TEST_F(BlockOpTest, MultiQueueDepthWriteTest) {
+  const uint8_t kTestLun = 0;
+
+  // Disable IoLoop completion
+  ufs_->DisableCompletion();
+
+  auto callback = [](void* ctx, zx_status_t status, block_op_t* op) {
+    EXPECT_OK(status, "op->rw.command.offset_vmo = %lu", op->rw.offset_vmo);
+    sync_completion_signal(static_cast<sync_completion_t*>(ctx));
+  };
+
+  // Test on 1, 2, 4, 8, 16, and 31 queue depth.
+  // One of the 32 slots is dedicated to the admin command, so the maximum queue depth is 31.
+  std::vector<uint8_t> queue_depth_list{1, 2, 4, 8, 16, 31};
+  for (auto queue_depth : queue_depth_list) {
+    zx::vmo vmo;
+    ASSERT_OK(zx::vmo::create(ufs_mock_device::kMockBlockSize * queue_depth, 0, &vmo));
+
+    zx_vaddr_t vaddr;
+    ASSERT_OK(zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo, 0,
+                                         ufs_mock_device::kMockBlockSize * queue_depth, &vaddr));
+    uint8_t* mapped_vaddr = reinterpret_cast<uint8_t*>(vaddr);
+    FillRandom(mapped_vaddr, ufs_mock_device::kMockBlockSize * queue_depth);
+
+    auto block_ops = std::make_unique<uint8_t[]>(op_size_ * queue_depth);
+    sync_completion_t done[queue_depth];
+
+    for (uint32_t i = 0; i < queue_depth; ++i) {
+      auto op = reinterpret_cast<block_op_t*>(block_ops.get() + (op_size_ * i));
+      *op = {
+          .rw =
+              {
+                  .command =
+                      {
+                          .opcode = BLOCK_OPCODE_WRITE,
+                      },
+                  .vmo = vmo.get(),
+                  .length = 1,
+                  .offset_dev = i,
+                  .offset_vmo = i,
+              },
+      };
+      client_.Queue(op, callback, &done[i]);
+    }
+
+    // Wait until the slot is used up to the desired queue depth.
+    constexpr uint32_t kMultiQueueTimeoutUs = 1000000;
+    auto wait_for_scheduled = [&]() -> bool {
+      return GetSlotStateCount(SlotState::kScheduled) == queue_depth;
+    };
+    fbl::String submission_timeout_message = "Timeout waiting for submission";
+    ASSERT_OK(ufs_->WaitWithTimeout(wait_for_scheduled, kMultiQueueTimeoutUs,
+                                    submission_timeout_message));
+
+    // Wait for mock device write I/O is completed.
+    auto wait_for_completion = [&]() -> bool {
+      std::bitset<32> notification =
+          UtrListCompletionNotificationReg::Get().ReadFrom(&ufs_->GetMmio()).notification();
+      return notification.count() == queue_depth;
+    };
+    fbl::String completion_timeout_message = "Timeout waiting for completion";
+    ASSERT_OK(ufs_->WaitWithTimeout(wait_for_completion, kMultiQueueTimeoutUs,
+                                    completion_timeout_message));
+
+    ufs_->ProcessCompletions();
+    ASSERT_EQ(GetSlotStateCount(SlotState::kFree),
+              ufs_->GetTransferRequestProcessor().GetRequestList().GetSlotCount());
+
+    for (uint32_t i = 0; i < queue_depth; ++i) {
+      sync_completion_wait(&done[i], ZX_TIME_INFINITE);
+      sync_completion_reset(&done[i]);
+    }
+
+    char buf[ufs_mock_device::kMockBlockSize * queue_depth];
+    ASSERT_OK(mock_device_->BufferRead(kTestLun, buf, queue_depth, 0));
+
+    ASSERT_EQ(std::memcmp(buf, mapped_vaddr, ufs_mock_device::kMockBlockSize), 0);
+    ASSERT_OK(zx::vmar::root_self()->unmap(vaddr, ufs_mock_device::kMockBlockSize));
+  }
 }
 
 }  // namespace ufs

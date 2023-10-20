@@ -12,7 +12,7 @@ namespace ufs {
 constexpr uint8_t kCommandTypeUfsStorage = 0x1;
 
 // UFSHCI Specification Version 3.0, section 6.1.1 "UTP Transfer Request Descriptor".
-enum TransferRequestDescriptorDataDirection {
+enum DataDirection {
   kNone = 0,
   kHostToDevice,
   kDeviceToHost,

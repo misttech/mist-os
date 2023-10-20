@@ -21,6 +21,8 @@ namespace ufs {
 // UFS 3.1 only supports 32 inflight requests.
 constexpr uint8_t kMaxRequestListSize = 32;
 
+struct IoCommand;
+
 enum class SlotState {
   kFree = 0,
   kReserved,
@@ -31,7 +33,11 @@ struct RequestSlot {
   SlotState state = SlotState::kFree;
   ddk::IoBuffer command_descriptor_io;
   sync_completion_t complete;
+  zx::pmt pmt;
+  IoCommand *io_cmd;
   bool is_scsi_command = false;
+  bool is_sync = false;
+  zx_status_t result = ZX_OK;
 };
 
 // Implements the UTP 'transfer/task management' request list.

@@ -28,28 +28,20 @@ class ScsiCommandTest : public UfsTest {
     ASSERT_OK(zx::vmo::create(kMockBlockSize, 0, &vmo_));
     zx::unowned_vmo unowned_vmo(vmo_);
 
-    auto paddrs_or =
-        MapAndPinVmo(ZX_BTI_PERM_WRITE, unowned_vmo, mapper_, pmt_, 0, block_count_ * block_size_);
-    ASSERT_OK(paddrs_or);
-    paddrs_ = std::move(paddrs_or.value());
+    ASSERT_OK(MapVmo(ZX_BTI_PERM_WRITE, unowned_vmo, mapper_, 0, block_count_ * block_size_));
   }
 
-  void TearDown() override {
-    pmt_.unpin();
-    UfsTest::TearDown();
-  }
+  void TearDown() override { UfsTest::TearDown(); }
 
   void *GetVirtualAddress() const { return mapper_.start(); }
-  std::vector<zx_paddr_t> &GetPhysicalAddress() { return paddrs_; }
+  zx::vmo &GetVmo() { return vmo_; }
 
   uint16_t GetBlockCount() const { return block_count_; }
   uint32_t GetBlockSize() const { return block_size_; }
 
  private:
   zx::vmo vmo_;
-  zx::pmt pmt_;
   fzl::VmoMapper mapper_;
-  std::vector<zx_paddr_t> paddrs_;
 
   const uint16_t block_count_ = 1;
   const uint32_t block_size_ = kMockBlockSize;
@@ -67,7 +59,8 @@ TEST_F(ScsiCommandTest, Read10) {
 
   ScsiRead10Upiu upiu(block_offset, GetBlockCount(), GetBlockSize(), /*fua=*/false, 0);
   ASSERT_EQ(upiu.GetOpcode(), scsi::Opcode::READ_10);
-  ASSERT_OK(ufs_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun, GetPhysicalAddress()));
+  ASSERT_OK(
+      ufs_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun, zx::unowned_vmo(GetVmo())));
 
   // Check the read data
   ASSERT_EQ(memcmp(GetVirtualAddress(), buf, kMockBlockSize), 0);
@@ -82,7 +75,8 @@ TEST_F(ScsiCommandTest, Write10) {
 
   ScsiWrite10Upiu upiu(block_offset, GetBlockCount(), GetBlockSize(), /*fua=*/false, 0);
   ASSERT_EQ(upiu.GetOpcode(), scsi::Opcode::WRITE_10);
-  ASSERT_OK(ufs_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun, GetPhysicalAddress()));
+  ASSERT_OK(
+      ufs_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun, zx::unowned_vmo(GetVmo())));
 
   // Read test data form the mock device
   char buf[kMockBlockSize];
@@ -97,7 +91,8 @@ TEST_F(ScsiCommandTest, ReadCapacity10) {
 
   ScsiReadCapacity10Upiu upiu;
   ASSERT_EQ(upiu.GetOpcode(), scsi::Opcode::READ_CAPACITY_10);
-  ASSERT_OK(ufs_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun, GetPhysicalAddress()));
+  ASSERT_OK(
+      ufs_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun, zx::unowned_vmo(GetVmo())));
 
   auto *read_capacity_data =
       reinterpret_cast<scsi::ReadCapacity10ParameterData *>(GetVirtualAddress());
@@ -113,7 +108,8 @@ TEST_F(ScsiCommandTest, RequestSense) {
 
   ScsiRequestSenseUpiu upiu;
   ASSERT_EQ(upiu.GetOpcode(), scsi::Opcode::REQUEST_SENSE);
-  ASSERT_OK(ufs_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun, GetPhysicalAddress()));
+  ASSERT_OK(
+      ufs_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun, zx::unowned_vmo(GetVmo())));
 
   auto *sense_data = reinterpret_cast<scsi::FixedFormatSenseDataHeader *>(GetVirtualAddress());
   ASSERT_EQ(sense_data->response_code(), 0x70);
@@ -127,8 +123,8 @@ TEST_F(ScsiCommandTest, SynchronizeCache10) {
 
   ScsiSynchronizeCache10Upiu cache_upiu(block_offset, GetBlockCount());
   ASSERT_EQ(cache_upiu.GetOpcode(), scsi::Opcode::SYNCHRONIZE_CACHE_10);
-  ASSERT_OK(
-      ufs_->GetTransferRequestProcessor().SendScsiUpiu(cache_upiu, kTestLun, GetPhysicalAddress()));
+  ASSERT_OK(ufs_->GetTransferRequestProcessor().SendScsiUpiu(cache_upiu, kTestLun,
+                                                             zx::unowned_vmo(GetVmo())));
 }
 
 TEST(ScsiCommandTest, uint24_t) {

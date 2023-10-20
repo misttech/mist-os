@@ -48,6 +48,7 @@ void TransferRequestProcessor::HandleTransferRequest(TransferRequestDescriptor &
   if (status == ZX_OK) {
     descriptor.set_overall_command_status(OverallCommandStatus::kSuccess);
   } else {
+    zxlogf(ERROR, "UFS MOCK: Failed to handle transfer request: %s", zx_status_get_string(status));
     descriptor.set_overall_command_status(OverallCommandStatus::kInvalid);
   }
 

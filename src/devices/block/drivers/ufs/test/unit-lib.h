@@ -27,18 +27,17 @@ class UfsTest : public zxtest::Test {
   zx_status_t EnableController() { return ufs_->EnableHostController(); }
 
   // Helper functions for accessing private functions.
-  zx::result<> FillDescriptorAndSendRequest(uint8_t slot,
-                                            TransferRequestDescriptorDataDirection ddir,
-                                            uint16_t resp_offset, uint16_t resp_len,
-                                            uint16_t prdt_offset, uint16_t prdt_entry_count,
-                                            bool sync);
+  zx::result<> FillDescriptorAndSendRequest(uint8_t slot, DataDirection ddir, uint16_t resp_offset,
+                                            uint16_t resp_len, uint16_t prdt_offset,
+                                            uint16_t prdt_entry_count);
 
   // Map the data vmo to the address space and assign physical addresses. Currently, it only
   // supports 8KB vmo. So, we get two physical addresses. The return value is the physical address
   // of the pinned memory.
-  zx::result<std::vector<zx_paddr_t>> MapAndPinVmo(uint32_t option, zx::unowned_vmo &vmo,
-                                                   fzl::VmoMapper &mapper, zx::pmt &pmt,
-                                                   uint64_t offset_vmo, uint64_t length);
+  zx::result<> MapVmo(uint32_t option, zx::unowned_vmo &vmo, fzl::VmoMapper &mapper,
+                      uint64_t offset_vmo, uint64_t length);
+
+  uint8_t GetSlotStateCount(SlotState slot_state);
 
  protected:
   std::shared_ptr<zx_device> fake_root_;

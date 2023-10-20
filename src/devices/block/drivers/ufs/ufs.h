@@ -103,10 +103,10 @@ class Ufs : public UfsDeviceType {
   // Queue an IO command to be performed asynchronously.
   void QueueIoCommand(IoCommand *io_cmd);
 
-  // Synchronously handle block operations delivered to the logical unit.
-  // TODO(fxbug.dev/124835): Currently, ProcessIoSubmissions() waits for command completion. To
-  // support Multi-QD, we need to submit the next command without waiting for command completion.
+  // Convert block operations to UPIU commands and submit them asynchronously.
   void ProcessIoSubmissions();
+  // Find the completed commands in the Request List and handle their completion.
+  void ProcessCompletions();
 
   // Used to register a platform-specific NotifyEventCallback, which handles variants and quirks for
   // each host interface platform.
@@ -124,13 +124,13 @@ class Ufs : public UfsDeviceType {
   zx_status_t WaitWithTimeout(fit::function<zx_status_t()> wait_for, uint32_t timeout_us,
                               const fbl::String &timeout_message);
 
-  sync_completion_t &GetIoEvent() { return io_signal_; }
-
   // for test
   uint32_t GetLogicalUnitCount() const { return logical_unit_count_; }
   DeviceDescriptor &GetDeviceDescriptor() { return device_descriptor_; }
   GeometryDescriptor &GetGeometryDescriptor() { return geometry_descriptor_; }
+  thrd_t &GetIoThread() { return io_thread_; }
 
+  void DisableCompletion() { disable_completion_ = true; }
   void DumpRegisters();
 
  private:
@@ -187,6 +187,7 @@ class Ufs : public UfsDeviceType {
   GeometryDescriptor geometry_descriptor_;
 
   bool driver_shutdown_ = false;
+  bool disable_completion_ = false;
 };
 
 }  // namespace ufs

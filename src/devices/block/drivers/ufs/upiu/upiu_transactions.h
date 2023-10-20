@@ -129,11 +129,9 @@ class AbstractRequestUpiu : public AbstractUpiu {
   ~AbstractRequestUpiu() override = default;
 
   // Get the direction of the data transfer to be written to the request descriptor. The
-  // TransferRequestDescriptorDataDirection determines whether the target device will read or write
-  // the system memory area pointed to by the PRDT.
-  virtual TransferRequestDescriptorDataDirection GetDataDirection() const {
-    return TransferRequestDescriptorDataDirection::kNone;
-  }
+  // DataDirection determines whether the target device will read or write the system memory area
+  // pointed to by the PRDT.
+  virtual DataDirection GetDataDirection() const { return DataDirection::kNone; }
 
   // Get the offset that ResponseUpiu will be written to.
   uint16_t GetResponseOffset() const { return sizeof(RequestData); }
@@ -212,8 +210,15 @@ class CommandUpiu : public AbstractRequestUpiu<CommandUpiuData, ResponseUpiuData
  public:
   explicit CommandUpiu() { GetHeader().set_trans_code(UpiuTransactionCodes::kCommand); }
 
-  explicit CommandUpiu(UpiuCommandSetType command_set_type) : CommandUpiu() {
+  explicit CommandUpiu(UpiuCommandSetType command_set_type, DataDirection data_direction)
+      : CommandUpiu() {
     GetHeader().set_command_set_type(command_set_type);
+
+    if (data_direction == DataDirection::kDeviceToHost) {
+      GetData<CommandUpiuData>()->set_header_flags_r(true);
+    } else if (data_direction == DataDirection::kHostToDevice) {
+      GetData<CommandUpiuData>()->set_header_flags_w(true);
+    }
   }
 
   ~CommandUpiu() override = default;
