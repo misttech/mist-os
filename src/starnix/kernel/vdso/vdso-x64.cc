@@ -10,7 +10,6 @@
 
 #include <inttypes.h>
 #include <sys/syscall.h>
-#include <sys/time.h>
 #include <time.h>
 
 #include "vdso-aux.h"
@@ -91,13 +90,13 @@ extern "C" EXPORT int __vdso_clock_getres(int clock_id, struct timespec* tp) {
 extern "C" WEAK int clock_getres(int clock_id, struct timespec* tp)
     __attribute__((alias("__vdso_clock_getres")));
 
-extern "C" EXPORT int __vdso_getcpu(unsigned* cpu, void* cache, void* unused) {
-  int ret = syscall(__NR_getcpu, reinterpret_cast<intptr_t>(cpu), reinterpret_cast<intptr_t>(cache),
-                    reinterpret_cast<intptr_t>(unused));
+extern "C" EXPORT int __vdso_getcpu(unsigned int* cpu, unsigned int* cache) {
+  int ret =
+      syscall(__NR_getcpu, reinterpret_cast<intptr_t>(cpu), reinterpret_cast<intptr_t>(cache), 0);
   return ret;
 }
 
-extern "C" WEAK int getcpu(unsigned* cpu, void* cache, void* unused)
+extern "C" WEAK int getcpu(unsigned int* cpu, unsigned int* cache)
     __attribute__((alias("__vdso_getcpu")));
 
 extern "C" EXPORT int __vdso_gettimeofday(struct timeval* tv, struct timezone* tz) {
