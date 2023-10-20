@@ -38,7 +38,6 @@ import("//src/lib/vulkan/vulkan.gni")
 template("generate_fuchsia-diagnostics-tests") {
   forward_variables_from(invoker, [ "test_info" ])
   fuchsia_package_with_test(target_name) {
-    test_component_name = "fuchsia-diagnostics-tests-root.cm"
     subpackages = [
       test_info.target_label,
       # These tests do not currently use a test realm factory.
@@ -50,7 +49,6 @@ template("generate_fuchsia-diagnostics-tests") {
 template("generate_fuchsia-diagnostics-log-tests") {
   forward_variables_from(invoker, [ "test_info" ])
   fuchsia_package_with_test(target_name) {
-    test_component_name = "fuchsia-diagnostics-log-tests-root.cm"
     subpackages = [
       test_info.target_label,
       # These tests do not currently use a test realm factory.
@@ -62,7 +60,6 @@ template("generate_fuchsia-diagnostics-log-tests") {
 template("generate_fidl-hlcpp-unit-tests") {
   forward_variables_from(invoker, [ "test_info" ])
   fuchsia_package_with_test(target_name) {
-    test_component_name = "fidl-hlcpp-unit-tests-root.cm"
     subpackages = [
       test_info.target_label,
       # These tests do not currently use a test realm factory.
@@ -74,7 +71,6 @@ template("generate_fidl-hlcpp-unit-tests") {
 template("generate_fidl-hlcpp-conformance-tests") {
   forward_variables_from(invoker, [ "test_info" ])
   fuchsia_package_with_test(target_name) {
-    test_component_name = "fidl-hlcpp-conformance-tests-root.cm"
     subpackages = [
       test_info.target_label,
       # These tests do not currently use a test realm factory.
@@ -87,7 +83,6 @@ template("generate_fidl-hlcpp-conformance-tests") {
 template("generate_svc-tests") {
   forward_variables_from(invoker, [ "test_info" ])
   fuchsia_package_with_test(target_name) {
-    test_component_name = "svc-tests-root.cm"
     subpackages = [
       test_info.target_label,
       # These tests do not currently use a test realm factory.
@@ -99,7 +94,6 @@ template("generate_svc-tests") {
 template("generate_vulkan-loader-tests") {
   forward_variables_from(invoker, [ "test_info" ])
   fuchsia_package_with_test(target_name) {
-    test_component_name = "vulkan-loader-test-root.cm"
     subpackages = [
       test_info.target_label,
       # These tests do not currently use a test realm factory.
@@ -117,7 +111,6 @@ template("generate_vulkan-loader-tests") {
 template("generate_fuchsia-intl-tests") {
   forward_variables_from(invoker, [ "test_info" ])
   fuchsia_package_with_test(target_name) {
-    test_component_name = "test-root.cm"
     test_component = "//sdk/ctf/tests/fidl/fuchsia.intl:test-root"
     subpackages = [
       test_info.target_label,
@@ -129,7 +122,6 @@ template("generate_fuchsia-intl-tests") {
 template("generate_fdio-spawn-tests") {
   forward_variables_from(invoker, [ "test_info" ])
   fuchsia_package_with_test(target_name) {
-    test_component_name = "test-root.cm"
     test_component = "//sdk/ctf/tests/pkg/fdio:test-root"
     subpackages = [
       test_info.target_label,
@@ -141,7 +133,6 @@ template("generate_fdio-spawn-tests") {
 template("generate_fuchsia-driver-test_tests") {
   forward_variables_from(invoker, [ "test_info" ])
   fuchsia_package_with_test(target_name) {
-    test_component_name = "test-root.cm"
     subpackages = [
       test_info.target_label,
       # These tests do not currently use a test realm factory.
@@ -157,7 +148,6 @@ template("generate_fuchsia-driver-test_tests") {
 template("generate_fuchsia-settings-tests") {
   forward_variables_from(invoker, [ "test_info" ])
   fuchsia_package_with_test(target_name) {
-    test_component_name = "test-root.cm"
     test_component = "//sdk/ctf/tests/fidl/fuchsia.settings:test-root"
     subpackages = [
       test_info.target_label,
@@ -169,7 +159,6 @@ template("generate_fuchsia-settings-tests") {
 template("generate_fuchsia-element-tests") {
   forward_variables_from(invoker, [ "test_info" ])
   fuchsia_package_with_test(target_name) {
-    test_component_name = "test-root.cm"
     subpackages = [
       test_info.target_label,
       "//sdk/ctf/tests/fidl/fuchsia.element/testing/realm-factory:realm-factory",
@@ -181,7 +170,6 @@ template("generate_fuchsia-element-tests") {
 template("generate_fuchsia-hwinfo-tests") {
   forward_variables_from(invoker, [ "test_info" ])
   fuchsia_package_with_test(target_name) {
-    test_component_name = "test-root.cm"
     subpackages = [ test_info.target_label ]
     test_component = "//sdk/ctf/tests/fidl/fuchsia.hwinfo:test-root"
   }
@@ -190,7 +178,6 @@ template("generate_fuchsia-hwinfo-tests") {
 template("generate_pkgdir-tests") {
   forward_variables_from(invoker, [ "test_info" ])
   fuchsia_package_with_test(target_name) {
-    test_component_name = "test-root.cm"
     subpackages = [
       test_info.target_label,
       "//src/sys/pkg/tests/pkgdir/test_realm_proxy",
