@@ -181,6 +181,8 @@ struct NodePath
 
   bool operator==(std::string_view path) const { return CompareWith(path) == Comparison::kEqual; }
 
+  bool operator!=(std::string_view path) const { return !(*this == path); }
+
   bool IsParentOf(std::string_view path) const { return CompareWith(path) == Comparison::kParent; }
 
   bool IsAncestorOf(std::string_view path) const {
