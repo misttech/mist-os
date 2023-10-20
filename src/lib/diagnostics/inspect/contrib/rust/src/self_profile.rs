@@ -139,6 +139,9 @@ struct InnerGuard {
 impl InnerGuard {
     #[track_caller]
     fn enter(name: &'static str) -> Self {
+        let start_monotonic_ns = zx::Time::get_monotonic();
+        let start_runtime = current_thread_runtime();
+
         // Get the location outside the below closure since it can't be track_caller on stable.
         let location = Location::caller();
         let parent_duration = CURRENT_PROFILE_DURATION.with(|current_duration| {
@@ -146,9 +149,6 @@ impl InnerGuard {
             let child_duration = current_duration.child(name, location);
             std::mem::replace(&mut *current_duration, child_duration)
         });
-
-        let start_monotonic_ns = zx::Time::get_monotonic();
-        let start_runtime = current_thread_runtime();
 
         Self { start_runtime, start_monotonic_ns, parent_duration }
     }
@@ -158,10 +158,11 @@ impl Drop for InnerGuard {
     fn drop(&mut self) {
         CURRENT_PROFILE_DURATION.with(|current_duration| {
             let mut current_duration = current_duration.borrow_mut();
-            let runtime_delta = current_thread_runtime() - self.start_runtime;
-            let wall_time_delta = zx::Time::get_monotonic() - self.start_monotonic_ns;
             let completed_duration =
                 std::mem::replace(&mut *current_duration, self.parent_duration.clone());
+
+            let runtime_delta = current_thread_runtime() - self.start_runtime;
+            let wall_time_delta = zx::Time::get_monotonic() - self.start_monotonic_ns;
 
             completed_duration.count.fetch_add(1, Ordering::Relaxed);
             completed_duration.wall_time.fetch_add(wall_time_delta.into_nanos(), Ordering::Relaxed);
