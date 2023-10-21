@@ -148,7 +148,11 @@ impl CompositeNodeSpecManager {
                     // TODO(fxb/107371): Only return specs that have a matched composite using
                     // info.matched_driver.is_some()
                     composite_parents_result.push(fdf::CompositeParent {
-                        composite: Some(info.clone()),
+                        composite: Some(fdf::CompositeInfo {
+                            spec: Some(strip_parents_from_spec(&info.spec)),
+                            matched_driver: info.matched_driver.clone(),
+                            ..Default::default()
+                        }),
                         index: Some(matching_ref.index),
                         ..Default::default()
                     });
@@ -275,6 +279,23 @@ impl CompositeNodeSpecManager {
             }
         }
         None
+    }
+}
+
+pub fn strip_parents_from_spec(spec: &Option<fdf::CompositeNodeSpec>) -> fdf::CompositeNodeSpec {
+    // Strip the parents of the rules and properties since they are not needed by
+    // the driver manager.
+    let parents_stripped = spec.as_ref().and_then(|spec| spec.parents.as_ref()).map(|parents| {
+        parents
+            .iter()
+            .map(|_parent| fdf::ParentSpec { bind_rules: vec![], properties: vec![] })
+            .collect::<Vec<_>>()
+    });
+
+    fdf::CompositeNodeSpec {
+        name: spec.as_ref().and_then(|spec| spec.name.clone()),
+        parents: parents_stripped,
+        ..Default::default()
     }
 }
 
@@ -507,7 +528,7 @@ fn match_composite_properties<'a>(
 
     let driver = fdf::CompositeDriverInfo {
         composite_name: Some(composite.symbol_table[&composite.device_name_id].clone()),
-        driver_info: Some(composite_driver.create_driver_info()),
+        driver_info: Some(composite_driver.create_driver_info(false)),
         ..Default::default()
     };
     return Ok(Some(fdf::CompositeDriverMatch {
@@ -725,7 +746,7 @@ mod tests {
 
         let expected_parent = fdf::CompositeParent {
             composite: Some(fdf::CompositeInfo {
-                spec: Some(composite_spec.clone()),
+                spec: Some(strip_parents_from_spec(&Some(composite_spec.clone()))),
                 ..Default::default()
             }),
             index: Some(0),
@@ -751,7 +772,7 @@ mod tests {
 
         let expected_parent_2 = fdf::CompositeParent {
             composite: Some(fdf::CompositeInfo {
-                spec: Some(composite_spec.clone()),
+                spec: Some(strip_parents_from_spec(&Some(composite_spec.clone()))),
                 ..Default::default()
             }),
             index: Some(1),
@@ -797,7 +818,7 @@ mod tests {
 
         let expected_parent = fdf::CompositeParent {
             composite: Some(fdf::CompositeInfo {
-                spec: Some(composite_spec.clone()),
+                spec: Some(strip_parents_from_spec(&Some(composite_spec.clone()))),
                 ..Default::default()
             }),
             index: Some(0),
@@ -852,7 +873,7 @@ mod tests {
 
         let expected_parent = fdf::CompositeParent {
             composite: Some(fdf::CompositeInfo {
-                spec: Some(composite_spec.clone()),
+                spec: Some(strip_parents_from_spec(&Some(composite_spec.clone()))),
                 ..Default::default()
             }),
             index: Some(0),
@@ -943,7 +964,7 @@ mod tests {
 
                 assert!(matched_node_info.contains(&fdf::CompositeParent {
                     composite: Some(fdf::CompositeInfo {
-                        spec: Some(composite_spec_1.clone()),
+                        spec: Some(strip_parents_from_spec(&Some(composite_spec_1.clone()))),
                         ..Default::default()
                     }),
                     index: Some(1),
@@ -952,7 +973,7 @@ mod tests {
 
                 assert!(matched_node_info.contains(&fdf::CompositeParent {
                     composite: Some(fdf::CompositeInfo {
-                        spec: Some(composite_spec_2.clone()),
+                        spec: Some(strip_parents_from_spec(&Some(composite_spec_2.clone()))),
                         ..Default::default()
                     }),
                     index: Some(0),
@@ -1068,7 +1089,7 @@ mod tests {
 
                 assert!(matched_node_info.contains(&fdf::CompositeParent {
                     composite: Some(fdf::CompositeInfo {
-                        spec: Some(composite_spec_1.clone()),
+                        spec: Some(strip_parents_from_spec(&Some(composite_spec_1.clone()))),
                         ..Default::default()
                     }),
                     index: Some(0),
@@ -1077,7 +1098,7 @@ mod tests {
 
                 assert!(matched_node_info.contains(&fdf::CompositeParent {
                     composite: Some(fdf::CompositeInfo {
-                        spec: Some(composite_spec_2.clone()),
+                        spec: Some(strip_parents_from_spec(&Some(composite_spec_2.clone()))),
                         ..Default::default()
                     }),
                     index: Some(1),
@@ -1086,7 +1107,7 @@ mod tests {
 
                 assert!(matched_node_info.contains(&fdf::CompositeParent {
                     composite: Some(fdf::CompositeInfo {
-                        spec: Some(composite_spec_3.clone()),
+                        spec: Some(strip_parents_from_spec(&Some(composite_spec_3.clone()))),
                         ..Default::default()
                     }),
                     index: Some(0),
@@ -1212,7 +1233,7 @@ mod tests {
 
         let expected_parent_1 = fdf::CompositeParent {
             composite: Some(fdf::CompositeInfo {
-                spec: Some(composite_spec.clone()),
+                spec: Some(strip_parents_from_spec(&Some(composite_spec.clone()))),
                 ..Default::default()
             }),
             index: Some(0),
@@ -1231,7 +1252,7 @@ mod tests {
 
         let expected_parent_2 = fdf::CompositeParent {
             composite: Some(fdf::CompositeInfo {
-                spec: Some(composite_spec.clone()),
+                spec: Some(strip_parents_from_spec(&Some(composite_spec.clone()))),
                 ..Default::default()
             }),
             index: Some(1),
@@ -1590,7 +1611,26 @@ mod tests {
             matched_driver: Some(fdf::CompositeDriverMatch {
                 composite_driver: Some(fdf::CompositeDriverInfo {
                     composite_name: Some(TEST_DEVICE_NAME.to_string()),
-                    driver_info: Some(composite_driver.clone().create_driver_info()),
+                    driver_info: Some(composite_driver.clone().create_driver_info(false)),
+                    ..Default::default()
+                }),
+                parent_names: Some(vec![
+                    TEST_PRIMARY_NAME.to_string(),
+                    TEST_ADDITIONAL_B_NAME.to_string(),
+                    TEST_ADDITIONAL_A_NAME.to_string(),
+                ]),
+                primary_parent_index: Some(0),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        let expected_spec_stripped_parents = fdf::CompositeInfo {
+            spec: Some(strip_parents_from_spec(&Some(composite_spec.clone()))),
+            matched_driver: Some(fdf::CompositeDriverMatch {
+                composite_driver: Some(fdf::CompositeDriverInfo {
+                    composite_name: Some(TEST_DEVICE_NAME.to_string()),
+                    driver_info: Some(composite_driver.clone().create_driver_info(false)),
                     ..Default::default()
                 }),
                 parent_names: Some(vec![
@@ -1611,7 +1651,7 @@ mod tests {
         device_properties_1.insert(PropertyKey::NumberKey(1), Symbol::NumberValue(10));
 
         let expected_parent = fdf::CompositeParent {
-            composite: Some(expected_spec.clone()),
+            composite: Some(expected_spec_stripped_parents.clone()),
             index: Some(2),
             ..Default::default()
         };
@@ -1740,7 +1780,26 @@ mod tests {
             matched_driver: Some(fdf::CompositeDriverMatch {
                 composite_driver: Some(fdf::CompositeDriverInfo {
                     composite_name: Some(TEST_DEVICE_NAME.to_string()),
-                    driver_info: Some(composite_driver.clone().create_driver_info()),
+                    driver_info: Some(composite_driver.clone().create_driver_info(false)),
+                    ..Default::default()
+                }),
+                parent_names: Some(vec![
+                    TEST_ADDITIONAL_B_NAME.to_string(),
+                    TEST_ADDITIONAL_A_NAME.to_string(),
+                    TEST_PRIMARY_NAME.to_string(),
+                ]),
+                primary_parent_index: Some(2),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        let expected_spec_stripped_parents = fdf::CompositeInfo {
+            spec: Some(strip_parents_from_spec(&Some(composite_spec.clone()))),
+            matched_driver: Some(fdf::CompositeDriverMatch {
+                composite_driver: Some(fdf::CompositeDriverInfo {
+                    composite_name: Some(TEST_DEVICE_NAME.to_string()),
+                    driver_info: Some(composite_driver.clone().create_driver_info(false)),
                     ..Default::default()
                 }),
                 parent_names: Some(vec![
@@ -1761,7 +1820,7 @@ mod tests {
         device_properties_1.insert(PropertyKey::NumberKey(1), Symbol::NumberValue(10));
 
         let expected_parent = fdf::CompositeParent {
-            composite: Some(expected_spec.clone()),
+            composite: Some(expected_spec_stripped_parents.clone()),
             index: Some(1),
             ..Default::default()
         };
@@ -1906,11 +1965,11 @@ mod tests {
 
         let expected_parent = fdf::CompositeParent {
             composite: Some(fdf::CompositeInfo {
-                spec: Some(composite_spec.clone()),
+                spec: Some(strip_parents_from_spec(&Some(composite_spec.clone()))),
                 matched_driver: Some(fdf::CompositeDriverMatch {
                     composite_driver: Some(fdf::CompositeDriverInfo {
                         composite_name: Some(TEST_DEVICE_NAME.to_string()),
-                        driver_info: Some(composite_driver.clone().create_driver_info()),
+                        driver_info: Some(composite_driver.clone().create_driver_info(false)),
                         ..Default::default()
                     }),
                     parent_names: Some(vec![
@@ -2080,11 +2139,11 @@ mod tests {
         device_properties_1.insert(PropertyKey::NumberKey(1), Symbol::NumberValue(10));
 
         let expected_composite = fdf::CompositeInfo {
-            spec: Some(composite_spec.clone()),
+            spec: Some(strip_parents_from_spec(&Some(composite_spec.clone()))),
             matched_driver: Some(fdf::CompositeDriverMatch {
                 composite_driver: Some(fdf::CompositeDriverInfo {
                     composite_name: Some(TEST_DEVICE_NAME.to_string()),
-                    driver_info: Some(composite_driver.clone().create_driver_info()),
+                    driver_info: Some(composite_driver.clone().create_driver_info(false)),
                     ..Default::default()
                 }),
                 parent_names: Some(vec![
@@ -2371,7 +2430,7 @@ mod tests {
         assert_eq!(
             fdf::CompositeDriverInfo {
                 composite_name: Some("rebind_composite".to_string()),
-                driver_info: Some(rebind_driver.clone().create_driver_info()),
+                driver_info: Some(rebind_driver.clone().create_driver_info(false)),
                 ..Default::default()
             },
             composite_node_spec_manager

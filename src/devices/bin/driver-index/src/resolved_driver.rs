@@ -124,20 +124,20 @@ impl ResolvedDriver {
                 return Ok(None);
             }
 
-            return Ok(Some(fdi::MatchDriverResult::Driver(self.create_driver_info())));
+            return Ok(Some(fdi::MatchDriverResult::Driver(self.create_driver_info(false))));
         }
 
         Ok(None)
     }
 
-    pub fn create_driver_info(&self) -> fdf::DriverInfo {
+    pub fn create_driver_info(&self, full: bool) -> fdf::DriverInfo {
         fdf::DriverInfo {
             url: Some(self.component_url.clone().to_string()),
             colocate: Some(self.colocate),
             package_type: fdf::DriverPackageType::from_primitive(self.package_type as u8),
             is_fallback: Some(self.fallback),
             device_categories: Some(self.device_categories.clone()),
-            bind_rules_bytecode: Some(self.bind_bytecode.clone()),
+            bind_rules_bytecode: if full { Some(self.bind_bytecode.clone()) } else { None },
             driver_framework_version: match self.is_dfv2 {
                 Some(true) => Some(2),
                 Some(false) => Some(1),

@@ -289,7 +289,7 @@ impl Indexer {
             if driver_filter.len() == 0
                 || driver_filter.iter().any(|f| f == driver.component_url.as_str())
             {
-                driver_info.push(driver.create_driver_info());
+                driver_info.push(driver.create_driver_info(true));
             }
         }
 
@@ -299,7 +299,7 @@ impl Indexer {
                 if driver_filter.len() == 0
                     || driver_filter.iter().any(|f| f == driver.component_url.as_str())
                 {
-                    driver_info.push(driver.create_driver_info());
+                    driver_info.push(driver.create_driver_info(true));
                 }
             }
         }
@@ -309,7 +309,7 @@ impl Indexer {
             if driver_filter.len() == 0
                 || driver_filter.iter().any(|f| f == driver.component_url.as_str())
             {
-                driver_info.push(driver.create_driver_info());
+                driver_info.push(driver.create_driver_info(true));
             }
         }
 

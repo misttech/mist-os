@@ -261,10 +261,20 @@ async fn run_index_server(
             let indexer = indexer.clone();
             match request {
                 DriverIndexRequest::MatchDriver { args, responder } => {
-                    responder
-                        .send(indexer.match_driver(args).as_ref().map_err(|e| *e))
-                        .or_else(ignore_peer_closed)
-                        .context("error responding to MatchDriver")?;
+                    let match_result = indexer.match_driver(args);
+                    let send_result = responder
+                        .send(match_result.as_ref().map_err(|e| *e))
+                        .or_else(ignore_peer_closed);
+
+                    if let Err(fidl::Error::ServerResponseWrite(Status::OUT_OF_RANGE)) = send_result
+                    {
+                        send_result.context(format!(
+                            "error responding to MatchDriver. Match result was too big: {:?}",
+                            match_result
+                        ))?;
+                    } else {
+                        send_result.context("error responding to MatchDriver.")?;
+                    }
                 }
                 DriverIndexRequest::WatchForDriverLoad { responder } => {
                     indexer.watch_for_driver_load(responder);
@@ -455,6 +465,7 @@ async fn main() -> Result<(), anyhow::Error> {
 mod tests {
     use super::*;
     use {
+        crate::composite_node_spec_manager::strip_parents_from_spec,
         crate::resolved_driver::{DriverPackageType, ResolvedDriver},
         bind::{
             compiler::{
@@ -484,7 +495,7 @@ mod tests {
             device_categories: Some(device_categories),
             package_type: fdf::DriverPackageType::from_primitive(package_type as u8),
             is_fallback: Some(fallback),
-            bind_rules_bytecode: Some(vec![]),
+            bind_rules_bytecode: None,
             ..Default::default()
         }
     }
@@ -779,7 +790,7 @@ mod tests {
                 device_categories: Some(vec![]),
                 package_type: Some(fdf::DriverPackageType::Base),
                 is_fallback: Some(false),
-                bind_rules_bytecode: Some(vec![]),
+                bind_rules_bytecode: None,
                 ..Default::default()
             });
 
@@ -852,7 +863,7 @@ mod tests {
                 package_type: Some(fdf::DriverPackageType::Base),
                 is_fallback: Some(false),
                 device_categories: Some(vec![]),
-                bind_rules_bytecode: Some(vec![]),
+                bind_rules_bytecode: None,
                 ..Default::default()
             });
 
@@ -1776,7 +1787,7 @@ mod tests {
                 value: fdf::NodePropertyValue::StringValue("thrasher".to_string()),
             }];
 
-            let composite_sepc = fdf::CompositeNodeSpec {
+            let composite_spec = fdf::CompositeNodeSpec {
                 name: Some("test_group".to_string()),
                 parents: Some(vec![fdf::ParentSpec {
                     bind_rules: bind_rules,
@@ -1785,7 +1796,7 @@ mod tests {
                 ..Default::default()
             };
 
-            assert_eq!(Ok(()), proxy.add_composite_node_spec(&composite_sepc).await.unwrap());
+            assert_eq!(Ok(()), proxy.add_composite_node_spec(&composite_spec).await.unwrap());
 
             let device_properties_match = vec![
                 fdf::NodeProperty {
@@ -1806,7 +1817,7 @@ mod tests {
             assert_eq!(
                 fdi::MatchDriverResult::CompositeParents(vec![fdf::CompositeParent {
                     composite: Some(fdf::CompositeInfo {
-                        spec: Some(composite_sepc.clone()),
+                        spec: Some(strip_parents_from_spec(&Some(composite_spec.clone()))),
                         ..Default::default()
                     }),
                     index: Some(0),
@@ -1839,6 +1850,91 @@ mod tests {
         futures::select! {
             result = index_task => {
                 panic!("Index task finished: {:?}", result);
+            },
+            () = test_task => {},
+        }
+    }
+
+    #[fuchsia::test]
+    async fn test_parent_spec_match_too_large() {
+        let base_repo = BaseRepo::Resolved(std::vec![]);
+
+        let (proxy, stream) =
+            fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>().unwrap();
+        let index = Rc::new(Indexer::new(std::vec![], base_repo, false));
+        let index_task = run_index_server(index.clone(), stream).fuse();
+
+        let test_task = async move {
+            let bind_rules = vec![
+                fdf::BindRule {
+                    key: fdf::NodePropertyKey::IntValue(1),
+                    condition: fdf::Condition::Accept,
+                    values: vec![
+                        fdf::NodePropertyValue::IntValue(200),
+                        fdf::NodePropertyValue::IntValue(150),
+                    ],
+                },
+                fdf::BindRule {
+                    key: fdf::NodePropertyKey::StringValue("lapwing".to_string()),
+                    condition: fdf::Condition::Accept,
+                    values: vec![fdf::NodePropertyValue::StringValue("plover".to_string())],
+                },
+            ];
+
+            let properties = vec![fdf::NodeProperty {
+                key: fdf::NodePropertyKey::StringValue("trembler".to_string()),
+                value: fdf::NodePropertyValue::StringValue("thrasher".to_string()),
+            }];
+
+            // Load in a bunch of composite node specs that will match later.
+            for i in 1..400 {
+                let composite_spec = fdf::CompositeNodeSpec {
+                    name: Some(format!("test_group_{}", i).to_string()),
+                    parents: Some(vec![fdf::ParentSpec {
+                        bind_rules: bind_rules.clone(),
+                        properties: properties.clone(),
+                    }]),
+                    ..Default::default()
+                };
+
+                assert_eq!(Ok(()), proxy.add_composite_node_spec(&composite_spec).await.unwrap());
+            }
+
+            let device_properties_match = vec![
+                fdf::NodeProperty {
+                    key: fdf::NodePropertyKey::IntValue(1),
+                    value: fdf::NodePropertyValue::IntValue(200),
+                },
+                fdf::NodeProperty {
+                    key: fdf::NodePropertyKey::StringValue("lapwing".to_string()),
+                    value: fdf::NodePropertyValue::StringValue("plover".to_string()),
+                },
+            ];
+            let match_args = fdi::MatchDriverArgs {
+                properties: Some(device_properties_match),
+                ..Default::default()
+            };
+
+            // Since there is a bunch of matching parent specs this will hit the too big case.
+            let result = proxy.match_driver(&match_args).await;
+            assert!(result.is_err());
+        }
+        .fuse();
+
+        let index_expected_error = "error responding to MatchDriver. Match result was too big: ";
+
+        futures::pin_mut!(index_task, test_task);
+        futures::select! {
+            index_result = index_task => {
+                assert!(index_result.is_err());
+                assert!(index_result.unwrap_err().to_string().starts_with(index_expected_error));
+            },
+            () = test_task => {},
+        }
+        futures::select! {
+            index_result = index_task => {
+                assert!(index_result.is_err());
+                assert!(index_result.unwrap_err().to_string().starts_with(index_expected_error));
             },
             () = test_task => {},
         }
