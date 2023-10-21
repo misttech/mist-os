@@ -18,13 +18,13 @@
 // - Display Monitor Timing Standard, Video Electronics Standards Association
 //   (VESA), Version 1.0, Rev. 13, dated February 8, 2013.
 //   Referenced as "DMT standard".
-//   Available at https://fs16.formsite.com/VESA/form714826558/secure_index.html .
+//   Available at https://vesa.org/vesa-standards/ .
 //
 // - VESA Enhanced Extended Display Identification Data (E-EDID) Standard,
 //   Video Electronics Standards Association (VESA), Release A, Revision 2,
 //   dated September 25, 2006, revised December 31, 2020.
 //   Referenced as "E-EDID standard".
-//   Available at https://fs16.formsite.com/VESA/form714826558/secure_index.html .
+//   Available at https://vesa.org/vesa-standards/ .
 //
 // - ANSI/CTA-861-I: A DTV Profile for Uncompressed High Speed Digital
 //   Interfaces, Consumer Technology Association (CTA), dated February 2023.
