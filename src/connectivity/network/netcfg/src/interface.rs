@@ -10,6 +10,8 @@ use {
     std::{fs, io, path},
 };
 
+use crate::devices;
+
 const INTERFACE_PREFIX_WLAN: &str = "wlan";
 const INTERFACE_PREFIX_ETHERNET: &str = "eth";
 
@@ -48,16 +50,17 @@ impl Config {
         topological_path: std::borrow::Cow<'_, str>,
         mac_address: fidl_fuchsia_net_ext::MacAddress,
     ) -> PersistentIdentifier {
-        if topological_path.contains("/PCI0") {
-            if topological_path.contains("/usb/") {
-                PersistentIdentifier::MacAddress(mac_address)
-            } else {
+        match get_bus_type_for_topological_path(&topological_path) {
+            Ok(BusType::USB) => PersistentIdentifier::MacAddress(mac_address),
+            Ok(BusType::PCI) => {
                 PersistentIdentifier::TopologicalPath(topological_path.into_owned())
             }
-        } else if topological_path.contains("/platform/") {
-            PersistentIdentifier::TopologicalPath(topological_path.into_owned())
-        } else {
-            PersistentIdentifier::MacAddress(mac_address)
+            Ok(BusType::SDIO) => {
+                PersistentIdentifier::TopologicalPath(topological_path.into_owned())
+            }
+            // Use the MacAddress as an identifier for the device if the
+            // BusType is currently not in the known list.
+            Err(_) => PersistentIdentifier::MacAddress(mac_address),
         }
     }
 
@@ -361,10 +364,57 @@ pub enum NameGenerationError<'a> {
     FileUpdateError { name: &'a str, err: anyhow::Error },
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "lowercase")]
+pub enum BusType {
+    USB,
+    PCI,
+    SDIO,
+}
+
+// Extract the BusType for a device given the topological path.
+fn get_bus_type_for_topological_path(topological_path: &str) -> Result<BusType, anyhow::Error> {
+    if topological_path.contains("/PCI0") {
+        // A USB bus will require a bridge over a PCI controller, so a
+        // topological path for a USB bus should contain strings to represent
+        // PCI and USB.
+        if topological_path.contains("/usb/") {
+            Ok(BusType::USB)
+        } else {
+            Ok(BusType::PCI)
+        }
+    } else if topological_path.contains("/platform/") {
+        Ok(BusType::SDIO)
+    } else {
+        Err(anyhow::format_err!(
+            "unexpected topological path {}: did not match known bus types",
+            topological_path,
+        ))
+    }
+}
+
 // TODO(fxbug.dev/135094): Add interface matchers for naming policy
 #[derive(Debug, Deserialize, Eq, Hash, PartialEq)]
-#[serde(deny_unknown_fields, rename_all = "lowercase")]
-pub enum MatchingRule {}
+#[serde(deny_unknown_fields, rename_all = "snake_case")]
+pub enum MatchingRule {
+    BusTypes(Vec<BusType>),
+}
+
+impl MatchingRule {
+    // TODO(fxbug.dev/135098): Use interface matching fn when there is naming
+    // policy to apply
+    #[allow(unused)]
+    fn does_interface_match(&self, info: &devices::DeviceInfo) -> Result<bool, anyhow::Error> {
+        match &self {
+            MatchingRule::BusTypes(type_list) => {
+                // Match the interface if the interface under comparison
+                // matches any of the types included in the list.
+                let bus_type = get_bus_type_for_topological_path(&info.topological_path)?;
+                Ok(type_list.contains(&bus_type))
+            }
+        }
+    }
+}
 
 // TODO(fxbug.dev/135097): Create framework for meta/static naming rules
 #[derive(Debug, Deserialize, PartialEq)]
@@ -392,6 +442,8 @@ pub struct NamingRule {
 mod tests {
     use super::*;
     use std::io::Write;
+
+    use fidl_fuchsia_hardware_network as fhwnet;
 
     #[derive(Clone)]
     struct TestCase {
@@ -707,5 +759,105 @@ mod tests {
         let expected_new_format =
             serde_json::to_string_pretty(&new_config.config).expect("serialize config");
         assert_eq!(persisted, expected_new_format);
+    }
+
+    #[test]
+    fn test_interface_matching_by_bus_type() {
+        #[derive(Clone)]
+        struct MatchBusTypeTestCase {
+            topological_path: &'static str,
+            bus_types: Vec<BusType>,
+            expected_bus_type: BusType,
+            want_match: bool,
+        }
+
+        let test_cases = vec![
+            // Base case for PCI.
+            MatchBusTypeTestCase {
+                topological_path: "/dev/sys/platform/pt/PCI0/bus/00:14.0_/00:14.0/ethernet",
+                bus_types: vec![BusType::PCI],
+                expected_bus_type: BusType::PCI,
+                want_match: true,
+            },
+            // Same topological path as the base case for PCI, but with
+            // non-matching bus types.
+            MatchBusTypeTestCase {
+                topological_path: "/dev/sys/platform/pt/PCI0/bus/00:14.0_/00:14.0/ethernet",
+                bus_types: vec![BusType::USB, BusType::SDIO],
+                expected_bus_type: BusType::PCI,
+                want_match: false,
+            },
+            // Base case for USB.
+            MatchBusTypeTestCase {
+                topological_path: "/dev/sys/platform/pt/PCI0/bus/00:14.0/00:14.0/xhci/usb/004/004/ifc-000/ax88179/ethernet",
+                bus_types: vec![BusType::USB],
+                expected_bus_type: BusType::USB,
+                want_match: true,
+            },
+            // Same topological path as the base case for USB, but with
+            // non-matching bus types. Ensure that even though PCI is
+            // present in the topological path, it does not match a PCI
+            // controller.
+            MatchBusTypeTestCase {
+                topological_path: "/dev/sys/platform/pt/PCI0/bus/00:14.0/00:14.0/xhci/usb/004/004/ifc-000/ax88179/ethernet",
+                bus_types: vec![BusType::PCI, BusType::SDIO],
+                expected_bus_type: BusType::USB,
+                want_match: false,
+            },
+            MatchBusTypeTestCase {
+                topological_path: "/dev/sys/platform/05:00:6/aml-sd-emmc/sdio/broadcom-wlanphy/wlanphy",
+                bus_types: vec![BusType::SDIO],
+                expected_bus_type: BusType::SDIO,
+                want_match: true,
+            },
+        ];
+
+        for (
+            _i,
+            MatchBusTypeTestCase { topological_path, bus_types, expected_bus_type, want_match },
+        ) in test_cases.into_iter().enumerate()
+        {
+            let device_info = devices::DeviceInfo {
+                // `device_class` and `mac` have no effect on `BusType`
+                // matching, so we use arbitrary values.
+                device_class: fhwnet::DeviceClass::Virtual,
+                mac: Default::default(),
+                topological_path: topological_path.to_owned(),
+            };
+
+            // Verify the `BusType` determined from the device's
+            // topological path.
+            let bus_type =
+                get_bus_type_for_topological_path(&device_info.topological_path).unwrap();
+            assert_eq!(bus_type, expected_bus_type);
+
+            // Create a matching rule for the provided `BusType` list.
+            let matching_rule = MatchingRule::BusTypes(bus_types);
+            let does_interface_match = matching_rule.does_interface_match(&device_info).unwrap();
+            assert_eq!(does_interface_match, want_match);
+        }
+    }
+
+    #[test]
+    fn test_interface_matching_by_bus_type_unsupported() {
+        let device_info = devices::DeviceInfo {
+            // `device_class` and `mac` have no effect on `BusType`
+            // matching, so we use arbitrary values.
+            device_class: fhwnet::DeviceClass::Virtual,
+            mac: Default::default(),
+            topological_path: String::from("/dev/sys/unsupported-bus/ethernet"),
+        };
+
+        // Verify the `BusType` determined from the device's topological
+        // path raises an error for being unsupported.
+        let bus_type_res = get_bus_type_for_topological_path(&device_info.topological_path);
+        assert!(bus_type_res.is_err());
+
+        // Create a matching rule for the provided `BusType` list. A device
+        // with an unsupported path should raise an error to signify the need
+        // to support a new bus type.
+        let matching_rule = MatchingRule::BusTypes(vec![BusType::USB, BusType::PCI, BusType::SDIO]);
+        let interface_match_res = matching_rule.does_interface_match(&device_info);
+        assert!(interface_match_res.is_err());
     }
 }

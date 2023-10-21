@@ -4506,7 +4506,10 @@ mod tests {
   "forwarded_device_classes": { "ipv4": [ "ethernet" ], "ipv6": [ "wlan" ] },
   "install_only": false,
   "interface_name_prefix": "hello",
-  "interface_naming_policy": [ { "matchers": [], "naming_scheme": [] } ]
+  "interface_naming_policy": [{
+    "matchers": [ { "bus_types": ["usb"] } ],
+    "naming_scheme": []
+  }]
 }
 "#;
 
@@ -4557,7 +4560,9 @@ mod tests {
         assert_eq!(interface_name_prefix, "hello".to_string());
 
         let expected_naming_policy = Vec::from([interface::NamingRule {
-            matchers: HashSet::new(),
+            matchers: HashSet::from([interface::MatchingRule::BusTypes(vec![
+                interface::BusType::USB,
+            ])]),
             naming_scheme: Vec::new(),
         }]);
         assert_eq!(interface_naming_policy, expected_naming_policy);
@@ -4771,7 +4776,28 @@ mod tests {
   "filter_enabled_interface_types": [],
   "allowed_upstream_device_classes": [],
   "forwarded_device_classes": { "ipv4": [], "ipv6": [] },
-  "interface_naming_policy": [ { "matchers": [], "naming_scheme": [], "speling": [] } ]
+  "interface_naming_policy": [{
+    "matchers": [],
+    "naming_scheme": [],
+    "speling": []
+  }]
+}
+"#,
+            r#"
+{
+  "dns_config": { "servers": [] },
+  "filter_config": {
+    "rules": [],
+    "nat_rules": [],
+    "rdr_rules": []
+  },
+  "filter_enabled_interface_types": [],
+  "allowed_upstream_device_classes": [],
+  "forwarded_device_classes": { "ipv4": [], "ipv6": [] },
+  "interface_naming_policy": [{
+    "matchers": [ { "speling": [] } ],
+    "naming_scheme": []
+  }]
 }
 "#,
         ];
