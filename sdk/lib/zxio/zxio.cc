@@ -957,3 +957,11 @@ zx_status_t zxio_xattr_remove(zxio_t* io, const uint8_t* name, size_t name_len) 
   zxio_internal_t* zio = to_internal(io);
   return zio->ops->xattr_remove(io, name, name_len);
 }
+
+zx_status_t zxio_allocate(zxio_t* io, uint64_t offset, uint64_t len, zxio_allocate_mode_t mode) {
+  if (!zxio_is_valid(io)) {
+    return ZX_ERR_BAD_HANDLE;
+  }
+  zxio_internal_t* zio = to_internal(io);
+  return zio->ops->allocate(io, offset, len, mode);
+}

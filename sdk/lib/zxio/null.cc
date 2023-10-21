@@ -307,3 +307,8 @@ zx_status_t zxio_default_open2(zxio_t* directory, const char* path, size_t path_
                                zxio_node_attributes_t* inout_attr, zxio_storage_t* storage) {
   return ZX_ERR_NOT_SUPPORTED;
 }
+
+zx_status_t zxio_default_allocate(zxio_t* io, uint64_t offset, uint64_t len,
+                                  zxio_allocate_mode_t mode) {
+  return ZX_ERR_NOT_SUPPORTED;
+}

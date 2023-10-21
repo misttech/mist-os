@@ -419,6 +419,25 @@ pub enum XattrSetMode {
     Replace = 3,
 }
 
+bitflags! {
+    /// Describes the mode of operation when allocating disk space using Allocate.
+    pub struct AllocateMode: u32 {
+        const KEEP_SIZE = 1 << 0;
+        const UNSHARE_RANGE = 1 << 1;
+        const PUNCH_HOLE = 1 << 2;
+        const COLLAPSE_RANGE = 1 << 3;
+        const ZERO_RANGE = 1 << 4;
+        const INSERT_RANGE = 1 << 5;
+    }
+}
+
+const_assert_eq!(AllocateMode::KEEP_SIZE.bits(), zxio::ZXIO_ALLOCATE_KEEP_SIZE);
+const_assert_eq!(AllocateMode::UNSHARE_RANGE.bits(), zxio::ZXIO_ALLOCATE_UNSHARE_RANGE);
+const_assert_eq!(AllocateMode::PUNCH_HOLE.bits(), zxio::ZXIO_ALLOCATE_PUNCH_HOLE);
+const_assert_eq!(AllocateMode::COLLAPSE_RANGE.bits(), zxio::ZXIO_ALLOCATE_COLLAPSE_RANGE);
+const_assert_eq!(AllocateMode::ZERO_RANGE.bits(), zxio::ZXIO_ALLOCATE_ZERO_RANGE);
+const_assert_eq!(AllocateMode::INSERT_RANGE.bits(), zxio::ZXIO_ALLOCATE_INSERT_RANGE);
+
 // `ZxioStorage` is marked as `PhantomPinned` in order to prevent unsafe moves
 // of the `zxio_storage_t`, because it may store self-referential types defined
 // in zxio.
@@ -1192,6 +1211,11 @@ impl Zxio {
         zx::ok(unsafe {
             zxio::zxio_link_into(self.as_ptr(), handle, name.as_ptr() as *const c_char, name.len())
         })
+    }
+
+    pub fn allocate(&self, offset: u64, len: u64, mode: AllocateMode) -> Result<(), zx::Status> {
+        let status = unsafe { zxio::zxio_allocate(self.as_ptr(), offset, len, mode.bits()) };
+        zx::ok(status)
     }
 }
 

@@ -217,6 +217,27 @@ closed protocol File {
     }) -> (resource struct {
         vmo zx.Handle:VMO;
     }) error zx.Status;
+
+    /// Pre-allocate on-disk space for this file.
+    @available(added=HEAD)
+    @selector("fuchsia.io/File.Allocate")
+    strict Allocate(resource struct {
+        offset uint64;
+        length uint64;
+
+        /// If an empty bits is passed for mode, the default behavior is used. Otherwise the
+        /// behavior is modified as described for each mode bit. If the backing filesystem doesn't
+        /// support a particular provided mode bit, or combination of mode bits, an error is
+        /// returned.
+        mode @generated_name("AllocateMode") flexible bits : uint32 {
+            KEEP_SIZE = 0x00000001;
+            UNSHARE_RANGE = 0x00000002;
+            PUNCH_HOLE = 0x00000004;
+            COLLAPSE_RANGE = 0x00000008;
+            ZERO_RANGE = 0x00000010;
+            INSERT_RANGE = 0x00000020;
+        };
+    }) -> () error zx.Status;
 };
 
 closed protocol Readable {

@@ -653,6 +653,11 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
                     Ok(info) => responder.send(0, Some(&info))?,
                 }
             }
+            fio::FileRequest::Allocate { offset, length, mode, responder } => {
+                fuchsia_trace::duration!("storage", "File::Allocate");
+                let result = self.handle_allocate(offset, length, mode).await;
+                responder.send(result.map_err(zx::Status::into_raw))?;
+            }
         }
         Ok(ConnectionState::Alive)
     }
@@ -850,6 +855,15 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
             .ok_or(Err(zx::Status::NOT_FOUND))?;
 
         self.file.clone().link_into(target_parent, target_name).await
+    }
+
+    async fn handle_allocate(
+        &mut self,
+        offset: u64,
+        length: u64,
+        mode: fio::AllocateMode,
+    ) -> Result<(), zx::Status> {
+        self.file.allocate(offset, length, mode).await
     }
 }
 
@@ -1865,7 +1879,9 @@ mod tests {
         let flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
         let env = init_mock_stream_file(vmo, flags);
 
-        let fio::FileInfo { stream: Some(stream), .. } = env.proxy.describe().await.unwrap() else { panic!("Missing stream") };
+        let fio::FileInfo { stream: Some(stream), .. } = env.proxy.describe().await.unwrap() else {
+            panic!("Missing stream")
+        };
         let mut buf = [0; 20];
         assert_eq!(
             stream.readv(zx::StreamReadOptions::empty(), &[&mut buf]).expect("readv failed"),

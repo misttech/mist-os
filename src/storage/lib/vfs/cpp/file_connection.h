@@ -89,6 +89,11 @@ class FileConnection : public Connection, public fidl::WireServer<fuchsia_io::Fi
   void Resize(ResizeRequestView request, ResizeCompleter::Sync& completer) final;
   void GetBackingMemory(GetBackingMemoryRequestView request,
                         GetBackingMemoryCompleter::Sync& completer) final;
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+  void Allocate(AllocateRequestView request, AllocateCompleter::Sync& completer) final {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+#endif
 
   //
   // |fuchsia.io/AdvisoryLocking| operations.

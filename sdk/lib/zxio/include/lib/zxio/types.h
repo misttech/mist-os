@@ -484,6 +484,17 @@ typedef struct zxio_xattr_data {
   size_t len;
 } zxio_xattr_data_t;
 
+// The possible modes allocate can operate with. Only some mode combinations are allowed. This
+// should be kept in sync with the AllocateMode type defined in the fuchsia.io fidl definition.
+typedef uint32_t zxio_allocate_mode_t;
+
+#define ZXIO_ALLOCATE_KEEP_SIZE ((zxio_allocate_mode_t)1ul << 0)
+#define ZXIO_ALLOCATE_UNSHARE_RANGE ((zxio_allocate_mode_t)1ul << 1)
+#define ZXIO_ALLOCATE_PUNCH_HOLE ((zxio_allocate_mode_t)1ul << 2)
+#define ZXIO_ALLOCATE_COLLAPSE_RANGE ((zxio_allocate_mode_t)1ul << 3)
+#define ZXIO_ALLOCATE_ZERO_RANGE ((zxio_allocate_mode_t)1ul << 4)
+#define ZXIO_ALLOCATE_INSERT_RANGE ((zxio_allocate_mode_t)1ul << 5)
+
 __END_CDECLS
 
 #endif  // LIB_ZXIO_TYPES_H_

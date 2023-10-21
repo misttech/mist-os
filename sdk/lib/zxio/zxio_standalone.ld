@@ -1,6 +1,7 @@
 {
 	global:
 		zxio_accept;
+		zxio_allocate;
 		zxio_attr_get;
 		zxio_attr_set;
 		zxio_bind;

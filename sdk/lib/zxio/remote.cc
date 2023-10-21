@@ -458,6 +458,8 @@ class Remote : public HasIo {
 
   zx_status_t XattrRemove(const uint8_t* name, size_t name_len);
 
+  zx_status_t Allocate(uint64_t offset, uint64_t len, zxio_allocate_mode_t mode);
+
   const fidl::WireSyncClient<Protocol>& client() const { return client_; }
 
  private:
@@ -1491,6 +1493,41 @@ zx_status_t Remote<Protocol>::XattrRemove(const uint8_t* name, size_t name_len) 
 #endif
 }
 
+template <typename Protocol>
+zx_status_t Remote<Protocol>::Allocate(uint64_t offset, uint64_t len, zxio_allocate_mode_t mode) {
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+  if (!client().is_valid()) {
+    return ZX_ERR_BAD_STATE;
+  }
+
+  fio::AllocateMode fidl_mode;
+  if (mode & ZXIO_ALLOCATE_KEEP_SIZE) {
+    fidl_mode |= fio::AllocateMode::kKeepSize;
+  } else if (mode & ZXIO_ALLOCATE_UNSHARE_RANGE) {
+    fidl_mode |= fio::AllocateMode::kUnshareRange;
+  } else if (mode & ZXIO_ALLOCATE_PUNCH_HOLE) {
+    fidl_mode |= fio::AllocateMode::kPunchHole;
+  } else if (mode & ZXIO_ALLOCATE_COLLAPSE_RANGE) {
+    fidl_mode |= fio::AllocateMode::kCollapseRange;
+  } else if (mode & ZXIO_ALLOCATE_ZERO_RANGE) {
+    fidl_mode |= fio::AllocateMode::kZeroRange;
+  } else if (mode & ZXIO_ALLOCATE_INSERT_RANGE) {
+    fidl_mode |= fio::AllocateMode::kInsertRange;
+  }
+  const fidl::WireResult result = client()->Allocate(offset, len, fidl_mode);
+  if (!result.ok()) {
+    return result.status();
+  }
+  if (result.value().is_error()) {
+    return result.value().error_value();
+  }
+
+  return ZX_OK;
+#else
+  return ZX_ERR_NOT_SUPPORTED;
+#endif
+}
+
 class Node : public Remote<fio::Node> {
  public:
   explicit Node(fidl::ClientEnd<fio::Node> client_end) : Remote(std::move(client_end), kOps) {}
@@ -1855,6 +1892,7 @@ constexpr zxio_ops_t File::kOps = ([]() {
   ops.xattr_remove = Adaptor::From<&File::XattrRemove>;
 
   ops.link_into = Adaptor::From<&File::LinkInto>;
+  ops.allocate = Adaptor::From<&File::Allocate>;
 
   return ops;
 })();

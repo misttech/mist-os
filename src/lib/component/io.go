@@ -700,6 +700,10 @@ func (*fileState) RemoveExtendedAttribute(fidl.Context, []uint8) (io.Node2Remove
 	return io.Node2RemoveExtendedAttributeResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
+func (*fileState) Allocate(fidl.Context, uint64, uint64, io.AllocateMode) (io.FileAllocateResult, error) {
+	return io.FileAllocateResultWithErr(int32(zx.ErrNotSupported)), nil
+}
+
 func (fState *fileState) Read(_ fidl.Context, count uint64) (io.ReadableReadResult, error) {
 	if l := fState.size; l < count {
 		count = l

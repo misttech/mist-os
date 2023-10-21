@@ -650,6 +650,7 @@ impl Default for zxio_xattr_data {
     }
 }
 pub type zxio_xattr_data_t = zxio_xattr_data;
+pub type zxio_allocate_mode_t = u32;
 pub type va_list = __builtin_va_list;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
@@ -1023,6 +1024,14 @@ extern "C" {
 extern "C" {
     pub fn zxio_xattr_remove(io: *mut zxio_t, name: *const u8, name_len: usize) -> zx_status_t;
 }
+extern "C" {
+    pub fn zxio_allocate(
+        io: *mut zxio_t,
+        offset: u64,
+        len: u64,
+        mode: zxio_allocate_mode_t,
+    ) -> zx_status_t;
+}
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct iovec {
@@ -1295,6 +1304,12 @@ pub const ZXIO_NODE_PROTOCOL_SYMLINK: zxio_node_protocols_t = 8;
 pub const ZXIO_SEEK_ORIGIN_START: zxio_seek_origin_t = 0;
 pub const ZXIO_SEEK_ORIGIN_CURRENT: zxio_seek_origin_t = 1;
 pub const ZXIO_SEEK_ORIGIN_END: zxio_seek_origin_t = 2;
+pub const ZXIO_ALLOCATE_KEEP_SIZE: zxio_allocate_mode_t = 1;
+pub const ZXIO_ALLOCATE_UNSHARE_RANGE: zxio_allocate_mode_t = 2;
+pub const ZXIO_ALLOCATE_PUNCH_HOLE: zxio_allocate_mode_t = 4;
+pub const ZXIO_ALLOCATE_COLLAPSE_RANGE: zxio_allocate_mode_t = 8;
+pub const ZXIO_ALLOCATE_ZERO_RANGE: zxio_allocate_mode_t = 16;
+pub const ZXIO_ALLOCATE_INSERT_RANGE: zxio_allocate_mode_t = 32;
 pub type __builtin_va_list = [__va_list_tag; 1usize];
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]

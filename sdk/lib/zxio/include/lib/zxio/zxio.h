@@ -583,6 +583,15 @@ ZXIO_EXPORT zx_status_t zxio_xattr_set(zxio_t* io, const uint8_t* name, size_t n
 // Returns ZX_ERR_NOT_SUPPORTED if |io| doesn't support extended attributes.
 ZXIO_EXPORT zx_status_t zxio_xattr_remove(zxio_t* io, const uint8_t* name, size_t name_len);
 
+// Allocates disk space for the given range for this file.
+//
+// Returns ZX_ERR_NOT_SUPPORTED if |io| doesn't support this feature, or if it doesn't support the
+// provided set of mode types. Returns ZX_ERR_INVALID_ARGS if the combination of mode types is not
+// allowed, or if the offset or length are invalid, either in general or with the provided mode
+// types.
+ZXIO_EXPORT zx_status_t zxio_allocate(zxio_t* io, uint64_t offset, uint64_t len,
+                                      zxio_allocate_mode_t mode);
+
 __END_CDECLS
 
 #endif  // LIB_ZXIO_ZXIO_H_

@@ -153,6 +153,16 @@ pub trait File: Node {
         Err(Status::NOT_SUPPORTED)
     }
 
+    /// Preallocate disk space for this range.
+    async fn allocate(
+        &self,
+        _offset: u64,
+        _length: u64,
+        _mode: fio::AllocateMode,
+    ) -> Result<(), Status> {
+        Err(Status::NOT_SUPPORTED)
+    }
+
     /// Sync this file's contents to the storage medium (probably disk).
     /// This does not necessarily guarantee that the file will be completely written to disk once
     /// the call returns. It merely guarantees that any changes to the file have been propagated

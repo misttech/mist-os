@@ -5,9 +5,9 @@
 use {
     assert_matches::assert_matches,
     async_trait::async_trait,
-    fidl::endpoints::create_endpoints,
+    fidl::endpoints::{create_endpoints, ServerEnd},
     fidl_fuchsia_io as fio, fuchsia_async as fasync,
-    fuchsia_zircon::{self as zx, HandleBased},
+    fuchsia_zircon::{self as zx, HandleBased, Status},
     fxfs_testing::TestFixture,
     std::sync::Arc,
     syncio::{
@@ -15,8 +15,14 @@ use {
         Zxio,
     },
     vfs::{
-        directory::entry::DirectoryEntry, execution_scope::ExecutionScope, node::Node, path::Path,
-        pseudo_directory, symlink::Symlink,
+        directory::entry::{DirectoryEntry, EntryInfo},
+        execution_scope::ExecutionScope,
+        file::{FidlIoConnection, File, FileIo, FileOptions, SyncMode},
+        node::Node,
+        path::Path,
+        pseudo_directory,
+        symlink::Symlink,
+        ToObjectRequest,
     },
 };
 
@@ -554,4 +560,184 @@ async fn test_open2_node() {
     .await;
 
     fixture.close().await;
+}
+
+// TODO(fxbug.dev/293943124): once fxfs supports allocate, use the test fixture.
+struct AllocateFile {
+    res: Result<(), Status>,
+}
+
+impl AllocateFile {
+    fn new(res: Result<(), Status>) -> Arc<Self> {
+        Arc::new(AllocateFile { res })
+    }
+}
+
+impl DirectoryEntry for AllocateFile {
+    fn open(
+        self: Arc<Self>,
+        scope: ExecutionScope,
+        flags: fio::OpenFlags,
+        _path: Path,
+        server_end: ServerEnd<fio::NodeMarker>,
+    ) {
+        flags.to_object_request(server_end).handle(|object_request| {
+            object_request.spawn_connection(
+                scope.clone(),
+                self.clone(),
+                flags,
+                FidlIoConnection::create,
+            )
+        });
+    }
+
+    fn entry_info(&self) -> EntryInfo {
+        EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::File)
+    }
+}
+
+#[async_trait]
+impl FileIo for AllocateFile {
+    async fn read_at(&self, _offset: u64, _buffer: &mut [u8]) -> Result<u64, Status> {
+        unimplemented!()
+    }
+    async fn write_at(&self, _offset: u64, _content: &[u8]) -> Result<u64, Status> {
+        unimplemented!()
+    }
+    async fn append(&self, _content: &[u8]) -> Result<(u64, u64), Status> {
+        unimplemented!()
+    }
+}
+
+#[async_trait]
+impl vfs::node::Node for AllocateFile {
+    async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
+        unimplemented!()
+    }
+    async fn get_attributes(
+        &self,
+        _query: fio::NodeAttributesQuery,
+    ) -> Result<fio::NodeAttributes2, Status> {
+        unimplemented!()
+    }
+}
+
+#[async_trait]
+impl File for AllocateFile {
+    fn writable(&self) -> bool {
+        true
+    }
+    async fn open_file(&self, _options: &FileOptions) -> Result<(), Status> {
+        Ok(())
+    }
+    async fn truncate(&self, _length: u64) -> Result<(), Status> {
+        unimplemented!()
+    }
+    async fn get_backing_memory(&self, _flags: fio::VmoFlags) -> Result<zx::Vmo, Status> {
+        unimplemented!()
+    }
+    async fn get_size(&self) -> Result<u64, Status> {
+        unimplemented!()
+    }
+    async fn set_attrs(
+        &self,
+        _flags: fio::NodeAttributeFlags,
+        _attrs: fio::NodeAttributes,
+    ) -> Result<(), Status> {
+        unimplemented!()
+    }
+    async fn update_attributes(
+        &self,
+        _attributes: fio::MutableNodeAttributes,
+    ) -> Result<(), Status> {
+        unimplemented!()
+    }
+    async fn sync(&self, _mode: SyncMode) -> Result<(), Status> {
+        Ok(())
+    }
+    async fn allocate(
+        &self,
+        _offset: u64,
+        _length: u64,
+        _mode: fio::AllocateMode,
+    ) -> Result<(), Status> {
+        self.res
+    }
+}
+
+#[fuchsia::test]
+async fn test_allocate_file() {
+    let dir = pseudo_directory! {
+        "foo" => AllocateFile::new(Ok(())),
+    };
+    let (dir_client, dir_server) = create_endpoints();
+    let scope = ExecutionScope::new();
+    dir.open(
+        scope,
+        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+        Path::dot(),
+        dir_server,
+    );
+
+    fasync::unblock(|| {
+        let dir_zxio =
+            Zxio::create(dir_client.into_channel().into_handle()).expect("create failed");
+        let foo_zxio = dir_zxio
+            .open(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE, "foo")
+            .expect("open failed");
+
+        foo_zxio.allocate(0, 10, syncio::AllocateMode::empty()).unwrap();
+    })
+    .await;
+}
+
+#[fuchsia::test]
+async fn test_allocate_file_not_sup() {
+    // For now we just tell it what error to send back, but this is mimicking the first pass at
+    // allocate which won't support any options.
+    let dir = pseudo_directory! {
+        "foo" => AllocateFile::new(Err(Status::NOT_SUPPORTED)),
+    };
+    let (dir_client, dir_server) = create_endpoints();
+    let scope = ExecutionScope::new();
+    dir.open(
+        scope,
+        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+        Path::dot(),
+        dir_server,
+    );
+
+    fasync::unblock(|| {
+        let dir_zxio =
+            Zxio::create(dir_client.into_channel().into_handle()).expect("create failed");
+        let foo_zxio = dir_zxio
+            .open(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE, "foo")
+            .expect("open failed");
+
+        assert_matches!(
+            foo_zxio.allocate(0, 10, syncio::AllocateMode::COLLAPSE_RANGE),
+            Err(zx::Status::NOT_SUPPORTED)
+        );
+        assert_matches!(
+            foo_zxio.allocate(0, 10, syncio::AllocateMode::KEEP_SIZE),
+            Err(zx::Status::NOT_SUPPORTED)
+        );
+        assert_matches!(
+            foo_zxio.allocate(0, 10, syncio::AllocateMode::INSERT_RANGE),
+            Err(zx::Status::NOT_SUPPORTED)
+        );
+        assert_matches!(
+            foo_zxio.allocate(0, 10, syncio::AllocateMode::PUNCH_HOLE),
+            Err(zx::Status::NOT_SUPPORTED)
+        );
+        assert_matches!(
+            foo_zxio.allocate(0, 10, syncio::AllocateMode::UNSHARE_RANGE),
+            Err(zx::Status::NOT_SUPPORTED)
+        );
+        assert_matches!(
+            foo_zxio.allocate(0, 10, syncio::AllocateMode::ZERO_RANGE),
+            Err(zx::Status::NOT_SUPPORTED)
+        );
+    })
+    .await;
 }

@@ -31,6 +31,7 @@ bindgen.var_allowlist = [
     "ZXIO_SHUTDOWN.*",
     "ZXIO_NODE_PROTOCOL.*",
     "ZXIO_SEEK_ORIGIN.*",
+    "ZXIO_ALLOCATE.*",
     "E[A-Z]*",
     "AF_.*",
     "SO.*",

@@ -82,6 +82,10 @@ class FileConnection final : public Connection, public fuchsia::io::File {
   void LinkInto(zx::event dst_parent_token, std::string dst, LinkIntoCallback callback) override {
     callback(fuchsia::io::Linkable_LinkInto_Result::WithErr(ZX_ERR_NOT_SUPPORTED));
   }
+  void Allocate(uint64_t offset, uint64_t len, fuchsia::io::AllocateMode mode,
+                AllocateCallback callback) override {
+    callback(fuchsia::io::File_Allocate_Result::WithErr(ZX_ERR_NOT_SUPPORTED));
+  }
 #endif
 
  protected:
