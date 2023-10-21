@@ -457,13 +457,22 @@ void Node::RemoveChild(const std::shared_ptr<Node>& child) {
   GetShutdownHelper().CheckNodeState();
 }
 
-void Node::FinishShutdown() {
+void Node::FinishShutdown(fit::callback<void()> shutdown_callback) {
   ZX_ASSERT_MSG(GetNodeState() == NodeState::kWaitingOnDriverComponent,
                 "FinishShutdown called in invalid node state: %s",
                 GetShutdownHelper().NodeStateAsString());
+  LOGF(INFO, "Node: %s finishing shutdown", name().c_str());
+
   if (shutdown_intent() == ShutdownIntent::kRestart) {
+    shutdown_callback();
+    FinishRestart();
     return;
   }
+
+  LOGF(DEBUG, "Node: %s unbinding and resetting", name().c_str());
+  CloseIfExists(controller_ref_);
+  CloseIfExists(node_ref_);
+  devfs_device_.unpublish();
 
   // Store a shared_ptr to ourselves so we won't be freed halfway through this function.
   std::shared_ptr this_node = shared_from_this();
@@ -477,22 +486,7 @@ void Node::FinishShutdown() {
   }
   parents_.clear();
 
-  LOGF(DEBUG, "Node: %s unbinding and resetting", name().c_str());
-  CloseIfExists(controller_ref_);
-  CloseIfExists(node_ref_);
-  devfs_device_.unpublish();
-}
-
-void Node::OnShutdownComplete() {
-  ZX_ASSERT_MSG(GetNodeState() == NodeState::kStopped,
-                "FinishShutdown called in invalid node state: %s",
-                GetShutdownHelper().NodeStateAsString());
-  LOGF(INFO, "Node: %s shutdown complete", name().c_str());
-
-  if (shutdown_intent() == ShutdownIntent::kRestart) {
-    FinishRestart();
-    return;
-  }
+  shutdown_callback();
 
   if (remove_complete_callback_) {
     remove_complete_callback_();

@@ -150,12 +150,10 @@ void ShutdownHelper::CheckWaitingOnDriverComponent() {
     return;
   }
 
-  bridge_->FinishShutdown();
-
-  node_state_ = NodeState::kStopped;
-  NotifyRemovalTracker();
-
-  bridge_->OnShutdownComplete();
+  bridge_->FinishShutdown([this]() {
+    node_state_ = NodeState::kStopped;
+    NotifyRemovalTracker();
+  });
 }
 
 void ShutdownHelper::NotifyRemovalTracker() {

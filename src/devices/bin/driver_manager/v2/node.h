@@ -341,8 +341,7 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   std::pair<std::string, Collection> GetRemovalTrackerInfo() override;
   void StopDriver() override;
   void StopDriverComponent() override;
-  void FinishShutdown() override;
-  void OnShutdownComplete() override;
+  void FinishShutdown(fit::callback<void()> shutdown_callback) override;
   bool HasChildren() const override { return !children_.empty(); }
   bool HasDriver() const override {
     return driver_component_.has_value() && driver_component_->driver;

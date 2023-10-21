@@ -5,6 +5,7 @@
 #ifndef SRC_DEVICES_BIN_DRIVER_MANAGER_V2_SHUTDOWN_HELPER_H_
 #define SRC_DEVICES_BIN_DRIVER_MANAGER_V2_SHUTDOWN_HELPER_H_
 
+#include <lib/fit/function.h>
 #include <stdint.h>
 
 #include <memory>
@@ -59,10 +60,10 @@ class NodeShutdownBridge {
   virtual void StopDriverComponent() = 0;
 
   // Clean up work before shutdown is complete. Invoked when transitioning to kStopped.
-  virtual void FinishShutdown() = 0;
-
-  // Called after shutdown is completed and the state is fully transitioned to kStopped.
-  virtual void OnShutdownComplete() = 0;
+  // The implementation is expected to invoke the callback once the node finished shutdown.
+  // Once the callback is invoked, the node state changes to to kStopped and the node removal
+  // tracker is notified.
+  virtual void FinishShutdown(fit::callback<void()> shutdown_callback) = 0;
 
   virtual bool HasChildren() const = 0;
 
