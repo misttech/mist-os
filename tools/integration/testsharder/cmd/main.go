@@ -264,8 +264,12 @@ func execute(ctx context.Context, flags testsharderFlags, m buildModules) error 
 		affected := func(t testsharder.Test) bool {
 			return t.Affected
 		}
-		affectedShards, _ := testsharder.PartitionShards(nonMultipliedShards, affected, testsharder.AffectedShardPrefix)
+		affectedShards, unaffectedShards := testsharder.PartitionShards(nonMultipliedShards, affected, testsharder.AffectedShardPrefix)
 		shards = affectedShards
+		skippedShards, err = testsharder.MarkShardsSkipped(unaffectedShards)
+		if err != nil {
+			return err
+		}
 	} else {
 		// Filter out the affected, hermetic shards from the non-multiplied shards.
 		hermeticAndAffected := func(t testsharder.Test) bool {
