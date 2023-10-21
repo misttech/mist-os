@@ -66,6 +66,7 @@ if (toolchain_environment == "kernel.phys") {
     include_dirs = [ "//zircon/kernel/phys" ]
     deps = [
       "//src/lib/zbitl",
+      "//zircon/kernel/phys:address-space",
       "//zircon/kernel/phys:allocation",
       "//zircon/kernel/phys:boot-zbi",
       "//zircon/kernel/phys:main",

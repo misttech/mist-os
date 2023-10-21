@@ -21,6 +21,7 @@
 
 #include <ktl/span.h>
 #include <ktl/string_view.h>
+#include <phys/address-space.h>
 #include <phys/allocation.h>
 #include <phys/boot-shim/devicetree.h>
 #include <phys/boot-zbi.h>
@@ -84,7 +85,8 @@ void PhysMain(void* flat_devicetree_blob, arch::EarlyTicks ticks) {
   InitStdout();
   ApplyRelocations();
 
-  InitMemory(flat_devicetree_blob);
+  AddressSpace aspace;
+  InitMemory(flat_devicetree_blob, &aspace);
   MainSymbolize symbolize(kShimName);
 
   // Memory has been initialized, we can finish up parsing the rest of the items from the boot shim.

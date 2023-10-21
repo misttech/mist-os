@@ -16,6 +16,7 @@
 #include <ktl/move.h>
 #include <ktl/span.h>
 #include <ktl/string_view.h>
+#include <phys/address-space.h>
 #include <phys/symbolize.h>
 #include <phys/zbitl-allocation.h>
 
@@ -117,7 +118,8 @@ int TestMain(void* zbi_ptr, arch::EarlyTicks) {
   MainSymbolize symbolize("code-patching-test");
 
   // Initialize memory for allocation/free.
-  InitMemory(zbi_ptr);
+  AddressSpace aspace;
+  InitMemory(zbi_ptr, &aspace);
 
   zbitl::View zbi(zbitl::StorageFromRawHeader(static_cast<const zbi_header_t*>(zbi_ptr)));
 

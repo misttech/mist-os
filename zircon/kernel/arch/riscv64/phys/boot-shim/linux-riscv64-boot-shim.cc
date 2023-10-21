@@ -18,6 +18,7 @@
 
 #include <ktl/span.h>
 #include <ktl/string_view.h>
+#include <phys/address-space.h>
 #include <phys/allocation.h>
 #include <phys/arch/arch-phys-info.h>
 #include <phys/boot-shim/devicetree.h>
@@ -51,7 +52,8 @@ void PhysMain(void* fdt, arch::EarlyTicks ticks) {
   InitStdout();
   ApplyRelocations();
 
-  InitMemory(fdt);
+  AddressSpace aspace;
+  InitMemory(fdt, &aspace);
 
   MainSymbolize symbolize(kShimName);
 

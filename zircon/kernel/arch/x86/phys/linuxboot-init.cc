@@ -93,7 +93,10 @@ ktl::string_view GetBootloaderName(const linuxboot::boot_params& bp) {
 LegacyBoot gLegacyBoot;
 
 // This populates the allocator and also collects other information.
-void InitMemory(void* bootloader_data) {
+void InitMemory(void* bootloader_data, AddressSpace* aspace) {
+  // `aspace` is ignored as we'll set up the virtual address space as we switch
+  // to long mode.
+
   auto& bp = *static_cast<const linuxboot::boot_params*>(bootloader_data);
 
   // Synthesize a boot loader name from the few bits we get.

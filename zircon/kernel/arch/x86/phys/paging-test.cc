@@ -17,9 +17,9 @@
 int TestMain(void* ptr, arch::EarlyTicks) {
   MainSymbolize symbolize("paging-test");
 
-  InitMemory(ptr);
-
-  ArchSetUpAddressSpaceLate();
+  AddressSpace aspace;
+  InitMemory(ptr, &aspace);
+  ArchSetUpAddressSpaceLate(aspace);
 
   static volatile int datum = 17;
   ZX_ASSERT(datum == 17);

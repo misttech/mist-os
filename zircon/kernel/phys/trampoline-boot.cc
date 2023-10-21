@@ -471,7 +471,9 @@ fit::result<BootZbi::Error> TrampolineBoot::Load(uint32_t extra_data_capacity,
   // up the address space out of the allocator, which will avoid allocating
   // from out of the load image's range that we just reserved.
 #ifdef __x86_64__
-  ArchSetUpAddressSpaceLate();
+  if (gAddressSpace) {
+    ArchSetUpAddressSpaceLate(*gAddressSpace);
+  }
 #endif
 
   return fit::ok();

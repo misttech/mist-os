@@ -20,6 +20,7 @@
 #include <ktl/optional.h>
 #include <ktl/span.h>
 #include <ktl/string_view.h>
+#include <phys/address-space.h>
 #include <phys/symbolize.h>
 #include <phys/trampoline-boot.h>
 #include <phys/zbitl-allocation.h>
@@ -205,7 +206,8 @@ int TestMain(void* zbi, arch::EarlyTicks entry_ticks) {
   MainSymbolize symbolize(kTestName);
   symbolize.ContextAlways();
 
-  InitMemory(zbi);
+  AddressSpace aspace;
+  InitMemory(zbi, &aspace);
 
   TurduckenTest test(zbi, entry_ticks);
   test.LogCmdLineArguments();

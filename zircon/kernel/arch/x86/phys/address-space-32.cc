@@ -15,9 +15,9 @@
 
 #include "phys/address-space.h"
 
-void ArchSetUpAddressSpaceEarly() {}
+void ArchSetUpAddressSpaceEarly(AddressSpace& aspace) {}
 
-void ArchSetUpAddressSpaceLate() {
+void ArchSetUpAddressSpaceLate(AddressSpace& aspace) {
   ZX_ASSERT_MSG(arch::BootCpuid<arch::CpuidAmdFeatureFlagsD>().lm(),
                 "CPU does not support 64-bit mode!");
   ZX_ASSERT_MSG(arch::BootCpuid<arch::CpuidFeatureFlagsD>().pse(), "x86-64 requires PSE support!");
@@ -50,10 +50,9 @@ void ArchSetUpAddressSpaceLate() {
   // fixed .bss location based on the fixed 1 MiB load address may overlap with
   // areas that should be reserved.  So it's preferable to go directly to the
   // physical page allocator that respects explicitly reserved ranges.
-  AddressSpace aspace;
   aspace.Init();
   aspace.SetUpIdentityMappings();
-  aspace.ArchInstall();
+  aspace.Install();
 
   // Now actually turn on paging.  This affects us immediately in 32-bit mode,
   // as well as being mandatory for 64-bit mode.

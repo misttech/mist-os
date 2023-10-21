@@ -21,6 +21,7 @@
 #include <ktl/move.h>
 #include <ktl/span.h>
 #include <ktl/string_view.h>
+#include <phys/address-space.h>
 #include <phys/elf-image.h>
 #include <phys/handoff.h>
 #include <phys/kernel-package.h>
@@ -48,7 +49,8 @@ constexpr size_t kMaxPhysloadModules = 4;
     symbolize.Context();
   }
 
-  InitMemory(zbi_ptr);
+  AddressSpace aspace;
+  InitMemory(zbi_ptr, &aspace);
 
   // This marks the interval between handoff from the boot loader (kZbiEntry)
   // and phys environment setup with identity-mapped memory management et al.
@@ -115,6 +117,6 @@ constexpr size_t kMaxPhysloadModules = 4;
   // Call into the entry point.  It must not return, but it will keep using the
   // same stack so it can safely take references to our stack objects.
   next_elf.Handoff<PhysLoadHandoffFunction>(next_elf, &log, gArchPhysInfo, GetUartDriver(),
-                                            &symbolize, gBootOptions, Allocation::GetPool(), times,
-                                            ktl::move(kernel_storage));
+                                            &symbolize, gBootOptions, Allocation::GetPool(),
+                                            gAddressSpace, times, ktl::move(kernel_storage));
 }

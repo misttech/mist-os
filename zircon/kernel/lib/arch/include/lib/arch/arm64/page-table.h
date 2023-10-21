@@ -447,7 +447,6 @@ class ArmAddressTranslationDescriptor
   static constexpr auto& As(Base* base) {
     // Double-check that we can safely recast a Base as a Subclass.
     static_assert(std::is_base_of_v<std::remove_const_t<Base>, Subclass>);
-    static_assert(sizeof(Subclass) == sizeof(Base));
     static_assert(std::alignment_of_v<Subclass> == std::alignment_of_v<Base>);
     ZX_ASSERT((base->*IsSubclass)());
     return *static_cast<std::conditional_t<std::is_const_v<Base>, const Subclass, Subclass>*>(base);

@@ -125,7 +125,7 @@ void AddressSpace::ArchInstall() const {
   }
 }
 
-void ArchSetUpAddressSpaceEarly() {
+void ArchSetUpAddressSpaceEarly(AddressSpace& aspace) {
   if (gBootOptions && !gBootOptions->phys_mmu) {
     return;
   }
@@ -134,10 +134,9 @@ void ArchSetUpAddressSpaceEarly() {
                   .SetAttribute(0, kArchNormalMemoryType)
                   .SetAttribute(1, kArchMmioMemoryType);
 
-  AddressSpace aspace;
   aspace.Init(mair);
   aspace.SetUpIdentityMappings();
-  aspace.ArchInstall();
+  aspace.Install();
 }
 
-void ArchSetUpAddressSpaceLate() {}
+void ArchSetUpAddressSpaceLate(AddressSpace& aspace) {}

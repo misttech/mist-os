@@ -279,6 +279,7 @@ if (current_toolchain != default_toolchain) {
     sources = [ "phys-memory-test.cc" ]
     deps = [
       ":test-main",
+      "..:address-space",
       "..:allocation",
       "..:new",
       "..:uart",
@@ -308,6 +309,7 @@ if (current_toolchain != default_toolchain) {
     sources = [ "decompress-test.cc" ]
     deps = [
       ":test-main",
+      "..:address-space",
       "..:allocation",
       "..:zbi-memory",
       "..:zbitl-allocation",
@@ -336,6 +338,7 @@ if (current_toolchain != default_toolchain) {
     sources = [ "turducken.cc" ]
     deps = [
       ":zbi-test-main",
+      "..:address-space",
       "..:trampoline-boot",
       "..:zbi-memory",
       "..:zbitl-allocation",

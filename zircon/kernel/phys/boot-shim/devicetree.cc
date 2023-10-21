@@ -37,7 +37,7 @@ constexpr size_t kDevicetreeMaxMemoryRanges = 512;
 
 }  // namespace
 
-void InitMemory(void* dtb) {
+void InitMemory(void* dtb, AddressSpace* aspace) {
   static std::array<memalloc::Range, kDevicetreeMaxMemoryRanges> range_storage;
 
   devicetree::ByteView fdt_blob(static_cast<const uint8_t*>(dtb),
@@ -115,7 +115,9 @@ void InitMemory(void* dtb) {
   SetUartConsole(boot_options.serial);
 
   Allocation::Init(ranges, special_ranges);
-  ArchSetUpAddressSpaceEarly();
+  if (aspace) {
+    ArchSetUpAddressSpaceEarly(*aspace);
+  }
   Allocation::GetPool().PrintMemoryRanges(ProgramName());
 
   gDevicetreeBoot = {

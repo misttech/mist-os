@@ -17,6 +17,7 @@ phys_executable("linux-arm64-boot-shim") {
   deps = [
     "//zircon/kernel/lib/boot-options",
     "//zircon/kernel/lib/libc",
+    "//zircon/kernel/phys:address-space",
     "//zircon/kernel/phys:allocation",
     "//zircon/kernel/phys:boot-zbi",
     "//zircon/kernel/phys:exception",

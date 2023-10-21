@@ -21,6 +21,9 @@
 struct ArchPhysInfo;
 extern ArchPhysInfo* gArchPhysInfo;
 
+// Defined in <phys/address-space.h>
+class AddressSpace;
+
 // There's never any such object but the static analysis API requires some
 // C++ object to refer to.  The PHYS_SINGLETHREAD marker on any function
 // asserts that it is only run in the single thread rooted at PhysMain.
@@ -65,12 +68,17 @@ void ApplyRelocations();
 // The argument is the pointer to the ZBI, Multiboot info, Device Tree, etc.
 // depending on the particular phys environment.  This panics if no memory is
 // found for the allocator.
-void InitMemory(void* bootloader_data);
+//
+// Further, if an address space object is provided, it will be used to install
+// an identity-mapped virtual address space (calling one of the
+// ArchSetUpAddressSpace{Early,Late} routines).
+void InitMemory(void* bootloader_data, AddressSpace* aspace = nullptr);
 
 // This does most of the InitMemory() work for ZBI executables, where
 // InitMemory() calls it with the ZBI_TYPE_MEM_CONFIG payload from the ZBI.
 void ZbiInitMemory(void* zbi, ktl::span<zbi_mem_range_t> mem_config,
-                   ktl::optional<memalloc::Range> extra_special_range = {});
+                   ktl::optional<memalloc::Range> extra_special_range = {},
+                   AddressSpace* aspace = nullptr);
 
 // Perform any architecture-specific set-up.
 void ArchSetUp(void* zbi);

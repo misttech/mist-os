@@ -9,14 +9,13 @@
 #include <lib/arch/cache.h>
 #include <lib/arch/riscv64/page-table.h>
 
-void ArchSetUpAddressSpaceEarly() {
-  AddressSpace aspace;
+void ArchSetUpAddressSpaceEarly(AddressSpace& aspace) {
   aspace.Init();
   aspace.SetUpIdentityMappings();
-  aspace.ArchInstall();
+  aspace.Install();
 }
 
-void ArchSetUpAddressSpaceLate() {}
+void ArchSetUpAddressSpaceLate(AddressSpace& aspace) {}
 
 void AddressSpace::ArchInstall() const {
   arch::RiscvSatp::Modify([root = root_paddr()](auto& satp) {

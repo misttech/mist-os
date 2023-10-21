@@ -25,6 +25,8 @@
 
 #include <ktl/enforce.h>
 
+AddressSpace* gAddressSpace = nullptr;
+
 void AddressSpace::AllocateRootPageTables() {
   // See allocator descriptions for the appropriate use-cases.
   auto lower_allocator = kDualSpaces ? temporary_allocator() : permanent_allocator();

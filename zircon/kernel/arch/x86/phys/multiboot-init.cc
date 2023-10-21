@@ -24,7 +24,10 @@
 LegacyBoot gLegacyBoot;
 
 // This populates the allocator and also collects other Multiboot information.
-void InitMemory(void* bootloader_data) {
+void InitMemory(void* bootloader_data, AddressSpace* aspace) {
+  // `aspace` is ignored as we'll set up the virtual address space as we switch
+  // to long mode.
+
   const auto& info = *static_cast<const multiboot_info_t*>(bootloader_data);
 
   if ((info.flags & MB_INFO_BOOT_LOADER) && info.boot_loader_name != 0) {

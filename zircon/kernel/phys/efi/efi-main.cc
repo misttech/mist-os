@@ -163,7 +163,7 @@ efi_status EfiMain(efi_handle image_handle, efi_system_table* systab) {
 
 void ArchPanicReset() { EfiExit(EFI_ABORTED); }
 
-void InitMemory(void* bootloader_data) {}
+void InitMemory(void* bootloader_data, AddressSpace* aspace) {}
 
 bool EfiLaunchedFromShell() {
   // A shell-launched application is spec'd to have the parameters protocol

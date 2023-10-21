@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <phys/address-space.h>
 #include <phys/allocation.h>
 #include <phys/boot-zbi.h>
 #include <phys/main.h>
@@ -28,7 +29,8 @@
 void ZbiMain(void* zbi, arch::EarlyTicks boot_ticks) {
   MainSymbolize symbolize("zbi-boot-shim");
 
-  InitMemory(zbi);
+  AddressSpace aspace;
+  InitMemory(zbi, &aspace);
 
   BootZbi::InputZbi input_zbi_view(
       zbitl::StorageFromRawHeader(static_cast<const zbi_header_t*>(zbi)));

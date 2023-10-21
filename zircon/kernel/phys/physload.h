@@ -39,6 +39,7 @@
 #include <phys/kernel-package.h>
 #include <phys/uart.h>
 
+class AddressSpace;
 struct ArchPhysInfo;
 struct BootOptions;
 class ElfImage;
@@ -57,6 +58,7 @@ using PhysLoadHandoffFunction =
          MainSymbolize* symbolize,         // Set gSymbolize to this.
          const BootOptions* boot_options,  // Set gBootOptions to this.
          memalloc::Pool& allocation_pool,  // Pass to Pool::InitWithPool.
+         AddressSpace* aspace,             // Set gAddressSpace to this.
          PhysBootTimes boot_times,         // TODO(mcgrathr): more time points
          KernelStorage kernel_storage);
 

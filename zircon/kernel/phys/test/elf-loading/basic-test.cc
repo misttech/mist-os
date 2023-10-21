@@ -14,6 +14,7 @@
 #include <ktl/byte.h>
 #include <ktl/span.h>
 #include <ktl/string_view.h>
+#include <phys/address-space.h>
 #include <phys/elf-image.h>
 #include <phys/kernel-package.h>
 #include <phys/symbolize.h>
@@ -38,7 +39,8 @@ int TestMain(void* zbi_ptr, arch::EarlyTicks) {
   MainSymbolize symbolize("basic-elf-loading-test");
 
   // Initialize memory for allocation/free.
-  InitMemory(zbi_ptr);
+  AddressSpace aspace;
+  InitMemory(zbi_ptr, &aspace);
 
   zbitl::View zbi(
       zbitl::StorageFromRawHeader<ktl::span<ktl::byte>>(static_cast<zbi_header_t*>(zbi_ptr)));

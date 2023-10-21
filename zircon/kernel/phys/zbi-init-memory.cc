@@ -20,7 +20,7 @@
 #include <ktl/enforce.h>
 
 void ZbiInitMemory(void* zbi, ktl::span<zbi_mem_range_t> mem_config,
-                   ktl::optional<memalloc::Range> extra_special_range) {
+                   ktl::optional<memalloc::Range> extra_special_range, AddressSpace* aspace) {
   zbitl::ByteView zbi_storage = zbitl::StorageFromRawHeader(static_cast<zbi_header_t*>(zbi));
 
   uint64_t phys_start = reinterpret_cast<uint64_t>(PHYS_LOAD_ADDRESS);
@@ -49,7 +49,9 @@ void ZbiInitMemory(void* zbi, ktl::span<zbi_mem_range_t> mem_config,
   Allocation::Init(zbi_ranges, special_ranges);
 
   // Set up our own address space.
-  ArchSetUpAddressSpaceEarly();
+  if (aspace) {
+    ArchSetUpAddressSpaceEarly(*aspace);
+  }
 
   if (gBootOptions->phys_verbose) {
     Allocation::GetPool().PrintMemoryRanges(ProgramName());

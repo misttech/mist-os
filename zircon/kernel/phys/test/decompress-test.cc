@@ -15,6 +15,7 @@
 
 #include <ktl/byte.h>
 #include <ktl/span.h>
+#include <phys/address-space.h>
 #include <phys/allocation.h>
 #include <phys/zbitl-allocation.h>
 
@@ -35,7 +36,8 @@ int TestMain(void* zbi_ptr, arch::EarlyTicks) {
   MainSymbolize symbolize("decompress-test");
 
   // Initialize memory for allocation/free.
-  InitMemory(zbi_ptr);
+  AddressSpace aspace;
+  InitMemory(zbi_ptr, &aspace);
 
   // Fetch ZBI.
   zbitl::View<zbitl::ByteView> zbi(

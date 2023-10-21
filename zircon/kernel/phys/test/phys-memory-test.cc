@@ -14,6 +14,7 @@
 #include <fbl/algorithm.h>
 #include <ktl/byte.h>
 #include <ktl/span.h>
+#include <phys/address-space.h>
 #include <phys/allocation.h>
 #include <phys/new.h>
 
@@ -70,7 +71,8 @@ int TestMain(void* zbi_ptr, arch::EarlyTicks ticks) {
   printf("Initializing memory...\n");
 
   // Initialize memory for allocation/free.
-  InitMemory(zbi_ptr);
+  AddressSpace aspace;
+  InitMemory(zbi_ptr, &aspace);
 
   printf("Testing memory allocation...\n");
 

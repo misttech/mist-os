@@ -7,6 +7,7 @@
 #include <lib/boot-options/boot-options.h>
 
 #include <ktl/move.h>
+#include <phys/address-space.h>
 #include <phys/allocation.h>
 #include <phys/elf-image.h>
 #include <phys/main.h>
@@ -27,7 +28,8 @@ ArchPhysInfo* gArchPhysInfo;
 [[noreturn]] void PhysLoadHandoff(ElfImage& self, Log* log, ArchPhysInfo* arch_phys,
                                   UartDriver& uart, MainSymbolize* symbolize,
                                   const BootOptions* boot_options, memalloc::Pool& allocation_pool,
-                                  PhysBootTimes boot_times, KernelStorage kernel_storage) {
+                                  AddressSpace* aspace, PhysBootTimes boot_times,
+                                  KernelStorage kernel_storage) {
   // Install the log/stdout first thing.  Note this doesn't use log.SetStdout()
   // because we don't want to stash this module's (uninitialized) stdout to be
   // restored, but keep the one already stashed by physload.
@@ -39,6 +41,7 @@ ArchPhysInfo* gArchPhysInfo;
   gSymbolize = symbolize;
   gBootOptions = boot_options;
   Allocation::InitWithPool(allocation_pool);
+  gAddressSpace = aspace;
 
   ArchOnPhysLoadHandoff();
   gSymbolize->OnHandoff(self);

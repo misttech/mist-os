@@ -52,7 +52,8 @@ void PhysMain(void* ptr, arch::EarlyTicks boot_ticks) {
 
   TrampolineBoot boot;
   if (shim.Load(boot)) {
-    ArchSetUpAddressSpaceLate();
+    AddressSpace aspace;
+    ArchSetUpAddressSpaceLate(aspace);
     memory.PrintMemoryRanges(symbolize.name());
     boot.Log();
     boot.Boot();

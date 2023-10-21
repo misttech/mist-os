@@ -16,7 +16,7 @@
 
 #include <ktl/enforce.h>
 
-void InitMemory(void* zbi) {
+void InitMemory(void* zbi, AddressSpace* aspace) {
   ktl::span<zbi_mem_range_t> zbi_ranges;
   ktl::optional<memalloc::Range> nvram_range;
 
@@ -48,5 +48,5 @@ void InitMemory(void* zbi) {
 
   ZX_ASSERT_MSG(!zbi_ranges.empty(), "no MEM_CONFIG item found in the data ZBI");
 
-  ZbiInitMemory(zbi, zbi_ranges, nvram_range);
+  ZbiInitMemory(zbi, zbi_ranges, nvram_range, aspace);
 }

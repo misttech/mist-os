@@ -294,10 +294,11 @@ if (toolchain_environment == "kernel.phys" ||
     ]
   }
 
-  source_set("address-space") {
+  static_library("address-space") {
     sources = [ "address-space.cc" ]
     public_deps = [ ":address-space.header" ]
     deps = [
+      ":allocation",
       ":stdio",
       ":uart",
       "$arch_phys:address-space",
@@ -693,6 +694,7 @@ kernel_cmdline("physboot-elf-kernel.cmdline") {
 zbi_executable("physload") {
   sources = [ "physload.cc" ]
   deps = [
+    ":address-space",
     ":allocation",
     ":elf-image",
     ":handoff",
@@ -734,6 +736,7 @@ if (is_kernel) {
     public_configs = [ ":physload.module.config" ]
     sources = [ "physload-module.cc" ]
     deps = [
+      ":address-space",
       ":allocation",
       ":elf-image",
       ":log",

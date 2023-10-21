@@ -47,12 +47,12 @@ void SetUpAddressSpace(AddressSpace& aspace) {
   arch::X86ExtendedFeatureEnableRegisterMsr::Get().ReadFrom(&msr).set_nxe(1).WriteTo(&msr);
   aspace.Init();
   aspace.SetUpIdentityMappings();
-  aspace.ArchInstall();
+  aspace.Install();
 }
 
 }  // namespace
 
-void ArchSetUpAddressSpaceEarly() {
+void ArchSetUpAddressSpaceEarly(AddressSpace& aspace) {
   memalloc::Pool& pool = Allocation::GetPool();
 
   uint64_t bootstrap_start = reinterpret_cast<uintptr_t>(gBootstrapMemory.data());
@@ -66,14 +66,12 @@ void ArchSetUpAddressSpaceEarly() {
              bootstrap_start, bootstrap_end);
   }
 
-  // TODO(fxbug.dev/91187): Remember to unset the allocation bounds when we
-  // once a global address space instance is set-up here instead.
-  AddressSpace aspace;
   aspace.SetPageTableAllocationBounds(bootstrap_start, bootstrap_end);
   SetUpAddressSpace(aspace);
+
+  // Now that all RAM is mapped in, we no longer have any allocation
+  // restrictions.
+  aspace.SetPageTableAllocationBounds(ktl::nullopt, ktl::nullopt);
 }
 
-void ArchSetUpAddressSpaceLate() {
-  AddressSpace aspace;
-  SetUpAddressSpace(aspace);
-}
+void ArchSetUpAddressSpaceLate(AddressSpace& aspace) { SetUpAddressSpace(aspace); }

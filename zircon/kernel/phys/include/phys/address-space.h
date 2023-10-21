@@ -25,6 +25,13 @@ namespace memalloc {
 class Pool;
 }  // namespace memalloc
 
+// Defined below.
+class AddressSpace;
+
+// The singleton address space expected to be used by a phys program,
+// registered as any instance that calls AddressSpace::Install().
+extern AddressSpace* gAddressSpace;
+
 // Perform architecture-specific address space set-up. The "Early" variant
 // assumes that only the boot conditions hold and is expected to be called
 // before "normal work" can proceed; otherwise, the "Late" variant assumes that
@@ -34,8 +41,8 @@ class Pool;
 //
 // In certain architectural contexts, early or late set-up will not make
 // practical sense, and the associated functions may be no-ops.
-void ArchSetUpAddressSpaceEarly();
-void ArchSetUpAddressSpaceLate();
+void ArchSetUpAddressSpaceEarly(AddressSpace& aspace);
+void ArchSetUpAddressSpaceLate(AddressSpace& aspace);
 
 // A representation of a virtual address space.
 //
@@ -141,8 +148,12 @@ class AddressSpace {
   }
 
   // Configures the hardware to install the address space (in an
-  // architecture-specific fashion).
-  void ArchInstall() const;
+  // architecture-specific fashion) and registers this instance as
+  // gAddressSpace.
+  void Install() const {
+    ArchInstall();
+    gAddressSpace = const_cast<AddressSpace*>(this);
+  }
 
  private:
   static constexpr uint64_t kNumTableEntries =
@@ -171,6 +182,11 @@ class AddressSpace {
   void AllocateRootPageTables();
   void IdentityMapRam();
   void IdentityMapUart();
+
+  // The architecture-specific subroutine of Install().
+  //
+  // Defined in //zircon/kernel/arch/$arch/phys/address-space.cc
+  void ArchInstall() const;
 
   fit::inline_function<decltype(Table{}.direct_io())(uint64_t)> paddr_to_io_ = [](uint64_t paddr) {
     return reinterpret_cast<Table*>(paddr)->direct_io();
