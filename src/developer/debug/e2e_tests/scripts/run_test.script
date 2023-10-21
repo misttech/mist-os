@@ -1,5 +1,8 @@
 # This test makes sure we can launch test with `run-test`. We currently do not insert
 # "break-on-failure" since it does not work with all test runners, so this test will fail and exit.
+
+## TODO(b/306748794): enable this on asan builds again.
+## require is_asan=false
 [zxdb] run-test fuchsia-pkg://fuchsia.com/crasher_test#meta/cpp_crasher_test.cm CrasherTest.ShouldFail
 Launched Process 1 state=Running koid=?? name=CrasherTest.ShouldFail component=cpp_crasher_test.cm
 ../../src/developer/forensics/crasher/cpp/crasher_test.cc:11: Failure
