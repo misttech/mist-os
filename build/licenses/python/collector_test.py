@@ -6,6 +6,7 @@
 
 
 from collections import defaultdict
+import dataclasses
 from gn_license_metadata import (
     GnLicenseMetadata,
     GnLicenseMetadataDB,
@@ -44,7 +45,7 @@ class CollectorTest(unittest.TestCase):
             file_access=file_access,
             metadata_db=self.metadata_db,
             readmes_db=ReadmesDB(file_access),
-            include_host_tools=True,
+            include_host_tools=False,
         )
 
         return super().setUp()
@@ -506,6 +507,66 @@ class CollectorTest(unittest.TestCase):
                 CollectorErrorKind.THIRD_PARTY_TARGET_WITHOUT_APPLICABLE_LICENSES,
             ]
         )
+
+    ########################### Default license:
+
+    def test_adds_default_license_for_non_3p_target(self):
+        self._add_files(["default_license.txt"])
+        self.collector = dataclasses.replace(
+            self.collector,
+            default_license_file=GnLabel.from_str("//default_license.txt"),
+        )
+
+        self._add_applicable_licenses_metadata(target="//foo", licenses=[])
+
+        self._collect_and_assert_licenses(
+            {"Fuchsia": ["//default_license.txt"]}
+        )
+
+    def test_does_not_add_default_license_for_3p_target(self):
+        self._add_files(["default_license.txt"])
+        self.collector = dataclasses.replace(
+            self.collector,
+            default_license_file=GnLabel.from_str("//default_license.txt"),
+        )
+
+        self._add_applicable_licenses_metadata(
+            target="//third_party/foo", licenses=[]
+        )
+
+        self._collect_and_assert_errors(
+            [CollectorErrorKind.THIRD_PARTY_TARGET_WITHOUT_APPLICABLE_LICENSES]
+        )
+
+    ########################### Host targets:
+
+    def _add_host_tool_target_and_licenses(self):
+        self._add_files(["third_party/foo/license.txt"])
+        self._add_license_metadata(
+            target="//third_party/foo:license",
+            name="Foo",
+            files=["license.txt"],
+        )
+        self._add_applicable_licenses_metadata(
+            target="//third_party/foo(//host_toolchain)",
+            licenses=["//third_party/foo:license"],
+        )
+
+    def test_includes_host_tools(self):
+        self._add_host_tool_target_and_licenses()
+        self.collector = dataclasses.replace(
+            self.collector, include_host_tools=True
+        )
+        self._collect_and_assert_licenses(
+            {"Foo": ["//third_party/foo/license.txt"]}
+        )
+
+    def test_excludes_host_tools(self):
+        self._add_host_tool_target_and_licenses()
+        self.collector = dataclasses.replace(
+            self.collector, include_host_tools=False
+        )
+        self._collect_and_assert_licenses({})
 
 
 if __name__ == "__main__":

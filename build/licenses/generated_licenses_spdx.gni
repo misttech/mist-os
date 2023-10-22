@@ -41,6 +41,9 @@ import("//build/python/python_action.gni")
 #     When true, generation will ignore license collection errors
 #     and only log them as warnings.
 #
+#   additional_licenses (list of labels, optional)
+#     Labels of additional license.gni targets to include in the SPDX.
+#
 template("generated_licenses_spdx") {
   assert(defined(invoker.target), "Must specify `target`")
   assert(defined(invoker.spdx_root_package_name),
@@ -48,8 +51,9 @@ template("generated_licenses_spdx") {
   assert(defined(invoker.output), "Must specify `output`")
 
   _targets = {
-    main_target = target_name
+    main = target_name
     generated_metadata = "${target_name}.licenses_metadata"
+    additional_licenses = "${target_name}.additional_licenses"
   }
 
   _files = {
@@ -64,6 +68,12 @@ template("generated_licenses_spdx") {
     _include_host_tools = invoker.include_host_tools
   }
 
+  if (defined(invoker.additional_licenses)) {
+    group(_targets.additional_licenses) {
+      applicable_licenses = invoker.additional_licenses
+    }
+  }
+
   generated_file(_targets.generated_metadata) {
     outputs = [ _files.generated_metadata ]
     data_keys = [
@@ -76,10 +86,14 @@ template("generated_licenses_spdx") {
     }
 
     deps = [ invoker.target ]
+    if (defined(invoker.additional_licenses)) {
+      deps += [ ":${_targets.additional_licenses}" ]
+    }
+
     output_conversion = "json"
   }
 
-  python_action(_targets.main_target) {
+  python_action(_targets.main) {
     forward_variables_from(invoker,
                            [
                              "deps",

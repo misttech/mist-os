@@ -21,6 +21,11 @@ license("license_3") {
   license_files = [ "text3.txt" ]
 }
 
+license("license_4") {
+  public_package_name = "License 4"
+  license_files = [ "text4.txt" ]
+}
+
 group("foo") {
   applicable_licenses = [ ":license_1" ]
   deps = []
@@ -37,11 +42,20 @@ group("baz") {
   deps = [ ":bar" ]
 }
 
+group("qax") {
+  deps = [ ":baz" ]
+
+  # No license - would default to the Fuchsia license
+  applicable_licenses = []
+}
+
 generated_licenses_spdx("actual_spdx") {
-  target = ":baz"
+  target = ":qax"
   spdx_root_package_name = "Example"
   debug_hints = false
   output = "${target_out_dir}/actual.spdx.json"
+  include_host_tools = true
+  additional_licenses = [ ":license_4" ]
 }
 
 golden_files("golden_test") {

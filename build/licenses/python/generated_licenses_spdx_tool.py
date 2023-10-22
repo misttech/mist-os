@@ -8,6 +8,7 @@ import argparse
 import sys
 import logging
 from file_access import FileAccess
+from gn_label import GnLabel
 from spdx_writer import SpdxWriter
 from readme_fuchsia import ReadmesDB
 from collector import Collector
@@ -113,6 +114,7 @@ def main():
         ),
         readmes_db=readmes_db,
         include_host_tools=args.include_host_tools,
+        default_license_file=GnLabel.from_str("//LICENSE"),
     )
 
     collector.collect()

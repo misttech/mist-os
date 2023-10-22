@@ -10,15 +10,22 @@
     },
     "dataLicense": "CC0-1.0",
     "documentDescribes": [
+        "SPDXRef-Package-1712756dc48e2e9fc112978e9f85987b",
         "SPDXRef-Package-3c15dcecfa4d293d236bdf07d11c34fa",
         "SPDXRef-Package-424806e005c0c4b3c66f0eafab89c7b6",
         "SPDXRef-Package-86d25b6b25bbac5045cbd9edc08917fe",
-        "SPDXRef-Package-Root"
+        "SPDXRef-Package-Root",
+        "SPDXRef-Package-fac6a8c0343cefe07749850e3bbb91b6"
     ],
     "packages": [
         {
             "SPDXID": "SPDXRef-Package-Root",
             "name": "Example"
+        },
+        {
+            "SPDXID": "SPDXRef-Package-fac6a8c0343cefe07749850e3bbb91b6",
+            "name": "Fuchsia",
+            "licenseConcluded": "LicenseRef-fac6a8c0343cefe07749850e3bbb91b6"
         },
         {
             "SPDXID": "SPDXRef-Package-3c15dcecfa4d293d236bdf07d11c34fa",
@@ -34,9 +41,19 @@
             "SPDXID": "SPDXRef-Package-86d25b6b25bbac5045cbd9edc08917fe",
             "name": "License 3",
             "licenseConcluded": "LicenseRef-86d25b6b25bbac5045cbd9edc08917fe"
+        },
+        {
+            "SPDXID": "SPDXRef-Package-1712756dc48e2e9fc112978e9f85987b",
+            "name": "License 4",
+            "licenseConcluded": "LicenseRef-1712756dc48e2e9fc112978e9f85987b"
         }
     ],
     "relationships": [
+        {
+            "spdxElementId": "SPDXRef-Package-Root",
+            "relatedSpdxElement": "SPDXRef-Package-1712756dc48e2e9fc112978e9f85987b",
+            "relationshipType": "CONTAINS"
+        },
         {
             "spdxElementId": "SPDXRef-Package-Root",
             "relatedSpdxElement": "SPDXRef-Package-3c15dcecfa4d293d236bdf07d11c34fa",
@@ -51,9 +68,24 @@
             "spdxElementId": "SPDXRef-Package-Root",
             "relatedSpdxElement": "SPDXRef-Package-86d25b6b25bbac5045cbd9edc08917fe",
             "relationshipType": "CONTAINS"
+        },
+        {
+            "spdxElementId": "SPDXRef-Package-Root",
+            "relatedSpdxElement": "SPDXRef-Package-fac6a8c0343cefe07749850e3bbb91b6",
+            "relationshipType": "CONTAINS"
         }
     ],
     "hasExtractedLicensingInfos": [
+        {
+            "name": "Fuchsia",
+            "licenseId": "LicenseRef-fac6a8c0343cefe07749850e3bbb91b6",
+            "extractedText": "Copyright 2019 The Fuchsia Authors.\n\nRedistribution and use in source and binary forms, with or without\nmodification, are permitted provided that the following conditions are\nmet:\n\n   * Redistributions of source code must retain the above copyright\nnotice, this list of conditions and the following disclaimer.\n   * Redistributions in binary form must reproduce the above\ncopyright notice, this list of conditions and the following disclaimer\nin the documentation and/or other materials provided with the\ndistribution.\n\nTHIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS\n\"AS IS\" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT\nLIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR\nA PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT\nOWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,\nSPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT\nLIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,\nDATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY\nTHEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT\n(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE\nOF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.",
+            "crossRefs": [
+                {
+                    "url": "https://cs.opensource.google/fuchsia/fuchsia/+/main:LICENSE"
+                }
+            ]
+        },
         {
             "name": "License 1",
             "licenseId": "LicenseRef-3c15dcecfa4d293d236bdf07d11c34fa",
@@ -81,6 +113,16 @@
             "crossRefs": [
                 {
                     "url": "https://cs.opensource.google/fuchsia/fuchsia/+/main:build/licenses/tests/text3.txt"
+                }
+            ]
+        },
+        {
+            "name": "License 4",
+            "licenseId": "LicenseRef-1712756dc48e2e9fc112978e9f85987b",
+            "extractedText": "4th license text",
+            "crossRefs": [
+                {
+                    "url": "https://cs.opensource.google/fuchsia/fuchsia/+/main:build/licenses/tests/text4.txt"
                 }
             ]
         }

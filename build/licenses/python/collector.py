@@ -146,6 +146,7 @@ class Collector:
     metadata_db: GnLicenseMetadataDB
     readmes_db: ReadmesDB
     include_host_tools: bool
+    default_license_file: GnLabel = None
     scan_result_by_label: Dict[GnLabel, bool] = dataclasses.field(
         default_factory=dict
     )
@@ -318,6 +319,19 @@ class Collector:
                     parent_lib, original_label=original_label
                 )
 
+    def _add_default_license(self, label: GnLabel) -> bool:
+        if self.default_license_file:
+            self._add_license(
+                CollectedLicense.create(
+                    public_name="Fuchsia",
+                    license_files=tuple([self.default_license_file]),
+                    collection_hint="Default license for non 3p targets",
+                )
+            )
+            return True
+        else:
+            return False
+
     def _label_requires_licenses(self, label: GnLabel) -> bool:
         return label.is_3rd_party() or label.is_prebuilt()
 
@@ -389,8 +403,10 @@ class Collector:
                 ):
                     resources_have_licenses = False
 
-        if not license_found and self._label_requires_licenses(label):
-            if resource_of:
+        if not license_found:
+            if not self._label_requires_licenses(label):
+                license_found = self._add_default_license(label)
+            elif resource_of:
                 # 3p resources require licenses too, unless the target that references them
                 # has a license.
                 if not is_resource_of_target_with_licenses:
