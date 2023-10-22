@@ -355,6 +355,8 @@ closed protocol RingBuffer {
     /// `WatchClockRecoveryPositionInfo` may only be called after `GetVmo` was called, hence a
     /// `clock_recovery_notifications_per_ring` was specified.
     /// Must be delivered with timestamps that are monotonically increasing.
+    /// The driver will close the protocol channel with an error of `ZX_ERR_BAD_STATE`, if there is
+    /// already a pending `WatchClockRecoveryPositionInfo` for this client.
     strict WatchClockRecoveryPositionInfo() -> (struct {
         position_info RingBufferPositionInfo;
     });
@@ -397,15 +399,17 @@ closed protocol RingBuffer {
     ///
     /// If `Start` is called before `SetActiveChannels`, then by default all channels are active.
     /// If `Start` is called before `GetVmo`, the channel must be closed with `ZX_ERR_BAD_STATE`.
-    /// If `Start` is called while this RingBuffer is already started, the channel must be closed
-    /// with an error `ZX_ERR_BAD_STATE` returned.
+    /// If `Start` is called while this RingBuffer is already started, or if `Start` is called for
+    /// a second time before the first call has completed, then the channel must be closed with an
+    /// error `ZX_ERR_BAD_STATE` returned.
     strict Start() -> (struct {
         start_time zx.Time;
     });
 
     /// Stop the ring buffer. Once this call's response is received, no further position
     /// notifications will be sent until `Start` is called again.
-    /// If `Stop` is called before `GetVmo`, the channel must be closed with `ZX_ERR_BAD_STATE`.
+    /// If `Stop` is called before `GetVmo`, or if `Stop` is called for a second time before the
+    /// first call has completed, then the channel must be closed with `ZX_ERR_BAD_STATE`.
     // TODO(fxbug.dev/39494): Add timestamp parameter.
     strict Stop() -> ();
 
@@ -433,6 +437,8 @@ closed protocol RingBuffer {
     /// hardware to actually turn on, the driver replies with a `set_time` indicating when the
     /// hardware configuration was completed.
     /// For input channels, it is not required that the driver zero-out inactive channels.
+    /// If `SetActiveChannels` is called for a second time before the first call has completed,
+    /// the channel must be closed with an error `ZX_ERR_BAD_STATE` returned.
     strict SetActiveChannels(struct {
         active_channels_bitmask uint64;
     }) -> (struct {
@@ -442,6 +448,8 @@ closed protocol RingBuffer {
     /// Get information about delays via a hanging get. The driver will immediately reply to the
     /// first `WatchDelayInfo` sent by the client. The driver will not respond to subsequent client
     /// `WatchDelayInfo` calls until the delay info changes from what was most recently reported.
+    /// If `WatchDelayInfo` is called for a second time before the first call has completed, the
+    /// channel must be closed with an error `ZX_ERR_BAD_STATE` returned.
     @available(added=HEAD)
     strict WatchDelayInfo() -> (struct {
         delay_info DelayInfo;

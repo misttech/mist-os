@@ -476,6 +476,24 @@ void SimpleCodecServerInternal<T>::GetTopologies(
 }
 
 template <class T>
+void SimpleCodecServerInternal<T>::WatchTopology(
+    signal_fidl::SignalProcessing::WatchTopologyCallback callback,
+    SimpleCodecServerInstance<T>* instance) {
+  if (!instance->responded_to_watch_topology_) {
+    instance->responded_to_watch_topology_ = true;
+    callback(kTopologyId);
+  } else if (!instance->topology_callback_) {
+    instance->topology_callback_ = std::move(callback);
+  } else {
+    // The client called WatchTopology when another hanging get was pending.
+    // This is an error condition and hence we unbind and remove the instance.
+    instance->binding_.Close(ZX_ERR_BAD_STATE);
+    fbl::AutoLock lock(&instances_lock_);
+    instances_.erase(*instance);
+  }
+}
+
+template <class T>
 void SimpleCodecServerInternal<T>::SetTopology(
     uint64_t topology_id, signal_fidl::SignalProcessing::SetTopologyCallback callback) {
   // We only support one topology, return error if any mismatch.

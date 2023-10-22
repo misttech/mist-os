@@ -587,6 +587,23 @@ void VirtualAudioComposite::GetTopologies(GetTopologiesCompleter::Sync& complete
   completer.Reply(zx::ok(std::vector{std::move(topology)}));
 }
 
+void VirtualAudioComposite::WatchTopology(WatchTopologyCompleter::Sync& completer) {
+  // This driver is limited to a single ring buffer and a single DAI interconnect.
+  // TODO(fxbug.dev/124865): Add support for more topologies allowing their configuration and
+  // observability via the virtual audio FIDL APIs.
+  if (!responded_to_watch_topology_) {
+    responded_to_watch_topology_ = true;
+    completer.Reply(kTopologyId);
+  } else if (topology_completer_) {
+    // The client called WatchTopology when another hanging get was pending.
+    // This is an error condition and hence we unbind the channel.
+    zxlogf(ERROR, "WatchTopology was re-called while the previous call was still pending");
+    completer.Close(ZX_ERR_BAD_STATE);
+  } else {
+    topology_completer_ = completer.ToAsync();
+  }
+}
+
 void VirtualAudioComposite::SetTopology(SetTopologyRequest& request,
                                         SetTopologyCompleter::Sync& completer) {
   if (request.topology_id() == kTopologyId) {

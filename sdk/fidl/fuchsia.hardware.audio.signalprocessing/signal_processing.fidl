@@ -222,24 +222,26 @@ closed protocol SignalProcessing {
     /// supported formats returned in a previous `GetDaiFormats` `Dai` protocol call.
     ///
     /// It is the driver's job to determine when renegotiation is required. If renegotiation is
-    /// required, then `SetElementState` must return ZX_ERR_BAD_STATE and the client must
+    /// required, then `SetElementState` must return `ZX_ERR_BAD_STATE` and the client must
     /// close the protocol channel such that the protocol negotiations are started over.
     /// The client then must make the `SetElementState` call that returned
-    /// ZX_ERR_BAD_STATE before any non-`SignalProcessing` protocol calls.
+    /// `ZX_ERR_BAD_STATE` before any non-`SignalProcessing` protocol calls.
     strict SetElementState(struct {
         processing_element_id uint64;
         state ElementState;
     }) -> () error zx.Status;
 
     /// Sets the topology to be used using an id to the vector returned by `GetTopologies`.
-    /// If `GetTopologies` returns more than one `Topology`, `SetTopology` must be called to put the
-    /// driver in an initialized state. If `GetTopologies` returns only one `Topology`,
-    /// `SetTopology` is optional and has no effect.
+    /// The current topology is communicated by `WatchTopology` responses. To change which topology
+    /// is active, a client uses `SetTopology`.
+    /// If the specified `topology_id` is not within the`topologies` returned by `GetTopologies`,
+    /// this call will return `ZX_ERR_INVALID_ARGS`.
+    /// If `GetTopologies` returns only one `Topology`, `SetTopology` is optional and has no effect.
     ///
     /// `SetTopology` may be called before or after non-`SignalProcessing` protocol calls.
     /// If called after non-`SignalProcessing` protocol calls, then `SetTopology` may return
-    /// ZX_ERR_BAD_STATE to indicate that the operation can not proceed without renegotiation of the
-    /// driver state. See `SetElementState` for further discussion.
+    /// `ZX_ERR_BAD_STATE` to indicate that the operation can not proceed without renegotiation of
+    /// the driver state. See `SetElementState` for further discussion.
     strict SetTopology(struct {
         topology_id uint64;
     }) -> () error zx.Status;
@@ -249,16 +251,19 @@ closed protocol SignalProcessing {
 /// [[Signal Processing Interface]](https://fuchsia.dev/fuchsia-src/concepts/drivers/driver_architectures/audio_drivers/audio_signal_processing).
 closed protocol Reader {
     /// Returns a vector of supported processing elements.
-    /// Must return one or more processing elements, or ZX_ERR_NOT_SUPPORTED.
+    /// Must return one or more processing elements, or `ZX_ERR_NOT_SUPPORTED`.
     strict GetElements() -> (struct {
         processing_elements vector<Element>:MAX_COUNT_PROCESSING_ELEMENTS;
     }) error zx.Status;
 
     /// Get the processing element state via a hanging get. For a given `processing_element_id`,
-    /// the driver will reply to the first `WatchElement` sent by the client.
-    /// The driver will not respond to subsequent client `WatchElement` calls for a
+    /// the driver will reply to the first `WatchElementState` sent by the client.
+    /// The driver will not respond to subsequent client `WatchElementState` calls for a
     /// given `processing_element_id` until any field of the `Element` table
     /// changes from what was most recently reported for that `processing_element_id`.
+    /// The driver will close the protocol channel with an error of `ZX_ERR_BAD_STATE`, if this
+    /// method is called again while there is already a pending `WatchElementState` for this client
+    /// and processing_element_id.
     strict WatchElementState(struct {
         processing_element_id uint64;
     }) -> (struct {
@@ -266,7 +271,7 @@ closed protocol Reader {
     });
 
     /// Returns a vector of supported topologies.
-    /// Must return one or more topologies, or ZX_ERR_NOT_SUPPORTED.
+    /// Must return one or more topologies, or `ZX_ERR_NOT_SUPPORTED`.
     /// If more than one topology is returned, then the client may choose any of the topologies from
     /// the list with `SetTopology`.
     /// If only one topology is returned, then the topology definition is informational only since
@@ -276,4 +281,15 @@ closed protocol Reader {
     strict GetTopologies() -> (struct {
         topologies vector<Topology>:MAX_COUNT_TOPOLOGIES;
     }) error zx.Status;
+
+    /// Get the current topology via a hanging get.
+    /// The driver will immediately reply to the first `WatchTopology` sent by each client. The
+    /// driver will not respond to subsequent `WatchTopology` calls from that client until the
+    /// signal-processing topology changes, which occurs as a result of a `SetTopology` call.
+    /// The driver will close the protocol channel with an error of `ZX_ERR_BAD_STATE`, if this
+    /// method is called again while there is already a pending `WatchTopology` for this client.
+    @available(added=HEAD)
+    strict WatchTopology() -> (struct {
+        topology_id uint64;
+    });
 };

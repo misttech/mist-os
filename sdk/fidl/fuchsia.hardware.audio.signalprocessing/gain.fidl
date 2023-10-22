@@ -49,7 +49,7 @@ type Gain = table {
 
     /// Minimum gain step in `GainType` format, this value must not be negative, but may be zero to
     /// convey an effectively continuous range of values. Must not exceed `max_gain` - `min_gain`.
-    /// The actual gain set may be queried by the client with a `WatchElement` call.
+    /// The actual gain set may be queried by the client with a `WatchElementState` call.
     ///
     /// Required.
     5: min_gain_step float32;

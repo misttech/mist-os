@@ -1013,6 +1013,7 @@ void UsbAudioStream::RequestComplete(fuchsia_hardware_usb_endpoint::Completion c
           // the tick on which we scheduled the first transaction.
           fbl::AutoLock req_lock(&req_lock_);
           start_completer_->Reply(zx_time_sub_duration(complete_time, ZX_MSEC(1)));
+          start_completer_.reset();
         }
         {
           fbl::AutoLock req_lock(&req_lock_);
@@ -1042,6 +1043,7 @@ void UsbAudioStream::RequestComplete(fuchsia_hardware_usb_endpoint::Completion c
         if (rb_channel_ != nullptr) {
           fbl::AutoLock req_lock(&req_lock_);
           stop_completer_->Reply();
+          stop_completer_.reset();
         }
         {
           fbl::AutoLock req_lock(&req_lock_);
@@ -1219,6 +1221,10 @@ size_t UsbAudioStream::CompleteRequestLocked(fuchsia_hardware_usb_endpoint::Comp
 
 void UsbAudioStream::DeactivateStreamChannelLocked(StreamChannel* channel) {
   if (stream_channel_.get() == channel) {
+    //  Any pending completers MUST be released, for the StreamConfig channel to cleanly unwind.
+    stream_channel_->gain_completer_.reset();
+    stream_channel_->plug_completer_.reset();
+
     stream_channel_ = nullptr;
   }
   stream_channels_.erase(*channel);
@@ -1237,6 +1243,12 @@ void UsbAudioStream::DeactivateRingBufferChannelLocked(const Channel* channel) {
     }
     rb_vmo_fetched_ = false;
     delay_info_updated_ = false;
+
+    //  Any pending completers MUST be released, for the RingBuffer channel to cleanly unwind.
+    start_completer_.reset();
+    stop_completer_.reset();
+    position_completer_.reset();
+    delay_completer_.reset();
   }
 
   rb_channel_.reset();

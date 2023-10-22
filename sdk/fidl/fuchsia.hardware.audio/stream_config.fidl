@@ -146,6 +146,8 @@ closed protocol StreamConfig {
     /// sent by the client and this reply must include a `gain_db` set to 0dB or lower. The driver
     /// will not respond to subsequent client `WatchGainState` calls until the gain state changes
     /// from what was most recently reported.
+    /// If `WatchGainState` is called for a second time before the first call has completed, then
+    /// the protocol channel must be closed with the error `ZX_ERR_BAD_STATE`.
     strict WatchGainState() -> (struct {
         gain_state GainState;
     });
@@ -158,6 +160,8 @@ closed protocol StreamConfig {
     /// Get the plug detect state via a hanging get. The driver will reply to the first
     /// `WatchPlugState` sent by the client. The driver will not respond to subsequent client
     /// `WatchPlugState` calls until the plug state changes from what was most recently reported.
+    /// If `WatchPlugState` is called for a second time before the first call has completed, then
+    /// the protocol channel must be closed with the error `ZX_ERR_BAD_STATE`.
     strict WatchPlugState() -> (struct {
         plug_state PlugState;
     });

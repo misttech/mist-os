@@ -64,6 +64,9 @@ class Tas58xx : public SimpleCodecServer,
   void GetTopologies(
       fuchsia::hardware::audio::signalprocessing::SignalProcessing::GetTopologiesCallback callback)
       override;
+  void WatchTopology(
+      fuchsia::hardware::audio::signalprocessing::SignalProcessing::WatchTopologyCallback callback)
+      override;
   void SetTopology(uint64_t topology_id,
                    fuchsia::hardware::audio::signalprocessing::SignalProcessing::SetTopologyCallback
                        callback) override;
@@ -176,6 +179,10 @@ class Tas58xx : public SimpleCodecServer,
       fuchsia::hardware::audio::signalprocessing::SignalProcessing::WatchElementStateCallback>
       mute_callback_;
   bool last_mute_update_reported_ = false;
+
+  bool responded_to_watch_topology_ = false;
+  std::optional<fuchsia::hardware::audio::signalprocessing::Reader::WatchTopologyCallback>
+      topology_callback_;
 };
 }  // namespace audio
 

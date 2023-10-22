@@ -45,6 +45,7 @@ class ObserverServer
   void WatchElementState(WatchElementStateRequest& request,
                          WatchElementStateCompleter::Sync& completer) final {}
   void GetTopologies(GetTopologiesCompleter::Sync& completer) final {}
+  void WatchTopology(WatchTopologyCompleter::Sync& completer) final {}
 
   // Static object count, for debugging purposes.
   static inline uint64_t count() { return count_; }

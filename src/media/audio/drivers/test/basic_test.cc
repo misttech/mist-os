@@ -88,10 +88,18 @@ void BasicTest::GetHealthState(fuchsia::hardware::audio::Health::GetHealthStateC
 //    Else set a static var for this driver instance that SignalProcessing is supported.
 //    GetTopologies returns a vector with [1,64] entries
 //    Implies that GetElements must return a non-empty vector.
+//    WatchTopology returns a value that is in the range returned by GetTopologies.
 //    For each topology element:
 //        id and processing_elements_edge_pairs are required.
 //    For each processing_elements_edge_pairs entry:
 //        processing_element_id_from and processing_element_id_to are both known (in elements set).
+// WatchTopologyWhilePending
+//    If SignalProcessingConnect not supported earlier, SKIP.
+//    If GetTopologies closes channel with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
+//    Else set a static var for this driver instance that SignalProcessing is supported.
+//    GetTopologies returns a vector with [1,64] entries
+//    WatchTopology returns a value that is in the range returned by GetTopologies.
+//    WatchTopology (again) closes the protocol channel with ZX_ERR_BAD_STATE
 // InitialElementState
 //    If SignalProcessingConnect not supported earlier, SKIP.
 //    If WatchElementState closes channel with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
@@ -115,19 +123,23 @@ void BasicTest::GetHealthState(fuchsia::hardware::audio::Health::GetHealthStateC
 //    Retrieve topologies. If closes with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
 //    Else set a static var for this driver instance that SignalProcessing is supported.
 //    SetTopology returns callback.
+//    WatchTopology acknowledges the change made by SetTopology.
 // SetTopologyBadId
 //    If SignalProcessingConnect not supported earlier, SKIP.
 //    Retrieve topologies. If closes with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
 //    SetTopology(badId) returns ZX_ERR_INVALID_ARGS, does not close channel. Fail on other error.
+//    WatchTopology does not return.
 // SetTopologyInvalidated
 //    If SignalProcessingConnect not supported earlier, SKIP.
 //    Retrieve topologies. If closes with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
 //    First make a change that invalidates the SignalProcessing configuration, then
+//    WatchTopology should ... return ZX_ERR_BAD_STATE and not close channel?
 //    SetTopology should return ZX_ERR_BAD_STATE and not close channel.
 // SetTopologyReconfigured
 //    If SignalProcessingConnect not supported earlier, SKIP.
 //    First invalidate the SignalProcessing configuration, then retrieve the new topologies.
 //    SetTopology returns callback (does not fail or close channel).
+//    WatchTopology acknowledges the change made by SetTopology.
 // SetElementState
 //    If SignalProcessingConnect not supported earlier, SKIP.
 //    If SetElementState closes channel with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
@@ -677,11 +689,14 @@ void RegisterBasicTestsForDevice(const DeviceEntry& device_entry) {
     FAIL() << "Unknown device type for entry '" << device_entry.filename << "'";
   }
   // TODO(fxbug.dev/124865): Add testing for Dai protocol methods (specifically Reset,
-  // GetProperties, GetDaiFormats and GetRingBufferFormats).
+  //   GetProperties, GetDaiFormats and GetRingBufferFormats).
   // TODO(fxbug.dev/126734): Add testing for SignalProcessing methods.
   // TODO(fxbug.dev/124865): Add testing for Composite protocol methods.
   // TODO(fxbug.dev/124865): Add tests for Codec protocol methods (specifically Reset, Start, Stop,
-  // IsBridgeable, SetBridgeMode, GetDaiFormats, SetDaiFormat, WatchPlugState and GetProperties).
+  //   IsBridgeable, SetBridgeMode, GetDaiFormats, SetDaiFormat, WatchPlugState and GetProperties).
+  // TODO(b/302704556): Add tests for Watch-while-still-pending (specifically WatchGainState,
+  //   WatchPlugState, WatchClockRecoveryPositionInfo, WatchDelayInfo, WatchElementState and
+  //   WatchTopology).
 }
 
 }  // namespace media::audio::drivers::test

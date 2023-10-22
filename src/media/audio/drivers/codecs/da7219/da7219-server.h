@@ -84,6 +84,7 @@ class Server : public fidl::WireServer<fuchsia_hardware_audio::Codec>,
   void WatchElementState(WatchElementStateRequestView request,
                          WatchElementStateCompleter::Sync& completer) override;
   void GetTopologies(GetTopologiesCompleter::Sync& completer) override;
+  void WatchTopology(WatchTopologyCompleter::Sync& completer) override;
   void SetElementState(SetElementStateRequestView request,
                        SetElementStateCompleter::Sync& completer) override;
   void SetTopology(SetTopologyRequestView request, SetTopologyCompleter::Sync& completer) override;
@@ -103,6 +104,9 @@ class Server : public fidl::WireServer<fuchsia_hardware_audio::Codec>,
   bool last_gain_update_reported_ = false;  // So we return the gain state on the first call.
   float gain_ = 0.0f;
   std::optional<WatchElementStateCompleter::Async> gain_completer_;
+
+  bool responded_to_watch_topology_ = false;
+  std::optional<WatchTopologyCompleter::Async> topology_completer_;
 };
 
 }  // namespace audio::da7219

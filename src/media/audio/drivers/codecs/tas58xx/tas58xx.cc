@@ -731,6 +731,20 @@ void Tas58xx::GetTopologies(signal_fidl::SignalProcessing::GetTopologiesCallback
   callback(std::move(result));
 }
 
+void Tas58xx::WatchTopology(
+    fuchsia::hardware::audio::signalprocessing::SignalProcessing::WatchTopologyCallback callback) {
+  if (!responded_to_watch_topology_) {
+    responded_to_watch_topology_ = true;
+    callback(kTopologyId);
+  } else if (topology_callback_) {
+    // The client called WatchTopology when another hanging get was pending.
+    // This is an error condition and hence we unbind the channel.
+    zxlogf(ERROR, "WatchTopology was re-called while the previous call was still pending");
+  } else {
+    topology_callback_ = std::move(callback);
+  }
+}
+
 void Tas58xx::SetTopology(uint64_t topology_id,
                           signal_fidl::SignalProcessing::SetTopologyCallback callback) {
   if (topology_id != kTopologyId) {

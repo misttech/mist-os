@@ -139,6 +139,7 @@ class TestCodecWithSignalProcessing : public SimpleCodecServer,
     result.set_response(std::move(response));
     callback(std::move(result));
   }
+  void WatchTopology(WatchTopologyCallback callback) override {}
   void SetTopology(uint64_t topology_id, SetTopologyCallback callback) override {
     if (topology_id != kTopologyId) {
       callback(signal_fidl::SignalProcessing_SetTopology_Result::WithErr(ZX_ERR_INVALID_ARGS));

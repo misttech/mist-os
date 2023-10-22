@@ -93,6 +93,7 @@ class VirtualAudioComposite
   void SetElementState(SetElementStateRequest& request,
                        SetElementStateCompleter::Sync& completer) override;
   void GetTopologies(GetTopologiesCompleter::Sync& completer) override;
+  void WatchTopology(WatchTopologyCompleter::Sync& completer) override;
   void SetTopology(SetTopologyRequest& request, SetTopologyCompleter::Sync& completer) override;
 
  private:
@@ -136,6 +137,9 @@ class VirtualAudioComposite
   std::optional<fidl::ServerBinding<fuchsia_hardware_audio::RingBuffer>> ring_buffer_;
   std::optional<fidl::ServerBinding<fuchsia_hardware_audio_signalprocessing::SignalProcessing>>
       signal_;
+
+  bool responded_to_watch_topology_ = false;
+  std::optional<WatchTopologyCompleter::Async> topology_completer_;
 };
 
 }  // namespace virtual_audio

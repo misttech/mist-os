@@ -88,6 +88,7 @@ class FakeCodec : public audio::SimpleCodecServer, public signal_fidl::SignalPro
   void SetTopology(uint64_t topology_id, SetTopologyCallback callback) override {
     callback(signal_fidl::SignalProcessing_SetTopology_Result::WithErr(ZX_ERR_NOT_SUPPORTED));
   }
+  void WatchTopology(WatchTopologyCallback callback) override {}
   audio::DaiSupportedFormats GetDaiFormats() override { return {}; }
   zx::result<audio::CodecFormatInfo> SetDaiFormat(const audio::DaiFormat& format) override {
     return zx::error(ZX_ERR_NOT_SUPPORTED);

@@ -84,6 +84,9 @@ class SimpleCodecServerInternal {
       SimpleCodecServerInstance<T>* instance);
   void GetTopologies(
       fuchsia::hardware::audio::signalprocessing::SignalProcessing::GetTopologiesCallback callback);
+  void WatchTopology(
+      fuchsia::hardware::audio::signalprocessing::SignalProcessing::WatchTopologyCallback callback,
+      SimpleCodecServerInstance<T>* instance);
   void SetTopology(
       uint64_t topology_id,
       fuchsia::hardware::audio::signalprocessing::SignalProcessing::SetTopologyCallback callback);
@@ -148,6 +151,11 @@ class SimpleCodecServerInstance
       override {
     parent_->GetTopologies(std::move(callback));
   }
+  void WatchTopology(
+      fuchsia::hardware::audio::signalprocessing::SignalProcessing::WatchTopologyCallback callback)
+      override {
+    parent_->WatchTopology(std::move(callback), this);
+  }
   void SetTopology(uint64_t topology_id,
                    fuchsia::hardware::audio::signalprocessing::SignalProcessing::SetTopologyCallback
                        callback) override {
@@ -192,6 +200,10 @@ class SimpleCodecServerInstance
   std::optional<
       fuchsia::hardware::audio::signalprocessing::SignalProcessing::WatchElementStateCallback>
       agc_callback_;
+
+  bool responded_to_watch_topology_ = false;
+  std::optional<fuchsia::hardware::audio::signalprocessing::SignalProcessing::WatchTopologyCallback>
+      topology_callback_;
 };
 
 }  // namespace audio

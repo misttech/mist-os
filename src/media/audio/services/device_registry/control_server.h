@@ -62,6 +62,7 @@ class ControlServer
   void WatchElementState(WatchElementStateRequest& request,
                          WatchElementStateCompleter::Sync& completer) final {}
   void GetTopologies(GetTopologiesCompleter::Sync& completer) final {}
+  void WatchTopology(WatchTopologyCompleter::Sync& completer) final {}
   void SetElementState(SetElementStateRequest& request,
                        SetElementStateCompleter::Sync& completer) final {}
   void SetTopology(SetTopologyRequest& request, SetTopologyCompleter::Sync& completer) final {}
