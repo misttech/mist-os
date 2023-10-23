@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::base_packages::BasePackages,
+    crate::base_packages::{BasePackages, CachePackages},
     crate::index::{
         fulfill_meta_far_blob, CompleteInstallError, FulfillMetaFarError, PackageIndex,
     },
@@ -42,15 +42,12 @@ use {
 
 mod missing_blobs;
 
-// This encodes a host to interpolate when responding to BasePackageIndex requests.
-const BASE_PACKAGE_HOST: &str = "fuchsia.com";
-
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn serve(
     package_index: Arc<async_lock::RwLock<PackageIndex>>,
     blobfs: blobfs::Client,
     base_packages: Arc<BasePackages>,
-    cache_packages: Option<Arc<system_image::CachePackages>>,
+    cache_packages: Arc<CachePackages>,
     executability_restrictions: system_image::ExecutabilityRestrictions,
     scope: package_directory::ExecutionScope,
     stream: PackageCacheRequestStream,
@@ -107,12 +104,19 @@ pub(crate) async fn serve(
                 }
                 PackageCacheRequest::BasePackageIndex { iterator, control_handle: _ } => {
                     let stream = iterator.into_stream()?;
-                    serve_base_package_index(BASE_PACKAGE_HOST, Arc::clone(&base_packages), stream)
-                        .await;
+                    let () = serve_package_index(
+                        base_packages.root_package_urls_and_hashes().clone().into_iter(),
+                        stream,
+                    )
+                    .await;
                 }
                 PackageCacheRequest::CachePackageIndex { iterator, control_handle: _ } => {
                     let stream = iterator.into_stream()?;
-                    serve_cache_package_index(cache_packages.clone(), stream).await;
+                    let () = serve_package_index(
+                        cache_packages.root_package_urls_and_hashes().clone().into_iter(),
+                        stream,
+                    )
+                    .await;
                 }
                 PackageCacheRequest::Sync { responder } => {
                     responder.send(blobfs.sync().await.map_err(|e| {
@@ -692,45 +696,18 @@ async fn open_blob(
 
 /// Serves the `PackageIndexIteratorRequestStream` with as many base package index entries per
 /// request as will fit in a fidl message.
-async fn serve_base_package_index(
-    package_host: &'static str,
-    base_packages: Arc<BasePackages>,
+async fn serve_package_index(
+    packages: impl IntoIterator<Item = (fuchsia_url::UnpinnedAbsolutePackageUrl, Hash)>,
     stream: PackageIndexIteratorRequestStream,
 ) {
-    let mut package_entries = base_packages
-        .root_package_urls_and_hashes()
-        .iter()
-        .map(|(path, hash)| PackageIndexEntry {
-            package_url: fpkg::PackageUrl {
-                url: format!("fuchsia-pkg://{}/{}", package_host, path.name()),
-            },
+    let mut package_entries = packages
+        .into_iter()
+        .map(|(mut url, hash)| PackageIndexEntry {
+            package_url: fpkg::PackageUrl { url: url.clear_variant().to_string() },
             meta_far_blob_id: BlobId::from(*hash).into(),
         })
         .collect::<Vec<PackageIndexEntry>>();
     package_entries.sort_unstable_by(|a, b| a.package_url.url.cmp(&b.package_url.url));
-    serve_fidl_iterator_from_slice(stream, package_entries).await.unwrap_or_else(|e| {
-        error!("error serving PackageIndexIteratorRequestStream protocol: {:#}", anyhow!(e))
-    })
-}
-
-/// Serves the `PackageIndexIteratorRequestStream` with as many cache package index entries per
-/// request as will fit in a fidl message.
-async fn serve_cache_package_index(
-    cache_packages: Option<Arc<system_image::CachePackages>>,
-    stream: PackageIndexIteratorRequestStream,
-) {
-    let package_entries = match cache_packages {
-        Some(cache_packages) => cache_packages
-            .contents()
-            .map(|package_url| PackageIndexEntry {
-                package_url: fpkg::PackageUrl {
-                    url: package_url.as_unpinned().clone().clear_variant().to_string(),
-                },
-                meta_far_blob_id: BlobId::from(package_url.hash()).into(),
-            })
-            .collect::<Vec<PackageIndexEntry>>(),
-        None => vec![],
-    };
     serve_fidl_iterator_from_slice(stream, package_entries).await.unwrap_or_else(|e| {
         error!("error serving PackageIndexIteratorRequestStream protocol: {:#}", anyhow!(e))
     })
@@ -2214,93 +2191,41 @@ mod get_handler_tests {
 }
 
 #[cfg(test)]
-mod serve_base_package_index_tests {
-    use {super::*, fidl_fuchsia_pkg::PackageIndexIteratorMarker, std::collections::HashSet};
+mod serve_package_index_tests {
+    use {super::*, fpkg::PackageIndexIteratorMarker, fuchsia_url::UnpinnedAbsolutePackageUrl};
 
     #[fuchsia::test]
-    async fn base_packages_entries_converted_correctly() {
-        let base_packages = BasePackages::new_test_only(
-            HashSet::new(),
-            [
-                (
-                    fuchsia_url::UnpinnedAbsolutePackageUrl::new(
-                        fuchsia_url::RepositoryUrl::parse_host("fuchsia.com".into())
-                            .expect("valid repository hostname"),
-                        "name0".parse().unwrap(),
-                        Some("0".parse().unwrap()),
-                    ),
-                    Hash::from([0u8; 32]),
+    async fn entries_converted_correctly() {
+        let cache_packages = [
+            (
+                UnpinnedAbsolutePackageUrl::new(
+                    "fuchsia-pkg://fuchsia.test".parse().unwrap(),
+                    "name0".parse().unwrap(),
+                    Some(fuchsia_url::PackageVariant::zero()),
                 ),
-                (
-                    fuchsia_url::UnpinnedAbsolutePackageUrl::new(
-                        fuchsia_url::RepositoryUrl::parse_host("fuchsia.com".into())
-                            .expect("valid repository hostname"),
-                        "name1".parse().unwrap(),
-                        Some("1".parse().unwrap()),
-                    ),
-                    Hash::from([1u8; 32]),
-                ),
-            ],
-        );
-
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<PackageIndexIteratorMarker>().unwrap();
-        let task =
-            Task::local(serve_base_package_index("fuchsia.test", Arc::new(base_packages), stream));
-
-        let entries = proxy.next().await.unwrap();
-        assert_eq!(
-            entries,
-            vec![
-                fpkg::PackageIndexEntry {
-                    package_url: fpkg::PackageUrl {
-                        url: "fuchsia-pkg://fuchsia.test/name0".to_string(),
-                    },
-                    meta_far_blob_id: fpkg::BlobId { merkle_root: [0u8; 32] }
-                },
-                fpkg::PackageIndexEntry {
-                    package_url: fpkg::PackageUrl {
-                        url: "fuchsia-pkg://fuchsia.test/name1".to_string(),
-                    },
-                    meta_far_blob_id: fpkg::BlobId { merkle_root: [1u8; 32] }
-                }
-            ]
-        );
-
-        let entries = proxy.next().await.unwrap();
-        assert_eq!(entries, vec![]);
-
-        let () = task.await;
-    }
-}
-
-#[cfg(test)]
-mod serve_cache_package_index_tests {
-    use {
-        super::*, fidl_fuchsia_pkg::PackageIndexIteratorMarker,
-        fuchsia_url::PinnedAbsolutePackageUrl,
-    };
-
-    #[fuchsia::test]
-    async fn cache_packages_entries_converted_correctly() {
-        let cache_packages = system_image::CachePackages::from_entries(vec![
-            PinnedAbsolutePackageUrl::new(
-                "fuchsia-pkg://fuchsia.test".parse().unwrap(),
-                "name0".parse().unwrap(),
-                Some(fuchsia_url::PackageVariant::zero()),
                 Hash::from([0u8; 32]),
             ),
-            PinnedAbsolutePackageUrl::new(
-                "fuchsia-pkg://fuchsia.test".parse().unwrap(),
-                "name1".parse().unwrap(),
-                Some("1".parse().unwrap()),
+            (
+                UnpinnedAbsolutePackageUrl::new(
+                    "fuchsia-pkg://fuchsia.test".parse().unwrap(),
+                    "name1".parse().unwrap(),
+                    Some("1".parse().unwrap()),
+                ),
                 Hash::from([1u8; 32]),
             ),
-        ]);
+            (
+                UnpinnedAbsolutePackageUrl::new(
+                    "fuchsia-pkg://fuchsia.test".parse().unwrap(),
+                    "name2".parse().unwrap(),
+                    None,
+                ),
+                Hash::from([2u8; 32]),
+            ),
+        ];
 
         let (proxy, stream) =
             fidl::endpoints::create_proxy_and_stream::<PackageIndexIteratorMarker>().unwrap();
-        let task = Task::local(serve_cache_package_index(Some(Arc::new(cache_packages)), stream));
+        let task = Task::local(serve_package_index(cache_packages, stream));
 
         let entries = proxy.next().await.unwrap();
         assert_eq!(
@@ -2317,6 +2242,12 @@ mod serve_cache_package_index_tests {
                         url: "fuchsia-pkg://fuchsia.test/name1".to_string()
                     },
                     meta_far_blob_id: fpkg::BlobId { merkle_root: [1u8; 32] }
+                },
+                fpkg::PackageIndexEntry {
+                    package_url: fpkg::PackageUrl {
+                        url: "fuchsia-pkg://fuchsia.test/name2".to_string()
+                    },
+                    meta_far_blob_id: fpkg::BlobId { merkle_root: [2u8; 32] }
                 }
             ]
         );

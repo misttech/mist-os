@@ -8,7 +8,10 @@
 #![allow(clippy::too_many_arguments)]
 
 use {
-    crate::{base_packages::BasePackages, index::PackageIndex},
+    crate::{
+        base_packages::{BasePackages, CachePackages},
+        index::PackageIndex,
+    },
     anyhow::{anyhow, format_err, Context as _, Error},
     cobalt_sw_delivery_registry as metrics,
     fidl::endpoints::DiscoverableProtocolMarker as _,
@@ -113,12 +116,19 @@ async fn main_inner() -> Result<(), Error> {
     info!("starting package cache service");
     let inspector = finspect::Inspector::default();
 
-    let (use_fxblob, use_system_image) = {
+    let (use_fxblob, use_system_image, cache_package_protection) = {
         let config = pkg_cache_config::Config::take_from_startup_handle();
         inspector
             .root()
             .record_child("structured_config", |config_node| config.record_inspect(config_node));
-        (config.use_fxblob, config.use_system_image)
+        (
+            config.use_fxblob,
+            config.use_system_image,
+            match config.protect_cache_packages {
+                true => CachePackageProtection::Always,
+                false => CachePackageProtection::TreatLikeRegular,
+            },
+        )
     };
 
     let mut package_index = PackageIndex::new();
@@ -144,29 +154,27 @@ async fn main_inner() -> Result<(), Error> {
                     let cache_packages =
                         system_image.cache_packages().await.context("reading cache_packages")?;
                     index::load_cache_packages(&mut package_index, &cache_packages, &blobfs).await;
-                    let cache_packages = Arc::new(cache_packages);
-                    inspector.root().record_lazy_values(
-                        "cache-packages",
-                        cache_packages.record_lazy_inspect("cache-packages"),
-                    );
-                    Ok(cache_packages)
+                    Ok(CachePackages::new(&blobfs, &cache_packages)
+                        .await
+                        .context("creating CachePackages index")?)
                 });
             let base_packages = base_packages_res.context("loading base packages")?;
-            let cache_packages = cache_packages_res.map_or_else(
-                |e: anyhow::Error| {
-                    error!("Failed to load cache packages: {e:#}");
-                    None
-                },
-                Some,
-            );
-
+            let cache_packages = cache_packages_res.unwrap_or_else(|e: anyhow::Error| {
+                error!("Failed to load cache packages, using empty: {e:#}");
+                CachePackages::empty()
+            });
             let executability_restrictions = system_image.load_executability_restrictions();
 
             (Some(system_image), executability_restrictions, base_packages, cache_packages)
         } else {
             info!("not loading system_image due to structured config");
             inspector.root().record_string("system_image", "ignored");
-            (None, system_image::ExecutabilityRestrictions::Enforce, BasePackages::empty(), None)
+            (
+                None,
+                system_image::ExecutabilityRestrictions::Enforce,
+                BasePackages::empty(),
+                CachePackages::empty(),
+            )
         };
 
     inspector
@@ -175,7 +183,9 @@ async fn main_inner() -> Result<(), Error> {
     let base_resolver_base_packages =
         Arc::new(base_packages.root_package_urls_and_hashes().clone());
     let base_packages = Arc::new(base_packages);
+    let cache_packages = Arc::new(cache_packages);
     inspector.root().record_lazy_child("base-packages", base_packages.record_lazy_inspect());
+    inspector.root().record_lazy_child("cache-packages", cache_packages.record_lazy_inspect());
     let package_index = Arc::new(async_lock::RwLock::new(package_index));
     inspector.root().record_lazy_child("index", PackageIndex::record_lazy_inspect(&package_index));
     let scope = vfs::execution_scope::ExecutionScope::new();
@@ -194,6 +204,7 @@ async fn main_inner() -> Result<(), Error> {
         let package_index = Arc::clone(&package_index);
         let blobfs = blobfs.clone();
         let base_packages = Arc::clone(&base_packages);
+        let cache_packages = Arc::clone(&cache_packages);
         let scope = scope.clone();
         let cobalt_sender = cobalt_sender.clone();
         let cache_inspect_id = Arc::new(AtomicU32::new(0));
@@ -207,7 +218,7 @@ async fn main_inner() -> Result<(), Error> {
                         Arc::clone(&package_index),
                         blobfs.clone(),
                         Arc::clone(&base_packages),
-                        cache_packages.clone(),
+                        Arc::clone(&cache_packages),
                         executability_restrictions,
                         scope.clone(),
                         stream,
@@ -264,9 +275,11 @@ async fn main_inner() -> Result<(), Error> {
                     gc_service::serve(
                         blobfs.clone(),
                         Arc::clone(&base_packages),
+                        Arc::clone(&cache_packages),
                         Arc::clone(&package_index),
                         commit_status_provider.clone(),
                         stream,
+                        cache_package_protection,
                     )
                     .unwrap_or_else(|e| {
                         error!("error handling fuchsia.space/Manager connection: {:#}", anyhow!(e))
@@ -383,4 +396,11 @@ async fn shell_commands_bin_dir(
     .await
     .context("serving shell-commands bin dir")?;
     Ok(client)
+}
+
+// TODO(b/293332528) Delete once cache packages are always protected.
+#[derive(Debug, Clone, Copy)]
+enum CachePackageProtection {
+    Always,
+    TreatLikeRegular,
 }

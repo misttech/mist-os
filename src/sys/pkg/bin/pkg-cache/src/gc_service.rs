@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::base_packages::BasePackages,
+    crate::base_packages::{BasePackages, CachePackages},
     crate::index::PackageIndex,
     anyhow::Context as _,
     fidl_fuchsia_space::{
@@ -20,9 +20,11 @@ use {
 pub async fn serve(
     blobfs: blobfs::Client,
     base_packages: Arc<BasePackages>,
+    cache_packages: Arc<CachePackages>,
     package_index: Arc<async_lock::RwLock<PackageIndex>>,
     commit_status_provider: CommitStatusProviderProxy,
     mut stream: SpaceManagerRequestStream,
+    cache_package_protection: super::CachePackageProtection,
 ) -> Result<(), anyhow::Error> {
     let event_pair = commit_status_provider
         .is_current_system_committed()
@@ -31,7 +33,17 @@ pub async fn serve(
 
     while let Some(event) = stream.try_next().await? {
         let SpaceManagerRequest::Gc { responder } = event;
-        responder.send(gc(&blobfs, base_packages.as_ref(), &package_index, &event_pair).await)?;
+        responder.send(
+            gc(
+                &blobfs,
+                base_packages.as_ref(),
+                cache_packages.as_ref(),
+                &package_index,
+                &event_pair,
+                cache_package_protection,
+            )
+            .await,
+        )?;
     }
     Ok(())
 }
@@ -39,8 +51,10 @@ pub async fn serve(
 async fn gc(
     blobfs: &blobfs::Client,
     base_packages: &BasePackages,
+    cache_packages: &CachePackages,
     package_index: &Arc<async_lock::RwLock<PackageIndex>>,
     event_pair: &zx::EventPair,
+    cache_package_protection: super::CachePackageProtection,
 ) -> Result<(), SpaceErrorCode> {
     info!("performing gc");
 
@@ -60,22 +74,33 @@ async fn gc(
     })?;
 
     async move {
-        // First, read out all blobs currently known in the system. Anything resolve after this is
-        // implicitly protected, because only blobs that appear in this list can be collected.
+        // Determine all resident blobs before locking the package index to decrease the amount of
+        // time the package index lock is held. Blobs written after this are implicitly protected.
+        // This is for speed and not necessary for correctness. It would still be correct if the
+        // list of resident blobs was determined any time after the package index lock is taken.
         let mut eligible_blobs = blobfs.list_known_blobs().await?;
 
-        // Any blobs protected by the package index are ineligible for collection.
+        // Lock the package index until we are done deleting blobs. During resolution, required
+        // blobs are added to the index before their presence in blobfs is checked, so locking
+        // the index until we are done deleting blobs guarantees we will never delete a blob
+        // that resolution thinks it doesn't need to fetch.
         let package_index = package_index.read().await;
         package_index.all_blobs().iter().for_each(|blob| {
             eligible_blobs.remove(blob);
         });
 
-        // Blobs in base are immutable and ineligible for collection.
         base_packages.list_blobs().iter().for_each(|blob| {
             eligible_blobs.remove(blob);
         });
 
-        // Evict all eligible blobs from blobfs.
+        use super::CachePackageProtection::*;
+        match cache_package_protection {
+            Always => cache_packages.list_blobs().iter().for_each(|blob| {
+                eligible_blobs.remove(blob);
+            }),
+            TreatLikeRegular => (),
+        }
+
         info!("Garbage collecting {} blobs...", eligible_blobs.len());
         for (i, blob) in eligible_blobs.iter().enumerate() {
             blobfs.delete_blob(blob).await?;
@@ -90,7 +115,5 @@ async fn gc(
     .map_err(|e: anyhow::Error| {
         error!("Failed to perform GC operation: {:#}", e);
         SpaceErrorCode::Internal
-    })?;
-
-    Ok(())
+    })
 }

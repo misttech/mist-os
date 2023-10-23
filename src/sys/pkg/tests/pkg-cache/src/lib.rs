@@ -346,6 +346,7 @@ struct TestEnvBuilder<BlobfsAndSystemImageFut> {
         Box<dyn FnOnce(blobfs_ramdisk::Implementation) -> BlobfsAndSystemImageFut>,
     ignore_system_image: bool,
     blob_implementation: Option<blobfs_ramdisk::Implementation>,
+    protect_cache_packages: Option<bool>,
 }
 
 impl TestEnvBuilder<BoxFuture<'static, (BlobfsRamdisk, Option<Hash>)>> {
@@ -365,6 +366,7 @@ impl TestEnvBuilder<BoxFuture<'static, (BlobfsRamdisk, Option<Hash>)>> {
             paver_service_builder: None,
             ignore_system_image: false,
             blob_implementation: None,
+            protect_cache_packages: None,
         }
     }
 }
@@ -391,6 +393,7 @@ where
             paver_service_builder: self.paver_service_builder,
             ignore_system_image: self.ignore_system_image,
             blob_implementation: self.blob_implementation,
+            protect_cache_packages: self.protect_cache_packages,
         }
     }
 
@@ -425,6 +428,7 @@ where
             paver_service_builder: self.paver_service_builder,
             ignore_system_image: self.ignore_system_image,
             blob_implementation: Some(blobfs_ramdisk::Implementation::from_env()),
+            protect_cache_packages: self.protect_cache_packages,
         }
     }
 
@@ -446,6 +450,11 @@ where
     fn blobfs_impl(self, impl_: blobfs_ramdisk::Implementation) -> Self {
         assert_eq!(self.blob_implementation, None);
         Self { blob_implementation: Some(impl_), ..self }
+    }
+
+    fn protect_cache_packages(self, protect_cache_packages: bool) -> Self {
+        assert_eq!(None, self.protect_cache_packages);
+        Self { protect_cache_packages: Some(protect_cache_packages), ..self }
     }
 
     async fn build(self) -> TestEnv<ConcreteBlobfs> {
@@ -572,7 +581,10 @@ where
             .add_child("pkg_cache", "#meta/pkg-cache.cm", ChildOptions::new())
             .await
             .unwrap();
-        if self.ignore_system_image || blob_implementation_overridden {
+        if self.ignore_system_image
+            || blob_implementation_overridden
+            || self.protect_cache_packages.is_some()
+        {
             builder.init_mutable_config_from_package(&pkg_cache).await.unwrap();
             if self.ignore_system_image {
                 builder.set_config_value_bool(&pkg_cache, "use_system_image", false).await.unwrap();
@@ -583,6 +595,16 @@ where
                         &pkg_cache,
                         "use_fxblob",
                         matches!(blob_implementation, blobfs_ramdisk::Implementation::Fxblob),
+                    )
+                    .await
+                    .unwrap();
+            }
+            if let Some(protect_cache_packages) = self.protect_cache_packages {
+                builder
+                    .set_config_value_bool(
+                        &pkg_cache,
+                        "protect_cache_packages",
+                        protect_cache_packages,
                     )
                     .await
                     .unwrap();

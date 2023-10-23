@@ -6,7 +6,7 @@ use {
     anyhow::Context as _,
     fuchsia_inspect as finspect,
     fuchsia_merkle::Hash,
-    futures::{future::BoxFuture, FutureExt as _, StreamExt as _, TryStreamExt as _},
+    futures::{future::BoxFuture, FutureExt as _, StreamExt as _},
     std::{
         collections::{HashMap, HashSet},
         sync::Arc,
@@ -34,6 +34,26 @@ pub struct Base;
 /// closure of their subpackages, or none if the system does not have a system_image package.
 pub type BasePackages = FrozenIndex<Base>;
 
+/// Marker type for CachePackages.
+#[derive(Debug)]
+pub struct Cache;
+/// The packages in the cache packages manifest and the transitive closure of their subpackages,
+/// or none if the system does not have a cache packages manifest.
+/// To avoid breaking the system because of a failure in a non-critical package, packages and blobs
+/// are loaded best-effort from blobfs. Packages with missing meta.fars or missing subpackage
+/// meta.fars will be dropped from the index, resulting in:
+///   * is_package returning false for the package
+///   * list_blobs not returning any of the package's blobs (unless the blobs happen to be
+///     referenced by another package)
+/// root_package_urls_and_hashes will still return the URLs and hashes of dropped packages.
+pub type CachePackages = FrozenIndex<Cache>;
+
+#[derive(Debug, Clone, Copy)]
+enum OnPackageLoadError {
+    Fail,
+    Log,
+}
+
 impl FrozenIndex<Base> {
     pub async fn new(
         blobfs: &blobfs::Client,
@@ -56,7 +76,18 @@ impl FrozenIndex<Base> {
                 (fuchsia_url::UnpinnedAbsolutePackageUrl::new(base_repo.clone(), name, None), hash)
             })
             .collect::<HashMap<_, _>>();
-        Self::from_urls(blobfs, root_package_urls_and_hashes).await
+        Self::from_urls(blobfs, root_package_urls_and_hashes, OnPackageLoadError::Fail).await
+    }
+}
+
+impl FrozenIndex<Cache> {
+    pub async fn new(
+        blobfs: &blobfs::Client,
+        cache_packages: &system_image::CachePackages,
+    ) -> Result<Self, anyhow::Error> {
+        let root_package_urls_and_hashes =
+            cache_packages.contents().cloned().map(|url| (url.into_unpinned_and_hash())).collect();
+        Self::from_urls(blobfs, root_package_urls_and_hashes, OnPackageLoadError::Log).await
     }
 }
 
@@ -66,10 +97,12 @@ impl<Marker: Send + Sync + 'static> FrozenIndex<Marker> {
     async fn from_urls(
         blobfs: &blobfs::Client,
         root_package_urls_and_hashes: HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, Hash>,
+        on_package_load_error: OnPackageLoadError,
     ) -> Result<Self, anyhow::Error> {
         let (packages, blobs) = Self::load_packages_and_blobs(
             blobfs,
             root_package_urls_and_hashes.iter().map(|(_, h)| *h),
+            on_package_load_error,
         )
         .await
         .context("Error determining blobs")?;
@@ -87,6 +120,7 @@ impl<Marker: Send + Sync + 'static> FrozenIndex<Marker> {
     async fn load_packages_and_blobs(
         blobfs: &blobfs::Client,
         root_packages: impl Iterator<Item = Hash>,
+        on_package_load_error: OnPackageLoadError,
     ) -> Result<(HashSet<Hash>, HashSet<Hash>), anyhow::Error> {
         let memoized_packages = async_lock::RwLock::new(HashMap::new());
         let mut futures = futures::stream::iter(
@@ -95,8 +129,14 @@ impl<Marker: Send + Sync + 'static> FrozenIndex<Marker> {
         .buffer_unordered(1000);
 
         let mut blobs = HashSet::new();
-        while let Some(p) = futures.try_next().await? {
-            blobs.extend(p);
+        while let Some(res) = futures.next().await {
+            use OnPackageLoadError::*;
+            match (res, on_package_load_error) {
+                (Ok(p), _) => blobs.extend(p),
+                (Err(e), Fail) => Err(e)?,
+                // TODO(b/293332528) Warn on error once cache packages are always protected.
+                (Err(_e), Log) => (),
+            }
         }
         drop(futures);
 
@@ -151,6 +191,7 @@ impl<Marker: Send + Sync + 'static> FrozenIndex<Marker> {
     }
 
     /// Returns a callback to be given to `finspect::Node::record_lazy_child`.
+    /// Records the URLs and hashes the FrozenIndex was initialized with.
     pub fn record_lazy_inspect(
         self: &Arc<Self>,
     ) -> impl Fn() -> BoxFuture<'static, Result<finspect::Inspector, anyhow::Error>>
@@ -199,7 +240,10 @@ impl<Marker: Send + Sync + 'static> FrozenIndex<Marker> {
 #[cfg(test)]
 mod tests {
     use {
-        super::*, diagnostics_assertions::assert_data_tree, fuchsia_pkg_testing::PackageBuilder,
+        super::*,
+        assert_matches::assert_matches,
+        diagnostics_assertions::assert_data_tree,
+        fuchsia_pkg_testing::{PackageBuilder, SystemImageBuilder},
         std::iter::FromIterator as _,
     };
 
@@ -229,7 +273,7 @@ mod tests {
 
             let inspector = finspect::Inspector::default();
 
-            let base_packages = FrozenIndex::new(
+            let base_packages = FrozenIndex::<Base>::new(
                 &blobfs_client,
                 &system_image::SystemImage::from_root_dir(
                     package_directory::RootDir::new(blobfs_client.clone(), *system_image.hash())
@@ -243,7 +287,9 @@ mod tests {
             (Self { _blobfs: blobfs, system_image, inspector }, base_packages)
         }
 
-        async fn new(static_packages: &[&fuchsia_pkg_testing::Package]) -> (Self, BasePackages) {
+        async fn new(
+            static_packages: &[&fuchsia_pkg_testing::Package],
+        ) -> (Self, FrozenIndex<Base>) {
             Self::new_with_subpackages(static_packages, &[]).await
         }
     }
@@ -407,16 +453,14 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn base_packages_fails_when_loading_fails() {
+    async fn base_packages_fails_when_reading_manifest_fails() {
         let blobfs = blobfs_ramdisk::BlobfsRamdisk::start().await.unwrap();
         let blobfs_client = blobfs.client();
         // system_image package has no data/static_packages file
         let system_image = PackageBuilder::new("system_image").build().await.unwrap();
         system_image.write_to_blobfs(&blobfs).await;
 
-        let inspector = finspect::Inspector::default();
-
-        let base_packages_res = FrozenIndex::new(
+        let base_packages_res = FrozenIndex::<Base>::new(
             &blobfs_client,
             &system_image::SystemImage::from_root_dir(
                 package_directory::RootDir::new(blobfs_client.clone(), *system_image.hash())
@@ -426,7 +470,83 @@ mod tests {
         )
         .await;
 
-        assert!(base_packages_res.is_err());
-        assert_data_tree!(inspector, root: {});
+        assert_matches!(base_packages_res, Err(_))
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn base_packages_fails_when_reading_package_fails() {
+        let blobfs = blobfs_ramdisk::BlobfsRamdisk::start().await.unwrap();
+        let blobfs_client = blobfs.client();
+        let present = PackageBuilder::new("present")
+            .add_resource_at("present-blob", &b"present-blob-contents"[..])
+            .build()
+            .await
+            .unwrap();
+        let absent = PackageBuilder::new("absent")
+            .add_resource_at("absent-blob", &b"absent-blob-contents"[..])
+            .build()
+            .await
+            .unwrap();
+        let system_image =
+            SystemImageBuilder::new().static_packages(&[&present, &absent]).build().await;
+        system_image.write_to_blobfs(&blobfs).await;
+        present.write_to_blobfs(&blobfs).await;
+
+        assert_matches!(
+            FrozenIndex::<Base>::new(
+                &blobfs_client,
+                &system_image::SystemImage::from_root_dir(
+                    package_directory::RootDir::new(blobfs_client.clone(), *system_image.hash())
+                        .await
+                        .unwrap(),
+                ),
+            )
+            .await,
+            Err(_)
+        );
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn cache_packages_ignores_failed_package_load() {
+        let blobfs = blobfs_ramdisk::BlobfsRamdisk::start().await.unwrap();
+        let blobfs_client = blobfs.client();
+        let present = PackageBuilder::new("present")
+            .add_resource_at("present-blob", &b"present-blob-contents"[..])
+            .build()
+            .await
+            .unwrap();
+        let absent = PackageBuilder::new("absent")
+            .add_resource_at("absent-blob", &b"absent-blob-contents"[..])
+            .build()
+            .await
+            .unwrap();
+        let system_image =
+            SystemImageBuilder::new().cache_packages(&[&present, &absent]).build().await;
+        system_image.write_to_blobfs(&blobfs).await;
+        present.write_to_blobfs(&blobfs).await;
+
+        let cache_packages = FrozenIndex::<Cache>::new(
+            &blobfs_client,
+            &system_image::SystemImage::from_root_dir(
+                package_directory::RootDir::new(blobfs_client.clone(), *system_image.hash())
+                    .await
+                    .unwrap(),
+            )
+            .cache_packages()
+            .await
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(cache_packages.packages, HashSet::from([*present.hash()]));
+        assert_eq!(cache_packages.blobs, HashSet::from_iter(present.list_blobs().unwrap()));
+        assert_eq!(
+            cache_packages.root_package_urls_and_hashes(),
+            &HashMap::from_iter([
+                ("fuchsia-pkg://fuchsia.com/present/0".parse().unwrap(), *present.hash()),
+                ("fuchsia-pkg://fuchsia.com/absent/0".parse().unwrap(), *absent.hash())
+            ])
+        );
     }
 }

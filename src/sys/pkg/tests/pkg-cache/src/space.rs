@@ -186,6 +186,44 @@ async fn gc_dynamic_index_protected() {
     assert_eq!(env.blobfs.list_blobs().expect("all blobs"), expected_blobs);
 }
 
+/// Assert that any blobs referenced by cache packages are ineligible for garbage collection, even
+/// if the cache package is not active in the dynamic index.
+#[fuchsia::test]
+async fn gc_cache_packages_protected() {
+    let cache_subpkg = PackageBuilder::new("cache-subpkg")
+        .add_resource_at("sub-blob", "sub-blob-contents".as_bytes())
+        .build()
+        .await
+        .unwrap();
+    let cache_pkg = PackageBuilder::new("cache-pkg")
+        .add_subpackage("cache-subpkg", &cache_subpkg)
+        .add_resource_at("cache-blob", "cache-blob-contents".as_bytes())
+        .build()
+        .await
+        .unwrap();
+    let system_image = SystemImageBuilder::new().cache_packages(&[&cache_pkg]).build().await;
+    let env = TestEnv::builder()
+        .protect_cache_packages(true)
+        .blobfs_from_system_image_and_extra_packages(&system_image, &[&cache_pkg])
+        .await
+        .build()
+        .await;
+
+    // All blobs required for the cache package should be in blobfs.
+    let protected_blobs = cache_pkg.list_blobs().unwrap();
+    assert!(env.blobfs.list_blobs().unwrap().is_superset(&protected_blobs));
+
+    // Replace the cache package in the dynamic index with an alternate that does not share any
+    // blobs, then trigger GC.
+    let dynamic_index_replacer = PackageBuilder::new("cache-pkg").build().await.unwrap();
+    let _: fio::DirectoryProxy =
+        crate::get_and_verify_package(&env.proxies.package_cache, &dynamic_index_replacer).await;
+    let () = env.proxies.space_manager.gc().await.unwrap().unwrap();
+
+    // The cache package blobs should still be in blobfs.
+    assert!(env.blobfs.list_blobs().unwrap().is_superset(&protected_blobs));
+}
+
 #[fuchsia::test]
 async fn gc_unowned_blob() {
     let env = TestEnv::builder().build().await;

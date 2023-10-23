@@ -89,12 +89,11 @@ async fn cache_packages() {
     assert_data_tree!(
         hierarchy,
         root: contains {
-            "cache-packages": vec![
-                format!(
-                    "fuchsia-pkg://fuchsia.com/a-cache-package/0?hash={}",
-                    cache_package.hash()
-                )
-            ]
+            "cache-packages": {
+                "fuchsia-pkg://fuchsia.com/a-cache-package/0": {
+                    "hash": cache_package.hash().to_string()
+                }
+            }
         }
 
     );
