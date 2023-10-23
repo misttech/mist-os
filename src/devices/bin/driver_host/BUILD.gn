@@ -73,6 +73,7 @@ source_set("common") {
     ":simple_binding",
     "//sdk/fidl/fuchsia.device.fs:fuchsia.device.fs_cpp",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
     "//sdk/lib/driver/runtime:driver_runtime_env_cpp",
     "//src/devices/lib/driver:driver_runtime",
     "//src/devices/lib/fidl:devfs_fidl",

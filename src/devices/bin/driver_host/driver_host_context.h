@@ -27,8 +27,11 @@ class DriverHostContext {
  public:
   using Callback = fit::inline_callback<void(void), 2 * sizeof(void*)>;
 
-  explicit DriverHostContext(const async_loop_config_t* config, zx::resource root_resource = {})
-      : loop_(config), root_resource_(std::move(root_resource)) {}
+  explicit DriverHostContext(const async_loop_config_t* config, zx::resource root_resource = {},
+                             zx::resource mmio_resource = {})
+      : loop_(config),
+        root_resource_(std::move(root_resource)),
+        mmio_resource_(std::move(mmio_resource)) {}
 
   ~DriverHostContext();
 
@@ -121,6 +124,7 @@ class DriverHostContext {
   async::Loop& loop() { return loop_; }
 
   const zx::resource& root_resource() { return root_resource_; }
+  const zx::resource& mmio_resource() { return mmio_resource_; }
 
   ApiLock& api_lock() TA_RET_CAP(api_lock_) { return api_lock_; }
 
@@ -157,6 +161,7 @@ class DriverHostContext {
   int enumerators_ TA_GUARDED(api_lock_) = 0;
 
   zx::resource root_resource_;
+  zx::resource mmio_resource_;
 
   DriverHostInspect inspect_;
 

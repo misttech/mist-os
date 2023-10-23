@@ -6,16 +6,19 @@
 
 #include <dlfcn.h>
 #include <fidl/fuchsia.driver.framework/cpp/wire.h>
+#include <fidl/fuchsia.kernel/cpp/wire.h>
 #include <inttypes.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/receiver.h>
 #include <lib/async/cpp/wait.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/fdf/cpp/env.h>
+#include <lib/fdio/directory.h>
 #include <lib/fdio/fdio.h>
 #include <lib/fidl/coding.h>
 #include <lib/fit/defer.h>
@@ -68,6 +71,7 @@ namespace {
 
 namespace fio = fuchsia_io;
 namespace fdm = fuchsia_device_manager;
+namespace fkernel = fuchsia_kernel;
 
 bool property_value_type_valid(uint32_t value_type) {
   return value_type > ZX_DEVICE_PROPERTY_VALUE_UNDEFINED &&
@@ -878,6 +882,22 @@ int main(int argc, char** argv) {
     LOGF(WARNING, "No root resource handle");
   }
 
+  zx::resource mmio_resource;
+  {
+    zx::result client_end = component::Connect<fkernel::MmioResource>();
+    if (client_end.is_error()) {
+      LOGF(WARNING, "Failed to connect to mmio_resource.");
+    }
+
+    fidl::WireResult result = fidl::WireCall(*client_end)->Get();
+
+    if (!result.ok()) {
+      LOGF(WARNING, "Failed to get mmio_resource.");
+    } else {
+      mmio_resource = std::move(result.value().resource);
+    }
+  }
+
   fidl::ServerEnd<fuchsia_device_manager::DriverHostController> controller_request(
       zx::channel(zx_take_startup_handle(PA_HND(PA_USER0, 0))));
   if (!controller_request.is_valid()) {
@@ -885,7 +905,8 @@ int main(int argc, char** argv) {
     return ZX_ERR_BAD_HANDLE;
   }
 
-  DriverHostContext ctx(&kAsyncLoopConfigAttachToCurrentThread, std::move(root_resource));
+  DriverHostContext ctx(&kAsyncLoopConfigAttachToCurrentThread, std::move(root_resource),
+                        std::move(mmio_resource));
 
   RegisterContextForApi(&ctx);
 
