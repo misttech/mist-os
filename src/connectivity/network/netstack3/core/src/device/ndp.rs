@@ -395,7 +395,7 @@ mod tests {
 
         let _: StepResult = net.step(receive_frame, handle_timer);
         assert_eq!(
-            get_counter_val(net.non_sync_ctx("remote"), "ndp::rx_neighbor_solicitation"),
+            net.sync_ctx("remote").state.get_ndp_counters().rx_neighbor_solicitation.get(),
             1,
             "remote received solicitation"
         );
@@ -405,7 +405,7 @@ mod tests {
         let _: StepResult = net.step(receive_frame, handle_timer);
 
         assert_eq!(
-            get_counter_val(net.non_sync_ctx("local"), "ndp::rx_neighbor_advertisement"),
+            net.sync_ctx("local").state.get_ndp_counters().rx_neighbor_advertisement.get(),
             1,
             "local received advertisement"
         );
@@ -417,7 +417,7 @@ mod tests {
         });
         let _: StepResult = net.step(receive_frame, handle_timer);
         assert_eq!(
-            get_counter_val(net.non_sync_ctx("remote"), "<IcmpIpTransportContext as BufferIpTransportContext<Ipv6>>::receive_ip_packet::echo_request"),
+            net.sync_ctx("remote").state.get_icmp_rx_counters::<Ipv6>().echo_request.get(),
             1
         );
 
@@ -1129,7 +1129,7 @@ mod tests {
             FrameDestination::Individual { local: true },
             icmpv6_packet_buf,
         );
-        assert_eq!(get_counter_val(&non_sync_ctx, "ndp::rx_router_advertisement"), 0);
+        assert_eq!(sync_ctx.state.get_ndp_counters().rx_router_advertisement.get(), 0);
 
         // Test receiving NDP RA where source IP is a link local address (should
         // receive).
@@ -1143,7 +1143,7 @@ mod tests {
             FrameDestination::Individual { local: true },
             icmpv6_packet_buf,
         );
-        assert_eq!(get_counter_val(&non_sync_ctx, "ndp::rx_router_advertisement"), 1);
+        assert_eq!(sync_ctx.state.get_ndp_counters().rx_router_advertisement.get(), 1);
     }
 
     #[test]
@@ -1272,7 +1272,7 @@ mod tests {
             FrameDestination::Multicast,
             icmpv6_packet_buf,
         );
-        assert_eq!(get_counter_val(&non_sync_ctx, "ndp::rx_router_advertisement"), 1);
+        assert_eq!(sync_ctx.state.get_ndp_counters().rx_router_advertisement.get(), 1);
         assert_eq!(
             crate::ip::IpDeviceContext::<Ipv6, _>::get_mtu(&mut Locked::new(sync_ctx), &device),
             hw_mtu
@@ -1293,7 +1293,7 @@ mod tests {
             FrameDestination::Multicast,
             icmpv6_packet_buf,
         );
-        assert_eq!(get_counter_val(&non_sync_ctx, "ndp::rx_router_advertisement"), 2);
+        assert_eq!(sync_ctx.state.get_ndp_counters().rx_router_advertisement.get(), 2);
         assert_eq!(
             crate::ip::IpDeviceContext::<Ipv6, _>::get_mtu(&mut Locked::new(sync_ctx), &device),
             hw_mtu
@@ -1314,7 +1314,7 @@ mod tests {
             FrameDestination::Multicast,
             icmpv6_packet_buf,
         );
-        assert_eq!(get_counter_val(&non_sync_ctx, "ndp::rx_router_advertisement"), 3);
+        assert_eq!(sync_ctx.state.get_ndp_counters().rx_router_advertisement.get(), 3);
         assert_eq!(
             crate::ip::IpDeviceContext::<Ipv6, _>::get_mtu(&mut Locked::new(sync_ctx), &device),
             Ipv6::MINIMUM_LINK_MTU,

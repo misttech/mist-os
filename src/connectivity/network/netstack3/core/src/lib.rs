@@ -72,7 +72,7 @@ use crate::{
             state::AddrSubnetAndManualConfigEither, DualStackDeviceHandler, Ipv4DeviceTimerId,
             Ipv6DeviceTimerId,
         },
-        icmp::{BufferIcmpContext, IcmpContext},
+        icmp::{BufferIcmpContext, IcmpContext, IcmpRxCounters, IcmpTxCounters, NdpCounters},
         IpCounters, IpLayerTimerId, Ipv4State, Ipv6State,
     },
     transport::{tcp::socket::TcpBindingsTypes, TransportLayerState, TransportLayerTimerId},
@@ -204,6 +204,26 @@ impl<BT: BindingsTypes> StackState<BT> {
 
     pub(crate) fn get_v6_state(&self) -> &Ipv6State<BT::Instant, DeviceId<BT>> {
         &self.ipv6
+    }
+
+    pub(crate) fn get_icmp_tx_counters<I: Ip>(&self) -> &IcmpTxCounters<I> {
+        I::map_ip(
+            IpInvariant(self),
+            |IpInvariant(state)| state.ipv4.get_icmp_tx_counters(),
+            |IpInvariant(state)| state.ipv6.get_icmp_tx_counters(),
+        )
+    }
+
+    pub(crate) fn get_icmp_rx_counters<I: Ip>(&self) -> &IcmpRxCounters<I> {
+        I::map_ip(
+            IpInvariant(self),
+            |IpInvariant(state)| state.ipv4.get_icmp_rx_counters(),
+            |IpInvariant(state)| state.ipv6.get_icmp_rx_counters(),
+        )
+    }
+
+    pub(crate) fn get_ndp_counters(&self) -> &NdpCounters {
+        &self.ipv6.get_ndp_counters()
     }
 }
 

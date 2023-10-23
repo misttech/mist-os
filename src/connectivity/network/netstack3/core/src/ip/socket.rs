@@ -950,6 +950,7 @@ pub(crate) mod testutil {
                 testutil::{DualStackForwardingTable, FakeIpForwardingCtx},
                 ForwardingTable,
             },
+            icmp::{IcmpRxCounters, IcmpTxCounters, NdpCounters},
             testutil::FakeIpDeviceIdCtx,
             types::Destination,
             HopLimits, IpCounters, MulticastMembershipHandler, SendIpPacketMeta,
@@ -1330,6 +1331,11 @@ pub(crate) mod testutil {
         ip_forwarding_ctx: FakeIpForwardingCtx<D>,
         pub(crate) v4_common_counters: IpCounters<Ipv4>,
         pub(crate) v6_common_counters: IpCounters<Ipv6>,
+        pub(crate) tx_icmpv4_counters: IcmpTxCounters<Ipv4>,
+        pub(crate) rx_icmpv4_counters: IcmpRxCounters<Ipv4>,
+        pub(crate) tx_icmpv6_counters: IcmpTxCounters<Ipv6>,
+        pub(crate) rx_icmpv6_counters: IcmpRxCounters<Ipv6>,
+        pub(crate) ndp_counters: NdpCounters,
     }
 
     impl<D: FakeStrongDeviceId> FakeDualStackIpSocketCtx<D> {
@@ -1363,6 +1369,11 @@ pub(crate) mod testutil {
                 ip_forwarding_ctx: _,
                 v4_common_counters: _,
                 v6_common_counters: _,
+                tx_icmpv4_counters: _,
+                rx_icmpv4_counters: _,
+                tx_icmpv6_counters: _,
+                rx_icmpv6_counters: _,
+                ndp_counters: _,
             } = self;
             device_state.get(device).unwrap_or_else(|| panic!("no device {device:?}"))
         }
@@ -1377,6 +1388,11 @@ pub(crate) mod testutil {
                 ip_forwarding_ctx: _,
                 v4_common_counters: _,
                 v6_common_counters: _,
+                tx_icmpv4_counters: _,
+                rx_icmpv4_counters: _,
+                tx_icmpv6_counters: _,
+                rx_icmpv6_counters: _,
+                ndp_counters: _,
             } = self;
             find_devices_with_addr::<I, _, _>(device_state, addr)
         }
@@ -1390,6 +1406,11 @@ pub(crate) mod testutil {
                 ip_forwarding_ctx: _,
                 v4_common_counters: _,
                 v6_common_counters: _,
+                tx_icmpv4_counters: _,
+                rx_icmpv4_counters: _,
+                tx_icmpv6_counters: _,
+                rx_icmpv6_counters: _,
+                ndp_counters: _,
             } = self;
             multicast_memberships::<I, _, _>(device_state)
         }
@@ -1435,6 +1456,11 @@ pub(crate) mod testutil {
                 ip_forwarding_ctx: FakeIpForwardingCtx::default(),
                 v4_common_counters: Default::default(),
                 v6_common_counters: Default::default(),
+                tx_icmpv4_counters: Default::default(),
+                rx_icmpv4_counters: Default::default(),
+                tx_icmpv6_counters: Default::default(),
+                rx_icmpv6_counters: Default::default(),
+                ndp_counters: Default::default(),
             }
         }
     }
@@ -1445,6 +1471,22 @@ pub(crate) mod testutil {
                 IpInvariant(self),
                 |IpInvariant(sync_ctx)| &sync_ctx.v4_common_counters,
                 |IpInvariant(sync_ctx)| &sync_ctx.v6_common_counters,
+            )
+        }
+
+        pub(crate) fn get_icmp_tx_counters<I: Ip>(&self) -> &IcmpTxCounters<I> {
+            I::map_ip(
+                IpInvariant(self),
+                |IpInvariant(sync_ctx)| &sync_ctx.tx_icmpv4_counters,
+                |IpInvariant(sync_ctx)| &sync_ctx.tx_icmpv6_counters,
+            )
+        }
+
+        pub(crate) fn get_icmp_rx_counters<I: Ip>(&self) -> &IcmpRxCounters<I> {
+            I::map_ip(
+                IpInvariant(self),
+                |IpInvariant(sync_ctx)| &sync_ctx.rx_icmpv4_counters,
+                |IpInvariant(sync_ctx)| &sync_ctx.rx_icmpv6_counters,
             )
         }
     }
@@ -1501,6 +1543,11 @@ pub(crate) mod testutil {
                 ip_forwarding_ctx,
                 v4_common_counters: _,
                 v6_common_counters: _,
+                tx_icmpv4_counters: _,
+                rx_icmpv4_counters: _,
+                tx_icmpv6_counters: _,
+                rx_icmpv6_counters: _,
+                ndp_counters: _,
             } = self;
             lookup_route(
                 table.as_ref(),
@@ -1552,6 +1599,11 @@ pub(crate) mod testutil {
                 ip_forwarding_ctx: _,
                 v4_common_counters: _,
                 v6_common_counters: _,
+                tx_icmpv4_counters: _,
+                rx_icmpv4_counters: _,
+                tx_icmpv6_counters: _,
+                rx_icmpv6_counters: _,
+                ndp_counters: _,
             } = self;
             let state =
                 device_state.get_mut(device).unwrap_or_else(|| panic!("no device {device:?}"));
@@ -1572,6 +1624,11 @@ pub(crate) mod testutil {
                 ip_forwarding_ctx: _,
                 v4_common_counters: _,
                 v6_common_counters: _,
+                tx_icmpv4_counters: _,
+                rx_icmpv4_counters: _,
+                tx_icmpv6_counters: _,
+                rx_icmpv6_counters: _,
+                ndp_counters: _,
             } = self;
             let state =
                 device_state.get_mut(device).unwrap_or_else(|| panic!("no device {device:?}"));

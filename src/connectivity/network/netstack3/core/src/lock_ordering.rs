@@ -130,6 +130,12 @@ pub(crate) struct IpStateCounters<I>(PhantomData<I>, Never);
 pub(crate) enum Ipv4StateCounters {}
 // Provides unlocked access of Ipv6Counters.
 pub(crate) enum Ipv6StateCounters {}
+// Provides unlocked access of IcmpTxCounters.
+pub(crate) struct IcmpTxCounters<I>(PhantomData<I>, Never);
+// Provides unlocked access of IcmpRxCounters.
+pub(crate) struct IcmpRxCounters<I>(PhantomData<I>, Never);
+// Provides unlocked access of NdpCounters.
+pub(crate) enum NdpCounters {}
 
 pub(crate) struct IpDeviceConfiguration<I>(PhantomData<I>, Never);
 pub(crate) struct IpDeviceGmp<I>(PhantomData<I>, Never);

@@ -73,9 +73,10 @@ use crate::{
         },
         forwarding::{ForwardingTable, IpForwardingDeviceContext},
         icmp::{
-            BufferIcmpHandler, IcmpHandlerIpExt, IcmpIpExt, IcmpIpTransportContext, Icmpv4Error,
-            Icmpv4ErrorCode, Icmpv4ErrorKind, Icmpv4State, Icmpv4StateBuilder, Icmpv6ErrorCode,
-            Icmpv6ErrorKind, Icmpv6State, Icmpv6StateBuilder, InnerIcmpContext,
+            BufferIcmpHandler, IcmpHandlerIpExt, IcmpIpExt, IcmpIpTransportContext, IcmpRxCounters,
+            IcmpTxCounters, Icmpv4Error, Icmpv4ErrorCode, Icmpv4ErrorKind, Icmpv4State,
+            Icmpv4StateBuilder, Icmpv6ErrorCode, Icmpv6ErrorKind, Icmpv6State, Icmpv6StateBuilder,
+            InnerIcmpContext, NdpCounters,
         },
         ipv6::Ipv6PacketAction,
         path_mtu::{PmtuCache, PmtuTimerId},
@@ -1170,6 +1171,14 @@ impl<Instant: crate::Instant, StrongDeviceId: StrongId> Ipv4State<Instant, Stron
     pub(crate) fn get_v4_counters(&self) -> &Ipv4Counters {
         &self.counters
     }
+
+    pub(crate) fn get_icmp_tx_counters(&self) -> &IcmpTxCounters<Ipv4> {
+        &self.icmp.inner.tx_counters
+    }
+
+    pub(crate) fn get_icmp_rx_counters(&self) -> &IcmpRxCounters<Ipv4> {
+        &self.icmp.inner.rx_counters
+    }
 }
 
 impl<I: Instant, StrongDeviceId: StrongId> AsRef<IpStateInner<Ipv4, I, StrongDeviceId>>
@@ -1200,6 +1209,18 @@ pub(crate) struct Ipv6State<Instant: crate::Instant, StrongDeviceId: StrongId> {
 impl<Instant: crate::Instant, StrongDeviceId: StrongId> Ipv6State<Instant, StrongDeviceId> {
     pub(crate) fn get_v6_counters(&self) -> &Ipv6Counters {
         &self.counters
+    }
+
+    pub(crate) fn get_icmp_tx_counters(&self) -> &IcmpTxCounters<Ipv6> {
+        &self.icmp.inner.tx_counters
+    }
+
+    pub(crate) fn get_icmp_rx_counters(&self) -> &IcmpRxCounters<Ipv6> {
+        &self.icmp.inner.rx_counters
+    }
+
+    pub(crate) fn get_ndp_counters(&self) -> &NdpCounters {
+        &self.icmp.ndp_counters
     }
 }
 
@@ -3809,7 +3830,10 @@ mod tests {
             false,
         );
         receive_ip_packet::<_, _, Ipv6>(&sync_ctx, &mut non_sync_ctx, &device, frame_dst, buf);
-        assert_eq!(get_counter_val(&non_sync_ctx, "send_icmpv6_parameter_problem"), expected_icmps);
+        assert_eq!(
+            sync_ctx.state.get_icmp_tx_counters::<Ipv6>().parameter_problem.get(),
+            expected_icmps
+        );
         assert_eq!(sync_ctx.state.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 1);
         assert_eq!(non_sync_ctx.frames_sent().len(), expected_icmps);
 
@@ -3822,7 +3846,10 @@ mod tests {
             false,
         );
         receive_ip_packet::<_, _, Ipv6>(&sync_ctx, &mut non_sync_ctx, &device, frame_dst, buf);
-        assert_eq!(get_counter_val(&non_sync_ctx, "send_icmpv6_parameter_problem"), expected_icmps);
+        assert_eq!(
+            sync_ctx.state.get_icmp_tx_counters::<Ipv6>().parameter_problem.get(),
+            expected_icmps
+        );
         assert_eq!(non_sync_ctx.frames_sent().len(), expected_icmps);
 
         // Test with unrecognized option type set with
@@ -3836,7 +3863,10 @@ mod tests {
         );
         receive_ip_packet::<_, _, Ipv6>(&sync_ctx, &mut non_sync_ctx, &device, frame_dst, buf);
         expected_icmps += 1;
-        assert_eq!(get_counter_val(&non_sync_ctx, "send_icmpv6_parameter_problem"), expected_icmps);
+        assert_eq!(
+            sync_ctx.state.get_icmp_tx_counters::<Ipv6>().parameter_problem.get(),
+            expected_icmps
+        );
         assert_eq!(non_sync_ctx.frames_sent().len(), expected_icmps);
         verify_icmp_for_unrecognized_ext_hdr_option(
             &mut non_sync_ctx,
@@ -3856,7 +3886,10 @@ mod tests {
         );
         receive_ip_packet::<_, _, Ipv6>(&sync_ctx, &mut non_sync_ctx, &device, frame_dst, buf);
         expected_icmps += 1;
-        assert_eq!(get_counter_val(&non_sync_ctx, "send_icmpv6_parameter_problem"), expected_icmps);
+        assert_eq!(
+            sync_ctx.state.get_icmp_tx_counters::<Ipv6>().parameter_problem.get(),
+            expected_icmps
+        );
         assert_eq!(non_sync_ctx.frames_sent().len(), expected_icmps);
         verify_icmp_for_unrecognized_ext_hdr_option(
             &mut non_sync_ctx,
@@ -3876,7 +3909,10 @@ mod tests {
         );
         receive_ip_packet::<_, _, Ipv6>(&sync_ctx, &mut non_sync_ctx, &device, frame_dst, buf);
         expected_icmps += 1;
-        assert_eq!(get_counter_val(&non_sync_ctx, "send_icmpv6_parameter_problem"), expected_icmps);
+        assert_eq!(
+            sync_ctx.state.get_icmp_tx_counters::<Ipv6>().parameter_problem.get(),
+            expected_icmps
+        );
         assert_eq!(non_sync_ctx.frames_sent().len(), expected_icmps);
         verify_icmp_for_unrecognized_ext_hdr_option(
             &mut non_sync_ctx,
@@ -3896,13 +3932,16 @@ mod tests {
         );
         // Do not expect an ICMP response for this packet
         receive_ip_packet::<_, _, Ipv6>(&sync_ctx, &mut non_sync_ctx, &device, frame_dst, buf);
-        assert_eq!(get_counter_val(&non_sync_ctx, "send_icmpv6_parameter_problem"), expected_icmps);
+        assert_eq!(
+            sync_ctx.state.get_icmp_tx_counters::<Ipv6>().parameter_problem.get(),
+            expected_icmps
+        );
         assert_eq!(non_sync_ctx.frames_sent().len(), expected_icmps);
 
         // None of our tests should have sent an icmpv4 packet, or dispatched an
         // IP packet after the first.
 
-        assert_eq!(get_counter_val(&non_sync_ctx, "send_icmpv4_parameter_problem"), 0);
+        assert_eq!(sync_ctx.state.get_icmp_tx_counters::<Ipv4>().parameter_problem.get(), 0);
         assert_eq!(sync_ctx.state.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 1);
     }
 
@@ -4239,7 +4278,7 @@ mod tests {
 
         // Should not have dispatched the packet.
         assert_eq!(sync_ctx.state.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 0);
-        assert_eq!(get_counter_val(&non_sync_ctx, "send_icmpv6_packet_too_big"), 1);
+        assert_eq!(sync_ctx.state.get_icmp_tx_counters::<Ipv6>().packet_too_big.get(), 1);
 
         // Should have sent out one frame though.
         assert_eq!(non_sync_ctx.frames_sent().len(), 1);
@@ -4706,7 +4745,7 @@ mod tests {
 
         // Should have dispatched the packet but resulted in an ICMP error.
         assert_eq!(sync_ctx.state.ipv4.inner.counters.dispatch_receive_ip_packet.get(), 1);
-        assert_eq!(get_counter_val(&non_sync_ctx, "send_icmpv4_dest_unreachable"), 1);
+        assert_eq!(sync_ctx.state.get_icmp_tx_counters::<Ipv4>().dest_unreachable.get(), 1);
         assert_eq!(non_sync_ctx.frames_sent().len(), 1);
         let buf = &non_sync_ctx.frames_sent()[0].1[..];
         let (_, _, _, _, _, _, code) = parse_icmp_packet_in_ip_packet_in_ethernet_frame::<

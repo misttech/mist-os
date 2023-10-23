@@ -1758,13 +1758,15 @@ mod tests {
         ) {
             let alice = net.non_sync_ctx("alice");
             assert_eq!(get_counter_val(alice, "timer::nop"), alice_nop);
-            assert_eq!(get_counter_val(alice, "<IcmpIpTransportContext as BufferIpTransportContext<Ipv4>>::receive_ip_packet::echo_reply"),
+            assert_eq!(
+                net.sync_ctx("alice").state.get_icmp_rx_counters::<Ipv4>().echo_reply.get(),
                 alice_echo_response
             );
 
             let bob = net.non_sync_ctx("bob");
             assert_eq!(get_counter_val(bob, "timer::nop"), bob_nop);
-            assert_eq!(get_counter_val(bob, "<IcmpIpTransportContext as BufferIpTransportContext<Ipv4>>::receive_ip_packet::echo_request"),
+            assert_eq!(
+                net.sync_ctx("bob").state.get_icmp_rx_counters::<Ipv4>().echo_request.get(),
                 bob_echo_request
             );
         }
