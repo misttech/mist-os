@@ -12,7 +12,7 @@ use self::obex_string::ObexString;
 use crate::error::PacketError;
 
 /// A collection of Headers sent & received in an OBEX packet.
-mod header_set;
+pub mod header_set;
 /// Definition of an OBEX-specific String type used in Headers.
 mod obex_string;
 

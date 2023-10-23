@@ -7,7 +7,7 @@ use std::collections::VecDeque;
 use tracing::{trace, warn};
 
 use crate::error::Error;
-use crate::header::{Header, HeaderSet};
+use crate::header::{Header, HeaderSet, SingleResponseMode};
 use crate::operation::{OpCode, RequestPacket, ResponseCode, ResponsePacket};
 use crate::server::handler::ObexOperationError;
 use crate::server::{ApplicationResponse, OperationRequest, ServerOperation};
@@ -19,12 +19,13 @@ const BODY_HEADER_PREFIX_LENGTH_BYTES: usize = 3;
 #[derive(Debug, PartialEq)]
 struct StagedData {
     /// The first chunk of user data.
-    /// This is Some<T> when the first chunk is available and can be taken with `first_response`
+    /// This is Some<T> when the first chunk is available and can be taken with `next_response`
     /// and None otherwise.
     /// In some cases, no user data can fit in the first chunk and so this will be Some<None>.
     first: Option<Option<Vec<u8>>>,
     /// The remaining chunks of user data to be sent.
-    /// The `StagedData` is considered exhausted and complete when this is empty.
+    /// The `StagedData` is considered exhausted and complete when both `first` and `rest` are
+    /// empty.
     rest: VecDeque<Vec<u8>>,
 }
 
@@ -95,6 +96,7 @@ impl StagedData {
     }
 
     /// Returns true if the first response exists and can be taken.
+    #[cfg(test)]
     fn is_first_response(&self) -> bool {
         self.first.is_some()
     }
@@ -104,43 +106,51 @@ impl StagedData {
         self.first.is_none() && self.rest.is_empty()
     }
 
-    /// Returns the first response in the staged data.
-    /// Returns the response code and potential first user data chunk on success, Error otherwise.
-    fn first_response(&mut self) -> Result<(ResponseCode, Option<Header>), Error> {
+    /// Returns the response packet for the next chunk of data in the staged payload.
+    /// Returns Error if all the data has already been returned - namely, `Self::is_complete` is
+    /// true or if the response packet couldn't be built with the provided `headers`.
+    fn next_response(&mut self, mut headers: HeaderSet) -> Result<ResponsePacket, Error> {
         if self.is_complete() {
-            return Err(Error::operation(OpCode::Get, "staged data exhausted"));
+            return Err(Error::operation(OpCode::Get, "staged data is already complete"));
         }
 
-        let first_packet = self
-            .first
-            .take()
-            .ok_or(Error::operation(OpCode::Get, "first response already taken"))?;
-        if self.rest.is_empty() {
-            Ok((ResponseCode::Ok, first_packet.map(|p| Header::EndOfBody(p))))
+        let chunk = if let Some(first_packet) = self.first.take() {
+            // First chunk, which may be None if no user data can fit in the first packet.
+            first_packet
         } else {
-            Ok((ResponseCode::Continue, first_packet.map(|p| Header::Body(p))))
+            // Otherwise, subsequent chunk. This must always be populated, even if empty.
+            Some(self.rest.pop_front().unwrap_or(vec![]))
+        };
+
+        // If `self.rest` is empty after grabbing the next chunk, then this is the final chunk of
+        // the payload. An EndOfBody header is used instead of Body for the chunk.
+        let (code, h) = if self.rest.is_empty() {
+            (ResponseCode::Ok, chunk.map(|p| Header::EndOfBody(p)))
+        } else {
+            (ResponseCode::Continue, chunk.map(|p| Header::Body(p)))
+        };
+
+        if let Some(header) = h {
+            headers.add(header)?;
         }
+        Ok(ResponsePacket::new_get(code, headers))
     }
 
-    /// Returns the response code and Header for the next chunk of data in the staged payload.
-    /// Returns Error if the first chunk of data has not been retrieved.
-    /// Returns Error if all the data has already been returned - namely, `Self::is_complete` is
-    /// true.
-    fn next_response(&mut self) -> Result<(ResponseCode, Header), Error> {
-        if self.is_complete() || self.is_first_response() {
-            return Err(Error::operation(OpCode::Get, "next_response called from invalid state"));
+    /// Returns response packets for all of the staged data.
+    /// Returns Error if all of the data has already been returned.
+    fn all_responses(
+        &mut self,
+        mut initial_headers: HeaderSet,
+    ) -> Result<Vec<ResponsePacket>, Error> {
+        let mut responses = Vec::new();
+        while !self.is_complete() {
+            // Only the first packet will contain the `initial_headers`. Subsequent responses will
+            // not have any informational headers.
+            let headers = std::mem::replace(&mut initial_headers, HeaderSet::new());
+            let response = self.next_response(headers)?;
+            responses.push(response);
         }
-
-        let next_chunk = self.rest.pop_front();
-        // Last chunk.
-        if self.rest.is_empty() {
-            let h = Header::EndOfBody(next_chunk.unwrap_or(vec![]));
-            Ok((ResponseCode::Ok, h))
-        } else {
-            // Otherwise, it's a multi-packet response.
-            let h = Header::Body(next_chunk.expect("more than one chunk"));
-            Ok((ResponseCode::Continue, h))
-        }
+        Ok(responses)
     }
 }
 
@@ -156,7 +166,9 @@ enum State {
     /// The response phase (`State::Response { .. }`) is started by calling
     /// `GetOperation::start_response_phase` which indicates whether the profile application has
     /// accepted or rejected the GET request.
-    RequestPhaseComplete,
+    /// `include_srm` is Some<T> if the peer requested SRM on the final request packet (GetFinal),
+    /// None otherwise. If set, it will be included in the first data response.
+    RequestPhaseComplete { include_srm: Option<SingleResponseMode> },
     /// The profile application has accepted the GET request.
     /// The response phase of the operation in which the local OBEX server sends the payload over
     /// potentially multiple packets.
@@ -171,20 +183,32 @@ pub struct GetOperation {
     /// The maximum number of bytes that can be allocated to headers in the GetOperation. This
     /// includes informational headers and data headers.
     max_headers_size: u16,
+    /// Whether SRM is locally supported or not.
+    srm_supported: bool,
+    /// The current SRM status for this operation. This is None if it has not been negotiated
+    /// and Some<T> when negotiated.
+    /// Defaults to disabled if never negotiated.
+    srm: Option<SingleResponseMode>,
+    /// Current state of the GET operation.
     state: State,
 }
 
 impl GetOperation {
     /// `max_packet_size` is the max number of bytes that can fit in a single packet.
-    pub fn new(max_packet_size: u16) -> Self {
+    pub fn new(max_packet_size: u16, srm_supported: bool) -> Self {
         let max_headers_size = max_packet_size - ResponsePacket::MIN_PACKET_SIZE as u16;
-        Self { max_headers_size, state: State::Request { headers: HeaderSet::new() } }
+        Self {
+            max_headers_size,
+            srm_supported,
+            srm: None,
+            state: State::Request { headers: HeaderSet::new() },
+        }
     }
 
     #[cfg(test)]
     fn new_at_state(max_packet_size: u16, state: State) -> Self {
         let max_headers_size = max_packet_size - ResponsePacket::MIN_PACKET_SIZE as u16;
-        Self { max_headers_size, state }
+        Self { max_headers_size, srm_supported: false, srm: None, state }
     }
 
     fn check_complete_and_update_state(&mut self) {
@@ -197,31 +221,69 @@ impl GetOperation {
 }
 
 impl ServerOperation for GetOperation {
+    fn srm_status(&self) -> SingleResponseMode {
+        // Defaults to disabled if SRM has not been negotiated.
+        self.srm.unwrap_or(SingleResponseMode::Disable)
+    }
+
     fn is_complete(&self) -> bool {
         matches!(self.state, State::Complete)
     }
 
     fn handle_peer_request(&mut self, request: RequestPacket) -> Result<OperationRequest, Error> {
         let code = *request.code();
+        // The current SRM mode before processing the peer's `request`, which can contain a SRM
+        // request. If SRM is not negotiated, or negotiation is in progress, this will default to
+        // `Disable` since SRM is not considered active.
+        let current_srm_mode = self.srm_status();
         match &mut self.state {
             State::Request { ref mut headers } if code == OpCode::Get => {
                 headers.try_append(HeaderSet::from(request))?;
-                let response = ResponsePacket::new_get(ResponseCode::Continue, HeaderSet::new());
-                Ok(OperationRequest::SendPacket(response))
+                // The response to the `request` depends on the current SRM status.
+                // If SRM is enabled, then no response is needed.
+                // If SRM is disabled, then we must acknowledge the `request`.
+                // If SRM hasn't been negotiated yet, we check to see if the peer requests it
+                // and reply with the negotiated SRM header.
+                let response_headers = match self.srm {
+                    Some(SingleResponseMode::Enable) => return Ok(OperationRequest::None),
+                    Some(SingleResponseMode::Disable) => HeaderSet::new(),
+                    None => {
+                        // SRM hasn't been negotiated. Check if the peer is requesting it.
+                        self.srm = Self::check_headers_for_srm(self.srm_supported, &headers);
+                        // If SRM was just negotiated then we need to include it in the response.
+                        self.srm.as_ref().map_or(HeaderSet::new(), |srm| {
+                            HeaderSet::from_header(Header::SingleResponseMode(*srm))
+                        })
+                    }
+                };
+                let response = ResponsePacket::new_get(ResponseCode::Continue, response_headers);
+                Ok(OperationRequest::SendPackets(vec![response]))
             }
             State::Request { ref mut headers } if code == OpCode::GetFinal => {
                 headers.try_append(HeaderSet::from(request))?;
+                // Update the current SRM status if it hasn't been negotiated yet.
+                let include_srm = if self.srm.is_none() {
+                    self.srm = Self::check_headers_for_srm(self.srm_supported, &headers);
+                    self.srm
+                } else {
+                    None
+                };
+
                 let request_headers = std::mem::replace(headers, HeaderSet::new());
-                // Received the final request packet. The set of request headers is considered
-                // complete and we are ready to ask the application for the payload.
-                self.state = State::RequestPhaseComplete;
+                // This is the final request packet. The set of request headers is considered
+                // complete and we are ready to get the payload from the application. Stage the
+                // potential SRM response header if it was just negotiated.
+                self.state = State::RequestPhaseComplete { include_srm };
                 Ok(OperationRequest::GetApplicationData(request_headers))
             }
             State::Response { ref mut staged_data } if code == OpCode::GetFinal => {
-                let (code, body_header) = staged_data.next_response()?;
-                let response = ResponsePacket::new_get(code, HeaderSet::from_header(body_header));
+                let responses = if current_srm_mode == SingleResponseMode::Enable {
+                    staged_data.all_responses(HeaderSet::new())?
+                } else {
+                    vec![staged_data.next_response(HeaderSet::new())?]
+                };
                 self.check_complete_and_update_state();
-                Ok(OperationRequest::SendPacket(response))
+                Ok(OperationRequest::SendPackets(responses))
             }
             _ => Err(Error::operation(OpCode::Get, "received invalid request")),
         }
@@ -230,28 +292,55 @@ impl ServerOperation for GetOperation {
     fn handle_application_response(
         &mut self,
         response: Result<ApplicationResponse, ObexOperationError>,
-    ) -> Result<ResponsePacket, Error> {
-        if !matches!(self.state, State::RequestPhaseComplete) {
+    ) -> Result<Vec<ResponsePacket>, Error> {
+        let State::RequestPhaseComplete { include_srm } = self.state else {
             return Err(Error::operation(OpCode::Get, "invalid state"));
-        }
+        };
 
-        let response = match response {
-            Ok(ApplicationResponse::Get((data, mut response_headers))) => {
-                // Potentially split the user data payload into chunks to be sent over multiple response
-                // packets. Grab the first packet and stage the rest.
+        let responses = match response {
+            Ok(ApplicationResponse::Get((data, response_headers))) => {
+                // If SRM was just negotiated, then the first packet will contain the SRM response.
+                let srm_packet = include_srm.map(|srm| {
+                    ResponsePacket::new_get(
+                        ResponseCode::Continue,
+                        HeaderSet::from_header(srm.into()),
+                    )
+                });
+
+                // Potentially split the user data payload into chunks to be sent over multiple
+                // response packets.
                 let mut staged_data = StagedData::from_data(
                     data,
                     self.max_headers_size,
                     response_headers.encoded_len(),
                 )?;
-                let (code, body_header) = staged_data.first_response()?;
-                self.state = State::Response { staged_data };
 
-                // Update the header set and build the response packet.
-                if let Some(header) = body_header {
-                    response_headers.add(header)?;
-                }
-                ResponsePacket::new_get(code, response_headers)
+                let responses = match (self.srm_status(), srm_packet) {
+                    (SingleResponseMode::Enable, Some(packet)) => {
+                        // If SRM was just enabled, then the first packet will only be the SRM
+                        // response. The remaining packets will contain the data & informational
+                        // headers.
+                        let mut packets = vec![packet];
+                        packets.append(&mut staged_data.all_responses(response_headers)?);
+                        packets
+                    }
+                    (SingleResponseMode::Disable, Some(packet)) => {
+                        // If SRM was just disabled, then the first packet will only be the SRM
+                        // response. The peer will make subsequent requests to get the data.
+                        vec![packet]
+                    }
+                    (SingleResponseMode::Enable, None) => {
+                        // SRM is enabled so all packets will be returned.
+                        staged_data.all_responses(response_headers)?
+                    }
+                    (SingleResponseMode::Disable, None) => {
+                        // SRM is disabled, so only the next packet will be returned.
+                        vec![staged_data.next_response(response_headers)?]
+                    }
+                };
+
+                self.state = State::Response { staged_data };
+                responses
             }
             Ok(ApplicationResponse::Put) => {
                 return Err(Error::operation(
@@ -262,12 +351,12 @@ impl ServerOperation for GetOperation {
             Err((code, response_headers)) => {
                 trace!("Application rejected GET request: {code:?}");
                 self.state = State::Response { staged_data: StagedData::empty() };
-                ResponsePacket::new_get(code, response_headers)
+                vec![ResponsePacket::new_get(code, response_headers)]
             }
         };
 
         self.check_complete_and_update_state();
-        Ok(response)
+        Ok(responses)
     }
 }
 
@@ -277,7 +366,9 @@ mod tests {
 
     use assert_matches::assert_matches;
 
+    use crate::header::header_set::{expect_body, expect_end_of_body};
     use crate::header::HeaderIdentifier;
+    use crate::server::test_utils::expect_single_packet;
 
     fn bytes(start_idx: usize, end_idx: usize) -> Vec<u8> {
         // NOTE: In practice this can result in unexpected behavior if `start_idx` and `end_idx`
@@ -287,27 +378,26 @@ mod tests {
         (s..e).collect::<Vec<u8>>()
     }
 
+    /// Expects a single outgoing response packet with the `expected_code` and `expected_body`.
     #[track_caller]
     fn expect_packet_with_body(
         operation_request: OperationRequest,
-        final_: bool,
         expected_code: ResponseCode,
         expected_body: Vec<u8>,
     ) {
-        let body = if let OperationRequest::SendPacket(packet) = operation_request {
-            assert_eq!(*packet.code(), expected_code);
-            let mut h = HeaderSet::from(packet);
-            h.remove_body(final_).expect("contains body")
+        let packet = expect_single_packet(operation_request);
+        assert_eq!(*packet.code(), expected_code);
+        if expected_code == ResponseCode::Ok {
+            expect_end_of_body(packet.headers(), expected_body);
         } else {
-            panic!("Expected send packet, got: {:?}", operation_request);
-        };
-        assert_eq!(body, expected_body);
+            expect_body(packet.headers(), expected_body);
+        }
     }
 
     #[fuchsia::test]
     fn single_packet_get_operation() {
         let max_packet_size = 50;
-        let mut operation = GetOperation::new(max_packet_size);
+        let mut operation = GetOperation::new(max_packet_size, false);
         assert!(!operation.is_complete());
 
         // First (and final) request with informational headers.
@@ -322,27 +412,27 @@ mod tests {
         // Application provides the payload. Since the entire payload can fit in a single packet,
         // we expect the operation to be complete after it is returned.
         let payload = bytes(0, 25);
-        let response2 = operation
+        let mut responses2 = operation
             .handle_application_response(ApplicationResponse::accept_get(payload, HeaderSet::new()))
-            .expect("valid request");
+            .expect("valid response");
+        let response2 = responses2.pop().expect("one response");
         assert_eq!(*response2.code(), ResponseCode::Ok);
-        let mut received_headers = HeaderSet::from(response2);
-        let received_body = received_headers.remove_body(/*final_=*/ true).expect("contains body");
-        assert_eq!(received_body, bytes(0, 25));
+        expect_end_of_body(response2.headers(), bytes(0, 25));
         assert!(operation.is_complete());
     }
 
     #[fuchsia::test]
     fn multi_packet_get_operation() {
         let max_packet_size = 50;
-        let mut operation = GetOperation::new(max_packet_size);
+        let mut operation = GetOperation::new(max_packet_size, false);
         assert!(!operation.is_complete());
 
         // First request provides informational headers. Expect a positive ack to the request.
         let headers1 = HeaderSet::from_header(Header::name("foo".into()));
         let request1 = RequestPacket::new_get(headers1);
         let response1 = operation.handle_peer_request(request1).expect("valid request");
-        assert_matches!(response1, OperationRequest::SendPacket(packet) if *packet.code() == ResponseCode::Continue);
+        let response_packet1 = expect_single_packet(response1);
+        assert_eq!(*response_packet1.code(), ResponseCode::Continue);
 
         // Second and final request provides informational headers. Expect to ask the profile
         // application for the user data payload. The received informational headers should be
@@ -363,46 +453,194 @@ mod tests {
         // first chunk of user data, of which 6 bytes are allocated to the prefix.
         let payload = bytes(0, 200);
         let response_headers = HeaderSet::from_header(Header::Description("random payload".into()));
-        let response_packet3 = operation
+        let mut response_packets3 = operation
             .handle_application_response(ApplicationResponse::accept_get(payload, response_headers))
-            .expect("valid request");
+            .expect("valid response");
+        let response_packet3 = response_packets3.pop().expect("one response");
         assert_eq!(*response_packet3.code(), ResponseCode::Continue);
-        let mut received_headers = HeaderSet::from(response_packet3);
-        assert!(received_headers.contains_header(&HeaderIdentifier::Description));
-        let received_body = received_headers.remove_body(/*final_=*/ false).expect("contains body");
-        assert_eq!(received_body, bytes(0, 11));
+        expect_body(response_packet3.headers(), bytes(0, 11));
 
         // Peer will keep asking for payload until finished.
         // Each data chunk will be 44 bytes long (max 50 - 3 bytes for response prefix - 3 bytes for
         // header prefix)
-        let expected_bytes = vec![bytes(11, 55), bytes(55, 99), bytes(99, 143), bytes(143, 187)];
-        for expected in expected_bytes {
+        let expected_bytes =
+            vec![bytes(11, 55), bytes(55, 99), bytes(99, 143), bytes(143, 187), bytes(187, 200)];
+        for (i, expected) in expected_bytes.into_iter().enumerate() {
+            let expected_code = if i == 4 { ResponseCode::Ok } else { ResponseCode::Continue };
             let request = RequestPacket::new_get_final(HeaderSet::new());
             let response = operation.handle_peer_request(request).expect("valid request");
-            expect_packet_with_body(
-                response,
-                /*final_=*/ false,
-                ResponseCode::Continue,
-                expected,
-            );
+            expect_packet_with_body(response, expected_code, expected);
+        }
+        assert!(operation.is_complete());
+    }
+
+    #[fuchsia::test]
+    fn multi_packet_get_operation_srm_enabled() {
+        let max_packet_size = 50;
+        let mut operation = GetOperation::new(max_packet_size, true);
+        assert!(!operation.is_complete());
+        assert_eq!(operation.srm_status(), SingleResponseMode::Disable);
+
+        // First request provides a Name and SRM enable request. Expect to reply positively and
+        // enable SRM.
+        let headers1 = HeaderSet::from_headers(vec![
+            Header::name("foo".into()),
+            SingleResponseMode::Enable.into(),
+        ])
+        .unwrap();
+        let request1 = RequestPacket::new_get(headers1);
+        let response1 = operation.handle_peer_request(request1).expect("valid request");
+        let response_packet1 = expect_single_packet(response1);
+        assert_eq!(*response_packet1.code(), ResponseCode::Continue);
+        assert!(response_packet1.headers().contains_header(&HeaderIdentifier::SingleResponseMode));
+        assert_eq!(operation.srm_status(), SingleResponseMode::Enable);
+
+        // Second (non-final) request provides another header. Don't expect to respond since SRM is
+        // enabled.
+        let headers2 = HeaderSet::from_header(Header::Description("random payload".into()));
+        let request2 = RequestPacket::new_get(headers2);
+        let response2 = operation.handle_peer_request(request2).expect("valid request");
+        assert_matches!(response2, OperationRequest::None);
+
+        // Third and final request provides a Type header - the request phase is considered complete
+        // Expect to ask the profile application for the user data payload.
+        let headers3 = HeaderSet::from_header(Header::Type("text/x-vCard".into()));
+        let request3 = RequestPacket::new_get_final(headers3);
+        let response3 = operation.handle_peer_request(request3).expect("valid request");
+        assert_matches!(response3,
+            OperationRequest::GetApplicationData(headers)
+            if headers.contains_header(&HeaderIdentifier::Name)
+            && headers.contains_header(&HeaderIdentifier::Type)
+            && headers.contains_header(&HeaderIdentifier::Description)
+        );
+
+        // After getting the payload from the application, we expect to send _all_ of the packets
+        // subsequently, since SRM is enabled. We expect 4 packets in total due to `max_packet_size`
+        // limitations.
+        let payload = bytes(0, 100);
+        let response_headers = HeaderSet::from_header(Header::Description("random payload".into()));
+        let response_packets = operation
+            .handle_application_response(ApplicationResponse::accept_get(payload, response_headers))
+            .expect("valid response");
+        assert_eq!(response_packets.len(), 4);
+        // First packet is special as it contains informational headers & data. `response_headers`
+        // takes up 39 bytes when encoded, so only 11 bytes of user data can fit in the packet.
+        assert_eq!(*response_packets[0].code(), ResponseCode::Continue);
+        expect_body(response_packets[0].headers(), bytes(0, 11));
+
+        // Each subsequent data chunk will be 44 bytes long (max 50 - 3 bytes for response prefix
+        // - 3 bytes for header prefix).
+        let expected_bytes = [bytes(11, 55), bytes(55, 99), bytes(99, 100)];
+        for (i, expected) in expected_bytes.into_iter().enumerate() {
+            // Skip the first packet since it's validated outside of the loop.
+            let idx = i + 1;
+            // Last packet has a code of `Ok`.
+            let expected_code = if idx == 3 { ResponseCode::Ok } else { ResponseCode::Continue };
+            assert_eq!(*response_packets[idx].code(), expected_code);
+            if expected_code == ResponseCode::Ok {
+                expect_end_of_body(response_packets[idx].headers(), expected);
+            } else {
+                expect_body(response_packets[idx].headers(), expected);
+            }
         }
 
-        // Final packet and the operation is complete.
-        let request4 = RequestPacket::new_get_final(HeaderSet::new());
-        let response4 = operation.handle_peer_request(request4).expect("valid request");
-        expect_packet_with_body(response4, /*final=*/ true, ResponseCode::Ok, bytes(187, 200));
+        // The operation is considered complete after this.
+        assert!(operation.is_complete());
+    }
+
+    // While unusual, it's valid for the peer to request SRM on the GetFinal packet. We should
+    // handle this and send the remaining data chunks after the first response.
+    #[fuchsia::test]
+    fn srm_enable_request_during_get_final_success() {
+        let max_packet_size = 50;
+        let mut operation = GetOperation::new(max_packet_size, true);
+
+        // First (and final) request contains a SRM enable request. Expect to get the data from
+        // the application and respond.
+        let headers1 = HeaderSet::from_header(SingleResponseMode::Enable.into());
+        let request1 = RequestPacket::new_get_final(headers1);
+        let response1 = operation.handle_peer_request(request1).expect("valid request");
+        assert_matches!(response1, OperationRequest::GetApplicationData(_));
+        assert!(!operation.is_complete());
+
+        // Because SRM was just requested, the first response packet should contain the SRM accept
+        // response. Subsequent packets will contain the data.
+        let payload = bytes(0, 90);
+        let response_headers = HeaderSet::from_header(Header::Description("random payload".into()));
+        let response_packets = operation
+            .handle_application_response(ApplicationResponse::accept_get(payload, response_headers))
+            .expect("valid response");
+        assert_eq!(response_packets.len(), 4);
+        assert_eq!(*response_packets[0].code(), ResponseCode::Continue);
+        assert!(response_packets[0]
+            .headers()
+            .contains_header(&HeaderIdentifier::SingleResponseMode));
+        // Shouldn't contain the Body or Description, yet.
+        assert!(!response_packets[0].headers().contains_header(&HeaderIdentifier::Description));
+        assert!(!response_packets[0].headers().contains_header(&HeaderIdentifier::Body));
+        assert_eq!(operation.srm_status(), SingleResponseMode::Enable);
+
+        // Each chunk can hold max (50) - 6 bytes (prefix) = 44 bytes of user data.
+        // The first chunk of data also contains the Description header (39 bytes), so there is only
+        // 12 bytes of data.
+        assert!(response_packets[1].headers().contains_header(&HeaderIdentifier::Description));
+        expect_body(response_packets[1].headers(), bytes(0, 11));
+        expect_body(response_packets[2].headers(), bytes(11, 55));
+        expect_end_of_body(response_packets[3].headers(), bytes(55, 90));
+        assert!(operation.is_complete());
+    }
+
+    #[fuchsia::test]
+    fn srm_disable_request_during_get_final_success() {
+        let max_packet_size = 50;
+        let mut operation = GetOperation::new(max_packet_size, false);
+
+        // First (and final) request contains a SRM enable request. Expect to get the data from
+        // the application and respond.
+        let headers1 = HeaderSet::from_header(SingleResponseMode::Enable.into());
+        let request1 = RequestPacket::new_get_final(headers1);
+        let response1 = operation.handle_peer_request(request1).expect("valid request");
+        assert_matches!(response1, OperationRequest::GetApplicationData(_));
+        assert!(!operation.is_complete());
+
+        // Because SRM was just requested and we don't support it, the first packet should only
+        // contain the negative response - SRM should be disabled for this operation.
+        let payload = bytes(0, 90);
+        let response_packets = operation
+            .handle_application_response(ApplicationResponse::accept_get(payload, HeaderSet::new()))
+            .expect("valid response");
+        assert_eq!(response_packets.len(), 1);
+        assert_eq!(*response_packets[0].code(), ResponseCode::Continue);
+        let received_srm = response_packets[0]
+            .headers()
+            .get(&HeaderIdentifier::SingleResponseMode)
+            .expect("contains SRM");
+        assert_eq!(*received_srm, Header::SingleResponseMode(SingleResponseMode::Disable));
+        // Shouldn't contain the Body in the first packet.
+        assert!(!response_packets[0].headers().contains_header(&HeaderIdentifier::Body));
+        assert_eq!(operation.srm_status(), SingleResponseMode::Disable);
+
+        // Because SRM is disabled, the peeer should issue GETFINAL requests for each data chunk.
+        let expected_bytes = vec![bytes(0, 44), bytes(44, 88), bytes(88, 90)];
+        for (i, expected) in expected_bytes.into_iter().enumerate() {
+            let expected_code = if i == 2 { ResponseCode::Ok } else { ResponseCode::Continue };
+            let request2 = RequestPacket::new_get_final(HeaderSet::new());
+            let response2 = operation.handle_peer_request(request2).expect("valid request");
+            expect_packet_with_body(response2, expected_code, expected);
+        }
         assert!(operation.is_complete());
     }
 
     #[fuchsia::test]
     fn application_rejects_request_success() {
-        let mut operation = GetOperation::new_at_state(10, State::RequestPhaseComplete);
+        let mut operation =
+            GetOperation::new_at_state(10, State::RequestPhaseComplete { include_srm: None });
         let headers = HeaderSet::from_header(Header::Description("not allowed today".into()));
-        let response_packet = operation
+        let response_packets = operation
             .handle_application_response(Err((ResponseCode::Forbidden, headers)))
             .expect("rejection is ok");
-        assert_eq!(*response_packet.code(), ResponseCode::Forbidden);
-        assert!(response_packet.headers().contains_header(&HeaderIdentifier::Description));
+        assert_eq!(*response_packets[0].code(), ResponseCode::Forbidden);
+        assert!(response_packets[0].headers().contains_header(&HeaderIdentifier::Description));
         assert!(operation.is_complete());
     }
 
@@ -410,7 +648,7 @@ mod tests {
     fn handle_application_response_error() {
         let max_packet_size = 15;
         // Receiving the application response before the request phase is complete is an Error.
-        let mut operation = GetOperation::new(max_packet_size);
+        let mut operation = GetOperation::new(max_packet_size, false);
         let data = vec![1, 2, 3];
         assert_matches!(
             operation.handle_application_response(ApplicationResponse::accept_get(
@@ -423,7 +661,7 @@ mod tests {
 
     #[fuchsia::test]
     fn non_get_request_is_error() {
-        let mut operation = GetOperation::new(50);
+        let mut operation = GetOperation::new(50, false);
         let random_request1 = RequestPacket::new_put(HeaderSet::new());
         assert_matches!(
             operation.handle_peer_request(random_request1),
@@ -443,7 +681,8 @@ mod tests {
 
         // Receiving another GET request while we are waiting for the application to accept is an
         // Error.
-        let mut operation1 = GetOperation::new_at_state(10, State::RequestPhaseComplete);
+        let mut operation1 =
+            GetOperation::new_at_state(10, State::RequestPhaseComplete { include_srm: None });
         let request1 = RequestPacket::new_get(random_headers.clone());
         let response1 = operation1.handle_peer_request(request1);
         assert_matches!(response1, Err(Error::OperationError { .. }));
@@ -529,12 +768,14 @@ mod tests {
     #[fuchsia::test]
     fn empty_staged_data_success() {
         let empty = Vec::new();
-        let mut staged = StagedData::from_data(empty.clone(), 50, 0).expect("can construct");
+        let empty_headers = HeaderSet::new();
+        let mut staged = StagedData::from_data(empty.clone(), 50, empty_headers.encoded_len())
+            .expect("can construct");
         assert!(staged.is_first_response());
         assert!(!staged.is_complete());
-        let (c, h) = staged.first_response().expect("has first response");
-        assert_eq!(c, ResponseCode::Ok);
-        assert_matches!(h, Some(Header::EndOfBody(v)) if v == empty);
+        let response = staged.next_response(empty_headers).expect("has first response");
+        assert_eq!(*response.code(), ResponseCode::Ok);
+        expect_end_of_body(response.headers(), vec![]);
         assert!(!staged.is_first_response());
         assert!(staged.is_complete());
     }
@@ -542,10 +783,12 @@ mod tests {
     #[fuchsia::test]
     fn single_packet_staged_data_success() {
         let single = vec![1, 2, 3];
-        let mut staged = StagedData::from_data(single.clone(), 50, 0).expect("can construct");
-        let (c, h) = staged.first_response().expect("has first response");
-        assert_eq!(c, ResponseCode::Ok);
-        assert_matches!(h, Some(Header::EndOfBody(v)) if v == single);
+        let empty_headers = HeaderSet::new();
+        let mut staged = StagedData::from_data(single.clone(), 50, empty_headers.encoded_len())
+            .expect("can construct");
+        let response = staged.next_response(empty_headers).expect("has first response");
+        assert_eq!(*response.code(), ResponseCode::Ok);
+        expect_end_of_body(response.headers(), single);
         assert!(staged.is_complete());
     }
 
@@ -553,52 +796,39 @@ mod tests {
     fn multi_packet_staged_data_success() {
         let max_packet_size = 10;
         let large_data = (0..30).collect::<Vec<u8>>();
-        let header_size = 8;
-        let mut staged =
-            StagedData::from_data(large_data, max_packet_size, header_size).expect("can construct");
-        let (c, h) = staged.first_response().expect("has first response");
-        assert_eq!(c, ResponseCode::Continue);
+        let headers = HeaderSet::from_header(Header::Who(vec![1, 2, 3, 4, 5]));
+        let mut staged = StagedData::from_data(large_data, max_packet_size, headers.encoded_len())
+            .expect("can construct");
+        let response1 = staged.next_response(headers).expect("has first response");
+        assert_eq!(*response1.code(), ResponseCode::Continue);
         // First buffer has no user data since it can't fit with headers.
-        assert_matches!(h, None);
+        assert!(response1.headers().contains_header(&HeaderIdentifier::Who));
+        assert!(!response1.headers().contains_header(&HeaderIdentifier::Body));
         assert!(!staged.is_complete());
 
         // Each next chunk should contain 7 bytes each since the max is 10 and 3 bytes are
         // reserved for the header prefix.
         let expected_bytes = vec![bytes(0, 7), bytes(7, 14), bytes(14, 21), bytes(21, 28)];
         for expected in expected_bytes {
-            let (c, h) = staged.next_response().expect("has next response");
-            assert_eq!(c, ResponseCode::Continue);
-            assert_matches!(h, Header::Body(v) if v == expected);
+            let r = staged.next_response(HeaderSet::new()).expect("has next response");
+            assert_eq!(*r.code(), ResponseCode::Continue);
+            expect_body(r.headers(), expected);
         }
 
         // Final chunk has the remaining bits and an Ok response code to signal completion.
-        let (c, h) = staged.next_response().expect("has next response");
-        assert_eq!(c, ResponseCode::Ok);
+        let final_response = staged.next_response(HeaderSet::new()).expect("has next response");
+        assert_eq!(*final_response.code(), ResponseCode::Ok);
         let expected = bytes(28, 30);
-        assert_matches!(h, Header::EndOfBody(v) if v == expected);
+        expect_end_of_body(final_response.headers(), expected);
         assert!(staged.is_complete());
     }
 
     #[fuchsia::test]
     fn staged_data_response_error() {
-        // Calling `first_response` twice is Error.
-        let mut staged = StagedData::new(None, VecDeque::from(vec![vec![1]]));
-        let _ = staged.first_response().expect("has first response");
-        assert!(!staged.is_complete());
-        assert_matches!(staged.first_response(), Err(Error::OperationError { .. }));
-
-        // Calling `first_response` when the operation is considered complete is Error.
-        let mut staged_no_data = StagedData::new(None, VecDeque::new());
-        let _ = staged_no_data.first_response().expect("has first response");
-        assert!(staged_no_data.is_complete());
-        assert_matches!(staged_no_data.first_response(), Err(Error::OperationError { .. }));
-
-        // Calling `next_response` before `first_response` is Error.
-        let mut staged = StagedData::new(None, VecDeque::new());
-        assert_matches!(staged.next_response(), Err(Error::OperationError { .. }));
         // Calling `next_response` when complete is Error.
-        let _ = staged.first_response().expect("has first response");
+        let mut staged = StagedData::new(None, VecDeque::new());
+        let _ = staged.next_response(HeaderSet::new()).expect("has first response");
         assert!(staged.is_complete());
-        assert_matches!(staged.next_response(), Err(Error::OperationError { .. }));
+        assert_matches!(staged.next_response(HeaderSet::new()), Err(Error::OperationError { .. }));
     }
 }

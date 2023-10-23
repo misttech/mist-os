@@ -231,6 +231,24 @@ impl Decodable for HeaderSet {
 }
 
 #[cfg(test)]
+#[track_caller]
+pub fn expect_body(headers: &HeaderSet, expected: Vec<u8>) {
+    match headers.get(&HeaderIdentifier::Body).expect("contains body") {
+        Header::Body(v) => assert_eq!(v, &expected),
+        x => panic!("Expected body, got: {x:?}"),
+    }
+}
+
+#[cfg(test)]
+#[track_caller]
+pub fn expect_end_of_body(headers: &HeaderSet, expected: Vec<u8>) {
+    match headers.get(&HeaderIdentifier::EndOfBody).expect("contains end of body") {
+        Header::EndOfBody(v) => assert_eq!(v, &expected),
+        x => panic!("Expected end of body, got: {x:?}"),
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
 

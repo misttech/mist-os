@@ -26,7 +26,7 @@ pub enum TransportType {
 }
 
 impl TransportType {
-    fn srm_supported(&self) -> bool {
+    pub fn srm_supported(&self) -> bool {
         match &self {
             // Per GOEP Section 7.1, SRM can be used with the L2CAP transport.
             Self::L2cap => true,
