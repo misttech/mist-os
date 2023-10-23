@@ -176,7 +176,7 @@ pub struct FilterConfig {
 
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "lowercase")]
-enum InterfaceType {
+pub enum InterfaceType {
     Ethernet,
     Wlan,
 }
@@ -4506,10 +4506,12 @@ mod tests {
   "forwarded_device_classes": { "ipv4": [ "ethernet" ], "ipv6": [ "wlan" ] },
   "install_only": false,
   "interface_name_prefix": "hello",
-  "interface_naming_policy": [{
-    "matchers": [ { "bus_types": ["usb"] } ],
-    "naming_scheme": []
-  }]
+  "interface_naming_policy": [ { "matchers": [
+        {"bus_types": ["usb", "pci", "sdio"]},
+        {"device_classes": ["ethernet", "wlan", "wlanap"]}
+    ],
+        "naming_scheme": []
+    } ]
 }
 "#;
 
@@ -4560,9 +4562,18 @@ mod tests {
         assert_eq!(interface_name_prefix, "hello".to_string());
 
         let expected_naming_policy = Vec::from([interface::NamingRule {
-            matchers: HashSet::from([interface::MatchingRule::BusTypes(vec![
-                interface::BusType::USB,
-            ])]),
+            matchers: HashSet::from([
+                interface::MatchingRule::BusTypes(vec![
+                    interface::BusType::USB,
+                    interface::BusType::PCI,
+                    interface::BusType::SDIO,
+                ]),
+                interface::MatchingRule::DeviceClasses(vec![
+                    DeviceClass::Ethernet,
+                    DeviceClass::Wlan,
+                    DeviceClass::WlanAp,
+                ]),
+            ]),
             naming_scheme: Vec::new(),
         }]);
         assert_eq!(interface_naming_policy, expected_naming_policy);
@@ -4796,6 +4807,40 @@ mod tests {
   "forwarded_device_classes": { "ipv4": [], "ipv6": [] },
   "interface_naming_policy": [{
     "matchers": [ { "speling": [] } ],
+    "naming_scheme": []
+  }]
+}
+"#,
+            r#"
+{
+  "dns_config": { "servers": [] },
+  "filter_config": {
+    "rules": [],
+    "nat_rules": [],
+    "rdr_rules": []
+  },
+  "filter_enabled_interface_types": [],
+  "allowed_upstream_device_classes": [],
+  "forwarded_device_classes": { "ipv4": [], "ipv6": [] },
+  "interface_naming_policy": [{
+    "matchers": [ { "bus_types": ["speling"] } ],
+    "naming_scheme": []
+  }]
+}
+"#,
+            r#"
+{
+  "dns_config": { "servers": [] },
+  "filter_config": {
+    "rules": [],
+    "nat_rules": [],
+    "rdr_rules": []
+  },
+  "filter_enabled_interface_types": [],
+  "allowed_upstream_device_classes": [],
+  "forwarded_device_classes": { "ipv4": [], "ipv6": [] },
+  "interface_naming_policy": [{
+    "matchers": [ { "device_classes": ["speling"] } ],
     "naming_scheme": []
   }]
 }

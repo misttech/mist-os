@@ -10,7 +10,7 @@ use {
     std::{fs, io, path},
 };
 
-use crate::devices;
+use crate::{devices, DeviceClass};
 
 const INTERFACE_PREFIX_WLAN: &str = "wlan";
 const INTERFACE_PREFIX_ETHERNET: &str = "eth";
@@ -372,7 +372,7 @@ pub enum BusType {
     SDIO,
 }
 
-// Extract the BusType for a device given the topological path.
+// Extract the `BusType` for a device given the topological path.
 fn get_bus_type_for_topological_path(topological_path: &str) -> Result<BusType, anyhow::Error> {
     if topological_path.contains("/PCI0") {
         // A USB bus will require a bridge over a PCI controller, so a
@@ -398,6 +398,7 @@ fn get_bus_type_for_topological_path(topological_path: &str) -> Result<BusType, 
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum MatchingRule {
     BusTypes(Vec<BusType>),
+    DeviceClasses(Vec<DeviceClass>),
 }
 
 impl MatchingRule {
@@ -411,6 +412,11 @@ impl MatchingRule {
                 // matches any of the types included in the list.
                 let bus_type = get_bus_type_for_topological_path(&info.topological_path)?;
                 Ok(type_list.contains(&bus_type))
+            }
+            MatchingRule::DeviceClasses(class_list) => {
+                // Match the interface if the interface under comparison
+                // matches any of the types included in the list.
+                Ok(class_list.contains(&info.device_class.into()))
             }
         }
     }
@@ -818,11 +824,11 @@ mod tests {
         ) in test_cases.into_iter().enumerate()
         {
             let device_info = devices::DeviceInfo {
+                topological_path: topological_path.to_owned(),
                 // `device_class` and `mac` have no effect on `BusType`
                 // matching, so we use arbitrary values.
                 device_class: fhwnet::DeviceClass::Virtual,
                 mac: Default::default(),
-                topological_path: topological_path.to_owned(),
             };
 
             // Verify the `BusType` determined from the device's
@@ -859,5 +865,94 @@ mod tests {
         let matching_rule = MatchingRule::BusTypes(vec![BusType::USB, BusType::PCI, BusType::SDIO]);
         let interface_match_res = matching_rule.does_interface_match(&device_info);
         assert!(interface_match_res.is_err());
+    }
+
+    #[test]
+    fn test_interface_matching_by_device_class() {
+        #[derive(Clone)]
+        struct MatchDeviceClassTestCase {
+            device_class_input: fhwnet::DeviceClass,
+            device_classes: Vec<DeviceClass>,
+            expected_device_class: DeviceClass,
+            want_match: bool,
+        }
+
+        let test_cases = vec![
+            // Base case for Ethernet.
+            MatchDeviceClassTestCase {
+                device_class_input: fhwnet::DeviceClass::Ethernet,
+                device_classes: vec![DeviceClass::Ethernet],
+                expected_device_class: DeviceClass::Ethernet,
+                want_match: true,
+            },
+            // Same fhwnet::DeviceClass as the base case for Ethernet, but with
+            // non-matching device classes.
+            MatchDeviceClassTestCase {
+                device_class_input: fhwnet::DeviceClass::Ethernet,
+                device_classes: vec![DeviceClass::Wlan, DeviceClass::WlanAp],
+                expected_device_class: DeviceClass::Ethernet,
+                want_match: false,
+            },
+            // Base case for Wlan.
+            MatchDeviceClassTestCase {
+                device_class_input: fhwnet::DeviceClass::Wlan,
+                device_classes: vec![DeviceClass::Wlan],
+                expected_device_class: DeviceClass::Wlan,
+                want_match: true,
+            },
+            // Same fhwnet::DeviceClass as the base case for Wlan, but with
+            // non-matching device classes.
+            MatchDeviceClassTestCase {
+                device_class_input: fhwnet::DeviceClass::Wlan,
+                device_classes: vec![DeviceClass::Ethernet, DeviceClass::WlanAp],
+                expected_device_class: DeviceClass::Wlan,
+                want_match: false,
+            },
+            // Base case for Ap.
+            MatchDeviceClassTestCase {
+                device_class_input: fhwnet::DeviceClass::WlanAp,
+                device_classes: vec![DeviceClass::WlanAp],
+                expected_device_class: DeviceClass::WlanAp,
+                want_match: true,
+            },
+            // Same fhwnet::DeviceClass as the base case for Wlan, but with
+            // non-matching device classes. Ensure that Wlan is differentiated
+            // from Ap for interface matching.
+            MatchDeviceClassTestCase {
+                device_class_input: fhwnet::DeviceClass::WlanAp,
+                device_classes: vec![DeviceClass::Ethernet, DeviceClass::Wlan],
+                expected_device_class: DeviceClass::WlanAp,
+                want_match: false,
+            },
+        ];
+
+        for (
+            _i,
+            MatchDeviceClassTestCase {
+                device_class_input,
+                device_classes,
+                expected_device_class,
+                want_match,
+            },
+        ) in test_cases.into_iter().enumerate()
+        {
+            let device_info = devices::DeviceInfo {
+                device_class: device_class_input,
+                // `mac` and `topological_path` have no effect on `DeviceClass`
+                // matching for the provided test cases, so we use
+                // arbitrary values.
+                mac: Default::default(),
+                topological_path: Default::default(),
+            };
+
+            // Verify the `DeviceClass` determined from the device info.
+            let device_class: DeviceClass = device_info.device_class.into();
+            assert_eq!(device_class, expected_device_class);
+
+            // Create a matching rule for the provided `DeviceClass` list.
+            let matching_rule = MatchingRule::DeviceClasses(device_classes);
+            let does_interface_match = matching_rule.does_interface_match(&device_info).unwrap();
+            assert_eq!(does_interface_match, want_match);
+        }
     }
 }
