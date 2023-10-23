@@ -93,6 +93,43 @@ impl Socket {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+impl tokio::io::AsyncWrite for Socket {
+    fn poll_write(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+        buf: &[u8],
+    ) -> std::task::Poll<Result<usize, futures::io::Error>> {
+        futures::io::AsyncWrite::poll_write(self, cx, buf)
+    }
+
+    fn poll_flush(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Result<(), tokio::io::Error>> {
+        futures::io::AsyncWrite::poll_flush(self, cx)
+    }
+
+    fn poll_shutdown(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Result<(), tokio::io::Error>> {
+        futures::io::AsyncWrite::poll_close(self, cx)
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl tokio::io::AsyncRead for Socket {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut tokio::io::ReadBuf<'_>,
+    ) -> Poll<std::io::Result<()>> {
+        futures::io::AsyncRead::poll_read(self, cx, buf.initialize_unfilled())
+            .map(|value| value.map(|size| buf.advance(size)))
+    }
+}
+
 impl AsyncWrite for Socket {
     fn poll_write(
         self: Pin<&mut Self>,

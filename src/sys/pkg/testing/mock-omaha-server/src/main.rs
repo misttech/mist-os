@@ -97,7 +97,9 @@ impl tokio::io::AsyncRead for ConnectionStream {
     ) -> Poll<Result<(), std::io::Error>> {
         match &mut *self {
             ConnectionStream::Tcp(t) => Pin::new(t).poll_read(cx, buf.initialize_unfilled()),
-            ConnectionStream::Socket(t) => Pin::new(t).poll_read(cx, buf.initialize_unfilled()),
+            ConnectionStream::Socket(t) => {
+                futures::AsyncRead::poll_read(Pin::new(t), cx, buf.initialize_unfilled())
+            }
         }
         .map_ok(|sz| {
             buf.advance(sz);
@@ -113,14 +115,14 @@ impl tokio::io::AsyncWrite for ConnectionStream {
     ) -> Poll<io::Result<usize>> {
         match &mut *self {
             ConnectionStream::Tcp(t) => Pin::new(t).poll_write(cx, buf),
-            ConnectionStream::Socket(t) => Pin::new(t).poll_write(cx, buf),
+            ConnectionStream::Socket(t) => futures::AsyncWrite::poll_write(Pin::new(t), cx, buf),
         }
     }
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         match &mut *self {
             ConnectionStream::Tcp(t) => Pin::new(t).poll_flush(cx),
-            ConnectionStream::Socket(t) => Pin::new(t).poll_flush(cx),
+            ConnectionStream::Socket(t) => futures::AsyncWrite::poll_flush(Pin::new(t), cx),
         }
     }
 

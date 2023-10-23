@@ -47,7 +47,6 @@ rustc_library("lib") {
     "//third_party/rust_crates:futures-lite",
     "//third_party/rust_crates:itertools",
     "//third_party/rust_crates:nix",
-    "//third_party/rust_crates:pin-project",
     "//third_party/rust_crates:rand",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:socket2",

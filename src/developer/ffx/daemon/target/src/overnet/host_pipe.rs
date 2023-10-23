@@ -10,10 +10,7 @@ use ffx_daemon_core::events;
 use ffx_daemon_events::{HostPipeErr, TargetEvent};
 use ffx_ssh::ssh::build_ssh_command_with_ssh_path;
 use fuchsia_async::{unblock, Task, TimeoutExt, Timer};
-use futures::{
-    io::{ReadHalf, WriteHalf},
-    FutureExt,
-};
+use futures::FutureExt;
 use futures_lite::stream::StreamExt;
 use nix::{
     sys::{
@@ -22,22 +19,19 @@ use nix::{
     },
     unistd::Pid,
 };
-use pin_project::pin_project;
 use std::{
     cell::RefCell,
     collections::VecDeque,
     fmt, io,
     io::Write,
     net::SocketAddr,
-    pin::Pin,
     process::Stdio,
     rc::{Rc, Weak},
     sync::Arc,
-    task::Poll,
     time::Duration,
 };
 use tokio::{
-    io::{copy_buf, AsyncBufRead, AsyncRead, AsyncReadExt, AsyncWrite, BufReader, ReadBuf},
+    io::{copy_buf, AsyncBufRead, AsyncRead, AsyncReadExt, BufReader},
     process::Child,
 };
 
@@ -91,79 +85,6 @@ impl LogBuffer {
     pub fn clear(&self) {
         let mut buf = self.buf.borrow_mut();
         buf.truncate(0);
-    }
-}
-
-// TODO(b/287551486): Remove when Overnet is moved fully
-// to Tokio.
-/// Makes WriteHalf from Overnet work with Tokio.
-#[pin_project]
-struct ReadHalfWrapper<T> {
-    #[pin]
-    writer: ReadHalf<T>,
-}
-
-impl<T> ReadHalfWrapper<T> {
-    fn new(writer: ReadHalf<T>) -> Self {
-        ReadHalfWrapper { writer }
-    }
-}
-
-impl<T> AsyncRead for ReadHalfWrapper<T>
-where
-    T: futures::io::AsyncRead,
-{
-    fn poll_read(
-        self: Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-        buf: &mut ReadBuf<'_>,
-    ) -> Poll<io::Result<()>> {
-        let this = self.project();
-        futures::io::AsyncRead::poll_read(this.writer, cx, buf.initialize_unfilled())
-            .map(|value| value.map(|size| buf.advance(size)))
-    }
-}
-
-/// Makes WriteHalf from Overnet work with Tokio.
-#[pin_project]
-struct WriteHalfWrapper<T> {
-    #[pin]
-    writer: WriteHalf<T>,
-}
-
-impl<T> WriteHalfWrapper<T> {
-    fn new(writer: WriteHalf<T>) -> Self {
-        WriteHalfWrapper { writer }
-    }
-}
-
-impl<T> AsyncWrite for WriteHalfWrapper<T>
-where
-    T: futures::io::AsyncWrite,
-{
-    fn poll_write(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-        buf: &[u8],
-    ) -> std::task::Poll<Result<usize, io::Error>> {
-        let this = self.project();
-        futures::io::AsyncWrite::poll_write(this.writer, cx, buf)
-    }
-
-    fn poll_flush(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Result<(), io::Error>> {
-        let this = self.project();
-        futures::io::AsyncWrite::poll_flush(this.writer, cx)
-    }
-
-    fn poll_shutdown(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Result<(), io::Error>> {
-        let this = self.project();
-        futures::io::AsyncWrite::poll_close(this.writer, cx)
     }
 }
 
@@ -433,15 +354,12 @@ impl HostPipeChild {
 
         let mut error_message = String::from("");
 
-        let (pipe_rx, pipe_tx) = futures::AsyncReadExt::split(overnet_pipe(node).map_err(|e| {
+        let (pipe_rx, mut pipe_tx) = tokio::io::split(overnet_pipe(node).map_err(|e| {
             PipeError::PipeCreationFailed(
                 format!("creating local overnet pipe: {e}"),
                 addr.to_string(),
             )
         })?);
-
-        let mut pipe_tx = WriteHalfWrapper::new(pipe_tx);
-        let pipe_rx = ReadHalfWrapper::new(pipe_rx);
 
         let stdout = ssh
             .stdout
