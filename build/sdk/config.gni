@@ -16,28 +16,11 @@ declare_args() {
   # related artifacts.
   sdk_inside_supported_api_sub_build = false
 
-  # An upper bound on the maximum number of subbuilds that may be running at the
-  # same time. A larger number means these good things:
-  # - Better parallelization of the inherently single-threaded parts of GN and
-  #   ninja.
-  # - Better parallelization in the face of "stragglers" in the build -
-  #   situations where each subbuild is executing a small number of actions.
-  #
-  # But also these bad things:
-  # - More memory usage, potentially leading to swapping and slowdowns.
-  # - More CPU contention when the build process is actually CPU-bound.
-  # - Potentially forcing a lower value of `sdk_sub_build_parallelism`, since
-  #   the total load is proportional to `sdk_max_simultaneous_sub_builds *
-  #   sdk_sub_build_parallelism`.
-  #
-  # 5 was chosen mostly because it's the number of fingers on each of my hands.
-  sdk_max_simultaneous_sub_builds = 5
-
-  # Value of `-j` to pass to ninja during a subbuild. Note that up to
-  # `sdk_max_simultaneous_sub_builds` subbuilds may be happening in parallel, so
-  # the number of concurrent actions may go as high as this number times the
-  # number of concurrent subbuilds. If left blank, the subbuild script will make
-  # a guess.
+  # Value of `-j` to pass to ninja during a subbuild. Note that several
+  # subbuilds may be happening in parallel (as of 2023-10-13, up to 15), so the
+  # number of concurrent actions may go as high as this number times the number
+  # of concurrent subbuilds. If left blank, the subbuild script will make a
+  # guess.
   sdk_sub_build_parallelism = ""
 
   # Value of `-l` to pass to ninja during a subbuild. If the system load average
