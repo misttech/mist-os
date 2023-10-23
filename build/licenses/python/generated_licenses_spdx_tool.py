@@ -87,7 +87,7 @@ def main():
     parser.add_argument(
         "--log-level",
         type=str,
-        default="WARN",
+        default="INFO",
         help="Python logging level",
     )
 
@@ -101,17 +101,21 @@ def main():
 
     fuchsia_source_path = Path(args.fuchsia_source_path).expanduser()
     assert fuchsia_source_path.exists()
+    logging.debug("fuchsia_source_path=%s", fuchsia_source_path)
 
     file_access = FileAccess(fuchsia_source_path=fuchsia_source_path)
 
     readmes_db = ReadmesDB(file_access=file_access)
 
+    metadata_db = GnLicenseMetadataDB.from_file(
+        file_path=Path(args.generated_license_metadata),
+        fuchsia_source_path=fuchsia_source_path,
+    )
+
     # Collect licenses information
     collector = Collector(
         file_access=file_access,
-        metadata_db=GnLicenseMetadataDB.from_file(
-            Path(args.generated_license_metadata)
-        ),
+        metadata_db=metadata_db,
         readmes_db=readmes_db,
         include_host_tools=args.include_host_tools,
         default_license_file=GnLabel.from_str("//LICENSE"),

@@ -10,11 +10,18 @@ import unittest
 
 class GnLicenseMetadataDBTest(unittest.TestCase):
     def test_load_from_list(self):
+        fuchsia_source_path = "/absolute/path/to/fuchsia/dir"
+
         input = [
             {  # l1
                 "target_label": "//foo:license(//toolchain)",
                 "public_package_name": "l1",
-                "license_files": ["//license1", "//license2"],
+                "license_files": [
+                    "//license1",
+                    "license2",
+                    "bar/license3",
+                    fuchsia_source_path + "/license4",
+                ],
             },
             {
                 # l2
@@ -31,10 +38,18 @@ class GnLicenseMetadataDBTest(unittest.TestCase):
                 # al2
                 "target_label": "//bar:bar(//toolchain)",
                 "license_labels": ["//bar:lic(//toolchain)"],
+                "third_party_resources": [
+                    "r1.txt",
+                    "r2/r2.txt",
+                    "//r3.txt",
+                    fuchsia_source_path + "/r4.txt",
+                ],
             },
         ]
 
-        db = GnLicenseMetadataDB.from_json_list(input)
+        db = GnLicenseMetadataDB.from_json_list(
+            input, fuchsia_source_path=fuchsia_source_path
+        )
 
         l1 = db.licenses_by_label[
             GnLabel.from_str("//foo:license(//toolchain)")
@@ -46,7 +61,9 @@ class GnLicenseMetadataDBTest(unittest.TestCase):
                 public_package_name="l1",
                 license_files=(
                     GnLabel.from_str("//license1"),
-                    GnLabel.from_str("//license2"),
+                    GnLabel.from_str("//foo/license2"),
+                    GnLabel.from_str("//foo/bar/license3"),
+                    GnLabel.from_str("//license4"),
                 ),
             ),
         )
@@ -80,6 +97,17 @@ class GnLicenseMetadataDBTest(unittest.TestCase):
         )
         self.assertEqual(
             al2.license_labels, (GnLabel.from_str("//bar:lic(//toolchain)"),)
+        )
+        self.assertEqual(
+            al2.third_party_resources,
+            tuple(
+                [
+                    GnLabel.from_str("//bar/r1.txt"),
+                    GnLabel.from_str("//bar/r2/r2.txt"),
+                    GnLabel.from_str("//r3.txt"),
+                    GnLabel.from_str("//r4.txt"),
+                ]
+            ),
         )
 
 

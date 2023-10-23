@@ -30,6 +30,10 @@ class GnLabel:
             "//"
         ), f"label must start with // but got {original_str}"
 
+        assert not original_str.startswith(
+            "///"
+        ), f"label can't start with /// but got {original_str}"
+
         label = original_str
         toolchain = None
         # Extract toolchain part
