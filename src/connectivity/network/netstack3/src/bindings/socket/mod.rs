@@ -559,9 +559,8 @@ impl IntoErrno for LocalAddressError {
         match self {
             LocalAddressError::CannotBindToAddress
             | LocalAddressError::FailedToAllocateLocalPort => Errno::Eaddrnotavail,
-            LocalAddressError::AddressMismatch | LocalAddressError::AddressUnexpectedlyMapped => {
-                Errno::Einval
-            }
+            LocalAddressError::AddressMismatch => Errno::Eaddrnotavail,
+            LocalAddressError::AddressUnexpectedlyMapped => Errno::Einval,
             LocalAddressError::AddressInUse => Errno::Eaddrinuse,
             LocalAddressError::Zone(e) => e.into_errno(),
         }

@@ -1865,6 +1865,37 @@ TEST_P(SocketKindTest, Getpeername) {
   ASSERT_NO_FATAL_FAILURE(TestGetname(client, getpeername, reinterpret_cast<sockaddr*>(&ss), len));
 }
 
+TEST_P(SocketKindTest, BindNonLocalAddress) {
+  {
+    fbl::unique_fd fd;
+    ASSERT_TRUE(fd = NewSocket()) << strerror(errno);
+    auto [addr, len] = LoopbackAddr();
+    ASSERT_EQ(bind(fd.get(), reinterpret_cast<sockaddr*>(&addr), sizeof(addr)), 0)
+        << strerror(errno);
+  }
+
+  {
+    fbl::unique_fd fd;
+    ASSERT_TRUE(fd = NewSocket()) << strerror(errno);
+    auto [addr, len] = LoopbackAddr();
+    auto const& [domain, _] = GetParam();
+    switch (domain.which()) {
+      case SocketDomain::Which::IPv4: {
+        sockaddr_in* in_addr = reinterpret_cast<sockaddr_in*>(&addr);
+        ASSERT_EQ(inet_pton(AF_INET, "192.0.2.1", &in_addr->sin_addr), 1) << strerror(errno);
+        break;
+      }
+      case SocketDomain::Which::IPv6: {
+        sockaddr_in6* in6_addr = reinterpret_cast<sockaddr_in6*>(&addr);
+        ASSERT_EQ(inet_pton(AF_INET6, "2001:db8::1", &in6_addr->sin6_addr), 1) << strerror(errno);
+        break;
+      }
+    }
+    ASSERT_EQ(bind(fd.get(), reinterpret_cast<sockaddr*>(&addr), len), -1);
+    ASSERT_EQ(errno, EADDRNOTAVAIL) << strerror(errno);
+  }
+}
+
 TEST(SocketKindTest, IoctlLookupForNonSocketFd) {
   fbl::unique_fd fd;
   ASSERT_TRUE(fd = fbl::unique_fd(open("/", O_RDONLY | O_DIRECTORY))) << strerror(errno);
