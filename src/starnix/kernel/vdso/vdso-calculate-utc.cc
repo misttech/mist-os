@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "vdso-calculate-utc.h"
-
 #include <lib/affine/ratio.h>
 
-#include "vdso-aux.h"
-#include "vdso-calculate-monotonic.h"
+#include "vdso-calculate-time.h"
+#include "vdso-platform.h"
 
+// This is in its own source file so it can be unit tested.
 int64_t calculate_utc_time_nsec() {
   int64_t monotonic_time = calculate_monotonic_time_nsec();
 
@@ -18,7 +17,7 @@ int64_t calculate_utc_time_nsec() {
   uint64_t seq_num1 = vvar.seq_num.load(std::memory_order_acquire);
   if (seq_num1 & 1) {
     // Cannot read, because a write is in progress
-    return UTC_INVALID;
+    return kUtcInvalid;
   }
   int64_t mono_to_utc_reference_offset =
       vvar.mono_to_utc_reference_offset.load(std::memory_order_acquire);
@@ -32,7 +31,7 @@ int64_t calculate_utc_time_nsec() {
   uint64_t seq_num2 = vvar.seq_num.load(std::memory_order_acquire);
   if (seq_num1 != seq_num2) {
     // Data has been updated during the reading of it, so is invalid
-    return UTC_INVALID;
+    return kUtcInvalid;
   }
 
   affine::Ratio mono_to_utc_ratio(mono_to_utc_synthetic_ticks, mono_to_utc_reference_ticks);

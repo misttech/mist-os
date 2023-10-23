@@ -2,15 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/starnix/kernel/vdso/vdso-calculate-utc.h"
-
 #include <thread>
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "src/starnix/kernel/vdso/vdso-aux.h"
-#include "src/starnix/kernel/vdso/vdso-calculate-monotonic.h"
+#include "src/starnix/kernel/vdso/vdso-calculate-time.h"
 
 vvar_data vvar;
 
@@ -90,17 +87,17 @@ TEST_F(VdsoCalculateUtcTest, InvalidVvarAccess) {
   // Seq_num says that an update is in progress.
   vvar.seq_num.store(5, std::memory_order_release);
   int64_t utc_result = calculate_utc_time_nsec();
-  ASSERT_EQ(utc_result, UTC_INVALID);
+  ASSERT_EQ(utc_result, kUtcInvalid);
 }
 
 TEST_F(VdsoCalculateUtcTest, UtcCalculationIncreasesWithMono) {
   int64_t prev_utc_value = calculate_utc_time_nsec();
-  ASSERT_NE(prev_utc_value, UTC_INVALID);
+  ASSERT_NE(prev_utc_value, kUtcInvalid);
   for (int i = 0; i < 100; i++) {
     // Monotonic time increases. Check that utc time also increases.
     monotonic_value += MONOTONIC_INCREMENT_SIZE;
     int64_t current_utc_value = calculate_utc_time_nsec();
-    ASSERT_NE(current_utc_value, UTC_INVALID);
+    ASSERT_NE(current_utc_value, kUtcInvalid);
     ASSERT_GT(current_utc_value, prev_utc_value);
     prev_utc_value = current_utc_value;
   }
@@ -109,7 +106,7 @@ TEST_F(VdsoCalculateUtcTest, UtcCalculationIncreasesWithMono) {
 TEST_F(VdsoCalculateUtcTest, SeqlockThreadSafe) {
   // A writer thread constantly updates vvar data so that the transform is one of 2 valid values.
   // The loop below constantly reads vvar data and checks that the calculated utc time is
-  // either one of the outputs that one of the valid transforms would produce, or UTC_INVALID.
+  // either one of the outputs that one of the valid transforms would produce, or kUtcInvalid.
   std::atomic_bool should_stop = false;
   std::thread writer(writer_thread, &should_stop);
   int64_t possible_utc_values[2] = {transform1.apply(INITIAL_MONOTONIC_VALUE),
@@ -118,7 +115,7 @@ TEST_F(VdsoCalculateUtcTest, SeqlockThreadSafe) {
   while (valid_value_counter[0] < 500 || valid_value_counter[1] < 500) {
     int64_t utc_result = calculate_utc_time_nsec();
     ASSERT_THAT(utc_result,
-                testing::AnyOf(testing::Eq(UTC_INVALID), testing::Eq(possible_utc_values[0]),
+                testing::AnyOf(testing::Eq(kUtcInvalid), testing::Eq(possible_utc_values[0]),
                                testing::Eq(possible_utc_values[1])));
     // Count the number of times each of the possible utc values is calculated.
     // Stop the loop and stop the writing thread once each value has been calculated at least
