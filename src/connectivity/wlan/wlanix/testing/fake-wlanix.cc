@@ -111,6 +111,15 @@ void FakeWlanix::CreateStaIface(fuchsia_wlan_wlanix::wire::WifiChipCreateStaIfac
   completer.ReplySuccess();
 }
 
+void FakeWlanix::RemoveStaIface(fuchsia_wlan_wlanix::wire::WifiChipRemoveStaIfaceRequest* request,
+                                RemoveStaIfaceCompleter::Sync& completer) {
+  AppendCommand(Command{.tag = CommandTag::kWifiChipRemoveStaIface});
+  if (!request->has_iface_name()) {
+    ZX_ASSERT_MSG(false, "expect `iface_name` to be present");
+  }
+  completer.ReplySuccess();
+}
+
 void FakeWlanix::GetAvailableModes(GetAvailableModesCompleter::Sync& completer) {
   AppendCommand(Command{.tag = CommandTag::kWifiChipGetAvailableModes});
 

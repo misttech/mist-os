@@ -84,6 +84,10 @@ async fn handle_wifi_chip_request(req: fidl_wlanix::WifiChipRequest) -> Result<(
                 }
             }
         }
+        fidl_wlanix::WifiChipRequest::RemoveStaIface { payload: _, responder, .. } => {
+            info!("fidl_wlanix::WifiChipRequest::RemoveStaIface");
+            responder.send(Ok(()))?;
+        }
         fidl_wlanix::WifiChipRequest::GetAvailableModes { responder } => {
             info!("fidl_wlanix::WifiChipRequest::GetAvailableModes");
             let response = fidl_wlanix::WifiChipGetAvailableModesResponse {
@@ -189,12 +193,12 @@ async fn handle_wifi_request(
             info!("fidl_wlanix::WifiRequest::Stop");
             let mut state = state.lock();
             state.started = false;
-            responder.send(Ok(())).context("send Stop response")?;
             run_callbacks(
                 fidl_wlanix::WifiEventCallbackProxy::on_stop,
                 &state.callbacks[..],
                 "OnStop",
             );
+            responder.send(Ok(())).context("send Stop response")?;
         }
         fidl_wlanix::WifiRequest::GetState { responder } => {
             info!("fidl_wlanix::WifiRequest::GetState");

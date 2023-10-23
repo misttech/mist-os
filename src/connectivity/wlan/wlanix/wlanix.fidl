@@ -83,6 +83,10 @@ open protocol WifiChip {
     flexible CreateStaIface(resource table {
         1: iface server_end:WifiStaIface;
     }) -> () error zx.Status;
+    /// Request the destruction of a STA iface on the chip.
+    flexible RemoveStaIface(resource table {
+        1: iface_name string:16;
+    }) -> () error zx.Status;
     /// Get a set of operation modes that the chip supports.
     /// This combination encodes what iface types and how many can be created,
     /// and which ones can run concurrently.
