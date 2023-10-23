@@ -100,6 +100,8 @@ class TestSelections:
         """
         if flags.random:
             random.shuffle(self.selected)
+        self.selected_but_not_run.extend(self.selected[: flags.offset])
+        self.selected = self.selected[flags.offset :]
         if flags.limit is not None:
             self.selected_but_not_run.extend(self.selected[flags.limit :])
             self.selected = self.selected[: flags.limit]

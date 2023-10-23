@@ -33,6 +33,7 @@ class Flags:
     random: bool
     count: int
     limit: int | None
+    offset: int
     min_severity_logs: typing.List[str]
     timeout: float | None
     test_filter: typing.List[str]
@@ -227,6 +228,12 @@ def parse_args(cli_args: typing.List[str] | None = None) -> Flags:
         type=int,
         help="Stop execution after this many tests",
         default=None,
+    )
+    execution.add_argument(
+        "--offset",
+        type=int,
+        help="Skip this many tests at the beginning of the test list. Combine with --limit to deterministically select a subrange of tests.",
+        default=0,
     )
     execution.add_argument(
         "-f",

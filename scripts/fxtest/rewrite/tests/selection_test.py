@@ -360,7 +360,41 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
             self._make_host_test("src/other-tests", "script_test"),
         ]
 
+        # Limit only
         select_all = await selection.select_tests(tests, [])
         select_all.apply_flags(args.parse_args(["--limit=3"]))
         self.assertEqual(len(select_all.selected), 3)
         self.assertEqual(len(select_all.selected_but_not_run), 1)
+        self.assertEqual(
+            [x.name() for x in select_all.selected],
+            [
+                "fuchsia-pkg://fuchsia.com/foo-pkg#meta/bar-test.cm",
+                "fuchsia-pkg://fuchsia.com/bar-pkg#meta/baz-test.cm",
+                "host_x64/binary_test",
+            ],
+        )
+
+        # Offset only
+        select_all = await selection.select_tests(tests, [])
+        select_all.apply_flags(args.parse_args(["--offset=3"]))
+        self.assertEqual(len(select_all.selected), 1)
+        self.assertEqual(len(select_all.selected_but_not_run), 3)
+        self.assertEqual(
+            [x.name() for x in select_all.selected],
+            [
+                "host_x64/script_test",
+            ],
+        )
+
+        # Both
+        select_all = await selection.select_tests(tests, [])
+        select_all.apply_flags(args.parse_args(["--offset=1", "--limit=2"]))
+        self.assertEqual(len(select_all.selected), 2)
+        self.assertEqual(len(select_all.selected_but_not_run), 2)
+        self.assertEqual(
+            [x.name() for x in select_all.selected],
+            [
+                "fuchsia-pkg://fuchsia.com/bar-pkg#meta/baz-test.cm",
+                "host_x64/binary_test",
+            ],
+        )
