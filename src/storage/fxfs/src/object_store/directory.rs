@@ -87,7 +87,7 @@ impl<S: HandleOwner> Directory<S> {
         create_attributes: Option<&fio::MutableNodeAttributes>,
     ) -> Result<Directory<S>, Error> {
         let store = owner.as_ref().as_ref();
-        let object_id = store.get_next_object_id().await?;
+        let object_id = store.get_next_object_id(transaction).await?;
         let now = Timestamp::now();
         let creation_time = create_attributes
             .and_then(|a| a.creation_time)
@@ -421,7 +421,7 @@ impl<S: HandleOwner> Directory<S> {
         // https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/limits.h.html.
         // See _POSIX_SYMLINK_MAX.
         ensure!(link.len() <= 256, FxfsError::BadPath);
-        let symlink_id = self.store().get_next_object_id().await?;
+        let symlink_id = self.store().get_next_object_id(transaction).await?;
         transaction.add(
             self.store().store_object_id(),
             Mutation::insert_object(

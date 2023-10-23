@@ -1067,13 +1067,13 @@ impl Journal {
             return Ok(self.inner.lock().unwrap().writer.journal_file_checkpoint().file_offset);
         }
 
-        self.pre_commit().await?;
+        self.pre_commit(transaction).await?;
         Ok(debug_assert_not_too_long!(self.write_and_apply_mutations(transaction)))
     }
 
     // Before we commit, we might need to extend the journal or write pending records to the
     // journal.
-    async fn pre_commit(&self) -> Result<(), Error> {
+    async fn pre_commit(&self, transaction: &Transaction<'_>) -> Result<(), Error> {
         let handle;
 
         let (size, zero_offset) = {
@@ -1117,6 +1117,7 @@ impl Journal {
                 skip_journal_checks: true,
                 borrow_metadata_space: true,
                 allocator_reservation: Some(self.objects.metadata_reservation()),
+                txn_guard: Some(transaction.txn_guard()),
                 ..Default::default()
             })
             .await?;

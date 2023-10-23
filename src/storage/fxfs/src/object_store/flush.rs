@@ -6,6 +6,7 @@
 
 use {
     crate::{
+        filesystem::TxnGuard,
         log::*,
         lsm_tree::{
             layers_from_handles,
@@ -54,6 +55,8 @@ impl ObjectStore {
         let filesystem = self.filesystem();
         let object_manager = filesystem.object_manager();
 
+        // We must take the transaction guard *before* we take the flush lock.
+        let txn_guard = filesystem.clone().txn_guard().await;
         let keys = lock_keys![LockKey::flush(self.store_object_id())];
         let _guard = filesystem.lock_manager().write_lock(keys).await;
 
@@ -84,12 +87,12 @@ impl ObjectStore {
         }
 
         let layer_file_sizes = if matches!(&*self.lock_state.lock().unwrap(), LockState::Locked) {
-            self.flush_locked().await.with_context(|| {
+            self.flush_locked(txn_guard).await.with_context(|| {
                 format!("Failed to flush object store {}", self.store_object_id)
             })?;
             None
         } else {
-            Some(self.flush_unlocked().await.with_context(|| {
+            Some(self.flush_unlocked(txn_guard).await.with_context(|| {
                 format!("Failed to flush object store {}", self.store_object_id)
             })?)
         };
@@ -109,7 +112,7 @@ impl ObjectStore {
     }
 
     // Flushes an unlocked store. Returns the layer file sizes.
-    async fn flush_unlocked(&self) -> Result<Vec<u64>, Error> {
+    async fn flush_unlocked(&self, txn_guard: TxnGuard<'_>) -> Result<Vec<u64>, Error> {
         let roll_mutations_key = self
             .mutations_cipher
             .lock()
@@ -159,6 +162,7 @@ impl ObjectStore {
             skip_journal_checks: true,
             borrow_metadata_space: true,
             allocator_reservation: Some(reservation),
+            txn_guard: Some(&txn_guard),
             ..Default::default()
         };
 
@@ -290,7 +294,7 @@ impl ObjectStore {
     }
 
     // Flushes a locked store.
-    async fn flush_locked(&self) -> Result<(), Error> {
+    async fn flush_locked(&self, txn_guard: TxnGuard<'_>) -> Result<(), Error> {
         let filesystem = self.filesystem();
         let object_manager = filesystem.object_manager();
         let reservation = object_manager.metadata_reservation();
@@ -298,6 +302,7 @@ impl ObjectStore {
             skip_journal_checks: true,
             borrow_metadata_space: true,
             allocator_reservation: Some(reservation),
+            txn_guard: Some(&txn_guard),
             ..Default::default()
         };
 

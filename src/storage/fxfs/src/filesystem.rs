@@ -19,7 +19,7 @@ use {
             object_manager::ObjectManager,
             transaction::{
                 self, lock_keys, AssocObj, LockKey, LockKeys, LockManager, MetadataReservation,
-                Mutation, Transaction, TRANSACTION_METADATA_MAX_AMOUNT,
+                Mutation, ReadGuard, Transaction, TRANSACTION_METADATA_MAX_AMOUNT,
             },
             volume::{root_volume, VOLUMES_DIRECTORY},
             ObjectStore,
@@ -35,7 +35,6 @@ use {
     futures::FutureExt,
     fxfs_crypto::Crypt,
     once_cell::sync::OnceCell,
-    scopeguard::ScopeGuard,
     static_assertions::const_assert,
     std::sync::{
         atomic::{AtomicBool, AtomicU64, Ordering},
@@ -525,31 +524,42 @@ impl FxFilesystem {
         &self.options
     }
 
+    /// Returns a guard that must be taken before any transaction can commence.  This guard takes a
+    /// shared lock on the filesystem.  `fsck` will take an exclusive lock so that it can get a
+    /// consistent picture of the filesystem that it can verify.  It is important that this lock is
+    /// acquired before *all* other locks.  It is also important that this lock is not taken twice
+    /// by the same task since that can lead to deadlocks if another task tries to take a write
+    /// lock.
+    pub async fn txn_guard(self: Arc<Self>) -> TxnGuard<'static> {
+        unsafe fn extend_lifetime(guard: ReadGuard<'_>) -> ReadGuard<'static> {
+            std::mem::transmute(guard)
+        }
+
+        let guard = self.lock_manager.read_lock(lock_keys!(LockKey::Filesystem)).await;
+        // SAFETY: This is safe because we keep a reference to the filesystem until
+        // the guard is dropped.  See `TxnGuard`.
+        let guard = unsafe { extend_lifetime(guard) };
+
+        TxnGuard { fs: self, _guard: Some(guard) }
+    }
+
     pub async fn new_transaction<'a>(
         self: Arc<Self>,
         locks: LockKeys,
         options: transaction::Options<'a>,
     ) -> Result<Transaction<'a>, Error> {
-        self.add_transaction(options.skip_journal_checks).await;
-        let guard = scopeguard::guard((), |_| self.sub_transaction());
-        let (metadata_reservation, allocator_reservation, hold) =
-            self.reservation_for_transaction(options).await?;
-        let mut transaction = Transaction::new(
-            self.clone(),
-            metadata_reservation,
-            lock_keys![LockKey::Filesystem],
-            locks,
-        )
-        .await;
-
-        ScopeGuard::into_inner(guard);
-        hold.map(|h| h.forget()); // Transaction takes ownership from here on.
-        transaction.allocator_reservation = allocator_reservation;
-        Ok(transaction)
+        let guard = if options.txn_guard.is_some() {
+            // We can just pass None to guard.  The 'a lifetime on Options and Transaction mean that
+            // the guard will remain in place until after the new Transaction is dropped.
+            TxnGuard { _guard: None, fs: self }
+        } else {
+            self.txn_guard().await
+        };
+        Transaction::new(guard, options, locks).await
     }
 
     pub async fn commit_transaction(
-        self: Arc<Self>,
+        &self,
         transaction: &mut Transaction<'_>,
         callback: &mut (dyn FnMut(u64) + Send),
     ) -> Result<u64, Error> {
@@ -576,7 +586,11 @@ impl FxFilesystem {
         Ok(journal_offset)
     }
 
-    pub fn drop_transaction(&self, transaction: &mut Transaction<'_>) {
+    pub fn lock_manager(&self) -> &LockManager {
+        &self.lock_manager
+    }
+
+    pub(crate) fn drop_transaction(&self, transaction: &mut Transaction<'_>) {
         if !matches!(transaction.metadata_reservation, MetadataReservation::None) {
             self.sub_transaction();
         }
@@ -595,10 +609,6 @@ impl FxFilesystem {
         self.lock_manager.drop_transaction(transaction);
     }
 
-    pub fn lock_manager(&self) -> &LockManager {
-        &self.lock_manager
-    }
-
     fn maybe_start_flush_task(&self) {
         let mut flush_task = self.flush_task.lock().unwrap();
         if flush_task.is_none() {
@@ -607,7 +617,7 @@ impl FxFilesystem {
         }
     }
 
-    async fn reservation_for_transaction<'a>(
+    pub(crate) async fn reservation_for_transaction<'a>(
         self: &Arc<Self>,
         options: transaction::Options<'a>,
     ) -> Result<(MetadataReservation, Option<&'a Reservation>, Option<Hold<'a>>), Error> {
@@ -653,7 +663,7 @@ impl FxFilesystem {
         Ok((metadata_reservation, options.allocator_reservation, hold))
     }
 
-    async fn add_transaction(&self, skip_journal_checks: bool) {
+    pub(crate) async fn add_transaction(&self, skip_journal_checks: bool) {
         if skip_journal_checks {
             self.in_flight_transactions.fetch_add(1, Ordering::Relaxed);
         } else {
@@ -682,13 +692,19 @@ impl FxFilesystem {
         }
     }
 
-    fn sub_transaction(&self) {
+    pub(crate) fn sub_transaction(&self) {
         let old = self.in_flight_transactions.fetch_sub(1, Ordering::Relaxed);
         assert!(old != 0);
         if old <= MAX_IN_FLIGHT_TRANSACTIONS {
             self.event.notify(usize::MAX);
         }
     }
+}
+
+pub struct TxnGuard<'a> {
+    // Elsewhere we rely on _guard being dropped before `fs`: see the `txn_guard` function above.
+    _guard: Option<ReadGuard<'a>>,
+    pub fs: Arc<FxFilesystem>,
 }
 
 /// Helper method for making a new filesystem.
@@ -766,7 +782,10 @@ mod tests {
             },
         },
         fuchsia_async as fasync,
-        futures::future::join_all,
+        futures::{
+            future::join_all,
+            stream::{FuturesUnordered, TryStreamExt},
+        },
         rustc_hash::FxHashMap as HashMap,
         std::sync::{Arc, Mutex},
         storage_device::{fake_device::FakeDevice, DeviceHolder},
@@ -982,10 +1001,11 @@ mod tests {
         let device = DeviceHolder::new(FakeDevice::new(8192, TEST_DEVICE_BLOCK_SIZE));
         let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
 
-        let mut transactions = Vec::new();
+        let transactions = FuturesUnordered::new();
         for _ in 0..super::MAX_IN_FLIGHT_TRANSACTIONS {
-            transactions.push(fs.clone().new_transaction(lock_keys![], Options::default()).await);
+            transactions.push(fs.clone().new_transaction(lock_keys![], Options::default()));
         }
+        let mut transactions: Vec<_> = transactions.try_collect().await.unwrap();
 
         // Trying to create another one should be blocked.
         let mut fut = std::pin::pin!(fs.clone().new_transaction(lock_keys![], Options::default()));

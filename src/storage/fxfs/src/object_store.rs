@@ -856,7 +856,7 @@ impl ObjectStore {
     ) -> Result<DataObjectHandle<S>, Error> {
         let store = owner.as_ref().as_ref();
         if object_id == INVALID_OBJECT_ID {
-            object_id = store.get_next_object_id().await?;
+            object_id = store.get_next_object_id(transaction).await?;
         } else {
             store.update_last_object_id(object_id);
         }
@@ -1653,7 +1653,9 @@ impl ObjectStore {
     }
 
     // Returns a new object ID that can be used.  This will create an object ID cipher if necessary.
-    pub async fn get_next_object_id(&self) -> Result<u64, Error> {
+    // We require a transaction to guarantee that a guard is held because if we create a transaction
+    // to roll the object ID key, we skip taking the filesystem lock.
+    pub async fn get_next_object_id(&self, transaction: &Transaction<'_>) -> Result<u64, Error> {
         let object_id = self.maybe_get_next_object_id();
         if object_id != INVALID_OBJECT_ID {
             return Ok(object_id);
@@ -1672,6 +1674,7 @@ impl ObjectStore {
                     // compact.
                     skip_journal_checks: true,
                     borrow_metadata_space: true,
+                    txn_guard: Some(transaction.txn_guard()),
                     ..Default::default()
                 },
             )

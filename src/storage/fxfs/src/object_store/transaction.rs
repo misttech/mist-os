@@ -5,7 +5,7 @@
 use {
     crate::{
         debug_assert_not_too_long,
-        filesystem::FxFilesystem,
+        filesystem::TxnGuard,
         log::*,
         lsm_tree::types::Item,
         object_handle::INVALID_OBJECT_ID,
@@ -36,7 +36,7 @@ use {
         marker::PhantomPinned,
         mem,
         ops::{Deref, DerefMut, Range},
-        sync::{Arc, Mutex},
+        sync::Mutex,
         task::{Poll, Waker},
         vec::Vec,
     },
@@ -62,6 +62,9 @@ pub struct Options<'a> {
     /// no free space.  The intention is that this should be used for things like the journal which
     /// require guaranteed space.
     pub allocator_reservation: Option<&'a Reservation>,
+
+    /// An existing transaction guard to be used.
+    pub txn_guard: Option<&'a TxnGuard<'a>>,
 }
 
 // This is the amount of space that we reserve for metadata when we are creating a new transaction.
@@ -669,16 +672,13 @@ pub enum MetadataReservation {
 
 /// A transaction groups mutation records to be committed as a group.
 pub struct Transaction<'a> {
-    fs: Arc<FxFilesystem>,
+    txn_guard: TxnGuard<'a>,
 
     // The mutations that make up this transaction.
     mutations: BTreeSet<TxnMutation<'a>>,
 
     // The locks that this transaction currently holds.
     txn_locks: LockKeys,
-
-    // The read locks that this transaction currently holds.
-    read_locks: LockKeys,
 
     /// If set, an allocator reservation that should be used for allocations.
     pub allocator_reservation: Option<&'a Reservation>,
@@ -692,33 +692,41 @@ pub struct Transaction<'a> {
 }
 
 impl<'a> Transaction<'a> {
-    /// Creates a new transaction.  This should typically be called by the filesystem's
-    /// implementation of new_transaction.  The read locks are acquired before the transaction locks
-    /// (see LockManager for the semantics of the different kinds of locks).
+    /// Creates a new transaction.  `txn_locks` are read locks that can be upgraded to write locks
+    /// at commit time.
     pub async fn new(
-        fs: Arc<FxFilesystem>,
-        metadata_reservation: MetadataReservation,
-        read_locks: LockKeys,
+        txn_guard: TxnGuard<'a>,
+        options: Options<'a>,
         txn_locks: LockKeys,
-    ) -> Transaction<'a> {
-        let (read_locks, txn_locks) = {
-            let lock_manager = fs.lock_manager();
-            let mut read_guard = lock_manager.read_lock(read_locks).await;
+    ) -> Result<Transaction<'a>, Error> {
+        txn_guard.fs.add_transaction(options.skip_journal_checks).await;
+        let fs = txn_guard.fs.clone();
+        let guard = scopeguard::guard((), |_| fs.sub_transaction());
+        let (metadata_reservation, allocator_reservation, hold) =
+            txn_guard.fs.reservation_for_transaction(options).await?;
+
+        let txn_locks = {
+            let lock_manager = txn_guard.fs.lock_manager();
             let mut write_guard = lock_manager.txn_lock(txn_locks).await;
-            (
-                std::mem::take(&mut read_guard.lock_keys),
-                std::mem::take(&mut write_guard.0.lock_keys),
-            )
+            std::mem::take(&mut write_guard.0.lock_keys)
         };
-        Transaction {
-            fs,
+        let mut transaction = Transaction {
+            txn_guard,
             mutations: BTreeSet::new(),
             txn_locks,
-            read_locks,
             allocator_reservation: None,
             metadata_reservation,
             new_objects: BTreeSet::new(),
-        }
+        };
+
+        ScopeGuard::into_inner(guard);
+        hold.map(|h| h.forget()); // Transaction takes ownership from here on.
+        transaction.allocator_reservation = allocator_reservation;
+        Ok(transaction)
+    }
+
+    pub fn txn_guard(&self) -> &TxnGuard<'_> {
+        &self.txn_guard
     }
 
     pub fn mutations(&self) -> &BTreeSet<TxnMutation<'a>> {
@@ -901,7 +909,7 @@ impl<'a> Transaction<'a> {
     /// Commits a transaction.  If successful, returns the journal offset of the transaction.
     pub async fn commit(mut self) -> Result<u64, Error> {
         debug!(txn = ?&self, "Commit");
-        self.fs.clone().commit_transaction(&mut self, &mut |_| {}).await
+        self.txn_guard.fs.clone().commit_transaction(&mut self, &mut |_| {}).await
     }
 
     /// Commits and then runs the callback whilst locks are held.  The callback accepts a single
@@ -915,7 +923,8 @@ impl<'a> Transaction<'a> {
         // do that (for performance reasons), hence the reason for the following.
         let mut f = Some(f);
         let mut result = None;
-        self.fs
+        self.txn_guard
+            .fs
             .clone()
             .commit_transaction(&mut self, &mut |offset| {
                 result = Some(f.take().unwrap()(offset));
@@ -928,9 +937,9 @@ impl<'a> Transaction<'a> {
     /// dropped (but transaction locks will get downgraded to read locks).
     pub async fn commit_and_continue(&mut self) -> Result<(), Error> {
         debug!(txn = ?self, "Commit");
-        self.fs.clone().commit_transaction(self, &mut |_| {}).await?;
+        self.txn_guard.fs.clone().commit_transaction(self, &mut |_| {}).await?;
         assert!(self.mutations.is_empty());
-        self.fs.lock_manager().downgrade_locks(&self.txn_locks);
+        self.txn_guard.fs.lock_manager().downgrade_locks(&self.txn_locks);
         Ok(())
     }
 }
@@ -940,7 +949,7 @@ impl Drop for Transaction<'_> {
         // Call the filesystem implementation of drop_transaction which should, as a minimum, call
         // LockManager's drop_transaction to ensure the locks are released.
         debug!(txn = ?&self, "Drop");
-        self.fs.clone().drop_transaction(self);
+        self.txn_guard.fs.clone().drop_transaction(self);
     }
 }
 
@@ -949,9 +958,36 @@ impl std::fmt::Debug for Transaction<'_> {
         f.debug_struct("Transaction")
             .field("mutations", &self.mutations)
             .field("txn_locks", &self.txn_locks)
-            .field("read_locks", &self.read_locks)
             .field("reservation", &self.allocator_reservation)
             .finish()
+    }
+}
+
+pub enum BorrowedOrOwned<'a, T> {
+    Borrowed(&'a T),
+    Owned(T),
+}
+
+impl<T> Deref for BorrowedOrOwned<'_, T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            BorrowedOrOwned::Borrowed(b) => b,
+            BorrowedOrOwned::Owned(o) => &o,
+        }
+    }
+}
+
+impl<'a, T> From<&'a T> for BorrowedOrOwned<'a, T> {
+    fn from(value: &'a T) -> Self {
+        BorrowedOrOwned::Borrowed(value)
+    }
+}
+
+impl<T> From<T> for BorrowedOrOwned<'_, T> {
+    fn from(value: T) -> Self {
+        BorrowedOrOwned::Owned(value)
     }
 }
 
@@ -1253,7 +1289,6 @@ impl LockManager {
     pub fn drop_transaction(&self, transaction: &mut Transaction<'_>) {
         let mut locks = self.locks.lock().unwrap();
         locks.drop_write_locks(std::mem::take(&mut transaction.txn_locks));
-        locks.drop_read_locks(std::mem::take(&mut transaction.read_locks));
     }
 
     /// Prepares to commit by waiting for readers to finish.
@@ -1513,7 +1548,8 @@ mod tests {
         let (send2, recv2) = channel();
         let (send3, recv3) = channel();
         let done = Mutex::new(false);
-        join!(
+        let mut futures = FuturesUnordered::new();
+        futures.push(
             async {
                 let _t = fs
                     .clone()
@@ -1529,7 +1565,10 @@ mod tests {
                 // This is a halting problem so all we can do is sleep.
                 fasync::Timer::new(Duration::from_millis(100)).await;
                 assert!(!*done.lock().unwrap());
-            },
+            }
+            .boxed(),
+        );
+        futures.push(
             async {
                 recv1.await.unwrap();
                 // This should not block since it is a different key.
@@ -1543,7 +1582,10 @@ mod tests {
                     .expect("new_transaction failed");
                 // Tell the first future to continue.
                 send2.send(()).unwrap();
-            },
+            }
+            .boxed(),
+        );
+        futures.push(
             async {
                 // This should block until the first future has completed.
                 recv3.await.unwrap();
@@ -1556,7 +1598,9 @@ mod tests {
                     .await;
                 *done.lock().unwrap() = true;
             }
+            .boxed(),
         );
+        while let Some(()) = futures.next().await {}
     }
 
     #[fuchsia::test]
@@ -1732,8 +1776,8 @@ mod tests {
         let manager = LockManager::new();
         let keys = lock_keys![LockKey::object(1, 1)];
         let _guard = manager.lock(keys.clone(), LockState::ReadLock).await;
-        let read_lock = manager.lock(keys.clone(), LockState::ReadLock);
-        pin_mut!(read_lock);
+        let mut read_lock = FuturesUnordered::new();
+        read_lock.push(manager.lock(keys.clone(), LockState::ReadLock));
 
         {
             let write_lock = manager.lock(keys, LockState::WriteLock);
@@ -1743,11 +1787,11 @@ mod tests {
             assert!(futures::poll!(write_lock).is_pending());
 
             // Another read lock should be blocked because of the write lock.
-            assert!(futures::poll!(read_lock.as_mut()).is_pending());
+            assert!(futures::poll!(read_lock.next()).is_pending());
         }
 
         // Dropping the write lock should allow the read lock to proceed.
-        assert!(futures::poll!(read_lock).is_ready());
+        assert!(futures::poll!(read_lock.next()).is_ready());
     }
 
     #[fuchsia::test]

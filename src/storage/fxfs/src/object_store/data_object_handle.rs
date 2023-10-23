@@ -1139,7 +1139,11 @@ mod tests {
         },
         assert_matches::assert_matches,
         fidl_fuchsia_io as fio, fuchsia_async as fasync,
-        futures::{channel::oneshot::channel, join, FutureExt},
+        futures::{
+            channel::oneshot::channel,
+            stream::{FuturesUnordered, StreamExt},
+            FutureExt,
+        },
         fxfs_crypto::Crypt,
         fxfs_insecure_crypto::InsecureCrypt,
         rand::Rng,
@@ -2301,7 +2305,8 @@ mod tests {
         let (send2, recv2) = channel();
         let (send3, recv3) = channel();
         let done = Mutex::new(false);
-        join!(
+        let mut futures = FuturesUnordered::new();
+        futures.push(
             async {
                 let mut t = object.new_transaction().await.expect("new_transaction failed");
                 send1.send(()).unwrap(); // Tell the next future to continue.
@@ -2314,7 +2319,10 @@ mod tests {
                 fasync::Timer::new(Duration::from_millis(100)).await;
                 assert!(!*done.lock().unwrap());
                 t.commit().await.expect("commit failed");
-            },
+            }
+            .boxed(),
+        );
+        futures.push(
             async {
                 recv1.await.unwrap();
                 // Reads should not block.
@@ -2329,7 +2337,10 @@ mod tests {
                 assert_eq!(&buf.as_slice()[align..], TEST_DATA);
                 // Tell the first future to continue.
                 send2.send(()).unwrap();
-            },
+            }
+            .boxed(),
+        );
+        futures.push(
             async {
                 // This should block until the first future has completed.
                 recv3.await.unwrap();
@@ -2338,7 +2349,9 @@ mod tests {
                 assert_eq!(object.read(0, buf.as_mut()).await.expect("read failed"), 5);
                 assert_eq!(buf.as_slice(), b"hello");
             }
+            .boxed(),
         );
+        while let Some(()) = futures.next().await {}
         fs.close().await.expect("Close failed");
     }
 
