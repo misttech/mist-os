@@ -612,6 +612,7 @@ def generate_sdk_constants(repo_ctx, manifests):
     """
     host_cpu_names_set = {}
     target_cpu_names_set = {}
+    all_cc_source_targets_map = {}
     for manifest_obj in manifests:
         root = manifest_obj.get("root")
         manifest_path = manifest_obj.get("manifest")
@@ -621,6 +622,26 @@ def generate_sdk_constants(repo_ctx, manifests):
         host_cpu_names_set[host_cpu] = None
         for cpu_name in json_obj["arch"]["target"]:
             target_cpu_names_set[cpu_name] = None
+
+        all_cc_source_metas = [
+            part["meta"]
+            for part in json_obj["parts"]
+            if part["type"] in ["cc_source_library"]
+        ]
+
+        for meta_path in all_cc_source_metas:
+            meta_obj = json.decode(repo_ctx.read(_path_in_root(repo_ctx, root, meta_path)))
+            target = "//{}:{}".format(meta_obj["root"], meta_obj["name"])
+            if meta_obj["root"].endswith("/" + meta_obj["name"]):
+                target = "//{}".format(meta_obj["root"])
+            all_cc_source_targets_map[target] = meta_obj["headers"]
+
+    # Pretty-print the cc_source_targets dictionary to make
+    # generated_constants.bzl easier to read.
+    all_cc_source_targets_map_pp = "{\n"
+    for k, v in all_cc_source_targets_map.items():
+        all_cc_source_targets_map_pp += '  "{}": {},\n'.format(k, str(v))
+    all_cc_source_targets_map_pp += "}\n"
 
     host_cpu_names = sorted(host_cpu_names_set.keys())
     target_cpu_names = sorted(target_cpu_names_set.keys())
@@ -632,6 +653,9 @@ def generate_sdk_constants(repo_ctx, manifests):
     generated_content = "# AUTO-GENERATED - DO NOT EDIT!\n\n"
     generated_content += "# The following list of CPU names use Fuchsia conventions.\n"
     generated_content += "constants = %s\n" % constants
+    generated_content += "\n"
+    generated_content += "# List of all c++ source targets in the SDK.\n"
+    generated_content += "ALL_CC_SOURCE_TARGETS = %s\n" % all_cc_source_targets_map_pp
 
     repo_ctx.file("generated_constants.bzl", generated_content, executable = False)
 
