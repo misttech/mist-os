@@ -52,7 +52,9 @@ void PhysMain(void* flat_devicetree_blob, arch::EarlyTicks ticks) {
   static BootOptions boot_options;
   gBootOptions = &boot_options;
 
-  boot_options.serial = chosen.uart().uart();
+  if (auto uart = chosen.uart()) {
+    boot_options.serial = *uart;
+  }
   SetBootOptions(boot_options, chosen.zbi(), chosen.cmdline().value_or(""));
   SetUartConsole(boot_options.serial);
 

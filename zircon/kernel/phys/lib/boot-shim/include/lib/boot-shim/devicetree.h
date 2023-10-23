@@ -34,6 +34,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <variant>
 
 #include <fbl/type_info.h>
 
@@ -312,9 +313,17 @@ class DevicetreeChosenNodeMatcher : public DevicetreeChosenNodeMatcherBase {
     };
   }
 
-  constexpr const auto& uart() const { return uart_; }
+  // We use std::nullopt over the null driver as a clearer indication that no
+  // UART was matched.
+  constexpr std::optional<AllUartDrivers> uart() const {
+    return std::holds_alternative<uart::null::Driver>(uart_.uart())
+               ? std::nullopt
+               : std::make_optional(uart_.uart());
+  }
 
  private:
+  // We use KernelDriver just for the MatchDevicetree() interface; the choice
+  // of I/O provider or synchronization policy is not actually material.
   uart::all::KernelDriver<uart::BasicIoProvider, uart::UnsynchronizedPolicy, AllUartDrivers> uart_;
 };
 

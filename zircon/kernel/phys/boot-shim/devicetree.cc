@@ -14,6 +14,7 @@
 #include <zircon/assert.h>
 
 #include <array>
+#include <variant>
 
 #include <ktl/array.h>
 #include <ktl/type_traits.h>
@@ -110,7 +111,11 @@ void InitMemory(void* dtb, AddressSpace* aspace) {
   // This instance of |BootOptions| is not meant to be wired anywhere, its sole purpose is to select
   // the proper uart from the cmdline if its present.
   static BootOptions boot_options;
-  boot_options.serial = chosen.uart().uart();
+
+  // If the chosen matcher did not find a serial console setting, keep whatever
+  // current setting was in place before calling InitMemory. That's often the
+  // null driver, but could be something else.
+  boot_options.serial = chosen.uart().value_or(GetUartDriver().uart());
   SetBootOptionsWithoutEntropy(boot_options, {}, chosen.cmdline().value_or(""));
   SetUartConsole(boot_options.serial);
 

@@ -114,19 +114,21 @@ void CheckChosenMatcher(const ChosenItemType& matcher, const ExpectedChosen& exp
   EXPECT_EQ(*matcher.stdout_path(), expected_uart_path);
 
   // Uart.
-  matcher.uart().Visit([&](const auto& driver) {
-    using config_t = std::decay_t<decltype(driver.uart().config())>;
-    if constexpr (std::is_same_v<config_t, zbi_dcfg_simple_t>) {
-      auto& uart = driver.uart();
-      EXPECT_EQ(uart.config_name(), expected.uart_config_name, "Actual name %s\n",
-                uart.config_name().data());
-      EXPECT_EQ(uart.config().mmio_phys, expected.uart_config.mmio_phys);
-      // The bootstrap phase does not decode interrupt.
-      EXPECT_EQ(uart.config().irq, expected.uart_config.irq);
-    } else {
-      FAIL("Unexpected driver: %s", fbl::TypeInfo<decltype(driver)>::Name());
-    }
-  });
+  ASSERT_TRUE(matcher.uart());
+  uart::internal::Visit(
+      [expected](const auto& uart) {
+        using config_t = std::decay_t<decltype(uart.config())>;
+        if constexpr (std::is_same_v<config_t, zbi_dcfg_simple_t>) {
+          EXPECT_EQ(uart.config_name(), expected.uart_config_name, "Actual name %s\n",
+                    uart.config_name().data());
+          EXPECT_EQ(uart.config().mmio_phys, expected.uart_config.mmio_phys);
+          // The bootstrap phase does not decode interrupt.
+          EXPECT_EQ(uart.config().irq, expected.uart_config.irq);
+        } else {
+          FAIL("Unexpected driver: %s", fbl::TypeInfo<decltype(uart)>::Name());
+        }
+      },
+      *matcher.uart());
 }
 
 TEST_F(ChosenNodeMatcherTest, Chosen) {
