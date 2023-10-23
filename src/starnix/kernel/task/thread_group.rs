@@ -20,7 +20,7 @@ use crate::{
     lock::{Mutex, MutexGuard, RwLock},
     logging::{log_error, not_implemented},
     mutable_state::*,
-    selinux::SeLinuxThreadGroupState,
+    selinux::fs::SeLinuxThreadGroupState,
     signals::{syscalls::WaitingOptions, *},
     task::{interval_timer::IntervalTimerHandle, *},
     time::utc,
