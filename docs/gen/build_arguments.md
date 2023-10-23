@@ -7683,6 +7683,28 @@ related artifacts.
 
 From //build/sdk/config.gni:17
 
+### sdk_max_simultaneous_sub_builds
+
+An upper bound on the maximum number of subbuilds that may be running at the
+same time. A larger number means these good things:
+- Better parallelization of the inherently single-threaded parts of GN and
+  ninja.
+- Better parallelization in the face of "stragglers" in the build -
+  situations where each subbuild is executing a small number of actions.
+
+But also these bad things:
+- More memory usage, potentially leading to swapping and slowdowns.
+- More CPU contention when the build process is actually CPU-bound.
+- Potentially forcing a lower value of `sdk_sub_build_parallelism`, since
+  the total load is proportional to `sdk_max_simultaneous_sub_builds *
+  sdk_sub_build_parallelism`.
+
+5 was chosen mostly because it's the number of fingers on each of my hands.
+
+**Current value (from the default):** `5`
+
+From //build/sdk/config.gni:34
+
 ### sdk_no_host_tools
 
 Whether to omit host tools from the generated IDKs.
@@ -7699,29 +7721,33 @@ blank, the subbuild script will make a guess.
 
 **Current value (from the default):** `""`
 
-From //build/sdk/config.gni:29
+From //build/sdk/config.gni:46
 
 ### sdk_sub_build_parallelism
 
-Value of `-j` to pass to ninja during a subbuild. Note that several
-subbuilds may be happening in parallel (as of 2023-10-13, up to 15), so the
-number of concurrent actions may go as high as this number times the number
-of concurrent subbuilds. If left blank, the subbuild script will make a
-guess.
+Value of `-j` to pass to ninja during a subbuild. Note that up to
+`sdk_max_simultaneous_sub_builds` subbuilds may be happening in parallel, so
+the number of concurrent actions may go as high as this number times the
+number of concurrent subbuilds. If left blank, the subbuild script will make
+a guess.
 
 **Current value (from the default):** `""`
 
-From //build/sdk/config.gni:24
+From //build/sdk/config.gni:41
 
 ### sdk_with_all_supported_api_levels
 
-Set to true to build IDK atoms for all supported API levels that are
-listed in fuchsia_platform.supported_fuchsia_api_levels. This impacts
-the behavior of the generate_final_idk() template.
+Set to true to build IDK atoms for all supported API levels that are listed
+in fuchsia_platform.supported_fuchsia_api_levels. This impacts the behavior
+of the generate_final_idk() template.
 
-**Current value (from the default):** `false`
+TODO(fxbug.dev/306723826): Deal with the fact that the mac builders are too
+slow to enable this setting, and therefore the mac IDK won't have
+per-api-level prebuilts.
 
-From //sdk/config.gni:18
+**Current value (from the default):** `true`
+
+From //sdk/config.gni:22
 
 ### select_variant
 
