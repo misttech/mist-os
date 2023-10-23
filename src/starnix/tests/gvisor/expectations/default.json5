@@ -806,14 +806,8 @@
                 "AllTimerTypes/TimerfdTest.BlockingPoll_SetTimeResetsExpirations/CLOCK_BOOTTIME",
 
                 // timers_test
-                "IntervalTimerTest.SingleShotSilent",
-                "IntervalTimerTest.PeriodicThreadDirectedSignal",
                 "IntervalTimerTest.OtherThreadGroup",
-                "IntervalTimerTest.PeriodicSilent",
-
-                // TODO(b/287114779): Re-enable after sigtimedwait is fully implemented.
                 "IntervalTimerTest.RealTimeSignalsAreNotDuplicated",
-                "IntervalTimerTest.IgnoredSignalCountsAsOverrun",
                 "TimerTest.ProcessKilledOnCPUHardLimit",
                 "TimerTest.ProcessKilledOnCPUSoftLimit",
                 "TimerTest.ProcessPingedRepeatedlyAfterCPUSoftLimit",
@@ -1021,7 +1015,6 @@
                 "ProcPidCmdline.SubprocessForkSameCmdline",
                 "SigaltstackTest.SetCurrentStack",
                 "Signalfd.KillStillKills",
-                "IntervalTimerTest.AlreadyPendingSignal",
                 "TimeTest.VsyscallTime_InvalidAddressSIGSEGV",
                 "TkillTest.ValidTIDAndRealSignal",
                 "VsyscallTest.VsyscallAlwaysAvailableOnGvisor",

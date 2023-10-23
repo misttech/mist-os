@@ -122,6 +122,7 @@ impl ops::Neg for Duration {
 impl Duration {
     pub const INFINITE: Duration = Duration(sys::zx_duration_t::MAX);
     pub const INFINITE_PAST: Duration = Duration(sys::zx_duration_t::MIN);
+    pub const ZERO: Duration = Duration(0);
 
     /// Sleep for the given amount of time.
     pub fn sleep(self) {

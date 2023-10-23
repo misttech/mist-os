@@ -22,6 +22,7 @@ mod uts_namespace;
 mod waiter;
 
 pub use abstract_socket_namespace::*;
+pub use interval_timer::*;
 pub use iptables::*;
 pub use kernel::*;
 pub use kernel_threads::*;

@@ -8,7 +8,7 @@ use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
 use crate::{
     lock::RwLock,
-    task::{TimerId, WaitQueue, WaiterRef},
+    task::{IntervalTimerHandle, WaitQueue, WaiterRef},
     types::*,
 };
 
@@ -298,14 +298,20 @@ impl SignalInfo {
                     _arch: arch as c_uint,
                 }
             ),
-            SignalDetail::Timer { timer_id: tid, overrun, sigval } => {
+            SignalDetail::Timer { ref timer } => {
+                let sigval: uapi::sigval = if timer.signal_event.notify == SignalEventNotify::None {
+                    Default::default()
+                } else {
+                    timer.signal_event.value.into()
+                };
+
                 make_siginfo!(
                     self,
                     _timer,
                     __sifields__bindgen_ty_2 {
-                        _tid: tid,
-                        _overrun: overrun,
-                        _sigval: sigval.into(),
+                        _tid: timer.timer_id,
+                        _overrun: timer.overrun_cur(),
+                        _sigval: sigval,
                         ..Default::default()
                     }
                 )
@@ -344,13 +350,11 @@ pub enum SignalDetail {
     },
     /// POSIX timer
     Timer {
-        timer_id: TimerId,
-        /// For the timer referred to by the `timer_id, the number of timer expirations that
-        /// occurred between the time when the signal was generated and when it was delivered or
-        /// accepted.
-        overrun: i32,
-        /// Data passed with notification from asynchronous routines.
-        sigval: SignalEventValue,
+        /// Timer where the signal comes from.
+        ///
+        /// Required fields in `uapi::siginfo_t` should be enquired from the timer only when needed.
+        /// Because `overrun` counts might change when the signal is waiting in the queue.
+        timer: IntervalTimerHandle,
     },
     Raw {
         data: [u8; SI_MAX_SIZE as usize - SI_HEADER_SIZE],
@@ -365,18 +369,18 @@ impl Default for SignalDetail {
 
 #[derive(Debug)]
 pub struct SignalEvent {
-    pub value: Option<SignalEventValue>,
+    pub value: SignalEventValue,
     pub signo: Option<Signal>,
     pub notify: SignalEventNotify,
 }
 
 impl SignalEvent {
     pub fn new(value: SignalEventValue, signo: Signal, notify: SignalEventNotify) -> Self {
-        Self { value: Some(value), signo: Some(signo), notify }
+        Self { value, signo: Some(signo), notify }
     }
 
     pub fn none() -> Self {
-        Self { value: None, signo: None, notify: SignalEventNotify::None }
+        Self { value: Default::default(), signo: None, notify: SignalEventNotify::None }
     }
 }
 
@@ -410,7 +414,7 @@ impl TryFrom<sigevent> for SignalEvent {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 /// Specifies how notification is to be performed.
 pub enum SignalEventNotify {
     /// Notify the process by sending the signal specified in `SignalInfo::Signal`.

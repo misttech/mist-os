@@ -36,20 +36,19 @@ impl From<TimerRemaining> for itimerspec {
     }
 }
 
-#[allow(dead_code)] // TODO(fxb/123084)
 #[derive(Debug)]
 pub struct IntervalTimer {
-    timer_id: TimerId,
+    pub timer_id: TimerId,
 
+    #[allow(dead_code)] // TODO(fxb/123084)
     clock_id: ClockId,
 
-    signal_event: SignalEvent,
+    pub signal_event: SignalEvent,
 
     state: Mutex<IntervalTimerMutableState>,
 }
 pub type IntervalTimerHandle = Arc<IntervalTimer>;
 
-#[allow(dead_code)] // TODO(fxb/123084)
 #[derive(Default, Debug)]
 struct IntervalTimerMutableState {
     /// Handle to abort the running timer task.
@@ -60,15 +59,12 @@ struct IntervalTimerMutableState {
     target_time: zx::Time,
     /// Interval for periodic timer.
     interval: zx::Duration,
-    /// Number of overruns that have occurred since the last time a signal was sent.
-    overrun: u64,
-    /// Number of overruns that was on last delivered signal.
-    overrun_last: u64,
-    /// Whether or not the timer is waiting for being requeued.
+    /// Number of timer expirations that have occurred since the last time a signal was sent.
     ///
-    /// If true, a signal to `target` is already queued, and timer expirations should increment
-    /// `overrun` instead of sending another signal.
-    requeue_pending: bool,
+    /// Timer expiration is not counted as overrun under `SignalEventNotify::None`.
+    overrun_cur: i32,
+    /// Number of timer expirations that was on last delivered signal.
+    overrun_last: i32,
 }
 
 impl IntervalTimerMutableState {
@@ -78,6 +74,11 @@ impl IntervalTimerMutableState {
             abort_handle.abort();
         }
         self.abort_handle = None;
+    }
+
+    fn on_setting_changed(&mut self) {
+        self.overrun_cur = 0;
+        self.overrun_last = 0;
     }
 }
 
@@ -90,31 +91,43 @@ impl IntervalTimer {
         Arc::new(Self { timer_id, clock_id, signal_event, state: Default::default() })
     }
 
-    fn signal_info(&self) -> Option<SignalInfo> {
-        let signal_detail = SignalDetail::Timer {
-            timer_id: self.timer_id,
-            overrun: 0,
-            sigval: self.signal_event.value?,
-        };
+    fn signal_info(self: &IntervalTimerHandle) -> Option<SignalInfo> {
+        let signal_detail = SignalDetail::Timer { timer: self.clone() };
         Some(SignalInfo::new(self.signal_event.signo?, SI_TIMER as u32, signal_detail))
     }
 
-    async fn start_timer_loop(&self, thread_group: Weak<ThreadGroup>) {
+    async fn start_timer_loop(self: &IntervalTimerHandle, thread_group: Weak<ThreadGroup>) {
         loop {
-            loop {
+            let target_monotonic = loop {
                 // We may have to issue multiple sleeps if the target time in the timer is
                 // updated while we are sleeping or if our estimation of the target time
                 // relative to the monotonic clock is off.
                 let target_monotonic =
                     utc::estimate_monotonic_deadline_from_utc(self.state.lock().target_time);
                 if zx::Time::get_monotonic() >= target_monotonic {
-                    break;
+                    break target_monotonic;
                 }
                 fuchsia_async::Timer::new(target_monotonic).await;
-            }
+            };
 
             if !self.state.lock().armed {
                 return;
+            }
+
+            // Timer expirations are counted as overruns except SIGEV_NONE.
+            if self.signal_event.notify != SignalEventNotify::None {
+                let mut guard = self.state.lock();
+                let overtime = zx::Time::get_monotonic() - target_monotonic;
+                // If the `interval` is zero, the timer expires just once, at the time
+                // specified by `target_time`.
+                if guard.interval == zx::Duration::ZERO {
+                    guard.overrun_cur = 1;
+                } else {
+                    let exp =
+                        i32::try_from(overtime.into_nanos() / guard.interval.into_nanos() + 1)
+                            .unwrap_or(i32::MAX);
+                    guard.overrun_cur = guard.overrun_cur.saturating_add(exp);
+                };
             }
 
             // Check on notify enum to determine the signal target.
@@ -156,6 +169,12 @@ impl IntervalTimer {
         }
     }
 
+    pub fn on_signal_delivered(self: &IntervalTimerHandle) {
+        let mut guard = self.state.lock();
+        guard.overrun_last = guard.overrun_cur;
+        guard.overrun_cur = 0;
+    }
+
     pub fn arm(
         self: &IntervalTimerHandle,
         thread_group: Weak<ThreadGroup>,
@@ -175,8 +194,7 @@ impl IntervalTimer {
         guard.armed = true;
         guard.target_time = target_time;
         guard.interval = interval;
-        guard.overrun = 0;
-        guard.overrun_last = 0;
+        guard.on_setting_changed();
 
         // TODO(fxb/123084): check on clock_id to see if the clock supports creating a timer.
 
@@ -204,6 +222,7 @@ impl IntervalTimer {
     pub fn disarm(&self) {
         let mut guard = self.state.lock();
         guard.disarm();
+        guard.on_setting_changed();
     }
 
     pub fn time_remaining(&self) -> TimerRemaining {
@@ -215,7 +234,17 @@ impl IntervalTimer {
         TimerRemaining { remainder: guard.target_time - utc::utc_now(), interval: guard.interval }
     }
 
+    pub fn overrun_cur(&self) -> i32 {
+        self.state.lock().overrun_cur
+    }
     pub fn overrun_last(&self) -> i32 {
-        self.state.lock().overrun_last as i32
+        self.state.lock().overrun_last
     }
 }
+
+impl PartialEq for IntervalTimer {
+    fn eq(&self, other: &Self) -> bool {
+        std::ptr::addr_of!(self) == std::ptr::addr_of!(other)
+    }
+}
+impl Eq for IntervalTimer {}

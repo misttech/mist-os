@@ -267,7 +267,6 @@
                 "tee02",
                 "tgkill02",
                 "time-schedule01",
-                "timer_getoverrun01",
 
                 // fxbug.dev/127682
                 "times03",

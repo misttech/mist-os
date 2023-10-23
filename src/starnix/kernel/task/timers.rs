@@ -98,8 +98,8 @@ impl TimerTable {
     }
 
     /// Returns the overrun count for the last timer expiration.
-    pub fn get_overrun(&self, _id: TimerId) -> Result<i32, Errno> {
-        error!(ENOSYS)
+    pub fn get_overrun(&self, id: TimerId) -> Result<i32, Errno> {
+        Ok(self.get_timer(id)?.overrun_last())
     }
 
     /// Arms (start) or disarms (stop) the timer identifierd by `id`. The `new_value` arg is a

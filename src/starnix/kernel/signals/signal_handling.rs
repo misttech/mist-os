@@ -152,6 +152,9 @@ pub fn dequeue_signal(
     }
 
     if let Some(siginfo) = siginfo {
+        if let SignalDetail::Timer { timer } = &siginfo.detail {
+            timer.on_signal_delivered();
+        }
         deliver_signal(task, task_state, siginfo, registers);
     }
 }
