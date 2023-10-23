@@ -77,9 +77,9 @@ class SyncProxy : public internal::InheritFromArgs<T, Methods...> {
   // Constructs an object inside the |TestDispatcherBound|.
   //
   // See |async_patterns::DispatcherBound<T>::emplace| for more information.
-  template <typename... Args>
+  template <typename T2 = T, typename... Args>
   void emplace(Args&&... args) {
-    inner_.emplace(std::forward<Args>(args)...);
+    inner_.template emplace<T2>(std::forward<Args>(args)...);
   }
 
   // If |has_value|, asynchronously destroys the managed |T| on a task

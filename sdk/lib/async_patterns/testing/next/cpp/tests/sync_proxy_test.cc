@@ -83,4 +83,38 @@ TEST(SyncProxy, ConstructDestruct) {
   EXPECT_FALSE(background.has_value());
 }
 
+struct Base {
+  explicit Base(int a) : a_(a) {}
+  virtual ~Base() {}
+  virtual std::string Speak() { return "Base"; }
+  int a_;
+};
+struct Derived : public Base {
+  Derived(int a, int b) : Base(a), b_(b) {}
+  std::string Speak() override { return "Derived"; }
+  int b_;
+};
+
+ASYNC_PATTERNS_DEFINE_SYNC_METHOD(BaseSyncProxy, Speak);
+
+using BaseSyncProxy =
+    async_patterns::SyncProxy<Base, ASYNC_PATTERNS_ADD_SYNC_METHOD(BaseSyncProxy, Base, Speak)>;
+
+TEST(SyncProxy, SubClass) {
+  async::Loop remote_loop{&kAsyncLoopConfigNeverAttachToThread};
+  remote_loop.StartThread();
+
+  {
+    BaseSyncProxy base(remote_loop.dispatcher());
+    base.emplace(1);
+    EXPECT_EQ(base.Speak(), "Base");
+  }
+
+  {
+    BaseSyncProxy base(remote_loop.dispatcher());
+    base.emplace<Derived>(1, 2);
+    EXPECT_EQ(base.Speak(), "Derived");
+  }
+}
+
 }  // namespace

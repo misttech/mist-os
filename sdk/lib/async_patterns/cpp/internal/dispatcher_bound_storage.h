@@ -28,40 +28,43 @@ struct PassDispatcherT {
   }
 };
 
-constexpr char kDispatcherBoundThreadSafetyDescription[] =
-    "|async_patterns::DispatcherBound| is meant to manage thread-unsafe asynchronous objects. "
-    "Those objects should only be used from synchronized dispatchers. "
-    "However, the |async_dispatcher_t*| provided is not a synchronized dispatcher.";
-
-// |Synchronized<T>| checks for synchronization before using |T|.
-template <typename T>
-class Synchronized {
+class SynchronizedBase {
  public:
-  template <typename... Args>
-  explicit Synchronized(async_dispatcher_t* dispatcher, Args&&... args)
-      : checker_(dispatcher, kDispatcherBoundThreadSafetyDescription),
-        inner_(std::forward<Args>(args)...) {}
+  explicit SynchronizedBase(async_dispatcher_t* dispatcher);
 
   /// Returns a callable that will check for synchronization before calling some
-  /// member function of |T|.
+  /// member function of |Base|.
   ///
   /// More precisely:
   ///
-  /// - Let |fn| be the result of `bind_front(member_fn, &inner_)`.
+  /// - Let |fn| be the result of `bind_front(member_fn, base)`.
   ///
   /// - Returns a callable that takes some arguments. When called, that callable
   ///   will check for synchronization, then forward those arguments to |fn|.
-  template <typename Callable>
-  auto Bind(Callable member_fn) {
-    return [member_fn = std::move(member_fn), this](auto&&... args) mutable {
+  template <typename Base, typename Callable>
+  auto Bind(Base* base, Callable member_fn) {
+    return [member_fn = std::move(member_fn), this, base](auto&&... args) mutable {
       std::lock_guard lock(checker_);
-      return cpp20::bind_front(std::forward<Callable>(member_fn), &inner_)(std::move(args)...);
+      return cpp20::bind_front(std::forward<Callable>(member_fn), base)(std::move(args)...);
     };
   }
 
  private:
   async::synchronization_checker checker_;
-  T inner_ __TA_GUARDED(checker_);
+};
+
+// |Synchronized<T>| adds a synchronization checker before |T|.
+template <typename T>
+class Synchronized : public SynchronizedBase {
+ public:
+  template <typename... Args>
+  explicit Synchronized(async_dispatcher_t* dispatcher, Args&&... args)
+      : SynchronizedBase(dispatcher), inner_(std::forward<Args>(args)...) {}
+
+  T* inner() { return &inner_; }
+
+ private:
+  T inner_;
 };
 
 // |DispatcherBoundStorage| encapsulates the subtle work of managing memory
@@ -77,7 +80,7 @@ class DispatcherBoundStorage final {
   //
   // |T| will be constructed and later destructed inside tasks posted to the
   // |dispatcher|.
-  template <typename T, typename... Args>
+  template <typename Base, typename T, typename... Args>
   void Construct(async_dispatcher_t* dispatcher, Args&&... args) {
     ZX_ASSERT(!op_fn_);
 
@@ -85,21 +88,25 @@ class DispatcherBoundStorage final {
     // so that the tasks have an agreed-upon memory location to construct
     // and destruct |T|, even if |DispatcherBoundStorage| is destroyed.
     Synchronized<T>* ptr = std::allocator<Synchronized<T>>{}.allocate(1);
+    Base* base = ptr->inner();
 
     // |op_fn_| let us compactly store both the destructor and the pointer to
     // the managed object in one inlined type erasing object (a function)
     // without heap allocation.
-    op_fn_ = [ptr](Operation op) -> void* {
+    op_fn_ = [ptr, base](Operation op) -> void* {
       switch (op) {
         case Operation::kDestruct:
           ptr->~Synchronized<T>();
           std::allocator<Synchronized<T>>{}.deallocate(ptr, 1);
           return nullptr;
-        case Operation::kGetPointer:
-          // During |Call|, |ptr_| will be cast back to |T|. This is guaranteed to
+        case Operation::kGetBasePointer:
+          // During |Call|, |base| will be cast back to |Base|. This is guaranteed to
           // yield the same object pointer by the language. See
           // https://timsong-cpp.github.io/cppwp/n4861/expr.static.cast#13
-          return static_cast<void*>(ptr);
+          return static_cast<void*>(base);
+        case Operation::kGetPointer:
+          // During |Call|, |ptr| will be cast to |SynchronizedBase|. Similar reasoning follows.
+          return static_cast<void*>(static_cast<SynchronizedBase*>(ptr));
       }
     };
 
@@ -114,10 +121,12 @@ class DispatcherBoundStorage final {
   template <template <typename, typename, typename> typename Builder, typename Result, typename T,
             typename Callable, typename... Args>
   auto AsyncCall(async_dispatcher_t* dispatcher, Callable&& callable, Args&&... args) {
+    void* raw_base_ptr = op_fn_(Operation::kGetBasePointer);
+    T* base = static_cast<T*>(raw_base_ptr);
     void* raw_ptr = op_fn_(Operation::kGetPointer);
-    Synchronized<T>* ptr = static_cast<Synchronized<T>*>(raw_ptr);
+    SynchronizedBase* ptr = static_cast<SynchronizedBase*>(raw_ptr);
     auto make_task = [&] {
-      return BindForSending(ptr->Bind(std::forward<Callable>(callable)),
+      return BindForSending(ptr->Bind(base, std::forward<Callable>(callable)),
                             ForwardOrPassDispatcher(dispatcher, std::forward<Args>(args))...);
     };
     return Builder<Result, decltype(make_task()), SubmitWithDispatcherBoundStorage>(
@@ -139,6 +148,7 @@ class DispatcherBoundStorage final {
 
   enum class Operation : uint8_t {
     kDestruct,
+    kGetBasePointer,
     kGetPointer,
   };
 

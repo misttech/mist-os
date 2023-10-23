@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/testing/cpp/real_loop.h>
 #include <lib/async/cpp/executor.h>
 #include <lib/async_patterns/cpp/dispatcher_bound.h>
 #include <lib/sync/cpp/completion.h>
@@ -17,19 +18,18 @@
 namespace {
 
 // In this test fixture, the loop should always be run from the main thread.
-class DispatcherBound : public testing::Test {
+class DispatcherBound : public testing::Test, public loop_fixture::RealLoop {
  protected:
   void SetUp() override { loop_thread_id_ = std::this_thread::get_id(); }
 
   void TearDown() override {}
 
-  async::Loop& loop() { return loop_; }
+  async::Loop& loop() { return loop_fixture::RealLoop::loop(); }
 
   std::thread::id loop_thread_id() const { return loop_thread_id_; }
 
  private:
   std::thread::id loop_thread_id_;
-  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
 };
 
 using ArcAtomic = std::shared_ptr<std::atomic_int>;
@@ -559,6 +559,90 @@ TEST(DispatcherBoundDeathTest, DispatcherIsNotSynchronized) {
                  "asynchronous objects.");
   });
   thread_b.join();
+}
+
+TEST_F(DispatcherBound, SubClass) {
+  struct Base {
+    explicit Base(int a) : a_(a) {}
+    virtual ~Base() {}
+    virtual std::string Speak() { return "Base"; }
+    int a_;
+  };
+  struct Derived : public Base {
+    Derived(int a, int b) : Base(a), b_(b) {}
+    std::string Speak() override { return "Derived"; }
+    int b_;
+  };
+
+  {
+    async_patterns::DispatcherBound<Base> base(dispatcher());
+    base.emplace(1);
+    EXPECT_EQ(RunPromise(base.AsyncCall(&Base::Speak).promise()).value(), "Base");
+  }
+
+  {
+    async_patterns::DispatcherBound<Base> base(dispatcher());
+    base.emplace<Derived>(1, 2);
+    EXPECT_EQ(RunPromise(base.AsyncCall(&Base::Speak).promise()).value(), "Derived");
+  }
+}
+
+TEST_F(DispatcherBound, PureVirtualMethod) {
+  struct Base {
+    Base() = default;
+    virtual ~Base() {}
+    virtual std::string Speak() = 0;
+    int a_;
+  };
+  struct Derived : public Base {
+    Derived() = default;
+    std::string Speak() override { return "Derived"; }
+    int b_;
+  };
+
+  {
+    async_patterns::DispatcherBound<Base> base(dispatcher());
+    base.emplace<Derived>();
+    EXPECT_EQ(RunPromise(base.AsyncCall(&Base::Speak).promise()).value(), "Derived");
+  }
+}
+
+TEST_F(DispatcherBound, ComplexLayout) {
+  class Foo {
+   public:
+    Foo() = default;
+    virtual ~Foo() {}
+
+   private:
+    virtual std::string GetFoo() { return std::to_string(foo_); }
+    int foo_;
+  };
+  class Bar {
+   public:
+    Bar() = default;
+    virtual ~Bar() {}
+
+   private:
+    virtual std::string GetBar() { return std::to_string(bar_); }
+    int bar_;
+  };
+  struct Base {
+    Base() = default;
+    virtual ~Base() {}
+    virtual std::string Speak() = 0;
+    int a_;
+  };
+  struct Derived : public Foo, public Base, public Bar {
+    Derived() = default;
+    std::string Speak() override { return "Derived"; }
+    int b_;
+  };
+
+  {
+    async_patterns::DispatcherBound<Base> base(dispatcher());
+    base.emplace<Derived>();
+    EXPECT_EQ(RunPromise(base.AsyncCall(&Base::Speak).promise()).value(), "Derived");
+  }
 }
 
 }  // namespace

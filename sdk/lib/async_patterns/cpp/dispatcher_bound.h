@@ -111,7 +111,7 @@ class DispatcherBound {
   template <typename... Args>
   explicit DispatcherBound(async_dispatcher_t* dispatcher, std::in_place_t, Args&&... args)
       : dispatcher_(dispatcher) {
-    storage_.Construct<T>(dispatcher, std::forward<Args>(args)...);
+    storage_.Construct<T, T>(dispatcher, std::forward<Args>(args)...);
   }
 
   // Constructs a |DispatcherBound| that does not hold an instance of |T|.
@@ -124,11 +124,17 @@ class DispatcherBound {
   // If this object already holds an instance of |T|, that older instance will
   // be asynchronously destroyed on the dispatcher.
   //
+  // If |T2| is specified, it must be same as |T| or a subclass. Then an instance
+  // of |T2| will be constructed. This can be useful for mocking: |T| may be some
+  // interface, and when constructing the object, either a fake (in unit tests)
+  // or a real concrete type (in production) will be specified.
+  //
   // See |async_patterns::BindForSending| for detailed requirements on |args|.
-  template <typename... Args>
+  template <typename T2 = T, typename... Args>
   void emplace(Args&&... args) {
+    static_assert(std::is_base_of_v<T, T2>, "|T| must be a base class of |T2|.");
     reset();
-    storage_.Construct<T>(dispatcher_, std::forward<Args>(args)...);
+    storage_.Construct<T, T2>(dispatcher_, std::forward<Args>(args)...);
   }
 
   // Asynchronously calls |member|, a pointer to member function of |T|, using

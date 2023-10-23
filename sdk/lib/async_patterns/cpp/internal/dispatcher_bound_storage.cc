@@ -46,7 +46,15 @@ class SelfDeletingTask : public async_task_t {
   fit::callback<void()> task_;
 };
 
+constexpr char kDispatcherBoundThreadSafetyDescription[] =
+    "|async_patterns::DispatcherBound| is meant to manage thread-unsafe asynchronous objects. "
+    "Those objects should only be used from synchronized dispatchers. "
+    "However, the |async_dispatcher_t*| provided is not a synchronized dispatcher.";
+
 }  // namespace
+
+SynchronizedBase::SynchronizedBase(async_dispatcher_t* dispatcher)
+    : checker_(dispatcher, kDispatcherBoundThreadSafetyDescription) {}
 
 DispatcherBoundStorage::~DispatcherBoundStorage() {
   ZX_ASSERT_MSG(!op_fn_, "Must call |Destruct| to destroy the dispatcher-bound object.");
