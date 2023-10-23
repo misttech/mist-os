@@ -45,34 +45,34 @@ class DriverHost;
 // clang-format off
 
 // This device is never destroyed
-#define DEV_CTX_IMMORTAL           static_cast<uint32_t>(fuchsia_driver_development::DeviceFlags::kImmortal)
+#define DEV_CTX_IMMORTAL           static_cast<uint32_t>(fuchsia_driver_legacy::DeviceFlags::kImmortal)
 
 // This device requires that children are created in a
 // new driver_host attached to a proxy device
-#define DEV_CTX_MUST_ISOLATE           static_cast<uint32_t>(fuchsia_driver_development::DeviceFlags::kMustIsolate)
+#define DEV_CTX_MUST_ISOLATE           static_cast<uint32_t>(fuchsia_driver_legacy::DeviceFlags::kMustIsolate)
 
 // This device is bound and not eligible for binding
 // again until unbound.  Not allowed on ALLOW_MULTI_COMPOSITE ctx.
-#define DEV_CTX_BOUND           static_cast<uint32_t>(fuchsia_driver_development::DeviceFlags::kBound)
+#define DEV_CTX_BOUND           static_cast<uint32_t>(fuchsia_driver_legacy::DeviceFlags::kBound)
 
 // Device has been remove()'d
-#define DEV_CTX_DEAD           static_cast<uint32_t>(fuchsia_driver_development::DeviceFlags::kDead)
+#define DEV_CTX_DEAD           static_cast<uint32_t>(fuchsia_driver_legacy::DeviceFlags::kDead)
 
 // This device is a fragment of a composite device and
 // can be part of multiple composite devices.
-#define DEV_CTX_ALLOW_MULTI_COMPOSITE           static_cast<uint32_t>(fuchsia_driver_development::DeviceFlags::kAllowMultiComposite)
+#define DEV_CTX_ALLOW_MULTI_COMPOSITE           static_cast<uint32_t>(fuchsia_driver_legacy::DeviceFlags::kAllowMultiComposite)
 
 // Device is a proxy -- its "parent" is the device it's
 // a proxy to.
-#define DEV_CTX_PROXY           static_cast<uint32_t>(fuchsia_driver_development::DeviceFlags::kProxy)
+#define DEV_CTX_PROXY           static_cast<uint32_t>(fuchsia_driver_legacy::DeviceFlags::kProxy)
 
 // Device is not visible in devfs or bindable.
 // Devices may be created in this state, but may not
 // return to this state once made visible.
-#define DEV_CTX_INVISIBLE           static_cast<uint32_t>(fuchsia_driver_development::DeviceFlags::kInvisible)
+#define DEV_CTX_INVISIBLE           static_cast<uint32_t>(fuchsia_driver_legacy::DeviceFlags::kInvisible)
 
 // Device should not go through auto-bind process
-#define DEV_CTX_SKIP_AUTOBIND           static_cast<uint32_t>(fuchsia_driver_development::DeviceFlags::kSkipAutobind)
+#define DEV_CTX_SKIP_AUTOBIND           static_cast<uint32_t>(fuchsia_driver_legacy::DeviceFlags::kSkipAutobind)
 
 // clang-format on
 

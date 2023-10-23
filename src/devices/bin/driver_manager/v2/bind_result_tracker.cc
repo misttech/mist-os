@@ -44,7 +44,7 @@ void BindResultTracker::ReportSuccessfulBind(const std::string_view& node_name,
 
 void BindResultTracker::ReportSuccessfulBind(
     const std::string_view& node_name,
-    const std::vector<fuchsia_driver_development::LegacyCompositeParent>& legacy_composite_parents,
+    const std::vector<fuchsia_driver_legacy::CompositeParent>& legacy_composite_parents,
     const std::vector<fuchsia_driver_framework::CompositeParent>& composite_parents) {
   size_t current;
   {

@@ -8,6 +8,7 @@
 
 namespace fdd = fuchsia_driver_development;
 namespace fdi = fuchsia_driver_index;
+namespace fdl = fuchsia_driver_legacy;
 
 namespace dfv2 {
 
@@ -173,7 +174,7 @@ void BindManager::BindInternal(BindRequest request,
   }
 
   // Check the DFv1 composites first.
-  std::vector<fdd::LegacyCompositeParent> bound_legacy_composite_info =
+  std::vector<fdl::CompositeParent> bound_legacy_composite_info =
       legacy_composite_manager_.BindNode(node);
   if (!bound_legacy_composite_info.empty()) {
     bind_node_set_.RemoveOrphanedNode(node->MakeComponentMoniker());
@@ -217,7 +218,7 @@ void BindManager::BindInternal(BindRequest request,
 
 void BindManager::OnMatchDriverCallback(
     BindRequest request, fidl::WireUnownedResult<fdi::DriverIndex::MatchDriver>& result,
-    const std::vector<fdd::LegacyCompositeParent>& bound_legacy_composite_infos,
+    const std::vector<fdl::CompositeParent>& bound_legacy_composite_infos,
     BindMatchCompleteCallback match_complete_callback) {
   auto report_no_bind = fit::defer([&request, &match_complete_callback]() mutable {
     if (request.tracker) {

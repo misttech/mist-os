@@ -46,7 +46,7 @@ TEST_F(DriverDevelopmentTest, DeviceInfo) {
 
         ASSERT_EQ(std::string(result->drivers[0].topological_path().get()),
                   std::string("/dev/sys/platform-bus/parent-device"));
-        ASSERT_EQ(result->drivers[0].flags(), fuchsia_driver_development::DeviceFlags::kBound);
+        ASSERT_EQ(result->drivers[0].flags(), fuchsia_driver_legacy::DeviceFlags::kBound);
       });
 
   loop.RunUntilIdle();

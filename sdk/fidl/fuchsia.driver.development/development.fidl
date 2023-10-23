@@ -12,37 +12,6 @@ using zx;
 
 const BINDING_RESULT_MAX uint8 = 10;
 
-type DeviceFlags = strict bits : uint32 {
-    //// This device is never destroyed
-    IMMORTAL = 0x0001;
-    /// This device requires that children are created in a
-    /// new driver_host attached to a proxy device
-    MUST_ISOLATE = 0x0002;
-
-    /// This device is bound and not eligible for binding
-    /// again until unbound.  Not allowed on ALLOW_MULTI_COMPOSITE ctx.
-    BOUND = 0x0008;
-
-    /// Device has been remove()'d
-    DEAD = 0x0010;
-
-    /// This device is a fragment of a composite device and
-    /// can be part of multiple composite devices.
-    ALLOW_MULTI_COMPOSITE = 0x0020;
-
-    /// Device is a proxy -- its "parent" is the device it's
-    /// a proxy to.
-    PROXY = 0x0040;
-
-    /// Device is not visible in devfs or bindable.
-    /// Devices may be created in this state, but may not
-    /// return to this state once made visible.
-    INVISIBLE = 0x0080;
-
-    /// Device should not go through auto-bind process.
-    SKIP_AUTOBIND = 0x0100;
-};
-
 type DeviceInfo = table {
     /// (DFv1/DFv2) Unique ID identifying the device.
     1: id uint64;
@@ -71,7 +40,7 @@ type DeviceInfo = table {
     8: property_list fuchsia.driver.legacy.DevicePropertyList;
 
     /// (DFv1) Tracks the state of the device.
-    9: flags DeviceFlags;
+    9: flags fuchsia.driver.legacy.DeviceFlags;
 
     /// (DFv2) The collection-relative moniker of the node.
    10: moniker string:fuchsia.driver.legacy.DEVICE_PATH_MAX;
@@ -102,48 +71,12 @@ type NodeBindingInfo = table {
     3: composite_parents vector<fuchsia.driver.framework.CompositeParent>:MAX;
     /// The legacy composite parents that this node binded to.
     /// Can be present alongside |composite_parents|, but not |driver_url|.
-    4: legacy_composite_parents vector<LegacyCompositeParent>:MAX;
-};
-
-/// Information for a composite node's fragment in DFv1.
-type LegacyCompositeFragmentInfo = table {
-    1: name string:MAX;
-    2: bind_rules
-            vector<fuchsia.driver.legacy.BindInstruction>:fuchsia.driver.legacy.BIND_RULES_INSTRUCTIONS_MAX;
-};
-
-/// Information for a legacy composite in DFv1.
-type LegacyCompositeInfo = table {
-    /// The name of the composite node.
-    1: name string:MAX;
-
-    /// A list of composite fragment information.
-    2: fragments vector<LegacyCompositeFragmentInfo>:MAX;
-
-    /// The node properties in the composite node.
-    3: properties
-            vector<fuchsia.driver.framework.NodeProperty>:fuchsia.driver.framework.MAX_PROPERTY_COUNT;
-
-    /// Information about the driver matched to the legacy composite node.
-    4: matched_driver fuchsia.driver.framework.DriverInfo;
-
-    /// This is the primary fragment. If it is unavailable the first fragment at index 0
-    /// is the primary fragment.
-    5: primary_fragment_index uint32;
-};
-
-/// A parent to a composite that is defined by a legacy composite.
-type LegacyCompositeParent = table {
-    /// Information about the legacy composite node that this is a parent of.
-    1: composite LegacyCompositeInfo;
-
-    /// The index of this parent in the fragments.
-    2: index uint32;
+    4: legacy_composite_parents vector<fuchsia.driver.legacy.CompositeParent>:MAX;
 };
 
 /// Contains information for either a composite or legacy composite.
 type CompositeInfo = strict union {
-    1: legacy_composite LegacyCompositeInfo;
+    1: legacy_composite fuchsia.driver.legacy.CompositeInfo;
     2: composite fuchsia.driver.framework.CompositeInfo;
 };
 

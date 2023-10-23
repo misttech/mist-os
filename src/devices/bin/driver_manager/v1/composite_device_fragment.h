@@ -68,7 +68,7 @@ class CompositeDeviceFragment
   // fragment.
   zx_status_t CreateProxy(const fbl::RefPtr<DriverHost> driver_host);
 
-  fuchsia_driver_development::wire::LegacyCompositeFragmentInfo GetCompositeFragmentInfo(
+  fuchsia_driver_legacy::wire::CompositeFragmentInfo GetCompositeFragmentInfo(
       fidl::AnyArena& arena) const;
 
   std::string_view name() const { return name_; }

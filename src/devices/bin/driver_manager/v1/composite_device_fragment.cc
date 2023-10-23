@@ -12,6 +12,7 @@
 #include "src/devices/lib/log/log.h"
 
 namespace fdd = fuchsia_driver_development;
+namespace fdl = fuchsia_driver_legacy;
 
 CompositeDeviceFragment::CompositeDeviceFragment(CompositeDevice* composite, std::string name,
                                                  uint32_t index,
@@ -20,10 +21,10 @@ CompositeDeviceFragment::CompositeDeviceFragment(CompositeDevice* composite, std
 
 CompositeDeviceFragment::~CompositeDeviceFragment() = default;
 
-fdd::wire::LegacyCompositeFragmentInfo CompositeDeviceFragment::GetCompositeFragmentInfo(
+fdl::wire::CompositeFragmentInfo CompositeDeviceFragment::GetCompositeFragmentInfo(
     fidl::AnyArena& arena) const {
-  auto fragment_info = fdd::wire::LegacyCompositeFragmentInfo::Builder(arena).name(
-      fidl::StringView(arena, name_.c_str()));
+  auto fragment_info =
+      fdl::wire::CompositeFragmentInfo::Builder(arena).name(fidl::StringView(arena, name_.c_str()));
 
   fidl::VectorView<fuchsia_driver_legacy::wire::BindInstruction> bind_rules(arena,
                                                                             bind_rules_.size());

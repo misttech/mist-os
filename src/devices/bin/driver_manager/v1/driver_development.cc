@@ -10,6 +10,7 @@
 #include "src/devices/bin/driver_manager/v1/driver_host.h"
 
 namespace fdd = fuchsia_driver_development;
+namespace fdl = fuchsia_driver_legacy;
 
 namespace {
 
@@ -130,7 +131,7 @@ zx::result<std::vector<fdd::wire::DeviceInfo>> GetDeviceInfo(
         .str_props = str_props,
     });
 
-    device_info.flags(fdd::wire::DeviceFlags::TruncatingUnknown(device->flags));
+    device_info.flags(fdl::DeviceFlags::TruncatingUnknown(device->flags));
 
     if (device->protocol_id() != 0 && device->protocol_id() != ZX_PROTOCOL_MISC) {
       device_info.protocol_id(device->protocol_id());

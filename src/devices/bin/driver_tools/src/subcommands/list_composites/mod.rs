@@ -9,6 +9,7 @@ use {
     anyhow::{Context, Result},
     args::ListCompositesCommand,
     fidl_fuchsia_driver_development as fdd, fidl_fuchsia_driver_framework as fdf,
+    fidl_fuchsia_driver_legacy as fdl,
     std::io::Write,
 };
 
@@ -97,7 +98,7 @@ fn write_composite(
 
 fn write_legacy_composite(
     writer: &mut dyn Write,
-    composite: fdd::LegacyCompositeInfo,
+    composite: fdl::CompositeInfo,
     parent_topological_paths: Vec<Option<String>>,
     topological_path: Option<String>,
     verbose: bool,
@@ -127,7 +128,7 @@ fn write_legacy_composite(
 fn write_legacy_composite_node_info(
     writer: &mut dyn Write,
     primary_fragment_index: usize,
-    fragments: Vec<fdd::LegacyCompositeFragmentInfo>,
+    fragments: Vec<fdl::CompositeFragmentInfo>,
     properties: Vec<fdf::NodeProperty>,
     parent_topological_paths: Vec<Option<String>>,
 ) -> Result<()> {
@@ -213,14 +214,14 @@ mod tests {
         ]
     }
 
-    fn gen_legacy_composite_data() -> fdd::LegacyCompositeInfo {
+    fn gen_legacy_composite_data() -> fdl::CompositeInfo {
         let test_fragments = vec![
-            fdd::LegacyCompositeFragmentInfo {
+            fdl::CompositeFragmentInfo {
                 name: Some("sysmem".to_string()),
                 bind_rules: Some(vec![BindInstruction { op: 1, arg: 30, debug: 0 }]),
                 ..Default::default()
             },
-            fdd::LegacyCompositeFragmentInfo {
+            fdl::CompositeFragmentInfo {
                 name: Some("acpi".to_string()),
                 bind_rules: Some(vec![
                     BindInstruction { op: 2, arg: 50, debug: 0 },
@@ -235,7 +236,7 @@ mod tests {
             ..Default::default()
         };
 
-        fdd::LegacyCompositeInfo {
+        fdl::CompositeInfo {
             name: Some("composite_dev".to_string()),
             fragments: Some(test_fragments),
             properties: Some(gen_composite_property_data()),
@@ -358,12 +359,12 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_composite_empty_fields() {
         let test_fragments = vec![
-            fdd::LegacyCompositeFragmentInfo {
+            fdl::CompositeFragmentInfo {
                 name: Some("sysmem".to_string()),
                 bind_rules: Some(vec![BindInstruction { op: 1, arg: 30, debug: 0 }]),
                 ..Default::default()
             },
-            fdd::LegacyCompositeFragmentInfo {
+            fdl::CompositeFragmentInfo {
                 name: Some("acpi".to_string()),
                 bind_rules: Some(vec![
                     BindInstruction { op: 2, arg: 50, debug: 0 },
@@ -373,7 +374,7 @@ mod tests {
             },
         ];
 
-        let test_composite = fdd::LegacyCompositeInfo {
+        let test_composite = fdl::CompositeInfo {
             name: Some("composite_dev".to_string()),
             fragments: Some(test_fragments),
             properties: Some(gen_composite_property_data()),

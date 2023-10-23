@@ -14,6 +14,7 @@ using namespace fuchsia_driver_framework;
 }  //  namespace fdf
 
 namespace fdd = fuchsia_driver_development;
+namespace fdl = fuchsia_driver_legacy;
 namespace fdm = fuchsia_device_manager;
 
 namespace dfv2 {
@@ -62,8 +63,8 @@ zx::result<CompositeDeviceFragment> CompositeDeviceFragment::Create(fdm::DeviceF
   return zx::ok(std::move(composite_fragment));
 }
 
-fdd::LegacyCompositeFragmentInfo CompositeDeviceFragment::GetCompositeFragmentInfo() const {
-  fdd::LegacyCompositeFragmentInfo fragment_info;
+fdl::CompositeFragmentInfo CompositeDeviceFragment::GetCompositeFragmentInfo() const {
+  fdl::CompositeFragmentInfo fragment_info;
   fragment_info.name() = name_;
 
   std::vector<fuchsia_driver_legacy::BindInstruction> bind_rules(bind_rules_.size());
@@ -140,9 +141,8 @@ fdd::CompositeNodeInfo CompositeDeviceAssembler::GetCompositeInfo() const {
   return info;
 }
 
-fuchsia_driver_development::LegacyCompositeInfo CompositeDeviceAssembler::GetLegacyCompositeInfo()
-    const {
-  std::vector<fdd::LegacyCompositeFragmentInfo> fragments;
+fuchsia_driver_legacy::CompositeInfo CompositeDeviceAssembler::GetLegacyCompositeInfo() const {
+  std::vector<fdl::CompositeFragmentInfo> fragments;
   fragments.reserve(fragments_.size());
   for (auto& fragment : fragments_) {
     fragments.push_back(fragment.GetCompositeFragmentInfo());
@@ -164,7 +164,7 @@ fuchsia_driver_development::LegacyCompositeInfo CompositeDeviceAssembler::GetLeg
     }
   }
 
-  fdd::LegacyCompositeInfo legacy_composite_info({
+  fdl::CompositeInfo legacy_composite_info({
       .name = name_,
       .fragments = fragments,
       .properties = properties,
@@ -336,16 +336,15 @@ zx_status_t CompositeDeviceManager::AddCompositeDevice(
   return ZX_OK;
 }
 
-std::vector<fdd::LegacyCompositeParent> CompositeDeviceManager::BindNode(
-    std::shared_ptr<Node> node) {
-  std::vector<fdd::LegacyCompositeParent> result_info;
+std::vector<fdl::CompositeParent> CompositeDeviceManager::BindNode(std::shared_ptr<Node> node) {
+  std::vector<fdl::CompositeParent> result_info;
   for (auto& assembler : assemblers_) {
     std::optional<uint32_t> bound = assembler->BindNode(node);
     if (!bound.has_value()) {
       continue;
     }
 
-    result_info.push_back(fdd::LegacyCompositeParent({assembler->GetLegacyCompositeInfo(), bound}));
+    result_info.push_back(fdl::CompositeParent({assembler->GetLegacyCompositeInfo(), bound}));
 
     // If the node cannot multibind, then it should only be matched with one
     // legacy composite.

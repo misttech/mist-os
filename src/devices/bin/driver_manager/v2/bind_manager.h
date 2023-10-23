@@ -196,8 +196,7 @@ class BindManager {
   void OnMatchDriverCallback(
       BindRequest request,
       fidl::WireUnownedResult<fuchsia_driver_index::DriverIndex::MatchDriver>& result,
-      const std::vector<fuchsia_driver_development::LegacyCompositeParent>&
-          bound_legacy_composite_info,
+      const std::vector<fuchsia_driver_legacy::CompositeParent>& bound_legacy_composite_info,
       BindMatchCompleteCallback match_complete_callback);
 
   // Binds |node| to |result|.

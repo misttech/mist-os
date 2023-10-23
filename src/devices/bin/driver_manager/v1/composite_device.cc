@@ -14,6 +14,7 @@
 #include "src/devices/lib/log/log.h"
 
 namespace fdd = fuchsia_driver_development;
+namespace fdl = fuchsia_driver_legacy;
 namespace fdm = fuchsia_device_manager;
 
 namespace fdf {
@@ -527,7 +528,7 @@ fdd::wire::CompositeNodeInfo CompositeDevice::GetLegacyCompositeInfo(fidl::AnyAr
     composite_info = composite_info.topological_path(device_->MakeTopologicalPath());
   }
 
-  auto legacy_info = fdd::wire::LegacyCompositeInfo::Builder(arena)
+  auto legacy_info = fdl::wire::CompositeInfo::Builder(arena)
                          .properties(ConvertToNodeProperties(arena, properties_, str_properties_))
                          .name(fidl::StringView(arena, name_.c_str()))
                          .primary_fragment_index(primary_fragment_index_);
@@ -543,7 +544,7 @@ fdd::wire::CompositeNodeInfo CompositeDevice::GetLegacyCompositeInfo(fidl::AnyAr
     legacy_info = legacy_info.matched_driver(matched_driver);
   }
 
-  fidl::VectorView<fdd::wire::LegacyCompositeFragmentInfo> fragments(arena, fragments_count_);
+  fidl::VectorView<fdl::wire::CompositeFragmentInfo> fragments(arena, fragments_count_);
   fidl::VectorView<fidl::StringView> parent_topological_paths(arena, fragments_count_);
   uint32_t index = 0;
   for (auto& fragment : fragments_) {
