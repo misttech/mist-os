@@ -4,6 +4,8 @@
 
 #include "vdso-calculate-utc.h"
 
+#include <lib/affine/ratio.h>
+
 #include "vdso-aux.h"
 #include "vdso-calculate-monotonic.h"
 
@@ -32,8 +34,8 @@ int64_t calculate_utc_time_nsec() {
     // Data has been updated during the reading of it, so is invalid
     return UTC_INVALID;
   }
-  int64_t utc_nsec = (monotonic_time - mono_to_utc_reference_offset) * mono_to_utc_synthetic_ticks /
-                         mono_to_utc_reference_ticks +
-                     mono_to_utc_synthetic_offset;
-  return utc_nsec;
+
+  affine::Ratio mono_to_utc_ratio(mono_to_utc_synthetic_ticks, mono_to_utc_reference_ticks);
+  return mono_to_utc_ratio.Scale(monotonic_time - mono_to_utc_reference_offset) +
+         mono_to_utc_synthetic_offset;
 }

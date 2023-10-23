@@ -472,11 +472,13 @@ config("vdso_config") {
 
 source_set("vdso-calculate-monotonic") {
   sources = [ "vdso/vdso-calculate-monotonic.cc" ]
+  deps = [ "//zircon/system/ulib/affine" ]
   configs += [ ":vdso_config" ]
 }
 
 source_set("vdso-calculate-utc") {
   sources = [ "vdso/vdso-calculate-utc.cc" ]
+  deps = [ "//zircon/system/ulib/affine" ]
   configs += [ ":vdso_config" ]
 }
 
