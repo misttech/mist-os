@@ -18,6 +18,9 @@ namespace async_patterns {
 // manually running an event loop.
 //
 // See |async_patterns::DispatcherBound| for general information.
+//
+// See |async_patterns::SyncProxy| which uses this class to manage a thread-unsafe
+// object and expose synchronous wrapper methods for every member method you specify.
 template <typename T>
 class TestDispatcherBound final : public DispatcherBound<T> {
  public:
