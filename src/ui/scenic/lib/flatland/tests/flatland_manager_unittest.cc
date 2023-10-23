@@ -135,12 +135,16 @@ class FlatlandManagerTest : public LoggingEventLoop, public ::testing::Test {
     // the tests.
     {
       std::lock_guard lock(removed_session_thread_checker_);
+      std::for_each(removed_sessions_.begin(), removed_sessions_.end(), [](auto session_id) {
+        FX_LOGS(INFO) << "`removed_sessions_` includes " << session_id;
+      });
       removed_sessions_.clear();
     }
     if (manager_) {
-      const size_t session_count = manager_->GetSessionCount();
-      EXPECT_CALL(*mock_flatland_presenter_, RemoveSession(_, _)).Times(AtLeast(session_count));
-      RunLoopUntil([this, session_count] {
+      const size_t initial_session_count = manager_->GetSessionCount();
+      EXPECT_CALL(*mock_flatland_presenter_, RemoveSession(_, _))
+          .Times(AtLeast(initial_session_count));
+      RunLoopUntil([this, initial_session_count] {
         std::lock_guard lock(removed_session_thread_checker_);
         // It could be tempting to only check a single condition here. However,
         // it won't work as expected. `FlatlandManager` posts the task
@@ -151,7 +155,11 @@ class FlatlandManagerTest : public LoggingEventLoop, public ::testing::Test {
         // session, which is handled on the presenter handler's FIDL loop.
         // There may be a critical section in between and we should make sure
         // both conditions are fulfilled before proceeding.
-        return manager_->GetSessionCount() == 0 && removed_sessions_.size() == session_count;
+        auto current_session_count = manager_->GetSessionCount();
+        std::for_each(removed_sessions_.begin(), removed_sessions_.end(), [](auto session_id) {
+          FX_LOGS(INFO) << "`removed_sessions_` includes " << session_id;
+        });
+        return current_session_count == 0 && removed_sessions_.size() == initial_session_count;
       });
     }
 
@@ -176,7 +184,8 @@ class FlatlandManagerTest : public LoggingEventLoop, public ::testing::Test {
 
   fidl::InterfacePtr<fuchsia::ui::composition::Flatland> CreateFlatland() {
     fidl::InterfacePtr<fuchsia::ui::composition::Flatland> flatland;
-    manager_->CreateFlatland(flatland.NewRequest(dispatcher()));
+    const scheduling::SessionId id = manager_->CreateFlatland(flatland.NewRequest(dispatcher()));
+    FX_LOGS(INFO) << "Created flatland with ID " << id;
     return flatland;
   }
 

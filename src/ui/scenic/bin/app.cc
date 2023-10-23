@@ -457,8 +457,12 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
 
     // TODO(fxbug.dev/67206): these should be moved into FlatlandManager.
     {
+      // Note: can't use `fit::bind_member()` here, because `CreateFlatland()` returns non-void.
       fit::function<void(fidl::InterfaceRequest<fuchsia::ui::composition::Flatland>)> handler =
-          fit::bind_member(flatland_manager_.get(), &flatland::FlatlandManager::CreateFlatland);
+          [flatland_manager = flatland_manager_.get()](
+              fidl::InterfaceRequest<fuchsia::ui::composition::Flatland> request) {
+            flatland_manager->CreateFlatland(std::move(request));
+          };
       FX_CHECK(app_context_->outgoing()->AddPublicService(std::move(handler)) == ZX_OK);
     }
     {

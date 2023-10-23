@@ -48,7 +48,8 @@ class FlatlandManager {
           register_mouse_source);
   ~FlatlandManager();
 
-  void CreateFlatland(fidl::InterfaceRequest<fuchsia::ui::composition::Flatland> flatland);
+  scheduling::SessionId CreateFlatland(
+      fidl::InterfaceRequest<fuchsia::ui::composition::Flatland> flatland);
 
   // TODO(fxbug.dev/76985): this creates a FlatlandDisplay attached to the "primary" hardware
   // display (i.e. the only one supported).  In the future there will be APIs that allow clients to

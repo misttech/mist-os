@@ -74,7 +74,7 @@ FlatlandManager::~FlatlandManager() {
   }
 }
 
-void FlatlandManager::CreateFlatland(
+scheduling::SessionId FlatlandManager::CreateFlatland(
     fidl::InterfaceRequest<fuchsia::ui::composition::Flatland> request) {
   CheckIsOnMainThread();
 
@@ -116,6 +116,7 @@ void FlatlandManager::CreateFlatland(
   FX_DCHECK(status == ZX_OK);
 
   alive_sessions_++;
+  return id;
 }
 
 std::shared_ptr<Flatland> FlatlandManager::NewFlatland(
