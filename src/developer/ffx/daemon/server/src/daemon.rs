@@ -15,8 +15,8 @@ use ffx_daemon_events::{
 use ffx_daemon_protocols::create_protocol_register_map;
 use ffx_daemon_target::{
     manual_targets::{Config, ManualTargets},
-    target::Target,
-    target_collection::TargetCollection,
+    target::{self, Target, TargetProtocol, TargetTransport},
+    target_collection::{TargetCollection, TargetUpdateFilter},
     zedboot::zedboot_discovery,
 };
 use ffx_metrics::{add_daemon_launch_event, add_daemon_metrics_event};
@@ -52,7 +52,7 @@ use std::{
     path::PathBuf,
     rc::Rc,
     sync::Arc,
-    time::{Duration, Instant},
+    time::Duration,
 };
 
 #[cfg(not(target_os = "macos"))]
@@ -121,8 +121,8 @@ impl DaemonEventHandler {
             }
         };
 
-        let target = match Target::from_rcs_connection(rcs).await {
-            Ok(target) => target,
+        let identify = match rcs.identify_host().await {
+            Ok(v) => v,
             Err(err) => {
                 tracing::error!(
                     "Target from Overnet {} could not be identified: {:?}",
@@ -133,50 +133,56 @@ impl DaemonEventHandler {
             }
         };
 
-        tracing::trace!("Target from Overnet {} is {}", node_id, target.nodename_str());
-        self.target_collection.merge_insert(target);
-    }
+        tracing::info!("Peer {node_id} identifies as: {identify:?}");
 
-    #[tracing::instrument(skip(self))]
-    async fn handle_overnet_peer_lost(&self, node_id: u64) {
-        if let Some(target) = self
-            .target_collection
-            .targets()
-            .iter()
-            .find(|target| target.overnet_node_id() == Some(node_id))
-        {
-            target.disconnect();
+        let (update, addrs) =
+            target::TargetUpdateBuilder::from_rcs_identify(rcs.clone(), &identify);
+
+        let updated = self.target_collection.update_target(
+            &[
+                TargetUpdateFilter::Ids(identify.ids.as_deref().unwrap_or(&[])),
+                TargetUpdateFilter::NetAddrs(&addrs),
+            ],
+            update.build(),
+            false,
+        );
+
+        if updated == 0 {
+            tracing::error!("Target from Overnet {node_id} did not match any known targets");
         }
     }
 
     #[tracing::instrument(skip(self))]
-    fn handle_fastboot(&self, t: TargetInfo) {
-        tracing::trace!(
-            "Found new target via fastboot: {}",
-            t.nodename.clone().unwrap_or("<unknown>".to_string())
+    async fn handle_overnet_peer_lost(&self, node_id: u64) {
+        self.target_collection.update_target(
+            &[TargetUpdateFilter::OvernetNodeId(node_id)],
+            target::TargetUpdateBuilder::new().disconnected().build(),
+            false,
         );
-        let target = self.target_collection.merge_insert(Target::from_target_info(t.into()));
-        target.update_connection_state(|s| match s {
-            TargetConnectionState::Disconnected | TargetConnectionState::Fastboot(_) => {
-                TargetConnectionState::Fastboot(Instant::now())
-            }
-            _ => s,
-        });
     }
 
     #[tracing::instrument(skip(self))]
     async fn handle_zedboot(&self, t: TargetInfo) {
         tracing::trace!(
             "Found new target via zedboot: {}",
-            t.nodename.clone().unwrap_or("<unknown>".to_string())
+            t.nodename.as_deref().unwrap_or("<unknown>")
         );
-        let target = self.target_collection.merge_insert(Target::from_netsvc_target_info(t.into()));
-        target.update_connection_state(|s| match s {
-            TargetConnectionState::Disconnected | TargetConnectionState::Zedboot(_) => {
-                TargetConnectionState::Zedboot(Instant::now())
-            }
-            _ => s,
-        });
+
+        let addrs = t.addresses.into_iter().map(|a| a.into()).collect::<Vec<_>>();
+
+        let mut update = target::TargetUpdateBuilder::new()
+            .net_addresses(&addrs)
+            .discovered(TargetProtocol::Netsvc, TargetTransport::Network);
+
+        if let Some(name) = t.nodename {
+            update = update.identity(target::Identity::from_name(name));
+        }
+
+        self.target_collection.update_target(
+            &[TargetUpdateFilter::NetAddrs(&addrs)],
+            update.build(),
+            true,
+        );
     }
 }
 
@@ -300,12 +306,6 @@ impl EventHandler<DaemonEvent> for DaemonEventHandler {
 
         match event {
             DaemonEvent::WireTraffic(traffic) => match traffic {
-                WireTrafficType::Mdns(t) => {
-                    tracing::warn!("mdns traffic fired in daemon. This is deprecated: {:?}", t);
-                }
-                WireTrafficType::Fastboot(t) => {
-                    self.handle_fastboot(t);
-                }
                 WireTrafficType::Zedboot(t) => {
                     self.handle_zedboot(t).await;
                 }
@@ -927,7 +927,7 @@ mod test {
     use fidl_fuchsia_developer_remotecontrol::RemoteControlMarker;
     use fuchsia_async::Task;
     use std::{
-        cell::RefCell, collections::BTreeSet, iter::FromIterator, str::FromStr, time::SystemTime,
+        cell::RefCell, collections::BTreeSet, iter::FromIterator, str::FromStr, time::{SystemTime, Instant},
     };
 
     fn spawn_test_daemon() -> (DaemonProxy, Daemon, Task<Result<()>>) {

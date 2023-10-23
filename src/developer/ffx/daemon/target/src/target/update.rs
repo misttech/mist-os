@@ -68,7 +68,7 @@ pub struct TargetUpdate<'a> {
     /// The known identity of the target.
     ///
     /// NOTE: Replaces previous identity.
-    identity: Option<SharedIdentity>,
+    pub(crate) identity: Option<SharedIdentity>,
 
     /// The target's new connection state.
     connection: Option<Connection<'a>>,

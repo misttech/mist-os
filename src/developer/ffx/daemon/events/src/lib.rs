@@ -38,13 +38,9 @@ pub struct TargetInfo {
     pub ssh_host_address: Option<String>,
 }
 
+// TODO(b/287780199): Remove once the usage in Zedboot discovery is removed/refactored.
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub enum WireTrafficType {
-    // It's simpler to leave this here than to sprinkle a few dozen linux-only
-    // invocations throughout the daemon code.
-    #[allow(dead_code)]
-    Mdns(TargetInfo),
-    Fastboot(TargetInfo),
     Zedboot(TargetInfo),
 }
 

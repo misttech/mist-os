@@ -3,15 +3,18 @@
 // found in the LICENSE file.
 
 use crate::target_handle::TargetHandle;
+use addr::TargetAddr;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use chrono::Utc;
 use emulator_targets::EmulatorTargetAction;
-use ffx_daemon_events::{FastbootInterface, TargetConnectionState, TargetInfo};
+use ffx_daemon_events::{FastbootInterface, TargetConnectionState};
 use ffx_daemon_target::{
     manual_targets,
-    target::{target_addr_info_to_socketaddr, Target, TargetAddrEntry, TargetAddrType},
-    target_collection::{TargetCollection, TargetQuery},
+    target::{
+        self, target_addr_info_to_socketaddr, Target, TargetProtocol, TargetTransport,
+        TargetUpdateBuilder,
+    },
+    target_collection::{TargetCollection, TargetQuery, TargetUpdateFilter},
 };
 use ffx_stream_util::TryStreamUtilExt;
 use fidl::endpoints::ProtocolMarker;
@@ -91,6 +94,7 @@ async fn add_manual_target(
     overnet_node: &Arc<overnet_core::Router>,
 ) -> Rc<Target> {
     tracing::debug!("Adding manual targets, addr: {addr:?}");
+
     // Expiry is the SystemTime (represented as seconds after the UNIX_EPOCH) at which a manual
     // target is allowed to expire and enter the Disconnected state. If no lifetime is given,
     // the target is allowed to persist indefinitely. This is persisted in FFX config.
@@ -103,28 +107,52 @@ async fn add_manual_target(
         (Some(timeout), Some(expiry), Some(Instant::now()))
     };
 
-    let tae = TargetAddrEntry::new(addr.into(), Utc::now(), TargetAddrType::Manual(timeout));
-    let _ = manual_targets.add(format!("{}", addr), expiry).await.map_err(|e| {
-        tracing::error!("Unable to persist manual target: {:?}", e);
-    });
-    let target = Target::new_with_addr_entries(Option::<String>::None, Some(tae).into_iter());
-
     // When adding a manual target we need to test if the target behind the
     // address is running in fastboot over tcp or not
     let is_fastboot_tcp = target_is_fastboot_tcp(addr).await;
 
     if is_fastboot_tcp {
-        // If the target is in fastboot mode we need to do these:
-        tracing::debug!("Target is fastboot... change target from manual to tcp_fastboot");
-        target.from_manual_to_tcp_fastboot();
-    } else {
-        if addr.port() != 0 {
-            target.set_ssh_port(Some(addr.port()));
-        }
-        target.update_connection_state(|_| TargetConnectionState::Manual(last_seen));
+        tracing::debug!("Manual target is fastboot");
     }
 
-    let target = tc.merge_insert(target);
+    let mut update = TargetUpdateBuilder::new()
+        .manual_target(timeout)
+        .net_addresses(std::slice::from_ref(&addr))
+        .discovered(
+            match is_fastboot_tcp {
+                true => TargetProtocol::Fastboot,
+                false => TargetProtocol::Ssh,
+            },
+            TargetTransport::Network,
+        );
+
+    if addr.port() != 0 {
+        update = update.ssh_port(Some(addr.port()));
+    }
+
+    if let Some(last_seen) = last_seen {
+        update = update.last_seen(last_seen);
+    }
+
+    tc.update_target(
+        &[TargetUpdateFilter::NetAddrs(std::slice::from_ref(&addr))],
+        update.build(),
+        true,
+    );
+
+    let _ = manual_targets.add(format!("{}", addr), expiry).await.map_err(|e| {
+        tracing::error!("Unable to persist manual target: {:?}", e);
+    });
+
+    let target = tc
+        .query_single_enabled_target(&if addr.port() == 0 {
+            TargetQuery::Addr(addr.into())
+        } else {
+            TargetQuery::AddrPort((addr.into(), addr.port()))
+        })
+        .expect("Query by address cannot be ambiguous")
+        .expect("Could not find inserted manual target");
+
     if !is_fastboot_tcp {
         tracing::info!("Running host pipe");
         target.run_host_pipe(overnet_node);
@@ -421,29 +449,16 @@ impl FidlProtocol for TargetCollectionProtocol {
                 responder.send(result).map_err(Into::into)
             }
             ffx::TargetCollectionRequest::AddInlineFastbootTarget { serial_number, responder } => {
-                let t = TargetInfo {
-                    serial: Some(serial_number),
-                    fastboot_interface: Some(FastbootInterface::Usb),
-                    ..Default::default()
-                };
-                let target =
-                    target_collection.merge_insert(match Target::from_fastboot_target_info(t) {
-                        Ok(ret) => {
-                            ret.mark_transient();
-                            ret
-                        }
-                        Err(e) => {
-                            tracing::warn!("encountered unhandled error: {:?}", e);
-                            return responder.send().map_err(Into::into);
-                        }
-                    });
-                target.update_connection_state(|s| match s {
-                    TargetConnectionState::Disconnected | TargetConnectionState::Fastboot(_) => {
-                        TargetConnectionState::Fastboot(Instant::now())
-                    }
-                    _ => s,
-                });
-                tracing::info!("added inline target: {:?}", target);
+                let update = TargetUpdateBuilder::new()
+                    .identity(target::Identity::from_serial(&serial_number))
+                    .discovered(TargetProtocol::Fastboot, TargetTransport::Usb)
+                    .transient_target();
+                target_collection.update_target(
+                    &[TargetUpdateFilter::Serial(&serial_number)],
+                    update.build(),
+                    true,
+                );
+                tracing::info!("Added inline target: {}", serial_number);
                 responder.send().map_err(Into::into)
             }
         }
@@ -481,23 +496,11 @@ impl FidlProtocol for TargetCollectionProtocol {
                 match *e {
                     ffx::MdnsEventType::TargetFound(t)
                     | ffx::MdnsEventType::TargetRediscovered(t) => {
-                        let in_product = t.fastboot_interface.is_none();
-                        let target = handle_discovered_target(&tc_clone, t, &node_clone);
-
-                        if ffx_config::get("discovery.mdns.autoconnect").await.unwrap_or(true) {
-                            // For backwards compatibility.
-                            // Immediately mark the target as used then run the host pipe.
-                            if let Some(target) = target {
-                                let _ = tc_clone.use_target(
-                                    target.clone().into(),
-                                    "mdns backwards compatibility",
-                                );
-
-                                if in_product && !target.is_host_pipe_running() {
-                                    target.run_host_pipe(&node_clone);
-                                }
-                            }
-                        }
+                        // For backwards compatibility.
+                        // Immediately mark the target as used then run the host pipe.
+                        let autoconnect =
+                            ffx_config::get("discovery.mdns.autoconnect").await.unwrap_or(true);
+                        handle_discovered_target(&tc_clone, t, &node_clone, autoconnect);
                     }
                     _ => {}
                 }
@@ -528,18 +531,7 @@ impl FidlProtocol for TargetCollectionProtocol {
                 if let Some(emu_target_action) = watcher.emulator_target_detected().await {
                     match emu_target_action {
                         EmulatorTargetAction::Add(emu_target) => {
-                            let target = handle_discovered_target(&tc2, emu_target, &node);
-                            if let Some(t) = target {
-                                tracing::info!(
-                                    "Emulator target added. {:?} state: {:?}",
-                                    t.ssh_address(),
-                                    t.state()
-                                );
-                                tc2.use_target(t.clone().into(), "emulator target");
-                                if !t.is_host_pipe_running() {
-                                    t.run_host_pipe(&node);
-                                }
-                            }
+                            handle_discovered_target(&tc2, emu_target, &node, true);
                         }
                         EmulatorTargetAction::Remove(emu_target) => {
                             if let Some(id) = emu_target.nodename {
@@ -563,20 +555,18 @@ impl FidlProtocol for TargetCollectionProtocol {
 // USB fastboot
 #[tracing::instrument(skip(tc))]
 fn handle_fastboot_target(tc: &Rc<TargetCollection>, target: ffx::FastbootTarget) {
-    if let Some(ref serial) = target.serial {
-        tracing::debug!("Found new target via fastboot: {}", serial);
-    } else {
+    let Some(serial) = target.serial else {
         tracing::debug!("Fastboot target has no serial number. Not able to merge.");
         return;
-    }
-    let t = TargetInfo { serial: target.serial, ..Default::default() };
-    let target = tc.merge_insert(Target::from_target_info(t.into()));
-    target.update_connection_state(|s| match s {
-        TargetConnectionState::Disconnected | TargetConnectionState::Fastboot(_) => {
-            TargetConnectionState::Fastboot(Instant::now())
-        }
-        _ => s,
-    });
+    };
+
+    tracing::debug!("Found new target via fastboot: {}", serial);
+
+    let update = TargetUpdateBuilder::new()
+        .discovered(TargetProtocol::Fastboot, TargetTransport::Usb)
+        .identity(target::Identity::from_serial(serial.clone()))
+        .build();
+    tc.update_target(&[TargetUpdateFilter::Serial(&serial)], update, true);
 }
 
 // mDNS Fastboot & RCS
@@ -585,66 +575,69 @@ fn handle_discovered_target(
     tc: &Rc<TargetCollection>,
     t: ffx::TargetInfo,
     overnet_node: &Arc<overnet_core::Router>,
-) -> Option<Rc<Target>> {
+    is_emulator: bool,
+) {
     tracing::debug!("Discovered target {t:?}");
-    let ssh_address = t.ssh_address;
-    let mut t = TargetInfo {
-        nodename: t.nodename,
-        addresses: t
-            .addresses
-            .map(|a| a.into_iter().map(Into::into).collect())
-            .unwrap_or(Vec::new()),
-        fastboot_interface: if t.target_state == Some(ffx::TargetState::Fastboot) {
-            t.fastboot_interface.map(|v| match v {
-                ffx::FastbootInterface::Usb => FastbootInterface::Usb,
-                ffx::FastbootInterface::Udp => FastbootInterface::Udp,
-                ffx::FastbootInterface::Tcp => FastbootInterface::Tcp,
-            })
-        } else {
-            None
-        },
-        ..Default::default()
-    };
-
-    if let Some(ffx::TargetAddrInfo::IpPort(ssh_address)) = ssh_address {
-        t.ssh_port = Some(ssh_address.port);
-    }
 
     if t.fastboot_interface.is_some() {
-        tracing::trace!(
+        tracing::debug!(
             "Found new fastboot target via mdns: {}. Address: {:?}",
-            t.nodename.clone().unwrap_or("<unknown>".to_string()),
+            t.nodename.as_deref().unwrap_or("<unknown>"),
             t.addresses
         );
-        let target = tc.merge_insert(match Target::from_fastboot_target_info(t) {
-            Ok(ret) => ret,
-            Err(e) => {
-                tracing::debug!("Error while making target: {:?}", e);
-                return None;
-            }
-        });
-        target.update_connection_state(|s| match s {
-            TargetConnectionState::Disconnected | TargetConnectionState::Fastboot(_) => {
-                TargetConnectionState::Fastboot(Instant::now())
-            }
-            _ => s,
-        });
-        return Some(target);
     } else {
         tracing::debug!(
             "Found new target via mdns or file watcher: {}",
-            t.nodename.clone().unwrap_or("<unknown>".to_string())
+            t.nodename.as_deref().unwrap_or("<unknown>")
         );
-        let new_target = Target::from_target_info(t);
-        new_target.update_connection_state(|_| TargetConnectionState::Mdns(Instant::now()));
-        let target = tc.merge_insert(new_target);
-
-        if target.is_enabled() && !target.is_host_pipe_running() {
-            tracing::debug!("Starting host_pipe for {:?}", &target.addrs());
-            target.run_host_pipe(overnet_node);
-        }
-        return Some(target);
     }
+
+    let identity = t.nodename.as_deref().map(target::Identity::from_name);
+
+    let addrs =
+        t.addresses.iter().flatten().map(|a| TargetAddr::from(a).into()).collect::<Vec<_>>();
+
+    let mut update = TargetUpdateBuilder::new().net_addresses(&addrs);
+
+    if is_emulator {
+        update = update.enable();
+    }
+
+    if let Some(identity) = identity {
+        update = update.identity(identity);
+    }
+
+    update = match t.fastboot_interface {
+        Some(interface) => update.discovered(
+            TargetProtocol::Fastboot,
+            match interface {
+                ffx::FastbootInterface::Tcp => TargetTransport::Network,
+                ffx::FastbootInterface::Udp => TargetTransport::NetworkUdp,
+                _ => panic!("Discovered non-network fastboot interface over mDNS, {interface:?}"),
+            },
+        ),
+        None => update.discovered(TargetProtocol::Ssh, TargetTransport::Network),
+    };
+
+    if let Some(ffx::TargetAddrInfo::IpPort(ssh_address)) = t.ssh_address {
+        update = update.ssh_port(Some(ssh_address.port));
+    }
+
+    let mut single_filter = None;
+    let mut both_filter = None;
+
+    let filter = if let Some(ref name) = t.nodename {
+        &both_filter.insert([
+            TargetUpdateFilter::NetAddrs(&addrs),
+            TargetUpdateFilter::LegacyNodeName(name),
+        ])[..]
+    } else {
+        &single_filter.insert([TargetUpdateFilter::NetAddrs(&addrs)])[..]
+    };
+
+    tc.update_target(filter, update.build(), true);
+
+    tc.try_to_reconnect_target(filter, overnet_node);
 }
 
 #[cfg(test)]
@@ -673,6 +666,7 @@ mod tests {
             &tc,
             ffx::TargetInfo { nodename: Some(t.nodename().unwrap()), ..Default::default() },
             &local_node,
+            false,
         );
         assert!(!t.is_host_pipe_running());
         assert_matches!(t.get_connection_state(), TargetConnectionState::Mdns(t) if t > before_update);
@@ -695,6 +689,7 @@ mod tests {
                 ..Default::default()
             },
             &local_node,
+            false,
         );
         assert!(!t.is_host_pipe_running());
         assert_matches!(t.get_connection_state(), TargetConnectionState::Fastboot(t) if t > before_update);

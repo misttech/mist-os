@@ -79,6 +79,7 @@ rustc_library("lib") {
     "src/target/identity.rs",
     "src/target/update.rs",
     "src/target_collection.rs",
+    "src/target_collection/tests/update.rs",
     "src/zedboot.rs",
   ]
 

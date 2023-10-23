@@ -192,7 +192,7 @@ mod tests {
     use super::*;
     use chrono::Utc;
     use ffx_daemon_events::TargetConnectionState;
-    use ffx_daemon_target::target::{TargetAddrEntry, TargetAddrType};
+    use ffx_daemon_target::target::{TargetAddrEntry, TargetAddrType, TargetUpdateBuilder};
     use fidl::prelude::*;
     use fidl_fuchsia_developer_remotecontrol as fidl_rcs;
     use fidl_fuchsia_io as fio;
@@ -407,13 +407,14 @@ mod tests {
             .unwrap();
         let rcs_proxy =
             fidl_rcs::RemoteControlProxy::new(fidl::AsyncChannel::from_channel(client).unwrap());
-        let target = Target::from_rcs_connection(RcsConnection::new_with_proxy(
-            local_node,
-            rcs_proxy.clone(),
-            &node2.node_id().into(),
-        ))
-        .await
-        .unwrap();
+        let rcs =
+            RcsConnection::new_with_proxy(local_node, rcs_proxy.clone(), &node2.node_id().into());
+
+        let identify = rcs.identify_host().await.unwrap();
+        let (update, _) = TargetUpdateBuilder::from_rcs_identify(rcs.clone(), &identify);
+        let target = Target::new();
+        target.apply_update(update.build());
+
         let (target_proxy, server) = fidl::endpoints::create_proxy::<ffx::TargetMarker>().unwrap();
         let _handle = Task::local(TargetHandle::new(target, cx, server).unwrap());
         let (rcs, rcs_server) =

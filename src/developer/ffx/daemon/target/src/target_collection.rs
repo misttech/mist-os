@@ -4,7 +4,8 @@
 
 use crate::{
     target::{
-        self, DiscoveredTarget, Identity, IdentityCmp, SharedIdentity, Target, TargetAddrType,
+        self, DiscoveredTarget, Identity, IdentityCmp, SharedIdentity, Target, TargetAddrEntry,
+        TargetAddrType, TargetUpdate, WeakIdentity,
     },
     MDNS_MAX_AGE,
 };
@@ -15,7 +16,11 @@ use async_utils::event::Event;
 use chrono::Utc;
 use ffx_daemon_core::events::{self, EventSynthesizer};
 use ffx_daemon_events::{DaemonEvent, TargetEvent, TargetInfo};
-use std::{cell::RefCell, collections::HashMap, fmt::Debug, net::IpAddr, ops::ControlFlow, rc::Rc};
+use netext::IsLocalAddr;
+use std::{
+    borrow::Borrow, cell::RefCell, collections::HashMap, fmt::Debug, net::IpAddr, net::SocketAddr,
+    ops::ControlFlow, rc::Rc, sync::Arc,
+};
 
 pub struct TargetCollection {
     targets: RefCell<HashMap<u64, Rc<Target>>>,
@@ -308,6 +313,9 @@ impl TargetCollection {
         self.on_targets_changed.replace(Event::new()).signal();
     }
 
+    // TODO(b/304312166): Test-only now.
+    // Will be removed once "targets" are associated with a single address.
+    #[doc(hidden)]
     #[tracing::instrument(skip(self))]
     pub fn merge_insert(&self, new_target: Rc<Target>) -> Rc<Target> {
         // Drop non-manual loopback address entries, as matching against
@@ -316,7 +324,17 @@ impl TargetCollection {
 
         // Canonicalize new_target's identity.
         if let Some(new_identity) = new_target.take_identity() {
-            let ident = self.merge_insert_identity(new_identity);
+            let ident = if self.identities.borrow().iter().any(|rc| {
+                // Shortcut if the identity is already known:
+                WeakIdentity::ptr_eq(rc, &SharedIdentity::downgrade(&new_identity))
+            }) {
+                new_identity
+            } else {
+                self.merge_insert_identity(
+                    Rc::try_unwrap(new_identity).unwrap_or_else(|id| (*id).clone()),
+                )
+            };
+
             new_target.replace_shared_identity(ident);
         }
 
@@ -397,6 +415,10 @@ impl TargetCollection {
 
         to_update.set_compatibility_status(&new_target.get_compatibility_status());
 
+        if let Some(fastboot_interface) = new_target.fastboot_interface() {
+            *to_update.fastboot_interface.borrow_mut() = Some(fastboot_interface);
+        }
+
         to_update.update_connection_state(|_| new_target.get_connection_state());
 
         if new_target.is_transient() {
@@ -427,6 +449,99 @@ impl TargetCollection {
         }
 
         to_update
+    }
+
+    /// Updates targets matching any of the update filters, optionally creating one if it
+    /// doesn't exist.
+    ///
+    /// Returns the number of updated targets.
+    pub fn update_target<'a, F>(
+        &self,
+        filters: &'a [F],
+        mut update: TargetUpdate<'a>,
+        create_new: bool,
+    ) -> usize
+    where
+        F: Borrow<TargetUpdateFilter<'a>> + Debug,
+    {
+        // For all matching targets, create a temporary target by id and update it.
+        tracing::debug!("Updating targets matching {filters:?} with {update:?}");
+
+        // Merge identities early so filters match on _merged_ identities.
+        if let Some(identity) = update.identity.take() {
+            update.identity = Some(self.merge_insert_identity(
+                Rc::try_unwrap(identity).unwrap_or_else(|rc| (*rc).clone()),
+            ));
+        }
+
+        let mut merge_targets = self
+            .targets
+            .borrow()
+            .values()
+            .filter(|target| filters.iter().any(|f| f.borrow().matches(target)))
+            .map(|target| {
+                // Create a target with the same ID so we can specifically update it.
+                let target = Target::new_with_id(target.id());
+                // Apply update to the newly created target since we are reusing merge_insert.
+                target.apply_update(update.clone());
+                target
+            })
+            .collect::<Vec<_>>();
+
+        if create_new && merge_targets.is_empty() {
+            // Insert a fresh & empty target to apply an update against.
+            let target = self.merge_insert(Target::new());
+
+            let target = Target::new_with_id(target.id());
+            target.apply_update(update.clone());
+
+            merge_targets.push(target);
+        }
+
+        let matches = merge_targets.len();
+
+        for merge_target in merge_targets {
+            // TODO(b/304312166): Stop depending on merge_insert here.
+            // merge_insert is used to maintain previous behaviors. If direct usage of
+            // Target::apply_update introduces a regression the corresponding revert will be much
+            // smaller.
+            self.merge_insert(merge_target);
+        }
+
+        matches
+    }
+
+    pub fn try_to_reconnect_target<'a, F>(
+        &self,
+        filters: &'a [F],
+        overnet_node: &Arc<overnet_core::Router>,
+    ) -> bool
+    where
+        F: Borrow<TargetUpdateFilter<'a>> + Debug,
+    {
+        let mut ret = None;
+        for target in self.targets.borrow().values() {
+            if !filters.iter().any(|f| f.borrow().matches(target)) {
+                continue;
+            }
+
+            if let Some(prev) = ret.as_mut() {
+                Self::select_preferred_target(target, prev)
+            } else {
+                ret = Some(target.clone());
+            }
+        }
+
+        match ret {
+            Some(target) if target.is_enabled() => {
+                if !target.is_host_pipe_running() {
+                    tracing::debug!("Reconnecting to {:?}", &target.addrs());
+                    target.run_host_pipe(overnet_node);
+                }
+                true
+            }
+            _ => false,
+        }
     }
 
     fn has_unidentified_target(&self) -> bool {
@@ -765,12 +880,68 @@ impl From<TargetAddr> for TargetQuery {
     }
 }
 
+/// A filter to select targets to update. Unlike `TargetQuery`, this cannot be parsed from a string.
+#[derive(Clone, Debug)]
+pub enum TargetUpdateFilter<'a> {
+    /// Update a target by ID.
+    Ids(&'a [u64]),
+    /// Update a target by Overnet Node ID.
+    OvernetNodeId(u64),
+    /// Update a target by (authoritative USB) serial.
+    Serial(&'a str),
+    /// Update a target by nodename.
+    /// For backwards compatibility with mDNS discovery.
+    LegacyNodeName(&'a str),
+    /// Update a target by net address.
+    NetAddrs(&'a [SocketAddr]),
+}
+
+impl<'a> TargetUpdateFilter<'a> {
+    fn matches(&self, target: &Target) -> bool {
+        match *self {
+            Self::Ids(ids) => target.has_id(ids.iter()),
+            Self::OvernetNodeId(id) => target.overnet_node_id() == Some(id),
+            Self::Serial(serial) => {
+                Some(serial) == target.identity().as_ref().map(|i| i.serial()).flatten()
+            }
+            Self::LegacyNodeName(name) => {
+                Some(name) == target.identity().as_ref().map(|i| i.name()).flatten()
+            }
+            Self::NetAddrs(addrs) => {
+                let target_addrs = target.addrs.borrow();
+                addrs.iter().any(|addr| {
+                    // Because of Rust's strange handling of scoped IPv6 addresses, link-local IPv6
+                    // address filtering requires special logic to match addresses correctly.
+                    match addr {
+                        SocketAddr::V6(addr)
+                            if addr.ip().is_link_local_addr() && addr.scope_id() == 0 =>
+                        {
+                            // Wildcard scope
+                            target_addrs.iter().any(|entry| {
+                                (entry.addr.ip(), entry.addr.port())
+                                    == (IpAddr::from(*addr.ip()), addr.port())
+                            })
+                        }
+                        _ => target_addrs.contains(&TargetAddrEntry::new(
+                            (*addr).into(),
+                            chrono::MIN_DATETIME,
+                            TargetAddrType::Ssh,
+                        )),
+                    }
+                })
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::target::{TargetAddrEntry, TargetAddrType};
+    use crate::target::{
+        TargetAddrEntry, TargetAddrType, TargetProtocol, TargetTransport, TargetUpdateBuilder,
+    };
     use chrono::{TimeZone, Utc};
-    use ffx_daemon_events::{FastbootInterface, TargetConnectionState};
+    use ffx_daemon_events::TargetConnectionState;
     use fuchsia_async::Task;
     use futures::prelude::*;
     use std::{
@@ -780,6 +951,8 @@ mod tests {
         task::{Context, Poll},
         time::Instant,
     };
+
+    mod update;
 
     #[track_caller]
     fn expect_target(tc: &TargetCollection, query: &TargetQuery) -> Rc<Target> {
@@ -933,14 +1106,17 @@ mod tests {
             t2.identity()
         );
 
-        // TODO(b/301988834): Only one target is updated with the new state.
-        // Fixing in follow-up CL.
-        let updated_target = tc.merge_insert(Target::new_with_fastboot_addrs(
-            Some(NODENAME),
-            Some(SERIAL.into()),
-            Default::default(),
-            FastbootInterface::Tcp,
-        ));
+        let addr = "192.0.2.0:55556".parse().unwrap();
+
+        tc.update_target(
+            &[TargetUpdateFilter::Serial(SERIAL)],
+            TargetUpdateBuilder::new()
+                .identity(Identity::try_from_name_serial(Some(NODENAME), Some(SERIAL)).unwrap())
+                .discovered(TargetProtocol::Fastboot, TargetTransport::Network)
+                .net_addresses(&[addr])
+                .build(),
+            true,
+        );
 
         assert_eq!(
             t1.identity().unwrap().cmp_to(&t2.identity().unwrap()),
@@ -953,10 +1129,10 @@ mod tests {
         // The most recent matching target should be returned for both queries.
         let query_name = expect_target(&tc, &TargetQuery::NodenameOrSerial(NODENAME.into()));
         let query_serial = expect_target(&tc, &TargetQuery::NodenameOrSerial(SERIAL.into()));
+        // Both targets have updated
+        assert!(Rc::ptr_eq(&query_name, &t1) || Rc::ptr_eq(&query_name, &t2));
+        // Target returned from queries should be consistent.
         assert!(Rc::ptr_eq(&query_name, &query_serial));
-
-        // This should be the target updated with the fastboot address.
-        assert!(Rc::ptr_eq(&query_name, &updated_target));
     }
 
     #[fuchsia_async::run_singlethreaded(test)]

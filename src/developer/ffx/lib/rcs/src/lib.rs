@@ -7,7 +7,8 @@ use errors;
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_developer_remotecontrol::{
-    ConnectCapabilityError, IdentifyHostError, RemoteControlMarker, RemoteControlProxy,
+    ConnectCapabilityError, IdentifyHostError, IdentifyHostResponse, RemoteControlMarker,
+    RemoteControlProxy,
 };
 use fidl_fuchsia_overnet_protocol::NodeId;
 use fidl_fuchsia_sys2::{
@@ -28,6 +29,8 @@ pub use fidl_fuchsia_sys2::OpenDirType;
 pub mod toolbox;
 
 const REMOTE_CONTROL_MONIKER: &str = "core/remote-control";
+
+const IDENTIFY_HOST_TIMEOUT_MILLIS: u64 = 10000;
 
 #[derive(Debug, Clone)]
 pub struct RcsConnection {
@@ -97,6 +100,26 @@ impl RcsConnection {
         id: &NodeId,
     ) -> Self {
         Self { node, proxy, overnet_id: id.clone() }
+    }
+
+    pub async fn identify_host(&self) -> Result<IdentifyHostResponse, RcsConnectionError> {
+        tracing::debug!("Requesting host identity from overnet id {}", self.overnet_id.id);
+        let identify_result = timeout(
+            Duration::from_millis(IDENTIFY_HOST_TIMEOUT_MILLIS),
+            self.proxy.identify_host(),
+        )
+        .await
+        .map_err(|e| RcsConnectionError::ConnectionTimeoutError(e))?;
+
+        let identify = match identify_result {
+            Ok(res) => match res {
+                Ok(target) => target,
+                Err(e) => return Err(RcsConnectionError::RemoteControlError(e)),
+            },
+            Err(e) => return Err(RcsConnectionError::FidlConnectionError(e)),
+        };
+
+        Ok(identify)
     }
 }
 

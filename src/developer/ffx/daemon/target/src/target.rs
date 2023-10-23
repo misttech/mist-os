@@ -8,7 +8,7 @@ use crate::{
     FASTBOOT_MAX_AGE, MDNS_MAX_AGE, ZEDBOOT_MAX_AGE,
 };
 use addr::TargetAddr;
-use anyhow::{anyhow, bail, Context, Error, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use compat_info::{CompatibilityInfo, CompatibilityState};
@@ -23,7 +23,7 @@ use fidl_fuchsia_net::{IpAddress, Ipv4Address, Ipv6Address};
 use fuchsia_async::Task;
 use netext::IsLocalAddr;
 use rand::random;
-use rcs::{knock_rcs, RcsConnection, RcsConnectionError};
+use rcs::{knock_rcs, RcsConnection};
 use std::{
     cell::{Cell, RefCell},
     cmp::Ordering,
@@ -32,12 +32,11 @@ use std::{
     fmt,
     fmt::Debug,
     hash::{Hash, Hasher},
-    net::{IpAddr, Ipv6Addr, SocketAddr},
+    net::{IpAddr, SocketAddr},
     rc::{Rc, Weak},
     sync::Arc,
     time::{Duration, Instant, SystemTime},
 };
-use timeout::timeout;
 use usb_bulk::AsyncInterface as Interface;
 
 mod identity;
@@ -47,7 +46,6 @@ pub use self::{
     update::{TargetUpdate, TargetUpdateBuilder},
 };
 
-const IDENTIFY_HOST_TIMEOUT_MILLIS: u64 = 10000;
 const DEFAULT_SSH_PORT: u16 = 22;
 const CONFIG_HOST_PIPE_SSH_TIMEOUT: &str = "daemon.host_pipe_ssh_timeout";
 
@@ -478,12 +476,18 @@ impl Target {
         }
     }
 
+    fn clear_ids(&self) {
+        let mut ids = self.ids.borrow_mut();
+        ids.clear();
+        ids.insert(self.id);
+    }
+
     pub(crate) fn replace_identity(&self, ident: Identity) {
         self.identity.replace(Some(Rc::new(ident.into())));
     }
 
-    pub(crate) fn take_identity(&self) -> Option<Identity> {
-        self.identity.take().map(|rc| Rc::try_unwrap(rc).unwrap_or_else(|rc| (*rc).clone()))
+    pub(crate) fn take_identity(&self) -> Option<SharedIdentity> {
+        self.identity.take()
     }
 
     pub(crate) fn replace_shared_identity(&self, ident: SharedIdentity) {
@@ -738,6 +742,7 @@ impl Target {
             // a call to .disconnect(). If the target is a manual target, it actually transitions to
             // the manual state.
             TargetConnectionState::Disconnected => {
+                self.clear_ids();
                 if self.is_manual() {
                     let timeout = self.get_manual_timeout();
                     let last_seen = if timeout.is_some() { Some(Instant::now()) } else { None };
@@ -981,15 +986,6 @@ impl Target {
         let mut addrs = self.addrs.borrow_mut();
 
         for mut addr in new_addrs.into_iter() {
-            // Do not add localhost to the collection during extend.
-            // Note: localhost addresses are added sometimes by direct
-            // insertion, in the manual add case.
-            // IPv4 is allowed so that emulators and tunneled devices are handled correctly.
-            let localhost_v6 = IpAddr::V6(Ipv6Addr::LOCALHOST);
-            if addr.addr.ip() == localhost_v6 {
-                continue;
-            }
-
             // Subtle:
             // Some sources of addresses can not be scoped, such as those which come from queries
             // over Overnet.
@@ -1019,60 +1015,6 @@ impl Target {
         if *last_response < other {
             *last_response = other;
         }
-    }
-
-    #[tracing::instrument]
-    pub fn from_identify(identify: IdentifyHostResponse) -> Result<Rc<Self>, Error> {
-        let nodename = match identify.nodename {
-            Some(n) => n,
-            None => bail!("Target identification missing a nodename: {:?}", identify),
-        };
-
-        tracing::debug!("Got nodename {nodename}");
-        let target = Target::new();
-
-        let identity =
-            Identity::try_from_name_serial(Some(nodename), identify.serial_number).unwrap();
-        target.replace_identity(identity);
-
-        target.update_last_response(Utc::now().into());
-        if let Some(ids) = identify.ids {
-            target.merge_ids(ids.iter());
-        }
-        *target.build_config.borrow_mut() =
-            if identify.board_config.is_some() || identify.product_config.is_some() {
-                let p = identify.product_config.unwrap_or("<unknown>".to_string());
-                let b = identify.board_config.unwrap_or("<unknown>".to_string());
-                Some(BuildConfig { product_config: p, board_config: b })
-            } else {
-                None
-            };
-
-        if let Some(t) = identify.boot_timestamp_nanos {
-            target.boot_timestamp_nanos.borrow_mut().replace(t);
-        }
-        Ok(target)
-    }
-
-    #[tracing::instrument]
-    pub async fn from_rcs_connection(rcs: RcsConnection) -> Result<Rc<Self>, RcsConnectionError> {
-        tracing::debug!("Requesting host identity from overnet id {}", rcs.overnet_id.id);
-        let identify_result =
-            timeout(Duration::from_millis(IDENTIFY_HOST_TIMEOUT_MILLIS), rcs.proxy.identify_host())
-                .await
-                .map_err(|e| RcsConnectionError::ConnectionTimeoutError(e))?;
-
-        let identify = match identify_result {
-            Ok(res) => match res {
-                Ok(target) => target,
-                Err(e) => return Err(RcsConnectionError::RemoteControlError(e)),
-            },
-            Err(e) => return Err(RcsConnectionError::FidlConnectionError(e)),
-        };
-        let target =
-            Target::from_identify(identify).map_err(|e| RcsConnectionError::TargetError(e))?;
-        target.update_connection_state(move |_| TargetConnectionState::Rcs(rcs));
-        Ok(target)
     }
 
     /// Sets the preferred SSH address.
@@ -1601,74 +1543,6 @@ mod test {
         proxy
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_target_from_rcs_connection_internal_err() {
-        let local_node = overnet_core::Router::new(None).unwrap();
-
-        // TODO(awdavies): Do some form of PartialEq implementation for
-        // the RcsConnectionError enum to avoid the nested matches.
-        let conn = RcsConnection::new_with_proxy(
-            local_node,
-            setup_fake_remote_control_service(true, "foo".to_owned()),
-            &NodeId { id: 123 },
-        );
-        match Target::from_rcs_connection(conn).await {
-            Ok(_) => assert!(false),
-            Err(e) => match e {
-                RcsConnectionError::RemoteControlError(rce) => match rce {
-                    rcs::IdentifyHostError::ListInterfacesFailed => (),
-                    _ => assert!(false),
-                },
-                _ => assert!(false),
-            },
-        }
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_target_from_rcs_connection_nodename_none() {
-        let local_node = overnet_core::Router::new(None).unwrap();
-
-        let conn = RcsConnection::new_with_proxy(
-            local_node,
-            setup_fake_remote_control_service(false, "".to_owned()),
-            &NodeId { id: 123456 },
-        );
-        match Target::from_rcs_connection(conn).await {
-            Ok(_) => assert!(false),
-            Err(e) => match e {
-                RcsConnectionError::TargetError(_) => (),
-                _ => assert!(false),
-            },
-        }
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_target_from_rcs_connection_no_err() {
-        let local_node = overnet_core::Router::new(None).unwrap();
-
-        let conn = RcsConnection::new_with_proxy(
-            local_node,
-            setup_fake_remote_control_service(false, "foo".to_owned()),
-            &NodeId { id: 1234 },
-        );
-        match Target::from_rcs_connection(conn).await {
-            Ok(t) => {
-                assert_eq!(t.nodename().unwrap(), "foo".to_string());
-                assert_eq!(t.rcs().unwrap().overnet_id.id, 1234u64);
-                assert_eq!(t.addrs().len(), 0);
-                assert_eq!(
-                    t.build_config().unwrap(),
-                    BuildConfig {
-                        product_config: DEFAULT_PRODUCT_CONFIG.to_string(),
-                        board_config: DEFAULT_BOARD_CONFIG.to_string()
-                    }
-                );
-                assert_eq!(t.serial().unwrap(), String::from(TEST_SERIAL));
-            }
-            Err(_) => assert!(false),
-        }
-    }
-
     // Most of this is now handled in `task.rs`
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_target_disconnect_multiple_invocations() {
@@ -1779,15 +1653,8 @@ mod test {
             setup_fake_remote_control_service(false, "foo".to_owned()),
             &NodeId { id: 1234 },
         );
-        let t = match Target::from_rcs_connection(conn).await {
-            Ok(t) => {
-                assert_eq!(t.nodename().unwrap(), "foo".to_string());
-                assert_eq!(t.rcs().unwrap().overnet_id.id, 1234u64);
-                assert_eq!(t.addrs().len(), 0);
-                t
-            }
-            Err(_) => unimplemented!("this branch should never happen"),
-        };
+        let t = Target::new();
+        t.update_connection_state(|_| TargetConnectionState::Rcs(conn));
         // This will hang forever if no synthesis happens.
         t.events.wait_for(None, |e| e == TargetEvent::RcsActivated).await.unwrap();
     }
