@@ -2,14 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <cerrno>
-#include <cstdint>
-#define EXPORT __attribute__((visibility("default")))
-#define WEAK __attribute__((weak, visibility("default")))
-#define __LOCAL __attribute__((__visibility__("hidden")))
-
 #include <sys/syscall.h>
 #include <sys/time.h>
+#include <zircon/compiler.h>
 
 #include "vdso-common.h"
 #include "vdso-platform.h"
@@ -24,31 +19,31 @@ int syscall(intptr_t syscall_number, intptr_t arg1, intptr_t arg2, intptr_t arg3
   return static_cast<int>(a0);
 }
 
-extern "C" EXPORT __attribute__((naked)) void __vdso_rt_sigreturn() {
+extern "C" __EXPORT __attribute__((naked)) void __vdso_rt_sigreturn() {
   __asm__ volatile("li a7, %0" ::"I"(__NR_rt_sigreturn));
   __asm__ volatile("ecall");
 }
 
-extern "C" EXPORT int __vdso_clock_gettime(int clock_id, struct timespec* tp) {
+extern "C" __EXPORT int __vdso_clock_gettime(int clock_id, struct timespec* tp) {
   return syscall(__NR_clock_gettime, static_cast<intptr_t>(clock_id),
                  reinterpret_cast<intptr_t>(tp), 0);
 }
 
-extern "C" EXPORT int __vdso_clock_getres(int clock_id, struct timespec* tp) {
+extern "C" __EXPORT int __vdso_clock_getres(int clock_id, struct timespec* tp) {
   return clock_getres_impl(clock_id, tp);
 }
 
-extern "C" EXPORT int __vdso_gettimeofday(struct timeval* tv, struct timezone* tz) {
+extern "C" __EXPORT int __vdso_gettimeofday(struct timeval* tv, struct timezone* tz) {
   return syscall(__NR_gettimeofday, reinterpret_cast<intptr_t>(tv), reinterpret_cast<intptr_t>(tz),
                  0);
 }
 
-extern "C" EXPORT int __vdso_getcpu(unsigned int* cpu, unsigned int* node, void* unused) {
+extern "C" __EXPORT int __vdso_getcpu(unsigned int* cpu, unsigned int* node, void* unused) {
   return syscall(__NR_getcpu, reinterpret_cast<intptr_t>(cpu), reinterpret_cast<intptr_t>(node),
                  reinterpret_cast<intptr_t>(unused));
 }
 
-extern "C" EXPORT int __vdso_flush_icache(void* start, void* end, unsigned long flags) {
+extern "C" __EXPORT int __vdso_flush_icache(void* start, void* end, unsigned long flags) {
   return syscall(__NR_riscv_flush_icache, reinterpret_cast<intptr_t>(start),
                  reinterpret_cast<intptr_t>(end), static_cast<intptr_t>(flags));
 }

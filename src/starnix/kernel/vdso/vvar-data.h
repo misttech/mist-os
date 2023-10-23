@@ -5,11 +5,12 @@
 #ifndef SRC_STARNIX_KERNEL_VDSO_VVAR_DATA_H_
 #define SRC_STARNIX_KERNEL_VDSO_VVAR_DATA_H_
 
+#include <zircon/compiler.h>
+
 #include "src/starnix/lib/linux_uapi/bindgen_atomics.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__BEGIN_CDECLS
+
 // This struct contains the data that is initialized by Starnix before any process is launched.
 // This struct can be written to by the Starnix kernel, but is read only from the vDSO code's
 // perspective.
@@ -44,8 +45,6 @@ struct vvar_data {
   StdAtomicU32 mono_to_utc_synthetic_ticks;
 };
 
-#ifdef __cplusplus
-}
-#endif
+__END_CDECLS
 
 #endif  // SRC_STARNIX_KERNEL_VDSO_VVAR_DATA_H_
