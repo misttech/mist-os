@@ -17,6 +17,7 @@ use fuchsia_zircon as zx;
 use std::collections::HashMap;
 use std::fs;
 use std::io::{Cursor, ErrorKind, Read, Write};
+use std::os::fd::AsRawFd;
 use std::path::PathBuf;
 use tracing::info;
 
@@ -222,6 +223,9 @@ impl StoreManager {
                 .open(temp_file_path.clone())?;
 
             f.write_all(&store_contents)?;
+            // This fsync is required because the storage stack doesn't guarantee data is flushed
+            // before the rename.
+            fuchsia_nix::unistd::fsync(f.as_raw_fd())?;
         }
         fs::rename(temp_file_path, &self.backing_file)?;
         Ok(())
