@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fuchsia_zircon_types::zx_koid_t;
 use std::{ffi::OsString, path::PathBuf, process::Command};
 
 use crate::debug_agent::DebugAgentSocket;
@@ -13,20 +14,24 @@ pub struct CommandBuilder {
 }
 
 impl CommandBuilder {
+    /// Create a command builder for zxdb at the given path.
     pub fn new(zxdb_path: PathBuf) -> Self {
         Self { zxdb_path, args: vec![] }
     }
 
-    pub fn build(self) -> Command {
-        let mut command = Command::new(self.zxdb_path);
+    /// Build the `Command` for running zxdb.
+    pub fn build(&self) -> Command {
+        let mut command = Command::new(self.zxdb_path.clone());
         command.args(&self.args);
         command
     }
 
-    pub fn into_args(self) -> Vec<OsString> {
-        self.args
+    /// The currently collected arguments.
+    pub fn args(&self) -> &[OsString] {
+        &self.args
     }
 
+    /// Add the `--unix-connect` argument for the given `socket`.
     pub fn connect(&mut self, socket: &DebugAgentSocket) {
         self.args.push(OsString::from("--unix-connect"));
         self.args.push(socket.unix_socket_path().into());
@@ -49,6 +54,10 @@ impl CommandBuilder {
         for attach in attach.iter() {
             self.attach(attach);
         }
+    }
+
+    pub fn attach_koid(&mut self, koid: zx_koid_t) {
+        self.attach(&format!("{koid}"));
     }
 
     pub fn execute(&mut self, execute: &String) {

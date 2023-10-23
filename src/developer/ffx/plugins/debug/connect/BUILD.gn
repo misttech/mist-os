@@ -18,8 +18,6 @@ ffx_plugin("ffx_debug_connect") {
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/sdk:lib",
-    "//src/developer/ffx/lib/symbol-index",
-    "//src/lib/fuchsia-async",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:signal-hook",
   ]

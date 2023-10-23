@@ -6,6 +6,8 @@ pub mod debug_agent;
 
 mod background;
 mod command_builder;
+mod debugger;
 
 pub use background::{forward_to_agent, spawn_forward_task};
 pub use command_builder::CommandBuilder;
+pub use debugger::Debugger;
