@@ -8,6 +8,10 @@
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/driver/logging/cpp/structured_logger.h>
 
+#include <cstdint>
+#include <memory>
+#include <optional>
+
 namespace fdf {
 using namespace fuchsia_driver_framework;
 }
@@ -17,52 +21,78 @@ namespace fdf_devicetree {
 constexpr const char kBtiProp[] = "iommus";
 constexpr const char kIommuCellsProp[] = "#iommu-cells";
 
-// Restrict #iommu-cells value to 1.
+// #iommu-cells == 1.
 // This is because fuchsia_hardware_platform_bus::Bti only takes a
-// bti_id as a specifier which is u32. Therefore iommu specifier should be 1.
-constexpr const uint32_t kFixedIommuCells = 1;
+// bti_id as a specifier which is u32. Therefore iommu specifier should be 1 cell wide.
+constexpr const uint32_t kIommuCellSize = 1;
 
-// phandles are u32.
-constexpr const uint32_t kPhandleCells = 1;
+class IommuCell {
+ public:
+  using IommuPropertyElement = devicetree::PropEncodedArrayElement<kIommuCellSize>;
 
-// Iommu is specified as <phandle, bti_id>, where phandle is the reference to
-// the iommu device.
-constexpr const uint32_t kNumIommuFields = 2;
+  explicit IommuCell(PropertyCells cells) : property_array_(cells, kIommuCellSize) {}
 
-using IommuPropertyElement = devicetree::PropEncodedArrayElement<kNumIommuFields>;
+  uint32_t bti_id() {
+    IommuPropertyElement element = property_array_[0];
+    std::optional<uint64_t> cell = element[0];
+    return static_cast<uint32_t>(*cell);
+  }
+
+ private:
+  devicetree::PropEncodedArray<IommuPropertyElement> property_array_;
+};
+
+BtiVisitor::BtiVisitor()
+    : reference_parser_(
+          kBtiProp, kIommuCellsProp,
+          [this](ReferenceNode& node) { return this->IsIommu(node.name()); },
+          [this](Node& child, ReferenceNode& parent, PropertyCells reference_cells) {
+            return this->ReferenceChildVisit(child, parent, reference_cells);
+          }) {}
+
+bool BtiVisitor::IsIommu(std::string_view node_name) { return node_name == "iommu"; }
 
 zx::result<> BtiVisitor::Visit(Node& node, const devicetree::PropertyDecoder& decoder) {
-  // Check if it's a iommu node. If so, check if the iommu specifier matches kFixedIommuCells.
-  auto iommu_cells_prop = node.properties().find(kIommuCellsProp);
-  if (iommu_cells_prop != node.properties().end()) {
-    auto iommu_cells = iommu_cells_prop->second.AsUint32();
-    if (!iommu_cells) {
-      FDF_LOG(ERROR, "Node '%s' has invalid iommu-cells property.", node.name().data());
-    } else if (*iommu_cells != kFixedIommuCells) {
-      FDF_LOG(ERROR, "Node '%s' has invalid iommu-cells property. Expected '1' but it is '%d'.",
-              node.name().data(), *iommu_cells);
+  zx::result result = reference_parser_.Visit(node, decoder);
+  if (result.is_error()) {
+    FDF_LOG(ERROR, "Failed to parse reference for node '%.*s'", (int)node.name().length(),
+            node.name().data());
+    return result.take_error();
+  }
+
+  if (IsIommu(node.name())) {
+    iommu_nodes_.push_back(*node.phandle());
+  }
+
+  return zx::ok();
+}
+
+zx::result<> BtiVisitor::ReferenceChildVisit(Node& child, ReferenceNode& parent,
+                                             PropertyCells reference_cells) {
+  std::optional<uint32_t> iommu_index;
+
+  for (uint32_t i = 0; i < iommu_nodes_.size(); i++) {
+    if (iommu_nodes_[i] == parent.phandle()) {
+      iommu_index = i;
+      break;
     }
   }
 
-  // Parse iommu property if specified for the node.
-  auto property = node.properties().find(kBtiProp);
-  if (property == node.properties().end()) {
-    FDF_LOG(DEBUG, "Node '%s' has no iommus property.", node.name().data());
-    return zx::ok();
+  if (!iommu_index) {
+    FDF_LOG(DEBUG, "Invalid iommu parent '%s' for child %s", parent.name().data(),
+            child.name().data());
+    return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
-  devicetree::PropEncodedArray<IommuPropertyElement> iommus(property->second.AsBytes(),
-                                                            kPhandleCells, kFixedIommuCells);
+  auto iommu_cell = IommuCell(reference_cells);
 
-  for (uint32_t i = 0; i < iommus.size(); i++) {
-    fuchsia_hardware_platform_bus::Bti bti = {{
-        .iommu_index = iommus[i][0],
-        .bti_id = iommus[i][1],
-    }};
-    FDF_LOG(DEBUG, "BTI (0x%0x, 0x%0x) added to node '%s'.", *bti.iommu_index(), *bti.bti_id(),
-            node.name().data());
-    node.AddBti(bti);
-  }
+  fuchsia_hardware_platform_bus::Bti bti = {{
+      .iommu_index = iommu_index,
+      .bti_id = iommu_cell.bti_id(),
+  }};
+  FDF_LOG(DEBUG, "BTI (0x%0x, 0x%0x) added to node '%s'.", *bti.iommu_index(), *bti.bti_id(),
+          child.name().data());
+  child.AddBti(bti);
 
   return zx::ok();
 }

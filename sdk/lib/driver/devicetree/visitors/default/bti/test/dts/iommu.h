@@ -5,7 +5,8 @@
 #ifndef LIB_DRIVER_DEVICETREE_VISITORS_DEFAULT_BTI_TEST_DTS_IOMMU_H_
 #define LIB_DRIVER_DEVICETREE_VISITORS_DEFAULT_BTI_TEST_DTS_IOMMU_H_
 
-#define TEST_IOMMU_PHANDLE 1
+// Giving a random phandle to check that iommu index is different from phandle.
+#define TEST_IOMMU_PHANDLE 20
 
 #define TEST_BTI_ID1 6
 #define TEST_BTI_ID2 3

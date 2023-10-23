@@ -64,7 +64,7 @@ class Node {
 
   zx::result<ReferenceNode> GetReferenceNode(Phandle parent);
 
-  std::optional<Phandle> phandle() { return phandle_; }
+  std::optional<Phandle> phandle() const { return phandle_; }
 
  private:
   Node* parent_;
@@ -103,6 +103,8 @@ class ReferenceNode {
   }
 
   std::string_view name() const { return node_->name(); }
+
+  std::optional<Phandle> phandle() const { return node_->phandle(); }
 
  private:
   const Node* node_;

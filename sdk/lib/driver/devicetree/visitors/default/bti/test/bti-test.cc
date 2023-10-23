@@ -44,7 +44,8 @@ TEST(BtiVisitorTest, TestBtiProperty) {
       // Test BTI properties.
       ASSERT_TRUE(bti1);
       ASSERT_EQ(1lu, bti1->size());
-      ASSERT_EQ((uint32_t)TEST_IOMMU_PHANDLE, *(*bti1)[0].iommu_index());
+      // iommu index is 0, as there is only one iommu provider.
+      ASSERT_EQ(0u, *(*bti1)[0].iommu_index());
       ASSERT_EQ((uint32_t)TEST_BTI_ID1, *(*bti1)[0].bti_id());
 
       node_tested_count++;
@@ -56,7 +57,8 @@ TEST(BtiVisitorTest, TestBtiProperty) {
       // Test BTI properties.
       ASSERT_TRUE(bti2);
       ASSERT_EQ(1lu, bti2->size());
-      ASSERT_EQ((uint32_t)TEST_IOMMU_PHANDLE, *(*bti2)[0].iommu_index());
+      // iommu index is 0, as there is only one iommu provider.
+      ASSERT_EQ(0u, *(*bti2)[0].iommu_index());
       ASSERT_EQ((uint32_t)TEST_BTI_ID2, *(*bti2)[0].bti_id());
 
       node_tested_count++;
