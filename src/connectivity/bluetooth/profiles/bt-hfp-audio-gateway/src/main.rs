@@ -41,7 +41,7 @@ fn controller_codecs(config: &hfp_profile_config::Config) -> HashSet<features::C
     controller_codecs
 }
 
-#[fuchsia::main(logging_tags = ["hfp-ag"])]
+#[fuchsia::main(logging_tags = ["bt-hfp-ag"])]
 async fn main() -> Result<(), Error> {
     let fs = ServiceFs::new();
 

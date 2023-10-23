@@ -418,7 +418,7 @@ mod tests {
 
         // Should get PeerConnected with the right handler id.
         let message = exec.run_singlethreaded(&mut receiver.next());
-        let Some(hfp::Event::PeerConnected { manager_id, handle, ..}) = message else {
+        let Some(hfp::Event::PeerConnected { manager_id, handle, .. }) = message else {
             panic!("Expected PeerConnected after restarting task, got {message:?}");
         };
         assert_eq!(sent_manager_id, manager_id);
@@ -440,7 +440,7 @@ mod tests {
         // The new task should notify the previously-connected CallManager of its
         // existence with a new peer when connected.
         let message = exec.run_singlethreaded(&mut receiver.next());
-        let Some(hfp::Event::PeerConnected { manager_id, handle, ..}) = message else {
+        let Some(hfp::Event::PeerConnected { manager_id, handle, .. }) = message else {
             panic!("Expected PeerConnected after restarting task, got {message:?}");
         };
         assert_eq!(sent_manager_id, manager_id);

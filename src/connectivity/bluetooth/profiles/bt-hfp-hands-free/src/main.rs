@@ -20,7 +20,7 @@ mod peer;
 mod profile;
 mod service_definition;
 
-#[fuchsia::main(logging_tags = ["hfp-hf"])]
+#[fuchsia::main(logging_tags = ["bt-hfp-hf"])]
 async fn main() -> Result<(), Error> {
     debug!("Starting HFP Hands Free");
 
