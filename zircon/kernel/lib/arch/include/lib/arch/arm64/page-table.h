@@ -413,9 +413,9 @@ class ArmAddressTranslationDescriptor
         desc.set_attr_index(*index);
       };
       if (IsPage()) {
-        set_memory(AsPage().set_af(settings.accessed));
+        set_memory(AsPage().set_af(true));
       } else {
-        set_memory(AsBlock().set_af(settings.accessed));
+        set_memory(AsBlock().set_af(true));
       }
     } else {
       if constexpr (Table::kValid) {

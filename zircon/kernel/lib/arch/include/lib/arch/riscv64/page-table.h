@@ -211,7 +211,8 @@ class RiscvPagingTraitsBase::TableEntry
           .set_x(access.executable)
           .set_u(access.user_accessible)
           .set_pbmt(settings.memory)
-          .set_a(settings.accessed);
+          .set_a(true)
+          .set_d(access.writable);
     } else {
       // Since access permissions cannot be applied to non-terminal levels to
       // constrain later ones, the provided permissions here are expected to be

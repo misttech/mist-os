@@ -617,35 +617,61 @@ TEST(RiscvPagingTraitTests, GetSetMemory) {
 }
 
 template <RiscvPagingLevel Level>
-void TestRiscvGetSetAccessed() {
+void TestRiscvSetImpliesAccessedAndDirty() {
   //
-  // Whether the entry was 'accessed' is given via the A field.
+  // Whether the entry was 'accessed' or 'dirty' is given via the A and D
+  // fields, respectively;
   //
 
   arch::RiscvPageTableEntry<Level> entry;
 
-  for (bool t : kBools) {
-    for (bool a : kBools) {
-      entry.set_reg_value(0).set_r(t).set_a(a);
-      EXPECT_EQ(t && a, entry.accessed());
+  //
+  // Non-terminal entries should not report as accessed or dirty.
+  //
 
-      entry.set_reg_value(0).Set({}, RiscvPagingSettings{
-                                         .present = true,
-                                         .terminal = t,
-                                         .access = {.readable = true},
-                                         .accessed = a,
-                                     });
-      EXPECT_EQ(t && a, entry.accessed()) << "t = " << t << "; a = " << a;
-    }
-  }
+  entry.set_reg_value(0).set_r(false).set_a(false);
+  EXPECT_FALSE(entry.accessed());
+
+  entry.set_reg_value(0).Set({}, RiscvPagingSettings{
+                                     .present = true,
+                                     .terminal = false,
+                                 });
+  EXPECT_FALSE(entry.accessed());
+  EXPECT_FALSE(entry.a());
+  EXPECT_FALSE(entry.d());
+
+  entry.set_reg_value(0).set_r(true).set_a(true);
+  EXPECT_TRUE(entry.accessed());
+
+  //
+  // Terminal entries should report as accessed, and dirty when writable.
+  //
+
+  entry.set_reg_value(0).Set({}, RiscvPagingSettings{
+                                     .present = true,
+                                     .terminal = true,
+                                     .access = {.readable = true, .writable = false},
+                                 });
+  EXPECT_TRUE(entry.accessed());
+  EXPECT_TRUE(entry.a());
+  EXPECT_FALSE(entry.d());
+
+  entry.set_reg_value(0).Set({}, RiscvPagingSettings{
+                                     .present = true,
+                                     .terminal = true,
+                                     .access = {.readable = true, .writable = true},
+                                 });
+  EXPECT_TRUE(entry.accessed());
+  EXPECT_TRUE(entry.a());
+  EXPECT_TRUE(entry.d());
 }
 
 TEST(RiscvPagingTraitTests, GetSetAccessed) {
-  TestRiscvGetSetAccessed<RiscvPagingLevel::k4>();
-  TestRiscvGetSetAccessed<RiscvPagingLevel::k3>();
-  TestRiscvGetSetAccessed<RiscvPagingLevel::k2>();
-  TestRiscvGetSetAccessed<RiscvPagingLevel::k1>();
-  TestRiscvGetSetAccessed<RiscvPagingLevel::k0>();
+  TestRiscvSetImpliesAccessedAndDirty<RiscvPagingLevel::k4>();
+  TestRiscvSetImpliesAccessedAndDirty<RiscvPagingLevel::k3>();
+  TestRiscvSetImpliesAccessedAndDirty<RiscvPagingLevel::k2>();
+  TestRiscvSetImpliesAccessedAndDirty<RiscvPagingLevel::k1>();
+  TestRiscvSetImpliesAccessedAndDirty<RiscvPagingLevel::k0>();
 }
 
 template <X86PagingLevel Level>
@@ -1042,7 +1068,7 @@ TEST(X86PagingTraitTests, GetSetAddress) {
 }
 
 template <X86PagingLevel Level>
-void TestX86GetSetAccessed() {
+void TestX86SetImpliesAccessedAndDirty() {
   arch::X86PagingStructure<Level> entry;
 
   entry.set_reg_value(0).set_a(false);
@@ -1051,45 +1077,35 @@ void TestX86GetSetAccessed() {
   entry.set_reg_value(0).set_a(true);
   EXPECT_TRUE(entry.accessed());
 
+  // A Set() entry should always report as accessed and dirty.
+
   if constexpr (kX86LevelCanBeNonTerminal<Level>) {
     entry.set_reg_value(0).Set({}, X86PagingSettings{
                                        .present = true,
                                        .terminal = false,
-                                       .accessed = false,
-                                   });
-    EXPECT_FALSE(entry.accessed());
-
-    entry.set_reg_value(0).Set({}, X86PagingSettings{
-                                       .present = true,
-                                       .terminal = false,
-                                       .accessed = true,
                                    });
     EXPECT_TRUE(entry.accessed());
+    EXPECT_TRUE(entry.a());
+    EXPECT_TRUE(entry.d());
   }
 
   if constexpr (kX86LevelCanBeTerminal<Level>) {
     entry.set_reg_value(0).Set({}, X86PagingSettings{
                                        .present = true,
                                        .terminal = true,
-                                       .accessed = false,
-                                   });
-    EXPECT_FALSE(entry.accessed());
-
-    entry.set_reg_value(0).Set({}, X86PagingSettings{
-                                       .present = true,
-                                       .terminal = true,
-                                       .accessed = true,
                                    });
     EXPECT_TRUE(entry.accessed());
+    EXPECT_TRUE(entry.a());
+    EXPECT_TRUE(entry.d());
   }
 }
 
-TEST(X86PagingTraitTests, GetSetAccessed) {
-  TestX86GetSetAccessed<X86PagingLevel::kPml5Table>();
-  TestX86GetSetAccessed<X86PagingLevel::kPml4Table>();
-  TestX86GetSetAccessed<X86PagingLevel::kPageDirectoryPointerTable>();
-  TestX86GetSetAccessed<X86PagingLevel::kPageDirectory>();
-  TestX86GetSetAccessed<X86PagingLevel::kPageTable>();
+TEST(X86PagingTraitTests, SetImpliesAccessedAndDirty) {
+  TestX86SetImpliesAccessedAndDirty<X86PagingLevel::kPml5Table>();
+  TestX86SetImpliesAccessedAndDirty<X86PagingLevel::kPml4Table>();
+  TestX86SetImpliesAccessedAndDirty<X86PagingLevel::kPageDirectoryPointerTable>();
+  TestX86SetImpliesAccessedAndDirty<X86PagingLevel::kPageDirectory>();
+  TestX86SetImpliesAccessedAndDirty<X86PagingLevel::kPageTable>();
 }
 
 template <ArmPagingLevel Level>
@@ -1709,7 +1725,7 @@ TEST(ArmPagingTraitTests, GetSetMemory) {
 }
 
 template <ArmPagingLevel Level>
-void TestArmGetSetAccessed() {
+void TestArmSetImpliesAccessed() {
   ArmTableEntry<Level> entry;
 
   if constexpr (kArmLevelCanBeTable<Level>) {
@@ -1731,49 +1747,30 @@ void TestArmGetSetAccessed() {
     EXPECT_TRUE(entry.accessed());
   }
 
-  // Non-terminal entries never report 'accessed'.
+  // Non-terminal entries never report as accessed.
   if constexpr (kArmLevelCanBeNonTerminal<Level>) {
     entry.set_reg_value(0).Set({}, ArmPagingSettings{
                                        .present = true,
                                        .terminal = false,
-                                       .access = {.readable = true},
-                                       .accessed = false,
-                                   });
-    EXPECT_FALSE(entry.accessed());
-
-    entry.set_reg_value(0).Set({}, ArmPagingSettings{
-                                       .present = true,
-                                       .terminal = false,
-                                       .access = {.readable = true},
-                                       .accessed = true,
                                    });
     EXPECT_FALSE(entry.accessed());
   }
 
+  // An entry Set() as terminal should report as accessed.
   if constexpr (kArmLevelCanBeTerminal<Level>) {
     entry.set_reg_value(0).Set({}, ArmPagingSettings{
                                        .present = true,
                                        .terminal = true,
-                                       .access = {.readable = true},
-                                       .accessed = false,
-                                   });
-    EXPECT_FALSE(entry.accessed());
-
-    entry.set_reg_value(0).Set({}, ArmPagingSettings{
-                                       .present = true,
-                                       .terminal = true,
-                                       .access = {.readable = true},
-                                       .accessed = true,
                                    });
     EXPECT_TRUE(entry.accessed());
   }
 }
 
-TEST(ArmPagingTraitTests, GetSetAccessed) {
-  TestArmGetSetAccessed<ArmPagingLevel::k0>();
-  TestArmGetSetAccessed<ArmPagingLevel::k1>();
-  TestArmGetSetAccessed<ArmPagingLevel::k2>();
-  TestArmGetSetAccessed<ArmPagingLevel::k3>();
+TEST(ArmPagingTraitTests, SetImpliesAccessed) {
+  TestArmSetImpliesAccessed<ArmPagingLevel::k0>();
+  TestArmSetImpliesAccessed<ArmPagingLevel::k1>();
+  TestArmSetImpliesAccessed<ArmPagingLevel::k2>();
+  TestArmSetImpliesAccessed<ArmPagingLevel::k3>();
 }
 
 // Represents a 512 entry page table and owns its own storage.

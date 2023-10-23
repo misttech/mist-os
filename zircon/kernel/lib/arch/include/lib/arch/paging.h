@@ -49,7 +49,6 @@ struct PagingSettings {
   bool terminal = false;
   AccessPermissions access;
   MemoryType memory = DefaultMemoryValue;
-  bool accessed = true;
 };
 
 // See Paging<PagingTraits>::MemoryType below.
@@ -57,7 +56,6 @@ template <typename MemoryType, auto& DefaultMemoryValue = kDefaultConstructedVal
 struct MapSettings {
   AccessPermissions access;
   MemoryType memory = DefaultMemoryValue;
-  bool accessed = true;
 
   // TODO(fxbug.dev/129344): global.
 };
@@ -128,7 +126,6 @@ struct ExamplePagingTraits {
   /// *  uint64_t address;
   /// *  AccessPermissions access;
   /// *  MemoryType memory;
-  /// *  bool accessed;
   ///
   /// Further, PagingSettings should define a default memory type value in the
   /// form of
@@ -202,11 +199,11 @@ struct ExamplePagingTraits {
       return PagingSettings::kDefaultMemory;
     }
 
-    /// Bulk-apply paging settings to the entry. This is done in one go as
-    /// there can be interdependicies among the different aspects of entry
-    /// state: these could not otherwise be captured by individual setters with
-    /// an unconstrained relative call order. (For example, the setting of
-    /// address could be sensitive to whether the entry is terminal.)
+    /// (Re)populates an entry as new. This is done in one go as there can be
+    /// interdependicies among the different aspects of entry state: these
+    /// could not otherwise be captured by individual setters with an
+    /// unconstrained relative call order. (For example, the setting of address
+    /// could be sensitive to whether the entry is terminal.)
     ///
     /// If `settings.present` is false, all other settings should be ignored.
     ///
@@ -218,6 +215,15 @@ struct ExamplePagingTraits {
     /// before making this call; otherwise if
     /// `!Traits::kNonTerminalAccessPermissions` then the provided access
     /// permissions are expected to be maximally permissive.
+    ///
+    /// Where the qualifiers make sense (which is implementation-specific), a
+    /// call to Set() will result in a present entry being updated as accessed.
+    /// There is no case in which we would want to create a new
+    /// entry but not mark it as such. If hardware is managing these bits, then
+    /// there is no penalty to doing so; if software-managed, then we avoid an
+    /// unnecessary trap that we would only handle later on to set these bits.
+    /// Similarly, if an entry is Set() as writable, then it should reflect as
+    /// 'dirty' when that makes sense.
     constexpr TableEntry& Set(const SystemState& state, const PagingSettings& settings) {
       return *this;
     }
@@ -731,7 +737,6 @@ class Paging : public PagingTraits {
         settings.address = output_paddr_;
         settings.access = settings_.access;
         settings.memory = settings_.memory;
-        settings.accessed = settings_.accessed;
       } else {
         std::optional<uint64_t> new_table_paddr = allocator_(kTableSize<Level>, kTableAlignment);
         if (!new_table_paddr) {

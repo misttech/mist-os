@@ -255,7 +255,8 @@ class X86PagingTraitsBase::TableEntry
     set_r_w(access.writable)
         .set_xd(!access.executable)
         .set_u_s(access.user_accessible)
-        .set_a(settings.accessed);
+        .set_a(true)
+        .set_d(true);
 
     ZX_DEBUG_ASSERT_MSG((fbl::ExtractBits<63, 52, uint64_t>(settings.address) == 0), "%#" PRIx64,
                         settings.address);
