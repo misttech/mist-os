@@ -19,6 +19,7 @@ import cxx
 import cl_utils
 import depfile
 import fuchsia
+import linker
 import remote_action
 
 from pathlib import Path
@@ -97,6 +98,22 @@ class CxxLinkRemoteAction(object):
     @property
     def compiler_type(self) -> cxx.Compiler:
         return self.cxx_action.compiler.type
+
+    @property
+    def target(self) -> str:
+        return self.cxx_action.target
+
+    @property
+    def sysroot(self) -> Optional[Path]:
+        return self.cxx_action.sysroot
+
+    @property
+    def use_ld(self) -> str:
+        return self.cxx_action.use_ld or "lld"  # default
+
+    @property
+    def unwindlib(self) -> str:
+        return self.cxx_action.unwindlib or "libunwind"  # default
 
     @property
     def depfile(self) -> Optional[Path]:
@@ -189,6 +206,65 @@ class CxxLinkRemoteAction(object):
             + self.command_line_output_files
         )
 
+    @property
+    def _sysroot_is_outside_exec_root(self) -> bool:
+        sysroot_dir = self.sysroot
+        if not sysroot_dir:
+            return False  # not applicable
+
+        if not sysroot_dir.is_absolute():
+            # C sysroot is relative to the working directory
+            return False
+
+        # Check all absolute path parents.
+        return self.exec_root not in sysroot_dir.parents
+
+    def _sysroot_files(self) -> Iterable[Path]:
+        # sysroot files
+        if not self.target:
+            return
+        sysroot_dir = self.sysroot
+        if not sysroot_dir:
+            return
+
+        # if sysroot points outside of exec_root, stop
+        if self._sysroot_is_outside_exec_root:
+            return
+
+        sysroot_triple = fuchsia.clang_target_to_sysroot_triple(self.target)
+        if sysroot_dir:
+            # Some sysroot files are linker scripts to be expanded.
+            if sysroot_triple:
+                search_paths = [
+                    sysroot_dir / "usr/lib" / sysroot_triple,
+                    sysroot_dir / "lib" / sysroot_triple,
+                ]
+            else:
+                search_paths = [sysroot_dir / "lib"]
+
+            link = linker.LinkerInvocation(
+                working_dir_abs=self.working_dir, search_paths=search_paths
+            )
+
+            lld = self.host_compiler.parent / ("ld." + self.use_ld)
+
+            def linker_script_expander(paths: Sequence[Path]) -> Iterable[Path]:
+                if lld.exists():
+                    yield from link.expand_using_lld(lld=lld, inputs=paths)
+                else:
+                    for path in paths:
+                        yield from link.expand_possible_linker_script(path)
+
+            yield from self.yield_verbose(
+                "C sysroot files",
+                fuchsia.c_sysroot_files(
+                    sysroot_dir=sysroot_dir,
+                    sysroot_triple=sysroot_triple,
+                    with_libgcc=False,
+                    linker_script_expander=linker_script_expander,
+                ),
+            )
+
     def prepare(self) -> int:
         """Setup everything ahead of remote execution."""
         assert (
@@ -201,12 +277,36 @@ class CxxLinkRemoteAction(object):
         self.check_preconditions()
 
         remote_command = self.cxx_action.command
-        remote_inputs = self.cxx_action.linker_inputs
-        if self.cxx_action.use_ld:
-            remote_ld = self.remote_compiler.parent / (
-                "ld." + self.cxx_action.use_ld
-            )
+        remote_inputs = []
+
+        remote_inputs.extend(self.cxx_action.linker_inputs_from_flags())
+        # If re-client is unable to process inputs inside response files:
+        # remote_inputs.extend(self.cxx_action.linker_inputs)
+        # remote_inputs.extend(self.cxx_action.response_files)
+
+        remote_ld = self.remote_compiler.parent / ("ld." + self.use_ld)
+        if remote_ld.exists():
             remote_inputs.append(remote_ld)
+
+        # built-in toolchain libraries, run-times
+        remote_inputs.extend(
+            fuchsia.remote_linker_toolchain_inputs(
+                clang_path_rel=self.remote_compiler,
+                target=self.cxx_action.target,
+                shared=self.cxx_action.shared,
+                rtlib=self.cxx_action.rtlib,
+                unwindlib=self.unwindlib,
+                profile=self.cxx_action.profile_instr_generate,
+                sanitizers=self.cxx_action.sanitizers,
+            )
+        )
+
+        # sysroot libraries:
+        # Currently, re-client grabs the entire --sysroot directory, which is
+        # excessive.  It would be more efficient to grab only what is needed,
+        # like:
+        #   remote_inputs.extend(self._sysroot_files())
+        # See b/306499345.
 
         remote_inputs += self.command_line_inputs
 
@@ -299,6 +399,25 @@ class CxxLinkRemoteAction(object):
         if self.verbose:
             msg(text)
 
+    def yield_verbose(self, desc: str, items: Iterable[Any]) -> Iterable[Any]:
+        """In verbose mode, print and forward items.
+
+        Args:
+          desc: text description of what is being printed.
+          items: stream of any type of object that is str-able.
+
+        Yields:
+          items, unchanged
+        """
+        if self.verbose:
+            msg(f"{desc}: {{")
+            for item in items:
+                print(f"  {item}")  # one item per line
+                yield item
+            print(f"}}  # {desc}")
+        else:
+            yield from items
+
     def vprintlist(self, desc: str, items: Iterable[Any]):
         """In verbose mode, print elements.
 
@@ -347,8 +466,12 @@ class CxxLinkRemoteAction(object):
         return self._cxx_action
 
     @property
+    def host_compiler(self) -> Path:
+        return self.cxx_action.compiler.tool
+
+    @property
     def remote_compiler(self) -> Path:
-        return fuchsia.remote_executable(self.cxx_action.compiler.tool)
+        return fuchsia.remote_executable(self.host_compiler)
 
     def _run_locally(self) -> int:
         export_dir = self.miscomparison_export_dir

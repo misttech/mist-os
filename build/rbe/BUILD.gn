@@ -53,7 +53,7 @@ if (is_host) {
   _cxx_sources = [ "cxx.py" ] + _cl_utils_sources
   _cxx_link_remote_wrapper_sources =
       [ "cxx_link_remote_wrapper.py" ] + _cxx_sources + _fuchsia_sources +
-      _cl_utils_sources + _remote_action_sources
+      _linker_sources + _remote_action_sources
   _cxx_remote_wrapper_sources =
       [ "cxx_remote_wrapper.py" ] + _cxx_sources + _fuchsia_sources +
       _cl_utils_sources + _remote_action_sources

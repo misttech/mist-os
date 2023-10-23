@@ -493,17 +493,13 @@ class LinkerInvocation(object):
                 "/dev/null",  # Don't want link output
                 "--dependency-file=/dev/stdout",  # avoid temp file
             ]
-            + ["--sysroot={self.sysroot}"]
-            if self.sysroot
-            else []
-            + ["-L{path}" for path in self.search_paths]
+            + ([f"--sysroot={self.sysroot}"] if self.sysroot else [])
+            + [f"-L{path}" for path in self.search_paths]
             + self.l_libs
             + [str(f) for f in self.direct_files + inputs]
         )
 
-        result = cl_utils.subprocess_call(
-            command=lld_command, cwd=self.working_dir
-        )
+        result = cl_utils.subprocess_call(cmd=lld_command, cwd=self.working_dir)
 
         if result.returncode != 0:
             err_msg = "\n".join(result.stderr)

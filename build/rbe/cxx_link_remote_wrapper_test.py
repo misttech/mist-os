@@ -55,9 +55,12 @@ class CxxLinkRemoteActionTests(unittest.TestCase):
         source = Path("hello.o")
         output = Path("hello.a")
         target = "riscv64-apple-darwin21"
+        sysroot = Path("/path/to/sys/root")
         command = _strs(
             [
                 compiler,
+                "--sysroot",
+                sysroot,
                 f"--target={target}",
                 source,
                 "-o",
@@ -73,17 +76,27 @@ class CxxLinkRemoteActionTests(unittest.TestCase):
         )
         self.assertFalse(c.verbose)
         self.assertFalse(c.dry_run)
-        self.assertEqual(c.cxx_action.compiler.tool, compiler)
+        self.assertEqual(c.host_compiler, compiler)
         self.assertTrue(c.cxx_action.compiler_is_clang)
         self.assertEqual(c.cxx_action.output_file, output)
-        self.assertEqual(c.cxx_action.target, target)
+        self.assertEqual(c.sysroot, sysroot)
+        self.assertEqual(c.target, target)
         self.assertEqual(c.original_link_command, command)
         self.assertFalse(c.local_only)
 
-        self.assertEqual(c.prepare(), 0)
+        with mock.patch.object(
+            fuchsia, "remote_linker_toolchain_inputs", return_value=[]
+        ):
+            self.assertEqual(c.prepare(), 0)
+        self.assertEqual(
+            c.cxx_action.linker_inputs,
+            [source],
+        )
         self.assertEqual(
             c.remote_action.inputs_relative_to_project_root,
-            [fake_builddir / source],
+            # re-client will automatically collect named linker inputs,
+            # so they need not be listed here.
+            [],
         )
         with mock.patch.object(
             cxx_link_remote_wrapper.CxxLinkRemoteAction,
@@ -117,7 +130,10 @@ class CxxLinkRemoteActionTests(unittest.TestCase):
                     host_platform=fuchsia.REMOTE_PLATFORM,  # host = remote exec
                     auto_reproxy=False,
                 )
-                self.assertEqual(c.prepare(), 0)
+                with mock.patch.object(
+                    fuchsia, "remote_linker_toolchain_inputs", return_value=[]
+                ):
+                    self.assertEqual(c.prepare(), 0)
                 self.assertEqual(c.remote_action.exec_root, fake_root)
                 self.assertEqual(c.remote_action.build_subdir, fake_builddir)
 
@@ -146,7 +162,10 @@ class CxxLinkRemoteActionTests(unittest.TestCase):
                 host_platform=fuchsia.REMOTE_PLATFORM,  # host = remote exec
                 auto_reproxy=False,
             )
-            self.assertEqual(c.prepare(), 0)
+            with mock.patch.object(
+                fuchsia, "remote_linker_toolchain_inputs", return_value=[]
+            ):
+                self.assertEqual(c.prepare(), 0)
             self.assertTrue(c.cxx_action.compiler_is_clang)
             self.assertEqual(c.remote_action.exec_root, fake_root)
             self.assertEqual(c.remote_action.build_subdir, fake_builddir)
@@ -190,7 +209,10 @@ class CxxLinkRemoteActionTests(unittest.TestCase):
             auto_reproxy=False,
         )
 
-        self.assertEqual(c.prepare(), 0)
+        with mock.patch.object(
+            fuchsia, "remote_linker_toolchain_inputs", return_value=[]
+        ):
+            self.assertEqual(c.prepare(), 0)
         # check that rewrapper option sees --foo=bar
         remote_action_command = c.remote_action.launch_command
         prefix, sep, wrapped_command = cl_utils.partition_sequence(
@@ -227,13 +249,22 @@ class CxxLinkRemoteActionTests(unittest.TestCase):
         self.assertEqual(c.depfile, depfile)
 
         with mock.patch.object(
-            fuchsia, "gcc_support_tools", return_value=iter([])
-        ) as mock_tools:
-            self.assertEqual(c.prepare(), 0)
+            fuchsia, "remote_linker_toolchain_inputs", return_value=[]
+        ):
+            with mock.patch.object(
+                fuchsia, "gcc_support_tools", return_value=iter([])
+            ) as mock_tools:
+                self.assertEqual(c.prepare(), 0)
         mock_tools.assert_called_with(c.compiler_path)
         self.assertEqual(
+            c.cxx_action.linker_inputs,
+            [source],
+        )
+        self.assertEqual(
             c.remote_action.inputs_relative_to_project_root,
-            [fake_builddir / source],
+            # re-client will automatically collect named linker inputs,
+            # so they need not be listed here.
+            [],
         )
         self.assertEqual(
             c.remote_action.output_files_relative_to_project_root,
@@ -287,7 +318,10 @@ class CxxLinkRemoteActionTests(unittest.TestCase):
             )
 
             # create the remote action
-            self.assertEqual(c.prepare(), 0)
+            with mock.patch.object(
+                fuchsia, "remote_linker_toolchain_inputs", return_value=[]
+            ):
+                self.assertEqual(c.prepare(), 0)
 
             self.assertEqual(
                 set(c.remote_action.always_download), set([depfile])

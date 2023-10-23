@@ -50,6 +50,19 @@ def _cxx_command_scanner() -> argparse.ArgumentParser:
         help="target platform",
     )
     parser.add_argument(
+        "-shared",
+        default=False,
+        action="store_true",
+        help="output is linked shared",
+    )
+    parser.add_argument(
+        "-fprofile-instr-generate",
+        dest="profile_instr_generate",
+        default=False,
+        action="store_true",
+        help="generate profiling instrumentation",
+    )
+    parser.add_argument(
         "-fprofile-list",
         type=Path,
         dest="profile_list",
@@ -350,6 +363,16 @@ def _linker_driver_arg_parser() -> argparse.ArgumentParser:
         type=Path,
         help="dependency file to write",
     )
+    parser.add_argument(
+        "--retain-symbols-file",
+        type=Path,
+        help="file that lists symbols to retain",
+    )
+    parser.add_argument(
+        "--version-script",
+        type=Path,
+        help="linking version script",
+    )
     return parser
 
 
@@ -457,7 +480,7 @@ class CxxAction(object):
         return self._attributes.target
 
     @property
-    def sysroot(self) -> Path:
+    def sysroot(self) -> Optional[Path]:
         return self._attributes.sysroot
 
     @property
@@ -465,8 +488,18 @@ class CxxAction(object):
         return self._sources
 
     @property
+    def shared(self) -> bool:
+        return self._attributes.shared
+
+    @property
     def linker_inputs(self) -> Sequence[Path]:
         return self._linker_inputs
+
+    def linker_inputs_from_flags(self) -> Iterable[Path]:
+        if self.linker_retain_symbols_file:
+            yield self.linker_retain_symbols_file
+        if self.linker_version_script:
+            yield self.linker_version_script
 
     @property
     def response_files(self) -> Sequence[Path]:
@@ -491,6 +524,14 @@ class CxxAction(object):
     @property
     def linker_mapfile(self) -> Optional[Path]:
         return self._linker_attributes.mapfile
+
+    @property
+    def linker_retain_symbols_file(self) -> Optional[Path]:
+        return self._linker_attributes.retain_symbols_file
+
+    @property
+    def linker_version_script(self) -> Optional[Path]:
+        return self._linker_attributes.version_script
 
     @property
     def rtlib(self) -> Optional[str]:
@@ -535,6 +576,10 @@ class CxxAction(object):
     @property
     def profile_list(self) -> Optional[Path]:
         return self._attributes.profile_list
+
+    @property
+    def profile_instr_generate(self) -> bool:
+        return self._attributes.profile_instr_generate
 
     @property
     def use_ld(self) -> Optional[str]:

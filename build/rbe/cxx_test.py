@@ -72,6 +72,8 @@ class CxxActionTests(unittest.TestCase):
         self.assertIsNone(c.depfile)
         self.assertIsNone(c.sysroot)
         self.assertIsNone(c.profile_list)
+        self.assertFalse(c.profile_instr_generate)
+        self.assertFalse(c.shared)
         self.assertEqual(c.sanitizers, set())
         self.assertFalse(c.using_asan)
         self.assertFalse(c.using_ubsan)
@@ -271,6 +273,13 @@ class CxxActionTests(unittest.TestCase):
         self.assertFalse(c.dialect_is_c)
         self.assertIsNone(c.crash_diagnostics_dir)
 
+    def test_shared(self):
+        source = Path("hello.o")
+        output = Path("hello.so")
+        c = cxx.CxxAction(_strs(["clang++", "-shared", source, "-o", output]))
+        self.assertTrue(c.shared)
+        self.assertEqual(c.linker_inputs, [source])
+
     def test_fuse_ld(self):
         source = Path("hello.o")
         output = Path("hello")
@@ -279,6 +288,7 @@ class CxxActionTests(unittest.TestCase):
             _strs(["clang++", f"-fuse-ld={linker}", source, "-o", output])
         )
         self.assertEqual(c.use_ld, linker)
+        self.assertEqual(c.linker_inputs, [source])
 
     def test_asan(self):
         source = Path("hello.o")
@@ -289,6 +299,7 @@ class CxxActionTests(unittest.TestCase):
         self.assertEqual(c.sanitizers, {"address"})
         self.assertTrue(c.using_asan)
         self.assertFalse(c.using_ubsan)
+        self.assertEqual(c.linker_inputs, [source])
 
     def test_no_sanitize(self):
         source = Path("hello.o")
@@ -308,6 +319,7 @@ class CxxActionTests(unittest.TestCase):
         self.assertEqual(c.sanitizers, set())
         self.assertFalse(c.using_asan)
         self.assertFalse(c.using_ubsan)
+        self.assertEqual(c.linker_inputs, [source])
 
     def test_ubsan(self):
         source = Path("hello.o")
@@ -318,6 +330,7 @@ class CxxActionTests(unittest.TestCase):
         self.assertEqual(c.sanitizers, {"undefined"})
         self.assertFalse(c.using_asan)
         self.assertTrue(c.using_ubsan)
+        self.assertEqual(c.linker_inputs, [source])
 
     def test_unwindlib(self):
         source = Path("hello.o")
@@ -379,6 +392,42 @@ class CxxActionTests(unittest.TestCase):
         )
         self.assertEqual(c.linker_depfile, depfile)
         self.assertEqual(list(c.linker_output_files()), [output, depfile])
+
+    def test_linker_retain_symbols_file(self):
+        source = Path("hello.o")
+        output = Path("hello")
+        retain_file = Path("hello.allowlist")
+        c = cxx.CxxAction(
+            _strs(
+                [
+                    "clang++",
+                    f"-Wl,--retain-symbols-file={retain_file}",
+                    source,
+                    "-o",
+                    output,
+                ]
+            )
+        )
+        self.assertEqual(c.linker_retain_symbols_file, retain_file)
+        self.assertEqual(list(c.linker_inputs_from_flags()), [retain_file])
+
+    def test_linker_version_script(self):
+        source = Path("hello.o")
+        output = Path("hello")
+        version_script = Path("hello.ld")
+        c = cxx.CxxAction(
+            _strs(
+                [
+                    "clang++",
+                    f"-Wl,--version-script={version_script}",
+                    source,
+                    "-o",
+                    output,
+                ]
+            )
+        )
+        self.assertEqual(c.linker_version_script, version_script)
+        self.assertEqual(list(c.linker_inputs_from_flags()), [version_script])
 
     def test_simple_gcc_cxx(self):
         source = Path("hello.cc")
@@ -489,6 +538,24 @@ class CxxActionTests(unittest.TestCase):
         )
         self.assertEqual(c.profile_list, profile)
         self.assertEqual(set(c.input_files()), {source, profile})
+
+    def test_profile_instr_generate(self):
+        source = Path("hello.cc")
+        ii_file = Path("hello.ii")
+        output = Path("hello.o")
+        c = cxx.CxxAction(
+            _strs(
+                [
+                    "clang++",
+                    "-c",
+                    source,
+                    "-o",
+                    output,
+                    "-fprofile-instr-generate",
+                ]
+            )
+        )
+        self.assertTrue(c.profile_instr_generate)
 
     def test_uses_macos_sdk(self):
         sysroot = Path("/Library/Developer/blah")

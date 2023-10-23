@@ -14,7 +14,7 @@ import os
 import platform
 import sys
 from pathlib import Path
-from typing import Callable, Iterable, Optional, Sequence
+from typing import Callable, FrozenSet, Iterable, Optional, Sequence
 
 _SCRIPT_PATH = Path(__file__)
 _SCRIPT_BASENAME = _SCRIPT_PATH.name
@@ -274,6 +274,10 @@ def rustc_target_to_sysroot_triple(target: str) -> str:
     raise ValueError(f"unhandled case for sysroot target subdir: {target}")
 
 
+def clang_target_to_sysroot_triple(target: str) -> str:
+    return target.replace("-unknown-", "")
+
+
 def rustc_target_to_clang_target(target: str) -> str:
     """Maps a rust target triple to a clang target triple."""
     # These mappings were determined by examining the options available
@@ -323,6 +327,54 @@ def remote_rustc_to_rust_lld_path(rustc: Path) -> str:
     # remote is only linux-64
     rust_lld = rustc.parent / _REMOTE_RUST_LLD_RELPATH
     return rust_lld  # already normalized by Path construction
+
+
+def remote_linker_toolchain_inputs(
+    clang_path_rel: Path,
+    target: str,
+    shared: bool,
+    rtlib: str,
+    unwindlib: str,
+    profile: bool,
+    sanitizers: FrozenSet[str],
+) -> Iterable[Path]:
+    """List linker support libraries.
+
+    Kludge: partially hardcode built-in libraries until linker tools can
+    quickly discover the needed libraries to link remotely.
+    See https://fxbug.dev/135168
+
+    Yields:
+      Paths to libraries needed for linking.
+    """
+    clang_root = clang_path_rel.parent.parent
+    libclang_root = clang_root / "lib" / "clang"
+    # Expect exactly one versioned libclang dir installed.
+    libclang_versioned = next(libclang_root.glob("*"))
+    libclang_target_dir = libclang_versioned / "lib" / target
+    if rtlib == "compiler-rt":
+        yield libclang_target_dir / "clang_rt.crtbegin.o"
+        yield libclang_target_dir / "clang_rt.crtend.o"
+
+    yield libclang_target_dir / "libclang_rt.builtins.a"
+
+    if "address" in sanitizers:
+        # Including both static and shared libraries, because one cannot
+        # deduce from the command-line alone which will be needed.
+        yield from libclang_target_dir.glob("libclang_rt.asan*")
+        ignorelist = libclang_versioned / "share" / "asan_ignorelist.txt"
+        yield ignorelist
+
+    if profile:
+        yield from libclang_target_dir.glob("libclang_rt.profile*")
+
+    stdlibs_dir = clang_root / "lib" / target
+    # This directory includes variants like asan, noexcept.
+    # Let the toolchain pick which one it needs.
+    yield stdlibs_dir  # grab the entire directory
+    # yield stdlibs_dir / "libc++.a"
+    # if unwindlib:
+    #     yield stdlibs_dir / (unwindlib + ".a")
 
 
 # Built lib/{sysroot_triple}/... files
