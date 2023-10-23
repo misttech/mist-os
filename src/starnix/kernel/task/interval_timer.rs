@@ -4,7 +4,8 @@
 
 use crate::{
     lock::Mutex,
-    signals::{send_signal, SignalDetail, SignalEvent, SignalInfo},
+    logging::not_implemented,
+    signals::{send_signal, SignalDetail, SignalEvent, SignalEventNotify, SignalInfo},
     task::{
         timers::{ClockId, TimerId},
         ThreadGroup,
@@ -15,6 +16,7 @@ use crate::{
 
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
+use futures::stream::AbortHandle;
 use std::sync::{Arc, Weak};
 
 #[derive(Default)]
@@ -23,6 +25,15 @@ pub struct TimerRemaining {
     pub remainder: zx::Duration,
     /// Interval for periodic timer.
     pub interval: zx::Duration,
+}
+
+impl From<TimerRemaining> for itimerspec {
+    fn from(value: TimerRemaining) -> Self {
+        Self {
+            it_interval: timespec_from_duration(value.interval),
+            it_value: timespec_from_duration(value.remainder),
+        }
+    }
 }
 
 #[allow(dead_code)] // TODO(fxb/123084)
@@ -41,9 +52,11 @@ pub type IntervalTimerHandle = Arc<IntervalTimer>;
 #[allow(dead_code)] // TODO(fxb/123084)
 #[derive(Default, Debug)]
 struct IntervalTimerMutableState {
+    /// Handle to abort the running timer task.
+    abort_handle: Option<AbortHandle>,
     /// If the timer is armed (started).
     armed: bool,
-    /// Absolute time of the next expiration.
+    /// Absolute UTC time of the next expiration.
     target_time: zx::Time,
     /// Interval for periodic timer.
     interval: zx::Duration,
@@ -56,6 +69,16 @@ struct IntervalTimerMutableState {
     /// If true, a signal to `target` is already queued, and timer expirations should increment
     /// `overrun` instead of sending another signal.
     requeue_pending: bool,
+}
+
+impl IntervalTimerMutableState {
+    fn disarm(&mut self) {
+        self.armed = false;
+        if let Some(abort_handle) = &self.abort_handle {
+            abort_handle.abort();
+        }
+        self.abort_handle = None;
+    }
 }
 
 impl IntervalTimer {
@@ -76,6 +99,63 @@ impl IntervalTimer {
         Some(SignalInfo::new(self.signal_event.signo?, SI_TIMER as u32, signal_detail))
     }
 
+    async fn start_timer_loop(&self, thread_group: Weak<ThreadGroup>) {
+        loop {
+            loop {
+                // We may have to issue multiple sleeps if the target time in the timer is
+                // updated while we are sleeping or if our estimation of the target time
+                // relative to the monotonic clock is off.
+                let target_monotonic =
+                    utc::estimate_monotonic_deadline_from_utc(self.state.lock().target_time);
+                if zx::Time::get_monotonic() >= target_monotonic {
+                    break;
+                }
+                fuchsia_async::Timer::new(target_monotonic).await;
+            }
+
+            if !self.state.lock().armed {
+                return;
+            }
+
+            // Check on notify enum to determine the signal target.
+            if let Some(thread_group) = thread_group.upgrade() {
+                let signal_target = match self.signal_event.notify {
+                    SignalEventNotify::Signal => self.signal_event.signo.and_then(|signal| {
+                        thread_group
+                            .read()
+                            .get_signal_target(&signal.into())
+                            .map(TempRef::into_static)
+                    }),
+                    SignalEventNotify::None => None, // No need to do anything.
+                    SignalEventNotify::Thread { .. } => {
+                        not_implemented!("SIGEV_THREAD timer");
+                        None
+                    }
+                    SignalEventNotify::ThreadId(tid) => {
+                        // Check if the target thread exists in the thread group.
+                        thread_group.read().get_task(tid).map(TempRef::into_static)
+                    }
+                };
+
+                if let Some(target) = &signal_target {
+                    if let Some(signal_info) = self.signal_info() {
+                        send_signal(target, signal_info)
+                    }
+                }
+            }
+
+            // If the `interval` is zero, the timer expires just once, at the time
+            // specified by `target_time`.
+            let mut guard = self.state.lock();
+            if guard.interval != zx::Duration::default() {
+                guard.target_time = utc::utc_now() + guard.interval;
+            } else {
+                guard.disarm();
+                return;
+            }
+        }
+    }
+
     pub fn arm(
         self: &IntervalTimerHandle,
         thread_group: Weak<ThreadGroup>,
@@ -83,62 +163,47 @@ impl IntervalTimer {
         target_time: zx::Time,
         interval: zx::Duration,
     ) {
-        {
-            let mut guard = self.state.lock();
-            guard.armed = true;
-            guard.target_time = target_time;
-            guard.interval = interval;
-            guard.overrun = 0;
-            guard.overrun_last = 0;
+        let mut guard = self.state.lock();
+
+        // Stop the current running task;
+        guard.disarm();
+
+        if target_time == zx::Time::ZERO {
+            return;
         }
-        let self_ref = self.clone();
+
+        guard.armed = true;
+        guard.target_time = target_time;
+        guard.interval = interval;
+        guard.overrun = 0;
+        guard.overrun_last = 0;
 
         // TODO(fxb/123084): check on clock_id to see if the clock supports creating a timer.
 
+        let self_ref = self.clone();
         executor.spawn_detached(async move {
-            loop {
-                loop {
-                    // We may have to issue multiple sleeps if the target time in the timer is
-                    // updated while we are sleeping or if our estimation of the target time
-                    // relative to the monotonic clock is off.
-                    let target_monotonic = utc::estimate_monotonic_deadline_from_utc(
-                        self_ref.state.lock().target_time,
-                    );
-                    if zx::Time::get_monotonic() >= target_monotonic {
-                        break;
-                    }
-                    fuchsia_async::Timer::new(target_monotonic).await;
-                }
-                if !self_ref.state.lock().armed {
+            let _ = {
+                // 1. Lock the state to update `abort_handle` when the timer is still armed.
+                // 2. MutexGuard needs to be dropped before calling await on the future task.
+                // Unfortuately, std::mem::drop is not working correctly on this:
+                // (https://github.com/rust-lang/rust/issues/57478).
+                let mut guard = self_ref.state.lock();
+                if !guard.armed {
                     return;
                 }
-                if let Some(thread_group) = thread_group.upgrade() {
-                    if let Some(signal_info) = &self_ref.signal_info() {
-                        // TODO(fxb/123084): Check on signal_notify to determine the target.
-                        let signal_target = thread_group
-                            .read()
-                            .get_signal_target(&signal_info.signal.into())
-                            .map(TempRef::into_static);
-                        if let Some(task) = &signal_target {
-                            send_signal(task, signal_info.clone());
-                        }
-                    }
-                    let mut guard = self_ref.state.lock();
-                    if guard.interval != zx::Duration::default() {
-                        guard.target_time = utc::utc_now() + guard.interval;
-                    } else {
-                        guard.armed = false;
-                        break;
-                    }
-                } else {
-                    break;
-                }
+
+                let (abortable_future, abort_handle) =
+                    futures::future::abortable(self_ref.start_timer_loop(thread_group));
+                guard.abort_handle = Some(abort_handle);
+                abortable_future
             }
+            .await;
         });
     }
 
     pub fn disarm(&self) {
-        self.state.lock().armed = false;
+        let mut guard = self.state.lock();
+        guard.disarm();
     }
 
     pub fn time_remaining(&self) -> TimerRemaining {

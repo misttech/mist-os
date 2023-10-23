@@ -8,7 +8,11 @@ use fuchsia_sync::Mutex;
 
 use crate::{
     signals::{SignalEvent, SignalEventNotify, SignalEventValue},
-    task::interval_timer::{IntervalTimer, IntervalTimerHandle},
+    task::{
+        interval_timer::{IntervalTimer, IntervalTimerHandle},
+        CurrentTask,
+    },
+    time::utc,
     types::*,
 };
 
@@ -89,8 +93,8 @@ impl TimerTable {
 
     /// Fetches the time remaining until the next expiration of a timer, along with the interval
     /// setting of the timer.
-    pub fn get_time(&self, _id: TimerId) -> Result<itimerspec, Errno> {
-        error!(ENOSYS)
+    pub fn get_time(&self, id: TimerId) -> Result<itimerspec, Errno> {
+        Ok(self.get_timer(id)?.time_remaining().into())
     }
 
     /// Returns the overrun count for the last timer expiration.
@@ -103,13 +107,30 @@ impl TimerTable {
     /// interval for the timer.
     pub fn set_time(
         &self,
-        _id: TimerId,
-        _flags: i32,
-        _new_value: UserRef<itimerspec>,
-        _old_value: UserRef<itimerspec>,
-    ) -> Result<(), Errno> {
-        // TODO(fxbug.dev/123084): Really implement.
-        Ok(())
+        current_task: &CurrentTask,
+        id: TimerId,
+        flags: i32,
+        new_value: itimerspec,
+    ) -> Result<itimerspec, Errno> {
+        let itimer = self.get_timer(id)?;
+        let old_value: itimerspec = itimer.time_remaining().into();
+        if new_value.it_value.tv_sec != 0 || new_value.it_value.tv_nsec != 0 {
+            let target_time = if flags == TIMER_ABSTIME as i32 {
+                time_from_timespec(new_value.it_value)?
+            } else {
+                utc::utc_now() + duration_from_timespec(new_value.it_value)?
+            };
+            itimer.arm(
+                std::sync::Arc::downgrade(&current_task.thread_group),
+                &current_task.kernel().kthreads.ehandle,
+                target_time,
+                duration_from_timespec(new_value.it_interval)?,
+            );
+        } else {
+            itimer.disarm();
+        }
+
+        Ok(old_value)
     }
 
     pub fn get_timer(&self, id: TimerId) -> Result<IntervalTimerHandle, Errno> {

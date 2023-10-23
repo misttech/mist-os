@@ -362,12 +362,25 @@ pub fn sys_timer_settime(
     current_task: &CurrentTask,
     id: uapi::__kernel_timer_t,
     flags: i32,
-    new_value: UserRef<itimerspec>,
-    old_value: UserRef<itimerspec>,
+    user_new_value: UserRef<itimerspec>,
+    user_old_value: UserRef<itimerspec>,
 ) -> Result<(), Errno> {
-    not_implemented!("timer_settime");
+    if user_new_value.is_null() {
+        return error!(EINVAL);
+    }
+    let new_value = current_task.read_object(user_new_value)?;
+
+    // Return early if the user passes an obviously invalid pointer. This avoids changing the timer
+    // settings for common pointer errors. This check is not a guarantee.
+    current_task.mm.check_plausible(user_old_value.addr(), std::mem::size_of::<itimerspec>())?;
+
     let timers = &current_task.thread_group.read().timers;
-    timers.set_time(id, flags, new_value, old_value)
+    let old_value = timers.set_time(current_task, id, flags, new_value)?;
+
+    if !user_old_value.is_null() {
+        current_task.write_object(user_old_value, &old_value)?;
+    }
+    Ok(())
 }
 
 pub fn sys_getitimer(

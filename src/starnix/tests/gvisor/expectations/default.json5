@@ -807,16 +807,16 @@
 
                 // timers_test
                 "IntervalTimerTest.SingleShotSilent",
-                "IntervalTimerTest.PeriodicGroupDirectedSignal",
                 "IntervalTimerTest.PeriodicThreadDirectedSignal",
-                "TimerTest.ProcessPingedRepeatedlyAfterCPUSoftLimit",
-                "TimerTest.ProcessKilledOnCPUHardLimit",
                 "IntervalTimerTest.OtherThreadGroup",
                 "IntervalTimerTest.PeriodicSilent",
-                "IntervalTimerTest.IsInitiallyStopped",
+
+                // TODO(b/287114779): Re-enable after sigtimedwait is fully implemented.
                 "IntervalTimerTest.RealTimeSignalsAreNotDuplicated",
                 "IntervalTimerTest.IgnoredSignalCountsAsOverrun",
+                "TimerTest.ProcessKilledOnCPUHardLimit",
                 "TimerTest.ProcessKilledOnCPUSoftLimit",
+                "TimerTest.ProcessPingedRepeatedlyAfterCPUSoftLimit",
 
                 // udp_socket_test
                 "AllInetTests/UdpSocketControlMessagesTest.SetAndReceivePktInfo/0",

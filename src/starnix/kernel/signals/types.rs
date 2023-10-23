@@ -436,7 +436,7 @@ impl From<SignalEventNotify> for i32 {
 }
 
 /// Data passed with signal event notification.
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Default)]
 pub struct SignalEventValue(pub u64);
 
 impl From<sigval_t> for SignalEventValue {

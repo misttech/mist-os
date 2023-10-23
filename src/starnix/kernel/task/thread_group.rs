@@ -1071,6 +1071,10 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
         self.tasks.contains_key(&tid)
     }
 
+    pub fn get_task(&self, tid: pid_t) -> Option<TempRef<'_, Task>> {
+        self.tasks.get(&tid).and_then(|t| t.upgrade())
+    }
+
     pub fn tasks_count(&self) -> usize {
         self.tasks.len()
     }

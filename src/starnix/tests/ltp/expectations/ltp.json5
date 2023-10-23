@@ -55,7 +55,6 @@
                 "cve-2017-7308",
                 "cve-2017-7472",
                 "cve-2018-1000199",
-                "cve-2018-12896",
                 "cve-2018-18445",
                 "cve-2018-5803",
                 "cve-2018-8897",
@@ -269,8 +268,6 @@
                 "tgkill02",
                 "time-schedule01",
                 "timer_getoverrun01",
-                "timer_gettime01",
-                "timer_settime02",
 
                 // fxbug.dev/127682
                 "times03",
@@ -321,6 +318,9 @@
 
                 // Times out.
                 "cve-2017-10661",
+
+                // TODO(b/287121317): Remove after timer_settime03 is fixed.
+                "cve-2018-12896",
             ],
         },
     ],

@@ -51,15 +51,7 @@
                 "PtraceResumptionTest.*",
 
                 // Timers
-                // TODO(b/287121317): Following tests are relying on timer_settime.
-                "time.timer_create_NULL",
-                "time.timer_create_SIGEV_SIGNAL",
-                "time.timer_create_multiple",
                 "time.timer_delete_from_timer_thread",
-                "time.timer_delete_terminates",
-                "time.timer_disarm_terminates",
-                "time.timer_settime_0",
-                "time.timer_settime_repeats",
 
                 // Our test runner doesn't understand DISABLED
                 "android_mallopt.DISABLED_multiple_enable_gwp_asan",
