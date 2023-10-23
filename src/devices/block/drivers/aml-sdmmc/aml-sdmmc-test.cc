@@ -29,7 +29,7 @@ namespace aml_sdmmc {
 class TestDfv1Driver : public Dfv1Driver {
  public:
   TestDfv1Driver(zx_device_t* parent, fdf::MmioBuffer mmio, zx::bti bti, fdf::MmioView view,
-                 aml_sdmmc::IoBuffer descs_buffer)
+                 ddk::IoBuffer descs_buffer)
       // Pass BTI ownership to Dfv1Driver, but keep a copy of the handle so we can get a list of
       // VMOs that are pinned when a request is made.
       : Dfv1Driver(parent, zx::bti(bti.get()), std::move(mmio),
@@ -144,7 +144,7 @@ class AmlSdmmcTest : public zxtest::Test {
     zx::bti bti;
     ASSERT_OK(fake_bti_create(bti.reset_and_get_address()));
 
-    aml_sdmmc::IoBuffer descs_buffer;
+    ddk::IoBuffer descs_buffer;
     EXPECT_OK(descs_buffer.Init(bti.get(), AmlSdmmc::kMaxDmaDescriptors * sizeof(aml_sdmmc_desc_t),
                                 IO_BUFFER_RW | IO_BUFFER_CONTIG));
     descs_ = descs_buffer.virt();
@@ -226,7 +226,7 @@ class AmlSdmmcTest : public zxtest::Test {
     mock_dev_->WaitUntilAsyncRemoveCalled();
     mock_ddk::ReleaseFlaggedDevices(dut_->zxdev());
 
-    aml_sdmmc::IoBuffer descs_buffer;
+    ddk::IoBuffer descs_buffer;
     EXPECT_OK(descs_buffer.Init(bti.get(), AmlSdmmc::kMaxDmaDescriptors * sizeof(aml_sdmmc_desc_t),
                                 IO_BUFFER_RW | IO_BUFFER_CONTIG));
     descs_ = descs_buffer.virt();

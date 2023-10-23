@@ -101,7 +101,7 @@ zx_status_t Dfv1Driver::Create(void* ctx, zx_device_t* parent) {
     }
   }
 
-  aml_sdmmc::IoBuffer descs_buffer;
+  ddk::IoBuffer descs_buffer;
   status = descs_buffer.Init(bti.get(), kMaxDmaDescriptors * sizeof(aml_sdmmc_desc_t),
                              IO_BUFFER_RW | IO_BUFFER_CONTIG);
   if (status != ZX_OK) {

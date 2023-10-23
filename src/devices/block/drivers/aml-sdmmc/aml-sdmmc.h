@@ -9,6 +9,7 @@
 #include <fidl/fuchsia.hardware.sdmmc/cpp/driver/fidl.h>
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <fuchsia/hardware/sdmmc/cpp/banjo.h>
+#include <lib/ddk/io-buffer.h>  // TODO(b/301003087): For DFv2, maybe templatize ddk::IoBuffer.
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/mmio/mmio.h>
 #include <lib/stdcompat/span.h>
@@ -25,7 +26,6 @@
 #include <fbl/auto_lock.h>
 #include <soc/aml-common/aml-sdmmc.h>
 
-#include "io-buffer.h"
 #include "src/lib/vmo_store/vmo_store.h"
 
 namespace aml_sdmmc {
@@ -37,8 +37,7 @@ class AmlSdmmc : public ddk::SdmmcProtocol<AmlSdmmc, ddk::base_protocol>,
   static constexpr size_t kMaxDmaDescriptors = 512;
 
   AmlSdmmc(zx::bti bti, fdf::MmioBuffer mmio, aml_sdmmc_config_t config, zx::interrupt irq,
-           fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> reset_gpio,
-           aml_sdmmc::IoBuffer descs_buffer)
+           fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> reset_gpio, ddk::IoBuffer descs_buffer)
       : mmio_(std::move(mmio)),
         bti_(std::move(bti)),
         irq_(std::move(irq)),
@@ -235,7 +234,7 @@ class AmlSdmmc : public ddk::SdmmcProtocol<AmlSdmmc, ddk::base_protocol>,
   aml_sdmmc_config_t board_config_;
 
   sdmmc_host_info_t dev_info_;
-  aml_sdmmc::IoBuffer descs_buffer_ TA_GUARDED(lock_);
+  ddk::IoBuffer descs_buffer_ TA_GUARDED(lock_);
   uint32_t max_freq_, min_freq_;
 
   // TODO(fxbug.dev/134787): Remove redundant locking when Banjo is removed.
