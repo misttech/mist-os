@@ -274,64 +274,68 @@ tcp6_result tcp6_read(tcp6_socket* socket, void* data, uint32_t size) {
     return TCP6_RESULT_ERROR;
   }
 
-  // If there isn't a read in progress, start a new one.
-  if (socket->read_token.CompletionToken.Event == NULL) {
-    DLOG("Creating TCP6 read event");
-    efi_status status = socket->boot_services->CreateEvent(
-        0, 0, NULL, NULL, &socket->read_token.CompletionToken.Event);
-    if (status != EFI_SUCCESS) {
-      ELOG_S(status, "Failed to create TCP6 read event");
-      return TCP6_RESULT_ERROR;
+  while (true) {
+    // If there isn't a read in progress, start a new one.
+    if (socket->read_token.CompletionToken.Event == NULL) {
+      DLOG("Creating TCP6 read event");
+      efi_status status = socket->boot_services->CreateEvent(
+          0, 0, NULL, NULL, &socket->read_token.CompletionToken.Event);
+      if (status != EFI_SUCCESS) {
+        ELOG_S(status, "Failed to create TCP6 read event");
+        return TCP6_RESULT_ERROR;
+      }
+
+      // Store the original read end so that we can internally handle partial
+      // reads. The EFI documentation isn't clear whether drivers can give us
+      // partial reads or not, so assume that they will.
+      socket->read_end = (uint8_t*)data + size;
+      socket->read_data.UrgentFlag = false;
+      socket->read_data.DataLength = size;
+      socket->read_data.FragmentCount = 1;
+      socket->read_data.FragmentTable[0].FragmentBuffer = data;
+      socket->read_data.FragmentTable[0].FragmentLength = size;
+      socket->read_token.Packet.RxData = &socket->read_data;
+
+      status = socket->client_protocol->Receive(socket->client_protocol, &socket->read_token);
+      if (status != EFI_SUCCESS) {
+        ELOG_S(status, "TCP read failed to start");
+        reset_token(socket->boot_services, &socket->read_token.CompletionToken);
+        return TCP6_RESULT_ERROR;
+      }
     }
 
-    // Store the original read end so that we can internally handle partial
-    // reads. The EFI documentation isn't clear whether drivers can give us
-    // partial reads or not, so assume that they will.
-    socket->read_end = (uint8_t*)data + size;
-    socket->read_data.UrgentFlag = false;
-    socket->read_data.DataLength = size;
-    socket->read_data.FragmentCount = 1;
-    socket->read_data.FragmentTable[0].FragmentBuffer = data;
-    socket->read_data.FragmentTable[0].FragmentLength = size;
-    socket->read_token.Packet.RxData = &socket->read_data;
+    // The interrupt rate can be pretty slow (10-20ms) which really hurts
+    // performance on larger transfers, so manually poll whenever we're waiting
+    // for a read.
+    socket->client_protocol->Poll(socket->client_protocol);
 
-    status = socket->client_protocol->Receive(socket->client_protocol, &socket->read_token);
-    if (status != EFI_SUCCESS) {
-      ELOG_S(status, "TCP read failed to start");
-      reset_token(socket->boot_services, &socket->read_token.CompletionToken);
-      return TCP6_RESULT_ERROR;
+    tcp6_result result = check_token(socket->boot_services, &socket->read_token.CompletionToken);
+    if (result == TCP6_RESULT_SUCCESS) {
+      DLOG("TCP6 read: %u bytes\n", socket->read_token.Packet.RxData->DataLength);
+
+      // Check if we're done with the read.
+      uint8_t* end = (uint8_t*)socket->read_token.Packet.RxData->FragmentTable[0].FragmentBuffer +
+                     socket->read_token.Packet.RxData->FragmentTable[0].FragmentLength;
+      if (end > socket->read_end) {
+        // Only possible if the driver is misbehaving and gives us more data than
+        // we asked for.
+        ELOG("TCP driver returned more data than expected");
+        return TCP6_RESULT_ERROR;
+      }
+      if (end < socket->read_end) {
+        // Partial read - advance the buffers and read again.
+
+        // 32-bit cast is safe because we calculated read_end by adding a 32-bit
+        // size in the first place, so the difference must be < 32 bits.
+        uint32_t remaining = (uint32_t)(socket->read_end - end);
+        DLOG("TCP6 partial read; starting again on the next %u bytes", remaining);
+        data = end;
+        size = remaining;
+        continue;
+      }
     }
+    return result;
   }
-
-  // The interrupt rate can be pretty slow (10-20ms) which really hurts
-  // performance on larger transfers, so manually poll whenever we're waiting
-  // for a read.
-  socket->client_protocol->Poll(socket->client_protocol);
-
-  tcp6_result result = check_token(socket->boot_services, &socket->read_token.CompletionToken);
-  if (result == TCP6_RESULT_SUCCESS) {
-    DLOG("TCP6 read: %u bytes\n", socket->read_token.Packet.RxData->DataLength);
-
-    // Check if we're done with the read.
-    uint8_t* end = (uint8_t*)socket->read_token.Packet.RxData->FragmentTable[0].FragmentBuffer +
-                   socket->read_token.Packet.RxData->FragmentTable[0].FragmentLength;
-    if (end > socket->read_end) {
-      // Only possible if the driver is misbehaving and gives us more data than
-      // we asked for.
-      ELOG("TCP driver returned more data than expected");
-      return TCP6_RESULT_ERROR;
-    }
-    if (end < socket->read_end) {
-      // Partial read - advance the buffers and read again.
-
-      // 32-bit cast is safe because we calculated read_end by adding a 32-bit
-      // size in the first place, so the difference must be < 32 bits.
-      uint32_t remaining = (uint32_t)(socket->read_end - end);
-      DLOG("TCP6 partial read; starting again on the next %u bytes", remaining);
-      return tcp6_read(socket, end, remaining);
-    }
-  }
-  return result;
 }
 
 tcp6_result tcp6_write(tcp6_socket* socket, const void* data, uint32_t size) {
@@ -441,6 +445,11 @@ tcp6_result tcp6_disconnect(tcp6_socket* socket) {
     socket->client_handle = NULL;
     socket->client_protocol = NULL;
   }
+
+  // If there's a new connection, it will need a clean start.
+  reset_token(socket->boot_services, &socket->read_token.CompletionToken);
+  reset_token(socket->boot_services, &socket->write_token.CompletionToken);
+
   return result;
 }
 

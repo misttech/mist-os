@@ -6,12 +6,15 @@
 #include "fastboot_tcp.h"
 
 #include <lib/fit/result.h>
+#include <log.h>
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "efi/types.h"
 #include "fastboot.h"
 #include "gigaboot/src/inet6.h"
 #include "gigaboot/src/tcp.h"
+#include "lib/zx/time.h"
 #include "mdns.h"
 #include "phys/efi/main.h"
 #include "zircon_boot_ops.h"
@@ -48,23 +51,34 @@ zx::result<> TcpInitialize(tcp6_socket &fb_tcp_socket) {
 
 class TcpTransport : public TcpTransportInterface {
  public:
-  TcpTransport(tcp6_socket &fb_tcp_socket) : fb_tcp_socket_(fb_tcp_socket) {}
+  TcpTransport(tcp6_socket &fb_tcp_socket)
+      : fb_tcp_socket_(fb_tcp_socket), io_timer_(gEfiSystemTable) {}
 
   bool Read(void *out, size_t size) override {
+    if (io_timer_.SetTimer(TimerRelative, zx::sec(30)).is_error()) {
+      ELOG("Failed to set read timer");
+      return false;
+    }
+
     tcp6_result res = TCP6_RESULT_PENDING;
     ZX_ASSERT(size < UINT32_MAX);
     // Block until complete or error.
-    while (res == TCP6_RESULT_PENDING) {
+    while (res == TCP6_RESULT_PENDING && io_timer_.CheckTimer() == Timer::Status::kWaiting) {
       res = tcp6_read(&fb_tcp_socket_, out, static_cast<uint32_t>(size));
     }
     return res == TCP6_RESULT_SUCCESS;
   }
 
   bool Write(const void *data, size_t size) override {
+    if (io_timer_.SetTimer(TimerRelative, zx::sec(30)).is_error()) {
+      ELOG("Failed to set read timer");
+      return false;
+    }
+
     tcp6_result res = TCP6_RESULT_PENDING;
     ZX_ASSERT(size < UINT32_MAX);
     // Block until complete or error.
-    while (res == TCP6_RESULT_PENDING) {
+    while (res == TCP6_RESULT_PENDING && io_timer_.CheckTimer() == Timer::Status::kWaiting) {
       res = tcp6_write(&fb_tcp_socket_, data, static_cast<uint32_t>(size));
     }
     return res == TCP6_RESULT_SUCCESS;
@@ -72,6 +86,7 @@ class TcpTransport : public TcpTransportInterface {
 
  private:
   tcp6_socket &fb_tcp_socket_;
+  Timer io_timer_;
 };
 
 zx::result<> FastbootTcpMain() {
