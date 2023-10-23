@@ -21,7 +21,6 @@
 #include <limits>
 #include <vector>
 
-#include <ddktl/device.h>  // TODO(b/301003087): For DFv2, maybe templatize ddk::base_protocol.
 #include <fbl/auto_lock.h>
 #include <soc/aml-common/aml-sdmmc.h>
 
@@ -30,21 +29,20 @@
 
 namespace aml_sdmmc {
 
-class AmlSdmmc : public ddk::SdmmcProtocol<AmlSdmmc, ddk::base_protocol>,
-                 public fdf::WireServer<fuchsia_hardware_sdmmc::Sdmmc> {
+// These are implemented in dfv1-driver.cc or dfv2-driver.cc.
+void DriverLogTrace(const char* message);
+void DriverLogInfo(const char* message);
+void DriverLogWarning(const char* message);
+void DriverLogError(const char* message);
+constexpr size_t kMaxLoggingCharacters = 256;
+
+class AmlSdmmc : public fdf::WireServer<fuchsia_hardware_sdmmc::Sdmmc> {
  public:
   // Limit maximum number of descriptors to 512 for now
   static constexpr size_t kMaxDmaDescriptors = 512;
 
-  AmlSdmmc(zx::bti bti, fdf::MmioBuffer mmio, aml_sdmmc_config_t config, zx::interrupt irq,
-           fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> reset_gpio,
-           aml_sdmmc::IoBuffer descs_buffer)
-      : mmio_(std::move(mmio)),
-        bti_(std::move(bti)),
-        irq_(std::move(irq)),
-        board_config_(config),
-        descs_buffer_(std::move(descs_buffer)),
-        registered_vmos_{
+  AmlSdmmc()
+      : registered_vmos_{
             // clang-format off
             SdmmcVmoStore{vmo_store::Options{}},
             SdmmcVmoStore{vmo_store::Options{}},
@@ -55,11 +53,7 @@ class AmlSdmmc : public ddk::SdmmcProtocol<AmlSdmmc, ddk::base_protocol>,
             SdmmcVmoStore{vmo_store::Options{}},
             SdmmcVmoStore{vmo_store::Options{}},
             // clang-format on
-        } {
-    if (reset_gpio.is_valid()) {
-      reset_gpio_.Bind(std::move(reset_gpio));
-    }
-  }
+        } {}
 
   ~AmlSdmmc() override {
     if (irq_.is_valid()) {
@@ -67,21 +61,9 @@ class AmlSdmmc : public ddk::SdmmcProtocol<AmlSdmmc, ddk::base_protocol>,
     }
   }
 
-  // ddk::SdmmcProtocol implementation
-  zx_status_t SdmmcHostInfo(sdmmc_host_info_t* out_info);
-  zx_status_t SdmmcSetSignalVoltage(sdmmc_voltage_t voltage);
-  zx_status_t SdmmcSetBusWidth(sdmmc_bus_width_t bus_width) TA_EXCL(lock_);
-  zx_status_t SdmmcSetBusFreq(uint32_t bus_freq) TA_EXCL(lock_);
-  zx_status_t SdmmcSetTiming(sdmmc_timing_t timing) TA_EXCL(lock_);
-  zx_status_t SdmmcHwReset() TA_EXCL(lock_);
-  zx_status_t SdmmcPerformTuning(uint32_t cmd_idx) TA_EXCL(tuning_lock_);
-  zx_status_t SdmmcRegisterInBandInterrupt(const in_band_interrupt_protocol_t* interrupt_cb);
-  void SdmmcAckInBandInterrupt() {}
-  zx_status_t SdmmcRegisterVmo(uint32_t vmo_id, uint8_t client_id, zx::vmo vmo, uint64_t offset,
-                               uint64_t size, uint32_t vmo_rights) TA_EXCL(lock_);
-  zx_status_t SdmmcUnregisterVmo(uint32_t vmo_id, uint8_t client_id, zx::vmo* out_vmo)
-      TA_EXCL(lock_);
-  zx_status_t SdmmcRequest(const sdmmc_req_t* req, uint32_t out_response[4]) TA_EXCL(lock_);
+  void SetUpResources(zx::bti bti, fdf::MmioBuffer mmio, const aml_sdmmc_config_t& config,
+                      zx::interrupt irq, fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> reset_gpio,
+                      aml_sdmmc::IoBuffer descs_buffer) TA_EXCL(lock_);
 
   // fuchsia_hardware_sdmmc::Sdmmc implementation
   void HostInfo(fdf::Arena& arena, HostInfoCompleter::Sync& completer) override;
@@ -116,8 +98,23 @@ class AmlSdmmc : public ddk::SdmmcProtocol<AmlSdmmc, ddk::base_protocol>,
  protected:
   void ShutDown() TA_EXCL(lock_);
 
+  // Actual ddk::SdmmcProtocol implementation
+  zx_status_t HostInfo(sdmmc_host_info_t* out_info);
+  zx_status_t SetSignalVoltage(sdmmc_voltage_t voltage);
+  zx_status_t SetBusWidth(sdmmc_bus_width_t bus_width) TA_EXCL(lock_);
+  zx_status_t SetBusFreq(uint32_t bus_freq) TA_EXCL(lock_);
+  zx_status_t SetTiming(sdmmc_timing_t timing) TA_EXCL(lock_);
+  zx_status_t HwReset() TA_EXCL(lock_);
+  zx_status_t PerformTuning(uint32_t cmd_idx) TA_EXCL(tuning_lock_);
+  zx_status_t RegisterInBandInterrupt(const in_band_interrupt_protocol_t* interrupt_cb);
+  void AckInBandInterrupt() {}
+  zx_status_t RegisterVmo(uint32_t vmo_id, uint8_t client_id, zx::vmo vmo, uint64_t offset,
+                          uint64_t size, uint32_t vmo_rights) TA_EXCL(lock_);
+  zx_status_t UnregisterVmo(uint32_t vmo_id, uint8_t client_id, zx::vmo* out_vmo) TA_EXCL(lock_);
+  zx_status_t Request(const sdmmc_req_t* req, uint32_t out_response[4]) TA_EXCL(lock_);
+
   virtual zx_status_t WaitForInterruptImpl();
-  virtual void WaitForBus() const;
+  virtual void WaitForBus() const TA_REQ(lock_);
 
   zx::vmo GetInspectVmo() const { return inspect_.inspector.DuplicateVmo(); }
 
@@ -183,6 +180,35 @@ class AmlSdmmc : public ddk::SdmmcProtocol<AmlSdmmc, ddk::base_protocol>,
 
   using SdmmcVmoStore = vmo_store::VmoStore<vmo_store::HashTableStorage<uint32_t, OwnedVmoInfo>>;
 
+  enum class LogSeverity : uint8_t { TRACE, INFO, WARNING, ERROR };
+  static constexpr LogSeverity TRACE = LogSeverity::TRACE;
+  static constexpr LogSeverity INFO = LogSeverity::INFO;
+  static constexpr LogSeverity WARNING = LogSeverity::WARNING;
+  static constexpr LogSeverity ERROR = LogSeverity::ERROR;
+
+  static void DriverLog(LogSeverity log_severity, const char* format, ...) {
+    va_list args;
+    va_start(args, format);
+    char buffer[kMaxLoggingCharacters];
+    std::vsnprintf(buffer, sizeof(buffer), format, args);
+    va_end(args);
+
+    switch (log_severity) {
+      case TRACE:
+        DriverLogTrace(buffer);
+        break;
+      case INFO:
+        DriverLogInfo(buffer);
+        break;
+      case WARNING:
+        DriverLogWarning(buffer);
+        break;
+      case ERROR:
+        DriverLogError(buffer);
+        break;
+    }
+  }
+
   aml_sdmmc_desc_t* descs() const TA_REQ(lock_) {
     return static_cast<aml_sdmmc_desc_t*>(descs_buffer_.virt());
   }
@@ -226,7 +252,7 @@ class AmlSdmmc : public ddk::SdmmcProtocol<AmlSdmmc, ddk::base_protocol>,
   zx::result<std::array<uint32_t, kResponseCount>> WaitForInterrupt(const sdmmc_req_t& req)
       TA_REQ(lock_);
 
-  fdf::MmioBuffer mmio_ TA_GUARDED(lock_);
+  std::optional<fdf::MmioBuffer> mmio_ TA_GUARDED(lock_);
 
   zx::bti bti_;
 

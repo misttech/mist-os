@@ -7,7 +7,6 @@
 #include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <fuchsia/hardware/sdmmc/c/banjo.h>
 #include <inttypes.h>
-#include <lib/ddk/debug.h>          // TODO(b/301003087): For DFv2, zxlogf() needs to be FDF_LOG().
 #include <lib/ddk/platform-defs.h>  // TODO(b/301003087): Needed for PDEV_DID_AMLOGIC_SDMMC_A, etc.
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/fit/defer.h>
@@ -34,11 +33,6 @@
 
 #include "aml-sdmmc-regs.h"
 
-#define AML_SDMMC_TRACE(fmt, ...) zxlogf(DEBUG, "%s: " fmt, __func__, ##__VA_ARGS__)
-#define AML_SDMMC_INFO(fmt, ...) zxlogf(INFO, "%s: " fmt, __func__, ##__VA_ARGS__)
-#define AML_SDMMC_ERROR(fmt, ...) zxlogf(ERROR, "%s: " fmt, __func__, ##__VA_ARGS__)
-#define AML_SDMMC_WARNING(fmt, ...) zxlogf(WARNING, "%s: " fmt, __func__, ##__VA_ARGS__)
-
 namespace {
 
 uint32_t log2_ceil(uint32_t blk_sz) {
@@ -57,6 +51,22 @@ zx_paddr_t PageMask() {
 
 namespace aml_sdmmc {
 
+void AmlSdmmc::SetUpResources(zx::bti bti, fdf::MmioBuffer mmio, const aml_sdmmc_config_t& config,
+                              zx::interrupt irq,
+                              fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> reset_gpio,
+                              aml_sdmmc::IoBuffer descs_buffer) {
+  fbl::AutoLock lock(&lock_);
+
+  mmio_ = std::move(mmio);
+  bti_ = std::move(bti);
+  irq_ = std::move(irq);
+  board_config_ = config;
+  descs_buffer_ = std::move(descs_buffer);
+  if (reset_gpio.is_valid()) {
+    reset_gpio_.Bind(std::move(reset_gpio));
+  }
+}
+
 zx_status_t AmlSdmmc::WaitForInterruptImpl() {
   zx::time timestamp;
   return irq_.wait(&timestamp);
@@ -64,9 +74,9 @@ zx_status_t AmlSdmmc::WaitForInterruptImpl() {
 
 void AmlSdmmc::ClearStatus() {
   AmlSdmmcStatus::Get()
-      .ReadFrom(&mmio_)
+      .ReadFrom(&*mmio_)
       .set_reg_value(AmlSdmmcStatus::kClearStatus)
-      .WriteTo(&mmio_);
+      .WriteTo(&*mmio_);
 }
 
 void AmlSdmmc::Inspect::Init(const pdev_device_info_t& device_info) {
@@ -99,43 +109,45 @@ zx::result<std::array<uint32_t, AmlSdmmc::kResponseCount>> AmlSdmmc::WaitForInte
   zx_status_t status = WaitForInterruptImpl();
 
   if (status != ZX_OK) {
-    AML_SDMMC_ERROR("WaitForInterruptImpl got %d", status);
+    DriverLog(ERROR, "WaitForInterruptImpl got %d", status);
     return zx::error(status);
   }
 
-  const auto status_irq = AmlSdmmcStatus::Get().ReadFrom(&mmio_);
+  const auto status_irq = AmlSdmmcStatus::Get().ReadFrom(&*mmio_);
   ClearStatus();
 
-  auto on_bus_error =
-      fit::defer([&]() { AmlSdmmcStart::Get().ReadFrom(&mmio_).set_desc_busy(0).WriteTo(&mmio_); });
+  // lock_ has already been acquired. AmlSdmmc::WaitForInterrupt() has the TA_REQ(lock_) annotation.
+  auto on_bus_error = fit::defer([&]() __TA_NO_THREAD_SAFETY_ANALYSIS {
+    AmlSdmmcStart::Get().ReadFrom(&*mmio_).set_desc_busy(0).WriteTo(&*mmio_);
+  });
 
   if (status_irq.rxd_err()) {
     if (req.suppress_error_messages) {
-      AML_SDMMC_TRACE("RX Data CRC Error cmd%d, arg=0x%08x, status=0x%08x", req.cmd_idx, req.arg,
-                      status_irq.reg_value());
+      DriverLog(TRACE, "RX Data CRC Error cmd%d, arg=0x%08x, status=0x%08x", req.cmd_idx, req.arg,
+                status_irq.reg_value());
     } else {
-      AML_SDMMC_WARNING("RX Data CRC Error cmd%d, arg=0x%08x, status=0x%08x, consecutive=%lu",
-                        req.cmd_idx, req.arg, status_irq.reg_value(), ++consecutive_data_errors_);
+      DriverLog(WARNING, "RX Data CRC Error cmd%d, arg=0x%08x, status=0x%08x, consecutive=%lu",
+                req.cmd_idx, req.arg, status_irq.reg_value(), ++consecutive_data_errors_);
     }
     return zx::error(ZX_ERR_IO_DATA_INTEGRITY);
   }
   if (status_irq.txd_err()) {
-    AML_SDMMC_WARNING("TX Data CRC Error, cmd%d, arg=0x%08x, status=0x%08x, consecutive=%lu",
-                      req.cmd_idx, req.arg, status_irq.reg_value(), ++consecutive_data_errors_);
+    DriverLog(WARNING, "TX Data CRC Error, cmd%d, arg=0x%08x, status=0x%08x, consecutive=%lu",
+              req.cmd_idx, req.arg, status_irq.reg_value(), ++consecutive_data_errors_);
     return zx::error(ZX_ERR_IO_DATA_INTEGRITY);
   }
   if (status_irq.desc_err()) {
-    AML_SDMMC_ERROR("Controller does not own the descriptor, cmd%d, arg=0x%08x, status=0x%08x",
-                    req.cmd_idx, req.arg, status_irq.reg_value());
+    DriverLog(ERROR, "Controller does not own the descriptor, cmd%d, arg=0x%08x, status=0x%08x",
+              req.cmd_idx, req.arg, status_irq.reg_value());
     return zx::error(ZX_ERR_IO_INVALID);
   }
   if (status_irq.resp_err()) {
     if (req.suppress_error_messages) {
-      AML_SDMMC_TRACE("Response CRC Error, cmd%d, arg=0x%08x, status=0x%08x", req.cmd_idx, req.arg,
-                      status_irq.reg_value());
+      DriverLog(TRACE, "Response CRC Error, cmd%d, arg=0x%08x, status=0x%08x", req.cmd_idx, req.arg,
+                status_irq.reg_value());
     } else {
-      AML_SDMMC_WARNING("Response CRC Error, cmd%d, arg=0x%08x, status=0x%08x, consecutive=%lu",
-                        req.cmd_idx, req.arg, status_irq.reg_value(), ++consecutive_cmd_errors_);
+      DriverLog(WARNING, "Response CRC Error, cmd%d, arg=0x%08x, status=0x%08x, consecutive=%lu",
+                req.cmd_idx, req.arg, status_irq.reg_value(), ++consecutive_cmd_errors_);
     }
     return zx::error(ZX_ERR_IO_DATA_INTEGRITY);
   }
@@ -147,23 +159,23 @@ zx::result<std::array<uint32_t, AmlSdmmc::kResponseCount>> AmlSdmmc::WaitForInte
                   (SD_SEND_IF_COND_FLAGS) != (MMC_SEND_EXT_CSD_FLAGS));
     // When mmc dev_ice is being probed with SDIO command this is an expected failure.
     if (req.suppress_error_messages || is_sd_cmd8) {
-      AML_SDMMC_TRACE("Response timeout, cmd%d, arg=0x%08x, status=0x%08x", req.cmd_idx, req.arg,
-                      status_irq.reg_value());
+      DriverLog(TRACE, "Response timeout, cmd%d, arg=0x%08x, status=0x%08x", req.cmd_idx, req.arg,
+                status_irq.reg_value());
     } else {
-      AML_SDMMC_ERROR("Response timeout, cmd%d, arg=0x%08x, status=0x%08x, consecutive=%lu",
-                      req.cmd_idx, req.arg, status_irq.reg_value(), ++consecutive_cmd_errors_);
+      DriverLog(ERROR, "Response timeout, cmd%d, arg=0x%08x, status=0x%08x, consecutive=%lu",
+                req.cmd_idx, req.arg, status_irq.reg_value(), ++consecutive_cmd_errors_);
     }
     return zx::error(ZX_ERR_TIMED_OUT);
   }
   if (status_irq.desc_timeout()) {
-    AML_SDMMC_ERROR("Descriptor timeout, cmd%d, arg=0x%08x, status=0x%08x, consecutive=%lu",
-                    req.cmd_idx, req.arg, status_irq.reg_value(), ++consecutive_data_errors_);
+    DriverLog(ERROR, "Descriptor timeout, cmd%d, arg=0x%08x, status=0x%08x, consecutive=%lu",
+              req.cmd_idx, req.arg, status_irq.reg_value(), ++consecutive_data_errors_);
     return zx::error(ZX_ERR_TIMED_OUT);
   }
 
   if (!(status_irq.end_of_chain())) {
-    AML_SDMMC_ERROR("END OF CHAIN bit is not set, cmd%d, arg=0x%08x, status=0x%08x", req.cmd_idx,
-                    req.arg, status_irq.reg_value());
+    DriverLog(ERROR, "END OF CHAIN bit is not set, cmd%d, arg=0x%08x, status=0x%08x", req.cmd_idx,
+              req.arg, status_irq.reg_value());
     return zx::error(ZX_ERR_IO_INVALID);
   }
 
@@ -177,12 +189,12 @@ zx::result<std::array<uint32_t, AmlSdmmc::kResponseCount>> AmlSdmmc::WaitForInte
 
   std::array<uint32_t, AmlSdmmc::kResponseCount> response = {};
   if (req.cmd_flags & SDMMC_RESP_LEN_136) {
-    response[0] = AmlSdmmcCmdResp::Get().ReadFrom(&mmio_).reg_value();
-    response[1] = AmlSdmmcCmdResp1::Get().ReadFrom(&mmio_).reg_value();
-    response[2] = AmlSdmmcCmdResp2::Get().ReadFrom(&mmio_).reg_value();
-    response[3] = AmlSdmmcCmdResp3::Get().ReadFrom(&mmio_).reg_value();
+    response[0] = AmlSdmmcCmdResp::Get().ReadFrom(&*mmio_).reg_value();
+    response[1] = AmlSdmmcCmdResp1::Get().ReadFrom(&*mmio_).reg_value();
+    response[2] = AmlSdmmcCmdResp2::Get().ReadFrom(&*mmio_).reg_value();
+    response[3] = AmlSdmmcCmdResp3::Get().ReadFrom(&*mmio_).reg_value();
   } else {
-    response[0] = AmlSdmmcCmdResp::Get().ReadFrom(&mmio_).reg_value();
+    response[0] = AmlSdmmcCmdResp::Get().ReadFrom(&*mmio_).reg_value();
   }
 
   return zx::ok(response);
@@ -190,7 +202,7 @@ zx::result<std::array<uint32_t, AmlSdmmc::kResponseCount>> AmlSdmmc::WaitForInte
 
 void AmlSdmmc::HostInfo(fdf::Arena& arena, HostInfoCompleter::Sync& completer) {
   sdmmc_host_info_t info;
-  zx_status_t status = SdmmcHostInfo(&info);
+  zx_status_t status = HostInfo(&info);
   if (status != ZX_OK) {
     completer.buffer(arena).ReplyError(status);
     return;
@@ -205,7 +217,7 @@ void AmlSdmmc::HostInfo(fdf::Arena& arena, HostInfoCompleter::Sync& completer) {
   completer.buffer(arena).ReplySuccess(wire_info);
 }
 
-zx_status_t AmlSdmmc::SdmmcHostInfo(sdmmc_host_info_t* info) {
+zx_status_t AmlSdmmc::HostInfo(sdmmc_host_info_t* info) {
   dev_info_.prefs = board_config_.prefs;
   memcpy(info, &dev_info_, sizeof(dev_info_));
   return ZX_OK;
@@ -229,7 +241,7 @@ void AmlSdmmc::SetBusWidth(SetBusWidthRequestView request, fdf::Arena& arena,
       break;
   }
 
-  zx_status_t status = SdmmcSetBusWidth(bus_width);
+  zx_status_t status = SetBusWidth(bus_width);
   if (status != ZX_OK) {
     completer.buffer(arena).ReplyError(status);
     return;
@@ -237,7 +249,7 @@ void AmlSdmmc::SetBusWidth(SetBusWidthRequestView request, fdf::Arena& arena,
   completer.buffer(arena).ReplySuccess();
 }
 
-zx_status_t AmlSdmmc::SdmmcSetBusWidth(sdmmc_bus_width_t bus_width) {
+zx_status_t AmlSdmmc::SetBusWidth(sdmmc_bus_width_t bus_width) {
   uint32_t bus_width_val;
   switch (bus_width) {
     case SDMMC_BUS_WIDTH_EIGHT:
@@ -255,7 +267,7 @@ zx_status_t AmlSdmmc::SdmmcSetBusWidth(sdmmc_bus_width_t bus_width) {
 
   {
     fbl::AutoLock lock(&lock_);
-    AmlSdmmcCfg::Get().ReadFrom(&mmio_).set_bus_width(bus_width_val).WriteTo(&mmio_);
+    AmlSdmmcCfg::Get().ReadFrom(&*mmio_).set_bus_width(bus_width_val).WriteTo(&*mmio_);
   }
 
   zx_nanosleep(zx_deadline_after(ZX_MSEC(10)));
@@ -269,14 +281,13 @@ void AmlSdmmc::RegisterInBandInterrupt(RegisterInBandInterruptRequestView reques
   completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
 
-zx_status_t AmlSdmmc::SdmmcRegisterInBandInterrupt(
-    const in_band_interrupt_protocol_t* interrupt_cb) {
+zx_status_t AmlSdmmc::RegisterInBandInterrupt(const in_band_interrupt_protocol_t* interrupt_cb) {
   return ZX_ERR_NOT_SUPPORTED;
 }
 
 void AmlSdmmc::SetBusFreq(SetBusFreqRequestView request, fdf::Arena& arena,
                           SetBusFreqCompleter::Sync& completer) {
-  zx_status_t status = SdmmcSetBusFreq(request->bus_freq);
+  zx_status_t status = SetBusFreq(request->bus_freq);
   if (status != ZX_OK) {
     completer.buffer(arena).ReplyError(status);
     return;
@@ -284,12 +295,12 @@ void AmlSdmmc::SetBusFreq(SetBusFreqRequestView request, fdf::Arena& arena,
   completer.buffer(arena).ReplySuccess();
 }
 
-zx_status_t AmlSdmmc::SdmmcSetBusFreq(uint32_t freq) {
+zx_status_t AmlSdmmc::SetBusFreq(uint32_t freq) {
   fbl::AutoLock lock(&lock_);
 
   uint32_t clk = 0, clk_src = 0, clk_div = 0;
   if (freq == 0) {
-    AmlSdmmcClock::Get().ReadFrom(&mmio_).set_cfg_div(0).WriteTo(&mmio_);
+    AmlSdmmcClock::Get().ReadFrom(&*mmio_).set_cfg_div(0).WriteTo(&*mmio_);
     inspect_.bus_clock_frequency.Set(0);
     return ZX_OK;
   }
@@ -308,7 +319,7 @@ zx_status_t AmlSdmmc::SdmmcSetBusFreq(uint32_t freq) {
   }
   // Round the divider up so the frequency is rounded down.
   clk_div = (clk + freq - 1) / freq;
-  AmlSdmmcClock::Get().ReadFrom(&mmio_).set_cfg_div(clk_div).set_cfg_src(clk_src).WriteTo(&mmio_);
+  AmlSdmmcClock::Get().ReadFrom(&*mmio_).set_cfg_div(clk_div).set_cfg_src(clk_src).WriteTo(&*mmio_);
   inspect_.bus_clock_frequency.Set(clk / clk_div);
   return ZX_OK;
 }
@@ -324,7 +335,7 @@ void AmlSdmmc::ConfigureDefaultRegs() {
                            .set_cfg_rx_phase(AmlSdmmcClock::kDefaultClkRxPhase)
                            .set_cfg_always_on(1)
                            .reg_value();
-    AmlSdmmcClockV3::Get().ReadFrom(&mmio_).set_reg_value(clk_val).WriteTo(&mmio_);
+    AmlSdmmcClockV3::Get().ReadFrom(&*mmio_).set_reg_value(clk_val).WriteTo(&*mmio_);
   } else {
     uint32_t clk_val = AmlSdmmcClockV2::Get()
                            .FromValue(0)
@@ -335,7 +346,7 @@ void AmlSdmmc::ConfigureDefaultRegs() {
                            .set_cfg_rx_phase(AmlSdmmcClock::kDefaultClkRxPhase)
                            .set_cfg_always_on(1)
                            .reg_value();
-    AmlSdmmcClockV2::Get().ReadFrom(&mmio_).set_reg_value(clk_val).WriteTo(&mmio_);
+    AmlSdmmcClockV2::Get().ReadFrom(&*mmio_).set_reg_value(clk_val).WriteTo(&*mmio_);
   }
 
   uint32_t config_val = AmlSdmmcCfg::Get()
@@ -345,26 +356,29 @@ void AmlSdmmc::ConfigureDefaultRegs() {
                             .set_rc_cc(AmlSdmmcCfg::kDefaultRcCc)
                             .set_bus_width(AmlSdmmcCfg::kBusWidth1Bit)
                             .reg_value();
-  AmlSdmmcCfg::Get().ReadFrom(&mmio_).set_reg_value(config_val).WriteTo(&mmio_);
+  AmlSdmmcCfg::Get().ReadFrom(&*mmio_).set_reg_value(config_val).WriteTo(&*mmio_);
   AmlSdmmcStatus::Get()
-      .ReadFrom(&mmio_)
+      .ReadFrom(&*mmio_)
       .set_reg_value(AmlSdmmcStatus::kClearStatus)
-      .WriteTo(&mmio_);
-  AmlSdmmcIrqEn::Get().ReadFrom(&mmio_).set_reg_value(AmlSdmmcStatus::kClearStatus).WriteTo(&mmio_);
+      .WriteTo(&*mmio_);
+  AmlSdmmcIrqEn::Get()
+      .ReadFrom(&*mmio_)
+      .set_reg_value(AmlSdmmcStatus::kClearStatus)
+      .WriteTo(&*mmio_);
 
   // Zero out any delay line or sampling settings that may have come from the bootloader.
   if (board_config_.version_3) {
-    AmlSdmmcAdjust::Get().FromValue(0).WriteTo(&mmio_);
-    AmlSdmmcDelay1::Get().FromValue(0).WriteTo(&mmio_);
-    AmlSdmmcDelay2::Get().FromValue(0).WriteTo(&mmio_);
+    AmlSdmmcAdjust::Get().FromValue(0).WriteTo(&*mmio_);
+    AmlSdmmcDelay1::Get().FromValue(0).WriteTo(&*mmio_);
+    AmlSdmmcDelay2::Get().FromValue(0).WriteTo(&*mmio_);
   } else {
-    AmlSdmmcAdjustV2::Get().FromValue(0).WriteTo(&mmio_);
-    AmlSdmmcDelayV2::Get().FromValue(0).WriteTo(&mmio_);
+    AmlSdmmcAdjustV2::Get().FromValue(0).WriteTo(&*mmio_);
+    AmlSdmmcDelayV2::Get().FromValue(0).WriteTo(&*mmio_);
   }
 }
 
 void AmlSdmmc::HwReset(fdf::Arena& arena, HwResetCompleter::Sync& completer) {
-  zx_status_t status = SdmmcHwReset();
+  zx_status_t status = HwReset();
   if (status != ZX_OK) {
     completer.buffer(arena).ReplyError(status);
     return;
@@ -372,31 +386,31 @@ void AmlSdmmc::HwReset(fdf::Arena& arena, HwResetCompleter::Sync& completer) {
   completer.buffer(arena).ReplySuccess();
 }
 
-zx_status_t AmlSdmmc::SdmmcHwReset() {
+zx_status_t AmlSdmmc::HwReset() {
   fbl::AutoLock lock(&lock_);
 
   if (reset_gpio_.is_valid()) {
     fidl::WireResult result1 = reset_gpio_->ConfigOut(0);
     if (!result1.ok()) {
-      AML_SDMMC_ERROR("Failed to send ConfigOut request to reset gpio: %s",
-                      result1.status_string());
+      DriverLog(ERROR, "Failed to send ConfigOut request to reset gpio: %s",
+                result1.status_string());
       return result1.status();
     }
     if (result1->is_error()) {
-      AML_SDMMC_ERROR("Failed to configure reset gpio to output low: %s",
-                      zx_status_get_string(result1->error_value()));
+      DriverLog(ERROR, "Failed to configure reset gpio to output low: %s",
+                zx_status_get_string(result1->error_value()));
       return result1->error_value();
     }
     zx_nanosleep(zx_deadline_after(ZX_MSEC(10)));
     fidl::WireResult result2 = reset_gpio_->ConfigOut(1);
     if (!result2.ok()) {
-      AML_SDMMC_ERROR("Failed to send ConfigOut request to reset gpio: %s",
-                      result2.status_string());
+      DriverLog(ERROR, "Failed to send ConfigOut request to reset gpio: %s",
+                result2.status_string());
       return result2.status();
     }
     if (result2->is_error()) {
-      AML_SDMMC_ERROR("Failed to configure reset gpio to output high: %s",
-                      zx_status_get_string(result2->error_value()));
+      DriverLog(ERROR, "Failed to configure reset gpio to output high: %s",
+                zx_status_get_string(result2->error_value()));
       return result2->error_value();
     }
     zx_nanosleep(zx_deadline_after(ZX_MSEC(10)));
@@ -425,7 +439,7 @@ void AmlSdmmc::SetTiming(SetTimingRequestView request, fdf::Arena& arena,
       break;
   }
 
-  zx_status_t status = SdmmcSetTiming(timing);
+  zx_status_t status = SetTiming(timing);
   if (status != ZX_OK) {
     completer.buffer(arena).ReplyError(status);
     return;
@@ -433,10 +447,10 @@ void AmlSdmmc::SetTiming(SetTimingRequestView request, fdf::Arena& arena,
   completer.buffer(arena).ReplySuccess();
 }
 
-zx_status_t AmlSdmmc::SdmmcSetTiming(sdmmc_timing_t timing) {
+zx_status_t AmlSdmmc::SetTiming(sdmmc_timing_t timing) {
   fbl::AutoLock lock(&lock_);
 
-  auto config = AmlSdmmcCfg::Get().ReadFrom(&mmio_);
+  auto config = AmlSdmmcCfg::Get().ReadFrom(&*mmio_);
   if (timing == SDMMC_TIMING_HS400 || timing == SDMMC_TIMING_HSDDR ||
       timing == SDMMC_TIMING_DDR50) {
     if (timing == SDMMC_TIMING_HS400) {
@@ -445,18 +459,18 @@ zx_status_t AmlSdmmc::SdmmcSetTiming(sdmmc_timing_t timing) {
       config.set_chk_ds(0);
     }
     config.set_ddr(1);
-    auto clk = AmlSdmmcClock::Get().ReadFrom(&mmio_);
+    auto clk = AmlSdmmcClock::Get().ReadFrom(&*mmio_);
     uint32_t clk_div = clk.cfg_div();
     if (clk_div & 0x01) {
       clk_div++;
     }
     clk_div /= 2;
-    clk.set_cfg_div(clk_div).WriteTo(&mmio_);
+    clk.set_cfg_div(clk_div).WriteTo(&*mmio_);
   } else {
     config.set_ddr(0);
   }
 
-  config.WriteTo(&mmio_);
+  config.WriteTo(&*mmio_);
   return ZX_OK;
 }
 
@@ -466,7 +480,7 @@ void AmlSdmmc::SetSignalVoltage(SetSignalVoltageRequestView request, fdf::Arena&
   completer.buffer(arena).ReplySuccess();
 }
 
-zx_status_t AmlSdmmc::SdmmcSetSignalVoltage(sdmmc_voltage_t voltage) {
+zx_status_t AmlSdmmc::SetSignalVoltage(sdmmc_voltage_t voltage) {
   // Amlogic controller does not allow to modify voltage
   // We do not return an error here since things work fine without switching the voltage.
   return ZX_OK;
@@ -509,11 +523,11 @@ zx::result<std::pair<aml_sdmmc_desc_t*, std::vector<fzl::PinnedVmo>>> AmlSdmmc::
     const sdmmc_req_t& req, aml_sdmmc_desc_t* const cur_desc) {
   const uint32_t req_blk_len = log2_ceil(req.blocksize);
   if (req_blk_len > AmlSdmmcCfg::kMaxBlkLen) {
-    AML_SDMMC_ERROR("blocksize %u is greater than the max (%u)", 1 << req_blk_len,
-                    1 << AmlSdmmcCfg::kMaxBlkLen);
+    DriverLog(ERROR, "blocksize %u is greater than the max (%u)", 1 << req_blk_len,
+              1 << AmlSdmmcCfg::kMaxBlkLen);
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
-  AmlSdmmcCfg::Get().ReadFrom(&mmio_).set_blk_len(req_blk_len).WriteTo(&mmio_);
+  AmlSdmmcCfg::Get().ReadFrom(&*mmio_).set_blk_len(req_blk_len).WriteTo(&*mmio_);
 
   std::vector<fzl::PinnedVmo> pinned_vmos;
   pinned_vmos.reserve(req.buffers_count);
@@ -533,8 +547,8 @@ zx::result<std::pair<aml_sdmmc_desc_t*, std::vector<fzl::PinnedVmo>>> AmlSdmmc::
       vmo_store::StoredVmo<OwnedVmoInfo>* const stored_vmo =
           vmos.GetVmo(req.buffers_list[i].buffer.vmo_id);
       if (stored_vmo == nullptr) {
-        AML_SDMMC_ERROR("no VMO %u for client %u", req.buffers_list[i].buffer.vmo_id,
-                        req.client_id);
+        DriverLog(ERROR, "no VMO %u for client %u", req.buffers_list[i].buffer.vmo_id,
+                  req.client_id);
         return zx::error(ZX_ERR_NOT_FOUND);
       }
       auto status = SetupOwnedVmoDescs(req, req.buffers_list[i], *stored_vmo, desc);
@@ -546,7 +560,7 @@ zx::result<std::pair<aml_sdmmc_desc_t*, std::vector<fzl::PinnedVmo>>> AmlSdmmc::
   }
 
   if (desc == cur_desc) {
-    AML_SDMMC_ERROR("empty descriptor list!");
+    DriverLog(ERROR, "empty descriptor list!");
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
@@ -558,17 +572,17 @@ zx::result<aml_sdmmc_desc_t*> AmlSdmmc::SetupOwnedVmoDescs(const sdmmc_req_t& re
                                                            vmo_store::StoredVmo<OwnedVmoInfo>& vmo,
                                                            aml_sdmmc_desc_t* const cur_desc) {
   if (!(req.cmd_flags & SDMMC_CMD_READ) && !(vmo.meta().rights & SDMMC_VMO_RIGHT_READ)) {
-    AML_SDMMC_ERROR("Request would read from write-only VMO");
+    DriverLog(ERROR, "Request would read from write-only VMO");
     return zx::error(ZX_ERR_ACCESS_DENIED);
   }
   if ((req.cmd_flags & SDMMC_CMD_READ) && !(vmo.meta().rights & SDMMC_VMO_RIGHT_WRITE)) {
-    AML_SDMMC_ERROR("Request would write to read-only VMO");
+    DriverLog(ERROR, "Request would write to read-only VMO");
     return zx::error(ZX_ERR_ACCESS_DENIED);
   }
 
   if (buffer.offset + buffer.size > vmo.meta().size) {
-    AML_SDMMC_ERROR("buffer reads past vmo end: offset %zu, size %zu, vmo size %zu",
-                    buffer.offset + vmo.meta().offset, buffer.size, vmo.meta().size);
+    DriverLog(ERROR, "buffer reads past vmo end: offset %zu, size %zu, vmo size %zu",
+              buffer.offset + vmo.meta().offset, buffer.size, vmo.meta().size);
     return zx::error(ZX_ERR_OUT_OF_RANGE);
   }
 
@@ -581,7 +595,7 @@ zx::result<aml_sdmmc_desc_t*> AmlSdmmc::SetupOwnedVmoDescs(const sdmmc_req_t& re
     zx_status_t status = vmo.GetPinnedRegions(offset + vmo.meta().offset, buffer.size, regions,
                                               std::size(regions), &region_count);
     if (status != ZX_OK && status != ZX_ERR_BUFFER_TOO_SMALL) {
-      AML_SDMMC_ERROR("failed to get pinned regions: %d", status);
+      DriverLog(ERROR, "failed to get pinned regions: %d", status);
       return zx::error(status);
     }
 
@@ -598,7 +612,7 @@ zx::result<aml_sdmmc_desc_t*> AmlSdmmc::SetupOwnedVmoDescs(const sdmmc_req_t& re
     }
 
     if (offset == last_offset) {
-      AML_SDMMC_ERROR("didn't get any pinned regions");
+      DriverLog(ERROR, "didn't get any pinned regions");
       return zx::error(ZX_ERR_BAD_STATE);
     }
   }
@@ -619,7 +633,7 @@ zx::result<std::pair<aml_sdmmc_desc_t*, fzl::PinnedVmo>> AmlSdmmc::SetupUnownedV
   zx_status_t status = pinned_vmo.PinRange(
       buffer.offset & ~PageMask(), pagecount * zx_system_get_page_size(), *vmo, bti_, options);
   if (status != ZX_OK) {
-    AML_SDMMC_ERROR("bti-pin failed with error %d", status);
+    DriverLog(ERROR, "bti-pin failed with error %d", status);
     return zx::error(status);
   }
 
@@ -635,7 +649,7 @@ zx::result<std::pair<aml_sdmmc_desc_t*, fzl::PinnedVmo>> AmlSdmmc::SetupUnownedV
   }
 
   if (status != ZX_OK) {
-    AML_SDMMC_ERROR("Cache op on unowned VMO failed: %s", zx_status_get_string(status));
+    DriverLog(ERROR, "Cache op on unowned VMO failed: %s", zx_status_get_string(status));
     return zx::error(status);
   }
 
@@ -666,7 +680,8 @@ zx::result<aml_sdmmc_desc_t*> AmlSdmmc::PopulateDescriptors(const sdmmc_req_t& r
                                                             aml_sdmmc_desc_t* const cur_desc,
                                                             fzl::PinnedVmo::Region region) {
   if (region.phys_addr > UINT32_MAX || (region.phys_addr + region.size) > UINT32_MAX) {
-    AML_SDMMC_ERROR("DMA goes out of accessible range: 0x%0zx, %zu", region.phys_addr, region.size);
+    DriverLog(ERROR, "DMA goes out of accessible range: 0x%0zx, %zu", region.phys_addr,
+              region.size);
     return zx::error(ZX_ERR_BAD_STATE);
   }
 
@@ -682,16 +697,16 @@ zx::result<aml_sdmmc_desc_t*> AmlSdmmc::PopulateDescriptors(const sdmmc_req_t& r
     const size_t desc_size = std::min(region.size, max_desc_size);
 
     if (desc >= descs_end) {
-      AML_SDMMC_ERROR("request with more than %zu chunks is unsupported\n", kMaxDmaDescriptors);
+      DriverLog(ERROR, "request with more than %zu chunks is unsupported\n", kMaxDmaDescriptors);
       return zx::error(ZX_ERR_NOT_SUPPORTED);
     }
     if (region.phys_addr % AmlSdmmcCmdCfg::kDataAddrAlignment != 0) {
       // The last two bits must be zero to indicate DDR/big-endian.
-      AML_SDMMC_ERROR("DMA start address must be 4-byte aligned");
+      DriverLog(ERROR, "DMA start address must be 4-byte aligned");
       return zx::error(ZX_ERR_NOT_SUPPORTED);
     }
     if (desc_size % req.blocksize != 0) {
-      AML_SDMMC_ERROR("DMA length %zu is not multiple of block size %u", desc_size, req.blocksize);
+      DriverLog(ERROR, "DMA length %zu is not multiple of block size %u", desc_size, req.blocksize);
       return zx::error(ZX_ERR_NOT_SUPPORTED);
     }
 
@@ -715,7 +730,7 @@ zx::result<aml_sdmmc_desc_t*> AmlSdmmc::PopulateDescriptors(const sdmmc_req_t& r
     } else if (blockcount == 1) {
       cmd.set_length(req.blocksize);
     } else {
-      AML_SDMMC_ERROR("can't send more than one block of size %u", req.blocksize);
+      DriverLog(ERROR, "can't send more than one block of size %u", req.blocksize);
       return zx::error(ZX_ERR_NOT_SUPPORTED);
     }
 
@@ -743,7 +758,7 @@ zx_status_t AmlSdmmc::FinishReq(const sdmmc_req_t& req) {
       zx_status_t status = zx_vmo_op_range(region.buffer.vmo, ZX_VMO_OP_CACHE_CLEAN_INVALIDATE,
                                            region.offset, region.size, nullptr, 0);
       if (status != ZX_OK) {
-        AML_SDMMC_ERROR("Failed to clean/invalidate cache: %s", zx_status_get_string(status));
+        DriverLog(ERROR, "Failed to clean/invalidate cache: %s", zx_status_get_string(status));
         return status;
       }
     }
@@ -753,7 +768,7 @@ zx_status_t AmlSdmmc::FinishReq(const sdmmc_req_t& req) {
 }
 
 void AmlSdmmc::WaitForBus() const {
-  while (!AmlSdmmcStatus::Get().ReadFrom(&mmio_).cmd_i()) {
+  while (!AmlSdmmcStatus::Get().ReadFrom(&*mmio_).cmd_i()) {
     zx::nanosleep(zx::deadline_after(zx::usec(10)));
   }
 }
@@ -800,7 +815,7 @@ bool AmlSdmmc::TuningTestSettings(const TuneContext& context) {
 
     uint8_t tuning_res[512] = {0};
     if ((status = context.vmo->read(tuning_res, 0, context.expected_block.size())) != ZX_OK) {
-      AML_SDMMC_ERROR("Failed to read VMO: %s", zx_status_get_string(status));
+      DriverLog(ERROR, "Failed to read VMO: %s", zx_status_get_string(status));
       break;
     }
     if (memcmp(context.expected_block.data(), tuning_res, context.expected_block.size()) != 0) {
@@ -853,36 +868,36 @@ AmlSdmmc::TuneResults AmlSdmmc::TuneDelayLines(const TuneContext& context) {
 void AmlSdmmc::SetTuneSettings(const TuneSettings& settings) {
   if (board_config_.version_3) {
     AmlSdmmcAdjust::Get()
-        .ReadFrom(&mmio_)
+        .ReadFrom(&*mmio_)
         .set_adj_delay(settings.adj_delay)
         .set_adj_fixed(1)
-        .WriteTo(&mmio_);
+        .WriteTo(&*mmio_);
     AmlSdmmcDelay1::Get()
-        .ReadFrom(&mmio_)
+        .ReadFrom(&*mmio_)
         .set_dly_0(settings.delay)
         .set_dly_1(settings.delay)
         .set_dly_2(settings.delay)
         .set_dly_3(settings.delay)
         .set_dly_4(settings.delay)
-        .WriteTo(&mmio_);
+        .WriteTo(&*mmio_);
     AmlSdmmcDelay2::Get()
-        .ReadFrom(&mmio_)
+        .ReadFrom(&*mmio_)
         .set_dly_5(settings.delay)
         .set_dly_6(settings.delay)
         .set_dly_7(settings.delay)
         .set_dly_8(settings.delay)
         .set_dly_9(settings.delay)
-        .WriteTo(&mmio_);
+        .WriteTo(&*mmio_);
   } else {
     AmlSdmmcAdjustV2::Get()
-        .ReadFrom(&mmio_)
+        .ReadFrom(&*mmio_)
         .set_adj_delay(settings.adj_delay)
         .set_adj_fixed(1)
         .set_dly_8(settings.delay)
         .set_dly_9(settings.delay)
-        .WriteTo(&mmio_);
+        .WriteTo(&*mmio_);
     AmlSdmmcDelayV2::Get()
-        .ReadFrom(&mmio_)
+        .ReadFrom(&*mmio_)
         .set_dly_0(settings.delay)
         .set_dly_1(settings.delay)
         .set_dly_2(settings.delay)
@@ -891,7 +906,7 @@ void AmlSdmmc::SetTuneSettings(const TuneSettings& settings) {
         .set_dly_5(settings.delay)
         .set_dly_6(settings.delay)
         .set_dly_7(settings.delay)
-        .WriteTo(&mmio_);
+        .WriteTo(&*mmio_);
   }
 }
 
@@ -899,11 +914,11 @@ AmlSdmmc::TuneSettings AmlSdmmc::GetTuneSettings() {
   TuneSettings settings{};
 
   if (board_config_.version_3) {
-    settings.adj_delay = AmlSdmmcAdjust::Get().ReadFrom(&mmio_).adj_delay();
-    settings.delay = AmlSdmmcDelay1::Get().ReadFrom(&mmio_).dly_0();
+    settings.adj_delay = AmlSdmmcAdjust::Get().ReadFrom(&*mmio_).adj_delay();
+    settings.delay = AmlSdmmcDelay1::Get().ReadFrom(&*mmio_).dly_0();
   } else {
-    settings.adj_delay = AmlSdmmcAdjustV2::Get().ReadFrom(&mmio_).adj_delay();
-    settings.delay = AmlSdmmcDelayV2::Get().ReadFrom(&mmio_).dly_0();
+    settings.adj_delay = AmlSdmmcAdjustV2::Get().ReadFrom(&*mmio_).adj_delay();
+    settings.delay = AmlSdmmcDelayV2::Get().ReadFrom(&*mmio_).dly_0();
   }
 
   return settings;
@@ -933,7 +948,7 @@ uint32_t AmlSdmmc::DistanceToFailingPoint(TuneSettings point,
 
 void AmlSdmmc::PerformTuning(PerformTuningRequestView request, fdf::Arena& arena,
                              PerformTuningCompleter::Sync& completer) {
-  zx_status_t status = SdmmcPerformTuning(request->cmd_idx);
+  zx_status_t status = PerformTuning(request->cmd_idx);
   if (status != ZX_OK) {
     completer.buffer(arena).ReplyError(status);
     return;
@@ -941,13 +956,13 @@ void AmlSdmmc::PerformTuning(PerformTuningRequestView request, fdf::Arena& arena
   completer.buffer(arena).ReplySuccess();
 }
 
-zx_status_t AmlSdmmc::SdmmcPerformTuning(uint32_t tuning_cmd_idx) {
+zx_status_t AmlSdmmc::PerformTuning(uint32_t tuning_cmd_idx) {
   fbl::AutoLock tuning_lock(&tuning_lock_);
 
   const auto [bw, clk_div, settings] = [this]() {
     fbl::AutoLock lock(&lock_);
-    const uint32_t bw = AmlSdmmcCfg::Get().ReadFrom(&mmio_).bus_width();
-    const uint32_t clk_div = AmlSdmmcClock::Get().ReadFrom(&mmio_).cfg_div();
+    const uint32_t bw = AmlSdmmcCfg::Get().ReadFrom(&*mmio_).bus_width();
+    const uint32_t clk_div = AmlSdmmcClock::Get().ReadFrom(&*mmio_).cfg_div();
     return std::tuple{bw, clk_div, GetTuneSettings()};
   }();
 
@@ -960,14 +975,14 @@ zx_status_t AmlSdmmc::SdmmcPerformTuning(uint32_t tuning_cmd_idx) {
     context.expected_block = cpp20::span<const uint8_t>(aml_sdmmc_tuning_blk_pattern_8bit,
                                                         sizeof(aml_sdmmc_tuning_blk_pattern_8bit));
   } else {
-    AML_SDMMC_ERROR("Tuning at wrong buswidth: %d", bw);
+    DriverLog(ERROR, "Tuning at wrong buswidth: %d", bw);
     return ZX_ERR_INTERNAL;
   }
 
   zx::vmo received_block;
   zx_status_t status = zx::vmo::create(context.expected_block.size(), 0, &received_block);
   if (status != ZX_OK) {
-    AML_SDMMC_ERROR("Failed to create VMO: %s", zx_status_get_string(status));
+    DriverLog(ERROR, "Failed to create VMO: %s", zx_status_get_string(status));
     return status;
   }
 
@@ -989,7 +1004,7 @@ zx_status_t AmlSdmmc::SdmmcPerformTuning(uint32_t tuning_cmd_idx) {
     inspect_.tuning_results_nodes.push_back(std::move(node));
 
     // Add a leading zero so that fx iquery show-file sorts the results properly.
-    AML_SDMMC_INFO("Tuning results [%02u]: %s", i, results.c_str());
+    DriverLog(INFO, "Tuning results [%02u]: %s", i, results.c_str());
   }
 
   zx::result<TuneSettings> tuning_settings =
@@ -1008,8 +1023,8 @@ zx_status_t AmlSdmmc::SdmmcPerformTuning(uint32_t tuning_cmd_idx) {
   inspect_.distance_to_failing_point.Set(
       DistanceToFailingPoint(*tuning_settings, adj_delay_results));
 
-  AML_SDMMC_INFO("Clock divider %u, adj delay %u, delay %u", clk_div, tuning_settings->adj_delay,
-                 tuning_settings->delay);
+  DriverLog(INFO, "Clock divider %u, adj delay %u, delay %u", clk_div, tuning_settings->adj_delay,
+            tuning_settings->delay);
   return ZX_OK;
 }
 
@@ -1029,7 +1044,7 @@ zx::result<AmlSdmmc::TuneSettings> AmlSdmmc::PerformTuning(
   }
 
   if (largest_failing_window.size == 0) {
-    AML_SDMMC_INFO("No transfers failed, using default settings");
+    DriverLog(INFO, "No transfers failed, using default settings");
     return zx::ok(TuneSettings{0, 0});
   }
 
@@ -1048,17 +1063,16 @@ zx::result<AmlSdmmc::TuneSettings> AmlSdmmc::PerformTuning(
   inspect_.longest_window_size.Set(largest_failing_window.size);
   inspect_.longest_window_adj_delay.Set(failing_adj_delay);
 
-  AML_SDMMC_INFO("Largest failing window: adj_delay %u, delay start %u, size %u, middle %u",
-                 failing_adj_delay, largest_failing_window.start, largest_failing_window.size,
-                 largest_failing_window.middle());
+  DriverLog(INFO, "Largest failing window: adj_delay %u, delay start %u, size %u, middle %u",
+            failing_adj_delay, largest_failing_window.start, largest_failing_window.size,
+            largest_failing_window.middle());
   return zx::ok(results);
 }
 
 void AmlSdmmc::RegisterVmo(RegisterVmoRequestView request, fdf::Arena& arena,
                            RegisterVmoCompleter::Sync& completer) {
-  zx_status_t status =
-      SdmmcRegisterVmo(request->vmo_id, request->client_id, std::move(request->vmo),
-                       request->offset, request->size, request->vmo_rights);
+  zx_status_t status = RegisterVmo(request->vmo_id, request->client_id, std::move(request->vmo),
+                                   request->offset, request->size, request->vmo_rights);
   if (status != ZX_OK) {
     completer.buffer(arena).ReplyError(status);
     return;
@@ -1066,8 +1080,8 @@ void AmlSdmmc::RegisterVmo(RegisterVmoRequestView request, fdf::Arena& arena,
   completer.buffer(arena).ReplySuccess();
 }
 
-zx_status_t AmlSdmmc::SdmmcRegisterVmo(uint32_t vmo_id, uint8_t client_id, zx::vmo vmo,
-                                       uint64_t offset, uint64_t size, uint32_t vmo_rights) {
+zx_status_t AmlSdmmc::RegisterVmo(uint32_t vmo_id, uint8_t client_id, zx::vmo vmo, uint64_t offset,
+                                  uint64_t size, uint32_t vmo_rights) {
   if (client_id > SDMMC_MAX_CLIENT_ID) {
     return ZX_ERR_OUT_OF_RANGE;
   }
@@ -1084,8 +1098,8 @@ zx_status_t AmlSdmmc::SdmmcRegisterVmo(uint32_t vmo_id, uint8_t client_id, zx::v
   const uint32_t write_perm = (vmo_rights & SDMMC_VMO_RIGHT_WRITE) ? ZX_BTI_PERM_WRITE : 0;
   zx_status_t status = stored_vmo.Pin(bti_, read_perm | write_perm, true);
   if (status != ZX_OK) {
-    AML_SDMMC_ERROR("Failed to pin VMO %u for client %u: %s", vmo_id, client_id,
-                    zx_status_get_string(status));
+    DriverLog(ERROR, "Failed to pin VMO %u for client %u: %s", vmo_id, client_id,
+              zx_status_get_string(status));
     return status;
   }
 
@@ -1096,7 +1110,7 @@ zx_status_t AmlSdmmc::SdmmcRegisterVmo(uint32_t vmo_id, uint8_t client_id, zx::v
 void AmlSdmmc::UnregisterVmo(UnregisterVmoRequestView request, fdf::Arena& arena,
                              UnregisterVmoCompleter::Sync& completer) {
   zx::vmo vmo;
-  zx_status_t status = SdmmcUnregisterVmo(request->vmo_id, request->client_id, &vmo);
+  zx_status_t status = UnregisterVmo(request->vmo_id, request->client_id, &vmo);
   if (status != ZX_OK) {
     completer.buffer(arena).ReplyError(status);
     return;
@@ -1104,7 +1118,7 @@ void AmlSdmmc::UnregisterVmo(UnregisterVmoRequestView request, fdf::Arena& arena
   completer.buffer(arena).ReplySuccess(std::move(vmo));
 }
 
-zx_status_t AmlSdmmc::SdmmcUnregisterVmo(uint32_t vmo_id, uint8_t client_id, zx::vmo* out_vmo) {
+zx_status_t AmlSdmmc::UnregisterVmo(uint32_t vmo_id, uint8_t client_id, zx::vmo* out_vmo) {
   if (client_id > SDMMC_MAX_CLIENT_ID) {
     return ZX_ERR_OUT_OF_RANGE;
   }
@@ -1165,7 +1179,7 @@ void AmlSdmmc::Request(RequestRequestView request, fdf::Arena& arena,
         .buffers_list = buffer_regions.data(),
         .buffers_count = buffer_regions.size(),
     };
-    zx_status_t status = SdmmcRequest(&sdmmc_req, response.data());
+    zx_status_t status = Request(&sdmmc_req, response.data());
     if (status != ZX_OK) {
       completer.buffer(arena).ReplyError(status);
       return;
@@ -1174,7 +1188,7 @@ void AmlSdmmc::Request(RequestRequestView request, fdf::Arena& arena,
   completer.buffer(arena).ReplySuccess(response);
 }
 
-zx_status_t AmlSdmmc::SdmmcRequest(const sdmmc_req_t* req, uint32_t out_response[4]) {
+zx_status_t AmlSdmmc::Request(const sdmmc_req_t* req, uint32_t out_response[4]) {
   if (req->client_id > SDMMC_MAX_CLIENT_ID) {
     return ZX_ERR_OUT_OF_RANGE;
   }
@@ -1193,7 +1207,7 @@ zx_status_t AmlSdmmc::SdmmcRequestLocked(const sdmmc_req_t* req, uint32_t out_re
   WaitForBus();
 
   // stop executing
-  AmlSdmmcStart::Get().ReadFrom(&mmio_).set_desc_busy(0).WriteTo(&mmio_);
+  AmlSdmmcStart::Get().ReadFrom(&*mmio_).set_desc_busy(0).WriteTo(&*mmio_);
 
   std::optional<std::vector<fzl::PinnedVmo>> pinned_vmos;
 
@@ -1202,7 +1216,7 @@ zx_status_t AmlSdmmc::SdmmcRequestLocked(const sdmmc_req_t* req, uint32_t out_re
   if (req->cmd_flags & SDMMC_RESP_DATA_PRESENT) {
     auto status = SetupDataDescs(*req, desc);
     if (status.is_error()) {
-      AML_SDMMC_ERROR("Failed to setup data descriptors");
+      DriverLog(ERROR, "Failed to setup data descriptors");
       return status.error_value();
     }
     last_desc = std::get<0>(status.value());
@@ -1212,12 +1226,12 @@ zx_status_t AmlSdmmc::SdmmcRequestLocked(const sdmmc_req_t* req, uint32_t out_re
   auto cmd_info = AmlSdmmcCmdCfg::Get().FromValue(last_desc->cmd_info);
   cmd_info.set_end_of_chain(1);
   last_desc->cmd_info = cmd_info.reg_value();
-  AML_SDMMC_TRACE("SUBMIT req:%p cmd_idx: %d cmd_cfg: 0x%x cmd_dat: 0x%x cmd_arg: 0x%x", req,
-                  req->cmd_idx, desc->cmd_info, desc->data_addr, desc->cmd_arg);
+  DriverLog(TRACE, "SUBMIT req:%p cmd_idx: %d cmd_cfg: 0x%x cmd_dat: 0x%x cmd_arg: 0x%x", req,
+            req->cmd_idx, desc->cmd_info, desc->data_addr, desc->cmd_arg);
 
   zx_paddr_t desc_phys;
 
-  auto start_reg = AmlSdmmcStart::Get().ReadFrom(&mmio_);
+  auto start_reg = AmlSdmmcStart::Get().ReadFrom(&*mmio_);
   desc_phys = descs_buffer_.phys();
   descs_buffer_.CacheFlush(0, descs_buffer_.size());
   // Read desc from external DDR
@@ -1225,7 +1239,9 @@ zx_status_t AmlSdmmc::SdmmcRequestLocked(const sdmmc_req_t* req, uint32_t out_re
 
   ClearStatus();
 
-  start_reg.set_desc_busy(1).set_desc_addr((static_cast<uint32_t>(desc_phys)) >> 2).WriteTo(&mmio_);
+  start_reg.set_desc_busy(1)
+      .set_desc_addr((static_cast<uint32_t>(desc_phys)) >> 2)
+      .WriteTo(&*mmio_);
 
   zx::result<std::array<uint32_t, AmlSdmmc::kResponseCount>> response = WaitForInterrupt(*req);
   if (response.is_ok()) {
@@ -1247,10 +1263,10 @@ zx_status_t AmlSdmmc::Init(const pdev_device_info_t& device_info) {
     ConfigureDefaultRegs();
 
     // Stop processing DMA descriptors before releasing quarantine.
-    AmlSdmmcStart::Get().ReadFrom(&mmio_).set_desc_busy(0).WriteTo(&mmio_);
+    AmlSdmmcStart::Get().ReadFrom(&*mmio_).set_desc_busy(0).WriteTo(&*mmio_);
     zx_status_t status = bti_.release_quarantine();
     if (status != ZX_OK) {
-      AML_SDMMC_ERROR("Failed to release quarantined pages");
+      DriverLog(ERROR, "Failed to release quarantined pages");
       return status;
     }
   }

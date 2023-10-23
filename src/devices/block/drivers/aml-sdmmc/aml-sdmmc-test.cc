@@ -30,18 +30,19 @@ class TestDfv1Driver : public Dfv1Driver {
  public:
   TestDfv1Driver(zx_device_t* parent, fdf::MmioBuffer mmio, zx::bti bti, fdf::MmioView view,
                  aml_sdmmc::IoBuffer descs_buffer)
-      // Pass BTI ownership to Dfv1Driver, but keep a copy of the handle so we can get a list of
-      // VMOs that are pinned when a request is made.
-      : Dfv1Driver(parent, zx::bti(bti.get()), std::move(mmio),
+      : Dfv1Driver(parent), view_(view) {
+    // Pass BTI ownership to Dfv1Driver, but keep a copy of the handle so we can get a list of
+    // VMOs that are pinned when a request is made.
+    SetUpResources(zx::bti(bti.get()), std::move(mmio),
                    aml_sdmmc_config_t{
                        .min_freq = 400000,
                        .max_freq = 120000000,
                        .version_3 = true,
                        .prefs = 0,
                    },
-                   zx::interrupt(ZX_HANDLE_INVALID), {}, std::move(descs_buffer)),
-        bti_(bti.release()),
-        view_(view) {}
+                   zx::interrupt(ZX_HANDLE_INVALID), {}, std::move(descs_buffer));
+    bti_ = zx::unowned_bti(bti.release());
+  }
 
   using Dfv1Driver::Bind;
 
