@@ -583,29 +583,35 @@ zx_status_t VmAspace::PageFault(vaddr_t va, uint flags) {
   zx_status_t status = ZX_OK;
   __UNINITIALIZED LazyPageRequest page_request;
   do {
+    // For now, hold the aspace lock across the page fault operation, which stops any other
+    // operations on the address space from moving the region out from underneath it.
     {
-      // for now, hold the aspace lock across the page fault operation,
-      // which stops any other operations on the address space from moving
-      // the region out from underneath it
       Guard<CriticalMutex> guard{&lock_};
       DEBUG_ASSERT(!aspace_destroyed_);
       // First check if we're faulting on the same mapping as last time to short-circuit the vmar
       // walk.
+      bool found = false;
       if (likely(last_fault_)) {
         AssertHeld(last_fault_->lock_ref());
         if (last_fault_->is_in_range_locked(va, 1)) {
           vm_aspace_last_fault_hit.Add(1);
-          status = last_fault_->PageFault(va, flags, &page_request);
-        } else {
-          AssertHeld(root_vmar_->lock_ref());
-          vm_aspace_last_fault_miss.Add(1);
-          status = root_vmar_->PageFault(va, flags, &page_request);
+          found = true;
         }
-      } else {
-        AssertHeld(root_vmar_->lock_ref());
-        vm_aspace_last_fault_miss.Add(1);
-        status = root_vmar_->PageFault(va, flags, &page_request);
       }
+      if (!found) {
+        vm_aspace_last_fault_miss.Add(1);
+        AssertHeld(root_vmar_->lock_ref());
+        // Stash the mapping we found as the most recent fault. As we just found this mapping in the
+        // VMAR tree we know it's in the ALIVE state (or is a nullptr), satisfying that requirement
+        // that allows us to record this as a raw pointer.
+        last_fault_ = root_vmar_->FindMappingLocked(va);
+        if (unlikely(!last_fault_)) {
+          return ZX_ERR_NOT_FOUND;
+        }
+      }
+      DEBUG_ASSERT(last_fault_);
+      AssertHeld(last_fault_->lock_ref());
+      status = last_fault_->PageFaultLocked(va, flags, &page_request);
     }
 
     if (status == ZX_ERR_SHOULD_WAIT) {

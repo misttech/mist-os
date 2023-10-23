@@ -134,13 +134,6 @@ class VmAddressRegionOrMapping
   static fbl::RefPtr<VmMapping> downcast_as_vm_mapping(
       fbl::RefPtr<VmAddressRegionOrMapping>* region_or_map);
 
-  // Page fault in an address within the region.  Recursively traverses
-  // the regions to find the target mapping, if it exists.
-  // If this returns ZX_ERR_SHOULD_WAIT, then the caller should wait on |page_request|
-  // and try again.
-  virtual zx_status_t PageFault(vaddr_t va, uint pf_flags, LazyPageRequest* page_request)
-      TA_REQ(lock()) = 0;
-
   // WAVL tree key function
   // For use in WAVL tree code only.
   // base_ access is safe as WAVL tree is guarded by aspace lock.
@@ -701,8 +694,11 @@ class VmAddressRegion final : public VmAddressRegionOrMapping {
   bool has_parent() const;
 
   void DumpLocked(uint depth, bool verbose) const TA_REQ(lock()) override;
-  zx_status_t PageFault(vaddr_t va, uint pf_flags, LazyPageRequest* page_request)
-      TA_REQ(lock()) override;
+
+  // Recursively traverses the regions for a given virtual address and returns a raw pointer to a
+  // mapping if one is found. The returned pointer is only valid as long as the aspace lock remains
+  // held.
+  VmMapping* FindMappingLocked(vaddr_t va) TA_REQ(lock());
 
   // Apply a memory priority to this VMAR and all of its subregions.
   zx_status_t SetMemoryPriority(MemoryPriority priority);
@@ -1005,8 +1001,12 @@ class VmMapping final : public VmAddressRegionOrMapping,
   zx_status_t Protect(vaddr_t base, size_t size, uint new_arch_mmu_flags);
 
   void DumpLocked(uint depth, bool verbose) const TA_REQ(lock()) override;
-  zx_status_t PageFault(vaddr_t va, uint pf_flags, LazyPageRequest* page_request)
-      TA_REQ(lock()) override;
+
+  // Page fault in an address within the mapping.
+  // If this returns ZX_ERR_SHOULD_WAIT, then the caller should wait on |page_request|
+  // and try again.
+  zx_status_t PageFaultLocked(vaddr_t va, uint pf_flags, LazyPageRequest* page_request)
+      TA_REQ(lock());
 
   // Apis intended for use by VmObject
 

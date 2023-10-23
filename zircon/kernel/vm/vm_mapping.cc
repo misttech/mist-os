@@ -858,7 +858,8 @@ zx_status_t VmMapping::DestroyLocked() {
   return ZX_OK;
 }
 
-zx_status_t VmMapping::PageFault(vaddr_t va, const uint pf_flags, LazyPageRequest* page_request) {
+zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
+                                       LazyPageRequest* page_request) {
   VM_KTRACE_DURATION(
       2, "VmMapping::PageFault",
       ("user_id", KTRACE_ANNOTATED_VALUE(AssertHeld(lock_ref()), object_->user_id())),

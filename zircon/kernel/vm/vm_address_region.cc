@@ -397,24 +397,19 @@ VmObject::AttributionCounts VmAddressRegion::AllocatedPagesLocked() const {
   return page_counts;
 }
 
-zx_status_t VmAddressRegion::PageFault(vaddr_t va, uint pf_flags, LazyPageRequest* page_request) {
+VmMapping* VmAddressRegion::FindMappingLocked(vaddr_t va) {
   canary_.Assert();
 
   VmAddressRegion* vmar = this;
   AssertHeld(vmar->lock_ref());
   while (VmAddressRegionOrMapping* next = vmar->subregions_.FindRegion(va)) {
     if (auto mapping = next->as_vm_mapping_ptr()) {
-      AssertHeld(mapping->lock_ref());
-      // Stash the mapping we found as the most recent fault. As we just found this mapping in the
-      // VMAR tree we know it's in the ALIVE state, satisfying that requirement that allows us to
-      // record this as a raw pointer.
-      aspace_->last_fault_ = mapping;
-      return mapping->PageFault(va, pf_flags, page_request);
+      return mapping;
     }
     vmar = next->as_vm_address_region_ptr();
   }
 
-  return ZX_ERR_NOT_FOUND;
+  return nullptr;
 }
 
 ktl::optional<vaddr_t> VmAddressRegion::CheckGapLocked(VmAddressRegionOrMapping* prev,
