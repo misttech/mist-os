@@ -85,7 +85,7 @@ Prior to building a custom Rust toolchain for Fuchsia, you need to do the follow
        config_toml \
        --clang-prefix=$DEV_ROOT/clang \
        --host-sysroot=$DEV_ROOT/sysroot/linux \
-       --beta=$DEV_ROOT/beta \
+       --stage0=$DEV_ROOT/beta \
        --prefix=$(pwd)/install/fuchsia-rust \
       | tee fuchsia-config.toml
 
@@ -95,7 +95,7 @@ Prior to building a custom Rust toolchain for Fuchsia, you need to do the follow
          --eval \
          --clang-prefix=$DEV_ROOT/clang \
          --sdk-dir=$DEV_ROOT/sdk \
-         --beta=$DEV_ROOT/beta \
+         --stage0=$DEV_ROOT/beta \
          --linux-amd64-sysroot=$DEV_ROOT/sysroot/linux \
          --linux-arm64-sysroot=$DEV_ROOT/sysroot/linux \
       | tee fuchsia-env.sh
