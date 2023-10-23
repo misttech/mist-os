@@ -4,7 +4,7 @@
 
 import("//sdk/ctf/build/ctf.gni")
 
-ctf_executable("svc-unittests") {
+executable("svc-unittests") {
   sources = [ "dir_unittest.cc" ]
 
   deps = [
@@ -20,7 +20,7 @@ ctf_executable("svc-unittests") {
   testonly = true
 }
 
-ctf_fuchsia_unittest_component("svc-tests-component") {
+fuchsia_unittest_component("svc-tests-component") {
   component_name = "svc-tests"
   deps = [ ":svc-unittests" ]
 }

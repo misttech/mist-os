@@ -5,7 +5,7 @@
 import("//build/components.gni")
 import("//sdk/ctf/build/ctf.gni")
 
-ctf_executable("reference-element-bin") {
+executable("reference-element-bin") {
   output_name = "reference-element"
   testonly = true
 
@@ -20,13 +20,13 @@ ctf_executable("reference-element-bin") {
   ]
 }
 
-ctf_fuchsia_component("reference-element") {
+fuchsia_component("reference-element") {
   manifest = "meta/reference-element.cml"
   testonly = true
   deps = [ ":reference-element-bin" ]
 }
 
-ctf_executable("reference-graphical-presenter-bin") {
+executable("reference-graphical-presenter-bin") {
   output_name = "reference-graphical-presenter"
   testonly = true
 
@@ -40,13 +40,13 @@ ctf_executable("reference-graphical-presenter-bin") {
   ]
 }
 
-ctf_fuchsia_component("reference-graphical-presenter") {
+fuchsia_component("reference-graphical-presenter") {
   manifest = "meta/reference-graphical-presenter.cml"
   testonly = true
   deps = [ ":reference-graphical-presenter-bin" ]
 }
 
-ctf_executable("reference-scenic-bin") {
+executable("reference-scenic-bin") {
   output_name = "reference-scenic"
   testonly = true
 
@@ -60,13 +60,13 @@ ctf_executable("reference-scenic-bin") {
   ]
 }
 
-ctf_fuchsia_component("reference-scenic") {
+fuchsia_component("reference-scenic") {
   manifest = "meta/reference-scenic.cml"
   testonly = true
   deps = [ ":reference-scenic-bin" ]
 }
 
-ctf_executable("reference-session-bin") {
+executable("reference-session-bin") {
   output_name = "reference-session"
   testonly = true
 
@@ -83,7 +83,7 @@ ctf_executable("reference-session-bin") {
   ]
 }
 
-ctf_fuchsia_component("reference-session") {
+fuchsia_component("reference-session") {
   manifest = "meta/reference-session.cml"
   testonly = true
   deps = [ ":reference-session-bin" ]

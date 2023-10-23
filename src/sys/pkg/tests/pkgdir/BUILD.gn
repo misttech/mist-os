@@ -6,7 +6,7 @@ import("//build/components.gni")
 import("//build/rust/rustc_test.gni")
 import("//sdk/ctf/build/ctf.gni")
 
-ctf_rustc_test("driver") {
+rustc_test("driver") {
   name = "pkgdir_integration_test"
   edition = "2021"
 
@@ -35,7 +35,8 @@ ctf_rustc_test("driver") {
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
-ctf_test_component("default") {
+fuchsia_component("pkgdir-tests-component") {
+  component_name = "default"
   testonly = true
   manifest = "meta/pkgdir-integration-test.cml"
   deps = [ ":driver" ]
@@ -44,7 +45,7 @@ ctf_test_component("default") {
 ctf_fuchsia_package("pkgdir-tests") {
   package_name = "pkgdir-tests"
   testonly = true
-  deps = [ ":default" ]
+  deps = [ ":pkgdir-tests-component" ]
 }
 
 fuchsia_component("test-root") {

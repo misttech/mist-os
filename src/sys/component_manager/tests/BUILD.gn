@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//sdk/ctf/build/ctf.gni")
+import("//build/rust/rustc_binary.gni")
 
 group("tests") {
   testonly = true
@@ -46,7 +46,7 @@ group("tests") {
   }
 }
 
-ctf_rustc_binary("trigger_bin") {
+rustc_binary("trigger_bin") {
   testonly = true
   name = "trigger"
   edition = "2021"

@@ -11,7 +11,7 @@ group("tests") {
   deps = [ ":fuchsia-examples-cpp-tests-package" ]
 }
 
-ctf_executable("bin") {
+executable("bin") {
   output_name = "ctf_fuchsia_examples_cpp_test"
   sources = [ "main.cc" ]
   deps = [
@@ -27,7 +27,7 @@ ctf_executable("bin") {
   testonly = true
 }
 
-ctf_fuchsia_component("test-suite") {
+fuchsia_component("test-suite") {
   manifest = "meta/test-suite.cml"
   deps = [ ":bin" ]
   testonly = true

@@ -4,7 +4,7 @@
 
 import("//sdk/ctf/build/ctf.gni")
 
-ctf_rustc_test("simulate_scan") {
+rustc_test("simulate_scan") {
   edition = "2021"
   deps = [
     "../../testing/fidl:test.wlan.realm_rust",

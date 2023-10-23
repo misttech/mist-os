@@ -27,7 +27,7 @@ foreach(gidl_file, conformance_suite_gidl_files) {
   }
 }
 
-ctf_source_set("host_test_sources") {
+source_set("host_test_sources") {
   testonly = true
 
   sources = [
@@ -54,7 +54,7 @@ ctf_source_set("host_test_sources") {
   ]
 }
 
-ctf_source_set("test_sources") {
+source_set("test_sources") {
   testonly = true
 
   # TODO(jamesr): Make this an sdk source set
@@ -103,7 +103,7 @@ ctf_source_set("test_sources") {
   public_configs = [ "//sdk/config" ]
 }
 
-ctf_executable("fidl-hlcpp-conformance-tests_bin") {
+executable("fidl-hlcpp-conformance-tests_bin") {
   visibility = [ ":*" ]
   testonly = true
 
@@ -119,7 +119,7 @@ ctf_executable("fidl-hlcpp-conformance-tests_bin") {
          ]
 }
 
-ctf_fuchsia_component("fidl-hlcpp-conformance-tests-component") {
+fuchsia_component("fidl-hlcpp-conformance-tests-component") {
   testonly = true
   component_name = "fidl-hlcpp-conformance-tests"
   manifest = "meta/fidl-hlcpp-conformance-tests.cml"
@@ -127,7 +127,7 @@ ctf_fuchsia_component("fidl-hlcpp-conformance-tests-component") {
   deps = [ ":fidl-hlcpp-conformance-tests_bin" ]
 }
 
-ctf_executable("fidl-hlcpp-unit-tests_bin") {
+executable("fidl-hlcpp-unit-tests_bin") {
   visibility = [ ":*" ]
   testonly = true
 
@@ -144,7 +144,7 @@ ctf_executable("fidl-hlcpp-unit-tests_bin") {
   ]
 }
 
-ctf_fuchsia_component("fidl-hlcpp-unit-tests-component") {
+fuchsia_component("fidl-hlcpp-unit-tests-component") {
   testonly = true
   component_name = "fidl-hlcpp-unit-tests"
   manifest = "meta/fidl-hlcpp-unit-tests.cml"
@@ -201,7 +201,7 @@ if (is_host) {
   }
 }
 
-ctf_fidl("union_migration_test_fidl") {
+fidl("union_migration_test_fidl") {
   name = "fidl.test.unionmigration"
 
   sources = [ "union_migration.test.fidl" ]
@@ -211,7 +211,7 @@ ctf_fidl("union_migration_test_fidl") {
   enable_hlcpp = true
 }
 
-ctf_source_set("test_util") {
+source_set("test_util") {
   testonly = true
 
   sources = [ "test/test_util.h" ]
@@ -221,7 +221,7 @@ ctf_source_set("test_util") {
   public_deps = [ "//sdk/lib/fidl/cpp:cpp_base" ]
 }
 
-ctf_source_set("handle_util") {
+source_set("handle_util") {
   testonly = true
 
   sources = [

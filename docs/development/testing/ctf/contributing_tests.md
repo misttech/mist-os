@@ -24,31 +24,11 @@ import("//sdk/ctf/build/ctf.gni")
 
 ### 2. Use CTF GN templates {#the-ctf-templates}
 
-Replace the test's `fuchsia_package` declaration and each of its direct
-dependencies' declarations with equivalent `ctf_*` GN targets. For example,
-`fuchsia_package` should be changed to `ctf_fuchsia_package`. This only needs to
-be done for the package's dependencies because they are versioned with the test
-in CTF. It does not need to be done to any parent packages that subpackage the
-test. For a list of all available CTF templates, see [//sdk/ctf/build].
+Replace the test's `fuchsia_package` declaration with `ctf_fuchsia_package`:
 
-* {Before (Rust)}
+* {Before}
 
   ```gn
-  rustc_test("bin") {
-    edition = "2018"
-    name = "fuchsia_example_test"
-    source_root = "src/main.rs"
-    sources = [ "src/main.rs" ]
-    deps = [ ... ]
-  }
-
-  fuchsia_component("fuchsia-example-test-component") {
-    testonly = true
-    component_name = "fuchsia-example-test"
-    manifest = "meta/fuchsia-example-test.cml"
-    deps = [ ":bin" ]
-  }
-
   fuchsia_package("fuchsia-example-tests") {
     testonly = true
     package_name = "fuchsia-example-tests"
@@ -56,72 +36,9 @@ test. For a list of all available CTF templates, see [//sdk/ctf/build].
   }
   ```
 
-* {After (Rust)}
+* {After}
 
   ```gn
-  ctf_rustc_test("bin") {
-    edition = "2018"
-    name = "fuchsia_example_test"
-    source_root = "src/main.rs"
-    sources = [ "src/main.rs" ]
-    deps = [ ... ]
-  }
-
-  ctf_fuchsia_component("fuchsia-example-test-component") {
-    testonly = true
-    component_name = "fuchsia-example-test"
-    manifest = "meta/fuchsia-example-test.cml"
-    deps = [ ":bin" ]
-  }
-
-  ctf_fuchsia_package("fuchsia-example-tests") {
-    testonly = true
-    package_name = "fuchsia-example-tests"
-    deps = [ ":fuchsia-example-test-component" ]
-  }
-  ```
-
-* {Before (C++)}
-
-  ```gn
-  executable("bin") {
-    testonly = true
-    name = "fuchsia_example_test"
-    sources = [ "src/main.cc" ]
-    deps = [ ... ]
-  }
-
-  fuchsia_component("fuchsia-example-test-component") {
-    testonly = true
-    component_name = "fuchsia-example-test"
-    manifest = "meta/fuchsia-example-test.cml"
-    deps = [ ":bin" ]
-  }
-
-  fuchsia_package("fuchsia-example-tests") {
-    testonly = true
-    package_name = "fuchsia-example-tests"
-    deps = [ ":fuchsia-example-test-component" ]
-  }
-  ```
-
-* {After (C++)}
-
-  ```gn
-  ctf_executable("bin") {
-    testonly = true
-    name = "fuchsia_example_test"
-    sources = [ "src/main.cc" ]
-    deps = [ ... ]
-  }
-
-  ctf_fuchsia_component("fuchsia-example-test-component") {
-    testonly = true
-    component_name = "fuchsia-example-test"
-    manifest = "meta/fuchsia-example-test.cml"
-    deps = [ ":bin" ]
-  }
-
   ctf_fuchsia_package("fuchsia-example-tests") {
     testonly = true
     package_name = "fuchsia-example-tests"
@@ -237,8 +154,7 @@ To remove a test from future CTF releases:
 
 1. Remove the [test archive](#the-test-archive) from the build graph.
 2. Delete the test's [gn template](#the-gn-template).
-3. Remove the test's dependencies from the [allowlist].
-4. Remove the [ctf templates](#the-ctf-templates) from the test's build rules.
+3. Remove the [ctf templates](#the-ctf-templates) from the test's build rules.
 
 Submit these changes to the main branch. Over time all of the API levels
 corresponding to each release will become unsupported and the last version of

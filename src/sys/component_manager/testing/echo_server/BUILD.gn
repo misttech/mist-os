@@ -2,9 +2,10 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//sdk/ctf/build/ctf.gni")
+import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
 
-ctf_rustc_binary("echo_server_testing") {
+rustc_binary("echo_server_testing") {
   testonly = true
   edition = "2021"
   deps = [
@@ -19,7 +20,7 @@ ctf_rustc_binary("echo_server_testing") {
   sources = [ "src/main.rs" ]
 }
 
-ctf_fuchsia_component("echo_server") {
+fuchsia_component("echo_server") {
   testonly = true
   component_name = "echo_server"
   manifest = "meta/echo_server.cml"

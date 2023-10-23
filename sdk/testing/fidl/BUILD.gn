@@ -4,7 +4,7 @@
 
 import("//sdk/ctf/build/ctf.gni")
 
-ctf_source_set("test_support") {
+source_set("test_support") {
   testonly = true
 
   public = [ "async_loop_for_test.h" ]
@@ -18,7 +18,7 @@ ctf_source_set("test_support") {
   ]
 }
 
-ctf_source_set("test") {
+source_set("test") {
   testonly = true
 
   public = [
@@ -38,7 +38,7 @@ ctf_source_set("test") {
   public_configs = [ "//sdk/config" ]
 }
 
-ctf_fidl("frobinator") {
+fidl("frobinator") {
   testonly = true
 
   name = "fidl.test.frobinator"
@@ -49,7 +49,7 @@ ctf_fidl("frobinator") {
   enable_hlcpp = true
 }
 
-ctf_fidl("fidl_test") {
+fidl("fidl_test") {
   name = "fidl.test.misc"
 
   testonly = true
@@ -59,7 +59,7 @@ ctf_fidl("fidl_test") {
   enable_hlcpp = true
 }
 
-ctf_fidl("fidl_test_handles") {
+fidl("fidl_test_handles") {
   name = "fidl.test.handles"
 
   testonly = true
@@ -70,7 +70,7 @@ ctf_fidl("fidl_test_handles") {
   enable_hlcpp = true
 }
 
-ctf_fidl("collision_test") {
+fidl("collision_test") {
   name = "fidl.test.collision"
 
   testonly = true

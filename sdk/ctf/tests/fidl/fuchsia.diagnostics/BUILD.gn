@@ -5,7 +5,7 @@
 import("//build/components.gni")
 import("//sdk/ctf/build/ctf.gni")
 
-ctf_executable("inspect-publisher-bin") {
+executable("inspect-publisher-bin") {
   output_name = "inspect-publisher"
   testonly = true
 
@@ -19,7 +19,7 @@ ctf_executable("inspect-publisher-bin") {
   ]
 }
 
-ctf_executable("diagnostics-test-bin") {
+executable("diagnostics-test-bin") {
   output_name = "diagnostics-test"
   testonly = true
 
@@ -41,7 +41,7 @@ ctf_executable("diagnostics-test-bin") {
   ]
 }
 
-ctf_executable("diagnostics-log-test-bin") {
+executable("diagnostics-log-test-bin") {
   output_name = "diagnostics-log-test"
   testonly = true
 
@@ -65,7 +65,7 @@ ctf_executable("diagnostics-log-test-bin") {
   ]
 }
 
-ctf_fuchsia_component("diagnostics-test") {
+fuchsia_component("diagnostics-test") {
   component_name = "fuchsia-diagnostics-tests"
   manifest = "meta/diagnostics-test.cml"
   testonly = true
@@ -75,7 +75,7 @@ ctf_fuchsia_component("diagnostics-test") {
   ]
 }
 
-ctf_fuchsia_component("diagnostics-log-test") {
+fuchsia_component("diagnostics-log-test") {
   component_name = "fuchsia-diagnostics-log-tests"
   manifest = "meta/diagnostics-log-test.cml"
   testonly = true
@@ -86,7 +86,7 @@ ctf_fuchsia_component("diagnostics-log-test") {
   ]
 }
 
-ctf_fuchsia_component("inspect-publisher") {
+fuchsia_component("inspect-publisher") {
   manifest = "meta/inspect-publisher.cml"
   testonly = true
   deps = [ ":inspect-publisher-bin" ]

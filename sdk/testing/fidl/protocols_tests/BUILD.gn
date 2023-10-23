@@ -6,28 +6,28 @@ import("//sdk/ctf/build/ctf.gni")
 
 # This is a FIDL library containing protocol declarations that are useful for
 # writing unknown interaction tests for FIDL bindings.
-ctf_fidl("test.unknown.interactions") {
+fidl("test.unknown.interactions") {
   testonly = true
   sources = [ "unknown_interactions.test.fidl" ]
   enable_hlcpp = true
   contains_drivers = true
 }
 
-ctf_fidl("test.protocol.connector") {
+fidl("test.protocol.connector") {
   testonly = true
   sources = [ "protocol_connector.test.fidl" ]
   enable_hlcpp = true
 }
 
 # A library containing just an empty protocol.
-ctf_fidl("test.empty.protocol") {
+fidl("test.empty.protocol") {
   testonly = true
   sources = [ "empty_protocol.test.fidl" ]
   enable_hlcpp = true
 }
 
 # Methods returning application errors.
-ctf_fidl("test.error.methods") {
+fidl("test.error.methods") {
   testonly = true
   sources = [ "error_methods.test.fidl" ]
   enable_hlcpp = true
@@ -35,7 +35,7 @@ ctf_fidl("test.error.methods") {
 
 # Simple one way/two way echo methods and events that test the basic operation
 # of client and server APIs.
-ctf_fidl("test.basic.protocol") {
+fidl("test.basic.protocol") {
   testonly = true
   sources = [ "basic_protocol.test.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
@@ -43,7 +43,7 @@ ctf_fidl("test.basic.protocol") {
 }
 
 # Methods and events with the @transitional attribute.
-ctf_fidl("test.transitional") {
+fidl("test.transitional") {
   testonly = true
   sources = [ "transitional.test.fidl" ]
   enable_hlcpp = true

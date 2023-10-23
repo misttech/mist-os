@@ -2,11 +2,13 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//sdk/ctf/build/ctf.gni")
+import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
+import("//build/rust/rustc_test.gni")
 
 # TODO(109696): Add this test to CTF by following the guide at
 # https://fuchsia.dev/fuchsia-src/development/testing/ctf/contributing_tests.
-ctf_rustc_test("collections_integration_test_bin") {
+rustc_test("collections_integration_test_bin") {
   name = "collections_integration_test"
   edition = "2021"
   source_root = "integration_test.rs"
@@ -27,7 +29,7 @@ ctf_rustc_test("collections_integration_test_bin") {
   sources = [ "integration_test.rs" ]
 }
 
-ctf_rustc_binary("write_startup_socket_bin") {
+rustc_binary("write_startup_socket_bin") {
   testonly = true
   name = "write_startup_socket"
   edition = "2021"
@@ -40,30 +42,30 @@ ctf_rustc_binary("write_startup_socket_bin") {
   sources = [ "write_startup_socket.rs" ]
 }
 
-ctf_fuchsia_component("write_startup_socket") {
+fuchsia_component("write_startup_socket") {
   testonly = true
   deps = [ ":write_startup_socket_bin" ]
   manifest = "meta/write_startup_socket.cml"
 }
 
-ctf_fuchsia_component("trigger_a") {
+fuchsia_component("trigger_a") {
   testonly = true
   deps = [ "//src/sys/component_manager/tests:trigger_bin" ]
   manifest = "meta/trigger_a.cml"
 }
 
-ctf_fuchsia_component("trigger_b") {
+fuchsia_component("trigger_b") {
   testonly = true
   deps = [ "//src/sys/component_manager/tests:trigger_bin" ]
   manifest = "meta/trigger_b.cml"
 }
 
-ctf_fuchsia_component("trigger_realm") {
+fuchsia_component("trigger_realm") {
   testonly = true
   manifest = "meta/trigger_realm.cml"
 }
 
-ctf_fuchsia_component("collections_integration_test_component") {
+fuchsia_component("collections_integration_test_component") {
   testonly = true
   manifest = "meta/collections_integration_test.cml"
   deps = [

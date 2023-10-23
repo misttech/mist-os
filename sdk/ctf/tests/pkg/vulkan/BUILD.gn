@@ -5,7 +5,7 @@
 import("//sdk/ctf/build/ctf.gni")
 import("//src/lib/vulkan/vulkan.gni")
 
-ctf_executable("vulkan-icd-load-bin") {
+executable("vulkan-icd-load-bin") {
   testonly = true
   output_name = "vulkan_icd_load_test"
   sources = [ "icd_load.cc" ]
@@ -15,7 +15,7 @@ ctf_executable("vulkan-icd-load-bin") {
   ]
 }
 
-ctf_fuchsia_component("vulkan-icd-load-test") {
+fuchsia_component("vulkan-icd-load-test") {
   testonly = true
   deps = [
     ":vulkan-icd-load-bin",

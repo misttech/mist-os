@@ -11,7 +11,7 @@ group("tests") {
   deps = [ ":fuchsia-examples-rust-tests-package" ]
 }
 
-ctf_rustc_test("bin") {
+rustc_test("bin") {
   edition = "2021"
   source_root = "src/main.rs"
   sources = [ source_root ]
@@ -28,7 +28,7 @@ ctf_rustc_test("bin") {
   ]
 }
 
-ctf_fuchsia_component("test-suite") {
+fuchsia_component("test-suite") {
   testonly = true
   manifest = "meta/test-suite.cml"
   deps = [ ":bin" ]

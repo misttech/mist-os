@@ -5,7 +5,7 @@
 import("//build/components.gni")
 import("//sdk/ctf/build/ctf.gni")
 
-ctf_executable("hwinfo-test-bin") {
+executable("hwinfo-test-bin") {
   output_name = "hwinfo-test"
   testonly = true
 
@@ -21,7 +21,7 @@ ctf_executable("hwinfo-test-bin") {
   ]
 }
 
-ctf_fuchsia_component("default") {
+fuchsia_component("default") {
   manifest = "meta/default.cml"
   deps = [ ":hwinfo-test-bin" ]
   testonly = true

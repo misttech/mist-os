@@ -9,19 +9,8 @@
 # verification helpers like verify_deps_in_sdk.gni.
 #
 # Please keep the list sorted alphabetically.
-import("//sdk/ctf/build/ctf_executable.gni")
-import("//sdk/ctf/build/ctf_fidl.gni")
-import("//sdk/ctf/build/ctf_fuchsia_component.gni")
 import("//sdk/ctf/build/ctf_fuchsia_package.gni")
-import("//sdk/ctf/build/ctf_fuchsia_unittest_component.gni")
 import("//sdk/ctf/build/ctf_host_test.gni")
-import("//sdk/ctf/build/ctf_host_test_data.gni")
-import("//sdk/ctf/build/ctf_resource.gni")
-import("//sdk/ctf/build/ctf_rustc_binary.gni")
-import("//sdk/ctf/build/ctf_rustc_library.gni")
-import("//sdk/ctf/build/ctf_rustc_test.gni")
-import("//sdk/ctf/build/ctf_source_set.gni")
-import("//sdk/ctf/build/ctf_test_component.gni")
 import("//sdk/ctf/build/generate_ctf_tests.gni")
 RUST_SUBPACKAGES = [
   "//src/sys/test_runners/lib_loader_cache:lib_loader_runner_cache",

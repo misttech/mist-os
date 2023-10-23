@@ -4,7 +4,7 @@
 
 import("//sdk/ctf/build/ctf.gni")
 
-ctf_rustc_test("fuchsia-intl-test-bin") {
+rustc_test("fuchsia-intl-test-bin") {
   edition = "2018"
   name = "fuchsia_intl_test"
   source_root = "src/fuchsia_intl_test.rs"
@@ -20,7 +20,7 @@ ctf_rustc_test("fuchsia-intl-test-bin") {
   ]
 }
 
-ctf_fuchsia_component("fuchsia-intl-test-component") {
+fuchsia_component("fuchsia-intl-test-component") {
   testonly = true
   component_name = "fuchsia-intl-test"
   manifest = "meta/fuchsia-intl-test.cml"

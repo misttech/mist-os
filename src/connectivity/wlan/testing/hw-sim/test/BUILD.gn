@@ -39,7 +39,7 @@ template("_hw_sim_integration_test") {
 
   if (is_ctf) {
     # Component containing test suite and wlantap-driver, used only in this BUILD file.
-    ctf_fuchsia_component(component_name) {
+    fuchsia_component(component_name) {
       testonly = true
       manifest = invoker.manifest
 

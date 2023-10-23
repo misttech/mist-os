@@ -31,7 +31,7 @@ link_output_rspfile("ctf_unstripped_binaries_list") {
   outputs = [ ctf_unstripped_binaries_file ]
   deps = [
     # TODO(chok): This currently contains a superset of unstripped binaries.
-    # We will want to create a smaller group which only contains ctf_executable()'s.
+    # We will want to create a smaller group which only contains executable()'s.
     ":tests",
   ]
 }
@@ -42,7 +42,7 @@ action("fidl_mangled_to_api_mapping") {
   deps = [ ":ctf_unstripped_binaries_list" ]
   script = "//sdk/ctf/build/scripts/fidl_api_mapper.py"
   depfile = "$target_gen_dir/$target_name.dd"
-  outputs = [ "$root_out_dir/ctf_fidl_mangled_to_api_mapping.json" ]
+  outputs = [ "$root_out_dir/fidl_mangled_to_api_mapping.json" ]
   args = [
     "--input",
     rebase_path(sources[0], root_build_dir),
