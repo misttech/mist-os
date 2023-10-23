@@ -276,6 +276,7 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv
 
         let mac = get_mac(self, device_id);
 
+        tracing::debug!("sending NDP solicitation for {lookup_addr} to {dst_ip}");
         // TODO(https://fxbug.dev/85055): Either panic or guarantee that this error
         // can't happen statically.
         let _: Result<(), _> = crate::ip::icmp::send_ndp_packet(

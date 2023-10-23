@@ -45,7 +45,7 @@ use crate::{
 ///
 /// `ArpDevice` is implemented for all `L: LinkDevice where L::Address: HType`.
 pub(crate) trait ArpDevice: LinkDevice<Address = Self::HType> {
-    type HType: HType + UnicastAddress;
+    type HType: HType + UnicastAddress + core::fmt::Debug;
 }
 
 impl<L: LinkDevice> ArpDevice for L
@@ -509,6 +509,7 @@ fn send_arp_request<D: ArpDevice, C: ArpNonSyncCtx<D, SC::DeviceId>, SC: ArpCont
         let self_hw_addr = sync_ctx.get_hardware_addr(ctx, device_id);
         // TODO(joshlf): Do something if send_frame returns an error?
         let dst_addr = remote_link_addr.unwrap_or(D::HType::BROADCAST);
+        debug!("sending ARP request for {lookup_addr} to {dst_addr:?}");
         let _ = SendFrameContext::send_frame(
             sync_ctx,
             ctx,

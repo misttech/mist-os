@@ -1628,6 +1628,9 @@ fn handle_neighbor_timer<I, D, SC, C>(
                         // TODO(http://fxbug.dev/132349): consider retaining this neighbor entry in
                         // a sentinel `Failed` state, equivalent to its having been discarded except
                         // for debugging/observability purposes.
+                        tracing::debug!(
+                            "neighbor resolution failed for {lookup_addr}; removing entry"
+                        );
                         let _: NeighborState<_, _, _> = entry.remove();
                         None
                     }
