@@ -66,24 +66,18 @@ async fn connect_tool_impl(cmd: ConnectCommand, debugger_proxy: DebugAgentProxy)
                 // OOT doesn't provide symbols for zxdb.
                 ffx_bail!("--debugger only works in-tree.");
             }
-            let debugger_arg = if debugger_debugger == "gdb" {
-                "--args"
-            } else if debugger_debugger == "lldb" {
+            let debugger_arg = if debugger_debugger == "lldb" {
                 "--"
             } else {
-                ffx_bail!("--debugger must be gdb or lldb");
+                ffx_bail!("--debugger must be lldb");
             };
-            // lldb can find .build-id directory automatically but gdb has some trouble.
-            // So we supply the unstripped version for them.
-            let zxdb_unstripped_path =
-                debugger.path().parent().unwrap().join("exe.unstripped/zxdb");
             // Ignore SIGINT because Ctrl-C is used to interrupt zxdb and return to the debugger.
             signal_hook::flag::register(SIGINT, Arc::new(AtomicBool::new(false)))?;
             let mut command = Command::new(debugger_debugger);
             command
                 .current_dir(sdk.get_path_prefix())
                 .arg(debugger_arg)
-                .arg(zxdb_unstripped_path)
+                .arg(debugger.path())
                 .args(debugger.command.args());
 
             command
