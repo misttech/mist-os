@@ -39,6 +39,14 @@ group("fct") {
   ]
 }
 
+group("emulation") {
+  deps = [
+    "bt-hci-emulator",
+    "bt-rootcanal",
+  ]
+  testonly = true
+}
+
 group("tools") {
   deps = [
     ":audio",
@@ -58,9 +66,9 @@ group("tests") {
     "bt-bredr-profile:tests",
     "bt-cli:tests",
     "bt-fct-hci:tests",
-    "bt-hci-emulator",
     "bt-le-central:tests",
     "bt-le-peripheral:tests",
+    "bt-rootcanal:tests",
     "bt-snoop:tests",
     "lib:tests",
     "tests",
