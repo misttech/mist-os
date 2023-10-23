@@ -467,32 +467,27 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
         mock_makedirs.assert_called()
         mock_send_snapshot_command.assert_called()
 
-    @mock.patch("time.sleep", autospec=True)
     @mock.patch.object(
         base_fuchsia_device.ffx_transport.FFX,
-        "is_target_connected",
-        side_effect=[True, False],
+        "wait_for_rcs_disconnection",
         autospec=True,
     )
     def test_wait_for_offline_success(
-        self, mock_ffx_is_target_connected, mock_sleep
+        self, mock_ffx_wait_for_rcs_disconnection
     ) -> None:
         """Testcase for BaseFuchsiaDevice.wait_for_offline() success case"""
         self.fd_obj.wait_for_offline()
 
-        mock_ffx_is_target_connected.assert_called()
-        mock_sleep.assert_called()
+        mock_ffx_wait_for_rcs_disconnection.assert_called()
 
-    @mock.patch("time.sleep", autospec=True)
-    @mock.patch("time.time", side_effect=[0, 1, 2], autospec=True)
     @mock.patch.object(
         base_fuchsia_device.ffx_transport.FFX,
-        "is_target_connected",
-        return_value=True,
+        "wait_for_rcs_disconnection",
+        side_effect=errors.FfxCommandError("error"),
         autospec=True,
     )
     def test_wait_for_offline_fail(
-        self, mock_ffx_is_target_connected, mock_sleep, mock_time
+        self, mock_ffx_wait_for_rcs_disconnection
     ) -> None:
         """Testcase for BaseFuchsiaDevice.wait_for_offline() failure case"""
         with self.assertRaisesRegex(
@@ -500,9 +495,7 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
         ):
             self.fd_obj.wait_for_offline(timeout=2)
 
-        mock_ffx_is_target_connected.assert_called()
-        mock_time.assert_called()
-        mock_sleep.assert_called()
+        mock_ffx_wait_for_rcs_disconnection.assert_called()
 
     @mock.patch.object(
         base_fuchsia_device.ffx_transport.FFX,

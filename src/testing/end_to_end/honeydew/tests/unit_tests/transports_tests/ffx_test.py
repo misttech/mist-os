@@ -334,66 +334,6 @@ class FfxCliTests(unittest.TestCase):
 
         mock_get_target_information.assert_called()
 
-    @parameterized.expand(
-        [
-            (
-                {
-                    "label": "true",
-                    "wait_for_rcs_connection": "",
-                    "expected_value": True,
-                },
-            ),
-            (
-                {
-                    "label": "false_when_DeviceNotConnectedError",
-                    "wait_for_rcs_connection": errors.DeviceNotConnectedError(
-                        "Error"
-                    ),
-                    "expected_value": False,
-                },
-            ),
-            (
-                {
-                    "label": "false_when_TimeoutExpired",
-                    "wait_for_rcs_connection": subprocess.TimeoutExpired(
-                        timeout=10, cmd="ffx -t fuchsia-emulator target wait"
-                    ),
-                    "expected_value": False,
-                },
-            ),
-        ],
-        name_func=_custom_test_name_func,
-    )
-    @mock.patch.object(ffx.FFX, "wait_for_rcs_connection", autospec=True)
-    def test_is_target_connected(
-        self, parameterized_dict, mock_wait_for_rcs_connection
-    ) -> None:
-        """Test case for is_target_connected()"""
-        mock_wait_for_rcs_connection.side_effect = [
-            parameterized_dict["wait_for_rcs_connection"]
-        ]
-
-        self.assertEqual(
-            self.ffx_obj.is_target_connected(),
-            parameterized_dict["expected_value"],
-        )
-
-        mock_wait_for_rcs_connection.assert_called()
-
-    @mock.patch.object(
-        ffx.FFX,
-        "wait_for_rcs_connection",
-        side_effect=errors.FfxCommandError("some error"),
-        autospec=True,
-    )
-    def test_is_target_connected_when_ffx_command_error(
-        self, mock_wait_for_rcs_connection
-    ) -> None:
-        """Test case to ensure is_target_connected() returns False when
-        underlying code returns FFXCommandError."""
-        self.assertFalse(self.ffx_obj.is_target_connected())
-        mock_wait_for_rcs_connection.assert_called()
-
     @mock.patch.object(
         ffx.subprocess,
         "check_output",
@@ -579,7 +519,7 @@ class FfxCliTests(unittest.TestCase):
     def test_wait_for_rcs_connection(
         self, mock_subprocess_check_output
     ) -> None:
-        """Test case for ffx.test_wait_for_rcs_connection()"""
+        """Test case for ffx.wait_for_rcs_connection()"""
         self.ffx_obj.wait_for_rcs_connection()
 
         mock_subprocess_check_output.assert_called()
@@ -647,3 +587,102 @@ class FfxCliTests(unittest.TestCase):
             self.ffx_obj.wait_for_rcs_connection()
 
         mock_subprocess_check_output.assert_called()
+
+    @parameterized.expand(
+        [
+            (
+                {
+                    "label": "when_rcs_connection_disconnected",
+                    "subprocess_side_effect": [
+                        subprocess.CalledProcessError(
+                            returncode=1,
+                            cmd="cmd",
+                            output="error",
+                            stderr="stderr",
+                        ),
+                        subprocess.CalledProcessError(
+                            returncode=1,
+                            cmd="cmd",
+                            output=ffx._DEVICE_NOT_CONNECTED,
+                            stderr="stderr",
+                        ),
+                    ],
+                },
+            ),
+            (
+                {
+                    "label": "when_rcs_connection_timedout",
+                    "subprocess_side_effect": [
+                        subprocess.CalledProcessError(
+                            returncode=1,
+                            cmd="cmd",
+                            output="error",
+                            stderr="stderr",
+                        ),
+                        subprocess.TimeoutExpired(
+                            timeout=5,
+                            cmd="cmd",
+                        ),
+                    ],
+                },
+            ),
+            (
+                {
+                    "label": "when_rcs_connection_disconnected_after_few_attempts",
+                    "subprocess_side_effect": [
+                        RuntimeError("error"),
+                        subprocess.CalledProcessError(
+                            returncode=1,
+                            cmd="cmd",
+                            output=ffx._DEVICE_NOT_CONNECTED,
+                            stderr="stderr",
+                        ),
+                    ],
+                },
+            ),
+        ],
+        name_func=_custom_test_name_func,
+    )
+    @mock.patch("time.sleep", autospec=True)
+    @mock.patch("time.time", side_effect=[0, 1, 2, 3, 4, 5], autospec=True)
+    @mock.patch.object(
+        ffx.subprocess,
+        "check_output",
+        autospec=True,
+    )
+    def test_wait_for_rcs_disconnection(
+        self,
+        parameterized_output,
+        mock_subprocess_check_output,
+        mock_time,
+        mock_sleep,
+    ) -> None:
+        """Test case for ffx.wait_for_rcs_disconnection()"""
+        mock_subprocess_check_output.side_effect = parameterized_output[
+            "subprocess_side_effect"
+        ]
+        self.ffx_obj.wait_for_rcs_disconnection(timeout=5)
+
+        mock_subprocess_check_output.assert_called()
+        mock_time.assert_called()
+        mock_sleep.assert_called()
+
+    @mock.patch("time.sleep", autospec=True)
+    @mock.patch("time.time", side_effect=[0, 1, 2, 3, 4, 5], autospec=True)
+    @mock.patch.object(
+        ffx.subprocess,
+        "check_output",
+        side_effect=subprocess.CalledProcessError(returncode=1, cmd="cmd"),
+        autospec=True,
+    )
+    def test_wait_for_rcs_disconnection_exception(
+        self, mock_subprocess_check_output, mock_time, mock_sleep
+    ) -> None:
+        """Test case for ffx.wait_for_rcs_disconnection() raising
+        FfxCommandError"""
+        with self.assertRaises(errors.FfxCommandError):
+            self.ffx_obj.wait_for_rcs_disconnection(timeout=5)
+
+        mock_subprocess_check_output.assert_called()
+        mock_time.assert_called()
+        mock_sleep.assert_called()

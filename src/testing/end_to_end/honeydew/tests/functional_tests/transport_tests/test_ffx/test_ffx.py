@@ -84,14 +84,6 @@ class FFXTransportTests(fuchsia_base_test.FuchsiaBaseTest):
             asserts.assert_is_not_none(target_type)
             asserts.assert_is_instance(target_type, str)
 
-    def test_is_target_connected(self) -> None:
-        """Test case for FFX.is_target_connected()."""
-        assert isinstance(self.device, transports_capable.FFXCapableDevice)
-        asserts.assert_true(
-            self.device.ffx.is_target_connected(),
-            msg=f"{self.device.device_name} is not connected",
-        )
-
     def test_ffx_run(self) -> None:
         """Test case for FFX.run()."""
         assert isinstance(self.device, transports_capable.FFXCapableDevice)

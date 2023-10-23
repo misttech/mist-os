@@ -37,10 +37,16 @@ def wait_for_state(
     end_time: float = start_time + timeout
     while time.time() < end_time:
         _LOGGER.debug("calling %s", state_fn.__qualname__)
-        current_state = state_fn()
-        _LOGGER.debug("%s returned %s", state_fn.__qualname__, current_state)
-        if current_state == expected_state:
-            return
+        try:
+            current_state: bool = state_fn()
+            _LOGGER.debug(
+                "%s returned %s", state_fn.__qualname__, current_state
+            )
+            if current_state == expected_state:
+                return
+        except Exception as err:  # pylint: disable=broad-except
+            # `state_fn()` raised an exception. Retry again
+            _LOGGER.debug(err)
         time.sleep(0.5)
     else:
         raise errors.HoneyDewTimeoutError(

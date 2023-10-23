@@ -81,11 +81,8 @@ class FastbootTransportTests(fuchsia_base_test.FuchsiaBaseTest):
 
         self.device.fastboot.boot_to_fastboot_mode()
 
-        asserts.assert_false(
-            self.device.fastboot.is_in_fuchsia_mode(),
-            msg=f"{self.device.device_name} is in fuchsia mode when not "
-            f"expected",
-        )
+        self.device.fastboot.wait_for_fastboot_mode()
+
         asserts.assert_true(
             self.device.fastboot.is_in_fastboot_mode(),
             msg=f"{self.device.device_name} is not in fastboot mode which "
@@ -97,11 +94,8 @@ class FastbootTransportTests(fuchsia_base_test.FuchsiaBaseTest):
 
         self.device.fastboot.boot_to_fuchsia_mode()
 
-        asserts.assert_true(
-            self.device.fastboot.is_in_fuchsia_mode(),
-            msg=f"{self.device.device_name} is not in fuchsia mode which is "
-            f"not expected",
-        )
+        self.device.fastboot.wait_for_fuchsia_mode()
+
         asserts.assert_false(
             self.device.fastboot.is_in_fastboot_mode(),
             msg=f"{self.device.device_name} is in fastboot mode when not "

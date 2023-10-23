@@ -140,38 +140,40 @@ class FastbootTests(unittest.TestCase):
 
     @mock.patch.object(
         fastboot.Fastboot,
-        "is_in_fuchsia_mode",
-        return_value=False,
+        "wait_for_fuchsia_mode",
+        side_effect=errors.FfxCommandError("error"),
         autospec=True,
     )
     def test_boot_to_fastboot_mode_when_not_in_fuchsia_mode(
-        self, mock_is_in_fuchsia_mode
+        self, mock_wait_for_fuchsia_mode
     ) -> None:
         """Test case for Fastboot.boot_to_fastboot_mode() when device is not in
         fuchsia mode"""
         with self.assertRaises(errors.FuchsiaStateError):
             self.fastboot_obj.boot_to_fastboot_mode()
 
-        mock_is_in_fuchsia_mode.assert_called()
+        mock_wait_for_fuchsia_mode.assert_called()
 
     @mock.patch.object(
-        fastboot.Fastboot, "_wait_for_fastboot_mode", autospec=True
+        fastboot.Fastboot, "wait_for_fastboot_mode", autospec=True
     )
     @mock.patch.object(fastboot.ffx_transport.FFX, "run", autospec=True)
     @mock.patch.object(
         fastboot.Fastboot,
-        "is_in_fuchsia_mode",
-        return_value=True,
+        "wait_for_fuchsia_mode",
         autospec=True,
     )
     def test_boot_to_fastboot_mode_when_in_fuchsia_mode(
-        self, mock_is_in_fuchsia_mode, mock_ffx_run, mock_wait_for_fastboot_mode
+        self,
+        mock_wait_for_fuchsia_mode,
+        mock_ffx_run,
+        mock_wait_for_fastboot_mode,
     ) -> None:
         """Test case for Fastboot.boot_to_fastboot_mode() when device is not in
         fuchsia mode"""
         self.fastboot_obj.boot_to_fastboot_mode()
 
-        mock_is_in_fuchsia_mode.assert_called()
+        mock_wait_for_fuchsia_mode.assert_called()
         mock_ffx_run.assert_called()
         mock_wait_for_fastboot_mode.assert_called()
 
@@ -183,19 +185,18 @@ class FastbootTests(unittest.TestCase):
     )
     @mock.patch.object(
         fastboot.Fastboot,
-        "is_in_fuchsia_mode",
-        return_value=True,
+        "wait_for_fuchsia_mode",
         autospec=True,
     )
     def test_boot_to_fastboot_mode_failed(
-        self, mock_is_in_fuchsia_mode, mock_ffx_run
+        self, mock_wait_for_fuchsia_mode, mock_ffx_run
     ) -> None:
         """Test case for Fastboot.boot_to_fastboot_mode() raising an
         exception"""
         with self.assertRaises(errors.FastbootCommandError):
             self.fastboot_obj.boot_to_fastboot_mode()
 
-        mock_is_in_fuchsia_mode.assert_called()
+        mock_wait_for_fuchsia_mode.assert_called()
         mock_ffx_run.assert_called()
 
     @mock.patch.object(
@@ -215,7 +216,7 @@ class FastbootTests(unittest.TestCase):
         mock_is_in_fastboot_mode.assert_called()
 
     @mock.patch.object(
-        fastboot.Fastboot, "_wait_for_fuchsia_mode", autospec=True
+        fastboot.Fastboot, "wait_for_fuchsia_mode", autospec=True
     )
     @mock.patch.object(fastboot.Fastboot, "run", autospec=True)
     @mock.patch.object(
@@ -280,13 +281,6 @@ class FastbootTests(unittest.TestCase):
                     "expected": True,
                 },
             ),
-            (
-                {
-                    "label": "when_exception_is_raised",
-                    "ffx_target_info": errors.FfxCommandError("error"),
-                    "expected": False,
-                },
-            ),
         ],
         name_func=_custom_test_name_func,
     )
@@ -304,40 +298,18 @@ class FastbootTests(unittest.TestCase):
         )
         mock_get_target_info.assert_called()
 
-    @parameterized.expand(
-        [
-            (
-                {
-                    "label": "device_is_in_fuchsia_mode",
-                    "is_target_connected": True,
-                    "expected": True,
-                },
-            ),
-            (
-                {
-                    "label": "device_is_in_fastboot_mode_mode",
-                    "is_target_connected": False,
-                    "expected": False,
-                },
-            ),
-        ],
-        name_func=_custom_test_name_func,
-    )
     @mock.patch.object(
-        fastboot.ffx_transport.FFX, "is_target_connected", autospec=True
+        fastboot.Fastboot,
+        "_get_target_info",
+        side_effect=errors.FfxCommandError("error"),
+        autospec=True,
     )
-    def test_is_in_fuchsia_mode(
-        self, parameterized_dict, mock_ffx_is_target_connected
-    ) -> None:
-        """Test case for Fastboot.is_in_fuchsia_mode()"""
-        mock_ffx_is_target_connected.return_value = parameterized_dict[
-            "is_target_connected"
-        ]
-        self.assertEqual(
-            self.fastboot_obj.is_in_fuchsia_mode(),
-            parameterized_dict["expected"],
-        )
-        mock_ffx_is_target_connected.assert_called()
+    def test_is_in_fastboot_mode_exception(self, mock_get_target_info) -> None:
+        """Test case for Fastboot.is_in_fastboot_mode() raising
+        FastbootCommandError."""
+        with self.assertRaises(errors.FastbootCommandError):
+            self.fastboot_obj.is_in_fastboot_mode()
+        mock_get_target_info.assert_called()
 
     @mock.patch.object(
         fastboot.Fastboot,
@@ -612,8 +584,8 @@ class FastbootTests(unittest.TestCase):
 
     @mock.patch.object(fastboot.common, "wait_for_state", autospec=True)
     def test_wait_for_fastboot_mode_success(self, mock_wait_for_state) -> None:
-        """Test case for Fastboot._wait_for_fastboot_mode() success case."""
-        self.fastboot_obj._wait_for_fastboot_mode()
+        """Test case for Fastboot.wait_for_fastboot_mode() success case."""
+        self.fastboot_obj.wait_for_fastboot_mode()
         mock_wait_for_state.assert_called()
 
     @mock.patch.object(
@@ -625,28 +597,34 @@ class FastbootTests(unittest.TestCase):
     def test_wait_for_fastboot_mode_exception(
         self, mock_wait_for_state
     ) -> None:
-        """Test case for Fastboot._wait_for_fastboot_mode() failure case."""
+        """Test case for Fastboot.wait_for_fastboot_mode() failure case."""
         with self.assertRaises(errors.FuchsiaDeviceError):
-            self.fastboot_obj._wait_for_fastboot_mode()
-        mock_wait_for_state.assert_called()
-
-    @mock.patch.object(fastboot.common, "wait_for_state", autospec=True)
-    def test_wait_for_fuchsia_mode_success(self, mock_wait_for_state) -> None:
-        """Test case for Fastboot._wait_for_fuchsia_mode() success case."""
-        self.fastboot_obj._wait_for_fuchsia_mode()
+            self.fastboot_obj.wait_for_fastboot_mode()
         mock_wait_for_state.assert_called()
 
     @mock.patch.object(
-        fastboot.common,
-        "wait_for_state",
+        fastboot.ffx_transport.FFX, "wait_for_rcs_connection", autospec=True
+    )
+    def test_wait_for_fuchsia_mode_success(
+        self, mock_wait_for_rcs_connection
+    ) -> None:
+        """Test case for Fastboot.wait_for_fuchsia_mode() success case."""
+        self.fastboot_obj.wait_for_fuchsia_mode()
+        mock_wait_for_rcs_connection.assert_called()
+
+    @mock.patch.object(
+        fastboot.ffx_transport.FFX,
+        "wait_for_rcs_connection",
         side_effect=errors.HoneyDewTimeoutError("error"),
         autospec=True,
     )
-    def test_wait_for_fuchsia_mode_exception(self, mock_wait_for_state) -> None:
-        """Test case for Fastboot._wait_for_fuchsia_mode() failure case."""
+    def test_wait_for_fuchsia_mode_exception(
+        self, mock_wait_for_rcs_connection
+    ) -> None:
+        """Test case for Fastboot.wait_for_fuchsia_mode() failure case."""
         with self.assertRaises(errors.FuchsiaDeviceError):
-            self.fastboot_obj._wait_for_fuchsia_mode()
-        mock_wait_for_state.assert_called()
+            self.fastboot_obj.wait_for_fuchsia_mode()
+        mock_wait_for_rcs_connection.assert_called()
 
     @mock.patch.object(fastboot.common, "wait_for_state", autospec=True)
     def test_wait_for_valid_tcp_address_success(
