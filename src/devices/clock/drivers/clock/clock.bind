@@ -3,6 +3,13 @@
 // found in the LICENSE file.
 
 using fuchsia.clock;
+using fuchsia.hardware.clockimpl;
 
 // The device must implement the clock impl protocol.
-fuchsia.BIND_PROTOCOL == fuchsia.clock.BIND_PROTOCOL.IMPL;
+if fuchsia.BIND_PROTOCOL == fuchsia.clock.BIND_PROTOCOL.IMPL {
+    true;
+} else if fuchsia.hardware.clockimpl.Service == fuchsia.hardware.clockimpl.Service.DriverTransport {
+    true;
+} else {
+    false;
+}

@@ -107,15 +107,28 @@ zx_status_t ClockDevice::ServeOutgoing(fidl::ServerEnd<fuchsia_io::Directory> se
 void ClockDevice::DdkRelease() { delete this; }
 
 zx_status_t ClockDevice::Create(void* ctx, zx_device_t* parent) {
-  clock_impl_protocol_t clock_proto;
-  auto status = device_get_protocol(parent, ZX_PROTOCOL_CLOCK_IMPL, &clock_proto);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "device_get_protocol failed %d", status);
-    return status;
+  const ddk::ClockImplProtocolClient clock_banjo(parent);
+  if (clock_banjo.is_valid()) {
+    zxlogf(INFO, "Using Banjo clockimpl protocol");
   }
 
-  // Process init metadata while we are still the exclusive owner of the clock client.
-  ClockInitDevice::Create(parent, &clock_proto);
+  {
+    fdf::WireSyncClient<fuchsia_hardware_clockimpl::ClockImpl> clock_fidl;
+    if (!clock_banjo.is_valid()) {
+      zx::result clock_fidl_client =
+          DdkConnectRuntimeProtocol<fuchsia_hardware_clockimpl::Service::Device>(parent);
+      if (clock_fidl_client.is_ok()) {
+        zxlogf(INFO, "Failed to get Banjo clockimpl protocol, falling back to FIDL");
+        clock_fidl = fdf::WireSyncClient(std::move(*clock_fidl_client));
+      } else {
+        zxlogf(ERROR, "Failed to get Banjo or FIDL clockimpl protocol");
+        return ZX_ERR_NO_RESOURCES;
+      }
+    }
+
+    // Process init metadata while we are still the exclusive owner of the clock client.
+    ClockInitDevice::Create(parent, {clock_banjo, std::move(clock_fidl)});
+  }
 
   auto clock_ids = ddk::GetMetadataArray<clock_id_t>(parent, DEVICE_METADATA_CLOCK_IDS);
   if (!clock_ids.is_ok()) {
@@ -124,9 +137,21 @@ zx_status_t ClockDevice::Create(void* ctx, zx_device_t* parent) {
   }
 
   for (auto clock : *clock_ids) {
+    fdf::WireSyncClient<fuchsia_hardware_clockimpl::ClockImpl> clock_fidl;
+    if (!clock_banjo.is_valid()) {
+      zx::result clock_fidl_client =
+          DdkConnectRuntimeProtocol<fuchsia_hardware_clockimpl::Service::Device>(parent);
+      ZX_ASSERT_MSG(clock_fidl_client.is_ok(), "Failed to get additional FIDL client: %s",
+                    clock_fidl_client.status_string());
+      clock_fidl = fdf::WireSyncClient(std::move(*clock_fidl_client));
+    }
+
+    ClockImplProxy clock_client(clock_banjo, std::move(clock_fidl));
+
     auto clock_id = clock.clock_id;
     fbl::AllocChecker ac;
-    std::unique_ptr<ClockDevice> dev(new (&ac) ClockDevice(parent, &clock_proto, clock_id));
+    std::unique_ptr<ClockDevice> dev(new (&ac)
+                                         ClockDevice(parent, std::move(clock_client), clock_id));
     if (!ac.check()) {
       zxlogf(ERROR, "Failed to allocate clock device.");
       return ZX_ERR_NO_MEMORY;
@@ -144,7 +169,7 @@ zx_status_t ClockDevice::Create(void* ctx, zx_device_t* parent) {
       return endpoints.status_value();
     }
 
-    status = dev->ServeOutgoing(std::move(endpoints->server));
+    zx_status_t status = dev->ServeOutgoing(std::move(endpoints->server));
     if (status != ZX_OK) {
       zxlogf(ERROR, "Failed to serve outgoing directory: %s", zx_status_get_string(status));
       return status;
@@ -171,7 +196,7 @@ zx_status_t ClockDevice::Create(void* ctx, zx_device_t* parent) {
   return ZX_OK;
 }
 
-void ClockInitDevice::Create(zx_device_t* parent, const ddk::ClockImplProtocolClient& clock) {
+void ClockInitDevice::Create(zx_device_t* parent, const ClockImplProxy& clock) {
   auto decoded = ddk::GetEncodedMetadata<fuchsia_hardware_clock::wire::InitMetadata>(
       parent, DEVICE_METADATA_CLOCK_INIT);
   if (!decoded.is_ok()) {
@@ -206,8 +231,7 @@ void ClockInitDevice::Create(zx_device_t* parent, const ddk::ClockImplProtocolCl
 }
 
 zx_status_t ClockInitDevice::ConfigureClocks(
-    const fuchsia_hardware_clock::wire::InitMetadata& metadata,
-    const ddk::ClockImplProtocolClient& clock) {
+    const fuchsia_hardware_clock::wire::InitMetadata& metadata, const ClockImplProxy& clock) {
   // Stop processing the list if any call returns an error so that clocks are not accidentally
   // enabled in an unknown state.
   for (const auto& step : metadata.steps) {
@@ -238,6 +262,152 @@ zx_status_t ClockInitDevice::ConfigureClocks(
     }
   }
 
+  return ZX_OK;
+}
+
+zx_status_t ClockImplProxy::Enable(uint32_t id) const {
+  if (clock_banjo_.is_valid()) {
+    return clock_banjo_.Enable(id);
+  }
+
+  fdf::Arena arena('CLK_');
+  const auto result = clock_fidl_.buffer(arena)->Enable(id);
+  if (!result.ok()) {
+    return result.status();
+  }
+
+  return result->is_error() ? result->error_value() : ZX_OK;
+}
+
+zx_status_t ClockImplProxy::Disable(uint32_t id) const {
+  if (clock_banjo_.is_valid()) {
+    return clock_banjo_.Disable(id);
+  }
+
+  fdf::Arena arena('CLK_');
+  const auto result = clock_fidl_.buffer(arena)->Disable(id);
+  if (!result.ok()) {
+    return result.status();
+  }
+
+  return result->is_error() ? result->error_value() : ZX_OK;
+}
+
+zx_status_t ClockImplProxy::IsEnabled(uint32_t id, bool* out_enabled) const {
+  if (clock_banjo_.is_valid()) {
+    return clock_banjo_.IsEnabled(id, out_enabled);
+  }
+
+  fdf::Arena arena('CLK_');
+  const auto result = clock_fidl_.buffer(arena)->IsEnabled(id);
+  if (!result.ok()) {
+    return result.status();
+  }
+  if (result->is_error()) {
+    return result->error_value();
+  }
+
+  *out_enabled = result->value()->enabled;
+  return ZX_OK;
+}
+
+zx_status_t ClockImplProxy::SetRate(uint32_t id, uint64_t hz) const {
+  if (clock_banjo_.is_valid()) {
+    return clock_banjo_.SetRate(id, hz);
+  }
+
+  fdf::Arena arena('CLK_');
+  const auto result = clock_fidl_.buffer(arena)->SetRate(id, hz);
+  if (!result.ok()) {
+    return result.status();
+  }
+
+  return result->is_error() ? result->error_value() : ZX_OK;
+}
+
+zx_status_t ClockImplProxy::QuerySupportedRate(uint32_t id, uint64_t hz, uint64_t* out_hz) const {
+  if (clock_banjo_.is_valid()) {
+    return clock_banjo_.QuerySupportedRate(id, hz, out_hz);
+  }
+
+  fdf::Arena arena('CLK_');
+  const auto result = clock_fidl_.buffer(arena)->QuerySupportedRate(id, hz);
+  if (!result.ok()) {
+    return result.status();
+  }
+  if (result->is_error()) {
+    return result->error_value();
+  }
+
+  *out_hz = result->value()->hz;
+  return ZX_OK;
+}
+
+zx_status_t ClockImplProxy::GetRate(uint32_t id, uint64_t* out_hz) const {
+  if (clock_banjo_.is_valid()) {
+    return clock_banjo_.GetRate(id, out_hz);
+  }
+
+  fdf::Arena arena('CLK_');
+  const auto result = clock_fidl_.buffer(arena)->GetRate(id);
+  if (!result.ok()) {
+    return result.status();
+  }
+  if (result->is_error()) {
+    return result->error_value();
+  }
+
+  *out_hz = result->value()->hz;
+  return ZX_OK;
+}
+
+zx_status_t ClockImplProxy::SetInput(uint32_t id, uint32_t idx) const {
+  if (clock_banjo_.is_valid()) {
+    return clock_banjo_.SetInput(id, idx);
+  }
+
+  fdf::Arena arena('CLK_');
+  const auto result = clock_fidl_.buffer(arena)->SetInput(id, idx);
+  if (!result.ok()) {
+    return result.status();
+  }
+
+  return result->is_error() ? result->error_value() : ZX_OK;
+}
+
+zx_status_t ClockImplProxy::GetNumInputs(uint32_t id, uint32_t* out_n) const {
+  if (clock_banjo_.is_valid()) {
+    return clock_banjo_.GetNumInputs(id, out_n);
+  }
+
+  fdf::Arena arena('CLK_');
+  const auto result = clock_fidl_.buffer(arena)->GetNumInputs(id);
+  if (!result.ok()) {
+    return result.status();
+  }
+  if (result->is_error()) {
+    return result->error_value();
+  }
+
+  *out_n = result->value()->n;
+  return ZX_OK;
+}
+
+zx_status_t ClockImplProxy::GetInput(uint32_t id, uint32_t* out_index) const {
+  if (clock_banjo_.is_valid()) {
+    return clock_banjo_.GetInput(id, out_index);
+  }
+
+  fdf::Arena arena('CLK_');
+  const auto result = clock_fidl_.buffer(arena)->GetInput(id);
+  if (!result.ok()) {
+    return result.status();
+  }
+  if (result->is_error()) {
+    return result->error_value();
+  }
+
+  *out_index = result->value()->index;
   return ZX_OK;
 }
 

@@ -14,11 +14,14 @@
 
 #include <zxtest/zxtest.h>
 
+#include "sdk/lib/async_patterns/testing/cpp/dispatcher_bound.h"
+#include "sdk/lib/driver/testing/cpp/driver_runtime.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace {
 
-class FakeClockImpl : public ddk::ClockImplProtocol<FakeClockImpl> {
+class FakeClockImpl : public ddk::ClockImplProtocol<FakeClockImpl>,
+                      public fdf::WireServer<fuchsia_hardware_clockimpl::ClockImpl> {
  public:
   struct FakeClock {
     std::optional<bool> enabled;
@@ -75,6 +78,72 @@ class FakeClockImpl : public ddk::ClockImplProtocol<FakeClockImpl> {
   cpp20::span<const FakeClock> clocks() const { return {clocks_.data(), clocks_.size()}; }
 
  private:
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_hardware_clockimpl::ClockImpl> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override {}
+
+  void Enable(fuchsia_hardware_clockimpl::wire::ClockImplEnableRequest* request, fdf::Arena& arena,
+              EnableCompleter::Sync& completer) override {
+    if (zx_status_t status = ClockImplEnable(request->id); status == ZX_OK) {
+      completer.buffer(arena).ReplySuccess();
+    } else {
+      completer.buffer(arena).ReplyError(status);
+    }
+  }
+
+  void Disable(fuchsia_hardware_clockimpl::wire::ClockImplDisableRequest* request,
+               fdf::Arena& arena, DisableCompleter::Sync& completer) override {
+    if (zx_status_t status = ClockImplEnable(request->id); status == ZX_OK) {
+      completer.buffer(arena).ReplySuccess();
+    } else {
+      completer.buffer(arena).ReplyError(status);
+    }
+  }
+
+  void IsEnabled(fuchsia_hardware_clockimpl::wire::ClockImplIsEnabledRequest* request,
+                 fdf::Arena& arena, IsEnabledCompleter::Sync& completer) override {
+    completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  void SetRate(fuchsia_hardware_clockimpl::wire::ClockImplSetRateRequest* request,
+               fdf::Arena& arena, SetRateCompleter::Sync& completer) override {
+    if (zx_status_t status = ClockImplSetRate(request->id, request->hz); status == ZX_OK) {
+      completer.buffer(arena).ReplySuccess();
+    } else {
+      completer.buffer(arena).ReplyError(status);
+    }
+  }
+
+  void QuerySupportedRate(
+      fuchsia_hardware_clockimpl::wire::ClockImplQuerySupportedRateRequest* request,
+      fdf::Arena& arena, QuerySupportedRateCompleter::Sync& completer) override {
+    completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  void GetRate(fuchsia_hardware_clockimpl::wire::ClockImplGetRateRequest* request,
+               fdf::Arena& arena, GetRateCompleter::Sync& completer) override {
+    completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  void SetInput(fuchsia_hardware_clockimpl::wire::ClockImplSetInputRequest* request,
+                fdf::Arena& arena, SetInputCompleter::Sync& completer) override {
+    if (zx_status_t status = ClockImplSetRate(request->id, request->idx); status == ZX_OK) {
+      completer.buffer(arena).ReplySuccess();
+    } else {
+      completer.buffer(arena).ReplyError(status);
+    }
+  }
+
+  void GetNumInputs(fuchsia_hardware_clockimpl::wire::ClockImplGetNumInputsRequest* request,
+                    fdf::Arena& arena, GetNumInputsCompleter::Sync& completer) override {
+    completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  void GetInput(fuchsia_hardware_clockimpl::wire::ClockImplGetInputRequest* request,
+                fdf::Arena& arena, GetInputCompleter::Sync& completer) override {
+    completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
   std::array<FakeClock, 6> clocks_;
 };
 
@@ -216,6 +285,96 @@ TEST(ClockTest, ConfigureClocksError) {
   EXPECT_FALSE(clock_impl.clocks()[2].enabled.has_value());
   EXPECT_FALSE(clock_impl.clocks()[2].input_idx.has_value());
   EXPECT_FALSE(clock_impl.clocks()[4].rate_hz.has_value());
+}
+
+TEST(ClockTest, BanjoPreferredOverFidl) {
+  constexpr uint32_t kTestClockId = 3;
+
+  fdf_testing::DriverRuntime runtime;
+
+  FakeClockImpl clockimpl_banjo;
+  FakeClockImpl clockimpl_fidl;
+
+  zx::result clockimpl_endpoints = fdf::CreateEndpoints<fuchsia_hardware_clockimpl::ClockImpl>();
+  ASSERT_TRUE(clockimpl_endpoints.is_ok());
+  fdf::BindServer(fdf::Dispatcher::GetCurrent()->get(), std::move(clockimpl_endpoints->server),
+                  &clockimpl_fidl);
+
+  const clock_impl_protocol_t clockimpl_banjo_proto{clockimpl_banjo.ops(), &clockimpl_banjo};
+  ClockImplProxy proxy(&clockimpl_banjo_proto,
+                       fdf::WireSyncClient(std::move(clockimpl_endpoints->client)));
+  ClockDevice dut(nullptr, std::move(proxy), kTestClockId);
+
+  zx::result clock_endpoints = fidl::CreateEndpoints<fuchsia_hardware_clock::Clock>();
+  ASSERT_TRUE(clock_endpoints.is_ok());
+
+  fidl::BindServer(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                   std::move(clock_endpoints->server), &dut);
+
+  fidl::WireClient<fuchsia_hardware_clock::Clock> clock_client(
+      std::move(clock_endpoints->client), fdf::Dispatcher::GetCurrent()->async_dispatcher());
+
+  clock_client->SetRate(1'000'000).ThenExactlyOnce(
+      [&](fidl::WireUnownedResult<fuchsia_hardware_clock::Clock::SetRate>& result) {
+        ASSERT_TRUE(result.ok());
+        EXPECT_TRUE(result->is_ok());
+        runtime.Quit();
+      });
+
+  // Run the foreground dispatcher until the callback stops it.
+  runtime.Run();
+
+  // The dut was provided with Banjo and FIDL clients, but only the Banjo client should receive this
+  // call.
+  ASSERT_TRUE(clockimpl_banjo.clocks()[kTestClockId].rate_hz);
+  EXPECT_EQ(*clockimpl_banjo.clocks()[kTestClockId].rate_hz, 1'000'000);
+
+  EXPECT_FALSE(clockimpl_fidl.clocks()[kTestClockId].rate_hz);
+}
+
+TEST(ClockTest, FallBackToFidl) {
+  constexpr uint32_t kTestClockId = 3;
+
+  fdf_testing::DriverRuntime runtime;
+  async_dispatcher_t* background_dispatcher =
+      runtime.StartBackgroundDispatcher()->async_dispatcher();
+
+  // Bind the FakeClockImpl to the foreground dispatcher, and the ClockDevice to the background
+  // dispatcher.
+
+  FakeClockImpl clockimpl_fidl;
+
+  zx::result clockimpl_endpoints = fdf::CreateEndpoints<fuchsia_hardware_clockimpl::ClockImpl>();
+  ASSERT_TRUE(clockimpl_endpoints.is_ok());
+  fdf::BindServer(fdf::Dispatcher::GetCurrent()->get(), std::move(clockimpl_endpoints->server),
+                  &clockimpl_fidl);
+
+  ClockImplProxy proxy({}, fdf::WireSyncClient(std::move(clockimpl_endpoints->client)));
+  async_patterns::TestDispatcherBound<ClockDevice> dut(background_dispatcher, std::in_place,
+                                                       nullptr, std::move(proxy), kTestClockId);
+
+  zx::result clock_endpoints = fidl::CreateEndpoints<fuchsia_hardware_clock::Clock>();
+  ASSERT_TRUE(clock_endpoints.is_ok());
+
+  dut.SyncCall([&](ClockDevice* device) {
+    fidl::BindServer(background_dispatcher, std::move(clock_endpoints->server), device);
+  });
+
+  fidl::WireClient<fuchsia_hardware_clock::Clock> clock_client(
+      std::move(clock_endpoints->client), fdf::Dispatcher::GetCurrent()->async_dispatcher());
+
+  // Call SetRate on the foreground dispatcher and run until the ClockDevice responds.
+  clock_client->SetRate(1'000'000).ThenExactlyOnce(
+      [&](fidl::WireUnownedResult<fuchsia_hardware_clock::Clock::SetRate>& result) {
+        ASSERT_TRUE(result.ok());
+        EXPECT_TRUE(result->is_ok());
+        runtime.Quit();
+      });
+
+  runtime.Run();
+
+  ASSERT_TRUE(clockimpl_fidl.clocks()[kTestClockId].rate_hz);
+  EXPECT_EQ(*clockimpl_fidl.clocks()[kTestClockId].rate_hz, 1'000'000);
 }
 
 }  // namespace

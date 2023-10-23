@@ -11,7 +11,10 @@ driver_bind_rules("clock-bind") {
   rules = "clock.bind"
   bind_output = "clock.bindbc"
   tests = "bind-tests.json"
-  deps = [ "//src/devices/bind/fuchsia.clock" ]
+  deps = [
+    "//sdk/fidl/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_bindlib",
+    "//src/devices/bind/fuchsia.clock",
+  ]
 }
 
 fuchsia_driver("clock-driver") {
@@ -25,6 +28,7 @@ fuchsia_driver("clock-driver") {
     ":clock-bind",
     "//sdk/banjo/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
+    "//sdk/fidl/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//src/devices/bind/fuchsia.clock:fuchsia.clock_cpp",
     "//src/devices/lib/driver",
@@ -59,7 +63,10 @@ test("clock-test-bin") {
     ":clock-bind",
     "//sdk/banjo/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
+    "//sdk/fidl/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_cpp",
+    "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/driver/testing/cpp",
     "//src/devices/bind/fuchsia.clock:fuchsia.clock_cpp",
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",

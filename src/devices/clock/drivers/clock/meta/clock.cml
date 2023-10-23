@@ -18,7 +18,9 @@
     capabilities: [
         { service: "fuchsia.hardware.clock.Service" },
     ],
-    use: [],
+    use: [
+        { service: 'fuchsia.hardware.clockimpl.Service' },
+    ],
     expose: [
         {
             service: "fuchsia.hardware.clock.Service",
