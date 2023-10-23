@@ -456,7 +456,7 @@ class PageRequest : public fbl::WAVLTreeContainable<PageRequest*>,
   // The batch state is used both to implement a stateful query of whether a batch page request is
   // finished taking new requests or not, and to implement assertions to catch misuse of the request
   // API.
-  enum class BatchState {
+  enum class BatchState : uint8_t {
     // Does not support batching.
     Unbatched,
     // Supports batching and can keep taking new requests. A request in this state must have
@@ -504,6 +504,9 @@ class PageRequest : public fbl::WAVLTreeContainable<PageRequest*>,
 
   uint64_t GetKey() const { return GetEnd(); }
 
+  // The type of the page request.
+  page_request_type type_;
+
   // The batch state the external caller created this request with. A single page request object can
   // be reused multiple times by calling Init in between uses, at which point the batch_state_ is
   // reset to this value (unless overridden by internal_batching).
@@ -512,10 +515,6 @@ class PageRequest : public fbl::WAVLTreeContainable<PageRequest*>,
   // perform on the request.
   BatchState batch_state_;
 
-  // The page source this request is currently associated with.
-  fbl::RefPtr<PageRequestInterface> src_;
-  // Event signaled when the request is fulfilled.
-  AutounsignalEvent event_;
   // PageRequests are active if offset_ is not UINT64_MAX. In an inactive request, the
   // only other valid field is src_. Whilst a request is with a PageProvider (i.e. SendAsyncRequest
   // has been called), these fields must be kept constant so the PageProvider can read them. Once
@@ -523,11 +522,14 @@ class PageRequest : public fbl::WAVLTreeContainable<PageRequest*>,
   // modified again. The provider_owned_ bool is used for assertions to validate this flow, but
   // otherwise has no functional affect.
   bool provider_owned_ = false;
+
+  // The page source this request is currently associated with.
+  fbl::RefPtr<PageRequestInterface> src_;
+  // Event signaled when the request is fulfilled.
+  AutounsignalEvent event_;
   uint64_t offset_ = UINT64_MAX;
   // The total length of the request.
   uint64_t len_ = 0;
-  // The type of the page request.
-  page_request_type type_;
   // The vmobject this page request is for.
   VmoDebugInfo vmo_debug_info_ = {};
 

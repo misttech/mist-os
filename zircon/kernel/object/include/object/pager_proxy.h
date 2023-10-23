@@ -36,6 +36,8 @@ class PagerProxy : public PageProvider,
   ~PagerProxy() override;
 
  private:
+  friend PagerDispatcher;
+
   // PortAllocator methods.
   PortPacket* Alloc() final {
     DEBUG_ASSERT(false);
@@ -71,11 +73,21 @@ class PagerProxy : public PageProvider,
   // exactly once just after construction.
   void SetPageSourceUnchecked(fbl::RefPtr<PageSource> src);
 
+  // Queues the page request, either sending it to the port or putting it in pending_requests_.
+  void QueuePacketLocked(PageRequest* request) TA_REQ(mtx_);
+
+  // Called when the packet becomes free. If pending_requests_ is non-empty, queues the
+  // next request.
+  void OnPacketFreedLocked() TA_REQ(mtx_);
+
+  mutable DECLARE_MUTEX(PagerProxy) mtx_;
+
   PagerDispatcher* const pager_;
   const fbl::RefPtr<PortDispatcher> port_;
   const uint64_t key_;
 
-  mutable DECLARE_MUTEX(PagerProxy) mtx_;
+  // Options set at creation.
+  const uint32_t options_;
   // Whether the page_source_ is closed, i.e. this proxy object is no longer linked to the
   // page_source_ and it can receive no more messages from the page_source_.
   bool page_source_closed_ TA_GUARDED(mtx_) = false;
@@ -88,14 +100,13 @@ class PagerProxy : public PageProvider,
   // last message sent). This flag is used to delay cleanup if PagerProxy::Close is called
   // while the port still has a reference to packet_.
   bool complete_pending_ TA_GUARDED(mtx_) = false;
-
+  // Bool indicating whether or not packet_ is currently queued in the port.
+  bool packet_busy_ TA_GUARDED(mtx_) = false;
   // PortPacket used for sending all page requests to the pager service. The pager
   // dispatcher serves as packet_'s allocator. This informs the dispatcher when
   // packet_ is freed by the port, which lets the single packet be continuously reused
   // for all of the source's page requests.
   PortPacket packet_ = PortPacket(nullptr, this);
-  // Bool indicating whether or not packet_ is currently queued in the port.
-  bool packet_busy_ TA_GUARDED(mtx_) = false;
   // The page_request_t which corresponds to the current packet_. Can be set to nullptr if the
   // PageSource calls ClearAsyncRequest to take back the request while the packet is still busy -
   PageRequest* active_request_ TA_GUARDED(mtx_) = nullptr;
@@ -114,18 +125,6 @@ class PagerProxy : public PageProvider,
   // deletion doesn't happen whilst port packets are queued. The cycle will be explicitly cut during
   // the graceful destruction triggered by OnDispatcherClose or OnClose.
   fbl::RefPtr<PageSource> page_source_ TA_GUARDED(mtx_);
-
-  // Queues the page request, either sending it to the port or putting it in pending_requests_.
-  void QueuePacketLocked(PageRequest* request) TA_REQ(mtx_);
-
-  // Called when the packet becomes free. If pending_requests_ is non-empty, queues the
-  // next request.
-  void OnPacketFreedLocked() TA_REQ(mtx_);
-
-  // Options set at creation.
-  const uint32_t options_;
-
-  friend PagerDispatcher;
 };
 
 #endif  // ZIRCON_KERNEL_OBJECT_INCLUDE_OBJECT_PAGER_PROXY_H_
