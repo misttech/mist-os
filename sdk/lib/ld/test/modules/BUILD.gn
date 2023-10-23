@@ -151,7 +151,7 @@ foreach(in_process,
           "",
           ".in-process",
         ]) {
-  static_library("test-executable$in_process") {
+  source_set("test-executable$in_process") {
     visibility = [ ":*" ]
     testonly = true
 
@@ -159,24 +159,24 @@ foreach(in_process,
       defines = [ "IN_PROCESS_TEST" ]
     }
 
-    public = [ "ensure-test-thread-pointer.h" ]
     public_deps = [ "//sdk/lib/ld:standalone" ]
     public_configs = [
       "//sdk/lib/ld:abi-interp",
       ":semantic-interposition",
     ]
-    sources = [ "ensure-test-thread-pointer.cc" ]
-    deps = [ "//zircon/system/public" ]
     if (is_fuchsia) {
       if (in_process == "") {
-        sources += [ "zircon-test-start.cc" ]
-        deps += [ "//src/zircon/lib/zircon" ]
+        sources = [ "zircon-test-start.cc" ]
+        deps = [
+          "//src/zircon/lib/zircon",
+          "//zircon/system/public",
+        ]
       } else {
         public_configs += [ ":test-executable.in-process.config" ]
       }
     } else {
-      sources += [ "posix-test-start.S" ]
-      deps += [ "//zircon/kernel/lib/arch" ]
+      sources = [ "posix-test-start.S" ]
+      deps = [ "//zircon/kernel/lib/arch" ]
     }
 
     # This dependency is evaluated in the toolchain where the test_executable()
