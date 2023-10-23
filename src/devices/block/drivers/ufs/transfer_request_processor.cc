@@ -167,11 +167,6 @@ zx::result<std::unique_ptr<ResponseUpiu>> TransferRequestProcessor::SendScsiUpiu
   }
   auto response_upiu = std::make_unique<ResponseUpiu>(response.value());
 
-  // Check response.
-  if (response_upiu->GetHeader().response != UpiuHeaderResponse::kTargetSuccess) {
-    zxlogf(ERROR, "Failed to get response: response=%x", response_upiu->GetHeader().response);
-    return zx::error(ZX_ERR_BAD_STATE);
-  }
   return zx::ok(std::move(response_upiu));
 }
 
@@ -188,12 +183,13 @@ zx::result<void *> TransferRequestProcessor::SendRequestUsingSlot(
   RequestSlot &request_slot = request_list_.GetSlot(slot);
   ZX_DEBUG_ASSERT_MSG(request_slot.state == SlotState::kReserved, "Invalid slot state");
 
+  const uint16_t response_offset = request.GetResponseOffset();
+  const uint16_t response_length = request.GetResponseLength();
+
   request_slot.io_cmd = io_cmd;
   request_slot.is_scsi_command = std::is_base_of<ScsiCommandUpiu, RequestType>::value;
   request_slot.is_sync = is_sync;
-
-  const uint16_t response_offset = request.GetResponseOffset();
-  const uint16_t response_length = request.GetResponseLength();
+  request_slot.response_upiu_offset = response_offset;
 
   uint16_t prdt_offset = 0;
   uint32_t prdt_entry_count = 0;
@@ -356,8 +352,17 @@ uint32_t TransferRequestProcessor::RequestCompletion() {
       if (!(UtrListDoorBellReg::Get().ReadFrom(&register_).door_bell() & (1 << slot_num))) {
         zx::result<> result = zx::ok();
         if (request_slot.is_scsi_command) {
+          // Check SCSI command response.
           auto descriptor = request_list_.GetRequestDescriptor<TransferRequestDescriptor>(slot_num);
           result = ScsiCompletion(slot_num, request_slot, descriptor);
+        } else {
+          // Check request command response.
+          ResponseUpiu response(request_list_.GetDescriptorBuffer<ResponseUpiu>(
+              slot_num, request_slot.response_upiu_offset));
+          if (response.GetHeader().response != UpiuHeaderResponse::kTargetSuccess) {
+            zxlogf(ERROR, "Request command failure: response=%x", response.GetHeader().response);
+            result = zx::error(ZX_ERR_BAD_STATE);
+          }
         }
         if (request_slot.io_cmd) {
           request_slot.io_cmd->Complete(result.status_value());
@@ -428,8 +433,9 @@ zx::result<> TransferRequestProcessor::GetResponseStatus(TransferRequestDescript
            descriptor->overall_command_status(), status, header_response);
     auto *sense_data = reinterpret_cast<scsi::FixedFormatSenseDataHeader *>(
         static_cast<ResponseUpiu &>(response).GetSenseData());
-    zxlogf(ERROR, "SCSI sense data:sense_key=0x%x, asc=0x%x, ascq=0x%x", sense_data->sense_key(),
-           sense_data->additional_sense_code, sense_data->additional_sense_code_qualifier);
+    zxlogf(ERROR, "SCSI sense data:sense_key=0x%x, asc=0x%x, ascq=0x%x",
+           static_cast<uint8_t>(sense_data->sense_key()), sense_data->additional_sense_code,
+           sense_data->additional_sense_code_qualifier);
   } else if (transaction_type == UpiuTransactionCodes::kQueryRequest &&
              (descriptor->overall_command_status() != OverallCommandStatus::kSuccess ||
               header_response != UpiuHeaderResponse::kTargetSuccess)) {

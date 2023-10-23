@@ -127,6 +127,9 @@ class UfsMockDevice {
   uint32_t GetAttribute(Attributes idn) const { return attributes_[static_cast<size_t>(idn)]; }
   bool GetFlag(Flags idn) const { return flags_[static_cast<size_t>(idn)]; }
 
+  void SetUnitAttention(bool value) { unit_attention_ = value; }
+  bool GetUnitAttention() const { return unit_attention_; }
+
   UfsLogicalUnit &GetLogicalUnit(uint8_t lun) { return logical_units_[lun]; }
   RegisterMmioProcessor &GetRegisterMmioProcessor() { return register_mmio_processor_; }
   UicCmdProcessor &GetUicCmdProcessor() { return uiccmd_processor_; }
@@ -149,6 +152,8 @@ class UfsMockDevice {
   TransferRequestProcessor transfer_request_processor_;
   QueryRequestProcessor query_request_processor_;
   ScsiCommandProcessor scsi_command_processor_;
+
+  bool unit_attention_ = false;
 };
 
 }  // namespace ufs_mock_device

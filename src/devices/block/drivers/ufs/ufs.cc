@@ -636,6 +636,42 @@ zx::result<> Ufs::ScanLogicalUnits() {
     }
     ZX_ASSERT_MSG(block_device.block_size == 4096, "Currently, it only supports a 4KB block size.");
 
+    // Verify that the Lun is ready. This command ignores unit attention errors if they occur.
+    ScsiTestUnitReadyUpiu unit_ready_upiu;
+    if (auto response = transfer_request_processor_->SendScsiUpiu(unit_ready_upiu, i);
+        response.is_error()) {
+      // Get the previous response from the admin slot.
+      auto response_upiu = std::make_unique<ResponseUpiu>(
+          transfer_request_processor_->GetRequestList().GetDescriptorBuffer(
+              kAdminCommandSlotNumber, unit_ready_upiu.GetResponseOffset()));
+      auto* response_data =
+          reinterpret_cast<scsi::FixedFormatSenseDataHeader*>(response_upiu->GetSenseData());
+      if (response_data->sense_key() != scsi::SenseKey::UNIT_ATTENTION) {
+        zxlogf(ERROR, "Failed to send SCSI command: %s", response.status_string());
+        return response.take_error();
+      }
+      zxlogf(DEBUG, "Expected Unit Attention error: %s", response.status_string());
+    }
+
+    // Send request sense commands to clear the Unit Attention Condition(UAC) of LUs. UAC is a
+    // condition which needs to be serviced before the logical unit can process commands.
+    // This command will get sense data, but ignore it for now because our goal is to clear the
+    // UAC.
+    ScsiRequestSenseUpiu request_sense_upiu;
+    if (auto response = transfer_request_processor_->SendScsiUpiu(request_sense_upiu, i,
+                                                                  zx::unowned_vmo(data_vmo));
+        response.is_error()) {
+      zxlogf(ERROR, "Failed to send SCSI command: %s", response.status_string());
+      return response.take_error();
+    }
+
+    // Verify that the Lun is ready. This command expects a success.
+    if (auto response = transfer_request_processor_->SendScsiUpiu(unit_ready_upiu, i);
+        response.is_error()) {
+      zxlogf(ERROR, "Failed to send SCSI command: %s", response.status_string());
+      return response.take_error();
+    }
+
     // Checks for block size consistency.
     ScsiReadCapacity10Upiu read_capacity_upiu;
     if (auto response = transfer_request_processor_->SendScsiUpiu(read_capacity_upiu, i,
@@ -665,40 +701,6 @@ zx::result<> Ufs::ScanLogicalUnits() {
     }
     zxlogf(INFO, "LUN-%d block_size=%zu, block_count=%ld", i, block_device.block_size,
            block_device.block_count);
-
-    // Verify that the Lun is ready. This command expects a unit attention error.
-    ScsiTestUnitReadyUpiu unit_ready_upiu;
-    if (auto response = transfer_request_processor_->SendScsiUpiu(unit_ready_upiu, i,
-                                                                  zx::unowned_vmo(data_vmo));
-        response.is_error()) {
-      auto* response_data = reinterpret_cast<scsi::FixedFormatSenseDataHeader*>(mapper.start());
-      if (response_data->sense_key() == static_cast<uint8_t>(scsi::SenseKey::UNIT_ATTENTION)) {
-        zxlogf(DEBUG, "Expected Unit Attention error: %s", response.status_string());
-      } else {
-        zxlogf(ERROR, "Failed to send SCSI command: %s", response.status_string());
-        return response.take_error();
-      }
-    }
-
-    // Send request sense commands to clear the Unit Attention Condition(UAC) of LUs. UAC is a
-    // condition which needs to be serviced before the logical unit can process commands.
-    // This command will get sense data, but ignore it for now because our goal is to clear the
-    // UAC.
-    ScsiRequestSenseUpiu request_sense_upiu;
-    if (auto response = transfer_request_processor_->SendScsiUpiu(request_sense_upiu, i,
-                                                                  zx::unowned_vmo(data_vmo));
-        response.is_error()) {
-      zxlogf(ERROR, "Failed to send SCSI command: %s", response.status_string());
-      return response.take_error();
-    }
-
-    // Verify that the Lun is ready. This command expects a success.
-    if (auto response = transfer_request_processor_->SendScsiUpiu(unit_ready_upiu, i,
-                                                                  zx::unowned_vmo(data_vmo));
-        response.is_error()) {
-      zxlogf(ERROR, "Failed to send SCSI command: %s", response.status_string());
-      return response.take_error();
-    }
   }
 
   // TODO(fxbug.dev/124835): Send a request sense command to clear the UAC of a well-known LU.

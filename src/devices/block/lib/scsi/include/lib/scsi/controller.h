@@ -194,7 +194,7 @@ struct FixedFormatSenseDataHeader {
   DEF_SUBBIT(mark_sense_key, 7, filemark);
   DEF_SUBBIT(mark_sense_key, 6, eom);
   DEF_SUBBIT(mark_sense_key, 5, ili);
-  DEF_SUBFIELD(mark_sense_key, 3, 0, sense_key);
+  DEF_ENUM_SUBFIELD(mark_sense_key, scsi::SenseKey, 3, 0, sense_key);
   DEF_SUBBIT(sense_key_specific[0], 7, sksv);
   // Additional sense byte follow after 18 bytes.
 } __PACKED;

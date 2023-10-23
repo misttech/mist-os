@@ -88,7 +88,8 @@ zx_status_t CopyPhysicalRegionToBuffer(
 }
 }  // namespace
 
-void ScsiCommandProcessor::BuildSenseData(ResponseUpiuData &response_upiu, uint8_t sense_key) {
+void ScsiCommandProcessor::BuildSenseData(ResponseUpiuData &response_upiu,
+                                          const scsi::SenseKey sense_key) {
   response_upiu.header.data_segment_length = htobe16(sizeof(scsi::FixedFormatSenseDataHeader));
   response_upiu.sense_data_len = htobe16(sizeof(scsi::FixedFormatSenseDataHeader));
   auto *sense_data = reinterpret_cast<scsi::FixedFormatSenseDataHeader *>(response_upiu.sense_data);
@@ -100,13 +101,18 @@ void ScsiCommandProcessor::BuildSenseData(ResponseUpiuData &response_upiu, uint8
 zx_status_t ScsiCommandProcessor::HandleScsiCommand(
     CommandUpiuData &command_upiu, ResponseUpiuData &response_upiu,
     cpp20::span<PhysicalRegionDescriptionTableEntry> &prdt_upius) {
-  constexpr uint8_t kIllegalRequest = 0x05;
   scsi::Opcode opcode = static_cast<scsi::Opcode>(command_upiu.cdb[0]);
   std::vector<uint8_t> data;
   if (auto it = handlers_.find(opcode); it != handlers_.end()) {
     if (auto result = (it->second)(mock_device_, command_upiu, response_upiu, prdt_upius);
         result.is_error()) {
-      BuildSenseData(response_upiu, kIllegalRequest);
+      scsi::SenseKey sense_key = scsi::SenseKey::ILLEGAL_REQUEST;
+      auto *response_data =
+          reinterpret_cast<scsi::FixedFormatSenseDataHeader *>(response_upiu.sense_data);
+      if (response_data->sense_key() != scsi::SenseKey::NO_SENSE) {
+        sense_key = static_cast<scsi::SenseKey>(response_data->sense_key());
+      }
+      BuildSenseData(response_upiu, sense_key);
       return result.status_value();
     } else {
       data = std::move(*result);
@@ -114,9 +120,10 @@ zx_status_t ScsiCommandProcessor::HandleScsiCommand(
   } else {
     zxlogf(ERROR, "UFS MOCK: scsi command opcode: 0x%hhx is not supported",
            static_cast<uint8_t>(opcode));
-    BuildSenseData(response_upiu, kIllegalRequest);
+    BuildSenseData(response_upiu, scsi::SenseKey::ILLEGAL_REQUEST);
     return ZX_ERR_NOT_SUPPORTED;
   }
+  BuildSenseData(response_upiu, scsi::SenseKey::NO_SENSE);
 
   zx_status_t status = ZX_OK;
   if (command_upiu.header_flags_r()) {
@@ -138,7 +145,7 @@ zx::result<std::vector<uint8_t>> ScsiCommandProcessor::DefaultRequestSenseHandle
   auto *sense_data = reinterpret_cast<scsi::FixedFormatSenseDataHeader *>(data_buffer.data());
   sense_data->set_response_code(0x70);
   sense_data->set_valid(0);
-  sense_data->set_sense_key(0);
+  sense_data->set_sense_key(scsi::SenseKey::NO_SENSE);
 
   ZX_DEBUG_ASSERT(command_upiu.header_flags_r());
   if (auto status = CopyBufferToPhysicalRegion(mock_device, prdt_upius, data_buffer);
@@ -146,6 +153,8 @@ zx::result<std::vector<uint8_t>> ScsiCommandProcessor::DefaultRequestSenseHandle
     zxlogf(ERROR, "UFS MOCK: scsi command, Failed to CopyBufferToPhysicalRegion");
     return zx::error(status);
   }
+
+  mock_device.SetUnitAttention(false);
 
   return zx::ok(std::move(data_buffer));
 }
@@ -249,6 +258,12 @@ zx::result<std::vector<uint8_t>> ScsiCommandProcessor::DefaultTestUnitReadyHandl
     cpp20::span<PhysicalRegionDescriptionTableEntry> &prdt_upius) {
   std::vector<uint8_t> data_buffer;
 
+  if (mock_device.GetUnitAttention()) {
+    auto *response_data =
+        reinterpret_cast<scsi::FixedFormatSenseDataHeader *>(response_upiu.sense_data);
+    response_data->set_sense_key(scsi::SenseKey::UNIT_ATTENTION);
+    return zx::error(ZX_ERR_BAD_STATE);
+  }
   return zx::ok(std::move(data_buffer));
 }
 

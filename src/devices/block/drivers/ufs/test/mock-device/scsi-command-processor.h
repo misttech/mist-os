@@ -70,7 +70,7 @@ class ScsiCommandProcessor {
   DEF_DEFAULT_HANDLER_END()
 
  private:
-  void BuildSenseData(ResponseUpiuData &response_upiu, uint8_t sense_key);
+  void BuildSenseData(ResponseUpiuData &response_upiu, scsi::SenseKey sense_key);
 
   UfsMockDevice &mock_device_;
 };

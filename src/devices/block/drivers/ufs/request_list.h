@@ -37,6 +37,7 @@ struct RequestSlot {
   IoCommand *io_cmd;
   bool is_scsi_command = false;
   bool is_sync = false;
+  uint16_t response_upiu_offset;
   zx_status_t result = ZX_OK;
 };
 

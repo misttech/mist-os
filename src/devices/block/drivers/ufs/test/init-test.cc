@@ -66,4 +66,9 @@ TEST_F(InitTest, LogicalUnitBlockInfo) {
   ASSERT_EQ(info.block_count, kMockTotalDeviceCapacity / kMockBlockSize);
 }
 
+TEST_F(InitTest, UnitAttentionClear) {
+  mock_device_->SetUnitAttention(true);
+  ASSERT_NO_FATAL_FAILURE(RunInit());
+}
+
 }  // namespace ufs

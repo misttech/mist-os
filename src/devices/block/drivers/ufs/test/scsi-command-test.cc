@@ -86,6 +86,29 @@ TEST_F(ScsiCommandTest, Write10) {
   ASSERT_EQ(memcmp(GetVirtualAddress(), buf, kMockBlockSize), 0);
 }
 
+TEST_F(ScsiCommandTest, TestUnitReady) {
+  const uint8_t kTestLun = 0;
+
+  ScsiTestUnitReadyUpiu upiu;
+  ASSERT_EQ(upiu.GetOpcode(), scsi::Opcode::TEST_UNIT_READY);
+  auto response = ufs_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun);
+  ASSERT_OK(response);
+
+  auto *response_sense_data =
+      reinterpret_cast<scsi::FixedFormatSenseDataHeader *>(response->GetSenseData());
+  ASSERT_EQ(response_sense_data->response_code(),
+            0x70);  // 0x70 is the fixed format sense data response.
+  ASSERT_EQ(response_sense_data->valid(), 0);
+  ASSERT_EQ(response_sense_data->sense_key(), scsi::SenseKey::NO_SENSE);
+
+  // The TEST UNIT READY command does not have a data response.
+  auto *data_sense_data = reinterpret_cast<scsi::FixedFormatSenseDataHeader *>(GetVirtualAddress());
+  scsi::FixedFormatSenseDataHeader empty_sense_data;
+  std::memset(&empty_sense_data, 0, sizeof(scsi::FixedFormatSenseDataHeader));
+  ASSERT_EQ(
+      std::memcmp(data_sense_data, &empty_sense_data, sizeof(scsi::FixedFormatSenseDataHeader)), 0);
+}
+
 TEST_F(ScsiCommandTest, ReadCapacity10) {
   const uint8_t kTestLun = 0;
 
@@ -112,9 +135,9 @@ TEST_F(ScsiCommandTest, RequestSense) {
       ufs_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun, zx::unowned_vmo(GetVmo())));
 
   auto *sense_data = reinterpret_cast<scsi::FixedFormatSenseDataHeader *>(GetVirtualAddress());
-  ASSERT_EQ(sense_data->response_code(), 0x70);
+  ASSERT_EQ(sense_data->response_code(), 0x70);  // 0x70 is the fixed format sense data response.
   ASSERT_EQ(sense_data->valid(), 0);
-  ASSERT_EQ(sense_data->sense_key(), 0);
+  ASSERT_EQ(sense_data->sense_key(), scsi::SenseKey::NO_SENSE);
 }
 
 TEST_F(ScsiCommandTest, SynchronizeCache10) {

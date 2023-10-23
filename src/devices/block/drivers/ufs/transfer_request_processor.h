@@ -66,11 +66,6 @@ class TransferRequestProcessor : public RequestProcessor {
     }
     auto response_upiu = std::make_unique<ResponseType>(response.value());
 
-    // Check response.
-    if (response_upiu->GetHeader().response != UpiuHeaderResponse::kTargetSuccess) {
-      zxlogf(ERROR, "Failed to get response: response=%x", response_upiu->GetHeader().response);
-      return zx::error(ZX_ERR_BAD_STATE);
-    }
     return zx::ok(std::move(response_upiu));
   }
 
