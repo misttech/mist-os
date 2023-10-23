@@ -520,6 +520,20 @@ template("zircon_toolchain") {
         } else {
           strip_tool = "$dir_prefix${tc.tool_prefix}strip"
         }
+        _remote_strip_list = []
+        if (link_rbe_enable) {
+          _remote_strip_list += [
+            rebase_path(python_exe_src, root_build_dir),
+            "-S",
+            rebase_path(prebuilt_tool_remote_wrapper, root_build_dir),
+            "--inputs",
+            "\"$unstripped_outfile\"",
+            "--output_files",
+            "\"$outfile\"",
+            "-- ",
+          ]
+        }
+        strip_command += string_join(" ", _remote_strip_list)
         strip_command += "$strip_tool -o \"$outfile\" \"$unstripped_outfile\""
       } else {
         strip_command += "$dir_prefix${tc.tool_prefix}objcopy ${_strip}" +
@@ -532,6 +546,7 @@ template("zircon_toolchain") {
 
     rspfile = "${outfile}.rsp"
     switches = "-o $unstripped_outfile {{ldflags}}"
+    linker_prefix = ""
     if (invoker.os == "mac") {
       rspfile_content = "{{inputs_newline}}"
       link_inputs = "-Wl,-filelist,$rspfile {{libs}} {{solibs}}"
@@ -549,6 +564,17 @@ template("zircon_toolchain") {
         mapfile = "${outfile}.map"
         outputs += [ mapfile ]
         switches += " -Wl,-Map,$mapfile"
+
+        # remote linking option
+        if (link_rbe_enable) {
+          linker_prefix_list = [
+            rebase_path(python_exe_src, root_build_dir),
+            "-S",
+            rebase_path(cxx_link_remote_wrapper, root_build_dir),
+            "--",
+          ]
+          linker_prefix = string_join(" ", linker_prefix_list)
+        }
       }
     }
 
@@ -663,7 +689,7 @@ template("zircon_toolchain") {
       if (invoker.os == "win") {
         default_output_extension = ".exe"
       }
-      command = "$ld $switches $link_inputs$strip_command"
+      command = "$linker_prefix $ld $switches $link_inputs$strip_command"
     }
 
     if (_toolchain_variant.with_shared || _toolchain_variant.is_pic_default) {
@@ -705,7 +731,7 @@ template("zircon_toolchain") {
           switches = "-Wl,$switches"
         }
 
-        command = "$ld $switches $link_inputs$strip_command"
+        command = "$linker_prefix $ld $switches $link_inputs$strip_command"
 
         if (use_llvm_ifs) {
           # The Ninja dependency for linking in the shared library will be
@@ -752,7 +778,7 @@ template("zircon_toolchain") {
           switches = "-Wl,$switches"
         }
 
-        command = "$ld $switches $link_inputs$strip_command"
+        command = "$linker_prefix $ld $switches $link_inputs$strip_command"
       }
     }
 

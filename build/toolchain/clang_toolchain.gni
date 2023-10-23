@@ -553,7 +553,7 @@ template("clang_toolchain") {
       if (use_strip) {
         remote_strip_prefix = ""
 
-        if (rust_rbe_enable || cxx_rbe_enable) {
+        if (rust_rbe_enable || link_rbe_enable) {
           remote_strip_prefix = string_join(
                   " ",
                   [
@@ -927,9 +927,20 @@ template("clang_toolchain") {
         command += "$ld {{SOLINK_FLAGS}}{{ldflags}} -o \"$unstripped_outfile\" -Wl,-filelist,\"$rspfile\" {{solibs}} {{libs}} {{frameworks}}"
         rspfile_content = "{{inputs_newline}}"
       } else {
+        if (link_rbe_enable) {
+          linker_prefix_list = [
+            rebase_path(python_exe_src, root_build_dir),
+            "-S",
+            rebase_path(cxx_link_remote_wrapper, root_build_dir),
+            "--",
+          ]
+          linker_prefix = string_join(" ", linker_prefix_list)
+        } else {
+          linker_prefix = ""
+        }
         depfile = _link_common.depfile
         depsformat = "gcc"
-        command += "$ld {{SOLINK_FLAGS}}{{ldflags}} -o \"$unstripped_outfile\" -Wl,--dependency-file=\"$depfile\" -Wl,--Map=\"$unstripped_outfile.map\""
+        command += "$linker_prefix $ld {{SOLINK_FLAGS}}{{ldflags}} -o \"$unstripped_outfile\" -Wl,--dependency-file=\"$depfile\" -Wl,--Map=\"$unstripped_outfile.map\""
         command +=
             " {{START_GROUP}}\"@$rspfile\" {{solibs}} {{END_GROUP}}{{libs}}"
         rspfile_content = "{{inputs}}"
@@ -938,10 +949,7 @@ template("clang_toolchain") {
       # Expand {{REMOTE_STRIP_PREFIX}}
       _remote_strip_prefix = ""
 
-      # NOTE: remote stripping is currently disabled for C++ linking which
-      # always happen locally at the moment. Remove the hard-coded `false`
-      # below when this will no longer be the case.
-      if (use_strip && false && cxx_rbe_enable) {
+      if (use_strip && link_rbe_enable) {
         _remote_strip_prefix = _link_common.remote_strip_prefix
       }
       command_suffix = string_replace(_link_common.command_suffix,

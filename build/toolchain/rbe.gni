@@ -48,6 +48,7 @@ rust_rbe_deps =
     ]
 
 cxx_remote_wrapper = "//build/rbe/cxx_remote_wrapper.py"
+cxx_link_remote_wrapper = "//build/rbe/cxx_link_remote_wrapper.py"
 
 # Lower overhead, simpler wrapper.
 cxx_remote_wrapper_minimalist = "//build/rbe/reclient_cxx.sh"
@@ -238,3 +239,9 @@ if (cxx_rbe_minimalist_wrapper) {
         cxx_remote_wrapper,
       ]
 }
+
+cxx_link_rbe_deps =
+    rbe_common_tools + rbe_common_scripts + rbe_common_py_scripts + [
+      "//build/rbe/cxx.py",
+      cxx_link_remote_wrapper,
+    ]
