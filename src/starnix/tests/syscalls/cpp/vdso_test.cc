@@ -65,7 +65,8 @@ TEST(VdsoTest, AtSysinfoEhdrPresent) {
   EXPECT_NE(addr, 0ul);
 }
 
-TEST_F(VdsoProcTest, VdsoMappingCannotBeSplit) {
+// TODO(https://fxbug.dev/135641): Re-enable test.
+TEST_F(VdsoProcTest, DISABLED_VdsoMappingCannotBeSplit) {
   // TODO(fxbug.dev/129749): Find out why this test does not work on host in CQ
   if (!test_helper::IsStarnix()) {
     GTEST_SKIP() << "This test does not work on Linux in CQ";
