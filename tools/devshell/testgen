@@ -32,4 +32,7 @@ fx-config-read
 # fx-commmand-run instead of fx-command-exec because exec replaces the current
 # process, so only the first command starts.
 fx-command-run host-tool testgen $args
-fx-command-run format-code --files="$output_dir/**/*"
+
+if [[ ! -z $output_dir ]]; then
+  fx-command-run format-code --files="$output_dir/**/*"
+fi
