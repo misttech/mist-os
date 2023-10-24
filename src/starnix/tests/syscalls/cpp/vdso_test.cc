@@ -6,6 +6,7 @@
 #include <string.h>
 #include <sys/auxv.h>
 #include <sys/mman.h>
+#include <sys/utsname.h>
 #include <unistd.h>
 
 #include <gtest/gtest.h>
@@ -66,9 +67,22 @@ TEST(VdsoTest, AtSysinfoEhdrPresent) {
 }
 
 TEST_F(VdsoProcTest, VdsoMappingCannotBeSplit) {
-  // TODO(fxbug.dev/129749): Find out why this test does not work on host in CQ
   if (!test_helper::IsStarnix()) {
-    GTEST_SKIP() << "This test does not work on Linux in CQ";
+    constexpr unsigned kMinMajorDisallowingSplitVdsoMapping = 5;
+    constexpr unsigned kMinMinorDisallowingSplitVdsoMapping = 11;
+
+    utsname u;
+    ASSERT_EQ(uname(&u), 0) << strerror(errno);
+
+    unsigned major = 0, minor = 0;
+    ASSERT_EQ(sscanf(u.release, "%u.%u", &major, &minor), 2) << u.release;
+    if ((major < kMinMajorDisallowingSplitVdsoMapping) ||
+        (major == kMinMajorDisallowingSplitVdsoMapping &&
+         minor < kMinMinorDisallowingSplitVdsoMapping)) {
+      GTEST_SKIP() << "Linux only disallows splitting a VDSO mapping as of v"
+                   << kMinMajorDisallowingSplitVdsoMapping << "."
+                   << kMinMinorDisallowingSplitVdsoMapping << ", we are at " << u.release;
+    }
   }
 
   const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
