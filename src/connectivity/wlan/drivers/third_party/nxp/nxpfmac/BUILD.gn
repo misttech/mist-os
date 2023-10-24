@@ -59,6 +59,8 @@ source_set("core") {
   public = [ "device.h" ]
   deps = [ ":nxpfmac_sdio_bind" ]
 
+  configs += [ "//build/config:Wno-bitfield-conversion" ]
+
   public_deps = [
     ":debug",
     "//sdk/fidl/fuchsia.wlan.fullmac:fuchsia.wlan.fullmac_cpp",

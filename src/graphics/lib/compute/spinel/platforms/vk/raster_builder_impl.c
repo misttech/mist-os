@@ -1510,7 +1510,7 @@ spinel_rbi_add(struct spinel_raster_builder_impl * impl,
   //
   struct spinel_cmd_fill cf = { 0 };
 
-  cf.cohort = dispatch->rc.span;
+  cf.cohort = dispatch->rc.span & 0x7fff;
 
   //
   // Append commands to the cf ring and dependent quads to the tc ring

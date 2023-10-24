@@ -691,6 +691,18 @@ config("Wno-undef") {
   visibility = [ "//third_party/googletest:*" ]
 }
 
+config("Wno-bitfield-conversion") {
+  cflags = [
+    # TODO(fxbug.dev/135166): Remove -Wno-unknown-warning-option after the next Clang roll.
+    "-Wno-unknown-warning-option",
+    "-Wno-bitfield-conversion",
+  ]
+  visibility = [
+    "//src/connectivity/wlan/drivers/third_party/nxp/nxpfmac:*",
+    "//src/lib/vulkan:*",
+  ]
+}
+
 # TODO(fxbug.dev/58162): clean up instances of this outside of third party code.
 #
 # NOTE: Do not add this to public_configs under any circumstances. Public
