@@ -283,6 +283,8 @@ class CxxLinkRemoteAction(object):
         # If re-client is unable to process inputs inside response files:
         # remote_inputs.extend(self.cxx_action.linker_inputs)
         # remote_inputs.extend(self.cxx_action.response_files)
+        # TODO(b/307418630): remove the following workaround when fixed.
+        remote_inputs.extend(self.cxx_action.linker_response_files)
 
         remote_ld = self.remote_compiler.parent / ("ld." + self.use_ld)
         if remote_ld.exists():

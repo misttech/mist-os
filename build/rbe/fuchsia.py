@@ -278,6 +278,12 @@ def clang_target_to_sysroot_triple(target: str) -> str:
     return target.replace("-unknown-", "")
 
 
+def clang_target_to_libdir(target: str) -> str:
+    if "fuchsia" in target and "-unknown-" not in target:
+        return target.replace("-fuchsia", "-unknown-fuchsia")
+    return target
+
+
 def rustc_target_to_clang_target(target: str) -> str:
     """Maps a rust target triple to a clang target triple."""
     # These mappings were determined by examining the options available
@@ -351,7 +357,8 @@ def remote_linker_toolchain_inputs(
     libclang_root = clang_root / "lib" / "clang"
     # Expect exactly one versioned libclang dir installed.
     libclang_versioned = next(libclang_root.glob("*"))
-    libclang_target_dir = libclang_versioned / "lib" / target
+    target_libdir = clang_target_to_libdir(target)
+    libclang_target_dir = libclang_versioned / "lib" / target_libdir
     if rtlib == "compiler-rt":
         yield libclang_target_dir / "clang_rt.crtbegin.o"
         yield libclang_target_dir / "clang_rt.crtend.o"
@@ -364,11 +371,19 @@ def remote_linker_toolchain_inputs(
         yield from libclang_target_dir.glob("libclang_rt.asan*")
         ignorelist = libclang_versioned / "share" / "asan_ignorelist.txt"
         yield ignorelist
+    if "hwaddress" in sanitizers:
+        yield from libclang_target_dir.glob("libclang_rt.hwasan*")
+        ignorelist = libclang_versioned / "share" / "hwasan_ignorelist.txt"
+        yield ignorelist
+    if "leak" in sanitizers:
+        yield from libclang_target_dir.glob("libclang_rt.lsan*")
+    if "fuzzer" in sanitizers or "fuzzer-no-link" in sanitizers:
+        yield from libclang_target_dir.glob("libclang_rt.fuzzer*")
 
     if profile:
         yield from libclang_target_dir.glob("libclang_rt.profile*")
 
-    stdlibs_dir = clang_root / "lib" / target
+    stdlibs_dir = clang_root / "lib" / target_libdir
     # This directory includes variants like asan, noexcept.
     # Let the toolchain pick which one it needs.
     yield stdlibs_dir  # grab the entire directory

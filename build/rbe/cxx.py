@@ -352,7 +352,13 @@ def _linker_driver_arg_parser() -> argparse.ArgumentParser:
         add_help=False,
     )
     parser.add_argument(
-        "--Map",
+        "-Map",  # single-dash
+        dest="mapfile",
+        type=Path,
+        help="linker map file to write",
+    )
+    parser.add_argument(
+        "--Map",  # double-dash
         dest="mapfile",
         type=Path,
         help="linker map file to write",
@@ -362,6 +368,11 @@ def _linker_driver_arg_parser() -> argparse.ArgumentParser:
         dest="depfile",
         type=Path,
         help="dependency file to write",
+    )
+    parser.add_argument(
+        "--just-symbols",
+        type=Path,
+        help="Use only the symbols of this",
     )
     parser.add_argument(
         "--retain-symbols-file",
@@ -436,10 +447,17 @@ class CxxAction(object):
             elif driver_flag.startswith("l,"):
                 self._linker_driver_flags.extend(forwarded_flags)
 
+        # Linker driver flags may contain response files, so expand them.
+        linker_rsp_files = []
+        expanded_linker_driver_flags = cl_utils.expand_response_files(
+            self.linker_driver_flags, linker_rsp_files
+        )
+        self._linker_response_files = linker_rsp_files
+
         (
             self._linker_attributes,
             unused_linker_args,
-        ) = _LINKER_DRIVER_PARSER.parse_known_args(self.linker_driver_flags)
+        ) = _LINKER_DRIVER_PARSER.parse_known_args(expanded_linker_driver_flags)
 
         # Infer the compiler command that would be used if preprocessing
         # were done separately.
@@ -500,10 +518,17 @@ class CxxAction(object):
             yield self.linker_retain_symbols_file
         if self.linker_version_script:
             yield self.linker_version_script
+        if self.linker_just_symbols:
+            yield self.linker_just_symbols
 
     @property
     def response_files(self) -> Sequence[Path]:
         return self._response_files
+
+    @property
+    def linker_response_files(self) -> Sequence[Path]:
+        # TODO(b/307418630): Remove this workaround after bug is fixed.
+        return self._linker_response_files
 
     @property
     def preprocessor_driver_flags(self) -> Sequence[str]:
@@ -524,6 +549,10 @@ class CxxAction(object):
     @property
     def linker_mapfile(self) -> Optional[Path]:
         return self._linker_attributes.mapfile
+
+    @property
+    def linker_just_symbols(self) -> Optional[Path]:
+        return self._linker_attributes.just_symbols
 
     @property
     def linker_retain_symbols_file(self) -> Optional[Path]:

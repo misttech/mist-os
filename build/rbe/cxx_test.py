@@ -69,6 +69,9 @@ class CxxActionTests(unittest.TestCase):
         self.assertIsNone(c.unwindlib)
         self.assertFalse(c.static_libstdcxx)
         self.assertEqual(c.linker_driver_flags, [])
+        self.assertIsNone(c.linker_retain_symbols_file)
+        self.assertIsNone(c.linker_version_script)
+        self.assertIsNone(c.linker_just_symbols)
         self.assertIsNone(c.depfile)
         self.assertIsNone(c.sysroot)
         self.assertIsNone(c.profile_list)
@@ -365,12 +368,22 @@ class CxxActionTests(unittest.TestCase):
         )
         self.assertEqual(c.linker_driver_flags, [flag])
 
-    def test_linker_mapfile(self):
+    def test_linker_mapfile_double_dash(self):
         source = Path("hello.o")
         output = Path("hello")
         mapfile = Path("hello.map")
         c = cxx.CxxAction(
             _strs(["clang++", f"-Wl,--Map={mapfile}", source, "-o", output])
+        )
+        self.assertEqual(c.linker_mapfile, mapfile)
+        self.assertEqual(list(c.linker_output_files()), [output, mapfile])
+
+    def test_linker_mapfile_single_dash(self):
+        source = Path("hello.o")
+        output = Path("hello")
+        mapfile = Path("hello.map")
+        c = cxx.CxxAction(
+            _strs(["clang++", f"-Wl,-Map={mapfile}", source, "-o", output])
         )
         self.assertEqual(c.linker_mapfile, mapfile)
         self.assertEqual(list(c.linker_output_files()), [output, mapfile])
@@ -428,6 +441,47 @@ class CxxActionTests(unittest.TestCase):
         )
         self.assertEqual(c.linker_version_script, version_script)
         self.assertEqual(list(c.linker_inputs_from_flags()), [version_script])
+
+    def test_linker_version_script_with_response_file(self):
+        source = Path("hello.o")
+        output = Path("hello")
+        version_script = Path("hello.ld")
+        rsp_file = Path("hello.rsp")
+        with mock.patch.object(
+            Path, "read_text", return_value=str(version_script)
+        ) as mock_read:
+            c = cxx.CxxAction(
+                _strs(
+                    [
+                        "clang++",
+                        f"-Wl,--version-script,@{rsp_file}",
+                        source,
+                        "-o",
+                        output,
+                    ]
+                )
+            )
+        self.assertEqual(c.linker_version_script, version_script)
+        self.assertEqual(list(c.linker_inputs_from_flags()), [version_script])
+        self.assertEqual(c.linker_response_files, [rsp_file])
+
+    def test_linker_just_symbols(self):
+        source = Path("hello.o")
+        output = Path("hello")
+        symbols = Path("hello.elf")
+        c = cxx.CxxAction(
+            _strs(
+                [
+                    "clang++",
+                    f"-Wl,--just-symbols={symbols}",
+                    source,
+                    "-o",
+                    output,
+                ]
+            )
+        )
+        self.assertEqual(c.linker_just_symbols, symbols)
+        self.assertEqual(list(c.linker_inputs_from_flags()), [symbols])
 
     def test_simple_gcc_cxx(self):
         source = Path("hello.cc")
