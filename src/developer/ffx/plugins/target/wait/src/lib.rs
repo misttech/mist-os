@@ -14,6 +14,10 @@ use fuchsia_async::WakeupTime;
 use futures::future::Either;
 use std::time::Duration;
 
+const DOWN_REPOLL_DELAY_MS: u64 = 500;
+const OPEN_TARGET_TIMEOUT_MS: u64 = 500;
+const KNOCK_TARGET_TIMEOUT_MS: u64 = 500;
+
 #[derive(FfxTool)]
 pub struct WaitTool {
     #[command]
@@ -40,10 +44,24 @@ async fn wait_for_device(target_collection: TargetCollectionProxy, cmd: WaitComm
             break match knock_target(&ffx, &target_collection).await {
                 Err(KnockError::CriticalError(e)) => Err(e),
                 Err(KnockError::NonCriticalError(e)) => {
-                    tracing::debug!("unable to knock target: {:?}", e);
-                    continue;
+                    if cmd.down {
+                        Ok(())
+                    } else {
+                        tracing::debug!("unable to knock target: {:?}", e);
+                        continue;
+                    }
                 }
-                Ok(()) => Ok(()),
+                Ok(()) => {
+                    if cmd.down {
+                        async_io::Timer::at(
+                            Duration::from_millis(DOWN_REPOLL_DELAY_MS).into_time(),
+                        )
+                        .await;
+                        continue;
+                    } else {
+                        Ok(())
+                    }
+                }
             };
         }
     };
@@ -75,21 +93,32 @@ async fn knock_target(
     // If you are reading this plugin for example code, this is an example of what you
     // should generally not be doing to connect to a daemon protocol. This is maintained
     // by the FFX team directly.
-    target_collection_proxy
-        .open_target(
+
+    timeout::timeout(
+        Duration::from_millis(OPEN_TARGET_TIMEOUT_MS),
+        target_collection_proxy.open_target(
             &TargetQuery { string_matcher: default_target.clone(), ..Default::default() },
             target_remote,
+        ),
+    )
+    .await
+    .map_err(|_e| {
+        KnockError::NonCriticalError(errors::ffx_error!("Timeout opening target.").into())
+    })?
+    .map_err(|e| {
+        KnockError::CriticalError(
+            errors::ffx_error!("Lost connection to the Daemon. Full context:\n{}", e).into(),
         )
-        .await
-        .map_err(|e| {
-            KnockError::CriticalError(
-                errors::ffx_error!("Lost connection to the Daemon. Full context:\n{}", e).into(),
-            )
-        })?
-        .map_err(|e| {
-            KnockError::CriticalError(errors::ffx_error!("Error opening target: {:?}", e).into())
-        })?;
-    ffx_target::knock_target(&target_proxy).await
+    })?
+    .map_err(|e| {
+        KnockError::CriticalError(errors::ffx_error!("Error opening target: {:?}", e).into())
+    })?;
+    // Knock with sub-second timing so we can react appropriately if the users's timeout is 1 second
+    ffx_target::knock_target_with_timeout(
+        &target_proxy,
+        Duration::from_millis(KNOCK_TARGET_TIMEOUT_MS),
+    )
+    .await
 }
 
 #[cfg(test)]
@@ -142,14 +171,25 @@ mod tests {
         .detach();
     }
 
-    fn setup_fake_target_collection_server(responsive_rcs: bool) -> TargetCollectionProxy {
+    fn setup_fake_target_collection_server(
+        target_responsive: [bool; 2],
+        rcs_responsive: bool,
+    ) -> TargetCollectionProxy {
         let (proxy, mut stream) = create_proxy_and_stream::<TargetCollectionMarker>().unwrap();
+        let mut target_responsive = target_responsive.into_iter();
         fuchsia_async::Task::local(async move {
             while let Ok(Some(req)) = stream.try_next().await {
                 match req {
                     TargetCollectionRequest::OpenTarget { responder, target_handle, .. } => {
-                        spawn_target_handler(target_handle.into_stream().unwrap(), responsive_rcs);
-                        responder.send(Ok(())).unwrap();
+                        if target_responsive.next().expect("Not enough target responses?") {
+                            spawn_target_handler(
+                                target_handle.into_stream().unwrap(),
+                                rcs_responsive,
+                            );
+                            responder.send(Ok(())).unwrap();
+                        } else {
+                            std::future::pending::<()>().await;
+                        }
                     }
                     e => panic!("unexpected request: {:?}", e),
                 }
@@ -182,7 +222,7 @@ mod tests {
         let _env = ffx_config::test_init().await.unwrap();
         assert!(wait_for_device(
             setup_fake_target_collection_server_auto_close(),
-            WaitCommand { timeout: 1000 }
+            WaitCommand { timeout: 1000, down: false }
         )
         .await
         .is_err())
@@ -205,8 +245,8 @@ mod tests {
     async fn able_to_connect_to_device() {
         let _env = ffx_config::test_init().await.unwrap();
         assert!(wait_for_device(
-            setup_fake_target_collection_server(true),
-            WaitCommand { timeout: 5 }
+            setup_fake_target_collection_server([true, true], true),
+            WaitCommand { timeout: 5, down: false }
         )
         .await
         .is_ok());
@@ -216,8 +256,68 @@ mod tests {
     async fn unable_to_connect_to_device() {
         let _env = ffx_config::test_init().await.unwrap();
         assert!(wait_for_device(
-            setup_fake_target_collection_server(false),
-            WaitCommand { timeout: 5 }
+            setup_fake_target_collection_server([true, true], false),
+            WaitCommand { timeout: 1, down: false }
+        )
+        .await
+        .is_err());
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn peer_closed_causes_down_error() {
+        let _env = ffx_config::test_init().await.unwrap();
+        assert!(wait_for_device(
+            setup_fake_target_collection_server_auto_close(),
+            WaitCommand { timeout: 1, down: true }
+        )
+        .await
+        .is_err());
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn wait_for_down() {
+        let _env = ffx_config::test_init().await.unwrap();
+        assert!(wait_for_device(
+            setup_fake_target_collection_server([true, true], false),
+            WaitCommand { timeout: 1, down: true }
+        )
+        .await
+        .is_ok());
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn wait_for_down_when_never_up() {
+        let _env = ffx_config::test_init().await.unwrap();
+        assert!(wait_for_device(
+            setup_fake_target_collection_server([false, false], false),
+            WaitCommand { timeout: 1, down: true }
+        )
+        .await
+        .is_ok());
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn wait_for_down_when_after_up() {
+        let _env = ffx_config::test_init().await.unwrap();
+        assert!(wait_for_device(
+            setup_fake_target_collection_server([true, false], true),
+            // We actually _have_ to wait for a few seconds, because
+            // knock_rcs_impl will take 1 second before returning, and
+            // we also wait for 500me in the wait_for_device() loop.
+            // Any shorter a time and we're just going to hit the
+            // timeout.
+            WaitCommand { timeout: 3, down: true }
+        )
+        .await
+        .is_ok());
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn wait_for_down_when_able_to_connect_to_device() {
+        let _env = ffx_config::test_init().await.unwrap();
+        assert!(wait_for_device(
+            setup_fake_target_collection_server([true, true], true),
+            WaitCommand { timeout: 3, down: true }
         )
         .await
         .is_err());

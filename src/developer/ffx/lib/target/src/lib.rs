@@ -192,9 +192,22 @@ const RCS_TIMEOUT: Duration = Duration::from_secs(3);
 /// should call again, and a critical error implying the caller should raise the error
 /// and no longer loop.
 pub async fn knock_target(target: &TargetProxy) -> Result<(), KnockError> {
+    knock_target_with_timeout(target, RCS_TIMEOUT).await
+}
+
+/// Attempts to "knock" a target to determine if it is up and connectable via RCS, within
+/// a specified timeout.
+///
+/// This is intended to be run in a loop, with a non-critical error implying the caller
+/// should call again, and a critical error implying the caller should raise the error
+/// and no longer loop.
+pub async fn knock_target_with_timeout(
+    target: &TargetProxy,
+    rcs_timeout: Duration,
+) -> Result<(), KnockError> {
     let (rcs_proxy, remote_server_end) = create_proxy::<RemoteControlMarker>()
         .map_err(|e| KnockError::NonCriticalError(e.into()))?;
-    timeout(RCS_TIMEOUT, target.open_remote_control(remote_server_end))
+    timeout(rcs_timeout, target.open_remote_control(remote_server_end))
         .await
         .context("timing out")?
         .context("opening remote_control")?

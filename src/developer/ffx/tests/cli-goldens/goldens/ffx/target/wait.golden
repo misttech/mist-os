@@ -22,6 +22,14 @@
       "short": "t",
       "description": "the timeout in seconds [default = 120]. A value of 0 implies no timeout.",
       "hidden": false
+    },
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--down",
+      "short": "d",
+      "description": "wait for target to go down",
+      "hidden": false
     }
   ],
   "notes": [],

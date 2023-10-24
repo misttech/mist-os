@@ -202,7 +202,9 @@ async fn knock_rcs_impl(rcs_proxy: &RemoteControlProxy) -> Result<(), KnockRcsEr
     let mut event_receiver = knock_client.take_event_receiver();
     let res = timeout(KNOCK_TIMEOUT, event_receiver.next()).await;
     match res {
-        Err(_) => Ok(()), // timeout is fine here, it means the connection wasn't lost.
+        // no events are expected -- the only reason we'll get an event is if
+        // channel closes. So the only valid response here is a timeout.
+        Err(_) => Ok(()),
         Ok(r) => r.ok_or(KnockRcsError::FailedToKnock).map(drop),
     }
 }
