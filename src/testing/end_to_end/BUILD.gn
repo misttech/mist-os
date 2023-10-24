@@ -7,12 +7,9 @@
 assert(is_host, "Python E2E tests are host-only")
 
 # Infra test groups:
-#     Stable
+#     Stable (Tests that passed for atleast 200+ consecutive runs)
 #         Emulator
 #             That require SL4F transport
-#             That does not require SL4F transport
-#     Unstable
-#         Emulator
 #             That does not require SL4F transport
 #         VIM3
 #             That require SL4F transport
@@ -20,7 +17,26 @@ assert(is_host, "Python E2E tests are host-only")
 #         NUC
 #             That require SL4F transport
 #             That does not require SL4F transport
-
+#     Unstable (Tests that are yet to pass 200 consecutive runs)
+#         Emulator
+#             That require SL4F transport
+#             That does not require SL4F transport
+#         VIM3
+#             That require SL4F transport
+#             That does not require SL4F transport
+#         NUC
+#             That require SL4F transport
+#             That does not require SL4F transport
+#     Staging (Stable test group + Unstable test group)
+#         Emulator
+#             That require SL4F transport
+#             That does not require SL4F transport
+#         VIM3
+#             That require SL4F transport
+#             That does not require SL4F transport
+#         NUC
+#             That require SL4F transport
+#             That does not require SL4F transport
 group("stable_emulator_sl4f_tests") {
   testonly = true
   public_deps = [
@@ -37,6 +53,31 @@ group("stable_emulator_tests") {
     "honeydew/tests/functional_tests:stable_emulator_tests",
     "//src/tests/end_to_end/snapshot:snapshot_test_fc($host_toolchain)",
   ]
+}
+
+group("stable_vim3_sl4f_tests") {
+  testonly = true
+  public_deps = [ "honeydew/tests/functional_tests:stable_vim3_sl4f_tests" ]
+}
+
+group("stable_vim3_tests") {
+  testonly = true
+  public_deps = [ "honeydew/tests/functional_tests:stable_vim3_tests" ]
+}
+
+group("stable_nuc_sl4f_tests") {
+  testonly = true
+  public_deps = [ "honeydew/tests/functional_tests:stable_nuc_sl4f_tests" ]
+}
+
+group("stable_nuc_tests") {
+  testonly = true
+  public_deps = [ "honeydew/tests/functional_tests:stable_nuc_tests" ]
+}
+
+group("unstable_emulator_sl4f_tests") {
+  testonly = true
+  public_deps = []
 }
 
 group("unstable_emulator_tests") {
@@ -62,6 +103,54 @@ group("unstable_nuc_sl4f_tests") {
 group("unstable_nuc_tests") {
   testonly = true
   public_deps = [ "honeydew/tests/functional_tests:unstable_nuc_tests" ]
+}
+
+group("staging_emulator_sl4f_tests") {
+  testonly = true
+  public_deps = [
+    ":stable_emulator_sl4f_tests",
+    ":unstable_emulator_sl4f_tests",
+  ]
+}
+
+group("staging_emulator_tests") {
+  testonly = true
+  public_deps = [
+    ":stable_emulator_tests",
+    ":unstable_emulator_tests",
+  ]
+}
+
+group("staging_vim3_sl4f_tests") {
+  testonly = true
+  public_deps = [
+    ":stable_vim3_sl4f_tests",
+    ":unstable_vim3_sl4f_tests",
+  ]
+}
+
+group("staging_vim3_tests") {
+  testonly = true
+  public_deps = [
+    ":stable_vim3_tests",
+    ":unstable_vim3_tests",
+  ]
+}
+
+group("staging_nuc_sl4f_tests") {
+  testonly = true
+  public_deps = [
+    ":stable_nuc_sl4f_tests",
+    ":unstable_nuc_sl4f_tests",
+  ]
+}
+
+group("staging_nuc_tests") {
+  testonly = true
+  public_deps = [
+    ":stable_nuc_tests",
+    ":unstable_nuc_tests",
+  ]
 }
 
 # ToDo(b/306756520) - Delete below mentioned test groups after updating pye2e

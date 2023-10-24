@@ -15,11 +15,17 @@ group("tests") {
 }
 
 # Infra test groups:
-#     Stable
+#     Stable (Tests that passed for atleast 200+ consecutive runs)
 #         Emulator
 #             That require SL4F transport
 #             That does not require SL4F transport
-#     Unstable
+#         VIM3
+#             That require SL4F transport
+#             That does not require SL4F transport
+#         NUC
+#             That require SL4F transport
+#             That does not require SL4F transport
+#     Unstable (Tests that are yet to pass 200 consecutive runs)
 #         Emulator
 #             That require SL4F transport
 #             That does not require SL4F transport
@@ -46,6 +52,33 @@ group("stable_emulator_tests") {
   ]
 }
 
+group("stable_vim3_sl4f_tests") {
+  testonly = true
+  public_deps =
+      [ "fuchsia_device_tests/test_fuchsia_device:vim3_test($host_toolchain)" ]
+}
+
+group("stable_vim3_tests") {
+  testonly = true
+  public_deps = [
+    "fuchsia_device_tests/test_fuchsia_device:vim3_test_fc($host_toolchain)",
+  ]
+}
+
+group("stable_nuc_sl4f_tests") {
+  testonly = true
+  public_deps = [
+    "fuchsia_device_tests/test_fuchsia_device:x64_nuc_test($host_toolchain)",
+  ]
+}
+
+group("stable_nuc_tests") {
+  testonly = true
+  public_deps = [
+    "fuchsia_device_tests/test_fuchsia_device:x64_nuc_test_fc($host_toolchain)",
+  ]
+}
+
 group("unstable_emulator_sl4f_tests") {
   testonly = true
   public_deps = []
@@ -61,29 +94,22 @@ group("unstable_emulator_tests") {
 
 group("unstable_vim3_sl4f_tests") {
   testonly = true
-  public_deps =
-      [ "fuchsia_device_tests/test_fuchsia_device:vim3_test($host_toolchain)" ]
+  public_deps = []
 }
 
 group("unstable_vim3_tests") {
   testonly = true
-  public_deps = [
-    "fuchsia_device_tests/test_fuchsia_device:vim3_test_fc($host_toolchain)",
-  ]
+  public_deps = []
 }
 
 group("unstable_nuc_sl4f_tests") {
   testonly = true
-  public_deps = [
-    "fuchsia_device_tests/test_fuchsia_device:x64_nuc_test($host_toolchain)",
-  ]
+  public_deps = []
 }
 
 group("unstable_nuc_tests") {
   testonly = true
-  public_deps = [
-    "fuchsia_device_tests/test_fuchsia_device:x64_nuc_test_fc($host_toolchain)",
-  ]
+  public_deps = []
 }
 
 # ToDo(b/306756520) - Delete below mentioned test groups after updating pye2e
@@ -105,7 +131,10 @@ group("stable_sl4f_nuc_tests") {
 
 group("unstable_sl4f_nuc_tests") {
   testonly = true
-  public_deps = [ ":unstable_nuc_sl4f_tests" ]
+  public_deps = [
+    ":stable_nuc_sl4f_tests",
+    ":unstable_nuc_sl4f_tests",
+  ]
 }
 
 group("stable_sl4f_vim3_tests") {
@@ -115,7 +144,10 @@ group("stable_sl4f_vim3_tests") {
 
 group("unstable_sl4f_vim3_tests") {
   testonly = true
-  public_deps = [ ":unstable_vim3_sl4f_tests" ]
+  public_deps = [
+    ":stable_vim3_sl4f_tests",
+    ":unstable_vim3_sl4f_tests",
+  ]
 }
 
 group("stable_non_sl4f_emulator_tests") {
@@ -135,7 +167,10 @@ group("stable_non_sl4f_nuc_tests") {
 
 group("unstable_non_sl4f_nuc_tests") {
   testonly = true
-  public_deps = [ ":unstable_nuc_tests" ]
+  public_deps = [
+    ":stable_nuc_tests",
+    ":unstable_nuc_tests",
+  ]
 }
 
 group("stable_non_sl4f_vim3_tests") {
@@ -145,5 +180,8 @@ group("stable_non_sl4f_vim3_tests") {
 
 group("unstable_non_sl4f_vim3_tests") {
   testonly = true
-  public_deps = [ ":unstable_vim3_tests" ]
+  public_deps = [
+    ":stable_vim3_tests",
+    ":unstable_vim3_tests",
+  ]
 }
