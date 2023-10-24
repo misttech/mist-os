@@ -27,7 +27,7 @@ use packet_formats::{
 };
 
 use crate::{
-    context::{InstantContext, SendFrameContext},
+    context::{CounterContext2, InstantContext, SendFrameContext},
     device::{AnyDevice, DeviceIdContext},
     error::{ExistsError, NotFoundError},
     ip::{
@@ -47,7 +47,7 @@ use crate::{
             send_ip_frame,
             slaac::{
                 SlaacAddressEntry, SlaacAddressEntryMut, SlaacAddresses, SlaacAddrsMutAndConfig,
-                SlaacContext,
+                SlaacContext, SlaacCounters,
             },
             state::{
                 DualStackIpDeviceState, IpDeviceConfiguration, IpDeviceFlags,
@@ -86,6 +86,12 @@ pub(crate) struct SlaacAddrs<'a, C: NonSyncContext> {
     > as DeviceIdContext<AnyDevice>>::DeviceId,
     pub(crate) config: &'a Ipv6DeviceConfiguration,
     pub(crate) _marker: PhantomData<C>,
+}
+
+impl<'a, C: NonSyncContext> CounterContext2<SlaacCounters> for SlaacAddrs<'a, C> {
+    fn with_counters<O, F: FnOnce(&SlaacCounters) -> O>(&self, cb: F) -> O {
+        cb(self.sync_ctx.sync_ctx.unlocked_access::<crate::lock_ordering::SlaacCounters>())
+    }
 }
 
 impl<'a, C: NonSyncContext> SlaacAddresses<C> for SlaacAddrs<'a, C> {

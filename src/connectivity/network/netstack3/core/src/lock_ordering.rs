@@ -143,6 +143,8 @@ pub(crate) enum TimerCounters {}
 pub(crate) enum DeviceCounters {}
 // Provides unlocked access of UdpCounters.
 pub(crate) struct UdpCounters<I>(PhantomData<I>, Never);
+// Provides unlocked access of SlaacCounters.
+pub(crate) enum SlaacCounters {}
 
 pub(crate) struct IpDeviceConfiguration<I>(PhantomData<I>, Never);
 pub(crate) struct IpDeviceGmp<I>(PhantomData<I>, Never);

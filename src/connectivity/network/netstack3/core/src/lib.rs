@@ -73,8 +73,8 @@ use crate::{
     },
     ip::{
         device::{
-            state::AddrSubnetAndManualConfigEither, DualStackDeviceHandler, Ipv4DeviceTimerId,
-            Ipv6DeviceTimerId,
+            slaac::SlaacCounters, state::AddrSubnetAndManualConfigEither, DualStackDeviceHandler,
+            Ipv4DeviceTimerId, Ipv6DeviceTimerId,
         },
         icmp::{BufferIcmpContext, IcmpContext, IcmpRxCounters, IcmpTxCounters, NdpCounters},
         IpCounters, IpLayerTimerId, Ipv4State, Ipv6State,
@@ -242,6 +242,10 @@ impl<BT: BindingsTypes> StackState<BT> {
 
     pub(crate) fn get_udp_counters<I: Ip>(&self) -> &UdpCounters<I> {
         &self.transport.get_udp_counters::<I>()
+    }
+
+    pub(crate) fn get_slaac_counters(&self) -> &SlaacCounters {
+        &self.ipv6.get_slaac_counters()
     }
 }
 

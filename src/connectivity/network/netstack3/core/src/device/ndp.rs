@@ -2243,7 +2243,7 @@ mod tests {
         );
 
         // Verify that `conflicted_addr` was generated and rejected.
-        assert_eq!(get_counter_val(&non_sync_ctx, "generated_slaac_addr_exists"), 1);
+        assert_eq!(sync_ctx.state.get_slaac_counters().generated_slaac_addr_exists.get(), 1);
 
         // Should have gotten a new temporary IP.
         let temporary_slaac_addresses =

@@ -68,8 +68,8 @@ use crate::{
     },
     ip::{
         device::{
-            state::IpDeviceStateIpExt, BufferIpv4DeviceHandler, IpDeviceIpExt,
-            IpDeviceNonSyncContext,
+            slaac::SlaacCounters, state::IpDeviceStateIpExt, BufferIpv4DeviceHandler,
+            IpDeviceIpExt, IpDeviceNonSyncContext,
         },
         forwarding::{ForwardingTable, IpForwardingDeviceContext},
         icmp::{
@@ -1156,7 +1156,12 @@ impl Ipv6StateBuilder {
     ) -> Ipv6State<Instant, StrongDeviceId> {
         let Ipv6StateBuilder { icmp } = self;
 
-        Ipv6State { inner: Default::default(), icmp: icmp.build(), counters: Default::default() }
+        Ipv6State {
+            inner: Default::default(),
+            icmp: icmp.build(),
+            counters: Default::default(),
+            slaac_counters: Default::default(),
+        }
     }
 }
 
@@ -1204,6 +1209,7 @@ pub(crate) struct Ipv6State<Instant: crate::Instant, StrongDeviceId: StrongId> {
     inner: IpStateInner<Ipv6, Instant, StrongDeviceId>,
     icmp: Icmpv6State<Instant, StrongDeviceId::Weak>,
     counters: Ipv6Counters,
+    slaac_counters: SlaacCounters,
 }
 
 impl<Instant: crate::Instant, StrongDeviceId: StrongId> Ipv6State<Instant, StrongDeviceId> {
@@ -1221,6 +1227,10 @@ impl<Instant: crate::Instant, StrongDeviceId: StrongId> Ipv6State<Instant, Stron
 
     pub(crate) fn get_ndp_counters(&self) -> &NdpCounters {
         &self.icmp.ndp_counters
+    }
+
+    pub(crate) fn get_slaac_counters(&self) -> &SlaacCounters {
+        &self.slaac_counters
     }
 }
 

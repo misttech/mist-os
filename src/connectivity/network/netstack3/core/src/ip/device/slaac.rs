@@ -15,6 +15,7 @@ use core::{
 
 use assert_matches::assert_matches;
 use const_unwrap::const_unwrap_option;
+use lock_order::{lock::UnlockedAccess, Locked};
 use net_types::{
     ip::{AddrSubnet, IpAddress, Ipv6Addr, Subnet},
     UnicastAddr, Witness as _,
@@ -27,16 +28,17 @@ pub use crate::algorithm::STABLE_IID_SECRET_KEY_BYTES;
 use crate::{
     algorithm::{generate_opaque_interface_identifier, OpaqueIidNonce},
     context::{
-        CounterContext, InstantBindingsTypes, InstantContext, RngContext, TimerContext,
-        TimerHandler,
+        CounterContext, CounterContext2, InstantBindingsTypes, InstantContext, RngContext,
+        TimerContext, TimerHandler,
     },
+    counters::Counter,
     device::Id,
     error::{ExistsError, NotFoundError},
     ip::{
         device::state::{DelIpv6AddrReason, Lifetime, SlaacConfig, TemporarySlaacConfig},
-        AnyDevice, DeviceIdContext,
+        AnyDevice, DeviceIdContext, NonSyncContext,
     },
-    Instant,
+    Instant, SyncCtx,
 };
 
 /// Minimum Valid Lifetime value to actually update an address's valid lifetime.
@@ -162,7 +164,7 @@ pub(super) struct SlaacAddrsMutAndConfig<'a, C: InstantContext, A: SlaacAddresse
 pub(super) trait SlaacContext<C: SlaacNonSyncContext<Self::DeviceId>>:
     DeviceIdContext<AnyDevice>
 {
-    type SlaacAddrs<'a>: SlaacAddresses<C> + 'a;
+    type SlaacAddrs<'a>: SlaacAddresses<C> + CounterContext2<SlaacCounters> + 'a;
 
     fn with_slaac_addrs_mut_and_configs<
         O,
@@ -189,6 +191,28 @@ pub(super) trait SlaacContext<C: SlaacNonSyncContext<Self::DeviceId>>:
                  _marker,
              }| cb(addrs),
         )
+    }
+}
+
+/// Counters for SLAAC.
+#[derive(Default)]
+pub(crate) struct SlaacCounters {
+    /// Count of already exists errors when adding a generated SLAAC address.
+    pub(crate) generated_slaac_addr_exists: Counter,
+}
+
+impl<C: NonSyncContext> UnlockedAccess<crate::lock_ordering::SlaacCounters> for SyncCtx<C> {
+    type Data = SlaacCounters;
+    type Guard<'l> = &'l SlaacCounters where Self: 'l;
+
+    fn access(&self) -> Self::Guard<'_> {
+        &self.state.get_slaac_counters()
+    }
+}
+
+impl<C: NonSyncContext, L> CounterContext2<SlaacCounters> for Locked<&SyncCtx<C>, L> {
+    fn with_counters<O, F: FnOnce(&SlaacCounters) -> O>(&self, cb: F) -> O {
+        cb(self.unlocked_access::<crate::lock_ordering::SlaacCounters>())
     }
 }
 
@@ -1600,7 +1624,9 @@ fn add_slaac_addr_sub<C: SlaacNonSyncContext<SC::DeviceId>, SC: SlaacContext<C>>
                 // Try the next address.
                 //
                 // TODO(https://fxbug.dev/100003): Limit number of attempts.
-                ctx.increment_debug_counter("generated_slaac_addr_exists");
+                slaac_addrs.with_counters(|counters| {
+                    counters.generated_slaac_addr_exists.increment();
+                });
             }
             Ok(addr_sub) => {
                 trace!("receive_ndp_packet: Successfully configured new IPv6 address {:?} on device {:?} via SLAAC", addr_sub, device_id);
@@ -1676,6 +1702,13 @@ mod tests {
     struct FakeSlaacAddrs {
         slaac_addrs: Vec<SlaacAddressEntry<FakeInstant>>,
         non_slaac_addr: Option<UnicastAddr<Ipv6Addr>>,
+        counters: SlaacCounters,
+    }
+
+    impl<'a> CounterContext2<SlaacCounters> for &'a mut FakeSlaacAddrs {
+        fn with_counters<O, F: FnOnce(&SlaacCounters) -> O>(&self, cb: F) -> O {
+            cb(&self.counters)
+        }
     }
 
     impl<'a> SlaacAddresses<FakeNonSyncCtxImpl> for &'a mut FakeSlaacAddrs {
@@ -1683,7 +1716,7 @@ mod tests {
             &mut self,
             mut cb: F,
         ) {
-            let FakeSlaacAddrs { slaac_addrs, non_slaac_addr: _ } = self;
+            let FakeSlaacAddrs { slaac_addrs, non_slaac_addr: _, counters: _ } = self;
             slaac_addrs.iter_mut().for_each(|SlaacAddressEntry { addr_sub, config, deprecated }| {
                 cb(SlaacAddressEntryMut { addr_sub: *addr_sub, config, deprecated })
             })
@@ -1696,7 +1729,7 @@ mod tests {
             &mut self,
             cb: F,
         ) -> O {
-            let FakeSlaacAddrs { slaac_addrs, non_slaac_addr: _ } = self;
+            let FakeSlaacAddrs { slaac_addrs, non_slaac_addr: _, counters: _ } = self;
             cb(Box::new(slaac_addrs.iter().cloned()))
         }
 
@@ -1710,7 +1743,7 @@ mod tests {
             config: SlaacConfig<FakeInstant>,
             and_then: F,
         ) -> Result<O, ExistsError> {
-            let FakeSlaacAddrs { slaac_addrs, non_slaac_addr } = self;
+            let FakeSlaacAddrs { slaac_addrs, non_slaac_addr, counters: _ } = self;
 
             if non_slaac_addr.map_or(false, |a| a == add_addr_sub.addr()) {
                 return Err(ExistsError);
@@ -1740,7 +1773,7 @@ mod tests {
             (AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>, SlaacConfig<FakeInstant>),
             NotFoundError,
         > {
-            let FakeSlaacAddrs { slaac_addrs, non_slaac_addr: _ } = self;
+            let FakeSlaacAddrs { slaac_addrs, non_slaac_addr: _, counters: _ } = self;
 
             slaac_addrs
                 .iter()
@@ -1928,6 +1961,7 @@ mod tests {
                     // Consider the address we will generate as already assigned without
                     // SLAAC.
                     non_slaac_addr: Some(addr_sub.addr()),
+                    counters: Default::default(),
                 },
                 ip_device_id_ctx: Default::default(),
             }));
