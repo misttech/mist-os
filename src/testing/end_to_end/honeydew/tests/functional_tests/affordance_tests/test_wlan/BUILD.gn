@@ -32,6 +32,4 @@ if (is_host) {
       ":wlan_test($host_toolchain)",
     ]
   }
-
-  # WLAN affordance tests are not enabled in infra yet.
 }

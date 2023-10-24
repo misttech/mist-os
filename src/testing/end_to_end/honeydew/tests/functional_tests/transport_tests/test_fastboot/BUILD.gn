@@ -22,6 +22,4 @@ if (is_host) {
     testonly = true
     public_deps = [ ":fastboot_test_fc($host_toolchain)" ]
   }
-
-  # Fastboot transport tests are not enabled in infra yet.
 }

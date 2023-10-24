@@ -8,47 +8,4 @@ if (is_host) {
     testonly = true
     public_deps = [ "test_fuchsia_device:tests" ]
   }
-
-  # Infra test groups:
-  #     Stable
-  #         Emulator
-  #             That require SL4F transport
-  #             That does not require SL4F transport
-  #     Unstable
-  #         VIM3
-  #             That require SL4F transport
-  #             That does not require SL4F transport
-  #         NUC
-  #             That require SL4F transport
-  #             That does not require SL4F transport
-
-  group("stable_emulator_sl4f_tests") {
-    testonly = true
-    public_deps = [ "test_fuchsia_device:stable_emulator_sl4f_tests" ]
-  }
-
-  group("stable_emulator_tests") {
-    testonly = true
-    public_deps = [ "test_fuchsia_device:stable_emulator_tests" ]
-  }
-
-  group("unstable_nuc_sl4f_tests") {
-    testonly = true
-    public_deps = [ "test_fuchsia_device:unstable_nuc_sl4f_tests" ]
-  }
-
-  group("unstable_nuc_tests") {
-    testonly = true
-    public_deps = [ "test_fuchsia_device:unstable_nuc_tests" ]
-  }
-
-  group("unstable_vim3_sl4f_tests") {
-    testonly = true
-    public_deps = [ "test_fuchsia_device:unstable_vim3_sl4f_tests" ]
-  }
-
-  group("unstable_vim3_tests") {
-    testonly = true
-    public_deps = [ "test_fuchsia_device:unstable_vim3_tests" ]
-  }
 }

@@ -35,21 +35,4 @@ if (is_host) {
       ":ffx_wait_for_rcs_disconnection_test_fc($host_toolchain)",
     ]
   }
-
-  # Infra test groups:
-  #     Stable
-  #         Emulator
-  #             That does not require SL4F transport
-  #     Unstable
-  #         Emulator
-  #             That does not require SL4F transport
-  group("stable_emulator_tests") {
-    testonly = true
-    public_deps = [ ":ffx_test_fc($host_toolchain)" ]
-  }
-
-  group("unstable_emulator_tests") {
-    testonly = true
-    public_deps = [ ":ffx_wait_for_rcs_disconnection_test_fc($host_toolchain)" ]
-  }
 }

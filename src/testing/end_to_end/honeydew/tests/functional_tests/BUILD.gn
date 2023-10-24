@@ -29,21 +29,20 @@ group("tests") {
 #         NUC
 #             That require SL4F transport
 #             That does not require SL4F transport
-
 group("stable_emulator_sl4f_tests") {
   testonly = true
   public_deps = [
-    "affordance_tests:stable_emulator_sl4f_tests",
-    "fuchsia_device_tests:stable_emulator_sl4f_tests",
+    "affordance_tests/test_tracing:tracing_test($host_toolchain)",
+    "fuchsia_device_tests/test_fuchsia_device:x64_emu_test($host_toolchain)",
   ]
 }
 
 group("stable_emulator_tests") {
   testonly = true
   public_deps = [
-    "affordance_tests:stable_emulator_tests",
-    "fuchsia_device_tests:stable_emulator_tests",
-    "transport_tests:stable_emulator_tests",
+    "affordance_tests/test_tracing:tracing_test_fc($host_toolchain)",
+    "fuchsia_device_tests/test_fuchsia_device:x64_emu_test_fc($host_toolchain)",
+    "transport_tests/test_ffx:ffx_test_fc($host_toolchain)",
   ]
 }
 
@@ -55,32 +54,40 @@ group("unstable_emulator_sl4f_tests") {
 group("unstable_emulator_tests") {
   testonly = true
   public_deps = [
-    "affordance_tests:unstable_emulator_tests",
-    "transport_tests:unstable_emulator_tests",
+    "affordance_tests/test_session:session_test_fc($host_toolchain)",
+    "transport_tests/test_ffx:ffx_wait_for_rcs_disconnection_test_fc($host_toolchain)",
   ]
 }
 
 group("unstable_vim3_sl4f_tests") {
   testonly = true
-  public_deps = [ "fuchsia_device_tests:unstable_vim3_sl4f_tests" ]
+  public_deps =
+      [ "fuchsia_device_tests/test_fuchsia_device:vim3_test($host_toolchain)" ]
 }
 
 group("unstable_vim3_tests") {
   testonly = true
-  public_deps = [ "fuchsia_device_tests:unstable_vim3_tests" ]
+  public_deps = [
+    "fuchsia_device_tests/test_fuchsia_device:vim3_test_fc($host_toolchain)",
+  ]
 }
 
 group("unstable_nuc_sl4f_tests") {
   testonly = true
-  public_deps = [ "fuchsia_device_tests:unstable_nuc_sl4f_tests" ]
+  public_deps = [
+    "fuchsia_device_tests/test_fuchsia_device:x64_nuc_test($host_toolchain)",
+  ]
 }
 
 group("unstable_nuc_tests") {
   testonly = true
-  public_deps = [ "fuchsia_device_tests:unstable_nuc_tests" ]
+  public_deps = [
+    "fuchsia_device_tests/test_fuchsia_device:x64_nuc_test_fc($host_toolchain)",
+  ]
 }
 
-# ToDo - Temporary. Will be deleted
+# ToDo(b/306756520) - Delete below mentioned test groups after updating pye2e
+# builders in shared.star with above mentioned test groups
 group("stable_sl4f_emulator_tests") {
   testonly = true
   public_deps = [ ":stable_emulator_sl4f_tests" ]

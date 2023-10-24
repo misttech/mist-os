@@ -82,46 +82,4 @@ if (is_host) {
       ":x64_nuc_test_fc($host_toolchain)",
     ]
   }
-
-  # Infra test groups:
-  #     Stable
-  #         Emulator
-  #             That require SL4F transport
-  #             That does not require SL4F transport
-  #     Unstable
-  #         VIM3
-  #             That require SL4F transport
-  #             That does not require SL4F transport
-  #         NUC
-  #             That require SL4F transport
-  #             That does not require SL4F transport
-  group("stable_emulator_sl4f_tests") {
-    testonly = true
-    public_deps = [ ":x64_emu_test($host_toolchain)" ]
-  }
-
-  group("stable_emulator_tests") {
-    testonly = true
-    public_deps = [ ":x64_emu_test_fc($host_toolchain)" ]
-  }
-
-  group("unstable_vim3_sl4f_tests") {
-    testonly = true
-    public_deps = [ ":vim3_test($host_toolchain)" ]
-  }
-
-  group("unstable_vim3_tests") {
-    testonly = true
-    public_deps = [ ":vim3_test_fc($host_toolchain)" ]
-  }
-
-  group("unstable_nuc_sl4f_tests") {
-    testonly = true
-    public_deps = [ ":x64_nuc_test($host_toolchain)" ]
-  }
-
-  group("unstable_nuc_tests") {
-    testonly = true
-    public_deps = [ ":x64_nuc_test_fc($host_toolchain)" ]
-  }
 }

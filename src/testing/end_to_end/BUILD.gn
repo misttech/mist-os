@@ -24,7 +24,7 @@ assert(is_host, "Python E2E tests are host-only")
 group("stable_emulator_sl4f_tests") {
   testonly = true
   public_deps = [
-    "examples:stable_emulator_sl4f_tests",
+    "examples/test_soft_reboot:soft_reboot_test($host_toolchain)",
     "honeydew/tests/functional_tests:stable_emulator_sl4f_tests",
     "//src/tests/end_to_end/snapshot:snapshot_test($host_toolchain)",
   ]
@@ -33,7 +33,7 @@ group("stable_emulator_sl4f_tests") {
 group("stable_emulator_tests") {
   testonly = true
   public_deps = [
-    "examples:stable_emulator_tests",
+    "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
     "honeydew/tests/functional_tests:stable_emulator_tests",
     "//src/tests/end_to_end/snapshot:snapshot_test_fc($host_toolchain)",
   ]
@@ -64,7 +64,8 @@ group("unstable_nuc_tests") {
   public_deps = [ "honeydew/tests/functional_tests:unstable_nuc_tests" ]
 }
 
-# ToDo - Temporary. Will be deleted
+# ToDo(b/306756520) - Delete below mentioned test groups after updating pye2e
+# builders in shared.star with above mentioned test groups
 group("stable_sl4f_emulator_tests") {
   testonly = true
   public_deps = [ ":stable_emulator_sl4f_tests" ]

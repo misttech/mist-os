@@ -21,14 +21,4 @@ if (is_host) {
     testonly = true
     public_deps = [ ":session_test_fc($host_toolchain)" ]
   }
-
-  # Infra test groups:
-  #     Unstable
-  #         Emulator
-  #             That does not require SL4F transport
-
-  group("unstable_emulator_tests") {
-    testonly = true
-    public_deps = [ ":session_test_fc($host_toolchain)" ]
-  }
 }

@@ -13,18 +13,3 @@ group("tests") {
     "test_soft_reboot:tests",
   ]
 }
-
-# Infra test groups:
-#     Stable
-#         Emulator
-#             That require SL4F transport
-#             That does not require SL4F transport
-group("stable_emulator_sl4f_tests") {
-  testonly = true
-  public_deps = [ "test_soft_reboot:stable_emulator_sl4f_tests" ]
-}
-
-group("stable_emulator_tests") {
-  testonly = true
-  public_deps = [ "test_soft_reboot:stable_emulator_tests" ]
-}

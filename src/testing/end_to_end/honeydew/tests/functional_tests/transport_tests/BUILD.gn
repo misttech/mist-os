@@ -11,21 +11,4 @@ if (is_host) {
       "test_ffx:tests",
     ]
   }
-
-  # Infra test groups:
-  #     Stable
-  #         Emulator
-  #             That does not require SL4F transport
-  #     Unstable
-  #         Emulator
-  #             That does not require SL4F transport
-  group("stable_emulator_tests") {
-    testonly = true
-    public_deps = [ "test_ffx:stable_emulator_tests" ]
-  }
-
-  group("unstable_emulator_tests") {
-    testonly = true
-    public_deps = [ "test_ffx:unstable_emulator_tests" ]
-  }
 }
