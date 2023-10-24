@@ -136,6 +136,9 @@ pub(crate) struct IcmpTxCounters<I>(PhantomData<I>, Never);
 pub(crate) struct IcmpRxCounters<I>(PhantomData<I>, Never);
 // Provides unlocked access of NdpCounters.
 pub(crate) enum NdpCounters {}
+// Provides unlocked access of TimerCounters.
+#[cfg(test)]
+pub(crate) enum TimerCounters {}
 
 pub(crate) struct IpDeviceConfiguration<I>(PhantomData<I>, Never);
 pub(crate) struct IpDeviceGmp<I>(PhantomData<I>, Never);

@@ -1599,28 +1599,28 @@ mod tests {
         });
 
         // No timers fired before.
-        assert_eq!(get_counter_val(net.non_sync_ctx(1), "timer::nop"), 0);
-        assert_eq!(get_counter_val(net.non_sync_ctx(2), "timer::nop"), 0);
+        assert_eq!(net.sync_ctx(1).state.timer_counters.nop.get(), 0);
+        assert_eq!(net.sync_ctx(2).state.timer_counters.nop.get(), 0);
         assert_eq!(net.step(receive_frame, handle_timer).timers_fired, 1);
         // Only timer in context 1 should have fired.
-        assert_eq!(get_counter_val(net.non_sync_ctx(1), "timer::nop"), 1);
-        assert_eq!(get_counter_val(net.non_sync_ctx(2), "timer::nop"), 0);
+        assert_eq!(net.sync_ctx(1).state.timer_counters.nop.get(), 1);
+        assert_eq!(net.sync_ctx(2).state.timer_counters.nop.get(), 0);
         assert_eq!(net.step(receive_frame, handle_timer).timers_fired, 1);
         // Only timer in context 2 should have fired.
-        assert_eq!(get_counter_val(net.non_sync_ctx(1), "timer::nop"), 1);
-        assert_eq!(get_counter_val(net.non_sync_ctx(2), "timer::nop"), 1);
+        assert_eq!(net.sync_ctx(1).state.timer_counters.nop.get(), 1);
+        assert_eq!(net.sync_ctx(2).state.timer_counters.nop.get(), 1);
         assert_eq!(net.step(receive_frame, handle_timer).timers_fired, 1);
         // Only timer in context 2 should have fired.
-        assert_eq!(get_counter_val(net.non_sync_ctx(1), "timer::nop"), 1);
-        assert_eq!(get_counter_val(net.non_sync_ctx(2), "timer::nop"), 2);
+        assert_eq!(net.sync_ctx(1).state.timer_counters.nop.get(), 1);
+        assert_eq!(net.sync_ctx(2).state.timer_counters.nop.get(), 2);
         assert_eq!(net.step(receive_frame, handle_timer).timers_fired, 1);
         // Only timer in context 1 should have fired.
-        assert_eq!(get_counter_val(net.non_sync_ctx(1), "timer::nop"), 2);
-        assert_eq!(get_counter_val(net.non_sync_ctx(2), "timer::nop"), 2);
+        assert_eq!(net.sync_ctx(1).state.timer_counters.nop.get(), 2);
+        assert_eq!(net.sync_ctx(2).state.timer_counters.nop.get(), 2);
         assert_eq!(net.step(receive_frame, handle_timer).timers_fired, 2);
         // Both timers have fired at the same time.
-        assert_eq!(get_counter_val(net.non_sync_ctx(1), "timer::nop"), 3);
-        assert_eq!(get_counter_val(net.non_sync_ctx(2), "timer::nop"), 3);
+        assert_eq!(net.sync_ctx(1).state.timer_counters.nop.get(), 3);
+        assert_eq!(net.sync_ctx(2).state.timer_counters.nop.get(), 3);
 
         assert!(net.step(receive_frame, handle_timer).is_idle());
         // Check that current time on contexts tick together.
@@ -1662,8 +1662,8 @@ mod tests {
         });
 
         while !net.step(receive_frame, handle_timer).is_idle()
-            && (get_counter_val(net.non_sync_ctx(1), "timer::nop") < 1
-                || get_counter_val(net.non_sync_ctx(2), "timer::nop") < 1)
+            && net.sync_ctx(1).state.timer_counters.nop.get() < 1
+            || net.sync_ctx(2).state.timer_counters.nop.get() < 1
         {}
         // Assert that we stopped before all times were fired, meaning we can
         // step again.
@@ -1756,15 +1756,13 @@ mod tests {
             bob_echo_request: usize,
             alice_echo_response: usize,
         ) {
-            let alice = net.non_sync_ctx("alice");
-            assert_eq!(get_counter_val(alice, "timer::nop"), alice_nop);
+            assert_eq!(net.sync_ctx("alice").state.timer_counters.nop.get(), alice_nop);
             assert_eq!(
                 net.sync_ctx("alice").state.get_icmp_rx_counters::<Ipv4>().echo_reply.get(),
                 alice_echo_response
             );
 
-            let bob = net.non_sync_ctx("bob");
-            assert_eq!(get_counter_val(bob, "timer::nop"), bob_nop);
+            assert_eq!(net.sync_ctx("bob").state.timer_counters.nop.get(), bob_nop);
             assert_eq!(
                 net.sync_ctx("bob").state.get_icmp_rx_counters::<Ipv4>().echo_request.get(),
                 bob_echo_request

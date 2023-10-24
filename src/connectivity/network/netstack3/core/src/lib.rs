@@ -47,6 +47,8 @@ use alloc::vec::Vec;
 use core::{fmt::Debug, time};
 
 use derivative::Derivative;
+#[cfg(test)]
+use lock_order::lock::UnlockedAccess;
 use lock_order::Locked;
 use net_types::{
     ip::{
@@ -58,6 +60,8 @@ use net_types::{
 use packet::{Buf, BufferMut, EmptyBuf};
 use tracing::trace;
 
+#[cfg(test)]
+use crate::{context::CounterContext2, counters::Counter};
 use crate::{
     context::{
         CounterContext, EventContext, InstantBindingsTypes, RngContext, TimerContext,
@@ -177,6 +181,8 @@ impl StackStateBuilder {
             ipv4: self.ipv4.build(),
             ipv6: self.ipv6.build(),
             device: DeviceLayerState::new(),
+            #[cfg(test)]
+            timer_counters: Default::default(),
         }
     }
 }
@@ -187,6 +193,8 @@ pub struct StackState<BT: BindingsTypes> {
     ipv4: Ipv4State<BT::Instant, DeviceId<BT>>,
     ipv6: Ipv6State<BT::Instant, DeviceId<BT>>,
     device: DeviceLayerState<BT>,
+    #[cfg(test)]
+    timer_counters: TimerCounters,
 }
 
 impl<BT: BindingsTypes> StackState<BT> {
@@ -476,8 +484,35 @@ pub fn handle_timer<NonSyncCtx: NonSyncContext>(
         }
         #[cfg(test)]
         TimerId(TimerIdInner::Nop(_)) => {
-            ctx.increment_debug_counter("timer::nop");
+            sync_ctx.with_counters(|counters: &TimerCounters| counters.nop.increment());
         }
+    }
+}
+
+#[cfg(test)]
+/// Timer-related counters.
+#[derive(Default)]
+struct TimerCounters {
+    /// Count of no-op timers handled.
+    pub(crate) nop: Counter,
+}
+
+#[cfg(test)]
+impl<C: NonSyncContext> UnlockedAccess<crate::lock_ordering::TimerCounters> for SyncCtx<C> {
+    type Data = TimerCounters;
+    type Guard<'l> = &'l TimerCounters where Self: 'l;
+
+    fn access(&self) -> Self::Guard<'_> {
+        &self.state.timer_counters
+    }
+}
+
+#[cfg(test)]
+impl<NonSyncCtx: NonSyncContext, L> CounterContext2<TimerCounters>
+    for Locked<&SyncCtx<NonSyncCtx>, L>
+{
+    fn with_counters<O, F: FnOnce(&TimerCounters) -> O>(&self, cb: F) -> O {
+        cb(self.unlocked_access::<crate::lock_ordering::TimerCounters>())
     }
 }
 
