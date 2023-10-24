@@ -18,6 +18,7 @@ if (is_host) {
     ]
     public_deps = [
       "//sdk/lib/fit",
+      "//src/developer/debug/ipc",
       "//src/developer/debug/zxdb/client",
       "//src/developer/debug/zxdb/console",
       "//src/developer/debug/zxdb/symbols",

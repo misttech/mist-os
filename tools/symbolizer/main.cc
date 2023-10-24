@@ -7,9 +7,9 @@
 #include <fstream>
 #include <iostream>
 
+#include "src/developer/debug/ipc/protocol.h"
 #include "src/developer/debug/zxdb/client/symbol_server_impl.h"
 #include "src/developer/debug/zxdb/common/curl.h"
-#include "src/developer/debug/zxdb/common/version.h"
 #include "src/lib/fxl/strings/trim.h"
 #include "tools/symbolizer/analytics.h"
 #include "tools/symbolizer/command_line_options.h"
@@ -69,7 +69,7 @@ int Main(int argc, const char* argv[]) {
   }
 
   if (options.requested_version) {
-    std::cout << "Version: " << zxdb::kBuildVersion << std::endl;
+    std::cout << "Version: " << debug_ipc::kCurrentProtocolVersion << std::endl;
     return EXIT_SUCCESS;
   }
 
