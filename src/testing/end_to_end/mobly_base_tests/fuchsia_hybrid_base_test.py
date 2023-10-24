@@ -53,24 +53,13 @@ class FuchsiaHybridBaseTest(fuchsia_base_test.FuchsiaBaseTest):
 
     def test_launch_hermetic_test(self) -> None:
         """Test to launch hermetic Fuchsia test and process test artifacts."""
-
-        # Execute `ffx test` cmd in isolation mode.
-        # Note: Avoid using `ffx` transport in Honeydew as it may be deprecated.
-        with tempfile.TemporaryDirectory() as iso_dir:
-            cmd = [
-                "ffx",
-                "--isolate-dir",
-                iso_dir,
-                "-t",
-                self.dut.device_name,
-                "test",
-                "run",
-                self.ffx_test_url,
-            ] + self.ffx_test_options
-            output = subprocess.check_output(
-                cmd, timeout=self.timeout_sec, stderr=subprocess.STDOUT
-            ).decode()
-            logging.info(output)
+        cmd = [
+            "test",
+            "run",
+            self.ffx_test_url,
+        ] + self.ffx_test_options
+        output = self.dut.ffx.run(cmd, timeout=self.timeout_sec)
+        _LOGGER.info(output)
 
 
 if __name__ == "__main__":
