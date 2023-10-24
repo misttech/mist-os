@@ -29,6 +29,7 @@ rustc_test("bin") {
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/replace-with",
+    "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/sys/component_manager/lib/sandbox",
     "//src/sys/component_manager/lib/serve_processargs",
     "//src/sys/lib/cm_types",

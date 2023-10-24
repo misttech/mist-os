@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    crate::{receiver::Message, AnyCast, Capability, CloneError},
+    crate::{receiver::MessageOrTask, AnyCast, Capability, CloneError},
     fidl::endpoints::{create_request_stream, ServerEnd},
     fidl_fuchsia_component_sandbox as fsandbox, fuchsia_async as fasync,
     fuchsia_zircon::{self as zx, HandleBased},
@@ -12,32 +12,36 @@ use {
 
 /// A capability that represents the sending end of a channel that transfers Zircon handles.
 #[derive(Capability, Debug)]
-pub struct Sender {
-    inner: mpsc::UnboundedSender<Message>,
+pub struct Sender<M: Capability + From<zx::Handle>> {
+    inner: mpsc::UnboundedSender<MessageOrTask<M>>,
 }
 
-impl Sender {
-    pub(crate) fn new(sender: mpsc::UnboundedSender<Message>) -> Self {
+impl<M: Capability + From<zx::Handle>> Clone for Sender<M> {
+    fn clone(&self) -> Self {
+        Self { inner: self.inner.clone() }
+    }
+}
+
+impl<M: Capability + From<zx::Handle>> Sender<M> {
+    pub(crate) fn new(sender: mpsc::UnboundedSender<MessageOrTask<M>>) -> Self {
         Self { inner: sender }
     }
 
-    pub fn send(&mut self, handle: zx::Handle) {
-        self.send_internal(Message::Handle(handle))
+    pub fn send_handle(&mut self, handle: zx::Handle) {
+        self.send_internal(MessageOrTask::Message(M::from(handle)))
     }
 
-    fn send_internal(&mut self, message: Message) {
+    pub fn send_message(&mut self, message: M) {
+        self.send_internal(MessageOrTask::Message(message))
+    }
+
+    fn send_internal(&mut self, message_or_task: MessageOrTask<M>) {
         // TODO: what lifecycle transitions would cause a receiver to be destroyed and leave a sender?
-        self.inner.unbounded_send(message).expect("Sender has no corresponding Receiver")
+        self.inner.unbounded_send(message_or_task).expect("Sender has no corresponding Receiver")
     }
 }
 
-impl Clone for Sender {
-    fn clone(&self) -> Self {
-        Self::new(self.inner.clone())
-    }
-}
-
-impl Capability for Sender {
+impl<M: Capability + From<zx::Handle>> Capability for Sender<M> {
     fn try_clone(&self) -> Result<Self, CloneError> {
         Ok(self.clone())
     }
@@ -47,12 +51,12 @@ impl Capability for Sender {
             create_request_stream::<fsandbox::SenderMarker>().unwrap();
         let mut this = self.clone();
         let task = fasync::Task::spawn(self.serve_sender(sender_stream));
-        this.send_internal(Message::Task(task));
+        this.send_internal(MessageOrTask::Task(task));
         (sender_client_end.into_handle(), None)
     }
 }
 
-impl Sender {
+impl<M: Capability + From<zx::Handle>> Sender<M> {
     fn serve_sender(self, stream: fsandbox::SenderRequestStream) -> BoxFuture<'static, ()> {
         self.serve_sender_internal(stream).boxed()
     }
@@ -61,7 +65,7 @@ impl Sender {
         while let Ok(Some(request)) = stream.try_next().await {
             match request {
                 fsandbox::SenderRequest::Send_ { capability, control_handle: _ } => {
-                    self.send(capability);
+                    self.send_handle(capability);
                 }
                 fsandbox::SenderRequest::Open {
                     flags: _,
@@ -70,7 +74,7 @@ impl Sender {
                     object,
                     control_handle: _,
                 } => {
-                    self.send(object.into());
+                    self.send_handle(object.into());
                 }
                 fsandbox::SenderRequest::Clone2 { request, control_handle: _ } => {
                     let sender = self.clone();
@@ -78,7 +82,7 @@ impl Sender {
                         ServerEnd::new(request.into_channel());
                     let stream = server_end.into_stream().unwrap();
                     let task = fasync::Task::spawn(sender.serve_sender(stream));
-                    self.send_internal(Message::Task(task));
+                    self.send_internal(MessageOrTask::Task(task));
                 }
             }
         }

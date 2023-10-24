@@ -10,6 +10,7 @@ use {
             error::CreateNamespaceError,
             routing::{self, route_and_open_capability, OpenOptions},
         },
+        sandbox_util::Message,
     },
     ::namespace::Entry as NamespaceEntry,
     ::routing::{
@@ -267,7 +268,7 @@ fn service_or_protocol_use(use_: UseDecl, component: WeakComponentInstance) -> B
                               relative_path: Path,
                               mut server_end: zx::Channel| {
         let use_ = use_.clone();
-        let component = component.clone();
+        let weak_component = component.clone();
         let component = match component.upgrade() {
             Ok(component) => component,
             Err(e) => {
@@ -293,7 +294,8 @@ fn service_or_protocol_use(use_: UseDecl, component: WeakComponentInstance) -> B
                         // only contain the receiver we declared.
                         if cap_sandbox.get_sender().is_some() {
                             let handle = server_end.into_handle();
-                            cap_sandbox.send(handle).unwrap();
+                            let msg = Message { handle, flags, target: weak_component.clone() };
+                            cap_sandbox.send(msg).unwrap();
                             return;
                         }
                     }

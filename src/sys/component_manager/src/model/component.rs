@@ -29,10 +29,12 @@ use {
         },
     },
     crate::runner::RemoteRunner,
-    crate::sandbox_util::Sandbox,
+    crate::sandbox_util::{Sandbox, SandboxWaiter},
     ::namespace::Entry as NamespaceEntry,
     ::routing::{
-        capability_source::{BuiltinCapabilities, NamespaceCapabilities},
+        capability_source::{
+            BuiltinCapabilities, CapabilitySource, ComponentCapability, NamespaceCapabilities,
+        },
         component_instance::{
             ComponentInstanceInterface, ExtendedInstanceInterface, ResolvedInstanceInterface,
             ResolvedInstanceInterfaceExt, TopInstanceInterface, WeakComponentInstanceInterface,
@@ -41,6 +43,7 @@ use {
         environment::EnvironmentInterface,
         error::ComponentInstanceError,
         policy::GlobalPolicyChecker,
+        policy::PolicyError,
         resolving::{
             ComponentAddress, ComponentResolutionContext, ResolvedComponent, ResolvedPackage,
         },
@@ -58,7 +61,11 @@ use {
     cm_util::TaskGroup,
     component_id_index::InstanceId,
     config_encoder::ConfigFields,
-    fidl::endpoints::{self, ServerEnd},
+    fidl::{
+        endpoints::{self, ServerEnd},
+        epitaph::ChannelEpitaphExt,
+        handle::fuchsia_handles::Channel,
+    },
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_hardware_power_statecontrol as fstatecontrol, fidl_fuchsia_io as fio,
@@ -77,6 +84,7 @@ use {
         collections::{HashMap, HashSet},
         convert::TryFrom,
         fmt,
+        ops::DerefMut,
         sync::{Arc, Weak},
         time::Duration,
     },
@@ -745,6 +753,13 @@ impl ComponentInstance {
         if was_running {
             let event = Event::new(self, EventPayload::Stopped { status: stop_result });
             self.hooks.dispatch(&event).await;
+
+            // If we're still in a resolved state then initiate watching the receivers in our
+            // sandbox so a new start action can be kicked off on the next capability access.
+            let mut state = self.lock_state().await;
+            if let InstanceState::Resolved(resolved_state) = state.deref_mut() {
+                resolved_state.wait_on_program_sandbox(&self);
+            }
         }
         if let ExtendedInstance::Component(parent) =
             self.try_get_parent().map_err(|_| StopActionError::GetParentFailed)?
@@ -949,6 +964,12 @@ impl ComponentInstance {
             ),
         )
         .await?;
+        {
+            let mut state = self.lock_state().await;
+            if let InstanceState::Resolved(resolved_state) = state.deref_mut() {
+                resolved_state.stop_waiting_on_program_sandbox();
+            }
+        }
 
         let eager_children: Vec<_> = {
             let state = self.lock_state().await;
@@ -1331,6 +1352,10 @@ pub struct ResolvedInstanceState {
     /// dynamic child gets a clone of one of these sandboxes (which is potentially extended by
     /// dynamic offers).
     collection_sandboxes: HashMap<Name, Sandbox>,
+
+    /// This waiter holds the component sandbox, and invokes a start command if the receiver
+    /// becomes available. The stop command sets this to a new SandboxWaiter.
+    pub sandbox_waiter: Option<SandboxWaiter>,
 }
 
 impl ResolvedInstanceState {
@@ -1369,9 +1394,48 @@ impl ResolvedInstanceState {
             sandbox_from_parent: component_sandboxes.sandbox_from_parent,
             program_sandbox: component_sandboxes.program_sandbox.clone(),
             collection_sandboxes: component_sandboxes.collection_sandboxes,
+            sandbox_waiter: None,
         };
         state.add_static_children(component, component_sandboxes.child_sandboxes).await?;
+        state.wait_on_program_sandbox(component);
         Ok(state)
+    }
+
+    // Waits for any receiver in our program sandbox to become readable.
+    pub fn wait_on_program_sandbox(&mut self, component: &Arc<ComponentInstance>) {
+        let weak_component = WeakComponentInstance::new(component);
+        self.sandbox_waiter =
+            Some(SandboxWaiter::new(self.program_sandbox.clone(), move |name, target_moniker| {
+                let name = name.clone();
+                async move {
+                    if let Ok(component) = weak_component.upgrade() {
+                        // This must be launched in a separate task because this closure needs to
+                        // return for the start action to finish (otherwise we deadlock).
+                        // TODO: We should have better ownership model for this task, or remove the
+                        // deadlock potential.
+                        fasync::Task::spawn(async move {
+                            if let Err(e) = component
+                                .start(
+                                    &StartReason::AccessCapability { target: target_moniker, name },
+                                    None,
+                                    vec![],
+                                    vec![],
+                                )
+                                .await
+                            {
+                                warn!("failed to start component due to capability access: {}", e);
+                            }
+                        })
+                        .detach();
+                    }
+                }
+                .boxed()
+            }));
+    }
+
+    // Causes this component to stop watching the receivers in our program sandbox.
+    pub fn stop_waiting_on_program_sandbox(&mut self) {
+        self.sandbox_waiter = None;
     }
 
     /// Returns a reference to the component's validated declaration.
@@ -1580,7 +1644,12 @@ impl ResolvedInstanceState {
         let child_moniker =
             ChildName::try_new(child.name.as_str(), collection.map(|c| c.name.as_str()))?;
 
-        extend_dict_with_offers(&self.sandbox_from_parent, &dynamic_offers, &mut child_sandbox);
+        extend_dict_with_offers(
+            &self.sandbox_from_parent,
+            &self.program_sandbox,
+            &dynamic_offers,
+            &mut child_sandbox,
+        );
 
         if self.get_child(&child_moniker).is_some() {
             return Err(AddChildError::InstanceAlreadyExists {
@@ -1782,6 +1851,10 @@ pub struct Runtime {
     ///
     /// Only set if the component uses the `fuchsia.logger.LogSink` protocol.
     logger: Option<Arc<ScopedLogger>>,
+
+    /// Reads messages from the program sandbox and dispatches those messages into the component's
+    /// outgoing directory.
+    _sandbox_dispatcher: SandboxDispatcher,
 }
 
 #[derive(Debug, PartialEq)]
@@ -1824,6 +1897,7 @@ impl Runtime {
         start_reason: StartReason,
         execution_controller_task: Option<controller::ExecutionControllerTask>,
         logger: Option<ScopedLogger>,
+        sandbox_dispatcher: SandboxDispatcher,
     ) -> Self {
         let timestamp = zx::Time::get_monotonic();
         Runtime {
@@ -1836,6 +1910,7 @@ impl Runtime {
             start_reason,
             execution_controller_task,
             logger: logger.map(Arc::new),
+            _sandbox_dispatcher: sandbox_dispatcher,
         }
     }
 
@@ -1907,6 +1982,126 @@ impl Runtime {
     #[cfg(test)]
     pub fn program_koid(&self) -> Option<fuchsia_zircon::Koid> {
         self.program.as_ref().map(Program::koid)
+    }
+}
+
+/// Reads messages from a sandbox, writing open requests into the given directory.
+pub struct SandboxDispatcher {
+    _task: fasync::Task<()>,
+}
+
+impl SandboxDispatcher {
+    pub fn new(
+        sandbox: Sandbox,
+        capability_decls: Vec<cm_rust::CapabilityDecl>,
+        directory: Option<fio::DirectoryProxy>,
+        component: WeakComponentInstance,
+    ) -> Self {
+        Self {
+            _task: fasync::Task::spawn(async move {
+                // Components that do not have a runner do not have an outgoing directory, so
+                // there's nothing for us to do here.
+                let Some(directory) = directory else { return };
+                while let Some((name, message)) = sandbox.read().await {
+                    let capability_decl = capability_decls
+                        .iter()
+                        .find(|decl| decl.name() == &name)
+                        .expect("capability received for name not in sandbox");
+                    // Check if this route is allowed by the security policy.
+                    if let Err(_e) = Self::can_route_capability(
+                        &component,
+                        &message.target,
+                        capability_decl.clone(),
+                    ) {
+                        // The `can_route_capability` function above will log an error, so we don't
+                        // have to.
+                        let _ = zx::Channel::from(message.handle)
+                            .close_with_epitaph(zx::Status::ACCESS_DENIED);
+                        continue;
+                    }
+                    // Check if the hooks system wants to claim the handle.
+                    if let Some(channel) = Self::dispatch_capability_routed_hook(
+                        &component,
+                        name.to_string(),
+                        message.handle,
+                        message.target,
+                    )
+                    .await
+                    {
+                        // Deliver the handle to the component.
+                        let path = fuchsia_fs::canonicalize_path(
+                            capability_decl
+                                .path()
+                                .expect("invalid protocol capability decl")
+                                .as_str(),
+                        );
+                        let server_end = ServerEnd::new(channel);
+                        // There's not much we can do if the open fails. The component's probably
+                        // crashed, and the stop action should be initiated momentarily or already
+                        // have started.
+                        let _ =
+                            directory.open(message.flags, fio::ModeType::empty(), path, server_end);
+                    }
+                }
+            }),
+        }
+    }
+
+    fn can_route_capability(
+        source_component: &WeakComponentInstance,
+        target_component: &WeakComponentInstance,
+        decl: cm_rust::CapabilityDecl,
+    ) -> Result<(), PolicyError> {
+        let capability_source = CapabilitySource::Component {
+            capability: ComponentCapability::Protocol(match decl {
+                cm_rust::CapabilityDecl::Protocol(p) => p,
+                _ => panic!("we currently only support protocols"),
+            }),
+            component: source_component.clone(),
+        };
+        let source_component = source_component
+            .upgrade()
+            .expect("it's impossible to have an invalid reference while a component is running");
+        source_component
+            .context
+            .policy()
+            .can_route_capability(&capability_source, &target_component.moniker)
+    }
+
+    /// Dispatches the capability routed hook. Returns the handle if none of the hooks took it.
+    async fn dispatch_capability_routed_hook(
+        source_component: &WeakComponentInstance,
+        name: String,
+        handle: zx::Handle,
+        target_component: WeakComponentInstance,
+    ) -> Option<zx::Channel> {
+        let capability = Arc::new(Mutex::new(Some(Channel::from(handle))));
+        let source_component = match source_component.upgrade() {
+            Ok(component) => component,
+            Err(_) => {
+                // If the source component doesn't exist anymore, then there's nothing to be done.
+                return None;
+            }
+        };
+        let target_component = match target_component.upgrade() {
+            Ok(component) => component,
+            Err(_) => {
+                // If the target component doesn't exist anymore, then we can't craft the following
+                // event payload.
+                return None;
+            }
+        };
+        let event = Event::new(
+            &target_component,
+            EventPayload::CapabilityRequested {
+                source_moniker: source_component.moniker.clone(),
+                name,
+                capability: capability.clone(),
+            },
+        );
+        source_component.hooks.dispatch(&event).await;
+        let mut guard = capability.lock().await;
+        guard.take()
     }
 }
 
@@ -2433,7 +2628,14 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn stop_component_without_program() {
-        let mut runtime = Runtime::new(None, None, StartReason::Debug, None, None);
+        let mut runtime = Runtime::new(
+            None,
+            None,
+            StartReason::Debug,
+            None,
+            None,
+            SandboxDispatcher::new(Sandbox::new(), vec![], None, WeakComponentInstance::invalid()),
+        );
         let stop_timer = Box::pin(std::future::ready(()));
         let kill_timer = Box::pin(std::future::ready(()));
         let result = runtime.stop_program(stop_timer, kill_timer).await.unwrap();

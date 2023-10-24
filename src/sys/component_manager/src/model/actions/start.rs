@@ -8,7 +8,8 @@ use {
     crate::model::{
         actions::{Action, ActionKey},
         component::{
-            ComponentInstance, ExecutionState, InstanceState, Package, Runtime, StartReason,
+            ComponentInstance, ExecutionState, InstanceState, Package, Runtime, SandboxDispatcher,
+            StartReason, WeakComponentInstance,
         },
         error::{StartActionError, StructuredConfigError},
         hooks::{Event, EventPayload, RuntimeInfo},
@@ -307,8 +308,26 @@ async fn make_execution_runtime(
         None
     };
 
-    let runtime =
-        Runtime::new(outgoing_dir, runtime_dir, start_reason, execution_controller_task, logger);
+    let resolved_state = component
+        .lock_resolved_state()
+        .await
+        .expect("component must be resolved in order to start");
+
+    let sandbox_dispatcher = SandboxDispatcher::new(
+        resolved_state.program_sandbox.clone(),
+        decl.capabilities.clone(),
+        outgoing_dir.clone(),
+        WeakComponentInstance::new(&component),
+    );
+
+    let runtime = Runtime::new(
+        outgoing_dir,
+        runtime_dir,
+        start_reason,
+        execution_controller_task,
+        logger,
+        sandbox_dispatcher,
+    );
     let (break_on_start_left, break_on_start_right) = zx::EventPair::create();
 
     let start_info = StartInfo {
@@ -367,7 +386,8 @@ mod tests {
                 },
                 component::{
                     ComponentInstance, ExecutionState, InstanceState, ResolvedInstanceState,
-                    Runtime, StartReason, UnresolvedInstanceState,
+                    Runtime, SandboxDispatcher, StartReason, UnresolvedInstanceState,
+                    WeakComponentInstance,
                 },
                 error::{ModelError, StartActionError},
                 hooks::{Event, EventType, Hook, HooksRegistration},
@@ -597,7 +617,19 @@ mod tests {
         // Check for already_started:
         {
             let mut es = ExecutionState::new();
-            es.runtime = Some(Runtime::new(None, None, StartReason::Debug, None, None));
+            es.runtime = Some(Runtime::new(
+                None,
+                None,
+                StartReason::Debug,
+                None,
+                None,
+                SandboxDispatcher::new(
+                    Sandbox::new(),
+                    vec![],
+                    None,
+                    WeakComponentInstance::invalid(),
+                ),
+            ));
             assert!(!es.is_shut_down());
             assert_matches!(
                 should_return_early(&InstanceState::New, &es, &m),

@@ -15,7 +15,7 @@ use {
     cm_rust::{CapabilityDecl, CollectionDecl, ExposeDecl, OfferDecl, OfferSource, UseDecl},
     cm_types::Name,
     derivative::Derivative,
-    moniker::{ChildName, ExtendedMoniker, Moniker},
+    moniker::{ChildName, ExtendedMoniker, Moniker, MonikerBase},
     std::{
         clone::Clone,
         sync::{Arc, Weak},
@@ -206,6 +206,11 @@ pub struct WeakComponentInstanceInterface<C: ComponentInstanceInterface> {
 impl<C: ComponentInstanceInterface> WeakComponentInstanceInterface<C> {
     pub fn new(component: &Arc<C>) -> Self {
         Self { inner: Arc::downgrade(component), moniker: component.moniker().clone() }
+    }
+
+    /// Returns a new weak component instance that will always fail to upgrade.
+    pub fn invalid() -> Self {
+        Self { inner: Weak::new(), moniker: Moniker::new(vec![]) }
     }
 
     /// Attempts to upgrade this `WeakComponentInterface<C>` into an `Arc<C>`, if the

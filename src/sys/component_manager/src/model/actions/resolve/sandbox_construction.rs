@@ -6,6 +6,7 @@ use {
     crate::sandbox_util::Sandbox,
     cm_rust::{self, Availability, OfferDeclCommon, SourceName, UseDeclCommon},
     cm_types::Name,
+    sandbox::Receiver,
     std::collections::HashMap,
     tracing::{debug, warn},
 };
@@ -48,6 +49,21 @@ pub async fn build_component_sandboxes(
         output.collection_sandboxes.insert(collection.name.clone(), Sandbox::new());
     }
 
+    // All declared capabilities must have a receiver, unless we are non-executable.
+    if decl.program.is_some() {
+        for capability in &decl.capabilities {
+            // We only support protocol capabilities right now
+            match &capability {
+                cm_rust::CapabilityDecl::Protocol(_) => (),
+                _ => continue,
+            }
+            output
+                .program_sandbox
+                .get_or_insert_protocol(capability.name().clone())
+                .insert_receiver(Receiver::new());
+        }
+    }
+
     for use_ in &decl.uses {
         // We only support protocol capabilities right now
         match &use_ {
@@ -70,6 +86,14 @@ pub async fn build_component_sandboxes(
                         "unable to use from parent, parent sandbox does not have {}",
                         source_name
                     );
+                }
+            }
+            cm_rust::UseSource::Self_ => {
+                if let Some(mut cap_sandbox) = output.program_sandbox.get_protocol_mut(source_name)
+                {
+                    if let Some(sender) = cap_sandbox.get_receiver().map(|r| r.new_sender()) {
+                        cap_sandbox.insert_sender(sender)
+                    }
                 }
             }
             _ => (), // unsupported
@@ -99,7 +123,12 @@ pub async fn build_component_sandboxes(
                 continue;
             }
         };
-        extend_dict_with_offer(&output.sandbox_from_parent, offer, target_sandbox);
+        extend_dict_with_offer(
+            &output.sandbox_from_parent,
+            &output.program_sandbox,
+            offer,
+            target_sandbox,
+        );
     }
 
     output
@@ -109,16 +138,18 @@ pub async fn build_component_sandboxes(
 /// assumed to target `target_sandbox`.
 pub fn extend_dict_with_offers(
     sandbox_from_parent: &Sandbox,
+    program_sandbox: &Sandbox,
     dynamic_offers: &Vec<cm_rust::OfferDecl>,
     target_sandbox: &mut Sandbox,
 ) {
     for offer in dynamic_offers {
-        extend_dict_with_offer(sandbox_from_parent, offer, target_sandbox);
+        extend_dict_with_offer(sandbox_from_parent, program_sandbox, offer, target_sandbox);
     }
 }
 
 fn extend_dict_with_offer(
     sandbox_from_parent: &Sandbox,
+    program_sandbox: &Sandbox,
     offer: &cm_rust::OfferDecl,
     target_sandbox: &mut Sandbox,
 ) {
@@ -129,6 +160,16 @@ fn extend_dict_with_offer(
     }
     let source_name = offer.source_name();
     let target_name = offer.target_name();
+    if let Some(mut cap_sandbox) = target_sandbox.get_protocol_mut(target_name) {
+        if cap_sandbox.get_sender().is_some() {
+            warn!(
+                "duplicate sources for protocol {} in a sandbox, unable to populate sandbox entry",
+                target_name
+            );
+            cap_sandbox.remove_sender();
+            return;
+        }
+    }
     match offer.source() {
         cm_rust::OfferSource::Parent => {
             if let Some(source_cap_sandbox) = sandbox_from_parent.get_protocol(source_name) {
@@ -148,6 +189,22 @@ fn extend_dict_with_offer(
                         target_cap_sandbox.insert_availability(new_availability);
                     }
                 }
+            }
+        }
+        cm_rust::OfferSource::Self_ => {
+            if let Some(sender) = program_sandbox
+                .get_protocol(source_name)
+                .and_then(|c| c.get_receiver().map(|r| r.new_sender()))
+            {
+                let mut target_cap_sandbox =
+                    target_sandbox.get_or_insert_protocol(source_name.clone());
+                target_cap_sandbox.insert_sender(sender);
+                target_cap_sandbox.insert_availability(
+                    offer
+                        .availability()
+                        .expect("availability should always be set for protocols")
+                        .clone(),
+                );
             }
         }
         cm_rust::OfferSource::Void => {

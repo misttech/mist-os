@@ -17,8 +17,10 @@ mod test {
     use fidl_fuchsia_component_sandbox as fsandbox;
     use fuchsia_async as fasync;
     use fuchsia_component::client;
+    use fuchsia_zircon as zx;
     use futures::{
         channel::mpsc::{unbounded, UnboundedSender},
+        future::BoxFuture,
         prelude::*,
     };
     use sandbox::{AnyCapability, Capability, Dict, Receiver};
@@ -94,6 +96,23 @@ mod test {
         Ok(out)
     }
 
+    #[derive(Capability, Debug)]
+    struct Handle {
+        handle: zx::Handle,
+    }
+
+    impl From<zx::Handle> for Handle {
+        fn from(handle: zx::Handle) -> Self {
+            Self { handle }
+        }
+    }
+
+    impl Capability for Handle {
+        fn to_zx_handle(self) -> (zx::Handle, Option<BoxFuture<'static, ()>>) {
+            (self.handle, None)
+        }
+    }
+
     #[fuchsia::test]
     async fn sender_fidl_interface() {
         // let dict = Dict::new();
@@ -103,7 +122,7 @@ mod test {
         let response = "first";
 
         // Initialize the host and sender/receiver pair.
-        let receiver = Receiver::new();
+        let receiver: Receiver<Handle> = Receiver::new();
         let sender = receiver.new_sender();
 
         // Serve an Echo request handler on the Receiver.

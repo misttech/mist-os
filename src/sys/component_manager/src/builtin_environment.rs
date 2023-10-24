@@ -65,7 +65,11 @@ use {
         root_stop_notifier::RootStopNotifier,
         sandbox_util::{LaunchTaskOnReceive, Sandbox},
     },
-    ::routing::environment::{DebugRegistry, RunnerRegistry},
+    ::routing::{
+        capability_source::{CapabilitySource, InternalCapability},
+        environment::{DebugRegistry, RunnerRegistry},
+        policy::GlobalPolicyChecker,
+    },
     anyhow::{format_err, Context as _, Error},
     cm_config::{RuntimeConfig, VmexSource},
     cm_rust::{Availability, RunnerRegistration, UseEventStreamDecl, UseSource},
@@ -341,16 +345,21 @@ impl BuiltinEnvironmentBuilder {
 struct BuiltinSandboxBuilder {
     sandbox: Sandbox,
     builtin_task_launchers: Vec<LaunchTaskOnReceive>,
-    task_group: TaskGroup,
+    top_instance: Arc<ComponentManagerInstance>,
+    policy_checker: GlobalPolicyChecker,
     builtin_capabilities: Vec<cm_rust::CapabilityDecl>,
 }
 
 impl BuiltinSandboxBuilder {
-    fn new(task_group: TaskGroup, runtime_config: &Arc<RuntimeConfig>) -> Self {
+    fn new(
+        top_instance: Arc<ComponentManagerInstance>,
+        runtime_config: &Arc<RuntimeConfig>,
+    ) -> Self {
         Self {
             sandbox: Sandbox::new(),
             builtin_task_launchers: Vec::new(),
-            task_group,
+            top_instance,
+            policy_checker: GlobalPolicyChecker::new(runtime_config.security_policy.clone()),
             builtin_capabilities: runtime_config.builtin_capabilities.clone(),
         }
     }
@@ -382,16 +391,16 @@ impl BuiltinSandboxBuilder {
         let mut cap_sandbox = self.sandbox.get_or_insert_protocol(name.clone());
         cap_sandbox.insert_sender(sender);
         cap_sandbox.insert_availability(cm_rust::Availability::Required);
+        let capability_source = CapabilitySource::Builtin {
+            capability: InternalCapability::Protocol(name.clone()),
+            top_instance: Arc::downgrade(&self.top_instance),
+        };
         self.builtin_task_launchers.push(LaunchTaskOnReceive::new(
-            self.task_group.as_weak(),
+            self.top_instance.task_group().as_weak(),
             name,
             receiver,
-            Box::new(move |handle| {
-                let channel = fidl::AsyncChannel::from_channel(zx::Channel::from(handle))
-                    .expect("failed to convert handle into async channel");
-                let stream = P::RequestStream::from_channel(channel);
-                task_to_launch(stream).boxed()
-            }),
+            Some((self.policy_checker.clone(), capability_source)),
+            Box::new(move |message| task_to_launch(message.take_handle_as_stream::<P>()).boxed()),
         ));
     }
 
@@ -467,7 +476,7 @@ impl BuiltinEnvironment {
         };
 
         let mut sandbox_builder =
-            BuiltinSandboxBuilder::new(model.top_instance().task_group(), &runtime_config);
+            BuiltinSandboxBuilder::new(model.top_instance().clone(), &runtime_config);
 
         // Set up ProcessLauncher if available.
         if runtime_config.use_builtin_process_launcher {
@@ -1155,7 +1164,6 @@ impl BuiltinEnvironment {
     ) where
         P: ProtocolMarker,
     {
-        tracing::warn!("adding builtin capability {} to root sandbox", name);
         let receiver = Receiver::new();
         let sender = receiver.new_sender();
 
@@ -1163,16 +1171,17 @@ impl BuiltinEnvironment {
         cap_sandbox.insert_sender(sender);
         cap_sandbox.insert_availability(cm_rust::Availability::Required);
 
+        let capability_source = CapabilitySource::Builtin {
+            capability: InternalCapability::Protocol(name.clone()),
+            top_instance: Arc::downgrade(self.model.top_instance()),
+        };
+
         let launch_task_on_receive = LaunchTaskOnReceive::new(
             self.model.top_instance().task_group().as_weak(),
             name,
             receiver,
-            Box::new(move |handle| {
-                let channel = fidl::AsyncChannel::from_channel(zx::Channel::from(handle))
-                    .expect("failed to convert handle into async channel");
-                let stream = P::RequestStream::from_channel(channel);
-                task_to_launch(stream).boxed()
-            }),
+            Some((self.model.root().context.policy().clone(), capability_source)),
+            Box::new(move |message| task_to_launch(message.take_handle_as_stream::<P>()).boxed()),
         );
 
         self._builtin_receivers_task_group.spawn(launch_task_on_receive.run());
