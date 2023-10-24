@@ -27,11 +27,13 @@ namespace aml_g12 {
 AmlG12TdmStream::AmlG12TdmStream(
     zx_device_t* parent, bool is_input, ddk::PDevFidl pdev,
     fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> gpio_enable_client,
-    fidl::WireSyncClient<fuchsia_hardware_clock::Clock> clock_gate_client)
+    fidl::WireSyncClient<fuchsia_hardware_clock::Clock> clock_gate_client,
+    fidl::WireSyncClient<fuchsia_hardware_clock::Clock> pll_client)
     : SimpleAudioStream(parent, is_input),
       pdev_(std::move(pdev)),
       enable_gpio_(std::move(gpio_enable_client)),
-      clock_gate_(std::move(clock_gate_client)) {
+      clock_gate_(std::move(clock_gate_client)),
+      pll_(std::move(pll_client)) {
   status_time_ = inspect().GetRoot().CreateInt("status_time", 0);
   dma_status_ = inspect().GetRoot().CreateUint("dma_status", 0);
   tdm_status_ = inspect().GetRoot().CreateUint("tdm_status", 0);
@@ -434,6 +436,18 @@ zx_status_t AmlG12TdmStream::StartSocPower() {
       return result->error_value();
     }
   }
+  if (pll_.is_valid()) {
+    fidl::WireResult result = pll_->Enable();
+    if (!result.ok()) {
+      zxlogf(ERROR, "Failed to send request to enable PLL: %s", result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "Send request to enable PLL error: %s",
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
+  }
   soc_power_started_ = true;
   return ZX_OK;
 }
@@ -452,6 +466,18 @@ zx_status_t AmlG12TdmStream::StopSocPower() {
     }
     if (result->is_error()) {
       zxlogf(ERROR, "Send request to disable clock gate error: %s",
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
+  }
+  if (pll_.is_valid()) {
+    fidl::WireResult result = pll_->Disable();
+    if (!result.ok()) {
+      zxlogf(ERROR, "Failed to send request to disable PLL: %s", result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "Send request to disable PLL error: %s",
              zx_status_get_string(result->error_value()));
       return result->error_value();
     }
@@ -819,9 +845,19 @@ static zx_status_t audio_bind(void* ctx, zx_device_t* device) {
   } else {
     clock_gate_client.Bind(std::move(clock_gate.value()));
   }
+  zx::result pll =
+      ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_clock::Service::Clock>(
+          device, "clock-pll");
+  fidl::WireSyncClient<fuchsia_hardware_clock::Clock> pll_client;
+  if (pll.is_error()) {
+    zxlogf(ERROR, "Failed to get clock protocol from fragment clock-pll: %s", pll.status_string());
+    // Continue, driver configurations without pll are also supported.
+  } else {
+    pll_client.Bind(std::move(pll.value()));
+  }
   auto stream = audio::SimpleAudioStream::Create<audio::aml_g12::AmlG12TdmStream>(
       device, metadata.is_input, ddk::PDevFidl::FromFragment(device), std::move(gpio_enable_client),
-      std::move(clock_gate_client));
+      std::move(clock_gate_client), std::move(pll_client));
   if (stream == nullptr) {
     zxlogf(ERROR, "Could not create aml-g12-tdm driver");
     return ZX_ERR_NO_MEMORY;

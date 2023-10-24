@@ -30,6 +30,11 @@ optional node "clock-gate" {
   fuchsia.clock.FUNCTION == fuchsia.clock.FUNCTION.AUDIO_GATE;
 }
 
+optional node "clock-pll" {
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.clock.BIND_FIDL_PROTOCOL.SERVICE;
+  fuchsia.clock.FUNCTION == fuchsia.clock.FUNCTION.AUDIO_PLL;
+}
+
 node "gpio-init" {
   fuchsia.BIND_INIT_STEP == fuchsia.gpio.BIND_INIT_STEP.GPIO;
 }

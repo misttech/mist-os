@@ -113,10 +113,22 @@ zx_status_t Vim3::AudioInit() {
                         bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
       fdf::MakeProperty(bind_fuchsia_clock::FUNCTION, bind_fuchsia_clock::FUNCTION_AUDIO_GATE),
   };
+  const std::vector<fdf::BindRule> kHifiPllBindRules = std::vector{
+      fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                              bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia::CLOCK_ID,
+                              bind_fuchsia_amlogic_platform_meson::G12B_CLK_ID_CLK_HIFI_PLL),
+  };
+  const std::vector<fdf::NodeProperty> kHifiPllProperties = std::vector{
+      fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                        bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
+      fdf::MakeProperty(bind_fuchsia_clock::FUNCTION, bind_fuchsia_clock::FUNCTION_AUDIO_PLL),
+  };
 
   std::vector<fdf::ParentSpec> kControllerParents = std::vector{
       fdf::ParentSpec{{kGpioInitRules, kGpioInitProps}},
       fdf::ParentSpec{{kClkBindRules, kClkProperties}},
+      fdf::ParentSpec{{kHifiPllBindRules, kHifiPllProperties}},
   };
 
   // Output device BTPCM setup with TDM bus A.

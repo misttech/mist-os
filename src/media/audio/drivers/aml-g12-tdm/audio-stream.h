@@ -34,7 +34,8 @@ class AmlG12TdmStream : public SimpleAudioStream {
  public:
   AmlG12TdmStream(zx_device_t* parent, bool is_input, ddk::PDevFidl pdev,
                   fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> gpio_enable_client,
-                  fidl::WireSyncClient<fuchsia_hardware_clock::Clock> clock_gate_client);
+                  fidl::WireSyncClient<fuchsia_hardware_clock::Clock> clock_gate_client,
+                  fidl::WireSyncClient<fuchsia_hardware_clock::Clock> pll_client);
 
  protected:
   zx_status_t Init() __TA_REQUIRES(domain_token()) override;
@@ -107,6 +108,7 @@ class AmlG12TdmStream : public SimpleAudioStream {
   inspect::UintProperty tdm_status_;
   inspect::UintProperty ring_buffer_physical_address_;
   fidl::WireSyncClient<fuchsia_hardware_clock::Clock> clock_gate_;
+  fidl::WireSyncClient<fuchsia_hardware_clock::Clock> pll_;
 };
 
 }  // namespace aml_g12

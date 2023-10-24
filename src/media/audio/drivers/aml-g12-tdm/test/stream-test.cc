@@ -99,6 +99,8 @@ class PowerManagementTest : public zxtest::Test {
     ASSERT_OK(loop_.StartThread("pm-test-loop"));
     auto clock_gate = clock_gate_.SyncCall(&FakeClock::Connect);
     clock_gate_client_ = fidl::WireSyncClient<fuchsia_hardware_clock::Clock>(std::move(clock_gate));
+    auto pll = pll_.SyncCall(&FakeClock::Connect);
+    pll_client_ = fidl::WireSyncClient<fuchsia_hardware_clock::Clock>(std::move(pll));
     enable_gpio_.SyncCall(&fake_gpio::FakeGpio::SetCurrentState,
                           fake_gpio::State{.polarity = fuchsia_hardware_gpio::GpioPolarity::kHigh,
                                            .sub_state = fake_gpio::WriteSubState{.value = 1}});
@@ -112,12 +114,15 @@ class PowerManagementTest : public zxtest::Test {
  protected:
   std::shared_ptr<zx_device> fake_parent() const { return fake_parent_; }
   bool IsClockGateEnabled() { return clock_gate_.SyncCall(&FakeClock::IsFakeClockEnabled); }
+  bool IsPllEnabled() { return pll_.SyncCall(&FakeClock::IsFakeClockEnabled); }
 
   async::Loop loop_{&kAsyncLoopConfigAttachToCurrentThread};
   async_patterns::TestDispatcherBound<fake_gpio::FakeGpio> enable_gpio_{loop_.dispatcher(),
                                                                         std::in_place};
   async_patterns::TestDispatcherBound<FakeClock> clock_gate_{loop_.dispatcher(), std::in_place};
+  async_patterns::TestDispatcherBound<FakeClock> pll_{loop_.dispatcher(), std::in_place};
   fidl::WireSyncClient<fuchsia_hardware_clock::Clock> clock_gate_client_;
+  fidl::WireSyncClient<fuchsia_hardware_clock::Clock> pll_client_;
   std::shared_ptr<zx_device> fake_parent_;
 };
 
@@ -154,7 +159,8 @@ class StreamTest : public zxtest::Test {
     auto enable_gpio_client = enable_gpio_.SyncCall(&fake_gpio::FakeGpio::Connect);
     auto controller = audio::SimpleAudioStream::Create<T>(
         fake_parent_.get(), std::move(codecs), mmio_reg_region, ddk::PDevFidl(),
-        std::move(enable_gpio_client), fidl::WireSyncClient<fuchsia_hardware_clock::Clock>());
+        std::move(enable_gpio_client), fidl::WireSyncClient<fuchsia_hardware_clock::Clock>(),
+        fidl::WireSyncClient<fuchsia_hardware_clock::Clock>());
     VerifyGpioAfterCreate();
     return controller;
   }
@@ -307,6 +313,7 @@ struct AmlG12I2sOutTest : public AmlG12TdmStream {
                    fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> enable_gpio)
       : AmlG12TdmStream(parent, false, std::move(pdev),
                         fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>(std::move(enable_gpio)),
+                        fidl::WireSyncClient<fuchsia_hardware_clock::Clock>(),
                         fidl::WireSyncClient<fuchsia_hardware_clock::Clock>()) {
     SetCommonDefaults();
     codecs_.push_back(std::make_unique<SimpleCodecClient>());
@@ -322,10 +329,11 @@ struct AmlG12I2sOutTest : public AmlG12TdmStream {
                    std::vector<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client_ends,
                    ddk_mock::MockMmioRegRegion& region, ddk::PDevFidl pdev,
                    fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> enable_gpio,
-                   fidl::WireSyncClient<fuchsia_hardware_clock::Clock> clock_gate_client)
+                   fidl::WireSyncClient<fuchsia_hardware_clock::Clock> clock_gate_client,
+                   fidl::WireSyncClient<fuchsia_hardware_clock::Clock> pll_client)
       : AmlG12TdmStream(parent, false, std::move(pdev),
                         fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>(std::move(enable_gpio)),
-                        std::move(clock_gate_client)) {
+                        std::move(clock_gate_client), std::move(pll_client)) {
     SetCommonDefaults();
     aml_audio_ = std::make_unique<AmlTdmConfigDevice>(metadata_, region.GetMmioBuffer());
     // Simply one ring buffer channel per codec.
@@ -1664,6 +1672,7 @@ struct AmlG12I2sInTest : public AmlG12TdmStream {
                   fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> enable_gpio)
       : AmlG12TdmStream(parent, true, std::move(pdev),
                         fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>(std::move(enable_gpio)),
+                        fidl::WireSyncClient<fuchsia_hardware_clock::Clock>(),
                         fidl::WireSyncClient<fuchsia_hardware_clock::Clock>()) {
     metadata_.is_input = true;
     metadata_.mClockDivFactor = 10;
@@ -1795,6 +1804,7 @@ class TestAmlG12TdmStream : public AmlG12TdmStream {
                                fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> enable_gpio)
       : AmlG12TdmStream(parent, false, std::move(pdev),
                         fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>(std::move(enable_gpio)),
+                        fidl::WireSyncClient<fuchsia_hardware_clock::Clock>(),
                         fidl::WireSyncClient<fuchsia_hardware_clock::Clock>()) {}
   bool AllowNonContiguousRingBuffer() override { return true; }
   inspect::Inspector& inspect() { return AmlG12TdmStream::inspect(); }
@@ -2095,6 +2105,7 @@ TEST_F(AmlG12TdmTest, NoGpio) {
   auto controller = audio::SimpleAudioStream::Create<AmlG12TdmStream>(
       fake_parent().get(), false, std::move(pdev.value()),
       fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>(),  // No GPIO.
+      fidl::WireSyncClient<fuchsia_hardware_clock::Clock>(),
       fidl::WireSyncClient<fuchsia_hardware_clock::Clock>());
   auto* child_dev = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
@@ -2109,7 +2120,8 @@ TEST_F(PowerManagementTest, ClockGating) {
   auto enable_gpio_client = enable_gpio_.SyncCall(&fake_gpio::FakeGpio::Connect);
   auto device = audio::SimpleAudioStream::Create<AmlG12I2sOutTest>(
       fake_parent_.get(), std::vector<fidl::ClientEnd<fuchsia_hardware_audio::Codec>>{},
-      unused_mock, ddk::PDevFidl(), std::move(enable_gpio_client), std::move(clock_gate_client_));
+      unused_mock, ddk::PDevFidl(), std::move(enable_gpio_client), std::move(clock_gate_client_),
+      std::move(pll_client_));
   auto* child_dev = fake_parent()->GetLatestChild();
   ASSERT_NOT_NULL(child_dev);
   AmlG12I2sOutTest* test_dev = child_dev->GetDeviceContext<AmlG12I2sOutTest>();
@@ -2148,10 +2160,12 @@ TEST_F(PowerManagementTest, ClockGating) {
   auto active2 = fidl::WireCall(local)->SetActiveChannels(0x2);
   ASSERT_TRUE(active2->is_ok());
   ASSERT_TRUE(IsClockGateEnabled());  // Some channels are active, then clock gate is enabled.
+  ASSERT_TRUE(IsPllEnabled());        // Some channels are active, then PLL is enabled.
 
   auto active3 = fidl::WireCall(local)->SetActiveChannels(0x0);
   ASSERT_TRUE(active3->is_ok());
   ASSERT_FALSE(IsClockGateEnabled());  // No channels are active, then clock gate is disabled.
+  ASSERT_FALSE(IsPllEnabled());        // No channels are active, then PLL is disabled.
 
   auto stop = fidl::WireCall(local)->Stop();
   ASSERT_OK(stop.status());
@@ -2160,9 +2174,11 @@ TEST_F(PowerManagementTest, ClockGating) {
   auto active4 = fidl::WireCall(local)->SetActiveChannels(0x2);
   ASSERT_TRUE(active4->is_ok());
   ASSERT_TRUE(IsClockGateEnabled());  // Some channels are active, then clock gate is enabled.
+  ASSERT_TRUE(IsPllEnabled());        // Some channels are active, then PLL is enabled.
 
   child_dev->UnbindOp();
   ASSERT_FALSE(IsClockGateEnabled());  // Shutdown disables the clock gate.
+  ASSERT_FALSE(IsPllEnabled());        // Shutdown disables the PLL.
   EXPECT_TRUE(child_dev->UnbindReplyCalled());
 }
 
