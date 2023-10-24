@@ -157,17 +157,6 @@ function main {
   if fx-rbe-enabled
   then
     rbe_wrapper=("${RBE_WRAPPER[@]}")
-
-    # TODO(https://fxbug.dev/134296): When using RBE, each build invocation gets
-    # its own reproxy instance with its own socket through the
-    # RBE_server_address environment variable.
-    # Ninja persistent mode will launch a server that snapshots environment
-    # variable to use with subsequent clients.
-    # To prevent mismatches on these environment variables (which would cause
-    # rewrapper to fail to connect), we force the server to restart for now.
-    if [[ "$NINJA_PERSISTENT_MODE" == 1 ]]
-    then "$PREBUILT_NINJA" -C "${FUCHSIA_BUILD_DIR}" -t server stop
-    fi
   fi
 
   if [ -n "${fint_params_path}" ]; then
