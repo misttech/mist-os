@@ -141,6 +141,7 @@ fuchsia_driver("vim3-driver") {
     "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.amlogic.platform:fuchsia.amlogic.platform_cpp",
     "//src/devices/bind/fuchsia.amlogic.platform.a311d:fuchsia.amlogic.platform.a311d_cpp",
+    "//src/devices/bind/fuchsia.amlogic.platform.meson:fuchsia.amlogic.platform.meson_cpp",
     "//src/devices/bind/fuchsia.arm.platform:fuchsia.arm.platform_cpp",
     "//src/devices/bind/fuchsia.clock:fuchsia.clock_cpp",
     "//src/devices/bind/fuchsia.designware.platform:fuchsia.designware.platform_cpp",

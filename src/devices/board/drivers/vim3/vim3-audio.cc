@@ -12,7 +12,10 @@
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 
+#include <bind/fuchsia/amlogic/platform/a311d/cpp/bind.h>
 #include <bind/fuchsia/amlogic/platform/cpp/bind.h>
+#include <bind/fuchsia/amlogic/platform/meson/cpp/bind.h>
+#include <bind/fuchsia/clock/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
 #include <ddktl/metadata/audio.h>
@@ -98,8 +101,22 @@ zx_status_t Vim3::AudioInit() {
   const std::vector<fdf::NodeProperty> kGpioInitProps = std::vector{
       fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
   };
-  const std::vector<fdf::ParentSpec> kControllerParents = std::vector{
+
+  const std::vector<fdf::BindRule> kClkBindRules = std::vector{
+      fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                              bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia::CLOCK_ID,
+                              bind_fuchsia_amlogic_platform_meson::G12B_CLK_ID_CLK_AUDIO),
+  };
+  const std::vector<fdf::NodeProperty> kClkProperties = std::vector{
+      fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                        bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
+      fdf::MakeProperty(bind_fuchsia_clock::FUNCTION, bind_fuchsia_clock::FUNCTION_AUDIO_GATE),
+  };
+
+  std::vector<fdf::ParentSpec> kControllerParents = std::vector{
       fdf::ParentSpec{{kGpioInitRules, kGpioInitProps}},
+      fdf::ParentSpec{{kClkBindRules, kClkProperties}},
   };
 
   // Output device BTPCM setup with TDM bus A.

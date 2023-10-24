@@ -18,5 +18,6 @@
         { service: "fuchsia.hardware.platform.device.Service" },
         { service: "fuchsia.hardware.audio.CodecService" },
         { service: "fuchsia.hardware.gpio.Service" },
+        { service: "fuchsia.hardware.clock.Service" },
     ],
 }

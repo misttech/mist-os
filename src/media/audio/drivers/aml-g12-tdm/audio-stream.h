@@ -5,6 +5,7 @@
 #ifndef SRC_MEDIA_AUDIO_DRIVERS_AML_G12_TDM_AUDIO_STREAM_H_
 #define SRC_MEDIA_AUDIO_DRIVERS_AML_G12_TDM_AUDIO_STREAM_H_
 
+#include <fidl/fuchsia.hardware.clock/cpp/wire.h>
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <lib/ddk/io-buffer.h>
@@ -32,7 +33,8 @@ namespace aml_g12 {
 class AmlG12TdmStream : public SimpleAudioStream {
  public:
   AmlG12TdmStream(zx_device_t* parent, bool is_input, ddk::PDevFidl pdev,
-                  fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> gpio_enable_client);
+                  fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> gpio_enable_client,
+                  fidl::WireSyncClient<fuchsia_hardware_clock::Clock> clock_gate_client);
 
  protected:
   zx_status_t Init() __TA_REQUIRES(domain_token()) override;
@@ -69,6 +71,8 @@ class AmlG12TdmStream : public SimpleAudioStream {
   void UpdateCodecsGainStateFromCurrent() __TA_REQUIRES(domain_token());
   zx_status_t StopAllCodecs();
   zx_status_t StartAllEnabledCodecs();
+  zx_status_t StartSocPower();
+  zx_status_t StopSocPower();
   zx_status_t UpdateHardwareSettings();
   virtual bool AllowNonContiguousRingBuffer() { return false; }
   zx_status_t StartCodecIfEnabled(size_t index);
@@ -80,6 +84,7 @@ class AmlG12TdmStream : public SimpleAudioStream {
   int64_t codecs_turn_on_delay_nsec_ = 0;
   int64_t codecs_turn_off_delay_nsec_ = 0;
   bool hardware_configured_ = false;
+  bool soc_power_started_ = false;
 
   async::TaskClosureMethod<AmlG12TdmStream, &AmlG12TdmStream::ProcessRingNotification> notify_timer_
       __TA_GUARDED(domain_token()){this};
@@ -101,6 +106,7 @@ class AmlG12TdmStream : public SimpleAudioStream {
   inspect::UintProperty dma_status_;
   inspect::UintProperty tdm_status_;
   inspect::UintProperty ring_buffer_physical_address_;
+  fidl::WireSyncClient<fuchsia_hardware_clock::Clock> clock_gate_;
 };
 
 }  // namespace aml_g12
