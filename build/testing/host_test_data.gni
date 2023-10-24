@@ -79,6 +79,7 @@ template("host_test_data") {
                              ])
       metadata = {
         test_runtime_deps = invoker.sources
+        test_runtime_deps_barrier = []
       }
     }
   }

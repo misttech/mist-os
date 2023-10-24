@@ -77,8 +77,8 @@ python_library("honeydew") {
 # This data is specific to ONLY Fuchsia Controller based tests. Other Fuchsia
 # Controller based tests will need to add their respective host test data
 # definitions to include the proper FIDL IR json.
-host_test_data("honeydew_fidl_ir_and_deps") {
-  sources = []
+group("honeydew_fidl_ir_and_deps") {
+  testonly = true
   deps = [
     # Required by Fuchsia Controller usage in Honeydew affordances and device claseses.
     "//sdk/fidl/fuchsia.buildinfo:fuchsia.buildinfo_host_test_data",

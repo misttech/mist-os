@@ -6,7 +6,7 @@ import("//build/fidl/toolchain.gni")
 import("//build/python/python_host_test.gni")
 import("//build/testing/host_test_data.gni")
 
-host_test_data("fuchsia_controller_test_data") {
+host_test_data("fuchsia_controller_host_test_data") {
   _sdk_out_dir =
       get_label_info("//sdk:core($default_toolchain)", "root_out_dir")
   sources = [
@@ -20,16 +20,23 @@ host_test_data("fuchsia_controller_test_data") {
   ]
   deps = [
     "//sdk:core($default_toolchain)",
-    "//sdk/fidl/fuchsia.developer.ffx:fuchsia.developer.ffx_host_test_data",
-    "//src/developer/ffx:test_data",
     "//src/developer/ffx/lib/fuchsia-controller:fidl_codec",
     "//src/developer/ffx/lib/fuchsia-controller:fuchsia_controller_py",
     "//src/developer/ffx/lib/fuchsia-controller:lib",
   ]
 }
 
-host_test_data("fuchsia_controller_fidl_test_data") {
-  sources = []
+group("fuchsia_controller_test_data") {
+  testonly = true
+  deps = [
+    ":fuchsia_controller_host_test_data",
+    "//sdk/fidl/fuchsia.developer.ffx:fuchsia.developer.ffx_host_test_data",
+    "//src/developer/ffx:test_data",
+  ]
+}
+
+group("fuchsia_controller_fidl_test_data") {
+  testonly = true
   deps = [
     "//src/developer/ffx/lib/fuchsia-controller/fidl:fuchsia.controller.othertest_host_test_data",
     "//src/developer/ffx/lib/fuchsia-controller/fidl:fuchsia.controller.test_host_test_data",

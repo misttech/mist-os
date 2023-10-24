@@ -200,7 +200,7 @@ template("fidl") {
   }
 
   if (is_host) {
-    host_test_data("${target_name}_host_test_data") {
+    host_test_data("_${target_name}_host_test_data") {
       forward_variables_from(invoker, [ "visibility" ])
       sources = [ common_parameters.fidl_ir_json ]
 
@@ -211,6 +211,10 @@ template("fidl") {
       # TODO(b/295190178): append all_fidl_json.txt with inclusion of
       # fidl_ir_target target.
       deps = [ ":${common_parameters.fidl_target}($fidl_toolchain)" ]
+    }
+    group("${target_name}_host_test_data") {
+      testonly = true
+      deps = [ ":_${target_name}" ]
       if (defined(invoker.public_deps)) {
         foreach(pdep, invoker.public_deps) {
           label = get_label_info(pdep, "label_no_toolchain")

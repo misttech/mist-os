@@ -114,6 +114,7 @@ if (is_linux) {
     non_go_deps = [
       ":archive-femu",
       ":archive-qemu",
+      ":kernel",
       ":test_data",
     ]
     sources = [

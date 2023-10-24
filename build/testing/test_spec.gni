@@ -356,6 +356,7 @@ template("test_spec") {
                              ])
       outputs = [ runtime_deps_file ]
       data_keys = [ "test_runtime_deps" ]
+      walk_keys = [ "test_runtime_deps_barrier" ]
       rebase = root_build_dir
       output_conversion = "json"
     }
