@@ -13,6 +13,7 @@
     device_set_profile_by_role;
     device_get_protocol;
     get_root_resource;
+    get_mmio_resource;
     load_firmware_from_driver;
     device_get_metadata;
     device_get_metadata_size;

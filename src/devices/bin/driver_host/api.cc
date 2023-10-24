@@ -354,6 +354,11 @@ __EXPORT zx_handle_t get_root_resource(zx_device_t* dev) {
   return internal::ContextForApi()->root_resource().get();
 }
 
+__EXPORT zx_handle_t get_mmio_resource(zx_device_t* dev) {
+  DEBUG_ASSERT_VALID_DEVICE(dev);
+  return internal::ContextForApi()->mmio_resource().get();
+}
+
 __EXPORT zx_status_t load_firmware_from_driver(zx_driver_t* drv, zx_device_t* dev, const char* path,
                                                zx_handle_t* fw, size_t* size) {
   DEBUG_ASSERT_VALID_DEVICE(dev);

@@ -225,6 +225,9 @@ __EXPORT zx_status_t device_get_variable(zx_device_t* device, const char* name, 
 __EXPORT
 zx_handle_t get_root_resource(zx_device_t* parent) { return ZX_HANDLE_INVALID; }
 
+__EXPORT
+zx_handle_t get_mmio_resource(zx_device_t* parent) { return ZX_HANDLE_INVALID; }
+
 extern "C" bool driver_log_severity_enabled_internal(const zx_driver_t* drv,
                                                      fx_log_severity_t flag) {
   std::lock_guard guard(libdriver_logger_lock);
