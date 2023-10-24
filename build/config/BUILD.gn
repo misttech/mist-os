@@ -1153,7 +1153,15 @@ config("auto_var_init") {
 
 config("thread_safety_annotations") {
   if (!is_gcc) {
-    cflags = [ "-Wthread-safety" ]
+    cflags = [
+      "-Wthread-safety",
+
+      # TODO(fxbug.dev/135657): Clang is catching instances of these in the kernel and drivers.
+      # Temporarily disable them for now to facilitate the roll then come back and
+      # fix them.
+      "-Wno-unknown-warning-option",
+      "-Wno-thread-safety-reference-return",
+    ]
     defines = [ "_LIBCPP_ENABLE_THREAD_SAFETY_ANNOTATIONS=1" ]
   }
 }
