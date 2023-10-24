@@ -12,8 +12,12 @@ declare_args() {
   # you'll also build SDK host tools for linux arm64.
   sdk_cross_compile_host_tools = false
 
-  # Set to true to build IDK atoms for all supported API levels that are
-  # listed in fuchsia_platform.supported_fuchsia_api_levels. This impacts
-  # the behavior of the generate_final_idk() template.
-  sdk_with_all_supported_api_levels = false
+  # Set to true to build IDK atoms for all supported API levels that are listed
+  # in fuchsia_platform.supported_fuchsia_api_levels. This impacts the behavior
+  # of the generate_final_idk() template.
+  #
+  # TODO(fxbug.dev/306723826): Deal with the fact that the mac builders are too
+  # slow to enable this setting, and therefore the mac IDK won't have
+  # per-api-level prebuilts.
+  sdk_with_all_supported_api_levels = host_os != "mac"
 }
