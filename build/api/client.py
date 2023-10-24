@@ -122,7 +122,7 @@ def cmd_print_all(args: argparse.Namespace) -> int:
     for module in args.modules.modules():
         if module.name != "api":
             result[module.name] = {
-                "file": str(module.path),
+                "file": os.path.relpath(module.path, args.build_dir),
                 "json": module.get_content_as_json(),
             }
     import json
