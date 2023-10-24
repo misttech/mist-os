@@ -2058,8 +2058,10 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: BoundStateContext<I, C> + UdpState
     }
 }
 
-impl<C: StateNonSyncContext<Ipv6>, SC: DualStackBoundStateContext<Ipv6, C> + UdpStateContext>
-    DualStackDatagramBoundStateContext<Ipv6, C, Udp> for SC
+impl<
+        C: StateNonSyncContext<Ipv6> + StateNonSyncContext<Ipv4>,
+        SC: DualStackBoundStateContext<Ipv6, C> + UdpStateContext,
+    > DualStackDatagramBoundStateContext<Ipv6, C, Udp> for SC
 {
     type IpSocketsCtx<'a> = SC::IpSocketsCtx<'a>;
     fn dual_stack_enabled(
@@ -2083,12 +2085,17 @@ impl<C: StateNonSyncContext<Ipv6>, SC: DualStackBoundStateContext<Ipv6, C> + Udp
         EitherIpSocket::V6(id)
     }
 
+    type LocalIdAllocator = Option<PortAlloc<UdpBoundSocketMap<Ipv6, SC::WeakDeviceId>>>;
+    type OtherLocalIdAllocator = Option<PortAlloc<UdpBoundSocketMap<Ipv4, SC::WeakDeviceId>>>;
+
     fn with_both_bound_sockets_mut<
         O,
         F: FnOnce(
             &mut Self::IpSocketsCtx<'_>,
             &mut UdpBoundSocketMap<Ipv6, Self::WeakDeviceId>,
             &mut UdpBoundSocketMap<Ipv4, Self::WeakDeviceId>,
+            &mut Self::LocalIdAllocator,
+            &mut Self::OtherLocalIdAllocator,
         ) -> O,
     >(
         &mut self,
@@ -2096,9 +2103,10 @@ impl<C: StateNonSyncContext<Ipv6>, SC: DualStackBoundStateContext<Ipv6, C> + Udp
     ) -> O {
         self.with_both_bound_sockets_mut(
             |sync_ctx,
-             BoundSockets { bound_sockets: bound_first, lazy_port_alloc: _ },
-             BoundSockets { bound_sockets: bound_second, lazy_port_alloc: _ }| {
-                cb(sync_ctx, bound_first, bound_second)
+             BoundSockets { bound_sockets: bound_first, lazy_port_alloc: alloc_first },
+             BoundSockets { bound_sockets: bound_second, lazy_port_alloc: alloc_second }
+            | {
+                cb(sync_ctx, bound_first, bound_second, alloc_first, alloc_second)
             },
         )
     }

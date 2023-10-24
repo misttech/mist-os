@@ -718,6 +718,24 @@ pub(crate) trait DualStackDatagramBoundStateContext<I: IpExt, C, S: DatagramSock
     /// Converts an other-IP-version address to an address for IP version `I`.
     fn from_other_ip_addr(&self, addr: <I::OtherVersion as Ip>::Addr) -> I::Addr;
 
+    /// The local id allocator for sockets in the `I` stack.
+    type LocalIdAllocator: LocalIdentifierAllocator<
+        I,
+        Self::WeakDeviceId,
+        S::AddrSpec,
+        C,
+        S::SocketMapSpec<I, Self::WeakDeviceId>,
+    >;
+
+    /// The local id allocator for sockets in the `I::OtherVersion` stack
+    type OtherLocalIdAllocator: LocalIdentifierAllocator<
+        I::OtherVersion,
+        Self::WeakDeviceId,
+        S::AddrSpec,
+        C,
+        S::SocketMapSpec<I::OtherVersion, Self::WeakDeviceId>,
+    >;
+
     /// Calls the provided callback with mutable access to both the
     /// demultiplexing maps.
     fn with_both_bound_sockets_mut<
@@ -736,6 +754,8 @@ pub(crate) trait DualStackDatagramBoundStateContext<I: IpExt, C, S: DatagramSock
                 S::AddrSpec,
                 S::SocketMapSpec<I::OtherVersion, Self::WeakDeviceId>,
             >,
+            &mut Self::LocalIdAllocator,
+            &mut Self::OtherLocalIdAllocator,
         ) -> O,
     >(
         &mut self,
@@ -931,6 +951,9 @@ where
         self.uninstantiable_unreachable()
     }
 
+    type LocalIdAllocator = UninstantiableAllocator;
+    type OtherLocalIdAllocator = UninstantiableAllocator;
+
     fn with_both_bound_sockets_mut<
         O,
         F: FnOnce(
@@ -947,6 +970,8 @@ where
                 S::AddrSpec,
                 S::SocketMapSpec<I::OtherVersion, Self::WeakDeviceId>,
             >,
+            &mut Self::LocalIdAllocator,
+            &mut Self::OtherLocalIdAllocator,
         ) -> O,
     >(
         &mut self,
@@ -1634,17 +1659,19 @@ fn remove_socket_from_bound_state_map<
             match operation {
                 RemoveOperation::DualStackAnyAddr(dual_stack_ctx) => {
                     let other_id = dual_stack_ctx.to_other_receiving_id(id.clone());
-                    dual_stack_ctx.with_both_bound_sockets_mut(|_sync_ctx, bound, other_bound| {
-                        PairedSocketMapMut::<_, _, S> { bound, other_bound }.remove_listener(
-                            &DualStackUnspecifiedAddr,
-                            *identifier,
-                            &device,
-                            &PairedReceivingIds {
-                                this: S::make_receiving_map_id(id),
-                                other: other_id,
-                            },
-                        )
-                    });
+                    dual_stack_ctx.with_both_bound_sockets_mut(
+                        |_sync_ctx, bound, other_bound, _alloc, _other_alloc| {
+                            PairedSocketMapMut::<_, _, S> { bound, other_bound }.remove_listener(
+                                &DualStackUnspecifiedAddr,
+                                *identifier,
+                                &device,
+                                &PairedReceivingIds {
+                                    this: S::make_receiving_map_id(id),
+                                    other: other_id,
+                                },
+                            )
+                        },
+                    );
                 }
                 RemoveOperation::OnlyCurrentStack(_, ip) => {
                     sync_ctx.with_bound_sockets_mut(|_sync_ctx, bound, _allocator| {
@@ -2323,34 +2350,37 @@ where
                 other: sync_ctx.to_other_receiving_id(id),
             };
             sync_ctx
-                .with_both_bound_sockets_mut(|sync_ctx, bound, other_bound| {
-                    let mut bound_pair = PairedSocketMapMut { bound, other_bound };
-                    let sharing = sharing.clone().into();
+                .with_both_bound_sockets_mut(
+                    |sync_ctx, bound, other_bound, _alloc, _other_alloc| {
+                        let mut bound_pair = PairedSocketMapMut { bound, other_bound };
+                        let sharing = sharing.clone().into();
 
-                    let identifier = match local_id {
-                        Some(id) => Some(id),
-                        None => try_pick_identifier::<I, S, _, _, _>(
+                        let identifier = match local_id {
+                            Some(id) => Some(id),
+                            None => try_pick_identifier::<I, S, _, _, _>(
+                                DualStackUnspecifiedAddr,
+                                &bound_pair,
+                                ctx,
+                                &sharing,
+                            ),
+                        }
+                        .ok_or(LocalAddressError::FailedToAllocateLocalPort)?;
+                        let (_addr, device, identifier) = try_pick_bound_address::<I, _, _, _>(
+                            None, device, sync_ctx, identifier,
+                        )?;
+                        let weak_device = device.map(|d| d.as_weak(sync_ctx).into_owned());
+
+                        BoundStateHandler::<_, S, _>::try_insert_listener(
+                            &mut bound_pair,
                             DualStackUnspecifiedAddr,
-                            &bound_pair,
-                            ctx,
-                            &sharing,
-                        ),
-                    }
-                    .ok_or(LocalAddressError::FailedToAllocateLocalPort)?;
-                    let (_addr, device, identifier) =
-                        try_pick_bound_address::<I, _, _, _>(None, device, sync_ctx, identifier)?;
-                    let weak_device = device.map(|d| d.as_weak(sync_ctx).into_owned());
-
-                    BoundStateHandler::<_, S, _>::try_insert_listener(
-                        &mut bound_pair,
-                        DualStackUnspecifiedAddr,
-                        identifier,
-                        weak_device.clone(),
-                        sharing,
-                        ids,
-                    )
-                    .map(|()| (identifier, weak_device))
-                })
+                            identifier,
+                            weak_device.clone(),
+                            sharing,
+                            ids,
+                        )
+                        .map(|()| (identifier, weak_device))
+                    },
+                )
                 .map(|(identifier, device)| ListenerAddr {
                     ip: sync_ctx.converter().convert_back(DualStackListenerIpAddr {
                         addr: DualStackIpAddr::ThisStack(None),
