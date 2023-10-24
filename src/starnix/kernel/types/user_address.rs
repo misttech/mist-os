@@ -50,6 +50,10 @@ impl UserAddress {
     pub fn checked_add(&self, rhs: usize) -> Option<UserAddress> {
         self.0.checked_add(rhs as u64).map(UserAddress)
     }
+
+    pub fn saturating_add(&self, rhs: usize) -> Self {
+        UserAddress(self.0.saturating_add(rhs as u64))
+    }
 }
 
 impl Default for UserAddress {

@@ -472,7 +472,7 @@ pub fn load_executable(
         0,
         vdso_size as usize,
         VDSO_PROT_FLAGS,
-        MappingOptions::empty(),
+        MappingOptions::DONT_SPLIT,
         MappingName::Vdso,
         FileWriteGuardRef(None),
     )?;

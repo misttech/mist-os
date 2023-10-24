@@ -39,6 +39,16 @@ namespace {
 constexpr size_t MMAP_FILE_SIZE = 64;
 constexpr intptr_t LIMIT_4GB = 0x80000000;
 
+TEST(MmapTest, UnmapPartialMapped) {
+  const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  uint8_t* mmap_addr = reinterpret_cast<uint8_t*>(
+      mmap(NULL, page_size * 2, PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
+  ASSERT_NE(mmap_addr, MAP_FAILED) << strerror(errno);
+
+  EXPECT_EQ(munmap(mmap_addr, page_size), 0) << strerror(errno);
+  EXPECT_EQ(munmap(mmap_addr + page_size, page_size), 0) << strerror(errno);
+}
+
 TEST(MmapTest, Map32Test) {
   char* tmp = getenv("TEST_TMPDIR");
   std::string path = tmp == nullptr ? "/tmp/mmaptest" : std::string(tmp) + "/mmaptest";

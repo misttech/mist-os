@@ -32,6 +32,7 @@ bitflags! {
       const ELF_BINARY = 16;
       const DONTFORK = 32;
       const WIPEONFORK = 64;
+      const DONT_SPLIT = 128;
     }
 }
 
@@ -358,6 +359,16 @@ impl MemoryManagerState {
         file_write_guard: FileWriteGuardRef,
         released_mappings: &mut Vec<Mapping>,
     ) -> Result<UserAddress, Errno> {
+        match addr {
+            DesiredAddress::Any => {}
+            DesiredAddress::Hint(_addr) | DesiredAddress::Fixed(_addr) => {}
+            DesiredAddress::FixedOverwrite(addr) => {
+                if self.check_has_unauthorized_splits(addr, length) {
+                    return error!(ENOMEM);
+                }
+            }
+        }
+
         let mapped_addr = self.map_internal(addr, &vmo, vmo_offset, length, prot_flags, options)?;
 
         #[cfg(any(test, debug_assertions))]
@@ -395,7 +406,7 @@ impl MemoryManagerState {
         old_length: usize,
         new_length: usize,
         flags: MremapFlags,
-        new_address: UserAddress,
+        new_addr: UserAddress,
         released_mappings: &mut Vec<Mapping>,
     ) -> Result<UserAddress, Errno> {
         // MREMAP_FIXED moves a mapping, which requires MREMAP_MAYMOVE.
@@ -434,20 +445,28 @@ impl MemoryManagerState {
         let old_length = round_up_to_system_page_size(old_length)?;
         let new_length = round_up_to_system_page_size(new_length)?;
 
+        if self.check_has_unauthorized_splits(old_addr, old_length) {
+            return error!(EINVAL);
+        }
+
+        if self.check_has_unauthorized_splits(new_addr, new_length) {
+            return error!(EINVAL);
+        }
+
         if !flags.contains(MremapFlags::FIXED) && old_length != 0 {
             // We are not requested to remap to a specific address, so first we see if we can remap
             // in-place. In-place copies (old_length == 0) are not allowed.
-            if let Some(new_address) =
+            if let Some(new_addr) =
                 self.try_remap_in_place(old_addr, old_length, new_length, released_mappings)?
             {
-                return Ok(new_address);
+                return Ok(new_addr);
             }
         }
 
         // There is no space to grow in place, or there is an explicit request to move.
         if flags.contains(MremapFlags::MAYMOVE) {
             let dst_address =
-                if flags.contains(MremapFlags::FIXED) { Some(new_address) } else { None };
+                if flags.contains(MremapFlags::FIXED) { Some(new_addr) } else { None };
             self.remap_move(old_addr, old_length, dst_address, new_length, released_mappings)
         } else {
             error!(ENOMEM)
@@ -642,6 +661,32 @@ impl MemoryManagerState {
         Ok(new_address)
     }
 
+    // Checks if an operation may be performed over the target mapping that may
+    // result in a split mapping.
+    //
+    // An operation may be forbidden if the target mapping only partially covers
+    // an existing mapping with the `MappingOptions::DONT_SPLIT` flag set.
+    fn check_has_unauthorized_splits(&self, addr: UserAddress, length: usize) -> bool {
+        let target_mapping = addr..addr.saturating_add(length);
+        let mut intersection = self.mappings.intersection(target_mapping.clone());
+
+        // A mapping is not OK if it disallows splitting and the target range
+        // does not fully cover the mapping range.
+        let check_if_mapping_has_unauthorized_split =
+            |mapping: Option<(&Range<UserAddress>, &Mapping)>| {
+                mapping.map_or(false, |(range, mapping)| {
+                    mapping.options.contains(MappingOptions::DONT_SPLIT)
+                        && (range.start < target_mapping.start || target_mapping.end < range.end)
+                })
+            };
+
+        // We only check the first and last mappings in the range because naturally,
+        // the mappings in the middle are fully covered by the target mapping and
+        // won't be split.
+        check_if_mapping_has_unauthorized_split(intersection.next())
+            || check_if_mapping_has_unauthorized_split(intersection.last())
+    }
+
     /// Unmaps the specified range. Unmapped mappings are placed in `released_mappings`.
     fn unmap(
         &mut self,
@@ -654,6 +699,10 @@ impl MemoryManagerState {
         }
         let length = round_up_to_system_page_size(length)?;
         if length == 0 {
+            return error!(EINVAL);
+        }
+
+        if self.check_has_unauthorized_splits(addr, length) {
             return error!(EINVAL);
         }
 
@@ -784,6 +833,10 @@ impl MemoryManagerState {
         // extend below the provided address if the lowest mapping is a MAP_GROWSDOWN mapping. This function has to
         // compute the potentially extended range before modifying the Zircon protections or metadata.
         let vmar_flags = prot_flags.to_vmar_flags();
+
+        if self.check_has_unauthorized_splits(addr, length) {
+            return error!(EINVAL);
+        }
 
         // Make one call to mprotect to update all the zircon protections.
         // SAFETY: This is safe because the vmar belongs to a different process.

@@ -65,8 +65,7 @@ TEST(VdsoTest, AtSysinfoEhdrPresent) {
   EXPECT_NE(addr, 0ul);
 }
 
-// TODO(https://fxbug.dev/135641): Re-enable test.
-TEST_F(VdsoProcTest, DISABLED_VdsoMappingCannotBeSplit) {
+TEST_F(VdsoProcTest, VdsoMappingCannotBeSplit) {
   // TODO(fxbug.dev/129749): Find out why this test does not work on host in CQ
   if (!test_helper::IsStarnix()) {
     GTEST_SKIP() << "This test does not work on Linux in CQ";
@@ -83,7 +82,7 @@ TEST_F(VdsoProcTest, DISABLED_VdsoMappingCannotBeSplit) {
 
   // We cannot unmap one page of the vdso.
   helper.RunInForkedProcess([&] {
-    EXPECT_NE(munmap(vdso_base_, page_size), 0)
+    ASSERT_NE(munmap(vdso_base_, page_size), 0)
         << "vdso: base " << vdso_base_ << " size " << vdso_size_ << " page size: " << page_size;
     EXPECT_EQ(errno, EINVAL);
   });
@@ -91,14 +90,14 @@ TEST_F(VdsoProcTest, DISABLED_VdsoMappingCannotBeSplit) {
 
   // We cannot mprotect one page of the vdso.
   helper.RunInForkedProcess([&] {
-    EXPECT_NE(mprotect(vdso_base_, page_size, PROT_NONE), 0);
+    ASSERT_NE(mprotect(vdso_base_, page_size, PROT_NONE), 0);
     EXPECT_EQ(errno, EINVAL);
   });
   EXPECT_TRUE(helper.WaitForChildren());
 
   // We cannot map on top of one page of the vdso.
   helper.RunInForkedProcess([&] {
-    EXPECT_EQ(
+    ASSERT_EQ(
         mmap(vdso_base_, page_size, PROT_NONE, MAP_FIXED | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0),
         MAP_FAILED);
     EXPECT_EQ(errno, ENOMEM);
@@ -110,7 +109,7 @@ TEST_F(VdsoProcTest, DISABLED_VdsoMappingCannotBeSplit) {
 
   // We cannot mremap one page of the vdso somewhere else.
   helper.RunInForkedProcess([&, new_addr] {
-    EXPECT_EQ(mremap(vdso_base_, page_size, page_size, MREMAP_MAYMOVE | MREMAP_FIXED, new_addr),
+    ASSERT_EQ(mremap(vdso_base_, page_size, page_size, MREMAP_MAYMOVE | MREMAP_FIXED, new_addr),
               MAP_FAILED);
     EXPECT_EQ(errno, EINVAL);
   });
@@ -118,7 +117,7 @@ TEST_F(VdsoProcTest, DISABLED_VdsoMappingCannotBeSplit) {
 
   // We cannot mremap something else on top of one page of the vdso.
   helper.RunInForkedProcess([&, new_addr] {
-    EXPECT_EQ(mremap(new_addr, page_size, page_size, MREMAP_MAYMOVE | MREMAP_FIXED, vdso_base_),
+    ASSERT_EQ(mremap(new_addr, page_size, page_size, MREMAP_MAYMOVE | MREMAP_FIXED, vdso_base_),
               MAP_FAILED);
     EXPECT_EQ(errno, EINVAL);
   });
