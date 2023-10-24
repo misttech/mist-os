@@ -8,6 +8,7 @@ group("examples") {
   testonly = true
   deps = [
     "effects",
+    "simple_adr",
     "simple_capture",
     "simple_sine",
     "sync_sine",

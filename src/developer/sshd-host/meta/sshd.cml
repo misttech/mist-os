@@ -193,6 +193,9 @@
         // Optional protocols that are not available on all builds.
         {
             protocol: [
+                "fuchsia.audio.device.ControlCreator",
+                "fuchsia.audio.device.Provider",
+                "fuchsia.audio.device.Registry",
                 "fuchsia.audio.ffxdaemon.DeviceControl",
                 "fuchsia.audio.ffxdaemon.Player",
                 "fuchsia.audio.ffxdaemon.Recorder",
