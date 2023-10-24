@@ -144,6 +144,7 @@ fn construct_fs_error_to_mount_vmo_result(source: ConstructFsError) -> MountVmoR
                 ParsingError::InvalidInodeSize(size) => ParseError::Incompatible(Incompatible {
                     msg: format!("Invalid inode size: {}", size),
                 }),
+                ParsingError::NotFile => unreachable!(),
             };
             MountVmoResult::ParseError(result)
         }

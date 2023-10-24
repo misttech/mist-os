@@ -251,6 +251,7 @@ rustc_binary("starnix_kernel_bin") {
     "fs/epoll.rs",
     "fs/eventfd.rs",
     "fs/ext4.rs",
+    "fs/ext4/pager.rs",
     "fs/fd_events.rs",
     "fs/fd_number.rs",
     "fs/fd_table.rs",

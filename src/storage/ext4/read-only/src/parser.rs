@@ -89,7 +89,7 @@ impl Parser {
     }
 
     /// Reads block size from the Super Block.
-    fn block_size(&self) -> Result<u64, ParsingError> {
+    pub fn block_size(&self) -> Result<u64, ParsingError> {
         self.super_block()?.block_size()
     }
 
@@ -194,6 +194,29 @@ impl Parser {
         }
 
         Ok(data)
+    }
+
+    /// Reads the inode size and raw extent data for a regular file.  Fails if the provided inode is
+    /// not a regular file.
+    pub fn read_extents(&self, inode_num: u32) -> Result<(u64, Vec<Extent>), ParsingError> {
+        let inode = self.inode(inode_num)?;
+
+        // Make sure this is a regular file.
+        const IFMT: u16 = 0xf000;
+        const IFREG: u16 = 0x8000;
+        if u16::from(inode.e2di_mode) & IFMT != IFREG {
+            return Err(ParsingError::NotFile);
+        }
+
+        let root_extent_tree_node = inode.extent_tree_node()?;
+        let mut extents = Vec::new();
+
+        self.iterate_extents_in_tree(&root_extent_tree_node, &mut |extent| {
+            extents.push(extent.clone());
+            Ok(())
+        })?;
+
+        Ok((inode.size(), extents))
     }
 
     /// Reads extent data from a leaf node.

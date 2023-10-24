@@ -548,6 +548,9 @@ pub enum ParsingError {
 
     #[error("Reader failed to read at 0x{:X}", _0)]
     SourceReadError(u64),
+
+    #[error("Not a file")]
+    NotFile,
 }
 
 impl From<ReaderError> for ParsingError {

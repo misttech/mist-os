@@ -6,9 +6,8 @@ use ext4_read_only::parser::{Parser as ExtParser, XattrMap as ExtXattrMap};
 use ext4_read_only::readers::VmoReader;
 use ext4_read_only::structs::{EntryType, INode, ROOT_INODE_NUM};
 use fuchsia_zircon as zx;
-use fuchsia_zircon::AsHandleRef;
 use once_cell::sync::OnceCell;
-use std::sync::{Arc, Weak};
+use std::sync::Arc;
 
 use super::*;
 use crate::auth::*;
@@ -18,11 +17,16 @@ use crate::mm::*;
 use crate::task::*;
 use crate::types::*;
 
+mod pager;
+
+use pager::{Pager, PagerExtent};
+
 pub struct ExtFilesystem {
     parser: ExtParser,
+    pager: Arc<Pager>,
 }
 
-impl FileSystemOps for Arc<ExtFilesystem> {
+impl FileSystemOps for ExtFilesystem {
     fn name(&self) -> &'static FsStr {
         b"ext4"
     }
@@ -33,7 +37,6 @@ impl FileSystemOps for Arc<ExtFilesystem> {
 }
 
 struct ExtNode {
-    fs: Weak<ExtFilesystem>,
     inode_num: u32,
     inode: INode,
     xattrs: ExtXattrMap,
@@ -57,33 +60,34 @@ impl ExtFilesystem {
 
         let source_device = current_task.open_file(&options.source, open_flags)?;
 
-        // TODO(https://fxbug.dev/130502) fall back to regular read operations if get_vmo fails
+        // Note that we *require* get_vmo to work here for performance reasons.  Fallback to
+        // FIDL-based read/write API is not an option.
         let vmo = source_device.get_vmo(current_task, None, prot_flags)?;
-        let fs = Arc::new(Self { parser: ExtParser::new(Box::new(VmoReader::new(vmo))) });
-        let ops = ExtDirectory {
-            inner: Arc::new(ExtNode::new(fs.clone(), current_task, ROOT_INODE_NUM)?),
-        };
+        let parser = ExtParser::new(Box::new(VmoReader::new(vmo.clone())));
+        let pager = Arc::new(Pager::new(vmo, parser.block_size().map_err(|e| errno!(EIO, e))?)?);
+        let fs = Self { parser, pager: pager.clone() };
+        let ops = ExtDirectory { inner: Arc::new(ExtNode::new(&fs, ROOT_INODE_NUM)?) };
         let mut root = FsNode::new_root(ops);
         root.node_id = ROOT_INODE_NUM as ino_t;
         let fs = FileSystem::new(kernel, CacheMode::Cached(CacheConfig::default()), fs, options);
         fs.set_root_node(root);
+        pager.start_pager_threads(current_task);
+
         Ok(fs)
     }
 }
 
+impl Drop for ExtFilesystem {
+    fn drop(&mut self) {
+        self.pager.terminate();
+    }
+}
+
 impl ExtNode {
-    fn new(
-        fs: Arc<ExtFilesystem>,
-        _current_task: &CurrentTask,
-        inode_num: u32,
-    ) -> Result<ExtNode, Errno> {
+    fn new(fs: &ExtFilesystem, inode_num: u32) -> Result<ExtNode, Errno> {
         let inode = fs.parser.inode(inode_num).map_err(|e| errno!(EIO, e))?;
         let xattrs = fs.parser.inode_xattrs(inode_num).unwrap_or_default();
-        Ok(ExtNode { fs: Arc::downgrade(&fs), inode_num, inode, xattrs })
-    }
-
-    fn fs(&self) -> Arc<ExtFilesystem> {
-        self.fs.upgrade().unwrap()
+        Ok(ExtNode { inode_num, inode, xattrs })
     }
 
     fn list_xattrs(&self) -> Result<Vec<FsString>, Errno> {
@@ -122,22 +126,20 @@ impl FsNodeOps for ExtDirectory {
     fn lookup(
         &self,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
-        let dir_entries = self
-            .inner
-            .fs()
-            .parser
-            .entries_from_inode(&self.inner.inode)
-            .map_err(|e| errno!(EIO, e))?;
+        let fs = node.fs();
+        let fs_ops = fs.downcast_ops::<ExtFilesystem>().unwrap();
+        let dir_entries =
+            fs_ops.parser.entries_from_inode(&self.inner.inode).map_err(|e| errno!(EIO, e))?;
         let entry = dir_entries
             .iter()
             .find(|e| e.name_bytes() == name)
             .ok_or_else(|| errno!(ENOENT, String::from_utf8_lossy(name)))?;
-        let ext_node = ExtNode::new(self.inner.fs(), current_task, entry.e2d_ino.into())?;
+        let ext_node = ExtNode::new(fs_ops, entry.e2d_ino.into())?;
         let inode_num = ext_node.inode_num as ino_t;
-        node.fs().get_or_create_node(Some(inode_num as ino_t), |inode_num| {
+        fs.get_or_create_node(Some(inode_num as ino_t), |inode_num| {
             let entry_type = EntryType::from_u8(entry.e2d_type).map_err(|e| errno!(EIO, e))?;
             let mode = FileMode::from_bits(ext_node.inode.e2di_mode.into());
             let owner =
@@ -157,7 +159,7 @@ impl FsNodeOps for ExtDirectory {
 
             let child = FsNode::new_uncached(
                 ops,
-                &node.fs(),
+                &fs,
                 inode_num,
                 FsNodeInfo { mode, uid: owner.uid, gid: owner.gid, ..Default::default() },
             );
@@ -173,6 +175,10 @@ impl FsNodeOps for ExtDirectory {
 struct ExtFile {
     inner: ExtNode,
     name: FsString,
+
+    // The VMO here will be a child of the main VMO that the pager holds.  We want to keep it here
+    // so that whilst ExtFile remains resident, we hold a child reference to the main VMO which
+    // will prevent the pager from dropping the VMO (and any data we might have paged-in).
     vmo: OnceCell<Arc<zx::Vmo>>,
 }
 
@@ -188,30 +194,47 @@ impl FsNodeOps for ExtFile {
 
     fn create_file_ops(
         &self,
-        _node: &FsNode,
+        node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
+        let fs = node.fs();
+        let fs_ops = fs.downcast_ops::<ExtFilesystem>().unwrap();
+        let inode_num = self.inner.inode_num;
         let vmo = self.vmo.get_or_try_init(|| {
-            let bytes = self
-                .inner
-                .fs()
+            let (file_size, extents) = fs_ops
                 .parser
-                .read_data(self.inner.inode_num)
-                .map_err(|e| errno!(EIO, e))?;
-            let vmo = zx::Vmo::create(bytes.len() as u64).map_err(|e| errno!(EBADF, e))?;
-            let name_slice = [b"ext4!".as_slice(), &self.name].concat();
-            let name_slice =
-                &name_slice[..std::cmp::min(name_slice.len(), zx::sys::ZX_MAX_NAME_LEN - 1)];
-            let name = std::ffi::CString::new(name_slice).map_err(|e| errno!(EINVAL, e))?;
-            vmo.set_name(&name)
-                .map_err(|e| errno!(EINVAL, format!("vmo set_name({:?}) failed: {e}", name)))?;
-            vmo.write(&bytes, 0).map_err(|e| errno!(EBADF, e))?;
-            Ok(Arc::new(vmo))
+                .read_extents(self.inner.inode_num)
+                .map_err(|e| errno!(EINVAL, format!("failed to read extents: {e}")))?;
+            // The extents should be sorted which we rely on later.
+            let mut pager_extents = Vec::with_capacity(extents.len());
+            let mut last_block = 0;
+            for e in extents {
+                let pager_extent = PagerExtent::from(e);
+                if pager_extent.logical.start < last_block {
+                    return error!(EIO, "Bad extent");
+                }
+                last_block = pager_extent.logical.end;
+                pager_extents.push(pager_extent);
+            }
+            Ok(Arc::new(
+                fs_ops
+                    .pager
+                    .register(&self.name, inode_num, file_size, pager_extents.into())
+                    .map_err(|e| errno!(EINVAL, e))?,
+            ))
         })?;
 
         // TODO(https://fxbug.dev/130425) returned vmo shouldn't be writeable
         Ok(Box::new(VmoFileObject::new(vmo.clone())))
+    }
+}
+
+impl From<ext4_read_only::structs::Extent> for PagerExtent {
+    fn from(e: ext4_read_only::structs::Extent) -> Self {
+        let block_count: u16 = e.e_len.into();
+        let start = e.e_blk.into();
+        Self { logical: start..start + block_count as u32, physical_block: e.target_block_num() }
     }
 }
 
@@ -223,13 +246,10 @@ impl FsNodeOps for ExtSymlink {
     fs_node_impl_symlink!();
     fs_node_impl_xattr_delegate!(self, self.inner);
 
-    fn readlink(
-        &self,
-        _node: &FsNode,
-        _current_task: &CurrentTask,
-    ) -> Result<SymlinkTarget, Errno> {
-        let data =
-            self.inner.fs().parser.read_data(self.inner.inode_num).map_err(|e| errno!(EIO, e))?;
+    fn readlink(&self, node: &FsNode, _current_task: &CurrentTask) -> Result<SymlinkTarget, Errno> {
+        let fs = node.fs();
+        let fs_ops = fs.downcast_ops::<ExtFilesystem>().unwrap();
+        let data = fs_ops.parser.read_data(self.inner.inode_num).map_err(|e| errno!(EIO, e))?;
         Ok(SymlinkTarget::Path(data))
     }
 }
@@ -253,16 +273,14 @@ impl FileOps for ExtDirFileObject {
 
     fn readdir(
         &self,
-        _file: &FileObject,
+        file: &FileObject,
         _current_task: &CurrentTask,
         sink: &mut dyn DirentSink,
     ) -> Result<(), Errno> {
-        let dir_entries = self
-            .inner
-            .fs()
-            .parser
-            .entries_from_inode(&self.inner.inode)
-            .map_err(|e| errno!(EIO, e))?;
+        let fs = file.node().fs();
+        let fs_ops = fs.downcast_ops::<ExtFilesystem>().unwrap();
+        let dir_entries =
+            fs_ops.parser.entries_from_inode(&self.inner.inode).map_err(|e| errno!(EIO, e))?;
 
         if sink.offset() as usize >= dir_entries.len() {
             return Ok(());
