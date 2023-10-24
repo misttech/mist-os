@@ -437,6 +437,8 @@ sdk_molecule("core_cc_prebuilt_libraries") {
 sdk_molecule("core_cc_source_libraries") {
   deps = [
     "//sdk/lib/async-loop-testing/cpp:cpp_sdk",
+    "//sdk/lib/async_patterns/cpp:cpp_sdk",
+    "//sdk/lib/async_patterns/testing/cpp:cpp_sdk",
     "//sdk/lib/component/incoming/cpp:cpp_sdk",
     "//sdk/lib/component/outgoing/cpp:cpp_sdk",
     "//sdk/lib/driver/component/cpp:cpp_sdk",

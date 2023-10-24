@@ -5,7 +5,7 @@
 import("//build/cpp/sdk_source_set.gni")
 
 sdk_source_set("cpp") {
-  category = "internal"
+  category = "partner"
   sdk_name = "async_patterns_testing_cpp"
   include_base = "//sdk"
 
@@ -17,7 +17,6 @@ sdk_source_set("cpp") {
   ]
 
   public_configs = [ "//sdk/config" ]
-  testonly = true
 }
 
 group("tests") {

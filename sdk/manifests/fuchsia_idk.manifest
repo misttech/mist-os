@@ -20,6 +20,8 @@ cc_source_library://pkg/async-loop
 cc_source_library://pkg/async-loop-cpp
 cc_source_library://pkg/async-loop-testing
 cc_source_library://pkg/async-testing
+cc_source_library://pkg/async_patterns_cpp
+cc_source_library://pkg/async_patterns_testing_cpp
 cc_source_library://pkg/component_incoming_cpp
 cc_source_library://pkg/component_outgoing_cpp
 cc_source_library://pkg/driver_component_cpp
