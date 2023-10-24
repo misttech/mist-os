@@ -1,3 +1,4 @@
+<<<<<<< PATCH SET (eefd8a [ffx][target]: flash communicate directly)
 {
   "name": "flash",
   "description": "Flash an image to a target device",
@@ -112,3 +113,5 @@
   ],
   "error_codes": []
 }
+=======
+>>>>>>> BASE      (c23c71 [ffx][target]: bootloader communicate directly)
