@@ -76,7 +76,14 @@ pub struct Params {
 
 impl Params {
     fn add_param<'a, T: Into<GA4Value>>(&mut self, param_key: &str, param_value: T) {
-        self.params.insert(param_key.into(), param_value.into());
+        let value = match param_value.into() {
+            GA4Value::Str(s) => {
+                let truncated_value = truncate_string_to_len(&s, PARAM_VALUE_LENGTH_MAX);
+                truncated_value.into()
+            }
+            x => x,
+        };
+        self.params.insert(param_key.into(), value);
     }
 
     fn validate(&self) -> Result<(), anyhow::Error> {
@@ -357,6 +364,13 @@ pub fn validate_string_len(string: &str, max_len: usize) -> Result<(), anyhow::E
     }
 }
 
+pub fn truncate_string_to_len(string: &str, max_len: usize) -> &str {
+    match string.len() <= max_len {
+        true => string,
+        false => &string[0..(max_len)],
+    }
+}
+
 /// Ensure that the keys and values of a map
 /// adhere to the Measurement Protocol constraints.
 /// The value_predicate parameter allows differing tests on values.
@@ -524,6 +538,24 @@ mod tests {
             _ => false,
         });
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn truncate_str_len_too_long() {
+        let result = truncate_string_to_len(&"foo", 2);
+        assert_eq!(result, "fo");
+    }
+
+    #[test]
+    fn truncate_str_len_one() {
+        let result = truncate_string_to_len(&"foo", 1);
+        assert_eq!(result, "f");
+    }
+
+    #[test]
+    fn truncate_str_len_empty() {
+        let result = truncate_string_to_len(&"", 3);
+        assert_eq!(result, "");
     }
 
     #[test]
