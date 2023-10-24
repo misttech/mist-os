@@ -35,6 +35,14 @@ Prior to building a custom Rust toolchain for Fuchsia, you need to do the follow
    Note: Running `jiri update` from the `infra` directory ensures that you
    have the most recent configurations and tools.
 
+1. If you haven't already, clone the Rust source. The
+   [Guide to Rustc Development] is a good resource to reference whenever you're
+   working on the compiler.
+
+   ```posix-terminal
+   git clone --recurse-submodules https://github.com/rust-lang/rust.git $DEV_ROOT/rust
+   ```
+
 1. Run the following command to use `cipd` to get a Fuchsia core IDK, a Linux
    sysroot, a recent version of clang, and the correct beta compiler for
    building Fuchsia's Rust toolchain:
@@ -61,14 +69,6 @@ Prior to building a custom Rust toolchain for Fuchsia, you need to do the follow
    Note: these versions are not pinned, so every time you run the `cipd ensure`
    command, you will get an updated version. As of writing, however, this
    matches the recipe behavior.
-
-1. If you haven't already, clone the Rust source. The
-   [Guide to Rustc Development] is a good resource to reference whenever you're
-   working on the compiler.
-
-   ```posix-terminal
-   git clone https://github.com/rust-lang/rust.git $DEV_ROOT/rust
-   ```
 
 [Guide to Rustc Development]: https://rustc-dev-guide.rust-lang.org/building/how-to-build-and-run.html
 
