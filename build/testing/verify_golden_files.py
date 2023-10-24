@@ -120,7 +120,7 @@ def main():
                 )
             else:
                 diff_lines = get_diff_lines(
-                    candidate, formatted_golden or golden
+                    formatted_golden or golden, candidate
                 )
                 current_comparison_failed = bool(diff_lines)
         else:
@@ -137,9 +137,9 @@ def main():
             if diff_lines:
                 max_diff_lines = 16
                 if len(diff_lines) > max_diff_lines:
-                    str += f"\nDiff (truncated):\n"
+                    str += f"\nDiff (-golden +actual, truncated):\n"
                 else:
-                    str += f"\nDiff:\n"
+                    str += f"\nDiff (-golden +actual):\n"
                 str += "".join(diff_lines[:max_diff_lines])
 
             print(str)
