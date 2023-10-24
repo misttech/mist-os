@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use addr::TargetAddr;
+use anyhow::anyhow;
 use async_trait::async_trait;
+use chrono::Duration;
 use errors::ffx_bail;
 use ffx_bootloader_args::{
     BootCommand, BootloaderCommand,
@@ -11,15 +14,23 @@ use ffx_bootloader_args::{
 };
 use ffx_fastboot::{
     boot::boot,
-    common::{from_manifest, prepare},
+    common::fastboot::tcp_proxy,
+    common::fastboot::udp_proxy,
+    common::fastboot::usb_proxy,
+    common::{fastboot_interface::FastbootInterface, from_manifest, prepare},
     file_resolver::resolvers::EmptyResolver,
     info::info,
     lock::lock,
     unlock::unlock,
 };
 use fho::{FfxContext, FfxMain, FfxTool, SimpleWriter};
-use fidl_fuchsia_developer_ffx::FastbootProxy;
+use fidl_fuchsia_developer_ffx::{
+    FastbootInterface as FidlFastbootInterface, TargetProxy, TargetRebootState,
+};
+use fidl_fuchsia_developer_ffx::{FastbootProxy, TargetState};
+use fuchsia_async::Timer;
 use std::io::{stdin, Write};
+use std::net::SocketAddr;
 
 const MISSING_ZBI: &str = "Error: vbmeta parameter must be used with zbi parameter";
 
@@ -31,6 +42,7 @@ pub struct BootloaderTool {
     #[command]
     cmd: BootloaderCommand,
     fastboot_proxy: FastbootProxy,
+    target_proxy: TargetProxy,
 }
 
 fho::embedded_plugin!(BootloaderTool);
@@ -39,12 +51,92 @@ fho::embedded_plugin!(BootloaderTool);
 impl FfxMain for BootloaderTool {
     type Writer = SimpleWriter;
     async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
-        bootloader_impl(self.fastboot_proxy, self.cmd, &mut writer).await
+        if self.cmd.daemon {
+            return bootloader_impl(self.fastboot_proxy, self.cmd, &mut writer).await;
+        }
+
+        let mut info = self.target_proxy.identity().await.map_err(|e| anyhow!(e))?;
+        match info.target_state {
+            Some(TargetState::Fastboot) => {
+                // Nothing to do
+                tracing::debug!("Target already in Fastboot state");
+            }
+            Some(mode) => {
+                // Tell the target to reboot to the bootloader
+                tracing::debug!("Target in {:#?} state. Rebooting to bootloader...", mode);
+                self.target_proxy
+                    .reboot(TargetRebootState::Bootloader)
+                    .await
+                    .user_message("Got error rebooting")?
+                    .map_err(|e| anyhow!("Got error rebooting target: {:#?}", e))
+                    .user_message("Got an error rebooting")?;
+
+                // Wait 10 seconds to allow the  target to fully cycle to the bootloader
+                write!(writer, "Waiting for 10 seconds for Target to reboot")
+                    .user_message("Error writing user message")?;
+                writer.flush().user_message("Error flushing writer buffer")?;
+
+                Timer::new(
+                    Duration::seconds(10)
+                        .to_std()
+                        .user_message("Error converting 10 seconds to Duration")?,
+                )
+                .await;
+
+                // Get the info again since the target changed state
+                info = self
+                    .target_proxy
+                    .identity()
+                    .await
+                    .user_message("Error getting the target's identity")?;
+
+                if !matches!(info.target_state, Some(TargetState::Fastboot)) {
+                    ffx_bail!("Target was requested to reboot to the bootloader, but was found in {:#?} state",info.target_state)
+                }
+            }
+            None => {
+                ffx_bail!("Target had an unknown, non-existant state")
+            }
+        };
+        match info.fastboot_interface {
+            None => ffx_bail!("Unknown fastboot interface state"),
+            Some(FidlFastbootInterface::Usb) => {
+                let serial_num = info.serial_number.ok_or_else(|| {
+                    anyhow!("Target was detected in Fastboot USB but did not have a serial number")
+                })?;
+                let proxy = usb_proxy(serial_num).await?;
+                bootloader_impl(proxy, self.cmd, &mut writer).await
+            }
+            Some(FidlFastbootInterface::Udp) => {
+                // We take the first address as when a target is in Fastboot mode and over
+                // UDP it only exposes one address
+                if let Some(addr) = info.addresses.unwrap().into_iter().take(1).next() {
+                    let target_addr: TargetAddr = addr.into();
+                    let socket_addr: SocketAddr = target_addr.into();
+                    let proxy = udp_proxy(&socket_addr).await?;
+                    bootloader_impl(proxy, self.cmd, &mut writer).await
+                } else {
+                    ffx_bail!("Could not get a valid address for target");
+                }
+            }
+            Some(FidlFastbootInterface::Tcp) => {
+                // We take the first address as when a target is in Fastboot mode and over
+                // TCP it only exposes one address
+                if let Some(addr) = info.addresses.unwrap().into_iter().take(1).next() {
+                    let target_addr: TargetAddr = addr.into();
+                    let socket_addr: SocketAddr = target_addr.into();
+                    let proxy = tcp_proxy(&socket_addr).await?;
+                    bootloader_impl(proxy, self.cmd, &mut writer).await
+                } else {
+                    ffx_bail!("Could not get a valid address for target");
+                }
+            }
+        }
     }
 }
 
 pub async fn bootloader_impl<W: Write>(
-    mut fastboot_proxy: FastbootProxy,
+    mut fastboot_proxy: impl FastbootInterface,
     cmd: BootloaderCommand,
     writer: &mut W,
 ) -> fho::Result<()> {
@@ -138,6 +230,7 @@ mod test {
                     vbmeta: Some(vbmeta_file_name),
                     slot: "a".to_string(),
                 }),
+                daemon: false,
             },
             &mut std::io::stdout(),
         )
@@ -165,6 +258,7 @@ mod test {
                     vbmeta: None,
                     slot: "a".to_string(),
                 }),
+                daemon: false,
             },
             &mut std::io::stdout(),
         )
@@ -192,6 +286,7 @@ mod test {
                     vbmeta: Some(vbmeta_file_name),
                     slot: "a".to_string(),
                 }),
+                daemon: false,
             },
             &mut std::io::stdout(),
         )
@@ -216,6 +311,7 @@ mod test {
                 product_bundle: None,
                 skip_verify: false,
                 subcommand: Lock(LockCommand {}),
+                daemon: false,
             },
             &mut std::io::stdout(),
         )

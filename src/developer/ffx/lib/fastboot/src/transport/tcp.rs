@@ -4,7 +4,7 @@
 
 // #![allow(unused_imports, unused_variables, dead_code)]
 use crate::common::fastboot::{InterfaceFactory, InterfaceFactoryBase};
-use anyhow::{ bail, Context as _, Result};
+use anyhow::{bail, Context as _, Result};
 use async_net::TcpStream;
 use async_trait::async_trait;
 use futures::{
@@ -33,7 +33,7 @@ impl TcpFactory {
     }
 }
 
-impl Drop for TcpFactory{
+impl Drop for TcpFactory {
     fn drop(&mut self) {
         futures::executor::block_on(async move {
             self.close().await;

@@ -37,6 +37,9 @@ pub struct BootloaderCommand {
 
     #[argh(subcommand)]
     pub subcommand: SubCommand,
+
+    #[argh(switch, description = "DEPRECATED - use the daemon to communicate with the Target.")]
+    pub daemon: bool,
 }
 
 #[derive(ArgsInfo, FromArgs, Clone, PartialEq, Debug)]
