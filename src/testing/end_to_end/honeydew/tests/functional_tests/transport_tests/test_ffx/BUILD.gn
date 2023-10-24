@@ -12,8 +12,8 @@ if (is_host) {
       "//src/testing/end_to_end/honeydew",
       "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
     ]
-    params_source = "params.yaml"
     transport = "fuchsia-controller"
+    params_source = "params.yaml"
     environments = [ emu_env ]
   }
 
@@ -27,6 +27,7 @@ if (is_host) {
     environments = [ emu_env ]
   }
 
+  # Group containing all of the FFX transport functional test cases.
   group("tests") {
     testonly = true
     public_deps = [
@@ -35,14 +36,19 @@ if (is_host) {
     ]
   }
 
-  # Stable infra test groups.
-  group("stable_non_sl4f_emulator_tests") {
+  # Infra test groups:
+  #     Stable
+  #         Emulator
+  #             That does not require SL4F transport
+  #     Unstable
+  #         Emulator
+  #             That does not require SL4F transport
+  group("stable_emulator_tests") {
     testonly = true
     public_deps = [ ":ffx_test_fc($host_toolchain)" ]
   }
 
-  # Unstable infra test groups.
-  group("unstable_non_sl4f_emulator_tests") {
+  group("unstable_emulator_tests") {
     testonly = true
     public_deps = [ ":ffx_wait_for_rcs_disconnection_test_fc($host_toolchain)" ]
   }

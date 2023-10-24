@@ -3,87 +3,52 @@
 # found in the LICENSE file.
 
 if (is_host) {
-  #
-  # Emulator tests
-  #
-
-  # Stable infra test groups.
-  group("stable_sl4f_emulator_tests") {
-    testonly = true
-    public_deps = [ "test_fuchsia_device:stable_sl4f_emulator_tests" ]
-  }
-
-  group("stable_non_sl4f_emulator_tests") {
-    testonly = true
-    public_deps = [ "test_fuchsia_device:stable_non_sl4f_emulator_tests" ]
-  }
-
-  # Unstable infra test groups.
-  group("unstable_sl4f_emulator_tests") {
-    testonly = true
-    public_deps = [ "test_fuchsia_device:unstable_sl4f_emulator_tests" ]
-  }
-
-  group("unstable_non_sl4f_emulator_tests") {
-    testonly = true
-    public_deps = [ "test_fuchsia_device:unstable_non_sl4f_emulator_tests" ]
-  }
-
-  #
-  # NUC tests
-  #
-
-  # Stable infra test groups.
-  group("stable_sl4f_nuc_tests") {
-    testonly = true
-    public_deps = [ "test_fuchsia_device:stable_sl4f_nuc_tests" ]
-  }
-
-  group("stable_non_sl4f_nuc_tests") {
-    testonly = true
-    public_deps = [ "test_fuchsia_device:stable_non_sl4f_nuc_tests" ]
-  }
-
-  # Unstable infra test groups.
-  group("unstable_sl4f_nuc_tests") {
-    testonly = true
-    public_deps = [ "test_fuchsia_device:unstable_sl4f_nuc_tests" ]
-  }
-
-  group("unstable_non_sl4f_nuc_tests") {
-    testonly = true
-    public_deps = [ "test_fuchsia_device:unstable_non_sl4f_nuc_tests" ]
-  }
-
-  #
-  # Vim3 tests
-  #
-
-  # Stable infra test groups.
-  group("stable_sl4f_vim3_tests") {
-    testonly = true
-    public_deps = [ "test_fuchsia_device:stable_sl4f_vim3_tests" ]
-  }
-
-  group("stable_non_sl4f_vim3_tests") {
-    testonly = true
-    public_deps = [ "test_fuchsia_device:stable_non_sl4f_vim3_tests" ]
-  }
-
-  # Unstable infra test groups.
-  group("unstable_sl4f_vim3_tests") {
-    testonly = true
-    public_deps = [ "test_fuchsia_device:unstable_sl4f_vim3_tests" ]
-  }
-
-  group("unstable_non_sl4f_vim3_tests") {
-    testonly = true
-    public_deps = [ "test_fuchsia_device:unstable_non_sl4f_vim3_tests" ]
-  }
-
   # Group containing all of the fuchsia_device functional test cases.
   group("tests") {
     testonly = true
     public_deps = [ "test_fuchsia_device:tests" ]
+  }
+
+  # Infra test groups:
+  #     Stable
+  #         Emulator
+  #             That require SL4F transport
+  #             That does not require SL4F transport
+  #     Unstable
+  #         VIM3
+  #             That require SL4F transport
+  #             That does not require SL4F transport
+  #         NUC
+  #             That require SL4F transport
+  #             That does not require SL4F transport
+
+  group("stable_emulator_sl4f_tests") {
+    testonly = true
+    public_deps = [ "test_fuchsia_device:stable_emulator_sl4f_tests" ]
+  }
+
+  group("stable_emulator_tests") {
+    testonly = true
+    public_deps = [ "test_fuchsia_device:stable_emulator_tests" ]
+  }
+
+  group("unstable_nuc_sl4f_tests") {
+    testonly = true
+    public_deps = [ "test_fuchsia_device:unstable_nuc_sl4f_tests" ]
+  }
+
+  group("unstable_nuc_tests") {
+    testonly = true
+    public_deps = [ "test_fuchsia_device:unstable_nuc_tests" ]
+  }
+
+  group("unstable_vim3_sl4f_tests") {
+    testonly = true
+    public_deps = [ "test_fuchsia_device:unstable_vim3_sl4f_tests" ]
+  }
+
+  group("unstable_vim3_tests") {
+    testonly = true
+    public_deps = [ "test_fuchsia_device:unstable_vim3_tests" ]
   }
 }

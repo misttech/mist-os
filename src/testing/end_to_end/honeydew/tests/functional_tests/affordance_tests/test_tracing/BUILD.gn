@@ -25,6 +25,7 @@ if (is_host) {
     environments = [ emu_env ]
   }
 
+  # Group containing all of the Tracing affordance functional test cases.
   group("tests") {
     testonly = true
     public_deps = [
@@ -33,25 +34,19 @@ if (is_host) {
     ]
   }
 
-  # Stable infra test groups.
-  group("stable_sl4f_emulator_tests") {
+  # Infra test groups:
+  #     Stable
+  #         Emulator
+  #             That require SL4F transport
+  #             That does not require SL4F transport
+
+  group("stable_emulator_sl4f_tests") {
     testonly = true
     public_deps = [ ":tracing_test($host_toolchain)" ]
   }
 
-  group("stable_non_sl4f_emulator_tests") {
+  group("stable_emulator_tests") {
     testonly = true
     public_deps = [ ":tracing_test_fc($host_toolchain)" ]
-  }
-
-  # Unstable infra test groups.
-  group("unstable_sl4f_emulator_tests") {
-    testonly = true
-    public_deps = []
-  }
-
-  group("unstable_non_sl4f_emulator_tests") {
-    testonly = true
-    public_deps = []
   }
 }

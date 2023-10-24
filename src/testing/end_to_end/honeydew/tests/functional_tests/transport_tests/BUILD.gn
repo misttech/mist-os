@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 if (is_host) {
+  # Group containing all of the transports functional test cases.
   group("tests") {
     testonly = true
     public_deps = [
@@ -11,35 +12,20 @@ if (is_host) {
     ]
   }
 
-  #
-  # Emulator tests
-  #
-
-  # Stable infra test groups.
-  group("stable_sl4f_emulator_tests") {
+  # Infra test groups:
+  #     Stable
+  #         Emulator
+  #             That does not require SL4F transport
+  #     Unstable
+  #         Emulator
+  #             That does not require SL4F transport
+  group("stable_emulator_tests") {
     testonly = true
-    public_deps = []
+    public_deps = [ "test_ffx:stable_emulator_tests" ]
   }
 
-  group("stable_non_sl4f_emulator_tests") {
+  group("unstable_emulator_tests") {
     testonly = true
-    public_deps = [
-      "test_fastboot:stable_non_sl4f_emulator_tests",
-      "test_ffx:stable_non_sl4f_emulator_tests",
-    ]
-  }
-
-  # Unstable infra test groups.
-  group("unstable_sl4f_emulator_tests") {
-    testonly = true
-    public_deps = []
-  }
-
-  group("unstable_non_sl4f_emulator_tests") {
-    testonly = true
-    public_deps = [
-      "test_fastboot:unstable_non_sl4f_emulator_tests",
-      "test_ffx:unstable_non_sl4f_emulator_tests",
-    ]
+    public_deps = [ "test_ffx:unstable_emulator_tests" ]
   }
 }

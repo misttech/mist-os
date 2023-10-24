@@ -2,108 +2,141 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-if (is_host) {
-  #
-  # Emulator tests
-  #
+assert(is_host, "Python E2E tests are host-only")
 
-  # Stable infra test groups.
-  group("stable_sl4f_emulator_tests") {
-    testonly = true
-    public_deps = [
-      "affordance_tests:stable_sl4f_emulator_tests",
-      "fuchsia_device_tests:stable_sl4f_emulator_tests",
-      "transport_tests:stable_sl4f_emulator_tests",
-    ]
-  }
+# All of the HoneyDew functional tests
+group("tests") {
+  testonly = true
+  public_deps = [
+    "affordance_tests:tests",
+    "fuchsia_device_tests:tests",
+    "transport_tests:tests",
+  ]
+}
 
-  group("stable_non_sl4f_emulator_tests") {
-    testonly = true
-    public_deps = [
-      "affordance_tests:stable_non_sl4f_emulator_tests",
-      "fuchsia_device_tests:stable_non_sl4f_emulator_tests",
-      "transport_tests:stable_non_sl4f_emulator_tests",
-    ]
-  }
+# Infra test groups:
+#     Stable
+#         Emulator
+#             That require SL4F transport
+#             That does not require SL4F transport
+#     Unstable
+#         Emulator
+#             That require SL4F transport
+#             That does not require SL4F transport
+#         VIM3
+#             That require SL4F transport
+#             That does not require SL4F transport
+#         NUC
+#             That require SL4F transport
+#             That does not require SL4F transport
 
-  # Unstable infra test groups.
-  group("unstable_sl4f_emulator_tests") {
-    testonly = true
-    public_deps = [
-      "affordance_tests:unstable_sl4f_emulator_tests",
-      "fuchsia_device_tests:unstable_sl4f_emulator_tests",
-      "transport_tests:unstable_sl4f_emulator_tests",
-    ]
-  }
+group("stable_emulator_sl4f_tests") {
+  testonly = true
+  public_deps = [
+    "affordance_tests:stable_emulator_sl4f_tests",
+    "fuchsia_device_tests:stable_emulator_sl4f_tests",
+  ]
+}
 
-  group("unstable_non_sl4f_emulator_tests") {
-    testonly = true
-    public_deps = [
-      "affordance_tests:unstable_non_sl4f_emulator_tests",
-      "fuchsia_device_tests:unstable_non_sl4f_emulator_tests",
-      "transport_tests:unstable_non_sl4f_emulator_tests",
-    ]
-  }
+group("stable_emulator_tests") {
+  testonly = true
+  public_deps = [
+    "affordance_tests:stable_emulator_tests",
+    "fuchsia_device_tests:stable_emulator_tests",
+    "transport_tests:stable_emulator_tests",
+  ]
+}
 
-  #
-  # Vim3 tests
-  #
+group("unstable_emulator_sl4f_tests") {
+  testonly = true
+  public_deps = []
+}
 
-  # Stable infra test groups.
-  group("stable_sl4f_vim3_tests") {
-    testonly = true
-    public_deps = [ "fuchsia_device_tests:stable_sl4f_vim3_tests" ]
-  }
+group("unstable_emulator_tests") {
+  testonly = true
+  public_deps = [
+    "affordance_tests:unstable_emulator_tests",
+    "transport_tests:unstable_emulator_tests",
+  ]
+}
 
-  group("stable_non_sl4f_vim3_tests") {
-    testonly = true
-    public_deps = [ "fuchsia_device_tests:stable_non_sl4f_vim3_tests" ]
-  }
+group("unstable_vim3_sl4f_tests") {
+  testonly = true
+  public_deps = [ "fuchsia_device_tests:unstable_vim3_sl4f_tests" ]
+}
 
-  # Unstable infra test groups.
-  group("unstable_sl4f_vim3_tests") {
-    testonly = true
-    public_deps = [ "fuchsia_device_tests:unstable_sl4f_vim3_tests" ]
-  }
+group("unstable_vim3_tests") {
+  testonly = true
+  public_deps = [ "fuchsia_device_tests:unstable_vim3_tests" ]
+}
 
-  group("unstable_non_sl4f_vim3_tests") {
-    testonly = true
-    public_deps = [ "fuchsia_device_tests:unstable_non_sl4f_vim3_tests" ]
-  }
+group("unstable_nuc_sl4f_tests") {
+  testonly = true
+  public_deps = [ "fuchsia_device_tests:unstable_nuc_sl4f_tests" ]
+}
 
-  #
-  # NUC tests
-  #
+group("unstable_nuc_tests") {
+  testonly = true
+  public_deps = [ "fuchsia_device_tests:unstable_nuc_tests" ]
+}
 
-  # Stable infra test groups.
-  group("stable_sl4f_nuc_tests") {
-    testonly = true
-    public_deps = [ "fuchsia_device_tests:stable_sl4f_nuc_tests" ]
-  }
+# ToDo - Temporary. Will be deleted
+group("stable_sl4f_emulator_tests") {
+  testonly = true
+  public_deps = [ ":stable_emulator_sl4f_tests" ]
+}
 
-  group("stable_non_sl4f_nuc_tests") {
-    testonly = true
-    public_deps = [ "fuchsia_device_tests:stable_non_sl4f_nuc_tests" ]
-  }
+group("unstable_sl4f_emulator_tests") {
+  testonly = true
+  public_deps = [ ":unstable_emulator_sl4f_tests" ]
+}
 
-  # Unstable infra test groups.
-  group("unstable_sl4f_nuc_tests") {
-    testonly = true
-    public_deps = [ "fuchsia_device_tests:unstable_sl4f_nuc_tests" ]
-  }
+group("stable_sl4f_nuc_tests") {
+  testonly = true
+  public_deps = []
+}
 
-  group("unstable_non_sl4f_nuc_tests") {
-    testonly = true
-    public_deps = [ "fuchsia_device_tests:unstable_non_sl4f_nuc_tests" ]
-  }
+group("unstable_sl4f_nuc_tests") {
+  testonly = true
+  public_deps = [ ":unstable_nuc_sl4f_tests" ]
+}
 
-  # All of the functional tests
-  group("tests") {
-    testonly = true
-    public_deps = [
-      "affordance_tests:tests",
-      "fuchsia_device_tests:tests",
-      "transport_tests:tests",
-    ]
-  }
+group("stable_sl4f_vim3_tests") {
+  testonly = true
+  public_deps = []
+}
+
+group("unstable_sl4f_vim3_tests") {
+  testonly = true
+  public_deps = [ ":unstable_vim3_sl4f_tests" ]
+}
+
+group("stable_non_sl4f_emulator_tests") {
+  testonly = true
+  public_deps = [ ":stable_emulator_tests" ]
+}
+
+group("unstable_non_sl4f_emulator_tests") {
+  testonly = true
+  public_deps = [ ":unstable_emulator_tests" ]
+}
+
+group("stable_non_sl4f_nuc_tests") {
+  testonly = true
+  public_deps = []
+}
+
+group("unstable_non_sl4f_nuc_tests") {
+  testonly = true
+  public_deps = [ ":unstable_nuc_tests" ]
+}
+
+group("stable_non_sl4f_vim3_tests") {
+  testonly = true
+  public_deps = []
+}
+
+group("unstable_non_sl4f_vim3_tests") {
+  testonly = true
+  public_deps = [ ":unstable_vim3_tests" ]
 }

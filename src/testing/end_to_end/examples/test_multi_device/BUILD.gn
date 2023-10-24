@@ -6,7 +6,7 @@ import("//build/python/python_library.gni")
 import("//build/python/python_mobly_test.gni")
 import("//build/testing/environments.gni")
 
-python_mobly_test("test_multi_device") {
+python_mobly_test("multi_device_test") {
   main_source = "test_multi_device.py"
 
   # The library below provides device interaction APIs.
@@ -16,4 +16,9 @@ python_mobly_test("test_multi_device") {
   ]
 
   params_source = "params.yaml"
+}
+
+group("tests") {
+  testonly = true
+  public_deps = [ ":multi_device_test($host_toolchain)" ]
 }

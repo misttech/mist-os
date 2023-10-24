@@ -4,21 +4,27 @@
 
 assert(is_host, "Python E2E tests are host-only")
 
+# Group containing all of the Lacewing example test cases.
 group("tests") {
   testonly = true
   public_deps = [
     "test_hybrid:tests",
+    "test_multi_device:tests",
     "test_soft_reboot:tests",
   ]
 }
 
-# Stable infra test groups.
-group("stable_sl4f_emulator_tests") {
+# Infra test groups:
+#     Stable
+#         Emulator
+#             That require SL4F transport
+#             That does not require SL4F transport
+group("stable_emulator_sl4f_tests") {
   testonly = true
-  public_deps = [ "test_soft_reboot:stable_sl4f_emulator_tests" ]
+  public_deps = [ "test_soft_reboot:stable_emulator_sl4f_tests" ]
 }
 
-group("stable_non_sl4f_emulator_tests") {
+group("stable_emulator_tests") {
   testonly = true
-  public_deps = [ "test_soft_reboot:stable_non_sl4f_emulator_tests" ]
+  public_deps = [ "test_soft_reboot:stable_emulator_tests" ]
 }

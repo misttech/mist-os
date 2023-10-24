@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 if (is_host) {
+  # Group containing all of the HoneyDew affordances functional test cases.
   group("tests") {
     testonly = true
     public_deps = [
@@ -14,53 +15,27 @@ if (is_host) {
     ]
   }
 
-  #
-  # Emulator tests
-  #
+  # Infra test groups:
+  #     Stable
+  #         Emulator
+  #             That require SL4F transport
+  #             That does not require SL4F transport
+  #     Unstable
+  #         Emulator
+  #             That does not require SL4F transport
 
-  # Stable infra test groups.
-  group("stable_sl4f_emulator_tests") {
+  group("stable_emulator_sl4f_tests") {
     testonly = true
-    public_deps = [
-      "test_bluetooth:stable_sl4f_emulator_tests",
-      "test_session:stable_sl4f_emulator_tests",
-      "test_tracing:stable_sl4f_emulator_tests",
-      "test_ui:stable_sl4f_emulator_tests",
-      "test_wlan:stable_sl4f_emulator_tests",
-    ]
+    public_deps = [ "test_tracing:stable_emulator_sl4f_tests" ]
   }
 
-  group("stable_non_sl4f_emulator_tests") {
+  group("stable_emulator_tests") {
     testonly = true
-    public_deps = [
-      "test_bluetooth:stable_non_sl4f_emulator_tests",
-      "test_session:stable_non_sl4f_emulator_tests",
-      "test_tracing:stable_non_sl4f_emulator_tests",
-      "test_ui:stable_non_sl4f_emulator_tests",
-      "test_wlan:stable_non_sl4f_emulator_tests",
-    ]
+    public_deps = [ "test_tracing:stable_emulator_tests" ]
   }
 
-  # Unstable infra test groups.
-  group("unstable_sl4f_emulator_tests") {
+  group("unstable_emulator_tests") {
     testonly = true
-    public_deps = [
-      "test_bluetooth:unstable_sl4f_emulator_tests",
-      "test_session:unstable_sl4f_emulator_tests",
-      "test_tracing:unstable_sl4f_emulator_tests",
-      "test_ui:unstable_sl4f_emulator_tests",
-      "test_wlan:unstable_sl4f_emulator_tests",
-    ]
-  }
-
-  group("unstable_non_sl4f_emulator_tests") {
-    testonly = true
-    public_deps = [
-      "test_bluetooth:unstable_non_sl4f_emulator_tests",
-      "test_session:unstable_non_sl4f_emulator_tests",
-      "test_tracing:unstable_non_sl4f_emulator_tests",
-      "test_ui:unstable_non_sl4f_emulator_tests",
-      "test_wlan:unstable_non_sl4f_emulator_tests",
-    ]
+    public_deps = [ "test_session:unstable_emulator_tests" ]
   }
 }

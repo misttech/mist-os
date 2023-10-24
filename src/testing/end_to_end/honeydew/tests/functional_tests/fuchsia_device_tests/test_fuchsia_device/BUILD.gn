@@ -37,6 +37,7 @@ if (is_host) {
     params_source = "params_x64.yaml"
     environments = [ nuc_env ]
   }
+
   python_mobly_test("x64_nuc_test_fc") {
     main_source = "test_fuchsia_device.py"
     libraries = [
@@ -57,6 +58,7 @@ if (is_host) {
     params_source = "params_vim3.yaml"
     environments = [ vim3_env ]
   }
+
   python_mobly_test("vim3_test_fc") {
     main_source = "test_fuchsia_device.py"
     libraries = [
@@ -68,68 +70,7 @@ if (is_host) {
     environments = [ vim3_env ]
   }
 
-  # Stable infra test groups.
-  group("stable_sl4f_vim3_tests") {
-    testonly = true
-    public_deps = []
-  }
-
-  group("stable_non_sl4f_vim3_tests") {
-    testonly = true
-    public_deps = []
-  }
-
-  group("stable_sl4f_nuc_tests") {
-    testonly = true
-    public_deps = []
-  }
-
-  group("stable_non_sl4f_nuc_tests") {
-    testonly = true
-    public_deps = []
-  }
-
-  group("stable_sl4f_emulator_tests") {
-    testonly = true
-    public_deps = [ ":x64_emu_test($host_toolchain)" ]
-  }
-  group("stable_non_sl4f_emulator_tests") {
-    testonly = true
-    public_deps = [ ":x64_emu_test_fc($host_toolchain)" ]
-  }
-
-  # Unstable infra test groups.
-  group("unstable_sl4f_vim3_tests") {
-    testonly = true
-    public_deps = [ ":vim3_test($host_toolchain)" ]
-  }
-
-  group("unstable_non_sl4f_vim3_tests") {
-    testonly = true
-    public_deps = [ ":vim3_test_fc($host_toolchain)" ]
-  }
-
-  group("unstable_sl4f_nuc_tests") {
-    testonly = true
-    public_deps = [ ":x64_nuc_test($host_toolchain)" ]
-  }
-
-  group("unstable_non_sl4f_nuc_tests") {
-    testonly = true
-    public_deps = [ ":x64_nuc_test_fc($host_toolchain)" ]
-  }
-
-  group("unstable_sl4f_emulator_tests") {
-    testonly = true
-    public_deps = []
-  }
-
-  group("unstable_non_sl4f_emulator_tests") {
-    testonly = true
-    public_deps = []
-  }
-
-  # All the FuchsiaDevice tests run across different fuchsia devices
+  # Group containing all of the fuchsia_device functional test cases.
   group("tests") {
     testonly = true
     public_deps = [
@@ -140,5 +81,47 @@ if (is_host) {
       ":x64_nuc_test($host_toolchain)",
       ":x64_nuc_test_fc($host_toolchain)",
     ]
+  }
+
+  # Infra test groups:
+  #     Stable
+  #         Emulator
+  #             That require SL4F transport
+  #             That does not require SL4F transport
+  #     Unstable
+  #         VIM3
+  #             That require SL4F transport
+  #             That does not require SL4F transport
+  #         NUC
+  #             That require SL4F transport
+  #             That does not require SL4F transport
+  group("stable_emulator_sl4f_tests") {
+    testonly = true
+    public_deps = [ ":x64_emu_test($host_toolchain)" ]
+  }
+
+  group("stable_emulator_tests") {
+    testonly = true
+    public_deps = [ ":x64_emu_test_fc($host_toolchain)" ]
+  }
+
+  group("unstable_vim3_sl4f_tests") {
+    testonly = true
+    public_deps = [ ":vim3_test($host_toolchain)" ]
+  }
+
+  group("unstable_vim3_tests") {
+    testonly = true
+    public_deps = [ ":vim3_test_fc($host_toolchain)" ]
+  }
+
+  group("unstable_nuc_sl4f_tests") {
+    testonly = true
+    public_deps = [ ":x64_nuc_test($host_toolchain)" ]
+  }
+
+  group("unstable_nuc_tests") {
+    testonly = true
+    public_deps = [ ":x64_nuc_test_fc($host_toolchain)" ]
   }
 }
