@@ -6,10 +6,10 @@ use super::*;
 
 use crate::{
     fs::{buffers::*, *},
-    lock::Mutex,
     task::*,
     types::*,
 };
+use starnix_lock::Mutex;
 
 // An implementation of AF_VSOCK.
 // See https://man7.org/linux/man-pages/man7/vsock.7.html
@@ -63,7 +63,7 @@ impl VsockSocket {
     }
 
     /// Locks and returns the inner state of the Socket.
-    fn lock(&self) -> crate::lock::MutexGuard<'_, VsockSocketInner> {
+    fn lock(&self) -> starnix_lock::MutexGuard<'_, VsockSocketInner> {
         self.inner.lock()
     }
 }

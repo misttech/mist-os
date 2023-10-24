@@ -16,7 +16,6 @@ use crate::{
         FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, NamespaceNode, SpecialNode,
         VecDirectory, VecDirectoryEntry,
     },
-    lock::{Mutex, MutexGuard, RwLock},
     logging::*,
     mm::{
         vmo::round_up_to_increment, DesiredAddress, MappedVmo, MappingName, MappingOptions,
@@ -34,6 +33,7 @@ use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_posix as fposix;
 use fidl_fuchsia_starnix_binder as fbinder;
 use fuchsia_zircon as zx;
+use starnix_lock::{Mutex, MutexGuard, RwLock};
 use starnix_sync::InterruptibleEvent;
 use std::{
     collections::{btree_map, BTreeMap, HashMap, HashSet, VecDeque},
@@ -4234,8 +4234,8 @@ pub mod tests {
             Self { driver: Arc::downgrade(&test_fixture.driver), task, proc, thread }
         }
 
-        fn lock_shared_memory(&self) -> crate::lock::MappedMutexGuard<'_, SharedMemory> {
-            crate::lock::MutexGuard::map(self.proc.shared_memory.lock(), |value| {
+        fn lock_shared_memory(&self) -> starnix_lock::MappedMutexGuard<'_, SharedMemory> {
+            starnix_lock::MutexGuard::map(self.proc.shared_memory.lock(), |value| {
                 value.as_mut().unwrap()
             })
         }

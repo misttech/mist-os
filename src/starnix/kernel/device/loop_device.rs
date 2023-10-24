@@ -9,7 +9,6 @@ use crate::{
         kobject::KObjectDeviceAttribute,
         *,
     },
-    lock::Mutex,
     logging::*,
     mm::*,
     syscalls::*,
@@ -18,6 +17,7 @@ use crate::{
 };
 use bitflags::bitflags;
 use fuchsia_zircon::{Vmo, VmoChildOptions};
+use starnix_lock::Mutex;
 use std::{
     collections::btree_map::{BTreeMap, Entry},
     sync::Arc,

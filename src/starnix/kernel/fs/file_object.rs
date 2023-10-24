@@ -4,6 +4,7 @@
 
 use fidl::HandleBased;
 use fuchsia_zircon as zx;
+use starnix_lock::Mutex;
 use std::{fmt, sync::Arc};
 
 use crate::{
@@ -13,7 +14,6 @@ use crate::{
         fsverity::{self, FsVerityState},
         *,
     },
-    lock::Mutex,
     logging::{impossible_error, not_implemented},
     mm::{
         vmo::round_up_to_system_page_size, DesiredAddress, MappedVmo, MappingName, MappingOptions,

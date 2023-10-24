@@ -4,6 +4,7 @@
 
 use fuchsia_zircon as zx;
 use itertools::Itertools;
+use starnix_lock::Mutex;
 use std::{
     collections::{hash_map::Entry, HashMap, VecDeque},
     sync::{Arc, Weak},
@@ -15,7 +16,6 @@ use crate::{
         buffers::{InputBuffer, OutputBuffer},
         *,
     },
-    lock::Mutex,
     logging::*,
     task::*,
     types::*,

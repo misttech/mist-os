@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{lock::Mutex, logging::log_debug, task::Task};
+use crate::{logging::log_debug, task::Task};
 use fuchsia_inspect::Node;
 use fuchsia_inspect_contrib::nodes::BoundedListNode;
 use fuchsia_zircon::AsHandleRef;
+use starnix_lock::Mutex;
 
 /// The maximum number of failed tasks to record.
 ///

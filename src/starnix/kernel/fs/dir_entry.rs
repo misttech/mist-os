@@ -3,19 +3,14 @@
 // found in the LICENSE file.
 
 use bitflags::bitflags;
+use starnix_lock::{RwLock, RwLockWriteGuard};
 use std::{
     collections::{btree_map::Entry, BTreeMap},
     fmt,
     sync::{Arc, Weak},
 };
 
-use crate::{
-    auth::FsCred,
-    fs::*,
-    lock::{RwLock, RwLockWriteGuard},
-    task::CurrentTask,
-    types::*,
-};
+use crate::{auth::FsCred, fs::*, task::CurrentTask, types::*};
 
 bitflags! {
     pub struct RenameFlags: u32 {

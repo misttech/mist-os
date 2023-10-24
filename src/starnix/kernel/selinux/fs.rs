@@ -7,12 +7,12 @@ use crate::{
         buffers::{InputBuffer, OutputBuffer},
         *,
     },
-    lock::Mutex,
     logging::not_implemented,
     task::*,
     types::*,
 };
 use derivative::Derivative;
+use starnix_lock::Mutex;
 use std::{borrow::Cow, collections::BTreeMap, sync::Arc};
 use zerocopy::AsBytes;
 

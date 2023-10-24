@@ -2,12 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use starnix_lock::Mutex;
+
 use crate::{
     fs::{
         buffers::{InputBuffer, OutputBuffer},
         *,
     },
-    lock::Mutex,
     task::*,
     types::*,
 };

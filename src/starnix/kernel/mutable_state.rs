@@ -148,9 +148,8 @@
 //! }
 //! ```
 
+use starnix_lock::*;
 use std::ops::{Deref, DerefMut};
-
-use crate::lock::*;
 
 /// Create the read() and write() accessor to respectively access the read guard and write guard.
 ///

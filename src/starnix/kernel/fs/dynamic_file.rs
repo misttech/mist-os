@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::lock::Mutex;
-
 use super::*;
 use crate::{
     fs::{
@@ -13,6 +11,7 @@ use crate::{
     task::*,
     types::*,
 };
+use starnix_lock::Mutex;
 use std::collections::VecDeque;
 
 pub trait SequenceFileSource: Send + Sync + 'static {

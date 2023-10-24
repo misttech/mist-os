@@ -8,7 +8,6 @@
 
 use crate::{
     fs::FsStr,
-    lock::Mutex,
     log_debug, log_error, log_warn,
     task::CurrentTask,
     types::{errno, error, Errno},
@@ -18,6 +17,7 @@ use fuchsia_zircon::{
     self as zx,
     sys::zx_page_request_command_t::{ZX_PAGER_VMO_COMPLETE, ZX_PAGER_VMO_READ},
 };
+use starnix_lock::Mutex;
 use std::{
     collections::{hash_map::Entry, HashMap},
     ops::Range,

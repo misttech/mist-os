@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use starnix_lock::Mutex;
 use std::{
     borrow::Cow,
     collections::{HashMap, VecDeque},
@@ -15,7 +16,6 @@ use crate::{
         buffers::{InputBuffer, OutputBuffer},
         *,
     },
-    lock::Mutex,
     mm::{vmo::round_up_to_increment, MemoryAccessorExt},
     syscalls::*,
     task::{CurrentTask, EventHandler, Kernel, WaitCanceler, WaitQueue, Waiter},

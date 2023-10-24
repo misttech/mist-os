@@ -4,6 +4,7 @@
 
 use fuchsia_zircon as zx;
 use once_cell::sync::Lazy;
+use starnix_lock::RwLock;
 use static_assertions::const_assert;
 use std::{cmp, ffi::CString, sync::Arc};
 use zerocopy::{AsBytes, FromBytes, FromZeroes};
@@ -12,7 +13,6 @@ use crate::{
     auth::{Credentials, SecureBits},
     execution::*,
     fs::*,
-    lock::RwLock,
     logging::{log_error, log_trace},
     mm::*,
     syscalls::*,

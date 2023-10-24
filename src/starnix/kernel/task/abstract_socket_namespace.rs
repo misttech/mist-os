@@ -2,12 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use starnix_lock::Mutex;
 use std::{
     collections::{hash_map::Entry, HashMap},
     sync::{Arc, Weak},
 };
 
-use crate::{fs::socket::*, lock::Mutex, task::CurrentTask, types::*};
+use crate::{fs::socket::*, task::CurrentTask, types::*};
 
 /// A registry of abstract sockets.
 ///

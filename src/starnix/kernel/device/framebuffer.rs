@@ -11,7 +11,6 @@ use crate::{
         sysfs::SysFsDirectory,
         *,
     },
-    lock::RwLock,
     logging::*,
     mm::{MemoryAccessorExt, ProtectionFlags},
     syscalls::*,
@@ -25,6 +24,7 @@ use fidl_fuchsia_ui_display_singleton as fuidisplay;
 use fidl_fuchsia_ui_views as fuiviews;
 use fuchsia_component::client::connect_channel_to_protocol;
 use fuchsia_zircon as zx;
+use starnix_lock::RwLock;
 use std::sync::Arc;
 use zerocopy::AsBytes;
 

@@ -6,6 +6,7 @@ use fidl::AsHandleRef;
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon as zx;
 use once_cell::sync::OnceCell;
+use starnix_lock::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::sync::Arc;
 use syncio::{
     zxio::{zxio_get_posix_mode, ZXIO_NODE_PROTOCOL_SYMLINK},
@@ -21,7 +22,6 @@ use crate::{
         zxio::*,
         *,
     },
-    lock::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard},
     logging::*,
     mm::ProtectionFlags,
     syscalls::{SyscallArg, SyscallResult},

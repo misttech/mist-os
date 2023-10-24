@@ -8,6 +8,7 @@ use fidl_fuchsia_logger;
 use fuchsia_zircon as zx;
 use fuchsia_zircon::HandleBased;
 use magma::*;
+use starnix_lock::Mutex;
 use std::{
     collections::HashMap,
     sync::{atomic::*, Arc, Once},
@@ -22,7 +23,6 @@ use crate::{
         fuchsia::RemoteFileObject,
         *,
     },
-    lock::Mutex,
     logging::{impossible_error, log_error, log_warn, set_zx_name},
     mm::{MemoryAccessorExt, ProtectionFlags},
     syscalls::*,

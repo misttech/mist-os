@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{lock::Mutex, power::SuspendStats};
+use crate::power::SuspendStats;
+use starnix_lock::Mutex;
 use std::sync::Arc;
 
 #[derive(Default)]

@@ -4,6 +4,7 @@
 
 use fuchsia_zircon as zx;
 use itertools::Itertools;
+use starnix_lock::{Mutex, MutexGuard, RwLock};
 use std::{
     collections::BTreeMap,
     fmt,
@@ -17,7 +18,6 @@ use crate::{
     auth::Credentials,
     device::terminal::*,
     drop_notifier::DropNotifier,
-    lock::{Mutex, MutexGuard, RwLock},
     logging::{log_error, not_implemented},
     mutable_state::*,
     selinux::fs::SeLinuxThreadGroupState,

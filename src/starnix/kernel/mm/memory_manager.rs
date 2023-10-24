@@ -8,12 +8,12 @@ use fuchsia_inspect_contrib::ProfileDuration;
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use once_cell::sync::Lazy;
 use range_map::*;
+use starnix_lock::{Mutex, RwLock};
 use std::{collections::HashMap, convert::TryInto, ffi::CStr, ops::Range, sync::Arc};
 use zerocopy::{AsBytes, FromBytes};
 
 use crate::{
     fs::*,
-    lock::{Mutex, RwLock},
     logging::*,
     mm::{vmo::round_up_to_system_page_size, FutexTable, PrivateFutexKey},
     task::*,

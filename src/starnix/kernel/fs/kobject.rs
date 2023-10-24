@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 use super::*;
 
+use starnix_lock::Mutex;
 use std::{
     collections::BTreeMap,
     sync::{Arc, Weak},
@@ -14,7 +15,6 @@ use crate::{
         buffers::{InputBuffer, OutputBuffer},
         sysfs::SysFsDirectory,
     },
-    lock::Mutex,
     task::*,
     types::*,
 };

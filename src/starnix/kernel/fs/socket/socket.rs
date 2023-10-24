@@ -14,12 +14,12 @@ use netlink_packet_route::{
     rtnl::address::nlas::Nla as AddressNla, rtnl::link::nlas::Nla as LinkNla, AddressMessage,
     LinkMessage, RtnlMessage,
 };
+use starnix_lock::Mutex;
 use static_assertions::const_assert;
 use zerocopy::{AsBytes, ByteOrder as _, FromBytes as _, NativeEndian};
 
 use crate::{
     fs::{buffers::*, *},
-    lock::Mutex,
     logging::log_warn,
     mm::MemoryAccessorExt,
     syscalls::*,

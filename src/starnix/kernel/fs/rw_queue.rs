@@ -2,9 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{lock::Mutex, task::CurrentTask, types::*};
+use crate::{task::CurrentTask, types::*};
 
 use fuchsia_zircon as zx;
+use starnix_lock::Mutex;
 use starnix_sync::InterruptibleEvent;
 use std::collections::VecDeque;
 use std::sync::Arc;

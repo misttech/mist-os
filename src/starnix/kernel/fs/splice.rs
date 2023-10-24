@@ -8,12 +8,12 @@ use crate::{
         pipe::PipeFileObject,
         FdNumber, FileHandle,
     },
-    lock::{ordered_lock, MutexGuard},
     logging::{log_warn, not_implemented},
     mm::{MemoryAccessorExt, PAGE_SIZE},
     task::CurrentTask,
     types::{error, off_t, uapi, Errno, OpenFlags, UserAddress, UserRef, MAX_RW_COUNT},
 };
+use starnix_lock::{ordered_lock, MutexGuard};
 use std::{cmp::Ordering, sync::Arc, usize};
 
 pub fn sendfile(

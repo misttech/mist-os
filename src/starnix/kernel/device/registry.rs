@@ -4,12 +4,12 @@
 
 use crate::{
     fs::{kobject::*, sysfs::SysFsDirectory, FileOps, FsNode},
-    lock::{Mutex, RwLock},
     logging::log_error,
     task::*,
     types::*,
 };
 
+use starnix_lock::{Mutex, RwLock};
 use std::{
     collections::btree_map::BTreeMap,
     marker::{Send, Sync},

@@ -19,7 +19,6 @@ use crate::{
         tracefs::trace_fs,
         FileSystemOptions, FsStr,
     },
-    lock::{Mutex, RwLock},
     mutable_state::*,
     selinux::fs::selinux_fs,
     task::*,
@@ -28,6 +27,7 @@ use crate::{
 };
 use fidl_fuchsia_io as fio;
 use ref_cast::RefCast;
+use starnix_lock::{Mutex, RwLock};
 use std::{
     collections::{HashMap, HashSet},
     fmt,

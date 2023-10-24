@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use starnix_lock::Mutex;
 use std::collections::{hash_map::Entry, HashMap};
 
 use super::*;
-use crate::{lock::Mutex, types::*};
+use crate::types::*;
 
 #[derive(Default)]
 pub struct MemoryXattrStorage {

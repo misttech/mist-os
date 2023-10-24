@@ -4,6 +4,7 @@
 
 use fuchsia_zircon as zx;
 use futures::channel::oneshot;
+use starnix_lock::Mutex;
 use starnix_sync::InterruptibleEvent;
 use std::{
     collections::{hash_map::Entry, HashMap, VecDeque},
@@ -11,7 +12,7 @@ use std::{
     sync::{Arc, Weak},
 };
 
-use crate::{lock::Mutex, logging::impossible_error, mm::ProtectionFlags, task::*, types::*};
+use crate::{logging::impossible_error, mm::ProtectionFlags, task::*, types::*};
 
 /// A table of futexes.
 ///

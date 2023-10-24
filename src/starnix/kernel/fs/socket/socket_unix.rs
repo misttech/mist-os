@@ -8,13 +8,13 @@ use super::*;
 
 use crate::{
     fs::{buffers::*, *},
-    lock::Mutex,
     mm::MemoryAccessorExt,
     syscalls::*,
     task::*,
     types::*,
 };
 
+use starnix_lock::Mutex;
 use std::sync::Arc;
 
 // From unix.go in gVisor.
@@ -244,7 +244,7 @@ impl UnixSocket {
     }
 
     /// Locks and returns the inner state of the Socket.
-    fn lock(&self) -> crate::lock::MutexGuard<'_, UnixSocketInner> {
+    fn lock(&self) -> starnix_lock::MutexGuard<'_, UnixSocketInner> {
         self.inner.lock()
     }
 

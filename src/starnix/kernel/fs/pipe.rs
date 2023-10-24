@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use starnix_lock::{Mutex, MutexGuard};
 use std::{convert::TryInto, sync::Arc};
 
 use crate::{
     fs::{buffers::*, *},
-    lock::{Mutex, MutexGuard},
     mm::{MemoryAccessorExt, PAGE_SIZE},
     signals::*,
     syscalls::*,

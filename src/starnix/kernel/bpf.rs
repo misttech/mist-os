@@ -12,6 +12,7 @@
 // TODO(https://github.com/rust-lang/rust/issues/39371): remove
 #![allow(non_upper_case_globals)]
 
+use starnix_lock::Mutex;
 use std::{collections::BTreeMap, ops::Bound, sync::Arc};
 use zerocopy::{AsBytes, FromBytes};
 
@@ -21,7 +22,6 @@ use crate::{
         buffers::{InputBuffer, OutputBuffer},
         *,
     },
-    lock::Mutex,
     mm::{MemoryAccessor, MemoryAccessorExt},
     syscalls::*,
     task::Kernel,

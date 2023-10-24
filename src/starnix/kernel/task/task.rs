@@ -8,6 +8,7 @@ use fuchsia_zircon::{
     self as zx, sys::zx_thread_state_general_regs_t, AsHandleRef, Signals, Task as _,
 };
 use once_cell::sync::OnceCell;
+use starnix_lock::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use starnix_sync::{EventWaitGuard, WakeReason};
 use std::{
     cmp,
@@ -32,7 +33,6 @@ use crate::{
         NamespaceNode, SymlinkMode, SymlinkTarget,
     },
     loader::*,
-    lock::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard},
     logging::*,
     mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt, MemoryManager},
     signals::{send_signal, types::*, SignalInfo},

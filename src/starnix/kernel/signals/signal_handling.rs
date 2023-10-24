@@ -10,7 +10,6 @@ use crate::{
             SignalStackFrame, RED_ZONE_SIZE, SIG_STACK_SIZE, SYSCALL_INSTRUCTION_SIZE_BYTES,
         },
     },
-    lock::RwLockWriteGuard,
     logging::{log_trace, log_warn},
     mm::{MemoryAccessor, MemoryAccessorExt},
     signals::*,
@@ -19,6 +18,7 @@ use crate::{
     types::*,
 };
 use lock_sequence::{Locked, Unlocked};
+use starnix_lock::RwLockWriteGuard;
 
 pub fn send_signal(task: &Task, siginfo: SignalInfo) {
     let mut task_state = task.write();

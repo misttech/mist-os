@@ -10,7 +10,6 @@ use crate::{
         sysfs::SysFsDirectory,
         *,
     },
-    lock::Mutex,
     logging::*,
     mm::MemoryAccessorExt,
     syscalls::*,
@@ -35,6 +34,7 @@ use futures::{
     future::{self, Either},
     StreamExt as _,
 };
+use starnix_lock::Mutex;
 use std::{collections::VecDeque, sync::Arc};
 use zerocopy::AsBytes as _; // for `as_bytes()`
 

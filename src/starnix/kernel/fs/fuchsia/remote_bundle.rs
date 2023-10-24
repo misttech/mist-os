@@ -6,7 +6,6 @@ use crate::{
     auth::FsCred,
     fs::{fuchsia::update_info_from_attrs, *},
     impossible_error,
-    lock::{RwLock, RwLockReadGuard, RwLockWriteGuard},
     logging::log_warn,
     mm::ProtectionFlags,
     task::{CurrentTask, EventHandler, Kernel, WaitCanceler, Waiter},
@@ -17,6 +16,7 @@ use anyhow::{anyhow, ensure, Error};
 use ext4_metadata::{Node, NodeInfo};
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon::{self as zx, HandleBased};
+use starnix_lock::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::{
     io::Read,
     sync::{Arc, Mutex},

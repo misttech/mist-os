@@ -2,12 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use starnix_lock::RwLock;
 use std::{
     collections::BTreeMap,
     sync::{Arc, Weak},
 };
 
-use crate::{device::terminal::*, lock::RwLock, mutable_state::*, task::*, types::*};
+use crate::{device::terminal::*, mutable_state::*, task::*, types::*};
 
 #[derive(Debug)]
 pub struct SessionMutableState {

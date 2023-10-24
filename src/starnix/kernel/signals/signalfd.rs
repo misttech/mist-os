@@ -7,11 +7,11 @@ use crate::{
         buffers::{InputBuffer, OutputBuffer},
         *,
     },
-    lock::Mutex,
     signals::*,
     task::*,
     types::*,
 };
+use starnix_lock::Mutex;
 use std::convert::TryInto;
 
 use zerocopy::AsBytes;

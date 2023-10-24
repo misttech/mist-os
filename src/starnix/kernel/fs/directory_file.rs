@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use starnix_lock::Mutex;
 use std::ops::Bound;
 
 use super::*;
-use crate::{fs::fileops_impl_directory, lock::Mutex, task::*, types::*};
+use crate::{fs::fileops_impl_directory, task::*, types::*};
 
 pub struct MemoryDirectoryFile {
     /// The current position for readdir.

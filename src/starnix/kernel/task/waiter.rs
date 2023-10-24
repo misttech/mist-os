@@ -4,6 +4,7 @@
 
 use fidl::AsHandleRef as _;
 use fuchsia_zircon as zx;
+use starnix_lock::Mutex;
 use starnix_sync::{EventWaitGuard, InterruptibleEvent, NotifyKind, PortEvent, PortWaitResult};
 use std::{
     collections::{HashMap, VecDeque},
@@ -16,7 +17,6 @@ use syncio::{zxio::zxio_signals_t, Zxio, ZxioSignals};
 
 use crate::{
     fs::{FdEvents, FdNumber},
-    lock::Mutex,
     signals::RunState,
     task::*,
     types::{Errno, *},

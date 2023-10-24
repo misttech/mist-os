@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use bstr::ByteSlice;
+use starnix_lock::Mutex;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, AtomicU8, Ordering};
 use std::sync::Arc;
@@ -14,7 +15,6 @@ use ubpf::{
 use crate::{
     fs::buffers::{InputBuffer, OutputBuffer},
     fs::{fileops_impl_nonseekable, Anon, FdEvents, FdFlags, FdNumber, FileObject, FileOps},
-    lock::Mutex,
     logging::log_warn,
     mm::MemoryAccessorExt,
     signals::{send_signal, SignalDetail, SignalInfo},

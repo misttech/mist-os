@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use starnix_lock::{Mutex, MutexGuard};
 use std::sync::Arc;
 
 use super::{directory_file::MemoryDirectoryFile, *};
 use crate::{
     auth::FsCred,
-    lock::{Mutex, MutexGuard},
     logging::not_implemented,
     mm::PAGE_SIZE,
     task::{CurrentTask, Kernel},

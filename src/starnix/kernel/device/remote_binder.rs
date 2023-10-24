@@ -9,7 +9,6 @@ use crate::{
         buffers::{InputBuffer, OutputBuffer},
         fileops_impl_nonseekable, FdEvents, FileObject, FileOps, FsNode, NamespaceNode,
     },
-    lock::{Mutex, MutexGuard},
     logging::{log_error, log_warn},
     mm::{DesiredAddress, MappedVmo, MappingOptions, MemoryAccessorExt, ProtectionFlags},
     syscalls::*,
@@ -38,6 +37,7 @@ use futures::{
     task::Poll,
     Future, Stream, StreamExt, TryStreamExt,
 };
+use starnix_lock::{Mutex, MutexGuard};
 use std::{
     collections::{HashMap, HashSet, VecDeque},
     rc::Rc,

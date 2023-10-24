@@ -6,6 +6,7 @@ use linked_hash_map::LinkedHashMap;
 use once_cell::sync::OnceCell;
 use ref_cast::RefCast;
 use smallvec::SmallVec;
+use starnix_lock::Mutex;
 use std::{
     collections::{hash_map::Entry, HashMap, HashSet},
     sync::{
@@ -16,7 +17,6 @@ use std::{
 
 use super::*;
 use crate::{
-    lock::Mutex,
     task::{CurrentTask, Kernel},
     types::{as_any::AsAny, *},
 };

@@ -13,6 +13,7 @@ use fuchsia_zircon as zx;
 use futures::FutureExt;
 use netlink::{interfaces::InterfacesHandler, Netlink, NETLINK_LOG_TAG};
 use once_cell::sync::OnceCell;
+use starnix_lock::RwLock;
 use std::{
     collections::{BTreeMap, HashSet},
     sync::{
@@ -38,7 +39,6 @@ use crate::{
         sysfs::{BlockDeviceDirectory, DeviceDirectory, SysFsDirectory},
         FileOps, FileSystemHandle, FsNode,
     },
-    lock::RwLock,
     logging::{log_error, set_zx_name},
     mm::{FutexTable, SharedFutexKey},
     power::PowerManager,

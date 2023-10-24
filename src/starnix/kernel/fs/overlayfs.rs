@@ -2,9 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{auth::FsCred, fs::*, lock::*, logging::*, task::CurrentTask, types::*};
+use crate::{auth::FsCred, fs::*, logging::*, task::CurrentTask, types::*};
 use once_cell::sync::OnceCell;
 use rand::Rng;
+use starnix_lock::*;
 use std::{
     collections::{BTreeSet, HashMap},
     sync::Arc,

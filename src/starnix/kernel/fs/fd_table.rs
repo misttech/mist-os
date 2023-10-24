@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 
 use bitflags::bitflags;
+use starnix_lock::Mutex;
 use std::{collections::HashMap, ops::DerefMut};
 
 use crate::{
     fs::*,
-    lock::Mutex,
     task::{CurrentTask, Task},
     types::*,
 };

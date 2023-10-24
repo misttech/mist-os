@@ -7,7 +7,6 @@ use crate::{
     auth::FsCred,
     device::DeviceMode,
     fs::{fsverity::FsVerityState, pipe::Pipe, rw_queue::RwQueue, socket::*, *},
-    lock::{Mutex, RwLock, RwLockReadGuard},
     logging::log_error,
     signals::*,
     task::*,
@@ -17,6 +16,7 @@ use crate::{
 use bitflags::bitflags;
 use fuchsia_zircon as zx;
 use once_cell::sync::OnceCell;
+use starnix_lock::{Mutex, RwLock, RwLockReadGuard};
 use std::sync::{Arc, Weak};
 use syncio::zxio_node_attr_has_t;
 

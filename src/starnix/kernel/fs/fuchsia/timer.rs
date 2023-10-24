@@ -5,6 +5,7 @@
 use fuchsia_runtime::zx_utc_reference_get;
 use fuchsia_zircon as zx;
 use fuchsia_zircon::{AsHandleRef, Clock, Unowned};
+use starnix_lock::Mutex;
 use std::sync::Arc;
 use zerocopy::AsBytes;
 
@@ -13,7 +14,6 @@ use crate::{
         buffers::{InputBuffer, OutputBuffer},
         *,
     },
-    lock::Mutex,
     task::*,
     types::*,
 };

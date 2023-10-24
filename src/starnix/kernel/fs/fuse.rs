@@ -12,7 +12,6 @@ use crate::{
         FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
         SeekTarget, SymlinkTarget, ValueOrSize, XattrOp,
     },
-    lock::{Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard},
     logging::{log_error, log_trace, log_warn, not_implemented, not_implemented_log_once},
     mm::{vmo::round_up_to_increment, PAGE_SIZE},
     syscalls::{SyscallArg, SyscallResult},
@@ -27,6 +26,7 @@ use crate::{
     },
 };
 use bstr::B;
+use starnix_lock::{Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::{
     collections::{hash_map::Entry, HashMap, VecDeque},
     sync::Arc,

@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    lock::Mutex,
     logging::not_implemented,
     signals::{send_signal, SignalDetail, SignalEvent, SignalEventNotify, SignalInfo},
     task::{
@@ -17,6 +16,7 @@ use crate::{
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
 use futures::stream::AbortHandle;
+use starnix_lock::Mutex;
 use std::sync::{Arc, Weak};
 
 #[derive(Default)]

@@ -7,6 +7,7 @@
 //! There is no support for actual resource constraints, or any operations outside of adding tasks
 //! to a control group (for the duration of their lifetime).
 
+use starnix_lock::Mutex;
 use std::sync::Arc;
 
 use crate::{
@@ -16,7 +17,6 @@ use crate::{
         DynamicFile, DynamicFileBuf, DynamicFileSource, FileObject, FileOps, FsNode, FsNodeHandle,
         FsNodeInfo, FsNodeOps, FsStr, MemoryDirectoryFile,
     },
-    lock::Mutex,
     task::{CurrentTask, Task},
     types::*,
 };
