@@ -60,6 +60,10 @@ impl CommandBuilder {
         self.attach(&format!("{koid}"));
     }
 
+    pub fn attach_job_koid(&mut self, koid: zx_koid_t) {
+        self.attach(&format!("--job {koid}"));
+    }
+
     pub fn execute(&mut self, execute: &String) {
         self.args.push(OsString::from("--execute"));
         self.args.push(execute.into());

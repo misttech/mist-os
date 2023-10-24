@@ -5,6 +5,7 @@ ffx/component/collection/list.golden
 ffx/component/collection/show.golden
 ffx/component/copy.golden
 ffx/component/create.golden
+ffx/component/debug.golden
 ffx/component/destroy.golden
 ffx/component/doctor.golden
 ffx/component/explore.golden
