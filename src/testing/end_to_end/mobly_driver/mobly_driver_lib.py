@@ -61,9 +61,9 @@ def _execute_test(
 
     with NamedTemporaryFile(mode="w") as tmp_config:
         config = driver.generate_test_config(transport)
-        print("======== Mobly config content ========")
-        print(config)
-        print("======================================")
+        print("======== Mobly config content ========", flush=True)
+        print(config, flush=True)
+        print("======================================", flush=True)
         tmp_config.write(config)
         tmp_config.flush()
 
@@ -71,7 +71,7 @@ def _execute_test(
         if verbose:
             cmd.append("-v")
         cmd_str = " ".join(cmd)
-        print(f'Executing Mobly test via cmd:\n"$ {cmd_str}"')
+        print(f'Executing Mobly test via cmd:\n"$ {cmd_str}"', flush=True)
 
         with subprocess.Popen(
             cmd,
@@ -134,7 +134,7 @@ def run(
         raise ValueError(
             "|timeout_sec| must be None or a non-negative integer."
         )
-    print(f"Running [{driver.__class__.__name__}]")
+    print(f"Running [{driver.__class__.__name__}]", flush=True)
     try:
         _execute_test(
             python_path=python_path,
