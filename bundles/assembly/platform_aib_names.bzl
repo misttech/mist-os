@@ -113,6 +113,7 @@ USER_PLATFORM_AIB_NAMES_RISCV64 = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + [
     "setui_with_camera.icu_default_{}".format(icu_flavors.default_git_commit),
     "setui_with_camera.icu_latest_{}".format(icu_flavors.latest_git_commit),
     "setui_with_camera.icu_stable_{}".format(icu_flavors.stable_git_commit),
+    "starnix_support",
     "system_update_configurator",
     "ui",
     "ui_package_user_and_userdebug",
@@ -138,9 +139,6 @@ USER_PLATFORM_AIB_NAMES_EXCLUDED_FROM_RISCV64 = [
     "netstack_migration",
     "netstack_migration_packages",
     "netstack_migration_packages_gub",
-
-    # TODO(fxbug.dev/128554): Move to the list above once build errors are resolved.
-    "starnix_support",
 
     # TODO(fxbug.dev/128551): Move to the list above once build errors are
     # resolved and/or define a formal mechanism for AIBs to vary across

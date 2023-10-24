@@ -204,6 +204,9 @@ user_platform_aib_names =
 
       # Recovery
       "factory_reset_trigger",
+
+      # Starnix
+      "starnix_support",
     ]
 
 if (current_cpu != "riscv64") {
@@ -214,9 +217,6 @@ if (current_cpu != "riscv64") {
     "netstack_migration",
     "netstack_migration_packages",
     "netstack_migration_packages_gub",
-
-    # TODO(fxbug.dev/128554):: Move to the list above once build errors are resolved.
-    "starnix_support",
 
     # TODO(fxbug.dev/128551): Move to the list above once build errors are resolved.
     "virtualization_support",
