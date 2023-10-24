@@ -107,6 +107,9 @@ class DispatcherBound {
   // Arguments after |std::in_place| are sent to the constructor of |T|.
   // See |async_patterns::BindForSending| for detailed requirements on |args|.
   //
+  // If you'd like to pass a |dispatcher| to |T| as a constructor argument,
+  // see |async_patterns::PassDispatcher|.
+  //
   // If the dispatcher is shutdown, |T| will be synchronously constructed.
   template <typename... Args>
   explicit DispatcherBound(async_dispatcher_t* dispatcher, std::in_place_t, Args&&... args)
@@ -128,6 +131,9 @@ class DispatcherBound {
   // of |T2| will be constructed. This can be useful for mocking: |T| may be some
   // interface, and when constructing the object, either a fake (in unit tests)
   // or a real concrete type (in production) will be specified.
+  //
+  // If you'd like to pass a |dispatcher| to |T| as a constructor argument,
+  // see |async_patterns::PassDispatcher|.
   //
   // See |async_patterns::BindForSending| for detailed requirements on |args|.
   template <typename T2 = T, typename... Args>

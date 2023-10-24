@@ -24,7 +24,17 @@ namespace async_patterns {
 template <typename T>
 class TestDispatcherBound final : public DispatcherBound<T> {
  public:
+  // See |async_patterns::DispatcherBound| for how to construct a |DispatcherBound|.
+  // The same applies to |TestDispatcherBound|.
   using DispatcherBound<T>::DispatcherBound;
+
+  // See |async_patterns::DispatcherBound::emplace| for how to construct an object
+  // inside a |DispatcherBound|. The same applies to |TestDispatcherBound::emplace|.
+  using DispatcherBound<T>::emplace;
+
+  // See |async_patterns::DispatcherBound::reset| for how to destroy an object
+  // inside a |DispatcherBound|. The same applies to |TestDispatcherBound::reset|.
+  using DispatcherBound<T>::reset;
 
   // Refer to |DispatcherBound<T>::AsyncCall| for documentation.
   //
