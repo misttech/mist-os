@@ -419,8 +419,6 @@
 
                 // packet_socket_raw_test
                 "AllInetTests/RawPacketTest.SetSocketDetachFilterNoInstalledFilter/*",
-                "AllRawPacketMsgSizeTest/RawPacketMsgSizeTest.SendTooLong/*",
-                "AllRawPacketMsgSizeTest/RawPacketMsgSizeTest.SpliceTooLong/*",
 
                 // packet_socket_test
                 "AllPacketSocketTests/PacketSocketTest.GetSockName/*",
@@ -429,7 +427,6 @@
                 "PauseTest.OnlyReturnsWhenSignalHandled",
 
                 // ping_socket_test
-                "PingSocket.PayloadTooLarge",
                 "PingSocket.ReceiveIPPacketInfo",
 
                 // pivot_root_test

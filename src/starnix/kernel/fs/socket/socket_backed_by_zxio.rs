@@ -96,7 +96,10 @@ impl ZxioBackedSocket {
         let sent_bytes = self
             .zxio
             .sendmsg(addr, bytes, cmsgs, flags.bits() & !MSG_DONTWAIT)
-            .map_err(|status| from_status_like_fdio!(status))?
+            .map_err(|status| match status {
+                zx::Status::OUT_OF_RANGE => errno!(EMSGSIZE),
+                other => from_status_like_fdio!(other),
+            })?
             .map_err(|out_code| errno_from_zxio_code!(out_code))?;
         data.advance(sent_bytes)?;
         Ok(sent_bytes)
