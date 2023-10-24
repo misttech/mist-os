@@ -11,6 +11,15 @@ for details.
 
 Prior to building a custom Rust toolchain for Fuchsia, you need to do the following:
 
+1. If you haven't already, clone the Rust source. The
+   [Guide to Rustc Development] is a good resource to reference whenever you're
+   working on the compiler.
+
+   ```posix-terminal
+   DEV_ROOT={{ '<var>' }}DEV_ROOT{{ '</var> '}} # parent of your Rust directory
+   git clone --recurse-submodules https://github.com/rust-lang/rust.git $DEV_ROOT/rust
+   ```
+
 1. Run the following command to install cmake and jq/tomlq:
 
    ```posix-terminal
@@ -35,14 +44,6 @@ Prior to building a custom Rust toolchain for Fuchsia, you need to do the follow
    Note: Running `jiri update` from the `infra` directory ensures that you
    have the most recent configurations and tools.
 
-1. If you haven't already, clone the Rust source. The
-   [Guide to Rustc Development] is a good resource to reference whenever you're
-   working on the compiler.
-
-   ```posix-terminal
-   git clone --recurse-submodules https://github.com/rust-lang/rust.git $DEV_ROOT/rust
-   ```
-
 1. Run the following command to use `cipd` to get a Fuchsia core IDK, a Linux
    sysroot, a recent version of clang, and the correct beta compiler for
    building Fuchsia's Rust toolchain:
@@ -58,17 +59,24 @@ Prior to building a custom Rust toolchain for Fuchsia, you need to do the follow
    @Subdir clang
    fuchsia/third_party/clang/${platform} integration
    EOF
-   BETA_DATE=`jq .compiler.date ${DEV_ROOT}/rust/src/stage0.json --raw-output`
-   BETA_COMMIT_HASH=`curl -s "https://static.rust-lang.org/dist/${BETA_DATE}/channel-rust-beta.toml" | tomlq .pkg.rust.git_commit_hash --raw-output`
-   echo "@Subdir beta" >> cipd.ensure
-   echo "fuchsia/third_party/rust/host/${platform} git_revision:${BETA_COMMIT_HASH}" >> cipd.ensure
-   echo "fuchsia/third_party/rust/target/${HOST_TRIPLE} git_revision:${BETA_COMMIT_HASH}" >> cipd.ensure
+   STAGE0_DATE=`jq .compiler.date ${DEV_ROOT}/rust/src/stage0.json --raw-output`
+   STAGE0_VERSION=`jq .compiler.version ${DEV_ROOT}/rust/src/stage0.json --raw-output`
+   STAGE0_COMMIT_HASH=`curl -s "https://static.rust-lang.org/dist/${STAGE0_DATE}/channel-rust-${STAGE0_VERSION}.toml" | tomlq .pkg.rust.git_commit_hash --raw-output`
+   echo "@Subdir stage0" >> cipd.ensure
+   echo "fuchsia/third_party/rust/host/\${platform} git_revision:${STAGE0_COMMIT_HASH}" >> cipd.ensure
+   echo "fuchsia/third_party/rust/target/${HOST_TRIPLE} git_revision:${STAGE0_COMMIT_HASH}" >> cipd.ensure
    $DEV_ROOT/infra/fuchsia/prebuilt/tools/cipd ensure --root $DEV_ROOT --ensure-file cipd.ensure
    ```
 
    Note: these versions are not pinned, so every time you run the `cipd ensure`
    command, you will get an updated version. As of writing, however, this
    matches the recipe behavior.
+
+   Downloading the Fuchsia-built stage0 compiler is optional, but useful for
+   recreating builds in CI. If the stage0 is not available you may instruct
+   the Rust build to download and use the upstream stage0 compiler by omitting
+   those lines from your `cipd.ensure` file and removing the `--stage0`
+   arguments to `generate_config.py` below.
 
 [Guide to Rustc Development]: https://rustc-dev-guide.rust-lang.org/building/how-to-build-and-run.html
 
@@ -85,7 +93,7 @@ Prior to building a custom Rust toolchain for Fuchsia, you need to do the follow
        config_toml \
        --clang-prefix=$DEV_ROOT/clang \
        --host-sysroot=$DEV_ROOT/sysroot/linux \
-       --stage0=$DEV_ROOT/beta \
+       --stage0=$DEV_ROOT/stage0 \
        --prefix=$(pwd)/install/fuchsia-rust \
       | tee fuchsia-config.toml
 
@@ -95,7 +103,7 @@ Prior to building a custom Rust toolchain for Fuchsia, you need to do the follow
          --eval \
          --clang-prefix=$DEV_ROOT/clang \
          --sdk-dir=$DEV_ROOT/sdk \
-         --stage0=$DEV_ROOT/beta \
+         --stage0=$DEV_ROOT/stage0 \
          --linux-amd64-sysroot=$DEV_ROOT/sysroot/linux \
          --linux-arm64-sysroot=$DEV_ROOT/sysroot/linux \
       | tee fuchsia-env.sh
