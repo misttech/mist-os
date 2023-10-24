@@ -2022,6 +2022,10 @@ ssize_t sendmsg(int fd, const struct msghdr* msg, int flags) {
       }
     }
     if (status != ZX_OK) {
+      if (status == ZX_ERR_OUT_OF_RANGE) {
+        errno = EMSGSIZE;
+        return -1;
+      }
       return ERROR(status);
     }
     if (out_code) {

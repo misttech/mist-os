@@ -6,11 +6,5 @@
         {
             include: "udp_common.json5",
         },
-        {
-            type: "expect_failure",
-            matchers: [
-                "AllUDPSockets/NonStreamSocketPairTest.SendMsgTooLarge/*",
-            ],
-        },
     ],
 }

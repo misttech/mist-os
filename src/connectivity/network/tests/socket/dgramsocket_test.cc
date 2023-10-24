@@ -1903,6 +1903,53 @@ INSTANTIATE_TEST_SUITE_P(IOSendingZeroBytesMethodTests, IOSendingZeroBytesMethod
                                                           SendZeroBytesTestCase::ZeroBufferLen)),
                          DomainAndIOMethodAndSendZeroBytesTestCaseToString);
 
+using SendIOMethodTestCase = std::tuple<SocketDomain, IOMethod>;
+
+std::string SendIOMethodTestCaseToString(const testing::TestParamInfo<SendIOMethodTestCase>& info) {
+  auto const& [domain, io_method] = info.param;
+  std::ostringstream oss;
+  oss << socketDomainToString(domain) << '_' << io_method.IOMethodToString();
+  return oss.str();
+}
+
+class SendIOMethodTest : public NetDatagramSocketsTestBase,
+                         public testing::TestWithParam<SendIOMethodTestCase> {
+  void SetUp() override {
+    auto const& [domain, io_method] = GetParam();
+    ASSERT_NO_FATAL_FAILURE(SetUpDatagramSockets(domain));
+  }
+
+  void TearDown() override {
+    if (!IsSkipped()) {
+      EXPECT_NO_FATAL_FAILURE(TearDownDatagramSockets());
+    }
+  }
+};
+
+TEST_P(SendIOMethodTest, SendDatagramTooLarge) {
+  auto [domain, io_method] = GetParam();
+
+  std::vector<char> buf(1024, 'a');
+  EXPECT_EQ(io_method.ExecuteIO(connected().get(), buf.data(), buf.size()), ssize_t(buf.size()))
+      << strerror(errno);
+
+  // The maximum IP packet size is 65535, so even ignoring the overhead of the
+  // IP and UDP headers, this payload is guaranteed to be too large.
+  buf.resize(65536, 'a');
+  EXPECT_EQ(io_method.ExecuteIO(connected().get(), buf.data(), buf.size()), -1);
+  EXPECT_EQ(errno, EMSGSIZE);
+
+  buf.resize(128 * 1024, 'a');
+  EXPECT_EQ(io_method.ExecuteIO(connected().get(), buf.data(), buf.size()), -1);
+  EXPECT_EQ(errno, EMSGSIZE);
+}
+
+INSTANTIATE_TEST_SUITE_P(SendIOMethodTests, SendIOMethodTest,
+                         testing::Combine(testing::Values(SocketDomain::IPv4(),
+                                                          SocketDomain::IPv6()),
+                                          testing::ValuesIn(kSendIOMethods)),
+                         SendIOMethodTestCaseToString);
+
 enum class SendZeroBytesVectorizedTestCase {
   NullIovecPointer,
   ZeroIovCnt,

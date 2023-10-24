@@ -1174,7 +1174,7 @@ const IPV6_LINK_LOCAL_ADDRESS_CONFIG: PingAddressConfig = PingAddressConfig {
     IPV4_ADDRESS_CONFIG,
     PingOptions { payload_length: u16::MAX, ..PingOptions::default() },
     fntr::Netstack::V2,
-    Err(fntr::Error::InvalidArguments);
+    Err(fntr::Error::PingFailed);
     "oversized payload length netstack2")]
 #[test_case(
         "ipv4_netstack3",
@@ -1297,7 +1297,7 @@ const IPV6_LINK_LOCAL_ADDRESS_CONFIG: PingAddressConfig = PingAddressConfig {
         IPV4_ADDRESS_CONFIG,
         PingOptions { payload_length: u16::MAX, ..PingOptions::default() },
         fntr::Netstack::V3,
-        Err(fntr::Error::InvalidArguments);
+        Err(fntr::Error::PingFailed);
         "oversized payload length netstack3")]
 async fn ping(
     name: &str,
