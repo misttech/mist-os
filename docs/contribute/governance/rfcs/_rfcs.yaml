@@ -2996,3 +2996,16 @@
   reviewers: ['abarth@google.com', 'hjfreyer@google.com', 'ianloic@google.com', 'sethladd@google.com', 'ddorwin@google.com']
   submitted: '2023-08-29'
   reviewed: '2023-10-11'
+
+- name: 'RFC-0231'
+  title: 'FIDL versioning replacement syntax'
+  short_description: 'Add a replaced=N argument to the @available attribute'
+  authors: ['mkember@google.com']
+  file: '0231_fidl_versioning_replacement_syntax.md'
+  area: ['FIDL']
+  issue: ['135676']
+  gerrit_change_id: ['922341']
+  status: 'Accepted'
+  reviewers: ['abarth@google.com', 'hjfreyer@google.com', 'ianloic@google.com', 'ddorwin@google.com']
+  submitted: '2023-09-26'
+  reviewed: '2023-10-24'

@@ -7,6 +7,9 @@ Note: This is a historical document describing the original design of FIDL
 versioning. Please see [FIDL versioning][versioning-docs] and [Fuchsia API
 evolution guidelines][api-evolution] for up-to-date information.
 
+Note: This RFC was amended by [RFC-0231: FIDL versioning replacement
+syntax][rfc-0231].
+
 ## Summary
 
 This document proposes a way to annotate FIDL elements with versions and a
@@ -826,6 +829,7 @@ i.e. without taking action to migrate.
 [rfc-0052]: /docs/contribute/governance/rfcs/0052_type_aliasing_named_types.md
 [rfc-0086]: /docs/contribute/governance/rfcs/0086_rfc_0050_attributes.md
 [rfc-0138]: /docs/contribute/governance/rfcs/0138_handling_unknown_interactions.md
+[rfc-0231]: /docs/contribute/governance/rfcs/0231_fidl_versioning_replacement_syntax.md
 [language]: /docs/reference/fidl/language/language.md
 [attrs]: /docs/reference/fidl/language/attributes.md
 [swift-attr]: https://docs.swift.org/swift-book/ReferenceManual/Attributes.html#ID583
