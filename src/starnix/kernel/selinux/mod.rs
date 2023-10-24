@@ -9,6 +9,7 @@ pub mod security_server;
 use bitflags::bitflags;
 
 /// The Security ID (SID) used internally to refer to a security context.
+#[derive(Clone, Copy, Default, PartialEq)]
 pub struct SecurityId(u32);
 
 impl From<u32> for SecurityId {
@@ -18,15 +19,25 @@ impl From<u32> for SecurityId {
 }
 
 /// An identifier for a class of object with SELinux-managed rights.
+#[derive(Clone, Copy, PartialEq)]
 pub enum ObjectClass {
+    /// Placeholder value used when an [`ObjectClass`] is required, but uninitialized.
+    Undefined,
     // TODO: Eliminate `dead_code` guard.
     #[allow(dead_code)]
     Process,
     // TODO: Include all object classes supported by SELinux.
 }
 
+impl Default for ObjectClass {
+    fn default() -> Self {
+        Self::Undefined
+    }
+}
+
 bitflags! {
     /// The set of rights that may be granted to sources accessing targets controlled by SELinux.
+    #[derive(Default)]
     pub struct AccessVector: u32 {
         // TODO: Add rights that may be included in an access vector cache response.
     }
@@ -39,7 +50,7 @@ impl AccessVector {
 /// An interface for computing the rights permitted to a subject accessing an object (or target) of
 /// a particular SELinux object type.
 pub trait AccessQueryable: Send {
-    /// Computes the [`Rights`] permitted to `source_sid` for accessing `target_sid`, an object of
+    /// Computes the [`AccessVector`] permitted to `source_sid` for accessing `target_sid`, an object of
     ///  type `target_class`.
     fn query(
         &mut self,
@@ -49,7 +60,7 @@ pub trait AccessQueryable: Send {
     ) -> AccessVector;
 }
 
-/// A default implementation for [`AccessQueryable`] that permits no [`Rights`].
+/// A default implementation for [`AccessQueryable`] that permits no [`AccessVector`].
 #[derive(Default)]
 pub struct DenyAll;
 
