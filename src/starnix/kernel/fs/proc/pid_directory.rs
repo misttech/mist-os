@@ -14,7 +14,7 @@ use crate::{
         *,
     },
     mm::{MemoryAccessor, MemoryAccessorExt, ProcMapsFile, ProcSmapsFile, PAGE_SIZE},
-    selinux::selinux_proc_attrs,
+    selinux::fs::selinux_proc_attrs,
     task::{CurrentTask, Task, TaskPersistentInfo, TaskStateCode, ThreadGroup},
     types::*,
 };

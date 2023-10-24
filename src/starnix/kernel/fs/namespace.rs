@@ -21,7 +21,7 @@ use crate::{
     },
     lock::{Mutex, RwLock},
     mutable_state::*,
-    selinux::selinux_fs,
+    selinux::fs::selinux_fs,
     task::*,
     time::*,
     types::*,

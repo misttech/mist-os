@@ -42,7 +42,7 @@ use crate::{
     logging::{log_error, set_zx_name},
     mm::{FutexTable, SharedFutexKey},
     power::PowerManager,
-    selinux::SecurityServer,
+    selinux::security_server::SecurityServer,
     task::*,
     types::{DeviceType, Errno, OpenFlags, *},
     vdso::vdso_loader::Vdso,
