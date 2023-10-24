@@ -98,6 +98,9 @@ toc:
 - title: "Trace"
   section:
   - include: /docs/development/tracing/_toc.yaml
+- title: "Fuchsia Controller"
+  section:
+  - include: /docs/development/tools/fuchsia-controller/_toc.yaml
 - heading: "Publish and deploy"
 - title: "Prebuilt packages"
   section:
