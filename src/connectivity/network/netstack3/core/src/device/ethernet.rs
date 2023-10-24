@@ -35,8 +35,8 @@ use tracing::trace;
 
 use crate::{
     context::{
-        CounterContext, InstantBindingsTypes, RecvFrameContext, RngContext, SendFrameContext,
-        TimerContext, TimerHandler,
+        CounterContext, CounterContext2, InstantBindingsTypes, RecvFrameContext, RngContext,
+        SendFrameContext, TimerContext, TimerHandler,
     },
     data_structures::ref_counted_hash_map::{InsertResult, RefCountedHashSet, RemoveResult},
     device::{
@@ -59,7 +59,7 @@ use crate::{
             NonSyncContext as SocketNonSyncContext, ParseSentFrameError, ReceivedFrame, SentFrame,
         },
         state::{DeviceStateSpec, IpLinkDeviceState},
-        Device, DeviceIdContext, DeviceLayerEventDispatcher, DeviceLayerTypes,
+        Device, DeviceCounters, DeviceIdContext, DeviceLayerEventDispatcher, DeviceLayerTypes,
         DeviceSendFrameError, EthernetDeviceId, FrameDestination, Mtu, RecvIpFrameMeta,
     },
     ip::{
@@ -836,7 +836,8 @@ pub(super) fn send_ip_frame<
     C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId> + SocketNonSyncContext<SC::DeviceId>,
     SC: EthernetIpLinkDeviceDynamicStateContext<C>
         + BufferNudHandler<B, A::Version, EthernetLinkDevice, C>
-        + BufferTransmitQueueHandler<EthernetLinkDevice, B, C, Meta = ()>,
+        + BufferTransmitQueueHandler<EthernetLinkDevice, B, C, Meta = ()>
+        + CounterContext2<DeviceCounters>,
     A: IpAddress,
     S: Serializer<Buffer = B>,
 >(
@@ -849,7 +850,9 @@ pub(super) fn send_ip_frame<
 where
     A::Version: EthernetIpExt,
 {
-    ctx.increment_debug_counter("ethernet::send_ip_frame");
+    sync_ctx.with_counters(|counters| {
+        counters.ethernet_send_ip_frame.increment();
+    });
 
     trace!("ethernet::send_ip_frame: local_addr = {:?}; device = {:?}", local_addr, device_id);
 
@@ -1429,6 +1432,7 @@ mod tests {
         static_state: StaticEthernetDeviceState,
         dynamic_state: DynamicEthernetDeviceState,
         tx_queue: TransmitQueueState<(), Buf<Vec<u8>>, BufVecU8Allocator>,
+        counters: DeviceCounters,
     }
 
     impl FakeEthernetCtx {
@@ -1441,6 +1445,7 @@ mod tests {
                 },
                 dynamic_state: DynamicEthernetDeviceState::new(max_frame_size),
                 tx_queue: Default::default(),
+                counters: Default::default(),
             }
         }
     }
@@ -1467,6 +1472,12 @@ mod tests {
             whole_frame: &[u8],
         ) {
             self.inner.handle_frame(ctx, device, frame, whole_frame)
+        }
+    }
+
+    impl CounterContext2<DeviceCounters> for FakeCtx {
+        fn with_counters<O, F: FnOnce(&DeviceCounters) -> O>(&self, cb: F) -> O {
+            cb(&self.as_ref().state.counters)
         }
     }
 

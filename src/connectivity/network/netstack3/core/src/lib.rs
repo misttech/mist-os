@@ -68,8 +68,8 @@ use crate::{
         TracingContext,
     },
     device::{
-        ethernet::EthernetLinkDevice, DeviceId, DeviceLayerState, DeviceLayerTimerId,
-        DeviceLayerTypes,
+        ethernet::EthernetLinkDevice, DeviceCounters, DeviceId, DeviceLayerState,
+        DeviceLayerTimerId, DeviceLayerTypes,
     },
     ip::{
         device::{
@@ -232,6 +232,10 @@ impl<BT: BindingsTypes> StackState<BT> {
 
     pub(crate) fn get_ndp_counters(&self) -> &NdpCounters {
         &self.ipv6.get_ndp_counters()
+    }
+
+    pub(crate) fn get_device_counters(&self) -> &DeviceCounters {
+        &self.device.get_device_counters()
     }
 }
 

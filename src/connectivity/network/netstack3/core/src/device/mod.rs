@@ -23,7 +23,7 @@ use core::{
 };
 
 use derivative::Derivative;
-use lock_order::Locked;
+use lock_order::{lock::UnlockedAccess, Locked};
 use net_types::{
     ethernet::Mac,
     ip::{Ip, IpAddr, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu},
@@ -34,7 +34,8 @@ use smallvec::SmallVec;
 use tracing::{debug, trace};
 
 use crate::{
-    context::{InstantBindingsTypes, InstantContext, RecvFrameContext},
+    context::{CounterContext2, InstantBindingsTypes, InstantContext, RecvFrameContext},
+    counters::Counter,
     device::{
         ethernet::{
             EthernetDeviceStateBuilder, EthernetIpLinkDeviceDynamicStateContext,
@@ -399,6 +400,37 @@ pub(crate) struct DeviceLayerState<C: DeviceLayerTypes> {
     devices: RwLock<Devices<C>>,
     origin: OriginTracker,
     shared_sockets: HeldSockets<C>,
+    counters: DeviceCounters,
+}
+
+impl<C: DeviceLayerTypes> DeviceLayerState<C> {
+    pub(crate) fn get_device_counters(&self) -> &DeviceCounters {
+        &self.counters
+    }
+}
+
+/// Device layer counters.
+#[derive(Default)]
+pub(crate) struct DeviceCounters {
+    /// Count of ip packets sent inside an ethernet frame.
+    pub(crate) ethernet_send_ip_frame: Counter,
+}
+
+impl<C: NonSyncContext> UnlockedAccess<crate::lock_ordering::DeviceCounters> for SyncCtx<C> {
+    type Data = DeviceCounters;
+    type Guard<'l> = &'l DeviceCounters where Self: 'l;
+
+    fn access(&self) -> Self::Guard<'_> {
+        self.state.get_device_counters()
+    }
+}
+
+impl<NonSyncCtx: NonSyncContext, L> CounterContext2<DeviceCounters>
+    for Locked<&SyncCtx<NonSyncCtx>, L>
+{
+    fn with_counters<O, F: FnOnce(&DeviceCounters) -> O>(&self, cb: F) -> O {
+        cb(self.unlocked_access::<crate::lock_ordering::DeviceCounters>())
+    }
 }
 
 /// Light-weight tracker for recording the source of some instance.
@@ -439,6 +471,7 @@ impl<C: DeviceLayerTypes + socket::NonSyncContext<DeviceId<C>>> DeviceLayerState
             devices: Default::default(),
             origin: OriginTracker::new(),
             shared_sockets: Default::default(),
+            counters: Default::default(),
         }
     }
 

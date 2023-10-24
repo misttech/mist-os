@@ -139,6 +139,8 @@ pub(crate) enum NdpCounters {}
 // Provides unlocked access of TimerCounters.
 #[cfg(test)]
 pub(crate) enum TimerCounters {}
+// Provides unlocked access of DeviceCounters.
+pub(crate) enum DeviceCounters {}
 
 pub(crate) struct IpDeviceConfiguration<I>(PhantomData<I>, Never);
 pub(crate) struct IpDeviceGmp<I>(PhantomData<I>, Never);
