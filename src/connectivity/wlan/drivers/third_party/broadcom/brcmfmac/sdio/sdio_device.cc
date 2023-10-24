@@ -13,6 +13,7 @@
 
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sdio/sdio_device.h"
 
+#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <lib/async-loop/default.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/metadata.h>
@@ -22,6 +23,7 @@
 #include <string>
 
 #include <bind/fuchsia/wlan/phyimpl/cpp/bind.h>
+#include <ddktl/device.h>
 #include <ddktl/init-txn.h>
 
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/bus.h"
@@ -111,8 +113,27 @@ DeviceInspect* SdioDevice::GetInspect() { return inspect_.get(); }
 zx_status_t SdioDevice::DeviceInit() {
   zx_status_t status = ZX_OK;
 
+  fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> fidl_gpios[GPIO_COUNT] = {};
+
+  zx::result client_end = DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
+      drvr()->device->parent(), "gpio-oob");
+  if (client_end.is_error()) {
+    BRCMF_ERR("Failed to connect to oob GPIO service: %s", client_end.status_string());
+    return client_end.status_value();
+  }
+  fidl_gpios[WIFI_OOB_IRQ_GPIO_INDEX].Bind(std::move(client_end.value()));
+
+  // Attempt to connect to the DEBUG GPIO, ignore if not available.
+  client_end = DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
+      drvr()->device->parent(), "gpio-debug");
+  if (client_end.is_error()) {
+    BRCMF_DBG(SDIO, "Failed to connect to debug GPIO service: %s", client_end.status_string());
+  } else {
+    fidl_gpios[DEBUG_GPIO_INDEX].Bind(std::move(client_end.value()));
+  }
+
   std::unique_ptr<brcmf_bus> bus;
-  if ((status = brcmf_sdio_register(drvr(), &bus)) != ZX_OK) {
+  if ((status = brcmf_sdio_register(drvr(), fidl_gpios, &bus)) != ZX_OK) {
     return status;
   }
 

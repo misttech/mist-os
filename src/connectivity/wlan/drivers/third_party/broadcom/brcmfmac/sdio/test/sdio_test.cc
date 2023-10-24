@@ -16,10 +16,13 @@
 
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sdio/sdio.h"
 
-#include <fuchsia/hardware/gpio/c/banjo.h>
-#include <fuchsia/hardware/gpio/cpp/banjo-mock.h>
+#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fuchsia/hardware/sdio/c/banjo.h>
 #include <fuchsia/hardware/sdio/cpp/banjo-mock.h>
+#include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/default.h>
+#include <lib/async/default.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
 #include <zircon/errors.h>
@@ -37,6 +40,7 @@
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/device.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sdio/sdio_device.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/test/stub_device.h"
+#include "src/devices/gpio/testing/fake-gpio/fake-gpio.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
 // These numbers come from real bugs.
@@ -183,7 +187,6 @@ TEST(Sdio, IntrRegisterStartup) {
   sdio_func func1 = {};
   MockSdio sdio1;
   MockSdio sdio2;
-  ddk::MockGpio gpio;
   brcmf_bus bus_if = {};
   brcmf_mp_device settings = {};
   brcmf_sdio_pd sdio_settings = {};
@@ -191,8 +194,14 @@ TEST(Sdio, IntrRegisterStartup) {
       .get_wifi_metadata = get_wifi_metadata,
   };
 
+  async::Loop fidl_loop{&kAsyncLoopConfigNoAttachToCurrentThread};
+  async_patterns::TestDispatcherBound<fake_gpio::FakeGpio> wifi_gpio{fidl_loop.dispatcher(),
+                                                                     std::in_place};
+  EXPECT_OK(fidl_loop.StartThread("fidl-servers"));
+
   sdio_dev.func1 = &func1;
-  sdio_dev.gpios[WIFI_OOB_IRQ_GPIO_INDEX] = *gpio.GetProto();
+  auto wifi_gpio_client = wifi_gpio.SyncCall(&fake_gpio::FakeGpio::Connect);
+  sdio_dev.fidl_gpios[WIFI_OOB_IRQ_GPIO_INDEX].Bind(std::move(wifi_gpio_client));
   sdio_dev.sdio_proto_fn1 = *sdio1.GetProto();
   sdio_dev.sdio_proto_fn2 = *sdio2.GetProto();
   sdio_dev.drvr = device.drvr();
@@ -202,22 +211,18 @@ TEST(Sdio, IntrRegisterStartup) {
   sdio_dev.settings = &settings;
   sdio_dev.settings->bus.sdio = &sdio_settings;
 
-  gpio.ExpectConfigIn(ZX_OK, GPIO_NO_PULL)
-      .ExpectGetInterrupt(ZX_OK, ZX_INTERRUPT_MODE_LEVEL_LOW, zx::interrupt(ZX_HANDLE_INVALID));
   sdio1.ExpectEnableFnIntr(ZX_OK).ExpectDoVendorControlRwByte(
       ZX_OK, true, SDIO_CCCR_BRCM_SEPINT, SDIO_CCCR_BRCM_SEPINT_MASK | SDIO_CCCR_BRCM_SEPINT_OE, 0);
   sdio2.ExpectEnableFnIntr(ZX_OK);
 
   EXPECT_OK(brcmf_sdiod_intr_register(&sdio_dev, false));
 
-  gpio.VerifyAndClear();
+  EXPECT_EQ(wifi_gpio.SyncCall(&fake_gpio::FakeGpio::GetReadFlags),
+            fuchsia_hardware_gpio::GpioFlags::kNoPull);
   sdio1.VerifyAndClear();
   sdio2.VerifyAndClear();
 
-  // Manually join the ISR thread created when the interrupt is registered.
-  int retval = 0;
   zx_handle_close(sdio_dev.irq_handle);
-  thrd_join(sdio_dev.isr_thread, &retval);
 }
 
 TEST(Sdio, IntrRegisterFwReload) {
@@ -226,7 +231,6 @@ TEST(Sdio, IntrRegisterFwReload) {
   sdio_func func1 = {};
   MockSdio sdio1;
   MockSdio sdio2;
-  ddk::MockGpio gpio;
   brcmf_bus bus_if = {};
   brcmf_mp_device settings = {};
   brcmf_sdio_pd sdio_settings = {};
@@ -234,8 +238,13 @@ TEST(Sdio, IntrRegisterFwReload) {
       .get_wifi_metadata = get_wifi_metadata,
   };
 
+  async::Loop fidl_loop{&kAsyncLoopConfigNoAttachToCurrentThread};
+  async_patterns::TestDispatcherBound<fake_gpio::FakeGpio> wifi_gpio{fidl_loop.dispatcher(),
+                                                                     std::in_place};
+  EXPECT_OK(fidl_loop.StartThread("fidl-servers"));
   sdio_dev.func1 = &func1;
-  sdio_dev.gpios[WIFI_OOB_IRQ_GPIO_INDEX] = *gpio.GetProto();
+  auto wifi_gpio_client = wifi_gpio.SyncCall(&fake_gpio::FakeGpio::Connect);
+  sdio_dev.fidl_gpios[WIFI_OOB_IRQ_GPIO_INDEX].Bind(std::move(wifi_gpio_client));
   sdio_dev.sdio_proto_fn1 = *sdio1.GetProto();
   sdio_dev.sdio_proto_fn2 = *sdio2.GetProto();
   sdio_dev.drvr = device.drvr();
@@ -251,10 +260,8 @@ TEST(Sdio, IntrRegisterFwReload) {
 
   EXPECT_OK(brcmf_sdiod_intr_register(&sdio_dev, true));
 
-  gpio.VerifyAndClear();
   sdio1.VerifyAndClear();
   sdio2.VerifyAndClear();
-
   zx_handle_close(sdio_dev.irq_handle);
 }
 
@@ -629,8 +636,7 @@ struct MinimalBrcmfSdio {
                    const char* workqueue_name, void (*work_item_handler)(WorkItem* work))
       : wq(workqueue_name),
         loop(std::make_unique<::async::Loop>(&kAsyncLoopConfigNeverAttachToThread)),
-        timer(std::make_unique<Timer>(
-            loop->dispatcher(), []() {}, false)) {
+        timer(std::make_unique<Timer>(loop->dispatcher(), []() {}, false)) {
     sdio_dev = {.ctl_done_timeout = ctl_done_timeout, .state = sdiod_state};
 
     pthread_mutex_init(&func1.lock, nullptr);

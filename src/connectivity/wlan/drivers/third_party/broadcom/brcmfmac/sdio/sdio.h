@@ -17,7 +17,7 @@
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_SDIO_SDIO_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_SDIO_SDIO_H_
 
-#include <fuchsia/hardware/gpio/c/banjo.h>
+#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fuchsia/hardware/sdio/c/banjo.h>
 #include <lib/ddk/device.h>
 #include <lib/sync/completion.h>
@@ -234,7 +234,7 @@ struct brcmf_sdio_dev {
   uint32_t product_id;
   sdio_protocol_t sdio_proto_fn1;
   sdio_protocol_t sdio_proto_fn2;
-  gpio_protocol_t gpios[GPIO_COUNT];
+  fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> fidl_gpios[GPIO_COUNT];
   bool has_debug_gpio;
   zx_handle_t irq_handle;
   thrd_t isr_thread;
@@ -437,7 +437,9 @@ zx_status_t brcmf_sdio_sleep(struct brcmf_sdio* bus, bool sleep);
 void brcmf_sdio_trigger_dpc(struct brcmf_sdio* bus);
 int brcmf_sdio_oob_irqhandler(void* cookie);
 
-zx_status_t brcmf_sdio_register(brcmf_pub* drvr, std::unique_ptr<brcmf_bus>* out_bus);
+zx_status_t brcmf_sdio_register(
+    brcmf_pub* drvr, fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> fidl_gpios[GPIO_COUNT],
+    std::unique_ptr<brcmf_bus>* out_bus);
 void brcmf_sdio_exit(struct brcmf_bus* bus);
 
 zx_status_t brcmf_sdio_request_card_reset(struct brcmf_sdio_dev* sdiod);
@@ -609,7 +611,7 @@ struct brcmf_sdio {
   uint console_interval;
   struct brcmf_console console; /* Console output polling support */
   uint console_addr;            /* Console address from shared struct */
-#endif // BRCMF_CONSOLE_LOG
+#endif                          // BRCMF_CONSOLE_LOG
 
   uint clkstate;     /* State of sd and backplane clock(s) */
   int32_t idletime;  /* Control for activity timeout */
@@ -644,7 +646,7 @@ struct brcmf_sdio {
   bool sr_enabled; /* SaveRestore enabled */
   bool sleeping;
 
-  uint8_t tx_hdrlen;      /* sdio bus header length for tx packet */
+  uint8_t tx_hdrlen; /* sdio bus header length for tx packet */
   bool txglom;
   uint16_t head_align;    /* buffer pointer alignment */
   uint16_t sgentry_align; /* scatter-gather buffer alignment */
