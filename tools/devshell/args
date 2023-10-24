@@ -14,7 +14,7 @@
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/vars.sh || exit $?
 fx-config-read
 
-set -ex
+set -e
 
 fx-gn-args "$@"
 
