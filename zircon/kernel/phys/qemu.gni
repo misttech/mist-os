@@ -81,16 +81,7 @@ if (current_cpu == "arm64" || current_cpu == "riscv64") {
       name = "linuxboot"
       environment = phys_toolchain
       deps = [ "//zircon/kernel/arch/$current_cpu/phys:linuxboot" ]
-      if (current_cpu == "arm64") {
-        shim_deps = [ "//zircon/kernel/target/arm64/boot-shim:qemu(//zircon/kernel/arch/arm64:physmem_arm64)" ]
-
-        # TODO(mcgrathr): Use root_out_dir of environment, target name
-        # when nothing cares.
-        shim_path = "$root_build_dir/qemu-boot-shim.bin"
-      }
-      if (current_cpu == "riscv64") {
-        shim_deps = [ "//zircon/kernel/arch/riscv64/phys/boot-shim:linux-riscv64-boot-shim($environment)" ]
-      }
+      shim_deps = [ "//zircon/kernel/arch/${current_cpu}/phys/boot-shim:linux-${current_cpu}-boot-shim($environment)" ]
       timeout = qemu_short_timeout
     },
   ]

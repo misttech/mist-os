@@ -4,14 +4,14 @@
 # license that can be found in the LICENSE file or at
 # https://opensource.org/licenses/MIT
 
-import("//zircon/kernel/phys/phys_executable.gni")
 import("//zircon/kernel/phys/qemu.gni")
+import("//zircon/kernel/phys/shim_executable.gni")
 
 group("boot-shim") {
   deps = [ ":linux-arm64-boot-shim" ]
 }
 
-phys_executable("linux-arm64-boot-shim") {
+shim_executable("linux-arm64-boot-shim") {
   sources = [ "linux-arm64-boot-shim.cc" ]
 
   deps = [
