@@ -27,7 +27,7 @@ void VerifyResourcenessStep::VerifyDecl(const Decl* decl) {
         for (const auto& member : struct_decl->members) {
           if (EffectiveResourceness(member.type_ctor->type) == types::Resourceness::kResource) {
             Fail(ErrTypeMustBeResource, struct_decl->name.span().value(), struct_decl->name,
-                 member.name.data(), "struct", struct_decl->name);
+                 member.name.data(), "struct");
           }
         }
       }
@@ -41,7 +41,7 @@ void VerifyResourcenessStep::VerifyDecl(const Decl* decl) {
             const auto& used = *member.maybe_used;
             if (EffectiveResourceness(used.type_ctor->type) == types::Resourceness::kResource) {
               Fail(ErrTypeMustBeResource, table_decl->name.span().value(), table_decl->name,
-                   used.name.data(), "table", table_decl->name);
+                   used.name.data(), "table");
             }
           }
         }
@@ -56,7 +56,7 @@ void VerifyResourcenessStep::VerifyDecl(const Decl* decl) {
             const auto& used = *member.maybe_used;
             if (EffectiveResourceness(used.type_ctor->type) == types::Resourceness::kResource) {
               Fail(ErrTypeMustBeResource, union_decl->name.span().value(), union_decl->name,
-                   used.name.data(), "union", union_decl->name);
+                   used.name.data(), "union");
             }
           }
         }

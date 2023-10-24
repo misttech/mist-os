@@ -187,8 +187,7 @@ void Dependencies::VerifyAllDependenciesWereUsed(const Library& for_library, Rep
   for (const auto& [filename, per_file] : by_filename_) {
     for (const auto& [name, ref] : per_file->refs) {
       if (!ref->used) {
-        reporter->Fail(ErrUnusedImport, ref->span, for_library.name, ref->library->name,
-                       ref->library->name);
+        reporter->Fail(ErrUnusedImport, ref->span, for_library.name, ref->library->name);
       }
     }
   }

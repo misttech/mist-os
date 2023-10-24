@@ -240,7 +240,7 @@ std::string Display(const flat::Element* e) {
 
 // Display a list of nested types with arrows indicating what includes what:
 // ['A', 'B', 'C'] -> "A -> B -> C"
-std::string Display(std::vector<const flat::Decl*>& d) {
+std::string Display(const std::vector<const flat::Decl*>& d) {
   std::stringstream ss;
   for (auto it = d.cbegin(); it != d.cend(); it++) {
     if (it != d.cbegin()) {

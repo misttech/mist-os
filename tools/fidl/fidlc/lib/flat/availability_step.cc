@@ -159,8 +159,7 @@ void AvailabilityStep::CompileAvailabilityFromAttribute(Element* element, Attrib
     const auto library_platform = GetPlatform(platform).value_or(GetDefaultPlatform());
     library()->platform = library_platform;
     if (!version_selection()->Contains(library_platform)) {
-      Fail(ErrPlatformVersionNotSelected, attribute->span, library()->name, library_platform,
-           library_platform);
+      Fail(ErrPlatformVersionNotSelected, attribute->span, library()->name, library_platform);
     }
     if (!init_args.added) {
       // Return early to avoid letting the -inf from Availability::Unbounded()

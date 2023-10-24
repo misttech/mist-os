@@ -32,8 +32,6 @@ using ErrorId = uint32_t;
 
 namespace internal {
 
-constexpr std::string_view kFormatMarker = "{}";
-
 std::string Display(char c);
 std::string Display(const std::string& s);
 std::string Display(std::string_view s);
@@ -50,7 +48,7 @@ std::string Display(const flat::Constant* c);
 std::string Display(flat::Element::Kind k);
 std::string Display(flat::Decl::Kind k);
 std::string Display(const flat::Element* e);
-std::string Display(std::vector<const flat::Decl*>& d);
+std::string Display(const std::vector<const flat::Decl*>& d);
 std::string Display(const flat::Type* t);
 std::string Display(const flat::Name& n);
 std::string Display(const Platform& p);
@@ -62,35 +60,32 @@ std::string Display(T val) {
   return std::to_string(val);
 }
 
-inline void FormatHelper(std::stringstream& out, std::string_view msg) {
-  ZX_ASSERT(msg.find(kFormatMarker) == std::string::npos);
-  out << msg;
-}
-
-template <typename T, typename... Rest>
-void FormatHelper(std::stringstream& out, std::string_view msg, T t, const Rest&... rest) {
-  auto i = msg.find(kFormatMarker);
-  ZX_ASSERT(i != std::string::npos);
-  out << msg.substr(0, i) << Display(t);
-  auto remaining_msg = msg.substr(i + kFormatMarker.size());
-  FormatHelper(out, remaining_msg, rest...);
-}
-
+// TODO(fxbug.dev/113689): Use std::format when we're on C++20.
 template <typename... Args>
 std::string FormatDiagnostic(std::string_view msg, const Args&... args) {
+  std::string displayed_args[] = {Display(args)...};
   std::stringstream s;
-  FormatHelper(s, msg, args...);
+  size_t offset = 0;
+  for (size_t i = 0; i < msg.size() - 2; i++) {
+    if (msg[i] == '{' && msg[i + 1] >= '0' && msg[i + 1] <= '9' && msg[i + 2] == '}') {
+      size_t index = msg[i + 1] - '0';
+      s << msg.substr(offset, i - offset) << displayed_args[index];
+      offset = i + 3;
+    }
+  }
+  s << msg.substr(offset);
   return s.str();
 }
 
-constexpr size_t CountFormatArgs(std::string_view s) {
-  size_t i = s.find(kFormatMarker, 0);
-  size_t total = 0;
-  while (i != std::string::npos) {
-    total++;
-    i = s.find(kFormatMarker, i + kFormatMarker.size());
+constexpr size_t CountFormatArgs(std::string_view msg) {
+  size_t count = 0;
+  for (size_t i = 0; i < msg.size() - 2; i++) {
+    if (msg[i] == '{' && msg[i + 1] >= '0' && msg[i + 1] <= '9' && msg[i + 2] == '}') {
+      size_t index = msg[i + 1] - '0';
+      count = std::max(count, index + 1);
+    }
   }
-  return total;
+  return count;
 }
 
 // No-op non-constexpr function used to produce an error.

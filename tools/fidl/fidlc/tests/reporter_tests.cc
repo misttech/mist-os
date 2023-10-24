@@ -35,16 +35,20 @@ const std::string kFixMeTagOpen = "[[[ FIXME ]]]";
 const std::string kFixMeTagClose = "[[[ /FIXME ]]]";
 
 constexpr ErrorDef<kTestErrorId, std::string_view, std::string_view> ErrTest(
-    "This test error has one string param '{}' and another '{}'.");
+    "This test error has one string param '{0}' and another '{1}'.");
 constexpr WarningDef<kTestWarningId, std::string_view, std::string_view> WarnTest(
-    "This test warning has one string param '{}' and another '{}'.");
+    "This test warning has one string param '{0}' and another '{1}'.");
 
 constexpr ErrorDef<kTestFixableErrorId, std::string_view, std::string_view> FixableErrTest(
-    "This test error has one string param '{}' and another '{}'.",
+    "This test error has one string param '{0}' and another '{1}'.",
     {.fixable = fidl::Fixable::Kind::kNoop});
 constexpr WarningDef<kTestFixableWarningId, std::string_view, std::string_view> FixableWarnTest(
-    "This test warning has one string param '{}' and another '{}'.",
+    "This test warning has one string param '{0}' and another '{1}'.",
     {.fixable = fidl::Fixable::Kind::kNoop});
+
+constexpr ErrorDef<kTestErrorId, std::string_view, std::string_view> ReuseParamsErrTest(
+    "This test error has one string param '{0}' and another '{1}'. "
+    "Backwards, that's '{1}' and '{0}'.");
 
 fidl::SourceManager FakeSourceManager(std::string prefix, uint8_t files_per_lib) {
   // Always use a positive single-digit number.
@@ -254,6 +258,19 @@ TEST(ReporterTests, MakeFixableWarningThenReportIt) {
                     std::string(fidl::Fixable::Get(fidl::Fixable::Kind::kNoop).name) +
                     " --experimental=noop lib_file_0.fidl lib_file_1.fidl lib_file_2.fidl");
   EXPECT_SUBSTR(warnings[0]->Format(reporter.program_invocation()).c_str(), kFixMeTagClose);
+}
+
+TEST(ReporterTests, ReportErrorWithReusedFormatParams) {
+  Reporter reporter;
+  VirtualSourceFile file("fake");
+  SourceSpan span("span text", file);
+  reporter.Fail(ReuseParamsErrTest, span, "param1", "param2");
+
+  const auto& errors = reporter.errors();
+  ASSERT_EQ(errors.size(), 1);
+  EXPECT_SUBSTR(errors[0]->msg.c_str(),
+                "This test error has one string param 'param1' and another 'param2'. "
+                "Backwards, that's 'param2' and 'param1'.");
 }
 
 TEST(ReporterTests, CheckpointFixablesSilenced) {

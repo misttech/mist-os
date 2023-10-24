@@ -16,20 +16,20 @@
 
 namespace fidl {
 
-constexpr ErrorDef<1, std::string_view> ErrInvalidCharacter("invalid character '{}'");
+constexpr ErrorDef<1, std::string_view> ErrInvalidCharacter("invalid character '{0}'");
 constexpr ErrorDef<2> ErrUnexpectedLineBreak("unexpected line-break in string literal");
-constexpr ErrorDef<3, std::string_view> ErrInvalidEscapeSequence("invalid escape sequence '{}'");
-constexpr ErrorDef<4, char> ErrInvalidHexDigit("invalid hex digit '{}'");
+constexpr ErrorDef<3, std::string_view> ErrInvalidEscapeSequence("invalid escape sequence '{0}'");
+constexpr ErrorDef<4, char> ErrInvalidHexDigit("invalid hex digit '{0}'");
 constexpr RetiredDef<5> ErrInvalidOctDigit;
-constexpr ErrorDef<6, std::string_view> ErrExpectedDeclaration("invalid declaration type {}");
+constexpr ErrorDef<6, std::string_view> ErrExpectedDeclaration("invalid declaration type {0}");
 constexpr ErrorDef<7> ErrUnexpectedToken("found unexpected token");
 constexpr ErrorDef<8, Token::KindAndSubkind, Token::KindAndSubkind> ErrUnexpectedTokenOfKind(
-    "unexpected token {}, was expecting {}");
+    "unexpected token {0}, was expecting {1}");
 constexpr ErrorDef<9, Token::KindAndSubkind, Token::KindAndSubkind> ErrUnexpectedIdentifier(
-    "unexpected identifier {}, was expecting {}");
-constexpr ErrorDef<10, std::string_view> ErrInvalidIdentifier("invalid identifier '{}'");
+    "unexpected identifier {0}, was expecting {1}");
+constexpr ErrorDef<10, std::string_view> ErrInvalidIdentifier("invalid identifier '{0}'");
 constexpr ErrorDef<11, std::string_view> ErrInvalidLibraryNameComponent(
-    "Invalid library name component {}");
+    "Invalid library name component {0}");
 constexpr ErrorDef<12> ErrInvalidLayoutClass(
     "layouts must be of the class: bits, enum, struct, table, or union.");
 constexpr ErrorDef<13> ErrInvalidWrappedType("wrapped type for bits/enum must be an identifier");
@@ -59,131 +59,128 @@ constexpr WarningDef<28> WarnDocCommentMustBeFollowedByDeclaration(
     "doc comment must be followed by a declaration");
 constexpr ErrorDef<29> ErrMustHaveOneProperty("must have at least one property");
 constexpr ErrorDef<30, Token::KindAndSubkind, Token::KindAndSubkind> ErrCannotSpecifyModifier(
-    "cannot specify modifier {} for {}");
+    "cannot specify modifier {0} for {1}");
 constexpr ErrorDef<31, Token::KindAndSubkind> ErrCannotSpecifySubtype(
-    "cannot specify subtype for {}");
+    "cannot specify subtype for {0}");
 constexpr ErrorDef<32, Token::KindAndSubkind> ErrDuplicateModifier(
-    "duplicate occurrence of modifier {}");
+    "duplicate occurrence of modifier {0}");
 constexpr ErrorDef<33, Token::KindAndSubkind, Token::KindAndSubkind> ErrConflictingModifier(
-    "modifier {} conflicts with modifier {}");
+    "modifier {0} conflicts with modifier {1}");
 constexpr ErrorDef<34, std::string_view, SourceSpan> ErrNameCollision(
-    "the name '{}' conflicts with another declaration at {}");
+    "the name '{0}' conflicts with another declaration at {1}");
 constexpr ErrorDef<35, std::string_view, std::string_view, SourceSpan, std::string_view>
     ErrNameCollisionCanonical(
-        "the name '{}' conflicts with '{}' from {}; both are represented by "
-        "the canonical form '{}'");
+        "the name '{0}' conflicts with '{1}' from {2}; both are represented by "
+        "the canonical form '{3}'");
 constexpr ErrorDef<36, std::string_view, SourceSpan, VersionSet, Platform> ErrNameOverlap(
-    "the name '{}' conflicts with another declaration at {}; both are "
-    "available {} of platform '{}'");
+    "the name '{0}' conflicts with another declaration at {1}; both are "
+    "available {2} of platform '{3}'");
 constexpr ErrorDef<37, std::string_view, std::string_view, SourceSpan, std::string_view, VersionSet,
                    Platform>
     ErrNameOverlapCanonical(
-        "the name '{}' conflicts with '{}' from {}; both are represented "
-        "by the canonical form '{}' and are available {} of platform '{}'");
+        "the name '{0}' conflicts with '{1}' from {2}; both are represented "
+        "by the canonical form '{3}' and are available {4} of platform '{5}'");
 constexpr ErrorDef<38, flat::Name> ErrDeclNameConflictsWithLibraryImport(
-    "Declaration name '{}' conflicts with a library import. Consider using the "
+    "Declaration name '{0}' conflicts with a library import. Consider using the "
     "'as' keyword to import the library under a different name.");
 constexpr ErrorDef<39, flat::Name, std::string_view> ErrDeclNameConflictsWithLibraryImportCanonical(
-    "Declaration name '{}' conflicts with a library import due to its "
-    "canonical form '{}'. Consider using the 'as' keyword to import the "
+    "Declaration name '{0}' conflicts with a library import due to its "
+    "canonical form '{1}'. Consider using the 'as' keyword to import the "
     "library under a different name.");
 constexpr ErrorDef<40> ErrFilesDisagreeOnLibraryName(
     "Two files in the library disagree about the name of the library");
 constexpr ErrorDef<41, std::vector<std::string_view>> ErrMultipleLibrariesWithSameName(
-    "There are multiple libraries named '{}'");
+    "There are multiple libraries named '{0}'");
 constexpr ErrorDef<42, std::vector<std::string_view>> ErrDuplicateLibraryImport(
-    "Library {} already imported. Did you require it twice?");
+    "Library {0} already imported. Did you require it twice?");
 constexpr ErrorDef<43, std::vector<std::string_view>> ErrConflictingLibraryImport(
-    "import of library '{}' conflicts with another library import");
+    "import of library '{0}' conflicts with another library import");
 constexpr ErrorDef<44, std::vector<std::string_view>, std::string_view>
     ErrConflictingLibraryImportAlias(
-        "import of library '{}' under alias '{}' conflicts with another library import");
+        "import of library '{0}' under alias '{1}' conflicts with another library import");
 constexpr ErrorDef<45, const raw::AttributeList *> ErrAttributesNotAllowedOnLibraryImport(
-    "no attributes allowed on library import, found: {}");
+    "no attributes allowed on library import, found: {0}");
 constexpr ErrorDef<46, std::vector<std::string_view>> ErrUnknownLibrary(
-    "Could not find library named {}. Did you include its sources with --files?");
+    "Could not find library named {0}. Did you include its sources with --files?");
 constexpr ErrorDef<47, SourceSpan> ErrProtocolComposedMultipleTimes(
-    "protocol composed multiple times; previous was at {}");
+    "protocol composed multiple times; previous was at {0}");
 constexpr ErrorDef<48> ErrOptionalTableMember("Table members cannot be optional");
 constexpr ErrorDef<49> ErrOptionalUnionMember("Union members cannot be optional");
 constexpr ErrorDef<50> ErrDeprecatedStructDefaults(
     "Struct defaults are deprecated and should not be used (see RFC-0160)");
 constexpr ErrorDef<51, std::vector<std::string_view>, std::vector<std::string_view>>
     ErrUnknownDependentLibrary(
-        "Unknown dependent library {} or reference to member of "
-        "library {}. Did you require it with `using`?");
+        "Unknown dependent library {0} or reference to member of "
+        "library {1}. Did you require it with `using`?");
 constexpr ErrorDef<52, std::string_view, std::vector<std::string_view>> ErrNameNotFound(
-    "cannot find '{}' in library '{}'");
-constexpr ErrorDef<53, const flat::Decl *> ErrCannotReferToMember("cannot refer to member of {}");
+    "cannot find '{0}' in library '{1}'");
+constexpr ErrorDef<53, const flat::Decl *> ErrCannotReferToMember("cannot refer to member of {0}");
 constexpr ErrorDef<54, const flat::Decl *, std::string_view> ErrMemberNotFound(
-    "{} has no member '{}'");
-constexpr ErrorDef<55, const flat::Element *, VersionRange, Platform, const flat::Element *,
-                   const flat::Element *>
+    "{0} has no member '{1}'");
+constexpr ErrorDef<55, const flat::Element *, VersionRange, Platform, const flat::Element *>
     ErrInvalidReferenceToDeprecated(
-        "invalid reference to {}, which is deprecated {} of platform '{}' while {} "
-        "is not; either remove this reference or mark {} as deprecated");
+        "invalid reference to {0}, which is deprecated {1} of platform '{2}' while {3} "
+        "is not; either remove this reference or mark {3} as deprecated");
 constexpr ErrorDef<56, const flat::Element *, VersionRange, Platform, const flat::Element *,
-                   VersionRange, Platform, const flat::Element *>
+                   VersionRange, Platform>
     ErrInvalidReferenceToDeprecatedOtherPlatform(
-        "invalid reference to {}, which is deprecated {} of platform '{}' while {} "
-        "is not deprecated {} of platform '{}'; either remove this reference or mark {} as "
+        "invalid reference to {0}, which is deprecated {1} of platform '{2}' while {3} "
+        "is not deprecated {4} of platform '{5}'; either remove this reference or mark {3} as "
         "deprecated");
-// ErrIncludeCycle is thrown either as part of SortDeclarations or as part of
-// CompileStep, depending on the type of the cycle, because SortDeclarations
-// understands the support for boxed recursive structs, while CompileStep
-// handles recursive protocols and self-referencing type-aliases.
 constexpr ErrorDef<57, std::vector<const flat::Decl *>> ErrIncludeCycle(
-    "There is an includes-cycle in declarations: {}");
-constexpr ErrorDef<58, flat::Name> ErrAnonymousNameReference("cannot refer to anonymous name {}");
-constexpr ErrorDef<59, const flat::Type *> ErrInvalidConstantType("invalid constant type {}");
+    "There is an includes-cycle in declarations: {0}");
+constexpr ErrorDef<58, flat::Name> ErrAnonymousNameReference("cannot refer to anonymous name {0}");
+constexpr ErrorDef<59, const flat::Type *> ErrInvalidConstantType("invalid constant type {0}");
 constexpr ErrorDef<60> ErrCannotResolveConstantValue("unable to resolve constant value");
 constexpr ErrorDef<61> ErrOrOperatorOnNonPrimitiveValue(
     "Or operator can only be applied to primitive-kinded values");
 constexpr ErrorDef<62, flat::Name, std::string_view> ErrNewTypesNotAllowed(
-    "newtypes not allowed: type declaration {} defines a new type of the existing {} type, which "
-    "is not yet supported");
+    "newtypes not allowed: type declaration {0} defines a new type of the "
+    "existing {1} type, which is not yet supported");
 constexpr ErrorDef<63, flat::Name> ErrExpectedValueButGotType(
-    "{} is a type, but a value was expected");
+    "{0} is a type, but a value was expected");
 constexpr ErrorDef<64, flat::Name, flat::Name> ErrMismatchedNameTypeAssignment(
-    "mismatched named type assignment: cannot define a constant or default value of type {} "
-    "using a value of type {}");
+    "mismatched named type assignment: cannot define a constant or default "
+    "value of type {0} using a value of type {1}");
 constexpr ErrorDef<65, const flat::Constant *, const flat::Type *, const flat::Type *>
-    ErrTypeCannotBeConvertedToType("{} (type {}) cannot be converted to type {}");
+    ErrTypeCannotBeConvertedToType("{0} (type {1}) cannot be converted to type {2}");
 constexpr ErrorDef<66, const flat::Constant *, const flat::Type *> ErrConstantOverflowsType(
-    "{} overflows type {}");
+    "{0} overflows type {1}");
 constexpr ErrorDef<67> ErrBitsMemberMustBePowerOfTwo("bits members must be powers of two");
 constexpr ErrorDef<68, std::string_view> ErrFlexibleEnumMemberWithMaxValue(
-    "flexible enums must not have a member with a value of {}, which is "
+    "flexible enums must not have a member with a value of {0}, which is "
     "reserved for the unknown value. either: remove the member, change its "
     "value to something else, or explicitly specify the unknown value with "
     "the @unknown attribute. see "
     "<https://fuchsia.dev/fuchsia-src/reference/fidl/language/attributes#unknown> "
     "for more info.");
 constexpr ErrorDef<69, const flat::Type *> ErrBitsTypeMustBeUnsignedIntegralPrimitive(
-    "bits may only be of unsigned integral primitive type, found {}");
+    "bits may only be of unsigned integral primitive type, found {0}");
 constexpr ErrorDef<70, const flat::Type *> ErrEnumTypeMustBeIntegralPrimitive(
-    "enums may only be of integral primitive type, found {}");
+    "enums may only be of integral primitive type, found {0}");
 constexpr ErrorDef<71> ErrUnknownAttributeOnStrictEnumMember(
     "the @unknown attribute can be only be used on flexible enum members.");
 constexpr ErrorDef<72> ErrUnknownAttributeOnMultipleEnumMembers(
     "the @unknown attribute can be only applied to one enum member.");
 constexpr ErrorDef<73> ErrComposingNonProtocol("This declaration is not a protocol");
 constexpr ErrorDef<74, flat::Decl::Kind> ErrInvalidMethodPayloadLayoutClass(
-    "cannot use {} as a request/response; must use a struct, table, or union");
+    "cannot use {0} as a request/response; must use a struct, table, or union");
 constexpr ErrorDef<75, const flat::Type *> ErrInvalidMethodPayloadType(
-    "invalid request/response type '{}'; must use a struct, table, or union");
+    "invalid request/response type '{0}'; must use a struct, table, or union");
 constexpr RetiredDef<76> ErrResponsesWithErrorsMustNotBeEmpty;
 constexpr ErrorDef<77, std::string_view> ErrEmptyPayloadStructs(
-    "method '{}' cannot have an empty struct as a payload, prefer omitting the payload altogether");
+    "method '{0}' cannot have an empty struct as a payload, prefer omitting "
+    "the payload altogether");
 constexpr ErrorDef<78, flat::Element::Kind, std::string_view, SourceSpan> ErrDuplicateElementName(
-    "duplicate {} named '{}'; previous was at {}");
+    "duplicate {0} named '{1}'; previous was at {2}");
 constexpr ErrorDef<79, flat::Element::Kind, std::string_view, std::string_view, SourceSpan,
                    std::string_view>
     ErrDuplicateElementNameCanonical(
-        "{} '{}' conflicts with '{}' from {}; both are represented by the canonical form '{}'");
+        "{0} '{1}' conflicts with '{2}' from {3}; both are represented by the "
+        "canonical form '{4}'");
 constexpr ErrorDef<80> ErrGeneratedZeroValueOrdinal("Ordinal value 0 disallowed.");
 constexpr ErrorDef<81, SourceSpan> ErrDuplicateMethodOrdinal(
-    "Multiple methods with the same ordinal in a protocol; previous was at {}.");
+    "Multiple methods with the same ordinal in a protocol; previous was at {0}.");
 constexpr ErrorDef<82> ErrInvalidSelectorValue(
     "invalid selector value, must be a method name or a fully qualified method name");
 constexpr ErrorDef<83> ErrFuchsiaIoExplicitOrdinals(
@@ -198,102 +195,101 @@ constexpr ErrorDef<88> ErrOptionalServiceMember("service members cannot be optio
 constexpr RetiredDef<89> ErrDuplicateStructMemberName;
 constexpr RetiredDef<90> ErrDuplicateStructMemberNameCanonical;
 constexpr ErrorDef<91, std::string_view, const flat::Type *> ErrInvalidStructMemberType(
-    "struct field {} has an invalid default type {}");
+    "struct field {0} has an invalid default type {1}");
 constexpr ErrorDef<92> ErrTooManyTableOrdinals(
     "table contains too many ordinals; tables are limited to 64 ordinals");
 constexpr ErrorDef<93> ErrMaxOrdinalNotTable(
     "the 64th ordinal of a table may only contain a table type");
 constexpr ErrorDef<94, SourceSpan> ErrDuplicateTableFieldOrdinal(
-    "multiple table fields with the same ordinal; previous was at {}");
+    "multiple table fields with the same ordinal; previous was at {0}");
 constexpr RetiredDef<95> ErrDuplicateTableFieldName;
 constexpr RetiredDef<96> ErrDuplicateTableFieldNameCanonical;
 constexpr ErrorDef<97, SourceSpan> ErrDuplicateUnionMemberOrdinal(
-    "multiple union fields with the same ordinal; previous was at {}");
+    "multiple union fields with the same ordinal; previous was at {0}");
 constexpr RetiredDef<98> ErrDuplicateUnionMemberName;
 constexpr RetiredDef<99> ErrDuplicateUnionMemberNameCanonical;
 constexpr ErrorDef<100, uint64_t> ErrNonDenseOrdinal(
-    "missing ordinal {} (ordinals must be dense); consider marking it reserved");
+    "missing ordinal {0} (ordinals must be dense); consider marking it reserved");
 constexpr ErrorDef<101> ErrCouldNotResolveSizeBound("unable to resolve size bound");
-constexpr ErrorDef<102, flat::Decl::Kind> ErrCouldNotResolveMember("unable to resolve {} member");
+constexpr ErrorDef<102, flat::Decl::Kind> ErrCouldNotResolveMember("unable to resolve {0} member");
 constexpr ErrorDef<103, std::string_view> ErrCouldNotResolveMemberDefault(
-    "unable to resolve {} default value");
+    "unable to resolve {0} default value");
 constexpr ErrorDef<104> ErrCouldNotResolveAttributeArg("unable to resolve attribute argument");
 constexpr RetiredDef<105> ErrDuplicateMemberName;
 constexpr RetiredDef<106> ErrDuplicateMemberNameCanonical;
 constexpr ErrorDef<107, flat::Decl::Kind, std::string_view, std::string_view, SourceSpan>
     ErrDuplicateMemberValue(
-        "value of {} member '{}' conflicts with previously declared member '{}' at {}");
+        "value of {0} member '{1}' conflicts with previously declared member '{2}' at {3}");
 constexpr RetiredDef<108> ErrDuplicateResourcePropertyName;
 constexpr RetiredDef<109> ErrDuplicateResourcePropertyNameCanonical;
-constexpr ErrorDef<110, flat::Name, std::string_view, std::string_view, flat::Name>
-    ErrTypeMustBeResource(
-        "'{}' may contain handles (due to member '{}'), so it must "
-        "be declared with the `resource` modifier: `resource {} {}`");
+constexpr ErrorDef<110, flat::Name, std::string_view, std::string_view> ErrTypeMustBeResource(
+    "'{0}' may contain handles (due to member '{1}'), so it must "
+    "be declared with the `resource` modifier: `resource {2} {0}`");
 constexpr ErrorDef<111, flat::Name, uint32_t, uint32_t> ErrInlineSizeExceedsLimit(
-    "'{}' has an inline size of {} bytes, which exceeds the maximum allowed "
-    "inline size of {} bytes");
+    "'{0}' has an inline size of {1} bytes, which exceeds the maximum allowed "
+    "inline size of {2} bytes");
 constexpr ErrorDef<112> ErrOnlyClientEndsInServices("service members must be client_end:P");
 constexpr ErrorDef<113, std::string_view, std::string_view, std::string_view, std::string_view>
     ErrMismatchedTransportInServices(
-        "service member {} is over the {} transport, but member {} is over the {} transport. "
-        "Multiple transports are not allowed.");
+        "service member {0} is over the {1} transport, but member {2} is over "
+        "the {3} transport. Multiple transports are not allowed.");
 constexpr ErrorDef<114, types::Openness, flat::Name, types::Openness, flat::Name>
     ErrComposedProtocolTooOpen(
-        "{} protocol '{}' cannot compose {} protocol '{}'; composed protocol may not be more open "
-        "than composing protocol");
+        "{0} protocol '{1}' cannot compose {2} protocol '{3}'; composed protocol "
+        "may not be more open than composing protocol");
 constexpr ErrorDef<115, types::Openness> ErrFlexibleTwoWayMethodRequiresOpenProtocol(
-    "flexible two-way method may only be defined in an open protocol, not {}");
+    "flexible two-way method may only be defined in an open protocol, not {0}");
 constexpr ErrorDef<116, std::string_view> ErrFlexibleOneWayMethodInClosedProtocol(
-    "flexible {} may only be defined in an open or ajar protocol, not closed");
+    "flexible {0} may only be defined in an open or ajar protocol, not closed");
 constexpr ErrorDef<117, std::string_view, std::string_view, const flat::Decl *>
     ErrHandleUsedInIncompatibleTransport(
-        "handle of type {} may not be sent over transport {} used by {}");
+        "handle of type {0} may not be sent over transport {1} used by {2}");
 constexpr ErrorDef<118, std::string_view, std::string_view, const flat::Decl *>
     ErrTransportEndUsedInIncompatibleTransport(
-        "client_end / server_end of transport type {} may not be sent over transport {} used by "
-        "{}");
+        "client_end / server_end of transport type {0} may not be sent over "
+        "transport {1} used by {2}");
 constexpr ErrorDef<119, std::string_view> ErrEventErrorSyntaxDeprecated(
-    "Event '{}' uses the error syntax. This is deprecated (see fxbug.dev/99924)");
+    "Event '{0}' uses the error syntax. This is deprecated (see fxbug.dev/99924)");
 constexpr ErrorDef<120, const flat::Attribute *> ErrInvalidAttributePlacement(
-    "placement of attribute '{}' disallowed here");
+    "placement of attribute '{0}' disallowed here");
 constexpr ErrorDef<121, const flat::Attribute *> ErrDeprecatedAttribute(
-    "attribute '{}' is deprecated");
+    "attribute '{0}' is deprecated");
 constexpr ErrorDef<122, std::string_view, SourceSpan> ErrDuplicateAttribute(
-    "duplicate attribute '{}'; previous was at {}");
+    "duplicate attribute '{0}'; previous was at {1}");
 constexpr ErrorDef<123, std::string_view, std::string_view, SourceSpan, std::string_view>
     ErrDuplicateAttributeCanonical(
-        "attribute '{}' conflicts with attribute '{}' from {}; both are "
-        "represented by the canonical form '{}'");
+        "attribute '{0}' conflicts with attribute '{1}' from {2}; both are "
+        "represented by the canonical form '{3}'");
 constexpr ErrorDef<124, const flat::AttributeArg *, const flat::Attribute *>
     ErrCanOnlyUseStringOrBool(
-        "argument '{}' on user-defined attribute '{}' cannot be a numeric "
+        "argument '{0}' on user-defined attribute '{1}' cannot be a numeric "
         "value; use a bool or string instead");
 constexpr ErrorDef<125> ErrAttributeArgMustNotBeNamed(
     "attributes that take a single argument must not name that argument");
 constexpr ErrorDef<126, std::string_view> ErrAttributeArgNotNamed(
-    "attributes that take multiple arguments must name all of them explicitly, but '{}' was not");
+    "attributes that take multiple arguments must name all of them explicitly, but '{0}' was not");
 constexpr ErrorDef<127, const flat::Attribute *, std::string_view> ErrMissingRequiredAttributeArg(
-    "attribute '{}' is missing the required '{}' argument");
+    "attribute '{0}' is missing the required '{1}' argument");
 constexpr ErrorDef<128, const flat::Attribute *> ErrMissingRequiredAnonymousAttributeArg(
-    "attribute '{}' is missing its required argument");
+    "attribute '{0}' is missing its required argument");
 constexpr ErrorDef<129, const flat::Attribute *, std::string_view> ErrUnknownAttributeArg(
-    "attribute '{}' does not support the '{}' argument");
+    "attribute '{0}' does not support the '{1}' argument");
 constexpr ErrorDef<130, const flat::Attribute *, std::string_view, SourceSpan>
     ErrDuplicateAttributeArg(
-        "attribute '{}' provides the '{}' argument multiple times; previous was at {}");
+        "attribute '{0}' provides the '{1}' argument multiple times; previous was at {2}");
 constexpr ErrorDef<131, const flat::Attribute *, std::string_view, std::string_view, SourceSpan,
                    std::string_view>
     ErrDuplicateAttributeArgCanonical(
-        "attribute '{}' argument '{}' conflicts with argument '{}' from {}; both "
-        "are represented by the canonical form '{}'");
+        "attribute '{0}' argument '{1}' conflicts with argument '{2}' from {3}; both "
+        "are represented by the canonical form '{4}'");
 constexpr ErrorDef<132, const flat::Attribute *> ErrAttributeDisallowsArgs(
-    "attribute '{}' does not support arguments");
+    "attribute '{0}' does not support arguments");
 constexpr ErrorDef<133, std::string_view, const flat::Attribute *> ErrAttributeArgRequiresLiteral(
-    "argument '{}' of attribute '{}' does not support referencing constants; "
+    "argument '{0}' of attribute '{1}' does not support referencing constants; "
     "please use a literal instead");
 constexpr RetiredDef<134> ErrAttributeConstraintNotSatisfied;
 constexpr ErrorDef<135, std::string_view> ErrInvalidDiscoverableName(
-    "invalid @discoverable name '{}'; must follow the format 'the.library.name.TheProtocolName'");
+    "invalid @discoverable name '{0}'; must follow the format 'the.library.name.TheProtocolName'");
 constexpr RetiredDef<136> ErrTableCannotBeSimple;
 constexpr RetiredDef<137> ErrUnionCannotBeSimple;
 constexpr RetiredDef<138> ErrElementMustBeSimple;
@@ -302,11 +298,11 @@ constexpr RetiredDef<140> ErrTooManyHandles;
 constexpr ErrorDef<141> ErrInvalidErrorType(
     "invalid error type: must be int32, uint32 or an enum thereof");
 constexpr ErrorDef<142, std::string_view, std::set<std::string_view>> ErrInvalidTransportType(
-    "invalid transport type: got {} expected one of {}");
+    "invalid transport type: got {0} expected one of {1}");
 constexpr RetiredDef<143> ErrBoundIsTooBig;
 constexpr RetiredDef<144> ErrUnableToParseBound;
 constexpr WarningDef<145, std::string_view, std::string_view> WarnAttributeTypo(
-    "suspect attribute with name '{}'; did you mean '{}'?");
+    "suspect attribute with name '{0}'; did you mean '{1}'?");
 constexpr ErrorDef<146> ErrInvalidGeneratedName("generated name must be a valid identifier");
 constexpr ErrorDef<147> ErrAvailableMissingArguments(
     "at least one argument is required: 'added', 'deprecated', or 'removed'");
@@ -318,11 +314,11 @@ constexpr ErrorDef<150> ErrLibraryAvailabilityMissingAdded(
     "missing 'added' argument on the library's @available attribute");
 constexpr ErrorDef<151, std::vector<std::string_view>> ErrMissingLibraryAvailability(
     "to use the @available attribute here, you must also annotate the "
-    "`library {};` declaration in one of the library's files");
+    "`library {0};` declaration in one of the library's files");
 constexpr ErrorDef<152, std::string_view> ErrInvalidPlatform(
-    "invalid platform '{}'; must match the regex [a-z][a-z0-9]*");
+    "invalid platform '{0}'; must match the regex [a-z][a-z0-9]*");
 constexpr ErrorDef<153, uint64_t> ErrInvalidVersion(
-    "invalid version '{}'; must be an integer from 1 to 2^63-1 inclusive, or "
+    "invalid version '{0}'; must be an integer from 1 to 2^63-1 inclusive, or "
     "the special constant `HEAD`");
 constexpr ErrorDef<154> ErrInvalidAvailabilityOrder(
     "invalid availability; must have added <= deprecated < removed");
@@ -330,28 +326,28 @@ constexpr ErrorDef<155, const flat::AttributeArg *, std::string_view, const flat
                    std::string_view, SourceSpan, std::string_view, std::string_view,
                    std::string_view>
     ErrAvailabilityConflictsWithParent(
-        "the argument {}={} conflicts with {}={} at {}; a child element "
-        "cannot be {} {} its parent element is {}");
-constexpr ErrorDef<156, flat::Name> ErrCannotBeOptional("{} cannot be optional");
-constexpr ErrorDef<157, flat::Name> ErrMustBeAProtocol("{} must be a protocol");
-constexpr ErrorDef<158, flat::Name> ErrCannotBoundTwice("{} cannot bound twice");
+        "the argument {0}={1} conflicts with {2}={3} at {4}; a child element "
+        "cannot be {5} {6} its parent element is {7}");
+constexpr ErrorDef<156, flat::Name> ErrCannotBeOptional("{0} cannot be optional");
+constexpr ErrorDef<157, flat::Name> ErrMustBeAProtocol("{0} must be a protocol");
+constexpr ErrorDef<158, flat::Name> ErrCannotBoundTwice("{0} cannot bound twice");
 constexpr ErrorDef<159, flat::Name> ErrStructCannotBeOptional(
     "structs can no longer be marked optional; please use the new syntax, "
-    "`box<{}>`");
+    "`box<{0}>`");
 constexpr ErrorDef<160, flat::Name> ErrCannotIndicateOptionalTwice(
-    "{} is already optional, cannot indicate optionality twice");
-constexpr ErrorDef<161, flat::Name> ErrMustHaveNonZeroSize("{} must have non-zero size");
+    "{0} is already optional, cannot indicate optionality twice");
+constexpr ErrorDef<161, flat::Name> ErrMustHaveNonZeroSize("{0} must have non-zero size");
 constexpr ErrorDef<162, flat::Name, size_t, size_t> ErrWrongNumberOfLayoutParameters(
-    "{} expected {} layout parameter(s), but got {}");
+    "{0} expected {1} layout parameter(s), but got {2}");
 constexpr ErrorDef<163> ErrMultipleConstraintDefinitions(
     "cannot specify multiple constraint sets on a type");
 constexpr ErrorDef<164, flat::Name, size_t, size_t> ErrTooManyConstraints(
-    "{} expected at most {} constraints, but got {}");
+    "{0} expected at most {1} constraints, but got {2}");
 constexpr ErrorDef<165> ErrExpectedType("expected type but got a literal or constant");
-constexpr ErrorDef<166, flat::Name> ErrUnexpectedConstraint("{} failed to resolve constraint");
-constexpr ErrorDef<167, flat::Name> ErrCannotConstrainTwice("{} cannot add additional constraint");
+constexpr ErrorDef<166, flat::Name> ErrUnexpectedConstraint("{0} failed to resolve constraint");
+constexpr ErrorDef<167, flat::Name> ErrCannotConstrainTwice("{0} cannot add additional constraint");
 constexpr ErrorDef<168, flat::Name> ErrProtocolConstraintRequired(
-    "{} requires a protocol as its first constraint");
+    "{0} requires a protocol as its first constraint");
 // The same error as ErrCannotBeOptional, but with a more specific message since the
 // optionality of boxes may be confusing
 constexpr ErrorDef<169> ErrBoxCannotBeOptional(
@@ -359,35 +355,35 @@ constexpr ErrorDef<169> ErrBoxCannotBeOptional(
 constexpr ErrorDef<170> ErrBoxedTypeCannotBeOptional(
     "no double optionality, boxes are already optional");
 constexpr ErrorDef<171, flat::Name> ErrCannotBeBoxedShouldBeOptional(
-    "type {} cannot be boxed, try using optional instead");
-constexpr ErrorDef<172, flat::Name> ErrResourceMustBeUint32Derived("resource {} must be uint32");
+    "type {0} cannot be boxed, try using optional instead");
+constexpr ErrorDef<172, flat::Name> ErrResourceMustBeUint32Derived("resource {0} must be uint32");
 constexpr ErrorDef<173, flat::Name> ErrResourceMissingSubtypeProperty(
-    "resource {} expected to have the subtype property, but it was missing");
+    "resource {0} expected to have the subtype property, but it was missing");
 constexpr RetiredDef<174> ErrResourceMissingRightsProperty;
 constexpr ErrorDef<175, flat::Name> ErrResourceSubtypePropertyMustReferToEnum(
-    "the subtype property must be an enum, but wasn't in resource {}");
+    "the subtype property must be an enum, but wasn't in resource {0}");
 constexpr RetiredDef<176> ErrHandleSubtypeMustReferToResourceSubtype;
 constexpr ErrorDef<177, flat::Name> ErrResourceRightsPropertyMustReferToBits(
     "the rights property must be a uint32 or a uint32-based bits, "
-    "but wasn't defined as such in resource {}");
-constexpr ErrorDef<178, std::vector<std::string_view>, std::vector<std::string_view>,
-                   std::vector<std::string_view>>
-    ErrUnusedImport("Library {} imports {} but does not use it. Either use {}, or remove import.");
+    "but wasn't defined as such in resource {0}");
+constexpr ErrorDef<178, std::vector<std::string_view>, std::vector<std::string_view>>
+    ErrUnusedImport(
+        "Library {0} imports {1} but does not use it. Either use {1}, or remove import.");
 constexpr ErrorDef<179, flat::Name> ErrNewTypeCannotHaveConstraint(
-    "{} is a newtype, which cannot carry constraints");
+    "{0} is a newtype, which cannot carry constraints");
 constexpr ErrorDef<180, flat::Name> ErrExperimentalZxCTypesDisallowed(
-    "{} is an experimental type that must be enabled by with `--experimental zx_c_types`");
+    "{0} is an experimental type that must be enabled by with `--experimental zx_c_types`");
 constexpr ErrorDef<181> ErrReferenceInLibraryAttribute(
     "attributes on the 'library' declaration do not support referencing constants");
 constexpr ErrorDef<182, const flat::AttributeArg *> ErrLegacyWithoutRemoval(
-    "the argument '{}' is not allowed on an element that is never removed");
+    "the argument '{0}' is not allowed on an element that is never removed");
 constexpr ErrorDef<183, const flat::AttributeArg *, std::string_view, const flat::AttributeArg *,
                    std::string_view, SourceSpan>
     ErrLegacyConflictsWithParent(
-        "the argument {}={} conflicts with {}={} at {}; a child element "
+        "the argument {0}={1} conflicts with {2}={3} at {4}; a child element "
         "cannot be added back at LEGACY if its parent is removed");
 constexpr ErrorDef<184, std::string_view> ErrUnexpectedControlCharacter(
-    "unexpected control character in string literal; use the Unicode escape `\\u{{}}` instead");
+    "unexpected control character in string literal; use the Unicode escape `\\u{{0}}` instead");
 constexpr ErrorDef<185> ErrUnicodeEscapeMissingBraces(
     "Unicode escape must use braces, like `\\u{a}` for U+000A");
 constexpr ErrorDef<186> ErrUnicodeEscapeUnterminated(
@@ -395,17 +391,17 @@ constexpr ErrorDef<186> ErrUnicodeEscapeUnterminated(
 constexpr ErrorDef<187> ErrUnicodeEscapeEmpty("Unicode escape must have at least 1 hex digit");
 constexpr ErrorDef<188> ErrUnicodeEscapeTooLong("Unicode escape must have at most 6 hex digits");
 constexpr ErrorDef<189, std::string_view> ErrUnicodeEscapeTooLarge(
-    "invalid Unicode code point '{}'; maximum is 10FFFF");
+    "invalid Unicode code point '{0}'; maximum is 10FFFF");
 constexpr RetiredDef<190> ErrSimpleProtocolMustBeClosed;
 constexpr ErrorDef<191, std::string_view> ErrMethodMustDefineStrictness(
-    "Method {} must explicitly specify strict or flexible. (The default is changing "
+    "Method {0} must explicitly specify strict or flexible. (The default is changing "
     "from strict to flexible, and explicit modifiers are mandatory during the migration.)",
     {.fixable = Fixable::Kind::kProtocolModifier});
 constexpr ErrorDef<192, std::string_view> ErrProtocolMustDefineOpenness(
-    "Protocol {} must explicitly specify open, ajar, or closed. (The default is changing "
+    "Protocol {0} must explicitly specify open, ajar, or closed. (The default is changing "
     "from closed to open, and explicit modifiers are mandatory during the migration.)",
     {.fixable = Fixable::Kind::kProtocolModifier});
-constexpr ErrorDef<193, flat::Name> ErrCannotBeBoxedNorOptional("type {} cannot be boxed");
+constexpr ErrorDef<193, flat::Name> ErrCannotBeBoxedNorOptional("type {0} cannot be boxed");
 constexpr RetiredDef<194> ErrEmptyPayloadStructsWhenResultUnion;
 constexpr RetiredDef<195> ErrExperimentalOverflowingAttributeMissingExperimentalFlag;
 constexpr RetiredDef<196> ErrExperimentalOverflowingIncorrectUsage;
@@ -416,12 +412,11 @@ constexpr ErrorDef<199> ErrOverlayMemberMustBeValue("overlays may not contain re
                                                     {.documented = false});
 constexpr ErrorDef<200> ErrOverlayMustNotContainReserved(
     "overlays may not contain reserved members", {.documented = false});
-constexpr ErrorDef<201, std::vector<std::string_view>, Platform, Platform>
-    ErrPlatformVersionNotSelected(
-        "library '{}' belongs to platform '{}', but no version was selected for it; "
-        "please choose a version N by passing `--available {}:N`");
+constexpr ErrorDef<201, std::vector<std::string_view>, Platform> ErrPlatformVersionNotSelected(
+    "library '{0}' belongs to platform '{1}', but no version was selected for it; "
+    "please choose a version N by passing `--available {1}:N`");
 constexpr ErrorDef<202, std::string_view> ErrTransitionalNotAllowed(
-    "The @transitional attribute is not allowed on {}. "
+    "The @transitional attribute is not allowed on {0}. "
     "Try using @available instead.");
 
 // To add a new error:

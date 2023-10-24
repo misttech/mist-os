@@ -705,11 +705,11 @@ void ResolveStep::ValidateReference(const Reference& ref, Context context) {
 
   if (source_platform == target_platform) {
     Fail(ErrInvalidReferenceToDeprecated, ref.span(), target, source->availability.range(),
-         source_platform, source, source);
+         source_platform, source);
   } else {
     Fail(ErrInvalidReferenceToDeprecatedOtherPlatform, ref.span(), target,
          target->availability.range(), target_platform, source, source->availability.range(),
-         source_platform, source);
+         source_platform);
   }
 }
 
