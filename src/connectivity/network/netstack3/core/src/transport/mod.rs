@@ -62,7 +62,7 @@ pub mod udp;
 use derivative::Derivative;
 use lock_order::{lock::RwLockFor, Locked};
 use net_types::{
-    ip::{IpAddress, Ipv4, Ipv6},
+    ip::{Ip, IpAddress, Ipv4, Ipv6},
     ScopeableAddress, SpecifiedAddr, ZonedAddr,
 };
 
@@ -73,7 +73,7 @@ use crate::{
     sync::{RwLockReadGuard, RwLockWriteGuard},
     transport::{
         tcp::TcpState,
-        udp::{UdpState, UdpStateBuilder},
+        udp::{UdpCounters, UdpState, UdpStateBuilder},
     },
     BindingsTypes, NonSyncContext, SyncCtx,
 };
@@ -114,6 +114,10 @@ pub(crate) struct TransportLayerState<BT: BindingsTypes> {
 impl<BT: BindingsTypes> TransportLayerState<BT> {
     fn tcp_state<I: IpExt>(&self) -> &TcpState<I, WeakDeviceId<BT>, BT> {
         I::map_ip((), |()| &self.tcpv4, |()| &self.tcpv6)
+    }
+
+    pub(crate) fn get_udp_counters<I: Ip>(&self) -> &UdpCounters<I> {
+        I::map_ip((), |()| &self.udpv4.counters, |()| &self.udpv6.counters)
     }
 }
 

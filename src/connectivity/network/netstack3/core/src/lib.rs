@@ -79,7 +79,9 @@ use crate::{
         icmp::{BufferIcmpContext, IcmpContext, IcmpRxCounters, IcmpTxCounters, NdpCounters},
         IpCounters, IpLayerTimerId, Ipv4State, Ipv6State,
     },
-    transport::{tcp::socket::TcpBindingsTypes, TransportLayerState, TransportLayerTimerId},
+    transport::{
+        tcp::socket::TcpBindingsTypes, udp::UdpCounters, TransportLayerState, TransportLayerTimerId,
+    },
 };
 pub(crate) use trace::trace_duration;
 
@@ -236,6 +238,10 @@ impl<BT: BindingsTypes> StackState<BT> {
 
     pub(crate) fn get_device_counters(&self) -> &DeviceCounters {
         &self.device.get_device_counters()
+    }
+
+    pub(crate) fn get_udp_counters<I: Ip>(&self) -> &UdpCounters<I> {
+        &self.transport.get_udp_counters::<I>()
     }
 }
 

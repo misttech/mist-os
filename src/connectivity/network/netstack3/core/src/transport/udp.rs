@@ -12,14 +12,15 @@ use core::{
     num::{NonZeroU16, NonZeroU8, NonZeroUsize},
     ops::RangeInclusive,
 };
-use lock_order::Locked;
+use lock_order::{lock::UnlockedAccess, Locked};
 
 use dense_map::EntryKey;
 use derivative::Derivative;
 use either::Either;
 use net_types::{
     ip::{
-        GenericOverIp, Ip, IpAddress, IpInvariant, IpVersionMarker, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr,
+        GenericOverIp, Ip, IpAddress, IpInvariant, IpMarked, IpVersionMarker, Ipv4, Ipv4Addr, Ipv6,
+        Ipv6Addr,
     },
     MulticastAddr, SpecifiedAddr, Witness,
 };
@@ -35,8 +36,12 @@ use tracing::trace;
 pub(crate) use crate::socket::datagram::IpExt;
 use crate::{
     algorithm::{PortAlloc, PortAllocImpl, ProtocolFlowId},
-    context::{CounterContext, InstantContext, NonTestCtxMarker, RngContext, TracingContext},
+    context::{
+        CounterContext, CounterContext2, InstantContext, NonTestCtxMarker, RngContext,
+        TracingContext,
+    },
     convert::BidirectionalConverter,
+    counters::Counter,
     data_structures::socketmap::{IterShadows as _, SocketMap, Tagged},
     device::{AnyDevice, DeviceId, DeviceIdContext, Id, WeakDeviceId, WeakId},
     error::{LocalAddressError, SocketError, ZonedAddressError},
@@ -107,7 +112,11 @@ impl UdpStateBuilder {
     }
 
     pub(crate) fn build<I: IpExt, D: WeakId>(self) -> UdpState<I, D> {
-        UdpState { sockets: Default::default(), send_port_unreachable: self.send_port_unreachable }
+        UdpState {
+            sockets: Default::default(),
+            send_port_unreachable: self.send_port_unreachable,
+            counters: Default::default(),
+        }
     }
 }
 
@@ -143,11 +152,40 @@ pub(crate) struct Sockets<I: Ip + IpExt, D: WeakId> {
 pub(crate) struct UdpState<I: IpExt, D: WeakId> {
     pub(crate) sockets: Sockets<I, D>,
     pub(crate) send_port_unreachable: bool,
+    pub(crate) counters: UdpCounters<I>,
 }
 
 impl<I: IpExt, D: WeakId> Default for UdpState<I, D> {
     fn default() -> UdpState<I, D> {
         UdpStateBuilder::default().build()
+    }
+}
+
+pub(crate) type UdpCounters<I> = IpMarked<I, UdpCountersInner>;
+
+/// Counters for the UDP layer.
+#[derive(Default)]
+pub(crate) struct UdpCountersInner {
+    /// Count of ICMP error messages received.
+    pub(crate) rx_icmp_error: Counter,
+}
+
+impl<C: crate::NonSyncContext, I: Ip> UnlockedAccess<crate::lock_ordering::UdpCounters<I>>
+    for SyncCtx<C>
+{
+    type Data = UdpCounters<I>;
+    type Guard<'l> = &'l UdpCounters<I> where Self: 'l;
+
+    fn access(&self) -> Self::Guard<'_> {
+        self.state.get_udp_counters()
+    }
+}
+
+impl<NonSyncCtx: crate::NonSyncContext, I: Ip, L> CounterContext2<UdpCounters<I>>
+    for Locked<&SyncCtx<NonSyncCtx>, L>
+{
+    fn with_counters<O, F: FnOnce(&UdpCounters<I>) -> O>(&self, cb: F) -> O {
+        cb(self.unlocked_access::<crate::lock_ordering::UdpCounters<I>>())
     }
 }
 
@@ -1155,7 +1193,7 @@ pub(crate) enum UdpIpTransportContext {}
 impl<
         I: IpExt,
         C: StateNonSyncContext<I> + StateNonSyncContext<I::OtherVersion>,
-        SC: StateContext<I, C>,
+        SC: StateContext<I, C> + CounterContext2<UdpCounters<I>>,
     > IpTransportContext<I, C, SC> for UdpIpTransportContext
 {
     fn receive_icmp_error(
@@ -1167,7 +1205,9 @@ impl<
         mut original_udp_packet: &[u8],
         err: I::ErrorCode,
     ) {
-        ctx.increment_debug_counter("UdpIpTransportContext::receive_icmp_error");
+        sync_ctx.with_counters(|counters| {
+            counters.rx_icmp_error.increment();
+        });
         trace!("UdpIpTransportContext::receive_icmp_error({:?})", err);
 
         let udp_packet = match original_udp_packet
@@ -1462,7 +1502,10 @@ impl<
         I: IpExt,
         B: BufferMut,
         C: BufferStateNonSyncContext<I, B> + BufferStateNonSyncContext<I::OtherVersion, B>,
-        SC: BufferStateContext<I, C, B> + BufferStateContext<I::OtherVersion, C, B> + NonTestCtxMarker,
+        SC: BufferStateContext<I, C, B>
+            + BufferStateContext<I::OtherVersion, C, B>
+            + NonTestCtxMarker
+            + CounterContext2<UdpCounters<I>>,
     > BufferIpTransportContext<I, C, SC, B> for UdpIpTransportContext
 {
     fn receive_ip_packet(
@@ -3101,11 +3144,23 @@ mod tests {
     struct DualStackSocketsState<D: WeakId> {
         v4: SocketsState<Ipv4, D>,
         v6: SocketsState<Ipv6, D>,
+        udpv4_counters: UdpCounters<Ipv4>,
+        udpv6_counters: UdpCounters<Ipv6>,
     }
 
     impl<I: IpExt, D: WeakId> AsRef<SocketsState<I, D>> for DualStackSocketsState<D> {
         fn as_ref(&self) -> &SocketsState<I, D> {
             I::map_ip(IpInvariant(self), |IpInvariant(dual)| &dual.v4, |IpInvariant(dual)| &dual.v6)
+        }
+    }
+
+    impl<D: WeakId> DualStackSocketsState<D> {
+        fn get_udp_counters<I: Ip>(&self) -> &UdpCounters<I> {
+            I::map_ip(
+                IpInvariant(self),
+                |IpInvariant(dual)| &dual.udpv4_counters,
+                |IpInvariant(dual)| &dual.udpv6_counters,
+            )
         }
     }
 
@@ -3121,6 +3176,12 @@ mod tests {
 
     type FakeUdpSyncCtx<D> =
         Wrapped<DualStackSocketsState<FakeWeakDeviceId<D>>, FakeUdpInnerSyncCtx<D>>;
+
+    impl<I: Ip, D: FakeStrongDeviceId> CounterContext2<UdpCounters<I>> for FakeUdpSyncCtx<D> {
+        fn with_counters<O, F: FnOnce(&UdpCounters<I>) -> O>(&self, cb: F) -> O {
+            cb(&self.outer.get_udp_counters())
+        }
+    }
 
     impl<I: TestIpExt, B: BufferMut> BufferNonSyncContext<I, B> for FakeUdpNonSyncCtx {
         fn receive_udp(
