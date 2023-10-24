@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use starnix_lock::Mutex;
 use std::collections::HashMap;
-
-// TODO: Why doesn't this use crate::lock::Mutex?
-use fuchsia_sync::Mutex;
 
 use crate::{
     signals::{SignalEvent, SignalEventNotify, SignalEventValue},

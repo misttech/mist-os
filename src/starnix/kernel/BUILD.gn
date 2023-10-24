@@ -106,7 +106,6 @@ rustc_binary("starnix_kernel_bin") {
     "//src/lib/fuchsia-fs",
     "//src/lib/fuchsia-image-format",
     "//src/lib/fuchsia-runtime",
-    "//src/lib/fuchsia-sync",
     "//src/lib/mundane",
     "//src/lib/process_builder",
     "//src/lib/trace/rust:trace",
