@@ -80,16 +80,16 @@ TEST_F(SegmentManagerTest, DirtyToFree) {
   // check the bitmaps and the number of free/prefree segments
   ASSERT_EQ(fs_->GetSegmentManager().FreeSegments(), nfree_segs - nprefree);
   for (auto &pre : prefree_array) {
-    ASSERT_TRUE(TestBit(pre, dirty_i->dirty_segmap[static_cast<int>(DirtyType::kPre)].get()));
-    ASSERT_TRUE(TestBit(pre, free_i->free_segmap.get()));
+    ASSERT_TRUE(dirty_i->dirty_segmap[static_cast<int>(DirtyType::kPre)].GetOne(pre));
+    ASSERT_TRUE(free_i->free_segmap.GetOne(pre));
   }
   // triggers checkpoint to make prefree segments transit to free ones
   fs_->WriteCheckpoint(false, false);
 
   // check the bitmaps and the number of free/prefree segments
   for (auto &pre : prefree_array) {
-    ASSERT_FALSE(TestBit(pre, dirty_i->dirty_segmap[static_cast<int>(DirtyType::kPre)].get()));
-    ASSERT_FALSE(TestBit(pre, free_i->free_segmap.get()));
+    ASSERT_FALSE(free_i->free_segmap.GetOne(pre));
+    ASSERT_FALSE(dirty_i->dirty_segmap[static_cast<int>(DirtyType::kPre)].GetOne(pre));
   }
   ASSERT_EQ(fs_->GetSegmentManager().FreeSegments(), nfree_segs);
   ASSERT_FALSE(fs_->GetSegmentManager().PrefreeSegments());
@@ -221,8 +221,8 @@ TEST_F(SegmentManagerTest, GetVictimByDefault) {
 
   // 1. Test SSR victim
   fs_->GetSuperblockInfo().SetLastVictim(static_cast<int>(GcType::kBgGc), target_segno);
-  if (!TestAndSetBit(target_segno,
-                     dirty_info->dirty_segmap[static_cast<int>(DirtyType::kDirtyHotNode)].get())) {
+  if (!dirty_info->dirty_segmap[static_cast<int>(DirtyType::kDirtyHotNode)].GetOne(target_segno)) {
+    dirty_info->dirty_segmap[static_cast<int>(DirtyType::kDirtyHotNode)].SetOne(target_segno);
     ++dirty_info->nr_dirty[static_cast<int>(DirtyType::kDirtyHotNode)];
   }
 
@@ -234,8 +234,8 @@ TEST_F(SegmentManagerTest, GetVictimByDefault) {
 
   // 2. Test FgGc victim
   fs_->GetSuperblockInfo().SetLastVictim(static_cast<int>(GcType::kFgGc), target_segno);
-  if (!TestAndSetBit(target_segno,
-                     dirty_info->dirty_segmap[static_cast<int>(DirtyType::kDirty)].get())) {
+  if (!dirty_info->dirty_segmap[static_cast<int>(DirtyType::kDirty)].GetOne(target_segno)) {
+    dirty_info->dirty_segmap[static_cast<int>(DirtyType::kDirty)].SetOne(target_segno);
     ++dirty_info->nr_dirty[static_cast<int>(DirtyType::kDirty)];
   }
 
@@ -247,8 +247,8 @@ TEST_F(SegmentManagerTest, GetVictimByDefault) {
 
   // 3. Skip if cur_victim_sec is set (SSR)
   ASSERT_EQ(fs_->GetGcManager().GetCurVictimSec(), fs_->GetSegmentManager().GetSecNo(target_segno));
-  ASSERT_TRUE(TestBit(target_segno,
-                      dirty_info->dirty_segmap[static_cast<int>(DirtyType::kDirtyHotNode)].get()));
+  ASSERT_TRUE(
+      dirty_info->dirty_segmap[static_cast<int>(DirtyType::kDirtyHotNode)].GetOne(target_segno));
   ASSERT_EQ(dirty_info->nr_dirty[static_cast<int>(DirtyType::kDirtyHotNode)], 1);
   victim_or = fs_->GetSegmentManager().GetVictimByDefault(GcType::kBgGc, CursegType::kCursegHotNode,
                                                           AllocMode::kSSR);
@@ -256,10 +256,10 @@ TEST_F(SegmentManagerTest, GetVictimByDefault) {
 
   // 4. Skip if victim_secmap is set (kBgGc)
   fs_->GetGcManager().SetCurVictimSec(kNullSecNo);
-  ASSERT_TRUE(TestBit(target_segno,
-                      dirty_info->dirty_segmap[static_cast<int>(DirtyType::kDirtyHotNode)].get()));
+  ASSERT_TRUE(
+      dirty_info->dirty_segmap[static_cast<int>(DirtyType::kDirtyHotNode)].GetOne(target_segno));
   ASSERT_EQ(dirty_info->nr_dirty[static_cast<int>(DirtyType::kDirty)], 1);
-  SetBit(fs_->GetSegmentManager().GetSecNo(target_segno), dirty_info->victim_secmap.get());
+  dirty_info->victim_secmap.SetOne(fs_->GetSegmentManager().GetSecNo(target_segno));
   victim_or = fs_->GetSegmentManager().GetVictimByDefault(GcType::kBgGc, CursegType::kCursegHotNode,
                                                           AllocMode::kLFS);
   ASSERT_TRUE(victim_or.is_error());
@@ -471,9 +471,7 @@ TEST(SegmentManagerOptionTest, DestroySegmentManagerExceptionCase) {
   // fault injection
   fs->GetSegmentManager().SetDirtySegmentInfo(nullptr);
   fs->GetSegmentManager().SetFreeSegmentInfo(nullptr);
-  fs->GetSegmentManager().DestroySitInfo();
   fs->GetSegmentManager().SetSitInfo(nullptr);
-  fs->GetSegmentManager().DestroySitInfo();
 
   fs->ResetPsuedoVnodes();
   fs->GetVCache().Reset();

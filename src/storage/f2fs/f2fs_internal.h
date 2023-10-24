@@ -494,36 +494,6 @@ class SuperblockInfo {
   std::mutex stat_lock_;  // lock for stat operations
 };
 
-inline int TestValidBitmap(uint64_t nr, const uint8_t *addr) {
-  int mask;
-
-  addr += (nr >> 3);
-  mask = 1 << (7 - (nr & 0x07));
-  return mask & *addr;
-}
-
-inline int SetValidBitmap(uint64_t nr, uint8_t *addr) {
-  int mask;
-  int ret;
-
-  addr += (nr >> 3);
-  mask = 1 << (7 - (nr & 0x07));
-  ret = mask & *addr;
-  *addr |= mask;
-  return ret;
-}
-
-inline int ClearValidBitmap(uint64_t nr, uint8_t *addr) {
-  int mask;
-  int ret;
-
-  addr += (nr >> 3);
-  mask = 1 << (7 - (nr & 0x07));
-  ret = mask & *addr;
-  *addr &= ~mask;
-  return ret;
-}
-
 // InodeInfo->flags keeping only in memory
 enum class InodeInfoFlag {
   kInit = 0,      // indicate inode is being initialized

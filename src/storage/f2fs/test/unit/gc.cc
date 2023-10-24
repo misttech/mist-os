@@ -252,9 +252,8 @@ TEST_F(GcManagerTest, OrphanFileGc) {
   auto target_segno = fs_->GetSegmentManager().GetSegmentNumber(block_or.value());
 
   // Check victim seg is dirty
-  ASSERT_TRUE(
-      TestBit(target_segno, dirty_info->dirty_segmap[static_cast<int>(DirtyType::kDirty)].get()));
-  ASSERT_TRUE(TestBit(target_segno, free_info->free_segmap.get()));
+  ASSERT_TRUE(dirty_info->dirty_segmap[static_cast<int>(DirtyType::kDirty)].GetOne(target_segno));
+  ASSERT_TRUE(free_info->free_segmap.GetOne(target_segno));
 
   // Make file orphan
   FileTester::DeleteChild(root_dir_.get(), "test", false);
@@ -263,8 +262,7 @@ TEST_F(GcManagerTest, OrphanFileGc) {
   ASSERT_EQ(GcTester::DoGarbageCollect(fs_->GetGcManager(), target_segno, GcType::kFgGc), ZX_OK);
 
   // Check victim seg is clean
-  ASSERT_FALSE(
-      TestBit(target_segno, dirty_info->dirty_segmap[static_cast<int>(DirtyType::kDirty)].get()));
+  ASSERT_FALSE(dirty_info->dirty_segmap[static_cast<int>(DirtyType::kDirty)].GetOne(target_segno));
 
   ASSERT_EQ(file->Close(), ZX_OK);
   file = nullptr;
@@ -298,8 +296,8 @@ TEST_P(GcManagerTestWithLargeSec, SegmentDirtyInfo) {
   bool is_dirty = false;
   const uint32_t start_segno = victim_seg - (victim_seg % fs_->GetSuperblockInfo().GetSegsPerSec());
   for (uint32_t i = 0; i < fs_->GetSuperblockInfo().GetSegsPerSec(); ++i) {
-    is_dirty |= TestBit(start_segno + i,
-                        dirty_info->dirty_segmap[static_cast<int>(DirtyType::kDirty)].get());
+    is_dirty |=
+        dirty_info->dirty_segmap[static_cast<int>(DirtyType::kDirty)].GetOne(start_segno + i);
   }
   ASSERT_TRUE(is_dirty);
 
@@ -313,8 +311,8 @@ TEST_P(GcManagerTestWithLargeSec, SegmentDirtyInfo) {
 
   // Check victim seg is clean
   for (uint32_t i = 0; i < fs_->GetSuperblockInfo().GetSegsPerSec(); ++i) {
-    ASSERT_FALSE(TestBit(start_segno + i,
-                         dirty_info->dirty_segmap[static_cast<int>(DirtyType::kDirty)].get()));
+    ASSERT_FALSE(
+        dirty_info->dirty_segmap[static_cast<int>(DirtyType::kDirty)].GetOne(start_segno + i));
   }
 
   // Check nr_dirty decreased
@@ -340,14 +338,14 @@ TEST_P(GcManagerTestWithLargeSec, SegmentFreeInfo) {
   uint32_t victim_sec = fs_->GetSegmentManager().GetSecNo(victim_seg);
 
   // Check victim sec is not free
-  ASSERT_TRUE(TestBit(victim_sec, free_info->free_secmap.get()));
+  ASSERT_TRUE(free_info->free_secmap.GetOne(victim_sec));
 
   // Trigger GC
   auto result = fs_->GetGcManager().F2fsGc();
   ASSERT_FALSE(result.is_error());
 
   // Check victim sec is freed
-  ASSERT_FALSE(TestBit(victim_sec, free_info->free_secmap.get()));
+  ASSERT_FALSE(free_info->free_secmap.GetOne(victim_sec));
 }
 
 TEST_P(GcManagerTestWithLargeSec, SecureSpace) {

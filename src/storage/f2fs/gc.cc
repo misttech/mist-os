@@ -33,12 +33,12 @@ VictimSelPolicy SegmentManager::GetVictimSelPolicy(GcType gc_type, CursegType ty
   policy.alloc_mode = alloc_mode;
   if (policy.alloc_mode == AllocMode::kSSR) {
     policy.gc_mode = GcMode::kGcGreedy;
-    policy.dirty_segmap = dirty_info_->dirty_segmap[static_cast<int>(type)].get();
+    policy.dirty_segmap = &dirty_info_->dirty_segmap[static_cast<int>(type)];
     policy.max_search = dirty_info_->nr_dirty[static_cast<int>(type)];
     policy.ofs_unit = 1;
   } else {
     policy.gc_mode = (gc_type == GcType::kBgGc) ? GcMode::kGcCb : GcMode::kGcGreedy;
-    policy.dirty_segmap = dirty_info_->dirty_segmap[static_cast<int>(DirtyType::kDirty)].get();
+    policy.dirty_segmap = &dirty_info_->dirty_segmap[static_cast<int>(DirtyType::kDirty)];
     policy.max_search = dirty_info_->nr_dirty[static_cast<int>(DirtyType::kDirty)];
     policy.ofs_unit = superblock_info_->GetSegsPerSec();
   }
@@ -51,7 +51,7 @@ VictimSelPolicy SegmentManager::GetVictimSelPolicy(GcType gc_type, CursegType ty
   return policy;
 }
 
-uint32_t SegmentManager::GetMaxCost(const VictimSelPolicy &policy) {
+size_t SegmentManager::GetMaxCost(const VictimSelPolicy &policy) {
   if (policy.alloc_mode == AllocMode::kSSR)
     return 1 << superblock_info_->GetLogBlocksPerSeg();
   if (policy.gc_mode == GcMode::kGcGreedy)
@@ -85,23 +85,24 @@ zx::result<uint32_t> SegmentManager::GetVictimByDefault(GcType gc_type, CursegTy
   if (policy.min_segno == kNullSegNo) {
     block_t last_segment = TotalSegs();
     while (nSearched < policy.max_search) {
-      uint32_t segno = FindNextBit(policy.dirty_segmap, last_segment, policy.offset);
-      if (segno >= last_segment) {
-        if (superblock_info_->GetLastVictim(gc_mode)) {
-          last_segment = superblock_info_->GetLastVictim(gc_mode);
-          superblock_info_->SetLastVictim(gc_mode, 0);
-          policy.offset = 0;
-          continue;
+      size_t dirty_seg;
+      if (policy.dirty_segmap->Scan(policy.offset, last_segment, false, &dirty_seg)) {
+        if (!superblock_info_->GetLastVictim(gc_mode)) {
+          break;
         }
-        break;
+        last_segment = superblock_info_->GetLastVictim(gc_mode);
+        superblock_info_->SetLastVictim(gc_mode, 0);
+        policy.offset = 0;
+        continue;
       }
+      uint32_t segno = safemath::checked_cast<uint32_t>(dirty_seg);
       policy.offset = segno + policy.ofs_unit;
       uint32_t secno = GetSecNo(segno);
 
       if (policy.ofs_unit > 1) {
         policy.offset = fbl::round_down(policy.offset, policy.ofs_unit);
         nSearched +=
-            CountBits(policy.dirty_segmap, policy.offset - policy.ofs_unit, policy.ofs_unit);
+            CountBits(*policy.dirty_segmap, policy.offset - policy.ofs_unit, policy.ofs_unit);
       } else {
         ++nSearched;
       }
@@ -110,7 +111,7 @@ zx::result<uint32_t> SegmentManager::GetVictimByDefault(GcType gc_type, CursegTy
         continue;
       }
 
-      if (gc_type == GcType::kBgGc && TestBit(secno, dirty_info_->victim_secmap.get())) {
+      if (gc_type == GcType::kBgGc && dirty_info_->victim_secmap.GetOne(secno)) {
         continue;
       }
 
@@ -141,10 +142,11 @@ zx::result<uint32_t> SegmentManager::GetVictimByDefault(GcType gc_type, CursegTy
       if (gc_type == GcType::kFgGc) {
         fs_->GetGcManager().SetCurVictimSec(secno);
       } else {
-        SetBit(secno, dirty_info_->victim_secmap.get());
+        dirty_info_->victim_secmap.SetOne(secno);
       }
     }
-    return zx::ok((policy.min_segno / policy.ofs_unit) * policy.ofs_unit);
+    return zx::ok(
+        safemath::checked_cast<uint32_t>(policy.min_segno - (policy.min_segno % policy.ofs_unit)));
   }
 
   return zx::error(ZX_ERR_UNAVAILABLE);
@@ -263,7 +265,7 @@ bool GcManager::CheckValidMap(uint32_t segno, uint64_t offset) {
 
   std::shared_lock sentry_lock(sit_info.sentry_lock);
   SegmentEntry &sentry = fs_->GetSegmentManager().GetSegmentEntry(segno);
-  return TestValidBitmap(offset, sentry.cur_valid_map.get());
+  return sentry.cur_valid_map.GetOne(ToMsbFirst(offset));
 }
 
 zx_status_t GcManager::GcNodeSegment(const SummaryBlock &sum_blk, uint32_t segno, GcType gc_type) {

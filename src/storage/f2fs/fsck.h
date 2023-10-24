@@ -41,8 +41,8 @@ struct FsckInfo {
   } result;
 
   std::map<nid_t, InodeLinkInfo> inode_link_map;
-  std::unique_ptr<uint8_t[]> main_area_bitmap;
-  std::unique_ptr<uint8_t[]> nat_area_bitmap;
+  RawBitmap main_area_bitmap;
+  RawBitmap nat_area_bitmap;
   std::set<nid_t> data_exist_flag_set;
 
   uint64_t main_area_bitmap_size = 0;
@@ -131,7 +131,7 @@ class FsckWorker {
                              uint16_t index_in_node, uint8_t ver);
   zx_status_t CheckDentries(uint32_t &child_count, uint32_t &child_files, int last_block,
                             const uint8_t *dentry_bitmap, const DirEntry *dentries,
-                            const uint8_t (*filename)[kNameLen], uint32_t max_entries);
+                            const uint8_t (*filename)[kNameLen], size_t max_entries);
   zx_status_t CheckDentryBlock(uint32_t block_address, uint32_t &child_count, uint32_t &child_files,
                                int last_block);
 
@@ -283,7 +283,7 @@ class FsckWorker {
 
   bool mounted_ = false;
 
-  std::unique_ptr<uint8_t[]> sit_area_bitmap_;
+  RawBitmap sit_area_bitmap_;
   uint32_t sit_area_bitmap_size_ = 0;
 };
 

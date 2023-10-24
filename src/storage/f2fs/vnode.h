@@ -5,6 +5,7 @@
 #ifndef SRC_STORAGE_F2FS_VNODE_H_
 #define SRC_STORAGE_F2FS_VNODE_H_
 
+#include "src/storage/f2fs/bitmap.h"
 #include "src/storage/f2fs/file_cache.h"
 #include "src/storage/f2fs/vmo_manager.h"
 
@@ -41,14 +42,11 @@ class VnodeF2fs : public fs::PagedVnode,
     return kPageSize - sizeof(NodeFooter) -
            sizeof(uint32_t) * (kAddrsPerInode + kNidsPerInode - 1) + GetExtraISize();
   }
-  uint32_t MaxInlineData() const {
-    return safemath::CheckMul<uint32_t>(sizeof(uint32_t), (GetAddrsPerInode() - 1)).ValueOrDie();
+  size_t MaxInlineData() const {
+    return safemath::CheckMul<size_t>(sizeof(uint32_t), (GetAddrsPerInode() - 1)).ValueOrDie();
   }
-  uint32_t MaxInlineDentry() const {
-    return safemath::checked_cast<uint32_t>(
-        safemath::CheckDiv(safemath::CheckMul(MaxInlineData(), kBitsPerByte).ValueOrDie(),
-                           ((kSizeOfDirEntry + kDentrySlotLen) * kBitsPerByte + 1))
-            .ValueOrDie());
+  size_t MaxInlineDentry() const {
+    return GetBitSize(MaxInlineData()) / (GetBitSize(kSizeOfDirEntry + kDentrySlotLen) + 1);
   }
   uint32_t GetAddrsPerInode() const {
     return safemath::checked_cast<uint32_t>(
@@ -142,6 +140,7 @@ class VnodeF2fs : public fs::PagedVnode,
   virtual zx_status_t RecoverInlineData(NodePage &node_page) __TA_EXCLUDES(info_mutex_) {
     return ZX_ERR_NOT_SUPPORTED;
   }
+  virtual zx::result<PageBitmap> GetBitmap(fbl::RefPtr<Page> dentry_page);
 
   void Notify(std::string_view name, fuchsia_io::wire::WatchEvent event) final;
   zx_status_t WatchDir(fs::FuchsiaVfs *vfs, fuchsia_io::wire::WatchMask mask, uint32_t options,
@@ -273,12 +272,12 @@ class VnodeF2fs : public fs::PagedVnode,
   }
 
   void ClearAdvise(const FAdvise bit) __TA_EXCLUDES(info_mutex_) {
-    fs::SharedLock lock(info_mutex_);
-    ClearBit(static_cast<int>(bit), &advise_);
+    std::lock_guard lock(info_mutex_);
+    advise_ &= ~GetMask(1, static_cast<size_t>(bit));
   }
   void SetAdvise(const FAdvise bit) __TA_EXCLUDES(info_mutex_) {
     std::lock_guard lock(info_mutex_);
-    SetBit(static_cast<int>(bit), &advise_);
+    advise_ |= GetMask(1, static_cast<size_t>(bit));
   }
   uint8_t GetAdvise() __TA_EXCLUDES(info_mutex_) {
     fs::SharedLock lock(info_mutex_);
@@ -288,9 +287,9 @@ class VnodeF2fs : public fs::PagedVnode,
     std::lock_guard lock(info_mutex_);
     advise_ = bits;
   }
-  int IsAdviseSet(const FAdvise bit) __TA_EXCLUDES(info_mutex_) {
+  bool IsAdviseSet(const FAdvise bit) __TA_EXCLUDES(info_mutex_) {
     fs::SharedLock lock(info_mutex_);
-    return TestBit(static_cast<int>(bit), &advise_);
+    return (GetMask(1, static_cast<size_t>(bit)) & advise_) != 0;
   }
 
   uint64_t GetDirHashLevel() __TA_EXCLUDES(info_mutex_) {

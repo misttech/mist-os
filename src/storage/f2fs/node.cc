@@ -66,8 +66,9 @@ zx::result<nid_t> NodeManager::GetNextFreeNid() {
 }
 
 void NodeManager::GetNatBitmap(void *out) {
-  std::memcpy(out, nat_bitmap_.get(), nat_bitmap_size_);
-  std::memcpy(nat_prev_bitmap_.get(), nat_bitmap_.get(), nat_bitmap_size_);
+  std::memcpy(out, nat_bitmap_.StorageUnsafe()->GetData(), nat_bitmap_size_);
+  std::memcpy(nat_prev_bitmap_.StorageUnsafe()->GetData(), nat_bitmap_.StorageUnsafe()->GetData(),
+              nat_bitmap_size_);
 }
 
 pgoff_t NodeManager::CurrentNatAddr(nid_t start) {
@@ -82,7 +83,7 @@ pgoff_t NodeManager::CurrentNatAddr(nid_t start) {
       nat_blkaddr_ + (seg_off << GetSuperblockInfo().GetLogBlocksPerSeg() << 1) +
       (block_off & ((1 << GetSuperblockInfo().GetLogBlocksPerSeg()) - 1)));
 
-  if (TestValidBitmap(block_off, nat_bitmap_.get()))
+  if (nat_bitmap_.GetOne(ToMsbFirst(block_off)))
     block_addr += GetSuperblockInfo().GetBlocksPerSeg();
 
   return block_addr;
@@ -93,8 +94,7 @@ bool NodeManager::IsUpdatedNatPage(nid_t start) {
 
   block_off = NatBlockOffset(start);
 
-  return (TestValidBitmap(block_off, nat_bitmap_.get()) ^
-          TestValidBitmap(block_off, nat_prev_bitmap_.get()));
+  return nat_bitmap_.GetOne(ToMsbFirst(block_off)) ^ nat_prev_bitmap_.GetOne(ToMsbFirst(block_off));
 }
 
 pgoff_t NodeManager::NextNatAddr(pgoff_t block_addr) {
@@ -110,17 +110,17 @@ pgoff_t NodeManager::NextNatAddr(pgoff_t block_addr) {
 void NodeManager::SetToNextNat(nid_t start_nid) {
   pgoff_t block_off = NatBlockOffset(start_nid);
 
-  if (TestValidBitmap(block_off, nat_bitmap_.get()))
-    ClearValidBitmap(block_off, nat_bitmap_.get());
+  if (nat_bitmap_.GetOne(ToMsbFirst(block_off)))
+    nat_bitmap_.ClearOne(ToMsbFirst(block_off));
   else
-    SetValidBitmap(block_off, nat_bitmap_.get());
+    nat_bitmap_.SetOne(ToMsbFirst(block_off));
 }
 
 // Coldness identification:
 //  - Mark cold files in InodeInfo
 //  - Mark cold node blocks in their node footer
 //  - Mark cold data pages in page cache
-bool NodeManager::IsColdFile(VnodeF2fs &vnode) { return (vnode.IsAdviseSet(FAdvise::kCold) != 0); }
+bool NodeManager::IsColdFile(VnodeF2fs &vnode) { return vnode.IsAdviseSet(FAdvise::kCold); }
 
 void NodeManager::DecValidNodeCount(VnodeF2fs *vnode, uint32_t count, bool isInode) {
   std::lock_guard stat_lock(GetSuperblockInfo().GetStatLock());
@@ -1432,18 +1432,16 @@ zx_status_t NodeManager::InitNodeManager() {
   }
 
   nat_bitmap_size_ = GetSuperblockInfo().BitmapSize(MetaBitmap::kNatBitmap);
-  nat_bitmap_ = std::make_unique<uint8_t[]>(nat_bitmap_size_);
-  memset(nat_bitmap_.get(), 0, nat_bitmap_size_);
-  nat_prev_bitmap_ = std::make_unique<uint8_t[]>(nat_bitmap_size_);
-  memset(nat_prev_bitmap_.get(), 0, nat_bitmap_size_);
+  nat_bitmap_.Reset(GetBitSize(nat_bitmap_size_));
+  nat_prev_bitmap_.Reset(GetBitSize(nat_bitmap_size_));
 
   version_bitmap = static_cast<uint8_t *>(GetSuperblockInfo().BitmapPtr(MetaBitmap::kNatBitmap));
   if (!version_bitmap)
     return ZX_ERR_INVALID_ARGS;
 
   // copy version bitmap
-  std::memcpy(nat_bitmap_.get(), version_bitmap, nat_bitmap_size_);
-  std::memcpy(nat_prev_bitmap_.get(), nat_bitmap_.get(), nat_bitmap_size_);
+  std::memcpy(nat_bitmap_.StorageUnsafe()->GetData(), version_bitmap, nat_bitmap_size_);
+  std::memcpy(nat_prev_bitmap_.StorageUnsafe()->GetData(), version_bitmap, nat_bitmap_size_);
   return ZX_OK;
 }
 
@@ -1480,9 +1478,6 @@ void NodeManager::DestroyNodeManager() {
     ZX_ASSERT(dirty_nat_list_.is_empty());
     ZX_ASSERT(nat_cache_.is_empty());
   }
-
-  nat_bitmap_.reset();
-  nat_prev_bitmap_.reset();
 }
 
 SuperblockInfo &NodeManager::GetSuperblockInfo() { return *superblock_info_; }

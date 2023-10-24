@@ -25,12 +25,8 @@ uint32_t MaxInlineData(const Inode &inode) {
          (kAddrsPerInode - extra_isize / sizeof(uint32_t) - inline_xattr_isize - 1);
 }
 
-uint32_t MaxInlineDentry(const Inode &inode) {
-  return (MaxInlineData(inode) * kBitsPerByte /
-          (safemath::CheckAdd(safemath::checked_cast<uint32_t>(kSizeOfDirEntry), kDentrySlotLen) *
-               kBitsPerByte +
-           1))
-      .ValueOrDie();
+size_t MaxInlineDentry(const Inode &inode) {
+  return GetBitSize(MaxInlineData(inode)) / (GetBitSize(kSizeOfDirEntry + kDentrySlotLen) + 1);
 }
 
 const uint8_t *InlineDataPtr(const Inode &inode) {
@@ -42,15 +38,24 @@ const uint8_t *InlineDataPtr(const Inode &inode) {
 const uint8_t *InlineDentryBitmap(const Inode &inode) { return InlineDataPtr(inode); }
 
 const DirEntry *InlineDentryArray(const Inode &inode) {
-  uint32_t reserved =
+  size_t reserved =
       MaxInlineData(inode) - MaxInlineDentry(inode) * (kSizeOfDirEntry + kDentrySlotLen);
   return reinterpret_cast<const DirEntry *>(InlineDentryBitmap(inode) + reserved);
 }
 
 const uint8_t (*InlineDentryNameArray(const Inode &inode))[kDentrySlotLen] {
-  uint32_t reserved = MaxInlineData(inode) - MaxInlineDentry(inode) * kDentrySlotLen;
+  size_t reserved = MaxInlineData(inode) - MaxInlineDentry(inode) * kDentrySlotLen;
   return reinterpret_cast<const uint8_t(*)[kDentrySlotLen]>(InlineDentryBitmap(inode) + reserved);
 }
+
+static bool TestBit(const void *addr, size_t pos, size_t size) {
+  if (pos >= size)
+    return false;
+  const uint8_t *bitmap = static_cast<const uint8_t *>(addr);
+  const uint8_t mask = GetMask(uint8_t(1U), pos & kLastNodeMask);
+  return (bitmap[pos >> kShiftForBitSize] & mask) != 0;
+}
+
 }  // namespace
 
 template <typename T>
@@ -221,18 +226,17 @@ zx_status_t FsckWorker::ValidateNodeBlock(const Node &node_block, NodeInfo node_
 zx::result<bool> FsckWorker::UpdateContext(const Node &node_block, NodeInfo node_info,
                                            FileType ftype, NodeType ntype) {
   nid_t nid = node_info.nid;
-  if (ftype != FileType::kFtOrphan || TestValidBitmap(nid, fsck_.nat_area_bitmap.get()) != 0x0) {
-    ClearValidBitmap(nid, fsck_.nat_area_bitmap.get());
+  if (ftype != FileType::kFtOrphan || fsck_.nat_area_bitmap.GetOne(ToMsbFirst(nid))) {
+    fsck_.nat_area_bitmap.ClearOne(ToMsbFirst(nid));
   } else {
     FX_LOGS(WARNING) << "\tnid duplicated [0x" << std::hex << nid << "]";
   }
 
-  if (TestValidBitmap(BlkoffFromMain(*segment_manager_, node_info.blk_addr),
-                      fsck_.main_area_bitmap.get()) == 0x0) {
+  if (!fsck_.main_area_bitmap.GetOne(
+          ToMsbFirst(BlkoffFromMain(*segment_manager_, node_info.blk_addr)))) {
     // Unvisited node, mark visited.
-    SetValidBitmap(BlkoffFromMain(*segment_manager_, node_info.blk_addr),
-                   fsck_.main_area_bitmap.get());
-
+    fsck_.main_area_bitmap.SetOne(
+        ToMsbFirst(BlkoffFromMain(*segment_manager_, node_info.blk_addr)));
     if (ntype == NodeType::kTypeInode) {
       uint32_t i_links = LeToCpu(node_block.i.i_links);
       if (ftype != FileType::kFtDir && ftype != FileType::kFtOrphan) {
@@ -294,8 +298,7 @@ zx::result<NodeInfo> FsckWorker::ReadNodeBlock(nid_t nid, FsBlock<Node> &block) 
     return zx::error(ZX_ERR_INTERNAL);
   }
 
-  if (TestValidBitmap(BlkoffFromMain(*segment_manager_, node_info.blk_addr),
-                      sit_area_bitmap_.get()) == 0x0) {
+  if (!sit_area_bitmap_.GetOne(ToMsbFirst(BlkoffFromMain(*segment_manager_, node_info.blk_addr)))) {
     FX_LOGS(INFO) << "\tSIT bitmap is 0x0. block_address[0x" << std::hex << node_info.blk_addr
                   << "]";
     return zx::error(ZX_ERR_INTERNAL);
@@ -528,14 +531,14 @@ zx::result<TraverseResult> FsckWorker::TraverseDoubleIndirectNodeBlock(const Ino
 zx_status_t FsckWorker::CheckDentries(uint32_t &child_count, uint32_t &child_files,
                                       const int last_block, const uint8_t *dentry_bitmap,
                                       const DirEntry *dentries, const uint8_t (*filename)[kNameLen],
-                                      const uint32_t max_entries) {
+                                      const size_t max_entries) {
   uint32_t hash_code;
   FileType ftype;
 
   ++fsck_.dentry_depth;
 
   for (uint32_t i = 0; i < max_entries;) {
-    if (TestBit(i, dentry_bitmap) == 0x0) {
+    if (!TestBit(dentry_bitmap, i, max_entries)) {
       ++i;
       continue;
     }
@@ -603,17 +606,15 @@ zx_status_t FsckWorker::CheckDataBlock(uint32_t block_address, uint32_t &child_c
     return ZX_ERR_INTERNAL;
   }
 
-  if (TestValidBitmap(BlkoffFromMain(*segment_manager_, block_address), sit_area_bitmap_.get()) ==
-      0x0) {
+  if (!sit_area_bitmap_.GetOne(ToMsbFirst(BlkoffFromMain(*segment_manager_, block_address)))) {
     ZX_ASSERT_MSG(false, "SIT bitmap is 0x0. block_address[0x%x]\n", block_address);
   }
 
-  if (TestValidBitmap(BlkoffFromMain(*segment_manager_, block_address),
-                      fsck_.main_area_bitmap.get()) != 0) {
+  if (fsck_.main_area_bitmap.GetOne(ToMsbFirst(BlkoffFromMain(*segment_manager_, block_address)))) {
     ZX_ASSERT_MSG(false, "Duplicated data block. pnid[0x%x] index[0x%x] block_address[0x%x]\n",
                   parent_nid, index_in_node, block_address);
   }
-  SetValidBitmap(BlkoffFromMain(*segment_manager_, block_address), fsck_.main_area_bitmap.get());
+  fsck_.main_area_bitmap.SetOne(ToMsbFirst(BlkoffFromMain(*segment_manager_, block_address)));
 
   ++fsck_.result.valid_block_count;
 
@@ -693,10 +694,7 @@ zx_status_t FsckWorker::Init() {
                          << superblock_info_.GetLogBlocksPerSeg();
   fsck_.main_area_bitmap_size = CheckedDivRoundUp<uint64_t>(fsck_.nr_main_blocks, kBitsPerByte);
   ZX_ASSERT(fsck_.main_area_bitmap_size == sit_area_bitmap_size_);
-  fsck_.main_area_bitmap = std::make_unique<uint8_t[]>(fsck_.main_area_bitmap_size);
-  if (fsck_.main_area_bitmap == nullptr) {
-    return ZX_ERR_NO_MEMORY;
-  }
+  fsck_.main_area_bitmap.Reset(GetBitSize(fsck_.main_area_bitmap_size));
 
   BuildNatAreaBitmap();
 
@@ -705,7 +703,7 @@ zx_status_t FsckWorker::Init() {
 
 zx_status_t FsckWorker::VerifyCursegOffset(CursegType segtype) {
   CursegInfo *curseg = segment_manager_->CURSEG_I(segtype);
-  if (curseg->next_blkoff >= kSitVBlockMapSize * kBitsPerByte) {
+  if (curseg->next_blkoff >= GetBitSize(kSitVBlockMapSize)) {
     return ZX_ERR_INTERNAL;
   }
 
@@ -717,8 +715,8 @@ zx_status_t FsckWorker::VerifyCursegOffset(CursegType segtype) {
     return ZX_ERR_INTERNAL;
   }
 
-  if (TestValidBitmap(BlkoffFromMain(*segment_manager_, logical_curseg_offset),
-                      sit_area_bitmap_.get()) != 0x0) {
+  if (sit_area_bitmap_.GetOne(
+          ToMsbFirst(BlkoffFromMain(*segment_manager_, logical_curseg_offset)))) {
     return ZX_ERR_INTERNAL;
   }
 
@@ -727,8 +725,7 @@ zx_status_t FsckWorker::VerifyCursegOffset(CursegType segtype) {
       block_t logical_offset = segment_manager_->GetMainAreaStartBlock() +
                                curseg->segno * superblock_info_.GetBlocksPerSeg() + offset;
 
-      if (TestValidBitmap(BlkoffFromMain(*segment_manager_, logical_offset),
-                          sit_area_bitmap_.get()) != 0x0) {
+      if (sit_area_bitmap_.GetOne(ToMsbFirst(BlkoffFromMain(*segment_manager_, logical_offset)))) {
         return ZX_ERR_INTERNAL;
       }
     }
@@ -743,7 +740,7 @@ zx_status_t FsckWorker::Verify() {
 
   std::string unreachable_nodes;
   for (uint32_t i = 0; i < fsck_.nr_nat_entries; ++i) {
-    if (TestValidBitmap(i, fsck_.nat_area_bitmap.get()) != 0) {
+    if (fsck_.nat_area_bitmap.GetOne(ToMsbFirst(i))) {
       std::ostringstream nid;
       nid << " 0x" << std::hex << i;
       unreachable_nodes += nid.str();
@@ -776,7 +773,8 @@ zx_status_t FsckWorker::Verify() {
   }
 
   str = "\tSIT valid block bitmap ";
-  if (memcmp(sit_area_bitmap_.get(), fsck_.main_area_bitmap.get(), sit_area_bitmap_size_) == 0x0) {
+  if (memcmp(sit_area_bitmap_.StorageUnsafe()->GetData(),
+             fsck_.main_area_bitmap.StorageUnsafe()->GetData(), sit_area_bitmap_size_) == 0x0) {
     FX_LOGS(INFO) << str << "[OK]";
   } else {
     FX_LOGS(INFO) << str << "[FAILED]";
@@ -863,7 +861,7 @@ zx_status_t FsckWorker::RepairNat() {
   bool need_journal_update = false;
 
   for (nid_t nid = 0; nid < fsck_.nr_nat_entries; ++nid) {
-    if (TestValidBitmap(nid, fsck_.nat_area_bitmap.get()) != 0) {
+    if (fsck_.nat_area_bitmap.GetOne(ToMsbFirst(nid))) {
       FX_LOGS(INFO) << std::hex << "\tRemoving unreachable node [0x" << nid << "]";
 
       // Lookup the journal first.
@@ -893,7 +891,7 @@ zx_status_t FsckWorker::RepairNat() {
                             (seg_off << superblock_info_.GetLogBlocksPerSeg() << 1) +
                             (block_off & ((1 << superblock_info_.GetLogBlocksPerSeg()) - 1)));
 
-      if (TestValidBitmap(block_off, node_manager_->GetNatBitmap())) {
+      if (node_manager_->GetNatBitmap().GetOne(ToMsbFirst(block_off))) {
         block_addr += superblock_info_.GetBlocksPerSeg();
       }
 
@@ -934,10 +932,12 @@ zx_status_t FsckWorker::RepairSit() {
   FsBlock<SummaryBlock> &summary_block = curseg->sum_blk;
 
   bool need_journal_update = false;
+  uint8_t *raw_sit_bitmap = static_cast<uint8_t *>(sit_area_bitmap_.StorageUnsafe()->GetData());
+  uint8_t *raw_main_bitmap =
+      static_cast<uint8_t *>(fsck_.main_area_bitmap.StorageUnsafe()->GetData());
   for (uint32_t segno = 0; segno < sit_area_bitmap_size_ / kSitVBlockMapSize; ++segno) {
     uint32_t sit_byte_offset = segno * kSitVBlockMapSize;
-    if (memcmp(sit_area_bitmap_.get() + sit_byte_offset,
-               fsck_.main_area_bitmap.get() + sit_byte_offset,
+    if (memcmp(raw_sit_bitmap + sit_byte_offset, raw_main_bitmap + sit_byte_offset,
                std::min(kSitVBlockMapSize, sit_area_bitmap_size_ - sit_byte_offset)) == 0x0) {
       continue;
     }
@@ -947,7 +947,7 @@ zx_status_t FsckWorker::RepairSit() {
     for (int i = 0; i < SitsInCursum(&summary_block); ++i) {
       if (LeToCpu(SegnoInJournal(&summary_block, i)) == segno) {
         SitEntry &sit = summary_block->sit_j.entries[i].se;
-        memcpy(sit.valid_map, fsck_.main_area_bitmap.get() + sit_byte_offset, kSitVBlockMapSize);
+        memcpy(sit.valid_map, raw_main_bitmap + sit_byte_offset, kSitVBlockMapSize);
         sit.vblocks = 0;
         for (uint8_t valid_bits : sit.valid_map) {
           sit.vblocks += std::bitset<8>(valid_bits).count();
@@ -967,12 +967,12 @@ zx_status_t FsckWorker::RepairSit() {
     uint32_t offset = segment_manager_->SitBlockOffset(segno);
     block_t sit_block_addr = sit_i.sit_base_addr + offset;
 
-    if (TestValidBitmap(offset, sit_i.sit_bitmap.get())) {
+    if (sit_i.sit_bitmap.GetOne(ToMsbFirst(offset))) {
       sit_block_addr += sit_i.sit_blocks;
     }
 
     SitEntry &sit_entry = (*sit_block)->entries[segment_manager_->SitEntryOffset(segno)];
-    memcpy(sit_entry.valid_map, fsck_.main_area_bitmap.get() + sit_byte_offset, kSitVBlockMapSize);
+    memcpy(sit_entry.valid_map, raw_main_bitmap + sit_byte_offset, kSitVBlockMapSize);
     sit_entry.vblocks = 0;
     for (uint8_t valid_bits : sit_entry.valid_map) {
       sit_entry.vblocks += std::bitset<8>(valid_bits).count();
@@ -1027,11 +1027,11 @@ zx_status_t FsckWorker::RepairCheckpoint() {
     CursegInfo *curseg = segment_manager_->CURSEG_I(static_cast<CursegType>(segtype));
     if (VerifyCursegOffset(static_cast<CursegType>(segtype)) != ZX_OK) {
       uint16_t offset;
-      for (offset = 0; offset < kSitVBlockMapSize * kBitsPerByte; ++offset) {
+      for (offset = 0; offset < GetBitSize(kSitVBlockMapSize); ++offset) {
         block_t logical_offset = segment_manager_->GetMainAreaStartBlock() +
                                  curseg->segno * superblock_info_.GetBlocksPerSeg() + offset;
-        if (TestValidBitmap(BlkoffFromMain(*segment_manager_, logical_offset),
-                            sit_area_bitmap_.get()) == 0x0) {
+        if (!sit_area_bitmap_.GetOne(
+                ToMsbFirst(BlkoffFromMain(*segment_manager_, logical_offset)))) {
           break;
         }
       }
@@ -1510,14 +1510,9 @@ zx_status_t FsckWorker::BuildSitInfo() {
   sit_i->sentries = std::make_unique<SegmentEntry[]>(segment_manager_->TotalSegs());
 
   for (uint32_t start = 0; start < segment_manager_->TotalSegs(); ++start) {
-    sit_i->sentries[start].cur_valid_map = std::make_unique<uint8_t[]>(kSitVBlockMapSize);
-    sit_i->sentries[start].ckpt_valid_map = std::make_unique<uint8_t[]>(kSitVBlockMapSize);
-    if (sit_i->sentries[start].cur_valid_map == nullptr ||
-        sit_i->sentries[start].ckpt_valid_map == nullptr) {
-      return ZX_ERR_NO_MEMORY;
-    }
+    sit_i->sentries[start].cur_valid_map.Reset(GetBitSize(kSitVBlockMapSize));
+    sit_i->sentries[start].ckpt_valid_map.Reset(GetBitSize(kSitVBlockMapSize));
   }
-
   sit_segs = LeToCpu(raw_sb.segment_count_sit) >> 1;
   bitmap_size = superblock_info_.BitmapSize(MetaBitmap::kSitBitmap);
   if (src_bitmap = static_cast<uint8_t *>(superblock_info_.BitmapPtr(MetaBitmap::kSitBitmap));
@@ -1525,11 +1520,8 @@ zx_status_t FsckWorker::BuildSitInfo() {
     return ZX_ERR_NO_MEMORY;
   }
 
-  if (sit_i->sit_bitmap = std::make_unique<uint8_t[]>(bitmap_size); sit_i->sit_bitmap == nullptr) {
-    return ZX_ERR_NO_MEMORY;
-  }
-
-  memcpy(sit_i->sit_bitmap.get(), src_bitmap, bitmap_size);
+  sit_i->sit_bitmap.Reset(GetBitSize(bitmap_size));
+  memcpy(sit_i->sit_bitmap.StorageUnsafe()->GetData(), src_bitmap, bitmap_size);
 
   sit_i->sit_base_addr = LeToCpu(raw_sb.sit_blkaddr);
   sit_i->sit_blocks = sit_segs << superblock_info_.GetLogBlocksPerSeg();
@@ -1712,7 +1704,7 @@ std::unique_ptr<FsBlock<SitBlock>> FsckWorker::GetCurrentSitPage(uint32_t segno)
   CheckSegmentRange(segno);
 
   // calculate sit block address
-  if (TestValidBitmap(offset, sit_i.sit_bitmap.get())) {
+  if (sit_i.sit_bitmap.GetOne(ToMsbFirst(offset))) {
     block_address += sit_i.sit_blocks;
   }
 
@@ -1733,7 +1725,7 @@ void FsckWorker::CheckBlockCount(uint32_t segno, const SitEntry &raw_sit) {
 
   // check bitmap with valid block count
   for (uint64_t i = 0; i < superblock_info_.GetBlocksPerSeg(); ++i) {
-    if (TestValidBitmap(i, raw_sit.valid_map)) {
+    if (TestBit(raw_sit.valid_map, ToMsbFirst(i), kSitVBlockMapSizeInBit)) {
       ++valid_blocks;
     }
   }
@@ -1743,8 +1735,10 @@ void FsckWorker::CheckBlockCount(uint32_t segno, const SitEntry &raw_sit) {
 void FsckWorker::SegmentInfoFromRawSit(SegmentEntry &segment_entry, const SitEntry &raw_sit) {
   segment_entry.valid_blocks = GetSitVblocks(raw_sit);
   segment_entry.ckpt_valid_blocks = GetSitVblocks(raw_sit);
-  memcpy(segment_entry.cur_valid_map.get(), raw_sit.valid_map, kSitVBlockMapSize);
-  memcpy(segment_entry.ckpt_valid_map.get(), raw_sit.valid_map, kSitVBlockMapSize);
+  memcpy(segment_entry.cur_valid_map.StorageUnsafe()->GetData(), raw_sit.valid_map,
+         kSitVBlockMapSize);
+  memcpy(segment_entry.ckpt_valid_map.StorageUnsafe()->GetData(), raw_sit.valid_map,
+         kSitVBlockMapSize);
   segment_entry.type = GetSitType(raw_sit);
   segment_entry.mtime = LeToCpu(raw_sit.mtime);
 }
@@ -1831,7 +1825,7 @@ zx::result<RawNatEntry> FsckWorker::GetNatEntry(nid_t nid) {
       (node_manager_->GetNatAddress() + (seg_off << superblock_info_.GetLogBlocksPerSeg() << 1) +
        (block_off & ((1 << superblock_info_.GetLogBlocksPerSeg()) - 1)));
 
-  if (TestValidBitmap(block_off, node_manager_->GetNatBitmap())) {
+  if (node_manager_->GetNatBitmap().GetOne(ToMsbFirst(block_off))) {
     block_addr += superblock_info_.GetBlocksPerSeg();
   }
 
@@ -1912,19 +1906,16 @@ zx_status_t FsckWorker::BuildSegmentManager() {
 
 void FsckWorker::BuildSitAreaBitmap() {
   uint32_t vblocks = 0;
-
   sit_area_bitmap_size_ = segment_manager_->GetMainSegmentsCount() * kSitVBlockMapSize;
-  sit_area_bitmap_ = std::make_unique<uint8_t[]>(sit_area_bitmap_size_);
-  uint8_t *ptr = sit_area_bitmap_.get();
-
+  sit_area_bitmap_.Reset(GetBitSize(sit_area_bitmap_size_));
+  uint8_t *raw_bitmap = static_cast<uint8_t *>(sit_area_bitmap_.StorageUnsafe()->GetData());
   for (uint32_t segno = 0; segno < segment_manager_->GetMainSegmentsCount(); ++segno) {
     SegmentEntry &segment_entry = GetSegmentEntry(segno);
 
-    memcpy(ptr, segment_entry.cur_valid_map.get(), kSitVBlockMapSize);
-    ptr += kSitVBlockMapSize;
+    memcpy(raw_bitmap, segment_entry.cur_valid_map.StorageUnsafe()->GetData(), kSitVBlockMapSize);
     vblocks = 0;
     for (uint64_t j = 0; j < kSitVBlockMapSize; ++j) {
-      vblocks += std::bitset<8>(segment_entry.cur_valid_map[j]).count();
+      vblocks += std::bitset<8>(*raw_bitmap++).count();
     }
     ZX_ASSERT(vblocks == segment_entry.valid_blocks);
 
@@ -1973,9 +1964,8 @@ void FsckWorker::BuildNatAreaBitmap() {
   nr_nat_blks = (LeToCpu(raw_sb.segment_count_nat) / 2) << superblock_info_.GetLogBlocksPerSeg();
 
   fsck_.nr_nat_entries = nr_nat_blks * kNatEntryPerBlock;
-  fsck_.nat_area_bitmap_size = (fsck_.nr_nat_entries + 7) / 8;
-  fsck_.nat_area_bitmap = std::make_unique<uint8_t[]>(fsck_.nat_area_bitmap_size);
-  ZX_ASSERT(fsck_.nat_area_bitmap.get() != nullptr);
+  fsck_.nat_area_bitmap_size = CheckedDivRoundUp(fsck_.nr_nat_entries, kBitsPerByte);
+  fsck_.nat_area_bitmap.Reset(GetBitSize(fsck_.nat_area_bitmap_size));
 
   for (block_off = 0; block_off < nr_nat_blks; ++block_off) {
     seg_off = block_off >> superblock_info_.GetLogBlocksPerSeg();
@@ -1983,7 +1973,7 @@ void FsckWorker::BuildNatAreaBitmap() {
                  (seg_off << superblock_info_.GetLogBlocksPerSeg() << 1) +
                  (block_off & ((1 << superblock_info_.GetLogBlocksPerSeg()) - 1));
 
-    if (TestValidBitmap(block_off, node_manager_->GetNatBitmap())) {
+    if (node_manager_->GetNatBitmap().GetOne(ToMsbFirst(block_off))) {
       block_addr += superblock_info_.GetBlocksPerSeg();
     }
 
@@ -2005,7 +1995,7 @@ void FsckWorker::BuildNatAreaBitmap() {
         RawNatEntry raw_nat = *result;
         NodeInfoFromRawNat(node_info, raw_nat);
         if (node_info.blk_addr != kNullAddr) {
-          SetValidBitmap(nid + i, fsck_.nat_area_bitmap.get());
+          fsck_.nat_area_bitmap.SetOne(ToMsbFirst(nid + i));
           ++fsck_.result.valid_nat_entry_count;
         }
       } else {
@@ -2016,7 +2006,7 @@ void FsckWorker::BuildNatAreaBitmap() {
             FX_LOGS(INFO) << "\tnid[0x" << std::hex << nid + i << "] in nat entry [0x"
                           << node_info.blk_addr << "] [0x" << node_info.ino << "]";
           }
-          SetValidBitmap(nid + i, fsck_.nat_area_bitmap.get());
+          fsck_.nat_area_bitmap.SetOne(ToMsbFirst(nid + i));
           ++fsck_.result.valid_nat_entry_count;
         }
       }

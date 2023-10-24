@@ -270,9 +270,10 @@ void FileTester::CheckChildrenInBlock(Dir *vn, uint64_t bidx,
   auto page_or = vn->FindDataPage(bidx);
   ZX_ASSERT(page_or.is_ok());
   DentryBlock *dentry_blk = page_or->GetAddress<DentryBlock>();
+  PageBitmap dentry_bitmap(dentry_blk->dentry_bitmap, kNrDentryInBlock);
 
-  uint32_t bit_pos = FindNextBit(dentry_blk->dentry_bitmap, kNrDentryInBlock, 0);
-  while (bit_pos < kNrDentryInBlock) {
+  size_t bit_pos = 0;
+  while ((bit_pos = dentry_bitmap.FindNextBit(bit_pos)) < kNrDentryInBlock) {
     DirEntry *de = &dentry_blk->dentry[bit_pos];
     uint32_t slots = (LeToCpu(de->name_len) + kNameLen - 1) / kNameLen;
 
@@ -288,7 +289,7 @@ void FileTester::CheckChildrenInBlock(Dir *vn, uint64_t bidx,
     ASSERT_NE(iter, childs.end());
     childs.erase(iter);
 
-    bit_pos = FindNextBit(dentry_blk->dentry_bitmap, kNrDentryInBlock, bit_pos + slots);
+    bit_pos += slots;
   }
 
   ASSERT_TRUE(childs.empty());
@@ -369,7 +370,7 @@ void MapTester::CheckBlkaddrsFree(F2fs *fs, std::unordered_set<block_t> &blkaddr
     SegmentManager &manager = fs->GetSegmentManager();
     SegmentEntry &se = manager.GetSegmentEntry(manager.GetSegmentNumber(blkaddr));
     uint32_t offset = manager.GetSegOffFromSeg0(blkaddr) & (superblock_info.GetBlocksPerSeg() - 1);
-    ASSERT_EQ(TestValidBitmap(offset, se.ckpt_valid_map.get()), 0);
+    ASSERT_EQ(se.ckpt_valid_map.GetOne(ToMsbFirst(offset)), false);
   }
 }
 
@@ -379,7 +380,7 @@ void MapTester::CheckBlkaddrsInuse(F2fs *fs, std::unordered_set<block_t> &blkadd
     SegmentManager &manager = fs->GetSegmentManager();
     SegmentEntry &se = manager.GetSegmentEntry(manager.GetSegmentNumber(blkaddr));
     uint32_t offset = manager.GetSegOffFromSeg0(blkaddr) & (superblock_info.GetBlocksPerSeg() - 1);
-    ASSERT_NE(TestValidBitmap(offset, se.ckpt_valid_map.get()), 0);
+    ASSERT_NE(se.ckpt_valid_map.GetOne(ToMsbFirst(offset)), false);
   }
 }
 

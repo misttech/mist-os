@@ -1221,7 +1221,8 @@ TEST(FsyncRecoveryTest, AtomicFsync) {
   fs->GetBc().Readblk(last_dnode_blkaddr, &node_block);
   ASSERT_EQ(curr_checkpoint_ver, LeToCpu(node_block->footer.cp_ver));
   ASSERT_EQ(node_block->footer.ino, invalid_fsync_vnode->Ino());
-  ASSERT_TRUE(TestBit(static_cast<uint32_t>(BitShift::kFsyncBitShift), &node_block->footer.flag));
+  uint32_t mask = 1 << static_cast<uint32_t>(BitShift::kFsyncBitShift);
+  ASSERT_NE(mask & node_block->footer.flag, 0U);
 
   uint32_t dummy_buf[PAGE_SIZE / (sizeof(uint32_t) / sizeof(uint8_t))] = {0};
   fs->GetBc().Writeblk(last_dnode_blkaddr, dummy_buf);

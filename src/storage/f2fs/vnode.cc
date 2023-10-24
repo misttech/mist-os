@@ -949,4 +949,8 @@ void VnodeF2fs::WaitForDeactive(std::mutex &mutex) {
 
 bool VnodeF2fs::IsActive() const { return TestFlag(InodeInfoFlag::kActive); }
 
+zx::result<PageBitmap> VnodeF2fs::GetBitmap(fbl::RefPtr<Page> page) {
+  return zx::error(ZX_ERR_NOT_SUPPORTED);
+}
+
 }  // namespace f2fs

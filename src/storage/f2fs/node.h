@@ -10,6 +10,7 @@
 #include <fbl/intrusive_double_list.h>
 #include <fbl/intrusive_wavl_tree.h>
 
+#include "src/storage/f2fs/bitmap.h"
 #include "src/storage/f2fs/f2fs_internal.h"
 #include "src/storage/f2fs/f2fs_layout.h"
 #include "src/storage/f2fs/file_cache.h"
@@ -186,14 +187,13 @@ class NodeManager {
   nid_t GetNatCount() const { return nat_entries_count_; }
   zx_status_t AllocNatBitmap(const uint32_t size) {
     nat_bitmap_size_ = size;
-    nat_bitmap_ = std::make_unique<uint8_t[]>(nat_bitmap_size_);
-    memset(nat_bitmap_.get(), 0, nat_bitmap_size_);
+    nat_bitmap_.Reset(GetBitSize(nat_bitmap_size_));
     return ZX_OK;
   }
   void SetNatBitmap(const uint8_t *bitmap) {
-    std::memcpy(nat_bitmap_.get(), bitmap, nat_bitmap_size_);
+    std::memcpy(nat_bitmap_.StorageUnsafe()->GetData(), bitmap, nat_bitmap_size_);
   }
-  uint8_t *GetNatBitmap() const { return nat_bitmap_.get(); }
+  RawBitmap &GetNatBitmap() { return nat_bitmap_; }
   void GetNatBitmap(void *out);
 
   SuperblockInfo &GetSuperblockInfo();
@@ -272,9 +272,9 @@ class NodeManager {
   nid_t next_scan_nid_ __TA_GUARDED(build_lock_) = 0;  // the next nid to be scanned
   std::set<nid_t> free_nid_tree_ __TA_GUARDED(free_nid_tree_lock_);  // tree for free nids
 
-  std::unique_ptr<uint8_t[]> nat_bitmap_ = nullptr;       // NAT bitmap pointer
-  std::unique_ptr<uint8_t[]> nat_prev_bitmap_ = nullptr;  // NAT previous checkpoint bitmap pointer
-  uint32_t nat_bitmap_size_ = 0;                          // NAT bitmap size
+  RawBitmap nat_bitmap_;          // NAT bitmap pointer
+  RawBitmap nat_prev_bitmap_;     // NAT previous checkpoint bitmap pointer
+  uint32_t nat_bitmap_size_ = 0;  // NAT bitmap size
 };
 
 }  // namespace f2fs

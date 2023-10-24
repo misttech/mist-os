@@ -210,9 +210,10 @@ TEST_F(DirEntryCacheTest, CacheDataValidation) {
     auto page_or = root_dir_->FindDataPage(element->GetDataPageIndex());
     ASSERT_TRUE(page_or.is_ok());
     DentryBlock *dentry_block = page_or->GetAddress<DentryBlock>();
+    PageBitmap dentry_bitmap(dentry_block->dentry_bitmap, kNrDentryInBlock);
 
-    uint32_t bit_pos = FindNextBit(dentry_block->dentry_bitmap, kNrDentryInBlock, 0);
-    while (bit_pos < kNrDentryInBlock) {
+    size_t bit_pos = 0;
+    while ((bit_pos = dentry_bitmap.FindNextBit(bit_pos)) < kNrDentryInBlock) {
       DirEntry *de = &dentry_block->dentry[bit_pos];
       uint32_t slots = (LeToCpu(de->name_len) + kNameLen - 1) / kNameLen;
 
@@ -231,7 +232,7 @@ TEST_F(DirEntryCacheTest, CacheDataValidation) {
         break;
       }
 
-      bit_pos = FindNextBit(dentry_block->dentry_bitmap, kNrDentryInBlock, bit_pos + slots);
+      bit_pos += slots;
     }
     // If not found, |bit_pos| exceeds the bitmap length, |kNrDentryInBlock|
     ASSERT_LT(bit_pos, safemath::checked_cast<uint32_t>(kNrDentryInBlock));

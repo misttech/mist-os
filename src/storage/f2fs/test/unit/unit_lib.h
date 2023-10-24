@@ -189,6 +189,7 @@ class DeviceTester {
   using Hook = std::function<zx_status_t(const block_fifo_request_t &request, const zx::vmo *vmo)>;
   static void SetHook(F2fs *fs, Hook hook);
 };
+
 }  // namespace f2fs
 
 #endif  // SRC_STORAGE_F2FS_TEST_UNIT_UNIT_LIB_H_

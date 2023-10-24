@@ -6,6 +6,7 @@ static_library("f2fs") {
   friend = [ "test:*" ]
   sources = [
     "bcache.cc",
+    "bitmap.cc",
     "checkpoint.cc",
     "data.cc",
     "dir.cc",
@@ -66,6 +67,7 @@ static_library("f2fs") {
     "//src/storage/lib/vfs/cpp",
     "//src/storage/lib/vfs/cpp/journal",
     "//src/storage/lib/vfs/cpp/transaction",
+    "//zircon/system/ulib/bitmap",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/storage/buffer",
     "//zircon/third_party/ulib/safemath",

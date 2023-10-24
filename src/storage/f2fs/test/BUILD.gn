@@ -42,6 +42,7 @@ test_deps = [
 test("f2fs_unit") {
   sources = [
     "unit/bcache.cc",
+    "unit/bitmap.cc",
     "unit/checkpoint.cc",
     "unit/dir.cc",
     "unit/dir_entry_cache.cc",

@@ -5,6 +5,7 @@
 #ifndef SRC_STORAGE_F2FS_SEGMENT_H_
 #define SRC_STORAGE_F2FS_SEGMENT_H_
 
+#include "src/storage/f2fs/bitmap.h"
 #include "src/storage/f2fs/f2fs_internal.h"
 #include "src/storage/f2fs/f2fs_layout.h"
 #include "src/storage/f2fs/f2fs_lib.h"
@@ -51,22 +52,22 @@ enum class GcType { kBgGc = 0, kFgGc };
 struct VictimSelPolicy {
   AllocMode alloc_mode = AllocMode::kLFS;  // LFS or SSR
   GcMode gc_mode = GcMode::kGcCb;          // cost effective or greedy
-  uint8_t *dirty_segmap = nullptr;         // dirty segment bitmap
-  uint32_t max_search = kMaxSearchLimit;   // maximum # of segments to search
-  uint32_t offset = 0;                     // last scanned bitmap offset
-  uint32_t ofs_unit = 0;                   // bitmap search unit
-  uint32_t min_cost = 0;                   // minimum cost
+  RawBitmap *dirty_segmap = nullptr;       // dirty segment bitmap
+  size_t max_search = kMaxSearchLimit;     // maximum # of segments to search
+  size_t offset = 0;                       // last scanned bitmap offset
+  size_t ofs_unit = 0;                     // bitmap search unit
+  size_t min_cost = 0;                     // minimum cost
   uint32_t min_segno = 0;                  // segment # having min. cost
 };
 
 // SSR mode uses these field to determine which blocks are allocatable.
 struct SegmentEntry {
-  std::unique_ptr<uint8_t[]> cur_valid_map;   // validity bitmap of blocks
-  std::unique_ptr<uint8_t[]> ckpt_valid_map;  // validity bitmap in the last CP
-  uint64_t mtime = 0;                         // modification time of the segment
-  uint16_t valid_blocks = 0;                  // # of valid blocks
-  uint16_t ckpt_valid_blocks = 0;             // # of valid blocks in the last CP
-  uint8_t type = 0;                           // segment type like CURSEG_XXX_TYPE
+  RawBitmapHeap cur_valid_map;     // validity bitmap of blocks
+  RawBitmapHeap ckpt_valid_map;    // validity bitmap in the last CP
+  uint64_t mtime = 0;              // modification time of the segment
+  uint16_t valid_blocks = 0;       // # of valid blocks
+  uint16_t ckpt_valid_blocks = 0;  // # of valid blocks in the last CP
+  uint8_t type = 0;                // segment type like CURSEG_XXX_TYPE
 };
 
 struct SectionEntry {
@@ -74,16 +75,16 @@ struct SectionEntry {
 };
 
 struct SitInfo {
-  std::unique_ptr<uint8_t[]> sit_bitmap;             // SIT bitmap pointer
-  std::unique_ptr<uint8_t[]> dirty_sentries_bitmap;  // bitmap for dirty sentries
-  std::unique_ptr<SegmentEntry[]> sentries;          // SIT segment-level cache
-  std::unique_ptr<SectionEntry[]> sec_entries;       // SIT section-level cache
-  block_t sit_base_addr = 0;                         // start block address of SIT area
-  block_t sit_blocks = 0;                            // # of blocks used by SIT area
-  block_t written_valid_blocks = 0;                  // # of valid blocks in main area
-  uint32_t bitmap_size = 0;                          // SIT bitmap size
-  uint32_t dirty_sentries = 0;                       // # of dirty sentries
-  uint32_t sents_per_block = 0;                      // # of SIT entries per block
+  RawBitmap sit_bitmap;                         // SIT bitmap pointer
+  RawBitmap dirty_sentries_bitmap;              // bitmap for dirty sentries
+  std::unique_ptr<SegmentEntry[]> sentries;     // SIT segment-level cache
+  std::unique_ptr<SectionEntry[]> sec_entries;  // SIT section-level cache
+  block_t sit_base_addr = 0;                    // start block address of SIT area
+  block_t sit_blocks = 0;                       // # of blocks used by SIT area
+  block_t written_valid_blocks = 0;             // # of valid blocks in main area
+  uint32_t bitmap_size = 0;                     // SIT bitmap size
+  uint32_t dirty_sentries = 0;                  // # of dirty sentries
+  uint32_t sents_per_block = 0;                 // # of SIT entries per block
   // for cost-benefit algorithm in cleaning procedure
   uint64_t elapsed_time = 0;    // elapsed time after mount
   uint64_t mounted_time = 0;    // mount time
@@ -93,12 +94,12 @@ struct SitInfo {
 };
 
 struct FreeSegmapInfo {
-  std::unique_ptr<uint8_t[]> free_segmap;  // free segment bitmap
-  std::unique_ptr<uint8_t[]> free_secmap;  // free section bitmap
-  uint32_t start_segno = 0;                // start segment number logically
-  uint32_t free_segments = 0;              // # of free segments
-  uint32_t free_sections = 0;              // # of free sections
-  fs::SharedMutex segmap_lock;             // free segmap lock
+  RawBitmap free_segmap;        // free segment bitmap
+  RawBitmap free_secmap;        // free section bitmap
+  uint32_t start_segno = 0;     // start segment number logically
+  uint32_t free_segments = 0;   // # of free segments
+  uint32_t free_sections = 0;   // # of free sections
+  fs::SharedMutex segmap_lock;  // free segmap lock
 };
 
 // Notice: The order of dirty type is same with CURSEG_XXX in f2fs.h
@@ -115,10 +116,10 @@ enum class DirtyType {
 };
 
 struct DirtySeglistInfo {
-  std::unique_ptr<uint8_t[]> dirty_segmap[static_cast<int>(DirtyType::kNrDirtytype)];
+  RawBitmap dirty_segmap[static_cast<int>(DirtyType::kNrDirtytype)];
   std::mutex seglist_lock;                                       // lock for segment bitmaps
   int nr_dirty[static_cast<int>(DirtyType::kNrDirtytype)] = {};  // # of dirty segments
-  std::unique_ptr<uint8_t[]> victim_secmap;                      // background gc victims
+  RawBitmap victim_secmap;                                       // background gc victims
 };
 
 // for active log information
@@ -178,7 +179,7 @@ class SegmentManager {
   uint32_t GetValidBlocks(uint32_t segno, uint32_t section);
   void SegInfoFromRawSit(SegmentEntry &segment_entry, SitEntry &raw_sit);
   void SegInfoToRawSit(SegmentEntry &segment_entry, SitEntry &raw_sit);
-  uint32_t FindNextInuse(uint32_t max, uint32_t segno);
+  uint32_t FindNextInuse(uint32_t max, uint32_t start);
   void SetFree(uint32_t segno);
   void SetInuse(uint32_t segno);
   void SetTestAndFree(uint32_t segno);
@@ -226,7 +227,7 @@ class SegmentManager {
   void GetSumPage(uint32_t segno, LockedPage *out);
   void WriteSumPage(SummaryBlock *sum_blk, block_t blk_addr);
   uint32_t CheckPrefreeSegments(int ofs_unit, CursegType type);
-  void GetNewSegment(uint32_t *newseg, bool new_sec, int dir);
+  void GetNewSegment(uint32_t *newseg, bool new_sec, AllocDirection dir);
   void ResetCurseg(CursegType type, int modified);
   void NewCurseg(CursegType type, bool new_sec);
   void NextFreeBlkoff(CursegInfo *seg, block_t start);
@@ -272,16 +273,10 @@ class SegmentManager {
   zx_status_t BuildSitEntries();
   void InitFreeSegmap();
   void InitDirtySegmap();
-  zx_status_t InitVictimSecmap();
   zx_status_t BuildDirtySegmap();
   void InitMinMaxMtime();
 
-  void DiscardDirtySegmap(enum DirtyType dirty_type);
-  void DestroyVictimSecmap();
   void DestroyDirtySegmap();
-
-  void DestroyFreeSegmap();
-  void DestroySitInfo();
 
   block_t GetSegment0StartBlock() const { return seg0_blkaddr_; }
   block_t GetMainAreaStartBlock() const { return main_blkaddr_; }
@@ -366,7 +361,6 @@ class SegmentManager {
   uint32_t SitEntryOffset(uint32_t segno) { return segno % sit_info_->sents_per_block; }
   static block_t SitBlockOffset(uint32_t segno) { return segno / kSitEntryPerBlock; }
   static block_t StartSegNo(uint32_t segno) { return SitBlockOffset(segno) * kSitEntryPerBlock; }
-  static uint32_t BitmapSize(uint32_t nr) { return CheckedDivRoundUp<uint32_t>(nr, CHAR_BIT); }
 
   block_t TotalSegs() const { return main_segments_; }
 
@@ -392,7 +386,7 @@ class SegmentManager {
 
   // This function calculates the maximum cost for a victim in each GcType
   // Any segment with a less cost value becomes a victim candidate.
-  uint32_t GetMaxCost(const VictimSelPolicy &policy);
+  size_t GetMaxCost(const VictimSelPolicy &policy);
 
   // This method determines GcMode for GetVictimByDefault
   VictimSelPolicy GetVictimSelPolicy(GcType gc_type, CursegType type, AllocMode alloc_mode);

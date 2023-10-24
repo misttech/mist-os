@@ -265,6 +265,7 @@ struct NatBlock {
 // there-in blocks should occupy 64 bytes, 512 bits.
 // Not allow to change this.
 constexpr uint32_t kSitVBlockMapSize = 64;
+constexpr uint32_t kSitVBlockMapSizeInBit = kSitVBlockMapSize << kShiftForBitSize;
 
 // Note that SitEntry->vblocks has the following bit-field information.
 // [15:10] : allocation type such as CURSEG_XXXX_TYPE
@@ -410,7 +411,7 @@ constexpr uint32_t kNrDentryInBlock = 214;
 constexpr uint32_t kMaxDirHashDepth = 63;
 
 constexpr size_t kSizeOfDirEntry = 11;  // by byte
-constexpr size_t kSizeOfDentryBitmap = (kNrDentryInBlock + kBitsPerByte - 1) / kBitsPerByte;
+constexpr size_t kSizeOfDentryBitmap = (kNrDentryInBlock + kBitsPerByte - 1) >> kShiftForBitSize;
 constexpr size_t kSizeOfReserved =
     kPageSize - ((kSizeOfDirEntry + kNameLen) * kNrDentryInBlock + kSizeOfDentryBitmap);
 

@@ -20,7 +20,7 @@ uint64_t Dir::InlineDentryBitmapSize() const {
 
 DirEntry *Dir::InlineDentryArray(Page *page, VnodeF2fs &vnode) {
   uint8_t *base = InlineDentryBitmap(page);
-  uint32_t reserved = safemath::checked_cast<uint32_t>(
+  size_t reserved = safemath::checked_cast<uint32_t>(
       (vnode.MaxInlineData() -
        safemath::CheckMul(vnode.MaxInlineDentry(), (kSizeOfDirEntry + kDentrySlotLen)))
           .ValueOrDie());
@@ -30,7 +30,7 @@ DirEntry *Dir::InlineDentryArray(Page *page, VnodeF2fs &vnode) {
 
 uint8_t (*Dir::InlineDentryFilenameArray(Page *page, VnodeF2fs &vnode))[kDentrySlotLen] {
   uint8_t *base = InlineDentryBitmap(page);
-  uint32_t reserved = safemath::checked_cast<uint32_t>(
+  size_t reserved = safemath::checked_cast<uint32_t>(
       (vnode.MaxInlineData() - safemath::CheckMul(vnode.MaxInlineDentry(), kDentrySlotLen))
           .ValueOrDie());
   return reinterpret_cast<uint8_t(*)[kDentrySlotLen]>(base + reserved);
@@ -40,32 +40,24 @@ DirEntry *Dir::FindInInlineDir(std::string_view name, fbl::RefPtr<Page> *res_pag
   LockedPage ipage;
   if (zx_status_t ret = fs()->GetNodeManager().GetNodePage(Ino(), &ipage); ret != ZX_OK)
     return nullptr;
+
   f2fs_hash_t namehash = DentryHash(name);
-
-  for (uint32_t bit_pos = 0; bit_pos < MaxInlineDentry();) {
-    bit_pos = FindNextBit(InlineDentryBitmap(ipage.get()), MaxInlineDentry(), bit_pos);
-    if (bit_pos >= MaxInlineDentry()) {
-      break;
-    }
-
-    DirEntry *de = &InlineDentryArray(ipage.get(), *this)[bit_pos];
-    if (EarlyMatchName(name, namehash, *de)) {
-      if (!memcmp(InlineDentryFilenameArray(ipage.get(), *this)[bit_pos], name.data(),
-                  name.length())) {
-        *res_page = ipage.release();
-
-        if (de != nullptr) {
-          fs()->GetDirEntryCache().UpdateDirEntry(Ino(), name, *de, kCachedInlineDirEntryPageIndex);
-        }
-        return de;
-      }
+  auto bits = GetBitmap(ipage.CopyRefPtr());
+  ZX_DEBUG_ASSERT(bits.is_ok());
+  for (size_t bit_pos = 0; (bit_pos = bits->FindNextBit(bit_pos)) < MaxInlineDentry();) {
+    DirEntry &de = InlineDentryArray(ipage.get(), *this)[bit_pos];
+    if (EarlyMatchName(name, namehash, de) &&
+        !memcmp(InlineDentryFilenameArray(ipage.get(), *this)[bit_pos], name.data(),
+                name.length())) {
+      *res_page = ipage.release();
+      fs()->GetDirEntryCache().UpdateDirEntry(Ino(), name, de, kCachedInlineDirEntryPageIndex);
+      return &de;
     }
 
     // For the most part, it should be a bug when name_len is zero.
     // We stop here for figuring out where the bugs are occurred.
-    ZX_DEBUG_ASSERT(de->name_len > 0);
-
-    bit_pos += GetDentrySlots(LeToCpu(de->name_len));
+    ZX_DEBUG_ASSERT(de.name_len > 0);
+    bit_pos += GetDentrySlots(LeToCpu(de.name_len));
   }
 
   return nullptr;
@@ -102,8 +94,10 @@ zx_status_t Dir::MakeEmptyInlineDir(VnodeF2fs *vnode) {
   std::memcpy(InlineDentryFilenameArray(&(*ipage), *vnode)[1], "..", 2);
   SetDeType(de, vnode);
 
-  TestAndSetBit(0, InlineDentryBitmap(&(*ipage)));
-  TestAndSetBit(1, InlineDentryBitmap(&(*ipage)));
+  auto bits = vnode->GetBitmap(ipage.CopyRefPtr());
+  ZX_DEBUG_ASSERT(bits.is_ok());
+  bits->Set(0);
+  bits->Set(1);
 
   ipage.SetDirty();
 
@@ -115,21 +109,19 @@ zx_status_t Dir::MakeEmptyInlineDir(VnodeF2fs *vnode) {
   return ZX_OK;
 }
 
-unsigned int Dir::RoomInInlineDir(Page *ipage, uint32_t slots) {
-  uint32_t bit_start = 0;
-
+size_t Dir::RoomInInlineDir(const PageBitmap &bits, size_t slots) {
+  size_t bit_start = 0;
   while (true) {
-    uint32_t zero_start = FindNextZeroBit(InlineDentryBitmap(ipage), MaxInlineDentry(), bit_start);
+    size_t zero_start = bits.FindNextZeroBit(bit_start);
     if (zero_start >= MaxInlineDentry())
       return MaxInlineDentry();
 
-    uint32_t zero_end = FindNextBit(InlineDentryBitmap(ipage), MaxInlineDentry(), zero_start);
+    size_t zero_end = bits.FindNextBit(zero_start);
     if (zero_end - zero_start >= slots)
       return zero_start;
 
     bit_start = zero_end + 1;
-
-    if (zero_end + 1 >= MaxInlineDentry()) {
+    if (bit_start >= MaxInlineDentry()) {
       return MaxInlineDentry();
     }
   }
@@ -206,7 +198,9 @@ zx::result<bool> Dir::AddInlineEntry(std::string_view name, VnodeF2fs *vnode) {
 
     f2fs_hash_t name_hash = DentryHash(name);
     uint16_t slots = GetDentrySlots(safemath::checked_cast<uint16_t>(name.length()));
-    uint32_t bit_pos = RoomInInlineDir(ipage.get(), slots);
+    auto bits = GetBitmap(ipage.CopyRefPtr());
+    ZX_DEBUG_ASSERT(bits.is_ok());
+    size_t bit_pos = RoomInInlineDir(*bits, slots);
     if (bit_pos < MaxInlineDentry()) {
       ipage->WaitOnWriteback();
 
@@ -226,7 +220,7 @@ zx::result<bool> Dir::AddInlineEntry(std::string_view name, VnodeF2fs *vnode) {
       de->ino = CpuToLe(vnode->Ino());
       SetDeType(de, vnode);
       for (int i = 0; i < slots; ++i) {
-        TestAndSetBit(bit_pos + i, InlineDentryBitmap(ipage.get()));
+        bits->Set(bit_pos + i);
       }
 
       if (de != nullptr) {
@@ -253,10 +247,12 @@ void Dir::DeleteInlineEntry(DirEntry *dentry, fbl::RefPtr<Page> &page, VnodeF2fs
   LockedPage lock_page(page);
   lock_page->WaitOnWriteback();
 
-  unsigned int bit_pos = static_cast<uint32_t>(dentry - InlineDentryArray(lock_page.get(), *this));
+  size_t bit_pos = dentry - InlineDentryArray(lock_page.get(), *this);
   int slots = GetDentrySlots(LeToCpu(dentry->name_len));
+  auto bits = GetBitmap(lock_page.CopyRefPtr());
+  ZX_DEBUG_ASSERT(bits.is_ok());
   for (int i = 0; i < slots; ++i) {
-    TestAndClearBit(bit_pos + i, InlineDentryBitmap(lock_page.get()));
+    bits->Clear(bit_pos + i);
   }
 
   lock_page.SetDirty();
@@ -299,9 +295,10 @@ bool Dir::IsEmptyInlineDir() {
   if (zx_status_t err = fs()->GetNodeManager().GetNodePage(Ino(), &ipage); err != ZX_OK)
     return false;
 
-  unsigned int bit_pos = 2;
-  bit_pos = FindNextBit(InlineDentryBitmap(ipage.get()), MaxInlineDentry(), bit_pos);
-
+  size_t bit_pos = 2;
+  auto bits = GetBitmap(ipage.CopyRefPtr());
+  ZX_DEBUG_ASSERT(bits.is_ok());
+  bit_pos = bits->FindNextBit(bit_pos);
   return bit_pos >= MaxInlineDentry();
 }
 
@@ -321,11 +318,12 @@ zx_status_t Dir::ReadInlineDir(fs::VdirCookie *cookie, void *dirents, size_t len
     return err;
 
   const unsigned char *types = kFiletypeTable;
-  uint32_t bit_pos = *pos_cookie % MaxInlineDentry();
+  size_t bit_pos = *pos_cookie % MaxInlineDentry();
+  auto bits = GetBitmap(ipage.CopyRefPtr());
+  ZX_DEBUG_ASSERT(bits.is_ok());
 
   while (bit_pos < MaxInlineDentry()) {
-    bit_pos = FindNextBit(InlineDentryBitmap(ipage.get()), MaxInlineDentry(), bit_pos);
-    if (bit_pos >= MaxInlineDentry()) {
+    if (bit_pos = bits->FindNextBit(bit_pos); bit_pos >= MaxInlineDentry()) {
       break;
     }
 

@@ -32,7 +32,7 @@ constexpr uint32_t kFirstCheckpointVersion = 2;
 constexpr uint32_t kCheckpointLoopCnt = 10;
 constexpr uint8_t kRootDirNatBit = 0x80;
 constexpr uint8_t kRootDirSitBit = 0x20;
-constexpr uint32_t kMapPerSitEntry = kSitVBlockMapSize * kBitsPerByte;
+constexpr uint32_t kMapPerSitEntry = kSitVBlockMapSize << kShiftForBitSize;
 constexpr uint32_t kOrphanInodeBlockCnt = 10;
 constexpr uint8_t kMSB = 0x80;  // MSB(Most Significant Bit)
 constexpr uint32_t kRootInodeNid = 3;
@@ -778,7 +778,7 @@ TEST_F(CheckpointTest, SitJournal) {
       // Clear SIT journal
       if (SitsInCursum(&curseg->sum_blk) >= static_cast<int>(kSitJournalEntries)) {
         SitInfo &sit_i = segment_manager.GetSitInfo();
-        uint8_t *bitmap = sit_i.dirty_sentries_bitmap.get();
+        RawBitmap &bitmap = sit_i.dirty_sentries_bitmap;
         block_t nsegs = segment_manager.TotalSegs();
 
         // Add dummy dirty sentries
@@ -792,8 +792,10 @@ TEST_F(CheckpointTest, SitJournal) {
 
         // Clear dirty sentries
         uint32_t segno = 0;
-        while ((segno = FindNextBit(bitmap, nsegs, segno + 1)) < nsegs) {
-          ClearBit(segno, bitmap);
+        size_t out;
+        while (!bitmap.Scan(segno + 1, nsegs, false, &out)) {
+          segno = safemath::checked_cast<uint32_t>(out);
+          bitmap.ClearOne(segno);
           --sit_i.dirty_sentries;
         }
       }

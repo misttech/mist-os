@@ -234,8 +234,8 @@ TEST(FsckTest, UnreachableSitEntry) {
 
   // Insert an unreachable entry and update counter.
   // SIT is consistent itself but the entry is unreachable from the directory tree.
-  ASSERT_EQ(TestValidBitmap(target_offset, sit_block->entries[target_segment].valid_map), 0);
-  SetValidBitmap(target_offset, sit_block->entries[target_segment].valid_map);
+  PageBitmap bits(sit_block->entries[target_segment].valid_map, kSitVBlockMapSizeInBit);
+  ASSERT_EQ(bits.Set(ToMsbFirst(target_offset)), false);
 
   sit_block->entries[target_segment].vblocks =
       CpuToLe(static_cast<uint16_t>(LeToCpu(sit_block->entries[target_segment].vblocks) + 1));
@@ -251,10 +251,9 @@ TEST(FsckTest, UnreachableSitEntry) {
 
   // Re-read the SIT block to check it is repaired.
   ASSERT_EQ(fsck.ReadBlock(&sit_block, LeToCpu(superblock_pointer->sit_blkaddr)), ZX_OK);
-  ASSERT_EQ(TestValidBitmap(target_offset, sit_block->entries[target_segment].valid_map), 0);
+  ASSERT_EQ(bits.Set(ToMsbFirst(target_offset)), false);
 
   // Re-insert the unreachable entry.
-  SetValidBitmap(target_offset, sit_block->entries[target_segment].valid_map);
   sit_block->entries[target_segment].vblocks =
       CpuToLe(static_cast<uint16_t>(LeToCpu(sit_block->entries[target_segment].vblocks) + 1));
   ASSERT_EQ(fsck.WriteBlock(&sit_block, LeToCpu(superblock_pointer->sit_blkaddr)), ZX_OK);
@@ -292,8 +291,8 @@ TEST(FsckTest, UnreachableSitEntryInJournal) {
   // Sit journal holds 6 summaries for open segments.
   // Set an address bit that is unreachable.
   SitEntry &target_sit_entry = cold_data_summary->sit_j.entries[target_entry_index].se;
-  ASSERT_EQ(TestValidBitmap(target_offset, target_sit_entry.valid_map), 0);
-  SetValidBitmap(target_offset, target_sit_entry.valid_map);
+  PageBitmap bits(target_sit_entry.valid_map, kSitVBlockMapSizeInBit);
+  ASSERT_EQ(bits.Set(ToMsbFirst(target_offset)), false);
   target_sit_entry.vblocks = CpuToLe(static_cast<uint16_t>(LeToCpu(target_sit_entry.vblocks) + 1));
 
   ASSERT_EQ(fsck.WriteBlock(&cold_data_summary, offset), ZX_OK);
@@ -307,12 +306,12 @@ TEST(FsckTest, UnreachableSitEntryInJournal) {
 
   // Re-read the summary to check it is repaired.
   ASSERT_EQ(fsck.ReadBlock(&cold_data_summary, offset), ZX_OK);
-  ASSERT_EQ(TestValidBitmap(target_offset, target_sit_entry.valid_map), 0);
+  ASSERT_EQ(bits.Test(ToMsbFirst(target_offset)), false);
 
   // Re-insert the unreachable entry.
   SitEntry &reinsert_sit_entry = cold_data_summary->sit_j.entries[target_entry_index].se;
-  ASSERT_EQ(TestValidBitmap(target_offset, reinsert_sit_entry.valid_map), 0);
-  SetValidBitmap(target_offset, reinsert_sit_entry.valid_map);
+  PageBitmap reinsert_bits(reinsert_sit_entry.valid_map, kSitVBlockMapSizeInBit);
+  ASSERT_EQ(reinsert_bits.Set(ToMsbFirst(target_offset)), false);
   reinsert_sit_entry.vblocks =
       CpuToLe(static_cast<uint16_t>(LeToCpu(reinsert_sit_entry.vblocks) + 1));
   ASSERT_EQ(fsck.WriteBlock(&cold_data_summary, offset), ZX_OK);
@@ -427,7 +426,7 @@ TEST(FsckTest, InvalidNatEntry) {
                       (seg_off << fsck.GetSuperblockInfo().GetLogBlocksPerSeg() << 1) +
                       (block_off & ((1 << fsck.GetSuperblockInfo().GetLogBlocksPerSeg()) - 1)));
 
-  if (TestValidBitmap(block_off, fsck.GetNodeManager().GetNatBitmap())) {
+  if (fsck.GetNodeManager().GetNatBitmap().GetOne(ToMsbFirst(block_off))) {
     nat_blkaddr += fsck.GetSuperblockInfo().GetBlocksPerSeg();
   }
 
@@ -946,8 +945,6 @@ TEST(FsckTest, AllocateFreeSegmapInfoAfterSPO) {
 
   // Check FreeSegmapInfo is valid
   ASSERT_NE(&fsck.GetSegmentManager().GetFreeSegmentInfo(), nullptr);
-  ASSERT_NE(fsck.GetSegmentManager().GetFreeSegmentInfo().free_segmap, nullptr);
-  ASSERT_NE(fsck.GetSegmentManager().GetFreeSegmentInfo().free_secmap, nullptr);
   ASSERT_EQ(fsck.GetSegmentManager().GetFreeSegmentInfo().free_segments, 0U);
   ASSERT_EQ(fsck.GetSegmentManager().GetFreeSegmentInfo().free_sections, 0U);
 

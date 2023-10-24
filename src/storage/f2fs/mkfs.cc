@@ -252,7 +252,7 @@ zx_status_t MkfsWorker::PrepareSuperblock() {
 
   uint32_t max_nat_bitmap_size;
   if (max_sit_bitmap_size >
-      kChecksumOffset - sizeof(Checkpoint) + 1 + (kDefaultBlocksPerSegment / kBitsPerByte)) {
+      kChecksumOffset - sizeof(Checkpoint) + 1 + (kDefaultBlocksPerSegment >> kShiftForBitSize)) {
     max_nat_bitmap_size = kChecksumOffset - sizeof(Checkpoint) + 1;
     super_block_.cp_payload = (max_sit_bitmap_size + kBlockSize - 1) / kBlockSize;
   } else {
@@ -550,7 +550,7 @@ zx_status_t MkfsWorker::WriteCheckPointPack() {
   summary->sit_j.entries[0].segno = checkpoint->cur_node_segno[0];
   summary->sit_j.entries[0].se.vblocks =
       CpuToLe(uint16_t{(static_cast<int>(CursegType::kCursegHotNode) << 10) | 1});
-  SetValidBitmap(0, summary->sit_j.entries[0].se.valid_map);
+  summary->sit_j.entries[0].se.valid_map[0] |= GetMask(1, ToMsbFirst(0));
   summary->sit_j.entries[1].segno = checkpoint->cur_node_segno[1];
   summary->sit_j.entries[1].se.vblocks =
       CpuToLe(uint16_t{(static_cast<int>(CursegType::kCursegWarmNode) << 10)});
@@ -562,7 +562,7 @@ zx_status_t MkfsWorker::WriteCheckPointPack() {
   summary->sit_j.entries[3].segno = checkpoint->cur_data_segno[0];
   summary->sit_j.entries[3].se.vblocks =
       CpuToLe(uint16_t{(static_cast<uint16_t>(CursegType::kCursegHotData) << 10) | 1});
-  SetValidBitmap(0, summary->sit_j.entries[3].se.valid_map);
+  summary->sit_j.entries[3].se.valid_map[0] |= GetMask(1, ToMsbFirst(0));
   summary->sit_j.entries[4].segno = checkpoint->cur_data_segno[1];
   summary->sit_j.entries[4].se.vblocks =
       CpuToLe(uint16_t{(static_cast<int>(CursegType::kCursegWarmData) << 10)});

@@ -147,7 +147,7 @@ void F2fs::CheckIndexInPrevNodes(block_t blkaddr) {
   int i;
 
   SegmentEntry &sentry = GetSegmentManager().GetSegmentEntry(segno);
-  if (!TestValidBitmap(blkoff, sentry.cur_valid_map.get())) {
+  if (!sentry.cur_valid_map.GetOne(ToMsbFirst(blkoff))) {
     return;
   }
 

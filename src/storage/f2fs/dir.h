@@ -70,9 +70,8 @@ class Dir : public VnodeF2fs, public fbl::Recyclable<Dir> {
   zx_status_t MakeEmpty(VnodeF2fs *vnode) __TA_REQUIRES(dir_mutex_);
   zx_status_t MakeEmptyInlineDir(VnodeF2fs *vnode) __TA_REQUIRES(dir_mutex_);
   void InitDentInode(VnodeF2fs *vnode, NodePage &page) __TA_REQUIRES(dir_mutex_);
-  uint32_t RoomInInlineDir(Page *ipage, uint32_t slots) __TA_REQUIRES_SHARED(dir_mutex_);
-  uint32_t RoomForFilename(DentryBlock *dentry_blk, uint32_t slots)
-      __TA_REQUIRES_SHARED(dir_mutex_);
+  size_t RoomInInlineDir(const PageBitmap &bits, size_t slots) __TA_REQUIRES_SHARED(dir_mutex_);
+  size_t RoomForFilename(const PageBitmap &bits, size_t slots) __TA_REQUIRES_SHARED(dir_mutex_);
 
   // delete
   zx_status_t Unlink(std::string_view name, bool must_be_dir) final __TA_EXCLUDES(dir_mutex_);
@@ -96,6 +95,7 @@ class Dir : public VnodeF2fs, public fbl::Recyclable<Dir> {
     return ZX_ERR_NOT_SUPPORTED;
   }
   void VmoRead(uint64_t offset, uint64_t length) final;
+  zx::result<PageBitmap> GetBitmap(fbl::RefPtr<Page> dentry_page) final;
 
  private:
   // helper

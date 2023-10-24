@@ -61,6 +61,7 @@ inline uint64_t CpuToLe(uint64_t x) { return x; }
 
 constexpr uint32_t kPageSize = PAGE_SIZE;
 constexpr uint32_t kBitsPerByte = 8;
+constexpr uint32_t kShiftForBitSize = 3;
 constexpr uint32_t kF2fsSuperMagic = 0xF2F52010;
 constexpr uint32_t kCrcPolyLe = 0xedb88320;
 constexpr size_t kWriteTimeOut = 60;  // in seconds

@@ -85,24 +85,20 @@ TEST_F(VnodeTest, Advise) {
   FileTester::Lookup(test_dir_ptr, "f2fs_lower_case.avi", &file_fs_vnode);
   fbl::RefPtr<VnodeF2fs> file_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(file_fs_vnode));
 
-  uint8_t i_advise = file_vnode->GetAdvise();
-  ASSERT_FALSE(TestBit(static_cast<int>(FAdvise::kCold), &i_advise));
+  ASSERT_FALSE(file_vnode->IsAdviseSet(FAdvise::kCold));
   ASSERT_EQ(file_vnode->Close(), ZX_OK);
 
   FileTester::CreateChild(test_dir_ptr, S_IFDIR, "f2fs_upper_case.AVI");
   FileTester::Lookup(test_dir_ptr, "f2fs_upper_case.AVI", &file_fs_vnode);
   file_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(file_fs_vnode));
 
-  i_advise = file_vnode->GetAdvise();
-  ASSERT_FALSE(TestBit(static_cast<int>(FAdvise::kCold), &i_advise));
+  ASSERT_FALSE(file_vnode->IsAdviseSet(FAdvise::kCold));
 
   test_dir_ptr->SetColdFile(*file_vnode);
-  i_advise = file_vnode->GetAdvise();
-  ASSERT_TRUE(TestBit(static_cast<int>(FAdvise::kCold), &i_advise));
+  ASSERT_TRUE(file_vnode->IsAdviseSet(FAdvise::kCold));
 
   file_vnode->ClearAdvise(FAdvise::kCold);
-  i_advise = file_vnode->GetAdvise();
-  ASSERT_FALSE(TestBit(static_cast<int>(FAdvise::kCold), &i_advise));
+  ASSERT_FALSE(file_vnode->IsAdviseSet(FAdvise::kCold));
 
   ASSERT_EQ(file_vnode->Close(), ZX_OK);
   file_vnode = nullptr;

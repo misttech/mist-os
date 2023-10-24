@@ -38,8 +38,10 @@ uint32_t SegmentManager::GetValidBlocks(uint32_t segno, uint32_t section) {
 void SegmentManager::SegInfoFromRawSit(SegmentEntry &segment_entry, SitEntry &raw_sit) {
   segment_entry.valid_blocks = GetSitVblocks(raw_sit);
   segment_entry.ckpt_valid_blocks = GetSitVblocks(raw_sit);
-  std::memcpy(segment_entry.cur_valid_map.get(), raw_sit.valid_map, kSitVBlockMapSize);
-  std::memcpy(segment_entry.ckpt_valid_map.get(), raw_sit.valid_map, kSitVBlockMapSize);
+  std::memcpy(segment_entry.cur_valid_map.StorageUnsafe()->GetData(), raw_sit.valid_map,
+              kSitVBlockMapSize);
+  std::memcpy(segment_entry.ckpt_valid_map.StorageUnsafe()->GetData(), raw_sit.valid_map,
+              kSitVBlockMapSize);
   segment_entry.type = GetSitType(raw_sit);
   segment_entry.mtime = LeToCpu(uint64_t{raw_sit.mtime});
 }
@@ -48,40 +50,46 @@ void SegmentManager::SegInfoToRawSit(SegmentEntry &segment_entry, SitEntry &raw_
   uint16_t raw_vblocks =
       static_cast<uint16_t>(segment_entry.type << kSitVblocksShift) | segment_entry.valid_blocks;
   raw_sit.vblocks = CpuToLe(raw_vblocks);
-  std::memcpy(raw_sit.valid_map, segment_entry.cur_valid_map.get(), kSitVBlockMapSize);
-  std::memcpy(segment_entry.ckpt_valid_map.get(), raw_sit.valid_map, kSitVBlockMapSize);
+  std::memcpy(raw_sit.valid_map, segment_entry.cur_valid_map.StorageUnsafe()->GetData(),
+              kSitVBlockMapSize);
+  std::memcpy(segment_entry.ckpt_valid_map.StorageUnsafe()->GetData(), raw_sit.valid_map,
+              kSitVBlockMapSize);
   segment_entry.ckpt_valid_blocks = segment_entry.valid_blocks;
   raw_sit.mtime = CpuToLe(static_cast<uint64_t>(segment_entry.mtime));
 }
 
-uint32_t SegmentManager::FindNextInuse(uint32_t max, uint32_t segno) {
-  uint32_t ret;
+uint32_t SegmentManager::FindNextInuse(uint32_t max, uint32_t start) {
   fs::SharedLock segmap_lock(free_info_->segmap_lock);
-  ret = FindNextBit(free_info_->free_segmap.get(), max, segno);
-  return ret;
+  size_t segno = start;
+  if (free_info_->free_segmap.Scan(segno, max, false, &segno)) {
+    return max;
+  }
+  return safemath::checked_cast<uint32_t>(segno);
 }
 
 void SegmentManager::SetFree(uint32_t segno) {
   uint32_t secno = segno / superblock_info_->GetSegsPerSec();
   uint32_t start_segno = secno * superblock_info_->GetSegsPerSec();
-  uint32_t next;
 
   std::lock_guard segmap_lock(free_info_->segmap_lock);
-  ClearBit(segno, free_info_->free_segmap.get());
+  free_info_->free_segmap.ClearOne(segno);
   ++free_info_->free_segments;
 
-  next = FindNextBit(free_info_->free_segmap.get(), TotalSegs(), start_segno);
-  if (next >= start_segno + superblock_info_->GetSegsPerSec()) {
-    ClearBit(secno, free_info_->free_secmap.get());
-    ++free_info_->free_sections;
+  size_t dirty_seg;
+  if (!free_info_->free_segmap.Scan(start_segno, TotalSegs(), false, &dirty_seg) &&
+      dirty_seg < start_segno + superblock_info_->GetSegsPerSec()) {
+    return;
   }
+  free_info_->free_secmap.ClearOne(secno);
+  ++free_info_->free_sections;
 }
 
 void SegmentManager::SetInuse(uint32_t segno) {
   uint32_t secno = segno / superblock_info_->GetSegsPerSec();
-  SetBit(segno, free_info_->free_segmap.get());
+  free_info_->free_segmap.SetOne(segno);
   --free_info_->free_segments;
-  if (!TestAndSetBit(secno, free_info_->free_secmap.get())) {
+  if (!free_info_->free_secmap.GetOne(secno)) {
+    free_info_->free_secmap.SetOne(secno);
     --free_info_->free_sections;
   }
 }
@@ -89,16 +97,19 @@ void SegmentManager::SetInuse(uint32_t segno) {
 void SegmentManager::SetTestAndFree(uint32_t segno) {
   uint32_t secno = segno / superblock_info_->GetSegsPerSec();
   uint32_t start_segno = secno * superblock_info_->GetSegsPerSec();
-  uint32_t next;
-
   std::lock_guard segmap_lock(free_info_->segmap_lock);
-  if (TestAndClearBit(segno, free_info_->free_segmap.get())) {
+  if (free_info_->free_segmap.GetOne(segno)) {
+    free_info_->free_segmap.ClearOne(segno);
     ++free_info_->free_segments;
 
-    next = FindNextBit(free_info_->free_segmap.get(), TotalSegs(), start_segno);
-    if (next >= start_segno + superblock_info_->GetSegsPerSec()) {
-      if (TestAndClearBit(secno, free_info_->free_secmap.get()))
-        ++free_info_->free_sections;
+    size_t next;
+    if (!free_info_->free_segmap.Scan(start_segno, TotalSegs(), false, &next)) {
+      if (next < start_segno + superblock_info_->GetSegsPerSec())
+        return;
+    }
+    if (free_info_->free_secmap.GetOne(secno)) {
+      free_info_->free_secmap.ClearOne(secno);
+      ++free_info_->free_sections;
     }
   }
 }
@@ -106,16 +117,18 @@ void SegmentManager::SetTestAndFree(uint32_t segno) {
 void SegmentManager::SetTestAndInuse(uint32_t segno) {
   uint32_t secno = segno / superblock_info_->GetSegsPerSec();
   std::lock_guard segmap_lock(free_info_->segmap_lock);
-  if (!TestAndSetBit(segno, free_info_->free_segmap.get())) {
+  if (!free_info_->free_segmap.GetOne(segno)) {
+    free_info_->free_segmap.SetOne(segno);
     --free_info_->free_segments;
-    if (!TestAndSetBit(secno, free_info_->free_secmap.get())) {
+    if (!free_info_->free_secmap.GetOne(secno)) {
+      free_info_->free_secmap.SetOne(secno);
       --free_info_->free_sections;
     }
   }
 }
 
 void SegmentManager::GetSitBitmap(void *dst_addr) {
-  std::memcpy(dst_addr, sit_info_->sit_bitmap.get(), sit_info_->bitmap_size);
+  std::memcpy(dst_addr, sit_info_->sit_bitmap.StorageUnsafe()->GetData(), sit_info_->bitmap_size);
 }
 
 block_t SegmentManager::FreeSegments() {
@@ -227,8 +240,9 @@ void SegmentManager::CheckBlockCount(uint32_t segno, SitEntry &raw_sit) {
   ZX_ASSERT(!(segno > end_segno));
 
   // check bitmap with valid block count
+  PageBitmap bits(raw_sit.valid_map, kSitVBlockMapSizeInBit);
   for (uint32_t i = 0; i < superblock_info_->GetBlocksPerSeg(); ++i) {
-    if (TestValidBitmap(i, raw_sit.valid_map))
+    if (bits.Test(ToMsbFirst(i)))
       ++valid_blocks;
   }
   ZX_ASSERT(GetSitVblocks(raw_sit) == valid_blocks);
@@ -241,7 +255,7 @@ pgoff_t SegmentManager::CurrentSitAddr(uint32_t start) {
   CheckSegRange(start);
 
   // calculate sit block address
-  if (TestValidBitmap(offset, sit_info_->sit_bitmap.get()))
+  if (sit_info_->sit_bitmap.GetOne(ToMsbFirst(offset)))
     blk_addr += sit_info_->sit_blocks;
 
   return blk_addr;
@@ -258,12 +272,11 @@ pgoff_t SegmentManager::NextSitAddr(pgoff_t block_addr) {
 }
 
 void SegmentManager::SetToNextSit(uint32_t start) {
-  uint32_t block_off = SitBlockOffset(start);
-
-  if (TestValidBitmap(block_off, sit_info_->sit_bitmap.get())) {
-    ClearValidBitmap(block_off, sit_info_->sit_bitmap.get());
+  size_t offset = ToMsbFirst(SitBlockOffset(start));
+  if (sit_info_->sit_bitmap.GetOne(offset)) {
+    sit_info_->sit_bitmap.ClearOne(offset);
   } else {
-    SetValidBitmap(block_off, sit_info_->sit_bitmap.get());
+    sit_info_->sit_bitmap.SetOne(offset);
   }
 }
 
@@ -325,30 +338,36 @@ void SegmentManager::LocateDirtySegment(uint32_t segno, DirtyType dirty_type) {
     return;
   }
 
-  if (!TestAndSetBit(segno, dirty_info_->dirty_segmap[static_cast<int>(dirty_type)].get()))
+  if (!dirty_info_->dirty_segmap[static_cast<int>(dirty_type)].GetOne(segno)) {
+    dirty_info_->dirty_segmap[static_cast<int>(dirty_type)].SetOne(segno);
     ++dirty_info_->nr_dirty[static_cast<int>(dirty_type)];
+  }
 
   if (dirty_type == DirtyType::kDirty) {
     SegmentEntry &sentry = GetSegmentEntry(segno);
     dirty_type = static_cast<DirtyType>(sentry.type);
-    if (!TestAndSetBit(segno, dirty_info_->dirty_segmap[static_cast<int>(dirty_type)].get()))
+    if (!dirty_info_->dirty_segmap[static_cast<int>(dirty_type)].GetOne(segno)) {
+      dirty_info_->dirty_segmap[static_cast<int>(dirty_type)].SetOne(segno);
       ++dirty_info_->nr_dirty[static_cast<int>(dirty_type)];
+    }
   }
 }
 
 void SegmentManager::RemoveDirtySegment(uint32_t segno, DirtyType dirty_type) {
-  if (TestAndClearBit(segno, dirty_info_->dirty_segmap[static_cast<int>(dirty_type)].get())) {
+  if (dirty_info_->dirty_segmap[static_cast<int>(dirty_type)].GetOne(segno)) {
+    dirty_info_->dirty_segmap[static_cast<int>(dirty_type)].ClearOne(segno);
     --dirty_info_->nr_dirty[static_cast<int>(dirty_type)];
   }
 
   if (dirty_type == DirtyType::kDirty) {
     SegmentEntry &sentry = GetSegmentEntry(segno);
     dirty_type = static_cast<DirtyType>(sentry.type);
-    if (TestAndClearBit(segno, dirty_info_->dirty_segmap[static_cast<int>(dirty_type)].get())) {
+    if (dirty_info_->dirty_segmap[static_cast<int>(dirty_type)].GetOne(segno)) {
+      dirty_info_->dirty_segmap[static_cast<int>(dirty_type)].ClearOne(segno);
       --dirty_info_->nr_dirty[static_cast<int>(dirty_type)];
     }
     if (GetValidBlocks(segno, superblock_info_->GetSegsPerSec()) == 0) {
-      ClearBit(GetSecNo(segno), dirty_info_->victim_secmap.get());
+      dirty_info_->victim_secmap.ClearOne(GetSecNo(segno));
     }
   }
 }
@@ -379,54 +398,43 @@ void SegmentManager::LocateDirtySegment(uint32_t segno) {
 
 // Should call clear_prefree_segments after checkpoint is done.
 void SegmentManager::SetPrefreeAsFreeSegments() {
-  uint32_t segno, offset = 0;
-  uint32_t total_segs = TotalSegs();
-
   std::lock_guard seglist_lock(dirty_info_->seglist_lock);
-
-  while (true) {
-    segno = FindNextBit(dirty_info_->dirty_segmap[static_cast<int>(DirtyType::kPre)].get(),
-                        total_segs, offset);
-    if (segno >= total_segs)
-      break;
-    SetTestAndFree(segno);
-    offset = segno + 1;
+  const size_t total_segs = TotalSegs();
+  for (size_t segno = 0; !dirty_info_->dirty_segmap[static_cast<int>(DirtyType::kPre)].Scan(
+           segno, total_segs, false, &segno);
+       ++segno) {
+    SetTestAndFree(safemath::checked_cast<uint32_t>(segno));
   }
 }
 
 void SegmentManager::ClearPrefreeSegments() {
-  uint32_t offset = 0;
-  uint32_t total_segs = TotalSegs();
+  const uint32_t total_segs = TotalSegs();
   bool need_align =
       superblock_info_->TestOpt(MountOption::kForceLfs) && superblock_info_->GetSegsPerSec() > 1;
 
   std::lock_guard seglist_lock(dirty_info_->seglist_lock);
-  while (true) {
-    uint32_t start = FindNextBit(dirty_info_->dirty_segmap[static_cast<int>(DirtyType::kPre)].get(),
-                                 total_segs, offset);
-    if (start >= total_segs) {
-      break;
-    }
-
+  for (size_t segno = 0; !dirty_info_->dirty_segmap[static_cast<int>(DirtyType::kPre)].Scan(
+           segno, total_segs, false, &segno);) {
+    uint32_t start = safemath::checked_cast<uint32_t>(segno);
     uint32_t end;
     if (need_align) {
       start = GetSecNo(start) * superblock_info_->GetSegsPerSec();
       end = start + superblock_info_->GetSegsPerSec();
-      offset = end;
     } else {
-      end = FindNextZeroBit(dirty_info_->dirty_segmap[static_cast<int>(DirtyType::kPre)].get(),
-                            total_segs, start + 1);
-      if (end > total_segs) {
-        end = total_segs;
+      if (dirty_info_->dirty_segmap[static_cast<int>(DirtyType::kPre)].Scan(start + 1, total_segs,
+                                                                            true, &segno)) {
+        segno = total_segs;
       }
-      offset = end + 1;
+      end = safemath::checked_cast<uint32_t>(segno);
     }
 
-    for (uint32_t i = start; i < end; ++i) {
-      if (TestAndClearBit(i, dirty_info_->dirty_segmap[static_cast<int>(DirtyType::kPre)].get())) {
+    for (size_t i = start; i < end; ++i) {
+      if (dirty_info_->dirty_segmap[static_cast<int>(DirtyType::kPre)].GetOne(i)) {
+        dirty_info_->dirty_segmap[static_cast<int>(DirtyType::kPre)].ClearOne(i);
         --dirty_info_->nr_dirty[static_cast<int>(DirtyType::kPre)];
       }
     }
+    segno = end;
 
     if (!superblock_info_->TestOpt(MountOption::kDiscard)) {
       continue;
@@ -438,8 +446,9 @@ void SegmentManager::ClearPrefreeSegments() {
               .ValueOrDie();
       fs_->MakeTrimOperation(StartBlock(start), num_of_blocks);
     } else {
-      // In kMountForceLfs mode, a section is reusable only when all segments of the section are
-      // free. Therefore, trim operation is performed in section unit only in this case.
+      // In kMountForceLfs mode, a section is reusable only when all
+      // segments of the section are free. Therefore, trim operation is
+      // performed in section unit only in this case.
       while (start < end) {
         uint32_t secno = GetSecNo(start);
         uint32_t start_segno =
@@ -457,8 +466,10 @@ void SegmentManager::ClearPrefreeSegments() {
 }
 
 void SegmentManager::MarkSitEntryDirty(uint32_t segno) {
-  if (!TestAndSetBit(segno, sit_info_->dirty_sentries_bitmap.get()))
+  if (!sit_info_->dirty_sentries_bitmap.GetOne(segno)) {
+    sit_info_->dirty_sentries_bitmap.SetOne(segno);
     ++sit_info_->dirty_sentries;
+  }
 }
 
 void SegmentManager::SetSitEntryType(CursegType type, uint32_t segno, int modified) {
@@ -486,13 +497,13 @@ void SegmentManager::UpdateSitEntry(block_t blkaddr, int del) {
 
   // Update valid block bitmap
   if (del > 0) {
-    if (SetValidBitmap(offset, segment_entry.cur_valid_map.get()))
-      ZX_ASSERT(0);
+    ZX_ASSERT(!segment_entry.cur_valid_map.GetOne(ToMsbFirst(offset)));
+    segment_entry.cur_valid_map.SetOne(ToMsbFirst(offset));
   } else {
-    if (!ClearValidBitmap(offset, segment_entry.cur_valid_map.get()))
-      ZX_ASSERT(0);
+    ZX_ASSERT(segment_entry.cur_valid_map.GetOne(ToMsbFirst(offset)));
+    segment_entry.cur_valid_map.ClearOne(ToMsbFirst(offset));
   }
-  if (!TestValidBitmap(offset, segment_entry.ckpt_valid_map.get()))
+  if (!segment_entry.ckpt_valid_map.GetOne(ToMsbFirst(offset)))
     segment_entry.ckpt_valid_blocks += del;
 
   MarkSitEntryDirty(segno);
@@ -576,7 +587,7 @@ void SegmentManager::WriteSumPage(SummaryBlock *sum_blk, block_t blk_addr) {
 // This function should be returned with success, otherwise BUG
 // TODO: after LFS allocation available, raise out of space event of inspect tree when new segment
 // cannot be allocated.
-void SegmentManager::GetNewSegment(uint32_t *newseg, bool new_sec, int dir) {
+void SegmentManager::GetNewSegment(uint32_t *newseg, bool new_sec, AllocDirection dir) {
   SuperblockInfo &superblock_info = fs_->GetSuperblockInfo();
   uint32_t total_secs = superblock_info.GetTotalSections();
   uint32_t segno, secno, zoneno;
@@ -584,45 +595,47 @@ void SegmentManager::GetNewSegment(uint32_t *newseg, bool new_sec, int dir) {
   uint32_t hint = *newseg / superblock_info.GetSegsPerSec();
   uint32_t old_zoneno = GetZoneNoFromSegNo(*newseg);
   uint32_t left_start = hint;
-  bool init = true;
-  int go_left = 0;
-  int i;
+  bool find_another = true;
+  bool go_left = false;
   bool got_it = false;
 
   std::lock_guard segmap_lock(free_info_->segmap_lock);
 
-  auto find_other_zone = [&]() -> bool {
-    secno = FindNextZeroBit(free_info_->free_secmap.get(), total_secs, hint);
-    if (secno >= total_secs) {
-      if (dir == static_cast<int>(AllocDirection::kAllocRight)) {
-        secno = FindNextZeroBit(free_info_->free_secmap.get(), total_secs, 0);
-        ZX_ASSERT(!(secno >= total_secs));
+  auto to_left = [&]() -> bool {
+    size_t free_sec;
+    if (free_info_->free_secmap.Scan(hint, total_secs, true, &free_sec)) {
+      if (dir == AllocDirection::kAllocRight) {
+        ZX_ASSERT(!free_info_->free_secmap.Scan(0, total_secs, true, &free_sec));
       } else {
-        go_left = 1;
+        go_left = true;
         left_start = hint - 1;
+        free_sec = total_secs;
       }
     }
-    if (go_left == 0)
-      return true;
-    return false;
+    secno = safemath::checked_cast<uint32_t>(free_sec);
+    return go_left;
   };
 
   if (!new_sec && ((*newseg + 1) % superblock_info.GetSegsPerSec())) {
-    segno = FindNextZeroBit(free_info_->free_segmap.get(), TotalSegs(), *newseg + 1);
-    if (segno < TotalSegs()) {
+    size_t free_seg;
+    if (free_info_->free_segmap.Scan(*newseg + 1, TotalSegs(), true, &free_seg)) {
+      free_seg = TotalSegs();
+    } else {
       got_it = true;
     }
+    segno = safemath::checked_cast<uint32_t>(free_seg);
   }
 
   while (!got_it) {
-    if (!find_other_zone()) {
-      while (TestBit(left_start, free_info_->free_secmap.get())) {
+    if (to_left()) {
+      while (free_info_->free_secmap.GetOne(left_start)) {
         if (left_start > 0) {
           --left_start;
           continue;
         }
-        left_start = FindNextZeroBit(free_info_->free_secmap.get(), total_secs, 0);
-        ZX_ASSERT(!(left_start >= total_secs));
+        size_t free_sec;
+        ZX_ASSERT(!free_info_->free_secmap.Scan(0, total_secs, true, &free_sec));
+        left_start = safemath::checked_cast<uint32_t>(free_sec);
         break;
       }
       secno = left_start;
@@ -633,7 +646,7 @@ void SegmentManager::GetNewSegment(uint32_t *newseg, bool new_sec, int dir) {
     zoneno = secno / superblock_info.GetSecsPerZone();
 
     // give up on finding another zone
-    if (!init) {
+    if (!find_another) {
       break;
     }
     if (superblock_info.GetSecsPerZone() == 1) {
@@ -642,7 +655,7 @@ void SegmentManager::GetNewSegment(uint32_t *newseg, bool new_sec, int dir) {
     if (zoneno == old_zoneno) {
       break;
     }
-    if (dir == static_cast<int>(AllocDirection::kAllocLeft)) {
+    if (dir == AllocDirection::kAllocLeft) {
       if (!go_left && zoneno + 1 >= total_zones) {
         break;
       }
@@ -650,28 +663,28 @@ void SegmentManager::GetNewSegment(uint32_t *newseg, bool new_sec, int dir) {
         break;
       }
     }
-    for (i = 0; i < kNrCursegType; ++i) {
+    bool is_current_zone = false;
+    for (size_t i = 0; i < kNrCursegType; ++i) {
       if (CURSEG_I(static_cast<CursegType>(i))->zone == zoneno) {
+        is_current_zone = true;
         break;
       }
     }
-
-    if (i < kNrCursegType) {
-      // zone is in user, try another
-      if (go_left) {
-        hint = zoneno * superblock_info.GetSecsPerZone() - 1;
-      } else if (zoneno + 1 >= total_zones) {
-        hint = 0;
-      } else {
-        hint = (zoneno + 1) * superblock_info.GetSecsPerZone();
-      }
-      init = false;
-      continue;
+    if (!is_current_zone) {
+      break;
     }
-    break;
+    // zone is in use, try another
+    if (go_left) {
+      hint = zoneno * superblock_info.GetSecsPerZone() - 1;
+    } else if (zoneno + 1 >= total_zones) {
+      hint = 0;
+    } else {
+      hint = (zoneno + 1) * superblock_info.GetSecsPerZone();
+    }
+    find_another = false;
   }
   // set it as dirty segment in free segmap
-  ZX_ASSERT(!TestBit(segno, free_info_->free_segmap.get()));
+  ZX_ASSERT(!free_info_->free_segmap.GetOne(segno));
   SetInuse(segno);
   *newseg = segno;
 }
@@ -700,14 +713,14 @@ void SegmentManager::NewCurseg(CursegType type, bool new_sec) {
   SuperblockInfo &superblock_info = fs_->GetSuperblockInfo();
   CursegInfo *curseg = CURSEG_I(type);
   uint32_t segno = curseg->segno;
-  int dir = static_cast<int>(AllocDirection::kAllocLeft);
+  AllocDirection dir = AllocDirection::kAllocLeft;
 
   WriteSumPage(&curseg->sum_blk, GetSumBlock(curseg->segno));
   if (type == CursegType::kCursegWarmData || type == CursegType::kCursegColdData)
-    dir = static_cast<int>(AllocDirection::kAllocRight);
+    dir = AllocDirection::kAllocRight;
 
   if (superblock_info.TestOpt(MountOption::kNoHeap))
-    dir = static_cast<int>(AllocDirection::kAllocRight);
+    dir = AllocDirection::kAllocRight;
 
   GetNewSegment(&segno, new_sec, dir);
   curseg->next_segno = segno;
@@ -720,8 +733,8 @@ void SegmentManager::NextFreeBlkoff(CursegInfo *seg, block_t start) {
   SegmentEntry &segment_entry = GetSegmentEntry(seg->segno);
   block_t ofs;
   for (ofs = start; ofs < superblock_info.GetBlocksPerSeg(); ++ofs) {
-    if (!TestValidBitmap(ofs, segment_entry.ckpt_valid_map.get()) &&
-        !TestValidBitmap(ofs, segment_entry.cur_valid_map.get()))
+    if (!segment_entry.ckpt_valid_map.GetOne(ToMsbFirst(ofs)) &&
+        !segment_entry.cur_valid_map.GetOne(ToMsbFirst(ofs)))
       break;
   }
   seg->next_blkoff = static_cast<uint16_t>(ofs);
@@ -1241,7 +1254,7 @@ zx::result<LockedPage> SegmentManager::GetCurrentSitPage(uint32_t segno) {
   CheckSegRange(segno);
 
   // calculate sit block address
-  if (TestValidBitmap(offset, sit_info_->sit_bitmap.get()))
+  if (sit_info_->sit_bitmap.GetOne(ToMsbFirst(offset)))
     blk_addr += sit_info_->sit_blocks;
 
   LockedPage locked_page;
@@ -1297,25 +1310,22 @@ bool SegmentManager::FlushSitsInJournal() {
 // CP calls this function, which flushes SIT entries including SitJournal,
 // and moves prefree segs to free segs.
 zx_status_t SegmentManager::FlushSitEntries() {
-  uint8_t *bitmap = sit_info_->dirty_sentries_bitmap.get();
+  RawBitmap &bitmap = sit_info_->dirty_sentries_bitmap;
   CursegInfo *curseg = CURSEG_I(CursegType::kCursegColdData);
   SummaryBlock *sum = &curseg->sum_blk;
   block_t nsegs = TotalSegs();
   LockedPage page;
-  SitBlock *raw_sit = nullptr;
   uint32_t start = 0, end = 0;
-  uint32_t segno = -1;
-  bool flushed;
-
   {
     std::lock_guard curseg_lock(curseg->curseg_mutex);
     std::lock_guard sentry_lock(sit_info_->sentry_lock);
 
     // "flushed" indicates whether sit entries in journal are flushed
     // to the SIT area or not.
-    flushed = FlushSitsInJournal();
+    bool flushed = FlushSitsInJournal();
 
-    while ((segno = FindNextBit(bitmap, nsegs, segno + 1)) < nsegs) {
+    for (size_t sentry = 0; !bitmap.Scan(sentry, nsegs, false, &sentry); ++sentry) {
+      uint32_t segno = safemath::checked_cast<uint32_t>(sentry);
       SegmentEntry &segment_entry = GetSegmentEntry(segno);
       uint32_t sit_offset;
       int offset = -1;
@@ -1345,13 +1355,12 @@ zx_status_t SegmentManager::FlushSitEntries() {
             return page_or.error_value();
           }
           page = std::move(*page_or);
-          raw_sit = page->GetAddress<SitBlock>();
         }
 
         // udpate entry in SIT block
-        SegInfoToRawSit(segment_entry, raw_sit->entries[sit_offset]);
+        SegInfoToRawSit(segment_entry, page->GetAddress<SitBlock>()->entries[sit_offset]);
       }
-      ClearBit(segno, bitmap);
+      bitmap.ClearOne(segno);
       --sit_info_->dirty_sentries;
     }
   }
@@ -1369,8 +1378,6 @@ zx_status_t SegmentManager::BuildSitInfo() {
   const Superblock &raw_super = superblock_info_->GetRawSuperblock();
   Checkpoint &ckpt = superblock_info_->GetCheckpoint();
   uint32_t sit_segs;
-  uint8_t *src_bitmap;
-  uint32_t bitmap_size;
 
   // allocate memory for SIT information
   sit_info_ = std::make_unique<SitInfo>();
@@ -1380,12 +1387,11 @@ zx_status_t SegmentManager::BuildSitInfo() {
     return ZX_ERR_NO_MEMORY;
   }
 
-  bitmap_size = BitmapSize(TotalSegs());
-  sit_i->dirty_sentries_bitmap = std::make_unique<uint8_t[]>(bitmap_size);
+  sit_i->dirty_sentries_bitmap.Reset(TotalSegs());
 
   for (uint32_t start = 0; start < TotalSegs(); ++start) {
-    sit_i->sentries[start].cur_valid_map = std::make_unique<uint8_t[]>(kSitVBlockMapSize);
-    sit_i->sentries[start].ckpt_valid_map = std::make_unique<uint8_t[]>(kSitVBlockMapSize);
+    sit_i->sentries[start].cur_valid_map.Reset(GetBitSize(kSitVBlockMapSize));
+    sit_i->sentries[start].ckpt_valid_map.Reset(GetBitSize(kSitVBlockMapSize));
   }
 
   if (superblock_info_->GetSegsPerSec() > 1) {
@@ -1399,11 +1405,11 @@ zx_status_t SegmentManager::BuildSitInfo() {
   sit_segs = LeToCpu(raw_super.segment_count_sit) >> 1;
 
   // setup SIT bitmap from ckeckpoint pack
-  bitmap_size = superblock_info_->BitmapSize(MetaBitmap::kSitBitmap);
-  src_bitmap = static_cast<uint8_t *>(superblock_info_->BitmapPtr(MetaBitmap::kSitBitmap));
+  uint32_t bitmap_size = superblock_info_->BitmapSize(MetaBitmap::kSitBitmap);
+  void *src_bitmap = superblock_info_->BitmapPtr(MetaBitmap::kSitBitmap);
 
-  sit_i->sit_bitmap = std::make_unique<uint8_t[]>(bitmap_size);
-  std::memcpy(sit_i->sit_bitmap.get(), src_bitmap, bitmap_size);
+  sit_i->sit_bitmap.Reset(GetBitSize(bitmap_size));
+  std::memcpy(sit_i->sit_bitmap.StorageUnsafe()->GetData(), src_bitmap, bitmap_size);
 
 #if 0  // porting needed
   /* init SIT information */
@@ -1423,20 +1429,20 @@ zx_status_t SegmentManager::BuildSitInfo() {
 }
 
 zx_status_t SegmentManager::BuildFreeSegmap() {
-  uint32_t bitmap_size, sec_bitmap_size;
-
   // allocate memory for free segmap information
   free_info_ = std::make_unique<FreeSegmapInfo>();
 
-  bitmap_size = BitmapSize(TotalSegs());
-  free_info_->free_segmap = std::make_unique<uint8_t[]>(bitmap_size);
-
-  sec_bitmap_size = BitmapSize(superblock_info_->GetTotalSections());
-  free_info_->free_secmap = std::make_unique<uint8_t[]>(sec_bitmap_size);
+  if (zx_status_t status = free_info_->free_segmap.Reset(TotalSegs()); status != ZX_OK) {
+    return status;
+  }
+  if (zx_status_t status = free_info_->free_secmap.Reset(superblock_info_->GetTotalSections());
+      status != ZX_OK) {
+    return status;
+  }
 
   // set all segments as dirty temporarily
-  memset(free_info_->free_segmap.get(), 0xff, bitmap_size);
-  memset(free_info_->free_secmap.get(), 0xff, sec_bitmap_size);
+  free_info_->free_segmap.Set(0, TotalSegs());
+  free_info_->free_secmap.Set(0, superblock_info_->GetTotalSections());
 
   // init free segmap information
   free_info_->start_segno = GetSegNoFromSeg0(main_blkaddr_);
@@ -1510,16 +1516,9 @@ void SegmentManager::InitFreeSegmap() {
 }
 
 void SegmentManager::InitDirtySegmap() {
-  uint32_t segno = 0, offset = 0;
-  uint16_t valid_blocks;
-
-  while (segno < TotalSegs()) {
-    /* find dirty segment based on free segmap */
-    segno = FindNextInuse(TotalSegs(), offset);
-    if (segno >= TotalSegs())
-      break;
-    offset = segno + 1;
-    valid_blocks = static_cast<uint16_t>(GetValidBlocks(segno, 0));
+  /* find dirty segment based on free segmap */
+  for (uint32_t segno = 0; (segno = FindNextInuse(TotalSegs(), segno)) < TotalSegs(); ++segno) {
+    size_t valid_blocks = GetValidBlocks(segno, 0);
     if (valid_blocks >= superblock_info_->GetBlocksPerSeg() || !valid_blocks) {
       continue;
     }
@@ -1528,26 +1527,15 @@ void SegmentManager::InitDirtySegmap() {
   }
 }
 
-zx_status_t SegmentManager::InitVictimSecmap() {
-  uint32_t bitmap_size = BitmapSize(superblock_info_->GetTotalSections());
-
-  dirty_info_->victim_secmap = std::make_unique<uint8_t[]>(bitmap_size);
-  return ZX_OK;
-}
-
 zx_status_t SegmentManager::BuildDirtySegmap() {
-  uint32_t bitmap_size;
-
   dirty_info_ = std::make_unique<DirtySeglistInfo>();
-  bitmap_size = BitmapSize(TotalSegs());
-
   for (uint32_t i = 0; i < static_cast<int>(DirtyType::kNrDirtytype); ++i) {
-    dirty_info_->dirty_segmap[i] = std::make_unique<uint8_t[]>(bitmap_size);
+    dirty_info_->dirty_segmap[i].Reset(TotalSegs());
     dirty_info_->nr_dirty[i] = 0;
   }
 
   InitDirtySegmap();
-  return InitVictimSecmap();
+  return dirty_info_->victim_secmap.Reset(superblock_info_->GetTotalSections());
 }
 
 // Update min, max modified time for cost-benefit GC algorithm
@@ -1610,53 +1598,18 @@ zx_status_t SegmentManager::BuildSegmentManager() {
   return ZX_OK;
 }
 
-void SegmentManager::DiscardDirtySegmap(DirtyType dirty_type) {
-  std::lock_guard seglist_lock(dirty_info_->seglist_lock);
-  dirty_info_->dirty_segmap[static_cast<int>(dirty_type)].reset();
-  dirty_info_->nr_dirty[static_cast<int>(dirty_type)] = 0;
-}
-
-void SegmentManager::DestroyVictimSecmap() { dirty_info_->victim_secmap.reset(); }
-
 void SegmentManager::DestroyDirtySegmap() {
   if (!dirty_info_)
     return;
 
-  // discard pre-free/dirty segments list
   for (int i = 0; i < static_cast<int>(DirtyType::kNrDirtytype); ++i) {
-    DiscardDirtySegmap(static_cast<DirtyType>(i));
+    std::lock_guard seglist_lock(dirty_info_->seglist_lock);
+    dirty_info_->nr_dirty[i] = 0;
   }
 
-  DestroyVictimSecmap();
   dirty_info_.reset();
 }
 
-void SegmentManager::DestroyFreeSegmap() {
-  if (!free_info_)
-    return;
-  free_info_->free_segmap.reset();
-  free_info_->free_secmap.reset();
-  free_info_.reset();
-}
-
-void SegmentManager::DestroySitInfo() {
-  if (!sit_info_)
-    return;
-
-  if (sit_info_->sentries) {
-    for (uint32_t start = 0; start < TotalSegs(); ++start) {
-      sit_info_->sentries[start].cur_valid_map.reset();
-      sit_info_->sentries[start].ckpt_valid_map.reset();
-    }
-  }
-  sit_info_->dirty_sentries_bitmap.reset();
-  sit_info_->sit_bitmap.reset();
-}
-
-void SegmentManager::DestroySegmentManager() {
-  DestroyDirtySegmap();
-  DestroyFreeSegmap();
-  DestroySitInfo();
-}
+void SegmentManager::DestroySegmentManager() { DestroyDirtySegmap(); }
 
 }  // namespace f2fs
