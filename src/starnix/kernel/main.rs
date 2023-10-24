@@ -40,7 +40,6 @@ mod dynamic_thread_spawner;
 mod execution;
 mod fs;
 mod loader;
-mod lock;
 mod logging;
 mod mm;
 mod mutable_state;
