@@ -1506,6 +1506,32 @@
             "expression": "1"
           }
         }
+      },
+      "type": {
+        "kind": "array",
+        "element_type": {
+          "kind": "primitive",
+          "subtype": "uint64",
+          "type_shape_v2": {
+            "inline_size": 8,
+            "alignment": 8,
+            "depth": 0,
+            "max_handles": 0,
+            "max_out_of_line": 0,
+            "has_padding": false,
+            "has_flexible_envelope": false
+          }
+        },
+        "element_count": 1,
+        "type_shape_v2": {
+          "inline_size": 8,
+          "alignment": 8,
+          "depth": 0,
+          "max_handles": 0,
+          "max_out_of_line": 0,
+          "has_padding": false,
+          "has_flexible_envelope": false
+        }
       }
     },
     {
@@ -1536,6 +1562,37 @@
             "expression": "2"
           }
         }
+      },
+      "type": {
+        "kind": "array",
+        "element_type": {
+          "kind": "primitive",
+          "subtype": "uint64",
+          "type_shape_v2": {
+            "inline_size": 8,
+            "alignment": 8,
+            "depth": 0,
+            "max_handles": 0,
+            "max_out_of_line": 0,
+            "has_padding": false,
+            "has_flexible_envelope": false
+          }
+        },
+        "experimental_maybe_from_alias": {
+          "name": "test.experimentalmaybefromalias/U64",
+          "args": [],
+          "nullable": false
+        },
+        "element_count": 2,
+        "type_shape_v2": {
+          "inline_size": 16,
+          "alignment": 8,
+          "depth": 0,
+          "max_handles": 0,
+          "max_out_of_line": 0,
+          "has_padding": false,
+          "has_flexible_envelope": false
+        }
       }
     },
     {
@@ -1556,6 +1613,32 @@
           }
         ],
         "nullable": false
+      },
+      "type": {
+        "kind": "vector",
+        "element_type": {
+          "kind": "primitive",
+          "subtype": "uint8",
+          "type_shape_v2": {
+            "inline_size": 1,
+            "alignment": 1,
+            "depth": 0,
+            "max_handles": 0,
+            "max_out_of_line": 0,
+            "has_padding": false,
+            "has_flexible_envelope": false
+          }
+        },
+        "nullable": false,
+        "type_shape_v2": {
+          "inline_size": 16,
+          "alignment": 8,
+          "depth": 1,
+          "max_handles": 0,
+          "max_out_of_line": 4294967295,
+          "has_padding": true,
+          "has_flexible_envelope": false
+        }
       }
     },
     {
@@ -1576,6 +1659,21 @@
           }
         ],
         "nullable": true
+      },
+      "type": {
+        "kind": "request",
+        "subtype": "test.experimentalmaybefromalias/MyProtocol",
+        "nullable": true,
+        "protocol_transport": "Channel",
+        "type_shape_v2": {
+          "inline_size": 4,
+          "alignment": 4,
+          "depth": 0,
+          "max_handles": 1,
+          "max_out_of_line": 0,
+          "has_padding": false,
+          "has_flexible_envelope": false
+        }
       }
     },
     {
@@ -1590,6 +1688,19 @@
         "name": "string",
         "args": [],
         "nullable": false
+      },
+      "type": {
+        "kind": "string",
+        "nullable": false,
+        "type_shape_v2": {
+          "inline_size": 16,
+          "alignment": 8,
+          "depth": 1,
+          "max_handles": 0,
+          "max_out_of_line": 4294967295,
+          "has_padding": true,
+          "has_flexible_envelope": false
+        }
       }
     },
     {
@@ -1620,6 +1731,38 @@
             "expression": "2"
           }
         }
+      },
+      "type": {
+        "kind": "vector",
+        "element_type": {
+          "kind": "primitive",
+          "subtype": "uint64",
+          "type_shape_v2": {
+            "inline_size": 8,
+            "alignment": 8,
+            "depth": 0,
+            "max_handles": 0,
+            "max_out_of_line": 0,
+            "has_padding": false,
+            "has_flexible_envelope": false
+          }
+        },
+        "experimental_maybe_from_alias": {
+          "name": "test.experimentalmaybefromalias/U64",
+          "args": [],
+          "nullable": false
+        },
+        "maybe_element_count": 2,
+        "nullable": false,
+        "type_shape_v2": {
+          "inline_size": 16,
+          "alignment": 8,
+          "depth": 1,
+          "max_handles": 0,
+          "max_out_of_line": 16,
+          "has_padding": false,
+          "has_flexible_envelope": false
+        }
       }
     },
     {
@@ -1634,6 +1777,19 @@
         "name": "uint64",
         "args": [],
         "nullable": false
+      },
+      "type": {
+        "kind": "primitive",
+        "subtype": "uint64",
+        "type_shape_v2": {
+          "inline_size": 8,
+          "alignment": 8,
+          "depth": 0,
+          "max_handles": 0,
+          "max_out_of_line": 0,
+          "has_padding": false,
+          "has_flexible_envelope": false
+        }
       }
     },
     {
@@ -1654,6 +1810,32 @@
           }
         ],
         "nullable": true
+      },
+      "type": {
+        "kind": "vector",
+        "element_type": {
+          "kind": "primitive",
+          "subtype": "uint64",
+          "type_shape_v2": {
+            "inline_size": 8,
+            "alignment": 8,
+            "depth": 0,
+            "max_handles": 0,
+            "max_out_of_line": 0,
+            "has_padding": false,
+            "has_flexible_envelope": false
+          }
+        },
+        "nullable": true,
+        "type_shape_v2": {
+          "inline_size": 16,
+          "alignment": 8,
+          "depth": 1,
+          "max_handles": 0,
+          "max_out_of_line": 4294967295,
+          "has_padding": false,
+          "has_flexible_envelope": false
+        }
       }
     }
   ],

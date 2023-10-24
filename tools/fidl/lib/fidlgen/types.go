@@ -1161,6 +1161,9 @@ func (rl resourceableLayoutDecl) GetResourceness() Resourceness {
 // Alias represents the declaration of a FIDL alias.
 type Alias struct {
 	decl
+	Type       Type                    `json:"type"`
+	MaybeAlias *PartialTypeConstructor `json:"experimental_maybe_from_alias,omitempty"`
+	// TODO(fxbug.dev/7807): Remove PartialTypeConstructor.
 	PartialTypeConstructor PartialTypeConstructor `json:"partial_type_ctor"`
 }
 

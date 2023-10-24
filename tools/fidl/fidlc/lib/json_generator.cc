@@ -854,7 +854,9 @@ void JSONGenerator::Generate(const flat::Alias& value) {
     GenerateObjectMember("location", NameSpan(value.name));
     if (!value.attributes->Empty())
       GenerateObjectMember("maybe_attributes", value.attributes);
+    // TODO(fxbug.dev/7807): Remove "partial_type_ctor".
     GenerateObjectMember("partial_type_ctor", value.partial_type_ctor);
+    GenerateTypeAndFromAlias(value.partial_type_ctor.get());
   });
 }
 

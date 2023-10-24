@@ -1662,6 +1662,10 @@
                 "^experimental_": {}
             },
             "properties": {
+                "experimental_maybe_from_alias": {
+                    "$ref": "#/definitions/partial-type-ctor",
+                    "description": "If provided, an alias for the corresponding type used in the definition"
+                },
                 "location": {
                     "$ref": "#/definitions/location",
                     "description": "Source location of the declaration"
@@ -1676,13 +1680,18 @@
                 },
                 "partial_type_ctor": {
                     "$ref": "#/definitions/partial-type-ctor",
-                    "description": "Type constructor being aliased, possibly partial"
+                    "description": "(Deprecated) Type constructor being aliased, possibly partial"
+                },
+                "type": {
+                    "$ref": "#/definitions/type",
+                    "description": "The type that the alias refers to"
                 }
             },
             "required": [
                 "location",
                 "name",
-                "partial_type_ctor"
+                "partial_type_ctor",
+                "type"
             ],
             "type": "object"
         },

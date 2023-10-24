@@ -1368,6 +1368,23 @@
         "name": "zx/Handle",
         "args": [],
         "nullable": false
+      },
+      "type": {
+        "kind": "handle",
+        "obj_type": 0,
+        "subtype": "handle",
+        "rights": 2147483648,
+        "nullable": false,
+        "resource_identifier": "zx/Handle",
+        "type_shape_v2": {
+          "inline_size": 4,
+          "alignment": 4,
+          "depth": 0,
+          "max_handles": 1,
+          "max_out_of_line": 0,
+          "has_padding": false,
+          "has_flexible_envelope": false
+        }
       }
     },
     {
@@ -1388,6 +1405,23 @@
           "expression": "zx.Rights.DUPLICATE",
           "identifier": "zx/Rights.DUPLICATE"
         }
+      },
+      "type": {
+        "kind": "handle",
+        "obj_type": 3,
+        "subtype": "vmo",
+        "rights": 1,
+        "nullable": false,
+        "resource_identifier": "zx/Handle",
+        "type_shape_v2": {
+          "inline_size": 4,
+          "alignment": 4,
+          "depth": 0,
+          "max_handles": 1,
+          "max_out_of_line": 0,
+          "has_padding": false,
+          "has_flexible_envelope": false
+        }
       }
     },
     {
@@ -1402,6 +1436,23 @@
         "name": "zx/Handle",
         "args": [],
         "nullable": false
+      },
+      "type": {
+        "kind": "handle",
+        "obj_type": 3,
+        "subtype": "vmo",
+        "rights": 2147483648,
+        "nullable": false,
+        "resource_identifier": "zx/Handle",
+        "type_shape_v2": {
+          "inline_size": 4,
+          "alignment": 4,
+          "depth": 0,
+          "max_handles": 1,
+          "max_out_of_line": 0,
+          "has_padding": false,
+          "has_flexible_envelope": false
+        }
       }
     }
   ],

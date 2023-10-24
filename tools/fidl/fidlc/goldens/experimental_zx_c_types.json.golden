@@ -386,6 +386,19 @@
         "name": "uchar",
         "args": [],
         "nullable": false
+      },
+      "type": {
+        "kind": "primitive",
+        "subtype": "uchar",
+        "type_shape_v2": {
+          "inline_size": 1,
+          "alignment": 1,
+          "depth": 0,
+          "max_handles": 0,
+          "max_out_of_line": 0,
+          "has_padding": false,
+          "has_flexible_envelope": false
+        }
       }
     },
     {
@@ -406,6 +419,31 @@
           }
         ],
         "nullable": false
+      },
+      "type": {
+        "kind": "experimental_pointer",
+        "pointee_type": {
+          "kind": "primitive",
+          "subtype": "uint32",
+          "type_shape_v2": {
+            "inline_size": 4,
+            "alignment": 4,
+            "depth": 0,
+            "max_handles": 0,
+            "max_out_of_line": 0,
+            "has_padding": false,
+            "has_flexible_envelope": false
+          }
+        },
+        "type_shape_v2": {
+          "inline_size": 8,
+          "alignment": 8,
+          "depth": 1,
+          "max_handles": 0,
+          "max_out_of_line": 0,
+          "has_padding": false,
+          "has_flexible_envelope": false
+        }
       }
     },
     {
@@ -420,6 +458,19 @@
         "name": "uintptr64",
         "args": [],
         "nullable": false
+      },
+      "type": {
+        "kind": "primitive",
+        "subtype": "uintptr64",
+        "type_shape_v2": {
+          "inline_size": 8,
+          "alignment": 8,
+          "depth": 0,
+          "max_handles": 0,
+          "max_out_of_line": 0,
+          "has_padding": false,
+          "has_flexible_envelope": false
+        }
       }
     },
     {
@@ -434,6 +485,19 @@
         "name": "usize64",
         "args": [],
         "nullable": false
+      },
+      "type": {
+        "kind": "primitive",
+        "subtype": "usize64",
+        "type_shape_v2": {
+          "inline_size": 8,
+          "alignment": 8,
+          "depth": 0,
+          "max_handles": 0,
+          "max_out_of_line": 0,
+          "has_padding": false,
+          "has_flexible_envelope": false
+        }
       }
     }
   ],
