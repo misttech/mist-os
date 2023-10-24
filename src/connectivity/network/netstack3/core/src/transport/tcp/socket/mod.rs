@@ -3401,12 +3401,11 @@ mod tests {
     use crate::{
         context::{
             testutil::{
-                FakeCounterCtx, FakeFrameCtx, FakeInstant, FakeInstantCtx,
-                FakeLinkResolutionNotifier, FakeNetwork, FakeNetworkContext, FakeTimerCtx,
-                InstantAndData, PendingFrameData, StepResult, WithFakeFrameContext,
-                WithFakeTimerContext, WrappedFakeSyncCtx,
+                FakeFrameCtx, FakeInstant, FakeInstantCtx, FakeLinkResolutionNotifier, FakeNetwork,
+                FakeNetworkContext, FakeTimerCtx, InstantAndData, PendingFrameData, StepResult,
+                WithFakeFrameContext, WithFakeTimerContext, WrappedFakeSyncCtx,
             },
-            CounterContext2, InstantContext as _, SendFrameContext,
+            CounterContext, InstantContext as _, SendFrameContext,
         },
         device::{
             link::LinkDevice,
@@ -3549,7 +3548,6 @@ mod tests {
     struct TcpNonSyncCtx<D: FakeStrongDeviceId> {
         rng: FakeCryptoRng<XorShiftRng>,
         timers: FakeTimerCtx<TimerId<D::Weak, Self>>,
-        counters: FakeCounterCtx,
     }
 
     impl<D: LinkDevice + FakeStrongDeviceId> LinkResolutionContext<D> for TcpNonSyncCtx<D> {
@@ -3591,12 +3589,6 @@ mod tests {
         }
     }
 
-    impl<D: FakeStrongDeviceId> AsMut<FakeCounterCtx> for TcpNonSyncCtx<D> {
-        fn as_mut(&mut self) -> &mut FakeCounterCtx {
-            &mut self.counters
-        }
-    }
-
     impl<D: FakeStrongDeviceId> DeviceSocketTypes for TcpNonSyncCtx<D> {
         type SocketState = ();
     }
@@ -3635,7 +3627,7 @@ mod tests {
         }
     }
 
-    impl<I: TcpTestIpExt, D: FakeStrongDeviceId, C: TcpBindingsTypes> CounterContext2<IpCounters<I>>
+    impl<I: TcpTestIpExt, D: FakeStrongDeviceId, C: TcpBindingsTypes> CounterContext<IpCounters<I>>
         for TcpSyncCtx<I, D, C>
     {
         fn with_counters<O, F: FnOnce(&IpCounters<I>) -> O>(&self, cb: F) -> O {

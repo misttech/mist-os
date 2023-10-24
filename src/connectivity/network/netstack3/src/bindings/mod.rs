@@ -68,8 +68,8 @@ use net_types::{
 use netstack3_core::{
     add_ip_addr_subnet,
     context::{
-        CounterContext, EventContext, InstantBindingsTypes, InstantContext, RngContext,
-        TimerContext, TracingContext,
+        EventContext, InstantBindingsTypes, InstantContext, RngContext, TimerContext,
+        TracingContext,
     },
     device::{
         loopback::LoopbackDeviceId, update_ipv4_configuration, update_ipv6_configuration, DeviceId,
@@ -393,8 +393,6 @@ impl InstantContext for BindingsNonSyncCtxImpl {
         StackTime(fasync::Time::now())
     }
 }
-
-impl CounterContext for BindingsNonSyncCtxImpl {}
 
 impl TracingContext for BindingsNonSyncCtxImpl {
     type DurationScope = fuchsia_trace::DurationScope<'static>;

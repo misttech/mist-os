@@ -53,8 +53,8 @@ use crate::{
             FakeFrameCtx, FakeInstant, FakeNetworkContext, FakeTimerCtx, WithFakeFrameContext,
             WithFakeTimerContext,
         },
-        CounterContext, EventContext, InstantBindingsTypes, InstantContext, RngContext,
-        TimerContext, TracingContext,
+        EventContext, InstantBindingsTypes, InstantContext, RngContext, TimerContext,
+        TracingContext,
     },
     device::{
         ethernet, link::LinkDevice, loopback::LoopbackDeviceId, DeviceId,
@@ -418,12 +418,6 @@ impl WithFakeTimerContext<TimerId<FakeNonSyncCtx>> for FakeNonSyncCtx {
     }
 }
 
-impl CounterContext for FakeNonSyncCtx {
-    fn increment_debug_counter(&mut self, key: &'static str) {
-        self.with_inner_mut(|ctx| ctx.increment_debug_counter(key));
-    }
-}
-
 impl InstantBindingsTypes for FakeNonSyncCtx {
     type Instant = FakeInstant;
 }
@@ -669,12 +663,6 @@ pub(crate) fn set_logger_for_test() {
         // Ignore errors caused by some other test invocation having already set
         // the global default subscriber.
     })
-}
-
-/// Get the counter value for a `key`.
-#[cfg(test)]
-pub(crate) fn get_counter_val(ctx: &FakeNonSyncCtx, key: &str) -> usize {
-    ctx.with_inner(|ctx| ctx.counter_ctx().get_counter_val(key))
 }
 
 /// An extension trait for `Ip` providing test-related functionality.

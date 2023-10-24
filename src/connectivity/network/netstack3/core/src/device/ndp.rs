@@ -173,9 +173,9 @@ mod tests {
             SendIpPacketMeta,
         },
         testutil::{
-            assert_empty, get_counter_val, handle_timer, set_logger_for_test, Ctx,
-            FakeEventDispatcherBuilder, FakeNonSyncCtx, TestIpExt, DEFAULT_INTERFACE_METRIC,
-            FAKE_CONFIG_V6, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            assert_empty, handle_timer, set_logger_for_test, Ctx, FakeEventDispatcherBuilder,
+            FakeNonSyncCtx, TestIpExt, DEFAULT_INTERFACE_METRIC, FAKE_CONFIG_V6,
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
         Instant, NonSyncContext, SyncCtx, TimerId, TimerIdInner,
     };
@@ -1079,7 +1079,7 @@ mod tests {
             FrameDestination::Multicast,
             icmpv6_packet_buf,
         );
-        assert_eq!(get_counter_val(&non_sync_ctx, "ndp::rx_router_solicitation"), 0);
+        assert_eq!(sync_ctx.state.get_ndp_counters().rx_router_solicitation.get(), 0);
     }
 
     #[test]

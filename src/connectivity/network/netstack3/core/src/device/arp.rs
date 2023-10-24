@@ -18,7 +18,7 @@ use packet_formats::{
 use tracing::{debug, trace, warn};
 
 use crate::{
-    context::{CounterContext, SendFrameContext, TimerContext, TracingContext},
+    context::{SendFrameContext, TimerContext, TracingContext},
     device::{link::LinkDevice, DeviceIdContext, FrameDestination},
     ip::device::nud::{
         BufferNudContext, BufferNudSenderContext, ConfirmationFlags, DynamicNeighborUpdateSource,
@@ -105,17 +105,14 @@ pub(crate) trait BufferArpSenderContext<
 
 /// The non-synchronized execution context for the ARP protocol.
 pub(crate) trait ArpNonSyncCtx<D: ArpDevice, DeviceId>:
-    TimerContext<ArpTimerId<D, DeviceId>> + CounterContext + TracingContext + LinkResolutionContext<D>
+    TimerContext<ArpTimerId<D, DeviceId>> + TracingContext + LinkResolutionContext<D>
 {
 }
 
 impl<
         DeviceId,
         D: ArpDevice,
-        C: TimerContext<ArpTimerId<D, DeviceId>>
-            + CounterContext
-            + TracingContext
-            + LinkResolutionContext<D>,
+        C: TimerContext<ArpTimerId<D, DeviceId>> + TracingContext + LinkResolutionContext<D>,
     > ArpNonSyncCtx<D, DeviceId> for C
 {
 }

@@ -261,25 +261,12 @@ pub trait SendFrameContext<C, B: BufferMut, Meta> {
     ) -> Result<(), S>;
 }
 
-/// A context that stores performance counters.
-///
-/// `CounterContext` exposes access to named counters for observation and
-/// debugging.
-pub trait CounterContext {
-    /// Increment the debug counter with the given key.
-    ///
-    /// This should not be relied on except in testing environments. The default
-    /// no-op implementation is expected to be optimized out completely by the
-    /// compiler.
-    fn increment_debug_counter(&mut self, _key: &'static str) {}
-}
-
 /// A context that stores counters.
 ///
 /// `CounterContext` exposes access to counters for observation and debugging.
 // TODO(http://fxbug.dev/134635): rename CounterContext once the deprecated
 // trait of that name is removed.
-pub(crate) trait CounterContext2<T> {
+pub(crate) trait CounterContext<T> {
     /// Call the function with an immutable reference to counter type T.
     fn with_counters<O, F: FnOnce(&T) -> O>(&self, cb: F) -> O;
 }
@@ -319,16 +306,9 @@ pub trait TracingContext {
 /// will take care of the rest.
 #[cfg(any(test, feature = "testutils"))]
 pub mod testutil {
+    use alloc::{boxed::Box, collections::BinaryHeap, format, string::String, sync::Arc, vec::Vec};
     #[cfg(test)]
-    use alloc::vec;
-    use alloc::{
-        boxed::Box,
-        collections::{BinaryHeap, HashMap},
-        format,
-        string::String,
-        sync::Arc,
-        vec::Vec,
-    };
+    use alloc::{collections::HashMap, vec};
     use core::{
         convert::Infallible as Never,
         fmt::{self, Debug, Formatter},
@@ -1099,32 +1079,6 @@ pub mod testutil {
         }
     }
 
-    /// A fake [`CounterContext`].
-    #[derive(Default)]
-    pub struct FakeCounterCtx {
-        counters: HashMap<&'static str, usize>,
-    }
-
-    impl FakeCounterCtx {
-        #[cfg(test)]
-        pub(crate) fn get_counter_val(&self, key: &str) -> usize {
-            *self.counters.get(key).unwrap_or(&0)
-        }
-    }
-
-    impl CounterContext for FakeCounterCtx {
-        fn increment_debug_counter(&mut self, key: &'static str) {
-            let val = self.counters.entry(key).or_insert(0);
-            *val += 1;
-        }
-    }
-
-    impl<T: AsMut<FakeCounterCtx>> CounterContext for T {
-        fn increment_debug_counter(&mut self, key: &'static str) {
-            self.as_mut().increment_debug_counter(key);
-        }
-    }
-
     /// A fake [`TracingContext`].
     #[derive(Default)]
     pub struct FakeTracingCtx;
@@ -1142,7 +1096,6 @@ pub mod testutil {
         pub(crate) timers: FakeTimerCtx<TimerId>,
         pub(crate) events: FakeEventCtx<Event>,
         pub(crate) frames: FakeFrameCtx<EthernetWeakDeviceId<crate::testutil::FakeNonSyncCtx>>,
-        pub(crate) counters: FakeCounterCtx,
         state: State,
     }
 
@@ -1153,7 +1106,6 @@ pub mod testutil {
                 timers: FakeTimerCtx::default(),
                 events: FakeEventCtx::default(),
                 frames: FakeFrameCtx::default(),
-                counters: FakeCounterCtx::default(),
                 state: Default::default(),
             }
         }
@@ -1211,11 +1163,6 @@ pub mod testutil {
         pub(crate) fn state_mut(&mut self) -> &mut State {
             &mut self.state
         }
-
-        #[cfg(test)]
-        pub(crate) fn counter_ctx(&self) -> &FakeCounterCtx {
-            &self.counters
-        }
     }
 
     impl<TimerId, Event: Debug, State> RngContext for FakeNonSyncCtx<TimerId, Event, State> {
@@ -1229,12 +1176,6 @@ pub mod testutil {
     impl<Id, Event: Debug, State> AsRef<FakeInstantCtx> for FakeNonSyncCtx<Id, Event, State> {
         fn as_ref(&self) -> &FakeInstantCtx {
             self.timers.as_ref()
-        }
-    }
-
-    impl<Id, Event: Debug, State> AsMut<FakeCounterCtx> for FakeNonSyncCtx<Id, Event, State> {
-        fn as_mut(&mut self) -> &mut FakeCounterCtx {
-            &mut self.counters
         }
     }
 

@@ -36,10 +36,7 @@ use tracing::trace;
 pub(crate) use crate::socket::datagram::IpExt;
 use crate::{
     algorithm::{PortAlloc, PortAllocImpl, ProtocolFlowId},
-    context::{
-        CounterContext, CounterContext2, InstantContext, NonTestCtxMarker, RngContext,
-        TracingContext,
-    },
+    context::{CounterContext, InstantContext, NonTestCtxMarker, RngContext, TracingContext},
     convert::BidirectionalConverter,
     counters::Counter,
     data_structures::socketmap::{IterShadows as _, SocketMap, Tagged},
@@ -181,7 +178,7 @@ impl<C: crate::NonSyncContext, I: Ip> UnlockedAccess<crate::lock_ordering::UdpCo
     }
 }
 
-impl<NonSyncCtx: crate::NonSyncContext, I: Ip, L> CounterContext2<UdpCounters<I>>
+impl<NonSyncCtx: crate::NonSyncContext, I: Ip, L> CounterContext<UdpCounters<I>>
     for Locked<&SyncCtx<NonSyncCtx>, L>
 {
     fn with_counters<O, F: FnOnce(&UdpCounters<I>) -> O>(&self, cb: F) -> O {
@@ -964,13 +961,11 @@ pub trait NonSyncContext<I: IcmpIpExt> {
 
 /// The non-synchronized context for UDP.
 pub(crate) trait StateNonSyncContext<I: IpExt>:
-    InstantContext + RngContext + CounterContext + TracingContext + NonSyncContext<I>
+    InstantContext + RngContext + TracingContext + NonSyncContext<I>
 {
 }
-impl<
-        I: IpExt,
-        C: InstantContext + RngContext + CounterContext + TracingContext + NonSyncContext<I>,
-    > StateNonSyncContext<I> for C
+impl<I: IpExt, C: InstantContext + RngContext + TracingContext + NonSyncContext<I>>
+    StateNonSyncContext<I> for C
 {
 }
 
@@ -1193,7 +1188,7 @@ pub(crate) enum UdpIpTransportContext {}
 impl<
         I: IpExt,
         C: StateNonSyncContext<I> + StateNonSyncContext<I::OtherVersion>,
-        SC: StateContext<I, C> + CounterContext2<UdpCounters<I>>,
+        SC: StateContext<I, C> + CounterContext<UdpCounters<I>>,
     > IpTransportContext<I, C, SC> for UdpIpTransportContext
 {
     fn receive_icmp_error(
@@ -1505,7 +1500,7 @@ impl<
         SC: BufferStateContext<I, C, B>
             + BufferStateContext<I::OtherVersion, C, B>
             + NonTestCtxMarker
-            + CounterContext2<UdpCounters<I>>,
+            + CounterContext<UdpCounters<I>>,
     > BufferIpTransportContext<I, C, SC, B> for UdpIpTransportContext
 {
     fn receive_ip_packet(
@@ -3177,7 +3172,7 @@ mod tests {
     type FakeUdpSyncCtx<D> =
         Wrapped<DualStackSocketsState<FakeWeakDeviceId<D>>, FakeUdpInnerSyncCtx<D>>;
 
-    impl<I: Ip, D: FakeStrongDeviceId> CounterContext2<UdpCounters<I>> for FakeUdpSyncCtx<D> {
+    impl<I: Ip, D: FakeStrongDeviceId> CounterContext<UdpCounters<I>> for FakeUdpSyncCtx<D> {
         fn with_counters<O, F: FnOnce(&UdpCounters<I>) -> O>(&self, cb: F) -> O {
             cb(&self.outer.get_udp_counters())
         }

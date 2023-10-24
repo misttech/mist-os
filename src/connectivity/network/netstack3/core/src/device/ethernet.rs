@@ -35,8 +35,8 @@ use tracing::trace;
 
 use crate::{
     context::{
-        CounterContext, CounterContext2, InstantBindingsTypes, RecvFrameContext, RngContext,
-        SendFrameContext, TimerContext, TimerHandler,
+        CounterContext, InstantBindingsTypes, RecvFrameContext, RngContext, SendFrameContext,
+        TimerContext, TimerHandler,
     },
     data_structures::ref_counted_hash_map::{InsertResult, RefCountedHashSet, RemoveResult},
     device::{
@@ -78,10 +78,10 @@ const ETHERNET_HDR_LEN_NO_TAG_U32: u32 = ETHERNET_HDR_LEN_NO_TAG as u32;
 
 /// The non-synchronized execution context for an Ethernet device.
 pub(crate) trait EthernetIpLinkDeviceNonSyncContext<DeviceId>:
-    CounterContext + RngContext + TimerContext<EthernetTimerId<DeviceId>>
+    RngContext + TimerContext<EthernetTimerId<DeviceId>>
 {
 }
-impl<DeviceId, C: CounterContext + RngContext + TimerContext<EthernetTimerId<DeviceId>>>
+impl<DeviceId, C: RngContext + TimerContext<EthernetTimerId<DeviceId>>>
     EthernetIpLinkDeviceNonSyncContext<DeviceId> for C
 {
 }
@@ -837,7 +837,7 @@ pub(super) fn send_ip_frame<
     SC: EthernetIpLinkDeviceDynamicStateContext<C>
         + BufferNudHandler<B, A::Version, EthernetLinkDevice, C>
         + BufferTransmitQueueHandler<EthernetLinkDevice, B, C, Meta = ()>
-        + CounterContext2<DeviceCounters>,
+        + CounterContext<DeviceCounters>,
     A: IpAddress,
     S: Serializer<Buffer = B>,
 >(
@@ -1422,9 +1422,8 @@ mod tests {
             testutil::is_in_ip_multicast,
         },
         testutil::{
-            add_arp_or_ndp_table_entry, assert_empty, get_counter_val, new_rng, Ctx,
-            FakeEventDispatcherBuilder, TestIpExt, DEFAULT_INTERFACE_METRIC, FAKE_CONFIG_V4,
-            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            add_arp_or_ndp_table_entry, assert_empty, new_rng, Ctx, FakeEventDispatcherBuilder,
+            TestIpExt, DEFAULT_INTERFACE_METRIC, FAKE_CONFIG_V4, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
     };
 
@@ -1475,7 +1474,7 @@ mod tests {
         }
     }
 
-    impl CounterContext2<DeviceCounters> for FakeCtx {
+    impl CounterContext<DeviceCounters> for FakeCtx {
         fn with_counters<O, F: FnOnce(&DeviceCounters) -> O>(&self, cb: F) -> O {
             cb(&self.as_ref().state.counters)
         }
@@ -2545,7 +2544,7 @@ mod tests {
         let addr_sub1 = AddrSubnet::new(ip1.get(), 64).unwrap();
         let addr_sub2 = AddrSubnet::new(ip2.get(), 64).unwrap();
 
-        assert_eq!(get_counter_val(&non_sync_ctx, "dispatch_receive_ip_packet"), 0);
+        assert_eq!(sync_ctx.state.get_ip_counters::<Ipv6>().dispatch_receive_ip_packet.get(), 0);
 
         // Add ip1 to the device.
         //

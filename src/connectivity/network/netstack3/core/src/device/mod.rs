@@ -34,7 +34,7 @@ use smallvec::SmallVec;
 use tracing::{debug, trace};
 
 use crate::{
-    context::{CounterContext2, InstantBindingsTypes, InstantContext, RecvFrameContext},
+    context::{CounterContext, InstantBindingsTypes, InstantContext, RecvFrameContext},
     counters::Counter,
     device::{
         ethernet::{
@@ -425,7 +425,7 @@ impl<C: NonSyncContext> UnlockedAccess<crate::lock_ordering::DeviceCounters> for
     }
 }
 
-impl<NonSyncCtx: NonSyncContext, L> CounterContext2<DeviceCounters>
+impl<NonSyncCtx: NonSyncContext, L> CounterContext<DeviceCounters>
     for Locked<&SyncCtx<NonSyncCtx>, L>
 {
     fn with_counters<O, F: FnOnce(&DeviceCounters) -> O>(&self, cb: F) -> O {

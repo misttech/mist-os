@@ -48,7 +48,7 @@ use zerocopy::ByteSlice;
 
 use crate::{
     algorithm::{PortAlloc, PortAllocImpl},
-    context::{CounterContext, CounterContext2, InstantContext, RngContext},
+    context::{CounterContext, InstantContext, RngContext},
     counters::Counter,
     data_structures::{socketmap::IterShadows as _, token_bucket::TokenBucket},
     device::{FrameDestination, Id, WeakId},
@@ -237,6 +237,9 @@ pub(crate) struct NdpCounters {
     pub(crate) rx_neighbor_advertisement: Counter,
     /// Count of router advertisement messages received.
     pub(crate) rx_router_advertisement: Counter,
+    #[cfg(test)]
+    /// Count of router solicitation messages received.
+    pub(crate) rx_router_solicitation: Counter,
 }
 
 impl<C: NonSyncContext, I: Ip> UnlockedAccess<crate::lock_ordering::IcmpTxCounters<I>>
@@ -250,7 +253,7 @@ impl<C: NonSyncContext, I: Ip> UnlockedAccess<crate::lock_ordering::IcmpTxCounte
     }
 }
 
-impl<NonSyncCtx: NonSyncContext, I: Ip, L> CounterContext2<IcmpTxCounters<I>>
+impl<NonSyncCtx: NonSyncContext, I: Ip, L> CounterContext<IcmpTxCounters<I>>
     for Locked<&SyncCtx<NonSyncCtx>, L>
 {
     fn with_counters<O, F: FnOnce(&IcmpTxCounters<I>) -> O>(&self, cb: F) -> O {
@@ -269,7 +272,7 @@ impl<C: NonSyncContext, I: Ip> UnlockedAccess<crate::lock_ordering::IcmpRxCounte
     }
 }
 
-impl<NonSyncCtx: NonSyncContext, I: Ip, L> CounterContext2<IcmpRxCounters<I>>
+impl<NonSyncCtx: NonSyncContext, I: Ip, L> CounterContext<IcmpRxCounters<I>>
     for Locked<&SyncCtx<NonSyncCtx>, L>
 {
     fn with_counters<O, F: FnOnce(&IcmpRxCounters<I>) -> O>(&self, cb: F) -> O {
@@ -286,7 +289,7 @@ impl<C: NonSyncContext> UnlockedAccess<crate::lock_ordering::NdpCounters> for Sy
     }
 }
 
-impl<NonSyncCtx: NonSyncContext, L> CounterContext2<NdpCounters>
+impl<NonSyncCtx: NonSyncContext, L> CounterContext<NdpCounters>
     for Locked<&SyncCtx<NonSyncCtx>, L>
 {
     fn with_counters<O, F: FnOnce(&NdpCounters) -> O>(&self, cb: F) -> O {
@@ -560,7 +563,7 @@ pub(crate) trait BufferIcmpHandler<I: IcmpHandlerIpExt, C, B: BufferMut>:
 impl<
         B: BufferMut,
         C: BufferIcmpNonSyncCtx<Ipv4, B>,
-        SC: InnerBufferIcmpv4Context<C, B> + CounterContext2<IcmpTxCounters<Ipv4>>,
+        SC: InnerBufferIcmpv4Context<C, B> + CounterContext<IcmpTxCounters<Ipv4>>,
     > BufferIcmpHandler<Ipv4, C, B> for SC
 {
     fn send_icmp_error_message(
@@ -642,7 +645,7 @@ impl<
 impl<
         B: BufferMut,
         C: BufferIcmpNonSyncCtx<Ipv6, B>,
-        SC: InnerBufferIcmpv6Context<C, B> + CounterContext2<IcmpTxCounters<Ipv6>>,
+        SC: InnerBufferIcmpv6Context<C, B> + CounterContext<IcmpTxCounters<Ipv6>>,
     > BufferIcmpHandler<Ipv6, C, B> for SC
 {
     fn send_icmp_error_message(
@@ -757,13 +760,10 @@ pub trait BufferIcmpContext<I: IcmpIpExt, B: BufferMut>: IcmpContext<I> {
 
 /// The non-synchronized execution context shared by both ICMPv4 and ICMPv6.
 pub(crate) trait IcmpNonSyncCtx<I: IcmpIpExt>:
-    InstantContext + IcmpContext<I> + CounterContext + RngContext
+    InstantContext + IcmpContext<I> + RngContext
 {
 }
-impl<I: IcmpIpExt, C: InstantContext + IcmpContext<I> + CounterContext + RngContext>
-    IcmpNonSyncCtx<I> for C
-{
-}
+impl<I: IcmpIpExt, C: InstantContext + IcmpContext<I> + RngContext> IcmpNonSyncCtx<I> for C {}
 
 /// Empty trait to work around coherence issues.
 ///
@@ -796,8 +796,8 @@ pub(crate) trait InnerIcmpContext<I: IcmpIpExt + IpExt, C: IcmpNonSyncCtx<I>>:
         + MulticastMembershipHandler<I, C>
         + DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
         + IcmpStateContext
-        + CounterContext2<IcmpTxCounters<I>>
-        + CounterContext2<IcmpRxCounters<I>>;
+        + CounterContext<IcmpTxCounters<I>>
+        + CounterContext<IcmpRxCounters<I>>;
     // TODO(joshlf): If we end up needing to respond to these messages with new
     // outbound packets, then perhaps it'd be worth passing the original buffer
     // so that it can be reused?
@@ -1450,7 +1450,7 @@ pub(crate) enum IcmpIpTransportContext {}
 impl<
         I: IcmpIpExt + IpExt,
         C: IcmpNonSyncCtx<I>,
-        SC: InnerIcmpContext<I, C> + CounterContext2<IcmpRxCounters<I>>,
+        SC: InnerIcmpContext<I, C> + CounterContext<IcmpRxCounters<I>>,
     > IpTransportContext<I, C, SC> for IcmpIpTransportContext
 {
     fn receive_icmp_error(
@@ -1526,8 +1526,8 @@ impl<
         C: BufferIcmpNonSyncCtx<Ipv4, B>,
         SC: InnerBufferIcmpv4Context<C, B>
             + PmtuHandler<Ipv4, C>
-            + CounterContext2<IcmpRxCounters<Ipv4>>
-            + CounterContext2<IcmpTxCounters<Ipv4>>,
+            + CounterContext<IcmpRxCounters<Ipv4>>
+            + CounterContext<IcmpTxCounters<Ipv4>>,
     > BufferIpTransportContext<Ipv4, C, SC, B> for IcmpIpTransportContext
 {
     fn receive_ip_packet(
@@ -1849,7 +1849,7 @@ fn receive_ndp_packet<
         + IpDeviceStateContext<Ipv6, C>
         + NudIpHandler<Ipv6, C>
         + BufferIpLayerHandler<Ipv6, C, EmptyBuf>
-        + CounterContext2<NdpCounters>,
+        + CounterContext<NdpCounters>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -2273,9 +2273,9 @@ impl<
             + PmtuHandler<Ipv6, C>
             + NudIpHandler<Ipv6, C>
             + BufferIpLayerHandler<Ipv6, C, EmptyBuf>
-            + CounterContext2<IcmpRxCounters<Ipv6>>
-            + CounterContext2<IcmpTxCounters<Ipv6>>
-            + CounterContext2<NdpCounters>,
+            + CounterContext<IcmpRxCounters<Ipv6>>
+            + CounterContext<IcmpTxCounters<Ipv6>>
+            + CounterContext<NdpCounters>,
     > BufferIpTransportContext<Ipv6, C, SC, B> for IcmpIpTransportContext
 {
     fn receive_ip_packet(
@@ -2431,9 +2431,7 @@ fn send_icmp_reply<
     I: crate::ip::IpExt,
     B: BufferMut,
     C: BufferIcmpNonSyncCtx<I, B>,
-    SC: BufferIpSocketHandler<I, C, B>
-        + DeviceIdContext<AnyDevice>
-        + CounterContext2<IcmpTxCounters<I>>,
+    SC: BufferIpSocketHandler<I, C, B> + DeviceIdContext<AnyDevice> + CounterContext<IcmpTxCounters<I>>,
     S: Serializer<Buffer = B>,
     F: FnOnce(SpecifiedAddr<I::Addr>) -> S,
 >(
@@ -2593,7 +2591,7 @@ fn receive_icmpv6_error<
 pub(crate) fn send_icmpv4_protocol_unreachable<
     B: BufferMut,
     C: BufferIcmpNonSyncCtx<Ipv4, B>,
-    SC: InnerBufferIcmpv4Context<C, B> + CounterContext2<IcmpTxCounters<Ipv4>>,
+    SC: InnerBufferIcmpv4Context<C, B> + CounterContext<IcmpTxCounters<Ipv4>>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -2639,7 +2637,7 @@ pub(crate) fn send_icmpv4_protocol_unreachable<
 pub(crate) fn send_icmpv6_protocol_unreachable<
     B: BufferMut,
     C: BufferIcmpNonSyncCtx<Ipv6, B>,
-    SC: InnerBufferIcmpv6Context<C, B> + CounterContext2<IcmpTxCounters<Ipv6>>,
+    SC: InnerBufferIcmpv6Context<C, B> + CounterContext<IcmpTxCounters<Ipv6>>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -2695,7 +2693,7 @@ pub(crate) fn send_icmpv6_protocol_unreachable<
 pub(crate) fn send_icmpv4_port_unreachable<
     B: BufferMut,
     C: BufferIcmpNonSyncCtx<Ipv4, B>,
-    SC: InnerBufferIcmpv4Context<C, B> + CounterContext2<IcmpTxCounters<Ipv4>>,
+    SC: InnerBufferIcmpv4Context<C, B> + CounterContext<IcmpTxCounters<Ipv4>>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -2740,7 +2738,7 @@ pub(crate) fn send_icmpv4_port_unreachable<
 pub(crate) fn send_icmpv6_port_unreachable<
     B: BufferMut,
     C: BufferIcmpNonSyncCtx<Ipv6, B>,
-    SC: InnerBufferIcmpv6Context<C, B> + CounterContext2<IcmpTxCounters<Ipv6>>,
+    SC: InnerBufferIcmpv6Context<C, B> + CounterContext<IcmpTxCounters<Ipv6>>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -2780,7 +2778,7 @@ pub(crate) fn send_icmpv6_port_unreachable<
 pub(crate) fn send_icmpv4_net_unreachable<
     B: BufferMut,
     C: BufferIcmpNonSyncCtx<Ipv4, B>,
-    SC: InnerBufferIcmpv4Context<C, B> + CounterContext2<IcmpTxCounters<Ipv4>>,
+    SC: InnerBufferIcmpv4Context<C, B> + CounterContext<IcmpTxCounters<Ipv4>>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -2830,7 +2828,7 @@ pub(crate) fn send_icmpv4_net_unreachable<
 pub(crate) fn send_icmpv6_net_unreachable<
     B: BufferMut,
     C: BufferIcmpNonSyncCtx<Ipv6, B>,
-    SC: InnerBufferIcmpv6Context<C, B> + CounterContext2<IcmpTxCounters<Ipv6>>,
+    SC: InnerBufferIcmpv6Context<C, B> + CounterContext<IcmpTxCounters<Ipv6>>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -2878,7 +2876,7 @@ pub(crate) fn send_icmpv6_net_unreachable<
 pub(crate) fn send_icmpv4_ttl_expired<
     B: BufferMut,
     C: BufferIcmpNonSyncCtx<Ipv4, B>,
-    SC: InnerBufferIcmpv4Context<C, B> + CounterContext2<IcmpTxCounters<Ipv4>>,
+    SC: InnerBufferIcmpv4Context<C, B> + CounterContext<IcmpTxCounters<Ipv4>>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -2929,7 +2927,7 @@ pub(crate) fn send_icmpv4_ttl_expired<
 pub(crate) fn send_icmpv6_ttl_expired<
     B: BufferMut,
     C: BufferIcmpNonSyncCtx<Ipv6, B>,
-    SC: InnerBufferIcmpv6Context<C, B> + CounterContext2<IcmpTxCounters<Ipv6>>,
+    SC: InnerBufferIcmpv6Context<C, B> + CounterContext<IcmpTxCounters<Ipv6>>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -2977,7 +2975,7 @@ pub(crate) fn send_icmpv6_ttl_expired<
 pub(crate) fn send_icmpv6_packet_too_big<
     B: BufferMut,
     C: BufferIcmpNonSyncCtx<Ipv6, B>,
-    SC: InnerBufferIcmpv6Context<C, B> + CounterContext2<IcmpTxCounters<Ipv6>>,
+    SC: InnerBufferIcmpv6Context<C, B> + CounterContext<IcmpTxCounters<Ipv6>>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -3034,7 +3032,7 @@ pub(crate) fn send_icmpv6_packet_too_big<
 pub(crate) fn send_icmpv4_parameter_problem<
     B: BufferMut,
     C: BufferIcmpNonSyncCtx<Ipv4, B>,
-    SC: InnerBufferIcmpv4Context<C, B> + CounterContext2<IcmpTxCounters<Ipv4>>,
+    SC: InnerBufferIcmpv4Context<C, B> + CounterContext<IcmpTxCounters<Ipv4>>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -3080,7 +3078,7 @@ pub(crate) fn send_icmpv4_parameter_problem<
 pub(crate) fn send_icmpv6_parameter_problem<
     B: BufferMut,
     C: BufferIcmpNonSyncCtx<Ipv6, B>,
-    SC: InnerBufferIcmpv6Context<C, B> + CounterContext2<IcmpTxCounters<Ipv6>>,
+    SC: InnerBufferIcmpv6Context<C, B> + CounterContext<IcmpTxCounters<Ipv6>>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -3120,7 +3118,7 @@ pub(crate) fn send_icmpv6_parameter_problem<
 fn send_icmpv4_dest_unreachable<
     B: BufferMut,
     C: BufferIcmpNonSyncCtx<Ipv4, B>,
-    SC: InnerBufferIcmpv4Context<C, B> + CounterContext2<IcmpTxCounters<Ipv4>>,
+    SC: InnerBufferIcmpv4Context<C, B> + CounterContext<IcmpTxCounters<Ipv4>>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -3154,7 +3152,7 @@ fn send_icmpv4_dest_unreachable<
 fn send_icmpv6_dest_unreachable<
     B: BufferMut,
     C: BufferIcmpNonSyncCtx<Ipv6, B>,
-    SC: InnerBufferIcmpv6Context<C, B> + CounterContext2<IcmpTxCounters<Ipv6>>,
+    SC: InnerBufferIcmpv6Context<C, B> + CounterContext<IcmpTxCounters<Ipv6>>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -3183,7 +3181,7 @@ fn send_icmpv4_error_message<
     B: BufferMut,
     M: IcmpMessage<Ipv4>,
     C: BufferIcmpNonSyncCtx<Ipv4, B>,
-    SC: InnerBufferIcmpv4Context<C, B> + CounterContext2<IcmpTxCounters<Ipv4>>,
+    SC: InnerBufferIcmpv4Context<C, B> + CounterContext<IcmpTxCounters<Ipv4>>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -3248,7 +3246,7 @@ fn send_icmpv6_error_message<
     B: BufferMut,
     M: IcmpMessage<Ipv6>,
     C: BufferIcmpNonSyncCtx<Ipv6, B>,
-    SC: InnerBufferIcmpv6Context<C, B> + CounterContext2<IcmpTxCounters<Ipv6>>,
+    SC: InnerBufferIcmpv6Context<C, B> + CounterContext<IcmpTxCounters<Ipv6>>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -4151,7 +4149,7 @@ mod tests {
         context::testutil::{
             FakeCtxWithSyncCtx, FakeInstant, FakeNonSyncCtx, FakeSyncCtx, Wrapped,
         },
-        context::CounterContext2,
+        context::CounterContext,
         device::{
             testutil::{set_forwarding_enabled, FakeDeviceId, FakeWeakDeviceId},
             DeviceId, FrameDestination,
@@ -4189,7 +4187,7 @@ mod tests {
         FakeDeviceId,
     >;
 
-    impl<I: Ip, D> CounterContext2<IpCounters<I>>
+    impl<I: Ip, D> CounterContext<IpCounters<I>>
         for FakeSyncCtx<FakeDualStackIpSocketCtx<D>, DualStackSendIpPacketMeta<D>, D>
     {
         fn with_counters<O, F: FnOnce(&IpCounters<I>) -> O>(&self, cb: F) -> O {
@@ -4197,7 +4195,7 @@ mod tests {
         }
     }
 
-    impl<Inner, I: Ip, D> CounterContext2<IpCounters<I>>
+    impl<Inner, I: Ip, D> CounterContext<IpCounters<I>>
         for Wrapped<
             Inner,
             FakeSyncCtx<FakeDualStackIpSocketCtx<D>, DualStackSendIpPacketMeta<D>, D>,
@@ -4208,7 +4206,7 @@ mod tests {
         }
     }
 
-    impl<I: Ip, D> CounterContext2<IcmpTxCounters<I>>
+    impl<I: Ip, D> CounterContext<IcmpTxCounters<I>>
         for FakeSyncCtx<FakeDualStackIpSocketCtx<D>, DualStackSendIpPacketMeta<D>, D>
     {
         fn with_counters<O, F: FnOnce(&IcmpTxCounters<I>) -> O>(&self, cb: F) -> O {
@@ -4216,7 +4214,7 @@ mod tests {
         }
     }
 
-    impl<Inner, I: Ip, D> CounterContext2<IcmpTxCounters<I>>
+    impl<Inner, I: Ip, D> CounterContext<IcmpTxCounters<I>>
         for Wrapped<
             Inner,
             FakeSyncCtx<FakeDualStackIpSocketCtx<D>, DualStackSendIpPacketMeta<D>, D>,
@@ -4227,7 +4225,7 @@ mod tests {
         }
     }
 
-    impl<I: Ip, D> CounterContext2<IcmpRxCounters<I>>
+    impl<I: Ip, D> CounterContext<IcmpRxCounters<I>>
         for FakeSyncCtx<FakeDualStackIpSocketCtx<D>, DualStackSendIpPacketMeta<D>, D>
     {
         fn with_counters<O, F: FnOnce(&IcmpRxCounters<I>) -> O>(&self, cb: F) -> O {
@@ -4235,7 +4233,7 @@ mod tests {
         }
     }
 
-    impl<Inner, I: Ip, D> CounterContext2<IcmpRxCounters<I>>
+    impl<Inner, I: Ip, D> CounterContext<IcmpRxCounters<I>>
         for Wrapped<
             Inner,
             FakeSyncCtx<FakeDualStackIpSocketCtx<D>, DualStackSendIpPacketMeta<D>, D>,
@@ -4246,7 +4244,7 @@ mod tests {
         }
     }
 
-    impl<D> CounterContext2<NdpCounters>
+    impl<D> CounterContext<NdpCounters>
         for FakeSyncCtx<FakeDualStackIpSocketCtx<D>, DualStackSendIpPacketMeta<D>, D>
     {
         fn with_counters<O, F: FnOnce(&NdpCounters) -> O>(&self, cb: F) -> O {
@@ -4254,7 +4252,7 @@ mod tests {
         }
     }
 
-    impl<Inner, D> CounterContext2<NdpCounters>
+    impl<Inner, D> CounterContext<NdpCounters>
         for Wrapped<
             Inner,
             FakeSyncCtx<FakeDualStackIpSocketCtx<D>, DualStackSendIpPacketMeta<D>, D>,

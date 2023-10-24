@@ -27,7 +27,7 @@ use packet_formats::{
 };
 
 use crate::{
-    context::{CounterContext2, InstantContext, SendFrameContext},
+    context::{CounterContext, InstantContext, SendFrameContext},
     device::{AnyDevice, DeviceIdContext},
     error::{ExistsError, NotFoundError},
     ip::{
@@ -88,7 +88,7 @@ pub(crate) struct SlaacAddrs<'a, C: NonSyncContext> {
     pub(crate) _marker: PhantomData<C>,
 }
 
-impl<'a, C: NonSyncContext> CounterContext2<SlaacCounters> for SlaacAddrs<'a, C> {
+impl<'a, C: NonSyncContext> CounterContext<SlaacCounters> for SlaacAddrs<'a, C> {
     fn with_counters<O, F: FnOnce(&SlaacCounters) -> O>(&self, cb: F) -> O {
         cb(self.sync_ctx.sync_ctx.unlocked_access::<crate::lock_ordering::SlaacCounters>())
     }

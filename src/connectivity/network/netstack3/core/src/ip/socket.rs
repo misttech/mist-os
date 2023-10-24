@@ -17,7 +17,7 @@ use packet::{Buf, BufferMut, SerializeError, Serializer};
 use thiserror::Error;
 
 use crate::{
-    context::{CounterContext, CounterContext2, InstantContext, NonTestCtxMarker, TracingContext},
+    context::{CounterContext, InstantContext, NonTestCtxMarker, TracingContext},
     ip::{
         device::state::IpDeviceStateIpExt,
         types::{NextHop, ResolvedRoute},
@@ -369,11 +369,8 @@ impl<I: IpExt, D, O> IpSock<I, D, O> {
 // raw IP sockets once we support those.
 
 /// The non-synchronized execution context for IP sockets.
-pub(crate) trait IpSocketNonSyncContext:
-    InstantContext + CounterContext + TracingContext
-{
-}
-impl<C: InstantContext + CounterContext + TracingContext> IpSocketNonSyncContext for C {}
+pub(crate) trait IpSocketNonSyncContext: InstantContext + TracingContext {}
+impl<C: InstantContext + TracingContext> IpSocketNonSyncContext for C {}
 
 /// The context required in order to implement [`IpSocketHandler`].
 ///
@@ -568,7 +565,7 @@ impl<
         SC: BufferIpSocketContext<I, C, B>
             + BufferIpSocketContext<I, C, Buf<Vec<u8>>>
             + IpSocketContext<I, C>
-            + CounterContext2<IpCounters<I>>,
+            + CounterContext<IpCounters<I>>,
     > BufferIpSocketHandler<I, C, B> for SC
 {
     fn send_ip_packet<S: Serializer<Buffer = B>, O: SendOptions<I>>(
@@ -1004,7 +1001,7 @@ pub(crate) mod testutil {
 
     impl<
             I: IpExt + IpDeviceStateIpExt,
-            C: CounterContext + InstantContext + TracingContext,
+            C: InstantContext + TracingContext,
             DeviceId: FakeStrongDeviceId,
         > TransportIpContext<I, C> for FakeIpSocketCtx<I, DeviceId>
     {
@@ -1093,7 +1090,7 @@ pub(crate) mod testutil {
 
     impl<
             I: IpDeviceStateIpExt,
-            C: CounterContext + InstantContext + TracingContext,
+            C: InstantContext + TracingContext,
             DeviceId: FakeStrongDeviceId,
         > IpSocketContext<I, C> for FakeIpSocketCtx<I, DeviceId>
     {
@@ -1286,7 +1283,7 @@ pub(crate) mod testutil {
 
     impl<
             I: IpExt + IpDeviceStateIpExt,
-            C: CounterContext + InstantContext + TracingContext,
+            C: InstantContext + TracingContext,
             D: FakeStrongDeviceId,
             State: TransportIpContext<I, C, DeviceId = D>,
             Meta,
@@ -1640,7 +1637,7 @@ pub(crate) mod testutil {
 
     impl<
             I: IpExt + IpDeviceStateIpExt,
-            C: CounterContext + InstantContext + TracingContext,
+            C: InstantContext + TracingContext,
             DeviceId: FakeStrongDeviceId,
         > TransportIpContext<I, C> for FakeDualStackIpSocketCtx<DeviceId>
     {

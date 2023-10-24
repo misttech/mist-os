@@ -57,8 +57,8 @@ use tracing::{debug, trace};
 
 use crate::{
     context::{
-        CounterContext, CounterContext2, EventContext, InstantContext, NonTestCtxMarker,
-        TimerHandler, TracingContext,
+        CounterContext, EventContext, InstantContext, NonTestCtxMarker, TimerHandler,
+        TracingContext,
     },
     counters::Counter,
     data_structures::token_bucket::TokenBucket,
@@ -621,13 +621,13 @@ pub enum IpLayerEvent<DeviceId, I: Ip> {
 
 /// The non-synchronized execution context for the IP layer.
 pub(crate) trait IpLayerNonSyncContext<I: Ip, DeviceId>:
-    InstantContext + EventContext<IpLayerEvent<DeviceId, I>> + CounterContext + TracingContext
+    InstantContext + EventContext<IpLayerEvent<DeviceId, I>> + TracingContext
 {
 }
 impl<
         I: Ip,
         DeviceId,
-        C: InstantContext + EventContext<IpLayerEvent<DeviceId, I>> + CounterContext + TracingContext,
+        C: InstantContext + EventContext<IpLayerEvent<DeviceId, I>> + TracingContext,
     > IpLayerNonSyncContext<I, DeviceId> for C
 {
 }
@@ -875,7 +875,7 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv
     }
 }
 
-impl<NonSyncCtx: NonSyncContext, I: Ip, L> CounterContext2<IpCounters<I>>
+impl<NonSyncCtx: NonSyncContext, I: Ip, L> CounterContext<IpCounters<I>>
     for Locked<&SyncCtx<NonSyncCtx>, L>
 {
     fn with_counters<O, F: FnOnce(&IpCounters<I>) -> O>(&self, cb: F) -> O {
@@ -883,7 +883,7 @@ impl<NonSyncCtx: NonSyncContext, I: Ip, L> CounterContext2<IpCounters<I>>
     }
 }
 
-impl<NonSyncCtx: NonSyncContext, L> CounterContext2<Ipv4Counters>
+impl<NonSyncCtx: NonSyncContext, L> CounterContext<Ipv4Counters>
     for Locked<&SyncCtx<NonSyncCtx>, L>
 {
     fn with_counters<O, F: FnOnce(&Ipv4Counters) -> O>(&self, cb: F) -> O {
@@ -891,7 +891,7 @@ impl<NonSyncCtx: NonSyncContext, L> CounterContext2<Ipv4Counters>
     }
 }
 
-impl<NonSyncCtx: NonSyncContext, L> CounterContext2<Ipv6Counters>
+impl<NonSyncCtx: NonSyncContext, L> CounterContext<Ipv6Counters>
     for Locked<&SyncCtx<NonSyncCtx>, L>
 {
     fn with_counters<O, F: FnOnce(&Ipv6Counters) -> O>(&self, cb: F) -> O {
@@ -1609,7 +1609,7 @@ pub(crate) fn handle_timer<NonSyncCtx: NonSyncContext>(
 fn dispatch_receive_ipv4_packet<
     C: IpLayerNonSyncContext<Ipv4, SC::DeviceId>,
     B: BufferMut,
-    SC: BufferIpLayerContext<Ipv4, C, B> + CounterContext2<IpCounters<Ipv4>>,
+    SC: BufferIpLayerContext<Ipv4, C, B> + CounterContext<IpCounters<Ipv4>>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -1696,7 +1696,7 @@ fn dispatch_receive_ipv4_packet<
 fn dispatch_receive_ipv6_packet<
     C: IpLayerNonSyncContext<Ipv6, SC::DeviceId>,
     B: BufferMut,
-    SC: BufferIpLayerContext<Ipv6, C, B> + CounterContext2<IpCounters<Ipv6>>,
+    SC: BufferIpLayerContext<Ipv6, C, B> + CounterContext<IpCounters<Ipv6>>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -1943,8 +1943,8 @@ pub(crate) fn receive_ipv4_packet<
     B: BufferMut,
     SC: BufferIpLayerContext<Ipv4, C, B>
         + BufferIpLayerContext<Ipv4, C, Buf<Vec<u8>>>
-        + CounterContext2<IpCounters<Ipv4>>
-        + CounterContext2<Ipv4Counters>,
+        + CounterContext<IpCounters<Ipv4>>
+        + CounterContext<Ipv4Counters>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -2164,8 +2164,8 @@ pub(crate) fn receive_ipv6_packet<
     B: BufferMut,
     SC: BufferIpLayerContext<Ipv6, C, B>
         + BufferIpLayerContext<Ipv6, C, Buf<Vec<u8>>>
-        + CounterContext2<IpCounters<Ipv6>>
-        + CounterContext2<Ipv6Counters>,
+        + CounterContext<IpCounters<Ipv6>>
+        + CounterContext<Ipv6Counters>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -2483,7 +2483,7 @@ enum DropReason {
 /// Computes the action to take in order to process a received IPv4 packet.
 fn receive_ipv4_packet_action<
     C: IpLayerNonSyncContext<Ipv4, SC::DeviceId>,
-    SC: IpLayerContext<Ipv4, C> + CounterContext2<IpCounters<Ipv4>> + CounterContext2<Ipv4Counters>,
+    SC: IpLayerContext<Ipv4, C> + CounterContext<IpCounters<Ipv4>> + CounterContext<Ipv4Counters>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -2529,7 +2529,7 @@ fn receive_ipv4_packet_action<
 /// Computes the action to take in order to process a received IPv6 packet.
 fn receive_ipv6_packet_action<
     C: IpLayerNonSyncContext<Ipv6, SC::DeviceId>,
-    SC: IpLayerContext<Ipv6, C> + CounterContext2<IpCounters<Ipv6>> + CounterContext2<Ipv6Counters>,
+    SC: IpLayerContext<Ipv6, C> + CounterContext<IpCounters<Ipv6>> + CounterContext<Ipv6Counters>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -2640,7 +2640,7 @@ fn receive_ipv6_packet_action<
 fn receive_ip_packet_action_common<
     I: IpLayerIpExt,
     C: IpLayerNonSyncContext<I, SC::DeviceId>,
-    SC: IpLayerContext<I, C> + CounterContext2<IpCounters<I>>,
+    SC: IpLayerContext<I, C> + CounterContext<IpCounters<I>>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -3515,10 +3515,9 @@ mod tests {
             types::{AddableEntryEither, AddableMetric, RawMetric},
         },
         testutil::{
-            assert_empty, get_counter_val, handle_timer, new_rng, set_logger_for_test, Ctx,
-            FakeCtx, FakeEventDispatcherBuilder, FakeNonSyncCtx, TestIpExt,
-            DEFAULT_INTERFACE_METRIC, FAKE_CONFIG_V4, FAKE_CONFIG_V6,
-            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            assert_empty, handle_timer, new_rng, set_logger_for_test, Ctx, FakeCtx,
+            FakeEventDispatcherBuilder, FakeNonSyncCtx, TestIpExt, DEFAULT_INTERFACE_METRIC,
+            FAKE_CONFIG_V4, FAKE_CONFIG_V6, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
         DeviceId, StackState,
     };
@@ -3760,8 +3759,8 @@ mod tests {
             buf,
         );
 
-        assert_eq!(get_counter_val(&non_sync_ctx, "send_icmpv4_parameter_problem"), 0);
-        assert_eq!(get_counter_val(&non_sync_ctx, "send_icmpv6_parameter_problem"), 0);
+        assert_eq!(sync_ctx.state.ipv4.get_icmp_tx_counters().parameter_problem.get(), 0);
+        assert_eq!(sync_ctx.state.ipv6.get_icmp_tx_counters().parameter_problem.get(), 0);
         assert_eq!(sync_ctx.state.ipv4.inner.counters.dispatch_receive_ip_packet.get(), 0);
         assert_eq!(sync_ctx.state.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 0);
     }

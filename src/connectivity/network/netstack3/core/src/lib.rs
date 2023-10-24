@@ -61,12 +61,9 @@ use packet::{Buf, BufferMut, EmptyBuf};
 use tracing::trace;
 
 #[cfg(test)]
-use crate::{context::CounterContext2, counters::Counter};
+use crate::{context::CounterContext, counters::Counter};
 use crate::{
-    context::{
-        CounterContext, EventContext, InstantBindingsTypes, RngContext, TimerContext,
-        TracingContext,
-    },
+    context::{EventContext, InstantBindingsTypes, RngContext, TimerContext, TracingContext},
     device::{
         ethernet::EthernetLinkDevice, DeviceCounters, DeviceId, DeviceLayerState,
         DeviceLayerTimerId, DeviceLayerTypes,
@@ -298,8 +295,7 @@ impl<O> BindingsTypes for O where O: InstantBindingsTypes + DeviceLayerTypes + T
 
 /// The non-synchronized context for the stack.
 pub trait NonSyncContext:
-    CounterContext
-    + BindingsTypes
+    BindingsTypes
     + BufferNonSyncContextInner<Buf<Vec<u8>>>
     + BufferNonSyncContextInner<EmptyBuf>
     + RngContext
@@ -323,8 +319,7 @@ pub trait NonSyncContext:
 {
 }
 impl<
-        C: CounterContext
-            + BindingsTypes
+        C: BindingsTypes
             + BufferNonSyncContextInner<Buf<Vec<u8>>>
             + BufferNonSyncContextInner<EmptyBuf>
             + RngContext
@@ -522,7 +517,7 @@ impl<C: NonSyncContext> UnlockedAccess<crate::lock_ordering::TimerCounters> for 
 }
 
 #[cfg(test)]
-impl<NonSyncCtx: NonSyncContext, L> CounterContext2<TimerCounters>
+impl<NonSyncCtx: NonSyncContext, L> CounterContext<TimerCounters>
     for Locked<&SyncCtx<NonSyncCtx>, L>
 {
     fn with_counters<O, F: FnOnce(&TimerCounters) -> O>(&self, cb: F) -> O {

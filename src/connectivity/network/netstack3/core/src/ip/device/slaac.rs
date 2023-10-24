@@ -28,8 +28,8 @@ pub use crate::algorithm::STABLE_IID_SECRET_KEY_BYTES;
 use crate::{
     algorithm::{generate_opaque_interface_identifier, OpaqueIidNonce},
     context::{
-        CounterContext, CounterContext2, InstantBindingsTypes, InstantContext, RngContext,
-        TimerContext, TimerHandler,
+        CounterContext, InstantBindingsTypes, InstantContext, RngContext, TimerContext,
+        TimerHandler,
     },
     counters::Counter,
     device::Id,
@@ -164,7 +164,7 @@ pub(super) struct SlaacAddrsMutAndConfig<'a, C: InstantContext, A: SlaacAddresse
 pub(super) trait SlaacContext<C: SlaacNonSyncContext<Self::DeviceId>>:
     DeviceIdContext<AnyDevice>
 {
-    type SlaacAddrs<'a>: SlaacAddresses<C> + CounterContext2<SlaacCounters> + 'a;
+    type SlaacAddrs<'a>: SlaacAddresses<C> + CounterContext<SlaacCounters> + 'a;
 
     fn with_slaac_addrs_mut_and_configs<
         O,
@@ -210,7 +210,7 @@ impl<C: NonSyncContext> UnlockedAccess<crate::lock_ordering::SlaacCounters> for 
     }
 }
 
-impl<C: NonSyncContext, L> CounterContext2<SlaacCounters> for Locked<&SyncCtx<C>, L> {
+impl<C: NonSyncContext, L> CounterContext<SlaacCounters> for Locked<&SyncCtx<C>, L> {
     fn with_counters<O, F: FnOnce(&SlaacCounters) -> O>(&self, cb: F) -> O {
         cb(self.unlocked_access::<crate::lock_ordering::SlaacCounters>())
     }
@@ -248,11 +248,11 @@ fn update_slaac_addr_valid_until<I: Instant>(
 
 /// The non-synchronized execution context for SLAAC.
 pub(super) trait SlaacNonSyncContext<DeviceId>:
-    RngContext + TimerContext<SlaacTimerId<DeviceId>> + CounterContext
+    RngContext + TimerContext<SlaacTimerId<DeviceId>>
 {
 }
-impl<DeviceId, C: RngContext + TimerContext<SlaacTimerId<DeviceId>> + CounterContext>
-    SlaacNonSyncContext<DeviceId> for C
+impl<DeviceId, C: RngContext + TimerContext<SlaacTimerId<DeviceId>>> SlaacNonSyncContext<DeviceId>
+    for C
 {
 }
 
@@ -1705,7 +1705,7 @@ mod tests {
         counters: SlaacCounters,
     }
 
-    impl<'a> CounterContext2<SlaacCounters> for &'a mut FakeSlaacAddrs {
+    impl<'a> CounterContext<SlaacCounters> for &'a mut FakeSlaacAddrs {
         fn with_counters<O, F: FnOnce(&SlaacCounters) -> O>(&self, cb: F) -> O {
             cb(&self.counters)
         }
