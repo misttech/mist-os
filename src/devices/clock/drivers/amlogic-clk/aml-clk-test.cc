@@ -233,20 +233,6 @@ TEST(ClkTestAml, G12bEnableAudio) {
   EXPECT_EQ(0x1, actual.Read32(kHhiGclkMpeg1Offset * sizeof(uint32_t)));
 }
 
-TEST(ClkTestAml, G12bEnableHifiPll) {
-  auto buffer = fdf_testing::CreateMmioBuffer(A311D_HIU_LENGTH);
-  auto actual = buffer.View(0);
-
-  auto [dos_data, dos_buffer] = MakeDosbusMmio();
-  AmlClockTest clk(std::move(buffer), std::move(dos_buffer), PDEV_DID_AMLOGIC_G12B_CLK);
-
-  zx_status_t st = clk.ClockImplEnable(g12b_clk::G12B_CLK_HIFI_PLL);
-  EXPECT_OK(st);
-
-  constexpr uint32_t kHhiHifiPllCntl0Offset = 0x36;
-  EXPECT_EQ((1 << 28), actual.Read32(kHhiHifiPllCntl0Offset * sizeof(uint32_t)));
-}
-
 TEST(ClkTestAml, ForceDisable) {
   auto expected = std::make_unique<uint8_t[]>(S905D2_HIU_LENGTH);
   auto buffer = fdf_testing::CreateMmioBuffer(S905D2_HIU_LENGTH);

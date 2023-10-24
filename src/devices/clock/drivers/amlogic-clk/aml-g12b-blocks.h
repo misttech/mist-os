@@ -61,7 +61,6 @@ static constexpr meson_clk_gate_t g12b_clk_gates[] = {
     {.reg = kG12bHhiXtalDivnCntl, .bit = 12},  // G12B_CLK_25M
 
     {.reg = kG12bHhiGclkMpeg1, .bit = 0},  // CLK_AUDIO
-    {.reg = kHhiHifiPllCntl0, .bit = 28},  // HIFI_PLL
 };
 
 static_assert(g12b_clk::CLK_G12B_COUNT == std::size(g12b_clk_gates),
