@@ -590,6 +590,7 @@ group("idk_build_tools") {
 
   deps = [
     "//src/sys/pkg/bin/package-tool($host_toolchain)",
+    "//tools/bindc:bin($host_toolchain)",
     "//tools/fidl/fidl_api_summarize($host_toolchain)",
     "//tools/fidl/fidlc:fidl-format($host_toolchain)",
     "//tools/fidl/fidlc:fidl-lint($host_toolchain)",
