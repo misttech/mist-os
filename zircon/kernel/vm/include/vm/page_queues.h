@@ -88,29 +88,7 @@ class PageQueues {
   // It does not update active/inactive counts, and this needs to be done separately once harvesting
   // is complete. It is only permitted to call this in between BeginAccessScan and EndAccessScan
   // calls.
-  void MarkAccessedDeferredCount(vm_page_t* page) {
-    // Ensure that the page queues is returning the cached counts at the moment, otherwise we might
-    // race.
-    DEBUG_ASSERT(use_cached_queue_counts_.load(ktl::memory_order_relaxed));
-    auto queue_ref = page->object.get_page_queue_ref();
-    uint8_t old_gen = queue_ref.load(ktl::memory_order_relaxed);
-    // Between loading the mru_gen and finally storing it in the queue_ref it's possible for our
-    // calculated target_queue to become invalid. This is extremely unlikely as it would require
-    // us to stall for long enough for the lru_gen to pass this point, but if it does happen then
-    // ProcessLruQueues will notice our queue is invalid and correct our age to be that of lru_gen.
-    const uint32_t target_queue = mru_gen_to_queue();
-    do {
-      // If we ever find old_gen to not be in the active/inactive range then this means the page has
-      // either been racily removed from, or was never in, the reclaim queue. In which case we
-      // can return as there's nothing to be marked accessed.
-      if (!queue_is_reclaim(static_cast<PageQueue>(old_gen))) {
-        return;
-      }
-    } while (!queue_ref.compare_exchange_weak(old_gen, static_cast<uint8_t>(target_queue),
-                                              ktl::memory_order_relaxed));
-    page_queue_counts_[old_gen].fetch_sub(1, ktl::memory_order_relaxed);
-    page_queue_counts_[target_queue].fetch_add(1, ktl::memory_order_relaxed);
-  }
+  void MarkAccessedDeferredCount(vm_page_t* page);
 
   // All Set operations places a page, which must not currently be in a page queue, into the
   // specified queue. The backlink information of |object| and |page_offset| must be specified and
