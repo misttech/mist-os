@@ -9,6 +9,8 @@ use starnix_sync::InterruptibleEvent;
 use std::collections::VecDeque;
 use std::sync::Arc;
 
+use lock_api as _;
+
 #[cfg(any(test, debug_assertions))]
 use lock_api::RawRwLock;
 

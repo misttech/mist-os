@@ -18,7 +18,6 @@ use netlink_packet_generic::{
     },
     GenlMessage,
 };
-use parking_lot::Mutex;
 use std::{
     collections::{HashMap, HashSet},
     ops::DerefMut,
@@ -26,6 +25,7 @@ use std::{
 };
 
 use crate::{
+    lock::Mutex,
     logging::{log_error, log_info, log_warn},
     types::{errno, Errno},
 };

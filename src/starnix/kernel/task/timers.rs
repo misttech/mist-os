@@ -4,6 +4,7 @@
 
 use std::collections::HashMap;
 
+// TODO: Why doesn't this use crate::lock::Mutex?
 use fuchsia_sync::Mutex;
 
 use crate::{
