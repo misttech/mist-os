@@ -979,10 +979,17 @@ mod tests {
         );
         let configurator = Arc::new(Mutex::new(DefaultConfigurator::new(config)?));
         if let Err(e) = find_codecs(&codec_proxy, 2, configurator.clone()).await {
-            assert_eq!(
-                e.to_string(),
+            // Driver discovery order is not deterministic, hence multiple errors may be returned
+            // by find_codecs depending which codec is found first.
+            // One of the test drivers reports bad formats, if found first its bad format error is
+            // returned.
+            // Another test driver reports good formats but it won't be found in the devices loaded
+            // above.
+            assert!(
+                (&e.to_string() ==
                 "Codec processing error: Codec (Device { manufacturer: \"456\", product: \"789\", \
-                 is_codec: true, hardwired: true, is_input: false }) not in config"
+                 is_codec: true, hardwired: true, is_input: false }) not in config") ||
+                 (&e.to_string() == "Codec processing error: Codec with bad format reported")
             );
         }
         if let Err(e) = find_dais(&dai_proxy, 1, configurator).await {
