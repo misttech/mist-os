@@ -242,7 +242,8 @@ devicetree::ScanState ArmDevicetreeGicItem::HandleGicV2(
   // The MSI Frame registers are contigous, so we will pick the lowest base address from all the
   // frames.
   dcfg.use_msi = false;
-  dcfg.msi_frame_phys = std::numeric_limits<decltype(dcfg.msi_frame_phys)>::max();
+  // Kernel expects 0 as no MSI.
+  dcfg.msi_frame_phys = 0;
   set_payload(dcfg);
   gic_ = &path.back();
 
