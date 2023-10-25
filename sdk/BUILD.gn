@@ -494,6 +494,8 @@ sdk_molecule("platform_fidls") {
   deps = [
     "//sdk/fidl/fuchsia.debugger:fuchsia.debugger_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.exception:fuchsia.exception_sdk($fidl_toolchain)",
+    "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_sdk($fidl_toolchain)",
+    "//sdk/fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.test.manager:fuchsia.test.manager_sdk($fidl_toolchain)",
   ]
@@ -504,9 +506,11 @@ sdk_molecule("platform_fidls") {
 sdk_molecule("platform_libs") {
   deps = [
     ":version_history",
+    "//sdk/lib/driver/compat/cpp:cpp_sdk",
     "//sdk/lib/syslog/cpp:backend_fuchsia_lib_sdk",
     "//src/developer/debug/ipc:ipc_sdk",
     "//src/developer/debug/shared:shared_sdk",
+    "//src/devices/block/lib/sdmmc:sdmmc_sdk",
     "//src/lib/containers/cpp:cpp_sdk",
     "//src/lib/diagnostics/accessor2logger:accessor2logger_sdk",
     "//src/lib/elflib:elflib_sdk",

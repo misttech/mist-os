@@ -101,6 +101,7 @@ template("sdk_source_set") {
 
   target(target_type, main_target_name) {
     deps = []
+    public_deps = []
     forward_variables_from(invoker,
                            "*",
                            [
@@ -120,6 +121,7 @@ template("sdk_source_set") {
 
     if (defined(invoker.non_sdk_deps)) {
       deps += invoker.non_sdk_deps
+      public_deps += invoker.non_sdk_deps
     }
 
     # 'source_set()' targets in the 'partner' or 'public' category that are not
