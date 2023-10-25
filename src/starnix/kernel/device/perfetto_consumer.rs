@@ -395,6 +395,7 @@ impl CallbackState {
                             buffers: vec![BufferConfig {
                                 size_kb: Some(PERFETTO_BUFFER_SIZE_KB),
                                 fill_policy: Some(FillPolicy::Discard.into()),
+                                ..Default::default()
                             }],
                             data_sources,
                             ..Default::default()
