@@ -39,6 +39,9 @@ bitflags! {
     /// The set of rights that may be granted to sources accessing targets controlled by SELinux.
     #[derive(Default)]
     pub struct AccessVector: u32 {
+        const READ = 1 << 0;
+        const WRITE = 1 << 1;
+
         // TODO: Add rights that may be included in an access vector cache response.
     }
 }
@@ -47,11 +50,17 @@ impl AccessVector {
     pub const NONE: AccessVector = AccessVector { bits: 0 };
 }
 
-/// An interface for computing the rights permitted to a subject accessing an object (or target) of
-/// a particular SELinux object type.
-pub trait AccessQueryable: Send {
-    /// Computes the [`AccessVector`] permitted to `source_sid` for accessing `target_sid`, an object of
-    ///  type `target_class`.
+impl Into<u32> for AccessVector {
+    fn into(self) -> u32 {
+        self.bits() as u32
+    }
+}
+
+/// An interface for computing the rights permitted to a source accessing a target of a particular
+/// SELinux object type.
+pub trait MutableAccessQueryable: Send {
+    /// Computes the [`AccessVector`] permitted to `source_sid` for accessing `target_sid`, an
+    /// object of type `target_class`.
     fn query(
         &mut self,
         source_sid: SecurityId,
@@ -60,13 +69,36 @@ pub trait AccessQueryable: Send {
     ) -> AccessVector;
 }
 
+/// An interface for computing the rights permitted to a source accessing a target of a particular
+/// SELinux object type.
+pub trait AccessQueryable: Send {
+    /// Computes the [`AccessVector`] permitted to `sid` for accessing `tid`, an object of of type `ty`.
+    fn query(
+        &self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        target_class: ObjectClass,
+    ) -> AccessVector;
+}
+
+impl<AQ: AccessQueryable> MutableAccessQueryable for AQ {
+    fn query(
+        &mut self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        target_class: ObjectClass,
+    ) -> AccessVector {
+        (self as &dyn AccessQueryable).query(source_sid, target_sid, target_class)
+    }
+}
+
 /// A default implementation for [`AccessQueryable`] that permits no [`AccessVector`].
 #[derive(Default)]
 pub struct DenyAll;
 
 impl AccessQueryable for DenyAll {
     fn query(
-        &mut self,
+        &self,
         _source_sid: SecurityId,
         _target_sid: SecurityId,
         _target_class: ObjectClass,
