@@ -131,6 +131,8 @@
                 capability: "protocol",
                 target_monikers: [
                     "/bootstrap",
+                    "/bootstrap/boot-drivers:**",
+                    "/bootstrap/driver_manager",
                 ],
             },
             {

@@ -103,6 +103,10 @@ class PlatformBus : public PlatformBusType,
     return zx::unowned_resource(get_root_resource(parent()));
   }
 
+  zx::unowned_resource GetMmioResource() const {
+    return zx::unowned_resource(get_mmio_resource(parent()));
+  }
+
   struct BootItemResult {
     zx::vmo vmo;
     uint32_t length;

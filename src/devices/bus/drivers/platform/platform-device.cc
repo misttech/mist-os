@@ -201,7 +201,7 @@ zx_status_t PlatformDevice::PDevGetMmio(uint32_t index, pdev_mmio_t* out_mmio) {
       ZX_ROUNDUP(mmio.base().value() + mmio.length().value() - vmo_base, ZX_PAGE_SIZE);
   zx::vmo vmo;
 
-  zx_status_t status = zx::vmo::create_physical(*bus_->GetResource(), vmo_base, vmo_size, &vmo);
+  zx_status_t status = zx::vmo::create_physical(*bus_->GetMmioResource(), vmo_base, vmo_size, &vmo);
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: creating vmo failed %d", __FUNCTION__, status);
     return status;
@@ -326,8 +326,8 @@ zx_status_t PlatformDevice::RpcGetMmio(uint32_t index, zx_paddr_t* out_paddr, si
   if (node_.mmio() == std::nullopt || index >= node_.mmio()->size()) {
     return ZX_ERR_OUT_OF_RANGE;
   }
-  const auto& root_rsrc = bus_->GetResource();
-  if (!root_rsrc->is_valid()) {
+  const auto& mmio_rsrc = bus_->GetMmioResource();
+  if (!mmio_rsrc->is_valid()) {
     return ZX_ERR_NO_RESOURCES;
   }
 
@@ -339,7 +339,7 @@ zx_status_t PlatformDevice::RpcGetMmio(uint32_t index, zx_paddr_t* out_paddr, si
   char rsrc_name[ZX_MAX_NAME_LEN];
   snprintf(rsrc_name, ZX_MAX_NAME_LEN - 1, "%s.pbus[%u]", name_, index);
   zx_status_t status =
-      zx::resource::create(*root_rsrc, ZX_RSRC_KIND_MMIO, mmio.base().value(),
+      zx::resource::create(*mmio_rsrc, ZX_RSRC_KIND_MMIO, mmio.base().value(),
                            mmio.length().value(), rsrc_name, sizeof(rsrc_name), &resource);
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: pdev_rpc_get_mmio: zx_resource_create failed: %d", name_, status);
