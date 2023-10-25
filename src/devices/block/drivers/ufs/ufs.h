@@ -16,16 +16,17 @@
 #include <fbl/string_printf.h>
 
 #include "registers.h"
+#include "src/devices/block/drivers/ufs/device_manager.h"
 #include "transfer_request_processor.h"
-#include "upiu/attributes.h"
-#include "upiu/descriptors.h"
-#include "upiu/flags.h"
 
 namespace ufs {
 
 constexpr uint32_t kMaxLun = 32;
 constexpr uint32_t kDeviceInitTimeoutMs = 2000;
 constexpr uint32_t kHostControllerTimeoutUs = 1000;
+
+constexpr uint32_t kBlockSize = 4096;
+constexpr uint32_t kSectorSize = 512;
 
 enum WellKnownLuns {
   kReportLuns = 0x81,
@@ -95,6 +96,10 @@ class Ufs : public UfsDeviceType {
 
   fdf::MmioBuffer &GetMmio() { return mmio_; }
 
+  DeviceManager &GetDeviceManager() const {
+    ZX_DEBUG_ASSERT(device_manager_ != nullptr);
+    return *device_manager_;
+  }
   TransferRequestProcessor &GetTransferRequestProcessor() const {
     ZX_DEBUG_ASSERT(transfer_request_processor_ != nullptr);
     return *transfer_request_processor_;
@@ -126,8 +131,6 @@ class Ufs : public UfsDeviceType {
 
   // for test
   uint32_t GetLogicalUnitCount() const { return logical_unit_count_; }
-  DeviceDescriptor &GetDeviceDescriptor() { return device_descriptor_; }
-  GeometryDescriptor &GetGeometryDescriptor() { return geometry_descriptor_; }
   thrd_t &GetIoThread() { return io_thread_; }
 
   void DisableCompletion() { disable_completion_ = true; }
@@ -175,6 +178,7 @@ class Ufs : public UfsDeviceType {
 
   bool io_thread_started_ = false;
 
+  std::unique_ptr<DeviceManager> device_manager_;
   std::unique_ptr<TransferRequestProcessor> transfer_request_processor_;
 
   // Controller internal information.
@@ -182,9 +186,6 @@ class Ufs : public UfsDeviceType {
 
   // Callback function to perform when the host controller is notified.
   HostControllerCallback host_controller_callback_;
-
-  DeviceDescriptor device_descriptor_;
-  GeometryDescriptor geometry_descriptor_;
 
   bool driver_shutdown_ = false;
   bool disable_completion_ = false;

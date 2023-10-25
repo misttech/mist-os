@@ -7,7 +7,6 @@
 #include <lib/ddk/binding_driver.h>
 #include <lib/fit/defer.h>
 #include <lib/trace/event.h>
-#include <lib/zx/clock.h>
 #include <zircon/errors.h>
 #include <zircon/threads.h>
 
@@ -253,7 +252,7 @@ zx_status_t Ufs::Init() {
     return result.error_value();
   }
 
-  if (zx::result<> result = GetControllerDescriptor(); result.is_error()) {
+  if (zx::result<> result = device_manager_->GetControllerDescriptor(); result.is_error()) {
     zxlogf(ERROR, "Failed to get controller descriptor: %s", result.status_string());
     return result.error_value();
   }
@@ -322,6 +321,13 @@ zx::result<> Ufs::InitController() {
          VersionReg::Get().ReadFrom(&mmio_).major_version_number(),
          VersionReg::Get().ReadFrom(&mmio_).minor_version_number());
   zxlogf(DEBUG, "capabilities 0x%x", CapabilityReg::Get().ReadFrom(&mmio_).reg_value());
+
+  auto device_manager = DeviceManager::Create(*this);
+  if (device_manager.is_error()) {
+    zxlogf(ERROR, "Failed to create device manager %s", device_manager.status_string());
+    return device_manager.take_error();
+  }
+  device_manager_ = std::move(*device_manager);
 
   uint8_t number_of_task_management_request_slots = safemath::checked_cast<uint8_t>(
       CapabilityReg::Get().ReadFrom(&mmio_).number_of_utp_task_management_request_slots() + 1);
@@ -400,14 +406,10 @@ zx::result<> Ufs::InitDeviceInterface() {
   }
 
   // Send Link Startup UIC command to start the link startup procedure.
-  DmeLinkStartUpUicCommand link_startup_command(*this);
-  if (zx::result<std::optional<uint32_t>> result = link_startup_command.SendCommand();
-      result.is_error()) {
-    zxlogf(ERROR, "Failed to startup UFS link: %s", result.status_string());
+  if (zx::result<> result = device_manager_->SendLinkStartUp(); result.is_error()) {
+    zxlogf(ERROR, "Failed to send Link Startup UIC command %s", result.status_string());
     return result.take_error();
   }
-
-  // TODO(fxbug.dev/124835): Get the max gear level using DME_GET command.
 
   // The |device_present| bit becomes true if the host controller has successfully received a Link
   // Startup UIC command response and the UFS device has found a physical link to the controller.
@@ -429,152 +431,48 @@ zx::result<> Ufs::InitDeviceInterface() {
   NopOutUpiu nop_upiu;
   auto nop_response = transfer_request_processor_->SendRequestUpiu<NopOutUpiu, NopInUpiu>(nop_upiu);
   if (nop_response.is_error()) {
-    zxlogf(ERROR, "Send NopInUpiu failed: %s", nop_response.status_string());
+    zxlogf(ERROR, "Failed to send NopInUpiu %s", nop_response.status_string());
     return nop_response.take_error();
   }
 
-  zx::time device_init_start_time = zx::clock::get_monotonic();
-  SetFlagUpiu set_flag_upiu(Flags::fDeviceInit);
-  auto query_response =
-      transfer_request_processor_->SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
-          set_flag_upiu);
-  if (query_response.is_error()) {
-    zxlogf(ERROR, "Failed to set fDeviceInit flag: %s", query_response.status_string());
-    return query_response.take_error();
-  }
-
-  zx::time device_init_time_out = device_init_start_time + zx::msec(kDeviceInitTimeoutMs);
-  while (true) {
-    ReadFlagUpiu read_flag_upiu(Flags::fDeviceInit);
-    auto response =
-        transfer_request_processor_->SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
-            read_flag_upiu);
-    if (response.is_error()) {
-      zxlogf(ERROR, "Failed to read fDeviceInit flag: %s", response.status_string());
-      return response.take_error();
-    }
-    uint8_t flag = response->GetResponse<FlagResponseUpiu>().GetFlag();
-
-    if (!flag)
-      break;
-
-    if (zx::clock::get_monotonic() > device_init_time_out) {
-      zxlogf(ERROR, "Wait for fDeviceInit timed out (%u ms)", kDeviceInitTimeoutMs);
-      return zx::error(ZX_ERR_TIMED_OUT);
-    }
-    usleep(10000);
+  if (zx::result<> result = device_manager_->DeviceInit(); result.is_error()) {
+    zxlogf(ERROR, "Failed to initialize device %s", result.status_string());
+    return result.take_error();
   }
 
   if (zx::result<> result = Notify(NotifyEvent::kDeviceInitDone, 0); result.is_error()) {
     return result.take_error();
   }
 
-  // 26MHz is a default value written in spec.
-  // UFS Specification Version 3.1, section 6.4 "Reference Clock".
-  WriteAttributeUpiu write_attribute_upiu(Attributes::bRefClkFreq, AttributeReferenceClock::k26MHz);
-  query_response =
-      transfer_request_processor_->SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
-          write_attribute_upiu);
-  if (query_response.is_error()) {
-    zxlogf(ERROR, "Failed to write bRefClkFreq attribute: %s", query_response.status_string());
+  if (zx::result<> result = device_manager_->SetReferenceClock(); result.is_error()) {
+    zxlogf(ERROR, "Failed to set reference clock %s", result.status_string());
+    return result.take_error();
   }
 
-  // Get connected lanes.
-  DmeGetUicCommand dme_get_connected_tx_lanes_command(*this, PA_ConnectedTxDataLanes, 0);
-  zx::result<std::optional<uint32_t>> value = dme_get_connected_tx_lanes_command.SendCommand();
-  if (value.is_error()) {
-    return value.take_error();
+  if (zx::result<> result = device_manager_->SetUicPowerMode(); result.is_error()) {
+    zxlogf(ERROR, "Failed to set UIC power mode %s", result.status_string());
+    return result.take_error();
   }
-  [[maybe_unused]] uint32_t connected_tx_lanes = value.value().value();
 
-  DmeGetUicCommand dme_get_connected_rx_lanes_command(*this, PA_ConnectedRxDataLanes, 0);
-  value = dme_get_connected_rx_lanes_command.SendCommand();
-  if (value.is_error()) {
-    return value.take_error();
+  if (zx::result<> result = device_manager_->CheckBootLunEnabled(); result.is_error()) {
+    zxlogf(ERROR, "Failed to check Boot LUN enabled %s", result.status_string());
+    return result.take_error();
   }
-  [[maybe_unused]] uint32_t connected_rx_lanes = value.value().value();
-
-  // Update lanes with available TX/RX lanes.
-  DmeGetUicCommand dme_get_avail_tx_lanes_command(*this, PA_AvailTxDataLanes, 0);
-  value = dme_get_avail_tx_lanes_command.SendCommand();
-  if (value.is_error()) {
-    return value.take_error();
-  }
-  uint32_t tx_lanes = value.value().value();
-
-  DmeGetUicCommand dme_get_avail_rx_lanes_command(*this, PA_AvailRxDataLanes, 0);
-  value = dme_get_avail_rx_lanes_command.SendCommand();
-  if (value.is_error()) {
-    return value.take_error();
-  }
-  uint32_t rx_lanes = value.value().value();
-  zxlogf(DEBUG, "tx_lanes_=%d, rx_lanes_=%d", tx_lanes, rx_lanes);
-
-  // Read bBootLunEn to confirm device interface is ok.
-  ReadAttributeUpiu read_attribute_upiu(Attributes::bBootLunEn);
-
-  query_response =
-      transfer_request_processor_->SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
-          read_attribute_upiu);
-  if (query_response.is_error()) {
-    zxlogf(ERROR, "Failed to read bBootLunEn attribute: %s", query_response.status_string());
-    return query_response.take_error();
-  }
-  auto attribute = query_response->GetResponse<AttributeResponseUpiu>().GetAttribute();
-  zxlogf(DEBUG, "bBootLunEn 0x%0x", attribute);
 
   // TODO(fxbug.dev/124835): Set bMaxNumOfRTT (Read-to-transfer)
 
   return zx::ok();
 }
 
-zx::result<> Ufs::GetControllerDescriptor() {
-  ReadDescriptorUpiu read_device_desc_upiu(DescriptorType::kDevice);
-  auto response = transfer_request_processor_->SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
-      read_device_desc_upiu);
-  if (response.is_error()) {
-    zxlogf(ERROR, "Failed to read device descriptor: %s", response.status_string());
-    return response.take_error();
-  }
-  device_descriptor_ =
-      response->GetResponse<DescriptorResponseUpiu>().GetDescriptor<DeviceDescriptor>();
-
-  // The field definitions for VersionReg and wSpecVersion are the same.
-  // wSpecVersion use big-endian byte ordering.
-  auto version = VersionReg::Get().FromValue(betoh16(device_descriptor_.wSpecVersion));
-  zxlogf(INFO, "UFS device version %u.%u%u", version.major_version_number(),
-         version.minor_version_number(), version.version_suffix());
-
-  zxlogf(INFO, "%u enabled LUNs found", device_descriptor_.bNumberLU);
-
-  ReadDescriptorUpiu read_geometry_desc_upiu(DescriptorType::kGeometry);
-  response = transfer_request_processor_->SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
-      read_geometry_desc_upiu);
-  if (response.is_error()) {
-    zxlogf(ERROR, "Failed to read geometry descriptor: %s", response.status_string());
-    return response.take_error();
-  }
-  geometry_descriptor_ =
-      response->GetResponse<DescriptorResponseUpiu>().GetDescriptor<GeometryDescriptor>();
-
-  // The kDeviceDensityUnit is defined in the spec as 512.
-  // qTotalRawDeviceCapacity use big-endian byte ordering.
-  constexpr uint32_t kDeviceDensityUnit = 512;
-  zxlogf(INFO, "UFS device total size is %lu bytes",
-         betoh64(geometry_descriptor_.qTotalRawDeviceCapacity) * kDeviceDensityUnit);
-
-  return zx::ok();
-}
-
 zx::result<> Ufs::ScanLogicalUnits() {
   uint8_t max_luns = 0;
-  if (geometry_descriptor_.bMaxNumberLU == 0) {
+  if (device_manager_->GetGeometryDescriptor().bMaxNumberLU == 0) {
     max_luns = 8;
-  } else if (geometry_descriptor_.bMaxNumberLU == 1) {
+  } else if (device_manager_->GetGeometryDescriptor().bMaxNumberLU == 1) {
     max_luns = 32;
   } else {
     zxlogf(ERROR, "Invalid Geometry Descriptor bMaxNumberLU value=%d",
-           geometry_descriptor_.bMaxNumberLU);
+           device_manager_->GetGeometryDescriptor().bMaxNumberLU);
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
   ZX_ASSERT(max_luns <= kMaxLun);
@@ -594,18 +492,12 @@ zx::result<> Ufs::ScanLogicalUnits() {
   }
 
   for (uint8_t i = 0; i < max_luns; ++i) {
-    ReadDescriptorUpiu read_unit_desc_upiu(DescriptorType::kUnit, i);
-    auto response =
-        transfer_request_processor_->SendRequestUpiu<QueryRequestUpiu, QueryResponseUpiu>(
-            read_unit_desc_upiu);
-    if (response.is_error()) {
+    zx::result<UnitDescriptor> unit_descriptor = device_manager_->ReadUnitDescriptor(i);
+    if (unit_descriptor.is_error()) {
       continue;
     }
 
-    auto unit_descriptor =
-        response->GetResponse<DescriptorResponseUpiu>().GetDescriptor<UnitDescriptor>();
-
-    if (unit_descriptor.bLUEnable != 1) {
+    if (unit_descriptor->bLUEnable != 1) {
       continue;
     }
 
@@ -615,26 +507,30 @@ zx::result<> Ufs::ScanLogicalUnits() {
 
     block_device.name = std::string("ufs") + std::to_string(i);
 
-    if (unit_descriptor.bLogicalBlockSize >= sizeof(size_t) * 8) {
+    if (unit_descriptor->bLogicalBlockSize >= sizeof(size_t) * 8) {
       zxlogf(ERROR, "Cannot handle the unit descriptor bLogicalBlockSize = %d.",
-             unit_descriptor.bLogicalBlockSize);
+             unit_descriptor->bLogicalBlockSize);
       return zx::error(ZX_ERR_OUT_OF_RANGE);
     }
 
-    block_device.block_size = 1 << unit_descriptor.bLogicalBlockSize;
-    block_device.block_count = betoh64(unit_descriptor.qLogicalBlockCount);
+    block_device.block_size = 1 << unit_descriptor->bLogicalBlockSize;
+    block_device.block_count = betoh64(unit_descriptor->qLogicalBlockCount);
 
-    if (block_device.block_size < 4096 ||
+    if (block_device.block_size < kBlockSize ||
         block_device.block_size <
-            static_cast<size_t>(geometry_descriptor_.bMinAddrBlockSize) * 512 ||
+            static_cast<size_t>(device_manager_->GetGeometryDescriptor().bMinAddrBlockSize) *
+                kSectorSize ||
         block_device.block_size >
-            static_cast<size_t>(geometry_descriptor_.bMaxInBufferSize) * 512 ||
+            static_cast<size_t>(device_manager_->GetGeometryDescriptor().bMaxInBufferSize) *
+                kSectorSize ||
         block_device.block_size >
-            static_cast<size_t>(geometry_descriptor_.bMaxOutBufferSize) * 512) {
+            static_cast<size_t>(device_manager_->GetGeometryDescriptor().bMaxOutBufferSize) *
+                kSectorSize) {
       zxlogf(ERROR, "Cannot handle logical block size of %zu.", block_device.block_size);
       return zx::error(ZX_ERR_OUT_OF_RANGE);
     }
-    ZX_ASSERT_MSG(block_device.block_size == 4096, "Currently, it only supports a 4KB block size.");
+    ZX_ASSERT_MSG(block_device.block_size == kBlockSize,
+                  "Currently, it only supports a 4KB block size.");
 
     // Verify that the Lun is ready. This command ignores unit attention errors if they occur.
     ScsiTestUnitReadyUpiu unit_ready_upiu;

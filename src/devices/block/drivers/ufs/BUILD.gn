@@ -28,6 +28,7 @@ group("tests") {
 
 source_set("shared") {
   sources = [
+    "device_manager.cc",
     "logical_unit.cc",
     "request_list.cc",
     "transfer_request_processor.cc",
