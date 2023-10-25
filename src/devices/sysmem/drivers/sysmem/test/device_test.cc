@@ -174,27 +174,31 @@ TEST(Device, GuardPageCommandLine) {
 
 class FakeDdkSysmem : public zxtest::Test {
  public:
-  FakeDdkSysmem() : outgoing_(pdev_loop_.dispatcher()) {}
+  FakeDdkSysmem() {}
 
   void SetUp() override {
     pdev_.SetConfig({
         .use_fake_bti = true,
     });
     EXPECT_OK(pdev_loop_.StartThread());
-    auto device_handler =
-        [this](fidl::ServerEnd<fuchsia_hardware_platform_device::Device> request) {
-          fidl::BindServer(pdev_loop_.dispatcher(), std::move(request), &pdev_);
-        };
-    fuchsia_hardware_platform_device::Service::InstanceHandler handler(
-        {.device = std::move(device_handler)});
-
-    auto service_result =
-        outgoing_.AddService<fuchsia_hardware_platform_device::Service>(std::move(handler));
-    ZX_ASSERT(service_result.is_ok());
 
     auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ZX_ASSERT(endpoints.is_ok());
-    ZX_ASSERT(outgoing_.Serve(std::move(endpoints->server)).is_ok());
+
+    runSyncOnLoop(pdev_loop_, [this, server = std::move(endpoints->server)]() mutable {
+      outgoing_.emplace(pdev_loop_.dispatcher());
+      auto device_handler =
+          [this](fidl::ServerEnd<fuchsia_hardware_platform_device::Device> request) {
+            fidl::BindServer(pdev_loop_.dispatcher(), std::move(request), &pdev_);
+          };
+      fuchsia_hardware_platform_device::Service::InstanceHandler handler(
+          {.device = std::move(device_handler)});
+      auto service_result =
+          outgoing_->AddService<fuchsia_hardware_platform_device::Service>(std::move(handler));
+      ZX_ASSERT(service_result.is_ok());
+
+      ZX_ASSERT(outgoing_->Serve(std::move(server)).is_ok());
+    });
 
     fake_parent_->AddFidlService(fuchsia_hardware_platform_device::Service::Name,
                                  std::move(endpoints->client));
@@ -207,6 +211,7 @@ class FakeDdkSysmem : public zxtest::Test {
     EXPECT_OK(sysmem_->zxdev()->WaitUntilUnbindReplyCalled());
     std::ignore = sysmem_.release();
     loop_.Shutdown();
+    runSyncOnLoop(pdev_loop_, [this] { outgoing_.reset(); });
   }
 
   fidl::ClientEnd<fuchsia_sysmem::Allocator> Connect() {
@@ -238,6 +243,16 @@ class FakeDdkSysmem : public zxtest::Test {
     return std::move(collection_client_end);
   }
 
+  void runSyncOnLoop(async::Loop& loop, fit::closure to_run) {
+    sync_completion_t done;
+    ZX_ASSERT(ZX_OK ==
+              async::PostTask(loop.dispatcher(), [&done, to_run = std::move(to_run)]() mutable {
+                std::move(to_run)();
+                sync_completion_signal(&done);
+              }));
+    ZX_ASSERT(ZX_OK == sync_completion_wait_deadline(&done, ZX_TIME_INFINITE));
+  }
+
  protected:
   sysmem_driver::Driver sysmem_ctx_;
   std::shared_ptr<MockDevice> fake_parent_ = MockDevice::FakeRootParent();
@@ -248,7 +263,8 @@ class FakeDdkSysmem : public zxtest::Test {
   async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
   // Separate loop so we can make sync FIDL calls from loop_ to pdev_loop_.
   async::Loop pdev_loop_{&kAsyncLoopConfigNeverAttachToThread};
-  component::OutgoingDirectory outgoing_;
+  // std::optional<> because outgoing_ can only be created, used, deleted on pdev_loop_
+  std::optional<component::OutgoingDirectory> outgoing_;
 };
 
 TEST_F(FakeDdkSysmem, TearDownLoop) {

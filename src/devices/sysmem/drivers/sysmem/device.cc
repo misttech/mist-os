@@ -361,7 +361,7 @@ zx_status_t Device::GetContiguousGuardParameters(uint64_t* guard_bytes_out,
 
 void Device::DdkUnbind(ddk::UnbindTxn txn) {
   // Try to ensure there are no outstanding VMOS before shutting down the loop.
-  async::PostTask(loop_.dispatcher(), [this]() mutable {
+  postTask([this]() mutable {
     std::lock_guard checker(*loop_checker_);
     waiting_for_unbind_ = true;
     CheckForUnbind();
@@ -380,8 +380,9 @@ void Device::DdkUnbind(ddk::UnbindTxn txn) {
 
 void Device::CheckForUnbind() {
   std::lock_guard checker(*loop_checker_);
-  if (!waiting_for_unbind_)
+  if (!waiting_for_unbind_) {
     return;
+  }
   if (!logical_buffer_collections().empty()) {
     zxlogf(INFO, "Not unbinding because there are logical buffer collections count %ld",
            logical_buffer_collections().size());
@@ -674,7 +675,7 @@ zx_status_t Device::Bind() {
   }
 
   sync_completion_t completion;
-  async::PostTask(loop_.dispatcher(), [this, &completion] {
+  postTask([this, &completion] {
     // After this point, all operations must happen on the loop thread.
     loop_checker_.emplace(fit::thread_checker());
     sync_completion_signal(&completion);
@@ -695,26 +696,23 @@ zx_status_t Device::Bind() {
 }
 
 void Device::ConnectV1(ConnectV1RequestView request, ConnectV1Completer::Sync& completer) {
-  async::PostTask(loop_.dispatcher(),
-                  [this, allocator_request = std::move(request->allocator_request)]() mutable {
-                    // The Allocator is channel-owned / self-owned.
-                    Allocator::CreateChannelOwnedV1(allocator_request.TakeChannel(), this);
-                  });
+  postTask([this, allocator_request = std::move(request->allocator_request)]() mutable {
+    // The Allocator is channel-owned / self-owned.
+    Allocator::CreateChannelOwnedV1(allocator_request.TakeChannel(), this);
+  });
 }
 
 void Device::ConnectV2(ConnectV2RequestView request, ConnectV2Completer::Sync& completer) {
-  async::PostTask(loop_.dispatcher(),
-                  [this, allocator_request = std::move(request->allocator_request)]() mutable {
-                    // The Allocator is channel-owned / self-owned.
-                    Allocator::CreateChannelOwnedV2(allocator_request.TakeChannel(), this);
-                  });
+  postTask([this, allocator_request = std::move(request->allocator_request)]() mutable {
+    // The Allocator is channel-owned / self-owned.
+    Allocator::CreateChannelOwnedV2(allocator_request.TakeChannel(), this);
+  });
 }
 
 void Device::SetAuxServiceDirectory(SetAuxServiceDirectoryRequestView request,
                                     SetAuxServiceDirectoryCompleter::Sync& completer) {
-  async::PostTask(loop_.dispatcher(), [this, aux_service_directory =
-                                                 std::make_shared<sys::ServiceDirectory>(
-                                                     request->service_directory.TakeChannel())] {
+  postTask([this, aux_service_directory = std::make_shared<sys::ServiceDirectory>(
+                      request->service_directory.TakeChannel())] {
     // Should the need arise in future, it'd be fine to stash a shared_ptr<aux_service_directory>
     // here if we need it for anything else.  For now we only need it for metrics.
     metrics_.metrics_buffer().SetServiceDirectory(aux_service_directory);
@@ -724,20 +722,20 @@ void Device::SetAuxServiceDirectory(SetAuxServiceDirectoryRequestView request,
 
 zx_status_t Device::CommonSysmemConnectV1(zx::channel allocator_request) {
   // The Allocator is channel-owned / self-owned.
-  return async::PostTask(loop_.dispatcher(),
-                         [this, allocator_request = std::move(allocator_request)]() mutable {
-                           // The Allocator is channel-owned / self-owned.
-                           Allocator::CreateChannelOwnedV1(std::move(allocator_request), this);
-                         });
+  postTask([this, allocator_request = std::move(allocator_request)]() mutable {
+    // The Allocator is channel-owned / self-owned.
+    Allocator::CreateChannelOwnedV1(std::move(allocator_request), this);
+  });
+  return ZX_OK;
 }
 
 zx_status_t Device::CommonSysmemConnectV2(zx::channel allocator_request) {
   // The Allocator is channel-owned / self-owned.
-  return async::PostTask(loop_.dispatcher(),
-                         [this, allocator_request = std::move(allocator_request)]() mutable {
-                           // The Allocator is channel-owned / self-owned.
-                           Allocator::CreateChannelOwnedV2(std::move(allocator_request), this);
-                         });
+  postTask([this, allocator_request = std::move(allocator_request)]() mutable {
+    // The Allocator is channel-owned / self-owned.
+    Allocator::CreateChannelOwnedV2(std::move(allocator_request), this);
+  });
+  return ZX_OK;
 }
 
 zx_status_t Device::CommonSysmemRegisterHeap(
@@ -798,11 +796,11 @@ zx_status_t Device::CommonSysmemRegisterHeap(
     std::weak_ptr<ExternalMemoryAllocator> weak_associated_allocator_;
   };
 
-  return async::PostTask(loop_.dispatcher(),
-                         [this, heap, heap_connection = std::move(heap_connection)]() mutable {
-                           std::lock_guard checker(*loop_checker_);
-                           EventHandler::Bind(this, std::move(heap_connection), heap);
-                         });
+  postTask([this, heap, heap_connection = std::move(heap_connection)]() mutable {
+    std::lock_guard checker(*loop_checker_);
+    EventHandler::Bind(this, std::move(heap_connection), heap);
+  });
+  return ZX_OK;
 }
 
 zx_status_t Device::CommonSysmemRegisterSecureMem(
@@ -811,189 +809,189 @@ zx_status_t Device::CommonSysmemRegisterSecureMem(
 
   current_close_is_abort_ = std::make_shared<std::atomic_bool>(true);
 
-  return async::PostTask(
-      loop_.dispatcher(), [this, secure_mem_connection = std::move(secure_mem_connection),
-                           close_is_abort = current_close_is_abort_]() mutable {
-        std::lock_guard checker(*loop_checker_);
-        // This code must run asynchronously for two reasons:
-        // 1) It does synchronous IPCs to the secure mem device, so SysmemRegisterSecureMem must
-        // have return so the call from the secure mem device is unblocked.
-        // 2) It modifies member variables like |secure_mem_| and |heaps_| that should only be
-        // touched on |loop_|'s thread.
-        auto wait_for_close = std::make_unique<async::Wait>(
-            secure_mem_connection.channel().get(), ZX_CHANNEL_PEER_CLOSED, 0,
-            async::Wait::Handler([this, close_is_abort](async_dispatcher_t* dispatcher,
-                                                        async::Wait* wait, zx_status_t status,
-                                                        const zx_packet_signal_t* signal) {
-              std::lock_guard checker(*loop_checker_);
-              if (*close_is_abort && secure_mem_) {
-                // The server end of this channel (the aml-securemem driver) is the driver that
-                // listens for suspend(mexec) so that soft reboot can succeed.  If that driver has
-                // failed, intentionally force a hard reboot here to get back to a known-good state.
-                //
-                // TODO(fxbug.dev/98039): When there's any more direct/immediate way to
-                // intentionally trigger a hard reboot, switch to that (or just remove this TODO
-                // when sysmem terminating directly leads to a hard reboot).
-                ZX_PANIC(
-                    "secure_mem_ connection unexpectedly lost; secure mem in unknown state; hard "
-                    "reboot");
-              }
-            }));
-
-        // It is safe to call Begin() here before setting up secure_mem_ because handler will either
-        // run on current thread (loop_thrd_), or be run after the current task finishes while the
-        // loop is shutting down.
-        zx_status_t status = wait_for_close->Begin(dispatcher());
-        if (status != ZX_OK) {
-          DRIVER_ERROR("Device::RegisterSecureMem() failed wait_for_close->Begin()");
-          return;
-        }
-
-        secure_mem_ = std::make_unique<SecureMemConnection>(std::move(secure_mem_connection),
-                                                            std::move(wait_for_close));
-
-        // Else we already ZX_PANIC()ed in wait_for_close.
-        ZX_DEBUG_ASSERT(secure_mem_);
-
-        // At this point secure_allocators_ has only the secure heaps that are configured via sysmem
-        // (not those configured via the TEE), and the memory for these is not yet protected.  Get
-        // the SecureMem properties for these.  At some point in the future it _may_ make sense to
-        // have connections to more than one SecureMem driver, but for now we assume that a single
-        // SecureMem connection is handling all the secure heaps.  We don't actually protect any
-        // range(s) until later.
-        for (const auto& [heap_type, allocator] : secure_allocators_) {
-          uint64_t phys_base;
-          uint64_t size_bytes;
-          zx_status_t get_status = allocator->GetPhysicalMemoryInfo(&phys_base, &size_bytes);
-          if (get_status != ZX_OK) {
-            LOG(WARNING, "get_status != ZX_OK - get_status: %d", get_status);
-            return;
+  postTask([this, secure_mem_connection = std::move(secure_mem_connection),
+            close_is_abort = current_close_is_abort_]() mutable {
+    std::lock_guard checker(*loop_checker_);
+    // This code must run asynchronously for two reasons:
+    // 1) It does synchronous IPCs to the secure mem device, so SysmemRegisterSecureMem must
+    // have return so the call from the secure mem device is unblocked.
+    // 2) It modifies member variables like |secure_mem_| and |heaps_| that should only be
+    // touched on |loop_|'s thread.
+    auto wait_for_close = std::make_unique<async::Wait>(
+        secure_mem_connection.channel().get(), ZX_CHANNEL_PEER_CLOSED, 0,
+        async::Wait::Handler([this, close_is_abort](async_dispatcher_t* dispatcher,
+                                                    async::Wait* wait, zx_status_t status,
+                                                    const zx_packet_signal_t* signal) {
+          std::lock_guard checker(*loop_checker_);
+          if (*close_is_abort && secure_mem_) {
+            // The server end of this channel (the aml-securemem driver) is the driver that
+            // listens for suspend(mexec) so that soft reboot can succeed.  If that driver has
+            // failed, intentionally force a hard reboot here to get back to a known-good state.
+            //
+            // TODO(fxbug.dev/98039): When there's any more direct/immediate way to
+            // intentionally trigger a hard reboot, switch to that (or just remove this TODO
+            // when sysmem terminating directly leads to a hard reboot).
+            ZX_PANIC(
+                "secure_mem_ connection unexpectedly lost; secure mem in unknown state; hard "
+                "reboot");
           }
-          fuchsia_sysmem::SecureHeapAndRange whole_heap;
-          whole_heap.heap().emplace(
-              safe_cast<fuchsia_sysmem::HeapType>(sysmem::fidl_underlying_cast(heap_type)));
-          fuchsia_sysmem::SecureHeapRange range;
-          range.physical_address().emplace(phys_base);
-          range.size_bytes().emplace(size_bytes);
-          whole_heap.range().emplace(std::move(range));
-          fidl::Arena arena;
-          auto wire_whole_heap = fidl::ToWire(arena, std::move(whole_heap));
-          auto get_properties_result =
-              secure_mem_->channel()->GetPhysicalSecureHeapProperties(wire_whole_heap);
-          if (!get_properties_result.ok()) {
-            ZX_ASSERT(!*close_is_abort);
-            return;
-          }
-          if (get_properties_result->is_error()) {
-            LOG(WARNING, "GetPhysicalSecureHeapProperties() failed - status: %d",
-                get_properties_result->error_value());
-            // Don't call set_ready() on secure_allocators_.  Eg. this can happen if securemem TA is
-            // not found.
-            return;
-          }
-          ZX_ASSERT(get_properties_result->is_ok());
-          const fuchsia_sysmem::SecureHeapProperties& properties =
-              fidl::ToNatural(get_properties_result->value()->properties);
-          ZX_ASSERT(properties.heap().has_value());
-          ZX_ASSERT(properties.heap().value() ==
-                    safe_cast<fuchsia_sysmem::HeapType>(sysmem::fidl_underlying_cast(heap_type)));
-          ZX_ASSERT(properties.dynamic_protection_ranges().has_value());
-          ZX_ASSERT(properties.protected_range_granularity().has_value());
-          ZX_ASSERT(properties.max_protected_range_count().has_value());
-          ZX_ASSERT(properties.is_mod_protected_range_available().has_value());
-          SecureMemControl control;
-          control.heap_type = heap_type;
-          control.parent = this;
-          control.is_dynamic = properties.dynamic_protection_ranges().value();
-          control.max_range_count = properties.max_protected_range_count().value();
-          control.range_granularity = properties.protected_range_granularity().value();
-          control.has_mod_protected_range = properties.is_mod_protected_range_available().value();
-          secure_mem_controls_.emplace(heap_type, std::move(control));
-        }
+        }));
 
-        // Now we get the secure heaps that are configured via the TEE.
-        auto get_result = secure_mem_->channel()->GetPhysicalSecureHeaps();
-        if (!get_result.ok()) {
-          // For now this is fatal unless explicitly unregistered, since this case is very
-          // unexpected, and in this case rebooting is the most plausible way to get back to a
-          // working state anyway.
-          ZX_ASSERT(!*close_is_abort);
-          return;
-        }
-        if (get_result->is_error()) {
-          LOG(WARNING, "GetPhysicalSecureHeaps() failed - status: %d", get_result->error_value());
-          // Don't call set_ready() on secure_allocators_.  Eg. this can happen if securemem TA is
-          // not found.
-          return;
-        }
-        ZX_ASSERT(get_result->is_ok());
-        const fuchsia_sysmem::SecureHeapsAndRanges& tee_configured_heaps =
-            fidl::ToNatural(get_result->value()->heaps);
-        ZX_ASSERT(tee_configured_heaps.heaps().has_value());
-        ZX_ASSERT(tee_configured_heaps.heaps()->size() != 0);
-        for (const auto& heap : *tee_configured_heaps.heaps()) {
-          ZX_ASSERT(heap.heap().has_value());
-          ZX_ASSERT(heap.ranges().has_value());
-          // A tee-configured heap with multiple ranges can be specified by the protocol but is not
-          // currently supported by sysmem.
-          ZX_ASSERT(heap.ranges()->size() == 1);
-          // For now we assume that all TEE-configured heaps are protected full-time, and that they
-          // start fully protected.
-          constexpr bool kIsAlwaysCpuAccessible = false;
-          constexpr bool kIsEverCpuAccessible = false;
-          constexpr bool kIsReady = false;
-          constexpr bool kCanBeTornDown = true;
-          const fuchsia_sysmem::SecureHeapRange& heap_range = heap.ranges()->at(0);
-          auto secure_allocator = std::make_unique<ContiguousPooledMemoryAllocator>(
-              this, "tee_secure", &heaps_, safe_cast<uint64_t>(heap.heap().value()),
-              *heap_range.size_bytes(), kIsAlwaysCpuAccessible, kIsEverCpuAccessible, kIsReady,
-              kCanBeTornDown, loop_.dispatcher());
-          status = secure_allocator->InitPhysical(heap_range.physical_address().value());
-          // A failing status is fatal for now.
-          ZX_ASSERT(status == ZX_OK);
-          LOG(DEBUG,
-              "created secure allocator: heap_type: %08lx base: %016" PRIx64 " size: %016" PRIx64,
-              safe_cast<uint64_t>(heap.heap().value()), heap_range.physical_address().value(),
-              heap_range.size_bytes().value());
-          auto heap_type =
-              safe_cast<fuchsia_sysmem2::HeapType>(sysmem::fidl_underlying_cast(*heap.heap()));
+    // It is safe to call Begin() here before setting up secure_mem_ because handler will either
+    // run on current thread (loop_thrd_), or be run after the current task finishes while the
+    // loop is shutting down.
+    zx_status_t status = wait_for_close->Begin(dispatcher());
+    if (status != ZX_OK) {
+      DRIVER_ERROR("Device::RegisterSecureMem() failed wait_for_close->Begin()");
+      return;
+    }
 
-          // The only usage of SecureMemControl for a TEE-configured heap is to do ZeroSubRange(),
-          // so field values of this SecureMemControl are somewhat degenerate (eg. VDEC).
-          SecureMemControl control;
-          control.heap_type = heap_type;
-          control.parent = this;
-          control.is_dynamic = false;
-          control.max_range_count = 0;
-          control.range_granularity = 0;
-          control.has_mod_protected_range = false;
-          secure_mem_controls_.emplace(heap_type, std::move(control));
+    secure_mem_ = std::make_unique<SecureMemConnection>(std::move(secure_mem_connection),
+                                                        std::move(wait_for_close));
 
-          ZX_ASSERT(secure_allocators_.find(heap_type) == secure_allocators_.end());
-          secure_allocators_[heap_type] = secure_allocator.get();
-          ZX_ASSERT(allocators_.find(heap_type) == allocators_.end());
-          allocators_[heap_type] = std::move(secure_allocator);
-        }
+    // Else we already ZX_PANIC()ed in wait_for_close.
+    ZX_DEBUG_ASSERT(secure_mem_);
 
-        for (const auto& [heap_type, allocator] : secure_allocators_) {
-          // The secure_mem_ connection is ready to protect ranges on demand to cover this heap's
-          // used ranges.  There are no used ranges yet since the heap wasn't ready until now.
-          allocator->set_ready();
-        }
+    // At this point secure_allocators_ has only the secure heaps that are configured via sysmem
+    // (not those configured via the TEE), and the memory for these is not yet protected.  Get
+    // the SecureMem properties for these.  At some point in the future it _may_ make sense to
+    // have connections to more than one SecureMem driver, but for now we assume that a single
+    // SecureMem connection is handling all the secure heaps.  We don't actually protect any
+    // range(s) until later.
+    for (const auto& [heap_type, allocator] : secure_allocators_) {
+      uint64_t phys_base;
+      uint64_t size_bytes;
+      zx_status_t get_status = allocator->GetPhysicalMemoryInfo(&phys_base, &size_bytes);
+      if (get_status != ZX_OK) {
+        LOG(WARNING, "get_status != ZX_OK - get_status: %d", get_status);
+        return;
+      }
+      fuchsia_sysmem::SecureHeapAndRange whole_heap;
+      whole_heap.heap().emplace(
+          safe_cast<fuchsia_sysmem::HeapType>(sysmem::fidl_underlying_cast(heap_type)));
+      fuchsia_sysmem::SecureHeapRange range;
+      range.physical_address().emplace(phys_base);
+      range.size_bytes().emplace(size_bytes);
+      whole_heap.range().emplace(std::move(range));
+      fidl::Arena arena;
+      auto wire_whole_heap = fidl::ToWire(arena, std::move(whole_heap));
+      auto get_properties_result =
+          secure_mem_->channel()->GetPhysicalSecureHeapProperties(wire_whole_heap);
+      if (!get_properties_result.ok()) {
+        ZX_ASSERT(!*close_is_abort);
+        return;
+      }
+      if (get_properties_result->is_error()) {
+        LOG(WARNING, "GetPhysicalSecureHeapProperties() failed - status: %d",
+            get_properties_result->error_value());
+        // Don't call set_ready() on secure_allocators_.  Eg. this can happen if securemem TA is
+        // not found.
+        return;
+      }
+      ZX_ASSERT(get_properties_result->is_ok());
+      const fuchsia_sysmem::SecureHeapProperties& properties =
+          fidl::ToNatural(get_properties_result->value()->properties);
+      ZX_ASSERT(properties.heap().has_value());
+      ZX_ASSERT(properties.heap().value() ==
+                safe_cast<fuchsia_sysmem::HeapType>(sysmem::fidl_underlying_cast(heap_type)));
+      ZX_ASSERT(properties.dynamic_protection_ranges().has_value());
+      ZX_ASSERT(properties.protected_range_granularity().has_value());
+      ZX_ASSERT(properties.max_protected_range_count().has_value());
+      ZX_ASSERT(properties.is_mod_protected_range_available().has_value());
+      SecureMemControl control;
+      control.heap_type = heap_type;
+      control.parent = this;
+      control.is_dynamic = properties.dynamic_protection_ranges().value();
+      control.max_range_count = properties.max_protected_range_count().value();
+      control.range_granularity = properties.protected_range_granularity().value();
+      control.has_mod_protected_range = properties.is_mod_protected_range_available().value();
+      secure_mem_controls_.emplace(heap_type, std::move(control));
+    }
 
-        is_secure_mem_ready_ = true;
+    // Now we get the secure heaps that are configured via the TEE.
+    auto get_result = secure_mem_->channel()->GetPhysicalSecureHeaps();
+    if (!get_result.ok()) {
+      // For now this is fatal unless explicitly unregistered, since this case is very
+      // unexpected, and in this case rebooting is the most plausible way to get back to a
+      // working state anyway.
+      ZX_ASSERT(!*close_is_abort);
+      return;
+    }
+    if (get_result->is_error()) {
+      LOG(WARNING, "GetPhysicalSecureHeaps() failed - status: %d", get_result->error_value());
+      // Don't call set_ready() on secure_allocators_.  Eg. this can happen if securemem TA is
+      // not found.
+      return;
+    }
+    ZX_ASSERT(get_result->is_ok());
+    const fuchsia_sysmem::SecureHeapsAndRanges& tee_configured_heaps =
+        fidl::ToNatural(get_result->value()->heaps);
+    ZX_ASSERT(tee_configured_heaps.heaps().has_value());
+    ZX_ASSERT(tee_configured_heaps.heaps()->size() != 0);
+    for (const auto& heap : *tee_configured_heaps.heaps()) {
+      ZX_ASSERT(heap.heap().has_value());
+      ZX_ASSERT(heap.ranges().has_value());
+      // A tee-configured heap with multiple ranges can be specified by the protocol but is not
+      // currently supported by sysmem.
+      ZX_ASSERT(heap.ranges()->size() == 1);
+      // For now we assume that all TEE-configured heaps are protected full-time, and that they
+      // start fully protected.
+      constexpr bool kIsAlwaysCpuAccessible = false;
+      constexpr bool kIsEverCpuAccessible = false;
+      constexpr bool kIsReady = false;
+      constexpr bool kCanBeTornDown = true;
+      const fuchsia_sysmem::SecureHeapRange& heap_range = heap.ranges()->at(0);
+      auto secure_allocator = std::make_unique<ContiguousPooledMemoryAllocator>(
+          this, "tee_secure", &heaps_, safe_cast<uint64_t>(heap.heap().value()),
+          *heap_range.size_bytes(), kIsAlwaysCpuAccessible, kIsEverCpuAccessible, kIsReady,
+          kCanBeTornDown, loop_.dispatcher());
+      status = secure_allocator->InitPhysical(heap_range.physical_address().value());
+      // A failing status is fatal for now.
+      ZX_ASSERT(status == ZX_OK);
+      LOG(DEBUG,
+          "created secure allocator: heap_type: %08lx base: %016" PRIx64 " size: %016" PRIx64,
+          safe_cast<uint64_t>(heap.heap().value()), heap_range.physical_address().value(),
+          heap_range.size_bytes().value());
+      auto heap_type =
+          safe_cast<fuchsia_sysmem2::HeapType>(sysmem::fidl_underlying_cast(*heap.heap()));
 
-        // At least for now, we just call all the LogicalBufferCollection(s), regardless of which
-        // are waiting on secure mem (if any). The extra calls are required (by semantics of
-        // OnDependencyReady) to not be harmful from a correctness point of view. If any are waiting
-        // on secure mem, those can now proceed, and will do so using the current thread (the loop_
-        // thread).
-        ForEachLogicalBufferCollection([](LogicalBufferCollection* logical_buffer_collection) {
-          logical_buffer_collection->OnDependencyReady();
-        });
+      // The only usage of SecureMemControl for a TEE-configured heap is to do ZeroSubRange(),
+      // so field values of this SecureMemControl are somewhat degenerate (eg. VDEC).
+      SecureMemControl control;
+      control.heap_type = heap_type;
+      control.parent = this;
+      control.is_dynamic = false;
+      control.max_range_count = 0;
+      control.range_granularity = 0;
+      control.has_mod_protected_range = false;
+      secure_mem_controls_.emplace(heap_type, std::move(control));
 
-        LOG(DEBUG, "sysmem RegisterSecureMem() done (async)");
-      });
+      ZX_ASSERT(secure_allocators_.find(heap_type) == secure_allocators_.end());
+      secure_allocators_[heap_type] = secure_allocator.get();
+      ZX_ASSERT(allocators_.find(heap_type) == allocators_.end());
+      allocators_[heap_type] = std::move(secure_allocator);
+    }
+
+    for (const auto& [heap_type, allocator] : secure_allocators_) {
+      // The secure_mem_ connection is ready to protect ranges on demand to cover this heap's
+      // used ranges.  There are no used ranges yet since the heap wasn't ready until now.
+      allocator->set_ready();
+    }
+
+    is_secure_mem_ready_ = true;
+
+    // At least for now, we just call all the LogicalBufferCollection(s), regardless of which
+    // are waiting on secure mem (if any). The extra calls are required (by semantics of
+    // OnDependencyReady) to not be harmful from a correctness point of view. If any are waiting
+    // on secure mem, those can now proceed, and will do so using the current thread (the loop_
+    // thread).
+    ForEachLogicalBufferCollection([](LogicalBufferCollection* logical_buffer_collection) {
+      logical_buffer_collection->OnDependencyReady();
+    });
+
+    LOG(DEBUG, "sysmem RegisterSecureMem() done (async)");
+  });
+  return ZX_OK;
 }
 
 // This call allows us to tell the difference between expected vs. unexpected close of the tee_
@@ -1007,12 +1005,13 @@ zx_status_t Device::CommonSysmemUnregisterSecureMem() {
   // We set a flag here so that a PEER_CLOSED of the channel won't cause the wait handler to crash.
   *current_close_is_abort_ = false;
   current_close_is_abort_.reset();
-  return async::PostTask(loop_.dispatcher(), [this]() {
+  postTask([this]() {
     std::lock_guard checker(*loop_checker_);
     LOG(DEBUG, "begin UnregisterSecureMem()");
     secure_mem_.reset();
     LOG(DEBUG, "end UnregisterSecureMem()");
   });
+  return ZX_OK;
 }
 
 // "Direct" sysmem banjo is sysmem banjo directly on the sysmem device instead of on the
@@ -1188,50 +1187,67 @@ const fidl::WireSyncClient<fuchsia_sysmem::SecureMem>& Device::SecureMemConnecti
 
 FidlDevice::FidlDevice(zx_device_t* parent, sysmem_driver::Device* sysmem_device,
                        async_dispatcher_t* dispatcher)
-    : DdkFidlDeviceBase(parent),
-      sysmem_device_(sysmem_device),
-      dispatcher_(dispatcher),
-      outgoing_(dispatcher) {
+    : DdkFidlDeviceBase(parent), sysmem_device_(sysmem_device), dispatcher_(dispatcher) {
   ZX_DEBUG_ASSERT(parent_);
   ZX_DEBUG_ASSERT(sysmem_device_);
 }
 
 zx_status_t FidlDevice::Bind() {
-  auto status = outgoing_.AddService<fuchsia_hardware_sysmem::Service>(
-      fuchsia_hardware_sysmem::Service::InstanceHandler({
-          .sysmem = bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure),
-          .allocator_v1 =
-              [this](fidl::ServerEnd<fuchsia_sysmem::Allocator> request) {
-                zx_status_t status = sysmem_device_->CommonSysmemConnectV1(request.TakeChannel());
-                if (status != ZX_OK) {
-                  LOG(INFO, "Direct connect to fuchsia_sysmem::Allocator() failed");
-                }
-              },
-          .allocator_v2 =
-              [this](fidl::ServerEnd<fuchsia_sysmem2::Allocator> request) {
-                zx_status_t status = sysmem_device_->CommonSysmemConnectV2(request.TakeChannel());
-                if (status != ZX_OK) {
-                  LOG(INFO, "Direct connect to fuchsia_sysmem2::Allocator() failed");
-                }
-              },
-      }));
-
-  if (status.is_error()) {
-    zxlogf(ERROR, "failed to add FIDL protocol to the outgoing directory (sysmem): %s",
-           status.status_string());
-    return status.status_value();
-  }
-
   auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
   if (endpoints.is_error()) {
     return endpoints.status_value();
   }
 
-  status = outgoing_.Serve(std::move(endpoints->server));
+  // outgoing_ can only be created and used on loop_ thread
+  std::optional<zx_status_t> status;
+  sysmem_device_->runSyncOnLoop([this, server = std::move(endpoints->server), &status]() mutable {
+    dispatcher_checker_.emplace();
+    std::lock_guard<fit::thread_checker> thread_checker(*dispatcher_checker_);
+
+    outgoing_.emplace(dispatcher_);
+    auto outgoing_result = outgoing_->AddService<fuchsia_hardware_sysmem::Service>(
+        fuchsia_hardware_sysmem::Service::InstanceHandler({
+            .sysmem = bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure),
+            .allocator_v1 =
+                [this](fidl::ServerEnd<fuchsia_sysmem::Allocator> request) {
+                  zx_status_t status = sysmem_device_->CommonSysmemConnectV1(request.TakeChannel());
+                  if (status != ZX_OK) {
+                    LOG(INFO, "Direct connect to fuchsia_sysmem::Allocator() failed");
+                  }
+                },
+            .allocator_v2 =
+                [this](fidl::ServerEnd<fuchsia_sysmem2::Allocator> request) {
+                  zx_status_t status = sysmem_device_->CommonSysmemConnectV2(request.TakeChannel());
+                  if (status != ZX_OK) {
+                    LOG(INFO, "Direct connect to fuchsia_sysmem2::Allocator() failed");
+                  }
+                },
+        }));
+
+    if (outgoing_result.is_error()) {
+      zxlogf(ERROR, "failed to add FIDL protocol to the outgoing directory (sysmem): %s",
+             outgoing_result.status_string());
+      status = outgoing_result.status_value();
+      return;
+    }
+
+    outgoing_result = outgoing_->Serve(std::move(server));
+    if (outgoing_result.is_error()) {
+      zxlogf(ERROR, "failed to serve outgoing directory (sysmem): %s",
+             outgoing_result.status_string());
+      status = outgoing_result.status_value();
+      return;
+    }
+    status = ZX_OK;
+  });
+  ZX_DEBUG_ASSERT(status.has_value());
+  if (status.value() != ZX_OK) {
+    return status.value();
+  }
+
   std::array offers = {
       fuchsia_hardware_sysmem::Service::Name,
   };
-
   zx_status_t add_status =
       DdkAdd(ddk::DeviceAddArgs("sysmem-fidl")
                  .set_flags(DEVICE_ADD_ALLOW_MULTI_COMPOSITE | DEVICE_ADD_MUST_ISOLATE)

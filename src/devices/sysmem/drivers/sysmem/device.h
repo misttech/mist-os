@@ -228,6 +228,25 @@ class Device final : public DdkDeviceType,
     return is_secure_mem_ready_;
   }
 
+  template <typename F>
+  void postTask(F to_run) {
+    zx_status_t post_status = async::PostTask(loop_.dispatcher(), std::move(to_run));
+    ZX_ASSERT_MSG(post_status == ZX_OK || (post_status == ZX_ERR_BAD_STATE && waiting_for_unbind_),
+                  "async::PostTask failed: %d", post_status);
+  }
+
+  template <typename F>
+  void runSyncOnLoop(F to_run) {
+    // Must not call runSyncOnLoop() from the loop_ thread, since that would get stuck.
+    ZX_DEBUG_ASSERT(!loop_checker_->is_thread_valid());
+    sync_completion_t done;
+    postTask([&done, to_run = std::move(to_run)]() mutable {
+      std::move(to_run)();
+      sync_completion_signal(&done);
+    });
+    ZX_ASSERT(ZX_OK == sync_completion_wait_deadline(&done, ZX_TIME_INFINITE));
+  }
+
  private:
   class SecureMemConnection {
    public:
@@ -356,7 +375,7 @@ class Device final : public DdkDeviceType,
 
   Settings settings_;
 
-  bool waiting_for_unbind_ __TA_GUARDED(*loop_checker_) = false;
+  std::atomic<bool> waiting_for_unbind_ = false;
 
   SysmemMetrics metrics_;
 
@@ -390,7 +409,9 @@ class FidlDevice : public DdkFidlDeviceBase, public fidl::Server<fuchsia_hardwar
   sysmem_driver::Device* sysmem_device_;
   fidl::ServerBindingGroup<fuchsia_hardware_sysmem::Sysmem> bindings_;
   async_dispatcher_t* dispatcher_;
-  component::OutgoingDirectory outgoing_;
+  std::optional<fit::thread_checker> dispatcher_checker_;
+  // std::optional<> so we can init on the dispatcher_ thread
+  std::optional<component::OutgoingDirectory> outgoing_ __TA_GUARDED(*dispatcher_checker_);
 };
 
 class BanjoDevice;
