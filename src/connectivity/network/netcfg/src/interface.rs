@@ -4,7 +4,7 @@
 
 use {
     anyhow::Context as _,
-    serde::{Deserialize, Serialize},
+    serde::{Deserialize, Deserializer, Serialize},
     std::collections::HashSet,
     std::io::{Seek, SeekFrom},
     std::{fs, io, path},
@@ -393,11 +393,23 @@ fn get_bus_type_for_topological_path(topological_path: &str) -> Result<BusType, 
     }
 }
 
+fn deserialize_glob_pattern<'de, D>(deserializer: D) -> Result<glob::Pattern, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let buf = String::deserialize(deserializer)?;
+    glob::Pattern::new(&buf).map_err(serde::de::Error::custom)
+}
+
 // TODO(fxbug.dev/135094): Add interface matchers for naming policy
 #[derive(Debug, Deserialize, Eq, Hash, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum MatchingRule {
     BusTypes(Vec<BusType>),
+    // TODO(fxbug.dev/135495): Use a lightweight regex crate with the basic
+    // regex features to allow for more configurations than glob.
+    #[serde(deserialize_with = "deserialize_glob_pattern")]
+    TopologicalPath(glob::Pattern),
     DeviceClasses(Vec<DeviceClass>),
 }
 
@@ -412,6 +424,12 @@ impl MatchingRule {
                 // matches any of the types included in the list.
                 let bus_type = get_bus_type_for_topological_path(&info.topological_path)?;
                 Ok(type_list.contains(&bus_type))
+            }
+            MatchingRule::TopologicalPath(pattern) => {
+                // Match the interface if the provided pattern finds any
+                // matches in the interface under comparison's
+                // topological path.
+                Ok(pattern.matches(&info.topological_path))
             }
             MatchingRule::DeviceClasses(class_list) => {
                 // Match the interface if the interface under comparison
@@ -865,6 +883,55 @@ mod tests {
         let matching_rule = MatchingRule::BusTypes(vec![BusType::USB, BusType::PCI, BusType::SDIO]);
         let interface_match_res = matching_rule.does_interface_match(&device_info);
         assert!(interface_match_res.is_err());
+    }
+
+    #[test]
+    fn test_interface_matching_by_topological_path() {
+        #[derive(Clone)]
+        struct MatchPathTestCase {
+            topological_path: &'static str,
+            glob_str: &'static str,
+            want_match: bool,
+        }
+
+        let test_cases = vec![
+            // Glob matches the number pattern of XX:XX in the path.
+            MatchPathTestCase {
+                topological_path: "/dev/sys/platform/pt/PCI0/bus/00:14.0_/00:14.0/ethernet",
+                glob_str: r"*[0-9][0-9]:[0-9][0-9]*",
+                want_match: true,
+            },
+            // Glob is a matcher for any character, so all paths will match.
+            MatchPathTestCase {
+                topological_path: "pattern/will/match/anything",
+                glob_str: r"*",
+                want_match: true,
+            },
+            // Glob checks for '00' after the colon but it will not find it.
+            MatchPathTestCase {
+                topological_path: "/dev/sys/platform/pt/PCI0/bus/00:14.0_/00:14.0/ethernet",
+                glob_str: r"*[0-9][0-9]:00*",
+                want_match: false,
+            },
+        ];
+
+        for (_i, MatchPathTestCase { topological_path, glob_str, want_match }) in
+            test_cases.into_iter().enumerate()
+        {
+            let device_info = devices::DeviceInfo {
+                topological_path: topological_path.to_owned(),
+                // `device_class` and `mac` have no effect on `TopologicalPath`
+                // matching, so we use arbitrary values.
+                device_class: fhwnet::DeviceClass::Virtual,
+                mac: Default::default(),
+            };
+
+            // Create a matching rule for the provided glob expression.
+            let matching_rule =
+                MatchingRule::TopologicalPath(glob::Pattern::new(glob_str).unwrap());
+            let does_interface_match = matching_rule.does_interface_match(&device_info).unwrap();
+            assert_eq!(does_interface_match, want_match);
+        }
     }
 
     #[test]

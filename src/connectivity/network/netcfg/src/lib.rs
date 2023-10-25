@@ -4508,7 +4508,8 @@ mod tests {
   "interface_name_prefix": "hello",
   "interface_naming_policy": [ { "matchers": [
         {"bus_types": ["usb", "pci", "sdio"]},
-        {"device_classes": ["ethernet", "wlan", "wlanap"]}
+        {"device_classes": ["ethernet", "wlan", "wlanap"]},
+        {"topological_path": "abcde"}
     ],
         "naming_scheme": []
     } ]
@@ -4573,6 +4574,7 @@ mod tests {
                     DeviceClass::Wlan,
                     DeviceClass::WlanAp,
                 ]),
+                interface::MatchingRule::TopologicalPath(glob::Pattern::new("abcde").unwrap()),
             ]),
             naming_scheme: Vec::new(),
         }]);
@@ -4896,5 +4898,36 @@ mod tests {
 
         fes.enable_masquerade_interface_id(id);
         assert_eq!(fes.should_enable(Some(ethernet_info.interface_type()), id), true);
+    }
+
+    // TODO(fxbug.dev/135108): Include the 'interface name' matcher
+    // pattern as a test case.
+    #[test]
+    fn test_config_denies_invalid_glob() {
+        // Should fail on improper glob: square braces not closed.
+        let bad_config = r#"
+{
+  "dns_config": { "servers": [] },
+  "filter_config": {
+    "rules": [],
+    "nat_rules": [],
+    "rdr_rules": []
+  },
+  "filter_enabled_interface_types": [],
+  "allowed_upstream_device_classes": [],
+  "forwarded_device_classes": { "ipv4": [], "ipv6": [] },
+  "interface_naming_policy": [{
+    "matchers": [ { "topological_path": "[speling" } ],
+    "naming_scheme": []
+  }]
+}
+"#;
+
+        let err =
+            Config::load_str(bad_config).expect_err("config shouldn't accept invalid pattern");
+        let err = err.downcast::<serde_json::Error>().expect("downcast error");
+        assert_eq!(err.classify(), serde_json::error::Category::Data);
+        // Ensure the error is complaining about invalid glob.
+        assert!(format!("{:?}", err).contains("invalid range"));
     }
 }
