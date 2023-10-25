@@ -57,7 +57,11 @@
                 "-machine", "virtualization=true", "-cpu", "max",
             {{/if}}
         {{else}} {{! architecture == x64 }}
-            "q35",
+            {{#if (eq runtime.engine_type "qemu")}}
+                "q35,smbios-entry-point-type=32",
+            {{else}}
+                "q35",
+            {{/if}}
             "-device",
             "isa-debug-exit,iobase=0xf4,iosize=0x04",
             {{! Override the SeaBIOS serial port to keep it from outputting

@@ -59,7 +59,7 @@ func TestQEMUCommand(t *testing.T) {
 			"-m",
 			"1",
 			"-machine",
-			"q35",
+			"q35,smbios-entry-point-type=32",
 			"-fw_cfg",
 			"name=etc/sercon-port,string=0",
 			"-cpu",

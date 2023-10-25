@@ -18,7 +18,10 @@ type AEMUCommandBuilder struct {
 }
 
 func NewAEMUCommandBuilder() *AEMUCommandBuilder {
-	a := &AEMUCommandBuilder{}
+	a := &AEMUCommandBuilder{
+		QEMUCommandBuilder: QEMUCommandBuilder{forAEMU: true},
+	}
+
 	// Default values for AEMU
 	a.SetFeature("GLDirectMem")
 	a.SetFeature("VirtioInput")

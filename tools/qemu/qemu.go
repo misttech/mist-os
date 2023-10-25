@@ -172,6 +172,7 @@ type QEMUCommandBuilder struct {
 	uefi       *uefiVolumes
 	kernelArgs []string
 	hasDisk    bool
+	forAEMU    bool // For AEMU-specific quirks
 
 	// Any errors encountered while building the command.
 	errs []string
@@ -215,7 +216,14 @@ func (q *QEMUCommandBuilder) SetTarget(target Target, kvm bool) {
 		}
 	case TargetEnum.X86_64:
 		q.AddKernelArg("kernel.serial=legacy")
-		q.SetFlag("-machine", "q35")
+		// AEMU's fork of QEMU does not support the smbios-entry-point-type
+		// machine property, but supports the type the kernel does without any
+		// added qualification.
+		if q.forAEMU {
+			q.SetFlag("-machine", "q35")
+		} else {
+			q.SetFlag("-machine", "q35,smbios-entry-point-type=32")
+		}
 
 		// Override the SeaBIOS serial port to keep it from outputting
 		// a terminal reset on start.

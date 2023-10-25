@@ -563,7 +563,8 @@ case $ARCH in
         ;;
     x64)
         QEMU=${QEMUDIR}qemu-system-x86_64
-        ARGS+=" -machine q35"
+        # The kernel only supports the v2.1 (32-bit) SMBIOS entry point.
+        ARGS+=" -machine q35,smbios-entry-point-type=32"
         ARGS+=" -device isa-debug-exit,iobase=0xf4,iosize=0x04"
 
         # Override the SeaBIOS serial port to keep it from outputting

@@ -47,7 +47,7 @@
                 "-serial",
                 "unix:/home/developer/.local/share/Fuchsia/ffx/emu/instances/fuchsia-emulator/serial,server,nowait,logfile=/home/developer/.local/share/Fuchsia/ffx/emu/instances/fuchsia-emulator/emulator.log.serial",
                 "-machine",
-                "q35",
+                "q35,smbios-entry-point-type=32",
                 "-device",
                 "isa-debug-exit,iobase=0xf4,iosize=0x04",
                 "-fw_cfg",
