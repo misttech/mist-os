@@ -27,13 +27,5 @@ class FIDLImportFinder(importlib.abc.MetaPathFinder):
         return load_module(fullname)
 
 
-def export(ty: type) -> None:
-    sys.modules[f"fidl.{ty.__name__}"] = ty
-
-
-export(TransportError)
-export(AsyncSocket)
-export(HandleWaker)
-export(GlobalHandleWaker)
 meta_hook = FIDLImportFinder()
 sys.meta_path.insert(0, meta_hook)

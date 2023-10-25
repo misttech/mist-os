@@ -2,3 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 from . import _import
+
+from ._import import AsyncSocket
+from ._import import GlobalHandleWaker
+from ._import import HandleWaker
+from ._import import TransportError
