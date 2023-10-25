@@ -86,7 +86,8 @@ template("board_configuration") {
     main_target = target_name
 
     # Outputs
-    bazel_inputs = "${target_name}_bazel_inputs"
+    bazel_inputs = "${target_name}.bazel_input"
+    assembly_inputs = "${target_name}.assembly_inputs"
 
     # Inputs
     if (defined(invoker.input_bundles)) {
@@ -95,10 +96,10 @@ template("board_configuration") {
       # The validation task that the bundles are all created by the
       # board_input_bundle() template.
       validate_input_bundles = "${main_target}.validate_input_bundle_targets"
-
-      # The input bundle copying targets.
-      input_bundle_copy_targets = []
     }
+
+    # The input bundle copying targets.
+    input_bundle_copy_targets = []
 
     # Intermediate Files
     base_info = "${target_name}.base_info"
@@ -118,6 +119,9 @@ template("board_configuration") {
 
     # The "official" output board configuration file
     board_configuration = "${board_configuration_dir}/board_configuration.json"
+
+    # The board input bundles that are needed for OOT use.
+    assembly_inputs = "${bundles_dir}/${target_name}.assembly_inputs.json"
 
     # The files that we create as book-keeping between our tasks.
     depfile = "${bundles_dir}/${target_name}.d"
@@ -231,7 +235,10 @@ template("board_configuration") {
       _input_bundle_copy_target = "${target_name}.${_input_bundle_name}.copy"
       action(_input_bundle_copy_target) {
         forward_variables_from(invoker, [ "testonly" ])
-        visibility = [ ":${labels.main_target}" ]
+        visibility = [
+          ":${labels.assembly_inputs}",
+          ":${labels.main_target}",
+        ]
         script = "//build/copy_tree.py"
         deps = [ ":${labels.validate_input_bundles}" ]
         depfile = "${target_out_dir}/${target_name}.d"
@@ -266,6 +273,23 @@ template("board_configuration") {
 
     creation_deps += labels.input_bundle_copy_targets
   }
+
+  generated_file(labels.assembly_inputs) {
+    deps = labels.input_bundle_copy_targets
+    data_keys = [ "board_assembly_artifacts" ]
+    output_conversion = "json"
+    outputs = [ files.assembly_inputs ]
+
+    metadata = {
+      assembly_inputs = [
+        {
+          path = rebase_path(outputs[0], root_build_dir)
+        },
+      ]
+      assembly_inputs_barrier = []
+    }
+  }
+  creation_deps += [ ":${labels.assembly_inputs}" ]
 
   base_info_contents = {
     name = board_name
@@ -317,7 +341,7 @@ template("board_configuration") {
   }
 
   # Make board configuration and hardware support bundle available to Bazel
-  bazel_input_resource_directory("${target_name}.bazel_input") {
+  bazel_input_resource_directory(labels.bazel_inputs) {
     forward_variables_from(invoker, [ "testonly" ])
     source_dir = files.board_configuration_dir
     dest_dir = rebase_path(files.board_configuration_dir, root_out_dir)

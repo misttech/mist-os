@@ -273,6 +273,12 @@ template("board_input_bundle") {
           outdir = rebase_path(files.bundle_dir, root_build_dir)
         },
       ]
+      board_assembly_artifacts = [
+        {
+          source = rebase_path(files.bundle_dir, root_build_dir)
+          destination = "built/artifacts/$source"
+        },
+      ]
     }
   }
 
