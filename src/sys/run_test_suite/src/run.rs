@@ -505,6 +505,9 @@ mod test {
                 ftest_manager::RunBuilderRequest::AddSuiteInRealm { .. } => {
                     panic!("AddSuiteInRealm not supported")
                 }
+                ftest_manager::RunBuilderRequest::_UnknownMethod { ordinal, .. } => {
+                    panic!("Not expecting unknown request: {}", ordinal)
+                }
             }
         }
         assert!(
@@ -892,6 +895,9 @@ mod test {
                 }
                 ftest_manager::RunBuilderRequest::WithSchedulingOptions { options, .. } => {
                     scheduling_options = Some(options);
+                }
+                ftest_manager::RunBuilderRequest::_UnknownMethod { ordinal, .. } => {
+                    panic!("Not expecting unknown request: {}", ordinal)
                 }
             }
         }

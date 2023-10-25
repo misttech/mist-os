@@ -142,6 +142,13 @@ pub async fn run_test_manager(
                 // clients should reconnect to run new tests.
                 break;
             }
+            ftest_manager::RunBuilderRequest::_UnknownMethod {
+                ordinal, control_handle, ..
+            } => {
+                warn!("Unknown run builder request received: {}, closing connection", ordinal);
+                control_handle.shutdown_with_epitaph(zx::Status::NOT_SUPPORTED);
+                break;
+            }
         }
     }
     Ok(())
@@ -206,6 +213,12 @@ pub async fn run_test_manager_query_server(
                     SuiteRealm { realm_proxy, offers, test_collection }.into(),
                     QueryResponder::EnumerateInRealm(responder),
                 )
+            }
+
+            ftest_manager::QueryRequest::_UnknownMethod { ordinal, control_handle, .. } => {
+                warn!("Unknown query request received: {}, closing connection", ordinal);
+                control_handle.shutdown_with_epitaph(zx::Status::NOT_SUPPORTED);
+                break;
             }
         };
         let mut iterator = match iterator.into_stream() {

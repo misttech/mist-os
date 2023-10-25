@@ -17,7 +17,7 @@ use {
         self_diagnostics::DiagnosticNode,
     },
     anyhow::Error,
-    fidl::endpoints::Responder,
+    fidl::endpoints::{ControlHandle, Responder},
     fidl_fuchsia_component::RealmProxy,
     fidl_fuchsia_component_resolution::ResolverProxy,
     fidl_fuchsia_component_test as ftest, fidl_fuchsia_test_manager as ftest_manager,
@@ -25,7 +25,7 @@ use {
         LaunchError, RunControllerRequest, RunControllerRequestStream, SchedulingOptions,
         SuiteControllerRequest, SuiteControllerRequestStream, SuiteEvent as FidlSuiteEvent,
     },
-    fuchsia_async as fasync,
+    fuchsia_async as fasync, fuchsia_zircon as zx,
     futures::{
         channel::{mpsc, oneshot},
         future::Either,
@@ -100,6 +100,16 @@ impl TestRunBuilder {
                             // channel.
                             e.into_inner().drop_without_shutdown();
                         })
+                    }
+                    RunControllerRequest::_UnknownMethod { ordinal, control_handle, .. } => {
+                        warn!(
+                            "Unknown run controller request received: {}, closing connection",
+                            ordinal
+                        );
+                        // dropping the remote handle cancels it.
+                        drop(run_task.take());
+                        control_handle.shutdown_with_epitaph(zx::Status::NOT_SUPPORTED);
+                        break;
                     }
                 }
             }
@@ -296,6 +306,16 @@ impl Suite {
                             // channel.
                             e.into_inner().drop_without_shutdown();
                         })
+                    }
+                    SuiteControllerRequest::_UnknownMethod { ordinal, control_handle, .. } => {
+                        warn!(
+                            "Unknown suite controller request received: {}, closing connection",
+                            ordinal
+                        );
+                        // Dropping the remote handle for the suite execution task cancels it.
+                        drop(task.take());
+                        control_handle.shutdown_with_epitaph(zx::Status::NOT_SUPPORTED);
+                        break;
                     }
                 }
             }
