@@ -149,7 +149,7 @@ The code makes two requests to the server:
 * A `SendString` request
 
 ```rust
-{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/fidl/rust/client/src/main.rs" region_tag="main" highlight="10,11,12,13,14,15" %}
+{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/fidl/rust/client_sync/src/main.rs" region_tag="main" highlight="10,11,12,13,14,15" %}
 ```
 
 The call to `echo_string` will block until a response is received from the server, and therefore
