@@ -1931,9 +1931,15 @@ static bool pmi_interrupt_handler(iframe_t* frame, PerfmonState* state) {
   bits_to_clear |=
       (IA32_PERF_GLOBAL_STATUS_UNCORE_OVF_MASK | IA32_PERF_GLOBAL_STATUS_COND_CHGD_MASK);
 
-  // TODO(dje): No need to accumulate bits to clear if we're going to clear
-  // everything that's set anyway. Kept as is during development.
-  bits_to_clear |= status;
+  // Do not attempt to clear any bits which were not asserted in the STATUS
+  // register at the start. In theory, this should not be a problem.  In
+  // practice, attempting to clear non-asserted bits can result in taking a
+  // general protection fault in some environment (specifically, I have seen
+  // this in an AEMU environment).
+  //
+  // TODO(johngro): Spend more time looking into why this happens, and whether
+  // or not the emulator is implementing incorrect behavior.
+  bits_to_clear &= status;
 
   LTRACEF("cpu %u: clearing status bits 0x%" PRIx64 "\n", cpu, bits_to_clear);
   write_msr(IA32_PERF_GLOBAL_STATUS_RESET, bits_to_clear);
