@@ -4,7 +4,6 @@
 
 use {
     anyhow::anyhow,
-    assert_matches::assert_matches,
     fidl_fuchsia_hardware_power_statecontrol::{self as fpower, RebootReason},
     fidl_fuchsia_sys2 as fsys2, fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
@@ -102,7 +101,7 @@ async fn test_reboot_ota_update() {
 
 #[fasync::run_singlethreaded(test)]
 async fn test_reboot_no_args() {
-    let (realm_instance, mut reboot_reason_receiver) = build_realm().await;
+    let (realm_instance, reboot_reason_receiver) = build_realm().await;
     let lifecycle_controller = realm_instance
         .root
         .connect_to_protocol_at_exposed_dir::<fsys2::LifecycleControllerMarker>()
@@ -112,5 +111,5 @@ async fn test_reboot_no_args() {
     lifecycle_controller.start_instance("./reboot_no_args", binder_server).await.unwrap().unwrap();
 
     fasync::Timer::new(std::time::Duration::from_secs(1)).await;
-    assert_matches!(reboot_reason_receiver.try_recv(), Ok(None));
+    assert_eq!(reboot_reason_receiver.await.unwrap(), RebootReason::UserRequest);
 }

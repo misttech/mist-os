@@ -193,23 +193,34 @@ pub fn sys_reboot(
                 .unwrap_or_default();
             let reboot_args: Vec<_> = arg_bytes.split(|byte| byte == &b',').collect();
 
-            if reboot_args.contains(&&b"ota_update"[..]) {
-                let (client_end, server_end) = zx::Channel::create();
-                connect_channel_to_protocol::<fpower::AdminMarker>(server_end)
-                    .expect("couldn't connect to fuchsia.hardware.power.statecontrol.Admin");
-                let proxy = fpower::AdminSynchronousProxy::new(client_end);
+            let (client_end, server_end) = zx::Channel::create();
+            connect_channel_to_protocol::<fpower::AdminMarker>(server_end)
+                .expect("couldn't connect to fuchsia.hardware.power.statecontrol.Admin");
+            let proxy = fpower::AdminSynchronousProxy::new(client_end);
 
-                match proxy.reboot(fpower::RebootReason::SystemUpdate, zx::Time::INFINITE) {
-                    Ok(_) => {
-                        log_info!("Rebooting to apply system update...");
-                        // System is rebooting... wait until runtime ends.
-                        zx::Time::INFINITE.sleep();
-                    }
-                    Err(e) => panic!("Failed to reboot, status: {e}"),
+            let reboot_reason = if reboot_args.contains(&&b"ota_update"[..]) {
+                fpower::RebootReason::SystemUpdate
+            } else if reboot_args.is_empty()
+                || reboot_args.contains(&&b"shell"[..])
+                || reboot_args.contains(&&b"bootloader"[..])
+            {
+                fpower::RebootReason::UserRequest
+            } else {
+                not_implemented!(
+                    "Unsupported reboot args: '{}'",
+                    String::from_utf8_lossy(&arg_bytes)
+                );
+                return error!(ENOSYS);
+            };
+            match proxy.reboot(reboot_reason, zx::Time::INFINITE) {
+                Ok(_) => {
+                    log_info!("Rebooting... reason: {:?}", reboot_reason);
+                    // System is rebooting... wait until runtime ends.
+                    zx::Time::INFINITE.sleep();
                 }
+                Err(e) => panic!("Failed to reboot, status: {e}"),
             }
-            not_implemented!("Unsupported reboot args: '{}'", String::from_utf8_lossy(&arg_bytes));
-            error!(ENOSYS)
+            Ok(())
         }
 
         _ => error!(EINVAL),
