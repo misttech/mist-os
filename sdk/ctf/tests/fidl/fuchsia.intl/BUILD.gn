@@ -2,19 +2,25 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/component/config.gni")
+import("//build/components.gni")
+import("//build/fidl/fidl.gni")
+import("//build/rust/rustc_binary.gni")
 import("//sdk/ctf/build/ctf.gni")
 
-rustc_test("fuchsia-intl-test-bin") {
-  edition = "2018"
+rustc_test("bin") {
+  edition = "2021"
+  source_root = "src/main.rs"
+  sources = [ source_root ]
   name = "fuchsia_intl_test"
-  source_root = "src/fuchsia_intl_test.rs"
-  sources = [ "src/fuchsia_intl_test.rs" ]
   deps = [
+    "//sdk/ctf/tests/fidl/fuchsia.intl/testing/fidl:fuchsia.intl.test_rust",
     "//sdk/fidl/fuchsia.intl:fuchsia.intl_rust",
     "//sdk/fidl/fuchsia.settings:fuchsia.settings_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
+    "//src/testing/realm_proxy",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
   ]
@@ -24,7 +30,7 @@ fuchsia_component("fuchsia-intl-test-component") {
   testonly = true
   component_name = "fuchsia-intl-test"
   manifest = "meta/fuchsia-intl-test.cml"
-  deps = [ ":fuchsia-intl-test-bin" ]
+  deps = [ ":bin" ]
 }
 
 ctf_fuchsia_package("fuchsia-intl-tests") {
@@ -39,15 +45,18 @@ fuchsia_test_component("test-root") {
   test_type = "ctf"
 }
 
-fuchsia_test_package("fuchsia-intl-tests-package") {
+fuchsia_test_package("fuchsia-intl-tests-latest") {
   test_components = [ ":test-root" ]
-  subpackages = [ ":fuchsia-intl-tests" ]
+  subpackages = [
+    "testing/realm-factory",
+    ":fuchsia-intl-tests",
+  ]
 }
 
 group("tests") {
   testonly = true
   deps = [
-    ":fuchsia-intl-tests-package",
+    ":fuchsia-intl-tests-latest",
     ":fuchsia-intl-tests_archive",
   ]
 }

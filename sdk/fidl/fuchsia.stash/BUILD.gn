@@ -18,6 +18,7 @@ fidl("fuchsia.stash") {
   # Please don't add entries to this visibility list without approval
   # from the people listed in OWNERS.
   visibility = [
+    "//sdk/ctf/tests/fidl/fuchsia.intl/*",
     "//src/connectivity/bluetooth/core/bt-gap/*",
     "//src/connectivity/bluetooth/testing/*",
     "//src/connectivity/bluetooth/tests/bt-manifest-integration-tests/*",

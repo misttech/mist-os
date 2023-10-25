@@ -2,14 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "syslog/client.shard.cml" ],
+    include: [
+        "//sdk/lib/sys/component/realm_builder.shard.cml",
+        "syslog/client.shard.cml",
+    ],
     children: [
+        {
+            name: "test_realm_factory",
+            url: "intl-realm-factory#meta/realm-factory.cm",
+        },
         {
             name: "test_suite",
             url: "fuchsia-intl-tests#meta/fuchsia-intl-test.cm",
         },
     ],
     offer: [
+        // TODO(297223481): The F15 CTF test uses these. Remove after we branch for F16.
         {
             protocol: [
                 "fuchsia.intl.PropertyProvider",
@@ -17,6 +25,26 @@
             ],
             from: "parent",
             to: "#test_suite",
+        },
+        {
+            protocol: "fuchsia.intl.test.RealmFactory",
+            from: "#test_realm_factory",
+            to: "#test_suite",
+        },
+        {
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+                "fuchsia.process.Launcher",
+                "fuchsia.stash.Store",
+            ],
+            from: "parent",
+            to: "#test_realm_factory",
+        },
+        {
+            storage: "data",
+            from: "parent",
+            to: "#test_realm_factory",
         },
     ],
     expose: [

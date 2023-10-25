@@ -12,5 +12,5 @@ restore the original values after it runs.
 ```shell
 fx set core.x64 --with //sdk/ctf/tests/fidl/fuchsia.intl:tests
 # ...
-fx test intl-services-system-test
+fx fuchsia.intl.test-services-system-test
 ```
