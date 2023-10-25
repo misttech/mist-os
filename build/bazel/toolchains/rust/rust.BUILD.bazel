@@ -4,7 +4,7 @@
 
 """Top level BUILD.bazel in the @fuchsia_rust_toolchain repository."""
 
-load("@//:fuchsia_build_config.bzl", "build_config")
+load("@fuchsia_build_config//:defs.bzl", "build_config")
 load("@rules_rust//rust:toolchain.bzl", "rust_stdlib_filegroup", "rust_toolchain")
 
 host_os = build_config.host_os

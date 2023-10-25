@@ -83,7 +83,6 @@ action("generate_main_workspace") {
     "//build/bazel/templates/template.WORKSPACE.bazel",
     "//build/bazel/templates/template.bazel.sh",
     "//build/bazel/templates/template.bazelrc",
-    "//build/bazel/templates/template.fuchsia_build_config.bzl",
     "//build/bazel/templates/template.platform_mappings",
 
     # The script reads this configuration file

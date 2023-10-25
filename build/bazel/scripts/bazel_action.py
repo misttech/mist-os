@@ -34,7 +34,6 @@ from typing import Dict, List, Optional
 _BAZEL_BUILTIN_REPOSITORIES = ("@bazel_tools//", "@local_config_cc//")
 
 # A list of file extensions for files that should be ignored from depfiles.
-
 _IGNORED_FILE_SUFFIXES = (
     # .pyc files contain their own timestamp which does not necessarily match
     # their file timestamp, triggering the python interpreter to rewrite them
@@ -46,6 +45,11 @@ _IGNORED_FILE_SUFFIXES = (
     #
     ".pyc",
 )
+
+# A list of external repository names which do not require a hash content file
+# I.e. their implementation should already record the right dependencies to
+# their input files.
+_BAZEL_NO_CONTENT_HASH_REPOSITORIES = ("@fuchsia_build_config//",)
 
 # Technical notes on input (source and build files) located in Bazel external
 # repositories.
@@ -799,6 +803,12 @@ def is_ignored_input_label(label: str) -> bool:
     )
 
 
+def label_requires_content_hash(label: str) -> bool:
+    """Return True if the label or source file belongs to a repository
+    that does not require a content hash file."""
+    return not label.startswith(_BAZEL_NO_CONTENT_HASH_REPOSITORIES)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -1171,7 +1181,7 @@ def main():
                 else:
                     debug(f"{path} <-- {label}")
                     all_sources.add(path)
-            else:
+            elif label_requires_content_hash(label):
                 debug(f"IGNORED: {label}")
                 ignored_labels.append(label)
 

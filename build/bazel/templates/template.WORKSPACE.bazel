@@ -76,6 +76,25 @@ local_repository(
     path = "build/bazel_sdk/bazel_rules_fuchsia/common",
 )
 
+load(
+    "//:build/bazel/repository_rules.bzl",
+    "fuchsia_build_config_repository",
+)
+
+# Create the @fuchsia_build_config repository which contains the defs.bzl file
+# exporting a `build_config` struct of configuration information specific to
+# the Fuchsia platform build.
+# buildifier: disable=load-on-top
+fuchsia_build_config_repository(
+    name = "fuchsia_build_config",
+)
+
+load("@fuchsia_build_config//:defs.bzl", "build_config")
+
+fuchsia_host_tag = build_config.host_tag
+fuchsia_host_tag_alt = build_config.host_tag_alt
+fuchsia_host_os = build_config.host_os
+
 # Create the @fuchsia_icu_config repository which contains the constants.bzl file
 # exporting generating configuration constants related to the ICU library flavors
 # buildifier: disable=load-on-top
@@ -112,11 +131,11 @@ load(
 
 generate_prebuilt_rust_toolchain_repository(
     name = "fuchsia_prebuilt_rust",
-    rust_install_dir = "prebuilt/third_party/rust/{host_tag}",
+    rust_install_dir = "prebuilt/third_party/rust/" + fuchsia_host_tag,
 )
 
 register_toolchains(
-    "@fuchsia_prebuilt_rust//:rust_{host_tag_alt}",
+    "@fuchsia_prebuilt_rust//:rust_" + fuchsia_host_tag_alt,
     "@fuchsia_prebuilt_rust//:rust_fuchsia_x64",
     "@fuchsia_prebuilt_rust//:rust_fuchsia_arm64",
 )
@@ -131,7 +150,7 @@ load(
 
 go_wrap_sdk(
     name = "go_sdk",
-    root_file = "//:prebuilt/third_party/go/{host_tag}/README.md",
+    root_file = "//:prebuilt/third_party/go/%s/README.md" % fuchsia_host_tag,
 )
 
 go_rules_dependencies()
@@ -212,7 +231,7 @@ register_toolchains("@fuchsia_sdk//:fuchsia_toolchain_sdk")
 
 fuchsia_clang_repository(
     name = "fuchsia_clang",
-    local_path = "prebuilt/third_party/clang/{host_tag}",
+    local_path = "prebuilt/third_party/clang/" + fuchsia_host_tag,
 )
 
 # buildifier: disable=load-on-top
@@ -238,18 +257,18 @@ generate_prebuilt_llvm_repository(
     # headers are the same across different platforms.
     #
     # See https://cs.opensource.google/fuchsia/fuchsia/+/main:src/lib/llvm/BUILD.gn;l=51;drc=468d94479b10f5613ca928d782990e5340e943a4
-    llvm_install_dir = "prebuilt/third_party/llvm/{host_tag}",
+    llvm_install_dir = "prebuilt/third_party/llvm/" + fuchsia_host_tag,
 )
 
 generate_prebuilt_clang_toolchain_repository(
     name = "prebuilt_clang",
-    clang_install_dir = "prebuilt/third_party/clang/{host_tag}",
+    clang_install_dir = "prebuilt/third_party/clang/" + fuchsia_host_tag,
     # LINT.IfChange
     repository_version_file = "generated_repository_hashes/prebuilt_clang.hash",
     # LINT.ThenChange(../scripts/update-workspace.py)
 )
-register_toolchains("@prebuilt_clang//:host_clang_{host_os}_x64_cc_toolchain")
-register_toolchains("@prebuilt_clang//:host_clang_{host_os}_arm64_cc_toolchain")
+register_toolchains("@prebuilt_clang//:host_clang_%s_x64_cc_toolchain" % fuchsia_host_os)
+register_toolchains("@prebuilt_clang//:host_clang_%s_arm64_cc_toolchain" % fuchsia_host_os)
 
 # buildifier: disable=load-on-top
 load(
