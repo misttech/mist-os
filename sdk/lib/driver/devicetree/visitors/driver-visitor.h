@@ -13,6 +13,7 @@
 
 #include <memory>
 #include <string_view>
+#include <utility>
 
 namespace fdf_devicetree {
 
@@ -22,7 +23,7 @@ namespace fdf_devicetree {
 // visitor.
 class DriverVisitor : public Visitor {
  public:
-  using MatchCallback = fit::function<bool(std::string_view)>;
+  using MatchCallback = fit::function<bool(devicetree::StringList<>)>;
 
   // Take a callback that matches compatible string for a driver.
   explicit DriverVisitor(MatchCallback compatible_matcher)
@@ -30,10 +31,13 @@ class DriverVisitor : public Visitor {
 
   // Overload callback for equality comparison against a specific compatible
   // string.
-  explicit DriverVisitor(std::string compatible_string)
+  explicit DriverVisitor(std::vector<std::string> compatible_strings)
       : Visitor(),
-        compatible_matcher_([compatible_string](std::string_view compatible_prop) -> bool {
-          return compatible_string == compatible_prop;
+        compatible_matcher_([compatible_strings = std::move(compatible_strings)](
+                                devicetree::StringList<> compatible_props) -> bool {
+          auto matched = std::find_first_of(compatible_strings.begin(), compatible_strings.end(),
+                                            compatible_props.begin(), compatible_props.end());
+          return matched != compatible_strings.end();
         }) {}
 
   ~DriverVisitor() override = default;
@@ -56,7 +60,7 @@ class DriverVisitor : public Visitor {
   virtual zx::result<> DriverFinalizeNode(Node& node) { return zx::ok(); }
 
  protected:
-  bool is_match(const std::unordered_map<std::string_view, devicetree::PropertyValue>& node);
+  bool is_match(const std::unordered_map<std::string_view, devicetree::PropertyValue>& properties);
 
  private:
   MatchCallback compatible_matcher_;

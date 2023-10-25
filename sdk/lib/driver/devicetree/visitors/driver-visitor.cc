@@ -24,7 +24,7 @@ bool DriverVisitor::is_match(
     return false;
   }
 
-  return compatible_matcher_(*property->second.AsStringList()->begin());
+  return compatible_matcher_(*property->second.AsStringList());
 }
 
 zx::result<> DriverVisitor::Visit(Node& node, const devicetree::PropertyDecoder& decoder) {

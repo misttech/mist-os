@@ -11,7 +11,7 @@ namespace example {
 
 class ExampleDriverVisitor final : public fdf_devicetree::DriverVisitor {
  public:
-  ExampleDriverVisitor() : DriverVisitor("fuchsia,sample-device") {}
+  ExampleDriverVisitor() : DriverVisitor({"fuchsia,sample-device"}) {}
 
   zx::result<> DriverVisit(fdf_devicetree::Node& node,
                            const devicetree::PropertyDecoder& decoder) override;

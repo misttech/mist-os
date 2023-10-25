@@ -11,7 +11,7 @@ namespace sysmem_dt {
 
 class SysmemVisitor : public fdf_devicetree::DriverVisitor {
  public:
-  SysmemVisitor() : DriverVisitor("sysmem") {}
+  SysmemVisitor() : DriverVisitor({"sysmem"}) {}
   zx::result<> DriverVisit(fdf_devicetree::Node& node,
                            const devicetree::PropertyDecoder& decoder) override;
 };

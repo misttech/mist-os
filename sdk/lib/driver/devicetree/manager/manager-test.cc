@@ -114,7 +114,7 @@ TEST_F(ManagerTest, DriverVisitorTest) {
 
   class TestDriverVisitor final : public DriverVisitor {
    public:
-    TestDriverVisitor() : DriverVisitor("fuchsia,sample-device") {}
+    TestDriverVisitor() : DriverVisitor({"wrong-string", "fuchsia,sample-device"}) {}
 
     zx::result<> DriverVisit(Node& node, const devicetree::PropertyDecoder& decoder) override {
       visited = true;
@@ -135,7 +135,7 @@ TEST_F(ManagerTest, TestMetadata) {
 
   class MetadataVisitor : public DriverVisitor {
    public:
-    MetadataVisitor() : DriverVisitor("fuchsia,sample-device") {}
+    MetadataVisitor() : DriverVisitor({"fuchsia,sample-device"}) {}
 
     zx::result<> DriverVisit(Node& node, const devicetree::PropertyDecoder& decoder) override {
       auto prop = node.properties().find("device_specific_prop");
@@ -178,7 +178,7 @@ TEST_F(ManagerTest, TestReferences) {
    public:
     using Property1Specifier = devicetree::PropEncodedArrayElement<PROPERTY1_CELLS>;
 
-    ReferenceParentVisitor() : DriverVisitor("fuchsia,reference-parent") {
+    ReferenceParentVisitor() : DriverVisitor({"fuchsia,reference-parent"}) {
       parser1_ = std::make_unique<ReferencePropertyParser>(
           "property1", "#property1-cells",
           [this](ReferenceNode& node) { return this->is_match(node.properties()); },
@@ -252,7 +252,7 @@ TEST_F(ManagerTest, TestParentChild) {
 
   class ParentVisitor final : public DriverVisitor {
    public:
-    ParentVisitor() : DriverVisitor("fuchsia,parent") {}
+    ParentVisitor() : DriverVisitor({"fuchsia,parent"}) {}
 
     zx::result<> DriverVisit(Node& node, const devicetree::PropertyDecoder& decoder) override {
       auto children = node.children();
@@ -270,7 +270,7 @@ TEST_F(ManagerTest, TestParentChild) {
 
   class ChildVisitor final : public DriverVisitor {
    public:
-    ChildVisitor() : DriverVisitor("fuchsia,child") {}
+    ChildVisitor() : DriverVisitor({"fuchsia,child"}) {}
 
     zx::result<> DriverVisit(Node& node, const devicetree::PropertyDecoder& decoder) override {
       count++;
