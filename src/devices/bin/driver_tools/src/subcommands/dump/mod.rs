@@ -168,10 +168,10 @@ pub async fn dump(
         .collect::<Result<BTreeMap<_, _>>>()?;
 
     if cmd.graph {
-        let digraph_prefix = r#"digraph {{
-     forcelabels = true; splines=\"ortho\"; ranksep = 1.2; nodesep = 0.5;
-     node [ shape = \"box\" color = \" #2a5b4f\" penwidth = 2.25 fontname = \"prompt medium\" fontsize = 10 margin = 0.22 ];
-     edge [ color = \" #37474f\" penwidth = 1 style = dashed fontname = \"roboto mono\" fontsize = 10 ];"#;
+        let digraph_prefix = r#"digraph {
+     forcelabels = true; splines="ortho"; ranksep = 1.2; nodesep = 0.5;
+     node [ shape = "box" color = " #2a5b4f" penwidth = 2.25 fontname = "prompt medium" fontsize = 10 margin = 0.22 ];
+     edge [ color = " #37474f" penwidth = 1 style = dashed fontname = "roboto mono" fontsize = 10 ];"#;
         writeln!(writer, "{}", digraph_prefix)?;
         for device in devices.iter() {
             device.print_graph_node(writer)?;
