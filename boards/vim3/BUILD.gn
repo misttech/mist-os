@@ -25,6 +25,7 @@ board_configuration("vim3") {
 
   input_bundles = [
     ":main_bundle",
+    ":board_driver",
     ":vulkan_arm_mali",
   ]
 
@@ -281,6 +282,9 @@ board_input_bundle("main_bundle") {
       driver_components = [ "meta/wlanphy.cm" ]
     },
   ]
+}
+
+board_input_bundle("board_driver") {
 }
 
 board_input_bundle("vulkan_arm_mali") {
