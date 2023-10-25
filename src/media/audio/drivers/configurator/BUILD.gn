@@ -92,7 +92,7 @@ fuchsia_unittest_package("configurator-unittests") {
   deps = [
     ":bin_test",
     "//src/devices/misc/drivers/test-parent",
-    "//src/media/audio/drivers/tests:drivers",
+    "//src/media/audio/drivers/testing:drivers",
   ]
   test_specs = {
     log_settings = {

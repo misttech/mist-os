@@ -304,7 +304,7 @@ group("driver") {
     "//src/media/audio/drivers/intel-hda/codecs/qemu:*",
     "//src/media/audio/drivers/intel-hda/codecs/realtek:*",
     "//src/media/audio/drivers/intel-hda/controller:*",
-    "//src/media/audio/drivers/tests/realm:*",
+    "//src/media/audio/drivers/testing/realm:*",
     "//src/media/audio/drivers/usb-audio:*",
     "//src/media/audio/drivers/virtual_audio:*",
     "//src/media/drivers/amlogic_decoder:*",

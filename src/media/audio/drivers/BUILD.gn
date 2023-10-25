@@ -25,7 +25,7 @@ group("drivers") {
     "intel-hda/codecs/qemu:qemu-audio-codec",
     "intel-hda/codecs/realtek:realtek-audio-codec",
     "intel-hda/controller:intel-hda",
-    "tests:drivers",
+    "testing:drivers",
     "usb-audio",
     "virtual_audio:virtual_audio_driver",
   ]

@@ -407,7 +407,7 @@ sdk_static_library("ddk") {
     "//src/media/audio/drivers/intel-hda/controller:*",
     "//src/media/audio/drivers/lib/aml-dsp:*",
     "//src/media/audio/drivers/lib/intel-hda:*",
-    "//src/media/audio/drivers/tests/realm:*",
+    "//src/media/audio/drivers/testing/realm:*",
     "//src/media/audio/drivers/usb-audio:*",
     "//src/media/audio/drivers/virtual_audio:*",
     "//src/media/audio/lib/simple-audio-stream:*",

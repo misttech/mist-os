@@ -891,7 +891,7 @@ mod tests {
         std::sync::Arc,
     };
 
-    // Integration tests using //src/media/audio/drivers/tests/realm devices.
+    // Integration tests using //src/media/audio/drivers/testing/realm devices.
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_default_configurator_devices_found() -> Result<()> {
