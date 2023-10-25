@@ -2997,6 +2997,19 @@
   submitted: '2023-08-29'
   reviewed: '2023-10-11'
 
+- name: 'RFC-0230'
+  title: 'Suspend-To-Idle in Fuchsia'
+  short_description: 'Introduces how Fuchsia handles system power state changes elaborating the design with Suspend-To-Idle usecase'
+  authors: ['harshanv@google.com']
+  file: '0230_suspend_to_idle.md'
+  area: ['Power']
+  issue: ['127897']
+  gerrit_change_id: ['865570']
+  status: 'Accepted'
+  reviewers: ['andresoportus@google.com', 'cja@google.com', 'claridge@google.com', 'cpu@google.com', 'jamesr@google.com', 'jmatt@google.com', 'maniscalco@google.com', 'quiche@google.com', 'surajmalhotra@google.com']
+  submitted: '2023-06-02'
+  reviewed: '2023-10-24'
+
 - name: 'RFC-0231'
   title: 'FIDL versioning replacement syntax'
   short_description: 'Add a replaced=N argument to the @available attribute'
