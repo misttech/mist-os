@@ -179,12 +179,11 @@ constexpr timing_params_t ToTimingParams(const DmtTiming& dmt) {
   // DMT formats never repeat the pixels.
   const uint32_t pixel_repeated_flag = 0;
 
-  const uint32_t pixel_freq_10khz = static_cast<uint32_t>(dmt.pixel_clock_khz + 5) / 10;
   const uint32_t vertical_field_refresh_rate_centihertz =
       static_cast<uint32_t>(dmt.vertical_field_refresh_rate_millihertz + 5) / 10;
 
   return timing_params_t{
-      .pixel_freq_10khz = pixel_freq_10khz,
+      .pixel_freq_khz = static_cast<uint32_t>(dmt.pixel_clock_khz),
       .horizontal_addressable = static_cast<uint32_t>(dmt.horizontal_active_px),
       .horizontal_front_porch = horizontal_front_porch_including_border_px,
       .horizontal_sync_pulse = static_cast<uint32_t>(dmt.horizontal_sync_width_px),

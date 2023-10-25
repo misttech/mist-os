@@ -66,7 +66,7 @@ constexpr zx::duration kVsyncMonitorInterval = kVsyncStallThreshold / 2;
 namespace display {
 
 void Controller::PopulateDisplayMode(const edid::timing_params_t& params, display_mode_t* mode) {
-  mode->pixel_clock_khz = params.pixel_freq_10khz * 10;
+  mode->pixel_clock_khz = params.pixel_freq_khz;
   mode->h_addressable = params.horizontal_addressable;
   mode->h_front_porch = params.horizontal_front_porch;
   mode->h_sync_pulse = params.horizontal_sync_pulse;

@@ -49,7 +49,7 @@ void DisplayInfo::InitializeInspect(inspect::Node* parent_node) {
   for (const auto& t : edid->timings) {
     auto child = node.CreateChild(fbl::StringPrintf("timing-parameters-%lu", ++i).c_str());
     child.CreateDouble("vsync-hz", static_cast<double>(t.vertical_refresh_e2) / 100.0, &properties);
-    child.CreateUint("pixel-clock-khz", t.pixel_freq_10khz * 10, &properties);
+    child.CreateUint("pixel-clock-khz", t.pixel_freq_khz, &properties);
     child.CreateUint("horizontal-pixels", t.horizontal_addressable, &properties);
     child.CreateUint("horizontal-blanking", t.horizontal_blanking, &properties);
     child.CreateUint("horizontal-sync-offset", t.horizontal_front_porch, &properties);

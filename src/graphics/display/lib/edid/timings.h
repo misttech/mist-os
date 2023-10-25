@@ -10,7 +10,7 @@
 namespace edid {
 
 typedef struct timing_params {
-  uint32_t pixel_freq_10khz;
+  uint32_t pixel_freq_khz;
 
   uint32_t horizontal_addressable;
   uint32_t horizontal_front_porch;

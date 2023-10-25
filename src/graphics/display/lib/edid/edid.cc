@@ -262,7 +262,7 @@ bool Edid::is_hdmi() const {
 }
 
 void convert_dtd_to_timing(const DetailedTimingDescriptor& dtd, timing_params* params) {
-  params->pixel_freq_10khz = dtd.pixel_clock_10khz;
+  params->pixel_freq_khz = dtd.pixel_clock_10khz * 10;
   params->horizontal_addressable = dtd.horizontal_addressable();
   params->horizontal_front_porch = dtd.horizontal_front_porch();
   params->horizontal_sync_pulse = dtd.horizontal_sync_pulse_width();
@@ -282,7 +282,7 @@ void convert_dtd_to_timing(const DetailedTimingDescriptor& dtd, timing_params* p
 
   double total_pxls = (params->horizontal_addressable + params->horizontal_blanking) *
                       (params->vertical_addressable + params->vertical_blanking);
-  double pixel_clock_hz = params->pixel_freq_10khz * 1000 * 10;
+  double pixel_clock_hz = params->pixel_freq_khz * 1000;
   params->vertical_refresh_e2 = static_cast<uint32_t>(round(100 * pixel_clock_hz / total_pxls));
 }
 
@@ -336,7 +336,7 @@ void convert_std_to_timing(const BaseEdid& edid, const StandardTimingDescriptor&
   uint32_t total_pixels = h_pixels_rnd + h_blank_pixels;
   double pixel_freq = total_pixels / h_period;
 
-  params->pixel_freq_10khz = (uint32_t)(pixel_freq * 100 + 50);
+  params->pixel_freq_khz = static_cast<uint32_t>(pixel_freq * 10 + 5);
   params->horizontal_addressable = h_pixels_rnd;
   params->horizontal_sync_pulse =
       round_div(kHsyncPercent * total_pixels, 100 * kCellGran) * kCellGran;
@@ -399,14 +399,14 @@ void timing_iterator::Advance() {
           if (rounded_refresh % 6 == 0) {
             if (modes_to_skip == 1) {
               params_ = internal::cea_timings[idx];
-              double clock = params_.pixel_freq_10khz;
+              double clock = params_.pixel_freq_khz;
               double refresh = params_.vertical_refresh_e2;
               // 240/480 height entries are already multipled by 1000/1001
               double mult =
                   params_.vertical_addressable == 240 || params_.vertical_addressable == 480
                       ? 1.001
                       : (1000. / 1001.);
-              params_.pixel_freq_10khz = static_cast<uint32_t>(round(clock * mult));
+              params_.pixel_freq_khz = static_cast<uint32_t>(round(clock * mult));
               params_.vertical_refresh_e2 = static_cast<uint32_t>(round(refresh * mult));
               return;
             }

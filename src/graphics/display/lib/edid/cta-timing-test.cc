@@ -174,7 +174,7 @@ TEST(CtaTimingToTimingParams, InterlacedWithAlternatingVblank) {
   };
 
   const timing_params_t kConverted = ToTimingParams(kCtaTiming);
-  EXPECT_EQ(kConverted.pixel_freq_10khz, 1'000'00u);
+  EXPECT_EQ(kConverted.pixel_freq_khz, 1'000'000u);
   EXPECT_EQ(kConverted.horizontal_addressable, 0x0a'0au);
   EXPECT_EQ(kConverted.horizontal_front_porch, 0x01'01u);
   EXPECT_EQ(kConverted.horizontal_sync_pulse, 0x02'02u);
@@ -216,7 +216,7 @@ TEST(CtaTimingToTimingParams, InterlacedWithConstantVblank) {
   };
 
   const timing_params_t kConverted = ToTimingParams(kCtaTiming);
-  EXPECT_EQ(kConverted.pixel_freq_10khz, 1'000'00u);
+  EXPECT_EQ(kConverted.pixel_freq_khz, 1'000'000u);
   EXPECT_EQ(kConverted.horizontal_addressable, 0x0a'0au);
   EXPECT_EQ(kConverted.horizontal_front_porch, 0x01'01u);
   EXPECT_EQ(kConverted.horizontal_sync_pulse, 0x02'02u);
@@ -259,7 +259,7 @@ TEST(CtaTimingToTimingParams, Progressive) {
   };
 
   const timing_params_t kConverted = ToTimingParams(kCtaTiming);
-  EXPECT_EQ(kConverted.pixel_freq_10khz, 1'000'00u);
+  EXPECT_EQ(kConverted.pixel_freq_khz, 1'000'000u);
   EXPECT_EQ(kConverted.horizontal_addressable, 0x0a'0au);
   EXPECT_EQ(kConverted.horizontal_front_porch, 0x01'01u);
   EXPECT_EQ(kConverted.horizontal_sync_pulse, 0x02'02u);
