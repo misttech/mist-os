@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// #![allow(unused_imports, unused_variables, dead_code)]
 use crate::common::fastboot::{InterfaceFactory, InterfaceFactoryBase};
 use anyhow::{bail, Context as _, Result};
 use async_net::TcpStream;

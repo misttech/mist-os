@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    fastboot::{get_var, network::tcp::TcpNetworkFactory},
     overnet::host_pipe::{spawn, HostAddr, LogBuffer},
     FASTBOOT_MAX_AGE, MDNS_MAX_AGE, ZEDBOOT_MAX_AGE,
 };
@@ -15,6 +14,8 @@ use compat_info::{CompatibilityInfo, CompatibilityState};
 use ffx::{TargetAddrInfo, TargetIpPort};
 use ffx_daemon_core::events::{self, EventSynthesizer};
 use ffx_daemon_events::{FastbootInterface, TargetConnectionState, TargetEvent, TargetInfo};
+use ffx_fastboot::common::fastboot::tcp_proxy;
+use ffx_fastboot::common::fastboot_interface::Fastboot;
 use ffx_fastboot::usb_discovery::open_interface_with_serial;
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_developer_ffx::TargetState;
@@ -1163,11 +1164,15 @@ impl Target {
     }
 
     pub async fn is_fastboot_tcp(&self) -> Result<bool> {
-        let mut factory = TcpNetworkFactory::new();
-        let mut interface = factory.open_with_retry(self, 1, 1).await?;
-        // Dont care what the result is, just need to get it
-        let _result = get_var(&mut interface, &"version".to_string()).await?;
-        Ok(true)
+        match self.fastboot_address() {
+            None => Ok(false),
+            Some(addr) => {
+                let mut fastboot_interface = tcp_proxy(&SocketAddr::from(addr.0)).await?;
+                // Dont care what the result is, just need to get it
+                let _result = fastboot_interface.get_var(&"version".to_string()).await?;
+                Ok(true)
+            }
+        }
     }
 
     /// Check the current target state, and if it is a state that expires (such
