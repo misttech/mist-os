@@ -354,7 +354,8 @@ Node::~Node() {
   // TODO(fxb/135416): Notify the NodeRemovalTracker if the node is deallocated before shutdown is
   // complete.
   if (GetNodeState() != NodeState::kStopped) {
-    LOGF(INFO, "Node deallocating while at state %s", GetShutdownHelper().NodeStateAsString());
+    LOGF(INFO, "Node %s deallocating while at state %s", MakeComponentMoniker().c_str(),
+         GetShutdownHelper().NodeStateAsString());
   }
 
   CloseIfExists(controller_ref_);
@@ -443,7 +444,7 @@ void Node::AddToParents() {
 
 ShutdownHelper& Node::GetShutdownHelper() {
   if (!shutdown_helper_) {
-    shutdown_helper_ = std::make_unique<ShutdownHelper>(this);
+    shutdown_helper_ = std::make_unique<ShutdownHelper>(this, dispatcher_);
   }
   return *shutdown_helper_.get();
 }
@@ -1016,7 +1017,7 @@ void Node::StopDriver() {
   ZX_ASSERT_MSG(GetNodeState() == NodeState::kWaitingOnChildren,
                 "StopDriverComponent called in invalid node state: %s",
                 GetShutdownHelper().NodeStateAsString());
-  if (!driver_component_ || !driver_component_->driver) {
+  if (!HasDriver()) {
     return;
   }
 

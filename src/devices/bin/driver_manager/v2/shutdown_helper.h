@@ -5,11 +5,12 @@
 #ifndef SRC_DEVICES_BIN_DRIVER_MANAGER_V2_SHUTDOWN_HELPER_H_
 #define SRC_DEVICES_BIN_DRIVER_MANAGER_V2_SHUTDOWN_HELPER_H_
 
-#include <lib/fit/function.h>
+#include <lib/async_patterns/cpp/task_scope.h>
 #include <stdint.h>
 
 #include <memory>
 #include <optional>
+#include <random>
 #include <string>
 #include <utility>
 
@@ -75,7 +76,7 @@ class NodeShutdownBridge {
 // Coordinates and keeps track of the node's shutdown process.
 class ShutdownHelper {
  public:
-  explicit ShutdownHelper(NodeShutdownBridge* bridge) : bridge_(bridge) {}
+  explicit ShutdownHelper(NodeShutdownBridge* bridge, async_dispatcher_t* dispatcher);
 
   ~ShutdownHelper() = default;
 
@@ -101,6 +102,12 @@ class ShutdownHelper {
   void CheckWaitingOnDriver();
   void CheckWaitingOnDriverComponent();
 
+  // Invokes |action|, which is the actions for transitioning to the next
+  // another state. If |kEnableShutdownDelay| is true and generates a randomized
+  // delay, then the action is invoked asynchronously with the delay.
+  void PerformTransition(fit::function<void()> action);
+
+  void UpdateAndNotifyState(NodeState state);
   void NotifyRemovalTracker();
 
   bool IsShuttingDown() const;
@@ -127,6 +134,19 @@ class ShutdownHelper {
 
   // Owner. Must outlive ShutdownHelper.
   NodeShutdownBridge* bridge_;
+
+  // Set to true when the ShutdownHelper is in the process of transitioning
+  // node states. Only set if |kEnableShutdownDelay| is enabled. Used to prevent
+  // multiple state transitions from happening at the same time.
+  bool is_transition_pending_ = false;
+
+  // Randomizer for injecting delays in shutdown. Only used when |kEnableShutdownDelay|
+  // is true.
+  std::random_device random_device_;
+  std::mt19937 rng_gen_;
+  std::uniform_int_distribution<uint64_t> distribution_;
+
+  async_patterns::TaskScope tasks_;
 };
 
 }  // namespace dfv2

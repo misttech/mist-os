@@ -10,6 +10,26 @@
 
 namespace dfv2 {
 
+namespace {
+
+// Flag for enabling test delays in shutdown.
+// TODO(fxb/134783): Set this value from the structured config.
+const bool kEnableShutdownDelay = false;
+
+// The range of test delay time in milliseconds.
+constexpr uint32_t kMinTestDelayMs = 0;
+constexpr uint32_t kMaxTestDelayMs = 5;
+
+}  // namespace
+
+ShutdownHelper::ShutdownHelper(NodeShutdownBridge* bridge, async_dispatcher_t* dispatcher)
+    : bridge_(bridge), distribution_(kMinTestDelayMs, kMaxTestDelayMs), tasks_(dispatcher) {
+  if (kEnableShutdownDelay) {
+    // TODO(fxb/134783): Pass in a seed so that all ShutdownHelpers share the same one.
+    rng_gen_ = std::mt19937(random_device_());
+  }
+}
+
 void ShutdownHelper::Remove(std::shared_ptr<Node> node, RemovalSet removal_set,
                             NodeRemovalTracker* removal_tracker) {
   std::stack<std::shared_ptr<Node>> nodes_to_check_for_removal;
@@ -83,6 +103,10 @@ void ShutdownHelper::ResetShutdown() {
 }
 
 void ShutdownHelper::CheckNodeState() {
+  if (is_transition_pending_) {
+    return;
+  }
+
   switch (node_state_) {
     case NodeState::kRunning:
     case NodeState::kPrestop:
@@ -104,25 +128,22 @@ void ShutdownHelper::CheckNodeState() {
 }
 
 void ShutdownHelper::CheckWaitingOnChildren() {
+  ZX_ASSERT(!is_transition_pending_);
   ZX_ASSERT_MSG(node_state_ == NodeState::kWaitingOnChildren,
                 "ShutdownHelper::CheckWaitingOnChildren called in invalid node state: %s",
                 NodeStateAsString());
-
   // Remain on this state if the node still has children.
   if (bridge_->HasChildren()) {
     return;
   }
-
-  // Send a request to stop the driver and then check the next state.
-  bridge_->StopDriver();
-
-  // Transition to "waiting on driver".
-  node_state_ = NodeState::kWaitingOnDriver;
-  NotifyRemovalTracker();
-  CheckNodeState();
+  PerformTransition([this]() mutable {
+    bridge_->StopDriver();
+    UpdateAndNotifyState(NodeState::kWaitingOnDriver);
+  });
 }
 
 void ShutdownHelper::CheckWaitingOnDriver() {
+  ZX_ASSERT(!is_transition_pending_);
   ZX_ASSERT_MSG(node_state_ == NodeState::kWaitingOnDriver,
                 "ShutdownHelper::CheckWaitingOnDriver called in invalid node state: %s",
                 NodeStateAsString());
@@ -131,16 +152,14 @@ void ShutdownHelper::CheckWaitingOnDriver() {
   if (bridge_->HasDriver()) {
     return;
   }
-
-  // Stop the driver component and transition to kWaitingOnDriverComponent.
-  bridge_->StopDriverComponent();
-
-  node_state_ = NodeState::kWaitingOnDriverComponent;
-  NotifyRemovalTracker();
-  CheckNodeState();
+  PerformTransition([this]() mutable {
+    bridge_->StopDriverComponent();
+    UpdateAndNotifyState(NodeState::kWaitingOnDriverComponent);
+  });
 }
 
 void ShutdownHelper::CheckWaitingOnDriverComponent() {
+  ZX_ASSERT(!is_transition_pending_);
   ZX_ASSERT_MSG(node_state_ == NodeState::kWaitingOnDriverComponent,
                 "ShutdownHelper::CheckWaitingOnDriverComponent called in invalid node state: %s",
                 NodeStateAsString());
@@ -150,10 +169,39 @@ void ShutdownHelper::CheckWaitingOnDriverComponent() {
     return;
   }
 
-  bridge_->FinishShutdown([this]() {
-    node_state_ = NodeState::kStopped;
-    NotifyRemovalTracker();
+  PerformTransition([this]() mutable {
+    bridge_->FinishShutdown([this]() { UpdateAndNotifyState(NodeState::kStopped); });
   });
+}
+
+void ShutdownHelper::PerformTransition(fit::function<void()> action) {
+  ZX_ASSERT(!is_transition_pending_);
+
+  std::optional<uint32_t> delay_ms;
+  if (kEnableShutdownDelay) {
+    // Randomize a 20% chance for adding a shutdown delay.
+    if (distribution_(rng_gen_) % 5 == 1) {
+      delay_ms = distribution_(rng_gen_);
+    }
+  }
+
+  if (!delay_ms) {
+    action();
+    return;
+  }
+
+  is_transition_pending_ = true;
+  tasks_.Post([action = std::move(action), delay_amount = delay_ms.value()] {
+    std::this_thread::sleep_for(std::chrono::microseconds(delay_amount));
+    action();
+  });
+}
+
+void ShutdownHelper::UpdateAndNotifyState(NodeState state) {
+  node_state_ = state;
+  is_transition_pending_ = false;
+  NotifyRemovalTracker();
+  CheckNodeState();
 }
 
 void ShutdownHelper::NotifyRemovalTracker() {

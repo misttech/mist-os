@@ -238,9 +238,11 @@ class NodeShutdownTest : public DriverManagerTestBase {
     ASSERT_TRUE(node);
     node->Remove(RemovalSet::kAll, &removal_tracker_);
     removal_tracker_.FinishEnumeration();
+    RunLoopUntilIdle();
   }
 
   void VerifyState(std::string node_name, NodeState expected_state) {
+    RunLoopUntilIdle();
     auto node = nodes_[node_name].lock();
     ASSERT_TRUE(node);
     ASSERT_EQ(expected_state, node->GetShutdownHelper().node_state());
@@ -253,6 +255,7 @@ class NodeShutdownTest : public DriverManagerTestBase {
   }
 
   void VerifyNodeRemovedFromParent(std::string node_name, std::string parent_name) {
+    RunLoopUntilIdle();
     ASSERT_FALSE(nodes_[node_name].lock());
     if (auto parent = nodes_[parent_name].lock(); parent) {
       for (auto child : parent->children()) {

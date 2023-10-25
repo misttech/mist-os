@@ -172,9 +172,12 @@ TEST_F(Dfv2NodeTest, RemoveDuringFailedBind) {
   ASSERT_EQ(dfv2::NodeState::kRunning, node->GetNodeState());
 
   node->Remove(dfv2::RemovalSet::kAll, nullptr);
+  RunLoopUntilIdle();
+
   ASSERT_EQ(dfv2::NodeState::kWaitingOnDriver, node->GetNodeState());
 
   node->CompleteBind(zx::error(ZX_ERR_NOT_FOUND));
+  RunLoopUntilIdle();
   ASSERT_FALSE(node->HasDriverComponent());
   ASSERT_EQ(dfv2::NodeState::kStopped, node->GetNodeState());
 }
@@ -251,6 +254,7 @@ TEST_F(Dfv2NodeTest, RemoveCompositeNodeForRebind) {
       remove_callback_succeeded = true;
     }
   });
+  RunLoopUntilIdle();
   ASSERT_EQ(dfv2::NodeState::kWaitingOnDriver, composite->GetNodeState());
   ASSERT_EQ(dfv2::ShutdownIntent::kRebindComposite, composite->shutdown_intent());
 
@@ -289,6 +293,7 @@ TEST_F(Dfv2NodeTest, RemoveCompositeNodeForRebind_Dealloc) {
       remove_callback_succeeded = true;
     }
   });
+  RunLoopUntilIdle();
   ASSERT_EQ(dfv2::NodeState::kWaitingOnDriver, composite->GetNodeState());
   ASSERT_EQ(dfv2::ShutdownIntent::kRebindComposite, composite->shutdown_intent());
 
