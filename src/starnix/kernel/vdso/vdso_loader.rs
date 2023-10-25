@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
-    arch::vdso::{calculate_ticks_offset, VDSO_SIGRETURN_NAME},
+    arch::vdso::{raw_ticks, VDSO_SIGRETURN_NAME},
     mm::PAGE_SIZE,
     time::utc::update_utc_clock,
     types::{errno, from_status_like_fdio, uapi, Errno},
@@ -180,7 +180,7 @@ fn sync_open_in_namespace(
 }
 
 /// Reads the vDSO file and returns the backing VMO.
-pub fn load_vdso_from_file() -> Result<Arc<zx::Vmo>, Errno> {
+fn load_vdso_from_file() -> Result<Arc<zx::Vmo>, Errno> {
     const VDSO_FILENAME: &str = "libvdso.so";
     const VDSO_LOCATION: &str = "/pkg/data";
 
@@ -196,7 +196,7 @@ pub fn load_vdso_from_file() -> Result<Arc<zx::Vmo>, Errno> {
     Ok(Arc::new(vdso_vmo))
 }
 
-pub fn get_sigreturn_offset(vdso_vmo: &zx::Vmo, sigreturn_name: &str) -> Result<u64, Errno> {
+fn get_sigreturn_offset(vdso_vmo: &zx::Vmo, sigreturn_name: &str) -> Result<u64, Errno> {
     let dyn_section = elf_parse::Elf64DynSection::from_vmo(vdso_vmo).map_err(|_| errno!(EINVAL))?;
     let symtab =
         dyn_section.dynamic_entry_with_tag(elf_parse::Elf64DynTag::Symtab).ok_or(errno!(EINVAL))?;
@@ -231,7 +231,7 @@ pub fn get_sigreturn_offset(vdso_vmo: &zx::Vmo, sigreturn_name: &str) -> Result<
     }
 }
 
-pub fn get_vvar_values() -> VvarInitialValues {
+fn get_vvar_values() -> VvarInitialValues {
     let clock = zx::Clock::create(zx::ClockOpts::MONOTONIC | zx::ClockOpts::AUTO_START, None)
         .expect("failed to create clock");
     let details = clock.get_details().expect("Failed to get clock details");
@@ -241,4 +241,28 @@ pub fn get_vvar_values() -> VvarInitialValues {
         ticks_to_mono_numerator: details.ticks_to_synthetic.rate.synthetic_ticks,
         ticks_to_mono_denominator: details.ticks_to_synthetic.rate.reference_ticks,
     }
+}
+
+fn calculate_ticks_offset() -> i64 {
+    let mut ticks_offset: i64 = i64::MIN;
+    let mut min_read_diff: i64 = i64::MAX;
+    // Assuming `zx_get_ticks` is based on the same registers that `get_raw_ticks`
+    // use, estimate the offset between the raw value and the ticks as returned by
+    // `zx_get_ticks`. Since the reads will not be made at the same time, the
+    // result will not be presice, so do the estimation several times and choose the
+    // measurement with the smallest error bars.
+    //
+    // TODO(https://g-issues.fuchsia.dev/issues/297375051): Obtain this value from Zircon
+    for _i in 0..5 {
+        let zx_read_first = zx::ticks_get();
+        let read_raw_ticks = raw_ticks();
+        let zx_read_second = zx::ticks_get();
+        let read_diff = zx_read_second - zx_read_first;
+        if read_diff < min_read_diff {
+            min_read_diff = read_diff;
+            let midpoint = zx_read_first + read_diff / 2;
+            ticks_offset = midpoint - read_raw_ticks as i64;
+        }
+    }
+    ticks_offset
 }

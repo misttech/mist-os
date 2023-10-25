@@ -25,9 +25,7 @@ extern "C" __EXPORT __attribute__((naked)) void __kernel_rt_sigreturn() {
 }
 
 extern "C" __EXPORT int __kernel_clock_gettime(int clock_id, struct timespec* tp) {
-  int ret = syscall(__NR_clock_gettime, static_cast<intptr_t>(clock_id),
-                    reinterpret_cast<intptr_t>(tp), 0);
-  return ret;
+  return clock_gettime_impl(clock_id, tp);
 }
 
 extern "C" __EXPORT int __kernel_clock_getres(int clock_id, struct timespec* tp) {

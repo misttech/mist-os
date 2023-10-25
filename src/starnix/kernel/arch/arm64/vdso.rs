@@ -4,9 +4,11 @@
 
 pub const VDSO_SIGRETURN_NAME: Option<&'static str> = Some("__kernel_rt_sigreturn");
 
-pub fn calculate_ticks_offset() -> i64 {
-    // Returns 0 as calculate_ticks_offset is currently unimplemented in this architecture.
-    // This isn't a problem as vvar_data is currently unused in this architecture.
-    // TODO(fxb/129367): Implement gettimeofday() in arm64.
-    0
+extern "C" {
+    // This method is implemented by //src/starnix/kernel/vdso/get_raw_ticks_arm.cc.
+    fn get_raw_ticks() -> u64;
+}
+
+pub fn raw_ticks() -> u64 {
+    unsafe { get_raw_ticks() }
 }
