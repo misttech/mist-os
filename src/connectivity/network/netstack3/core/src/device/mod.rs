@@ -404,7 +404,7 @@ pub(crate) struct DeviceLayerState<C: DeviceLayerTypes> {
 }
 
 impl<C: DeviceLayerTypes> DeviceLayerState<C> {
-    pub(crate) fn get_device_counters(&self) -> &DeviceCounters {
+    pub(crate) fn counters(&self) -> &DeviceCounters {
         &self.counters
     }
 }
@@ -421,7 +421,7 @@ impl<C: NonSyncContext> UnlockedAccess<crate::lock_ordering::DeviceCounters> for
     type Guard<'l> = &'l DeviceCounters where Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
-        self.state.get_device_counters()
+        self.state.device_counters()
     }
 }
 

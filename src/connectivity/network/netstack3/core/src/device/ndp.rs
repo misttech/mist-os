@@ -395,7 +395,7 @@ mod tests {
 
         let _: StepResult = net.step(receive_frame, handle_timer);
         assert_eq!(
-            net.sync_ctx("remote").state.get_ndp_counters().rx_neighbor_solicitation.get(),
+            net.sync_ctx("remote").state.ndp_counters().rx_neighbor_solicitation.get(),
             1,
             "remote received solicitation"
         );
@@ -405,7 +405,7 @@ mod tests {
         let _: StepResult = net.step(receive_frame, handle_timer);
 
         assert_eq!(
-            net.sync_ctx("local").state.get_ndp_counters().rx_neighbor_advertisement.get(),
+            net.sync_ctx("local").state.ndp_counters().rx_neighbor_advertisement.get(),
             1,
             "local received advertisement"
         );
@@ -416,10 +416,7 @@ mod tests {
             assert_eq!(non_sync_ctx.frames_sent().len(), 1);
         });
         let _: StepResult = net.step(receive_frame, handle_timer);
-        assert_eq!(
-            net.sync_ctx("remote").state.get_icmp_rx_counters::<Ipv6>().echo_request.get(),
-            1
-        );
+        assert_eq!(net.sync_ctx("remote").state.icmp_rx_counters::<Ipv6>().echo_request.get(), 1);
 
         // TODO(brunodalbo): We should be able to verify that remote also sends
         //  back an echo reply, but we're having some trouble with IPv6 link
@@ -1079,7 +1076,7 @@ mod tests {
             FrameDestination::Multicast,
             icmpv6_packet_buf,
         );
-        assert_eq!(sync_ctx.state.get_ndp_counters().rx_router_solicitation.get(), 0);
+        assert_eq!(sync_ctx.state.ndp_counters().rx_router_solicitation.get(), 0);
     }
 
     #[test]
@@ -1129,7 +1126,7 @@ mod tests {
             FrameDestination::Individual { local: true },
             icmpv6_packet_buf,
         );
-        assert_eq!(sync_ctx.state.get_ndp_counters().rx_router_advertisement.get(), 0);
+        assert_eq!(sync_ctx.state.ndp_counters().rx_router_advertisement.get(), 0);
 
         // Test receiving NDP RA where source IP is a link local address (should
         // receive).
@@ -1143,7 +1140,7 @@ mod tests {
             FrameDestination::Individual { local: true },
             icmpv6_packet_buf,
         );
-        assert_eq!(sync_ctx.state.get_ndp_counters().rx_router_advertisement.get(), 1);
+        assert_eq!(sync_ctx.state.ndp_counters().rx_router_advertisement.get(), 1);
     }
 
     #[test]
@@ -1272,7 +1269,7 @@ mod tests {
             FrameDestination::Multicast,
             icmpv6_packet_buf,
         );
-        assert_eq!(sync_ctx.state.get_ndp_counters().rx_router_advertisement.get(), 1);
+        assert_eq!(sync_ctx.state.ndp_counters().rx_router_advertisement.get(), 1);
         assert_eq!(
             crate::ip::IpDeviceContext::<Ipv6, _>::get_mtu(&mut Locked::new(sync_ctx), &device),
             hw_mtu
@@ -1293,7 +1290,7 @@ mod tests {
             FrameDestination::Multicast,
             icmpv6_packet_buf,
         );
-        assert_eq!(sync_ctx.state.get_ndp_counters().rx_router_advertisement.get(), 2);
+        assert_eq!(sync_ctx.state.ndp_counters().rx_router_advertisement.get(), 2);
         assert_eq!(
             crate::ip::IpDeviceContext::<Ipv6, _>::get_mtu(&mut Locked::new(sync_ctx), &device),
             hw_mtu
@@ -1314,7 +1311,7 @@ mod tests {
             FrameDestination::Multicast,
             icmpv6_packet_buf,
         );
-        assert_eq!(sync_ctx.state.get_ndp_counters().rx_router_advertisement.get(), 3);
+        assert_eq!(sync_ctx.state.ndp_counters().rx_router_advertisement.get(), 3);
         assert_eq!(
             crate::ip::IpDeviceContext::<Ipv6, _>::get_mtu(&mut Locked::new(sync_ctx), &device),
             Ipv6::MINIMUM_LINK_MTU,
@@ -2243,7 +2240,7 @@ mod tests {
         );
 
         // Verify that `conflicted_addr` was generated and rejected.
-        assert_eq!(sync_ctx.state.get_slaac_counters().generated_slaac_addr_exists.get(), 1);
+        assert_eq!(sync_ctx.state.slaac_counters().generated_slaac_addr_exists.get(), 1);
 
         // Should have gotten a new temporary IP.
         let temporary_slaac_addresses =

@@ -116,7 +116,7 @@ impl<BT: BindingsTypes> TransportLayerState<BT> {
         I::map_ip((), |()| &self.tcpv4, |()| &self.tcpv6)
     }
 
-    pub(crate) fn get_udp_counters<I: Ip>(&self) -> &UdpCounters<I> {
+    pub(crate) fn udp_counters<I: Ip>(&self) -> &UdpCounters<I> {
         I::map_ip((), |()| &self.udpv4.counters, |()| &self.udpv6.counters)
     }
 }

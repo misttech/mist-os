@@ -174,7 +174,7 @@ impl<C: crate::NonSyncContext, I: Ip> UnlockedAccess<crate::lock_ordering::UdpCo
     type Guard<'l> = &'l UdpCounters<I> where Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
-        self.state.get_udp_counters()
+        self.state.udp_counters()
     }
 }
 
@@ -3174,7 +3174,7 @@ mod tests {
     }
 
     impl<D: WeakId> DualStackSocketsState<D> {
-        fn get_udp_counters<I: Ip>(&self) -> &UdpCounters<I> {
+        fn udp_counters<I: Ip>(&self) -> &UdpCounters<I> {
             I::map_ip(
                 IpInvariant(self),
                 |IpInvariant(dual)| &dual.udpv4_counters,
@@ -3198,7 +3198,7 @@ mod tests {
 
     impl<I: Ip, D: FakeStrongDeviceId> CounterContext<UdpCounters<I>> for FakeUdpSyncCtx<D> {
         fn with_counters<O, F: FnOnce(&UdpCounters<I>) -> O>(&self, cb: F) -> O {
-            cb(&self.outer.get_udp_counters())
+            cb(&self.outer.udp_counters())
         }
     }
 

@@ -1465,7 +1465,7 @@ pub(crate) mod testutil {
             )
         }
 
-        pub(crate) fn get_icmp_tx_counters<I: Ip>(&self) -> &IcmpTxCounters<I> {
+        pub(crate) fn icmp_tx_counters<I: Ip>(&self) -> &IcmpTxCounters<I> {
             I::map_ip(
                 IpInvariant(self),
                 |IpInvariant(sync_ctx)| &sync_ctx.tx_icmpv4_counters,
@@ -1473,7 +1473,7 @@ pub(crate) mod testutil {
             )
         }
 
-        pub(crate) fn get_icmp_rx_counters<I: Ip>(&self) -> &IcmpRxCounters<I> {
+        pub(crate) fn icmp_rx_counters<I: Ip>(&self) -> &IcmpRxCounters<I> {
             I::map_ip(
                 IpInvariant(self),
                 |IpInvariant(sync_ctx)| &sync_ctx.rx_icmpv4_counters,
@@ -2122,7 +2122,7 @@ mod tests {
 
         assert_eq!(non_sync_ctx.frames_sent().len(), 0);
 
-        assert_eq!(sync_ctx.state.get_ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
+        assert_eq!(sync_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
     }
 
     #[ip_test]

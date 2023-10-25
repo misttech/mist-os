@@ -249,7 +249,7 @@ impl<C: NonSyncContext, I: Ip> UnlockedAccess<crate::lock_ordering::IcmpTxCounte
     type Guard<'l> = &'l IcmpTxCounters<I> where Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
-        self.state.get_icmp_tx_counters()
+        self.state.icmp_tx_counters()
     }
 }
 
@@ -268,7 +268,7 @@ impl<C: NonSyncContext, I: Ip> UnlockedAccess<crate::lock_ordering::IcmpRxCounte
     type Guard<'l> = &'l IcmpRxCounters<I> where Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
-        self.state.get_icmp_rx_counters()
+        self.state.icmp_rx_counters()
     }
 }
 
@@ -285,7 +285,7 @@ impl<C: NonSyncContext> UnlockedAccess<crate::lock_ordering::NdpCounters> for Sy
     type Guard<'l> = &'l NdpCounters where Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
-        self.state.get_ndp_counters()
+        self.state.ndp_counters()
     }
 }
 
@@ -4210,7 +4210,7 @@ mod tests {
         for FakeSyncCtx<FakeDualStackIpSocketCtx<D>, DualStackSendIpPacketMeta<D>, D>
     {
         fn with_counters<O, F: FnOnce(&IcmpTxCounters<I>) -> O>(&self, cb: F) -> O {
-            cb(self.get_ref().get_icmp_tx_counters::<I>())
+            cb(self.get_ref().icmp_tx_counters::<I>())
         }
     }
 
@@ -4221,7 +4221,7 @@ mod tests {
         >
     {
         fn with_counters<O, F: FnOnce(&IcmpTxCounters<I>) -> O>(&self, cb: F) -> O {
-            cb(self.as_ref().get_ref().get_icmp_tx_counters::<I>())
+            cb(self.as_ref().get_ref().icmp_tx_counters::<I>())
         }
     }
 
@@ -4229,7 +4229,7 @@ mod tests {
         for FakeSyncCtx<FakeDualStackIpSocketCtx<D>, DualStackSendIpPacketMeta<D>, D>
     {
         fn with_counters<O, F: FnOnce(&IcmpRxCounters<I>) -> O>(&self, cb: F) -> O {
-            cb(self.get_ref().get_icmp_rx_counters::<I>())
+            cb(self.get_ref().icmp_rx_counters::<I>())
         }
     }
 
@@ -4240,7 +4240,7 @@ mod tests {
         >
     {
         fn with_counters<O, F: FnOnce(&IcmpRxCounters<I>) -> O>(&self, cb: F) -> O {
-            cb(self.as_ref().get_ref().get_icmp_rx_counters::<I>())
+            cb(self.as_ref().get_ref().icmp_rx_counters::<I>())
         }
     }
 
@@ -4530,28 +4530,22 @@ mod tests {
             let count = match *counter {
                 "send_ipv4_packet" => sync_ctx.state.ipv4.inner.counters.send_ip_packet.get(),
                 "send_ipv6_packet" => sync_ctx.state.ipv6.inner.counters.send_ip_packet.get(),
-                "echo_request" => sync_ctx.state.get_icmp_rx_counters::<I>().echo_request.get(),
+                "echo_request" => sync_ctx.state.icmp_rx_counters::<I>().echo_request.get(),
                 "timestamp_request" => {
-                    sync_ctx.state.get_icmp_rx_counters::<I>().timestamp_request.get()
+                    sync_ctx.state.icmp_rx_counters::<I>().timestamp_request.get()
                 }
                 "protocol_unreachable" => {
-                    sync_ctx.state.get_icmp_tx_counters::<I>().protocol_unreachable.get()
+                    sync_ctx.state.icmp_tx_counters::<I>().protocol_unreachable.get()
                 }
-                "port_unreachable" => {
-                    sync_ctx.state.get_icmp_tx_counters::<I>().port_unreachable.get()
-                }
-                "net_unreachable" => {
-                    sync_ctx.state.get_icmp_tx_counters::<I>().net_unreachable.get()
-                }
-                "ttl_expired" => sync_ctx.state.get_icmp_tx_counters::<I>().ttl_expired.get(),
-                "packet_too_big" => sync_ctx.state.get_icmp_tx_counters::<I>().packet_too_big.get(),
+                "port_unreachable" => sync_ctx.state.icmp_tx_counters::<I>().port_unreachable.get(),
+                "net_unreachable" => sync_ctx.state.icmp_tx_counters::<I>().net_unreachable.get(),
+                "ttl_expired" => sync_ctx.state.icmp_tx_counters::<I>().ttl_expired.get(),
+                "packet_too_big" => sync_ctx.state.icmp_tx_counters::<I>().packet_too_big.get(),
                 "parameter_problem" => {
-                    sync_ctx.state.get_icmp_tx_counters::<I>().parameter_problem.get()
+                    sync_ctx.state.icmp_tx_counters::<I>().parameter_problem.get()
                 }
-                "dest_unreachable" => {
-                    sync_ctx.state.get_icmp_tx_counters::<I>().dest_unreachable.get()
-                }
-                "error" => sync_ctx.state.get_icmp_tx_counters::<I>().error.get(),
+                "dest_unreachable" => sync_ctx.state.icmp_tx_counters::<I>().dest_unreachable.get(),
+                "error" => sync_ctx.state.icmp_tx_counters::<I>().error.get(),
                 c => panic!("unrecognized counter: {c}"),
             };
             assert!(count > 0, "counter at zero: {counter}");
@@ -5191,16 +5185,9 @@ mod tests {
             },
         );
 
+        assert_eq!(net.sync_ctx(LOCAL_CTX_NAME).state.icmp_rx_counters::<I>().echo_reply.get(), 1);
         assert_eq!(
-            net.sync_ctx(LOCAL_CTX_NAME).state.get_icmp_rx_counters::<I>().echo_reply.get(),
-            1
-        );
-        assert_eq!(
-            net.sync_ctx(ctx_name_receiving_req)
-                .state
-                .get_icmp_rx_counters::<I>()
-                .echo_request
-                .get(),
+            net.sync_ctx(ctx_name_receiving_req).state.icmp_rx_counters::<I>().echo_request.get(),
             1
         );
         let replies = net.non_sync_ctx(LOCAL_CTX_NAME).take_icmp_replies(conn);
@@ -5528,22 +5515,18 @@ mod tests {
             for (ctr, expected) in assert_counters {
                 let actual = match *ctr {
                     "InnerIcmpContext::receive_icmp_error" => {
-                        sync_ctx.inner.inner.state.get_icmp_rx_counters::<Ipv4>().error.get()
+                        sync_ctx.inner.inner.state.icmp_rx_counters::<Ipv4>().error.get()
                     }
                     "IcmpIpTransportContext::receive_icmp_error" => sync_ctx
                         .inner
                         .inner
                         .state
-                        .get_icmp_rx_counters::<Ipv4>()
+                        .icmp_rx_counters::<Ipv4>()
                         .error_at_transport_layer
                         .get(),
-                    "IcmpContext::receive_icmp_error" => sync_ctx
-                        .inner
-                        .inner
-                        .state
-                        .get_icmp_rx_counters::<Ipv4>()
-                        .error_at_socket
-                        .get(),
+                    "IcmpContext::receive_icmp_error" => {
+                        sync_ctx.inner.inner.state.icmp_rx_counters::<Ipv4>().error_at_socket.get()
+                    }
                     c => panic!("unrecognized counter: {c}"),
                 };
                 assert_eq!(actual, *expected, "wrong count for {ctr}");
@@ -5851,7 +5834,7 @@ mod tests {
             for (ctr, count) in assert_counters {
                 match *ctr {
                     "InnerIcmpContext::receive_icmp_error" => assert_eq!(
-                        sync_ctx.inner.inner.state.get_icmp_rx_counters::<Ipv6>().error.get(),
+                        sync_ctx.inner.inner.state.icmp_rx_counters::<Ipv6>().error.get(),
                         *count,
                         "wrong count for counter {ctr}",
                     ),
@@ -5860,20 +5843,14 @@ mod tests {
                             .inner
                             .inner
                             .state
-                            .get_icmp_rx_counters::<Ipv6>()
+                            .icmp_rx_counters::<Ipv6>()
                             .error_at_transport_layer
                             .get(),
                         *count,
                         "wrong count for counter {ctr}",
                     ),
                     "IcmpContext::receive_icmp_error" => assert_eq!(
-                        sync_ctx
-                            .inner
-                            .inner
-                            .state
-                            .get_icmp_rx_counters::<Ipv6>()
-                            .error_at_socket
-                            .get(),
+                        sync_ctx.inner.inner.state.icmp_rx_counters::<Ipv6>().error_at_socket.get(),
                         *count,
                         "wrong count for counter {ctr}",
                     ),
@@ -6261,18 +6238,18 @@ mod tests {
             for i in 0..ERRORS_PER_SECOND {
                 send(&mut ctx);
                 assert_eq!(
-                    ctx.sync_ctx.inner.inner.state.get_icmp_tx_counters::<I>().error.get(),
+                    ctx.sync_ctx.inner.inner.state.icmp_tx_counters::<I>().error.get(),
                     i as usize + 1
                 );
             }
 
             assert_eq!(
-                ctx.sync_ctx.inner.inner.state.get_icmp_tx_counters::<I>().error.get(),
+                ctx.sync_ctx.inner.inner.state.icmp_tx_counters::<I>().error.get(),
                 ERRORS_PER_SECOND as usize
             );
             send(&mut ctx);
             assert_eq!(
-                ctx.sync_ctx.inner.inner.state.get_icmp_tx_counters::<I>().error.get(),
+                ctx.sync_ctx.inner.inner.state.icmp_tx_counters::<I>().error.get(),
                 ERRORS_PER_SECOND as usize
             );
 
@@ -6281,13 +6258,13 @@ mod tests {
 
             let mut ctx = with_errors_per_second(0);
             send(&mut ctx);
-            assert_eq!(ctx.sync_ctx.inner.inner.state.get_icmp_tx_counters::<I>().error.get(), 0);
+            assert_eq!(ctx.sync_ctx.inner.inner.state.icmp_tx_counters::<I>().error.get(), 0);
             ctx.non_sync_ctx.sleep_skip_timers(Duration::from_secs(1));
             send(&mut ctx);
-            assert_eq!(ctx.sync_ctx.inner.inner.state.get_icmp_tx_counters::<I>().error.get(), 0);
+            assert_eq!(ctx.sync_ctx.inner.inner.state.icmp_tx_counters::<I>().error.get(), 0);
             ctx.non_sync_ctx.sleep_skip_timers(Duration::from_secs(1));
             send(&mut ctx);
-            assert_eq!(ctx.sync_ctx.inner.inner.state.get_icmp_tx_counters::<I>().error.get(), 0);
+            assert_eq!(ctx.sync_ctx.inner.inner.state.icmp_tx_counters::<I>().error.get(), 0);
         }
 
         fn with_errors_per_second_v4(errors_per_second: u64) -> FakeIcmpCtx<Ipv4> {

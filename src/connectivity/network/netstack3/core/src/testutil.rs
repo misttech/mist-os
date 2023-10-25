@@ -1749,13 +1749,13 @@ mod tests {
         ) {
             assert_eq!(net.sync_ctx("alice").state.timer_counters.nop.get(), alice_nop);
             assert_eq!(
-                net.sync_ctx("alice").state.get_icmp_rx_counters::<Ipv4>().echo_reply.get(),
+                net.sync_ctx("alice").state.icmp_rx_counters::<Ipv4>().echo_reply.get(),
                 alice_echo_response
             );
 
             assert_eq!(net.sync_ctx("bob").state.timer_counters.nop.get(), bob_nop);
             assert_eq!(
-                net.sync_ctx("bob").state.get_icmp_rx_counters::<Ipv4>().echo_request.get(),
+                net.sync_ctx("bob").state.icmp_rx_counters::<Ipv4>().echo_request.get(),
                 bob_echo_request
             );
         }

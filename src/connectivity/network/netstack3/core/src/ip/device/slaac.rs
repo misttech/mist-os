@@ -206,7 +206,7 @@ impl<C: NonSyncContext> UnlockedAccess<crate::lock_ordering::SlaacCounters> for 
     type Guard<'l> = &'l SlaacCounters where Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
-        &self.state.get_slaac_counters()
+        &self.state.slaac_counters()
     }
 }
 

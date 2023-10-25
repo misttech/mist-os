@@ -197,52 +197,52 @@ pub struct StackState<BT: BindingsTypes> {
 }
 
 impl<BT: BindingsTypes> StackState<BT> {
-    pub(crate) fn get_ip_counters<I: Ip>(&self) -> &IpCounters<I> {
+    pub(crate) fn ip_counters<I: Ip>(&self) -> &IpCounters<I> {
         I::map_ip(
             IpInvariant(self),
-            |IpInvariant(state)| state.ipv4.as_ref().get_counters(),
-            |IpInvariant(state)| state.ipv6.as_ref().get_counters(),
+            |IpInvariant(state)| state.ipv4.as_ref().counters(),
+            |IpInvariant(state)| state.ipv6.as_ref().counters(),
         )
     }
 
-    pub(crate) fn get_v4_state(&self) -> &Ipv4State<BT::Instant, DeviceId<BT>> {
+    pub(crate) fn ipv4(&self) -> &Ipv4State<BT::Instant, DeviceId<BT>> {
         &self.ipv4
     }
 
-    pub(crate) fn get_v6_state(&self) -> &Ipv6State<BT::Instant, DeviceId<BT>> {
+    pub(crate) fn ipv6(&self) -> &Ipv6State<BT::Instant, DeviceId<BT>> {
         &self.ipv6
     }
 
-    pub(crate) fn get_icmp_tx_counters<I: Ip>(&self) -> &IcmpTxCounters<I> {
+    pub(crate) fn icmp_tx_counters<I: Ip>(&self) -> &IcmpTxCounters<I> {
         I::map_ip(
             IpInvariant(self),
-            |IpInvariant(state)| state.ipv4.get_icmp_tx_counters(),
-            |IpInvariant(state)| state.ipv6.get_icmp_tx_counters(),
+            |IpInvariant(state)| state.ipv4.icmp_tx_counters(),
+            |IpInvariant(state)| state.ipv6.icmp_tx_counters(),
         )
     }
 
-    pub(crate) fn get_icmp_rx_counters<I: Ip>(&self) -> &IcmpRxCounters<I> {
+    pub(crate) fn icmp_rx_counters<I: Ip>(&self) -> &IcmpRxCounters<I> {
         I::map_ip(
             IpInvariant(self),
-            |IpInvariant(state)| state.ipv4.get_icmp_rx_counters(),
-            |IpInvariant(state)| state.ipv6.get_icmp_rx_counters(),
+            |IpInvariant(state)| state.ipv4.icmp_rx_counters(),
+            |IpInvariant(state)| state.ipv6.icmp_rx_counters(),
         )
     }
 
-    pub(crate) fn get_ndp_counters(&self) -> &NdpCounters {
-        &self.ipv6.get_ndp_counters()
+    pub(crate) fn ndp_counters(&self) -> &NdpCounters {
+        &self.ipv6.ndp_counters()
     }
 
-    pub(crate) fn get_device_counters(&self) -> &DeviceCounters {
-        &self.device.get_device_counters()
+    pub(crate) fn device_counters(&self) -> &DeviceCounters {
+        &self.device.counters()
     }
 
-    pub(crate) fn get_udp_counters<I: Ip>(&self) -> &UdpCounters<I> {
-        &self.transport.get_udp_counters::<I>()
+    pub(crate) fn udp_counters<I: Ip>(&self) -> &UdpCounters<I> {
+        &self.transport.udp_counters::<I>()
     }
 
-    pub(crate) fn get_slaac_counters(&self) -> &SlaacCounters {
-        &self.ipv6.get_slaac_counters()
+    pub(crate) fn slaac_counters(&self) -> &SlaacCounters {
+        &self.ipv6.slaac_counters()
     }
 }
 

@@ -1891,10 +1891,7 @@ mod tests {
             Buf::new(bytes, ..),
         );
 
-        assert_eq!(
-            sync_ctx.state.get_ip_counters::<I>().receive_ip_packet.get(),
-            expected_received
-        );
+        assert_eq!(sync_ctx.state.ip_counters::<I>().receive_ip_packet.get(), expected_received);
     }
 
     #[test]
@@ -2100,9 +2097,9 @@ mod tests {
         crate::device::set_promiscuous_mode(&sync_ctx, &mut non_sync_ctx, &device, false)
             .expect("error setting promiscuous mode");
         crate::device::receive_frame(&sync_ctx, &mut non_sync_ctx, &eth_device, buf.clone());
-        assert_eq!(sync_ctx.state.get_ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
+        assert_eq!(sync_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
         assert_eq!(
-            sync_ctx.state.get_ip_counters::<I>().dispatch_receive_ip_packet_other_host.get(),
+            sync_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet_other_host.get(),
             0
         );
 
@@ -2110,9 +2107,9 @@ mod tests {
         crate::device::set_promiscuous_mode(&sync_ctx, &mut non_sync_ctx, &device, true)
             .expect("error setting promiscuous mode");
         crate::device::receive_frame(&sync_ctx, &mut non_sync_ctx, &eth_device, buf);
-        assert_eq!(sync_ctx.state.get_ip_counters::<I>().dispatch_receive_ip_packet.get(), 2);
+        assert_eq!(sync_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 2);
         assert_eq!(
-            sync_ctx.state.get_ip_counters::<I>().dispatch_receive_ip_packet_other_host.get(),
+            sync_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet_other_host.get(),
             0
         );
 
@@ -2139,9 +2136,9 @@ mod tests {
         crate::device::set_promiscuous_mode(&sync_ctx, &mut non_sync_ctx, &device, false)
             .expect("error setting promiscuous mode");
         crate::device::receive_frame(&sync_ctx, &mut non_sync_ctx, &eth_device, buf.clone());
-        assert_eq!(sync_ctx.state.get_ip_counters::<I>().dispatch_receive_ip_packet.get(), 2);
+        assert_eq!(sync_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 2);
         assert_eq!(
-            sync_ctx.state.get_ip_counters::<I>().dispatch_receive_ip_packet_other_host.get(),
+            sync_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet_other_host.get(),
             0
         );
 
@@ -2149,9 +2146,9 @@ mod tests {
         crate::device::set_promiscuous_mode(&sync_ctx, &mut non_sync_ctx, &device, true)
             .expect("error setting promiscuous mode");
         crate::device::receive_frame(&sync_ctx, &mut non_sync_ctx, &eth_device, buf);
-        assert_eq!(sync_ctx.state.get_ip_counters::<I>().dispatch_receive_ip_packet.get(), 3);
+        assert_eq!(sync_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 3);
         assert_eq!(
-            sync_ctx.state.get_ip_counters::<I>().dispatch_receive_ip_packet_other_host.get(),
+            sync_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet_other_host.get(),
             usize::from(is_other_host)
         );
     }
@@ -2265,7 +2262,7 @@ mod tests {
             buf,
         );
         assert_eq!(
-            sync_ctx.state.get_ip_counters::<A::Version>().dispatch_receive_ip_packet.get(),
+            sync_ctx.state.ip_counters::<A::Version>().dispatch_receive_ip_packet.get(),
             expected
         );
     }
@@ -2544,7 +2541,7 @@ mod tests {
         let addr_sub1 = AddrSubnet::new(ip1.get(), 64).unwrap();
         let addr_sub2 = AddrSubnet::new(ip2.get(), 64).unwrap();
 
-        assert_eq!(sync_ctx.state.get_ip_counters::<Ipv6>().dispatch_receive_ip_packet.get(), 0);
+        assert_eq!(sync_ctx.state.ip_counters::<Ipv6>().dispatch_receive_ip_packet.get(), 0);
 
         // Add ip1 to the device.
         //
