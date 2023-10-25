@@ -1214,25 +1214,24 @@ void Node::SetPerformanceState(SetPerformanceStateRequestView request,
 Devnode::Target Node::CreateDevfsPassthrough(
     std::optional<fidl::ClientEnd<fuchsia_device_fs::Connector>> connector,
     std::optional<fuchsia_device_fs::ConnectionType> connector_supports) {
-  // TODO(https://fxbug.dev/112484): Once multiplexing is not needed anymore, the default
-  // can be kDevice only.
-  auto supported_by_connector = connector_supports.value_or(
-      fuchsia_device_fs::ConnectionType::kDevice | fuchsia_device_fs::ConnectionType::kController |
-      fuchsia_device_fs::ConnectionType::kNode);
+  auto supported_by_connector =
+      connector_supports.value_or(fuchsia_device_fs::ConnectionType::kDevice);
   return Devnode::PassThrough(
+      fuchsia_device_fs::ConnectionType::kDevice,
       [connector = std::move(connector), supported_by_connector, node = weak_from_this(),
        node_name = name_](zx::channel server_end, fuchsia_device_fs::ConnectionType type) {
         // If the connector supports all of the requested types, connect with the connector.
         if (connector.has_value() && type == (supported_by_connector & type)) {
           return fidl::WireCall(connector.value())->Connect(std::move(server_end)).status();
         }
+
         if (type & fuchsia_device_fs::ConnectionType::kDevice ||
             type & fuchsia_device_fs::ConnectionType::kNode) {
           LOGF(WARNING, "Cannot include device or node for %s.", node_name.c_str());
         }
 
         if (!(type & fuchsia_device_fs::ConnectionType::kController)) {
-          LOGF(ERROR, "Controller not requested for %s.", node_name.c_str());
+          LOGF(WARNING, "Controller not requested for %s.", node_name.c_str());
           return ZX_ERR_NOT_SUPPORTED;
         }
 

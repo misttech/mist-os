@@ -88,7 +88,6 @@ TEST_F(CompositeDeviceTest, CreateTest) {
 TEST_F(CompositeDeviceTest, UnbindFragment) {
   std::unique_ptr<RootMockDevice> root_device, composite_mock;
   std::unique_ptr<MockDevice> child_device1, child_device2, composite_child_device;
-  fidl::InterfacePtr<fuchsia::io::Node> client;
   fidl::InterfacePtr<fuchsia::device::Controller> child1_controller;
 
   constexpr char kName[] = "sys/test/test/mock/fragment1/composite/test";
@@ -96,10 +95,13 @@ TEST_F(CompositeDeviceTest, UnbindFragment) {
   auto promise =
       CreateFragmentDevices(&root_device, &child_device1, &child_device2)
           .and_then(DoWaitForPath(kName))
-          .and_then([&]() { return DoOpen(kName, &client); })
           .and_then([&]() -> Promise<void> {
+            zx::result composite_test_channel =
+                device_watcher::RecursiveWaitForFile(devmgr_.devfs_root().get(), kName);
+            PROMISE_ASSERT(ASSERT_EQ(composite_test_channel.status_value(), ZX_OK));
+
             fidl::SynchronousInterfacePtr<fuchsia::device::test::RootDevice> composite_test;
-            composite_test.Bind(client.Unbind().TakeChannel());
+            composite_test.Bind(std::move(composite_test_channel.value()));
 
             auto bind_callback = [&composite_mock, &composite_child_device](
                                      HookInvocation record, Completer<void> completer) {
@@ -117,19 +119,20 @@ TEST_F(CompositeDeviceTest, UnbindFragment) {
                 std::make_unique<BindOnce>(std::move(bridge.completer), std::move(bind_callback));
             // Bind the mock device driver to a new child
             zx_status_t status = RootMockDevice::CreateFromTestRoot(
-                devmgr_, loop_.dispatcher(), std::move(composite_test), std::move(bind_hook),
+                devmgr_, loop_.dispatcher(), std::move(composite_test), kName, std::move(bind_hook),
                 &composite_mock);
             PROMISE_ASSERT(ASSERT_EQ(status, ZX_OK));
 
             return bridge.consumer.promise_or(fpromise::error("bind abandoned"));
           })
           .and_then([&]() -> Promise<void> {
-            // Open up child1, so we can send it an unbind request
-            return DoOpen(child_device1->path(), &client);
-          })
-          .and_then([&]() -> Promise<void> {
-            zx_status_t status =
-                child1_controller.Bind(client.Unbind().TakeChannel(), loop_.dispatcher());
+            auto child1_controller_path = child_device1->path() + "/device_controller";
+            zx::result child1_controller_channel = device_watcher::RecursiveWaitForFile(
+                devmgr_.devfs_root().get(), child1_controller_path.c_str());
+            PROMISE_ASSERT(ASSERT_EQ(child1_controller_channel.status_value(), ZX_OK));
+
+            zx_status_t status = child1_controller.Bind(
+                std::move(child1_controller_channel.value()), loop_.dispatcher());
             PROMISE_ASSERT(ASSERT_EQ(status, ZX_OK));
 
             // Setup our expectations for unbinding. The child device will be unbound,

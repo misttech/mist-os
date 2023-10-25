@@ -22,12 +22,13 @@
 #include <zxtest/zxtest.h>
 
 using driver_integration_test::IsolatedDevmgr;
-using fuchsia_device::Controller;
 using fuchsia_device_lifecycle_test::Lifecycle;
 using fuchsia_device_lifecycle_test::TestDevice;
 
 namespace {
 constexpr char kLifecycleTopoPath[] = "sys/platform/11:10:0/ddk-lifecycle-test";
+constexpr char kLifecycleControllerTopoPath[] =
+    "sys/platform/11:10:0/ddk-lifecycle-test/device_controller";
 constexpr char kChildTopoPath[] =
     "sys/platform/11:10:0/ddk-lifecycle-test/ddk-lifecycle-test-child-0";
 }  // namespace
@@ -225,9 +226,12 @@ TEST_F(LifecycleTest, CallsFailDuringUnbind) {
 }
 
 TEST_F(LifecycleTest, CloseAllConnectionsOnUnbind) {
-  const fidl::WireResult result =
-      fidl::WireCall(fidl::UnownedClientEnd<Controller>(chan_.channel().borrow()))
-          ->ScheduleUnbind();
+  zx::result channel = device_watcher::RecursiveWaitForFile(devmgr_.devfs_root().get(),
+                                                            kLifecycleControllerTopoPath);
+  ASSERT_OK(channel);
+  fidl::WireSyncClient controller{
+      fidl::ClientEnd<fuchsia_device::Controller>(std::move(channel.value()))};
+  const fidl::WireResult result = controller->ScheduleUnbind();
   ASSERT_OK(result.status());
   const fit::result response = result.value();
   ASSERT_TRUE(response.is_ok(), "%s", zx_status_get_string(response.error_value()));
@@ -250,8 +254,8 @@ TEST_F(LifecycleTest, FailedInit) {
 }
 
 TEST_F(LifecycleTest, RebindNoChildren) {
-  zx::result channel =
-      device_watcher::RecursiveWaitForFile(devmgr_.devfs_root().get(), kLifecycleTopoPath);
+  zx::result channel = device_watcher::RecursiveWaitForFile(devmgr_.devfs_root().get(),
+                                                            kLifecycleControllerTopoPath);
   ASSERT_OK(channel);
   fidl::WireSyncClient controller{
       fidl::ClientEnd<fuchsia_device::Controller>(std::move(channel.value()))};
@@ -268,8 +272,8 @@ TEST_F(LifecycleTest, RebindChildren) {
     ASSERT_TRUE(result.value().is_ok(), "%s", zx_status_get_string(result.value().error_value()));
   }
 
-  zx::result channel =
-      device_watcher::RecursiveWaitForFile(devmgr_.devfs_root().get(), kLifecycleTopoPath);
+  zx::result channel = device_watcher::RecursiveWaitForFile(devmgr_.devfs_root().get(),
+                                                            kLifecycleControllerTopoPath);
   ASSERT_OK(channel);
   fidl::WireSyncClient controller{
       fidl::ClientEnd<fuchsia_device::Controller>(std::move(channel.value()))};

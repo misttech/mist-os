@@ -26,8 +26,8 @@ namespace test {
 class TestDeviceBase {
  public:
   static zx::result<TestDeviceBase> CreateFromFileName(std::string_view path) {
-    zx::result client_end =
-        component::Connect<fuchsia_device::Controller>(std::string(path).c_str());
+    auto controller_path = std::string(path) + "/device_controller";
+    zx::result client_end = component::Connect<fuchsia_device::Controller>(controller_path.c_str());
     if (client_end.is_error()) {
       return client_end.take_error();
     }
@@ -49,12 +49,13 @@ class TestDeviceBase {
 
           fdio_cpp::UnownedFdioCaller caller(dirfd);
           std::string controller_path = std::string(fn).append("/device_controller");
-          zx::result client_end = component::ConnectAt<fuchsia_device::Controller>(
+          zx::result controller_client_end = component::ConnectAt<fuchsia_device::Controller>(
               caller.directory(), controller_path.c_str());
-          if (client_end.is_error()) {
-            return client_end.error_value();
+          if (controller_client_end.is_error()) {
+            return controller_client_end.error_value();
           }
-          const fidl::WireResult result = fidl::WireCall(client_end.value())->GetTopologicalPath();
+          const fidl::WireResult result =
+              fidl::WireCall(controller_client_end.value())->GetTopologicalPath();
           if (!result.ok()) {
             return result.status();
           }
@@ -63,11 +64,19 @@ class TestDeviceBase {
             return response.error_value();
           }
           std::string_view path = (*response.value()).path.get();
-          if (cpp20::ends_with(path, suffix)) {
-            out.get() = TestDeviceBase(std::move(client_end.value()));
-            return ZX_ERR_STOP;
+          if (!cpp20::ends_with(path, suffix)) {
+            return ZX_OK;
           }
-          return ZX_OK;
+
+          zx::result device_client_end =
+              component::ConnectAt<fuchsia_hardware_mediacodec::Tester>(caller.directory(), fn);
+          if (device_client_end.is_error()) {
+            return device_client_end.error_value();
+          }
+
+          out.get() = TestDeviceBase(std::move(controller_client_end.value()),
+                                     std::move(device_client_end.value()));
+          return ZX_ERR_STOP;
         },
         zx::time::infinite().get(), &pair);
     if (status == ZX_OK) {
@@ -85,7 +94,7 @@ class TestDeviceBase {
   // Get a channel to the parent device, so we can rebind the driver to it. This
   // can require sandbox access to /dev/sys.
   zx::result<TestDeviceBase> GetParentDevice() const {
-    const fidl::WireResult result = fidl::WireCall(client_end_)->GetTopologicalPath();
+    const fidl::WireResult result = fidl::WireCall(controller_client_end_)->GetTopologicalPath();
     if (!result.ok()) {
       return zx::error(result.status());
     }
@@ -104,7 +113,7 @@ class TestDeviceBase {
   }
 
   zx::result<> UnbindChildren() const {
-    const fidl::WireResult result = fidl::WireCall(client_end_)->UnbindChildren();
+    const fidl::WireResult result = fidl::WireCall(controller_client_end_)->UnbindChildren();
     if (!result.ok()) {
       return zx::error(result.status());
     }
@@ -117,7 +126,7 @@ class TestDeviceBase {
 
   zx::result<> RebindDriver(std::string_view path) const {
     const fidl::WireResult result =
-        fidl::WireCall(client_end_)->Rebind(fidl::StringView::FromExternal(path));
+        fidl::WireCall(controller_client_end_)->Rebind(fidl::StringView::FromExternal(path));
     if (!result.ok()) {
       return zx::error(result.status());
     }
@@ -129,7 +138,7 @@ class TestDeviceBase {
   }
 
   zx::result<> Unbind() const {
-    const fidl::WireResult result = fidl::WireCall(client_end_)->ScheduleUnbind();
+    const fidl::WireResult result = fidl::WireCall(controller_client_end_)->ScheduleUnbind();
     if (!result.ok()) {
       return zx::error(result.status());
     }
@@ -141,15 +150,20 @@ class TestDeviceBase {
   }
 
   fidl::UnownedClientEnd<fuchsia_hardware_mediacodec::Tester> tester() const {
-    return fidl::UnownedClientEnd<fuchsia_hardware_mediacodec::Tester>(
-        client_end_.channel().borrow());
+    return device_client_end_.borrow();
   }
 
  private:
-  explicit TestDeviceBase(fidl::ClientEnd<fuchsia_device::Controller> client_end)
-      : client_end_(std::move(client_end)) {}
+  explicit TestDeviceBase(fidl::ClientEnd<fuchsia_device::Controller> controller_client_end)
+      : controller_client_end_(std::move(controller_client_end)) {}
 
-  fidl::ClientEnd<fuchsia_device::Controller> client_end_;
+  TestDeviceBase(fidl::ClientEnd<fuchsia_device::Controller> controller_client_end,
+                 fidl::ClientEnd<fuchsia_hardware_mediacodec::Tester> device_client_end)
+      : controller_client_end_(std::move(controller_client_end)),
+        device_client_end_(std::move(device_client_end)) {}
+
+  fidl::ClientEnd<fuchsia_device::Controller> controller_client_end_;
+  fidl::ClientEnd<fuchsia_hardware_mediacodec::Tester> device_client_end_;
 };
 
 constexpr char kMediaCodecPath[] = "/dev/class/media-codec";
