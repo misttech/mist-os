@@ -2555,6 +2555,52 @@ TEST(Sysmem, RequiredSizeV1) {
   EXPECT_LE(1024 * 512 * 3 / 2, vmo_size);
 }
 
+// min_bytes_per_row should account for the bytes_per_row_divisor.
+TEST(Sysmem, BytesPerRowMinRowV1) {
+  auto collection = make_single_participant_collection_v1();
+
+  fuchsia_sysmem::wire::BufferCollectionConstraints constraints;
+  constraints.usage.cpu =
+      fuchsia_sysmem::wire::kCpuUsageReadOften | fuchsia_sysmem::wire::kCpuUsageWriteOften;
+  constraints.min_buffer_count_for_camping = 1;
+  constraints.has_buffer_memory_constraints = false;
+  constraints.image_format_constraints_count = 1;
+  fuchsia_sysmem::wire::ImageFormatConstraints& image_constraints =
+      constraints.image_format_constraints[0];
+  image_constraints.pixel_format.type = fuchsia_sysmem::wire::PixelFormatType::kR8G8B8A8;
+  image_constraints.color_spaces_count = 1;
+  image_constraints.color_space[0] = fuchsia_sysmem::wire::ColorSpace{
+      .type = fuchsia_sysmem::wire::ColorSpaceType::kSrgb,
+  };
+  image_constraints.min_coded_width = 254;
+  image_constraints.max_coded_width = std::numeric_limits<uint32_t>::max();
+  image_constraints.min_coded_height = 256;
+  image_constraints.max_coded_height = std::numeric_limits<uint32_t>::max();
+  image_constraints.min_bytes_per_row = 256;
+  image_constraints.max_bytes_per_row = std::numeric_limits<uint32_t>::max();
+  image_constraints.max_coded_width_times_coded_height = std::numeric_limits<uint32_t>::max();
+  image_constraints.layers = 1;
+  image_constraints.coded_width_divisor = 1;
+  image_constraints.coded_height_divisor = 1;
+  constexpr uint32_t kBytesPerRowDivisor = 64;
+  image_constraints.bytes_per_row_divisor = kBytesPerRowDivisor;
+  image_constraints.start_offset_divisor = 1;
+  image_constraints.display_width_divisor = 1;
+  image_constraints.display_height_divisor = 1;
+  image_constraints.required_max_coded_width = 512;
+  image_constraints.required_max_coded_height = 1024;
+
+  ASSERT_OK(collection->SetConstraints(true, std::move(constraints)));
+
+  auto allocate_result = collection->WaitForBuffersAllocated();
+  ASSERT_OK(allocate_result);
+  ASSERT_OK(allocate_result.value().status);
+
+  auto& out_constraints = allocate_result->buffer_collection_info.settings.image_format_constraints;
+  EXPECT_EQ(out_constraints.min_bytes_per_row % kBytesPerRowDivisor, 0, "%u",
+            out_constraints.min_bytes_per_row);
+}
+
 TEST(Sysmem, CpuUsageAndNoBufferMemoryConstraintsV1) {
   auto allocator_1 = connect_to_sysmem_driver_v1();
   ASSERT_OK(allocator_1);

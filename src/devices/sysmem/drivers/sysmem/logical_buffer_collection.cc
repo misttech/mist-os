@@ -2554,11 +2554,15 @@ bool LogicalBufferCollection::CheckSanitizeImageFormatConstraints(
       LogError(FROM_HERE, "Unsupported pixel format");
       return false;
     }
-    uint32_t min_bytes_per_row_given_min_width =
-        ImageFormatStrideBytesPerWidthPixel(pixel_format_and_modifier) *
-        constraints.min_size()->width();
-    constraints.min_bytes_per_row() =
-        std::max(constraints.min_bytes_per_row().value(), min_bytes_per_row_given_min_width);
+    if (constraints.min_size()->width() > 0) {
+      uint32_t minimum_row_bytes = 0;
+
+      if (ImageFormatMinimumRowBytes(constraints, constraints.min_size()->width(),
+                                     &minimum_row_bytes)) {
+        constraints.min_bytes_per_row() =
+            std::max(constraints.min_bytes_per_row().value(), minimum_row_bytes);
+      }
+    }
   }
 
   if (!constraints.color_spaces().has_value()) {
