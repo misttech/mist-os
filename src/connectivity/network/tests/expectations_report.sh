@@ -56,10 +56,7 @@ read_expectations() {
 #  - Fully qualified fuchsia package URL for the test COMPONENT.
 list_cases() {
     log "listing cases for $1"
-    # We have to skip the first few lines because of bogus list-cases output.
-    # TODO(https://fxbug.dev/116555): Use --machine option instead when it's
-    # available for ffx test.
-    ffx test list-cases "$1" | tail -n +3
+    ffx test list-cases "$1"
 }
 
 # Loads test cases and expectations JSON for a test.

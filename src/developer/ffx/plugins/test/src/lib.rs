@@ -384,7 +384,6 @@ async fn get_tests<W: Write>(
         .context("enumeration failed")?
         .map_err(|e| format_err!("error launching test: {:?}", e))?;
 
-    writeln!(writer, "Tests in suite {}:\n", cmd.test_url)?;
     loop {
         let cases = iterator_proxy.get_next().await?;
         if cases.is_empty() {
