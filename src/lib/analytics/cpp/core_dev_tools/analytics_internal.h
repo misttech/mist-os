@@ -18,8 +18,13 @@ void PrepareGoogleAnalyticsClient(google_analytics::Client& client, std::string_
                                   std::string_view tracking_id,
                                   std::optional<BotInfo> bot = std::nullopt);
 
-void PrepareGa4Client(google_analytics_4::Client& client, std::string_view measurement_id,
-                      std::string_view measurement_key, std::optional<BotInfo> bot = std::nullopt);
+void PrepareGa4Client(google_analytics_4::Client& client, std::string tool_version,
+                      std::string_view measurement_id, std::string_view measurement_key,
+                      std::optional<BotInfo> bot = std::nullopt);
+
+void PrepareGa4Client(google_analytics_4::Client& client, std::uint32_t tool_version,
+                      std::string_view measurement_id, std::string_view measurement_key,
+                      std::optional<BotInfo> bot = std::nullopt);
 
 }  // namespace analytics::core_dev_tools::internal
 

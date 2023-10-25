@@ -10,7 +10,6 @@
 
 #include "lib/fit/function.h"
 #include "sdk/lib/syslog/cpp/macros.h"
-#include "src/developer/debug/zxdb/common/version.h"
 #include "src/lib/analytics/cpp/core_dev_tools/analytics_internal.h"
 #include "src/lib/analytics/cpp/core_dev_tools/analytics_messages.h"
 #include "src/lib/analytics/cpp/core_dev_tools/analytics_status.h"
@@ -45,7 +44,8 @@ namespace analytics::core_dev_tools {
 //      private:
 //       friend class Analytics<ToolAnalytics>;
 //       static constexpr char kToolName[] = "tool";
-//       static constexpr int64_t kQuitTimeoutMs = 500; // wait for at most 500 ms before quitting
+//       static constexpr char kToolVersion[] = "1.0";
+//       static constexpr int64_t kQuitTimeoutMs = 500; // wait for at most 500ms before quitting
 //       static constexpr char kMeasurementId[] = "G-XXXXXXXXXX";
 //       static constexpr char kMeasurementKey[] = "YYYYYYYYYYYYYY";
 //       static constexpr char kTrackingId[] = "UA-XXXXX-Y";
@@ -131,19 +131,6 @@ class Analytics {
 
   static void IfEnabledSendInvokeEvent() {
     if (IsEnabled()) {
-      GeneralParameters parameters;
-      parameters.SetOsVersion(analytics::GetOsVersion());
-      parameters.SetApplicationVersion(zxdb::kBuildVersion);
-
-      // Set an empty application name (an) to make application version (av) usable. Otherwise, the
-      // hit will be treated as invalid by Google Analytics.
-      // See https://developers.google.com/analytics/devguides/collection/protocol/v1/parameters#an
-      parameters.SetApplicationName("");
-
-      google_analytics::Event event(kEventCategoryGeneral, kEventActionInvoke);
-      event.AddGeneralParameters(parameters);
-      SendGoogleAnalyticsHit(event);
-
       SendGa4Event(std::make_unique<InvokeEvent>());
     }
   }
@@ -271,7 +258,8 @@ class Analytics {
 
   static void CreateAndPrepareGa4Client(std::optional<BotInfo> bot = std::nullopt) {
     client_ga4_ = new Ga4Client(T::kQuitTimeoutMs);
-    internal::PrepareGa4Client(*client_ga4_, T::kMeasurementId, T::kMeasurementKey, bot);
+    internal::PrepareGa4Client(*client_ga4_, T::kToolVersion, T::kMeasurementId, T::kMeasurementKey,
+                               bot);
   }
 
   static void SendAnalyticsManualEnableEvent() {

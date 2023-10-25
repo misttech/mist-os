@@ -5,6 +5,7 @@
 #ifndef SRC_DEVELOPER_DEBUG_ZXDB_CONSOLE_ANALYTICS_H_
 #define SRC_DEVELOPER_DEBUG_ZXDB_CONSOLE_ANALYTICS_H_
 
+#include "src/developer/debug/ipc/protocol.h"
 #include "src/developer/debug/zxdb/client/session.h"
 #include "src/lib/analytics/cpp/core_dev_tools/analytics.h"
 
@@ -24,6 +25,7 @@ class Analytics : public analytics::core_dev_tools::Analytics<Analytics> {
   using analytics::core_dev_tools::Analytics<Analytics>::IfEnabledSendInvokeEvent;
 
   static constexpr char kToolName[] = "zxdb";
+  static constexpr uint32_t kToolVersion = debug_ipc::kCurrentProtocolVersion;
   static constexpr int64_t kQuitTimeoutMs = 500;
   static constexpr char kMeasurementId[] = "G-MT0S0L238V";
   static constexpr char kMeasurementKey[] = "ftnVxL9mSuKh52n-HaCjoQ";

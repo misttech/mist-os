@@ -4,17 +4,13 @@
 
 #include "src/developer/debug/zxdb/console/analytics.h"
 
-#include "src/developer/debug/ipc/protocol.h"
 #include "src/developer/debug/zxdb/client/setting_schema_definition.h"
 #include "src/lib/analytics/cpp/core_dev_tools/general_parameters.h"
 #include "src/lib/analytics/cpp/core_dev_tools/system_info.h"
 
 namespace zxdb {
 
-using ::analytics::GetOsVersion;
 using ::analytics::core_dev_tools::AnalyticsOption;
-using ::analytics::core_dev_tools::GeneralParameters;
-using ::analytics::core_dev_tools::GoogleAnalyticsEvent;
 using ::analytics::core_dev_tools::InvokeEvent;
 
 void Analytics::Init(Session& session, AnalyticsOption analytics_option) {
@@ -29,20 +25,6 @@ bool Analytics::IsEnabled(Session* session) {
 
 void Analytics::IfEnabledSendInvokeEvent(Session* session) {
   if (IsEnabled(session)) {
-    GeneralParameters parameters;
-    parameters.SetOsVersion(GetOsVersion());
-    parameters.SetApplicationVersion(std::to_string(debug_ipc::kCurrentProtocolVersion));
-
-    // Set an empty application name (an) to make application version (av) usable. Otherwise, the
-    // hit will be treated as invalid by Google Analytics.
-    // See https://developers.google.com/analytics/devguides/collection/protocol/v1/parameters#an
-    // for more information.
-    parameters.SetApplicationName("");
-
-    GoogleAnalyticsEvent event(kEventCategoryGeneral, kEventActionInvoke);
-    event.AddGeneralParameters(parameters);
-    SendGoogleAnalyticsHit(event);
-
     SendGa4Event(std::make_unique<InvokeEvent>());
   }
 }

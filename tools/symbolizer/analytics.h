@@ -8,6 +8,7 @@
 #include <chrono>
 #include <memory>
 
+#include "src/developer/debug/ipc/protocol.h"
 #include "src/lib/analytics/cpp/core_dev_tools/analytics.h"
 #include "src/lib/analytics/cpp/core_dev_tools/general_parameters.h"
 #include "src/lib/analytics/cpp/google_analytics/timing.h"
@@ -78,6 +79,7 @@ class Analytics : public analytics::core_dev_tools::Analytics<Analytics> {
   friend class analytics::core_dev_tools::Analytics<Analytics>;
 
   static constexpr char kToolName[] = "symbolizer";
+  static constexpr uint32_t kToolVersion = debug_ipc::kCurrentProtocolVersion;
   static constexpr int64_t kQuitTimeoutMs = 500;
   static constexpr char kMeasurementId[] = "G-B0SP6NVLC6";
   static constexpr char kMeasurementKey[] = "ABmnNSKcQX21P9EcYQDt2Q";
