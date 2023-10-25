@@ -115,7 +115,8 @@ fn extract_flashing_artifacts(
                     Image::ZBI { path: _, signed: _ }
                     | Image::VBMeta(_)
                     | Image::FVMFastboot(_)
-                    | Image::Fxfs { path: _, contents: _ } => {
+                    | Image::Fxfs { path: _, contents: _ }
+                    | Image::FxfsSparse { path: _, contents: _ } => {
                         artifacts.push(compute_path(&image.source())?)
                     }
                     _ => continue,
@@ -157,7 +158,8 @@ fn extract_emu_artifacts(
                     Image::ZBI { path: _, signed: _ }
                     | Image::QemuKernel(_)
                     | Image::FVM(_)
-                    | Image::Fxfs { path: _, contents: _ } => {
+                    | Image::Fxfs { path: _, contents: _ }
+                    | Image::FxfsSparse { path: _, contents: _ } => {
                         artifacts.push(compute_path(&image.source())?)
                     }
                     _ => continue,
