@@ -1784,23 +1784,21 @@ impl MemoryManager {
                     .or_insert(clone_vmo(&mapping.vmo, basic_info.rights)?);
 
                 if *needs_snapshot_on_parent {
-                    let vmo = replaced_vmos.entry(basic_info.koid).or_insert(snapshot_vmo(
-                        &mapping.vmo,
-                        *vmo_size,
-                        basic_info.rights,
-                    )?);
+                    let replaced_vmo = replaced_vmos
+                        .entry(basic_info.koid)
+                        .or_insert(snapshot_vmo(&mapping.vmo, *vmo_size, basic_info.rights)?);
                     map_in_vmar(
                         &state.user_vmar,
                         &state.user_vmar_info,
                         DesiredAddress::FixedOverwrite(range.start),
-                        vmo,
+                        replaced_vmo,
                         vmo_offset,
                         length,
                         mapping.prot_flags,
                         mapping.options,
                     )?;
 
-                    mapping.vmo = vmo.clone();
+                    mapping.vmo = replaced_vmo.clone();
                 }
                 vmo.clone()
             };
