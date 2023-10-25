@@ -47,6 +47,7 @@ if (is_host) {
       ":session_proto",
       "//sdk/lib/fidl_base",
       "//sdk/lib/fit",
+      "//src/developer/debug/ipc",
       "//src/developer/debug/zxdb/client",
       "//src/developer/debug/zxdb/common",
       "//src/lib/analytics/cpp/core_dev_tools",
