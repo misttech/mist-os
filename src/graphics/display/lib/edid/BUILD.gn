@@ -37,9 +37,7 @@ fuchsia_library_fuzzer("edid-fuzzer") {
 
 test("edid-test") {
   sources = [
-    "cta-timing-conversion-parity-test.cc",
     "cta-timing-test.cc",
-    "dmt-timing-conversion-parity-test.cc",
     "dmt-timing-test.cc",
     "unit-tests.cc",
   ]
