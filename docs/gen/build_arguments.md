@@ -207,7 +207,7 @@ From //build/images/vbmeta.gni:20
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/android/platform/external/avb/test/data/atx_metadata.bin"`
 
-From //boards/common/x64-common.gni:101
+From //boards/common/x64-common.gni:100
 
 **Overridden from the default:** `""`
 
@@ -227,7 +227,7 @@ From //build/images/vbmeta.gni:17
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/android/platform/external/avb/test/data/testkey_atx_psk.pem"`
 
-From //boards/common/x64-common.gni:99
+From //boards/common/x64-common.gni:98
 
 **Overridden from the default:** `""`
 
@@ -388,7 +388,7 @@ From //build/images/filesystem_limits.gni:17
 
 **Current value for `target_cpu = "x64"`:** `10485760000`
 
-From //boards/common/x64-common.gni:103
+From //boards/common/x64-common.gni:102
 
 **Overridden from the default:** `false`
 
@@ -626,19 +626,7 @@ From //build/board.gni:11
 A list of package labels to include in the 'base' package set. Used by the
 board definition rather than the product definition.
 
-**Current value for `target_cpu = "arm64"`:** `["//src/hwinfo:default_board_config"]`
-
-From //boards/common/arm64-common.gni:28
-
-**Overridden from the default:** `[]`
-
-From //build/board.gni:29
-
-**Current value for `target_cpu = "x64"`:** `["//src/factory/factory_store_providers/config/qemu", "//src/hwinfo:default_board_config"]`
-
-From //boards/common/x64-common.gni:82
-
-**Overridden from the default:** `[]`
+**Current value (from the default):** `[]`
 
 From //build/board.gni:29
 
@@ -923,7 +911,7 @@ From //build/images/args.gni:29
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/common/x64-common.gni:107
+From //boards/common/x64-common.gni:106
 
 **Overridden from the default:** `false`
 
@@ -4548,7 +4536,7 @@ From //build/images/filesystem_limits.gni:12
 
 **Current value for `target_cpu = "x64"`:** `5216665600`
 
-From //boards/common/x64-common.gni:105
+From //boards/common/x64-common.gni:104
 
 **Overridden from the default:** `false`
 
@@ -5308,7 +5296,7 @@ From //build/board.gni:94
 
 **Current value for `target_cpu = "x64"`:** `["//out/not-default/fuchsia.esp.blk"]`
 
-From //boards/common/x64-common.gni:95
+From //boards/common/x64-common.gni:94
 
 **Overridden from the default:** `[]`
 
@@ -5329,7 +5317,7 @@ From //build/board.gni:93
 
 **Current value for `target_cpu = "x64"`:** `"//boards/partitions:x64"`
 
-From //boards/common/x64-common.gni:94
+From //boards/common/x64-common.gni:93
 
 **Overridden from the default:** `false`
 
@@ -6322,7 +6310,8 @@ From //third_party/pigweed/src/pw_protobuf_compiler/toolchain.gni:28
 
 ### pw_protobuf_compiler_PROTOC_BINARY
 
-To override the protobuf compiler used set this to the path, relative to the root_build_dir, to the protoc binary.
+To override the protobuf compiler used set this to the path, relative to the
+root_build_dir, to the protoc binary.
 
 **Current value for `target_cpu = "arm64"`:** `"host_x64/protoc"`
 
@@ -6330,7 +6319,7 @@ From //.gn:108
 
 **Overridden from the default:** `""`
 
-From //third_party/pigweed/src/pw_protobuf_compiler/proto.gni:39
+From //third_party/pigweed/src/pw_protobuf_compiler/proto.gni:55
 
 **Current value for `target_cpu = "x64"`:** `"host_x64/protoc"`
 
@@ -6338,11 +6327,12 @@ From //.gn:108
 
 **Overridden from the default:** `""`
 
-From //third_party/pigweed/src/pw_protobuf_compiler/proto.gni:39
+From //third_party/pigweed/src/pw_protobuf_compiler/proto.gni:55
 
 ### pw_protobuf_compiler_PROTOC_TARGET
 
-To override the protobuf compiler used set this to the GN target that builds the protobuf compiler.
+To override the protobuf compiler used set this to the GN target that builds
+the protobuf compiler.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/protobuf:protoc"`
 
@@ -6350,7 +6340,7 @@ From //.gn:107
 
 **Overridden from the default:** `""`
 
-From //third_party/pigweed/src/pw_protobuf_compiler/proto.gni:36
+From //third_party/pigweed/src/pw_protobuf_compiler/proto.gni:38
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/protobuf:protoc"`
 
@@ -6358,7 +6348,7 @@ From //.gn:107
 
 **Overridden from the default:** `""`
 
-From //third_party/pigweed/src/pw_protobuf_compiler/proto.gni:36
+From //third_party/pigweed/src/pw_protobuf_compiler/proto.gni:38
 
 ### pw_protobuf_compiler_TOOLCHAIN
 
@@ -6636,6 +6626,20 @@ From //third_party/pigweed/src/third_party/emboss/emboss.gni:24
 **Current value (from the default):** `"//third_party/pigweed/src/third_party/mbedtls/configs/config_default.h"`
 
 From //third_party/pigweed/src/third_party/mbedtls/mbedtls.gni:25
+
+### pw_third_party_nanopb_AGGRESSIVE_NANOPB_PB2_REGEN
+
+Regenerates `$dir_pw_third_party_nanopb/generator/proto/nanopb_pb2.py`
+whenever the `generate_nanopb_proto` action is run. If this is set to false,
+the file will only be regenerated if `protoc` is newer than the generated
+`nanopb_pb2.py`.
+
+Aggressive regeneration is NOT safe if this build will run in parallel with
+other build systems that try to read `nanopb_pb2.py`.
+
+**Current value (from the default):** `true`
+
+From //third_party/pigweed/src/third_party/nanopb/nanopb.gni:36
 
 ### pw_third_party_nanopb_CONFIG
 
@@ -8557,7 +8561,7 @@ From //build/images/args.gni:26
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/common/x64-common.gni:108
+From //boards/common/x64-common.gni:107
 
 **Overridden from the default:** `false`
 
@@ -8736,7 +8740,7 @@ From //build/images/vbmeta.gni:14
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/common/x64-common.gni:97
+From //boards/common/x64-common.gni:96
 
 **Overridden from the default:** `false`
 
