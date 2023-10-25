@@ -57,6 +57,8 @@ source_set("shared") {
     "controller.h",
     "display-info.cc",
     "display-info.h",
+    "driver.cc",
+    "driver.h",
     "eld.cc",
     "eld.h",
     "fence.cc",
