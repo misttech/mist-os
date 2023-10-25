@@ -8,6 +8,7 @@ import("//build/test.gni")
 
 source_set("edid") {
   sources = [
+    "cta-timing.h",
     "dmt-timing.h",
     "edid.cc",
     "edid.h",
@@ -36,6 +37,8 @@ fuchsia_library_fuzzer("edid-fuzzer") {
 
 test("edid-test") {
   sources = [
+    "cta-timing-conversion-parity-test.cc",
+    "cta-timing-test.cc",
     "dmt-timing-conversion-parity-test.cc",
     "dmt-timing-test.cc",
     "unit-tests.cc",
