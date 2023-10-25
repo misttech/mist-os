@@ -476,3 +476,5 @@ toc:
     path: /docs/contribute/governance/rfcs/0229_fidl_2023.md
   - title: "RFC-0231: FIDL versioning replacement syntax"
     path: /docs/contribute/governance/rfcs/0231_fidl_versioning_replacement_syntax.md
+  - title: "RFC-0232: FIDL bindings for multiple API levels"
+    path: /docs/contribute/governance/rfcs/0232_fidl_bindings_for_multiple_api_levels.md

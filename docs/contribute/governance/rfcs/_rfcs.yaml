@@ -3009,3 +3009,16 @@
   reviewers: ['abarth@google.com', 'hjfreyer@google.com', 'ianloic@google.com', 'ddorwin@google.com']
   submitted: '2023-09-26'
   reviewed: '2023-10-24'
+
+- name: 'RFC-0232'
+  title: 'FIDL bindings for multiple API levels'
+  short_description: 'Enable building FIDL bindings for compatibility with multiple API levels'
+  authors: ['mkember@google.com', 'ianloic@google.com']
+  file: '0232_fidl_bindings_for_multiple_api_levels.md'
+  area: ['FIDL']
+  issue: ['135677']
+  gerrit_change_id: ['923433']
+  status: 'Accepted'
+  reviewers: ['abarth@google.com', 'hjfreyer@google.com', 'ddorwin@google.com', 'wilkinsonclay@google.com']
+  submitted: '2023-09-27'
+  reviewed: '2023-10-24'

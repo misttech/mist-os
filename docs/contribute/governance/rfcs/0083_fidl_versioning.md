@@ -7,8 +7,9 @@ Note: This is a historical document describing the original design of FIDL
 versioning. Please see [FIDL versioning][versioning-docs] and [Fuchsia API
 evolution guidelines][api-evolution] for up-to-date information.
 
-Note: This RFC was amended by [RFC-0231: FIDL versioning replacement
-syntax][rfc-0231].
+Note: This RFC was amended by
+[RFC-0231: FIDL versioning replacement syntax][rfc-0231] and
+[RFC-0232: FIDL bindings for multiple API levels][rfc-0232].
 
 ## Summary
 
@@ -830,6 +831,7 @@ i.e. without taking action to migrate.
 [rfc-0086]: /docs/contribute/governance/rfcs/0086_rfc_0050_attributes.md
 [rfc-0138]: /docs/contribute/governance/rfcs/0138_handling_unknown_interactions.md
 [rfc-0231]: /docs/contribute/governance/rfcs/0231_fidl_versioning_replacement_syntax.md
+[rfc-0232]: /docs/contribute/governance/rfcs/0232_fidl_bindings_for_multiple_api_levels.md
 [language]: /docs/reference/fidl/language/language.md
 [attrs]: /docs/reference/fidl/language/attributes.md
 [swift-attr]: https://docs.swift.org/swift-book/ReferenceManual/Attributes.html#ID583

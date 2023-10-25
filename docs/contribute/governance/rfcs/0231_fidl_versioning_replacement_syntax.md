@@ -51,7 +51,7 @@ adjacent in the source code.
 
 Distinguishing replacement from removal also makes it possible to get rid of the
 [legacy] feature and replace it with a more general solution. This is a separate
-proposal: [RFC NNNN: FIDL bindings for multiple API levels][rfc-NNNN].
+proposal: [RFC-0232: FIDL bindings for multiple API levels][rfc-0232].
 
 ## Stakeholders
 
@@ -201,6 +201,6 @@ prior art on this exact problem, as far as I know.
 [inherit]: /docs/reference/fidl/language/versioning.md#inheritance
 [legacy]: /docs/reference/fidl/language/versioning.md#legacy
 [rfc-0083]: /docs/contribute/governance/rfcs/0083_fidl_versioning.md
-[rfc-NNNN]: https://fuchsia-review.git.corp.google.com/c/fuchsia/+/923433
+[rfc-0232]: /docs/contribute/governance/rfcs/0232_fidl_bindings_for_multiple_api_levels.md
 [swapping]: /docs/reference/fidl/language/versioning.md#swapping
 [versioning]: /docs/reference/fidl/language/versioning.md
