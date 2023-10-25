@@ -12,7 +12,7 @@
 // TODO(https://github.com/rust-lang/rust/issues/39371): remove
 #![allow(non_upper_case_globals)]
 
-use starnix_lock::Mutex;
+use starnix_lock::OrderedMutex;
 use std::{collections::BTreeMap, ops::Bound, sync::Arc};
 use zerocopy::{AsBytes, FromBytes};
 
@@ -22,11 +22,21 @@ use crate::{
         buffers::{InputBuffer, OutputBuffer},
         *,
     },
+    lock_ordering::*,
     mm::{MemoryAccessor, MemoryAccessorExt},
     syscalls::*,
     task::Kernel,
     types::{as_any::AsAny, *},
 };
+
+pub mod lock_levels {
+    use lock_sequence::lock_level;
+    use starnix_lock::OrderedMutex;
+    use std::collections::BTreeMap;
+    lock_level!(BpfMapEntries, OrderedMutex<BTreeMap<Vec<u8>, Vec<u8>>, BpfMapEntries>);
+}
+
+use crate::bpf::lock_levels::BpfMapEntries;
 
 /// The default selinux context to use for each BPF object.
 const DEFAULT_BPF_SELINUX_CONTEXT: &FsStr = b"u:object_r:fs_bpf:s0";
@@ -91,7 +101,7 @@ struct Map {
     // TODO(tbodt): Linux actually has 30 different implementations of a BPF map, from hashmap to
     // array to bloom filter. BTreeMap is probably the correct semantics for none of them. This
     // will ultimately need to be a trait object.
-    entries: Mutex<BTreeMap<Vec<u8>, Vec<u8>>>,
+    entries: OrderedMutex<BTreeMap<Vec<u8>, Vec<u8>>, BpfMapEntries>,
 }
 impl BpfObject for Map {}
 
@@ -169,7 +179,7 @@ fn get_selinux_context(path: &FsStr) -> FsString {
 }
 
 pub fn sys_bpf(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     cmd: bpf_cmd,
     attr_addr: UserAddress,
@@ -229,7 +239,7 @@ pub fn sys_bpf(
                 .mm
                 .read_memory_to_vec(UserAddress::from(value_addr), map.value_size as usize)?;
 
-            map.entries.lock().insert(key, value);
+            map.entries.lock(locked).insert(key, value);
             Ok(SUCCESS)
         }
 
@@ -249,7 +259,7 @@ pub fn sys_bpf(
                 None
             };
 
-            let entries = map.entries.lock();
+            let entries = map.entries.lock(locked);
             let next_entry = match key {
                 Some(key) if entries.contains_key(&key) => {
                     entries.range((Bound::Excluded(key), Bound::Unbounded)).next()

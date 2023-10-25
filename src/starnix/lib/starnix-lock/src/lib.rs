@@ -3,13 +3,13 @@
 // found in the LICENSE file.
 
 // Use these crates so that we don't need to make the dependency conditional.
-#[cfg(test)]
 use core::marker::PhantomData;
 use fuchsia_sync as _;
 use lock_api as _;
 use lock_sequence as _;
-#[cfg(test)]
+
 use lock_sequence::{lock::LockFor, relation::LockBefore, relation::LockLevel, Locked};
+use std::{any, fmt};
 
 #[cfg(not(any(test, debug_assertions)))]
 pub type Mutex<T> = fuchsia_sync::Mutex<T>;
@@ -68,14 +68,23 @@ pub fn ordered_lock<'a, T>(
 /// A wrapper for mutex that requires a `Locked` context to acquire.
 /// This context must be of a level that precedes `L` in the lock ordering graph
 /// where `L` is a level associated with this mutex.
-#[cfg(test)]
-#[derive(Debug, Default)]
 pub struct OrderedMutex<T, L: LockLevel<Source = Self>> {
     mutex: Mutex<T>,
     _phantom: PhantomData<L>,
 }
 
-#[cfg(test)]
+impl<T: Default, L: LockLevel<Source = Self>> Default for OrderedMutex<T, L> {
+    fn default() -> Self {
+        Self { mutex: Default::default(), _phantom: Default::default() }
+    }
+}
+
+impl<T: Default + fmt::Debug, L: LockLevel<Source = Self>> fmt::Debug for OrderedMutex<T, L> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "OrderedMutex({:?}, {})", self.mutex, any::type_name::<L>())
+    }
+}
+
 impl<T, L: LockLevel<Source = Self>> LockFor<L> for OrderedMutex<T, L> {
     type Data = T;
     type Guard<'a> = MutexGuard<'a, T> where T: 'a, L: 'a;
@@ -84,22 +93,23 @@ impl<T, L: LockLevel<Source = Self>> LockFor<L> for OrderedMutex<T, L> {
     }
 }
 
-#[cfg(test)]
 impl<T, L: LockLevel<Source = Self>> OrderedMutex<T, L> {
+    #[cfg(test)]
     pub fn new(t: T) -> Self {
         Self { mutex: Mutex::new(t), _phantom: Default::default() }
     }
 
-    pub fn lock<'a, P>(&'a self, locked: &'a mut Locked<'a, P>) -> <Self as LockFor<L>>::Guard<'a>
+    pub fn lock<'a, P>(&'a self, locked: &'a mut Locked<'_, P>) -> <Self as LockFor<L>>::Guard<'a>
     where
         P: LockBefore<L> + LockLevel,
     {
         locked.lock(self)
     }
 
+    #[cfg(test)]
     pub fn lock_and<'a, P>(
         &'a self,
-        locked: &'a mut Locked<'a, P>,
+        locked: &'a mut Locked<'_, P>,
     ) -> (<Self as LockFor<L>>::Guard<'a>, Locked<'a, L>)
     where
         P: LockBefore<L> + LockLevel,

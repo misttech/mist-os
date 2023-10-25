@@ -318,6 +318,7 @@ rustc_binary("starnix_kernel_bin") {
     "fs/xattr.rs",
     "fs/zxio.rs",
     "loader.rs",
+    "lock_ordering.rs",
     "logging.rs",
     "main.rs",
     "mm/futex_table.rs",

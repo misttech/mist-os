@@ -112,6 +112,7 @@ pub trait LockBefore<X> {}
 
 impl<B: LockAfter<A>, A> LockBefore<B> for A {}
 
+// Define a lock level that corresponds to some state that can be locked.
 #[macro_export]
 macro_rules! lock_level {
     ($A:ident, $B:ty) => {
@@ -122,8 +123,13 @@ macro_rules! lock_level {
     };
 }
 
+// Defines the order between two lock levels. Lock B comes after A if B
+// can be acquired while A is locked.
 #[macro_export]
 macro_rules! impl_lock_after {
+    (Unlocked => $A:ty) => {
+        impl lock_sequence::relation::LockAfter<Unlocked> for $A {}
+    };
     ($A:ty => $B:ty) => {
         impl lock_sequence::relation::LockAfter<$A> for $B {}
         impl<X: lock_sequence::relation::LockBefore<$A>> lock_sequence::relation::LockAfter<X>
@@ -135,7 +141,7 @@ macro_rules! impl_lock_after {
 
 #[cfg(test)]
 mod test {
-    use crate::{lock::LockFor, relation::LockAfter, Unlocked};
+    use crate::{lock::LockFor, Unlocked};
     use std::sync::{Mutex, MutexGuard};
 
     extern crate self as lock_sequence;
@@ -147,7 +153,7 @@ mod test {
     impl_lock_after!(A => B);
     impl_lock_after!(B => C);
 
-    impl LockAfter<Unlocked> for A {}
+    impl_lock_after!(Unlocked => A);
 
     pub struct FakeLocked {
         a: Mutex<u32>,
