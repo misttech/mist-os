@@ -25,6 +25,6 @@ see Starnix's [`README`][starnix-readme] file.
 [starnix-runner]: /docs/concepts/components/v2/starnix.md
 [starnix-rfc]: /docs/contribute/governance/rfcs/0082_starnix.md
 [starnix-readme]: https://cs.opensource.google/fuchsia/fuchsia/+/main:/src/starnix/kernel/README.md
-[making-linux-syscalls]: /docs//concepts/starnix/making-linux-syscalls-in-fuchsia.md
+[making-linux-syscalls]: /docs/concepts/starnix/making-linux-syscalls-in-fuchsia.md
 [starnix-container]: /docs/concepts/starnix/starnix-container.md
 [starnix-vfs]: /docs/concepts/starnix/architecture-of-the-starnix-vfs.md
