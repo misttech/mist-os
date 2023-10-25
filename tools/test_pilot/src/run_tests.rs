@@ -5,10 +5,10 @@
 use crate::errors::TestRunError;
 use crate::opts::CommandLineArgs;
 use crate::test_config::{TestConfigV1, TestConfiguration};
-use async_io::Async;
-use futures::prelude::*;
 use std::io::{self, Write};
-use std::process::{self, Command, ExitStatus, Stdio};
+use std::process::{ExitStatus, Stdio};
+use tokio::io::AsyncReadExt;
+use tokio::process::{self, Command};
 
 const DEFAULT_PATH: &str = "/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin";
 const ENV_PATH: &str = "PATH";
@@ -89,14 +89,11 @@ async fn run_test_and_stream_output_v1<W1: Write + Send, W2: Write + Send>(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|e| TestRunError::Spawn(command.get_program().into(), e))?
+        .map_err(|e| TestRunError::Spawn(command.as_std().get_program().into(), e))?
         .into();
 
-    let stdout = child.inner.stdout.take().unwrap();
-    let stderr = child.inner.stderr.take().unwrap();
-
-    let mut stdout = Async::new(stdout).unwrap();
-    let mut stderr = Async::new(stderr).unwrap();
+    let mut stdout = child.inner.stdout.take().unwrap();
+    let mut stderr = child.inner.stderr.take().unwrap();
 
     let stdout_writer_handle = async move {
         let mut buf = vec![0; BUFFER_SIZE];
@@ -132,7 +129,7 @@ async fn run_test_and_stream_output_v1<W1: Write + Send, W2: Write + Send>(
 
     stdout_status?;
     stderr_status?;
-    Ok(child.inner.wait().expect("Command wasn't running"))
+    Ok(child.inner.wait().await.expect("Command wasn't running"))
 }
 
 pub async fn run_test(
@@ -188,9 +185,9 @@ mod tests {
 
         let cmd = create_test_launch_command_v1(&args, &config);
 
-        assert_eq!(cmd.get_program(), "/path/to/test_bin");
-        assert_eq!(cmd.get_args().len(), 0);
-        let env = cmd.get_envs().collect::<HashMap<_, _>>();
+        assert_eq!(cmd.as_std().get_program(), "/path/to/test_bin");
+        assert_eq!(cmd.as_std().get_args().len(), 0);
+        let env = cmd.as_std().get_envs().collect::<HashMap<_, _>>();
         assert_eq!(env.get(OsStr::new(ENV_PATH)).unwrap().unwrap(), DEFAULT_PATH);
         assert_eq!(env.get(OsStr::new(ENV_SDK_TOOL_PATH)), None);
         assert_eq!(env.get(OsStr::new(ENV_TARGETS)), None);
@@ -230,9 +227,9 @@ mod tests {
         };
 
         let cmd = create_test_launch_command_v1(&args, &config);
-        let env = cmd.get_envs().collect::<HashMap<_, _>>();
-        assert_eq!(cmd.get_program(), "/path/to/test_bin");
-        assert_eq!(cmd.get_args().len(), 0);
+        let env = cmd.as_std().get_envs().collect::<HashMap<_, _>>();
+        assert_eq!(cmd.as_std().get_program(), "/path/to/test_bin");
+        assert_eq!(cmd.as_std().get_args().len(), 0);
         assert_eq!(env.get(OsStr::new(ENV_PATH)).unwrap().unwrap(), DEFAULT_PATH);
         assert_eq!(env.get(OsStr::new(ENV_SDK_TOOL_PATH)).unwrap().unwrap(), "/path/to/sdk_tools");
         assert_eq!(env.get(OsStr::new(ENV_TARGETS)).unwrap().unwrap(), "target1, target2");
@@ -258,9 +255,9 @@ mod tests {
         args.extra_test_args = Some("--arg1 --arg2".into());
 
         let cmd = create_test_launch_command_v1(&args, &config);
-        let env = cmd.get_envs().collect::<HashMap<_, _>>();
-        assert_eq!(cmd.get_program(), "/path/to/test_bin");
-        assert_eq!(cmd.get_args().len(), 0);
+        let env = cmd.as_std().get_envs().collect::<HashMap<_, _>>();
+        assert_eq!(cmd.as_std().get_program(), "/path/to/test_bin");
+        assert_eq!(cmd.as_std().get_args().len(), 0);
         assert_eq!(env.get(OsStr::new(ENV_PATH)).unwrap().unwrap(), DEFAULT_PATH);
         assert_eq!(env.get(OsStr::new(ENV_SDK_TOOL_PATH)), None);
         assert_eq!(env.get(OsStr::new(ENV_TARGETS)), None);
