@@ -355,12 +355,6 @@ impl<I: IpExt, D, O> IpSock<I, D, O> {
     {
         self.replace_options(Default::default())
     }
-
-    /// Consumes the socket and returns the contained options.
-    pub(crate) fn into_options(self) -> O {
-        let Self { definition: _, options } = self;
-        options
-    }
 }
 
 // TODO(joshlf): Once we support configuring transport-layer protocols using
@@ -2403,7 +2397,6 @@ mod tests {
         assert_eq!(socket.take_options(), START_OPTION);
         assert_eq!(socket.replace_options(NEW_OPTION), DEFAULT_OPTION);
         assert_eq!(socket.options(), &NEW_OPTION);
-        assert_eq!(socket.into_options(), NEW_OPTION);
     }
 
     #[ip_test]

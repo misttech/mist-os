@@ -6864,6 +6864,15 @@ mod tests {
         );
     }
 
+    fn get_dual_stack_context<'a, C: 'a, SC: DatagramBoundStateContext<Ipv6, C, Udp>>(
+        sync_ctx: &'a mut SC,
+    ) -> &'a mut SC::DualStackContext {
+        match sync_ctx.dual_stack_context() {
+            MaybeDualStack::NotDualStack(_) => unreachable!("UDP is a dual stack enabled protocol"),
+            MaybeDualStack::DualStack(ds) => ds,
+        }
+    }
+
     #[test_case(DualStackBindAddr::Any; "dual-stack")]
     #[test_case(DualStackBindAddr::V4Any; "v4 any")]
     #[test_case(DualStackBindAddr::V4Specific; "v4 specific")]
@@ -7036,6 +7045,87 @@ mod tests {
             ),
             Err(Either::Right(LocalAddressError::CannotBindToAddress))
         );
+    }
+
+    // Calling `connect` on an already bound socket will cause the existing
+    // `listener` entry in the bound state map to be upgraded to a `connected`
+    // entry. Dual-stack listeners may exist in both the IPv4 and IPv6 bound
+    // state maps, so make sure both entries are properly removed.
+    #[test]
+    fn dual_stack_connect_cleans_up_existing_listener() {
+        let FakeCtxWithSyncCtx { mut sync_ctx, mut non_sync_ctx } =
+            FakeCtxWithSyncCtx::with_sync_ctx(FakeUdpSyncCtx::with_local_remote_ip_addrs(
+                vec![Ipv6::FAKE_CONFIG.local_ip],
+                vec![Ipv6::FAKE_CONFIG.remote_ip],
+            ));
+
+        const DUAL_STACK_ANY_ADDR: Option<SocketZonedIpAddr<Ipv6Addr, FakeDeviceId>> = None;
+
+        fn assert_listeners(sync_ctx: &mut FakeUdpSyncCtx<FakeDeviceId>, expect_present: bool) {
+            const V4_LISTENER_ADDR: ListenerAddr<
+                ListenerIpAddr<Ipv4Addr, NonZeroU16>,
+                FakeWeakDeviceId<FakeDeviceId>,
+            > = ListenerAddr {
+                ip: ListenerIpAddr { addr: None, identifier: LOCAL_PORT },
+                device: None,
+            };
+            const V6_LISTENER_ADDR: ListenerAddr<
+                ListenerIpAddr<Ipv6Addr, NonZeroU16>,
+                FakeWeakDeviceId<FakeDeviceId>,
+            > = ListenerAddr {
+                ip: ListenerIpAddr { addr: None, identifier: LOCAL_PORT },
+                device: None,
+            };
+
+            transport::udp::DualStackBoundStateContext::with_both_bound_sockets_mut(
+                get_dual_stack_context(&mut sync_ctx.inner),
+                |_sync_ctx, v6_sockets, v4_sockets| {
+                    let v4 = v4_sockets.bound_sockets.listeners().get_by_addr(&V4_LISTENER_ADDR);
+                    let v6 = v6_sockets.bound_sockets.listeners().get_by_addr(&V6_LISTENER_ADDR);
+                    if expect_present {
+                        assert_matches!(v4, Some(_));
+                        assert_matches!(v6, Some(_));
+                    } else {
+                        assert_matches!(v4, None);
+                        assert_matches!(v6, None);
+                    }
+                },
+            );
+        }
+
+        // Create a socket and listen on the IPv6 any address. Verify we have
+        // listener state for both IPv4 and IPv6.
+        let socket = SocketHandler::<Ipv6, _>::create_udp(&mut sync_ctx);
+        enable_dual_stack_for_test(&mut sync_ctx, &mut non_sync_ctx, socket);
+        assert_eq!(
+            SocketHandler::listen_udp(
+                &mut sync_ctx,
+                &mut non_sync_ctx,
+                socket,
+                DUAL_STACK_ANY_ADDR,
+                Some(LOCAL_PORT),
+            ),
+            Ok(())
+        );
+        assert_listeners(&mut sync_ctx, true);
+
+        // Connect the socket to a remote V6 address and verify that both
+        // the IPv4 and IPv6 listener state has been removed.
+        assert_eq!(
+            SocketHandler::connect(
+                &mut sync_ctx,
+                &mut non_sync_ctx,
+                socket,
+                Some(ZonedAddr::Unzoned(Ipv6::FAKE_CONFIG.remote_ip).into()),
+                REMOTE_PORT,
+            ),
+            Ok(())
+        );
+        assert_matches!(
+            SocketHandler::get_udp_info(&mut sync_ctx, &mut non_sync_ctx, socket),
+            SocketInfo::Connected(_)
+        );
+        assert_listeners(&mut sync_ctx, false);
     }
 
     #[test_case(net_ip_v6!("::"), true; "dual stack any")]
