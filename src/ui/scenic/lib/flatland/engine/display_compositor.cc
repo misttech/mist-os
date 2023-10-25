@@ -342,6 +342,9 @@ fuchsia::sysmem::BufferCollectionSyncPtr DisplayCompositor::TakeDisplayBufferCol
 
 fuchsia::hardware::display::ImageConfig DisplayCompositor::CreateImageConfig(
     const allocation::ImageMetadata& metadata) const {
+  // TODO(fxbug.dev/71344): Pixel format should be ignored when using sysmem. We do not want to have
+  // to deal with this default image format. Work was in progress to address this, but is currently
+  // stalled: see fxr/716543.
   FX_DCHECK(buffer_collection_pixel_format_.count(metadata.collection_id));
   const auto pixel_format = buffer_collection_pixel_format_.at(metadata.collection_id);
   return fuchsia::hardware::display::ImageConfig{
@@ -577,10 +580,6 @@ void DisplayCompositor::ApplyLayerImage(const fuchsia::hardware::display::LayerI
       GetDisplayTransformFromOrientationAndFlip(rectangle.orientation, image.flip);
   const auto alpha_mode = GetAlphaMode(image.blend_mode);
 
-  // TODO(fxbug.dev/71344): Pixel format should be ignored when using sysmem. We do not want to have
-  // to deal with this default image format. Work was in progress to address this, but is currently
-  // stalled: see fxr/716543.
-  const auto pixel_format = buffer_collection_pixel_format_.at(image.collection_id);
   const fuchsia::hardware::display::ImageConfig image_config = CreateImageConfig(image);
   (*display_coordinator_)->SetLayerPrimaryConfig(layer_id, image_config);
   (*display_coordinator_)->SetLayerPrimaryPosition(layer_id, transform, src, dst);
