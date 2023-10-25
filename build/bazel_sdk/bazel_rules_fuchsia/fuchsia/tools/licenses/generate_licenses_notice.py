@@ -78,9 +78,10 @@ def main():
             )
 
         for grouped_licenses in licenses_by_unique_stripped_text.values():
-            write_delimiter()
+            is_notice_shipped = False
             unique_package_names = set()
             unique_public_source_mirrors = set()
+
             for license in grouped_licenses:
                 for package in spdx_index.get_packages_by_license(license):
                     unique_package_names.add(package.name)
@@ -93,6 +94,18 @@ def main():
                         classification.all_public_source_mirrors()
                     )
 
+                    is_notice_shipped = (
+                        is_notice_shipped
+                        or classification.is_notice_shipped is True
+                    )
+                else:
+                    # Absent classifications, fallback to true
+                    is_notice_shipped = True
+
+            if not is_notice_shipped:
+                continue
+
+            write_delimiter()
             write("The following license text(s) applies to these projects:\n")
             for package_name in sorted(list(unique_package_names)):
                 write(f" • {package_name}\n")

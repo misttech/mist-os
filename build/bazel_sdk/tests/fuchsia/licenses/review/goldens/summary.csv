@@ -7,7 +7,7 @@ License Kind 2 (forbidden_condition),
 License Kind 3 (forbidden_condition)",allowed_condition,"http://foo.bar
 https://x",bug/1234,"License Kind 2 (*) -> (allowed_condition)
 Some comment text","http://mirror1
-http://mirror2",False,False,False,LicenseRef-X,"Root>Package A
+http://mirror2",True,True,False,LicenseRef-X,"Root>Package A
 Root>Package B
 Root>Package F","License Kind 1 at lines 1-2: allowed_condition,
 License Kind 2 at lines 3-4: forbidden_condition,

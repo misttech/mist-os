@@ -106,17 +106,21 @@ def _write_summary_csv(
                 ]
                 final_conditions = []
 
-                identification_stats = {
-                    "_size_bytes": license_classification.size_bytes,
-                    "_size_lines": license_classification.size_lines,
-                    "_unidentified_lines": license_classification.unidentified_lines,
-                }
+                identification_stats.update(
+                    {
+                        "_size_bytes": license_classification.size_bytes,
+                        "_size_lines": license_classification.size_lines,
+                        "_unidentified_lines": license_classification.unidentified_lines,
+                    }
+                )
 
-                shipped_info = {
-                    "is_project_shipped": license_classification.is_project_shipped(),
-                    "is_notice_shipped": license_classification.is_notice_shipped(),
-                    "is_source_code_shipped": license_classification.is_source_code_shipped(),
-                }
+                shipped_info.update(
+                    {
+                        "is_project_shipped": license_classification.is_project_shipped,
+                        "is_notice_shipped": license_classification.is_notice_shipped,
+                        "is_source_code_shipped": license_classification.is_source_code_shipped,
+                    }
+                )
 
                 for i in license_classification.identifications:
                     identifications.append(i.identified_as)

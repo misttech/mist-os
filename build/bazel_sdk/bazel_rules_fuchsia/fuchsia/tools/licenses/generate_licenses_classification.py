@@ -224,6 +224,16 @@ def main():
     )
 
     parser.add_argument(
+        "--conditions_requiring_shipped_notice",
+        help="""Only licenses with at least one identification with the given conditions
+will be shipped as a notice text. If empty, all licenses will be shipped as notice text.
+""",
+        nargs="*",
+        required=False,
+        default=[],
+    )
+
+    parser.add_argument(
         "--fail_on_disallowed_conditions",
         help="The tool will fail when classifications map to conditions not in the allowed list",
         type=bool,
@@ -281,6 +291,11 @@ allowing downstream customers to provide project specific instructions.
         policy_override_rules_file_paths=args.policy_override_rules,
         allowed_conditions=args.allowed_conditions,
     )
+
+    if args.conditions_requiring_shipped_notice:
+        classification = classification.determine_is_notice_shipped(
+            conditions_requiring_shipped_notice=args.conditions_requiring_shipped_notice
+        )
 
     output_json_path = args.output_file
     _log(f"Writing classification into {output_json_path}!")

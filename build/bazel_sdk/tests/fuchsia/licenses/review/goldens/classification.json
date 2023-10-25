@@ -5,6 +5,9 @@
         "links": [
             "https://x"
         ],
+        "is_project_shipped": true,
+        "is_notice_shipped": true,
+        "is_source_code_shipped": false,
         "dependents": [
             "Package A"
         ],

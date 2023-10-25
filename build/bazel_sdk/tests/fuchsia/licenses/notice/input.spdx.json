@@ -49,6 +49,12 @@
             "name": "Package E",
             "licenseConcluded": "LicenseRef-Z",
             "copyrightText": "copyright E"
+        },
+        {
+            "SPDXID": "SPDXRef-Package-6",
+            "name": "Package F",
+            "licenseConcluded": "LicenseRef-Internal",
+            "copyrightText": "copyright F"
         }
     ],
     "relationships": [
@@ -75,6 +81,11 @@
         {
             "spdxElementId": "SPDXRef-Package-0",
             "relatedSpdxElement": "SPDXRef-Package-5",
+            "relationshipType": "CONTAINS"
+        },
+        {
+            "spdxElementId": "SPDXRef-Package-0",
+            "relatedSpdxElement": "SPDXRef-Package-6",
             "relationshipType": "CONTAINS"
         }
     ],
@@ -113,6 +124,11 @@
                     "url": "https://z"
                 }
             ]
+        },
+        {
+            "name": "License Internal",
+            "licenseId": "LicenseRef-Internal",
+            "extractedText": "Internal text"
         }
     ]
 }

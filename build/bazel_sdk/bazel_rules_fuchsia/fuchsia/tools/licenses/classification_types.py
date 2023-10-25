@@ -30,12 +30,6 @@ class IdentifiedSnippet:
     overriden_conditions: Set[str] = dataclasses.field(default_factory=set)
     # Optional public source code mirroring urls (supplied by some override rules)
     public_source_mirrors: List[str] = None
-    # Whether the project is shipped.
-    is_project_shipped: bool = None
-    # Whether notice is shipped.
-    is_notice_shipped: bool = None
-    # Whether source code is shipped.
-    is_source_code_shipped: bool = None
     # Dependents that were not matched by any rule
     dependents_unmatched_by_overriding_rules: Set[str] = dataclasses.field(
         default_factory=set
@@ -149,12 +143,6 @@ class IdentifiedSnippet:
             ] = self.suggested_override_rule.to_json_dict()
         if self.public_source_mirrors:
             out["public_source_mirrors"] = self.public_source_mirrors
-        if self.is_project_shipped != None:
-            out["is_project_shipped"] = self.is_project_shipped
-        if self.is_notice_shipped != None:
-            out["is_notice_shipped"] = self.is_notice_shipped
-        if self.is_source_code_shipped != None:
-            out["is_source_code_shipped"] = self.is_source_code_shipped
 
         out.update(
             {
@@ -195,15 +183,6 @@ class IdentifiedSnippet:
             public_source_mirrors=reader.get_or(
                 "public_source_mirrors", default=None, expected_type=list
             ),
-            is_project_shipped=reader.get_or(
-                "is_project_shipped", default=None, expected_type=bool
-            ),
-            is_notice_shipped=reader.get_or(
-                "is_notice_shipped", default=None, expected_type=bool
-            ),
-            is_source_code_shipped=reader.get_or(
-                "is_source_code_shipped", default=None, expected_type=bool
-            ),
             conditions_unmatched_by_overriding_rules=reader.get_string_set(
                 "conditions_unmatched_by_overriding_rules"
             ),
@@ -227,31 +206,6 @@ class IdentifiedSnippet:
         checksum = md5(text.encode("utf-8")).hexdigest()
         return dataclasses.replace(
             self, snippet_text=text, snippet_checksum=checksum
-        )
-
-    def set_is_shipped_defaults(
-        self,
-        default_is_project_shipped,
-        default_is_notice_shipped,
-        default_is_source_code_shipped,
-    ) -> "IdentifiedSnippet":
-        def default_if_none(value, default):
-            if value == None:
-                return default
-            else:
-                return value
-
-        return dataclasses.replace(
-            self,
-            is_project_shipped=default_if_none(
-                self.is_project_shipped, default_is_project_shipped
-            ),
-            is_notice_shipped=default_if_none(
-                self.is_notice_shipped, default_is_notice_shipped
-            ),
-            is_source_code_shipped=default_if_none(
-                self.is_source_code_shipped, default_is_source_code_shipped
-            ),
         )
 
     def is_identified(self):
@@ -450,17 +404,27 @@ class LicenseClassification:
     links: List[str] = None
     dependents: List[str] = None
 
+    # Whether the project is shipped.
+    is_project_shipped: bool = None
+    # Whether notice is shipped.
+    is_notice_shipped: bool = None
+    # Whether source code is shipped.
+    is_source_code_shipped: bool = None
+
     # license size & identification stats
     size_bytes: int = None
     size_lines: int = None
     unidentified_lines: int = None
 
     def to_json_dict(self):
-        out = {
+        return {
             "license_id": self.license_id,
             "name": self.name,
             "links": self.links,
             "dependents": self.dependents,
+            "is_project_shipped": self.is_project_shipped,
+            "is_notice_shipped": self.is_notice_shipped,
+            "is_source_code_shipped": self.is_source_code_shipped,
             "identifications": [m.to_json_dict() for m in self.identifications],
             "identification_stats": {
                 "size_bytes": self.size_bytes,
@@ -468,8 +432,6 @@ class LicenseClassification:
                 "unidentified_lines": self.unidentified_lines,
             },
         }
-
-        return out
 
     def from_json_dict(reader: DictReader) -> "LicenseClassification":
         identifications = [
@@ -483,6 +445,15 @@ class LicenseClassification:
             name=reader.get("name"),
             links=reader.get_string_list("links"),
             dependents=reader.get_string_list("dependents"),
+            is_project_shipped=reader.get_or(
+                "is_project_shipped", default=None, expected_type=bool
+            ),
+            is_notice_shipped=reader.get_or(
+                "is_notice_shipped", default=None, expected_type=bool
+            ),
+            is_source_code_shipped=reader.get_or(
+                "is_source_code_shipped", default=None, expected_type=bool
+            ),
             identifications=identifications,
             size_bytes=stats_reader.get_or(
                 "size_bytes", default=None, expected_type=int, accept_none=True
@@ -498,7 +469,9 @@ class LicenseClassification:
             ),
         )
 
-    def add_license_information(self, index: SpdxIndex):
+    def add_license_information(
+        self, index: SpdxIndex
+    ) -> "LicenseClassification":
         spdx_license = index.get_license_by_id(self.license_id)
         snippet_lines = spdx_license.extracted_text_lines()
         identifications = [
@@ -520,6 +493,31 @@ class LicenseClassification:
             name=spdx_license.name,
             links=links,
             dependents=dependents,
+        )
+
+    def set_is_shipped_defaults(
+        self,
+        default_is_project_shipped,
+        default_is_notice_shipped,
+        default_is_source_code_shipped,
+    ) -> "LicenseClassification":
+        def default_if_none(value, default):
+            if value == None:
+                return default
+            else:
+                return value
+
+        return dataclasses.replace(
+            self,
+            is_project_shipped=default_if_none(
+                self.is_project_shipped, default_is_project_shipped
+            ),
+            is_notice_shipped=default_if_none(
+                self.is_notice_shipped, default_is_notice_shipped
+            ),
+            is_source_code_shipped=default_if_none(
+                self.is_source_code_shipped, default_is_source_code_shipped
+            ),
         )
 
     def compute_identification_stats(self, index: SpdxIndex):
@@ -582,23 +580,16 @@ class LicenseClassification:
                 out.extend(i.public_source_mirrors)
         return sorted(list(set(out)))
 
-    def is_project_shipped(self) -> bool:
+    def determine_is_notice_shipped(
+        self, conditions_requiring_shipped_notice: List[str]
+    ) -> "LicenseClassification":
+        is_shipped = False
         for i in self.identifications:
-            if i.is_project_shipped:
-                return True
-        return False
-
-    def is_notice_shipped(self) -> bool:
-        for i in self.identifications:
-            if i.is_notice_shipped:
-                return True
-        return False
-
-    def is_source_code_shipped(self) -> bool:
-        for i in self.identifications:
-            if i.is_source_code_shipped:
-                return True
-        return False
+            conditions = i.verified_conditions if i.verified else i.conditions
+            if conditions.intersection(conditions_requiring_shipped_notice):
+                is_shipped = True
+                break
+        return dataclasses.replace(self, is_notice_shipped=is_shipped)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -741,7 +732,7 @@ class LicensesClassifications:
         is_notice_shipped: bool,
         is_source_code_shipped: bool,
     ) -> "LicensesClassifications":
-        return self._transform_each_identification(
+        return self._transform_each_classification(
             lambda x: x.set_is_shipped_defaults(
                 is_project_shipped, is_notice_shipped, is_source_code_shipped
             )
@@ -806,6 +797,15 @@ class LicensesClassifications:
 
     def license_ids(self):
         return self.classifications_by_id.keys()
+
+    def determine_is_notice_shipped(
+        self, conditions_requiring_shipped_notice: List[str]
+    ):
+        return self._transform_each_classification(
+            lambda x: x.determine_is_notice_shipped(
+                conditions_requiring_shipped_notice
+            )
+        )
 
 
 @dataclasses.dataclass(frozen=True)

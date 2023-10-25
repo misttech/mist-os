@@ -40,3 +40,8 @@ The following copyright(s) applies to these projects:
  • Package E
 
 copyright E
+================================================================================
+The following copyright(s) applies to these projects:
+ • Package F
+
+copyright F

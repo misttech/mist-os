@@ -6,6 +6,9 @@
         "dependents": [
             "Package A"
         ],
+        "is_project_shipped": true,
+        "is_notice_shipped": true,
+        "is_source_code_shipped": false,
         "identifications": [
             {
                 "identified_as": "License Kind 3",
@@ -46,9 +49,6 @@
                         }
                     }
                 ],
-                "is_project_shipped": true,
-                "is_notice_shipped": true,
-                "is_source_code_shipped": false,
                 "confidence": 1.0,
                 "start_line": 1,
                 "end_line": 2,
@@ -86,9 +86,6 @@
                         ]
                     }
                 },
-                "is_project_shipped": true,
-                "is_notice_shipped": true,
-                "is_source_code_shipped": false,
                 "confidence": 1.0,
                 "start_line": 3,
                 "end_line": 3,
@@ -110,6 +107,9 @@
             "Package A",
             "Package B"
         ],
+        "is_project_shipped": true,
+        "is_notice_shipped": false,
+        "is_source_code_shipped": false,
         "identifications": [
             {
                 "identified_as": "License Kind 3",
@@ -183,9 +183,6 @@
                     "http://mirror1",
                     "http://mirror2"
                 ],
-                "is_project_shipped": true,
-                "is_notice_shipped": true,
-                "is_source_code_shipped": false,
                 "confidence": 1.0,
                 "start_line": 1,
                 "end_line": 2,
@@ -224,9 +221,6 @@
                         ]
                     }
                 },
-                "is_project_shipped": true,
-                "is_notice_shipped": true,
-                "is_source_code_shipped": false,
                 "confidence": 1.0,
                 "start_line": 3,
                 "end_line": 3,
@@ -249,6 +243,9 @@
         "dependents": [
             "Package A"
         ],
+        "is_project_shipped": true,
+        "is_notice_shipped": false,
+        "is_source_code_shipped": false,
         "identifications": [
             {
                 "identified_as": "License Kind 1",
@@ -281,9 +278,6 @@
                         ]
                     }
                 },
-                "is_project_shipped": true,
-                "is_notice_shipped": true,
-                "is_source_code_shipped": false,
                 "confidence": 1.0,
                 "start_line": 1,
                 "end_line": 2,
@@ -321,9 +315,6 @@
                         ]
                     }
                 },
-                "is_project_shipped": true,
-                "is_notice_shipped": true,
-                "is_source_code_shipped": false,
                 "confidence": 0.5,
                 "start_line": 2,
                 "end_line": 3,
@@ -344,6 +335,9 @@
         "dependents": [
             "Package C"
         ],
+        "is_project_shipped": true,
+        "is_notice_shipped": true,
+        "is_source_code_shipped": false,
         "identifications": [
             {
                 "identified_as": "License Kind 4",
@@ -377,9 +371,6 @@
                         ]
                     }
                 },
-                "is_project_shipped": true,
-                "is_notice_shipped": true,
-                "is_source_code_shipped": false,
                 "confidence": 1.0,
                 "start_line": 1,
                 "end_line": 2,
@@ -400,6 +391,9 @@
         "dependents": [
             "Package C"
         ],
+        "is_project_shipped": true,
+        "is_notice_shipped": true,
+        "is_source_code_shipped": false,
         "identifications": [
             {
                 "identified_as": "License Kind 5",
@@ -444,9 +438,6 @@
                         }
                     }
                 ],
-                "is_project_shipped": true,
-                "is_notice_shipped": true,
-                "is_source_code_shipped": false,
                 "confidence": 1.0,
                 "start_line": 1,
                 "end_line": 2,
@@ -467,6 +458,9 @@
         "dependents": [
             "Package C"
         ],
+        "is_project_shipped": true,
+        "is_notice_shipped": false,
+        "is_source_code_shipped": false,
         "identifications": [
             {
                 "identified_as": "License Kind 6",
@@ -533,9 +527,6 @@
                         ]
                     }
                 },
-                "is_project_shipped": true,
-                "is_notice_shipped": true,
-                "is_source_code_shipped": false,
                 "confidence": 1.0,
                 "start_line": 1,
                 "end_line": 2,
@@ -556,6 +547,9 @@
         "dependents": [
             "Package A"
         ],
+        "is_project_shipped": true,
+        "is_notice_shipped": false,
+        "is_source_code_shipped": false,
         "identifications": [
             {
                 "identified_as": "[UNIDENTIFIED]",
@@ -588,9 +582,6 @@
                         ]
                     }
                 },
-                "is_project_shipped": true,
-                "is_notice_shipped": true,
-                "is_source_code_shipped": false,
                 "confidence": 1.0,
                 "start_line": 1,
                 "end_line": 3,

@@ -2,18 +2,22 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-load("@fuchsia_sdk//fuchsia:licenses.bzl", "fuchsia_licenses_notice")
 load("@bazel_skylib//rules:diff_test.bzl", "diff_test")
+load("@fuchsia_sdk//fuchsia:licenses.bzl", "fuchsia_licenses_notice")
 
 fuchsia_licenses_notice(
-    name = "actual_notice",
+    name = "actual_notice.txt",
     classifications = "input_classifications.json",
     spdx_input = "input.spdx.json",
 )
 
+# To update the expected file:
+# cp \
+# ~/fuchsia/build/bazel_sdk/tests/bazel-bin/fuchsia/licenses/notice/actual_notice.txt \
+# ~/fuchsia/build/bazel_sdk/tests/fuchsia/licenses/notice/expected_notice.txt
 diff_test(
     name = "notice_test",
-    file1 = ":actual_notice",
+    file1 = ":actual_notice.txt",
     file2 = "expected_notice.txt",
     visibility = ["//visibility:public"],
 )

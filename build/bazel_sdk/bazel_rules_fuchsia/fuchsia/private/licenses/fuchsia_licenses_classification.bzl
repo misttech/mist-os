@@ -25,6 +25,9 @@ def _fuchsia_licenses_classification_impl(ctx):
     if ctx.attr.allowed_conditions:
         arguments.append("--allowed_conditions")
         arguments.extend(ctx.attr.allowed_conditions)
+    if ctx.attr.conditions_requiring_shipped_notice:
+        arguments.append("--conditions_requiring_shipped_notice")
+        arguments.extend(ctx.attr.conditions_requiring_shipped_notice)
     if ctx.attr.fail_on_disallowed_conditions:
         arguments.append("--fail_on_disallowed_conditions=True")
     if ctx.file.failure_message_preamble:
@@ -116,6 +119,11 @@ and build identify_license to match their organization OSS compliance policies.
         ),
         "allowed_conditions": attr.string_list(
             doc = """List of allowed conditions.""",
+            mandatory = False,
+            default = [],
+        ),
+        "conditions_requiring_shipped_notice": attr.string_list(
+            doc = """Only licenses with the any of the given condition will be shipped as notices.""",
             mandatory = False,
             default = [],
         ),
