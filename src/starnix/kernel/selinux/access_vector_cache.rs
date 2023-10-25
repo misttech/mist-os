@@ -7,11 +7,21 @@ use super::{AccessQueryable, AccessVector, DenyAll, ObjectClass, SecurityId};
 /// A cache of access vectors that associate source SID, target SID, and object type to a set of
 /// rights permitted for the source accessing the target object.
 pub trait AccessVectorCache: AccessQueryable {
+    /// Removes all entries from the nearest cache without notifying additional delegate caches
+    /// encapsulated in this cache. Note that the "nearest cache" may be a delegate in cases where,
+    /// for example, the implementation manages synchronization but delegates storage of cache
+    /// entries.
+    fn local_reset(&mut self);
+
     /// Removes all entries from this cache and any delegate caches encapsulated in this cache.
     fn reset(&mut self);
 }
 
 impl AccessVectorCache for DenyAll {
+    /// A no-op implementation: [`DenyAll`] has no state to reset when it is being treated as a
+    /// cache to be reset.
+    fn local_reset(&mut self) {}
+
     /// A no-op implementation: [`DenyAll`] has no state to reset and no delegates to notify
     /// when it is being treated as a cache to be reset.
     fn reset(&mut self) {}
@@ -53,6 +63,8 @@ impl<D: AccessVectorCache> AccessQueryable for EmptyAccessVectorCache<D> {
 }
 
 impl<D: AccessVectorCache> AccessVectorCache for EmptyAccessVectorCache<D> {
+    fn local_reset(&mut self) {}
+
     fn reset(&mut self) {
         self.delegate.reset()
     }
@@ -145,10 +157,14 @@ impl<D: AccessVectorCache, const SIZE: usize> AccessQueryable for FixedAccessVec
 impl<D: AccessVectorCache, const SIZE: usize> AccessVectorCache
     for FixedAccessVectorCache<D, SIZE>
 {
-    fn reset(&mut self) {
+    fn local_reset(&mut self) {
         self.next_index = 0;
         self.is_full = false;
-        self.delegate.reset()
+    }
+
+    fn reset(&mut self) {
+        self.local_reset();
+        self.delegate.reset();
     }
 }
 
@@ -159,6 +175,7 @@ mod tests {
     #[derive(Default)]
     struct CountingAccessVectorCache<D: AccessVectorCache = DenyAll> {
         query_count: usize,
+        local_reset_count: usize,
         reset_count: usize,
         delegate: D,
     }
@@ -176,9 +193,13 @@ mod tests {
     }
 
     impl<D: AccessVectorCache> AccessVectorCache for CountingAccessVectorCache<D> {
+        fn local_reset(&mut self) {
+            self.local_reset_count = self.local_reset_count + 1;
+        }
+
         fn reset(&mut self) {
             self.reset_count = self.reset_count + 1;
-            self.delegate.reset()
+            self.delegate.reset();
         }
     }
 
@@ -199,6 +220,19 @@ mod tests {
         assert_eq!(1, avc.delegate.query_count);
         assert_eq!(1, avc.next_index);
         assert_eq!(false, avc.is_full);
+    }
+
+    #[fuchsia::test]
+    fn fixed_access_vector_cache_local_reset() {
+        let mut avc: FixedAccessVectorCache<_, 10> =
+            FixedAccessVectorCache::new(CountingAccessVectorCache::<DenyAll>::default());
+
+        // No reset signals (local or otherwise) propagated to delegate.
+        assert_eq!(0, avc.delegate.reset_count);
+        assert_eq!(0, avc.delegate.local_reset_count);
+        avc.local_reset();
+        assert_eq!(0, avc.delegate.reset_count);
+        assert_eq!(0, avc.delegate.local_reset_count);
     }
 
     #[fuchsia::test]
