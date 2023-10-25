@@ -117,7 +117,9 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         return super().setUp()
 
     def _mock_run_commands_in_parallel(self, stdout: str) -> mock.MagicMock:
-        m = mock.AsyncMock(return_value=[mock.MagicMock(stdout=stdout)])
+        m = mock.AsyncMock(
+            return_value=[mock.MagicMock(stdout=stdout, return_code=0)]
+        )
         patch = mock.patch("main.run_commands_in_parallel", m)
         patch.start()
         self.addCleanup(patch.stop)
@@ -517,4 +519,40 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
                 ]
             ),
             command_mock.call_args_list,
+        )
+
+    async def test_list_command(self):
+        """Test that we can list test cases using --list"""
+
+        command_mock = self._mock_run_commands_in_parallel(
+            "foo::test\nbar::test",
+        )
+
+        self._mock_has_device_connected(True)
+        self._mock_has_tests_in_base(False)
+
+        recorder = event.EventRecorder()
+
+        # This only works if the first test is a device test.
+        ret = await main.async_main_wrapper(
+            args.parse_args(["--simple", "--no-build", "--list", "--limit=1"]),
+            recorder=recorder,
+        )
+        self.assertEqual(ret, 0)
+        self.assertEqual(command_mock.call_count, 1)
+
+        events = [
+            e.payload.enumerate_test_cases
+            async for e in recorder.iter()
+            if e.payload is not None
+            and e.payload.enumerate_test_cases is not None
+        ]
+        self.assertEqual(len(events), 1)
+
+        self.assertEqual(
+            events[0].test_case_names,
+            [
+                "foo::test",
+                "bar::test",
+            ],
         )

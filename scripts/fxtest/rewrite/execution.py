@@ -84,33 +84,8 @@ class TestExecution:
         if self._test.info.execution is not None:
             execution = self._test.info.execution
 
-            component_url = execution.component_url
-            if self._flags.use_package_hash:
-                try:
-                    package_repo = (
-                        package_repository.PackageRepository.from_env(
-                            self._exec_env
-                        )
-                    )
-
-                    name = extract_package_name_from_url(component_url)
-                    if name is None:
-                        raise TestCouldNotRun(
-                            "Failed to parse package name for Merkle root matching.\nTry running with --no-use-package-hash."
-                        )
-
-                    if name not in package_repo.name_to_merkle:
-                        raise TestCouldNotRun(
-                            "Could not find a Merkle hash for this test.\nTry running with --no-use-package-hash or rebuild your package repository."
-                        )
-
-                    suffix = f"?hash={package_repo.name_to_merkle[name]}"
-                    component_url = component_url.replace("#", f"{suffix}#", 1)
-
-                except package_repository.PackageRepositoryError as e:
-                    raise TestCouldNotRun(
-                        f"Could not load a Merkle hash for this test ({str(e)})\nTry running with --no-use-package-hash or rebuild your package repository."
-                    )
+            component_url = self._get_component_url()
+            assert component_url is not None
 
             min_severity_logs: typing.List[str] = []
             if self._flags.min_severity_logs:
@@ -148,6 +123,33 @@ class TestExecution:
             raise TestCouldNotRun(
                 f"We do not know how to run this test: {str(self._test)}"
             )
+
+    def enumerate_cases_command_line(self) -> typing.List[str] | None:
+        """Get the command line to enumerate all test cases in this test.
+
+        If this type of test does not support test case enumeration,
+        return None.
+
+        Returns:
+            typing.List[str] | None: Command line to enumerate cases
+                if possible, None otherwise.
+        """
+
+        execution = self._test.info.execution
+        try:
+            component_url = self._get_component_url()
+        except TestCouldNotRun:
+            return None
+        if component_url is None or execution is None:
+            return None
+
+        extra_args = []
+        if execution.realm:
+            extra_args += ["--realm", execution.realm]
+
+        return (
+            ["fx", "ffx", "test", "list-cases"] + extra_args + [component_url]
+        )
 
     def environment(self) -> typing.Dict[str, str] | None:
         """Format environment variables needed to run the test.
@@ -226,6 +228,50 @@ class TestExecution:
             else:
                 raise TestFailed("Test reported failure")
         return output
+
+    def _get_component_url(self) -> str | None:
+        """Get the final component URL to execute for this test.
+
+        If this test is not a component test, return None.
+
+        Raises:
+            TestCouldNotRun: If we cannot determine the merkle hash for this test.
+
+        Returns:
+            str | None: The final URL to execute (optionally with
+                hash), or None if this is not a component test.
+        """
+        if self._test.info.execution is None:
+            return None
+
+        execution = self._test.info.execution
+
+        component_url = execution.component_url
+        if self._flags.use_package_hash:
+            try:
+                package_repo = package_repository.PackageRepository.from_env(
+                    self._exec_env
+                )
+
+                name = extract_package_name_from_url(component_url)
+                if name is None:
+                    raise TestCouldNotRun(
+                        "Failed to parse package name for Merkle root matching.\nTry running with --no-use-package-hash."
+                    )
+
+                if name not in package_repo.name_to_merkle:
+                    raise TestCouldNotRun(
+                        f"Could not find a Merkle hash for this test: {component_url}\nTry running with --no-use-package-hash or rebuild your package repository."
+                    )
+
+                suffix = f"?hash={package_repo.name_to_merkle[name]}"
+                component_url = component_url.replace("#", f"{suffix}#", 1)
+
+            except package_repository.PackageRepositoryError as e:
+                raise TestCouldNotRun(
+                    f"Could not load a Merkle hash for this test ({str(e)})\nTry running with --no-use-package-hash or rebuild your package repository."
+                )
+        return component_url
 
 
 _PACKAGE_NAME_REGEX = re.compile(r"fuchsia-pkg://fuchsia\.com/([^/#]+)#")

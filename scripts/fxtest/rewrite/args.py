@@ -18,6 +18,7 @@ class Flags:
     """
 
     dry: bool
+    list: bool
 
     build: bool
     updateifinbase: bool
@@ -106,7 +107,12 @@ def parse_args(cli_args: typing.List[str] | None = None) -> Flags:
     utility.add_argument(
         "--dry",
         action="store_true",
-        help="Do not actually run tests.",
+        help="Do not actually run tests. Instead print out the tests that would have been run.",
+    )
+    utility.add_argument(
+        "--list",
+        action="store_true",
+        help="Do not actually run tests. Instead print out the list of test cases each test contains.",
     )
 
     build = parser.add_argument_group("Build Options")

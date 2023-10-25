@@ -147,7 +147,7 @@ async def console_printer(
 
     print(
         statusinfo.dim(
-            f"Completed in {state.end_duration:.3f}s [{len(state.complete_durations)}/{len(state.complete_durations)} complete]",
+            f"\nCompleted in {state.end_duration:.3f}s [{len(state.complete_durations)}/{len(state.complete_durations)} complete]",
             style=flags.style,
         )
     )
@@ -653,6 +653,20 @@ async def _console_event_loop(
                 lines_to_print.append(
                     f"\n{label}: {test_suite_names[next_event.id]}{suffix}"
                 )
+            elif next_event.payload.enumerate_test_cases is not None:
+                cases_payload = next_event.payload.enumerate_test_cases
+                styled_name = statusinfo.green_highlight(
+                    cases_payload.test_name, style=flags.style
+                )
+                lines_to_print.append(f"\nTest cases in {styled_name}:")
+                for line in cases_payload.test_case_names:
+                    lines_to_print.append(
+                        f" {statusinfo.highlight(line, style=flags.style)}"
+                    )
+                    command = f'fx test --test-filter "{line}"'
+                    lines_to_print.append(
+                        f" {statusinfo.dim(command, style=flags.style)}"
+                    )
 
         if next_event.error:
             # Highlight all errors.

@@ -234,6 +234,17 @@ To go back to the old fx test, use `fx --enable=legacy_fxtest test`, and please 
         recorder.emit_end("Failed to build.")
         return 1
 
+    # Don't actually run tests if --list was specified, instead gather the
+    # list of test cases for each test and output to the user.
+    if flags.list:
+        recorder.emit_info_message("Enumerating all test cases...")
+        recorder.emit_instruction_message(
+            "Will not run any tests, --list specified"
+        )
+        await enumerate_test_cases(selections, recorder, flags, exec_env)
+        recorder.emit_end()
+        return 0
+
     # Finally, run all selected tests.
     if not await run_all_tests(selections, recorder, flags, exec_env):
         recorder.emit_end("Test failures reported")
@@ -829,6 +840,57 @@ async def run_all_tests(
     return not test_failure_observed
 
 
+async def enumerate_test_cases(
+    tests: selection_types.TestSelections,
+    recorder: event.EventRecorder,
+    flags: args.Flags,
+    exec_env: environment.ExecutionEnvironment,
+):
+    # Get the set of test executions that support enumeration.
+    executions = [
+        e
+        for t in tests.selected
+        if (
+            e := execution.TestExecution(t, exec_env, flags)
+        ).enumerate_cases_command_line()
+        is not None
+    ]
+
+    wont_enumerate_count = len(tests.selected) - len(executions)
+
+    outputs = await run_commands_in_parallel(
+        [
+            cmd_line
+            for e in executions
+            if (cmd_line := e.enumerate_cases_command_line()) is not None
+        ],
+        group_name="Enumerate test cases",
+        recorder=recorder,
+        maximum_parallel=8,
+    )
+
+    assert len(outputs) == len(executions)
+
+    if wont_enumerate_count > 0:
+        recorder.emit_info_message(
+            f"\n{wont_enumerate_count:d} tests do not support enumeration"
+        )
+
+    failed_enumeration_names = []
+    for output, exec in zip(outputs, executions):
+        if output is None or output.return_code != 0:
+            failed_enumeration_names.append(exec.name())
+            continue
+        recorder.emit_enumerate_test_cases(
+            exec.name(), list(output.stdout.splitlines())
+        )
+
+    if failed_enumeration_names:
+        recorder.emit_info_message(
+            f"{len(failed_enumeration_names)} tests could not be enumerated"
+        )
+
+
 async def run_commands_in_parallel(
     commands: typing.List[typing.List[str]],
     group_name: str,
@@ -862,7 +924,9 @@ async def run_commands_in_parallel(
             in_progress.add(asyncio.create_task(set_index(index)))
             index += 1
 
-        _, in_progress = await asyncio.wait(in_progress)
+        _, in_progress = await asyncio.wait(
+            in_progress, return_when="FIRST_COMPLETED"
+        )
 
     recorder.emit_end(id=parent)
 

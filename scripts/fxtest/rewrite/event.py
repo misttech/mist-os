@@ -258,6 +258,18 @@ class TestSuiteEndedPayload:
 
 @dataparse
 @dataclass
+class EnumerateTestCasesPayload:
+    """A test suite's cases were enumerated."""
+
+    # The name of the test being enumerated.
+    test_name: str
+
+    # The names of the test cases in the test.
+    test_case_names: typing.List[str]
+
+
+@dataparse
+@dataclass
 class EventPayloadUnion:
     """Payload for event types.
 
@@ -356,6 +368,11 @@ class EventPayloadUnion:
     #
     # The value provides result information.
     test_suite_ended: TestSuiteEndedPayload | None = None
+
+    # This event denotes the numeration of cases within a test suite.
+    #
+    # The value provides details on the cases that were found.
+    enumerate_test_cases: EnumerateTestCasesPayload | None = None
 
 
 @dataparse
@@ -1031,6 +1048,22 @@ class EventRecorder:
                 ending=True,
                 payload=EventPayloadUnion(
                     test_suite_ended=TestSuiteEndedPayload(status, message)
+                ),
+            )
+        )
+
+    def emit_enumerate_test_cases(
+        self, test_name: str, test_case_names: typing.List[str]
+    ):
+        id = self._new_id()
+        self._emit(
+            Event(
+                id,
+                self._get_timestamp(),
+                payload=EventPayloadUnion(
+                    enumerate_test_cases=EnumerateTestCasesPayload(
+                        test_name, test_case_names
+                    )
                 ),
             )
         )
