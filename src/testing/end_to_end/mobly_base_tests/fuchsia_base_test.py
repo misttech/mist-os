@@ -21,9 +21,14 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 class SnapshotOn(enum.Enum):
     """How often we need to collect the snapshot"""
 
+    # Once per test class.
     TEARDOWN_CLASS = enum.auto()
-    ON_FAIL = enum.auto()
+    # Once per test class on failure only.
+    TEARDOWN_CLASS_ON_FAIL = enum.auto()
+    # Once per test case.
     TEARDOWN_TEST = enum.auto()
+    # Once per test case on failure only.
+    ON_FAIL = enum.auto()
 
 
 class FuchsiaBaseTest(base_test.BaseTestClass):
@@ -36,8 +41,9 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
             Enum.
 
     Required Mobly Test Params:
-        snapshot_on (str): One of "teardown_class", "teardown_test", "on_fail".
-            Default value is "teardown_class".
+        snapshot_on (str): One of "teardown_class", "teardown_class_on_fail",
+            "teardown_test", "on_fail".
+            Default value is "teardown_class_on_fail".
     """
 
     def setup_class(self) -> None:
@@ -47,6 +53,7 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
             * Reads user params passed to the test
             * Instantiates all fuchsia devices into self.fuchsia_devices
         """
+        self._any_test_failed: bool = False
         self._process_user_params()
 
         self.fuchsia_devices: List[
@@ -92,11 +99,21 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
 
         It does the following things:
             * Takes snapshot of all the fuchsia devices and stores it under
-              "<log_path>/teardown_class" directory if `snapshot_on` test param
-              is set to "teardown_class"
+              "<log_path>/teardown_class<_on_fail>" directory if `snapshot_on`
+              test param is set to "teardown_class" or "teardown_class_on_fail".
         """
-        self._teardown_class_artifacts: str = f"{self.log_path}/teardown_class"
         if self.snapshot_on == SnapshotOn.TEARDOWN_CLASS:
+            self._teardown_class_artifacts: str = (
+                f"{self.log_path}/teardown_class"
+            )
+            self._collect_snapshot(directory=self._teardown_class_artifacts)
+        elif (
+            self.snapshot_on == SnapshotOn.TEARDOWN_CLASS_ON_FAIL
+            and self._any_test_failed
+        ):
+            self._teardown_class_artifacts: str = (
+                f"{self.log_path}/teardown_class_on_fail"
+            )
             self._collect_snapshot(directory=self._teardown_class_artifacts)
 
     def on_fail(self, _) -> None:
@@ -107,6 +124,7 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
               test case directory if `snapshot_on` test param is set to
               "on_fail"
         """
+        self._any_test_failed = True
         if self.snapshot_on == SnapshotOn.ON_FAIL:
             self._collect_snapshot(directory=self.test_case_path)
 
@@ -296,21 +314,22 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
 
         try:
             snapshot_on: str = self.user_params.get(
-                "snapshot_on", SnapshotOn.TEARDOWN_CLASS.name
+                "snapshot_on", SnapshotOn.TEARDOWN_CLASS_ON_FAIL.name
             ).upper()
             self.snapshot_on: SnapshotOn = SnapshotOn[snapshot_on]
         except KeyError as err:
             _LOGGER.warning(
                 "Invalid value %s passed in 'snapshot_on' test param. "
-                "Valid values for this test param include: '%s', '%s','%s'. "
+                "Valid values for this test param are: '%s', '%s', '%s','%s'. "
                 "Proceeding with default value: '%s'",
                 err,
                 SnapshotOn.TEARDOWN_CLASS.name,
+                SnapshotOn.TEARDOWN_CLASS_ON_FAIL.name,
                 SnapshotOn.TEARDOWN_TEST.name,
                 SnapshotOn.ON_FAIL.name,
-                SnapshotOn.TEARDOWN_CLASS.name,
+                SnapshotOn.TEARDOWN_CLASS_ON_FAIL.name,
             )
-            self.snapshot_on = SnapshotOn.TEARDOWN_CLASS
+            self.snapshot_on = SnapshotOn.TEARDOWN_CLASS_ON_FAIL
 
 
 if __name__ == "__main__":
