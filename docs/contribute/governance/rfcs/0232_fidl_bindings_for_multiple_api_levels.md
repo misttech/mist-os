@@ -364,7 +364,7 @@ implications for platform versioning and is out of scope in this proposal.
 
 ### Alternative: Make `legacy` true by default
 
-See [RFC-NNNN: FIDL legacy by default][rfc-legacy].
+See [RFC-0233: FIDL legacy by default][rfc-0233].
 
 This alternative improves on the status quo. With `false` as the default,
 forgetting to add `legacy=true` can cause ABI breakage. With `true` as the
@@ -391,7 +391,7 @@ The Android SDK allows specifying `compileSdkVersion` and `minSdkVersion`. See
 [rfc-0083-amendment]: https://fuchsia-review.googlesource.com/c/fuchsia/+/734932
 [rfc-0083]: /docs/contribute/governance/rfcs/0083_fidl_versioning.md
 [rfc-0231]: /docs/contribute/governance/rfcs/0231_fidl_versioning_replacement_syntax.md
-[rfc-legacy]: https://fuchsia-review.googlesource.com/c/fuchsia/+/906797
+[rfc-0233]: /docs/contribute/governance/rfcs/0233_fidl_legacy_by_default.md
 [swapping]: /docs/reference/fidl/language/versioning.md#swapping
 [uses-sdk]: https://developer.android.com/guide/topics/manifest/uses-sdk-element
 [version_history.json]: /sdk/version_history.json

@@ -478,3 +478,5 @@ toc:
     path: /docs/contribute/governance/rfcs/0231_fidl_versioning_replacement_syntax.md
   - title: "RFC-0232: FIDL bindings for multiple API levels"
     path: /docs/contribute/governance/rfcs/0232_fidl_bindings_for_multiple_api_levels.md
+  - title: "RFC-0233: FIDL legacy by default"
+    path: /docs/contribute/governance/rfcs/0233_fidl_legacy_by_default.md
