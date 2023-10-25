@@ -7,6 +7,7 @@ use crate::{
         client::{FastbootImpl, InterfaceFactory},
         network::{tcp::TcpNetworkFactory, udp::UdpNetworkFactory},
     },
+    is_usb_discovery_disabled,
     target::Target,
 };
 use anyhow::{anyhow, bail, Context, Result};
@@ -41,9 +42,6 @@ pub mod network;
 const FLASH_TIMEOUT_RATE: &str = "fastboot.flash.timeout_rate";
 /// The minimum flash timeout (in seconds) for flashing to a target device
 const MIN_FLASH_TIMEOUT: &str = "fastboot.flash.min_timeout_secs";
-
-/// Disables fastboot usb discovery if set to true.
-const FASTBOOT_USB_DISCOVERY_DISABLED: &str = "fastboot.usb.disabled";
 
 /// Fastboot Service that handles communicating with a target over the Fastboot protocol.
 ///
@@ -152,10 +150,6 @@ impl Drop for UsbFactory {
             self.close().await;
         });
     }
-}
-
-pub async fn is_usb_discovery_disabled() -> bool {
-    get(FASTBOOT_USB_DISCOVERY_DISABLED).await.unwrap_or(false)
 }
 
 //TODO(fxbug.dev/52733) - this info will probably get rolled into the target struct
