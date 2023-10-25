@@ -228,8 +228,9 @@ impl ProductBundleV2 {
                 let dir = product_bundle_dir.join(path);
                 // Create the directory to ensure that canonicalize will work.
                 if !dir.exists() {
-                    std::fs::create_dir_all(&dir)
-                        .with_context(|| format!("Creating the directory: {}", dir))?;
+                    if let Err(e) = std::fs::create_dir_all(&dir) {
+                        eprintln!("Cannot create directory: {}, {:#?}", dir, e);
+                    }
                 }
                 let path = canonicalize_path(path, vec![Type::Update]);
                 Ok(path)
