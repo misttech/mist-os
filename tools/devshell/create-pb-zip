@@ -16,11 +16,18 @@ fx-config-read
 
 main() {
     local product_bundles_path="${FUCHSIA_BUILD_DIR}/product_bundles.json"
-    local product_bundle_path="${FUCHSIA_BUILD_DIR}/$(fx-command-run jq -r '.[0].path' ${product_bundles_path})"
+
+    # Determine the name of main product
+    local args_json_path="${FUCHSIA_BUILD_DIR}/args.json"
+    local product=$(fx-command-run jq .build_info_product ${args_json_path})
+    local board=$(fx-command-run jq .build_info_board ${args_json_path})
+    local product_name="\"${product//\"}.${board//\"}\""
+
+    local product_bundle_path=$(fx-command-run jq ".[] | select(.name==${product_name}) | .path" ${product_bundles_path})
 
     fx-info "Start creating pb.zip..."
     (
-        cd "${product_bundle_path}/.."
+        cd "${FUCHSIA_BUILD_DIR}/${product_bundle_path//\"}/.."
         local tmpfile_path="${FUCHSIA_BUILD_DIR}/tmp-pb-zip-$$"
 
         fx-command-run ffx product get-artifacts product_bundle -r -g flash > "$tmpfile_path"
