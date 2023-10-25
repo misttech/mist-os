@@ -102,7 +102,10 @@ async fn run_console(
     std::mem::drop(raw_mode);
     let exit_code = exit_result?.map_err(|e| {
         let status = fidl::Status::from_raw(e);
-        anyhow!("Failed to spawn console: {}", status)
+        anyhow!(
+            "Failed to spawn console: {}. Verify that the console binary exists at the specified path in the container.",
+            status
+        )
     })?;
     Ok(exit_code)
 }
