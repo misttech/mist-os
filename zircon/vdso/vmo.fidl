@@ -565,6 +565,10 @@ closed protocol Vmo {
     /// to the clone will be committed. If required, *offset* will be rounded down to the previous page
     /// boundary and *offset*+*size* will be rounded up to the next page boundary.
     ///
+    /// Note that **ZX_VMO_OP_DONT_NEED** does not undo a previous **ZX_VMO_OP_ALWAYS_NEED**. The
+    /// **ZX_VMO_OP_ALWAYS_NEED** hint is sticky, until such a time that the kernel decides to override the
+    /// hint due to memory pressure.
+    ///
     /// ## Rights
     ///
     /// If *op* is **ZX_VMO_OP_COMMIT**, *handle* must be of type **ZX_OBJ_TYPE_VMO** and have **ZX_RIGHT_WRITE**.
