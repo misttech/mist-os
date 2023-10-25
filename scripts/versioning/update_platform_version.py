@@ -81,9 +81,9 @@ def update_version_history(fuchsia_api_level, version_history_path):
                     data["status"] = "supported"
 
             abi_revision = generate_random_abi_revision()
-            versions[str(fuchsia_api_level)] = {"abi_revision": abi_revision}, {
-                "status": "in-development"
-            }
+            versions[str(fuchsia_api_level)] = dict(
+                abi_revision=abi_revision, status="in-development"
+            )
             f.seek(0)
             json.dump(version_history, f, indent=4)
             f.truncate()
