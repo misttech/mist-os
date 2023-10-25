@@ -6,7 +6,8 @@ pub use cstr::cstr;
 
 use {
     fuchsia_zircon as zx,
-    std::{ffi::CStr, marker::PhantomData, mem, ptr},
+    pin_project::pin_project,
+    std::{ffi::CStr, future::Future, marker::PhantomData, mem, pin::Pin, ptr, task::Poll},
 };
 
 pub use sys::{TRACE_BLOB_TYPE_DATA, TRACE_BLOB_TYPE_LAST_BRANCH, TRACE_BLOB_TYPE_PERFETTO};
@@ -1676,6 +1677,105 @@ macro_rules! string_name_macro {
             };
         }
     };
+}
+
+/// Extension trait for tracing futures.
+pub trait TraceFutureExt: Future + Sized {
+    /// Wraps a `Future` in a `TraceFuture`.
+    ///
+    /// Example:
+    ///
+    /// ```rust
+    /// future.trace(cstr!("category"), cstr!("name")).await;
+    /// ```
+    ///
+    /// Which is equivalent to:
+    ///
+    /// ```rust
+    /// TraceFuture::new(cstr!("category"), cstr!("name"), Id::new(), future).await;
+    /// ```
+    fn trace(self, category: &'static CStr, name: &'static CStr) -> TraceFuture<Self> {
+        TraceFuture::new(category, name, Id::new(), self)
+    }
+}
+
+impl<T: Future + Sized> TraceFutureExt for T {}
+
+/// Wraps a `Future` and emits a duration event every time the future is polled. The duration events
+/// are connected by flow events.
+#[pin_project(PinnedDrop)]
+pub struct TraceFuture<Fut: Future> {
+    category: &'static CStr,
+    name: &'static CStr,
+    flow_id: Id,
+    #[pin]
+    future: Fut,
+}
+
+impl<Fut: Future> TraceFuture<Fut> {
+    pub fn new(category: &'static CStr, name: &'static CStr, flow_id: Id, future: Fut) -> Self {
+        let this = Self { category, name, flow_id, future };
+        if let Some(context) = TraceCategoryContext::acquire(category) {
+            this.trace_create(context);
+        }
+        this
+    }
+
+    #[cold]
+    fn trace_create(&self, context: TraceCategoryContext) {
+        let name_ref = context.register_string_literal(self.name);
+        let args = [ArgValue::of("state", "created")];
+        let duration_start = zx::ticks_get();
+        context.write_flow_begin(name_ref, self.flow_id, &[]);
+        context.write_duration(name_ref, duration_start, &args);
+    }
+
+    #[cold]
+    fn trace_poll(
+        self: Pin<&mut Self>,
+        context: TraceCategoryContext,
+        cx: &mut std::task::Context<'_>,
+    ) -> Poll<Fut::Output> {
+        let this = self.project();
+        let name_ref = context.register_string_literal(this.name);
+        let duration_start = zx::ticks_get();
+        context.write_flow_step(name_ref, *this.flow_id, &[]);
+        let result = this.future.poll(cx);
+        let result_str: &'static str = if result.is_pending() { "pending" } else { "ready" };
+        let args = [ArgValue::of("state", result_str)];
+        context.write_duration(name_ref, duration_start, &args);
+        result
+    }
+
+    #[cold]
+    fn trace_drop(self: Pin<&mut Self>, context: TraceCategoryContext) {
+        let this = self.project();
+        let name_ref = context.register_string_literal(this.name);
+        let args = [ArgValue::of("state", "dropped")];
+        let duration_start = zx::ticks_get();
+        context.write_flow_end(name_ref, *this.flow_id, &[]);
+        context.write_duration(name_ref, duration_start, &args);
+    }
+}
+
+impl<Fut: Future> Future for TraceFuture<Fut> {
+    type Output = Fut::Output;
+    fn poll(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Fut::Output> {
+        if let Some(context) = TraceCategoryContext::acquire(self.as_ref().get_ref().category) {
+            self.trace_poll(context, cx)
+        } else {
+            self.project().future.poll(cx)
+        }
+    }
+}
+
+#[pin_project::pinned_drop]
+impl<Fut: Future> PinnedDrop for TraceFuture<Fut> {
+    fn drop(self: Pin<&mut Self>) {
+        if let Some(context) = TraceCategoryContext::acquire(self.as_ref().get_ref().category) {
+            self.trace_drop(context);
+        }
+    }
 }
 
 #[cfg(test)]

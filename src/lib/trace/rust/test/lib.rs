@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use fuchsia_trace as trace;
+use std::{ffi::CStr, future::poll_fn, task::Poll};
 
 #[no_mangle]
 pub extern "C" fn rs_test_trace_enabled() -> bool {
@@ -95,4 +96,33 @@ pub extern "C" fn rs_test_async_event_with_scope() {
 #[no_mangle]
 pub extern "C" fn rs_test_alert() {
     trace::alert!("+enabled", "alert_name");
+}
+
+fn trace_future_test(category: &'static CStr) {
+    let mut executor = fuchsia_async::TestExecutor::new();
+    let mut polled = false;
+    executor.run_singlethreaded(trace::TraceFuture::new(
+        category,
+        trace::cstr!("name"),
+        3.into(),
+        poll_fn(move |cx| {
+            if !polled {
+                polled = true;
+                cx.waker().clone().wake();
+                Poll::Pending
+            } else {
+                Poll::Ready(())
+            }
+        }),
+    ))
+}
+
+#[no_mangle]
+pub extern "C" fn rs_test_trace_future_enabled() {
+    trace_future_test(trace::cstr!("+enabled"));
+}
+
+#[no_mangle]
+pub extern "C" fn rs_test_trace_future_disabled() {
+    trace_future_test(trace::cstr!("-disabled"));
 }
