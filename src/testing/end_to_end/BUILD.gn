@@ -152,15 +152,3 @@ group("staging_nuc_tests") {
     ":unstable_nuc_tests",
   ]
 }
-
-# ToDo(b/306756520) - Delete below mentioned test groups after updating pye2e
-# builders in shared.star with above mentioned test groups
-group("stable_sl4f_emulator_tests") {
-  testonly = true
-  public_deps = [ ":stable_emulator_sl4f_tests" ]
-}
-
-group("stable_non_sl4f_emulator_tests") {
-  testonly = true
-  public_deps = [ ":stable_emulator_tests" ]
-}

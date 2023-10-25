@@ -43,23 +43,26 @@ Use the following approach in deciding whether to run the test case in CQ/CI/FYI
   After 200 consecutive successful runs, test case will be promoted to CQ.
 * Any test case that can be run using hardware (NUC, VIM3 etc) will be run in
   FYI and will remain in FYI. (We are exploring options on gradually promoting
-  these tests from FYI to CI but at the moment these tests will remain in FYI)
+  these tests from FYI to CI but at the moment these tests will remain in FYI).
 
 Based on this we have created the following:
 * Test case build groups:
-  * Test group naming scheme: `<STABILITY>_<SL4F_USAGE>_<BOARD>_tests`
+  * Test group naming scheme: `<STABILITY>_<BOARD>[ |_sl4f]_tests`
     * `<STABILITY>` - Whether tests are stable or flaky - "stable" or "unstable".
         All newly added tests must be added to the "unstable" groups until 200
         passing runs in infra FYI builder have been observed, after which they
         may be promoted to "stable" groups.
-    * `<SL4F_USAGE>` - Whether tests require SL4F server or not - "sl4f" or "non_sl4f"
-    * `<BOARD>` - The board that the tests require to run on - e.g. "emulator", "nuc", "vim3"
+    * `<BOARD>` - The board that the tests require to run on - e.g. "emulator",
+        "nuc", "vim3".
+    * `[ |_sl4f]` - If tests require SL4F server then include "_sl4f".
+        Otherwise, leave it empty.
     * Examples:
-      * `stable_non_sl4f_emulator_tests`
-      * `unstable_sl4f_emulator_tests`
+      * `stable_emulator_tests`
+      * `unstable_emulator_sl4f_tests`
   * This naming scheme is chosen to facilitate infra builder configuration.
-    * `<STABILITY>` informs whether a group is run in CI/CQ.
-    * `<SL4F_USAGE>` informs whether a test group can be run on certain products.
+    * `<STABILITY>` informs whether a group is potential to run in CI/CQ
+        (as it depends on `<BOARD>` also).
+    * `[ |_sl4f]` informs whether a test group can be run on certain products.
     * `<BOARD>` informs whether a test group can be run on certain boards.
 * Builder examples:
   * `core.qemu-x64-debug-pye2e` - CQ builder to run stable emulator tests
@@ -69,6 +72,21 @@ Based on this we have created the following:
   * format: `<PRODUCT>.<BOARD>-debug-pye2e-[ |staging|ci]`, where
     * if builder is for "CQ" then no postfix is needed but for other stages,
       postfix is necessary (`-staging` or `-ci`)
+
+### How to add a new test to run in infra
+* Refer to [CQ VS CI vs FYI](#CQ-VS-CI-vs-FYI) section to decide which test case
+build group the new test belongs to
+* Once decided, you can add it accordingly to that group by updating
+[HoneyDew Infra Test Groups]
+* If the desired group is not present in [HoneyDew Infra Test Groups] then in
+  addition to creating a new group here, you may also need to
+  * Add the same group in [Lacewing Infra Test Groups] (follow the already
+    available test groups in this file for reference)
+  * Update the corresponding Lacewing builder configuration file (maintained by
+    Foundation Infra team) to include this newly created group in
+    [Lacewing Infra Test Groups]. Please reach out to Lacewing team if you need
+    help with this one. And also, please include Lacewing team as one of the
+    reviewer in this CL
 
 ## Setup
 1. Ensure device type that you want to run the test on (will be listed in
@@ -322,3 +340,7 @@ $ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/transport_tes
 [Intel NUC]: https://fuchsia.dev/fuchsia-src/development/hardware/intel_nuc
 
 [vim3]: https://fuchsia.dev/fuchsia-src/development/hardware/khadas-vim3
+
+[HoneyDew Infra Test Groups]: BUILD.gn
+
+[Lacewing Infra Test Groups]: ../../../BUILD.gn
