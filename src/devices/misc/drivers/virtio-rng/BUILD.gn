@@ -41,3 +41,8 @@ fuchsia_driver_component("virtio_rng") {
   manifest = "meta/virtio_rng.cml"
   deps = [ ":virtio_rng-driver" ]
 }
+
+fuchsia_driver_package("package") {
+  package_name = "virtio_rng"
+  driver_components = [ ":virtio_rng" ]
+}

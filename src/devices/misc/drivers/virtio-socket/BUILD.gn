@@ -55,6 +55,11 @@ fuchsia_driver_component("virtio_socket") {
   deps = [ ":virtio_socket-driver" ]
 }
 
+fuchsia_driver_package("package") {
+  package_name = "virtio_socket"
+  driver_components = [ ":virtio_socket" ]
+}
+
 test("test") {
   output_name = "virtio-socket-test"
   sources = [ "test.cc" ]

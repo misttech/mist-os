@@ -47,3 +47,8 @@ fuchsia_driver_component("virtio_console") {
   deps = [ ":virtio_console-driver" ]
   manifest = "meta/virtio_console.cml"
 }
+
+fuchsia_driver_package("package") {
+  package_name = "virtio_console"
+  driver_components = [ ":virtio_console" ]
+}

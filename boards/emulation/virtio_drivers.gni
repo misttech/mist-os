@@ -2,10 +2,10 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# Drivers required for virtio support.
-#
-# These drivers are used when Fuchsia is running as a guest in a hypervisor
-# such as QEMU.
+# ATTENTION: Do not include new drivers in this set; instead add new drivers to
+# //boards/emulation/virtio/BUILD.gn.
+# TODO(b/301629746): remove this set after all boards have been transitioned
+# to using the virtio board input bundle.
 virtio_drivers = [
   "//src/connectivity/ethernet/drivers/virtio:virtio_netdevice",
   "//src/devices/block/drivers/virtio:virtio_block",

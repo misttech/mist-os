@@ -71,6 +71,11 @@ fuchsia_driver_component("virtio_gpu") {
   deps = [ ":virtio_gpu-driver" ]
 }
 
+fuchsia_driver_package("package") {
+  package_name = "virtio_gpu"
+  driver_components = [ ":virtio_gpu" ]
+}
+
 test("virtio-gpu-test") {
   output_name = "virtio-gpu-test-test"
   if (is_fuchsia) {

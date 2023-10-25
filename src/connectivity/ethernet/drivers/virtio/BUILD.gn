@@ -69,6 +69,11 @@ fuchsia_driver_component("virtio_netdevice") {
   manifest = "meta/virtio_netdevice.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "virtio_netdevice"
+  driver_components = [ ":virtio_netdevice" ]
+}
+
 group("tests") {
   testonly = true
   deps = [

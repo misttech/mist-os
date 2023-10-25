@@ -47,6 +47,11 @@ fuchsia_driver_component("virtio_input") {
   manifest = "meta/virtio_input.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "virtio_input"
+  driver_components = [ ":virtio_input" ]
+}
+
 test("virtio-input-test") {
   if (is_fuchsia) {
     fdio_config = [ "//build/config/fuchsia:fdio_config" ]

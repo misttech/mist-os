@@ -43,6 +43,11 @@ fuchsia_driver_component("virtio_block") {
   manifest = "meta/virtio_block.cml"
 }
 
+fuchsia_driver_package("virtio_block_package") {
+  package_name = "virtio_block"
+  driver_components = [ ":virtio_block" ]
+}
+
 source_set("block_lib") {
   configs += [ "//build/config:all_source" ]
   sources = [ "block.cc" ]
@@ -97,6 +102,11 @@ fuchsia_driver_component("virtio_scsi") {
   deps = [ ":virtio_scsi-driver" ]
   info = "virtio_scsi-info.json"
   manifest = "meta/virtio_scsi.cml"
+}
+
+fuchsia_driver_package("virtio_scsi_package") {
+  package_name = "virtio_scsi"
+  driver_components = [ ":virtio_scsi" ]
 }
 
 test("virtio-block-test-bin") {
