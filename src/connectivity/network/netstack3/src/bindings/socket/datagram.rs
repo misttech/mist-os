@@ -57,7 +57,7 @@ use crate::bindings::{
         DeviceNotFoundError, IntoCore as _, IntoFidl, TryFromFidlWithContext, TryIntoCore,
         TryIntoCoreWithContext, TryIntoFidl, TryIntoFidlWithContext,
     },
-    BindingsNonSyncCtxImpl, Ctx,
+    BindingId, BindingsNonSyncCtxImpl, Ctx,
 };
 
 use super::{
@@ -594,16 +594,20 @@ impl<I: icmp::IcmpIpExt> udp::NonSyncContext<I> for SocketCollection<I, Udp> {
     }
 }
 
-impl<I: IpExt, B: BufferMut> udp::BufferNonSyncContext<I, B> for SocketCollection<I, Udp> {
+impl<I: IpExt, B: BufferMut> udp::BufferNonSyncContext<I, B, DeviceId<BindingsNonSyncCtxImpl>>
+    for SocketCollection<I, Udp>
+{
     fn receive_udp(
         &mut self,
         id: udp::SocketId<I>,
+        device_id: &DeviceId<BindingsNonSyncCtxImpl>,
         (dst_ip, dst_port): (<I>::Addr, NonZeroU16),
         (src_ip, src_port): (<I>::Addr, Option<NonZeroU16>),
         body: &B,
     ) {
         let queue = self.received.get(id.get_key_index()).unwrap();
         queue.lock().receive(AvailableMessage {
+            interface_id: device_id.bindings_id().id,
             source_addr: src_ip,
             source_port: src_port.map_or(0, NonZeroU16::get),
             destination_addr: dst_ip,
@@ -879,6 +883,9 @@ impl<I: IpExt, B: BufferMut> icmp::BufferIcmpContext<I, B> for SocketCollection<
         queue.lock().receive(AvailableMessage {
             source_addr: src_ip,
             source_port: 0,
+            // TODO(https://fxbug.dev/133573): ICMP sockets need to populate
+            // scope id for link local addresses too.
+            interface_id: NonZeroU64::MAX,
             destination_addr: dst_ip,
             destination_port: id,
             data: data.as_ref().to_vec(),
@@ -890,6 +897,7 @@ impl<I: IpExt, B: BufferMut> icmp::BufferIcmpContext<I, B> for SocketCollection<
 #[derive(Debug, Derivative)]
 #[derivative(Clone(bound = ""))]
 struct AvailableMessage<I: Ip, T> {
+    interface_id: BindingId,
     source_addr: I::Addr,
     source_port: u16,
     destination_addr: I::Addr,
@@ -1807,6 +1815,7 @@ where
         });
 
         let AvailableMessage {
+            interface_id,
             source_addr,
             source_port,
             destination_addr,
@@ -1839,7 +1848,8 @@ where
         };
         let addr = want_addr.then(|| {
             I::SocketAddress::new(
-                SpecifiedAddr::new(source_addr).map(|a| ZonedAddr::Unzoned(a).into()),
+                SpecifiedAddr::new(source_addr)
+                    .map(|a| SocketZonedIpAddr::new_with_zone(a, || interface_id)),
                 source_port,
             )
             .into_sock_addr()
@@ -2354,7 +2364,7 @@ mod tests {
         util::IntoFidl,
     };
     use net_types::{
-        ip::{Ip, IpAddr, IpAddress},
+        ip::{IpAddr, IpAddress},
         Witness as _,
     };
 

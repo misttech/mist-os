@@ -247,29 +247,33 @@ impl<BT: BindingsTypes> StackState<BT> {
 }
 
 /// The non synchronized context for the stack with a buffer.
-pub trait BufferNonSyncContextInner<B: BufferMut>:
-    transport::udp::BufferNonSyncContext<Ipv4, B>
-    + transport::udp::BufferNonSyncContext<Ipv6, B>
+pub trait BufferNonSyncContextInner<B: BufferMut, D>:
+    transport::udp::BufferNonSyncContext<Ipv4, B, D>
+    + transport::udp::BufferNonSyncContext<Ipv6, B, D>
     + BufferIcmpContext<Ipv4, B>
     + BufferIcmpContext<Ipv6, B>
 {
 }
 impl<
         B: BufferMut,
-        C: transport::udp::BufferNonSyncContext<Ipv4, B>
-            + transport::udp::BufferNonSyncContext<Ipv6, B>
+        C: transport::udp::BufferNonSyncContext<Ipv4, B, D>
+            + transport::udp::BufferNonSyncContext<Ipv6, B, D>
             + BufferIcmpContext<Ipv4, B>
             + BufferIcmpContext<Ipv6, B>,
-    > BufferNonSyncContextInner<B> for C
+        D,
+    > BufferNonSyncContextInner<B, D> for C
 {
 }
 
 /// The non synchronized context for the stack with a buffer.
 pub trait BufferNonSyncContext<B: BufferMut>:
-    NonSyncContext + BufferNonSyncContextInner<B>
+    NonSyncContext + BufferNonSyncContextInner<B, DeviceId<Self>>
 {
 }
-impl<B: BufferMut, C: NonSyncContext + BufferNonSyncContextInner<B>> BufferNonSyncContext<B> for C {}
+impl<B: BufferMut, C: NonSyncContext + BufferNonSyncContextInner<B, DeviceId<Self>>>
+    BufferNonSyncContext<B> for C
+{
+}
 
 /// A context trait determining the types to be used for reference notifications.
 pub trait ReferenceNotifiers {
@@ -296,8 +300,8 @@ impl<O> BindingsTypes for O where O: InstantBindingsTypes + DeviceLayerTypes + T
 /// The non-synchronized context for the stack.
 pub trait NonSyncContext:
     BindingsTypes
-    + BufferNonSyncContextInner<Buf<Vec<u8>>>
-    + BufferNonSyncContextInner<EmptyBuf>
+    + BufferNonSyncContextInner<Buf<Vec<u8>>, DeviceId<Self>>
+    + BufferNonSyncContextInner<EmptyBuf, DeviceId<Self>>
     + RngContext
     + TimerContext<TimerId<Self>>
     + EventContext<
@@ -320,8 +324,8 @@ pub trait NonSyncContext:
 }
 impl<
         C: BindingsTypes
-            + BufferNonSyncContextInner<Buf<Vec<u8>>>
-            + BufferNonSyncContextInner<EmptyBuf>
+            + BufferNonSyncContextInner<Buf<Vec<u8>>, DeviceId<Self>>
+            + BufferNonSyncContextInner<EmptyBuf, DeviceId<Self>>
             + RngContext
             + TimerContext<TimerId<Self>>
             + EventContext<

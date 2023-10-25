@@ -1125,12 +1125,15 @@ impl<I: IcmpIpExt> udp::NonSyncContext<I> for FakeNonSyncCtx {
     }
 }
 
-impl<I: crate::ip::IpExt, B: BufferMut> udp::BufferNonSyncContext<I, B> for FakeNonSyncCtx {
+impl<I: crate::ip::IpExt, B: BufferMut> udp::BufferNonSyncContext<I, B, DeviceId<Self>>
+    for FakeNonSyncCtx
+{
     fn receive_udp(
         &mut self,
         id: udp::SocketId<I>,
-        _dst_addr: (I::Addr, core::num::NonZeroU16),
-        _src_addr: (I::Addr, Option<core::num::NonZeroU16>),
+        _device: &DeviceId<Self>,
+        _dst_addr: (<I>::Addr, core::num::NonZeroU16),
+        _src_addr: (<I>::Addr, Option<core::num::NonZeroU16>),
         body: &B,
     ) {
         let mut state = self.state_mut();

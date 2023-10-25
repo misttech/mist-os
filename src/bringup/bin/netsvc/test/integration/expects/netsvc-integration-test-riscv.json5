@@ -12,13 +12,7 @@
         {
             type: "expect_failure",
             matchers: [
-                "advertises",
-                "can_discover",
-                "debuglog",
-                "get_board_info",
-                "pave_image::*",
                 "replies_to_ping::*",
-                "retransmits_acks",
             ],
         },
     ],

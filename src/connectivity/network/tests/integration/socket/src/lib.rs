@@ -9,7 +9,7 @@ use assert_matches::assert_matches;
 use async_trait::async_trait;
 use fidl_fuchsia_hardware_network as fhardware_network;
 use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_ext::{self as fnet_ext, IntoExt as _};
+use fidl_fuchsia_net_ext::{self as fnet_ext, IntoExt as _, IpExt as _};
 use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
@@ -2737,6 +2737,117 @@ async fn udp_send_from_bound_to_device<N: Netstack>(name: &str) {
         },
     )
     .await
+}
+
+#[netstack_test]
+async fn test_udp_source_address_has_zone<N: Netstack>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let net = sandbox.create_network("net").await.expect("failed to create network");
+
+    let client = sandbox
+        .create_netstack_realm::<N, _>(format!("{}_client", name))
+        .expect("failed to create client realm");
+    let server = sandbox
+        .create_netstack_realm::<N, _>(format!("{}_server", name))
+        .expect("failed to create server realm");
+
+    let client_ep = client
+        .join_network_with(
+            &net,
+            "client",
+            netemul::new_endpoint_config(netemul::DEFAULT_MTU, Some(CLIENT_MAC)),
+            Default::default(),
+        )
+        .await
+        .expect("client failed to join network");
+    client_ep.add_address_and_subnet_route(Ipv6::CLIENT_SUBNET).await.expect("configure address");
+    let server_ep = server
+        .join_network_with(
+            &net,
+            "server",
+            netemul::new_endpoint_config(netemul::DEFAULT_MTU, Some(SERVER_MAC)),
+            Default::default(),
+        )
+        .await
+        .expect("server failed to join network");
+    server_ep.add_address_and_subnet_route(Ipv6::SERVER_SUBNET).await.expect("configure address");
+
+    if let NetstackVersion::Netstack2 { .. } = N::VERSION {
+        // Add static ARP entries as we've observed flakes in CQ due to ARP timeouts
+        // and ARP resolution is immaterial to this test.
+        futures::stream::iter([
+            (&server, &server_ep, Ipv6::CLIENT_SUBNET.addr, CLIENT_MAC),
+            (&client, &client_ep, Ipv6::SERVER_SUBNET.addr, SERVER_MAC),
+        ])
+        .for_each_concurrent(None, |(realm, ep, addr, mac)| {
+            realm.add_neighbor_entry(ep.id(), addr, mac).map(|r| r.expect("add_neighbor_entry"))
+        })
+        .await;
+    }
+
+    // Get the link local address for the client.
+    let link_local_addr = std::pin::pin!(client_ep
+        .get_interface_event_stream()
+        .expect("get_interface_event_stream failed")
+        .filter_map(|event| async {
+            match event.expect("event error") {
+                fnet_interfaces::Event::Existing(properties)
+                | fnet_interfaces::Event::Added(properties) => {
+                    if let Some(addresses) = properties.addresses {
+                        for address in addresses {
+                            if let Some(fnet::Subnet {
+                                addr: fnet::IpAddress::Ipv6(addr), ..
+                            }) = address.addr
+                            {
+                                if addr.is_unicast_link_local() {
+                                    return Some(addr);
+                                }
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+            None
+        }))
+    .next()
+    .await
+    .expect("unexpected end of events");
+
+    let client_addr = assert_matches!(fnet::IpAddress::Ipv6(link_local_addr).into(),
+                                      fnet_ext::IpAddress(std::net::IpAddr::V6(client_addr)) => client_addr);
+    let client_addr = std::net::SocketAddr::V6(std::net::SocketAddrV6::new(
+        client_addr,
+        1234,
+        0,
+        client_ep.id().try_into().unwrap(),
+    ));
+
+    let fnet_ext::IpAddress(server_addr) = fnet_ext::IpAddress::from(Ipv6::SERVER_SUBNET.addr);
+    let server_addr = std::net::SocketAddr::new(server_addr, 8080);
+
+    let client_sock = fasync::net::UdpSocket::bind_in_realm(&client, client_addr)
+        .await
+        .expect("failed to create client socket");
+
+    let server_sock = fasync::net::UdpSocket::bind_in_realm(&server, server_addr)
+        .await
+        .expect("failed to create server socket");
+
+    const PAYLOAD: &'static str = "Hello World";
+
+    let client_fut = async move {
+        let r = client_sock.send_to(PAYLOAD.as_bytes(), server_addr).await.expect("sendto failed");
+        assert_eq!(r, PAYLOAD.as_bytes().len());
+    };
+    let server_fut = async move {
+        let mut buf = [0u8; 1024];
+        let (_, from) = server_sock.recv_from(&mut buf[..]).await.expect("recvfrom failed");
+        // This will also check the zone.
+        assert_eq!(from, client_addr);
+    };
+
+    let ((), ()) = futures::future::join(client_fut, server_fut).await;
 }
 
 #[netstack_test]

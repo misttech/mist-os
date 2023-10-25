@@ -343,8 +343,8 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>>
 impl<
         I: udp::IpExt,
         B: BufferMut,
-        C: udp::BufferNonSyncContext<I, B>
-            + udp::BufferNonSyncContext<I::OtherVersion, B>
+        C: udp::BufferNonSyncContext<I, B, Self::DeviceId>
+            + udp::BufferNonSyncContext<I::OtherVersion, B, Self::DeviceId>
             + crate::NonSyncContext,
         L,
     > udp::BufferStateContext<I, C, B> for Locked<&SyncCtx<C>, L>
@@ -358,8 +358,8 @@ where
 impl<
         I: udp::IpExt,
         B: BufferMut,
-        C: udp::BufferNonSyncContext<I, B>
-            + udp::BufferNonSyncContext<I::OtherVersion, B>
+        C: udp::BufferNonSyncContext<I, B, Self::DeviceId>
+            + udp::BufferNonSyncContext<I::OtherVersion, B, Self::DeviceId>
             + crate::NonSyncContext,
         L,
     > udp::BufferBoundStateContext<I, C, B> for Locked<&SyncCtx<C>, L>

@@ -565,18 +565,20 @@ where
     }
 }
 
-impl<I, B: BufferMut> udp::BufferNonSyncContext<I, B> for BindingsNonSyncCtxImpl
+impl<I, B: BufferMut> udp::BufferNonSyncContext<I, B, DeviceId<BindingsNonSyncCtxImpl>>
+    for BindingsNonSyncCtxImpl
 where
     I: socket::datagram::SocketCollectionIpExt<socket::datagram::Udp> + IpExt,
 {
     fn receive_udp(
         &mut self,
         id: udp::SocketId<I>,
+        device: &DeviceId<BindingsNonSyncCtxImpl>,
         dst_addr: (<I>::Addr, NonZeroU16),
         src_addr: (<I>::Addr, Option<NonZeroU16>),
         body: &B,
     ) {
-        I::with_collection_mut(self, |c| c.receive_udp(id, dst_addr, src_addr, body))
+        I::with_collection_mut(self, |c| c.receive_udp(id, device, dst_addr, src_addr, body))
     }
 }
 
