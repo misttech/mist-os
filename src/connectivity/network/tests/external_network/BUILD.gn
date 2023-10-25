@@ -18,6 +18,9 @@ test("bin") {
     "//src/lib/fxl/test:gtest_main",
     "//zircon/system/ulib/fbl",
   ]
+
+  # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
+  configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
 fuchsia_unittest_component("client") {

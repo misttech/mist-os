@@ -85,6 +85,9 @@ executable("multithreaded_breakpoint_test_exe") {
   sources = [ "multithreaded_breakpoint_test_exe.cc" ]
 
   deps = [ ":debug_agent_test_so" ]
+
+  # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
+  configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
 executable("watchpoint_test_exe") {

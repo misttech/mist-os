@@ -111,6 +111,9 @@ python_c_extension("fuchsia_controller_py") {
     "//sdk:marker-internal",
     "//sdk:marker-unknown",
   ]
+
+  # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
+  configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
 python_library("fidl_bindings") {

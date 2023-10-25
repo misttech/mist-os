@@ -54,6 +54,9 @@ test("minfs_unit") {
     "//zircon/third_party/ulib/cksum",
     "//zircon/third_party/ulib/safemath",
   ]
+
+  # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
+  configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
 test("minfs-integration") {
@@ -133,6 +136,9 @@ test("fs_tests") {
     "//third_party/googletest:gmock",
     "//zircon/system/ulib/fdio-caller",
   ]
+
+  # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
+  configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
 test("minfs_component_runner_test") {

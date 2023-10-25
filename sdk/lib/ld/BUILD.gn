@@ -193,6 +193,9 @@ shared_library("ld-startup") {
     "//zircon/system/ulib/fbl",
   ]
 
+  # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
+  configs += [ "//build/config:Wno-vla-cxx-extension" ]
+
   if (is_fuchsia) {
     sources += [
       "ldsvc.cc",

@@ -12,6 +12,9 @@ executable("spiutil") {
     "//src/lib/ddk",
     "//zircon/system/ulib/spi",
   ]
+
+  # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
+  configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
 bootfs_files_for_assembly("bootfs") {

@@ -30,6 +30,9 @@ source_set("lib") {
     "//sdk/lib/fit-promise",
     "//src/camera/bin/camera-gym/fidl:controller_hlcpp",
   ]
+
+  # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
+  configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
 executable("camera_gym_controller_parser_unittest_bin") {

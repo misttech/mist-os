@@ -11,6 +11,9 @@ executable("dlog") {
     "//sdk/lib/component/incoming/cpp",
     "//zircon/system/ulib/zx",
   ]
+
+  # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
+  configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
 bootfs_files_for_assembly("bootfs") {

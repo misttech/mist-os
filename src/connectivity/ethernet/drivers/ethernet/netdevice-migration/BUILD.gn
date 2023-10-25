@@ -36,6 +36,9 @@ source_set("src") {
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zircon-internal",
   ]
+
+  # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
+  configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
 fuchsia_driver("netdevice-migration-driver") {
@@ -75,6 +78,9 @@ test("unit-tests") {
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
   ]
+
+  # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
+  configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
 fuchsia_unittest_package("netdevice-migration-tests") {

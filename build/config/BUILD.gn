@@ -703,6 +703,83 @@ config("Wno-bitfield-conversion") {
   ]
 }
 
+# TODO(fxbug.dev/135694): Remove the use of variable length arrays.
+#
+# NOTE: Do not add this to public_configs under any circumstances. Public
+# configs are viral and will infect unsuspecting targets.
+
+config("Wno-vla-cxx-extension") {
+  cflags_cc = [
+    # TODO(fxbug.dev/135166): Remove -Wno-unknown-warning-option after the next Clang roll.
+    "-Wno-unknown-warning-option",
+    "-Wno-vla-cxx-extension",
+  ]
+  visibility = [
+    "//sdk/lib/fdio:*",
+    "//sdk/lib/fdio/tests:*",
+    "//sdk/lib/ld:*",
+    "//sdk/lib/zxio:*",
+    "//src/bringup/bin/console:*",
+    "//src/bringup/bin/console-launcher:*",
+    "//src/bringup/bin/dlog:*",
+    "//src/camera/bin/camera-gym/controller_parser:*",
+    "//src/camera/drivers/hw_accel/task:*",
+    "//src/camera/lib/raw_formats:*",
+    "//src/connectivity/bluetooth/core/bt-host/fidl:*",
+    "//src/connectivity/bluetooth/core/bt-host/socket:*",
+    "//src/connectivity/bluetooth/hci/transport/usb:*",
+    "//src/connectivity/ethernet/drivers/ethernet/netdevice-migration:*",
+    "//src/connectivity/network/netstack/udp_serde:*",
+    "//src/connectivity/network/tests/benchmarks/udp-serde:*",
+    "//src/connectivity/network/tests/external_network:*",
+    "//src/connectivity/network/tests/socket:*",
+    "//src/connectivity/wlan/drivers/lib/log/cpp/test:*",
+    "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:*",
+    "//src/connectivity/wlan/lib/mlme/cpp:*",
+    "//src/developer/adb/bin/adb-file-sync:*",
+    "//src/developer/debug/debug_agent/test_data:*",
+    "//src/developer/ffx/lib/fuchsia-controller:*",
+    "//src/developer/memory/metrics/tests:*",
+    "//src/devices/block/bin/gpt:*",
+    "//src/devices/block/bin/iochk:*",
+    "//src/devices/block/drivers/zxcrypt:*",
+    "//src/devices/spi/bin/spiutil:*",
+    "//src/devices/usb/bin/usbctl:*",
+    "//src/graphics/display/drivers/amlogic-display:*",
+    "//src/graphics/display/drivers/coordinator:*",
+    "//src/graphics/display/drivers/intel-i915:*",
+    "//src/graphics/lib/compute/spinel/platforms/vk/tests/spinel_vk_tests:*",
+    "//src/graphics/lib/magma/src/libmagma_virt:*",
+    "//src/media/audio/examples/effects:*",
+    "//src/media/drivers/amlogic_decoder:*",
+    "//src/performance/experimental/profiler:*",
+    "//src/performance/lib/gperftools:*",
+    "//src/performance/lib/trace_converters:*",
+    "//src/starnix/tests/syscalls/cpp:*",
+    "//src/storage/blobfs/test:*",
+    "//src/storage/f2fs:*",
+    "//src/storage/f2fs/test:*",
+    "//src/storage/fs_test:*",
+    "//src/storage/fxfs:*",
+    "//src/storage/gpt:*",
+    "//src/storage/lib/block_client/cpp:*",
+    "//src/storage/lib/fs_management/cpp:*",
+    "//src/storage/lib/vfs/cpp:*",
+    "//src/storage/lib/vfs/cpp/journal:*",
+    "//src/storage/minfs:*",
+    "//src/storage/minfs/test:*",
+    "//src/sys/bin/psutils:*",
+    "//src/ui/input/drivers/hid:*",
+    "//src/ui/input/drivers/hid-input-report:*",
+    "//src/ui/scenic/lib/flatland/renderer/tests:*",
+    "//third_party/openweave-core/src/lib/profiles:*",
+    "//tools/fidl/fidlc:*",
+    "//zircon/system/ulib/runtests-utils:*",
+    "//zircon/system/ulib/test-utils:*",
+    "//zircon/system/ulib/zxtest:*",
+  ]
+}
+
 # TODO(fxbug.dev/58162): clean up instances of this outside of third party code.
 #
 # NOTE: Do not add this to public_configs under any circumstances. Public

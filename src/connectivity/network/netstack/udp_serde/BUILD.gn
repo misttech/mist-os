@@ -53,6 +53,9 @@ test("udp_serde_cpp_test") {
     "//sdk/lib/fidl/cpp/wire",
     "//src/lib/fxl/test:gtest_main",
   ]
+
+  # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
+  configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
 test("udp_serde_c_compilation_test") {

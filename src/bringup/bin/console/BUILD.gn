@@ -38,6 +38,9 @@ source_set("common") {
     "//zircon/system/ulib/cmdline",
     "//zircon/system/ulib/fbl",
   ]
+
+  # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
+  configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
 executable("console") {

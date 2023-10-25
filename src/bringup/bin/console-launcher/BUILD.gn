@@ -67,6 +67,9 @@ executable("bin") {
     "//zircon/system/ulib/fdio-caller",
     "//zircon/system/ulib/zx",
   ]
+
+  # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
+  configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
 fuchsia_component("component") {

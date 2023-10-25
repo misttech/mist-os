@@ -36,6 +36,9 @@ source_set("lib") {
     "//zircon/system/ulib/elf-search",
     "//zircon/system/ulib/task-utils",
   ]
+
+  # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
+  configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
 executable("bin") {

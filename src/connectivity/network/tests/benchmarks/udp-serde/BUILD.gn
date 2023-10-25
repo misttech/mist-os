@@ -16,6 +16,9 @@ test("udp_serde_benchmarks") {
     "//src/lib/fxl",
     "//zircon/system/ulib/perftest",
   ]
+
+  # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
+  configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
 fuchsia_unittest_package("udp-serde-benchmarks") {

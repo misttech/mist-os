@@ -82,6 +82,9 @@ test("netstack_${dgramsocket_label}_test") {
     "//zircon/system/ulib/fbl",
   ]
 
+  # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
+  configs += [ "//build/config:Wno-vla-cxx-extension" ]
+
   if (is_fuchsia) {
     deps += [
       "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_cpp",

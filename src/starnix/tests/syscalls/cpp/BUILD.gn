@@ -155,6 +155,9 @@ test("syscalls_cpp_test_bin") {
     include_dirs +=
         [ "//third_party/android/platform/bionic/libc/kernel/uapi/asm-arm64" ]
   }
+
+  # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
+  configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
 test("crash") {

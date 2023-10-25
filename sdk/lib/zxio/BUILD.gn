@@ -84,6 +84,9 @@ source_set("zxio") {
     "//zircon/system/ulib/zx",
     "//zircon/third_party/ulib/safemath",
   ]
+
+  # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
+  configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
 shared_library("zxio_standalone") {

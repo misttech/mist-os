@@ -23,6 +23,7 @@ template("python_c_extension") {
     forward_variables_from(invoker,
                            [
                              "assert_no_deps",
+                             "configs",
                              "testonly",
                            ])
     sources = c_sources
@@ -64,4 +65,8 @@ template("python_c_extension") {
     source_root = "${target_gen_dir}/" + target_name + "_wrapper"
     sources = [ "__init__.py" ]
   }
+}
+
+set_defaults("python_c_extension") {
+  configs = default_shared_library_configs
 }

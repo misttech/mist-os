@@ -37,6 +37,9 @@ static_library("cpp") {
 
   deps = [ "//zircon/system/ulib/fbl" ]
 
+  # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
+  configs += [ "//build/config:Wno-vla-cxx-extension" ]
+
   if (is_fuchsia) {
     public += [
       "file_connection.h",

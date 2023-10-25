@@ -22,4 +22,7 @@ source_set("camera-task") {
     "//zircon/system/ulib/image-format",
     "//zircon/system/ulib/zx",
   ]
+
+  # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
+  configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }

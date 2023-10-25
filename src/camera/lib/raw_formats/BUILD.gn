@@ -100,6 +100,9 @@ executable("raw_unittests_bin") {
   ]
   testonly = true
   configs -= [ "//build/config:language" ]
+
+  # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
+  configs += [ "//build/config:Wno-vla-cxx-extension" ]
   cflags_cc = [ "--std=c++20" ]
 }
 

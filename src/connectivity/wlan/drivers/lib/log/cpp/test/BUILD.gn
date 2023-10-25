@@ -36,6 +36,9 @@ test("wlan_drivers_log_test") {
     "//src/connectivity/wlan/drivers/lib/log/cpp",
     "//src/lib/fxl/test:gtest_main",
   ]
+
+  # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
+  configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
 fuchsia_unittest_package("wlan-drivers-log-tests") {

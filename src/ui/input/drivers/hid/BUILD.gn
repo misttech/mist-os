@@ -43,6 +43,9 @@ fuchsia_driver("hid-driver") {
     "//zircon/system/ulib/hid-parser",
     "//zircon/system/ulib/trace",
   ]
+
+  # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
+  configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
 fuchsia_driver_component("hid") {

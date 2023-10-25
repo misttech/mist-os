@@ -134,6 +134,9 @@ if (is_fuzzer) {
     inputs = [ fdio_version_script ]
     ldflags = [ "-Wl,--version-script=" +
                 rebase_path(fdio_version_script, root_build_dir) ]
+
+    # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
+    configs += [ "//build/config:Wno-vla-cxx-extension" ]
   }
 } else {
   source_set("fdio") {

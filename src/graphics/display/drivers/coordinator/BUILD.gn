@@ -101,6 +101,9 @@ source_set("shared") {
     "//zircon/system/ulib/trace",
     "//zircon/system/ulib/zx",
   ]
+
+  # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
+  configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
 source_set("preferred-scanout-image-type") {

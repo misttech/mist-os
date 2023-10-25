@@ -82,6 +82,9 @@ static_library("minfs") {
     "//zircon/third_party/ulib/cksum",
     "//zircon/third_party/ulib/safemath",
   ]
+
+  # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
+  configs += [ "//build/config:Wno-vla-cxx-extension" ]
   if (is_fuchsia) {
     public += [
       "inspector/command_handler.h",

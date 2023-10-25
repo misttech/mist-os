@@ -69,6 +69,9 @@ test("append_tests") {
     "//src/lib/fxl/test:gtest_main",
     "//zircon/system/ulib/fbl",
   ]
+
+  # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
+  configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
 test("attr_tests") {
@@ -87,6 +90,9 @@ test("basic_tests") {
     "//src/lib/fxl/test:gtest_main",
     "//src/storage/minfs",
   ]
+
+  # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
+  configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
 test("case_sensitivity_tests") {
@@ -194,6 +200,9 @@ test("lseek_tests") {
     "//src/lib/fxl/test:gtest_main",
     "//zircon/system/ulib/fbl",
   ]
+
+  # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
+  configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
 test("mmap_tests") {
@@ -289,6 +298,9 @@ test("rw_tests") {
     "//src/lib/fxl/test:gtest_main",
     "//zircon/system/ulib/fbl",
   ]
+
+  # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
+  configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
 test("rw_workers_tests") {
@@ -337,6 +349,9 @@ test("truncate_tests") {
     "//src/lib/fxl/test:gtest_main",
     "//zircon/system/ulib/fbl",
   ]
+
+  # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
+  configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
 test("unicode_tests") {

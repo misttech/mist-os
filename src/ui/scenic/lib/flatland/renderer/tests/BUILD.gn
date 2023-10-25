@@ -59,4 +59,7 @@ executable("unittests") {
     "//src/ui/scenic/lib/utils",
     "//third_party/googletest:gmock",
   ]
+
+  # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
+  configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
