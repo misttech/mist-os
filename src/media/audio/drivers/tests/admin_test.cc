@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/media/audio/drivers/test/admin_test.h"
+#include "src/media/audio/drivers/tests/admin_test.h"
 
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/vmo.h>

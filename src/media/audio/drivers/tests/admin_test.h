@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_MEDIA_AUDIO_DRIVERS_TEST_ADMIN_TEST_H_
-#define SRC_MEDIA_AUDIO_DRIVERS_TEST_ADMIN_TEST_H_
+#ifndef SRC_MEDIA_AUDIO_DRIVERS_TESTS_ADMIN_TEST_H_
+#define SRC_MEDIA_AUDIO_DRIVERS_TESTS_ADMIN_TEST_H_
 
 #include <fuchsia/hardware/audio/cpp/fidl.h>
 #include <lib/fzl/vmo-mapper.h>
@@ -13,7 +13,7 @@
 
 #include <optional>
 
-#include "src/media/audio/drivers/test/test_base.h"
+#include "src/media/audio/drivers/tests/test_base.h"
 
 namespace media::audio::drivers::test {
 
@@ -98,4 +98,4 @@ class AdminTest : public TestBase {
 
 }  // namespace media::audio::drivers::test
 
-#endif  // SRC_MEDIA_AUDIO_DRIVERS_TEST_ADMIN_TEST_H_
+#endif  // SRC_MEDIA_AUDIO_DRIVERS_TESTS_ADMIN_TEST_H_

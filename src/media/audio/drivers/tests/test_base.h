@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_MEDIA_AUDIO_DRIVERS_TEST_TEST_BASE_H_
-#define SRC_MEDIA_AUDIO_DRIVERS_TEST_TEST_BASE_H_
+#ifndef SRC_MEDIA_AUDIO_DRIVERS_TESTS_TEST_BASE_H_
+#define SRC_MEDIA_AUDIO_DRIVERS_TESTS_TEST_BASE_H_
 
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <fuchsia/hardware/audio/cpp/fidl.h>
@@ -14,7 +14,7 @@
 #include <zircon/rights.h>
 
 #include "lib/fidl/cpp/interface_handle.h"
-#include "src/media/audio/drivers/test/audio_device_enumerator_stub.h"
+#include "src/media/audio/drivers/tests/audio_device_enumerator_stub.h"
 #include "src/media/audio/lib/test/test_fixture.h"
 
 namespace media::audio::drivers::test {
@@ -225,4 +225,4 @@ class TestBase : public media::audio::test::TestFixture {
 
 }  // namespace media::audio::drivers::test
 
-#endif  // SRC_MEDIA_AUDIO_DRIVERS_TEST_TEST_BASE_H_
+#endif  // SRC_MEDIA_AUDIO_DRIVERS_TESTS_TEST_BASE_H_

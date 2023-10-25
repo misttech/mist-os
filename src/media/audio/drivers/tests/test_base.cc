@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/media/audio/drivers/test/test_base.h"
+#include "src/media/audio/drivers/tests/test_base.h"
 
 #include <fcntl.h>
 #include <fuchsia/component/cpp/fidl.h>
@@ -22,7 +22,7 @@
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 
-#include "src/media/audio/drivers/test/audio_device_enumerator_stub.h"
+#include "src/media/audio/drivers/tests/audio_device_enumerator_stub.h"
 
 namespace media::audio::drivers::test {
 

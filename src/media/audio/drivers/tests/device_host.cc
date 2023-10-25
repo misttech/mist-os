@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/media/audio/drivers/test/device_host.h"
+#include "src/media/audio/drivers/tests/device_host.h"
 
 #include <fuchsia/virtualaudio/cpp/fidl.h>
 #include <lib/async-loop/loop.h>
@@ -22,7 +22,7 @@
 
 #include "src/lib/fsl/io/device_watcher.h"
 #include "src/lib/fxl/strings/concatenate.h"
-#include "src/media/audio/drivers/test/test_base.h"
+#include "src/media/audio/drivers/tests/test_base.h"
 
 namespace media::audio::drivers::test {
 

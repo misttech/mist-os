@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_MEDIA_AUDIO_DRIVERS_TEST_DEVICE_HOST_H_
-#define SRC_MEDIA_AUDIO_DRIVERS_TEST_DEVICE_HOST_H_
+#ifndef SRC_MEDIA_AUDIO_DRIVERS_TESTS_DEVICE_HOST_H_
+#define SRC_MEDIA_AUDIO_DRIVERS_TESTS_DEVICE_HOST_H_
 
 #include <fuchsia/virtualaudio/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
@@ -11,7 +11,7 @@
 #include <atomic>
 
 #include "src/lib/fsl/io/device_watcher.h"
-#include "src/media/audio/drivers/test/test_base.h"
+#include "src/media/audio/drivers/tests/test_base.h"
 
 namespace media::audio::drivers::test {
 
@@ -59,4 +59,4 @@ class DeviceHost {
 
 }  // namespace media::audio::drivers::test
 
-#endif  // SRC_MEDIA_AUDIO_DRIVERS_TEST_DEVICE_HOST_H_
+#endif  // SRC_MEDIA_AUDIO_DRIVERS_TESTS_DEVICE_HOST_H_

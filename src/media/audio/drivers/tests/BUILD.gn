@@ -6,7 +6,7 @@ import("//build/components.gni")
 import("//build/test.gni")
 import("//src/media/audio/hardware.gni")
 
-group("test") {
+group("tests") {
   testonly = true
 
   deps = [ ":audio_driver_tests" ]

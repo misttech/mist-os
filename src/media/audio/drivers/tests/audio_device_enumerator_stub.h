@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_MEDIA_AUDIO_DRIVERS_TEST_AUDIO_DEVICE_ENUMERATOR_STUB_H_
-#define SRC_MEDIA_AUDIO_DRIVERS_TEST_AUDIO_DEVICE_ENUMERATOR_STUB_H_
+#ifndef SRC_MEDIA_AUDIO_DRIVERS_TESTS_AUDIO_DEVICE_ENUMERATOR_STUB_H_
+#define SRC_MEDIA_AUDIO_DRIVERS_TESTS_AUDIO_DEVICE_ENUMERATOR_STUB_H_
 
 #include <fuchsia/hardware/audio/cpp/fidl.h>
 #include <fuchsia/media/cpp/fidl.h>
@@ -39,4 +39,4 @@ class AudioDeviceEnumeratorStub : public fuchsia::media::AudioDeviceEnumerator,
 
 }  // namespace media::audio::drivers::test
 
-#endif  // SRC_MEDIA_AUDIO_DRIVERS_TEST_AUDIO_DEVICE_ENUMERATOR_STUB_H_
+#endif  // SRC_MEDIA_AUDIO_DRIVERS_TESTS_AUDIO_DEVICE_ENUMERATOR_STUB_H_

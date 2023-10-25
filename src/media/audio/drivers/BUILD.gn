@@ -40,7 +40,7 @@ group("tests") {
     "configurator:tests",
     "intel-hda:tests",
     "lib:tests",
-    "test",
+    "tests",
     "usb-audio:tests",
   ]
 }

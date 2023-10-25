@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/media/audio/drivers/test/audio_device_enumerator_stub.h"
+#include "src/media/audio/drivers/tests/audio_device_enumerator_stub.h"
 
 #include <fuchsia/media/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>

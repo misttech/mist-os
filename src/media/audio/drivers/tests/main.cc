@@ -10,7 +10,7 @@
 
 #include "src/lib/fxl/command_line.h"
 #include "src/lib/fxl/test/test_settings.h"
-#include "src/media/audio/drivers/test/device_host.h"
+#include "src/media/audio/drivers/tests/device_host.h"
 
 int main(int argc, char** argv) {
   auto command_line = fxl::CommandLineFromArgcArgv(argc, argv);

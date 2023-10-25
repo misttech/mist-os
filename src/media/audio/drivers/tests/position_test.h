@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_MEDIA_AUDIO_DRIVERS_TEST_POSITION_TEST_H_
-#define SRC_MEDIA_AUDIO_DRIVERS_TEST_POSITION_TEST_H_
+#ifndef SRC_MEDIA_AUDIO_DRIVERS_TESTS_POSITION_TEST_H_
+#define SRC_MEDIA_AUDIO_DRIVERS_TESTS_POSITION_TEST_H_
 
-#include "src/media/audio/drivers/test/admin_test.h"
+#include "src/media/audio/drivers/tests/admin_test.h"
 
 namespace media::audio::drivers::test {
 
@@ -50,4 +50,4 @@ class PositionTest : public AdminTest {
 
 }  // namespace media::audio::drivers::test
 
-#endif  // SRC_MEDIA_AUDIO_DRIVERS_TEST_POSITION_TEST_H_
+#endif  // SRC_MEDIA_AUDIO_DRIVERS_TESTS_POSITION_TEST_H_
