@@ -42,6 +42,7 @@ if (is_linux) {
     ]
     non_go_deps = [
       ":installer_image",
+      "//build/images/fuchsia:fuchsia_zbi_for_host_tests($host_toolchain)",
       "//build/images/recovery:test_data",
     ]
   }
