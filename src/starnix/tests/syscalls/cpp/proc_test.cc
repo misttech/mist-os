@@ -150,3 +150,28 @@ INSTANTIATE_TEST_SUITE_P(
                           "/ipv6/conf/%s/addr_gen_mode", "/ipv6/conf/%s/stable_secret",
                           "/ipv6/conf/%s/disable_ipv6", "/ipv6/neigh/%s/ucast_solicit",
                           "/ipv6/neigh/%s/retrans_time_ms", "/ipv6/neigh/%s/mcast_resolicit")));
+
+// Test that after forking without execing, /proc/self/cmdline still works.
+TEST(ProcTest, CmdlineAfterFork) {
+  char cmdline[100];
+  int cmdline_fd = open("/proc/self/cmdline", O_RDONLY);
+  ASSERT_GT(cmdline_fd, 0) << strerror(errno);
+  ssize_t cmdline_len = read(cmdline_fd, cmdline, sizeof(cmdline));
+  ASSERT_GT(cmdline_len, 0) << strerror(errno);
+  close(cmdline_fd);
+
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([&] {
+    char child_cmdline[100];
+    int cmdline_fd = open("/proc/self/cmdline", O_RDONLY);
+    ASSERT_GT(cmdline_fd, 0) << strerror(errno);
+    ssize_t child_cmdline_len = read(cmdline_fd, child_cmdline, sizeof(child_cmdline));
+    ASSERT_GT(child_cmdline_len, 0) << strerror(errno);
+    close(cmdline_fd);
+
+    ASSERT_EQ(cmdline_len, child_cmdline_len);
+    ASSERT_TRUE(memcmp(cmdline, child_cmdline, cmdline_len) == 0);
+  });
+
+  ASSERT_TRUE(helper.WaitForChildren());
+}

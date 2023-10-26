@@ -248,13 +248,18 @@ pub struct MemoryManagerState {
     /// Cached VmarInfo for user_vmar.
     user_vmar_info: zx::VmarInfo,
 
-    /// State for the brk and sbrk syscalls.
-    brk: Option<ProgramBreak>,
-
     /// The memory mappings currently used by this address space.
     ///
     /// The mappings record which VMO backs each address.
     mappings: RangeMap<UserAddress, Mapping>,
+
+    forkable_state: MemoryManagerForkableState,
+}
+
+#[derive(Default, Clone)]
+pub struct MemoryManagerForkableState {
+    /// State for the brk and sbrk syscalls.
+    brk: Option<ProgramBreak>,
 
     /// The namespace node that represents the executable associated with this task.
     executable_node: Option<NamespaceNode>,
@@ -272,6 +277,19 @@ pub struct MemoryManagerState {
 
     /// vDSO location
     pub vdso_base: UserAddress,
+}
+
+impl std::ops::Deref for MemoryManagerState {
+    type Target = MemoryManagerForkableState;
+    fn deref(&self) -> &Self::Target {
+        &self.forkable_state
+    }
+}
+
+impl std::ops::DerefMut for MemoryManagerState {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.forkable_state
+    }
 }
 
 fn map_in_vmar(
@@ -1574,19 +1592,8 @@ impl MemoryManager {
             state: RwLock::new(MemoryManagerState {
                 user_vmar,
                 user_vmar_info,
-                brk: None,
                 mappings: RangeMap::new(),
-                executable_node: None,
-                stack_base: UserAddress::NULL,
-                stack_size: 0,
-                stack_start: UserAddress::NULL,
-                auxv_start: UserAddress::NULL,
-                auxv_end: UserAddress::NULL,
-                argv_start: UserAddress::NULL,
-                argv_end: UserAddress::NULL,
-                environ_start: UserAddress::NULL,
-                environ_end: UserAddress::NULL,
-                vdso_base: UserAddress::NULL,
+                forkable_state: Default::default(),
             }),
             // TODO(security): Reset to DISABLE, or the value in the fs.suid_dumpable sysctl, under
             // certain conditions as specified in the prctl(2) man page.
@@ -1818,10 +1825,8 @@ impl MemoryManager {
             assert!(released_mappings.is_empty());
         }
 
-        target_state.brk = state.brk;
-        target_state.executable_node = state.executable_node.clone();
+        target_state.forkable_state = state.forkable_state.clone();
         *target.dumpable.lock() = *self.dumpable.lock();
-        target_state.vdso_base = state.vdso_base;
 
         Ok(())
     }
