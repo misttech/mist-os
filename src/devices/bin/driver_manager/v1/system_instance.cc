@@ -115,6 +115,7 @@ zx_status_t SystemInstance::InitializeDriverHostSvcDir() {
   }
 
   const char* kAllowedServices[] = {
+      "fuchsia.kernel.IoportResource",
       "fuchsia.kernel.MmioResource",
       "fuchsia.logger.LogSink",
       "fuchsia.scheduler.ProfileProvider",
