@@ -12,7 +12,10 @@ def os_exec(ctx, cmd, *args, **kwargs):
     return ctx.os.exec(cmd, *args, **kwargs)
 
 def get_fuchsia_dir(ctx):
-    return ctx.scm.root + "/" + ctx.vars.get("fuchsia_dir")
+    rel_fuchsia_dir = ctx.vars.get("fuchsia_dir")
+    if rel_fuchsia_dir == ".":
+        return ctx.scm.root
+    return ctx.scm.root + "/" + rel_fuchsia_dir
 
 def cipd_platform_name(ctx):
     """Returns CIPD's name for the current host platform.
