@@ -202,16 +202,21 @@ FUNCTION_LABEL(_start)
     rep stosq
 #endif  // __has_feature(address_sanitizer)
 
-    /*
-     * Set PGE to enable global kernel pages
-     */
+    // Disable global pages before installing the new root page table to ensure
+    // that any prior global TLB entries are flushed.
+    mov   %cr4, %rax
+    and   $(~X86_CR4_PGE), %rax
+    mov   %rax, %cr4
+
+    // Load the physical pointer to the root page table.
+    mov  $PHYS(pml4), %rax
+    mov  %rax, %cr3
+
+    // Now that we have installed the new root, re-enable global pages. Doing
+    // this before the installation could result in more stale TLB entries.
     mov   %cr4, %rax
     or    $(X86_CR4_PGE), %rax
     mov   %rax, %cr4
-
-    /* load the physical pointer to the top level page table */
-    mov  $PHYS(pml4), %rax
-    mov  %rax, %cr3
 
     // Load our new GDT by physical pointer.
     // _temp_gdtr has it as a virtual pointer, so copy it and adjust.
