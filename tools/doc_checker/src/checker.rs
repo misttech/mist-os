@@ -5,18 +5,17 @@
 //! checker are the traits and structs used to perform checks on markdown documentation
 //! in the Fuchsia project.
 
-use {
-    crate::md_element::Element,
-    anyhow::Result,
-    async_trait::async_trait,
-    serde_yaml::Value,
-    std::{
-        fmt::{self, Debug, Display},
-        path::{Path, PathBuf},
-    },
+use crate::md_element::Element;
+use anyhow::Result;
+use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
+use serde_yaml::Value;
+use std::{
+    fmt::{self, Debug, Display},
+    path::{Path, PathBuf},
 };
 
-#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Ord, PartialOrd, Serialize)]
 pub enum ErrorLevel {
     Info,
     Warning,
@@ -33,7 +32,7 @@ impl fmt::Display for ErrorLevel {
 }
 
 /// An error reported by a [`DocCheck`].
-#[derive(Clone, Debug, Eq, Ord, PartialOrd, PartialEq)]
+#[derive(Clone, Deserialize, Debug, Eq, Ord, PartialOrd, PartialEq, Serialize)]
 pub struct DocCheckError {
     pub level: ErrorLevel,
     pub doc_line: DocLine,
@@ -126,7 +125,7 @@ impl fmt::Display for DocCheckError {
 }
 
 /// A line within a file.
-#[derive(Debug, Clone, Eq, Hash, Ord, PartialOrd, PartialEq)]
+#[derive(Debug, Deserialize, Clone, Eq, Hash, Ord, PartialOrd, PartialEq, Serialize)]
 pub struct DocLine {
     pub line_num: usize,
     pub file_name: PathBuf,

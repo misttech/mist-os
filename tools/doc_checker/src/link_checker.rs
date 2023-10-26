@@ -789,7 +789,7 @@ pub async fn check_external_links(links: &Vec<LinkReference>) -> Option<Vec<DocC
     let client: HttpsClient = new_https_client_from_tcp_options(tcp_options());
     for (authority, links) in domain_sorted_links {
         let mut pending_requests = vec![];
-        println!("checking {authority} {link_count} links", link_count = links.len());
+        eprintln!("checking {authority} {link_count} links", link_count = links.len());
         for link in links {
             let p = check_url_link(client.clone(), link);
             pending_requests.push(p);
@@ -925,6 +925,7 @@ mod tests {
             project: "fuchsia".to_string(),
             docs_folder: PathBuf::from("docs"),
             local_links_only: true,
+            json: false,
         };
 
         let mut checks = register_markdown_checks(&opt)?;
@@ -981,6 +982,7 @@ mod tests {
             project: "fuchsia".to_string(),
             docs_folder: PathBuf::from("docs"),
             local_links_only: true,
+            json: false,
         };
 
         let mut checks = register_markdown_checks(&opt)?;
@@ -1130,6 +1132,7 @@ mod tests {
             project: "fuchsia".to_string(),
             docs_folder: PathBuf::from("docs"),
             local_links_only: true,
+            json: false,
         };
 
         let mut checks = register_markdown_checks(&opt)?;

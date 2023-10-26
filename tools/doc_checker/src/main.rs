@@ -5,18 +5,19 @@
 //! doc_checker is a CLI tool to check markdown files for correctness in
 //! the Fuchsia project.
 
-pub(crate) use crate::checker::{DocCheck, DocCheckError, DocLine, DocYamlCheck, ErrorLevel};
-pub(crate) use crate::md_element::DocContext;
-use {
-    anyhow::{bail, Context, Result},
-    argh::FromArgs,
-    glob::glob,
-    serde_yaml::Value,
-    std::{
-        fs::{self, File},
-        io::BufReader,
-        path::PathBuf,
-    },
+pub(crate) use crate::{
+    checker::{DocCheck, DocCheckError, DocLine, DocYamlCheck, ErrorLevel},
+    md_element::DocContext,
+};
+use anyhow::{bail, Context, Result};
+use argh::FromArgs;
+use glob::glob;
+use serde_json;
+use serde_yaml::Value;
+use std::{
+    fs::{self, File},
+    io::BufReader,
+    path::PathBuf,
 };
 mod checker;
 mod include_checker;
@@ -100,6 +101,10 @@ pub struct DocCheckerArgs {
     /// do not resolve http(s) links
     #[argh(switch)]
     pub local_links_only: bool,
+
+    /// output in JSON format
+    #[argh(switch)]
+    pub json: bool,
 }
 
 #[fuchsia::main]
@@ -108,43 +113,57 @@ async fn main() -> Result<()> {
 
     // Canonicalize the root directory so the rest of the code can rely on
     // the root directory existing and being a normalized path.
-    opt.root = opt
-        .root
-        .canonicalize()
-        .context(format!("invalid root dir for source: {:?} ", &opt.root))?;
+    opt.root =
+        opt.root.canonicalize().context(format!("invalid root dir for source: {:?} ", opt.root))?;
 
-    if let Some(mut errors) = do_main(opt).await? {
+    if let Some(mut errors) = do_main(&opt).await? {
         // Output the result
         let mut error_count = 0;
         let mut warning_count = 0;
         let mut info_count = 0;
         errors.sort();
-        for e in &errors {
-            match e.level {
-                ErrorLevel::Info => info_count += 1,
-                ErrorLevel::Warning => warning_count += 1,
-                ErrorLevel::Error => error_count += 1,
+        if opt.json {
+            println!("{}", serde_json::to_string(&errors)?);
+            if errors.iter().any(|e| e.level == ErrorLevel::Error) {
+                std::process::exit(1);
             }
-            println!("{}\n", e);
-        }
-        // Only bail if there are errors, warnings should return OK.
-        if error_count > 0 {
-            bail!("Found {} errors, {} warnings, {} info.", error_count, warning_count, info_count)
         } else {
-            println!(
-                "Found {} errors, {} warnings, {} info.",
-                error_count, warning_count, info_count
-            )
+            for e in &errors {
+                match e.level {
+                    ErrorLevel::Info => info_count += 1,
+                    ErrorLevel::Warning => warning_count += 1,
+                    ErrorLevel::Error => error_count += 1,
+                }
+                println!("{}\n", e);
+            }
+            // Only bail if there are errors, warnings should return OK.
+            if error_count > 0 {
+                bail!(
+                    "Found {} errors, {} warnings, {} info.",
+                    error_count,
+                    warning_count,
+                    info_count
+                )
+            } else {
+                println!(
+                    "Found {} errors, {} warnings, {} info.",
+                    error_count, warning_count, info_count
+                )
+            }
         }
     } else {
-        println!("No errors found");
+        if opt.json {
+            println!("[]");
+        } else {
+            println!("No errors found");
+        }
     }
     Ok(())
 }
 
 /// The actual main function. It is refactored like this to make it easier
 /// to run it in a unit test.
-async fn do_main(opt: DocCheckerArgs) -> Result<Option<Vec<DocCheckError>>> {
+async fn do_main(opt: &DocCheckerArgs) -> Result<Option<Vec<DocCheckError>>> {
     let root_dir = &opt.root;
     let docs_project = &opt.project;
     let docs_dir = root_dir.join(&opt.docs_folder);
@@ -311,6 +330,7 @@ mod test {
             project: "fuchsia".to_string(),
             docs_folder: PathBuf::from("docs"),
             local_links_only: true,
+            json: false,
         };
 
         // Set the current directory to the executable dir so the relative test paths WAI.
@@ -351,7 +371,7 @@ mod test {
                 "File not reachable via _toc include references."),
         ];
 
-        if let Some(actual_errors) = do_main(opt).await? {
+        if let Some(actual_errors) = do_main(&opt).await? {
             let mut expected_iter = expected.iter();
             for actual in actual_errors {
                 if let Some(expected) = expected_iter.next() {

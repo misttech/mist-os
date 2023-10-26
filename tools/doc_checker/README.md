@@ -16,6 +16,8 @@ To reproduce the check run as a static check  for presubmits, Run:
 fx doc-checker  --local-links-only
 ```
 
+To get JSON encoded format of the output use `--json`
+
 ## What if there is a bug?
 
 Please [file a bug](https://bugs.fuchsia.dev/p/fuchsia/issues/entry?components=DeveloperExperience%3EDocTools).
