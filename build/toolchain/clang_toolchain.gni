@@ -61,7 +61,7 @@ if (support_rust) {
 #     Type: bool
 #     Default: true
 #
-#   use_ccache, use_goma, cxx_rbe_enable
+#   use_ccache, use_goma, cxx_rbe_enable, link_rbe_enable
 #     Optional: Override the global setting, useful to opt out of
 #     ccache/goma in a particular toolchain.
 #
@@ -95,6 +95,14 @@ template("clang_toolchain") {
     if (defined(invoker.use_goma)) {
       use_goma = invoker.use_goma
     }
+    if (defined(invoker.link_rbe_enable)) {
+      _link_rbe_enable = invoker.link_rbe_enable
+    } else {
+      _link_rbe_enable = link_rbe_enable
+    }
+
+    # re-client provides write-if-change with --preserve_unchanged_output_mtime.
+    _restat_link = _link_rbe_enable
 
     if (_cxx_rbe_enable) {
       # Use reclient to remotely build C++.
@@ -553,7 +561,7 @@ template("clang_toolchain") {
       if (use_strip) {
         remote_strip_prefix = ""
 
-        if (rust_rbe_enable || link_rbe_enable) {
+        if (rust_rbe_enable || _link_rbe_enable) {
           remote_strip_prefix = string_join(
                   " ",
                   [
@@ -564,6 +572,7 @@ template("clang_toolchain") {
                     "\"$unstripped_outfile\"",
                     "--output_files",
                     "\"$outfile\"",
+                    "--preserve_unchanged_output_mtime",
                     "-- ",
                   ])
         }
@@ -855,8 +864,8 @@ template("clang_toolchain") {
       forward_variables_from(concurrent_jobs.local, "*")
       rspfile = "{{output}}.rsp"
       linker_prefix = ""
-      if (link_rbe_enable) {  # Assume non-thin archives, the simplest case of
-                              # direct inclusion.
+      if (_link_rbe_enable) {  # Assume non-thin archives, the simplest case of
+        # direct inclusion.
         linker_prefix_list = [
           rebase_path(python_exe_src, root_build_dir),
           "-S",
@@ -867,10 +876,12 @@ template("clang_toolchain") {
           "\"$rspfile\"",
           "--output_files",
           "{{output}}",
+          "--preserve_unchanged_output_mtime",
           "--",
         ]
         linker_prefix = string_join(" ", linker_prefix_list)
       }
+      restat = _restat_link
       command = "rm -f {{output}} && $linker_prefix $ar {{arflags}} rcsD {{output}} \"@$rspfile\""
       description = "AR {{output}}"
       rspfile_content = "{{inputs}}"
@@ -927,11 +938,12 @@ template("clang_toolchain") {
         command += "$ld {{SOLINK_FLAGS}}{{ldflags}} -o \"$unstripped_outfile\" -Wl,-filelist,\"$rspfile\" {{solibs}} {{libs}} {{frameworks}}"
         rspfile_content = "{{inputs_newline}}"
       } else {
-        if (link_rbe_enable) {
+        if (_link_rbe_enable) {
           linker_prefix_list = [
             rebase_path(python_exe_src, root_build_dir),
             "-S",
             rebase_path(cxx_link_remote_wrapper, root_build_dir),
+            "--preserve_unchanged_output_mtime",
             "--",
           ]
           linker_prefix = string_join(" ", linker_prefix_list)
@@ -946,10 +958,13 @@ template("clang_toolchain") {
         rspfile_content = "{{inputs}}"
       }
 
+      restat = _restat_link
+
       # Expand {{REMOTE_STRIP_PREFIX}}
       _remote_strip_prefix = ""
 
-      if (use_strip && link_rbe_enable) {
+      # If remotely linking, also remotely strip.
+      if (use_strip && _link_rbe_enable) {
         _remote_strip_prefix = _link_common.remote_strip_prefix
       }
       command_suffix = string_replace(_link_common.command_suffix,

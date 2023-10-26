@@ -79,6 +79,16 @@ _buildidtool =
 #     otherwise it defaults to "".
 #     Type: string
 #
+#   cxx_rbe_enable
+#     If defined, override the global value of the same name.
+#     If true, compile remotely using re-client on RBE.
+#     Type: bool
+#
+#   link_rbe_enable
+#     If defined, override the global value of the same name.
+#     If true, link and strip remotely using re-client on RBE.
+#     Type: bool
+#
 #   use_goma
 #     Optional: If defined, overrides the $use_goma build argument.
 #     If true, compilation commands are prefixed with "$goma_dir/gomacc".
@@ -168,6 +178,12 @@ template("zircon_toolchain") {
   if (defined(invoker.use_goma)) {
     use_goma = invoker.use_goma
   }
+  if (defined(invoker.link_rbe_enable)) {
+    _link_rbe_enable = invoker.link_rbe_enable
+  } else {
+    _link_rbe_enable = link_rbe_enable
+  }
+  _restat_link = _link_rbe_enable
 
   _restat_cc_prefix_list = []
   if (restat_cc) {
@@ -502,6 +518,8 @@ template("zircon_toolchain") {
     runtime_outputs = [ outfile ]
     outputs = runtime_outputs
 
+    restat = _restat_link
+
     if (use_strip) {
       unstripped_outfile = "${outfile}.debug"
       outputs += [ unstripped_outfile ]
@@ -521,7 +539,7 @@ template("zircon_toolchain") {
           strip_tool = "$dir_prefix${tc.tool_prefix}strip"
         }
         _remote_strip_list = []
-        if (link_rbe_enable) {
+        if (_link_rbe_enable) {
           _remote_strip_list += [
             rebase_path(python_exe_src, root_build_dir),
             "-S",
@@ -530,6 +548,7 @@ template("zircon_toolchain") {
             "\"$unstripped_outfile\"",
             "--output_files",
             "\"$outfile\"",
+            "--preserve_unchanged_output_mtime",
             "-- ",
           ]
         }
@@ -566,11 +585,12 @@ template("zircon_toolchain") {
         switches += " -Wl,-Map,$mapfile"
 
         # remote linking option
-        if (link_rbe_enable) {
+        if (_link_rbe_enable) {
           linker_prefix_list = [
             rebase_path(python_exe_src, root_build_dir),
             "-S",
             rebase_path(cxx_link_remote_wrapper, root_build_dir),
+            "--preserve_unchanged_output_mtime",
             "--",
           ]
           linker_prefix = string_join(" ", linker_prefix_list)
@@ -674,8 +694,26 @@ template("zircon_toolchain") {
     tool("alink") {
       description = "AR {{output}}"
       rspfile = "{{output}}.rsp"
-      command =
-          "rm -f {{output}} && $ar {{arflags}} rcsD {{output}} \"@$rspfile\""
+      linker_prefix = ""
+      if (_link_rbe_enable) {  # Assume non-thin archives, the simplest case of
+        # direct inclusion.
+        linker_prefix_list = [
+          rebase_path(python_exe_src, root_build_dir),
+          "-S",
+          rebase_path(prebuilt_tool_remote_wrapper, root_build_dir),
+          "--inputs",
+          "\"$rspfile\"",
+          "--input_list_paths",
+          "\"$rspfile\"",
+          "--output_files",
+          "{{output}}",
+          "--preserve_unchanged_output_mtime",
+          "--",
+        ]
+        linker_prefix = string_join(" ", linker_prefix_list)
+      }
+      restat = _restat_link
+      command = "rm -f {{output}} && $linker_prefix $ar {{arflags}} rcsD {{output}} \"@$rspfile\""
       rspfile_content = "{{inputs}}"
       default_output_dir = "{{target_out_dir}}"
       default_output_extension = ".a"
