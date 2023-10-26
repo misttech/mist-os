@@ -5,6 +5,7 @@
 // https://opensource.org/licenses/MIT
 
 #include <bits.h>
+#include <lib/arch/intrin.h>
 #include <lib/cbuf.h>
 #include <lib/debuglog.h>
 #include <lib/zbi-format/driver-config.h>
@@ -14,7 +15,6 @@
 #include <stdio.h>
 #include <trace.h>
 
-#include <arch/arm64/periphmap.h>
 #include <dev/interrupt.h>
 #include <dev/uart.h>
 #include <dev/uart/motmot/init.h>
@@ -25,6 +25,12 @@
 #include <ktl/algorithm.h>
 #include <pdev/uart.h>
 #include <platform/debug.h>
+
+#if __aarch64__
+#include <arch/arm64/periphmap.h>
+#elif __riscv
+#include <vm/physmap.h>
+#endif
 
 #include <ktl/enforce.h>
 
@@ -331,7 +337,13 @@ void MotmotUartInitEarly(const zbi_dcfg_simple_t& config) {
   ASSERT(config.mmio_phys != 0);
   ASSERT(config.irq != 0);
 
+#if __aarch64__
   uart_base = periph_paddr_to_vaddr(config.mmio_phys);
+#elif __riscv
+  uart_base = reinterpret_cast<vaddr_t>(paddr_to_physmap(config.mmio_phys));
+#else
+#error define uart base logic for architecture
+#endif
   ASSERT(uart_base != 0);
   uart_irq = config.irq;
 

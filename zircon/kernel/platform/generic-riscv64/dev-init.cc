@@ -9,6 +9,7 @@
 #include <dev/hw_watchdog/generic32/init.h>
 #include <dev/init.h>
 #include <dev/uart/dw8250/init.h>
+#include <dev/uart/motmot/init.h>
 #include <ktl/type_traits.h>
 #include <ktl/variant.h>
 #include <phys/arch/arch-handoff.h>
@@ -43,9 +44,14 @@ void UartInitEarly(uint32_t extra, const uart::null::Driver::config_type& config
 void UartInitEarly(uint32_t extra, const zbi_dcfg_simple_t& config) {
   switch (extra) {
     case ZBI_KERNEL_DRIVER_I8250_MMIO8_UART:
-      // TODO-rvbringup: pull stride out of the config entry, but for now hard
-      // code that the register stride is 1 byte.
       Dw8250UartInitEarly(config, 1);
+      break;
+    case ZBI_KERNEL_DRIVER_I8250_MMIO32_UART:
+    case ZBI_KERNEL_DRIVER_DW8250_UART:
+      Dw8250UartInitEarly(config, 4);
+      break;
+    case ZBI_KERNEL_DRIVER_MOTMOT_UART:
+      MotmotUartInitEarly(config);
       break;
   }
 }
@@ -53,7 +59,12 @@ void UartInitEarly(uint32_t extra, const zbi_dcfg_simple_t& config) {
 void UartInitLate(uint32_t extra) {
   switch (extra) {
     case ZBI_KERNEL_DRIVER_I8250_MMIO8_UART:
+    case ZBI_KERNEL_DRIVER_I8250_MMIO32_UART:
+    case ZBI_KERNEL_DRIVER_DW8250_UART:
       Dw8250UartInitLate();
+      break;
+    case ZBI_KERNEL_DRIVER_MOTMOT_UART:
+      MotmotUartInitLate();
       break;
   }
 }
