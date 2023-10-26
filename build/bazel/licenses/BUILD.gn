@@ -22,7 +22,7 @@ declare_args() {
 
   # Enable hermetic GN licensing pipeline.
   # TODO(132725): Remove once migration completes.
-  generate_legacy_ninja_build_outputs_licenses_spdx_from_metadata = false
+  generate_legacy_ninja_build_outputs_licenses_spdx_from_metadata = true
 }
 
 # TODO(fxb/117740): We only need to cover bazel inputs that end up in the product,
@@ -109,23 +109,18 @@ if (generate_legacy_ninja_build_outputs_licenses_spdx) {
   if (generate_legacy_ninja_build_outputs_licenses_spdx_from_metadata) {
     generated_licenses_spdx("spdx_from_metadata") {
       target = ":all_bazel_inputs"
-      spdx_root_package_name = "All Bazel Inputs"
+      spdx_root_package_name = "Fuchsia"
       output = "${target_out_dir}/licenses_from_metadata.spdx.json"
 
       debug_hints = true
 
-      # Current Bazel inputs don't need host tool licenses.
+      # Current Bazel inputs customers don't need host tool licenses.
+      # TODO(132725): Revisit once each individual input has its own SPDX.
+      # We can then derive value based on whether the input target's toolchain.
       include_host_tools = false
 
+      # TODO(132725): Remove once all remaining errors are sorted out.
       ignore_collection_errors = true
-
-      # Compare the output with the legacy spdx
-      # TODO(132725): Remove once migration completes.
-      deps = [ ":licenses_data" ]
-      compare_with_legacy_spdx =
-          "${target_out_dir}/licenses_data/results.spdx.json"
-
-      ignore_comparison_errors = true
     }
 
     bazel_input_resource("legacy_ninja_build_outputs_licenses_spdx") {
@@ -134,6 +129,7 @@ if (generate_legacy_ninja_build_outputs_licenses_spdx) {
       outputs = [ "legacy_ninja_build_outputs_licenses.spdx.json" ]
     }
   } else {
+    # TODO(132725): Remove once migration completes.
     bazel_input_resource("legacy_ninja_build_outputs_licenses_spdx") {
       deps = [ ":licenses_data" ]
       sources = get_target_outputs(":licenses_data_spdx_copy")
