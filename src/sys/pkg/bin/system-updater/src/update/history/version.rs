@@ -86,33 +86,46 @@ impl Version {
 
         let mut vbmeta_hash = "".to_string();
         let mut zbi_hash = "".to_string();
-        if let Ok(image_package_manifest) = update_package.image_packages().await {
-            let manifest: ImagePackagesSlots = image_package_manifest.into();
-            if let Some(fuchsia) = manifest.fuchsia() {
-                zbi_hash = fuchsia.zbi().hash().to_string();
-                if let Some(vbmeta) = fuchsia.vbmeta() {
-                    vbmeta_hash = vbmeta.hash().to_string();
+
+        match update_package.image_packages().await {
+            Ok(image_package_manifest) => {
+                let manifest: ImagePackagesSlots = image_package_manifest.into();
+                if let Some(fuchsia) = manifest.fuchsia() {
+                    zbi_hash = fuchsia.zbi().hash().to_string();
+                    if let Some(vbmeta) = fuchsia.vbmeta() {
+                        vbmeta_hash = vbmeta.hash().to_string();
+                    }
                 }
             }
-        } else {
-            vbmeta_hash =
-                get_image_hash_from_update_package(update_package, ImageType::FuchsiaVbmeta)
+            Err(err) => {
+                if !matches!(err, update_package::ImagePackagesError::NotFound) {
+                    error!(
+                        "Failed to parse images manifest, trying to use inline images: {:#}",
+                        anyhow!(err)
+                    );
+                }
+
+                vbmeta_hash =
+                    get_image_hash_from_update_package(update_package, ImageType::FuchsiaVbmeta)
+                        .await
+                        .unwrap_or_else(|e| {
+                            error!("Failed to read vbmeta hash: {:#}", anyhow!(e));
+                            "".to_string()
+                        });
+                zbi_hash = match get_image_hash_from_update_package(update_package, ImageType::Zbi)
                     .await
-                    .unwrap_or_else(|e| {
-                        error!("Failed to read vbmeta hash: {:#}", anyhow!(e));
-                        "".to_string()
-                    });
-            zbi_hash = match get_image_hash_from_update_package(update_package, ImageType::Zbi)
-                .await
-            {
-                Ok(v) => v,
-                Err(_) => get_image_hash_from_update_package(update_package, ImageType::ZbiSigned)
-                    .await
-                    .unwrap_or_else(|e| {
-                        error!("Failed to read zbi hash: {:#}", anyhow!(e));
-                        "".to_string()
-                    }),
-            };
+                {
+                    Ok(v) => v,
+                    Err(_) => {
+                        get_image_hash_from_update_package(update_package, ImageType::ZbiSigned)
+                            .await
+                            .unwrap_or_else(|e| {
+                                error!("Failed to read zbi hash: {:#}", anyhow!(e));
+                                "".to_string()
+                            })
+                    }
+                };
+            }
         }
 
         let build_version = update_package.version().await.unwrap_or_else(|e| {

@@ -798,121 +798,141 @@ impl<'a> Attempt<'a> {
 
         let () = validate_epoch(SOURCE_EPOCH_RAW, &update_pkg).await?;
 
-        if let Ok(image_package_manifest) = update_pkg.image_packages().await {
-            let mut images_to_write = ImagesToWrite::new();
-            let manifest: ImagePackagesSlots = image_package_manifest.into();
-            manifest.verify(mode).map_err(PrepareError::VerifyImages)?;
+        match update_pkg.image_packages().await {
+            Ok(image_package_manifest) => {
+                let mut images_to_write = ImagesToWrite::new();
+                let manifest: ImagePackagesSlots = image_package_manifest.into();
+                manifest.verify(mode).map_err(PrepareError::VerifyImages)?;
 
-            if let Some(fuchsia) = manifest.fuchsia() {
-                target_version.zbi_hash = fuchsia.zbi().hash().to_string();
+                if let Some(fuchsia) = manifest.fuchsia() {
+                    target_version.zbi_hash = fuchsia.zbi().hash().to_string();
 
-                // Determine if the fuchsia zbi has changed in this update. If an error is raised, do not fail the update.
-                match asset_to_write(
-                    fuchsia.zbi(),
-                    current_config,
-                    &self.env.data_sink,
-                    Asset::Kernel,
-                    &Image::new(ImageType::Zbi, None),
-                )
-                .await
-                {
-                    Ok(url) => images_to_write.fuchsia.set_zbi(url),
-                    Err(e) => {
-                        error!(
-                            "Error while determining whether to write the zbi image, assume update is needed: {:#}", anyhow!(e));
-                        images_to_write.fuchsia.set_zbi(Some(fuchsia.zbi().url().to_owned()))
-                    }
-                };
-
-                if let Some(vbmeta_image) = fuchsia.vbmeta() {
-                    target_version.vbmeta_hash = vbmeta_image.hash().to_string();
-                    // Determine if the vbmeta has changed in this update. If an error is raised, do not fail the update.
+                    // Determine if the fuchsia zbi has changed in this update. If an error is raised, do not fail the update.
                     match asset_to_write(
-                        vbmeta_image,
+                        fuchsia.zbi(),
                         current_config,
                         &self.env.data_sink,
-                        Asset::VerifiedBootMetadata,
-                        &Image::new(ImageType::FuchsiaVbmeta, None),
+                        Asset::Kernel,
+                        &Image::new(ImageType::Zbi, None),
                     )
                     .await
                     {
-                        Ok(url) => images_to_write.fuchsia.set_vbmeta(url),
+                        Ok(url) => images_to_write.fuchsia.set_zbi(url),
                         Err(e) => {
                             error!(
-                                "Error while determining whether to write the vbmeta image, assume update is needed: {:#}", anyhow!(e));
-                            images_to_write.fuchsia.set_vbmeta(Some(vbmeta_image.url().to_owned()))
-                        }
-                    };
-                }
-            }
-
-            // Only check these images if we have to.
-            if self.config.should_write_recovery {
-                if let Some(recovery) = manifest.recovery() {
-                    match recovery_to_write(recovery.zbi(), &self.env.data_sink, Asset::Kernel)
-                        .await
-                    {
-                        Ok(url) => images_to_write.recovery.set_zbi(url),
-                        Err(e) => {
-                            error!(
-                                "Error while determining whether to write the recovery zbi image, assume update is needed: {:#}", anyhow!(e));
-                            images_to_write.recovery.set_zbi(Some(recovery.zbi().url().to_owned()))
+                                "Error while determining whether to write the zbi image, assume update is needed: {:#}", anyhow!(e));
+                            images_to_write.fuchsia.set_zbi(Some(fuchsia.zbi().url().to_owned()))
                         }
                     };
 
-                    if let Some(vbmeta_image) = recovery.vbmeta() {
+                    if let Some(vbmeta_image) = fuchsia.vbmeta() {
+                        target_version.vbmeta_hash = vbmeta_image.hash().to_string();
                         // Determine if the vbmeta has changed in this update. If an error is raised, do not fail the update.
-                        match recovery_to_write(
+                        match asset_to_write(
                             vbmeta_image,
+                            current_config,
                             &self.env.data_sink,
                             Asset::VerifiedBootMetadata,
+                            &Image::new(ImageType::FuchsiaVbmeta, None),
                         )
                         .await
                         {
-                            Ok(url) => images_to_write.recovery.set_vbmeta(url),
+                            Ok(url) => images_to_write.fuchsia.set_vbmeta(url),
                             Err(e) => {
-                                error!("Error while determining whether to write the recovery vbmeta image, assume update is needed: {:#}", anyhow!(e));
+                                error!(
+                                    "Error while determining whether to write the vbmeta image, assume update is needed: {:#}", anyhow!(e));
                                 images_to_write
-                                    .recovery
+                                    .fuchsia
                                     .set_vbmeta(Some(vbmeta_image.url().to_owned()))
                             }
                         };
                     }
                 }
-            }
 
-            for (filename, imagemetadata) in manifest.firmware() {
-                match firmware_to_write(
-                    filename,
-                    imagemetadata,
-                    current_config,
-                    &self.env.data_sink,
-                    &Image::new(ImageType::Firmware, Some(filename)),
-                )
-                .await
-                {
-                    Ok(Some(url)) => images_to_write.firmware.push((filename.to_string(), url)),
-                    Ok(None) => (),
-                    Err(e) => {
-                        // If an error is raised, do not fail the update.
-                        error!("Error while determining firmware to write, assume update is needed: {:#}", anyhow!(e));
-                        images_to_write
-                            .firmware
-                            .push((filename.to_string(), imagemetadata.url().to_owned()))
+                // Only check these images if we have to.
+                if self.config.should_write_recovery {
+                    if let Some(recovery) = manifest.recovery() {
+                        match recovery_to_write(recovery.zbi(), &self.env.data_sink, Asset::Kernel)
+                            .await
+                        {
+                            Ok(url) => images_to_write.recovery.set_zbi(url),
+                            Err(e) => {
+                                error!(
+                                    "Error while determining whether to write the recovery zbi image, assume update is needed: {:#}", anyhow!(e));
+                                images_to_write
+                                    .recovery
+                                    .set_zbi(Some(recovery.zbi().url().to_owned()))
+                            }
+                        };
+
+                        if let Some(vbmeta_image) = recovery.vbmeta() {
+                            // Determine if the vbmeta has changed in this update. If an error is raised, do not fail the update.
+                            match recovery_to_write(
+                                vbmeta_image,
+                                &self.env.data_sink,
+                                Asset::VerifiedBootMetadata,
+                            )
+                            .await
+                            {
+                                Ok(url) => images_to_write.recovery.set_vbmeta(url),
+                                Err(e) => {
+                                    error!("Error while determining whether to write the recovery vbmeta image, assume update is needed: {:#}", anyhow!(e));
+                                    images_to_write
+                                        .recovery
+                                        .set_vbmeta(Some(vbmeta_image.url().to_owned()))
+                                }
+                            };
+                        }
                     }
                 }
+
+                for (filename, imagemetadata) in manifest.firmware() {
+                    match firmware_to_write(
+                        filename,
+                        imagemetadata,
+                        current_config,
+                        &self.env.data_sink,
+                        &Image::new(ImageType::Firmware, Some(filename)),
+                    )
+                    .await
+                    {
+                        Ok(Some(url)) => images_to_write.firmware.push((filename.to_string(), url)),
+                        Ok(None) => (),
+                        Err(e) => {
+                            // If an error is raised, do not fail the update.
+                            error!("Error while determining firmware to write, assume update is needed: {:#}", anyhow!(e));
+                            images_to_write
+                                .firmware
+                                .push((filename.to_string(), imagemetadata.url().to_owned()))
+                        }
+                    }
+                }
+
+                return Ok((
+                    (update_pkg, update_package_hash),
+                    mode,
+                    packages_to_fetch,
+                    Some(images_to_write),
+                    current_config,
+                ));
             }
+            Err(err) => {
+                if !matches!(err, update_package::ImagePackagesError::NotFound) {
+                    error!(
+                        "Failed to parse images manifest, trying to use inline images: {:#}",
+                        anyhow!(err)
+                    );
+                }
 
-            return Ok((
-                (update_pkg, update_package_hash),
-                mode,
-                packages_to_fetch,
-                Some(images_to_write),
-                current_config,
-            ));
+                Ok((
+                    (update_pkg, update_package_hash),
+                    mode,
+                    packages_to_fetch,
+                    None,
+                    current_config,
+                ))
+            }
         }
-
-        Ok(((update_pkg, update_package_hash), mode, packages_to_fetch, None, current_config))
     }
 
     /// Pave the various raw images (zbi, firmware, vbmeta) for fuchsia and/or recovery.
