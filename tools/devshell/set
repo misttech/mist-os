@@ -131,7 +131,6 @@ set -e
 
 function main {
   fx-standard-switches "$@"
-  set -- "${FX_ARGV[@]}"
 
   # Check if the --dev flag is set. If it is, then we'll always build fx-set
   # from source.
