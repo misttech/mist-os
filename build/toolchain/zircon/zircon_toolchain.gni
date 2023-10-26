@@ -566,6 +566,7 @@ template("zircon_toolchain") {
     rspfile = "${outfile}.rsp"
     switches = "-o $unstripped_outfile {{ldflags}}"
     linker_prefix = ""
+    _link_concurrent_jobs = concurrent_jobs.local
     if (invoker.os == "mac") {
       rspfile_content = "{{inputs_newline}}"
       link_inputs = "-Wl,-filelist,$rspfile {{libs}} {{solibs}}"
@@ -594,9 +595,11 @@ template("zircon_toolchain") {
             "--",
           ]
           linker_prefix = string_join(" ", linker_prefix_list)
+          _link_concurrent_jobs = concurrent_jobs.remote
         }
       }
     }
+    forward_variables_from(_link_concurrent_jobs, "*")
 
     if (invoker.os == "win") {
       # This assumes "-Wl,/debug" or suchlike is in ldflags.  If it's not
@@ -695,6 +698,7 @@ template("zircon_toolchain") {
       description = "AR {{output}}"
       rspfile = "{{output}}.rsp"
       linker_prefix = ""
+      _link_concurrent_jobs = concurrent_jobs.local
       if (_link_rbe_enable) {  # Assume non-thin archives, the simplest case of
         # direct inclusion.
         linker_prefix_list = [
@@ -711,6 +715,7 @@ template("zircon_toolchain") {
           "--",
         ]
         linker_prefix = string_join(" ", linker_prefix_list)
+        _link_concurrent_jobs = concurrent_jobs.remote
       }
       restat = _restat_link
       command = "rm -f {{output}} && $linker_prefix $ar {{arflags}} rcsD {{output}} \"@$rspfile\""
@@ -719,6 +724,7 @@ template("zircon_toolchain") {
       default_output_extension = ".a"
       output_prefix = "lib"
       outputs = [ "{{output_dir}}/{{target_output_name}}{{output_extension}}" ]
+      forward_variables_from(_link_concurrent_jobs, "*")
     }
 
     tool("link") {
