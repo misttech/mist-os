@@ -26,6 +26,9 @@ import("//build/testing/test_spec.gni")
 #   target (optional)
 #     [label]: The test target. Defaults to target_name.
 #
+#   timeout_secs (optional)
+#     [int] The infra timeout in seconds for the test.
+#
 #   deps, environments, data_deps, public_deps, visibility
 #     Forwarded from invoker.
 #
@@ -89,6 +92,7 @@ template("host_test") {
                              "metadata",
                              "visibility",
                              "isolated",
+                             "timeout_secs",
                            ])
 
     # If we have args, we put most deps on the script target,

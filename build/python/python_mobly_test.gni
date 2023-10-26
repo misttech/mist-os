@@ -106,6 +106,9 @@ import("//build/testing/host_test_data.gni")
 #    Type: list(string)
 #    Default: empty list
 #
+#   timeout_secs (optional)
+#     [int] The infra timeout in seconds for the test.
+#
 #  deps
 #  environments
 #  visibility
@@ -262,6 +265,7 @@ template("python_mobly_test") {
                            [
                              "environments",
                              "visibility",
+                             "timeout_secs",
                            ])
 
     binary_path = python_exe_src
