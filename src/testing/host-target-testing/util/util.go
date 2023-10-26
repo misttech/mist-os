@@ -222,45 +222,50 @@ func RehostPackagesJSON(rd io.Reader, w io.Writer, newHostname string) error {
 }
 
 func UpdateHashValuePackagesJSON(
-	rd io.Reader,
-	w io.Writer,
+	path string,
 	repoName string,
 	pkgUrlPath string,
 	merkle build.MerkleRoot,
 ) error {
-	p, err := DecodePackagesJSON(rd)
-	if err != nil {
-		return err
-	}
+	if err := AtomicallyWriteFile(path, 0600, func(f *os.File) error {
+		src, err := os.Open(path)
+		if err != nil {
+			return fmt.Errorf("failed to open packages.json %q: %w", path, err)
+		}
+		defer src.Close()
 
-	for i, pkgURL := range p.Content {
-		u, err := url.Parse(pkgURL)
+		p, err := DecodePackagesJSON(src)
 		if err != nil {
 			return err
 		}
 
-		if u.Host == repoName && u.Path == "/"+pkgUrlPath {
-			queryValues := u.Query()
-			queryValues.Set("hash", merkle.String())
-			u.RawQuery = queryValues.Encode()
+		for i, pkgURL := range p.Content {
+			u, err := url.Parse(pkgURL)
+			if err != nil {
+				return err
+			}
+
+			if u.Host == repoName && u.Path == "/"+pkgUrlPath {
+				queryValues := u.Query()
+				queryValues.Set("hash", merkle.String())
+				u.RawQuery = queryValues.Encode()
+			}
+
+			p.Content[i] = u.String()
 		}
 
-		p.Content[i] = u.String()
+		return json.NewEncoder(f).Encode(p)
+	}); err != nil {
+		return fmt.Errorf("failed to atomically overwrite %q: %w", path, err)
 	}
 
-	return json.NewEncoder(w).Encode(p)
+	return nil
 }
 
-func ParseImagesJSON(path string) (ImagesManifest, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return ImagesManifest{}, err
-	}
-	defer f.Close()
-
+func ParseImagesJSON(rd io.Reader) (ImagesManifest, error) {
 	var i ImagesManifest
 
-	if err := json.NewDecoder(f).Decode(&i); err != nil {
+	if err := json.NewDecoder(rd).Decode(&i); err != nil {
 		return ImagesManifest{}, err
 	}
 
@@ -295,6 +300,22 @@ func Sha256File(path string) (string, error) {
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
+// ParsePackageUrl parses a string into a URL and a MerkleRoot
+func ParsePackageUrl(urlString string) (*url.URL, build.MerkleRoot, error) {
+	url, err := url.Parse(urlString)
+	if err != nil {
+		return nil, build.MerkleRoot{}, fmt.Errorf("could not parse url %s: %w", urlString, err)
+	}
+
+	merkleString := url.Query()["hash"]
+	merkle, err := build.DecodeMerkleRoot([]byte(merkleString[0]))
+	if err != nil {
+		return nil, build.MerkleRoot{}, fmt.Errorf("failed to decode merkle from %s: %w", urlString, err)
+	}
+
+	return url, merkle, nil
+}
+
 type ImagesManifest struct {
 	Version  string        `json:"version"`
 	Contents ImagesContent `json:"contents"`
@@ -314,18 +335,7 @@ func (i *ImagesManifest) GetPartition(slot string, typ string) (*url.URL, build.
 		return nil, build.MerkleRoot{}, fmt.Errorf("missing entry for zbi")
 	}
 
-	url, err := url.Parse(partition.Url)
-	if err != nil {
-		return nil, build.MerkleRoot{}, fmt.Errorf("could not parse url %s: %w", partition.Url, err)
-	}
-
-	merkleString := url.Query()["hash"]
-	merkle, err := build.DecodeMerkleRoot([]byte(merkleString[0]))
-	if err != nil {
-		return nil, build.MerkleRoot{}, fmt.Errorf("failed to decode merkle from %s: %w", partition.Url, err)
-	}
-
-	return url, merkle, nil
+	return ParsePackageUrl(partition.Url)
 }
 
 func (i *ImagesManifest) SetPartition(slot string, typ string, url string, path string) error {

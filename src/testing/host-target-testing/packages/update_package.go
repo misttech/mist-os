@@ -7,8 +7,8 @@ package packages
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -21,12 +21,32 @@ import (
 )
 
 type UpdatePackage struct {
-	r        *Repository
-	p        Package
-	packages map[string]build.MerkleRoot
+	r                 *Repository
+	p                 Package
+	packages          map[string]build.MerkleRoot
+	hasImagesManifest bool
+	images            util.ImagesManifest
 }
 
 func newUpdatePackage(ctx context.Context, r *Repository, p Package) (*UpdatePackage, error) {
+	// Parse the images manifest, if it exists.
+	hasImagesManifest := false
+	var images util.ImagesManifest
+	if f, err := p.Open(ctx, "images.json"); err == nil {
+		defer f.Close()
+
+		i, err := util.ParseImagesJSON(f)
+		if err != nil {
+			return nil, err
+		}
+
+		images = i
+		hasImagesManifest = true
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+
+	// Parse the packages list.
 	f, err := p.Open(ctx, "packages.json")
 	if err != nil {
 		return nil, err
@@ -39,9 +59,11 @@ func newUpdatePackage(ctx context.Context, r *Repository, p Package) (*UpdatePac
 	}
 
 	return &UpdatePackage{
-		r:        r,
-		p:        p,
-		packages: packages,
+		r:                 r,
+		p:                 p,
+		packages:          packages,
+		hasImagesManifest: hasImagesManifest,
+		images:            images,
 	}, nil
 }
 
@@ -51,6 +73,10 @@ func (u *UpdatePackage) Path() string {
 
 func (u *UpdatePackage) Merkle() build.MerkleRoot {
 	return u.p.Merkle()
+}
+
+func (u *UpdatePackage) HasImagesManifest() bool {
+	return u.hasImagesManifest
 }
 
 func (u *UpdatePackage) OpenPackage(ctx context.Context, path string) (Package, error) {
@@ -126,18 +152,88 @@ func (u *UpdatePackage) EditUpdatePackageWithNewSystemImage(
 		ctx,
 		dstUpdatePackagePath,
 		func(tempDir string) error {
-			if err := editUpdatePackageWithNewSystemImage(
+			// Update the update package's zbi and vbmeta to point at this system image.
+			if err := u.editUpdateImages(
 				ctx,
-				avbTool,
-				zbiTool,
-				u.r,
-				repoName,
-				&systemImage,
-				map[string]string{},
 				dstUpdatePackagePath,
-				bootfsCompression,
-				tempDir,
 				useNewUpdateFormat,
+				tempDir,
+				func(zbiPath string, vbmetaPath string) error {
+					if err := zbiTool.UpdateZBIWithNewSystemImageMerkle(
+						ctx,
+						systemImage.Merkle(),
+						zbiPath,
+						zbiPath,
+						bootfsCompression,
+					); err != nil {
+						return err
+					}
+
+					if err := avbTool.MakeVBMetaImageWithZbi(
+						ctx,
+						vbmetaPath,
+						vbmetaPath,
+						zbiPath,
+					); err != nil {
+						return err
+					}
+
+					return nil
+				},
+			); err != nil {
+				return err
+			}
+
+			// Update the `system_image/0` entry for this new system image.
+			packagesJsonPath := filepath.Join(tempDir, "packages.json")
+			return util.UpdateHashValuePackagesJSON(
+				packagesJsonPath,
+				repoName,
+				"system_image/0",
+				systemImage.Merkle(),
+			)
+		},
+	)
+}
+
+// Extracts the update package into a temporary directory, and injects the
+// specified vbmeta property files into the vbmeta.
+func (u *UpdatePackage) EditUpdatePackageWithVBMetaProperties(
+	ctx context.Context,
+	avbTool *avb.AVBTool,
+	dstUpdatePackagePath string,
+	vbmetaPropertyFiles map[string]string,
+	useNewUpdateFormat bool,
+	editFunc func(path string) error,
+) (*UpdatePackage, error) {
+	return u.EditUpdatePackage(
+		ctx,
+		dstUpdatePackagePath,
+		func(tempDir string) error {
+			if err := editFunc(tempDir); err != nil {
+				return err
+			}
+
+			// Update the update package's zbi and vbmeta to point at this system image.
+			if err := u.editUpdateImages(
+				ctx,
+				dstUpdatePackagePath,
+				useNewUpdateFormat,
+				tempDir,
+				func(zbiPath string, vbmetaPath string) error {
+					logger.Infof(ctx, "updating vbmeta %q", vbmetaPath)
+
+					if err := util.AtomicallyWriteFile(vbmetaPath, 0600, func(f *os.File) error {
+						if err := avbTool.MakeVBMetaImage(ctx, f.Name(), vbmetaPath, vbmetaPropertyFiles); err != nil {
+							return fmt.Errorf("failed to update vbmeta: %w", err)
+						}
+						return nil
+					}); err != nil {
+						return fmt.Errorf("failed to atomically overwrite %q: %w", vbmetaPath, err)
+					}
+
+					return nil
+				},
 			); err != nil {
 				return err
 			}
@@ -147,127 +243,79 @@ func (u *UpdatePackage) EditUpdatePackageWithNewSystemImage(
 	)
 }
 
-func editUpdatePackageWithNewSystemImage(
+// editUpdateImages will allow the `editFunc` to modify the zbi and vbmeta from
+// an update package, whether or not those files are in a side-package listed in
+// the images.json file, or directly embedded in the update package.
+func (u *UpdatePackage) editUpdateImages(
 	ctx context.Context,
-	avbTool *avb.AVBTool,
-	zbiTool *zbi.ZBITool,
-	repo *Repository,
-	repoName string,
-	systemImage *Package,
-	vbmetaPropertyFiles map[string]string,
 	dstUpdatePackagePath string,
-	bootfsCompression string,
-	tempDir string,
 	useNewUpdateFormat bool,
+	tempDir string,
+	editFunc func(zbiPath string, vbmetaPath string) error,
 ) error {
-	hasImages := false
-	imagesPath := filepath.Join(tempDir, "images.json")
-	images, err := util.ParseImagesJSON(imagesPath)
-	if err == nil {
-		hasImages = true
-	}
-
-	if hasImages {
-		if err := editExternalUpdatePackageWithNewSystemImage(
+	if u.hasImagesManifest {
+		if err := editUpdateImagesManifest(
 			ctx,
-			avbTool,
-			zbiTool,
-			repo,
-			systemImage,
-			vbmetaPropertyFiles,
+			u.r,
 			dstUpdatePackagePath,
-			bootfsCompression,
 			tempDir,
-			images,
+			u.images,
+			editFunc,
 		); err != nil {
-			return err
-		}
-	} else if useNewUpdateFormat {
-		imagesPath := filepath.Join(tempDir, "images.json.orig")
-		images, err := util.ParseImagesJSON(imagesPath)
-		if err != nil {
-			return err
-		}
-
-		if err := editExternalUpdatePackageWithNewSystemImage(
-			ctx,
-			avbTool,
-			zbiTool,
-			repo,
-			systemImage,
-			vbmetaPropertyFiles,
-			dstUpdatePackagePath,
-			bootfsCompression,
-			tempDir,
-			images,
-		); err != nil {
-			return err
-		}
-
-		if err := os.Remove(filepath.Join(tempDir, "zbi")); err != nil {
-			return err
-		}
-
-		if err := os.Remove(filepath.Join(tempDir, "fuchsia.vbmeta")); err != nil {
 			return err
 		}
 	} else {
-		if err := editInlinedUpdatePackageWithNewSystemImage(
-			ctx,
-			avbTool,
-			zbiTool,
-			repo,
-			repoName,
-			systemImage,
-			vbmetaPropertyFiles,
-			dstUpdatePackagePath,
-			bootfsCompression,
-			tempDir,
-		); err != nil {
-			return err
-		}
-	}
+		zbiPath := filepath.Join(tempDir, "zbi")
+		vbmetaPath := filepath.Join(tempDir, "fuchsia.vbmeta")
 
-	if systemImage != nil {
-		// Update `packages.json` to point at the new system image merkle.
-		packagesJsonPath := filepath.Join(tempDir, "packages.json")
-		if err := util.AtomicallyWriteFile(packagesJsonPath, 0600, func(f *os.File) error {
-			src, err := os.Open(packagesJsonPath)
+		if useNewUpdateFormat {
+			imagesPath := filepath.Join(tempDir, "images.json.orig")
+			f, err := os.Open(imagesPath)
 			if err != nil {
-				return fmt.Errorf("failed to open packages.json %q: %w", packagesJsonPath, err)
+				return err
 			}
-			defer src.Close()
+			defer f.Close()
 
-			if err := util.UpdateHashValuePackagesJSON(
-				bufio.NewReader(src),
-				bufio.NewWriter(f),
-				repoName,
-				"system_image/0",
-				systemImage.Merkle(),
+			images, err := util.ParseImagesJSON(f)
+			if err != nil {
+				return err
+			}
+
+			if err := editUpdateImagesManifest(
+				ctx,
+				u.r,
+				dstUpdatePackagePath,
+				tempDir,
+				images,
+				editFunc,
 			); err != nil {
-				return fmt.Errorf("failed to update system_image_merkle in package.json: %w", err)
+				return err
 			}
 
-			return nil
-		}); err != nil {
-			return fmt.Errorf("failed to atomically overwrite %q: %w", packagesJsonPath, err)
+			if err := os.Remove(zbiPath); err != nil {
+				return err
+			}
+
+			if err := os.Remove(vbmetaPath); err != nil {
+				return err
+			}
+		} else {
+			if err := editFunc(zbiPath, vbmetaPath); err != nil {
+				return err
+			}
 		}
 	}
 
 	return nil
 }
 
-func editExternalUpdatePackageWithNewSystemImage(
+func editUpdateImagesManifest(
 	ctx context.Context,
-	avbTool *avb.AVBTool,
-	zbiTool *zbi.ZBITool,
 	repo *Repository,
-	systemImage *Package,
-	vbmetaPropertyFiles map[string]string,
 	dstUpdatePackagePath string,
-	bootfsCompression string,
 	tempDir string,
 	images util.ImagesManifest,
+	editFunc func(zbiPath string, vbmetaPath string) error,
 ) error {
 	dstUpdatePackageParts := strings.Split(dstUpdatePackagePath, "/")
 	dstUpdatePackageName := dstUpdatePackageParts[0]
@@ -275,7 +323,7 @@ func editExternalUpdatePackageWithNewSystemImage(
 	// Create a new zbi+vbmeta package that points at the system image package.
 	srcZbiUrl, srcZbiMerkle, err := images.GetPartition("fuchsia", "zbi")
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to read zbi from images manifest: %w", err)
 	}
 
 	if srcZbiUrl.Fragment == "" {
@@ -284,7 +332,7 @@ func editExternalUpdatePackageWithNewSystemImage(
 
 	srcVbmetaUrl, srcVbmetaMerkle, err := images.GetPartition("fuchsia", "vbmeta")
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to read vbmeta from images manifest: %w", err)
 	}
 
 	if srcVbmetaUrl.Fragment == "" {
@@ -297,99 +345,64 @@ func editExternalUpdatePackageWithNewSystemImage(
 		return fmt.Errorf("zbi and vbmeta package must be the same: %s != %s", srcZbiUrl, srcVbmetaUrl)
 	}
 
-	srcZbiPackage, err := newPackage(ctx, repo, srcZbiUrl.Path[1:], srcZbiMerkle)
+	srcImagesPath := srcZbiUrl.Path[1:]
+	srcImagesPackage, err := newPackage(ctx, repo, srcImagesPath, srcZbiMerkle)
 	if err != nil {
-		return fmt.Errorf("could not parse package %s: %w", srcZbiUrl, err)
+		return fmt.Errorf("could not parse package %s: %w", srcImagesPath, err)
 	}
 
 	// Create a new zbi+vbmeta package
-	dstZbiPackagePath := fmt.Sprintf("%s_images_fuchsia", dstUpdatePackageName)
-	dstZbiPackage, err := repo.EditPackage(
+	dstImagesPackagePath := fmt.Sprintf("%s_images_fuchsia", dstUpdatePackageName)
+	dstImagesPackage, err := repo.EditPackage(
 		ctx,
-		srcZbiPackage,
-		dstZbiPackagePath,
-		func(zbiTempDir string) error {
-			// Inject the new system image merkle into the zbi.
-			zbiPath := filepath.Join(zbiTempDir, srcZbiUrl.Fragment)
-			vbmetaPath := filepath.Join(zbiTempDir, srcVbmetaUrl.Fragment)
+		srcImagesPackage,
+		dstImagesPackagePath,
+		func(imagesTempDir string) error {
+			zbiPath := filepath.Join(imagesTempDir, srcZbiUrl.Fragment)
+			vbmetaPath := filepath.Join(imagesTempDir, srcVbmetaUrl.Fragment)
 
-			if systemImage != nil {
-				if err := zbiTool.UpdateZBIWithNewSystemImageMerkle(
-					ctx,
-					systemImage.Merkle(),
-					zbiPath,
-					zbiPath,
-					bootfsCompression,
-				); err != nil {
-					return err
-				}
-
-				if err := avbTool.MakeVBMetaImageWithZbi(
-					ctx,
-					vbmetaPath,
-					vbmetaPath,
-					zbiPath,
-				); err != nil {
-					return err
-				}
-			}
-
-			if len(vbmetaPropertyFiles) != 0 {
-				logger.Infof(ctx, "updating vbmeta %q", vbmetaPath)
-
-				if err := util.AtomicallyWriteFile(vbmetaPath, 0600, func(f *os.File) error {
-					if err := avbTool.MakeVBMetaImage(ctx, f.Name(), vbmetaPath, vbmetaPropertyFiles); err != nil {
-						return fmt.Errorf("failed to update vbmeta: %w", err)
-					}
-					return nil
-				}); err != nil {
-					return fmt.Errorf("failed to atomically overwrite %q: %w", vbmetaPath, err)
-				}
-			}
-
-			return nil
+			return editFunc(zbiPath, vbmetaPath)
 		},
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create fuchsia images package: %w", err)
 	}
 
 	// Update the zbi partition entry.
 	dstZbiUrl := fmt.Sprintf(
 		"fuchsia-pkg://%s/%s?hash=%s#%s",
 		srcZbiUrl.Host,
-		dstZbiPackage.Path(),
-		dstZbiPackage.Merkle(),
+		dstImagesPackage.Path(),
+		dstImagesPackage.Merkle(),
 		srcZbiUrl.Fragment,
 	)
 	logger.Infof(ctx, "updating update image zbi package url to %s", dstZbiUrl)
 
-	zbiBlobPath, err := dstZbiPackage.FilePath(ctx, srcZbiUrl.Fragment)
+	zbiBlobPath, err := dstImagesPackage.FilePath(ctx, srcZbiUrl.Fragment)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to find zbi blob path for %s: %w", srcZbiUrl.Fragment, err)
 	}
 
 	if err := images.SetPartition("fuchsia", "zbi", dstZbiUrl, zbiBlobPath); err != nil {
-		return err
+		return fmt.Errorf("failed to set zbi partition: %w", err)
 	}
 
-	// Update the vbmeta partition entry.
 	dstVbmetaUrl := fmt.Sprintf(
 		"fuchsia-pkg://%s/%s?hash=%s#%s",
 		srcVbmetaUrl.Host,
-		dstZbiPackage.Path(),
-		dstZbiPackage.Merkle(),
+		dstImagesPackage.Path(),
+		dstImagesPackage.Merkle(),
 		srcVbmetaUrl.Fragment,
 	)
 	logger.Infof(ctx, "updating update image vbmeta package url to %s", dstVbmetaUrl)
 
-	vbmetaBlobPath, err := dstZbiPackage.FilePath(ctx, srcVbmetaUrl.Fragment)
+	vbmetaBlobPath, err := dstImagesPackage.FilePath(ctx, srcVbmetaUrl.Fragment)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to find zbi blob path for %s: %w", srcVbmetaUrl.Fragment, err)
 	}
 
 	if err := images.SetPartition("fuchsia", "vbmeta", dstVbmetaUrl, vbmetaBlobPath); err != nil {
-		return err
+		return fmt.Errorf("failed to set vbmeta partition: %w", err)
 	}
 
 	imagesPath := filepath.Join(tempDir, "images.json")
@@ -400,182 +413,165 @@ func editExternalUpdatePackageWithNewSystemImage(
 	return nil
 }
 
-func editInlinedUpdatePackageWithNewSystemImage(
-	ctx context.Context,
-	avbTool *avb.AVBTool,
-	zbiTool *zbi.ZBITool,
-	repo *Repository,
-	repoName string,
-	systemImage *Package,
-	vbmetaPropertyFiles map[string]string,
-	dstUpdatePackagePath string,
-	bootfsCompression string,
-	tempDir string,
-) error {
-	vbmetaPath := filepath.Join(tempDir, "fuchsia.vbmeta")
+// OtaMaxNeededSize returns the maximum space needed to OTA this update package
+// onto a device.
+func (u *UpdatePackage) OtaMaxNeededSize(ctx context.Context) (int64, error) {
+	// The system updater flow is currently:
+	//
+	// * Download the update package.
+	// * If the update package contains an images manifest:
+	//   * Download all the update image packages.
+	//   * Install the update images.
+	//   * GC the update image packages.
+	// * Download the system image packages.
+	//
+	// Therefore, the maximum space we need available in blobfs to install
+	// an OTA is `update + max(images, system image)`.
 
-	if systemImage != nil {
-		zbiPath := filepath.Join(tempDir, "zbi")
-		if err := zbiTool.UpdateZBIWithNewSystemImageMerkle(
-			ctx,
-			systemImage.Merkle(),
-			zbiPath,
-			zbiPath,
-			bootfsCompression,
-		); err != nil {
-			return err
-		}
-
-		if err := avbTool.MakeVBMetaImageWithZbi(ctx, vbmetaPath, vbmetaPath, zbiPath); err != nil {
-			return err
-		}
-
-		packagesJsonPath := filepath.Join(tempDir, "packages.json")
-		if err := util.AtomicallyWriteFile(packagesJsonPath, 0600, func(f *os.File) error {
-			src, err := os.Open(packagesJsonPath)
-			if err != nil {
-				return fmt.Errorf("failed to open packages.json %q: %w", packagesJsonPath, err)
-			}
-			defer src.Close()
-
-			if err := util.UpdateHashValuePackagesJSON(
-				bufio.NewReader(src),
-				bufio.NewWriter(f),
-				repoName,
-				"system_image/0",
-				systemImage.Merkle(),
-			); err != nil {
-				return fmt.Errorf("failed to update system_image_merkle in package.json: %w", err)
-			}
-
-			return nil
-		}); err != nil {
-			return fmt.Errorf("failed to atomically overwrite %q: %w", packagesJsonPath, err)
-		}
-	}
-
-	if len(vbmetaPropertyFiles) != 0 {
-		if _, err := os.Stat(vbmetaPath); err != nil {
-			return fmt.Errorf("vbmeta %q does not exist in repo: %w", vbmetaPath, err)
-		}
-
-		logger.Infof(ctx, "updating vbmeta %q", vbmetaPath)
-
-		if err := util.AtomicallyWriteFile(vbmetaPath, 0600, func(f *os.File) error {
-			if err := avbTool.MakeVBMetaImage(ctx, f.Name(), vbmetaPath, vbmetaPropertyFiles); err != nil {
-				return fmt.Errorf("failed to update vbmeta: %w", err)
-			}
-			return nil
-		}); err != nil {
-			return fmt.Errorf("failed to atomically overwrite %q: %w", vbmetaPath, err)
-		}
-	}
-
-	return nil
-}
-
-func copyFile(srcPath string, dstPath string) error {
-	src, err := os.Open(srcPath)
+	updateImagesSize, err := u.UpdateAndImagesSize(ctx)
 	if err != nil {
-		return err
+		return 0, err
 	}
-	defer src.Close()
 
-	dst, err := os.Open(dstPath)
+	systemImageSize, err := u.UpdateAndSystemImageSize(ctx)
 	if err != nil {
-		return err
-	}
-	defer dst.Close()
-
-	if _, err := io.Copy(src, dst); err != nil {
-		return err
+		return 0, err
 	}
 
-	return nil
+	if systemImageSize < updateImagesSize {
+		return updateImagesSize, nil
+	} else {
+		return systemImageSize, nil
+	}
 }
 
-// Extracts the update package into a temporary directory, and injects the
-// specified vbmeta property files into the vbmeta.
-func (u *UpdatePackage) EditUpdatePackageWithVBMetaProperties(
-	ctx context.Context,
-	avbTool *avb.AVBTool,
-	dstUpdatePath string,
-	vbmetaPropertyFiles map[string]string,
-	editFunc func(path string) error,
-) (*UpdatePackage, error) {
-	return u.EditUpdatePackage(
-		ctx,
-		dstUpdatePath,
-		func(tempDir string) error {
-			if err := editFunc(tempDir); err != nil {
-				return err
-			}
+// UpdateImagesSize returns the transitive space needed to install the update
+// package and all the blobs in update images.
+func (u *UpdatePackage) UpdateAndImagesSize(ctx context.Context) (int64, error) {
+	visitedPackages := make(map[build.MerkleRoot]struct{})
 
-			if err := editUpdatePackageWithNewSystemImage(
-				ctx,
-				avbTool,
-				nil,
-				u.r,
-				"fuchsia.com",
-				nil,
-				vbmetaPropertyFiles,
-				dstUpdatePath,
-				"",
-				tempDir,
-				false,
-			); err != nil {
-				return err
-			}
-
-			return nil
-		},
-	)
-}
-
-func (u *UpdatePackage) OtaSize(ctx context.Context) (int64, error) {
+	// This will contain all the blobs in the update package and the update
+	// image packages, and any of their subpackages.
 	blobs := u.p.Blobs()
 
-	// Next, find all the packages in the update package.
-	packageMerkles := []build.MerkleRoot{}
-	for _, merkle := range u.packages {
-		packageMerkles = append(packageMerkles, merkle)
+	if err := u.transitiveUpdateImagesBlobs(ctx, visitedPackages, blobs); err != nil {
+		return 0, err
 	}
 
-	// Walk through all the packages and subpackages and gather up all the blobs.
+	return u.totalBlobSize(ctx, blobs)
+}
+
+// SystemImageSize returns the transitive space needed to store the update
+// package and all the blobs in the system image. It does not include the
+// update image package blobs, since those are garbage collected during the
+// OTA.
+func (u *UpdatePackage) UpdateAndSystemImageSize(ctx context.Context) (int64, error) {
 	visitedPackages := make(map[build.MerkleRoot]struct{})
-	for {
-		if len(packageMerkles) == 0 {
-			break
-		}
 
-		// Pop a merkle from the list.
-		index := len(packageMerkles) - 1
-		merkle := packageMerkles[index]
-		packageMerkles = packageMerkles[:index]
+	// This will contain all the blobs in the update package and the system
+	// image packages, and any of their subpackages.
+	blobs := u.p.Blobs()
 
-		// Skip if we've already processed this merkle.
-		if _, ok := visitedPackages[merkle]; ok {
-			continue
-		}
-		visitedPackages[merkle] = struct{}{}
+	if err := u.transitiveSystemImageBlobs(ctx, visitedPackages, blobs); err != nil {
+		return 0, err
+	}
 
-		// Open up each package and add its blobs to our set.
-		p, err := newPackage(ctx, u.r, "", merkle)
+	return u.totalBlobSize(ctx, blobs)
+}
+
+func (u *UpdatePackage) transitiveUpdateImagesBlobs(
+	ctx context.Context,
+	visitedPackages map[build.MerkleRoot]struct{},
+	blobs map[build.MerkleRoot]struct{},
+) error {
+	if f, err := u.p.Open(ctx, "images.json"); err == nil {
+		defer f.Close()
+
+		images, err := util.ParseImagesJSON(f)
 		if err != nil {
-			return 0, err
+			return err
 		}
 
-		for blob := range p.Blobs() {
-			blobs[blob] = struct{}{}
+		for _, partition := range images.Contents.Partitions {
+			_, merkle, err := util.ParsePackageUrl(partition.Url)
+			if err != nil {
+				return err
+			}
+
+			if err := u.transitivePackageBlobs(ctx, visitedPackages, blobs, merkle); err != nil {
+				return err
+			}
 		}
 
-		// Push any subpackages onto our stack.
-		for _, subpackageMerkle := range p.Subpackages() {
-			packageMerkles = append(packageMerkles, subpackageMerkle)
+		for _, firmware := range images.Contents.Firmware {
+			_, merkle, err := util.ParsePackageUrl(firmware.Url)
+			if err != nil {
+				return err
+			}
+
+			if err := u.transitivePackageBlobs(ctx, visitedPackages, blobs, merkle); err != nil {
+				return err
+			}
+		}
+
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+
+	return nil
+}
+
+func (u *UpdatePackage) transitiveSystemImageBlobs(
+	ctx context.Context,
+	visitedPackages map[build.MerkleRoot]struct{},
+	blobs map[build.MerkleRoot]struct{},
+) error {
+	for _, merkle := range u.packages {
+		if err := u.transitivePackageBlobs(ctx, visitedPackages, blobs, merkle); err != nil {
+			return err
 		}
 	}
 
-	// Finally sum up all the blob sizes from the blob store.
+	return nil
+}
+
+func (u *UpdatePackage) transitivePackageBlobs(
+	ctx context.Context,
+	visitedPackages map[build.MerkleRoot]struct{},
+	blobs map[build.MerkleRoot]struct{},
+	merkle build.MerkleRoot,
+) error {
+	// Exit early if we've already processed this package.
+	if _, ok := visitedPackages[merkle]; ok {
+		return nil
+	}
+	visitedPackages[merkle] = struct{}{}
+
+	// Open up each package and add its blobs to our set.
+	p, err := newPackage(ctx, u.r, "", merkle)
+	if err != nil {
+		return err
+	}
+
+	for blob := range p.Blobs() {
+		blobs[blob] = struct{}{}
+	}
+
+	// Recurse into any subpackages.
+	for _, subpackageMerkle := range p.Subpackages() {
+		if err := u.transitivePackageBlobs(ctx, visitedPackages, blobs, subpackageMerkle); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// totalBlobSize sums up all the blob sizes from the blob store.
+func (u *UpdatePackage) totalBlobSize(
+	ctx context.Context,
+	blobs map[build.MerkleRoot]struct{},
+) (int64, error) {
 	totalSize := int64(0)
 	for blob := range blobs {
 		size, err := u.r.BlobSize(ctx, blob)

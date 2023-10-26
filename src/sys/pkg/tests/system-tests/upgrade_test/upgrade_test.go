@@ -587,7 +587,12 @@ func otaToPackage(
 		)
 	}
 
-	u, err := c.installerConfig.Updater(repo, dstUpdatePackageUrl, checkForUnknownFirmware)
+	u, err := c.installerConfig.Updater(
+		repo,
+		dstUpdatePackageUrl,
+		checkForUnknownFirmware,
+		c.useNewUpdateFormat,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to create updater: %w", err)
 	}
@@ -647,11 +652,23 @@ func AddRandomFilesToUpdate(
 		return nil, packages.Package{}, fmt.Errorf("error extracting expected system image merkle: %w", err)
 	}
 
-	otaSize, err := srcUpdate.OtaSize(ctx)
+	otaSize, err := srcUpdate.OtaMaxNeededSize(ctx)
 	if err != nil {
 		return nil, packages.Package{}, fmt.Errorf("failed to compute size of the OTA: %w", err)
 	}
 	logger.Infof(ctx, "OTA size of %s: %d", srcUpdate.Path(), otaSize)
+
+	updateImagesSize, err := srcUpdate.UpdateAndImagesSize(ctx)
+	if err != nil {
+		return nil, packages.Package{}, fmt.Errorf("failed to compute size of the update images: %w", err)
+	}
+	logger.Infof(ctx, "Update images size of %s: %d", srcUpdate.Path(), updateImagesSize)
+
+	systemImageSize, err := srcUpdate.UpdateAndSystemImageSize(ctx)
+	if err != nil {
+		return nil, packages.Package{}, fmt.Errorf("failed to compute size of the system image: %w", err)
+	}
+	logger.Infof(ctx, "System image size of %s: %d", srcUpdate.Path(), systemImageSize)
 
 	if c.maxOtaSize == 0 {
 		// We just want to add a random file or so to the update package so
@@ -792,7 +809,7 @@ func GenerateUpdatePackageWithRandomFiles(
 		)
 	}
 
-	otaSize, err := dstUpdate.OtaSize(ctx)
+	otaSize, err := dstUpdate.OtaMaxNeededSize(ctx)
 	if err != nil {
 		return nil, packages.Package{}, 0, fmt.Errorf("failed to compute size of the OTA: %w", err)
 	}
@@ -801,6 +818,28 @@ func GenerateUpdatePackageWithRandomFiles(
 		"Created update package %s with OTA size %d",
 		dstUpdate.Path(),
 		otaSize,
+	)
+
+	updateImagesSize, err := dstUpdate.UpdateAndImagesSize(ctx)
+	if err != nil {
+		return nil, packages.Package{}, 0, fmt.Errorf("failed to compute size of the update images: %w", err)
+	}
+	logger.Infof(
+		ctx,
+		"Created update package %s with update images size: %d",
+		dstUpdate.Path(),
+		updateImagesSize,
+	)
+
+	systemImageSize, err := dstUpdate.UpdateAndSystemImageSize(ctx)
+	if err != nil {
+		return nil, packages.Package{}, 0, fmt.Errorf("failed to compute size of the system image: %w", err)
+	}
+	logger.Infof(
+		ctx,
+		"Created update package %s with system image size: %d",
+		dstUpdate.Path(),
+		systemImageSize,
 	)
 
 	return dstUpdate, dstSystemImage, otaSize, nil

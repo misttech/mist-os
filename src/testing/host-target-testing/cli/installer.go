@@ -181,7 +181,12 @@ func (c *InstallerConfig) ConfigureBuild(ctx context.Context, device *device.Cli
 }
 
 // Updater returns the configured updater.
-func (c *InstallerConfig) Updater(repo *packages.Repository, updatePackageURL string, checkForUnkownFirmware bool) (updater.Updater, error) {
+func (c *InstallerConfig) Updater(
+	repo *packages.Repository,
+	updatePackageURL string,
+	checkForUnkownFirmware bool,
+	useNewUpdateFormat bool,
+) (updater.Updater, error) {
 	switch c.installerMode {
 	case Omaha:
 		avbTool, err := c.AVBTool()
@@ -194,10 +199,23 @@ func (c *InstallerConfig) Updater(repo *packages.Repository, updatePackageURL st
 			return nil, err
 		}
 
-		return updater.NewOmahaUpdater(repo, updatePackageURL, c.omahaTool, avbTool, zbiTool, c.workaroundOtaNoRewriteRules, checkForUnkownFirmware)
+		return updater.NewOmahaUpdater(
+			repo,
+			updatePackageURL,
+			c.omahaTool,
+			avbTool,
+			zbiTool,
+			c.workaroundOtaNoRewriteRules,
+			checkForUnkownFirmware,
+			useNewUpdateFormat,
+		)
 
 	case SystemUpdateChecker:
-		return updater.NewSystemUpdateChecker(repo, updatePackageURL, checkForUnkownFirmware), nil
+		return updater.NewSystemUpdateChecker(
+			repo,
+			updatePackageURL,
+			checkForUnkownFirmware,
+		), nil
 
 	case SystemUpdater:
 		return updater.NewSystemUpdater(repo, updatePackageURL, checkForUnkownFirmware), nil
