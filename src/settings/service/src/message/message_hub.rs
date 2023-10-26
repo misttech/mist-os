@@ -481,8 +481,6 @@ impl MessageHub {
                     responder.send(Ok((MessengerClient::new(messenger, fuse), receptor)));
                 #[allow(clippy::redundant_pattern_matching)]
                 if let Err(_) = response_result {
-                    // TODO(fxbug.dev/85529) Track whether this is common, if so, bubble the error
-                    // up.
                     tracing::warn!(
                         "Receiving end of oneshot closed while trying to create messenger client \
                             for client with id: {}",
