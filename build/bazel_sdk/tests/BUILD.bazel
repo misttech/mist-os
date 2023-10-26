@@ -7,6 +7,7 @@ test_suite(
     tags = ["all"],
     tests = [
         ":assembly_tests",
+        ":cpp_variants_tests",
         ":licenses_tests",
         "//fuchsia/api_levels:tests",
         "//fuchsia/drivers:tests",
@@ -35,6 +36,15 @@ test_suite(
         "//fuchsia/licenses/spdx_dedup:golden_test",
         "//tools/licenses:classification_types_test",
         "//tools/licenses:spdx_types_test",
+    ],
+)
+
+test_suite(
+    name = "cpp_variants_tests",
+    tests = [
+        "//fuchsia/cpp_variants:cc_17_all",
+        "//fuchsia/cpp_variants:cc_17_shadow",
+        "//fuchsia/cpp_variants:cc_20_all",
     ],
 )
 
