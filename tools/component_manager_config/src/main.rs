@@ -3,9 +3,8 @@
 // found in the LICENSE file.
 
 use cml::error::Error;
-
-mod compile;
+use component_manager_config::compile;
 
 fn main() -> Result<(), Error> {
-    compile::from_args()
+    compile(argh::from_env())
 }

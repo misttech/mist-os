@@ -727,27 +727,25 @@ impl TryInto<Config> for ProductConfig {
     }
 }
 
-#[derive(Debug, Default, FromArgs)]
 /// Create a binary config and populate it with data from .json file.
-struct Args {
+#[derive(Debug, Default, FromArgs)]
+pub struct Args {
     /// path to a JSON configuration file
     #[argh(option)]
-    input: Vec<PathBuf>,
+    pub input: Vec<PathBuf>,
 
     /// path to a product-specific JSON configuration file
     #[argh(option)]
-    product: Vec<PathBuf>,
+    pub product: Vec<PathBuf>,
 
     /// path to the output binary config file
     #[argh(option)]
-    output: PathBuf,
+    pub output: PathBuf,
 }
 
-pub fn from_args() -> Result<(), Error> {
-    compile(argh::from_env())
-}
-
-fn compile(args: Args) -> Result<(), Error> {
+/// Compile multiple platform configs with an optional product config, and generate a file that can
+/// be added to BootFS for component_manager to use at runtime.
+pub fn compile(args: Args) -> Result<(), Error> {
     let configs =
         args.input.iter().map(Config::from_json_file).collect::<Result<Vec<Config>, _>>()?;
     let mut config_json =
