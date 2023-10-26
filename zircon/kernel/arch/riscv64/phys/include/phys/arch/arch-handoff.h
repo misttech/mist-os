@@ -21,6 +21,9 @@ struct ArchPhysHandoff {
   // (ZBI_TYPE_KERNEL_DRIVER, ZBI_KERNEL_DRIVER_RISCV_PLIC) payload.
   ktl::optional<zbi_dcfg_riscv_plic_driver_t> plic_driver;
 
+  // (ZBI_TYPE_KERNEL_DRIVER, ZBI_KERNEL_DRIVER_ARM_GIC_V2) payload.
+  ktl::optional<zbi_dcfg_arm_gic_v2_driver_t> gic_driver;
+
   // (ZBI_TYPE_KERNEL_DRIVER, ZBI_KERNEL_DRIVER_RISCV_GENERIC_TIMER) payload.
   ktl::optional<zbi_dcfg_riscv_generic_timer_driver_t> generic_timer_driver;
 };

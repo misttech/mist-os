@@ -8,6 +8,7 @@
 
 #include <dev/hw_watchdog/generic32/init.h>
 #include <dev/init.h>
+#include <dev/interrupt/arm_gicv2_init.h>
 #include <dev/uart/dw8250/init.h>
 #include <dev/uart/motmot/init.h>
 #include <ktl/type_traits.h>
@@ -25,6 +26,10 @@ void PlatformDriverHandoffEarly(const ArchPhysHandoff& arch_handoff) {
   if (arch_handoff.plic_driver) {
     PLICInitEarly(arch_handoff.plic_driver.value());
   }
+  if (arch_handoff.gic_driver) {
+    ArmGicInitEarly(arch_handoff.gic_driver.value());
+  }
+
   if (arch_handoff.generic_timer_driver) {
     riscv_generic_timer_init_early(arch_handoff.generic_timer_driver.value());
   }
@@ -33,6 +38,9 @@ void PlatformDriverHandoffEarly(const ArchPhysHandoff& arch_handoff) {
 void PlatformDriverHandoffLate(const ArchPhysHandoff& arch_handoff) {
   if (arch_handoff.plic_driver) {
     PLICInitLate();
+  }
+  if (arch_handoff.gic_driver) {
+    ArmGicInitLate(arch_handoff.gic_driver.value());
   }
 }
 
