@@ -31,6 +31,42 @@ use tokio::sync::mpsc::Sender;
 use usb_bulk::AsyncInterface;
 
 ///////////////////////////////////////////////////////////////////////////////
+// ConnectionFactory
+//
+
+pub enum FastbootConnectionKind {
+    Usb(String),
+    Tcp(SocketAddr),
+    Udp(SocketAddr),
+}
+
+#[async_trait(?Send)]
+pub trait FastbootConnectionFactory {
+    async fn build_interface(
+        &self,
+        connection: FastbootConnectionKind,
+    ) -> Result<Box<dyn FastbootInterface>>;
+}
+
+pub struct ConnectionFactory {}
+
+#[async_trait(?Send)]
+impl FastbootConnectionFactory for ConnectionFactory {
+    async fn build_interface(
+        &self,
+        connection: FastbootConnectionKind,
+    ) -> Result<Box<dyn FastbootInterface>> {
+        match connection {
+            FastbootConnectionKind::Usb(serial_number) => {
+                Ok(Box::new(usb_proxy(serial_number).await?))
+            }
+            FastbootConnectionKind::Tcp(addr) => Ok(Box::new(tcp_proxy(&addr).await?)),
+            FastbootConnectionKind::Udp(addr) => Ok(Box::new(udp_proxy(&addr).await?)),
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
 // AsyncInterface
 //
 

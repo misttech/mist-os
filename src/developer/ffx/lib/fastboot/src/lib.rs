@@ -16,6 +16,7 @@ pub mod usb_discovery;
 // tests
 pub mod test {
     use crate::{
+        common::fastboot::{FastbootConnectionFactory, FastbootConnectionKind},
         common::fastboot_interface::{
             Fastboot, FastbootInterface, RebootEvent, UploadProgress, Variable,
         },
@@ -175,5 +176,25 @@ pub mod test {
         let state = Arc::new(Mutex::new(FakeServiceCommands::default()));
         let interface = TestFastbootInterface { state: state.clone() };
         (state, interface)
+    }
+
+    pub struct TestConnectionFactory {
+        state: Arc<Mutex<FakeServiceCommands>>,
+    }
+
+    #[async_trait(?Send)]
+    impl FastbootConnectionFactory for TestConnectionFactory {
+        async fn build_interface(
+            &self,
+            _connection: FastbootConnectionKind,
+        ) -> Result<Box<dyn FastbootInterface>> {
+            Ok(Box::new(TestFastbootInterface { state: self.state.clone() }))
+        }
+    }
+
+    pub fn setup_connection_factory(
+    ) -> (Arc<Mutex<FakeServiceCommands>>, impl FastbootConnectionFactory) {
+        let state = Arc::new(Mutex::new(FakeServiceCommands::default()));
+        (state.clone(), TestConnectionFactory { state: state.clone() })
     }
 }
