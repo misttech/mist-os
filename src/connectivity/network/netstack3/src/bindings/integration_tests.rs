@@ -9,22 +9,30 @@ use std::{
 
 use assert_matches::assert_matches;
 use fidl_fuchsia_net as fidl_net;
-use fidl_fuchsia_net_ext::IntoExt;
+use fidl_fuchsia_net_ext::IntoExt as _;
+use fidl_fuchsia_net_neighbor as fnet_neighbor;
 use fidl_fuchsia_net_stack as fidl_net_stack;
 use fidl_fuchsia_net_stack_ext::FidlReturn as _;
 use fidl_fuchsia_netemul_network as net;
 use fuchsia_async as fasync;
 use futures::{channel::mpsc, StreamExt as _, TryFutureExt as _};
-use net_declare::{net_ip_v4, net_ip_v6, net_subnet_v4, net_subnet_v6};
+use net_declare::{net_ip_v4, net_ip_v6, net_mac, net_subnet_v4, net_subnet_v6};
 use net_types::{
-    ip::{AddrSubnetEither, Ip, IpAddress, Ipv4, Ipv6},
-    SpecifiedAddr,
+    ethernet::Mac,
+    ip::{AddrSubnetEither, Ip, IpAddr, IpAddress, Ipv4, Ipv6},
+    SpecifiedAddr, Witness as _,
 };
 use netstack3_core::{
     add_ip_addr_subnet,
-    device::{insert_static_neighbor_entry, update_ipv6_configuration},
+    device::{
+        ethernet::resolve_ethernet_link_addr, insert_static_neighbor_entry,
+        update_ipv6_configuration, DeviceId,
+    },
     ip::{
-        device::{slaac::STABLE_IID_SECRET_KEY_BYTES, Ipv6DeviceConfigurationUpdate},
+        device::{
+            nud::LinkResolutionResult, slaac::STABLE_IID_SECRET_KEY_BYTES,
+            Ipv6DeviceConfigurationUpdate,
+        },
         types::{AddableEntry, AddableEntryEither, AddableMetric, RawMetric},
     },
 };
@@ -42,7 +50,7 @@ use crate::bindings::{
     devices::{BindingId, Devices},
     routes,
     util::{ConversionContext as _, IntoFidl as _, TryIntoFidlWithContext as _},
-    Ctx, TimerId, DEFAULT_INTERFACE_METRIC, LOOPBACK_NAME,
+    Ctx, DEFAULT_INTERFACE_METRIC, LOOPBACK_NAME,
 };
 
 struct LogFormatter;
@@ -141,6 +149,7 @@ impl_service_marker!(fidl_fuchsia_net_filter::FilterMarker, Filter);
 impl_service_marker!(fidl_fuchsia_net_interfaces::StateMarker, Interfaces);
 impl_service_marker!(fidl_fuchsia_net_interfaces_admin::InstallerMarker, InterfacesAdmin);
 impl_service_marker!(fidl_fuchsia_net_neighbor::ViewMarker, Neighbor);
+impl_service_marker!(fidl_fuchsia_net_neighbor::ControllerMarker, NeighborController);
 impl_service_marker!(fidl_fuchsia_posix_socket_packet::ProviderMarker, PacketSocket);
 impl_service_marker!(fidl_fuchsia_posix_socket_raw::ProviderMarker, RawSocket);
 impl_service_marker!(fidl_fuchsia_net_root::InterfacesMarker, RootInterfaces);
@@ -1013,22 +1022,24 @@ async fn test_neighbor_table_inspect() {
         let devices: &Devices<_> = non_sync_ctx.as_ref();
         let device = devices.get_core_id(bindings_id).expect("get_core_id failed");
         let v4_neigh_addr = net_ip_v4!("192.168.0.1");
-        let v4_neigh_mac = net_types::ethernet::Mac::new([0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF]);
-        insert_static_neighbor_entry::<
-            Ipv4,
-            packet::Buf<Vec<u8>>,
-            TimerId<BindingsNonSyncCtxImpl>,
-            BindingsNonSyncCtxImpl,
-        >(sync_ctx, non_sync_ctx, &device, v4_neigh_addr, v4_neigh_mac)
+        let v4_neigh_mac = net_mac!("AA:BB:CC:DD:EE:FF");
+        insert_static_neighbor_entry::<Ipv4, BindingsNonSyncCtxImpl>(
+            sync_ctx,
+            non_sync_ctx,
+            &device,
+            v4_neigh_addr,
+            v4_neigh_mac,
+        )
         .expect("failed to insert static neighbor entry");
         let v6_neigh_addr = net_ip_v6!("2001:DB8::1");
-        let v6_neigh_mac = net_types::ethernet::Mac::new([0x11, 0x22, 0x33, 0x44, 0x55, 0x66]);
-        insert_static_neighbor_entry::<
-            Ipv6,
-            packet::Buf<Vec<u8>>,
-            TimerId<BindingsNonSyncCtxImpl>,
-            BindingsNonSyncCtxImpl,
-        >(sync_ctx, non_sync_ctx, &device, v6_neigh_addr, v6_neigh_mac)
+        let v6_neigh_mac = net_mac!("00:11:22:33:44:55");
+        insert_static_neighbor_entry::<Ipv6, BindingsNonSyncCtxImpl>(
+            sync_ctx,
+            non_sync_ctx,
+            &device,
+            v6_neigh_addr,
+            v6_neigh_mac,
+        )
         .expect("failed to insert static neighbor entry");
     });
     let inspector = test_stack.inspector();
@@ -1046,11 +1057,83 @@ async fn test_neighbor_table_inspect() {
                 "1": {
                     IpAddress: "2001:db8::1",
                     State: "Static",
-                    LinkAddress: "11:22:33:44:55:66",
+                    LinkAddress: "00:11:22:33:44:55",
                 },
             },
         }
     });
+
+    t
+}
+
+trait IpExt: Ip {
+    const ADDR: SpecifiedAddr<Self::Addr>;
+}
+
+impl IpExt for Ipv4 {
+    const ADDR: SpecifiedAddr<Self::Addr> =
+        unsafe { SpecifiedAddr::new_unchecked(net_ip_v4!("192.0.2.1")) };
+}
+
+impl IpExt for Ipv6 {
+    const ADDR: SpecifiedAddr<Self::Addr> =
+        unsafe { SpecifiedAddr::new_unchecked(net_ip_v6!("2001:db8::1")) };
+}
+
+// TODO(https://fxbug.dev/135211): Use ip_test when it supports async.
+#[fixture::teardown(TestSetup::shutdown)]
+#[fasync::run_singlethreaded(test)]
+async fn add_neighbor_entry_v4() {
+    add_neighbor_entry::<Ipv4>().await
+}
+
+// TODO(https://fxbug.dev/135211): Use ip_test when it supports async.
+#[fixture::teardown(TestSetup::shutdown)]
+#[fasync::run_singlethreaded(test)]
+async fn add_neighbor_entry_v6() {
+    add_neighbor_entry::<Ipv6>().await
+}
+
+async fn add_neighbor_entry<I: Ip + IpExt>() -> TestSetup {
+    const EP_IDX: usize = 1;
+    let mut t = TestSetupBuilder::new()
+        .add_endpoint()
+        .add_stack(StackSetupBuilder::new().add_endpoint(EP_IDX, None))
+        .build()
+        .await;
+
+    let test_stack = t.get(0);
+    let bindings_id = test_stack.get_endpoint_id(EP_IDX);
+    let mut ctx = test_stack.ctx();
+    let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
+    let devices: &Devices<_> = non_sync_ctx.as_ref();
+    let ethernet_device_id = assert_matches!(
+        devices.get_core_id(bindings_id).expect("get core id"),
+        DeviceId::Ethernet(ethernet_device_id) => ethernet_device_id
+    );
+    let observer = assert_matches!(
+        resolve_ethernet_link_addr::<I, _>(
+            sync_ctx,
+            non_sync_ctx,
+            &ethernet_device_id,
+            &I::ADDR
+        ),
+        LinkResolutionResult::Pending(observer) => observer
+    );
+    let controller = test_stack.connect_proxy::<fnet_neighbor::ControllerMarker>();
+    const MAC: Mac = net_mac!("00:11:22:33:44:55");
+    controller
+        .add_entry(bindings_id.into(), &IpAddr::from(I::ADDR.get()).into_ext(), &MAC.into_ext())
+        .await
+        .expect("add_entry FIDL")
+        .expect("add_entry");
+    assert_eq!(
+        observer
+            .await
+            .expect("address resolution should not be cancelled")
+            .expect("address resolution should succeed after adding static entry"),
+        MAC,
+    );
 
     t
 }

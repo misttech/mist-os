@@ -1103,43 +1103,42 @@ pub(super) fn get_mtu<
 /// This will cause any conflicting dynamic entry to be removed, and
 /// any future conflicting gratuitous ARPs to be ignored.
 pub(super) fn insert_static_arp_table_entry<
-    C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId> + LinkResolutionContext<EthernetLinkDevice>,
-    SC: EthernetIpLinkDeviceDynamicStateContext<C> + NudHandler<Ipv4, EthernetLinkDevice, C>,
+    C: LinkResolutionContext<EthernetLinkDevice>,
+    SC: NudHandler<Ipv4, EthernetLinkDevice, C>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
     device_id: &SC::DeviceId,
-    addr: Ipv4Addr,
-    mac: Mac,
+    // TODO(https://fxbug.dev/134098): Use NeighborAddr when available.
+    addr: SpecifiedAddr<Ipv4Addr>,
+    mac: UnicastAddr<Mac>,
 ) {
-    if let Some(addr) = SpecifiedAddr::new(addr) {
-        NudHandler::<Ipv4, EthernetLinkDevice, _>::set_static_neighbor(
-            sync_ctx, ctx, device_id, addr, mac,
-        )
-    }
+    NudHandler::<Ipv4, EthernetLinkDevice, _>::set_static_neighbor(
+        sync_ctx, ctx, device_id, addr, *mac,
+    )
 }
 
-/// Insert an entry into this device's NDP table.
+/// Insert a static entry into this device's NDP table.
 ///
-/// This method only gets called when testing to force set a neighbor's link
-/// address so that lookups succeed immediately, without doing address
-/// resolution.
-pub(super) fn insert_ndp_table_entry<
-    C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId> + LinkResolutionContext<EthernetLinkDevice>,
-    SC: EthernetIpLinkDeviceDynamicStateContext<C> + NudHandler<Ipv6, EthernetLinkDevice, C>,
+/// This will cause any conflicting dynamic entry to be removed, and NDP
+/// messages about `addr` to be ignored.
+pub(super) fn insert_static_ndp_table_entry<
+    C: LinkResolutionContext<EthernetLinkDevice>,
+    SC: NudHandler<Ipv6, EthernetLinkDevice, C>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
     device_id: &SC::DeviceId,
+    // TODO(https://fxbug.dev/134098): Use NeighborAddr when available.
     addr: UnicastAddr<Ipv6Addr>,
-    mac: Mac,
+    mac: UnicastAddr<Mac>,
 ) {
     NudHandler::<Ipv6, EthernetLinkDevice, _>::set_static_neighbor(
         sync_ctx,
         ctx,
         device_id,
         addr.into_specified(),
-        mac,
+        *mac,
     )
 }
 
@@ -1834,8 +1833,8 @@ mod tests {
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 &FakeDeviceId,
-                FAKE_CONFIG_V4.remote_ip.get(),
-                FAKE_CONFIG_V4.remote_mac.get(),
+                FAKE_CONFIG_V4.remote_ip,
+                FAKE_CONFIG_V4.remote_mac,
             );
             let _ = send_ip_frame(
                 &mut sync_ctx,
@@ -1982,7 +1981,7 @@ mod tests {
 
         let mut builder = FakeEventDispatcherBuilder::from_config(config.clone());
         let device_builder_id = 0;
-        add_arp_or_ndp_table_entry(&mut builder, device_builder_id, src_ip.get(), src_mac);
+        add_arp_or_ndp_table_entry(&mut builder, device_builder_id, src_ip, src_mac);
         let (Ctx { sync_ctx, mut non_sync_ctx }, device_ids) = builder.build();
         let device: DeviceId<_> = device_ids[device_builder_id].clone().into();
         let mut sync_ctx = &sync_ctx;

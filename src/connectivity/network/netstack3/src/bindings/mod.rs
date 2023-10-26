@@ -1030,6 +1030,7 @@ pub(crate) enum Service {
     Filter(fidl_fuchsia_net_filter::FilterRequestStream),
     Interfaces(fidl_fuchsia_net_interfaces::StateRequestStream),
     InterfacesAdmin(fidl_fuchsia_net_interfaces_admin::InstallerRequestStream),
+    NeighborController(fidl_fuchsia_net_neighbor::ControllerRequestStream),
     Neighbor(fidl_fuchsia_net_neighbor::ViewRequestStream),
     PacketSocket(fidl_fuchsia_posix_socket_packet::ProviderRequestStream),
     RawSocket(fidl_fuchsia_posix_socket_raw::ProviderRequestStream),
@@ -1344,6 +1345,13 @@ impl NetstackSeed {
                         Service::Neighbor(neighbor) => {
                             neighbor
                                 .serve_with(|rs| neighbor_worker::serve(netstack.clone(), rs))
+                                .await
+                        }
+                        Service::NeighborController(neighbor_controller) => {
+                            neighbor_controller
+                                .serve_with(|rs| {
+                                    neighbor_worker::serve_controller(netstack.ctx.clone(), rs)
+                                })
                                 .await
                         }
                         Service::Verifier(verifier) => {

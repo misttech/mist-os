@@ -23,10 +23,10 @@ use net_types::{
         AddrSubnetEither, Ip, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet,
         SubnetEither,
     },
-    UnicastAddr, Witness,
+    SpecifiedAddr, UnicastAddr,
 };
 #[cfg(test)]
-use net_types::{ip::IpAddr, MulticastAddr, SpecifiedAddr};
+use net_types::{ip::IpAddr, MulticastAddr, Witness as _};
 use packet::{Buf, BufferMut};
 #[cfg(test)]
 use packet_formats::ip::IpProto;
@@ -827,7 +827,8 @@ struct DeviceConfig {
 #[derive(Clone, Default)]
 pub struct FakeEventDispatcherBuilder {
     devices: Vec<DeviceConfig>,
-    arp_table_entries: Vec<(usize, Ipv4Addr, UnicastAddr<Mac>)>,
+    // TODO(https://fxbug.dev/134098): Use NeighborAddr when available.
+    arp_table_entries: Vec<(usize, SpecifiedAddr<Ipv4Addr>, UnicastAddr<Mac>)>,
     ndp_table_entries: Vec<(usize, UnicastAddr<Ipv6Addr>, UnicastAddr<Mac>)>,
     // usize refers to index into devices Vec.
     device_routes: Vec<(SubnetEither, usize)>,
@@ -853,11 +854,13 @@ impl FakeEventDispatcherBuilder {
             ipv6_config: None,
         });
 
-        match cfg.remote_ip.get().into() {
+        match cfg.remote_ip.into() {
             IpAddr::V4(ip) => builder.arp_table_entries.push((0, ip, cfg.remote_mac)),
-            IpAddr::V6(ip) => {
-                builder.ndp_table_entries.push((0, UnicastAddr::new(ip).unwrap(), cfg.remote_mac))
-            }
+            IpAddr::V6(ip) => builder.ndp_table_entries.push((
+                0,
+                UnicastAddr::new(ip.get()).unwrap(),
+                cfg.remote_mac,
+            )),
         };
 
         // Even with fixed ipv4 address we can have IPv6 link local addresses
@@ -963,7 +966,8 @@ impl FakeEventDispatcherBuilder {
     pub(crate) fn add_arp_table_entry(
         &mut self,
         device: usize,
-        ip: Ipv4Addr,
+        // TODO(https://fxbug.dev/134098): Use NeighborAddr when available.
+        ip: SpecifiedAddr<Ipv4Addr>,
         mac: UnicastAddr<Mac>,
     ) {
         self.arp_table_entries.push((device, ip, mac));
@@ -974,6 +978,7 @@ impl FakeEventDispatcherBuilder {
     pub(crate) fn add_ndp_table_entry(
         &mut self,
         device: usize,
+        // TODO(https://fxbug.dev/134098): Use NeighborAddr when available.
         ip: UnicastAddr<Ipv6Addr>,
         mac: UnicastAddr<Mac>,
     ) {
@@ -1071,12 +1076,12 @@ impl FakeEventDispatcherBuilder {
         }
         for (idx, ip, mac) in ndp_table_entries {
             let device = &idx_to_device_id[idx];
-            crate::device::insert_ndp_table_entry(
+            crate::device::insert_static_ndp_table_entry(
                 sync_ctx,
                 non_sync_ctx,
                 &device.clone().into(),
                 ip,
-                mac.get(),
+                mac,
             )
             .expect("error inserting static NDP entry");
         }
@@ -1105,12 +1110,15 @@ impl FakeEventDispatcherBuilder {
 pub(crate) fn add_arp_or_ndp_table_entry<A: IpAddress>(
     builder: &mut FakeEventDispatcherBuilder,
     device: usize,
-    ip: A,
+    // TODO(https://fxbug.dev/134098): Use NeighborAddr when available.
+    ip: SpecifiedAddr<A>,
     mac: UnicastAddr<Mac>,
 ) {
     match ip.into() {
         IpAddr::V4(ip) => builder.add_arp_table_entry(device, ip, mac),
-        IpAddr::V6(ip) => builder.add_ndp_table_entry(device, UnicastAddr::new(ip).unwrap(), mac),
+        IpAddr::V6(ip) => {
+            builder.add_ndp_table_entry(device, UnicastAddr::new(ip.get()).unwrap(), mac)
+        }
     }
 }
 
@@ -1834,12 +1842,12 @@ mod tests {
         let bob_device_idx = bob.add_device_with_ip(mac_b, ip_b.get(), subnet);
         let mut calvin = FakeEventDispatcherBuilder::default();
         let calvin_device_idx = calvin.add_device_with_ip(mac_c, ip_c.get(), subnet);
-        add_arp_or_ndp_table_entry(&mut alice, alice_device_idx, ip_b.get(), mac_b);
-        add_arp_or_ndp_table_entry(&mut alice, alice_device_idx, ip_c.get(), mac_c);
-        add_arp_or_ndp_table_entry(&mut bob, bob_device_idx, ip_a.get(), mac_a);
-        add_arp_or_ndp_table_entry(&mut bob, bob_device_idx, ip_c.get(), mac_c);
-        add_arp_or_ndp_table_entry(&mut calvin, calvin_device_idx, ip_a.get(), mac_a);
-        add_arp_or_ndp_table_entry(&mut calvin, calvin_device_idx, ip_b.get(), mac_b);
+        add_arp_or_ndp_table_entry(&mut alice, alice_device_idx, ip_b, mac_b);
+        add_arp_or_ndp_table_entry(&mut alice, alice_device_idx, ip_c, mac_c);
+        add_arp_or_ndp_table_entry(&mut bob, bob_device_idx, ip_a, mac_a);
+        add_arp_or_ndp_table_entry(&mut bob, bob_device_idx, ip_c, mac_c);
+        add_arp_or_ndp_table_entry(&mut calvin, calvin_device_idx, ip_a, mac_a);
+        add_arp_or_ndp_table_entry(&mut calvin, calvin_device_idx, ip_b, mac_b);
         let (alice_ctx, alice_device_ids) = alice.build();
         let (bob_ctx, bob_device_ids) = bob.build();
         let (calvin_ctx, calvin_device_ids) = calvin.build();

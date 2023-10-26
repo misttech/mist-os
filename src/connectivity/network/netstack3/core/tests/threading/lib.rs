@@ -13,7 +13,7 @@ use loom::sync::Arc;
 use net_declare::{net_ip_v4, net_ip_v6, net_mac, net_subnet_v4, net_subnet_v6};
 use net_types::{
     ethernet::Mac,
-    ip::{Ip, IpInvariant, Ipv4, Ipv6, Subnet},
+    ip::{Ip, Ipv4, Ipv6, Subnet},
     SpecifiedAddr, UnicastAddr, Witness as _, ZonedAddr,
 };
 use netstack3_core::{
@@ -457,31 +457,16 @@ fn new_incomplete_neighbor_schedule_timer_atomic<I: Ip + TestIpExt>() {
 
         let thread_vars = (sync_ctx.clone(), non_sync_ctx.clone(), device.clone());
         let set_static_neighbor = loom::thread::spawn(move || {
-            let (sync_ctx, non_sync_ctx, device) = thread_vars;
+            let (sync_ctx, mut non_sync_ctx, device) = thread_vars;
 
-            I::map_ip::<_, ()>(
-                (I::NEIGHBOR_ADDR, IpInvariant((sync_ctx, non_sync_ctx, device))),
-                |(addr, IpInvariant((sync_ctx, mut non_sync_ctx, device)))| {
-                    netstack3_core::device::insert_static_arp_table_entry(
-                        &sync_ctx,
-                        &mut non_sync_ctx,
-                        &device.into(),
-                        addr,
-                        UnicastAddr::new(NEIGHBOR_MAC).unwrap(),
-                    )
-                    .unwrap();
-                },
-                |(addr, IpInvariant((sync_ctx, mut non_sync_ctx, device)))| {
-                    netstack3_core::device::insert_ndp_table_entry(
-                        &sync_ctx,
-                        &mut non_sync_ctx,
-                        &device.into(),
-                        UnicastAddr::new(addr).unwrap(),
-                        NEIGHBOR_MAC,
-                    )
-                    .unwrap();
-                },
-            );
+            netstack3_core::device::insert_static_neighbor_entry::<I, _>(
+                &sync_ctx,
+                &mut non_sync_ctx,
+                &device.into(),
+                I::NEIGHBOR_ADDR,
+                NEIGHBOR_MAC,
+            )
+            .unwrap();
         });
 
         create_incomplete_neighbor.join().unwrap();

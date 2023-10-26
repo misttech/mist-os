@@ -183,9 +183,19 @@ pub struct AddressResolutionFailed;
 /// Error when a static neighbor entry cannot be inserted.
 #[derive(Debug, PartialEq, Eq, Error)]
 pub enum StaticNeighborInsertionError {
-    /// The address used for a static neighbor entry is not unicast.
-    #[error("Address is not unicast")]
-    AddressNotUnicast,
+    /// The MAC address used for a static neighbor entry is not unicast.
+    #[error("MAC address is not unicast")]
+    MacAddressNotUnicast,
+
+    /// The IP address is invalid as the address of a neighbor. A valid address
+    /// is:
+    /// - specified,
+    /// - not multicast,
+    /// - not loopback,
+    /// - not an IPv4-mapped address, and
+    /// - not the limited broadcast address of `255.255.255.255`.
+    #[error("IP address is invalid")]
+    IpAddressInvalid,
 
     /// Loopback devices do not support neighbor entries.
     #[error("{0}")]

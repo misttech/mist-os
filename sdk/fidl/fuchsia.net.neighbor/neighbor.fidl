@@ -141,6 +141,8 @@ closed protocol View {
     }) error zx.Status;
 };
 
+// TODO(https://fxbug.dev/135744): Define and use domain-specific error enum
+// instead of zx.Status.
 /// Modify the neighbor table and related interface configuration.
 @discoverable
 closed protocol Controller {
@@ -152,6 +154,8 @@ closed protocol Controller {
     ///     communicating with the neighbor.
     /// + request `neighbor` IP address of the neighbor.
     /// + request `mac` MAC address of the neighbor.
+    /// * error `ZX_ERR_INVALID_ARGS` if `neighbor` is not a valid
+    ///   neighbor address or `mac` is not a unicast MAC address.
     /// * error `ZX_ERR_NOT_FOUND` if `interface` does not exist.
     /// * error `ZX_ERR_NOT_SUPPORTED` if `interface` does not keep a neighbor
     ///     table (e.g. point-to-point links).

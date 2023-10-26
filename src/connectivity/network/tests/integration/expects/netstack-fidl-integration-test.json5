@@ -15,11 +15,5 @@
                 "log_packets_ns3",
             ],
         },
-        {
-            type: "expect_failure_with_err_logs",
-            matchers: [
-                "test_forwarding_ns3*",
-            ],
-        },
     ],
 }

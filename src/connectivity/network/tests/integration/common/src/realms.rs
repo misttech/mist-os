@@ -74,6 +74,7 @@ impl NetstackVersion {
                 fnet_interfaces_admin::InstallerMarker::PROTOCOL_NAME,
                 fnet_interfaces::StateMarker::PROTOCOL_NAME,
                 fnet_name::DnsServerWatcherMarker::PROTOCOL_NAME,
+                fnet_neighbor::ControllerMarker::PROTOCOL_NAME,
                 fnet_root::InterfacesMarker::PROTOCOL_NAME,
                 fnet_routes::StateMarker::PROTOCOL_NAME,
                 fnet_routes::StateV4Marker::PROTOCOL_NAME,
@@ -96,7 +97,6 @@ impl NetstackVersion {
             | NetstackVersion::ProdNetstack2 => &common_services_and!(
                 fnet_multicast_admin::Ipv4RoutingTableControllerMarker::PROTOCOL_NAME,
                 fnet_multicast_admin::Ipv6RoutingTableControllerMarker::PROTOCOL_NAME,
-                fnet_neighbor::ControllerMarker::PROTOCOL_NAME,
                 fnet_neighbor::ViewMarker::PROTOCOL_NAME,
                 fnet_stack::LogMarker::PROTOCOL_NAME,
             ),

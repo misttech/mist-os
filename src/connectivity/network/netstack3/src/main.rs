@@ -70,6 +70,7 @@ pub fn main() {
         .add_fidl_service(Service::InterfacesAdmin)
         .add_fidl_service(Service::Filter)
         .add_fidl_service(Service::Neighbor)
+        .add_fidl_service(Service::NeighborController)
         .add_fidl_service(Service::Verifier);
 
     let seed = NetstackSeed::default();

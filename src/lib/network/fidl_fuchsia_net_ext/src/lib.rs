@@ -66,6 +66,15 @@ impl FromExt<ip::IpAddr> for fidl::IpAddress {
     }
 }
 
+impl FromExt<fidl::IpAddress> for ip::IpAddr {
+    fn from_ext(f: fidl::IpAddress) -> Self {
+        match f {
+            fidl::IpAddress::Ipv4(v4) => ip::IpAddr::V4(v4.into_ext()),
+            fidl::IpAddress::Ipv6(v6) => ip::IpAddr::V6(v6.into_ext()),
+        }
+    }
+}
+
 impl TryFromExt<fidl::Ipv4AddressWithPrefix> for ip::Subnet<ip::Ipv4Addr> {
     type Error = ip::SubnetError;
     fn try_from_ext(

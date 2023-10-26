@@ -8,6 +8,8 @@
 use std::collections::{HashMap, HashSet};
 use std::convert::From as _;
 
+use fidl_fuchsia_net_ext::FromExt as _;
+
 use anyhow::Context as _;
 use assert_matches::assert_matches;
 use futures::{stream, FutureExt as _, StreamExt as _, TryStreamExt as _};
@@ -17,6 +19,7 @@ use netemul::{RealmUdpSocket as _, TestInterface, TestNetwork, TestRealm, TestSa
 use netstack_testing_common::realms::{Netstack, TestRealmExt as _, TestSandboxExt as _};
 use netstack_testing_common::Result;
 use netstack_testing_macros::netstack_test;
+use test_case::test_case;
 
 const ALICE_MAC: fidl_fuchsia_net::MacAddress = fidl_mac!("02:00:01:02:03:04");
 const ALICE_IP: fidl_fuchsia_net::IpAddress = fidl_ip!("192.168.0.100");
@@ -631,11 +634,24 @@ async fn next_solicitation_resolution(
 }
 
 #[netstack_test]
-async fn neigh_clear_entries_errors<N: Netstack>(name: &str) {
+#[test_case(
+    |controller, id| {
+        controller.clear_entries(id, fidl_fuchsia_net::IpVersion::V4)
+    };
+    "clear_entries"
+)]
+#[test_case(|controller, id| controller.add_entry(id, &BOB_IP, &BOB_MAC); "add_entry")]
+async fn neigh_wrong_interface<N: Netstack>(
+    name: &str,
+    fidl_method: fn(
+        &fidl_fuchsia_net_neighbor::ControllerProxy,
+        u64,
+    ) -> fidl::client::QueryResponseFut<std::result::Result<(), i32>>,
+) {
     let sandbox = TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("net").await.expect("failed to create network");
 
-    let alice = create_realm::<N>(
+    let NeighborRealm { realm, ep, ipv6: _, loopback_id } = create_realm::<N>(
         &sandbox,
         &network,
         name,
@@ -646,14 +662,12 @@ async fn neigh_clear_entries_errors<N: Netstack>(name: &str) {
     .await;
 
     // Connect to the service and check some error cases.
-    let controller = alice
-        .realm
+    let controller = realm
         .connect_to_protocol::<fidl_fuchsia_net_neighbor::ControllerMarker>()
         .expect("failed to connect to Controller");
     // Clearing neighbors on loopback interface is not supported.
     assert_eq!(
-        controller
-            .clear_entries(alice.loopback_id, fidl_fuchsia_net::IpVersion::V4)
+        fidl_method(&controller, loopback_id)
             .await
             .expect("clear_entries FIDL error")
             .map_err(fuchsia_zircon::Status::from_raw),
@@ -661,8 +675,7 @@ async fn neigh_clear_entries_errors<N: Netstack>(name: &str) {
     );
     // Clearing neighbors on non-existing interface returns the proper error.
     assert_eq!(
-        controller
-            .clear_entries(alice.ep.id() + 100, fidl_fuchsia_net::IpVersion::V4)
+        fidl_method(&controller, ep.id() + 100)
             .await
             .expect("clear_entries FIDL error")
             .map_err(fuchsia_zircon::Status::from_raw),
@@ -759,6 +772,88 @@ async fn neigh_clear_entries<N: Netstack>(name: &str) {
     let () = exchange_dgrams(&alice, &bob).await;
     assert_eq!(next_solicitation_resolution(&mut solicit_stream).await, BOB_IP);
     assert_eq!(next_solicitation_resolution(&mut solicit_stream).await, bob.ipv6);
+}
+
+#[netstack_test]
+#[test_case(fidl_ip!("255.255.255.255"); "ipv4_limited_broadcast")]
+#[test_case(fidl_ip!("127.0.0.1"); "ipv4_loopback")]
+#[test_case(fidl_ip!("::1"); "ipv6_loopback")]
+#[test_case(fidl_ip!("224.0.0.0"); "ipv4_multicast")]
+#[test_case(fidl_ip!("ff00::"); "ipv6_multicast")]
+#[test_case(fidl_ip!("0.0.0.0"); "ipv4_unspecified")]
+#[test_case(fidl_ip!("::"); "ipv6_unspecified")]
+#[test_case(fidl_ip!("::ffff:0:1"); "ipv6_mapped")]
+async fn neigh_add_entry_invalid_addr<N: Netstack>(
+    name: &str,
+    invalid_addr: fidl_fuchsia_net::IpAddress,
+) {
+    let sandbox = TestSandbox::new().expect("failed to create sandbox");
+    let network = sandbox.create_network("net").await.expect("failed to create network");
+
+    let alice = create_realm::<N>(
+        &sandbox,
+        &network,
+        name,
+        "alice",
+        fidl_fuchsia_net::Subnet { addr: ALICE_IP, prefix_len: SUBNET_PREFIX },
+        ALICE_MAC,
+    )
+    .await;
+
+    let controller = alice
+        .realm
+        .connect_to_protocol::<fidl_fuchsia_net_neighbor::ControllerMarker>()
+        .expect("failed to connect to Controller");
+
+    assert_eq!(
+        controller
+            .add_entry(alice.ep.id(), &invalid_addr, &BOB_MAC)
+            .await
+            .expect("add_entry FIDL error")
+            .map_err(fuchsia_zircon::Status::from_raw),
+        Err(fuchsia_zircon::Status::INVALID_ARGS),
+        "{} is an invalid neighbor addr and add_entry should fail",
+        net_types::ip::IpAddr::from_ext(invalid_addr)
+    );
+}
+
+#[netstack_test]
+#[test_case(fidl_mac!("ff:ff:ff:ff:ff:ff"); "broadcast_mac")]
+#[test_case(fidl_mac!("01:00:00:00:00:00"); "multicast_mac")]
+async fn neigh_add_entry_invalid_mac<N: Netstack>(
+    name: &str,
+    invalid_mac: fidl_fuchsia_net::MacAddress,
+) {
+    let sandbox = TestSandbox::new().expect("failed to create sandbox");
+    let network = sandbox.create_network("net").await.expect("failed to create network");
+
+    let alice = create_realm::<N>(
+        &sandbox,
+        &network,
+        name,
+        "alice",
+        fidl_fuchsia_net::Subnet { addr: ALICE_IP, prefix_len: SUBNET_PREFIX },
+        ALICE_MAC,
+    )
+    .await;
+
+    let controller = alice
+        .realm
+        .connect_to_protocol::<fidl_fuchsia_net_neighbor::ControllerMarker>()
+        .expect("failed to connect to Controller");
+
+    for valid_addr in [fidl_ip!("2001:db8::1"), fidl_ip!("192.0.2.1")] {
+        assert_eq!(
+            controller
+                .add_entry(alice.ep.id(), &valid_addr, &invalid_mac)
+                .await
+                .expect("add_entry FIDL error")
+                .map_err(fuchsia_zircon::Status::from_raw),
+            Err(fuchsia_zircon::Status::INVALID_ARGS),
+            "{} is not a unicast mac addr and add_entry should fail",
+            net_types::ethernet::Mac::from_ext(invalid_mac)
+        );
+    }
 }
 
 #[netstack_test]

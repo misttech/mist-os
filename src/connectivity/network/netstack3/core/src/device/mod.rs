@@ -953,37 +953,45 @@ pub(crate) fn del_ip_addr<NonSyncCtx: NonSyncContext, A: IpAddress>(
 }
 
 /// Inserts a static neighbor entry for a neighbor.
-pub fn insert_static_neighbor_entry<
-    I: Ip,
-    B: BufferMut,
-    Id,
-    C: BufferNonSyncContext<B> + crate::TimerContext<Id>,
->(
-    sync_ctx: &SyncCtx<C>,
-    ctx: &mut C,
-    device: &DeviceId<C>,
+pub fn insert_static_neighbor_entry<I: Ip, NonSyncCtx: NonSyncContext>(
+    sync_ctx: &SyncCtx<NonSyncCtx>,
+    ctx: &mut NonSyncCtx,
+    device: &DeviceId<NonSyncCtx>,
     addr: I::Addr,
     mac: Mac,
 ) -> Result<(), StaticNeighborInsertionError> {
+    let mac = UnicastAddr::new(mac).ok_or(StaticNeighborInsertionError::MacAddressNotUnicast)?;
     let IpInvariant(result) = I::map_ip(
         (IpInvariant((sync_ctx, ctx, device, mac)), addr),
         |(IpInvariant((sync_ctx, ctx, device, mac)), addr)| {
-            let result = UnicastAddr::new(mac)
-                .ok_or(StaticNeighborInsertionError::AddressNotUnicast)
-                .and_then(|mac| {
+            IpInvariant(
+                // TODO(https://fxbug.dev/134098): Use NeighborAddr to witness these
+                // properties.
+                (!Ipv4::LOOPBACK_SUBNET.contains(&addr)
+                    && !Ipv4::MULTICAST_SUBNET.contains(&addr)
+                    && addr != Ipv4::LIMITED_BROADCAST_ADDRESS.get())
+                .then_some(())
+                .and_then(|()| SpecifiedAddr::new(addr))
+                .ok_or(StaticNeighborInsertionError::IpAddressInvalid)
+                .and_then(|addr| {
                     insert_static_arp_table_entry(sync_ctx, ctx, device, addr, mac)
                         .map_err(StaticNeighborInsertionError::NotSupported)
-                });
-            IpInvariant(result)
+                }),
+            )
         },
         |(IpInvariant((sync_ctx, ctx, device, mac)), addr)| {
-            let result = UnicastAddr::new(addr)
-                .ok_or(StaticNeighborInsertionError::AddressNotUnicast)
-                .and_then(|addr| {
-                    insert_ndp_table_entry(sync_ctx, ctx, device, addr, mac)
-                        .map_err(StaticNeighborInsertionError::NotSupported)
-                });
-            IpInvariant(result)
+            IpInvariant(
+                // TODO(https://fxbug.dev/134098): Use NeighborAddr to witness these
+                // properties.
+                (addr != Ipv6::LOOPBACK_ADDRESS.get() && addr.to_ipv4_mapped().is_none())
+                    .then_some(())
+                    .and_then(|()| UnicastAddr::new(addr))
+                    .ok_or(StaticNeighborInsertionError::IpAddressInvalid)
+                    .and_then(|addr| {
+                        insert_static_ndp_table_entry(sync_ctx, ctx, device, addr, mac)
+                            .map_err(StaticNeighborInsertionError::NotSupported)
+                    }),
+            )
         },
     );
     result
@@ -993,11 +1001,12 @@ pub fn insert_static_neighbor_entry<
 ///
 /// This will cause any conflicting dynamic entry to be removed, and
 /// any future conflicting gratuitous ARPs to be ignored.
-pub fn insert_static_arp_table_entry<NonSyncCtx: NonSyncContext>(
+pub(crate) fn insert_static_arp_table_entry<NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
     device: &DeviceId<NonSyncCtx>,
-    addr: Ipv4Addr,
+    // TODO(https://fxbug.dev/134098): Use NeighborAddr when available.
+    addr: SpecifiedAddr<Ipv4Addr>,
     mac: UnicastAddr<Mac>,
 ) -> Result<(), NotSupportedError> {
     match device {
@@ -1006,26 +1015,26 @@ pub fn insert_static_arp_table_entry<NonSyncCtx: NonSyncContext>(
             ctx,
             id,
             addr,
-            mac.into(),
+            mac,
         )),
         DeviceId::Loopback(LoopbackDeviceId { .. }) => Err(NotSupportedError),
     }
 }
 
-/// Insert an entry into this device's NDP table.
+/// Insert a static entry into this device's NDP table.
 ///
-/// This method only gets called when testing to force set a neighbor's link
-/// address so that lookups succeed immediately, without doing address
-/// resolution.
-pub fn insert_ndp_table_entry<NonSyncCtx: NonSyncContext>(
+/// This will cause any conflicting dynamic entry to be removed, and NDP
+/// messages about `addr` to be ignored.
+pub(crate) fn insert_static_ndp_table_entry<NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
     device: &DeviceId<NonSyncCtx>,
+    // TODO(https://fxbug.dev/134098): Use NeighborAddr when available.
     addr: UnicastAddr<Ipv6Addr>,
-    mac: Mac,
+    mac: UnicastAddr<Mac>,
 ) -> Result<(), NotSupportedError> {
     match device {
-        DeviceId::Ethernet(id) => Ok(self::ethernet::insert_ndp_table_entry(
+        DeviceId::Ethernet(id) => Ok(self::ethernet::insert_static_ndp_table_entry(
             &mut Locked::new(sync_ctx),
             ctx,
             id,
