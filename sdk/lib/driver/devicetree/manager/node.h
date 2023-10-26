@@ -45,6 +45,8 @@ class Node {
 
   void AddBti(fuchsia_hardware_platform_bus::Bti bti);
 
+  void AddIrq(fuchsia_hardware_platform_bus::Irq irq);
+
   void AddMetadata(fuchsia_hardware_platform_bus::Metadata metadata);
 
   // Publish this node.
@@ -54,7 +56,7 @@ class Node {
 
   std::string_view name() const { return name_; }
 
-  ParentNode parent();
+  ParentNode parent() const;
 
   std::vector<ChildNode> children();
 
@@ -96,7 +98,7 @@ class Node {
 
 class ReferenceNode {
  public:
-  explicit ReferenceNode(Node* node) : node_(node) { ZX_ASSERT(node_); }
+  explicit ReferenceNode(const Node* node) : node_(node) {}
 
   const std::unordered_map<std::string_view, devicetree::PropertyValue>& properties() const {
     return node_->properties();
@@ -105,6 +107,8 @@ class ReferenceNode {
   std::string_view name() const { return node_->name(); }
 
   std::optional<Phandle> phandle() const { return node_->phandle(); }
+
+  explicit operator bool() const { return (node_ != nullptr); }
 
  private:
   const Node* node_;
@@ -117,6 +121,14 @@ class ParentNode {
   std::string_view name() const { return node_->name(); }
 
   explicit operator bool() const { return (node_ != nullptr); }
+
+  const std::unordered_map<std::string_view, devicetree::PropertyValue>& properties() const {
+    return node_->properties();
+  }
+
+  ParentNode parent() const { return node_->parent(); }
+
+  ReferenceNode MakeReferenceNode() const { return ReferenceNode(node_); }
 
  private:
   const Node* node_;

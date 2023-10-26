@@ -3,7 +3,10 @@
 # found in the LICENSE file.
 
 group("tests") {
-  deps = [ "default:tests" ]
+  deps = [
+    "default:tests",
+    "drivers:tests",
+  ]
   testonly = true
 }
 
@@ -61,4 +64,11 @@ source_set("reference-property") {
     "//sdk/lib/driver/devicetree/manager",
     "//zircon/system/ulib/zx",
   ]
+}
+
+source_set("interrupt-parser") {
+  sources = [ "interrupt-parser.cc" ]
+  public = [ "interrupt-parser.h" ]
+  deps = [ "//sdk/lib/driver/logging/cpp" ]
+  public_deps = [ ":reference-property" ]
 }

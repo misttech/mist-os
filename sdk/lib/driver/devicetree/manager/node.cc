@@ -73,6 +73,13 @@ void Node::AddBti(fuchsia_hardware_platform_bus::Bti bti) {
   pbus_node_.bti()->emplace_back(std::move(bti));
 }
 
+void Node::AddIrq(fuchsia_hardware_platform_bus::Irq irq) {
+  if (!pbus_node_.irq()) {
+    pbus_node_.irq() = std::vector<fuchsia_hardware_platform_bus::Irq>();
+  }
+  pbus_node_.irq()->emplace_back(std::move(irq));
+}
+
 void Node::AddMetadata(fuchsia_hardware_platform_bus::Metadata metadata) {
   if (!pbus_node_.metadata()) {
     pbus_node_.metadata() = std::vector<fuchsia_hardware_platform_bus::Metadata>();
@@ -151,7 +158,7 @@ zx::result<ReferenceNode> Node::GetReferenceNode(Phandle parent) {
   return manager_->GetReferenceNode(parent);
 }
 
-ParentNode Node::parent() { return ParentNode(parent_); }
+ParentNode Node::parent() const { return ParentNode(parent_); }
 
 std::vector<ChildNode> Node::children() {
   std::vector<ChildNode> children;

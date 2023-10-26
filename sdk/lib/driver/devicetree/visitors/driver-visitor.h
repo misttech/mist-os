@@ -46,7 +46,7 @@ class DriverVisitor : public Visitor {
   DriverVisitor(DriverVisitor&& other) = default;
   DriverVisitor& operator=(DriverVisitor&& other) = default;
 
-  zx::result<> Visit(Node& node, const devicetree::PropertyDecoder& decoder) final;
+  zx::result<> Visit(Node& node, const devicetree::PropertyDecoder& decoder) override;
 
   zx::result<> FinalizeNode(Node& node) final;
 

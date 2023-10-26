@@ -28,7 +28,9 @@ class ReferencePropertyParser {
         reference_node_matcher_(std::move(reference_node_matcher)),
         reference_child_callback_(std::move(reference_child_callback)) {}
 
-  zx::result<> Visit(Node& node, const devicetree::PropertyDecoder& decoder);
+  virtual ~ReferencePropertyParser() = default;
+
+  virtual zx::result<> Visit(Node& node, const devicetree::PropertyDecoder& decoder);
 
  private:
   PropertyName reference_property_;
