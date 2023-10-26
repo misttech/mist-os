@@ -1,6 +1,6 @@
 # Write a fuzzer
 
-Fuchsia's toolchain supports fuzzing using LLVM's [libFuzzer]. To create a fuzzer for a particular
+Fuchsia's toolchain supports fuzzing using LLVM's libFuzzer. To create a fuzzer for a particular
 interface, you need to implement a [fuzz target function][fuzz-target]{:.external} that uses a
 provided sequence of bytes to exercise the interface. The sequence of bytes is referred to as a
 fuzzer "input". The fuzz target function is used by libFuzzer to search for inputs that cause panics

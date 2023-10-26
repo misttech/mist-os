@@ -6,6 +6,9 @@
 # before making changes to this file, and add a member of the fuchsia.dev
 # team as reviewer.
 toc:
+- title: "DFv1 to DFv2 driver migration"
+  section:
+  - include: /docs/development/drivers/migration/_toc.yaml
 - title: "Developer guide"
   section:
   - include: /docs/development/drivers/developer_guide/_toc.yaml
