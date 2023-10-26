@@ -373,13 +373,23 @@ class PaverServiceSkipBlockTest : public PaverServiceTest {
     return *reinterpret_cast<AbrData*>(buf);
   }
 
+  const uint8_t* SysconfigStart() {
+    return reinterpret_cast<uint8_t*>(device_->mapper().start()) +
+           (static_cast<size_t>(14) * kSkipBlockSize);
+  }
+
+  sysconfig_header GetSysconfigHeader() {
+    const uint8_t* sysconfig_start = SysconfigStart();
+    sysconfig_header ret;
+    memcpy(&ret, sysconfig_start, sizeof(ret));
+    return ret;
+  }
+
   // Equivalence of GetAbr() in the context of abr wear-leveling.
   // Since there can be multiple pages in abr sub-partition that may have valid abr data,
   // argument |copy_index| is used to read a specific one.
   AbrData GetAbrInWearLeveling(const sysconfig_header& header, size_t copy_index) {
-    auto* buf = reinterpret_cast<uint8_t*>(device_->mapper().start()) +
-                (static_cast<size_t>(14) * kSkipBlockSize) + header.abr_metadata.offset +
-                copy_index * 4 * kKilobyte;
+    auto* buf = SysconfigStart() + header.abr_metadata.offset + copy_index * 4 * kKilobyte;
     AbrData ret;
     memcpy(&ret, buf, sizeof(ret));
     return ret;
@@ -1339,6 +1349,10 @@ TEST_F(PaverServiceSkipBlockTest, AbrWearLevelingLayoutUpdated) {
   // Thus, the new abr metadata is expected to be appended at the 2nd page (page 1).
   actual = GetAbrInWearLeveling(header, 1);
   ASSERT_BYTES_EQ(&abr_data, &actual, sizeof(abr_data));
+
+  // Validate that header is updated.
+  const sysconfig_header actual_header = GetSysconfigHeader();
+  ASSERT_BYTES_EQ(&header, &actual_header, sizeof(sysconfig_header));
 }
 
 TEST_F(PaverServiceSkipBlockTest, WriteAssetBuffered) {

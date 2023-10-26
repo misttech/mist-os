@@ -50,7 +50,8 @@ const sysconfig_header kLegacyLayout = {
     .vb_metadata_a = {offsetof(AstroSysconfigPartition, vb_metadata_a), kVerifiedBootMetadataSize},
     .vb_metadata_b = {offsetof(AstroSysconfigPartition, vb_metadata_b), kVerifiedBootMetadataSize},
     .vb_metadata_r = {offsetof(AstroSysconfigPartition, vb_metadata_r), kVerifiedBootMetadataSize},
-    .crc_value = 2716817057,  // pre-calculated crc
+    .crc_value = 0,  // Don't care. The header is only a default returned by
+                     // GetHeader() and should never be written to storage.
 };
 
 constexpr size_t kAstroPageSize = 4 * kKilobyte;
@@ -479,7 +480,7 @@ zx_status_t SyncClient::UpdateLayout(sysconfig_header target_header) {
 
   // Write the header, if it is not the legacy one.
   if (!sysconfig_header_equal(&target_header, &kLegacyLayout)) {
-    if (zx_status_t status = read_mapper_.vmo().write(&header, 0, sizeof(header));
+    if (zx_status_t status = read_mapper_.vmo().write(&target_header, 0, sizeof(target_header));
         status != ZX_OK) {
       fprintf(stderr, "failed to write header to vmo. %s\n", zx_status_get_string(status));
       return status;
