@@ -19,6 +19,8 @@
 
 #include <zxtest/zxtest.h>
 
+#include "lib/stdcompat/array.h"
+
 using namespace std::literals;
 
 namespace {
@@ -326,6 +328,47 @@ TEST(UartTests, MatchCompatible) {
     driver.Visit(visit([&](auto&& driver) {
       EXPECT_EQ(driver.uart().extra(), ZBI_KERNEL_DRIVER_DW8250_UART);
       EXPECT_EQ(driver.uart().config_name(), uart::ns8250::Dw8250Driver::config_name());
+      EXPECT_EQ(driver.uart().config().mmio_phys, 1);
+      EXPECT_EQ(driver.uart().config().irq, 2);
+    }));
+  }
+
+  {
+    // Match no reg shift or io width
+    PropertyBuilder builder;
+    builder.Add("compatible", cpp20::to_array<std::string_view>({"foo", "arm,pl011"}));
+    auto props = builder.Build();
+    devicetree::PropertyDecoder decoder(props);
+
+    // Arbitrary range of string views.
+    auto emplacer = driver.MatchDevicetree(decoder);
+    EXPECT_TRUE(emplacer);
+    emplacer(dcfg);
+
+    driver.Visit(visit([&](auto&& driver) {
+      EXPECT_EQ(driver.uart().extra(), ZBI_KERNEL_DRIVER_PL011_UART);
+      EXPECT_EQ(driver.uart().config_name(), uart::pl011::Driver::config_name());
+      EXPECT_EQ(driver.uart().config().mmio_phys, 1);
+      EXPECT_EQ(driver.uart().config().irq, 2);
+    }));
+  }
+
+  {
+    // Match no reg shift or io width
+    PropertyBuilder builder;
+    builder.Add("compatible", cpp20::to_array<std::string_view>({"foo", "amlogic,meson-gx-uart"}));
+    auto props = builder.Build();
+    devicetree::PropertyDecoder decoder(props);
+
+    // Arbitrary range of string views.
+    auto emplacer = driver.MatchDevicetree(decoder);
+
+    EXPECT_TRUE(emplacer);
+    emplacer(dcfg);
+
+    driver.Visit(visit([&](auto&& driver) {
+      EXPECT_EQ(driver.uart().extra(), ZBI_KERNEL_DRIVER_AMLOGIC_UART);
+      EXPECT_EQ(driver.uart().config_name(), uart::amlogic::Driver::config_name());
       EXPECT_EQ(driver.uart().config().mmio_phys, 1);
       EXPECT_EQ(driver.uart().config().irq, 2);
     }));

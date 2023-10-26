@@ -29,22 +29,29 @@ class ArmDevicetreeTest {
     loaded_dtb = LoadDtb("qemu-arm-gic2.dtb");
     ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
     qemu_arm_gic2_ = std::move(loaded_dtb).value();
+
+    loaded_dtb = LoadDtb("khadas-vim3.dtb");
+    ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
+    khadas_vim3_ = std::move(loaded_dtb).value();
   }
 
   static void TearDownTestSuite() {
     qemu_arm_gic3_ = std::nullopt;
     qemu_arm_gic2_ = std::nullopt;
     crosvm_arm_ = std::nullopt;
+    khadas_vim3_ = std::nullopt;
   }
 
   devicetree::Devicetree qemu_arm_gic3() { return qemu_arm_gic3_->fdt(); }
   devicetree::Devicetree qemu_arm_gic2() { return qemu_arm_gic2_->fdt(); }
   devicetree::Devicetree crosvm_arm() { return crosvm_arm_->fdt(); }
+  devicetree::Devicetree khadas_vim3() { return khadas_vim3_->fdt(); }
 
  private:
   static std::optional<LoadedDtb> crosvm_arm_;
   static std::optional<LoadedDtb> qemu_arm_gic3_;
   static std::optional<LoadedDtb> qemu_arm_gic2_;
+  static std::optional<LoadedDtb> khadas_vim3_;
 };
 
 // Devicetree Test fixture that provides members to existing RISCV dtbs.

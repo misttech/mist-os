@@ -386,4 +386,31 @@ TEST_F(MemoryMatcherTest, CrosvmArm) {
   EXPECT_EQ(ranges[0].type, memalloc::Type::kFreeRam);
 }
 
+TEST_F(MemoryMatcherTest, KhadasVim3) {
+  std::vector<memalloc::Range> storage(5);
+
+  auto fdt = khadas_vim3();
+  boot_shim::DevicetreeMemoryMatcher memory_matcher("test", stdout, storage);
+
+  ASSERT_TRUE(devicetree::Match(fdt, memory_matcher));
+  auto ranges = memory_matcher.ranges();
+  ASSERT_EQ(ranges.size(), 4);
+
+  EXPECT_EQ(ranges[0].addr, 0x00);
+  EXPECT_EQ(ranges[0].size, 0xf4e5b000);
+  EXPECT_EQ(ranges[0].type, memalloc::Type::kFreeRam);
+
+  EXPECT_EQ(ranges[1].addr, 0xd000000);
+  EXPECT_EQ(ranges[1].size, 0x100000);
+  EXPECT_EQ(ranges[1].type, memalloc::Type::kReserved);
+
+  EXPECT_EQ(ranges[2].addr, 0x5000000);
+  EXPECT_EQ(ranges[2].size, 0x300000);
+  EXPECT_EQ(ranges[2].type, memalloc::Type::kReserved);
+
+  EXPECT_EQ(ranges[3].addr, 0x5300000);
+  EXPECT_EQ(ranges[3].size, 0x2000000);
+  EXPECT_EQ(ranges[3].type, memalloc::Type::kReserved);
+}
+
 }  // namespace

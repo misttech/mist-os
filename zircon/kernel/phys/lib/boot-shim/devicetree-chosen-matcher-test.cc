@@ -7,6 +7,7 @@
 #include <lib/boot-shim/devicetree-boot-shim.h>
 #include <lib/boot-shim/devicetree.h>
 #include <lib/fit/defer.h>
+#include <lib/uart/amlogic.h>
 #include <lib/zbitl/image.h>
 
 #include "devicetree-test-fixture.h"
@@ -74,7 +75,7 @@ struct ExpectedChosen {
 
 using AllUartDrivers =
     std::variant<uart::null::Driver, uart::ns8250::Dw8250Driver, uart::pl011::Driver,
-                 uart::ns8250::Mmio8Driver, uart::ns8250::Mmio32Driver>;
+                 uart::ns8250::Mmio8Driver, uart::ns8250::Mmio32Driver, uart::amlogic::Driver>;
 
 template <typename ChosenItemType>
 void CheckChosenMatcher(const ChosenItemType& matcher, const ExpectedChosen& expected) {
@@ -216,7 +217,8 @@ TEST_F(ChosenNodeMatcherTest, ChosenWithUnknownInterruptController) {
 
 TEST_F(ChosenNodeMatcherTest, CrosvmArm) {
   constexpr std::string_view kCmdline =
-      "panic=-1 kernel.experimental.serial_migration=true console.shell=true zircon.autorun.boot=/boot/bin/devicetree-extract";
+      "panic=-1 kernel.experimental.serial_migration=true console.shell=true "
+      "zircon.autorun.boot=/boot/bin/devicetree-extract";
 
   auto fdt = crosvm_arm();
   boot_shim::DevicetreeChosenNodeMatcher<AllUartDrivers> chosen_matcher("test", stdout);
@@ -240,7 +242,9 @@ TEST_F(ChosenNodeMatcherTest, CrosvmArm) {
 
 TEST_F(ChosenNodeMatcherTest, QemuArm) {
   constexpr std::string_view kQemuCmdline =
-      "TERM=xterm-256color kernel.entropy-mixin=cd93b8955fc588b1bcde0d691a694b926d53faeca61c386635739b24df717363 kernel.halt-on-panic=true ";
+      "TERM=xterm-256color "
+      "kernel.entropy-mixin=cd93b8955fc588b1bcde0d691a694b926d53faeca61c386635739b24df717363 "
+      "kernel.halt-on-panic=true ";
   constexpr uint32_t kQemuRamdiskStart = 0x48000000;
   constexpr uint32_t kQemuRamdiskEnd = 0x499e8458;
 
@@ -291,7 +295,8 @@ TEST_F(ChosenNodeMatcherTest, QemuRiscv) {
 
 TEST_F(ChosenNodeMatcherTest, VisionFive2) {
   constexpr std::string_view kCmdline =
-      "root=/dev/mmcblk1p4 rw console=tty0 console=ttyS0,115200 earlycon rootwait stmmaceth=chain_mode:1 selinux=0";
+      "root=/dev/mmcblk1p4 rw console=tty0 console=ttyS0,115200 earlycon rootwait "
+      "stmmaceth=chain_mode:1 selinux=0";
 
   auto fdt = vision_five_2();
   boot_shim::DevicetreeChosenNodeMatcher<AllUartDrivers> chosen_matcher("test", stdout);
@@ -311,6 +316,33 @@ TEST_F(ChosenNodeMatcherTest, VisionFive2) {
                              },
                          .uart_absolute_path = "/soc/serial@10000000",
                      });
+}
+
+TEST_F(ChosenNodeMatcherTest, KhadasVim3) {
+  constexpr std::string_view kCmdline =
+      " androidboot.verifiedbootstate=orange androidboot.dtbo_idx=3   "
+      " androidboot.serialno=06ECB1E62CB2  no_console_suspend console=ttyAML0,115200 earlycon"
+      " printk.devkmsg=on androidboot.boot_devices=soc/ffe07000.mmc init=/init"
+      " firmware_class.path=/vendor/firmware androidboot.hardware=yukawa"
+      " androidboot.selinux=permissive";
+
+  auto fdt = khadas_vim3();
+  boot_shim::DevicetreeChosenNodeMatcher<AllUartDrivers> chosen_matcher("test", stdout);
+
+  ASSERT_TRUE(devicetree::Match(fdt, chosen_matcher));
+
+  CheckChosenMatcher(chosen_matcher, {
+                                         .ramdisk_start = 0x7fe4d000,
+                                         .ramdisk_end = 0x7ffff5d7,
+                                         .cmdline = kCmdline,
+                                         .uart_config_name = uart::amlogic::Driver::config_name(),
+                                         .uart_config =
+                                             {
+                                                 .mmio_phys = 0xff803000,
+                                                 .irq = 225,
+                                             },
+                                         .uart_absolute_path = "/soc/bus@ff800000/serial@3000",
+                                     });
 }
 
 }  // namespace

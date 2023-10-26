@@ -5,11 +5,11 @@
 #ifndef LIB_UART_AMLOGIC_H_
 #define LIB_UART_AMLOGIC_H_
 
+#include <lib/stdcompat/array.h>
 #include <lib/zbi-format/driver-config.h>
 #include <lib/zbi-format/zbi.h>
 
 #include <algorithm>
-#include <array>
 
 #include <hwreg/bitfields.h>
 
@@ -97,6 +97,9 @@ struct IrqControlRegister : public hwreg::RegisterBase<IrqControlRegister, uint3
 };
 
 struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_AMLOGIC_UART, zbi_dcfg_simple_t> {
+  static constexpr auto kDevicetreeBindings =
+      cpp20::to_array<std::string_view>({"amlogic,meson-gx-uart", "amlogic,meson-ao-uart"});
+
   template <typename... Args>
   explicit Driver(Args&&... args)
       : DriverBase<Driver, ZBI_KERNEL_DRIVER_AMLOGIC_UART, zbi_dcfg_simple_t>(

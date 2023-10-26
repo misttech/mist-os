@@ -11,6 +11,7 @@ namespace devicetree_test {
 std::optional<LoadedDtb> ArmDevicetreeTest::crosvm_arm_ = std::nullopt;
 std::optional<LoadedDtb> ArmDevicetreeTest::qemu_arm_gic3_ = std::nullopt;
 std::optional<LoadedDtb> ArmDevicetreeTest::qemu_arm_gic2_ = std::nullopt;
+std::optional<LoadedDtb> ArmDevicetreeTest::khadas_vim3_ = std::nullopt;
 
 std::optional<LoadedDtb> RiscvDevicetreeTest::qemu_riscv_ = std::nullopt;
 std::optional<LoadedDtb> RiscvDevicetreeTest::sifive_hifive_unmatched_ = std::nullopt;

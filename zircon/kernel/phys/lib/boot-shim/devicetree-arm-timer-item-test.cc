@@ -164,4 +164,33 @@ TEST_F(ArmDevicetreeTimerItemTest, Crosvm) {
   ASSERT_TRUE(present);
 }
 
+TEST_F(ArmDevicetreeTimerItemTest, KhadasVim3) {
+  std::array<std::byte, 1024> image_buffer;
+  std::vector<void*> allocs;
+  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  ASSERT_TRUE(image.clear().is_ok());
+
+  auto fdt = khadas_vim3();
+  boot_shim::DevicetreeBootShim<boot_shim::ArmDevicetreeTimerItem> shim("test", fdt);
+
+  shim.Init();
+
+  auto clear_errors = fit::defer([&]() { image.ignore_error(); });
+  ASSERT_TRUE(shim.AppendItems(image).is_ok());
+  bool present = false;
+  for (auto [header, payload] : image) {
+    if (header->type == ZBI_TYPE_KERNEL_DRIVER &&
+        header->extra == ZBI_KERNEL_DRIVER_ARM_GENERIC_TIMER) {
+      ASSERT_GE(payload.size_bytes(), sizeof(zbi_dcfg_arm_generic_timer_driver_t));
+      auto* timer_item = reinterpret_cast<zbi_dcfg_arm_generic_timer_driver_t*>(payload.data());
+      EXPECT_EQ(timer_item->freq_override, 0);
+      EXPECT_EQ(timer_item->irq_phys, 30);
+      EXPECT_EQ(timer_item->irq_sphys, 29);
+      EXPECT_EQ(timer_item->irq_virt, 27);
+      present = true;
+    }
+  }
+  ASSERT_TRUE(present);
+}
+
 }  // namespace

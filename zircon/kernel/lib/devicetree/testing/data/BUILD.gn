@@ -21,6 +21,7 @@ dtb_real = [
   "qemu-riscv.dtb",
   "sifive-hifive-unmatched.dtb",
   "vision-five-2.dtb",
+  "khadas-vim3.dtb",
 ]
 
 # Synthetic devicetree source files meant for testing, they are not required to reflect any real node.

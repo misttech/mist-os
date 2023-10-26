@@ -147,4 +147,29 @@ TEST_F(ArmDevicetreePsciItemTest, ParseCrosvm) {
   ASSERT_TRUE(present, "ZBI Driver for PSCI missing.");
 }
 
+TEST_F(ArmDevicetreePsciItemTest, KhadasVim3) {
+  std::array<std::byte, 256> image_buffer;
+  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  ASSERT_TRUE(image.clear().is_ok());
+
+  auto fdt = khadas_vim3();
+  boot_shim::DevicetreeBootShim<boot_shim::ArmDevicetreePsciItem> shim("test", fdt);
+
+  shim.Init();
+  EXPECT_TRUE(shim.AppendItems(image).is_ok());
+
+  bool present = false;
+  for (auto [header, payload] : image) {
+    if (header->type == ZBI_TYPE_KERNEL_DRIVER && header->extra == ZBI_KERNEL_DRIVER_ARM_PSCI) {
+      present = true;
+      ASSERT_EQ(payload.size(), sizeof(zbi_dcfg_arm_psci_driver_t));
+      const auto* dcfg = reinterpret_cast<const zbi_dcfg_arm_psci_driver_t*>(payload.data());
+      EXPECT_FALSE(dcfg->use_hvc);
+      break;
+    }
+  }
+  image.ignore_error();
+  ASSERT_TRUE(present, "ZBI Driver for PSCI missing.");
+}
+
 }  // namespace

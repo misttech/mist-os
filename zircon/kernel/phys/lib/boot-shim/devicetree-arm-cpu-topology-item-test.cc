@@ -778,4 +778,234 @@ TEST_F(ArmCpuTopologyItemTest, Crosvm) {
   ASSERT_TRUE(present);
 }
 
+TEST_F(ArmCpuTopologyItemTest, KhadasVim3) {
+  constexpr std::array
+      kExpectedTopology =
+          {
+
+              // cluster0
+              zbi_topology_node_t{
+                  .entity =
+                      {
+                          .discriminant = ZBI_TOPOLOGY_ENTITY_CLUSTER,
+                          .cluster =
+                              {
+                                  .performance_class = 0x93,
+                              },
+                      },
+                  .parent_index = ZBI_TOPOLOGY_NO_PARENT,
+              },
+
+              // cpu@0
+              zbi_topology_node_t{
+                  .entity =
+                      {
+                          .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                          .processor =
+                              {
+                                  .architecture_info =
+                                      {
+                                          .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64,
+                                          .arm64 =
+                                              {
+                                                  .cluster_1_id = 0,
+                                                  .cluster_2_id = 0,
+                                                  .cluster_3_id = 0,
+                                                  .cpu_id = 0,
+                                                  .gic_id = 0,
+                                              },
+                                      },
+                                  .flags = ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY,
+                                  .logical_ids = {0, 0, 0, 0},
+                                  .logical_id_count = 1,
+                              },
+                      },
+                  .parent_index = 0,
+              },
+
+              // core@1
+              zbi_topology_node_t{
+                  .entity =
+                      {
+                          .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                          .processor =
+                              {
+                                  .architecture_info =
+                                      {
+                                          .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64,
+                                          .arm64 =
+                                              {
+                                                  .cluster_1_id = 0,
+                                                  .cluster_2_id = 0,
+                                                  .cluster_3_id = 0,
+                                                  .cpu_id = 1,
+                                                  .gic_id = 1,
+                                              },
+                                      },
+                                  .flags = 0,
+                                  .logical_ids = {1, 0, 0, 0},
+                                  .logical_id_count = 1,
+                              },
+                      },
+                  .parent_index = 0,
+              },
+
+              // cluster1
+              zbi_topology_node_t{
+                  .entity =
+                      {
+                          .discriminant = ZBI_TOPOLOGY_ENTITY_CLUSTER,
+                          .cluster =
+                              {
+                                  .performance_class = 0xFF,
+                              },
+                      },
+                  .parent_index = ZBI_TOPOLOGY_NO_PARENT,
+              },
+
+              // core@100
+              zbi_topology_node_t{
+                  .entity =
+                      {
+                          .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                          .processor =
+                              {
+                                  .architecture_info =
+                                      {
+                                          .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64,
+                                          .arm64 =
+                                              {
+                                                  .cluster_1_id = 1,
+                                                  .cluster_2_id = 0,
+                                                  .cluster_3_id = 0,
+                                                  .cpu_id = 0,
+                                                  .gic_id = 2,
+                                              },
+                                      },
+                                  .flags = 0,
+                                  .logical_ids = {2, 0, 0, 0},
+                                  .logical_id_count = 1,
+                              },
+                      },
+                  .parent_index = 3,
+              },
+
+              // core@101
+              zbi_topology_node_t{
+                  .entity =
+                      {
+                          .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                          .processor =
+                              {
+                                  .architecture_info =
+                                      {
+                                          .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64,
+                                          .arm64 =
+                                              {
+                                                  .cluster_1_id = 1,
+                                                  .cluster_2_id = 0,
+                                                  .cluster_3_id = 0,
+                                                  .cpu_id = 1,
+                                                  .gic_id = 3,
+                                              },
+                                      },
+                                  .flags = 0,
+                                  .logical_ids = {3, 0, 0, 0},
+                                  .logical_id_count = 1,
+                              },
+                      },
+                  .parent_index = 3,
+              },
+
+              // core@102
+              zbi_topology_node_t{
+                  .entity =
+                      {
+                          .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                          .processor =
+                              {
+                                  .architecture_info =
+                                      {
+                                          .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64,
+                                          .arm64 =
+                                              {
+                                                  .cluster_1_id = 1,
+                                                  .cluster_2_id = 0,
+                                                  .cluster_3_id = 0,
+                                                  .cpu_id = 2,
+                                                  .gic_id = 4,
+                                              },
+                                      },
+                                  .flags = 0,
+                                  .logical_ids = {4, 0, 0, 0},
+                                  .logical_id_count = 1,
+                              },
+                      },
+                  .parent_index = 3,
+              },
+
+              // core@103
+              zbi_topology_node_t{
+                  .entity =
+                      {
+                          .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                          .processor =
+                              {
+                                  .architecture_info =
+                                      {
+                                          .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64,
+                                          .arm64 =
+                                              {
+                                                  .cluster_1_id = 1,
+                                                  .cluster_2_id = 0,
+                                                  .cluster_3_id = 0,
+                                                  .cpu_id = 3,
+                                                  .gic_id = 5,
+                                              },
+                                      },
+                                  .flags = 0,
+                                  .logical_ids = {5, 0, 0, 0},
+                                  .logical_id_count = 1,
+                              },
+                      },
+                  .parent_index = 3,
+              },
+          };
+
+  std::array<std::byte, 1024> image_buffer;
+  std::vector<void*> allocs;
+  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  ASSERT_TRUE(image.clear().is_ok());
+
+  auto fdt = khadas_vim3();
+  boot_shim::DevicetreeBootShim<boot_shim::ArmDevictreeCpuTopologyItem> shim("test", fdt);
+  shim.set_allocator([&allocs](size_t size, size_t alignment) -> void* {
+    // Custom aligned_alloc since OS X doesnt support it in some versions.
+    void* alloc = malloc(size + alignment);
+    allocs.push_back(alloc);
+    return reinterpret_cast<void*>((reinterpret_cast<uintptr_t>(alloc) + alignment) &
+                                   ~(alignment - 1));
+  });
+
+  auto release_memory = fit::defer([&]() {
+    for (auto* alloc : allocs) {
+      free(alloc);
+    }
+  });
+
+  shim.Init();
+  auto clear_errors = fit::defer([&]() { image.ignore_error(); });
+  ASSERT_TRUE(shim.AppendItems(image).is_ok());
+  bool present = false;
+  for (auto [header, payload] : image) {
+    if (header->type == ZBI_TYPE_CPU_TOPOLOGY) {
+      present = true;
+      cpp20::span<zbi_topology_node_t> nodes(reinterpret_cast<zbi_topology_node_t*>(payload.data()),
+                                             payload.size() / sizeof(zbi_topology_node_t));
+      devicetree_test::CheckCpuTopology(nodes, kExpectedTopology);
+    }
+  }
+  ASSERT_TRUE(present);
+}
+
 }  // namespace
