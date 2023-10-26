@@ -13,23 +13,25 @@ def _doc_checker(ctx):
         return
 
     exe = compiled_tool_path(ctx, "doc-checker")
-    res = os_exec(ctx, [exe, "--json", "--local-links-only", "--root", get_fuchsia_dir(ctx)], ok_retcodes = [0, 1]).wait()
-    findings = json.decode(res.stdout)
-    for finding in findings:
-        abspath = finding["doc_line"]["file_name"]
-        msg = finding["message"]
-        if finding["help_suggestion"]:
-            msg += "\n\n" + finding["help_suggestion"]
-        msg += "\n\nRun `fx doc-checker --local-links-only` to reproduce."
+    res = os_exec(ctx, [exe, "--local-links-only", "--root", get_fuchsia_dir(ctx)], ok_retcodes = [0, 1]).wait()
+    if res.retcode == 0:
+        return
+    lines = res.stdout.split("\n")
+    for i in range(0, len(lines), 4):
+        # The doc-checker output contains 4-line plain text entries of the
+        # form:
+        # """Error
+        # /path/to/file:<line_number>
+        # The error message
+        # """
+        if i + 4 > len(lines):
+            break
+        _, location, msg, _ = lines[i:i + 4]
+        abspath = location.split(":", 1)[0]
         ctx.emit.finding(
-            level = {
-                "Info": "notice",
-                "Warning": "warning",
-                "Error": "error",
-            }[finding["level"]],
+            level = "error",
             filepath = abspath[len(ctx.scm.root) + 1:],
-            line = finding["doc_line"]["line_num"],
-            message = msg,
+            message = msg + "\n\n" + "Run `fx doc-checker --local-links-only` to reproduce.",
         )
 
 def _mdlint(ctx):
