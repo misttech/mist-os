@@ -23,12 +23,14 @@ use {
     crate::{crash_info::CrashRecords, vdso_vmo::get_next_vdso_vmo},
     ::routing::policy::ScopedPolicyChecker,
     chrono::{DateTime, NaiveDateTime, Utc},
+    fidl::endpoints::ControlHandle,
+    fidl::endpoints::RequestStream,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_component as fcomp, fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_diagnostics_types::{
         ComponentDiagnostics, ComponentTasks, Task as DiagnosticsTask,
     },
-    fidl_fuchsia_mem as fmem, fidl_fuchsia_process as fproc,
+    fidl_fuchsia_mem as fmem, fidl_fuchsia_memory_report as freport, fidl_fuchsia_process as fproc,
     fidl_fuchsia_process_lifecycle::LifecycleMarker,
     fuchsia_async::{self as fasync, TimeoutExt},
     fuchsia_runtime::{duplicate_utc_clock_handle, job_default, HandleInfo, HandleType},
@@ -422,6 +424,14 @@ impl ElfRunner {
         checker: ScopedPolicyChecker,
     ) -> Arc<ScopedElfRunner> {
         Arc::new(ScopedElfRunner { runner: self, checker })
+    }
+
+    pub fn serve_memory_reporter(&self, stream: freport::SnapshotProviderRequestStream) {
+        fasync::Task::spawn(async move {
+            // TODO(fxbug.dev/307580082): Implement.
+            stream.control_handle().shutdown_with_epitaph(zx::Status::NOT_SUPPORTED);
+        })
+        .detach();
     }
 }
 

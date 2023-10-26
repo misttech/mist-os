@@ -123,6 +123,11 @@
             to: "#core",
         },
         {
+            protocol: [ "fuchsia.memory.report.SnapshotProvider" ],
+            from: "parent",
+            to: "#core",
+        },
+        {
             protocol: [
                 "fuchsia.component.resolution.Resolver",
                 "fuchsia.sys2.SystemController",

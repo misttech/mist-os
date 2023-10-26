@@ -43,6 +43,7 @@
                 "fuchsia.sys2.CrashIntrospect",
                 "fuchsia.sys2.SystemController",
                 "fuchsia.time.Maintenance",
+                "fuchsia.memory.report.SnapshotProvider",
             ],
         },
         {

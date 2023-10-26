@@ -16,6 +16,7 @@ use {
             cpu_resource::CpuResource,
             crash_introspect::CrashIntrospectSvc,
             debug_resource::DebugResource,
+            elf_runner_memory_attribution::ElfRunnerMemoryAttribution,
             energy_info_resource::EnergyInfoResource,
             factory_items::FactoryItems,
             fuchsia_boot_resolver::{FuchsiaBootResolver, SCHEME as BOOT_SCHEME},
@@ -86,8 +87,9 @@ use {
     fidl_fuchsia_boot as fboot,
     fidl_fuchsia_component_internal::BuiltinBootResolver,
     fidl_fuchsia_diagnostics_types::Task as DiagnosticsTask,
-    fidl_fuchsia_io as fio, fidl_fuchsia_kernel as fkernel, fidl_fuchsia_process as fprocess,
-    fidl_fuchsia_sys2 as fsys, fidl_fuchsia_time as ftime, fuchsia_async as fasync,
+    fidl_fuchsia_io as fio, fidl_fuchsia_kernel as fkernel, fidl_fuchsia_memory_report as freport,
+    fidl_fuchsia_process as fprocess, fidl_fuchsia_sys2 as fsys, fidl_fuchsia_time as ftime,
+    fuchsia_async as fasync,
     fuchsia_component::server::*,
     fuchsia_inspect::{self as inspect, component, health::Reporter, Inspector},
     fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType},
@@ -111,6 +113,7 @@ pub struct BuiltinEnvironmentBuilder {
     runtime_config: Option<RuntimeConfig>,
     bootfs_svc: Option<BootfsSvc>,
     runners: Vec<(Name, Arc<dyn BuiltinRunnerFactory>)>,
+    elf_runner: Option<Arc<ElfRunner>>,
     resolvers: ResolverRegistry,
     utc_clock: Option<Arc<Clock>>,
     add_environment_resolvers: bool,
@@ -124,6 +127,7 @@ impl Default for BuiltinEnvironmentBuilder {
             runtime_config: None,
             bootfs_svc: None,
             runners: vec![],
+            elf_runner: None,
             resolvers: ResolverRegistry::default(),
             utc_clock: None,
             add_environment_resolvers: false,
@@ -171,7 +175,7 @@ impl BuiltinEnvironmentBuilder {
         Ok(self)
     }
 
-    pub fn add_elf_runner(self) -> Result<Self, Error> {
+    pub fn add_elf_runner(mut self) -> Result<Self, Error> {
         let runtime_config = self
             .runtime_config
             .as_ref()
@@ -188,6 +192,7 @@ impl BuiltinEnvironmentBuilder {
             self.utc_clock.clone(),
             self.crash_records.clone(),
         ));
+        self.elf_runner = Some(runner.clone());
         Ok(self.add_runner("elf".parse().unwrap(), runner))
     }
 
@@ -337,6 +342,7 @@ impl BuiltinEnvironmentBuilder {
             self.utc_clock,
             self.inspector.unwrap_or(component::inspector().clone()),
             self.crash_records,
+            self.elf_runner,
         )
         .await?)
     }
@@ -462,6 +468,7 @@ impl BuiltinEnvironment {
         utc_clock: Option<Arc<Clock>>,
         inspector: Inspector,
         crash_records: CrashRecords,
+        elf_runner: Option<Arc<ElfRunner>>,
     ) -> Result<BuiltinEnvironment, Error> {
         let debug = runtime_config.debug;
 
@@ -950,6 +957,16 @@ impl BuiltinEnvironment {
         ));
         model.root().hooks.install(event_source_factory.hooks()).await;
         model.root().hooks.install(event_stream_provider.hooks()).await;
+
+        if let Some(elf_runner) = elf_runner {
+            let elf_runner_memory_attribution = ElfRunnerMemoryAttribution::new(elf_runner);
+            sandbox_builder.add_builtin_protocol_if_enabled::<freport::SnapshotProviderMarker>(
+                move |stream| {
+                    elf_runner_memory_attribution.serve(stream);
+                    std::future::ready::<Result<(), anyhow::Error>>(Ok(())).boxed()
+                },
+            );
+        }
 
         let (sandbox, builtin_receivers_task) = sandbox_builder.build();
         let builtin_receivers_task_group = TaskGroup::new();
