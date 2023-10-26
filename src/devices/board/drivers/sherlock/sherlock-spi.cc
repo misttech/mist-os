@@ -109,8 +109,7 @@ zx_status_t Sherlock::SpiInit() {
   // TODO(fxbug.dev/34010): fix this clock enable block when the clock driver can handle the
   // dividers
   {
-    // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
-    zx::unowned_resource resource(get_root_resource(parent()));
+    zx::unowned_resource resource(get_mmio_resource(parent()));
     zx::vmo vmo;
     zx_status_t status = zx::vmo::create_physical(*resource, T931_HIU_BASE, T931_HIU_LENGTH, &vmo);
     if (status != ZX_OK) {

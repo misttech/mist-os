@@ -154,7 +154,7 @@ zx_status_t Sherlock::SdioInit() {
   gpio_init_steps_.push_back({T931_SDIO_CLK, set_alt_function(T931_SDIO_CLK_FN)});
   gpio_init_steps_.push_back({T931_SDIO_CMD, set_alt_function(T931_SDIO_CMD_FN)});
 
-  zx::unowned_resource res(get_root_resource(parent()));
+  zx::unowned_resource res(get_mmio_resource(parent()));
   zx::vmo vmo;
   status = zx::vmo::create_physical(*res, kGpioBase, kGpioBaseOffset + T931_GPIO_LENGTH, &vmo);
   if (status != ZX_OK) {
