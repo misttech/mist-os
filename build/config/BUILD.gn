@@ -729,6 +729,7 @@ config("Wno-vla-cxx-extension") {
     "//src/connectivity/bluetooth/core/bt-host/socket:*",
     "//src/connectivity/bluetooth/hci/transport/usb:*",
     "//src/connectivity/ethernet/drivers/ethernet/netdevice-migration:*",
+    "//src/connectivity/ethernet/drivers/gvnic:*",
     "//src/connectivity/network/netstack/udp_serde:*",
     "//src/connectivity/network/tests/benchmarks/udp-serde:*",
     "//src/connectivity/network/tests/external_network:*",

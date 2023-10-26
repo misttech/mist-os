@@ -53,6 +53,9 @@ fuchsia_driver("gvnic-driver") {
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/inspect",
   ]
+
+  # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
+  configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
 fuchsia_driver_component("gvnic") {
