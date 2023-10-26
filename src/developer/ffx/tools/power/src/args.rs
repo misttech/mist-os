@@ -4,7 +4,7 @@
 
 use argh::{ArgsInfo, FromArgs};
 use ffx_core::ffx_command;
-use ffx_power_sub_command::SubCommand;
+use ffx_power_plugin_sub_command::SubCommand;
 
 #[ffx_command()]
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]

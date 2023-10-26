@@ -4,5 +4,5 @@
 
 #[fuchsia_async::run_singlethreaded]
 async fn main() {
-    ffx_power_suite::fho_suite_main().await
+    ffx_power_plugin_suite::fho_suite_main().await
 }

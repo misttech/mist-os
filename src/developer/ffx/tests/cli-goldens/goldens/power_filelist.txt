@@ -1,2 +1,0 @@
-ffx/power.golden
-ffx/power/debugcmd.golden

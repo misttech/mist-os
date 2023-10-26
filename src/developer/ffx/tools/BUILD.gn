@@ -9,6 +9,7 @@ _tools = [
   "//src/developer/ffx/plugins/audio",
   "auth",
   "echo",
+  "power",
   "profiler",
   "starnix",
   "target-package",

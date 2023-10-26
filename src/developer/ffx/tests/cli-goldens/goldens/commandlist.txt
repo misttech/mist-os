@@ -16,7 +16,6 @@ log
 net
 package
 platform
-power
 process
 product
 profile
