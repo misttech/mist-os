@@ -17,6 +17,7 @@ rustc_library("platform_configuration") {
     "src/subsystems.rs",
     "src/subsystems/battery.rs",
     "src/subsystems/build_info.rs",
+    "src/subsystems/component.rs",
     "src/subsystems/connectivity.rs",
     "src/subsystems/development.rs",
     "src/subsystems/diagnostics.rs",
@@ -47,6 +48,7 @@ rustc_library("platform_configuration") {
   deps = [
     "//src/developer/ffx/config:lib",
     "//src/lib/assembly/component_id_index",
+    "//src/lib/assembly/component_manager_config",
     "//src/lib/assembly/config_schema",
     "//src/lib/assembly/images_config",
     "//src/lib/assembly/named_file_map",

@@ -32,6 +32,11 @@ pub struct ProductConfig {
     /// The file paths to various build information.
     #[serde(default)]
     pub build_info: Option<BuildInfoConfig>,
+
+    /// The policy given to component_manager that restricts where sensitive capabilities can be
+    /// routed.
+    #[serde(default)]
+    pub component_policy: Option<ComponentPolicyConfig>,
 }
 
 /// Packages provided by the product, to add to the assembled images.
@@ -134,6 +139,15 @@ pub struct BuildInfoConfig {
     pub latest_commit_date: Utf8PathBuf,
     /// Path to the minimum UTC stamp.
     pub minimum_utc_stamp: Utf8PathBuf,
+}
+
+/// Configuration options for the component policy.
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ComponentPolicyConfig {
+    /// The file paths to a product-provided component policies.
+    #[serde(default)]
+    pub product_policies: Vec<Utf8PathBuf>,
 }
 
 #[cfg(test)]

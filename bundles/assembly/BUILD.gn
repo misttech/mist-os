@@ -2801,7 +2801,18 @@ assembly_input_bundle("fonts_hermetic") {
 
 # Static resources files to make available to product assembly subsystems.
 assembly_resources_directory("resources") {
-  sources = [ "//src/sys/core/core_component_id_index.json5" ]
+  sources = [
+    "//src/sys/core/core_component_id_index.json5",
+
+    # Platform configs for the component_manager config.
+    "//src/security/policy/component_manager_policy.json5",
+    "//src/security/policy/component_manager_policy_base.json5",
+    "//src/security/policy/component_manager_policy_build_type_base.json5",
+    "//src/security/policy/component_manager_policy_eng.json5",
+    "//src/security/policy/component_manager_policy_user.json5",
+    "//src/security/policy/component_manager_policy_userdebug.json5",
+    "//src/sys/component_manager/configs/bootfs_config.json5",
+  ]
 }
 
 # Enables in kernel compression of anonymous memory with some common configuration options.

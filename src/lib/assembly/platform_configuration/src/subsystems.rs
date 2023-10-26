@@ -25,6 +25,7 @@ use prelude::*;
 
 mod battery;
 mod build_info;
+mod component;
 mod connectivity;
 mod development;
 mod diagnostics;
@@ -211,6 +212,13 @@ fn configure_subsystems(
         builder,
     )
     .context("Configuring the 'build_info' subsystem")?;
+
+    component::ComponentSubsystem::define_configuration(
+        context,
+        &config.product.component_policy,
+        builder,
+    )
+    .context("Configuring the 'component' subsystem")?;
 
     connectivity::ConnectivitySubsystemConfig::define_configuration(
         context,
