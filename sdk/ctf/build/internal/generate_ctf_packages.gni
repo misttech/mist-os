@@ -47,7 +47,7 @@ template("generate_ctf_package") {
 #
 # Each package is named according the API level it tests. For example, a package
 # originally named "fuchsia-echo-tests" in the CTF release for API level 11 can
-# be referred to using the label :fuchsia-echo-tests_api11.
+# be referred to using the label :fuchsia-echo-tests_ctf11.
 #
 # The input is a JSON list containing the set of packages to generated.
 # See `generate_ctf_package` above for the schema used by each object in the list.
@@ -63,7 +63,7 @@ template("generate_ctf_packages") {
   root_dir = get_path_info(manifest, "dir")
   foreach(item, read_file(manifest, "json")) {
     actual_package_name = item.package_name
-    package_target_name = "${actual_package_name}_api${api_level}"
+    package_target_name = "${actual_package_name}_ctf${api_level}"
     packages += [ ":$package_target_name" ]
     generate_ctf_package(package_target_name) {
       package_name = actual_package_name

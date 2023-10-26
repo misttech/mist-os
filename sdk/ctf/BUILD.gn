@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/config/build_api_module.gni")
+import("//build/config/fuchsia/platform_version.gni")
 import("//build/testing/golden_files.gni")
 import("//sdk/ctf/build/ctf.gni")
 
@@ -73,12 +74,8 @@ generated_file("host_test_manifest") {
   }
 }
 
-# TODO(125231): Add the same check for API levels 12+ after the next bump.
-#
-# Ensures test authors add new test templates in generate_ctf_tests.gni when adding tests,
-# and that those templates actually build.
 generate_ctf_tests("check_test_templates") {
-  api_level = "test"
+  api_level = "_in_development"
   manifest = "//sdk/ctf/goldens/package_archives.json"
   use_prebuilts_from_current_build = true
 }

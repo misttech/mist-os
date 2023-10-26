@@ -276,7 +276,7 @@ template("generate_ctf_tests") {
   tests = []
 
   foreach(prebuilt_package, read_file(manifest, "json")) {
-    test_name = "${prebuilt_package.package_name}_api${invoker.api_level}"
+    test_name = "${prebuilt_package.package_name}_ctf${invoker.api_level}"
     generate_ctf_test(test_name) {
       forward_variables_from(invoker,
                              [

@@ -136,11 +136,12 @@ with the GN template. If everything succeeds, the test can be run using this
 command:
 
 ```sh
-fx test fuchsia-example-test_apitest
+fx test fuchsia-example-test_ctf<N>
 ```
 
-The `_apitest` suffix indicates that this is the version of the prebuilt test
-from the latest build rather than some version from a previous CTF release.
+Given that this is the version of the prebuilt test from the current build rather
+than some version from a previous CTF release, `N` is the Fuchsia platform's
+currently in-development API level.
 
 ### 6. Submit the changes
 
@@ -195,6 +196,5 @@ At the time of writing CTF only supports these languages.
 [SDK category]: /docs/contribute/sdk/categories.md
 [test realm factory]: /docs/development/testing/components/test_realm_factory.md
 [//sdk/ctf/tests:tests]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/ctf/tests/BUILD.gn
-[//sdk/ctf/build]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/ctf/build/
 [//sdk/ctf/build/generate_ctf_tests.gni]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/ctf/build/generate_ctf_tests.gni
 [//sdk/ctf/goldens/package_archives.json]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/ctf/goldens/package_archives.json

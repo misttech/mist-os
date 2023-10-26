@@ -37,7 +37,7 @@ template("compatibility_test_suite") {
   }
 
   # On-device ABI tests.
-  on_device_tests = "${target_name}_api${invoker.api_level}"
+  on_device_tests = "${target_name}_ctf${invoker.api_level}"
   generate_ctf_tests(on_device_tests) {
     forward_variables_from(invoker, [ "api_level" ])
     manifest = "${invoker.path}/package_archives.json"
