@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 import asyncio
 import logging
-from typing import Dict, Set
+from typing import Dict, Set, Any, Tuple
 
 from fidl_codec import decode_fidl_response
 from fidl_codec import encode_fidl_message
@@ -44,10 +44,36 @@ class FidlClient(object):
             self.staged_messages[txid] = asyncio.Queue(1)
         self.staged_messages[txid].put_nowait(msg)
 
-    def _decode(self, txid: TXID_Type, msg: FidlMessage):
-        self.staged_messages.pop(txid)  # Just a memory leak prevention.
-        self.pending_txids.remove(txid)
+    def _clean_staging(self, txid: TXID_Type):
+        self.staged_messages.pop(txid)
+        # Events are never added to this set, since they're always pending.
+        if txid != 0:
+            self.pending_txids.remove(txid)
+
+    def _decode(self, txid: TXID_Type, msg: FidlMessage) -> Dict[str, Any]:
+        self._clean_staging(txid)
         return decode_fidl_response(bytes=msg[0], handles=msg[1])
+
+    async def next_event(self) -> FidlMessage:
+        """Attempts to read the next FIDL event from this client.
+
+        Returns:
+            The next FIDL event. If ZX_ERR_PEER_CLOSED is received on the channel, will return None.
+            Note: this does not check to see if the protocol supports any events, so if not this
+            function could wait forever.
+
+        Raises:
+            Any exceptions other than ZX_ERR_PEER_CLOSED (fuchsia_controller_py.ZxStatus)
+        """
+        # TODO(awdavies): Raise an exception if there are no events supported for this client.
+        try:
+            self.channel_waker.register(self.channel)
+            return await self._read_and_decode(0)
+        except fc.ZxStatus as e:
+            if e.args[0] != fc.ZxStatus.ZX_ERR_PEER_CLOSED:
+                self.channel_waker.unregister(self.channel)
+                raise e
+        return None
 
     async def _read_and_decode(self, txid: int):
         if txid not in self.staged_messages:
@@ -70,12 +96,14 @@ class FidlClient(object):
                 msg = self.channel.read()
                 recvd_txid = parse_txid(msg)
                 if recvd_txid == txid:
-                    return self._decode(txid, msg)
-                if recvd_txid == 0:  # This is an event.
-                    logging.warning(
-                        f"FIDL channel event on chan: {self.channel.as_int()}. Currently ignoring."
-                    )
-                elif recvd_txid not in self.pending_txids:
+                    if txid != 0:
+                        return self._decode(txid, msg)
+                    else:
+                        # There's additional message processing for events, so instead return the
+                        # raw bytes/handles.
+                        self._clean_staging(txid)
+                        return msg
+                if recvd_txid != 0 and recvd_txid not in self.pending_txids:
                     self.channel_waker.unregister(self.channel)
                     self.channel = None
                     raise RuntimeError(
@@ -173,3 +201,46 @@ class FidlClient(object):
             type_name=type_name,
         )
         self.channel.write(fidl_message)
+
+
+class EventHandlerBase(object):
+    """Base object for doing FIDL client event handling."""
+
+    library: str = ""
+    method_map: typing.Dict[Ordinal, MethodInfo] = {}
+
+    def __init__(self, client: FidlClient):
+        self.client = client
+        self.client.channel_waker.register(self.client.channel)
+
+    async def serve(self):
+        while True:
+            msg = await self.client.next_event()
+            # msg is None if the channel has been closed.
+            if msg is None:
+                break
+            if not await self._handle_request(msg):
+                break
+
+    async def _handle_request(self, msg: FidlMessage):
+        try:
+            await self._handle_request_helper(msg)
+            return True
+        except StopEventHandler:
+            return False
+
+    async def _handle_request_helper(self, msg: FidlMessage):
+        ordinal = parse_ordinal(msg)
+        txid = parse_txid(msg)
+        handles = [x.take() for x in msg[1]]
+        decoded_msg = decode_fidl_response(bytes=msg[0], handles=handles)
+        method = self.method_map[ordinal]
+        request_ident = method.request_ident
+        request_obj = construct_response_object(request_ident, decoded_msg)
+        method_lambda = getattr(self, method.name)
+        if request_obj is not None:
+            res = method_lambda(request_obj)
+        else:
+            res = method_lambda()
+        if asyncio.iscoroutine(res) or asyncio.isfuture(res):
+            await res

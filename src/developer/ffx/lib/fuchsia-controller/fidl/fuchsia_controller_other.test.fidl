@@ -26,4 +26,11 @@ closed protocol CrossLibraryNoop {
     strict SendingProtocol(resource struct {
         some_handle server_end:fuchsia.controller.test.Testing;
     });
+
+    strict -> OnRandomEvent(struct {
+        this uint32;
+        that TestingEnum;
+    });
+
+    strict -> OnEmptyEvent();
 };

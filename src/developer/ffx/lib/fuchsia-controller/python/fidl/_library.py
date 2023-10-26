@@ -30,10 +30,11 @@ from typing import (
 
 from fidl_codec import add_ir_path
 
+from ._client import EventHandlerBase
 from ._client import FidlClient
 from ._fidl_common import camel_case_to_snake_case
 from ._fidl_common import internal_kind_to_type
-from ._server import MethodInfo
+from ._fidl_common import MethodInfo
 from ._server import ServerBase
 
 LIB_MAP: Dict[str, str] = {}
@@ -718,9 +719,46 @@ def protocol_type(ir, root_ir, recurse_guard=None) -> type:
             "__fidl_kind__": "protocol",
             "Client": protocol_client_type(ir, root_ir),
             "Server": protocol_server_type(ir, root_ir),
+            "EventHandler": protocol_event_handler_type(ir, root_ir),
             "MARKER": fidl_ident_to_marker(ir.name()),
         },
     )
+
+
+def protocol_event_handler_type(ir: IR, root_ir) -> type:
+    name = fidl_ident_to_py_library_member(ir.name())
+    properties = {
+        "__doc__": docstring(ir),
+        "__fidl_kind__": "event_handler",
+        "library": root_ir.name(),
+        "method_map": {},
+    }
+    for method in ir.methods():
+        # Methods without a request are event methods.
+        if method.has_request():
+            continue
+        method_snake_case = camel_case_to_snake_case(method.name())
+        properties[method_snake_case] = event_method(
+            method, root_ir, get_fidl_request_server_lambda
+        )
+        ident = ""
+        # The IR uses direction-based terminology, so an event is a method where
+        # "has_request" is false and "has_response" is true (server -> client).
+        # We are moving towards sequence-based terminology, where "request"
+        # always means the initiating message. That's why the generated type is
+        # named as *Request, but we use the "response" IR fields.
+        # TODO(fxbug.dev/7660): Remove this comment when the IR is updated.
+        if "maybe_response_payload" in method:
+            ident = method.response_payload_raw_identifier()
+        properties["method_map"][method.ordinal()] = MethodInfo(
+            name=method_snake_case,
+            request_ident=ident,
+            requires_response=False,
+            empty_response=False,
+            has_result=False,
+            response_identifier=None,
+        )
+    return type(name, (EventHandlerBase,), properties)
 
 
 def protocol_server_type(ir: IR, root_ir) -> type:
@@ -732,10 +770,13 @@ def protocol_server_type(ir: IR, root_ir) -> type:
         "method_map": {},
     }
     for method in ir.methods():
-        if not method.has_request():
-            # This is an event.
-            continue
         method_snake_case = camel_case_to_snake_case(method.name())
+        if not method.has_request():
+            # This is an event. It is callable as a one-way method.
+            properties[method_snake_case] = event_method(
+                method, root_ir, send_event_lambda
+            )
+            continue
         properties[method_snake_case] = protocol_method(
             method, root_ir, get_fidl_request_server_lambda
         )
@@ -806,6 +847,16 @@ def get_fidl_request_client_lambda(ir: Method, root_ir, msg) -> Callable:
     )
 
 
+def send_event_lambda(method: Method, root_ir: IR, msg) -> Callable:
+    assert not method.has_request()
+    if msg:
+        return lambda self, *args, **kwargs: self._send_event(
+            method["ordinal"], root_ir.name(), msg(*args, **kwargs)
+        )
+
+    return lambda self: self._send_event(method["ordinal"], root_ir.name(), msg)
+
+
 def get_fidl_request_server_lambda(ir: Method, root_ir, msg) -> Callable:
     snake_case_name = camel_case_to_snake_case(ir.name())
     if msg:
@@ -839,17 +890,63 @@ def normalize_identifier(identifier: str) -> str:
     return identifier
 
 
+def event_method(
+    method: Method,
+    root_ir: IR,
+    lambda_constructor: Callable,
+    recurse_guard=None,
+) -> Callable:
+    assert not method.has_request()
+    if "maybe_response_payload" in method:
+        payload_id = method.response_payload_raw_identifier()
+        (payload_kind, payload_ir) = root_ir.resolve_kind(payload_id)
+    else:
+        payload_id = None
+        payload_kind = None
+        payload_ir = None
+    return create_method(
+        method,
+        root_ir,
+        payload_id,
+        payload_kind,
+        payload_ir,
+        lambda_constructor,
+        recurse_guard,
+    )
+
+
 def protocol_method(
     method: Method, root_ir, lambda_constructor: Callable, recurse_guard=None
 ) -> Callable:
     assert method.has_request()
     if "maybe_request_payload" in method:
-        req_id = method.request_payload_identifier()
-        (req_kind, req_ir) = root_ir.resolve_kind(req_id)
+        payload_id = method.request_payload_identifier()
+        (payload_kind, payload_ir) = root_ir.resolve_kind(payload_id)
     else:
-        req_kind = None
-        method_impl = lambda_constructor(method, root_ir, None)
-    if req_kind == "struct":
+        payload_id = None
+        payload_kind = None
+        payload_ir = None
+    return create_method(
+        method,
+        root_ir,
+        payload_id,
+        payload_kind,
+        payload_ir,
+        lambda_constructor,
+        recurse_guard,
+    )
+
+
+def create_method(
+    method: Method,
+    root_ir: IR,
+    payload_id: str,
+    payload_kind: str,
+    payload_ir: IR,
+    lambda_constructor: Callable,
+    recurse_guard=None,
+):
+    if payload_kind == "struct":
         params = [
             inspect.Parameter(
                 normalize_member_name(member["name"]),
@@ -858,12 +955,12 @@ def protocol_method(
                     member["type"], root_ir, recurse_guard
                 ),
             )
-            for member in req_ir["members"]
+            for member in payload_ir["members"]
         ]
         method_impl = lambda_constructor(
-            method, root_ir, get_type_by_identifier(req_id, root_ir)
+            method, root_ir, get_type_by_identifier(payload_id, root_ir)
         )
-    elif req_kind == "table":
+    elif payload_kind == "table":
         params = [
             inspect.Parameter(
                 member["name"],
@@ -873,13 +970,13 @@ def protocol_method(
                     member["type"], root_ir, recurse_guard
                 ),
             )
-            for member in req_ir["members"]
+            for member in payload_ir["members"]
             if not member["reserved"]
         ]
         method_impl = lambda_constructor(
-            method, root_ir, get_type_by_identifier(req_id, root_ir)
+            method, root_ir, get_type_by_identifier(payload_id, root_ir)
         )
-    elif req_kind == "union":
+    elif payload_kind == "union":
         params = [
             inspect.Parameter(
                 member["name"],
@@ -888,16 +985,19 @@ def protocol_method(
                     member["type"], root_ir, recurse_guard
                 ),
             )
-            for member in req_ir["members"]
+            for member in payload_ir["members"]
             if not member["reserved"]
         ]
         method_impl = lambda_constructor(
-            method, root_ir, get_type_by_identifier(req_id, root_ir)
+            method, root_ir, get_type_by_identifier(payload_id, root_ir)
         )
-    elif req_kind == None:
+    elif payload_kind == None:
         params = []
+        method_impl = lambda_constructor(method, root_ir, None)
     else:
-        raise RuntimeError(f"Unrecognized method parameter kind: {req_kind}")
+        raise RuntimeError(
+            f"Unrecognized method parameter kind: {payload_kind}"
+        )
 
     setattr(method_impl, "__signature__", inspect.Signature(params))
     setattr(method_impl, "__doc__", docstring(method))

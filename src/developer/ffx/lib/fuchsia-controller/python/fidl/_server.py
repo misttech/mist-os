@@ -6,24 +6,13 @@ from dataclasses import dataclass
 import typing
 
 from fidl_codec import decode_fidl_request
+from fidl_codec import decode_fidl_response
 from fidl_codec import encode_fidl_message
 import fuchsia_controller_py as fc
 
 from ._fidl_common import *
 from ._ipc import GlobalHandleWaker
-
-
-@dataclass
-class MethodInfo:
-    name: str
-    request_ident: str
-    requires_response: bool
-    empty_response: bool
-    has_result: bool
-    response_identifier: str
-
-
-Ordinal = int
+from ._client import FidlClient
 
 
 class ServerBase(object):
@@ -31,15 +20,6 @@ class ServerBase(object):
 
     library: str = ""
     method_map: typing.Dict[Ordinal, MethodInfo] = {}
-
-    class StopService(Exception):
-        """StopService is used to stop the serving loop, close the channel, and shutdown cleanly."""
-
-    class Error:
-        """Simple wrapper class around an error."""
-
-        def __init__(self, error):
-            self.error = error
 
     def __init__(self, channel: fc.Channel, channel_waker=None):
         self.channel = channel
@@ -64,8 +44,9 @@ class ServerBase(object):
 
     async def handle_next_request(self) -> bool:
         try:
+            # TODO(b/299946378): Handle case where ordinal is unknown.
             return await self._handle_request_helper()
-        except type(self).StopService:
+        except StopServer:
             self.channel.close()
             return False
         except Exception as e:
@@ -107,7 +88,7 @@ class ServerBase(object):
                 f"Method {info.name} returned None when a response was expected"
             )
         if info.has_result:
-            if type(res) is type(self).Error:
+            if type(res) is DomainError:
                 res = GenericResult(
                     fidl_type=info.response_identifier, err=res.error
                 )
@@ -160,3 +141,16 @@ class ServerBase(object):
             self.method_map[ordinal].request_ident, msg
         )
         return result_obj, txid, ordinal
+
+    def _send_event(self, ordinal: int, library: str, msg_obj):
+        type_name = None
+        if msg_obj is not None:
+            type_name = msg_obj.__fidl_type__
+        fidl_message = encode_fidl_message(
+            ordinal=ordinal,
+            object=msg_obj,
+            library=library,
+            txid=0,
+            type_name=type_name,
+        )
+        self.channel.write(fidl_message)

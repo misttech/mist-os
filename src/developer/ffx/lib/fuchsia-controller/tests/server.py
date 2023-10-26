@@ -6,11 +6,15 @@ import typing
 import unittest
 
 import fidl.fuchsia_controller_test as fc_test
+import fidl.fuchsia_controller_othertest as fc_othertest
 import fidl.fuchsia_developer_ffx as ffx
 import fidl.fuchsia_io as f_io
 from fuchsia_controller_py import Channel
 from fuchsia_controller_py import ZxStatus
 
+from fidl import DomainError
+from fidl import StopServer
+from fidl import StopEventHandler
 from fidl import TransportError
 
 
@@ -32,7 +36,7 @@ class TargetCollectionReaderImpl(ffx.TargetCollectionReader.Server):
 
     def next(self, request: ffx.TargetCollectionReaderNextRequest):
         if not request.entry:
-            raise super().StopService()
+            raise StopServer
         self.target_list.extend(request.entry)
 
 
@@ -68,9 +72,29 @@ class FlexibleMethodTesterServer(fc_test.FlexibleMethodTester.Server):
         return TransportError.UNKNOWN_METHOD
 
 
+class TestEventHandler(fc_othertest.CrossLibraryNoop.EventHandler):
+    def __init__(
+        self,
+        client: fc_othertest.CrossLibraryNoop.Client,
+        random_event_handler: typing.Callable[
+            [fc_othertest.CrossLibraryNoopOnRandomEventRequest], None
+        ],
+    ):
+        super().__init__(client)
+        self.random_event_handler = random_event_handler
+
+    def on_random_event(
+        self, request: fc_othertest.CrossLibraryNoopOnRandomEventRequest
+    ):
+        self.random_event_handler(request)
+
+    def on_empty_event(self):
+        raise StopEventHandler
+
+
 class FailingFileServer(f_io.File.Server):
     def read(self, _: f_io.ReadableReadRequest):
-        return self.Error(ZxStatus.ZX_ERR_PEER_CLOSED)
+        return DomainError(ZxStatus.ZX_ERR_PEER_CLOSED)
 
 
 class TestingServer(fc_test.Testing.Server):
@@ -194,3 +218,46 @@ class ServerTests(unittest.IsolatedAsyncioTestCase):
         res = await t_client.some_method()
         self.assertEqual(res.transport_err, TransportError.UNKNOWN_METHOD)
         server_task.cancel()
+
+    async def test_sending_and_receiving_event(self):
+        client, server = Channel.create()
+        t_client = fc_othertest.CrossLibraryNoop.Client(client)
+        THIS_EXPECTED = 3
+        THAT_EXPECTED = fc_othertest.TestingEnum.FLIPPED_OTHER_TEST
+
+        def random_event_handler(
+            request: fc_othertest.CrossLibraryNoopOnRandomEventRequest,
+        ):
+            self.assertEqual(request.this, THIS_EXPECTED)
+            self.assertEqual(request.that, THAT_EXPECTED)
+            raise StopEventHandler
+
+        # It's okay to use an unimplemented server here since we're not fielding any calls.
+        t_server = fc_othertest.CrossLibraryNoop.Server(server)
+        event_handler = TestEventHandler(t_client, random_event_handler)
+        t_server.on_random_event(this=THIS_EXPECTED, that=THAT_EXPECTED)
+        task = asyncio.get_running_loop().create_task(event_handler.serve())
+        # If the event is never received this will loop forever (since the channel is open, and the
+        # handler should stop service after receiving the event.
+        await task
+
+    async def test_sending_and_receiving_empty_event(self):
+        client, server = Channel.create()
+        t_client = fc_othertest.CrossLibraryNoop.Client(client)
+        # It's okay to use an unimplemented server here since we're not fielding any calls.
+        t_server = fc_othertest.CrossLibraryNoop.Server(server)
+        event_handler = TestEventHandler(t_client, self)
+        t_server.on_empty_event()
+        task = asyncio.get_running_loop().create_task(event_handler.serve())
+        # If the event is never received this will loop forever (since the channel is open, and the
+        # handler should stop service after receiving the event.
+        await task
+
+    async def test_closing_channel_closes_event_loop(self):
+        client, server = Channel.create()
+        t_client = fc_othertest.CrossLibraryNoop.Client(client)
+        del server
+        # A generic unimplemented event handler is fine, since we're just making it exit.
+        event_handler = fc_othertest.CrossLibraryNoop.EventHandler(t_client)
+        task = asyncio.get_running_loop().create_task(event_handler.serve())
+        await task

@@ -14,12 +14,42 @@ import fuchsia_controller_py as fc
 
 # These can be updated to use TypeAlias when python is updated to 3.10+
 TXID_Type = int
+Ordinal = int
+
 FidlMessage = Tuple[bytearray, List[fc.Channel]]
 
 # The number of bytes in a FIDL header.
 FIDL_HEADER_SIZE = 8
 # The number of bytes in a FIDL ordinal.
 FIDL_ORDINAL_SIZE = 8
+
+
+@dataclass
+class MethodInfo:
+    name: str
+    request_ident: str
+    requires_response: bool
+    empty_response: bool
+    has_result: bool
+    response_identifier: str
+
+
+class StopServer(Exception):
+    """An exception used to stop a server loop from continuing.
+
+    This closes the underlying channel as well.
+    """
+
+
+@dataclass
+class DomainError:
+    """A class used to wrap returning an error from a two-way method."""
+
+    error: typing.Any
+
+
+class StopEventHandler(Exception):
+    """An exception used to stop an event handler from continuing."""
 
 
 def internal_kind_to_type(internal_kind: str):
