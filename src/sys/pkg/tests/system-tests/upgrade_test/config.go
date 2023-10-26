@@ -31,6 +31,7 @@ type config struct {
 	bootfsCompression          string
 	buildExpectUnknownFirmware bool
 	maxOtaSize                 int64
+	useNewUpdateFormat         bool
 }
 
 func newConfig(fs *flag.FlagSet) (*config, error) {
@@ -61,6 +62,7 @@ func newConfig(fs *flag.FlagSet) (*config, error) {
 	fs.StringVar(&c.bootfsCompression, "bootfs-compression", "zstd", "compress storage images, default is zstd")
 	fs.BoolVar(&c.buildExpectUnknownFirmware, "build-expect-unknown-firmware", false, "Ignore 'Unknown Firmware' during OTAs")
 	fs.Int64Var(&c.maxOtaSize, "max-ota-size", 0, "Maximum size of all the blobs in the update package")
+	fs.BoolVar(&c.useNewUpdateFormat, "use-new-update-format", false, "Use the new update format")
 	return c, nil
 }
 

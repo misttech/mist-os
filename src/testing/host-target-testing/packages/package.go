@@ -125,6 +125,15 @@ func (p *Package) Open(ctx context.Context, path string) (*os.File, error) {
 	return p.repo.OpenUncompressedBlob(ctx, merkle)
 }
 
+func (p *Package) FilePath(ctx context.Context, path string) (string, error) {
+	merkle, ok := p.contents[path]
+	if !ok {
+		return "", os.ErrNotExist
+	}
+
+	return p.repo.UncompressedBlobPath(ctx, merkle)
+}
+
 // ReadFile reads a file from a package.
 func (p *Package) ReadFile(ctx context.Context, path string) ([]byte, error) {
 	r, err := p.Open(ctx, path)

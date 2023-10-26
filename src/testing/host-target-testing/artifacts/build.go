@@ -202,7 +202,7 @@ type proxyBlobStore struct {
 	dir string
 }
 
-func (fs *proxyBlobStore) OpenBlob(ctx context.Context, deliveryBlobType *int, merkle pmBuild.MerkleRoot) (*os.File, error) {
+func (fs *proxyBlobStore) BlobPath(ctx context.Context, deliveryBlobType *int, merkle pmBuild.MerkleRoot) (string, error) {
 	var path string
 	if deliveryBlobType == nil {
 		path = filepath.Join(fs.dir, merkle.String())
@@ -211,8 +211,8 @@ func (fs *proxyBlobStore) OpenBlob(ctx context.Context, deliveryBlobType *int, m
 	}
 
 	// First, try to read the blob from the directory
-	if f, err := os.Open(path); err == nil {
-		return f, nil
+	if _, err := os.Stat(path); err == nil {
+		return path, nil
 	}
 
 	// Otherwise, start downloading the blob. The package resolver will only
@@ -228,6 +228,15 @@ func (fs *proxyBlobStore) OpenBlob(ctx context.Context, deliveryBlobType *int, m
 	logger.Infof(ctx, "downloading %s from build %s", src, fs.b.id)
 
 	if err := fs.b.archive.download(ctx, fs.b.id, true, path, []string{src}); err != nil {
+		return "", err
+	}
+
+	return path, nil
+}
+
+func (fs *proxyBlobStore) OpenBlob(ctx context.Context, deliveryBlobType *int, merkle pmBuild.MerkleRoot) (*os.File, error) {
+	path, err := fs.BlobPath(ctx, deliveryBlobType, merkle)
+	if err != nil {
 		return nil, err
 	}
 

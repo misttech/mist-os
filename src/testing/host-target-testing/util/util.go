@@ -9,6 +9,8 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -247,6 +249,122 @@ func UpdateHashValuePackagesJSON(
 	}
 
 	return json.NewEncoder(w).Encode(p)
+}
+
+func ParseImagesJSON(path string) (ImagesManifest, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return ImagesManifest{}, err
+	}
+	defer f.Close()
+
+	var i ImagesManifest
+
+	if err := json.NewDecoder(f).Decode(&i); err != nil {
+		return ImagesManifest{}, err
+	}
+
+	if i.Version != "1" {
+		return ImagesManifest{}, fmt.Errorf("images.json version 1 is supported; found version %s", i.Version)
+	}
+
+	return i, nil
+}
+
+func UpdateImagesJSON(
+	path string,
+	images ImagesManifest,
+) error {
+	return AtomicallyWriteFile(path, 0600, func(f *os.File) error {
+		return json.NewEncoder(f).Encode(images)
+	})
+}
+
+func Sha256File(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", nil
+	}
+	defer f.Close()
+
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+type ImagesManifest struct {
+	Version  string        `json:"version"`
+	Contents ImagesContent `json:"contents"`
+}
+
+func (i *ImagesManifest) GetPartition(slot string, typ string) (*url.URL, build.MerkleRoot, error) {
+	found := false
+	var partition ImagePartition
+	for _, p := range i.Contents.Partitions {
+		if p.Slot == slot && p.Type == typ {
+			found = true
+			partition = p
+			break
+		}
+	}
+	if !found {
+		return nil, build.MerkleRoot{}, fmt.Errorf("missing entry for zbi")
+	}
+
+	url, err := url.Parse(partition.Url)
+	if err != nil {
+		return nil, build.MerkleRoot{}, fmt.Errorf("could not parse url %s: %w", partition.Url, err)
+	}
+
+	merkleString := url.Query()["hash"]
+	merkle, err := build.DecodeMerkleRoot([]byte(merkleString[0]))
+	if err != nil {
+		return nil, build.MerkleRoot{}, fmt.Errorf("failed to decode merkle from %s: %w", partition.Url, err)
+	}
+
+	return url, merkle, nil
+}
+
+func (i *ImagesManifest) SetPartition(slot string, typ string, url string, path string) error {
+	hash, err := Sha256File(path)
+	if err != nil {
+		return err
+	}
+
+	for idx := 0; idx < len(i.Contents.Partitions); idx++ {
+		p := &i.Contents.Partitions[idx]
+
+		if p.Slot == slot && p.Type == typ {
+			p.Url = url
+			p.Hash = hash
+			return nil
+		}
+	}
+
+	return fmt.Errorf("could not find partition %s %s", slot, typ)
+}
+
+type ImagesContent struct {
+	Partitions []ImagePartition `json:"partitions"`
+	Firmware   []ImageFirmware  `json:"firmware"`
+}
+
+type ImagePartition struct {
+	Slot string `json:"slot"`
+	Type string `json:"type"`
+	Size int64  `json:"size"`
+	Hash string `json:"hash"`
+	Url  string `json:"url"`
+}
+
+type ImageFirmware struct {
+	Type string `json:"type"`
+	Size int64  `json:"size"`
+	Hash string `json:"hash"`
+	Url  string `json:"url"`
 }
 
 func AtomicallyWriteFile(path string, mode os.FileMode, writeFileFunc func(*os.File) error) error {

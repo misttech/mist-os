@@ -520,9 +520,7 @@ func systemPrimeOTA(
 		dstSystemImage,
 		dstUpdatePath,
 		c.bootfsCompression,
-		func(path string) error {
-			return nil
-		},
+		c.useNewUpdateFormat,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create the %q package: %w", dstUpdatePath, err)
@@ -784,9 +782,7 @@ func GenerateUpdatePackageWithRandomFiles(
 		dstSystemImage,
 		dstUpdatePath,
 		c.bootfsCompression,
-		func(path string) error {
-			return nil
-		},
+		c.useNewUpdateFormat,
 	)
 	if err != nil {
 		return nil, packages.Package{}, 0, fmt.Errorf(

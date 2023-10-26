@@ -22,6 +22,7 @@ import (
 
 type BlobStore interface {
 	Dir() string
+	BlobPath(ctx context.Context, deliveryBlobType *int, merkle build.MerkleRoot) (string, error)
 	OpenBlob(ctx context.Context, deliveryBlobType *int, merkle build.MerkleRoot) (*os.File, error)
 	BlobSize(ctx context.Context, deliveryBlobType *int, merkle build.MerkleRoot) (int64, error)
 }
@@ -34,21 +35,28 @@ func NewDirBlobStore(dir string) BlobStore {
 	return &DirBlobStore{dir}
 }
 
-func (fs *DirBlobStore) blobPath(deliveryBlobType *int, merkle build.MerkleRoot) string {
+func (fs *DirBlobStore) BlobPath(ctx context.Context, deliveryBlobType *int, merkle build.MerkleRoot) (string, error) {
 	if deliveryBlobType == nil {
-		return filepath.Join(fs.dir, merkle.String())
+		return filepath.Join(fs.dir, merkle.String()), nil
 	} else {
-		return filepath.Join(fs.dir, strconv.Itoa(*deliveryBlobType), merkle.String())
+		return filepath.Join(fs.dir, strconv.Itoa(*deliveryBlobType), merkle.String()), nil
 	}
 }
 
 func (fs *DirBlobStore) OpenBlob(ctx context.Context, deliveryBlobType *int, merkle build.MerkleRoot) (*os.File, error) {
-	path := fs.blobPath(deliveryBlobType, merkle)
+	path, err := fs.BlobPath(ctx, deliveryBlobType, merkle)
+	if err != nil {
+		return nil, err
+	}
 	return os.Open(path)
 }
 
 func (fs *DirBlobStore) BlobSize(ctx context.Context, deliveryBlobType *int, merkle build.MerkleRoot) (int64, error) {
-	path := fs.blobPath(deliveryBlobType, merkle)
+	path, err := fs.BlobPath(ctx, deliveryBlobType, merkle)
+	if err != nil {
+		return 0, err
+	}
+
 	s, err := os.Stat(path)
 	if err != nil {
 		return 0, err
@@ -163,7 +171,10 @@ func (r *Repository) OpenPackage(ctx context.Context, path string) (Package, err
 	}
 
 	return Package{}, fmt.Errorf("could not find package: %q", path)
+}
 
+func (r *Repository) UncompressedBlobPath(ctx context.Context, merkle build.MerkleRoot) (string, error) {
+	return r.blobStore.BlobPath(ctx, nil, merkle)
 }
 
 func (r *Repository) OpenUncompressedBlob(ctx context.Context, merkle build.MerkleRoot) (*os.File, error) {
