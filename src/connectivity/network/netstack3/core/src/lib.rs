@@ -250,16 +250,16 @@ impl<BT: BindingsTypes> StackState<BT> {
 pub trait BufferNonSyncContextInner<B: BufferMut, D>:
     transport::udp::BufferNonSyncContext<Ipv4, B, D>
     + transport::udp::BufferNonSyncContext<Ipv6, B, D>
-    + BufferIcmpContext<Ipv4, B>
-    + BufferIcmpContext<Ipv6, B>
+    + BufferIcmpContext<Ipv4, B, D>
+    + BufferIcmpContext<Ipv6, B, D>
 {
 }
 impl<
         B: BufferMut,
         C: transport::udp::BufferNonSyncContext<Ipv4, B, D>
             + transport::udp::BufferNonSyncContext<Ipv6, B, D>
-            + BufferIcmpContext<Ipv4, B>
-            + BufferIcmpContext<Ipv6, B>,
+            + BufferIcmpContext<Ipv4, B, D>
+            + BufferIcmpContext<Ipv6, B, D>,
         D,
     > BufferNonSyncContextInner<B, D> for C
 {

@@ -1153,10 +1153,11 @@ impl<I: IcmpIpExt> IcmpContext<I> for FakeNonSyncCtx {
     }
 }
 
-impl<B: BufferMut> BufferIcmpContext<Ipv4, B> for FakeNonSyncCtx {
+impl<B: BufferMut> BufferIcmpContext<Ipv4, B, DeviceId<Self>> for FakeNonSyncCtx {
     fn receive_icmp_echo_reply(
         &mut self,
         conn: crate::ip::icmp::SocketId<Ipv4>,
+        _device: &DeviceId<Self>,
         _src_ip: Ipv4Addr,
         _dst_ip: Ipv4Addr,
         _id: u16,
@@ -1168,10 +1169,11 @@ impl<B: BufferMut> BufferIcmpContext<Ipv4, B> for FakeNonSyncCtx {
     }
 }
 
-impl<B: BufferMut> BufferIcmpContext<Ipv6, B> for FakeNonSyncCtx {
+impl<B: BufferMut> BufferIcmpContext<Ipv6, B, DeviceId<Self>> for FakeNonSyncCtx {
     fn receive_icmp_echo_reply(
         &mut self,
         conn: crate::ip::icmp::SocketId<Ipv6>,
+        _device: &DeviceId<Self>,
         _src_ip: Ipv6Addr,
         _dst_ip: Ipv6Addr,
         _id: u16,

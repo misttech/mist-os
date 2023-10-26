@@ -3187,8 +3187,8 @@ impl<
 impl<
         I: datagram::IpExt,
         B: BufferMut,
-        C: icmp::BufferIcmpNonSyncCtx<I, B>
-            + icmp::BufferIcmpNonSyncCtx<I::OtherVersion, B>
+        C: icmp::BufferIcmpNonSyncCtx<I, B, Self::DeviceId>
+            + icmp::BufferIcmpNonSyncCtx<I::OtherVersion, B, Self::DeviceId>
             + crate::NonSyncContext,
         L,
     > icmp::BufferStateContext<I, C, B> for Locked<&SyncCtx<C>, L>
@@ -3202,8 +3202,8 @@ where
 impl<
         I: datagram::IpExt,
         B: BufferMut,
-        C: icmp::BufferIcmpNonSyncCtx<I, B>
-            + icmp::BufferIcmpNonSyncCtx<I::OtherVersion, B>
+        C: icmp::BufferIcmpNonSyncCtx<I, B, Self::DeviceId>
+            + icmp::BufferIcmpNonSyncCtx<I::OtherVersion, B, Self::DeviceId>
             + crate::NonSyncContext,
         L,
     > icmp::BufferBoundStateContext<I, C, B> for Locked<&SyncCtx<C>, L>

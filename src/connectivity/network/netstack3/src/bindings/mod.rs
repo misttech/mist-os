@@ -542,17 +542,20 @@ impl<
             + icmp::IcmpIpExt
             + IpExt,
         B: BufferMut,
-    > icmp::BufferIcmpContext<I, B> for BindingsNonSyncCtxImpl
+    > icmp::BufferIcmpContext<I, B, DeviceId<BindingsNonSyncCtxImpl>> for BindingsNonSyncCtxImpl
 {
     fn receive_icmp_echo_reply(
         &mut self,
         conn: icmp::SocketId<I>,
+        device: &DeviceId<BindingsNonSyncCtxImpl>,
         src_ip: I::Addr,
         dst_ip: I::Addr,
         id: u16,
         data: B,
     ) {
-        I::with_collection_mut(self, |c| c.receive_icmp_echo_reply(conn, src_ip, dst_ip, id, data))
+        I::with_collection_mut(self, |c| {
+            c.receive_icmp_echo_reply(conn, device, src_ip, dst_ip, id, data)
+        })
     }
 }
 

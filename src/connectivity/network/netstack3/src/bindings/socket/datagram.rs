@@ -869,10 +869,13 @@ impl<I: IpExt> icmp::IcmpContext<I> for SocketCollection<I, IcmpEcho> {
     }
 }
 
-impl<I: IpExt, B: BufferMut> icmp::BufferIcmpContext<I, B> for SocketCollection<I, IcmpEcho> {
+impl<I: IpExt, B: BufferMut> icmp::BufferIcmpContext<I, B, DeviceId<BindingsNonSyncCtxImpl>>
+    for SocketCollection<I, IcmpEcho>
+{
     fn receive_icmp_echo_reply(
         &mut self,
         conn: icmp::SocketId<I>,
+        device: &DeviceId<BindingsNonSyncCtxImpl>,
         src_ip: I::Addr,
         dst_ip: I::Addr,
         id: u16,
@@ -883,9 +886,7 @@ impl<I: IpExt, B: BufferMut> icmp::BufferIcmpContext<I, B> for SocketCollection<
         queue.lock().receive(AvailableMessage {
             source_addr: src_ip,
             source_port: 0,
-            // TODO(https://fxbug.dev/133573): ICMP sockets need to populate
-            // scope id for link local addresses too.
-            interface_id: NonZeroU64::MAX,
+            interface_id: device.bindings_id().id,
             destination_addr: dst_ip,
             destination_port: id,
             data: data.as_ref().to_vec(),
