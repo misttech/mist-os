@@ -5468,7 +5468,7 @@ mod tests {
             original_packet: &mut [u8],
             code: C,
             msg: M,
-            assert_counters: &[(&str, usize)],
+            assert_counters: &[(&str, u64)],
             f: F,
         ) {
             crate::testutil::set_logger_for_test();
@@ -5788,7 +5788,7 @@ mod tests {
             original_packet: &mut [u8],
             code: C,
             msg: M,
-            assert_counters: &[(&str, usize)],
+            assert_counters: &[(&str, u64)],
             f: F,
         ) {
             crate::testutil::set_logger_for_test();
@@ -6239,18 +6239,18 @@ mod tests {
                 send(&mut ctx);
                 assert_eq!(
                     ctx.sync_ctx.inner.inner.state.icmp_tx_counters::<I>().error.get(),
-                    i as usize + 1
+                    i + 1
                 );
             }
 
             assert_eq!(
                 ctx.sync_ctx.inner.inner.state.icmp_tx_counters::<I>().error.get(),
-                ERRORS_PER_SECOND as usize
+                ERRORS_PER_SECOND
             );
             send(&mut ctx);
             assert_eq!(
                 ctx.sync_ctx.inner.inner.state.icmp_tx_counters::<I>().error.get(),
-                ERRORS_PER_SECOND as usize
+                ERRORS_PER_SECOND
             );
 
             // Test that, if we set a rate of 0, we are not able to send any

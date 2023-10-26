@@ -3844,7 +3844,7 @@ mod tests {
             expected_icmps
         );
         assert_eq!(sync_ctx.state.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 1);
-        assert_eq!(non_sync_ctx.frames_sent().len(), expected_icmps);
+        assert_eq!(u64::try_from(non_sync_ctx.frames_sent().len()).unwrap(), expected_icmps);
 
         // Test with unrecognized option type set with
         // action = discard.
@@ -3859,7 +3859,7 @@ mod tests {
             sync_ctx.state.icmp_tx_counters::<Ipv6>().parameter_problem.get(),
             expected_icmps
         );
-        assert_eq!(non_sync_ctx.frames_sent().len(), expected_icmps);
+        assert_eq!(u64::try_from(non_sync_ctx.frames_sent().len()).unwrap(), expected_icmps);
 
         // Test with unrecognized option type set with
         // action = discard & send icmp
@@ -3876,12 +3876,12 @@ mod tests {
             sync_ctx.state.icmp_tx_counters::<Ipv6>().parameter_problem.get(),
             expected_icmps
         );
-        assert_eq!(non_sync_ctx.frames_sent().len(), expected_icmps);
+        assert_eq!(u64::try_from(non_sync_ctx.frames_sent().len()).unwrap(), expected_icmps);
         verify_icmp_for_unrecognized_ext_hdr_option(
             &mut non_sync_ctx,
             Icmpv6ParameterProblemCode::UnrecognizedIpv6Option,
             48,
-            expected_icmps - 1,
+            usize::try_from(expected_icmps).unwrap() - 1,
         );
 
         // Test with unrecognized option type set with
@@ -3899,12 +3899,12 @@ mod tests {
             sync_ctx.state.icmp_tx_counters::<Ipv6>().parameter_problem.get(),
             expected_icmps
         );
-        assert_eq!(non_sync_ctx.frames_sent().len(), expected_icmps);
+        assert_eq!(u64::try_from(non_sync_ctx.frames_sent().len()).unwrap(), expected_icmps);
         verify_icmp_for_unrecognized_ext_hdr_option(
             &mut non_sync_ctx,
             Icmpv6ParameterProblemCode::UnrecognizedIpv6Option,
             48,
-            expected_icmps - 1,
+            usize::try_from(expected_icmps).unwrap() - 1,
         );
 
         // Test with unrecognized option type set with
@@ -3922,12 +3922,12 @@ mod tests {
             sync_ctx.state.icmp_tx_counters::<Ipv6>().parameter_problem.get(),
             expected_icmps
         );
-        assert_eq!(non_sync_ctx.frames_sent().len(), expected_icmps);
+        assert_eq!(u64::try_from(non_sync_ctx.frames_sent().len()).unwrap(), expected_icmps);
         verify_icmp_for_unrecognized_ext_hdr_option(
             &mut non_sync_ctx,
             Icmpv6ParameterProblemCode::UnrecognizedIpv6Option,
             48,
-            expected_icmps - 1,
+            usize::try_from(expected_icmps).unwrap() - 1,
         );
 
         // Test with unrecognized option type set with
@@ -3945,7 +3945,7 @@ mod tests {
             sync_ctx.state.icmp_tx_counters::<Ipv6>().parameter_problem.get(),
             expected_icmps
         );
-        assert_eq!(non_sync_ctx.frames_sent().len(), expected_icmps);
+        assert_eq!(u64::try_from(non_sync_ctx.frames_sent().len()).unwrap(), expected_icmps);
 
         // None of our tests should have sent an icmpv4 packet, or dispatched an
         // IP packet after the first.

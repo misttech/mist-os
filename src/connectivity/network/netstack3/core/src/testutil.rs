@@ -1742,10 +1742,10 @@ mod tests {
             >,
         >(
             net: &mut FakeNetwork<&'a str, EthernetDeviceId<FakeNonSyncCtx>, FakeCtx, L>,
-            alice_nop: usize,
-            bob_nop: usize,
-            bob_echo_request: usize,
-            alice_echo_response: usize,
+            alice_nop: u64,
+            bob_nop: u64,
+            bob_echo_request: u64,
+            alice_echo_response: u64,
         ) {
             assert_eq!(net.sync_ctx("alice").state.timer_counters.nop.get(), alice_nop);
             assert_eq!(

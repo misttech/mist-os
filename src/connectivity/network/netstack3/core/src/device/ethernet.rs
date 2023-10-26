@@ -2149,7 +2149,7 @@ mod tests {
         assert_eq!(sync_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 3);
         assert_eq!(
             sync_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet_other_host.get(),
-            usize::from(is_other_host)
+            u64::from(is_other_host)
         );
     }
 
@@ -2238,7 +2238,7 @@ mod tests {
         device: &DeviceId<crate::testutil::FakeNonSyncCtx>,
         src_ip: A,
         dst_ip: A,
-        expected: usize,
+        expected: u64,
     ) where
         A::Version: TestIpExt,
     {

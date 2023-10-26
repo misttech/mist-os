@@ -4,11 +4,11 @@
 
 //! Types and utilities for working with packet statistic counters.
 
-use core::sync::atomic::{AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicU64, Ordering};
 
 /// An atomic counter for packet statistics, e.g. IPv4 packets received.
 #[derive(Debug, Default)]
-pub(crate) struct Counter(AtomicUsize);
+pub(crate) struct Counter(AtomicU64);
 
 impl Counter {
     pub(crate) fn increment(&self) {
@@ -16,11 +16,12 @@ impl Counter {
         // synchronize other accesses.  See:
         // https://doc.rust-lang.org/nomicon/atomics.html#relaxed
         let Self(v) = self;
-        let _: usize = v.fetch_add(1, Ordering::Relaxed);
+        let _: u64 = v.fetch_add(1, Ordering::Relaxed);
     }
 
     #[cfg(test)]
-    pub(crate) fn get(&self) -> usize {
+    /// Atomically retrieves the counter value as a `u64`.
+    pub(crate) fn get(&self) -> u64 {
         // Use relaxed ordering since we do not use packet counter values to
         // synchronize other accesses.  See:
         // https://doc.rust-lang.org/nomicon/atomics.html#relaxed
