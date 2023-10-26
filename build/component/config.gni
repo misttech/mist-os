@@ -47,7 +47,10 @@ template("component_config") {
   }
   if (defined(invoker.build_type)) {
     if (invoker.build_type == "eng") {
-      _sources += [ "//src/security/policy/component_manager_policy_eng.json5" ]
+      _sources += [
+        "//src/security/policy/component_manager_policy.json5",
+        "//src/security/policy/component_manager_policy_eng.json5",
+      ]
     } else if (invoker.build_type == "userdebug") {
       _sources +=
           [ "//src/security/policy/component_manager_policy_userdebug.json5" ]
