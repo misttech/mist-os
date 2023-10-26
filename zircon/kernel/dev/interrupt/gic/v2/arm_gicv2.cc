@@ -129,7 +129,7 @@ static void gic_init_percpu_early() {
   arm_gicv2_write32(GICC_PMR, 0xff);  // unmask interrupts at all priority levels
 }
 
-static unsigned int arm_gic_max_cpu() { return (arm_gicv2_read32(GICD_TYPER) >> 5) & 0x7; }
+static unsigned int arm_gic_max_cpu() { return BITS_SHIFT(arm_gicv2_read32(GICD_TYPER), 7, 5) + 1; }
 
 static zx_status_t arm_gic_init() {
   uint i;
@@ -446,11 +446,14 @@ void ArmGicInitEarly(const zbi_dcfg_arm_gic_v2_driver_t& config) {
     return;
   }
 
-  dprintf(SPEW, "GICv2 (ID %#x), IPI base %u, GICH offset %#lx, GICV offset %#lx\n",
-          arm_gicv2_read32(GICC_IIDR), ipi_base, arm_gicv2_gich_offset, arm_gicv2_gicv_offset);
+  dprintf(SPEW,
+          "GICv2 (ID %#x), IPI base %u, MMIO phys %#lx, GICD offset %#lx, GICC offset %#lx\n"
+          "\tGICH offset %#lx, GICV offset %#lx\n",
+          arm_gicv2_read32(GICC_IIDR), ipi_base, mmio_phys, arm_gicv2_gicd_offset,
+          arm_gicv2_gicc_offset, arm_gicv2_gich_offset, arm_gicv2_gicv_offset);
 
   // pass the list of physical and virtual addresses for the GICv2m register apertures
-  if (msi_frame_phys) {
+  if (use_msi && msi_frame_phys) {
     // the following arrays must be static because arm_gicv2m_init stashes the pointer
     static paddr_t GICV2M_REG_FRAMES[] = {0};
     static vaddr_t GICV2M_REG_FRAMES_VIRT[] = {0};
