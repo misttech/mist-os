@@ -223,6 +223,7 @@
 //src/developer/ffx/lib/symbol-index:symbol-index-sdk
 //src/developer/ffx/plugins/assembly:sdk
 //src/developer/ffx/plugins/audio:sdk
+//src/developer/ffx/plugins/coverage:sdk
 //src/developer/ffx/plugins/emulator:aemu_internal
 //src/developer/ffx/plugins/emulator:qemu_internal
 //src/developer/ffx/plugins/emulator:uefi_internal
