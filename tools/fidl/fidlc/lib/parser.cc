@@ -1413,8 +1413,7 @@ std::unique_ptr<raw::TypeConstructor> Parser::ParseTypeConstructor() {
             }
             if (maybe_strictness.has_value()) {
               Fail(ErrConflictingModifier, modifier_token, modifier_token.kind_and_subkind(),
-                   Token::KindAndSubkind(Token::Kind::kIdentifier,
-                                         modifier_subkind == Token::Subkind::kFlexible
+                   Token::KindAndSubkind(modifier_subkind == Token::Subkind::kFlexible
                                              ? Token::Subkind::kStrict
                                              : Token::Subkind::kFlexible));
               RecoverOneError();

@@ -432,7 +432,10 @@ protocol A {
 
 )FIDL");
   library.set_warnings_as_errors(true);
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::WarnAttributeTypo);
+  ASSERT_FALSE(library.Compile());
+  ASSERT_EQ(library.warnings().size(), 0);
+  ASSERT_EQ(library.errors().size(), 1);
+  ASSERT_ERR(library.errors()[0], fidl::WarnAttributeTypo);
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "duc");
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "doc");
 }
@@ -1902,8 +1905,8 @@ library example;
 const BAR bool = true;
 
 )FIDL");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrIncludeCycle,
-                                      fidl::ErrCouldNotResolveAttributeArg);
+  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrCouldNotResolveAttributeArg,
+                                      fidl::ErrIncludeCycle);
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "const 'BAR' -> const 'BAR'");
 }
 
@@ -1915,8 +1918,8 @@ library example;
 const BAR string = "bar";
 
 )FIDL");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrIncludeCycle,
-                                      fidl::ErrCouldNotResolveAttributeArg);
+  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrCouldNotResolveAttributeArg,
+                                      fidl::ErrIncludeCycle);
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "const 'BAR' -> const 'BAR'");
 }
 
@@ -1930,8 +1933,8 @@ const BAR bool = true;
 )FIDL");
   library.AddAttributeSchema("foo").AddArg(
       "value", fidl::flat::AttributeArgSchema(fidl::flat::ConstantValue::Kind::kBool));
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrIncludeCycle,
-                                      fidl::ErrCouldNotResolveAttributeArg);
+  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrCouldNotResolveAttributeArg,
+                                      fidl::ErrIncludeCycle);
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "const 'BAR' -> const 'BAR'");
 }
 

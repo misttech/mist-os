@@ -41,7 +41,11 @@ class Token {
 
   class KindAndSubkind {
    public:
-    constexpr KindAndSubkind(Kind kind, Subkind subkind) : kind_(kind), subkind_(subkind) {}
+    explicit constexpr KindAndSubkind(Kind kind) : kind_(kind), subkind_(Subkind::kNone) {}
+    explicit constexpr KindAndSubkind(Subkind subkind)
+        : kind_(Kind::kIdentifier), subkind_(subkind) {}
+    explicit constexpr KindAndSubkind(Kind kind, Subkind subkind)
+        : kind_(kind), subkind_(subkind) {}
 
     constexpr Kind kind() const { return kind_; }
     constexpr Subkind subkind() const { return subkind_; }

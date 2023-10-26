@@ -35,10 +35,9 @@ namespace internal {
 std::string Display(char c);
 std::string Display(const std::string& s);
 std::string Display(std::string_view s);
-std::string Display(const std::set<std::string>& s);
 std::string Display(const std::set<std::string_view>& s);
-std::string Display(const SourceSpan& s);
-std::string Display(const Token::KindAndSubkind& t);
+std::string Display(SourceSpan s);
+std::string Display(Token::KindAndSubkind t);
 std::string Display(types::Openness o);
 std::string Display(const raw::AttributeList* a);
 std::string Display(const std::vector<std::string_view>& library_name);
@@ -52,8 +51,8 @@ std::string Display(const std::vector<const flat::Decl*>& d);
 std::string Display(const flat::Type* t);
 std::string Display(const flat::Name& n);
 std::string Display(const Platform& p);
-std::string Display(const Version& v);
-std::string Display(const VersionRange& r);
+std::string Display(Version v);
+std::string Display(VersionRange r);
 std::string Display(const VersionSet& s);
 template <typename T, typename = decltype(std::to_string(std::declval<T>()))>
 std::string Display(T val) {

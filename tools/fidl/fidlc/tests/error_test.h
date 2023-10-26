@@ -53,9 +53,10 @@
       }                                                           \
       FAIL("stopping test, compilation failed");                  \
     }                                                             \
-    ASSERT_EQ(library_ref.warnings().size(), 2);                  \
-    EXPECT_ERR(library_ref.warnings()[0], (warn0));               \
-    EXPECT_ERR(library_ref.warnings()[1], (warn1));               \
+    auto the_diags = library_ref.Diagnostics();                   \
+    ASSERT_EQ(the_diags.size(), 2u);                              \
+    EXPECT_ERR(the_diags[0], (warn0));                            \
+    EXPECT_ERR(the_diags[1], (warn1));                            \
   }
 
 #define ASSERT_ERRORED_DURING_COMPILE(library, error)    \
@@ -74,9 +75,10 @@
   {                                                              \
     TestLibrary& library_ref = (library);                        \
     ASSERT_FALSE(library_ref.Compile());                         \
-    ASSERT_EQ(library_ref.errors().size(), 2u);                  \
-    EXPECT_ERR(library_ref.errors()[0], (err0));                 \
-    EXPECT_ERR(library_ref.errors()[1], (err1));                 \
+    auto the_diags = library_ref.Diagnostics();                  \
+    ASSERT_EQ(the_diags.size(), 2u);                             \
+    EXPECT_ERR(the_diags[0], (err0));                            \
+    EXPECT_ERR(the_diags[1], (err1));                            \
     EXPECT_EQ(library_ref.warnings().size(), 0);                 \
     for (const auto& warning : library_ref.warnings()) {         \
       EXPECT_STREQ("", warning->def.msg.data());                 \

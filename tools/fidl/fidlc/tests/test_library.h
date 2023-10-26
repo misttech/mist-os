@@ -9,7 +9,9 @@
 
 #include <cstring>
 #include <fstream>
+#include <type_traits>
 
+#include "tools/fidl/fidlc/include/fidl/diagnostic_types.h"
 #include "tools/fidl/fidlc/include/fidl/experimental_flags.h"
 #include "tools/fidl/fidlc/include/fidl/findings.h"
 #include "tools/fidl/fidlc/include/fidl/flat/compiler.h"
@@ -23,6 +25,7 @@
 #include "tools/fidl/fidlc/include/fidl/source_map.h"
 #include "tools/fidl/fidlc/include/fidl/source_map_generator.h"
 #include "tools/fidl/fidlc/include/fidl/tables_generator.h"
+#include "tools/fidl/fidlc/include/fidl/utils.h"
 #include "tools/fidl/fidlc/include/fidl/versioning_types.h"
 #include "tools/fidl/fidlc/include/fidl/virtual_source_file.h"
 
@@ -113,39 +116,18 @@ inline fidl::raw::Ordinal64 GetGeneratedOrdinal64ForTesting(
                                                source_element);
 }
 
-// Template helper to change diagnostic argument types from those that are convenient during compile
-// to those that are convenient during tests. By default the types are the same.
-template <typename Arg>
-struct DiagnosticArgForTest {
-  using type = Arg;
-};
-
-// It's difficult to generate valid fidl::flat::Name values in tests so use use std::string_view.
-template <>
-struct DiagnosticArgForTest<fidl::flat::Name> {
-  using type = std::string_view;
-};
-
-// It's difficult to generate valid fidl::flat::Type values in tests so use use std::string_view.
-template <>
-struct DiagnosticArgForTest<const fidl::flat::Type*> {
-  using type = std::string_view;
-};
-
-// Represents an error or warning that a test expects to be generated.
-struct ExpectedDiagnostic {
-  template <fidl::ErrorId Id, typename... Args>
-  explicit ExpectedDiagnostic(
-      const fidl::ErrorDef<Id, Args...>& def,
-      const fidl::identity_t<typename DiagnosticArgForTest<Args>::type>&... args)
-      : def(def) {
-    message = fidl::internal::FormatDiagnostic(def.msg, args...);
-  }
-  std::string message;
-  const fidl::DiagnosticDef& def;
-};
-
 }  // namespace internal
+
+// Helper template to allow passing either a string literal or `const Arg&`.
+template <typename Arg>
+struct StringOrArg {
+  // NOLINTNEXTLINE(google-explicit-constructor)
+  StringOrArg(const char* string) : string(string) {}
+  template <typename From, typename = std::enable_if_t<std::is_convertible_v<From, Arg>>>
+  // NOLINTNEXTLINE(google-explicit-constructor)
+  StringOrArg(const From& arg) : string(fidl::internal::Display(static_cast<const Arg&>(arg))) {}
+  std::string string;
+};
 
 // Test harness for a single library. To compile multiple libraries together,
 // first default construct a SharedAmongstLibraries and then pass it to each
@@ -222,23 +204,19 @@ class TestLibrary final : public SharedInterface {
   }
 
   // Record that a particular error is expected during the compile.
-  // Note: the types of the arguments are influenced by the internal::DiagnosticArgForTest template
-  // above.
+  // The args can either match the ErrorDef's argument types, or they can be string literals.
   template <fidl::ErrorId Id, typename... Args>
-  void ExpectFail(
-      const fidl::ErrorDef<Id, Args...>& def,
-      const fidl::identity_t<typename internal::DiagnosticArgForTest<Args>::type>&... args) {
-    expected_diagnostics_.push_back(internal::ExpectedDiagnostic(def, args...));
+  void ExpectFail(const fidl::ErrorDef<Id, Args...>& def,
+                  fidl::utils::identity_t<StringOrArg<Args>>... args) {
+    expected_diagnostics_.push_back(fidl::internal::FormatDiagnostic(def.msg, args.string...));
   }
 
   // Record that a particular warning is expected during the compile.
-  // Note: the types of the arguments are influenced by the internal::DiagnosticArgForTest template
-  // above.
+  // The args can either match the WarningDef's argument types, or they can be string literals.
   template <fidl::ErrorId Id, typename... Args>
-  void ExpectWarn(
-      const fidl::WarningDef<Id, Args...>& def,
-      const fidl::identity_t<typename internal::DiagnosticArgForTest<Args>::type>&... args) {
-    expected_diagnostics_.push_back(internal::ExpectedDiagnostic(def, args...));
+  void ExpectWarn(const fidl::WarningDef<Id, Args...>& def,
+                  fidl::utils::identity_t<StringOrArg<Args>>... args) {
+    expected_diagnostics_.push_back(fidl::internal::FormatDiagnostic(def.msg, args.string...));
   }
 
   // Check that the diagnostics expected with ExpectFail and ExpectWarn were recorded, in that order
@@ -250,7 +228,7 @@ class TestLibrary final : public SharedInterface {
     size_t num_found = Diagnostics().size();
     for (size_t i = 0; i < std::max(num_expected, num_found); i++) {
       if (i < num_expected && i < num_found) {
-        const std::string& expected = expected_diagnostics_[i].message;
+        const std::string& expected = expected_diagnostics_[i];
         const std::string& found = Diagnostics()[i]->msg;
         const std::string found_at = Diagnostics()[i]->span.position_str();
         if (expected != found) {
@@ -270,7 +248,7 @@ class TestLibrary final : public SharedInterface {
         fprintf(stderr, "Unexpected: %s\n        At: %s\n", found.c_str(), found_at.c_str());
         ok = false;
       } else if (i < num_expected) {
-        const std::string& expected = expected_diagnostics_[i].message;
+        const std::string& expected = expected_diagnostics_[i];
         if (!ok) {
           fprintf(stderr, "\n");
         }
@@ -560,7 +538,7 @@ class TestLibrary final : public SharedInterface {
   std::vector<std::string> lints_;
   std::vector<fidl::SourceFile*> all_sources_;
   std::unique_ptr<fidl::flat::Compilation> compilation_;
-  std::vector<internal::ExpectedDiagnostic> expected_diagnostics_;
+  std::vector<std::string> expected_diagnostics_;
 };
 
 #endif  // TOOLS_FIDL_FIDLC_TESTS_TEST_LIBRARY_H_

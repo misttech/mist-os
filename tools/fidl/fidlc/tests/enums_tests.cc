@@ -79,8 +79,8 @@ type Fruit = enum : uint64 {
     APPLE = -2;
 };
 )FIDL");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrConstantOverflowsType,
-                                      fidl::ErrCouldNotResolveMember);
+  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrCouldNotResolveMember,
+                                      fidl::ErrConstantOverflowsType);
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "-2");
 }
 
@@ -93,8 +93,8 @@ type Fruit = enum {
     APPLE = -2;
 };
 )FIDL");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrConstantOverflowsType,
-                                      fidl::ErrCouldNotResolveMember);
+  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrCouldNotResolveMember,
+                                      fidl::ErrConstantOverflowsType);
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "-2");
 }
 
@@ -107,8 +107,8 @@ type Fruit = enum : uint8 {
     APPLE = 256;
 };
 )FIDL");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrConstantOverflowsType,
-                                      fidl::ErrCouldNotResolveMember);
+  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrCouldNotResolveMember,
+                                      fidl::ErrConstantOverflowsType);
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "256");
 }
 
@@ -184,7 +184,7 @@ type Struct = struct {
     not_nullable NotNullable:optional;
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrCannotBeOptional)
+  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrCannotBeOptional);
 }
 
 TEST(EnumsTests, BadEnumMultipleConstraints) {
@@ -199,7 +199,7 @@ type Struct = struct {
     not_nullable NotNullable:<1, 2, 3>;
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrTooManyConstraints)
+  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrTooManyConstraints);
 }
 
 TEST(EnumsTests, GoodSimpleEnum) {

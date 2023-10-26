@@ -917,8 +917,8 @@ TEST(VersioningTests, BadInvalidVersionAfterLegacyOrdinal) {
 library example;
 )FIDL");
   library.SelectVersion("example", "HEAD");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrConstantOverflowsType,
-                                      fidl::ErrCouldNotResolveAttributeArg);
+  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrCouldNotResolveAttributeArg,
+                                      fidl::ErrConstantOverflowsType);
 }
 
 TEST(VersioningTests, BadInvalidVersionLegacy) {
@@ -936,8 +936,8 @@ TEST(VersioningTests, BadInvalidVersionNegative) {
 library example;
 )FIDL");
   library.SelectVersion("example", "HEAD");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrConstantOverflowsType,
-                                      fidl::ErrCouldNotResolveAttributeArg);
+  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrCouldNotResolveAttributeArg,
+                                      fidl::ErrConstantOverflowsType);
 }
 
 TEST(VersioningTests, BadNoArguments) {

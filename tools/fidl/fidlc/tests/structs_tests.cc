@@ -103,15 +103,15 @@ type MyStruct = struct {
     field MyEnum = OtherEnum.A;
 };
 )FIDL");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrMismatchedNameTypeAssignment,
-                                      fidl::ErrCouldNotResolveMemberDefault);
+  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrCouldNotResolveMemberDefault,
+                                      fidl::ErrMismatchedNameTypeAssignment);
 }
 
 TEST(StructsTests, BadDefaultValuePrimitiveInEnum) {
   TestLibrary library;
   library.AddFile("bad/fi-0103.test.fidl");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrTypeCannotBeConvertedToType,
-                                      fidl::ErrCouldNotResolveMemberDefault);
+  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrCouldNotResolveMemberDefault,
+                                      fidl::ErrTypeCannotBeConvertedToType);
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "MyEnum");
 }
 
@@ -157,8 +157,8 @@ type MyStruct = struct {
     field MyBits = OtherBits.A;
 };
 )FIDL");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrMismatchedNameTypeAssignment,
-                                      fidl::ErrCouldNotResolveMemberDefault);
+  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrCouldNotResolveMemberDefault,
+                                      fidl::ErrMismatchedNameTypeAssignment);
 }
 
 TEST(StructsTests, BadDefaultValuePrimitiveInBits) {
@@ -172,8 +172,8 @@ type MyStruct = struct {
     field MyBits = 1;
 };
 )FIDL");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrTypeCannotBeConvertedToType,
-                                      fidl::ErrCouldNotResolveMemberDefault);
+  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrCouldNotResolveMemberDefault,
+                                      fidl::ErrTypeCannotBeConvertedToType);
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "MyBits");
 }
 
@@ -361,7 +361,9 @@ TEST(StructsTests, BadTypeCannotBeBoxedShouldBeOptional) {
     std::string fidl_library = "library example;\nusing zx;\n\n" + definition + "\n";
     TestLibrary library(fidl_library);
     library.UseLibraryZx();
-    ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrCannotBeBoxedShouldBeOptional);
+    ASSERT_FALSE(library.Compile());
+    ASSERT_EQ(library.errors().size(), 1);
+    ASSERT_ERR(library.errors()[0], fidl::ErrCannotBeBoxedShouldBeOptional);
   }
 }
 
@@ -394,7 +396,9 @@ TEST(StructsTests, BadTypeCannotBeBoxedNorOptional) {
     std::string fidl_library = "library example;\nusing zx;\n\n" + definition + "\n";
     TestLibrary library(fidl_library);
     library.UseLibraryZx();
-    ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrCannotBeBoxedNorOptional);
+    ASSERT_FALSE(library.Compile());
+    ASSERT_EQ(library.errors().size(), 1);
+    ASSERT_ERR(library.errors()[0], fidl::ErrCannotBeBoxedNorOptional);
   }
 }
 

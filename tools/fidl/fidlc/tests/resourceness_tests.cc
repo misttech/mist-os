@@ -12,29 +12,26 @@
 
 namespace {
 
-void invalid_resource_modifier(const std::string& type, const std::string& definition) {
-  std::string fidl_library = "library example;\n\n" + definition + "\n";
-
-  TestLibrary library(fidl_library);
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrCannotSpecifyModifier);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "resource");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), type);
-}
-
 TEST(ResourcenessTests, BadBitsResourceness) {
-  invalid_resource_modifier("bits", R"FIDL(
+  TestLibrary library(R"FIDL(
+library example;
 type Foo = resource bits {
-    BAR = 0x1;
+    BAR = 1;
 };
 )FIDL");
+  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrCannotSpecifyModifier);
+  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "resource");
 }
 
 TEST(ResourcenessTests, BadEnumResourceness) {
-  invalid_resource_modifier("enum", R"FIDL(
+  TestLibrary library(R"FIDL(
+library example;
 type Foo = resource enum {
     BAR = 1;
 };
 )FIDL");
+  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrCannotSpecifyModifier);
+  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "resource");
 }
 
 TEST(ResourcenessTests, BadConstResourceness) {

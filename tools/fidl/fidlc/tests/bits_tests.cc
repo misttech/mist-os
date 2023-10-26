@@ -79,8 +79,8 @@ const TWO_SQUARED uint32 = 4;
 TEST(BitsTests, BadUnsignedWithNegativeMember) {
   TestLibrary library;
   library.AddFile("bad/fi-0102.test.fidl");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrConstantOverflowsType,
-                                      fidl::ErrCouldNotResolveMember);
+  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrCouldNotResolveMember,
+                                      fidl::ErrConstantOverflowsType);
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "-4");
 }
 
@@ -93,8 +93,8 @@ type Fruit = bits : uint8 {
     APPLE = 256;
 };
 )FIDL");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrConstantOverflowsType,
-                                      fidl::ErrCouldNotResolveMember);
+  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrCouldNotResolveMember,
+                                      fidl::ErrConstantOverflowsType);
   ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "256");
 }
 

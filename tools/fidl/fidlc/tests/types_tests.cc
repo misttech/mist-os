@@ -717,25 +717,49 @@ type Foo = struct {
   ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrNameNotFound);
 }
 
-TEST(TypesTests, BadUsizeWithoutFlag) {
+TEST(TypesTests, BadUsize64WithoutFlag) {
   TestLibrary library;
   library.AddFile("bad/fi-0180.test.fidl");
   ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrExperimentalZxCTypesDisallowed);
 }
 
-TEST(TypesTests, BadExperimentalZxCTypesWithoutFlag) {
-  for (std::string type : {"usize64", "uintptr64", "uchar", "experimental_pointer<uint32>"}) {
-    TestLibrary library("library example; alias T = " + type + ";");
-    ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrExperimentalZxCTypesDisallowed);
-  }
+TEST(TypesTests, BadUintptr64WithoutFlag) {
+  TestLibrary library("library example; alias T = uintptr64;");
+  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrExperimentalZxCTypesDisallowed);
 }
 
-TEST(TypesTests, GoodExperimentalZxCTypesWithFlag) {
-  for (std::string type : {"usize64", "uintptr64", "uchar", "experimental_pointer<uint32>"}) {
-    TestLibrary library("library example; alias T = " + type + ";");
-    library.EnableFlag(fidl::ExperimentalFlags::Flag::kZxCTypes);
-    ASSERT_COMPILED(library);
-  }
+TEST(TypesTests, BadUcharWithoutFlag) {
+  TestLibrary library("library example; alias T = uchar;");
+  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrExperimentalZxCTypesDisallowed);
+}
+
+TEST(TypesTests, BadExperimentalPointerWithoutFlag) {
+  TestLibrary library("library example; alias T = experimental_pointer<uint32>;");
+  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrExperimentalZxCTypesDisallowed);
+}
+
+TEST(TypesTests, GoodUsize64WithFlag) {
+  TestLibrary library("library example; alias T = usize64;");
+  library.EnableFlag(fidl::ExperimentalFlags::Flag::kZxCTypes);
+  ASSERT_COMPILED(library);
+}
+
+TEST(TypesTests, GoodUintptr64WithFlag) {
+  TestLibrary library("library example; alias T = uintptr64;");
+  library.EnableFlag(fidl::ExperimentalFlags::Flag::kZxCTypes);
+  ASSERT_COMPILED(library);
+}
+
+TEST(TypesTests, GoodUcharWithFlag) {
+  TestLibrary library("library example; alias T = uchar;");
+  library.EnableFlag(fidl::ExperimentalFlags::Flag::kZxCTypes);
+  ASSERT_COMPILED(library);
+}
+
+TEST(TypesTests, GoodExperimentalPointerWithFlag) {
+  TestLibrary library("library example; alias T = experimental_pointer<uint32>;");
+  library.EnableFlag(fidl::ExperimentalFlags::Flag::kZxCTypes);
+  ASSERT_COMPILED(library);
 }
 
 }  // namespace fidl::flat
