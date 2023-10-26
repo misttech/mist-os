@@ -213,7 +213,12 @@ def clang_libcxx_static(clang_dir_rel: Path, clang_lib_triple: str) -> str:
     return clang_dir_rel / "lib" / clang_lib_triple / "libc++.a"
 
 
-def gcc_support_tools(gcc_path: Path) -> Iterable[Path]:
+def gcc_support_tools(
+    gcc_path: Path,
+    parser: bool = False,
+    assembler: bool = False,
+    linker: bool = False,
+) -> Iterable[Path]:
     bindir = gcc_path.parent
     # expect compiler to be named like {x64_64,aarch64}-elf-{g++,gcc}
     try:
@@ -224,16 +229,23 @@ def gcc_support_tools(gcc_path: Path) -> Iterable[Path]:
         )
     target = "-".join([arch, objfmt])
     install_root = bindir.parent
-    yield install_root / target / "bin/as"
+    if assembler:
+        yield install_root / target / "bin/as"
+
     libexec_base = install_root / "libexec/gcc" / target
     libexec_dirs = list(libexec_base.glob("*"))  # dir is a version number
     if not libexec_dirs:
         return
 
     libexec_dir = Path(libexec_dirs[0])
-    parsers = {"gcc": "cc1", "g++": "cc1plus"}
-    yield libexec_dir / parsers[tool]
-    # yield libexec_dir / "collect2"  # needed only if linking remotely
+    if parser:
+        parsers = {"gcc": "cc1", "g++": "cc1plus"}
+        yield libexec_dir / parsers[tool]
+
+    if linker:
+        yield libexec_dir / "collect2"
+        yield libexec_dir / "lto-wrapper"
+        yield from (install_root / target / "bin").glob("ld*")  # ld linkers
 
     # Workaround: gcc builds a COMPILER_PATH to its related tools with
     # non-normalized paths like:
@@ -247,7 +259,10 @@ def gcc_support_tools(gcc_path: Path) -> Iterable[Path]:
     version = libexec_dir.name
     # need this dir to exist remotely:
     lib_base = install_root / "lib/gcc" / target / version
-    yield lib_base / "crtbegin.o"  # arbitrary unused file, just to setup its dir
+    if linker:
+        yield lib_base / "libgcc.a"  # used during collect2
+    else:
+        yield lib_base / "crtbegin.o"  # arbitrary unused file, just to setup its dir
 
 
 def rust_stdlib_subdir(target_triple: str) -> str:
@@ -335,7 +350,7 @@ def remote_rustc_to_rust_lld_path(rustc: Path) -> str:
     return rust_lld  # already normalized by Path construction
 
 
-def remote_linker_toolchain_inputs(
+def remote_clang_linker_toolchain_inputs(
     clang_path_rel: Path,
     target: str,
     shared: bool,
@@ -365,9 +380,9 @@ def remote_linker_toolchain_inputs(
 
     yield libclang_target_dir / "libclang_rt.builtins.a"
 
+    # Including both static and shared libraries, because one cannot
+    # deduce from the command-line alone which will be needed.
     if "address" in sanitizers:
-        # Including both static and shared libraries, because one cannot
-        # deduce from the command-line alone which will be needed.
         yield from libclang_target_dir.glob("libclang_rt.asan*")
         ignorelist = libclang_versioned / "share" / "asan_ignorelist.txt"
         yield ignorelist
@@ -377,8 +392,16 @@ def remote_linker_toolchain_inputs(
         yield ignorelist
     if "leak" in sanitizers:
         yield from libclang_target_dir.glob("libclang_rt.lsan*")
+    if "memory" in sanitizers:
+        yield from libclang_target_dir.glob("libclang_rt.msan*")
+        ignorelist = libclang_versioned / "share" / "msan_ignorelist.txt"
+        yield ignorelist
     if "fuzzer" in sanitizers or "fuzzer-no-link" in sanitizers:
         yield from libclang_target_dir.glob("libclang_rt.fuzzer*")
+    if "thread" in sanitizers:
+        yield from libclang_target_dir.glob("libclang_rt.tsan*")
+    if "undefined" in sanitizers:
+        yield from libclang_target_dir.glob("libclang_rt.ubsan*")
 
     if profile:
         yield from libclang_target_dir.glob("libclang_rt.profile*")
@@ -390,6 +413,12 @@ def remote_linker_toolchain_inputs(
     # yield stdlibs_dir / "libc++.a"
     # if unwindlib:
     #     yield stdlibs_dir / (unwindlib + ".a")
+
+
+def remote_gcc_linker_toolchain_inputs(
+    gcc_path_rel: Path,
+) -> Iterable[Path]:
+    return
 
 
 # Built lib/{sysroot_triple}/... files

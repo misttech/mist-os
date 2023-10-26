@@ -291,17 +291,30 @@ class CxxLinkRemoteAction(object):
             remote_inputs.append(remote_ld)
 
         # built-in toolchain libraries, run-times
-        remote_inputs.extend(
-            fuchsia.remote_linker_toolchain_inputs(
-                clang_path_rel=self.remote_compiler,
-                target=self.cxx_action.target,
-                shared=self.cxx_action.shared,
-                rtlib=self.cxx_action.rtlib,
-                unwindlib=self.unwindlib,
-                profile=self.cxx_action.profile_instr_generate,
-                sanitizers=self.cxx_action.sanitizers,
+        if self.cxx_action.compiler_is_clang:
+            remote_inputs.extend(
+                fuchsia.remote_clang_linker_toolchain_inputs(
+                    clang_path_rel=self.remote_compiler,
+                    target=self.cxx_action.target,
+                    shared=self.cxx_action.shared,
+                    rtlib=self.cxx_action.rtlib,
+                    unwindlib=self.unwindlib,
+                    profile=self.cxx_action.profile_instr_generate,
+                    sanitizers=self.cxx_action.sanitizers,
+                )
             )
-        )
+        elif self.cxx_action.compiler_is_gcc:
+            # Workaround b/239101612: missing gcc support libexec binaries for remote build
+            remote_inputs.extend(
+                list(fuchsia.gcc_support_tools(self.compiler_path, linker=True))
+            )
+            for libdir in self.cxx_action.libdirs:
+                # Search paths that point to the source/checkout directory
+                # are assumed to be stable throughout the build, and should
+                # be safe to list as input directories.
+                # Conservatively, include these directories contents.
+                if str(libdir).startswith(str(self.exec_root_rel)):
+                    remote_inputs.append(libdir)
 
         # sysroot libraries:
         # Currently, re-client grabs the entire --sysroot directory, which is
@@ -325,13 +338,6 @@ class CxxLinkRemoteAction(object):
         # but naming it explicitly here makes it easier for RemoteAction
         # to use the output file name for other auxiliary files.
         remote_output_files = self._remote_output_files()
-
-        # Workaround b/239101612: missing gcc support libexec binaries for remote build
-        if self.compiler_type == cxx.Compiler.GCC:
-            remote_inputs.extend(
-                list(fuchsia.gcc_support_tools(self.compiler_path))
-                # TODO: probably need collect2
-            )
 
         # Support for remote cross-compilation is missing.
         if self.host_platform != fuchsia.REMOTE_PLATFORM:
@@ -439,6 +445,11 @@ class CxxLinkRemoteAction(object):
         return self.cxx_action.command
 
     def _detect_local_only(self) -> bool:
+        """Detect when to force local fallback."""
+        # Implicit thin-LTO needs a shared writeable cache directory
+        # which does not work well with remote execution.
+        if self.cxx_action.lto == "thin":
+            return True
         return False
 
     @property

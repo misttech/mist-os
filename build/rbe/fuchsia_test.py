@@ -45,7 +45,9 @@ class GCCSupportToolsTests(unittest.TestCase):
         ) as mock_version:
             tools = list(
                 fuchsia.gcc_support_tools(
-                    gcc_install_base / f"bin/{arch}-{objfmt}-gcc"
+                    gcc_install_base / "bin" / f"{arch}-{objfmt}-gcc",
+                    parser=True,
+                    assembler=True,
                 )
             )
         self.assertEqual({t.name for t in tools}, {"as", "cc1", "crtbegin.o"})
@@ -63,11 +65,37 @@ class GCCSupportToolsTests(unittest.TestCase):
         ) as mock_version:
             tools = list(
                 fuchsia.gcc_support_tools(
-                    gcc_install_base / f"bin/{arch}-{objfmt}-g++"
+                    gcc_install_base / "bin" / f"{arch}-{objfmt}-g++",
+                    parser=True,
+                    assembler=True,
                 )
             )
         self.assertEqual(
             {t.name for t in tools}, {"as", "cc1plus", "crtbegin.o"}
+        )
+        # we only need crtbegin.o for the remote setup of its parent dir
+        for t in tools:
+            self.assertIn(gcc_install_base, t.parents)
+
+    def test_partial_paths_cxx_link(self):
+        arch = "powerpc64"
+        objfmt = "macho"
+        gcc_install_base = Path("../../some/where/install_gcc")
+        version_dir = gcc_install_base / f"libexec/gcc/{arch}-{objfmt}/0.88"
+        with mock.patch.object(
+            Path,
+            "glob",
+            side_effect=[iter([version_dir]), iter([gcc_install_base / "ld"])],
+        ) as mock_version:
+            tools = list(
+                fuchsia.gcc_support_tools(
+                    gcc_install_base / "bin" / f"{arch}-{objfmt}-g++",
+                    linker=True,
+                )
+            )
+        self.assertEqual(
+            {t.name for t in tools},
+            {"ld", "collect2", "lto-wrapper", "libgcc.a"},
         )
         # we only need crtbegin.o for the remote setup of its parent dir
         for t in tools:

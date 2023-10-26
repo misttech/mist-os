@@ -38,6 +38,15 @@ def _cxx_command_scanner() -> argparse.ArgumentParser:
         required=True,
     )
     parser.add_argument(
+        "-L",
+        type=Path,
+        dest="libdirs",
+        action="append",
+        default=[],
+        metavar="DIR",
+        help="linking search paths",
+    )
+    parser.add_argument(
         "--sysroot",
         type=Path,
         default=None,
@@ -93,6 +102,13 @@ def _cxx_command_scanner() -> argparse.ArgumentParser:
         dest="sanitize",
         default=set(),
         help="Disable compiler/linker sanitize options",
+    )
+    parser.add_argument(
+        "-flto",
+        type=str,
+        dest="lto",
+        default=None,
+        help="Link time optimization",
     )
     parser.add_argument(
         "-fuse-ld",
@@ -510,6 +526,10 @@ class CxxAction(object):
         return self._attributes.shared
 
     @property
+    def libdirs(self) -> Sequence[Path]:
+        return self._attributes.libdirs
+
+    @property
     def linker_inputs(self) -> Sequence[Path]:
         return self._linker_inputs
 
@@ -609,6 +629,10 @@ class CxxAction(object):
     @property
     def profile_instr_generate(self) -> bool:
         return self._attributes.profile_instr_generate
+
+    @property
+    def lto(self) -> Optional[str]:
+        return self._attributes.lto
 
     @property
     def use_ld(self) -> Optional[str]:

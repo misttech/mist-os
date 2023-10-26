@@ -65,6 +65,7 @@ class CxxActionTests(unittest.TestCase):
         self.assertTrue(c.dialect_is_cxx)
         self.assertFalse(c.dialect_is_c)
         self.assertIsNone(c.use_ld)
+        self.assertIsNone(c.lto)
         self.assertIsNone(c.rtlib)
         self.assertIsNone(c.unwindlib)
         self.assertFalse(c.static_libstdcxx)
@@ -74,6 +75,7 @@ class CxxActionTests(unittest.TestCase):
         self.assertIsNone(c.linker_just_symbols)
         self.assertIsNone(c.depfile)
         self.assertIsNone(c.sysroot)
+        self.assertEqual(c.libdirs, [])
         self.assertIsNone(c.profile_list)
         self.assertFalse(c.profile_instr_generate)
         self.assertFalse(c.shared)
@@ -283,6 +285,14 @@ class CxxActionTests(unittest.TestCase):
         self.assertTrue(c.shared)
         self.assertEqual(c.linker_inputs, [source])
 
+    def test_flto(self):
+        source = Path("hello.o")
+        output = Path("hello")
+        c = cxx.CxxAction(
+            _strs(["clang++", "-flto=thin", source, "-o", output])
+        )
+        self.assertEqual(c.lto, "thin")
+
     def test_fuse_ld(self):
         source = Path("hello.o")
         output = Path("hello")
@@ -334,6 +344,16 @@ class CxxActionTests(unittest.TestCase):
         self.assertFalse(c.using_asan)
         self.assertTrue(c.using_ubsan)
         self.assertEqual(c.linker_inputs, [source])
+
+    def test_libdirs(self):
+        source = Path("hello.o")
+        output = Path("hello")
+        c = cxx.CxxAction(
+            _strs(
+                ["clang++", "-L../foo/foo", "-Lbar/bar", source, "-o", output]
+            )
+        )
+        self.assertEqual(c.libdirs, [Path("../foo/foo"), Path("bar/bar")])
 
     def test_unwindlib(self):
         source = Path("hello.o")

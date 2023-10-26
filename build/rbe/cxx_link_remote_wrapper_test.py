@@ -85,7 +85,7 @@ class CxxLinkRemoteActionTests(unittest.TestCase):
         self.assertFalse(c.local_only)
 
         with mock.patch.object(
-            fuchsia, "remote_linker_toolchain_inputs", return_value=[]
+            fuchsia, "remote_clang_linker_toolchain_inputs", return_value=[]
         ):
             self.assertEqual(c.prepare(), 0)
         self.assertEqual(
@@ -131,7 +131,9 @@ class CxxLinkRemoteActionTests(unittest.TestCase):
                     auto_reproxy=False,
                 )
                 with mock.patch.object(
-                    fuchsia, "remote_linker_toolchain_inputs", return_value=[]
+                    fuchsia,
+                    "remote_clang_linker_toolchain_inputs",
+                    return_value=[],
                 ):
                     self.assertEqual(c.prepare(), 0)
                 self.assertEqual(c.remote_action.exec_root, fake_root)
@@ -163,7 +165,7 @@ class CxxLinkRemoteActionTests(unittest.TestCase):
                 auto_reproxy=False,
             )
             with mock.patch.object(
-                fuchsia, "remote_linker_toolchain_inputs", return_value=[]
+                fuchsia, "remote_clang_linker_toolchain_inputs", return_value=[]
             ):
                 self.assertEqual(c.prepare(), 0)
             self.assertTrue(c.cxx_action.compiler_is_clang)
@@ -177,6 +179,39 @@ class CxxLinkRemoteActionTests(unittest.TestCase):
                 c.remote_action.output_dirs_relative_to_project_root,
                 [fake_builddir / crash_dir],
             )
+
+    def test_thin_lto_local_only(self):
+        fake_root = Path("/usr/project")
+        fake_builddir = Path("build-it")
+        fake_cwd = fake_root / fake_builddir
+        compiler = Path("clang++")
+        source = Path("hello.o")
+        output = Path("hello")
+        command = _strs(
+            [
+                compiler,
+                "--target=riscv64-apple-darwin21",
+                "-flto=thin",
+                source,
+                "-o",
+                output,
+            ]
+        )
+        with mock.patch.object(remote_action, "PROJECT_ROOT", fake_root):
+            c = cxx_link_remote_wrapper.CxxLinkRemoteAction(
+                ["--"] + command,
+                working_dir=fake_cwd,
+                host_platform=fuchsia.REMOTE_PLATFORM,  # host = remote exec
+                auto_reproxy=False,
+            )
+            self.assertTrue(c.local_only)
+            with mock.patch.object(
+                cxx_link_remote_wrapper.CxxLinkRemoteAction,
+                "_run_locally",
+                return_value=0,
+            ) as mock_run:
+                self.assertEqual(c.run(), 0)
+            mock_run.assert_called_once_with()
 
     def test_remote_flag_back_propagating(self):
         compiler = Path("clang++")
@@ -210,7 +245,7 @@ class CxxLinkRemoteActionTests(unittest.TestCase):
         )
 
         with mock.patch.object(
-            fuchsia, "remote_linker_toolchain_inputs", return_value=[]
+            fuchsia, "remote_clang_linker_toolchain_inputs", return_value=[]
         ):
             self.assertEqual(c.prepare(), 0)
         # check that rewrapper option sees --foo=bar
@@ -249,13 +284,13 @@ class CxxLinkRemoteActionTests(unittest.TestCase):
         self.assertEqual(c.depfile, depfile)
 
         with mock.patch.object(
-            fuchsia, "remote_linker_toolchain_inputs", return_value=[]
+            fuchsia, "remote_gcc_linker_toolchain_inputs", return_value=[]
         ):
             with mock.patch.object(
                 fuchsia, "gcc_support_tools", return_value=iter([])
             ) as mock_tools:
                 self.assertEqual(c.prepare(), 0)
-        mock_tools.assert_called_with(c.compiler_path)
+        mock_tools.assert_called_with(c.compiler_path, linker=True)
         self.assertEqual(
             c.cxx_action.linker_inputs,
             [source],
@@ -319,7 +354,7 @@ class CxxLinkRemoteActionTests(unittest.TestCase):
 
             # create the remote action
             with mock.patch.object(
-                fuchsia, "remote_linker_toolchain_inputs", return_value=[]
+                fuchsia, "remote_gcc_linker_toolchain_inputs", return_value=[]
             ):
                 self.assertEqual(c.prepare(), 0)
 

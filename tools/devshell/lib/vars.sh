@@ -61,6 +61,7 @@ function fx-rbe-enabled {
   # wrapped with ${RBE_WRAPPER[@]}.
   grep -q -e "^[ \t]*rust_rbe_enable[ ]*=[ ]*true" \
     -e "^[ \t]*cxx_rbe_enable[ ]*=[ ]*true" \
+    -e "^[ \t]*link_rbe_enable[ ]*=[ ]*true" \
     -e "^[ \t]*enable_rbe[ ]*=[ ]*true" \
     "${FUCHSIA_BUILD_DIR}/args.gn"
 }

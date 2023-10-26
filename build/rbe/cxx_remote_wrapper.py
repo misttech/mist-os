@@ -297,7 +297,11 @@ class CxxRemoteAction(object):
         # Workaround b/239101612: missing gcc support libexec binaries for remote build
         if self.compiler_type == cxx.Compiler.GCC:
             remote_inputs.extend(
-                list(fuchsia.gcc_support_tools(self.compiler_path))
+                list(
+                    fuchsia.gcc_support_tools(
+                        self.compiler_path, parser=True, assembler=True
+                    )
+                )
             )
 
         # Support for remote cross-compilation is missing.

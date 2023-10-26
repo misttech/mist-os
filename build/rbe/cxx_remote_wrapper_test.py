@@ -365,7 +365,9 @@ class CxxRemoteActionTests(unittest.TestCase):
                 fuchsia, "gcc_support_tools", return_value=iter([])
             ) as mock_tools:
                 self.assertEqual(c.prepare(), 0)
-        mock_tools.assert_called_with(c.compiler_path)
+        mock_tools.assert_called_with(
+            c.compiler_path, parser=True, assembler=True
+        )
         self.assertEqual(
             c.remote_action.inputs_relative_to_project_root,
             [fake_builddir / source],
