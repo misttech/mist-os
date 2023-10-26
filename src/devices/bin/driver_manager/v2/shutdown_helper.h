@@ -76,7 +76,8 @@ class NodeShutdownBridge {
 // Coordinates and keeps track of the node's shutdown process.
 class ShutdownHelper {
  public:
-  explicit ShutdownHelper(NodeShutdownBridge* bridge, async_dispatcher_t* dispatcher);
+  explicit ShutdownHelper(NodeShutdownBridge* bridge, async_dispatcher_t* dispatcher,
+                          bool enable_test_shutdown_delays, std::weak_ptr<std::mt19937> rng_gen);
 
   ~ShutdownHelper() = default;
 
@@ -118,10 +119,14 @@ class ShutdownHelper {
   // TODO(fxb/132254): Handle shutdown intent priority. Currently it's possible
   // for rebind or restart to override a a removal in process.
   void set_shutdown_intent(ShutdownIntent intent) { shutdown_intent_ = intent; }
-  ShutdownIntent shutdown_intent() { return shutdown_intent_; }
+  ShutdownIntent shutdown_intent() const { return shutdown_intent_; }
 
  private:
   void SetRemovalTracker(NodeRemovalTracker* tracker);
+
+  // Generates a random test delay in milliseconds. Returns std::nullopt if
+  // |enable_test_shutdown_delays_| is false.
+  std::optional<uint32_t> GenerateTestDelayMs();
 
   std::optional<NodeId> removal_id_;
 
@@ -136,14 +141,15 @@ class ShutdownHelper {
   NodeShutdownBridge* bridge_;
 
   // Set to true when the ShutdownHelper is in the process of transitioning
-  // node states. Only set if |kEnableShutdownDelay| is enabled. Used to prevent
+  // node states. Only set if |enable_test_shutdown_delays_| is enabled. Used to prevent
   // multiple state transitions from happening at the same time.
   bool is_transition_pending_ = false;
 
-  // Randomizer for injecting delays in shutdown. Only used when |kEnableShutdownDelay|
+  bool enable_test_shutdown_delays_;
+
+  // Randomizer for injecting delays in shutdown. Only used when |enable_test_shutdown_delays_|
   // is true.
-  std::random_device random_device_;
-  std::mt19937 rng_gen_;
+  std::weak_ptr<std::mt19937> rng_gen_;
   std::uniform_int_distribution<uint64_t> distribution_;
 
   async_patterns::TaskScope tasks_;

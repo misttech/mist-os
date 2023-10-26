@@ -51,7 +51,7 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
   DriverRunner(fidl::ClientEnd<fuchsia_component::Realm> realm,
                fidl::ClientEnd<fuchsia_driver_index::DriverIndex> driver_index,
                InspectManager& inspect, LoaderServiceFactory loader_service_factory,
-               async_dispatcher_t* dispatcher);
+               async_dispatcher_t* dispatcher, bool enable_test_shutdown_delays);
 
   // fidl::WireServer<fuchsia_driver_framework::CompositeNodeManager> interface
   void AddSpec(AddSpecRequestView request, AddSpecCompleter::Sync& completer) override;
@@ -87,6 +87,11 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
 
   void RebindComposite(std::string spec, std::optional<std::string> driver_url,
                        fit::callback<void(zx::result<>)> callback) override;
+
+  bool IsTestShutdownDelayEnabled() const override { return enable_test_shutdown_delays_; }
+  std::weak_ptr<std::mt19937> GetShutdownTestRng() const override {
+    return shutdown_test_delay_rng_;
+  }
 
   void PublishComponentRunner(component::OutgoingDirectory& outgoing);
   void PublishCompositeNodeManager(component::OutgoingDirectory& outgoing);
@@ -170,6 +175,14 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
   NodeRemovalTracker removal_tracker_;
 
   fbl::DoublyLinkedList<std::unique_ptr<DriverHostComponent>> driver_hosts_;
+
+  // True if the driver manager should inject test delays in the shutdown process. Set by the
+  // structured config.
+  bool enable_test_shutdown_delays_;
+
+  // RNG engine for the shutdown test delays. For reproducibility reasons, only one engine should
+  // be used.
+  std::shared_ptr<std::mt19937> shutdown_test_delay_rng_;
 };
 
 Collection ToCollection(const Node& node, fuchsia_driver_framework::DriverPackageType package_type);

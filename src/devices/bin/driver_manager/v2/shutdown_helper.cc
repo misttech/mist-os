@@ -12,23 +12,20 @@ namespace dfv2 {
 
 namespace {
 
-// Flag for enabling test delays in shutdown.
-// TODO(fxb/134783): Set this value from the structured config.
-const bool kEnableShutdownDelay = false;
-
 // The range of test delay time in milliseconds.
 constexpr uint32_t kMinTestDelayMs = 0;
 constexpr uint32_t kMaxTestDelayMs = 5;
 
 }  // namespace
 
-ShutdownHelper::ShutdownHelper(NodeShutdownBridge* bridge, async_dispatcher_t* dispatcher)
-    : bridge_(bridge), distribution_(kMinTestDelayMs, kMaxTestDelayMs), tasks_(dispatcher) {
-  if (kEnableShutdownDelay) {
-    // TODO(fxb/134783): Pass in a seed so that all ShutdownHelpers share the same one.
-    rng_gen_ = std::mt19937(random_device_());
-  }
-}
+ShutdownHelper::ShutdownHelper(NodeShutdownBridge* bridge, async_dispatcher_t* dispatcher,
+                               bool enable_test_shutdown_delays,
+                               std::weak_ptr<std::mt19937> rng_gen)
+    : bridge_(bridge),
+      enable_test_shutdown_delays_(enable_test_shutdown_delays),
+      rng_gen_(rng_gen),
+      distribution_(kMinTestDelayMs, kMaxTestDelayMs),
+      tasks_(dispatcher) {}
 
 void ShutdownHelper::Remove(std::shared_ptr<Node> node, RemovalSet removal_set,
                             NodeRemovalTracker* removal_tracker) {
@@ -177,21 +174,16 @@ void ShutdownHelper::CheckWaitingOnDriverComponent() {
 void ShutdownHelper::PerformTransition(fit::function<void()> action) {
   ZX_ASSERT(!is_transition_pending_);
 
-  std::optional<uint32_t> delay_ms;
-  if (kEnableShutdownDelay) {
-    // Randomize a 20% chance for adding a shutdown delay.
-    if (distribution_(rng_gen_) % 5 == 1) {
-      delay_ms = distribution_(rng_gen_);
-    }
-  }
-
-  if (!delay_ms) {
+  // Generate a test delay. If there is none, perform the action and return.
+  // Otherwise, perform the action asynchronously with the delay.
+  std::optional<uint32_t> test_delay = GenerateTestDelayMs();
+  if (!test_delay) {
     action();
     return;
   }
 
   is_transition_pending_ = true;
-  tasks_.Post([action = std::move(action), delay_amount = delay_ms.value()] {
+  tasks_.Post([action = std::move(action), delay_amount = test_delay.value()] {
     std::this_thread::sleep_for(std::chrono::microseconds(delay_amount));
     action();
   });
@@ -244,6 +236,24 @@ void ShutdownHelper::SetRemovalTracker(NodeRemovalTracker* removal_tracker) {
       .collection = node_info.second,
       .state = node_state_,
   });
+}
+
+std::optional<uint32_t> ShutdownHelper::GenerateTestDelayMs() {
+  if (!enable_test_shutdown_delays_) {
+    return std::nullopt;
+  }
+
+  auto rng = rng_gen_.lock();
+  if (!rng) {
+    LOGF(WARNING, "Shutdown test RNG released. Unable to generate a test delay");
+    return std::nullopt;
+  }
+
+  // Randomize a 20% chance for adding a shutdown delay.
+  if (distribution_(*rng) % 5 == 1) {
+    return distribution_(*rng);
+  }
+  return std::nullopt;
 }
 
 }  // namespace dfv2

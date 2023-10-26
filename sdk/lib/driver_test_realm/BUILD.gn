@@ -150,6 +150,7 @@ fuchsia_structured_config_values("test_config") {
     use_driver_framework_v2 = false
     driver_host_crash_policy = "restart-driver-host"
     root_driver = "fuchsia-boot:///#meta/test-parent-sys.cm"
+    enable_test_shutdown_delays = false
   }
 }
 

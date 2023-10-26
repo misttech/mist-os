@@ -464,7 +464,7 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
     auto driver_index_client = driver_index_->Connect();
     ASSERT_EQ(ZX_OK, driver_index_client.status_value());
     driver_runner_.emplace(ConnectToRealm(), std::move(*driver_index_client), inspect(),
-                           &LoaderFactory, dispatcher());
+                           &LoaderFactory, dispatcher(), false);
     SetupDevfs();
   }
 

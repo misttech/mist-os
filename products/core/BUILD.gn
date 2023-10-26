@@ -212,9 +212,10 @@ product_assembly_configuration("core_with_dfv2_fuzzing") {
     forward_variables_from(_storage_default, "*")
 
     driver_framework = {
-      driver_load_config = {
-        enable_fuzzer = true
-        max_delay_ms = 300
+      test_fuzzing_config = {
+        enable_load_fuzzer = true
+        max_load_delay_ms = 300
+        enable_test_shutdown_delays = true
       }
     }
   }

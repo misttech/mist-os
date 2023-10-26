@@ -444,7 +444,12 @@ void Node::AddToParents() {
 
 ShutdownHelper& Node::GetShutdownHelper() {
   if (!shutdown_helper_) {
-    shutdown_helper_ = std::make_unique<ShutdownHelper>(this, dispatcher_);
+    bool is_shutdown_test_delay_enabled =
+        node_manager_.has_value() && node_manager_.value()->IsTestShutdownDelayEnabled();
+    auto shutdown_rng = node_manager_.has_value() ? node_manager_.value()->GetShutdownTestRng()
+                                                  : std::weak_ptr<std::mt19937>();
+    shutdown_helper_ = std::make_unique<ShutdownHelper>(
+        this, dispatcher_, is_shutdown_test_delay_enabled, shutdown_rng);
   }
   return *shutdown_helper_.get();
 }

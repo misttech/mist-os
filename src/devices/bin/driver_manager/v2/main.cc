@@ -109,7 +109,7 @@ int RunDfv2(driver_manager_config::Config config,
 #endif
         return client;
       },
-      loop.dispatcher());
+      loop.dispatcher(), config.enable_test_shutdown_delays());
 
   // Setup devfs.
   std::optional<Devfs> devfs;

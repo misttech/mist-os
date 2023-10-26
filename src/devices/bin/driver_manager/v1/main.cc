@@ -61,6 +61,10 @@ int RunDfv1(driver_manager_config::Config dm_config,
   auto outgoing = component::OutgoingDirectory(loop.dispatcher());
   InspectManager inspect_manager(loop.dispatcher());
 
+  if (dm_config.enable_test_shutdown_delays()) {
+    LOGF(WARNING, "Shutdown test delays are not available in DFv1");
+  }
+
   inspect::Node config_node = inspect_manager.root_node().CreateChild("config");
   dm_config.RecordInspect(&config_node);
 

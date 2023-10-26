@@ -72,6 +72,11 @@ class NodeManager {
 
   virtual void RebindComposite(std::string spec, std::optional<std::string> driver_url,
                                fit::callback<void(zx::result<>)> callback) {}
+
+  virtual bool IsTestShutdownDelayEnabled() const { return false; }
+  virtual std::weak_ptr<std::mt19937> GetShutdownTestRng() const {
+    return std::weak_ptr<std::mt19937>();
+  }
 };
 
 enum class Collection : uint8_t {

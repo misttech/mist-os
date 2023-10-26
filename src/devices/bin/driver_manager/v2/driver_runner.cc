@@ -232,7 +232,7 @@ Collection ToCollection(const Node& node, fdf::DriverPackageType package_type) {
 DriverRunner::DriverRunner(fidl::ClientEnd<fcomponent::Realm> realm,
                            fidl::ClientEnd<fdi::DriverIndex> driver_index, InspectManager& inspect,
                            LoaderServiceFactory loader_service_factory,
-                           async_dispatcher_t* dispatcher)
+                           async_dispatcher_t* dispatcher, bool enable_test_shutdown_delays)
     : driver_index_(std::move(driver_index), dispatcher),
       loader_service_factory_(std::move(loader_service_factory)),
       dispatcher_(dispatcher),
@@ -241,7 +241,15 @@ DriverRunner::DriverRunner(fidl::ClientEnd<fcomponent::Realm> realm,
           inspect.CreateDevice(std::string(kRootDeviceName), zx::vmo(), 0))),
       composite_node_spec_manager_(this),
       bind_manager_(this, this, dispatcher),
-      runner_(dispatcher, fidl::WireClient(std::move(realm), dispatcher)) {
+      runner_(dispatcher, fidl::WireClient(std::move(realm), dispatcher)),
+      enable_test_shutdown_delays_(enable_test_shutdown_delays) {
+  if (enable_test_shutdown_delays_) {
+    // TODO(fxb/134783): Allow the seed to be set from the configuration.
+    auto seed = std::chrono::system_clock::now().time_since_epoch().count();
+    LOGF(INFO, "Shutdown test delays enabled. Using seed %u", seed);
+    shutdown_test_delay_rng_ = std::make_shared<std::mt19937>(static_cast<uint32_t>(seed));
+  }
+
   inspect.inspector().GetRoot().CreateLazyNode(
       "driver_runner", [this] { return Inspect(); }, &inspect.inspector());
 

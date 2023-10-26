@@ -4,7 +4,7 @@
 
 use crate::subsystems::prelude::*;
 use assembly_config_schema::platform_config::driver_framework_config::{
-    DriverFrameworkConfig, DriverHostCrashPolicy, TestDriverLoadConfig,
+    DriverFrameworkConfig, DriverHostCrashPolicy, TestFuzzingConfig,
 };
 
 pub(crate) struct DriverFrameworkSubsystemConfig;
@@ -27,10 +27,12 @@ impl DefineSubsystemConfiguration<DriverFrameworkConfig> for DriverFrameworkSubs
 
         let delay_fallback = !matches!(context.feature_set_level, FeatureSupportLevel::Bootstrap);
 
-        let driver_load_config = driver_framework_config
-            .driver_load_config
-            .as_ref()
-            .unwrap_or(&TestDriverLoadConfig { enable_fuzzer: false, max_delay_ms: 0 });
+        let test_fuzzing_config =
+            driver_framework_config.test_fuzzing_config.as_ref().unwrap_or(&TestFuzzingConfig {
+                enable_load_fuzzer: false,
+                max_load_delay_ms: 0,
+                enable_test_shutdown_delays: false,
+            });
 
         builder
             .package("driver-index")
@@ -38,8 +40,8 @@ impl DefineSubsystemConfiguration<DriverFrameworkConfig> for DriverFrameworkSubs
             .field("enable_ephemeral_drivers", matches!(context.build_type, BuildType::Eng))?
             .field("delay_fallback_until_base_drivers_indexed", delay_fallback)?
             .field("bind_eager", driver_framework_config.eager_drivers.clone())?
-            .field("enable_driver_load_fuzzer", driver_load_config.enable_fuzzer)?
-            .field("driver_load_fuzzer_max_delay_ms", driver_load_config.max_delay_ms)?
+            .field("enable_driver_load_fuzzer", test_fuzzing_config.enable_load_fuzzer)?
+            .field("driver_load_fuzzer_max_delay_ms", test_fuzzing_config.max_load_delay_ms)?
             .field("disabled_drivers", disabled_drivers)?;
 
         let driver_host_crash_policy = driver_framework_config
@@ -56,7 +58,11 @@ impl DefineSubsystemConfiguration<DriverFrameworkConfig> for DriverFrameworkSubs
             .field("verbose", false)?
             .field("use_driver_framework_v2", use_dfv2)?
             .field("driver_host_crash_policy", format!("{driver_host_crash_policy}"))?
-            .field("root_driver", "fuchsia-boot:///platform-bus#meta/platform-bus.cm")?;
+            .field("root_driver", "fuchsia-boot:///platform-bus#meta/platform-bus.cm")?
+            .field(
+                "enable_test_shutdown_delays",
+                test_fuzzing_config.enable_test_shutdown_delays,
+            )?;
 
         Ok(())
     }
