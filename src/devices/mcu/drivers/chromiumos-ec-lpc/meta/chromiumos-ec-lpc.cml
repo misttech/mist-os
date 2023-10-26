@@ -19,7 +19,7 @@
         { service: "fuchsia.hardware.google.ec.Service" },
     ],
     use: [
-        { protocol: "fuchsia.boot.RootResource" },
+        { protocol: "fuchsia.kernel.IoportResource" },
         { service: "fuchsia.hardware.acpi.Service" },
     ],
     expose: [
