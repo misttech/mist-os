@@ -5,6 +5,7 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/boot-options/boot-options.h>
+#include <lib/counters.h>
 #include <lib/debuglog.h>
 #include <lib/zircon-internal/macros.h>
 
@@ -15,6 +16,34 @@
 #include <vm/scanner.h>
 
 namespace {
+
+KCOUNTER(pressure_level_oom, "memory_watchdog.pressure.oom")
+KCOUNTER(pressure_level_imminent_oom, "memory_watchdog.pressure.imminent_oom")
+KCOUNTER(pressure_level_critical, "memory_watchdog.pressure.critical")
+KCOUNTER(pressure_level_warning, "memory_watchdog.pressure.warning")
+KCOUNTER(pressure_level_normal, "memory_watchdog.pressure.normal")
+
+void CountPressureEvent(MemoryWatchdog::PressureLevel level) {
+  switch (level) {
+    case MemoryWatchdog::PressureLevel::kOutOfMemory:
+      pressure_level_oom.Add(1);
+      break;
+    case MemoryWatchdog::PressureLevel::kImminentOutOfMemory:
+      pressure_level_imminent_oom.Add(1);
+      break;
+    case MemoryWatchdog::PressureLevel::kCritical:
+      pressure_level_critical.Add(1);
+      break;
+    case MemoryWatchdog::PressureLevel::kWarning:
+      pressure_level_warning.Add(1);
+      break;
+    case MemoryWatchdog::PressureLevel::kNormal:
+      pressure_level_normal.Add(1);
+      break;
+    default:
+      break;
+  }
+}
 
 const char* PressureLevelToString(MemoryWatchdog::PressureLevel level) {
   switch (level) {
@@ -202,6 +231,8 @@ void MemoryWatchdog::WorkerThread() {
   while (true) {
     // If we've hit OOM level perform some immediate synchronous eviction to attempt to avoid OOM.
     if (mem_event_idx_ == PressureLevel::kOutOfMemory) {
+      // Count kOutOfMemory explicitly and not mem_event_idx_, as reading it is racy.
+      CountPressureEvent(PressureLevel::kOutOfMemory);
       printf("memory-pressure: free memory is %zuMB, evicting pages to prevent OOM...\n",
              pmm_count_free_pages() * PAGE_SIZE / MB);
       pmm_page_queues()->Dump();
@@ -245,6 +276,7 @@ void MemoryWatchdog::WorkerThread() {
     auto time_now = current_time();
 
     if (IsSignalDue(idx, time_now)) {
+      CountPressureEvent(idx);
       printf("memory-pressure: memory availability state - %s\n", PressureLevelToString(idx));
       pmm_page_queues()->Dump();
 
