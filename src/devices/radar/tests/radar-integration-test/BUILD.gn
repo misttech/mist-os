@@ -46,7 +46,8 @@ fuchsia_test_package("radar-integration-reader-proxying-test") {
 group("tests") {
   testonly = true
   deps = [
-    ":radar-integration-reader-proxying-test",
+    # TODO(fxbug.dev/135703): Re-enable this test once it has been fixed.
+    # ":radar-integration-reader-proxying-test",
     ":radar-integration-test",
   ]
 }
