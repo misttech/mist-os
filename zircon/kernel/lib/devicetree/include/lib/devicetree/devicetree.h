@@ -37,6 +37,11 @@ namespace devicetree {
 
 using ByteView = cpp20::span<const uint8_t>;
 
+// See
+// https://devicetree-specification.readthedocs.io/en/v0.3/devicetree-basics.html#address-cells-and-size-cells
+constexpr uint32_t kRegDefaultAddressCells = 2;
+constexpr uint32_t kRegDefaultSizeCells = 1;
+
 // Represents a tuple of N-elements encoded as collection of cells. Each cell is a 32 bit big endian
 // unsigned integer.
 //     A   B      C   D

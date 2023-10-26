@@ -23,11 +23,6 @@
 namespace devicetree {
 namespace {
 
-// See
-// https://devicetree-specification.readthedocs.io/en/v0.3/devicetree-basics.html#address-cells-and-size-cells
-constexpr uint32_t kRegDefaultAddressCells = 2;
-constexpr uint32_t kRegDefaultSizeCells = 1;
-
 constexpr uint32_t kMagic = 0xd00dfeed;
 // The structure block tokens, named as in the spec for clarity.
 constexpr uint32_t FDT_BEGIN_NODE = 0x00000001;
