@@ -26,7 +26,6 @@ group("tests") {
     deps -= [
       "android:tests",
       "gvisor:tests",
-      "syscalls:tests",
       "vdso:tests",
     ]
   }

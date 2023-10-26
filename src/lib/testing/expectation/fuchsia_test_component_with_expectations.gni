@@ -26,13 +26,11 @@ import("//tools/cmc/build/expect_includes.gni")
 #
 #  All others - same as fuchsia_test_component.
 template("fuchsia_test_component_with_expectations") {
-  assert(defined(invoker.expectations),
-         "Must define path to expectations file.")
   assert(defined(invoker.manifest), "Must define path to manifest file.")
 
   _test_component_name = target_name
 
-  _expectations_target = "${target_name}_expectations"
+  _expectations_target = "${target_name}_preprocessed_expectations"
   preprocess_expectations(_expectations_target) {
     if (defined(invoker.generated_expectations)) {
       assert(!defined(invoker.expectations))
@@ -43,6 +41,8 @@ template("fuchsia_test_component_with_expectations") {
           "/" + get_label_info(invoker.generated_expectations, "name") +
           ".json5"
     } else {
+      assert(defined(invoker.expectations),
+             "Must define path to expectations file.")
       expectations = invoker.expectations
     }
     output_path =

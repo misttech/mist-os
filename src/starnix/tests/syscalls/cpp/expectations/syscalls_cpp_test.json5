@@ -4,12 +4,6 @@
 {
     actions: [
         {
-            type: "expect_pass",
-            matchers: [
-                "*",
-            ],
-        },
-        {
             type: "skip",
             matchers: [
                 // TODO(https://fxbug.dev/97514): Make these tests pass in Starnix then enable.

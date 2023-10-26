@@ -26,8 +26,12 @@ import("//src/starnix/kernel/starnix.gni")
 #     The name of the binary produced by test_label. Defaults to target_name.
 #     Type: string
 #   uses_expectations (optional)
-#     Set to true if this test has an expectations file in the path "expectations/${target_name}.json5".
+#     Set to true if this test has an expectations file. "expectations/${target_name}.json5" is
+#     used by default, unless `generated_expectations` is also set.
 #     Type: bool
+#   generated_expectations (optional)
+#     A `generated_expectations_file` target that generates expectations for this test.
+#     Type: GN label string
 #
 #   The remaining parameters are forwarded to the fuchsia_component template.
 template("starnix_toolchain_test_component") {
@@ -74,7 +78,11 @@ template("starnix_toolchain_test_component") {
     }
     deps += [ ":${target_name}_resource" ]
     if (defined(invoker.uses_expectations) && invoker.uses_expectations) {
-      expectations = "expectations/${target_name}.json5"
+      if (defined(invoker.generated_expectations)) {
+        generated_expectations = invoker.generated_expectations
+      } else {
+        expectations = "expectations/${target_name}.json5"
+      }
       deps += [ "//src/starnix/tests:starnix_test_with_expectations" ]
     } else {
       deps += [ "//src/starnix/tests:starnix_test" ]

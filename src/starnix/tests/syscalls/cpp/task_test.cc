@@ -106,7 +106,7 @@ pid_t DoClone3(const clone_args* cl_args, size_t size, int (*func)(void*), void*
       "li   a7, %[sys_clone3]\n"
       "ecall\n"
       "bnez a0, 1f\n"
-      "ld   a0, %[param]\n"
+      "mv   a0, %[param]\n"
       "jalr %[func]\n"
       "li   a7, %[sys_exit]\n"
       "ecall\n"

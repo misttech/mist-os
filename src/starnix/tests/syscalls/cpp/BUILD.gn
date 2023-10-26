@@ -6,6 +6,7 @@ import("//build/components.gni")
 import("//build/test.gni")
 import("//build/testing/host_test.gni")
 import("//build/testing/host_test_data.gni")
+import("//src/lib/testing/expectation/generated_expectations_file.gni")
 import("//src/starnix/kernel/starnix.gni")
 import("//src/starnix/tests/build/starnix_linux_test_component.gni")
 import("//src/starnix/tests/starnix_test_subpackages.gni")
@@ -220,6 +221,14 @@ resource("extended_pstate_initial_state_child_resource") {
   deps = [ exe_label ]
 }
 
+generated_expectations_file("syscalls_cpp_test_expectations") {
+  includes = [ "expectations/syscalls_cpp_test.json5" ]
+
+  if (current_cpu == "riscv64") {
+    includes += [ "expectations/syscalls_cpp_test_riscv64.json5" ]
+  }
+}
+
 starnix_linux_test_component("syscalls_cpp_test") {
   test_label = ":syscalls_cpp_test_bin"
   test_binary = "syscalls_cpp_test_bin"
@@ -229,6 +238,7 @@ starnix_linux_test_component("syscalls_cpp_test") {
     ":syscall_test_exec_child_resource($target_linux_toolchain)",
   ]
   uses_expectations = true
+  generated_expectations = ":syscalls_cpp_test_expectations"
   test_type = "starnix"
 }
 

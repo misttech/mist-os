@@ -3,10 +3,14 @@
 // found in the LICENSE file.
 
 #include <fcntl.h>
+
+#include <linux/memfd.h>
+
+// Must be included after <linux/*.h> to avoid conflicts between Bionic UAPI and glibc headers.
+// TODO(b/307959737): Build these tests without glibc.
 #include <sys/mman.h>
 
 #include <gtest/gtest.h>
-#include <linux/memfd.h>
 
 #if !defined(__NR_memfd_create)
 #if defined(__x86_64__)

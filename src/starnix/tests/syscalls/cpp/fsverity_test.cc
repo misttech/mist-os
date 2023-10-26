@@ -2,28 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <dirent.h>
 #include <fcntl.h>
-#include <fidl/fuchsia.fs/cpp/wire.h>
+
+#include <linux/fs.h>
+#include <linux/fsverity.h>
+
+// Must be included after <linux/*.h> to avoid conflicts between Bionic UAPI and glibc headers.
+// TODO(b/307959737): Build these tests without glibc.
 #include <sys/ioctl.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <sys/syscall.h>
-#include <sys/types.h>
 #include <sys/uio.h>
 #include <sys/vfs.h>
-#include <sys/xattr.h>
-#include <unistd.h>
 
 #include <cstdint>
 
 #include <gtest/gtest.h>
-#include <linux/capability.h>
-#include <linux/fs.h>
-#include <linux/fsverity.h>
-#include <linux/stat.h>
 
 #include "fidl/fuchsia.fs/cpp/common_types.h"
+#include "fidl/fuchsia.fs/cpp/wire.h"
 #include "src/starnix/tests/syscalls/cpp/test_helper.h"
 
 namespace {
