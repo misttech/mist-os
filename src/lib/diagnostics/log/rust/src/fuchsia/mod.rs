@@ -18,6 +18,7 @@ use tracing_core::span::Current;
 use tracing_subscriber::{layer::Layered, prelude::*, registry::Registry};
 mod filter;
 mod sink;
+use once_cell::sync::Lazy;
 
 use filter::InterestFilter;
 use sink::{Sink, SinkConfig};
@@ -158,7 +159,8 @@ pub fn initialize(opts: PublishOptions<'_>) -> Result<(), PublishError> {
 pub fn set_minimum_severity(severity: Severity) {
     tracing::dispatcher::get_default(|dispatcher| {
         let publisher: &Publisher = dispatcher.downcast_ref().unwrap();
-        let filter: &InterestFilter = (&publisher.inner as &dyn Subscriber).downcast_ref().unwrap();
+        let filter: &InterestFilter =
+            (&*publisher.inner as &dyn Subscriber).downcast_ref().unwrap();
         filter.set_minimum_severity(severity);
     });
 }
@@ -252,7 +254,10 @@ pub fn initialize_sync(opts: PublishOptions<'_>) -> impl Drop {
 /// A `Publisher` acts as broker, implementing [`tracing::Subscriber`] to receive diagnostic
 /// events from a component, and then forwarding that data on to a diagnostics service.
 pub struct Publisher {
-    inner: Layered<InterestFilter, Layered<Sink, Registry>>,
+    inner: Lazy<
+        Layered<InterestFilter, Layered<Sink, Registry>>,
+        Box<dyn FnOnce() -> Layered<InterestFilter, Layered<Sink, Registry>> + Send>,
+    >,
     interest_listening_task: Option<fasync::Task<()>>,
 }
 
@@ -290,15 +295,18 @@ impl Publisher {
             None
         };
 
-        Ok(Self { inner: Registry::default().with(sink).with(filter), interest_listening_task })
+        Ok(Self {
+            inner: Lazy::new(Box::new(move || Registry::default().with(sink).with(filter))),
+            interest_listening_task,
+        })
     }
 
     // TODO(fxbug.dev/71242) delete this and make Publisher private
     /// Publish the provided event for testing.
     pub fn event_for_testing(&self, record: TestRecord<'_>) {
-        let filter: &InterestFilter = (&self.inner as &dyn Subscriber).downcast_ref().unwrap();
+        let filter: &InterestFilter = (&*self.inner as &dyn Subscriber).downcast_ref().unwrap();
         if filter.enabled_for_testing(&record) {
-            let sink: &Sink = (&self.inner as &dyn Subscriber).downcast_ref().unwrap();
+            let sink: &Sink = (&*self.inner as &dyn Subscriber).downcast_ref().unwrap();
             sink.event_for_testing(record);
         }
     }
@@ -308,7 +316,7 @@ impl Publisher {
     where
         T: OnInterestChanged + Send + Sync + 'static,
     {
-        let filter: &InterestFilter = (&self.inner as &dyn Subscriber).downcast_ref().unwrap();
+        let filter: &InterestFilter = (&*self.inner as &dyn Subscriber).downcast_ref().unwrap();
         filter.set_interest_listener(listener);
     }
 
