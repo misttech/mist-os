@@ -181,6 +181,9 @@ int scanner_request_thread(void*) {
       last_pt_evict = current;
     }
 
+    // Recalculate next_harvest_deadline, as scanning may have happened via a different means while
+    // we were sleeping and we do not want to re-scan unless *no* scan happens for the period.
+    next_harvest_deadline = zx_time_add_duration(last_accessed_scan_complete, accessed_scan_period);
     if (current >= next_harvest_deadline) {
       scanner_wait_for_accessed_scan(next_harvest_deadline, false);
       op |= kScannerOpUpdateHarvestTime;
@@ -388,8 +391,10 @@ static void scanner_init_func(uint level) {
   pmm_page_queues()->SetActiveRatioMultiplier(gBootOptions->page_scanner_active_ratio_multiplier);
   pmm_page_queues()->StartThreads(ZX_SEC(gBootOptions->page_scanner_min_aging_interval),
                                   ZX_SEC(gBootOptions->page_scanner_max_aging_interval));
-  // Ensure at least 1 second between access scans.
-  accessed_scan_period = ZX_SEC(ktl::max(gBootOptions->page_scanner_min_aging_interval, 1u));
+  // Set the access scan to 1 second over the min page scanning interval. This both ensures that the
+  // access scan period is never 0, and always gives the page scanner a chance to trigger harvesting
+  // first if it is rapidly aging.
+  accessed_scan_period = ZX_SEC(gBootOptions->page_scanner_min_aging_interval + 1u);
 
   if (fbl::RefPtr<VmCompression> compression = VmCompression::CreateDefault()) {
     zx_status_t status = pmm_set_page_compression(ktl::move(compression));
