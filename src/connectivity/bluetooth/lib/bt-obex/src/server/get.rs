@@ -159,16 +159,14 @@ impl StagedData {
 enum State {
     /// The request phase of the operation in which the remote OBEX client sends informational
     /// headers describing the payload. This can be spread out over multiple packets.
-    /// `headers` will be updated each time new headers are received.
+    /// `headers` contain staged informational headers to be relayed to the upper application
+    /// profile.
     Request { headers: HeaderSet },
     /// The request phase of the operation is complete (GET_FINAL has been received) and we are
-    /// waiting for the profile application to accept or reject the request.
-    /// The response phase (`State::Response { .. }`) is started by calling
-    /// `GetOperation::start_response_phase` which indicates whether the profile application has
-    /// accepted or rejected the GET request.
-    /// `include_srm` is Some<T> if the peer requested SRM on the final request packet (GetFinal),
-    /// None otherwise. If set, it will be included in the first data response.
-    RequestPhaseComplete { include_srm: Option<SingleResponseMode> },
+    /// waiting for the profile application.
+    /// The response phase is started by calling `GetOperation::handle_application_response` with
+    /// the profile application's accepting or rejecting of the request.
+    RequestPhaseComplete,
     /// The profile application has accepted the GET request.
     /// The response phase of the operation in which the local OBEX server sends the payload over
     /// potentially multiple packets.
@@ -178,17 +176,28 @@ enum State {
     Complete,
 }
 
+/// The current SRM status for the GET operation.
+enum SrmState {
+    /// SRM has not been negotiated yet.
+    /// `srm_supported` is true if SRM is supported locally.
+    NotNegotiated { srm_supported: bool },
+    /// SRM is currently negotiating and therefore we need to send a SRM response to the peer.
+    /// `negotiated_srm` is the negotiated SRM value that will be sent to the peer.
+    Negotiating { negotiated_srm: SingleResponseMode },
+    /// SRM has been negotiated. If `srm` is `SingleResponseMode::Enable`, then SRM is considered
+    /// active for the duration of this GET operation.
+    Negotiated { srm: SingleResponseMode },
+}
+
 /// Represents an in-progress GET operation.
 pub struct GetOperation {
     /// The maximum number of bytes that can be allocated to headers in the GetOperation. This
     /// includes informational headers and data headers.
     max_headers_size: u16,
-    /// Whether SRM is locally supported or not.
-    srm_supported: bool,
-    /// The current SRM status for this operation. This is None if it has not been negotiated
-    /// and Some<T> when negotiated.
-    /// Defaults to disabled if never negotiated.
-    srm: Option<SingleResponseMode>,
+    /// The current SRM status for this operation.
+    /// SRM may not necessarily be negotiated during a GET operation in which case is defaulted
+    /// to disabled.
+    srm_state: SrmState,
     /// Current state of the GET operation.
     state: State,
 }
@@ -199,8 +208,7 @@ impl GetOperation {
         let max_headers_size = max_packet_size - ResponsePacket::MIN_PACKET_SIZE as u16;
         Self {
             max_headers_size,
-            srm_supported,
-            srm: None,
+            srm_state: SrmState::NotNegotiated { srm_supported },
             state: State::Request { headers: HeaderSet::new() },
         }
     }
@@ -208,9 +216,14 @@ impl GetOperation {
     #[cfg(test)]
     fn new_at_state(max_packet_size: u16, state: State) -> Self {
         let max_headers_size = max_packet_size - ResponsePacket::MIN_PACKET_SIZE as u16;
-        Self { max_headers_size, srm_supported: false, srm: None, state }
+        Self {
+            max_headers_size,
+            srm_state: SrmState::NotNegotiated { srm_supported: false },
+            state,
+        }
     }
 
+    /// Checks if the operation is complete and updates the state.
     fn check_complete_and_update_state(&mut self) {
         let State::Response { ref staged_data } = &self.state else { return };
 
@@ -218,12 +231,30 @@ impl GetOperation {
             self.state = State::Complete;
         }
     }
+
+    /// Attempts to add the SRM response to the provided `headers`.
+    /// Returns Ok(true) if SRM is negotiating and the header was added.
+    /// Returns Ok(false) if SRM is not negotiating and the header wasn't added.
+    /// Returns Error if the SRM response couldn't be added to `headers`.
+    fn maybe_add_srm_header(&mut self, headers: &mut HeaderSet) -> Result<bool, Error> {
+        if let SrmState::Negotiating { negotiated_srm } = self.srm_state {
+            headers.add(negotiated_srm.into())?;
+            self.srm_state = SrmState::Negotiated { srm: negotiated_srm };
+            return Ok(true);
+        }
+        Ok(false)
+    }
 }
 
 impl ServerOperation for GetOperation {
     fn srm_status(&self) -> SingleResponseMode {
         // Defaults to disabled if SRM has not been negotiated.
-        self.srm.unwrap_or(SingleResponseMode::Disable)
+        match self.srm_state {
+            SrmState::NotNegotiated { .. } | SrmState::Negotiating { .. } => {
+                SingleResponseMode::Disable
+            }
+            SrmState::Negotiated { srm } => srm,
+        }
     }
 
     fn is_complete(&self) -> bool {
@@ -238,42 +269,51 @@ impl ServerOperation for GetOperation {
         let current_srm_mode = self.srm_status();
         match &mut self.state {
             State::Request { ref mut headers } if code == OpCode::Get => {
-                headers.try_append(HeaderSet::from(request))?;
+                let request_headers = HeaderSet::from(request);
                 // The response to the `request` depends on the current SRM status.
                 // If SRM is enabled, then no response is needed.
-                // If SRM is disabled, then we must acknowledge the `request`.
+                // If SRM is disabled or is being negotiated, then we expect to reply with the
+                // application's response headers.
                 // If SRM hasn't been negotiated yet, we check to see if the peer requests it
-                // and reply with the negotiated SRM header.
-                let response_headers = match self.srm {
-                    Some(SingleResponseMode::Enable) => return Ok(OperationRequest::None),
-                    Some(SingleResponseMode::Disable) => HeaderSet::new(),
-                    None => {
+                // and include the negotiated SRM header in the next response.
+                match self.srm_state {
+                    SrmState::Negotiated { srm: SingleResponseMode::Enable } => {
+                        // Stage the request headers to be given to the application.
+                        headers.try_append(request_headers)?;
+                        return Ok(OperationRequest::None);
+                    }
+                    SrmState::Negotiated { srm: SingleResponseMode::Disable }
+                    | SrmState::Negotiating { .. } => {}
+                    SrmState::NotNegotiated { srm_supported } => {
                         // SRM hasn't been negotiated. Check if the peer is requesting it.
-                        self.srm = Self::check_headers_for_srm(self.srm_supported, &headers);
-                        // If SRM was just negotiated then we need to include it in the response.
-                        self.srm.as_ref().map_or(HeaderSet::new(), |srm| {
-                            HeaderSet::from_header(Header::SingleResponseMode(*srm))
-                        })
+                        if let Some(negotiated_srm) =
+                            Self::check_headers_for_srm(srm_supported, &request_headers)
+                        {
+                            // The peer is requesting to update the SRM status. We need to
+                            // include it in the next response packet.
+                            self.srm_state = SrmState::Negotiating { negotiated_srm };
+                        }
                     }
                 };
-                let response = ResponsePacket::new_get(ResponseCode::Continue, response_headers);
-                Ok(OperationRequest::SendPackets(vec![response]))
+                Ok(OperationRequest::GetApplicationInfo(request_headers))
             }
             State::Request { ref mut headers } if code == OpCode::GetFinal => {
                 headers.try_append(HeaderSet::from(request))?;
                 // Update the current SRM status if it hasn't been negotiated yet.
-                let include_srm = if self.srm.is_none() {
-                    self.srm = Self::check_headers_for_srm(self.srm_supported, &headers);
-                    self.srm
-                } else {
-                    None
-                };
+                if let SrmState::NotNegotiated { srm_supported } = self.srm_state {
+                    if let Some(negotiated_srm) =
+                        Self::check_headers_for_srm(srm_supported, &headers)
+                    {
+                        // The peer is requesting to update the SRM status. We need to
+                        // include it in the next response packet.
+                        self.srm_state = SrmState::Negotiating { negotiated_srm };
+                    }
+                }
 
                 let request_headers = std::mem::replace(headers, HeaderSet::new());
-                // This is the final request packet. The set of request headers is considered
-                // complete and we are ready to get the payload from the application. Stage the
-                // potential SRM response header if it was just negotiated.
-                self.state = State::RequestPhaseComplete { include_srm };
+                // This is the final request packet. All request headers have been received and we
+                // are ready to get the payload from the application.
+                self.state = State::RequestPhaseComplete;
                 Ok(OperationRequest::GetApplicationData(request_headers))
             }
             State::Response { ref mut staged_data } if code == OpCode::GetFinal => {
@@ -293,19 +333,38 @@ impl ServerOperation for GetOperation {
         &mut self,
         response: Result<ApplicationResponse, ObexOperationError>,
     ) -> Result<Vec<ResponsePacket>, Error> {
-        let State::RequestPhaseComplete { include_srm } = self.state else {
-            return Err(Error::operation(OpCode::Get, "invalid state"));
+        let response = match response {
+            Ok(response) => response,
+            Err((code, response_headers)) => {
+                trace!("Application rejected GET request: {code:?}");
+                self.state = State::Response { staged_data: StagedData::empty() };
+                self.check_complete_and_update_state();
+                return Ok(vec![ResponsePacket::new_get(code, response_headers)]);
+            }
         };
 
-        let responses = match response {
-            Ok(ApplicationResponse::Get((data, response_headers))) => {
-                // If SRM was just negotiated, then the first packet will contain the SRM response.
-                let srm_packet = include_srm.map(|srm| {
-                    ResponsePacket::new_get(
-                        ResponseCode::Continue,
-                        HeaderSet::from_header(srm.into()),
-                    )
-                });
+        match response {
+            ApplicationResponse::GetInfo(mut response_headers) => {
+                if !matches!(self.state, State::Request { .. }) {
+                    return Err(Error::operation(OpCode::Get, "GetInfo response in invalid state"));
+                }
+                let _ = self.maybe_add_srm_header(&mut response_headers)?;
+                Ok(vec![ResponsePacket::new_get(ResponseCode::Continue, response_headers)])
+            }
+            ApplicationResponse::GetData((data, response_headers)) => {
+                if !matches!(self.state, State::RequestPhaseComplete) {
+                    return Err(Error::operation(
+                        OpCode::Get,
+                        "Get response before request phase complete",
+                    ));
+                }
+
+                let mut srm_headers = HeaderSet::new();
+                let srm_packet = if self.maybe_add_srm_header(&mut srm_headers)? {
+                    Some(ResponsePacket::new_get(ResponseCode::Continue, srm_headers))
+                } else {
+                    None
+                };
 
                 // Potentially split the user data payload into chunks to be sent over multiple
                 // response packets.
@@ -338,25 +397,14 @@ impl ServerOperation for GetOperation {
                         vec![staged_data.next_response(response_headers)?]
                     }
                 };
-
                 self.state = State::Response { staged_data };
-                responses
+                self.check_complete_and_update_state();
+                Ok(responses)
             }
-            Ok(ApplicationResponse::Put) => {
-                return Err(Error::operation(
-                    OpCode::Get,
-                    "invalid application response to GET request",
-                ));
+            ApplicationResponse::Put => {
+                Err(Error::operation(OpCode::Get, "invalid application response to GET request"))
             }
-            Err((code, response_headers)) => {
-                trace!("Application rejected GET request: {code:?}");
-                self.state = State::Response { staged_data: StagedData::empty() };
-                vec![ResponsePacket::new_get(code, response_headers)]
-            }
-        };
-
-        self.check_complete_and_update_state();
-        Ok(responses)
+        }
     }
 }
 
@@ -427,42 +475,50 @@ mod tests {
         let mut operation = GetOperation::new(max_packet_size, false);
         assert!(!operation.is_complete());
 
-        // First request provides informational headers. Expect a positive ack to the request.
+        // First request provides informational headers. Expect to ask the application for a
+        // response.
         let headers1 = HeaderSet::from_header(Header::name("foo".into()));
         let request1 = RequestPacket::new_get(headers1);
         let response1 = operation.handle_peer_request(request1).expect("valid request");
-        let response_packet1 = expect_single_packet(response1);
-        assert_eq!(*response_packet1.code(), ResponseCode::Continue);
+        assert_matches!(response1, OperationRequest::GetApplicationInfo(headers) if headers.contains_header(&HeaderIdentifier::Name));
 
-        // Second and final request provides informational headers. Expect to ask the profile
-        // application for the user data payload. The received informational headers should be
+        // Application responds with a header - expect to handle it and return a single outgoing
+        // packet to be sent to the peer.
+        let info_headers = HeaderSet::from_header(Header::Description("ok".into()));
+        let response2 = operation
+            .handle_application_response(ApplicationResponse::accept_get_info(info_headers))
+            .expect("valid request");
+        assert_eq!(response2.len(), 1);
+        assert_eq!(*response2[0].code(), ResponseCode::Continue);
+        assert!(response2[0].headers().contains_header(&HeaderIdentifier::Description));
+
+        // Peer sends a final request with more informational headers. Expect to ask the profile
+        // application for the user data payload. The received informational headers should also be
         // relayed.
-        let headers2 = HeaderSet::from_header(Header::Type("text/x-vCard".into()));
-        let request2 = RequestPacket::new_get_final(headers2);
-        let response2 = operation.handle_peer_request(request2).expect("valid request");
-        assert_matches!(response2,
+        let headers3 = HeaderSet::from_header(Header::Type("text/x-vCard".into()));
+        let request3 = RequestPacket::new_get_final(headers3);
+        let response3 = operation.handle_peer_request(request3).expect("valid request");
+        assert_matches!(response3,
             OperationRequest::GetApplicationData(headers)
-            if headers.contains_header(&HeaderIdentifier::Name)
-            && headers.contains_header(&HeaderIdentifier::Type)
+            if headers.contains_header(&HeaderIdentifier::Type)
         );
 
         // After providing the payload, we expect the first response packet to contain the
-        // response headers and the first chunk of the payload since it cannot fit in
+        // response headers and the first chunk of the payload since it cannot entirely fit in
         // `max_packet_size`.
         // The `response_headers` has an encoded size of 33 bytes. This leaves 17 bytes for the
         // first chunk of user data, of which 6 bytes are allocated to the prefix.
         let payload = bytes(0, 200);
         let response_headers = HeaderSet::from_header(Header::Description("random payload".into()));
-        let mut response_packets3 = operation
+        let response_packets4 = operation
             .handle_application_response(ApplicationResponse::accept_get(payload, response_headers))
             .expect("valid response");
-        let response_packet3 = response_packets3.pop().expect("one response");
-        assert_eq!(*response_packet3.code(), ResponseCode::Continue);
-        expect_body(response_packet3.headers(), bytes(0, 11));
+        assert_eq!(response_packets4.len(), 1);
+        assert_eq!(*response_packets4[0].code(), ResponseCode::Continue);
+        expect_body(response_packets4[0].headers(), bytes(0, 11));
 
         // Peer will keep asking for payload until finished.
-        // Each data chunk will be 44 bytes long (max 50 - 3 bytes for response prefix - 3 bytes for
-        // header prefix)
+        // Each data chunk will be 44 bytes long (max 50 - 6 byte prefix)
         let expected_bytes =
             vec![bytes(11, 55), bytes(55, 99), bytes(99, 143), bytes(143, 187), bytes(187, 200)];
         for (i, expected) in expected_bytes.into_iter().enumerate() {
@@ -481,8 +537,8 @@ mod tests {
         assert!(!operation.is_complete());
         assert_eq!(operation.srm_status(), SingleResponseMode::Disable);
 
-        // First request provides a Name and SRM enable request. Expect to reply positively and
-        // enable SRM.
+        // First request provides a Name and SRM enable request. Expect to ask application and
+        // eventually reply positively to negotiate SRM.
         let headers1 = HeaderSet::from_headers(vec![
             Header::name("foo".into()),
             SingleResponseMode::Enable.into(),
@@ -490,27 +546,38 @@ mod tests {
         .unwrap();
         let request1 = RequestPacket::new_get(headers1);
         let response1 = operation.handle_peer_request(request1).expect("valid request");
-        let response_packet1 = expect_single_packet(response1);
-        assert_eq!(*response_packet1.code(), ResponseCode::Continue);
-        assert!(response_packet1.headers().contains_header(&HeaderIdentifier::SingleResponseMode));
+        assert_matches!(response1, OperationRequest::GetApplicationInfo(headers) if headers.contains_header(&HeaderIdentifier::Name));
+
+        // Application responds with a header - expect to return a single outgoing packet to be sent
+        // to the peer which contains the SRM header.
+        let info_headers = HeaderSet::from_header(Header::Description("ok".into()));
+        let response2 = operation
+            .handle_application_response(ApplicationResponse::accept_get_info(info_headers))
+            .expect("valid request");
+        assert_eq!(response2.len(), 1);
+        assert_eq!(*response2[0].code(), ResponseCode::Continue);
+        assert!(response2[0].headers().contains_header(&HeaderIdentifier::Description));
+        assert!(response2[0].headers().contains_header(&HeaderIdentifier::SingleResponseMode));
+        // SRM should be enabled now.
         assert_eq!(operation.srm_status(), SingleResponseMode::Enable);
 
-        // Second (non-final) request provides another header. Don't expect to respond since SRM is
-        // enabled.
-        let headers2 = HeaderSet::from_header(Header::Description("random payload".into()));
-        let request2 = RequestPacket::new_get(headers2);
-        let response2 = operation.handle_peer_request(request2).expect("valid request");
-        assert_matches!(response2, OperationRequest::None);
+        // Second (non-final) request from the peer. Don't expect an immediate response since SRM is
+        // active.
+        let headers3 = HeaderSet::from_header(Header::Description("random payload".into()));
+        let request3 = RequestPacket::new_get(headers3);
+        let response3 = operation.handle_peer_request(request3).expect("valid request");
+        assert_matches!(response3, OperationRequest::None);
 
         // Third and final request provides a Type header - the request phase is considered complete
-        // Expect to ask the profile application for the user data payload.
-        let headers3 = HeaderSet::from_header(Header::Type("text/x-vCard".into()));
-        let request3 = RequestPacket::new_get_final(headers3);
-        let response3 = operation.handle_peer_request(request3).expect("valid request");
-        assert_matches!(response3,
+        // Expect to ask the profile application for the user data payload with the previous two
+        // headers.
+        let headers4 = HeaderSet::from_header(Header::Type("text/x-vCard".into()));
+        let request4 = RequestPacket::new_get_final(headers4);
+        let response4 = operation.handle_peer_request(request4).expect("valid request");
+        assert_matches!(response4,
             OperationRequest::GetApplicationData(headers)
-            if headers.contains_header(&HeaderIdentifier::Name)
-            && headers.contains_header(&HeaderIdentifier::Type)
+            if
+             headers.contains_header(&HeaderIdentifier::Type)
             && headers.contains_header(&HeaderIdentifier::Description)
         );
 
@@ -633,8 +700,7 @@ mod tests {
 
     #[fuchsia::test]
     fn application_rejects_request_success() {
-        let mut operation =
-            GetOperation::new_at_state(10, State::RequestPhaseComplete { include_srm: None });
+        let mut operation = GetOperation::new_at_state(10, State::RequestPhaseComplete);
         let headers = HeaderSet::from_header(Header::Description("not allowed today".into()));
         let response_packets = operation
             .handle_application_response(Err((ResponseCode::Forbidden, headers)))
@@ -647,12 +713,21 @@ mod tests {
     #[fuchsia::test]
     fn handle_application_response_error() {
         let max_packet_size = 15;
-        // Receiving the application response before the request phase is complete is an Error.
+        // Receiving the application data response before the request phase is complete is an Error.
         let mut operation = GetOperation::new(max_packet_size, false);
         let data = vec![1, 2, 3];
         assert_matches!(
             operation.handle_application_response(ApplicationResponse::accept_get(
                 data,
+                HeaderSet::new()
+            )),
+            Err(Error::OperationError { .. })
+        );
+
+        // Receiving the application info response after the request phase is complete is an Error.
+        let mut operation = GetOperation::new_at_state(10, State::RequestPhaseComplete);
+        assert_matches!(
+            operation.handle_application_response(ApplicationResponse::accept_get_info(
                 HeaderSet::new()
             )),
             Err(Error::OperationError { .. })
@@ -681,8 +756,7 @@ mod tests {
 
         // Receiving another GET request while we are waiting for the application to accept is an
         // Error.
-        let mut operation1 =
-            GetOperation::new_at_state(10, State::RequestPhaseComplete { include_srm: None });
+        let mut operation1 = GetOperation::new_at_state(10, State::RequestPhaseComplete);
         let request1 = RequestPacket::new_get(random_headers.clone());
         let response1 = operation1.handle_peer_request(request1);
         assert_matches!(response1, Err(Error::OperationError { .. }));

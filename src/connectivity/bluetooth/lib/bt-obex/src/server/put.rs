@@ -126,15 +126,15 @@ impl ServerOperation for PutOperation {
             Ok(ApplicationResponse::Put) => {
                 ResponsePacket::new_no_data(ResponseCode::Ok, HeaderSet::new())
             }
-            Ok(ApplicationResponse::Get(_)) => {
+            Err((code, response_headers)) => {
+                trace!("Application rejected PUT request: {code:?}");
+                ResponsePacket::new_no_data(code, response_headers)
+            }
+            _ => {
                 return Err(Error::operation(
                     OpCode::Put,
                     "invalid application response to PUT request",
                 ));
-            }
-            Err((code, response_headers)) => {
-                trace!("Application rejected PUT request: {code:?}");
-                ResponsePacket::new_no_data(code, response_headers)
             }
         };
         self.state = State::Complete;

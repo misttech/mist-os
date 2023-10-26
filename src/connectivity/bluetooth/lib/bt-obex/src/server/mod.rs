@@ -32,6 +32,9 @@ use put::PutOperation;
 pub enum OperationRequest {
     /// Request to send response packets to the remote peer.
     SendPackets(Vec<ResponsePacket>),
+    /// Request to get informational headers describing a payload from the upper layer application
+    /// -- occurs in a GET operation.
+    GetApplicationInfo(HeaderSet),
     /// Request to get the payload from the upper layer application -- occurs in a GET operation.
     GetApplicationData(HeaderSet),
     /// Request to give the payload to the upper layer application -- occurs in a PUT operation.
@@ -45,9 +48,12 @@ pub enum OperationRequest {
 /// Represents a response from the upper layer application during a multi-step operation.
 #[derive(Debug)]
 pub enum ApplicationResponse {
+    /// The application responded successfully to get GET information request by providing
+    /// informational headers.
+    GetInfo(HeaderSet),
     /// The application responded successfully to the GET request by providing the data payload
     /// and informational headers.
-    Get((Vec<u8>, HeaderSet)),
+    GetData((Vec<u8>, HeaderSet)),
     /// The application responded successfully to the PUT request.
     Put,
 }
@@ -55,7 +61,12 @@ pub enum ApplicationResponse {
 impl ApplicationResponse {
     #[cfg(test)]
     fn accept_get(data: Vec<u8>, headers: HeaderSet) -> Result<Self, ObexOperationError> {
-        Ok(ApplicationResponse::Get((data, headers)))
+        Ok(ApplicationResponse::GetData((data, headers)))
+    }
+
+    #[cfg(test)]
+    fn accept_get_info(headers: HeaderSet) -> Result<Self, ObexOperationError> {
+        Ok(ApplicationResponse::GetInfo(headers))
     }
 
     #[cfg(test)]
@@ -297,9 +308,14 @@ impl ObexServer {
 
         let application_response = match operation.handle_peer_request(request) {
             Ok(OperationRequest::SendPackets(responses)) => return Ok(responses),
-            Ok(OperationRequest::GetApplicationData(request_headers)) => {
-                self.handler.get(request_headers).await.map(|x| ApplicationResponse::Get(x))
+            Ok(OperationRequest::GetApplicationInfo(info_headers)) => {
+                self.handler.get_info(info_headers).await.map(|x| ApplicationResponse::GetInfo(x))
             }
+            Ok(OperationRequest::GetApplicationData(request_headers)) => self
+                .handler
+                .get_data(request_headers)
+                .await
+                .map(|x| ApplicationResponse::GetData(x)),
             Ok(OperationRequest::PutApplicationData(data, request_headers)) => {
                 self.handler.put(data, request_headers).await.map(|_| ApplicationResponse::Put)
             }
@@ -596,10 +612,25 @@ mod tests {
         pin_mut!(server_fut);
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
 
-        // Send an example GET_FINAL request with a header describing the name of the object.
-        let headers = HeaderSet::from_header(Header::name("random object"));
-        let get_request = RequestPacket::new_get_final(headers);
-        send_packet(&mut remote, get_request);
+        // Remote asks for information about the payload. The ObexServer should receive the request
+        // and ask the application for the response.
+        let get_request1 =
+            RequestPacket::new_get(HeaderSet::from_header(Header::name("random object")));
+        send_packet(&mut remote, get_request1);
+        // Simulate the application responding with the size of the object.
+        test_app.set_response(Ok(HeaderSet::from_header(Header::Length(0x10))));
+        let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
+
+        // The remote peer should receive the info response.
+        let expectation = |response: ResponsePacket| {
+            assert_eq!(*response.code(), ResponseCode::Continue);
+            assert!(response.headers().contains_header(&HeaderIdentifier::Length));
+        };
+        expect_response(&mut exec, &mut remote, expectation, OpCode::Get);
+
+        // Remote sends a GET_FINAL request indicating that it is ready to receive the data payload.
+        let get_request2 = RequestPacket::new_get_final(HeaderSet::new());
+        send_packet(&mut remote, get_request2);
 
         // The ObexServer should receive the request and hand it to the profile. Set the profile
         // handler to return a static buffer.
@@ -653,16 +684,19 @@ mod tests {
         pin_mut!(server_fut);
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
 
-        let headers = HeaderSet::from_headers(vec![
+        // First request asks for information & SRM. Server should receive the request, ask the
+        // application, and negotiate SRM.
+        let headers1 = HeaderSet::from_headers(vec![
             Header::name("random object"),
             SingleResponseMode::Enable.into(),
         ])
         .unwrap();
-        let get_request1 = RequestPacket::new_get(headers);
+        let get_request1 = RequestPacket::new_get(headers1);
         send_packet(&mut remote, get_request1);
+        test_app.set_response(Ok(HeaderSet::from_header(Header::Length(0x20))));
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
-
-        // Obex Server should receive the request, acknowledge SRM, and reply back positively.
+        // Expect the response packet to the peer to negotiate SRM and contain the application
+        // response.
         let expectation1 = |response: ResponsePacket| {
             assert_eq!(*response.code(), ResponseCode::Continue);
             let Header::SingleResponseMode(SingleResponseMode::Enable) =
@@ -670,8 +704,10 @@ mod tests {
             else {
                 panic!("Expected SRM enable in response");
             };
+            assert!(response.headers().contains_header(&HeaderIdentifier::Length));
         };
         expect_response(&mut exec, &mut remote, expectation1, OpCode::Get);
+        // At this point, SRM is considered active for the operation.
 
         // Second (final) request to get the payload.
         let get_request2 = RequestPacket::new_get_final(HeaderSet::new());
@@ -683,7 +719,7 @@ mod tests {
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
 
         // Since SRM is enabled, we expect consecutive packets containing the payload - no requests
-        // needed in between.
+        // made by the remote in between.
         let expected_bufs = vec![
             (0..14).collect::<Vec<u8>>(),
             (14..28).collect::<Vec<u8>>(),

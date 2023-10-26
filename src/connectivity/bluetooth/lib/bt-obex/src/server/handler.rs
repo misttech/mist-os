@@ -43,12 +43,19 @@ pub trait ObexServerHandler {
         create: bool,
     ) -> ObexResult<HeaderSet>;
 
+    /// A request to get information about a data payload from the local OBEX server.
+    /// `headers` are the headers provided by the remote OBEX client that specify the desired
+    /// information.
+    /// Returns `Ok` with headers if accepted.
+    /// Returns `Err` with a rejection code and optional headers if rejected.
+    async fn get_info(&mut self, headers: HeaderSet) -> ObexResult<HeaderSet>;
+
     /// A request to get data from the local OBEX server.
     /// `headers` are the informational headers provided by the remote OBEX client that identify
     /// the payload to be retrieved.
     /// Returns `Ok` with the payload and optional informational headers if accepted.
     /// Returns `Err` with a rejection code and optional headers if rejected.
-    async fn get(&mut self, headers: HeaderSet) -> ObexResult<(Vec<u8>, HeaderSet)>;
+    async fn get_data(&mut self, headers: HeaderSet) -> ObexResult<(Vec<u8>, HeaderSet)>;
 
     /// A request to put data in the local OBEX server.
     /// `data` is the payload to be written.
@@ -144,7 +151,15 @@ pub(crate) mod test_utils {
                 .unwrap_or(Err((ResponseCode::Forbidden, HeaderSet::new())))
         }
 
-        async fn get(&mut self, _headers: HeaderSet) -> ObexResult<(Vec<u8>, HeaderSet)> {
+        async fn get_info(&mut self, _headers: HeaderSet) -> ObexResult<HeaderSet> {
+            self.inner
+                .lock()
+                .generic_response
+                .take()
+                .unwrap_or(Err((ResponseCode::NotFound, HeaderSet::new())))
+        }
+
+        async fn get_data(&mut self, _headers: HeaderSet) -> ObexResult<(Vec<u8>, HeaderSet)> {
             self.inner
                 .lock()
                 .get_response
