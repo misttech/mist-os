@@ -68,6 +68,36 @@ macro_rules! merge_vec {
     };
 }
 
+const SESSION_MONIKER: &str = "/core/session-manager/session:session";
+
+/// We use types for the platform capabilities so that the product owners get a nice error
+/// indicating their options if they choose an invalid capability.
+#[derive(Deserialize, Debug, Eq, PartialEq, Hash, Clone)]
+enum PlatformCapability {
+    #[serde(rename = "fuchsia.lowpan.device.DeviceExtraConnector")]
+    Lowpan,
+    #[serde(rename = "fuchsia.kernel.VmexResource")]
+    VmexResource,
+}
+
+impl PlatformCapability {
+    /// Convert the capability back to a string.
+    fn source_name(&self) -> &str {
+        match self {
+            &PlatformCapability::Lowpan => "fuchsia.lowpan.device.DeviceExtraConnector",
+            &PlatformCapability::VmexResource => "fuchsia.kernel.VmexResource",
+        }
+    }
+
+    /// Map the capability to the moniker of the source.
+    fn source_moniker(&self) -> &str {
+        match self {
+            &PlatformCapability::Lowpan => "/core/lowpanservice",
+            &PlatformCapability::VmexResource => "<component_manager>",
+        }
+    }
+}
+
 #[derive(Deserialize, Debug, Default)]
 #[serde(deny_unknown_fields)]
 struct Config {
@@ -590,12 +620,123 @@ impl Config {
     }
 }
 
+#[derive(Deserialize, Debug, Default)]
+#[serde(deny_unknown_fields)]
+struct ProductConfig {
+    #[serde(default)]
+    ambient_mark_vmo_exec: AmbientMarkVmoExec,
+    #[serde(default)]
+    platform_capabilities: PlatformCapabilities,
+    #[serde(default)]
+    product_capabilities: ProductCapabilities,
+}
+
+#[derive(Deserialize, Debug, Default)]
+#[serde(deny_unknown_fields)]
+struct AmbientMarkVmoExec {
+    session: Vec<String>,
+}
+
+#[derive(Deserialize, Debug, Default)]
+#[serde(deny_unknown_fields)]
+struct PlatformCapabilities {
+    session: Vec<PlatformCapabilityEntry>,
+}
+
+#[derive(Deserialize, Debug, Default)]
+#[serde(deny_unknown_fields)]
+struct ProductCapabilities {
+    session: Vec<ProductCapabilityEntry>,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(deny_unknown_fields)]
+struct PlatformCapabilityEntry {
+    capability: PlatformCapability,
+    target_monikers: Vec<String>,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(deny_unknown_fields)]
+struct ProductCapabilityEntry {
+    source_moniker: String,
+    capability: String,
+    target_monikers: Vec<String>,
+}
+
+impl ProductConfig {
+    fn from_json_file(path: &PathBuf) -> Result<Self, Error> {
+        let data = fs::read_to_string(path)?;
+        serde_json5::from_str(&data).map_err(|e| {
+            let serde_json5::Error::Message { location, msg } = e;
+            let location = location.map(|l| Location { line: l.line, column: l.column });
+            Error::parse(msg, location, Some(path))
+        })
+    }
+}
+
+impl TryInto<Config> for ProductConfig {
+    type Error = Error;
+
+    fn try_into(self) -> Result<Config, Error> {
+        let Self { ambient_mark_vmo_exec, platform_capabilities, product_capabilities } = self;
+
+        fn rebase_string(s: String) -> String {
+            format!("{SESSION_MONIKER}/{s}")
+        }
+
+        fn rebase_vec_string(vec: Vec<String>) -> Vec<String> {
+            vec.into_iter().map(|s| rebase_string(s)).collect()
+        }
+
+        let vmo_exec =
+            ambient_mark_vmo_exec.session.into_iter().map(|s| rebase_string(s)).collect();
+        let job_policy =
+            JobPolicyAllowlists { ambient_mark_vmo_exec: Some(vmo_exec), ..Default::default() };
+
+        let platform_capabilities =
+            platform_capabilities.session.into_iter().map(|entry| CapabilityAllowlistEntry {
+                source: Some(CapabilityFrom::Component),
+                capability: Some(CapabilityTypeName::Protocol),
+                source_moniker: Some(entry.capability.source_moniker().to_string()),
+                source_name: Some(entry.capability.source_name().to_string()),
+                target_monikers: Some(rebase_vec_string(entry.target_monikers)),
+            });
+
+        let capability_policy = product_capabilities
+            .session
+            .into_iter()
+            .map(|entry| CapabilityAllowlistEntry {
+                source: Some(CapabilityFrom::Component),
+                capability: Some(CapabilityTypeName::Protocol),
+                source_moniker: Some(rebase_string(entry.source_moniker)),
+                source_name: Some(entry.capability),
+                target_monikers: Some(rebase_vec_string(entry.target_monikers)),
+            })
+            .chain(platform_capabilities)
+            .collect();
+
+        Ok(Config {
+            security_policy: Some(SecurityPolicy {
+                job_policy: Some(job_policy),
+                capability_policy: Some(capability_policy),
+                ..Default::default()
+            }),
+            ..Default::default()
+        })
+    }
+}
+
 #[derive(Debug, Default, FromArgs)]
 /// Create a binary config and populate it with data from .json file.
 struct Args {
     /// path to a JSON configuration file
     #[argh(option)]
     input: Vec<PathBuf>,
+
+    /// path to a product-specific JSON configuration file
+    #[argh(option)]
+    product: Vec<PathBuf>,
 
     /// path to the output binary config file
     #[argh(option)]
@@ -609,8 +750,13 @@ pub fn from_args() -> Result<(), Error> {
 fn compile(args: Args) -> Result<(), Error> {
     let configs =
         args.input.iter().map(Config::from_json_file).collect::<Result<Vec<Config>, _>>()?;
-    let config_json =
+    let mut config_json =
         configs.into_iter().try_fold(Config::default(), |acc, next| acc.merge(next))?;
+
+    for product in args.product.into_iter() {
+        let product = ProductConfig::from_json_file(&product)?;
+        config_json = config_json.merge(product.try_into()?)?;
+    }
 
     let config_fidl: component_internal::Config = config_json.try_into()?;
     let bytes = persist(&config_fidl).map_err(|e| Error::FidlEncoding(e))?;
@@ -632,7 +778,7 @@ mod tests {
         let input_path = tmp_dir.path().join("config.json");
         let output_path = tmp_dir.path().join("config.fidl");
         File::create(&input_path).unwrap().write_all(input.as_bytes()).unwrap();
-        let args = Args { output: output_path.clone(), input: vec![input_path] };
+        let args = Args { output: output_path.clone(), input: vec![input_path], product: vec![] };
         compile(args)?;
         let mut bytes = Vec::new();
         File::open(output_path)?.read_to_end(&mut bytes)?;
@@ -966,8 +1112,11 @@ mod tests {
         let another_input = "{\"debug\": false,}";
         File::create(&another_input_path).unwrap().write_all(another_input.as_bytes()).unwrap();
 
-        let args =
-            Args { output: output_path.clone(), input: vec![input_path, another_input_path] };
+        let args = Args {
+            output: output_path.clone(),
+            input: vec![input_path, another_input_path],
+            product: vec![],
+        };
         assert_matches!(compile(args), Err(Error::Parse { .. }));
     }
 
@@ -984,8 +1133,11 @@ mod tests {
         let another_input = "{\"list_children_batch_size\": 42}";
         File::create(&another_input_path).unwrap().write_all(another_input.as_bytes()).unwrap();
 
-        let args =
-            Args { output: output_path.clone(), input: vec![input_path, another_input_path] };
+        let args = Args {
+            output: output_path.clone(),
+            input: vec![input_path, another_input_path],
+            product: vec![],
+        };
         compile(args)?;
 
         let mut bytes = Vec::new();
@@ -1023,8 +1175,11 @@ mod tests {
         }"#;
         File::create(&another_input_path).unwrap().write_all(another_input.as_bytes()).unwrap();
 
-        let args =
-            Args { output: output_path.clone(), input: vec![input_path, another_input_path] };
+        let args = Args {
+            output: output_path.clone(),
+            input: vec![input_path, another_input_path],
+            product: vec![],
+        };
         compile(args)?;
 
         let mut bytes = Vec::new();
@@ -1134,5 +1289,239 @@ mod tests {
 
         let combined = CapabilityAllowlistEntry::merge_vecs(left, right).unwrap();
         assert_eq!(combined, expected_combine);
+    }
+
+    #[test]
+    fn test_product_and_platform() -> Result<(), Error> {
+        let tmp_dir = TempDir::new().unwrap();
+        let output_path = tmp_dir.path().join("config");
+
+        let input_path = tmp_dir.path().join("foo.json");
+        let input = r#"{
+            security_policy: {
+                job_policy: {
+                    ambient_mark_vmo_exec: ["/foo1"],
+                    create_raw_processes: ["/foo1"],
+                },
+                capability_policy: [
+                    {
+                        source_moniker: "<component_manager>",
+                        source: "component",
+                        source_name: "fuchsia.boot.RootResource",
+                        capability: "protocol",
+                        target_monikers: ["/root", "/root/bootstrap", "/root/core"],
+                    },
+                ],
+            },
+        }"#;
+        File::create(&input_path).unwrap().write_all(input.as_bytes()).unwrap();
+
+        let another_input_path = tmp_dir.path().join("bar.json");
+        let another_input = r#"{
+            ambient_mark_vmo_exec: {
+                session: ["foo2"],
+            },
+            platform_capabilities: {
+                session: [
+                    {
+                        capability: "fuchsia.lowpan.device.DeviceExtraConnector",
+                        target_monikers: ["session_comp1"],
+                    },
+                ],
+            },
+            product_capabilities: {
+                session: [
+                    {
+                        source_moniker: "session_comp1",
+                        capability: "product.some.Resource",
+                        target_monikers: ["session_comp2", "session_comp3"],
+                    },
+                ],
+            },
+        }"#;
+        File::create(&another_input_path).unwrap().write_all(another_input.as_bytes()).unwrap();
+
+        let args = Args {
+            output: output_path.clone(),
+            input: vec![input_path],
+            product: vec![another_input_path],
+        };
+        compile(args)?;
+
+        let mut bytes = Vec::new();
+        File::open(output_path)?.read_to_end(&mut bytes)?;
+        let config: component_internal::Config = unpersist(&bytes)?;
+        assert_eq!(
+            config.security_policy,
+            Some(component_internal::SecurityPolicy {
+                job_policy: Some(component_internal::JobPolicyAllowlists {
+                    ambient_mark_vmo_exec: Some(vec![
+                        "/core/session-manager/session:session/foo2".to_string(),
+                        "/foo1".to_string()
+                    ]),
+                    create_raw_processes: Some(vec!["/foo1".to_string()]),
+                    ..Default::default()
+                }),
+                capability_policy: Some(component_internal::CapabilityPolicyAllowlists {
+                    allowlist: Some(vec![
+                        component_internal::CapabilityAllowlistEntry {
+                            source_moniker: Some("/core/lowpanservice".to_string()),
+                            source_name: Some(
+                                "fuchsia.lowpan.device.DeviceExtraConnector".to_string()
+                            ),
+                            source: Some(fdecl::Ref::Self_(fdecl::SelfRef {})),
+                            capability: Some(component_internal::AllowlistedCapability::Protocol(
+                                component_internal::AllowlistedProtocol::default()
+                            )),
+                            target_monikers: Some(vec![
+                                "/core/session-manager/session:session/session_comp1".to_string(),
+                            ]),
+                            ..Default::default()
+                        },
+                        component_internal::CapabilityAllowlistEntry {
+                            source_moniker: Some(
+                                "/core/session-manager/session:session/session_comp1".to_string()
+                            ),
+                            source_name: Some("product.some.Resource".to_string()),
+                            source: Some(fdecl::Ref::Self_(fdecl::SelfRef {})),
+                            capability: Some(component_internal::AllowlistedCapability::Protocol(
+                                component_internal::AllowlistedProtocol::default()
+                            )),
+                            target_monikers: Some(vec![
+                                "/core/session-manager/session:session/session_comp2".to_string(),
+                                "/core/session-manager/session:session/session_comp3".to_string(),
+                            ]),
+                            ..Default::default()
+                        },
+                        component_internal::CapabilityAllowlistEntry {
+                            source_moniker: Some("<component_manager>".to_string()),
+                            source_name: Some("fuchsia.boot.RootResource".to_string()),
+                            source: Some(fdecl::Ref::Self_(fdecl::SelfRef {})),
+                            capability: Some(component_internal::AllowlistedCapability::Protocol(
+                                component_internal::AllowlistedProtocol::default()
+                            )),
+                            target_monikers: Some(vec![
+                                "/root".to_string(),
+                                "/root/bootstrap".to_string(),
+                                "/root/core".to_string()
+                            ]),
+                            ..Default::default()
+                        },
+                    ]),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            })
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_product_only() -> Result<(), Error> {
+        let tmp_dir = TempDir::new().unwrap();
+        let output_path = tmp_dir.path().join("config");
+
+        let another_input_path = tmp_dir.path().join("bar.json");
+        let another_input = r#"{
+            ambient_mark_vmo_exec: {
+                session: ["foo2"],
+            },
+            platform_capabilities: {
+                session: [
+                    {
+                        capability: "fuchsia.lowpan.device.DeviceExtraConnector",
+                        target_monikers: ["session_comp1"],
+                    },
+                ],
+            },
+            product_capabilities: {
+                session: [
+                    {
+                        source_moniker: "session_comp1",
+                        capability: "product.some.Resource",
+                        target_monikers: ["session_comp2", "session_comp3"],
+                    },
+                ],
+            },
+        }"#;
+        File::create(&another_input_path).unwrap().write_all(another_input.as_bytes()).unwrap();
+
+        let args =
+            Args { output: output_path.clone(), input: vec![], product: vec![another_input_path] };
+        compile(args)?;
+
+        let mut bytes = Vec::new();
+        File::open(output_path)?.read_to_end(&mut bytes)?;
+        let config: component_internal::Config = unpersist(&bytes)?;
+        assert_eq!(
+            config.security_policy,
+            Some(component_internal::SecurityPolicy {
+                job_policy: Some(component_internal::JobPolicyAllowlists {
+                    ambient_mark_vmo_exec: Some(vec![
+                        "/core/session-manager/session:session/foo2".to_string(),
+                    ]),
+                    ..Default::default()
+                }),
+                capability_policy: Some(component_internal::CapabilityPolicyAllowlists {
+                    allowlist: Some(vec![
+                        component_internal::CapabilityAllowlistEntry {
+                            source_moniker: Some(
+                                "/core/session-manager/session:session/session_comp1".to_string()
+                            ),
+                            source_name: Some("product.some.Resource".to_string()),
+                            source: Some(fdecl::Ref::Self_(fdecl::SelfRef {})),
+                            capability: Some(component_internal::AllowlistedCapability::Protocol(
+                                component_internal::AllowlistedProtocol::default()
+                            )),
+                            target_monikers: Some(vec![
+                                "/core/session-manager/session:session/session_comp2".to_string(),
+                                "/core/session-manager/session:session/session_comp3".to_string(),
+                            ]),
+                            ..Default::default()
+                        },
+                        component_internal::CapabilityAllowlistEntry {
+                            source_moniker: Some("/core/lowpanservice".to_string()),
+                            source_name: Some(
+                                "fuchsia.lowpan.device.DeviceExtraConnector".to_string()
+                            ),
+                            source: Some(fdecl::Ref::Self_(fdecl::SelfRef {})),
+                            capability: Some(component_internal::AllowlistedCapability::Protocol(
+                                component_internal::AllowlistedProtocol::default()
+                            )),
+                            target_monikers: Some(vec![
+                                "/core/session-manager/session:session/session_comp1".to_string(),
+                            ]),
+                            ..Default::default()
+                        },
+                    ]),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            })
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_product_invalid_platform_capability() {
+        let tmp_dir = TempDir::new().unwrap();
+        let output_path = tmp_dir.path().join("config");
+
+        let another_input_path = tmp_dir.path().join("bar.json");
+        let another_input = r#"{
+            platform_capabilities: {
+                session: [
+                    {
+                        capability: "fuchsia.nonexistent.Resource",
+                        target_monikers: ["session_comp1"],
+                    },
+                ],
+            },
+        }"#;
+        File::create(&another_input_path).unwrap().write_all(another_input.as_bytes()).unwrap();
+
+        let args =
+            Args { output: output_path.clone(), input: vec![], product: vec![another_input_path] };
+        assert_matches!(compile(args), Err(Error::Parse { .. }));
     }
 }

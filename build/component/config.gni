@@ -25,7 +25,10 @@ import("//build/dist/resource.gni")
 #
 # Parameters:
 #
-#   sources (required)
+#   product_configs (optional)
+#     Paths to one or more JSON files containing the product policy.
+#
+#   sources (optional)
 #     Paths to one or more JSON files containing config values.
 #
 #   build_type (optional)
@@ -38,9 +41,10 @@ import("//build/dist/resource.gni")
 #     If specified, the packaged path for the generated binary config file.
 #     Default: "data/${target_name}"
 template("component_config") {
-  assert(defined(invoker.sources), "Parameter source=... is required")
-
   _sources = []
+  if (defined(invoker.sources)) {
+    _sources += invoker.sources
+  }
   if (defined(invoker.build_type)) {
     if (invoker.build_type == "eng") {
       _sources += [ "//src/security/policy/component_manager_policy_eng.json5" ]
@@ -58,9 +62,11 @@ template("component_config") {
       "//src/security/policy/component_manager_policy_build_type_base.json5",
       "//src/sys/component_manager/configs/bootfs_config.json5",
     ]
-    _sources += invoker.sources
-  } else {
-    _sources += invoker.sources
+  }
+
+  _product_configs = []
+  if (defined(invoker.product_configs)) {
+    _product_configs += invoker.product_configs
   }
 
   generate_target = "${target_name}_generate"
@@ -76,7 +82,7 @@ template("component_config") {
     tool = "//tools/component_manager_config:generate_config_bin"
     tool_output_name = "generate_config"
 
-    inputs = _sources
+    inputs = _sources + _product_configs
     outputs = [ output ]
 
     args = [ "--output" ] + rebase_path(outputs, root_build_dir)
@@ -84,6 +90,13 @@ template("component_config") {
       args += [
         "--input",
         rebase_path(source, root_build_dir),
+      ]
+    }
+
+    foreach(product, _product_configs) {
+      args += [
+        "--product",
+        rebase_path(product, root_build_dir),
       ]
     }
   }
