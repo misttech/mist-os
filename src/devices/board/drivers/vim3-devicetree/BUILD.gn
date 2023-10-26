@@ -75,6 +75,11 @@ fuchsia_driver_component("vim3-devicetree") {
   manifest = "meta/vim3-devicetree.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "vim3-devicetree"
+  driver_components = [ ":vim3-devicetree" ]
+}
+
 test("vim3-devicetree-test") {
   sources = [ "vim3-devicetree-test.cc" ]
   deps = [

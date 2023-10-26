@@ -10,7 +10,7 @@ assert(current_toolchain == default_toolchain,
 assert(current_cpu == "arm64",
        "The vim3 board can only be defined in an arm64 toolchain.")
 
-board_configuration("vim3") {
+_base = {
   hardware_info = {
     name = "default-board"
   }
@@ -25,7 +25,6 @@ board_configuration("vim3") {
 
   input_bundles = [
     ":main_bundle",
-    ":board_driver",
     ":vulkan_arm_mali",
   ]
 
@@ -60,6 +59,16 @@ board_configuration("vim3") {
   }
 }
 
+board_configuration("vim3") {
+  forward_variables_from(_base, "*")
+  input_bundles += [ ":board_driver" ]
+}
+
+board_configuration("vim3-devicetree") {
+  forward_variables_from(_base, "*")
+  input_bundles += [ ":devicetree_board_driver" ]
+}
+
 board_input_bundle("main_bundle") {
   base_packages = [ "//src/graphics/bin/vulkan_loader" ]
   drivers = [
@@ -89,11 +98,6 @@ board_input_bundle("main_bundle") {
       package_target = "//src/devices/block/drivers/bootpart:package"
       package_set = "bootfs"
       driver_components = [ "meta/bootpart.cm" ]
-    },
-    {
-      package_target = "//src/devices/board/drivers/vim3:package"
-      package_set = "bootfs"
-      driver_components = [ "meta/vim3.cm" ]
     },
     {
       package_target = "//src/devices/clock/drivers/amlogic-clk:package"
@@ -285,6 +289,23 @@ board_input_bundle("main_bundle") {
 }
 
 board_input_bundle("board_driver") {
+  drivers = [
+    {
+      package_target = "//src/devices/board/drivers/vim3:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/vim3.cm" ]
+    },
+  ]
+}
+
+board_input_bundle("devicetree_board_driver") {
+  drivers = [
+    {
+      package_target = "//src/devices/board/drivers/vim3-devicetree:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/vim3-devicetree.cm" ]
+    },
+  ]
 }
 
 board_input_bundle("vulkan_arm_mali") {
