@@ -20,6 +20,9 @@ declare_args() {
   # logs are compiled-out for performance reasons. For more information, see
   # https://fuchsia-review.googlesource.com/c/fuchsia/+/929995.
   starnix_enable_trace_and_debug_logs_in_release = false
+
+  # Whether or not syscall status inspect is enabled globally.
+  starnix_syscall_stats = false
 }
 
 rust_proto_library("perfetto_consumer_proto") {
@@ -409,6 +412,9 @@ rustc_binary("starnix_kernel_bin") {
   }
   if (starnix_enable_trace_and_debug_logs_in_release) {
     features += [ "trace_and_debug_logs_in_release" ]
+  }
+  if (starnix_syscall_stats) {
+    features += [ "syscall_stats" ]
   }
 
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]

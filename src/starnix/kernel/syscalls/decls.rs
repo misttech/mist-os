@@ -479,8 +479,11 @@ impl SyscallDecl {
 
 #[cfg(feature = "syscall_stats")]
 mod syscall_stats {
+    use crate::{syscalls::decls::SyscallDecl, types::*};
+
     use fuchsia_inspect as inspect;
     use once_cell::sync::Lazy;
+    use paste::paste;
 
     /// A macro for declaring a SyscallDecl stats property.
     macro_rules! syscall_stats_property {
