@@ -207,9 +207,16 @@ function fx-build-config-load {
   return 0
 }
 
+# Sets FUCHSIA_BUILD_DIR once, to an absolute path.
 function fx-build-dir-if-present {
-  if [[ -n "${_FX_BUILD_DIR:-}" ]]; then
+  if [[ -n "${FUCHSIA_BUILD_DIR:-}" ]]; then
+    # already set by this function earlier
+    return 0
+  elif [[ -n "${_FX_BUILD_DIR:-}" ]]; then
     export FUCHSIA_BUILD_DIR="${_FX_BUILD_DIR}"
+    # This can be set by --dir.
+    # Unset to prevent subprocess from acting on it again.
+    unset _FX_BUILD_DIR
   else
     if [[ ! -f "${FUCHSIA_DIR}/.fx-build-dir" ]]; then
       return 1
