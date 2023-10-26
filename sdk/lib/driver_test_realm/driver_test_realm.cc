@@ -250,15 +250,6 @@ std::map<std::string, std::string> CreateBootArgs(const fuchsia_driver_test::Rea
     }
   }
 
-  if (args.driver_disable().has_value()) {
-    std::vector<std::string_view> drivers(args.driver_disable()->size());
-    for (const auto& driver : *args.driver_disable()) {
-      drivers.emplace_back(driver);
-      auto string = fbl::StringPrintf("driver.%s.disable", driver.c_str());
-      boot_args[string.data()] = "true";
-    }
-  }
-
   return boot_args;
 }
 
