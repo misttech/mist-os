@@ -3,12 +3,12 @@
 // found in the LICENSE file.
 
 // Use these crates so that we don't need to make the dependency conditional.
-use core::marker::PhantomData;
 use fuchsia_sync as _;
 use lock_api as _;
 use lock_sequence as _;
 
-use lock_sequence::{lock::LockFor, relation::LockBefore, relation::LockLevel, Locked};
+use core::marker::PhantomData;
+use lock_sequence::*;
 use std::{any, fmt};
 
 #[cfg(not(any(test, debug_assertions)))]
@@ -118,6 +118,89 @@ impl<T, L: LockLevel<Source = Self>> OrderedMutex<T, L> {
     }
 }
 
+/// A wrapper for an RwLock that requires a `Locked` context to acquire.
+/// This context must be of a level that precedes `L` in the lock ordering graph
+/// where `L` is a level associated with this RwLock.
+#[cfg(test)]
+pub struct OrderedRwLock<T, L: LockLevel<Source = Self>> {
+    rwlock: RwLock<T>,
+    _phantom: PhantomData<L>,
+}
+
+#[cfg(test)]
+impl<T: Default, L: LockLevel<Source = Self>> Default for OrderedRwLock<T, L> {
+    fn default() -> Self {
+        Self { rwlock: Default::default(), _phantom: Default::default() }
+    }
+}
+
+#[cfg(test)]
+impl<T: Default + fmt::Debug, L: LockLevel<Source = Self>> fmt::Debug for OrderedRwLock<T, L> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "OrderedRwLock({:?}, {})", self.rwlock, any::type_name::<L>())
+    }
+}
+
+#[cfg(test)]
+impl<T, L: LockLevel<Source = Self>> RwLockFor<L> for OrderedRwLock<T, L> {
+    type Data = T;
+    type ReadGuard<'a> = RwLockReadGuard<'a, T> where T: 'a, L: 'a;
+    type WriteGuard<'a> = RwLockWriteGuard<'a, T> where T: 'a, L: 'a;
+    fn read_lock(&self) -> Self::ReadGuard<'_> {
+        self.rwlock.read()
+    }
+    fn write_lock(&self) -> Self::WriteGuard<'_> {
+        self.rwlock.write()
+    }
+}
+
+#[cfg(test)]
+impl<T, L: LockLevel<Source = Self>> OrderedRwLock<T, L> {
+    pub fn new(t: T) -> Self {
+        Self { rwlock: RwLock::new(t), _phantom: Default::default() }
+    }
+
+    pub fn read<'a, P>(
+        &'a self,
+        locked: &'a mut Locked<'_, P>,
+    ) -> <Self as RwLockFor<L>>::ReadGuard<'a>
+    where
+        P: LockBefore<L> + LockLevel,
+    {
+        locked.read_lock(self)
+    }
+
+    pub fn write<'a, P>(
+        &'a self,
+        locked: &'a mut Locked<'_, P>,
+    ) -> <Self as RwLockFor<L>>::WriteGuard<'a>
+    where
+        P: LockBefore<L> + LockLevel,
+    {
+        locked.write_lock(self)
+    }
+
+    pub fn read_and<'a, P>(
+        &'a self,
+        locked: &'a mut Locked<'_, P>,
+    ) -> (<Self as RwLockFor<L>>::ReadGuard<'a>, Locked<'a, L>)
+    where
+        P: LockBefore<L> + LockLevel,
+    {
+        locked.read_lock_and(self)
+    }
+
+    pub fn write_and<'a, P>(
+        &'a self,
+        locked: &'a mut Locked<'_, P>,
+    ) -> (<Self as RwLockFor<L>>::WriteGuard<'a>, Locked<'a, L>)
+    where
+        P: LockBefore<L> + LockLevel,
+    {
+        locked.write_lock_and(self)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -142,21 +225,30 @@ mod test {
 
     mod lock_levels {
         //! Lock ordering tree:
-        //! A -> B -> C
+        //! Unlocked -> A -> B -> C
+        //!          -> D -> E -> F
 
-        use super::OrderedMutex;
+        use super::{OrderedMutex, OrderedRwLock};
         use lock_sequence::{impl_lock_after, lock_level, relation::LockAfter, Unlocked};
 
         lock_level!(A, OrderedMutex<u8, A>);
         lock_level!(B, OrderedMutex<u16, B>);
         lock_level!(C, OrderedMutex<u32, C>);
 
+        lock_level!(D, OrderedRwLock<u8, D>);
+        lock_level!(E, OrderedRwLock<u16, E>);
+        lock_level!(F, OrderedRwLock<u32, F>);
+
         impl LockAfter<Unlocked> for A {}
         impl_lock_after!(A => B);
         impl_lock_after!(B => C);
+
+        impl LockAfter<Unlocked> for D {}
+        impl_lock_after!(D => E);
+        impl_lock_after!(E => F);
     }
 
-    use lock_levels::{A, B, C};
+    use lock_levels::{A, B, C, D, E, F};
 
     #[test]
     fn test_ordered_mutex() {
@@ -175,5 +267,35 @@ mod test {
 
         assert_eq!(&*a_data, &15);
         assert_eq!(&*c_data, &45);
+    }
+    #[test]
+    fn test_ordered_rwlock() {
+        let d: OrderedRwLock<u8, D> = OrderedRwLock::new(15);
+        let _e: OrderedRwLock<u16, E> = OrderedRwLock::new(30);
+        let f: OrderedRwLock<u32, F> = OrderedRwLock::new(45);
+
+        let mut locked = Unlocked::new();
+        {
+            let (d_data, mut next_locked) = d.write_and(&mut locked);
+            let f_data = f.read(&mut next_locked);
+
+            // This won't compile
+            //let _e_data = _e.read(&mut locked);
+            //let _e_data = _e.read(&mut next_locked);
+
+            assert_eq!(&*d_data, &15);
+            assert_eq!(&*f_data, &45);
+        }
+        {
+            let (d_data, mut next_locked) = d.read_and(&mut locked);
+            let f_data = f.write(&mut next_locked);
+
+            // This won't compile
+            //let _e_data = _e.write(&mut locked);
+            //let _e_data = _e.write(&mut next_locked);
+
+            assert_eq!(&*d_data, &15);
+            assert_eq!(&*f_data, &45);
+        }
     }
 }
