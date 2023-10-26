@@ -1,7 +1,7 @@
 # Migrate from Banjo to FIDL
 
 DFv1 drivers communicate with each other using the [Banjo][banjo] protocol.
-In DFv2, all communications occur over [FIDL][fidl] (Fuchsia Interface
+In DFv2, all communications occur over [FIDL][fidl-guides] (Fuchsia Interface
 Definition Language) calls, for both drivers and non-drivers. So if your
 DFv1 driver uses the Banjo protocol, it is recommended to migrate the driver
 to use FIDL first before [migrating it to DFv2][migrate-from-dfv1-to-dfv2].
@@ -66,7 +66,7 @@ that may apply to your driver.
   One major advantage of migrating a driver to use the new driver runtime
   is that it changes the way that the driver communicates with co-located
   drivers, which is done by using the driver runtime FIDL. However, before
-  you can start migratinh a driver to use the driver runtime, if your driver
+  you can start migrating a driver to use the driver runtime, if your driver
   is using Banjo or is already using FIDL but it's based on the original
   transport (Zircon primitives), you first need to make changes so that all
   communications in the driver take place using FIDL.
@@ -981,7 +981,8 @@ All the **documentation pages** mentioned in this section:
 
 [fidlbolt]: https://fidlbolt-6jq5tlqt6q-uc.a.run.app/
 [banjo]: /docs/development/drivers/concepts/device_driver_model/banjo.md
-[fidl]: /docs/development/languages/fidl/README.md
+[fidl-guides]: /docs/development/languages/fidl/README.md
+[fidl]: /docs/concepts/fidl/overview.md
 [migrate-from-dfv1-to-dfv2]: /docs/development/drivers/migration/migrate-from-dfv1-to-dfv2.md
 [driver-runtime-rfc]: /docs/contribute/governance/rfcs/0126_driver_runtime.md
 [llcpp]: /docs/development/languages/fidl/tutorials/cpp/README.md
