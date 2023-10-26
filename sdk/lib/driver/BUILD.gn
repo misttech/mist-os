@@ -7,7 +7,7 @@ group("tests") {
 
   deps = [
     "compat:tests",
-    "component:tests",
+    "component/cpp:tests",
     "devfs:tests",
     "devicetree:tests",
     "symbols:tests",
