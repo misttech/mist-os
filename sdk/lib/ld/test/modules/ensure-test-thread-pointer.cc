@@ -37,7 +37,11 @@ bool EnsureTestThreadPointer() {
   int64_t result;
   __asm__ volatile("syscall"
                    : "=a"(result)
-                   : "0"(__NR_arch_prctl), "D"(ARCH_SET_FS), "S"(&fs_points_to));
+                   : "0"(__NR_arch_prctl), "D"(ARCH_SET_FS), "S"(&fs_points_to)
+                   // The kernel doesn't touch any registers except the result,
+                   // but the SYSCALL instruction in the CPU itself always
+                   // clobbers %rcx and %r11.
+                   : "rcx", "r11");
   if (result == 0) {
     return true;
   }
