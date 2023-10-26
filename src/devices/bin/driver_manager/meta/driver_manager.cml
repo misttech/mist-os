@@ -21,6 +21,7 @@
             protocol: [
                 "fuchsia.boot.RootResource",
                 "fuchsia.boot.WriteOnlyLog",
+                "fuchsia.kernel.InfoResource",
                 "fuchsia.kernel.IoportResource",
                 "fuchsia.kernel.IrqResource",
                 "fuchsia.kernel.MexecResource",

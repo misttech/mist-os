@@ -16,6 +16,7 @@
     get_ioport_resource;
     get_mmio_resource;
     get_irq_resource;
+    get_info_resource;
     load_firmware_from_driver;
     device_get_metadata;
     device_get_metadata_size;
