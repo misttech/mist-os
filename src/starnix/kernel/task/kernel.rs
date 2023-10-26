@@ -13,6 +13,7 @@ use fuchsia_zircon as zx;
 use futures::FutureExt;
 use netlink::{interfaces::InterfacesHandler, Netlink, NETLINK_LOG_TAG};
 use once_cell::sync::OnceCell;
+use selinux::security_server::SecurityServer;
 use starnix_lock::RwLock;
 use std::{
     collections::{BTreeMap, HashSet},
@@ -42,7 +43,6 @@ use crate::{
     logging::{log_error, set_zx_name},
     mm::{FutexTable, SharedFutexKey},
     power::PowerManager,
-    selinux::security_server::SecurityServer,
     task::*,
     types::{DeviceType, Errno, OpenFlags, *},
     vdso::vdso_loader::Vdso,
