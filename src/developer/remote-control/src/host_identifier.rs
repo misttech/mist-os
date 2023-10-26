@@ -6,7 +6,8 @@ use {
     fidl_fuchsia_buildinfo as buildinfo, fidl_fuchsia_developer_remotecontrol as rcs,
     fidl_fuchsia_device as fdevice, fidl_fuchsia_hwinfo as hwinfo,
     fidl_fuchsia_net_interfaces as fnet_interfaces,
-    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fuchsia_zircon as zx,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_sysinfo as sysinfo,
+    fuchsia_zircon as zx,
     std::collections::HashMap,
     tracing::*,
 };
@@ -15,6 +16,7 @@ pub struct HostIdentifier {
     pub(crate) interface_state_proxy: fnet_interfaces::StateProxy,
     pub(crate) name_provider_proxy: fdevice::NameProviderProxy,
     pub(crate) device_info_proxy: hwinfo::DeviceProxy,
+    pub(crate) system_info_proxy: sysinfo::SysInfoProxy,
     pub(crate) build_info_proxy: buildinfo::ProviderProxy,
     pub(crate) boot_timestamp_nanos: u64,
 }
@@ -28,6 +30,7 @@ impl HostIdentifier {
         let interface_state_proxy = connect_to_protocol::<fnet_interfaces::StateMarker>()?;
         let name_provider_proxy = connect_to_protocol::<fdevice::NameProviderMarker>()?;
         let device_info_proxy = connect_to_protocol::<hwinfo::DeviceMarker>()?;
+        let system_info_proxy = connect_to_protocol::<sysinfo::SysInfoMarker>()?;
         let build_info_proxy = connect_to_protocol::<buildinfo::ProviderMarker>()?;
         let boot_timestamp_nanos = (fuchsia_runtime::utc_time().into_nanos()
             - zx::Time::get_monotonic().into_nanos()) as u64;
@@ -35,6 +38,7 @@ impl HostIdentifier {
             interface_state_proxy,
             name_provider_proxy,
             device_info_proxy,
+            system_info_proxy,
             build_info_proxy,
             boot_timestamp_nanos,
         });
@@ -59,13 +63,23 @@ impl HostIdentifier {
             rcs::IdentifyHostError::ListInterfacesFailed
         })?;
 
-        let serial_number = self
-            .device_info_proxy
-            .get_info()
-            .await
-            .map_err(|e| error!(%e, "DeviceProxy internal err"))
-            .ok()
-            .and_then(|i| i.serial_number);
+        let serial_number = 'serial: {
+            match self.system_info_proxy.get_serial_number().await {
+                Ok(Ok(serial)) => break 'serial Some(serial),
+                Ok(Err(status)) => {
+                    let status = zx::Status::from_raw(status);
+                    error!(%status, "Failed to get serial from SysInfo")
+                }
+                Err(err) => error!(%err, "SysInfoProxy internal err"),
+            }
+
+            match self.device_info_proxy.get_info().await {
+                Ok(info) => break 'serial info.serial_number,
+                Err(err) => error!(%err, "DeviceProxy internal err"),
+            }
+
+            None
+        };
 
         let (product_config, board_config) = self
             .build_info_proxy

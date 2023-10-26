@@ -27,7 +27,7 @@ mod host_identifier;
 
 pub struct RemoteControlService {
     ids: RefCell<Vec<Weak<RefCell<Vec<u64>>>>>,
-    id_allocator: fn() -> Result<HostIdentifier>,
+    id_allocator: Box<dyn Fn() -> Result<HostIdentifier>>,
     connector: Box<dyn Fn(fidl::Socket)>,
     moniker_map: HashMap<String, String>,
 }
@@ -45,7 +45,7 @@ struct Client {
 impl RemoteControlService {
     pub async fn new(connector: impl Fn(fidl::Socket) + 'static) -> Self {
         let moniker_map = Self::load_moniker_map().await;
-        Self::new_with_allocator(connector, || HostIdentifier::new(), moniker_map)
+        Self::new_with_allocator(connector, Box::new(|| HostIdentifier::new()), moniker_map)
     }
 
     async fn load_moniker_map() -> HashMap<String, String> {
@@ -77,10 +77,15 @@ impl RemoteControlService {
 
     pub(crate) fn new_with_allocator(
         connector: impl Fn(fidl::Socket) + 'static,
-        id_allocator: fn() -> Result<HostIdentifier>,
+        id_allocator: impl Fn() -> Result<HostIdentifier> + 'static,
         moniker_map: HashMap<String, String>,
     ) -> Self {
-        Self { id_allocator, ids: Default::default(), connector: Box::new(connector), moniker_map }
+        Self {
+            id_allocator: Box::new(id_allocator),
+            ids: Default::default(),
+            connector: Box::new(connector),
+            moniker_map,
+        }
     }
 
     // Some of the ID-lists may be gone because old clients have shut down.
@@ -660,12 +665,13 @@ mod tests {
         super::*, assert_matches::assert_matches, fidl_fuchsia_buildinfo as buildinfo,
         fidl_fuchsia_developer_remotecontrol as rcs, fidl_fuchsia_device as fdevice,
         fidl_fuchsia_hwinfo as hwinfo, fidl_fuchsia_io as fio, fidl_fuchsia_net as fnet,
-        fidl_fuchsia_net_interfaces as fnet_interfaces, fuchsia_component::server::ServiceFs,
-        fuchsia_zircon as zx, std::net::Ipv4Addr,
+        fidl_fuchsia_net_interfaces as fnet_interfaces, fidl_fuchsia_sysinfo as sysinfo,
+        fuchsia_component::server::ServiceFs, fuchsia_zircon as zx, std::net::Ipv4Addr,
     };
 
     const NODENAME: &'static str = "thumb-set-human-shred";
     const BOOT_TIME: u64 = 123456789000000000;
+    const SYSINFO_SERIAL: &'static str = "test_sysinfo_serial";
     const SERIAL: &'static str = "test_serial";
     const BOARD_CONFIG: &'static str = "test_board_name";
     const PRODUCT_CONFIG: &'static str = "core";
@@ -687,6 +693,28 @@ mod tests {
                             ..Default::default()
                         });
                     }
+                }
+            }
+        })
+        .detach();
+
+        proxy
+    }
+
+    fn setup_fake_sysinfo_service(status: zx::Status) -> sysinfo::SysInfoProxy {
+        let (proxy, mut stream) =
+            fidl::endpoints::create_proxy_and_stream::<sysinfo::SysInfoMarker>().unwrap();
+        fasync::Task::spawn(async move {
+            while let Ok(Some(req)) = stream.try_next().await {
+                match req {
+                    sysinfo::SysInfoRequest::GetSerialNumber { responder } => {
+                        let _ = responder.send(
+                            Result::from(status)
+                                .map(|_| SYSINFO_SERIAL)
+                                .map_err(zx::Status::into_raw),
+                        );
+                    }
+                    _ => panic!("unexpected request: {req:?}"),
                 }
             }
         })
@@ -812,18 +840,25 @@ mod tests {
         proxy
     }
 
-    fn make_rcs() -> Rc<RemoteControlService> {
-        make_rcs_with_maps(HashMap::default())
+    #[derive(Default)]
+    #[non_exhaustive]
+    struct RcsEnv {
+        moniker_map: HashMap<String, String>,
+        system_info_proxy: Option<sysinfo::SysInfoProxy>,
     }
 
-    fn make_rcs_with_maps(moniker_map: HashMap<String, String>) -> Rc<RemoteControlService> {
+    fn make_rcs_from_env(env: RcsEnv) -> Rc<RemoteControlService> {
+        let RcsEnv { moniker_map, system_info_proxy } = env;
         Rc::new(RemoteControlService::new_with_allocator(
             |_| (),
-            || {
+            move || {
                 Ok(HostIdentifier {
                     interface_state_proxy: setup_fake_interface_state_service(),
                     name_provider_proxy: setup_fake_name_provider_service(),
                     device_info_proxy: setup_fake_device_service(),
+                    system_info_proxy: system_info_proxy
+                        .clone()
+                        .unwrap_or_else(|| setup_fake_sysinfo_service(zx::Status::INTERNAL)),
                     build_info_proxy: setup_fake_build_info_service(),
                     boot_timestamp_nanos: BOOT_TIME,
                 })
@@ -832,12 +867,14 @@ mod tests {
         ))
     }
 
-    fn setup_rcs_proxy() -> rcs::RemoteControlProxy {
-        setup_rcs_proxy_with_connector().0
+    fn make_rcs_with_maps(moniker_map: HashMap<String, String>) -> Rc<RemoteControlService> {
+        make_rcs_from_env(RcsEnv { moniker_map, ..Default::default() })
     }
 
-    fn setup_rcs_proxy_with_connector() -> (rcs::RemoteControlProxy, connector::ConnectorProxy) {
-        let service = make_rcs();
+    fn setup_rcs_proxy_from_env(
+        env: RcsEnv,
+    ) -> (rcs::RemoteControlProxy, connector::ConnectorProxy) {
+        let service = make_rcs_from_env(env);
 
         let (rcs_proxy, stream) =
             fidl::endpoints::create_proxy_and_stream::<rcs::RemoteControlMarker>().unwrap();
@@ -856,6 +893,14 @@ mod tests {
         .detach();
 
         (rcs_proxy, connector_proxy)
+    }
+
+    fn setup_rcs_proxy() -> rcs::RemoteControlProxy {
+        setup_rcs_proxy_from_env(Default::default()).0
+    }
+
+    fn setup_rcs_proxy_with_connector() -> (rcs::RemoteControlProxy, connector::ConnectorProxy) {
+        setup_rcs_proxy_from_env(Default::default())
     }
 
     fn setup_fake_lifecycle_controller() -> fsys::LifecycleControllerProxy {
@@ -996,6 +1041,40 @@ mod tests {
         let resp = rcs_proxy.identify_host().await.unwrap().unwrap();
 
         assert_eq!(resp.serial_number.unwrap(), SERIAL);
+        assert_eq!(resp.board_config.unwrap(), BOARD_CONFIG);
+        assert_eq!(resp.product_config.unwrap(), PRODUCT_CONFIG);
+        assert_eq!(resp.nodename.unwrap(), NODENAME);
+
+        let addrs = resp.addresses.unwrap();
+        assert_eq!(
+            addrs[..],
+            [
+                fnet::Subnet {
+                    addr: fnet::IpAddress::Ipv4(fnet::Ipv4Address { addr: IPV4_ADDR }),
+                    prefix_len: 4,
+                },
+                fnet::Subnet {
+                    addr: fnet::IpAddress::Ipv6(fnet::Ipv6Address { addr: IPV6_ADDR }),
+                    prefix_len: 110,
+                }
+            ]
+        );
+
+        assert_eq!(resp.boot_timestamp_nanos.unwrap(), BOOT_TIME);
+
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn test_identify_host_sysinfo_serial() -> Result<()> {
+        let (rcs_proxy, _) = setup_rcs_proxy_from_env(RcsEnv {
+            system_info_proxy: Some(setup_fake_sysinfo_service(zx::Status::OK)),
+            ..Default::default()
+        });
+
+        let resp = rcs_proxy.identify_host().await.unwrap().unwrap();
+
+        assert_eq!(resp.serial_number.unwrap(), SYSINFO_SERIAL);
         assert_eq!(resp.board_config.unwrap(), BOARD_CONFIG);
         assert_eq!(resp.product_config.unwrap(), PRODUCT_CONFIG);
         assert_eq!(resp.nodename.unwrap(), NODENAME);
