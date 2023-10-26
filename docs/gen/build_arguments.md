@@ -2754,12 +2754,12 @@ From //third_party/perfetto/gn/perfetto.gni:198
 
 Enables gRPC in the Perfetto codebase. gRPC significantly increases build
 times and the general footprint of Perfetto. As it only required for
-cloud trace processor and even then only to build the final ready-to-ship
-binary, don't enable this by default.
+BigTrace and even then only to build the final ready-to-ship binary, don't
+enable this by default.
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:316
+From //third_party/perfetto/gn/perfetto.gni:319
 
 ### enable_perfetto_heapprofd
 
@@ -2783,7 +2783,7 @@ From //third_party/perfetto/gn/perfetto.gni:150
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:310
+From //third_party/perfetto/gn/perfetto.gni:313
 
 ### enable_perfetto_platform_services
 
@@ -2800,7 +2800,7 @@ rerunning gn.
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:333
+From //third_party/perfetto/gn/perfetto.gni:336
 
 ### enable_perfetto_stderr_crash_dump
 
@@ -2830,37 +2830,37 @@ From //third_party/perfetto/gn/perfetto.gni:173
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:296
+From //third_party/perfetto/gn/perfetto.gni:300
 
 ### enable_perfetto_trace_processor_json
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:291
+From //third_party/perfetto/gn/perfetto.gni:295
 
 ### enable_perfetto_trace_processor_linenoise
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:285
+From //third_party/perfetto/gn/perfetto.gni:289
 
 ### enable_perfetto_trace_processor_percentile
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:280
+From //third_party/perfetto/gn/perfetto.gni:284
 
 ### enable_perfetto_trace_processor_sqlite
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:275
+From //third_party/perfetto/gn/perfetto.gni:279
 
 ### enable_perfetto_traceconv
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:322
+From //third_party/perfetto/gn/perfetto.gni:325
 
 ### enable_perfetto_traced_perf
 
@@ -2882,11 +2882,20 @@ extremely low.
 
 From //third_party/perfetto/gn/perfetto.gni:267
 
+### enable_perfetto_traced_relay
+
+The relay service is enabled when platform services are enabled.
+TODO(chinglinyu) check if we can enable on Windows.
+
+**Current value (from the default):** `false`
+
+From //third_party/perfetto/gn/perfetto.gni:271
+
 ### enable_perfetto_ui
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:326
+From //third_party/perfetto/gn/perfetto.gni:329
 
 ### enable_perfetto_unittests
 
@@ -2916,7 +2925,7 @@ From //third_party/perfetto/gn/perfetto.gni:243
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:303
+From //third_party/perfetto/gn/perfetto.gni:307
 
 ### enable_power_manager_debug
 
@@ -3446,7 +3455,7 @@ From //build/bazel/licenses/BUILD.gn:21
 Enable hermetic GN licensing pipeline.
 TODO(132725): Remove once migration completes.
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
 From //build/bazel/licenses/BUILD.gn:25
 
@@ -5372,7 +5381,7 @@ from /usr/include instead of the hermetic one.
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:340
+From //third_party/perfetto/gn/perfetto.gni:343
 
 ### perfetto_use_system_sqlite
 
@@ -5381,19 +5390,19 @@ from /usr/include instead of the hermetic one.
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:344
+From //third_party/perfetto/gn/perfetto.gni:347
 
 ### perfetto_use_system_zlib
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:346
+From //third_party/perfetto/gn/perfetto.gni:349
 
 ### perfetto_verbose_logs_enabled
 
 **Current value (from the default):** `true`
 
-From //third_party/perfetto/gn/perfetto.gni:271
+From //third_party/perfetto/gn/perfetto.gni:275
 
 ### persistent_ram_allocation_granularity
 
@@ -7990,7 +7999,7 @@ Skip buildtools dependency checks (needed for ChromeOS).
 
 **Current value (from the default):** `false`
 
-From //third_party/perfetto/gn/perfetto.gni:336
+From //third_party/perfetto/gn/perfetto.gni:339
 
 ### smp_max_cpus
 
@@ -8048,6 +8057,14 @@ Whether or not tracing is enabled globally.
 **Current value (from the default):** `false`
 
 From //src/starnix/kernel/BUILD.gn:17
+
+### starnix_syscall_stats
+
+Whether or not syscall status inspect is enabled globally.
+
+**Current value (from the default):** `false`
+
+From //src/starnix/kernel/BUILD.gn:25
 
 ### target_cpu
 
