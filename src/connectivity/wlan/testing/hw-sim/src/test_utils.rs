@@ -4,8 +4,10 @@
 use {
     crate::{
         event::{self, Handler},
+        netdevice_helper,
         wlancfg_helper::{start_ap_and_wait_for_confirmation, NetworkConfigBuilder},
     },
+    fidl::endpoints::Proxy,
     fidl::endpoints::{create_endpoints, create_proxy},
     fidl_fuchsia_driver_test as fidl_driver_test, fidl_fuchsia_wlan_policy as fidl_policy,
     fidl_fuchsia_wlan_tap as wlantap, fidl_test_wlan_realm as fidl_realm,
@@ -13,6 +15,7 @@ use {
     fuchsia_component::client::connect_to_protocol,
     fuchsia_zircon::{self as zx, prelude::*},
     futures::{channel::oneshot, FutureExt, StreamExt},
+    ieee80211::{MacAddr, MacAddrBytes},
     realm_proxy::client::RealmProxyClient,
     std::{
         fmt::Display,
@@ -130,10 +133,10 @@ impl TestRealmContext {
 type EventStream = wlantap::WlantapPhyEventStream;
 pub struct TestHelper {
     ctx: Arc<TestRealmContext>,
+    netdevice_task_handles: Vec<fuchsia_async::Task<()>>,
     _wlantap: Wlantap,
     proxy: Arc<wlantap::WlantapPhyProxy>,
     event_stream: Option<EventStream>,
-    is_stopped: bool,
 }
 struct TestHelperFuture<H, F>
 where
@@ -261,6 +264,7 @@ impl TestHelper {
         helper.wait_for_wlan_softmac_start().await;
         helper
     }
+
     async fn create_phy_and_helper(
         config: wlantap::WlantapPhyConfig,
         ctx: Arc<TestRealmContext>,
@@ -280,12 +284,13 @@ impl TestHelper {
         let event_stream = Some(proxy.take_event_stream());
         TestHelper {
             ctx,
+            netdevice_task_handles: vec![],
             _wlantap: wlantap,
             proxy: Arc::new(proxy),
             event_stream,
-            is_stopped: false,
         }
     }
+
     async fn wait_for_wlan_softmac_start(&mut self) {
         let (sender, receiver) = oneshot::channel::<()>();
         self.run_until_complete_or_timeout(
@@ -297,15 +302,36 @@ impl TestHelper {
         .await
         .unwrap_or_else(|oneshot::Canceled| panic!());
     }
+
+    /// Returns a clone of the `Arc<wlantap::WlantapPhyProxy>` as a convenience for passing
+    /// the proxy to futures. Tests must drop every `Arc<wlantap::WlantapPhyProxy>` returned from this
+    /// method before dropping the TestHelper. Otherwise, TestHelper::drop() cannot synchronously
+    /// block on WlantapPhy.Shutdown().
     pub fn proxy(&self) -> Arc<wlantap::WlantapPhyProxy> {
-        self.proxy.clone()
+        Arc::clone(&self.proxy)
     }
+
     pub fn test_realm_proxy(&self) -> Arc<RealmProxyClient> {
         self.ctx.test_realm_proxy()
     }
+
     pub fn devfs(&self) -> &fidl_fuchsia_io::DirectoryProxy {
         self.ctx.devfs()
     }
+
+    pub async fn start_netdevice_session(
+        &mut self,
+        mac: MacAddr,
+    ) -> (netdevice_client::Session, netdevice_client::Port) {
+        let mac = fidl_fuchsia_net::MacAddress { octets: mac.to_array() };
+        let (client, port) = netdevice_helper::create_client(self.devfs(), mac)
+            .await
+            .expect("failed to create netdevice client");
+        let (session, task_handle) = netdevice_helper::start_session(client, port).await;
+        self.netdevice_task_handles.push(task_handle);
+        (session, port)
+    }
+
     /// Will run the main future until it completes or when it has run past the specified duration.
     /// Note that any events that are observed on the event stream will be passed to the
     /// |event_handler| closure first before making progress on the main future.
@@ -333,19 +359,65 @@ impl TestHelper {
         self.event_stream = Some(stream);
         item
     }
-    // stop must be called at the end of the test to tell wlantap-phy driver that the proxy's
-    // channel that is about to be closed (dropped) from our end so that the driver would not try to
-    // access it. Otherwise it could crash the isolated devmgr.
-    pub async fn stop(mut self) {
-        let () = self.proxy.shutdown().await.expect("shut down fake phy");
-        self.is_stopped = true;
-    }
 }
 impl Drop for TestHelper {
     fn drop(&mut self) {
-        assert!(self.is_stopped, "Must call stop() on a TestHelper before dropping it");
+        // Drop each fuchsia_async::Task driving each
+        // netdevice_client::Session in the reverse order the test
+        // created them.
+        while let Some(task_handle) = self.netdevice_task_handles.pop() {
+            drop(task_handle);
+        }
+
+        // Create a placeholder proxy to swap into place of self.proxy. This allows this
+        // function to create a synchronous proxy from the real proxy.
+        let (placeholder_proxy, _server_end) =
+            fidl::endpoints::create_proxy::<wlantap::WlantapPhyMarker>()
+                .expect("failed to create placeholder WlantapPhyProxy");
+        let mut proxy = Arc::new(placeholder_proxy);
+        std::mem::swap(&mut self.proxy, &mut proxy);
+
+        // Drop the event stream so the WlantapPhyProxy can be converted
+        // back into a channel. Conversion from a proxy into a channel fails
+        // otherwise.
+        let event_stream = self.event_stream.take();
+        drop(event_stream);
+
+        let sync_proxy = wlantap::WlantapPhySynchronousProxy::new(fidl::Channel::from_handle(
+            // Arc::into_inner() should succeed in a properly constructed test. Using a WlantapPhyProxy
+            // returned from TestHelper beyond the lifetime of TestHelper is not supported.
+            Arc::<wlantap::WlantapPhyProxy>::into_inner(proxy)
+                .expect("Outstanding references to WlantapPhyProxy! Failed to drop TestHelper.")
+                .into_channel()
+                .expect("failed to get fidl::AsyncChannel from proxy")
+                .into_zx_channel()
+                .into_handle(),
+        ));
+
+        // TODO(b/307808624): At this point in the shutdown, we should
+        // stop wlancfg first and destroy all ifaces through
+        // fuchsia.wlan.device.service/DeviceMonitor.DestroyIface().
+        // This test framework does not currently support stopping
+        // individual components. If instead we drop the
+        // TestRealmProxy, and thus stop both wlancfg and
+        // wlandevicemonitor, wlandevicemonitor which will drop the
+        // GenericSme channel before graceful destruction of the
+        // iface. Dropping the GenericSme channel for an existing
+        // iface is considered an error because doing so prevents
+        // future communication with the iface.
+        //
+        // In lieu of stopping wlancfg first, we instead shutdown the
+        // phy device via WlantapPhy.Shutdown() which will block until
+        // both the phy and any remaining ifaces are shutdown. We
+        // first shutdown the phy to prevent any automated CreateIface
+        // calls from wlancfg after removing the iface.
+        //
+        // TODO(fxrev.dev/937293): WlantapPhy.Shutdown() does not
+        // currently block, but the fix is in review.
+        sync_proxy.shutdown(zx::Time::INFINITE).expect("shut down fake phy");
     }
 }
+
 pub struct RetryWithBackoff {
     deadline: Time,
     prev_delay: zx::Duration,

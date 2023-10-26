@@ -76,6 +76,4 @@ async fn autoconnect_idle_iface() {
         wait_for_connect,
     )
     .await;
-
-    helper.stop().await;
 }

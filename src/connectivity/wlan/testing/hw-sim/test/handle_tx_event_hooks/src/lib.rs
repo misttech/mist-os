@@ -165,6 +165,4 @@ async fn handle_tx_event_hooks() {
     assert!(matches!(trace[n - 3], Key(Ptk(..))));
     assert!(matches!(trace[n - 2], Key(Gtk(..))));
     assert!(matches!(trace[n - 1], Status(EssSaEstablished)));
-
-    helper.stop().await;
 }

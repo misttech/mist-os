@@ -28,5 +28,4 @@ async fn connect_to_wpa1_network() {
         fidl_policy::SecurityType::Wpa,
     )
     .await;
-    helper.stop().await;
 }

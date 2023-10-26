@@ -125,6 +125,4 @@ async fn connect_with_bad_password() {
         fidl_policy::DisconnectStatus::CredentialsFailed,
     )
     .await;
-
-    helper.stop().await;
 }

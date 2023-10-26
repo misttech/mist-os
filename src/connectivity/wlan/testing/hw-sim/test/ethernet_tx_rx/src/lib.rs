@@ -6,7 +6,7 @@ use {
     fidl_fuchsia_wlan_policy as fidl_policy,
     fidl_test_wlan_realm::WlanConfig,
     fuchsia_zircon::DurationNum,
-    ieee80211::{Bssid, MacAddrBytes},
+    ieee80211::Bssid,
     lazy_static::lazy_static,
     netdevice_client,
     pin_utils::pin_mut,
@@ -116,14 +116,6 @@ async fn ethernet_tx_rx() {
     )
     .await;
 
-    let (client, port) = netdevice_helper::create_client(
-        &helper.devfs(),
-        fidl_fuchsia_net::MacAddress { octets: CLIENT_MAC_ADDR.to_array() },
-    )
-    .await
-    .expect("failed to create netdevice client");
-    let (session, _task) = netdevice_helper::start_session(client, port).await;
+    let (session, port) = helper.start_netdevice_session(*CLIENT_MAC_ADDR).await;
     verify_tx_and_rx(&session, &port, &mut helper).await;
-
-    helper.stop().await;
 }

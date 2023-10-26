@@ -30,5 +30,4 @@ async fn connect_to_open_network() {
         fidl_policy::SecurityType::None,
     )
     .await;
-    helper.stop().await;
 }

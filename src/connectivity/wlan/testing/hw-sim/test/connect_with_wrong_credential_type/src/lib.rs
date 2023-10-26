@@ -156,6 +156,4 @@ async fn connecting_to_aps_with_wrong_credential_types() {
         .await;
         info!("OK: invalid connection parameters failed as expected.");
     }
-
-    helper.stop().await;
 }

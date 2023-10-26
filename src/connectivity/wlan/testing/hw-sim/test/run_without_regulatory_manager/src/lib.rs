@@ -60,6 +60,4 @@ async fn run_without_regulatory_manager() {
             fut,
         )
         .await;
-
-    helper.stop().await;
 }

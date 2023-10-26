@@ -8,7 +8,7 @@ use {
     fidl_test_wlan_realm::WlanConfig,
     fuchsia_zircon::DurationNum as _,
     futures::{channel::oneshot, join, TryFutureExt},
-    ieee80211::{MacAddr, MacAddrBytes},
+    ieee80211::MacAddr,
     pin_utils::pin_mut,
     tracing::{info, warn},
     wlan_common::{bss::Protection::Wpa2Personal, buffer_reader::BufferReader, mac},
@@ -250,22 +250,9 @@ async fn verify_ethernet_in_both_directions(
     client_helper: &mut test_utils::TestHelper,
     ap_helper: &mut test_utils::TestHelper,
 ) {
-    let (client_netdevice, client_port) = netdevice_helper::create_client(
-        &client_helper.devfs(),
-        fidl_fuchsia_net::MacAddress { octets: CLIENT_MAC_ADDR.to_array() },
-    )
-    .await
-    .expect("failed to create netdevice client for client");
-    let (ap_netdevice, ap_port) = netdevice_helper::create_client(
-        &ap_helper.devfs(),
-        fidl_fuchsia_net::MacAddress { octets: AP_MAC_ADDR.to_array() },
-    )
-    .await
-    .expect("failed to create netdevice client for AP");
-
-    let (client_session, _client_task) =
-        netdevice_helper::start_session(client_netdevice, client_port).await;
-    let (ap_session, _ap_task) = netdevice_helper::start_session(ap_netdevice, ap_port).await;
+    let (client_session, client_port) =
+        client_helper.start_netdevice_session(*CLIENT_MAC_ADDR).await;
+    let (ap_session, ap_port) = ap_helper.start_netdevice_session((*AP_MAC_ADDR).into()).await;
 
     let (sender_ap_to_client, receiver_client_from_ap) = oneshot::channel();
     let (sender_client_to_ap, receiver_ap_from_client) = oneshot::channel();
@@ -357,6 +344,4 @@ async fn sim_client_vs_sim_ap() {
         &mut ap_helper,
     )
     .await;
-    client_helper.stop().await;
-    ap_helper.stop().await;
 }

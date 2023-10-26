@@ -225,13 +225,11 @@ fn send_tx_result(
 }
 
 async fn send_eth_beacons<'a>(
-    client: netdevice_client::Client,
-    port: netdevice_client::Port,
+    session: &netdevice_client::Session,
+    port: &netdevice_client::Port,
     receiver: &'a mut mpsc::Receiver<Option<Maxima<TxVecCount>>>,
     phy: &'a fidl_tap::WlantapPhyProxy,
 ) -> Result<Maxima<TxVecCount>, Error> {
-    let (session, _task) = netdevice_helper::start_session(client, port).await;
-
     let mut buf: Vec<u8> = vec![];
     buf.append_value(&mac::EthernetIIHdr {
         da: *ETH_DST_MAC,
@@ -294,14 +292,8 @@ async fn rate_selection() {
     let phy = helper.proxy();
     let (sender, mut receiver) = mpsc::channel(1);
 
-    let (client, port) = netdevice_helper::create_client(
-        helper.devfs(),
-        fidl_fuchsia_net::MacAddress { octets: CLIENT_MAC_ADDR.to_array() },
-    )
-    .await
-    .expect("failed to create netdevice client");
-
-    let send_eth_beacons = send_eth_beacons(client, port, &mut receiver, &phy);
+    let (session, port) = helper.start_netdevice_session(*CLIENT_MAC_ADDR).await;
+    let send_eth_beacons = send_eth_beacons(&session, &port, &mut receiver, &phy);
     pin_mut!(send_eth_beacons);
 
     let mut tx_vec_counts = HashMap::new();
@@ -338,5 +330,4 @@ async fn rate_selection() {
          fxbug.dev/33151). Try increasing |DATA_FRAME_INTERVAL_NANOS| above."
     );
     assert_eq!(snapshot.max.tx_vec_idx, MAX_SUCCESSFUL_IDX);
-    helper.stop().await;
 }

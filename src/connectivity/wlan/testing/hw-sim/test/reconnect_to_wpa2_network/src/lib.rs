@@ -180,5 +180,4 @@ async fn reconnect_to_wpa2_network() {
             run_policy_future,
         )
         .await;
-    helper.stop().await;
 }

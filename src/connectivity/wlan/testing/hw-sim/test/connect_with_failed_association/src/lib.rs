@@ -105,6 +105,4 @@ async fn connect_with_failed_association() {
             save_network_fut,
         )
         .await;
-
-    helper.stop().await;
 }

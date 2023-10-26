@@ -58,7 +58,6 @@ async fn open_ap_connect() {
 
     // (ap->client) verify assoc response frame was sent
     verify_assoc_resp(&mut helper).await;
-    helper.stop().await;
 }
 
 async fn verify_auth_resp(helper: &mut test_utils::TestHelper) {

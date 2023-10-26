@@ -191,6 +191,4 @@ async fn simulate_scan() {
     for i in 0..expected_scan_result_list.len() {
         assert_eq!(scan_result_list[i], expected_scan_result_list[i]);
     }
-
-    helper.stop().await;
 }

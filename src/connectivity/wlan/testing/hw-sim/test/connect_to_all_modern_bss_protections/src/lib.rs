@@ -91,5 +91,4 @@ async fn connect_to_modern_wpa_network() {
         })
         .await;
     }
-    helper.stop().await;
 }

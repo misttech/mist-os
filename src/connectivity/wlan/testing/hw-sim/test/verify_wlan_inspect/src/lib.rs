@@ -262,8 +262,6 @@ async fn verify_wlan_inspect() {
             },
         },
     });
-
-    helper.stop().await;
 }
 
 async fn get_inspect_hierarchy(

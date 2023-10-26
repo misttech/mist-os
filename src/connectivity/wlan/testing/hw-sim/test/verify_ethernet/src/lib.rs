@@ -49,5 +49,4 @@ async fn verify_ethernet() {
             panic!("No netdevice client with mac_addr {:?} found in time", *CLIENT_MAC_ADDR)
         });
     }
-    helper.stop().await;
 }

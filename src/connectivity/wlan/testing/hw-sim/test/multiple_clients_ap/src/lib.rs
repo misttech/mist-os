@@ -192,7 +192,4 @@ async fn multiple_clients_ap() {
     );
 
     join!(ap_fut, client1_fut, client2_fut, canary(finish_receiver));
-    client1_helper.stop().await;
-    client2_helper.stop().await;
-    ap_helper.stop().await;
 }
