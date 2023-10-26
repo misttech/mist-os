@@ -321,6 +321,9 @@ mod tests {
         files
     }
 
+    // TODO(b/307977827): Re-enable this, making it not depend on the
+    // in-development API level.
+    #[ignore]
     #[test]
     fn test_package_copy() {
         let temp_dir = TempDir::new().unwrap();
