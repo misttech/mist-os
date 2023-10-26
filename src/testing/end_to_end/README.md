@@ -119,7 +119,8 @@ device interactions. Fore more information see the
 
 ### Build definition
 
-Now that you have a Lacewing test module, integrate it with the build system.
+Now that you have a Lacewing test module you can integrate it with the build
+system.
 
 
 ```gn
@@ -133,6 +134,8 @@ python_mobly_test("my_test_target") {
       # Base class provides common Fuchsia testing setup and teardown logic.
       "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
     ]
+    # Transport can also be "sl4f" if SL4F is required by your test.
+    transport = "fuchsia-controller"
 }
 ```
 ### Test execution
@@ -140,20 +143,27 @@ python_mobly_test("my_test_target") {
 Once the Lacewing target has been defined, you can trigger the test to run
 locally via `fx test`.
 
-Currently, there's a framework dependency on `SL4F` to be present on the Fuchsia
-DUT which prevents Lacewing to work with `core` products. This constraint will
-be lifted upon Lacewing's integration with [Fuchsia Controller](https://cs.opensource.google/fuchsia/fuchsia/+/main:src/developer/ffx/lib/fuchsia-controller/).
-But for now you'll have to ensure that the DUT will have the `SL4F` server
-present.
-
-
 ```sh
-$ fx set core.qemu-x64 \
+# Step 1 - Configure build
+
+# 1.a - If Fuchsia-Controller transport.
+$ fx set workbench_eng.qemu-x64 \
+    --with-host //src/testing/end_to_end/examples/my_test_dir:my_test_target
+
+# 1.b - If SL4F transport.
+$ fx set workbench_eng.qemu-x64 \
+    --with-host //src/testing/end_to_end/examples/my_test_dir:my_test_target \
     --with //src/testing/sl4f \
     --with //src/sys/bin/start_sl4f \
-    --args 'core_realm_shards += [ "//src/testing/sl4f:sl4f_core_shard" ]' \
-    --with-host //src/testing/end_to_end/examples/my_test_dir:my_test_target
-$ fx test //src/testing/end_to_end/examples/my_test_dir:my_test_target --e2e --output
+    --args 'core_realm_shards += [ "//src/testing/sl4f:sl4f_core_shard" ]'
+
+# Step 2- Start the emulator and package server (in separate terminals)
+$ fx serve
+$ ffx emu stop ; ffx emu start -H --net tap
+
+# Step 3 - Run the test
+$ fx test //src/testing/end_to_end/examples/my_test_dir:my_test_target --e2e \
+    --output
 ```
 
 Congrats! You've just written and run your first Lacewing test!
