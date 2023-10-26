@@ -374,6 +374,7 @@
                 "fuchsia.boot.RootResource",
                 "fuchsia.boot.WriteOnlyLog",
                 "fuchsia.kernel.IoportResource",
+                "fuchsia.kernel.IrqResource",
                 "fuchsia.kernel.MexecResource",
                 "fuchsia.kernel.MmioResource",
                 "fuchsia.kernel.PowerResource",
