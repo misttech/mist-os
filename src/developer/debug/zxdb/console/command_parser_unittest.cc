@@ -269,6 +269,24 @@ TEST(CommandParser, OneParam) {
 
   // The whitespace at the end is not trimmed. This could possibly be changed in the future.
   EXPECT_EQ("x + 2 ", output.args()[0]);
+
+  err = ParseCommand("opendump path/has a/space/mini.dmp", &output);
+  EXPECT_FALSE(err.has_error());
+  EXPECT_EQ(Verb::kOpenDump, output.verb());
+
+  ASSERT_EQ(1u, output.args().size());
+
+  // Even unquoted, the path is consumed as a single string.
+  EXPECT_EQ("path/has a/space/mini.dmp", output.args()[0]);
+
+  err = ParseCommand("opendump \"path/has a/space/mini.dmp\"", &output);
+  EXPECT_FALSE(err.has_error());
+  EXPECT_EQ(Verb::kOpenDump, output.verb());
+
+  ASSERT_EQ(1u, output.args().size());
+
+  // A quoted path should continue to work regardless of the OneParam setting.
+  EXPECT_EQ("\"path/has a/space/mini.dmp\"", output.args()[0]);
 }
 
 TEST(CommandParser, Completions) {

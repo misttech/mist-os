@@ -89,8 +89,6 @@ void RunVerbOpendump(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context
     return cmd_context->ReportError(Err(ErrType::kInput, "Need path to open."));
   } else if (cmd.args().size() == 1) {
     path = cmd.args()[0];
-  } else {
-    return cmd_context->ReportError(Err(ErrType::kInput, "Too many arguments."));
   }
 
   cmd_context->GetConsoleContext()->session()->OpenMinidump(path, [cmd_context](const Err& err) {
@@ -104,8 +102,10 @@ void RunVerbOpendump(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context
 }  // namespace
 
 VerbRecord GetOpendumpVerbRecord() {
-  return VerbRecord(&RunVerbOpendump, &DoCompleteOpenDump, {"opendump"}, kOpenDumpShortHelp,
-                    kOpenDumpHelp, CommandGroup::kGeneral, SourceAffinity::kNone);
+  auto record = VerbRecord(&RunVerbOpendump, &DoCompleteOpenDump, {"opendump"}, kOpenDumpShortHelp,
+                           kOpenDumpHelp, CommandGroup::kGeneral, SourceAffinity::kNone);
+  record.param_type = VerbRecord::ParamType::kOneParam;
+  return record;
 }
 
 }  // namespace zxdb
