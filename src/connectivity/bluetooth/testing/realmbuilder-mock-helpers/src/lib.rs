@@ -5,9 +5,8 @@
 use {
     anyhow::Error,
     fdio,
-    fidl::endpoints::{create_proxy, DiscoverableProtocolMarker, ProtocolMarker, Proxy, ServerEnd},
+    fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker, Proxy},
     fidl_fuchsia_device::{NameProviderMarker, NameProviderRequestStream},
-    fidl_fuchsia_io as fio,
     fidl_fuchsia_stash::SecureStoreMarker,
     fuchsia_async as fasync,
     fuchsia_component::server::{ServiceFs, ServiceObj},
@@ -15,7 +14,7 @@ use {
     futures::{channel::mpsc, SinkExt, StreamExt, TryStream, TryStreamExt},
     std::sync::Arc,
     tracing::info,
-    vfs::{directory::entry::DirectoryEntry, execution_scope::ExecutionScope},
+    vfs::directory::{entry::DirectoryEntry, spawn_directory},
 };
 
 // #! Library for common utilities (mocks, definitions) for the manifest integration tests.
@@ -81,26 +80,13 @@ where
     Ok(())
 }
 
-/// Spawns a VFS handler for the provided `dir`.
-fn spawn_vfs(dir: Arc<dyn DirectoryEntry>) -> fio::DirectoryProxy {
-    let (client_end, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
-    let scope = ExecutionScope::new();
-    dir.open(
-        scope,
-        fio::OpenFlags::RIGHT_READABLE,
-        vfs::path::Path::dot(),
-        ServerEnd::new(server_end.into_channel()),
-    );
-    client_end
-}
-
 /// Sets up a mock dev/ directory with the provided `dev_directory` topology.
 pub async fn mock_dev(
     handles: LocalComponentHandles,
     dev_directory: Arc<dyn DirectoryEntry>,
 ) -> Result<(), Error> {
     let mut fs = ServiceFs::new();
-    let _: &mut ServiceFs<_> = fs.add_remote("dev", spawn_vfs(dev_directory));
+    let _ = fs.add_remote("dev", spawn_directory(dev_directory));
     let _ = fs.serve_connection(handles.outgoing_dir)?;
     fs.collect::<()>().await;
     Ok(())

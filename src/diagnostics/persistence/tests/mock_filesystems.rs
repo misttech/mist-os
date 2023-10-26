@@ -3,15 +3,17 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
-use fidl::endpoints::ServerEnd;
-use fidl_fuchsia_io::{self as fio, DirectoryMarker, DirectoryProxy};
+use fidl_fuchsia_io as fio;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::{ChildOptions, ChildRef, RealmBuilder};
 use futures::prelude::*;
 use std::fs;
-use std::sync::Arc;
-use vfs::test_utils::assertions::reexport::StreamExt;
-use vfs::{directory::entry::DirectoryEntry, file::vmo::read_only, pseudo_directory};
+use vfs::{
+    directory::{spawn_directory_with_options, DirectoryOptions},
+    file::vmo::read_only,
+    pseudo_directory,
+    test_utils::assertions::reexport::StreamExt,
+};
 
 pub(crate) async fn create_config_data(builder: &RealmBuilder) -> Result<ChildRef, Error> {
     let config_data_dir = pseudo_directory! {
@@ -26,7 +28,10 @@ pub(crate) async fn create_config_data(builder: &RealmBuilder) -> Result<ChildRe
         .add_local_child(
             "config-data-server",
             move |handles| {
-                let proxy = spawn_vfs(config_data_dir.clone());
+                let proxy = spawn_directory_with_options(
+                    config_data_dir.clone(),
+                    DirectoryOptions::new(fio::R_STAR_DIR | fio::W_STAR_DIR),
+                );
                 async move {
                     let mut fs = ServiceFs::new();
                     fs.add_remote("config", proxy);
@@ -49,19 +54,6 @@ pub(crate) fn setup_backing_directories() {
     fs::create_dir_all(path)
         .map_err(|err| tracing::warn!(%path, ?err, "Could not create directory"))
         .ok();
-}
-
-// Returns a `DirectoryProxy` that serves the directory entry `dir`.
-fn spawn_vfs(dir: Arc<dyn DirectoryEntry>) -> DirectoryProxy {
-    let (client_end, server_end) = fidl::endpoints::create_endpoints::<DirectoryMarker>();
-    let scope = vfs::execution_scope::ExecutionScope::new();
-    dir.open(
-        scope,
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-        vfs::path::Path::dot(),
-        ServerEnd::new(server_end.into_channel()),
-    );
-    client_end.into_proxy().unwrap()
 }
 
 pub(crate) async fn create_cache_server(builder: &RealmBuilder) -> Result<ChildRef, Error> {

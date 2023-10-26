@@ -597,11 +597,7 @@ mod legacy_tests {
         crate::{TestUpdatePackage, UpdatePackage},
         assert_matches::assert_matches,
         maplit::btreeset,
-        std::sync::Arc,
-        vfs::{
-            directory::entry::DirectoryEntry, execution_scope::ExecutionScope,
-            file::vmo::read_only, pseudo_directory,
-        },
+        vfs::{file::vmo::read_only, pseudo_directory},
     };
 
     #[test]
@@ -685,22 +681,9 @@ mod legacy_tests {
         );
     }
 
-    fn spawn_vfs(dir: Arc<vfs::directory::immutable::simple::Simple>) -> fio::DirectoryProxy {
-        let (proxy, proxy_server_end) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-        let scope = ExecutionScope::new();
-        dir.open(
-            scope,
-            fuchsia_fs::OpenFlags::RIGHT_READABLE,
-            vfs::path::Path::dot(),
-            fidl::endpoints::ServerEnd::new(proxy_server_end.into_channel()),
-        );
-        proxy
-    }
-
     #[fuchsia_async::run_singlethreaded(test)]
     async fn list_images_ignores_directories() {
-        let proxy = spawn_vfs(pseudo_directory! {
+        let proxy = vfs::directory::spawn_directory(pseudo_directory! {
             "ignore_directories" => pseudo_directory! {
                 "and_their_contents" => read_only(""),
             },
@@ -806,11 +789,8 @@ mod tests {
         assert_matches::assert_matches,
         maplit::btreemap,
         serde_json::json,
-        std::{fs::File, io::Write, sync::Arc},
-        vfs::{
-            directory::entry::DirectoryEntry, execution_scope::ExecutionScope,
-            file::vmo::read_only, pseudo_directory,
-        },
+        std::{fs::File, io::Write},
+        vfs::{file::vmo::read_only, pseudo_directory},
     };
 
     fn hash(n: u8) -> Hash {
@@ -1205,29 +1185,16 @@ mod tests {
         assert_eq!(without_zbi.verify(UpdateMode::ForceRecovery), Ok(()));
     }
 
-    fn spawn_vfs(dir: Arc<vfs::directory::immutable::simple::Simple>) -> fio::DirectoryProxy {
-        let (proxy, proxy_server_end) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-        let scope = ExecutionScope::new();
-        dir.open(
-            scope,
-            fuchsia_fs::OpenFlags::RIGHT_READABLE,
-            vfs::path::Path::dot(),
-            fidl::endpoints::ServerEnd::new(proxy_server_end.into_channel()),
-        );
-        proxy
-    }
-
     #[fuchsia_async::run_singlethreaded(test)]
     async fn image_packages_detects_missing_manifest() {
-        let proxy = spawn_vfs(pseudo_directory! {});
+        let proxy = vfs::directory::spawn_directory(pseudo_directory! {});
 
         assert_matches!(image_packages(&proxy).await, Err(ImagePackagesError::NotFound));
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn image_packages_detects_invalid_json() {
-        let proxy = spawn_vfs(pseudo_directory! {
+        let proxy = vfs::directory::spawn_directory(pseudo_directory! {
             "images.json" => read_only("not json!"),
         });
 
@@ -1236,7 +1203,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn image_packages_loads_valid_manifest() {
-        let proxy = spawn_vfs(pseudo_directory! {
+        let proxy = vfs::directory::spawn_directory(pseudo_directory! {
             "images.json" => read_only(r#"{
 "version": "1",
 "contents": { "partitions" : [], "firmware" : [] }

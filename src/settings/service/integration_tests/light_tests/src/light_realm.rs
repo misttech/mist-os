@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
-use fidl::endpoints::{create_proxy, DiscoverableProtocolMarker, ServerEnd};
+use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_hardware_light::{
     Capability, Info as HardwareInfo, LightError, LightRequest, LightRequestStream, Rgb,
 };
@@ -25,9 +25,10 @@ use futures::{FutureExt, StreamExt, TryStreamExt};
 use std::collections::HashMap;
 use std::sync::Arc;
 use utils;
-use vfs::directory::entry::DirectoryEntry;
-use vfs::execution_scope::ExecutionScope;
-use vfs::{pseudo_directory, service};
+use vfs::{
+    directory::{spawn_directory_with_options, DirectoryOptions},
+    pseudo_directory, service,
+};
 
 #[derive(Clone, Debug)]
 pub struct HardwareLight {
@@ -51,7 +52,7 @@ impl LightRealm {
         hardware_lights: impl Into<Option<Vec<HardwareLight>>>,
         listener_sender: impl Into<Option<Sender<MediaButtonsListenerProxy>>>,
     ) -> Result<RealmInstance, Error> {
-        let hardware_lights = hardware_lights.into().unwrap_or_else(|| vec![]);
+        let hardware_lights = hardware_lights.into().unwrap_or_default();
         let builder = RealmBuilder::new().await?;
         // Add setui_service as child of the realm builder.
         let setui_service =
@@ -59,13 +60,7 @@ impl LightRealm {
         let hardware_light = builder
             .add_local_child(
                 "dev-light",
-                move |handles| {
-                    Self::mock_dev(
-                        handles,
-                        Self::mock_light_dev_with_light_devices(hardware_lights.clone()),
-                    )
-                    .boxed()
-                },
+                move |handles| Box::pin(Self::serve_dev(handles, hardware_lights.clone())),
                 ChildOptions::new().eager(),
             )
             .await?;
@@ -284,42 +279,29 @@ impl LightRealm {
         .detach();
     }
 
-    async fn mock_dev(
+    async fn serve_dev(
         handles: LocalComponentHandles,
-        dev_directory: Arc<dyn DirectoryEntry>,
+        hardware_lights: Vec<HardwareLight>,
     ) -> Result<(), Error> {
-        let mut fs = ServiceFs::new();
-        let _: &mut ServiceFs<_> = fs.add_remote("dev", Self::spawn_vfs(dev_directory));
-        let _ = fs.serve_connection(handles.outgoing_dir)?;
-        fs.collect::<()>().await;
-        Ok(())
-    }
-
-    /// Spawns a VFS handler for the provided `dir`.
-    fn spawn_vfs(dir: Arc<dyn DirectoryEntry>) -> fio::DirectoryProxy {
-        let (client_end, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
-        let scope = ExecutionScope::new();
-        dir.open(
-            scope,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            vfs::path::Path::dot(),
-            ServerEnd::new(server_end.into_channel()),
-        );
-        client_end
-    }
-
-    fn mock_light_dev_with_light_devices(handles: Vec<HardwareLight>) -> Arc<dyn DirectoryEntry> {
-        pseudo_directory! {
+        let dir = pseudo_directory! {
             "class" => pseudo_directory! {
                 "light" => pseudo_directory! {
                     "000" => service::host(
                         move |stream: LightRequestStream| {
-                            Self::hardware_light_service(stream, handles.clone())
+                            Self::hardware_light_service(stream, hardware_lights.clone())
                         }
                     ),
                 }
             }
-        }
+        };
+
+        let dir_options = DirectoryOptions::new(fio::R_STAR_DIR | fio::W_STAR_DIR);
+
+        let mut fs = ServiceFs::new();
+        let _ = fs.add_remote("dev", spawn_directory_with_options(dir, dir_options));
+        let _ = fs.serve_connection(handles.outgoing_dir).expect("failed to serve dev");
+        fs.collect::<()>().await;
+        Ok(())
     }
 }
 

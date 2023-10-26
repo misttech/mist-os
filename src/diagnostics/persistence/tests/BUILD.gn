@@ -16,7 +16,6 @@ rustc_test("integration-bin") {
     "//src/diagnostics/persistence/fidl:persist_rust",
     "//src/diagnostics/sampler/tests/fidl:fuchsia.samplertestcontroller_rust",
     "//src/lib/diagnostics/reader/rust",
-    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-component-test",
