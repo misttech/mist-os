@@ -367,8 +367,9 @@ class FFX:
     def run(
         self,
         cmd: list[str],
-        timeout: float = _TIMEOUTS["FFX_CLI"],
+        timeout: float | None = _TIMEOUTS["FFX_CLI"],
         exceptions_to_skip: Iterable[Type[Exception]] | None = None,
+        capture_output: bool = True,
     ) -> str:
         """Executes and returns the output of `ffx -t {target} {cmd}`.
 
@@ -376,9 +377,13 @@ class FFX:
             cmd: FFX command to run.
             timeout: Timeout to wait for the ffx command to return.
             exceptions_to_skip: Any non fatal exceptions to be ignored.
+            capture_output: When True, the stdout/err from the command will be captured and
+                returned. When False, the output of the command will be streamed to stdout/err
+                accordingly and it won't be returned. Defaults to True.
 
         Returns:
-            Output of `ffx -t {target} {cmd}`.
+            Output of `ffx -t {target} {cmd}` when capture_output is set to True, otherwise an
+            empty string.
 
         Raises:
             subprocess.TimeoutExpired: In case of timeout
@@ -389,12 +394,15 @@ class FFX:
         ffx_cmd: list[str] = FFX._generate_ffx_cmd(cmd=cmd, target=self._target)
         try:
             _LOGGER.debug("Executing command `%s`", " ".join(ffx_cmd))
-            output: str = subprocess.check_output(
-                ffx_cmd, stderr=subprocess.STDOUT, timeout=timeout
-            ).decode()
-            _LOGGER.debug("`%s` returned: %s", " ".join(ffx_cmd), output)
-
-            return output
+            if capture_output:
+                output: str = subprocess.check_output(
+                    ffx_cmd, stderr=subprocess.STDOUT, timeout=timeout
+                ).decode()
+                _LOGGER.debug("`%s` returned: %s", " ".join(ffx_cmd), output)
+                return output
+            _LOGGER.debug("`%s` finished executing", " ".join(ffx_cmd))
+            subprocess.check_call(ffx_cmd, timeout=timeout)
+            return ""
         except Exception as err:  # pylint: disable=broad-except
             # Catching all exceptions into this broad one because of
             # `exceptions_to_skip` argument

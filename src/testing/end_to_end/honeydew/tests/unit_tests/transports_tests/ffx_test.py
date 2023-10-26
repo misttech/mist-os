@@ -351,6 +351,43 @@ class FfxCliTests(unittest.TestCase):
 
     @mock.patch.object(
         ffx.subprocess,
+        "check_call",
+        return_value=None,
+        autospec=True,
+    )
+    @mock.patch.object(
+        ffx.subprocess,
+        "check_output",
+        return_value=None,
+        autospec=True,
+    )
+    def test_ffx_run_no_capture_output(
+        self, mock_subprocess_check_output, mock_subprocess_check_call
+    ) -> None:
+        """Test case for ffx.run()"""
+        self.assertEqual(
+            self.ffx_obj.run(
+                cmd=["test", "run", "my-test"], capture_output=False
+            ),
+            "",
+        )
+        mock_subprocess_check_output.assert_not_called()
+        mock_subprocess_check_call.assert_called_with(
+            [
+                "ffx",
+                "-t",
+                "fuchsia-emulator",
+                "--config",
+                "{}",
+                "test",
+                "run",
+                "my-test",
+            ],
+            timeout=10,
+        )
+
+    @mock.patch.object(
+        ffx.subprocess,
         "check_output",
         side_effect=subprocess.TimeoutExpired(
             timeout=10, cmd="ffx -t fuchsia-emulator target show"
