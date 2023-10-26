@@ -56,15 +56,12 @@ pub async fn create_client(
                 unreachable!("unexpected event: {:?}", e);
             }
         };
-        let (port, port_server) =
-            fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_network::PortMarker>()
-                .expect("failed to create proxy");
         let netdev_port = port_id.try_into().expect("bad port id");
-        client.connect_port_server_end(netdev_port, port_server).expect("failed to connect port");
+        let port_proxy = client.connect_port(netdev_port).expect("failed to connect port");
         let (mac_addressing, mac_addressing_server) =
             fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_network::MacAddressingMarker>()
                 .expect("failed to create proxy");
-        port.get_mac(mac_addressing_server).expect("failed to get mac addressing");
+        port_proxy.get_mac(mac_addressing_server).expect("failed to get mac addressing");
         let addr = mac_addressing.get_unicast_address().await.expect("failed to get address");
 
         (addr.octets == mac.octets).then(move || (client, netdev_port))
