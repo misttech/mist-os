@@ -1008,7 +1008,8 @@ TEST(VersioningTests, BadAddedEqualsRemoved) {
   TestLibrary library;
   library.AddFile("bad/fi-0154-a.test.fidl");
   library.SelectVersion("test", "HEAD");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidAvailabilityOrder);
+  library.ExpectFail(fidl::ErrInvalidAvailabilityOrder, "added < removed");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(VersioningTests, BadAddedGreaterThanRemoved) {
@@ -1017,7 +1018,8 @@ TEST(VersioningTests, BadAddedGreaterThanRemoved) {
 library example;
 )FIDL");
   library.SelectVersion("example", "HEAD");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidAvailabilityOrder);
+  library.ExpectFail(fidl::ErrInvalidAvailabilityOrder, "added < removed");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(VersioningTests, GoodAddedEqualsDeprecated) {
@@ -1035,14 +1037,16 @@ TEST(VersioningTests, BadAddedGreaterThanDeprecated) {
 library example;
 )FIDL");
   library.SelectVersion("example", "HEAD");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidAvailabilityOrder);
+  library.ExpectFail(fidl::ErrInvalidAvailabilityOrder, "added <= deprecated");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(VersioningTests, BadDeprecatedEqualsRemoved) {
   TestLibrary library;
   library.AddFile("bad/fi-0154-b.test.fidl");
   library.SelectVersion("test", "HEAD");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidAvailabilityOrder);
+  library.ExpectFail(fidl::ErrInvalidAvailabilityOrder, "added <= deprecated < removed");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(VersioningTests, BadDeprecatedGreaterThanRemoved) {
@@ -1051,7 +1055,8 @@ TEST(VersioningTests, BadDeprecatedGreaterThanRemoved) {
 library example;
 )FIDL");
   library.SelectVersion("example", "HEAD");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidAvailabilityOrder);
+  library.ExpectFail(fidl::ErrInvalidAvailabilityOrder, "added <= deprecated < removed");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(VersioningTests, BadLegacyTrueNotRemoved) {

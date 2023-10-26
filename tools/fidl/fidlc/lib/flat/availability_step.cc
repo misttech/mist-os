@@ -169,7 +169,17 @@ void AvailabilityStep::CompileAvailabilityFromAttribute(Element* element, Attrib
     }
   }
   if (!element->availability.Init(init_args)) {
-    Fail(ErrInvalidAvailabilityOrder, attribute->span);
+    std::string msg;
+    if (added) {
+      msg.append("added");
+    }
+    if (deprecated) {
+      msg.append(msg.empty() ? "deprecated" : " <= deprecated");
+    }
+    if (removed) {
+      msg.append(" < removed");
+    }
+    Fail(ErrInvalidAvailabilityOrder, attribute->span, msg);
     // Return early to avoid confusing error messages about inheritance
     // conflicts for an availability that isn't even self-consistent.
     return;
