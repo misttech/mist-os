@@ -55,7 +55,7 @@ zx_status_t pci_get_bar(kpci_device* device, uint32_t bar_id, pci_bar_t* out_res
     out_res->type = bar.type;
     if (out_res->type == PCI_BAR_TYPE_IO) {
       char name[] = "kPCI IO";
-      st = zx_resource_create(get_root_resource(device->zxdev), ZX_RSRC_KIND_IOPORT, bar.addr,
+      st = zx_resource_create(get_ioport_resource(device->zxdev), ZX_RSRC_KIND_IOPORT, bar.addr,
                               bar.size, name, sizeof(name), &handle);
       out_res->result.io.address = bar.addr;
       out_res->result.io.resource = handle;
