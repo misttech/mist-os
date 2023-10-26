@@ -193,7 +193,7 @@ async fn inspect_devices(name: &str) {
                 Loopback: false,
                 IpAddresses: vec!["192.168.0.1".to_string(), "fe80::ff:fe00:1".to_string()],
                 NetworkDevice: {
-                    MacAddress: "2:0:0:0:0:1",
+                    MacAddress: "02:00:00:00:00:01",
                     PhyUp: true,
                 },
             }
