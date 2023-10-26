@@ -33,8 +33,5 @@ extern "C" __EXPORT int __kernel_clock_getres(int clock_id, struct timespec* tp)
 }
 
 extern "C" __EXPORT int __kernel_gettimeofday(struct timeval* tv, struct timezone* tz) {
-  int ret =
-      syscall(__NR_gettimeofday, reinterpret_cast<intptr_t>(tv), reinterpret_cast<intptr_t>(tz), 0);
-
-  return ret;
+  return gettimeofday_impl(tv, tz);
 }

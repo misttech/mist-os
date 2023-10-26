@@ -15,4 +15,7 @@ int clock_gettime_impl(int clock_id, timespec* tp);
 // An implementation of the clock_getres syscall.
 int clock_getres_impl(int clock_id, timespec* tp);
 
+// An implementation of the gettimeofday syscall.
+int gettimeofday_impl(timeval* tv, struct timezone* tz);
+
 #endif  // SRC_STARNIX_KERNEL_VDSO_VDSO_COMMON_H_

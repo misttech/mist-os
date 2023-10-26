@@ -6,7 +6,6 @@
 #include <sys/time.h>
 #include <zircon/compiler.h>
 
-#include "vdso-calculate-time.h"
 #include "vdso-common.h"
 #include "vdso-platform.h"
 
@@ -45,26 +44,7 @@ extern "C" __EXPORT __WEAK_ALIAS("__vdso_getcpu") int getcpu(unsigned int* cpu,
                                                              unsigned int* cache);
 
 extern "C" __EXPORT int __vdso_gettimeofday(struct timeval* tv, struct timezone* tz) {
-  if (tz != nullptr) {
-    int ret = syscall(__NR_gettimeofday, reinterpret_cast<intptr_t>(tv),
-                      reinterpret_cast<intptr_t>(tz), 0);
-    return ret;
-  }
-  if (tv == nullptr) {
-    return 0;
-  }
-  int64_t utc_nsec = calculate_utc_time_nsec();
-  if (utc_nsec != kUtcInvalid) {
-    tv->tv_sec = utc_nsec / kNanosecondsPerSecond;
-    tv->tv_usec = (utc_nsec % kNanosecondsPerSecond) / 1'000;
-    return 0;
-  }
-  // The syscall is used instead of endlessly retrying to acquire the seqlock. This gives the
-  // writer thread of the seqlock a chance to run, even if it happens to have a lower priority
-  // than the current thread.
-  int ret =
-      syscall(__NR_gettimeofday, reinterpret_cast<intptr_t>(tv), reinterpret_cast<intptr_t>(tz), 0);
-  return ret;
+  return gettimeofday_impl(tv, tz);
 }
 
 extern "C" __EXPORT __WEAK_ALIAS("__vdso_gettimeofday") int gettimeofday(struct timeval* tv,
