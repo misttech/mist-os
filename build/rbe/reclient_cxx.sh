@@ -174,7 +174,7 @@ fi
 if [[ "$use_py_wrapper" == 1 ]]
 then
   readonly python="$exec_root_rel"/prebuilt/third_party/python3/"${HOST_PLATFORM}"/bin/python3
-  exec "$python" -S "$script_dir"/cxx_remote_wrapper.py "${rewrapper_opts[@]}" -- "${local_compile_cmd[@]}"
+  exec "$python" -S "$script_dir"/cxx_remote_wrapper.py "${rewrapper_opts[@]+"${rewrapper_opts[@]}"}" -- "${local_compile_cmd[@]}"
   # no return
 fi
 
@@ -224,6 +224,12 @@ do
     *.S) local_only=1 ;;  # b/220030106: no plan to support asm preprocessing.
   esac
 done
+
+if [[ "$HOST_PLATFORM" != "linux-x64" ]]
+then local_only=1
+  # remote compiling with re-client/RBE is supported
+  # for only linux-x64 at this time.
+fi
 
 if [[ "$local_only" == 1 ]]
 then
@@ -369,11 +375,13 @@ remote_cmd_prefix+=(
   --labels=type=compile,compiler=clang,lang=cpp
   --canonicalize_working_dir=true
 
-  "${remote_input_files_opt[@]}"
-  "${remote_output_files_opt[@]}"
-  "${remote_output_dirs_opt[@]}"
+  # Need to expand possible empty arrays as "${arr[@]+"${arr[@]}"}"
+  # https://stackoverflow.com/questions/7577052/bash-empty-array-expansion-with-set-u
+  "${remote_input_files_opt[@]+"${remote_input_files_opt[@]}"}"
+  "${remote_output_files_opt[@]+"${remote_output_files_opt[@]}"}"
+  "${remote_output_dirs_opt[@]+"${remote_output_dirs_opt[@]}"}"
 
-  "${rewrapper_opts[@]}"
+  "${rewrapper_opts[@]+"${rewrapper_opts[@]}"}"
   --
 )
 
