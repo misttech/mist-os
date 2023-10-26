@@ -20,6 +20,12 @@ use {
 #[cfg(target_os = "fuchsia")]
 use fuchsia_zircon as zx;
 
+pub type AliasedPlainHandle = fidl::Handle;
+
+pub type AliasedRightsHandle = fidl::Vmo;
+
+pub type AliasedSubtypeHandle = fidl::Vmo;
+
 #[derive(Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Handles {
     pub plain_handle: fidl::Handle,

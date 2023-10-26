@@ -237,7 +237,18 @@ IDENTIFIERS = [
     Identifier("static_assert"),
     Identifier("static_cast"),
     Identifier("stream"),
-    Identifier("string", FIDL_PRIMITIVE),
+    Identifier(
+        "string",
+        FIDL_PRIMITIVE
+        + [
+            # TODO(fxbug.dev/66767): Need to escape "String" in Rust.
+            Deny(
+                bindings=["rust"],
+                styles=["upper", "camel"],
+                uses=["using"],
+            )
+        ],
+    ),
     Identifier("struct", RUST_KEYWORD),
     Identifier("stub"),
     Identifier("stderr"),

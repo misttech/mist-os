@@ -16,6 +16,7 @@ if (is_host) {
     source_dir = "codegen"
     deps = [ "//tools/fidl/lib/fidlgen" ]
     sources = [
+      "alias.tmpl",
       "bits.tmpl",
       "codegen.go",
       "const.tmpl",

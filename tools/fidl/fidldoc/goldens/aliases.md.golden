@@ -9,7 +9,7 @@
 ## **STRUCTS**
 
 ### ExampleOfUseOfAliases [resource](/fuchsia-src/reference/fidl/language/language.md#value-vs-resource){:.fidl-attribute} {#ExampleOfUseOfAliases data-text="ExampleOfUseOfAliases"}
-*Defined in [test.aliases/example.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/aliases/example.test.fidl;l=25)*
+*Defined in [test.aliases/example.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/aliases/example.test.fidl;l=26)*
 
 <table>
     <tr><th>Field</th><th>Type</th><th>Description</th><th>Default</th></tr>
@@ -110,6 +110,12 @@ Type: <code>uint32</code>
 
 <table>
     <tr><th>Name</th><th>Value</th><th>Description</th></tr>
+        <tr id="ReferenceMe">
+            <td><a href="https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/aliases/example.test.fidl;l=24">ReferenceMe</a></td>
+            <td>
+                <code>test.someotherlibrary/ReferenceMe</code></td>
+            <td></td>
+        </tr>
         <tr id="alias_of_channel">
             <td><a href="https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/aliases/example.test.fidl;l=23">alias_of_channel</a></td>
             <td>

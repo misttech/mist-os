@@ -20,6 +20,18 @@ use {
 #[cfg(target_os = "fuchsia")]
 use fuchsia_zircon as zx;
 
+pub type ReferenceMe = fidl_test_someotherlibrary::ReferenceMe;
+
+pub type AliasOfChannel = fidl::Channel;
+
+pub type Channel = fidl::Channel;
+
+pub type U32 = u32;
+
+pub type VecOfStrings = Vec<String>;
+
+pub type VecOfStringsAtMost5 = Vec<String>;
+
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(u32)]
 pub enum ObjType {

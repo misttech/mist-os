@@ -97,8 +97,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/aliases/example.test.fidl",
         "data": "ExampleOfUseOfAliases",
-        "start_offset": 568,
-        "end_offset": 589
+        "start_offset": 623,
+        "end_offset": 644
       },
       "members": [
         {
@@ -107,8 +107,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/aliases/example.test.fidl",
             "data": "field_of_u32",
-            "start_offset": 614,
-            "end_offset": 626
+            "start_offset": 669,
+            "end_offset": 681
           },
           "type": {
             "kind": "primitive"
@@ -120,8 +120,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/aliases/example.test.fidl",
             "data": "field_of_vec_of_strings",
-            "start_offset": 636,
-            "end_offset": 659
+            "start_offset": 691,
+            "end_offset": 714
           },
           "type": {
             "kind": "vector"
@@ -133,8 +133,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/aliases/example.test.fidl",
             "data": "field_of_vec_of_strings_at_most_nine",
-            "start_offset": 680,
-            "end_offset": 716
+            "start_offset": 735,
+            "end_offset": 771
           },
           "type": {
             "kind": "vector"
@@ -146,8 +146,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/aliases/example.test.fidl",
             "data": "field_of_vec_of_strings_at_most_5",
-            "start_offset": 739,
-            "end_offset": 772
+            "start_offset": 794,
+            "end_offset": 827
           },
           "type": {
             "kind": "vector"
@@ -159,8 +159,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/aliases/example.test.fidl",
             "data": "field_of_vec_of_ref_me_at_most_5",
-            "start_offset": 803,
-            "end_offset": 835
+            "start_offset": 858,
+            "end_offset": 890
           },
           "type": {
             "kind": "vector"
@@ -172,8 +172,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/aliases/example.test.fidl",
             "data": "field_of_channel",
-            "start_offset": 885,
-            "end_offset": 901
+            "start_offset": 918,
+            "end_offset": 934
           },
           "type": {
             "kind": "handle"
@@ -185,8 +185,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/aliases/example.test.fidl",
             "data": "field_of_client_end",
-            "start_offset": 915,
-            "end_offset": 934
+            "start_offset": 948,
+            "end_offset": 967
           },
           "type": {
             "kind": "handle"
@@ -198,8 +198,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/aliases/example.test.fidl",
             "data": "field_of_nullable_client_end",
-            "start_offset": 957,
-            "end_offset": 985
+            "start_offset": 990,
+            "end_offset": 1018
           },
           "type": {
             "kind": "handle"

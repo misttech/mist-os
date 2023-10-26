@@ -21,13 +21,14 @@ alias vec_of_strings = vector<string>;
 alias vec_of_strings_at_most_5 = vector<string>:5;
 alias channel = handle:CHANNEL;
 alias alias_of_channel = channel;
+alias ReferenceMe = test.someotherlibrary.ReferenceMe;
 
 type ExampleOfUseOfAliases = resource struct {
     field_of_u32 u32;
     field_of_vec_of_strings vec_of_strings;
     field_of_vec_of_strings_at_most_nine vec_of_strings:9;
     field_of_vec_of_strings_at_most_5 vec_of_strings_at_most_5;
-    field_of_vec_of_ref_me_at_most_5 vector<test.someotherlibrary.ReferenceMe>:5;
+    field_of_vec_of_ref_me_at_most_5 vector<ReferenceMe>:5;
     field_of_channel channel;
     field_of_client_end alias_of_channel;
     field_of_nullable_client_end alias_of_channel:optional;

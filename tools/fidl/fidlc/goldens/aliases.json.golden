@@ -136,7 +136,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/aliases/example.test.fidl",
-        "line": 25,
+        "line": 26,
         "column": 6,
         "length": 21
       },
@@ -163,7 +163,7 @@
           "name": "field_of_u32",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/aliases/example.test.fidl",
-            "line": 26,
+            "line": 27,
             "column": 5,
             "length": 12
           },
@@ -207,7 +207,7 @@
           "name": "field_of_vec_of_strings",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/aliases/example.test.fidl",
-            "line": 27,
+            "line": 28,
             "column": 5,
             "length": 23
           },
@@ -262,7 +262,7 @@
           "name": "field_of_vec_of_strings_at_most_nine",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/aliases/example.test.fidl",
-            "line": 28,
+            "line": 29,
             "column": 5,
             "length": 36
           },
@@ -307,7 +307,7 @@
           "name": "field_of_vec_of_strings_at_most_5",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/aliases/example.test.fidl",
-            "line": 29,
+            "line": 30,
             "column": 5,
             "length": 33
           },
@@ -333,6 +333,11 @@
                 "has_flexible_envelope": false
               }
             },
+            "experimental_maybe_from_alias": {
+              "name": "test.aliases/ReferenceMe",
+              "args": [],
+              "nullable": false
+            },
             "maybe_element_count": 5,
             "nullable": false,
             "type_shape_v2": {
@@ -348,7 +353,7 @@
           "name": "field_of_vec_of_ref_me_at_most_5",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/aliases/example.test.fidl",
-            "line": 30,
+            "line": 31,
             "column": 5,
             "length": 32
           },
@@ -383,7 +388,7 @@
           "name": "field_of_channel",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/aliases/example.test.fidl",
-            "line": 31,
+            "line": 32,
             "column": 5,
             "length": 16
           },
@@ -418,7 +423,7 @@
           "name": "field_of_client_end",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/aliases/example.test.fidl",
-            "line": 32,
+            "line": 33,
             "column": 5,
             "length": 19
           },
@@ -453,7 +458,7 @@
           "name": "field_of_nullable_client_end",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/aliases/example.test.fidl",
-            "line": 33,
+            "line": 34,
             "column": 5,
             "length": 28
           },
@@ -480,6 +485,34 @@
   "table_declarations": [],
   "union_declarations": [],
   "alias_declarations": [
+    {
+      "name": "test.aliases/ReferenceMe",
+      "location": {
+        "filename": "../../tools/fidl/fidlc/testdata/aliases/example.test.fidl",
+        "line": 24,
+        "column": 7,
+        "length": 11
+      },
+      "partial_type_ctor": {
+        "name": "test.someotherlibrary/ReferenceMe",
+        "args": [],
+        "nullable": false
+      },
+      "type": {
+        "kind": "identifier",
+        "identifier": "test.someotherlibrary/ReferenceMe",
+        "nullable": false,
+        "type_shape_v2": {
+          "inline_size": 1,
+          "alignment": 1,
+          "depth": 0,
+          "max_handles": 0,
+          "max_out_of_line": 0,
+          "has_padding": false,
+          "has_flexible_envelope": false
+        }
+      }
+    },
     {
       "name": "test.aliases/alias_of_channel",
       "location": {
@@ -687,12 +720,14 @@
     "test.aliases/handle",
     "test.aliases/channel",
     "test.aliases/alias_of_channel",
+    "test.aliases/ReferenceMe",
     "test.aliases/ExampleOfUseOfAliases"
   ],
   "declarations": {
     "test.aliases/obj_type": "enum",
     "test.aliases/handle": "experimental_resource",
     "test.aliases/ExampleOfUseOfAliases": "struct",
+    "test.aliases/ReferenceMe": "alias",
     "test.aliases/alias_of_channel": "alias",
     "test.aliases/channel": "alias",
     "test.aliases/u32": "alias",

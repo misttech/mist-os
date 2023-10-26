@@ -6,8 +6,6 @@ library fuchsia.factory.lowpan;
 using fuchsia.lowpan;
 using zx;
 
-alias InterfaceName = fuchsia.lowpan.InterfaceName;
-
 /// Protocol for sending factory commands to a LoWPAN device.
 ///
 /// Not to be confused with `FactoryDriver`.
@@ -49,7 +47,7 @@ closed protocol FactoryDevice {
 closed protocol FactoryLookup {
     /// Connects the the associated `FactoryDevice` API for the given LoWPAN interface name.
     strict Lookup(resource struct {
-        name InterfaceName;
+        name fuchsia.lowpan.InterfaceName;
         device_factory server_end:FactoryDevice;
     });
 };
@@ -79,7 +77,7 @@ closed protocol FactoryRegister {
     /// The provided `FactoryDriver` will be used to connect requests made via
     /// `FactoryLookup.Lookup()` for `FactoryDevice`.
     strict Register(resource struct {
-        name InterfaceName;
+        name fuchsia.lowpan.InterfaceName;
         driver client_end:FactoryDriver;
     });
 };

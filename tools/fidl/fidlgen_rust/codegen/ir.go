@@ -40,6 +40,12 @@ type Type struct {
 	Param string
 }
 
+type Alias struct {
+	fidlgen.Alias
+	Name string
+	Type Type
+}
+
 type Bits struct {
 	fidlgen.Bits
 	Name           string
@@ -266,6 +272,7 @@ type ServiceMember struct {
 type Root struct {
 	Experiments  fidlgen.Experiments
 	ExternCrates []string
+	Aliases      []Alias
 	Bits         []Bits
 	Consts       []Const
 	Enums        []Enum
@@ -1036,6 +1043,14 @@ func convertMutRefOwnedToEncodeExpr(v string, t Type) string {
 		}
 	default:
 		panic(fmt.Sprintf("unknown type kind: %v", t.Kind))
+	}
+}
+
+func (c *compiler) compileAlias(val fidlgen.Alias) Alias {
+	return Alias{
+		Alias: val,
+		Name:  c.compileDeclIdentifier(val.Name),
+		Type:  c.compileType(val.Type),
 	}
 }
 
@@ -1844,6 +1859,10 @@ func Compile(r fidlgen.Root) Root {
 
 	for _, s := range r.ExternalStructs {
 		c.structs[s.Name] = s
+	}
+
+	for _, v := range r.Aliases {
+		root.Aliases = append(root.Aliases, c.compileAlias(v))
 	}
 
 	for _, v := range r.Bits {

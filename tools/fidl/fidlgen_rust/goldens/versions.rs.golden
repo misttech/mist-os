@@ -20,6 +20,8 @@ use {
 #[cfg(target_os = "fuchsia")]
 use fuchsia_zircon as zx;
 
+pub type Alias = String;
+
 pub const ADDED_AT_HEAD: bool = true;
 
 pub const CONST: u32 = 0;
