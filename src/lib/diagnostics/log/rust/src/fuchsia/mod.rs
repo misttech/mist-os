@@ -7,7 +7,7 @@ use fidl_fuchsia_logger::{LogSinkMarker, LogSinkProxy};
 use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_zircon::{self as zx};
-use std::{collections::HashSet, fmt::Debug};
+use std::{cell::Cell, collections::HashSet, fmt::Debug, ops::Deref, sync::OnceLock};
 use thiserror::Error;
 use tracing::{
     span::{Attributes, Id, Record},
@@ -18,7 +18,6 @@ use tracing_core::span::Current;
 use tracing_subscriber::{layer::Layered, prelude::*, registry::Registry};
 mod filter;
 mod sink;
-use once_cell::sync::Lazy;
 
 use filter::InterestFilter;
 use sink::{Sink, SinkConfig};
@@ -249,6 +248,35 @@ pub fn initialize_sync(opts: PublishOptions<'_>) -> impl Drop {
     }
 
     AbortAndJoinOnDrop(recv.recv().map_or(None, |value| Some(value)), Some(bg_thread))
+}
+
+/// This custom Lazy implementation can be replaced by LazyLock once that is stabilized:
+/// https://github.com/rust-lang/rust/issues/109736
+struct Lazy<T, F> {
+    cell: OnceLock<T>,
+    init: Cell<Option<F>>,
+}
+
+// SAFETY: We never create a `&F` from a `&Lazy<T, F>` so it is fine to not impl `Sync`
+// for `F`. We do create a `&mut Option<F>` in `deref`, but that is properly synchronized
+// under `get_or_init`, so is safe.
+unsafe impl<T, F: Send> Sync for Lazy<T, F> where OnceLock<T>: Sync {}
+
+impl<T, F: FnOnce() -> T> Lazy<T, F> {
+    fn new(f: F) -> Self {
+        Self { cell: OnceLock::new(), init: Cell::new(Some(f)) }
+    }
+}
+
+impl<T, F: FnOnce() -> T> Deref for Lazy<T, F> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        self.cell.get_or_init(|| match self.init.take() {
+            Some(f) => f(),
+            None => panic!("Lazy poisoned"),
+        })
+    }
 }
 
 /// A `Publisher` acts as broker, implementing [`tracing::Subscriber`] to receive diagnostic
