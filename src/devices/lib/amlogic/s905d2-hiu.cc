@@ -44,9 +44,9 @@ static inline uint32_t hiu_get_pll_offs(aml_pll_dev_t* pll_dev) {
   return 0;
 }
 
-zx_status_t s905d2_hiu_init(zx_handle_t root_resource, fdf::MmioBuffer* device) {
+zx_status_t s905d2_hiu_init(zx_handle_t mmio_resource, fdf::MmioBuffer* device) {
   zx::vmo vmo;
-  zx_status_t status = zx::vmo::create_physical(zx::resource(root_resource), S905D2_HIU_BASE,
+  zx_status_t status = zx::vmo::create_physical(zx::resource(mmio_resource), S905D2_HIU_BASE,
                                                 S905D2_HIU_LENGTH, &vmo);
   if (status != ZX_OK) {
     zxlogf(ERROR, "failed to create VMO: %s", zx_status_get_string(status));
