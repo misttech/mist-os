@@ -52,6 +52,11 @@ Lacewing:
     end-to-end input latency, measured by tracing flow events, for minimal
     Scenic clients (`simplest-app-flatland-session`).
 
+As well as the following examples:
+
+*   `perf_publish_example` - Simple example test that publishes a performance
+    metric.
+
 You can view the test results from CI builds in [Chromeperf][chromeperf].
 
 <!-- Reference links -->

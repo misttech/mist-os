@@ -1,0 +1,20 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/python/python_library.gni")
+
+python_library("perf_publish") {
+  testonly = true
+  library_name = "perf_publish"
+  sources = [
+    "__init__.py",
+    "metrics_allowlist.py",
+    "publish.py",
+  ]
+}
+
+group("tests") {
+  testonly = true
+  public_deps = [ "tests" ]
+}
