@@ -286,6 +286,15 @@ board_input_bundle("main_bundle") {
       driver_components = [ "meta/wlanphy.cm" ]
     },
   ]
+  kernel_cmdline = [
+    # Prefer using the built-in NIC to the CDC-ether interface.
+    # TODO(https://fxbug.dev/117539): Update topopath when dwmac is off
+    # netdevice migration.
+    "netsvc.interface=/dwmac/dwmac/Designware-MAC/netdevice-migration/network-device",
+
+    # Enable the Debug Access Port (DAP) for improved lockup/crash diagnostics.
+    "kernel.arm64.debug.dap-rom-soc=amlogic-a311d",
+  ]
 }
 
 board_input_bundle("board_driver") {

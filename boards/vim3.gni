@@ -27,7 +27,6 @@ bazel_product_bundle_board = "vim3"
 # Configuration items that need to be added to assembly
 
 _common_bootfs_deps = [
-  "//boards/kernel_cmdline:vim3",
   "//src/power/power-manager:vim3_config",
   "//src/power/power-manager/thermal_config:vim3",
 ]
