@@ -98,28 +98,31 @@ pub(super) async fn serve_controller(
                     });
                     responder.send(result)
                 }
-                ControllerRequest::RemoveEntry { interface: _, neighbor: _, responder: _ } => {
-                    unimplemented!(
+                ControllerRequest::RemoveEntry { interface: _, neighbor: _, responder } => {
+                    warn!(
                         "TODO(https://fxbug.dev/124960): \
                             Implement fuchsia.net.neighbor/Controller.RemoveEntry"
                     );
+                    responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))
                 }
-                ControllerRequest::ClearEntries { interface: _, ip_version: _, responder: _ } => {
-                    unimplemented!(
+                ControllerRequest::ClearEntries { interface: _, ip_version: _, responder } => {
+                    warn!(
                         "TODO(https://fxbug.dev/124960): \
                             Implement fuchsia.net.neighbor/Controller.ClearEntries"
                     );
+                    responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))
                 }
                 ControllerRequest::UpdateUnreachabilityConfig {
                     interface: _,
                     ip_version: _,
                     config: _,
-                    responder: _,
+                    responder,
                 } => {
-                    unimplemented!(
+                    warn!(
                         "TODO(https://fxbug.dev/124960): \
                             Implement fuchsia.net.neighbor/Controller.UpdateUnreachabilityConfig"
                     );
+                    responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))
                 }
             }
         })
