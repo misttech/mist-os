@@ -10,9 +10,11 @@ def _doc_checker(ctx):
         # doc-checker is only relevant for fuchsia.git.
         return
 
+    affected_files = set(ctx.scm.affected_files())
+
     # If a Markdown change is present (including a deletion of a markdown file),
     # check the entire project.
-    if not any([f.endswith(".md") for f in ctx.scm.affected_files()]):
+    if not any([f.endswith(".md") for f in affected_files]):
         return
 
     exe = compiled_tool_path(ctx, "doc-checker")
@@ -24,16 +26,18 @@ def _doc_checker(ctx):
         if finding["help_suggestion"]:
             msg += "\n\n" + finding["help_suggestion"]
         msg += "\n\nRun `fx doc-checker --local-links-only` to reproduce."
-        ctx.emit.finding(
-            level = {
-                "Info": "notice",
-                "Warning": "warning",
-                "Error": "error",
-            }[finding["level"]],
-            filepath = abspath[len(ctx.scm.root) + 1:],
-            line = finding["doc_line"]["line_num"],
-            message = msg,
-        )
+        filepath = abspath[len(ctx.scm.root) + 1:]
+        if filepath in affected_files:
+            ctx.emit.finding(
+                level = {
+                    "Info": "notice",
+                    "Warning": "warning",
+                    "Error": "error",
+                }[finding["level"]],
+                filepath = filepath,
+                line = finding["doc_line"]["line_num"],
+                message = msg,
+            )
 
 def _mdlint(ctx):
     """Runs mdlint."""
