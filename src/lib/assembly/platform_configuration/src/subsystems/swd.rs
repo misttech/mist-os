@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::subsystems::prelude::*;
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use assembly_config_schema::platform_config::swd_config::{
     OtaConfigs, PolicyConfig, PolicyLabels, SwdConfig, UpdateChecker, VerificationFailureAction,
 };
@@ -73,7 +73,7 @@ impl DefineSubsystemConfiguration<SwdConfig> for SwdSubsystemConfig {
         match &subsystem_config.update_checker {
             // The product set a specific update checker. Use that one.
             Some(update_checker) => {
-                Self::set_update_checker(&update_checker, builder)?;
+                Self::set_update_checker(&update_checker, context.build_type, builder)?;
                 Self::set_policy_by_build_type(&context.build_type, context, builder)?;
             }
             // The product does not specify. Set based on feature set level.
@@ -83,7 +83,7 @@ impl DefineSubsystemConfiguration<SwdConfig> for SwdSubsystemConfig {
                     FeatureSupportLevel::Minimal => {
                         let update_checker =
                             UpdateChecker::default_by_build_type(context.build_type);
-                        Self::set_update_checker(&update_checker, builder)?;
+                        Self::set_update_checker(&update_checker, context.build_type, builder)?;
                         Self::set_policy_by_build_type(&context.build_type, context, builder)?;
                     }
                     // Utility has no update checker
@@ -109,10 +109,22 @@ impl SwdSubsystemConfig {
     /// Configure which AIB to select based on the UpdateChecker
     fn set_update_checker(
         update_checker: &UpdateChecker,
+        build_type: &BuildType,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
         match update_checker {
-            UpdateChecker::OmahaClient(OtaConfigs { policy_config, .. }) => {
+            UpdateChecker::OmahaClient(OtaConfigs {
+                policy_config,
+                include_empty_eager_config,
+                ..
+            }) => {
+                if *include_empty_eager_config {
+                    if build_type == &BuildType::User {
+                        bail!("The empty_eager_config cannot be enabled on user builds");
+                    }
+                    builder.platform_bundle("omaha_client_empty_eager_config");
+                }
+
                 builder.platform_bundle("omaha_client");
                 let mut omaha_config =
                     builder.package("omaha-client").component("meta/omaha-client-service.cm")?;
@@ -190,11 +202,13 @@ impl DefaultByBuildType for UpdateChecker {
                 channels_path: None,
                 server_url: None,
                 policy_config: PolicyConfig::default(),
+                include_empty_eager_config: false,
             }),
             BuildType::User => UpdateChecker::OmahaClient(OtaConfigs {
                 channels_path: None,
                 server_url: None,
                 policy_config: PolicyConfig::default(),
+                include_empty_eager_config: false,
             }),
         }
     }
@@ -274,7 +288,8 @@ mod tests {
             UpdateChecker::OmahaClient(OtaConfigs {
                 channels_path: None,
                 server_url: None,
-                policy_config: PolicyConfig::default()
+                policy_config: PolicyConfig::default(),
+                include_empty_eager_config: false,
             })
         );
         assert_eq!(on_verification_failure, VerificationFailureAction::Reboot);
@@ -299,7 +314,8 @@ mod tests {
             UpdateChecker::OmahaClient(OtaConfigs {
                 channels_path: None,
                 server_url: None,
-                policy_config: PolicyConfig::default()
+                policy_config: PolicyConfig::default(),
+                include_empty_eager_config: false,
             })
         );
         assert_eq!(on_verification_failure, VerificationFailureAction::Reboot);

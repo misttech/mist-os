@@ -151,6 +151,7 @@ USERDEBUG_PLATFORM_AIB_NAMES_RISCV64 = BOOTSTRAP_USERDEBUG_PLATFORM_AIB_NAMES + 
     "core_realm_development_access",
     "core_realm_development_access_rcs_no_usb",
     "core_realm_development_access_rcs_usb",
+    "omaha_client_empty_eager_config",
     "minimal_userdebug",
     "minimal_userdebug_and_eng",
     "mdns_fuchsia_device_wired_service",

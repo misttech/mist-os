@@ -64,6 +64,9 @@ pub struct OtaConfigs {
 
     #[serde(default)]
     pub policy_config: PolicyConfig,
+
+    #[serde(default)]
+    pub include_empty_eager_config: bool,
 }
 
 type ServerUrl = String;
@@ -152,7 +155,8 @@ mod tests {
                         startup_delay_seconds: 42,
                         periodic_interval_minutes: 55,
                         ..Default::default()
-                    }
+                    },
+                    include_empty_eager_config: false,
                 })),
                 on_verification_failure: VerificationFailureAction::Reboot,
                 tuf_config_path: Some(Utf8PathBuf::from_str("/path/to/tuf_config.json").unwrap()),
@@ -273,7 +277,8 @@ mod tests {
                         "allow_reboot_when_idle": false,
                         "startup_delay_seconds": 42,
                         "periodic_interval_minutes": 55,
-                    }
+                    },
+                    "include_empty_eager_config": true
                 },
               }
             }
@@ -290,7 +295,8 @@ mod tests {
                     startup_delay_seconds: 42,
                     periodic_interval_minutes: 55,
                     ..Default::default()
-                }
+                },
+                include_empty_eager_config: true,
             }))
         );
     }
@@ -314,7 +320,8 @@ mod tests {
             Some(UpdateChecker::OmahaClient(OtaConfigs {
                 channels_path: Some(Utf8PathBuf::from_str("/path/to/channel_config.json").unwrap()),
                 server_url: Some("http://localhost:5000".to_string()),
-                policy_config: PolicyConfig::default()
+                policy_config: PolicyConfig::default(),
+                include_empty_eager_config: false,
             }))
         );
     }
