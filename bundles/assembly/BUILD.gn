@@ -1067,7 +1067,7 @@ assembly_input_bundle("common_minimal") {
     "//src/sys/activity",
 
     # Developer
-    "//src/developer/memory/monitor",
+    "//src/developer/memory/monitor:monitor_without_memory_sampler",
 
     # Recovery
     "//src/recovery/factory_reset:factory_reset_pkg",

@@ -1,0 +1,66 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "inspect/client.shard.cml",
+        "syslog/client.shard.cml",
+    ],
+    capabilities: [
+        {
+            protocol: [
+                "fuchsia.memory.debug.MemoryPressure",
+                "fuchsia.memory.Debugger",
+                "fuchsia.memory.inspection.Collector",
+                "fuchsia.memory.Monitor",
+                "fuchsia.memorypressure.Provider",
+            ],
+        },
+    ],
+    use: [
+        {
+            protocol: [
+                "fuchsia.feedback.CrashReporter",
+                "fuchsia.kernel.RootJobForInspect",
+                "fuchsia.kernel.Stats",
+                "fuchsia.memory.report.SnapshotProvider",
+                "fuchsia.metrics.MetricEventLoggerFactory",
+                "fuchsia.scheduler.ProfileProvider",
+            ],
+        },
+        {
+            protocol: [ "fuchsia.tracing.provider.Registry" ],
+
+            // Trace manager may be excluded from builds where tracing is not
+            // expected to be used for observability, such as in the bringup
+            // product and non-eng builds of any product.
+            availability: "optional",
+        },
+        {
+            directory: "dev-aml-ram",
+            rights: [ "r*" ],
+            path: "/dev/class/aml-ram",
+        },
+        {
+            storage: "cache",
+            path: "/cache",
+        },
+        {
+            directory: "config-data",
+            rights: [ "r*" ],
+            path: "/config/data",
+        },
+    ],
+    expose: [
+        {
+            protocol: [
+                "fuchsia.memory.debug.MemoryPressure",
+                "fuchsia.memory.Debugger",
+                "fuchsia.memory.inspection.Collector",
+                "fuchsia.memory.Monitor",
+                "fuchsia.memorypressure.Provider",
+            ],
+            from: "self",
+        },
+    ],
+}

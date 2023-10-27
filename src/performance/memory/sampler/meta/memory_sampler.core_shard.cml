@@ -6,6 +6,7 @@
         {
             name: "memory_sampler",
             url: "fuchsia-pkg://fuchsia.com/memory_sampler#meta/memory_sampler.cm",
+            environment: "#core-env",
         },
     ],
     offer: [

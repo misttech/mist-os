@@ -63,20 +63,29 @@ metrics_registry("memory_metrics_registry") {
   generate_binarypb = false
 }
 
+_common_deps = [
+  ":lib",
+  "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_hlcpp",
+  "//sdk/lib/sys/cpp",
+  "//src/lib/fsl",
+  "//src/lib/fxl",
+  "//zircon/system/ulib/async-default",
+  "//zircon/system/ulib/async-loop:async-loop-cpp",
+  "//zircon/system/ulib/async-loop:async-loop-default",
+  "//zircon/system/ulib/trace-provider",
+]
+
 executable("bin") {
   output_name = "memory_monitor"
   sources = [ "main.cc" ]
-  deps = [
-    ":lib",
-    "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_hlcpp",
-    "//sdk/lib/sys/cpp",
-    "//src/lib/fsl",
-    "//src/lib/fxl",
-    "//zircon/system/ulib/async-default",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/trace-provider",
-  ]
+  deps = _common_deps
+}
+
+executable("bin_with_memory_sampler") {
+  output_name = "memory_monitor_with_memory_sampler"
+  sources = [ "main.cc" ]
+  deps =
+      _common_deps + [ "//src/performance/memory/sampler/instrumentation:lib" ]
 }
 
 fuchsia_component("component") {
@@ -85,9 +94,20 @@ fuchsia_component("component") {
   deps = [ ":bin" ]
 }
 
-fuchsia_package("monitor") {
+fuchsia_component("component_with_memory_sampler") {
+  component_name = "memory_monitor"
+  manifest = "meta/memory_monitor_with_memory_sampler.cml"
+  deps = [ ":bin_with_memory_sampler" ]
+}
+
+fuchsia_package("monitor_without_memory_sampler") {
   package_name = "memory_monitor"
   deps = [ ":component" ]
+}
+
+fuchsia_package("monitor_with_memory_sampler") {
+  package_name = "memory_monitor"
+  deps = [ ":component_with_memory_sampler" ]
 }
 
 core_shard("memory_monitor_core_shard") {
