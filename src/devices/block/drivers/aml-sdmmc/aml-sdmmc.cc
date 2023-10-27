@@ -277,7 +277,7 @@ zx_status_t AmlSdmmc::SetBusWidth(sdmmc_bus_width_t bus_width) {
 void AmlSdmmc::RegisterInBandInterrupt(RegisterInBandInterruptRequestView request,
                                        fdf::Arena& arena,
                                        RegisterInBandInterruptCompleter::Sync& completer) {
-  // Mirroring AmlSdmmc::SdmmcRegisterInBandInterrupt().
+  // Mirroring AmlSdmmc::RegisterInBandInterrupt(const in_band_interrupt_protocol_t* interrupt_cb).
   completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
 
@@ -423,7 +423,7 @@ zx_status_t AmlSdmmc::HwReset() {
 void AmlSdmmc::SetTiming(SetTimingRequestView request, fdf::Arena& arena,
                          SetTimingCompleter::Sync& completer) {
   sdmmc_timing_t timing;
-  // Only handling the cases for AmlSdmmc::SdmmcSetTiming() to work correctly.
+  // Only handling the cases for AmlSdmmc::SetTiming(sdmmc_timing_t timing) to work correctly.
   switch (request->timing) {
     case fuchsia_hardware_sdmmc::wire::SdmmcTiming::kHs400:
       timing = SDMMC_TIMING_HS400;
@@ -476,7 +476,7 @@ zx_status_t AmlSdmmc::SetTiming(sdmmc_timing_t timing) {
 
 void AmlSdmmc::SetSignalVoltage(SetSignalVoltageRequestView request, fdf::Arena& arena,
                                 SetSignalVoltageCompleter::Sync& completer) {
-  // Mirroring AmlSdmmc::SdmmcSetSignalVoltage().
+  // Mirroring AmlSdmmc::SetSignalVoltage(sdmmc_voltage_t voltage).
   completer.buffer(arena).ReplySuccess();
 }
 

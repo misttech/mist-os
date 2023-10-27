@@ -79,7 +79,8 @@
 //src/devices/bin/driver_host2:test_not_driver_driver
 //src/devices/block/drivers/abr-shim:abr-shim-driver
 //src/devices/block/drivers/ahci:ahci-driver
-//src/devices/block/drivers/aml-sdmmc:aml-sdmmc-driver
+//src/devices/block/drivers/aml-sdmmc:aml-sdmmc-driver-dfv1
+//src/devices/block/drivers/aml-sdmmc:aml-sdmmc-driver-dfv2
 //src/devices/block/drivers/as370-sdhci:as370-sdhci-driver
 //src/devices/block/drivers/block-verity:block-verity-driver
 //src/devices/block/drivers/bootpart:bootpart-driver

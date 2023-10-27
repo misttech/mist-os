@@ -47,7 +47,7 @@ class TestDfv1Driver : public Dfv1Driver {
   using Dfv1Driver::Bind;
 
   const inspect::Hierarchy* GetInspectRoot(const std::string& suffix) {
-    const zx::vmo inspect_vmo = GetInspectVmo();
+    const zx::vmo inspect_vmo = inspector().DuplicateVmo();
     if (!inspect_vmo.is_valid()) {
       return nullptr;
     }

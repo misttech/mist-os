@@ -90,9 +90,9 @@ board_input_bundle("main_bundle") {
       driver_components = [ "meta/realtek-8211f.cm" ]
     },
     {
-      package_target = "//src/devices/block/drivers/aml-sdmmc:package"
+      package_target = "//src/devices/block/drivers/aml-sdmmc:package-dfv1"
       package_set = "bootfs"
-      driver_components = [ "meta/aml-sdmmc.cm" ]
+      driver_components = [ "meta/aml-sdmmc-dfv1.cm" ]
     },
     {
       package_target = "//src/devices/block/drivers/bootpart:package"

@@ -82,7 +82,7 @@ class AmlSdmmc : public fdf::WireServer<fuchsia_hardware_sdmmc::Sdmmc> {
                                RegisterInBandInterruptCompleter::Sync& completer) override;
   void AckInBandInterrupt(fdf::Arena& arena,
                           AckInBandInterruptCompleter::Sync& completer) override {
-    // Mirroring AmlSdmmc::SdmmcAckInBandInterrupt().
+    // Mirroring AmlSdmmc::AckInBandInterrupt().
   }
   void RegisterVmo(RegisterVmoRequestView request, fdf::Arena& arena,
                    RegisterVmoCompleter::Sync& completer) override;
@@ -116,7 +116,7 @@ class AmlSdmmc : public fdf::WireServer<fuchsia_hardware_sdmmc::Sdmmc> {
   virtual zx_status_t WaitForInterruptImpl();
   virtual void WaitForBus() const TA_REQ(lock_);
 
-  zx::vmo GetInspectVmo() const { return inspect_.inspector.DuplicateVmo(); }
+  const inspect::Inspector& inspector() const { return inspect_.inspector; }
 
  private:
   constexpr static size_t kResponseCount = 4;
@@ -273,7 +273,6 @@ class AmlSdmmc : public fdf::WireServer<fuchsia_hardware_sdmmc::Sdmmc> {
   uint64_t consecutive_cmd_errors_ = 0;
   uint64_t consecutive_data_errors_ = 0;
 
-  // TODO(b/301003087): Migrate this to DFv2.
   Inspect inspect_;
 };
 

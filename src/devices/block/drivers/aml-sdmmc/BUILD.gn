@@ -14,8 +14,8 @@ driver_bind_rules("aml-sdmmc-bind") {
   deps = [ "//src/devices/bind/fuchsia.amlogic.platform" ]
 }
 
-fuchsia_driver("aml-sdmmc-driver") {
-  output_name = "aml-sdmmc"
+fuchsia_driver("aml-sdmmc-driver-dfv1") {
+  output_name = "aml-sdmmc-dfv1"
   configs += [
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
@@ -51,16 +51,25 @@ fuchsia_driver("aml-sdmmc-driver") {
   ]
 }
 
+# TODO(b/301003087): This target is identical to fuchsia_driver_component("aml-sdmmc-dfv1") below
+# except for its name. Delete this target when all references to it have been removed.
 fuchsia_driver_component("aml-sdmmc") {
-  component_name = "aml-sdmmc"
-  deps = [ ":aml-sdmmc-driver" ]
+  component_name = "aml-sdmmc-dfv1"
+  deps = [ ":aml-sdmmc-driver-dfv1" ]
   info = "aml-sdmmc-info.json"
-  manifest = "meta/aml-sdmmc.cml"
+  manifest = "meta/dfv1-driver.cml"
 }
 
-fuchsia_driver_package("package") {
-  package_name = "aml-sdmmc"
-  driver_components = [ ":aml-sdmmc" ]
+fuchsia_driver_component("aml-sdmmc-dfv1") {
+  component_name = "aml-sdmmc-dfv1"
+  deps = [ ":aml-sdmmc-driver-dfv1" ]
+  info = "aml-sdmmc-info.json"
+  manifest = "meta/dfv1-driver.cml"
+}
+
+fuchsia_driver_package("package-dfv1") {
+  package_name = "aml-sdmmc-dfv1"
+  driver_components = [ ":aml-sdmmc-dfv1" ]
 }
 
 test("aml-sdmmc-test-bin") {
@@ -117,4 +126,54 @@ group("tests") {
     ":aml-sdmmc-bind_test",
     ":aml-sdmmc-test",
   ]
+}
+
+fuchsia_driver("aml-sdmmc-driver-dfv2") {
+  output_name = "aml-sdmmc-dfv2"
+  configs += [
+    "//build/config:all_source",
+    "//build/config/fuchsia:enable_zircon_asserts",
+  ]
+  sources = [
+    "aml-sdmmc.cc",
+    "dfv2-driver.cc",
+    "io-buffer.c",
+  ]
+  deps = [
+    ":aml-sdmmc-bind",
+    "//sdk/banjo/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
+    "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
+    "//sdk/fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_bindlib_cpp",
+    "//sdk/fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_cpp",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/component/cpp:cpp",
+    "//sdk/lib/driver/runtime:driver_runtime_cpp",
+    "//sdk/lib/fit",
+    "//sdk/lib/inspect/component/cpp:inspect_component_cpp",
+    "//src/devices/bin/driver_runtime",
+    "//src/devices/block/lib/sdio",
+    "//src/devices/block/lib/sdmmc",
+    "//src/devices/bus/lib/device-protocol-pdev",
+    "//src/devices/lib/amlogic",
+    "//src/devices/lib/mmio",
+    "//src/lib/vmo_store",
+    "//zircon/system/ulib/hwreg",
+    "//zircon/system/ulib/inspect",
+    "//zircon/system/ulib/sync",
+    "//zircon/system/ulib/zircon-internal",
+    "//zircon/system/ulib/zx",
+  ]
+}
+
+fuchsia_driver_component("aml-sdmmc-dfv2") {
+  component_name = "aml-sdmmc-dfv2"
+  deps = [ ":aml-sdmmc-driver-dfv2" ]
+  info = "aml-sdmmc-info.json"
+  manifest = "meta/dfv2-driver.cml"
+}
+
+fuchsia_driver_package("package-dfv2") {
+  package_name = "aml-sdmmc-dfv2"
+  driver_components = [ ":aml-sdmmc-dfv2" ]
 }
