@@ -8,11 +8,16 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/component/cpp/composite_node_spec.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zircon-internal/align.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/register/cpp/bind.h>
 #include <ddk/usb-peripheral-config.h>
 #include <soc/aml-common/aml-registers.h>
 #include <soc/aml-s905d2/s905d2-hw.h>
@@ -23,10 +28,13 @@
 #include <usb/usb.h>
 
 #include "astro.h"
-#include "src/devices/board/drivers/astro/astro-aml-usb-phy-v2-bind.h"
 #include "src/devices/board/drivers/astro/astro-dwc2-phy-bind.h"
 #include "src/devices/board/drivers/astro/astro-xhci-bind.h"
 #include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
+
+namespace fdf {
+using namespace fuchsia_driver_framework;
+}  // namespace fdf
 
 namespace astro {
 namespace fpbus = fuchsia_hardware_platform_bus;
@@ -51,7 +59,6 @@ static const std::vector<fpbus::Bti> dwc2_btis{
         .bti_id = BTI_USB,
     }},
 };
-
 
 // Metadata for DWC2 driver.
 static const dwc2_metadata_t dwc2_metadata = {
@@ -168,8 +175,8 @@ static const std::vector<fpbus::Metadata> usb_phy_metadata{
 static const fpbus::Node usb_phy_dev = []() {
   fpbus::Node dev = {};
   dev.name() = "aml-usb-phy-v2";
-  dev.vid() = PDEV_VID_AMLOGIC;
-  dev.did() = PDEV_DID_AML_USB_PHY_V2;
+  dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
+  dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_USB_PHY_V2;
   dev.mmio() = usb_phy_mmios;
   dev.irq() = usb_phy_irqs;
   dev.bti() = usb_btis;
@@ -177,27 +184,52 @@ static const fpbus::Node usb_phy_dev = []() {
   return dev;
 }();
 
-zx_status_t Astro::UsbInit() {
-  fidl::Arena<> fidl_arena;
-  fdf::Arena arena('USB_');
-  auto result = pbus_.buffer(arena)->AddComposite(
+zx_status_t AddUsbPhyComposite(fdf::WireSyncClient<fpbus::PlatformBus>& pbus,
+                               fidl::AnyArena& fidl_arena, fdf::Arena& arena) {
+  const std::vector<fdf::BindRule> kResetRegisterRules = std::vector{
+      fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                              bind_fuchsia_register::BIND_FIDL_PROTOCOL_DEVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia::REGISTER_ID,
+                              bind_fuchsia_amlogic_platform::BIND_REGISTER_ID_USB_PHY_V2_RESET),
+  };
+
+  const std::vector<fdf::NodeProperty> kResetRegisterProperties = std::vector{
+      fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                        bind_fuchsia_register::BIND_FIDL_PROTOCOL_DEVICE),
+      fdf::MakeProperty(bind_fuchsia::REGISTER_ID,
+                        bind_fuchsia_amlogic_platform::BIND_REGISTER_ID_USB_PHY_V2_RESET),
+  };
+
+  std::vector<fdf::ParentSpec> parents{{kResetRegisterRules, kResetRegisterProperties}};
+  auto result = pbus.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, usb_phy_dev),
-      platform_bus_composite::MakeFidlFragment(fidl_arena, aml_usb_phy_v2_fragments,
-                                               std::size(aml_usb_phy_v2_fragments)),
-      "pdev");
+      fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
+                                   {.name = "aml_usb_phy_v2", .parents = parents}}));
+
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddComposite Usb(usb_phy_dev) request failed: %s", __func__,
+    zxlogf(ERROR, "AddCompositeNodeSpec Usb(usb_phy_dev) request failed: %s",
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddComposite Usb(usb_phy_dev) failed: %s", __func__,
+    zxlogf(ERROR, "AddCompositeNodeSpec Usb(usb_phy_dev) failed: %s",
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }
+  return ZX_OK;
+}
+
+zx_status_t Astro::UsbInit() {
+  fidl::Arena<> fidl_arena;
+  fdf::Arena arena('USB_');
+
+  auto status = AddUsbPhyComposite(pbus_, fidl_arena, arena);
+  if (status != ZX_OK) {
+    return status;
+  }
 
   // Add XHCI and DWC2 to the same driver host as the aml-usb-phy.
-  result =
+  auto result =
       pbus_.buffer(arena)->AddComposite(fidl::ToWire(fidl_arena, xhci_dev),
                                         platform_bus_composite::MakeFidlFragment(
                                             fidl_arena, xhci_fragments, std::size(xhci_fragments)),
@@ -214,7 +246,7 @@ zx_status_t Astro::UsbInit() {
   }
 
   std::unique_ptr<usb::UsbPeripheralConfig> peripheral_config;
-  auto status = usb::UsbPeripheralConfig::CreateFromBootArgs(parent_, &peripheral_config);
+  status = usb::UsbPeripheralConfig::CreateFromBootArgs(parent_, &peripheral_config);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to get usb config from boot args - %d", status);
     return status;
