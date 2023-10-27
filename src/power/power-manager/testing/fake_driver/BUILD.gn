@@ -26,8 +26,8 @@ driver_bind_rules("power-manager-fake-bind") {
   deps = [ "../fuchsia.powermanager.driver.bind:powermanager_bindlib" ]
 }
 
-fuchsia_driver("power-manager-fake-driver") {
-  output_name = "power-manager-fake-driver"
+fuchsia_driver("fake-temperature") {
+  output_name = "fake-temperature"
   sources = [ "driver.cc" ]
 
   deps = [
@@ -38,9 +38,9 @@ fuchsia_driver("power-manager-fake-driver") {
 }
 
 fuchsia_driver_component("component") {
-  component_name = "power-manager-fake-driver"
+  component_name = "fake-temperature"
   manifest = "meta/power-manager-fake-driver.cml"
-  deps = [ ":power-manager-fake-driver" ]
+  deps = [ ":fake-temperature" ]
   info = "power-manager-fake-driver.json"
 }
 

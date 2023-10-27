@@ -8,7 +8,7 @@
     ],
     program: {
         runner: "driver",
-        binary: "driver/power-manager-fake-driver.so",
+        binary: "driver/fake-temperature.so",
         bind: "meta/bind/power-manager-fake-bind.bindbc",
     },
     capabilities: [

@@ -374,7 +374,7 @@
 //src/media/audio/drivers/usb-audio:usb-audio-driver
 //src/media/audio/drivers/virtual_audio:virtual_audio_driver-driver
 //src/power/fake-battery:fake_battery_driver
-//src/power/power-manager/testing/fake_driver:power-manager-fake-driver
+//src/power/power-manager/testing/fake_driver:fake-temperature
 //src/power/power-manager/testing/fake_driver:power-manager-nelson-fake-driver
 //src/power/power-manager/testing/fake_root:root_driver
 //src/storage/fvm/driver:fuchsia_driver
