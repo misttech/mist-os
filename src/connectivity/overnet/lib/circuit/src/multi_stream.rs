@@ -6,7 +6,7 @@ use crate::error::{Error, Result};
 use crate::stream;
 use crate::{Node, Quality};
 
-use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
+use futures::channel::mpsc::{channel, unbounded, Sender, UnboundedReceiver, UnboundedSender};
 use futures::channel::oneshot;
 use futures::future::Either;
 use futures::prelude::*;
@@ -52,7 +52,7 @@ pub async fn multi_stream(
     reader: stream::Reader,
     writer: stream::Writer,
     is_server: bool,
-    streams_out: UnboundedSender<(stream::Reader, stream::Writer, oneshot::Sender<Result<()>>)>,
+    streams_out: Sender<(stream::Reader, stream::Writer, oneshot::Sender<Result<()>>)>,
     streams_in: UnboundedReceiver<(stream::Reader, stream::Writer)>,
     stream_errors_out: UnboundedSender<Error>,
     remote_name: String,
@@ -80,25 +80,30 @@ pub async fn multi_stream(
                     let (size, new_stream) =
                         handle_one_chunk(&mut *streams, is_server, buf, &remote_name)?;
 
-                    if let Some((id, first_chunk_data)) = new_stream {
-                        streams_out
-                            .unbounded_send(handle_new_stream(
-                                &mut *streams,
-                                id,
-                                first_chunk_data,
-                                &new_readers_sender_clone,
-                                &stream_errors_sender,
-                            )?)
-                            .map_err(|_| {
-                                Error::ConnectionClosed(Some(
-                                    "New stream handler disappeared".to_owned(),
-                                ))
-                            })?;
-                    }
-
-                    Ok(((), size))
+                    Ok((
+                        new_stream
+                            .map(|(id, first_chunk_data)| {
+                                handle_new_stream(
+                                    &mut *streams,
+                                    id,
+                                    first_chunk_data,
+                                    &new_readers_sender_clone,
+                                    &stream_errors_sender,
+                                )
+                            })
+                            .transpose()?,
+                        size,
+                    ))
                 })
                 .await;
+
+            let got = match got {
+                Ok(Some(x)) => streams_out.clone().send(x).await.map_err(|_| {
+                    Error::ConnectionClosed(Some("New stream handler disappeared".to_owned()))
+                }),
+                Ok(None) => Ok(()),
+                Err(e) => Err(e),
+            };
 
             Some((got, ()))
         });
@@ -404,7 +409,7 @@ pub fn multi_stream_node_connection(
     remote_name: String,
 ) -> impl Future<Output = Result<()>> + Send {
     let (new_stream_sender, streams_in) = unbounded();
-    let (streams_out, new_stream_receiver) = unbounded();
+    let (streams_out, new_stream_receiver) = channel(1);
 
     let control_stream = if is_server {
         let (control_reader, control_writer_remote) = stream::stream();
@@ -521,7 +526,6 @@ pub async fn multi_stream_node_connection_to_async(
 mod test {
     use super::*;
     use fuchsia_async as fasync;
-    use futures::channel::mpsc::channel;
 
     #[fuchsia::test]
     async fn one_stream() {
@@ -529,8 +533,8 @@ mod test {
         let (b_reader, a_writer) = stream::stream();
         let (mut create_stream_a, a_streams_in) = unbounded();
         let (_create_stream_b, b_streams_in) = unbounded();
-        let (a_streams_out, _get_stream_a) = unbounded();
-        let (b_streams_out, mut get_stream_b) = unbounded();
+        let (a_streams_out, _get_stream_a) = channel(100);
+        let (b_streams_out, mut get_stream_b) = channel(1);
         // Connection closure errors are very timing-dependent so we'll tend to be flaky if we
         // observe them in a test.
         let (errors_sink_a, _black_hole) = unbounded();
@@ -625,8 +629,8 @@ mod test {
         let (b_reader, a_writer) = stream::stream();
         let (mut create_stream_a, a_streams_in) = unbounded();
         let (_create_stream_b, b_streams_in) = unbounded();
-        let (a_streams_out, _get_stream_a) = unbounded();
-        let (b_streams_out, mut get_stream_b) = unbounded();
+        let (a_streams_out, _get_stream_a) = channel(100);
+        let (b_streams_out, mut get_stream_b) = channel(1);
         let (errors_sink_a, _black_hole) = unbounded();
         // Connection closure errors are very timing-dependent so we'll tend to be flaky if we
         // observe them in a test.
@@ -748,8 +752,8 @@ mod test {
         let (b_reader, a_writer) = stream::stream();
         let (mut create_stream_a, a_streams_in) = unbounded();
         let (mut create_stream_b, b_streams_in) = unbounded();
-        let (a_streams_out, mut get_stream_a) = unbounded();
-        let (b_streams_out, mut get_stream_b) = unbounded();
+        let (a_streams_out, mut get_stream_a) = channel(1);
+        let (b_streams_out, mut get_stream_b) = channel(1);
         // Connection closure errors are very timing-dependent so we'll tend to be flaky if we
         // observe them in a test.
         let (errors_sink, _black_hole) = unbounded();
