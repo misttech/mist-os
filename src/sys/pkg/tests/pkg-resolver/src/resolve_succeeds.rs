@@ -10,10 +10,7 @@ use {
     cobalt_sw_delivery_registry as metrics,
     diagnostics_assertions::assert_data_tree,
     fidl_fuchsia_io as fio, fidl_fuchsia_pkg_ext as pkg, fuchsia_async as fasync,
-    fuchsia_pkg_testing::{
-        serve::{responder, Domain},
-        Package, PackageBuilder, RepositoryBuilder,
-    },
+    fuchsia_pkg_testing::{serve::responder, Package, PackageBuilder, RepositoryBuilder},
     futures::{join, prelude::*},
     http_uri_ext::HttpUriExt as _,
     lib::{
@@ -24,11 +21,17 @@ use {
     std::{
         collections::HashSet,
         io::{self, Read},
-        net::{IpAddr, Ipv4Addr, Ipv6Addr},
         path::Path,
         sync::Arc,
         time::Duration,
     },
+};
+
+// TODO(b/308158482): re-enable when ring works on riscv64
+#[cfg(not(target_arch = "riscv64"))]
+use {
+    fuchsia_pkg_testing::serve::Domain,
+    std::net::{IpAddr, Ipv4Addr, Ipv6Addr},
 };
 
 #[fuchsia::test]
@@ -764,6 +767,8 @@ async fn dedup_concurrent_content_blob_fetches() {
     env.stop().await;
 }
 
+// TODO(b/308158482): re-enable when ring works on riscv64
+#[cfg(not(target_arch = "riscv64"))]
 async fn test_https_endpoint(pkg_name: &str, bind_addr: impl Into<IpAddr>) {
     let env = TestEnvBuilder::new().build().await;
 
@@ -798,11 +803,15 @@ async fn test_https_endpoint(pkg_name: &str, bind_addr: impl Into<IpAddr>) {
     env.stop().await;
 }
 
+// TODO(b/308158482): re-enable when ring works on riscv64
+#[cfg(not(target_arch = "riscv64"))]
 #[fuchsia::test]
 async fn https_endpoint_ipv6_only() {
     test_https_endpoint("https_endpoint_ipv6", Ipv6Addr::LOCALHOST).await
 }
 
+// TODO(b/308158482): re-enable when ring works on riscv64
+#[cfg(not(target_arch = "riscv64"))]
 #[fuchsia::test]
 async fn https_endpoint_ipv4_only() {
     test_https_endpoint("https_endpoint_ipv4", Ipv4Addr::LOCALHOST).await

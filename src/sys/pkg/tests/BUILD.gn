@@ -18,13 +18,6 @@ group("tests") {
     "system-updater:tests",
     "update:tests",
   ]
-
-  if (current_cpu == "riscv64") {
-    public_deps -= [
-      # TODO(http://b/301437556): Remove after fixing tests on RISC-V.
-      "pkg-resolver:tests",
-    ]
-  }
 }
 
 group("e2e_tests") {

@@ -9,15 +9,19 @@ use {
     assert_matches::assert_matches,
     fuchsia_merkle::MerkleTree,
     fuchsia_pkg_testing::{
-        serve::{responder, Domain, HttpResponder},
+        serve::{responder, HttpResponder},
         Package, PackageBuilder, RepositoryBuilder,
     },
     lib::{
         extra_blob_contents, make_pkg_with_extra_blobs, TestEnvBuilder, EMPTY_REPO_PATH,
         FILE_SIZE_LARGE_ENOUGH_TO_TRIGGER_HYPER_BATCHING,
     },
-    std::{net::Ipv4Addr, sync::Arc},
+    std::sync::Arc,
 };
+
+// TODO(b/308158482): re-enable when ring works on riscv64
+#[cfg(not(target_arch = "riscv64"))]
+use {fuchsia_pkg_testing::serve::Domain, std::net::Ipv4Addr};
 
 async fn verify_resolve_fails_then_succeeds<H: HttpResponder>(
     pkg: Package,
@@ -248,6 +252,8 @@ async fn second_resolve_succeeds_when_tuf_metadata_update_fails() {
 // on its hyper clients, so the way this change would sneak in is if the hyper client is changed
 // to use ALPN to prefer http2. The blob server used in this test has ALPN configured to prefer
 // http2.
+// TODO(b/308158482): re-enable when ring works on riscv64.
+#[cfg(not(target_arch = "riscv64"))]
 #[fuchsia::test]
 async fn blob_timeout_causes_new_tcp_connection() {
     let pkg = PackageBuilder::new("blob_timeout_causes_new_tcp_connection").build().await.unwrap();
