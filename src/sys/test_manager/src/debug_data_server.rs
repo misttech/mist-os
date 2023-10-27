@@ -241,6 +241,7 @@ pub(crate) async fn serve_iterator(
     let _ = event_sender.send(RunEvent::debug_data(client).into()).await;
     event_sender.disconnect(); // No need to hold this open while we serve the iterator.
 
+    let mut file_tasks = vec![];
     while let Some(request) = iterator.try_next().await? {
         let ftest_manager::DebugDataIteratorRequest::GetNext { responder } = request;
         let next_files = match file_stream.is_terminated() {
@@ -261,7 +262,8 @@ pub(crate) async fn serve_iterator(
 
                 tracing::info!("Serving debug data file {}: {}", dir_path, file_name);
                 let (client, server) = fuchsia_zircon::Socket::create_stream();
-                fasync::Task::spawn(serve_file_over_socket(file, server)).detach();
+                let t = fasync::Task::spawn(serve_file_over_socket(file, server));
+                file_tasks.push(t);
                 Ok(ftest_manager::DebugData {
                     socket: Some(client.into()),
                     name: file_name.into(),
@@ -271,6 +273,9 @@ pub(crate) async fn serve_iterator(
             .collect::<Result<Vec<_>, Error>>()?;
         let _ = responder.send(debug_data);
     }
+
+    // make sure all tasks complete
+    future::join_all(file_tasks).await;
     Ok(())
 }
 
