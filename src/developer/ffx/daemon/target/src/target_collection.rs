@@ -16,10 +16,18 @@ use async_utils::event::Event;
 use chrono::Utc;
 use ffx_daemon_core::events::{self, EventSynthesizer};
 use ffx_daemon_events::{DaemonEvent, TargetEvent, TargetInfo};
+use fidl_fuchsia_developer_ffx as ffx;
 use netext::IsLocalAddr;
 use std::{
-    borrow::Borrow, cell::RefCell, collections::HashMap, fmt::Debug, net::IpAddr, net::SocketAddr,
-    ops::ControlFlow, rc::Rc, sync::Arc,
+    borrow::Borrow,
+    cell::RefCell,
+    collections::{hash_map::Entry, HashMap},
+    fmt::Debug,
+    net::IpAddr,
+    net::SocketAddr,
+    ops::ControlFlow,
+    rc::Rc,
+    sync::Arc,
 };
 
 pub struct TargetCollection {
@@ -73,8 +81,203 @@ impl TargetCollection {
 
     // TODO(b/297896647): Filter discovered targets and introduce `discover_targets` as the new
     // multi-target discovery method.
-    pub fn targets(&self) -> Vec<Rc<Target>> {
-        self.targets.borrow().values().cloned().collect()
+    pub fn targets(&self, query: Option<&TargetQuery>) -> Vec<ffx::TargetInfo> {
+        // Merge targets by shared identity.
+
+        #[derive(Clone, Debug, PartialEq)]
+        struct AddrKey(ffx::TargetAddrInfo);
+
+        impl Eq for AddrKey {}
+
+        impl std::hash::Hash for AddrKey {
+            fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+                let (ip, port, scope_id) = match &self.0 {
+                    ffx::TargetAddrInfo::Ip(ip) => (ip.ip, 0, ip.scope_id),
+                    ffx::TargetAddrInfo::IpPort(ip) => (ip.ip, ip.port, ip.scope_id),
+                };
+
+                ip.hash(state);
+                state.write_u16(port);
+                state.write_u32(scope_id);
+            }
+        }
+
+        struct MergeState {
+            info: ffx::TargetInfo,
+            // Address -> Age mapping.
+            // Determines how addresses are sorted.
+            addrs: HashMap<AddrKey, u64>,
+        }
+
+        fn merge<T>(lhs: &mut Option<T>, rhs: Option<T>, f: impl FnOnce(&mut T, T)) {
+            let Some(rhs) = rhs else { return };
+            match lhs {
+                Some(lhs) => f(lhs, rhs),
+                None => {}
+            }
+        }
+
+        fn check_eq<T: PartialEq + Debug>(lhs: &Option<T>, rhs: &Option<T>, name: &str) {
+            let Some(lhs) = lhs else { return };
+            let Some(rhs) = rhs else { return };
+            if lhs != rhs {
+                tracing::warn!("Identical target with mismatching {name}: {lhs:?} vs {rhs:?}");
+            }
+        }
+
+        fn addr_age(addr: &ffx::TargetAddrInfo, target: &Target, age_ms: Option<u64>) -> u64 {
+            if target.rcs_address() == Some(SocketAddr::from(TargetAddr::from(addr.clone()))) {
+                // Give the RCS address the highest priority possible.
+                u64::MAX
+            } else {
+                age_ms.unwrap_or(0)
+            }
+        }
+
+        // One invariant that `Self::merge_insert_identity` maintains is that identities will always
+        // be equal by pointer. This makes merging _significantly_ faster.
+        let mut merged = HashMap::<*const Identity, MergeState>::new();
+        let mut unidentified = Vec::new();
+
+        for target in self.targets.borrow().values() {
+            if let Some(query) = query {
+                if !query.matches(target) {
+                    continue;
+                }
+            }
+
+            let info = ffx::TargetInfo::from(&**target);
+
+            let Some(key) = target.identity() else {
+                unidentified.push(info);
+                continue;
+            };
+
+            match merged.entry(&*key) {
+                Entry::Occupied(mut other) => {
+                    let MergeState { info: prev, addrs } = other.get_mut();
+
+                    tracing::info!("Merging {prev:?} + {info:?}");
+
+                    let ffx::TargetInfo {
+                        nodename: _,
+                        addresses,
+                        age_ms,
+                        rcs_state,
+                        target_state,
+                        product_config,
+                        board_config,
+                        serial_number: _,
+                        ssh_address,
+                        fastboot_interface,
+                        ssh_host_address,
+                        compatibility,
+                        // Intentionally opt-in to compilation failures when new fields are added.
+                        __source_breaking: _,
+                    } = info;
+
+                    // Nodename and Serial already match.
+
+                    // Addresses are sorted and added to the merged target later.
+                    addresses.into_iter().flatten().for_each(|addr| {
+                        let age_ms = addr_age(&addr, &target, age_ms);
+
+                        addrs
+                            .entry(AddrKey(addr))
+                            .and_modify(|addr_age_ms| {
+                                if *addr_age_ms < age_ms {
+                                    *addr_age_ms = age_ms;
+                                }
+                            })
+                            .or_insert(age_ms);
+                    });
+
+                    merge(&mut prev.rcs_state, rcs_state, |old, new| {
+                        *old = match (*old, new) {
+                            (ffx::RemoteControlState::Up, _) | (_, ffx::RemoteControlState::Up) => {
+                                ffx::RemoteControlState::Up
+                            }
+                            (ffx::RemoteControlState::Down, _)
+                            | (_, ffx::RemoteControlState::Down) => ffx::RemoteControlState::Down,
+                            _ => return,
+                        };
+                    });
+
+                    if prev.rcs_state == Some(ffx::RemoteControlState::Up) {
+                        check_eq(
+                            &prev.target_state,
+                            &Some(ffx::TargetState::Product),
+                            "target_state",
+                        );
+
+                        // Always override state if RCS is up.
+                        prev.target_state = Some(ffx::TargetState::Product);
+                    } else if target_state.is_some() {
+                        // Override state by age.
+                        match (prev.age_ms, age_ms) {
+                            (Some(prev_age), Some(cur_age)) if cur_age >= prev_age => {
+                                prev.target_state = target_state;
+                            }
+                            (None, Some(_)) => {
+                                prev.target_state = target_state;
+                            }
+                            _ => {
+                                merge(&mut prev.target_state, target_state, |old, new| {
+                                    if *old == ffx::TargetState::Disconnected {
+                                        *old = new;
+                                    } else {
+                                        tracing::warn!("Conflicting state: {old:?} vs {new:?}");
+                                    }
+                                });
+                            }
+                        }
+                    }
+
+                    check_eq(&prev.product_config, &product_config, "product_config");
+                    check_eq(&prev.board_config, &board_config, "board_config");
+                    check_eq(&prev.ssh_address, &ssh_address, "ssh_address");
+                    check_eq(&prev.fastboot_interface, &fastboot_interface, "fastboot_interface");
+                    check_eq(&prev.ssh_host_address, &ssh_host_address, "ssh_host_address");
+                    check_eq(&prev.compatibility, &compatibility, "compatibility");
+
+                    merge(&mut prev.age_ms, age_ms, |old, new| {
+                        if *old < new {
+                            *old = new;
+                        }
+                    });
+                }
+                Entry::Vacant(vacant) => {
+                    let addrs =
+                        HashMap::from_iter(info.addresses.as_deref().into_iter().flatten().map(
+                            |addr| (AddrKey(addr.clone()), addr_age(&addr, &target, info.age_ms)),
+                        ));
+                    vacant.insert(MergeState { info, addrs });
+                }
+            }
+        }
+
+        for merge_state in merged.values_mut() {
+            if merge_state.addrs.is_empty() {
+                continue;
+            }
+
+            let addrs = &mut merge_state.info.addresses;
+            let addrs = addrs.get_or_insert(Vec::new());
+            addrs.clear();
+            addrs.extend(merge_state.addrs.keys().map(|key| key.0.clone()));
+            addrs.sort_by(|addr_a, addr_b| {
+                let a = merge_state.addrs.get(&AddrKey(addr_a.clone())).copied().unwrap_or(0);
+                let b = merge_state.addrs.get(&AddrKey(addr_b.clone())).copied().unwrap_or(0);
+                b.cmp(&a).then_with(|| {
+                    // If the ages are equal, compare addresses to maintain stability.
+                    SocketAddr::from(TargetAddr::from(addr_b.clone()))
+                        .cmp(&SocketAddr::from(TargetAddr::from(addr_a.clone())))
+                })
+            });
+        }
+
+        unidentified.extend(merged.into_iter().map(|(_, v)| v.info));
+        unidentified
     }
 
     pub fn is_empty(&self) -> bool {
@@ -97,6 +300,39 @@ impl TargetCollection {
         let Some(target) = self.targets.borrow_mut().remove(&target.id()) else { return false };
         target.disable();
         true
+    }
+
+    /// Checks and expires stale targets.
+    ///
+    /// Returns the list of expired manual addresses.
+    pub fn expire_targets(&self, overnet_node: &Arc<overnet_core::Router>) -> Vec<SocketAddr> {
+        let mut expired_manual_addrs = Vec::new();
+        let mut expired = Vec::new();
+        for target in Vec::from_iter(self.targets.borrow().values()) {
+            target.expire_state();
+            if target.is_manual() && !target.is_connected() {
+                // If a manual target has been allowed to transition to the
+                // "disconnected" state, it should be removed from the collection.
+                let ssh_port = target.ssh_port();
+                for addr in target.manual_addrs() {
+                    let mut sockaddr = SocketAddr::from(addr);
+                    ssh_port.map(|p| sockaddr.set_port(p));
+                    expired_manual_addrs.push(sockaddr);
+                }
+                expired.push(target.clone());
+            } else if target.is_manual() {
+                // Manually-added remote targets will not be discovered by mDNS,
+                // and as a result will not have host-pipe triggered automatically
+                // by the mDNS event handler.
+                target.run_host_pipe(overnet_node);
+            }
+        }
+
+        for target in expired {
+            self.remove_ephemeral_target(target);
+        }
+        eprintln!("expired: {expired_manual_addrs:?}");
+        expired_manual_addrs
     }
 
     // Merge intersecting identities.
@@ -1133,6 +1369,22 @@ mod tests {
         assert!(Rc::ptr_eq(&query_name, &t1) || Rc::ptr_eq(&query_name, &t2));
         // Target returned from queries should be consistent.
         assert!(Rc::ptr_eq(&query_name, &query_serial));
+
+        // The state of both targets are merged together when requesting TargetInfo:
+        let targets = tc.targets(None);
+        let [target_info] = &targets[..] else {
+            panic!("Too many target info structs: {targets:?}");
+        };
+
+        println!("{target_info:?}");
+        println!("{:?}", ffx::TargetInfo::from(&*t1));
+        println!("{:?}", ffx::TargetInfo::from(&*t2));
+
+        assert_eq!(target_info.nodename.as_deref(), Some(NODENAME));
+        assert_eq!(target_info.serial_number.as_deref(), Some(SERIAL));
+        assert_eq!(target_info.addresses.as_deref(), Some(&[TargetAddr::from(addr).into()][..]));
+        assert_eq!(target_info.target_state, Some(ffx::TargetState::Fastboot));
+        assert_eq!(target_info.fastboot_interface, Some(ffx::FastbootInterface::Tcp));
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -1442,7 +1694,8 @@ mod tests {
         let tc = TargetCollection::new_with_queue();
         tc.merge_insert(t1);
         tc.merge_insert(t2);
-        let mut targets = tc.targets().into_iter();
+        let targets = tc.targets.borrow();
+        let mut targets = targets.values();
         let target = targets.next().expect("Merging resulted in no targets.");
         assert!(targets.next().is_none());
         assert_eq!(target.nodename_str(), "this-is-a-crunchy-falafel");
@@ -1469,7 +1722,8 @@ mod tests {
         tc.merge_insert(t1);
         tc.merge_insert(t2);
 
-        let mut targets = tc.targets().into_iter().collect::<Vec<Rc<Target>>>();
+        let targets = tc.targets.borrow();
+        let mut targets = Vec::from_iter(targets.values());
 
         assert_eq!(targets.len(), 2);
 
@@ -1505,7 +1759,8 @@ mod tests {
         tc.merge_insert(t1);
         tc.merge_insert(t2);
 
-        let mut targets = tc.targets().into_iter().collect::<Vec<Rc<Target>>>();
+        let targets = tc.targets.borrow();
+        let mut targets = Vec::from_iter(targets.values());
 
         assert_eq!(targets.len(), 2);
 
@@ -1565,22 +1820,31 @@ mod tests {
         t2.addrs.borrow_mut().replace(TargetAddr::new(ip2, 0, 0).into());
         tc.merge_insert(t1);
         tc.merge_insert(t2);
-        let mut targets = tc.targets().into_iter();
-        let mut target1 = targets.next().expect("Merging resulted in no targets.");
-        let mut target2 = targets.next().expect("Merging resulted in only one target.");
 
-        if target1.nodename().is_none() {
-            std::mem::swap(&mut target1, &mut target2)
+        {
+            let targets = tc.targets.borrow();
+            let mut targets = targets.values();
+            let mut target1 = targets.next().expect("Merging resulted in no targets.");
+            let mut target2 = targets.next().expect("Merging resulted in only one target.");
+
+            if target1.nodename().is_none() {
+                std::mem::swap(&mut target1, &mut target2)
+            }
+
+            assert!(targets.next().is_none());
+            assert_eq!(target1.nodename_str(), "this-is-a-crunchy-falafel");
+            assert_eq!(target2.nodename(), None);
         }
 
-        assert!(targets.next().is_none());
-        assert_eq!(target1.nodename_str(), "this-is-a-crunchy-falafel");
-        assert_eq!(target2.nodename(), None);
         assert!(tc.remove_target("f111::3".to_owned()));
-        let mut targets = tc.targets().into_iter();
-        let target = targets.next().expect("Merging resulted in no targets.");
-        assert!(targets.next().is_none());
-        assert_eq!(target.nodename_str(), "this-is-a-crunchy-falafel");
+
+        {
+            let targets = tc.targets.borrow();
+            let mut targets = targets.values();
+            let target = targets.next().expect("Merging resulted in no targets.");
+            assert!(targets.next().is_none());
+            assert_eq!(target.nodename_str(), "this-is-a-crunchy-falafel");
+        }
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -1595,21 +1859,30 @@ mod tests {
         t2.addrs.borrow_mut().replace(TargetAddr::new(ip2, 0, 0).into());
         tc.merge_insert(t1);
         tc.merge_insert(t2);
-        let mut targets = tc.targets().into_iter();
-        let mut target1 = targets.next().expect("Merging resulted in no targets.");
-        let mut target2 = targets.next().expect("Merging resulted in only one target.");
 
-        if target1.nodename().is_none() {
-            std::mem::swap(&mut target1, &mut target2);
+        {
+            let targets = tc.targets.borrow();
+            let mut targets = targets.values();
+            let mut target1 = targets.next().expect("Merging resulted in no targets.");
+            let mut target2 = targets.next().expect("Merging resulted in only one target.");
+
+            if target1.nodename().is_none() {
+                std::mem::swap(&mut target1, &mut target2);
+            }
+            assert!(targets.next().is_none());
+            assert_eq!(target1.nodename_str(), "this-is-a-crunchy-falafel");
+            assert_eq!(target2.nodename(), None);
         }
-        assert!(targets.next().is_none());
-        assert_eq!(target1.nodename_str(), "this-is-a-crunchy-falafel");
-        assert_eq!(target2.nodename(), None);
+
         assert!(tc.remove_target("f111::4".to_owned()));
-        let mut targets = tc.targets().into_iter();
-        let target = targets.next().expect("Merging resulted in no targets.");
-        assert!(targets.next().is_none());
-        assert_eq!(target.nodename(), None);
+
+        {
+            let targets = tc.targets.borrow();
+            let mut targets = targets.values();
+            let target = targets.next().expect("Merging resulted in no targets.");
+            assert!(targets.next().is_none());
+            assert_eq!(target.nodename(), None);
+        }
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -1624,22 +1897,31 @@ mod tests {
         t2.addrs.borrow_mut().replace(TargetAddr::new(ip2, 0, 0).into());
         tc.merge_insert(t1);
         tc.merge_insert(t2);
-        let mut targets = tc.targets().into_iter();
-        let mut target1 = targets.next().expect("Merging resulted in no targets.");
-        let mut target2 = targets.next().expect("Merging resulted in only one target.");
 
-        if target1.nodename().is_none() {
-            std::mem::swap(&mut target1, &mut target2);
+        {
+            let targets = tc.targets.borrow();
+            let mut targets = targets.values();
+            let mut target1 = targets.next().expect("Merging resulted in no targets.");
+            let mut target2 = targets.next().expect("Merging resulted in only one target.");
+
+            if target1.nodename().is_none() {
+                std::mem::swap(&mut target1, &mut target2);
+            }
+
+            assert!(targets.next().is_none());
+            assert_eq!(target1.nodename_str(), "this-is-a-crunchy-falafel");
+            assert_eq!(target2.nodename(), None);
         }
 
-        assert!(targets.next().is_none());
-        assert_eq!(target1.nodename_str(), "this-is-a-crunchy-falafel");
-        assert_eq!(target2.nodename(), None);
         assert!(tc.remove_target("this-is-a-crunchy-falafel".to_owned()));
-        let mut targets = tc.targets().into_iter();
-        let target = targets.next().expect("Merging resulted in no targets.");
-        assert!(targets.next().is_none());
-        assert_eq!(target.nodename(), None);
+
+        {
+            let targets = tc.targets.borrow();
+            let mut targets = targets.values();
+            let target = targets.next().expect("Merging resulted in no targets.");
+            assert!(targets.next().is_none());
+            assert_eq!(target.nodename(), None);
+        }
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -1651,6 +1933,7 @@ mod tests {
         target.host_pipe.borrow_mut().replace(HostPipeState {
             task: Task::local(future::pending()),
             overnet_node: local_node,
+            ssh_addr: None,
         });
 
         let collection = TargetCollection::new();

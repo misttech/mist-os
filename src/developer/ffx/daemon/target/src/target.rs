@@ -165,6 +165,7 @@ impl EventSynthesizer<TargetEvent> for TargetEventSynthesizer {
 pub(crate) struct HostPipeState {
     pub task: Task<()>,
     pub overnet_node: Arc<overnet_core::Router>,
+    pub(crate) ssh_addr: Option<SocketAddr>,
 }
 
 pub struct Target {
@@ -518,6 +519,10 @@ impl Target {
         .unwrap_or(false)
     }
 
+    pub fn rcs_address(&self) -> Option<SocketAddr> {
+        self.host_pipe.borrow().as_ref().and_then(|hp| hp.ssh_addr)
+    }
+
     /// ssh_address returns the SocketAddr of the next SSH address to connect to for this target.
     ///
     /// The sort algorithm for SSH address priority is in order of:
@@ -532,6 +537,10 @@ impl Target {
     /// connection attempt.
     pub fn ssh_address(&self) -> Option<SocketAddr> {
         use itertools::Itertools;
+
+        if let Some(addr) = self.rcs_address() {
+            return Some(addr);
+        }
 
         // Order e1 & e2 by most recent timestamp
         let recency = |e1: &TargetAddrEntry, e2: &TargetAddrEntry| e2.timestamp.cmp(&e1.timestamp);
@@ -1042,7 +1051,7 @@ impl Target {
     /// `HostPipe`.
     pub fn maybe_reconnect(self: &Rc<Self>) {
         if self.host_pipe.borrow().is_some() {
-            let HostPipeState { task, overnet_node } = self.host_pipe.take().unwrap();
+            let HostPipeState { task, overnet_node, ssh_addr: _ } = self.host_pipe.take().unwrap();
             drop(task);
             tracing::debug!("Reconnecting host_pipe for {}@{}", self.nodename_str(), self.id());
             self.run_host_pipe(&overnet_node);
@@ -1109,6 +1118,10 @@ impl Target {
 
                         if let Some(target) = weak_target.upgrade() {
                             target.set_compatibility_status(&compatibility_status);
+
+                            if let Some(host_pipe) = target.host_pipe.borrow_mut().as_mut() {
+                                host_pipe.ssh_addr = Some(hp.get_address());
+                            }
                         }
 
                         // wait for the host pipe to exit.
@@ -1135,6 +1148,7 @@ impl Target {
                 });
             }),
             overnet_node,
+            ssh_addr: None,
         });
     }
 
@@ -2284,6 +2298,7 @@ mod test {
         target.host_pipe.borrow_mut().replace(HostPipeState {
             task: Task::local(future::pending()),
             overnet_node: local_node,
+            ssh_addr: None,
         });
 
         target.disconnect();

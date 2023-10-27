@@ -48,7 +48,6 @@ use std::{
     cell::Cell,
     collections::HashSet,
     hash::{Hash, Hasher},
-    net::SocketAddr,
     path::PathBuf,
     rc::Rc,
     sync::Arc,
@@ -582,37 +581,23 @@ impl Daemon {
         let target_collection = Rc::downgrade(&self.target_collection);
         self.tasks.push(Rc::new(Task::local(async move {
             loop {
-                Timer::new(frequency.clone()).await;
+                Timer::new(frequency).await;
                 let manual_targets = Config::default();
 
                 match target_collection.upgrade() {
                     Some(target_collection) => {
-                        for target in target_collection.targets() {
-                            // Manually-added remote targets will not be discovered by mDNS,
-                            // and as a result will not have host-pipe triggered automatically
-                            // by the mDNS event handler.
-                            if target.is_manual() {
-                                target.run_host_pipe(&overnet_node);
-                            }
-                            target.expire_state();
-                            if target.is_manual() && !target.is_connected() {
-                                // If a manual target has been allowed to transition to the
-                                // "disconnected" state, it should be removed from the collection.
-                                let ssh_port = target.ssh_port();
-                                for addr in target.manual_addrs() {
-                                    let mut sockaddr = SocketAddr::from(addr);
-                                    ssh_port.map(|p| sockaddr.set_port(p));
-                                    let _ = manual_targets
-                                        .remove(format!("{}", sockaddr))
-                                        .await
-                                        .map_err(|e| {
-                                            tracing::error!(
-                                                "Unable to persist ephemeral target removal: {}",
-                                                e
-                                            );
-                                        });
+                        let expired_addrs = target_collection.expire_targets(&overnet_node);
+                        for addr in expired_addrs {
+                            // If a manual target has been allowed to transition to the
+                            // "disconnected" state, it should be removed from the collection.
+                            match manual_targets.remove(format!("{}", addr)).await {
+                                Ok(_) => {}
+                                Err(e) => {
+                                    tracing::error!(
+                                        "Unable to persist ephemeral target removal: {}",
+                                        e
+                                    );
                                 }
-                                target_collection.remove_ephemeral_target(target);
                             }
                         }
                     }
@@ -927,7 +912,11 @@ mod test {
     use fidl_fuchsia_developer_remotecontrol::RemoteControlMarker;
     use fuchsia_async::Task;
     use std::{
-        cell::RefCell, collections::BTreeSet, iter::FromIterator, str::FromStr, time::{SystemTime, Instant},
+        cell::RefCell,
+        collections::BTreeSet,
+        iter::FromIterator,
+        str::FromStr,
+        time::{Instant, SystemTime},
     };
 
     fn spawn_test_daemon() -> (DaemonProxy, Daemon, Task<Result<()>>) {
@@ -1100,7 +1089,11 @@ mod test {
             persistent_target.get_connection_state(),
             TargetConnectionState::Manual(None)
         );
-        assert_eq!(daemon.target_collection.targets().len(), 1);
+        let not_found = daemon
+            .target_collection
+            .query_single_enabled_target(&"goodbye-world".into())
+            .expect("Query should not be ambiguous");
+        assert!(not_found.is_none(), "Should've expired: {not_found:?}");
     }
 
     struct NullDaemonEventSynthesizer();

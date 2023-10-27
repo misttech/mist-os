@@ -267,12 +267,7 @@ impl FidlProtocol for TargetCollectionProtocol {
                 // targets. Wait for `reader.as_channel().on_closed()` to cancel discovery when no
                 // longer reading. Add FIDL parameter to control discovery streaming.
 
-                let targets = target_collection
-                    .targets()
-                    .into_iter()
-                    .filter(|t| query.as_ref().map(|q| q.matches(t)).unwrap_or(true))
-                    .map(|t| Into::into(&*t))
-                    .collect::<Vec<_>>();
+                let targets = target_collection.targets(query.as_ref());
 
                 // This was chosen arbitrarily. It's possible to determine a
                 // better chunk size using some FIDL constant math.
@@ -859,7 +854,7 @@ mod tests {
     async fn test_handle_fastboot_target_no_serial() {
         let tc = Rc::new(TargetCollection::new());
         handle_fastboot_target(&tc, ffx::FastbootTarget::default());
-        assert_eq!(tc.targets().len(), 0, "target collection should remain empty");
+        assert_eq!(tc.targets(None).len(), 0, "target collection should remain empty");
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -869,7 +864,7 @@ mod tests {
             &tc,
             ffx::FastbootTarget { serial: Some("12345".to_string()), ..Default::default() },
         );
-        assert_eq!(tc.targets()[0].serial().as_deref(), Some("12345"));
+        assert_eq!(tc.targets(None)[0].serial_number.as_deref(), Some("12345"));
     }
 
     fn make_target_add_fut(
@@ -1079,7 +1074,7 @@ mod tests {
             .unwrap();
         target_add_fut.await.unwrap();
         let target_collection = Context::new(fake_daemon).get_target_collection().await.unwrap();
-        assert_eq!(1, target_collection.targets().len());
+        assert_eq!(1, target_collection.targets(None).len());
         let mut map = Map::<String, Value>::new();
         map.insert("[fe80::1%1]:8022".to_string(), Value::Null);
         assert_eq!(tc_impl.borrow().manual_targets.get().await.unwrap(), json!(map));
@@ -1112,7 +1107,7 @@ mod tests {
             .await
             .unwrap();
         let target_collection = Context::new(fake_daemon).get_target_collection().await.unwrap();
-        assert_eq!(1, target_collection.targets().len());
+        assert_eq!(1, target_collection.targets(None).len());
         assert!(tc_impl.borrow().manual_targets.get().await.unwrap().is_object());
         let value = tc_impl.borrow().manual_targets.get().await.unwrap();
         assert!(value.is_object());

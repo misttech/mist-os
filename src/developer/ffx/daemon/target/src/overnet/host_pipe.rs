@@ -173,6 +173,7 @@ pub(crate) struct HostPipeChild {
     inner: Child,
     task: Option<Task<()>>,
     pub(crate) compatibility_status: Option<CompatibilityInfo>,
+    address: SocketAddr,
 }
 
 fn setup_watchdogs() {
@@ -495,6 +496,7 @@ impl HostPipeChild {
                         futures::join!(copy_in, copy_out, log_stderr);
                     })),
                     compatibility_status,
+                    address: addr,
                 },
             ))
         } else {
@@ -892,6 +894,10 @@ where
     pub fn get_compatibility_status(&self) -> Option<CompatibilityInfo> {
         self.inner.get_compatibility_status()
     }
+
+    pub fn get_address(&self) -> SocketAddr {
+        self.inner.address
+    }
 }
 
 /// creates the socket for overnet. IoError is possible from socket operations.
@@ -945,7 +951,7 @@ mod test {
     use serde_json::json;
     use std::fs;
     use std::os::unix::prelude::PermissionsExt;
-    use std::{rc::Rc, str::FromStr};
+    use std::{net::Ipv4Addr, rc::Rc, str::FromStr};
     use tokio::process::Command;
 
     const ERR_CTX: &'static str = "running fake host-pipe command for test";
@@ -959,6 +965,7 @@ mod test {
                 inner: child.spawn().unwrap(),
                 task: Some(Task::local(async {})),
                 compatibility_status: None,
+                address: SocketAddr::new(Ipv4Addr::new(192, 0, 2, 0).into(), 2345),
             }
         }
     }
