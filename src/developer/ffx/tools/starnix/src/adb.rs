@@ -6,11 +6,15 @@ use anyhow::{anyhow, Result};
 use argh::{ArgsInfo, FromArgs};
 use async_net::{TcpListener, TcpStream};
 use fho::SimpleWriter;
+use fidl_fuchsia_developer_ffx::{TargetCollectionProxy, TargetQuery};
 use fidl_fuchsia_developer_remotecontrol as rc;
 use fuchsia_async as fasync;
 use futures::io::AsyncReadExt;
 use futures::stream::StreamExt;
+use futures::FutureExt;
 use signal_hook::{consts::signal::SIGINT, iterator::Signals};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 use crate::common::*;
 
@@ -21,14 +25,16 @@ async fn serve_adb_connection(mut stream: TcpStream, bridge_socket: fidl::Socket
     let (breader, mut bwriter) = (&mut bridge).split();
     let (sreader, mut swriter) = (&mut stream).split();
 
-    let copy_futures = futures::future::try_join(
-        futures::io::copy(breader, &mut swriter),
-        futures::io::copy(sreader, &mut bwriter),
-    );
+    let copy_result = futures::select! {
+        r = futures::io::copy(breader, &mut swriter).fuse() => {
+            r
+        },
+        r = futures::io::copy(sreader, &mut bwriter).fuse() => {
+            r
+        },
+    };
 
-    copy_futures.await?;
-
-    Ok(())
+    copy_result.map(|_| ()).map_err(|e| e.into())
 }
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
@@ -49,12 +55,43 @@ pub struct StarnixAdbCommand {
     pub port: u16,
 }
 
+async fn connect_to_rcs(
+    target_collection_proxy: &TargetCollectionProxy,
+    query: &TargetQuery,
+) -> Result<rc::RemoteControlProxy> {
+    let (client, server) = fidl::endpoints::create_proxy().expect("Failed to create endpoints.");
+    target_collection_proxy
+        .open_target(query, server)
+        .await
+        .expect("Fidl error opening target.")
+        .expect("Failed to open target.");
+    let (rcs_client, rcs_server) =
+        fidl::endpoints::create_proxy().expect("Failed to create rcs endpoints.");
+    client
+        .open_remote_control(rcs_server)
+        .await
+        .expect("Fidl error opening remote control")
+        .expect("Error opening remote control.");
+    Ok(rcs_client)
+}
+
 pub async fn starnix_adb(
     command: &StarnixAdbCommand,
     rcs_proxy: &rc::RemoteControlProxy,
+    target_collection_proxy: &TargetCollectionProxy,
     _writer: SimpleWriter,
 ) -> Result<()> {
-    let controller_proxy = connect_to_contoller(&rcs_proxy, command.moniker.clone()).await?;
+    let node_name = rcs_proxy.identify_host().await.expect("").expect("").nodename;
+    let target_query = TargetQuery { string_matcher: node_name, ..Default::default() };
+
+    let reconnect = || async {
+        let rcs_proxy = connect_to_rcs(&target_collection_proxy, &target_query).await?;
+        anyhow::Ok((
+            connect_to_contoller(&rcs_proxy, command.moniker.clone()).await?,
+            Arc::new(AtomicBool::new(false)),
+        ))
+    };
+    let mut controller_proxy = reconnect().await?;
 
     println!("starnix adb - listening");
 
@@ -72,18 +109,26 @@ pub async fn starnix_adb(
     let listener = TcpListener::bind(address).await.expect("cannot bind to adb address");
     println!("The adb bridge is listening on {}", address);
     println!("To connect: adb connect {}", address);
+
     while let Some(stream) = listener.incoming().next().await {
+        if controller_proxy.1.load(Ordering::SeqCst) {
+            controller_proxy = reconnect().await?;
+        }
+
         let stream = stream?;
         let (sbridge, cbridge) = fidl::Socket::create_stream();
 
         controller_proxy
+            .0
             .vsock_connect(ADB_DEFAULT_PORT, sbridge)
             .map_err(|e| anyhow!("Error connecting to adbd: {:?}", e))?;
 
+        let reconnect_flag = Arc::clone(&controller_proxy.1);
         fasync::Task::spawn(async move {
             serve_adb_connection(stream, cbridge)
                 .await
                 .unwrap_or_else(|e| println!("serve_adb_connection returned with {:?}", e));
+            reconnect_flag.store(true, std::sync::atomic::Ordering::SeqCst);
         })
         .detach();
     }
