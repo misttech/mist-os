@@ -183,7 +183,7 @@ impl Router {
         router_interval: Option<Duration>,
     ) -> Result<Arc<Self>, Error> {
         let service_map = ServiceMap::new(node_id);
-        let (new_peer_sender, new_peer_receiver) = futures::channel::mpsc::unbounded();
+        let (new_peer_sender, new_peer_receiver) = futures::channel::mpsc::channel(1);
         let (circuit_node, circuit_connections) = if let Some(interval) = router_interval {
             let (a, b) = circuit::ConnectionNode::new_with_router(
                 &node_id.circuit_string(),

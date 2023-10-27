@@ -5,7 +5,7 @@
 use crate::stream;
 use crate::{Error, Node, Result};
 
-use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
+use futures::channel::mpsc::{unbounded, Sender, UnboundedReceiver};
 use futures::channel::oneshot;
 use futures::lock::Mutex;
 use futures::stream::Stream;
@@ -181,7 +181,7 @@ impl ConnectionNode {
     pub fn new(
         node_id: &str,
         protocol: &str,
-        new_peer_sender: UnboundedSender<String>,
+        new_peer_sender: Sender<String>,
     ) -> Result<(ConnectionNode, impl Stream<Item = Connection> + Send)> {
         let (incoming_stream_sender, incoming_stream_receiver) = unbounded();
         let node = Arc::new(Node::new(node_id, protocol, new_peer_sender, incoming_stream_sender)?);
@@ -197,7 +197,7 @@ impl ConnectionNode {
         node_id: &str,
         protocol: &str,
         interval: Duration,
-        new_peer_sender: UnboundedSender<String>,
+        new_peer_sender: Sender<String>,
     ) -> Result<(ConnectionNode, impl Stream<Item = Connection> + Send)> {
         let (incoming_stream_sender, incoming_stream_receiver) = unbounded();
         let (node, router) = Node::new_with_router(

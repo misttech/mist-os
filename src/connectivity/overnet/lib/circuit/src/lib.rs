@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use fuchsia_async::Timer;
-use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
+use futures::channel::mpsc::{Sender, UnboundedReceiver, UnboundedSender};
 use futures::channel::oneshot;
 use futures::future::Either;
 use futures::lock::Mutex;
@@ -121,11 +121,7 @@ impl PeerMap {
 
     /// Adds a control channel to `control_channels` and sends an initial route update for that
     /// channel.
-    async fn add_control_channel(
-        &mut self,
-        channel: stream::Writer,
-        quality: Quality,
-    ) -> Result<()> {
+    fn add_control_channel(&mut self, channel: stream::Writer, quality: Quality) -> Result<()> {
         let routes = self.condense_routes();
 
         for (node, &route_quality) in &routes {
@@ -163,7 +159,7 @@ pub struct Node {
     incoming_stream_sender: UnboundedSender<(stream::Reader, stream::Writer, String)>,
 
     /// If a new peer becomes available we will send its name through this sender to notify the user.
-    new_peer_sender: UnboundedSender<String>,
+    new_peer_sender: Sender<String>,
 }
 
 impl Node {
@@ -177,7 +173,7 @@ impl Node {
     pub fn new(
         node_id: &str,
         protocol: &str,
-        new_peer_sender: UnboundedSender<String>,
+        new_peer_sender: Sender<String>,
         incoming_stream_sender: UnboundedSender<(stream::Reader, stream::Writer, String)>,
     ) -> Result<Node> {
         let node_id = node_id.to_owned().try_into()?;
@@ -199,7 +195,7 @@ impl Node {
         node_id: &str,
         protocol: &str,
         interval: Duration,
-        new_peer_sender: UnboundedSender<String>,
+        new_peer_sender: Sender<String>,
         incoming_stream_sender: UnboundedSender<(stream::Reader, stream::Writer, String)>,
     ) -> Result<(Node, impl Future<Output = ()> + Send)> {
         let mut node = Self::new(node_id, protocol, new_peer_sender, incoming_stream_sender)?;
@@ -334,7 +330,6 @@ impl Node {
                     .lock()
                     .await
                     .add_control_channel(control_writer, quality)
-                    .await
                     .expect("We just created this channel!");
             } else {
                 // No router means no further routing messages. Just let 'er go.

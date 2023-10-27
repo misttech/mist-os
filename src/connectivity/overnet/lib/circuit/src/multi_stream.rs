@@ -521,6 +521,7 @@ pub async fn multi_stream_node_connection_to_async(
 mod test {
     use super::*;
     use fuchsia_async as fasync;
+    use futures::channel::mpsc::channel;
 
     #[fuchsia::test]
     async fn one_stream() {
@@ -843,8 +844,8 @@ mod test {
 
     #[fuchsia::test]
     async fn node_connect() {
-        let (new_peer_sender_a, mut new_peers) = unbounded();
-        let (new_peer_sender_b, _new_peers_b) = unbounded();
+        let (new_peer_sender_a, mut new_peers) = channel(1);
+        let (new_peer_sender_b, _new_peers_b) = channel(100);
         let (incoming_streams_sender_a, _streams_a) = unbounded();
         let (incoming_streams_sender_b, mut streams) = unbounded();
         let a = Node::new("a", "test", new_peer_sender_a, incoming_streams_sender_a).unwrap();
