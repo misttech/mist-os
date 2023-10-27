@@ -6,7 +6,7 @@ use crate::error::{Error, Result};
 use crate::stream;
 use crate::{Node, Quality};
 
-use futures::channel::mpsc::{channel, unbounded, Receiver, Sender, UnboundedSender};
+use futures::channel::mpsc::{channel, Receiver, Sender, UnboundedSender};
 use futures::channel::oneshot;
 use futures::future::Either;
 use futures::prelude::*;
@@ -57,12 +57,11 @@ pub async fn multi_stream(
     stream_errors_out: UnboundedSender<Error>,
     remote_name: String,
 ) -> Result<()> {
-    let (mut new_readers_sender, new_readers) = unbounded();
-    let (stream_errors_sender, stream_errors) = unbounded();
+    let (new_readers_sender, new_readers) = channel(1);
+    let (stream_errors_sender, stream_errors) = channel(1);
     let first_stream_id = if is_server { 1 } else { 0 };
     let mut stream_ids = (first_stream_id..).step_by(2);
 
-    let new_readers_sender_clone = new_readers_sender.clone();
     let handle_read = async move {
         let streams = SyncMutex::new(HashMap::<u32, StreamStatus>::new());
 
@@ -81,26 +80,50 @@ pub async fn multi_stream(
                         handle_one_chunk(&mut *streams, is_server, buf, &remote_name)?;
 
                     Ok((
-                        new_stream
-                            .map(|(id, first_chunk_data)| {
-                                handle_new_stream(
-                                    &mut *streams,
-                                    id,
-                                    first_chunk_data,
-                                    &new_readers_sender_clone,
-                                    &stream_errors_sender,
-                                )
-                            })
-                            .transpose()?,
+                        new_stream.map(|(id, first_chunk_data)| {
+                            let (reader, remote_writer) = stream::stream();
+                            remote_writer
+                                .write(first_chunk_data.len(), |out| {
+                                    out[..first_chunk_data.len()]
+                                        .copy_from_slice(&first_chunk_data);
+                                    Ok(first_chunk_data.len())
+                                })
+                                .expect("We just created this stream!");
+                            streams.insert(id, StreamStatus::Open(remote_writer));
+                            (id, reader)
+                        }),
                         size,
                     ))
                 })
                 .await;
 
             let got = match got {
-                Ok(Some(x)) => streams_out.clone().send(x).await.map_err(|_| {
-                    Error::ConnectionClosed(Some("New stream handler disappeared".to_owned()))
-                }),
+                Ok(Some((id, reader))) => {
+                    // We got a request to initiate a new stream. It's already
+                    // in the streams table, just have to hand the reader over
+                    // to the other task to be dispatched, and the writer out to
+                    // the caller.
+                    let (remote_reader, writer) = stream::stream();
+
+                    if new_readers_sender.clone().send((id, remote_reader)).await.is_err() {
+                        Err(Error::ConnectionClosed(Some(
+                            "New stream reader handler disappeared".to_owned(),
+                        )))
+                    } else {
+                        let (sender, receiver) = oneshot::channel();
+                        if stream_errors_sender.clone().send(receiver).await.is_ok() {
+                            streams_out.clone().send((reader, writer, sender)).await.map_err(|_| {
+                                Error::ConnectionClosed(Some(
+                                    "New stream handler disappeared".to_owned(),
+                                ))
+                            })
+                        } else {
+                            Err(Error::ConnectionClosed(Some(
+                                "Error reporting channel closed".to_owned(),
+                            )))
+                        }
+                    }
+                }
                 Ok(None) => Ok(()),
                 Err(e) => Err(e),
             };
@@ -148,7 +171,7 @@ pub async fn multi_stream(
                 }
                 Either::Right((reader, writer)) => {
                     let id = stream_ids.next().expect("This iterator should be infinite!");
-                    if new_readers_sender.send((id, reader)).await.is_err() {
+                    if new_readers_sender.clone().send((id, reader)).await.is_err() {
                         break;
                     }
                     streams.lock().unwrap().insert(id, StreamStatus::Open(writer));
@@ -183,44 +206,6 @@ pub async fn multi_stream(
     match futures::future::select(handle_read, handle_write).await {
         Either::Left((res, _)) => res,
         Either::Right(((), handle_read)) => handle_read.await,
-    }
-}
-
-/// Handle chunk data for a new stream being initiated by the other end of the connection.
-///
-/// We take the `id` of the stream, and whatever data was sent with the initial message in
-/// `first_chunk_data`. We return a `Reader` and `Writer` that will get the de-multiplexed data for
-/// that stream, as well as a oneshot sender which takes an error, and can be used if the back end
-/// driving us has trouble setting up the new stream.
-///
-/// The oneshot receiver which will get the error once sent is handed off to `stream_errors_sender`,
-/// and the reader which feeds the returned writer is handed off to `new_readers_sender`. The writer
-/// which handles the returned reader is stored in the `streams` table.
-fn handle_new_stream(
-    streams: &mut HashMap<u32, StreamStatus>,
-    id: u32,
-    first_chunk_data: &[u8],
-    new_readers_sender: &UnboundedSender<(u32, stream::Reader)>,
-    stream_errors_sender: &UnboundedSender<oneshot::Receiver<Result<()>>>,
-) -> Result<(stream::Reader, stream::Writer, oneshot::Sender<Result<()>>)> {
-    let (reader, remote_writer) = stream::stream();
-    let (remote_reader, writer) = stream::stream();
-
-    remote_writer
-        .write(first_chunk_data.len(), |out| {
-            out[..first_chunk_data.len()].copy_from_slice(first_chunk_data);
-            Ok(first_chunk_data.len())
-        })
-        .expect("We just created this stream!");
-    new_readers_sender.unbounded_send((id, remote_reader)).map_err(|_| {
-        Error::ConnectionClosed(Some("New stream reader handler disappeared".to_owned()))
-    })?;
-    let (sender, receiver) = oneshot::channel();
-    streams.insert(id, StreamStatus::Open(remote_writer));
-    if stream_errors_sender.unbounded_send(receiver).is_ok() {
-        Ok((reader, writer, sender))
-    } else {
-        Err(Error::ConnectionClosed(Some("Error reporting channel closed".to_owned())))
     }
 }
 
@@ -526,6 +511,7 @@ pub async fn multi_stream_node_connection_to_async(
 mod test {
     use super::*;
     use fuchsia_async as fasync;
+    use futures::channel::mpsc::unbounded;
 
     #[fuchsia::test]
     async fn one_stream() {
