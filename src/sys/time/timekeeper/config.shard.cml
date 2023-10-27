@@ -53,5 +53,8 @@
         // This helps buggy programs which assume UTC clock is monotonic, and
         // use it to measure time durations.
         utc_start_at_startup: { type: "bool" },
+
+        // If set, timekeeper will exit early without managing the clock.
+        early_exit: { type: "bool" },
     },
 }

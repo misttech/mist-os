@@ -30,4 +30,7 @@
 
     // `false` is the default and legacy behavior.
     utc_start_at_startup: false,
+
+    // `false` is the default.
+    early_exit: false,
 }

@@ -12,6 +12,9 @@ board_configuration("qemu-riscv64") {
   provided_features = [
     "fuchsia::driver_framework_v2_support",
     "fuchsia::network_require_netstack3",
+
+    # TODO: b/299320231 - Remove when ring is supported on riscv64.
+    "fuchsia::soft_crypto",
   ]
 
   input_bundles = [ "//boards/riscv64:main_bundle" ]

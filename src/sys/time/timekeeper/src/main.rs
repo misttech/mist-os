@@ -99,6 +99,10 @@ impl Config {
     fn get_utc_start_at_startup(&self) -> bool {
         self.source_config.utc_start_at_startup
     }
+
+    fn get_early_exit(&self) -> bool {
+        self.source_config.early_exit
+    }
 }
 
 /// A definition which time sources to install, along with the URL and child names for each.
@@ -344,6 +348,10 @@ async fn maintain_utc<R: 'static, D: 'static>(
             });
         }
     }
+    if config.get_early_exit() {
+        tracing::info!("early_exit=true: exiting early per request from configuration. UTC clock will not be managed");
+        return;
+    }
     let primary_source_manager = time_source_fn(
         clock_details.backstop,
         Role::Primary,
@@ -446,6 +454,7 @@ mod tests {
             monitor_time_source_url: "".to_string(),
             primary_uses_pull: false,
             utc_start_at_startup: false,
+            early_exit: false,
         }))
     }
 

@@ -35,6 +35,8 @@ impl DefineSubsystemConfiguration<()> for TimekeeperSubsystem {
             (false, BuildType::Eng) => true,
         };
 
+        let has_soft_crypto = context.board_info.provides_feature("fuchsia::soft_crypto");
+
         config_builder
             .field("disable_delays", false)?
             .field("oscillator_error_std_dev_ppm", 15)?
@@ -48,8 +50,8 @@ impl DefineSubsystemConfiguration<()> for TimekeeperSubsystem {
             .field("primary_uses_pull", true)?
             .field("monitor_uses_pull", false)?
             .field("back_off_time_between_pull_samples_sec", 300)?
-
-            .field("utc_start_at_startup", utc_start_at_startup)?;
+            .field("utc_start_at_startup", utc_start_at_startup)?
+            .field("early_exit", has_soft_crypto)?;
 
         Ok(())
     }
