@@ -186,6 +186,7 @@ DEFINE_POSITION_TEST_CLASS(PositionNotifyFast, {
   constexpr auto kNotifsPerRingBuffer = 32u;
   ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
   // Request a 0.5-second ring-buffer.
   ASSERT_NO_FAILURE_OR_SKIP(
       RequestBuffer(ring_buffer_pcm_format().frame_rate / 2, kNotifsPerRingBuffer));
@@ -205,6 +206,7 @@ DEFINE_POSITION_TEST_CLASS(PositionNotifySlow, {
   constexpr auto kNotifsPerRingBuffer = 2u;
   ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMinFormat());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
   // Request a 2-second ring-buffer.
   ASSERT_NO_FAILURE_OR_SKIP(
       RequestBuffer(ring_buffer_pcm_format().frame_rate * 2, kNotifsPerRingBuffer));
@@ -227,6 +229,7 @@ DEFINE_POSITION_TEST_CLASS(NoPositionNotifyAfterStop, {
   constexpr auto kNotifsPerRingBuffer = 32u;
   ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
   // Set notifications to be rapid, with a small ring buffer and a large notifications-per-buffer.
   // If the device supports 192 kHz and the driver supports a ring this small, the buffer will be
   // 32 ms and notifications should arrive every 1 msec!
@@ -245,6 +248,7 @@ DEFINE_POSITION_TEST_CLASS(NoPositionNotifyAfterStop, {
 DEFINE_POSITION_TEST_CLASS(PositionNotifyNone, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
   ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(8000, 0));
   ASSERT_NO_FAILURE_OR_SKIP(DisallowPositionNotifications());
   ASSERT_NO_FAILURE_OR_SKIP(EnablePositionNotifications());
