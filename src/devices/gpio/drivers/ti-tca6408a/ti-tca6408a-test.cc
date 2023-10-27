@@ -4,16 +4,16 @@
 
 #include "ti-tca6408a.h"
 
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
-#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/metadata.h>
+#include <lib/driver/compat/cpp/device_server.h>
+#include <lib/driver/testing/cpp/driver_lifecycle.h>
+#include <lib/driver/testing/cpp/driver_runtime.h>
+#include <lib/driver/testing/cpp/test_environment.h>
+#include <lib/driver/testing/cpp/test_node.h>
 #include <lib/fake-i2c/fake-i2c.h>
 
 #include <zxtest/zxtest.h>
-
-#include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace gpio {
 
@@ -24,6 +24,13 @@ class FakeTiTca6408aDevice : public fake_i2c::FakeI2c {
   uint8_t output_port() const { return output_port_; }
   uint8_t polarity_inversion() const { return polarity_inversion_; }
   uint8_t configuration() const { return configuration_; }
+
+  fuchsia_hardware_i2c::Service::InstanceHandler GetInstanceHandler() {
+    return fuchsia_hardware_i2c::Service::InstanceHandler({
+        .device = bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                          fidl::kIgnoreBindingClosure),
+    });
+  }
 
  protected:
   zx_status_t Transact(const uint8_t* write_buffer, size_t write_buffer_size, uint8_t* read_buffer,
@@ -70,52 +77,70 @@ class FakeTiTca6408aDevice : public fake_i2c::FakeI2c {
 };
 
 struct IncomingNamespace {
-  component::OutgoingDirectory outgoing_{async_get_default_dispatcher()};
+  fdf_testing::TestNode node_{std::string("root")};
+  fdf_testing::TestEnvironment env_{fdf::Dispatcher::GetCurrent()->get()};
+  compat::DeviceServer device_server_{"pdev", 0, ""};
   FakeTiTca6408aDevice fake_i2c_;
 };
 
 class TiTca6408aTest : public zxtest::Test {
  public:
   TiTca6408aTest()
-      : ddk_(MockDevice::FakeRootParent()),
-        dispatcher_(mock_ddk::GetDriverRuntime()->StartBackgroundDispatcher()),
-        loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
-        incoming_(loop_.dispatcher(), std::in_place) {
-    ASSERT_OK(loop_.StartThread("incoming-ns-loop"));
-  }
+      : env_dispatcher_(runtime_.StartBackgroundDispatcher()),
+        driver_dispatcher_(runtime_.StartBackgroundDispatcher()),
+        dut_(driver_dispatcher_->async_dispatcher(), std::in_place),
+        incoming_(env_dispatcher_->async_dispatcher(), std::in_place) {}
 
   void SetUp() override {
     constexpr uint32_t kPinIndexOffset = 100;
-    ddk_->SetMetadata(DEVICE_METADATA_PRIVATE, &kPinIndexOffset, sizeof(kPinIndexOffset));
 
-    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ZX_ASSERT(endpoints.is_ok());
-    incoming_.SyncCall([&](IncomingNamespace* incoming) {
-      auto service_result = incoming->outgoing_.AddService<fuchsia_hardware_i2c::Service>(
-          fuchsia_hardware_i2c::Service::InstanceHandler(
-              {.device = incoming->fake_i2c_.bind_handler(async_get_default_dispatcher())}));
-      ZX_ASSERT(service_result.is_ok());
+    fuchsia_driver_framework::DriverStartArgs start_args;
+    fidl::ClientEnd<fuchsia_io::Directory> outgoing_directory_client;
+    incoming_.SyncCall([&kPinIndexOffset, &start_args,
+                        &outgoing_directory_client](IncomingNamespace* incoming) {
+      auto start_args_result = incoming->node_.CreateStartArgsAndServe();
+      ASSERT_TRUE(start_args_result.is_ok());
+      start_args = std::move(start_args_result->start_args);
+      outgoing_directory_client = std::move(start_args_result->outgoing_directory_client);
 
-      ZX_ASSERT(incoming->outgoing_.Serve(std::move(endpoints->server)).is_ok());
+      auto init_result =
+          incoming->env_.Initialize(std::move(start_args_result->incoming_directory_server));
+      ASSERT_TRUE(init_result.is_ok());
+
+      // Serve metadata.
+      auto status = incoming->device_server_.AddMetadata(DEVICE_METADATA_PRIVATE, &kPinIndexOffset,
+                                                         sizeof(kPinIndexOffset));
+      EXPECT_OK(status);
+      status = incoming->device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                              &incoming->env_.incoming_directory());
+      EXPECT_OK(status);
+
+      // Serve fake_i2c_.
+      auto result = incoming->env_.incoming_directory().AddService<fuchsia_hardware_i2c::Service>(
+          std::move(incoming->fake_i2c_.GetInstanceHandler()), "i2c");
+      ASSERT_TRUE(result.is_ok());
     });
 
-    ddk_->AddFidlService(fuchsia_hardware_i2c::Service::Name, std::move(endpoints->client), "i2c");
+    // Start dut_.
+    auto result = runtime_.RunToCompletion(dut_.SyncCall(
+        &fdf_testing::DriverUnderTest<TiTca6408aDevice>::Start, std::move(start_args)));
+    ASSERT_TRUE(result.is_ok());
 
-    // This TiTca6408a gets released by the MockDevice destructor.
-    ASSERT_OK(TiTca6408a::Create(nullptr, ddk_.get()));
+    // Connect to GpioImpl.
+    auto svc_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    EXPECT_EQ(ZX_OK, svc_endpoints.status_value());
 
-    MockDevice* device = ddk_->GetLatestChild();
-    ASSERT_NOT_NULL(device);
+    zx_status_t status = fdio_open_at(outgoing_directory_client.handle()->get(), "/svc",
+                                      static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
+                                      svc_endpoints->server.TakeChannel().release());
+    EXPECT_EQ(ZX_OK, status);
 
-    TiTca6408a* dut = device->GetDeviceContext<TiTca6408a>();
-    ASSERT_NOT_NULL(dut);
-
-    {
-      auto endpoints = fdf::CreateEndpoints<fuchsia_hardware_gpioimpl::GpioImpl>();
-      ASSERT_OK(endpoints.status_value());
-      fdf::BindServer(dispatcher_->get(), std::move(endpoints->server), dut);
-      gpio_.Bind(std::move(endpoints->client));
-    }
+    auto connect_result =
+        fdf::internal::DriverTransportConnect<fuchsia_hardware_gpioimpl::Service::Device>(
+            svc_endpoints->client, component::kDefaultInstance);
+    ASSERT_TRUE(connect_result.is_ok());
+    gpio_.Bind(std::move(connect_result.value()));
+    ASSERT_TRUE(gpio_.is_valid());
 
     incoming_.SyncCall([](IncomingNamespace* incoming) {
       EXPECT_EQ(incoming->fake_i2c_.polarity_inversion(), 0);
@@ -123,9 +148,10 @@ class TiTca6408aTest : public zxtest::Test {
   }
 
  private:
-  std::shared_ptr<MockDevice> ddk_;
-  fdf::UnownedSynchronizedDispatcher dispatcher_;
-  async::Loop loop_;
+  fdf_testing::DriverRuntime runtime_;
+  fdf::UnownedSynchronizedDispatcher env_dispatcher_;
+  fdf::UnownedSynchronizedDispatcher driver_dispatcher_;
+  async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<TiTca6408aDevice>> dut_;
 
  protected:
   async_patterns::TestDispatcherBound<IncomingNamespace> incoming_;
