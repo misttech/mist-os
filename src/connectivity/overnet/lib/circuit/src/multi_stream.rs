@@ -57,11 +57,12 @@ pub async fn multi_stream(
     stream_errors_out: UnboundedSender<Error>,
     remote_name: String,
 ) -> Result<()> {
-    let (new_readers_sender, new_readers) = unbounded();
+    let (mut new_readers_sender, new_readers) = unbounded();
     let (stream_errors_sender, stream_errors) = unbounded();
     let first_stream_id = if is_server { 1 } else { 0 };
     let mut stream_ids = (first_stream_id..).step_by(2);
 
+    let new_readers_sender_clone = new_readers_sender.clone();
     let handle_read = async move {
         let streams = SyncMutex::new(HashMap::<u32, StreamStatus>::new());
 
@@ -85,7 +86,7 @@ pub async fn multi_stream(
                                 &mut *streams,
                                 id,
                                 first_chunk_data,
-                                &new_readers_sender,
+                                &new_readers_sender_clone,
                                 &stream_errors_sender,
                             )?)
                             .map_err(|_| {
@@ -142,7 +143,7 @@ pub async fn multi_stream(
                 }
                 Either::Right((reader, writer)) => {
                     let id = stream_ids.next().expect("This iterator should be infinite!");
-                    if new_readers_sender.unbounded_send((id, reader)).is_err() {
+                    if new_readers_sender.send((id, reader)).await.is_err() {
                         break;
                     }
                     streams.lock().unwrap().insert(id, StreamStatus::Open(writer));
@@ -525,7 +526,7 @@ mod test {
     async fn one_stream() {
         let (a_reader, b_writer) = stream::stream();
         let (b_reader, a_writer) = stream::stream();
-        let (create_stream_a, a_streams_in) = unbounded();
+        let (mut create_stream_a, a_streams_in) = unbounded();
         let (_create_stream_b, b_streams_in) = unbounded();
         let (a_streams_out, _get_stream_a) = unbounded();
         let (b_streams_out, mut get_stream_b) = unbounded();
@@ -568,7 +569,7 @@ mod test {
         let (ab_reader_a, ab_reader_write) = stream::stream();
         let (ab_writer_read, ab_writer_a) = stream::stream();
 
-        create_stream_a.unbounded_send((ab_writer_read, ab_reader_write)).unwrap();
+        create_stream_a.send((ab_writer_read, ab_reader_write)).await.unwrap();
 
         ab_writer_a
             .write(8, |buf| {
@@ -621,7 +622,7 @@ mod test {
     async fn fallible_stream() {
         let (a_reader, b_writer) = stream::stream();
         let (b_reader, a_writer) = stream::stream();
-        let (create_stream_a, a_streams_in) = unbounded();
+        let (mut create_stream_a, a_streams_in) = unbounded();
         let (_create_stream_b, b_streams_in) = unbounded();
         let (a_streams_out, _get_stream_a) = unbounded();
         let (b_streams_out, mut get_stream_b) = unbounded();
@@ -664,7 +665,7 @@ mod test {
         // The first stream fails to be created.
         let (fail_reader, fail_reader_write) = stream::stream();
         let (_ignore, fail_writer) = stream::stream();
-        create_stream_a.unbounded_send((fail_reader, fail_writer)).unwrap();
+        create_stream_a.send((fail_reader, fail_writer)).await.unwrap();
 
         // There's a laziness to stream creation in the protocol so we need to send a little data to
         // actually create the stream.
@@ -691,7 +692,7 @@ mod test {
         let (ab_reader_a, ab_reader_write) = stream::stream();
         let (ab_writer_read, ab_writer_a) = stream::stream();
 
-        create_stream_a.unbounded_send((ab_writer_read, ab_reader_write)).unwrap();
+        create_stream_a.send((ab_writer_read, ab_reader_write)).await.unwrap();
 
         ab_writer_a
             .write(8, |buf| {
@@ -744,8 +745,8 @@ mod test {
     async fn two_streams() {
         let (a_reader, b_writer) = stream::stream();
         let (b_reader, a_writer) = stream::stream();
-        let (create_stream_a, a_streams_in) = unbounded();
-        let (create_stream_b, b_streams_in) = unbounded();
+        let (mut create_stream_a, a_streams_in) = unbounded();
+        let (mut create_stream_b, b_streams_in) = unbounded();
         let (a_streams_out, mut get_stream_a) = unbounded();
         let (b_streams_out, mut get_stream_b) = unbounded();
         // Connection closure errors are very timing-dependent so we'll tend to be flaky if we
@@ -776,8 +777,8 @@ mod test {
         let (ba_reader_b, ba_reader_write) = stream::stream();
         let (ba_writer_read, ba_writer_b) = stream::stream();
 
-        create_stream_a.unbounded_send((ab_writer_read, ab_reader_write)).unwrap();
-        create_stream_b.unbounded_send((ba_writer_read, ba_reader_write)).unwrap();
+        create_stream_a.send((ab_writer_read, ab_reader_write)).await.unwrap();
+        create_stream_b.send((ba_writer_read, ba_reader_write)).await.unwrap();
 
         ab_writer_a
             .write(8, |buf| {

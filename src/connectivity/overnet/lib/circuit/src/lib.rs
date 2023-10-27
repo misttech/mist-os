@@ -9,6 +9,7 @@ use futures::future::Either;
 use futures::lock::Mutex;
 use futures::stream::StreamExt as _;
 use futures::FutureExt;
+use futures::SinkExt as _;
 use std::collections::HashMap;
 use std::future::Future;
 use std::sync::{Arc, Weak};
@@ -219,7 +220,9 @@ impl Node {
     ) -> Result<()> {
         if self.node_id == node_id {
             self.incoming_stream_sender
-                .unbounded_send((connection_reader, connection_writer, node_id.to_owned()))
+                .clone()
+                .send((connection_reader, connection_writer, node_id.to_owned()))
+                .await
                 .map_err(|_| Error::NoSuchPeer(node_id.to_owned()))?;
         } else {
             let node_id: EncodableString = node_id.to_owned().try_into()?;
@@ -391,7 +394,7 @@ impl Node {
         let peers = Arc::clone(&self.peers);
         let new_stream_sender = new_stream_sender.clone();
         let node_id = self.node_id.clone();
-        let new_peer_sender = self.new_peer_sender.clone();
+        let mut new_peer_sender = self.new_peer_sender.clone();
 
         async move {
             let control_reader = control_reader.await.map_err(|_| {
@@ -408,16 +411,20 @@ impl Node {
                         }
 
                         let quality = path_quality.combine(quality);
-                        let mut peers = peers.lock().await;
-                        let peers = peers.peers();
                         let peer_string = peer.to_string();
-                        let peer_list = peers.entry(peer).or_insert_with(Vec::new);
-                        if peer_list.is_empty() {
-                            let _ = new_peer_sender.unbounded_send(peer_string);
+                        let should_send = {
+                            let mut peers = peers.lock().await;
+                            let peers = peers.peers();
+                            let peer_list = peers.entry(peer).or_insert_with(Vec::new);
+                            let should_send = peer_list.is_empty();
+                            peer_list.retain(|x| !x.0.same_receiver(&new_stream_sender));
+                            peer_list.push((new_stream_sender.clone(), quality));
+                            peer_list.sort_by_key(|x| x.1);
+                            should_send
+                        };
+                        if should_send {
+                            let _ = new_peer_sender.send(peer_string).await;
                         }
-                        peer_list.retain(|x| !x.0.same_receiver(&new_stream_sender));
-                        peer_list.push((new_stream_sender.clone(), quality));
-                        peer_list.sort_by_key(|x| x.1);
                     }
                     NodeState::Offline(peer) => {
                         let mut peers = peers.lock().await;
@@ -451,8 +458,8 @@ impl Node {
         new_stream_sender: UnboundedSender<(stream::Reader, stream::Writer)>,
     ) -> impl Future<Output = ()> {
         let peers = Arc::clone(&self.peers);
-        let incoming_stream_sender = self.incoming_stream_sender.clone();
-        let new_peer_sender = self.new_peer_sender.clone();
+        let mut incoming_stream_sender = self.incoming_stream_sender.clone();
+        let mut new_peer_sender = self.new_peer_sender.clone();
         let node_id = self.node_id.clone();
 
         async move {
@@ -489,20 +496,27 @@ impl Node {
                             connect_to_peer(Arc::clone(&peers), reader, writer, &dest).await?;
                         } else {
                             let src = reader.read_protocol_message::<EncodableString>().await?;
-                            {
+                            let send_new_peer = {
                                 let mut peers = peers.lock().await;
                                 let peer_list =
                                     peers.peers.entry(src.clone()).or_insert_with(Vec::new);
                                 if !peer_list.iter().any(|x| x.0.same_receiver(&new_stream_sender))
                                 {
                                     peer_list.push((new_stream_sender.clone(), Quality::UNKNOWN));
-                                    let _ = new_peer_sender.unbounded_send(src.to_string());
                                     peers.increment_generation();
+                                    true
+                                } else {
+                                    false
                                 }
+                            };
+
+                            if send_new_peer {
+                                let _ = new_peer_sender.send(src.to_string()).await;
                             }
 
                             incoming_stream_sender
-                                .unbounded_send((reader, writer, src.to_string()))
+                                .send((reader, writer, src.to_string()))
+                                .await
                                 .map_err(|_| {
                                     Error::ConnectionClosed(Some(
                                         "Incoming stream dispatcher disappeared".to_owned(),

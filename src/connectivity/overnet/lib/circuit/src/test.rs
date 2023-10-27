@@ -19,8 +19,8 @@ async fn connect_nodes(a: &Node, b: &Node) -> impl std::future::Future<Output = 
     let (read_b_control_writer, b_control_writer) = stream::stream();
     let (a_new_stream_sender, mut a_new_streams) = unbounded();
     let (b_new_stream_sender, mut b_new_streams) = unbounded();
-    let (a_new_stream_requests, a_new_stream_receiver) = unbounded();
-    let (b_new_stream_requests, b_new_stream_receiver) = unbounded();
+    let (mut a_new_stream_requests, a_new_stream_receiver) = unbounded();
+    let (mut b_new_stream_requests, b_new_stream_receiver) = unbounded();
     let a_runner = a.link_node(
         Some((read_a_control_writer, write_a_control_reader)),
         a_new_stream_sender,
@@ -93,7 +93,7 @@ async fn connect_nodes(a: &Node, b: &Node) -> impl std::future::Future<Output = 
         let a_to_b = async move {
             while let Some((reader, writer)) = a_new_streams.next().await {
                 let (err_sender, err) = oneshot();
-                b_new_stream_requests.unbounded_send((reader, writer, err_sender)).unwrap();
+                b_new_stream_requests.send((reader, writer, err_sender)).await.unwrap();
                 err.await.unwrap().unwrap();
             }
         };
@@ -101,7 +101,7 @@ async fn connect_nodes(a: &Node, b: &Node) -> impl std::future::Future<Output = 
         let b_to_a = async move {
             while let Some((reader, writer)) = b_new_streams.next().await {
                 let (err_sender, err) = oneshot();
-                a_new_stream_requests.unbounded_send((reader, writer, err_sender)).unwrap();
+                a_new_stream_requests.send((reader, writer, err_sender)).await.unwrap();
                 err.await.unwrap().unwrap();
             }
         };
