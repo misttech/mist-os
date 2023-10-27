@@ -10,7 +10,6 @@ if (is_host) {
     main_source = "perf_publish_test.py"
     libraries = [ "//src/performance/lib/perf_publish" ]
     deps = [ ":runtime_deps" ]
-    test_dir = "${target_gen_dir}/${target_name}"
   }
 
   python_host_test("metrics_allowlist_test") {
@@ -21,7 +20,7 @@ if (is_host) {
 
   host_test_data("runtime_deps") {
     sources = [ "${root_out_dir}/catapult_converter" ]
-    outputs = [ "${target_gen_dir}/runtime_deps/{{source_file_part}}" ]
+    outputs = [ "${target_out_dir}/runtime_deps/{{source_file_part}}" ]
     deps = [ "//src/testing/catapult_converter:converter_bin" ]
   }
 }

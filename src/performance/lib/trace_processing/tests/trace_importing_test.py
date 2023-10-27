@@ -19,8 +19,11 @@ class TraceImportingTest(unittest.TestCase):
 
     def setUp(self):
         # A second dirname is required to account for the .pyz archive which
-        # contains the test.
-        self._test_path: str = os.path.dirname(os.path.dirname(__file__))
+        # contains the test and a third one since data is a sibling of the test.
+        self._runtime_deps_path: str = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+            "runtime_deps",
+        )
 
     def test_create_model(self) -> None:
         """Test case to ensure we can load a model from a file"""
@@ -28,7 +31,7 @@ class TraceImportingTest(unittest.TestCase):
         model: trace_model.Model = test_utils.get_test_model()
         model_from_json: trace_model.Model = (
             trace_importing.create_model_from_file_path(
-                os.path.join(self._test_path, "runtime_deps/model.json")
+                os.path.join(self._runtime_deps_path, "model.json")
             )
         )
         test_utils.assertModelsEqual(self, model, model_from_json)
@@ -172,7 +175,7 @@ class TraceImportingTest(unittest.TestCase):
 
     def test_flow_ids(self) -> None:
         model: trace_model.Model = trace_importing.create_model_from_file_path(
-            os.path.join(self._test_path, "runtime_deps/flow_ids.json")
+            os.path.join(self._runtime_deps_path, "flow_ids.json")
         )
 
         events: List[trace_model.Event] = list(model.all_events())
@@ -189,9 +192,7 @@ class TraceImportingTest(unittest.TestCase):
 
     def test_flow_event_binding_points(self) -> None:
         model: trace_model.Model = trace_importing.create_model_from_file_path(
-            os.path.join(
-                self._test_path, "runtime_deps/flow_event_binding.json"
-            )
+            os.path.join(self._runtime_deps_path, "flow_event_binding.json")
         )
 
         process: trace_model.Process = model.processes[0]
@@ -241,7 +242,7 @@ class TraceImportingTest(unittest.TestCase):
 
     def test_async_events_with_id2(self) -> None:
         model: trace_model.Model = trace_importing.create_model_from_file_path(
-            os.path.join(self._test_path, "runtime_deps/id2_async.json")
+            os.path.join(self._runtime_deps_path, "id2_async.json")
         )
         self.assertEqual(len(model.processes), 2)
         self.assertEqual(
@@ -273,7 +274,7 @@ class TraceImportingTest(unittest.TestCase):
 
     def test_chrome_metadata_events(self) -> None:
         model: trace_model.Model = trace_importing.create_model_from_file_path(
-            os.path.join(self._test_path, "runtime_deps/chrome_metadata.json")
+            os.path.join(self._runtime_deps_path, "chrome_metadata.json")
         )
         process: trace_model.Process = model.processes[0]
         thread: trace_model.Thread = process.threads[0]

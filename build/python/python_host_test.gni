@@ -45,7 +45,7 @@ import("//build/testing/host_test_data.gni")
 #  test_dir (optional)
 #    Path to where the test executes.
 #    Type: string
-#    Default: "${root_out_dir}/test_data/${target_dir}"
+#    Default: "${target_out_dir}/${target_name}"
 #
 #  extra_args (optional)
 #    Additional arguments to pass to the test.
@@ -85,8 +85,7 @@ template("python_host_test") {
     }
   }
 
-  _target_dir = get_label_info(target_name, "dir")
-  _test_dir = "${root_out_dir}/test_data/${_target_dir}"
+  _test_dir = "${target_out_dir}/${target_name}"
   if (defined(invoker.test_dir)) {
     _test_dir = invoker.test_dir
   }
