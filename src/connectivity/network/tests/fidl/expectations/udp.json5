@@ -16,5 +16,12 @@
                 "*ns3*",
             ],
         },
+        {
+            type: "skip",
+            matchers: [
+                // TODO(https://fxbug.dev/106604): Implement filtering in NS3.
+                "drop_udp_incoming_with_src_address_invert_ns3",
+            ],
+        },
     ],
 }
