@@ -127,17 +127,6 @@ driver_bind_rules("sherlock-securemem-bind") {
   ]
 }
 
-driver_bind_rules("sherlock-dwc2-phy-bind") {
-  rules = "bind/sherlock-dwc2-phy.bind"
-  header_output = "sherlock-dwc2-phy-bind.h"
-  bind_output = "sherlock-dwc2-phy-bind.bc"
-  tests = "bind-tests/sherlock-dwc2-phy-test.json"
-  deps = [
-    "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.usb.phy",
-  ]
-}
-
 driver_bind_rules("sherlock-xhci-bind") {
   rules = "bind/sherlock-xhci.bind"
   header_output = "sherlock-xhci-bind.h"
@@ -312,7 +301,6 @@ template("sherlock_driver") {
 
     deps = [
       ":camera-isp-bind_header",
-      ":sherlock-dwc2-phy-bind_header",
       ":sherlock-emmc-bind_header",
       ":sherlock-hevc-enc-bind_header",
       ":sherlock-ot-radio-bind_header",
@@ -361,13 +349,13 @@ template("sherlock_driver") {
       "//src/devices/bind/fuchsia.i2c:fuchsia.i2c_cpp",
       "//src/devices/bind/fuchsia.isp:fuchsia.isp_cpp",
       "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
-      "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
       "//src/devices/bind/fuchsia.pwm:fuchsia.pwm_cpp",
       "//src/devices/bind/fuchsia.register:fuchsia.register_cpp",
       "//src/devices/bind/fuchsia.sony.platform:fuchsia.sony.platform_cpp",
       "//src/devices/bind/fuchsia.sysmem:fuchsia.sysmem_cpp",
       "//src/devices/bind/fuchsia.thermal:fuchsia.thermal_cpp",
       "//src/devices/bind/fuchsia.ti.platform:fuchsia.ti.platform_cpp",
+      "//src/devices/bind/fuchsia.usb.phy:fuchsia.usb.phy_cpp",
       "//src/devices/bus/lib/platform-bus-composites",
       "//src/devices/lib/amlogic",
       "//src/devices/lib/broadcom",
@@ -424,6 +412,5 @@ group("tests") {
   deps = [
     ":camera-isp-bind_test",
     ":sherlock-bind_test",
-    ":sherlock-dwc2-phy-bind_test",
   ]
 }

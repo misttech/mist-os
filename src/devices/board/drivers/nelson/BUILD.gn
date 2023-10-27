@@ -220,17 +220,6 @@ driver_bind_rules("nelson_xhci_bind") {
   ]
 }
 
-driver_bind_rules("nelson_dwc2_bind") {
-  rules = "bind/nelson_dwc2.bind"
-  header_output = "nelson_dwc2_bind.h"
-  bind_output = "nelson_dwc2_bind.bc"
-  tests = "bind-tests/dwc2-test.json"
-  deps = [
-    "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.usb.phy",
-  ]
-}
-
 driver_bind_rules("nelson_aml_video_bind") {
   rules = "bind/nelson_aml_video.bind"
   header_output = "nelson_aml_video_bind.h"
@@ -308,7 +297,6 @@ fuchsia_driver("nelson-module-driver") {
     ":nelson-bind",
     ":nelson_aml_sdio_bind_header",
     ":nelson_aml_video_bind_header",
-    ":nelson_dwc2_bind_header",
     ":nelson_emmc_bind_header",
     ":nelson_ot_radio_bind_header",
     ":nelson_selina_bind_header",
@@ -347,11 +335,13 @@ fuchsia_driver("nelson-module-driver") {
     "//src/devices/bind/fuchsia.goodix.platform:fuchsia.goodix.platform_cpp",
     "//src/devices/bind/fuchsia.gpio:fuchsia.gpio_cpp",
     "//src/devices/bind/fuchsia.i2c:fuchsia.i2c_cpp",
+    "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
     "//src/devices/bind/fuchsia.power:fuchsia.power_cpp",
     "//src/devices/bind/fuchsia.pwm:fuchsia.pwm_cpp",
     "//src/devices/bind/fuchsia.register:fuchsia.register_cpp",
     "//src/devices/bind/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//src/devices/bind/fuchsia.ti.platform:fuchsia.ti.platform_cpp",
+    "//src/devices/bind/fuchsia.usb.phy:fuchsia.usb.phy_cpp",
     "//src/devices/bus/lib/platform-bus-composites",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/broadcom",
@@ -407,7 +397,6 @@ group("tests") {
     ":nelson_aml_sdio_bind_test",
     ":nelson_aml_video_bind_test",
     ":nelson_aml_video_bind_test",
-    ":nelson_dwc2_bind_test",
     ":nelson_ot_radio_bind_test",
     ":nelson_selina_bind_test",
     ":nelson_wifi_bind_test",

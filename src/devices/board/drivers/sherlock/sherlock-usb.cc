@@ -18,7 +18,9 @@
 
 #include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/platform/cpp/bind.h>
 #include <bind/fuchsia/register/cpp/bind.h>
+#include <bind/fuchsia/usb/phy/cpp/bind.h>
 #include <ddk/usb-peripheral-config.h>
 #include <soc/aml-common/aml-registers.h>
 #include <usb/cdc.h>
@@ -28,7 +30,6 @@
 #include <usb/usb.h>
 
 #include "sherlock.h"
-#include "src/devices/board/drivers/sherlock/sherlock-dwc2-phy-bind.h"
 #include "src/devices/board/drivers/sherlock/sherlock-xhci-bind.h"
 #include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 
@@ -220,6 +221,51 @@ zx_status_t AddUsbPhyComposite(fdf::WireSyncClient<fpbus::PlatformBus>& pbus,
   return ZX_OK;
 }
 
+zx_status_t AddDwc2Composite(fdf::WireSyncClient<fpbus::PlatformBus>& pbus,
+                             fidl::AnyArena& fidl_arena, fdf::Arena& arena) {
+  fpbus::Node dwc2_dev = {};
+  dwc2_dev.name() = "dwc2";
+  dwc2_dev.vid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_GENERIC;
+  dwc2_dev.pid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC;
+  dwc2_dev.did() = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_USB_DWC2;
+  dwc2_dev.mmio() = dwc2_mmios;
+  dwc2_dev.irq() = dwc2_irqs;
+  dwc2_dev.bti() = dwc2_btis;
+  dwc2_dev.metadata() = usb_metadata;
+  dwc2_dev.boot_metadata() = usb_boot_metadata;
+
+  const std::vector<fdf::BindRule> kDwc2PhyRules = std::vector{
+      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_usb_phy::BIND_PROTOCOL_DEVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_VID,
+                              bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_GENERIC),
+      fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_PID,
+                              bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
+      fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_DID,
+                              bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_USB_DWC2),
+  };
+
+  const std::vector<fdf::NodeProperty> kDwc2PhyProperties = std::vector{
+      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_usb_phy::BIND_PROTOCOL_DEVICE),
+  };
+
+  std::vector<fdf::ParentSpec> parents{{kDwc2PhyRules, kDwc2PhyProperties}};
+  auto spec_result = pbus.buffer(arena)->AddCompositeNodeSpec(
+      fidl::ToWire(fidl_arena, dwc2_dev),
+      fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
+                                   {.name = "dwc2_phy", .parents = parents}}));
+  if (!spec_result.ok()) {
+    zxlogf(ERROR, "AddCompositeNodeSpec Usb(dwc2_phy) request failed: %s",
+           spec_result.FormatDescription().data());
+    return spec_result.status();
+  }
+  if (spec_result->is_error()) {
+    zxlogf(ERROR, "AddCompositeNodeSpec Usb(dwc2_phy) failed: %s",
+           zx_status_get_string(spec_result->error_value()));
+    return spec_result->error_value();
+  }
+  return ZX_OK;
+}
+
 }  // namespace
 
 zx_status_t Sherlock::UsbInit() {
@@ -256,31 +302,10 @@ zx_status_t Sherlock::UsbInit() {
       return status;
     }
     usb_metadata[0].data() = peripheral_config->config_data();
-    fpbus::Node dwc2_dev = {};
-    dwc2_dev.name() = "dwc2";
-    dwc2_dev.vid() = PDEV_VID_GENERIC;
-    dwc2_dev.pid() = PDEV_PID_GENERIC;
-    dwc2_dev.did() = PDEV_DID_USB_DWC2;
-    dwc2_dev.mmio() = dwc2_mmios;
-    dwc2_dev.irq() = dwc2_irqs;
-    dwc2_dev.bti() = dwc2_btis;
-    dwc2_dev.metadata() = usb_metadata;
-    dwc2_dev.boot_metadata() = usb_boot_metadata;
 
-    result = pbus_.buffer(arena)->AddComposite(
-        fidl::ToWire(fidl_arena, dwc2_dev),
-        platform_bus_composite::MakeFidlFragment(fidl_arena, dwc2_phy_fragments,
-                                                 std::size(dwc2_phy_fragments)),
-        "dwc2-phy");
-    if (!result.ok()) {
-      zxlogf(ERROR, "%s: AddComposite Usb(dwc2_dev) request failed: %s", __func__,
-             result.FormatDescription().data());
-      return result.status();
-    }
-    if (result->is_error()) {
-      zxlogf(ERROR, "%s: AddComposite Usb(dwc2_dev) failed: %s", __func__,
-             zx_status_get_string(result->error_value()));
-      return result->error_value();
+    status = AddDwc2Composite(pbus_, fidl_arena, arena);
+    if (status != ZX_OK) {
+      return status;
     }
   }
 

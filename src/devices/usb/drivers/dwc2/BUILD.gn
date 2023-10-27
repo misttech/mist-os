@@ -14,6 +14,7 @@ driver_bind_rules("dwc2_bind") {
   deps = [
     "//src/devices/bind/fuchsia.designware.platform",
     "//src/devices/bind/fuchsia.platform",
+    "//src/devices/bind/fuchsia.usb.phy",
   ]
 }
 

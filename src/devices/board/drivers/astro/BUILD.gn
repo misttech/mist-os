@@ -101,17 +101,6 @@ driver_bind_rules("pwm-ao-d-bind") {
   ]
 }
 
-driver_bind_rules("astro-dwc2-phy-bind") {
-  rules = "bind/astro-dwc2-phy.bind"
-  header_output = "astro-dwc2-phy-bind.h"
-  bind_output = "astro-dwc2-phy-bind.bc"
-  tests = "bind-tests/astro-dwc2-phy-test.json"
-  deps = [
-    "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.usb.phy",
-  ]
-}
-
 driver_bind_rules("astro-xhci-bind") {
   rules = "bind/astro-xhci.bind"
   header_output = "astro-xhci-bind.h"
@@ -190,7 +179,6 @@ fuchsia_driver("astro-driver") {
   deps = [
     ":astro-aml-sdio-bind_header",
     ":astro-bind",
-    ":astro-dwc2-phy-bind_header",
     ":astro-pwm-bind_header",
     ":astro-securemem-bind_header",
     ":astro-tee-bind_header",
@@ -225,11 +213,13 @@ fuchsia_driver("astro-driver") {
     "//src/devices/bind/fuchsia.google.platform:fuchsia.google.platform_cpp",
     "//src/devices/bind/fuchsia.gpio:fuchsia.gpio_cpp",
     "//src/devices/bind/fuchsia.i2c:fuchsia.i2c_cpp",
+    "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
     "//src/devices/bind/fuchsia.power:fuchsia.power_cpp",
     "//src/devices/bind/fuchsia.pwm:fuchsia.pwm_cpp",
     "//src/devices/bind/fuchsia.register:fuchsia.register_cpp",
     "//src/devices/bind/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//src/devices/bind/fuchsia.ti.platform:fuchsia.ti.platform_cpp",
+    "//src/devices/bind/fuchsia.usb.phy:fuchsia.usb.phy_cpp",
     "//src/devices/bus/lib/platform-bus-composites",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/broadcom",
@@ -280,7 +270,6 @@ group("tests") {
   deps = [
     ":astro-aml-sdio-bind_test",
     ":astro-bind_test",
-    ":astro-dwc2-phy-bind_test",
     ":astro-pwm-bind_test",
     ":astro-securemem-bind_test",
     ":astro-tee-bind_test",
