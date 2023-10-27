@@ -220,6 +220,11 @@ pub enum AddDynamicChildError {
     NameTooLong { max_len: usize },
     #[error("collection {} does not allow dynamic offers", collection_name)]
     DynamicOffersNotAllowed { collection_name: String },
+    #[error("failed to start child in single-run collection: {}", err)]
+    StartSingleRun {
+        #[source]
+        err: StartActionError,
+    },
     #[error("failed to add child to parent: {}", err)]
     AddChildError {
         #[from]
@@ -251,11 +256,10 @@ impl Into<fcomponent::Error> for AddDynamicChildError {
             AddDynamicChildError::AddChildError {
                 err: AddChildError::InstanceAlreadyExists { .. },
             } => fcomponent::Error::InstanceAlreadyExists,
-
-            // Invalid Arguments
             AddDynamicChildError::DynamicOffersNotAllowed { .. } => {
                 fcomponent::Error::InvalidArguments
             }
+            AddDynamicChildError::StartSingleRun { err } => err.into(),
             AddDynamicChildError::NameTooLong { .. } => fcomponent::Error::InvalidArguments,
             AddDynamicChildError::AddChildError {
                 err: AddChildError::DynamicOfferError { .. },
@@ -288,6 +292,7 @@ impl Into<fsys::CreateError> for AddDynamicChildError {
             AddDynamicChildError::DynamicOffersNotAllowed { .. } => {
                 fsys::CreateError::DynamicOffersForbidden
             }
+            AddDynamicChildError::StartSingleRun { .. } => fsys::CreateError::Internal,
             AddDynamicChildError::NameTooLong { .. } => fsys::CreateError::BadChildDecl,
             AddDynamicChildError::AddChildError {
                 err: AddChildError::DynamicOfferError { .. },

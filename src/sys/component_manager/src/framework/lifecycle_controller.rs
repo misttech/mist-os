@@ -135,21 +135,15 @@ impl LifecycleController {
             _ => fsys::CreateError::Internal,
         })?;
 
-        cm_fidl_validator::validate_dynamic_child(&child_decl)
-            .map_err(|error| {
-                warn!(%parent_moniker, %error, "failed to create dynamic child. child decl validation failed");
-                fsys::CreateError::BadChildDecl
-            })?;
-        if child_decl.environment.is_some() {
-            warn!(%parent_moniker, "failed to create dynamic child. child decl cannot specify environment");
-            return Err(fsys::CreateError::BadChildDecl);
-        }
+        cm_fidl_validator::validate_dynamic_child(&child_decl).map_err(|error| {
+            warn!(%parent_moniker, %error, "failed to create dynamic child. child decl is invalid");
+            fsys::CreateError::BadChildDecl
+        })?;
         let child_decl = child_decl.fidl_into_native();
 
         parent_component
-            .add_dynamic_child(collection.name.clone(), &child_decl, child_args, false)
+            .add_dynamic_child(collection.name.clone(), &child_decl, child_args)
             .await
-            .map(|_| ())
             .map_err(|error| {
                 warn!(%parent_moniker, %error, "failed to add dynamic child");
                 error.into()

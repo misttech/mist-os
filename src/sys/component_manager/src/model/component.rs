@@ -88,7 +88,7 @@ use {
         sync::{Arc, Weak},
         time::Duration,
     },
-    tracing::warn,
+    tracing::{debug, warn},
     version_history::AbiRevision,
     vfs::{execution_scope::ExecutionScope, path::Path},
 };
@@ -564,23 +564,17 @@ impl ComponentInstance {
         return Ok(Some(RemoteRunner::new(client)));
     }
 
-    /// Adds the dynamic child defined by `child_decl` to the given `collection_name`. Once
-    /// added, the component instance exists but is not bound.
-    ///
-    /// Returns the collection durability of the collection the child was added to.
+    /// Adds the dynamic child defined by `child_decl` to the given `collection_name`.
     pub async fn add_dynamic_child(
         self: &Arc<Self>,
         collection_name: String,
         child_decl: &ChildDecl,
         child_args: fcomponent::CreateChildArgs,
-        numbered_handles_are_present: bool,
-    ) -> Result<fdecl::Durability, AddDynamicChildError> {
-        match child_decl.startup {
-            fdecl::StartupMode::Lazy => {}
-            fdecl::StartupMode::Eager => {
-                return Err(AddDynamicChildError::EagerStartupUnsupported);
-            }
+    ) -> Result<(), AddDynamicChildError> {
+        if child_decl.startup == fdecl::StartupMode::Eager {
+            return Err(AddDynamicChildError::EagerStartupUnsupported);
         }
+
         let mut state = self.lock_resolved_state().await?;
         let collection_decl = state
             .decl()
@@ -589,16 +583,13 @@ impl ComponentInstance {
                 name: collection_name.clone(),
             })?
             .clone();
+        let is_single_run_collection = collection_decl.durability == fdecl::Durability::SingleRun;
 
-        // Numbered handles which are to be given to a component in a single run collection are
-        // provided to the component as part of the start action. We want to disallow numbered
-        // handles being provided at component creation time for components not in a single run
-        // collection, but the collection decl isn't looked up until this point.
-        //
-        // The `numbered_handles_are_present` bool is thus used here to denote if an error should
-        // be returned when the collection is not single run.
-        if numbered_handles_are_present
-            && collection_decl.durability != fdecl::Durability::SingleRun
+        // Specifying numbered handles is only allowed if the component is started in
+        // a single-run collection.
+        if child_args.numbered_handles.is_some()
+            && !child_args.numbered_handles.as_ref().unwrap().is_empty()
+            && !is_single_run_collection
         {
             return Err(AddDynamicChildError::NumberedHandleNotInSingleRunCollection);
         }
@@ -607,18 +598,19 @@ impl ComponentInstance {
             return Err(AddDynamicChildError::NameTooLong { max_len: cm_types::MAX_NAME_LENGTH });
         }
 
-        let collection_sandbox = state
-            .collection_sandboxes
-            .get(&Name::new(&collection_name).unwrap())
-            .expect("sandbox missing for declared collection");
-
         if child_args.dynamic_offers.as_ref().map(|v| v.first()).flatten().is_some()
             && collection_decl.allowed_offers != cm_types::AllowedOffers::StaticAndDynamic
         {
             return Err(AddDynamicChildError::DynamicOffersNotAllowed { collection_name });
         }
+
+        let collection_sandbox = state
+            .collection_sandboxes
+            .get(&Name::new(&collection_name).unwrap())
+            .expect("sandbox missing for declared collection");
         let child_sandbox = collection_sandbox.clone();
-        let discover_fut = state
+
+        let (child, discover_fut) = state
             .add_child(
                 self,
                 child_decl,
@@ -628,8 +620,30 @@ impl ComponentInstance {
                 child_sandbox,
             )
             .await?;
+
+        // Release the component state lock so DiscoverAction can acquire it.
+        drop(state);
+
+        // Wait for the Discover action to finish.
         discover_fut.await?;
-        Ok(collection_decl.durability)
+
+        // Start the child if it's created in a `SingleRun` collection.
+        if is_single_run_collection {
+            child
+                .start(
+                    &StartReason::SingleRun,
+                    None,
+                    child_args.numbered_handles.unwrap_or_default(),
+                    vec![],
+                )
+                .await
+                .map_err(|err| {
+                    debug!(%err, moniker=%child.moniker, "failed to start component instance");
+                    AddDynamicChildError::StartSingleRun { err }
+                })?;
+        }
+
+        Ok(())
     }
 
     /// Removes the dynamic child, returning a future that will execute the
@@ -1586,11 +1600,13 @@ impl ResolvedInstanceState {
         self.get_environment(component, collection.environment.as_ref())
     }
 
-    /// Adds a new child of this instance for the given `ChildDecl`. Returns a
-    /// future to wait on the child's `Discover` action, or `None` if a child
-    /// with the same name already existed. This function always succeeds - an
-    /// error returned by the `Future` means that the `Discover` action failed,
-    /// but the creation of the child still succeeded.
+    /// Adds a new child component instance.
+    ///
+    /// The new child starts with a registered `Discover` action. Returns the child and a future to
+    /// wait on the `Discover` action, or an error if a child with the same name already exists.
+    ///
+    /// If the outer `Result` is successful but the `Discover` future results in an error, the
+    /// `Discover` action failed, but the child was still created successfully.
     async fn add_child(
         &mut self,
         component: &Arc<ComponentInstance>,
@@ -1599,14 +1615,21 @@ impl ResolvedInstanceState {
         dynamic_offers: Option<Vec<fdecl::Offer>>,
         controller: Option<ServerEnd<fcomponent::ControllerMarker>>,
         sandbox: Sandbox,
-    ) -> Result<BoxFuture<'static, Result<(), DiscoverActionError>>, AddChildError> {
+    ) -> Result<
+        (Arc<ComponentInstance>, BoxFuture<'static, Result<(), DiscoverActionError>>),
+        AddChildError,
+    > {
         let (child, sandbox) = self
             .add_child_internal(component, child, collection, dynamic_offers, controller, sandbox)
             .await?;
-        // We can dispatch a Discovered event for the component now that it's installed in the
-        // tree, which means any Discovered hooks will capture it.
-        let mut actions = child.lock_actions().await;
-        Ok(actions.register_no_wait(&child, DiscoverAction::new(sandbox)).boxed())
+        // Register a Discover action.
+        let discover_fut = child
+            .clone()
+            .lock_actions()
+            .await
+            .register_no_wait(&child, DiscoverAction::new(sandbox))
+            .boxed();
+        Ok((child, discover_fut))
     }
 
     /// Adds a new child of this instance for the given `ChildDecl`. Returns

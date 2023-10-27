@@ -176,7 +176,21 @@ pub fn validate_capabilities(
 type CheckChildNameFn = fn(Option<&String>, DeclType, &str, &mut Vec<Error>) -> bool;
 
 pub fn validate_dynamic_child(child: &fdecl::Child) -> Result<(), ErrorList> {
-    validate_child(child, check_dynamic_name)
+    let mut errors = vec![];
+
+    if let Err(mut error_list) = validate_child(child, check_dynamic_name) {
+        errors.append(&mut error_list.errs);
+    }
+
+    if child.environment.is_some() {
+        errors.push(Error::DynamicChildWithEnvironment);
+    }
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(ErrorList { errs: errors })
+    }
 }
 
 /// Validates an independent Child. Performs the same validation on it as `validate`. A
@@ -9807,6 +9821,21 @@ mod tests {
                 environment: None,
                 ..Default::default()
             })
+        );
+    }
+
+    #[test]
+    fn test_validate_dynamic_child_environment_is_invalid() {
+        assert_eq!(
+            validate_dynamic_child(&fdecl::Child {
+                name: Some("a".repeat(MAX_LONG_NAME_LENGTH).to_string()),
+                url: Some("test:///child".to_string()),
+                startup: Some(fdecl::StartupMode::Lazy),
+                on_terminate: None,
+                environment: Some("env".to_string()),
+                ..Default::default()
+            }),
+            Err(ErrorList::new(vec![Error::DynamicChildWithEnvironment]))
         );
     }
 

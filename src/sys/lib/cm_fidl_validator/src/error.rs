@@ -97,6 +97,9 @@ pub enum Error {
             `program` section or in the `use` section."
     )]
     MissingRunner,
+
+    #[error("Dynamic children cannot specify an environment.")]
+    DynamicChildWithEnvironment,
 }
 
 /// [AvailabilityList] is a newtype to provide a human friendly [Display] impl for a vector

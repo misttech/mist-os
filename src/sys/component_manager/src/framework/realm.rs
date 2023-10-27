@@ -6,7 +6,7 @@ use {
     crate::{
         capability::{CapabilityProvider, CapabilitySource},
         model::{
-            component::{ComponentInstance, StartReason, WeakComponentInstance},
+            component::{ComponentInstance, WeakComponentInstance},
             error::{CapabilityProviderError, ModelError, OpenExposedDirError},
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
             model::Model,
@@ -23,8 +23,7 @@ use {
     cm_util::TaskGroup,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess, fuchsia_async as fasync,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx,
     futures::prelude::*,
     lazy_static::lazy_static,
     moniker::{ChildName, ChildNameBase, Moniker},
@@ -166,76 +165,25 @@ impl RealmCapabilityHost {
         component: &WeakComponentInstance,
         collection: fdecl::CollectionRef,
         child_decl: fdecl::Child,
-        mut child_args: fcomponent::CreateChildArgs,
+        child_args: fcomponent::CreateChildArgs,
     ) -> Result<(), fcomponent::Error> {
         let component = component.upgrade().map_err(|_| fcomponent::Error::InstanceDied)?;
+
         cm_fidl_validator::validate_dynamic_child(&child_decl).map_err(|error| {
-            debug!(%error, "validate_dynamic_child() failed");
+            warn!(%error, "failed to create dynamic child. child decl is invalid");
             fcomponent::Error::InvalidArguments
         })?;
-        if child_decl.environment.is_some() {
-            return Err(fcomponent::Error::InvalidArguments);
-        }
-        let numbered_handles = child_args
-            .numbered_handles
-            .as_mut()
-            .map(|v| v.drain(..).collect::<Vec<_>>())
-            .unwrap_or_default();
-        let numbered_handles_are_present = !numbered_handles.is_empty();
         let child_decl = child_decl.fidl_into_native();
-        match component
-            .add_dynamic_child(
-                collection.name.clone(),
-                &child_decl,
-                child_args,
-                numbered_handles_are_present,
-            )
-            .await
-        {
-            Ok(fdecl::Durability::SingleRun) => {
-                // Creating a child in a `SingleRun` collection automatically starts it, so
-                // start the component.
-                let child_ref =
-                    fdecl::ChildRef { name: child_decl.name, collection: Some(collection.name) };
-                let weak_component = WeakComponentInstance::new(&component);
-                RealmCapabilityHost::start_single_run_child(
-                    &weak_component,
-                    child_ref,
-                    StartReason::SingleRun,
-                    numbered_handles,
-                )
-                .await
-            }
-            Ok(_) => Ok(()),
-            Err(e) => {
+
+        component.add_dynamic_child(collection.name.clone(), &child_decl, child_args).await.map_err(
+            |err| {
                 warn!(
                     "Failed to create child \"{}\" in collection \"{}\" of component \"{}\": {}",
-                    child_decl.name, collection.name, component.moniker, e
+                    child_decl.name, collection.name, component.moniker, err
                 );
-                Err(e.into())
-            }
-        }
-    }
-
-    async fn start_single_run_child(
-        component: &WeakComponentInstance,
-        child: fdecl::ChildRef,
-        start_reason: StartReason,
-        numbered_handles: Vec<fprocess::HandleInfo>,
-    ) -> Result<(), fcomponent::Error> {
-        match Self::get_child(component, child.clone()).await? {
-            Some(child) => {
-                child.start(&start_reason, None, numbered_handles, vec![]).await.map_err(|error| {
-                    debug!(%error, moniker=%child.moniker, "failed to start component instance");
-                    error.into()
-                })?;
-            }
-            None => {
-                debug!(?child, "start_child() failed: instance not found");
-                return Err(fcomponent::Error::InstanceNotFound);
-            }
-        }
-        Ok(())
+                err.into()
+            },
+        )
     }
 
     async fn open_exposed_dir(
