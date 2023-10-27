@@ -181,6 +181,23 @@ build_dir: \"${FUCHSIA_BUILD_DIR}\"
 
 function goma-check {
   if grep -q "^ *use_goma = true" "${FUCHSIA_BUILD_DIR}/args.gn"; then
+    cat <<EOF
+**************** NOTICE ****************
+Goma is deprecated and will be shutting down for Fuchsia soon.
+You can replace it with re-client (linux-x64 only right now)
+with the following steps.
+
+  * In args.gn (fx args), set:
+
+    cxx_rbe_enable = true
+    use_goma = false
+
+  * Make sure you have valid 'gcert' credentials.
+  * Resume your typical workflows.
+
+See the go/fuchsia-goma-shutdown-psa announcement.
+****************************************
+EOF
     if ! fx-command-run goma_ctl status >/dev/null 2>&1; then
       fx-warn "Goma is enabled but not started."
       fx-info "Starting Goma..."
