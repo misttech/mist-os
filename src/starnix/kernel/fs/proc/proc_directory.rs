@@ -14,7 +14,7 @@ use crate::{
     task::*,
     types::*,
 };
-use fuchsia_component::client::connect_channel_to_protocol;
+use fuchsia_component::client::connect_to_protocol_sync;
 use fuchsia_zircon as zx;
 use once_cell::sync::{Lazy, OnceCell};
 
@@ -334,10 +334,8 @@ struct KernelStatsStore(OnceCell<fidl_fuchsia_kernel::StatsSynchronousProxy>);
 impl KernelStatsStore {
     pub fn get(&self) -> &fidl_fuchsia_kernel::StatsSynchronousProxy {
         self.0.get_or_init(|| {
-            let (client_end, server_end) = zx::Channel::create();
-            connect_channel_to_protocol::<fidl_fuchsia_kernel::StatsMarker>(server_end)
-                .expect("Failed to connect to fuchsia.kernel.Stats.");
-            fidl_fuchsia_kernel::StatsSynchronousProxy::new(client_end)
+            connect_to_protocol_sync::<fidl_fuchsia_kernel::StatsMarker>()
+                .expect("Failed to connect to fuchsia.kernel.Stats.")
         })
     }
 }
@@ -355,9 +353,7 @@ impl SysInfo {
     }
 
     fn fetch() -> Result<SysInfo, anyhow::Error> {
-        let (client_end, server_end) = zx::Channel::create();
-        connect_channel_to_protocol::<fidl_fuchsia_sysinfo::SysInfoMarker>(server_end)?;
-        let sysinfo = fidl_fuchsia_sysinfo::SysInfoSynchronousProxy::new(client_end);
+        let sysinfo = connect_to_protocol_sync::<fidl_fuchsia_sysinfo::SysInfoMarker>()?;
         let board_name = match sysinfo.get_board_name(zx::Time::INFINITE)? {
             (zx::sys::ZX_OK, Some(name)) => name,
             (_, _) => "Unknown".to_string(),

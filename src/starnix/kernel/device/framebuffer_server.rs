@@ -21,7 +21,7 @@ use flatland_frame_scheduling_lib::{
     PresentationInfo, PresentedInfo, SchedulingLib, ThroughputScheduler,
 };
 use fuchsia_async as fasync;
-use fuchsia_component::{client::connect_channel_to_protocol, server::ServiceFs};
+use fuchsia_component::{client::connect_to_protocol_sync, server::ServiceFs};
 use fuchsia_framebuffer::{sysmem::BufferCollectionAllocator, FrameUsage};
 use fuchsia_scenic::BufferCollectionTokenPair;
 use fuchsia_zircon as zx;
@@ -67,15 +67,10 @@ impl FramebufferServer {
     /// Returns a `FramebufferServer` that has created a scene and registered a buffer with
     /// Flatland.
     pub fn new(width: u32, height: u32) -> Result<Self, Errno> {
-        let (server_end, client_end) = zx::Channel::create();
-        connect_channel_to_protocol::<fuicomposition::AllocatorMarker>(server_end)
+        let allocator = connect_to_protocol_sync::<fuicomposition::AllocatorMarker>()
             .map_err(|_| errno!(ENOENT))?;
-        let allocator = fuicomposition::AllocatorSynchronousProxy::new(client_end);
-
-        let (server_end, client_end) = zx::Channel::create();
-        connect_channel_to_protocol::<fuicomposition::FlatlandMarker>(server_end)
+        let flatland = connect_to_protocol_sync::<fuicomposition::FlatlandMarker>()
             .map_err(|_| errno!(ENOENT))?;
-        let flatland = fuicomposition::FlatlandSynchronousProxy::new(client_end);
         flatland.set_debug_name("StarnixFrameBufferServer").map_err(|_| errno!(EINVAL))?;
 
         let collection =

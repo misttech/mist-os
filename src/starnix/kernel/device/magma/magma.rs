@@ -6,7 +6,7 @@
 
 use fidl_fuchsia_sysmem as fsysmem;
 use fidl_fuchsia_ui_composition as fuicomp;
-use fuchsia_component::client::connect_channel_to_protocol;
+use fuchsia_component::client::connect_to_protocol_sync;
 use fuchsia_image_format::*;
 use fuchsia_vulkan::*;
 use fuchsia_zircon as zx;
@@ -248,11 +248,7 @@ pub fn create_drm_image(
 
 /// Initializes and returns Scenic allocator proxy.
 pub fn init_scenic() -> Result<fuicomp::AllocatorSynchronousProxy, Errno> {
-    let (server_end, client_end) = zx::Channel::create();
-    connect_channel_to_protocol::<fuicomp::AllocatorMarker>(server_end)
-        .map_err(|_| errno!(ENOENT))?;
-    let composition_proxy = fuicomp::AllocatorSynchronousProxy::new(client_end);
-    Ok(composition_proxy)
+    Ok(connect_to_protocol_sync::<fuicomp::AllocatorMarker>().map_err(|_| errno!(ENOENT))?)
 }
 
 /// Allocates a shared sysmem collection.
@@ -262,10 +258,8 @@ pub fn init_scenic() -> Result<fuicomp::AllocatorSynchronousProxy, Errno> {
 pub fn init_sysmem(
     use_scenic: bool,
 ) -> Result<(BufferCollectionTokens, fsysmem::AllocatorSynchronousProxy), Errno> {
-    let (server_end, client_end) = zx::Channel::create();
-    connect_channel_to_protocol::<fsysmem::AllocatorMarker>(server_end)
-        .map_err(|_| errno!(ENOENT))?;
-    let sysmem_allocator = fsysmem::AllocatorSynchronousProxy::new(client_end);
+    let sysmem_allocator =
+        connect_to_protocol_sync::<fsysmem::AllocatorMarker>().map_err(|_| errno!(ENOENT))?;
 
     let (client, remote) =
         fidl::endpoints::create_endpoints::<fsysmem::BufferCollectionTokenMarker>();

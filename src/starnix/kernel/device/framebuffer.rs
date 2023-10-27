@@ -22,7 +22,7 @@ use fidl_fuchsia_math as fmath;
 use fidl_fuchsia_ui_composition as fuicomposition;
 use fidl_fuchsia_ui_display_singleton as fuidisplay;
 use fidl_fuchsia_ui_views as fuiviews;
-use fuchsia_component::client::connect_channel_to_protocol;
+use fuchsia_component::client::connect_to_protocol_sync;
 use fuchsia_zircon as zx;
 use starnix_lock::RwLock;
 use std::sync::Arc;
@@ -113,10 +113,8 @@ impl Framebuffer {
     }
 
     fn get_display_size() -> Result<fmath::SizeU, Errno> {
-        let (server_end, client_end) = zx::Channel::create();
-        connect_channel_to_protocol::<fuidisplay::InfoMarker>(server_end)
-            .map_err(|_| errno!(ENOENT))?;
-        let singleton_display_info = fuidisplay::InfoSynchronousProxy::new(client_end);
+        let singleton_display_info =
+            connect_to_protocol_sync::<fuidisplay::InfoMarker>().map_err(|_| errno!(ENOENT))?;
         let metrics =
             singleton_display_info.get_metrics(zx::Time::INFINITE).map_err(|_| errno!(EINVAL))?;
         let extent_in_px =

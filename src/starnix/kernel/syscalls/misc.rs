@@ -5,7 +5,7 @@
 use fuchsia_zircon as zx;
 
 use fidl_fuchsia_hardware_power_statecontrol as fpower;
-use fuchsia_component::client::connect_channel_to_protocol;
+use fuchsia_component::client::connect_to_protocol_sync;
 
 use crate::{
     logging::log_info,
@@ -193,10 +193,8 @@ pub fn sys_reboot(
                 .unwrap_or_default();
             let reboot_args: Vec<_> = arg_bytes.split(|byte| byte == &b',').collect();
 
-            let (client_end, server_end) = zx::Channel::create();
-            connect_channel_to_protocol::<fpower::AdminMarker>(server_end)
+            let proxy = connect_to_protocol_sync::<fpower::AdminMarker>()
                 .expect("couldn't connect to fuchsia.hardware.power.statecontrol.Admin");
-            let proxy = fpower::AdminSynchronousProxy::new(client_end);
 
             let reboot_reason = if reboot_args.contains(&&b"ota_update"[..]) {
                 fpower::RebootReason::SystemUpdate
