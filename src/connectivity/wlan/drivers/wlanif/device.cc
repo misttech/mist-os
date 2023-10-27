@@ -398,29 +398,32 @@ void Device::Reset(const wlan_fullmac_impl_reset_request_t* req) {
   }
 }
 
-void Device::StartReq(const wlan_fullmac_start_req_t* req) {
-  fuchsia_wlan_fullmac::wire::WlanFullmacStartReq start_req;
-
-  ConvertCSsid(req->ssid, &start_req.ssid);
-  start_req.bss_type = ConvertBssType(req->bss_type);
-  start_req.beacon_period = req->beacon_period;
-  start_req.dtim_period = req->dtim_period;
-  start_req.channel = req->channel;
-  std::memcpy(start_req.rsne.data(), req->rsne, req->rsne_len);
-  start_req.rsne_len = req->rsne_len;
-  std::memcpy(start_req.vendor_ie.data(), req->vendor_ie, req->vendor_ie_len);
-  start_req.vendor_ie_len = req->vendor_ie_len;
-
+void Device::StartBss(const wlan_fullmac_impl_start_bss_request_t* req) {
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     lerror("Arena creation failed: %s", arena.status_string());
     return;
   }
 
-  auto result = client_.buffer(*arena)->StartReq(start_req);
+  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplStartBssRequest::Builder(*arena);
+
+  fuchsia_wlan_ieee80211::wire::CSsid ssid;
+  ConvertCSsid(req->ssid, &ssid);
+  builder.ssid(ssid);
+  builder.bss_type(ConvertBssType(req->bss_type));
+  builder.beacon_period(req->beacon_period);
+  builder.dtim_period(req->dtim_period);
+  builder.channel(req->channel);
+  auto rsne = std::vector<uint8_t>(req->rsne_list, req->rsne_list + req->rsne_count);
+  builder.rsne(fidl::VectorView<uint8_t>(*arena, rsne));
+  auto vendor_ie =
+      std::vector<uint8_t>(req->vendor_ie_list, req->vendor_ie_list + req->vendor_ie_count);
+  builder.vendor_ie(fidl::VectorView<uint8_t>(*arena, vendor_ie));
+
+  auto result = client_.buffer(*arena)->StartBss(builder.Build());
 
   if (!result.ok()) {
-    lerror("StartReq failed FIDL error: %s", result.status_string());
+    lerror("StartBss failed FIDL error: %s", result.status_string());
     return;
   }
 }

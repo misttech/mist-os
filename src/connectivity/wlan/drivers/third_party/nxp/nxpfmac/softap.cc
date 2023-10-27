@@ -50,7 +50,7 @@ SoftAp::~SoftAp() {
 }
 
 wlan_fullmac_wire::WlanStartResult SoftAp::Start(
-    const fuchsia_wlan_fullmac::wire::WlanFullmacStartReq* req) {
+    const fuchsia_wlan_fullmac::wire::WlanFullmacImplStartBssRequest* req) {
   std::lock_guard lock(mutex_);
   IoctlRequest<mlan_ds_bss> start_req(MLAN_IOCTL_BSS, MLAN_ACT_GET, bss_index_,
                                       {.sub_command = MLAN_OID_UAP_BSS_CONFIG});
@@ -75,7 +75,7 @@ wlan_fullmac_wire::WlanStartResult SoftAp::Start(
   auto& rate_band_cfg = rate_req.UserReq().param.rate_band_cfg;
   rate_band_cfg.bss_mode = MLAN_BSS_MODE_INFRA;
   rate_band_cfg.config_bands =
-      (band_from_channel(req->channel) == BAND_5GHZ) ? BAND_A : (BAND_B | BAND_G);
+      (band_from_channel(req->channel()) == BAND_5GHZ) ? BAND_A : (BAND_B | BAND_G);
   io_status = context_->ioctl_adapter_->IssueIoctlSync(&rate_req);
   if (io_status != IoctlStatus::Success) {
     NXPF_ERR("Rate req get failed: %d", io_status);
@@ -87,10 +87,10 @@ wlan_fullmac_wire::WlanStartResult SoftAp::Start(
   // BSS get should have copied the default config into the ioctl buffer, just set ssid,
   // channel and band from the request
   start_req.IoctlReq().action = MLAN_ACT_SET;
-  memcpy(&bss_cfg.ssid.ssid, req->ssid.data.data(), req->ssid.len);
-  bss_cfg.ssid.ssid_len = req->ssid.len;
-  bss_cfg.channel = req->channel;
-  bss_cfg.bandcfg.chanBand = band_from_channel(req->channel);
+  memcpy(&bss_cfg.ssid.ssid, req->ssid().data.data(), req->ssid().len);
+  bss_cfg.ssid.ssid_len = req->ssid().len;
+  bss_cfg.channel = req->channel();
+  bss_cfg.bandcfg.chanBand = band_from_channel(req->channel());
   bss_cfg.bandcfg.chanWidth = CHAN_BW_20MHZ;
   io_status = context_->ioctl_adapter_->IssueIoctlSync(&start_req);
   if (io_status != IoctlStatus::Success) {
@@ -115,7 +115,7 @@ wlan_fullmac_wire::WlanStartResult SoftAp::Start(
     return wlan_fullmac_wire::WlanStartResult::kNotSupported;
   }
   started_ = true;
-  ssid_ = req->ssid;
+  ssid_ = req->ssid();
   return wlan_fullmac_wire::WlanStartResult::kSuccess;
 }
 

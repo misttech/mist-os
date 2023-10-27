@@ -626,7 +626,7 @@ void brcmf_if_disassoc_req(net_device* ndev,
 void brcmf_if_reset_req(net_device* ndev,
                         const fuchsia_wlan_fullmac_wire::WlanFullmacImplResetRequest* req);
 void brcmf_if_start_req(net_device* ndev,
-                        const fuchsia_wlan_fullmac_wire::WlanFullmacStartReq* req);
+                        const fuchsia_wlan_fullmac_wire::WlanFullmacImplStartBssRequest* req);
 void brcmf_if_stop_req(net_device* ndev, const fuchsia_wlan_fullmac_wire::WlanFullmacStopReq* req);
 void brcmf_if_set_keys_req(net_device* ndev,
                            const fuchsia_wlan_fullmac_wire::WlanFullmacSetKeysReq* req,

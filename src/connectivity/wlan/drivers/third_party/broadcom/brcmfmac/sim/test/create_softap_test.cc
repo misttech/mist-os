@@ -122,12 +122,11 @@ class CreateSoftAPTest : public SimTest {
  protected:
   simulation::WlanTxInfo tx_info_ = {.channel = kDefaultChannel};
   bool sec_enabled_ = false;
+  SoftApInterface softap_ifc_;
 
  private:
   void Rx(std::shared_ptr<const simulation::SimFrame> frame,
           std::shared_ptr<const simulation::WlanRxInfo> info) override;
-  // SME callbacks
-  SoftApInterface softap_ifc_;
 
   uint16_t CreateRsneIe(uint8_t* buffer);
 };
@@ -266,20 +265,23 @@ uint16_t CreateSoftAPTest::CreateRsneIe(uint8_t* buffer) {
 }
 
 zx_status_t CreateSoftAPTest::StartSoftAP() {
-  wlan_fullmac_wire::WlanFullmacStartReq start_req = {
-      .ssid = {.len = 6, .data = {.data_ = "Sim_AP"}},
-      .bss_type = fuchsia_wlan_common::wire::BssType::kInfrastructure,
-      .beacon_period = 100,
-      .dtim_period = 100,
-      .channel = kDefaultCh,
-      .rsne_len = 0,
-  };
+  fuchsia_wlan_ieee80211::wire::CSsid ssid = {.len = 6, .data = {.data_ = "Sim_AP"}};
+  auto builder = wlan_fullmac_wire::WlanFullmacImplStartBssRequest::Builder(test_arena_)
+                     .bss_type(fuchsia_wlan_common_wire::BssType::kInfrastructure)
+                     .beacon_period(100)
+                     .dtim_period(100)
+                     .channel(kDefaultCh)
+                     .ssid(ssid);
+
   // If sec mode is requested, create a dummy RSNE IE (our SoftAP only
   // supports WPA2)
   if (sec_enabled_ == true) {
-    start_req.rsne_len = CreateRsneIe(start_req.rsne.data());
+    uint8_t rsne_data[fuchsia_wlan_ieee80211::wire::kWlanIeBodyMaxLen];
+    uint32_t rsne_len = CreateRsneIe(rsne_data);
+    auto rsne = std::vector<uint8_t>(rsne_data, rsne_data + rsne_len);
+    builder.rsne(fidl::VectorView<uint8_t>(test_arena_, rsne));
   }
-  auto result = softap_ifc_.client_.buffer(softap_ifc_.test_arena_)->StartReq(start_req);
+  auto result = softap_ifc_.client_.buffer(softap_ifc_.test_arena_)->StartBss(builder.Build());
   EXPECT_TRUE(result.ok());
 
   // Retrieve wsec from SIM FW to check if it is set appropriately
@@ -479,6 +481,23 @@ TEST_F(CreateSoftAPTest, CreateSoftAPFail) {
   InjectStartAPError();
   env_->ScheduleNotification(std::bind(&CreateSoftAPTest::StartSoftAP, this), zx::msec(50));
   env_->Run(kSimulatedClockDuration);
+  VerifyStartAPConf(wlan_fullmac_wire::WlanStartResult::kNotSupported);
+}
+
+TEST_F(CreateSoftAPTest, CreateSoftAPMissingParams) {
+  Init();
+  CreateInterface();
+  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 1u);
+  // Create the Start BSS request without the SSID.
+  auto builder = wlan_fullmac_wire::WlanFullmacImplStartBssRequest::Builder(test_arena_)
+                     .bss_type(fuchsia_wlan_common_wire::BssType::kInfrastructure)
+                     .beacon_period(100)
+                     .dtim_period(100)
+                     .channel(kDefaultCh);
+
+  auto result = softap_ifc_.client_.buffer(softap_ifc_.test_arena_)->StartBss(builder.Build());
+  EXPECT_TRUE(result.ok());
+  // Should have received a StartConf with kNotSupported result.
   VerifyStartAPConf(wlan_fullmac_wire::WlanStartResult::kNotSupported);
 }
 

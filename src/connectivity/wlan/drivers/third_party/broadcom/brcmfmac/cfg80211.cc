@@ -3386,10 +3386,11 @@ skip_fw_cmds:
 // Returns an MLME result code (WLAN_START_RESULT_*) if an error is encountered.
 // If all iovars succeed, MLME is notified when E_LINK event is received.
 static fuchsia_wlan_fullmac_wire::WlanStartResult brcmf_cfg80211_start_ap(
-    struct net_device* ndev, const fuchsia_wlan_fullmac_wire::WlanFullmacStartReq* req) {
+    struct net_device* ndev, const fuchsia_wlan_fullmac_wire::WlanFullmacImplStartBssRequest* req) {
   struct brcmf_if* ifp = ndev_to_if(ndev);
   struct brcmf_cfg80211_info* cfg = ifp->drvr->config;
-  fuchsia_wlan_common::WlanChannel channel(req->channel,
+
+  fuchsia_wlan_common::WlanChannel channel(req->channel(),
                                            fuchsia_wlan_common::ChannelBandwidth::kCbw20, 0);
 
   if (brcmf_test_bit(brcmf_vif_status_bit_t::AP_CREATED, &ifp->vif->sme_state)) {
@@ -3402,8 +3403,8 @@ static fuchsia_wlan_fullmac_wire::WlanStartResult brcmf_cfg80211_start_ap(
     return fuchsia_wlan_fullmac_wire::WlanStartResult::kBssAlreadyStartedOrJoined;
   }
 
-  if (req->bss_type != fuchsia_wlan_common::BssType::kInfrastructure) {
-    BRCMF_ERR("Attempt to start AP in unsupported mode (%d)", req->bss_type);
+  if (req->bss_type() != fuchsia_wlan_common::BssType::kInfrastructure) {
+    BRCMF_ERR("Attempt to start AP in unsupported mode (%d)", req->bss_type());
     return fuchsia_wlan_fullmac_wire::WlanStartResult::kNotSupported;
   }
 
@@ -3427,8 +3428,8 @@ static fuchsia_wlan_fullmac_wire::WlanStartResult brcmf_cfg80211_start_ap(
 
   BRCMF_DBG(TRACE,
             "ssid: " FMT_SSID "  beacon period: %d  dtim_period: %d  channel: %d  rsne_len: %zd",
-            FMT_SSID_BYTES(req->ssid.data.data(), req->ssid.len), req->beacon_period,
-            req->dtim_period, req->channel, req->rsne_len);
+            FMT_SSID_BYTES(req->ssid().data.data(), req->ssid().len), req->beacon_period(),
+            req->dtim_period(), req->channel(), req->has_rsne() ? req->rsne().count() : 0);
 
   uint16_t chanspec = 0;
   zx_status_t status;
@@ -3436,8 +3437,8 @@ static fuchsia_wlan_fullmac_wire::WlanStartResult brcmf_cfg80211_start_ap(
 
   struct brcmf_ssid_le ssid_le;
   memset(&ssid_le, 0, sizeof(ssid_le));
-  memcpy(ssid_le.SSID, req->ssid.data.data(), req->ssid.len);
-  ssid_le.SSID_len = req->ssid.len;
+  memcpy(ssid_le.SSID, req->ssid().data.data(), req->ssid().len);
+  ssid_le.SSID_len = req->ssid().len;
 
   brcmf_enable_mpc(ifp, 0);
 
@@ -3451,8 +3452,8 @@ static fuchsia_wlan_fullmac_wire::WlanStartResult brcmf_cfg80211_start_ap(
   }
 
   // Configure RSN IE
-  if (req->rsne_len != 0) {
-    struct brcmf_vs_tlv* tmp_ie = (struct brcmf_vs_tlv*)req->rsne.data();
+  if (req->has_rsne() && req->rsne().count() != 0) {
+    struct brcmf_vs_tlv* tmp_ie = (struct brcmf_vs_tlv*)req->rsne().data();
     status = brcmf_configure_wpaie(ifp, tmp_ie, true, true);
     if (status != ZX_OK) {
       BRCMF_ERR("Failed to install RSNE: %s", zx_status_get_string(status));
@@ -3466,15 +3467,15 @@ static fuchsia_wlan_fullmac_wire::WlanStartResult brcmf_cfg80211_start_ap(
     }
   }
 
-  status = brcmf_fil_cmd_int_set(ifp, BRCMF_C_SET_BCNPRD, req->beacon_period, &fw_err);
+  status = brcmf_fil_cmd_int_set(ifp, BRCMF_C_SET_BCNPRD, req->beacon_period(), &fw_err);
   if (status != ZX_OK) {
     BRCMF_ERR("Beacon Interval Set Error: %s, fw err %s", zx_status_get_string(status),
               brcmf_fil_get_errstr(fw_err));
     goto fail;
   }
-  ifp->vif->profile.beacon_period = req->beacon_period;
+  ifp->vif->profile.beacon_period = req->beacon_period();
 
-  status = brcmf_fil_cmd_int_set(ifp, BRCMF_C_SET_DTIMPRD, req->dtim_period, &fw_err);
+  status = brcmf_fil_cmd_int_set(ifp, BRCMF_C_SET_DTIMPRD, req->dtim_period(), &fw_err);
   if (status != ZX_OK) {
     BRCMF_ERR("DTIM Interval Set Error: %s, fw err %s", zx_status_get_string(status),
               brcmf_fil_get_errstr(fw_err));
@@ -3984,7 +3985,8 @@ void brcmf_if_reset_req(net_device* ndev,
   BRCMF_ERR("Unimplemented");
 }
 
-void brcmf_if_start_conf(net_device* ndev, fuchsia_wlan_fullmac_wire::WlanStartResult result) {
+static void brcmf_if_start_conf(net_device* ndev,
+                                fuchsia_wlan_fullmac_wire::WlanStartResult result) {
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
   if (!ndev->if_proto.is_valid()) {
     BRCMF_IFDBG(WLANIF, ndev, "interface stopped -- skipping AP start callback");
@@ -4037,11 +4039,21 @@ static void brcmf_ap_start_timeout(struct brcmf_cfg80211_info* cfg) {
 
 /* Start AP mode */
 void brcmf_if_start_req(net_device* ndev,
-                        const fuchsia_wlan_fullmac_wire::WlanFullmacStartReq* req) {
-  BRCMF_IFDBG(WLANIF, ndev, "Start AP request from SME. rsne_len: %zu, channel: %u", req->rsne_len,
-              req->channel);
+                        const fuchsia_wlan_fullmac_wire::WlanFullmacImplStartBssRequest* req) {
+  if (!req->has_ssid() || !req->has_dtim_period() || !req->has_channel() || !req->has_bss_type() ||
+      !req->has_beacon_period()) {
+    BRCMF_ERR(
+        "Start BSS req does not have all required fields ssid: %d "
+        "dtim: %d channel: %d bss type: %d beacon period: %d",
+        req->has_ssid(), req->has_dtim_period(), req->has_channel(), req->has_bss_type(),
+        req->has_beacon_period());
+    brcmf_if_start_conf(ndev, fuchsia_wlan_fullmac_wire::WlanStartResult::kNotSupported);
+    return;
+  }
+  BRCMF_IFDBG(WLANIF, ndev, "Start AP request from SME. rsne_len: %zu, channel: %u",
+              req->has_rsne() ? req->rsne().count() : 0, req->channel());
 #if !defined(NDEBUG)
-  BRCMF_DBG(WLANIF, "  ssid: " FMT_SSID, FMT_SSID_BYTES(req->ssid.data.data(), req->ssid.len));
+  BRCMF_DBG(WLANIF, "  ssid: " FMT_SSID, FMT_SSID_BYTES(req->ssid().data.data(), req->ssid().len));
 #endif /* !defined(NDEBUG) */
 
   fuchsia_wlan_fullmac_wire::WlanStartResult result_code = brcmf_cfg80211_start_ap(ndev, req);

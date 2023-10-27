@@ -48,18 +48,6 @@ type WlanFullmacAssocInd = struct {
     vendor_ie array<uint8, WLAN_VIE_MAX_LEN>;
 };
 
-type WlanFullmacStartReq = struct {
-    ssid ieee80211.CSsid;
-    bss_type fuchsia.wlan.common.BssType;
-    beacon_period uint32;
-    dtim_period uint32;
-    channel uint8;
-    rsne_len uint64;
-    rsne array<uint8, ieee80211.WLAN_IE_BODY_MAX_LEN>;
-    vendor_ie_len uint64;
-    vendor_ie array<uint8, WLAN_VIE_MAX_LEN>;
-};
-
 type WlanFullmacStopReq = struct {
     ssid ieee80211.CSsid;
 };
@@ -683,8 +671,14 @@ closed protocol WlanFullmacImpl {
         1: sta_address ieee80211.MacAddr;
         2: set_default_mib bool;
     }) -> ();
-    strict StartReq(struct {
-        req WlanFullmacStartReq;
+    strict StartBss(table {
+        1: ssid ieee80211.CSsid;
+        2: bss_type fuchsia.wlan.common.BssType;
+        3: beacon_period uint32;
+        4: dtim_period uint32;
+        5: channel uint8;
+        6: rsne vector<uint8>:ieee80211.WLAN_IE_BODY_MAX_LEN;
+        7: vendor_ie vector<uint8>:WLAN_VIE_MAX_LEN;
     }) -> ();
     strict StopReq(struct {
         req WlanFullmacStopReq;

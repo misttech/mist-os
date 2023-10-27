@@ -89,8 +89,8 @@ class WlanInterface : public WlanInterfaceDeviceType,
   void Disassoc(DisassocRequestView request, fdf::Arena& arena,
                 DisassocCompleter::Sync& completer) override;
   void Reset(ResetRequestView request, fdf::Arena& arena, ResetCompleter::Sync& completer) override;
-  void StartReq(StartReqRequestView request, fdf::Arena& arena,
-                StartReqCompleter::Sync& completer) override;
+  void StartBss(StartBssRequestView request, fdf::Arena& arena,
+                StartBssCompleter::Sync& completer) override;
   void StopReq(StopReqRequestView request, fdf::Arena& arena,
                StopReqCompleter::Sync& completer) override;
   void SetKeysReq(SetKeysReqRequestView request, fdf::Arena& arena,

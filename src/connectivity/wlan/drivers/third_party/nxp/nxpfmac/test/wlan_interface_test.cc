@@ -624,9 +624,9 @@ TEST_F(WlanInterfaceTest, WlanFullmacImplStartScan) {
 
   StartInterface();
 
-  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplStartScanRequest::Builder(test_arena_);
-  builder.txn_id(kScanTxnId);
-  builder.scan_type(fuchsia_wlan_fullmac::wire::WlanScanType::kActive);
+  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplStartScanRequest::Builder(test_arena_)
+                     .txn_id(kScanTxnId)
+                     .scan_type(fuchsia_wlan_fullmac::wire::WlanScanType::kActive);
 
   auto result = client_.buffer(test_arena_)->StartScan(builder.Build());
   ASSERT_TRUE(result.ok());
@@ -690,16 +690,14 @@ TEST_F(WlanInterfaceTest, WlanFullmacImplConnectDisconnectReq) {
   constexpr uint8_t kIesWithSsid[] = {"\x00\x04Test"};
   constexpr uint8_t kTestChannel = 1;
 
-  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectRequest::Builder(test_arena_);
-
   fuchsia_wlan_internal::wire::BssDescription bss = {
       .ies = fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(kIesWithSsid),
                                                      sizeof(kIesWithSsid)),
       .channel = {.primary = kTestChannel},
   };
-
-  builder.selected_bss(bss);
-  builder.auth_type(fuchsia_wlan_fullmac::wire::WlanAuthType::kOpenSystem);
+  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectRequest::Builder(test_arena_)
+                     .selected_bss(bss)
+                     .auth_type(fuchsia_wlan_fullmac::wire::WlanAuthType::kOpenSystem);
 
   {
     auto result = client_.buffer(test_arena_)->Connect(builder.Build());
@@ -721,13 +719,13 @@ TEST_F(WlanInterfaceTest, WlanFullmacImplConnectDisconnectReq) {
   EXPECT_EQ(ifc_results_.report_ind_.rssi_dbm, kTestRssi);
   EXPECT_EQ(ifc_results_.report_ind_.snr_db, kTestSnr);
 
-  auto deauth_builder =
-      fuchsia_wlan_fullmac::wire::WlanFullmacImplDeauthRequest::Builder(test_arena_);
   constexpr uint8_t kTestPeerAddr[] = {1, 2, 3, 4, 5, 6};
   ::fidl::Array<uint8_t, ETH_ALEN> peer_sta_address;
   std::memcpy(peer_sta_address.data(), kTestPeerAddr, ETH_ALEN);
-  deauth_builder.peer_sta_address(peer_sta_address);
-  deauth_builder.reason_code(fuchsia_wlan_ieee80211::ReasonCode::kUnspecifiedReason);
+  auto deauth_builder =
+      fuchsia_wlan_fullmac::wire::WlanFullmacImplDeauthRequest::Builder(test_arena_)
+          .peer_sta_address(peer_sta_address)
+          .reason_code(fuchsia_wlan_ieee80211::ReasonCode::kUnspecifiedReason);
 
   {
     auto result = client_.buffer(test_arena_)->Deauth(deauth_builder.Build());
@@ -783,16 +781,14 @@ TEST_F(WlanInterfaceTest, WlanFullmacImplConnectRemoteDisconnectReq) {
 
   constexpr uint8_t kIesWithSsid[] = {"\x00\x04Test"};
   constexpr uint8_t kTestChannel = 1;
-  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectRequest::Builder(test_arena_);
-
   fuchsia_wlan_internal::wire::BssDescription bss = {
       .ies = fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(kIesWithSsid),
                                                      sizeof(kIesWithSsid)),
       .channel = {.primary = kTestChannel},
   };
-
-  builder.selected_bss(bss);
-  builder.auth_type(fuchsia_wlan_fullmac::wire::WlanAuthType::kOpenSystem);
+  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectRequest::Builder(test_arena_)
+                     .selected_bss(bss)
+                     .auth_type(fuchsia_wlan_fullmac::wire::WlanAuthType::kOpenSystem);
 
   auto result = client_.buffer(test_arena_)->Connect(builder.Build());
   ASSERT_TRUE(result.ok());
@@ -934,15 +930,20 @@ TEST_F(WlanInterfaceTest, WlanFullmacImplStartReq) {
   StartInterface();
 
   // Start the SoftAP
-  fuchsia_wlan_fullmac::wire::WlanFullmacStartReq start_req = {
-      .bss_type = fuchsia_wlan_common::wire::BssType::kInfrastructure,
-      .channel = kTestChannel,
-  };
-  memcpy(start_req.ssid.data.data(), kSoftApSsid, sizeof(kSoftApSsid));
-  start_req.ssid.len = sizeof(kSoftApSsid);
+  fuchsia_wlan_ieee80211::wire::CSsid ssid;
+  memcpy(ssid.data.data(), kSoftApSsid, sizeof(kSoftApSsid));
+  ssid.len = sizeof(kSoftApSsid);
+
+  fidl::Arena<sizeof(fuchsia_wlan_fullmac::wire::WlanFullmacImplStartBssRequest)> arena;
+  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplStartBssRequest::Builder(arena)
+                     .bss_type(fuchsia_wlan_common::wire::BssType::kInfrastructure)
+                     .beacon_period(100)
+                     .dtim_period(100)
+                     .channel(kTestChannel)
+                     .ssid(ssid);
 
   {
-    auto result = client_.buffer(test_arena_)->StartReq(start_req);
+    auto result = client_.buffer(test_arena_)->StartBss(builder.Build());
     ASSERT_TRUE(result.ok());
   }
 
@@ -1019,15 +1020,20 @@ TEST_F(WlanInterfaceTest, SoftApStaConnectDisconnect) {
   StartInterface();
 
   // Start the SoftAP
-  fuchsia_wlan_fullmac::wire::WlanFullmacStartReq start_req = {
-      .bss_type = fuchsia_wlan_common::wire::BssType::kInfrastructure,
-      .channel = kTestChannel,
-  };
-  memcpy(start_req.ssid.data.data(), kSoftApSsid, sizeof(kSoftApSsid));
-  start_req.ssid.len = sizeof(kSoftApSsid);
+  fuchsia_wlan_ieee80211::wire::CSsid ssid;
+  memcpy(ssid.data.data(), kSoftApSsid, sizeof(kSoftApSsid));
+  ssid.len = sizeof(kSoftApSsid);
+
+  fidl::Arena<sizeof(fuchsia_wlan_fullmac::wire::WlanFullmacImplStartBssRequest)> arena;
+  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplStartBssRequest::Builder(arena)
+                     .bss_type(fuchsia_wlan_common::wire::BssType::kInfrastructure)
+                     .beacon_period(100)
+                     .dtim_period(100)
+                     .channel(kTestChannel)
+                     .ssid(ssid);
 
   {
-    auto result = client_.buffer(test_arena_)->StartReq(start_req);
+    auto result = client_.buffer(test_arena_)->StartBss(builder.Build());
     ASSERT_TRUE(result.ok());
   }
 
@@ -1137,15 +1143,19 @@ TEST_F(WlanInterfaceTest, SoftApStaLocalDisconnect) {
   StartInterface();
 
   // Start the SoftAP
-  fuchsia_wlan_fullmac::wire::WlanFullmacStartReq start_req = {
-      .bss_type = fuchsia_wlan_common::wire::BssType::kInfrastructure,
-      .channel = kTestChannel,
-  };
-  memcpy(start_req.ssid.data.data(), kSoftApSsid, sizeof(kSoftApSsid));
-  start_req.ssid.len = sizeof(kSoftApSsid);
+  fuchsia_wlan_ieee80211::wire::CSsid ssid;
+  memcpy(ssid.data.data(), kSoftApSsid, sizeof(kSoftApSsid));
+  ssid.len = sizeof(kSoftApSsid);
+  auto bss_builder =
+      fuchsia_wlan_fullmac::wire::WlanFullmacImplStartBssRequest::Builder(test_arena_)
+          .bss_type(fuchsia_wlan_common::wire::BssType::kInfrastructure)
+          .beacon_period(100)
+          .dtim_period(100)
+          .channel(kTestChannel)
+          .ssid(ssid);
 
   {
-    auto result = client_.buffer(test_arena_)->StartReq(start_req);
+    auto result = client_.buffer(test_arena_)->StartBss(bss_builder.Build());
     ASSERT_TRUE(result.ok());
   }
 
@@ -1172,12 +1182,12 @@ TEST_F(WlanInterfaceTest, SoftApStaLocalDisconnect) {
   EXPECT_BYTES_EQ(ifc_results_.assoc_ind_.peer_sta_address.data(), kTestSoftApClient, ETH_ALEN);
   EXPECT_EQ(ifc_results_.assoc_ind_.listen_interval, 0);
 
-  // Send a deauth request to disconnect the STA
-  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplDeauthRequest::Builder(test_arena_);
   ::fidl::Array<uint8_t, ETH_ALEN> peer_sta_address;
   std::memcpy(peer_sta_address.data(), kTestSoftApClient, ETH_ALEN);
-  builder.peer_sta_address(peer_sta_address);
-  builder.reason_code(fuchsia_wlan_ieee80211::ReasonCode::kUnspecifiedReason);
+  // Send a deauth request to disconnect the STA
+  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplDeauthRequest::Builder(test_arena_)
+                     .peer_sta_address(peer_sta_address)
+                     .reason_code(fuchsia_wlan_ieee80211::ReasonCode::kUnspecifiedReason);
 
   env_.ScheduleNotification(
       [&]() { EXPECT_TRUE(client_.buffer(test_arena_)->Deauth(builder.Build()).ok()); },

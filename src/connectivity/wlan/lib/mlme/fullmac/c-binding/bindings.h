@@ -75,7 +75,7 @@ typedef struct {
   void (*assoc_resp)(void *device, wlan_fullmac_impl_assoc_resp_request_t *resp);
   void (*disassoc)(void *device, wlan_fullmac_impl_disassoc_request_t *req);
   void (*reset)(void *device, wlan_fullmac_impl_reset_request_t *req);
-  void (*start_req)(void *device, wlan_fullmac_start_req_t *req);
+  void (*start_bss)(void *device, wlan_fullmac_impl_start_bss_request_t *req);
   void (*stop_req)(void *device, wlan_fullmac_stop_req_t *req);
   wlan_fullmac_set_keys_resp_t (*set_keys_req)(void *device, wlan_fullmac_set_keys_req_t *req);
   void (*del_keys_req)(void *device, wlan_fullmac_del_keys_req_t *req);

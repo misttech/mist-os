@@ -122,25 +122,6 @@ fn dummy_delete_key_descriptor() -> banjo_wlan_fullmac::DeleteKeyDescriptor {
     }
 }
 
-fn convert_rsne(
-    rsne: &Option<Vec<u8>>,
-) -> ([u8; banjo_wlan_ieee80211::WLAN_IE_BODY_MAX_LEN as usize], u64) {
-    let mut rsne_len = 0;
-    let mut rsne_copy = [0; banjo_wlan_ieee80211::WLAN_IE_BODY_MAX_LEN as usize];
-    if let Some(rsne) = rsne {
-        if rsne.len() > banjo_wlan_ieee80211::WLAN_IE_BODY_MAX_LEN as usize {
-            warn!(
-                "Truncating rsne len from {} to {}",
-                rsne.len(),
-                banjo_wlan_ieee80211::WLAN_IE_BODY_MAX_LEN
-            );
-        }
-        rsne_len = min(rsne.len(), banjo_wlan_ieee80211::WLAN_IE_BODY_MAX_LEN as usize);
-        rsne_copy[..rsne_len].copy_from_slice(&rsne[..rsne_len]);
-    }
-    (rsne_copy, rsne_len as u64)
-}
-
 pub fn convert_ssid(ssid: &[u8]) -> banjo_wlan_ieee80211::CSsid {
     assert_eq_size_val!(banjo_wlan_ieee80211::MAX_SSID_BYTE_LEN, 0u8);
     if ssid.len() > banjo_wlan_ieee80211::MAX_SSID_BYTE_LEN as usize {
@@ -296,21 +277,34 @@ pub fn convert_reset_request(
     }
 }
 
-pub fn convert_start_request(
+pub fn convert_start_bss_request(
     req: &fidl_mlme::StartRequest,
-) -> banjo_wlan_fullmac::WlanFullmacStartReq {
-    let (rsne, rsne_len) = convert_rsne(&req.rsne);
-    banjo_wlan_fullmac::WlanFullmacStartReq {
+) -> banjo_wlan_fullmac::WlanFullmacImplStartBssRequest {
+    let mut request = banjo_wlan_fullmac::WlanFullmacImplStartBssRequest {
         ssid: convert_ssid(&req.ssid[..]),
         bss_type: banjo_wlan_common::BssType(req.bss_type.into_primitive()),
         beacon_period: req.beacon_period as u32,
         dtim_period: req.dtim_period as u32,
         channel: req.channel,
-        rsne_len,
-        rsne,
-        vendor_ie_len: 0,
-        vendor_ie: [0; banjo_wlan_fullmac::WLAN_VIE_MAX_LEN as usize],
+        rsne_list: std::ptr::null(),
+        rsne_count: 0,
+        vendor_ie_list: std::ptr::null(),
+        vendor_ie_count: 0,
+    };
+    if let Some(rsne) = &req.rsne {
+        if rsne.len() > banjo_wlan_ieee80211::WLAN_IE_BODY_MAX_LEN as usize {
+            warn!(
+                "Truncating rsne len from {} to {}",
+                rsne.len(),
+                banjo_wlan_ieee80211::WLAN_IE_BODY_MAX_LEN
+            );
+        }
+        // Assuming here that the input StartRequest outlives the output
+        // WlanFullmacImplStartBssRequest.
+        request.rsne_list = rsne.as_ptr();
+        request.rsne_count = min(rsne.len(), banjo_wlan_ieee80211::WLAN_IE_BODY_MAX_LEN as usize);
     }
+    request
 }
 
 pub fn convert_stop_request(

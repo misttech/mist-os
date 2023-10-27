@@ -429,19 +429,15 @@ void SimInterface::StartSoftAp(const wlan_ieee80211::CSsid& ssid,
   // This should only be performed on an AP interface
   ZX_ASSERT(role_ == wlan_common::WlanMacRole::kAp);
 
-  wlan_fullmac_wire::WlanFullmacStartReq start_req = {
-      .bss_type = fuchsia_wlan_common::wire::BssType::kInfrastructure,
-      .beacon_period = beacon_period,
-      .dtim_period = dtim_period,
-      .channel = channel.primary,
-      .rsne_len = 0,
-  };
-
-  // Set the SSID field in the request
-  start_req.ssid = ssid;
+  auto builder = wlan_fullmac_wire::WlanFullmacImplStartBssRequest::Builder(test_arena_)
+                     .bss_type(fuchsia_wlan_common_wire::BssType::kInfrastructure)
+                     .beacon_period(beacon_period)
+                     .dtim_period(dtim_period)
+                     .channel(channel.primary)
+                     .ssid(ssid);
 
   // Send request to driver
-  auto result = client_.buffer(test_arena_)->StartReq(start_req);
+  auto result = client_.buffer(test_arena_)->StartBss(builder.Build());
   ZX_ASSERT(result.ok());
 
   // Remember context

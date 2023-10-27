@@ -377,7 +377,7 @@ impl FullmacMlme {
             AssocResponse(resp) => self.device.assoc_resp(convert_associate_response(&resp)),
             Disassociate(req) => self.device.disassoc(convert_disassociate_request(&req)),
             Reset(req) => self.device.reset(convert_reset_request(&req)),
-            Start(req) => self.device.start_req(convert_start_request(&req)),
+            Start(req) => self.device.start_bss(convert_start_bss_request(&req)),
             Stop(req) => self.device.stop_req(convert_stop_request(&req)),
             SetKeys(req) => self.handle_mlme_set_keys_request(req),
             DeleteKeys(req) => self.device.del_keys_req(convert_delete_keys_request(&req)),
@@ -1062,17 +1062,17 @@ mod handle_mlme_request_tests {
 
         let mut driver_calls = h.fake_device.captured_driver_calls.iter();
         let driver_req =
-            assert_variant!(driver_calls.next(), Some(DriverCall::StartReq { req }) => req);
+            assert_variant!(driver_calls.next(), Some(DriverCall::StartBss { req }) => req);
         assert_eq!(driver_req.ssid.len as usize, SSID_LEN);
         assert_eq!(driver_req.ssid.data[..SSID_LEN], [1u8; SSID_LEN][..]);
         assert_eq!(driver_req.bss_type, banjo_wlan_common::BssType::INFRASTRUCTURE);
         assert_eq!(driver_req.beacon_period, 3);
         assert_eq!(driver_req.dtim_period, 4);
         assert_eq!(driver_req.channel, 5);
-        assert_eq!(driver_req.rsne_len as usize, RSNE_LEN);
-        assert_eq!(driver_req.rsne[..RSNE_LEN], [14; RSNE_LEN][..]);
-        assert_eq!(driver_req.vendor_ie, [0; 510]);
-        assert_eq!(driver_req.vendor_ie_len, 0);
+        assert_eq!(driver_req.rsne_count as usize, RSNE_LEN);
+        assert_ne!(driver_req.rsne_list, std::ptr::null());
+        assert_eq!(driver_req.vendor_ie_list, std::ptr::null());
+        assert_eq!(driver_req.vendor_ie_count as usize, 0);
     }
 
     #[test]

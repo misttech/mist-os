@@ -55,7 +55,7 @@ class SoftAp {
   // Attempt to start the SoftAP on the given bss and channel. Returns appropriate
   // WlanStartResult.
   wlan_fullmac_wire::WlanStartResult Start(
-      const fuchsia_wlan_fullmac::wire::WlanFullmacStartReq* req) __TA_EXCLUDES(mutex_);
+      const fuchsia_wlan_fullmac::wire::WlanFullmacImplStartBssRequest* req) __TA_EXCLUDES(mutex_);
 
   // Returns appropriate WlanStopResult.
   wlan_fullmac_wire::WlanStopResult Stop(const fuchsia_wlan_fullmac::wire::WlanFullmacStopReq* req)

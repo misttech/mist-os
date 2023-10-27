@@ -169,8 +169,15 @@ struct WlanifDeviceTest : public ::zxtest::Test,
     EXPECT_EQ(request->has_set_default_mib(), true);
     completer.buffer(arena).Reply();
   }
-  void StartReq(StartReqRequestView request, fdf::Arena& arena,
-                StartReqCompleter::Sync& completer) override {}
+  void StartBss(StartBssRequestView request, fdf::Arena& arena,
+                StartBssCompleter::Sync& completer) override {
+    EXPECT_EQ(request->has_beacon_period(), true);
+    EXPECT_EQ(request->has_bss_type(), true);
+    EXPECT_EQ(request->has_channel(), true);
+    EXPECT_EQ(request->has_dtim_period(), true);
+    EXPECT_EQ(request->has_ssid(), true);
+    completer.buffer(arena).Reply();
+  }
   void StopReq(StopReqRequestView request, fdf::Arena& arena,
                StopReqCompleter::Sync& completer) override {}
   void SetKeysReq(SetKeysReqRequestView request, fdf::Arena& arena,
@@ -308,6 +315,16 @@ TEST_F(WlanifDeviceTest, CheckDisassoc) {
   wlan_fullmac_impl_disassoc_request_t req = {.reason_code = REASON_CODE_LEAVING_NETWORK_DISASSOC};
   memcpy(req.peer_sta_address, kPeerStaAddress, sizeof(kPeerStaAddress));
   device_->Disassociate(&req);
+}
+
+TEST_F(WlanifDeviceTest, CheckStartBss) {
+  device_->AddDevice();
+  device_->DdkAsyncRemove();
+  wlan_fullmac_impl_start_bss_request_t req = {
+      .bss_type = BSS_TYPE_INFRASTRUCTURE, .beacon_period = 100, .dtim_period = 100, .channel = 1};
+  memcpy(req.ssid.data, kPeerStaAddress, sizeof(kPeerStaAddress));
+  req.ssid.len = sizeof(kPeerStaAddress);
+  device_->StartBss(&req);
 }
 
 TEST_F(WlanifDeviceTest, CheckReset) {

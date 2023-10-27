@@ -591,8 +591,17 @@ void WlanInterface::Reset(ResetRequestView request, fdf::Arena& arena,
   completer.buffer(arena).Reply();
 }
 
-void WlanInterface::StartReq(StartReqRequestView request, fdf::Arena& arena,
-                             StartReqCompleter::Sync& completer) {
+void WlanInterface::StartBss(StartBssRequestView request, fdf::Arena& arena,
+                             StartBssCompleter::Sync& completer) {
+  if (!request->has_ssid() || !request->has_dtim_period() || !request->has_channel() ||
+      !request->has_bss_type() || !request->has_beacon_period()) {
+    NXPF_ERR(
+        "Start BSS req does not have all required fields ssid: %d "
+        "dtim: %d channel: %d bss type: %d beacon period: %d",
+        request->has_ssid(), request->has_dtim_period(), request->has_channel(),
+        request->has_bss_type(), request->has_beacon_period());
+    return;
+  }
   const fuchsia_wlan_fullmac_wire::WlanStartResult result =
       [&]() -> fuchsia_wlan_fullmac_wire::WlanStartResult {
     std::lock_guard lock(mutex_);
@@ -600,11 +609,11 @@ void WlanInterface::StartReq(StartReqRequestView request, fdf::Arena& arena,
       NXPF_ERR("Start is supported only in AP mode, current mode: %d", role_);
       return fuchsia_wlan_fullmac_wire::WlanStartResult::kNotSupported;
     }
-    if (request->req.bss_type != fuchsia_wlan_common_wire::BssType::kInfrastructure) {
-      NXPF_ERR("Attempt to start AP in unsupported mode (%d)", request->req.bss_type);
+    if (request->bss_type() != fuchsia_wlan_common_wire::BssType::kInfrastructure) {
+      NXPF_ERR("Attempt to start AP in unsupported mode (%d)", request->bss_type());
       return fuchsia_wlan_fullmac_wire::WlanStartResult::kNotSupported;
     }
-    return soft_ap_.Start(&request->req);
+    return soft_ap_.Start(request);
   }();
 
   fuchsia_wlan_fullmac_wire::WlanFullmacStartConfirm start_conf = {.result_code = result};
