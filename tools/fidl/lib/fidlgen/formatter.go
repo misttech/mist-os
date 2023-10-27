@@ -54,9 +54,14 @@ func NewFormatter(path string, args ...string) Formatter {
 // NewFormatterWithSizeLimit creates a new external formatter that doesn't
 // attempt to format sources over a specified size.
 //
-// The `path` needs to either
-// * Point to an executable which formats stdin and outputs it to stdout;
-// * An empty string, in which case no formatting will occur.
+// If the source is within the size limit, but the formatted output exceeds it,
+// then it discards the output and returns the unformatted source. This ensures
+// that running it multiple times (which happens when we reformat golden files)
+// will either invoke the external formatter every time or not at all.
+//
+// The `path` needs to either * Point to an executable which formats stdin and
+// outputs it to stdout; * An empty string, in which case no formatting will
+// occur.
 func NewFormatterWithSizeLimit(limit int, path string, args ...string) Formatter {
 	if path == "" {
 		return identityFormatter{}
@@ -97,6 +102,9 @@ func (f externalFormatter) Format(source []byte) ([]byte, error) {
 			return nil, fmt.Errorf("Formatter (%v) error: %w (stderr: %s)", cmd, err, string(errContent))
 		}
 		return nil, fmt.Errorf("Formatter (%v) error but stderr was empty: %w", cmd, err)
+	}
+	if f.limit > 0 && formattedBuf.Len() > f.limit {
+		return source, nil
 	}
 	return formattedBuf.Bytes(), nil
 }
