@@ -16,6 +16,11 @@
         fallback: "false",
     },
     use: [
-        { protocol: ["fuchsia.boot.RootResource", "fuchsia.kernel.IrqResource"] },
+        {
+            protocol: [
+                "fuchsia.kernel.IoportResource",
+                "fuchsia.kernel.IrqResource",
+            ],
+        },
     ],
 }

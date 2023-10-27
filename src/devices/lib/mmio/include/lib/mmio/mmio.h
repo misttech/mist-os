@@ -53,8 +53,7 @@
 // std::optional<fdf::MmioBuffer> mmio;
 // zx_status_t status;
 //
-// Please do not use get_root_resource() in new code. See fxbug.dev/31358.
-// zx::unowned_resource resource(get_root_resource());
+// zx::unowned_resource resource(get_mmio_resource());
 // status = fdf::MmioBuffer::Create(T931_USBPHY21_BASE, T931_USBPHY21_LENGTH,
 //                                  *resource, ZX_CACHE_POLICY_UNCACHED_DEVICE,
 //                                  &mmio);
