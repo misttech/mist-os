@@ -64,8 +64,7 @@ zx_status_t AmlCpuFrequency::Create(
   }
 
   // HIU Init.
-  // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
-  status = s905d2_hiu_init(get_root_resource(parent), &*hiu_);
+  status = s905d2_hiu_init(get_mmio_resource(parent), &*hiu_);
   if (status != ZX_OK) {
     zxlogf(ERROR, "aml-cpufreq: hiu_init failed: %s", zx_status_get_string(status));
     return status;
