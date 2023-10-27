@@ -110,6 +110,10 @@ if (is_fuchsia) {
         }
       }
     }
+    product = {
+      component_policy = {
+      }
+    }
   }
 
   assembled_system("assembly") {

@@ -137,6 +137,8 @@ product_assembly_configuration("core") {
   }
   product = {
     build_info = default_product_build_info
+    component_policy = {
+    }
   }
 
   base_driver_packages = _base_driver_packages
@@ -151,6 +153,8 @@ product_assembly_configuration("core_with_f2fs") {
   }
   product = {
     build_info = default_product_build_info
+    component_policy = {
+    }
   }
 
   base_driver_packages = _base_driver_packages
@@ -165,6 +169,8 @@ product_assembly_configuration("core_with_minfs") {
   }
   product = {
     build_info = default_product_build_info
+    component_policy = {
+    }
   }
 
   base_driver_packages = _base_driver_packages
@@ -179,6 +185,8 @@ product_assembly_configuration("core_with_fxfs") {
   }
   product = {
     build_info = default_product_build_info
+    component_policy = {
+    }
   }
 
   base_driver_packages = _base_driver_packages
@@ -199,6 +207,8 @@ product_assembly_configuration("core_with_netstack3") {
   }
   product = {
     build_info = default_product_build_info
+    component_policy = {
+    }
   }
 
   base_driver_packages = _base_driver_packages
@@ -221,6 +231,8 @@ product_assembly_configuration("core_with_dfv2_fuzzing") {
   }
   product = {
     build_info = default_product_build_info
+    component_policy = {
+    }
   }
 
   base_driver_packages = _base_driver_packages

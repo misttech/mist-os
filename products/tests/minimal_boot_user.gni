@@ -17,6 +17,3 @@ legacy_universe_package_labels += [
   # of the product.
   "//src/tests/memory_budget:tests",
 ]
-
-product_bootfs_labels +=
-    [ "//src/sys/component_manager:component_manager_bootfs_config" ]

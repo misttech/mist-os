@@ -42,10 +42,7 @@ fuchsia_product_assembly_config_label = "//products/minimal"
 zedboot_product_assembly_config_label = "//products/zedboot"
 
 # Kernel command line arguments.
-product_bootfs_labels = [
-  "//products/kernel_cmdline:oom.reboot-timeout--low",
-  "//src/sys/component_manager:component_manager_bootfs_config",
-]
+product_bootfs_labels = [ "//products/kernel_cmdline:oom.reboot-timeout--low" ]
 
 fuchsia_structured_config_policy =
     "//products/minimal/minimal_user_structured_config_policy.json5"

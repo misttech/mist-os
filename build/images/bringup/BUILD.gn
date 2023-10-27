@@ -71,6 +71,8 @@ product_assembly_configuration("product_assembly_config") {
   # The bringup product can't specify anything in base/cache packages, as it
   # doesn't have an fvm with blobfs.
   product = {
+    component_policy = {
+    }
   }
 }
 
