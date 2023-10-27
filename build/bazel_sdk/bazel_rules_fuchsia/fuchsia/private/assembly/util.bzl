@@ -88,6 +88,10 @@ def _walk_json(json_dict, visit_node_funcs):
         for key, value in dictionary.items():
             _enqueue(dictionary, key, value)
 
+    def _enqueue_array(array):
+        for i, value in enumerate(array):
+            _enqueue(array, i, value)
+
     _enqueue_dictionary_children(json_dict)
 
     # Bazel doesn't support recursions, but we don't expect
@@ -102,6 +106,8 @@ def _walk_json(json_dict, visit_node_funcs):
             visit_node_func(dictionary = node.dictionary, key = node.key, value = node.value)
         if type(node.value) == "dict":
             _enqueue_dictionary_children(node.value)
+        if type(node.value) == "list":
+            _enqueue_array(node.value)
 
     if nodes_to_visit:
         fail("More than %s nodes in the input json_dict" % max_nodes)

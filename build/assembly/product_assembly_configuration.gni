@@ -361,6 +361,11 @@ template("product_assembly_configuration") {
       ]
     },
     {
+      node_path = "product.component_policy"
+      fields = [ "product_policies" ]
+      is_list = true
+    },
+    {
       node_path = "platform.forensics.cobalt"
       fields = [ "registry" ]
     },
@@ -435,7 +440,12 @@ template("product_assembly_configuration") {
     if (_continue) {
       foreach(_field_name, potential_input.fields) {
         if (defined(_node[_field_name])) {
-          _file_path = _node[_field_name]
+          _file_paths = []
+          if (defined(potential_input.is_list) && potential_input.is_list) {
+            _file_paths += _node[_field_name]
+          } else {
+            _file_paths += [ _node[_field_name] ]
+          }
 
           # Here the rebased path is converted back in to an absolute GN
           # file label, from the GN root dir `//`:
@@ -456,8 +466,10 @@ template("product_assembly_configuration") {
           #
           # And the resultant (non-rebased) path can be used in the GN
           # action's `inputs` list
-          _gn_path = "//" + rebase_path(_file_path, "//", root_build_dir)
-          config_inputs += [ _gn_path ]
+          foreach(_file_path, _file_paths) {
+            _gn_path = "//" + rebase_path(_file_path, "//", root_build_dir)
+            config_inputs += [ _gn_path ]
+          }
         }
       }
     }
