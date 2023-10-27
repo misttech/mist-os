@@ -26,6 +26,7 @@
                 "fuchsia.net.routes.StateV4",
                 "fuchsia.net.routes.StateV6",
                 "fuchsia.net.stack.Stack",
+                "fuchsia.posix.socket.Provider",
                 "fuchsia.posix.socket.raw.Provider",
             ],
             from: "#network",
@@ -53,6 +54,7 @@
             protocol: [
                 "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.kernel.Stats",
+                "fuchsia.kernel.VmexResource",
                 "fuchsia.sysinfo.SysInfo",
             ],
             from: "parent",
@@ -63,6 +65,26 @@
             from: "#wlanix",
             to: "#starnix_runner",
             source_availability: "unknown",
+        },
+        {
+            protocol: [
+                "fuchsia.sysmem.Allocator",
+                "fuchsia.sysmem2.Allocator",
+            ],
+            from: "#sysmem_connector",
+            to: [ "#starnix_runner" ],
+        },
+        {
+            protocol: [ "fuchsia.vulkan.loader.Loader" ],
+            from: "#vulkan_loader",
+            to: [ "#starnix_runner" ],
+        },
+        {
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-gpu",
+            to: [ "#starnix_runner" ],
+            subdir: "gpu",
         },
     ],
 }

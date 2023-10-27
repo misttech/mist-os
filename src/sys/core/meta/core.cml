@@ -83,6 +83,8 @@
             name: "cobalt",
             url: "fuchsia-pkg://fuchsia.com/cobalt#meta/cobalt.cm",
         },
+
+        // TODO(https://fxbug.dev/294908023) move to the relevant core shard
         {
             name: "starnix_runner",
             url: "fuchsia-pkg://fuchsia.com/starnix#meta/starnix_runner.cm",
@@ -225,11 +227,6 @@
             to: [ "#sl4f_bridge_server" ],
         },
         {
-            protocol: [ "fuchsia.posix.socket.Provider" ],
-            from: "#network",
-            to: [ "#starnix_runner" ],
-        },
-        {
             protocol: "fuchsia.stash.SecureStore",
             from: "#stash_secure",
             to: [
@@ -302,20 +299,12 @@
             to: "#system-update",
         },
         {
-            protocol: [ "fuchsia.kernel.VmexResource" ],
-            from: "parent",
-            to: "#starnix_runner",
-        },
-        {
             protocol: [
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.sysmem2.Allocator",
             ],
             from: "#sysmem_connector",
-            to: [
-                "#agis",
-                "#starnix_runner",
-            ],
+            to: [ "#agis" ],
         },
         {
             protocol: "fuchsia.factory.MiscFactoryStoreProvider",
@@ -448,10 +437,7 @@
         {
             protocol: [ "fuchsia.vulkan.loader.Loader" ],
             from: "#vulkan_loader",
-            to: [
-                "#agis",
-                "#starnix_runner",
-            ],
+            to: [ "#agis" ],
         },
         {
             directory: "dev-class",
@@ -470,10 +456,7 @@
             directory: "dev-class",
             from: "parent",
             as: "dev-gpu",
-            to: [
-                "#starnix_runner",
-                "#vulkan_loader",
-            ],
+            to: [ "#vulkan_loader" ],
             subdir: "gpu",
         },
         {
