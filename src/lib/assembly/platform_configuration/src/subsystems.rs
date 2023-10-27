@@ -213,12 +213,12 @@ fn configure_subsystems(
     )
     .context("Configuring the 'build_info' subsystem")?;
 
-    component::ComponentSubsystem::define_configuration(
-        context,
-        &config.product.component_policy,
-        builder,
-    )
-    .context("Configuring the 'component' subsystem")?;
+    let component_config = component::ComponentConfig {
+        policy: &config.product.component_policy,
+        development_support: &config.platform.development_support,
+    };
+    component::ComponentSubsystem::define_configuration(context, &component_config, builder)
+        .context("Configuring the 'component' subsystem")?;
 
     connectivity::ConnectivitySubsystemConfig::define_configuration(
         context,
