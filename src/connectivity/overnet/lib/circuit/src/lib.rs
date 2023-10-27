@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use fuchsia_async::Timer;
-use futures::channel::mpsc::{Sender, UnboundedReceiver, UnboundedSender};
+use futures::channel::mpsc::{Sender, UnboundedSender};
 use futures::channel::oneshot;
 use futures::future::Either;
 use futures::lock::Mutex;
@@ -276,11 +276,9 @@ impl Node {
         &self,
         control_stream: Option<(stream::Reader, stream::Writer)>,
         new_stream_sender: UnboundedSender<(stream::Reader, stream::Writer)>,
-        mut new_stream_receiver: UnboundedReceiver<(
-            stream::Reader,
-            stream::Writer,
-            oneshot::Sender<Result<()>>,
-        )>,
+        mut new_stream_receiver: impl futures::Stream<Item = (stream::Reader, stream::Writer, oneshot::Sender<Result<()>>)>
+            + Unpin
+            + Send,
         quality: Quality,
     ) -> impl Future<Output = Result<()>> + Send {
         let has_router = self.has_router;
@@ -448,7 +446,9 @@ impl Node {
     fn handle_new_streams(
         &self,
         new_stream_receiver_receiver: oneshot::Receiver<
-            UnboundedReceiver<(stream::Reader, stream::Writer, oneshot::Sender<Result<()>>)>,
+            impl futures::Stream<
+                    Item = (stream::Reader, stream::Writer, oneshot::Sender<Result<()>>),
+                > + Unpin,
         >,
         new_stream_sender: UnboundedSender<(stream::Reader, stream::Writer)>,
     ) -> impl Future<Output = ()> {
