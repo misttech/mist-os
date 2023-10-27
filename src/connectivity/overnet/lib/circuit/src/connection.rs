@@ -5,7 +5,7 @@
 use crate::stream;
 use crate::{Error, Node, Result};
 
-use futures::channel::mpsc::{unbounded, Sender, UnboundedReceiver};
+use futures::channel::mpsc::{channel, Receiver, Sender};
 use futures::channel::oneshot;
 use futures::lock::Mutex;
 use futures::stream::Stream;
@@ -183,7 +183,7 @@ impl ConnectionNode {
         protocol: &str,
         new_peer_sender: Sender<String>,
     ) -> Result<(ConnectionNode, impl Stream<Item = Connection> + Send)> {
-        let (incoming_stream_sender, incoming_stream_receiver) = unbounded();
+        let (incoming_stream_sender, incoming_stream_receiver) = channel(1);
         let node = Arc::new(Node::new(node_id, protocol, new_peer_sender, incoming_stream_sender)?);
         let conns = Arc::new(Mutex::new(HashMap::<u64, (Weak<StreamMap>, ClientOrServer)>::new()));
         let conn_stream =
@@ -199,7 +199,7 @@ impl ConnectionNode {
         interval: Duration,
         new_peer_sender: Sender<String>,
     ) -> Result<(ConnectionNode, impl Stream<Item = Connection> + Send)> {
-        let (incoming_stream_sender, incoming_stream_receiver) = unbounded();
+        let (incoming_stream_sender, incoming_stream_receiver) = channel(1);
         let (node, router) = Node::new_with_router(
             node_id,
             protocol,
@@ -263,7 +263,7 @@ impl ConnectionNode {
 fn conn_stream(
     node: Weak<Node>,
     conns: Arc<Mutex<HashMap<u64, (Weak<StreamMap>, ClientOrServer)>>>,
-    incoming_stream_receiver: UnboundedReceiver<(stream::Reader, stream::Writer, String)>,
+    incoming_stream_receiver: Receiver<(stream::Reader, stream::Writer, String)>,
 ) -> impl Stream<Item = Connection> + Send {
     incoming_stream_receiver.filter_map(move |(reader, writer, peer_node_id)| {
         let conns = Arc::clone(&conns);

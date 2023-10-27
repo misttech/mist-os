@@ -156,7 +156,7 @@ pub struct Node {
 
     /// If another node establishes a connection to this node, we will notify the user by way of
     /// this sender.
-    incoming_stream_sender: UnboundedSender<(stream::Reader, stream::Writer, String)>,
+    incoming_stream_sender: Sender<(stream::Reader, stream::Writer, String)>,
 
     /// If a new peer becomes available we will send its name through this sender to notify the user.
     new_peer_sender: Sender<String>,
@@ -174,7 +174,7 @@ impl Node {
         node_id: &str,
         protocol: &str,
         new_peer_sender: Sender<String>,
-        incoming_stream_sender: UnboundedSender<(stream::Reader, stream::Writer, String)>,
+        incoming_stream_sender: Sender<(stream::Reader, stream::Writer, String)>,
     ) -> Result<Node> {
         let node_id = node_id.to_owned().try_into()?;
         let protocol = protocol.to_owned().try_into()?;
@@ -196,7 +196,7 @@ impl Node {
         protocol: &str,
         interval: Duration,
         new_peer_sender: Sender<String>,
-        incoming_stream_sender: UnboundedSender<(stream::Reader, stream::Writer, String)>,
+        incoming_stream_sender: Sender<(stream::Reader, stream::Writer, String)>,
     ) -> Result<(Node, impl Future<Output = ()> + Send)> {
         let mut node = Self::new(node_id, protocol, new_peer_sender, incoming_stream_sender)?;
         node.has_router = true;

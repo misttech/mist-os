@@ -846,8 +846,8 @@ mod test {
     async fn node_connect() {
         let (new_peer_sender_a, mut new_peers) = channel(1);
         let (new_peer_sender_b, _new_peers_b) = channel(100);
-        let (incoming_streams_sender_a, _streams_a) = unbounded();
-        let (incoming_streams_sender_b, mut streams) = unbounded();
+        let (incoming_streams_sender_a, _streams_a) = channel(100);
+        let (incoming_streams_sender_b, mut streams) = channel(1);
         let a = Node::new("a", "test", new_peer_sender_a, incoming_streams_sender_a).unwrap();
         let b = Node::new("b", "test", new_peer_sender_b, incoming_streams_sender_b).unwrap();
         // Connection closure errors are very timing-dependent so we'll tend to be flaky if we

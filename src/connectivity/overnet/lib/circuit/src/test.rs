@@ -119,8 +119,8 @@ async fn connect_nodes(a: &Node, b: &Node) -> impl std::future::Future<Output = 
 async fn connection_test() {
     let (new_peer_sender_a, mut new_peers) = channel(1);
     let (new_peer_sender_b, _new_peers_b) = channel(100);
-    let (incoming_streams_sender_a, _streams_a) = unbounded();
-    let (incoming_streams_sender_b, mut streams) = unbounded();
+    let (incoming_streams_sender_a, _streams_a) = channel(100);
+    let (incoming_streams_sender_b, mut streams) = channel(1);
     let a = Node::new("a", "test", new_peer_sender_a, incoming_streams_sender_a).unwrap();
     let b = Node::new("b", "test", new_peer_sender_b, incoming_streams_sender_b).unwrap();
 
@@ -156,8 +156,8 @@ async fn connection_test() {
 async fn connection_test_duplex() {
     let (new_peer_sender_a, new_peers_a) = channel(1);
     let (new_peer_sender_b, new_peers_b) = channel(1);
-    let (incoming_streams_sender_a, streams_a) = unbounded();
-    let (incoming_streams_sender_b, streams_b) = unbounded();
+    let (incoming_streams_sender_a, streams_a) = channel(1);
+    let (incoming_streams_sender_b, streams_b) = channel(1);
     let a = Node::new("a", "test", new_peer_sender_a, incoming_streams_sender_a).unwrap();
     let b = Node::new("b", "test", new_peer_sender_b, incoming_streams_sender_b).unwrap();
 
@@ -231,12 +231,12 @@ async fn connection_test_duplex() {
 async fn connection_test_with_router() {
     let (new_peer_sender_a, new_peers_a) = channel(1);
     let (new_peer_sender_b, new_peers_b) = channel(1);
-    let (incoming_streams_sender_a, streams_a) = unbounded();
-    let (incoming_streams_sender_b, streams_b) = unbounded();
+    let (incoming_streams_sender_a, streams_a) = channel(1);
+    let (incoming_streams_sender_b, streams_b) = channel(1);
     let a = Node::new("a", "test", new_peer_sender_a, incoming_streams_sender_a).unwrap();
     let b = Node::new("b", "test", new_peer_sender_b, incoming_streams_sender_b).unwrap();
     let (new_peer_sender_router, _new_peers_router) = channel(100);
-    let (incoming_streams_sender_router, _streams_router) = unbounded();
+    let (incoming_streams_sender_router, _streams_router) = channel(100);
     let (router, router_task) = Node::new_with_router(
         "router",
         "test",
@@ -320,12 +320,12 @@ async fn connection_test_with_router() {
 async fn connection_test_with_injected_route() {
     let (new_peer_sender_a, new_peers_a) = channel(1);
     let (new_peer_sender_b, new_peers_b) = channel(1);
-    let (incoming_streams_sender_a, streams_a) = unbounded();
-    let (incoming_streams_sender_b, streams_b) = unbounded();
+    let (incoming_streams_sender_a, streams_a) = channel(1);
+    let (incoming_streams_sender_b, streams_b) = channel(1);
     let a = Node::new("a", "test", new_peer_sender_a, incoming_streams_sender_a).unwrap();
     let b = Node::new("b", "test", new_peer_sender_b, incoming_streams_sender_b).unwrap();
     let (new_peer_sender_router, mut new_peers_router) = channel(1);
-    let (incoming_streams_sender_router, _streams_router) = unbounded();
+    let (incoming_streams_sender_router, _streams_router) = channel(100);
     let router =
         Node::new("router", "test", new_peer_sender_router, incoming_streams_sender_router)
             .unwrap();
