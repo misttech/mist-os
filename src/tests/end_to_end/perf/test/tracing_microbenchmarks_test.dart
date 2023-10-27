@@ -144,4 +144,53 @@ void main() {
         expectedMetricNamesFile:
             'fuchsia.microbenchmarks.tracing_categories_disabled.txt');
   }, timeout: Timeout.none);
+
+  // --- Rust Trace Library Benchmarks
+  //
+  // We take a similar approach with the rust benchmarks. The library currently calls into the c
+  // trace bindings, so our aim here is to ensure we aren't accidentally adding significant overhead
+  // in the translation layer.
+  //
+  // These benchmarks are in a separate rust based binary, so we run 2 variants:
+  // - Tracing disabled
+  // - Tracing enabled, but "benchmark" category disabled
+  //
+  // TODO(b/295183613): Add a benchmark with tracing enabled. Currently the buffer fills up
+  // instantly and then trace manager attempts to empty the buffer during the run, blocking its
+  // async loop. At the same time sl4f tries to block on stopping the trace but doesn't try to read
+  // the trace buffer resulting in a deadlock. Once that's done, it should be as easy as copying
+  // this benchmark and changing the categories enabled to 'benchmark'.
+  test('fuchsia_microbenchmarks_tracing_rust_categories_disabled', () async {
+    final helper = await PerfTestHelper.make();
+    final traceSession = await helper.performance
+        .initializeTracing(categories: ['nonexistent_category'], bufferSize: 1);
+    await traceSession.start();
+
+    final resultsFile = await helper.runTestComponentReturningResultsFile(
+        packageName: 'rust_trace_events_benchmarks',
+        componentName: 'trace_events.cm',
+        commandArgs: PerfTestHelper.componentOutputPath,
+        resultsFileSuffix: '_categories_disabled');
+
+    await traceSession.stop();
+    addTestSuiteSuffix(resultsFile, '.tracing_categories_disabled');
+
+    await helper.processResultsSummarized([resultsFile],
+        expectedMetricNamesFile:
+            'fuchsia.trace_records.rust.tracing_categories_disabled.txt');
+  }, timeout: Timeout.none);
+
+  test('fuchsia_microbenchmarks_tracing_rust_tracing_disabled', () async {
+    final helper = await PerfTestHelper.make();
+    final resultsFile = await helper.runTestComponentReturningResultsFile(
+        packageName: 'rust_trace_events_benchmarks',
+        componentName: 'trace_events.cm',
+        commandArgs: PerfTestHelper.componentOutputPath,
+        resultsFileSuffix: '_tracing_disabled');
+
+    addTestSuiteSuffix(resultsFile, '.tracing_disabled');
+    await helper.processResultsSummarized([resultsFile],
+        expectedMetricNamesFile:
+            'fuchsia.trace_records.rust.tracing_disabled.txt');
+  }, timeout: Timeout.none);
 }

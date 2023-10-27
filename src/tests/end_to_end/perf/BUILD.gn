@@ -17,6 +17,7 @@ import("//build/testing/host_test_data.gni")
 # test executables.
 
 test_list = [
+  # keep-sorted start
   "archivist_benchmarks_test",
   "audio_mixer_profiler_test",
   "diagnostics_benchmarks_test",
@@ -36,6 +37,8 @@ test_list = [
   "rust_inspect_benchmarks_test",
   "storage_benchmarks_test",
   "tracing_microbenchmarks_test",
+
+  # keep-sorted end
 ]
 
 # TODO(https://fxbug.dev/131000): diagnostics_log_encoding_bench
@@ -212,6 +215,7 @@ if (is_host) {
   }
 
   metric_files = [
+    # keep-sorted start
     "fuchsia.archivist.formatter.txt",
     "fuchsia.archivist.logging.txt",
     "fuchsia.audio.txt",
@@ -290,6 +294,10 @@ if (is_host) {
     "fuchsia.storage.starnix_data.txt",
     "fuchsia.storage.starnix_tmp.txt",
     "fuchsia.storage.txt",
+    "fuchsia.trace_records.rust.tracing_categories_disabled.txt",
+    "fuchsia.trace_records.rust.tracing_disabled.txt",
+
+    # keep-sorted end
   ]
 
   host_test_data("runtime_deps") {
@@ -345,6 +353,9 @@ group("package_deps") {
 
     # These are used by extended_pstate_test
     "//src/starnix/lib/extended_pstate",
+
+    # Used by the tracing_microbenchmarks test
+    "//src/lib/trace/rust/bench",
   ]
 
   if (!is_asan) {
