@@ -39,14 +39,12 @@ void WlanPhyImplDevice::Init(
   wlantap_phy_ = std::make_unique<WlantapPhy>(
       std::move(user_channel), phy_config_,
       [self = shared_from_this(),
-       name = name_](WlantapPhy::ShutdownCompleter::Async wlantap_phy_shutdown_completer)
-          -> fit::result<zx_status_t> {
-        // Return an error if this function is called more than once.
-        // On the first call, this function calls the deconstructor of
-        // the captured `shared_ptr` |self| to drop the reference.
-        static size_t call_count = 0;
-        ++call_count;
-        if (call_count > 1) {
+       name = name_](WlantapPhy::ShutdownCompleter::Async wlantap_phy_shutdown_completer) mutable
+      -> fit::result<zx_status_t> {
+        // Return an error if |self| has already been reset(). This function
+        // should only be called once, and |self| is reset() upon completion
+        // to drop its reference.
+        if (self == nullptr) {
           FDF_LOG(ERROR, "%s: shutdown callback called more than once", name.c_str());
           return fit::error(ZX_ERR_INTERNAL);
         }
@@ -64,9 +62,7 @@ void WlanPhyImplDevice::Init(
 
           result = fit::error(phy_removal_status.error_value().status());
         }
-
-        // |call_count| protects this function from being called more than once.
-        self.~shared_ptr();
+        self.reset();
         return result;
       });
 
