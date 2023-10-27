@@ -31,7 +31,10 @@ source_set("edid") {
 
 fuchsia_library_fuzzer("edid-fuzzer") {
   sources = [ "edid-fuzzer.cc" ]
-  deps = [ ":edid" ]
+  deps = [
+    ":edid",
+    "//src/devices/testing/no_ddk",
+  ]
   include_dirs = [ ".." ]
 }
 
@@ -43,6 +46,7 @@ test("edid-test") {
   ]
   deps = [
     ":edid",
+    "//src/devices/testing/no_ddk",
     "//src/lib/fxl",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
