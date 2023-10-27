@@ -466,149 +466,157 @@ pub struct NamingRule {
 mod tests {
     use super::*;
     use std::io::Write;
+    use test_case::test_case;
 
     use fidl_fuchsia_hardware_network as fhwnet;
 
-    #[derive(Clone)]
-    struct TestCase {
+    // usb interfaces
+    #[test_case(
+        "/dev/sys/platform/pt/PCI0/bus/00:14.0/00:14.0/xhci/usb/004/004/ifc-000/ax88179/ethernet",
+        [0x01, 0x01, 0x01, 0x01, 0x01, 0x01],
+        crate::InterfaceType::Wlan,
+        "wlanx1";
+        "usb_wlan"
+    )]
+    #[test_case(
+        "/dev/sys/platform/pt/PCI0/bus/00:15.0/00:15.0/xhci/usb/004/004/ifc-000/ax88179/ethernet",
+        [0x02, 0x02, 0x02, 0x02, 0x02, 0x02],
+        crate::InterfaceType::Ethernet,
+        "ethx2";
+        "usb_eth"
+    )]
+    // pci interfaces
+    #[test_case(
+        "/dev/sys/platform/pt/PCI0/bus/00:14.0/00:14.0/ethernet",
+        [0x03, 0x03, 0x03, 0x03, 0x03, 0x03],
+        crate::InterfaceType::Wlan,
+        "wlanp0014";
+        "pci_wlan"
+    )]
+    #[test_case(
+        "/dev/sys/platform/pt/PCI0/bus/00:15.0/00:14.0/ethernet",
+        [0x04, 0x04, 0x04, 0x04, 0x04, 0x04],
+        crate::InterfaceType::Ethernet,
+        "ethp0015";
+        "pci_eth"
+    )]
+    // platform interfaces (ethernet jack and sdio devices)
+    #[test_case(
+        "/dev/sys/platform/05:00:6/aml-sd-emmc/sdio/broadcom-wlanphy/wlanphy",
+        [0x05, 0x05, 0x05, 0x05, 0x05, 0x05],
+        crate::InterfaceType::Wlan,
+        "wlans05006";
+        "platform_wlan"
+    )]
+    #[test_case(
+        "/dev/sys/platform/04:02:7/aml-ethernet/Designware-MAC/ethernet",
+        [0x07, 0x07, 0x07, 0x07, 0x07, 0x07],
+        crate::InterfaceType::Ethernet,
+        "eths04027";
+        "platform_eth"
+    )]
+    // unknown interfaces
+    #[test_case(
+        "/dev/sys/unknown",
+        [0x08, 0x08, 0x08, 0x08, 0x08, 0x08],
+        crate::InterfaceType::Wlan,
+        "wlanx8";
+        "unknown_wlan1"
+    )]
+    #[test_case(
+        "unknown",
+        [0x09, 0x09, 0x09, 0x09, 0x09, 0x09],
+        crate::InterfaceType::Wlan,
+        "wlanx9";
+        "unknown_wlan2"
+    )]
+    fn test_generate_name(
         topological_path: &'static str,
         mac: [u8; 6],
         interface_type: crate::InterfaceType,
         want_name: &'static str,
-    }
-
-    #[test]
-    fn test_generate_name() {
-        let test_cases = vec![
-            // usb interfaces
-            TestCase {
-                topological_path: "/dev/sys/platform/pt/PCI0/bus/00:14.0/00:14.0/xhci/usb/004/004/ifc-000/ax88179/ethernet",
-                mac: [0x01, 0x01, 0x01, 0x01, 0x01, 0x01],
-                interface_type: crate::InterfaceType::Wlan,
-                want_name: "wlanx1",
-            },
-            TestCase {
-                topological_path: "/dev/sys/platform/pt/PCI0/bus/00:15.0/00:15.0/xhci/usb/004/004/ifc-000/ax88179/ethernet",
-                mac: [0x02, 0x02, 0x02, 0x02, 0x02, 0x02],
-                interface_type: crate::InterfaceType::Ethernet,
-                want_name: "ethx2",
-            },
-            // pci intefaces
-            TestCase {
-                topological_path: "/dev/sys/platform/pt/PCI0/bus/00:14.0/00:14.0/ethernet",
-                mac: [0x03, 0x03, 0x03, 0x03, 0x03, 0x03],
-                interface_type: crate::InterfaceType::Wlan,
-                want_name: "wlanp0014",
-            },
-            TestCase {
-                topological_path: "/dev/sys/platform/pt/PCI0/bus/00:15.0/00:14.0/ethernet",
-                mac: [0x04, 0x04, 0x04, 0x04, 0x04, 0x04],
-                interface_type: crate::InterfaceType::Ethernet,
-                want_name: "ethp0015",
-            },
-            // platform interfaces (ethernet jack and sdio devices)
-            TestCase {
-                topological_path:
-                    "/dev/sys/platform/05:00:6/aml-sd-emmc/sdio/broadcom-wlanphy/wlanphy",
-                mac: [0x05, 0x05, 0x05, 0x05, 0x05, 0x05],
-                interface_type: crate::InterfaceType::Wlan,
-                want_name: "wlans05006",
-            },
-            TestCase {
-                topological_path: "/dev/sys/platform/04:02:7/aml-ethernet/Designware-MAC/ethernet",
-                mac: [0x07, 0x07, 0x07, 0x07, 0x07, 0x07],
-                interface_type: crate::InterfaceType::Ethernet,
-                want_name: "eths04027",
-            },
-            // unknown interfaces
-            TestCase {
-                topological_path: "/dev/sys/unknown",
-                mac: [0x08, 0x08, 0x08, 0x08, 0x08, 0x08],
-                interface_type: crate::InterfaceType::Wlan,
-                want_name: "wlanx8",
-            },
-            TestCase {
-                topological_path: "unknown",
-                mac: [0x09, 0x09, 0x09, 0x09, 0x09, 0x09],
-                interface_type: crate::InterfaceType::Wlan,
-                want_name: "wlanx9",
-            },
-        ];
+    ) {
         let config = Config { interfaces: vec![] };
-        for TestCase { topological_path, mac, interface_type, want_name } in test_cases.into_iter()
-        {
-            let persistent_id = config.generate_identifier(
-                topological_path.into(),
-                fidl_fuchsia_net_ext::MacAddress { octets: mac },
-            );
-            let name = config
-                .generate_name(&persistent_id, interface_type)
-                .expect("failed to generate the name");
-            assert_eq!(name, want_name);
-        }
+        let persistent_id = config.generate_identifier(
+            topological_path.into(),
+            fidl_fuchsia_net_ext::MacAddress { octets: mac },
+        );
+        let name = config
+            .generate_name(&persistent_id, interface_type)
+            .expect("failed to generate the name");
+        assert_eq!(name, want_name);
     }
 
-    #[test]
-    fn test_generate_stable_name() {
-        #[derive(Clone)]
-        struct FileBackedConfigTestCase {
-            topological_path: &'static str,
-            mac: [u8; 6],
-            interface_type: crate::InterfaceType,
-            want_name: &'static str,
-            expected_size: usize,
-        }
+    struct StableNameTestCase {
+        topological_path: &'static str,
+        mac: [u8; 6],
+        interface_type: crate::InterfaceType,
+        want_name: &'static str,
+        expected_size: usize,
+    }
 
-        let test_cases = vec![
-            // Base case.
-            FileBackedConfigTestCase {
-                topological_path: "/dev/sys/platform/pt/PCI0/bus/00:14.0_/00:14.0/ethernet",
-                mac: [0x01, 0x01, 0x01, 0x01, 0x01, 0x01],
-                interface_type: crate::InterfaceType::Wlan,
-                want_name: "wlanp0014",
-                expected_size: 1,
-            },
-            // Same topological path as the base case, different MAC address.
-            FileBackedConfigTestCase {
-                topological_path: "/dev/sys/platform/pt/PCI0/bus/00:14.0_/00:14.0/ethernet",
-                mac: [0xFE, 0x01, 0x01, 0x01, 0x01, 0x01],
-                interface_type: crate::InterfaceType::Wlan,
-                want_name: "wlanp0014",
-                expected_size: 1,
-            },
-            // Test case that labels iwilwifi as ethernet.
-            FileBackedConfigTestCase {
-                topological_path: "/dev/sys/platform/pt/PCI0/bus/01:00.0/01:00.0/iwlwifi-wlan-softmac/wlan-ethernet/ethernet",
-                mac: [0x01, 0x01, 0x01, 0x01, 0x01, 0x01],
-                interface_type: crate::InterfaceType::Ethernet,
-                want_name: "ethp01",
-                expected_size: 2,
-            },
-            // Test case that changes the previous test case's device class to wlan.
-            // The test should detect that the device class doesn't match the interface
-            // name, and overwrite with the new interface name that does match.
-            FileBackedConfigTestCase {
-                topological_path: "/dev/sys/platform/pt/PCI0/bus/01:00.0/01:00.0/iwlwifi-wlan-softmac/wlan-ethernet/ethernet",
-                mac: [0x01, 0x01, 0x01, 0x01, 0x01, 0x01],
-                interface_type: crate::InterfaceType::Wlan,
-                want_name: "wlanp01",
-                expected_size: 2,
-            },
-        ];
-
+    // Base case. Interface should be added to config.
+    #[test_case([StableNameTestCase {
+        topological_path: "/dev/sys/platform/pt/PCI0/bus/00:14.0_/00:14.0/ethernet",
+        mac: [0x01, 0x01, 0x01, 0x01, 0x01, 0x01],
+        interface_type: crate::InterfaceType::Wlan,
+        want_name: "wlanp0014",
+        expected_size: 1 }];
+        "single_interface"
+    )]
+    // Test case that shares the same topo path and interface name, with
+    // different MAC address. New interface should not be added.
+    #[test_case([StableNameTestCase {
+        topological_path: "/dev/sys/platform/pt/PCI0/bus/00:14.0_/00:14.0/ethernet",
+        mac: [0x01, 0x01, 0x01, 0x01, 0x01, 0x01],
+        interface_type: crate::InterfaceType::Wlan,
+        want_name: "wlanp0014",
+        expected_size: 1}, StableNameTestCase {
+        topological_path: "/dev/sys/platform/pt/PCI0/bus/00:14.0_/00:14.0/ethernet",
+        mac: [0xFE, 0x01, 0x01, 0x01, 0x01, 0x01],
+        interface_type: crate::InterfaceType::Wlan,
+        want_name: "wlanp0014",
+        expected_size: 1 }];
+        "two_interfaces_different_mac"
+    )]
+    #[test_case([StableNameTestCase {
+        topological_path: "/dev/sys/platform/pt/PCI0/bus/00:14.0_/00:14.0/ethernet",
+        mac: [0x01, 0x01, 0x01, 0x01, 0x01, 0x01],
+        interface_type: crate::InterfaceType::Wlan,
+        want_name: "wlanp0014",
+        expected_size: 1}, StableNameTestCase {
+        topological_path: "/dev/sys/platform/pt/PCI0/bus/01:00.0/01:00.0/iwlwifi-wlan-softmac/wlan-ethernet/ethernet",
+        mac: [0x01, 0x01, 0x01, 0x01, 0x01, 0x01],
+        interface_type: crate::InterfaceType::Ethernet,
+        want_name: "ethp01",
+        expected_size: 2 }];
+        "two_distinct_interfaces"
+    )]
+    // Test case that labels iwilwifi as ethernet, then changes the device
+    // class to wlan. The test should detect that the device class doesn't
+    // match the interface name, and overwrite with the new interface name
+    // that does match.
+    #[test_case([StableNameTestCase {
+        topological_path: "/dev/sys/platform/pt/PCI0/bus/01:00.0/01:00.0/iwlwifi-wlan-softmac/wlan-ethernet/ethernet",
+        mac: [0x01, 0x01, 0x01, 0x01, 0x01, 0x01],
+        interface_type: crate::InterfaceType::Ethernet,
+        want_name: "ethp01",
+        expected_size: 1 }, StableNameTestCase {
+        topological_path: "/dev/sys/platform/pt/PCI0/bus/01:00.0/01:00.0/iwlwifi-wlan-softmac/wlan-ethernet/ethernet",
+        mac: [0x01, 0x01, 0x01, 0x01, 0x01, 0x01],
+        interface_type: crate::InterfaceType::Wlan,
+        want_name: "wlanp01",
+        expected_size: 1 }];
+        "two_interfaces_different_device_class"
+    )]
+    fn test_generate_stable_name(test_cases: impl IntoIterator<Item = StableNameTestCase>) {
         let temp_dir = tempfile::tempdir_in("/tmp").expect("failed to create the temp dir");
         let path = temp_dir.path().join("net.config.json");
 
         // query an existing interface with the same topo path and a different mac address
         for (
             _i,
-            FileBackedConfigTestCase {
-                topological_path,
-                mac,
-                interface_type,
-                want_name,
-                expected_size,
-            },
+            StableNameTestCase { topological_path, mac, interface_type, want_name, expected_size },
         ) in test_cases.into_iter().enumerate()
         {
             let mut interface_config =
@@ -785,81 +793,68 @@ mod tests {
         assert_eq!(persisted, expected_new_format);
     }
 
-    #[test]
-    fn test_interface_matching_by_bus_type() {
-        #[derive(Clone)]
-        struct MatchBusTypeTestCase {
-            topological_path: &'static str,
-            bus_types: Vec<BusType>,
-            expected_bus_type: BusType,
-            want_match: bool,
-        }
+    #[test_case(
+        "/dev/sys/platform/pt/PCI0/bus/00:14.0_/00:14.0/ethernet",
+        vec![BusType::PCI],
+        BusType::PCI,
+        true;
+        "pci_match"
+    )]
+    #[test_case(
+        "/dev/sys/platform/pt/PCI0/bus/00:14.0_/00:14.0/ethernet",
+        vec![BusType::USB, BusType::SDIO],
+        BusType::PCI,
+        false;
+        "pci_no_match"
+    )]
+    #[test_case(
+        "/dev/sys/platform/pt/PCI0/bus/00:14.0/00:14.0/xhci/usb/004/004/ifc-000/ax88179/ethernet",
+        vec![BusType::USB],
+        BusType::USB,
+        true;
+        "usb_match"
+    )]
+    // Same topological path as the case for USB, but with
+    // non-matching bus types. Ensure that even though PCI is
+    // present in the topological path, it does not match a PCI
+    // controller.
+    #[test_case(
+        "/dev/sys/platform/pt/PCI0/bus/00:14.0/00:14.0/xhci/usb/004/004/ifc-000/ax88179/ethernet",
+        vec![BusType::PCI, BusType::SDIO],
+        BusType::USB,
+        false;
+        "usb_no_match"
+    )]
+    #[test_case(
+        "/dev/sys/platform/05:00:6/aml-sd-emmc/sdio/broadcom-wlanphy/wlanphy",
+        vec![BusType::SDIO],
+        BusType::SDIO,
+        true;
+        "sdio_match"
+    )]
+    fn test_interface_matching_by_bus_type(
+        topological_path: &'static str,
+        bus_types: Vec<BusType>,
+        expected_bus_type: BusType,
+        want_match: bool,
+    ) {
+        let device_info = devices::DeviceInfo {
+            topological_path: topological_path.to_owned(),
+            // `device_class` and `mac` have no effect on `BusType`
+            // matching, so we use arbitrary values.
+            device_class: fhwnet::DeviceClass::Virtual,
+            mac: Default::default(),
+        };
 
-        let test_cases = vec![
-            // Base case for PCI.
-            MatchBusTypeTestCase {
-                topological_path: "/dev/sys/platform/pt/PCI0/bus/00:14.0_/00:14.0/ethernet",
-                bus_types: vec![BusType::PCI],
-                expected_bus_type: BusType::PCI,
-                want_match: true,
-            },
-            // Same topological path as the base case for PCI, but with
-            // non-matching bus types.
-            MatchBusTypeTestCase {
-                topological_path: "/dev/sys/platform/pt/PCI0/bus/00:14.0_/00:14.0/ethernet",
-                bus_types: vec![BusType::USB, BusType::SDIO],
-                expected_bus_type: BusType::PCI,
-                want_match: false,
-            },
-            // Base case for USB.
-            MatchBusTypeTestCase {
-                topological_path: "/dev/sys/platform/pt/PCI0/bus/00:14.0/00:14.0/xhci/usb/004/004/ifc-000/ax88179/ethernet",
-                bus_types: vec![BusType::USB],
-                expected_bus_type: BusType::USB,
-                want_match: true,
-            },
-            // Same topological path as the base case for USB, but with
-            // non-matching bus types. Ensure that even though PCI is
-            // present in the topological path, it does not match a PCI
-            // controller.
-            MatchBusTypeTestCase {
-                topological_path: "/dev/sys/platform/pt/PCI0/bus/00:14.0/00:14.0/xhci/usb/004/004/ifc-000/ax88179/ethernet",
-                bus_types: vec![BusType::PCI, BusType::SDIO],
-                expected_bus_type: BusType::USB,
-                want_match: false,
-            },
-            MatchBusTypeTestCase {
-                topological_path: "/dev/sys/platform/05:00:6/aml-sd-emmc/sdio/broadcom-wlanphy/wlanphy",
-                bus_types: vec![BusType::SDIO],
-                expected_bus_type: BusType::SDIO,
-                want_match: true,
-            },
-        ];
+        // Verify the `BusType` determined from the device's
+        // topological path.
+        let bus_type = get_bus_type_for_topological_path(&device_info.topological_path).unwrap();
+        assert_eq!(bus_type, expected_bus_type);
 
-        for (
-            _i,
-            MatchBusTypeTestCase { topological_path, bus_types, expected_bus_type, want_match },
-        ) in test_cases.into_iter().enumerate()
-        {
-            let device_info = devices::DeviceInfo {
-                topological_path: topological_path.to_owned(),
-                // `device_class` and `mac` have no effect on `BusType`
-                // matching, so we use arbitrary values.
-                device_class: fhwnet::DeviceClass::Virtual,
-                mac: Default::default(),
-            };
-
-            // Verify the `BusType` determined from the device's
-            // topological path.
-            let bus_type =
-                get_bus_type_for_topological_path(&device_info.topological_path).unwrap();
-            assert_eq!(bus_type, expected_bus_type);
-
-            // Create a matching rule for the provided `BusType` list.
-            let matching_rule = MatchingRule::BusTypes(bus_types);
-            let does_interface_match = matching_rule.does_interface_match(&device_info).unwrap();
-            assert_eq!(does_interface_match, want_match);
-        }
+        // Create a matching rule for the provided `BusType` list.
+        let matching_rule = MatchingRule::BusTypes(bus_types);
+        let does_interface_match = matching_rule.does_interface_match(&device_info).unwrap();
+        assert_eq!(does_interface_match, want_match);
     }
 
     #[test]
@@ -885,141 +880,104 @@ mod tests {
         assert!(interface_match_res.is_err());
     }
 
-    #[test]
-    fn test_interface_matching_by_topological_path() {
-        #[derive(Clone)]
-        struct MatchPathTestCase {
-            topological_path: &'static str,
-            glob_str: &'static str,
-            want_match: bool,
-        }
+    // Glob matches the number pattern of XX:XX in the path.
+    #[test_case(
+        "/dev/sys/platform/pt/PCI0/bus/00:14.0_/00:14.0/ethernet",
+        r"*[0-9][0-9]:[0-9][0-9]*",
+        true;
+        "pattern_matches"
+    )]
+    #[test_case("pattern/will/match/anything", r"*", true; "pattern_matches_any")]
+    // Glob checks for '00' after the colon but it will not find it.
+    #[test_case(
+        "/dev/sys/platform/pt/PCI0/bus/00:14.0_/00:14.0/ethernet",
+        r"*[0-9][0-9]:00*",
+        false;
+        "no_matches"
+    )]
+    fn test_interface_matching_by_topological_path(
+        topological_path: &'static str,
+        glob_str: &'static str,
+        want_match: bool,
+    ) {
+        let device_info = devices::DeviceInfo {
+            topological_path: topological_path.to_owned(),
+            // `device_class` and `mac` have no effect on `TopologicalPath`
+            // matching, so we use arbitrary values.
+            device_class: fhwnet::DeviceClass::Virtual,
+            mac: Default::default(),
+        };
 
-        let test_cases = vec![
-            // Glob matches the number pattern of XX:XX in the path.
-            MatchPathTestCase {
-                topological_path: "/dev/sys/platform/pt/PCI0/bus/00:14.0_/00:14.0/ethernet",
-                glob_str: r"*[0-9][0-9]:[0-9][0-9]*",
-                want_match: true,
-            },
-            // Glob is a matcher for any character, so all paths will match.
-            MatchPathTestCase {
-                topological_path: "pattern/will/match/anything",
-                glob_str: r"*",
-                want_match: true,
-            },
-            // Glob checks for '00' after the colon but it will not find it.
-            MatchPathTestCase {
-                topological_path: "/dev/sys/platform/pt/PCI0/bus/00:14.0_/00:14.0/ethernet",
-                glob_str: r"*[0-9][0-9]:00*",
-                want_match: false,
-            },
-        ];
-
-        for (_i, MatchPathTestCase { topological_path, glob_str, want_match }) in
-            test_cases.into_iter().enumerate()
-        {
-            let device_info = devices::DeviceInfo {
-                topological_path: topological_path.to_owned(),
-                // `device_class` and `mac` have no effect on `TopologicalPath`
-                // matching, so we use arbitrary values.
-                device_class: fhwnet::DeviceClass::Virtual,
-                mac: Default::default(),
-            };
-
-            // Create a matching rule for the provided glob expression.
-            let matching_rule =
-                MatchingRule::TopologicalPath(glob::Pattern::new(glob_str).unwrap());
-            let does_interface_match = matching_rule.does_interface_match(&device_info).unwrap();
-            assert_eq!(does_interface_match, want_match);
-        }
+        // Create a matching rule for the provided glob expression.
+        let matching_rule = MatchingRule::TopologicalPath(glob::Pattern::new(glob_str).unwrap());
+        let does_interface_match = matching_rule.does_interface_match(&device_info).unwrap();
+        assert_eq!(does_interface_match, want_match);
     }
 
-    #[test]
-    fn test_interface_matching_by_device_class() {
-        #[derive(Clone)]
-        struct MatchDeviceClassTestCase {
-            device_class_input: fhwnet::DeviceClass,
-            device_classes: Vec<DeviceClass>,
-            expected_device_class: DeviceClass,
-            want_match: bool,
-        }
+    #[test_case(
+        fhwnet::DeviceClass::Ethernet,
+        vec![DeviceClass::Ethernet],
+        DeviceClass::Ethernet,
+        true;
+        "eth_match"
+    )]
+    #[test_case(
+        fhwnet::DeviceClass::Ethernet,
+        vec![DeviceClass::Wlan, DeviceClass::WlanAp],
+        DeviceClass::Ethernet,
+        false;
+        "eth_no_match"
+    )]
+    #[test_case(
+        fhwnet::DeviceClass::Wlan,
+        vec![DeviceClass::Wlan],
+        DeviceClass::Wlan,
+        true;
+        "wlan_match"
+    )]
+    #[test_case(
+        fhwnet::DeviceClass::Wlan,
+        vec![DeviceClass::Ethernet, DeviceClass::WlanAp],
+        DeviceClass::Wlan,
+        false;
+        "wlan_no_match"
+    )]
+    #[test_case(
+        fhwnet::DeviceClass::WlanAp,
+        vec![DeviceClass::WlanAp],
+        DeviceClass::WlanAp,
+        true;
+        "ap_match"
+    )]
+    #[test_case(
+        fhwnet::DeviceClass::WlanAp,
+        vec![DeviceClass::Ethernet, DeviceClass::Wlan],
+        DeviceClass::WlanAp,
+        false;
+        "ap_no_match"
+    )]
+    fn test_interface_matching_by_device_class(
+        device_class_input: fhwnet::DeviceClass,
+        device_classes: Vec<DeviceClass>,
+        expected_device_class: DeviceClass,
+        want_match: bool,
+    ) {
+        let device_info = devices::DeviceInfo {
+            device_class: device_class_input,
+            // `mac` and `topological_path` have no effect on `DeviceClass`
+            // matching for the provided test cases, so we use
+            // arbitrary values.
+            mac: Default::default(),
+            topological_path: Default::default(),
+        };
 
-        let test_cases = vec![
-            // Base case for Ethernet.
-            MatchDeviceClassTestCase {
-                device_class_input: fhwnet::DeviceClass::Ethernet,
-                device_classes: vec![DeviceClass::Ethernet],
-                expected_device_class: DeviceClass::Ethernet,
-                want_match: true,
-            },
-            // Same fhwnet::DeviceClass as the base case for Ethernet, but with
-            // non-matching device classes.
-            MatchDeviceClassTestCase {
-                device_class_input: fhwnet::DeviceClass::Ethernet,
-                device_classes: vec![DeviceClass::Wlan, DeviceClass::WlanAp],
-                expected_device_class: DeviceClass::Ethernet,
-                want_match: false,
-            },
-            // Base case for Wlan.
-            MatchDeviceClassTestCase {
-                device_class_input: fhwnet::DeviceClass::Wlan,
-                device_classes: vec![DeviceClass::Wlan],
-                expected_device_class: DeviceClass::Wlan,
-                want_match: true,
-            },
-            // Same fhwnet::DeviceClass as the base case for Wlan, but with
-            // non-matching device classes.
-            MatchDeviceClassTestCase {
-                device_class_input: fhwnet::DeviceClass::Wlan,
-                device_classes: vec![DeviceClass::Ethernet, DeviceClass::WlanAp],
-                expected_device_class: DeviceClass::Wlan,
-                want_match: false,
-            },
-            // Base case for Ap.
-            MatchDeviceClassTestCase {
-                device_class_input: fhwnet::DeviceClass::WlanAp,
-                device_classes: vec![DeviceClass::WlanAp],
-                expected_device_class: DeviceClass::WlanAp,
-                want_match: true,
-            },
-            // Same fhwnet::DeviceClass as the base case for Wlan, but with
-            // non-matching device classes. Ensure that Wlan is differentiated
-            // from Ap for interface matching.
-            MatchDeviceClassTestCase {
-                device_class_input: fhwnet::DeviceClass::WlanAp,
-                device_classes: vec![DeviceClass::Ethernet, DeviceClass::Wlan],
-                expected_device_class: DeviceClass::WlanAp,
-                want_match: false,
-            },
-        ];
+        // Verify the `DeviceClass` determined from the device info.
+        let device_class: DeviceClass = device_info.device_class.into();
+        assert_eq!(device_class, expected_device_class);
 
-        for (
-            _i,
-            MatchDeviceClassTestCase {
-                device_class_input,
-                device_classes,
-                expected_device_class,
-                want_match,
-            },
-        ) in test_cases.into_iter().enumerate()
-        {
-            let device_info = devices::DeviceInfo {
-                device_class: device_class_input,
-                // `mac` and `topological_path` have no effect on `DeviceClass`
-                // matching for the provided test cases, so we use
-                // arbitrary values.
-                mac: Default::default(),
-                topological_path: Default::default(),
-            };
-
-            // Verify the `DeviceClass` determined from the device info.
-            let device_class: DeviceClass = device_info.device_class.into();
-            assert_eq!(device_class, expected_device_class);
-
-            // Create a matching rule for the provided `DeviceClass` list.
-            let matching_rule = MatchingRule::DeviceClasses(device_classes);
-            let does_interface_match = matching_rule.does_interface_match(&device_info).unwrap();
-            assert_eq!(does_interface_match, want_match);
-        }
+        // Create a matching rule for the provided `DeviceClass` list.
+        let matching_rule = MatchingRule::DeviceClasses(device_classes);
+        let does_interface_match = matching_rule.does_interface_match(&device_info).unwrap();
+        assert_eq!(does_interface_match, want_match);
     }
 }
