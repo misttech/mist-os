@@ -73,13 +73,6 @@ class FuchsiaDeviceTests(fuchsia_base_test.FuchsiaBaseTest):
 
     def test_device_type(self) -> None:
         """Test case for device_type"""
-        # TODO(b/293640613): uncomment when we've landed the switch from
-        # qemu-x64 to x64 boards
-        asserts.skip(
-            reason="TODO(b/293640613): uncomment this after landing "
-            "qemu-x64 switch to x64"
-        )
-
         asserts.assert_equal(
             self.device.device_type,
             self.user_params["expected_values"]["device_type"],
