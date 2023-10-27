@@ -119,13 +119,55 @@ impl StreamRefSender {
     }
 }
 
+mod proxy_count {
+    use std::sync::Mutex;
+
+    pub struct ProxyCount {
+        count: usize,
+        high_water: usize,
+        increment: usize,
+    }
+
+    pub static PROXY_COUNT: Mutex<ProxyCount> =
+        Mutex::new(ProxyCount { count: 0, high_water: 0, increment: 100 });
+
+    impl ProxyCount {
+        pub fn increment(&mut self) {
+            self.count += 1;
+
+            if self.count == self.high_water + self.increment {
+                self.high_water += self.increment;
+                if self.count == self.increment * 10 {
+                    self.increment *= 10;
+                }
+                tracing::info!("{} proxies extant or never reaped", self.count)
+            }
+        }
+
+        pub fn decrement(&mut self) {
+            if self.count == 0 {
+                tracing::warn!("proxy counter went below zero");
+            } else {
+                self.count -= 1;
+            }
+        }
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct Proxy<Hdl: Proxyable + 'static> {
     hdl: Option<ProxyableHandle<Hdl>>,
 }
 
+impl<Hdl: 'static + Proxyable> Drop for Proxy<Hdl> {
+    fn drop(&mut self) {
+        proxy_count::PROXY_COUNT.lock().unwrap().decrement();
+    }
+}
+
 impl<Hdl: 'static + Proxyable> Proxy<Hdl> {
     fn new(hdl: Hdl, router: Weak<Router>) -> Arc<Self> {
+        proxy_count::PROXY_COUNT.lock().unwrap().increment();
         Arc::new(Self { hdl: Some(ProxyableHandle::new(hdl, router)) })
     }
 
