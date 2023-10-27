@@ -72,8 +72,6 @@ rustc_test("integration_tests_bin") {
     "test_data/empty_result_golden.json",
     "test_data/unified_reader_all_golden.json",
     "test_data/pipeline_reader_all_golden.json",
-    "test_data/memory_monitor_v2_moniker_golden.json",
-    "test_data/memory_monitor_legacy_moniker_golden.json",
     "test_data/unified_reader_full_filter_golden.json",
     "test_data/pipeline_reader_nonoverlapping_selectors_golden.json",
     "test_data/unified_reader_single_value_golden.json",
@@ -111,17 +109,6 @@ fuchsia_component_manifest("with-feedback-filtering-manifest") {
 
 fuchsia_component("archivist-with-feedback-filtering") {
   cm_label = ":with-feedback-filtering-manifest"
-  testonly = true
-  deps = [ "//src/diagnostics/archivist:bin" ]
-}
-
-fuchsia_component_manifest("with-legacy-metrics-filtering-manifest") {
-  manifest = "meta/archivist_for_integration.cml"
-  component_name = "archivist-with-legacy-metrics-filtering"
-}
-
-fuchsia_component("archivist-with-legacy-metrics-filtering") {
-  cm_label = ":with-legacy-metrics-filtering-manifest"
   testonly = true
   deps = [ "//src/diagnostics/archivist:bin" ]
 }
@@ -169,12 +156,6 @@ fuchsia_structured_config_values("archivist-with-feedback-filtering-config") {
   values = with_feedback_filtering
 }
 
-fuchsia_structured_config_values(
-    "archivist-with-legacy-metrics-filtering-config") {
-  cm_label = ":with-legacy-metrics-filtering-manifest"
-  values = with_legacy_metrics_filtering
-}
-
 fuchsia_structured_config_values("archivist-with-lowpan-filtering-config") {
   cm_label = ":with-lowpan-filtering-manifest"
   values = with_lowpan_filtering
@@ -204,11 +185,6 @@ resource("do_not_filter_feedback") {
   outputs = [ "data/config/pipelines/feedback_filtering_disabled/feedback/DISABLE_FILTERING.txt" ]
 }
 
-resource("configure_legacy_metrics_pipeline") {
-  sources = [ "configs/pipelines/legacy_selectors.cfg" ]
-  outputs = [ "data/config/pipelines/legacy_metrics_filtered/legacy_metrics/legacy_selectors.cfg" ]
-}
-
 fuchsia_test_package("archivist-integration-tests") {
   test_components = [ ":archivist_integration_tests" ]
   deps = [
@@ -218,13 +194,10 @@ fuchsia_test_package("archivist-integration-tests") {
     ":archivist-with-feedback-filtering-config",
     ":archivist-with-feedback-filtering-disabled",
     ":archivist-with-feedback-filtering-disabled-config",
-    ":archivist-with-legacy-metrics-filtering",
-    ":archivist-with-legacy-metrics-filtering-config",
     ":archivist-with-lowpan-filtering",
     ":archivist-with-lowpan-filtering-config",
     ":archivist-with-small-caches",
     ":archivist-with-small-caches-config",
-    ":configure_legacy_metrics_pipeline",
     ":do_not_filter_feedback",
     ":filter_feedback",
     ":filter_lowpan",

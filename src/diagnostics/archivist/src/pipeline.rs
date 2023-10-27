@@ -2,10 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    crate::{
-        configs, constants, diagnostics::AccessorStats, error::Error,
-        moniker_rewriter::MonikerRewriter,
-    },
+    crate::{configs, constants, diagnostics::AccessorStats, error::Error},
     async_lock::RwLock,
     diagnostics_hierarchy::HierarchyMatcher,
     fidl::prelude::*,
@@ -21,7 +18,6 @@ struct PipelineParameters {
     name: &'static str,
     protocol_name: &'static str,
     empty_behavior: configs::EmptyBehavior,
-    moniker_rewriter: Option<MonikerRewriter>,
 }
 
 /// Overlay that mediates connections between servers and the central
@@ -31,9 +27,6 @@ struct PipelineParameters {
 pub struct Pipeline {
     /// The name of the protocol through which the pipeline is served.
     protocol_name: &'static str,
-
-    /// A rewriter of monikers that the pipeline uses.
-    moniker_rewriter: Option<MonikerRewriter>,
 
     /// Contains information about the configuration of the pipeline.
     _pipeline_node: Option<inspect::Node>,
@@ -60,7 +53,6 @@ impl Pipeline {
             name: "feedback",
             empty_behavior: configs::EmptyBehavior::DoNotFilter,
             protocol_name: constants::FEEDBACK_ARCHIVE_ACCESSOR_NAME,
-            moniker_rewriter: None,
         };
         Self::new(parameters, pipelines_path, parent_node, accessor_stats_node)
     }
@@ -77,7 +69,6 @@ impl Pipeline {
             name: "legacy_metrics",
             empty_behavior: configs::EmptyBehavior::Disable,
             protocol_name: constants::LEGACY_METRICS_ARCHIVE_ACCESSOR_NAME,
-            moniker_rewriter: Some(MonikerRewriter::new()),
         };
         Self::new(parameters, pipelines_path, parent_node, accessor_stats_node)
     }
@@ -95,7 +86,6 @@ impl Pipeline {
             name: "all",
             empty_behavior: configs::EmptyBehavior::Disable,
             protocol_name: ArchiveAccessorMarker::PROTOCOL_NAME,
-            moniker_rewriter: None,
         };
         Self::new(parameters, pipelines_path, parent_node, accessor_stats_node)
     }
@@ -112,7 +102,6 @@ impl Pipeline {
             name: "lowpan",
             empty_behavior: configs::EmptyBehavior::Disable,
             protocol_name: constants::LOWPAN_ARCHIVE_ACCESSOR_NAME,
-            moniker_rewriter: Some(MonikerRewriter::new()),
         };
         Self::new(parameters, pipelines_path, parent_node, accessor_stats_node)
     }
@@ -121,7 +110,6 @@ impl Pipeline {
     pub fn for_test(static_selectors: Option<Vec<Selector>>) -> Self {
         Pipeline {
             _pipeline_node: None,
-            moniker_rewriter: None,
             protocol_name: "test",
             has_error: false,
             stats: AccessorStats::new(Default::default()),
@@ -158,7 +146,6 @@ impl Pipeline {
             _pipeline_node,
             stats,
             protocol_name: parameters.protocol_name,
-            moniker_rewriter: parameters.moniker_rewriter,
             has_error,
             mutable_state: RwLock::new(PipelineMutableState {
                 moniker_to_static_matcher_map: HashMap::new(),
@@ -173,10 +160,6 @@ impl Pipeline {
 
     pub fn protocol_name(&self) -> &'static str {
         self.protocol_name
-    }
-
-    pub fn moniker_rewriter(&self) -> Option<&MonikerRewriter> {
-        self.moniker_rewriter.as_ref()
     }
 
     pub fn accessor_stats(&self) -> &AccessorStats {

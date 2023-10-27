@@ -57,15 +57,6 @@ fuchsia_configured_component("archivist-with-kernel-log-component") {
   deps = [ "//src/diagnostics/archivist:bin" ]
 }
 
-fuchsia_configured_component(
-    "archivist-with-legacy-metrics-filtering-component") {
-  testonly = true
-  component_name = "archivist-with-legacy-metrics-filtering"
-  manifest = "meta/archivist.cml"
-  config_values = with_legacy_metrics_filtering
-  deps = [ "//src/diagnostics/archivist:bin" ]
-}
-
 fuchsia_package("realm-factory") {
   package_name = "archivist-realm-factory"
   testonly = true
@@ -73,7 +64,6 @@ fuchsia_package("realm-factory") {
     ":archivist-component",
     ":archivist-realm-factory-component",
     ":archivist-with-kernel-log-component",
-    ":archivist-with-legacy-metrics-filtering-component",
     "//src/diagnostics/archivist/testing/puppet:puppet-component",
   ]
 }

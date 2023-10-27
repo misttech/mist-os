@@ -7,7 +7,6 @@ pub const ARCHIVIST_WITH_LOWPAN_FILTERING: &str = "#meta/archivist-with-lowpan-f
 pub const ARCHIVIST_WITH_FEEDBACK_FILTERING_DISABLED: &str =
     "#meta/archivist-with-feedback-filtering-disabled.cm";
 pub const ARCHIVIST_WITH_SMALL_CACHES: &str = "#meta/archivist-with-small-caches.cm";
-pub const ARCHIVIST_WITH_LEGACY_METRICS: &str = "#meta/archivist-with-legacy-metrics-filtering.cm";
 pub const INTEGRATION_ARCHIVIST_URL: &str = "#meta/archivist.cm";
 pub const COMPONENT_WITH_CHILDREN_URL: &str =
     "fuchsia-pkg://fuchsia.com/archivist-integration-tests#meta/component_with_children.cm";

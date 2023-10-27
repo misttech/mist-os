@@ -7,7 +7,6 @@ use {
         accessor::PerformanceConfig,
         diagnostics::BatchIteratorConnectionStats,
         inspect::container::{ReadSnapshot, SnapshotData, UnpopulatedInspectDataContainer},
-        moniker_rewriter::OutputRewriter,
     },
     diagnostics_data::{self as schema, Data, Inspect, InspectHandleName},
     diagnostics_hierarchy::{DiagnosticsHierarchy, HierarchyMatcher},
@@ -77,7 +76,6 @@ pub struct ReaderServer {
     /// Selectors provided by the client which define what inspect data is returned by read
     /// requests. A none type implies that all available data should be returned.
     selectors: Option<Vec<Selector>>,
-    output_rewriter: Option<OutputRewriter>,
 }
 
 fn convert_snapshot_to_node_hierarchy(
@@ -96,11 +94,10 @@ impl ReaderServer {
         unpopulated_diagnostics_sources: Vec<UnpopulatedInspectDataContainer>,
         performance_configuration: PerformanceConfig,
         selectors: Option<Vec<Selector>>,
-        output_rewriter: Option<OutputRewriter>,
         stats: Arc<BatchIteratorConnectionStats>,
         parent_trace_id: ftrace::Id,
     ) -> impl Stream<Item = Data<Inspect>> + Send + 'static {
-        let server = Arc::new(Self { selectors, output_rewriter });
+        let server = Arc::new(Self { selectors });
 
         let batch_timeout = performance_configuration.batch_timeout_sec;
         let maximum_concurrent_snapshots_per_reader =
@@ -328,10 +325,6 @@ impl ReaderServer {
         // inspect hierarchy is then added to an accumulator as a HierarchyData to be converted
         // into a JSON string and returned.
         let moniker = pumped_inspect_data.identity.moniker.to_string();
-        let moniker = match &self.output_rewriter {
-            None => moniker,
-            Some(rewriter) => rewriter.rewrite_moniker(moniker),
-        };
 
         if let Some(configured_selectors) = &self.selectors {
             client_selectors = {
@@ -1163,8 +1156,6 @@ mod tests {
             inspect_repo.fetch_inspect_data(&None, static_selectors_matchers).await,
             test_performance_config,
             // No selectors
-            None,
-            // No output rewriter
             None,
             Arc::clone(&stats),
             trace_id,

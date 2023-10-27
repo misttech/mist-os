@@ -98,9 +98,6 @@ pub async fn create(opts: Options) -> Result<(RealmBuilder, SubRealmBuilder), Er
     let archivist_to_parent = Route::new()
         .capability(Capability::protocol_by_name("fuchsia.diagnostics.ArchiveAccessor"))
         .capability(Capability::protocol_by_name("fuchsia.diagnostics.FeedbackArchiveAccessor"))
-        .capability(Capability::protocol_by_name(
-            "fuchsia.diagnostics.LegacyMetricsArchiveAccessor",
-        ))
         .capability(Capability::protocol_by_name("fuchsia.diagnostics.LoWPANArchiveAccessor"))
         .capability(Capability::protocol_by_name("fuchsia.diagnostics.LogSettings"))
         .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))

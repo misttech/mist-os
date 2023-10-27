@@ -188,13 +188,6 @@ impl ArchiveAccessorServer {
                     _ => return Err(AccessorError::InvalidSelectors("unrecognized selectors")),
                 };
 
-                let (selectors, output_rewriter) =
-                    match (selectors, pipeline.moniker_rewriter().as_ref()) {
-                        (Some(selectors), Some(rewriter)) => rewriter.rewrite_selectors(selectors),
-                        // behaves correctly whether selectors is Some(_) or None
-                        (selectors, _) => (selectors, None),
-                    };
-
                 let static_selectors_matchers = pipeline.read().await.static_selectors_matchers();
                 let unpopulated_container_vec =
                     inspect_repo.fetch_inspect_data(&selectors, static_selectors_matchers).await;
@@ -215,7 +208,6 @@ impl ArchiveAccessorServer {
                         unpopulated_container_vec,
                         performance_config,
                         selectors,
-                        output_rewriter,
                         Arc::clone(&stats),
                         trace_id,
                     ),
@@ -429,8 +421,8 @@ impl ArchiveAccessorTranslator for fhost::ArchiveAccessorRequestStream {
             parameters,
             responder,
             stream,
-        })) = StreamExt::next(&mut __self).await else
-        {
+        })) = StreamExt::next(&mut __self).await
+        else {
             return None;
         };
         // It's fine for the client to send us a socket
@@ -452,8 +444,8 @@ impl ArchiveAccessorTranslator for ArchiveAccessorRequestStream {
             control_handle: _,
             result_stream,
             stream_parameters,
-        })) = StreamExt::next(&mut __self).await else
-        {
+        })) = StreamExt::next(&mut __self).await
+        else {
             return None;
         };
         Some(ArchiveIteratorRequest {

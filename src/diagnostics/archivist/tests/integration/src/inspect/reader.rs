@@ -10,7 +10,7 @@ use diagnostics_reader::{ArchiveReader, Inspect};
 use difference::assert_diff;
 use fidl_fuchsia_archivist_test as ftest;
 use fidl_fuchsia_diagnostics::{ArchiveAccessorMarker, ArchiveAccessorProxy};
-use fuchsia_component_test::{Capability, ChildOptions, RealmInstance, Ref, Route};
+use fuchsia_component_test::RealmInstance;
 use lazy_static::lazy_static;
 
 const MONIKER_KEY: &str = "moniker";
@@ -34,10 +34,6 @@ lazy_static! {
         include_str!("../../test_data/pipeline_reader_all_golden.json");
     static ref PIPELINE_NONOVERLAPPING_SELECTORS_GOLDEN: &'static str =
         include_str!("../../test_data/pipeline_reader_nonoverlapping_selectors_golden.json");
-    static ref MEMORY_MONITOR_V2_MONIKER_GOLDEN: &'static str =
-        include_str!("../../test_data/memory_monitor_v2_moniker_golden.json");
-    static ref MEMORY_MONITOR_LEGACY_MONIKER_GOLDEN: &'static str =
-        include_str!("../../test_data/memory_monitor_legacy_moniker_golden.json");
 }
 
 #[fuchsia::test]
@@ -196,84 +192,6 @@ async fn unified_reader() -> Result<(), Error> {
 }
 
 #[fuchsia::test]
-async fn memory_monitor_moniker_rewrite() -> Result<(), Error> {
-    let (builder, test_realm) = test_topology::create(test_topology::Options {
-        archivist_url: ARCHIVIST_WITH_LEGACY_METRICS,
-        realm_name: None,
-    })
-    .await
-    .expect("create base topology");
-    let core_realm = test_realm.add_child_realm("core", ChildOptions::new().eager()).await?;
-    let memory_monitor = core_realm
-        .add_child("memory_monitor", IQUERY_TEST_COMPONENT_URL, ChildOptions::new().eager())
-        .await?;
-    test_realm
-        .add_route(
-            Route::new()
-                .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
-                .from(Ref::child("archivist"))
-                .to(&core_realm),
-        )
-        .await?;
-    core_realm
-        .add_route(
-            Route::new()
-                .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
-                .from(Ref::parent())
-                .to(&memory_monitor),
-        )
-        .await?;
-    let instance = builder.build().await.expect("create instance");
-
-    // Verify that fetching "core/memory_monitor" from ArchiveAccessor produces results with
-    // the correct v2 moniker.
-    let accessor =
-        instance.root.connect_to_protocol_at_exposed_dir::<ArchiveAccessorMarker>().unwrap();
-    retrieve_and_validate_results(
-        accessor,
-        vec!["core/memory_monitor:*:lazy-*"],
-        &MEMORY_MONITOR_V2_MONIKER_GOLDEN,
-        1,
-    )
-    .await;
-
-    // Verify that fetching "memory_monitor.cmx" from ArchiveAccessor does not fetch anything.
-    let accessor =
-        instance.root.connect_to_protocol_at_exposed_dir::<ArchiveAccessorMarker>().unwrap();
-    retrieve_and_validate_results(
-        accessor,
-        vec!["memory_monitor.cmx:*:lazy-*"],
-        &EMPTY_RESULT_GOLDEN,
-        0,
-    )
-    .await;
-
-    // Verify that fetching "core/memory_monitor" from Legacy produces results with the
-    // correct v2 moniker.
-    let accessor = connect_to_legacy_accessor(&instance);
-    retrieve_and_validate_results(
-        accessor,
-        vec!["core/memory_monitor:*:lazy-*"],
-        &MEMORY_MONITOR_V2_MONIKER_GOLDEN,
-        1,
-    )
-    .await;
-
-    // Verify that fetching "memory_monitor.cmx" from Legacy produces results with the
-    // correct (rewritten) v1 moniker.
-    let accessor = connect_to_legacy_accessor(&instance);
-    retrieve_and_validate_results(
-        accessor,
-        vec!["memory_monitor.cmx:*:lazy-*"],
-        &MEMORY_MONITOR_LEGACY_MONIKER_GOLDEN,
-        1,
-    )
-    .await;
-
-    Ok(())
-}
-
-#[fuchsia::test]
 async fn feedback_canonical_reader_test() -> Result<(), Error> {
     let (builder, test_realm) = test_topology::create(test_topology::Options {
         archivist_url: ARCHIVIST_WITH_FEEDBACK_FILTERING,
@@ -412,15 +330,6 @@ fn connect_to_feedback_accessor(instance: &RealmInstance) -> ArchiveAccessorProx
         .root
         .connect_to_named_protocol_at_exposed_dir::<ArchiveAccessorMarker>(
             "fuchsia.diagnostics.FeedbackArchiveAccessor",
-        )
-        .unwrap()
-}
-
-fn connect_to_legacy_accessor(instance: &RealmInstance) -> ArchiveAccessorProxy {
-    instance
-        .root
-        .connect_to_named_protocol_at_exposed_dir::<ArchiveAccessorMarker>(
-            "fuchsia.diagnostics.LegacyMetricsArchiveAccessor",
         )
         .unwrap()
 }

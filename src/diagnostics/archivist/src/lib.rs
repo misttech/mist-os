@@ -18,7 +18,6 @@ pub mod formatter;
 mod identity;
 mod inspect;
 pub mod logs;
-mod moniker_rewriter;
 mod pipeline;
 mod utils;
 
