@@ -106,6 +106,9 @@ import("//build/toolchain/rbe.gni")
 #
 #   assert_no_deps (optional)
 #     Ensure no deps on these targets, see [assert_no_deps](https://gn.googlesource.com/gn/+/main/docs/reference.md#var_assert_no_deps)
+#
+#   applicable_licenses (optional)
+#     The usual GN meaning.
 template("rustc_artifact") {
   # rustc does not support dashes in crate names
   _crate_name = string_replace(invoker.crate_name, "-", "_")
@@ -148,6 +151,7 @@ template("rustc_artifact") {
     clippy(_clippy_name) {
       forward_variables_from(invoker,
                              [
+                               "applicable_licenses",
                                "testonly",
                                "rustenv",
                                "public_deps",
@@ -192,6 +196,7 @@ template("rustc_artifact") {
   group(target_name) {
     forward_variables_from(invoker,
                            [
+                             "applicable_licenses",
                              "testonly",
                              "visibility",
                            ])
@@ -306,6 +311,7 @@ template("rustc_artifact") {
 
     forward_variables_from(invoker,
                            [
+                             "applicable_licenses",
                              "assert_no_deps",
                              "pool",
                              "testonly",

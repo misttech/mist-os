@@ -70,6 +70,7 @@ template("fuchsia_component_manifest") {
       output_name = "$manifest_extension/$target_name/$manifest_name"
       forward_variables_from(invoker,
                              [
+                               "applicable_licenses",
                                "deps",
                                "manifest",
                                "required_offers",
@@ -112,6 +113,7 @@ template("fuchsia_component_manifest") {
     resource(manifest_resource_target) {
       forward_variables_from(invoker,
                              [
+                               "applicable_licenses",
                                "data_deps",
                                "testonly",
                              ])
@@ -123,6 +125,7 @@ template("fuchsia_component_manifest") {
     group(target_name) {
       forward_variables_from(invoker,
                              [
+                               "applicable_licenses",
                                "testonly",
                                "visibility",
                              ])
@@ -235,6 +238,7 @@ template("fuchsia_component_manifest") {
 #   visibility
 template("fuchsia_component") {
   forwarded = [
+    "applicable_licenses",
     "data_deps",
     "deps",
     "component_name",
@@ -290,7 +294,11 @@ template("fuchsia_component") {
     if (check_includes) {
       _find_manifest_target = "${target_name}_find_manifest"
       generated_file(_find_manifest_target) {
-        forward_variables_from(invoker, [ "testonly" ])
+        forward_variables_from(invoker,
+                               [
+                                 "applicable_licenses",
+                                 "testonly",
+                               ])
         visibility = [ ":*" ]
         outputs = [ "$target_out_dir/$_find_manifest_target.json" ]
         data_keys = [ "component_manifest_path" ]
@@ -305,6 +313,7 @@ template("fuchsia_component") {
       cmc_check_includes(_check_includes_target) {
         forward_variables_from(invoker,
                                [
+                                 "applicable_licenses",
                                  "deps",
                                  "testonly",
                                ])
@@ -334,6 +343,7 @@ template("fuchsia_component") {
       cmc_validate_references(_check_references_target) {
         forward_variables_from(invoker,
                                [
+                                 "applicable_licenses",
                                  "deps",
                                  "testonly",
                                ])
@@ -352,6 +362,7 @@ template("fuchsia_component") {
     generated_file(component_catalog_target) {
       forward_variables_from(invoker,
                              [
+                               "applicable_licenses",
                                "testonly",
                                "deps",
                                "public_deps",
@@ -369,7 +380,11 @@ template("fuchsia_component") {
     # We want to adopt the outputs of the cm_label, so we
     # copy them to a new directory.
     copy(target_name) {
-      forward_variables_from(invoker, [ "testonly" ])
+      forward_variables_from(invoker,
+                             [
+                               "applicable_licenses",
+                               "testonly",
+                             ])
       sources = _manifest_outputs
       outputs = [ "$target_out_dir/${target_name}_component_manifest/{{source_file_part}}" ]
 

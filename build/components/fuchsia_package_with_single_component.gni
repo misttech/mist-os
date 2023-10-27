@@ -158,6 +158,7 @@ template("fuchsia_package_with_single_component") {
   fuchsia_component(component_target) {
     forward_variables_from(invoker,
                            [
+                             "applicable_licenses",
                              "deps",
                              "data_deps",
                              "manifest",
@@ -184,6 +185,7 @@ template("fuchsia_package_with_single_component") {
   fuchsia_package(target_name) {
     forward_variables_from(invoker,
                            [
+                             "applicable_licenses",
                              "is_shell_package",
                              "shell_commands",
                              "disable_elf_binaries_checks",

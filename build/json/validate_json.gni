@@ -27,6 +27,7 @@ import("//build/compiled_action.gni")
 #     [bool] If true, a valico-based validator will be used instead of the
 #     previous rapidjson-based version.
 #
+#   applicable_licenses (optional)
 #   deps (optional)
 #   public_deps (optional)
 #   testonly (optional)
@@ -48,6 +49,7 @@ template("validate_json") {
   compiled_action(target_name) {
     forward_variables_from(invoker,
                            [
+                             "applicable_licenses",
                              "deps",
                              "sources",
                              "public_deps",
@@ -103,6 +105,7 @@ template("validate_json") {
 #     Additional schema files used by the original schema file must be listed
 #     here for validation to be re-run when they change.
 #
+#   applicable_licenses (optional)
 #   deps (optional)
 #   public_deps (optional)
 #   testonly (optional)
@@ -122,6 +125,7 @@ template("validate_json5") {
   compiled_action(target_name) {
     forward_variables_from(invoker,
                            [
+                             "applicable_licenses",
                              "deps",
                              "sources",
                              "public_deps",

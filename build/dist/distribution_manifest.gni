@@ -56,6 +56,7 @@ template("distribution_manifest") {
   generated_file(generate_target) {
     forward_variables_from(invoker,
                            [
+                             "applicable_licenses",
                              "deps",
                              "testonly",
                            ])
@@ -86,6 +87,7 @@ template("distribution_manifest") {
   action(main_target) {
     forward_variables_from(invoker,
                            [
+                             "applicable_licenses",
                              "data_deps",
                              "deps",
                              "testonly",

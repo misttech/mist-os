@@ -52,6 +52,7 @@ template("fidlc") {
   action(response_file_target_name) {
     forward_variables_from(invoker,
                            [
+                             "applicable_licenses",
                              "testonly",
                              "public_deps",
                            ])
@@ -112,6 +113,7 @@ template("fidlc") {
   compiled_action(main_target_name) {
     forward_variables_from(invoker,
                            [
+                             "applicable_licenses",
                              "sources",
                              "testonly",
                              "visibility",

@@ -95,6 +95,7 @@ template("_compiled_action_target") {
     forward_variables_from(invoker,
                            [
                              "all_outputs_fresh",
+                             "applicable_licenses",
                              "assert_no_deps",
                              "data_deps",
                              "depfile",
@@ -169,7 +170,11 @@ template("_compiled_action_target") {
 template("compiled_action") {
   _compiled_action_target(target_name) {
     _target_type = "action"
-    forward_variables_from(invoker, [ "visibility" ])
+    forward_variables_from(invoker,
+                           [
+                             "applicable_licenses",
+                             "visibility",
+                           ])
     forward_variables_from(invoker, "*", [ "visibility" ])
   }
 }
@@ -178,7 +183,11 @@ template("compiled_action") {
 template("compiled_action_foreach") {
   _compiled_action_target(target_name) {
     _target_type = "action_foreach"
-    forward_variables_from(invoker, [ "visibility" ])
+    forward_variables_from(invoker,
+                           [
+                             "applicable_licenses",
+                             "visibility",
+                           ])
     forward_variables_from(invoker, "*", [ "visibility" ])
   }
 }

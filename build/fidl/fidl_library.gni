@@ -43,7 +43,7 @@ import("//build/testing/golden_files.gni")
 #    goldens_dir, non_fidl_deps, sdk_category
 #    - Optional: See //build/fidl/fidl.gni for a description.
 #
-#  * testonly, visibility, public_deps
+#  * testonly, visibility, public_deps, applicable_licenses
 #    - Optional: Usual GN meanings.
 #
 template("fidl_library") {
@@ -101,6 +101,7 @@ template("fidl_library") {
   fidl_ir(compilation_target_name) {
     forward_variables_from(invoker,
                            [
+                             "applicable_licenses",
                              "available",
                              "experimental_flags",
                              "non_fidl_deps",
@@ -120,7 +121,11 @@ template("fidl_library") {
   plasa_fragment_file = summary_file_json
   plasa_fragment_target_name = "${target_name}_plasa"
   plasa_fragment_fidl(plasa_fragment_target_name) {
-    forward_variables_from(invoker, [ "testonly" ])
+    forward_variables_from(invoker,
+                           [
+                             "applicable_licenses",
+                             "testonly",
+                           ])
     visibility = [
       ":*",
       "//sdk/fidl:plasa",
@@ -136,6 +141,7 @@ template("fidl_library") {
   action(lint_target_name) {
     forward_variables_from(invoker,
                            [
+                             "applicable_licenses",
                              "sources",
                              "testonly",
                            ])
@@ -248,6 +254,7 @@ template("fidl_library") {
       fidl_ir(fidl_ir_target_name) {
         forward_variables_from(invoker,
                                [
+                                 "applicable_licenses",
                                  "available",
                                  "experimental_flags",
                                  "non_fidl_deps",
@@ -299,7 +306,11 @@ template("fidl_library") {
   }
 
   validate_json(verification_target_name) {
-    forward_variables_from(invoker, [ "testonly" ])
+    forward_variables_from(invoker,
+                           [
+                             "applicable_licenses",
+                             "testonly",
+                           ])
     visibility = [ ":*" ]
     data = fidl_ir_json
     schema = "//tools/fidl/fidlc/schema.json"
@@ -311,6 +322,7 @@ template("fidl_library") {
   group(main_target_name) {
     forward_variables_from(invoker,
                            [
+                             "applicable_licenses",
                              "testonly",
                              "visibility",
                            ])

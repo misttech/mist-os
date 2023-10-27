@@ -127,6 +127,10 @@ import("//build/rust/rustc_test.gni")
 #   assert_no_deps (optional)
 #     Ensure no deps on these targets, see [assert_no_deps](https://gn.googlesource.com/gn/+/main/docs/reference.md#var_assert_no_deps)
 #
+#   applicable_licenses (optional)
+#     The usual GN meaning.
+#
+#
 # Example of usage:
 #
 #   rustc_library("foo-bar") {
@@ -229,6 +233,7 @@ template("rustc_library") {
 
     forward_variables_from(invoker,
                            [
+                             "applicable_licenses",
                              "assert_no_deps",
                              "disable_clippy",
                              "quiet_clippy",

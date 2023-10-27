@@ -49,6 +49,7 @@ template("_fidl_cpp_codegen_impl") {
     # supply defaults for various options
     forward_variables_from(invoker,
                            [
+                             "applicable_licenses",
                              "testonly",
                              "fidl_ir_json",
                              "fidl_ir_target",
@@ -180,6 +181,7 @@ template("_fidl_cpp_library_impl") {
   source_set(target_name) {
     forward_variables_from(invoker,
                            [
+                             "applicable_licenses",
                              "defines",
                              "testonly",
                              "visibility",
@@ -391,6 +393,7 @@ template("fidl_cpp_family") {
     fidl_cpp_codegen(_hlcpp_target) {
       forward_variables_from(invoker,
                              [
+                               "applicable_licenses",
                                "testonly",
                                "fidl_gen_dir",
                                "fidl_ir_json",
@@ -402,6 +405,7 @@ template("fidl_cpp_family") {
     fidl_cpp_library("${target_name}_hlcpp") {
       forward_variables_from(invoker,
                              [
+                               "applicable_licenses",
                                "testonly",
                                "visibility",
                                "public_deps",
@@ -444,6 +448,7 @@ template("fidl_cpp_family") {
     fidl_cpp_library(_cpp_target) {
       forward_variables_from(invoker,
                              [
+                               "applicable_licenses",
                                "testonly",
                                "visibility",
                                "public_configs",
@@ -512,6 +517,7 @@ template("fidl_cpp_family") {
     fidl_cpp_library("${target_name}_cpp_testing") {
       forward_variables_from(invoker,
                              [
+                               "applicable_licenses",
                                "testonly",
                                "visibility",
                                "public_configs",
@@ -546,6 +552,7 @@ template("fidl_cpp_family") {
     fidl_cpp_library("${target_name}_cpp_hlcpp_conversion") {
       forward_variables_from(invoker,
                              [
+                               "applicable_licenses",
                                "testonly",
                                "visibility",
                                "public_configs",
@@ -567,6 +574,7 @@ template("fidl_cpp_family") {
   fidl_cpp_codegen("${target_name}_cpp") {
     forward_variables_from(invoker,
                            [
+                             "applicable_licenses",
                              "testonly",
                              "fidl_gen_dir",
                              "fidl_ir_json",
@@ -631,6 +639,7 @@ template("fidl_cpp_family") {
     fidl_cpp_codegen("${target_name}_libfuzzer") {
       forward_variables_from(invoker,
                              [
+                               "applicable_licenses",
                                "testonly",
                                "fuzzers",
                                "golden_fuzzer",
@@ -648,6 +657,7 @@ template("fidl_cpp_family") {
     fidl_cpp_library("${target_name}_libfuzzer") {
       forward_variables_from(invoker,
                              [
+                               "applicable_licenses",
                                "testonly",
                                "visibility",
                                "public_deps",
@@ -706,6 +716,7 @@ template("fidl_cpp_family") {
       fidl_cpp_library(fuzzer_lib_name) {
         forward_variables_from(invoker,
                                [
+                                 "applicable_licenses",
                                  "testonly",
                                  "visibility",
                                  "public_deps",
@@ -728,6 +739,7 @@ template("fidl_cpp_family") {
     fidl_cpp_library("${target_name}_libfuzzer__golden") {
       forward_variables_from(invoker,
                              [
+                               "applicable_licenses",
                                "testonly",
                                "visibility",
                                "public_deps",

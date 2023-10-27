@@ -42,6 +42,7 @@ template("verify_manifest_elf_binaries") {
   action(target_name) {
     forward_variables_from(invoker,
                            [
+                             "applicable_licenses",
                              "testonly",
                              "visibility",
                            ])

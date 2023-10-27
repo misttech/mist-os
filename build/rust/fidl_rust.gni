@@ -59,6 +59,7 @@ template("fidl_rust") {
     compiled_action(generation_target) {
       forward_variables_from(invoker,
                              [
+                               "applicable_licenses",
                                "testonly",
                                "fidl_ir_json",
                                "fidl_ir_target",
@@ -114,6 +115,7 @@ template("fidl_rust") {
     rustc_library(target_name) {
       forward_variables_from(invoker,
                              [
+                               "applicable_licenses",
                                "testonly",
                                "visibility",
                                "disable_rustdoc",

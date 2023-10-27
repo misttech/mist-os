@@ -17,6 +17,7 @@ import("//build/compiled_action.gni")
 # outputs: list(label)
 #   A singleton naming the output API summary file to generate.
 #
+# applicable_licenses: list(label)
 # testonly: bool(optional)
 # deps: list(label)
 # visiblility: list(label)
@@ -24,6 +25,8 @@ template("fidl_summary_json") {
   compiled_action("${target_name}") {
     forward_variables_from(invoker,
                            [
+                             "applicable_licenses",
+                             "appl",
                              "testonly",
                              "deps",
                              "metadata",

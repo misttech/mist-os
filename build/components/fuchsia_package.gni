@@ -191,7 +191,11 @@ template("fuchsia_package") {
     # Generate the "meta/package" file
     meta_package_target = "${target_name}_meta_package"
     generate_meta_package(meta_package_target) {
-      forward_variables_from(invoker, [ "testonly" ])
+      forward_variables_from(invoker,
+                             [
+                               "applicable_licenses",
+                               "testonly",
+                             ])
       visibility = [ ":*" ]
       package_name = package_name
     }
@@ -279,6 +283,7 @@ template("fuchsia_package") {
     fini_manifest(package_manifest_target) {
       forward_variables_from(invoker,
                              [
+                               "applicable_licenses",
                                "deps",
                                "testonly",
                              ])
@@ -301,7 +306,11 @@ template("fuchsia_package") {
     if (verify_elf) {
       package_manifest_verify_target = "${target_name}.verify"
       verify_manifest_elf_binaries(package_manifest_verify_target) {
-        forward_variables_from(invoker, [ "testonly" ])
+        forward_variables_from(invoker,
+                               [
+                                 "applicable_licenses",
+                                 "testonly",
+                               ])
         manifest = _files.fini_manifest
         check_unstripped_files = true
         deps = [ ":$package_manifest_target" ]
@@ -337,6 +346,7 @@ template("fuchsia_package") {
     package_tool_package_build(_package_build_target) {
       forward_variables_from(invoker,
                              [
+                               "applicable_licenses",
                                "data_deps",
                                "deps",
                                "testonly",

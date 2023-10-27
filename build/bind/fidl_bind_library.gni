@@ -51,6 +51,7 @@ template("fidl_bind_library") {
     compiled_action(generation_target) {
       forward_variables_from(invoker,
                              [
+                               "applicable_licenses",
                                "testonly",
                                "fidl_ir_json",
                                "fidl_ir_target",
@@ -89,6 +90,7 @@ template("fidl_bind_library") {
     bind_library(target_name) {
       forward_variables_from(invoker,
                              [
+                               "applicable_licenses",
                                "testonly",
                                "visibility",
                              ])

@@ -34,6 +34,7 @@ template("expect_includes") {
   group(target_name) {
     forward_variables_from(invoker,
                            [
+                             "applicable_licenses",
                              "deps",
                              "check_includes",
                              "includes",
@@ -77,6 +78,7 @@ template("collect_expected_includes") {
   generated_file(target_name) {
     forward_variables_from(invoker,
                            [
+                             "applicable_licenses",
                              "deps",
                              "manifest",
                              "metadata",
@@ -107,6 +109,7 @@ template("cmc_check_includes") {
   collect_expected_includes(_expected_includes_label) {
     forward_variables_from(invoker,
                            [
+                             "applicable_licenses",
                              "deps",
                              "metadata",
                              "testonly",
@@ -122,6 +125,7 @@ template("cmc_check_includes") {
   python_action(target_name) {
     forward_variables_from(invoker,
                            [
+                             "applicable_licenses",
                              "deps",
                              "inputs",
                              "testonly",

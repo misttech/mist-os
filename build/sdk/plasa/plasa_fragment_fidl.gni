@@ -31,6 +31,7 @@ import("//build/fidl/fidl_summary.gni")
 # dest: "fidl"|"vdso"
 #   The destination packaging directory for the code.
 #
+# applicable_licenses: list(label)
 # testonly: bool(optional)
 # deps: list(label)
 # visiblility: list(label)
@@ -47,6 +48,7 @@ template("plasa_fragment_fidl") {
   fidl_summary_json(target_name) {
     forward_variables_from(invoker,
                            [
+                             "applicable_licenses",
                              "deps",
                              "testonly",
                              "visibility",

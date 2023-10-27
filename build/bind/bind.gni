@@ -546,6 +546,7 @@ template("_bind_library_cpp") {
   compiled_action(cpp_header_file_gen_target) {
     forward_variables_from(invoker,
                            [
+                             "applicable_licenses",
                              "testonly",
                              "visibility",
                            ])
@@ -595,6 +596,7 @@ template("_bind_library_cpp") {
   source_set(cpp_header_file_target) {
     forward_variables_from(invoker,
                            [
+                             "applicable_licenses",
                              "testonly",
                              "visibility",
                            ])
@@ -813,6 +815,7 @@ template("bind_library") {
 
     forward_variables_from(invoker,
                            [
+                             "applicable_licenses",
                              "public_deps",
                              "testonly",
                              "visibility",
