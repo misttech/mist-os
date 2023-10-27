@@ -45,7 +45,7 @@ class WlanSoftmacHandle {
   explicit WlanSoftmacHandle(DeviceInterface* device);
   ~WlanSoftmacHandle();
 
-  zx_status_t Init();
+  zx_status_t Init(fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac> client);
   zx_status_t StopMainLoop();
   zx_status_t QueueEthFrameTx(std::unique_ptr<Packet> pkt);
 
@@ -90,16 +90,11 @@ class Device : public DeviceInterface,
   zx_status_t DeliverEthernet(cpp20::span<const uint8_t> eth_frame) final
       __TA_EXCLUDES(ethernet_proxy_lock_);
   zx_status_t QueueTx(std::unique_ptr<Packet> packet, wlan_tx_info_t tx_info) final;
-  fidl::Response<fuchsia_wlan_softmac::WlanSoftmacBridge::SetChannel> SetChannel(
-      fuchsia_wlan_softmac::wire::WlanSoftmacBridgeSetChannelRequest* request) final;
   zx_status_t SetEthernetStatus(uint32_t status) final __TA_EXCLUDES(ethernet_proxy_lock_);
   zx_status_t JoinBss(join_bss_request_t* cfg) final;
   zx_status_t EnableBeaconing(wlan_softmac_enable_beaconing_request_t* request) final;
   zx_status_t DisableBeaconing() final;
   zx_status_t InstallKey(wlan_key_configuration_t* key_config) final;
-  fidl::Response<fuchsia_wlan_softmac::WlanSoftmacBridge::NotifyAssociationComplete>
-  NotifyAssociationComplete(
-      fuchsia_wlan_softmac::wire::WlanSoftmacBridgeNotifyAssociationCompleteRequest* request) final;
   zx_status_t ClearAssociation(const uint8_t[fuchsia_wlan_ieee80211_MAC_ADDR_LEN]) final;
   zx_status_t StartPassiveScan(const wlan_softmac_start_passive_scan_request_t* passive_scan_args,
                                uint64_t* out_scan_id) final;
@@ -107,7 +102,6 @@ class Device : public DeviceInterface,
                               uint64_t* out_scan_id) final;
   zx_status_t CancelScan(uint64_t scan_id) final;
   fbl::RefPtr<DeviceState> GetState() final;
-  const fuchsia_wlan_softmac::WlanSoftmacQueryResponse& GetWlanSoftmacQueryResponse() const final;
   const discovery_support_t& GetDiscoverySupport() const final;
   const mac_sublayer_support_t& GetMacSublayerSupport() const final;
   const security_support_t& GetSecuritySupport() const final;
@@ -162,7 +156,6 @@ class Device : public DeviceInterface,
   //                         calls have not been profiled, and this behavior is
   //                         not documented in the SDK. Moreover, caching
   //                         introduces opportunities for subtle bugs.
-  fuchsia_wlan_softmac::WlanSoftmacQueryResponse wlan_softmac_query_response_ = {};
   discovery_support_t discovery_support_ = {};
   mac_sublayer_support_t mac_sublayer_support_ = {};
   security_support_t security_support_ = {};

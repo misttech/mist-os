@@ -115,27 +115,86 @@ static constexpr inline DeviceInterface* DEVICE(void* c) {
 // https://fuchsia.dev/fuchsia-src/development/languages/fidl/tutorials/cpp/basics/server.
 class WlanSoftmacBridgeImpl : public fidl::WireServer<fuchsia_wlan_softmac::WlanSoftmacBridge> {
  public:
-  explicit WlanSoftmacBridgeImpl(DeviceInterface* device) : device_(device) {}
+  explicit WlanSoftmacBridgeImpl(fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac> client)
+      : client_(std::move(client)) {}
 
   void NotifyAssociationComplete(NotifyAssociationCompleteRequestView request,
                                  NotifyAssociationCompleteCompleter::Sync& completer) override {
-    completer.Reply(device_->NotifyAssociationComplete(request));
+    auto arena = fdf::Arena::Create(0, 0);
+    if (arena.is_error()) {
+      lerror("Arena creation failed: %s", arena.status_string());
+      completer.ReplyError(ZX_ERR_INTERNAL);
+      return;
+    }
+
+    auto result =
+        client_.sync().buffer(*std::move(arena))->NotifyAssociationComplete(request->assoc_cfg);
+
+    if (!result.ok()) {
+      lerror("NotifyAssociationComplete failed (FIDL error %s)", result.status_string());
+      completer.ReplyError(result.status());
+      return;
+    }
+
+    if (result->is_error()) {
+      lerror("NotifyAssociationComplete failed (status %s)",
+             zx_status_get_string(result->error_value()));
+      completer.ReplyError(result->error_value());
+      return;
+    }
+
+    completer.ReplySuccess();
   }
 
   void Query(QueryCompleter::Sync& completer) override {
-    auto arena = fidl::Arena();
-    auto response = fidl::ToWire(arena, device_->GetWlanSoftmacQueryResponse());
-    completer.ReplySuccess(response);
+    auto arena = fdf::Arena::Create(0, 0);
+    if (arena.is_error()) {
+      lerror("Arena creation failed: %s", arena.status_string());
+      completer.ReplyError(ZX_ERR_INTERNAL);
+      return;
+    }
+
+    auto result = client_.sync().buffer(*std::move(arena))->Query();
+
+    if (!result.ok()) {
+      lerror("Query failed (FIDL error %s)", result.status_string());
+      completer.ReplyError(result.status());
+      return;
+    }
+
+    if (result->is_error()) {
+      lerror("Query failed (status %s)", zx_status_get_string(result->error_value()));
+      completer.ReplyError(result->error_value());
+      return;
+    }
+
+    completer.ReplySuccess(*result->value());
   }
 
   void SetChannel(SetChannelRequestView request, SetChannelCompleter::Sync& completer) override {
-    completer.Reply(device_->SetChannel(request));
+    auto arena = fdf::Arena::Create(0, 0);
+    if (arena.is_error()) {
+      lerror("Arena creation failed: %s", arena.status_string());
+      return completer.ReplyError(ZX_ERR_INTERNAL);
+    }
+
+    auto result = client_.sync().buffer(*std::move(arena))->SetChannel(*request);
+    if (!result.ok()) {
+      lerror("SetChannel failed (FIDL error %s)", result.status_string());
+      return completer.ReplyError(result.status());
+    }
+    if (result->is_error()) {
+      lerror("SetChannel failed (status %s)", zx_status_get_string(result->error_value()));
+      return completer.ReplyError(result->error_value());
+    }
+    return completer.ReplySuccess();
   }
 
   static void BindSelfManagedServer(
-      async_dispatcher_t* dispatcher, DeviceInterface* device,
+      async_dispatcher_t* dispatcher,
+      fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac> client,
       fidl::ServerEnd<fuchsia_wlan_softmac::WlanSoftmacBridge> server_end) {
-    std::unique_ptr impl = std::make_unique<WlanSoftmacBridgeImpl>(device);
+    std::unique_ptr impl = std::make_unique<WlanSoftmacBridgeImpl>(std::move(client));
     fidl::BindServer(dispatcher, std::move(server_end), std::move(impl),
                      std::mem_fn(&WlanSoftmacBridgeImpl::OnUnbound));
   }
@@ -154,10 +213,11 @@ class WlanSoftmacBridgeImpl : public fidl::WireServer<fuchsia_wlan_softmac::Wlan
   }
 
  private:
-  DeviceInterface* device_;
+  fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac> client_;
 };
 
-zx_status_t WlanSoftmacHandle::Init() {
+zx_status_t WlanSoftmacHandle::Init(
+    fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac> client) {
   if (inner_handle_ != nullptr) {
     return ZX_ERR_BAD_STATE;
   }
@@ -234,7 +294,7 @@ zx_status_t WlanSoftmacHandle::Init() {
 
   auto endpoints = fidl::CreateEndpoints<fuchsia_wlan_softmac::WlanSoftmacBridge>();
   WlanSoftmacBridgeImpl::BindSelfManagedServer(wlan_softmac_bridge_server_loop_.dispatcher(),
-                                               this->device_, std::move(endpoints->server));
+                                               std::move(client), std::move(endpoints->server));
   wlan_softmac_bridge_server_loop_.StartThread("wlansoftmac-migration-fidl-server");
 
   inner_handle_ = start_sta(wlansoftmac_rust_ops, rust_buffer_provider,
@@ -331,7 +391,11 @@ zx_status_t Device::Bind() __TA_NO_THREAD_SAFETY_ANALYSIS {
     return query_result->error_value();
   }
   // Take ownership of the data in the wire representation's arena.
-  wlan_softmac_query_response_ = fidl::ToNatural(*(query_result->value()));
+  if (!query_result->value()->has_sta_addr()) {
+    lerror("Query result missing sta_addr.");
+    return ZX_ERR_INTERNAL;
+  }
+  state_->set_address(common::MacAddr(query_result->value()->sta_addr().data()));
 
   auto discovery_arena = fdf::Arena::Create(0, 0);
   if (discovery_arena.is_error()) {
@@ -403,10 +467,8 @@ zx_status_t Device::Bind() __TA_NO_THREAD_SAFETY_ANALYSIS {
 
   /* End of data type conversion. */
 
-  state_->set_address(common::MacAddr(wlan_softmac_query_response_.sta_addr().value()));
-
   softmac_handle_.reset(new WlanSoftmacHandle(this));
-  status = softmac_handle_->Init();
+  status = softmac_handle_->Init(client_.Clone());
   if (status != ZX_OK) {
     lerror("could not initialize Rust WlanSoftmac: %d", status);
     return status;
@@ -494,7 +556,7 @@ zx_status_t Device::EthernetImplQuery(uint32_t options, ethernet_info_t* info) {
     return ZX_ERR_INVALID_ARGS;
 
   memset(info, 0, sizeof(*info));
-  std::memcpy(info->mac, wlan_softmac_query_response_.sta_addr().value().begin(), ETH_MAC_SIZE);
+  state_->address().CopyTo(info->mac);
   info->features = ETHERNET_FEATURE_WLAN;
 
   auto arena = fdf::Arena::Create(0, 0);
@@ -679,38 +741,6 @@ zx_status_t Device::QueueTx(std::unique_ptr<Packet> packet, wlan_tx_info_t tx_in
   }
 
   return ZX_OK;
-}
-
-// Disable thread safety analysis, since these methods are called through an
-// interface from an object that we know is holding the lock. So taking the lock
-// would be wrong, but there's no way to convince the compiler that the lock is
-// held.
-
-// TODO(tkilbourn): Figure out how to make sure we have the lock for accessing
-//                  `dispatcher_`.
-fidl::Response<fuchsia_wlan_softmac::WlanSoftmacBridge::SetChannel> Device::SetChannel(
-    fuchsia_wlan_softmac::wire::WlanSoftmacBridgeSetChannelRequest* request)
-    __TA_NO_THREAD_SAFETY_ANALYSIS {
-  auto arena = fdf::Arena::Create(0, 0);
-  if (arena.is_error()) {
-    lerror("Arena creation failed: %s", arena.status_string());
-    return fit::error(ZX_ERR_INTERNAL);
-  }
-
-  fidl::Arena fidl_arena;
-  auto builder =
-      fuchsia_wlan_softmac::wire::WlanSoftmacBridgeSetChannelRequest::Builder(fidl_arena);
-  builder.channel(request->channel());
-  auto result = client_.sync().buffer(*std::move(arena))->SetChannel(builder.Build());
-  if (!result.ok()) {
-    lerror("SetChannel failed (FIDL error %s)", result.status_string());
-    return fit::error(result.status());
-  }
-  if (result->is_error()) {
-    lerror("SetChannel failed (status %s)", zx_status_get_string(result->error_value()));
-    return fit::error(result->error_value());
-  }
-  return fit::success();
 }
 
 zx_status_t Device::SetEthernetStatus(uint32_t status) {
@@ -901,29 +931,6 @@ zx_status_t Device::CancelScan(uint64_t scan_id) {
   return result.status();
 }
 
-fidl::Response<fuchsia_wlan_softmac::WlanSoftmacBridge::NotifyAssociationComplete>
-Device::NotifyAssociationComplete(
-    fuchsia_wlan_softmac::wire::WlanSoftmacBridgeNotifyAssociationCompleteRequest* request) {
-  auto arena = fdf::Arena::Create(0, 0);
-  if (arena.is_error()) {
-    lerror("Arena creation failed: %s", arena.status_string());
-    return fit::error(ZX_ERR_INTERNAL);
-  }
-
-  auto result =
-      client_.sync().buffer(*std::move(arena))->NotifyAssociationComplete(request->assoc_cfg);
-  if (!result.ok()) {
-    lerror("NotifyAssociationComplete failed (FIDL error %s)", result.status_string());
-    return fit::error(result.status());
-  }
-  if (result->is_error()) {
-    lerror("NotifyAssociationComplete failed (status %s)",
-           zx_status_get_string(result->error_value()));
-    return fit::error(result->error_value());
-  }
-  return fit::success();
-}
-
 zx_status_t Device::ClearAssociation(const uint8_t peer_addr[fuchsia_wlan_ieee80211_MAC_ADDR_LEN]) {
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
@@ -1003,10 +1010,6 @@ void Device::NotifyScanComplete(NotifyScanCompleteRequestView request, fdf::Aren
 }
 
 fbl::RefPtr<DeviceState> Device::GetState() { return state_; }
-
-const fuchsia_wlan_softmac::WlanSoftmacQueryResponse& Device::GetWlanSoftmacQueryResponse() const {
-  return wlan_softmac_query_response_;
-}
 
 const discovery_support_t& Device::GetDiscoverySupport() const { return discovery_support_; }
 

@@ -52,8 +52,6 @@ class DeviceInterface {
   virtual zx_status_t DeliverEthernet(cpp20::span<const uint8_t> eth_frame) = 0;
   virtual zx_status_t QueueTx(std::unique_ptr<Packet> packet, wlan_tx_info_t tx_info) = 0;
 
-  virtual fidl::Response<fuchsia_wlan_softmac::WlanSoftmacBridge::SetChannel> SetChannel(
-      fuchsia_wlan_softmac::wire::WlanSoftmacBridgeSetChannelRequest* request) = 0;
   virtual zx_status_t SetEthernetStatus(uint32_t status) = 0;
   virtual zx_status_t JoinBss(join_bss_request_t* cfg) = 0;
   virtual zx_status_t EnableBeaconing(wlan_softmac_enable_beaconing_request_t* request) = 0;
@@ -65,14 +63,9 @@ class DeviceInterface {
   virtual zx_status_t StartActiveScan(
       const wlan_softmac_start_active_scan_request_t* active_scan_args, uint64_t* out_scan_id) = 0;
   virtual zx_status_t CancelScan(uint64_t scan_id) = 0;
-  virtual fidl::Response<fuchsia_wlan_softmac::WlanSoftmacBridge::NotifyAssociationComplete>
-  NotifyAssociationComplete(
-      fuchsia_wlan_softmac::wire::WlanSoftmacBridgeNotifyAssociationCompleteRequest* request) = 0;
   virtual zx_status_t ClearAssociation(const uint8_t[fuchsia_wlan_ieee80211_MAC_ADDR_LEN]) = 0;
 
   virtual fbl::RefPtr<DeviceState> GetState() = 0;
-  virtual const fuchsia_wlan_softmac::WlanSoftmacQueryResponse& GetWlanSoftmacQueryResponse()
-      const = 0;
   virtual const discovery_support_t& GetDiscoverySupport() const = 0;
   virtual const mac_sublayer_support_t& GetMacSublayerSupport() const = 0;
   virtual const security_support_t& GetSecuritySupport() const = 0;
