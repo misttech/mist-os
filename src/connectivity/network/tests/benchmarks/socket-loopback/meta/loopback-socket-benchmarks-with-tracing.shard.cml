@@ -11,7 +11,7 @@
             // Limit the number of runs of each test to prevent the trace file
             // generated from being too large.
             "--runs",
-            "50",
+            "25",
         ],
     },
     use: [

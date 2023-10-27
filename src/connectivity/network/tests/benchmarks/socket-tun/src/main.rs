@@ -415,9 +415,11 @@ async fn main() {
     let Args { output_fuchsiaperf, netstack3, tracing } = argh::from_env();
     let iter_count = if output_fuchsiaperf.is_some() {
         1000
-    } else if tracing {
-        10
     } else {
+        // This iteration count is used both for the test variants to keep
+        // run time low, and for the trace variants to ensure that the trace
+        // file generated aren't too large and result in truncated trace
+        // events.
         3
     };
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
@@ -452,10 +454,16 @@ async fn main() {
             .initialize_tracing(
                 &ftracing_controller::TraceConfig {
                     categories: Some(
-                        ["kernel:sched", "kernel:meta", "net", "tun_socket_benchmarks"]
-                            .into_iter()
-                            .map(ToString::to_string)
-                            .collect(),
+                        [
+                            "kernel:meta",
+                            "kernel:sched",
+                            "kernel:syscall",
+                            "net",
+                            "tun_socket_benchmarks",
+                        ]
+                        .into_iter()
+                        .map(ToString::to_string)
+                        .collect(),
                     ),
                     // Since oneshot mode is used, set the buffer size as large
                     // as possible so that trace events don't get dropped.

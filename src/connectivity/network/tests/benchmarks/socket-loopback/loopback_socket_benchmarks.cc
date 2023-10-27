@@ -472,8 +472,8 @@ int main(int argc, char** argv) {
   std::optional<Tracer> tracer;
   if (std::getenv(kTracingEnvVar)) {
     const fuchsia_tracing_controller::TraceConfig trace_config{{
-        .categories = std::vector<std::string>{"kernel:sched", "kernel:meta", "net", "perftest",
-                                               kSocketBenchmarksTracingCategory},
+        .categories = std::vector<std::string>{"kernel:meta", "kernel:sched", "kernel:syscall",
+                                               "net", "perftest", kSocketBenchmarksTracingCategory},
         .buffer_size_megabytes_hint = 64,
     }};
     fit::result<fit::failed, Tracer> result =
