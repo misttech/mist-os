@@ -21,11 +21,7 @@ config("gtest_config") {
 
 static_library("gtest_no_testonly") {
   # In-tree tests should prefer //third_party/googletest:gtest.
-  visibility = [
-    ":*",
-    "//src/connectivity/bluetooth/*",
-    "//third_party/pigweed/*",
-  ]
+  visibility = [ ":*" ]
 
   public = [
     "src/googletest/include/gtest/gtest-spi.h",
@@ -245,8 +241,12 @@ config("gmock_config") {
   include_dirs = [ "src/googlemock/include" ]
 }
 
-static_library("gmock") {
-  testonly = true
+static_library("gmock_no_testonly") {
+  # In-tree tests should prefer //third_party/googletest:gmock.
+  visibility = [
+    ":*",
+    "//third_party/pigweed/*",
+  ]
   public = [ "src/googlemock/include/gmock/gmock.h" ]
   sources = [
     "src/googlemock/include/gmock/gmock-actions.h",
@@ -275,7 +275,12 @@ static_library("gmock") {
   sources -= [ "src/googlemock/src/gmock-all.cc" ]
   public_configs = [ ":gmock_config" ]
   configs += [ ":gmock_private_config" ]
-  public_deps = [ ":gtest" ]
+  public_deps = [ ":gtest_no_testonly" ]
+}
+
+group("gmock") {
+  testonly = true
+  public_deps = [ ":gmock_no_testonly" ]
 }
 
 static_library("gmock_main") {
