@@ -5,8 +5,8 @@
 """Unit tests for honeydew.affordances.fuchsia_controller.tracing.py."""
 
 import tempfile
-from typing import Any
 import unittest
+from typing import Any
 from unittest import mock
 
 import fidl.fuchsia_tracing_controller as f_tracingcontroller

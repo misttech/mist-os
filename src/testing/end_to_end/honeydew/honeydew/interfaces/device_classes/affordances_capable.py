@@ -7,14 +7,13 @@
 import abc
 from typing import Callable
 
-from honeydew.interfaces.affordances import session
-from honeydew.interfaces.affordances import tracing
-from honeydew.interfaces.affordances.bluetooth.profiles import bluetooth_avrcp
-from honeydew.interfaces.affordances.bluetooth.profiles import bluetooth_gap
-from honeydew.interfaces.affordances.ui import screenshot
-from honeydew.interfaces.affordances.ui import user_input
-from honeydew.interfaces.affordances.wlan import wlan
-from honeydew.interfaces.affordances.wlan import wlan_policy
+from honeydew.interfaces.affordances import session, tracing
+from honeydew.interfaces.affordances.bluetooth.profiles import (
+    bluetooth_avrcp,
+    bluetooth_gap,
+)
+from honeydew.interfaces.affordances.ui import screenshot, user_input
+from honeydew.interfaces.affordances.wlan import wlan, wlan_policy
 from honeydew.interfaces.device_classes import fuchsia_device
 from honeydew.utils import properties
 

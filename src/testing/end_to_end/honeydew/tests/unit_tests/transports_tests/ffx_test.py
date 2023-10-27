@@ -5,14 +5,13 @@
 """Unit tests for honeydew.transports.ffx.py."""
 
 import subprocess
-from typing import Any
 import unittest
+from typing import Any
 from unittest import mock
 
 from parameterized import parameterized
 
-from honeydew import custom_types
-from honeydew import errors
+from honeydew import custom_types, errors
 from honeydew.transports import ffx
 
 # pylint: disable=protected-access

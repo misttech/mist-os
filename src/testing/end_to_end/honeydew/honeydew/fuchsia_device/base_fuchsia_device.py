@@ -5,21 +5,22 @@
 """Fuchsia device common implementation with transport-independent logic."""
 
 import abc
-from datetime import datetime
 import logging
 import os
+from datetime import datetime
 from typing import Any, Callable
 
-from honeydew import custom_types
-from honeydew import errors
+from honeydew import custom_types, errors
 from honeydew.affordances.ffx import session as session_ffx
 from honeydew.interfaces.affordances import session
 from honeydew.interfaces.auxiliary_devices import (
     power_switch as power_switch_interface,
 )
-from honeydew.interfaces.device_classes import affordances_capable
-from honeydew.interfaces.device_classes import fuchsia_device
-from honeydew.interfaces.device_classes import transports_capable
+from honeydew.interfaces.device_classes import (
+    affordances_capable,
+    fuchsia_device,
+    transports_capable,
+)
 from honeydew.transports import fastboot as fastboot_transport
 from honeydew.transports import ffx as ffx_transport
 from honeydew.transports import ssh as ssh_transport

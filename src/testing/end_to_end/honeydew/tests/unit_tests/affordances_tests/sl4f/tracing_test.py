@@ -6,8 +6,8 @@
 
 import base64
 import tempfile
-from typing import Any
 import unittest
+from typing import Any
 from unittest import mock
 
 from parameterized import parameterized

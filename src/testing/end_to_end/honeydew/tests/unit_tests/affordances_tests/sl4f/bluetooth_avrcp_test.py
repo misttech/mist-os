@@ -4,8 +4,8 @@
 # found in the LICENSE file.
 """Unit tests for honeydew.affordances.sl4f.bluetooth_avrcp.py."""
 
-from typing import Any
 import unittest
+from typing import Any
 from unittest import mock
 
 from parameterized import parameterized

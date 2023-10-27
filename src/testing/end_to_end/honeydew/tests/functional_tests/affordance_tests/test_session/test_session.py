@@ -5,8 +5,7 @@
 """Mobly test for Session affordance."""
 
 from fuchsia_base_test import fuchsia_base_test
-from mobly import asserts
-from mobly import test_runner
+from mobly import asserts, test_runner
 
 from honeydew import errors
 from honeydew.interfaces.device_classes import fuchsia_device

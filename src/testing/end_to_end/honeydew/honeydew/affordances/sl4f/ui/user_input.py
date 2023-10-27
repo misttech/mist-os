@@ -5,8 +5,7 @@
 
 from typing import Any
 
-from honeydew.interfaces.affordances.ui import custom_types
-from honeydew.interfaces.affordances.ui import user_input
+from honeydew.interfaces.affordances.ui import custom_types, user_input
 from honeydew.transports import sl4f as sl4f_transport
 
 _SL4F_METHODS: dict[str, str] = {

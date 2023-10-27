@@ -6,8 +6,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import enum
+from dataclasses import dataclass
 
 
 # pylint: disable=line-too-long

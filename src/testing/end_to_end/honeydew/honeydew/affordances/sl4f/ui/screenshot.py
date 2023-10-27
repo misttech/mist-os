@@ -7,8 +7,7 @@ import base64
 from typing import Any
 
 from honeydew import errors
-from honeydew.interfaces.affordances.ui import custom_types
-from honeydew.interfaces.affordances.ui import screenshot
+from honeydew.interfaces.affordances.ui import custom_types, screenshot
 from honeydew.transports import sl4f as sl4f_transport
 
 _SL4F_METHODS: dict[str, str] = {

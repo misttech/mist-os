@@ -9,8 +9,7 @@ import os
 import tempfile
 
 from fuchsia_base_test import fuchsia_base_test
-from mobly import asserts
-from mobly import test_runner
+from mobly import asserts, test_runner
 
 from honeydew import custom_types
 from honeydew.fuchsia_device.fuchsia_controller import (

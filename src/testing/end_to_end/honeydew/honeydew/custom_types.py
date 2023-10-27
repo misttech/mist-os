@@ -6,9 +6,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import enum
 import ipaddress
+from dataclasses import dataclass
 from typing import NamedTuple
 
 import fuchsia_controller_py as fuchsia_controller

@@ -7,12 +7,10 @@
 import logging
 
 from fuchsia_base_test import fuchsia_base_test
-from mobly import asserts
-from mobly import test_runner
+from mobly import asserts, test_runner
 
 from honeydew.interfaces.device_classes import fuchsia_device
-from honeydew.typing.wlan import NetworkConfig
-from honeydew.typing.wlan import SecurityType
+from honeydew.typing.wlan import NetworkConfig, SecurityType
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 

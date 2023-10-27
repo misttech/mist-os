@@ -8,8 +8,7 @@ import unittest
 from unittest import mock
 
 from honeydew.affordances.sl4f.ui import user_input as sl4f_user_input
-from honeydew.interfaces.affordances.ui import custom_types
-from honeydew.interfaces.affordances.ui import user_input
+from honeydew.interfaces.affordances.ui import custom_types, user_input
 from honeydew.transports import sl4f as sl4f_transport
 
 

@@ -5,9 +5,9 @@
 """Tracing affordance implementation using SL4F."""
 
 import base64
-from datetime import datetime
 import logging
 import os
+from datetime import datetime
 from typing import Any
 
 from honeydew import errors

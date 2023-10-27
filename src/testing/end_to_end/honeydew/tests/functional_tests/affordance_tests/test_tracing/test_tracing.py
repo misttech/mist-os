@@ -10,8 +10,7 @@ import tempfile
 import time
 
 from fuchsia_base_test import fuchsia_base_test
-from mobly import asserts
-from mobly import test_runner
+from mobly import asserts, test_runner
 
 from honeydew.interfaces.device_classes import fuchsia_device
 

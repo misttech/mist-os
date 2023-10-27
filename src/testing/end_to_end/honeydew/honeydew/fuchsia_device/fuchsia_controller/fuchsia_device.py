@@ -16,8 +16,7 @@ import fidl.fuchsia_hwinfo as f_hwinfo
 import fidl.fuchsia_io as f_io
 import fuchsia_controller_py as fcp
 
-from honeydew import custom_types
-from honeydew import errors
+from honeydew import custom_types, errors
 from honeydew.affordances.fuchsia_controller import tracing as tracing_fc
 from honeydew.fuchsia_device import base_fuchsia_device
 from honeydew.interfaces.affordances import tracing
@@ -27,10 +26,8 @@ from honeydew.interfaces.affordances.bluetooth.profiles import (
 from honeydew.interfaces.affordances.bluetooth.profiles import (
     bluetooth_gap as bluetooth_gap_interface,
 )
-from honeydew.interfaces.affordances.ui import screenshot
-from honeydew.interfaces.affordances.ui import user_input
-from honeydew.interfaces.affordances.wlan import wlan
-from honeydew.interfaces.affordances.wlan import wlan_policy
+from honeydew.interfaces.affordances.ui import screenshot, user_input
+from honeydew.interfaces.affordances.wlan import wlan, wlan_policy
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports import (
     fuchsia_controller as fuchsia_controller_transport,

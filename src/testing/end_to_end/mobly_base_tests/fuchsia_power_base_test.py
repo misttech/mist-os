@@ -7,11 +7,12 @@
 It is assumed that this is a hybrid test, with a host-side and a single target-side component.
 """
 
-from fuchsia_base_hybrid_test_lib import fuchsia_hybrid_base_test
 import os
-import subprocess
 import signal
+import subprocess
 import time
+
+from fuchsia_base_hybrid_test_lib import fuchsia_hybrid_base_test
 from mobly import test_runner
 
 

@@ -10,8 +10,7 @@ from typing import Any, Iterable, Type
 from honeydew import errors
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports import ffx as ffx_transport
-from honeydew.utils import common
-from honeydew.utils import properties
+from honeydew.utils import common, properties
 
 _FASTBOOT_CMDS: dict[str, list[str]] = {
     "BOOT_TO_FUCHSIA_MODE": ["reboot"],

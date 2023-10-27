@@ -9,8 +9,7 @@ import logging
 import fidl.fuchsia_developer_remotecontrol as fd_remotecontrol
 import fuchsia_controller_py as fuchsia_controller
 
-from honeydew import custom_types
-from honeydew import errors
+from honeydew import custom_types, errors
 from honeydew.transports import ffx as ffx_transport
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)

@@ -7,8 +7,8 @@
 import json
 import logging
 import time
-from typing import Any, Iterable, Type
 import urllib.request
+from typing import Any, Iterable, Type
 
 from honeydew import errors
 

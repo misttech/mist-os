@@ -4,14 +4,13 @@
 # found in the LICENSE file.
 """Unit tests for honeydew.transports.fuchsia_controller.py."""
 
-from typing import Any
 import unittest
+from typing import Any
 from unittest import mock
 
 import fuchsia_controller_py as fuchsia_controller
 
-from honeydew import custom_types
-from honeydew import errors
+from honeydew import custom_types, errors
 from honeydew.transports import (
     fuchsia_controller as fuchsia_controller_transport,
 )

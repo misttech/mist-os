@@ -13,8 +13,7 @@ from typing import Any, Iterable, Type
 
 import fuchsia_controller_py as fuchsia_controller
 
-from honeydew import custom_types
-from honeydew import errors
+from honeydew import custom_types, errors
 
 _FFX_CMDS: dict[str, list[str]] = {
     "TARGET_ADD": ["target", "add"],

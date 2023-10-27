@@ -7,12 +7,13 @@
 import logging
 
 from fuchsia_base_test import fuchsia_base_test
-from mobly import asserts
-from mobly import test_runner
+from mobly import asserts, test_runner
 
 from honeydew import custom_types
-from honeydew.interfaces.device_classes import fuchsia_device
-from honeydew.interfaces.device_classes import transports_capable
+from honeydew.interfaces.device_classes import (
+    fuchsia_device,
+    transports_capable,
+)
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 

@@ -4,21 +4,23 @@
 # found in the LICENSE file.
 """Wlan policy affordance implementation using SL4F."""
 
-from enum import StrEnum
 import logging
+from enum import StrEnum
 from typing import Mapping
 
 from honeydew.interfaces.affordances.wlan import wlan_policy
 from honeydew.transports.sl4f import SL4F
-from honeydew.typing.wlan import ClientStateSummary
-from honeydew.typing.wlan import ConnectionState
-from honeydew.typing.wlan import DisconnectStatus
-from honeydew.typing.wlan import NetworkConfig
-from honeydew.typing.wlan import NetworkIdentifier
-from honeydew.typing.wlan import NetworkState
-from honeydew.typing.wlan import RequestStatus
-from honeydew.typing.wlan import SecurityType
-from honeydew.typing.wlan import WlanClientState
+from honeydew.typing.wlan import (
+    ClientStateSummary,
+    ConnectionState,
+    DisconnectStatus,
+    NetworkConfig,
+    NetworkIdentifier,
+    NetworkState,
+    RequestStatus,
+    SecurityType,
+    WlanClientState,
+)
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 

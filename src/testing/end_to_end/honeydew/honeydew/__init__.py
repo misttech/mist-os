@@ -8,9 +8,7 @@ import logging
 import subprocess
 from typing import Type
 
-from honeydew import custom_types
-from honeydew import errors
-from honeydew import transports
+from honeydew import custom_types, errors, transports
 from honeydew.fuchsia_device.fuchsia_controller import (
     fuchsia_device as fc_fuchsia_device,
 )

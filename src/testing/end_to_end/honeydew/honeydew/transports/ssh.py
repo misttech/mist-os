@@ -9,8 +9,7 @@ import subprocess
 import time
 from typing import Any
 
-from honeydew import custom_types
-from honeydew import errors
+from honeydew import custom_types, errors
 from honeydew.transports import ffx as ffx_transport
 
 _DEFAULTS: dict[str, Any] = {

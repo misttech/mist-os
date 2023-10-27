@@ -5,16 +5,15 @@
 """Tracing affordance implementation using Fuchsia-Controller."""
 
 import asyncio
-from datetime import datetime
 import logging
 import os
+from datetime import datetime
 
 import fidl.fuchsia_tracing as f_tracing
 import fidl.fuchsia_tracing_controller as f_tracingcontroller
 import fuchsia_controller_py as fc
 
-from honeydew import custom_types
-from honeydew import errors
+from honeydew import custom_types, errors
 from honeydew.interfaces.affordances import tracing
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports import fuchsia_controller as fc_transport

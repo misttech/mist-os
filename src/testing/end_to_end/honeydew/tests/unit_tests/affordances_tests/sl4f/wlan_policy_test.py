@@ -4,22 +4,24 @@
 # found in the LICENSE file.
 """Unit tests for honeydew.affordances.sl4f.wlan_policy.py."""
 
-from typing import Any
 import unittest
+from typing import Any
 from unittest import mock
 
 from parameterized import parameterized
 
 from honeydew.affordances.sl4f.wlan import wlan_policy as sl4f_wlan_policy
 from honeydew.transports import sl4f as sl4f_transport
-from honeydew.typing.wlan import ConnectionState
-from honeydew.typing.wlan import DisconnectStatus
-from honeydew.typing.wlan import NetworkConfig
-from honeydew.typing.wlan import NetworkIdentifier
-from honeydew.typing.wlan import NetworkState
-from honeydew.typing.wlan import RequestStatus
-from honeydew.typing.wlan import SecurityType
-from honeydew.typing.wlan import WlanClientState
+from honeydew.typing.wlan import (
+    ConnectionState,
+    DisconnectStatus,
+    NetworkConfig,
+    NetworkIdentifier,
+    NetworkState,
+    RequestStatus,
+    SecurityType,
+    WlanClientState,
+)
 
 
 def _custom_test_name_func(testcase_func, _, param) -> str:

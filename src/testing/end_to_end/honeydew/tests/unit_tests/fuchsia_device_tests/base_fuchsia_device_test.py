@@ -5,14 +5,13 @@
 """Unit tests for honeydew.fuchsia_device.base_fuchsia_device.py."""
 
 import base64
-from typing import Any
 import unittest
+from typing import Any
 from unittest import mock
 
 from parameterized import parameterized
 
-from honeydew import custom_types
-from honeydew import errors
+from honeydew import custom_types, errors
 from honeydew.fuchsia_device import base_fuchsia_device
 from honeydew.interfaces.device_classes import (
     fuchsia_device as fuchsia_device_interface,

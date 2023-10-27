@@ -5,16 +5,15 @@
 """Unit tests for honeydew.__init__.py."""
 
 import subprocess
-from typing import Any
 import unittest
+from typing import Any
 from unittest import mock
 
 import fuchsia_controller_py as fcp
 from parameterized import parameterized
 
 import honeydew
-from honeydew import custom_types
-from honeydew import errors
+from honeydew import custom_types, errors
 from honeydew.fuchsia_device import base_fuchsia_device
 from honeydew.fuchsia_device.fuchsia_controller import (
     fuchsia_device as fc_fuchsia_device,

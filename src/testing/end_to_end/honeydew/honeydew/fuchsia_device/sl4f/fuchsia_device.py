@@ -5,8 +5,8 @@
 """FuchsiaDevice abstract base class implementation using SL4F."""
 
 import base64
-from http.client import RemoteDisconnected
 import logging
+from http.client import RemoteDisconnected
 from typing import Any
 
 from honeydew import custom_types
@@ -39,8 +39,10 @@ from honeydew.interfaces.affordances.wlan import wlan as wlan_interface
 from honeydew.interfaces.affordances.wlan import (
     wlan_policy as wlan_policy_interface,
 )
-from honeydew.interfaces.device_classes import affordances_capable
-from honeydew.interfaces.device_classes import transports_capable
+from honeydew.interfaces.device_classes import (
+    affordances_capable,
+    transports_capable,
+)
 from honeydew.transports import sl4f as sl4f_transport
 from honeydew.utils import properties
 

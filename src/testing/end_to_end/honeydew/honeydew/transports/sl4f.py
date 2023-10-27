@@ -10,11 +10,9 @@ import sys
 import time
 from typing import Any, Iterable, Type
 
-from honeydew import custom_types
-from honeydew import errors
+from honeydew import custom_types, errors
 from honeydew.transports import ffx as ffx_transport
-from honeydew.utils import http_utils
-from honeydew.utils import properties
+from honeydew.utils import http_utils, properties
 
 _TIMEOUTS: dict[str, float] = {
     "RESPONSE": 30,

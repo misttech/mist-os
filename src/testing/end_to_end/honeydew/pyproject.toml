@@ -40,10 +40,16 @@ include = ["honeydew*"]  # package names should match these glob patterns (["*"]
 
 [tool.isort]
 # Reference at https://pycqa.github.io/isort/docs/configuration/config_files.html
-profile = "google"
+profile = "black"
 line_length = 80
 
 [tool.mypy]
 # Reference at https://mypy.readthedocs.io/en/stable/config_file.html#example-pyproject-toml
 # Needed because dependency modules such as mobly are not pip installed
 ignore_missing_imports = true
+
+# HoneyDew uses `fx format-code` to format the code.
+# `fx format-code` uses `black` underneath to format the python code, using the
+# configuration specified in $FUCHSIA_DIR/pyproject.toml.
+# So just run the below command to format the code inside this folder:
+# `fx format-code "--files=${FUCHSIA_DIR}/src/testing/end_to_end/honeydew/*" --all`

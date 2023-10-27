@@ -4,14 +4,13 @@
 # found in the LICENSE file.
 """Unit tests for honeydew.transports.sl4f.py."""
 
-from typing import Any
 import unittest
+from typing import Any
 from unittest import mock
 
 from parameterized import parameterized
 
-from honeydew import custom_types
-from honeydew import errors
+from honeydew import custom_types, errors
 from honeydew.transports import sl4f
 
 # pylint: disable=protected-access

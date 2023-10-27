@@ -5,8 +5,8 @@
 """Unit tests for honeydew.affordances.sl4f.screenshot.py."""
 
 import base64
-from typing import Any
 import unittest
+from typing import Any
 from unittest import mock
 
 from honeydew import errors

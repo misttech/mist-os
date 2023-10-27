@@ -5,8 +5,8 @@
 """Unit tests for honeydew.fuchsia_device.sl4f.fuchsia_device.py."""
 
 import base64
-from typing import Any
 import unittest
+from typing import Any
 from unittest import mock
 
 from parameterized import parameterized

@@ -5,8 +5,8 @@
 """Unit tests for
 honeydew.fuchsia_device.fuchsia_controller.fuchsia_device.py."""
 
-from typing import Any
 import unittest
+from typing import Any
 from unittest import mock
 
 import fidl.fuchsia_buildinfo as f_buildinfo
@@ -18,8 +18,7 @@ import fidl.fuchsia_io as f_io
 import fuchsia_controller_py as fuchsia_controller
 from parameterized import parameterized
 
-from honeydew import custom_types
-from honeydew import errors
+from honeydew import custom_types, errors
 from honeydew.fuchsia_device import base_fuchsia_device
 from honeydew.fuchsia_device.fuchsia_controller import fuchsia_device
 from honeydew.interfaces.device_classes import affordances_capable

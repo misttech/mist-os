@@ -6,10 +6,12 @@
 
 import abc
 
-from honeydew.typing.wlan import ClientStateSummary
-from honeydew.typing.wlan import NetworkConfig
-from honeydew.typing.wlan import RequestStatus
-from honeydew.typing.wlan import SecurityType
+from honeydew.typing.wlan import (
+    ClientStateSummary,
+    NetworkConfig,
+    RequestStatus,
+    SecurityType,
+)
 
 DEFAULTS: dict[str, float] = {
     "UPDATE_TIMEOUT_S": 30.0,
