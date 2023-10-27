@@ -289,8 +289,8 @@ pub fn convert_disassociate_request(
 
 pub fn convert_reset_request(
     req: &fidl_mlme::ResetRequest,
-) -> banjo_wlan_fullmac::WlanFullmacResetReq {
-    banjo_wlan_fullmac::WlanFullmacResetReq {
+) -> banjo_wlan_fullmac::WlanFullmacImplResetRequest {
+    banjo_wlan_fullmac::WlanFullmacImplResetRequest {
         sta_address: req.sta_address,
         set_default_mib: req.set_default_mib,
     }

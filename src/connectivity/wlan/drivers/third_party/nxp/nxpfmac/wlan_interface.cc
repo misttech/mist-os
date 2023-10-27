@@ -585,8 +585,8 @@ void WlanInterface::Disassoc(DisassocRequestView request, fdf::Arena& arena,
   completer.buffer(arena).Reply();
 }
 
-void WlanInterface::ResetReq(ResetReqRequestView request, fdf::Arena& arena,
-                             ResetReqCompleter::Sync& completer) {
+void WlanInterface::Reset(ResetRequestView request, fdf::Arena& arena,
+                          ResetCompleter::Sync& completer) {
   NXPF_ERR("%s called", __func__);
   completer.buffer(arena).Reply();
 }

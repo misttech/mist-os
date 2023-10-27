@@ -163,8 +163,12 @@ struct WlanifDeviceTest : public ::zxtest::Test,
     EXPECT_EQ(request->has_reason_code(), true);
     completer.buffer(arena).Reply();
   }
-  void ResetReq(ResetReqRequestView request, fdf::Arena& arena,
-                ResetReqCompleter::Sync& completer) override {}
+  void Reset(ResetRequestView request, fdf::Arena& arena,
+             ResetCompleter::Sync& completer) override {
+    EXPECT_EQ(request->has_sta_address(), true);
+    EXPECT_EQ(request->has_set_default_mib(), true);
+    completer.buffer(arena).Reply();
+  }
   void StartReq(StartReqRequestView request, fdf::Arena& arena,
                 StartReqCompleter::Sync& completer) override {}
   void StopReq(StopReqRequestView request, fdf::Arena& arena,
@@ -306,6 +310,13 @@ TEST_F(WlanifDeviceTest, CheckDisassoc) {
   device_->Disassociate(&req);
 }
 
+TEST_F(WlanifDeviceTest, CheckReset) {
+  device_->AddDevice();
+  device_->DdkAsyncRemove();
+  wlan_fullmac_impl_reset_request_t req = {.set_default_mib = true};
+  memcpy(req.sta_address, kPeerStaAddress, sizeof(kPeerStaAddress));
+  device_->Reset(&req);
+}
 // Call DeauthConf on WlanFullmacImplIfc and verify that it calls deauth_conf on the given
 // protocol ops with the correct peer_sta_address.
 TEST_F(WlanifDeviceTest, CheckDeauthConf) {

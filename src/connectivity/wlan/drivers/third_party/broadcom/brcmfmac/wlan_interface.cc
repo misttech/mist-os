@@ -363,12 +363,11 @@ void WlanInterface::Disassoc(DisassocRequestView request, fdf::Arena& arena,
   completer.buffer(arena).Reply();
 }
 
-void WlanInterface::ResetReq(ResetReqRequestView request, fdf::Arena& arena,
-                             ResetReqCompleter::Sync& completer) {
+void WlanInterface::Reset(ResetRequestView request, fdf::Arena& arena,
+                          ResetCompleter::Sync& completer) {
   std::shared_lock<std::shared_mutex> guard(lock_);
-  const fuchsia_wlan_fullmac::wire::WlanFullmacResetReq req = request->req;
   if (wdev_ != nullptr) {
-    brcmf_if_reset_req(wdev_->netdev, &req);
+    brcmf_if_reset_req(wdev_->netdev, request);
   }
   completer.buffer(arena).Reply();
 }

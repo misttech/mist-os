@@ -376,7 +376,7 @@ impl FullmacMlme {
             }
             AssocResponse(resp) => self.device.assoc_resp(convert_associate_response(&resp)),
             Disassociate(req) => self.device.disassoc(convert_disassociate_request(&req)),
-            Reset(req) => self.device.reset_req(convert_reset_request(&req)),
+            Reset(req) => self.device.reset(convert_reset_request(&req)),
             Start(req) => self.device.start_req(convert_start_request(&req)),
             Stop(req) => self.device.stop_req(convert_stop_request(&req)),
             SetKeys(req) => self.handle_mlme_set_keys_request(req),
@@ -1028,10 +1028,10 @@ mod handle_mlme_request_tests {
 
         let mut driver_calls = h.fake_device.captured_driver_calls.iter();
         let driver_req =
-            assert_variant!(driver_calls.next(), Some(DriverCall::ResetReq { req }) => req);
+            assert_variant!(driver_calls.next(), Some(DriverCall::Reset { req }) => req);
         assert_eq!(
             *driver_req,
-            banjo_wlan_fullmac::WlanFullmacResetReq {
+            banjo_wlan_fullmac::WlanFullmacImplResetRequest {
                 sta_address: [1u8; 6],
                 set_default_mib: true,
             }

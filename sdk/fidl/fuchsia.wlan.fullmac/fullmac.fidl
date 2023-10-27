@@ -48,12 +48,6 @@ type WlanFullmacAssocInd = struct {
     vendor_ie array<uint8, WLAN_VIE_MAX_LEN>;
 };
 
-
-type WlanFullmacResetReq = struct {
-    sta_address ieee80211.MacAddr;
-    set_default_mib bool;
-};
-
 type WlanFullmacStartReq = struct {
     ssid ieee80211.CSsid;
     bss_type fuchsia.wlan.common.BssType;
@@ -685,8 +679,9 @@ closed protocol WlanFullmacImpl {
         1: peer_sta_address ieee80211.MacAddr;
         2: reason_code ieee80211.ReasonCode;
     }) -> ();
-    strict ResetReq(struct {
-        req WlanFullmacResetReq;
+    strict Reset(table {
+        1: sta_address ieee80211.MacAddr;
+        2: set_default_mib bool;
     }) -> ();
     strict StartReq(struct {
         req WlanFullmacStartReq;

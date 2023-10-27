@@ -376,22 +376,22 @@ void Device::Disassociate(const wlan_fullmac_impl_disassoc_request_t* req) {
   }
 }
 
-void Device::ResetReq(const wlan_fullmac_reset_req_t* req) {
+void Device::Reset(const wlan_fullmac_impl_reset_request_t* req) {
   OnLinkStateChanged(false);
-
-  fuchsia_wlan_fullmac::wire::WlanFullmacResetReq reset_req;
-
-  std::memcpy(reset_req.sta_address.data(), req->sta_address, ETH_ALEN);
-  reset_req.set_default_mib = req->set_default_mib;
 
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     lerror("Arena creation failed: %s", arena.status_string());
     return;
   }
+  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplResetRequest::Builder(*arena);
 
-  auto result = client_.buffer(*arena)->ResetReq(reset_req);
+  ::fidl::Array<uint8_t, ETH_ALEN> sta_address;
+  std::memcpy(sta_address.data(), req->sta_address, ETH_ALEN);
+  builder.sta_address(sta_address);
+  builder.set_default_mib(req->set_default_mib);
 
+  auto result = client_.buffer(*arena)->Reset(builder.Build());
   if (!result.ok()) {
     lerror("ResetReq failed FIDL error: %s", result.status_string());
     return;

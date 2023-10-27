@@ -351,8 +351,10 @@ pub struct FullmacDeviceInterface {
         device: *mut c_void,
         req: *mut banjo_wlan_fullmac::WlanFullmacImplDisassocRequest,
     ),
-    reset_req:
-        extern "C" fn(device: *mut c_void, req: *mut banjo_wlan_fullmac::WlanFullmacResetReq),
+    reset: extern "C" fn(
+        device: *mut c_void,
+        req: *mut banjo_wlan_fullmac::WlanFullmacImplResetRequest,
+    ),
     start_req:
         extern "C" fn(device: *mut c_void, req: *mut banjo_wlan_fullmac::WlanFullmacStartReq),
     stop_req: extern "C" fn(device: *mut c_void, req: *mut banjo_wlan_fullmac::WlanFullmacStopReq),
@@ -457,8 +459,8 @@ impl FullmacDeviceInterface {
             &mut req as *mut banjo_wlan_fullmac::WlanFullmacImplDisassocRequest,
         )
     }
-    pub fn reset_req(&self, mut req: banjo_wlan_fullmac::WlanFullmacResetReq) {
-        (self.reset_req)(self.device, &mut req as *mut banjo_wlan_fullmac::WlanFullmacResetReq)
+    pub fn reset(&self, mut req: banjo_wlan_fullmac::WlanFullmacImplResetRequest) {
+        (self.reset)(self.device, &mut req as *mut banjo_wlan_fullmac::WlanFullmacImplResetRequest)
     }
     pub fn start_req(&self, mut req: banjo_wlan_fullmac::WlanFullmacStartReq) {
         (self.start_req)(self.device, &mut req as *mut banjo_wlan_fullmac::WlanFullmacStartReq)
@@ -559,8 +561,8 @@ pub mod test_utils {
         Disassoc {
             req: banjo_wlan_fullmac::WlanFullmacImplDisassocRequest,
         },
-        ResetReq {
-            req: banjo_wlan_fullmac::WlanFullmacResetReq,
+        Reset {
+            req: banjo_wlan_fullmac::WlanFullmacImplResetRequest,
         },
         StartReq {
             req: banjo_wlan_fullmac::WlanFullmacStartReq,
@@ -675,7 +677,7 @@ pub mod test_utils {
                 deauth: Self::deauth,
                 assoc_resp: Self::assoc_resp,
                 disassoc: Self::disassoc,
-                reset_req: Self::reset_req,
+                reset: Self::reset,
                 start_req: Self::start_req,
                 stop_req: Self::stop_req,
                 set_keys_req: Self::set_keys_req,
@@ -839,13 +841,13 @@ pub mod test_utils {
         }
         // Cannot mark fn unsafe because it has to match fn signature in FullDeviceInterface
         #[allow(clippy::not_unsafe_ptr_arg_deref)]
-        pub extern "C" fn reset_req(
+        pub extern "C" fn reset(
             device: *mut c_void,
-            req: *mut banjo_wlan_fullmac::WlanFullmacResetReq,
+            req: *mut banjo_wlan_fullmac::WlanFullmacImplResetRequest,
         ) {
             let device = unsafe { &mut *(device as *mut Self) };
             let req = unsafe { *req };
-            device.captured_driver_calls.push(DriverCall::ResetReq { req });
+            device.captured_driver_calls.push(DriverCall::Reset { req });
         }
         // Cannot mark fn unsafe because it has to match fn signature in FullDeviceInterface
         #[allow(clippy::not_unsafe_ptr_arg_deref)]

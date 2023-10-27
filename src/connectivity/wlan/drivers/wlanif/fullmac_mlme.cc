@@ -77,8 +77,8 @@ void FullmacMlme::Init() {
           [](void *device, wlan_fullmac_impl_disassoc_request_t *req) {
             DEVICE(device)->Disassociate(req);
           },
-      .reset_req = [](void *device,
-                      wlan_fullmac_reset_req_t *req) { DEVICE(device)->ResetReq(req); },
+      .reset = [](void *device,
+                  wlan_fullmac_impl_reset_request_t *req) { DEVICE(device)->Reset(req); },
       .start_req = [](void *device,
                       wlan_fullmac_start_req_t *req) { DEVICE(device)->StartReq(req); },
       .stop_req = [](void *device, wlan_fullmac_stop_req_t *req) { DEVICE(device)->StopReq(req); },
