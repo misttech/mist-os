@@ -231,6 +231,7 @@ build_api_module("generated_docs") {
     ":invoke_helpdoc",
     "//bundles/drivers:create_all_drivers_doc",
     "//sdk/lib/fdio:docs",
+    "//zircon/vdso:syscall_docs.zip",
   ]
 }
 

@@ -106,6 +106,7 @@ zither_golden_files("ifs") {
   sources = [ "//src/zircon/lib/zircon/zircon.ifs" ]
 }
 
+# TODO(b/306180541): Delete this target once docsgen pipeline is in place.
 zither_golden_files("docs") {
   fidl = ":zx"
   backend = "syscall_docs"
@@ -166,4 +167,25 @@ group("fuchsia-zircon-sys") {
   visibility = [ "//src/lib/zircon/rust:*" ]
   public_deps = [ ":zx_zither.rust_syscall" ]
   metadata = barrier_metadata
+}
+
+# Used to publish reference documentation.
+if (current_toolchain == default_toolchain) {
+  action("syscall_docs.zip") {
+    # Depend on  the internal backend target.
+    deps = [ ":zx_zither.syscall_docs.gen" ]
+
+    # The output manifest is always first, per a private contract with
+    # zither_library().
+    inputs = get_target_outputs(deps[0])
+    outputs = [ "${target_out_dir}/syscall_docs.zip" ]
+
+    script = "//zircon/tools/zither/scripts/create-doc-archive.py"
+    args = [
+      "--source-file-manifest",
+      rebase_path(inputs[0], root_build_dir),
+      "--output",
+      rebase_path(outputs[0], root_build_dir),
+    ]
+  }
 }
