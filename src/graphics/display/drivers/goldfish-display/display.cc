@@ -283,7 +283,7 @@ zx_status_t Display::InitSysmemAllocatorClientLocked() {
   }
   sysmem_allocator_client_ = fidl::WireSyncClient(std::move(client));
 
-  std::string debug_name = fxl::StringPrintf("goldfish-display[%lu]", fsl::GetCurrentProcessKoid());
+  std::string debug_name = fxl::StringPrintf("goldfish-display");
   auto set_debug_status = sysmem_allocator_client_->SetDebugClientInfo(
       fidl::StringView::FromExternal(debug_name), fsl::GetCurrentProcessKoid());
   if (!set_debug_status.ok()) {
