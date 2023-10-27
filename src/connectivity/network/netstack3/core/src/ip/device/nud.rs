@@ -34,7 +34,7 @@ use crate::{
         link::{LinkAddress, LinkDevice},
         AnyDevice, DeviceIdContext, StrongId,
     },
-    error::AddressResolutionFailed,
+    error::{AddressResolutionFailed, NotFoundError},
     Instant,
 };
 
@@ -1508,12 +1508,16 @@ pub(crate) trait NudHandler<I: Ip, D: LinkDevice, C: LinkResolutionContext<D>>:
 {
     /// Sets a dynamic neighbor's entry state to the specified values in
     /// response to the source packet.
-    // TODO(https://fxbug.dev/126138): Require that neighbor is a `UnicastAddr`.
     fn handle_neighbor_update(
         &mut self,
         ctx: &mut C,
         device_id: &Self::DeviceId,
+        // TODO(https://fxbug.dev/126138): Use IPv4 subnet information to
+        // disallow the address with all host bits equal to 0, and the
+        // subnet broadcast addresses with all host bits equal to 1.
+        // TODO(https://fxbug.dev/134098): Use NeighborAddr when available.
         neighbor: SpecifiedAddr<I::Addr>,
+        // TODO(https://fxbug.dev/134102): Wrap in `UnicastAddr`.
         link_addr: D::Address,
         source: DynamicNeighborUpdateSource,
     );
@@ -1525,24 +1529,41 @@ pub(crate) trait NudHandler<I: Ip, D: LinkDevice, C: LinkResolutionContext<D>>:
     /// to be a static entry.
     ///
     /// Dynamic updates for the neighbor will be ignored for static entries.
-    // TODO(https://fxbug.dev/126138): Require that neighbor is a `UnicastAddr`.
     fn set_static_neighbor(
         &mut self,
         ctx: &mut C,
         device_id: &Self::DeviceId,
+        // TODO(https://fxbug.dev/126138): Use IPv4 subnet information to
+        // disallow the address with all host bits equal to 0, and the
+        // subnet broadcast addresses with all host bits equal to 1.
+        // TODO(https://fxbug.dev/134098): Use NeighborAddr when available.
         neighbor: SpecifiedAddr<I::Addr>,
+        // TODO(https://fxbug.dev/134102): Wrap in `UnicastAddr`.
         link_addr: D::Address,
     );
+
+    /// Deletes a static or dynamic neighbor entry.
+    fn delete_neighbor(
+        &mut self,
+        ctx: &mut C,
+        device_id: &Self::DeviceId,
+        // TODO(https://fxbug.dev/126138): Use IPv4 subnet information to
+        // disallow subnet and subnet broadcast addresses.
+        // TODO(https://fxbug.dev/134098): Use NeighborAddr when available.
+        neighbor: SpecifiedAddr<I::Addr>,
+    ) -> Result<(), NotFoundError>;
 
     /// Clears the neighbor table.
     fn flush(&mut self, ctx: &mut C, device_id: &Self::DeviceId);
 
     /// Resolve the link-address of a device's neighbor.
-    // TODO(https://fxbug.dev/126138): Require that dst is a `UnicastAddr`.
     fn resolve_link_addr(
         &mut self,
         ctx: &mut C,
         device: &Self::DeviceId,
+        // TODO(https://fxbug.dev/126138): Use IPv4 subnet information to
+        // disallow subnet and subnet broadcast addresses.
+        // TODO(https://fxbug.dev/134098): Use NeighborAddr when available.
         dst: &SpecifiedAddr<I::Addr>,
     ) -> LinkResolutionResult<
         D::Address,
@@ -1835,6 +1856,23 @@ impl<
                 Some(NeighborState::Static(_)) | None => {}
             },
         );
+    }
+
+    fn delete_neighbor(
+        &mut self,
+        ctx: &mut C,
+        device_id: &SC::DeviceId,
+        neighbor: SpecifiedAddr<I::Addr>,
+    ) -> Result<(), NotFoundError> {
+        self.with_nud_state_mut(device_id, |NudState { neighbors, last_gc: _ }, _config| {
+            match neighbors.remove(&neighbor).ok_or(NotFoundError)? {
+                NeighborState::Dynamic(mut entry) => {
+                    entry.cancel_timer(ctx, device_id, neighbor);
+                }
+                NeighborState::Static(_) => {}
+            }
+            Ok(())
+        })
     }
 
     fn flush(&mut self, ctx: &mut C, device_id: &Self::DeviceId) {
@@ -3681,6 +3719,17 @@ mod tests {
             DynamicNeighborUpdateSource::Probe,
         );
         check_lookup_has(&mut sync_ctx, &mut non_sync_ctx, I::LOOKUP_ADDR1, LINK_ADDR1);
+
+        NudHandler::delete_neighbor(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            &FakeLinkDeviceId,
+            I::LOOKUP_ADDR1,
+        )
+        .expect("neighbor entry should exist");
+
+        let FakeNudContext { nud: NudState { neighbors, last_gc: _ } } = &sync_ctx.outer;
+        assert!(neighbors.is_empty(), "neighbor table should be empty: {neighbors:?}");
     }
 
     #[ip_test]
@@ -3956,6 +4005,30 @@ mod tests {
             nud.neighbors,
             HashMap::from([(I::LOOKUP_ADDR1, NeighborState::Static(LINK_ADDR1))])
         );
+        non_sync_ctx.timer_ctx().assert_no_timers_installed();
+    }
+
+    #[ip_test]
+    fn delete_dynamic_entry<I: Ip + TestIpExt>() {
+        let FakeCtxWithSyncCtx { mut sync_ctx, mut non_sync_ctx } =
+            FakeCtxWithSyncCtx::with_sync_ctx(FakeCtxImpl::<I>::new());
+        non_sync_ctx.timer_ctx().assert_no_timers_installed();
+        assert_eq!(sync_ctx.inner.take_frames(), []);
+
+        init_reachable_neighbor(&mut sync_ctx, &mut non_sync_ctx, LINK_ADDR1);
+        check_lookup_has(&mut sync_ctx, &mut non_sync_ctx, I::LOOKUP_ADDR1, LINK_ADDR1);
+
+        NudHandler::delete_neighbor(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            &FakeLinkDeviceId,
+            I::LOOKUP_ADDR1,
+        )
+        .expect("neighbor entry should exist");
+
+        // Entry should be removed and timer cancelled.
+        let FakeNudContext { nud: NudState { neighbors, last_gc: _ } } = &sync_ctx.outer;
+        assert!(neighbors.is_empty(), "neighbor table should be empty: {neighbors:?}");
         non_sync_ctx.timer_ctx().assert_no_timers_installed();
     }
 

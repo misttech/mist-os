@@ -52,12 +52,12 @@ use crate::{
         state::{BaseDeviceState, DeviceStateSpec, IpLinkDeviceState, IpLinkDeviceStateInner},
     },
     error::{
-        ExistsError, NotFoundError, NotSupportedError, SetIpAddressPropertiesError,
-        StaticNeighborInsertionError,
+        ExistsError, NeighborRemovalError, NotFoundError, NotSupportedError,
+        SetIpAddressPropertiesError, StaticNeighborInsertionError,
     },
     ip::{
         device::{
-            nud::{LinkResolutionContext, NeighborStateInspect},
+            nud::{LinkResolutionContext, NeighborStateInspect, NudHandler},
             state::{
                 AddrSubnetAndManualConfigEither, AssignedAddress as _, IpDeviceFlags,
                 Ipv4DeviceConfigurationAndFlags, Ipv6DeviceConfigurationAndFlags, Lifetime,
@@ -952,6 +952,22 @@ pub(crate) fn del_ip_addr<NonSyncCtx: NonSyncContext, A: IpAddress>(
     }
 }
 
+// TODO(https://fxbug.dev/134098): Use NeighborAddr to witness these properties.
+fn validate_ipv4_neighbor_addr(addr: Ipv4Addr) -> Option<SpecifiedAddr<Ipv4Addr>> {
+    (!Ipv4::LOOPBACK_SUBNET.contains(&addr)
+        && !Ipv4::MULTICAST_SUBNET.contains(&addr)
+        && addr != Ipv4::LIMITED_BROADCAST_ADDRESS.get())
+    .then_some(())
+    .and_then(|()| SpecifiedAddr::new(addr))
+}
+
+// TODO(https://fxbug.dev/134098): Use NeighborAddr to witness these properties.
+fn validate_ipv6_neighbor_addr(addr: Ipv6Addr) -> Option<UnicastAddr<Ipv6Addr>> {
+    (addr != Ipv6::LOOPBACK_ADDRESS.get() && addr.to_ipv4_mapped().is_none())
+        .then_some(())
+        .and_then(|()| UnicastAddr::new(addr))
+}
+
 /// Inserts a static neighbor entry for a neighbor.
 pub fn insert_static_neighbor_entry<I: Ip, NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
@@ -965,27 +981,17 @@ pub fn insert_static_neighbor_entry<I: Ip, NonSyncCtx: NonSyncContext>(
         (IpInvariant((sync_ctx, ctx, device, mac)), addr),
         |(IpInvariant((sync_ctx, ctx, device, mac)), addr)| {
             IpInvariant(
-                // TODO(https://fxbug.dev/134098): Use NeighborAddr to witness these
-                // properties.
-                (!Ipv4::LOOPBACK_SUBNET.contains(&addr)
-                    && !Ipv4::MULTICAST_SUBNET.contains(&addr)
-                    && addr != Ipv4::LIMITED_BROADCAST_ADDRESS.get())
-                .then_some(())
-                .and_then(|()| SpecifiedAddr::new(addr))
-                .ok_or(StaticNeighborInsertionError::IpAddressInvalid)
-                .and_then(|addr| {
-                    insert_static_arp_table_entry(sync_ctx, ctx, device, addr, mac)
-                        .map_err(StaticNeighborInsertionError::NotSupported)
-                }),
+                validate_ipv4_neighbor_addr(addr)
+                    .ok_or(StaticNeighborInsertionError::IpAddressInvalid)
+                    .and_then(|addr| {
+                        insert_static_arp_table_entry(sync_ctx, ctx, device, addr, mac)
+                            .map_err(StaticNeighborInsertionError::NotSupported)
+                    }),
             )
         },
         |(IpInvariant((sync_ctx, ctx, device, mac)), addr)| {
             IpInvariant(
-                // TODO(https://fxbug.dev/134098): Use NeighborAddr to witness these
-                // properties.
-                (addr != Ipv6::LOOPBACK_ADDRESS.get() && addr.to_ipv4_mapped().is_none())
-                    .then_some(())
-                    .and_then(|()| UnicastAddr::new(addr))
+                validate_ipv6_neighbor_addr(addr)
                     .ok_or(StaticNeighborInsertionError::IpAddressInvalid)
                     .and_then(|addr| {
                         insert_static_ndp_table_entry(sync_ctx, ctx, device, addr, mac)
@@ -1043,6 +1049,54 @@ pub(crate) fn insert_static_ndp_table_entry<NonSyncCtx: NonSyncContext>(
         )),
         DeviceId::Loopback(LoopbackDeviceId { .. }) => Err(NotSupportedError),
     }
+}
+
+/// Remove a static or dynamic neighbor table entry.
+pub fn remove_neighbor_table_entry<I: Ip, NonSyncCtx: NonSyncContext>(
+    sync_ctx: &SyncCtx<NonSyncCtx>,
+    ctx: &mut NonSyncCtx,
+    device: &DeviceId<NonSyncCtx>,
+    addr: I::Addr,
+) -> Result<(), NeighborRemovalError> {
+    let device = match device {
+        DeviceId::Ethernet(device) => device,
+        DeviceId::Loopback(LoopbackDeviceId { .. }) => return Err(NotSupportedError.into()),
+    };
+    let IpInvariant(result) = I::map_ip(
+        (IpInvariant((sync_ctx, ctx, device)), addr),
+        |(IpInvariant((sync_ctx, ctx, device)), addr)| {
+            IpInvariant(
+                validate_ipv4_neighbor_addr(addr)
+                    .ok_or(NeighborRemovalError::IpAddressInvalid)
+                    .and_then(|addr| {
+                        NudHandler::<Ipv4, EthernetLinkDevice, _>::delete_neighbor(
+                            &mut Locked::new(sync_ctx),
+                            ctx,
+                            device,
+                            addr,
+                        )
+                        .map_err(Into::into)
+                    }),
+            )
+        },
+        |(IpInvariant((sync_ctx, ctx, device)), addr)| {
+            IpInvariant(
+                validate_ipv6_neighbor_addr(addr)
+                    .map(UnicastAddr::into_specified)
+                    .ok_or(NeighborRemovalError::IpAddressInvalid)
+                    .and_then(|addr| {
+                        NudHandler::<Ipv6, EthernetLinkDevice, _>::delete_neighbor(
+                            &mut Locked::new(sync_ctx),
+                            ctx,
+                            device,
+                            addr,
+                        )
+                        .map_err(Into::into)
+                    }),
+            )
+        },
+    );
+    result
 }
 
 /// Gets the IPv4 configuration and flags for a `device`.

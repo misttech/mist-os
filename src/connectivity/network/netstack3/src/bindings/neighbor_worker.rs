@@ -16,8 +16,8 @@ use tracing::warn;
 
 use crate::bindings::{devices::BindingId, BindingsNonSyncCtxImpl, Ctx, Netstack};
 use netstack3_core::{
-    device::insert_static_neighbor_entry,
-    error::{NotSupportedError, StaticNeighborInsertionError},
+    device::{insert_static_neighbor_entry, remove_neighbor_table_entry},
+    error::{NeighborRemovalError, NotFoundError, NotSupportedError, StaticNeighborInsertionError},
 };
 
 pub(super) async fn serve(ns: Netstack, stream: ViewRequestStream) -> Result<(), fidl::Error> {
@@ -62,11 +62,11 @@ pub(super) async fn serve_controller(
 ) -> Result<(), fidl::Error> {
     stream
         .try_for_each(|request| async {
+            let mut ctx = ctx.clone();
+            let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
+
             match request {
                 ControllerRequest::AddEntry { interface, neighbor, mac, responder } => {
-                    let mut ctx = ctx.clone();
-                    let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
-
                     let Some(device_id) = BindingId::new(interface)
                         .and_then(|id| non_sync_ctx.devices.get_core_id(id))
                     else {
@@ -98,12 +98,40 @@ pub(super) async fn serve_controller(
                     });
                     responder.send(result)
                 }
-                ControllerRequest::RemoveEntry { interface: _, neighbor: _, responder } => {
-                    warn!(
-                        "TODO(https://fxbug.dev/124960): \
-                            Implement fuchsia.net.neighbor/Controller.RemoveEntry"
-                    );
-                    responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))
+                ControllerRequest::RemoveEntry { interface, neighbor, responder } => {
+                    let Some(device_id) = BindingId::new(interface)
+                        .and_then(|id| non_sync_ctx.devices.get_core_id(id))
+                    else {
+                        return responder.send(Err(zx::Status::NOT_FOUND.into_raw()));
+                    };
+                    let result =
+                        match neighbor.into_ext() {
+                            IpAddr::V4(v4) => remove_neighbor_table_entry::<
+                                Ipv4,
+                                BindingsNonSyncCtxImpl,
+                            >(
+                                sync_ctx, non_sync_ctx, &device_id, v4
+                            ),
+                            IpAddr::V6(v6) => remove_neighbor_table_entry::<
+                                Ipv6,
+                                BindingsNonSyncCtxImpl,
+                            >(
+                                sync_ctx, non_sync_ctx, &device_id, v6
+                            ),
+                        }
+                        .map_err(|e| {
+                            match e {
+                                NeighborRemovalError::IpAddressInvalid => zx::Status::INVALID_ARGS,
+                                NeighborRemovalError::NotFound(NotFoundError) => {
+                                    zx::Status::NOT_FOUND
+                                }
+                                NeighborRemovalError::NotSupported(NotSupportedError) => {
+                                    zx::Status::NOT_SUPPORTED
+                                }
+                            }
+                            .into_raw()
+                        });
+                    responder.send(result)
                 }
                 ControllerRequest::ClearEntries { interface: _, ip_version: _, responder } => {
                     warn!(

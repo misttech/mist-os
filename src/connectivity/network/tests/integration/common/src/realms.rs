@@ -95,9 +95,9 @@ impl NetstackVersion {
         match self {
             NetstackVersion::Netstack2 { tracing: _, fast_udp: _ }
             | NetstackVersion::ProdNetstack2 => &common_services_and!(
+                fnet_neighbor::ViewMarker::PROTOCOL_NAME,
                 fnet_multicast_admin::Ipv4RoutingTableControllerMarker::PROTOCOL_NAME,
                 fnet_multicast_admin::Ipv6RoutingTableControllerMarker::PROTOCOL_NAME,
-                fnet_neighbor::ViewMarker::PROTOCOL_NAME,
                 fnet_stack::LogMarker::PROTOCOL_NAME,
             ),
             NetstackVersion::Netstack3 | NetstackVersion::ProdNetstack3 => &common_services_and!(),

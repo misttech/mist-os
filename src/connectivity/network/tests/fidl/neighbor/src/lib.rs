@@ -641,6 +641,7 @@ async fn next_solicitation_resolution(
     "clear_entries"
 )]
 #[test_case(|controller, id| controller.add_entry(id, &BOB_IP, &BOB_MAC); "add_entry")]
+#[test_case(|controller, id| controller.remove_entry(id, &BOB_IP); "remove_entry")]
 async fn neigh_wrong_interface<N: Netstack>(
     name: &str,
     fidl_method: fn(
@@ -783,7 +784,7 @@ async fn neigh_clear_entries<N: Netstack>(name: &str) {
 #[test_case(fidl_ip!("0.0.0.0"); "ipv4_unspecified")]
 #[test_case(fidl_ip!("::"); "ipv6_unspecified")]
 #[test_case(fidl_ip!("::ffff:0:1"); "ipv6_mapped")]
-async fn neigh_add_entry_invalid_addr<N: Netstack>(
+async fn neigh_add_remove_entry_invalid_addr<N: Netstack>(
     name: &str,
     invalid_addr: fidl_fuchsia_net::IpAddress,
 ) {
@@ -813,6 +814,16 @@ async fn neigh_add_entry_invalid_addr<N: Netstack>(
             .map_err(fuchsia_zircon::Status::from_raw),
         Err(fuchsia_zircon::Status::INVALID_ARGS),
         "{} is an invalid neighbor addr and add_entry should fail",
+        net_types::ip::IpAddr::from_ext(invalid_addr)
+    );
+    assert_eq!(
+        controller
+            .remove_entry(alice.ep.id(), &invalid_addr)
+            .await
+            .expect("remove_entry FIDL error")
+            .map_err(fuchsia_zircon::Status::from_raw),
+        Err(fuchsia_zircon::Status::INVALID_ARGS),
+        "{} is an invalid neighbor addr and remove_entry should fail",
         net_types::ip::IpAddr::from_ext(invalid_addr)
     );
 }
@@ -854,6 +865,39 @@ async fn neigh_add_entry_invalid_mac<N: Netstack>(
             net_types::ethernet::Mac::from_ext(invalid_mac)
         );
     }
+}
+
+// TODO(https://fxbug.dev/124960): Remove this test when NS3 passes
+// neigh_add_remove_entry since that test is a superset of this test but it
+// doesn't yet pass due to the lack of fuchsia.net.neighbor/EntryIterator.
+#[netstack_test]
+async fn neigh_remove_entry_not_found<N: Netstack>(name: &str) {
+    let sandbox = TestSandbox::new().expect("failed to create sandbox");
+    let network = sandbox.create_network("net").await.expect("failed to create network");
+
+    let alice = create_realm::<N>(
+        &sandbox,
+        &network,
+        name,
+        "alice",
+        fidl_fuchsia_net::Subnet { addr: ALICE_IP, prefix_len: SUBNET_PREFIX },
+        ALICE_MAC,
+    )
+    .await;
+
+    let controller = alice
+        .realm
+        .connect_to_protocol::<fidl_fuchsia_net_neighbor::ControllerMarker>()
+        .expect("failed to connect to Controller");
+
+    assert_eq!(
+        controller
+            .remove_entry(alice.ep.id(), &BOB_IP)
+            .await
+            .expect("remove_entry FIDL error")
+            .map_err(fuchsia_zircon::Status::from_raw),
+        Err(fuchsia_zircon::Status::NOT_FOUND)
+    );
 }
 
 #[netstack_test]
@@ -1304,6 +1348,15 @@ async fn channel_is_closed_if_not_polled<N: Netstack>(name: &str) {
             &fidl_fuchsia_net_neighbor::EntryIteratorOptions::default(),
         )
         .expect("failed to open EntryIterator");
+    // Poll at least once for the idle event to ensure that EntryIterator is
+    // actually implemented, otherwise this test passes against a netstack
+    // that doesn't expose the capability of implementing View at all.
+    assert_eq!(
+        iter.get_next().await.expect("get_next"),
+        vec![fidl_fuchsia_net_neighbor::EntryIteratorItem::Idle(
+            fidl_fuchsia_net_neighbor::IdleEvent {}
+        )]
+    );
 
     let controller = alice
         .realm

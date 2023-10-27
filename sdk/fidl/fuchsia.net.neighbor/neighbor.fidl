@@ -170,6 +170,8 @@ closed protocol Controller {
     /// + request `interface` identifier for the interface associated with the
     ///     entry to be deleted.
     /// + request `neighbor` IP address of the entry to be deleted.
+    /// * error `ZX_ERR_INVALID_ARGS` if `neighbor` is not a valid neighbor
+    ///   address.
     /// * error `ZX_ERR_NOT_FOUND` if no entries match `interface` and
     ///   `neighbor`.
     /// * error `ZX_ERR_NOT_SUPPORTED` if `interface` does not keep a neighbor

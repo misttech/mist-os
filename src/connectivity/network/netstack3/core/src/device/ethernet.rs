@@ -1583,6 +1583,15 @@ mod tests {
             unimplemented!()
         }
 
+        fn delete_neighbor(
+            &mut self,
+            _ctx: &mut FakeNonSyncCtx,
+            _device_id: &Self::DeviceId,
+            _neighbor: SpecifiedAddr<Ipv6Addr>,
+        ) -> Result<(), NotFoundError> {
+            unimplemented!()
+        }
+
         fn flush(&mut self, _ctx: &mut FakeNonSyncCtx, _device_id: &Self::DeviceId) {
             unimplemented!()
         }

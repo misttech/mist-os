@@ -197,7 +197,23 @@ pub enum StaticNeighborInsertionError {
     #[error("IP address is invalid")]
     IpAddressInvalid,
 
-    /// Loopback devices do not support neighbor entries.
+    /// The device does not support neighbor entries, e.g. loopback.
+    #[error("{0}")]
+    NotSupported(#[from] NotSupportedError),
+}
+
+/// Error when a neighbor table entry cannot be removed.
+#[derive(Debug, PartialEq, Eq, Error)]
+pub enum NeighborRemovalError {
+    /// The IP address is invalid as the address of a neighbor.
+    #[error("IP address is invalid")]
+    IpAddressInvalid,
+
+    /// Entry cannot be found.
+    #[error("{0}")]
+    NotFound(#[from] NotFoundError),
+
+    /// The device does not support neighbor entries, e.g. loopback.
     #[error("{0}")]
     NotSupported(#[from] NotSupportedError),
 }

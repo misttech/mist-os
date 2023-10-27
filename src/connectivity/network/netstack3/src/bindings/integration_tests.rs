@@ -28,6 +28,7 @@ use netstack3_core::{
         ethernet::resolve_ethernet_link_addr, insert_static_neighbor_entry,
         update_ipv6_configuration, DeviceId,
     },
+    error::AddressResolutionFailed,
     ip::{
         device::{
             nud::LinkResolutionResult, slaac::STABLE_IID_SECRET_KEY_BYTES,
@@ -1068,33 +1069,36 @@ async fn test_neighbor_table_inspect() {
 
 trait IpExt: Ip {
     const ADDR: SpecifiedAddr<Self::Addr>;
+    const PREFIX_LEN: u8;
 }
 
 impl IpExt for Ipv4 {
     const ADDR: SpecifiedAddr<Self::Addr> =
         unsafe { SpecifiedAddr::new_unchecked(net_ip_v4!("192.0.2.1")) };
+    const PREFIX_LEN: u8 = 24;
 }
 
 impl IpExt for Ipv6 {
     const ADDR: SpecifiedAddr<Self::Addr> =
         unsafe { SpecifiedAddr::new_unchecked(net_ip_v6!("2001:db8::1")) };
+    const PREFIX_LEN: u8 = 64;
 }
 
 // TODO(https://fxbug.dev/135211): Use ip_test when it supports async.
 #[fixture::teardown(TestSetup::shutdown)]
 #[fasync::run_singlethreaded(test)]
-async fn add_neighbor_entry_v4() {
-    add_neighbor_entry::<Ipv4>().await
+async fn add_remove_neighbor_entry_v4() {
+    add_remove_neighbor_entry::<Ipv4>().await
 }
 
 // TODO(https://fxbug.dev/135211): Use ip_test when it supports async.
 #[fixture::teardown(TestSetup::shutdown)]
 #[fasync::run_singlethreaded(test)]
-async fn add_neighbor_entry_v6() {
-    add_neighbor_entry::<Ipv6>().await
+async fn add_remove_neighbor_entry_v6() {
+    add_remove_neighbor_entry::<Ipv6>().await
 }
 
-async fn add_neighbor_entry<I: Ip + IpExt>() -> TestSetup {
+async fn add_remove_neighbor_entry<I: Ip + IpExt>() -> TestSetup {
     const EP_IDX: usize = 1;
     let mut t = TestSetupBuilder::new()
         .add_endpoint()
@@ -1112,12 +1116,7 @@ async fn add_neighbor_entry<I: Ip + IpExt>() -> TestSetup {
         DeviceId::Ethernet(ethernet_device_id) => ethernet_device_id
     );
     let observer = assert_matches!(
-        resolve_ethernet_link_addr::<I, _>(
-            sync_ctx,
-            non_sync_ctx,
-            &ethernet_device_id,
-            &I::ADDR
-        ),
+        resolve_ethernet_link_addr::<I, _>(sync_ctx, non_sync_ctx, &ethernet_device_id, &I::ADDR),
         LinkResolutionResult::Pending(observer) => observer
     );
     let controller = test_stack.connect_proxy::<fnet_neighbor::ControllerMarker>();
@@ -1133,6 +1132,71 @@ async fn add_neighbor_entry<I: Ip + IpExt>() -> TestSetup {
             .expect("address resolution should not be cancelled")
             .expect("address resolution should succeed after adding static entry"),
         MAC,
+    );
+
+    controller
+        .remove_entry(bindings_id.into(), &IpAddr::from(I::ADDR.get()).into_ext())
+        .await
+        .expect("remove_entry FIDL")
+        .expect("remove_entry");
+    assert_matches!(
+        resolve_ethernet_link_addr::<I, _>(sync_ctx, non_sync_ctx, &ethernet_device_id, &I::ADDR),
+        LinkResolutionResult::Pending(_)
+    );
+
+    t
+}
+
+// TODO(https://fxbug.dev/135211): Use ip_test when it supports async.
+#[fixture::teardown(TestSetup::shutdown)]
+#[fasync::run_singlethreaded(test)]
+async fn remove_dynamic_neighbor_entry_v4() {
+    remove_dynamic_neighbor_entry::<Ipv4>().await
+}
+
+// TODO(https://fxbug.dev/135211): Use ip_test when it supports async.
+#[fixture::teardown(TestSetup::shutdown)]
+#[fasync::run_singlethreaded(test)]
+async fn remove_dynamic_neighbor_entry_v6() {
+    remove_dynamic_neighbor_entry::<Ipv6>().await
+}
+
+async fn remove_dynamic_neighbor_entry<I: Ip + IpExt>() -> TestSetup {
+    const EP_IDX: usize = 1;
+    let mut t = TestSetupBuilder::new()
+        .add_endpoint()
+        .add_stack(StackSetupBuilder::new().add_endpoint(
+            EP_IDX,
+            // NB: Unfortunately AddrSubnetEither cannot be constructed with a
+            // const fn on `I`, so it must be constructed here.
+            Some(AddrSubnetEither::new(I::ADDR.get().into(), I::PREFIX_LEN).unwrap()),
+        ))
+        .build()
+        .await;
+
+    let test_stack = t.get(0);
+    let bindings_id = test_stack.get_endpoint_id(EP_IDX);
+    let mut ctx = test_stack.ctx();
+    let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
+    let devices: &Devices<_> = non_sync_ctx.as_ref();
+    let ethernet_device_id = assert_matches!(
+        devices.get_core_id(bindings_id).expect("get core id"),
+        DeviceId::Ethernet(ethernet_device_id) => ethernet_device_id
+    );
+    let observer = assert_matches!(
+        resolve_ethernet_link_addr::<I, _>(sync_ctx, non_sync_ctx, &ethernet_device_id, &I::ADDR),
+        LinkResolutionResult::Pending(observer) => observer
+    );
+
+    let controller = test_stack.connect_proxy::<fnet_neighbor::ControllerMarker>();
+    controller
+        .remove_entry(bindings_id.into(), &IpAddr::from(I::ADDR.get()).into_ext())
+        .await
+        .expect("remove_entry FIDL")
+        .expect("remove_entry");
+    assert_eq!(
+        observer.await.expect("observer should not be canceled"),
+        Err(AddressResolutionFailed)
     );
 
     t
