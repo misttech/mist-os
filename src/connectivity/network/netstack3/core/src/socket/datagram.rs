@@ -647,6 +647,14 @@ pub(crate) enum MaybeDualStack<DS, NDS> {
     NotDualStack(NDS),
 }
 
+// Implement `GenericOverIp` for a `MaybeDualStack` whose `DS` and `NDS` also
+// implement `GenericOverIp`.
+impl<I: DualStackIpExt, DS: GenericOverIp<I>, NDS: GenericOverIp<I>> GenericOverIp<I>
+    for MaybeDualStack<DS, NDS>
+{
+    type Type = MaybeDualStack<<DS as GenericOverIp<I>>::Type, <NDS as GenericOverIp<I>>::Type>;
+}
+
 impl<'a, DS, NDS> MaybeDualStack<&'a mut DS, &'a mut NDS> {
     fn to_converter<I: IpExt, C, S: DatagramSocketSpec>(
         self,
@@ -4151,7 +4159,7 @@ mod test {
     use const_unwrap::const_unwrap_option;
     use derivative::Derivative;
     use ip_test_macro::ip_test;
-    use net_types::ip::{Ip, Ipv4, Ipv6};
+    use net_types::ip::{Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
     use packet::Buf;
     use packet_formats::ip::{Ipv4Proto, Ipv6Proto};
     use test_case::test_case;
@@ -4175,8 +4183,15 @@ mod test {
 
     use super::*;
 
-    trait DatagramIpExt: Ip + IpExt + IpDeviceStateIpExt + TestIpExt {}
-    impl<I: Ip + IpExt + IpDeviceStateIpExt + TestIpExt> DatagramIpExt for I {}
+    trait DatagramIpExt:
+        Ip + IpExt + IpDeviceStateIpExt + TestIpExt + DualStackIpExt + DualStackContextsIpExt
+    {
+    }
+    impl<
+            I: Ip + IpExt + IpDeviceStateIpExt + TestIpExt + DualStackIpExt + DualStackContextsIpExt,
+        > DatagramIpExt for I
+    {
+    }
 
     #[derive(Debug)]
     enum FakeAddrSpec {}
@@ -4247,11 +4262,10 @@ mod test {
         type UnboundSharingState<I: IpExt> = Sharing;
         type SocketMapSpec<I: IpExt, D: device::WeakId> = (Self, I, D);
         type ListenerSharingState = Sharing;
-        type ListenerIpAddr<I: IpExt> = ListenerIpAddr<I::Addr, u8>;
-        type ConnIpAddr<I: IpExt> = ConnIpAddr<I::Addr, u8, char>;
+        type ListenerIpAddr<I: IpExt> = I::DualStackListenerIpAddr<u8>;
+        type ConnIpAddr<I: IpExt> = I::DualStackConnIpAddr<Self>;
         type ConnStateExtra = ();
-        type ConnState<I: IpExt, D: Debug + Eq + Hash> =
-            ConnState<I, D, Self, IpOptions<I, D, Self>>;
+        type ConnState<I: IpExt, D: Debug + Eq + Hash> = I::DualStackConnState<D, Self>;
 
         fn ip_proto<I: IpProtoExt>() -> I::Proto {
             I::map_ip((), |()| FAKE_DATAGRAM_IPV4_PROTOCOL, |()| FAKE_DATAGRAM_IPV6_PROTOCOL)
@@ -4286,8 +4300,7 @@ mod test {
         fn conn_addr_from_state<I: IpExt, D: Clone + Debug + Eq + Hash>(
             state: &Self::ConnState<I, D>,
         ) -> ConnAddr<Self::ConnIpAddr<I>, D> {
-            let ConnState { addr, .. } = state;
-            addr.clone()
+            I::conn_addr_from_state(state)
         }
     }
 
@@ -4485,10 +4498,12 @@ mod test {
         }
     }
 
-    impl<I: DatagramIpExt + IpLayerIpExt, D: FakeStrongDeviceId>
-        DatagramStateContext<I, FakeNonSyncCtx<(), (), ()>, FakeStateSpec> for FakeSyncCtx<I, D>
+    impl<I: DatagramIpExt + IpLayerIpExt>
+        DatagramStateContext<I, FakeNonSyncCtx<(), (), ()>, FakeStateSpec>
+        for FakeSyncCtx<I, FakeDeviceId>
     {
-        type SocketsStateCtx<'a> = Wrapped<FakeBoundSockets<D>, FakeInnerSyncCtx<D>>;
+        type SocketsStateCtx<'a> =
+            Wrapped<FakeBoundSockets<FakeDeviceId>, FakeInnerSyncCtx<FakeDeviceId>>;
 
         fn with_sockets_state<
             O,
@@ -4527,14 +4542,71 @@ mod test {
         }
     }
 
-    impl<I: Ip + IpExt + IpDeviceStateIpExt, D: FakeStrongDeviceId>
+    /// A test-only IpExt trait to specialize the `DualStackContext` and
+    /// `NonDualStackContext` associated types on the
+    /// `DatagramBoundStateContext`.
+    ///
+    /// This allows us to implement `DatagramBoundStateContext` for all `I`
+    /// while also assigning its associated types different values for `Ipv4`
+    /// and `Ipv6`.
+    trait DualStackContextsIpExt: Ip + DualStackIpExt {
+        type DualStackContext: DualStackDatagramBoundStateContext<
+            Self,
+            FakeNonSyncCtx<(), (), ()>,
+            FakeStateSpec,
+            DeviceId = FakeDeviceId,
+            WeakDeviceId = FakeWeakDeviceId<FakeDeviceId>,
+        >;
+        type NonDualStackContext: NonDualStackDatagramBoundStateContext<
+            Self,
+            FakeNonSyncCtx<(), (), ()>,
+            FakeStateSpec,
+            DeviceId = FakeDeviceId,
+            WeakDeviceId = FakeWeakDeviceId<FakeDeviceId>,
+        >;
+        fn dual_stack_context(
+            sync_ctx: &mut Wrapped<FakeBoundSockets<FakeDeviceId>, FakeInnerSyncCtx<FakeDeviceId>>,
+        ) -> MaybeDualStack<&mut Self::DualStackContext, &mut Self::NonDualStackContext>;
+    }
+
+    impl DualStackContextsIpExt for Ipv4 {
+        type DualStackContext = UninstantiableContext<
+            Self,
+            FakeStateSpec,
+            Wrapped<FakeBoundSockets<FakeDeviceId>, FakeInnerSyncCtx<FakeDeviceId>>,
+        >;
+        type NonDualStackContext =
+            Wrapped<FakeBoundSockets<FakeDeviceId>, FakeInnerSyncCtx<FakeDeviceId>>;
+        fn dual_stack_context(
+            sync_ctx: &mut Wrapped<FakeBoundSockets<FakeDeviceId>, FakeInnerSyncCtx<FakeDeviceId>>,
+        ) -> MaybeDualStack<&mut Self::DualStackContext, &mut Self::NonDualStackContext> {
+            MaybeDualStack::NotDualStack(sync_ctx)
+        }
+    }
+
+    impl DualStackContextsIpExt for Ipv6 {
+        type DualStackContext =
+            Wrapped<FakeBoundSockets<FakeDeviceId>, FakeInnerSyncCtx<FakeDeviceId>>;
+        type NonDualStackContext = UninstantiableContext<
+            Self,
+            FakeStateSpec,
+            Wrapped<FakeBoundSockets<FakeDeviceId>, FakeInnerSyncCtx<FakeDeviceId>>,
+        >;
+        fn dual_stack_context(
+            sync_ctx: &mut Wrapped<FakeBoundSockets<FakeDeviceId>, FakeInnerSyncCtx<FakeDeviceId>>,
+        ) -> MaybeDualStack<&mut Self::DualStackContext, &mut Self::NonDualStackContext> {
+            MaybeDualStack::DualStack(sync_ctx)
+        }
+    }
+
+    impl<I: Ip + IpExt + IpDeviceStateIpExt + DualStackContextsIpExt>
         DatagramBoundStateContext<I, FakeNonSyncCtx<(), (), ()>, FakeStateSpec>
-        for Wrapped<FakeBoundSockets<D>, FakeInnerSyncCtx<D>>
+        for Wrapped<FakeBoundSockets<FakeDeviceId>, FakeInnerSyncCtx<FakeDeviceId>>
     {
-        type IpSocketsCtx<'a> = FakeInnerSyncCtx<D>;
+        type IpSocketsCtx<'a> = FakeInnerSyncCtx<FakeDeviceId>;
         type LocalIdAllocator = ();
-        type DualStackContext = UninstantiableContext<I, FakeStateSpec, Self>;
-        type NonDualStackContext = Self;
+        type DualStackContext = I::DualStackContext;
+        type NonDualStackContext = I::NonDualStackContext;
 
         fn with_bound_sockets<
             O,
@@ -4585,19 +4657,101 @@ mod test {
         fn dual_stack_context(
             &mut self,
         ) -> MaybeDualStack<&mut Self::DualStackContext, &mut Self::NonDualStackContext> {
-            // Dual-stack operation will be tested through UDP since that's the
-            // only datagram socket type that will use it.
-            MaybeDualStack::NotDualStack(self)
+            I::dual_stack_context(self)
         }
     }
 
-    impl<I: Ip + IpExt + IpDeviceStateIpExt, D: FakeStrongDeviceId>
-        NonDualStackDatagramBoundStateContext<I, FakeNonSyncCtx<(), (), ()>, FakeStateSpec>
+    impl<D: FakeStrongDeviceId>
+        NonDualStackDatagramBoundStateContext<Ipv4, FakeNonSyncCtx<(), (), ()>, FakeStateSpec>
         for Wrapped<FakeBoundSockets<D>, FakeInnerSyncCtx<D>>
     {
         type Converter = ();
         fn converter(&self) -> Self::Converter {
             ()
+        }
+    }
+
+    impl<D: FakeStrongDeviceId>
+        DualStackDatagramBoundStateContext<Ipv6, FakeNonSyncCtx<(), (), ()>, FakeStateSpec>
+        for Wrapped<FakeBoundSockets<D>, FakeInnerSyncCtx<D>>
+    {
+        type IpSocketsCtx<'a> = FakeInnerSyncCtx<D>;
+        fn dual_stack_enabled(
+            &self,
+            _state: &impl AsRef<IpOptions<Ipv6, Self::WeakDeviceId, FakeStateSpec>>,
+        ) -> bool {
+            // For now, it's simplest to have dual-stack unconditionally enabled
+            // for datagram tests. However, in the future this could be stateful
+            // and follow an implementation similar to UDP's test fixture.
+            true
+        }
+        fn assert_dual_stack_enabled(
+            &self,
+            state: &impl AsRef<IpOptions<Ipv6, Self::WeakDeviceId, FakeStateSpec>>,
+        ) {
+            assert!(self.dual_stack_enabled(state))
+        }
+        type Converter = ();
+        fn converter(&self) -> Self::Converter {
+            ()
+        }
+
+        fn from_other_ip_addr(&self, addr: Ipv4Addr) -> Ipv6Addr {
+            addr.to_ipv6_mapped()
+        }
+
+        fn to_other_receiving_id(&self, id: Id) -> Id {
+            id
+        }
+
+        type LocalIdAllocator = ();
+        type OtherLocalIdAllocator = ();
+
+        fn with_both_bound_sockets_mut<
+            O,
+            F: FnOnce(
+                &mut Self::IpSocketsCtx<'_>,
+                &mut BoundSockets<
+                    Ipv6,
+                    Self::WeakDeviceId,
+                    FakeAddrSpec,
+                    (FakeStateSpec, Ipv6, Self::WeakDeviceId),
+                >,
+                &mut BoundSockets<
+                    Ipv4,
+                    Self::WeakDeviceId,
+                    FakeAddrSpec,
+                    (FakeStateSpec, Ipv4, Self::WeakDeviceId),
+                >,
+                &mut Self::LocalIdAllocator,
+                &mut Self::OtherLocalIdAllocator,
+            ) -> O,
+        >(
+            &mut self,
+            cb: F,
+        ) -> O {
+            let Self { ref mut outer, inner } = self;
+            let FakeBoundSockets { v4, v6 } = outer;
+            cb(inner, v6, v4, &mut (), &mut ())
+        }
+
+        fn with_other_bound_sockets_mut<
+            O,
+            F: FnOnce(
+                &mut Self::IpSocketsCtx<'_>,
+                &mut BoundSockets<
+                    Ipv4,
+                    Self::WeakDeviceId,
+                    FakeAddrSpec,
+                    (FakeStateSpec, Ipv4, Self::WeakDeviceId),
+                >,
+            ) -> O,
+        >(
+            &mut self,
+            cb: F,
+        ) -> O {
+            let Self { outer, inner } = self;
+            cb(inner, outer.as_mut())
         }
     }
 
@@ -4936,6 +5090,45 @@ mod test {
         assert!(!get_ip_transparent(&mut sync_ctx, unbound.clone()));
     }
 
+    // Translates a listener addr from the associated type to a concrete type.
+    fn convert_listener_addr<I: DualStackIpExt, LI: Clone + Debug>(
+        addr: I::DualStackListenerIpAddr<LI>,
+    ) -> MaybeDualStack<DualStackListenerIpAddr<I::Addr, LI>, ListenerIpAddr<I::Addr, LI>> {
+        #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
+        struct Wrapper<I: DualStackIpExt, LI: Clone + Debug>(I::DualStackListenerIpAddr<LI>);
+        I::map_ip(
+            Wrapper(addr),
+            |Wrapper(addr)| MaybeDualStack::NotDualStack(addr),
+            |Wrapper(addr)| MaybeDualStack::DualStack(addr),
+        )
+    }
+
+    // Translates a conn addr from the associated type to a concrete type.
+    fn convert_conn_addr<I: DualStackIpExt, S: DatagramSocketSpec>(
+        addr: I::DualStackConnIpAddr<S>,
+    ) -> MaybeDualStack<
+        DualStackConnIpAddr<
+            I::Addr,
+            <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
+            <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
+        >,
+        ConnIpAddr<
+            I::Addr,
+            <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
+            <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
+        >,
+    > {
+        #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
+        struct Wrapper<I: DualStackIpExt, S: DatagramSocketSpec>(I::DualStackConnIpAddr<S>);
+        I::map_ip(
+            Wrapper(addr),
+            |Wrapper(addr)| MaybeDualStack::NotDualStack(addr),
+            |Wrapper(addr)| MaybeDualStack::DualStack(addr),
+        )
+    }
+
     enum OriginalSocketState {
         Unbound,
         Listener,
@@ -5019,20 +5212,42 @@ mod test {
         match original {
             OriginalSocketState::Unbound => assert_matches!(info, SocketInfo::Unbound),
             OriginalSocketState::Listener => {
-                assert_matches!(
-                    info,
-                    SocketInfo::Listener(
-                        ListenerAddr { ip: ListenerIpAddr { addr: _, identifier }, device: _ }
-                    ) if identifier == LOCAL_PORT
-                )
+                let ip =
+                    assert_matches!(info, SocketInfo::Listener(ListenerAddr{ip, device: _}) => ip);
+                let identifier = match convert_listener_addr::<I, _>(ip) {
+                    MaybeDualStack::DualStack(DualStackListenerIpAddr { addr, identifier }) => {
+                        assert_matches!(
+                            addr,
+                            DualStackIpAddr::ThisStack(_),
+                            "socket unexpectedly bound in other stack"
+                        );
+                        identifier
+                    }
+                    MaybeDualStack::NotDualStack(ListenerIpAddr { addr: _, identifier }) => {
+                        identifier
+                    }
+                };
+                assert_eq!(LOCAL_PORT, identifier);
             }
             OriginalSocketState::Connected => {
-                assert_matches!(
-                    info,
-                    SocketInfo::Connected(
-                        ConnAddr { ip: ConnIpAddr { local : _, remote: (_addr, id) }, device: _ }
-                    ) if id == ORIGINAL_REMOTE_PORT
-                )
+                let ip =
+                    assert_matches!(info, SocketInfo::Connected(ConnAddr{ip, device: _}) => ip);
+                let identifier = match convert_conn_addr::<I, _>(ip) {
+                    MaybeDualStack::DualStack(addr) => match addr {
+                        DualStackConnIpAddr::ThisStack(ConnIpAddr {
+                            local: _,
+                            remote: (_addr, identifier),
+                        }) => identifier,
+                        DualStackConnIpAddr::OtherStack(_addr) => {
+                            panic!("socket unexpectedly bound in other stack")
+                        }
+                    },
+                    MaybeDualStack::NotDualStack(ConnIpAddr {
+                        local: _,
+                        remote: (_addr, identifier),
+                    }) => identifier,
+                };
+                assert_eq!(ORIGINAL_REMOTE_PORT, identifier)
             }
         }
     }

@@ -166,7 +166,8 @@ impl<A: IpAddress> ScopeableAddress for SocketIpAddr<A> {
 }
 
 /// The IP address and identifier (port) of a listening socket.
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, GenericOverIp, Hash, PartialEq)]
+#[generic_over_ip(A, IpAddress)]
 pub(crate) struct ListenerIpAddr<A: IpAddress, LI> {
     /// The specific address being listened on, or `None` for all addresses.
     pub(crate) addr: Option<SocketIpAddr<A>>,
@@ -182,7 +183,8 @@ pub(crate) struct ListenerAddr<A, D> {
 }
 
 // The IP address and identifier (port) of a connected socket.
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, GenericOverIp, Hash, PartialEq)]
+#[generic_over_ip(A, IpAddress)]
 pub(crate) struct ConnIpAddr<A: IpAddress, LI, RI> {
     pub(crate) local: (SocketIpAddr<A>, LI),
     pub(crate) remote: (SocketIpAddr<A>, RI),
@@ -208,6 +210,14 @@ where
     pub(crate) identifier: LI,
 }
 
+impl<A: IpAddress, NewIp: DualStackIpExt, LI> GenericOverIp<NewIp>
+    for DualStackListenerIpAddr<A, LI>
+where
+    A::Version: DualStackIpExt,
+{
+    type Type = DualStackListenerIpAddr<NewIp::Addr, LI>;
+}
+
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 pub(crate) enum DualStackIpAddr<A: IpAddress>
 where
@@ -225,6 +235,14 @@ where
 {
     ThisStack(ConnIpAddr<A, LI, RI>),
     OtherStack(ConnIpAddr<<<A::Version as DualStackIpExt>::OtherVersion as Ip>::Addr, LI, RI>),
+}
+
+impl<A: IpAddress, NewIp: DualStackIpExt, LI, RI> GenericOverIp<NewIp>
+    for DualStackConnIpAddr<A, LI, RI>
+where
+    A::Version: DualStackIpExt,
+{
+    type Type = DualStackConnIpAddr<NewIp::Addr, LI, RI>;
 }
 
 /// Uninstantiable type used to implement [`SocketMapAddrSpec`] for addresses
