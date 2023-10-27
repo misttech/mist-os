@@ -52,6 +52,13 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #  kernel_cmdline (optional: default: [])
 #    [list of strings] Kernel cmdline arguments.
 #
+#  configuration (optional: default: {})
+#    [GN scope] A scope of fields of configuration files provided by this board
+#    input bundle.  All are optional.
+#
+#    Fields:
+#    - power_manager: configuration for the power_manager system.
+#
 #  Outputs
 #    A directory structure and manifest
 #
@@ -230,6 +237,21 @@ template("board_input_bundle") {
       ]
     }
   }
+
+  # If configuration files for platform subsystems have been provided, then
+  # add them to the creation inputs and args.
+  if (defined(invoker.configuration)) {
+    configuration = invoker.configuration
+
+    if (defined(configuration.power_manager)) {
+      creation_inputs += [ configuration.power_manager ]
+      creation_args += [
+        "--power-manager",
+        rebase_path(configuration.power_manager),
+      ]
+    }
+  }
+
   ffx_action(labels.main_target) {
     forward_variables_from(invoker,
                            [
@@ -248,6 +270,7 @@ template("board_input_bundle") {
       "${files.bundle_dir}/packages",
       "${files.bundle_dir}/subpackages",
       "${files.bundle_dir}/blobs",
+      "${files.bundle_dir}/config",
     ]
 
     inputs = creation_inputs

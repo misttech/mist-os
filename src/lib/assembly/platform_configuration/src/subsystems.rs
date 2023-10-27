@@ -40,6 +40,7 @@ mod input_groups;
 mod intl;
 mod kernel;
 mod media;
+mod power;
 mod radar;
 mod rcs;
 mod recovery;
@@ -274,6 +275,9 @@ fn configure_subsystems(
 
     media::MediaSubsystem::define_configuration(context, &config.platform.media, builder)
         .context("Configuring the 'media' subsystem")?;
+
+    power::PowerManagementSubsystem::define_configuration(context, &(), builder)
+        .context("Configuring the 'power' subsystem")?;
 
     radar::RadarSubsystemConfig::define_configuration(context, &(), builder)
         .context("Configuring the 'radar' subsystem")?;

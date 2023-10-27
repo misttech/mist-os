@@ -730,6 +730,7 @@ mod tests {
             provided_features: vec![],
             input_bundles: vec![],
             filesystems: BoardFilesystemConfig::default(),
+            ..Default::default()
         };
     }
 

@@ -175,8 +175,16 @@ impl FileRelativePathBuf {
         }
     }
 
+    /// Use this FileRelativePathBuf as a simple Utf8PathBuf
+    pub fn as_utf8_pathbuf(&self) -> &Utf8PathBuf {
+        match self {
+            FileRelativePathBuf::FileRelative(path_in_file) => path_in_file,
+            FileRelativePathBuf::Resolved(resolved_path) => resolved_path,
+        }
+    }
+
     /// Convert this FileRelativePathBuf to a simple Utf8PathBuf
-    pub fn as_utf8_pathbuf(self) -> Utf8PathBuf {
+    pub fn to_utf8_pathbuf(self) -> Utf8PathBuf {
         match self {
             FileRelativePathBuf::FileRelative(path_in_file) => path_in_file,
             FileRelativePathBuf::Resolved(resolved_path) => resolved_path,
@@ -397,25 +405,19 @@ impl Into<FileRelativePathBufSerializationHelper> for FileRelativePathBuf {
 // form.
 impl From<FileRelativePathBuf> for Utf8PathBuf {
     fn from(value: FileRelativePathBuf) -> Self {
-        value.as_utf8_pathbuf()
+        value.to_utf8_pathbuf()
     }
 }
 
 impl AsRef<Utf8Path> for FileRelativePathBuf {
     fn as_ref(&self) -> &Utf8Path {
-        match self {
-            FileRelativePathBuf::FileRelative(path_in_file) => path_in_file.as_ref(),
-            FileRelativePathBuf::Resolved(resolved_path) => resolved_path.as_ref(),
-        }
+        self.as_utf8_pathbuf()
     }
 }
 
 impl AsRef<std::path::Path> for FileRelativePathBuf {
     fn as_ref(&self) -> &std::path::Path {
-        match self {
-            FileRelativePathBuf::FileRelative(path_in_file) => path_in_file.as_ref(),
-            FileRelativePathBuf::Resolved(resolved_path) => resolved_path.as_ref(),
-        }
+        self.as_utf8_pathbuf().as_std_path()
     }
 }
 

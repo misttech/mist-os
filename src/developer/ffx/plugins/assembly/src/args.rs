@@ -373,4 +373,8 @@ pub struct BoardInputBundleArgs {
     /// arguments to pass to the kernel on boot
     #[argh(option)]
     pub kernel_boot_args: Vec<String>,
+
+    /// power-manager configuration
+    #[argh(option)]
+    pub power_manager: Option<Utf8PathBuf>,
 }

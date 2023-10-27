@@ -68,12 +68,22 @@ pub fn set_option_once_or<T, E>(
     value: impl Into<Option<T>>,
     e: E,
 ) -> Result<(), E> {
+    set_option_once_or_else(opt, value, || e)
+}
+
+/// Helper fn to insert into an empty Option, or return an Error created by a
+/// closure.
+pub fn set_option_once_or_else<T, E, F: FnOnce() -> E>(
+    opt: &mut Option<T>,
+    value: impl Into<Option<T>>,
+    f: F,
+) -> Result<(), E> {
     let value = value.into();
     if value.is_none() {
         Ok(())
     } else {
         if opt.is_some() {
-            Err(e)
+            Err(f())
         } else {
             *opt = value;
             Ok(())

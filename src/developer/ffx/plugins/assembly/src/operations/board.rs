@@ -4,14 +4,17 @@
 
 use std::io::Write;
 
-use anyhow::{Context, Result};
-use assembly_config_schema::{BoardInputBundle, PackageDetails, PackageSet, PackagedDriverDetails};
-use assembly_file_relative_path::SupportsFileRelativePaths;
+use anyhow::{bail, Context, Result};
+use assembly_config_schema::{
+    BoardInputBundle, BoardProvidedConfig, PackageDetails, PackageSet, PackagedDriverDetails,
+};
+use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
 use assembly_package_copy::PackageCopier;
 use assembly_util as util;
 use camino::Utf8PathBuf;
 use ffx_assembly_args::BoardInputBundleArgs;
 use serde::{Deserialize, Serialize};
+use util::fast_copy;
 
 pub fn board_input_bundle(args: BoardInputBundleArgs) -> Result<()> {
     let BoardInputBundleArgs {
@@ -21,6 +24,7 @@ pub fn board_input_bundle(args: BoardInputBundleArgs) -> Result<()> {
         base_packages,
         bootfs_packages,
         kernel_boot_args,
+        power_manager,
     } = args;
     let bundle_file_path = outdir.join("board_input_bundle.json");
 
@@ -50,6 +54,7 @@ pub fn board_input_bundle(args: BoardInputBundleArgs) -> Result<()> {
     let packages_dir = outdir.join("packages");
     let subpackages_dir = outdir.join("subpackages");
     let blobstore = outdir.join("blobs");
+    let config_files_dir = outdir.join("config");
 
     std::fs::create_dir_all(&packages_dir)
         .with_context(|| format!("Creating packages directory: {}", &packages_dir))?;
@@ -57,6 +62,12 @@ pub fn board_input_bundle(args: BoardInputBundleArgs) -> Result<()> {
         .with_context(|| format!("Creating subpackages directory: {}", &subpackages_dir))?;
     std::fs::create_dir_all(&blobstore)
         .with_context(|| format!("Creating blobstore directory: {}", &blobstore))?;
+    std::fs::create_dir(&config_files_dir)
+        .with_context(|| format!("Creating config files directory: {}", &config_files_dir))?;
+
+    //========
+    // Copy the configuration files provided, if any
+    let power_manager = copy_config_file(&power_manager, "power_manager.json5", &config_files_dir)?;
 
     //========
     // Copy the drivers and packages to the outdir, writing the package manifests
@@ -109,6 +120,11 @@ pub fn board_input_bundle(args: BoardInputBundleArgs) -> Result<()> {
         drivers,
         packages,
         kernel_boot_args: kernel_boot_args.into_iter().collect(),
+        configuration: if power_manager.is_some() {
+            Some(BoardProvidedConfig { power_manager })
+        } else {
+            None
+        },
     }
     // And convert all paths to be file-relative.
     .make_paths_relative_to_file(&bundle_file_path)
@@ -168,4 +184,24 @@ fn write_depfile(
 
     depfile_writer.flush()?;
     Ok(())
+}
+
+fn copy_config_file(
+    source: &Option<Utf8PathBuf>,
+    name: &str,
+    config_files_dir: &Utf8PathBuf,
+) -> Result<Option<FileRelativePathBuf>> {
+    Ok(match source {
+        Some(src) => {
+            let dst = config_files_dir.join(name);
+            if !dst.exists() {
+                fast_copy(src, &dst)
+                    .with_context(|| format!("Copying config file from {src} to {dst}"))?;
+                Some(dst.into())
+            } else {
+                bail!("Destination file exists copying config file from {src} to {dst}");
+            }
+        }
+        None => None,
+    })
 }

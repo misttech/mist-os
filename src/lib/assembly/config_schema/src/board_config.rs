@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#![deny(missing_docs)]
+
 use std::collections::BTreeSet;
 
 use crate::common::{PackageDetails, PackagedDriverDetails};
@@ -51,6 +53,22 @@ pub struct BoardInformation {
     #[serde(default)]
     #[file_relative_paths]
     pub input_bundles: Vec<FileRelativePathBuf>,
+
+    /// Consolidated configuration from all of the BoardInputBundles.  This is
+    /// not deserialized from the BoardConfiguration, but is instead created by
+    /// parsing each of the input_bundles and merging their configuration fields.
+    #[serde(skip_deserializing)]
+    #[file_relative_paths]
+    pub configuration: BoardProvidedConfig,
+}
+
+/// This struct defines board-provided data for the 'fuchsia.hwinfo.Board' fidl
+/// protocol.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct HardwareInfo {
+    /// This is the value returned in the 'BoardInfo.name' field.
+    pub name: String,
 }
 
 /// This struct defines a bundle of artifacts that can be included by the board
@@ -69,11 +87,23 @@ pub struct BoardInputBundle {
     /// These are kernel boot arguments that are to be passed to the kernel when
     /// this bundle is included in the assembled system.
     pub kernel_boot_args: BTreeSet<String>,
+
+    /// Board-provided configuration for platform services.  Each field of this
+    /// structure can only be provided by one of the BoardInputBundles that a
+    /// BoardInformation uses.
+    #[file_relative_paths]
+    pub configuration: Option<BoardProvidedConfig>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
-pub struct HardwareInfo {
-    pub name: String,
+/// This struct defines board-provided configuration for platform services and
+/// features, used if those services are included by the product's supplied
+/// platform configuration.
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, SupportsFileRelativePaths)]
+#[serde(deny_unknown_fields)]
+pub struct BoardProvidedConfig {
+    /// Configuration for the power-manager service
+    #[file_relative_paths]
+    pub power_manager: Option<FileRelativePathBuf>,
 }
 
 #[cfg(test)]

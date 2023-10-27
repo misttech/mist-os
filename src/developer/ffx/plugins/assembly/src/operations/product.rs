@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::operations::product::assembly_builder::ImageAssemblyConfigBuilder;
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use assembly_config_schema::{
     AssemblyConfig, BoardInformation, BoardInputBundle, FeatureSupportLevel,
 };
@@ -30,20 +30,58 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
         mode,
     } = args;
 
-    info!("Loading configuration files.");
+    info!("Reading configuration files.");
     info!("  product: {}", product);
 
     let config: AssemblyConfig =
-        util::read_config(&product).context("Loading product configuration")?;
+        util::read_config(&product).context("Reading product configuration")?;
 
     let board_info_path = board_info;
     let board_info = util::read_config::<BoardInformation>(&board_info_path)
-        .context("Loading board information")?
+        .context("REading board information")?
         // and then resolve the file-relative paths to be relative to the cwd instead.
         .resolve_paths_from_file(&board_info_path)
         .context("Resolving paths in board configuration.")?;
 
-    let mut builder = ImageAssemblyConfigBuilder::new(config.platform.build_type.clone());
+    // Parse the board's Board Input Bundles, if it has them, and merge their
+    // configuration fields into that of the board_info struct.
+    let mut board_input_bundles = Vec::new();
+    for bundle_path in &board_info.input_bundles {
+        let bundle_path = bundle_path.as_utf8_pathbuf().join("board_input_bundle.json");
+        let bundle = util::read_config::<BoardInputBundle>(&bundle_path)
+            .with_context(|| format!("Reading board input bundle: {bundle_path}"))?;
+        let bundle = bundle
+            .resolve_paths_from_file(&bundle_path)
+            .with_context(|| format!("resolving paths in board input bundle: {bundle_path}"))?;
+        board_input_bundles.push((bundle_path, bundle));
+    }
+    let board_input_bundles = board_input_bundles;
+
+    // Find the Board Input Bundle that's providing the configuration files, by first finding _all_
+    // structs that aren't None, and then verifying that we only have one of them.  This is perhaps
+    // more complicated than strictly necessary to get that struct, because it collects all paths to
+    // the bundles that are providing a Some() value, and reporting them all in the error.
+    let board_configuration_files = board_input_bundles
+        .iter()
+        .filter_map(
+            |(path, bib)| if let Some(cfg) = &bib.configuration { Some((path, cfg)) } else { None },
+        )
+        .collect::<Vec<_>>();
+
+    let board_provided_config = if board_configuration_files.len() > 1 {
+        let paths = board_configuration_files
+            .iter()
+            .map(|(path, _)| format!("  - {path}"))
+            .collect::<Vec<_>>();
+        let paths = paths.join("\n");
+        bail!("Only one board input bundle can provide configuration files, found: \n{paths}");
+    } else {
+        board_configuration_files.first().map(|(_, cfg)| (*cfg).clone()).unwrap_or_default()
+    };
+
+    // Replace board_info with a new one that swaps its empty 'configuraton' field
+    // for the consolidated one created from the board's input bundles.
+    let board_info = BoardInformation { configuration: board_provided_config, ..board_info };
 
     // Get platform configuration based on the AssemblyConfig and the BoardInformation.
     let ramdisk_image = mode == PackageMode::DiskImageInZbi;
@@ -56,6 +94,10 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
         &resource_dir,
     )?;
 
+    // Now that all the configuration has been determined, create the builder
+    // and start doing the work of creating the image assembly config.
+    let mut builder = ImageAssemblyConfigBuilder::new(config.platform.build_type.clone());
+
     // Set the configuration for the rest of the packages.
     for (package, config) in configuration.package_configs {
         builder.set_package_config(package, config)?;
@@ -67,15 +109,7 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
     }
 
     // Add the board's Board Input Bundles, if it has them.
-    for bundle_path in board_info.input_bundles {
-        let bundle_path = bundle_path.as_utf8_pathbuf().join("board_input_bundle.json");
-        let bundle: BoardInputBundle = util::read_config(&bundle_path)
-            .with_context(|| format!("Loading board input bundle: {bundle_path}"))?;
-
-        let bundle = bundle
-            .resolve_paths_from_file(&bundle_path)
-            .with_context(|| format!("resolving paths in board input bundle: {bundle_path}"))?;
-
+    for (bundle_path, bundle) in board_input_bundles {
         builder
             .add_board_input_bundle(
                 bundle,
@@ -115,7 +149,7 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
 
     if let Some(package_config_path) = additional_packages_path {
         let additional_packages =
-            util::read_config(package_config_path).context("Loading additional package config")?;
+            util::read_config(package_config_path).context("Reading additional package config")?;
         builder.add_product_packages(additional_packages).context("Adding additional packages")?;
     }
 
@@ -124,6 +158,7 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
 
     // Serialize the builder state for forensic use.
     let builder_forensics_file_path = outdir.join("assembly_builder_forensics.json");
+    let board_forensics_file_path = outdir.join("board_configuration_forensics.json");
 
     if let Some(parent_dir) = builder_forensics_file_path.parent() {
         std::fs::create_dir_all(parent_dir)
@@ -136,6 +171,13 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
     serde_json::to_writer_pretty(builder_forensics_file, &builder).with_context(|| {
         format!("Writing builder forensics file to: {builder_forensics_file_path}")
     })?;
+
+    let board_forensics_file =
+        std::fs::File::create(&board_forensics_file_path).with_context(|| {
+            format!("Failed to create builder forensics files: {builder_forensics_file_path}")
+        })?;
+    serde_json::to_writer_pretty(board_forensics_file, &board_info)
+        .with_context(|| format!("Writing board forensics file to: {board_forensics_file_path}"))?;
 
     // Do the actual building of everything for the Image Assembly config.
     let mut image_assembly =

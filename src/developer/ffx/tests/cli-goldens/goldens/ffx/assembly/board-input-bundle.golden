@@ -82,6 +82,18 @@
       "short": null,
       "description": "arguments to pass to the kernel on boot",
       "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "power-manager"
+        }
+      },
+      "optionality": "optional",
+      "long": "--power-manager",
+      "short": null,
+      "description": "power-manager configuration",
+      "hidden": false
     }
   ],
   "notes": [],
