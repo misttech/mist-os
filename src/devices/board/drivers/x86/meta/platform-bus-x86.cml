@@ -18,7 +18,12 @@
         { service: "fuchsia.hardware.acpi.Service" },
     ],
     use: [
-        { protocol: "fuchsia.boot.RootResource" },
+        {
+            protocol: [
+                "fuchsia.boot.RootResource",
+                "fuchsia.kernel.IoportResource",
+            ],
+        },
         { service: "fuchsia.hardware.platform.bus.Service" },
     ],
     expose: [

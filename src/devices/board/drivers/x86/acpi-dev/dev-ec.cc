@@ -18,8 +18,7 @@ class RealIoPort : public IoPortInterface {
   void outp(uint16_t port, uint8_t value) override { ::outp(port, value); }
 
   zx_status_t Map(uint16_t port) override {
-    // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
-    return zx_ioports_request(get_root_resource(parent_), port, 1);
+    return zx_ioports_request(get_ioport_resource(parent_), port, 1);
   }
 
   explicit RealIoPort(zx_device_t* parent) : parent_(parent) {}
