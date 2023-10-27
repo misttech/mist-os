@@ -5,11 +5,8 @@
 #ifndef LIB_SYSLOG_CPP_MACROS_H_
 #define LIB_SYSLOG_CPP_MACROS_H_
 
-#if defined(__Fuchsia__)
-#include <zircon/types.h>
-#endif
-
 #include <lib/syslog/cpp/log_level.h>
+#include <zircon/types.h>
 
 #include <atomic>
 #include <functional>
@@ -268,6 +265,20 @@ class LogMessage {
 #endif
 };
 
+// LogFirstNState is used by the macro FX_SLOG_FIRST_N_SECONDS below.
+class LogEveryNSecondsState {
+ public:
+  bool ShouldLog(uint32_t n);
+  uint32_t GetCounter();
+
+ private:
+  __WEAK std::chrono::high_resolution_clock::time_point GetCurrentTime();
+  bool ShouldLogInternal(uint32_t n);
+
+  std::atomic<uint32_t> counter_{0};
+  std::chrono::high_resolution_clock::time_point last_;
+};
+
 // LogFirstNState is used by the macro FX_LOGS_FIRST_N below.
 class LogFirstNState {
  public:
@@ -340,6 +351,15 @@ bool ShouldCreateLogMessage(LogSeverity severity);
   log_statement
 #define FX_LOGS_FIRST_N(severity, n) FX_FIRST_N(n, FX_LOGS(severity))
 #define FX_LOGST_FIRST_N(severity, n, tag) FX_FIRST_N(n, FX_LOGST(severity, tag))
+
+#define FX_FIRST_N_SECS(n, log_statement)                                                 \
+  for (bool do_log = true; do_log; do_log = false)                                        \
+    for (static ::fuchsia_logging::LogEveryNSecondsState internal_state;                  \
+         do_log && internal_state.ShouldLog(n); do_log = false)                           \
+      for ([[maybe_unused]] const uint32_t COUNTER = internal_state.GetCounter(); do_log; \
+           do_log = false)                                                                \
+  log_statement
+#define FX_SLOG_EVERY_N_SECONDS(severity, n, msg...) FX_FIRST_N_SECS(n, FX_SLOG(severity, msg))
 
 #define FX_CHECK(condition) FX_CHECKT(condition, nullptr)
 

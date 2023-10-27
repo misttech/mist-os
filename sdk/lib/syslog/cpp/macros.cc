@@ -75,6 +75,32 @@ bool LogFirstNState::ShouldLog(uint32_t n) {
   return counter_value < n;
 }
 
+bool LogEveryNSecondsState::ShouldLog(uint32_t n) {
+  if (ShouldLogInternal(n)) {
+    counter_++;
+    last_ = GetCurrentTime();
+    return true;
+  }
+  return false;
+}
+
+__attribute__((weak)) std::chrono::high_resolution_clock::time_point
+LogEveryNSecondsState::GetCurrentTime() {
+  return std::chrono::steady_clock::now();
+}
+
+bool LogEveryNSecondsState::ShouldLogInternal(uint32_t n) {
+  if (counter_ == 0) {
+    return true;
+  }
+  if (std::chrono::duration_cast<std::chrono::seconds>(GetCurrentTime() - last_).count() >= n) {
+    return true;
+  }
+  return false;
+}
+
+uint32_t LogEveryNSecondsState::GetCounter() { return counter_; }
+
 uint8_t GetVlogVerbosity() {
   LogSeverity min_level = GetMinLogLevel();
   if (min_level < LOG_INFO && min_level > LOG_DEBUG) {

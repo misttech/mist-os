@@ -18,6 +18,8 @@
 #ifndef __Fuchsia__
 #include "host/encoder.h"
 #endif
+#include <zircon/types.h>
+
 #include "src/lib/files/file.h"
 #include "src/lib/files/scoped_temp_dir.h"
 #include "src/lib/uuid/uuid.h"
@@ -41,7 +43,18 @@
 #endif
 
 namespace fuchsia_logging {
+
 namespace {
+std::chrono::high_resolution_clock::time_point mock_time = std::chrono::steady_clock::now();
+}
+
+__WEAK std::chrono::high_resolution_clock::time_point LogEveryNSecondsState::GetCurrentTime() {
+  return mock_time;
+}
+
+namespace {
+
+void AdvanceClock(uint32_t seconds) { mock_time += std::chrono::seconds(seconds); }
 
 class LoggingFixture : public ::testing::Test {
  public:
@@ -367,6 +380,46 @@ TEST_F(LoggingFixture, BackendDirect) {
               testing::HasSubstr("ERROR: [foo.cc(42)] Check failed: condition. Log message\n"));
   EXPECT_THAT(log, testing::HasSubstr(
                        "ERROR: [foo.cc(42)] Check failed: condition. fake message foo=42\n"));
+}
+
+TEST_F(LoggingFixture, LogEveryN) {
+  LogSettings new_settings;
+  new_settings.wait_for_initial_interest = false;
+  EXPECT_EQ(LOG_INFO, new_settings.min_log_level);
+  LogState state = SetupLogs(new_settings);
+  int32_t counter = 0;
+  auto emit_log = [&]() {
+    FX_SLOG_EVERY_N_SECONDS(INFO, 5, "test", KV("key", counter));
+    counter++;
+  };
+  emit_log();
+  emit_log();
+  AdvanceClock(5);
+  emit_log();
+  std::string log = ReadLogs(state);
+  EXPECT_THAT(log, testing::HasSubstr("test key=0\n"));
+  EXPECT_THAT(log, testing::Not(testing::HasSubstr("test key=1\n")));
+  EXPECT_THAT(log, testing::HasSubstr("test key=2\n"));
+}
+
+TEST_F(LoggingFixture, LogEveryNWithCounter) {
+  LogSettings new_settings;
+  new_settings.wait_for_initial_interest = false;
+  EXPECT_EQ(LOG_INFO, new_settings.min_log_level);
+  LogState state = SetupLogs(new_settings);
+  int32_t counter = 0;
+  auto emit_log = [&]() {
+    FX_SLOG_EVERY_N_SECONDS(INFO, 5, "test", KV("key", COUNTER));
+    counter++;
+  };
+  emit_log();
+  emit_log();
+  AdvanceClock(5);
+  emit_log();
+  std::string log = ReadLogs(state);
+  EXPECT_THAT(log, testing::HasSubstr("test key=1\n"));
+  EXPECT_THAT(log, testing::Not(testing::HasSubstr("test key=3\n")));
+  EXPECT_THAT(log, testing::HasSubstr("test key=2\n"));
 }
 
 TEST_F(LoggingFixture, MacroCompilationTest) {
