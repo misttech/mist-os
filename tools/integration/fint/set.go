@@ -86,7 +86,7 @@ func setImpl(
 			Variants:   staticSpec.Variants,
 		},
 		// True if any toolchain is using RBE and needs reproxy to run.
-		EnableRbe: staticSpec.RustRbeEnable || staticSpec.CxxRbeEnable,
+		EnableRbe: staticSpec.RustRbeEnable || staticSpec.CxxRbeEnable || staticSpec.LinkRbeEnable,
 	}
 
 	if contextSpec.ArtifactDir != "" {
@@ -266,6 +266,7 @@ func genArgs(ctx context.Context, staticSpec *fintpb.Static, contextSpec *fintpb
 	vars["use_goma"] = staticSpec.UseGoma
 	vars["rust_rbe_enable"] = staticSpec.RustRbeEnable
 	vars["cxx_rbe_enable"] = staticSpec.CxxRbeEnable
+	vars["link_rbe_enable"] = staticSpec.LinkRbeEnable
 
 	if staticSpec.Product != "" {
 		basename := filepath.Base(staticSpec.Product)

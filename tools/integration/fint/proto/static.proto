@@ -206,4 +206,7 @@ message Static {
   // :default ninja target, but are not added to the product, or any published
   // package sets.
   repeated string build_only_labels = 42;
+
+  // If true, link C/C++ targets remotely with RBE/reclient.
+  bool link_rbe_enable = 43;
 }
