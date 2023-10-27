@@ -64,12 +64,6 @@ class FFXTransportTests(fuchsia_base_test.FuchsiaBaseTest):
 
     def test_get_target_type(self) -> None:
         """Test case for FFX.get_target_type()."""
-        # TODO(b/293640613): uncomment after landing qemu-x64 switch to x64
-        asserts.skip(
-            reason="TODO(b/293640613): uncomment this after landing "
-            "qemu-x64 switch to x64"
-        )
-
         assert isinstance(self.device, transports_capable.FFXCapableDevice)
         target_type: str = self.device.ffx.get_target_type()
         # Note - If "target_type" is specified in "expected_values" in
