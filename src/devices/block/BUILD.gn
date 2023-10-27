@@ -21,6 +21,7 @@ group("drivers") {
     "drivers/ramdisk",
     "drivers/sdhci",
     "drivers/sdmmc",
+    "drivers/sdmmc-dfv1",
     "drivers/ufs",
     "drivers/ums-function",
     "drivers/usb-mass-storage",
