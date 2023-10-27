@@ -278,9 +278,7 @@ zx::result<fidl::ClientEnd<fuchsia_device::Controller>> TryBindToFvmDriver(
     return zx::error(result.value().error_value());
   }
 
-  auto fvm_controller_path = std::string(kFvmName) + "/device_controller";
-  zx::result channel =
-      device_watcher::RecursiveWaitForFile(dirfd(dir), fvm_controller_path.c_str(), timeout);
+  zx::result channel = device_watcher::RecursiveWaitForFile(dirfd(dir), kFvmName, timeout);
   if (channel.is_error()) {
     ERROR("Error waiting for fvm driver to bind: %s\n", channel.status_string());
     return channel.take_error();

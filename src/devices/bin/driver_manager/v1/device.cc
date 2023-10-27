@@ -457,32 +457,28 @@ Devnode::Target Device::MakeDevfsTarget() {
   if (!device_controller_.is_valid()) {
     return Devnode::Target();
   }
-  return Devnode::PassThrough(
-      fuchsia_device_fs::ConnectionType::kDevice | fuchsia_device_fs::ConnectionType::kNode,
-      [controller = device_controller_.Clone()](zx::channel connection,
-                                                fuchsia_device_fs::ConnectionType type) {
-        if (!controller.is_valid()) {
-          return ZX_ERR_NOT_SUPPORTED;
-        }
+  return Devnode::PassThrough([controller = device_controller_.Clone()](
+                                  zx::channel connection, fuchsia_device_fs::ConnectionType type) {
+    if (!controller.is_valid()) {
+      return ZX_ERR_NOT_SUPPORTED;
+    }
 
-        const bool include_node(type & fuchsia_device_fs::ConnectionType::kNode);
-        const bool include_controller(type & fuchsia_device_fs::ConnectionType::kController);
-        const bool include_device(type & fuchsia_device_fs::ConnectionType::kDevice);
+    const bool include_node(type & fuchsia_device_fs::ConnectionType::kNode);
+    const bool include_controller(type & fuchsia_device_fs::ConnectionType::kController);
+    const bool include_device(type & fuchsia_device_fs::ConnectionType::kDevice);
 
-        if (include_controller && !include_device && !include_node) {
-          return controller
-              ->ConnectToController(
-                  fidl::ServerEnd<fuchsia_device::Controller>(std::move(connection)))
-              .status();
-        }
-        if (!include_controller && include_device && !include_node) {
-          return controller->ConnectToDeviceProtocol(std::move(connection)).status();
-        }
+    if (include_controller && !include_device && !include_node) {
+      return controller
+          ->ConnectToController(fidl::ServerEnd<fuchsia_device::Controller>(std::move(connection)))
+          .status();
+    }
+    if (!include_controller && include_device && !include_node) {
+      return controller->ConnectToDeviceProtocol(std::move(connection)).status();
+    }
 
-        return controller
-            ->ConnectMultiplexed(std::move(connection), include_node, include_controller)
-            .status();
-      });
+    return controller->ConnectMultiplexed(std::move(connection), include_node, include_controller)
+        .status();
+  });
 }
 
 zx_status_t Device::SignalReadyForBind(zx::duration delay) {

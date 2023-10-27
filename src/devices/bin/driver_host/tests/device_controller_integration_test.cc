@@ -271,8 +271,7 @@ TEST_F(DeviceControllerIntegrationTest, TestUnbindChildrenSuccess) {
   {
     // Call |UnbindChildren| on the child, which has no children.
     zx::result channel = device_watcher::RecursiveWaitForFile(
-        devmgr.devfs_root().get(),
-        "sys/platform/11:0e:0/devhost-test-parent/devhost-test-child/device_controller");
+        devmgr.devfs_root().get(), "sys/platform/11:0e:0/devhost-test-parent/devhost-test-child");
     ASSERT_OK(channel.status_value());
 
     fidl::ClientEnd<fuchsia_device::Controller> child_channel{std::move(channel.value())};

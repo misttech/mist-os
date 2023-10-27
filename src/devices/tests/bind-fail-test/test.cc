@@ -31,8 +31,8 @@ TEST(BindFailTest, BindFail) {
 
   fidl::ClientEnd<fuchsia_device::Controller> client_end;
   {
-    zx::result channel = device_watcher::RecursiveWaitForFile(devmgr.value().devfs_root().get(),
-                                                              "sys/test/test/device_controller");
+    zx::result channel =
+        device_watcher::RecursiveWaitForFile(devmgr.value().devfs_root().get(), "sys/test/test");
     ASSERT_OK(channel);
     client_end.channel() = std::move(channel.value());
   }

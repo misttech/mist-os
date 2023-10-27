@@ -353,6 +353,11 @@ zx_status_t Devnode::add_child(std::string_view name, std::optional<std::string_
       }
 
       target->default_connection_type -= fuchsia_device_fs::ConnectionType::kController;
+    } else {
+      // TODO(https://fxbug.dev/112484): Remove this multiplexing after clients have migrated.
+      target->default_connection_type |=
+          fuchsia_device_fs::ConnectionType::kNode |
+          fuchsia_device_fs::ConnectionType::kController;
     }
   }
 
