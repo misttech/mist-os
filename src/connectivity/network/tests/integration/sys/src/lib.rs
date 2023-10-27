@@ -304,11 +304,14 @@ where
             .expect("snapshot failed")
             .into_iter()
             .filter_map(|v| v.payload)
-            .next()
-            .expect("no payload in snapshot");
+            .next();
+        if *tag == persistence_config::Tag::new("sockets".into()).unwrap() {
+            assert_eq!(inspect_payload, None);
+            continue;
+        }
 
         // Assert on payload.
-        validate_payload(inspect_payload, tag, tag_config);
+        validate_payload(inspect_payload.expect("no payload in snapshot"), tag, tag_config);
     }
 }
 

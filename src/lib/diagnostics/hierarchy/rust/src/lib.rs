@@ -997,7 +997,7 @@ where
     node.children.retain_mut(|child| filter_hierarchy_helper(child, &child_matchers));
     node.properties.retain_mut(|prop| eval_matchers_on_property(prop.name(), &child_matchers));
 
-    true
+    !(node.children.is_empty() && node.properties.is_empty())
 }
 
 fn eval_matchers_on_node_name<'a>(
@@ -1765,16 +1765,12 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_filter_includes_empty_node() {
+    fn test_filter_does_not_include_empty_node() {
         let test_selectors = vec!["*:root/foo:blorg"];
 
         assert_eq!(
             parse_selectors_and_filter_hierarchy(get_test_hierarchy(), test_selectors),
-            Some(DiagnosticsHierarchy::new(
-                "root",
-                vec![],
-                vec![DiagnosticsHierarchy::new("foo", vec![], vec![],)],
-            ))
+            None,
         );
     }
 
@@ -1856,11 +1852,11 @@ mod tests {
             Some(empty_hierarchy.clone())
         );
 
-        // Selecting a property on the root, even if it doesn't exist, should produce the empty tree.
+        // Selecting a property on the root, even if it doesn't exist, should produce nothing.
         let fake_property_selector = vec!["*:root:blorp"];
         assert_eq!(
             parse_selectors_and_filter_hierarchy(empty_hierarchy.clone(), fake_property_selector),
-            Some(empty_hierarchy)
+            None,
         );
     }
 
@@ -1933,5 +1929,16 @@ mod tests {
                 ]
             )
         );
+    }
+
+    #[fuchsia::test]
+    fn filter_hierarchy_doesnt_return_partial_matches() {
+        let hierarchy = DiagnosticsHierarchy::new(
+            "root",
+            vec![],
+            vec![DiagnosticsHierarchy::new("session_started_at", vec![], vec![])],
+        );
+        let test_selectors = vec!["*:root/session_started_at/0"];
+        assert_eq!(parse_selectors_and_filter_hierarchy(hierarchy, test_selectors), None);
     }
 }
