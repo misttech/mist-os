@@ -19,6 +19,7 @@ go_library("serial") {
     "//third_party/golibs:golang.org/x/sys",
     "//tools/lib/iomisc",
     "//tools/lib/logger",
+    "//tools/lib/syslog",
   ]
 }
 

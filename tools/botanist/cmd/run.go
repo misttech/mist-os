@@ -581,7 +581,7 @@ func (r *RunCommand) dumpSyslogOverSerial(ctx context.Context, socketPath string
 	// Dump the existing syslog buffer. This may not work if pkg-resolver is not
 	// up yet, in which case it will just print nothing.
 	cmds := []serial.Command{
-		{Cmd: []string{syslog.LogListener, "--dump_logs", "yes"}, SleepDuration: 5 * time.Second},
+		{Cmd: syslog.LogListenerWithArgs("--dump_logs", "yes"), SleepDuration: 5 * time.Second},
 	}
 	if err := serial.RunCommands(ctx, socket, cmds); err != nil {
 		return fmt.Errorf("failed to dump syslog over serial: %w", err)

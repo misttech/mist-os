@@ -36,6 +36,10 @@ type sshClient interface {
 	ReconnectWithBackoff(context.Context, retry.Backoff) error
 }
 
+func LogListenerWithArgs(args ...string) []string {
+	return append([]string{LogListener, "--no-color"}, args...)
+}
+
 // NewSyslogger creates a new Syslogger, given an SSH session with a Fuchsia instance.
 func NewSyslogger(client *sshutil.Client) *Syslogger {
 	return &Syslogger{
@@ -64,7 +68,7 @@ func (s *Syslogger) Stream(ctx context.Context, output io.Writer) <-chan error {
 		}
 		errs <- err
 	}
-	cmd := []string{LogListener}
+	cmd := LogListenerWithArgs()
 	s.running = true
 	go func() {
 		for {
@@ -77,7 +81,7 @@ func (s *Syslogger) Stream(ctx context.Context, output io.Writer) <-chan error {
 					logger.Debugf(ctx, "log_listener exited successfully, will rerun")
 					// Don't stream from the beginning of the system's uptime, since
 					// that would include logs that we've already streamed.
-					cmd = []string{LogListener, "--since_now", "yes"}
+					cmd = LogListenerWithArgs("--since_now", "yes")
 					continue
 				}
 			}
@@ -109,7 +113,7 @@ func (s *Syslogger) Stream(ctx context.Context, output io.Writer) <-chan error {
 			}
 			// Start streaming from the beginning of the system's uptime again now that
 			// we're rebooting.
-			cmd = []string{LogListener}
+			cmd = LogListenerWithArgs()
 			logger.Infof(ctx, "syslog: refreshed ssh connection")
 			io.WriteString(output, "\n\n<< SYSLOG STREAM INTERRUPTED; RECONNECTING NOW >>\n\n")
 			sendErr(errs, err)

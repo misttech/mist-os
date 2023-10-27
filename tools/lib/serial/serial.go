@@ -17,6 +17,7 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/lib/iomisc"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 	"go.fuchsia.dev/fuchsia/tools/lib/serial/constants"
+	"go.fuchsia.dev/fuchsia/tools/lib/syslog"
 )
 
 const (
@@ -42,7 +43,7 @@ var diagnosticCmds = []Command{
 	// Print netstack goroutines while only using shell-builtin commands to
 	// avoid hitting the package resolver.
 	{[]string{`(export PATH=; export P="$(component explore /core/network/netstack -c \"cat out/debug/goroutines\")" && test -e "$P" && while IFS='' read line; do echo "$line"; done < "$P";) &`}, 1 * time.Minute},
-	{[]string{"/bin/log_listener", "--dump_logs", "yes"}, 1 * time.Minute},
+	{syslog.LogListenerWithArgs("--dump_logs", "yes"), 1 * time.Minute},
 }
 
 type SerialSocket struct {
