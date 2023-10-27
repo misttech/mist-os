@@ -58,8 +58,7 @@ class FuchsiaHybridBaseTest(fuchsia_base_test.FuchsiaBaseTest):
             "run",
             self.ffx_test_url,
         ] + self.ffx_test_options
-        output = self.dut.ffx.run(cmd, timeout=self.timeout_sec)
-        _LOGGER.info(output)
+        self.dut.ffx.run(cmd, timeout=self.timeout_sec, capture_output=False)
 
 
 if __name__ == "__main__":
