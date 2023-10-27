@@ -343,7 +343,7 @@ async fn connection_test_with_injected_route() {
         let new_peer = new_peers.next().await.unwrap();
         assert_eq!("router", &new_peer);
 
-        a.route_via("b", "router").await;
+        a.route_via("b", "router");
 
         let (_reader, peer_writer) = stream::stream();
         let (peer_reader, writer) = stream::stream();

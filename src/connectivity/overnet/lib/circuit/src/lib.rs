@@ -6,13 +6,12 @@ use fuchsia_async::Timer;
 use futures::channel::mpsc::{Sender, UnboundedSender};
 use futures::channel::oneshot;
 use futures::future::Either;
-use futures::lock::Mutex;
 use futures::stream::StreamExt as _;
 use futures::FutureExt;
 use futures::SinkExt as _;
 use std::collections::HashMap;
 use std::future::Future;
-use std::sync::{Arc, Weak};
+use std::sync::{Arc, Mutex, Weak};
 use std::time::Duration;
 
 pub const CIRCUIT_VERSION: u8 = 0;
@@ -241,10 +240,10 @@ impl Node {
 
     /// Test function to copy all routes toward one node as routes to another node.
     #[cfg(test)]
-    pub async fn route_via(&self, to: &str, via: &str) {
+    pub fn route_via(&self, to: &str, via: &str) {
         let to = EncodableString::try_from(to.to_owned()).unwrap();
         let via = EncodableString::try_from(via.to_owned()).unwrap();
-        let mut peers = self.peers.lock().await;
+        let mut peers = self.peers.lock().unwrap();
         let new_list = peers.peers.get(&via).unwrap().clone();
         peers.peers.insert(to, new_list);
     }
@@ -326,7 +325,7 @@ impl Node {
             if has_router {
                 peers
                     .lock()
-                    .await
+                    .unwrap()
                     .add_control_channel(control_writer, quality)
                     .expect("We just created this channel!");
             } else {
@@ -361,7 +360,7 @@ impl Node {
             };
 
             {
-                let mut peers = peers.lock().await;
+                let mut peers = peers.lock().unwrap();
                 let peers = peers.peers();
                 for peer_list in peers.values_mut() {
                     peer_list.retain(|x| !x.0.same_receiver(&new_stream_sender));
@@ -406,7 +405,7 @@ impl Node {
                         let quality = path_quality.combine(quality);
                         let peer_string = peer.to_string();
                         let should_send = {
-                            let mut peers = peers.lock().await;
+                            let mut peers = peers.lock().unwrap();
                             let peers = peers.peers();
                             let peer_list = peers.entry(peer).or_insert_with(Vec::new);
                             let should_send = peer_list.is_empty();
@@ -420,7 +419,7 @@ impl Node {
                         }
                     }
                     NodeState::Offline(peer) => {
-                        let mut peers = peers.lock().await;
+                        let mut peers = peers.lock().unwrap();
                         let peers = peers.peers();
                         let peer_list = peers.get_mut(&peer);
 
@@ -492,7 +491,7 @@ impl Node {
                         } else {
                             let src = reader.read_protocol_message::<EncodableString>().await?;
                             let send_new_peer = {
-                                let mut peers = peers.lock().await;
+                                let mut peers = peers.lock().unwrap();
                                 let peer_list =
                                     peers.peers.entry(src.clone()).or_insert_with(Vec::new);
                                 if !peer_list.iter().any(|x| x.0.same_receiver(&new_stream_sender))
@@ -534,14 +533,14 @@ async fn connect_to_peer(
     peer_writer: stream::Writer,
     node_id: &EncodableString,
 ) -> Result<()> {
-    let mut peers_lock = peers.lock().await;
-    let peers = &mut peers_lock.peers;
+    let mut peers = peers.lock().unwrap();
 
     // For each peer we have a list of channels to which we can send our reader and writer, each
     // representing a connection which will become the next link in the circuit. The list is sorted
     // by connection quality, getting worse toward the end of the list, so we want to send our
     // reader and writer to the first one we can.
-    let peer_list = peers.get_mut(node_id).ok_or_else(|| Error::NoSuchPeer(node_id.to_string()))?;
+    let peer_list =
+        peers.peers.get_mut(node_id).ok_or_else(|| Error::NoSuchPeer(node_id.to_string()))?;
 
     let mut peer_channels = Some((peer_reader, peer_writer));
     let mut changed = false;
@@ -567,7 +566,7 @@ async fn connect_to_peer(
     // If this is true, we cleared out some stale connections from the routing table. Send a routing
     // update to update our neighbors about how this might affect connectivity.
     if changed {
-        peers_lock.increment_generation();
+        peers.increment_generation();
     }
 
     // Our iteration above should have taken channels and sent them along to the connection that
@@ -620,7 +619,7 @@ async fn router(peers: Weak<Mutex<PeerMap>>, interval: Duration) {
             } else {
                 return;
             };
-            let mut peers = peers.lock().await;
+            let mut peers = peers.lock().unwrap();
 
             if peers.generation <= generation {
                 let (sender, receiver) = oneshot::channel();
