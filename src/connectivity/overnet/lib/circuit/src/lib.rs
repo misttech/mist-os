@@ -5,13 +5,14 @@
 use fuchsia_async::Timer;
 use futures::channel::mpsc::{Sender, UnboundedSender};
 use futures::channel::oneshot;
-use futures::future::Either;
+use futures::future::{poll_fn, Either};
 use futures::stream::StreamExt as _;
 use futures::FutureExt;
 use futures::SinkExt as _;
 use std::collections::HashMap;
 use std::future::Future;
 use std::sync::{Arc, Mutex, Weak};
+use std::task::Poll;
 use std::time::Duration;
 
 pub const CIRCUIT_VERSION: u8 = 0;
@@ -526,51 +527,78 @@ impl Node {
     }
 }
 
-/// Given the reader and writer for an incoming connection, forward that connection to another node.
+/// Given the reader and writer for an incoming connection, forward that
+/// connection to another node.
 async fn connect_to_peer(
     peers: Arc<Mutex<PeerMap>>,
     peer_reader: stream::Reader,
     peer_writer: stream::Writer,
     node_id: &EncodableString,
 ) -> Result<()> {
-    let mut peers = peers.lock().unwrap();
-
-    // For each peer we have a list of channels to which we can send our reader and writer, each
-    // representing a connection which will become the next link in the circuit. The list is sorted
-    // by connection quality, getting worse toward the end of the list, so we want to send our
-    // reader and writer to the first one we can.
-    let peer_list =
-        peers.peers.get_mut(node_id).ok_or_else(|| Error::NoSuchPeer(node_id.to_string()))?;
-
     let mut peer_channels = Some((peer_reader, peer_writer));
-    let mut changed = false;
 
-    // Go through each potential connection and send to the first one which will handle the
-    // connection. We may discover the first few we try have hung up and gone away, so we'll delete
-    // those from the list and try the next one.
-    peer_list.retain_mut(|x| {
-        if let Some((peer_reader, peer_writer)) = peer_channels.take() {
-            match x.0.unbounded_send((peer_reader, peer_writer)) {
-                Ok(()) => true,
-                Err(e) => {
-                    changed = true;
-                    peer_channels = Some(e.into_inner());
-                    false
+    poll_fn(|ctx| {
+        let mut peers = peers.lock().unwrap();
+
+        // For each peer we have a list of channels to which we can send our
+        // reader and writer, each representing a connection which will become
+        // the next link in the circuit. The list is sorted by connection
+        // quality, getting worse toward the end of the list, so we want to send
+        // our reader and writer to the first one we can.
+        let Some(peer_list) = peers.peers.get_mut(node_id) else {
+            return Poll::Ready(());
+        };
+
+        let mut changed = false;
+        let mut ret = Poll::Ready(());
+
+        // Go through each potential connection and send to the first one which
+        // will handle the connection. We may discover the first few we try have
+        // hung up and gone away, so we'll delete those from the list and try
+        // the next one.
+        //
+        // If the channel used to send to the fastest available connection is
+        // full, we pause and retry when it is ready. We *could* continue down
+        // the list to find another connection, but we don't; we assume waiting
+        // for a faster connection to be serviceable locally nets better
+        // performance in the long run than sending on a slower connection that
+        // can be serviced right away.
+        peer_list.retain_mut(|x| {
+            if peer_channels.is_some() && ret.is_ready() {
+                match x.0.poll_ready(ctx) {
+                    Poll::Ready(Ok(())) => {
+                        x.0.start_send(peer_channels.take().unwrap())
+                            .expect("Should be guaranteed to succeed!");
+                        true
+                    }
+                    Poll::Ready(Err(_)) => {
+                        changed = true;
+                        false
+                    }
+                    Poll::Pending => {
+                        ret = Poll::Pending;
+                        true
+                    }
                 }
+            } else {
+                true
             }
-        } else {
-            true
+        });
+
+        // If this is true, we cleared out some stale connections from the
+        // routing table. Send a routing update to update our neighbors about
+        // how this might affect connectivity.
+        if changed {
+            peers.increment_generation();
         }
-    });
 
-    // If this is true, we cleared out some stale connections from the routing table. Send a routing
-    // update to update our neighbors about how this might affect connectivity.
-    if changed {
-        peers.increment_generation();
-    }
+        ret
+    })
+    .await;
 
-    // Our iteration above should have taken channels and sent them along to the connection that
-    // will handle them. If they're still here we didn't find a channel.
+    // Our iteration above should have taken channels and sent them along to the
+    // connection that will handle them. If they're still here we didn't find a
+    // channel.
     if peer_channels.is_none() {
         Ok(())
     } else {
@@ -578,8 +606,8 @@ async fn connect_to_peer(
     }
 }
 
-/// Given an old and a new condensed routing table, create a serialized list of `NodeState`s which
-/// will update a node on what has changed between them.
+/// Given an old and a new condensed routing table, create a serialized list of
+/// `NodeState`s which will update a node on what has changed between them.
 fn route_updates(
     old_routes: &HashMap<EncodableString, Quality>,
     new_routes: &HashMap<EncodableString, Quality>,

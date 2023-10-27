@@ -116,6 +116,20 @@ async fn connect_nodes(a: &Node, b: &Node) -> impl std::future::Future<Output = 
 }
 
 #[fuchsia::test]
+async fn connect_to_nonexistent_peer() {
+    let (new_peer_sender_a, _new_peers) = channel(100);
+    let (incoming_streams_sender_a, _streams_a) = channel(100);
+    let a = Node::new("a", "test", new_peer_sender_a, incoming_streams_sender_a).unwrap();
+
+    let (_reader, peer_writer) = stream::stream();
+    let (peer_reader, _writer) = stream::stream();
+    match a.connect_to_peer(peer_reader, peer_writer, "b").await {
+        Err(Error::NoSuchPeer(peer)) => assert_eq!("b", &peer),
+        other => panic!("Unexpected result {other:?}!"),
+    }
+}
+
+#[fuchsia::test]
 async fn connection_test() {
     let (new_peer_sender_a, mut new_peers) = channel(1);
     let (new_peer_sender_b, _new_peers_b) = channel(100);
