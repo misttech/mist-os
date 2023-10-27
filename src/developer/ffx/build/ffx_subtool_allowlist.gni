@@ -24,7 +24,6 @@ ffx_subtool_fidl_allowlist = [
 
   # ffx driver
   "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development",
-  "//sdk/fidl/fuchsia.driver.index:fuchsia.driver.index",
   "//sdk/fidl/fuchsia.driver.legacy:fuchsia.driver.legacy",
   "//sdk/fidl/fuchsia.driver.playground:fuchsia.driver.playground",
   "//sdk/fidl/fuchsia.driver.registrar:fuchsia.driver.registrar",
@@ -80,10 +79,6 @@ ffx_subtool_fidl_allowlist = [
 
   # used by ffx fuchsia.developer.ffx
   "//sdk/fidl/fuchsia.tracing.controller:fuchsia.tracing.controller",
-
-  # used by ffx guest
-  "//sdk/fidl/fuchsia.virtualization:fuchsia.virtualization",
-  "//sdk/fidl/fuchsia.wayland:fuchsia.wayland",
 
   # used by ffx net-test-realm
   "//src/connectivity/network/testing/network-test-realm/fidl:fuchsia.net.test.realm",
