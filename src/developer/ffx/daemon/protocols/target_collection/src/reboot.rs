@@ -3,33 +3,32 @@
 // found in the LICENSE file.
 
 use addr::TargetAddr;
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, Result};
 use async_utils::async_once::Once;
-use ffx_daemon_events::TargetConnectionState;
+use ffx_daemon_events::{FastbootInterface, TargetConnectionState};
 use ffx_daemon_target::{
-    fastboot::Fastboot,
     target::Target,
     zedboot::{reboot, reboot_to_bootloader, reboot_to_recovery},
 };
+use ffx_fastboot::common::fastboot::{
+    ConnectionFactory, FastbootConnectionFactory, FastbootConnectionKind,
+};
+use ffx_fastboot::common::fastboot_interface::RebootEvent;
 use ffx_ssh::ssh::get_ssh_key_paths;
-use fidl::{
-    endpoints::{DiscoverableProtocolMarker as _, ServerEnd},
-    Error,
-};
-use fidl_fuchsia_developer_ffx::{
-    self as ffx, RebootListenerRequest, TargetRebootError, TargetRebootResponder, TargetRebootState,
-};
+use fidl::{endpoints::DiscoverableProtocolMarker as _, Error};
+use fidl_fuchsia_developer_ffx::{TargetRebootError, TargetRebootResponder, TargetRebootState};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_hardware_power_statecontrol::{AdminMarker, AdminProxy, RebootReason};
 use fidl_fuchsia_io::OpenFlags;
 use fidl_fuchsia_sys2 as fsys;
-use futures::{try_join, TryFutureExt, TryStreamExt};
-use std::net::IpAddr;
+use futures::TryFutureExt;
+use std::net::{IpAddr, SocketAddr};
 use std::process::Command;
 use std::rc::Rc;
 use std::rc::Weak;
 use std::sync::Arc;
-use tasks::TaskManager;
+use tokio::sync::mpsc;
+use tokio::sync::mpsc::{Receiver, Sender};
 
 // TODO(125639): Remove when Power Manager stabilizes
 /// Configuration flag which enables using `dm` over ssh to reboot the target
@@ -41,10 +40,9 @@ const ADMIN_MONIKER: &'static str = "/bootstrap/shutdown_shim";
 pub(crate) struct RebootController {
     target: Rc<Target>,
     remote_proxy: Once<RemoteControlProxy>,
-    fastboot_proxy: Once<ffx::FastbootProxy>,
     admin_proxy: Once<AdminProxy>,
-    tasks: TaskManager,
     overnet_node: Arc<overnet_core::Router>,
+    fastboot_connection_builder: Box<dyn FastbootConnectionFactory>,
 }
 
 impl RebootController {
@@ -52,10 +50,9 @@ impl RebootController {
         Self {
             target,
             remote_proxy: Once::new(),
-            fastboot_proxy: Once::new(),
             admin_proxy: Once::new(),
-            tasks: Default::default(),
             overnet_node,
+            fastboot_connection_builder: Box::new(ConnectionFactory {}),
         }
     }
 
@@ -67,10 +64,6 @@ impl RebootController {
             .get_or_try_init(self.target.init_remote_proxy(&self.overnet_node))
             .await
             .map(|proxy| proxy.clone())
-    }
-
-    async fn get_fastboot_proxy(&self) -> Result<ffx::FastbootProxy> {
-        self.fastboot_proxy.get_or_try_init(self.fastboot_init()).await.map(|p| p.clone())
     }
 
     async fn get_admin_proxy(&self) -> Result<AdminProxy> {
@@ -94,30 +87,6 @@ impl RebootController {
             .map_err(|_| anyhow!("could not get admin proxy"))
     }
 
-    async fn fastboot_init(&self) -> Result<ffx::FastbootProxy> {
-        let (proxy, fastboot) = fidl::endpoints::create_proxy::<ffx::FastbootMarker>()?;
-        self.spawn_fastboot(fastboot).await?;
-        Ok(proxy)
-    }
-
-    #[tracing::instrument(skip(self))]
-    pub(crate) async fn spawn_fastboot(
-        &self,
-        fastboot: ServerEnd<ffx::FastbootMarker>,
-    ) -> Result<()> {
-        let mut fastboot_manager = Fastboot::new(self.target.clone());
-        let stream = fastboot.into_stream()?;
-        let overnet_node = Arc::clone(&self.overnet_node);
-        self.tasks.spawn(async move {
-            match fastboot_manager.handle_fastboot_requests_from_stream(stream, &overnet_node).await
-            {
-                Ok(_) => tracing::trace!("Fastboot proxy finished - client disconnected"),
-                Err(e) => tracing::error!("Handling fastboot requests: {:?}", e),
-            }
-        });
-        Ok(())
-    }
-
     #[tracing::instrument(skip(self))]
     pub(crate) async fn reboot(
         &self,
@@ -127,7 +96,43 @@ impl RebootController {
         match self.target.get_connection_state() {
             TargetConnectionState::Fastboot(_) => match state {
                 TargetRebootState::Product => {
-                    match self.get_fastboot_proxy().await?.reboot().await? {
+                    let mut fastboot_interface = match self
+                        .target
+                        .fastboot_interface()
+                        .ok_or(anyhow!("No fastboot interface"))?
+                    {
+                        FastbootInterface::Tcp => {
+                            let address: SocketAddr = self
+                                .target
+                                .fastboot_address()
+                                .ok_or_else(|| anyhow!("No fastboot address"))?
+                                .0
+                                .into();
+                            self.fastboot_connection_builder
+                                .build_interface(FastbootConnectionKind::Tcp(address))
+                                .await?
+                        }
+                        FastbootInterface::Udp => {
+                            let address: SocketAddr = self
+                                .target
+                                .fastboot_address()
+                                .ok_or_else(|| anyhow!("No fastboot address"))?
+                                .0
+                                .into();
+                            self.fastboot_connection_builder
+                                .build_interface(FastbootConnectionKind::Udp(address))
+                                .await?
+                        }
+                        FastbootInterface::Usb => {
+                            let serial =
+                                self.target.serial().ok_or_else(|| anyhow!("No serial number"))?;
+                            self.fastboot_connection_builder
+                                .build_interface(FastbootConnectionKind::Usb(serial))
+                                .await?
+                        }
+                    };
+
+                    match fastboot_interface.reboot().await {
                         Ok(_) => responder.send(Ok(())).map_err(Into::into),
                         Err(e) => {
                             tracing::error!("Fastboot communication error: {:?}", e);
@@ -138,23 +143,48 @@ impl RebootController {
                     }
                 }
                 TargetRebootState::Bootloader => {
-                    let (reboot_client, reboot_server) =
-                        fidl::endpoints::create_endpoints::<ffx::RebootListenerMarker>();
-                    let mut stream = reboot_server.into_stream()?;
-                    match try_join!(
-                        self.get_fastboot_proxy().await?.reboot_bootloader(reboot_client).map_err(
-                            |e| anyhow!("fidl error when rebooting to bootloader: {:?}", e)
-                        ),
-                        async move {
-                            if let Some(RebootListenerRequest::OnReboot { control_handle: _ }) =
-                                stream.try_next().await?
-                            {
-                                Ok(())
-                            } else {
-                                bail!("Did not receive reboot signal");
-                            }
+                    let (reboot_client, _reboot_server): (
+                        Sender<RebootEvent>,
+                        Receiver<RebootEvent>,
+                    ) = mpsc::channel(1);
+
+                    let mut fastboot_interface = match self
+                        .target
+                        .fastboot_interface()
+                        .ok_or(anyhow!("No fastboot interface"))?
+                    {
+                        FastbootInterface::Tcp => {
+                            let address: SocketAddr = self
+                                .target
+                                .fastboot_address()
+                                .ok_or_else(|| anyhow!("No fastboot address"))?
+                                .0
+                                .into();
+                            self.fastboot_connection_builder
+                                .build_interface(FastbootConnectionKind::Tcp(address))
+                                .await?
                         }
-                    ) {
+                        FastbootInterface::Udp => {
+                            let address: SocketAddr = self
+                                .target
+                                .fastboot_address()
+                                .ok_or_else(|| anyhow!("No fastboot address"))?
+                                .0
+                                .into();
+                            self.fastboot_connection_builder
+                                .build_interface(FastbootConnectionKind::Udp(address))
+                                .await?
+                        }
+                        FastbootInterface::Usb => {
+                            let serial =
+                                self.target.serial().ok_or_else(|| anyhow!("No serial number"))?;
+                            self.fastboot_connection_builder
+                                .build_interface(FastbootConnectionKind::Usb(serial))
+                                .await?
+                        }
+                    };
+
+                    match fastboot_interface.reboot_bootloader(reboot_client).await {
                         Ok(_) => responder.send(Ok(())).map_err(Into::into),
                         Err(e) => {
                             tracing::error!("Fastboot communication error: {:?}", e);
@@ -370,34 +400,13 @@ fn build_ssh_command(
 mod tests {
     use super::*;
     use anyhow::anyhow;
+    use ffx_fastboot::test::setup_connection_factory;
     use fidl::endpoints::{create_proxy_and_stream, RequestStream};
-    use fidl_fuchsia_developer_ffx::{
-        FastbootMarker, FastbootProxy, FastbootRequest, TargetMarker, TargetProxy, TargetRequest,
-    };
+    use fidl_fuchsia_developer_ffx::{TargetMarker, TargetProxy, TargetRequest};
     use fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlRequest};
     use fidl_fuchsia_hardware_power_statecontrol::{AdminRequest, AdminRequestStream};
+    use futures::TryStreamExt;
     use std::time::Instant;
-
-    async fn setup_fastboot() -> FastbootProxy {
-        let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<FastbootMarker>().unwrap();
-        fuchsia_async::Task::local(async move {
-            while let Ok(Some(req)) = stream.try_next().await {
-                match req {
-                    FastbootRequest::Reboot { responder } => {
-                        responder.send(Ok(())).unwrap();
-                    }
-                    FastbootRequest::RebootBootloader { listener, responder } => {
-                        listener.into_proxy().unwrap().on_reboot().unwrap();
-                        responder.send(Ok(())).unwrap();
-                    }
-                    _ => assert!(false),
-                }
-            }
-        })
-        .detach();
-        proxy
-    }
 
     fn setup_admin(chan: fidl::Channel) -> Result<()> {
         let mut stream = AdminRequestStream::from_channel(fidl::AsyncChannel::from_channel(chan)?);
@@ -439,21 +448,18 @@ mod tests {
         proxy
     }
 
-    async fn setup() -> (Rc<Target>, TargetProxy) {
+    async fn setup_inner(target: Rc<Target>) -> (Rc<Target>, TargetProxy) {
         let overnet_node = overnet_core::Router::new(None).unwrap();
-        let target = Target::new_named("scooby-dooby-doo");
-        let fastboot_proxy = Once::new();
-        let _ = fastboot_proxy.get_or_init(setup_fastboot()).await;
         let remote_proxy = Once::new();
         let _ = remote_proxy.get_or_init(setup_remote()).await;
         let admin_proxy = Once::new();
+        let (_, connection_builder) = setup_connection_factory();
         let rc = RebootController {
             target: target.clone(),
-            fastboot_proxy,
             remote_proxy,
             admin_proxy,
-            tasks: Default::default(),
             overnet_node,
+            fastboot_connection_builder: Box::new(connection_builder),
         };
         let (proxy, mut stream) = create_proxy_and_stream::<TargetMarker>().unwrap();
         fuchsia_async::Task::local(async move {
@@ -468,6 +474,16 @@ mod tests {
         })
         .detach();
         (target, proxy)
+    }
+
+    async fn setup() -> (Rc<Target>, TargetProxy) {
+        let target = Target::new_named("scooby-dooby-doo");
+        setup_inner(target).await
+    }
+
+    async fn setup_usb() -> (Rc<Target>, TargetProxy) {
+        let target = Target::new_for_usb("1DISTHISAREALSERIAL");
+        setup_inner(target).await
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -499,7 +515,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_fastboot_reboot_product() -> Result<()> {
-        let (target, proxy) = setup().await;
+        let (target, proxy) = setup_usb().await;
         target.set_state(TargetConnectionState::Fastboot(Instant::now()));
         proxy
             .reboot(TargetRebootState::Product)
@@ -509,7 +525,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_fastboot_reboot_recovery() -> Result<()> {
-        let (target, proxy) = setup().await;
+        let (target, proxy) = setup_usb().await;
         target.set_state(TargetConnectionState::Fastboot(Instant::now()));
         assert!(proxy.reboot(TargetRebootState::Recovery).await?.is_err());
         Ok(())
@@ -517,7 +533,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_fastboot_reboot_bootloader() -> Result<()> {
-        let (target, proxy) = setup().await;
+        let (target, proxy) = setup_usb().await;
         target.set_state(TargetConnectionState::Fastboot(Instant::now()));
         proxy
             .reboot(TargetRebootState::Bootloader)
