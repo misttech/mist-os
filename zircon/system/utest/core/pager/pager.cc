@@ -1739,6 +1739,10 @@ TEST(Pager, InvalidPagerSupplyPages) {
   ASSERT_EQ(aux_vmo.duplicate(ZX_DEFAULT_VMO_RIGHTS & ~ZX_RIGHT_WRITE, &ro_vmo), ZX_OK);
   ASSERT_EQ(zx_pager_supply_pages(pager.get(), vmo.get(), 0, 0, ro_vmo.get(), 0),
             ZX_ERR_ACCESS_DENIED);
+  zx::vmo wo_vmo;
+  ASSERT_EQ(aux_vmo.duplicate(ZX_DEFAULT_VMO_RIGHTS & ~ZX_RIGHT_READ, &wo_vmo), ZX_OK);
+  ASSERT_EQ(zx_pager_supply_pages(pager.get(), vmo.get(), 0, 0, wo_vmo.get(), 0),
+            ZX_ERR_ACCESS_DENIED);
 
   // missing permissions on the pager vmo
   zx::vmo ro_pager_vmo;

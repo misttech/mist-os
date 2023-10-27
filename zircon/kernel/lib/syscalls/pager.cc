@@ -174,8 +174,8 @@ zx_status_t sys_pager_supply_pages(zx_handle_t pager, zx_handle_t pager_vmo, uin
   }
 
   fbl::RefPtr<VmObjectDispatcher> aux_vmo_dispatcher;
-  status = up->handle_table().GetDispatcherWithRights(*up, aux_vmo_handle, ZX_RIGHT_WRITE,
-                                                      &aux_vmo_dispatcher);
+  status = up->handle_table().GetDispatcherWithRights(
+      *up, aux_vmo_handle, ZX_RIGHT_READ | ZX_RIGHT_WRITE, &aux_vmo_dispatcher);
   if (status != ZX_OK) {
     return status;
   }
