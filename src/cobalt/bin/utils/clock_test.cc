@@ -4,6 +4,7 @@
 
 #include "src/cobalt/bin/utils/clock.h"
 
+#include <fuchsia/time/cpp/fidl.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/inspect/testing/cpp/inspect.h>
 #include <lib/sys/cpp/testing/component_context_provider.h>
@@ -49,13 +50,32 @@ class FuchsiaSystemClockTest : public ::gtest::TestLoopFixture {
     EXPECT_EQ(ZX_OK, zircon_clock_.update(args));
   }
 
+  void SignalClockSynced() {
+    if (const zx_status_t status =
+            zircon_clock_.signal(/*clear_mask=*/0,
+                                 /*set_mask=*/fuchsia::time::SIGNAL_UTC_CLOCK_SYNCHRONIZED);
+        status != ZX_OK) {
+      FX_PLOGS(FATAL, status) << "Failed to sync clock";
+    }
+  }
+
   zx::clock zircon_clock_;
   inspect::Inspector inspector_;
   std::unique_ptr<FuchsiaSystemClock> clock_;
 };
 
-TEST_F(FuchsiaSystemClockTest, AwaitExternalSourceInitiallyAccurate) {
+TEST_F(FuchsiaSystemClockTest, AwaitExternalSourceNotTriggeredOnClockReady) {
   SignalClockStarted();
+
+  bool called = false;
+  clock_->AwaitExternalSource([&called]() { called = true; });
+  RunLoopUntilIdle();
+
+  EXPECT_FALSE(called);
+}
+
+TEST_F(FuchsiaSystemClockTest, AwaitExternalSourceInitiallyAccurate) {
+  SignalClockSynced();
 
   bool called = false;
   clock_->AwaitExternalSource([&called]() { called = true; });
@@ -71,7 +91,7 @@ TEST_F(FuchsiaSystemClockTest, AwaitExternalSourceInitiallyInaccurate) {
 
   EXPECT_FALSE(called);
 
-  SignalClockStarted();
+  SignalClockSynced();
   RunLoopUntilIdle();
 
   EXPECT_TRUE(called);
@@ -91,7 +111,7 @@ TEST_F(FuchsiaSystemClockTest, AwaitExternalSourceInitiallyInaccurate) {
 TEST_F(FuchsiaSystemClockTest, NowBeforeInitialized) { EXPECT_EQ(clock_->now(), std::nullopt); }
 
 TEST_F(FuchsiaSystemClockTest, NowAfterInitialized) {
-  SignalClockStarted();
+  SignalClockSynced();
 
   clock_->AwaitExternalSource([]() {});
 
@@ -103,7 +123,7 @@ TEST_F(FuchsiaSystemClockTest, NowAfterInitialized) {
 // Tests our use of an atomic_bool. We can set |accurate_| true in
 // one thread and read it as true in another thread.
 TEST_F(FuchsiaSystemClockTest, NowFromAnotherThread) {
-  SignalClockStarted();
+  SignalClockSynced();
   clock_->AwaitExternalSource([]() {});
 
   RunLoopUntilIdle();

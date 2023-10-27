@@ -47,7 +47,8 @@ class FuchsiaSystemClock : public FuchsiaSystemClockInterface {
   // Construct a |FuchsiaSystemClock| that uses the given |clock| to check if the clock is
   // started, but reads time off of the UTC clock passed to the runtime. This constructor is
   // only intended for testing this class.
-  explicit FuchsiaSystemClock(async_dispatcher_t* dispatcher, inspect::Node node, zx::unowned_clock clock);
+  explicit FuchsiaSystemClock(async_dispatcher_t* dispatcher, inspect::Node node,
+                              zx::unowned_clock clock);
 
   // Returns the current time once the Fuchsia timekeeper service reports that
   // the system clock has been initialized from an external source.
@@ -55,7 +56,7 @@ class FuchsiaSystemClock : public FuchsiaSystemClockInterface {
 
   // Wait for the system clock to become accurate, then call the callback.
   //
-  // Uses a clock handle to wait for the ZX_CLOCK_STARTED signal to be asserted.
+  // Uses a clock handle to wait for the SIGNAL_UTC_CLOCK_SYNCHRONIZED signal to be asserted.
   void AwaitExternalSource(std::function<void()> callback) override;
 
  private:

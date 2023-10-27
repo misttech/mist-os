@@ -4,6 +4,7 @@
 
 #include "src/cobalt/bin/utils/clock.h"
 
+#include <fuchsia/time/cpp/fidl.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/utc.h>
@@ -18,7 +19,7 @@ FuchsiaSystemClock::FuchsiaSystemClock(async_dispatcher_t* dispatcher, inspect::
     : dispatcher_(dispatcher),
       system_clock_node_(std::move(node)),
       system_clock_accurate_(system_clock_node_.CreateBool("is_accurate", false)),
-      utc_start_wait_(clock->get_handle(), ZX_CLOCK_STARTED, 0) {}
+      utc_start_wait_(clock->get_handle(), fuchsia::time::SIGNAL_UTC_CLOCK_SYNCHRONIZED, 0) {}
 
 std::optional<std::chrono::system_clock::time_point> FuchsiaSystemClock::now() {
   if (accurate_) {

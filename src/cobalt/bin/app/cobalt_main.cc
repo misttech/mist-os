@@ -5,6 +5,7 @@
 #include <fuchsia/buildinfo/cpp/fidl.h>
 #include <fuchsia/scheduler/cpp/fidl.h>
 #include <fuchsia/sysinfo/cpp/fidl.h>
+#include <fuchsia/time/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
@@ -134,6 +135,14 @@ void ReplaceRuntimeClock() {
   zx::clock::update_args update_args;
   update_args.set_value(start_time);
   replacement.update(update_args);
+
+  if (const zx_status_t status =
+          replacement.signal(/*clear_mask=*/0,
+                             /*set_mask=*/fuchsia::time::SIGNAL_UTC_CLOCK_SYNCHRONIZED);
+      status != ZX_OK) {
+    FX_PLOGS(FATAL, status) << "Failed to sync clock";
+  }
+
   zx_utc_reference_swap(replacement.release(), current_clock.reset_and_get_address());
 }
 

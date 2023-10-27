@@ -44,6 +44,8 @@ source_set("clock") {
     "//sdk/lib/syslog/cpp",
     "//third_party/cobalt/src/public/lib:clock_interfaces",
   ]
+
+  deps = [ "//sdk/fidl/fuchsia.time:fuchsia.time_hlcpp" ]
 }
 
 source_set("base64") {
@@ -78,6 +80,7 @@ executable("cobalt_utils_unittests") {
     ":base64",
     ":clock",
     ":fuchsia_http_client",
+    "//sdk/fidl/fuchsia.time:fuchsia.time_hlcpp",
     "//sdk/lib/inspect/testing/cpp",
     "//sdk/lib/sys/cpp/testing:unit",
     "//sdk/lib/sys/inspect/cpp",
