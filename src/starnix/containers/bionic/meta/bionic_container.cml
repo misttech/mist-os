@@ -6,7 +6,6 @@
     program: {
         runner: "starnix",
         features: [
-            "binder",
             "mock_selinux",
             "test_data",
         ],

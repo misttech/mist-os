@@ -23,15 +23,11 @@ use fuchsia_zircon::Task as _;
 use futures::{channel::oneshot, FutureExt, StreamExt, TryStreamExt};
 use runner::{get_program_string, get_program_strvec};
 use starnix_kernel_config::Config;
-use std::{
-    collections::{BTreeMap, HashSet},
-    ffi::CString,
-    sync::Arc,
-};
+use std::{collections::BTreeMap, ffi::CString, sync::Arc};
 
 use crate::{
     auth::Credentials,
-    device::{init_common_devices, run_features},
+    device::{init_common_devices, parse_features, run_container_features},
     execution::*,
     fs::{layeredfs::LayeredFs, tmpfs::TmpFs, *},
     logging::*,
@@ -293,10 +289,9 @@ async fn create_container(
 
     let pkg_dir_proxy = fio::DirectorySynchronousProxy::new(config.pkg_dir.take().unwrap());
 
-    let features = HashSet::from_iter(config.features.iter().cloned());
-
+    let features = parse_features(&config.features)?;
     let mut kernel_cmdline = BString::from(config.kernel_cmdline.as_bytes());
-    if features.contains("android_serialno") {
+    if features.android_serialno {
         match crate::device::get_serial_number().await {
             Ok(serial) => {
                 kernel_cmdline.extend(b" androidboot.serialno=");
@@ -333,8 +328,7 @@ async fn create_container(
             .source_context("mounting filesystems")?;
 
         // Run all common features that were specified in the .cml.
-        run_features(&config.features, &kernel)
-            .with_source_context(|| format!("initializing features: {:?}", &config.features))?;
+        run_container_features(&kernel)?;
 
         // If there is an init binary path, run it, optionally waiting for the
         // startup_file_path to be created. The task struct is still used
@@ -405,10 +399,10 @@ fn create_fs_context(
     );
     let mut mappings =
         vec![(b"container".to_vec(), container_fs), (b"data".to_vec(), TmpFs::new_fs(kernel))];
-    if config.features.contains(&"custom_artifacts".to_string()) {
+    if current_task.kernel().features.custom_artifacts {
         mappings.push((b"custom_artifacts".to_vec(), TmpFs::new_fs(kernel)));
     }
-    if config.features.contains(&"test_data".to_string()) {
+    if current_task.kernel().features.test_data {
         mappings.push((b"test_data".to_vec(), TmpFs::new_fs(kernel)));
     }
     let root_fs = LayeredFs::new_fs(kernel, root_fs, mappings.into_iter().collect());

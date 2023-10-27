@@ -16,7 +16,7 @@ use once_cell::sync::OnceCell;
 use selinux::security_server::SecurityServer;
 use starnix_lock::RwLock;
 use std::{
-    collections::{BTreeMap, HashSet},
+    collections::BTreeMap,
     sync::{
         atomic::{AtomicI32, AtomicU16, AtomicU32, AtomicU64, AtomicU8},
         Arc, Weak,
@@ -26,7 +26,7 @@ use std::{
 use crate::{
     device::{
         framebuffer::Framebuffer, input::InputDevice, loop_device::LoopDeviceRegistry,
-        BinderDriver, DeviceMode, DeviceOps, DeviceRegistry,
+        BinderDriver, DeviceMode, DeviceOps, DeviceRegistry, Features,
     },
     diagnostics::CoreDumpList,
     fs::{
@@ -106,7 +106,7 @@ pub struct Kernel {
 
     // The features enabled for the container this kernel is associated with, as specified in
     // the container's configuration file.
-    pub features: HashSet<String>,
+    pub features: Features,
 
     /// The service directory of the container.
     container_svc: Option<fio::DirectoryProxy>,
@@ -232,7 +232,7 @@ impl Kernel {
     pub fn new(
         name: &[u8],
         cmdline: BString,
-        features: HashSet<String>,
+        features: Features,
         container_svc: Option<fio::DirectoryProxy>,
         container_data_dir: Option<fio::DirectorySynchronousProxy>,
         inspect_node: fuchsia_inspect::Node,
@@ -242,13 +242,13 @@ impl Kernel {
         let job = fuchsia_runtime::job_default().create_child_job()?;
         set_zx_name(&job, name);
 
-        let framebuffer = Framebuffer::new(features.iter().find(|f| f.starts_with("aspect_ratio")))
-            .expect("Failed to create framebuffer");
+        let framebuffer =
+            Framebuffer::new(features.aspect_ratio.as_ref()).expect("Failed to create framebuffer");
         let input_device = InputDevice::new(framebuffer.clone(), &inspect_node);
 
         let core_dumps = CoreDumpList::new(inspect_node.create_child("coredumps"));
 
-        let security_server = features.contains("selinux").then(|| SecurityServer::new());
+        let security_server = if features.selinux { Some(SecurityServer::new()) } else { None };
 
         let this = Arc::new(Kernel {
             job,
@@ -435,7 +435,7 @@ impl Kernel {
     }
 
     pub fn mock_selinux(&self) -> bool {
-        self.features.contains("mock_selinux")
+        self.features.mock_selinux
     }
 
     fn get_thread_groups_inspect(&self) -> fuchsia_inspect::Inspector {

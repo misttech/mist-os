@@ -4,7 +4,7 @@
 
 use super::framebuffer_server::{init_viewport_scene, spawn_view_provider, FramebufferServer};
 use crate::{
-    device::{DeviceMode, DeviceOps},
+    device::{features::AspectRatio, DeviceMode, DeviceOps},
     fs::{
         buffers::{InputBuffer, OutputBuffer},
         kobject::{KObjectDeviceAttribute, KType},
@@ -36,14 +36,10 @@ pub struct Framebuffer {
 }
 
 impl Framebuffer {
-    /// Creates a new `Framebuffer` according to the spec provided in `feature_string`.
+    /// Creates a new `Framebuffer` fit to the screen, while maintaining the provided aspect ratio.
     ///
-    /// For example, `aspect_ratio:1:1` creates a 1:1 aspect ratio framebuffer, scaled to
-    /// fit the display.
-    ///
-    /// If the `feature_string` is empty, or `None`, the framebuffer will be scaled to the
-    /// display.
-    pub fn new(feature_string: Option<&String>) -> Result<Arc<Self>, Errno> {
+    /// If the `aspect_ratio` is `None`, the framebuffer will be scaled to the display.
+    pub fn new(aspect_ratio: Option<&AspectRatio>) -> Result<Arc<Self>, Errno> {
         let mut info = fb_var_screeninfo::default();
 
         let display_size =
@@ -51,15 +47,8 @@ impl Framebuffer {
 
         // If the container has a specific aspect ratio set, use that to fit the framebuffer
         // inside of the display.
-        let (feature_width, feature_height) = feature_string
-            .map(|s| {
-                let components: Vec<_> = s.split(':').collect();
-                assert_eq!(components.len(), 3, "Malformed aspect ratio");
-                (
-                    components[1].parse().expect("Malformed aspect ratio"),
-                    components[2].parse().expect("Malformed aspect ratio"),
-                )
-            })
+        let (feature_width, feature_height) = aspect_ratio
+            .map(|ar| (ar.width, ar.height))
             .unwrap_or((display_size.width, display_size.height));
 
         // Scale to framebuffer to fit the display, while maintaining the expected aspect ratio.

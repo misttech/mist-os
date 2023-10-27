@@ -7,10 +7,10 @@ use crate::{
         framebuffer::fb_device_init, input::init_input_devices,
         perfetto_consumer::start_perfetto_consumer_thread, starnix::magma_device_init,
     },
-    logging::log_warn,
     task::Kernel,
     types::*,
 };
+use anyhow::{anyhow, Context, Error};
 use bstr::BString;
 use fuchsia_zircon as zx;
 use std::sync::Arc;
@@ -21,54 +21,116 @@ use fidl_fuchsia_ui_input3 as fuiinput;
 use fidl_fuchsia_ui_policy as fuipolicy;
 use fidl_fuchsia_ui_views as fuiviews;
 
-/// Parses and runs the features from the provided "program strvec". Some features,
-/// should be enabled on a per-component basis. We run this when we first
-/// make the container. When we start the component, we run the run_component_features
-/// function.
-pub fn run_features(entries: &Vec<String>, kernel: &Arc<Kernel>) -> Result<(), Errno> {
-    let mut enabled_profiling = false;
+/// A collection of parsed features, and their arguments.
+#[derive(Default, Debug)]
+pub struct Features {
+    pub mock_selinux: bool,
+
+    pub selinux: bool,
+
+    pub framebuffer: bool,
+
+    pub magma: bool,
+
+    pub test_data: bool,
+
+    pub custom_artifacts: bool,
+
+    pub android_serialno: bool,
+
+    pub self_profile: bool,
+
+    pub aspect_ratio: Option<AspectRatio>,
+
+    pub perfetto: Option<String>,
+}
+
+/// An aspect ratio, as defined by the `ASPECT_RATIO` feature.
+#[derive(Default, Debug)]
+pub struct AspectRatio {
+    pub width: u32,
+    pub height: u32,
+}
+
+/// Parses all the featurse in `entries`.
+///
+/// Returns an error if parsing fails, or if an unsupported feature is present in `features`.
+pub fn parse_features(entries: &Vec<String>) -> Result<Features, Error> {
+    let mut features = Features::default();
     for entry in entries {
-        let entry_type = entry.split_once(':').map(|(ty, _)| ty).unwrap_or(entry);
-        match entry_type {
-            "mock_selinux" => {}
-            "selinux" => {}
-            "framebuffer" => {
-                fb_device_init(kernel);
-                init_input_devices(kernel);
+        let (raw_flag, raw_args) =
+            entry.split_once(':').map(|(f, a)| (f, Some(a.to_string()))).unwrap_or((entry, None));
+        match (raw_flag, raw_args) {
+            ("android_serialno", _) => features.android_serialno = true,
+            ("aspect_ratio", Some(args)) => {
+                let e = anyhow!("Invalid aspect_ratio: {:?}", args);
+                let components: Vec<_> = args.split(':').collect();
+                if components.len() != 2 {
+                    return Err(e);
+                }
+                let width: u32 = components[0].parse().map_err(|_| anyhow!("Invalid aspect ratio width"))?;
+                let height: u32 = components[1].parse().map_err(|_| anyhow!("Invalid aspect ratio height"))?;
+                features.aspect_ratio = Some(AspectRatio { width, height });
             }
-            "magma" => {
-                magma_device_init(kernel);
+            ("aspect_ratio", None) => {
+                return Err(anyhow!(
+                    "Aspect ratio feature must contain the aspect ratio in the format: aspect_ratio:w:h"
+                ))
             }
-            "test_data" => {}
-            "custom_artifacts" => {}
-            "perfetto" => {
-                let socket_path = entry
-                    .split_once(':')
-                    .expect("Perfetto feature must have a socket path specified")
-                    .1;
-                start_perfetto_consumer_thread(kernel, socket_path.as_bytes())?;
+            ("custom_artifacts", _) => features.custom_artifacts = true,
+            ("framebuffer", _) => features.framebuffer = true,
+            ("magma", _) => features.magma = true,
+            ("mock_selinux", _) => features.mock_selinux = true,
+            ("perfetto", Some(socket_path)) => {
+                features.perfetto = Some(socket_path.to_string());
             }
-            "android_serialno" => {}
-            "self_profile" => {
-                enabled_profiling = true;
-                fuchsia_inspect::component::inspector().root().record_lazy_child(
-                    "self_profile",
-                    fuchsia_inspect_contrib::ProfileDuration::lazy_node_callback,
-                );
-                fuchsia_inspect_contrib::start_self_profiling();
+            ("perfetto", None) => {
+                return Err(anyhow!("Perfetto feature must contain a socket path"));
             }
-            feature => {
-                log_warn!("Unsupported feature: {:?}", feature);
+            ("self_profile", _) => features.self_profile = true,
+            ("selinux", _) => features.selinux = true,
+            ("selinux_enabled", _) => features.mock_selinux = true,
+            ("test_data", _) => features.test_data = true,
+            (f, _) => {
+                return Err(anyhow!("Unsupported feature: {}", f));
             }
-        }
+        };
+    }
+    Ok(features)
+}
+
+/// Runs all the features that are enabled in `kernel`.
+pub fn run_container_features(kernel: &Arc<Kernel>) -> Result<(), Error> {
+    let mut enabled_profiling = false;
+    if kernel.features.framebuffer {
+        fb_device_init(kernel);
+        init_input_devices(kernel);
+    }
+    if kernel.features.magma {
+        magma_device_init(kernel);
+    }
+    if kernel.features.perfetto.is_some() {
+        let socket_path =
+            kernel.features.perfetto.clone().ok_or(anyhow!("No perfetto socket path"))?;
+        start_perfetto_consumer_thread(kernel, socket_path.as_bytes())
+            .context("Failed to start perfetto consumer thread")?;
+    }
+    if kernel.features.self_profile {
+        enabled_profiling = true;
+        fuchsia_inspect::component::inspector().root().record_lazy_child(
+            "self_profile",
+            fuchsia_inspect_contrib::ProfileDuration::lazy_node_callback,
+        );
+        fuchsia_inspect_contrib::start_self_profiling();
     }
     if !enabled_profiling {
         fuchsia_inspect_contrib::stop_self_profiling();
     }
+
     Ok(())
 }
 
-/// Runs features requested by individual components
+/// Runs features requested by individual components inside the container.
 pub fn run_component_features(
     entries: &Vec<String>,
     kernel: &Arc<Kernel>,
@@ -107,16 +169,8 @@ pub fn run_component_features(
                     view_ref,
                 );
             }
-            "binder" => {}
-            "logd" => {}
-            "mock_selinux" => {}
-            "selinux" => {}
-            "magma" => {}
-            "test_data" => {}
-            "custom_artifacts" => {}
-            "android_serialno" => {}
             feature => {
-                log_warn!("Unsupported component feature: {:?}", feature);
+                return error!(ENOSYS, format!("Unsupported feature: {}", feature));
             }
         }
     }

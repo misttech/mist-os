@@ -4,11 +4,11 @@
 
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon as zx;
-use std::{collections::HashSet, ffi::CString, sync::Arc};
+use std::{ffi::CString, sync::Arc};
 use zerocopy::AsBytes;
 
 use crate::{
-    device::init_common_devices,
+    device::{init_common_devices, Features},
     fs::{
         buffers::{InputBuffer, OutputBuffer},
         fuchsia::RemoteFs,
@@ -67,7 +67,7 @@ fn create_kernel_task_and_unlocked_with_fs<'l>(
     let kernel = Kernel::new(
         b"test-kernel",
         b"".into(),
-        HashSet::new(),
+        Features::default(),
         None,
         None,
         fuchsia_inspect::Node::default(),
