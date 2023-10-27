@@ -146,14 +146,14 @@ fn calculate_cpu_loads(
 #[cfg(test)]
 mod tests {
     use {
-        super::*, fidl_fuchsia_boot as fboot, fuchsia_async as fasync,
+        super::*, fidl_fuchsia_kernel as fkernel, fuchsia_async as fasync,
         fuchsia_component::client::connect_to_protocol, zx::DurationNum as _,
     };
 
-    async fn get_root_resource() -> Result<Resource, Error> {
-        let root_resource_provider = connect_to_protocol::<fboot::RootResourceMarker>()?;
-        let root_resource_handle = root_resource_provider.get().await?;
-        Ok(Resource::from(root_resource_handle))
+    async fn get_info_resource() -> Result<Resource, Error> {
+        let info_resource_provider = connect_to_protocol::<fkernel::InfoResourceMarker>()?;
+        let info_resource_handle = info_resource_provider.get().await?;
+        Ok(Resource::from(info_resource_handle))
     }
 
     enum OnError {
@@ -162,10 +162,10 @@ mod tests {
     }
 
     async fn serve_kernel_stats(on_error: OnError) -> Result<fkernel::StatsProxy, Error> {
-        let root_resource = get_root_resource().await?;
+        let info_resource = get_info_resource().await?;
 
         let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fkernel::StatsMarker>()?;
-        fasync::Task::local(KernelStats::new(root_resource).serve(stream).unwrap_or_else(
+        fasync::Task::local(KernelStats::new(info_resource).serve(stream).unwrap_or_else(
             move |e| match on_error {
                 OnError::Panic => panic!("Error while serving kernel stats: {}", e),
                 _ => {}
