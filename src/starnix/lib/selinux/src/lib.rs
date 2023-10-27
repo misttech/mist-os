@@ -8,12 +8,24 @@ pub mod security_server;
 use bitflags::bitflags;
 
 /// The Security ID (SID) used internally to refer to a security context.
-#[derive(Clone, Copy, Default, PartialEq)]
-pub struct SecurityId(u32);
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+pub struct SecurityId(u64);
 
-impl From<u32> for SecurityId {
-    fn from(sid: u32) -> Self {
+impl From<u64> for SecurityId {
+    fn from(sid: u64) -> Self {
         Self(sid)
+    }
+}
+
+/// The security context, a variable-length string associated with each SELinux object in the
+/// system. Security contexts are configured by userspace atop Starnix, and mapped to
+/// [`SecurityId`]s for internal use in Starnix.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SecurityContext(String);
+
+impl From<&str> for SecurityContext {
+    fn from(security_context: &str) -> Self {
+        Self(security_context.to_string())
     }
 }
 
