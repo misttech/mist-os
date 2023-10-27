@@ -146,7 +146,7 @@ class FuchsiaProducer : public perfetto::Producer {
   }
 
   void Flush(perfetto::FlushRequestID id, const perfetto::DataSourceInstanceID* data_source_ids,
-             size_t num_data_sources) override {
+             size_t num_data_sources, perfetto::FlushFlags) override {
     writer_->Flush([&]() { perfetto_service_->NotifyFlushComplete(id); });
   }
 
@@ -174,7 +174,8 @@ class FuchsiaProducer : public perfetto::Producer {
     }
 
     shmem_arbiter_ = perfetto::SharedMemoryArbiter::CreateInstance(
-        shared_memory_.get(), ZX_PAGE_SIZE, perfetto_service_.get(), task_runner_.get());
+        shared_memory_.get(), ZX_PAGE_SIZE, perfetto::SharedMemoryABI::ShmemMode::kDefault,
+        perfetto_service_.get(), task_runner_.get());
     if (shmem_arbiter_ == nullptr) {
       return zx::error(ZX_ERR_NO_MEMORY);
     }
