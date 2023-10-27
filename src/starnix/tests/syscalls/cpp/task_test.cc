@@ -22,6 +22,10 @@
 #include <linux/sched.h>
 
 #include "src/lib/files/directory.h"
+#include "src/lib/files/file.h"
+#include "src/lib/fxl/strings/split_string.h"
+#include "src/lib/fxl/strings/string_number_conversions.h"
+#include "src/lib/fxl/strings/string_printf.h"
 #include "src/starnix/tests/syscalls/cpp/test_helper.h"
 
 namespace {
@@ -142,6 +146,40 @@ int stack_test_func(void* a) {
 }
 
 int empty_func(void*) { return 0; }
+
+void ReadStackStart(pid_t pid, uintptr_t* result) {
+  std::string contents, path = fxl::StringPrintf("/proc/%ld/stat", static_cast<long>(pid));
+  ASSERT_TRUE(files::ReadFileToString(path, &contents));
+
+  auto parts = fxl::SplitString(contents, " ", fxl::kTrimWhitespace, fxl::kSplitWantAll);
+  ASSERT_GE(parts.size(), 28U) << contents;
+  ASSERT_TRUE(fxl::StringToNumberWithError(parts[27], result)) << parts[27];
+}
+
+void ReadStackSize(pid_t pid, uintptr_t* result) {
+  std::string contents, path = fxl::StringPrintf("/proc/%ld/status", static_cast<long>(pid));
+  ASSERT_TRUE(files::ReadFileToString(path, &contents));
+  std::vector<std::string_view> lines =
+      fxl::SplitString(contents, "\n", fxl::kTrimWhitespace, fxl::kSplitWantNonEmpty);
+
+  bool vm_stk_found = false;
+  for (auto line : lines) {
+    auto key_and_value =
+        fxl::SplitString(line, ": ", fxl::kTrimWhitespace, fxl::kSplitWantNonEmpty);
+    if (key_and_value.size() >= 2 && key_and_value[0] == "VmStk") {
+      ASSERT_TRUE(fxl::StringToNumberWithError(key_and_value[1], result)) << line;
+      vm_stk_found = true;
+      break;
+    }
+  }
+
+  ASSERT_TRUE(vm_stk_found) << contents;
+}
+
+void ReadProcPidFile(pid_t pid, const char* name, std::vector<uint8_t>* result) {
+  std::string path = fxl::StringPrintf("/proc/%ld/%s", static_cast<long>(pid), name);
+  ASSERT_TRUE(files::ReadFileToVector(path, result));
+}
 
 }  // namespace
 
@@ -478,5 +516,65 @@ TEST(Task, ExecvePathnameTooLong) {
     EXPECT_EQ(errno, ENAMETOOLONG);
   });
 
+  ASSERT_TRUE(helper.WaitForChildren());
+}
+
+TEST(Task, ForkPreservesStackStart) {
+  pid_t parent_pid = getpid();
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([parent_pid] {
+    uintptr_t parent_stack_start, child_stack_start;
+    ASSERT_NO_FATAL_FAILURE(ReadStackStart(parent_pid, &parent_stack_start));
+    ASSERT_NO_FATAL_FAILURE(ReadStackStart(getpid(), &child_stack_start));
+    EXPECT_EQ(parent_stack_start, child_stack_start);
+  });
+  ASSERT_TRUE(helper.WaitForChildren());
+}
+
+TEST(Task, ForkPreservesStackSize) {
+  pid_t parent_pid = getpid();
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([parent_pid] {
+    uintptr_t parent_stack_size, child_stack_size;
+    ASSERT_NO_FATAL_FAILURE(ReadStackSize(parent_pid, &parent_stack_size));
+    ASSERT_NO_FATAL_FAILURE(ReadStackSize(getpid(), &child_stack_size));
+    EXPECT_EQ(parent_stack_size, child_stack_size);
+  });
+  ASSERT_TRUE(helper.WaitForChildren());
+}
+
+TEST(Task, ForkPreservesAux) {
+  pid_t parent_pid = getpid();
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([parent_pid] {
+    std::vector<uint8_t> parent_auxv, child_auxv;
+    ASSERT_NO_FATAL_FAILURE(ReadProcPidFile(parent_pid, "auxv", &parent_auxv));
+    ASSERT_NO_FATAL_FAILURE(ReadProcPidFile(getpid(), "auxv", &child_auxv));
+    EXPECT_EQ(parent_auxv, child_auxv);
+  });
+  ASSERT_TRUE(helper.WaitForChildren());
+}
+
+TEST(Task, ForkPreservesCmdline) {
+  pid_t parent_pid = getpid();
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([parent_pid] {
+    std::vector<uint8_t> parent_cmdline, child_cmdline;
+    ASSERT_NO_FATAL_FAILURE(ReadProcPidFile(parent_pid, "cmdline", &parent_cmdline));
+    ASSERT_NO_FATAL_FAILURE(ReadProcPidFile(getpid(), "cmdline", &child_cmdline));
+    EXPECT_EQ(parent_cmdline, child_cmdline);
+  });
+  ASSERT_TRUE(helper.WaitForChildren());
+}
+
+TEST(Task, ForkPreservesEnviron) {
+  pid_t parent_pid = getpid();
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([parent_pid] {
+    std::vector<uint8_t> parent_environ, child_environ;
+    ASSERT_NO_FATAL_FAILURE(ReadProcPidFile(parent_pid, "environ", &parent_environ));
+    ASSERT_NO_FATAL_FAILURE(ReadProcPidFile(getpid(), "environ", &child_environ));
+    EXPECT_EQ(parent_environ, child_environ);
+  });
   ASSERT_TRUE(helper.WaitForChildren());
 }
