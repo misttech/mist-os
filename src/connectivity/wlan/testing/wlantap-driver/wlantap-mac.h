@@ -11,7 +11,6 @@
 #include <lib/driver/logging/cpp/logger.h>
 
 #include "fidl/fuchsia.wlan.softmac/cpp/markers.h"
-#include "lib/fidl/cpp/wire/internal/transport.h"
 
 namespace wlan_tap = fuchsia_wlan_tap::wire;
 namespace wlan_common = fuchsia_wlan_common::wire;
@@ -39,7 +38,8 @@ class WlantapMac : public fdf::WireServer<fuchsia_wlan_softmac::WlanSoftmac> {
   };
 
   WlantapMac(Listener* listener, wlan_common::WlanMacRole,
-             std::shared_ptr<wlan_tap::WlantapPhyConfig> config, zx::channel sme_channel);
+             const std::shared_ptr<const wlan_tap::WlantapPhyConfig>& config,
+             zx::channel sme_channel);
 
   fidl::ProtocolHandler<fuchsia_wlan_softmac::WlanSoftmac> ProtocolHandler();
 
@@ -83,7 +83,7 @@ class WlantapMac : public fdf::WireServer<fuchsia_wlan_softmac::WlanSoftmac> {
   Listener* listener_;
   wlan_common::WlanMacRole role_;
 
-  std::shared_ptr<wlan_tap::WlantapPhyConfig> phy_config_;
+  const std::shared_ptr<const wlan_tap::WlantapPhyConfig> phy_config_;
 
   zx::channel sme_channel_;
 

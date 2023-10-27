@@ -411,9 +411,6 @@ impl Drop for TestHelper {
         // both the phy and any remaining ifaces are shutdown. We
         // first shutdown the phy to prevent any automated CreateIface
         // calls from wlancfg after removing the iface.
-        //
-        // TODO(fxrev.dev/937293): WlantapPhy.Shutdown() does not
-        // currently block, but the fix is in review.
         sync_proxy.shutdown(zx::Time::INFINITE).expect("shut down fake phy");
     }
 }

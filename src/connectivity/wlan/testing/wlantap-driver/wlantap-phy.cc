@@ -5,10 +5,11 @@
 #include "wlantap-phy.h"
 
 #include <fidl/fuchsia.wlan.common/cpp/fidl.h>
+#include <lib/fidl/cpp/wire/channel.h>
+#include <lib/fidl_driver/cpp/wire_messaging_declarations.h>
+#include <zircon/types.h>
 
-#include "lib/fidl/cpp/wire/channel.h"
-#include "lib/fidl_driver/cpp/wire_messaging_declarations.h"
-#include "utils.h"
+#include "wlantap-phy-impl.h"
 
 namespace wlan {
 namespace wlan_common = fuchsia_wlan_common::wire;
@@ -61,14 +62,15 @@ wlan_tap::TxArgs ToTxArgs(const wlan_softmac::WlanTxPacket pkt) {
 }  // namespace
 
 WlantapPhy::WlantapPhy(zx::channel user_channel,
-                       std::shared_ptr<wlan_tap::WlantapPhyConfig> phy_config,
-                       fidl::ClientEnd<fuchsia_driver_framework::NodeController> phy_controller)
+                       const std::shared_ptr<const wlan_tap::WlantapPhyConfig>& phy_config,
+                       std::function<fit::result<zx_status_t>(WlantapPhy::ShutdownCompleter::Async)>
+                           phy_impl_shutdown_callback)
     : phy_config_(std::move(phy_config)),
       name_("wlantap-phy:" + std::string(phy_config_->name.get())),
       user_binding_(fidl::BindServer(
           fdf::Dispatcher::GetCurrent()->async_dispatcher(),
           fidl::ServerEnd<fuchsia_wlan_tap::WlantapPhy>(std::move(user_channel)), this)),
-      phy_controller_(std::move(phy_controller)) {}
+      phy_impl_shutdown_callback_(std::move(phy_impl_shutdown_callback)) {}
 
 zx_status_t WlantapPhy::SetCountry(wlan_tap::SetCountryArgs args) {
   fidl::Status status = fidl::WireSendEvent(user_binding_)->SetCountry(args);
@@ -82,23 +84,25 @@ zx_status_t WlantapPhy::SetCountry(wlan_tap::SetCountryArgs args) {
 
 // wlan_tap::WlantapPhy impl
 
+// Passes the |completer| to the |phy_impl_shutdown_callback_|
+// initialized during construction of WlantapPhy. WlantapPhy expects
+// |completer.Reply()| to called when the phy node and any iface node
+// no longer exists.
 void WlantapPhy::Shutdown(ShutdownCompleter::Sync& completer) {
   FDF_LOG(INFO, "%s: Shutdown", name_.c_str());
   FDF_LOG(INFO, "%s: PHY device shutdown initiated.", name_.c_str());
-  // user_binding_.Unbind();
-  ZX_ASSERT(phy_controller_.is_valid());
 
-  auto status = phy_controller_->Remove();
-  if (!status.ok()) {
-    FDF_LOG(ERROR, "Could not remove phy: %s", status.status_string());
+  auto phy_impl_shutdown_status = phy_impl_shutdown_callback_(completer.ToAsync());
+  if (phy_impl_shutdown_status.is_error()) {
+    FDF_LOG(ERROR, "%s: Failed to shutdown the PHY: %s", name_.c_str(),
+            zx_status_get_string(phy_impl_shutdown_status.error_value()));
   }
-  completer.Reply();
 }
 
 void WlantapPhy::Rx(RxRequestView request, RxCompleter::Sync& completer) {
   FDF_LOG(INFO, "%s: Rx(%zu bytes)", name_.c_str(), request->data.count());
   if (!wlan_softmac_ifc_client_.is_valid()) {
-    FDF_LOG(ERROR, "No WlantapMac present.");
+    FDF_LOG(ERROR, "%s: No WlantapMac present.", name_.c_str());
     return;
   }
   auto rx_flags = wlan_softmac::WlanRxInfoFlags::TruncatingUnknown(request->info.rx_flags);
@@ -115,9 +119,9 @@ void WlantapPhy::Rx(RxRequestView request, RxCompleter::Sync& completer) {
   wlan_softmac::WlanRxPacket rx_packet = {.mac_frame = request->data, .info = converted_info};
   auto arena = fdf::Arena::Create(0, 0);
   wlan_softmac_ifc_client_.buffer(*arena)->Recv(rx_packet).ThenExactlyOnce(
-      [completer = completer.ToAsync()](
-          fdf::WireUnownedResult<fuchsia_wlan_softmac::WlanSoftmacIfc::Recv>& result) {
-        FDF_LOG(INFO, "Recv completed");
+      [completer = completer.ToAsync(),
+       name = name_](fdf::WireUnownedResult<fuchsia_wlan_softmac::WlanSoftmacIfc::Recv>& result) {
+        FDF_LOG(INFO, "%s: Recv completed", name.c_str());
       });
   FDF_LOG(DEBUG, "%s: Rx done", name_.c_str());
 }
@@ -129,7 +133,7 @@ void WlantapPhy::ReportTxResult(ReportTxResultRequestView request,
   }
 
   if (!wlan_softmac_ifc_client_.is_valid()) {
-    FDF_LOG(ERROR, "WlantapMacStart() not called.");
+    FDF_LOG(ERROR, "%s: WlantapMacStart() not called.", name_.c_str());
     return;
   }
 
@@ -142,7 +146,7 @@ void WlantapPhy::ReportTxResult(ReportTxResultRequestView request,
           [this](fdf::WireUnownedResult<fuchsia_wlan_softmac::WlanSoftmacIfc::ReportTxResult>&
                      result) {
             if (!result.ok()) {
-              FDF_LOG(ERROR, "Failed to report tx status up. Status: %s",
+              FDF_LOG(ERROR, "%s: Failed to report tx status up. Status: %s", name_.c_str(),
                       zx_status_get_string(result.status()));
               return;
             }
@@ -158,7 +162,7 @@ void WlantapPhy::ScanComplete(ScanCompleteRequestView request,
                               ScanCompleteCompleter::Sync& completer) {
   FDF_LOG(INFO, "%s: ScanComplete(%u)", name_.c_str(), request->status);
   if (!wlan_softmac_ifc_client_.is_valid()) {
-    FDF_LOG(ERROR, "WlantapMacStart() not called.");
+    FDF_LOG(ERROR, "%s: WlantapMacStart() not called.", name_.c_str());
     return;
   }
 
@@ -172,13 +176,14 @@ void WlantapPhy::ScanComplete(ScanCompleteRequestView request,
   wlan_softmac_ifc_client_.buffer(*arena)
       ->NotifyScanComplete(scan_complete_req)
       .ThenExactlyOnce(
-          [](fdf::WireUnownedResult<fuchsia_wlan_softmac::WlanSoftmacIfc::NotifyScanComplete>&
-                 result) {
+          [name = name_](
+              fdf::WireUnownedResult<fuchsia_wlan_softmac::WlanSoftmacIfc::NotifyScanComplete>&
+                  result) {
             if (!result.ok()) {
-              FDF_LOG(ERROR, "Failed to send scan complete notification up. Status: %s",
-                      zx_status_get_string(result.status()));
+              FDF_LOG(ERROR, "%s: Failed to send scan complete notification up. Status: %s",
+                      name.c_str(), zx_status_get_string(result.status()));
             } else {
-              FDF_LOG(INFO, "ScanComplete done");
+              FDF_LOG(INFO, "%s: ScanComplete done", name.c_str());
             }
           });
 }

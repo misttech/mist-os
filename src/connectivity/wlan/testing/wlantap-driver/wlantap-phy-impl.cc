@@ -6,6 +6,11 @@
 
 #include <lib/ddk/driver.h>
 #include <lib/driver/component/cpp/node_add_args.h>
+#include <lib/fidl/cpp/wire/status.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
+
+#include <utility>
 
 #include <bind/fuchsia/wlan/softmac/cpp/bind.h>
 #include <wlan/common/phy.h>
@@ -14,14 +19,92 @@
 
 namespace wlan {
 
+std::shared_ptr<WlanPhyImplDevice> WlanPhyImplDevice::New(
+    const std::shared_ptr<const WlantapDriverContext>& context, zx::channel user_channel,
+    const std::shared_ptr<const wlan_tap::WlantapPhyConfig>& phy_config,
+    NodeControllerClient phy_controller) {
+  auto device = std::shared_ptr<WlanPhyImplDevice>(new WlanPhyImplDevice(context, phy_config));
+  device->Init(std::move(user_channel), std::move(phy_controller));
+  return device;
+}
+
 WlanPhyImplDevice::WlanPhyImplDevice(
-    WlantapDriverContext context, zx::channel user_channel,
-    std::shared_ptr<wlan_tap::WlantapPhyConfig> phy_config,
-    fidl::ClientEnd<fuchsia_driver_framework::NodeController> phy_controller)
-    : driver_context_(std::move(context)),
-      phy_config_(std::move(phy_config)),
-      wlantap_phy_(std::make_unique<WlantapPhy>(std::move(user_channel), phy_config_,
-                                                std::move(phy_controller))) {}
+    const std::shared_ptr<const WlantapDriverContext>& context,
+    const std::shared_ptr<const wlan_tap::WlantapPhyConfig>& phy_config)
+    : driver_context_(context), phy_config_(phy_config) {}
+
+void WlanPhyImplDevice::Init(
+    zx::channel user_channel,
+    fidl::ClientEnd<fuchsia_driver_framework::NodeController> phy_controller) {
+  wlantap_phy_ = std::make_unique<WlantapPhy>(
+      std::move(user_channel), phy_config_,
+      [self = shared_from_this(),
+       name = name_](WlantapPhy::ShutdownCompleter::Async wlantap_phy_shutdown_completer)
+          -> fit::result<zx_status_t> {
+        // Return an error if this function is called more than once.
+        // On the first call, this function calls the deconstructor of
+        // the captured `shared_ptr` |self| to drop the reference.
+        static size_t call_count = 0;
+        ++call_count;
+        if (call_count > 1) {
+          FDF_LOG(ERROR, "%s: shutdown callback called more than once", name.c_str());
+          return fit::error(ZX_ERR_INTERNAL);
+        }
+
+        self->wlantap_phy_shutdown_completer_ = std::move(wlantap_phy_shutdown_completer);
+
+        // Unbind the WlanPhyImpl child node. This effectively blocks iface
+        // management from the outside.
+        auto phy_removal_status = self->phy_controller_->Remove();
+        fit::result<zx_status_t> result = fit::ok();
+        if (phy_removal_status.is_error()) {
+          FDF_LOG(ERROR, "%s: Could not remove phy: %s", name.c_str(),
+                  phy_removal_status.error_value().status_string());
+          self->ShutdownComplete();
+
+          result = fit::error(phy_removal_status.error_value().status());
+        }
+
+        // |call_count| protects this function from being called more than once.
+        self.~shared_ptr();
+        return result;
+      });
+
+  // The PhyControllerEventHandler class detects when NodeController server associated
+  // with the phy is no longer available. This normally occurs during shutdown.
+  class PhyControllerEventHandler
+      : public fidl::AsyncEventHandler<fuchsia_driver_framework::NodeController> {
+   public:
+    explicit PhyControllerEventHandler(std::shared_ptr<WlanPhyImplDevice> device)
+        : device_(std::move(device)) {}
+    void on_fidl_error(::fidl::UnbindInfo error) override {
+      // TODO(b/307809104): Determine which FIDL errors are
+      // normal during shutdown.
+      FDF_LOG(INFO, "%s: phy node unbound: %s", device_->name_.c_str(),
+              error.FormatDescription().c_str());
+
+      // If an iface exists, then iface destruction will call ShutdownComplete().
+      if (device_->IfaceExists()) {
+        auto status = device_->iface_controller_->Remove();
+        if (status.is_error()) {
+          FDF_LOG(ERROR, "%s: Could not remove iface: %s", device_->name_.c_str(),
+                  status.error_value().status_string());
+          device_->ShutdownComplete();
+        }
+      } else {
+        device_->ShutdownComplete();
+      }
+      delete this;
+    }
+    void handle_unknown_event(
+        fidl::UnknownEventMetadata<fuchsia_driver_framework::NodeController> metadata) override {}
+
+   private:
+    std::shared_ptr<WlanPhyImplDevice> device_;
+  };
+  phy_controller_.Bind(std::move(phy_controller), fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                       new PhyControllerEventHandler(shared_from_this()));
+}
 
 void WlanPhyImplDevice::GetSupportedMacRoles(fdf::Arena& arena,
                                              GetSupportedMacRolesCompleter::Sync& completer) {
@@ -51,6 +134,14 @@ void WlanPhyImplDevice::CreateIface(CreateIfaceRequestView request, fdf::Arena& 
     return;
   }
 
+  if (IfaceExists()) {
+    FDF_LOG(ERROR,
+            "%s: CreateIface(%s): Failed to create iface. wlantap only supports at most one iface.",
+            name_.c_str(), role_str.c_str());
+    completer.buffer(arena).ReplyError(ZX_ERR_ALREADY_EXISTS);
+    return;
+  }
+
   if (!request->mlme_channel().is_valid()) {
     FDF_LOG(ERROR, "%s: CreateIface(%s): MLME channel in request is invalid", name_.c_str(),
             role_str.c_str());
@@ -73,25 +164,39 @@ void WlanPhyImplDevice::CreateIface(CreateIfaceRequestView request, fdf::Arena& 
   completer.buffer(arena).ReplySuccess(resp);
 }
 
-void WlanPhyImplDevice::DestroyIface(DestroyIfaceRequestView request, fdf::Arena& arena,
-                                     DestroyIfaceCompleter::Sync& completer) {
-  FDF_LOG(INFO, "%s: received a 'DestroyIface' DDK request", name_.c_str());
-  if (!softmac_controller_.is_valid() || !wlantap_mac_) {
-    FDF_LOG(ERROR, "Iface doesn't exist");
-    completer.buffer(arena).ReplyError(ZX_ERR_NOT_FOUND);
-    return;
+bool WlanPhyImplDevice::IfaceExists() {
+  return this->iface_controller_.is_valid() && this->wlantap_mac_;
+}
+
+fit::result<zx_status_t> WlanPhyImplDevice::DestroyIface() {
+  if (!IfaceExists()) {
+    FDF_LOG(ERROR, "%s: Iface doesn't exist", name_.c_str());
+    return fit::error(ZX_ERR_NOT_FOUND);
   }
 
-  auto status = softmac_controller_->Remove();
-  if (!status.ok()) {
-    FDF_LOG(ERROR, "Failed to destroy iface: %s", status.status_string());
-    completer.buffer(arena).ReplyError(status.status());
-    return;
+  auto status = iface_controller_->Remove();
+  if (status.is_error()) {
+    FDF_LOG(ERROR, "%s: Failed to destroy iface: %s", name_.c_str(),
+            status.error_value().status_string());
+    return fit::error(status.error_value().status());
   }
 
   wlantap_mac_.reset();
 
-  completer.buffer(arena).ReplySuccess();
+  return fit::ok();
+}
+
+// Calls the stored ShutdownCompleter received through WlantapPhy.Shutdown().
+void WlanPhyImplDevice::ShutdownComplete() {
+  if (this->wlantap_phy_shutdown_completer_.has_value()) {
+    this->wlantap_phy_shutdown_completer_->Reply();
+  }
+}
+
+void WlanPhyImplDevice::DestroyIface(DestroyIfaceRequestView request, fdf::Arena& arena,
+                                     DestroyIfaceCompleter::Sync& completer) {
+  FDF_LOG(INFO, "%s: received a 'DestroyIface' DDK request", name_.c_str());
+  completer.buffer(arena).Reply(DestroyIface());
 }
 
 void WlanPhyImplDevice::SetCountry(SetCountryRequestView request, fdf::Arena& arena,
@@ -102,7 +207,7 @@ void WlanPhyImplDevice::SetCountry(SetCountryRequestView request, fdf::Arena& ar
   wlan_tap::SetCountryArgs args{.alpha2 = request->alpha2()};
   zx_status_t status = wlantap_phy_->SetCountry(args);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "SetCountry() failed: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "%s: SetCountry() failed: %s", name_.c_str(), zx_status_get_string(status));
     completer.buffer(arena).ReplyError(status);
     return;
   }
@@ -139,24 +244,49 @@ zx_status_t WlanPhyImplDevice::CreateWlanSoftmac(wlan_common::WlanMacRole role,
 
   auto endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
   if (endpoints.is_error()) {
-    FDF_LOG(ERROR, "Failed to create endpoints: %s", endpoints.status_string());
+    FDF_LOG(ERROR, "%s: Failed to create endpoints: %s", name_.c_str(), endpoints.status_string());
     return endpoints.status_value();
   }
 
   zx_status_t status = ServeWlanSoftmac(name, role, std::move(mlme_channel));
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "ServeWlanSoftmac failed: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "%s: ServeWlanSoftmac failed: %s", name_.c_str(), zx_status_get_string(status));
     return status;
   }
 
   status = AddWlanSoftmacChild(name, std::move(endpoints->server));
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "AddWlanSoftmacChild failed: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "%s: AddWlanSoftmacChild failed: %s", name_.c_str(),
+            zx_status_get_string(status));
     return status;
   }
 
-  // Bind softmac controller for DestroyIface()
-  softmac_controller_.Bind(std::move(endpoints->client));
+  // The IfaceControllerEventHandler class detects when NodeController server associated
+  // with an iface is no longer available. This normally occurs during shutdown.
+  class IfaceControllerEventHandler
+      : public fidl::AsyncEventHandler<fuchsia_driver_framework::NodeController> {
+   public:
+    explicit IfaceControllerEventHandler(std::shared_ptr<WlanPhyImplDevice> device)
+        : device_(std::move(device)) {}
+    void on_fidl_error(::fidl::UnbindInfo error) override {
+      // TODO(b/307809104): Determine which FIDL errors are
+      // normal during shutdown and iface destruction.
+      FDF_LOG(INFO, "%s: Iface node unbound: %s", device_->name_.c_str(),
+              error.FormatDescription().c_str());
+      if (device_->wlantap_phy_shutdown_completer_.has_value()) {
+        device_->ShutdownComplete();
+      }
+      delete this;
+    }
+    void handle_unknown_event(
+        fidl::UnknownEventMetadata<fuchsia_driver_framework::NodeController> metadata) override {}
+
+   private:
+    std::shared_ptr<WlanPhyImplDevice> device_;
+  };
+  iface_controller_.Bind(std::move(endpoints->client),
+                         fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                         new IfaceControllerEventHandler(shared_from_this()));
   return ZX_OK;
 }
 
@@ -166,7 +296,7 @@ zx_status_t WlanPhyImplDevice::AddWlanSoftmacChild(
 
   auto offers = std::vector{fdf::MakeOffer<fuchsia_wlan_softmac::Service>(arena, name)};
 
-  FDF_LOG(INFO, "Creating Child node");
+  FDF_LOG(INFO, "%s: Creating Child node", name_.c_str());
   auto properties = fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty>(arena, 1);
   properties[0] = fdf::MakeProperty(arena, bind_fuchsia_wlan_softmac::WLANSOFTMAC,
                                     bind_fuchsia_wlan_softmac::WLANSOFTMAC_DRIVERTRANSPORT);
@@ -177,15 +307,9 @@ zx_status_t WlanPhyImplDevice::AddWlanSoftmacChild(
                   .offers(offers)
                   .Build();
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
-  if (endpoints.is_error()) {
-    FDF_LOG(ERROR, "Failed to create endpoints: %s", endpoints.status_string());
-    return endpoints.status_value();
-  }
-
-  auto res = driver_context_.node_client()->AddChild(args, std::move(endpoints->server), {});
+  auto res = driver_context_->node_client()->AddChild(args, std::move(server), {});
   if (!res.ok()) {
-    FDF_LOG(ERROR, "failed to add child: %s", res.status_string());
+    FDF_LOG(ERROR, "%s: Failed to add child: %s", name_.c_str(), res.status_string());
     return res.status();
   }
 
@@ -196,22 +320,23 @@ zx_status_t WlanPhyImplDevice::ServeWlanSoftmac(std::string_view name,
                                                 wlan_common::WlanMacRole role,
                                                 zx::channel mlme_channel) {
   if (wlantap_mac_) {
-    FDF_LOG(ERROR, "Softmac already exists, only one allowed");
+    FDF_LOG(ERROR, "%s: Softmac already exists, only one allowed", name_.c_str());
     return ZX_ERR_ALREADY_EXISTS;
   }
 
   wlantap_mac_ =
       std::make_unique<WlantapMac>(wlantap_phy_.get(), role, phy_config_, std::move(mlme_channel));
 
-  FDF_LOG(INFO, "Adding softmac outgoing service");
+  FDF_LOG(INFO, "%s: Adding softmac outgoing service", name_.c_str());
   fuchsia_wlan_softmac::Service::InstanceHandler handler(
       {.wlan_softmac = wlantap_mac_->ProtocolHandler()});
 
-  zx::result result = driver_context_.outgoing()->AddService<fuchsia_wlan_softmac::Service>(
+  zx::result result = driver_context_->outgoing()->AddService<fuchsia_wlan_softmac::Service>(
       std::move(handler), name);
 
   if (result.is_error()) {
-    FDF_LOG(ERROR, "Failed To add WlanSoftmac service: %s", result.status_string());
+    FDF_LOG(ERROR, "%s: Failed To add WlanSoftmac service: %s", name_.c_str(),
+            result.status_string());
     return result.status_value();
   }
 

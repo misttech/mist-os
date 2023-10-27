@@ -24,8 +24,9 @@ class WlantapPhy : public fidl::WireServer<fuchsia_wlan_tap::WlantapPhy>,
                    public WlantapMac::Listener {
  public:
   WlantapPhy(zx::channel user_channel,
-             std::shared_ptr<wlan_tap::WlantapPhyConfig> phy_config,
-             fidl::ClientEnd<fuchsia_driver_framework::NodeController> phy_controller);
+             const std::shared_ptr<const wlan_tap::WlantapPhyConfig>& phy_config,
+             std::function<fit::result<zx_status_t>(WlantapPhy::ShutdownCompleter::Async)>
+                 phy_impl_shutdown_callback);
 
   zx_status_t SetCountry(wlan_tap::SetCountryArgs args);
 
@@ -52,7 +53,8 @@ class WlantapPhy : public fidl::WireServer<fuchsia_wlan_tap::WlantapPhy>,
   fidl::ServerBindingRef<fuchsia_wlan_tap::WlantapPhy> user_binding_;
   size_t report_tx_status_count_ = 0;
   fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmacIfc> wlan_softmac_ifc_client_;
-  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> phy_controller_;
+  std::function<fit::result<zx_status_t>(WlantapPhy::ShutdownCompleter::Async)>
+      phy_impl_shutdown_callback_;
 };
 
 }  // namespace wlan

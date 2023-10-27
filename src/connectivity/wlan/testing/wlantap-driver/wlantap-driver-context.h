@@ -22,17 +22,17 @@ class WlantapDriverContext {
                        fidl::WireSyncClient<fuchsia_driver_framework::Node>* node_client)
       : logger_(logger), outgoing_(std::move(outgoing)), node_client_(node_client) {}
 
-  fdf::Logger* logger() { return logger_; }
-  std::shared_ptr<fdf::OutgoingDirectory>& outgoing() { return outgoing_; }
-  fidl::WireSyncClient<fuchsia_driver_framework::Node>& node_client() {
+  const fdf::Logger* logger() const { return logger_; }
+  const std::shared_ptr<fdf::OutgoingDirectory>& outgoing() const { return outgoing_; }
+  const fidl::WireSyncClient<fuchsia_driver_framework::Node>& node_client() const {
     ZX_ASSERT(node_client_);
     return *node_client_;
   }
 
  private:
-  fdf::Logger* logger_;
-  std::shared_ptr<fdf::OutgoingDirectory> outgoing_;
-  fidl::WireSyncClient<fuchsia_driver_framework::Node>* node_client_;
+  const fdf::Logger* logger_;
+  const std::shared_ptr<fdf::OutgoingDirectory> outgoing_;
+  const fidl::WireSyncClient<fuchsia_driver_framework::Node>* node_client_;
 };
 
 }  // namespace wlan

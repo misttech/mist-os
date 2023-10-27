@@ -16,13 +16,20 @@ namespace wlan {
 
 // Serves the WlanPhyImpl protocol. This also creates an instance of WlantapPhy, which lets the test
 // suite control the state of the mock driver.
-class WlanPhyImplDevice : public fdf::WireServer<fuchsia_wlan_phyimpl::WlanPhyImpl> {
+class WlanPhyImplDevice : public fdf::WireServer<fuchsia_wlan_phyimpl::WlanPhyImpl>,
+                          public std::enable_shared_from_this<WlanPhyImplDevice> {
   using NodeControllerClient = fidl::ClientEnd<fuchsia_driver_framework::NodeController>;
 
  public:
-  WlanPhyImplDevice(WlantapDriverContext context, zx::channel user_channel,
-                    std::shared_ptr<wlan_tap::WlantapPhyConfig> phy_config,
-                    NodeControllerClient phy_controller);
+  WlanPhyImplDevice() = delete;
+
+  // Allocates a WlanPhyImplDevice into a std::shared_ptr so that WlanPhyImplDevice
+  // in its implementation can create additional references to the std::shared_ptr
+  // for use by WlantapPhy and shutdown callbacks.
+  static std::shared_ptr<WlanPhyImplDevice> New(
+      const std::shared_ptr<const WlantapDriverContext>& context, zx::channel user_channel,
+      const std::shared_ptr<const wlan_tap::WlantapPhyConfig>& phy_config,
+      NodeControllerClient phy_controller);
 
   // WlanPhyImpl protocol implementation
   void GetSupportedMacRoles(fdf::Arena& arena,
@@ -40,23 +47,37 @@ class WlanPhyImplDevice : public fdf::WireServer<fuchsia_wlan_phyimpl::WlanPhyIm
   void GetPowerSaveMode(fdf::Arena& arena, GetPowerSaveModeCompleter::Sync& completer) override;
 
  private:
-  zx_status_t CreateWlanSoftmac(wlan_common::WlanMacRole role, zx::channel mlme_channel);
+  WlanPhyImplDevice(const std::shared_ptr<const WlantapDriverContext>& context,
+                    const std::shared_ptr<const wlan_tap::WlantapPhyConfig>& phy_config);
+  void Init(zx::channel user_channel, NodeControllerClient phy_controller);
+
+  zx_status_t CreateWlanSoftmac(wlan_common::WlanMacRole role,
+                                zx::channel mlme_channel) __TA_NO_THREAD_SAFETY_ANALYSIS;
   zx_status_t AddWlanSoftmacChild(std::string_view name,
                                   fidl::ServerEnd<fuchsia_driver_framework::NodeController> server);
   zx_status_t ServeWlanSoftmac(std::string_view name, wlan_common::WlanMacRole role,
                                zx::channel mlme_channel);
 
-  WlantapDriverContext driver_context_;
+  bool IfaceExists();
+  fit::result<zx_status_t> DestroyIface();
+  void ShutdownComplete();
 
-  std::shared_ptr<wlan_tap::WlantapPhyConfig> phy_config_{};
+  const std::shared_ptr<const WlantapDriverContext> driver_context_;
+
+  const std::shared_ptr<const wlan_tap::WlantapPhyConfig> phy_config_{};
 
   std::string name_{"wlanphyimpl"};
 
-  std::unique_ptr<WlantapPhy> wlantap_phy_;
+  // Initialize in Init() with a shared_ptr to this instance.
+  std::unique_ptr<WlantapPhy> wlantap_phy_ = nullptr;
 
   std::unique_ptr<WlantapMac> wlantap_mac_;
 
-  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> softmac_controller_;
+  fidl::Client<fuchsia_driver_framework::NodeController> phy_controller_;
+
+  fidl::Client<fuchsia_driver_framework::NodeController> iface_controller_;
+
+  std::optional<WlantapPhy::ShutdownCompleter::Async> wlantap_phy_shutdown_completer_;
 };
 
 }  // namespace wlan

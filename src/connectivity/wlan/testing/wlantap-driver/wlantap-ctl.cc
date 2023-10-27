@@ -21,9 +21,9 @@ void WlantapCtlServer::CreatePhy(CreatePhyRequestView request,
 
   auto natural_config = fidl::ToNatural(request->config);
   auto wire_config = fidl::ToWire(phy_config_arena_, std::move(natural_config));
-  auto phy_config = std::make_shared<wlan_tap::WlantapPhyConfig>(wire_config);
+  const auto phy_config = std::make_shared<const wlan_tap::WlantapPhyConfig>(wire_config);
 
-  std::string_view instance_name = phy_config->name.get();
+  auto instance_name = phy_config->name.get();
 
   auto endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
   if (endpoints.is_error()) {
@@ -31,8 +31,9 @@ void WlantapCtlServer::CreatePhy(CreatePhyRequestView request,
     completer.Reply(endpoints.error_value());
   }
 
-  auto impl = std::make_unique<WlanPhyImplDevice>(driver_context_, request->proxy.TakeChannel(),
-                                                  phy_config, std::move(endpoints->client));
+  auto impl = WlanPhyImplDevice::New(driver_context_, request->proxy.TakeChannel(), phy_config,
+                                     std::move(endpoints->client));
+
   zx_status_t status = ServeWlanPhyImplProtocol(instance_name, std::move(impl));
   if (status != ZX_OK) {
     FDF_LOG(ERROR, "ServeWlanPhyImplProtocol failed: %s", zx_status_get_string(status));
@@ -66,7 +67,7 @@ zx_status_t WlantapCtlServer::AddWlanPhyImplChild(
                   .offers(offers)
                   .Build();
 
-  auto res = driver_context_.node_client()->AddChild(args, std::move(server), {});
+  auto res = driver_context_->node_client()->AddChild(args, std::move(server), {});
   if (!res.ok()) {
     FDF_LOG(ERROR, "Failed to add WlanPhyImpl child: %s", res.status_string());
     return res.status();
@@ -75,7 +76,7 @@ zx_status_t WlantapCtlServer::AddWlanPhyImplChild(
 }
 
 zx_status_t WlantapCtlServer::ServeWlanPhyImplProtocol(std::string_view name,
-                                                       std::unique_ptr<WlanPhyImplDevice> impl) {
+                                                       std::shared_ptr<WlanPhyImplDevice> impl) {
   auto protocol_handler =
       [impl = std::move(impl)](fdf::ServerEnd<fuchsia_wlan_phyimpl::WlanPhyImpl> request) mutable {
         fdf::BindServer(fdf::Dispatcher::GetCurrent()->get(), std::move(request), std::move(impl));
@@ -84,7 +85,7 @@ zx_status_t WlantapCtlServer::ServeWlanPhyImplProtocol(std::string_view name,
   fuchsia_wlan_phyimpl::Service::InstanceHandler handler(
       {.wlan_phy_impl = std::move(protocol_handler)});
 
-  zx::result result = driver_context_.outgoing()->AddService<fuchsia_wlan_phyimpl::Service>(
+  zx::result result = driver_context_->outgoing()->AddService<fuchsia_wlan_phyimpl::Service>(
       std::move(handler), name);
 
   if (result.is_error()) {
