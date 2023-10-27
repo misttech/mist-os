@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 library fuchsia.inspect;
 
-@available(added=HEAD)
+@available(added=16)
 const MAX_NAME_LENGTH uint64 = 4096;
 
-@available(added=HEAD)
+@available(added=16)
 @discoverable
 closed protocol InspectSink {
     /// Publishes a handle to the `fuchsia.inspect.Tree` protocol that the server can use to read
