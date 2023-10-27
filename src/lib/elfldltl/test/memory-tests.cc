@@ -101,7 +101,7 @@ TEST(ElfldltlDirectMemoryTests, MemoryApi) {
 
 TEST(ElfldltlMemoryTests, NoArrayFromFile) {
   auto result = elfldltl::NoArrayFromFile<char>()(1);
-  static_assert(std::is_convertible_v<decltype(result.value()), cpp20::span<const char>>);
+  static_assert(std::is_convertible_v<decltype(result.value()), cpp20::span<char>>);
   EXPECT_FALSE(result.has_value());
 }
 

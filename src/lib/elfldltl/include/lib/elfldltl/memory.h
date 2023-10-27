@@ -95,15 +95,6 @@ namespace elfldltl {
 // but other implementations need one.  A few common convenience Allocator
 // implementations are provided here.
 
-// This is the stub implementation of the Allocator API that can be used with
-// DirectMemory or other implementations that never call it.
-template <typename T>
-struct NoArrayFromFile {
-  using Result = cpp20::span<const T>;
-
-  std::optional<Result> operator()(size_t size) const { return std::nullopt; }
-};
-
 // This is an implementation of the Allocator API for File::ReadArrayFromFile
 // that uses plain `new (alloc_checker) T[count]`.  Its return value object
 // owns the data via `std::unique_ptr<T[]>` or equivalent type given as the
@@ -134,6 +125,8 @@ class NewArrayFromFile {
 
     constexpr operator cpp20::span<T>() const { return get(); }
 
+    constexpr operator cpp20::span<const T>() const { return get(); }
+
    private:
     Ptr ptr_;
     size_t size_ = 0;
@@ -161,6 +154,16 @@ class NewArrayFromFile {
   }
 
   std::tuple<Args...> args_;
+};
+
+// This is the stub implementation of the Allocator API that can be used with
+// DirectMemory or other implementations that never call it.
+template <typename T>
+struct NoArrayFromFile {
+  // Reuse the Result type that has the right API.  It will never be returned.
+  using Result = typename NewArrayFromFile<T>::Result;
+
+  constexpr std::optional<Result> operator()(size_t size) const { return std::nullopt; }
 };
 
 // This is an implementation of the Allocator API for File::ReadArrayFromFile

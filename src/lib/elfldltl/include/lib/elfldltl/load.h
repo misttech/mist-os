@@ -115,7 +115,7 @@ constexpr bool WithLoadHeadersFromFile(Diagnostics& diagnostics, File& file, Cal
     if (!read_phdrs) [[unlikely]] {
       return false;
     }
-    cpp20::span<const Phdr> phdrs = read_phdrs->get();
+    cpp20::span<const Phdr> phdrs = *read_phdrs;
     return std::invoke(std::forward<Callback>(callback), ehdr, phdrs);
   };
 
