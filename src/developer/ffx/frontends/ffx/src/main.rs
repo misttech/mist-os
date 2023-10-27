@@ -159,14 +159,9 @@ async fn run_legacy_subcommand(
 ) -> Result<()> {
     let daemon_version_string = DaemonVersionCheck::SameBuildId(context.daemon_version_string()?);
     tracing::debug!("initializing overnet");
-    let injector = Injection::initialize_overnet(
-        context,
-        None,
-        daemon_version_string,
-        app.global.machine,
-        app.global.target().await?,
-    )
-    .await?;
+    let injector =
+        Injection::initialize_overnet(context, None, daemon_version_string, app.global.machine)
+            .await?;
     tracing::debug!("Overnet initialized, creating injector");
     let injector: Arc<dyn ffx_core::Injector> = Arc::new(injector);
     ffx_lib_suite::ffx_plugin_impl(&injector, subcommand).await

@@ -141,7 +141,6 @@ impl<T: FfxTool> FhoTool<T> {
             None,
             DaemonVersionCheck::SameVersionInfo(build_info),
             ffx.global.machine,
-            ffx.global.target().await?,
         )
         .await?;
         let redacted_args = ffx.redact_subcmd(&tool);

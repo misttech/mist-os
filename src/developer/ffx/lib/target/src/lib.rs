@@ -14,6 +14,7 @@ use futures::{select, Future, FutureExt};
 use std::time::Duration;
 use thiserror::Error;
 use timeout::timeout;
+use tracing::info;
 
 /// Re-export of [`fidl_fuchsia_developer_ffx::TargetProxy`] for ease of use
 pub use fidl_fuchsia_developer_ffx::TargetProxy;
@@ -164,15 +165,11 @@ pub async fn maybe_inline_target(
     target: Option<String>,
     env_context: &EnvironmentContext,
 ) -> Option<TargetKind> {
-    match target {
-        Some(t) => {
-            if env_context.get(FASTBOOT_INLINE_TARGET).await.unwrap_or(false) {
-                Some(TargetKind::FastbootInline(t))
-            } else {
-                Some(TargetKind::Normal(t))
-            }
-        }
-        None => None,
+    let target = target?;
+    if env_context.get(FASTBOOT_INLINE_TARGET).await.unwrap_or(false) {
+        Some(TargetKind::FastbootInline(target))
+    } else {
+        Some(TargetKind::Normal(target))
     }
 }
 
@@ -223,7 +220,8 @@ pub async fn knock_target_with_timeout(
 /// common use of this functionality would be to specify an array of environment
 /// variables, e.g. ["$FUCHSIA_TARGET_ADDR", "FUCHSIA_NODENAME"])
 pub async fn get_default_target(context: &EnvironmentContext) -> Result<Option<String>> {
-    let target = ffx_config::query(TARGET_DEFAULT_KEY).context(Some(context)).get().await?;
+    let target = context.get(TARGET_DEFAULT_KEY).await?;
+    info!("Default target resolved to {target:?}");
     Ok(target)
 }
 

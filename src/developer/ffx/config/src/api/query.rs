@@ -13,6 +13,7 @@ use std::{
     default::Default,
     path::{Path, PathBuf},
 };
+use tracing::debug;
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum SelectMode {
@@ -92,6 +93,7 @@ impl<'a> ConfigQuery<'a> {
     }
 
     async fn get_config(&self, env: Environment) -> ConfigResult {
+        debug!("{self}");
         let config = env.config_from_cache(self.build).await?;
         let read_guard = config.read().await;
         let result = match self {
@@ -234,6 +236,26 @@ impl<'a> ConfigQuery<'a> {
         };
 
         write_guard.save().await
+    }
+}
+
+impl<'a> std::fmt::Display for ConfigQuery<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Self { name, level, build, select, .. } = self;
+        let mut sep = "";
+        if let Some(name) = name {
+            write!(f, "{sep}key='{name}'")?;
+            sep = ", ";
+        }
+        if let Some(level) = level {
+            write!(f, "{sep}level={level:?}")?;
+            sep = ", ";
+        }
+        if let Some(build) = build {
+            write!(f, "{sep}build_override={build:?}")?;
+            sep = ", ";
+        }
+        write!(f, "{sep}select={select:?}")
     }
 }
 

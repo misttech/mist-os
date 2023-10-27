@@ -79,13 +79,12 @@ impl Injection {
         router_interval: Option<Duration>,
         daemon_check: DaemonVersionCheck,
         format: Option<Format>,
-        target: Option<String>,
     ) -> ffx_command_error::Result<Injection> {
         tracing::debug!("Initializing Overnet");
         let node = overnet_core::Router::new(router_interval)
             .bug_context("Failed to initialize overnet")?;
         tracing::debug!("Getting target");
-        let target = ffx_target::maybe_inline_target(target, &env_context).await;
+        let target = ffx_target::resolve_default_target(&env_context).await?;
         tracing::debug!("Building Injection");
         Ok(Injection::new(env_context, daemon_check, node, format, target))
     }
