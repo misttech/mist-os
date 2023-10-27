@@ -6,7 +6,7 @@ use crate::error::{Error, Result};
 use crate::stream;
 use crate::{Node, Quality};
 
-use futures::channel::mpsc::{channel, unbounded, Sender, UnboundedReceiver, UnboundedSender};
+use futures::channel::mpsc::{channel, unbounded, Receiver, Sender, UnboundedSender};
 use futures::channel::oneshot;
 use futures::future::Either;
 use futures::prelude::*;
@@ -53,7 +53,7 @@ pub async fn multi_stream(
     writer: stream::Writer,
     is_server: bool,
     streams_out: Sender<(stream::Reader, stream::Writer, oneshot::Sender<Result<()>>)>,
-    streams_in: UnboundedReceiver<(stream::Reader, stream::Writer)>,
+    streams_in: Receiver<(stream::Reader, stream::Writer)>,
     stream_errors_out: UnboundedSender<Error>,
     remote_name: String,
 ) -> Result<()> {
@@ -408,7 +408,7 @@ pub fn multi_stream_node_connection(
     stream_errors_out: UnboundedSender<Error>,
     remote_name: String,
 ) -> impl Future<Output = Result<()>> + Send {
-    let (new_stream_sender, streams_in) = unbounded();
+    let (mut new_stream_sender, streams_in) = channel(1);
     let (streams_out, new_stream_receiver) = channel(1);
 
     let control_stream = if is_server {
@@ -416,7 +416,7 @@ pub fn multi_stream_node_connection(
         let (control_reader_remote, control_writer) = stream::stream();
 
         new_stream_sender
-            .unbounded_send((control_reader_remote, control_writer_remote))
+            .try_send((control_reader_remote, control_writer_remote))
             .expect("We just created this channel!");
         Some((control_reader, control_writer))
     } else {
@@ -531,8 +531,8 @@ mod test {
     async fn one_stream() {
         let (a_reader, b_writer) = stream::stream();
         let (b_reader, a_writer) = stream::stream();
-        let (mut create_stream_a, a_streams_in) = unbounded();
-        let (_create_stream_b, b_streams_in) = unbounded();
+        let (mut create_stream_a, a_streams_in) = channel(1);
+        let (_create_stream_b, b_streams_in) = channel(1);
         let (a_streams_out, _get_stream_a) = channel(100);
         let (b_streams_out, mut get_stream_b) = channel(1);
         // Connection closure errors are very timing-dependent so we'll tend to be flaky if we
@@ -627,8 +627,8 @@ mod test {
     async fn fallible_stream() {
         let (a_reader, b_writer) = stream::stream();
         let (b_reader, a_writer) = stream::stream();
-        let (mut create_stream_a, a_streams_in) = unbounded();
-        let (_create_stream_b, b_streams_in) = unbounded();
+        let (mut create_stream_a, a_streams_in) = channel(1);
+        let (_create_stream_b, b_streams_in) = channel(1);
         let (a_streams_out, _get_stream_a) = channel(100);
         let (b_streams_out, mut get_stream_b) = channel(1);
         let (errors_sink_a, _black_hole) = unbounded();
@@ -750,8 +750,8 @@ mod test {
     async fn two_streams() {
         let (a_reader, b_writer) = stream::stream();
         let (b_reader, a_writer) = stream::stream();
-        let (mut create_stream_a, a_streams_in) = unbounded();
-        let (mut create_stream_b, b_streams_in) = unbounded();
+        let (mut create_stream_a, a_streams_in) = channel(1);
+        let (mut create_stream_b, b_streams_in) = channel(1);
         let (a_streams_out, mut get_stream_a) = channel(1);
         let (b_streams_out, mut get_stream_b) = channel(1);
         // Connection closure errors are very timing-dependent so we'll tend to be flaky if we

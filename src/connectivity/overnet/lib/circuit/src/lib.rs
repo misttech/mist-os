@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use fuchsia_async::Timer;
-use futures::channel::mpsc::{Sender, UnboundedSender};
+use futures::channel::mpsc::Sender;
 use futures::channel::oneshot;
 use futures::future::{poll_fn, Either};
 use futures::stream::StreamExt as _;
@@ -40,8 +40,7 @@ use crate::protocol::ProtocolMessage;
 /// quality values for hops to that peer (see `header::NodeState::Online`).
 struct PeerMap {
     /// The actual map of peers itself.
-    peers:
-        HashMap<EncodableString, Vec<(UnboundedSender<(stream::Reader, stream::Writer)>, Quality)>>,
+    peers: HashMap<EncodableString, Vec<(Sender<(stream::Reader, stream::Writer)>, Quality)>>,
     /// This value increments once every time the peer map changes. Consequently, we can track
     /// changes in this number to determine when a routing refresh is necessary.
     generation: usize,
@@ -95,10 +94,8 @@ impl PeerMap {
     /// Get the list of peers mutably, and signal the routing task that we have modified it.
     fn peers(
         &mut self,
-    ) -> &mut HashMap<
-        EncodableString,
-        Vec<(UnboundedSender<(stream::Reader, stream::Writer)>, Quality)>,
-    > {
+    ) -> &mut HashMap<EncodableString, Vec<(Sender<(stream::Reader, stream::Writer)>, Quality)>>
+    {
         self.increment_generation();
         &mut self.peers
     }
@@ -275,7 +272,7 @@ impl Node {
     pub fn link_node(
         &self,
         control_stream: Option<(stream::Reader, stream::Writer)>,
-        new_stream_sender: UnboundedSender<(stream::Reader, stream::Writer)>,
+        new_stream_sender: Sender<(stream::Reader, stream::Writer)>,
         mut new_stream_receiver: impl futures::Stream<Item = (stream::Reader, stream::Writer, oneshot::Sender<Result<()>>)>
             + Unpin
             + Send,
@@ -381,7 +378,7 @@ impl Node {
     fn handle_control_stream(
         &self,
         control_reader: oneshot::Receiver<stream::Reader>,
-        new_stream_sender: UnboundedSender<(stream::Reader, stream::Writer)>,
+        new_stream_sender: Sender<(stream::Reader, stream::Writer)>,
         quality: Quality,
     ) -> impl Future<Output = Result<()>> + Send {
         let peers = Arc::clone(&self.peers);
@@ -450,7 +447,7 @@ impl Node {
                     Item = (stream::Reader, stream::Writer, oneshot::Sender<Result<()>>),
                 > + Unpin,
         >,
-        new_stream_sender: UnboundedSender<(stream::Reader, stream::Writer)>,
+        new_stream_sender: Sender<(stream::Reader, stream::Writer)>,
     ) -> impl Future<Output = ()> {
         let peers = Arc::clone(&self.peers);
         let mut incoming_stream_sender = self.incoming_stream_sender.clone();

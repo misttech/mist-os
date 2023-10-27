@@ -4,7 +4,7 @@
 
 use crate::*;
 use fuchsia_async as fasync;
-use futures::channel::mpsc::{channel, unbounded};
+use futures::channel::mpsc::channel;
 use futures::channel::oneshot::channel as oneshot;
 use futures::stream::StreamExt;
 
@@ -17,10 +17,10 @@ async fn connect_nodes(a: &Node, b: &Node) -> impl std::future::Future<Output = 
     let (read_a_control_writer, a_control_writer) = stream::stream();
     let (b_control_reader, write_b_control_reader) = stream::stream();
     let (read_b_control_writer, b_control_writer) = stream::stream();
-    let (a_new_stream_sender, mut a_new_streams) = unbounded();
-    let (b_new_stream_sender, mut b_new_streams) = unbounded();
-    let (mut a_new_stream_requests, a_new_stream_receiver) = unbounded();
-    let (mut b_new_stream_requests, b_new_stream_receiver) = unbounded();
+    let (a_new_stream_sender, mut a_new_streams) = channel(1);
+    let (b_new_stream_sender, mut b_new_streams) = channel(1);
+    let (mut a_new_stream_requests, a_new_stream_receiver) = channel(1);
+    let (mut b_new_stream_requests, b_new_stream_receiver) = channel(1);
     let a_runner = a.link_node(
         Some((read_a_control_writer, write_a_control_reader)),
         a_new_stream_sender,
