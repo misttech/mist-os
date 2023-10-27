@@ -318,6 +318,7 @@ sdk_molecule("host_tools") {
     "//src/developer/ffx/plugins/package:sdk",
     "//src/developer/ffx/plugins/product:sdk",
     "//src/developer/ffx/plugins/scrutiny:sdk",
+    "//src/developer/ffx/plugins/test:sdk",
     "//src/performance/trace2json:bin_sdk",
     "//src/storage/bin/fvm:fvm_sdk",
     "//src/storage/blobfs/tools:blobfs_sdk",

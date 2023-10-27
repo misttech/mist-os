@@ -64,4 +64,23 @@ ffx_tool("ffx_test_tool") {
     "//src/lib/fuchsia-async",
   ]
   sources = [ "src/main.rs" ]
+
+  sdk_target_name = "sdk"
+  sdk_category = "partner"
+}
+
+group("test") {
+  public_deps = [
+    ":ffx_test_tool",
+    ":ffx_test_tool_host_tool",
+  ]
+}
+
+group("bin") {
+  public_deps = [ ":ffx_test_tool_versioned" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [ ":ffx_test_tests($host_toolchain)" ]
 }

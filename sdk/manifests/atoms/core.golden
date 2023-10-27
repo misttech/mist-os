@@ -230,6 +230,7 @@
 //src/developer/ffx/plugins/package:sdk
 //src/developer/ffx/plugins/product:sdk
 //src/developer/ffx/plugins/scrutiny:sdk
+//src/developer/ffx/plugins/test:sdk
 //src/developer/ffx:bin_sdk
 //src/devices/bin/driver_runtime:driver_runtime_sdk_manifest
 //src/devices/bind/fuchsia.arm.platform:fuchsia.arm.platform_sdk
