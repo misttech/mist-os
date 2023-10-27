@@ -95,11 +95,16 @@ zx::result<fidl::VectorView<fuchsia_hardware_sdmmc::wire::SdmmcReq>> BanjoToFidl
 namespace sdmmc {
 
 zx_status_t SdmmcDevice::Init(bool try_to_use_fidl) {
+  // Reset any previous initializations in a way that works with unit testing.
+  use_fidl_ = try_to_use_fidl;
+
   if (try_to_use_fidl && root_device_ != nullptr) {
     auto client_end =
         root_device_->DdkConnectRuntimeProtocol<fuchsia_hardware_sdmmc::SdmmcService::Sdmmc>();
-    if (client_end.is_ok()) {
-      client_.Bind(std::move(*client_end), fdf::Dispatcher::GetCurrent()->get());
+    if (!client_end.is_ok()) {
+      use_fidl_ = false;
+    } else {
+      client_ = fdf::WireSharedClient(std::move(*client_end), fdf::Dispatcher::GetCurrent()->get());
 
       fdf::Arena arena('SDMC');
       auto result = client_.sync().buffer(arena)->HostInfo();
