@@ -16,7 +16,9 @@ namespace {
 TEST(CanonicalNamesTests, BadCollision) {
   TestLibrary library;
   library.AddFile("bad/fi-0035.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrNameCollisionCanonical);
+  library.ExpectFail(fidl::ErrNameCollisionCanonical, "Color", "COLOR", "bad/fi-0035.test.fidl:6:7",
+                     "color");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(CanonicalNamesTests, GoodCollisionFixRename) {
@@ -292,10 +294,9 @@ library example;
 @FooBar
 type Example = struct {};
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateAttributeCanonical);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "fooBar");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "FooBar");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "foo_bar");
+  library.ExpectFail(fidl::ErrDuplicateAttributeCanonical, "FooBar", "fooBar", "example.fidl:4:2",
+                     "foo_bar");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(CanonicalNamesTests, BadAttributeArguments) {
@@ -305,10 +306,9 @@ library example;
 @some_attribute(fooBar="", FooBar="")
 type Example = struct {};
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateAttributeArgCanonical);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "fooBar");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "FooBar");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "foo_bar");
+  library.ExpectFail(fidl::ErrDuplicateAttributeArgCanonical, "some_attribute", "FooBar", "fooBar",
+                     "example.fidl:4:17", "foo_bar");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(CanonicalNamesTests, BadStructMembers) {
@@ -320,11 +320,10 @@ type MyStruct = struct {
     MyStructMember uint64;
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementNameCanonical);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "struct member");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "myStructMember");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "MyStructMember");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "my_struct_member");
+  library.ExpectFail(fidl::ErrDuplicateElementNameCanonical,
+                     fidl::flat::Element::Kind::kStructMember, "MyStructMember", "myStructMember",
+                     "example.fidl:5:5", "my_struct_member");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(CanonicalNamesTests, BadTableMembers) {
@@ -336,11 +335,10 @@ type MyTable = table {
     2: MyField bool;
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementNameCanonical);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "table member");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "myField");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "MyField");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "my_field");
+  library.ExpectFail(fidl::ErrDuplicateElementNameCanonical,
+                     fidl::flat::Element::Kind::kTableMember, "MyField", "myField",
+                     "example.fidl:5:8", "my_field");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(CanonicalNamesTests, BadUnionMembers) {
@@ -352,11 +350,10 @@ type MyUnion = union {
     2: MyVariant bool;
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementNameCanonical);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "union member");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "myVariant");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "MyVariant");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "my_variant");
+  library.ExpectFail(fidl::ErrDuplicateElementNameCanonical,
+                     fidl::flat::Element::Kind::kUnionMember, "MyVariant", "myVariant",
+                     "example.fidl:5:8", "my_variant");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(CanonicalNamesTests, BadEnumMembers) {
@@ -368,11 +365,9 @@ type Example = enum {
   FooBar = 2;
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementNameCanonical);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "enum member");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "fooBar");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "FooBar");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "foo_bar");
+  library.ExpectFail(fidl::ErrDuplicateElementNameCanonical, fidl::flat::Element::Kind::kEnumMember,
+                     "FooBar", "fooBar", "example.fidl:5:3", "foo_bar");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(CanonicalNamesTests, BadBitsMembers) {
@@ -384,11 +379,9 @@ type MyBits = bits {
     FooBar = 2;
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementNameCanonical);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "bits member");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "fooBar");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "FooBar");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "foo_bar");
+  library.ExpectFail(fidl::ErrDuplicateElementNameCanonical, fidl::flat::Element::Kind::kBitsMember,
+                     "FooBar", "fooBar", "example.fidl:5:5", "foo_bar");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(CanonicalNamesTests, BadProtocolMethods) {
@@ -409,11 +402,10 @@ protocol Example {
   example(struct { fooBar bool; FooBar bool; }) -> ();
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementNameCanonical);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "struct member");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "fooBar");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "FooBar");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "foo_bar");
+  library.ExpectFail(fidl::ErrDuplicateElementNameCanonical,
+                     fidl::flat::Element::Kind::kStructMember, "FooBar", "fooBar",
+                     "example.fidl:5:20", "foo_bar");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(CanonicalNamesTests, BadMethodResults) {
@@ -424,11 +416,10 @@ protocol Example {
   example() -> (struct { fooBar bool; FooBar bool; });
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementNameCanonical);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "struct member");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "fooBar");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "FooBar");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "foo_bar");
+  library.ExpectFail(fidl::ErrDuplicateElementNameCanonical,
+                     fidl::flat::Element::Kind::kStructMember, "FooBar", "fooBar",
+                     "example.fidl:5:26", "foo_bar");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(CanonicalNamesTests, BadServiceMembers) {
@@ -442,11 +433,10 @@ service MyService {
     MyServiceMember client_end:MyProtocol;
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementNameCanonical);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "service member");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "myServiceMember");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "MyServiceMember");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "my_service_member");
+  library.ExpectFail(fidl::ErrDuplicateElementNameCanonical,
+                     fidl::flat::Element::Kind::kServiceMember, "MyServiceMember",
+                     "myServiceMember", "example.fidl:7:5", "my_service_member");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(CanonicalNamesTests, BadResourceProperties) {
@@ -461,17 +451,17 @@ resource_definition MyResource : uint32 {
     };
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementNameCanonical);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "resource property");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "rights");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "Rights");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "rights");
+  library.ExpectFail(fidl::ErrDuplicateElementNameCanonical,
+                     fidl::flat::Element::Kind::kResourceProperty, "Rights", "rights",
+                     "example.fidl:7:9", "rights");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(CanonicalNamesTests, BadMemberValues) {
   TestLibrary library;
   library.AddFile("bad/fi-0054.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrMemberNotFound);
+  library.ExpectFail(fidl::ErrMemberNotFound, "enum 'Enum'", "FOO_BAR");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(CanonicalNamesTests, BadUpperAcronym) {
@@ -481,10 +471,9 @@ library example;
 type HTTPServer = struct {};
 type HttpServer = struct {};
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrNameCollisionCanonical);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "HTTPServer");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "HttpServer");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "http_server");
+  library.ExpectFail(fidl::ErrNameCollisionCanonical, "HttpServer", "HTTPServer",
+                     "example.fidl:4:6", "http_server");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(CanonicalNamesTests, BadDependentLibrary) {
@@ -502,9 +491,8 @@ using foobar;
 
 alias FOOBAR = foobar.Something;
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDeclNameConflictsWithLibraryImportCanonical);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "FOOBAR");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "foobar");
+  library.ExpectFail(fidl::ErrDeclNameConflictsWithLibraryImportCanonical, "FOOBAR", "foobar");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(CanonicalNamesTests, BadVariousCollisions) {
@@ -553,9 +541,9 @@ library example;
 type it_is_the_same = struct {};
 type it__is___the____same = struct {};
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrNameCollisionCanonical);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "it_is_the_same");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "it__is___the____same");
+  library.ExpectFail(fidl::ErrNameCollisionCanonical, "it_is_the_same", "it__is___the____same",
+                     "example.fidl:5:6", "it_is_the_same");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(CanonicalNamesTests, BadInconsistentTypeSpelling) {
@@ -608,7 +596,8 @@ TEST(CanonicalNamesTests, BadInconsistentConstSpelling) {
       << "const EXAMPLE bool = " << use_name << ";\n";
     const auto fidl = s.str();
     TestLibrary library(fidl);
-    ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrNameNotFound);
+    library.ExpectFail(fidl::ErrNameNotFound, use_name, "example");
+    ASSERT_COMPILER_DIAGNOSTICS(library);
   }
 }
 

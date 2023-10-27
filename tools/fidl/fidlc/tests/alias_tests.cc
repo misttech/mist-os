@@ -22,7 +22,8 @@ type Message = struct {
 alias alias_of_int16 = int16;
 alias alias_of_int16 = int16;
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrNameCollision);
+  library.ExpectFail(fidl::ErrNameCollision, "alias_of_int16", "example.fidl:8:7");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AliasTests, GoodAliasOfStruct) {
@@ -109,14 +110,15 @@ type Message = struct {
     f uint32;
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrIncludeCycle);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "alias 'uint32' -> alias 'uint32'");
+  library.ExpectFail(fidl::ErrIncludeCycle, "alias 'uint32' -> alias 'uint32'");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AliasTests, BadNoOptionalOnPrimitive) {
   TestLibrary library;
   library.AddFile("bad/fi-0156.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrCannotBeOptional);
+  library.ExpectFail(fidl::ErrCannotBeOptional, "int16");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AliasTests, BadMultipleConstraintsOnPrimitive) {
@@ -128,20 +130,23 @@ type Bad = struct {
 };
 
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrTooManyConstraints);
+  library.ExpectFail(fidl::ErrTooManyConstraints, "int64", 0, 3);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AliasTests, BadInvalidSizeConstraintType) {
   TestLibrary library;
   library.AddFile("bad/fi-0101-a.test.fidl");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrTypeCannotBeConvertedToType,
-                                      fidl::ErrCouldNotResolveSizeBound);
+  library.ExpectFail(fidl::ErrTypeCannotBeConvertedToType, "\"255\"", "string:3", "uint32");
+  library.ExpectFail(fidl::ErrCouldNotResolveSizeBound);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AliasTests, BadInvalidSizeConstraintIsNotValue) {
   TestLibrary library;
   library.AddFile("bad/fi-0101-b.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrCouldNotResolveSizeBound);
+  library.ExpectFail(fidl::ErrCouldNotResolveSizeBound);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AliasTests, BadNoOptionalOnAliasedPrimitive) {
@@ -155,7 +160,8 @@ type Bad = struct {
 };
 
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrCannotBeOptional);
+  library.ExpectFail(fidl::ErrCannotBeOptional, "alias");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AliasTests, GoodVectorParameterizedOnDecl) {
@@ -199,10 +205,9 @@ type Message = struct {
 
 alias alias_of_vector = vector;
 )FIDL");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrWrongNumberOfLayoutParameters,
-                                      fidl::ErrWrongNumberOfLayoutParameters);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "vector expected 1 layout parameter(s)");
-  ASSERT_SUBSTR(library.errors()[1]->msg.c_str(), "alias_of_vector expected 0 layout parameter(s)");
+  library.ExpectFail(fidl::ErrWrongNumberOfLayoutParameters, "alias_of_vector", 0, 1);
+  library.ExpectFail(fidl::ErrWrongNumberOfLayoutParameters, "vector", 1, 0);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AliasTests, BadVectorBoundedOnDecl) {
@@ -215,11 +220,9 @@ type Message = struct {
 
 alias alias_of_vector_max_8 = vector:8;
 )FIDL");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrWrongNumberOfLayoutParameters,
-                                      fidl::ErrWrongNumberOfLayoutParameters);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "vector expected 1 layout parameter(s)");
-  ASSERT_SUBSTR(library.errors()[1]->msg.c_str(),
-                "alias_of_vector_max_8 expected 0 layout parameter(s)");
+  library.ExpectFail(fidl::ErrWrongNumberOfLayoutParameters, "alias_of_vector_max_8", 0, 1);
+  library.ExpectFail(fidl::ErrWrongNumberOfLayoutParameters, "vector", 1, 0);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AliasTests, GoodVectorBoundedOnUse) {
@@ -333,21 +336,24 @@ type Message = struct {
 
 alias alias_of_vector_of_string = vector<string>;
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrWrongNumberOfLayoutParameters);
+  library.ExpectFail(fidl::ErrWrongNumberOfLayoutParameters, "alias_of_vector_of_string", 0, 1);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AliasTests, BadCannotBoundTwice) {
   TestLibrary library;
   library.AddFile("bad/fi-0158.test.fidl");
 
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrCannotBoundTwice);
+  library.ExpectFail(fidl::ErrCannotBoundTwice, "ByteVec256");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AliasTests, BadCannotNullTwice) {
   TestLibrary library;
   library.AddFile("bad/fi-0160.test.fidl");
 
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrCannotIndicateOptionalTwice);
+  library.ExpectFail(fidl::ErrCannotIndicateOptionalTwice, "MyAlias");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AliasTests, GoodMultiFileAliasReference) {
@@ -397,9 +403,9 @@ type TheStruct = struct {
 };
 )FIDL");
 
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrIncludeCycle);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(),
-                "alias 'TheAlias' -> struct 'TheStruct' -> alias 'TheAlias'");
+  library.ExpectFail(fidl::ErrIncludeCycle,
+                     "alias 'TheAlias' -> struct 'TheStruct' -> alias 'TheAlias'");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AliasTests, BadCompoundIdentifier) {
@@ -409,7 +415,10 @@ library example;
 alias foo.bar.baz = uint8;
 )FIDL");
 
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrUnexpectedTokenOfKind);
+  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kDot),
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kEqual));
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AliasTests, GoodUsingLibrary) {

@@ -303,9 +303,9 @@ TEST(AttributesTests, BadNoAttributeOnUsingNotEventDoc) {
   ASSERT_COMPILED(dependency);
   TestLibrary library(&shared);
   library.AddFile("bad/fi-0045-b.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrAttributesNotAllowedOnLibraryImport);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "doc comment");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "also_not_allowed");
+  library.ExpectFail(fidl::ErrAttributesNotAllowedOnLibraryImport,
+                     "(doc comment), also_not_allowed");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 // Test that a duplicate attribute is caught, and nicely reported.
@@ -320,16 +320,17 @@ protocol A {
 };
 
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateAttribute);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "dup");
+  library.ExpectFail(fidl::ErrDuplicateAttribute, "dup", "example.fidl:4:2");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 // Test that attributes with the same canonical form are considered duplicates.
 TEST(AttributesTests, BadNoTwoSameAttributeCanonical) {
   TestLibrary library;
   library.AddFile("bad/fi-0123.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateAttributeCanonical);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "canonical form 'custom_attribute'");
+  library.ExpectFail(fidl::ErrDuplicateAttributeCanonical, "CustomAttribute", "custom_attribute",
+                     "bad/fi-0123.test.fidl:6:2", "custom_attribute");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, GoodDocAttribute) {
@@ -351,8 +352,8 @@ protocol A {
 };
 
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateAttribute);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "doc");
+  library.ExpectFail(fidl::ErrDuplicateAttribute, "doc", "generated:1:1");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, BadNoTwoSameAttributeOnLibrary) {
@@ -367,8 +368,8 @@ library fidl.test.dupattributes;
 library fidl.test.dupattributes;
 
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateAttribute);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "dup");
+  library.ExpectFail(fidl::ErrDuplicateAttribute, "dup", "first.fidl:2:2");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 // Test that a close attribute is caught.
@@ -376,9 +377,8 @@ TEST(AttributesTests, WarnOnCloseToOfficialAttribute) {
   TestLibrary library;
   library.AddFile("bad/fi-0145.test.fidl");
 
-  ASSERT_WARNED_DURING_COMPILE(library, fidl::WarnAttributeTypo);
-  EXPECT_SUBSTR(library.warnings()[0]->msg.c_str(), "duc");
-  EXPECT_SUBSTR(library.warnings()[0]->msg.c_str(), "doc");
+  library.ExpectWarn(fidl::WarnAttributeTypo, "duc", "doc");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, GoodNotTooCloseUnofficialAttribute) {
@@ -448,13 +448,16 @@ TEST(AttributesTests, BadUnknownArgument) {
 TEST(AttributesTests, BadEmptyTransport) {
   TestLibrary library;
   library.AddFile("bad/fi-0128.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrMissingRequiredAnonymousAttributeArg);
+  library.ExpectFail(fidl::ErrMissingRequiredAnonymousAttributeArg, "transport");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, BadUnrecognizedTransport) {
   TestLibrary library;
   library.AddFile("bad/fi-0142.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidTransportType);
+  library.ExpectFail(fidl::ErrInvalidTransportType, "Invalid",
+                     std::set<std::string_view>{"Banjo", "Channel", "Driver", "Syscall"});
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, GoodChannelTransport) {
@@ -487,7 +490,9 @@ protocol A {
     MethodA();
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidTransportType);
+  library.ExpectFail(fidl::ErrInvalidTransportType, "Channel, Syscall",
+                     std::set<std::string_view>{"Banjo", "Channel", "Driver", "Syscall"});
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, BadTransitionalInvalidPlacement) {
@@ -500,8 +505,8 @@ protocol MyProtocol {
 };
 )FIDL");
 
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidAttributePlacement);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "transitional");
+  library.ExpectFail(fidl::ErrInvalidAttributePlacement, "transitional");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, BadUnknownInvalidPlacementOnUnion) {
@@ -514,8 +519,8 @@ type U = flexible union {
 };
 )FIDL");
 
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidAttributePlacement);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "unknown");
+  library.ExpectFail(fidl::ErrInvalidAttributePlacement, "unknown");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, BadUnknownInvalidPlacementOnUnionMember) {
@@ -527,8 +532,8 @@ type U = flexible union {
 };
 )FIDL");
 
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidAttributePlacement);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "unknown");
+  library.ExpectFail(fidl::ErrInvalidAttributePlacement, "unknown");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, BadUnknownInvalidPlacementOnBitsMember) {
@@ -540,15 +545,15 @@ type B = flexible bits : uint32 {
 };
 )FIDL");
 
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidAttributePlacement);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "unknown");
+  library.ExpectFail(fidl::ErrInvalidAttributePlacement, "unknown");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, BadUnknownInvalidOnStrictEnumMember) {
   TestLibrary library;
   library.AddFile("bad/fi-0071.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrUnknownAttributeOnStrictEnumMember);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "unknown");
+  library.ExpectFail(fidl::ErrUnknownAttributeOnStrictEnumMember);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, BadTransitionalOnEnum) {
@@ -560,8 +565,8 @@ type E = strict enum : uint32 {
 };
 )FIDL");
 
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidAttributePlacement);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "transitional");
+  library.ExpectFail(fidl::ErrInvalidAttributePlacement, "transitional");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, BadIncorrectPlacementLayout) {
@@ -615,7 +620,8 @@ protocol MyProtocol {
 TEST(AttributesTests, BadSingleDeprecatedAttribute) {
   TestLibrary library;
   library.AddFile("bad/fi-0121.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDeprecatedAttribute);
+  library.ExpectFail(fidl::ErrDeprecatedAttribute, "example_deprecated_attribute");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, BadDeprecatedAttributes) {
@@ -688,8 +694,8 @@ protocol MyProtocol {
 
 )FIDL");
   library.AddAttributeSchema("must_have_three_members").Constrain(MustHaveThreeMembers);
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidAttributePlacement);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "must_have_three_members");
+  library.ExpectFail(fidl::ErrInvalidAttributePlacement, "must_have_three_members");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, BadConstraintOnlyThreeMembersOnProtocol) {
@@ -704,20 +710,22 @@ protocol MyProtocol {
 
 )FIDL");
   library.AddAttributeSchema("must_have_three_members").Constrain(MustHaveThreeMembers);
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidAttributePlacement);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "must_have_three_members");
+  library.ExpectFail(fidl::ErrInvalidAttributePlacement, "must_have_three_members");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, BadAttributeValue) {
   TestLibrary library;
   library.AddFile("bad/fi-0132.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrAttributeDisallowsArgs);
+  library.ExpectFail(fidl::ErrAttributeDisallowsArgs, "unknown");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, BadSelectorIncorrectPlacement) {
   TestLibrary library;
   library.AddFile("bad/fi-0120-a.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidAttributePlacement);
+  library.ExpectFail(fidl::ErrInvalidAttributePlacement, "selector");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, BadParameterAttributeIncorrectPlacement) {
@@ -729,13 +737,17 @@ protocol ExampleProtocol {
 };
 
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrUnexpectedTokenOfKind);
+  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kAt),
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kRightParen));
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, BadDuplicateAttributePlacement) {
   TestLibrary library;
   library.AddFile("bad/fi-0023.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrRedundantAttributePlacement);
+  library.ExpectFail(fidl::ErrRedundantAttributePlacement);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, GoodLayoutAttributePlacements) {
@@ -776,7 +788,8 @@ protocol MyProtocol {
 TEST(AttributesTests, BadNoArgumentsEmptyParens) {
   TestLibrary library;
   library.AddFile("bad/fi-0014.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrAttributeWithEmptyParens);
+  library.ExpectFail(fidl::ErrAttributeWithEmptyParens);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, GoodMultipleArguments) {
@@ -803,7 +816,8 @@ type MyStruct = struct {};
 TEST(AttributesTests, BadMultipleArgumentsWithNoNames) {
   TestLibrary library;
   library.AddFile("bad/fi-0015.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrAttributeArgsMustAllBeNamed);
+  library.ExpectFail(fidl::ErrAttributeArgsMustAllBeNamed);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, BadMultipleArgumentsSomeNamesUnnamedStringArgFirst) {
@@ -815,7 +829,8 @@ type MyStruct = struct {};
 
 )FIDL");
 
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrAttributeArgsMustAllBeNamed);
+  library.ExpectFail(fidl::ErrAttributeArgsMustAllBeNamed);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, BadMultipleArgumentsSomeNamesUnnamedStringArgSecond) {
@@ -830,7 +845,10 @@ type MyStruct = struct {};
   // argument, it incorrectly produces ErrUnexpectedTokenOfKind instead of
   // ErrAttributeArgsMustAllBeNamed.
   // ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrAttributeArgsMustAllBeNamed);
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrUnexpectedTokenOfKind);
+  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kStringLiteral),
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kIdentifier));
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, BadMultipleArgumentsSomeNamesUnnamedIdentifierArgFirst) {
@@ -841,7 +859,8 @@ library example;
 type MyStruct = struct {};
 
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrAttributeArgsMustAllBeNamed);
+  library.ExpectFail(fidl::ErrAttributeArgsMustAllBeNamed);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, BadMultipleArgumentsSomeNamesUnnamedIdentifierArgSecond) {
@@ -856,21 +875,27 @@ type MyStruct = struct {};
   // argument, it incorrectly produces ErrUnexpectedTokenOfKind and
   // ErrUnexpectedToken instead of ErrAttributeArgsMustAllBeNamed.
   // ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrAttributeArgsMustAllBeNamed);
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrUnexpectedTokenOfKind,
-                                      fidl::ErrUnexpectedToken);
+  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kRightParen),
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kEqual));
+  library.ExpectFail(fidl::ErrUnexpectedToken);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, BadMultipleArgumentsDuplicateNames) {
   TestLibrary library;
   library.AddFile("bad/fi-0130.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateAttributeArg);
+  library.ExpectFail(fidl::ErrDuplicateAttributeArg, "custom_attribute", "custom_arg",
+                     "bad/fi-0130.test.fidl:6:19");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, BadMultipleArgumentsDuplicateCanonicalNames) {
   TestLibrary library;
   library.AddFile("bad/fi-0131.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateAttributeArgCanonical);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "canonical form 'custom_arg'");
+  library.ExpectFail(fidl::ErrDuplicateAttributeArgCanonical, "custom_attribute", "CustomArg",
+                     "custom_arg", "bad/fi-0131.test.fidl:6:19", "custom_arg");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, GoodSingleArgumentIsNotNamed) {
@@ -955,7 +980,8 @@ type MyOtherStruct = struct {};
 TEST(AttributesTests, BadSingleSchemaArgumentIsNamed) {
   TestLibrary library;
   library.AddFile("bad/fi-0125.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrAttributeArgMustNotBeNamed);
+  library.ExpectFail(fidl::ErrAttributeArgMustNotBeNamed);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 // If a schema is provided (ie, this is an "official" FIDL attribute), and it specifies that
@@ -967,8 +993,9 @@ TEST(AttributesTests, BadSingleSchemaArgumentIsNotNamed) {
   // Here we are demonstrating ErrAttributeArgNotNamed. There is another error
   // because @available is the only attribute that takes multiple arguments, and
   // omitting the required "added" causes another error.
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrAttributeArgNotNamed,
-                                      fidl::ErrLibraryAvailabilityMissingAdded);
+  library.ExpectFail(fidl::ErrAttributeArgNotNamed, "1");
+  library.ExpectFail(fidl::ErrLibraryAvailabilityMissingAdded);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, GoodMultipleSchemaArgumentsRequiredOnly) {
@@ -1061,8 +1088,8 @@ TEST(AttributesTests, BadMultipleSchemaArgumentsRequiredMissing) {
       .AddArg("optional", fidl::flat::AttributeArgSchema(
                               fidl::flat::ConstantValue::Kind::kString,
                               fidl::flat::AttributeArgSchema::Optionality::kOptional));
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrMissingRequiredAttributeArg);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "required");
+  library.ExpectFail(fidl::ErrMissingRequiredAttributeArg, "has_required_arg", "required");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, GoodLiteralTypesWithoutSchema) {
@@ -1101,8 +1128,9 @@ type MyStruct = struct {};
 TEST(AttributesTests, BadLiteralNumericTypesWithoutSchema) {
   TestLibrary library;
   library.AddFile("bad/fi-0124.test.fidl");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrCanOnlyUseStringOrBool,
-                                      fidl::ErrCanOnlyUseStringOrBool);
+  library.ExpectFail(fidl::ErrCanOnlyUseStringOrBool, "foo", "my_custom_attr");
+  library.ExpectFail(fidl::ErrCanOnlyUseStringOrBool, "bar", "my_custom_attr");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, GoodReferencedTypesWithoutSchema) {
@@ -1166,8 +1194,9 @@ const bar float32 = -2.3;
 type MyStruct = struct {};
 
 )FIDL");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrCanOnlyUseStringOrBool,
-                                      fidl::ErrCanOnlyUseStringOrBool);
+  library.ExpectFail(fidl::ErrCanOnlyUseStringOrBool, "foo", "attr");
+  library.ExpectFail(fidl::ErrCanOnlyUseStringOrBool, "bar", "attr");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, GoodLiteralTypesWithSchema) {
@@ -1404,8 +1433,9 @@ type MyStruct = struct {};
 )FIDL");
   library.AddAttributeSchema("attr").AddArg(
       "string", fidl::flat::AttributeArgSchema(fidl::flat::ConstantValue::Kind::kString));
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrTypeCannotBeConvertedToType,
-                                      fidl::ErrCouldNotResolveAttributeArg);
+  library.ExpectFail(fidl::ErrTypeCannotBeConvertedToType, "true", "bool", "string");
+  library.ExpectFail(fidl::ErrCouldNotResolveAttributeArg);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, BadInvalidLiteralBoolTypeWithSchema) {
@@ -1418,8 +1448,9 @@ type MyStruct = struct {};
 )FIDL");
   library.AddAttributeSchema("attr").AddArg(
       "bool", fidl::flat::AttributeArgSchema(fidl::flat::ConstantValue::Kind::kBool));
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrTypeCannotBeConvertedToType,
-                                      fidl::ErrCouldNotResolveAttributeArg);
+  library.ExpectFail(fidl::ErrTypeCannotBeConvertedToType, "\"foo\"", "string:3", "bool");
+  library.ExpectFail(fidl::ErrCouldNotResolveAttributeArg);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, BadInvalidLiteralNumericTypeWithSchema) {
@@ -1432,15 +1463,18 @@ type MyStruct = struct {};
 )FIDL");
   library.AddAttributeSchema("attr").AddArg(
       "uint8", fidl::flat::AttributeArgSchema(fidl::flat::ConstantValue::Kind::kUint8));
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrConstantOverflowsType,
-                                      fidl::ErrCouldNotResolveAttributeArg);
+  library.ExpectFail(fidl::ErrConstantOverflowsType, "-1", "uint8");
+  library.ExpectFail(fidl::ErrCouldNotResolveAttributeArg);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, BadInvalidLiteralWithRealSchema) {
   TestLibrary library;
   library.AddFile("bad/fi-0065-c.test.fidl");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrTypeCannotBeConvertedToType,
-                                      fidl::ErrCouldNotResolveAttributeArg);
+  library.ExpectFail(fidl::ErrTypeCannotBeConvertedToType, "3840912312901827381273",
+                     "untyped numeric", "string");
+  library.ExpectFail(fidl::ErrCouldNotResolveAttributeArg);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, GoodReferencedTypesWithSchema) {
@@ -1703,8 +1737,9 @@ type MyStruct = struct {};
 )FIDL");
   library.AddAttributeSchema("attr").AddArg(
       "string", fidl::flat::AttributeArgSchema(fidl::flat::ConstantValue::Kind::kString));
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrTypeCannotBeConvertedToType,
-                                      fidl::ErrCouldNotResolveAttributeArg);
+  library.ExpectFail(fidl::ErrTypeCannotBeConvertedToType, "example/foo", "bool", "string");
+  library.ExpectFail(fidl::ErrCouldNotResolveAttributeArg);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, BadInvalidReferencedBoolTypeWithSchema) {
@@ -1719,8 +1754,9 @@ type MyStruct = struct {};
 )FIDL");
   library.AddAttributeSchema("attr").AddArg(
       "bool", fidl::flat::AttributeArgSchema(fidl::flat::ConstantValue::Kind::kBool));
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrTypeCannotBeConvertedToType,
-                                      fidl::ErrCouldNotResolveAttributeArg);
+  library.ExpectFail(fidl::ErrTypeCannotBeConvertedToType, "example/foo", "string:3", "bool");
+  library.ExpectFail(fidl::ErrCouldNotResolveAttributeArg);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, BadInvalidReferencedNumericTypeWithSchema) {
@@ -1735,8 +1771,9 @@ type MyStruct = struct {};
 )FIDL");
   library.AddAttributeSchema("attr").AddArg(
       "int8", fidl::flat::AttributeArgSchema(fidl::flat::ConstantValue::Kind::kInt8));
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrTypeCannotBeConvertedToType,
-                                      fidl::ErrCouldNotResolveAttributeArg);
+  library.ExpectFail(fidl::ErrTypeCannotBeConvertedToType, "example/foo", "uint16", "int8");
+  library.ExpectFail(fidl::ErrCouldNotResolveAttributeArg);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, GoodCompileEarlyAttributeLiteralArgument) {
@@ -1766,7 +1803,8 @@ const BAD uint8 = 1;
   library.AddAttributeSchema("attr")
       .AddArg("int8", fidl::flat::AttributeArgSchema(fidl::flat::ConstantValue::Kind::kUint8))
       .CompileEarly();
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrAttributeArgRequiresLiteral);
+  library.ExpectFail(fidl::ErrAttributeArgRequiresLiteral, "int8", "attr");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, GoodAnonymousArgumentGetsNamedValue) {
@@ -1811,7 +1849,8 @@ library example;
 type MyStruct = struct {};
 
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrNameNotFound);
+  library.ExpectFail(fidl::ErrNameNotFound, "nonexistent", "example");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, BadReferencesNonexistentConstWithSingleArgSchema) {
@@ -1824,7 +1863,8 @@ type MyStruct = struct {};
 )FIDL");
   library.AddAttributeSchema("foo").AddArg(
       "value", fidl::flat::AttributeArgSchema(fidl::flat::ConstantValue::Kind::kBool));
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrNameNotFound);
+  library.ExpectFail(fidl::ErrNameNotFound, "nonexistent", "example");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, BadReferencesNonexistentConstWithMultipleArgSchema) {
@@ -1838,7 +1878,8 @@ type MyStruct = struct {};
   library.AddAttributeSchema("foo")
       .AddArg("first", fidl::flat::AttributeArgSchema(fidl::flat::ConstantValue::Kind::kBool))
       .AddArg("second", fidl::flat::AttributeArgSchema(fidl::flat::ConstantValue::Kind::kBool));
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrNameNotFound);
+  library.ExpectFail(fidl::ErrNameNotFound, "nonexistent", "example");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, BadReferencesInvalidConstWithoutSchema) {
@@ -1905,9 +1946,9 @@ library example;
 const BAR bool = true;
 
 )FIDL");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrCouldNotResolveAttributeArg,
-                                      fidl::ErrIncludeCycle);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "const 'BAR' -> const 'BAR'");
+  library.ExpectFail(fidl::ErrCouldNotResolveAttributeArg);
+  library.ExpectFail(fidl::ErrIncludeCycle, "const 'BAR' -> const 'BAR'");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, BadSelfReferenceWithoutSchemaString) {
@@ -1918,9 +1959,9 @@ library example;
 const BAR string = "bar";
 
 )FIDL");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrCouldNotResolveAttributeArg,
-                                      fidl::ErrIncludeCycle);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "const 'BAR' -> const 'BAR'");
+  library.ExpectFail(fidl::ErrCouldNotResolveAttributeArg);
+  library.ExpectFail(fidl::ErrIncludeCycle, "const 'BAR' -> const 'BAR'");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, BadSelfReferenceWithSchema) {
@@ -1933,9 +1974,9 @@ const BAR bool = true;
 )FIDL");
   library.AddAttributeSchema("foo").AddArg(
       "value", fidl::flat::AttributeArgSchema(fidl::flat::ConstantValue::Kind::kBool));
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrCouldNotResolveAttributeArg,
-                                      fidl::ErrIncludeCycle);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "const 'BAR' -> const 'BAR'");
+  library.ExpectFail(fidl::ErrCouldNotResolveAttributeArg);
+  library.ExpectFail(fidl::ErrIncludeCycle, "const 'BAR' -> const 'BAR'");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, BadMutualReferenceWithoutSchemaBool) {
@@ -1948,10 +1989,9 @@ const FIRST bool = true;
 const SECOND bool = false;
 
 )FIDL");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrIncludeCycle,
-                                      fidl::ErrCouldNotResolveAttributeArg);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(),
-                "const 'FIRST' -> const 'SECOND' -> const 'FIRST'");
+  library.ExpectFail(fidl::ErrIncludeCycle, "const 'FIRST' -> const 'SECOND' -> const 'FIRST'");
+  library.ExpectFail(fidl::ErrCouldNotResolveAttributeArg);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, BadMutualReferenceWithoutSchemaString) {
@@ -1964,10 +2004,9 @@ const FIRST string = "first";
 const SECOND string = "second";
 
 )FIDL");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrIncludeCycle,
-                                      fidl::ErrCouldNotResolveAttributeArg);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(),
-                "const 'FIRST' -> const 'SECOND' -> const 'FIRST'");
+  library.ExpectFail(fidl::ErrIncludeCycle, "const 'FIRST' -> const 'SECOND' -> const 'FIRST'");
+  library.ExpectFail(fidl::ErrCouldNotResolveAttributeArg);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, BadMutualReferenceWithSchema) {
@@ -1982,10 +2021,9 @@ const SECOND bool = false;
 )FIDL");
   library.AddAttributeSchema("foo").AddArg(
       "value", fidl::flat::AttributeArgSchema(fidl::flat::ConstantValue::Kind::kBool));
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrIncludeCycle,
-                                      fidl::ErrCouldNotResolveAttributeArg);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(),
-                "const 'FIRST' -> const 'SECOND' -> const 'FIRST'");
+  library.ExpectFail(fidl::ErrIncludeCycle, "const 'FIRST' -> const 'SECOND' -> const 'FIRST'");
+  library.ExpectFail(fidl::ErrCouldNotResolveAttributeArg);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, BadLibraryReferencesNonexistentConst) {
@@ -1993,7 +2031,8 @@ TEST(AttributesTests, BadLibraryReferencesNonexistentConst) {
 @foo(nonexistent)
 library example;
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrNameNotFound);
+  library.ExpectFail(fidl::ErrNameNotFound, "nonexistent", "example");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, BadLibraryReferencesConst) {
@@ -2004,7 +2043,8 @@ library example;
 const BAR bool = true;
 
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrReferenceInLibraryAttribute);
+  library.ExpectFail(fidl::ErrReferenceInLibraryAttribute);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, BadLibraryReferencesExternalConst) {
@@ -2022,7 +2062,8 @@ library example;
 
 using dependency;
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrReferenceInLibraryAttribute);
+  library.ExpectFail(fidl::ErrReferenceInLibraryAttribute);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, GoodDiscoverableImplicitName) {
@@ -2059,14 +2100,16 @@ protocol Foo {};
 )FIDL";
     library_str.replace(library_str.find("%1"), 2, name);
     TestLibrary library(library_str);
-    ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidDiscoverableName);
+    library.ExpectFail(fidl::ErrInvalidDiscoverableName, name);
+    ASSERT_COMPILER_DIAGNOSTICS(library);
   }
 }
 
 TEST(AttributesTests, BadDiscoverableInvalidNameErrcat) {
   TestLibrary library;
   library.AddFile("bad/fi-0135.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidDiscoverableName);
+  library.ExpectFail(fidl::ErrInvalidDiscoverableName, "test.bad.fi0135/Parser");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 // The @result attribute was originally used to implement method error results.

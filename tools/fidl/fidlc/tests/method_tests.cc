@@ -401,13 +401,15 @@ closed protocol Closed {
   flexible -> Event();
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrFlexibleOneWayMethodInClosedProtocol);
+  library.ExpectFail(fidl::ErrFlexibleOneWayMethodInClosedProtocol, "event");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(MethodTests, BadInvalidStrictnessFlexibleOneWayMethodInClosed) {
   TestLibrary library;
   library.AddFile("bad/fi-0116.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrFlexibleOneWayMethodInClosedProtocol);
+  library.ExpectFail(fidl::ErrFlexibleOneWayMethodInClosedProtocol, "one-way method");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(MethodTests, BadInvalidStrictnessFlexibleTwoWayMethodInClosed) {
@@ -417,13 +419,17 @@ closed protocol Closed {
   flexible Method() -> ();
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrFlexibleTwoWayMethodRequiresOpenProtocol);
+  library.ExpectFail(fidl::ErrFlexibleTwoWayMethodRequiresOpenProtocol,
+                     fidl::types::Openness::kClosed);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(MethodTests, BadInvalidStrictnessFlexibleTwoWayMethodInAjar) {
   TestLibrary library;
   library.AddFile("bad/fi-0115.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrFlexibleTwoWayMethodRequiresOpenProtocol);
+  library.ExpectFail(fidl::ErrFlexibleTwoWayMethodRequiresOpenProtocol,
+                     fidl::types::Openness::kAjar);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(MethodTests, BadInvalidOpennessModifierOnMethod) {
@@ -435,7 +441,8 @@ protocol BadMethod {
 };
 
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidProtocolMember);
+  library.ExpectFail(fidl::ErrInvalidProtocolMember);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(MethodTests, GoodValidEmptyPayloads) {
@@ -462,7 +469,8 @@ open protocol Test {
   strict Method() -> (struct {});
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrEmptyPayloadStructs);
+  library.ExpectFail(fidl::ErrEmptyPayloadStructs, "Method");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(MethodTests, BadEmptyStructPayloadFlexibleNoError) {
@@ -472,7 +480,8 @@ open protocol Test {
   flexible Method() -> (struct {});
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrEmptyPayloadStructs);
+  library.ExpectFail(fidl::ErrEmptyPayloadStructs, "Method");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(MethodTests, BadEmptyStructPayloadStrictError) {
@@ -482,7 +491,8 @@ open protocol Test {
   strict Method() -> (struct {}) error int32;
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrEmptyPayloadStructs);
+  library.ExpectFail(fidl::ErrEmptyPayloadStructs, "Method");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(MethodTests, BadEmptyStructPayloadFlexibleError) {
@@ -492,7 +502,8 @@ open protocol Test {
   flexible Method() -> (struct {}) error int32;
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrEmptyPayloadStructs);
+  library.ExpectFail(fidl::ErrEmptyPayloadStructs, "Method");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(MethodTests, GoodAbsentPayloadFlexibleNoError) {

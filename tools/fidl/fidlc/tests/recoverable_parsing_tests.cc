@@ -13,7 +13,8 @@ namespace {
 TEST(ParsingTests, BadUnexpectedToken) {
   TestLibrary library;
   library.AddFile("bad/fi-0007.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrUnexpectedToken);
+  library.ExpectFail(fidl::ErrUnexpectedToken);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(RecoverableParsingTests, BadRecoverAtEndOfFile) {
@@ -28,8 +29,11 @@ type Bits = bits {
     CONSTANT = ;  // Second error
 };
 )FIDL");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrUnexpectedTokenOfKind,
-                                      fidl::ErrUnexpectedToken);
+  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kSemicolon),
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kEqual));
+  library.ExpectFail(fidl::ErrUnexpectedToken);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(RecoverableParsingTests, BadRecoverAtEndOfDecl) {
@@ -50,8 +54,13 @@ type Struct = struct {
     value string;
 };
 )FIDL");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrUnexpectedTokenOfKind,
-                                      fidl::ErrUnexpectedTokenOfKind);
+  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kNumericLiteral),
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kEqual));
+  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kIdentifier),
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kColon));
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(RecoverableParsingTests, BadRecoverAtEndOfMember) {
@@ -113,7 +122,10 @@ type NameCollision = struct {};       // This name collision error will not be
                                       // reported, because if parsing fails
                                       // compilation is skipped
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrUnexpectedTokenOfKind);
+  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kDot),
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kIdentifier));
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(RecoverableParsingTests, BadRecoverToNextBitsMember) {
@@ -127,8 +139,13 @@ type Bits = bits {
     EIGHT = 0x8;
 };
 )FIDL");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrUnexpectedTokenOfKind,
-                                      fidl::ErrUnexpectedTokenOfKind);
+  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kNumericLiteral),
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kEqual));
+  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kIdentifier),
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kSemicolon));
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(RecoverableParsingTests, BadRecoverToNextEnumMember) {
@@ -142,8 +159,13 @@ type Enum = enum {
     FOUR = 4;
 };
 )FIDL");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrUnexpectedTokenOfKind,
-                                      fidl::ErrUnexpectedTokenOfKind);
+  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kNumericLiteral),
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kEqual));
+  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kIdentifier),
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kSemicolon));
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(RecoverableParsingTests, BadRecoverToNextProtocolMember) {
@@ -188,8 +210,9 @@ protocol Example {
 };
 )FIDL");
 
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrDocCommentOnParameters,
-                                      fidl::ErrDocCommentOnParameters);
+  library.ExpectFail(fidl::ErrDocCommentOnParameters);
+  library.ExpectFail(fidl::ErrDocCommentOnParameters);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ParsingTests, BadRecoverableUnmatchedDelimiterInParamList) {
@@ -222,8 +245,13 @@ service Service {
   r R;
 };
 )FIDL");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrUnexpectedTokenOfKind,
-                                      fidl::ErrUnexpectedTokenOfKind);
+  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kIdentifier),
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kSemicolon));
+  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kSemicolon),
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kIdentifier));
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(RecoverableParsingTests, BadRecoverToNextStructMember) {
@@ -277,8 +305,13 @@ type Union = union {
     5: int_value int16;
 };
 )FIDL");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrUnexpectedTokenOfKind,
-                                      fidl::ErrUnexpectedTokenOfKind);
+  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kIdentifier),
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kColon));
+  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kNumericLiteral),
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kSemicolon));
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(RecoverableParsingTests, BadRecoverFinalMemberMissingSemicolon) {
@@ -295,8 +328,11 @@ type Good = struct {};
 
 extra_token // Second error
 )FIDL");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrUnexpectedTokenOfKind,
-                                      fidl::ErrExpectedDeclaration);
+  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kRightCurly),
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kSemicolon));
+  library.ExpectFail(fidl::ErrExpectedDeclaration, "extra_token");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(RecoverableParsingTests, BadRecoverFinalMemberMissingNameAndSemicolon) {
@@ -315,8 +351,11 @@ type Good = struct {};
 
 extra_token // Second error
 )FIDL");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrUnexpectedTokenOfKind,
-                                      fidl::ErrExpectedDeclaration);
+  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kRightCurly),
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kIdentifier));
+  library.ExpectFail(fidl::ErrExpectedDeclaration, "extra_token");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 // This test ensures that recoverable parsing works as intended for constraints,
@@ -366,13 +405,15 @@ type TypeDecl = struct {
 TEST(RecoverableParsingTests, UnexpectedLineBreakInLiteral) {
   TestLibrary library;
   library.AddFile("bad/fi-0002.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrUnexpectedLineBreak);
+  library.ExpectFail(fidl::ErrUnexpectedLineBreak);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(RecoverableParsingTests, UnexpectedControlCharacter) {
   TestLibrary library;
   library.AddFile("bad/fi-0184.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrUnexpectedControlCharacter);
+  library.ExpectFail(fidl::ErrUnexpectedControlCharacter, "9");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(RecoverableParsingTests, InvalidEscapeSequenceInLiteral) {
@@ -392,48 +433,55 @@ TEST(RecoverableParsingTests, InvalidEscapeSequenceInLiteral) {
 TEST(RecoverableParsingTests, InvalidHexDigit) {
   TestLibrary library;
   library.AddFile("bad/fi-0004.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidHexDigit);
+  library.ExpectFail(fidl::ErrInvalidHexDigit, 'G');
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(RecoverableParsingTests, UnicodeEscapeMissingBraces) {
   TestLibrary library;
   library.AddFile("bad/fi-0185.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrUnicodeEscapeMissingBraces);
+  library.ExpectFail(fidl::ErrUnicodeEscapeMissingBraces);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
   EXPECT_EQ(library.errors()[0]->span.data(), "\\u");
 }
 
 TEST(RecoverableParsingTests, UnicodeEscapeUnterminated) {
   TestLibrary library;
   library.AddFile("bad/fi-0186.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrUnicodeEscapeUnterminated);
+  library.ExpectFail(fidl::ErrUnicodeEscapeUnterminated);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
   EXPECT_EQ(library.errors()[0]->span.data(), "\\u{1F600");
 }
 
 TEST(RecoverableParsingTests, UnicodeEscapeEmpty) {
   TestLibrary library;
   library.AddFile("bad/fi-0187.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrUnicodeEscapeEmpty);
+  library.ExpectFail(fidl::ErrUnicodeEscapeEmpty);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
   EXPECT_EQ(library.errors()[0]->span.data(), "\\u{}");
 }
 
 TEST(RecoverableParsingTests, UnicodeEscapeTooLong) {
   TestLibrary library;
   library.AddFile("bad/fi-0188.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrUnicodeEscapeTooLong);
+  library.ExpectFail(fidl::ErrUnicodeEscapeTooLong);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
   EXPECT_EQ(library.errors()[0]->span.data(), "001F600");
 }
 
 TEST(RecoverableParsingTests, UnicodeEscapeTooLarge) {
   TestLibrary library;
   library.AddFile("bad/fi-0189.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrUnicodeEscapeTooLarge);
+  library.ExpectFail(fidl::ErrUnicodeEscapeTooLarge, "110000");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
   EXPECT_EQ(library.errors()[0]->span.data(), "110000");
 }
 
 TEST(RecoverableParsingTests, ExpectedDeclaration) {
   TestLibrary library;
   library.AddFile("bad/fi-0006.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrExpectedDeclaration);
+  library.ExpectFail(fidl::ErrExpectedDeclaration, "cosnt");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 }  // namespace

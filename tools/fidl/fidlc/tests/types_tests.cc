@@ -211,13 +211,15 @@ type TypeDecl = struct {
 TEST(NewSyntaxTests, BadTypeDeclOfNewTypeErrors) {
   TestLibrary library;
   library.AddFile("bad/fi-0062.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrNewTypesNotAllowed);
+  library.ExpectFail(fidl::ErrNewTypesNotAllowed, "Matrix", "array");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(NewSyntaxTests, BadBoxWithDoubleOptionality) {
   TestLibrary library;
   library.AddFile("bad/fi-0170.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrBoxedTypeCannotBeOptional);
+  library.ExpectFail(fidl::ErrBoxedTypeCannotBeOptional);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(NewSyntaxTests, GoodTypeParameters) {
@@ -561,7 +563,8 @@ type TypeDecl = resource struct {
 TEST(NewSyntaxTests, BadTooManyLayoutParameters) {
   TestLibrary library;
   library.AddFile("bad/fi-0162-b.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrWrongNumberOfLayoutParameters);
+  library.ExpectFail(fidl::ErrWrongNumberOfLayoutParameters, "uint8", 0, 1);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(NewSyntaxTests, BadZeroParameters) {
@@ -573,21 +576,24 @@ type Foo = struct {
 };
 )FIDL");
 
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrWrongNumberOfLayoutParameters);
+  library.ExpectFail(fidl::ErrWrongNumberOfLayoutParameters, "array", 2, 0);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
   EXPECT_EQ(library.errors()[0]->span.data(), "array");
 }
 
 TEST(NewSyntaxTests, BadNotEnoughParameters) {
   TestLibrary library;
   library.AddFile("bad/fi-0162-a.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrWrongNumberOfLayoutParameters);
+  library.ExpectFail(fidl::ErrWrongNumberOfLayoutParameters, "array", 2, 1);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
   EXPECT_EQ(library.errors()[0]->span.data(), "<8>");
 }
 
 TEST(NewSyntaxTests, BadTooManyConstraints) {
   TestLibrary library;
   library.AddFile("bad/fi-0164.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrTooManyConstraints);
+  library.ExpectFail(fidl::ErrTooManyConstraints, "string", 2, 3);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
   EXPECT_EQ(library.errors()[0]->span.data(), "<0, optional, 20>");
 }
 
@@ -600,7 +606,8 @@ type Foo = struct {
 };
 )FIDL");
 
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrWrongNumberOfLayoutParameters);
+  library.ExpectFail(fidl::ErrWrongNumberOfLayoutParameters, "Bar", 0, 1);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(NewSyntaxTests, BadConstrainTwice) {
@@ -621,7 +628,8 @@ type Foo = struct {
   // TODO(fxbug.dev/74193): We plan to disallow constraints on aliases, so this
   // error message should change to that. For now, to test this we have to use
   // `zx.ObjType` above because contextual lookup is not done through aliases.
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrCannotConstrainTwice);
+  library.ExpectFail(fidl::ErrCannotConstrainTwice, "MyVmo");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(NewSyntaxTests, GoodNoOverlappingConstraints) {
@@ -645,7 +653,8 @@ type Foo = resource struct {
 TEST(NewSyntaxTests, BadWantTypeLayoutParameter) {
   TestLibrary library;
   library.AddFile("bad/fi-0165.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrExpectedType);
+  library.ExpectFail(fidl::ErrExpectedType);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(NewSyntaxTests, BadWantValueLayoutParameter) {
@@ -657,13 +666,15 @@ type Foo = struct {
 };
 )FIDL");
 
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrExpectedValueButGotType);
+  library.ExpectFail(fidl::ErrExpectedValueButGotType, "uint8");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(NewSyntaxTests, BadUnresolvableConstraint) {
   TestLibrary library;
   library.AddFile("bad/fi-0166.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrUnexpectedConstraint);
+  library.ExpectFail(fidl::ErrUnexpectedConstraint, "vector");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(NewSyntaxTests, BadShadowedOptional) {
@@ -677,7 +688,8 @@ type Foo = resource struct {
 };
 )FIDL");
 
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrUnexpectedConstraint);
+  library.ExpectFail(fidl::ErrUnexpectedConstraint, "vector");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(NewSyntaxTests, BadWrongConstraintType) {
@@ -689,8 +701,9 @@ type Foo = resource struct {
 };
 )FIDL");
 
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrTypeCannotBeConvertedToType,
-                                      fidl::ErrCouldNotResolveSizeBound);
+  library.ExpectFail(fidl::ErrTypeCannotBeConvertedToType, "\"hello\"", "string:5", "uint32");
+  library.ExpectFail(fidl::ErrCouldNotResolveSizeBound);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(InternalTypes, CannotReferToUnqualifiedInternalType) {
@@ -702,7 +715,8 @@ type Foo = struct {
 };
 )FIDL");
 
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrNameNotFound);
+  library.ExpectFail(fidl::ErrNameNotFound, "TransportErr", "example");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(InternalTypes, CannotReferToQualifiedInternalType) {
@@ -714,28 +728,33 @@ type Foo = struct {
 };
 )FIDL");
 
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrNameNotFound);
+  library.ExpectFail(fidl::ErrNameNotFound, "TransportErr", "fidl");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(TypesTests, BadUsize64WithoutFlag) {
   TestLibrary library;
   library.AddFile("bad/fi-0180.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrExperimentalZxCTypesDisallowed);
+  library.ExpectFail(fidl::ErrExperimentalZxCTypesDisallowed, "usize64");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(TypesTests, BadUintptr64WithoutFlag) {
   TestLibrary library("library example; alias T = uintptr64;");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrExperimentalZxCTypesDisallowed);
+  library.ExpectFail(fidl::ErrExperimentalZxCTypesDisallowed, "uintptr64");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(TypesTests, BadUcharWithoutFlag) {
   TestLibrary library("library example; alias T = uchar;");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrExperimentalZxCTypesDisallowed);
+  library.ExpectFail(fidl::ErrExperimentalZxCTypesDisallowed, "uchar");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(TypesTests, BadExperimentalPointerWithoutFlag) {
   TestLibrary library("library example; alias T = experimental_pointer<uint32>;");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrExperimentalZxCTypesDisallowed);
+  library.ExpectFail(fidl::ErrExperimentalZxCTypesDisallowed, "experimental_pointer");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(TypesTests, GoodUsize64WithFlag) {

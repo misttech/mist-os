@@ -34,7 +34,8 @@ type MyStruct = struct {
 TEST(StructsTests, BadPrimitiveDefaultValueNoAnnotation) {
   TestLibrary library;
   library.AddFile("bad/fi-0050.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDeprecatedStructDefaults);
+  library.ExpectFail(fidl::ErrDeprecatedStructDefaults);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(StructsTests, GoodPrimitiveDefaultValueConstReference) {
@@ -103,16 +104,18 @@ type MyStruct = struct {
     field MyEnum = OtherEnum.A;
 };
 )FIDL");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrCouldNotResolveMemberDefault,
-                                      fidl::ErrMismatchedNameTypeAssignment);
+  library.ExpectFail(fidl::ErrCouldNotResolveMemberDefault, "field");
+  library.ExpectFail(fidl::ErrMismatchedNameTypeAssignment, "MyEnum", "OtherEnum");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(StructsTests, BadDefaultValuePrimitiveInEnum) {
   TestLibrary library;
   library.AddFile("bad/fi-0103.test.fidl");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrCouldNotResolveMemberDefault,
-                                      fidl::ErrTypeCannotBeConvertedToType);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "MyEnum");
+  library.ExpectFail(fidl::ErrCouldNotResolveMemberDefault, "field");
+  library.ExpectFail(fidl::ErrTypeCannotBeConvertedToType, "1", "untyped numeric",
+                     "test.bad.fi0103/MyEnum");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(StructsTests, GoodEnumDefaultValueBitsMemberReference) {
@@ -157,8 +160,9 @@ type MyStruct = struct {
     field MyBits = OtherBits.A;
 };
 )FIDL");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrCouldNotResolveMemberDefault,
-                                      fidl::ErrMismatchedNameTypeAssignment);
+  library.ExpectFail(fidl::ErrCouldNotResolveMemberDefault, "field");
+  library.ExpectFail(fidl::ErrMismatchedNameTypeAssignment, "MyBits", "OtherBits");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(StructsTests, BadDefaultValuePrimitiveInBits) {
@@ -172,9 +176,10 @@ type MyStruct = struct {
     field MyBits = 1;
 };
 )FIDL");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrCouldNotResolveMemberDefault,
-                                      fidl::ErrTypeCannotBeConvertedToType);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "MyBits");
+  library.ExpectFail(fidl::ErrCouldNotResolveMemberDefault, "field");
+  library.ExpectFail(fidl::ErrTypeCannotBeConvertedToType, "1", "untyped numeric",
+                     "example/MyBits");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 // The old-style of enum-referencing should no longer work.
@@ -194,7 +199,8 @@ type MyStruct = struct {
 TEST(StructsTests, BadDefaultValueNullableString) {
   TestLibrary library;
   library.AddFile("bad/fi-0091.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidStructMemberType);
+  library.ExpectFail(fidl::ErrInvalidStructMemberType, "name", "string?");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(StructsTests, BadDuplicateMemberName) {
@@ -206,9 +212,9 @@ type MyStruct = struct {
     my_struct_member uint8;
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementName);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "struct member");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "my_struct_member");
+  library.ExpectFail(fidl::ErrDuplicateElementName, fidl::flat::Element::Kind::kStructMember,
+                     "my_struct_member", "example.fidl:5:5");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(StructsTests, GoodMaxInlineSize) {
@@ -224,23 +230,24 @@ type MyStruct = struct {
 TEST(StructsTests, BadInlineSizeExceeds64k) {
   TestLibrary library;
   library.AddFile("bad/fi-0111.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInlineSizeExceedsLimit);
+  library.ExpectFail(fidl::ErrInlineSizeExceedsLimit, "MyStruct", 65536, 65535);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(StructsTests, BadMutuallyRecursive) {
   TestLibrary library;
   library.AddFile("bad/fi-0057-a.test.fidl");
 
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrIncludeCycle);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "struct 'Yang' -> struct 'Yin' -> struct 'Yang'");
+  library.ExpectFail(fidl::ErrIncludeCycle, "struct 'Yang' -> struct 'Yin' -> struct 'Yang'");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(StructsTests, BadSelfRecursive) {
   TestLibrary library;
   library.AddFile("bad/fi-0057-c.test.fidl");
 
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrIncludeCycle);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "struct 'MySelf' -> struct 'MySelf'");
+  library.ExpectFail(fidl::ErrIncludeCycle, "struct 'MySelf' -> struct 'MySelf'");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(StructsTests, GoodOptionalityAllowsRecursion) {
@@ -266,10 +273,10 @@ type Leaf = struct {
   yin Yin;
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrIncludeCycle);
   // Leaf sorts before either Yin or Yang, so the cycle finder in sort_step.cc
   // starts there, which leads it to yin before yang.
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "struct 'Yin' -> struct 'Yang' -> struct 'Yin'");
+  library.ExpectFail(fidl::ErrIncludeCycle, "struct 'Yin' -> struct 'Yang' -> struct 'Yin'");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(StructsTests, BadMutuallyRecursiveWithOutogingLeaf) {
@@ -289,8 +296,8 @@ type Leaf = struct {
   x int32;
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrIncludeCycle);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "struct 'Yang' -> struct 'Yin' -> struct 'Yang'");
+  library.ExpectFail(fidl::ErrIncludeCycle, "struct 'Yang' -> struct 'Yin' -> struct 'Yang'");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(StructsTests, BadMutuallyRecursiveIntersectingLoops) {
@@ -310,15 +317,16 @@ type Intersection = struct {
   yang Yang;
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrIncludeCycle);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(),
-                "struct 'Intersection' -> struct 'Yang' -> struct 'Intersection'");
+  library.ExpectFail(fidl::ErrIncludeCycle,
+                     "struct 'Intersection' -> struct 'Yang' -> struct 'Intersection'");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(StructsTests, BadBoxCannotBeOptional) {
   TestLibrary library;
   library.AddFile("bad/fi-0169.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrBoxCannotBeOptional);
+  library.ExpectFail(fidl::ErrBoxCannotBeOptional);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(StructsTests, GoodWithoutFlagStructCanBeOptional) {
@@ -338,15 +346,16 @@ TEST(StructsTests, BadWithFlagStructCannotBeOptional) {
   TestLibrary library;
   library.AddFile("bad/fi-0159.test.fidl");
   library.EnableFlag(fidl::ExperimentalFlags::Flag::kNoOptionalStructs);
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrStructCannotBeOptional);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "box<Date>");
+  library.ExpectFail(fidl::ErrStructCannotBeOptional, "Date");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(StructsTests, BadHandleCannotBeBoxedShouldBeOptional) {
   TestLibrary library;
   library.AddFile("bad/fi-0171.test.fidl");
   library.UseLibraryZx();
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrCannotBeBoxedShouldBeOptional);
+  library.ExpectFail(fidl::ErrCannotBeBoxedShouldBeOptional, "Handle");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(StructsTests, BadTypeCannotBeBoxedShouldBeOptional) {
@@ -370,8 +379,8 @@ TEST(StructsTests, BadTypeCannotBeBoxedShouldBeOptional) {
 TEST(StructsTests, BadCannotBoxPrimitive) {
   TestLibrary library;
   library.AddFile("bad/fi-0193.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrCannotBeBoxedNorOptional);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "bool");
+  library.ExpectFail(fidl::ErrCannotBeBoxedNorOptional, "bool");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(StructsTests, BadTypeCannotBeBoxedNorOptional) {
@@ -424,14 +433,16 @@ TEST(StructsTests, CannotReferToIntMember) {
   TestLibrary library;
   library.AddFile("bad/fi-0053-a.test.fidl");
 
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrCannotReferToMember);
+  library.ExpectFail(fidl::ErrCannotReferToMember, "struct 'Person'");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(StructsTests, CannotReferToStructMember) {
   TestLibrary library;
   library.AddFile("bad/fi-0053-b.test.fidl");
 
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrCannotReferToMember);
+  library.ExpectFail(fidl::ErrCannotReferToMember, "struct 'Person'");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 }  // namespace

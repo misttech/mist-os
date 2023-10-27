@@ -242,7 +242,8 @@ library fidl.test;
 type Bad = struct {};
 
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidAttributePlacement);
+  library.ExpectFail(fidl::ErrInvalidAttributePlacement, "generated_name");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(GeneratedNameTests, BadOnTopLevelStruct) {
@@ -252,7 +253,8 @@ library fidl.test;
 type Foo = @generated_name("Bad") struct {};
 
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidAttributePlacement);
+  library.ExpectFail(fidl::ErrInvalidAttributePlacement, "generated_name");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(GeneratedNameTests, BadOnIdentifierType) {
@@ -266,13 +268,15 @@ type Foo = struct {
 type Bar = struct {};
 
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrCannotAttachAttributeToIdentifier);
+  library.ExpectFail(fidl::ErrCannotAttachAttributeToIdentifier);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(GeneratedNameTests, BadOnStructMember) {
   TestLibrary library;
   library.AddFile("bad/fi-0120-b.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidAttributePlacement);
+  library.ExpectFail(fidl::ErrInvalidAttributePlacement, "generated_name");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(GeneratedNameTests, BadOnEnumMember) {
@@ -286,7 +290,8 @@ type MetaVars = enum {
 };
 
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidAttributePlacement);
+  library.ExpectFail(fidl::ErrInvalidAttributePlacement, "generated_name");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(GeneratedNameTests, BadOnServiceMember) {
@@ -301,7 +306,8 @@ service Bar {
 };
 
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidAttributePlacement);
+  library.ExpectFail(fidl::ErrInvalidAttributePlacement, "generated_name");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(GeneratedNameTests, BadMissingArgument) {
@@ -313,13 +319,15 @@ type Foo = struct {
 };
 
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrMissingRequiredAnonymousAttributeArg);
+  library.ExpectFail(fidl::ErrMissingRequiredAnonymousAttributeArg, "generated_name");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(GeneratedNameTests, BadInvalidIdentifier) {
   TestLibrary library;
   library.AddFile("bad/fi-0146.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidGeneratedName);
+  library.ExpectFail(fidl::ErrInvalidGeneratedName);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(GeneratedNameTests, BadNameCollision) {
@@ -333,20 +341,23 @@ type Foo = struct {
 type Baz = struct {};
 
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrNameCollision);
+  library.ExpectFail(fidl::ErrNameCollision, "Baz", "example.fidl:5:30");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(GeneratedNameTests, BadNotString) {
   TestLibrary library;
   library.AddFile("bad/fi-0104.test.fidl");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrTypeCannotBeConvertedToType,
-                                      fidl::ErrCouldNotResolveAttributeArg);
+  library.ExpectFail(fidl::ErrTypeCannotBeConvertedToType, "true", "bool", "string");
+  library.ExpectFail(fidl::ErrCouldNotResolveAttributeArg);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(GeneratedNameTests, BadNonLiteralArgument) {
   TestLibrary library;
   library.AddFile("bad/fi-0133.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrAttributeArgRequiresLiteral);
+  library.ExpectFail(fidl::ErrAttributeArgRequiresLiteral, "value", "generated_name");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 }  // namespace

@@ -133,15 +133,16 @@ TEST(ErrorsTests, BadErrorUnknownIdentifier) {
   TestLibrary library;
   library.AddFile("bad/fi-0052.test.fidl");
 
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrNameNotFound);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "ParsingError");
+  library.ExpectFail(fidl::ErrNameNotFound, "ParsingError", "test.bad.fi0052");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ErrorsTests, BadErrorWrongPrimitive) {
   TestLibrary library;
   library.AddFile("bad/fi-0141.test.fidl");
 
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidErrorType);
+  library.ExpectFail(fidl::ErrInvalidErrorType);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ErrorsTests, BadErrorMissingType) {
@@ -151,7 +152,10 @@ protocol Example {
     Method() -> (flub int32) error;
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrUnexpectedTokenOfKind);
+  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kIdentifier),
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kRightParen));
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ErrorsTests, BadErrorNotAType) {
@@ -161,7 +165,10 @@ protocol Example {
     Method() -> (flub int32) error "hello";
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrUnexpectedTokenOfKind);
+  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kIdentifier),
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kRightParen));
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ErrorsTests, BadErrorNoResponse) {
@@ -171,7 +178,10 @@ protocol Example {
     Method() -> error int32;
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrUnexpectedTokenOfKind);
+  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
+                     fidl::Token::KindAndSubkind(fidl::Token::Subkind::kError),
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kLeftParen));
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ErrorsTests, BadErrorUnexpectedEndOfFile) {
@@ -180,19 +190,28 @@ library example;
 type ForgotTheSemicolon = table {}
 )FIDL");
 
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrUnexpectedTokenOfKind);
+  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kEndOfFile),
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kSemicolon));
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ErrorsTests, BadIncorrectIdentifier) {
   TestLibrary library;
   library.AddFile("bad/fi-0009.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrUnexpectedIdentifier);
+  library.ExpectFail(fidl::ErrUnexpectedIdentifier,
+                     fidl::Token::KindAndSubkind(fidl::Token::Subkind::kUsing),
+                     fidl::Token::KindAndSubkind(fidl::Token::Subkind::kLibrary));
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ErrorsTests, BadErrorEmptyFile) {
   TestLibrary library("");
 
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrUnexpectedIdentifier);
+  library.ExpectFail(fidl::ErrUnexpectedIdentifier,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kEndOfFile),
+                     fidl::Token::KindAndSubkind(fidl::Token::Subkind::kLibrary));
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ErrorsTests, ExperimentalAllowArbitraryErrorTypes) {
@@ -217,7 +236,8 @@ TEST(ErrorsTest, TransitionalAllowList) {
   TestLibrary library;
   library.AddFile("bad/fi-0202.test.fidl");
   library.EnableFlag(fidl::ExperimentalFlags::Flag::kTransitionalAllowList);
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrTransitionalNotAllowed);
+  library.ExpectFail(fidl::ErrTransitionalNotAllowed, "NewMethod");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 }  // namespace

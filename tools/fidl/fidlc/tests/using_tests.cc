@@ -109,8 +109,8 @@ type Foo = struct {
 };
 
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrNameNotFound);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "'dependent' in library 'example'");
+  library.ExpectFail(fidl::ErrNameNotFound, "dependent", "example");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(UsingTests, BadUnknownUsing) {
@@ -138,8 +138,8 @@ type Foo = struct {
 };
 
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrNameNotFound);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "'dependent' in library 'example'");
+  library.ExpectFail(fidl::ErrNameNotFound, "dependent", "example");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(UsingTests, BadDuplicateUsingNoAlias) {
@@ -149,8 +149,8 @@ TEST(UsingTests, BadDuplicateUsingNoAlias) {
   ASSERT_COMPILED(dependency);
   TestLibrary library(&shared);
   library.AddFile("bad/fi-0042-b.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateLibraryImport);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "fi0042a");
+  library.ExpectFail(fidl::ErrDuplicateLibraryImport, "test.bad.fi0042a");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(UsingTests, BadDuplicateUsingFirstAlias) {
@@ -166,8 +166,8 @@ using dependent as alias;
 using dependent; // duplicated
 
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateLibraryImport);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "dependent");
+  library.ExpectFail(fidl::ErrDuplicateLibraryImport, "dependent");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(UsingTests, BadDuplicateUsingSecondAlias) {
@@ -183,8 +183,8 @@ using dependent;
 using dependent as alias; // duplicated
 
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateLibraryImport);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "dependent");
+  library.ExpectFail(fidl::ErrDuplicateLibraryImport, "dependent");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(UsingTests, BadDuplicateUsingSameLibrarySameAlias) {
@@ -200,8 +200,8 @@ using dependent as alias;
 using dependent as alias; // duplicated
 
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateLibraryImport);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "dependent");
+  library.ExpectFail(fidl::ErrDuplicateLibraryImport, "dependent");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(UsingTests, BadDuplicateUsingSameLibraryDifferentAlias) {
@@ -217,8 +217,8 @@ using dependent as alias1;
 using dependent as alias2; // duplicated
 
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateLibraryImport);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "dependent");
+  library.ExpectFail(fidl::ErrDuplicateLibraryImport, "dependent");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(UsingTests, BadConflictingUsingLibraryAndAlias) {
@@ -237,9 +237,8 @@ using dependent1;
 using dependent2 as dependent1; // conflict
 
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrConflictingLibraryImportAlias);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "dependent2");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "dependent1");
+  library.ExpectFail(fidl::ErrConflictingLibraryImportAlias, "dependent2", "dependent1");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(UsingTests, BadConflictingUsingAliasAndLibrary) {
@@ -253,8 +252,8 @@ TEST(UsingTests, BadConflictingUsingAliasAndLibrary) {
 
   TestLibrary library(&shared);
   library.AddFile("bad/fi-0043-c.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrConflictingLibraryImport);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "fi0043b");
+  library.ExpectFail(fidl::ErrConflictingLibraryImport, "fi0043b");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(UsingTests, BadConflictingUsingAliasAndAlias) {
@@ -268,9 +267,8 @@ TEST(UsingTests, BadConflictingUsingAliasAndAlias) {
 
   TestLibrary library(&shared);
   library.AddFile("bad/fi-0044-c.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrConflictingLibraryImportAlias);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "fi0044b");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "dep");
+  library.ExpectFail(fidl::ErrConflictingLibraryImportAlias, "test.bad.fi0044b", "dep");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(UsingTests, BadUnusedUsing) {
@@ -282,15 +280,17 @@ TEST(UsingTests, BadUnusedUsing) {
   TestLibrary library(&shared);
   library.AddFile("bad/fi-0178.test.fidl");
 
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrUnusedImport);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "dependent");
+  library.ExpectFail(fidl::ErrUnusedImport, "test.bad.fi0178", "dependent");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(UsingTests, BadUnknownDependentLibrary) {
   TestLibrary library;
   library.AddFile("bad/fi-0051.test.fidl");
 
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrUnknownDependentLibrary);
+  library.ExpectFail(fidl::ErrUnknownDependentLibrary, "unknown.dependent.library",
+                     "unknown.dependent");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(UsingTests, BadTooManyProvidedLibraries) {
@@ -316,8 +316,8 @@ TEST(UsingTests, BadLibraryDeclarationNameCollision) {
   TestLibrary library(&shared);
   library.AddFile("bad/fi-0038-b.test.fidl");
 
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDeclNameConflictsWithLibraryImport);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "dependency");
+  library.ExpectFail(fidl::ErrDeclNameConflictsWithLibraryImport, "dependency");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(UsingTests, BadAliasedLibraryDeclarationNameCollision) {
@@ -340,8 +340,8 @@ type B = struct{a dep.A;}; // So the import is used.
 
 )FIDL");
 
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDeclNameConflictsWithLibraryImport);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "x");
+  library.ExpectFail(fidl::ErrDeclNameConflictsWithLibraryImport, "x");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 }  // namespace

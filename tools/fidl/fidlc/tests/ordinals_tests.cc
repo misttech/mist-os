@@ -29,7 +29,8 @@ protocol Special {
 };
 
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrGeneratedZeroValueOrdinal);
+  library.ExpectFail(fidl::ErrGeneratedZeroValueOrdinal);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(OrdinalsTests, BadClashingOrdinalValues) {
@@ -45,7 +46,8 @@ protocol Special {
 
 )FIDL");
   library.UseLibraryZx();
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateMethodOrdinal);
+  library.ExpectFail(fidl::ErrDuplicateMethodOrdinal, "example.fidl:7:5");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(OrdinalsTests, BadClashingOrdinalValuesWithAttribute) {
@@ -63,13 +65,15 @@ protocol Special {
 
 )FIDL");
   library.UseLibraryZx();
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateMethodOrdinal);
+  library.ExpectFail(fidl::ErrDuplicateMethodOrdinal, "example.fidl:8:5");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(OrdinalsTests, BadClashingOrdinalBadSelector) {
   TestLibrary library;
   library.AddFile("bad/fi-0081.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateMethodOrdinal);
+  library.ExpectFail(fidl::ErrDuplicateMethodOrdinal, "bad/fi-0081.test.fidl:7:5");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(OrdinalsTests, GoodAttributeResolvesClashes) {
@@ -137,7 +141,8 @@ TEST(OrdinalsTests, BadSelectorValueWrongFormat) {
   TestLibrary library;
   library.AddFile("bad/fi-0082.test.fidl");
 
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidSelectorValue);
+  library.ExpectFail(fidl::ErrInvalidSelectorValue);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(OrdinalsTests, BadSelectorValueNotString) {
@@ -150,8 +155,9 @@ protocol at {
     all();
 };
 )FIDL");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrTypeCannotBeConvertedToType,
-                                      fidl::ErrCouldNotResolveAttributeArg);
+  library.ExpectFail(fidl::ErrTypeCannotBeConvertedToType, "true", "bool", "string");
+  library.ExpectFail(fidl::ErrCouldNotResolveAttributeArg);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(OrdinalsTests, GoodSelectorValueReferencesConst) {
@@ -177,7 +183,8 @@ protocol at {
     all();
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrNameNotFound);
+  library.ExpectFail(fidl::ErrNameNotFound, "nonexistent", "not.important");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(OrdinalsTests, GoodOrdinalValueIsFirst64BitsOfSha256) {
@@ -267,7 +274,8 @@ protocol protocol {
 TEST(OrdinalsTests, GoodHackToRenameFuchsiaIoToFuchsiaIoOneNoSelector) {
   TestLibrary library;
   library.AddFile("bad/fi-0083.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrFuchsiaIoExplicitOrdinals);
+  library.ExpectFail(fidl::ErrFuchsiaIoExplicitOrdinals);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(OrdinalsTests, GoodHackToRenameFuchsiaIoToFuchsiaIoOneHasSelector) {
@@ -298,7 +306,8 @@ protocol DirectoryAdmin {
 };
 
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrNameNotFound);
+  library.ExpectFail(fidl::ErrNameNotFound, "Id", "example");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 }  // namespace

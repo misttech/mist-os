@@ -402,7 +402,12 @@ TEST(AvailabilityInterleavingTests, OtherLibrary) {
   ASSERT_COMPILED(dependency);
   TestLibrary library(&shared);
   library.AddFile("bad/fi-0056-b.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidReferenceToDeprecatedOtherPlatform);
+  library.ExpectFail(fidl::ErrInvalidReferenceToDeprecatedOtherPlatform, "alias 'RGB'",
+                     fidl::VersionRange(fidl::Version::From(2).value(), fidl::Version::PosInf()),
+                     fidl::Platform::Parse("foo").value(), "table member 'color'",
+                     fidl::VersionRange(fidl::Version::From(3).value(), fidl::Version::PosInf()),
+                     fidl::Platform::Parse("bar").value());
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AvailabilityInterleavingTests, SameLibrary) {
@@ -432,7 +437,10 @@ TEST(AvailabilityInterleavingTests, SameLibrarySingleInstance) {
   TestLibrary library;
   library.AddFile("bad/fi-0055.test.fidl");
   library.SelectVersion("test", "HEAD");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidReferenceToDeprecated);
+  library.ExpectFail(fidl::ErrInvalidReferenceToDeprecated, "alias 'RGB'",
+                     fidl::VersionRange(fidl::Version::From(3).value(), fidl::Version::PosInf()),
+                     fidl::Platform::Parse("test").value(), "table member 'color'");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 // Tests compilation of example_fidl and dependency_fidl after substituting

@@ -68,16 +68,17 @@ service MyService {
     my_service_member client_end:MyProtocol;
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementName);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "service member");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "my_service_member");
+  library.ExpectFail(fidl::ErrDuplicateElementName, fidl::flat::Element::Kind::kServiceMember,
+                     "my_service_member", "example.fidl:7:5");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ServiceTests, BadNoNullableProtocolMembers) {
   TestLibrary library;
   library.AddFile("bad/fi-0088.test.fidl");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrOptionalServiceMember,
-                                      fidl::ErrOptionalServiceMember);
+  library.ExpectFail(fidl::ErrOptionalServiceMember);
+  library.ExpectFail(fidl::ErrOptionalServiceMember);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ServiceTests, BadOnlyProtocolMembers) {
@@ -91,13 +92,15 @@ service SomeService {
 };
 
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrOnlyClientEndsInServices);
+  library.ExpectFail(fidl::ErrOnlyClientEndsInServices);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ServiceTests, BadNoServerEnds) {
   TestLibrary library;
   library.AddFile("bad/fi-0112.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrOnlyClientEndsInServices);
+  library.ExpectFail(fidl::ErrOnlyClientEndsInServices);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ServiceTests, BadCannotUseServicesInDecls) {
@@ -111,13 +114,15 @@ type CannotUseService = struct {
 };
 
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrExpectedType);
+  library.ExpectFail(fidl::ErrExpectedType);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ServiceTests, BadCannotUseMoreThanOneProtocolTransportKind) {
   TestLibrary library;
   library.AddFile("bad/fi-0113.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrMismatchedTransportInServices);
+  library.ExpectFail(fidl::ErrMismatchedTransportInServices, "b", "Driver", "a", "Channel");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 }  // namespace

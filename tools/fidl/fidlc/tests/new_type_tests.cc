@@ -58,7 +58,8 @@ type C = struct { b B; };
 )FIDL");
 
   library.EnableFlag(ExperimentalFlags::Flag::kAllowNewTypes);
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrTypeMustBeResource);
+  library.ExpectFail(fidl::ErrTypeMustBeResource, "C", "b", "struct");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(NewTypeTests, GoodNewTypesSimple) {
@@ -141,7 +142,8 @@ TEST(NewTypeTests, BadNewTypesConstraints) {
   TestLibrary library;
   library.AddFile("bad/fi-0179.test.fidl");
   library.EnableFlag(ExperimentalFlags::Flag::kAllowNewTypes);
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrNewTypeCannotHaveConstraint);
+  library.ExpectFail(fidl::ErrNewTypeCannotHaveConstraint, "Name");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 }  // namespace

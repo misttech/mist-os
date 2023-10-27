@@ -24,7 +24,8 @@ TEST(StringArrayTests, GoodNonzeroSizeArray) {
 
 TEST(StringArrayTests, BadNoExperimentalFlag) {
   TestLibrary library(good_library_source);
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrExperimentalZxCTypesDisallowed);
+  library.ExpectFail(fidl::ErrExperimentalZxCTypesDisallowed, "string_array");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(StringArrayTests, BadZeroSizeArray) {
@@ -35,7 +36,8 @@ type S = struct {
 };
 )FIDL");
   library.EnableFlag(fidl::ExperimentalFlags::Flag::kZxCTypes);
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrMustHaveNonZeroSize);
+  library.ExpectFail(fidl::ErrMustHaveNonZeroSize, "string_array");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(StringArrayTests, BadNoSizeArray) {
@@ -47,7 +49,8 @@ type S = struct {
 };
 )FIDL");
   library.EnableFlag(fidl::ExperimentalFlags::Flag::kZxCTypes);
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrWrongNumberOfLayoutParameters);
+  library.ExpectFail(fidl::ErrWrongNumberOfLayoutParameters, "string_array", 1, 0);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(StringArrayTests, BadOptionalArray) {
@@ -59,7 +62,8 @@ type S = struct {
 };
 )FIDL");
   library.EnableFlag(fidl::ExperimentalFlags::Flag::kZxCTypes);
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrCannotBeOptional);
+  library.ExpectFail(fidl::ErrCannotBeOptional, "string_array");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 }  // namespace

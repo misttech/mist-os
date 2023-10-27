@@ -37,21 +37,21 @@ type Three = strict strict strict union { 1: b bool; }; // line 6
 TEST(StrictnessTests, BadDuplicateModifierNonConsecutive) {
   TestLibrary library;
   library.AddFile("bad/fi-0032.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateModifier);
+  library.ExpectFail(fidl::ErrDuplicateModifier,
+                     fidl::Token::KindAndSubkind(fidl::Token::Subkind::kStrict));
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(StrictnessTests, BadConflictingModifiers) {
   TestLibrary library;
   library.AddFile("bad/fi-0033.test.fidl");
-
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrConflictingModifier,
-                                      fidl::ErrConflictingModifier);
-  EXPECT_EQ(library.errors()[0]->span.position().line, 6);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "strict");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "flexible");
-  EXPECT_EQ(library.errors()[1]->span.position().line, 10);
-  ASSERT_SUBSTR(library.errors()[1]->msg.c_str(), "strict");
-  ASSERT_SUBSTR(library.errors()[1]->msg.c_str(), "flexible");
+  library.ExpectFail(fidl::ErrConflictingModifier,
+                     fidl::Token::KindAndSubkind(fidl::Token::Subkind::kFlexible),
+                     fidl::Token::KindAndSubkind(fidl::Token::Subkind::kStrict));
+  library.ExpectFail(fidl::ErrConflictingModifier,
+                     fidl::Token::KindAndSubkind(fidl::Token::Subkind::kStrict),
+                     fidl::Token::KindAndSubkind(fidl::Token::Subkind::kFlexible));
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(StrictnessTests, GoodBitsStrictness) {
@@ -121,7 +121,10 @@ type Foo = flexible bits {
 TEST(StrictnessTests, BadStrictnessStruct) {
   TestLibrary library;
   library.AddFile("bad/fi-0030.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrCannotSpecifyModifier);
+  library.ExpectFail(fidl::ErrCannotSpecifyModifier,
+                     fidl::Token::KindAndSubkind(fidl::Token::Subkind::kStrict),
+                     fidl::Token::KindAndSubkind(fidl::Token::Subkind::kStruct));
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(StrictnessTests, BadStrictnessTable) {
@@ -130,7 +133,10 @@ library example;
 
 type StrictFoo = strict table {};
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrCannotSpecifyModifier);
+  library.ExpectFail(fidl::ErrCannotSpecifyModifier,
+                     fidl::Token::KindAndSubkind(fidl::Token::Subkind::kStrict),
+                     fidl::Token::KindAndSubkind(fidl::Token::Subkind::kTable));
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(StrictnessTests, GoodUnionStrictness) {

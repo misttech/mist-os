@@ -118,7 +118,8 @@ type Foo = flexible overlay {
 )FIDL");
   library.EnableFlag(fidl::ExperimentalFlags::Flag::kZxCTypes);
 
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrOverlayMustBeStrict);
+  library.ExpectFail(fidl::ErrOverlayMustBeStrict);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(OverlayTests, BadResource) {
@@ -132,7 +133,10 @@ type Foo = strict resource overlay {
 )FIDL");
   library.EnableFlag(fidl::ExperimentalFlags::Flag::kZxCTypes);
 
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrCannotSpecifyModifier);
+  library.ExpectFail(fidl::ErrCannotSpecifyModifier,
+                     fidl::Token::KindAndSubkind(fidl::Token::Subkind::kResource),
+                     fidl::Token::KindAndSubkind(fidl::Token::Subkind::kOverlay));
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(OverlayTests, BadResourceMember) {
@@ -147,7 +151,8 @@ type Foo = strict overlay {
 )FIDL");
   library.EnableFlag(fidl::ExperimentalFlags::Flag::kZxCTypes);
 
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrOverlayMemberMustBeValue);
+  library.ExpectFail(fidl::ErrOverlayMemberMustBeValue);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(OverlayTests, BadReserved) {
@@ -162,7 +167,8 @@ type Foo = strict overlay {
 )FIDL");
   library.EnableFlag(fidl::ExperimentalFlags::Flag::kZxCTypes);
 
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrOverlayMustNotContainReserved);
+  library.ExpectFail(fidl::ErrOverlayMustNotContainReserved);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(OverlayTests, BadNoExperimentalFlag) {
@@ -174,7 +180,8 @@ type Foo = strict overlay {
 };
 
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidLayoutClass);
+  library.ExpectFail(fidl::ErrInvalidLayoutClass);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(OverlayTests, BadOptionalOverlay) {
@@ -191,7 +198,8 @@ type Baff = struct {
 )FIDL");
   library.EnableFlag(fidl::ExperimentalFlags::Flag::kZxCTypes);
 
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrCannotBeOptional);
+  library.ExpectFail(fidl::ErrCannotBeOptional, "Biff");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(OverlayTests, GoodRecursiveOverlay) {
@@ -225,7 +233,8 @@ type Value = strict overlay {
 )FIDL");
   library.EnableFlag(fidl::ExperimentalFlags::Flag::kZxCTypes);
 
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrIncludeCycle);
+  library.ExpectFail(fidl::ErrIncludeCycle, "overlay 'Value' -> overlay 'Value'");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(OverlayTests, BadInlineRecursiveOverlay) {
@@ -247,7 +256,9 @@ type Sum = strict overlay {
 )FIDL");
   library.EnableFlag(fidl::ExperimentalFlags::Flag::kZxCTypes);
 
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrIncludeCycle);
+  library.ExpectFail(fidl::ErrIncludeCycle,
+                     "struct 'Product' -> overlay 'Sum' -> struct 'Product'");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(OverlayTests, BadNoSelector) {
@@ -261,5 +272,6 @@ type Foo = strict overlay {
 )FIDL");
   library.EnableFlag(fidl::ExperimentalFlags::Flag::kZxCTypes);
 
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidAttributePlacement);
+  library.ExpectFail(fidl::ErrInvalidAttributePlacement, "selector");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }

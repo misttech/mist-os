@@ -48,9 +48,9 @@ type Fruit = enum {
 TEST(EnumsTests, BadEnumTestWithNonUniqueValues) {
   TestLibrary library;
   library.AddFile("bad/fi-0107.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateMemberValue);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "APPLE");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "ORANGE");
+  library.ExpectFail(fidl::ErrDuplicateMemberValue, fidl::flat::Decl::Kind::kEnum, "APPLE",
+                     "ORANGE", "bad/fi-0107.test.fidl:7:5");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(EnumsTests, BadEnumTestWithNonUniqueValuesOutOfLine) {
@@ -65,9 +65,9 @@ type Fruit = enum {
 const FOUR uint32 = 4;
 const TWO_SQUARED uint32 = 4;
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateMemberValue);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "APPLE");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "ORANGE");
+  library.ExpectFail(fidl::ErrDuplicateMemberValue, fidl::flat::Decl::Kind::kEnum, "APPLE",
+                     "ORANGE", "example.fidl:5:5");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(EnumsTests, BadEnumTestUnsignedWithNegativeMember) {
@@ -79,9 +79,9 @@ type Fruit = enum : uint64 {
     APPLE = -2;
 };
 )FIDL");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrCouldNotResolveMember,
-                                      fidl::ErrConstantOverflowsType);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "-2");
+  library.ExpectFail(fidl::ErrCouldNotResolveMember, fidl::flat::Decl::Kind::kEnum);
+  library.ExpectFail(fidl::ErrConstantOverflowsType, "-2", "uint64");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(EnumsTests, BadEnumTestInferredUnsignedWithNegativeMember) {
@@ -93,9 +93,9 @@ type Fruit = enum {
     APPLE = -2;
 };
 )FIDL");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrCouldNotResolveMember,
-                                      fidl::ErrConstantOverflowsType);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "-2");
+  library.ExpectFail(fidl::ErrCouldNotResolveMember, fidl::flat::Decl::Kind::kEnum);
+  library.ExpectFail(fidl::ErrConstantOverflowsType, "-2", "uint32");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(EnumsTests, BadEnumTestMemberOverflow) {
@@ -107,15 +107,16 @@ type Fruit = enum : uint8 {
     APPLE = 256;
 };
 )FIDL");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrCouldNotResolveMember,
-                                      fidl::ErrConstantOverflowsType);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "256");
+  library.ExpectFail(fidl::ErrCouldNotResolveMember, fidl::flat::Decl::Kind::kEnum);
+  library.ExpectFail(fidl::ErrConstantOverflowsType, "256", "uint8");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(EnumsTests, BadEnumTestFloatType) {
   TestLibrary library;
   library.AddFile("bad/fi-0070.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrEnumTypeMustBeIntegralPrimitive);
+  library.ExpectFail(fidl::ErrEnumTypeMustBeIntegralPrimitive, "float64");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(EnumsTests, BadEnumTestDuplicateMember) {
@@ -128,9 +129,9 @@ type Fruit = flexible enum {
     ORANGE = 3;
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementName);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "enum member");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "ORANGE");
+  library.ExpectFail(fidl::ErrDuplicateElementName, fidl::flat::Element::Kind::kEnumMember,
+                     "ORANGE", "example.fidl:5:5");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(EnumsTests, GoodEnumTestNoMembersAllowedWhenDefaultsToFlexible) {
@@ -157,7 +158,8 @@ TEST(EnumsTests, GoodEnumTestStrictWithMembers) {
 TEST(EnumsTests, BadEnumTestNoMembersWhenStrict) {
   TestLibrary library;
   library.AddFile("bad/fi-0019.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrMustHaveOneMember);
+  library.ExpectFail(fidl::ErrMustHaveOneMember);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(EnumsTests, GoodEnumTestKeywordNames) {
@@ -184,7 +186,8 @@ type Struct = struct {
     not_nullable NotNullable:optional;
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrCannotBeOptional);
+  library.ExpectFail(fidl::ErrCannotBeOptional, "NotNullable");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(EnumsTests, BadEnumMultipleConstraints) {
@@ -199,7 +202,8 @@ type Struct = struct {
     not_nullable NotNullable:<1, 2, 3>;
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrTooManyConstraints);
+  library.ExpectFail(fidl::ErrTooManyConstraints, "NotNullable", 1, 3);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(EnumsTests, GoodSimpleEnum) {

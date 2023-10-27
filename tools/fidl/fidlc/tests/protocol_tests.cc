@@ -79,7 +79,8 @@ library example;
 strict protocol Empty {};
 
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrExpectedDeclaration);
+  library.ExpectFail(fidl::ErrExpectedDeclaration, "strict");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, BadEmptyFlexibleProtocol) {
@@ -89,7 +90,8 @@ library example;
 flexible protocol Empty {};
 
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrExpectedDeclaration);
+  library.ExpectFail(fidl::ErrExpectedDeclaration, "flexible");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, BadOpenMissingProtocolToken) {
@@ -99,7 +101,10 @@ library example;
 open Empty {};
 
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrUnexpectedIdentifier);
+  library.ExpectFail(fidl::ErrUnexpectedIdentifier,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kIdentifier),
+                     fidl::Token::KindAndSubkind(fidl::Token::Subkind::kProtocol));
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, BadAjarMissingProtocolToken) {
@@ -109,7 +114,10 @@ library example;
 ajar Empty {};
 
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrUnexpectedIdentifier);
+  library.ExpectFail(fidl::ErrUnexpectedIdentifier,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kIdentifier),
+                     fidl::Token::KindAndSubkind(fidl::Token::Subkind::kProtocol));
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, BadClosedMissingProtocolToken) {
@@ -119,7 +127,10 @@ library example;
 closed Empty {};
 
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrUnexpectedIdentifier);
+  library.ExpectFail(fidl::ErrUnexpectedIdentifier,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kIdentifier),
+                     fidl::Token::KindAndSubkind(fidl::Token::Subkind::kProtocol));
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, BadEmptyProtocolMember) {
@@ -131,7 +142,8 @@ protocol Example {
 };
 
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidProtocolMember);
+  library.ExpectFail(fidl::ErrInvalidProtocolMember);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, GoodValidProtocolComposition) {
@@ -230,7 +242,9 @@ closed protocol Composing {
 };
 
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrComposedProtocolTooOpen);
+  library.ExpectFail(fidl::ErrComposedProtocolTooOpen, fidl::types::Openness::kClosed, "Composing",
+                     fidl::types::Openness::kOpen, "Composed");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, BadInvalidComposeAjarInClosed) {
@@ -244,13 +258,17 @@ closed protocol Composing {
 };
 
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrComposedProtocolTooOpen);
+  library.ExpectFail(fidl::ErrComposedProtocolTooOpen, fidl::types::Openness::kClosed, "Composing",
+                     fidl::types::Openness::kAjar, "Composed");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, BadInvalidComposeOpenInAjar) {
   TestLibrary library;
   library.AddFile("bad/fi-0114.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrComposedProtocolTooOpen);
+  library.ExpectFail(fidl::ErrComposedProtocolTooOpen, fidl::types::Openness::kAjar, "Composing",
+                     fidl::types::Openness::kOpen, "Composed");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, BadModifierStrictOnCompose) {
@@ -264,7 +282,8 @@ protocol B {
 };
 
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidProtocolMember);
+  library.ExpectFail(fidl::ErrInvalidProtocolMember);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, BadModifierFlexibleOnCompose) {
@@ -278,7 +297,8 @@ protocol B {
 };
 
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidProtocolMember);
+  library.ExpectFail(fidl::ErrInvalidProtocolMember);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, BadModifierStrictOnInvalidMember) {
@@ -290,7 +310,8 @@ protocol Example {
 };
 
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidProtocolMember);
+  library.ExpectFail(fidl::ErrInvalidProtocolMember);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, BadModifierFlexibleOnInvalidMember) {
@@ -302,7 +323,8 @@ protocol Example {
 };
 
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidProtocolMember);
+  library.ExpectFail(fidl::ErrInvalidProtocolMember);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, BadColonNotSupported) {
@@ -313,7 +335,10 @@ protocol Parent {};
 protocol Child : Parent {};
 
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrUnexpectedTokenOfKind);
+  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kColon),
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kLeftCurly));
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, BadDocCommentOutsideAttributelist) {
@@ -326,7 +351,8 @@ protocol WellDocumented {
 };
 
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidProtocolMember);
+  library.ExpectFail(fidl::ErrInvalidProtocolMember);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, GoodAttachAttributesToCompose) {
@@ -380,23 +406,23 @@ protocol Narcisse {
 };
 
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrIncludeCycle);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "protocol 'Narcisse' -> protocol 'Narcisse'");
+  library.ExpectFail(fidl::ErrIncludeCycle, "protocol 'Narcisse' -> protocol 'Narcisse'");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, BadCannotMutuallyCompose) {
   TestLibrary library;
   library.AddFile("bad/fi-0057-b.test.fidl");
 
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrIncludeCycle);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(),
-                "protocol 'Yang' -> protocol 'Yin' -> protocol 'Yang'");
+  library.ExpectFail(fidl::ErrIncludeCycle, "protocol 'Yang' -> protocol 'Yin' -> protocol 'Yang'");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, BadCannotComposeSameProtocolTwice) {
   TestLibrary library;
   library.AddFile("bad/fi-0047.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrProtocolComposedMultipleTimes);
+  library.ExpectFail(fidl::ErrProtocolComposedMultipleTimes, "bad/fi-0047.test.fidl:11:13");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, BadCannotComposeMissingProtocol) {
@@ -408,14 +434,15 @@ protocol Child {
 };
 
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrNameNotFound);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "MissingParent");
+  library.ExpectFail(fidl::ErrNameNotFound, "MissingParent", "example");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, BadCannotComposeNonProtocol) {
   TestLibrary library;
   library.AddFile("bad/fi-0073.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrComposingNonProtocol);
+  library.ExpectFail(fidl::ErrComposingNonProtocol);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, BadCannotUseOrdinalsInProtocolDeclaration) {
@@ -427,13 +454,15 @@ protocol NoMoreOrdinals {
 };
 
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidProtocolMember);
+  library.ExpectFail(fidl::ErrInvalidProtocolMember);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, BadEmptyNamedItem) {
   TestLibrary library;
   library.AddFile("bad/fi-0020.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidProtocolMember);
+  library.ExpectFail(fidl::ErrInvalidProtocolMember);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, BadNoOtherPragmaThanCompose) {
@@ -445,22 +474,25 @@ protocol Wrong {
 };
 
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidProtocolMember);
+  library.ExpectFail(fidl::ErrInvalidProtocolMember);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, BadDuplicateMethodNames) {
   TestLibrary library;
   library.AddFile("bad/fi-0078-a.test.fidl");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrDuplicateElementName,
-                                      fidl::ErrDuplicateMethodOrdinal);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "protocol method");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "MyMethod");
+  library.ExpectFail(fidl::ErrDuplicateElementName, fidl::flat::Element::Kind::kProtocolMethod,
+                     "MyMethod", "bad/fi-0078-a.test.fidl:7:5");
+  library.ExpectFail(fidl::ErrDuplicateMethodOrdinal, "bad/fi-0078-a.test.fidl:7:5");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, BadDuplicateMethodNamesFromImmediateComposition) {
   TestLibrary library;
   library.AddFile("bad/fi-0078-b.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementName);
+  library.ExpectFail(fidl::ErrDuplicateElementName, fidl::flat::Element::Kind::kProtocolMethod,
+                     "MyMethod", "bad/fi-0078-b.test.fidl:7:5");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, BadDuplicateMethodNamesFromMultipleComposition) {
@@ -480,7 +512,9 @@ protocol C {
     compose B;
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementName);
+  library.ExpectFail(fidl::ErrDuplicateElementName, fidl::flat::Element::Kind::kProtocolMethod,
+                     "Method", "example.fidl:5:5");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, BadDuplicateMethodNamesFromNestedComposition) {
@@ -508,7 +542,9 @@ protocol D {
     MethodA();
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementName);
+  library.ExpectFail(fidl::ErrDuplicateElementName, fidl::flat::Element::Kind::kProtocolMethod,
+                     "MethodA", "example.fidl:5:5");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 // See GetGeneratedOrdinal64ForTesting in test_library.h
@@ -526,13 +562,15 @@ protocol Special {
     ClashTwo();
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateMethodOrdinal);
+  library.ExpectFail(fidl::ErrDuplicateMethodOrdinal, "example.fidl:5:4");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, BadRequestMustBeProtocol) {
   TestLibrary library;
   library.AddFile("bad/fi-0157.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrMustBeAProtocol);
+  library.ExpectFail(fidl::ErrMustBeAProtocol, "server_end");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, BadRequestMustBeProtocolWithOptional) {
@@ -542,13 +580,15 @@ library example;
 type MyStruct = struct {};
 alias ServerEnd = server_end:<MyStruct, optional>;
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrMustBeAProtocol);
+  library.ExpectFail(fidl::ErrMustBeAProtocol, "server_end");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, BadRequestMustBeParameterized) {
   TestLibrary library;
   library.AddFile("bad/fi-0168.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrProtocolConstraintRequired);
+  library.ExpectFail(fidl::ErrProtocolConstraintRequired, "server_end");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
   EXPECT_EQ(library.errors()[0]->span.data(), "server_end");
 }
 
@@ -560,7 +600,8 @@ protocol MyProtocol {
     MyMethod(resource struct { server server_end; });
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrProtocolConstraintRequired);
+  library.ExpectFail(fidl::ErrProtocolConstraintRequired, "server_end");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, BadRequestCannotHaveSize) {
@@ -572,7 +613,8 @@ type S = struct {
     p server_end:<P,0>;
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrUnexpectedConstraint);
+  library.ExpectFail(fidl::ErrUnexpectedConstraint, "server_end");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, BadDuplicateParameterName) {
@@ -583,7 +625,9 @@ protocol P {
   MethodWithDuplicateParams(struct {foo uint8; foo uint8; });
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementName);
+  library.ExpectFail(fidl::ErrDuplicateElementName, fidl::flat::Element::Kind::kStructMember, "foo",
+                     "example.fidl:5:37");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, BadParameterizedTypedChannel) {
@@ -596,7 +640,8 @@ type Foo = resource struct {
   foo client_end<MyProtocol>;
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrWrongNumberOfLayoutParameters);
+  library.ExpectFail(fidl::ErrWrongNumberOfLayoutParameters, "client_end", 0, 1);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, BadTooManyConstraintsTypedChannel) {
@@ -609,7 +654,8 @@ type Foo = resource struct {
   foo client_end:<MyProtocol, optional, 1, 2>;
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrTooManyConstraints);
+  library.ExpectFail(fidl::ErrTooManyConstraints, "client_end", 2, 4);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, GoodTypedChannels) {
@@ -686,14 +732,16 @@ protocol MyProtocol {
   });
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrPayloadStructHasDefaultMembers);
+  library.ExpectFail(fidl::ErrPayloadStructHasDefaultMembers);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, BadMethodEmptyPayloadStruct) {
   TestLibrary library;
   library.AddFile("bad/fi-0077-a.test.fidl");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrEmptyPayloadStructs,
-                                      fidl::ErrEmptyPayloadStructs);
+  library.ExpectFail(fidl::ErrEmptyPayloadStructs, "MyMethod");
+  library.ExpectFail(fidl::ErrEmptyPayloadStructs, "MyMethod");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, GoodMethodAbsentPayloadStruct) {
@@ -705,7 +753,8 @@ TEST(ProtocolTests, GoodMethodAbsentPayloadStruct) {
 TEST(ProtocolTests, BadEventEmptyPayloadStruct) {
   TestLibrary library;
   library.AddFile("bad/fi-0077-b.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrEmptyPayloadStructs);
+  library.ExpectFail(fidl::ErrEmptyPayloadStructs, "MyEvent");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, GoodEventAbsentPayloadStruct) {
@@ -717,8 +766,8 @@ TEST(ProtocolTests, GoodEventAbsentPayloadStruct) {
 TEST(ProtocolTests, BadMethodEnumLayout) {
   TestLibrary library;
   library.AddFile("bad/fi-0074.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidMethodPayloadLayoutClass);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "enum");
+  library.ExpectFail(fidl::ErrInvalidMethodPayloadLayoutClass, fidl::flat::Decl::Kind::kEnum);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, GoodMethodAbsentResponseWithError) {
@@ -740,7 +789,8 @@ protocol MyProtocol {
     MyMethod() -> (struct {}) error uint32;
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrEmptyPayloadStructs);
+  library.ExpectFail(fidl::ErrEmptyPayloadStructs, "MyMethod");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, GoodMethodNamedTypeRequest) {
@@ -818,15 +868,17 @@ protocol MyProtocol {
     MyMethod(MyStruct) -> (MyStruct);
 };
 )FIDL");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrEmptyPayloadStructs,
-                                      fidl::ErrEmptyPayloadStructs);
+  library.ExpectFail(fidl::ErrEmptyPayloadStructs, "MyMethod");
+  library.ExpectFail(fidl::ErrEmptyPayloadStructs, "MyMethod");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, BadMethodNamedDefaultValueStruct) {
   TestLibrary library;
   library.AddFile("bad/fi-0084.test.fidl");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrPayloadStructHasDefaultMembers,
-                                      fidl::ErrPayloadStructHasDefaultMembers);
+  library.ExpectFail(fidl::ErrPayloadStructHasDefaultMembers);
+  library.ExpectFail(fidl::ErrPayloadStructHasDefaultMembers);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, BadMethodNamedInvalidHandle) {
@@ -853,8 +905,8 @@ protocol MyProtocol {
     MyMethod(Handle);
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidMethodPayloadType);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "Handle");
+  library.ExpectFail(fidl::ErrInvalidMethodPayloadType, "example/Handle");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, BadMethodNamedInvalidAlias) {
@@ -913,7 +965,9 @@ protocol MyProtocol {
     MyMethod(MyOtherProtocol) -> (MyService);
 };
 )FIDL");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrExpectedType, fidl::ErrExpectedType);
+  library.ExpectFail(fidl::ErrExpectedType);
+  library.ExpectFail(fidl::ErrExpectedType);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, GoodMethodTableRequest) {
@@ -1039,13 +1093,15 @@ protocol MyProtocol {
 TEST(ProtocolTests, BadEventErrorSyntax) {
   TestLibrary library;
   library.AddFile("bad/fi-0119.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrEventErrorSyntaxDeprecated);
+  library.ExpectFail(fidl::ErrEventErrorSyntaxDeprecated, "OnMyEvent");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, BadDisallowedRequestType) {
   TestLibrary library;
   library.AddFile("bad/fi-0075.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidMethodPayloadType);
+  library.ExpectFail(fidl::ErrInvalidMethodPayloadType, "uint32");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, BadInvalidRequestType) {
@@ -1056,7 +1112,8 @@ protocol MyProtocol {
     MyMethod(box);
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrWrongNumberOfLayoutParameters);
+  library.ExpectFail(fidl::ErrWrongNumberOfLayoutParameters, "box", 1, 0);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, BadDisallowedResponseType) {
@@ -1067,7 +1124,8 @@ protocol MyProtocol {
     MyMethod() -> (uint32);
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidMethodPayloadType);
+  library.ExpectFail(fidl::ErrInvalidMethodPayloadType, "uint32");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, BadInvalidResponseType) {
@@ -1078,7 +1136,8 @@ protocol MyProtocol {
     MyMethod() -> (box);
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrWrongNumberOfLayoutParameters);
+  library.ExpectFail(fidl::ErrWrongNumberOfLayoutParameters, "box", 1, 0);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, BadDisallowedSuccessType) {
@@ -1089,7 +1148,8 @@ protocol MyProtocol {
     MyMethod() -> (uint32) error uint32;
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrInvalidMethodPayloadType);
+  library.ExpectFail(fidl::ErrInvalidMethodPayloadType, "uint32");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, BadInvalidSuccessType) {
@@ -1100,7 +1160,8 @@ protocol MyProtocol {
     MyMethod() -> (box) error uint32;
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrWrongNumberOfLayoutParameters);
+  library.ExpectFail(fidl::ErrWrongNumberOfLayoutParameters, "box", 1, 0);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 // TODO(fxbug.dev/93542): add bad `:optional` message body tests here.

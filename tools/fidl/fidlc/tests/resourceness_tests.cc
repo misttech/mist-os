@@ -19,8 +19,10 @@ type Foo = resource bits {
     BAR = 1;
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrCannotSpecifyModifier);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "resource");
+  library.ExpectFail(fidl::ErrCannotSpecifyModifier,
+                     fidl::Token::KindAndSubkind(fidl::Token::Subkind::kResource),
+                     fidl::Token::KindAndSubkind(fidl::Token::Subkind::kBits));
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ResourcenessTests, BadEnumResourceness) {
@@ -30,8 +32,10 @@ type Foo = resource enum {
     BAR = 1;
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrCannotSpecifyModifier);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "resource");
+  library.ExpectFail(fidl::ErrCannotSpecifyModifier,
+                     fidl::Token::KindAndSubkind(fidl::Token::Subkind::kResource),
+                     fidl::Token::KindAndSubkind(fidl::Token::Subkind::kEnum));
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ResourcenessTests, BadConstResourceness) {
@@ -40,7 +44,8 @@ library example;
 
 resource const BAR uint32 = 1;
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrExpectedDeclaration);
+  library.ExpectFail(fidl::ErrExpectedDeclaration, "resource");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ResourcenessTests, BadProtocolResourceness) {
@@ -49,7 +54,8 @@ library example;
 
 resource protocol Foo {};
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrExpectedDeclaration);
+  library.ExpectFail(fidl::ErrExpectedDeclaration, "resource");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ResourcenessTests, BadAliasResourceness) {
@@ -58,7 +64,8 @@ library example;
 
 resource alias B = bool;
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrExpectedDeclaration);
+  library.ExpectFail(fidl::ErrExpectedDeclaration, "resource");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ResourcenessTests, BadDuplicateModifier) {
@@ -97,7 +104,8 @@ TEST(ResourcenessTests, BadResourceModifierMissing) {
   library.UseLibraryZx();
   library.AddFile("bad/fi-0110.test.fidl");
 
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrTypeMustBeResource);
+  library.ExpectFail(fidl::ErrTypeMustBeResource, "Foo", "handle", "struct");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ResourcenessTests, GoodResourceStruct) {
@@ -144,7 +152,6 @@ TEST(ResourcenessTests, GoodResourceUnion) {
     std::string fidl_library = "library example;\n\n" + definition + "\n";
     TestLibrary library(fidl_library);
     library.UseLibraryZx();
-    ;
     ASSERT_COMPILED(library);
     EXPECT_EQ(library.LookupUnion("Foo")->resourceness, fidl::types::Resourceness::kResource, "%s",
               fidl_library.c_str());
@@ -162,9 +169,8 @@ TEST(ResourcenessTests, BadHandlesInValueStruct) {
     std::string fidl_library = "library example;\nusing zx;\n\n" + definition + "\n";
     TestLibrary library(fidl_library);
     library.UseLibraryZx();
-    ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrTypeMustBeResource);
-    ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "Foo", "%s", fidl_library.c_str());
-    ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "bad_member", "%s", fidl_library.c_str());
+    library.ExpectFail(fidl::ErrTypeMustBeResource, "Foo", "bad_member", "struct");
+    ASSERT_COMPILER_DIAGNOSTICS(library);
   }
 }
 
@@ -178,9 +184,8 @@ TEST(ResourcenessTests, BadHandlesInValueTable) {
     std::string fidl_library = "library example;\nusing zx;\n\n" + definition + "\n";
     TestLibrary library(fidl_library);
     library.UseLibraryZx();
-    ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrTypeMustBeResource);
-    ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "Foo", "%s", fidl_library.c_str());
-    ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "bad_member", "%s", fidl_library.c_str());
+    library.ExpectFail(fidl::ErrTypeMustBeResource, "Foo", "bad_member", "table");
+    ASSERT_COMPILER_DIAGNOSTICS(library);
   }
 }
 
@@ -194,10 +199,8 @@ TEST(ResourcenessTests, BadHandlesInValueUnion) {
     std::string fidl_library = "library example;\nusing zx;\n\n" + definition + "\n";
     TestLibrary library(fidl_library);
     library.UseLibraryZx();
-    ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrTypeMustBeResource);
-    ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "Foo", "%s", fidl_library.c_str());
-    ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "bad_member", "%s", fidl_library.c_str());
-    ;
+    library.ExpectFail(fidl::ErrTypeMustBeResource, "Foo", "bad_member", "union");
+    ASSERT_COMPILER_DIAGNOSTICS(library);
   }
 }
 
@@ -217,10 +220,8 @@ protocol Protocol {};
 )FIDL" + definition + "\n";
     TestLibrary library(fidl_library);
     library.UseLibraryZx();
-    ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrTypeMustBeResource);
-    ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "Foo", "%s", fidl_library.c_str());
-    ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "bad_member", "%s", fidl_library.c_str());
-    ;
+    library.ExpectFail(fidl::ErrTypeMustBeResource, "Foo", "bad_member", "struct");
+    ASSERT_COMPILER_DIAGNOSTICS(library);
   }
 }
 TEST(ResourcenessTests, BadResourceTypesInValueType) {
@@ -241,10 +242,8 @@ type ResourceUnion = resource union { 1: b bool; };
 )FIDL" + definition + "\n";
     TestLibrary library(fidl_library);
     library.UseLibraryZx();
-    ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrTypeMustBeResource);
-    ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "Foo", "%s", fidl_library.c_str());
-    ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "bad_member", "%s", fidl_library.c_str());
-    ;
+    library.ExpectFail(fidl::ErrTypeMustBeResource, "Foo", "bad_member", "struct");
+    ASSERT_COMPILER_DIAGNOSTICS(library);
   }
 }
 
@@ -274,10 +273,8 @@ type ResourceUnion = resource union { 1: b bool; };
 )FIDL" + definition + "\n";
     TestLibrary library(fidl_library);
     library.UseLibraryZx();
-    ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrTypeMustBeResource);
-    ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "Foo", "%s", fidl_library.c_str());
-    ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "bad_member", "%s", fidl_library.c_str());
-    ;
+    library.ExpectFail(fidl::ErrTypeMustBeResource, "Foo", "bad_member", "struct");
+    ASSERT_COMPILER_DIAGNOSTICS(library);
   }
 }
 
@@ -304,10 +301,8 @@ type ResourceUnion = resource union { 1: b bool; };
 )FIDL" + definition + "\n";
     TestLibrary library(fidl_library);
     library.UseLibraryZx();
-    ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrTypeMustBeResource);
-    ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "Foo", "%s", fidl_library.c_str());
-    ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "bad_member", "%s", fidl_library.c_str());
-    ;
+    library.ExpectFail(fidl::ErrTypeMustBeResource, "Foo", "bad_member", "struct");
+    ASSERT_COMPILER_DIAGNOSTICS(library);
   }
 }
 
@@ -325,22 +320,10 @@ type Foo = struct {
 type ResourceStruct = resource struct {};
 )FIDL");
   library.UseLibraryZx();
-  ASSERT_FALSE(library.Compile());
-
-  const auto& errors = library.errors();
-  ASSERT_EQ(errors.size(), 3);
-
-  ASSERT_ERR(errors[0], fidl::ErrTypeMustBeResource);
-  ASSERT_SUBSTR(errors[0]->msg.c_str(), "Foo");
-  ASSERT_SUBSTR(errors[0]->msg.c_str(), "first");
-
-  ASSERT_ERR(errors[1], fidl::ErrTypeMustBeResource);
-  ASSERT_SUBSTR(errors[1]->msg.c_str(), "Foo");
-  ASSERT_SUBSTR(errors[1]->msg.c_str(), "second");
-
-  ASSERT_ERR(errors[2], fidl::ErrTypeMustBeResource);
-  ASSERT_SUBSTR(errors[2]->msg.c_str(), "Foo");
-  ASSERT_SUBSTR(errors[2]->msg.c_str(), "third");
+  library.ExpectFail(fidl::ErrTypeMustBeResource, "Foo", "first", "struct");
+  library.ExpectFail(fidl::ErrTypeMustBeResource, "Foo", "second", "struct");
+  library.ExpectFail(fidl::ErrTypeMustBeResource, "Foo", "third", "struct");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ResourcenessTests, GoodTransitiveResourceMember) {
@@ -372,15 +355,11 @@ type Middle = struct {
 };
 type Bottom = resource struct {};
 )FIDL");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrTypeMustBeResource,
-                                      fidl::ErrTypeMustBeResource);
-  // `Middle` must be a resource because it includes `bottom`, a *nominal* resource.
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "Middle");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "bottom");
-
   // `Top` must be a resource because it includes `middle`, an *effective* resource.
-  ASSERT_SUBSTR(library.errors()[1]->msg.c_str(), "Top");
-  ASSERT_SUBSTR(library.errors()[1]->msg.c_str(), "middle");
+  library.ExpectFail(fidl::ErrTypeMustBeResource, "Top", "middle", "struct");
+  // `Middle` must be a resource because it includes `bottom`, a *nominal* resource.
+  library.ExpectFail(fidl::ErrTypeMustBeResource, "Middle", "bottom", "struct");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ResourcenessTests, GoodRecursiveValueTypes) {
@@ -427,9 +406,8 @@ type Boros = struct {
   bad_member box<Ouro>;
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrTypeMustBeResource);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "Boros");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "bad_member");
+  library.ExpectFail(fidl::ErrTypeMustBeResource, "Boros", "bad_member", "struct");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ResourcenessTests, GoodStrictResourceOrderIndependent) {

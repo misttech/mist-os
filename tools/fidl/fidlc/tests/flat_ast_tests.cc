@@ -106,7 +106,8 @@ protocol Foo {
 
 type FooSomeMethodRequest = struct {};
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrNameCollision);
+  library.ExpectFail(fidl::ErrNameCollision, "FooSomeMethodRequest", "example.fidl:5:14");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(FlatAstTests, GoodSingleAnonymousNameUse) {

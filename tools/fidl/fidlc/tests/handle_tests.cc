@@ -84,8 +84,9 @@ protocol P {
 
   // NOTE(fxbug.dev/72924): we provide a more general error because there are multiple
   // possible interpretations.
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrTypeCannotBeConvertedToType,
-                                      fidl::ErrUnexpectedConstraint);
+  library.ExpectFail(fidl::ErrTypeCannotBeConvertedToType, "1", "untyped numeric", "zx/Rights");
+  library.ExpectFail(fidl::ErrUnexpectedConstraint, "Handle");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(HandleTests, GoodPlainHandleTest) {
@@ -169,7 +170,8 @@ type MyStruct = struct {
 )FIDL");
   library.UseLibraryZx();
 
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrNameNotFound);
+  library.ExpectFail(fidl::ErrNameNotFound, "ZIPPY", "example");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(HandleTests, BadDisallowOldHandles) {
@@ -184,9 +186,9 @@ type MyStruct = struct {
 )FIDL");
   library.UseLibraryZx();
 
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrNameNotFound, fidl::ErrNameNotFound);
-  EXPECT_SUBSTR(library.errors()[0]->msg.c_str(), "cannot find 'handle'");
-  EXPECT_SUBSTR(library.errors()[1]->msg.c_str(), "cannot find 'vmo'");
+  library.ExpectFail(fidl::ErrNameNotFound, "handle", "example");
+  library.ExpectFail(fidl::ErrNameNotFound, "vmo", "example");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(HandleTests, GoodResourceDefinitionOnlySubtypeNoRightsTest) {
@@ -244,8 +246,10 @@ type MyStruct = resource struct {
 };
 )FIDL");
 
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrTypeCannotBeConvertedToType,
-                                      fidl::ErrUnexpectedConstraint);
+  library.ExpectFail(fidl::ErrTypeCannotBeConvertedToType, "1", "untyped numeric",
+                     "example/ObjType");
+  library.ExpectFail(fidl::ErrUnexpectedConstraint, "handle");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(HandleTests, BadInvalidRightsAtUseSite) {
@@ -269,8 +273,10 @@ type MyStruct = resource struct {
 };
 )FIDL");
 
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrTypeCannotBeConvertedToType,
-                                      fidl::ErrUnexpectedConstraint);
+  library.ExpectFail(fidl::ErrTypeCannotBeConvertedToType, "\"my_improperly_typed_rights\"",
+                     "string:26", "uint32");
+  library.ExpectFail(fidl::ErrUnexpectedConstraint, "handle");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(HandleTests, BadBareHandleNoConstraints) {
@@ -281,7 +287,8 @@ type MyStruct = resource struct {
     h handle;
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrNameNotFound);
+  library.ExpectFail(fidl::ErrNameNotFound, "handle", "example");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(HandleTests, BadBareHandleWithConstraints) {
@@ -292,7 +299,9 @@ type MyStruct = resource struct {
     h handle:VMO;
 };
 )FIDL");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrNameNotFound, fidl::ErrNameNotFound);
+  library.ExpectFail(fidl::ErrNameNotFound, "handle", "example");
+  library.ExpectFail(fidl::ErrNameNotFound, "VMO", "example");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(HandleTests, BadBareHandleWithConstraintsThroughAlias) {
@@ -305,7 +314,9 @@ type MyStruct = resource struct {
     h my_handle:VMO;
 };
 )FIDL");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(library, fidl::ErrNameNotFound, fidl::ErrNameNotFound);
+  library.ExpectFail(fidl::ErrNameNotFound, "handle", "example");
+  library.ExpectFail(fidl::ErrNameNotFound, "VMO", "example");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 }  // namespace

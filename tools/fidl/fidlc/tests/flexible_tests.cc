@@ -14,14 +14,16 @@ namespace {
 TEST(FlexibleTests, BadEnumMultipleUnknown) {
   TestLibrary library;
   library.AddFile("bad/fi-0072.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrUnknownAttributeOnMultipleEnumMembers);
+  library.ExpectFail(fidl::ErrUnknownAttributeOnMultipleEnumMembers);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(FlexibleTests, BadEnumMaxValueWithoutUnknownUnsigned) {
   {
     TestLibrary library;
     library.AddFile("bad/fi-0068.test.fidl");
-    ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrFlexibleEnumMemberWithMaxValue);
+    library.ExpectFail(fidl::ErrFlexibleEnumMemberWithMaxValue, "255");
+    ASSERT_COMPILER_DIAGNOSTICS(library);
   }
   {
     TestLibrary library;
@@ -45,7 +47,8 @@ type Foo = flexible enum : int8 {
   MAX = 127;
 };
 )FIDL");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrFlexibleEnumMemberWithMaxValue);
+  library.ExpectFail(fidl::ErrFlexibleEnumMemberWithMaxValue, "127");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(FlexibleTests, GoodEnumCanUseMaxValueIfOtherIsUnknownUnsigned) {
