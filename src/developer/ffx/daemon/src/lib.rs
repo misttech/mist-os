@@ -139,10 +139,6 @@ pub async fn get_daemon_proxy_single_link(
     // - A timeout
     // - Getting a FIDL proxy over the link
 
-    if ffx_config::get::<String, _>("overnet.cso").await.is_ok() {
-        tracing::warn!("'overnet.cso' config is no longer supported (non-CSO is deprecated)");
-    }
-
     let link = run_single_ascendd_link(Arc::clone(node), socket_path.clone()).fuse();
     let mut link = Box::pin(link);
     let find = find_next_daemon(node, exclusions).fuse();
