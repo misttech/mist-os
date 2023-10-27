@@ -57,6 +57,8 @@ class FuchsiaHybridBaseTest(fuchsia_base_test.FuchsiaBaseTest):
             "test",
             "run",
             self.ffx_test_url,
+            "--output-directory",
+            self.test_case_path,
         ] + self.ffx_test_options
         self.dut.ffx.run(cmd, timeout=self.timeout_sec, capture_output=False)
 
