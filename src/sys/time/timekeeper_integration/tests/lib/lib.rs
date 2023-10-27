@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl_test_time_realm;
 use {
     chrono::{Datelike, TimeZone, Timelike},
     fidl::endpoints::ServerEnd,
@@ -52,6 +53,13 @@ pub struct NestedTimekeeper {
     _realm_instance: RealmInstance,
 }
 
+impl Into<RealmInstance> for NestedTimekeeper {
+    // Deconstructs [Self] into an underlying [RealmInstance].
+    fn into(self) -> RealmInstance {
+        self._realm_instance
+    }
+}
+
 impl NestedTimekeeper {
     /// Launches an instance of timekeeper maintaining the provided |clock| in a nested
     /// environment. If |initial_rtc_time| is provided, then the environment contains a fake RTC
@@ -62,6 +70,20 @@ impl NestedTimekeeper {
     pub async fn new(
         clock: Arc<zx::Clock>,
         initial_rtc_time: Option<zx::Time>,
+        use_fake_clock: bool,
+    ) -> (
+        Self,
+        Arc<PushSourcePuppet>,
+        RtcUpdates,
+        MetricEventLoggerQuerierProxy,
+        Option<FakeClockController>,
+    ) {
+        NestedTimekeeper::new_with_rtc_options(clock, initial_rtc_time.into(), use_fake_clock).await
+    }
+
+    async fn new_with_rtc_options(
+        clock: Arc<zx::Clock>,
+        rtc_options: RtcOptions,
         use_fake_clock: bool,
     ) -> (
         Self,
@@ -203,7 +225,7 @@ impl NestedTimekeeper {
             .await
             .unwrap();
 
-        let rtc_updates = setup_rtc(initial_rtc_time, &builder, &timekeeper).await;
+        let rtc_updates = setup_rtc(rtc_options, &builder, &timekeeper).await;
         let realm_instance = builder.build().await.unwrap();
 
         let fake_clock_control = if use_fake_clock {
@@ -336,8 +358,8 @@ impl RtcUpdates {
     }
 }
 
-/// A wrapper around a `FakeClockControlProxy` that also allows a client to read the current fake
-/// time.
+/// A wrapper around a `FakeClockControlProxy` that also allows a client to read
+/// the current fake time.
 pub struct FakeClockController {
     control_proxy: FakeClockControlProxy,
     clock_proxy: FakeClockProxy,
@@ -352,37 +374,122 @@ impl Deref for FakeClockController {
 }
 
 impl FakeClockController {
+    /// Re-constructs FakeClockController from the constituents.
+    pub fn new(control_proxy: FakeClockControlProxy, clock_proxy: FakeClockProxy) -> Self {
+        FakeClockController { control_proxy, clock_proxy }
+    }
+
+    /// Deconstructs [Self] into fake clock proxies.
+    pub fn into_components(self) -> (FakeClockControlProxy, FakeClockProxy) {
+        (self.control_proxy, self.clock_proxy)
+    }
+
     pub async fn get_monotonic(&self) -> Result<i64, fidl::Error> {
         self.clock_proxy.get().await
     }
 }
 
+/// The RTC configuration options.
+pub enum RtcOptions {
+    /// No real-time clock available. This configuration simulates a system that
+    /// does not have a RTC circuit available.
+    None,
+    /// Fake real-time clock. Supplied initial RTC time to report.
+    InitialRtcTime(zx::Time),
+    /// Injected real-time clock.
+    ///
+    /// This is the handle that will appear as the directory
+    /// `/dev/class/rtc` in the Timekeeper's namespace.
+    ///
+    /// The caller must set this directory up so that it serves
+    /// a RTC device (e.g. named `/dev/class/rtc/000`, and serving
+    /// the FIDL `fuchsia.hardware.rtc/Device`) from this directory.
+    ///
+    /// It is also possible to serve more RTCs from the directory, or
+    /// other files and file types at the caller's option.
+    ///
+    /// Use this option if you need to implement corner cases, or
+    /// very specific RTC behavior, such as abnormal configuration
+    /// or anomalous behavior.
+    InjectedRtc(fidl_fuchsia_io::DirectoryProxy),
+}
+
+impl From<fidl_test_time_realm::RtcOptions> for RtcOptions {
+    fn from(value: fidl_test_time_realm::RtcOptions) -> Self {
+        match value {
+            fidl_test_time_realm::RtcOptions::DevClassRtc(h) => {
+                RtcOptions::InjectedRtc(h.into_proxy().expect("can be converted to proxy"))
+            }
+            fidl_test_time_realm::RtcOptions::InitialRtcTime(t) => {
+                RtcOptions::InitialRtcTime(zx::Time::from_nanos(t))
+            }
+            _ => unimplemented!(),
+        }
+    }
+}
+
+impl From<zx::Time> for RtcOptions {
+    fn from(value: zx::Time) -> Self {
+        RtcOptions::InitialRtcTime(value)
+    }
+}
+
+impl From<Option<zx::Time>> for RtcOptions {
+    fn from(value: Option<zx::Time>) -> Self {
+        value.map(|t| t.into()).unwrap_or(Self::None)
+    }
+}
+
+/// Sets up the RTC serving.
+///
+/// Args:
+/// - `rtc_options`: options for RTC setup.
+/// - `build`: the `RealmBuilder` that will construct the realm.
+/// - `timekeeper`: the Timekeeper component instance.
+///
+/// Returns:
+/// - `RtcUpdates`: A vector of RTC updates received from a fake RTC. If the
+///   client serves the RTC directory, then the return value is useless.
 async fn setup_rtc(
-    initial_rtc_time: Option<zx::Time>,
+    rtc_options: RtcOptions,
     builder: &RealmBuilder,
     timekeeper: &ChildRef,
 ) -> RtcUpdates {
     let rtc_updates = RtcUpdates(Arc::new(Mutex::new(vec![])));
 
-    let rtc_dir = match initial_rtc_time {
-        Some(initial_time) => pseudo_directory! {
-            "class" => pseudo_directory! {
-                "rtc" => pseudo_directory! {
-                    "000" => vfs::service::host({
-                        let rtc_updates = rtc_updates.clone();
-                        move |stream| {
-                            serve_fake_rtc(initial_time, rtc_updates.clone(), stream)
-                        }
-                    })
+    let rtc_dir = match rtc_options {
+        RtcOptions::InitialRtcTime(initial_time) => {
+            tracing::debug!("using fake /dev/class/rtc/000");
+            pseudo_directory! {
+                "class" => pseudo_directory! {
+                    "rtc" => pseudo_directory! {
+                        "000" => vfs::service::host({
+                            let rtc_updates = rtc_updates.clone();
+                            move |stream| {
+                                serve_fake_rtc(initial_time, rtc_updates.clone(), stream)
+                            }
+                        })
+                    }
                 }
             }
-        },
-        None => pseudo_directory! {
-            "class" => pseudo_directory! {
-                "rtc" => pseudo_directory! {
+        }
+        RtcOptions::None => {
+            tracing::debug!("using an empty /dev/class/rtc directory");
+            pseudo_directory! {
+                "class" => pseudo_directory! {
+                    "rtc" => pseudo_directory! {
+                    }
                 }
             }
-        },
+        }
+        RtcOptions::InjectedRtc(h) => {
+            tracing::debug!("using /dev/class/rtc provided by client");
+            pseudo_directory! {
+                "class" => pseudo_directory! {
+                    "rtc" => vfs::remote::remote_dir(h)
+                }
+            }
+        }
     };
 
     let fake_rtc_server = builder

@@ -1,0 +1,65 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+/// Test realm factory library for the Timekeeper subsystem.
+library test.time.realm;
+
+using fuchsia.io;
+using fuchsia.testing.harness;
+using zx;
+
+@discoverable
+open protocol RealmFactory {
+    /// Creates the realm using the given options.
+    flexible CreateRealm(resource struct {
+        /// The options for creating the Timekeeper realm factory.
+        options @generated_name("RealmOptions") resource table {
+            /// If set, the test realm will us a real monotonic clock handle (in
+            /// contrast to a fake handle which can be manipulated from the test
+            /// fixture).
+            1: use_real_monotonic_clock bool;
+
+            /// Sets up the RTC clock.
+            ///
+            /// Use one of the available options:
+            /// 1. Fill in `dev_class_rtc` to inject a test RTC implementation.
+            /// 2. Fill in `initial_rtc_time` to let the test realm create
+            ///    a fake RTC that reports a specific initial reading.
+            /// 3. Do not set `rtc` at all, to let test realm start without
+            ///    *any* RTC.
+            2: rtc @generated_name("RtcOptions") flexible resource union {
+                /// The directory handle for `/dev/class/rtc`.
+                ///
+                /// This is the handle that will appear as the directory
+                /// `/dev/class/rtc` in the Timekeeper's namespace.
+                ///
+                /// The caller must set this directory up so that it serves
+                /// a RTC device (e.g. named `/dev/class/rtc/000`, and serving
+                /// the FIDL `fuchsia.hardware.rtc/Device`) from this directory.
+                ///
+                /// It is also possible to serve more RTCs from the directory, or
+                /// other files and file types at the caller's option.
+                ///
+                /// Use this option if you need to implement corner cases, or
+                /// very specific RTC behavior, such as abnormal configuration
+                /// or anomalous behavior.
+                1: dev_class_rtc client_end:fuchsia.io.Directory;
+
+                /// The initial time that the fake RTC will report.
+                ///
+                /// If set, this will be the RTC time to be used for fake RTC reporting.
+                2: initial_rtc_time zx.Time;
+            };
+
+        };
+
+        /// The UTC clock handle that Timekeeper will manage.
+        fake_utc_clock zx.Handle:CLOCK;
+
+        /// A standardized `RealmProxy`, for connecting to some of the
+        /// exported FIDL protocols in the created test realm.
+        realm_server server_end:fuchsia.testing.harness.RealmProxy;
+    }) -> (@generated_name("CreateResponse") resource table {
+    }) error fuchsia.testing.harness.OperationError;
+};
