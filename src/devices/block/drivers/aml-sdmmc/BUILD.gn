@@ -51,15 +51,6 @@ fuchsia_driver("aml-sdmmc-driver-dfv1") {
   ]
 }
 
-# TODO(b/301003087): This target is identical to fuchsia_driver_component("aml-sdmmc-dfv1") below
-# except for its name. Delete this target when all references to it have been removed.
-fuchsia_driver_component("aml-sdmmc") {
-  component_name = "aml-sdmmc-dfv1"
-  deps = [ ":aml-sdmmc-driver-dfv1" ]
-  info = "aml-sdmmc-info.json"
-  manifest = "meta/dfv1-driver.cml"
-}
-
 fuchsia_driver_component("aml-sdmmc-dfv1") {
   component_name = "aml-sdmmc-dfv1"
   deps = [ ":aml-sdmmc-driver-dfv1" ]
