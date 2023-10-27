@@ -108,6 +108,7 @@ def _cxx_command_scanner() -> argparse.ArgumentParser:
         type=str,
         dest="lto",
         default=None,
+        nargs="?",  # default: full LTO
         help="Link time optimization",
     )
     parser.add_argument(
@@ -421,6 +422,21 @@ def expand_forwarded_driver_flags(args: Iterable[str]) -> Iterable[str]:
             yield arg
 
 
+def _assign_explicit_flag_defaults(opts: Iterable[str]) -> Iterable[str]:
+    """Workarounds for argparse limitations.
+
+    argparse doesn't have a way to accept both -flto and -flto=arg
+    because with nargs='?', the former will try to consume the following
+    argument.  Instead we make the implicit default explicit just for
+    easy parsing.
+    """
+    for opt in opts:
+        if opt == "-flto":
+            yield "-flto=full"
+        else:
+            yield opt
+
+
 class CxxAction(object):
     """Attributes of C/C++ (or dialect) compilation command.
 
@@ -444,7 +460,9 @@ class CxxAction(object):
         (
             self._attributes,
             remaining_args,
-        ) = _CXX_COMMAND_SCANNER.parse_known_args(argparseable_args)
+        ) = _CXX_COMMAND_SCANNER.parse_known_args(
+            _assign_explicit_flag_defaults(argparseable_args)
+        )
         self._compiler = _find_compiler_from_command(argparseable_args)
         self._sources = list(_compile_action_sources(remaining_args))
         self._dialect = _infer_dialect_from_sources(self._sources)

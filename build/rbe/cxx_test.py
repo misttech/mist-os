@@ -285,7 +285,21 @@ class CxxActionTests(unittest.TestCase):
         self.assertTrue(c.shared)
         self.assertEqual(c.linker_inputs, [source])
 
-    def test_flto(self):
+    def test_flto_default(self):
+        source = Path("hello.o")
+        output = Path("hello")
+        c = cxx.CxxAction(_strs(["clang++", "-flto", source, "-o", output]))
+        self.assertEqual(c.lto, "full")
+
+    def test_flto_full(self):
+        source = Path("hello.o")
+        output = Path("hello")
+        c = cxx.CxxAction(
+            _strs(["clang++", "-flto=full", source, "-o", output])
+        )
+        self.assertEqual(c.lto, "full")
+
+    def test_flto_thin(self):
         source = Path("hello.o")
         output = Path("hello")
         c = cxx.CxxAction(
