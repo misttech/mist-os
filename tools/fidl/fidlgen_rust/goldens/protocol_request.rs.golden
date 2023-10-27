@@ -54,6 +54,10 @@ pub struct ChildMarker;
 impl fidl::endpoints::ProtocolMarker for ChildMarker {
     type Proxy = ChildProxy;
     type RequestStream = ChildRequestStream;
+
+    #[cfg(target_os = "fuchsia")]
+    type SynchronousProxy = ChildSynchronousProxy;
+
     const DEBUG_NAME: &'static str = "(anonymous) Child";
 }
 
@@ -63,6 +67,24 @@ pub trait ChildProxyInterface: Send + Sync {}
 #[cfg(target_os = "fuchsia")]
 pub struct ChildSynchronousProxy {
     client: fidl::client::sync::Client,
+}
+
+#[cfg(target_os = "fuchsia")]
+impl fidl::endpoints::SynchronousProxy for ChildSynchronousProxy {
+    type Proxy = ChildProxy;
+    type Protocol = ChildMarker;
+
+    fn from_channel(inner: fidl::Channel) -> Self {
+        Self::new(inner)
+    }
+
+    fn into_channel(self) -> fidl::Channel {
+        self.client.into_channel()
+    }
+
+    fn as_channel(&self) -> &fidl::Channel {
+        self.client.as_channel()
+    }
 }
 
 #[cfg(target_os = "fuchsia")]
@@ -287,6 +309,10 @@ pub struct ParentMarker;
 impl fidl::endpoints::ProtocolMarker for ParentMarker {
     type Proxy = ParentProxy;
     type RequestStream = ParentRequestStream;
+
+    #[cfg(target_os = "fuchsia")]
+    type SynchronousProxy = ParentSynchronousProxy;
+
     const DEBUG_NAME: &'static str = "(anonymous) Parent";
 }
 
@@ -308,6 +334,24 @@ pub trait ParentProxyInterface: Send + Sync {
 #[cfg(target_os = "fuchsia")]
 pub struct ParentSynchronousProxy {
     client: fidl::client::sync::Client,
+}
+
+#[cfg(target_os = "fuchsia")]
+impl fidl::endpoints::SynchronousProxy for ParentSynchronousProxy {
+    type Proxy = ParentProxy;
+    type Protocol = ParentMarker;
+
+    fn from_channel(inner: fidl::Channel) -> Self {
+        Self::new(inner)
+    }
+
+    fn into_channel(self) -> fidl::Channel {
+        self.client.into_channel()
+    }
+
+    fn as_channel(&self) -> &fidl::Channel {
+        self.client.as_channel()
+    }
 }
 
 #[cfg(target_os = "fuchsia")]

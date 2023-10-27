@@ -5,8 +5,8 @@
 use {
     anyhow::{Context as _, Error},
     config::Config,
-    fidl_test_exampletester::{SimpleMarker, SimpleSynchronousProxy},
-    fuchsia_component::client::connect_channel_to_protocol,
+    fidl_test_exampletester::SimpleMarker,
+    fuchsia_component::client::connect_to_protocol_sync,
     fuchsia_zircon as zx,
     std::{thread, time},
 };
@@ -21,12 +21,10 @@ fn main() -> Result<(), Error> {
     if config.do_in_process {
         println!("Response: {:?}", config.augend + config.addend);
     } else {
-        let (client_end, server_end) = zx::Channel::create();
-        connect_channel_to_protocol::<SimpleMarker>(server_end)
+        let simple = connect_to_protocol_sync::<SimpleMarker>()
             .context("Failed to connect to simple service")?;
         println!("Outgoing connection enabled");
 
-        let simple = SimpleSynchronousProxy::new(client_end);
         let res = simple.add(config.augend, config.addend, zx::Time::INFINITE)?;
         println!("Response: {:?}", res);
     }

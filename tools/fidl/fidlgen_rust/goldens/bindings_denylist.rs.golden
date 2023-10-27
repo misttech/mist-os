@@ -125,6 +125,10 @@ pub struct AllowedMarker;
 impl fidl::endpoints::ProtocolMarker for AllowedMarker {
     type Proxy = AllowedProxy;
     type RequestStream = AllowedRequestStream;
+
+    #[cfg(target_os = "fuchsia")]
+    type SynchronousProxy = AllowedSynchronousProxy;
+
     const DEBUG_NAME: &'static str = "(anonymous) Allowed";
 }
 
@@ -134,6 +138,24 @@ pub trait AllowedProxyInterface: Send + Sync {}
 #[cfg(target_os = "fuchsia")]
 pub struct AllowedSynchronousProxy {
     client: fidl::client::sync::Client,
+}
+
+#[cfg(target_os = "fuchsia")]
+impl fidl::endpoints::SynchronousProxy for AllowedSynchronousProxy {
+    type Proxy = AllowedProxy;
+    type Protocol = AllowedMarker;
+
+    fn from_channel(inner: fidl::Channel) -> Self {
+        Self::new(inner)
+    }
+
+    fn into_channel(self) -> fidl::Channel {
+        self.client.into_channel()
+    }
+
+    fn as_channel(&self) -> &fidl::Channel {
+        self.client.as_channel()
+    }
 }
 
 #[cfg(target_os = "fuchsia")]
@@ -358,6 +380,10 @@ pub struct DenyEachBindingMarker;
 impl fidl::endpoints::ProtocolMarker for DenyEachBindingMarker {
     type Proxy = DenyEachBindingProxy;
     type RequestStream = DenyEachBindingRequestStream;
+
+    #[cfg(target_os = "fuchsia")]
+    type SynchronousProxy = DenyEachBindingSynchronousProxy;
+
     const DEBUG_NAME: &'static str = "(anonymous) DenyEachBinding";
 }
 pub type DenyEachBindingOnlyDenyCppResult = Result<i32, u32>;
@@ -388,6 +414,24 @@ pub trait DenyEachBindingProxyInterface: Send + Sync {
 #[cfg(target_os = "fuchsia")]
 pub struct DenyEachBindingSynchronousProxy {
     client: fidl::client::sync::Client,
+}
+
+#[cfg(target_os = "fuchsia")]
+impl fidl::endpoints::SynchronousProxy for DenyEachBindingSynchronousProxy {
+    type Proxy = DenyEachBindingProxy;
+    type Protocol = DenyEachBindingMarker;
+
+    fn from_channel(inner: fidl::Channel) -> Self {
+        Self::new(inner)
+    }
+
+    fn into_channel(self) -> fidl::Channel {
+        self.client.into_channel()
+    }
+
+    fn as_channel(&self) -> &fidl::Channel {
+        self.client.as_channel()
+    }
 }
 
 #[cfg(target_os = "fuchsia")]
@@ -1331,6 +1375,10 @@ pub struct ImportsSameNameContextMarker;
 impl fidl::endpoints::ProtocolMarker for ImportsSameNameContextMarker {
     type Proxy = ImportsSameNameContextProxy;
     type RequestStream = ImportsSameNameContextRequestStream;
+
+    #[cfg(target_os = "fuchsia")]
+    type SynchronousProxy = ImportsSameNameContextSynchronousProxy;
+
     const DEBUG_NAME: &'static str = "(anonymous) ImportsSameNameContext";
 }
 
@@ -1343,6 +1391,24 @@ pub trait ImportsSameNameContextProxyInterface: Send + Sync {
 #[cfg(target_os = "fuchsia")]
 pub struct ImportsSameNameContextSynchronousProxy {
     client: fidl::client::sync::Client,
+}
+
+#[cfg(target_os = "fuchsia")]
+impl fidl::endpoints::SynchronousProxy for ImportsSameNameContextSynchronousProxy {
+    type Proxy = ImportsSameNameContextProxy;
+    type Protocol = ImportsSameNameContextMarker;
+
+    fn from_channel(inner: fidl::Channel) -> Self {
+        Self::new(inner)
+    }
+
+    fn into_channel(self) -> fidl::Channel {
+        self.client.into_channel()
+    }
+
+    fn as_channel(&self) -> &fidl::Channel {
+        self.client.as_channel()
+    }
 }
 
 #[cfg(target_os = "fuchsia")]

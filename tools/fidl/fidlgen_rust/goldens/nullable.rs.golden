@@ -124,6 +124,10 @@ pub struct SimpleProtocolMarker;
 impl fidl::endpoints::ProtocolMarker for SimpleProtocolMarker {
     type Proxy = SimpleProtocolProxy;
     type RequestStream = SimpleProtocolRequestStream;
+
+    #[cfg(target_os = "fuchsia")]
+    type SynchronousProxy = SimpleProtocolSynchronousProxy;
+
     const DEBUG_NAME: &'static str = "(anonymous) SimpleProtocol";
 }
 
@@ -136,6 +140,24 @@ pub trait SimpleProtocolProxyInterface: Send + Sync {
 #[cfg(target_os = "fuchsia")]
 pub struct SimpleProtocolSynchronousProxy {
     client: fidl::client::sync::Client,
+}
+
+#[cfg(target_os = "fuchsia")]
+impl fidl::endpoints::SynchronousProxy for SimpleProtocolSynchronousProxy {
+    type Proxy = SimpleProtocolProxy;
+    type Protocol = SimpleProtocolMarker;
+
+    fn from_channel(inner: fidl::Channel) -> Self {
+        Self::new(inner)
+    }
+
+    fn into_channel(self) -> fidl::Channel {
+        self.client.into_channel()
+    }
+
+    fn as_channel(&self) -> &fidl::Channel {
+        self.client.as_channel()
+    }
 }
 
 #[cfg(target_os = "fuchsia")]

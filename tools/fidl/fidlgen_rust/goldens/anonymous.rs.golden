@@ -361,6 +361,10 @@ pub struct SomeProtocolMarker;
 impl fidl::endpoints::ProtocolMarker for SomeProtocolMarker {
     type Proxy = SomeProtocolProxy;
     type RequestStream = SomeProtocolRequestStream;
+
+    #[cfg(target_os = "fuchsia")]
+    type SynchronousProxy = SomeProtocolSynchronousProxy;
+
     const DEBUG_NAME: &'static str = "(anonymous) SomeProtocol";
 }
 pub type SomeProtocolSomeMethodResult = Result<BitsMember, SomeProtocolSomeMethodError>;
@@ -379,6 +383,24 @@ pub trait SomeProtocolProxyInterface: Send + Sync {
 #[cfg(target_os = "fuchsia")]
 pub struct SomeProtocolSynchronousProxy {
     client: fidl::client::sync::Client,
+}
+
+#[cfg(target_os = "fuchsia")]
+impl fidl::endpoints::SynchronousProxy for SomeProtocolSynchronousProxy {
+    type Proxy = SomeProtocolProxy;
+    type Protocol = SomeProtocolMarker;
+
+    fn from_channel(inner: fidl::Channel) -> Self {
+        Self::new(inner)
+    }
+
+    fn into_channel(self) -> fidl::Channel {
+        self.client.into_channel()
+    }
+
+    fn as_channel(&self) -> &fidl::Channel {
+        self.client.as_channel()
+    }
 }
 
 #[cfg(target_os = "fuchsia")]

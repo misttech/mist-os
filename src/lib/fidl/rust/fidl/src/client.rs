@@ -757,6 +757,11 @@ pub mod sync {
             Client { channel, protocol_name }
         }
 
+        /// Return a reference to the underlying channel for the client.
+        pub fn as_channel(&self) -> &zx::Channel {
+            &self.channel
+        }
+
         /// Get the underlying channel out of the client.
         pub fn into_channel(self) -> zx::Channel {
             self.channel

@@ -279,6 +279,10 @@ pub struct MainProtocolMarker;
 impl fidl::endpoints::ProtocolMarker for MainProtocolMarker {
     type Proxy = MainProtocolProxy;
     type RequestStream = MainProtocolRequestStream;
+
+    #[cfg(target_os = "fuchsia")]
+    type SynchronousProxy = MainProtocolSynchronousProxy;
+
     const DEBUG_NAME: &'static str = "(anonymous) MainProtocol";
 }
 pub type MainProtocolTwoWayImportWithErrorResult =
@@ -373,6 +377,24 @@ pub trait MainProtocolProxyInterface: Send + Sync {
 #[cfg(target_os = "fuchsia")]
 pub struct MainProtocolSynchronousProxy {
     client: fidl::client::sync::Client,
+}
+
+#[cfg(target_os = "fuchsia")]
+impl fidl::endpoints::SynchronousProxy for MainProtocolSynchronousProxy {
+    type Proxy = MainProtocolProxy;
+    type Protocol = MainProtocolMarker;
+
+    fn from_channel(inner: fidl::Channel) -> Self {
+        Self::new(inner)
+    }
+
+    fn into_channel(self) -> fidl::Channel {
+        self.client.into_channel()
+    }
+
+    fn as_channel(&self) -> &fidl::Channel {
+        self.client.as_channel()
+    }
 }
 
 #[cfg(target_os = "fuchsia")]
@@ -2767,6 +2789,10 @@ pub struct OpenProtocolMarker;
 impl fidl::endpoints::ProtocolMarker for OpenProtocolMarker {
     type Proxy = OpenProtocolProxy;
     type RequestStream = OpenProtocolRequestStream;
+
+    #[cfg(target_os = "fuchsia")]
+    type SynchronousProxy = OpenProtocolSynchronousProxy;
+
     const DEBUG_NAME: &'static str = "(anonymous) OpenProtocol";
 }
 
@@ -2796,6 +2822,24 @@ pub trait OpenProtocolProxyInterface: Send + Sync {
 #[cfg(target_os = "fuchsia")]
 pub struct OpenProtocolSynchronousProxy {
     client: fidl::client::sync::Client,
+}
+
+#[cfg(target_os = "fuchsia")]
+impl fidl::endpoints::SynchronousProxy for OpenProtocolSynchronousProxy {
+    type Proxy = OpenProtocolProxy;
+    type Protocol = OpenProtocolMarker;
+
+    fn from_channel(inner: fidl::Channel) -> Self {
+        Self::new(inner)
+    }
+
+    fn into_channel(self) -> fidl::Channel {
+        self.client.into_channel()
+    }
+
+    fn as_channel(&self) -> &fidl::Channel {
+        self.client.as_channel()
+    }
 }
 
 #[cfg(target_os = "fuchsia")]

@@ -26,6 +26,11 @@ pub trait ProtocolMarker: Sized + Send + Sync + 'static {
     /// Queries made against the proxy are sent to the paired `ServerEnd`.
     type Proxy: Proxy<Protocol = Self>;
 
+    /// The type of the structure against which thread-blocking FIDL requests are made.
+    /// Queries made against the proxy are sent to the paired `ServerEnd`.
+    #[cfg(target_os = "fuchsia")]
+    type SynchronousProxy: SynchronousProxy<Protocol = Self>;
+
     /// The type of the stream of requests coming into a server.
     type RequestStream: RequestStream<Protocol = Self>;
 
@@ -85,6 +90,29 @@ pub trait Proxy: Sized + Send + Sync {
     fn on_closed(&self) -> OnSignals<'_> {
         self.as_channel().on_closed()
     }
+}
+
+/// A type which allows querying a remote FIDL server over a channel, blocking the calling thread.
+#[cfg(target_os = "fuchsia")]
+pub trait SynchronousProxy: Sized + Send + Sync {
+    /// The async proxy for the same protocol.
+    type Proxy: Proxy<Protocol = Self::Protocol>;
+
+    /// The protocol which this `Proxy` controls.
+    type Protocol: ProtocolMarker<Proxy = Self::Proxy>;
+
+    /// Create a proxy over the given channel.
+    fn from_channel(inner: Channel) -> Self;
+
+    /// Convert the proxy back into a channel.
+    fn into_channel(self) -> Channel;
+
+    /// Get a reference to the proxy's underlying channel.
+    ///
+    /// This should only be used for non-effectful operations. Reading or
+    /// writing to the channel is unsafe because the proxy assumes it has
+    /// exclusive control over these operations.
+    fn as_channel(&self) -> &Channel;
 }
 
 /// A stream of requests coming into a FIDL server over a channel.
@@ -271,6 +299,13 @@ impl<T: ProtocolMarker> ClientEnd<T> {
             AsyncChannel::from_channel(self.inner).map_err(Error::AsyncChannel)?,
         ))
     }
+
+    /// Convert the `ClientEnd` into a `SynchronousProxy` through which thread-blocking FIDL calls
+    /// may be made.
+    #[cfg(target_os = "fuchsia")]
+    pub fn into_sync_proxy(self) -> T::SynchronousProxy {
+        T::SynchronousProxy::from_channel(self.inner)
+    }
 }
 
 impl<T> AsHandleRef for ClientEnd<T> {
@@ -418,6 +453,16 @@ pub fn create_proxy<T: ProtocolMarker>() -> Result<(T::Proxy, ServerEnd<T>), Err
     Ok((client.into_proxy()?, server))
 }
 
+/// Create a synchronous client proxy and a server endpoint connected to it by a channel.
+///
+/// Useful for sending channel handles to calls that take arguments
+/// of type `server_end:SomeProtocol`
+#[cfg(target_os = "fuchsia")]
+pub fn create_sync_proxy<T: ProtocolMarker>() -> (T::SynchronousProxy, ServerEnd<T>) {
+    let (client, server) = create_endpoints();
+    (client.into_sync_proxy(), server)
+}
+
 /// Create a request stream and a client endpoint connected to it by a channel.
 ///
 /// Useful for sending channel handles to calls that take arguments
@@ -435,6 +480,17 @@ pub fn create_request_stream<T: ProtocolMarker>() -> Result<(ClientEnd<T>, T::Re
 pub fn create_proxy_and_stream<T: ProtocolMarker>() -> Result<(T::Proxy, T::RequestStream), Error> {
     let (client, server) = create_endpoints::<T>();
     Ok((client.into_proxy()?, server.into_stream()?))
+}
+
+/// Create a request stream and synchronous proxy connected to one another.
+///
+/// Useful for testing where both the request stream and proxy are
+/// used in the same process.
+#[cfg(target_os = "fuchsia")]
+pub fn create_sync_proxy_and_stream<T: ProtocolMarker>(
+) -> Result<(T::SynchronousProxy, T::RequestStream), Error> {
+    let (client, server) = create_endpoints::<T>();
+    Ok((client.into_sync_proxy(), server.into_stream()?))
 }
 
 /// The type of a client-initiated method.

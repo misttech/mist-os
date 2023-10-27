@@ -41,6 +41,10 @@ pub struct ExampleUseOfErrorSyntaxMarker;
 impl fidl::endpoints::ProtocolMarker for ExampleUseOfErrorSyntaxMarker {
     type Proxy = ExampleUseOfErrorSyntaxProxy;
     type RequestStream = ExampleUseOfErrorSyntaxRequestStream;
+
+    #[cfg(target_os = "fuchsia")]
+    type SynchronousProxy = ExampleUseOfErrorSyntaxSynchronousProxy;
+
     const DEBUG_NAME: &'static str = "(anonymous) ExampleUseOfErrorSyntax";
 }
 pub type ExampleUseOfErrorSyntaxCallWhichMayFailResult = Result<i64, u32>;
@@ -63,6 +67,24 @@ pub trait ExampleUseOfErrorSyntaxProxyInterface: Send + Sync {
 #[cfg(target_os = "fuchsia")]
 pub struct ExampleUseOfErrorSyntaxSynchronousProxy {
     client: fidl::client::sync::Client,
+}
+
+#[cfg(target_os = "fuchsia")]
+impl fidl::endpoints::SynchronousProxy for ExampleUseOfErrorSyntaxSynchronousProxy {
+    type Proxy = ExampleUseOfErrorSyntaxProxy;
+    type Protocol = ExampleUseOfErrorSyntaxMarker;
+
+    fn from_channel(inner: fidl::Channel) -> Self {
+        Self::new(inner)
+    }
+
+    fn into_channel(self) -> fidl::Channel {
+        self.client.into_channel()
+    }
+
+    fn as_channel(&self) -> &fidl::Channel {
+        self.client.as_channel()
+    }
 }
 
 #[cfg(target_os = "fuchsia")]

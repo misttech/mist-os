@@ -181,6 +181,10 @@ pub struct OtherProtocolMarker;
 impl fidl::endpoints::ProtocolMarker for OtherProtocolMarker {
     type Proxy = OtherProtocolProxy;
     type RequestStream = OtherProtocolRequestStream;
+
+    #[cfg(target_os = "fuchsia")]
+    type SynchronousProxy = OtherProtocolSynchronousProxy;
+
     const DEBUG_NAME: &'static str = "(anonymous) OtherProtocol";
 }
 
@@ -190,6 +194,24 @@ pub trait OtherProtocolProxyInterface: Send + Sync {}
 #[cfg(target_os = "fuchsia")]
 pub struct OtherProtocolSynchronousProxy {
     client: fidl::client::sync::Client,
+}
+
+#[cfg(target_os = "fuchsia")]
+impl fidl::endpoints::SynchronousProxy for OtherProtocolSynchronousProxy {
+    type Proxy = OtherProtocolProxy;
+    type Protocol = OtherProtocolMarker;
+
+    fn from_channel(inner: fidl::Channel) -> Self {
+        Self::new(inner)
+    }
+
+    fn into_channel(self) -> fidl::Channel {
+        self.client.into_channel()
+    }
+
+    fn as_channel(&self) -> &fidl::Channel {
+        self.client.as_channel()
+    }
 }
 
 #[cfg(target_os = "fuchsia")]
@@ -415,6 +437,10 @@ pub struct ProtocolMarker;
 impl fidl::endpoints::ProtocolMarker for ProtocolMarker {
     type Proxy = ProtocolProxy;
     type RequestStream = ProtocolRequestStream;
+
+    #[cfg(target_os = "fuchsia")]
+    type SynchronousProxy = ProtocolSynchronousProxy;
+
     const DEBUG_NAME: &'static str = "(anonymous) Protocol";
 }
 
@@ -426,6 +452,24 @@ pub trait ProtocolProxyInterface: Send + Sync {
 #[cfg(target_os = "fuchsia")]
 pub struct ProtocolSynchronousProxy {
     client: fidl::client::sync::Client,
+}
+
+#[cfg(target_os = "fuchsia")]
+impl fidl::endpoints::SynchronousProxy for ProtocolSynchronousProxy {
+    type Proxy = ProtocolProxy;
+    type Protocol = ProtocolMarker;
+
+    fn from_channel(inner: fidl::Channel) -> Self {
+        Self::new(inner)
+    }
+
+    fn into_channel(self) -> fidl::Channel {
+        self.client.into_channel()
+    }
+
+    fn as_channel(&self) -> &fidl::Channel {
+        self.client.as_channel()
+    }
 }
 
 #[cfg(target_os = "fuchsia")]

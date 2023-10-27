@@ -369,6 +369,10 @@ pub struct AnotherDiscoverableProtocolMarker;
 impl fidl::endpoints::ProtocolMarker for AnotherDiscoverableProtocolMarker {
     type Proxy = AnotherDiscoverableProtocolProxy;
     type RequestStream = AnotherDiscoverableProtocolRequestStream;
+
+    #[cfg(target_os = "fuchsia")]
+    type SynchronousProxy = AnotherDiscoverableProtocolSynchronousProxy;
+
     const DEBUG_NAME: &'static str = "fake.library.FakeProtocol";
 }
 impl fidl::endpoints::DiscoverableProtocolMarker for AnotherDiscoverableProtocolMarker {}
@@ -379,6 +383,24 @@ pub trait AnotherDiscoverableProtocolProxyInterface: Send + Sync {}
 #[cfg(target_os = "fuchsia")]
 pub struct AnotherDiscoverableProtocolSynchronousProxy {
     client: fidl::client::sync::Client,
+}
+
+#[cfg(target_os = "fuchsia")]
+impl fidl::endpoints::SynchronousProxy for AnotherDiscoverableProtocolSynchronousProxy {
+    type Proxy = AnotherDiscoverableProtocolProxy;
+    type Protocol = AnotherDiscoverableProtocolMarker;
+
+    fn from_channel(inner: fidl::Channel) -> Self {
+        Self::new(inner)
+    }
+
+    fn into_channel(self) -> fidl::Channel {
+        self.client.into_channel()
+    }
+
+    fn as_channel(&self) -> &fidl::Channel {
+        self.client.as_channel()
+    }
 }
 
 #[cfg(target_os = "fuchsia")]
@@ -612,6 +634,10 @@ pub struct ChannelProtocolMarker;
 impl fidl::endpoints::ProtocolMarker for ChannelProtocolMarker {
     type Proxy = ChannelProtocolProxy;
     type RequestStream = ChannelProtocolRequestStream;
+
+    #[cfg(target_os = "fuchsia")]
+    type SynchronousProxy = ChannelProtocolSynchronousProxy;
+
     const DEBUG_NAME: &'static str = "(anonymous) ChannelProtocol";
 }
 
@@ -630,6 +656,24 @@ pub trait ChannelProtocolProxyInterface: Send + Sync {
 #[cfg(target_os = "fuchsia")]
 pub struct ChannelProtocolSynchronousProxy {
     client: fidl::client::sync::Client,
+}
+
+#[cfg(target_os = "fuchsia")]
+impl fidl::endpoints::SynchronousProxy for ChannelProtocolSynchronousProxy {
+    type Proxy = ChannelProtocolProxy;
+    type Protocol = ChannelProtocolMarker;
+
+    fn from_channel(inner: fidl::Channel) -> Self {
+        Self::new(inner)
+    }
+
+    fn into_channel(self) -> fidl::Channel {
+        self.client.into_channel()
+    }
+
+    fn as_channel(&self) -> &fidl::Channel {
+        self.client.as_channel()
+    }
 }
 
 #[cfg(target_os = "fuchsia")]
@@ -1330,6 +1374,10 @@ pub struct DiscoverableProtocolMarker;
 impl fidl::endpoints::ProtocolMarker for DiscoverableProtocolMarker {
     type Proxy = DiscoverableProtocolProxy;
     type RequestStream = DiscoverableProtocolRequestStream;
+
+    #[cfg(target_os = "fuchsia")]
+    type SynchronousProxy = DiscoverableProtocolSynchronousProxy;
+
     const DEBUG_NAME: &'static str = "test.protocols.DiscoverableProtocol";
 }
 impl fidl::endpoints::DiscoverableProtocolMarker for DiscoverableProtocolMarker {}
@@ -1342,6 +1390,24 @@ pub trait DiscoverableProtocolProxyInterface: Send + Sync {
 #[cfg(target_os = "fuchsia")]
 pub struct DiscoverableProtocolSynchronousProxy {
     client: fidl::client::sync::Client,
+}
+
+#[cfg(target_os = "fuchsia")]
+impl fidl::endpoints::SynchronousProxy for DiscoverableProtocolSynchronousProxy {
+    type Proxy = DiscoverableProtocolProxy;
+    type Protocol = DiscoverableProtocolMarker;
+
+    fn from_channel(inner: fidl::Channel) -> Self {
+        Self::new(inner)
+    }
+
+    fn into_channel(self) -> fidl::Channel {
+        self.client.into_channel()
+    }
+
+    fn as_channel(&self) -> &fidl::Channel {
+        self.client.as_channel()
+    }
 }
 
 #[cfg(target_os = "fuchsia")]
@@ -1619,6 +1685,10 @@ pub struct HandleRightsProtocolMarker;
 impl fidl::endpoints::ProtocolMarker for HandleRightsProtocolMarker {
     type Proxy = HandleRightsProtocolProxy;
     type RequestStream = HandleRightsProtocolRequestStream;
+
+    #[cfg(target_os = "fuchsia")]
+    type SynchronousProxy = HandleRightsProtocolSynchronousProxy;
+
     const DEBUG_NAME: &'static str = "(anonymous) HandleRightsProtocol";
 }
 
@@ -1633,6 +1703,24 @@ pub trait HandleRightsProtocolProxyInterface: Send + Sync {
 #[cfg(target_os = "fuchsia")]
 pub struct HandleRightsProtocolSynchronousProxy {
     client: fidl::client::sync::Client,
+}
+
+#[cfg(target_os = "fuchsia")]
+impl fidl::endpoints::SynchronousProxy for HandleRightsProtocolSynchronousProxy {
+    type Proxy = HandleRightsProtocolProxy;
+    type Protocol = HandleRightsProtocolMarker;
+
+    fn from_channel(inner: fidl::Channel) -> Self {
+        Self::new(inner)
+    }
+
+    fn into_channel(self) -> fidl::Channel {
+        self.client.into_channel()
+    }
+
+    fn as_channel(&self) -> &fidl::Channel {
+        self.client.as_channel()
+    }
 }
 
 #[cfg(target_os = "fuchsia")]
@@ -2076,6 +2164,10 @@ pub struct ManyParametersMarker;
 impl fidl::endpoints::ProtocolMarker for ManyParametersMarker {
     type Proxy = ManyParametersProxy;
     type RequestStream = ManyParametersRequestStream;
+
+    #[cfg(target_os = "fuchsia")]
+    type SynchronousProxy = ManyParametersSynchronousProxy;
+
     const DEBUG_NAME: &'static str = "(anonymous) ManyParameters";
 }
 
@@ -2104,6 +2196,24 @@ pub trait ManyParametersProxyInterface: Send + Sync {
 #[cfg(target_os = "fuchsia")]
 pub struct ManyParametersSynchronousProxy {
     client: fidl::client::sync::Client,
+}
+
+#[cfg(target_os = "fuchsia")]
+impl fidl::endpoints::SynchronousProxy for ManyParametersSynchronousProxy {
+    type Proxy = ManyParametersProxy;
+    type Protocol = ManyParametersMarker;
+
+    fn from_channel(inner: fidl::Channel) -> Self {
+        Self::new(inner)
+    }
+
+    fn into_channel(self) -> fidl::Channel {
+        self.client.into_channel()
+    }
+
+    fn as_channel(&self) -> &fidl::Channel {
+        self.client.as_channel()
+    }
 }
 
 #[cfg(target_os = "fuchsia")]
@@ -2500,6 +2610,10 @@ pub struct MethodWithUnionMarker;
 impl fidl::endpoints::ProtocolMarker for MethodWithUnionMarker {
     type Proxy = MethodWithUnionProxy;
     type RequestStream = MethodWithUnionRequestStream;
+
+    #[cfg(target_os = "fuchsia")]
+    type SynchronousProxy = MethodWithUnionSynchronousProxy;
+
     const DEBUG_NAME: &'static str = "(anonymous) MethodWithUnion";
 }
 
@@ -2513,6 +2627,24 @@ pub trait MethodWithUnionProxyInterface: Send + Sync {
 #[cfg(target_os = "fuchsia")]
 pub struct MethodWithUnionSynchronousProxy {
     client: fidl::client::sync::Client,
+}
+
+#[cfg(target_os = "fuchsia")]
+impl fidl::endpoints::SynchronousProxy for MethodWithUnionSynchronousProxy {
+    type Proxy = MethodWithUnionProxy;
+    type Protocol = MethodWithUnionMarker;
+
+    fn from_channel(inner: fidl::Channel) -> Self {
+        Self::new(inner)
+    }
+
+    fn into_channel(self) -> fidl::Channel {
+        self.client.into_channel()
+    }
+
+    fn as_channel(&self) -> &fidl::Channel {
+        self.client.as_channel()
+    }
 }
 
 #[cfg(target_os = "fuchsia")]
@@ -2877,6 +3009,10 @@ pub struct TransitionalMarker;
 impl fidl::endpoints::ProtocolMarker for TransitionalMarker {
     type Proxy = TransitionalProxy;
     type RequestStream = TransitionalRequestStream;
+
+    #[cfg(target_os = "fuchsia")]
+    type SynchronousProxy = TransitionalSynchronousProxy;
+
     const DEBUG_NAME: &'static str = "(anonymous) Transitional";
 }
 
@@ -2896,6 +3032,24 @@ pub trait TransitionalProxyInterface: Send + Sync {
 #[cfg(target_os = "fuchsia")]
 pub struct TransitionalSynchronousProxy {
     client: fidl::client::sync::Client,
+}
+
+#[cfg(target_os = "fuchsia")]
+impl fidl::endpoints::SynchronousProxy for TransitionalSynchronousProxy {
+    type Proxy = TransitionalProxy;
+    type Protocol = TransitionalMarker;
+
+    fn from_channel(inner: fidl::Channel) -> Self {
+        Self::new(inner)
+    }
+
+    fn into_channel(self) -> fidl::Channel {
+        self.client.into_channel()
+    }
+
+    fn as_channel(&self) -> &fidl::Channel {
+        self.client.as_channel()
+    }
 }
 
 #[cfg(target_os = "fuchsia")]
@@ -3321,6 +3475,10 @@ pub struct WithAndWithoutRequestResponseMarker;
 impl fidl::endpoints::ProtocolMarker for WithAndWithoutRequestResponseMarker {
     type Proxy = WithAndWithoutRequestResponseProxy;
     type RequestStream = WithAndWithoutRequestResponseRequestStream;
+
+    #[cfg(target_os = "fuchsia")]
+    type SynchronousProxy = WithAndWithoutRequestResponseSynchronousProxy;
+
     const DEBUG_NAME: &'static str = "(anonymous) WithAndWithoutRequestResponse";
 }
 
@@ -3346,6 +3504,24 @@ pub trait WithAndWithoutRequestResponseProxyInterface: Send + Sync {
 #[cfg(target_os = "fuchsia")]
 pub struct WithAndWithoutRequestResponseSynchronousProxy {
     client: fidl::client::sync::Client,
+}
+
+#[cfg(target_os = "fuchsia")]
+impl fidl::endpoints::SynchronousProxy for WithAndWithoutRequestResponseSynchronousProxy {
+    type Proxy = WithAndWithoutRequestResponseProxy;
+    type Protocol = WithAndWithoutRequestResponseMarker;
+
+    fn from_channel(inner: fidl::Channel) -> Self {
+        Self::new(inner)
+    }
+
+    fn into_channel(self) -> fidl::Channel {
+        self.client.into_channel()
+    }
+
+    fn as_channel(&self) -> &fidl::Channel {
+        self.client.as_channel()
+    }
 }
 
 #[cfg(target_os = "fuchsia")]
@@ -4290,6 +4466,10 @@ pub struct WithErrorSyntaxMarker;
 impl fidl::endpoints::ProtocolMarker for WithErrorSyntaxMarker {
     type Proxy = WithErrorSyntaxProxy;
     type RequestStream = WithErrorSyntaxRequestStream;
+
+    #[cfg(target_os = "fuchsia")]
+    type SynchronousProxy = WithErrorSyntaxSynchronousProxy;
+
     const DEBUG_NAME: &'static str = "(anonymous) WithErrorSyntax";
 }
 pub type WithErrorSyntaxResponseAsStructResult = Result<(i64, i64, i64), u32>;
@@ -4316,6 +4496,24 @@ pub trait WithErrorSyntaxProxyInterface: Send + Sync {
 #[cfg(target_os = "fuchsia")]
 pub struct WithErrorSyntaxSynchronousProxy {
     client: fidl::client::sync::Client,
+}
+
+#[cfg(target_os = "fuchsia")]
+impl fidl::endpoints::SynchronousProxy for WithErrorSyntaxSynchronousProxy {
+    type Proxy = WithErrorSyntaxProxy;
+    type Protocol = WithErrorSyntaxMarker;
+
+    fn from_channel(inner: fidl::Channel) -> Self {
+        Self::new(inner)
+    }
+
+    fn into_channel(self) -> fidl::Channel {
+        self.client.into_channel()
+    }
+
+    fn as_channel(&self) -> &fidl::Channel {
+        self.client.as_channel()
+    }
 }
 
 #[cfg(target_os = "fuchsia")]
@@ -5106,6 +5304,10 @@ pub struct WithProtocolEndsMarker;
 impl fidl::endpoints::ProtocolMarker for WithProtocolEndsMarker {
     type Proxy = WithProtocolEndsProxy;
     type RequestStream = WithProtocolEndsRequestStream;
+
+    #[cfg(target_os = "fuchsia")]
+    type SynchronousProxy = WithProtocolEndsSynchronousProxy;
+
     const DEBUG_NAME: &'static str = "(anonymous) WithProtocolEnds";
 }
 
@@ -5136,6 +5338,24 @@ pub trait WithProtocolEndsProxyInterface: Send + Sync {
 #[cfg(target_os = "fuchsia")]
 pub struct WithProtocolEndsSynchronousProxy {
     client: fidl::client::sync::Client,
+}
+
+#[cfg(target_os = "fuchsia")]
+impl fidl::endpoints::SynchronousProxy for WithProtocolEndsSynchronousProxy {
+    type Proxy = WithProtocolEndsProxy;
+    type Protocol = WithProtocolEndsMarker;
+
+    fn from_channel(inner: fidl::Channel) -> Self {
+        Self::new(inner)
+    }
+
+    fn into_channel(self) -> fidl::Channel {
+        self.client.into_channel()
+    }
+
+    fn as_channel(&self) -> &fidl::Channel {
+        self.client.as_channel()
+    }
 }
 
 #[cfg(target_os = "fuchsia")]

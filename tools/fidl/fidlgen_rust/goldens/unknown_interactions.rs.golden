@@ -1268,6 +1268,10 @@ pub struct UnknownInteractionsAjarProtocolMarker;
 impl fidl::endpoints::ProtocolMarker for UnknownInteractionsAjarProtocolMarker {
     type Proxy = UnknownInteractionsAjarProtocolProxy;
     type RequestStream = UnknownInteractionsAjarProtocolRequestStream;
+
+    #[cfg(target_os = "fuchsia")]
+    type SynchronousProxy = UnknownInteractionsAjarProtocolSynchronousProxy;
+
     const DEBUG_NAME: &'static str = "(anonymous) UnknownInteractionsAjarProtocol";
 }
 pub type UnknownInteractionsAjarProtocolStrictTwoWayErrResult = Result<(), i32>;
@@ -1330,6 +1334,24 @@ pub trait UnknownInteractionsAjarProtocolProxyInterface: Send + Sync {
 #[cfg(target_os = "fuchsia")]
 pub struct UnknownInteractionsAjarProtocolSynchronousProxy {
     client: fidl::client::sync::Client,
+}
+
+#[cfg(target_os = "fuchsia")]
+impl fidl::endpoints::SynchronousProxy for UnknownInteractionsAjarProtocolSynchronousProxy {
+    type Proxy = UnknownInteractionsAjarProtocolProxy;
+    type Protocol = UnknownInteractionsAjarProtocolMarker;
+
+    fn from_channel(inner: fidl::Channel) -> Self {
+        Self::new(inner)
+    }
+
+    fn into_channel(self) -> fidl::Channel {
+        self.client.into_channel()
+    }
+
+    fn as_channel(&self) -> &fidl::Channel {
+        self.client.as_channel()
+    }
 }
 
 #[cfg(target_os = "fuchsia")]
@@ -3326,6 +3348,10 @@ pub struct UnknownInteractionsClosedProtocolMarker;
 impl fidl::endpoints::ProtocolMarker for UnknownInteractionsClosedProtocolMarker {
     type Proxy = UnknownInteractionsClosedProtocolProxy;
     type RequestStream = UnknownInteractionsClosedProtocolRequestStream;
+
+    #[cfg(target_os = "fuchsia")]
+    type SynchronousProxy = UnknownInteractionsClosedProtocolSynchronousProxy;
+
     const DEBUG_NAME: &'static str = "(anonymous) UnknownInteractionsClosedProtocol";
 }
 pub type UnknownInteractionsClosedProtocolStrictTwoWayErrResult = Result<(), i32>;
@@ -3393,6 +3419,24 @@ pub trait UnknownInteractionsClosedProtocolProxyInterface: Send + Sync {
 #[cfg(target_os = "fuchsia")]
 pub struct UnknownInteractionsClosedProtocolSynchronousProxy {
     client: fidl::client::sync::Client,
+}
+
+#[cfg(target_os = "fuchsia")]
+impl fidl::endpoints::SynchronousProxy for UnknownInteractionsClosedProtocolSynchronousProxy {
+    type Proxy = UnknownInteractionsClosedProtocolProxy;
+    type Protocol = UnknownInteractionsClosedProtocolMarker;
+
+    fn from_channel(inner: fidl::Channel) -> Self {
+        Self::new(inner)
+    }
+
+    fn into_channel(self) -> fidl::Channel {
+        self.client.into_channel()
+    }
+
+    fn as_channel(&self) -> &fidl::Channel {
+        self.client.as_channel()
+    }
 }
 
 #[cfg(target_os = "fuchsia")]
@@ -5069,6 +5113,10 @@ pub struct UnknownInteractionsProtocolMarker;
 impl fidl::endpoints::ProtocolMarker for UnknownInteractionsProtocolMarker {
     type Proxy = UnknownInteractionsProtocolProxy;
     type RequestStream = UnknownInteractionsProtocolRequestStream;
+
+    #[cfg(target_os = "fuchsia")]
+    type SynchronousProxy = UnknownInteractionsProtocolSynchronousProxy;
+
     const DEBUG_NAME: &'static str = "(anonymous) UnknownInteractionsProtocol";
 }
 pub type UnknownInteractionsProtocolStrictTwoWayErrResult = Result<(), i32>;
@@ -5163,6 +5211,24 @@ pub trait UnknownInteractionsProtocolProxyInterface: Send + Sync {
 #[cfg(target_os = "fuchsia")]
 pub struct UnknownInteractionsProtocolSynchronousProxy {
     client: fidl::client::sync::Client,
+}
+
+#[cfg(target_os = "fuchsia")]
+impl fidl::endpoints::SynchronousProxy for UnknownInteractionsProtocolSynchronousProxy {
+    type Proxy = UnknownInteractionsProtocolProxy;
+    type Protocol = UnknownInteractionsProtocolMarker;
+
+    fn from_channel(inner: fidl::Channel) -> Self {
+        Self::new(inner)
+    }
+
+    fn into_channel(self) -> fidl::Channel {
+        self.client.into_channel()
+    }
+
+    fn as_channel(&self) -> &fidl::Channel {
+        self.client.as_channel()
+    }
 }
 
 #[cfg(target_os = "fuchsia")]
