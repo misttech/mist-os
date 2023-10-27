@@ -5,7 +5,7 @@
 #ifndef SRC_DEVICES_GPIO_DRIVERS_TI_TCA6408A_TI_TCA6408A_H_
 #define SRC_DEVICES_GPIO_DRIVERS_TI_TCA6408A_TI_TCA6408A_H_
 
-#include <fuchsia/hardware/gpioimpl/cpp/banjo.h>
+#include <fidl/fuchsia.hardware.gpioimpl/cpp/driver/fidl.h>
 #include <lib/ddk/device.h>
 #include <lib/device-protocol/i2c-channel.h>
 #include <lib/zx/result.h>
@@ -20,7 +20,9 @@ using DeviceType = ddk::Device<TiTca6408a>;
 
 class TiTca6408aTest;
 
-class TiTca6408a : public DeviceType, public ddk::GpioImplProtocol<TiTca6408a, ddk::base_protocol> {
+class TiTca6408a : public DeviceType,
+                   public fdf::Server<fuchsia_hardware_gpioimpl::GpioImpl>,
+                   public ddk::EmptyProtocol<ZX_PROTOCOL_GPIO_IMPL> {
  public:
   static zx_status_t Create(void* ctx, zx_device_t* parent);
 
@@ -29,16 +31,26 @@ class TiTca6408a : public DeviceType, public ddk::GpioImplProtocol<TiTca6408a, d
 
   void DdkRelease() { delete this; }
 
-  zx_status_t GpioImplConfigIn(uint32_t index, uint32_t flags);
-  zx_status_t GpioImplConfigOut(uint32_t index, uint8_t initial_value);
-  zx_status_t GpioImplSetAltFunction(uint32_t index, uint64_t function);
-  zx_status_t GpioImplSetDriveStrength(uint32_t index, uint64_t ua, uint64_t* out_actual_ua);
-  zx_status_t GpioImplGetDriveStrength(uint32_t index, uint64_t* ua);
-  zx_status_t GpioImplRead(uint32_t index, uint8_t* out_value);
-  zx_status_t GpioImplWrite(uint32_t index, uint8_t value);
-  zx_status_t GpioImplGetInterrupt(uint32_t index, uint32_t flags, zx::interrupt* out_irq);
-  zx_status_t GpioImplReleaseInterrupt(uint32_t index);
-  zx_status_t GpioImplSetPolarity(uint32_t index, gpio_polarity_t polarity);
+  void ConfigIn(ConfigInRequest& request, ConfigInCompleter::Sync& completer) override;
+  void ConfigOut(ConfigOutRequest& request, ConfigOutCompleter::Sync& completer) override;
+  void SetAltFunction(SetAltFunctionRequest& request,
+                      SetAltFunctionCompleter::Sync& completer) override;
+  void Read(ReadRequest& request, ReadCompleter::Sync& completer) override;
+  void Write(WriteRequest& request, WriteCompleter::Sync& completer) override;
+  void SetPolarity(SetPolarityRequest& request, SetPolarityCompleter::Sync& completer) override;
+  void SetDriveStrength(SetDriveStrengthRequest& request,
+                        SetDriveStrengthCompleter::Sync& completer) override;
+  void GetDriveStrength(GetDriveStrengthRequest& request,
+                        GetDriveStrengthCompleter::Sync& completer) override;
+  void GetInterrupt(GetInterruptRequest& request, GetInterruptCompleter::Sync& completer) override;
+  void ReleaseInterrupt(ReleaseInterruptRequest& request,
+                        ReleaseInterruptCompleter::Sync& completer) override;
+
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_hardware_gpioimpl::GpioImpl> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override {
+    zxlogf(ERROR, "Unknown method %lu", metadata.method_ordinal);
+  }
 
  protected:
   friend class TiTca6408aTest;
@@ -52,6 +64,8 @@ class TiTca6408a : public DeviceType, public ddk::GpioImplProtocol<TiTca6408a, d
     kPolarityInversion = 2,
     kConfiguration = 3,
   };
+
+  zx_status_t Write(uint32_t index, uint8_t value);
 
   bool IsIndexInRange(uint32_t index) const {
     return index >= pin_index_offset_ && index < (pin_index_offset_ + kPinCount);

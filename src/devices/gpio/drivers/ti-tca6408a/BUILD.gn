@@ -20,8 +20,7 @@ driver_bind_rules("ti-tca6408a-bind") {
 source_set("common") {
   public_deps = [
     ":ti-tca6408a-bind",
-    "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_cpp",
     "//src/devices/i2c/lib/device-protocol-i2c-channel",
     "//src/devices/lib/driver",
     "//src/lib/ddk",
@@ -33,7 +32,10 @@ source_set("common") {
 fuchsia_driver("ti-tca6408a-driver") {
   output_name = "ti-tca6408a"
   sources = [ "ti-tca6408a.cc" ]
-  deps = [ ":common" ]
+  deps = [
+    ":common",
+    "//src/devices/lib/driver:driver_runtime",
+  ]
 }
 
 fuchsia_driver_component("ti-tca6408a") {
@@ -55,7 +57,7 @@ test("ti-tca6408a-test-bin") {
   ]
   deps = [
     ":common",
-    "//sdk/lib/async-loop-testing/cpp",
+    "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//src/devices/i2c/testing/fake-i2c",
     "//src/devices/testing/mock-ddk",

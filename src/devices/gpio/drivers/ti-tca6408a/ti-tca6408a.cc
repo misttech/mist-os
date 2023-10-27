@@ -58,56 +58,78 @@ zx_status_t TiTca6408a::Create(void* ctx, zx_device_t* parent) {
   return ZX_OK;
 }
 
-zx_status_t TiTca6408a::GpioImplConfigIn(uint32_t index, uint32_t flags) {
-  if (!IsIndexInRange(index)) {
-    return ZX_ERR_OUT_OF_RANGE;
+void TiTca6408a::ConfigIn(ConfigInRequest& request, ConfigInCompleter::Sync& completer) {
+  if (!IsIndexInRange(request.index())) {
+    completer.Reply(fit::error(ZX_ERR_OUT_OF_RANGE));
+    return;
   }
 
-  if (flags != GPIO_NO_PULL) {
-    return ZX_ERR_NOT_SUPPORTED;
+  if (request.flags() != fuchsia_hardware_gpio::GpioFlags::kNoPull) {
+    completer.Reply(fit::error(ZX_ERR_NOT_SUPPORTED));
+    return;
   }
 
-  return SetBit(Register::kConfiguration, index).status_value();
-}
-
-zx_status_t TiTca6408a::GpioImplConfigOut(uint32_t index, uint8_t initial_value) {
-  if (zx_status_t status = GpioImplWrite(index, initial_value); status != ZX_OK) {
-    return status;
+  auto result = SetBit(Register::kConfiguration, request.index());
+  if (result.is_error()) {
+    completer.Reply(fit::error(result.error_value()));
+    return;
   }
-  return ClearBit(Register::kConfiguration, index).status_value();
+  completer.Reply(fit::ok());
 }
 
-zx_status_t TiTca6408a::GpioImplSetAltFunction(uint32_t index, uint64_t function) {
-  return ZX_ERR_NOT_SUPPORTED;
+void TiTca6408a::ConfigOut(ConfigOutRequest& request, ConfigOutCompleter::Sync& completer) {
+  if (zx_status_t status = Write(request.index(), request.initial_value()); status != ZX_OK) {
+    completer.Reply(zx::error(status));
+    return;
+  }
+  auto result = ClearBit(Register::kConfiguration, request.index());
+  if (result.is_error()) {
+    completer.Reply(zx::error(result.status_value()));
+    return;
+  }
+  completer.Reply(fit::ok());
 }
 
-zx_status_t TiTca6408a::GpioImplSetDriveStrength(uint32_t index, uint64_t ua,
-                                                 uint64_t* out_actual_ua) {
-  return ZX_ERR_NOT_SUPPORTED;
+void TiTca6408a::SetAltFunction(SetAltFunctionRequest& request,
+                                SetAltFunctionCompleter::Sync& completer) {
+  completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
 }
 
-zx_status_t TiTca6408a::GpioImplGetDriveStrength(uint32_t index, uint64_t* ua) {
-  return ZX_ERR_NOT_SUPPORTED;
+void TiTca6408a::SetDriveStrength(SetDriveStrengthRequest& request,
+                                  SetDriveStrengthCompleter::Sync& completer) {
+  completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
 }
 
-zx_status_t TiTca6408a::GpioImplRead(uint32_t index, uint8_t* out_value) {
-  if (!IsIndexInRange(index)) {
-    return ZX_ERR_OUT_OF_RANGE;
+void TiTca6408a::GetDriveStrength(GetDriveStrengthRequest& request,
+                                  GetDriveStrengthCompleter::Sync& completer) {
+  completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+}
+
+void TiTca6408a::Read(ReadRequest& request, ReadCompleter::Sync& completer) {
+  if (!IsIndexInRange(request.index())) {
+    completer.Reply(zx::error(ZX_ERR_OUT_OF_RANGE));
+    return;
   }
 
-  zx::result<uint8_t> value = ReadBit(Register::kInputPort, index);
+  zx::result<uint8_t> value = ReadBit(Register::kInputPort, request.index());
   if (value.is_error()) {
-    return value.status_value();
+    completer.Reply(zx::error(value.error_value()));
+    return;
   }
 
-  if (out_value) {
-    *out_value = value.value();
-  }
-
-  return ZX_OK;
+  completer.Reply(fit::ok(value.value()));
 }
 
-zx_status_t TiTca6408a::GpioImplWrite(uint32_t index, uint8_t value) {
+void TiTca6408a::Write(WriteRequest& request, WriteCompleter::Sync& completer) {
+  auto status = Write(request.index(), request.value());
+  if (status != ZX_OK) {
+    completer.Reply(fit::error(status));
+    return;
+  }
+  completer.Reply(fit::ok());
+}
+
+zx_status_t TiTca6408a::Write(uint32_t index, uint8_t value) {
   if (!IsIndexInRange(index)) {
     return ZX_ERR_OUT_OF_RANGE;
   }
@@ -117,15 +139,18 @@ zx_status_t TiTca6408a::GpioImplWrite(uint32_t index, uint8_t value) {
   return status.status_value();
 }
 
-zx_status_t TiTca6408a::GpioImplGetInterrupt(uint32_t index, uint32_t flags,
-                                             zx::interrupt* out_irq) {
-  return ZX_ERR_NOT_SUPPORTED;
+void TiTca6408a::GetInterrupt(GetInterruptRequest& request,
+                              GetInterruptCompleter::Sync& completer) {
+  completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
 }
 
-zx_status_t TiTca6408a::GpioImplReleaseInterrupt(uint32_t index) { return ZX_ERR_NOT_SUPPORTED; }
+void TiTca6408a::ReleaseInterrupt(ReleaseInterruptRequest& request,
+                                  ReleaseInterruptCompleter::Sync& completer) {
+  completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+}
 
-zx_status_t TiTca6408a::GpioImplSetPolarity(uint32_t index, gpio_polarity_t polarity) {
-  return ZX_ERR_NOT_SUPPORTED;
+void TiTca6408a::SetPolarity(SetPolarityRequest& request, SetPolarityCompleter::Sync& completer) {
+  completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
 }
 
 zx::result<uint8_t> TiTca6408a::ReadBit(Register reg, uint32_t index) {
