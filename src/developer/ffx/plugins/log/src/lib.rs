@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use error::LogError;
-use ffx_log_args::FfxLogCommand;
+use ffx_log_args::LogCommand;
 use fho::{daemon_protocol, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl_fuchsia_developer_ffx::{TargetCollectionProxy, TargetQuery};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
@@ -14,7 +14,7 @@ use log_command::{
         dump_logs_from_socket, BootTimeAccessor, DefaultLogFormatter, LogEntry, LogFormatter,
         WriterContainer,
     },
-    InstanceGetter, LogCommand, LogSubCommand, WatchCommand,
+    InstanceGetter, LogSubCommand, WatchCommand,
 };
 use log_symbolizer::{LogSymbolizer, Symbolizer};
 use std::io::Write;
@@ -38,7 +38,7 @@ pub struct LogTool {
     target_collection: TargetCollectionProxy,
     rcs_proxy: RemoteControlProxy,
     #[command]
-    cmd: FfxLogCommand,
+    cmd: LogCommand,
 }
 
 fho::embedded_plugin!(LogTool);
@@ -48,7 +48,7 @@ impl FfxMain for LogTool {
     type Writer = MachineWriter<LogEntry>;
 
     async fn main(self, writer: Self::Writer) -> fho::Result<()> {
-        log_impl(writer, self.rcs_proxy, self.target_collection, self.cmd.cmd).await?;
+        log_impl(writer, self.rcs_proxy, self.target_collection, self.cmd).await?;
         Ok(())
     }
 }

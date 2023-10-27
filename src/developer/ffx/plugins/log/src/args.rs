@@ -2,34 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use argh::{ArgsInfo, CommandInfoWithArgs, FromArgs, SubCommand};
-use log_command as log_utils;
-pub use log_utils::DumpCommand;
-pub use log_utils::LogCommand;
-pub use log_utils::LogSubCommand;
-pub use log_utils::TimeFormat;
-pub use log_utils::WatchCommand;
+// Bypass warning about not using the argh and ffx_core crates, which are
+// imported automatically by ffx_plugin. These can be removed when the plugin is
+// no longer compiled as part of ffx.
+use argh as _;
+use ffx_core as _;
 
-use ffx_core::ffx_command;
+pub use log_command::DumpCommand;
+pub use log_command::LogCommand;
+pub use log_command::LogSubCommand;
+pub use log_command::TimeFormat;
+pub use log_command::WatchCommand;
 
-#[ffx_command()]
-#[derive(Clone, Debug, PartialEq)]
-pub struct FfxLogCommand {
-    pub cmd: LogCommand,
-}
-
-impl SubCommand for FfxLogCommand {
-    const COMMAND: &'static argh::CommandInfo = LogCommand::COMMAND;
-}
-
-impl ArgsInfo for FfxLogCommand {
-    fn get_args_info() -> CommandInfoWithArgs {
-        LogCommand::get_args_info()
-    }
-}
-
-impl FromArgs for FfxLogCommand {
-    fn from_args(command_name: &[&str], args: &[&str]) -> Result<Self, argh::EarlyExit> {
-        Ok(Self { cmd: LogCommand::from_args(command_name, args)? })
-    }
-}
+// This does what the `ffx_command` proc macro would
+// do if this type were implemented here.
+pub type FfxPluginCommand = LogCommand;
