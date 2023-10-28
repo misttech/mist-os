@@ -8,12 +8,23 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/component/cpp/composite_node_spec.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 
 #include <cstdint>
 
+#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/platform/cpp/bind.h>
+#include <bind/fuchsia/sysmem/cpp/bind.h>
+#include <bind/fuchsia/tee/cpp/bind.h>
+
 #include "sherlock.h"
-#include "src/devices/board/drivers/sherlock/sherlock-securemem-bind.h"
 #include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
+
+namespace fdf {
+using namespace fuchsia_driver_framework;
+}  // namespace fdf
 
 namespace sherlock {
 namespace fpbus = fuchsia_hardware_platform_bus;
@@ -28,9 +39,9 @@ static const std::vector<fpbus::Bti> sherlock_secure_mem_btis{
 static const fpbus::Node secure_mem_dev = []() {
   fpbus::Node dev = {};
   dev.name() = "aml-secure-mem";
-  dev.vid() = PDEV_VID_AMLOGIC;
-  dev.pid() = PDEV_PID_AMLOGIC_T931;
-  dev.did() = PDEV_DID_AMLOGIC_SECURE_MEM;
+  dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
+  dev.pid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_T931;
+  dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_SECURE_MEM;
   dev.bti() = sherlock_secure_mem_btis;
   return dev;
 }();
@@ -38,18 +49,29 @@ static const fpbus::Node secure_mem_dev = []() {
 zx_status_t Sherlock::SecureMemInit() {
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('SECU');
-  auto result = pbus_.buffer(arena)->AddComposite(
+
+  const std::vector<uint32_t> kParentNodeProtocols = {
+      bind_fuchsia_sysmem::BIND_FIDL_PROTOCOL_DEVICE, bind_fuchsia_tee::BIND_FIDL_PROTOCOL_DEVICE};
+  std::vector<fdf::ParentSpec> parents;
+  parents.reserve(kParentNodeProtocols.size());
+  for (auto& protocol : kParentNodeProtocols) {
+    parents.push_back(fdf::ParentSpec{
+        {{fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL, protocol)},
+         {fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, protocol)}},
+    });
+  }
+
+  auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, secure_mem_dev),
-      platform_bus_composite::MakeFidlFragment(fidl_arena, aml_secure_mem_fragments,
-                                               std::size(aml_secure_mem_fragments)),
-      "pdev");
+      fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
+                                   {.name = "aml_securemem", .parents = parents}}));
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddComposite SecureMem(secure_mem_dev) request failed: %s", __func__,
+    zxlogf(ERROR, "AddCompositeNodeSpec SecureMem(secure_mem_dev) request failed: %s",
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddComposite SecureMem(secure_mem_dev) failed: %s", __func__,
+    zxlogf(ERROR, "AddCompositeNodeSpec SecureMem(secure_mem_dev) failed: %s",
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }

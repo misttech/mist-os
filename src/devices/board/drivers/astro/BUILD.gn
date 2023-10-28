@@ -37,19 +37,6 @@ driver_bind_rules("astro-pwm-bind") {
   ]
 }
 
-driver_bind_rules("astro-securemem-bind") {
-  rules = "bind/astro-securemem.bind"
-  header_output = "astro-securemem-bind.h"
-  bind_output = "astro-securemem-bind.bc"
-  tests = "bind-tests/astro-securemem-test.json"
-  deps = [
-    "//src/devices/bind/fuchsia.amlogic.platform",
-    "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.sysmem",
-    "//src/devices/bind/fuchsia.tee",
-  ]
-}
-
 driver_bind_rules("astro-tee-bind") {
   rules = "bind/astro-tee.bind"
   header_output = "astro-tee-bind.h"
@@ -180,7 +167,6 @@ fuchsia_driver("astro-driver") {
     ":astro-aml-sdio-bind_header",
     ":astro-bind",
     ":astro-pwm-bind_header",
-    ":astro-securemem-bind_header",
     ":astro-tee-bind_header",
     ":astro-video-bind_header",
     ":astro-wifi-bind_header",
@@ -218,6 +204,7 @@ fuchsia_driver("astro-driver") {
     "//src/devices/bind/fuchsia.pwm:fuchsia.pwm_cpp",
     "//src/devices/bind/fuchsia.register:fuchsia.register_cpp",
     "//src/devices/bind/fuchsia.sysmem:fuchsia.sysmem_cpp",
+    "//src/devices/bind/fuchsia.tee:fuchsia.tee_cpp",
     "//src/devices/bind/fuchsia.ti.platform:fuchsia.ti.platform_cpp",
     "//src/devices/bind/fuchsia.usb.phy:fuchsia.usb.phy_cpp",
     "//src/devices/bus/lib/platform-bus-composites",
@@ -271,7 +258,6 @@ group("tests") {
     ":astro-aml-sdio-bind_test",
     ":astro-bind_test",
     ":astro-pwm-bind_test",
-    ":astro-securemem-bind_test",
     ":astro-tee-bind_test",
     ":astro-video-bind_test",
     ":astro-wifi-bind_test",

@@ -55,7 +55,7 @@ TEST_F(DeviceEnumerationTest, NelsonTest) {
       "sys/platform/05:05:a/aml-thermal-pll/thermal",
       "class/thermal/000",
       // "sys/platform/05:03:1e/cpu",
-      "sys/platform/05:03:1a/aml-secure-mem/aml-securemem",
+      "sys/platform/05:03:1a/aml_securemem/aml-securemem",
       "sys/platform/05:05:1d/aml-pwm-device/pwm-0",
       "sys/platform/05:05:1d/aml-pwm-device/pwm-1",
       "sys/platform/05:05:1d/aml-pwm-device/pwm-2",

@@ -56,7 +56,7 @@ TEST_F(DeviceEnumerationTest, SherlockTest) {
       "sys/platform/05:04:1/aml-gpio/gpio-79/sherlock-buttons/hid-buttons",
       "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c/i2c-2-44/backlight/ti-lp8556",
       "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-57/tcs3400_light/tcs-3400",
-      "sys/platform/05:04:1a/aml-secure-mem/aml-securemem",
+      "sys/platform/05:04:1a/aml_securemem/aml-securemem",
       "sys/platform/05:04:1d/aml-pwm-device/pwm-4/pwm-init",
       "sys/platform/05:04:24/ram",
       "sys/platform/00:00:29",  // registers device
