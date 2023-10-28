@@ -3734,6 +3734,12 @@ From //BUILD.gn:120
 
 **Current value (from the default):** `"linux"`
 
+### host_pkg_config
+
+**Current value (from the default):** `"pkg-config"`
+
+From //third_party/perfetto/gn/pkg_config.gni:24
+
 ### host_test_labels
 
 Host-only tests.  These cannot have any dependency on an assembled platform
@@ -5421,8 +5427,8 @@ From //third_party/perfetto/gn/perfetto.gni:219
 
 Used by CrOS builds. Uses pkg-config to determine the appropriate flags
 for including and linking system libraries.
-  set `pkg_config` to the `BUILD_PKG_CONFIG` and
-  set `target_pkg_config` to the target `PKG_CONFIG`.
+  set `host_pkg_config` to the `BUILD_PKG_CONFIG` and
+  set `pkg_config` to the target `PKG_CONFIG`.
 Note: that if this is enabled `perfetto_use_system_protobuf` should be also.
 
 **Current value (from the default):** `false`
@@ -5475,7 +5481,7 @@ From //zircon/kernel/params.gni:109
 
 **Current value (from the default):** `"pkg-config"`
 
-From //third_party/perfetto/gn/pkg_config.gni:18
+From //third_party/perfetto/gn/pkg_config.gni:21
 
 ### platform_enable_user_pci
 
@@ -8165,12 +8171,6 @@ resources.  Must be a multiple of 128 bytes.
 **Current value (from the default):** `0`
 
 From //zircon/kernel/lib/persistent-debuglog/params.gni:13
-
-### target_pkg_config
-
-**Current value (from the default):** `"pkg-config"`
-
-From //third_party/perfetto/gn/pkg_config.gni:19
 
 ### target_sysroot
 
