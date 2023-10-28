@@ -12,7 +12,7 @@ toc:
   path: /docs/development/drivers/concepts/driver_development/sl4f.md
 - title: "Using the C++ DDK template library"
   path: /docs/development/drivers/concepts/driver_development/using-ddktl.md
-- title: "PCI Base Address Registers (BAR)"
+- title: "Configuration"
   path: /docs/development/drivers/concepts/driver_development/bar.md
 - title: "Interrupts"
   path: /docs/development/drivers/concepts/driver_development/interrupts.md

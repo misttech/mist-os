@@ -6,14 +6,22 @@
 # before making changes to this file, and add a member of the fuchsia.dev
 # team as reviewer.
 toc:
-- title: "Getting started"
+- title: "Fuchsia driver development"
   path: /docs/development/drivers/developer_guide/driver-development.md
-- title: "Write a ramdisk driver"
+- title: "RAMdisk Device"
   path: /docs/development/drivers/developer_guide/ramdisk.md
-- title: "Create a composite node"
+- title: "Composite nodes"
   path: /docs/development/drivers/developer_guide/composite-node.md
 - title: "Driver runtime API guidelines"
   path: /docs/development/drivers/developer_guide/driver-runtime-api-guidelines.md
 - title: "Drivers rubric"
   path: /docs/development/drivers/developer_guide/rubric.md
-
+- title: "Tutorials"
+  section:
+  - include: /docs/development/drivers/tutorials/_toc.yaml
+- title: "Best practices"
+  section:
+  - include: /docs/development/drivers/best_practices/_toc.yaml
+- title: "Driver-specifc guides"
+  section:
+  - include: /docs/development/drivers/driver_guides/_toc.yaml

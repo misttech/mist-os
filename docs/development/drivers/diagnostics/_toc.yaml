@@ -6,11 +6,11 @@
 # before making changes to this file, and add a member of the fuchsia.dev
 # team as reviewer.
 toc:
-- title: "Inspect"
+- title: "Using Inspect for drivers"
   path: /docs/development/drivers/diagnostics/inspect.md
-- title: "Logging"
+- title: "Driver logging"
   path: /docs/development/drivers/diagnostics/logging.md
-- title: "Tracing"
+- title: "Add tracing to a driver"
   path: /docs/development/drivers/diagnostics/tracing.md
 - title: "Bind debugger"
   path: /docs/development/drivers/diagnostics/bind-debugger.md
