@@ -33,7 +33,7 @@ config("abi") {
       # varargs routines that floating point args are in use.
       "-mskip-rax-setup",
     ]
-  } else {
+  } else if (toolchain_environment != "kernel.phys32") {
     # Clang needs -mcmodel=kernel to tell it to use the right safe-stack
     # ABI for the kernel.
     cflags += [ "-mcmodel=kernel" ]
