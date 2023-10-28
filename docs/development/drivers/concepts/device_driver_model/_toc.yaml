@@ -22,7 +22,7 @@ toc:
   path: /docs/development/drivers/concepts/device_driver_model/device-power.md
 - title: "Protocols in drivers"
   path: /docs/development/drivers/concepts/device_driver_model/protocol.md
-- title: "Platform bus"
+- title: "Platform Bus"
   path: /docs/development/drivers/concepts/device_driver_model/platform-bus.md
 - title: "FIDL in drivers"
   path: /docs/development/drivers/concepts/device_driver_model/fidl.md

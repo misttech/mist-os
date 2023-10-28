@@ -67,7 +67,7 @@ Driver development guides
      -  [Modifying board drivers][modifying-board-drivers]
      -  [What does a display controller do?][what-does-a-display-controller-do]
   -  Registers
-     -  [Overview][registers-overview]
+     -  [Registers overview][registers-overview]
   -  USB development
      -  [Getting descriptors and endpoints from USB][getting-descriptors-and-endpoints-from-usb]
      -  [USB system overview][usb-system-overview]
@@ -76,7 +76,7 @@ Driver development guides
 
 Testing
 
-- [Overview][driver-testing-overview]
+- [Driver testing][driver-testing-overview]
 - [Mock DDK][mock-ddk]
 - [DriverTestRealm][driver-test-realm]
 - [Threading tips in tests][threading-tips-in-tests]
@@ -91,7 +91,7 @@ Debugging
 
 Concepts
 
-- [Getting started][getting-started]
+- [Getting Started][getting-started]
 - [Fuchsia Driver Framework][fuchsia-driver-framework]
 - Device Driver Model
 

@@ -6,7 +6,7 @@
 # before making changes to this file, and add a member of the fuchsia.dev
 # team as reviewer.
 toc:
-- title: "Overview"
+- title: "Driver testing"
   path: /docs/development/drivers/testing/overview.md
 - title: "Mock DDK"
   path: /docs/development/drivers/testing/mock_ddk.md
