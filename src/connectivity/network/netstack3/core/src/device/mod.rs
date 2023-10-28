@@ -1099,6 +1099,38 @@ pub fn remove_neighbor_table_entry<I: Ip, NonSyncCtx: NonSyncContext>(
     result
 }
 
+/// Flush neighbor table entries.
+pub fn flush_neighbor_table<I: Ip, NonSyncCtx: NonSyncContext>(
+    sync_ctx: &SyncCtx<NonSyncCtx>,
+    ctx: &mut NonSyncCtx,
+    device: &DeviceId<NonSyncCtx>,
+) -> Result<(), NotSupportedError> {
+    let device = match device {
+        DeviceId::Ethernet(device) => device,
+        DeviceId::Loopback(LoopbackDeviceId { .. }) => return Err(NotSupportedError),
+    };
+    let IpInvariant(()) = I::map_ip(
+        IpInvariant((sync_ctx, ctx)),
+        |IpInvariant((sync_ctx, ctx))| {
+            NudHandler::<Ipv4, EthernetLinkDevice, _>::flush(
+                &mut Locked::new(sync_ctx),
+                ctx,
+                device,
+            );
+            IpInvariant(())
+        },
+        |IpInvariant((sync_ctx, ctx))| {
+            NudHandler::<Ipv6, EthernetLinkDevice, _>::flush(
+                &mut Locked::new(sync_ctx),
+                ctx,
+                device,
+            );
+            IpInvariant(())
+        },
+    );
+    Ok(())
+}
+
 /// Gets the IPv4 configuration and flags for a `device`.
 pub fn get_ipv4_configuration_and_flags<NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,

@@ -1068,20 +1068,26 @@ async fn test_neighbor_table_inspect() {
 }
 
 trait IpExt: Ip {
+    type OtherIp: IpExt;
     const ADDR: SpecifiedAddr<Self::Addr>;
     const PREFIX_LEN: u8;
+    const FIDL_IP_VERSION: fidl_net::IpVersion;
 }
 
 impl IpExt for Ipv4 {
+    type OtherIp = Ipv6;
     const ADDR: SpecifiedAddr<Self::Addr> =
         unsafe { SpecifiedAddr::new_unchecked(net_ip_v4!("192.0.2.1")) };
     const PREFIX_LEN: u8 = 24;
+    const FIDL_IP_VERSION: fidl_net::IpVersion = fidl_net::IpVersion::V4;
 }
 
 impl IpExt for Ipv6 {
+    type OtherIp = Ipv4;
     const ADDR: SpecifiedAddr<Self::Addr> =
         unsafe { SpecifiedAddr::new_unchecked(net_ip_v6!("2001:db8::1")) };
     const PREFIX_LEN: u8 = 64;
+    const FIDL_IP_VERSION: fidl_net::IpVersion = fidl_net::IpVersion::V6;
 }
 
 // TODO(https://fxbug.dev/135211): Use ip_test when it supports async.
@@ -1197,6 +1203,68 @@ async fn remove_dynamic_neighbor_entry<I: Ip + IpExt>() -> TestSetup {
     assert_eq!(
         observer.await.expect("observer should not be canceled"),
         Err(AddressResolutionFailed)
+    );
+
+    t
+}
+
+#[fixture::teardown(TestSetup::shutdown)]
+#[fasync::run_singlethreaded(test)]
+async fn clear_entries_v4() {
+    clear_entries::<Ipv4>().await
+}
+
+#[fixture::teardown(TestSetup::shutdown)]
+#[fasync::run_singlethreaded(test)]
+async fn clear_entries_v6() {
+    clear_entries::<Ipv6>().await
+}
+
+async fn clear_entries<I: Ip + IpExt>() -> TestSetup {
+    const EP_IDX: usize = 1;
+    let mut t = TestSetupBuilder::new()
+        .add_endpoint()
+        .add_stack(StackSetupBuilder::new().add_endpoint(EP_IDX, None))
+        .build()
+        .await;
+
+    let test_stack = t.get(0);
+    let bindings_id = test_stack.get_endpoint_id(EP_IDX);
+    let mut ctx = test_stack.ctx();
+    let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
+    let devices: &Devices<_> = non_sync_ctx.as_ref();
+    let ethernet_device_id = assert_matches!(
+        devices.get_core_id(bindings_id).expect("get core id"),
+        DeviceId::Ethernet(ethernet_device_id) => ethernet_device_id
+    );
+    let controller = test_stack.connect_proxy::<fnet_neighbor::ControllerMarker>();
+    const MAC: Mac = net_mac!("00:11:22:33:44:55");
+    for addr in [IpAddr::from(Ipv4::ADDR.get()), IpAddr::from(Ipv6::ADDR.get())] {
+        controller
+            .add_entry(bindings_id.into(), &addr.into_ext(), &MAC.into_ext())
+            .await
+            .expect("add_entry FIDL")
+            .expect("add_entry");
+    }
+
+    controller
+        .clear_entries(bindings_id.into(), I::FIDL_IP_VERSION)
+        .await
+        .expect("clear_entries FIDL")
+        .expect("clear_entries");
+
+    assert_matches!(
+        resolve_ethernet_link_addr::<I, _>(sync_ctx, non_sync_ctx, &ethernet_device_id, &I::ADDR),
+        LinkResolutionResult::Pending(_)
+    );
+    assert_matches!(
+        resolve_ethernet_link_addr::<I::OtherIp, _>(
+            sync_ctx,
+            non_sync_ctx,
+            &ethernet_device_id,
+            &I::OtherIp::ADDR
+        ),
+        LinkResolutionResult::Resolved(mac) => assert_eq!(mac, MAC)
     );
 
     t

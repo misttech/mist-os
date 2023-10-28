@@ -21,7 +21,6 @@
                 "neigh_unreachability_config_errors_ns3",
                 "neigh_unreachability_config_ns3",
                 "neigh_unreachable_entries_ns3",
-                "neigh_wrong_interface_ns3::clear_entries",
                 "neighbor_with_many_addresses_disconnects_ns3",
                 "remove_device_clears_neighbors_ns3",
 

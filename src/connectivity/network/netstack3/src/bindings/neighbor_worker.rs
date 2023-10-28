@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use fidl::endpoints::{ProtocolMarker as _, ServerEnd};
+use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_ext::IntoExt as _;
 use fidl_fuchsia_net_neighbor::{
     self as fnet_neighbor, ControllerRequest, ControllerRequestStream, ViewRequest,
@@ -16,7 +17,7 @@ use tracing::warn;
 
 use crate::bindings::{devices::BindingId, BindingsNonSyncCtxImpl, Ctx, Netstack};
 use netstack3_core::{
-    device::{insert_static_neighbor_entry, remove_neighbor_table_entry},
+    device::{flush_neighbor_table, insert_static_neighbor_entry, remove_neighbor_table_entry},
     error::{NeighborRemovalError, NotFoundError, NotSupportedError, StaticNeighborInsertionError},
 };
 
@@ -133,12 +134,32 @@ pub(super) async fn serve_controller(
                         });
                     responder.send(result)
                 }
-                ControllerRequest::ClearEntries { interface: _, ip_version: _, responder } => {
-                    warn!(
-                        "TODO(https://fxbug.dev/124960): \
-                            Implement fuchsia.net.neighbor/Controller.ClearEntries"
-                    );
-                    responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))
+                ControllerRequest::ClearEntries { interface, ip_version, responder } => {
+                    let device_id = match BindingId::new(interface)
+                        .and_then(|id| non_sync_ctx.devices.get_core_id(id))
+                    {
+                        Some(device_id) => device_id,
+                        None => {
+                            return responder.send(Err(zx::Status::NOT_FOUND.into_raw()));
+                        }
+                    };
+                    let result =
+                        match ip_version {
+                            fnet::IpVersion::V4 => flush_neighbor_table::<
+                                Ipv4,
+                                BindingsNonSyncCtxImpl,
+                            >(
+                                sync_ctx, non_sync_ctx, &device_id
+                            ),
+                            fnet::IpVersion::V6 => flush_neighbor_table::<
+                                Ipv6,
+                                BindingsNonSyncCtxImpl,
+                            >(
+                                sync_ctx, non_sync_ctx, &device_id
+                            ),
+                        }
+                        .map_err(|NotSupportedError| zx::Status::NOT_SUPPORTED.into_raw());
+                    responder.send(result)
                 }
                 ControllerRequest::UpdateUnreachabilityConfig {
                     interface: _,
