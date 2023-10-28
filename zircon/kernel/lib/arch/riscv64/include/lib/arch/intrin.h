@@ -33,7 +33,7 @@ inline void ThreadMemoryBarrier() { __asm__("fence iorw, iorw" ::: "memory"); }
 /// Return the current CPU cycle count.
 inline uint64_t Cycles() {
   uint64_t time;
-  __asm__ volatile("rdtime %0" : "=r"(time));
+  __asm__ volatile("rdcycle %0" : "=r"(time));
   return time;
 }
 
