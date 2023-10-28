@@ -1877,16 +1877,11 @@ impl<
 
     fn flush(&mut self, ctx: &mut C, device_id: &Self::DeviceId) {
         self.with_nud_state_mut(device_id, |NudState { neighbors, last_gc: _ }, _config| {
-            neighbors.retain(|neighbor, state| {
-                match state {
-                    NeighborState::Dynamic(entry) => {
-                        entry.cancel_timer(ctx, device_id, *neighbor);
-
-                        // Only flush dynamic entries.
-                        false
-                    }
-                    NeighborState::Static(_) => true,
+            neighbors.drain().for_each(|(neighbor, state)| match state {
+                NeighborState::Dynamic(mut entry) => {
+                    entry.cancel_timer(ctx, device_id, neighbor);
                 }
+                NeighborState::Static(_) => {}
             });
         });
     }
@@ -3998,13 +3993,10 @@ mod tests {
             non_sync_ctx.now() + ONE_SECOND.get(),
         )]);
 
-        // Flushing the table should clear all dynamic entries and timers.
+        // Flushing the table should clear all entries (dynamic and static) and timers.
         NudHandler::flush(&mut sync_ctx, &mut non_sync_ctx, &FakeLinkDeviceId);
         let FakeNudContext { nud } = &sync_ctx.outer;
-        assert_eq!(
-            nud.neighbors,
-            HashMap::from([(I::LOOKUP_ADDR1, NeighborState::Static(LINK_ADDR1))])
-        );
+        assert!(nud.neighbors.is_empty(), "neighbor table should be empty: {:?}", nud.neighbors);
         non_sync_ctx.timer_ctx().assert_no_timers_installed();
     }
 

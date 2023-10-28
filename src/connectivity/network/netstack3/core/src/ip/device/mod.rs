@@ -2238,14 +2238,18 @@ mod tests {
     use test_case::test_case;
 
     use lock_order::Locked;
-    use net_declare::net_ip_v6;
+    use net_declare::{net_ip_v4, net_ip_v6, net_mac};
     use net_types::{ip::Ipv6, LinkLocalAddr};
 
     use crate::{
         context::testutil::FakeInstant,
         device::{ethernet, update_ipv4_configuration, update_ipv6_configuration, DeviceId},
         ip::{
-            device::{state::Lifetime, testutil::UpdateIpDeviceConfigurationAndFlagsTestIpExt},
+            device::{
+                nud::{LinkResolutionResult, NudHandler},
+                state::Lifetime,
+                testutil::UpdateIpDeviceConfigurationAndFlagsTestIpExt,
+            },
             gmp::GmpDelayedReportTimerId,
         },
         testutil::{
@@ -2262,13 +2266,13 @@ mod tests {
         let sync_ctx = &sync_ctx;
         non_sync_ctx.timer_ctx().assert_no_timers_installed();
         let local_mac = Ipv4::FAKE_CONFIG.local_mac;
-        let device_id = crate::device::add_ethernet_device(
+        let ethernet_device_id = crate::device::add_ethernet_device(
             sync_ctx,
             local_mac,
             ethernet::MaxFrameSize::from_mtu(Ipv4::MINIMUM_LINK_MTU).unwrap(),
             DEFAULT_INTERFACE_METRIC,
-        )
-        .into();
+        );
+        let device_id = ethernet_device_id.clone().into();
 
         assert_eq!(non_sync_ctx.take_events()[..], []);
 
@@ -2288,6 +2292,25 @@ mod tests {
             })]
         );
 
+        let addr = SpecifiedAddr::new(net_ip_v4!("192.0.2.1")).expect("addr should be unspecified");
+        let mac = net_mac!("01:23:45:67:89:ab");
+        NudHandler::<Ipv4, _, _>::set_static_neighbor(
+            &mut Locked::new(sync_ctx),
+            &mut non_sync_ctx,
+            &ethernet_device_id,
+            addr,
+            mac,
+        );
+        assert_matches!(
+            NudHandler::<Ipv4, _, _>::resolve_link_addr(
+                &mut Locked::new(sync_ctx),
+                &mut non_sync_ctx,
+                &ethernet_device_id,
+                &addr,
+            ),
+            LinkResolutionResult::Resolved(got) => assert_eq!(got, mac)
+        );
+
         set_ipv4_enabled(&mut non_sync_ctx, false, true);
         assert_eq!(
             non_sync_ctx.take_events()[..],
@@ -2295,6 +2318,13 @@ mod tests {
                 device: weak_device_id.clone(),
                 ip_enabled: false,
             })]
+        );
+
+        // Assert that static ARP entries are flushed on link down.
+        nud::testutil::assert_neighbor_unknown::<Ipv4, _, _, _>(
+            &mut Locked::new(sync_ctx),
+            ethernet_device_id,
+            addr,
         );
 
         let ipv4_addr_subnet = AddrSubnet::new(Ipv4Addr::new([192, 168, 0, 1]), 24).unwrap();
@@ -2413,13 +2443,13 @@ mod tests {
         let mut sync_ctx = &sync_ctx;
         non_sync_ctx.timer_ctx().assert_no_timers_installed();
         let local_mac = Ipv6::FAKE_CONFIG.local_mac;
-        let device_id = crate::device::add_ethernet_device(
+        let ethernet_device_id = crate::device::add_ethernet_device(
             sync_ctx,
             local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
             DEFAULT_INTERFACE_METRIC,
-        )
-        .into();
+        );
+        let device_id = ethernet_device_id.clone().into();
         let ll_addr = local_mac.to_ipv6_link_local();
         let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
             sync_ctx,
@@ -2521,6 +2551,26 @@ mod tests {
             Err(SetIpAddressPropertiesError::NotManual)
         );
 
+        let addr =
+            SpecifiedAddr::new(net_ip_v6!("2001:db8::1")).expect("addr should be unspecified");
+        let mac = net_mac!("01:23:45:67:89:ab");
+        NudHandler::<Ipv6, _, _>::set_static_neighbor(
+            &mut Locked::new(sync_ctx),
+            &mut non_sync_ctx,
+            &ethernet_device_id,
+            addr,
+            mac,
+        );
+        assert_matches!(
+            NudHandler::<Ipv6, _, _>::resolve_link_addr(
+                &mut Locked::new(sync_ctx),
+                &mut non_sync_ctx,
+                &ethernet_device_id,
+                &addr,
+            ),
+            LinkResolutionResult::Resolved(got) => assert_eq!(got, mac)
+        );
+
         let test_disable_device = |sync_ctx: &mut &FakeSyncCtx,
                                    non_sync_ctx: &mut FakeNonSyncCtx,
                                    expected_prev| {
@@ -2549,6 +2599,13 @@ mod tests {
             |addrs, _sync_ctx| {
                 assert_empty(addrs);
             },
+        );
+
+        // Assert that static NDP entry was removed on link down.
+        nud::testutil::assert_neighbor_unknown::<Ipv6, _, _, _>(
+            &mut Locked::new(sync_ctx),
+            ethernet_device_id,
+            addr,
         );
 
         let multicast_addr = Ipv6::ALL_ROUTERS_LINK_LOCAL_MULTICAST_ADDRESS;
