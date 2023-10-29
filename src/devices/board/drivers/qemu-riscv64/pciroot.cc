@@ -11,7 +11,6 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
-#include <lib/pci/root_host.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
 #include <stdint.h>
@@ -96,7 +95,7 @@ zx::result<> QemuRiscv64Pciroot::Create(PciRootHost* root_host, QemuRiscv64Pciro
 }
 
 zx::result<> QemuRiscv64::PcirootInit() {
-  zx::unowned_resource root_resource(get_root_resource(parent()));
+  zx::unowned_resource mmio_resource(get_mmio_resource(parent()));
 
   pci_root_host_.mcfgs().push_back(kVirtPcieMcfg);
   pci_root_host_.Io().AddRegion(kVirtPciePio);
@@ -104,7 +103,7 @@ zx::result<> QemuRiscv64::PcirootInit() {
 
   QemuRiscv64Pciroot::Context context{};
   zx_status_t status =
-      zx::vmo::create_physical(/*resource=*/*root_resource, /*paddr=*/kVirtPcieEcam.base,
+      zx::vmo::create_physical(/*resource=*/*mmio_resource, /*paddr=*/kVirtPcieEcam.base,
                                /*size=*/kVirtPcieEcam.size, /*result=*/&context.ecam);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to allocate ecam vmo for [%#lx, %#lx): %s", kVirtPcieEcam.base,
@@ -116,11 +115,11 @@ zx::result<> QemuRiscv64::PcirootInit() {
 }
 
 zx::result<> QemuRiscv64Pciroot::CreateInterrupts() {
-  zx::unowned_resource root_resource(get_root_resource(parent()));
+  zx::unowned_resource irq_resource(get_irq_resource(parent()));
 
   for (uint32_t vector_offset = 0; vector_offset < kVirtPcieIrqCount; vector_offset++) {
     zx::interrupt interrupt;
-    zx_status_t status = zx::interrupt::create(/*resource=*/*root_resource,
+    zx_status_t status = zx::interrupt::create(/*resource=*/*irq_resource,
                                                /*vector=*/kVirtPcieIrqBase + vector_offset,
                                                /*options=*/0, /*result=*/&interrupt);
     if (status != ZX_OK) {
