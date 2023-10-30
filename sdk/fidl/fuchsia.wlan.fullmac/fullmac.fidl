@@ -13,17 +13,9 @@ type WlanScanType = flexible enum : uint8 {
     PASSIVE = 2;
 };
 
-// LINT.IfChange
-/// WFA WMM v1.2, 2.2.2 Table 5
-/// Length of the WMM Parameter Element body. This does not include IE and vendor IE headers,
-/// and only includes the QoS Info, reserved, and AC parameters fields.
-const WLAN_WMM_PARAM_LEN uint32 = 18;
-// LINT.ThenChange(//sdk/fidl/fuchsia.wlan.mlme/wlan_mlme.fidl)
-
 /// Max length for vendor IEs to be added to the association request. This is currently
 /// used for WPA.
 const WLAN_VIE_MAX_LEN uint32 = 510;
-const WLAN_MAX_OP_RATES uint32 = 12;
 
 type WlanAuthType = flexible enum : uint8 {
     OPEN_SYSTEM = 1;
