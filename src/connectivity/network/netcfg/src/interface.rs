@@ -411,6 +411,8 @@ pub enum MatchingRule {
     #[serde(deserialize_with = "deserialize_glob_pattern")]
     TopologicalPath(glob::Pattern),
     DeviceClasses(Vec<DeviceClass>),
+    // Signals whether this rule should match any interface.
+    Any(bool),
 }
 
 impl MatchingRule {
@@ -436,6 +438,7 @@ impl MatchingRule {
                 // matches any of the types included in the list.
                 Ok(class_list.contains(&info.device_class.into()))
             }
+            MatchingRule::Any(matches_any_interface) => Ok(*matches_any_interface),
         }
     }
 }
@@ -979,5 +982,32 @@ mod tests {
         let matching_rule = MatchingRule::DeviceClasses(device_classes);
         let does_interface_match = matching_rule.does_interface_match(&device_info).unwrap();
         assert_eq!(does_interface_match, want_match);
+    }
+
+    // The device information should not have any impact on whether the
+    // interface matches, but we use Ethernet and Wlan as base cases
+    // to ensure that all interfaces are accepted or all interfaces
+    // are rejected.
+    #[test_case(fhwnet::DeviceClass::Ethernet, ETHERNET_TOPO_PATH)]
+    #[test_case(fhwnet::DeviceClass::Wlan, WLAN_TOPO_PATH)]
+    fn test_interface_matching_by_any_matching_rule(
+        device_class: fhwnet::DeviceClass,
+        topological_path: &'static str,
+    ) {
+        let device_info = devices::DeviceInfo {
+            device_class,
+            mac: None,
+            topological_path: topological_path.to_owned(),
+        };
+
+        // Create a matching rule that should match any interface.
+        let matching_rule = MatchingRule::Any(true);
+        let does_interface_match = matching_rule.does_interface_match(&device_info).unwrap();
+        assert!(does_interface_match);
+
+        // Create a matching rule that should reject any interface.
+        let matching_rule = MatchingRule::Any(false);
+        let does_interface_match = matching_rule.does_interface_match(&device_info).unwrap();
+        assert!(!does_interface_match);
     }
 }
