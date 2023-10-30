@@ -2147,6 +2147,10 @@ impl<
         EitherIpSocket::V6(id)
     }
 
+    fn to_other_conn_sharing_state(&self, state: Sharing) -> Sharing {
+        state
+    }
+
     type LocalIdAllocator = Option<PortAlloc<UdpBoundSocketMap<Ipv6, SC::WeakDeviceId>>>;
     type OtherLocalIdAllocator = Option<PortAlloc<UdpBoundSocketMap<Ipv4, SC::WeakDeviceId>>>;
 

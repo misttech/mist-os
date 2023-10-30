@@ -730,6 +730,13 @@ pub(crate) trait DualStackDatagramBoundStateContext<I: IpExt, C, S: DatagramSock
         S::AddrSpec,
     >>::ReceivingId;
 
+    fn to_other_conn_sharing_state(
+        &self,
+        state: <S::SocketMapSpec<I, Self::WeakDeviceId> as SocketMapStateSpec>::ConnSharingState,
+    ) -> <S::SocketMapSpec<
+        I::OtherVersion, Self::WeakDeviceId
+    > as SocketMapStateSpec>::ConnSharingState;
+
     /// Converts an other-IP-version address to an address for IP version `I`.
     fn from_other_ip_addr(&self, addr: <I::OtherVersion as Ip>::Addr) -> I::Addr;
 
@@ -966,6 +973,15 @@ where
         Self::WeakDeviceId,
         S::AddrSpec,
     >>::ReceivingId {
+        self.uninstantiable_unreachable()
+    }
+
+    fn to_other_conn_sharing_state(
+        &self,
+        _state: <S::SocketMapSpec<I, Self::WeakDeviceId> as SocketMapStateSpec>::ConnSharingState,
+    ) -> <S::SocketMapSpec<
+        I::OtherVersion, Self::WeakDeviceId
+    > as SocketMapStateSpec>::ConnSharingState{
         self.uninstantiable_unreachable()
     }
 
@@ -4702,6 +4718,10 @@ mod test {
 
         fn to_other_receiving_id(&self, id: Id) -> Id {
             id
+        }
+
+        fn to_other_conn_sharing_state(&self, state: Sharing) -> Sharing {
+            state
         }
 
         type LocalIdAllocator = ();
