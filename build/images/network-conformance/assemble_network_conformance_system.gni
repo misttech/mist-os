@@ -105,9 +105,6 @@ template("assemble_network_conformance_system") {
         [ "virtcon.disable=true" ] + zedboot_additional_boot_args
     cmdline = [ "kernel.halt-on-panic=true" ]
 
-    bootfs_labels = [
-      "//build/input:recovery_bootfs",
-      "//src/sys/component_manager:component_manager_bootfs_config",
-    ]
+    bootfs_labels = [ "//build/input:recovery_bootfs" ]
   }
 }

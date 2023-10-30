@@ -36,7 +36,7 @@ pub struct ProductConfig {
     /// The policy given to component_manager that restricts where sensitive capabilities can be
     /// routed.
     #[serde(default)]
-    pub component_policy: Option<ComponentPolicyConfig>,
+    pub component_policy: ComponentPolicyConfig,
 }
 
 /// Packages provided by the product, to add to the assembled images.

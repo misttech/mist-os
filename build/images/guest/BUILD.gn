@@ -138,7 +138,6 @@ if (labels.images == "//build/images/bringup") {
       "//src/storage/bin/mount",
       "//src/storage/bin/umount",
       "//src/storage/fvm/driver",
-      "//src/sys/component_manager:component_manager_bootfs_config",
       "//src/ui/input/drivers/hid",
       "//src/ui/input/drivers/hid-input-report",
       "//src/ui/input/drivers/virtio:virtio_input",

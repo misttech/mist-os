@@ -46,10 +46,7 @@ assembled_system("zedboot_assembly") {
     "virtcon.dpi=160,240,360,480",
   ]
 
-  bootfs_labels = [
-    "//build/input:zedboot_bootfs",
-    "//src/sys/component_manager:component_manager_bootfs_config",
-  ]
+  bootfs_labels = [ "//build/input:zedboot_bootfs" ]
 
   # Needed for installer runs.
   bootfs_labels += [

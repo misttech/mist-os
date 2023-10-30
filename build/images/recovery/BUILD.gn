@@ -57,8 +57,6 @@ if (is_fuchsia) {
         [ "virtcon.disable=true" ] + zedboot_additional_boot_args
 
     bootfs_labels = [ "//build/input:recovery_bootfs" ]
-    bootfs_labels +=
-        [ "//src/sys/component_manager:component_manager_bootfs_config" ]
 
     if (custom_signing_script != "") {
       inputs = custom_signing_script_inputs
@@ -297,10 +295,7 @@ if (is_fuchsia) {
                     ]
 
     bootfs_labels = []
-    bootfs_labels = [
-      "//build/input:recovery_bootfs",
-      "//src/sys/component_manager:component_manager_bootfs_config",
-    ]
+    bootfs_labels = [ "//build/input:recovery_bootfs" ]
 
     if (recovery_is_recovery_fastboot) {
       image_metadata_overrides = {
@@ -370,8 +365,6 @@ if (is_fuchsia) {
     board_config_label = board_configuration_label
 
     bootfs_labels = [ "//build/input:recovery_bootfs" ]
-    bootfs_labels +=
-        [ "//src/sys/component_manager:component_manager_bootfs_config" ]
 
     if (custom_signing_script != "") {
       inputs = custom_signing_script_inputs
