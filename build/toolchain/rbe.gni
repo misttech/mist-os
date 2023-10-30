@@ -245,3 +245,8 @@ cxx_link_rbe_deps =
       "//build/rbe/cxx.py",
       cxx_link_remote_wrapper,
     ]
+
+assert(
+    link_rbe_check == "none" || link_rbe_check == "consistency" ||
+        link_rbe_check == "determinism",
+    "link_rbe_check must be one of {none,consistency,determinism}, but got: ${link_rbe_check}.")

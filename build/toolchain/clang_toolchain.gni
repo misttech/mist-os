@@ -863,12 +863,25 @@ template("clang_toolchain") {
     tool("alink") {
       rspfile = "{{output}}.rsp"
       linker_prefix = ""
+      _link_concurrent_jobs = concurrent_jobs.local
       if (_link_rbe_enable) {  # Assume non-thin archives, the simplest case of
         # direct inclusion.
-        linker_prefix_list = [
+        _linker_prefix_list = [
           rebase_path(python_exe_src, root_build_dir),
           "-S",
           rebase_path(prebuilt_tool_remote_wrapper, root_build_dir),
+        ]
+        if (link_rbe_check == "determinism") {
+          _linker_prefix_list += [
+            "--local",
+            "--check-determinism",
+          ]
+        } else if (link_rbe_check == "consistency") {
+          _linker_prefix_list += [ "--compare" ]
+        } else if (link_rbe_check == "none") {
+          _link_concurrent_jobs = concurrent_jobs.remote
+        }
+        _linker_prefix_list += [
           "--inputs",
           "\"$rspfile\"",
           "--input_list_paths",
@@ -878,11 +891,9 @@ template("clang_toolchain") {
           "--preserve_unchanged_output_mtime",
           "--",
         ]
-        linker_prefix = string_join(" ", linker_prefix_list)
-        forward_variables_from(concurrent_jobs.remote, "*")
-      } else {
-        forward_variables_from(concurrent_jobs.local, "*")
+        linker_prefix = string_join(" ", _linker_prefix_list)
       }
+      forward_variables_from(_link_concurrent_jobs, "*")
       restat = _restat_link
       command = "rm -f {{output}} && $linker_prefix $ar {{arflags}} rcsD {{output}} \"@$rspfile\""
       description = "AR {{output}}"
@@ -941,15 +952,26 @@ template("clang_toolchain") {
         rspfile_content = "{{inputs_newline}}"
       } else {
         if (_link_rbe_enable) {
-          linker_prefix_list = [
+          _linker_prefix_list = [
             rebase_path(python_exe_src, root_build_dir),
             "-S",
             rebase_path(cxx_link_remote_wrapper, root_build_dir),
+          ]
+          if (link_rbe_check == "determinism") {
+            _linker_prefix_list += [
+              "--local",
+              "--check-determinism",
+            ]
+          } else if (link_rbe_check == "determinism") {
+            _linker_prefix_list += [ "--compare" ]
+          } else if (link_rbe_check == "none") {
+            _concurrent_jobs = concurrent_jobs.remote
+          }
+          _linker_prefix_list += [
             "--preserve_unchanged_output_mtime",
             "--",
           ]
-          linker_prefix = string_join(" ", linker_prefix_list)
-          _concurrent_jobs = concurrent_jobs.remote
+          linker_prefix = string_join(" ", _linker_prefix_list)
         } else {
           linker_prefix = ""
         }

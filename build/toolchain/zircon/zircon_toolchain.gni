@@ -567,6 +567,7 @@ template("zircon_toolchain") {
     switches = "-o $unstripped_outfile {{ldflags}}"
     linker_prefix = ""
     _link_concurrent_jobs = concurrent_jobs.local
+
     if (invoker.os == "mac") {
       rspfile_content = "{{inputs_newline}}"
       link_inputs = "-Wl,-filelist,$rspfile {{libs}} {{solibs}}"
@@ -587,15 +588,26 @@ template("zircon_toolchain") {
 
         # remote linking option
         if (_link_rbe_enable) {
-          linker_prefix_list = [
+          _linker_prefix_list = [
             rebase_path(python_exe_src, root_build_dir),
             "-S",
             rebase_path(cxx_link_remote_wrapper, root_build_dir),
+          ]
+          if (link_rbe_check == "determinism") {
+            _linker_prefix_list += [
+              "--local",
+              "--check-determinism",
+            ]
+          } else if (link_rbe_check == "consistency") {
+            _linker_prefix_list += [ "--compare" ]
+          } else if (link_rbe_check == "none") {
+            _link_concurrent_jobs = concurrent_jobs.remote
+          }
+          _linker_prefix_list += [
             "--preserve_unchanged_output_mtime",
             "--",
           ]
-          linker_prefix = string_join(" ", linker_prefix_list)
-          _link_concurrent_jobs = concurrent_jobs.remote
+          linker_prefix = string_join(" ", _linker_prefix_list)
         }
       }
     }
@@ -701,10 +713,22 @@ template("zircon_toolchain") {
       _link_concurrent_jobs = concurrent_jobs.local
       if (_link_rbe_enable) {  # Assume non-thin archives, the simplest case of
         # direct inclusion.
-        linker_prefix_list = [
+        _linker_prefix_list = [
           rebase_path(python_exe_src, root_build_dir),
           "-S",
           rebase_path(prebuilt_tool_remote_wrapper, root_build_dir),
+        ]
+        if (link_rbe_check == "determinism") {
+          _linker_prefix_list += [
+            "--local",
+            "--check-determinism",
+          ]
+        } else if (link_rbe_check == "consistency") {
+          _linker_prefix_list += [ "--compare" ]
+        } else if (link_rbe_check == "none") {
+          _link_concurrent_jobs = concurrent_jobs.remote
+        }
+        _linker_prefix_list += [
           "--inputs",
           "\"$rspfile\"",
           "--input_list_paths",
@@ -714,8 +738,7 @@ template("zircon_toolchain") {
           "--preserve_unchanged_output_mtime",
           "--",
         ]
-        linker_prefix = string_join(" ", linker_prefix_list)
-        _link_concurrent_jobs = concurrent_jobs.remote
+        linker_prefix = string_join(" ", _linker_prefix_list)
       }
       restat = _restat_link
       command = "rm -f {{output}} && $linker_prefix $ar {{arflags}} rcsD {{output}} \"@$rspfile\""
