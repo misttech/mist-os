@@ -4,6 +4,7 @@
 
 pub(crate) mod common;
 pub(crate) mod subsystems;
+pub(crate) mod util;
 
 pub use common::CompletedConfiguration;
 pub use common::ComponentConfigs;

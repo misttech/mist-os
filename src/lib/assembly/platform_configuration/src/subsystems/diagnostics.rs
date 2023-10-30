@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::subsystems::prelude::*;
+use crate::util;
 use assembly_config_schema::platform_config::diagnostics_config::{
     ArchivistConfig, DiagnosticsConfig,
 };
@@ -91,6 +92,14 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
             .package("svchost")
             .component("meta/svchost.cm")?
             .field("exception_handler_available", exception_handler_available)?;
+
+        // Cobalt is added to anything minimal and higher.
+        match context.feature_set_level {
+            FeatureSupportLevel::Bootstrap | FeatureSupportLevel::Utility => {}
+            FeatureSupportLevel::Minimal => {
+                util::add_build_type_config_data("cobalt", context, builder)?;
+            }
+        }
 
         Ok(())
     }

@@ -12,9 +12,6 @@ core_realm_shards = []
 legacy_base_package_labels +=
     [ "//src/connectivity/network/netcfg:config-default" ]
 
-# Add build type config data
-legacy_base_package_labels += [ "//src/cobalt/bin/app:build_type_eng" ]
-
 # Add UI packages on terminal.
 legacy_cache_package_labels += [
   "//src/media/codec/bundles:services",

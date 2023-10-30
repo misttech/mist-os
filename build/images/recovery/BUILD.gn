@@ -163,7 +163,6 @@ if (is_fuchsia) {
       recovery_packages + core_realm_eng_aib_pkgs +
       core_realm_testing_aib_pkgs +
       [
-        "//src/cobalt/bin/app:build_type_eng",
         "//src/cobalt/bin/app:cobalt",
         "//src/cobalt/bin/app:cobalt_registry",
         "//src/cobalt/bin/app:config",

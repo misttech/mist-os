@@ -22,7 +22,7 @@ template("build_type_config_data") {
 
   template("config_data_for_build_type") {
     build_type = target_name
-    config_data(original_target_name + "_" + build_type) {
+    group(original_target_name + "_" + build_type) {
       forward_variables_from(invoker,
                              [
                                "deps",
@@ -30,8 +30,7 @@ template("build_type_config_data") {
                                "testonly",
                                "visibility",
                              ])
-      outputs = [ "build/type" ]
-      sources = [ "//build/type/" + build_type + ".txt" ]
+      not_needed([ "for_pkg" ])
     }
   }
 

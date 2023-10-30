@@ -45,6 +45,7 @@ rustc_library("platform_configuration") {
     "src/subsystems/timekeeper.rs",
     "src/subsystems/ui.rs",
     "src/subsystems/virtualization.rs",
+    "src/util.rs",
   ]
   deps = [
     "//src/developer/ffx/config:lib",
