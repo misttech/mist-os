@@ -274,23 +274,6 @@ template("board_configuration") {
     creation_deps += labels.input_bundle_copy_targets
   }
 
-  generated_file(labels.assembly_inputs) {
-    deps = labels.input_bundle_copy_targets
-    data_keys = [ "board_assembly_artifacts" ]
-    output_conversion = "json"
-    outputs = [ files.assembly_inputs ]
-
-    metadata = {
-      assembly_inputs = [
-        {
-          path = rebase_path(outputs[0], root_build_dir)
-        },
-      ]
-      assembly_inputs_barrier = []
-    }
-  }
-  creation_deps += [ ":${labels.assembly_inputs}" ]
-
   base_info_contents = {
     name = board_name
 
