@@ -84,6 +84,12 @@ config("llvm-libc.config") {
     libc,
     llvm_libc,
   ]
+
+  if (is_gcc) {
+    # GCC complains about using __m128i type in template speciailization
+    # because the typedef includes attributes.
+    cflags = [ "-Wno-ignored-attributes" ]
+  }
 }
 
 config("testonly.config") {

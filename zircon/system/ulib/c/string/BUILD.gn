@@ -4,12 +4,6 @@
 
 import("../libc.gni")
 
-# GCC complains about using __m128i type in template speciailization
-# because the typedef includes attributes.
-config("Wno-ignored-attributes") {
-  cflags = [ "-Wno-ignored-attributes" ]
-}
-
 llvm_libc_group("string") {
   deps = [
     ":compat",
@@ -42,10 +36,6 @@ llvm_libc_source_set("mem") {
     ":memcpy",
     ":memset",
   ]
-
-  if (is_gcc) {
-    configs = [ ":Wno-ignored-attributes" ]
-  }
 }
 
 unsanitized_funcs = [
@@ -106,10 +96,6 @@ foreach(funcs,
     # Avoid self-referential libcalls.
     configs = [ ":no-builtin-${funcs[0]}" ]
 
-    if (is_gcc) {
-      configs += [ ":Wno-ignored-attributes" ]
-    }
-
     # These also need to stick to the basic machine ABI so that dynlink.c can
     # use them early.
     basic_abi = true
@@ -168,10 +154,6 @@ llvm_libc_source_set("minimal-str") {
     ":mem",
     ":strlen",
   ]
-
-  if (is_gcc) {
-    configs = [ ":Wno-ignored-attributes" ]
-  }
 }
 
 llvm_libc_source_set("str") {
@@ -242,10 +224,6 @@ llvm_libc_source_set("compat") {
   ]
 
   deps = [ ":swab" ]
-
-  if (is_gcc) {
-    configs = [ ":Wno-ignored-attributes" ]
-  }
 }
 
 # This lives in libc/src/unistd upstream because it's declared in <unistd.h>
