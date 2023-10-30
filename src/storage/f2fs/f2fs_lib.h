@@ -7,6 +7,8 @@
 
 #include <safemath/checked_math.h>
 
+#include "src/storage/f2fs/f2fs_types.h"
+
 namespace f2fs {
 
 // Checkpoint

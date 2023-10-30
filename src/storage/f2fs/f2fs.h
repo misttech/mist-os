@@ -57,7 +57,6 @@
 #include "src/storage/lib/vfs/cpp/fuchsia_vfs.h"
 #include "src/storage/lib/vfs/cpp/inspect/inspect_tree.h"
 
-#include "src/storage/f2fs/f2fs_types.h"
 #include "src/storage/f2fs/f2fs_lib.h"
 #include "src/storage/f2fs/f2fs_layout.h"
 #include "src/storage/f2fs/bcache.h"

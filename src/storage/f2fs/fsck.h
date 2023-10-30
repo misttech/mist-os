@@ -9,7 +9,6 @@
 
 #include "src/storage/f2fs/bcache.h"
 #include "src/storage/f2fs/f2fs_layout.h"
-#include "src/storage/f2fs/f2fs_types.h"
 #include "src/storage/f2fs/node.h"
 #include "src/storage/f2fs/segment.h"
 

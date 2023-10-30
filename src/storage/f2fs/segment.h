@@ -9,7 +9,6 @@
 #include "src/storage/f2fs/f2fs_internal.h"
 #include "src/storage/f2fs/f2fs_layout.h"
 #include "src/storage/f2fs/f2fs_lib.h"
-#include "src/storage/f2fs/f2fs_types.h"
 #include "src/storage/f2fs/file_cache.h"
 
 namespace f2fs {

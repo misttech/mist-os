@@ -413,15 +413,15 @@ class SuperblockInfo {
     return LeToCpu(checkpoint_block_->sit_ver_bitmap_bytesize);
   }
 
-  void *BitmapPtr(MetaBitmap flag) {
+  uint8_t *GetBitmap(MetaBitmap flag) {
     if (raw_superblock_->cp_payload > 0) {
       if (flag == MetaBitmap::kNatBitmap) {
-        return &checkpoint_block_->sit_nat_version_bitmap;
+        return checkpoint_block_->sit_nat_version_bitmap;
       }
-      return checkpoint_trailer_.data();
+      return checkpoint_trailer_[0].get<uint8_t>();
     }
     int offset = (flag == MetaBitmap::kNatBitmap) ? checkpoint_block_->sit_ver_bitmap_bytesize : 0;
-    return &checkpoint_block_->sit_nat_version_bitmap + offset;
+    return checkpoint_block_->sit_nat_version_bitmap + offset;
   }
 
   block_t StartCpAddr() {

@@ -1478,8 +1478,7 @@ zx_status_t FsckWorker::InitNodeManager() {
   }
 
   // copy version bitmap
-  node_manager_->SetNatBitmap(
-      static_cast<uint8_t *>(superblock_info_.BitmapPtr(MetaBitmap::kNatBitmap)));
+  node_manager_->SetNatBitmap(superblock_info_.GetBitmap(MetaBitmap::kNatBitmap));
   return ZX_OK;
 }
 
@@ -1500,7 +1499,6 @@ zx_status_t FsckWorker::BuildSitInfo() {
   Checkpoint &ckpt = superblock_info_.GetCheckpoint();
   std::unique_ptr<SitInfo> sit_i;
   uint32_t sit_segs;
-  uint8_t *src_bitmap;
   uint32_t bitmap_size;
 
   if (sit_i = std::make_unique<SitInfo>(); sit_i == nullptr) {
@@ -1515,13 +1513,9 @@ zx_status_t FsckWorker::BuildSitInfo() {
   }
   sit_segs = LeToCpu(raw_sb.segment_count_sit) >> 1;
   bitmap_size = superblock_info_.BitmapSize(MetaBitmap::kSitBitmap);
-  if (src_bitmap = static_cast<uint8_t *>(superblock_info_.BitmapPtr(MetaBitmap::kSitBitmap));
-      src_bitmap == nullptr) {
-    return ZX_ERR_NO_MEMORY;
-  }
-
   sit_i->sit_bitmap.Reset(GetBitSize(bitmap_size));
-  memcpy(sit_i->sit_bitmap.StorageUnsafe()->GetData(), src_bitmap, bitmap_size);
+  CloneBits(sit_i->sit_bitmap, superblock_info_.GetBitmap(MetaBitmap::kSitBitmap), 0,
+            GetBitSize(bitmap_size));
 
   sit_i->sit_base_addr = LeToCpu(raw_sb.sit_blkaddr);
   sit_i->sit_blocks = sit_segs << superblock_info_.GetLogBlocksPerSeg();
@@ -1735,10 +1729,10 @@ void FsckWorker::CheckBlockCount(uint32_t segno, const SitEntry &raw_sit) {
 void FsckWorker::SegmentInfoFromRawSit(SegmentEntry &segment_entry, const SitEntry &raw_sit) {
   segment_entry.valid_blocks = GetSitVblocks(raw_sit);
   segment_entry.ckpt_valid_blocks = GetSitVblocks(raw_sit);
-  memcpy(segment_entry.cur_valid_map.StorageUnsafe()->GetData(), raw_sit.valid_map,
-         kSitVBlockMapSize);
-  memcpy(segment_entry.ckpt_valid_map.StorageUnsafe()->GetData(), raw_sit.valid_map,
-         kSitVBlockMapSize);
+  CloneBits<RawBitmapHeap>(segment_entry.cur_valid_map, raw_sit.valid_map, 0,
+                           GetBitSize(kSitVBlockMapSize));
+  CloneBits<RawBitmapHeap>(segment_entry.ckpt_valid_map, raw_sit.valid_map, 0,
+                           GetBitSize(kSitVBlockMapSize));
   segment_entry.type = GetSitType(raw_sit);
   segment_entry.mtime = LeToCpu(raw_sit.mtime);
 }
@@ -1911,8 +1905,8 @@ void FsckWorker::BuildSitAreaBitmap() {
   uint8_t *raw_bitmap = static_cast<uint8_t *>(sit_area_bitmap_.StorageUnsafe()->GetData());
   for (uint32_t segno = 0; segno < segment_manager_->GetMainSegmentsCount(); ++segno) {
     SegmentEntry &segment_entry = GetSegmentEntry(segno);
-
-    memcpy(raw_bitmap, segment_entry.cur_valid_map.StorageUnsafe()->GetData(), kSitVBlockMapSize);
+    CloneBits<RawBitmapHeap>(raw_bitmap, segment_entry.cur_valid_map, 0,
+                             GetBitSize(kSitVBlockMapSize));
     vblocks = 0;
     for (uint64_t j = 0; j < kSitVBlockMapSize; ++j) {
       vblocks += std::bitset<8>(*raw_bitmap++).count();

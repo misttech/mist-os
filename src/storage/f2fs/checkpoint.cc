@@ -417,8 +417,8 @@ zx_status_t F2fs::DoCheckpoint(bool is_umount) {
   }
 
   // update SIT/NAT bitmap
-  GetSegmentManager().GetSitBitmap(superblock_info.BitmapPtr(MetaBitmap::kSitBitmap));
-  GetNodeManager().GetNatBitmap(superblock_info.BitmapPtr(MetaBitmap::kNatBitmap));
+  GetSegmentManager().GetSitBitmap(superblock_info.GetBitmap(MetaBitmap::kSitBitmap));
+  GetNodeManager().GetNatBitmap(superblock_info.GetBitmap(MetaBitmap::kNatBitmap));
 
   crc32 = CpuToLe(F2fsCrc32(&ckpt, LeToCpu(ckpt.checksum_offset)));
   std::memcpy(reinterpret_cast<uint8_t *>(&ckpt) + LeToCpu(ckpt.checksum_offset), &crc32,

@@ -46,13 +46,13 @@ TEST_F(BitmapTest, GetBitmap) {
   auto bits = test_file->GetBitmap(file_page.CopyRefPtr());
   ASSERT_EQ(bits.status_value(), ZX_ERR_NOT_SUPPORTED);
 
-  bits = test_dir1->GetBitmap(dir_page2.CopyRefPtr());
-  ASSERT_EQ(bits.status_value(), ZX_ERR_INVALID_ARGS);
-
   bits = test_dir1->GetBitmap(dir_page1.CopyRefPtr());
   ASSERT_EQ(bits.status_value(), ZX_ERR_INVALID_ARGS);
 
   test_dir1->ClearFlag(InodeInfoFlag::kInlineDentry);
+  bits = test_dir1->GetBitmap(dir_page2.CopyRefPtr());
+  ASSERT_EQ(bits.status_value(), ZX_ERR_INVALID_ARGS);
+
   bits = test_dir1->GetBitmap(dir_page1.CopyRefPtr());
   ASSERT_TRUE(bits.is_ok());
 
@@ -98,6 +98,58 @@ TEST_F(BitmapTest, BasicOp) {
   ASSERT_EQ(bits.Test(0), false);
 
   file->Close();
+}
+
+TEST_F(BitmapTest, CountBits) {
+  size_t kNumBits = GetBitSize(kPageSize * 2);
+  RawBitmap bits;
+  bits.Reset(kNumBits);
+  ASSERT_EQ(CountBits(bits, kNumBits, kNumBits), 0UL);
+  ASSERT_EQ(CountBits(bits, 0, kNumBits), 0UL);
+  ASSERT_EQ(bits.SetOne(kPageSize), ZX_OK);
+  ASSERT_EQ(CountBits(bits, 0, kNumBits), 1UL);
+  ASSERT_EQ(bits.ClearOne(kPageSize), ZX_OK);
+
+  for (size_t i = 0; i < kNumBits; ++i) {
+    if (i & 1U)
+      bits.SetOne(i);
+  }
+  ASSERT_EQ(CountBits(bits, 0, kNumBits), kNumBits / 2);
+  ASSERT_EQ(CountBits(bits, kNumBits, kNumBits), 0UL);
+}
+
+TEST_F(BitmapTest, CloneBits) {
+  size_t num_bytes = kPageSize * 2;
+  size_t num_bits = GetBitSize(kPageSize * 2);
+  RawBitmap bits1;
+  RawBitmap bits2;
+  uint8_t raw_bits[num_bytes];
+  memset(raw_bits, 0xAA, num_bytes);
+  bits1.Reset(num_bits);
+  bits2.Reset(num_bits);
+
+  // Byte-aligned copy
+  ASSERT_EQ(CloneBits(bits1, raw_bits, num_bits, num_bits), ZX_ERR_INVALID_ARGS);
+  ASSERT_EQ(CloneBits(bits1, raw_bits, 0, num_bits), ZX_OK);
+
+  ASSERT_EQ(memcmp(bits1.StorageUnsafe()->GetData(), raw_bits, num_bytes), 0);
+
+  size_t offset = GetBitSize(kPageSize);
+  ASSERT_EQ(CloneBits(bits2, bits1, num_bits, num_bits), ZX_ERR_INVALID_ARGS);
+  ASSERT_EQ(CloneBits(bits2, bits1, offset, num_bits - offset), ZX_OK);
+
+  ASSERT_NE(memcmp(bits2.StorageUnsafe()->GetData(), raw_bits, num_bytes), 0);
+  ASSERT_EQ(memcmp(static_cast<uint8_t *>(bits2.StorageUnsafe()->GetData()) + GetByteSize(offset),
+                   raw_bits, GetByteSize(num_bits - offset)),
+            0);
+
+  ASSERT_EQ(CloneBits(raw_bits, bits2, 0, num_bits * 2), ZX_ERR_INVALID_ARGS);
+  ASSERT_EQ(CloneBits(raw_bits, bits2, 0, num_bits), ZX_OK);
+  ASSERT_EQ(memcmp(bits2.StorageUnsafe()->GetData(), raw_bits, num_bytes), 0);
+  ASSERT_NE(memcmp(bits1.StorageUnsafe()->GetData(), raw_bits, num_bytes), 0);
+
+  // Byte-unaligned copy
+  ASSERT_EQ(CloneBits(bits1, raw_bits, 1, num_bits), ZX_ERR_INVALID_ARGS);
 }
 
 }  // namespace

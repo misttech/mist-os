@@ -66,9 +66,8 @@ zx::result<nid_t> NodeManager::GetNextFreeNid() {
 }
 
 void NodeManager::GetNatBitmap(void *out) {
-  std::memcpy(out, nat_bitmap_.StorageUnsafe()->GetData(), nat_bitmap_size_);
-  std::memcpy(nat_prev_bitmap_.StorageUnsafe()->GetData(), nat_bitmap_.StorageUnsafe()->GetData(),
-              nat_bitmap_size_);
+  CloneBits(out, nat_bitmap_, 0, GetBitSize(nat_bitmap_size_));
+  CloneBits(nat_prev_bitmap_, nat_bitmap_, 0, GetBitSize(nat_bitmap_size_));
 }
 
 pgoff_t NodeManager::CurrentNatAddr(nid_t start) {
@@ -1418,13 +1417,11 @@ zx_status_t NodeManager::FlushNatEntries() {
 
 zx_status_t NodeManager::InitNodeManager() {
   const Superblock &sb_raw = GetSuperblockInfo().GetRawSuperblock();
-  uint8_t *version_bitmap;
-  uint32_t nat_segs, nat_blocks;
 
-  nat_blkaddr_ = LeToCpu(sb_raw.nat_blkaddr);
   // segment_count_nat includes pair segment so divide to 2
-  nat_segs = LeToCpu(sb_raw.segment_count_nat) >> 1;
-  nat_blocks = nat_segs << LeToCpu(sb_raw.log_blocks_per_seg);
+  uint32_t nat_segs = LeToCpu(sb_raw.segment_count_nat) >> 1;
+  uint32_t nat_blocks = nat_segs << LeToCpu(sb_raw.log_blocks_per_seg);
+  nat_blkaddr_ = LeToCpu(sb_raw.nat_blkaddr);
   max_nid_ = kNatEntryPerBlock * nat_blocks;
   {
     std::lock_guard lock(build_lock_);
@@ -1435,13 +1432,13 @@ zx_status_t NodeManager::InitNodeManager() {
   nat_bitmap_.Reset(GetBitSize(nat_bitmap_size_));
   nat_prev_bitmap_.Reset(GetBitSize(nat_bitmap_size_));
 
-  version_bitmap = static_cast<uint8_t *>(GetSuperblockInfo().BitmapPtr(MetaBitmap::kNatBitmap));
+  uint8_t *version_bitmap = GetSuperblockInfo().GetBitmap(MetaBitmap::kNatBitmap);
   if (!version_bitmap)
     return ZX_ERR_INVALID_ARGS;
 
   // copy version bitmap
-  std::memcpy(nat_bitmap_.StorageUnsafe()->GetData(), version_bitmap, nat_bitmap_size_);
-  std::memcpy(nat_prev_bitmap_.StorageUnsafe()->GetData(), version_bitmap, nat_bitmap_size_);
+  CloneBits(nat_bitmap_, version_bitmap, 0, GetBitSize(nat_bitmap_size_));
+  CloneBits(nat_prev_bitmap_, version_bitmap, 0, GetBitSize(nat_bitmap_size_));
   return ZX_OK;
 }
 

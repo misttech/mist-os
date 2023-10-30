@@ -38,10 +38,10 @@ uint32_t SegmentManager::GetValidBlocks(uint32_t segno, uint32_t section) {
 void SegmentManager::SegInfoFromRawSit(SegmentEntry &segment_entry, SitEntry &raw_sit) {
   segment_entry.valid_blocks = GetSitVblocks(raw_sit);
   segment_entry.ckpt_valid_blocks = GetSitVblocks(raw_sit);
-  std::memcpy(segment_entry.cur_valid_map.StorageUnsafe()->GetData(), raw_sit.valid_map,
-              kSitVBlockMapSize);
-  std::memcpy(segment_entry.ckpt_valid_map.StorageUnsafe()->GetData(), raw_sit.valid_map,
-              kSitVBlockMapSize);
+  CloneBits<RawBitmapHeap>(segment_entry.cur_valid_map, raw_sit.valid_map, 0,
+                           GetBitSize(kSitVBlockMapSize));
+  CloneBits<RawBitmapHeap>(segment_entry.ckpt_valid_map, raw_sit.valid_map, 0,
+                           GetBitSize(kSitVBlockMapSize));
   segment_entry.type = GetSitType(raw_sit);
   segment_entry.mtime = LeToCpu(uint64_t{raw_sit.mtime});
 }
@@ -50,10 +50,10 @@ void SegmentManager::SegInfoToRawSit(SegmentEntry &segment_entry, SitEntry &raw_
   uint16_t raw_vblocks =
       static_cast<uint16_t>(segment_entry.type << kSitVblocksShift) | segment_entry.valid_blocks;
   raw_sit.vblocks = CpuToLe(raw_vblocks);
-  std::memcpy(raw_sit.valid_map, segment_entry.cur_valid_map.StorageUnsafe()->GetData(),
-              kSitVBlockMapSize);
-  std::memcpy(segment_entry.ckpt_valid_map.StorageUnsafe()->GetData(), raw_sit.valid_map,
-              kSitVBlockMapSize);
+  CloneBits<RawBitmapHeap>(raw_sit.valid_map, segment_entry.cur_valid_map, 0,
+                           GetBitSize(kSitVBlockMapSize));
+  CloneBits<RawBitmapHeap>(segment_entry.ckpt_valid_map, raw_sit.valid_map, 0,
+                           GetBitSize(kSitVBlockMapSize));
   segment_entry.ckpt_valid_blocks = segment_entry.valid_blocks;
   raw_sit.mtime = CpuToLe(static_cast<uint64_t>(segment_entry.mtime));
 }
@@ -128,7 +128,7 @@ void SegmentManager::SetTestAndInuse(uint32_t segno) {
 }
 
 void SegmentManager::GetSitBitmap(void *dst_addr) {
-  std::memcpy(dst_addr, sit_info_->sit_bitmap.StorageUnsafe()->GetData(), sit_info_->bitmap_size);
+  CloneBits(dst_addr, sit_info_->sit_bitmap, 0, GetBitSize(sit_info_->bitmap_size));
 }
 
 block_t SegmentManager::FreeSegments() {
@@ -1401,15 +1401,14 @@ zx_status_t SegmentManager::BuildSitInfo() {
     }
   }
 
+  uint32_t bitmap_size = superblock_info_->BitmapSize(MetaBitmap::kSitBitmap);
   // get information related with SIT
   sit_segs = LeToCpu(raw_super.segment_count_sit) >> 1;
 
   // setup SIT bitmap from ckeckpoint pack
-  uint32_t bitmap_size = superblock_info_->BitmapSize(MetaBitmap::kSitBitmap);
-  void *src_bitmap = superblock_info_->BitmapPtr(MetaBitmap::kSitBitmap);
-
   sit_i->sit_bitmap.Reset(GetBitSize(bitmap_size));
-  std::memcpy(sit_i->sit_bitmap.StorageUnsafe()->GetData(), src_bitmap, bitmap_size);
+  CloneBits(sit_i->sit_bitmap, superblock_info_->GetBitmap(MetaBitmap::kSitBitmap), 0,
+            GetBitSize(bitmap_size));
 
 #if 0  // porting needed
   /* init SIT information */

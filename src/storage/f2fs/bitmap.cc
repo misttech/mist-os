@@ -11,11 +11,16 @@
 namespace f2fs {
 
 size_t CountBits(const RawBitmap &bits, size_t offset, size_t len) {
-  size_t end = offset + len, sum = 0;
-  for (; offset < end; ++offset) {
-    if (bits.GetOne(offset)) {
-      ++sum;
-    }
+  if (offset >= bits.size())
+    return 0;
+  len = std::min(len, bits.size() - offset);
+  constexpr size_t kNumBits = kBitsPerByte * sizeof(uint64_t);
+  const uint64_t *raw_bits = static_cast<const uint64_t *>(bits.StorageUnsafe()->GetData());
+  uint64_t sum = 0;
+  uint64_t end = CheckedDivRoundUp(offset + len, kNumBits);
+  for (uint64_t i = offset / kNumBits; i < end; ++i) {
+    std::bitset<kNumBits> node{raw_bits[i]};
+    sum += node.count();
   }
   return sum;
 }
