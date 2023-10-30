@@ -103,6 +103,10 @@ class PlatformBus : public PlatformBusType,
     return zx::unowned_resource(get_root_resource(parent()));
   }
 
+  zx::unowned_resource GetIrqResource() const {
+    return zx::unowned_resource(get_irq_resource(parent()));
+  }
+
   zx::unowned_resource GetMmioResource() const {
     return zx::unowned_resource(get_mmio_resource(parent()));
   }

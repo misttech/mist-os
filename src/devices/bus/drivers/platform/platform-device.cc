@@ -238,7 +238,7 @@ zx_status_t PlatformDevice::PDevGetInterrupt(uint32_t index, uint32_t flags,
     flags = irq.mode().value();
   }
   zx_status_t status =
-      zx::interrupt::create(*bus_->GetResource(), irq.irq().value(), flags, out_irq);
+      zx::interrupt::create(*bus_->GetIrqResource(), irq.irq().value(), flags, out_irq);
   if (status != ZX_OK) {
     zxlogf(ERROR, "platform_dev_map_interrupt: zx_interrupt_create failed %d", status);
     return status;
@@ -361,8 +361,8 @@ zx_status_t PlatformDevice::RpcGetInterrupt(uint32_t index, uint32_t* out_irq, u
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  const auto& root_rsrc = bus_->GetResource();
-  if (!root_rsrc->is_valid()) {
+  const auto& irq_rsrc = bus_->GetIrqResource();
+  if (!irq_rsrc->is_valid()) {
     return ZX_ERR_NO_RESOURCES;
   }
 
@@ -374,7 +374,7 @@ zx_status_t PlatformDevice::RpcGetInterrupt(uint32_t index, uint32_t* out_irq, u
   uint32_t options = ZX_RSRC_KIND_IRQ | ZX_RSRC_FLAG_EXCLUSIVE;
   char rsrc_name[ZX_MAX_NAME_LEN];
   snprintf(rsrc_name, ZX_MAX_NAME_LEN - 1, "%s.pbus[%u]", name_, index);
-  zx_status_t status = zx::resource::create(*root_rsrc, options, irq.irq().value(), 1, rsrc_name,
+  zx_status_t status = zx::resource::create(*irq_rsrc, options, irq.irq().value(), 1, rsrc_name,
                                             sizeof(rsrc_name), &resource);
   if (status != ZX_OK) {
     return status;
