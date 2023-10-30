@@ -20,7 +20,7 @@
         {
             protocol: [
                 "fuchsia.boot.Arguments",
-                "fuchsia.boot.RootResource",
+                "fuchsia.kernel.InfoResource",
                 "fuchsia.kernel.MmioResource",
                 "fuchsia.scheduler.ProfileProvider",
             ],

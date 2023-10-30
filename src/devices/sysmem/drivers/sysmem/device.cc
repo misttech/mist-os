@@ -647,7 +647,7 @@ zx_status_t Device::Bind() {
     contiguous_system_ram_allocator_ = std::move(pooled_allocator);
   } else {
     contiguous_system_ram_allocator_ = std::make_unique<ContiguousSystemRamMemoryAllocator>(
-        zx::unowned_resource(get_root_resource(parent())), this);
+        zx::unowned_resource(get_info_resource(parent())), this);
   }
 
   // TODO: Separate protected memory allocator into separate driver or library
