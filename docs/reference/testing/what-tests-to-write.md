@@ -36,14 +36,15 @@ pipeline is this kind of test run)
 The below table provides an overview of the types of tests categorized
 by what needs that type of test.
 
-||Source Code|Components|Drivers|Protocols|
-|-|-|-|-|-|
-|[Unit](#unit-tests)|All|-|-|-
-|[Hermetic integration](#hermetic-integration-tests)|-|All|Some|-
-|[Non-hermetic integration](#non-hermetic-integration-tests)|-|Few|Few|-
-|[Compatibility (CTF)](#compatibility-tests)|-|Some|Some|All (SDK)
-|[Conformance](#conformance-tests)|-|Some|Some|Some
-|[System Validation](#system-validation-tests)|-|Some|Some|Some
+|                                                           |Source Code|Components|Drivers|Protocols|
+|-----------------------------------------------------------|-----------|----------|-------|---------|
+|[Unit](#unit-tests)                                        |All        |-         |-      |-        |
+|[Hermetic integration](#hermetic-integration-tests)        |-          |All       |Some   |-        |
+|[Non-hermetic integration](#non-hermetic-integration-tests)|-          |Few       |Few    |-        |
+|[Compatibility (CTF)](#compatibility-tests)                |-          |Some      |Some   |All (SDK)|
+|[Conformance](#conformance-tests)                          |-          |Some      |Some   |Some     |
+|[System Validation](#system-validation-tests)              |-          |Some      |Some   |Some     |
+|[Host-driven (Lacewing)](#lacewing-tests)                  |-          |Some      |Some   |Some     |
 <!-- TODO(b/308191530): Fill out these sections
 |[Microbenchmarks](#microbenchmarks)|All (performance critical)|-|-|-
 |[Mezzobenchmarks](#mezzobenchmarks)|-|Some|Some|-
