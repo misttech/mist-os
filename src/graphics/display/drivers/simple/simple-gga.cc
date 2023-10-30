@@ -71,22 +71,19 @@ __attribute__((unused)) static void gga_dump_regs() {
 
 static zx_status_t gga_disp_setup(zx_device_t* dev, uint16_t width, uint16_t height,
                                   uint16_t bits_per_pixel) {
-  // TODO(fxbug.dev/84561): Drivers shouldn't request root resource to get IO
-  // ports. Instead the board driver should provide the port access over PCI
-  // root protocol and PCI bus driver should pass them to corresponding devices.
-  zx_handle_t root = get_root_resource(dev);
+  zx_handle_t ioport = get_ioport_resource(dev);
 
-  zx_status_t status = zx_ioports_request(root, GGA_VBE_INDEX_REG, 1u);
+  zx_status_t status = zx_ioports_request(ioport, GGA_VBE_INDEX_REG, 1u);
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: Cannot request VBE index register: %d", __func__, status);
     return status;
   }
-  status = zx_ioports_request(root, GGA_VBE_DATA_REG, 1u);
+  status = zx_ioports_request(ioport, GGA_VBE_DATA_REG, 1u);
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: Cannot request VBE data register: %d", __func__, status);
     return status;
   }
-  status = zx_ioports_request(root, GGA_VBE_DATA2_REG, 1u);
+  status = zx_ioports_request(ioport, GGA_VBE_DATA2_REG, 1u);
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: Cannot request VBE data2 register: %d", __func__, status);
     return status;
@@ -98,17 +95,17 @@ static zx_status_t gga_disp_setup(zx_device_t* dev, uint16_t width, uint16_t hei
   gga_write_reg(GGA_VBE_DISPI_ENABLE,
                 GGA_VBE_DISPI_ENABLE_FLAG_ENABLED | GGA_VBE_DISPI_ENABLE_FLAG_LFB_ENABLED);
 
-  status = zx_ioports_release(root, GGA_VBE_INDEX_REG, 1u);
+  status = zx_ioports_release(ioport, GGA_VBE_INDEX_REG, 1u);
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: Cannot release VBE index register: %d", __func__, status);
     return status;
   }
-  status = zx_ioports_release(root, GGA_VBE_DATA_REG, 1u);
+  status = zx_ioports_release(ioport, GGA_VBE_DATA_REG, 1u);
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: Cannot release VBE data register: %d", __func__, status);
     return status;
   }
-  status = zx_ioports_request(root, GGA_VBE_DATA2_REG, 1u);
+  status = zx_ioports_request(ioport, GGA_VBE_DATA2_REG, 1u);
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: Cannot release VBE data2 register: %d", __func__, status);
     return status;
