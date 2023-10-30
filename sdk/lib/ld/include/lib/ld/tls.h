@@ -101,6 +101,63 @@ inline ptrdiff_t TpRelativeToOffset(T* ptr) {
   return reinterpret_cast<std::byte*>(ptr) - tp;
 }
 
+// Interrogate the passive ABI (e.g. ld::abi::_ld_abi) for the thread-pointer
+// offset of each thread's static TLS data area for the given TLS module ID
+// among the initial-exec set of TLS modules.
+template <class Elf, class AbiTraits>
+constexpr ptrdiff_t TlsInitialExecOffset(const typename abi::Abi<Elf, AbiTraits>& abi,
+                                         typename Elf::size_type modid) {
+  // The offset is stored as unsigned, but is actually signed.
+  const size_t offset = abi.static_tls_offsets[modid - 1];
+  return cpp20::bit_cast<ptrdiff_t>(offset);
+}
+
+// Populate a static TLS segment for the given module in one thread.  The size
+// of the segment must match .tls_size().
+template <class Module>
+constexpr void TlsModuleInit(const Module& module, cpp20::span<std::byte> segment,
+                             bool known_zero = false) {
+  cpp20::span<const std::byte> initial_data = module.tls_initial_data;
+  if (!initial_data.empty()) {
+    memcpy(segment.data(), initial_data.data(), initial_data.size());
+  }
+  if (module.tls_bss_size != 0 && !known_zero) {
+    memset(segment.data() + initial_data.size(), 0, module.tls_bss_size);
+  }
+}
+
+// Populate the static TLS block with initial data and zero'd tbss regions for
+// each module that has a PT_TLS segment.  The span passed should cover the
+// whole area allocated for static TLS data for a new thread.  The offset
+// should be the location in that span where the thread pointer will point
+// (which may be at the end of the span for x86 negative TLS offsets).
+template <class Elf, class AbiTraits>
+inline void TlsInitialExecDataInit(const typename abi::Abi<Elf, AbiTraits>& abi,
+                                   cpp20::span<std::byte> block, ptrdiff_t tp_offset,
+                                   bool known_zero = false) {
+  using size_type = typename Elf::size_type;
+  for (size_t i = 0; i < abi.static_tls_modules.size(); ++i) {
+    const auto& module = abi.static_tls_modules[i];
+    const size_type modid = static_cast<size_type>(i + 1);
+    const ptrdiff_t offset = TlsInitialExecOffset(abi, modid);
+    cpp20::span segment = block.subspan(tp_offset + offset, module.tls_size());
+    TlsModuleInit(module, segment, known_zero);
+  }
+}
+
+// Interrogate the passive ABI (e.g. ld::abi::_ld_abi) to locate the current
+// thread's TLS data area for the given TLS module ID among the initial-exec
+// set of TLS modules.
+template <class Elf, class AbiTraits>
+inline void* TlsInitialExecData(const typename abi::Abi<Elf, AbiTraits>& abi,
+                                typename Elf::size_type modid) {
+  if (modid == 0) {
+    return nullptr;
+  }
+
+  return TpRelative(TlsInitialExecOffset(abi, modid));
+}
+
 }  // namespace ld
 
 #endif  // LIB_LD_TLS_H_

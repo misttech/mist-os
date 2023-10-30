@@ -32,12 +32,16 @@ class ElfldltlResolveTests : public testing::Test {
    public:
     using size_type = typename Elf::size_type;
 
-    TestModule(std::string_view prefix) { create(prefix); }
+    explicit TestModule(std::string_view prefix) { create(prefix); }
+
+    explicit TestModule(const elfldltl::SymbolInfo<Elf>& si) : symbol_info_{si} {}
 
     constexpr const auto& symbol_info() const { return symbol_info_; }
     constexpr auto& symbol_info() { return symbol_info_; }
 
     constexpr size_type load_bias() const { return 0; }
+
+    constexpr bool uses_static_tls() const { return false; }
 
     constexpr auto& file() { return file_; }
 
@@ -130,7 +134,7 @@ TYPED_TEST(ElfldltlResolveTests, SingleModule) {
   ASSERT_NE(a, nullptr);
 
   cpp20::span modules{&module, 1};
-  auto resolve = elfldltl::MakeSymbolResolver(si, modules, diag);
+  auto resolve = elfldltl::MakeSymbolResolver(module, modules, diag);
   auto found = resolve(*a, elfldltl::RelocateTls::kNone);
   ASSERT_TRUE(found);
   ASSERT_FALSE(found->undefined_weak());
@@ -158,7 +162,7 @@ TYPED_TEST(ElfldltlResolveTests, DefBothFoundFirst) {
   const Sym* a2 = kASymbol.Lookup(si2);
   ASSERT_NE(a2, nullptr);
 
-  auto resolve = elfldltl::MakeSymbolResolver(si2, modules, diag);
+  auto resolve = elfldltl::MakeSymbolResolver(modules[1], modules, diag);
   auto found = resolve(*a2, elfldltl::RelocateTls::kNone);
   ASSERT_TRUE(found);
   ASSERT_FALSE(found->undefined_weak());
@@ -181,11 +185,12 @@ TYPED_TEST(ElfldltlResolveTests, UndefFirstFoundSecond) {
   auto& si2 = modules[1].symbol_info();
 
   elfldltl::SymbolInfoForSingleLookup<Elf> si{"b"};
+  TestModule lookup_module{si};
 
   const Sym* b_def = kBSymbol.Lookup(si2);
   ASSERT_NE(b_def, nullptr);
 
-  auto resolve = elfldltl::MakeSymbolResolver(si, modules, diag);
+  auto resolve = elfldltl::MakeSymbolResolver(lookup_module, modules, diag);
   auto found = resolve(si.symbol(), elfldltl::RelocateTls::kNone);
   ASSERT_TRUE(found);
   ASSERT_FALSE(found->undefined_weak());
@@ -212,12 +217,13 @@ TYPED_TEST(ElfldltlResolveTests, UndefinedWeak) {
     EXPECT_TRUE(found->undefined_weak()) << identifier;
   };
 
-  check_resolver(
-      elfldltl::MakeSymbolResolver(si, modules, diag, elfldltl::ResolverPolicy::kStrictLinkOrder),
-      "kStrictLinkOrder");
-  check_resolver(
-      elfldltl::MakeSymbolResolver(si, modules, diag, elfldltl::ResolverPolicy::kStrongOverWeak),
-      "kStrongOverWeak");
+  TestModule lookup_module{si};
+  check_resolver(elfldltl::MakeSymbolResolver(lookup_module, modules, diag,
+                                              elfldltl::ResolverPolicy::kStrictLinkOrder),
+                 "kStrictLinkOrder");
+  check_resolver(elfldltl::MakeSymbolResolver(lookup_module, modules, diag,
+                                              elfldltl::ResolverPolicy::kStrongOverWeak),
+                 "kStrongOverWeak");
 }
 
 TYPED_TEST(ElfldltlResolveTests, DefaultWeakPolicy) {
@@ -250,10 +256,11 @@ TYPED_TEST(ElfldltlResolveTests, DefaultWeakPolicy) {
     EXPECT_EQ(found->symbol().value, 1ul) << identifier;
   };
 
-  check_resolver(elfldltl::MakeSymbolResolver(si, modules, diag), "default");
-  check_resolver(
-      elfldltl::MakeSymbolResolver(si, modules, diag, elfldltl::ResolverPolicy::kStrictLinkOrder),
-      "specified");
+  TestModule lookup_module{si};
+  check_resolver(elfldltl::MakeSymbolResolver(lookup_module, modules, diag), "default");
+  check_resolver(elfldltl::MakeSymbolResolver(lookup_module, modules, diag,
+                                              elfldltl::ResolverPolicy::kStrictLinkOrder),
+                 "specified");
 }
 
 TYPED_TEST(ElfldltlResolveTests, DynamicWeakPolicy) {
@@ -279,8 +286,9 @@ TYPED_TEST(ElfldltlResolveTests, DynamicWeakPolicy) {
 
     elfldltl::SymbolInfoForSingleLookup<Elf> si{"c"};
 
-    auto resolve =
-        elfldltl::MakeSymbolResolver(si, modules, diag, elfldltl::ResolverPolicy::kStrongOverWeak);
+    TestModule lookup_module{si};
+    auto resolve = elfldltl::MakeSymbolResolver(lookup_module, modules, diag,
+                                                elfldltl::ResolverPolicy::kStrongOverWeak);
     auto found = resolve(si.symbol(), elfldltl::RelocateTls::kNone);
     ASSERT_TRUE(found);
     ASSERT_FALSE(found->undefined_weak());
@@ -295,8 +303,9 @@ TYPED_TEST(ElfldltlResolveTests, DynamicWeakPolicy) {
 
     elfldltl::SymbolInfoForSingleLookup<Elf> si{"weak_both"};
 
-    auto resolve =
-        elfldltl::MakeSymbolResolver(si, modules, diag, elfldltl::ResolverPolicy::kStrongOverWeak);
+    TestModule lookup_module{si};
+    auto resolve = elfldltl::MakeSymbolResolver(lookup_module, modules, diag,
+                                                elfldltl::ResolverPolicy::kStrongOverWeak);
     auto found = resolve(si.symbol(), elfldltl::RelocateTls::kNone);
     ASSERT_TRUE(found);
     ASSERT_FALSE(found->undefined_weak());
@@ -323,7 +332,7 @@ TYPED_TEST(ElfldltlResolveTests, GnuUniqueError) {
   ASSERT_NE(a, nullptr);
 
   cpp20::span modules{&module, 1};
-  auto resolve = elfldltl::MakeSymbolResolver(si, modules, expected.diag());
+  auto resolve = elfldltl::MakeSymbolResolver(module, modules, expected.diag());
   auto found = resolve(*a, elfldltl::RelocateTls::kNone);
   EXPECT_FALSE(found);
 }
@@ -340,7 +349,8 @@ TYPED_TEST(ElfldltlResolveTests, Undefined) {
   }
 
   elfldltl::SymbolInfoForSingleLookup<Elf> si{"noexist"};
-  auto resolve = elfldltl::MakeSymbolResolver(si, modules, expected.diag());
+  TestModule lookup_module{si};
+  auto resolve = elfldltl::MakeSymbolResolver(lookup_module, modules, expected.diag());
   auto found = resolve(si.symbol(), elfldltl::RelocateTls::kNone);
   ASSERT_FALSE(found);
 }

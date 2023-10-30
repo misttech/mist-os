@@ -12,6 +12,6 @@ extern "C" void __assert_fail(const char*, const char*, int, const char*) { __bu
 
 extern "C" void __zx_panic(const char* format, ...) { __builtin_trap(); }
 
-[[gnu::alias("__zx_panic")]] void std::__libcpp_verbose_abort(const char* format, ...);
+void std::__libcpp_verbose_abort(const char* format, ...) { __builtin_trap(); }
 
 extern "C" void abort() { __builtin_trap(); }

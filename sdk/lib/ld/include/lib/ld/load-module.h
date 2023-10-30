@@ -8,6 +8,7 @@
 #include <lib/elfldltl/load.h>
 #include <lib/elfldltl/relocation.h>
 #include <lib/elfldltl/soname.h>
+#include <lib/elfldltl/tls-layout.h>
 #include <lib/ld/abi.h>
 #include <lib/ld/module.h>
 #include <lib/ld/tls.h>
@@ -51,6 +52,7 @@ template <class ElfLayout, template <typename> class SegmentContainer,
 class LoadModule {
  public:
   using Elf = ElfLayout;
+  using Addr = typename Elf::Addr;
   using size_type = typename Elf::size_type;
   using Module = typename abi::Abi<Elf>::Module;
   using TlsModule = typename abi::Abi<Elf>::TlsModule;
@@ -143,6 +145,12 @@ class LoadModule {
     return reloc_info_;
   }
 
+  template <bool Inline = InlineModule == LoadModuleInline::kYes,
+            typename = std::enable_if_t<!Inline>>
+  constexpr void set_module(Module& module) {
+    module_ = &module;
+  }
+
   // Set up the Abi<>::TlsModule in tls_module() based on the PT_TLS segment.
   template <class Diagnostics, class Memory>
   bool SetTls(Diagnostics& diag, Memory& memory, size_type modid, const Phdr& tls_phdr) {
@@ -179,12 +187,35 @@ class LoadModule {
   }
 
   // This returns the TLS module ID assigned by SetTls, or zero if none is set.
-  size_type tls_modid() const { return module().tls_modid; }
+  constexpr size_type tls_module_id() const { return module().tls_modid; }
 
   // This should only be called after SetTls.
-  const TlsModule& tls_module() const {
-    assert(tls_modid() != 0);
+  constexpr const TlsModule& tls_module() const {
+    assert(tls_module_id() != 0);
     return tls_module_;
+  }
+
+  // Use ths TlsLayout object to assign a static TLS offset for this module's
+  // PT_TLS segment, if it has one.  SetTls() has already been called if it
+  // will be, so the module ID is known.  The two arrays have enough elements
+  // for all the module IDs assigned; this sets the slots for this module's ID.
+  template <elfldltl::ElfMachine Machine = elfldltl::ElfMachine::kNative, size_type RedZone = 0>
+  constexpr void AssignStaticTls(elfldltl::TlsLayout<Elf>& tls_layout,
+                                 cpp20::span<TlsModule> tls_modules,
+                                 cpp20::span<Addr> tls_offsets) {
+    if (tls_module_id() != 0) {
+      // These correspond to the p_memsz and p_align of the PT_TLS.
+      const size_type memsz = tls_module_.tls_size();
+      const size_type align = tls_module_.tls_alignment;
+
+      // Save the offset for use in resolving IE relocations.
+      static_tls_bias_ = tls_layout.template Assign<Machine, RedZone>(memsz, align);
+
+      // Fill out the separate TLS module arrays for the passive ABI.
+      const size_t idx = tls_module_id() - 1;
+      tls_modules[idx] = tls_module_;
+      tls_offsets[idx] = static_tls_bias_;
+    }
   }
 
   // The following methods satisfy the Module template API for use with
@@ -194,15 +225,14 @@ class LoadModule {
 
   constexpr size_type load_bias() const { return module().link_map.addr; }
 
+  constexpr bool uses_static_tls() const {
+    return (module().symbols.flags() & elfldltl::ElfDynFlags::kStaticTls) ||
+           (module().symbols.flags1() & elfldltl::ElfDynFlags1::kPie);
+  }
+
+  constexpr size_t static_tls_bias() const { return static_tls_bias_; }
+
   // TODO(fxbug.dev/128502): tls methods
-  constexpr size_t static_tls_bias() const {
-    ZX_PANIC("Should never be called");
-    return 0;
-  }
-  constexpr size_t tls_module_id() const {
-    ZX_PANIC("Should never be called");
-    return 0;
-  }
   constexpr size_t tls_desc_hook(const Sym& sym) const {
     ZX_PANIC("Should never be called");
     return 0;
@@ -210,12 +240,6 @@ class LoadModule {
   constexpr size_t tls_desc_value(const Sym& sym) const {
     ZX_PANIC("Should never be called");
     return 0;
-  }
-
-  template <bool Inline = InlineModule == LoadModuleInline::kYes,
-            typename = std::enable_if_t<!Inline>>
-  constexpr void set_module(Module& module) {
-    module_ = &module;
   }
 
  private:
@@ -232,6 +256,7 @@ class LoadModule {
   LoadInfo load_info_;
   [[no_unique_address]] RelocInfoStorage reloc_info_;
   TlsModule tls_module_;
+  size_type static_tls_bias_ = 0;
 };
 
 // This object is returned by the name_ref() and soname_ref() methods of

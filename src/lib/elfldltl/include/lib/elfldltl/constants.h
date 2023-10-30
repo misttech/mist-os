@@ -166,6 +166,20 @@ struct ElfDynFlags {
   };
 };
 
+// These are individual flag bits that can be set in the value for the DT_FLAGS_1
+// entry in PT_DYNAMIC.
+struct ElfDynFlags1 {
+  enum : uint32_t {
+    kNow = 1 << 0,
+    kGlobal = 1 << 1,
+    kGroup = 1 << 2,
+    kNoDelete = 1 << 3,
+    kNoOpen = 1 << 6,
+    kOrigin = 1 << 7,
+    kPie = 1 << 27,
+  };
+};
+
 // These are the "binding" classes of symbols, found in Elf::Sym::bind().
 enum class ElfSymBind : uint8_t {
   kLocal = 0,
@@ -184,6 +198,14 @@ enum class ElfSymType : uint8_t {
   kCommon = 5,
   kTls = 6,
   kIfunc = 10,  // STT_GNU_IFUNC is a GNU extension not widely supported.
+};
+
+// These are the symbol visibility types, found in Elf::Sym::visibility().
+enum class ElfSymVisibility : uint8_t {
+  kDefault = 0,
+  kInternal = 1,
+  kHidden = 2,
+  kProtected = 3,
 };
 
 // This indicates the machine architecture the ELF file is for, as found in

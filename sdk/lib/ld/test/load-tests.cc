@@ -214,4 +214,18 @@ TYPED_TEST(LdLoadTests, TlsExecShlib) {
   this->ExpectLog("");
 }
 
+TYPED_TEST(LdLoadTests, TlsInitialExecAccess) {
+  constexpr int64_t kReturnValue = 17;
+
+  ASSERT_NO_FATAL_FAILURE(this->Init());
+
+  ASSERT_NO_FATAL_FAILURE(this->Needed({"libtls-ie-dep.so"}));
+
+  ASSERT_NO_FATAL_FAILURE(this->Load("tls-ie"));
+
+  EXPECT_EQ(this->Run(), kReturnValue);
+
+  this->ExpectLog("");
+}
+
 }  // namespace

@@ -129,20 +129,23 @@ constexpr bool RelocateSymbolic(Memory& memory, DiagnosticsType& diagnostics,
   auto relocate_symbolic = [&](const auto& reloc, auto&& apply,
                                RelocateTls tls = RelocateTls::kNone) -> bool {
     const uint32_t symndx = reloc.symndx();
-    if (symndx == 0) [[unlikely]] {
-      return diagnostics.FormatError(
-          "symbolic relocation entry uses reserved symbol table index 0"sv);
-    }
     decltype(auto) symtab = symbol_info.symtab();
     if (symndx >= symtab.size()) [[unlikely]] {
       return diagnostics.FormatError("relocation entry symbol table index out of bounds"sv);
     }
     const Sym& sym = symtab[symndx];
-    const bool is_tls = tls != RelocateTls::kNone;
-    if ((sym.type() == ElfSymType::kTls) != is_tls) [[unlikely]] {
-      return diagnostics.FormatError(  //
-          is_tls ? "TLS relocation entry with non-STT_TLS symbol"sv
-                 : "non-TLS relocation entry with STT_TLS symbol"sv);
+    // Symbol index zero is mostly treated like anything else because the null
+    // symbol at index zero's all-zero fields map to an STB_LOCAL symbol with
+    // st_value of zero, which does the right thing.  However, it's also an
+    // STT_NOTYPE symbol but still does the right thing for a TLS relocation.
+    if (symndx != 0) {
+      const bool is_tls = tls != RelocateTls::kNone;
+      if ((sym.type() == ElfSymType::kTls) != is_tls) [[unlikely]] {
+        return diagnostics.FormatError(  //
+            is_tls ? "TLS relocation entry with non-STT_TLS symbol: "sv
+                   : "non-TLS relocation entry with STT_TLS symbol: "sv,
+            symbol_info.string(sym.name));
+      }
     }
     if (auto defn = resolve(sym, tls)) {
       return apply(reloc, *defn);
@@ -163,9 +166,13 @@ constexpr bool RelocateSymbolic(Memory& memory, DiagnosticsType& diagnostics,
 
   // Static TLS relocs resolve to an offset from the thread pointer.  Each
   // module capable of resolving definitions for static TLS relocs will have
-  // had a static TLS layout assigned.
+  // had a static TLS layout assigned.  Consistent with the glibc behavior, an
+  // undefined weak symbol results in not applying the relocation at all, which
+  // results in an offset from the thread pointer that's either zero or is the
+  // reloc's nonzero addend in the DT_REL (vs DT_RELA) case.
   auto tls_absolute = [apply_with_addend](const auto& reloc, const auto& defn) {
-    return apply_with_addend(reloc, defn.symbol().value() + defn.static_tls_bias());
+    return defn.undefined_weak() ||
+           apply_with_addend(reloc, defn.symbol().value() + defn.static_tls_bias());
   };
 
   // TLSMOD relocs resolve to a module ID (index), not an address value.

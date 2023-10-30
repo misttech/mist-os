@@ -131,6 +131,21 @@ struct SymBase {
     return static_cast<uint8_t>((static_cast<uint8_t>(bind) << 4) |
                                 (static_cast<uint8_t>(type) << 0));
   }
+
+  constexpr ElfSymVisibility visibility() const {
+    return static_cast<ElfSymVisibility>(static_cast<const Sym*>(this)->other() & 0x3);
+  }
+
+  // Returns true if this symbol as the referent of a dynamic relocation will
+  // always be resolved just to itself in the referring module.  This assumes
+  // that STV_PROTECTED does not need to be resolved to ET_EXEC PLT or COPY
+  // reloc sites.  Note also that the null symbol with index zero always has
+  // all zero fields and thus STB_LOCAL binding, so this returns true for it.
+  // Relocations using symbol zero are implicitly resolved as module-relative
+  // since its st_value is also zero.
+  constexpr bool runtime_local() const {
+    return bind() == ElfSymBind::kLocal || visibility() > ElfSymVisibility::kDefault;
+  }
 };
 
 // Some header layouts vary by ElfClass, i.e. address size used in ELF

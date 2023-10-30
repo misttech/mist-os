@@ -190,7 +190,7 @@ struct StartupLoadModule : public StartupLoadModuleBase,
   void Relocate(Diagnostics& diag, const List& modules) {
     ModuleDiagnostics module_diag{diag, this->name().str()};
     elfldltl::RelocateRelative(diag, memory(), reloc_info(), load_bias());
-    auto resolver = elfldltl::MakeSymbolResolver(symbol_info(), modules, diag);
+    auto resolver = elfldltl::MakeSymbolResolver(*this, modules, diag);
     elfldltl::RelocateSymbolic(memory(), diag, reloc_info(), symbol_info(), load_bias(), resolver);
   }
 
@@ -225,22 +225,29 @@ struct StartupLoadModule : public StartupLoadModuleBase,
                           size_t executable_needed_count, LoaderArgs&&... loader_args) {
     main_executable->module().symbols_visible = true;
 
+    // The main executable implicitly can use static TLS and doesn't have to
+    // have DF_STATIC_TLS set at link time.
+    main_executable->module().symbols.set_flags(main_executable->module().symbols.flags() |
+                                                elfldltl::ElfDynFlags::kStaticTls);
+
     List modules = main_executable->MakeList();
     List preloaded_modules =
         MakePreloadedList(diag, scratch, preloaded_module_list, loader_args...);
 
     // This will be incremented by each Load() of a module that has a PT_TLS.
-    Elf::size_type max_tls_modid = main_executable->tls_modid();
+    Elf::size_type max_tls_modid = main_executable->tls_module_id();
 
     LoadDeps(diag, scratch, initial_exec, modules, preloaded_modules, executable_needed_count,
              std::forward<GetDepFile>(get_dep_file), max_tls_modid, loader_args...);
     CheckErrors(diag);
 
+    // This assigns static TLS offsets, so it must happen before relocation.
+    PopulateAbiTls(diag, initial_exec, modules, max_tls_modid);
+
     RelocateModules(diag, modules);
     CheckErrors(diag);
 
     PopulateAbiLoadedModules(modules, std::move(preloaded_modules));
-    PopulateAbiTls(diag, initial_exec, modules, max_tls_modid);
 
     CommitModules(diag, std::move(modules));
   }
@@ -390,7 +397,7 @@ struct StartupLoadModule : public StartupLoadModuleBase,
   // passive ABI's array.
   template <typename InitialExecAllocator>
   static void PopulateAbiTls(Diagnostics& diag, InitialExecAllocator& initial_exec_allocator,
-                             const List& modules, Elf::size_type max_tls_modid) {
+                             List& modules, Elf::size_type max_tls_modid) {
     if (max_tls_modid > 0) {
       auto new_array = [&diag, &initial_exec_allocator, max_tls_modid](auto& result) {
         using T = typename std::decay_t<decltype(result.front())>;
@@ -399,22 +406,17 @@ struct StartupLoadModule : public StartupLoadModuleBase,
         CheckAlloc(diag, ac, "passive ABI for TLS modules");
         result = {array, max_tls_modid};
       };
+
       cpp20::span<TlsModule> tls_modules;
-      new_array(tls_modules);
-      PopulateAbiStaticTlsModules(modules, tls_modules);
-
       cpp20::span<Addr> tls_offsets;
+      new_array(tls_modules);
       new_array(tls_offsets);
-      PopulateAbiStaticTlsLayout(tls_modules, tls_offsets);
-    }
-  }
 
-  static void PopulateAbiStaticTlsModules(const List& modules, cpp20::span<TlsModule> tls_modules) {
-    for (const StartupLoadModule& module : modules) {
-      if (const size_type modid = module.tls_modid(); modid != 0) {
-        tls_modules[modid - 1] = module.tls_module();
+      for (StartupLoadModule& module : modules) {
+        module.AssignStaticTls(mutable_abi.static_tls_layout, tls_modules, tls_offsets);
+
 #ifdef NDEBUG
-        if (modid == tls_modules.size()) {
+        if (module.tls_module_id() == tls_modules.size()) {
           // Don't keep scanning the list if there aren't any more, but skip
           // this optimization if it would prevent a later iteration from
           // hitting an assertion failure if there's a bug that causes an
@@ -423,21 +425,10 @@ struct StartupLoadModule : public StartupLoadModuleBase,
         }
 #endif
       }
-    }
 
-    mutable_abi.static_tls_modules = tls_modules;
-  }
-
-  static void PopulateAbiStaticTlsLayout(cpp20::span<const TlsModule> tls_modules,
-                                         cpp20::span<Addr> tls_offsets) {
-    assert(tls_offsets.size() == tls_modules.size());
-    auto next_offset = tls_offsets.begin();
-    for (const TlsModule& module : tls_modules) {
-      const size_type memsz = module.tls_size();
-      const size_type align = module.tls_alignment;
-      *next_offset++ = mutable_abi.static_tls_layout.Assign(memsz, align);
+      mutable_abi.static_tls_modules = tls_modules;
+      mutable_abi.static_tls_offsets = tls_offsets;
     }
-    mutable_abi.static_tls_offsets = tls_offsets;
   }
 
   Loader loader_;  // Must be initialized by constructor.

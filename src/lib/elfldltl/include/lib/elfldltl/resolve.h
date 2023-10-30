@@ -19,20 +19,26 @@ namespace elfldltl {
 // the `resolve` parameter for RelocateSymbolic. See link.h for more details.
 // The Module type must have the following methods:
 //
-//  * const SymbolInfo& symbol_info()
+//  * const SymbolInfo& symbol_info() const
 //    Returns the SymbolInfo type associated with this module. This is used
 //    to call SymbolInfo::Lookup().
 //
-//  * size_type load_bias()
+//  * size_type load_bias() const
 //    Returns the load bias for symbol addresses in this module.
 //
-//  * size_type tls_module_id()
+//  * size_type tls_module_id() const
 //    Returns the TLS module ID number for this module.
+//    This will be zero for a module with no PT_TLS segment.
+//    It's always one in the main executable if has a PT_TLS segment,
+//    but may be one in a different module if the main executable has none.
 //
-//  * size_type static_tls_bias()
+//  * bool uses_static_tls() const
+//    This module may have TLS relocations for IE or LE model accesses.
+//
+//  * size_type static_tls_bias() const
 //    Returns the static TLS layout bias for the defining module.
 //
-//  * size_type tls_desc_hook(const Sym&), tls_desc_value(const Sym&)
+//  * size_type tls_desc_hook(const Sym&), tls_desc_value(const Sym&) const
 //    Returns the two values for the TLSDESC resolution.
 //
 template <class Module>
@@ -73,28 +79,69 @@ enum class ResolverPolicy : bool {
 };
 
 // Returns a callable object which can be used for RelocateSymbolic's `resolve`
-// argument. This takes a SymbolInfo object which is used for finding the name
-// of the symbol given by RelocateSymbolic. The `modules` argument is a list of
-// modules from where symbolic definitions can be resolved, this list is in
-// order of precedence. The ModuleList type is a forward iterable range or
-// container. diag is a diagnostics object for reporting errors. All references
-// passed to MakeSymbolResolver should outlive the returned object.
-template <class SymbolInfo, class ModuleList, class Diagnostics>
-constexpr auto MakeSymbolResolver(const SymbolInfo& ref_info, const ModuleList& modules,
+// argument.  This takes some Module object (as described above) whose
+// symbol_info() contains the symbol given by RelocateSymbolic.  The `modules`
+// argument is a list of modules from where symbolic definitions can be
+// resolved, this list is in order of precedence.  The ModuleList type is a
+// forward iterable range or container. diag is a diagnostics object for
+// reporting errors.  All references passed to MakeSymbolResolver should
+// outlive the returned object.
+template <class Module, class ModuleList, class Diagnostics>
+constexpr auto MakeSymbolResolver(const Module& ref_module, const ModuleList& modules,
                                   Diagnostics& diag,
                                   ResolverPolicy policy = ResolverPolicy::kStrictLinkOrder) {
-  using Module = std::decay_t<decltype(*std::declval<ModuleList>().begin())>;
   using Definition = ResolverDefinition<Module>;
 
-  return [&, policy](const auto& ref, elfldltl::RelocateTls tls_type) -> std::optional<Definition> {
-    // TODO(fxbug.dev/118060): Support thread local symbols. For now we just use
-    // FormatError, which isn't preferable, but this is just a temporary error.
-    if (tls_type != RelocateTls::kNone) {
-      diag.FormatError("TLS not yet supported");
-      return std::nullopt;
+  return [&ref_module, &modules, &diag, policy](const auto& ref,
+                                                RelocateTls tls_type) -> std::optional<Definition> {
+    if (ref.runtime_local()) {
+      // The symbol just resolves to itself in the referring module.  Usually
+      // this would have been replaced with an R_*_RELATIVE reloc (and then
+      // folded into DT_RELR), but it doesn't have to be.  In practice, this
+      // comes up for TLS relocations which still need to have their specific
+      // reloc type but can be for purely module-local references.
+      return Definition{&ref, &ref_module};
     }
 
-    elfldltl::SymbolName name{ref_info, ref};
+    SymbolName name{ref_module.symbol_info(), ref};
+
+    // Return the chosen Definition after some checking.
+    auto use = [&ref_module, tls_type, &diag, &name](Definition def) -> std::optional<Definition> {
+      switch (tls_type) {
+        case RelocateTls::kNone:
+          if (def.symbol_->type() == ElfSymType::kTls) [[unlikely]] {
+            diag.FormatError("non-TLS relocation resolves to STT_TLS symbol ", name);
+            return std::nullopt;
+          }
+          break;
+        case RelocateTls::kStatic:
+          // If the referring module itself must be in the initial exec set
+          // then it's fine for it to use IE relocs for any of its references.
+          // If the referring module itself does not have DF_STATIC_TLS set to
+          // prevent it from being loaded outside the initial exec set, then
+          // the defining module must be guaranteed to be in the initial exec
+          // set.  Note that we expect a main executable module to always
+          // return true for uses_static_tls() even though the linker doesn't
+          // set DF_STATIC_TLS when generating relocs in an executable
+          // (including PIE), so we're really using uses_static_tls() here as a
+          // proxy for "is in initial exec set".
+          if (!ref_module.uses_static_tls() && !def.module_->uses_static_tls()) [[unlikely]] {
+            diag.FormatError(
+                "TLS Initial Exec relocation resolves to STT_TLS symbol in module without DF_STATIC_TLS: ",
+                name);
+            return std::nullopt;
+          }
+          [[fallthrough]];
+        case RelocateTls::kDynamic:
+        case RelocateTls::kDesc:
+          if (def.symbol_->type() != ElfSymType::kTls) [[unlikely]] {
+            diag.FormatError("TLS relocation resolves to non-STT_TLS symbol: ", name);
+            return std::nullopt;
+          }
+          break;
+      }
+      return def;
+    };
 
     if (name.empty()) [[unlikely]] {
       diag.FormatError("Symbol had invalid st_name");
@@ -108,31 +155,42 @@ constexpr auto MakeSymbolResolver(const SymbolInfo& ref_info, const ModuleList& 
         switch (sym->bind()) {
           case ElfSymBind::kWeak:
             // In kStrongOverWeak policy the first weak definition will prevail
-            // if no global symbol is found later.
+            // if no strong definition is found later.
             if (policy == ResolverPolicy::kStrongOverWeak) {
               if (weak_def.undefined_weak()) {
                 weak_def = module_def;
               }
-              break;
+              continue;
             }
             [[fallthrough]];
           case ElfSymBind::kGlobal:
             // The first (strong) global always prevails regardless of policy.
-            return module_def;
+            return use(module_def);
           case ElfSymBind::kLocal:
+            // Local symbols are never matched by name.
             diag.FormatWarning("STB_LOCAL found in hash table");
-            break;
+            continue;
           case ElfSymBind::kUnique:
             diag.FormatError("STB_GNU_UNIQUE not supported");
-            return {};
+            break;
           default:
-            diag.FormatError("Unkown symbol bind", static_cast<unsigned>(sym->bind()));
-            return {};
+            diag.FormatError("Unknown symbol binding type", static_cast<unsigned>(sym->bind()));
+            break;
         }
+
+        // That returned a definition or continued to look for another so this
+        // is only reached for the error cases.
+        [[unlikely]] return std::nullopt;
       }
     }
 
-    if (!weak_def.undefined_weak() || ref.bind() == ElfSymBind::kWeak) {
+    if (!weak_def.undefined_weak()) {
+      // The only definition found was weak in kStrongOverWeak mode.
+      return use(weak_def);
+    }
+
+    // Undefined weak is a valid return value for an STB_WEAK reference.
+    if (ref.bind() == ElfSymBind::kWeak) [[likely]] {
       return weak_def;
     }
 

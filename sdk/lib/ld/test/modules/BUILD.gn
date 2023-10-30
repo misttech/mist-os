@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/testing/host_test_data.gni")
+import("//build/toolchain/ifs_shared_library.gni")
 import("//build/toolchain/toolchain_environment.gni")
 import("//build/toolchain/zircon/user_basic_redirect.gni")
 
@@ -24,6 +25,7 @@ in_process_executables = [
   ":tls-exec-only",
   ":tls-shlib-only",
   ":tls-exec-shlib",
+  ":tls-ie",
 ]
 
 # Everything in this list does not have can_be_in_process = true.
@@ -40,6 +42,7 @@ shlibs = [
   ":indirect-deps-b",
   ":indirect-deps-c",
   ":tls-dep",
+  ":tls-ie-dep",
 ]
 
 modules = []
@@ -52,13 +55,12 @@ foreach(label, in_process_executables) {
 }
 
 if (is_fuchsia) {
-  assert(toolchain_environment == "user.basic",
-         "$current_toolchain is $toolchain_environment")
+  if (toolchain_environment == "user.basic") {
+    group("modules") {
+      testonly = true
 
-  group("modules") {
-    testonly = true
-
-    deps = executables + modules
+      deps = executables + modules
+    }
   }
 } else if (current_toolchain != shlib_toolchain) {
   if (is_linux) {
@@ -207,14 +209,17 @@ template("test_shared_library") {
   shared_library(target_name) {
     ldflags = []
     public_deps = [ "//sdk/lib/ld:standalone" ]
-    forward_variables_from(invoker, "*")
+    forward_variables_from(invoker, "*", [ "remove_configs" ])
 
     if (is_linux) {
       configs -= [ "//build/config/linux:implicit-host-libs" ]
     }
     configs += [ ":nostdlibs" ]
 
-    exclude_toolchain_tags = [ "instrumentation-runtime" ]
+    if (defined(invoker.remove_configs)) {
+      configs += invoker.remove_configs
+      configs -= invoker.remove_configs
+    }
   }
 }
 
@@ -430,4 +435,33 @@ test_executable("tls-exec-shlib") {
     ":tls-dep",
     "../..",
   ]
+}
+
+test_executable("tls-ie") {
+  can_be_in_process = true
+  sources = [ "tls-ie.cc" ]
+  deps = [
+    ":tls-ie-dep",
+    "../..",
+  ]
+}
+
+ifs_shared_library("tls-ie-dep-weak") {
+  abi = "tls-ie-dep-weak.ifs"
+
+  public = [ "tls-ie-dep.h" ]
+
+  data_deps = [ ":tls-ie-dep" ]
+}
+
+# The actual tls-ie is an empty library that doesn't define all the symbols
+# seen at link time in the IFS-generated link stub.
+test_shared_library("tls-ie-dep") {
+  public = [ "tls-ie-dep.h" ]
+  sources = [ "tls-ie-dep.cc" ]
+  deps = [ "//zircon/system/public" ]
+
+  # TODO(fxbug.dev/135809): LTO insists on using LE accesses. Remove this when
+  # the LLVM bug gets fixed and the fixed toolchain rolled into Fuchsia.
+  remove_configs = [ "//build/config/lto" ]
 }

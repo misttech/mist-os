@@ -130,12 +130,14 @@ constexpr auto ObserveBuildIdNote(AbiModule<Elf>& module, bool keep_going = fals
     return elfldltl::ObserveBuildIdNote(build_id, keep_going);
   };
   using NoteObserver = decltype(make_observer(std::declval<ObserverResult>()));
+  using MakeObserver = decltype(make_observer);
 
   // This wraps the generic observer with one whose destructor copies the
   // results into the Module field.
   class BuildIdObserver : public NoteObserver {
    public:
-    constexpr explicit BuildIdObserver(typename abi::Abi<Elf>::Module& module)
+    constexpr BuildIdObserver(typename abi::Abi<Elf>::Module& module,
+                              const MakeObserver& make_observer)
         : NoteObserver(make_observer(build_id_)), module_(module) {}
 
     ~BuildIdObserver() {
@@ -149,7 +151,7 @@ constexpr auto ObserveBuildIdNote(AbiModule<Elf>& module, bool keep_going = fals
     std::optional<elfldltl::ElfNote> build_id_;
   };
 
-  return BuildIdObserver{module};
+  return BuildIdObserver{module, make_observer};
 }
 
 }  // namespace ld
