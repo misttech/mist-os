@@ -7,7 +7,6 @@ import("//build/components/fuchsia_structured_config.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_library.gni")
 import("//build/rust/rustc_test.gni")
-import("//build/type/config.gni")
 import("//src/fonts/build/fonts.gni")
 
 declare_args() {
@@ -158,10 +157,6 @@ fuchsia_structured_config_rust_lib("config") {
 fuchsia_package("pkg") {
   package_name = "fonts"
   deps = [ ":font_provider_cm" ]
-}
-
-build_type_config_data("build_type") {
-  for_pkg = "fonts"
 }
 
 fuchsia_component_manifest("font_provider_unit_tests_cmp_manifest") {
