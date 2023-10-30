@@ -173,6 +173,7 @@ void main() {
         resultsFileSuffix: '_categories_disabled');
 
     await traceSession.stop();
+    await traceSession.terminateAndDownloadAsBytes();
     addTestSuiteSuffix(resultsFile, '.tracing_categories_disabled');
 
     await helper.processResultsSummarized([resultsFile],
