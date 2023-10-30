@@ -26,16 +26,6 @@ template("compatibility_test_suite") {
   assert(defined(invoker.path),
          "The path to the extracted CTF archive is required.")
 
-  # On-device ABI Tests.
-  # See issuetracker.google.com/301268871: These tests use a deprecated manifest
-  # format. All of the tests have been migrated to the new format and this block
-  # will be deleted when the CTF release using this format falls off CQ.
-  legacy_on_device_tests = "${target_name}_on_device_tests_legacy"
-  ctf_prebuilt_tests_from_manifest(legacy_on_device_tests) {
-    forward_variables_from(invoker, [ "disabled_tests" ])
-    ctf_path = rebase_path(invoker.path)
-  }
-
   # On-device ABI tests.
   on_device_tests = "${target_name}_ctf${invoker.api_level}"
   generate_ctf_tests(on_device_tests) {
@@ -56,7 +46,6 @@ template("compatibility_test_suite") {
     testonly = true
     deps = [
       ":$host_tests($host_toolchain)",
-      ":$legacy_on_device_tests",
       ":$on_device_tests",
     ]
   }
