@@ -31,8 +31,8 @@ std::filesystem::path GetResourcePath() {
   path.append("/pkg");
 #elif defined(__APPLE__)
   uint32_t length = PATH_MAX;
-  char self_path[length];
-  char self_path_symlink[length];
+  char self_path[PATH_MAX];
+  char self_path_symlink[PATH_MAX];
   _NSGetExecutablePath(self_path_symlink, &length);
   const char* bin_dir = dirname(realpath(self_path_symlink, self_path));
   path.append(bin_dir);
