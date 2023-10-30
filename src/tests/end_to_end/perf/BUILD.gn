@@ -80,7 +80,6 @@ foreach(target_name, test_list) {
     non_dart_deps = [ ":runtime_deps($host_toolchain)" ]
 
     environments = [
-      atlas_env,
       nuc_env,
       vim3_env,
     ]
@@ -176,8 +175,6 @@ foreach(test, shard_test_list) {
       non_dart_deps = [ ":runtime_deps($host_toolchain)" ]
 
       environments = [
-        # TODO(fxb/88635): netstack_iperf fails on altas_env
-        # atlas_env,
         nuc_env,
         vim3_env,
       ]
@@ -207,7 +204,6 @@ if (is_host) {
       test_dir = "${target_gen_dir}/${target_name}"
 
       environments = [
-        atlas_env,
         nuc_env,
         vim3_env,
       ]
