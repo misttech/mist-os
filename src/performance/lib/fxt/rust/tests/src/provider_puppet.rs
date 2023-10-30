@@ -21,16 +21,16 @@ fn main() {
 
     duration!("test_puppet", "puppet_duration_raii");
 
-    let async_id = Id::new();
-    async_begin(async_id, cstr!("test_puppet"), cstr!("puppet_async"), &[]);
+    {
+        let async_id = Id::new();
+        let _guard = async_enter!(async_id, "test_puppet", "puppet_async");
 
-    std::thread::spawn(move || {
-        async_instant(async_id, cstr!("test_puppet"), cstr!("puppet_async_instant1"), &[]);
-    })
-    .join()
-    .unwrap();
-
-    async_end(async_id, cstr!("test_puppet"), cstr!("puppet_async"), &[]);
+        std::thread::spawn(move || {
+            async_instant!(async_id, "test_puppet", "puppet_async_instant1");
+        })
+        .join()
+        .unwrap();
+    }
 
     let flow_id = Id::new();
     flow_begin!("test_puppet", "puppet_flow", flow_id);

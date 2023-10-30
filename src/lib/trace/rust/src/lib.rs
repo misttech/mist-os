@@ -124,6 +124,7 @@ macro_rules! arg_from {
     ($valname:ident, $(($type:ty, $tag:expr, $value:expr))*) => {
         $(
             impl ArgValue for $type {
+                #[inline]
                 fn of<'a>(key: &'a str, $valname: Self) -> Arg<'a>
                     where Self: 'a
                 {
@@ -157,6 +158,7 @@ arg_from!(val,
 );
 
 impl<T> ArgValue for *const T {
+    #[inline]
     fn of<'a>(key: &'a str, val: Self) -> Arg<'a>
     where
         Self: 'a,
@@ -175,6 +177,7 @@ impl<T> ArgValue for *const T {
 }
 
 impl<T> ArgValue for *mut T {
+    #[inline]
     fn of<'a>(key: &'a str, val: Self) -> Arg<'a>
     where
         Self: 'a,
@@ -193,6 +196,7 @@ impl<T> ArgValue for *mut T {
 }
 
 impl<'a> ArgValue for &'a str {
+    #[inline]
     fn of<'b>(key: &'b str, val: Self) -> Arg<'b>
     where
         Self: 'b,
@@ -229,20 +233,25 @@ impl<'a> ArgValue for &'a str {
 #[macro_export]
 macro_rules! instant {
     ($category:expr, $name:expr, $scope:expr $(, $key:expr => $val:expr)*) => {
-        $crate::instant($crate::cstr!($category), $crate::cstr!($name), $scope,
-            &[$($crate::ArgValue::of($key, $val)),*])
+        if let Some(context) = $crate::TraceCategoryContext::acquire($crate::cstr!($category)) {
+            $crate::instant(&context, $crate::cstr!($name), $scope, &[$($crate::ArgValue::of($key, $val)),*]);
+        }
     }
 }
 
 /// Writes an instant event representing a single moment in time.
 /// The number of `args` must not be greater than 15.
-pub fn instant(category: &'static CStr, name: &'static CStr, scope: Scope, args: &[Arg<'_>]) {
+#[inline]
+pub fn instant(
+    context: &TraceCategoryContext,
+    name: &'static CStr,
+    scope: Scope,
+    args: &[Arg<'_>],
+) {
     assert!(args.len() <= 15, "no more than 15 trace arguments are supported");
 
-    if let Some(context) = TraceCategoryContext::acquire(category) {
-        let name_ref = context.register_string_literal(name);
-        context.write_instant(name_ref, scope, args);
-    }
+    let name_ref = context.register_string_literal(name);
+    context.write_instant(name_ref, scope, args);
 }
 
 /// Convenience macro for the `alert` function.
@@ -300,8 +309,10 @@ pub fn alert(category: &'static CStr, name: &'static CStr) {
 #[macro_export]
 macro_rules! counter {
     ($category:expr, $name:expr, $counter_id:expr $(, $key:expr => $val:expr)*) => {
-        $crate::counter($crate::cstr!($category), $crate::cstr!($name), $counter_id,
-            &[$($crate::ArgValue::of($key, $val)),*])
+        if let Some(context) = $crate::TraceCategoryContext::acquire($crate::cstr!($category)) {
+            $crate::counter(&context, $crate::cstr!($name), $counter_id,
+                &[$($crate::ArgValue::of($key, $val)),*])
+        }
     }
 }
 
@@ -314,14 +325,17 @@ macro_rules! counter {
 ///
 /// 1 to 15 numeric arguments can be associated with an event, each of which is
 /// interpreted as a distinct time series.
-pub fn counter(category: &'static CStr, name: &'static CStr, counter_id: u64, args: &[Arg<'_>]) {
+pub fn counter(
+    context: &TraceCategoryContext,
+    name: &'static CStr,
+    counter_id: u64,
+    args: &[Arg<'_>],
+) {
     assert!(args.len() >= 1, "trace counter args must include at least one numeric argument");
     assert!(args.len() <= 15, "no more than 15 trace arguments are supported");
 
-    if let Some(context) = TraceCategoryContext::acquire(category) {
-        let name_ref = context.register_string_literal(name);
-        context.write_counter(name_ref, counter_id, args);
-    }
+    let name_ref = context.register_string_literal(name);
+    context.write_counter(name_ref, counter_id, args);
 }
 
 /// The scope of a duration event, returned by the `duration` function and the `duration!` macro.
@@ -394,8 +408,13 @@ pub fn complete_duration(
 #[macro_export]
 macro_rules! duration {
     ($category:expr, $name:expr $(, $key:expr => $val:expr)*) => {
-        let args = [$($crate::ArgValue::of($key, $val)),*];
-        let _scope = $crate::duration($crate::cstr!($category), $crate::cstr!($name), &args);
+        let mut args;
+        let _scope = if let Some(context) = $crate::TraceCategoryContext::acquire($crate::cstr!($category)) {
+            args = [$($crate::ArgValue::of($key, $val)),*];
+            Some($crate::duration($crate::cstr!($category), $crate::cstr!($name), &args))
+        } else {
+            None
+        };
     }
 }
 
@@ -433,8 +452,10 @@ pub fn duration<'a>(
 #[macro_export]
 macro_rules! duration_begin {
     ($category:expr, $name:expr $(, $key:expr => $val:expr)*) => {
-        $crate::duration_begin($crate::cstr!($category), $crate::cstr!($name),
+        if let Some(context) = $crate::TraceCategoryContext::acquire($crate::cstr!($category)) {
+        $crate::duration_begin(&context, $crate::cstr!($name),
             &[$($crate::ArgValue::of($key, $val)),*])
+        }
     }
 }
 
@@ -455,8 +476,9 @@ macro_rules! duration_begin {
 #[macro_export]
 macro_rules! duration_end {
     ($category:expr, $name:expr $(, $key:expr => $val:expr)*) => {
-        $crate::duration_end($crate::cstr!($category), $crate::cstr!($name),
-            &[$($crate::ArgValue::of($key, $val)),*])
+        if let Some(context) = $crate::TraceCategoryContext::acquire($crate::cstr!($category)) {
+            $crate::duration_end(&context, $crate::cstr!($name), &[$($crate::ArgValue::of($key, $val)),*])
+        }
     }
 }
 
@@ -470,13 +492,11 @@ macro_rules! duration_end {
 /// to annotate the duration with additional information.  The arguments provided
 /// to matching duration begin and duration end events are combined together in
 /// the trace; it is not necessary to repeat them.
-pub fn duration_begin(category: &'static CStr, name: &'static CStr, args: &[Arg<'_>]) {
+pub fn duration_begin(context: &TraceCategoryContext, name: &'static CStr, args: &[Arg<'_>]) {
     assert!(args.len() <= 15, "no more than 15 trace arguments are supported");
 
-    if let Some(context) = TraceCategoryContext::acquire(category) {
-        let name_ref = context.register_string_literal(name);
-        context.write_duration_begin(name_ref, args);
-    }
+    let name_ref = context.register_string_literal(name);
+    context.write_duration_begin(name_ref, args);
 }
 
 /// Writes a duration end event only.
@@ -488,13 +508,11 @@ pub fn duration_begin(category: &'static CStr, name: &'static CStr, args: &[Arg<
 /// to annotate the duration with additional information.  The arguments provided
 /// to matching duration begin and duration end events are combined together in
 /// the trace; it is not necessary to repeat them.
-pub fn duration_end(category: &'static CStr, name: &'static CStr, args: &[Arg<'_>]) {
+pub fn duration_end(context: &TraceCategoryContext, name: &'static CStr, args: &[Arg<'_>]) {
     assert!(args.len() <= 15, "no more than 15 trace arguments are supported");
 
-    if let Some(context) = TraceCategoryContext::acquire(category) {
-        let name_ref = context.register_string_literal(name);
-        context.write_duration_end(name_ref, args);
-    }
+    let name_ref = context.register_string_literal(name);
+    context.write_duration_end(name_ref, args);
 }
 
 /// AsyncScope maintains state around the context of async events generated via the
@@ -586,7 +604,11 @@ pub fn async_enter(
 #[macro_export]
 macro_rules! async_enter {
     ($id:expr, $category:expr, $name:expr $(, $key:expr => $val:expr)*) => {
-        $crate::AsyncScope::begin($id, $crate::cstr!($category), $crate::cstr!($name), &[$($crate::ArgValue::of($key, $val)),*]);
+        if let Some(context) = $crate::TraceCategoryContext::acquire($crate::cstr!($category)) {
+            Some($crate::AsyncScope::begin($id, $crate::cstr!($category), $crate::cstr!($name), &[$($crate::ArgValue::of($key, $val)),*]))
+        } else {
+            None
+        }
     }
 }
 
@@ -616,7 +638,9 @@ macro_rules! async_enter {
 #[macro_export]
 macro_rules! async_instant {
     ($id:expr, $category:expr, $name:expr $(, $key:expr => $val:expr)*) => {
-        $crate::async_instant($id, $crate::cstr!($category), $crate::cstr!($name), &[$($crate::ArgValue::of($key, $val)),*]);
+        if let Some(context) = $crate::TraceCategoryContext::acquire($crate::cstr!($category)) {
+            $crate::async_instant($id, &context, $crate::cstr!($name), &[$($crate::ArgValue::of($key, $val)),*]);
+        }
     }
 }
 
@@ -671,26 +695,34 @@ pub fn async_end(id: Id, category: &'static CStr, name: &'static CStr, args: &[A
 /// to annotate the asynchronous operation with additional information.  The
 /// arguments provided to matching async begin, async instant, and async end
 /// events are combined together in the trace; it is not necessary to repeat them.
-pub fn async_instant(id: Id, category: &'static CStr, name: &'static CStr, args: &[Arg<'_>]) {
+pub fn async_instant(
+    id: Id,
+    context: &TraceCategoryContext,
+    name: &'static CStr,
+    args: &[Arg<'_>],
+) {
     assert!(args.len() <= 15, "no more than 15 trace arguments are supported");
 
-    if let Some(context) = TraceCategoryContext::acquire(category) {
-        let name_ref = context.register_string_literal(name);
-        context.write_async_instant(id, name_ref, args);
-    }
+    let name_ref = context.register_string_literal(name);
+    context.write_async_instant(id, name_ref, args);
 }
 
 #[macro_export]
 macro_rules! blob {
     ($category:expr, $name:expr, $bytes:expr $(, $key:expr => $val:expr)*) => {
-        $crate::blob_fn($crate::cstr!($category), $crate::cstr!($name), $bytes, &[$($crate::ArgValue::of($key, $val)),*])
+    if let Some(context) = $crate::TraceCategoryContext::acquire($crate::cstr!($category)) {
+        $crate::blob_fn(&context, $crate::cstr!($name), $bytes, &[$($crate::ArgValue::of($key, $val)),*])
+    }
     }
 }
-pub fn blob_fn(category: &'static CStr, name: &'static CStr, bytes: &[u8], args: &[Arg<'_>]) {
-    if let Some(context) = TraceCategoryContext::acquire(category) {
-        let name_ref = context.register_string_literal(name);
-        context.write_blob(name_ref, bytes, args);
-    }
+pub fn blob_fn(
+    context: &TraceCategoryContext,
+    name: &'static CStr,
+    bytes: &[u8],
+    args: &[Arg<'_>],
+) {
+    let name_ref = context.register_string_literal(name);
+    context.write_blob(name_ref, bytes, args);
 }
 
 /// Convenience macro for the `flow_begin` function.
@@ -711,8 +743,10 @@ pub fn blob_fn(category: &'static CStr, name: &'static CStr, bytes: &[u8], args:
 #[macro_export]
 macro_rules! flow_begin {
     ($category:expr, $name:expr, $flow_id:expr $(, $key:expr => $val:expr)*) => {
-        $crate::flow_begin($crate::cstr!($category), $crate::cstr!($name), $flow_id,
+    if let Some(context) = $crate::TraceCategoryContext::acquire($crate::cstr!($category)) {
+        $crate::flow_begin(&context, $crate::cstr!($name), $flow_id,
             &[$($crate::ArgValue::of($key, $val)),*])
+    }
     }
 }
 
@@ -734,8 +768,10 @@ macro_rules! flow_begin {
 #[macro_export]
 macro_rules! flow_step {
     ($category:expr, $name:expr, $flow_id:expr $(, $key:expr => $val:expr)*) => {
-        $crate::flow_step($crate::cstr!($category), $crate::cstr!($name), $flow_id,
+    if let Some(context) = $crate::TraceCategoryContext::acquire($crate::cstr!($category)) {
+        $crate::flow_step(&context, $crate::cstr!($name), $flow_id,
             &[$($crate::ArgValue::of($key, $val)),*])
+    }
     }
 }
 
@@ -757,8 +793,10 @@ macro_rules! flow_step {
 #[macro_export]
 macro_rules! flow_end {
     ($category:expr, $name:expr, $flow_id:expr $(, $key:expr => $val:expr)*) => {
-        $crate::flow_end($crate::cstr!($category), $crate::cstr!($name), $flow_id,
+    if let Some(context) = $crate::TraceCategoryContext::acquire($crate::cstr!($category)) {
+        $crate::flow_end(&context, $crate::cstr!($name), $flow_id,
             &[$($crate::ArgValue::of($key, $val)),*])
+    }
     }
 }
 
@@ -780,13 +818,16 @@ macro_rules! flow_end {
 /// to annotate the flow with additional information.  The arguments provided
 /// to matching flow begin, flow step, and flow end events are combined together
 /// in the trace; it is not necessary to repeat them.
-pub fn flow_begin(category: &'static CStr, name: &'static CStr, flow_id: Id, args: &[Arg<'_>]) {
+pub fn flow_begin(
+    context: &TraceCategoryContext,
+    name: &'static CStr,
+    flow_id: Id,
+    args: &[Arg<'_>],
+) {
     assert!(args.len() <= 15, "no more than 15 trace arguments are supported");
 
-    if let Some(context) = TraceCategoryContext::acquire(category) {
-        let name_ref = context.register_string_literal(name);
-        context.write_flow_begin(name_ref, flow_id, args);
-    }
+    let name_ref = context.register_string_literal(name);
+    context.write_flow_begin(name_ref, flow_id, args);
 }
 
 /// Writes a flow end event with the specified id.
@@ -805,13 +846,16 @@ pub fn flow_begin(category: &'static CStr, name: &'static CStr, flow_id: Id, arg
 /// to annotate the flow with additional information.  The arguments provided
 /// to matching flow begin, flow step, and flow end events are combined together
 /// in the trace; it is not necessary to repeat them.
-pub fn flow_end(category: &'static CStr, name: &'static CStr, flow_id: Id, args: &[Arg<'_>]) {
+pub fn flow_end(
+    context: &TraceCategoryContext,
+    name: &'static CStr,
+    flow_id: Id,
+    args: &[Arg<'_>],
+) {
     assert!(args.len() <= 15, "no more than 15 trace arguments are supported");
 
-    if let Some(context) = TraceCategoryContext::acquire(category) {
-        let name_ref = context.register_string_literal(name);
-        context.write_flow_end(name_ref, flow_id, args);
-    }
+    let name_ref = context.register_string_literal(name);
+    context.write_flow_end(name_ref, flow_id, args);
 }
 
 /// Writes a flow step event with the specified id.
@@ -830,23 +874,27 @@ pub fn flow_end(category: &'static CStr, name: &'static CStr, flow_id: Id, args:
 /// to annotate the flow with additional information.  The arguments provided
 /// to matching flow begin, flow step, and flow end events are combined together
 /// in the trace; it is not necessary to repeat them.
-pub fn flow_step(category: &'static CStr, name: &'static CStr, flow_id: Id, args: &[Arg<'_>]) {
+pub fn flow_step(
+    context: &TraceCategoryContext,
+    name: &'static CStr,
+    flow_id: Id,
+    args: &[Arg<'_>],
+) {
     assert!(args.len() <= 15, "no more than 15 trace arguments are supported");
 
-    if let Some(context) = TraceCategoryContext::acquire(category) {
-        let name_ref = context.register_string_literal(name);
-        context.write_flow_step(name_ref, flow_id, args);
-    }
+    let name_ref = context.register_string_literal(name);
+    context.write_flow_step(name_ref, flow_id, args);
 }
 
 // translated from trace-engine/types.h for inlining
-fn trace_make_empty_string_ref() -> sys::trace_string_ref_t {
+const fn trace_make_empty_string_ref() -> sys::trace_string_ref_t {
     sys::trace_string_ref_t {
         encoded_value: sys::TRACE_ENCODED_STRING_REF_EMPTY,
         inline_string: ptr::null(),
     }
 }
 
+#[inline]
 fn trim_to_last_char_boundary(string: &str, max_len: usize) -> &[u8] {
     let mut len = string.len();
     if string.len() > max_len {
@@ -866,6 +914,7 @@ fn trim_to_last_char_boundary(string: &str, max_len: usize) -> &[u8] {
 
 // translated from trace-engine/types.h for inlining
 // The resulting `trace_string_ref_t` only lives as long as the input `string`.
+#[inline]
 fn trace_make_inline_string_ref(string: &str) -> sys::trace_string_ref_t {
     let len = string.len() as u32;
     if len == 0 {
@@ -888,6 +937,7 @@ pub struct TraceCategoryContext {
 }
 
 impl TraceCategoryContext {
+    #[inline]
     pub fn acquire(category: &'static CStr) -> Option<TraceCategoryContext> {
         unsafe {
             let mut category_ref = mem::MaybeUninit::<sys::trace_string_ref_t>::uninit();
@@ -903,7 +953,8 @@ impl TraceCategoryContext {
         }
     }
 
-    fn register_string_literal(&self, name: &'static CStr) -> sys::trace_string_ref_t {
+    #[inline]
+    pub fn register_string_literal(&self, name: &'static CStr) -> sys::trace_string_ref_t {
         unsafe {
             let mut name_ref = mem::MaybeUninit::<sys::trace_string_ref_t>::uninit();
             sys::trace_context_register_string_literal(
@@ -915,6 +966,7 @@ impl TraceCategoryContext {
         }
     }
 
+    #[inline]
     fn register_current_thread(&self) -> sys::trace_thread_ref_t {
         unsafe {
             let mut thread_ref = mem::MaybeUninit::<sys::trace_thread_ref_t>::uninit();
@@ -923,7 +975,8 @@ impl TraceCategoryContext {
         }
     }
 
-    fn write_instant(&self, name_ref: sys::trace_string_ref_t, scope: Scope, args: &[Arg<'_>]) {
+    #[inline]
+    pub fn write_instant(&self, name_ref: sys::trace_string_ref_t, scope: Scope, args: &[Arg<'_>]) {
         let ticks = zx::ticks_get();
         let thread_ref = self.register_current_thread();
         unsafe {
@@ -1171,6 +1224,7 @@ pub struct Context {
 }
 
 impl Context {
+    #[inline]
     pub fn acquire() -> Option<Self> {
         let context = unsafe { sys::trace_acquire_context() };
         if context.is_null() {
@@ -1180,6 +1234,7 @@ impl Context {
         }
     }
 
+    #[inline]
     pub fn register_string_literal(&self, s: &'static CStr) -> sys::trace_string_ref_t {
         unsafe {
             let mut s_ref = mem::MaybeUninit::<sys::trace_string_ref_t>::uninit();

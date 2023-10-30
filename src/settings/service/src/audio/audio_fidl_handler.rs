@@ -28,7 +28,7 @@ use crate::{trace, trace_guard};
 /// here so that it's active until a response is sent and this responder is dropped.
 struct AudioSetTraceResponder {
     responder: AudioSetResponder,
-    _guard: ftrace::AsyncScope,
+    _guard: Option<ftrace::AsyncScope>,
 }
 
 impl request::Responder<Scoped<AudioSetResult>> for AudioSetTraceResponder {

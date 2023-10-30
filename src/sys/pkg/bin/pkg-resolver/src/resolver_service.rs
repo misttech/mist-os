@@ -164,25 +164,27 @@ impl Resolver for QueuedResolver {
         let resolve_res =
             self.resolve_with_source(pkg_url, gc_protection, eager_package_manager, trace_id).await;
         let error_string;
-        let () = guard.end(&[
-            ftrace::ArgValue::of(
-                "status",
-                match resolve_res {
-                    Ok(_) => "success",
-                    Err(ref e) => {
-                        error_string = e.to_string();
-                        error_string.as_str()
-                    }
-                },
-            ),
-            ftrace::ArgValue::of(
-                "source",
-                match resolve_res {
-                    Ok(ref package_with_source) => package_with_source.source.str_for_trace(),
-                    Err(_) => "no source because resolve failed",
-                },
-            ),
-        ]);
+        if let Some(inner) = guard {
+            inner.end(&[
+                ftrace::ArgValue::of(
+                    "status",
+                    match resolve_res {
+                        Ok(_) => "success",
+                        Err(ref e) => {
+                            error_string = e.to_string();
+                            error_string.as_str()
+                        }
+                    },
+                ),
+                ftrace::ArgValue::of(
+                    "source",
+                    match resolve_res {
+                        Ok(ref package_with_source) => package_with_source.source.str_for_trace(),
+                        Err(_) => "no source because resolve failed",
+                    },
+                ),
+            ]);
+        }
         resolve_res.map(|pkg_with_source| (pkg_with_source.package, pkg_with_source.blob_id.into()))
     }
 }

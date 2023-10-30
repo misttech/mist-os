@@ -340,7 +340,7 @@ struct State {
     batch_timeout: Option<zx::Duration>,
     elapsed_time: zx::Duration,
     global_stats: Arc<GlobalConnectionStats>,
-    trace_guard: Arc<ftrace::AsyncScope>,
+    trace_guard: Arc<Option<ftrace::AsyncScope>>,
     trace_id: ftrace::Id,
 }
 

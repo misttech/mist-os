@@ -641,7 +641,7 @@ async fn fetch_blob(
                 .as_occurrence(1),
         );
     }
-    guard.end(&[ftrace::ArgValue::of("result", format!("{res:?}").as_str())]);
+    guard.map(|o| o.end(&[ftrace::ArgValue::of("result", format!("{res:?}").as_str())]));
     res
 }
 
@@ -715,10 +715,12 @@ async fn fetch_blob_http(
                         Ok(size) => (size.to_string(), "success".to_string()),
                         Err(e) => ("no size because download failed".to_string(), e.to_string()),
                     };
-                    guard.end(&[
-                        ftrace::ArgValue::of("size", size_str.as_str()),
-                        ftrace::ArgValue::of("status", status_str.as_str()),
-                    ]);
+                    guard.map(|o| {
+                        o.end(&[
+                            ftrace::ArgValue::of("size", size_str.as_str()),
+                            ftrace::ArgValue::of("status", status_str.as_str()),
+                        ])
+                    });
                     inspect.state(inspect::Http::CloseBlob);
                     blob_closer.close().await;
                     res?;
