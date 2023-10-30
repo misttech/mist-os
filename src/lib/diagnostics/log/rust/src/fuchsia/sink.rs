@@ -140,6 +140,11 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
+    use crate as diagnostics_log;
+    use crate::{increment_clock, log_every_n_seconds};
+
     use super::*;
     use diagnostics_log_encoding::{parse::parse_record, Severity};
     use fidl::endpoints::create_proxy_and_stream;
@@ -148,6 +153,7 @@ mod tests {
     use futures::{stream::StreamExt, AsyncReadExt};
     use tracing::{debug, error, info, info_span, trace, warn};
     use tracing_subscriber::{layer::SubscriberExt, Registry};
+    use zx::Status;
 
     const TARGET: &str = "diagnostics_log_lib_test::fuchsia::sink::tests";
 
@@ -365,6 +371,50 @@ mod tests {
             .arguments
             .push(Argument { name: "tag".into(), value: Value::Text("tags_are_sent".into()) });
         assert_eq!(observed, expected);
+    }
+
+    #[fuchsia::test(logging = false)]
+    async fn log_every_n_seconds_test() {
+        let socket = init_sink(SinkConfig { ..SinkConfig::default() }).await;
+        let mut buf = [0u8; MAX_DATAGRAM_LEN_BYTES as _];
+        let next_message = |buf: &mut [u8]| {
+            let len = socket.read(buf).unwrap();
+            let (record, _) = parse_record(&buf[..len]).unwrap();
+            assert_eq!(socket.outstanding_read_bytes().unwrap(), 0, "socket must be empty");
+            record
+        };
+
+        let log_fn = || {
+            log_every_n_seconds!(5, INFO, "test message");
+        };
+
+        let expect_message = |buf: &mut [u8]| {
+            let observed = next_message(buf);
+
+            let mut expected = Record {
+                timestamp: observed.timestamp,
+                severity: Severity::Info,
+                arguments: arg_prefix(),
+            };
+            expected.arguments.push(Argument {
+                name: "message".into(),
+                value: Value::Text("test message".into()),
+            });
+            assert_eq!(observed, expected);
+        };
+
+        log_fn();
+        // First log call should result in a message.
+        expect_message(&mut buf);
+        log_fn();
+        // Subsequent log call in less than 5 seconds should NOT
+        // result in a message.
+        assert_eq!(socket.read(&mut buf), Err(Status::SHOULD_WAIT));
+        increment_clock(Duration::from_secs(5));
+
+        // Calling log_fn after 5 seconds should result in a message.
+        log_fn();
+        expect_message(&mut buf);
     }
 
     #[fuchsia::test(logging = false)]

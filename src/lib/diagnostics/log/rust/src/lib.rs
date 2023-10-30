@@ -98,6 +98,7 @@ impl<'t> PublishOptions<'t> {
         self
     }
 }
+
 macro_rules! publisher_options {
     ($(($name:ident, $self:ident, $($self_arg:ident),*)),*) => {
         $(

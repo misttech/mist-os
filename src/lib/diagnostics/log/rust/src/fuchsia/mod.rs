@@ -23,6 +23,13 @@ use filter::InterestFilter;
 use sink::{Sink, SinkConfig};
 
 pub use diagnostics_log_encoding::{encode::TestRecord, Metatag};
+pub use paste::paste;
+
+#[cfg(test)]
+use std::{
+    sync::atomic::{AtomicI64, Ordering},
+    time::Duration,
+};
 
 /// Callback for interest listeners
 pub trait OnInterestChanged {
@@ -415,6 +422,47 @@ pub enum PublishError {
     /// Installing a forwarder from [`log`] macros to [`tracing`] macros failed.
     #[error("failed to install a forwarder from `log` to `tracing`")]
     InitLogForward(#[from] tracing_log::log_tracer::SetLoggerError),
+}
+
+#[cfg(test)]
+static CURRENT_TIME_NANOS: AtomicI64 = AtomicI64::new(Duration::from_secs(10).as_nanos() as i64);
+
+/// Increments the test clock.
+#[cfg(test)]
+pub fn increment_clock(duration: Duration) {
+    CURRENT_TIME_NANOS.fetch_add(duration.as_nanos() as i64, Ordering::SeqCst);
+}
+
+/// Gets the current monotonic time in nanoseconds.
+#[doc(hidden)]
+pub fn get_now() -> i64 {
+    #[cfg(not(test))]
+    return zx::Time::get_monotonic().into_nanos();
+
+    #[cfg(test)]
+    CURRENT_TIME_NANOS.load(Ordering::Relaxed)
+}
+
+/// Logs every N seconds using an Atomic variable
+/// to keep track of the time. This will have a higher
+/// performance impact on ARM compared to regular logging due to the use
+/// of an atomic.
+#[macro_export]
+macro_rules! log_every_n_seconds {
+    ($seconds:expr, $severity:expr, $($arg:tt)*) => {
+        use std::{time::Duration, sync::atomic::{Ordering, AtomicI64}};
+        use diagnostics_log::{paste, fuchsia::get_now};
+
+        let now = get_now();
+
+        static LAST_LOG_TIMESTAMP: AtomicI64 = AtomicI64::new(0);
+        if now - LAST_LOG_TIMESTAMP.load(Ordering::Acquire) >= Duration::from_secs($seconds).as_nanos() as i64 {
+            paste! {
+                tracing::[< $severity:lower >]!($($arg)*);
+            }
+            LAST_LOG_TIMESTAMP.store(now, Ordering::Release);
+        }
+    }
 }
 
 #[cfg(test)]
