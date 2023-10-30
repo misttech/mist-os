@@ -76,7 +76,6 @@
                 "fuchsia.boot.FactoryItems",
                 "fuchsia.boot.Items",
                 "fuchsia.boot.ReadOnlyLog",
-                "fuchsia.boot.RootResource",
                 "fuchsia.boot.WriteOnlyLog",
                 "fuchsia.device.NameProvider",
                 "fuchsia.diagnostics.ArchiveAccessor",
