@@ -9,7 +9,9 @@ declare_args() {
   # with placeholder license. License gathering will be skipped.
   # Since license gathering is resource intensive, this is useful for non-production
   # builds that would run faster.
-  generate_licenses_spdx_stubs = false
+  # The global configuration can be overwritten in specific `generated_licenses_spdx`
+  # template invocation via the `generate_stub` parameter.
+  generate_licenses_spdx_stubs = true
 }
 
 # Generates a stub license SPDX json file. See `generate_licenses_spdx_stubs` arg.
@@ -100,13 +102,22 @@ template("_generated_licenses_spdx_stub") {
 #   additional_licenses (list of labels, optional)
 #     Labels of additional license.gni targets to include in the SPDX.
 #
+#   generate_stub (bool, optional)
+#     When true, will generate an SPDX placeholder. Defaults to the global
+#     `generate_licenses_spdx_stubs` gn arg.
+#
 template("generated_licenses_spdx") {
   assert(defined(invoker.target), "Must specify `target`")
   assert(defined(invoker.spdx_root_package_name),
          "Must specify `spdx_root_package_name`")
   assert(defined(invoker.output), "Must specify `output`")
 
-  if (generate_licenses_spdx_stubs) {
+  _generate_stub = generate_licenses_spdx_stubs
+  if (defined(invoker.generate_stub)) {
+    _generate_stub = invoker.generate_stub
+  }
+
+  if (_generate_stub) {
     _generated_licenses_spdx_stub(target_name) {
       output = invoker.output
       spdx_root_package_name = invoker.spdx_root_package_name

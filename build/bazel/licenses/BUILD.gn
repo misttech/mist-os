@@ -14,14 +14,12 @@ import("//build/security.gni")
 import("//tools/check-licenses/build/license_data.gni")
 
 declare_args() {
-  # Whether to generate real licenses for
-  # `//build/bazel/licenses:legacy_ninja_build_outputs_licenses_spdx`.
-  # License collection + generation for ninja targets is slow and expensive,
-  # so it is turned off by default, and a placeholder is produced instead.
+  # Deprecated. No-op.
+  # TODO(fxb/132725): Remove once unused downstream.
   generate_legacy_ninja_build_outputs_licenses_spdx = false
 
-  # Enable hermetic GN licensing pipeline.
-  # TODO(132725): Remove once migration completes.
+  # Deprecated. No-op.
+  # TODO(fxb/132725): Remove once unused downstream.
   generate_legacy_ninja_build_outputs_licenses_spdx_from_metadata = true
 }
 
@@ -70,76 +68,24 @@ group("all_bazel_inputs") {
   }
 }
 
-# Collects the license data for all GN inputs and makes it available for Bazel
-# (1) This target is relatively slow.
-# (2) When developing locally, may produce inaccurate results without 'fx clean'.
-#     To avoid 'fx clean' do:
-#     * fxbug.dev/84924 workaround: Manually delete the SPDX output :
-#       `rm -rf out/default/obj/build/bazel/licenses/licenses_data/`
-#     * fxbug.dev/117694 workaround: Manually delete cached depenedency calculation:
-#       `rm out/default/project.json`
-# TODO(132725): Remove once migration completes.
-license_data("licenses_data") {
-  target = "//build/bazel/licenses:all_bazel_inputs"  # Must be a fully
-                                                      # qualified label.
-  out_dir = "$target_out_dir/licenses_data"
-  produce_spdx = true
+generated_licenses_spdx("all_bazel_inputs_licenses_spdx") {
+  target = ":all_bazel_inputs"
+  spdx_root_package_name = "Fuchsia"
+  output = "${target_out_dir}/all_bazel_inputs_licenses.spdx.json"
 
-  # This is an intermediate input to the licenses pipeline, no need to upload to GCS.
-  emit_metadata = false
+  debug_hints = true
 
-  # Analysis is not needed - it is assumed it is done elsewhere.
-  run_analysis = false
+  # Current Bazel inputs customers don't need host tool licenses.
+  # TODO(132725): Revisit once each individual input has its own SPDX.
+  # We can then derive value based on whether the input target's toolchain.
+  include_host_tools = false
 
-  # These targets are not being distributed.
-  prune_targets = [
-    "//prebuilt/third_party/android/aemu/release/linux-x64",
-    "//src/developer/ffx/plugins/emulator",
-    "//vendor/third_party/eigen3",
-    "//vendor/third_party/eigen3/",
-  ]
-
-  # Force build in preparation of fxr/924760.
-  # Otherwise, license_data doesn't actually build "target". It only
-  # searches for it in the generated project.json.
-  deps = [ ":all_bazel_inputs" ]
+  # TODO(132725): Remove once all remaining errors are sorted out.
+  ignore_collection_errors = true
 }
 
-if (generate_legacy_ninja_build_outputs_licenses_spdx) {
-  if (generate_legacy_ninja_build_outputs_licenses_spdx_from_metadata) {
-    generated_licenses_spdx("spdx_from_metadata") {
-      target = ":all_bazel_inputs"
-      spdx_root_package_name = "Fuchsia"
-      output = "${target_out_dir}/licenses_from_metadata.spdx.json"
-
-      debug_hints = true
-
-      # Current Bazel inputs customers don't need host tool licenses.
-      # TODO(132725): Revisit once each individual input has its own SPDX.
-      # We can then derive value based on whether the input target's toolchain.
-      include_host_tools = false
-
-      # TODO(132725): Remove once all remaining errors are sorted out.
-      ignore_collection_errors = true
-    }
-
-    bazel_input_resource("legacy_ninja_build_outputs_licenses_spdx") {
-      deps = [ ":spdx_from_metadata" ]
-      sources = get_target_outputs(":spdx_from_metadata")
-      outputs = [ "legacy_ninja_build_outputs_licenses.spdx.json" ]
-    }
-  } else {
-    # TODO(132725): Remove once migration completes.
-    bazel_input_resource("legacy_ninja_build_outputs_licenses_spdx") {
-      deps = [ ":licenses_data" ]
-      sources = get_target_outputs(":licenses_data_spdx_copy")
-      outputs = [ "legacy_ninja_build_outputs_licenses.spdx.json" ]
-    }
-  }
-} else {
-  # Use a placeholder instead.
-  bazel_input_resource("legacy_ninja_build_outputs_licenses_spdx") {
-    sources = [ "licenses_placeholder.spdx.json" ]
-    outputs = [ "legacy_ninja_build_outputs_licenses.spdx.json" ]
-  }
+bazel_input_resource("legacy_ninja_build_outputs_licenses_spdx") {
+  deps = [ ":all_bazel_inputs_licenses_spdx" ]
+  sources = get_target_outputs(":all_bazel_inputs_licenses_spdx")
+  outputs = [ "legacy_ninja_build_outputs_licenses.spdx.json" ]
 }
