@@ -18,10 +18,13 @@
         { service: "fuchsia.hardware.usb.hci.UsbHciService" },
     ],
     use: [
-        { protocol: "fuchsia.boot.RootResource" },
         { protocol: "fuchsia.scheduler.ProfileProvider" },
-        { service: "fuchsia.hardware.pci.Service" },
-        { service: "fuchsia.hardware.platform.device.Service" },
+        {
+            service: [
+                "fuchsia.hardware.pci.Service",
+                "fuchsia.hardware.platform.device.Service",
+            ],
+        },
     ],
     expose: [
         {
