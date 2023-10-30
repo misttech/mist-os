@@ -298,6 +298,14 @@ rustc_test("metrics") {
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:test-case",
   ]
+
+  # TODO(b/308214783): Re-enable on risc-v when flakes fixed.
+  if (current_cpu == "riscv64") {
+    deps -= [
+      "//src/lib/fuchsia-async",
+      "//third_party/rust_crates:test-case",
+    ]
+  }
   sources = [ "src/metrics.rs" ]
 }
 

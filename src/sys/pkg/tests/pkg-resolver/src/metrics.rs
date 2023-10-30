@@ -8,13 +8,12 @@ use {
     cobalt_client::traits::AsEventCodes,
     cobalt_sw_delivery_registry as metrics,
     fidl_fuchsia_metrics::{MetricEvent, MetricEventPayload},
-    fuchsia_async as fasync,
     fuchsia_pkg_testing::{
         serve::{responder, HttpResponder},
         Package, PackageBuilder, RepositoryBuilder,
     },
     lib::{make_repo, make_repo_config, MountsBuilder, TestEnv, TestEnvBuilder, EMPTY_REPO_PATH},
-    std::{net::Ipv4Addr, sync::Arc},
+    std::sync::Arc,
 };
 
 async fn assert_integer_events(
@@ -394,10 +393,13 @@ async fn update_tuf_client_error() {
 }
 
 // Test the HTTP status range space for metrics handling for a blob fetch.
+// TODO(b/308214783): Re-enable on risc-v when flakes fixed.
+#[cfg(not(target_arch = "riscv64"))]
 mod pkg_resolver_blob_fetch {
-    use super::*;
-    use metrics::FetchBlobMigratedMetricDimensionResult::*;
-    use test_case::test_case;
+    use {
+        super::*, metrics::FetchBlobMigratedMetricDimensionResult::*, std::net::Ipv4Addr,
+        test_case::test_case,
+    };
 
     struct StatusTest {
         min_code: u16,
@@ -447,7 +449,7 @@ mod pkg_resolver_blob_fetch {
     // 600-999 aren't real, but are sometimes used in e.g. CDN configurations to track state
     // machine transitions, and occasionally leak on bugs. Unfortunately, we don't get to test
     // these because StatusCode won't let us create new ones in this range.
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia_async::run_singlethreaded(test)]
     async fn tests(tests: &[(u16, u16, usize, metrics::FetchBlobMigratedMetricDimensionResult)]) {
         let test_table: Vec<StatusTest> = tests
             .into_iter()
@@ -508,10 +510,13 @@ mod pkg_resolver_blob_fetch {
 }
 
 // Test the HTTP status range space for metrics related to TUF client construction.
+// TODO(b/308214783): Re-enable on risc-v when flakes fixed.
+#[cfg(not(target_arch = "riscv64"))]
 mod pkg_resolver_create_tuf_client {
-    use super::*;
-    use metrics::CreateTufClientMigratedMetricDimensionResult::*;
-    use test_case::test_case;
+    use {
+        super::*, metrics::CreateTufClientMigratedMetricDimensionResult::*, std::net::Ipv4Addr,
+        test_case::test_case,
+    };
 
     struct StatusTest {
         min_code: u16,
@@ -557,7 +562,7 @@ mod pkg_resolver_create_tuf_client {
             (504, 504, HttpGatewayTimeout),
             (505, 599, Http5xx),
         ]; "status_ranges_5xx")]
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia_async::run_singlethreaded(test)]
     // 600-999 aren't real, but are sometimes used in e.g. CDN configurations to track state
     // machine transitions, and occasionally leak on bugs. Unfortunately, we don't get to test
     // these because StatusCode won't let us create new ones in this range.
@@ -607,10 +612,13 @@ mod pkg_resolver_create_tuf_client {
 }
 
 // Test the HTTP status range space for metrics related to TUF update clients.
+// TODO(b/308214783): Re-enable on risc-v when flakes fixed.
+#[cfg(not(target_arch = "riscv64"))]
 mod pkg_resolver_update_tuf_client {
-    use super::*;
-    use metrics::UpdateTufClientMigratedMetricDimensionResult::*;
-    use test_case::test_case;
+    use {
+        super::*, metrics::UpdateTufClientMigratedMetricDimensionResult::*, std::net::Ipv4Addr,
+        test_case::test_case,
+    };
 
     struct StatusTest {
         min_code: u16,
@@ -656,7 +664,7 @@ mod pkg_resolver_update_tuf_client {
             (504, 504, HttpGatewayTimeout),
             (505, 599, Http5xx),
         ]; "status_ranges_5xx")]
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia_async::run_singlethreaded(test)]
     // 600-999 aren't real, but are sometimes used in e.g. CDN configurations to track state
     // machine transitions, and occasionally leak on bugs. Unfortunately, we don't get to test
     // these because StatusCode won't let us create new ones in this range.
