@@ -200,14 +200,14 @@ pub(crate) struct ConnAddr<A, D> {
 
 /// The IP address and identifier (port) of a dual-stack listening socket.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
-pub(crate) struct DualStackListenerIpAddr<A: IpAddress, LI>
+pub(crate) enum DualStackListenerIpAddr<A: IpAddress, LI>
 where
     A::Version: DualStackIpExt,
 {
-    /// The specific address being listened on.
-    pub(crate) addr: DualStackIpAddr<A>,
-    /// The local identifier (i.e. port for TCP/UDP).
-    pub(crate) identifier: LI,
+    ThisStack(ListenerIpAddr<A, LI>),
+    OtherStack(ListenerIpAddr<<<A::Version as DualStackIpExt>::OtherVersion as Ip>::Addr, LI>),
+    // The socket is dual-stack enabled and bound to the IPv6 any address.
+    BothStacks(LI),
 }
 
 impl<A: IpAddress, NewIp: DualStackIpExt, LI> GenericOverIp<NewIp>
@@ -216,15 +216,6 @@ where
     A::Version: DualStackIpExt,
 {
     type Type = DualStackListenerIpAddr<NewIp::Addr, LI>;
-}
-
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
-pub(crate) enum DualStackIpAddr<A: IpAddress>
-where
-    A::Version: DualStackIpExt,
-{
-    ThisStack(Option<SocketIpAddr<A>>),
-    OtherStack(Option<SocketIpAddr<<<A::Version as DualStackIpExt>::OtherVersion as Ip>::Addr>>),
 }
 
 /// The IP address and identifiers (ports) of a dual-stack connected socket.

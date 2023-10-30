@@ -45,8 +45,7 @@ use crate::{
         self,
         address::{
             AddrIsMappedError, AddrVecIter, ConnAddr, ConnIpAddr, DualStackConnIpAddr,
-            DualStackIpAddr, DualStackListenerIpAddr, ListenerIpAddr, SocketIpAddr,
-            SocketZonedIpAddr,
+            DualStackListenerIpAddr, ListenerIpAddr, SocketIpAddr, SocketZonedIpAddr,
         },
         AddrVec, BoundSocketMap, ExistsError, InsertError, ListenerAddr, Shutdown,
         SocketMapAddrSpec, SocketMapConflictPolicy, SocketMapStateSpec,
@@ -1866,58 +1865,44 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> DualStackRemoveOperation<I, D, 
             BoundSocketState::Listener { state, sharing } => {
                 let ListenerState { addr: associated_addr, ip_options } = state;
                 let ListenerAddr { ip, device } = associated_addr.clone();
-                let DualStackListenerIpAddr { addr: ip, identifier } =
-                    sync_ctx.converter().convert(ip);
-                match (ip, sync_ctx.dual_stack_enabled(&ip_options)) {
-                        // Dual-stack enabled, bound to unspecified
-                        // address.
-                        (DualStackIpAddr::ThisStack(None), true) => {
-                            DualStackRemove::ListenerBothStacks{
-                                identifier: identifier.clone(),
-                                device: device,
-                                associated_addr: associated_addr.clone(),
-                                ip_options: ip_options.clone(),
-                                sharing: sharing.clone(),
-                                socket_id: S::make_receiving_map_id(socket_id.clone()),
-                                other_socket_id: sync_ctx.to_other_receiving_id(socket_id),
-                            }
-                        }
-                        // Bound to unspecified address but not enabled
-                        // for dual-stack, so only in the current stack
-                        (DualStackIpAddr::ThisStack(addr @ None), false)
-                        // Bound to a specified address is always in
-                        // only one stack.
-                        | (DualStackIpAddr::ThisStack(addr @ Some(_)), true | false) => {
-                            DualStackRemove::CurrentStack(
-                                SingleStackRemove::Listener{
-                                    concrete_addr: ListenerAddr{
-                                        ip: ListenerIpAddr{ addr, identifier },
-                                        device
-                                    },
-                                    associated_addr: associated_addr.clone(),
-                                    ip_options: ip_options.clone(),
-                                    sharing: sharing.clone(),
-                                    socket_id: S::make_receiving_map_id(socket_id),
-                                }
-                            )
-                        }
-                        // Bound only in the other stack.
-                        (DualStackIpAddr::OtherStack(addr), true) => {
-                            DualStackRemove::ListenerOtherStack{
-                                concrete_addr: ListenerAddr{
-                                    ip: ListenerIpAddr{ addr, identifier },
-                                    device
-                                },
-                                associated_addr: associated_addr.clone(),
-                                ip_options: ip_options.clone(),
-                                sharing: sharing.clone(),
-                                socket_id: sync_ctx.to_other_receiving_id(socket_id),
-                            }
-                        }
-                        (DualStackIpAddr::OtherStack(_addr), false) => {
-                            unreachable!("dual-stack disabled socket cannot be OtherStack")
+                match (sync_ctx.converter().convert(ip), sync_ctx.dual_stack_enabled(&ip_options)) {
+                    // Dual-stack enabled, bound in both stacks.
+                    (DualStackListenerIpAddr::BothStacks(identifier), true) => {
+                        DualStackRemove::ListenerBothStacks {
+                            identifier: identifier.clone(),
+                            device: device,
+                            associated_addr: associated_addr.clone(),
+                            ip_options: ip_options.clone(),
+                            sharing: sharing.clone(),
+                            socket_id: S::make_receiving_map_id(socket_id.clone()),
+                            other_socket_id: sync_ctx.to_other_receiving_id(socket_id),
                         }
                     }
+                    // Bound in this stack, with/without dual-stack enabled.
+                    (DualStackListenerIpAddr::ThisStack(addr), true | false) => {
+                        DualStackRemove::CurrentStack(SingleStackRemove::Listener {
+                            concrete_addr: ListenerAddr { ip: addr, device },
+                            associated_addr: associated_addr.clone(),
+                            ip_options: ip_options.clone(),
+                            sharing: sharing.clone(),
+                            socket_id: S::make_receiving_map_id(socket_id),
+                        })
+                    }
+                    // Dual-stack enabled, bound only in the other stack.
+                    (DualStackListenerIpAddr::OtherStack(addr), true) => {
+                        DualStackRemove::ListenerOtherStack {
+                            concrete_addr: ListenerAddr { ip: addr, device },
+                            associated_addr: associated_addr.clone(),
+                            ip_options: ip_options.clone(),
+                            sharing: sharing.clone(),
+                            socket_id: sync_ctx.to_other_receiving_id(socket_id),
+                        }
+                    }
+                    (DualStackListenerIpAddr::OtherStack(_), false)
+                    | (DualStackListenerIpAddr::BothStacks(_), false) => {
+                        unreachable!("dual-stack disabled socket cannot use the other stack")
+                    }
+                }
             }
             BoundSocketState::Connected { state, sharing } => {
                 match sync_ctx.converter().convert(state) {
@@ -2654,12 +2639,9 @@ where
                 })
                 .map(|ListenerAddr { ip: ListenerIpAddr { addr, identifier }, device }| {
                     let ip = match converter {
-                        MaybeDualStack::DualStack(converter) => {
-                            converter.convert_back(DualStackListenerIpAddr {
-                                addr: DualStackIpAddr::ThisStack(addr),
-                                identifier,
-                            })
-                        }
+                        MaybeDualStack::DualStack(converter) => converter.convert_back(
+                            DualStackListenerIpAddr::ThisStack(ListenerIpAddr { addr, identifier }),
+                        ),
                         MaybeDualStack::NotDualStack(converter) => {
                             converter.convert_back(ListenerIpAddr { addr, identifier })
                         }
@@ -2684,10 +2666,9 @@ where
                 })
                 .map(|ListenerAddr { ip: ListenerIpAddr { addr, identifier }, device }| {
                     ListenerAddr {
-                        ip: sync_ctx.converter().convert_back(DualStackListenerIpAddr {
-                            addr: DualStackIpAddr::OtherStack(addr),
-                            identifier,
-                        }),
+                        ip: sync_ctx.converter().convert_back(DualStackListenerIpAddr::OtherStack(
+                            ListenerIpAddr { addr, identifier },
+                        )),
                         device,
                     }
                 })
@@ -2730,10 +2711,9 @@ where
                     },
                 )
                 .map(|(identifier, device)| ListenerAddr {
-                    ip: sync_ctx.converter().convert_back(DualStackListenerIpAddr {
-                        addr: DualStackIpAddr::ThisStack(None),
-                        identifier,
-                    }),
+                    ip: sync_ctx
+                        .converter()
+                        .convert_back(DualStackListenerIpAddr::BothStacks(identifier)),
                     device,
                 })
         }
@@ -2806,16 +2786,19 @@ where
                     let ListenerState { ip_options, addr: ListenerAddr { device, ip } } = state;
                     let ip = match sync_ctx.dual_stack_context() {
                         MaybeDualStack::DualStack(dual_stack) => {
-                            let DualStackListenerIpAddr { addr, identifier } =
-                                dual_stack.converter().convert(ip.clone());
-                            match addr {
-                                DualStackIpAddr::OtherStack(_) => {
+                            match dual_stack.converter().convert(ip.clone()) {
+                                DualStackListenerIpAddr::OtherStack(_)  => {
                                     dual_stack.assert_dual_stack_enabled(state);
                                     todo!("https://fxbug.dev/21198: connecting dual-stack sockets")
                                 }
-                                DualStackIpAddr::ThisStack(addr) => {
-                                    ListenerIpAddr { addr, identifier }
+                                DualStackListenerIpAddr::BothStacks(identifier)=> {
+                                    // TODO(https://fxbug.dev/135204): Use the
+                                    // `remote_ip` to dictate which stack to
+                                    // connect to.
+                                    dual_stack.assert_dual_stack_enabled(state);
+                                    ListenerIpAddr{addr: None, identifier}
                                 }
+                                DualStackListenerIpAddr::ThisStack(addr) => addr,
                             }
                         }
                         MaybeDualStack::NotDualStack(single_stack) => {
@@ -3115,10 +3098,10 @@ where
                 }
                 let converter = dual_stack.converter();
                 MaybeDualStack::DualStack(move |ListenerIpAddr { addr, identifier }| {
-                    converter.convert_back(DualStackListenerIpAddr {
-                        addr: DualStackIpAddr::ThisStack(addr),
+                    converter.convert_back(DualStackListenerIpAddr::ThisStack(ListenerIpAddr {
+                        addr,
                         identifier,
-                    })
+                    }))
                 })
             }
             MaybeDualStack::NotDualStack(non_dual) => {
@@ -3423,11 +3406,19 @@ where
 
                 let (local_ip, local_port) = match sync_ctx.dual_stack_context() {
                     MaybeDualStack::DualStack(dual_stack) => {
-                        let DualStackListenerIpAddr { addr, identifier } =
-                            dual_stack.converter().convert(ip.clone());
-                        match addr {
-                            DualStackIpAddr::ThisStack(addr) => (addr, identifier),
-                            DualStackIpAddr::OtherStack(_) => {
+                        match dual_stack.converter().convert(ip.clone()) {
+                            DualStackListenerIpAddr::ThisStack(ListenerIpAddr {
+                                addr,
+                                identifier,
+                            }) => (addr, identifier),
+                            DualStackListenerIpAddr::BothStacks(identifier) => {
+                                // TODO(https://fxbug.dev/135204): Use the
+                                // `remote_ip` to dictate which stack to send
+                                // to.
+                                dual_stack.assert_dual_stack_enabled(state);
+                                (None, identifier)
+                            }
+                            DualStackListenerIpAddr::OtherStack(_) => {
                                 dual_stack.assert_dual_stack_enabled(state);
                                 // To implement: perform a one-shot send on the
                                 // other IP stack's transport context.
@@ -3560,13 +3551,10 @@ pub(crate) fn set_device<
                     let ListenerAddr { device: old_device, ip } = addr;
                     let ip = match sync_ctx.dual_stack_context() {
                         MaybeDualStack::DualStack(dual_stack) => {
-                            let DualStackListenerIpAddr { addr, identifier } =
-                                dual_stack.converter().convert(ip.clone());
-                            match addr {
-                                DualStackIpAddr::ThisStack(addr) => {
-                                    ListenerIpAddr { addr, identifier }
-                                }
-                                DualStackIpAddr::OtherStack(_) => {
+                            match dual_stack.converter().convert(ip.clone()) {
+                                DualStackListenerIpAddr::ThisStack(addr) => addr,
+                                DualStackListenerIpAddr::OtherStack(_)
+                                | DualStackListenerIpAddr::BothStacks(_) => {
                                     dual_stack.assert_dual_stack_enabled(ip_options);
                                     todo!(
                                         "https://fxbug.dev/21198: implement dual-stack set_device"
@@ -3619,10 +3607,9 @@ pub(crate) fn set_device<
                         let new_ip = match sync_ctx.dual_stack_context().to_converter() {
                             MaybeDualStack::DualStack(converter) => {
                                 let ListenerIpAddr { addr, identifier } = ip;
-                                converter.convert_back(DualStackListenerIpAddr {
-                                    addr: DualStackIpAddr::ThisStack(addr),
-                                    identifier,
-                                })
+                                converter.convert_back(DualStackListenerIpAddr::ThisStack(
+                                    ListenerIpAddr { addr, identifier },
+                                ))
                             }
                             MaybeDualStack::NotDualStack(converter) => converter.convert_back(ip),
                         };
@@ -5235,13 +5222,12 @@ mod test {
                 let ip =
                     assert_matches!(info, SocketInfo::Listener(ListenerAddr{ip, device: _}) => ip);
                 let identifier = match convert_listener_addr::<I, _>(ip) {
-                    MaybeDualStack::DualStack(DualStackListenerIpAddr { addr, identifier }) => {
-                        assert_matches!(
-                            addr,
-                            DualStackIpAddr::ThisStack(_),
-                            "socket unexpectedly bound in other stack"
-                        );
-                        identifier
+                    MaybeDualStack::DualStack(DualStackListenerIpAddr::ThisStack(
+                        ListenerIpAddr { addr: _, identifier },
+                    )) => identifier,
+                    MaybeDualStack::DualStack(DualStackListenerIpAddr::OtherStack(_))
+                    | MaybeDualStack::DualStack(DualStackListenerIpAddr::BothStacks(_)) => {
+                        panic!("socket unexpectedly bound in other stack")
                     }
                     MaybeDualStack::NotDualStack(ListenerIpAddr { addr: _, identifier }) => {
                         identifier

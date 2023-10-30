@@ -50,9 +50,8 @@ use crate::{
     },
     socket::{
         address::{
-            AddrIsMappedError, ConnAddr, ConnIpAddr, DualStackConnIpAddr, DualStackIpAddr,
-            DualStackListenerIpAddr, IpPortSpec, ListenerAddr, ListenerIpAddr, SocketIpAddr,
-            SocketZonedIpAddr,
+            AddrIsMappedError, ConnAddr, ConnIpAddr, DualStackConnIpAddr, DualStackListenerIpAddr,
+            IpPortSpec, ListenerAddr, ListenerIpAddr, SocketIpAddr, SocketZonedIpAddr,
         },
         datagram::{
             self, AddrEntry, BoundSocketState as DatagramBoundSocketState,
@@ -896,14 +895,17 @@ where
             |Wrapper(ListenerIpAddr { addr, identifier })| {
                 (addr.map(SocketIpAddr::into), IpInvariant(identifier))
             },
-            |Wrapper(DualStackListenerIpAddr { addr, identifier })| {
-                let addr = match addr {
-                    DualStackIpAddr::ThisStack(addr) => addr.map(SocketIpAddr::into),
-                    DualStackIpAddr::OtherStack(addr) => SpecifiedAddr::new(
+            |Wrapper(addr)| match addr {
+                DualStackListenerIpAddr::ThisStack(ListenerIpAddr { addr, identifier }) => {
+                    (addr.map(SocketIpAddr::into), IpInvariant(identifier))
+                }
+                DualStackListenerIpAddr::OtherStack(ListenerIpAddr { addr, identifier }) => (
+                    SpecifiedAddr::new(
                         addr.map_or(Ipv4::UNSPECIFIED_ADDRESS, SocketIpAddr::addr).to_ipv6_mapped(),
                     ),
-                };
-                (addr, IpInvariant(identifier))
+                    IpInvariant(identifier),
+                ),
+                DualStackListenerIpAddr::BothStacks(identifier) => (None, IpInvariant(identifier)),
             },
         );
 
