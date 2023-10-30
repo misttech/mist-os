@@ -219,6 +219,16 @@ async fn detect_disk_format_res(block_proxy: &dyn DetectableDevice) -> Result<Di
         return Ok(DiskFormat::VbMeta);
     }
 
+    if &data[1024..1024 + constants::F2FS_MAGIC.len()] == &constants::F2FS_MAGIC {
+        return Ok(DiskFormat::F2fs);
+    }
+
+    if data.starts_with(&constants::FXFS_MAGIC) {
+        return Ok(DiskFormat::Fxfs);
+    }
+
+    // Check for Mbr and Fat last.  Since they only have two bytes of magic, it's fairly easy to
+    // randomly encounter this combination (this has happened multiple times in unit tests).
     if data[510] == 0x55 && data[511] == 0xAA {
         if data[38] == 0x29 || data[66] == 0x29 {
             // 0x55AA are always placed at offset 510 and 511 for FAT filesystems.
@@ -227,14 +237,6 @@ async fn detect_disk_format_res(block_proxy: &dyn DetectableDevice) -> Result<Di
             return Ok(DiskFormat::Fat);
         }
         return Ok(DiskFormat::Mbr);
-    }
-
-    if &data[1024..1024 + constants::F2FS_MAGIC.len()] == &constants::F2FS_MAGIC {
-        return Ok(DiskFormat::F2fs);
-    }
-
-    if data.starts_with(&constants::FXFS_MAGIC) {
-        return Ok(DiskFormat::Fxfs);
     }
 
     return Ok(DiskFormat::Unknown);

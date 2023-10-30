@@ -128,6 +128,16 @@ DiskFormat DetectDiskFormatImpl(fidl::UnownedClientEnd<fblock::Block> device,
     return kDiskFormatVbmeta;
   }
 
+  if (!memcmp(&data[1024], kF2fsMagic, sizeof(kF2fsMagic))) {
+    return kDiskFormatF2fs;
+  }
+
+  if (!memcmp(data, kFxfsMagic, sizeof(kFxfsMagic))) {
+    return kDiskFormatFxfs;
+  }
+
+  // Check for Mbr and Fat last.  Since they only have two bytes of magic, it's fairly easy to
+  // randomly encounter this combination (this has tripped us multiple times in unit tests).
   if ((data[510] == 0x55 && data[511] == 0xAA)) {
     if ((data[38] == 0x29 || data[66] == 0x29)) {
       // 0x55AA are always placed at offset 510 and 511 for FAT filesystems.
@@ -136,14 +146,6 @@ DiskFormat DetectDiskFormatImpl(fidl::UnownedClientEnd<fblock::Block> device,
       return kDiskFormatFat;
     }
     return kDiskFormatMbr;
-  }
-
-  if (!memcmp(&data[1024], kF2fsMagic, sizeof(kF2fsMagic))) {
-    return kDiskFormatF2fs;
-  }
-
-  if (!memcmp(data, kFxfsMagic, sizeof(kFxfsMagic))) {
-    return kDiskFormatFxfs;
   }
 
   if (verbosity == DiskFormatLogVerbosity::Verbose) {
