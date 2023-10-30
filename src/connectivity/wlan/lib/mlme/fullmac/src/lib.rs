@@ -378,7 +378,7 @@ impl FullmacMlme {
             Disassociate(req) => self.device.disassoc(convert_disassociate_request(&req)),
             Reset(req) => self.device.reset(convert_reset_request(&req)),
             Start(req) => self.device.start_bss(convert_start_bss_request(&req)),
-            Stop(req) => self.device.stop_req(convert_stop_request(&req)),
+            Stop(req) => self.device.stop_bss(convert_stop_bss_request(&req)),
             SetKeys(req) => self.handle_mlme_set_keys_request(req),
             DeleteKeys(req) => self.device.del_keys_req(convert_delete_keys_request(&req)),
             Eapol(req) => self.device.eapol_req(&mut convert_eapol_request(&req)),
@@ -1086,7 +1086,7 @@ mod handle_mlme_request_tests {
 
         let mut driver_calls = h.fake_device.captured_driver_calls.iter();
         let driver_req =
-            assert_variant!(driver_calls.next(), Some(DriverCall::StopReq { req }) => req);
+            assert_variant!(driver_calls.next(), Some(DriverCall::StopBss { req }) => req);
         assert_eq!(driver_req.ssid.len as usize, SSID_LEN);
         assert_eq!(driver_req.ssid.data[..SSID_LEN], [1u8; SSID_LEN][..]);
     }

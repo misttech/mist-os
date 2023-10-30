@@ -84,7 +84,7 @@ exclude = [
 "WlanFullmacStartCaptureFramesResp" = "wlan_fullmac_start_capture_frames_resp_t"
 "WlanFullmacStartConfirm" = "wlan_fullmac_start_confirm_t"
 "WlanFullmacImplStartBssRequest" = "wlan_fullmac_impl_start_bss_request_t"
-"WlanFullmacStopReq" = "wlan_fullmac_stop_req_t"
+"WlanFullmacImplStopBssRequest" = "wlan_fullmac_impl_stop_bss_request_t"
 "WlanFullmacStopConfirm" = "wlan_fullmac_stop_confirm_t"
 "WlanWmmParameters" = "wlan_wmm_parameters_t"
 

@@ -630,8 +630,12 @@ void WlanInterface::StartBss(StartBssRequestView request, fdf::Arena& arena,
   completer.buffer(arena).Reply();
 }
 
-void WlanInterface::StopReq(StopReqRequestView request, fdf::Arena& arena,
-                            StopReqCompleter::Sync& completer) {
+void WlanInterface::StopBss(StopBssRequestView request, fdf::Arena& arena,
+                            StopBssCompleter::Sync& completer) {
+  if (!request->has_ssid()) {
+    NXPF_ERR("Stop req does not contain ssid");
+    return;
+  }
   const fuchsia_wlan_fullmac_wire::WlanStopResult result =
       [&]() -> fuchsia_wlan_fullmac_wire::WlanStopResult {
     std::lock_guard lock(mutex_);
@@ -641,7 +645,7 @@ void WlanInterface::StopReq(StopReqRequestView request, fdf::Arena& arena,
       return fuchsia_wlan_fullmac_wire::WlanStopResult::kInternalError;
     }
 
-    return soft_ap_.Stop(&request->req);
+    return soft_ap_.Stop(&(request->ssid()));
   }();
 
   fuchsia_wlan_fullmac_wire::WlanFullmacStopConfirm stop_conf = {.result_code = result};

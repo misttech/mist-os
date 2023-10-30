@@ -450,14 +450,14 @@ void SimInterface::StopSoftAp() {
   // This should only be performed on an AP interface
   ZX_ASSERT(role_ == wlan_common::WlanMacRole::kAp);
 
-  wlan_fullmac_wire::WlanFullmacStopReq stop_req;
-
-  ZX_ASSERT(stop_req.ssid.data.size() == wlan_ieee80211::kMaxSsidByteLen);
+  auto builder = wlan_fullmac_wire::WlanFullmacImplStopBssRequest::Builder(test_arena_);
   // Use the ssid from the last call to StartSoftAp
-  stop_req.ssid = soft_ap_ctx_.ssid;
+  builder.ssid(soft_ap_ctx_.ssid);
+
+  ZX_ASSERT(soft_ap_ctx_.ssid.data.size() == wlan_ieee80211::kMaxSsidByteLen);
 
   // Send request to driver
-  auto result = client_.buffer(test_arena_)->StopReq(stop_req);
+  auto result = client_.buffer(test_arena_)->StopBss(builder.Build());
   ZX_ASSERT(result.ok());
 }
 

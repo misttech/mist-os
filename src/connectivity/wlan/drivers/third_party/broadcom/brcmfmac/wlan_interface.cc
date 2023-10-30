@@ -381,12 +381,11 @@ void WlanInterface::StartBss(StartBssRequestView request, fdf::Arena& arena,
   completer.buffer(arena).Reply();
 }
 
-void WlanInterface::StopReq(StopReqRequestView request, fdf::Arena& arena,
-                            StopReqCompleter::Sync& completer) {
+void WlanInterface::StopBss(StopBssRequestView request, fdf::Arena& arena,
+                            StopBssCompleter::Sync& completer) {
   std::shared_lock<std::shared_mutex> guard(lock_);
-  const fuchsia_wlan_fullmac::wire::WlanFullmacStopReq req = request->req;
   if (wdev_ != nullptr) {
-    brcmf_if_stop_req(wdev_->netdev, &req);
+    brcmf_if_stop_req(wdev_->netdev, request);
   }
   completer.buffer(arena).Reply();
 }

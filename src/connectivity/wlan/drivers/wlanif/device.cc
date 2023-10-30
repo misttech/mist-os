@@ -428,20 +428,21 @@ void Device::StartBss(const wlan_fullmac_impl_start_bss_request_t* req) {
   }
 }
 
-void Device::StopReq(const wlan_fullmac_stop_req_t* req) {
-  fuchsia_wlan_fullmac::wire::WlanFullmacStopReq stop_req;
-  ConvertCSsid(req->ssid, &stop_req.ssid);
-
+void Device::StopBss(const wlan_fullmac_impl_stop_bss_request_t* req) {
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     lerror("Arena creation failed: %s", arena.status_string());
     return;
   }
+  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplStopBssRequest::Builder(*arena);
+  fuchsia_wlan_ieee80211::wire::CSsid ssid;
+  ConvertCSsid(req->ssid, &ssid);
+  builder.ssid(ssid);
 
-  auto result = client_.buffer(*arena)->StopReq(stop_req);
+  auto result = client_.buffer(*arena)->StopBss(builder.Build());
 
   if (!result.ok()) {
-    lerror("StopReq failed FIDL error: %s", result.status_string());
+    lerror("StopBss failed FIDL error: %s", result.status_string());
     return;
   }
 }

@@ -48,10 +48,6 @@ type WlanFullmacAssocInd = struct {
     vendor_ie array<uint8, WLAN_VIE_MAX_LEN>;
 };
 
-type WlanFullmacStopReq = struct {
-    ssid ieee80211.CSsid;
-};
-
 type SetKeyDescriptor = struct {
     key vector<uint8>:MAX;
     key_id uint16;
@@ -680,8 +676,8 @@ closed protocol WlanFullmacImpl {
         6: rsne vector<uint8>:ieee80211.WLAN_IE_BODY_MAX_LEN;
         7: vendor_ie vector<uint8>:WLAN_VIE_MAX_LEN;
     }) -> ();
-    strict StopReq(struct {
-        req WlanFullmacStopReq;
+    strict StopBss(table {
+        1: ssid ieee80211.CSsid;
     }) -> ();
     strict SetKeysReq(struct {
         req WlanFullmacSetKeysReq;

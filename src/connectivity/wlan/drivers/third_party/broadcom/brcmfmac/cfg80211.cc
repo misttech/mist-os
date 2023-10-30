@@ -3379,6 +3379,7 @@ skip_fw_cmds:
   brcmf_clear_bit(brcmf_vif_status_bit_t::AP_START_PENDING, &ifp->vif->sme_state);
   brcmf_clear_bit(brcmf_vif_status_bit_t::AP_CREATED, &ifp->vif->sme_state);
   brcmf_net_setcarrier(ifp, false);
+  ifp->saved_softap_ssid = {};
 
   return result;
 }
@@ -3550,6 +3551,8 @@ static fuchsia_wlan_fullmac_wire::WlanStartResult brcmf_cfg80211_start_ap(
   brcmf_net_setcarrier(ifp, true);
 
   cfg->ap_started = true;
+  // Save the SSID for checking when SoftAP is stopped.
+  ifp->saved_softap_ssid = req->ssid();
   return fuchsia_wlan_fullmac_wire::WlanStartResult::kSuccess;
 
 fail:
@@ -4063,20 +4066,39 @@ void brcmf_if_start_req(net_device* ndev,
 }
 
 /* Stop AP mode */
-void brcmf_if_stop_req(net_device* ndev, const fuchsia_wlan_fullmac_wire::WlanFullmacStopReq* req) {
+void brcmf_if_stop_req(net_device* ndev,
+                       const fuchsia_wlan_fullmac_wire::WlanFullmacImplStopBssRequest* req) {
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
+  struct brcmf_if* ifp = ndev_to_if(ndev);
+  fuchsia_wlan_fullmac_wire::WlanStopResult result_code;
+  fuchsia_wlan_fullmac_wire::WlanFullmacStopConfirm result;
+
   if (!ndev->if_proto.is_valid()) {
     BRCMF_IFDBG(WLANIF, ndev, "interface stopped -- skipping AP stop callback");
     return;
   }
 
   BRCMF_IFDBG(WLANIF, ndev, "Stop AP request from SME.");
+  if (!req->has_ssid()) {
+    BRCMF_ERR("Stop req does not contain ssid");
+    result_code = fuchsia_wlan_fullmac_wire::WlanStopResult::kInternalError;
+    goto done;
+  }
 #if !defined(NDEBUG)
-  BRCMF_DBG(WLANIF, "  ssid: " FMT_SSID, FMT_SSID_BYTES(req->ssid.data.data(), req->ssid.len));
+  BRCMF_DBG(WLANIF, "  ssid: " FMT_SSID, FMT_SSID_BYTES(req->ssid().data.data(), req->ssid().len));
 #endif /* !defined(NDEBUG) */
+  if ((req->ssid().len != ifp->saved_softap_ssid.len) ||
+      (memcmp(req->ssid().data.data(), ifp->saved_softap_ssid.data.data(), req->ssid().len) != 0)) {
+    BRCMF_ERR("SSID does not match running SoftAP, req SSID: " FMT_SSID, " current SSID: " FMT_SSID,
+              FMT_SSID_BYTES(req->ssid().data.data(), req->ssid().len),
+              FMT_SSID_BYTES(ifp->saved_softap_ssid.data.data(), ifp->saved_softap_ssid.len));
+    result_code = fuchsia_wlan_fullmac_wire::WlanStopResult::kInternalError;
+    goto done;
+  }
 
-  fuchsia_wlan_fullmac_wire::WlanStopResult result_code = brcmf_cfg80211_stop_ap(ndev);
-  fuchsia_wlan_fullmac_wire::WlanFullmacStopConfirm result = {.result_code = result_code};
+  result_code = brcmf_cfg80211_stop_ap(ndev);
+done:
+  result = {.result_code = result_code};
 
   BRCMF_IFDBG(WLANIF, ndev, "Sending AP stop confirm to SME. result_code: %s",
               result_code == fuchsia_wlan_fullmac_wire::WlanStopResult ::kSuccess ? "success"

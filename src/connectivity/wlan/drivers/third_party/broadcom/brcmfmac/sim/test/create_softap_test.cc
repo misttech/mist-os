@@ -320,10 +320,10 @@ void CreateSoftAPTest::InjectSetSsidError() {
 void CreateSoftAPTest::SetExpectMacForInds(common::MacAddr set_mac) { ind_expect_mac_ = set_mac; }
 
 zx_status_t CreateSoftAPTest::StopSoftAP() {
-  wlan_fullmac_wire::WlanFullmacStopReq stop_req{
-      .ssid = {.len = 6, .data = {.data_ = "Sim_AP"}},
-  };
-  auto result = softap_ifc_.client_.buffer(softap_ifc_.test_arena_)->StopReq(stop_req);
+  auto builder = wlan_fullmac_wire::WlanFullmacImplStopBssRequest::Builder(test_arena_);
+  fuchsia_wlan_ieee80211::wire::CSsid ssid = {.len = 6, .data = {.data_ = "Sim_AP"}};
+  builder.ssid(ssid);
+  auto result = softap_ifc_.client_.buffer(softap_ifc_.test_arena_)->StopBss(builder.Build());
   EXPECT_TRUE(result.ok());
   return ZX_OK;
 }
@@ -541,6 +541,22 @@ TEST_F(CreateSoftAPTest, BssIovarFail) {
   StopSoftAP();
   VerifyStopAPConf(wlan_fullmac_wire::WlanStopResult::kSuccess);
 }
+
+TEST_F(CreateSoftAPTest, BssStopMissingParam) {
+  Init();
+  CreateInterface();
+  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 1u);
+  // Start SoftAP
+  StartSoftAP();
+  // Create the Stop BSS request without the SSID.
+  auto builder = wlan_fullmac_wire::WlanFullmacImplStopBssRequest::Builder(test_arena_);
+
+  auto result = softap_ifc_.client_.buffer(softap_ifc_.test_arena_)->StopBss(builder.Build());
+  EXPECT_TRUE(result.ok());
+  // Should have received a StartConf with kNotSupported result.
+  VerifyStopAPConf(wlan_fullmac_wire::WlanStopResult ::kInternalError);
+}
+
 // Start SoftAP in secure mode and then restart in open mode.
 // Appropriate secure mode is checked in StartSoftAP() after SoftAP
 // is started

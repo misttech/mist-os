@@ -234,6 +234,8 @@ struct brcmf_if {
   uint8_t mac_addr[ETH_ALEN];
   uint8_t netif_stop;
   fuchsia_wlan_fullmac::WlanFullmacImplConnectRequest connect_req;
+  // SSID of Successfully started SoftAP.
+  fuchsia_wlan_ieee80211::wire::CSsid saved_softap_ssid;
   reassoc_context_t reassoc_context;
   std::atomic<int> pend_8021x_cnt;
   sync_completion_t pend_8021x_wait;

@@ -83,7 +83,8 @@ void FullmacMlme::Init() {
           [](void *device, wlan_fullmac_impl_start_bss_request_t *req) {
             DEVICE(device)->StartBss(req);
           },
-      .stop_req = [](void *device, wlan_fullmac_stop_req_t *req) { DEVICE(device)->StopReq(req); },
+      .stop_bss = [](void *device,
+                     wlan_fullmac_impl_stop_bss_request_t *req) { DEVICE(device)->StopBss(req); },
       .set_keys_req = [](void *device,
                          wlan_fullmac_set_keys_req_t *req) -> wlan_fullmac_set_keys_resp_t {
         wlan_fullmac_set_keys_resp_t out_resp;

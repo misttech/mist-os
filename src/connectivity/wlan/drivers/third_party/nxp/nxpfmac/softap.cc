@@ -45,8 +45,7 @@ SoftAp::SoftAp(SoftApIfc* ifc, DeviceContext* context, uint32_t bss_index)
 
 SoftAp::~SoftAp() {
   // Attempt to stop the Soft AP and ignore the error.
-  fuchsia_wlan_fullmac::wire::WlanFullmacStopReq req = {.ssid = ssid_};
-  Stop(&req);
+  Stop(&ssid_);
 }
 
 wlan_fullmac_wire::WlanStartResult SoftAp::Start(
@@ -119,8 +118,7 @@ wlan_fullmac_wire::WlanStartResult SoftAp::Start(
   return wlan_fullmac_wire::WlanStartResult::kSuccess;
 }
 
-wlan_fullmac_wire::WlanStopResult SoftAp::Stop(
-    const fuchsia_wlan_fullmac::wire::WlanFullmacStopReq* req) {
+wlan_fullmac_wire::WlanStopResult SoftAp::Stop(const fuchsia_wlan_ieee80211::wire::CSsid* ssid) {
   {
     std::lock_guard lock(mutex_);
     if (!started_) {
@@ -128,8 +126,8 @@ wlan_fullmac_wire::WlanStopResult SoftAp::Stop(
       return wlan_fullmac_wire::WlanStopResult::kBssAlreadyStopped;
     }
     // Ensure the requested ssid matches the started ssid.
-    if (memcmp(req->ssid.data.data(), ssid_.data.data(), req->ssid.len) != 0) {
-      NXPF_ERR("Stop req ssid: %s does not match started ssid: %s", req->ssid.data.data(),
+    if (memcmp(ssid->data.data(), ssid_.data.data(), ssid->len) != 0) {
+      NXPF_ERR("Stop req ssid: %s does not match started ssid: %s", ssid->data.data(),
                ssid_.data.data());
       return wlan_fullmac_wire::WlanStopResult::kInternalError;
     }

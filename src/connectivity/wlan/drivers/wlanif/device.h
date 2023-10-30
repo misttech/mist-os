@@ -50,7 +50,7 @@ class Device : public ddk::Device<Device, ddk::Unbindable>,
   void Disassociate(const wlan_fullmac_impl_disassoc_request_t* req);
   void Reset(const wlan_fullmac_impl_reset_request_t* req);
   void StartBss(const wlan_fullmac_impl_start_bss_request_t* req);
-  void StopReq(const wlan_fullmac_stop_req_t* req);
+  void StopBss(const wlan_fullmac_impl_stop_bss_request_t* req);
   void SetKeysReq(const wlan_fullmac_set_keys_req_t* req, wlan_fullmac_set_keys_resp_t* out_resp);
   void DeleteKeysReq(const wlan_fullmac_del_keys_req_t* req);
   void EapolReq(const wlan_fullmac_eapol_req_t* req);

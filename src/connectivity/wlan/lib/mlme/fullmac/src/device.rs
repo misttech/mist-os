@@ -359,7 +359,10 @@ pub struct FullmacDeviceInterface {
         device: *mut c_void,
         req: *mut banjo_wlan_fullmac::WlanFullmacImplStartBssRequest,
     ),
-    stop_req: extern "C" fn(device: *mut c_void, req: *mut banjo_wlan_fullmac::WlanFullmacStopReq),
+    stop_bss: extern "C" fn(
+        device: *mut c_void,
+        req: *mut banjo_wlan_fullmac::WlanFullmacImplStopBssRequest,
+    ),
     set_keys_req: extern "C" fn(
         device: *mut c_void,
         req: *mut banjo_wlan_fullmac::WlanFullmacSetKeysReq,
@@ -470,8 +473,11 @@ impl FullmacDeviceInterface {
             &mut req as *mut banjo_wlan_fullmac::WlanFullmacImplStartBssRequest,
         )
     }
-    pub fn stop_req(&self, mut req: banjo_wlan_fullmac::WlanFullmacStopReq) {
-        (self.stop_req)(self.device, &mut req as *mut banjo_wlan_fullmac::WlanFullmacStopReq)
+    pub fn stop_bss(&self, mut req: banjo_wlan_fullmac::WlanFullmacImplStopBssRequest) {
+        (self.stop_bss)(
+            self.device,
+            &mut req as *mut banjo_wlan_fullmac::WlanFullmacImplStopBssRequest,
+        )
     }
     pub fn set_keys_req(
         &self,
@@ -572,8 +578,8 @@ pub mod test_utils {
         StartBss {
             req: banjo_wlan_fullmac::WlanFullmacImplStartBssRequest,
         },
-        StopReq {
-            req: banjo_wlan_fullmac::WlanFullmacStopReq,
+        StopBss {
+            req: banjo_wlan_fullmac::WlanFullmacImplStopBssRequest,
         },
         SetKeysReq {
             req: banjo_wlan_fullmac::WlanFullmacSetKeysReq,
@@ -684,7 +690,7 @@ pub mod test_utils {
                 disassoc: Self::disassoc,
                 reset: Self::reset,
                 start_bss: Self::start_bss,
-                stop_req: Self::stop_req,
+                stop_bss: Self::stop_bss,
                 set_keys_req: Self::set_keys_req,
                 del_keys_req: Self::del_keys_req,
                 eapol_req: Self::eapol_req,
@@ -866,13 +872,13 @@ pub mod test_utils {
         }
         // Cannot mark fn unsafe because it has to match fn signature in FullDeviceInterface
         #[allow(clippy::not_unsafe_ptr_arg_deref)]
-        pub extern "C" fn stop_req(
+        pub extern "C" fn stop_bss(
             device: *mut c_void,
-            req: *mut banjo_wlan_fullmac::WlanFullmacStopReq,
+            req: *mut banjo_wlan_fullmac::WlanFullmacImplStopBssRequest,
         ) {
             let device = unsafe { &mut *(device as *mut Self) };
             let req = unsafe { *req };
-            device.captured_driver_calls.push(DriverCall::StopReq { req });
+            device.captured_driver_calls.push(DriverCall::StopBss { req });
         }
         // Cannot mark fn unsafe because it has to match fn signature in FullDeviceInterface
         #[allow(clippy::not_unsafe_ptr_arg_deref)]

@@ -952,12 +952,13 @@ TEST_F(WlanInterfaceTest, WlanFullmacImplStartReq) {
             fuchsia_wlan_fullmac::wire::WlanStartResult::kSuccess);
 
   // And now ensure SoftAP Stop works ok.
-  fuchsia_wlan_fullmac::wire::WlanFullmacStopReq stop_req;
-  memcpy(stop_req.ssid.data.data(), kSoftApSsid, sizeof(kSoftApSsid));
-  stop_req.ssid.len = sizeof(kSoftApSsid);
+  fidl::Arena<sizeof(fuchsia_wlan_fullmac::wire::WlanFullmacImplStopBssRequest)> stop_arena;
+  auto stop_builder =
+      fuchsia_wlan_fullmac::wire::WlanFullmacImplStopBssRequest::Builder(stop_arena);
+  stop_builder.ssid(ssid);
 
   {
-    auto result = client_.buffer(test_arena_)->StopReq(stop_req);
+    auto result = client_.buffer(test_arena_)->StopBss(stop_builder.Build());
     ASSERT_TRUE(result.ok());
   }
 
@@ -1075,12 +1076,13 @@ TEST_F(WlanInterfaceTest, SoftApStaConnectDisconnect) {
   EXPECT_BYTES_EQ(ifc_results_.disassoc_ind_.peer_sta_address.data(), kTestSoftApClient, ETH_ALEN);
 
   // And now ensure SoftAP Stop works ok.
-  fuchsia_wlan_fullmac::wire::WlanFullmacStopReq stop_req = {};
-  memcpy(stop_req.ssid.data.data(), kSoftApSsid, sizeof(kSoftApSsid));
-  stop_req.ssid.len = sizeof(kSoftApSsid);
+  fidl::Arena<sizeof(fuchsia_wlan_fullmac::wire::WlanFullmacImplStopBssRequest)> stop_arena;
+  auto stop_builder =
+      fuchsia_wlan_fullmac::wire::WlanFullmacImplStopBssRequest::Builder(stop_arena);
+  stop_builder.ssid(ssid);
 
   {
-    auto result = client_.buffer(test_arena_)->StopReq(stop_req);
+    auto result = client_.buffer(test_arena_)->StopBss(stop_builder.Build());
     ASSERT_TRUE(result.ok());
   }
 
@@ -1204,12 +1206,13 @@ TEST_F(WlanInterfaceTest, SoftApStaLocalDisconnect) {
   EXPECT_BYTES_EQ(ifc_results_.deauth_conf_.peer_sta_address().data(), kTestSoftApClient, ETH_ALEN);
 
   // And now ensure SoftAP Stop works ok.
-  fuchsia_wlan_fullmac::wire::WlanFullmacStopReq stop_req;
-  memcpy(stop_req.ssid.data.data(), kSoftApSsid, sizeof(kSoftApSsid));
-  stop_req.ssid.len = sizeof(kSoftApSsid);
+  fidl::Arena<sizeof(fuchsia_wlan_fullmac::wire::WlanFullmacImplStopBssRequest)> stop_arena;
+  auto stop_builder =
+      fuchsia_wlan_fullmac::wire::WlanFullmacImplStopBssRequest::Builder(stop_arena);
+  stop_builder.ssid(ssid);
 
   {
-    auto result = client_.buffer(test_arena_)->StopReq(stop_req);
+    auto result = client_.buffer(test_arena_)->StopBss(stop_builder.Build());
     ASSERT_TRUE(result.ok());
   }
 

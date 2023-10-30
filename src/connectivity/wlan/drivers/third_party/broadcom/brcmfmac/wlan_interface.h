@@ -102,8 +102,8 @@ class WlanInterface : public ddk::Device<WlanInterface, ddk::Unbindable>,
   void Reset(ResetRequestView request, fdf::Arena& arena, ResetCompleter::Sync& completer) override;
   void StartBss(StartBssRequestView request, fdf::Arena& arena,
                 StartBssCompleter::Sync& completer) override;
-  void StopReq(StopReqRequestView request, fdf::Arena& arena,
-               StopReqCompleter::Sync& completer) override;
+  void StopBss(StopBssRequestView request, fdf::Arena& arena,
+               StopBssCompleter ::Sync& completer) override;
   void SetKeysReq(SetKeysReqRequestView request, fdf::Arena& arena,
                   SetKeysReqCompleter::Sync& completer) override;
   void DelKeysReq(DelKeysReqRequestView request, fdf::Arena& arena,

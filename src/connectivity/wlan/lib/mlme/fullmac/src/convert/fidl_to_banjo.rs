@@ -307,10 +307,10 @@ pub fn convert_start_bss_request(
     request
 }
 
-pub fn convert_stop_request(
+pub fn convert_stop_bss_request(
     req: &fidl_mlme::StopRequest,
-) -> banjo_wlan_fullmac::WlanFullmacStopReq {
-    banjo_wlan_fullmac::WlanFullmacStopReq { ssid: convert_ssid(&req.ssid[..]) }
+) -> banjo_wlan_fullmac::WlanFullmacImplStopBssRequest {
+    banjo_wlan_fullmac::WlanFullmacImplStopBssRequest { ssid: convert_ssid(&req.ssid[..]) }
 }
 
 pub fn convert_set_keys_request(

@@ -58,7 +58,7 @@ class SoftAp {
       const fuchsia_wlan_fullmac::wire::WlanFullmacImplStartBssRequest* req) __TA_EXCLUDES(mutex_);
 
   // Returns appropriate WlanStopResult.
-  wlan_fullmac_wire::WlanStopResult Stop(const fuchsia_wlan_fullmac::wire::WlanFullmacStopReq* req)
+  wlan_fullmac_wire::WlanStopResult Stop(const fuchsia_wlan_ieee80211::wire::CSsid* ssid)
       __TA_EXCLUDES(mutex_);
   zx_status_t DeauthSta(const uint8_t sta_mac_addr[ETH_ALEN], uint16_t reason_code)
       __TA_EXCLUDES(mutex_);

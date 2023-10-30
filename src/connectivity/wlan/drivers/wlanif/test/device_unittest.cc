@@ -178,8 +178,11 @@ struct WlanifDeviceTest : public ::zxtest::Test,
     EXPECT_EQ(request->has_ssid(), true);
     completer.buffer(arena).Reply();
   }
-  void StopReq(StopReqRequestView request, fdf::Arena& arena,
-               StopReqCompleter::Sync& completer) override {}
+  void StopBss(StopBssRequestView request, fdf::Arena& arena,
+               StopBssCompleter::Sync& completer) override {
+    EXPECT_EQ(request->has_ssid(), true);
+    completer.buffer(arena).Reply();
+  }
   void SetKeysReq(SetKeysReqRequestView request, fdf::Arena& arena,
                   SetKeysReqCompleter::Sync& completer) override {}
   void DelKeysReq(DelKeysReqRequestView request, fdf::Arena& arena,
@@ -325,6 +328,15 @@ TEST_F(WlanifDeviceTest, CheckStartBss) {
   memcpy(req.ssid.data, kPeerStaAddress, sizeof(kPeerStaAddress));
   req.ssid.len = sizeof(kPeerStaAddress);
   device_->StartBss(&req);
+}
+
+TEST_F(WlanifDeviceTest, CheckStopBss) {
+  device_->AddDevice();
+  device_->DdkAsyncRemove();
+  wlan_fullmac_impl_stop_bss_request_t req;
+  memcpy(req.ssid.data, kPeerStaAddress, sizeof(kPeerStaAddress));
+  req.ssid.len = sizeof(kPeerStaAddress);
+  device_->StopBss(&req);
 }
 
 TEST_F(WlanifDeviceTest, CheckReset) {
