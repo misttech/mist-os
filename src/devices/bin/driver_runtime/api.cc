@@ -285,3 +285,14 @@ __EXPORT void fdf_testing_quit() { driver_runtime::DispatcherCoordinator::Testin
 __EXPORT zx_status_t fdf_testing_reset_quit() {
   return driver_runtime::DispatcherCoordinator::TestingResetQuit();
 }
+
+__EXPORT uint32_t fdf_env_get_thread_limit(const char* scheduler_role, size_t scheduler_role_len) {
+  return driver_runtime::DispatcherCoordinator::GetThreadLimit(
+      std::string_view(scheduler_role, scheduler_role_len));
+}
+
+__EXPORT zx_status_t fdf_env_set_thread_limit(const char* scheduler_role, size_t scheduler_role_len,
+                                              uint32_t max_threads) {
+  return driver_runtime::DispatcherCoordinator::SetThreadLimit(
+      std::string_view(scheduler_role, scheduler_role_len), max_threads);
+}

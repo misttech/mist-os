@@ -146,17 +146,31 @@ class Dispatcher : public async_dispatcher_t,
     void OnThreadWakeup();
 
     // Returns the number of threads that have been started on |loop_|.
-    uint32_t num_threads() {
+    uint32_t num_threads() const {
       fbl::AutoLock al(&lock_);
       return num_threads_;
     }
 
-    uint32_t num_dispatchers() {
+    uint32_t max_threads() const {
+      fbl::AutoLock al(&lock_);
+      return max_threads_;
+    }
+
+    zx_status_t set_max_threads(uint32_t max_threads) {
+      fbl::AutoLock al(&lock_);
+      if (max_threads < num_threads_) {
+        return ZX_ERR_OUT_OF_RANGE;
+      }
+      max_threads_ = max_threads;
+      return ZX_OK;
+    }
+
+    uint32_t num_dispatchers() const {
       fbl::AutoLock al(&lock_);
       return num_dispatchers_;
     }
 
-    std::string_view scheduler_role() { return scheduler_role_; }
+    std::string_view scheduler_role() const { return scheduler_role_; }
     async::Loop* loop() { return &loop_; }
 
    private:
@@ -226,12 +240,18 @@ class Dispatcher : public async_dispatcher_t,
 
     std::string scheduler_role_;
 
-    fbl::Mutex lock_;
+    mutable fbl::Mutex lock_;
     // Tracks the number of dispatchers which have sync calls allowed. We will only spawn additional
     // threads if this number exceeds |number_threads_|.
     uint32_t dispatcher_threads_needed_ __TA_GUARDED(&lock_) = 0;
     // Tracks the number of threads we've spawned via |loop_|.
     uint32_t num_threads_ __TA_GUARDED(&lock_) = 0;
+    // Total number of threads we will spawn.
+    // TODO(fxbug.dev/135980): We are clamping number_threads_ to 10 to avoid spawning too many
+    // threads. Technically this can result in a deadlock scenario in a very complex driver host. We
+    // need better support for dynamically starting threads as necessary.
+    uint32_t max_threads_ __TA_GUARDED(&lock_) = 10;
+
     uint32_t num_dispatchers_ __TA_GUARDED(&lock_) = 0;
 
     // Stores unbound irqs which will be garbage collected at a later time.
@@ -769,6 +789,10 @@ class DispatcherCoordinator {
   static zx_status_t TokenRegister(zx_handle_t token, fdf_dispatcher_t* dispatcher,
                                    fdf_token_t* handler);
   static zx_status_t TokenTransfer(zx_handle_t token, fdf_handle_t channel);
+
+  // Implementation of fdf_env_*.
+  static uint32_t GetThreadLimit(std::string_view scheduler_role);
+  static zx_status_t SetThreadLimit(std::string_view scheduler_role, uint32_t max_threads);
 
   // Returns ZX_OK if |dispatcher| was added successfully.
   // Returns ZX_ERR_BAD_STATE if the driver is currently shutting down.

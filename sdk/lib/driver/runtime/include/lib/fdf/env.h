@@ -104,6 +104,29 @@ const void* fdf_env_get_current_driver(void);
 // Returns whether the dispatcher has any queued tasks.
 bool fdf_env_dispatcher_has_queued_tasks(fdf_dispatcher_t* dispatcher);
 
+// Returns the current maximum number of threads which will be spawned for thread pool associated
+// with the given scheduler role.
+//
+// |scheduler_role| is the name of the role which is passed when creating dispatchers.
+// |scheduler_role_len | is the length of the string, without including the terminating
+// NULL character.
+uint32_t fdf_env_get_thread_limit(const char* scheduler_role, size_t scheduler_role_len);
+
+// Sets the number of threads which will be spawned for thread pool associated with the given
+// scheduler role. It cannot shrink the limit less to a value lower than the current number of
+// threads in the thread pool.
+//
+// |scheduler_role| is the name of the role which is passed when creating dispatchers.
+// |scheduler_role_len | is the length of the string, without including the terminating
+// NULL character.
+// |max_threads| is the number of threads to use as new limit.
+//
+// # Errors
+//
+// ZX_ERR_OUT_OF_RANGE: |max_threads| is less that the current number of threads.
+zx_status_t fdf_env_set_thread_limit(const char* scheduler_role, size_t scheduler_role_len,
+                                     uint32_t max_threads);
+
 __END_CDECLS
 
 #endif  // LIB_FDF_ENV_H_

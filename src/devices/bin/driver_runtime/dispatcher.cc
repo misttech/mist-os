@@ -1585,6 +1585,33 @@ zx_status_t DispatcherCoordinator::AddDispatcher(fbl::RefPtr<Dispatcher> dispatc
   return ZX_OK;
 }
 
+// static
+uint32_t DispatcherCoordinator::GetThreadLimit(std::string_view scheduler_role) {
+  auto thread_pool = GetDispatcherCoordinator().default_thread_pool();
+  if (scheduler_role != Dispatcher::ThreadPool::kNoSchedulerRole) {
+    auto result = GetDispatcherCoordinator().GetOrCreateThreadPool(scheduler_role);
+    if (result.is_error()) {
+      return 0;
+    }
+    thread_pool = *result;
+  }
+  return thread_pool->max_threads();
+}
+
+// static
+zx_status_t DispatcherCoordinator::SetThreadLimit(std::string_view scheduler_role,
+                                                  uint32_t max_threads) {
+  auto thread_pool = GetDispatcherCoordinator().default_thread_pool();
+  if (scheduler_role != Dispatcher::ThreadPool::kNoSchedulerRole) {
+    auto result = GetDispatcherCoordinator().GetOrCreateThreadPool(scheduler_role);
+    if (result.is_error()) {
+      return 0;
+    }
+    thread_pool = *result;
+  }
+  return thread_pool->set_max_threads(max_threads);
+}
+
 void DispatcherCoordinator::NotifyDispatcherShutdown(
     Dispatcher& dispatcher, fdf_dispatcher_shutdown_observer_t* dispatcher_shutdown_observer) {
   DriverState::DriverShutdownCallback shutdown_callback = nullptr;
@@ -1806,10 +1833,7 @@ zx_status_t Dispatcher::ThreadPool::AddThread() {
     return ZX_OK;
   }
 
-  // TODO(surajmalhotra): We are clamping number_threads_ to 10 to avoid spawning too many threads.
-  // Technically this can result in a deadlock scenario in a very complex driver host. We need
-  // better support for dynamically starting threads as necessary.
-  if (num_threads_ >= dispatcher_threads_needed_ || num_threads_ == 10) {
+  if (num_threads_ >= dispatcher_threads_needed_ || num_threads_ == max_threads_) {
     return ZX_OK;
   }
   auto name = "fdf-dispatcher-thread-" + std::to_string(num_threads_);
@@ -1857,6 +1881,7 @@ void Dispatcher::ThreadPool::Reset() {
 
   {
     fbl::AutoLock al(&lock_);
+    max_threads_ = 10;
     num_threads_ = 0;
     dispatcher_threads_needed_ = 0;
     num_dispatchers_ = 0;
