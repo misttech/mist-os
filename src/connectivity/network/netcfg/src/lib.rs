@@ -4511,9 +4511,9 @@ mod tests {
         {"device_classes": ["ethernet", "wlan", "wlanap"]},
         {"topological_path": "abcde"},
         {"any": true}
-    ],
-        "naming_scheme": []
-    } ]
+    ], "naming_scheme": [
+        { "static": "x" }
+    ] } ]
 }
 "#;
 
@@ -4578,7 +4578,7 @@ mod tests {
                 interface::MatchingRule::TopologicalPath(glob::Pattern::new("abcde").unwrap()),
                 interface::MatchingRule::Any(true),
             ]),
-            naming_scheme: Vec::new(),
+            naming_scheme: vec![interface::NameCompositionRule::Static("x".to_owned())],
         }]);
         assert_eq!(interface_naming_policy, expected_naming_policy);
     }
@@ -4863,6 +4863,40 @@ mod tests {
   "interface_naming_policy": [{
     "matchers": [ { "any": "speling" } ],
     "naming_scheme": []
+  }]
+}
+"#,
+            r#"
+{
+  "dns_config": { "servers": [] },
+  "filter_config": {
+    "rules": [],
+    "nat_rules": [],
+    "rdr_rules": []
+  },
+  "filter_enabled_interface_types": [],
+  "allowed_upstream_device_classes": [],
+  "forwarded_device_classes": { "ipv4": [], "ipv6": [] },
+  "interface_naming_policy": [{
+    "matchers": [ { "any": true } ],
+    "naming_scheme": [ { "speling": "" } ]
+  }]
+}
+"#,
+            r#"
+{
+  "dns_config": { "servers": [] },
+  "filter_config": {
+    "rules": [],
+    "nat_rules": [],
+    "rdr_rules": []
+  },
+  "filter_enabled_interface_types": [],
+  "allowed_upstream_device_classes": [],
+  "forwarded_device_classes": { "ipv4": [], "ipv6": [] },
+  "interface_naming_policy": [{
+    "matchers": [ { "any": true } ],
+    "naming_scheme": [ { "dynamic": "speling" } ]
   }]
 }
 "#,

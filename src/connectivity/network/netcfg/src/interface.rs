@@ -443,10 +443,30 @@ impl MatchingRule {
     }
 }
 
-// TODO(fxbug.dev/135097): Create framework for meta/static naming rules
+// TODO(fxbug.dev/135106): Create dynamic naming rules
+// A naming rule that uses device information to produce a component of
+// the interface's name.
 #[derive(Debug, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "lowercase")]
-pub enum NameCompositionRule {}
+pub enum DynamicNameCompositionRule {}
+
+impl DynamicNameCompositionRule {
+    // TODO(fxbug.dev/135106): Make use of this function when rules are implemented
+    #[allow(unused)]
+    fn get_name(&self, _info: &devices::DeviceInfo) -> &str {
+        match *self {}
+    }
+}
+
+// A rule that dictates a component of an interface's name. An interface's name
+// will be determined by extracting the name of each rule, in order, and
+// concatenating the results.
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields, rename_all = "lowercase")]
+pub enum NameCompositionRule {
+    Static(String),
+    Dynamic(DynamicNameCompositionRule),
+}
 
 /// A rule that dictates how interfaces that align with the property matching
 /// rules should be named.
@@ -459,7 +479,7 @@ pub struct NamingRule {
     #[allow(unused)]
     pub matchers: HashSet<MatchingRule>,
     // TODO(fxbug.dev/135098): Add static naming rules
-    // TODO(fxbug.dev/135106): Add meta naming rules
+    // TODO(fxbug.dev/135106): Add dynamic naming rules
     /// The rules to apply to the interface to produce the interface's name.
     #[allow(unused)]
     pub naming_scheme: Vec<NameCompositionRule>,
