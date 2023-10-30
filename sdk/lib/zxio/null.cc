@@ -32,7 +32,7 @@ void zxio_default_wait_end(zxio_t* io, zx_signals_t zx_signals, zxio_signals_t* 
 
 zx_status_t zxio_default_sync(zxio_t* io) { return ZX_ERR_NOT_SUPPORTED; }
 
-zx_status_t zxio_default_attr_get(zxio_t* io, zxio_node_attributes_t* out_attr) {
+zx_status_t zxio_default_attr_get(zxio_t* io, zxio_node_attributes_t* inout_attr) {
   return ZX_ERR_NOT_SUPPORTED;
 }
 

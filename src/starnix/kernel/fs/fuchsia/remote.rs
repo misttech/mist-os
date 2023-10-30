@@ -184,7 +184,10 @@ impl RemoteFs {
                         ),
                         rights,
                     };
-                    let attrs = remote_node.zxio.attr_get().map_err(|_| errno!(EIO))?;
+                    let attrs = remote_node
+                        .zxio
+                        .attr_get(zxio_node_attr_has_t { id: true, ..Default::default() })
+                        .map_err(|_| errno!(EIO))?;
                     (remote_node, attrs.id, false)
                 }
                 Err(status) => return Err(from_status_like_fdio!(status)),
@@ -252,7 +255,16 @@ pub fn new_remote_file(
     let handle_type =
         handle.basic_info().map_err(|status| from_status_like_fdio!(status))?.object_type;
     let zxio = Zxio::create(handle).map_err(|status| from_status_like_fdio!(status))?;
-    let attrs = zxio.attr_get().map_err(|status| from_status_like_fdio!(status))?;
+    let attrs = zxio
+        .attr_get(zxio_node_attr_has_t {
+            protocols: true,
+            abilities: true,
+            content_size: true,
+            storage_size: true,
+            link_count: true,
+            ..Default::default()
+        })
+        .map_err(|status| from_status_like_fdio!(status))?;
     let mode = get_mode(&attrs)?;
     let ops: Box<dyn FileOps> = match handle_type {
         zx::ObjectType::CHANNEL | zx::ObjectType::VMO | zx::ObjectType::DEBUGLOG => {
@@ -400,7 +412,14 @@ impl FsNodeOps for RemoteNode {
             );
             // Unfortunately, remote filesystems that don't support open2 require another
             // round-trip.
-            let attrs = zxio.attr_get().map_err(|status| from_status_like_fdio!(status, name))?;
+            let attrs = zxio
+                .attr_get(zxio_node_attr_has_t {
+                    protocols: true,
+                    abilities: true,
+                    id: true,
+                    ..Default::default()
+                })
+                .map_err(|status| from_status_like_fdio!(status, name))?;
             mode = get_mode(&attrs)?;
             node_id = attrs.id;
         }
@@ -484,7 +503,10 @@ impl FsNodeOps for RemoteNode {
 
             // Unfortunately, remote filesystems that don't support open2 require another
             // round-trip.
-            node_id = zxio.attr_get().map_err(|status| from_status_like_fdio!(status, name))?.id;
+            node_id = zxio
+                .attr_get(zxio_node_attr_has_t { id: true, ..Default::default() })
+                .map_err(|status| from_status_like_fdio!(status, name))?
+                .id;
         }
 
         let ops = RemoteNode { zxio, rights: self.rights };
@@ -562,7 +584,14 @@ impl FsNodeOps for RemoteNode {
 
             // Unfortunately, remote filesystems that don't support open2 require another
             // round-trip.
-            let attrs = zxio.attr_get().map_err(|status| from_status_like_fdio!(status))?;
+            let attrs = zxio
+                .attr_get(zxio_node_attr_has_t {
+                    protocols: true,
+                    abilities: true,
+                    id: true,
+                    ..Default::default()
+                })
+                .map_err(|status| from_status_like_fdio!(status))?;
             mode = get_mode(&attrs)?;
             node_id = attrs.id;
             rdev = DeviceType::from_bits(0);
@@ -653,7 +682,15 @@ impl FsNodeOps for RemoteNode {
         _current_task: &CurrentTask,
         info: &'a RwLock<FsNodeInfo>,
     ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
-        let attrs = self.zxio.attr_get().map_err(|status| from_status_like_fdio!(status))?;
+        let attrs = self
+            .zxio
+            .attr_get(zxio_node_attr_has_t {
+                content_size: true,
+                storage_size: true,
+                link_count: true,
+                ..Default::default()
+            })
+            .map_err(|status| from_status_like_fdio!(status))?;
         let mut info = info.write();
         update_info_from_attrs(&mut info, &attrs);
         Ok(RwLockWriteGuard::downgrade(info))
@@ -710,7 +747,9 @@ impl FsNodeOps for RemoteNode {
         let fs_ops = RemoteFs::from_fs(&fs);
 
         let node_id = if fs_ops.use_remote_ids {
-            let attrs = zxio.attr_get().map_err(|status| from_status_like_fdio!(status))?;
+            let attrs = zxio
+                .attr_get(zxio_node_attr_has_t { id: true, ..Default::default() })
+                .map_err(|status| from_status_like_fdio!(status))?;
             attrs.id
         } else {
             fs.next_node_id()

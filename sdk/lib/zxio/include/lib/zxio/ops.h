@@ -42,7 +42,7 @@ typedef struct zxio_ops {
                      zx_signals_t* out_zx_signals);
   void (*wait_end)(zxio_t* io, zx_signals_t zx_signals, zxio_signals_t* out_zxio_signals);
   zx_status_t (*sync)(zxio_t* io);
-  zx_status_t (*attr_get)(zxio_t* io, zxio_node_attributes_t* out_attr);
+  zx_status_t (*attr_get)(zxio_t* io, zxio_node_attributes_t* inout_attr);
   zx_status_t (*attr_set)(zxio_t* io, const zxio_node_attributes_t* attr);
   zx_status_t (*readv)(zxio_t* io, const zx_iovec_t* vector, size_t vector_count,
                        zxio_flags_t flags, size_t* out_actual);

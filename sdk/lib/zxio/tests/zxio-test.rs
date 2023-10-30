@@ -741,3 +741,64 @@ async fn test_allocate_file_not_sup() {
     })
     .await;
 }
+
+#[fuchsia::test]
+async fn test_get_set_attributes_node() {
+    let fixture = TestFixture::new().await;
+
+    let (dir_client, dir_server) = zx::Channel::create();
+    fixture
+        .root()
+        .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, dir_server.into())
+        .expect("clone failed");
+
+    fasync::unblock(|| {
+        let dir_zxio = Zxio::create(dir_client.into_handle()).expect("create failed");
+
+        dir_zxio
+            .open_node(".", fio::NodeProtocolFlags::MUST_BE_DIRECTORY, None)
+            .expect("open_node failed");
+
+        // Create a file.
+        let test_file = dir_zxio
+            .open2(
+                "test_file",
+                OpenOptions {
+                    mode: fio::OpenMode::AlwaysCreate,
+                    ..OpenOptions::file(fio::FileProtocolFlags::empty())
+                },
+                None,
+            )
+            .expect("open2 failed");
+
+        let attr = zxio_node_attributes_t {
+            gid: 111,
+            access_time: 222,
+            modification_time: 333,
+            has: zxio_node_attr_has_t {
+                gid: true,
+                access_time: true,
+                modification_time: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        test_file.attr_set(&attr).expect("attr_set failed");
+
+        let query = zxio_node_attr_has_t {
+            gid: true,
+            access_time: true,
+            modification_time: true,
+            ..Default::default()
+        };
+
+        let attributes = test_file.attr_get(query).expect("attr_get failed");
+        assert_eq!(attributes.gid, 111);
+        assert_eq!(attributes.access_time, 222);
+        assert_eq!(attributes.modification_time, 333);
+    })
+    .await;
+
+    fixture.close().await;
+}

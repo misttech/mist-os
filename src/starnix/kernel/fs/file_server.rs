@@ -646,7 +646,7 @@ mod tests {
     use crate::{fs::tmpfs::TmpFs, testing::*};
     use fuchsia_async as fasync;
     use std::collections::HashSet;
-    use syncio::Zxio;
+    use syncio::{zxio_node_attr_has_t, Zxio};
 
     fn assert_directory_content(zxio: &Zxio, content: &[&[u8]]) {
         let expected = content.iter().map(|x| x.to_vec()).collect::<HashSet<_>>();
@@ -676,7 +676,9 @@ mod tests {
             // Check that one can reiterate from the start.
             assert_directory_content(&root_zxio, &[b"."]);
 
-            let attrs = root_zxio.attr_get().expect("attr_get");
+            let attrs = root_zxio
+                .attr_get(zxio_node_attr_has_t { id: true, ..Default::default() })
+                .expect("attr_get");
             assert_eq!(attrs.id, fs.dev_id.bits());
 
             let mut attrs = syncio::zxio_node_attributes_t::default();
@@ -685,7 +687,13 @@ mod tests {
             attrs.creation_time = 0;
             attrs.modification_time = 42;
             root_zxio.attr_set(&attrs).expect("attr_set");
-            let attrs = root_zxio.attr_get().expect("attr_get");
+            let attrs = root_zxio
+                .attr_get(zxio_node_attr_has_t {
+                    creation_time: true,
+                    modification_time: true,
+                    ..Default::default()
+                })
+                .expect("attr_get");
             assert_eq!(attrs.creation_time, 0);
             assert_eq!(attrs.modification_time, 42);
 
@@ -714,7 +722,9 @@ mod tests {
             assert_eq!(foo_zxio.read(&mut buffer).expect("read"), 5);
             assert_eq!(&buffer[..5], b"hecho");
 
-            let attrs = foo_zxio.attr_get().expect("attr_get");
+            let attrs = foo_zxio
+                .attr_get(zxio_node_attr_has_t { id: true, ..Default::default() })
+                .expect("attr_get");
             assert_eq!(attrs.id, fs.dev_id.bits());
 
             let mut attrs = syncio::zxio_node_attributes_t::default();
@@ -723,7 +733,13 @@ mod tests {
             attrs.creation_time = 0;
             attrs.modification_time = 42;
             foo_zxio.attr_set(&attrs).expect("attr_set");
-            let attrs = foo_zxio.attr_get().expect("attr_get");
+            let attrs = foo_zxio
+                .attr_get(zxio_node_attr_has_t {
+                    creation_time: true,
+                    modification_time: true,
+                    ..Default::default()
+                })
+                .expect("attr_get");
             assert_eq!(attrs.creation_time, 0);
             assert_eq!(attrs.modification_time, 42);
 

@@ -197,7 +197,9 @@ ZXIO_EXPORT void zxio_wait_end(zxio_t* io, zx_signals_t zx_signals,
 ZXIO_EXPORT zx_status_t zxio_sync(zxio_t* io);
 
 // Returns information about the file.
-ZXIO_EXPORT zx_status_t zxio_attr_get(zxio_t* io, zxio_node_attributes_t* out_attr);
+//
+// |inout_attr->has| must be initialized to indicate which attributes are to be returned.
+ZXIO_EXPORT zx_status_t zxio_attr_get(zxio_t* io, zxio_node_attributes_t* inout_attr);
 
 // Update information about the file.
 //

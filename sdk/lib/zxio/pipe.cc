@@ -33,12 +33,12 @@ static constexpr zxio_ops_t zxio_pipe_ops = []() {
     return ZX_OK;
   };
 
-  ops.attr_get = [](zxio_t* io, zxio_node_attributes_t* out_attr) {
-    zxio_node_attributes_t attr = {};
-    ZXIO_NODE_ATTR_SET(
-        attr, abilities,
-        ZXIO_OPERATION_READ_BYTES | ZXIO_OPERATION_WRITE_BYTES | ZXIO_OPERATION_GET_ATTRIBUTES);
-    *out_attr = attr;
+  ops.attr_get = [](zxio_t* io, zxio_node_attributes_t* inout_attr) {
+    if (inout_attr->has.abilities) {
+      ZXIO_NODE_ATTR_SET(
+          *inout_attr, abilities,
+          ZXIO_OPERATION_READ_BYTES | ZXIO_OPERATION_WRITE_BYTES | ZXIO_OPERATION_GET_ATTRIBUTES);
+    }
     return ZX_OK;
   };
 

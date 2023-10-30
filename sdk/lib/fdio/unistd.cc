@@ -551,7 +551,16 @@ zx_status_t fdio_wait(const fdio_ptr& io, uint32_t events, zx::time deadline,
 }
 
 static zx_status_t fdio_stat(const fdio_ptr& io, struct stat* s) {
-  zxio_node_attributes_t attr;
+  zxio_node_attributes_t attr = {.has = {
+                                     .protocols = true,
+                                     .abilities = true,
+                                     .id = true,
+                                     .content_size = true,
+                                     .storage_size = true,
+                                     .link_count = true,
+                                     .creation_time = true,
+                                     .modification_time = true,
+                                 }};
   const zx_status_t status = io->get_attr(&attr);
   if (status != ZX_OK) {
     return status;

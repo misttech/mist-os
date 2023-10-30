@@ -48,7 +48,7 @@ static zx_status_t read_file_into_vmo(zxio_t* io, zx_handle_t* out_vmo) {
 
   auto current_vmar = zx::vmar::root_self();
 
-  zxio_node_attributes_t attr;
+  zxio_node_attributes_t attr = {.has = {.content_size = true}};
   zx_status_t status = zxio_attr_get(io, &attr);
   if (status != ZX_OK) {
     return status;

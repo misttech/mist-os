@@ -791,8 +791,11 @@ impl Zxio {
         Ok(zx::Vmo::from(handle))
     }
 
-    pub fn attr_get(&self) -> Result<zxio_node_attributes_t, zx::Status> {
-        let mut attributes = zxio_node_attributes_t::default();
+    pub fn attr_get(
+        &self,
+        query: zxio_node_attr_has_t,
+    ) -> Result<zxio_node_attributes_t, zx::Status> {
+        let mut attributes = zxio_node_attributes_t { has: query, ..Default::default() };
         let status = unsafe { zxio::zxio_attr_get(self.as_ptr(), &mut attributes) };
         zx::ok(status)?;
         Ok(attributes)

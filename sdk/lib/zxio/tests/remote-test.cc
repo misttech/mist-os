@@ -98,7 +98,9 @@ TEST_F(Remote, ServiceGetAttributes) {
   };
   ASSERT_NO_FAILURES(StartServer<TestServer>());
 
-  zxio_node_attributes_t attr = {};
+  zxio_node_attributes_t attr = {.has = {
+                                     .protocols = true,
+                                 }};
   ASSERT_OK(zxio_attr_get(&remote_.io, &attr));
   EXPECT_EQ(ZXIO_NODE_PROTOCOL_FILE, attr.protocols);
 }

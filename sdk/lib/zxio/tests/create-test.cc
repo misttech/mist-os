@@ -667,7 +667,7 @@ TEST(CreateVmofileWithTypeTest, File) {
   ASSERT_OK(zxio_create_with_type(&storage, ZXIO_OBJECT_TYPE_VMO, vmo.release(), stream.release()));
   zxio_t* zxio = &storage.io;
 
-  zxio_node_attributes_t attr;
+  zxio_node_attributes_t attr = {.has = {.content_size = true}};
   EXPECT_OK(zxio_attr_get(zxio, &attr));
 
   EXPECT_TRUE(attr.has.content_size);
@@ -694,7 +694,7 @@ TEST(CreateVmoWithTypeWrapperTest, File) {
   ASSERT_OK(zxio::CreateVmo(&storage, std::move(vmo), std::move(stream)));
   zxio_t* zxio = &storage.io;
 
-  zxio_node_attributes_t attr;
+  zxio_node_attributes_t attr = {.has = {.content_size = true}};
   EXPECT_OK(zxio_attr_get(zxio, &attr));
 
   EXPECT_TRUE(attr.has.content_size);

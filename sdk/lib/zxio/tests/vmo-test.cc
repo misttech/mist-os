@@ -25,7 +25,7 @@ TEST(Vmo, Create) {
   ASSERT_OK(zxio_create(backing.release(), &storage));
   zxio_t* io = &storage.io;
 
-  zxio_node_attributes_t attr = {};
+  zxio_node_attributes_t attr = {.has = {.content_size = true}};
   ASSERT_OK(zxio_attr_get(io, &attr));
   EXPECT_EQ(kSize, attr.content_size);
   ASSERT_STATUS(ZX_ERR_NOT_SUPPORTED, zxio_attr_set(io, &attr));
@@ -64,7 +64,7 @@ TEST_F(VmoTest, Basic) {
   ASSERT_OK(zxio_clone(io, clone.reset_and_get_address()));
   ASSERT_STATUS(ZX_ERR_NOT_SUPPORTED, zxio_sync(io));
 
-  zxio_node_attributes_t attr = {};
+  zxio_node_attributes_t attr = {.has = {.content_size = true}};
   ASSERT_OK(zxio_attr_get(io, &attr));
   EXPECT_EQ(kSize, attr.content_size);
   ASSERT_STATUS(ZX_ERR_NOT_SUPPORTED, zxio_attr_set(io, &attr));

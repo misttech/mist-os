@@ -538,6 +538,8 @@ pub struct zxio_node_attr {
     pub link_count: u64,
     pub creation_time: u64,
     pub modification_time: u64,
+    pub change_time: u64,
+    pub access_time: u64,
     pub mode: u32,
     pub uid: u32,
     pub gid: u32,
@@ -557,6 +559,8 @@ pub struct zxio_node_attr_zxio_node_attr_has_t {
     pub link_count: bool,
     pub creation_time: bool,
     pub modification_time: bool,
+    pub change_time: bool,
+    pub access_time: bool,
     pub mode: bool,
     pub uid: bool,
     pub gid: bool,
@@ -732,7 +736,7 @@ extern "C" {
     pub fn zxio_sync(io: *mut zxio_t) -> zx_status_t;
 }
 extern "C" {
-    pub fn zxio_attr_get(io: *mut zxio_t, out_attr: *mut zxio_node_attributes_t) -> zx_status_t;
+    pub fn zxio_attr_get(io: *mut zxio_t, inout_attr: *mut zxio_node_attributes_t) -> zx_status_t;
 }
 extern "C" {
     pub fn zxio_attr_set(io: *mut zxio_t, attr: *const zxio_node_attributes_t) -> zx_status_t;

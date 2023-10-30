@@ -45,18 +45,23 @@ class Vmo : public HasIo {
     return ZX_OK;
   }
 
-  zx_status_t AttrGet(zxio_node_attributes_t* out_attr) {
+  zx_status_t AttrGet(zxio_node_attributes_t* inout_attr) {
     uint64_t content_size;
     if (zx_status_t status =
             vmo_.get_property(ZX_PROP_VMO_CONTENT_SIZE, &content_size, sizeof(content_size));
         status != ZX_OK) {
       return status;
     }
-    *out_attr = {};
-    ZXIO_NODE_ATTR_SET(*out_attr, protocols, ZXIO_NODE_PROTOCOL_FILE);
-    ZXIO_NODE_ATTR_SET(*out_attr, abilities,
-                       ZXIO_OPERATION_READ_BYTES | ZXIO_OPERATION_GET_ATTRIBUTES);
-    ZXIO_NODE_ATTR_SET(*out_attr, content_size, content_size);
+    if (inout_attr->has.protocols) {
+      ZXIO_NODE_ATTR_SET(*inout_attr, protocols, ZXIO_NODE_PROTOCOL_FILE);
+    }
+    if (inout_attr->has.abilities) {
+      ZXIO_NODE_ATTR_SET(*inout_attr, abilities,
+                         ZXIO_OPERATION_READ_BYTES | ZXIO_OPERATION_GET_ATTRIBUTES);
+    }
+    if (inout_attr->has.content_size) {
+      ZXIO_NODE_ATTR_SET(*inout_attr, content_size, content_size);
+    }
     return ZX_OK;
   }
 

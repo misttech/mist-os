@@ -228,6 +228,12 @@ typedef struct zxio_node_attr {
   // Time of last modification in ns since Unix epoch, UTC.
   uint64_t modification_time;
 
+  // Time of last status change in ns since Unix epoch, UTC.
+  uint64_t change_time;
+
+  // Time of last access in ns since Unix epoch, UTC.
+  uint64_t access_time;
+
   // POSIX attributes.
   uint32_t mode;
   uint32_t uid;
@@ -249,6 +255,8 @@ typedef struct zxio_node_attr {
     bool link_count;
     bool creation_time;
     bool modification_time;
+    bool change_time;
+    bool access_time;
     bool mode;
     bool uid;
     bool gid;
@@ -259,8 +267,9 @@ typedef struct zxio_node_attr {
       return protocols == other.protocols && abilities == other.abilities && id == other.id &&
              content_size == other.content_size && storage_size == other.storage_size &&
              link_count == other.link_count && creation_time == other.creation_time &&
-             modification_time == other.modification_time && mode == other.mode &&
-             uid == other.uid && gid == other.gid && rdev == other.rdev;
+             modification_time == other.modification_time && change_time == other.change_time &&
+             access_time == other.access_time && mode == other.mode && uid == other.uid &&
+             gid == other.gid && rdev == other.rdev;
     }
     constexpr bool operator!=(const zxio_node_attr_has_t& other) const { return !(*this == other); }
 #endif  // _cplusplus
@@ -293,6 +302,12 @@ typedef struct zxio_node_attr {
       return false;
     }
     if (has.modification_time && (modification_time != other.modification_time)) {
+      return false;
+    }
+    if (has.change_time && (change_time != other.change_time)) {
+      return false;
+    }
+    if (has.access_time && (access_time != other.access_time)) {
       return false;
     }
     if (has.mode && (mode != other.mode)) {

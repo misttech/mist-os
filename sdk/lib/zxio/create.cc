@@ -112,74 +112,6 @@ class ZxioCreateOnRepresentationEventHandler final : public fidl::WireSyncEventH
   zx_status_t& status_;
 };
 
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
-
-zx_status_t fill_in_attributes(fio::wire::NodeAttributes2 in, zxio_node_attributes_t& out) {
-  if (out.has.protocols) {
-    if (!in.immutable_attributes.has_protocols())
-      return ZX_ERR_INVALID_ARGS;
-    out.protocols = uint64_t(in.immutable_attributes.protocols());
-  }
-  if (out.has.abilities) {
-    if (!in.immutable_attributes.has_abilities())
-      return ZX_ERR_INVALID_ARGS;
-    out.abilities = uint64_t(in.immutable_attributes.abilities());
-  }
-  if (out.has.id) {
-    if (!in.immutable_attributes.has_id())
-      return ZX_ERR_INVALID_ARGS;
-    out.id = in.immutable_attributes.id();
-  }
-  if (out.has.content_size) {
-    if (!in.immutable_attributes.has_content_size())
-      return ZX_ERR_INVALID_ARGS;
-    out.content_size = in.immutable_attributes.content_size();
-  }
-  if (out.has.storage_size) {
-    if (!in.immutable_attributes.has_storage_size())
-      return ZX_ERR_INVALID_ARGS;
-    out.storage_size = in.immutable_attributes.storage_size();
-  }
-  if (out.has.link_count) {
-    if (!in.immutable_attributes.has_link_count())
-      return ZX_ERR_INVALID_ARGS;
-    out.link_count = in.immutable_attributes.link_count();
-  }
-  if (out.has.creation_time) {
-    if (!in.mutable_attributes.has_creation_time())
-      return ZX_ERR_INVALID_ARGS;
-    out.creation_time = in.mutable_attributes.creation_time();
-  }
-  if (out.has.modification_time) {
-    if (!in.mutable_attributes.has_modification_time())
-      return ZX_ERR_INVALID_ARGS;
-    out.modification_time = in.mutable_attributes.modification_time();
-  }
-  if (out.has.mode) {
-    if (!in.mutable_attributes.has_mode())
-      return ZX_ERR_INVALID_ARGS;
-    out.mode = in.mutable_attributes.mode();
-  }
-  if (out.has.uid) {
-    if (!in.mutable_attributes.has_uid())
-      return ZX_ERR_INVALID_ARGS;
-    out.uid = in.mutable_attributes.uid();
-  }
-  if (out.has.gid) {
-    if (!in.mutable_attributes.has_gid())
-      return ZX_ERR_INVALID_ARGS;
-    out.gid = in.mutable_attributes.gid();
-  }
-  if (out.has.rdev) {
-    if (!in.mutable_attributes.has_rdev())
-      return ZX_ERR_INVALID_ARGS;
-    out.rdev = in.mutable_attributes.rdev();
-  }
-  return ZX_OK;
-}
-
-#endif
-
 }  // namespace
 
 zx::result<zxio_object_type_t> zxio_get_object_type(
@@ -519,7 +451,7 @@ zx_status_t zxio_create_with_representation(fidl::ClientEnd<fio::Node> node,
       if (attr) {
         if (!connector.has_attributes())
           return ZX_ERR_INVALID_ARGS;
-        if (zx_status_t status = fill_in_attributes(connector.attributes(), *attr); status != ZX_OK)
+        if (zx_status_t status = zxio_attr_from_wire(connector.attributes(), attr); status != ZX_OK)
           return status;
       }
       return zxio_node_init(storage, std::move(node));
@@ -529,7 +461,7 @@ zx_status_t zxio_create_with_representation(fidl::ClientEnd<fio::Node> node,
       if (attr) {
         if (!dir.has_attributes())
           return ZX_ERR_INVALID_ARGS;
-        if (zx_status_t status = fill_in_attributes(dir.attributes(), *attr); status != ZX_OK)
+        if (zx_status_t status = zxio_attr_from_wire(dir.attributes(), attr); status != ZX_OK)
           return status;
       }
       return zxio_dir_init(storage, fidl::ClientEnd<fio::Directory>(node.TakeChannel()));
@@ -539,7 +471,7 @@ zx_status_t zxio_create_with_representation(fidl::ClientEnd<fio::Node> node,
       if (attr) {
         if (!file.has_attributes())
           return ZX_ERR_INVALID_ARGS;
-        if (zx_status_t status = fill_in_attributes(file.attributes(), *attr); status != ZX_OK)
+        if (zx_status_t status = zxio_attr_from_wire(file.attributes(), attr); status != ZX_OK)
           return status;
       }
       zx::event event;
@@ -558,7 +490,7 @@ zx_status_t zxio_create_with_representation(fidl::ClientEnd<fio::Node> node,
       if (attr) {
         if (!symlink.has_attributes())
           return ZX_ERR_INVALID_ARGS;
-        if (zx_status_t status = fill_in_attributes(symlink.attributes(), *attr); status != ZX_OK)
+        if (zx_status_t status = zxio_attr_from_wire(symlink.attributes(), attr); status != ZX_OK)
           return status;
       }
       const auto& span = symlink.target();
