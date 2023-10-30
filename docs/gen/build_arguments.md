@@ -1155,7 +1155,7 @@ Selects the Cobalt environment to send data to. Choices:
 
 **Current value (from the default):** `"PROD"`
 
-From //src/cobalt/bin/app/BUILD.gn:15
+From //src/cobalt/bin/app/BUILD.gn:14
 
 ### comparison_diagnostics_dir
 
@@ -1366,7 +1366,7 @@ One of:
 
   * "remote_local_fallback": Execute action remotely first.
         If that fails, run locally instead.  The locally produced
-        result are not uploaded to the remote cache.
+        results are not uploaded to the remote cache.
 
   * "racing": Race local vs. remote execution, take the first to finish.
 
@@ -3461,23 +3461,21 @@ From //build/toolchain/zircon/gcc.gni:10
 
 ### generate_legacy_ninja_build_outputs_licenses_spdx
 
-Whether to generate real licenses for
-`//build/bazel/licenses:legacy_ninja_build_outputs_licenses_spdx`.
-License collection + generation for ninja targets is slow and expensive,
-so it is turned off by default, and a placeholder is produced instead.
+Deprecated. No-op.
+TODO(fxb/132725): Remove once unused downstream.
 
 **Current value (from the default):** `false`
 
-From //build/bazel/licenses/BUILD.gn:21
+From //build/bazel/licenses/BUILD.gn:19
 
 ### generate_legacy_ninja_build_outputs_licenses_spdx_from_metadata
 
-Enable hermetic GN licensing pipeline.
-TODO(132725): Remove once migration completes.
+Deprecated. No-op.
+TODO(fxb/132725): Remove once unused downstream.
 
 **Current value (from the default):** `true`
 
-From //build/bazel/licenses/BUILD.gn:25
+From //build/bazel/licenses/BUILD.gn:23
 
 ### generate_licenses_spdx_stubs
 
@@ -3485,10 +3483,12 @@ When true, generated_licenses_spdx template will generate stub SPDX files
 with placeholder license. License gathering will be skipped.
 Since license gathering is resource intensive, this is useful for non-production
 builds that would run faster.
+The global configuration can be overwritten in specific `generated_licenses_spdx`
+template invocation via the `generate_stub` parameter.
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
-From //build/licenses/generated_licenses_spdx.gni:12
+From //build/licenses/generated_licenses_spdx.gni:14
 
 ### generate_plasa_artifacts
 
@@ -3733,12 +3733,6 @@ From //BUILD.gn:120
 ### host_os
 
 **Current value (from the default):** `"linux"`
-
-### host_pkg_config
-
-**Current value (from the default):** `"pkg-config"`
-
-From //third_party/perfetto/gn/pkg_config.gni:24
 
 ### host_test_labels
 
@@ -4473,7 +4467,7 @@ One of:
 
   * "remote_local_fallback": Execute action remotely first.
         If that fails, run locally instead.  The locally produced
-        result are not uploaded to the remote cache.
+        results are not uploaded to the remote cache.
 
   * "racing": Race local vs. remote execution, take the first to finish.
 
@@ -5476,12 +5470,6 @@ cacheline size of the target architecture.
 **Current value (from the default):** `128`
 
 From //zircon/kernel/params.gni:109
-
-### pkg_config
-
-**Current value (from the default):** `"pkg-config"`
-
-From //third_party/perfetto/gn/pkg_config.gni:21
 
 ### platform_enable_user_pci
 
@@ -8097,7 +8085,7 @@ Used in the structured configuration below.
 
 **Current value (from the default):** `false`
 
-From //src/fonts/BUILD.gn:15
+From //src/fonts/BUILD.gn:14
 
 ### stack_size_section
 
