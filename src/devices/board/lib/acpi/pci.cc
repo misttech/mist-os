@@ -289,7 +289,7 @@ zx_status_t pci_init_interrupts(zx_device_t* parent, acpi::Acpi* acpi, ACPI_HAND
     const uint32_t& vector = e.first;
     const acpi_legacy_irq& irq_cfg = e.second;
     zx::resource resource;
-    zx_status_t status = zx::resource::create(*zx::unowned_resource(get_root_resource(parent)),
+    zx_status_t status = zx::resource::create(*zx::unowned_resource(get_irq_resource(parent)),
                                               ZX_RSRC_KIND_IRQ | ZX_RSRC_FLAG_EXCLUSIVE, vector, 1,
                                               name.data(), name.size(), &resource);
 
@@ -374,9 +374,8 @@ zx_status_t pci_init_segment_and_ecam(zx_device_t* parent, acpi::Acpi* acpi, ACP
     // The range from start_bus_num to end_bus_num is inclusive.
     size_t ecam_size = (pinfo.end_bus_num - pinfo.start_bus_num + 1) * PCIE_ECAM_BYTES_PER_BUS;
     zx_paddr_t vmo_base = mcfg_alloc.address + (pinfo.start_bus_num * PCIE_ECAM_BYTES_PER_BUS);
-    // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
     status =
-        zx_vmo_create_physical(get_root_resource(parent), vmo_base, ecam_size, &pinfo.ecam_vmo);
+        zx_vmo_create_physical(get_mmio_resource(parent), vmo_base, ecam_size, &pinfo.ecam_vmo);
     if (status != ZX_OK) {
       zxlogf(ERROR, "couldn't create VMO for ecam, mmio cfg will not work: %s!",
              zx_status_get_string(status));
