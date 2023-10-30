@@ -252,11 +252,6 @@ template("zircon_toolchain") {
       ]
       _cxx_concurrent_jobs = concurrent_jobs.local
     } else {
-      assert(cxx_rbe_exec_strategy == "remote" ||
-                 cxx_rbe_exec_strategy == "local" ||
-                 cxx_rbe_exec_strategy == "remote_local_fallback" ||
-                 cxx_rbe_exec_strategy == "racing",
-             "Unsupported RBE exec_strategy: \"$cxx_rbe_exec_strategy\".")
       if (cxx_rbe_exec_strategy == "remote") {
         compiler_prefix_list += [ "--exec_strategy=remote" ]
       } else if (cxx_rbe_exec_strategy == "remote_local_fallback") {

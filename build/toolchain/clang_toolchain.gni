@@ -123,10 +123,6 @@ template("clang_toolchain") {
           _cxx_remote_wrapper_path,
         ]
       }
-      assert(
-          cxx_rbe_check == "none" || cxx_rbe_check == "consistency" ||
-              cxx_rbe_check == "determinism",
-          "cxx_rbe_check must be one of {none,consistency,determinism}, but got: ${cxx_rbe_check}.")
       if (cxx_rbe_check == "consistency") {
         # Compare local vs. remote build.
         # Allow caching.
@@ -153,11 +149,6 @@ template("clang_toolchain") {
         ]
         _cxx_concurrent_jobs = concurrent_jobs.local
       } else {
-        assert(cxx_rbe_exec_strategy == "remote" ||
-                   cxx_rbe_exec_strategy == "local" ||
-                   cxx_rbe_exec_strategy == "remote_local_fallback" ||
-                   cxx_rbe_exec_strategy == "racing",
-               "Unsupported RBE exec_strategy: \"$cxx_rbe_exec_strategy\".")
         if (cxx_rbe_exec_strategy == "remote") {
           compiler_prefix_list += [ "--exec_strategy=remote" ]
         } else if (cxx_rbe_exec_strategy == "remote_local_fallback") {
@@ -286,11 +277,6 @@ template("clang_toolchain") {
           ]
           _rust_concurrent_jobs = concurrent_jobs.local
         } else {
-          assert(rust_rbe_exec_strategy == "remote" ||
-                     rust_rbe_exec_strategy == "remote_local_fallback" ||
-                     rust_rbe_exec_strategy == "local" ||
-                     rust_rbe_exec_strategy == "racing",
-                 "Unsupported RBE exec_strategy: \"$rust_rbe_exec_strategy\".")
           if (rust_rbe_exec_strategy == "remote") {
             _rewrapper_flags = [ "--exec_strategy=remote" ]
           } else if (rust_rbe_exec_strategy == "remote_local_fallback") {
