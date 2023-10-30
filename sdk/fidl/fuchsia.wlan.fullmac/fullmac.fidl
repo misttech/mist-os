@@ -8,7 +8,7 @@ using fuchsia.wlan.internal;
 using fuchsia.wlan.ieee80211 as ieee80211;
 using zx;
 
-type WlanScanType = strict enum : uint8 {
+type WlanScanType = flexible enum : uint8 {
     ACTIVE = 1;
     PASSIVE = 2;
 };
@@ -25,7 +25,7 @@ const WLAN_WMM_PARAM_LEN uint32 = 18;
 const WLAN_VIE_MAX_LEN uint32 = 510;
 const WLAN_MAX_OP_RATES uint32 = 12;
 
-type WlanAuthType = strict enum : uint8 {
+type WlanAuthType = flexible enum : uint8 {
     OPEN_SYSTEM = 1;
     SHARED_KEY = 2;
     FAST_BSS_TRANSITION = 3;
@@ -107,7 +107,7 @@ type WlanFullmacSaeFrame = struct {
 ///
 /// These values are set at `1 << MgmtFrameSubtypeValue`
 /// See IEEE Std 802.11-2016, 9.2.4.1.3, for value of each management frame subtype
-type WlanMgmtCaptureFlag = strict enum : uint32 {
+type WlanMgmtCaptureFlag = flexible enum : uint32 {
     ASSOC_REQ = 0x1;
     ASSOC_RESP = 0x2;
     REASSOC_REQ = 0x4;
@@ -142,7 +142,7 @@ type WlanFullmacScanResult = struct {
     bss fuchsia.wlan.internal.BssDescription;
 };
 
-type WlanScanResult = strict enum : uint8 {
+type WlanScanResult = flexible enum : uint8 {
     SUCCESS = 0;
     NOT_SUPPORTED = 1;
     INVALID_ARGS = 2;
@@ -177,7 +177,7 @@ type WlanFullmacRoamConfirm = struct {
     selected_bss fuchsia.wlan.internal.BssDescription;
 };
 
-type WlanAuthResult = strict enum : uint8 {
+type WlanAuthResult = flexible enum : uint8 {
     SUCCESS = 0;
     REFUSED = 1;
     ANTI_CLOGGING_TOKEN_REQUIRED = 2;
@@ -194,7 +194,7 @@ type WlanFullmacDeauthIndication = struct {
     locally_initiated bool;
 };
 
-type WlanAssocResult = strict enum : uint8 {
+type WlanAssocResult = flexible enum : uint8 {
     SUCCESS = 0;
     REFUSED_REASON_UNSPECIFIED = 1;
     REFUSED_NOT_AUTHENTICATED = 2;
@@ -219,7 +219,7 @@ type WlanFullmacDisassocIndication = struct {
     locally_initiated bool;
 };
 
-type WlanStartResult = strict enum : uint8 {
+type WlanStartResult = flexible enum : uint8 {
     SUCCESS = 0;
     BSS_ALREADY_STARTED_OR_JOINED = 1;
     RESET_REQUIRED_BEFORE_START = 2;
@@ -230,7 +230,7 @@ type WlanFullmacStartConfirm = struct {
     result_code WlanStartResult;
 };
 
-type WlanStopResult = strict enum : uint8 {
+type WlanStopResult = flexible enum : uint8 {
     SUCCESS = 0;
     BSS_ALREADY_STOPPED = 1;
     INTERNAL_ERROR = 2;
@@ -240,7 +240,7 @@ type WlanFullmacStopConfirm = struct {
     result_code WlanStopResult;
 };
 
-type WlanEapolResult = strict enum : uint8 {
+type WlanEapolResult = flexible enum : uint8 {
     SUCCESS = 0;
     TRANSMISSION_FAILURE = 1;
 };
@@ -304,7 +304,7 @@ type WlanFullmacBandCapability = struct {
     operating_channel_list array<uint8, ieee80211.MAX_UNIQUE_CHANNEL_NUMBERS>;
 };
 
-type WlanFullmacFeature = strict enum : uint32 {
+type WlanFullmacFeature = flexible enum : uint32 {
     /// Supports DMA buffer transfer protocol
     DMA = 0x1;
     /// Synthetic (i.e., non-physical) device
