@@ -232,3 +232,26 @@ pub(crate) fn neighbors(ctx: &Ctx) -> fuchsia_inspect::Inspector {
     let Visitor(inspector) = visitor;
     inspector
 }
+
+pub(crate) fn counters(ctx: &Ctx) -> fuchsia_inspect::Inspector {
+    struct Visitor(fuchsia_inspect::Inspector);
+    impl netstack3_core::CounterVisitor for Visitor {
+        fn visit_counters(&self, counters: netstack3_core::StackCounters<'_>) {
+            let Self(inspector) = self;
+            inspector.root().record_child("IPv4", |node| {
+                node.record_uint("PacketTx", counters.ipv4_common.send_ip_packet.get());
+                node.record_uint("PacketRx", counters.ipv4_common.receive_ip_packet.get());
+            });
+            inspector.root().record_child("IPv6", |node| {
+                node.record_uint("PacketTx", counters.ipv6_common.send_ip_packet.get());
+                node.record_uint("PacketRx", counters.ipv6_common.receive_ip_packet.get());
+            });
+        }
+    }
+    let sync_ctx = ctx.sync_ctx();
+    let visitor =
+        Visitor(fuchsia_inspect::Inspector::new(fuchsia_inspect::InspectorConfig::default()));
+    netstack3_core::inspect_counters::<_, _>(sync_ctx, &visitor);
+    let Visitor(inspector) = visitor;
+    inspector
+}

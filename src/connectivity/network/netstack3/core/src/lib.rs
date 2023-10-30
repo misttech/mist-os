@@ -246,6 +246,29 @@ impl<BT: BindingsTypes> StackState<BT> {
     }
 }
 
+/// Stack counters for export outside of core.
+pub struct StackCounters<'a> {
+    /// IPv4 layer common counters.
+    pub ipv4_common: &'a IpCounters<Ipv4>,
+    /// IPv6 layer common counters.
+    pub ipv6_common: &'a IpCounters<Ipv6>,
+}
+
+/// Visitor for stack counters.
+pub trait CounterVisitor {
+    /// Performs a user-defined operation on stack counters.
+    fn visit_counters(&self, counters: StackCounters<'_>);
+}
+
+/// Provides access to stack counters via a visitor.
+pub fn inspect_counters<C: NonSyncContext, V: CounterVisitor>(sync_ctx: &SyncCtx<C>, visitor: &V) {
+    let counters = StackCounters {
+        ipv4_common: sync_ctx.state.ip_counters::<Ipv4>(),
+        ipv6_common: sync_ctx.state.ip_counters::<Ipv6>(),
+    };
+    visitor.visit_counters(counters);
+}
+
 /// The non synchronized context for the stack with a buffer.
 pub trait BufferNonSyncContextInner<B: BufferMut, D>:
     transport::udp::BufferNonSyncContext<Ipv4, B, D>

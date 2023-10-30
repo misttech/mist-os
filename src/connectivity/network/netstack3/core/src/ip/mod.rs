@@ -1428,19 +1428,20 @@ impl<C: NonSyncContext> UnlockedAccess<crate::lock_ordering::Ipv4StateNextPacket
     }
 }
 
-pub(crate) type IpCounters<I> = IpMarked<I, IpCountersInner>;
+/// IP layer counters.
+pub type IpCounters<I> = IpMarked<I, IpCountersInner>;
 
-/// Ip layer counters.
+/// Ip layer counters for a specific IP version.
 #[derive(Default)]
-pub(crate) struct IpCountersInner {
+pub struct IpCountersInner {
     /// Count of incoming IP packets that are dispatched to the appropriate protocol.
     pub(crate) dispatch_receive_ip_packet: Counter,
     /// Count of incoming IP packets destined to another host.
     pub(crate) dispatch_receive_ip_packet_other_host: Counter,
     /// Count of incoming IP packets received by the stack.
-    pub(crate) receive_ip_packet: Counter,
+    pub receive_ip_packet: Counter,
     /// Count of sent outgoing IP packets.
-    pub(crate) send_ip_packet: Counter,
+    pub send_ip_packet: Counter,
     // Count of packets to be forwarded which are instead dropped because
     // routing is disabled.
     pub(crate) routing_disabled_per_device: Counter,

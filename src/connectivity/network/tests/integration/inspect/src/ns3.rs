@@ -200,3 +200,41 @@ async fn inspect_devices(name: &str) {
         }
     })
 }
+
+#[netstack_test]
+async fn inspect_counters(name: &str) {
+    type N = netstack_testing_common::realms::Netstack3;
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let _network = sandbox.create_network("net").await.expect("failed to create network");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create realm");
+
+    // Send a packet over loopback to increment Tx and Rx count by 1.
+    let sender = realm
+        .datagram_socket(fposix_socket::Domain::Ipv4, fposix_socket::DatagramSocketProtocol::Udp)
+        .await
+        .expect("datagram socket creation failed");
+    let addr = net_declare::std_socket_addr!("127.0.0.1:8080");
+    let buf = [0; 8];
+    let bytes_sent = sender.send_to(&buf, &addr.into()).expect("socket send to failed");
+    assert_eq!(bytes_sent, buf.len());
+
+    let data =
+        get_inspect_data(&realm, "netstack", "root", constants::inspect::DEFAULT_INSPECT_TREE_NAME)
+            .await
+            .expect("inspect data should be present");
+
+    // Debug print the tree to make debugging easier in case of failures.
+    println!("Got inspect data: {:#?}", data);
+    diagnostics_assertions::assert_data_tree!(data, "root": contains {
+        "Counters": {
+            "IPv4": {
+                PacketTx: 1u64,
+                PacketRx: 1u64,
+            },
+            "IPv6": {
+                PacketTx: 0u64,
+                PacketRx: 0u64,
+            }
+        }
+    })
+}
