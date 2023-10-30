@@ -122,8 +122,6 @@ class SimInterface : public fdf::WireServer<fuchsia_wlan_fullmac::WlanFullmacImp
                     SignalReportCompleter::Sync& completer) override;
   void EapolInd(EapolIndRequestView request, fdf::Arena& arena,
                 EapolIndCompleter::Sync& completer) override;
-  void RelayCapturedFrame(RelayCapturedFrameRequestView request, fdf::Arena& arena,
-                          RelayCapturedFrameCompleter::Sync& completer) override;
   void OnPmkAvailable(OnPmkAvailableRequestView request, fdf::Arena& arena,
                       OnPmkAvailableCompleter::Sync& completer) override;
   void SaeHandshakeInd(SaeHandshakeIndRequestView request, fdf::Arena& arena,

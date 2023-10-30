@@ -403,10 +403,6 @@ struct WlanInterfaceTest : public zxtest::Test,
                 EapolIndCompleter::Sync& completer) override {
     completer.buffer(arena).Reply();
   }
-  void RelayCapturedFrame(RelayCapturedFrameRequestView request, fdf::Arena& arena,
-                          RelayCapturedFrameCompleter::Sync& completer) override {
-    completer.buffer(arena).Reply();
-  }
   void OnPmkAvailable(OnPmkAvailableRequestView request, fdf::Arena& arena,
                       OnPmkAvailableCompleter::Sync& completer) override {
     completer.buffer(arena).Reply();

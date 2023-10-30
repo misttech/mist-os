@@ -94,38 +94,6 @@ type WlanFullmacSaeFrame = struct {
     sae_fields vector<uint8>:MAX;
 };
 
-/// Bits used to request management frame subtypes to be captured. Also used by driver to indicate
-/// which management frame subtypes are supported for capture.
-///
-/// These values are set at `1 << MgmtFrameSubtypeValue`
-/// See IEEE Std 802.11-2016, 9.2.4.1.3, for value of each management frame subtype
-type WlanMgmtCaptureFlag = flexible enum : uint32 {
-    ASSOC_REQ = 0x1;
-    ASSOC_RESP = 0x2;
-    REASSOC_REQ = 0x4;
-    REASSOC_RESP = 0x8;
-    PROBE_REQ = 0x10;
-    PROBE_RESP = 0x20;
-    TIMING_AD = 0x40;
-
-    BEACON = 0x100;
-    ATIM = 0x200;
-    DISASSOC = 0x400;
-    AUTH = 0x800;
-    DEAUTH = 0x1000;
-    ACTION = 0x2000;
-    ACTION_NO_ACK = 0x4000;
-};
-
-type WlanFullmacStartCaptureFramesReq = struct {
-    mgmt_frame_flags uint32;
-};
-
-type WlanFullmacStartCaptureFramesResp = struct {
-    status int32;
-    supported_mgmt_frames uint32;
-};
-
 type WlanFullmacScanResult = struct {
     txn_id uint64;
     // Time of the scan result relative to when the system was powered on.
@@ -476,10 +444,6 @@ type WlanFullmacIfaceHistogramStats = table {
     4: snr_histograms vector<WlanFullmacSnrHistogram>:WLAN_FULLMAC_MAX_HISTOGRAMS_PER_TYPE;
 };
 
-type WlanFullmacCapturedFrameResult = struct {
-    data vector<uint8>:MAX;
-};
-
 type WlanFullmacChannelSwitchInfo = struct {
     new_channel uint8;
 };
@@ -544,9 +508,6 @@ closed protocol WlanFullmacImplIfc {
     }) -> ();
     strict EapolInd(struct {
         ind WlanFullmacEapolIndication;
-    }) -> ();
-    strict RelayCapturedFrame(struct {
-        result WlanFullmacCapturedFrameResult;
     }) -> ();
     strict OnPmkAvailable(struct {
         info WlanFullmacPmkInfo;
@@ -690,12 +651,6 @@ closed protocol WlanFullmacImpl {
     strict GetIfaceHistogramStats() -> (struct {
         stats WlanFullmacIfaceHistogramStats;
     }) error zx.Status;
-    strict StartCaptureFrames(struct {
-        req WlanFullmacStartCaptureFramesReq;
-    }) -> (struct {
-        resp WlanFullmacStartCaptureFramesResp;
-    });
-    strict StopCaptureFrames() -> ();
     strict SaeHandshakeResp(struct {
         resp WlanFullmacSaeHandshakeResp;
     }) -> ();

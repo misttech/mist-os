@@ -243,11 +243,6 @@ void SimInterface::EapolInd(EapolIndRequestView request, fdf::Arena& arena,
   completer.buffer(arena).Reply();
 }
 
-void SimInterface::RelayCapturedFrame(RelayCapturedFrameRequestView request, fdf::Arena& arena,
-                                      RelayCapturedFrameCompleter::Sync& completer) {
-  completer.buffer(arena).Reply();
-}
-
 void SimInterface::OnPmkAvailable(OnPmkAvailableRequestView request, fdf::Arena& arena,
                                   OnPmkAvailableCompleter::Sync& completer) {
   completer.buffer(arena).Reply();

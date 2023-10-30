@@ -918,16 +918,6 @@ void Device::EapolInd(EapolIndRequestView request, fdf::Arena& arena,
   completer.buffer(arena).Reply();
 }
 
-void Device::RelayCapturedFrame(RelayCapturedFrameRequestView request, fdf::Arena& arena,
-                                RelayCapturedFrameCompleter::Sync& completer) {
-  wlan_fullmac_captured_frame_result_t captured_frame_result;
-  captured_frame_result.data_list = request->result.data.data();
-  captured_frame_result.data_count = request->result.data.count();
-  wlan_fullmac_impl_ifc_protocol_ops_->relay_captured_frame(wlan_fullmac_impl_ifc_protocol_->ctx,
-                                                            &captured_frame_result);
-  completer.buffer(arena).Reply();
-}
-
 void Device::OnPmkAvailable(OnPmkAvailableRequestView request, fdf::Arena& arena,
                             OnPmkAvailableCompleter::Sync& completer) {
   wlan_fullmac_pmk_info_t pmk_info;

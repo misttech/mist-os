@@ -460,26 +460,6 @@ void WlanInterface::GetIfaceHistogramStats(fdf::Arena& arena,
   }
 }
 
-void WlanInterface::StartCaptureFrames(StartCaptureFramesRequestView request, fdf::Arena& arena,
-                                       StartCaptureFramesCompleter::Sync& completer) {
-  std::shared_lock<std::shared_mutex> guard(lock_);
-  const fuchsia_wlan_fullmac::wire::WlanFullmacStartCaptureFramesReq req = request->req;
-  fuchsia_wlan_fullmac::wire::WlanFullmacStartCaptureFramesResp resp;
-  if (wdev_ != nullptr) {
-    brcmf_if_start_capture_frames(wdev_->netdev, &req, &resp);
-  }
-  completer.buffer(arena).Reply(resp);
-}
-
-void WlanInterface::StopCaptureFrames(fdf::Arena& arena,
-                                      StopCaptureFramesCompleter::Sync& completer) {
-  std::shared_lock<std::shared_mutex> guard(lock_);
-  if (wdev_ != nullptr) {
-    brcmf_if_stop_capture_frames(wdev_->netdev);
-  }
-  completer.buffer(arena).Reply();
-}
-
 void WlanInterface::SetMulticastPromisc(SetMulticastPromiscRequestView request, fdf::Arena& arena,
                                         SetMulticastPromiscCompleter::Sync& completer) {
   std::shared_lock<std::shared_mutex> guard(lock_);

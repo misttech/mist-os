@@ -737,18 +737,6 @@ void WlanInterface::GetIfaceHistogramStats(fdf::Arena& arena,
   completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
 
-void WlanInterface::StartCaptureFrames(StartCaptureFramesRequestView request, fdf::Arena& arena,
-                                       StartCaptureFramesCompleter::Sync& completer) {
-  // Reply with the structure initialized with default value(0).
-  fuchsia_wlan_fullmac::wire::WlanFullmacStartCaptureFramesResp resp;
-  completer.buffer(arena).Reply(resp);
-}
-
-void WlanInterface::StopCaptureFrames(fdf::Arena& arena,
-                                      StopCaptureFramesCompleter::Sync& completer) {
-  completer.buffer(arena).Reply();
-}
-
 void WlanInterface::SetMulticastPromisc(SetMulticastPromiscRequestView request, fdf::Arena& arena,
                                         SetMulticastPromiscCompleter::Sync& completer) {
   completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);

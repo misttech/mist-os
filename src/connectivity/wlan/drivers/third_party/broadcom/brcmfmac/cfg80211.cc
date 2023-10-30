@@ -5178,18 +5178,6 @@ zx_status_t brcmf_if_set_multicast_promisc(net_device* ndev, bool enable) {
   return ZX_OK;
 }
 
-void brcmf_if_start_capture_frames(
-    net_device* ndev, const fuchsia_wlan_fullmac_wire::WlanFullmacStartCaptureFramesReq* req,
-    fuchsia_wlan_fullmac_wire::WlanFullmacStartCaptureFramesResp* resp) {
-  BRCMF_ERR("start_capture_frames not supported");
-  resp->status = ZX_ERR_NOT_SUPPORTED;
-  resp->supported_mgmt_frames = 0;
-}
-
-void brcmf_if_stop_capture_frames(net_device* ndev) {
-  BRCMF_ERR("stop_capture_frames not supported");
-}
-
 static void brcmf_if_convert_ac_param(
     const edcf_acparam_t* acparam,
     fuchsia_wlan_common_wire::WlanWmmAccessCategoryParameters* out_ac_params) {

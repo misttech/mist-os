@@ -103,9 +103,6 @@ class WlanInterface : public WlanInterfaceDeviceType,
                             GetIfaceCounterStatsCompleter::Sync& completer) override;
   void GetIfaceHistogramStats(fdf::Arena& arena,
                               GetIfaceHistogramStatsCompleter::Sync& completer) override;
-  void StartCaptureFrames(StartCaptureFramesRequestView request, fdf::Arena& arena,
-                          StartCaptureFramesCompleter::Sync& completer) override;
-  void StopCaptureFrames(fdf::Arena& arena, StopCaptureFramesCompleter::Sync& completer) override;
   void SetMulticastPromisc(SetMulticastPromiscRequestView request, fdf::Arena& arena,
                            SetMulticastPromiscCompleter::Sync& completer) override;
   void SaeHandshakeResp(SaeHandshakeRespRequestView request, fdf::Arena& arena,

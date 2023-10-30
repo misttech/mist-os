@@ -642,10 +642,6 @@ zx_status_t brcmf_if_get_iface_counter_stats(
 zx_status_t brcmf_if_get_iface_histogram_stats(
     net_device* ndev, fuchsia_wlan_fullmac_wire::WlanFullmacIfaceHistogramStats* out_stats,
     fidl::AnyArena& arena);
-void brcmf_if_start_capture_frames(
-    net_device* ndev, const fuchsia_wlan_fullmac_wire::WlanFullmacStartCaptureFramesReq* req,
-    fuchsia_wlan_fullmac_wire::WlanFullmacStartCaptureFramesResp* resp);
-void brcmf_if_stop_capture_frames(net_device* ndev);
 zx_status_t brcmf_if_set_multicast_promisc(net_device* ndev, bool enable);
 zx_status_t brcmf_if_sae_handshake_resp(
     net_device* ndev, const fuchsia_wlan_fullmac_wire::WlanFullmacSaeHandshakeResp* resp);
