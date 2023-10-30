@@ -352,6 +352,7 @@
                 "fuchsia.media.AudioCore",
                 "fuchsia.media.AudioDeviceEnumerator",
                 "fuchsia.media.ProfileProvider",
+                "fuchsia.media.tuning.AudioTuner",
                 "fuchsia.media.UsageGainReporter",
                 "fuchsia.media.UsageReporter",
             ],
