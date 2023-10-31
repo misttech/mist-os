@@ -52,7 +52,7 @@ class PciDeviceTests : protected inspect::InspectTestHelper, public zxtest::Test
   PciDeviceTests()
       : pciroot_(0, 1),
         client_(pciroot_.proto()),
-        parent_(MockDevice::FakeRootParentNoDispatcherIntegrationDEPRECATED()),
+        parent_(MockDevice::FakeRootParent()),
         upstream_(UpstreamNode::Type::ROOT, 0),
         inspect_vmo_(inspector_.DuplicateVmo()) {}
   ~PciDeviceTests() override {
