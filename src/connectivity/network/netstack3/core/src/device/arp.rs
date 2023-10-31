@@ -466,6 +466,8 @@ fn handle_packet<
             DynamicNeighborUpdateSource::Probe => {
                 let self_hw_addr = sync_ctx.get_hardware_addr(ctx, &device_id);
 
+                debug!("sending ARP response for {target_addr} to {sender_addr}");
+
                 // TODO(joshlf): Do something if send_frame returns an error?
                 let _: Result<(), _> = SendFrameContext::send_frame(
                     sync_ctx,
