@@ -946,6 +946,22 @@ int main(int argc, char** argv) {
     }
   }
 
+  zx::resource smc_resource;
+  {
+    zx::result client_end = component::Connect<fkernel::SmcResource>();
+    if (client_end.is_error()) {
+      LOGF(WARNING, "Failed to connect to smc_resource.");
+    }
+
+    fidl::WireResult result = fidl::WireCall(*client_end)->Get();
+
+    if (!result.ok()) {
+      LOGF(WARNING, "Failed to get smc_resource.");
+    } else {
+      smc_resource = std::move(result.value().resource);
+    }
+  }
+
   fidl::ServerEnd<fuchsia_device_manager::DriverHostController> controller_request(
       zx::channel(zx_take_startup_handle(PA_HND(PA_USER0, 0))));
   if (!controller_request.is_valid()) {
@@ -955,7 +971,7 @@ int main(int argc, char** argv) {
 
   DriverHostContext ctx(&kAsyncLoopConfigAttachToCurrentThread, std::move(root_resource),
                         std::move(mmio_resource), std::move(ioport_resource),
-                        std::move(irq_resource), std::move(info_resource));
+                        std::move(irq_resource), std::move(info_resource), std::move(smc_resource));
 
   RegisterContextForApi(&ctx);
 

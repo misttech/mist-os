@@ -27,6 +27,7 @@
                 "fuchsia.kernel.MexecResource",
                 "fuchsia.kernel.MmioResource",
                 "fuchsia.kernel.PowerResource",
+                "fuchsia.kernel.SmcResource",
                 "fuchsia.scheduler.ProfileProvider",
             ],
         },

@@ -115,13 +115,10 @@ zx_status_t SystemInstance::InitializeDriverHostSvcDir() {
   }
 
   const char* kAllowedServices[] = {
-      "fuchsia.kernel.InfoResource",
-      "fuchsia.kernel.IoportResource",
-      "fuchsia.kernel.MmioResource",
-      "fuchsia.kernel.IrqResource",
-      "fuchsia.logger.LogSink",
-      "fuchsia.scheduler.ProfileProvider",
-      "fuchsia.tracing.provider.Registry",
+      "fuchsia.kernel.InfoResource",       "fuchsia.kernel.IoportResource",
+      "fuchsia.kernel.MmioResource",       "fuchsia.kernel.IrqResource",
+      "fuchsia.kernel.SmcResource",        "fuchsia.logger.LogSink",
+      "fuchsia.scheduler.ProfileProvider", "fuchsia.tracing.provider.Registry",
   };
   return driver_host_svc_->Initialize(std::move(incoming_services), cpp20::span(kAllowedServices));
 }

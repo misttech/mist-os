@@ -380,6 +380,7 @@
                 "fuchsia.kernel.MmioResource",
                 "fuchsia.kernel.PowerResource",
                 "fuchsia.kernel.RootJob",
+                "fuchsia.kernel.SmcResource",
                 "fuchsia.process.Launcher",
             ],
             from: "parent",
