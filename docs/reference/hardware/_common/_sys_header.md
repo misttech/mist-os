@@ -20,7 +20,7 @@
 {%- endset %}
 
 {%- set drivers | yamlloads %}
-{% include "reference/drivers/all_drivers_doc.yaml" %}
+{% include "reference/drivers/_all_drivers_doc.yaml" %}
 {%- endset %}
 
 {% comment %}

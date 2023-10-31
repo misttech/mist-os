@@ -45,7 +45,7 @@ template("create_all_drivers_doc") {
       all_doc_output,
       areas_file,
     ]
-    outputs = [ "${target_gen_dir}/all_drivers_doc.yaml" ]
+    outputs = [ "${target_gen_dir}/_all_drivers_doc.yaml" ]
     depfile = "${target_gen_dir}/${target_name}.d"
     args = [
       "--areas_list",
