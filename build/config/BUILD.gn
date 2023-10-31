@@ -709,11 +709,13 @@ config("Wno-bitfield-conversion") {
 # configs are viral and will infect unsuspecting targets.
 
 config("Wno-vla-cxx-extension") {
-  cflags_cc = [
-    # TODO(fxbug.dev/135166): Remove -Wno-unknown-warning-option after the next Clang roll.
-    "-Wno-unknown-warning-option",
-    "-Wno-vla-cxx-extension",
-  ]
+  if (!is_gcc) {
+    cflags_cc = [
+      # TODO(fxbug.dev/135166): Remove -Wno-unknown-warning-option after the next Clang roll.
+      "-Wno-unknown-warning-option",
+      "-Wno-vla-cxx-extension",
+    ]
+  }
   visibility = [
     "//sdk/lib/fdio:*",
     "//sdk/lib/fdio/tests:*",
