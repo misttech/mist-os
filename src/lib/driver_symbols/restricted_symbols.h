@@ -1403,6 +1403,20 @@ const std::set<std::string> kRestrictedLibcSymbols = {
     "zx_utc_reference_swap",
 };
 
+const std::set<std::string> kRestrictedDriverRuntimeSymbols = {
+    "fdf_env_dispatcher_create_with_owner",
+    "fdf_env_dispatcher_dump",
+    "fdf_env_dispatcher_get_dump_deprecated",
+    "fdf_env_shutdown_dispatchers_async",
+    "fdf_env_destroy_all_dispatchers",
+    "fdf_env_register_driver_entry",
+    "fdf_env_register_driver_exit",
+    "fdf_env_get_current_driver",
+    "fdf_env_dispatcher_has_queued_tasks",
+    "fdf_env_get_thread_limit",
+    "fdf_env_set_thread_limit",
+};
+
 }  // namespace driver_symbols
 
 #endif  // SRC_LIB_DRIVER_SYMBOLS_RESTRICTED_SYMBOLS_H_
