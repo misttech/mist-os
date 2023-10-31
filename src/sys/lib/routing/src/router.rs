@@ -55,20 +55,14 @@ use {
 /// `sources` defines what are the valid sources of the capability. See [`AllowedSourcesBuilder`].
 /// `visitor` is invoked for each `Offer` and `Expose` declaration in the routing path, as well as
 /// the final `Capability` declaration if `sources` permits.
-pub async fn route_from_use<U, C, S, V, M>(
-    use_decl: U,
+pub async fn route_from_use<C, S, V, M>(
+    use_decl: UseDecl,
     use_target: Arc<C>,
     sources: S,
     visitor: &mut V,
     mapper: &mut M,
 ) -> Result<CapabilitySource<C>, RoutingError>
 where
-    U: UseDeclCommon
-        + ErrorNotFoundFromParent
-        + ErrorNotFoundInChild
-        + Into<UseDecl>
-        + Clone
-        + 'static,
     C: ComponentInstanceInterface + 'static,
     S: Sources + 'static,
     V: OfferVisitor,
@@ -91,7 +85,7 @@ where
                     .ok_or_else(|| {
                         let child_moniker =
                             child_component.child_moniker().expect("ChildName should exist");
-                        <U as ErrorNotFoundInChild>::error_not_found_in_child(
+                        <UseDecl as ErrorNotFoundInChild>::error_not_found_in_child(
                             use_target.moniker().clone(),
                             child_moniker.clone(),
                             use_decl.source_name().clone(),
@@ -359,15 +353,14 @@ where
 ///
 /// `sources` defines what are the valid sources of the capability. See [`AllowedSourcesBuilder`].
 /// `visitor` is invoked for each `Capability` declaration if `sources` permits.
-pub async fn route_from_self<U, C, S, V, M>(
-    use_decl: U,
+pub async fn route_from_self<C, S, V, M>(
+    use_decl: UseDecl,
     target: Arc<C>,
     sources: S,
     visitor: &mut V,
     mapper: &mut M,
 ) -> Result<CapabilitySource<C>, RoutingError>
 where
-    U: UseDeclCommon + ErrorNotFoundFromParent + Into<UseDecl> + Clone,
     C: ComponentInstanceInterface + 'static,
     S: Sources + 'static,
     V: CapabilityVisitor,
@@ -396,15 +389,14 @@ where
 /// `sources` defines what are the valid sources of the capability. See [`AllowedSourcesBuilder`].
 /// `visitor` is invoked for each `Offer` declaration in the routing path, as well as the final
 /// `Capability` declaration if `sources` permits.
-pub async fn route_from_use_without_expose<U, C, S, V, M>(
-    use_decl: U,
+pub async fn route_from_use_without_expose<C, S, V, M>(
+    use_decl: UseDecl,
     use_target: Arc<C>,
     sources: S,
     visitor: &mut V,
     mapper: &mut M,
 ) -> Result<CapabilitySource<C>, RoutingError>
 where
-    U: UseDeclCommon + ErrorNotFoundFromParent + Into<UseDecl> + Clone,
     C: ComponentInstanceInterface + 'static,
     S: Sources,
     V: OfferVisitor,
@@ -727,43 +719,38 @@ impl Sources for AllowedSourcesBuilder {
     }
 }
 
-/// The `Use` phase of routing.
-pub struct Use<U>(PhantomData<U>);
+pub struct Use();
 
 /// The result of routing a Use declaration to the next phase.
-enum UseResult<C: ComponentInstanceInterface, O: Clone + fmt::Debug, U> {
+enum UseResult<C: ComponentInstanceInterface> {
     /// The source of the Use was found (Framework, AboveRoot, etc.)
     Source(CapabilitySource<C>),
     /// The Use led to a parent offer.
-    OfferFromParent(RouteBundle<O>, Arc<C>),
+    OfferFromParent(RouteBundle<OfferDecl>, Arc<C>),
     /// The Use led to a child Expose declaration.
     /// Note: Instead of FromChild carrying an ExposeDecl of the matching child, it carries a
     /// UseDecl. This is because some RoutingStrategy<> don't support Expose, but are still
     /// required to enumerate over UseResult<>.
-    ExposeFromChild(U, Arc<C>),
+    ExposeFromChild(UseDecl, Arc<C>),
 }
 
-impl<U> Use<U>
-where
-    U: UseDeclCommon + ErrorNotFoundFromParent + Into<UseDecl> + Clone,
-{
+impl Use {
     /// Routes the capability starting from the `use_` declaration at `target` to either a valid
     /// source (as defined by `sources`) or the Offer declaration that ends this phase of routing.
     async fn route<C, S, V, M>(
-        use_: U,
+        use_: UseDecl,
         target: Arc<C>,
         sources: &S,
         visitor: &mut V,
         mapper: &mut M,
-    ) -> Result<UseResult<C, OfferDecl, U>, RoutingError>
+    ) -> Result<UseResult<C>, RoutingError>
     where
         C: ComponentInstanceInterface,
         S: Sources,
         V: CapabilityVisitor,
         M: DebugRouteMapper,
     {
-        let use_decl: UseDecl = use_.clone().into();
-        mapper.add_use(target.moniker().clone(), &use_decl);
+        mapper.add_use(target.moniker().clone(), &use_);
         match use_.source() {
             UseSource::Framework => Ok(UseResult::Source(CapabilitySource::<C>::Framework {
                 capability: sources.framework_source(use_.source_name().clone(), mapper)?,
@@ -810,13 +797,13 @@ where
                     let parent_offers = parent_component.lock_resolved_state().await?.offers();
                     let child_moniker = target.child_moniker().expect("ChildName should exist");
                     let parent_offers = find_matching_offers(
-                        CapabilityTypeName::from(&use_decl),
+                        CapabilityTypeName::from(&use_),
                         use_.source_name(),
                         &child_moniker,
                         &parent_offers,
                     )
                     .ok_or_else(|| {
-                        <U as ErrorNotFoundFromParent>::error_not_found_from_parent(
+                        <UseDecl as ErrorNotFoundFromParent>::error_not_found_from_parent(
                             target.moniker().clone(),
                             use_.source_name().clone(),
                         )
