@@ -152,23 +152,20 @@ fn read_twice() {
 
     run_server_client(
         fio::OpenFlags::RIGHT_READABLE,
-        VmoFile::new_async(
+        VmoFile::new_lazy(
             {
                 let attempts = attempts.clone();
                 move || {
-                    let attempts = attempts.clone();
-                    async move {
-                        let read_attempt = attempts.fetch_add(1, Ordering::Relaxed);
-                        match read_attempt {
-                            0 => {
-                                let content = b"State one";
-                                let capacity = content.len() as u64;
-                                let vmo = Vmo::create(capacity)?;
-                                vmo.write(content, 0)?;
-                                Ok(vmo)
-                            }
-                            _ => panic!("Called init_vmo() a second time."),
+                    let read_attempt = attempts.fetch_add(1, Ordering::Relaxed);
+                    match read_attempt {
+                        0 => {
+                            let content = b"State one";
+                            let capacity = content.len() as u64;
+                            let vmo = Vmo::create(capacity)?;
+                            vmo.write(content, 0)?;
+                            Ok(vmo)
                         }
+                        _ => panic!("Called init_vmo() a second time."),
                     }
                 }
             },
@@ -195,24 +192,21 @@ fn read_error() {
     let scope = ExecutionScope::new();
 
     let flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE;
-    let server = VmoFile::new_async(
+    let server = VmoFile::new_lazy(
         {
             let read_attempt = read_attempt.clone();
             move || {
-                let read_attempt = read_attempt.clone();
-                async move {
-                    let attempt = read_attempt.fetch_add(1, Ordering::Relaxed);
-                    match attempt {
-                        0 => Err(Status::SHOULD_WAIT),
-                        1 => {
-                            let content = b"Have value";
-                            let capacity = content.len() as u64;
-                            let vmo = Vmo::create(capacity)?;
-                            vmo.write(content, 0)?;
-                            Ok(vmo)
-                        }
-                        _ => panic!("Third call to read()."),
+                let attempt = read_attempt.fetch_add(1, Ordering::Relaxed);
+                match attempt {
+                    0 => Err(Status::SHOULD_WAIT),
+                    1 => {
+                        let content = b"Have value";
+                        let capacity = content.len() as u64;
+                        let vmo = Vmo::create(capacity)?;
+                        vmo.write(content, 0)?;
+                        Ok(vmo)
                     }
+                    _ => panic!("Third call to read()."),
                 }
             }
         },

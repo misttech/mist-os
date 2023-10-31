@@ -23,36 +23,9 @@ use {
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio,
     fuchsia_zircon::{self as zx, AsHandleRef as _, HandleBased as _, Status, Vmo},
-    futures::lock::Mutex,
-    std::{future::Future, sync::Arc},
+    futures::lock::{MappedMutexGuard, Mutex, MutexGuard},
+    std::sync::Arc,
 };
-
-/// Helper trait to avoid generics in the [`VmoFile`] type by using dynamic dispatch.
-#[async_trait]
-trait AsyncInitVmoFile: Send + Sync {
-    // TODO(http://fxbug.dev/99448): Making this non-async FnOnce() can greatly simplify things
-    // and would remove the need for a separate trait.
-    async fn init_vmo(&self) -> InitVmoResult;
-}
-
-struct AsyncInitVmoFileImpl<InitVmo> {
-    callback: InitVmo,
-}
-
-#[async_trait]
-impl<InitVmo, InitVmoFuture> AsyncInitVmoFile for AsyncInitVmoFileImpl<InitVmo>
-where
-    InitVmo: Fn() -> InitVmoFuture + Send + Sync + 'static,
-    InitVmoFuture: Future<Output = InitVmoResult> + Send + 'static,
-{
-    async fn init_vmo(&self) -> InitVmoResult {
-        (self.callback)().await
-    }
-}
-
-/// Connection buffer initialization result. It is either a byte buffer with the file content, or
-/// an error code.
-pub type InitVmoResult = Result<Vmo, Status>;
 
 /// Create new read-only `VmoFile` which serves constant content.
 ///
@@ -70,15 +43,12 @@ where
     Bytes: 'static + AsRef<[u8]> + Send + Sync,
 {
     let bytes = Arc::new(bytes);
-    VmoFile::new_async(
+    VmoFile::new_lazy(
         move || {
-            let bytes = bytes.clone();
-            Box::pin(async move {
-                let bytes: &[u8] = bytes.as_ref().as_ref();
-                let vmo = Vmo::create(bytes.len().try_into().unwrap())?;
-                vmo.write(&bytes, 0)?;
-                Ok(vmo)
-            })
+            let bytes: &[u8] = bytes.as_ref().as_ref();
+            let vmo = Vmo::create(bytes.len().try_into().unwrap())?;
+            vmo.write(&bytes, 0)?;
+            Ok(vmo)
         },
         true,
         false,
@@ -108,17 +78,14 @@ where
     let content_size: u64 = std::cmp::min(capacity, content_size);
 
     let content = Arc::new(content);
-    VmoFile::new_async(
+    VmoFile::new_lazy(
         move || {
-            let content = content.clone();
-            Box::pin(async move {
-                let vmo = Vmo::create(capacity)?;
-                // Write up to `content_size` bytes from `content`, and set the VMO's content size.
-                let content: &[u8] = &(*content).as_ref()[..content_size.try_into().unwrap()];
-                vmo.write(&content, 0)?;
-                vmo.set_content_size(&content_size)?;
-                Ok(vmo)
-            })
+            let vmo = Vmo::create(capacity)?;
+            // Write up to `content_size` bytes from `content`, and set the VMO's content size.
+            let content: &[u8] = &(*content).as_ref()[..content_size.try_into().unwrap()];
+            vmo.write(&content, 0)?;
+            vmo.set_content_size(&content_size)?;
+            Ok(vmo)
         },
         /*readable*/ true,
         /*writable*/ true,
@@ -126,8 +93,13 @@ where
     )
 }
 
-/// Implementation of a VMO-backed file in a virtual file system. Supports both synchronous (from
-/// existing Vmo) and asynchronous (from async callback) construction of the backing Vmo.
+enum VmoOrInit {
+    Vmo(Vmo),
+    Init(Box<dyn Fn() -> Result<Vmo, Status> + Send + Sync + 'static>),
+}
+
+/// Implementation of a VMO-backed file in a virtual file system. Supports lazy construction of the
+/// backing Vmo.
 ///
 /// Futures returned by these callbacks will be executed by the library using connection specific
 /// [`ExecutionScope`].
@@ -149,10 +121,7 @@ pub struct VmoFile {
 
     /// Vmo that backs the file. If constructed as None, will be initialized on first connection
     /// using [`Self::init_vmo`].
-    vmo: Mutex<Option<Vmo>>,
-
-    /// Asynchronous callback used to initialize [`Self::vmo`] on first connection to the file.
-    init_vmo: Option<Box<dyn AsyncInitVmoFile + 'static>>,
+    vmo: Mutex<VmoOrInit>,
 }
 
 impl VmoFile {
@@ -189,38 +158,39 @@ impl VmoFile {
             writable,
             executable,
             inode,
-            vmo: Mutex::new(Some(vmo)),
-            init_vmo: None,
+            vmo: Mutex::new(VmoOrInit::Vmo(vmo)),
         })
     }
 
-    /// Create a new VmoFile which will be asynchronously initialized. The reported inode value will
-    /// be [`fio::INO_UNKNOWN`]. See [`VmoFile::new_with_inode()`] to construct a VmoFile with an
+    /// Create a new VmoFile which will be lazily initialized. The reported inode value will be
+    /// [`fio::INO_UNKNOWN`]. See [`VmoFile::new_with_inode()`] to construct a VmoFile with an
     /// explicit inode value.
     ///
     /// # Arguments
     ///
-    /// * `init_vmo` - Async callback to create the Vmo backing this file upon first connection.
+    /// * `init_vmo` - Callback to create the Vmo backing this file upon first connection.
     /// * `readable` - If true, allow connections with OpenFlags::RIGHT_READABLE.
     /// * `writable` - If true, allow connections with OpenFlags::RIGHT_WRITABLE.
     /// * `executable` - If true, allow connections with OpenFlags::RIGHT_EXECUTABLE.
-    pub fn new_async<InitVmo, InitVmoFuture>(
-        init_vmo: InitVmo,
+    pub fn new_lazy(
+        init_vmo: impl Fn() -> Result<Vmo, Status> + Send + Sync + 'static,
         readable: bool,
         writable: bool,
         executable: bool,
-    ) -> Arc<Self>
-    where
-        InitVmo: Fn() -> InitVmoFuture + Send + Sync + 'static,
-        InitVmoFuture: Future<Output = InitVmoResult> + Send + 'static,
-    {
+    ) -> Arc<Self> {
         Arc::new(VmoFile {
             readable,
             writable,
             executable,
             inode: fio::INO_UNKNOWN,
-            vmo: Mutex::new(None),
-            init_vmo: Some(Box::new(AsyncInitVmoFileImpl { callback: init_vmo })),
+            vmo: Mutex::new(VmoOrInit::Init(Box::new(init_vmo))),
+        })
+    }
+
+    async fn vmo(&self) -> MappedMutexGuard<'_, VmoOrInit, Vmo> {
+        MutexGuard::map(self.vmo.lock().await, |vmo_or_init| match vmo_or_init {
+            VmoOrInit::Vmo(vmo) => vmo,
+            VmoOrInit::Init(_) => panic!("The VMO was not initialized"),
         })
     }
 }
@@ -245,9 +215,9 @@ impl DirectoryEntry for VmoFile {
             object_request.take().spawn(&scope.clone(), move |object_request| {
                 Box::pin(async move {
                     {
-                        let mut vmo_state = self.vmo.lock().await;
-                        if vmo_state.is_none() {
-                            *vmo_state = Some(self.init_vmo.as_ref().unwrap().init_vmo().await?);
+                        let mut guard = self.vmo.lock().await;
+                        if let VmoOrInit::Init(init) = &mut *guard {
+                            *guard = VmoOrInit::Vmo(init()?);
                         }
                     }
                     object_request.create_connection(scope, self, flags, FidlIoConnection::create)
@@ -304,8 +274,7 @@ impl Node for VmoFile {
 #[async_trait]
 impl FileIo for VmoFile {
     async fn read_at(&self, offset: u64, buffer: &mut [u8]) -> Result<u64, Status> {
-        let guard = self.vmo.lock().await;
-        let vmo = guard.as_ref().unwrap();
+        let vmo = self.vmo().await;
         let content_size = vmo.get_content_size()?;
         if offset >= content_size {
             return Ok(0u64);
@@ -320,8 +289,7 @@ impl FileIo for VmoFile {
         if content.is_empty() {
             return Ok(0u64);
         }
-        let guard = self.vmo.lock().await;
-        let vmo = guard.as_ref().unwrap();
+        let vmo = self.vmo().await;
         let capacity = vmo.get_size()?;
         if offset >= capacity {
             return Err(Status::OUT_OF_RANGE);
@@ -360,8 +328,7 @@ impl File for VmoFile {
     }
 
     async fn truncate(&self, length: u64) -> Result<(), Status> {
-        let guard = self.vmo.lock().await;
-        let vmo = guard.as_ref().unwrap();
+        let vmo = self.vmo().await;
         let capacity = vmo.get_size()?;
 
         if length > capacity {
@@ -396,8 +363,7 @@ impl File for VmoFile {
             return Err(zx::Status::NOT_SUPPORTED);
         }
 
-        let guard = self.vmo.lock().await;
-        let vmo = guard.as_ref().unwrap();
+        let vmo = self.vmo().await;
 
         // Logic here matches fuchsia.io requirements and matches what works for memfs.
         // Shared requests are satisfied by duplicating an handle, and private shares are
@@ -405,17 +371,15 @@ impl File for VmoFile {
         let vmo_rights = vmo_flags_to_rights(flags);
         // Unless private sharing mode is specified, we always default to shared.
         let new_vmo = if flags.contains(fio::VmoFlags::PRIVATE_CLONE) {
-            get_as_private(&vmo, vmo_rights)?
+            get_as_private(&*vmo, vmo_rights)?
         } else {
-            get_as_shared(&vmo, vmo_rights)?
+            get_as_shared(&*vmo, vmo_rights)?
         };
         Ok(new_vmo)
     }
 
     async fn get_size(&self) -> Result<u64, Status> {
-        let guard = self.vmo.lock().await;
-        let vmo = guard.as_ref().unwrap();
-        Ok(vmo.get_content_size()?)
+        Ok(self.vmo().await.get_content_size()?)
     }
 
     // TODO(fxbug.dev/72801)
