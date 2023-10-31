@@ -62,7 +62,7 @@ where
     C: ComponentInstanceInterface + 'static,
     S: Sources + 'static,
     V: ExposeVisitor,
-    V: CapabilityVisitor<CapabilityDecl = S::CapabilityDecl>,
+    V: CapabilityVisitor,
     V: Clone + Send + Sync + 'static,
 {
     /// Returns a list of instances of capabilities in this provider.
@@ -261,7 +261,7 @@ impl<C, S, V> OfferAggregateServiceProvider<C, S, V>
 where
     C: ComponentInstanceInterface + 'static,
     S: Sources + 'static,
-    V: OfferVisitor + ExposeVisitor + CapabilityVisitor<CapabilityDecl = S::CapabilityDecl>,
+    V: OfferVisitor + ExposeVisitor + CapabilityVisitor,
     V: Send + Sync + Clone + 'static,
 {
     pub(super) fn new(
@@ -278,7 +278,7 @@ impl<C, S, V> FilteredAggregateCapabilityProvider<C> for OfferAggregateServicePr
 where
     C: ComponentInstanceInterface + 'static,
     S: Sources + 'static,
-    V: OfferVisitor + ExposeVisitor + CapabilityVisitor<CapabilityDecl = S::CapabilityDecl>,
+    V: OfferVisitor + ExposeVisitor + CapabilityVisitor,
     V: Send + Sync + Clone + 'static,
 {
     fn route_instances(

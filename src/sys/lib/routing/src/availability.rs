@@ -142,12 +142,8 @@ impl<O, E, C> crate::router::ExposeVisitor for AvailabilityVisitor<O, E, C> {
     }
 }
 
-impl<O, E, C> crate::router::CapabilityVisitor for AvailabilityVisitor<O, E, C>
-where
-    C: cm_rust::CapabilityDeclCommon,
-{
-    type CapabilityDecl = C;
-    fn visit(&mut self, _: &Self::CapabilityDecl) -> Result<(), crate::RoutingError> {
+impl<O, E, C> crate::router::CapabilityVisitor for AvailabilityVisitor<O, E, C> {
+    fn visit(&mut self, _: &cm_rust::CapabilityDecl) -> Result<(), crate::RoutingError> {
         Ok(())
     }
 }

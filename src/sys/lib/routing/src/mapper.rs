@@ -148,20 +148,21 @@ impl DebugRouteMapper for RouteMapper {
         })
     }
 
-    fn add_component_capability(&mut self, moniker: Moniker, capability_decl: CapabilityDecl) {
-        self.route.push(RouteSegment::DeclareBy { moniker: moniker, capability: capability_decl })
+    fn add_component_capability(&mut self, moniker: Moniker, capability_decl: &CapabilityDecl) {
+        self.route
+            .push(RouteSegment::DeclareBy { moniker: moniker, capability: capability_decl.clone() })
     }
 
     fn add_framework_capability(&mut self, capability_name: Name) {
         self.route.push(RouteSegment::ProvideFromFramework { capability: capability_name })
     }
 
-    fn add_builtin_capability(&mut self, capability_decl: CapabilityDecl) {
-        self.route.push(RouteSegment::ProvideAsBuiltin { capability: capability_decl })
+    fn add_builtin_capability(&mut self, capability_decl: &CapabilityDecl) {
+        self.route.push(RouteSegment::ProvideAsBuiltin { capability: capability_decl.clone() })
     }
 
-    fn add_namespace_capability(&mut self, capability_decl: CapabilityDecl) {
-        self.route.push(RouteSegment::ProvideFromNamespace { capability: capability_decl })
+    fn add_namespace_capability(&mut self, capability_decl: &CapabilityDecl) {
+        self.route.push(RouteSegment::ProvideFromNamespace { capability: capability_decl.clone() })
     }
 }
 
@@ -185,14 +186,14 @@ pub trait DebugRouteMapper: Send + Sync {
     fn add_registration(&mut self, moniker: Moniker, registration_decl: &RegistrationDecl) {}
 
     #[allow(unused_variables)]
-    fn add_component_capability(&mut self, moniker: Moniker, capability_decl: CapabilityDecl) {}
+    fn add_component_capability(&mut self, moniker: Moniker, capability_decl: &CapabilityDecl) {}
 
     #[allow(unused_variables)]
     fn add_framework_capability(&mut self, capability_name: Name) {}
 
     #[allow(unused_variables)]
-    fn add_builtin_capability(&mut self, capability_decl: CapabilityDecl) {}
+    fn add_builtin_capability(&mut self, capability_decl: &CapabilityDecl) {}
 
     #[allow(unused_variables)]
-    fn add_namespace_capability(&mut self, capability_decl: CapabilityDecl) {}
+    fn add_namespace_capability(&mut self, capability_decl: &CapabilityDecl) {}
 }

@@ -36,14 +36,13 @@ use {
         RegistrationDecl,
     },
     cm_rust::{
-        Availability, CapabilityDecl, CapabilityDeclCommon, CapabilityTypeName, ExposeDecl,
-        ExposeDeclCommon, ExposeSource, ExposeTarget, OfferDecl, OfferDeclCommon, OfferServiceDecl,
-        OfferSource, OfferTarget, RegistrationDeclCommon, RegistrationSource, SourceName, UseDecl,
+        Availability, CapabilityDecl, CapabilityTypeName, ExposeDecl, ExposeDeclCommon,
+        ExposeSource, ExposeTarget, OfferDecl, OfferDeclCommon, OfferServiceDecl, OfferSource,
+        OfferTarget, RegistrationDeclCommon, RegistrationSource, SourceName, UseDecl,
         UseDeclCommon, UseSource,
     },
     cm_types::Name,
     derivative::Derivative,
-    from_enum::FromEnum,
     moniker::{ChildName, ChildNameBase, Moniker},
     std::collections::HashSet,
     std::{fmt, slice},
@@ -74,7 +73,7 @@ where
     S: Sources + 'static,
     V: OfferVisitor,
     V: ExposeVisitor,
-    V: CapabilityVisitor<CapabilityDecl = S::CapabilityDecl>,
+    V: CapabilityVisitor,
     V: Clone + Send + Sync + 'static,
     M: DebugRouteMapper + 'static,
 {
@@ -127,7 +126,7 @@ where
     S: Sources + 'static,
     V: OfferVisitor,
     V: ExposeVisitor,
-    V: CapabilityVisitor<CapabilityDecl = S::CapabilityDecl>,
+    V: CapabilityVisitor,
     V: Clone + Send + Sync + 'static,
     M: DebugRouteMapper + 'static,
 {
@@ -162,7 +161,7 @@ where
     S: Sources + 'static,
     V: OfferVisitor,
     V: ExposeVisitor,
-    V: CapabilityVisitor<CapabilityDecl = S::CapabilityDecl>,
+    V: CapabilityVisitor,
     V: Clone + Send + Sync + 'static,
     M: DebugRouteMapper + 'static,
 {
@@ -311,7 +310,7 @@ where
     C: ComponentInstanceInterface + 'static,
     S: Sources + 'static,
     V: ExposeVisitor,
-    V: CapabilityVisitor<CapabilityDecl = S::CapabilityDecl>,
+    V: CapabilityVisitor,
     V: Clone + Send + Sync + 'static,
     M: DebugRouteMapper + 'static,
 {
@@ -371,7 +370,7 @@ where
     U: UseDeclCommon + ErrorNotFoundFromParent + Into<UseDecl> + Clone,
     C: ComponentInstanceInterface + 'static,
     S: Sources + 'static,
-    V: CapabilityVisitor<CapabilityDecl = S::CapabilityDecl>,
+    V: CapabilityVisitor,
     V: Clone + Send + Sync + 'static,
     M: DebugRouteMapper + 'static,
 {
@@ -409,7 +408,7 @@ where
     C: ComponentInstanceInterface + 'static,
     S: Sources,
     V: OfferVisitor,
-    V: CapabilityVisitor<CapabilityDecl = S::CapabilityDecl>,
+    V: CapabilityVisitor,
     M: DebugRouteMapper + 'static,
 {
     match Use::route(use_decl, use_target, &sources, visitor, mapper).await? {
@@ -442,7 +441,7 @@ where
     C: ComponentInstanceInterface + 'static,
     S: Sources,
     V: OfferVisitor,
-    V: CapabilityVisitor<CapabilityDecl = S::CapabilityDecl>,
+    V: CapabilityVisitor,
     M: DebugRouteMapper,
 {
     match Offer::route(offer, offer_target, &sources, visitor, mapper).await? {
@@ -467,9 +466,6 @@ where
 
 /// A trait for extracting the source of a capability.
 pub trait Sources: Clone + Send + Sync {
-    /// The supported capability declaration type for namespace, component and built-in sources.
-    type CapabilityDecl;
-
     /// Return the [`InternalCapability`] representing this framework capability source, or
     /// [`RoutingError::UnsupportedRouteSource`] if unsupported.
     fn framework_source<M>(
@@ -506,7 +502,7 @@ pub trait Sources: Clone + Send + Sync {
         mapper: &mut M,
     ) -> Result<Option<ComponentCapability>, RoutingError>
     where
-        V: CapabilityVisitor<CapabilityDecl = Self::CapabilityDecl>,
+        V: CapabilityVisitor,
         M: DebugRouteMapper;
 
     /// Looks for a built-in capability in the list of capability sources.
@@ -520,7 +516,7 @@ pub trait Sources: Clone + Send + Sync {
         mapper: &mut M,
     ) -> Result<Option<InternalCapability>, RoutingError>
     where
-        V: CapabilityVisitor<CapabilityDecl = Self::CapabilityDecl>,
+        V: CapabilityVisitor,
         M: DebugRouteMapper;
 
     /// Looks for a component capability in the list of capability sources for the component instance
@@ -537,40 +533,26 @@ pub trait Sources: Clone + Send + Sync {
         mapper: &mut M,
     ) -> Result<ComponentCapability, RoutingError>
     where
-        V: CapabilityVisitor<CapabilityDecl = Self::CapabilityDecl>,
+        V: CapabilityVisitor,
         M: DebugRouteMapper;
 }
 
 /// Defines which capability source types are supported.
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""))]
-pub struct AllowedSourcesBuilder<C>
-where
-    C: CapabilityDeclCommon
-        + FromEnum<CapabilityDecl>
-        + Into<ComponentCapability>
-        + Into<InternalCapability>
-        + Clone,
-{
+pub struct AllowedSourcesBuilder {
     framework: Option<fn(Name) -> InternalCapability>,
     builtin: bool,
     capability: bool,
     collection: bool,
     namespace: bool,
     component: bool,
-    _decl: PhantomData<C>,
+    capability_type: CapabilityTypeName,
 }
 
-impl<
-        C: CapabilityDeclCommon
-            + FromEnum<CapabilityDecl>
-            + Into<ComponentCapability>
-            + Into<InternalCapability>
-            + Clone,
-    > AllowedSourcesBuilder<C>
-{
+impl AllowedSourcesBuilder {
     /// Creates a new [`AllowedSourcesBuilder`] that does not allow any capability source types.
-    pub fn new() -> Self {
+    pub fn new(capability: CapabilityTypeName) -> Self {
         Self {
             framework: None,
             builtin: false,
@@ -578,7 +560,7 @@ impl<
             collection: false,
             namespace: false,
             component: false,
-            _decl: PhantomData,
+            capability_type: capability,
         }
     }
 
@@ -618,17 +600,7 @@ impl<
 
 // Implementation of `Sources` that allows namespace, component, and/or built-in source
 // types.
-impl<C> Sources for AllowedSourcesBuilder<C>
-where
-    C: CapabilityDeclCommon
-        + FromEnum<CapabilityDecl>
-        + Into<ComponentCapability>
-        + Into<InternalCapability>
-        + Into<CapabilityDecl>
-        + Clone,
-{
-    type CapabilityDecl = C;
-
+impl Sources for AllowedSourcesBuilder {
     fn framework_source<M>(
         &self,
         name: Name,
@@ -674,18 +646,19 @@ where
         mapper: &mut M,
     ) -> Result<Option<ComponentCapability>, RoutingError>
     where
-        V: CapabilityVisitor<CapabilityDecl = Self::CapabilityDecl>,
+        V: CapabilityVisitor,
         M: DebugRouteMapper,
     {
         if self.namespace {
             if let Some(decl) = capabilities
                 .iter()
-                .flat_map(FromEnum::from_enum)
-                .find(|decl: &&C| decl.name() == name)
+                .find(|decl: &&CapabilityDecl| {
+                    self.capability_type == CapabilityTypeName::from(*decl) && decl.name() == name
+                })
                 .cloned()
             {
                 visitor.visit(&decl)?;
-                mapper.add_namespace_capability(decl.clone().into());
+                mapper.add_namespace_capability(&decl);
                 Ok(Some(decl.into()))
             } else {
                 Ok(None)
@@ -703,18 +676,19 @@ where
         mapper: &mut M,
     ) -> Result<Option<InternalCapability>, RoutingError>
     where
-        V: CapabilityVisitor<CapabilityDecl = Self::CapabilityDecl>,
+        V: CapabilityVisitor,
         M: DebugRouteMapper,
     {
         if self.builtin {
             if let Some(decl) = capabilities
                 .iter()
-                .flat_map(FromEnum::from_enum)
-                .find(|decl: &&C| decl.name() == name)
+                .find(|decl: &&CapabilityDecl| {
+                    self.capability_type == CapabilityTypeName::from(*decl) && decl.name() == name
+                })
                 .cloned()
             {
                 visitor.visit(&decl)?;
-                mapper.add_builtin_capability(decl.clone().into());
+                mapper.add_builtin_capability(&decl);
                 Ok(Some(decl.into()))
             } else {
                 Ok(None)
@@ -733,18 +707,19 @@ where
         mapper: &mut M,
     ) -> Result<ComponentCapability, RoutingError>
     where
-        V: CapabilityVisitor<CapabilityDecl = Self::CapabilityDecl>,
+        V: CapabilityVisitor,
         M: DebugRouteMapper,
     {
         if self.component {
             let decl = capabilities
                 .iter()
-                .flat_map(FromEnum::from_enum)
-                .find(|decl: &&C| decl.name() == name)
+                .find(|decl: &&CapabilityDecl| {
+                    self.capability_type == CapabilityTypeName::from(*decl) && decl.name() == name
+                })
                 .cloned()
                 .expect("CapabilityDecl missing, FIDL validation should catch this");
             visitor.visit(&decl)?;
-            mapper.add_component_capability(moniker.clone(), decl.clone().into());
+            mapper.add_component_capability(moniker.clone(), &decl);
             Ok(decl.into())
         } else {
             Err(RoutingError::unsupported_route_source("component"))
@@ -784,7 +759,7 @@ where
     where
         C: ComponentInstanceInterface,
         S: Sources,
-        V: CapabilityVisitor<CapabilityDecl = S::CapabilityDecl>,
+        V: CapabilityVisitor,
         M: DebugRouteMapper,
     {
         let use_decl: UseDecl = use_.clone().into();
@@ -916,7 +891,7 @@ where
     where
         C: ComponentInstanceInterface,
         S: Sources,
-        V: CapabilityVisitor<CapabilityDecl = S::CapabilityDecl>,
+        V: CapabilityVisitor,
         M: DebugRouteMapper,
     {
         let registration_decl: RegistrationDecl = registration.clone().into();
@@ -1055,7 +1030,7 @@ impl Offer {
         C: ComponentInstanceInterface + 'static,
         S: Sources,
         V: OfferVisitor,
-        V: CapabilityVisitor<CapabilityDecl = S::CapabilityDecl>,
+        V: CapabilityVisitor,
         M: DebugRouteMapper,
     {
         loop {
@@ -1131,7 +1106,7 @@ impl Offer {
         C: ComponentInstanceInterface + 'static,
         S: Sources,
         V: OfferVisitor,
-        V: CapabilityVisitor<CapabilityDecl = S::CapabilityDecl>,
+        V: CapabilityVisitor,
         M: DebugRouteMapper,
     {
         let res = match offer.source() {
@@ -1487,7 +1462,7 @@ impl Expose {
         C: ComponentInstanceInterface,
         S: Sources,
         V: ExposeVisitor,
-        V: CapabilityVisitor<CapabilityDecl = S::CapabilityDecl>,
+        V: CapabilityVisitor,
         M: DebugRouteMapper,
     {
         loop {
@@ -1544,7 +1519,7 @@ impl Expose {
         C: ComponentInstanceInterface,
         S: Sources,
         V: ExposeVisitor,
-        V: CapabilityVisitor<CapabilityDecl = S::CapabilityDecl>,
+        V: CapabilityVisitor,
         M: DebugRouteMapper,
     {
         let res = match expose.source() {
@@ -1644,18 +1619,11 @@ pub trait ExposeVisitor {
     fn visit(&mut self, expose: &ExposeDecl) -> Result<(), RoutingError>;
 }
 
-/// Visitor pattern trait for visiting a variant of [`CapabilityDecl`] specific to a capability
-/// type.
+/// Visitor pattern trait for visiting all [`CapabilityDecl`] during a route.
 pub trait CapabilityVisitor {
-    /// The concrete declaration type. Can be `()` if the capability type does not support
-    /// namespace, component, or built-in source types.
-    type CapabilityDecl;
-
-    /// Visit a variant of [`CapabilityDecl`] specific to the capability.
+    /// Visit each [`CapabilityDecl`] on the route.
     /// Returning an `Err` cancels visitation.
-    fn visit(&mut self, _capability_decl: &Self::CapabilityDecl) -> Result<(), RoutingError> {
-        Ok(())
-    }
+    fn visit(&mut self, capability: &CapabilityDecl) -> Result<(), RoutingError>;
 }
 
 pub fn find_matching_offers(
@@ -1745,12 +1713,8 @@ impl<O, E, C> crate::router::ExposeVisitor for NoopVisitor<O, E, C> {
     }
 }
 
-impl<O, E, C> crate::router::CapabilityVisitor for NoopVisitor<O, E, C>
-where
-    C: CapabilityDeclCommon,
-{
-    type CapabilityDecl = C;
-    fn visit(&mut self, _: &Self::CapabilityDecl) -> Result<(), RoutingError> {
+impl<O, E, C> crate::router::CapabilityVisitor for NoopVisitor<O, E, C> {
+    fn visit(&mut self, _: &CapabilityDecl) -> Result<(), RoutingError> {
         Ok(())
     }
 }

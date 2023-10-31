@@ -1721,6 +1721,21 @@ impl From<&ExposeDecl> for CapabilityTypeName {
     }
 }
 
+impl From<&CapabilityDecl> for CapabilityTypeName {
+    fn from(capability: &CapabilityDecl) -> Self {
+        match capability {
+            CapabilityDecl::Service(_) => Self::Service,
+            CapabilityDecl::Protocol(_) => Self::Protocol,
+            CapabilityDecl::Directory(_) => Self::Directory,
+            CapabilityDecl::Storage(_) => Self::Storage,
+            CapabilityDecl::Runner(_) => Self::Runner,
+            CapabilityDecl::Resolver(_) => Self::Resolver,
+            CapabilityDecl::EventStream(_) => Self::EventStream,
+            CapabilityDecl::Dictionary(_) => Self::Dictionary,
+        }
+    }
+}
+
 // TODO: Runners and third parties can use this to parse `facets`.
 impl FidlIntoNative<HashMap<String, DictionaryValue>> for fdata::Dictionary {
     fn fidl_into_native(self) -> HashMap<String, DictionaryValue> {
