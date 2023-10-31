@@ -1,0 +1,9 @@
+# NOTE: This file uses the 'GLOB' style path expressions (not the `find-owners`
+# style), which is documented here:
+# https://android-review.googlesource.com/plugins/code-owners/Documentation/path-expressions.html#findOwnersCaveat
+
+per-file wlan/** = patricklu@google.com
+per-file bluetooth/** = jnchang@google.com
+per-file ui/** = chaopeng@google.com
+per-file tracing.py = maheshsr@google.com
+per-file session.py = chaopeng@google.com
