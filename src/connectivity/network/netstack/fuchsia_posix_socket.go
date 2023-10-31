@@ -2890,7 +2890,7 @@ func (s *datagramSocketImpl) Close(fidl.Context) (unknown.CloseableCloseResult, 
 }
 
 func (*datagramSocketImpl) Query(fidl.Context) ([]uint8, error) {
-	return []byte(socket.DatagramSocketProtocolName), nil
+	return []byte(socket.DatagramSocketProtocolName_), nil
 }
 
 func (s *datagramSocketImpl) Describe(fidl.Context) (socket.DatagramSocketDescribeResponse, error) {
@@ -3054,7 +3054,7 @@ type synchronousDatagramSocketImpl struct {
 var _ socket.SynchronousDatagramSocketWithCtx = (*synchronousDatagramSocketImpl)(nil)
 
 func (*synchronousDatagramSocketImpl) Query(fidl.Context) ([]byte, error) {
-	return []byte(socket.SynchronousDatagramSocketProtocolName), nil
+	return []byte(socket.SynchronousDatagramSocketProtocolName_), nil
 }
 
 func (s *synchronousDatagramSocketImpl) Describe(fidl.Context) (socket.SynchronousDatagramSocketDescribeResponse, error) {
@@ -3602,7 +3602,7 @@ func (s *streamSocketImpl) Clone2(ctx fidl.Context, object unknown.CloneableWith
 }
 
 func (*streamSocketImpl) Query(fidl.Context) ([]uint8, error) {
-	return []byte(socket.StreamSocketProtocolName), nil
+	return []byte(socket.StreamSocketProtocolName_), nil
 }
 
 func (s *streamSocketImpl) Describe(fidl.Context) (socket.StreamSocketDescribeResponse, error) {
@@ -4369,7 +4369,7 @@ type rawSocketImpl struct {
 var _ rawsocket.SocketWithCtx = (*rawSocketImpl)(nil)
 
 func (*rawSocketImpl) Query(fidl.Context) ([]byte, error) {
-	return []byte(rawsocket.SocketProtocolName), nil
+	return []byte(rawsocket.SocketProtocolName_), nil
 }
 
 func (s *rawSocketImpl) Describe(fidl.Context) (rawsocket.SocketDescribeResponse, error) {
@@ -4702,7 +4702,7 @@ type packetSocketImpl struct {
 }
 
 func (*packetSocketImpl) Query(fidl.Context) ([]uint8, error) {
-	return []byte(packetsocket.SocketProtocolName), nil
+	return []byte(packetsocket.SocketProtocolName_), nil
 }
 
 func (s *packetSocketImpl) Describe(fidl.Context) (packetsocket.SocketDescribeResponse, error) {

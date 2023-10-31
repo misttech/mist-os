@@ -15,14 +15,14 @@ import (
 )
 
 const (
-	ProxySuffix            = "Interface"
-	StubSuffix             = "Stub"
-	EventProxySuffix       = "EventProxy"
-	TransitionalBaseSuffix = "TransitionalBase"
-	ServiceNameSuffix      = "Name"
-	RequestSuffix          = "InterfaceRequest"
-	TagSuffix              = "Tag"
-	WithCtxSuffix          = "WithCtx"
+	// Keep these constants in sync with reservedSuffixes below.
+	EventProxySuffix              = "EventProxy"
+	ServiceNameSuffix             = "Name"
+	WithCtxSuffix                 = "WithCtx"
+	WithCtxInterfaceSuffix        = "WithCtxInterface"
+	WithCtxInterfaceRequestSuffix = "WithCtxInterfaceRequest"
+	WithCtxStubSuffix             = "WithCtxStub"
+	WithCtxTransitionalBaseSuffix = "WithCtxTransitionalBase"
 
 	SyscallZxPackage = "syscall/zx"
 	SyscallZxAlias   = "_zx"
@@ -33,6 +33,17 @@ const (
 	StringsPackage = "strings"
 	StringsAlias   = "_strings"
 )
+
+// Suffixes that are reserved for top level names.
+var reservedSuffixes = []string{
+	EventProxySuffix,
+	ServiceNameSuffix,
+	WithCtxSuffix,
+	WithCtxInterfaceSuffix,
+	WithCtxInterfaceRequestSuffix,
+	WithCtxStubSuffix,
+	WithCtxTransitionalBaseSuffix,
+}
 
 // Type represents a golang type.
 type Type string
@@ -243,10 +254,6 @@ type Union struct {
 	Tags    Tags
 	fidlgen.Strictness
 	UnknownDataType string
-}
-
-func (u *Union) setTagName(c *compiler, protocol fidlgen.EncodedCompoundIdentifier, ext string) {
-	u.TagName = "I_" + c.compileCompoundIdentifier(protocol, false, ext+TagSuffix)
 }
 
 type UnionMember struct {
@@ -559,9 +566,31 @@ func isReservedWord(str string) bool {
 	return ok
 }
 
-func changeIfReserved(val fidlgen.Identifier, ext string) string {
-	// TODO(fxbug.dev/118283): Detect name collision within a scope as a result of transforming.
-	str := string(val) + ext
+func hasReservedSuffix(str string) bool {
+	for _, suffix := range reservedSuffixes {
+		if strings.HasSuffix(str, suffix) {
+			return true
+		}
+	}
+	return false
+}
+
+type escapeKind int
+
+const (
+	// Apply escaping rules for a name defined at the top level.
+	topLevel escapeKind = iota
+	// Apply escaping rules for a name *NOT* defined at the top level,
+	// e.g. a struct member or method.
+	notTopLevel
+)
+
+func changeIfReserved(val fidlgen.Identifier, ext string, kind escapeKind) string {
+	str := string(val)
+	if kind == topLevel && hasReservedSuffix(str) {
+		str += "_"
+	}
+	str += ext
 	if isReservedWord(str) {
 		return str + "_"
 	}
@@ -628,7 +657,7 @@ func (*compiler) compileIdentifier(id fidlgen.Identifier, export bool, ext strin
 	} else {
 		str = fidlgen.ToLowerCamelCase(str)
 	}
-	return changeIfReserved(fidlgen.Identifier(str), ext)
+	return changeIfReserved(fidlgen.Identifier(str), ext, notTopLevel)
 }
 
 func (c *compiler) compileCompoundIdentifier(eci fidlgen.EncodedCompoundIdentifier, export bool, ext string) string {
@@ -646,7 +675,7 @@ func (c *compiler) compileCompoundIdentifier(eci fidlgen.EncodedCompoundIdentifi
 		strs = append(strs, pkgAlias)
 		c.usedLibraryDeps[pkg] = pkgAlias
 	}
-	strs = append(strs, changeIfReserved(fidlgen.Identifier(name), ext))
+	strs = append(strs, changeIfReserved(fidlgen.Identifier(name), ext, topLevel))
 	if ci.Member != "" {
 		strs[len(strs)-1] += c.compileIdentifier(ci.Member, true, "")
 	}
@@ -728,7 +757,7 @@ func (c *compiler) compileType(val fidlgen.Type) (r Type, t StackOfBoundsTag) {
 		t.reverseOfBounds = append(t.reverseOfBounds, nullability)
 		r = Type(e)
 	case fidlgen.RequestType:
-		e := c.compileCompoundIdentifier(val.RequestSubtype, true, WithCtxSuffix+RequestSuffix)
+		e := c.compileCompoundIdentifier(val.RequestSubtype, true, WithCtxInterfaceRequestSuffix)
 		var nullability int
 		if val.Nullable {
 			nullability = 1
@@ -764,7 +793,7 @@ func (c *compiler) compileType(val fidlgen.Type) (r Type, t StackOfBoundsTag) {
 		case fidlgen.EnumDeclType:
 			r = Type(e)
 		case fidlgen.ProtocolDeclType:
-			r = Type(e + WithCtxSuffix + ProxySuffix)
+			r = Type(e + WithCtxInterfaceSuffix)
 		case fidlgen.StructDeclType:
 			fallthrough
 		case fidlgen.UnionDeclType:
@@ -941,7 +970,7 @@ func (c *compiler) compileUnion(val fidlgen.Union) Union {
 	return Union{
 		Union:           val,
 		Name:            c.compileCompoundIdentifier(val.Name, true, ""),
-		TagName:         "I_" + c.compileCompoundIdentifier(val.Name, false, TagSuffix),
+		TagName:         "I_" + c.compileCompoundIdentifier(val.Name, false, "Tag"),
 		Members:         members,
 		Strictness:      val.Strictness,
 		Tags:            tags,
@@ -1063,11 +1092,11 @@ func (c *compiler) compileProtocol(val fidlgen.Protocol) Protocol {
 		Attributes:           val.Attributes,
 		Name:                 c.compileCompoundIdentifier(val.Name, true, WithCtxSuffix),
 		Openness:             val.Openness,
-		TransitionalBaseName: c.compileCompoundIdentifier(val.Name, true, WithCtxSuffix+TransitionalBaseSuffix),
-		ProxyName:            c.compileCompoundIdentifier(val.Name, true, WithCtxSuffix+ProxySuffix),
+		TransitionalBaseName: c.compileCompoundIdentifier(val.Name, true, WithCtxTransitionalBaseSuffix),
+		ProxyName:            c.compileCompoundIdentifier(val.Name, true, WithCtxInterfaceSuffix),
 		ProxyType:            proxyType,
-		StubName:             c.compileCompoundIdentifier(val.Name, true, WithCtxSuffix+StubSuffix),
-		RequestName:          c.compileCompoundIdentifier(val.Name, true, WithCtxSuffix+RequestSuffix),
+		StubName:             c.compileCompoundIdentifier(val.Name, true, WithCtxStubSuffix),
+		RequestName:          c.compileCompoundIdentifier(val.Name, true, WithCtxInterfaceRequestSuffix),
 		EventProxyName:       c.compileCompoundIdentifier(val.Name, true, EventProxySuffix),
 		ProtocolNameConstant: c.compileCompoundIdentifier(val.Name, true, ServiceNameSuffix),
 		ProtocolNameString:   val.GetProtocolName(),
@@ -1111,6 +1140,7 @@ func Compile(ir fidlgen.Root) Root {
 				joinLibraryIdentifier(libComponents, ""),
 			)),
 			"",
+			topLevel,
 		)
 		godeps[path] = alias
 	}
@@ -1127,7 +1157,7 @@ func Compile(ir fidlgen.Root) Root {
 	// Compile ir into r.
 	r := Root{
 		Experiments:   ir.Experiments,
-		Name:          changeIfReserved(libraryName[len(libraryName)-1], ""),
+		Name:          changeIfReserved(libraryName[len(libraryName)-1], "", topLevel),
 		PackageName:   libraryPath,
 		BindingsAlias: BindingsAlias,
 	}
