@@ -10,4 +10,4 @@
 
 import("vim3.gni")
 
-board_bootfs_labels += [ "//boards/kernel_cmdline:reduced-perf-variation" ]
+board_bootfs_labels = [ "//boards/kernel_cmdline:reduced-perf-variation" ]
