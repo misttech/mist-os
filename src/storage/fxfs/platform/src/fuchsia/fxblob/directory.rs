@@ -213,16 +213,21 @@ impl BlobDirectory {
 
         // A lock needs to be held over searching the directory and incrementing the open count.
         let guard = fs.lock_manager().read_lock(keys.clone()).await;
-        let key = (self.directory.object_id(), id.string.clone());
 
-        let child_node = match self.directory.directory().owner().dirent_cache().lookup(&key) {
+        let child_node = match self
+            .directory
+            .directory()
+            .owner()
+            .dirent_cache()
+            .lookup(&(self.directory.object_id(), &id.string))
+        {
             Some(node) => Some(node),
             None => {
                 if let Some((object_id, _)) = self.directory.directory().lookup(&id.string).await? {
                     let node = self.get_or_load_node(object_id, &id).await?;
                     self.directory.directory().owner().dirent_cache().insert(
-                        key.0,
-                        key.1,
+                        self.directory.object_id(),
+                        id.string.clone(),
                         node.clone(),
                     );
                     Some(node)

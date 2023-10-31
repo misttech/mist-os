@@ -138,7 +138,7 @@ impl FxDirectory {
                 .directory
                 .owner()
                 .dirent_cache()
-                .lookup(&(current_dir.object_id(), name.to_owned()))
+                .lookup(&(current_dir.object_id(), name))
             {
                 Some(node) => {
                     let desc = node.object_descriptor();
@@ -267,10 +267,7 @@ impl FxDirectory {
 
     /// Called to indicate a file or directory was removed from this directory.
     pub(crate) fn did_remove(&self, name: &str) {
-        self.directory
-            .owner()
-            .dirent_cache()
-            .remove(&(self.directory.object_id(), name.to_owned()));
+        self.directory.owner().dirent_cache().remove(&(self.directory.object_id(), name));
         self.watchers.lock().unwrap().send_event(&mut SingleNameEventProducer::removed(name));
     }
 
