@@ -8,7 +8,7 @@ use std::{collections::VecDeque, sync::Arc};
 use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
 use crate::{
-    task::{IntervalTimerHandle, WaitQueue, WaiterRef},
+    task::{IntervalTimerHandle, ThreadGroupReadGuard, WaitQueue, WaiterRef},
     types::*,
 };
 
@@ -381,6 +381,20 @@ impl SignalEvent {
 
     pub fn none() -> Self {
         Self { value: Default::default(), signo: None, notify: SignalEventNotify::None }
+    }
+
+    pub fn is_valid(&self, thread_group: &ThreadGroupReadGuard<'_>) -> bool {
+        if self.notify != SignalEventNotify::None && self.signo.is_none() {
+            return false;
+        }
+
+        if let SignalEventNotify::ThreadId(tid) = self.notify {
+            if !thread_group.contains_task(tid) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }
 

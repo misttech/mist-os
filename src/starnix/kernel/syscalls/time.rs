@@ -6,7 +6,13 @@ use fuchsia_zircon::{self as zx, Task};
 use lock_sequence::{Locked, Unlocked};
 use starnix_sync::{InterruptibleEvent, WakeReason};
 
-use crate::{mm::MemoryAccessorExt, signals::RunState, syscalls::*, task::*, time::utc::*};
+use crate::{
+    mm::MemoryAccessorExt,
+    signals::{RunState, SignalEvent},
+    syscalls::*,
+    task::*,
+    time::utc::*,
+};
 
 pub fn sys_clock_getres(
     _locked: &mut Locked<'_, Unlocked>,
@@ -317,13 +323,23 @@ pub fn sys_timer_create(
     event: UserRef<sigevent>,
     timerid: UserRef<TimerId>,
 ) -> Result<(), Errno> {
-    let timers = &current_task.thread_group.read().timers;
     if clock_id >= MAX_CLOCKS as TimerId {
         return error!(EINVAL);
     }
     let user_event =
         if event.addr().is_null() { None } else { Some(current_task.read_object(event)?) };
-    let id = timers.create(clock_id, user_event)?;
+
+    let mut checked_signal_event: Option<SignalEvent> = None;
+    let thread_group = current_task.thread_group.read();
+    if let Some(user_event) = user_event {
+        let signal_event: SignalEvent = user_event.try_into()?;
+        if !signal_event.is_valid(&thread_group) {
+            return error!(EINVAL);
+        }
+        checked_signal_event = Some(signal_event);
+    }
+
+    let id = &thread_group.timers.create(clock_id, checked_signal_event)?;
     current_task.write_object(timerid, &id)?;
     Ok(())
 }

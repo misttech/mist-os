@@ -806,7 +806,6 @@
                 "AllTimerTypes/TimerfdTest.BlockingPoll_SetTimeResetsExpirations/CLOCK_BOOTTIME",
 
                 // timers_test
-                "IntervalTimerTest.OtherThreadGroup",
                 "IntervalTimerTest.RealTimeSignalsAreNotDuplicated",
                 "TimerTest.ProcessKilledOnCPUHardLimit",
                 "TimerTest.ProcessKilledOnCPUSoftLimit",

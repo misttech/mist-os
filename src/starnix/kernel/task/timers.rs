@@ -42,7 +42,11 @@ impl TimerTable {
     /// Creates a new per-process interval timer.
     ///
     /// The new timer is initially disarmed.
-    pub fn create(&self, clock_id: ClockId, sigev: Option<sigevent>) -> Result<TimerId, Errno> {
+    pub fn create(
+        &self,
+        clock_id: ClockId,
+        signal_event: Option<SignalEvent>,
+    ) -> Result<TimerId, Errno> {
         let mut state = self.state.lock();
 
         // Find a vacant timer id.
@@ -64,16 +68,18 @@ impl TimerTable {
             }
         };
 
-        let signal_event: SignalEvent = match sigev {
-            Some(sigev) => sigev.try_into()?,
-            None => SignalEvent::new(
-                SignalEventValue(timer_id as u64),
-                SIGALRM,
-                SignalEventNotify::Signal,
+        state.timers.insert(
+            timer_id,
+            IntervalTimer::new(
+                timer_id,
+                clock_id,
+                signal_event.unwrap_or(SignalEvent::new(
+                    SignalEventValue(timer_id as u64),
+                    SIGALRM,
+                    SignalEventNotify::Signal,
+                )),
             ),
-        };
-
-        state.timers.insert(timer_id, IntervalTimer::new(timer_id, clock_id, signal_event));
+        );
 
         Ok(timer_id)
     }
