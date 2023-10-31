@@ -14,6 +14,8 @@ mod rtc;
 mod time_source;
 mod time_source_manager;
 
+use fidl::AsHandleRef;
+use fidl_fuchsia_time as fft;
 use futures::{
     channel::mpsc,
     future::{self, OptionFuture},
@@ -272,6 +274,8 @@ async fn set_clock_from_rtc<R: Rtc, D: Diagnostics>(
             time: Some(rtc_time),
         });
         return;
+    } else {
+        debug!("RTC time ahead of backstop: rtc_time={:?}; backstop={:?}", rtc_time, backstop);
     }
 
     diagnostics.record(Event::InitializeRtc {
@@ -286,6 +290,17 @@ async fn set_clock_from_rtc<R: Rtc, D: Diagnostics>(
         diagnostics
             .record(Event::StartClock { track: Track::Primary, source: StartClockSource::Rtc });
         info!("started UTC clock from RTC at time: {}", rtc_chrono);
+
+        if let Err(status) = clock.signal_handle(
+            zx::Signals::NONE,
+            zx::Signals::from_bits(fft::SIGNAL_UTC_CLOCK_LOGGING_QUALITY).unwrap(),
+        ) {
+            // Since userspace depends on this signal, we probably can not recover if
+            // we can not signal.
+            panic!("Failed to signal clock logging quality: {}", status);
+        } else {
+            debug!("sent SIGNAL_UTC_CLOCK_LOGGING_QUALITY");
+        }
     }
 }
 

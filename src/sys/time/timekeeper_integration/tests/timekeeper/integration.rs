@@ -55,6 +55,30 @@ where
 }
 
 #[fuchsia::test]
+fn test_no_rtc_start_clock_from_time_source_alternate_signal() {
+    let clock = new_clock();
+    timekeeper_test(Arc::clone(&clock), None, |push_source_controller, _, _| async move {
+        let sample_monotonic = zx::Time::get_monotonic();
+        tracing::info!("[fxb/130140]: before push_source_controller.set_sample");
+        push_source_controller
+            .set_sample(TimeSample {
+                utc: Some(VALID_TIME.into_nanos()),
+                monotonic: Some(sample_monotonic.into_nanos()),
+                standard_deviation: Some(STD_DEV.into_nanos()),
+                ..Default::default()
+            })
+            .await;
+
+        fasync::OnSignals::new(
+            &*clock,
+            zx::Signals::from_bits(fft::SIGNAL_UTC_CLOCK_LOGGING_QUALITY).unwrap(),
+        )
+        .await
+        .unwrap();
+    });
+}
+
+#[fuchsia::test]
 fn test_no_rtc_start_clock_from_time_source() {
     let clock = new_clock();
     timekeeper_test(Arc::clone(&clock), None, |push_source_controller, _, cobalt| async move {
@@ -336,6 +360,20 @@ fn test_start_clock_from_rtc() {
             );
         },
     );
+}
+
+#[fuchsia::test]
+fn test_start_clock_from_rtc_alternate_signal() {
+    let clock = new_clock();
+    timekeeper_test(Arc::clone(&clock), Some(*VALID_RTC_TIME), |_, _, _| async move {
+        // Clock should start from the time read off the RTC.
+        fasync::OnSignals::new(
+            &*clock,
+            zx::Signals::from_bits(fft::SIGNAL_UTC_CLOCK_LOGGING_QUALITY).unwrap(),
+        )
+        .await
+        .unwrap();
+    });
 }
 
 #[fuchsia::test]

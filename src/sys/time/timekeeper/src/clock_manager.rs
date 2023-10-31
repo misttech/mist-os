@@ -555,7 +555,10 @@ fn update_clock(clock: &Arc<zx::Clock>, track: &Track, update: impl Into<zx::Clo
     // time source.
     if let Err(status) = clock.signal_handle(
         zx::Signals::NONE,
-        zx::Signals::from_bits(fft::SIGNAL_UTC_CLOCK_SYNCHRONIZED).unwrap(),
+        zx::Signals::from_bits(
+            fft::SIGNAL_UTC_CLOCK_SYNCHRONIZED | fft::SIGNAL_UTC_CLOCK_LOGGING_QUALITY,
+        )
+        .unwrap(),
     ) {
         panic!("Failed to signal clock synchronization to {:?} clock: {}", track, status);
     }
