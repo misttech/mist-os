@@ -663,7 +663,7 @@ async def _console_event_loop(
                     lines_to_print.append(
                         f" {statusinfo.highlight(line, style=flags.style)}"
                     )
-                    command = f'fx test --test-filter "{line}"'
+                    command = f'fx test {cases_payload.test_name} --test-filter "{line}"'
                     lines_to_print.append(
                         f" {statusinfo.dim(command, style=flags.style)}"
                     )
