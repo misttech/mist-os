@@ -12,7 +12,7 @@ if (is_host) {
       "//src/testing/end_to_end/honeydew",
       "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
     ]
-    environments = [ nelson_env ]
+    environments = [ vim3_env ]
   }
 
   python_mobly_test("wlan_test") {
@@ -21,7 +21,7 @@ if (is_host) {
       "//src/testing/end_to_end/honeydew",
       "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
     ]
-    environments = [ astro_env ]
+    environments = [ vim3_env ]
   }
 
   # Group containing all of the WLAN affordance functional test cases.

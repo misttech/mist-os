@@ -94,7 +94,10 @@ group("unstable_emulator_tests") {
 
 group("unstable_vim3_sl4f_tests") {
   testonly = true
-  public_deps = []
+  public_deps = [
+    "affordance_tests/test_wlan:wlan_policy_test($host_toolchain)",
+    "affordance_tests/test_wlan:wlan_test($host_toolchain)",
+  ]
 }
 
 group("unstable_vim3_tests") {
