@@ -5,9 +5,14 @@
 use fuchsia_zircon::{self as zx, HandleBased};
 use std::sync::Arc;
 
-use super::*;
 use crate::{
-    fs::buffers::{InputBuffer, OutputBuffer},
+    fs::{
+        anon_fs,
+        buffers::{InputBuffer, OutputBuffer},
+        fileops_impl_seekable, fs_node_impl_not_dir, fs_node_impl_xattr_delegate, DirEntry,
+        FallocMode, FileHandle, FileObject, FileOps, FsNode, FsNodeInfo, FsNodeOps, FsString,
+        MemoryXattrStorage, MountInfo, NamespaceNode, MAX_LFS_FILESIZE,
+    },
     logging::impossible_error,
     mm::{vmo::round_up_to_system_page_size, ProtectionFlags, PAGE_SIZE},
     task::CurrentTask,
