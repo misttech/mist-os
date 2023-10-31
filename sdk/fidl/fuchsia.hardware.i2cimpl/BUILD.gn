@@ -7,4 +7,5 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.hardware.i2cimpl") {
   sources = [ "i2cimpl.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
+  contains_drivers = true
 }

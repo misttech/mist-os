@@ -17,6 +17,7 @@ type I2cImplOp = struct {
 
 /// Low-level protocol for i2c drivers.
 @discoverable
+@transport("Driver")
 open protocol I2cImpl {
     flexible GetMaxTransferSize() -> (struct {
         size uint64;
