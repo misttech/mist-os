@@ -451,15 +451,13 @@ impl MatchingRule {
 pub enum DynamicNameCompositionRule {}
 
 impl DynamicNameCompositionRule {
-    // TODO(fxbug.dev/135106): Make use of this function when rules are implemented
-    #[allow(unused)]
     fn get_name(&self, _info: &devices::DeviceInfo) -> &str {
         match *self {}
     }
 }
 
 // A rule that dictates a component of an interface's name. An interface's name
-// will be determined by extracting the name of each rule, in order, and
+// is determined by extracting the name of each rule, in order, and
 // concatenating the results.
 #[derive(Debug, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "lowercase")]
@@ -483,6 +481,21 @@ pub struct NamingRule {
     /// The rules to apply to the interface to produce the interface's name.
     #[allow(unused)]
     pub naming_scheme: Vec<NameCompositionRule>,
+}
+
+impl NamingRule {
+    // An interface's name is determined by extracting the name of each rule,
+    // in order, and concatenating the results.
+    #[allow(unused)]
+    fn get_name(&self, info: &devices::DeviceInfo) -> String {
+        self.naming_scheme
+            .iter()
+            .map(|rule| match rule {
+                NameCompositionRule::Static(s) => &s.as_str(),
+                NameCompositionRule::Dynamic(rule) => rule.get_name(info),
+            })
+            .collect()
+    }
 }
 
 #[cfg(test)]
@@ -1029,5 +1042,36 @@ mod tests {
         let matching_rule = MatchingRule::Any(false);
         let does_interface_match = matching_rule.does_interface_match(&device_info).unwrap();
         assert!(!does_interface_match);
+    }
+
+    #[test_case(
+        vec![NameCompositionRule::Static(String::from("x"))],
+        "x";
+        "single_rule"
+    )]
+    #[test_case(
+        vec![
+            NameCompositionRule::Static(String::from("eth")),
+            NameCompositionRule::Static(String::from("x")),
+            NameCompositionRule::Static(String::from("100"))
+        ],
+        "ethx100";
+        "multiple_rules"
+    )]
+    fn test_static_naming_rules(
+        static_rules: Vec<NameCompositionRule>,
+        expected_name: &'static str,
+    ) {
+        let naming_rule = NamingRule { matchers: HashSet::new(), naming_scheme: static_rules };
+
+        // DeviceInfo does not impact static naming rules, so use arbitrary values.
+        let info = devices::DeviceInfo {
+            device_class: fhwnet::DeviceClass::Ethernet,
+            mac: None,
+            topological_path: "".to_owned(),
+        };
+
+        let name = naming_rule.get_name(&info);
+        assert_eq!(name, expected_name.to_owned());
     }
 }
