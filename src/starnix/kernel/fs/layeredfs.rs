@@ -4,8 +4,15 @@
 
 use std::{collections::BTreeMap, sync::Arc};
 
-use super::*;
-use crate::{task::*, types::*};
+use crate::{
+    fs::{
+        fileops_impl_directory, fs_node_impl_dir_readonly, unbounded_seek, CacheMode,
+        DirectoryEntryType, DirentSink, FileHandle, FileObject, FileOps, FileSystem,
+        FileSystemHandle, FileSystemOps, FsNode, FsNodeOps, FsStr, FsString, MountInfo, SeekTarget,
+    },
+    task::*,
+    types::*,
+};
 
 /// A filesystem that will delegate most operation to a base one, but have a number of top level
 /// directory that points to other filesystems.
