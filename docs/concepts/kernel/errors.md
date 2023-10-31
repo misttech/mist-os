@@ -100,7 +100,7 @@ not satisfied or the system is unable to complete the operation in its current s
 **HANDLE\_CLOSED**
   A handle being waited on was closed.
 
-**REMOTE\_CLOSED**
+**PEER\_CLOSED**
   The operation failed because the remote end of the subject of the operation was closed.
 
 **UNAVAILABLE**
@@ -113,7 +113,7 @@ not satisfied or the system is unable to complete the operation in its current s
   a prerequisite to be satisfied, for example waiting for a handle to be readable or writable.
   Example: Attempting to read from a channel that has no messages waiting but has an open
   remote will return **SHOULD\_WAIT**. Attempting to read from a channel that has no messages
-  waiting and has a closed remote end will return **REMOTE\_CLOSED**.
+  waiting and has a closed remote end will return **PEER\_CLOSED**.
 
 ### Permission errors
 
