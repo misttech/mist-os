@@ -99,7 +99,7 @@ TEST_F(DeviceEnumerationTest, SherlockTest) {
 
       "sys/platform/05:04:e/aml-video",
 
-      "sys/platform/05:04:1:1/aml-gpio/gpio-50/spi-0/aml-spi-0/spi/spi-0-0/nrf52840_radio/ot-radio",
+      "sys/platform/05:04:1:1/aml-gpio/gpio-50/spi-0/aml-spi-0/spi/spi-0-0/nrf52840-radio/ot-radio",
 
       // WLAN
       "sys/platform/05:00:6/sherlock-sd-emmc/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphy",
