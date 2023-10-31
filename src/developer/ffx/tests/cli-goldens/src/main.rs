@@ -91,7 +91,7 @@ pub(crate) async fn new_ffx_isolate(
     Ok((ffx_isolate, temp_dir, test_env))
 }
 
-#[fuchsia::main]
+#[fuchsia::main(logging_minimum_severity = "info")]
 async fn main() -> Result<()> {
     let args = argh::from_env::<Args>();
 
