@@ -279,9 +279,11 @@ impl BufferAllocator {
             order += 1;
         }
 
-        let idx = inner.free_lists[order]
-            .binary_search(&offset)
-            .expect_err(&format!("Unexpectedly found {} in free list {}", offset, order));
+        let idx = match inner.free_lists[order].binary_search(&offset) {
+            Ok(_) => panic!("Unexpectedly found {} in free list {}", offset, order),
+            Err(idx) => idx,
+        };
+
         inner.free_lists[order].insert(idx, offset);
     }
 

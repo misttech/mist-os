@@ -527,30 +527,30 @@ impl SuperBlockHeader {
             let mut magic_bytes: [u8; 8] = [0; 8];
             cursor.read_exact(&mut magic_bytes)?;
             if magic_bytes.as_slice() != SUPER_BLOCK_MAGIC.as_slice() {
-                bail!(format!("Invalid magic: {:?}", magic_bytes));
+                bail!("Invalid magic: {:?}", magic_bytes);
             }
             (super_block_header, super_block_version) =
                 SuperBlockHeader::deserialize_with_version(&mut cursor)?;
 
             if super_block_version < EARLIEST_SUPPORTED_VERSION {
-                bail!(format!("Unsupported SuperBlock version: {:?}", super_block_version));
+                bail!("Unsupported SuperBlock version: {:?}", super_block_version);
             }
 
             // NOTE: It is possible that data was written to the journal with an old version
             // but no compaction ever happened, so the journal version could potentially be older
             // than the layer file versions.
             if super_block_header.journal_checkpoint.version < EARLIEST_SUPPORTED_VERSION {
-                bail!(format!(
+                bail!(
                     "Unsupported JournalCheckpoint version: {:?}",
                     super_block_header.journal_checkpoint.version
-                ));
+                );
             }
 
             if super_block_header.earliest_version < EARLIEST_SUPPORTED_VERSION {
-                bail!(format!(
+                bail!(
                     "Filesystem contains struct with unsupported version: {:?}",
                     super_block_header.earliest_version
-                ));
+                );
             }
 
             cursor.position() as usize

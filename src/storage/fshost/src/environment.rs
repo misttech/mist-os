@@ -1183,7 +1183,7 @@ impl FilesystemLauncher {
                 serving_multi_vol_fs
                     .remove_volume(&volume.name)
                     .await
-                    .context(format!("failed to remove volume: {:?}", volume.name))?;
+                    .with_context(|| format!("failed to remove volume: {:?}", volume.name))?;
             }
         }
 

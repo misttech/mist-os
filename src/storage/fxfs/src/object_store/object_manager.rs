@@ -283,7 +283,7 @@ impl ObjectManager {
             store
                 .on_replay_complete()
                 .await
-                .context(format!("Store {} failed to load after replay", store_id))?;
+                .with_context(|| format!("Store {} failed to load after replay", store_id))?;
         }
 
         ensure!(

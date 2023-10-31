@@ -307,7 +307,7 @@ impl<'a> Fsck<'a> {
     fn assert<V>(&self, res: Result<V, Error>, error: FsckFatal) -> Result<V, Error> {
         if res.is_err() {
             (self.options.on_error)(&FsckIssue::Fatal(error.clone()));
-            return Err(anyhow!(format!("{:?}", error)).context(res.err().unwrap()));
+            return Err(anyhow!("{:?}", error)).context(res.err().unwrap());
         }
         res
     }
@@ -322,7 +322,7 @@ impl<'a> Fsck<'a> {
         (self.options.on_error)(&FsckIssue::Error(error.clone()));
         self.errors.fetch_add(1, Ordering::Relaxed);
         if self.options.halt_on_error {
-            Err(anyhow!(format!("{:?}", error)))
+            Err(anyhow!("{:?}", error))
         } else {
             Ok(())
         }
@@ -330,7 +330,7 @@ impl<'a> Fsck<'a> {
 
     fn fatal(&self, error: FsckFatal) -> Result<(), Error> {
         (self.options.on_error)(&FsckIssue::Fatal(error.clone()));
-        Err(anyhow!(format!("{:?}", error)))
+        Err(anyhow!("{:?}", error))
     }
 
     // Does not actually verify the inner contents of the store; for that, use check_child_store.

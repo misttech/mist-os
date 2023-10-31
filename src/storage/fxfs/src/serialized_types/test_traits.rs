@@ -18,7 +18,7 @@ impl VersionedLatest for u64 {
     {
         match version.major {
             1.. => Ok(u64::deserialize_from(reader, version)?.into()),
-            _ => anyhow::bail!(format!("Invalid version {} for u64.", version)),
+            _ => anyhow::bail!("Invalid version {} for u64.", version),
         }
     }
 }

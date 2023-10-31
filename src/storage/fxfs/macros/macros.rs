@@ -115,12 +115,12 @@ pub fn versioned_type(input: TokenStream) -> TokenStream {
                         "Found version > LATEST_VERSION for {}.", stringify!(#ident));
                     const future_ver : u32 = LATEST_VERSION.major + 1;
                     match version.major {
-                        future_ver.. => anyhow::bail!(format!(
+                        future_ver.. => anyhow::bail!(
                                 "Invalid future version {} > {} deserializing {}.",
-                                version, LATEST_VERSION, stringify!(#ident))),
+                                version, LATEST_VERSION, stringify!(#ident)),
                         #(#match_iter)*
-                        x => anyhow::bail!(format!(
-                                "Unsupported version {} for {}.", x, stringify!(#ident))),
+                        x => anyhow::bail!(
+                                "Unsupported version {} for {}.", x, stringify!(#ident)),
                     }
                 }
             }

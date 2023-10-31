@@ -152,7 +152,7 @@ fn create_sparse_image(
     let image = std::fs::OpenOptions::new()
         .read(true)
         .open(image_path)
-        .context(format!("Failed to open {:?}", image_path))?;
+        .with_context(|| format!("Failed to open {:?}", image_path))?;
     let actual_length = image.metadata()?.len();
     let mut output = std::fs::OpenOptions::new()
         .read(true)
@@ -160,7 +160,7 @@ fn create_sparse_image(
         .create(true)
         .truncate(true)
         .open(sparse_output_image_path)
-        .context(format!("Failed to create {:?}", sparse_output_image_path))?;
+        .with_context(|| format!("Failed to create {:?}", sparse_output_image_path))?;
     sparse::builder::SparseImageBuilder::new()
         .set_block_size(block_size)
         .add_chunk(sparse::builder::DataSource::Reader(Box::new(image)))
@@ -306,9 +306,9 @@ async fn install_blob(
 fn generate_blob(hash: Hash, path: PathBuf, fs_block_size: usize) -> Result<BlobToInstall, Error> {
     let mut contents = Vec::new();
     std::fs::File::open(&path)
-        .context(format!("Unable to open `{:?}'", &path))?
+        .with_context(|| format!("Unable to open `{:?}'", &path))?
         .read_to_end(&mut contents)
-        .context(format!("Unable to read contents of `{:?}'", &path))?;
+        .with_context(|| format!("Unable to read contents of `{:?}'", &path))?;
     let hashes = {
         // TODO(fxbug.dev/122056): Refactor to share implementation with blob.rs.
         let mut builder = MerkleTreeBuilder::new();

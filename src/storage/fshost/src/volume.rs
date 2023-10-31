@@ -80,8 +80,9 @@ pub async fn resize_volume(volume_proxy: &VolumeProxy, target_bytes: u64) -> Res
             .extend(1, slice_count - 1)
             .await
             .context("Transport error on extend call")?;
-        zx::Status::ok(status)
-            .context(format!("Failed to extend partition (slice count: {:?})", slice_count))?;
+        zx::Status::ok(status).with_context(|| {
+            format!("Failed to extend partition (slice count: {:?})", slice_count)
+        })?;
     }
     return Ok(slice_count * slice_size);
 }

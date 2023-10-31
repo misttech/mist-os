@@ -260,10 +260,7 @@ async fn get_entries(dir: &fio::DirectoryProxy) -> Result<Vec<DirectoryEntry>, E
         if ent.kind != DirentKind::File {
             // If we run into anything in this partition that isn't a file, there is some kind of
             // problem with our environment. Surface that information so that it can get fixed.
-            bail!(format!(
-                "Directory entry '{}' is not a file. FactoryFS can only contain files.",
-                ent.name
-            ))
+            bail!("Directory entry '{}' is not a file. FactoryFS can only contain files.", ent.name)
         }
 
         // NB: We are loading all the files we are going to serialize into memory first.
@@ -276,20 +273,21 @@ async fn get_entries(dir: &fio::DirectoryProxy) -> Result<Vec<DirectoryEntry>, E
             &ent.name,
             fidl::endpoints::ServerEnd::new(server_end.into_channel()),
         )
-        .context(format!("failed to open file {}", ent.name))?;
-        let (status, attrs) = file_proxy
-            .get_attr()
-            .await
-            .context(format!("failed to get attributes of file {}: (fidl failure)", ent.name))?;
+        .with_context(|| format!("failed to open file {}", ent.name))?;
+        let (status, attrs) = file_proxy.get_attr().await.with_context(|| {
+            format!("failed to get attributes of file {}: (fidl failure)", ent.name)
+        })?;
         if zx::Status::from_raw(status) != zx::Status::OK {
             bail!("failed to get attributes of file {}", ent.name);
         }
         let data = file_proxy
             .read(attrs.content_size)
             .await
-            .context(format!("failed to read contents of file {}: (fidl failure)", ent.name))?
+            .with_context(|| {
+                format!("failed to read contents of file {}: (fidl failure)", ent.name)
+            })?
             .map_err(zx::Status::from_raw)
-            .context(format!("failed to read contents of file {}", ent.name))?;
+            .with_context(|| format!("failed to read contents of file {}", ent.name))?;
 
         entries.push(DirectoryEntry { name: ent.name.as_bytes().to_vec(), data });
     }

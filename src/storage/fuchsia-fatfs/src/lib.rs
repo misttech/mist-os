@@ -236,7 +236,10 @@ mod tests {
                                     server_end,
                                 )
                                 .context("Sending open failed")?;
-                            value.verify(proxy).await.context(format!("Verifying {}", name))?;
+                            value
+                                .verify(proxy)
+                                .await
+                                .with_context(|| format!("Verifying {}", name))?;
                         }
                         Ok(())
                     }

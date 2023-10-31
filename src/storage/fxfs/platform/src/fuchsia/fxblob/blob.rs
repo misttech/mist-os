@@ -258,11 +258,13 @@ impl PagerBacked for FxBlob {
                         .commit_range(buffer.range())
                         .map_err(|e| e.into())
                 })
-                .context(format!(
-                    "Failed to read compressed range {:?}, len {}",
-                    aligned,
-                    self.handle.get_size()
-                ))?;
+                .with_context(|| {
+                    format!(
+                        "Failed to read compressed range {:?}, len {}",
+                        aligned,
+                        self.handle.get_size()
+                    )
+                })?;
             let compressed_buf_range = (compressed_offsets.start - aligned.start) as usize
                 ..(compressed_offsets.end - aligned.start) as usize;
             ensure!(

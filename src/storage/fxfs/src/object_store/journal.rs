@@ -693,10 +693,12 @@ impl Journal {
                 None,
             )
             .await
-            .context(format!(
-                "Failed to open journal file (object id: {})",
-                super_block.journal_object_id
-            ))?;
+            .with_context(|| {
+                format!(
+                    "Failed to open journal file (object id: {})",
+                    super_block.journal_object_id
+                )
+            })?;
             let _ = self.handle.set(handle);
             let mut inner = self.inner.lock().unwrap();
             let mut writer_checkpoint = reader.journal_file_checkpoint();

@@ -24,7 +24,8 @@ pub(crate) const METADATA_PATH: &str = "metadata.v1";
 /// to source pairs. Additionally, create a metadata file that provides information
 /// necessary for mounting the files from a fuchsia package.
 pub fn ext4_extract(path: &str, out_dir: &str) -> Result<HashMap<String, String>, Error> {
-    let mut file = std::fs::File::open(path).context(format!("Unable to open `{:?}'", path))?;
+    let mut file =
+        std::fs::File::open(path).with_context(|| format!("Unable to open `{:?}'", path))?;
     let reader = if sparse::is_sparse_image(&mut file) {
         Box::new(IoAdapter::new(SparseReader::new(Box::new(file))?)) as Box<dyn Reader>
     } else {

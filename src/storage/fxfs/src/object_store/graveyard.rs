@@ -199,7 +199,7 @@ impl Graveyard {
         let store = self
             .object_manager
             .store(store_id)
-            .context(format!("Failed to get store {}", store_id))?;
+            .with_context(|| format!("Failed to get store {}", store_id))?;
         // For now, it's safe to assume that all objects in the root parent and root store should
         // return space to the metadata reservation, but we might have to revisit that if we end up
         // with objects that are in other stores.
@@ -222,7 +222,7 @@ impl Graveyard {
         let store = self
             .object_manager
             .store(store_id)
-            .context(format!("Failed to get store {}", store_id))?;
+            .with_context(|| format!("Failed to get store {}", store_id))?;
         store.trim(object_id).await.context("Failed to trim object")
     }
 

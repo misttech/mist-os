@@ -1394,7 +1394,7 @@ impl ObjectStore {
                     crypt.clone(),
                 )
                 .await
-                .context(format!("Failed to open layer file {}", object_id))?,
+                .with_context(|| format!("Failed to open layer file {}", object_id))?,
             );
             sizes.push(handle.get_size());
             handles.push(handle);

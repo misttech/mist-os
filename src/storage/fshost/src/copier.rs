@@ -34,7 +34,7 @@ pub fn recursive_copy<'a>(
                 .context("open dst dir")?;
                 recursive_copy(&src, &dst)
                     .await
-                    .context(format!("path {}", entry.name.as_str()))?;
+                    .with_context(|| format!("path {}", entry.name.as_str()))?;
             } else {
                 let src = fuchsia_fs::directory::open_file_no_describe(
                     src,
