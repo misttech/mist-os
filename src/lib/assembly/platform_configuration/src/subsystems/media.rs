@@ -16,6 +16,10 @@ impl DefineSubsystemConfiguration<PlatformMediaConfig> for MediaSubsystem {
             && *context.build_type == BuildType::Eng
         {
             builder.platform_bundle("audio_development_support");
+
+            if context.board_info.provides_feature("fuchsia::video_encoders") {
+                builder.platform_bundle("video_development_support");
+            }
         }
 
         match (&media_config.audio, media_config.audio_device_registry_enabled) {

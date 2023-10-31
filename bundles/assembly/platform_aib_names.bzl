@@ -178,5 +178,6 @@ ENG_PLATFORM_AIB_NAMES_RISCV64 = BOOTSTRAP_ENG_PLATFORM_AIB_NAMES + USERDEBUG_PL
     "ui_eng.icu_latest_{}".format(icu_flavors.latest_git_commit),
     "ui_eng.icu_stable_{}".format(icu_flavors.stable_git_commit),
     "ui_package_eng",
+    "video_development_support",
 ]
 ENG_PLATFORM_AIB_NAMES = ENG_PLATFORM_AIB_NAMES_RISCV64 + USER_PLATFORM_AIB_NAMES_EXCLUDED_FROM_RISCV64

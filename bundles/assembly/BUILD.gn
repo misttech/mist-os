@@ -2369,6 +2369,17 @@ assembly_input_bundle("audio_development_support") {
   ]
 }
 
+assembly_input_bundle("video_development_support") {
+  testonly = true
+  cache_packages = [ "//src/media/codec/examples:encode-file" ]
+  shell_commands = [
+    {
+      package = "encode-file"
+      components = [ "encode-file" ]
+    },
+  ]
+}
+
 assembly_input_bundle("audio_core") {
   base_packages = [ "//src/media/audio/audio_core" ]
 }
