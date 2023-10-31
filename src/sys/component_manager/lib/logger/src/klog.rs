@@ -128,20 +128,19 @@ mod tests {
         tracing::{error, info, warn},
     };
 
-    fn get_root_resource() -> zx::Resource {
+    fn get_readonlylog() -> zx::DebugLog {
         let (client_end, server_end) = zx::Channel::create();
-        connect_channel_to_protocol::<fboot::RootResourceMarker>(server_end).unwrap();
-        let service = fboot::RootResourceSynchronousProxy::new(client_end);
-        let resource = service.get(zx::Time::INFINITE).expect("couldn't get root resource");
-        resource
+        connect_channel_to_protocol::<fboot::ReadOnlyLogMarker>(server_end).unwrap();
+        let service = fboot::ReadOnlyLogSynchronousProxy::new(client_end);
+        let log = service.get(zx::Time::INFINITE).expect("couldn't get read only log");
+        log
     }
 
     // expect_message_in_debuglog will read the last 10000 messages in zircon's debuglog, looking
     // for a message that equals `sent_msg`. If found, the function returns. If the first 10,000
     // messages doesn't contain `sent_msg`, it will panic.
     fn expect_message_in_debuglog(sent_msg: String) {
-        let resource = get_root_resource();
-        let debuglog = zx::DebugLog::create(&resource, zx::DebugLogOpts::READABLE).unwrap();
+        let debuglog = get_readonlylog();
         for _ in 0..10000 {
             match debuglog.read() {
                 Ok(record) => {

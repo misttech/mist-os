@@ -10,6 +10,6 @@
         binary: "bin/cm_logger_lib_test",
     },
     use: [
-        { protocol: "fuchsia.boot.RootResource" },
+        { protocol: "fuchsia.boot.ReadOnlyLog" },
     ],
 }
