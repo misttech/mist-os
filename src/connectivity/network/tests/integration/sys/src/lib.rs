@@ -9,6 +9,7 @@ use fidl::{
     AsHandleRef as _,
 };
 use fidl_fuchsia_netemul as fnetemul;
+use fidl_fuchsia_posix_socket as fposix_socket;
 use fuchsia_component::server::{ServiceFs, ServiceFsDir, ServiceObj};
 use fuchsia_zircon as zx;
 
@@ -30,7 +31,7 @@ where
     RS::Protocol: DiscoverableProtocolMarker,
 {
     let mut netstack: fnetemul::ChildDef =
-        (&netstack_testing_common::realms::KnownServiceProvider::Netstack(
+        netstack_testing_common::realms::KnownServiceProvider::Netstack(
             match N::VERSION {
                 // The prod ns2 has a route for
                 // fuchsia.scheduler.ProfileProvider which is needed for tests
@@ -44,7 +45,7 @@ where
                     panic!("netstack_test should only be parameterized with Netstack2 or Netstack3: got {:?}", v);
                 }
             }
-        ))
+        )
             .into();
     {
         let fnetemul::ChildUses::Capabilities(capabilities) =
@@ -168,6 +169,9 @@ async fn ns_requests_inspect_persistence<N: Netstack>(name: &str) {
     assert_persist_called_for_tags::<N>(fs, &config).await
 }
 
+// N.B.: If the test realm has been created with a mock service endpoint for
+// fuchsia.diagnostics.persist.DataPersistence, then this function must be
+// called to unblock netstack's calls to that mock service.
 async fn assert_persist_called_for_tags<N: Netstack>(
     fs: ServiceFs<ServiceObj<'_, fidl_fuchsia_diagnostics_persist::DataPersistenceRequestStream>>,
     config: &persistence_config::Config,
@@ -269,6 +273,12 @@ where
 
     assert_persist_called_for_tags::<N>(fs, &config).await;
 
+    // Create a socket to ensure socket Inspect data is available.
+    let _socket = realm
+        .datagram_socket(fposix_socket::Domain::Ipv4, fposix_socket::DatagramSocketProtocol::Udp)
+        .await
+        .expect("datagram socket creation failed");
+
     // The realm moniker is needed to construct the component part of an Inspect
     // selector.
     let moniker = realm.get_moniker().await.expect("get moniker failed");
@@ -305,10 +315,6 @@ where
             .into_iter()
             .filter_map(|v| v.payload)
             .next();
-        if *tag == persistence_config::Tag::new("sockets".into()).unwrap() {
-            assert_eq!(inspect_payload, None);
-            continue;
-        }
 
         // Assert on payload.
         validate_payload(inspect_payload.expect("no payload in snapshot"), tag, tag_config);
