@@ -52,3 +52,22 @@ fuchsia_package("ui_package") {
 
   deps = [ ":ui_component" ]
 }
+
+fuchsia_component("ui_with_synthetic_device_support_component") {
+  component_name = "ui"
+  manifest = "meta/ui_with_synthetic_device_support.cml"
+  deps = [
+    # `display-coordinator-connector` lets components connect to the
+    # `fuchsia.hardware.display.Coordinator` service, provided by the display
+    # coordinator driver so that components can present contents to the display
+    # hardware.
+    "//src/graphics/display/bin/coordinator-connector:shard-includes",
+    "//src/ui/testing/input_helper:input-helper-component",
+  ]
+}
+
+fuchsia_package("ui_with_synthetic_device_support_package") {
+  package_name = "ui"
+
+  deps = [ ":ui_with_synthetic_device_support_component" ]
+}

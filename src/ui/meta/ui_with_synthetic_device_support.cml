@@ -1,0 +1,44 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [ "//src/ui/meta/ui.cml" ],
+    children: [
+        {
+            name: "input-helper",
+            url: "#meta/input-helper.cm",
+        },
+    ],
+    offer: [
+        {
+            protocol: "fuchsia.logger.LogSink",
+            from: "parent",
+            to: [ "#input-helper" ],
+        },
+        {
+            protocol: [ "fuchsia.input.injection.InputDeviceRegistry" ],
+            from: "#scene_manager",
+            to: [ "#input-helper" ],
+        },
+        {
+            // input-helper use `fuchsia.ui.display.singleton.Info` to get
+            // display size to create a touch screen match the screen,
+            // input-helper will use default size 1000x1000 if this protocol
+            // not available.
+            protocol: [ "fuchsia.ui.display.singleton.Info" ],
+            from: "#scenic",
+            to: [ "#input-helper" ],
+        },
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent",
+            to: [ "#input-helper" ],
+        },
+    ],
+    expose: [
+        {
+            protocol: [ "fuchsia.ui.test.input.Registry" ],
+            from: "#input-helper",
+        },
+    ],
+}

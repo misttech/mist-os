@@ -53,6 +53,10 @@ pub struct PlatformUiConfig {
     /// Whether to include brightness manager, and the relevant configs.
     #[serde(default)]
     pub brightness_manager: Option<BrightnessManager>,
+
+    /// Set with_synthetic_device_support true to include input-helper to ui.
+    #[serde(default)]
+    pub with_synthetic_device_support: bool,
 }
 
 impl Default for PlatformUiConfig {
@@ -68,6 +72,7 @@ impl Default for PlatformUiConfig {
             display_pixel_density: Default::default(),
             viewing_distance: Default::default(),
             brightness_manager: Default::default(),
+            with_synthetic_device_support: Default::default(),
         }
     }
 }

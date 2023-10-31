@@ -2530,6 +2530,19 @@ assembly_input_bundle("ui_package_user_and_userdebug") {
   base_packages = [ "//src/ui:ui_package" ]
 }
 
+# UI support for builds wants synthetic device support
+#
+# Use PlatformUiConfig.with_synthetic_device_support to select this bundle
+# over ui_package_eng / ui_package_user_and_userdebug.
+#
+# feature_set_levels: minimal
+# build-types: eng, userdebug
+#
+assembly_input_bundle(
+    "ui_package_eng_userdebug_with_synthetic_device_support") {
+  cache_packages = [ "//src/ui:ui_with_synthetic_device_support_package" ]
+}
+
 # Fan support
 #
 # feature_set_levels: utility, minimal

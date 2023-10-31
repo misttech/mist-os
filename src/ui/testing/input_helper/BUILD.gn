@@ -62,7 +62,6 @@ rustc_binary("input_helper_bin") {
 }
 
 fuchsia_component("input-helper-component") {
-  testonly = true
   component_name = "input-helper"
   manifest = "meta/input-helper.cml"
   deps = [ ":input_helper_bin" ]

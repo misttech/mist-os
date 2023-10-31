@@ -14,14 +14,39 @@ impl DefineSubsystemConfiguration<PlatformUiConfig> for UiSubsystem {
         ui_config: &PlatformUiConfig,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
-        match (&ui_config.enabled, context.build_type) {
-            (false, _) => return Ok(()),
-            (true, BuildType::Eng) => {
+        if !ui_config.enabled {
+            return Ok(());
+        }
+        match context.build_type {
+            BuildType::Eng => {
                 builder.platform_bundle("ui");
                 builder.icu_platform_bundle("ui_eng")?;
-                builder.platform_bundle("ui_package_eng");
+                match &ui_config.with_synthetic_device_support {
+                    true => {
+                        builder.platform_bundle(
+                            "ui_package_eng_userdebug_with_synthetic_device_support",
+                        );
+                    }
+                    false => {
+                        builder.platform_bundle("ui_package_eng");
+                    }
+                }
             }
-            (true, _) => {
+            BuildType::UserDebug => {
+                builder.platform_bundle("ui");
+                builder.icu_platform_bundle("ui_user_and_userdebug")?;
+                match &ui_config.with_synthetic_device_support {
+                    true => {
+                        builder.platform_bundle(
+                            "ui_package_eng_userdebug_with_synthetic_device_support",
+                        );
+                    }
+                    false => {
+                        builder.platform_bundle("ui_package_user_and_userdebug");
+                    }
+                }
+            }
+            BuildType::User => {
                 builder.platform_bundle("ui");
                 builder.icu_platform_bundle("ui_user_and_userdebug")?;
                 builder.platform_bundle("ui_package_user_and_userdebug");

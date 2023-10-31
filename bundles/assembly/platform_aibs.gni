@@ -184,6 +184,7 @@ user_platform_aib_names =
       "ui_user_and_userdebug.icu_latest_${icu_git_info.latest}",
       "ui_user_and_userdebug.icu_stable_${icu_git_info.stable}",
       "ui_package_user_and_userdebug",
+      "ui_package_eng_userdebug_with_synthetic_device_support",
       "brightness_manager",
 
       # Drivers
@@ -271,6 +272,7 @@ eng_only_platform_aib_names =
       "ui_eng.icu_latest_${icu_git_info.latest}",
       "ui_eng.icu_stable_${icu_git_info.stable}",
       "ui_package_eng",
+      "ui_package_eng_userdebug_with_synthetic_device_support",
 
       # Example AIB
       "example_assembly_bundle",

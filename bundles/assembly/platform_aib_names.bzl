@@ -116,6 +116,7 @@ USER_PLATFORM_AIB_NAMES_RISCV64 = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + [
     "starnix_support",
     "system_update_configurator",
     "ui",
+    "ui_package_eng_userdebug_with_synthetic_device_support",
     "ui_package_user_and_userdebug",
     "ui_user_and_userdebug",
     "ui_user_and_userdebug.icu_default_{}".format(icu_flavors.default_git_commit),
