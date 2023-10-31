@@ -19,10 +19,9 @@ use {
         },
     },
     async_trait::async_trait,
-    cm_rust::{ExposeDecl, ExposeDeclCommon, NameMapping, OfferDecl, OfferServiceDecl},
+    cm_rust::{ExposeDecl, NameMapping, OfferDecl, OfferServiceDecl},
     cm_types::Name,
     derivative::Derivative,
-    from_enum::FromEnum,
     futures::future::BoxFuture,
     moniker::ChildName,
     std::collections::HashSet,
@@ -36,12 +35,10 @@ use {
 ///
 /// This is used during collection routing from anonymized aggregate service instances.
 #[derive(Derivative)]
-#[derivative(Clone(bound = "E: Clone, S: Clone, V: Clone"))]
-pub(super) struct AnonymizedAggregateServiceProvider<C: ComponentInstanceInterface, E, S, V> {
+#[derivative(Clone(bound = "S: Clone, V: Clone"))]
+pub(super) struct AnonymizedAggregateServiceProvider<C: ComponentInstanceInterface, S, V> {
     /// Component that defines the aggregate.
     pub containing_component: WeakComponentInstanceInterface<C>,
-
-    pub phantom_expose: std::marker::PhantomData<E>,
 
     /// Names of the collections within `containing_component` that are in the aggregate.
     pub collections: Vec<Name>,
@@ -52,23 +49,19 @@ pub(super) struct AnonymizedAggregateServiceProvider<C: ComponentInstanceInterfa
     /// Name of the capability as exposed by children in the collection.
     pub capability_name: Name,
 
+    pub capability_type: cm_rust::CapabilityTypeName,
+
     pub sources: S,
     pub visitor: V,
 }
 
 #[async_trait]
-impl<C, E, S, V> AnonymizedAggregateCapabilityProvider<C>
-    for AnonymizedAggregateServiceProvider<C, E, S, V>
+impl<C, S, V> AnonymizedAggregateCapabilityProvider<C>
+    for AnonymizedAggregateServiceProvider<C, S, V>
 where
     C: ComponentInstanceInterface + 'static,
-    E: ExposeDeclCommon
-        + FromEnum<cm_rust::ExposeDecl>
-        + ErrorNotFoundInChild
-        + Into<ExposeDecl>
-        + Clone
-        + 'static,
     S: Sources + 'static,
-    V: ExposeVisitor<ExposeDecl = E>,
+    V: ExposeVisitor,
     V: CapabilityVisitor<CapabilityDecl = S::CapabilityDecl>,
     V: Clone + Send + Sync + 'static,
 {
@@ -98,9 +91,11 @@ where
             let child_exposes = child_component.lock_resolved_state().await.map(|c| c.exposes());
             match child_exposes {
                 Ok(child_exposes) => {
-                    if let Some(_) =
-                        router::find_matching_exposes::<E>(&self.capability_name, &child_exposes)
-                    {
+                    if let Some(_) = router::find_matching_exposes(
+                        self.capability_type,
+                        &self.capability_name,
+                        &child_exposes,
+                    ) {
                         instances.push(child_name.clone());
                     }
                 }
@@ -130,14 +125,18 @@ where
             )?;
 
         let child_exposes = child_component.lock_resolved_state().await?.exposes();
-        let child_exposes = router::find_matching_exposes(&self.capability_name, &child_exposes)
-            .ok_or_else(|| {
-                E::error_not_found_in_child(
-                    containing_component.moniker().clone(),
-                    instance.clone(),
-                    self.capability_name.clone(),
-                )
-            })?;
+        let child_exposes = router::find_matching_exposes(
+            self.capability_type,
+            &self.capability_name,
+            &child_exposes,
+        )
+        .ok_or_else(|| {
+            ExposeDecl::error_not_found_in_child(
+                containing_component.moniker().clone(),
+                instance.clone(),
+                self.capability_name.clone(),
+            )
+        })?;
         router::route_from_expose(
             child_exposes,
             child_component,
@@ -247,11 +246,9 @@ fn get_instance_filter(offer_decl: &OfferServiceDecl) -> Vec<NameMapping> {
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = "S: Clone, V: Clone"))]
-pub(super) struct OfferAggregateServiceProvider<C: ComponentInstanceInterface, E, S, V> {
+pub(super) struct OfferAggregateServiceProvider<C: ComponentInstanceInterface, S, V> {
     /// Component that offered the aggregate service
     component: WeakComponentInstanceInterface<C>,
-
-    phantom_expose: std::marker::PhantomData<E>,
 
     /// List of offer decl to follow for routing each service provider used in the overall aggregation
     offer_decls: Vec<OfferServiceDecl>,
@@ -260,19 +257,11 @@ pub(super) struct OfferAggregateServiceProvider<C: ComponentInstanceInterface, E
     visitor: V,
 }
 
-impl<C, E, S, V> OfferAggregateServiceProvider<C, E, S, V>
+impl<C, S, V> OfferAggregateServiceProvider<C, S, V>
 where
     C: ComponentInstanceInterface + 'static,
-    E: ExposeDeclCommon
-        + ErrorNotFoundInChild
-        + FromEnum<ExposeDecl>
-        + Into<ExposeDecl>
-        + Clone
-        + 'static,
     S: Sources + 'static,
-    V: OfferVisitor
-        + ExposeVisitor<ExposeDecl = E>
-        + CapabilityVisitor<CapabilityDecl = S::CapabilityDecl>,
+    V: OfferVisitor + ExposeVisitor + CapabilityVisitor<CapabilityDecl = S::CapabilityDecl>,
     V: Send + Sync + Clone + 'static,
 {
     pub(super) fn new(
@@ -281,30 +270,15 @@ where
         sources: S,
         visitor: V,
     ) -> Self {
-        Self {
-            offer_decls,
-            phantom_expose: std::marker::PhantomData::<E> {},
-            sources,
-            visitor,
-            component,
-        }
+        Self { offer_decls, sources, visitor, component }
     }
 }
 
-impl<C, E, S, V> FilteredAggregateCapabilityProvider<C>
-    for OfferAggregateServiceProvider<C, E, S, V>
+impl<C, S, V> FilteredAggregateCapabilityProvider<C> for OfferAggregateServiceProvider<C, S, V>
 where
     C: ComponentInstanceInterface + 'static,
-    E: ExposeDeclCommon
-        + ErrorNotFoundInChild
-        + FromEnum<ExposeDecl>
-        + Into<ExposeDecl>
-        + Clone
-        + 'static,
     S: Sources + 'static,
-    V: OfferVisitor
-        + ExposeVisitor<ExposeDecl = E>
-        + CapabilityVisitor<CapabilityDecl = S::CapabilityDecl>,
+    V: OfferVisitor + ExposeVisitor + CapabilityVisitor<CapabilityDecl = S::CapabilityDecl>,
     V: Send + Sync + Clone + 'static,
 {
     fn route_instances(

@@ -136,12 +136,8 @@ impl<O, E, C> crate::router::OfferVisitor for AvailabilityVisitor<O, E, C> {
     }
 }
 
-impl<O, E, C> crate::router::ExposeVisitor for AvailabilityVisitor<O, E, C>
-where
-    E: ExposeDeclCommon,
-{
-    type ExposeDecl = E;
-    fn visit(&mut self, expose: &Self::ExposeDecl) -> Result<(), crate::RoutingError> {
+impl<O, E, C> crate::router::ExposeVisitor for AvailabilityVisitor<O, E, C> {
+    fn visit(&mut self, expose: &cm_rust::ExposeDecl) -> Result<(), crate::RoutingError> {
         self.state.advance_with_expose(expose).map_err(Into::into)
     }
 }

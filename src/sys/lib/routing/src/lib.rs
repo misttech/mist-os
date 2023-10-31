@@ -41,13 +41,13 @@ use {
         walk_state::WalkState,
     },
     cm_rust::{
-        Availability, DirectoryDecl, ExposeDirectoryDecl, ExposeProtocolDecl, ExposeResolverDecl,
-        ExposeRunnerDecl, ExposeServiceDecl, ExposeSource, OfferDirectoryDecl,
-        OfferEventStreamDecl, OfferProtocolDecl, OfferResolverDecl, OfferRunnerDecl,
-        OfferServiceDecl, OfferSource, OfferStorageDecl, RegistrationDeclCommon,
-        RegistrationSource, ResolverRegistration, RunnerDecl, RunnerRegistration, SourceName,
-        StorageDecl, StorageDirectorySource, UseDeclCommon, UseDirectoryDecl, UseEventStreamDecl,
-        UseProtocolDecl, UseRunnerDecl, UseServiceDecl, UseSource, UseStorageDecl,
+        Availability, DirectoryDecl, ExposeDirectoryDecl, ExposeProtocolDecl, ExposeServiceDecl,
+        ExposeSource, OfferDirectoryDecl, OfferEventStreamDecl, OfferProtocolDecl,
+        OfferResolverDecl, OfferRunnerDecl, OfferServiceDecl, OfferSource, OfferStorageDecl,
+        RegistrationDeclCommon, RegistrationSource, ResolverRegistration, RunnerDecl,
+        RunnerRegistration, SourceName, StorageDecl, StorageDirectorySource, UseDeclCommon,
+        UseDirectoryDecl, UseEventStreamDecl, UseProtocolDecl, UseRunnerDecl, UseServiceDecl,
+        UseSource, UseStorageDecl,
     },
     cm_types::Name,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio,
@@ -596,7 +596,7 @@ where
         .component()
         .capability();
     let source = router::route_from_expose(
-        RouteBundle::from_expose(expose_decl),
+        RouteBundle::from_expose(expose_decl.into()),
         target.clone(),
         allowed_sources,
         &mut availability_visitor,
@@ -662,7 +662,7 @@ where
         AvailabilityServiceVisitor::new(expose_bundle.availability().clone());
     let allowed_sources = AllowedSourcesBuilder::new().component().collection();
     let source = router::route_from_expose(
-        expose_bundle,
+        expose_bundle.map(Into::into),
         target.clone(),
         allowed_sources,
         &mut availability_visitor,
@@ -741,12 +741,13 @@ impl OfferVisitor for DirectoryState {
 }
 
 impl ExposeVisitor for DirectoryState {
-    type ExposeDecl = ExposeDirectoryDecl;
-
-    fn visit(&mut self, expose: &ExposeDirectoryDecl) -> Result<(), RoutingError> {
-        match expose.source {
-            ExposeSource::Framework => self.finalize(fio::RW_STAR_DIR, expose.subdir.clone()),
-            _ => self.advance_with_expose(expose),
+    fn visit(&mut self, expose: &cm_rust::ExposeDecl) -> Result<(), RoutingError> {
+        match expose {
+            cm_rust::ExposeDecl::Directory(dir) => match dir.source {
+                ExposeSource::Framework => self.finalize(fio::RW_STAR_DIR, dir.subdir.clone()),
+                _ => self.advance_with_expose(dir),
+            },
+            _ => Ok(()),
         }
     }
 }
@@ -835,7 +836,7 @@ where
         .namespace()
         .component();
     let source = router::route_from_expose(
-        RouteBundle::from_expose(expose_decl),
+        RouteBundle::from_expose(expose_decl.into()),
         target.clone(),
         allowed_sources,
         &mut state,
@@ -1224,7 +1225,7 @@ impl ErrorNotFoundInChild for UseEventStreamDecl {
     }
 }
 
-impl ErrorNotFoundInChild for ExposeProtocolDecl {
+impl ErrorNotFoundInChild for cm_rust::ExposeDecl {
     fn error_not_found_in_child(
         moniker: Moniker,
         child_moniker: ChildName,
@@ -1272,20 +1273,6 @@ impl ErrorNotFoundInChild for cm_rust::OfferDecl {
     }
 }
 
-impl ErrorNotFoundInChild for ExposeServiceDecl {
-    fn error_not_found_in_child(
-        moniker: Moniker,
-        child_moniker: ChildName,
-        capability_name: Name,
-    ) -> RoutingError {
-        RoutingError::ExposeFromChildExposeNotFound {
-            moniker,
-            child_moniker,
-            capability_id: capability_name.into(),
-        }
-    }
-}
-
 impl ErrorNotFoundFromParent for UseDirectoryDecl {
     fn error_not_found_from_parent(moniker: Moniker, capability_name: Name) -> RoutingError {
         RoutingError::UseFromParentNotFound { moniker, capability_id: capability_name.into() }
@@ -1307,20 +1294,6 @@ impl ErrorNotFoundInChild for UseDirectoryDecl {
         RoutingError::UseFromChildExposeNotFound {
             child_moniker,
             moniker,
-            capability_id: capability_name.into(),
-        }
-    }
-}
-
-impl ErrorNotFoundInChild for ExposeDirectoryDecl {
-    fn error_not_found_in_child(
-        moniker: Moniker,
-        child_moniker: ChildName,
-        capability_name: Name,
-    ) -> RoutingError {
-        RoutingError::ExposeFromChildExposeNotFound {
-            moniker,
-            child_moniker,
             capability_id: capability_name.into(),
         }
     }
@@ -1377,20 +1350,6 @@ impl ErrorNotFoundInChild for RunnerRegistration {
     }
 }
 
-impl ErrorNotFoundInChild for ExposeRunnerDecl {
-    fn error_not_found_in_child(
-        moniker: Moniker,
-        child_moniker: ChildName,
-        capability_name: Name,
-    ) -> RoutingError {
-        RoutingError::ExposeFromChildExposeNotFound {
-            moniker,
-            child_moniker,
-            capability_id: capability_name.into(),
-        }
-    }
-}
-
 impl ErrorNotFoundFromParent for ResolverRegistration {
     fn error_not_found_from_parent(moniker: Moniker, capability_name: Name) -> RoutingError {
         RoutingError::EnvironmentFromParentNotFound {
@@ -1412,20 +1371,6 @@ impl ErrorNotFoundInChild for ResolverRegistration {
             child_moniker,
             capability_name,
             capability_type: "resolver".to_string(),
-        }
-    }
-}
-
-impl ErrorNotFoundInChild for ExposeResolverDecl {
-    fn error_not_found_in_child(
-        moniker: Moniker,
-        child_moniker: ChildName,
-        capability_name: Name,
-    ) -> RoutingError {
-        RoutingError::ExposeFromChildExposeNotFound {
-            moniker,
-            child_moniker,
-            capability_id: capability_name.into(),
         }
     }
 }

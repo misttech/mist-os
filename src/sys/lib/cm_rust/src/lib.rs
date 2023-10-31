@@ -1652,7 +1652,7 @@ pub trait CapabilityDeclCommon: Send + Sync {
 ///
 /// `CapabilityTypeName` provides a user friendly type encoding for a capability.
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize), serde(rename_all = "snake_case"))]
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CapabilityTypeName {
     Directory,
     EventStream,
