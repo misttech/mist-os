@@ -76,6 +76,8 @@ pub struct LaunchProcessArgs<'a> {
     pub executable_vmo: Option<zx::Vmo>,
     /// Options to create process with.
     pub options: zx::ProcessOptions,
+    // The structured config vmo.
+    pub config_vmo: Option<zx::Vmo>,
 }
 
 /// Launches process, assigns a combined logger stream as stdout/stderr to launched process.
@@ -130,6 +132,13 @@ async fn launch_process_impl(
         .into_handle(),
         id: HandleInfo::new(HandleType::ClockUtc, 0).as_raw(),
     });
+
+    if let Some(config_vmo) = args.config_vmo {
+        handle_infos.push(fproc::HandleInfo {
+            handle: config_vmo.into_handle(),
+            id: HandleInfo::new(HandleType::ComponentConfigVmo, 0).as_raw(),
+        });
+    }
 
     // Load the component
     let launch_info =
@@ -273,6 +282,7 @@ mod tests {
             loader_proxy_chan: None,
             executable_vmo: None,
             options: zx::ProcessOptions::empty(),
+            config_vmo: None,
         };
         let (mock_proxy, mut mock_stream) = create_proxy_and_stream::<fproc::LauncherMarker>()
             .expect("failed to create mock handles");

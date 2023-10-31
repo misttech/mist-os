@@ -12,6 +12,7 @@ use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_io as fio,
     fidl_fuchsia_ldsvc::LoaderMarker,
+    fidl_fuchsia_mem as fmem,
     fidl_fuchsia_test_runner::{
         LibraryLoaderCacheBuilderMarker, LibraryLoaderCacheMarker, LibraryLoaderCacheProxy,
     },
@@ -89,6 +90,9 @@ pub enum ComponentError {
     #[error("cannot create job: {:?}", _0)]
     CreateJob(zx::Status),
 
+    #[error("Cannot set config vmo: {:?}", _0)]
+    ConfigVmo(anyhow::Error),
+
     #[error("cannot create channel: {:?}", _0)]
     CreateChannel(zx::Status),
 
@@ -119,6 +123,7 @@ impl ComponentError {
             Self::CreateChannel(_) => fcomponent::Error::ResourceUnavailable,
             Self::DuplicateJob(_) => fcomponent::Error::Internal,
             Self::InvalidUrl => fcomponent::Error::InvalidArguments,
+            Self::ConfigVmo(_) => fcomponent::Error::Internal,
         };
         zx::Status::from_raw(status.into_primitive().try_into().unwrap())
     }
@@ -156,6 +161,9 @@ pub struct Component {
 
     /// cached executable vmo.
     executable_vmo: zx::Vmo,
+
+    /// The structured config vmo.
+    pub config_vmo: Option<zx::Vmo>,
 }
 
 pub struct BuilderArgs {
@@ -182,6 +190,9 @@ pub struct BuilderArgs {
 
     /// The options to create the process with.
     pub options: zx::ProcessOptions,
+
+    /// The structured config vmo.
+    pub config: Option<zx::Vmo>,
 }
 
 impl Component {
@@ -246,6 +257,11 @@ impl Component {
                 ComponentError::Fidl("cannot communicate with lib loader cache".into(), e)
             })?;
 
+        let config_vmo = match start_info.encoded_config {
+            None => None,
+            Some(config) => Some(encoded_config_into_vmo(config)?),
+        };
+
         Ok((
             Self {
                 url: url,
@@ -262,10 +278,28 @@ impl Component {
                 } else {
                     zx::ProcessOptions::empty()
                 },
+                config_vmo,
             },
             outgoing_dir,
             runtime_dir,
         ))
+    }
+
+    pub fn config_vmo(&self) -> Result<Option<zx::Vmo>, ComponentError> {
+        match &self.config_vmo {
+            None => Ok(None),
+            Some(vmo) => Ok(Some(
+                vmo.as_handle_ref()
+                    .duplicate(fuchsia_zircon::Rights::SAME_RIGHTS)
+                    .map_err(|_| {
+                        ComponentError::VmoChild(
+                            self.url.clone(),
+                            anyhow!("Failed to clone config_vmo"),
+                        )
+                    })?
+                    .into(),
+            )),
+        }
     }
 
     pub fn executable_vmo(&self) -> Result<zx::Vmo, ComponentError> {
@@ -306,7 +340,26 @@ impl Component {
             lib_loader_cache,
             executable_vmo,
             options: args.options,
+            config_vmo: None,
         })
+    }
+}
+
+fn encoded_config_into_vmo(encoded_config: fmem::Data) -> Result<zx::Vmo, ComponentError> {
+    match encoded_config {
+        fmem::Data::Buffer(fmem::Buffer {
+            vmo,
+            size: _, // we get this vmo from component manager which sets the content size
+        }) => Ok(vmo),
+        fmem::Data::Bytes(bytes) => {
+            let size = bytes.len() as u64;
+            let vmo = zx::Vmo::create(size)
+                .map_err(|e| ComponentError::ConfigVmo(anyhow!("Failed to create vmo: {}", e)))?;
+            vmo.write(&bytes, 0)
+                .map_err(|e| ComponentError::ConfigVmo(anyhow!("Failed to write to vmo: {}", e)))?;
+            Ok(vmo)
+        }
+        _ => Err(ComponentError::ConfigVmo(anyhow!("Bad fmem::Buffer variant"))),
     }
 }
 
@@ -633,6 +686,7 @@ mod tests {
                 ns: ns,
                 job: child_job!(),
                 options: zx::ProcessOptions::empty(),
+                config: None,
             })
             .await?,
         ))

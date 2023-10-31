@@ -1,0 +1,15 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+#include <zxtest/zxtest.h>
+
+#include "src/sys/component_manager/tests/structured_config/test_runners/elf/receiver_config.h"
+
+namespace {
+TEST(ScTest, CheckValues) {
+  receiver_config::Config c = receiver_config::Config::TakeFromStartupHandle();
+  ASSERT_EQ(c.my_flag(), true);
+  ASSERT_EQ(c.my_uint8(), 255);
+}
+}  // namespace

@@ -161,7 +161,7 @@ pub enum RepackageError {
 }
 
 /// The list of runners currently supported by structured config.
-static SUPPORTED_RUNNERS: &[&str] = &["driver", "elf"];
+static SUPPORTED_RUNNERS: &[&str] = &["driver", "elf", "elf_test_runner"];
 
 /// Validate a component manifest given access to the contents of its `/pkg` directory.
 ///

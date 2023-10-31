@@ -65,6 +65,7 @@ impl ComponentLauncher for ElfComponentLauncher {
             loader_proxy_chan: Some(client_end.into_channel()),
             executable_vmo,
             options: component.options,
+            config_vmo: component.config_vmo()?,
         })
         .await?)
     }

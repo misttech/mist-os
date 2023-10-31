@@ -10,5 +10,6 @@ group("tests") {
     "minimal_shards",
     "parent_overrides",
     "split_values_and_manifests:tests",
+    "test_runners/elf:tests",
   ]
 }
