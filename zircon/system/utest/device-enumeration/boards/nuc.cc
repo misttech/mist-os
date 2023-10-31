@@ -11,11 +11,14 @@ namespace {
 
 enum NucType {
   NUC7i5DNB,
+  NUC11TNBv5,
 };
 
 std::string NucTypeToString(NucType nuc_type) {
   if (nuc_type == NucType::NUC7i5DNB) {
     return "NUC7i5DNB";
+  } else if (nuc_type == NucType::NUC11TNBv5) {
+    return "NUC11TNBv5";
   }
 
   return "N/A";
@@ -34,6 +37,8 @@ std::variant<NucType, std::string> GetNucType() {
   const std::string_view board_name = response.name.get();
   if (board_name == "NUC7i5DNB") {
     return NucType::NUC7i5DNB;
+  } else if (board_name == "NUC11TNBv5") {
+    return NucType::NUC11TNBv5;
   }
 
   return std::string(board_name);
@@ -85,6 +90,24 @@ TEST_F(DeviceEnumerationTest, Nuc7i5DNBTest) {
     };
     ASSERT_NO_FATAL_FAILURE(TestRunner(kDfv1DevicePaths, std::size(kDfv1DevicePaths)));
   }
+}
+
+TEST_F(DeviceEnumerationTest, Nuc11TNBv5Test) {
+  if (!CheckTestMatch(NucType::NUC11TNBv5)) {
+    return;
+  }
+
+  static const char* kDevicePaths[] = {
+      "sys/platform/pt/PC00/bus/00:02.0/00_02_0/intel_i915/intel-gpu-core",
+      "sys/platform/pt/PC00/bus/00_02.0/00_02_0/intel_i915/intel-display-controller/display-coordinator",
+      "sys/platform/pt/PC00/bus/00:14.0/00:14.0/xhci/usb-bus",
+      "sys/platform/pt/PC00/bus/00:17.0/00_17_0/ahci",
+#ifdef include_packaged_drivers
+      "sys/platform/pt/PC00/bus/00:14.3/00:14.3/iwlwifi-wlanphyimpl",
+#endif
+  };
+
+  ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));
 }
 
 }  // namespace
