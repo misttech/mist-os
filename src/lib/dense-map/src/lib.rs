@@ -35,6 +35,7 @@ enum DenseMapEntry<T> {
 #[derive(PartialEq, Eq, Debug)]
 #[cfg_attr(test, derive(Clone))]
 struct AllocatedEntry<T> {
+    link: ListLink,
     item: T,
 }
 
@@ -71,7 +72,29 @@ impl List {
     }
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+enum DenseMapEntryKind {
+    Allocated,
+    Free,
+}
+
 impl<T> DenseMapEntry<T> {
+    fn link(&self) -> (&ListLink, DenseMapEntryKind) {
+        match self {
+            DenseMapEntry::Allocated(entry) => (&entry.link, DenseMapEntryKind::Allocated),
+            DenseMapEntry::Free(link) => (&link, DenseMapEntryKind::Free),
+        }
+    }
+
+    fn link_mut_and_check(&mut self, expected_kind: DenseMapEntryKind) -> &mut ListLink {
+        let (link, got_kind) = match self {
+            DenseMapEntry::Allocated(entry) => (&mut entry.link, DenseMapEntryKind::Allocated),
+            DenseMapEntry::Free(link) => (link, DenseMapEntryKind::Free),
+        };
+        assert_eq!(expected_kind, got_kind);
+        link
+    }
+
     /// Returns a reference to the freelist link if the entry is free, otherwise None.
     fn as_free_or_none(&self) -> Option<&ListLink> {
         match self {
@@ -108,13 +131,14 @@ impl<T> DenseMapEntry<T> {
 #[cfg_attr(test, derive(Clone))]
 pub struct DenseMap<T> {
     freelist: Option<List>,
+    allocatedlist: Option<List>,
     data: Vec<DenseMapEntry<T>>,
 }
 
 impl<T> DenseMap<T> {
     /// Creates a new empty [`DenseMap`].
     pub fn new() -> Self {
-        Self { freelist: None, data: Vec::new() }
+        Self { freelist: None, allocatedlist: None, data: Vec::new() }
     }
 
     /// Returns `true` if there are no items in [`DenseMap`].
@@ -131,7 +155,7 @@ impl<T> DenseMap<T> {
     /// doesn't exist.
     pub fn get(&self, key: Key) -> Option<&T> {
         self.data.get(key).and_then(|v| match v {
-            DenseMapEntry::Allocated(AllocatedEntry { item }) => Some(item),
+            DenseMapEntry::Allocated(AllocatedEntry { link: _, item }) => Some(item),
             DenseMapEntry::Free(_) => None,
         })
     }
@@ -140,7 +164,7 @@ impl<T> DenseMap<T> {
     /// the `key` doesn't exist.
     pub fn get_mut(&mut self, key: Key) -> Option<&mut T> {
         self.data.get_mut(key).and_then(|v| match v {
-            DenseMapEntry::Allocated(AllocatedEntry { item }) => Some(item),
+            DenseMapEntry::Allocated(AllocatedEntry { link: _, item }) => Some(item),
             DenseMapEntry::Free(_) => None,
         })
     }
@@ -160,14 +184,13 @@ impl<T> DenseMap<T> {
     }
 
     fn remove_inner(&mut self, key: Key) -> Option<T> {
-        let Self { data, freelist } = self;
-        let r = data.get_mut(key).and_then(|v| {
+        let r = self.data.get_mut(key).and_then(|v| {
             match v {
                 DenseMapEntry::Allocated(_) => {
-                    let old_head = freelist.map(|l| l.head);
+                    let old_head = self.freelist.map(|l| l.head);
                     let new_link = DenseMapEntry::Free(ListLink { prev: None, next: old_head });
                     match core::mem::replace(v, new_link) {
-                        DenseMapEntry::Allocated(AllocatedEntry { item }) => Some(item),
+                        DenseMapEntry::Allocated(entry) => Some(entry),
                         DenseMapEntry::Free(_) => unreachable!("already matched"),
                     }
                 }
@@ -176,21 +199,55 @@ impl<T> DenseMap<T> {
                 DenseMapEntry::Free(_) => None,
             }
         });
-        if r.is_some() {
+        r.map(|AllocatedEntry { link, item }| {
+            self.unlink_entry_inner(DenseMapEntryKind::Allocated, link);
             // If it was allocated, we add the removed entry to the head of the
             // free-list.
-            match freelist.as_mut() {
+            match self.freelist.as_mut() {
                 Some(List { head, .. }) => {
-                    data[*head]
+                    self.data[*head]
                         .as_free_or_none_mut()
                         .unwrap_or_else(|| panic!("freelist head node {} is not free", head))
                         .prev = Some(key);
                     *head = key;
                 }
-                None => *freelist = Some(List::singleton(key)),
+                None => self.freelist = Some(List::singleton(key)),
             }
+
+            item
+        })
+    }
+
+    fn allocated_link(
+        allocatedlist: &mut Option<List>,
+        data: &mut [DenseMapEntry<T>],
+        key: Key,
+    ) -> ListLink {
+        // Add the key to the tail of the allocated list. There are four cases
+        // to consider. In all cases however, we update the list's tail to point
+        // to `key` and create a `ListLink` with a previous pointer that points
+        // to the current allocate list's tail and no next pointer.
+        //
+        //  1) The allocated list is empty.
+        //  2) `key` points to a free entry
+        //  3) `key` is the (non-empty) allocated list's tail.
+        //  4) `key` is in the middle of the (non-empty) allocated list.
+        if let Some(List { head: _, tail }) = allocatedlist {
+            match data[*tail] {
+                DenseMapEntry::Allocated(ref mut entry) => {
+                    assert_eq!(None, core::mem::replace(&mut entry.link.next, Some(key)));
+                    ListLink { next: None, prev: Some(core::mem::replace(tail, key)) }
+                }
+                DenseMapEntry::Free(_) => unreachable!(
+                    "allocated list tail entry is free; key = {}; tail = {}",
+                    key, tail,
+                ),
+            }
+        } else {
+            *allocatedlist = Some(List { head: key, tail: key });
+
+            ListLink { next: None, prev: None }
         }
-        r
     }
 
     /// Inserts `item` at `key`.
@@ -202,16 +259,22 @@ impl<T> DenseMap<T> {
     /// than the number of items currently held by the [`DenseMap`].
     pub fn insert(&mut self, key: Key, item: T) -> Option<T> {
         if key < self.data.len() {
+            // Remove the entry from whatever list it may be in
+            self.unlink_entry(key);
+            // Add the key to the allocated list.
+            let link = Self::allocated_link(&mut self.allocatedlist, &mut self.data, key);
+
             let prev = core::mem::replace(
                 &mut self.data[key],
-                DenseMapEntry::Allocated(AllocatedEntry { item }),
+                DenseMapEntry::Allocated(AllocatedEntry { link, item }),
             );
+            // We don't need to do anything with the `ListLink` since we removed
+            // the entry from the list.
             match prev {
-                DenseMapEntry::Free(link) => {
-                    self.freelist_unlink(link);
-                    None
+                DenseMapEntry::Free(ListLink { .. }) => None,
+                DenseMapEntry::Allocated(AllocatedEntry { link: ListLink { .. }, item }) => {
+                    Some(item)
                 }
-                DenseMapEntry::Allocated(AllocatedEntry { item }) => Some(item),
             }
         } else {
             let start_len = self.data.len();
@@ -254,7 +317,8 @@ impl<T> DenseMap<T> {
                 }
             }
             // And finally we insert our item into the map.
-            self.data.push(DenseMapEntry::Allocated(AllocatedEntry { item }));
+            let link = Self::allocated_link(&mut self.allocatedlist, &mut self.data, key);
+            self.data.push(DenseMapEntry::Allocated(AllocatedEntry { link, item }));
             None
         }
     }
@@ -287,11 +351,13 @@ impl<T> DenseMap<T> {
     /// Like [`DenseMap::push`] except that the item is constructed by the provided
     /// function, which is passed its index.
     pub fn push_with(&mut self, make_item: impl FnOnce(Key) -> T) -> OccupiedEntry<'_, usize, T> {
-        if let Some(List { head, .. }) = self.freelist.as_mut() {
+        let Self { freelist, allocatedlist, data } = self;
+        if let Some(List { head, .. }) = freelist.as_mut() {
             let ret = *head;
+            let link = Self::allocated_link(allocatedlist, data, ret);
             let old = core::mem::replace(
-                self.data.get_mut(ret).unwrap(),
-                DenseMapEntry::Allocated(AllocatedEntry { item: make_item(ret) }),
+                data.get_mut(ret).unwrap(),
+                DenseMapEntry::Allocated(AllocatedEntry { link, item: make_item(ret) }),
             );
             let old_link = old
                 .as_free_or_none()
@@ -300,19 +366,20 @@ impl<T> DenseMap<T> {
             match old_link.next {
                 Some(new_head) => {
                     *head = new_head;
-                    self.data[new_head]
+                    data[new_head]
                         .as_free_or_none_mut()
                         .unwrap_or_else(|| panic!("new free list head {} is not free", new_head))
                         .prev = None;
                 }
-                None => self.freelist = None,
+                None => *freelist = None,
             }
             OccupiedEntry { key: ret, id_map: self }
         } else {
             // If we run out of freelist, we simply push a new entry into the
             // underlying vector.
-            let key = self.data.len();
-            self.data.push(DenseMapEntry::Allocated(AllocatedEntry { item: make_item(key) }));
+            let key = data.len();
+            let link = Self::allocated_link(allocatedlist, data, key);
+            data.push(DenseMapEntry::Allocated(AllocatedEntry { link, item: make_item(key) }));
             OccupiedEntry { key, id_map: self }
         }
     }
@@ -330,7 +397,7 @@ impl<T> DenseMap<T> {
             // Remove all the trailing free entries.
             for i in idx + 1..self.data.len() {
                 let link = *self.data[i].as_free_or_none().expect("already confirmed as free");
-                self.freelist_unlink(link);
+                self.unlink_entry_inner(DenseMapEntryKind::Free, link);
             }
             self.data.truncate(idx + 1);
         } else {
@@ -379,7 +446,8 @@ impl<T> DenseMap<T> {
     /// elements are visited in ascending key order.
     pub fn key_ordered_retain<F: FnMut(&T) -> bool>(&mut self, mut should_retain: F) {
         (0..self.data.len()).for_each(|k| {
-            if let DenseMapEntry::Allocated(AllocatedEntry { item }) = self.data.get_mut(k).unwrap()
+            if let DenseMapEntry::Allocated(AllocatedEntry { link: _, item }) =
+                self.data.get_mut(k).unwrap()
             {
                 if !should_retain(item) {
                     // Note the use of `remove_inner` rather than `remove`
@@ -404,45 +472,40 @@ impl<T> DenseMap<T> {
         self.compress();
     }
 
-    /// Unlink an entry from the freelist.
-    ///
-    /// We want to do so whenever a freed block turns allocated.
-    fn freelist_unlink(&mut self, link: ListLink) {
-        let ListLink { prev, next } = link;
+    fn unlink_entry_inner(&mut self, kind: DenseMapEntryKind, link: ListLink) {
+        let ListLink { next, prev } = link;
+
+        let list = match kind {
+            DenseMapEntryKind::Allocated => &mut self.allocatedlist,
+            DenseMapEntryKind::Free => &mut self.freelist,
+        };
 
         match (prev, next) {
             (Some(prev), Some(next)) => {
                 // A normal node in the middle of a list.
-                self.data[prev]
-                    .as_free_or_none_mut()
-                    .unwrap_or_else(|| panic!("free's prev {} is not free", prev))
-                    .next = Some(next);
-                self.data[next]
-                    .as_free_or_none_mut()
-                    .unwrap_or_else(|| panic!("free's next {} is not free", next))
-                    .prev = Some(prev);
+                self.data[prev].link_mut_and_check(kind).next = Some(next);
+                self.data[next].link_mut_and_check(kind).prev = Some(prev);
             }
             (Some(prev), None) => {
                 // The node at the tail.
-                self.data[prev]
-                    .as_free_or_none_mut()
-                    .unwrap_or_else(|| panic!("tail's prev {} is not free", prev))
-                    .next = next;
-                self.freelist.as_mut().unwrap().tail = prev;
+                self.data[prev].link_mut_and_check(kind).next = next;
+                list.as_mut().unwrap().tail = prev;
             }
             (None, Some(next)) => {
                 // The node at the head.
-                self.data[next]
-                    .as_free_or_none_mut()
-                    .unwrap_or_else(|| panic!("head's next {} is not free", next))
-                    .prev = prev;
-                self.freelist.as_mut().unwrap().head = next;
+                self.data[next].link_mut_and_check(kind).prev = prev;
+                list.as_mut().unwrap().head = next;
             }
             (None, None) => {
                 // We are the last node.
-                self.freelist = None;
+                *list = None;
             }
         }
+    }
+
+    fn unlink_entry(&mut self, i: Key) {
+        let (link, kind) = self.data[i].link();
+        self.unlink_entry_inner(kind, *link);
     }
 }
 
@@ -462,7 +525,7 @@ impl<T> Iterator for IntoKeyOrderedIter<T> {
     fn next(&mut self) -> Option<Self::Item> {
         let Self(it) = self;
         it.filter_map(|(k, v)| match v {
-            DenseMapEntry::Allocated(AllocatedEntry { item }) => Some((k, item)),
+            DenseMapEntry::Allocated(AllocatedEntry { link: _, item }) => Some((k, item)),
             DenseMapEntry::Free(_) => None,
         })
         .next()
@@ -489,7 +552,7 @@ impl<'a, T> Iterator for KeyOrderedIter<'a, T> {
     fn next(&mut self) -> Option<Self::Item> {
         let Self(it) = self;
         it.filter_map(|(k, v)| match v {
-            DenseMapEntry::Allocated(AllocatedEntry { item }) => Some((k, item)),
+            DenseMapEntry::Allocated(AllocatedEntry { link: _, item }) => Some((k, item)),
             DenseMapEntry::Free(_) => None,
         })
         .next()
@@ -518,7 +581,7 @@ impl<'a, T> Iterator for KeyOrderedIterMut<'a, T> {
     fn next(&mut self) -> Option<Self::Item> {
         let Self(it) = self;
         it.filter_map(|(k, v)| match v {
-            DenseMapEntry::Allocated(AllocatedEntry { item }) => Some((k, item)),
+            DenseMapEntry::Allocated(AllocatedEntry { link: _, item }) => Some((k, item)),
             DenseMapEntry::Free(_) => None,
         })
         .next()
@@ -561,7 +624,7 @@ impl<'a, K, T> VacantEntry<'a, K, T> {
     {
         assert!(self.id_map.insert(self.key.get_key_index(), value).is_none());
         match &mut self.id_map.data[self.key.get_key_index()] {
-            DenseMapEntry::Allocated(AllocatedEntry { item }) => item,
+            DenseMapEntry::Allocated(AllocatedEntry { link: _, item }) => item,
             DenseMapEntry::Free(_) => unreachable!("entry is known to be vacant"),
         }
     }
@@ -783,27 +846,42 @@ mod tests {
     fn test_push() {
         let mut map = DenseMap::new();
         assert_eq!(map.insert(1, 2), None);
-        let DenseMap { data, freelist } = &map;
-        assert_eq!(data, &vec![free_none(), Allocated(AllocatedEntry { item: 2 })]);
-        assert_eq!(freelist, &Some(List::singleton(0)));
-        assert_eq!(map.push(1), 0);
-        let DenseMap { data, freelist } = &map;
-        assert_eq!(
-            data,
-            &vec![Allocated(AllocatedEntry { item: 1 }), Allocated(AllocatedEntry { item: 2 })]
-        );
-        assert_eq!(freelist, &None);
-        assert_eq!(map.push(3), 2);
-        let DenseMap { data, freelist } = &map;
+        let DenseMap { data, freelist, allocatedlist } = &map;
         assert_eq!(
             data,
             &vec![
-                Allocated(AllocatedEntry { item: 1 }),
-                Allocated(AllocatedEntry { item: 2 }),
-                Allocated(AllocatedEntry { item: 3 })
+                free_none(),
+                Allocated(AllocatedEntry { link: ListLink { prev: None, next: None }, item: 2 })
+            ]
+        );
+        assert_eq!(freelist, &Some(List::singleton(0)));
+        assert_eq!(allocatedlist, &Some(List { head: 1, tail: 1 }));
+        assert_eq!(map.push(1), 0);
+        let DenseMap { data, freelist, allocatedlist } = &map;
+        assert_eq!(
+            data,
+            &vec![
+                Allocated(AllocatedEntry { link: ListLink { prev: Some(1), next: None }, item: 1 }),
+                Allocated(AllocatedEntry { link: ListLink { prev: None, next: Some(0) }, item: 2 })
             ]
         );
         assert_eq!(freelist, &None);
+        assert_eq!(allocatedlist, &Some(List { head: 1, tail: 0 }));
+        assert_eq!(map.push(3), 2);
+        let DenseMap { data, freelist, allocatedlist } = &map;
+        assert_eq!(
+            data,
+            &vec![
+                Allocated(AllocatedEntry {
+                    link: ListLink { prev: Some(1), next: Some(2) },
+                    item: 1
+                }),
+                Allocated(AllocatedEntry { link: ListLink { prev: None, next: Some(0) }, item: 2 }),
+                Allocated(AllocatedEntry { link: ListLink { prev: Some(0), next: None }, item: 3 })
+            ]
+        );
+        assert_eq!(freelist, &None);
+        assert_eq!(allocatedlist, &Some(List { head: 1, tail: 2 }));
     }
 
     #[test]
@@ -811,16 +889,17 @@ mod tests {
         let mut map = DenseMap::new();
         assert_eq!(map.push(1), 0);
         assert_eq!(map.insert(2, 3), None);
-        let DenseMap { data, freelist } = &map;
+        let DenseMap { data, freelist, allocatedlist } = &map;
         assert_eq!(
             data,
             &vec![
-                Allocated(AllocatedEntry { item: 1 }),
+                Allocated(AllocatedEntry { link: ListLink { prev: None, next: Some(2) }, item: 1 }),
                 free_none(),
-                Allocated(AllocatedEntry { item: 3 })
+                Allocated(AllocatedEntry { link: ListLink { prev: Some(0), next: None }, item: 3 })
             ]
         );
         assert_eq!(freelist, &Some(List::singleton(1)));
+        assert_eq!(allocatedlist, &Some(List { head: 0, tail: 2 }));
         assert_eq!(*map.get(0).unwrap(), 1);
         assert_eq!(map.get(1), None);
         assert_eq!(*map.get(2).unwrap(), 3);
@@ -832,16 +911,17 @@ mod tests {
         let mut map = DenseMap::new();
         assert_eq!(map.push(1), 0);
         assert_eq!(map.insert(2, 3), None);
-        let DenseMap { data, freelist } = &map;
+        let DenseMap { data, freelist, allocatedlist } = &map;
         assert_eq!(
             data,
             &vec![
-                Allocated(AllocatedEntry { item: 1 }),
+                Allocated(AllocatedEntry { link: ListLink { prev: None, next: Some(2) }, item: 1 }),
                 free_none(),
-                Allocated(AllocatedEntry { item: 3 })
+                Allocated(AllocatedEntry { link: ListLink { prev: Some(0), next: None }, item: 3 })
             ]
         );
         assert_eq!(freelist, &Some(List::singleton(1)));
+        assert_eq!(allocatedlist, &Some(List { head: 0, tail: 2 }));
         *map.get_mut(2).unwrap() = 10;
         assert_eq!(*map.get(0).unwrap(), 1);
         assert_eq!(*map.get(2).unwrap(), 10);
@@ -864,29 +944,34 @@ mod tests {
         assert_eq!(map.push(1), 0);
         assert_eq!(map.push(2), 1);
         assert_eq!(map.push(3), 2);
-        let DenseMap { data, freelist } = &map;
+        let DenseMap { data, freelist, allocatedlist } = &map;
         assert_eq!(
             data,
             &vec![
-                Allocated(AllocatedEntry { item: 1 }),
-                Allocated(AllocatedEntry { item: 2 }),
-                Allocated(AllocatedEntry { item: 3 })
+                Allocated(AllocatedEntry { link: ListLink { prev: None, next: Some(1) }, item: 1 }),
+                Allocated(AllocatedEntry {
+                    link: ListLink { prev: Some(0), next: Some(2) },
+                    item: 2
+                }),
+                Allocated(AllocatedEntry { link: ListLink { prev: Some(1), next: None }, item: 3 })
             ]
         );
         assert_eq!(freelist, &None);
+        assert_eq!(allocatedlist, &Some(List { head: 0, tail: 2 }));
         assert_eq!(map.remove(1).unwrap(), 2);
 
         assert_eq!(map.remove(1), None);
-        let DenseMap { data, freelist } = &map;
+        let DenseMap { data, freelist, allocatedlist } = &map;
         assert_eq!(
             data,
             &vec![
-                Allocated(AllocatedEntry { item: 1 }),
+                Allocated(AllocatedEntry { link: ListLink { prev: None, next: Some(2) }, item: 1 }),
                 free_none(),
-                Allocated(AllocatedEntry { item: 3 })
+                Allocated(AllocatedEntry { link: ListLink { prev: Some(0), next: None }, item: 3 })
             ]
         );
         assert_eq!(freelist, &Some(List::singleton(1)));
+        assert_eq!(allocatedlist, &Some(List { head: 0, tail: 2 }));
     }
 
     #[test]
@@ -894,67 +979,91 @@ mod tests {
         let mut map = DenseMap::new();
         assert_eq!(map.insert(0, 1), None);
         assert_eq!(map.insert(2, 3), None);
-        let DenseMap { data, freelist } = &map;
+        let DenseMap { data, freelist, allocatedlist } = &map;
         assert_eq!(
             data,
             &vec![
-                Allocated(AllocatedEntry { item: 1 }),
+                Allocated(AllocatedEntry { link: ListLink { prev: None, next: Some(2) }, item: 1 }),
                 free_none(),
-                Allocated(AllocatedEntry { item: 3 })
+                Allocated(AllocatedEntry { link: ListLink { prev: Some(0), next: None }, item: 3 })
             ]
         );
         assert_eq!(freelist, &Some(List::singleton(1)));
+        assert_eq!(allocatedlist, &Some(List { head: 0, tail: 2 }));
         assert_eq!(map.remove(2).unwrap(), 3);
-        let DenseMap { data, freelist } = &map;
-        assert_eq!(data, &vec![Allocated(AllocatedEntry { item: 1 })]);
+        let DenseMap { data, freelist, allocatedlist } = &map;
+        assert_eq!(
+            data,
+            &vec![Allocated(AllocatedEntry { link: ListLink { prev: None, next: None }, item: 1 })]
+        );
         assert_eq!(freelist, &None);
+        assert_eq!(allocatedlist, &Some(List { head: 0, tail: 0 }));
         assert_eq!(map.remove(0).unwrap(), 1);
-        assert_empty(map.data);
+        let DenseMap { data, freelist, allocatedlist } = &map;
+        assert_empty(data);
+        assert_eq!(freelist, &None);
+        assert_eq!(allocatedlist, &None);
     }
 
     #[test]
     fn test_insert() {
         let mut map = DenseMap::new();
         assert_eq!(map.insert(1, 2), None);
-        let DenseMap { data, freelist } = &map;
-        assert_eq!(data, &vec![free_none(), Allocated(AllocatedEntry { item: 2 })]);
+        let DenseMap { data, freelist, allocatedlist } = &map;
+        assert_eq!(
+            data,
+            &vec![
+                free_none(),
+                Allocated(AllocatedEntry { link: ListLink { prev: None, next: None }, item: 2 })
+            ]
+        );
         assert_eq!(freelist, &Some(List::singleton(0)));
+        assert_eq!(allocatedlist, &Some(List { head: 1, tail: 1 }));
         assert_eq!(map.insert(3, 4), None);
-        let DenseMap { data, freelist } = &map;
+        let DenseMap { data, freelist, allocatedlist } = &map;
         assert_eq!(
             data,
             &vec![
                 free_head(2),
-                Allocated(AllocatedEntry { item: 2 }),
+                Allocated(AllocatedEntry { link: ListLink { prev: None, next: Some(3) }, item: 2 }),
                 free_tail(0),
-                Allocated(AllocatedEntry { item: 4 })
+                Allocated(AllocatedEntry { link: ListLink { prev: Some(1), next: None }, item: 4 })
             ]
         );
         assert_eq!(freelist, &Some(List { head: 0, tail: 2 }));
+        assert_eq!(allocatedlist, &Some(List { head: 1, tail: 3 }));
         assert_eq!(map.insert(0, 1), None);
-        let DenseMap { data, freelist } = &map;
+        let DenseMap { data, freelist, allocatedlist } = &map;
         assert_eq!(
             data,
             &vec![
-                Allocated(AllocatedEntry { item: 1 }),
-                Allocated(AllocatedEntry { item: 2 }),
+                Allocated(AllocatedEntry { link: ListLink { prev: Some(3), next: None }, item: 1 }),
+                Allocated(AllocatedEntry { link: ListLink { prev: None, next: Some(3) }, item: 2 }),
                 free_none(),
-                Allocated(AllocatedEntry { item: 4 })
+                Allocated(AllocatedEntry {
+                    link: ListLink { prev: Some(1), next: Some(0) },
+                    item: 4
+                })
             ]
         );
         assert_eq!(freelist, &Some(List::singleton(2)));
+        assert_eq!(allocatedlist, &Some(List { head: 1, tail: 0 }));
         assert_eq!(map.insert(3, 5).unwrap(), 4);
-        let DenseMap { data, freelist } = &map;
+        let DenseMap { data, freelist, allocatedlist } = &map;
         assert_eq!(
             data,
             &vec![
-                Allocated(AllocatedEntry { item: 1 }),
-                Allocated(AllocatedEntry { item: 2 }),
+                Allocated(AllocatedEntry {
+                    link: ListLink { prev: Some(1), next: Some(3) },
+                    item: 1
+                }),
+                Allocated(AllocatedEntry { link: ListLink { prev: None, next: Some(0) }, item: 2 }),
                 free_none(),
-                Allocated(AllocatedEntry { item: 5 })
+                Allocated(AllocatedEntry { link: ListLink { prev: Some(0), next: None }, item: 5 })
             ]
         );
         assert_eq!(freelist, &Some(List::singleton(2)));
+        assert_eq!(allocatedlist, &Some(List { head: 1, tail: 3 }));
     }
 
     #[test]
@@ -965,26 +1074,31 @@ mod tests {
         let mut map = DenseMap::new();
         assert_eq!(map.insert(0, 0), None);
         assert_eq!(map.insert(3, 5), None);
-        let DenseMap { data, freelist } = &map;
+        let DenseMap { data, freelist, allocatedlist } = &map;
         assert_eq!(
             data,
             &vec![
-                Allocated(AllocatedEntry { item: 0 }),
+                Allocated(AllocatedEntry { link: ListLink { prev: None, next: Some(3) }, item: 0 }),
                 free_head(2),
                 free_tail(1),
-                Allocated(AllocatedEntry { item: 5 })
+                Allocated(AllocatedEntry { link: ListLink { prev: Some(0), next: None }, item: 5 })
             ]
         );
         assert_eq!(freelist, &Some(List { head: 1, tail: 2 }));
+        assert_eq!(allocatedlist, &Some(List { head: 0, tail: 3 }));
 
         assert_eq!(map.push(6), 1);
         assert_eq!(map.remove(1), Some(6));
         assert_eq!(map.remove(3), Some(5));
 
         // The remove() call compresses the list, which leaves just the 0 element.
-        let DenseMap { data, freelist } = &map;
-        assert_eq!(data, &vec![Allocated(AllocatedEntry { item: 0 })]);
+        let DenseMap { data, freelist, allocatedlist } = &map;
+        assert_eq!(
+            data,
+            &vec![Allocated(AllocatedEntry { link: ListLink { prev: None, next: None }, item: 0 })]
+        );
         assert_eq!(freelist, &None);
+        assert_eq!(allocatedlist, &Some(List { head: 0, tail: 0 }));
     }
 
     #[test]
@@ -993,20 +1107,24 @@ mod tests {
         assert_eq!(map.insert(1, 0), None);
         assert_eq!(map.insert(3, 1), None);
         assert_eq!(map.insert(6, 2), None);
-        let DenseMap { data, freelist } = &map;
+        let DenseMap { data, freelist, allocatedlist } = &map;
         assert_eq!(
             data,
             &vec![
                 free_head(2),
-                Allocated(AllocatedEntry { item: 0 }),
+                Allocated(AllocatedEntry { link: ListLink { prev: None, next: Some(3) }, item: 0 }),
                 free(0, 4),
-                Allocated(AllocatedEntry { item: 1 }),
+                Allocated(AllocatedEntry {
+                    link: ListLink { prev: Some(1), next: Some(6) },
+                    item: 1
+                }),
                 free(2, 5),
                 free_tail(4),
-                Allocated(AllocatedEntry { item: 2 }),
+                Allocated(AllocatedEntry { link: ListLink { prev: Some(3), next: None }, item: 2 }),
             ]
         );
         assert_eq!(freelist, &Some(List { head: 0, tail: 5 }));
+        assert_eq!(allocatedlist, &Some(List { head: 1, tail: 6 }));
         let mut c = 0;
         for (i, (k, v)) in map.key_ordered_iter().enumerate() {
             assert_eq!(i, *v as usize);
@@ -1022,37 +1140,45 @@ mod tests {
         assert_eq!(map.insert(1, 0), None);
         assert_eq!(map.insert(3, 1), None);
         assert_eq!(map.insert(6, 2), None);
-        let DenseMap { data, freelist } = &map;
+        let DenseMap { data, freelist, allocatedlist } = &map;
         assert_eq!(
             data,
             &vec![
                 free_head(2),
-                Allocated(AllocatedEntry { item: 0 }),
+                Allocated(AllocatedEntry { link: ListLink { prev: None, next: Some(3) }, item: 0 }),
                 free(0, 4),
-                Allocated(AllocatedEntry { item: 1 }),
+                Allocated(AllocatedEntry {
+                    link: ListLink { prev: Some(1), next: Some(6) },
+                    item: 1
+                }),
                 free(2, 5),
                 free_tail(4),
-                Allocated(AllocatedEntry { item: 2 }),
+                Allocated(AllocatedEntry { link: ListLink { prev: Some(3), next: None }, item: 2 }),
             ]
         );
         assert_eq!(freelist, &Some(List { head: 0, tail: 5 }));
+        assert_eq!(allocatedlist, &Some(List { head: 1, tail: 6 }));
         for (k, v) in map.key_ordered_iter_mut() {
             *v += k as u32;
         }
-        let DenseMap { data, freelist } = &map;
+        let DenseMap { data, freelist, allocatedlist } = &map;
         assert_eq!(
             data,
             &vec![
                 free_head(2),
-                Allocated(AllocatedEntry { item: 1 }),
+                Allocated(AllocatedEntry { link: ListLink { prev: None, next: Some(3) }, item: 1 }),
                 free(0, 4),
-                Allocated(AllocatedEntry { item: 4 }),
+                Allocated(AllocatedEntry {
+                    link: ListLink { prev: Some(1), next: Some(6) },
+                    item: 4
+                }),
                 free(2, 5),
                 free_tail(4),
-                Allocated(AllocatedEntry { item: 8 }),
+                Allocated(AllocatedEntry { link: ListLink { prev: Some(3), next: None }, item: 8 }),
             ]
         );
         assert_eq!(freelist, &Some(List { head: 0, tail: 5 }));
+        assert_eq!(allocatedlist, &Some(List { head: 1, tail: 6 }));
     }
 
     #[test]
@@ -1080,43 +1206,59 @@ mod tests {
             map.key_ordered_iter().map(|(key, entry)| (key, entry.clone())).collect();
         assert_eq!(remaining.as_slice(), [(1, 1), (3, 3), (5, 5), (7, 7)]);
 
-        // Make sure that the buffer is laid out as we expect it so that this
-        // test is actually valid.
-        assert_eq!(
-            map.data,
-            [
-                free_tail(2),
-                Allocated(AllocatedEntry { item: 1 }),
-                free(4, 0),
-                Allocated(AllocatedEntry { item: 3 }),
-                free(6, 2),
-                Allocated(AllocatedEntry { item: 5 }),
-                free_head(4),
-                Allocated(AllocatedEntry { item: 7 }),
-            ]
-        );
-
-        // Make sure that the underlying vector gets compressed.
-        map.key_ordered_retain(|x| *x < 5);
-        let DenseMap { data, freelist: _ } = &map;
+        let DenseMap { data, freelist, allocatedlist } = &map;
         assert_eq!(
             data,
             &[
                 free_tail(2),
-                Allocated(AllocatedEntry { item: 1 }),
-                free_head(0),
-                Allocated(AllocatedEntry { item: 3 }),
+                Allocated(AllocatedEntry { link: ListLink { prev: None, next: Some(3) }, item: 1 }),
+                free(4, 0),
+                Allocated(AllocatedEntry {
+                    link: ListLink { prev: Some(1), next: Some(5) },
+                    item: 3
+                }),
+                free(6, 2),
+                Allocated(AllocatedEntry {
+                    link: ListLink { prev: Some(3), next: Some(7) },
+                    item: 5
+                }),
+                free_head(4),
+                Allocated(AllocatedEntry { link: ListLink { prev: Some(5), next: None }, item: 7 }),
             ]
         );
+        assert_eq!(freelist, &Some(List { head: 6, tail: 0 }));
+        assert_eq!(allocatedlist, &Some(List { head: 1, tail: 7 }));
+
+        // Make sure that the underlying vector gets compressed.
+        map.key_ordered_retain(|x| *x < 5);
+        let DenseMap { data, freelist, allocatedlist } = &map;
+        assert_eq!(
+            data,
+            &[
+                free_tail(2),
+                Allocated(AllocatedEntry { link: ListLink { prev: None, next: Some(3) }, item: 1 }),
+                free_head(0),
+                Allocated(AllocatedEntry { link: ListLink { prev: Some(1), next: None }, item: 3 }),
+            ]
+        );
+        assert_eq!(freelist, &Some(List { head: 2, tail: 0 }));
+        assert_eq!(allocatedlist, &Some(List { head: 1, tail: 3 }));
     }
 
     #[test]
     fn test_entry() {
         let mut map = DenseMap::new();
         assert_eq!(*map.entry(1).or_insert(2), 2);
-        let DenseMap { data, freelist } = &map;
-        assert_eq!(data, &vec![free_none(), Allocated(AllocatedEntry { item: 2 })]);
+        let DenseMap { data, freelist, allocatedlist } = &map;
+        assert_eq!(
+            data,
+            &vec![
+                free_none(),
+                Allocated(AllocatedEntry { link: ListLink { prev: None, next: None }, item: 2 })
+            ]
+        );
         assert_eq!(freelist, &Some(List::singleton(0)));
+        assert_eq!(allocatedlist, &Some(List::singleton(1)));
         assert_eq!(
             *map.entry(1)
                 .and_modify(|v| {
@@ -1125,9 +1267,16 @@ mod tests {
                 .or_insert(5),
             10
         );
-        let DenseMap { data, freelist } = &map;
-        assert_eq!(data, &vec![free_none(), Allocated(AllocatedEntry { item: 10 })]);
+        let DenseMap { data, freelist, allocatedlist } = &map;
+        assert_eq!(
+            data,
+            &vec![
+                free_none(),
+                Allocated(AllocatedEntry { link: ListLink { prev: None, next: None }, item: 10 })
+            ]
+        );
         assert_eq!(freelist, &Some(List::singleton(0)));
+        assert_eq!(allocatedlist, &Some(List::singleton(1)));
         assert_eq!(
             *map.entry(2)
                 .and_modify(|v| {
@@ -1136,55 +1285,89 @@ mod tests {
                 .or_insert(5),
             5
         );
-        let DenseMap { data, freelist } = &map;
+        let DenseMap { data, freelist, allocatedlist } = &map;
         assert_eq!(
             data,
             &vec![
                 free_none(),
-                Allocated(AllocatedEntry { item: 10 }),
-                Allocated(AllocatedEntry { item: 5 })
+                Allocated(AllocatedEntry {
+                    link: ListLink { prev: None, next: Some(2) },
+                    item: 10
+                }),
+                Allocated(AllocatedEntry { link: ListLink { prev: Some(1), next: None }, item: 5 }),
             ]
         );
         assert_eq!(freelist, &Some(List::singleton(0)));
+        assert_eq!(allocatedlist, &Some(List { head: 1, tail: 2 }));
         assert_eq!(*map.entry(4).or_default(), 0);
-        let DenseMap { data, freelist } = &map;
+        let DenseMap { data, freelist, allocatedlist } = &map;
         assert_eq!(
             data,
             &vec![
                 free_head(3),
-                Allocated(AllocatedEntry { item: 10 }),
-                Allocated(AllocatedEntry { item: 5 }),
+                Allocated(AllocatedEntry {
+                    link: ListLink { prev: None, next: Some(2) },
+                    item: 10
+                }),
+                Allocated(AllocatedEntry {
+                    link: ListLink { prev: Some(1), next: Some(4) },
+                    item: 5
+                }),
                 free_tail(0),
-                Allocated(AllocatedEntry { item: 0 })
+                Allocated(AllocatedEntry { link: ListLink { prev: Some(2), next: None }, item: 0 })
             ]
         );
         assert_eq!(freelist, &Some(List { head: 0, tail: 3 }));
+        assert_eq!(allocatedlist, &Some(List { head: 1, tail: 4 }));
         assert_eq!(*map.entry(3).or_insert_with(|| 7), 7);
-        let DenseMap { data, freelist } = &map;
+        let DenseMap { data, freelist, allocatedlist } = &map;
         assert_eq!(
             data,
             &vec![
                 free_none(),
-                Allocated(AllocatedEntry { item: 10 }),
-                Allocated(AllocatedEntry { item: 5 }),
-                Allocated(AllocatedEntry { item: 7 }),
-                Allocated(AllocatedEntry { item: 0 })
+                Allocated(AllocatedEntry {
+                    link: ListLink { prev: None, next: Some(2) },
+                    item: 10
+                }),
+                Allocated(AllocatedEntry {
+                    link: ListLink { prev: Some(1), next: Some(4) },
+                    item: 5
+                }),
+                Allocated(AllocatedEntry { link: ListLink { prev: Some(4), next: None }, item: 7 }),
+                Allocated(AllocatedEntry {
+                    link: ListLink { prev: Some(2), next: Some(3) },
+                    item: 0
+                })
             ]
         );
         assert_eq!(freelist, &Some(List::singleton(0)));
+        assert_eq!(allocatedlist, &Some(List { head: 1, tail: 3 }));
         assert_eq!(*map.entry(0).or_insert(1), 1);
-        let DenseMap { data, freelist } = &map;
+        let DenseMap { data, freelist, allocatedlist } = &map;
         assert_eq!(
             data,
             &vec![
-                Allocated(AllocatedEntry { item: 1 }),
-                Allocated(AllocatedEntry { item: 10 }),
-                Allocated(AllocatedEntry { item: 5 }),
-                Allocated(AllocatedEntry { item: 7 }),
-                Allocated(AllocatedEntry { item: 0 })
+                Allocated(AllocatedEntry { link: ListLink { prev: Some(3), next: None }, item: 1 }),
+                Allocated(AllocatedEntry {
+                    link: ListLink { prev: None, next: Some(2) },
+                    item: 10
+                }),
+                Allocated(AllocatedEntry {
+                    link: ListLink { prev: Some(1), next: Some(4) },
+                    item: 5
+                }),
+                Allocated(AllocatedEntry {
+                    link: ListLink { prev: Some(4), next: Some(0) },
+                    item: 7
+                }),
+                Allocated(AllocatedEntry {
+                    link: ListLink { prev: Some(2), next: Some(3) },
+                    item: 0
+                })
             ]
         );
         assert_eq!(freelist, &None);
+        assert_eq!(allocatedlist, &Some(List { head: 1, tail: 0 }));
         match map.entry(0) {
             Entry::Occupied(mut e) => {
                 assert_eq!(*e.key(), 0);
@@ -1195,18 +1378,28 @@ mod tests {
             }
             _ => panic!("Wrong entry type, should be occupied"),
         }
-        let DenseMap { data, freelist } = &map;
+        let DenseMap { data, freelist, allocatedlist } = &map;
         assert_eq!(
             data,
             &vec![
                 free_none(),
-                Allocated(AllocatedEntry { item: 10 }),
-                Allocated(AllocatedEntry { item: 5 }),
-                Allocated(AllocatedEntry { item: 7 }),
-                Allocated(AllocatedEntry { item: 0 })
+                Allocated(AllocatedEntry {
+                    link: ListLink { prev: None, next: Some(2) },
+                    item: 10
+                }),
+                Allocated(AllocatedEntry {
+                    link: ListLink { prev: Some(1), next: Some(4) },
+                    item: 5
+                }),
+                Allocated(AllocatedEntry { link: ListLink { prev: Some(4), next: None }, item: 7 }),
+                Allocated(AllocatedEntry {
+                    link: ListLink { prev: Some(2), next: Some(3) },
+                    item: 0
+                })
             ]
         );
         assert_eq!(freelist, &Some(List::singleton(0)));
+        assert_eq!(allocatedlist, &Some(List { head: 1, tail: 3 }));
 
         match map.entry(0) {
             Entry::Vacant(e) => {
@@ -1215,19 +1408,31 @@ mod tests {
             }
             _ => panic!("Wrong entry type, should be vacant"),
         }
-        let DenseMap { data, freelist } = &map;
+        let DenseMap { data, freelist, allocatedlist } = &map;
         assert_eq!(
             data,
             &vec![
-                Allocated(AllocatedEntry { item: 4 }),
-                Allocated(AllocatedEntry { item: 10 }),
-                Allocated(AllocatedEntry { item: 5 }),
-                Allocated(AllocatedEntry { item: 7 }),
-                Allocated(AllocatedEntry { item: 0 })
+                Allocated(AllocatedEntry { link: ListLink { prev: Some(3), next: None }, item: 4 }),
+                Allocated(AllocatedEntry {
+                    link: ListLink { prev: None, next: Some(2) },
+                    item: 10
+                }),
+                Allocated(AllocatedEntry {
+                    link: ListLink { prev: Some(1), next: Some(4) },
+                    item: 5
+                }),
+                Allocated(AllocatedEntry {
+                    link: ListLink { prev: Some(4), next: Some(0) },
+                    item: 7
+                }),
+                Allocated(AllocatedEntry {
+                    link: ListLink { prev: Some(2), next: Some(3) },
+                    item: 0
+                })
             ]
         );
-
-        assert_eq!(freelist, &None)
+        assert_eq!(freelist, &None);
+        assert_eq!(allocatedlist, &Some(List { head: 1, tail: 0 }));
     }
 
     #[test]
@@ -1266,9 +1471,10 @@ mod tests {
         for i in 0..100 {
             assert_eq!(map.remove(i), Some(0));
         }
-        let DenseMap { data, freelist } = &map;
+        let DenseMap { data, freelist, allocatedlist } = &map;
         assert_empty(data.iter());
         assert_eq!(freelist, &None);
+        assert_eq!(allocatedlist, &None);
     }
 
     #[test]
@@ -1366,19 +1572,18 @@ mod tests {
         ]
     }
 
-    /// Searches through the given data entries to identify the free list. Returns the indices of
-    /// elements in the free list in order, panicking if there is any inconsistency in the list.
-    fn find_free_elements<T>(data: &[DenseMapEntry<T>]) -> Vec<usize> {
-        let head = data.iter().enumerate().find_map(|(i, e)| match e {
-            DenseMapEntry::Free(link) => {
-                let ListLink { prev, next: _ } = link;
-                if prev == &None {
-                    Some((i, link))
-                } else {
-                    None
-                }
+    fn find_elements<T>(
+        data: &[DenseMapEntry<T>],
+        get_link: impl Fn(&DenseMapEntry<T>) -> Option<&ListLink>,
+    ) -> Vec<usize> {
+        let head = data.iter().enumerate().find_map(|(i, e)| {
+            let link = get_link(e)?;
+            let ListLink { prev, next: _ } = link;
+            if prev == &None {
+                Some((i, *link))
+            } else {
+                None
             }
-            DenseMapEntry::Allocated(_) => None,
         });
         let mut found = Vec::new();
         let mut next = head;
@@ -1387,64 +1592,95 @@ mod tests {
         while let Some((index, link)) = next {
             found.push(index);
             next = link.next.map(|next_i| {
-                let next_free = match &data[next_i] {
-                    DenseMapEntry::Free(f) => f,
-                    DenseMapEntry::Allocated(_) => panic!("free list element is not free"),
-                };
-                assert_eq!(Some(index), next_free.prev, "data[{}] and data[{}]", index, next_i);
-                (next_i, next_free)
+                let next_entry =
+                    *get_link(&data[next_i]).expect("entry should match target link type");
+                assert_eq!(Some(index), next_entry.prev, "data[{}] and data[{}]", index, next_i);
+                (next_i, next_entry)
             })
         }
 
         // The freelist should contain all of the free data elements.
-        data.iter().enumerate().for_each(|(i, e)| match e {
-            DenseMapEntry::Free(_) => {
-                assert!(found.contains(&i), "data[{}] is free but not in the list", i)
-            }
-            DenseMapEntry::Allocated(_) => (),
+        data.iter().enumerate().for_each(|(i, e)| {
+            assert_eq!(
+                found.contains(&i),
+                get_link(e).is_some(),
+                "data[{}] should be in found list if link type matches",
+                i,
+            )
         });
         found
     }
 
+    /// Searches through the given data entries to identify the free list. Returns the indices of
+    /// elements in the free list in order, panicking if there is any inconsistency in the list.
+    fn find_free_elements<T>(data: &[DenseMapEntry<T>]) -> Vec<usize> {
+        find_elements(data, |entry| match entry {
+            DenseMapEntry::Free(link) => Some(link),
+            DenseMapEntry::Allocated(_) => None,
+        })
+    }
+
+    /// Searches through the given data entries to identify the allocated list. Returns the indices of
+    /// elements in the allocated list in order, panicking if there is any inconsistency in the list.
+    fn find_allocated_elements<T>(data: &[DenseMapEntry<T>]) -> Vec<usize> {
+        find_elements(data, |entry| match entry {
+            DenseMapEntry::Allocated(AllocatedEntry { item: _, link }) => Some(link),
+            DenseMapEntry::Free(_) => None,
+        })
+    }
+
     #[test]
     fn test_find_free_elements() {
-        let data =
-            vec![Allocated(AllocatedEntry { item: 1 }), free_tail(2), free(3, 1), free_head(2)];
+        let data = vec![
+            Allocated(AllocatedEntry { link: ListLink { prev: None, next: None }, item: 1 }),
+            free_tail(2),
+            free(3, 1),
+            free_head(2),
+        ];
         assert_eq!(find_free_elements(&data), vec![3, 2, 1]);
     }
 
     #[test]
     fn test_find_free_elements_none_free() {
         let data = vec![
-            Allocated(AllocatedEntry { item: 1 }),
-            Allocated(AllocatedEntry { item: 2 }),
-            Allocated(AllocatedEntry { item: 3 }),
-            Allocated(AllocatedEntry { item: 2 }),
+            Allocated(AllocatedEntry { link: ListLink { prev: None, next: None }, item: 1 }),
+            Allocated(AllocatedEntry { link: ListLink { prev: None, next: None }, item: 2 }),
+            Allocated(AllocatedEntry { link: ListLink { prev: None, next: None }, item: 3 }),
+            Allocated(AllocatedEntry { link: ListLink { prev: None, next: None }, item: 2 }),
         ];
         assert_eq!(find_free_elements(&data), vec![]);
     }
 
     #[test]
-    #[should_panic(expected = "not free")]
+    #[should_panic(expected = "entry should match target link type")]
     fn test_find_free_elements_includes_allocated() {
-        let data = vec![Allocated(AllocatedEntry { item: 1 }), free_head(0), free_tail(0)];
+        let data = vec![
+            Allocated(AllocatedEntry { link: ListLink { prev: None, next: None }, item: 1 }),
+            free_head(0),
+            free_tail(0),
+        ];
         let _ = find_free_elements(&data);
     }
 
     #[test]
-    #[should_panic(expected = "is free but not in the list")]
+    #[should_panic(expected = "should be in found list if link type matches")]
     fn test_find_free_elements_in_cycle() {
-        let data = vec![free(2, 1), free(0, 2), free(1, 0), Allocated(AllocatedEntry { item: 5 })];
+        let data = vec![
+            free(2, 1),
+            free(0, 2),
+            free(1, 0),
+            Allocated(AllocatedEntry { link: ListLink { prev: None, next: None }, item: 5 }),
+        ];
         let _ = find_free_elements(&data);
     }
 
     #[test]
-    #[should_panic(expected = "is free but not in the list")]
+    #[should_panic(expected = "should be in found list if link type matches")]
     fn test_find_free_elements_multiple_lists() {
         let data = vec![
             free_head(1),
             free_tail(0),
-            Allocated(AllocatedEntry { item: 13 }),
+            Allocated(AllocatedEntry { link: ListLink { prev: None, next: None }, item: 13 }),
             free_head(4),
             free_tail(3),
         ];
@@ -1466,7 +1702,7 @@ mod tests {
                 op.apply(&mut map, &mut reference);
 
                 // Now check the invariants that the map should be guaranteeing.
-                let DenseMap {data, freelist} = &map;
+                let DenseMap { data, freelist, allocatedlist } = &map;
 
                 match freelist {
                     None => {
@@ -1477,9 +1713,24 @@ mod tests {
                         })
                     },
                     Some(List {head, tail}) => {
-                        let traversed = find_free_elements(data);
-                        assert_eq!(traversed.first(), Some(head));
-                        assert_eq!(traversed.last(), Some(tail));
+                        let free = find_free_elements(data);
+                        assert_eq!(free.first(), Some(head));
+                        assert_eq!(free.last(), Some(tail));
+                    }
+                }
+
+                match allocatedlist {
+                    None => {
+                        // No allocatedlist means all nodes are free.
+                        data.iter().enumerate().for_each(|(i, d)| match d {
+                            DenseMapEntry::Allocated(_) => panic!("no allocatedlist but data[{}] is allocated", i),
+                            DenseMapEntry::Free(_) => (),
+                        })
+                    },
+                    Some(List {head, tail}) => {
+                        let allocated = find_allocated_elements(data);
+                        assert_eq!(allocated.first(), Some(head));
+                        assert_eq!(allocated.last(), Some(tail));
                     }
                 }
             }
@@ -1488,6 +1739,5 @@ mod tests {
             let elements : HashMap<_, i32> = map.key_ordered_iter().map(|(a, b)| (a, *b)).collect();
             assert_eq!(elements, reference);
         }
-
     }
 }
