@@ -3,11 +3,6 @@
     security_policy: {
         job_policy: {
             ambient_mark_vmo_exec: [
-                // TODO(crbug.com/1324624): Remove once
-                // https://chromium-review.googlesource.com/c/chromium/src/+/3907745 rolls
-                // to latest and stable prebuilts
-                "/core/context_provider/web_instances:**",
-
                 // We allow tests to access ambient executability in the same
                 // way that we're permissive with use of the components v1
                 // deprecated-ambient-replace-as-executable feature and
