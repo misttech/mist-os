@@ -31,7 +31,7 @@ use {
         rights::Rights,
         router::{
             AllowedSourcesBuilder, CapabilityVisitor, ErrorNotFoundFromParent,
-            ErrorNotFoundInChild, ExposeVisitor, NoopVisitor, OfferVisitor, RouteBundle, Sources,
+            ErrorNotFoundInChild, ExposeVisitor, NoopVisitor, OfferVisitor, RouteBundle,
         },
         walk_state::WalkState,
     },
@@ -303,7 +303,7 @@ where
     let source = router::route_from_offer(
         RouteBundle::from_offer(offer_decl.into()),
         target.clone(),
-        allowed_sources,
+        allowed_sources.build(),
         &mut availability_visitor,
         mapper,
     )
@@ -334,7 +334,7 @@ where
     let source = router::route_from_offer(
         RouteBundle::from_offer(offer_decl.into()),
         target.clone(),
-        allowed_sources,
+        allowed_sources.build(),
         &mut state,
         mapper,
     )
@@ -360,7 +360,7 @@ where
     let source = router::route_from_offer(
         offer_bundle.map(Into::into),
         target.clone(),
-        allowed_sources,
+        allowed_sources.build(),
         &mut availability_visitor,
         mapper,
     )
@@ -383,7 +383,7 @@ where
     let source = router::route_from_offer_without_expose(
         RouteBundle::from_offer(offer_decl.into()),
         target.clone(),
-        allowed_sources,
+        allowed_sources.build(),
         &mut availability_visitor,
         mapper,
     )
@@ -404,7 +404,7 @@ where
     let source = router::route_from_offer_without_expose(
         RouteBundle::from_offer(offer_decl.into()),
         target.clone(),
-        allowed_sources,
+        allowed_sources.build(),
         &mut availability_visitor,
         mapper,
     )
@@ -425,7 +425,7 @@ where
     let source = router::route_from_offer(
         RouteBundle::from_offer(offer_decl.into()),
         target.clone(),
-        allowed_sources,
+        allowed_sources.build(),
         &mut NoopVisitor::new(),
         mapper,
     )
@@ -446,7 +446,7 @@ where
     let source = router::route_from_offer(
         RouteBundle::from_offer(offer_decl.into()),
         target.clone(),
-        allowed_sources,
+        allowed_sources.build(),
         &mut NoopVisitor::new(),
         mapper,
     )
@@ -516,7 +516,7 @@ where
             let source = router::route_from_registration(
                 registration_decl,
                 env_component_instance.clone(),
-                allowed_sources,
+                allowed_sources.build(),
                 &mut availability_visitor,
                 mapper,
             )
@@ -542,7 +542,7 @@ where
             let source = router::route_from_self(
                 use_decl.into(),
                 target.clone(),
-                allowed_sources,
+                allowed_sources.build(),
                 &mut availability_visitor,
                 mapper,
             )
@@ -554,7 +554,7 @@ where
             let source = router::route_from_use(
                 use_decl.into(),
                 target.clone(),
-                allowed_sources,
+                allowed_sources.build(),
                 &mut availability_visitor,
                 mapper,
             )
@@ -586,7 +586,7 @@ where
     let source = router::route_from_expose(
         RouteBundle::from_expose(expose_decl.into()),
         target.clone(),
-        allowed_sources,
+        allowed_sources.build(),
         &mut availability_visitor,
         mapper,
     )
@@ -612,7 +612,7 @@ where
             let source = router::route_from_self(
                 use_decl.into(),
                 target.clone(),
-                allowed_sources,
+                allowed_sources.build(),
                 &mut availability_visitor,
                 mapper,
             )
@@ -626,7 +626,7 @@ where
             let source = router::route_from_use(
                 use_decl.into(),
                 target.clone(),
-                allowed_sources,
+                allowed_sources.build(),
                 &mut availability_visitor,
                 mapper,
             )
@@ -652,7 +652,7 @@ where
     let source = router::route_from_expose(
         expose_bundle.map(Into::into),
         target.clone(),
-        allowed_sources,
+        allowed_sources.build(),
         &mut availability_visitor,
         mapper,
     )
@@ -768,7 +768,7 @@ where
             let source = router::route_from_self(
                 use_decl.into(),
                 target.clone(),
-                allowed_sources,
+                allowed_sources.build(),
                 &mut availability_visitor,
                 mapper,
             )
@@ -791,7 +791,7 @@ where
             let source = router::route_from_use(
                 use_decl.into(),
                 target.clone(),
-                allowed_sources,
+                allowed_sources.build(),
                 &mut state,
                 mapper,
             )
@@ -826,7 +826,7 @@ where
     let source = router::route_from_expose(
         RouteBundle::from_expose(expose_decl.into()),
         target.clone(),
-        allowed_sources,
+        allowed_sources.build(),
         &mut state,
         mapper,
     )
@@ -880,7 +880,7 @@ where
     let source = router::route_from_use_without_expose(
         use_decl.into(),
         target.clone(),
-        allowed_sources,
+        allowed_sources.build(),
         &mut availability_visitor,
         mapper,
     )
@@ -921,7 +921,7 @@ where
     let source = router::route_from_registration(
         StorageDeclAsRegistration::from(storage_decl.clone()),
         target.clone(),
-        allowed_sources,
+        allowed_sources.build(),
         &mut state,
         mapper,
     )
@@ -943,7 +943,7 @@ where
     C: ComponentInstanceInterface + 'static,
 {
     let allowed_sources =
-        AllowedSourcesBuilder::new(CapabilityTypeName::Runner).builtin().component();
+        AllowedSourcesBuilder::new(CapabilityTypeName::Runner).builtin().component().build();
     let source = match target.environment().get_registered_runner(&runner)? {
         // The runner was registered in the environment of some component instance..
         Some((ExtendedInstanceInterface::Component(env_component_instance), registration_decl)) => {
@@ -1008,7 +1008,7 @@ where
             let source = router::route_from_use(
                 use_decl.into(),
                 target.clone(),
-                allowed_sources,
+                allowed_sources.build(),
                 &mut availability_visitor,
                 mapper,
             )
@@ -1034,7 +1034,7 @@ where
     let source = router::route_from_registration(
         registration,
         target.clone(),
-        allowed_sources,
+        allowed_sources.build(),
         &mut NoopVisitor::new(),
         mapper,
     )
@@ -1061,7 +1061,7 @@ where
     let source = router::route_from_use_without_expose(
         use_decl.into(),
         target.clone(),
-        allowed_sources,
+        allowed_sources.build(),
         &mut availability_visitor,
         mapper,
     )

@@ -35,8 +35,8 @@ use {
 ///
 /// This is used during collection routing from anonymized aggregate service instances.
 #[derive(Derivative)]
-#[derivative(Clone(bound = "S: Clone, V: Clone"))]
-pub(super) struct AnonymizedAggregateServiceProvider<C: ComponentInstanceInterface, S, V> {
+#[derivative(Clone(bound = "V: Clone"))]
+pub(super) struct AnonymizedAggregateServiceProvider<C: ComponentInstanceInterface, V> {
     /// Component that defines the aggregate.
     pub containing_component: WeakComponentInstanceInterface<C>,
 
@@ -51,16 +51,14 @@ pub(super) struct AnonymizedAggregateServiceProvider<C: ComponentInstanceInterfa
 
     pub capability_type: cm_rust::CapabilityTypeName,
 
-    pub sources: S,
+    pub sources: Sources,
     pub visitor: V,
 }
 
 #[async_trait]
-impl<C, S, V> AnonymizedAggregateCapabilityProvider<C>
-    for AnonymizedAggregateServiceProvider<C, S, V>
+impl<C, V> AnonymizedAggregateCapabilityProvider<C> for AnonymizedAggregateServiceProvider<C, V>
 where
     C: ComponentInstanceInterface + 'static,
-    S: Sources + 'static,
     V: ExposeVisitor,
     V: CapabilityVisitor,
     V: Clone + Send + Sync + 'static,
@@ -245,39 +243,37 @@ fn get_instance_filter(offer_decl: &OfferServiceDecl) -> Vec<NameMapping> {
 }
 
 #[derive(Derivative)]
-#[derivative(Clone(bound = "S: Clone, V: Clone"))]
-pub(super) struct OfferAggregateServiceProvider<C: ComponentInstanceInterface, S, V> {
+#[derivative(Clone(bound = "V: Clone"))]
+pub(super) struct OfferAggregateServiceProvider<C: ComponentInstanceInterface, V> {
     /// Component that offered the aggregate service
     component: WeakComponentInstanceInterface<C>,
 
     /// List of offer decl to follow for routing each service provider used in the overall aggregation
     offer_decls: Vec<OfferServiceDecl>,
 
-    sources: S,
+    sources: Sources,
     visitor: V,
 }
 
-impl<C, S, V> OfferAggregateServiceProvider<C, S, V>
+impl<C, V> OfferAggregateServiceProvider<C, V>
 where
     C: ComponentInstanceInterface + 'static,
-    S: Sources + 'static,
     V: OfferVisitor + ExposeVisitor + CapabilityVisitor,
     V: Send + Sync + Clone + 'static,
 {
     pub(super) fn new(
         offer_decls: Vec<OfferServiceDecl>,
         component: WeakComponentInstanceInterface<C>,
-        sources: S,
+        sources: Sources,
         visitor: V,
     ) -> Self {
         Self { offer_decls, sources, visitor, component }
     }
 }
 
-impl<C, S, V> FilteredAggregateCapabilityProvider<C> for OfferAggregateServiceProvider<C, S, V>
+impl<C, V> FilteredAggregateCapabilityProvider<C> for OfferAggregateServiceProvider<C, V>
 where
     C: ComponentInstanceInterface + 'static,
-    S: Sources + 'static,
     V: OfferVisitor + ExposeVisitor + CapabilityVisitor,
     V: Send + Sync + Clone + 'static,
 {
