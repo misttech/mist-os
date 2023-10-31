@@ -161,6 +161,35 @@ action("invoke_helpdoc") {
   deps = [ ":${_helpdoc_script_target}" ]
 }
 
+action("create_syscall_docs") {
+  script = "gen_syscalls_toc.py"
+
+  deps = [ "//zircon/vdso:syscall_docs.zip" ]
+  inputs = [ get_label_info(deps[0], "target_out_dir") + "/syscall_docs.zip" ]
+  outputs = [ "${target_out_dir}/syscalls.zip" ]
+
+  args = [
+    "--input",
+    rebase_path(inputs[0], root_build_dir),
+    "--output",
+    rebase_path(outputs[0], root_build_dir),
+    "--reference-root",
+    "/reference/syscalls",
+  ]
+
+  metadata = {
+    generated_docset = [
+      {
+        name = "syscalls"
+        archive = {
+          origin_file = rebase_path(outputs[0], root_build_dir)
+        }
+        dest_folder = "syscalls"
+      },
+    ]
+  }
+}
+
 compiled_action("invoke_cmldoc") {
   tool = "//tools/cmc:cmc"
   tool_output_name = "cmc"
@@ -225,13 +254,13 @@ build_api_module("generated_docs") {
   testonly = true
   data_keys = [ "generated_docset" ]
   deps = [
+    ":create_syscall_docs",
     ":invoke_clidoc",
     ":invoke_cmldoc",
     ":invoke_fidldoc",
     ":invoke_helpdoc",
     "//bundles/drivers:create_all_drivers_doc",
     "//sdk/lib/fdio:docs",
-    "//zircon/vdso:syscall_docs.zip",
   ]
 }
 
