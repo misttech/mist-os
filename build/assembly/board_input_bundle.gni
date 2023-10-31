@@ -58,6 +58,7 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #
 #    Fields:
 #    - power_manager: configuration for the power_manager system.
+#    - thermal: configuration of the thermal management system.
 #
 #  Outputs
 #    A directory structure and manifest
@@ -246,8 +247,16 @@ template("board_input_bundle") {
     if (defined(configuration.power_manager)) {
       creation_inputs += [ configuration.power_manager ]
       creation_args += [
-        "--power-manager",
+        "--power-manager-config",
         rebase_path(configuration.power_manager),
+      ]
+    }
+
+    if (defined(configuration.thermal)) {
+      creation_inputs += [ configuration.thermal ]
+      creation_args += [
+        "--thermal-config",
+        rebase_path(configuration.thermal),
       ]
     }
   }

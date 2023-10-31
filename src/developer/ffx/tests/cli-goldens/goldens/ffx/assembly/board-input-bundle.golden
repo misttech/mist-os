@@ -86,13 +86,25 @@
     {
       "kind": {
         "Option": {
-          "arg_name": "power-manager"
+          "arg_name": "power-manager-config"
         }
       },
       "optionality": "optional",
-      "long": "--power-manager",
+      "long": "--power-manager-config",
       "short": null,
       "description": "power-manager configuration",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "thermal-config"
+        }
+      },
+      "optionality": "optional",
+      "long": "--thermal-config",
+      "short": null,
+      "description": "thermal management configuration",
       "hidden": false
     }
   ],

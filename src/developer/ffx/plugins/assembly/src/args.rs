@@ -376,5 +376,9 @@ pub struct BoardInputBundleArgs {
 
     /// power-manager configuration
     #[argh(option)]
-    pub power_manager: Option<Utf8PathBuf>,
+    pub power_manager_config: Option<Utf8PathBuf>,
+
+    /// thermal management configuration
+    #[argh(option)]
+    pub thermal_config: Option<Utf8PathBuf>,
 }

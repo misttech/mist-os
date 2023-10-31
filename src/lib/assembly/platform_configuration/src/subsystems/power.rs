@@ -24,6 +24,17 @@ impl DefineSubsystemConfiguration<()> for PowerManagementSubsystem {
                 })
                 .context("Adding power_manager config file")?;
         }
+
+        if let Some(thermal_config) = &context.board_info.configuration.thermal {
+            builder
+                .bootfs()
+                .file(FileEntry {
+                    source: thermal_config.as_utf8_pathbuf().into(),
+                    destination: "config/power_manager/thermal_config.json".into(),
+                })
+                .context("Adding power_manager's thermal config file")?;
+        }
+
         Ok(())
     }
 }
