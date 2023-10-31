@@ -4,13 +4,7 @@
 
 use {
     crate::error::AvailabilityRoutingError,
-    cm_rust::{
-        Availability, DirectoryDecl, EventStreamDecl, ExposeDeclCommon, ExposeDirectoryDecl,
-        ExposeProtocolDecl, ExposeRunnerDecl, ExposeServiceDecl, ExposeSource, OfferDeclCommon,
-        OfferDirectoryDecl, OfferEventStreamDecl, OfferProtocolDecl, OfferRunnerDecl,
-        OfferServiceDecl, OfferSource, OfferStorageDecl, ProtocolDecl, RunnerDecl, ServiceDecl,
-        StorageDecl,
-    },
+    cm_rust::{Availability, ExposeDeclCommon, ExposeSource, OfferDeclCommon, OfferSource},
     std::convert::From,
 };
 
@@ -111,65 +105,42 @@ impl AvailabilityState {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct AvailabilityVisitor<O, E, C> {
-    phantom_offer: std::marker::PhantomData<O>,
-    phantom_expose: std::marker::PhantomData<E>,
-    phantom_capability: std::marker::PhantomData<C>,
-
+pub struct AvailabilityVisitor {
     pub state: AvailabilityState,
 }
 
-impl<O, E, C> AvailabilityVisitor<O, E, C> {
-    pub fn new(availability: Availability) -> AvailabilityVisitor<O, E, C> {
-        AvailabilityVisitor {
-            phantom_offer: std::marker::PhantomData,
-            phantom_expose: std::marker::PhantomData,
-            phantom_capability: std::marker::PhantomData,
-            state: AvailabilityState(availability),
-        }
+impl AvailabilityVisitor {
+    pub fn new(availability: Availability) -> AvailabilityVisitor {
+        AvailabilityVisitor { state: AvailabilityState(availability) }
     }
 }
 
-impl<O, E, C> crate::router::OfferVisitor for AvailabilityVisitor<O, E, C> {
+impl crate::router::OfferVisitor for AvailabilityVisitor {
     fn visit(&mut self, offer: &cm_rust::OfferDecl) -> Result<(), crate::RoutingError> {
         self.state.advance_with_offer(offer).map_err(Into::into)
     }
 }
 
-impl<O, E, C> crate::router::ExposeVisitor for AvailabilityVisitor<O, E, C> {
+impl crate::router::ExposeVisitor for AvailabilityVisitor {
     fn visit(&mut self, expose: &cm_rust::ExposeDecl) -> Result<(), crate::RoutingError> {
         self.state.advance_with_expose(expose).map_err(Into::into)
     }
 }
 
-impl<O, E, C> crate::router::CapabilityVisitor for AvailabilityVisitor<O, E, C> {
+impl crate::router::CapabilityVisitor for AvailabilityVisitor {
     fn visit(&mut self, _: &cm_rust::CapabilityDecl) -> Result<(), crate::RoutingError> {
         Ok(())
     }
 }
 
-pub type AvailabilityProtocolVisitor =
-    AvailabilityVisitor<OfferProtocolDecl, ExposeProtocolDecl, ProtocolDecl>;
-
-pub type AvailabilityServiceVisitor =
-    AvailabilityVisitor<OfferServiceDecl, ExposeServiceDecl, ServiceDecl>;
-
-pub type AvailabilityDirectoryVisitor =
-    AvailabilityVisitor<OfferDirectoryDecl, ExposeDirectoryDecl, DirectoryDecl>;
-
-pub type AvailabilityStorageVisitor = AvailabilityVisitor<OfferStorageDecl, (), StorageDecl>;
-
-pub type AvailabilityEventStreamVisitor =
-    AvailabilityVisitor<OfferEventStreamDecl, (), EventStreamDecl>;
-
-pub type AvailabilityRunnerVisitor =
-    AvailabilityVisitor<OfferRunnerDecl, ExposeRunnerDecl, RunnerDecl>;
-
 #[cfg(test)]
 mod tests {
     use {
         super::*,
-        cm_rust::{DependencyType, ExposeDecl, ExposeTarget, OfferDecl, OfferTarget},
+        cm_rust::{
+            DependencyType, ExposeDecl, ExposeProtocolDecl, ExposeTarget, OfferDecl,
+            OfferProtocolDecl, OfferTarget,
+        },
         test_case::test_case,
     };
 

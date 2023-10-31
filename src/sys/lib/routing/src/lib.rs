@@ -19,11 +19,7 @@ pub mod walk_state;
 
 use {
     crate::{
-        availability::{
-            AvailabilityDirectoryVisitor, AvailabilityEventStreamVisitor,
-            AvailabilityProtocolVisitor, AvailabilityRunnerVisitor, AvailabilityServiceVisitor,
-            AvailabilityState, AvailabilityStorageVisitor,
-        },
+        availability::{AvailabilityState, AvailabilityVisitor},
         capability_source::{CapabilitySource, ComponentCapability, InternalCapability},
         component_instance::{
             ComponentInstanceInterface, ExtendedInstanceInterface, TopInstanceInterface,
@@ -35,8 +31,7 @@ use {
         rights::Rights,
         router::{
             AllowedSourcesBuilder, CapabilityVisitor, ErrorNotFoundFromParent,
-            ErrorNotFoundInChild, ExposeVisitor, NoopResolverVisitor, NoopRunnerVisitor,
-            OfferVisitor, RouteBundle, Sources,
+            ErrorNotFoundInChild, ExposeVisitor, NoopVisitor, OfferVisitor, RouteBundle, Sources,
         },
         walk_state::WalkState,
     },
@@ -300,7 +295,7 @@ where
     C: ComponentInstanceInterface + 'static,
     M: DebugRouteMapper + 'static,
 {
-    let mut availability_visitor = AvailabilityProtocolVisitor::new(offer_decl.availability);
+    let mut availability_visitor = AvailabilityVisitor::new(offer_decl.availability);
     let allowed_sources = AllowedSourcesBuilder::new(CapabilityTypeName::Protocol)
         .framework(InternalCapability::Protocol)
         .builtin()
@@ -363,7 +358,7 @@ where
     // multiple routes with different availabilities. It's possible that manifest validation should
     // disallow this. For now, just pick the first.
     let mut availability_visitor =
-        AvailabilityServiceVisitor::new(offer_bundle.iter().next().unwrap().availability);
+        AvailabilityVisitor::new(offer_bundle.iter().next().unwrap().availability);
     let allowed_sources =
         AllowedSourcesBuilder::new(CapabilityTypeName::Service).component().collection();
     let source = router::route_from_offer(
@@ -389,7 +384,7 @@ where
 {
     let allowed_sources = AllowedSourcesBuilder::new(CapabilityTypeName::EventStream).builtin();
 
-    let mut availability_visitor = AvailabilityEventStreamVisitor::new(offer_decl.availability);
+    let mut availability_visitor = AvailabilityVisitor::new(offer_decl.availability);
     let source = router::route_from_offer_without_expose(
         RouteBundle::from_offer(offer_decl.into()),
         target.clone(),
@@ -410,7 +405,7 @@ where
     C: ComponentInstanceInterface + 'static,
     M: DebugRouteMapper + 'static,
 {
-    let mut availability_visitor = AvailabilityStorageVisitor::new(offer_decl.availability);
+    let mut availability_visitor = AvailabilityVisitor::new(offer_decl.availability);
     let allowed_sources = AllowedSourcesBuilder::new(CapabilityTypeName::Storage).component();
     let source = router::route_from_offer_without_expose(
         RouteBundle::from_offer(offer_decl.into()),
@@ -438,7 +433,7 @@ where
         RouteBundle::from_offer(offer_decl.into()),
         target.clone(),
         allowed_sources,
-        &mut NoopRunnerVisitor::new(),
+        &mut NoopVisitor::new(),
         mapper,
     )
     .await?;
@@ -460,7 +455,7 @@ where
         RouteBundle::from_offer(offer_decl.into()),
         target.clone(),
         allowed_sources,
-        &mut NoopResolverVisitor::new(),
+        &mut NoopVisitor::new(),
         mapper,
     )
     .await?;
@@ -526,7 +521,7 @@ where
 
             let env_moniker = env_component_instance.moniker();
 
-            let mut availability_visitor = AvailabilityProtocolVisitor::new(use_decl.availability);
+            let mut availability_visitor = AvailabilityVisitor::new(use_decl.availability);
             let source = router::route_from_registration(
                 registration_decl,
                 env_component_instance.clone(),
@@ -550,7 +545,7 @@ where
             return Ok(RouteSource::new(source));
         }
         UseSource::Self_ => {
-            let mut availability_visitor = AvailabilityProtocolVisitor::new(use_decl.availability);
+            let mut availability_visitor = AvailabilityVisitor::new(use_decl.availability);
             let allowed_sources =
                 AllowedSourcesBuilder::new(CapabilityTypeName::Protocol).component();
             let source = router::route_from_self(
@@ -564,7 +559,7 @@ where
             Ok(RouteSource::new(source))
         }
         _ => {
-            let mut availability_visitor = AvailabilityProtocolVisitor::new(use_decl.availability);
+            let mut availability_visitor = AvailabilityVisitor::new(use_decl.availability);
             let source = router::route_from_use(
                 use_decl,
                 target.clone(),
@@ -591,7 +586,7 @@ where
     M: DebugRouteMapper + 'static,
 {
     // This is a noop visitor for exposes
-    let mut availability_visitor = AvailabilityProtocolVisitor::new(expose_decl.availability);
+    let mut availability_visitor = AvailabilityVisitor::new(expose_decl.availability);
     let allowed_sources = AllowedSourcesBuilder::new(CapabilityTypeName::Protocol)
         .framework(InternalCapability::Protocol)
         .builtin()
@@ -622,7 +617,7 @@ where
 {
     match use_decl.source {
         UseSource::Self_ => {
-            let mut availability_visitor = AvailabilityServiceVisitor::new(use_decl.availability);
+            let mut availability_visitor = AvailabilityVisitor::new(use_decl.availability);
             let allowed_sources =
                 AllowedSourcesBuilder::new(CapabilityTypeName::Service).component();
             let source = router::route_from_self(
@@ -636,7 +631,7 @@ where
             Ok(RouteSource::new(source))
         }
         _ => {
-            let mut availability_visitor = AvailabilityServiceVisitor::new(use_decl.availability);
+            let mut availability_visitor = AvailabilityVisitor::new(use_decl.availability);
             let allowed_sources =
                 AllowedSourcesBuilder::new(CapabilityTypeName::Service).component().collection();
             let source = router::route_from_use(
@@ -663,8 +658,7 @@ where
     C: ComponentInstanceInterface + 'static,
     M: DebugRouteMapper + 'static,
 {
-    let mut availability_visitor =
-        AvailabilityServiceVisitor::new(expose_bundle.availability().clone());
+    let mut availability_visitor = AvailabilityVisitor::new(expose_bundle.availability().clone());
     let allowed_sources =
         AllowedSourcesBuilder::new(CapabilityTypeName::Service).component().collection();
     let source = router::route_from_expose(
@@ -781,7 +775,7 @@ where
 {
     match use_decl.source {
         UseSource::Self_ => {
-            let mut availability_visitor = AvailabilityDirectoryVisitor::new(use_decl.availability);
+            let mut availability_visitor = AvailabilityVisitor::new(use_decl.availability);
             let allowed_sources =
                 AllowedSourcesBuilder::new(CapabilityTypeName::Dictionary).component();
             let source = router::route_from_self(
@@ -896,7 +890,7 @@ where
     C: ComponentInstanceInterface + 'static,
     M: DebugRouteMapper + 'static,
 {
-    let mut availability_visitor = AvailabilityStorageVisitor::new(use_decl.availability);
+    let mut availability_visitor = AvailabilityVisitor::new(use_decl.availability);
     let allowed_sources = AllowedSourcesBuilder::new(CapabilityTypeName::Storage).component();
     let source = router::route_from_use_without_expose(
         use_decl,
@@ -975,7 +969,7 @@ where
                 registration_decl,
                 env_component_instance,
                 allowed_sources,
-                &mut NoopRunnerVisitor::new(),
+                &mut NoopVisitor::new(),
                 mapper,
             )
             .await
@@ -986,7 +980,7 @@ where
                 .find_builtin_source(
                     reg.source_name(),
                     top_instance.builtin_capabilities(),
-                    &mut NoopRunnerVisitor::new(),
+                    &mut NoopVisitor::new(),
                     mapper,
                 )?
                 .ok_or(RoutingError::register_from_component_manager_not_found(
@@ -1029,7 +1023,7 @@ where
                 .capability()
                 .component();
             let mut availability_visitor =
-                AvailabilityRunnerVisitor::new(use_decl.availability().clone());
+                AvailabilityVisitor::new(use_decl.availability().clone());
             let source = router::route_from_use(
                 use_decl,
                 target.clone(),
@@ -1061,7 +1055,7 @@ where
         registration,
         target.clone(),
         allowed_sources,
-        &mut NoopResolverVisitor::new(),
+        &mut NoopVisitor::new(),
         mapper,
     )
     .await?;
@@ -1084,7 +1078,7 @@ where
     M: DebugRouteMapper + 'static,
 {
     let allowed_sources = AllowedSourcesBuilder::new(CapabilityTypeName::EventStream).builtin();
-    let mut availability_visitor = AvailabilityEventStreamVisitor::new(use_decl.availability);
+    let mut availability_visitor = AvailabilityVisitor::new(use_decl.availability);
     let source = router::route_from_use_without_expose(
         use_decl,
         target.clone(),

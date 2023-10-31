@@ -1685,44 +1685,31 @@ pub trait ErrorNotFoundInChild {
 }
 
 #[derive(Clone)]
-pub struct NoopVisitor<O, E, C> {
-    phantom_offer: std::marker::PhantomData<O>,
-    phantom_expose: std::marker::PhantomData<E>,
-    phantom_capability: std::marker::PhantomData<C>,
-}
+pub struct NoopVisitor {}
 
-impl<O, E, C> NoopVisitor<O, E, C> {
-    pub fn new() -> NoopVisitor<O, E, C> {
-        NoopVisitor {
-            phantom_offer: PhantomData,
-            phantom_expose: PhantomData,
-            phantom_capability: PhantomData,
-        }
+impl NoopVisitor {
+    pub fn new() -> NoopVisitor {
+        NoopVisitor {}
     }
 }
 
-impl<O, E, C> crate::router::OfferVisitor for NoopVisitor<O, E, C> {
+impl crate::router::OfferVisitor for NoopVisitor {
     fn visit(&mut self, _: &OfferDecl) -> Result<(), RoutingError> {
         Ok(())
     }
 }
 
-impl<O, E, C> crate::router::ExposeVisitor for NoopVisitor<O, E, C> {
+impl crate::router::ExposeVisitor for NoopVisitor {
     fn visit(&mut self, _: &ExposeDecl) -> Result<(), RoutingError> {
         Ok(())
     }
 }
 
-impl<O, E, C> crate::router::CapabilityVisitor for NoopVisitor<O, E, C> {
+impl crate::router::CapabilityVisitor for NoopVisitor {
     fn visit(&mut self, _: &CapabilityDecl) -> Result<(), RoutingError> {
         Ok(())
     }
 }
-
-pub type NoopRunnerVisitor =
-    NoopVisitor<cm_rust::OfferRunnerDecl, cm_rust::ExposeRunnerDecl, cm_rust::RunnerDecl>;
-pub type NoopResolverVisitor =
-    NoopVisitor<cm_rust::OfferResolverDecl, cm_rust::ExposeResolverDecl, cm_rust::ResolverDecl>;
 
 #[cfg(test)]
 mod tests {
