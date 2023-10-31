@@ -61,8 +61,10 @@ void InputReport::HidReportListenerReceiveReport(const uint8_t* report, size_t r
                                                  zx_time_t report_time) {
   fbl::AutoLock lock(&readers_lock_);
   for (auto& device : devices_) {
-    // Find the matching device.
-    if (device->InputReportId() != 0 && device->InputReportId() != report[0]) {
+    // Find the matching device. In particular, if a device has report id (report id != 0),
+    // the device's report id must match the report's id.
+    if (device->InputReportId() && *device->InputReportId() != 0 &&
+        *device->InputReportId() != report[0]) {
       continue;
     }
 
