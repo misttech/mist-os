@@ -28,7 +28,6 @@
                 // VmexResource protocol on eng builds.
                 //
                 // Some test runners explicitly require ambient executability.
-                "/core/test_manager/dart_jit_runner",
                 "/core/test_manager/elf_test_ambient_exec_runner",
                 "/core/test_manager/g3_dart_jit_product_runner",
             ],
