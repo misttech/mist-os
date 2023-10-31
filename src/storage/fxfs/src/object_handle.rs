@@ -4,7 +4,7 @@
 
 use {
     crate::object_store::{PosixAttributes, Timestamp},
-    anyhow::{bail, Error},
+    anyhow::Error,
     async_trait::async_trait,
     storage_device::buffer::{Buffer, BufferRef, MutableBufferRef},
 };
@@ -80,23 +80,6 @@ pub trait WriteObjectHandle: ObjectHandle {
     /// Flushes all pending data and metadata updates for the object.
     async fn flush(&self) -> Result<(), Error>;
 }
-
-#[async_trait]
-pub trait ObjectHandleExt: ReadObjectHandle {
-    // Returns the contents of the object. The object must be < |limit| bytes in size.
-    async fn contents(&self, limit: usize) -> Result<Box<[u8]>, Error> {
-        let size = self.get_size();
-        if size > limit as u64 {
-            bail!("Object too big ({} > {})", size, limit);
-        }
-        let mut buf = self.allocate_buffer(size as usize);
-        self.read(0u64, buf.as_mut()).await?;
-        Ok(buf.as_slice().into())
-    }
-}
-
-#[async_trait]
-impl<T: ReadObjectHandle + ?Sized> ObjectHandleExt for T {}
 
 #[async_trait]
 /// This trait is an asynchronous streaming writer.

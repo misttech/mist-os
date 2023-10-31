@@ -951,6 +951,17 @@ impl<S: HandleOwner> DataObjectHandle<S> {
             _ => bail!(FxfsError::NotFile),
         }
     }
+
+    // Returns the contents of this object. This object must be < |limit| bytes in size.
+    pub async fn contents(&self, limit: usize) -> Result<Box<[u8]>, Error> {
+        let size = self.get_size();
+        if size > limit as u64 {
+            bail!("Object too big ({} > {})", size, limit);
+        }
+        let mut buf = self.allocate_buffer(size as usize);
+        self.read(0u64, buf.as_mut()).await?;
+        Ok(buf.as_slice().into())
+    }
 }
 
 impl<S: HandleOwner> AssociatedObject for DataObjectHandle<S> {

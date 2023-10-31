@@ -20,7 +20,7 @@ use {
             },
             LSMTree, LayerSet,
         },
-        object_handle::{ObjectHandle, ObjectHandleExt, ReadObjectHandle, INVALID_OBJECT_ID},
+        object_handle::{ObjectHandle, ReadObjectHandle, INVALID_OBJECT_ID},
         object_store::{
             object_manager::ReservationUpdate,
             transaction::{

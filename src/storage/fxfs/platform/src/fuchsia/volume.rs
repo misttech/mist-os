@@ -650,7 +650,7 @@ mod tests {
         fxfs::{
             filesystem::FxFilesystem,
             fsck::{fsck, fsck_volume},
-            object_handle::{ObjectHandle, ObjectHandleExt},
+            object_handle::ObjectHandle,
             object_store::{
                 transaction::{lock_keys, Options},
                 volume::root_volume,
