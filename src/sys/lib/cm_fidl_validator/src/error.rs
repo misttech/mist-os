@@ -372,10 +372,6 @@ pub enum DeclType {
     UseService,
     UseStorage,
     VoidRef,
-
-    // TODO(fxbug.dev/126609): These will be generated when fuchsia.component.config goes away.
-    ValueSpec,
-    ValuesData,
 }
 
 impl fmt::Display for DeclType {
@@ -468,10 +464,6 @@ impl fmt::Display for DeclType {
             DeclType::UseService => "UseService",
             DeclType::UseStorage => "UseStorage",
             DeclType::VoidRef => "VoidRef",
-
-            // TODO(fxbug.dev/126609): These will be generated when fuchsia.component.config goes away.
-            DeclType::ValueSpec => "ValueSpec",
-            DeclType::ValuesData => "ValuesData",
         };
         write!(f, "{}", name)
     }
