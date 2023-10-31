@@ -1635,6 +1635,9 @@ struct dirent* readdir(DIR* dir) {
       if (protocols & ZXIO_NODE_PROTOCOL_FILE) {
         return DT_REG;
       }
+      if (protocols & ZXIO_NODE_PROTOCOL_SYMLINK) {
+        return DT_LNK;
+      }
       if (protocols & ZXIO_NODE_PROTOCOL_CONNECTOR) {
         // There is no good analogue for FIDL services in POSIX land.
         return DT_UNKNOWN;

@@ -950,7 +950,7 @@ mod tests {
             },
         },
         assert_matches::assert_matches,
-        fidl::endpoints::{create_proxy, Proxy, ServerEnd},
+        fidl::endpoints::{create_proxy, ClientEnd, Proxy, ServerEnd},
         fidl_fuchsia_io as fio, fuchsia_async as fasync,
         fuchsia_fs::directory::{DirEntry, DirentKind},
         fuchsia_fs::file,
@@ -958,7 +958,14 @@ mod tests {
         futures::StreamExt,
         fxfs::object_store::Timestamp,
         rand::Rng,
-        std::{os::fd::AsRawFd, sync::Arc, time::Duration},
+        std::{
+            os::fd::AsRawFd,
+            sync::{
+                atomic::{AtomicU64, Ordering},
+                Arc,
+            },
+            time::Duration,
+        },
         storage_device::{fake_device::FakeDevice, DeviceHolder},
         vfs::{common::rights_to_posix_mode_bits, node::Node, path::Path},
     };
@@ -1842,6 +1849,54 @@ mod tests {
                     unsafe { libc::fstatat(root.as_raw_fd(), name.as_ptr(), &mut stat, 0) },
                     0
                 );
+            })
+            .await;
+        }
+
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_remove_dir_all_with_symlink() {
+        // This test makes sure that remove_dir_all works.  At time of writing remove_dir_all uses
+        // d_type from the directory entry to determine whether or not to recurse into directories,
+        // so this tests that is working correctly.
+
+        let fixture = TestFixture::new().await;
+
+        {
+            let root = fixture.root();
+
+            let dir = open_dir_checked(
+                &root,
+                fio::OpenFlags::CREATE
+                    | fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::DIRECTORY,
+                "dir",
+            )
+            .await;
+
+            dir.create_symlink("symlink", b"target", None)
+                .await
+                .expect("FIDL call failed")
+                .expect("create_symlink failed");
+
+            let namespace = fdio::Namespace::installed().expect("Unable to get namespace");
+            static COUNTER: AtomicU64 = AtomicU64::new(0);
+            let path = format!("/test_symlink_stat.{}", COUNTER.fetch_add(1, Ordering::Relaxed));
+            let root = fuchsia_fs::directory::clone_no_describe(root, None)
+                .expect("clone_no_describe failed");
+            namespace
+                .bind(&path, ClientEnd::new(root.into_channel().unwrap().into_zx_channel()))
+                .expect("bind failed");
+            let path_copy = path.clone();
+            scopeguard::defer!({
+                let _ = namespace.unbind(&path_copy);
+            });
+
+            fasync::unblock(move || {
+                assert_matches!(std::fs::remove_dir_all(&format!("{path}/dir")), Ok(()));
             })
             .await;
         }
