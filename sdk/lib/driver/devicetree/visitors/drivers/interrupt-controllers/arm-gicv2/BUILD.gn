@@ -11,6 +11,10 @@ group("tests") {
   testonly = true
 }
 
+devicetree_visitor("arm-gicv2") {
+  deps = [ ":arm-gicv2-visitor" ]
+}
+
 source_set("arm-gicv2-visitor") {
   sources = [ "arm-gicv2-visitor.cc" ]
   deps = [
