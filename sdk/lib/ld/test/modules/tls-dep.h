@@ -13,6 +13,10 @@ constexpr int kTlsDepDataValue = 42;
 extern thread_local int tls_dep_data;
 extern thread_local char tls_dep_bss[2];
 
+int* get_tls_dep_data();
+char* get_tls_dep_bss1();
+int* get_tls_dep_weak();
+
 // Since tls_dep_bss is what's aligned, the tls_bss_size includes the alignment
 // padding between the end of .tdata (containing only tls_dep_data) and the
 // aligned start of .tbss (containing tls_dep_bss).

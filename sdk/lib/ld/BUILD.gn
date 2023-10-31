@@ -54,6 +54,15 @@ config("abi-interp") {
   ldflags = [ "-Wl,-dynamic-linker=${toolchain_variant.libprefix}$abi_soname" ]
 }
 
+# This provides the __tls_get_addr ABI symbol used by TLS GD accesses when
+# TLSDESC is not in use.  This implementation uses the passive ABI to resolve
+# references in the initial exec set's static TLS layout.  A different
+# implementation would be required to also support post-startup modules.
+source_set("static-tls-get-addr") {
+  sources = [ "static-tls-get-addr.cc" ]
+  deps = [ "." ]
+}
+
 # `verify_ld_abi(ld) {}` defines "$ld.verify-abi" to check that the
 # shared_library(ld) or loadable_module(ld) matches the passive ABI.
 template("verify_ld_abi") {

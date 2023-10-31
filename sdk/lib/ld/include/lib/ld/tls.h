@@ -55,6 +55,18 @@ struct Abi<Elf, AbiTraits>::TlsModule {
   Addr tls_alignment = 0;
 };
 
+// This is the symbol that compilers generate calls to for GD/LD TLS accesses
+// in the original ABI (without TLSDESC).  Its linkage name is known to the
+// compiler and the linker.  This is not actually implemented by ld.so, but
+// must be supplied by something in the dependency graph of a program that uses
+// old-style TLS.  The implementation in libc or libdl or suchlike can use the
+// `_ld_abi.static_tls_offsets` data to handle TLS module IDs in the
+// initial-exec set, e.g. via ld::TlsInitialExecOffset (see below).
+extern "C" void* __tls_get_addr(const elfldltl::Elf<>::TlsGetAddrGot& got);
+
+// The standard symbol name with hash value cached statically.
+inline constexpr elfldltl::SymbolName kTlsGetAddrSymbol{"__tls_get_addr"};
+
 }  // namespace abi
 
 // Fetch the current thread pointer with the given byte offset.

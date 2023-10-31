@@ -175,16 +175,22 @@ constexpr bool RelocateSymbolic(Memory& memory, DiagnosticsType& diagnostics,
            apply_with_addend(reloc, defn.symbol().value() + defn.static_tls_bias());
   };
 
-  // TLSMOD relocs resolve to a module ID (index), not an address value.
-  // This is stored in a GOT slot to be passed to __tls_get_addr.
+  // TLSMOD relocs resolve to a module ID (index), not an address value.  This
+  // is stored in a GOT slot to be passed to __tls_get_addr.  Consistent with
+  // the glibc behavior, an undefined weak symbol results in not applying the
+  // relocation at all, leaving the slot to yield module ID zero.  The glibc
+  // __tls_get_addr will not handle that well--it's really not expected to be
+  // called at all when the symbol is an undefined weak, so nothing should
+  // really care what's in the GOT slots.
   auto tls_module = [apply_no_addend](const auto& reloc, const auto& defn) {
-    return apply_no_addend(reloc, defn.tls_module_id());
+    return defn.undefined_weak() || apply_no_addend(reloc, defn.tls_module_id());
   };
 
   // Dynamic TLS relocs resolve to an offset into the defining module's TLS
-  // segment, stored in a GOT slot to be passed to __tls_get_addr.
+  // segment, stored in a GOT slot to be passed to __tls_get_addr.  The
+  // undefined weak case is as for tls_module (above), see comments there.
   auto tls_relative = [apply_with_addend](const auto& reloc, const auto& defn) {
-    return apply_with_addend(reloc, defn.symbol().value());
+    return defn.undefined_weak() || apply_with_addend(reloc, defn.symbol().value());
   };
 
   // Each TLSDESC reloc acts like two relocs to consecutive GOT slots: first

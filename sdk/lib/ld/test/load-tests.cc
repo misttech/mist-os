@@ -228,4 +228,26 @@ TYPED_TEST(LdLoadTests, TlsInitialExecAccess) {
   this->ExpectLog("");
 }
 
+TYPED_TEST(LdLoadTests, TlsGlobalDynamicAccess) {
+  constexpr int64_t kReturnValue = 17;
+  constexpr int64_t kSkipReturnValue = 77;
+
+  ASSERT_NO_FATAL_FAILURE(this->Init());
+
+  ASSERT_NO_FATAL_FAILURE(this->Needed({"libtls-dep.so"}));
+
+  ASSERT_NO_FATAL_FAILURE(this->Load("tls-gd"));
+
+  const int64_t return_value = this->Run();
+
+  // Check the log before the return value so we've handled it in case we skip.
+  this->ExpectLog("");
+
+  if (return_value == kSkipReturnValue) {
+    GTEST_SKIP() << "tls-gd module compiled with TLSDESC";
+  }
+
+  EXPECT_EQ(return_value, kReturnValue);
+}
+
 }  // namespace

@@ -26,6 +26,7 @@ in_process_executables = [
   ":tls-shlib-only",
   ":tls-exec-shlib",
   ":tls-ie",
+  ":tls-gd",
 ]
 
 # Everything in this list does not have can_be_in_process = true.
@@ -209,12 +210,20 @@ template("test_shared_library") {
   shared_library(target_name) {
     ldflags = []
     public_deps = [ "//sdk/lib/ld:standalone" ]
-    forward_variables_from(invoker, "*", [ "remove_configs" ])
+    forward_variables_from(invoker,
+                           "*",
+                           [
+                             "configs",
+                             "remove_configs",
+                           ])
 
     if (is_linux) {
       configs -= [ "//build/config/linux:implicit-host-libs" ]
     }
     configs += [ ":nostdlibs" ]
+    if (defined(invoker.configs)) {
+      configs += invoker.configs
+    }
 
     if (defined(invoker.remove_configs)) {
       configs += invoker.remove_configs
@@ -425,7 +434,15 @@ test_executable("tls-shlib-only") {
 test_shared_library("tls-dep") {
   public = [ "tls-dep.h" ]
   sources = [ "tls-dep.cc" ]
-  deps = [ "//zircon/system/public" ]
+  configs = [ "//build/config:no-tlsdesc" ]
+  deps = [
+    "//sdk/lib/ld:static-tls-get-addr",
+    "//zircon/system/public",
+  ]
+
+  # TODO(fxbug.dev/135809): LTO insists on using IE accesses here. Remove this
+  # when the LLVM bug gets fixed and the fixed toolchain rolled into Fuchsia.
+  remove_configs = [ "//build/config/lto" ]
 }
 
 test_executable("tls-exec-shlib") {
@@ -464,4 +481,14 @@ test_shared_library("tls-ie-dep") {
   # TODO(fxbug.dev/135809): LTO insists on using LE accesses. Remove this when
   # the LLVM bug gets fixed and the fixed toolchain rolled into Fuchsia.
   remove_configs = [ "//build/config/lto" ]
+}
+
+test_executable("tls-gd") {
+  can_be_in_process = true
+  sources = [ "tls-gd.cc" ]
+  configs = [ "//build/config:no-tlsdesc" ]
+  deps = [
+    ":tls-dep",
+    "../..",
+  ]
 }

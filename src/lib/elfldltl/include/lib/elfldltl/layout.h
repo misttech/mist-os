@@ -439,6 +439,17 @@ struct Elf : private Layout<Class, Data> {
     SignedField<size_type, kSwap> addend;
   };
 
+  // When the compiler generates a call to __tls_get_addr, the linker
+  // generates two corresponding dynamic relocation entries applying to
+  // adjacent GOT slots that form a pair describing what module and symbol
+  // resolved the reference at dynamic link time.  The first slot holds the
+  // module ID, a 1-origin index.  The second slot holds the offset from
+  // that module's PT_TLS segment.
+  struct TlsGetAddrGot {
+    Addr tls_modid;  // R_*_DTPMOD* et al relocations set this.
+    Addr offset;     // R_*_DTPOFF* et al relocations set this.
+  };
+
   // These are declared in svr4-abi.h rather than there.  These are not
   // formally parts of the ELF format, but rather de facto standard ABI types
   // from the original SVR4 implementation that introduced ELF that have been
