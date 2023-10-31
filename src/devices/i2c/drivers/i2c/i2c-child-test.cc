@@ -4,6 +4,7 @@
 
 #include "i2c-child.h"
 
+#include <lib/async-loop/cpp/loop.h>
 #include <lib/ddk/metadata.h>
 
 #include <algorithm>
@@ -55,15 +56,11 @@ class FakeI2cImpl : public ddk::I2cImplProtocol<FakeI2cImpl> {
 class I2cChildTest : public zxtest::Test {
  public:
   void TearDown() override {
-    // Destruction must happen on the framework dispatcher.
-    auto result = fdf::RunOnDispatcherSync(dispatcher_->async_dispatcher(), [this]() {
-      device_async_remove(fake_root_->GetLatestChild());
-      for (auto& child : fake_root_->GetLatestChild()->children()) {
-        device_async_remove(child.get());
-      }
-      EXPECT_OK(mock_ddk::ReleaseFlaggedDevices(fake_root_.get()));
-    });
-    EXPECT_TRUE(result.is_ok());
+    device_async_remove(fake_root_->GetLatestChild());
+    for (auto& child : fake_root_->GetLatestChild()->children()) {
+      device_async_remove(child.get());
+    }
+    EXPECT_OK(mock_ddk::ReleaseFlaggedDevices(fake_root_.get()));
   }
 
  protected:
@@ -72,6 +69,15 @@ class I2cChildTest : public zxtest::Test {
     fidl::WireSyncClient<fuchsia_hardware_i2c::Device> client{};
     GetI2cChildClient(i2c, name, &client, bus_id);
     return client;
+  }
+
+  // Because this test is using a fidl::WireSyncClient, we need to run any ops on the client on
+  // their own thread because the testing thread is shared with the fidl::Server<fi2c::Device>.
+  static void RunSyncClientTask(fit::closure task) {
+    async::Loop loop{&kAsyncLoopConfigNeverAttachToThread};
+    loop.StartThread();
+    zx::result result = fdf::RunOnDispatcherSync(loop.dispatcher(), std::move(task));
+    ASSERT_EQ(ZX_OK, result.status_value());
   }
 
  private:
@@ -111,32 +117,17 @@ class I2cChildTest : public zxtest::Test {
 
     *client = fidl::WireSyncClient<fuchsia_hardware_i2c::Device>(std::move(endpoints->client));
 
-    {
-      auto result = fdf::RunOnDispatcherSync(dispatcher_->async_dispatcher(), [&]() {
-        EXPECT_OK(I2cDevice::Create(nullptr, fake_root_.get()));
-      });
-
-      EXPECT_TRUE(result.is_ok());
-    }
+    EXPECT_OK(I2cDevice::Create(nullptr, fake_root_.get()));
 
     ASSERT_EQ(fake_root_->child_count(), 1);
     zx_device_t* i2c_root = fake_root_->GetLatestChild();
 
-    {
-      auto result = fdf::RunOnDispatcherSync(
-          dispatcher_->async_dispatcher(), [=, server = std::move(endpoints->server)]() mutable {
-            auto* const i2c_child = i2c_root->GetLatestChild()->GetDeviceContext<I2cChild>();
-            i2c_child->Bind(std::move(server));
-          });
-      EXPECT_TRUE(result.is_ok());
-    }
+    auto* const i2c_child = i2c_root->GetLatestChild()->GetDeviceContext<I2cChild>();
+    i2c_child->Bind(std::move(endpoints->server));
   }
 
   // TODO(fxb/124464): Migrate test to use dispatcher integration.
-  std::shared_ptr<zx_device> fake_root_{
-      MockDevice::FakeRootParentNoDispatcherIntegrationDEPRECATED()};
-  fdf_testing::DriverRuntime runtime_;
-  fdf::UnownedSynchronizedDispatcher dispatcher_ = runtime_.StartBackgroundDispatcher();
+  std::shared_ptr<zx_device> fake_root_{MockDevice::FakeRootParent()};
 };
 
 TEST_F(I2cChildTest, Write3BytesOnce) {
@@ -170,10 +161,11 @@ TEST_F(I2cChildTest, Write3BytesOnce) {
   transactions[0] =
       fidl_i2c::wire::Transaction::Builder(arena).data_transfer(write_transfer).Build();
 
-  auto read = client_wrap->Transfer(transactions);
-
-  ASSERT_OK(read.status());
-  ASSERT_FALSE(read->is_error());
+  RunSyncClientTask([&]() {
+    auto read = client_wrap->Transfer(transactions);
+    ASSERT_OK(read.status());
+    ASSERT_FALSE(read->is_error());
+  });
 }
 
 TEST_F(I2cChildTest, Read3BytesOnce) {
@@ -203,15 +195,17 @@ TEST_F(I2cChildTest, Read3BytesOnce) {
   transactions[0] =
       fidl_i2c::wire::Transaction::Builder(arena).data_transfer(read_transfer).Build();
 
-  auto read = client_wrap->Transfer(transactions);
-  ASSERT_OK(read.status());
-  ASSERT_FALSE(read->is_error());
-  ASSERT_EQ(read->value()->read_data.count(), 1);
+  RunSyncClientTask([&]() {
+    auto read = client_wrap->Transfer(transactions);
+    ASSERT_OK(read.status());
+    ASSERT_FALSE(read->is_error());
+    ASSERT_EQ(read->value()->read_data.count(), 1);
 
-  auto* read_data = read->value()->read_data[0].data();
-  ASSERT_EQ(read_data[0], kTestRead0);
-  ASSERT_EQ(read_data[1], kTestRead1);
-  ASSERT_EQ(read_data[2], kTestRead2);
+    auto* read_data = read->value()->read_data[0].data();
+    ASSERT_EQ(read_data[0], kTestRead0);
+    ASSERT_EQ(read_data[1], kTestRead1);
+    ASSERT_EQ(read_data[2], kTestRead2);
+  });
 }
 
 TEST_F(I2cChildTest, Write1ByteOnceRead1Byte3Times) {
@@ -263,14 +257,16 @@ TEST_F(I2cChildTest, Write1ByteOnceRead1Byte3Times) {
                         .data_transfer(fidl_i2c::wire::DataTransfer::WithReadSize(1))
                         .Build();
 
-  auto read = client_wrap->Transfer(transactions);
-  ASSERT_OK(read.status());
-  ASSERT_FALSE(read->is_error());
+  RunSyncClientTask([&]() {
+    auto read = client_wrap->Transfer(transactions);
+    ASSERT_OK(read.status());
+    ASSERT_FALSE(read->is_error());
 
-  auto& read_data = read->value()->read_data;
-  ASSERT_EQ(read_data[0].data()[0], kTestRead0);
-  ASSERT_EQ(read_data[1].data()[0], kTestRead1);
-  ASSERT_EQ(read_data[2].data()[0], kTestRead2);
+    auto& read_data = read->value()->read_data;
+    ASSERT_EQ(read_data[0].data()[0], kTestRead0);
+    ASSERT_EQ(read_data[1].data()[0], kTestRead1);
+    ASSERT_EQ(read_data[2].data()[0], kTestRead2);
+  });
 }
 
 TEST_F(I2cChildTest, StopFlagPropagates) {
@@ -319,9 +315,11 @@ TEST_F(I2cChildTest, StopFlagPropagates) {
                         .stop(false)
                         .Build();
 
-  auto read = client_wrap->Transfer(transactions);
-  ASSERT_OK(read.status());
-  ASSERT_FALSE(read.value().is_error());
+  RunSyncClientTask([&]() {
+    auto read = client_wrap->Transfer(transactions);
+    ASSERT_OK(read.status());
+    ASSERT_FALSE(read.value().is_error());
+  });
 }
 
 TEST_F(I2cChildTest, BadTransfers) {
@@ -334,9 +332,11 @@ TEST_F(I2cChildTest, BadTransfers) {
     fidl::Arena arena;
     auto transactions = fidl::VectorView<fidl_i2c::wire::Transaction>(arena, 0);
 
-    auto read = client_wrap->Transfer(transactions);
-    ASSERT_OK(read.status());
-    ASSERT_TRUE(read->is_error());
+    RunSyncClientTask([&]() {
+      auto read = client_wrap->Transfer(transactions);
+      ASSERT_OK(read.status());
+      ASSERT_TRUE(read->is_error());
+    });
   }
 
   {
@@ -350,9 +350,11 @@ TEST_F(I2cChildTest, BadTransfers) {
 
     transactions[1] = fidl_i2c::wire::Transaction::Builder(arena).stop(true).Build();
 
-    auto read = client_wrap->Transfer(transactions);
-    ASSERT_OK(read.status());
-    ASSERT_TRUE(read->is_error());
+    RunSyncClientTask([&]() {
+      auto read = client_wrap->Transfer(transactions);
+      ASSERT_OK(read.status());
+      ASSERT_TRUE(read->is_error());
+    });
   }
 
   {
@@ -368,9 +370,11 @@ TEST_F(I2cChildTest, BadTransfers) {
                           .data_transfer(fidl_i2c::wire::DataTransfer::WithReadSize(0))
                           .Build();
 
-    auto read = client_wrap->Transfer(transactions);
-    ASSERT_OK(read.status());
-    ASSERT_TRUE(read->is_error());
+    RunSyncClientTask([&]() {
+      auto read = client_wrap->Transfer(transactions);
+      ASSERT_OK(read.status());
+      ASSERT_TRUE(read->is_error());
+    });
   }
 
   {
@@ -391,9 +395,11 @@ TEST_F(I2cChildTest, BadTransfers) {
                           .data_transfer(fidl_i2c::wire::DataTransfer::WithWriteData(arena, write1))
                           .Build();
 
-    auto read = client_wrap->Transfer(transactions);
-    ASSERT_OK(read.status());
-    ASSERT_TRUE(read->is_error());
+    RunSyncClientTask([&]() {
+      auto read = client_wrap->Transfer(transactions);
+      ASSERT_OK(read.status());
+      ASSERT_TRUE(read->is_error());
+    });
   }
 }
 
@@ -404,11 +410,13 @@ TEST_F(I2cChildTest, GetNameTest) {
   auto client_wrap = GetI2cChildClient(i2c.GetClient(), kTestName.c_str());
   ASSERT_TRUE(client_wrap.is_valid());
 
-  auto name = client_wrap->GetName();
-  ASSERT_OK(name.status());
-  ASSERT_FALSE(name->is_error());
+  RunSyncClientTask([&]() {
+    auto name = client_wrap->GetName();
+    ASSERT_OK(name.status());
+    ASSERT_FALSE(name->is_error());
 
-  ASSERT_EQ(std::string(name->value()->name.get()), kTestName);
+    ASSERT_EQ(std::string(name->value()->name.get()), kTestName);
+  });
 }
 
 TEST_F(I2cChildTest, GetEmptyNameTest) {
@@ -416,11 +424,13 @@ TEST_F(I2cChildTest, GetEmptyNameTest) {
   auto client_wrap = GetI2cChildClient(i2c.GetClient(), "");
   ASSERT_TRUE(client_wrap.is_valid());
 
-  auto name = client_wrap->GetName();
-  ASSERT_OK(name.status());
+  RunSyncClientTask([&]() {
+    auto name = client_wrap->GetName();
+    ASSERT_OK(name.status());
 
-  // Empty string here means this endpoint returns an error.
-  ASSERT_TRUE(name->is_error());
+    // Empty string here means this endpoint returns an error.
+    ASSERT_TRUE(name->is_error());
+  });
 }
 
 TEST_F(I2cChildTest, HugeTransfer) {
@@ -456,15 +466,17 @@ TEST_F(I2cChildTest, HugeTransfer) {
   transactions[1] =
       fidl_i2c::wire::Transaction::Builder(arena).data_transfer(read_transfer).Build();
 
-  auto read = client_wrap->Transfer(transactions);
+  RunSyncClientTask([&]() {
+    auto read = client_wrap->Transfer(transactions);
 
-  ASSERT_OK(read.status());
-  ASSERT_FALSE(read->is_error());
+    ASSERT_OK(read.status());
+    ASSERT_FALSE(read->is_error());
 
-  ASSERT_EQ(read->value()->read_data.count(), 1);
-  ASSERT_EQ(read->value()->read_data[0].count(), 1024);
-  cpp20::span data(read->value()->read_data[0].data(), read->value()->read_data[0].count());
-  EXPECT_TRUE(std::all_of(data.begin(), data.end(), [](uint8_t b) { return b == 'r'; }));
+    ASSERT_EQ(read->value()->read_data.count(), 1);
+    ASSERT_EQ(read->value()->read_data[0].count(), 1024);
+    cpp20::span data(read->value()->read_data[0].data(), read->value()->read_data[0].count());
+    EXPECT_TRUE(std::all_of(data.begin(), data.end(), [](uint8_t b) { return b == 'r'; }));
+  });
 }
 
 }  // namespace i2c

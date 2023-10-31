@@ -69,24 +69,19 @@ class I2cMetadataTest : public zxtest::Test {
  public:
   void SetUp() override {
     // TODO(fxb/124464): Migrate test to use dispatcher integration.
-    fake_root_ = MockDevice::FakeRootParentNoDispatcherIntegrationDEPRECATED();
+    fake_root_ = MockDevice::FakeRootParent();
   }
 
   void TearDown() override {
-    auto result =
-        fdf::RunOnDispatcherSync(dispatcher_->async_dispatcher(), [parent = fake_root_.get()]() {
-          for (auto& device : parent->children()) {
-            device_async_remove(device.get());
-          }
+    auto* parent = fake_root_.get();
+    for (auto& device : parent->children()) {
+      device_async_remove(device.get());
+    }
 
-          mock_ddk::ReleaseFlaggedDevices(parent);
-        });
-    EXPECT_TRUE(result.is_ok());
+    mock_ddk::ReleaseFlaggedDevices(parent);
   }
 
  protected:
-  fdf_testing::DriverRuntime runtime_;
-  fdf::UnownedSynchronizedDispatcher dispatcher_ = runtime_.StartBackgroundDispatcher();
   std::shared_ptr<zx_device> fake_root_;
 };
 
@@ -98,40 +93,26 @@ TEST_F(I2cMetadataTest, ProvidesMetadataToChildren) {
 
   auto impl = FakeI2cImpl::Create(fake_root_.get(), std::move(channels));
 
-  {
-    auto result =
-        fdf::RunOnDispatcherSync(dispatcher_->async_dispatcher(), [parent = impl->zxdev()]() {
-          // Make the fake I2C driver.
-          ASSERT_OK(i2c::I2cDevice::Create(nullptr, parent));
-        });
-    EXPECT_TRUE(result.is_ok());
-  }
+  ASSERT_OK(i2c::I2cDevice::Create(nullptr, impl->zxdev()));
 
   // Check the number of devices we have makes sense.
   ASSERT_EQ(impl->zxdev()->child_count(), 1);
 
-  // I2cDevice::Create has posted a task to create children on its dispatcher. Verify device
-  // properties on that dispatcher to ensure we are running after the children have been added.
-  {
-    auto result = fdf::RunOnDispatcherSync(dispatcher_->async_dispatcher(), [impl]() {
-      zx_device_t* i2c = impl->zxdev()->GetLatestChild();
-      // There should be two devices per channel.
-      ASSERT_EQ(i2c->child_count(), 2);
+  zx_device_t* i2c = impl->zxdev()->GetLatestChild();
+  // There should be two devices per channel.
+  ASSERT_EQ(i2c->child_count(), 2);
 
-      for (auto& child : i2c->children()) {
-        uint16_t expected_addr = 0xff;
-        for (const auto& prop : child->GetProperties()) {
-          if (prop.id == BIND_I2C_ADDRESS) {
-            expected_addr = static_cast<uint16_t>(prop.value);
-          }
-        }
-
-        auto decoded =
-            ddk::GetEncodedMetadata<fi2c::I2CChannel>(child.get(), DEVICE_METADATA_I2C_DEVICE);
-        ASSERT_TRUE(decoded.is_ok());
-        ASSERT_EQ(decoded->address(), expected_addr);
+  for (auto& child : i2c->children()) {
+    uint16_t expected_addr = 0xff;
+    for (const auto& prop : child->GetProperties()) {
+      if (prop.id == BIND_I2C_ADDRESS) {
+        expected_addr = static_cast<uint16_t>(prop.value);
       }
-    });
-    EXPECT_TRUE(result.is_ok());
+    }
+
+    auto decoded =
+        ddk::GetEncodedMetadata<fi2c::I2CChannel>(child.get(), DEVICE_METADATA_I2C_DEVICE);
+    ASSERT_TRUE(decoded.is_ok());
+    ASSERT_EQ(decoded->address(), expected_addr);
   }
 }
