@@ -67,9 +67,22 @@ source_set("static-tls-get-addr") {
 # shared_library(ld) or loadable_module(ld) matches the passive ABI.
 template("verify_ld_abi") {
   ld_target = target_name
-  extract_target = "$ld_target.ifs"
   verify_target = "$ld_target.verify-abi"
+  extract_target = "$ld_target.ifs"
   ifs_file = "$target_out_dir/$extract_target"
+
+  if (defined(invoker.variant_target)) {
+    # Do variant selection as if for the ld_target, approximately.
+    variant_selection_target = verify_target
+    verify_target += ".variant"
+    variant_target("group") {
+      visibility = [ "./*" ]
+      target_type = invoker.variant_target
+      target_name = variant_selection_target
+      variant_shared_redirection = true
+      data_deps = [ ":$verify_target" ]
+    }
+  }
 
   ifs_extract(extract_target) {
     visibility = [ ":*" ]
@@ -79,7 +92,7 @@ template("verify_ld_abi") {
   }
 
   verify_public_symbols(verify_target) {
-    visibility = [ ":*" ]
+    visibility = [ "./*" ]
     forward_variables_from(invoker, [ "testonly" ])
     deps = [ ":$extract_target" ]
     current = ifs_file
@@ -107,7 +120,15 @@ loadable_module("ld-stub") {
   exclude_toolchain_tags = [ "instrumented" ]
 }
 
+# This redirects to the user.basic toolchain where ld-stub.so should be built.
+# It only serves to get it built and reached via data_deps so it will be
+# included in a package.
+user_basic_redirect("ld-stub.basic") {
+  public_deps = [ ":ld-stub.verify-abi" ]
+}
+
 verify_ld_abi("ld-stub") {
+  variant_target = "loadable_module"
 }
 
 source_set("abi") {
@@ -308,21 +329,16 @@ user_basic_redirect("ld-startup.basic") {
   public_deps = [ ":ld-startup" ]
 }
 
-verify_ld_abi("ld-startup.basic") {
-}
-
-user_basic_redirect("verify-abi") {
-  public_deps = [
-    ":ld-startup.basic.verify-abi",
-    ":ld-stub.verify-abi",
-  ]
+# This is reached from test:ld-startup.test-data, where it will be instantiated
+# in each environment and variant for which any tests are built.
+verify_ld_abi("ld-startup") {
 }
 
 group("tests") {
   testonly = true
 
   deps = [
-    ":verify-abi",
+    ":ld-stub.basic",  # This just gets it built and its ABI verified.
     "test:tests",
   ]
 }

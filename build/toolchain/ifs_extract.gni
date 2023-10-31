@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/toolchain/zircon/gcc.gni")
 import("//build/zircon/c_utils.gni")
 
 # Extract a text ABI (.ifs) specification file from a binary.
@@ -60,7 +61,7 @@ template("ifs_extract") {
     sources = [ rspfile ]
     deps = [ ":$rspfile_target" ]
     outputs = ifs_outputs
-    args = ifs_args
+    args = ifs_args + ifs_extra_switches
     args += [
       "--input-format=ELF",
       "--write-if-changed",

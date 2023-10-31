@@ -204,5 +204,9 @@ if (!is_fuchsia) {
   group("ld-startup.test-data") {
     testonly = true
     public_deps = [ "..:ld-startup" ]
+
+    # This gets the verification done on each variant that's being used by one
+    # or more tests.
+    data_deps = [ "..:ld-startup.verify-abi" ]
   }
 }
