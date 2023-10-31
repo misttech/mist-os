@@ -33,6 +33,11 @@
             to: "#starnix_runner",
         },
         {
+            protocol: [ "fuchsia.buildinfo.Provider" ],
+            from: "#build-info",
+            to: "#starnix_runner",
+        },
+        {
             protocol: [ "fuchsia.net.root.Interfaces_OnlyForStarnix" ],
             from: "#network",
             as: "fuchsia.net.root.Interfaces",

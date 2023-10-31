@@ -44,11 +44,13 @@
         },
         {
             protocol: [
+                "fuchsia.buildinfo.Provider",
                 "fuchsia.kernel.Stats",
                 "fuchsia.kernel.VmexResource",
                 "fuchsia.sysinfo.SysInfo",
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.sysmem2.Allocator",
+                "fuchsia.tracing.controller.Controller",
                 "fuchsia.vulkan.loader.Loader",
             ],
             from: "parent",

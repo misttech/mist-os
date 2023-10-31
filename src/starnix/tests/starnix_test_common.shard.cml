@@ -38,6 +38,7 @@
     offer: [
         {
             protocol: [
+                "fuchsia.buildinfo.Provider",
                 "fuchsia.kernel.Stats",
                 "fuchsia.kernel.VmexResource",
                 "fuchsia.logger.LogSink",
