@@ -678,7 +678,7 @@ zx_status_t Device::Start(const rust_wlan_softmac_ifc_protocol_copy_t* ifc,
   // called in the handler functions of FIDL server end.
   wlan_softmac_ifc_protocol_ops_.reset(new wlan_softmac_ifc_protocol_ops_t{
       .recv = ifc->ops->recv,
-      .report_tx_result = ifc->ops->report_tx_status,
+      .report_tx_result = ifc->ops->report_tx_result,
       .notify_scan_complete = ifc->ops->scan_complete,
   });
 
