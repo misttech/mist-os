@@ -89,14 +89,16 @@ class CatapultConverter:
             fuchsia_expected_metric_names_dest_dir
         )
 
-        # Go four directories up. We expect the binary to be in a
-        # `runtime_deps` directory hosting the test cases.
-        self._runtime_deps_dir = os.path.join(
-            os.path.dirname(
-                os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-            ),
-            "runtime_deps",
-        )
+        # We expect the binary to be in a `runtime_deps` directory hosting the test cases in a
+        # parent directory.
+        cur_path: str = os.path.dirname(__file__)
+        while not os.path.isdir(os.path.join(cur_path, "runtime_deps")):
+            cur_path = os.path.dirname(cur_path)
+            if cur_path == "/":
+                raise ValueError(
+                    "Couldn't find required runtime_deps directory"
+                )
+        self._runtime_deps_dir = os.path.join(cur_path, "runtime_deps")
 
         self._upload_enabled: bool = True
         if master is None and bot is None:

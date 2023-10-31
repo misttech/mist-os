@@ -4,9 +4,9 @@
 
 import("//build/dart/dart_library.gni")
 import("//build/dart/test.gni")
-import("//build/python/python_mobly_test.gni")
 import("//build/testing/environments.gni")
 import("//build/testing/host_test_data.gni")
+import("//src/tests/end_to_end/perf/python_perf_test.gni")
 
 # This directory contains Dart wrappers for running performance tests
 # that are defined elsewhere in the Fuchsia tree.
@@ -183,31 +183,37 @@ foreach(test, shard_test_list) {
   }
 }
 
-lacewing_test_list = [
-  "flatland_benchmark",
-  "input_latency_benchmark",
-  "perf_publish_example",
-]
+_all_python_benchmarks = []
 
 if (is_host) {
-  foreach(test_name, lacewing_test_list) {
-    python_mobly_test("py_$test_name") {
-      main_source = "test/$test_name.py"
-      libraries = [
-        "//src/performance/lib/perf_publish",
-        "//src/testing/end_to_end/honeydew",
-        "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
+  _tests = [
+    {
+      name = "flatland_benchmark"
+      expected_metric_filenames = [
+        # TODO(b/305080561): enable trace publishing and add this expected metric names.
+        # "fuchsia.flatland_latency.txt"
       ]
-
-      deps = [ ":runtime_deps" ]
-
-      test_dir = "${target_gen_dir}/${target_name}"
-
-      environments = [
-        nuc_env,
-        vim3_env,
+    },
+    {
+      name = "input_latency_benchmark"
+      expected_metric_filenames = [
+        # TODO(b/305080563): enable trace publishing and add this expected metric names.
+        # "fuchsia.input_latency.simplest_app.txt"
       ]
+    },
+    {
+      name = "perf_publish_example"
+      expected_metric_filenames = [ "fuchsia.example.txt" ]
+    },
+  ]
+
+  foreach(test, _tests) {
+    _name = test.name
+    python_perf_test("py_${_name}") {
+      main_source = "test/${_name}.py"
+      expected_metric_filenames = test.expected_metric_filenames
     }
+    _all_python_benchmarks += [ ":py_${_name}($host_toolchain)" ]
   }
 
   metric_files = [
@@ -219,7 +225,6 @@ if (is_host) {
     "fuchsia.diagnostics_log_rust.core.txt",
     "fuchsia.diagnostics_log_rust.encoding.txt",
     "fuchsia.driver_runtime_microbenchmarks.txt",
-    "fuchsia.example.txt",
     "fuchsia.extended_pstate.txt",
     "fuchsia.fidl_microbenchmarks.cpp.txt",
     "fuchsia.fidl_microbenchmarks.driver_cpp.txt",
@@ -372,14 +377,10 @@ group("package_deps") {
 group("test") {
   testonly = true
 
-  deps = [ ":package_deps" ]
+  deps = [ ":package_deps" ] + _all_python_benchmarks
 
   foreach(target_name, test_list) {
     deps += [ ":$target_name($host_toolchain)" ]
-  }
-
-  foreach(target_name, lacewing_test_list) {
-    deps += [ ":py_$target_name($host_toolchain)" ]
   }
 }
 
