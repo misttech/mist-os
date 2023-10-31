@@ -223,21 +223,6 @@ driver_bind_rules("nelson_aml_video_bind") {
   ]
 }
 
-driver_bind_rules("nelson_ot_radio_bind") {
-  rules = "bind/nelson_ot_radio.bind"
-  header_output = "nelson_ot_radio_bind.h"
-  bind_output = "nelson_ot_radio_bind.bc"
-  tests = "bind-tests/nelson_ot_radio_test.json"
-  deps = [
-    "//src/devices/bind/fuchsia.amlogic.platform.s905d3",
-    "//src/devices/bind/fuchsia.google.platform",
-    "//src/devices/bind/fuchsia.gpio",
-    "//src/devices/bind/fuchsia.nordic.platform",
-    "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.spi",
-  ]
-}
-
 fuchsia_driver("nelson-module-driver") {
   output_name = "nelson-module"
   configs += [
@@ -284,7 +269,6 @@ fuchsia_driver("nelson-module-driver") {
     ":nelson_aml_sdio_bind_header",
     ":nelson_aml_video_bind_header",
     ":nelson_emmc_bind_header",
-    ":nelson_ot_radio_bind_header",
     ":nelson_selina_bind_header",
     ":nelson_tee_bind_header",
     ":nelson_wifi_bind_header",
@@ -319,12 +303,15 @@ fuchsia_driver("nelson-module-driver") {
     "//src/devices/bind/fuchsia.codec:fuchsia.codec_cpp",
     "//src/devices/bind/fuchsia.display.dsi:fuchsia.display.dsi_cpp",
     "//src/devices/bind/fuchsia.goodix.platform:fuchsia.goodix.platform_cpp",
+    "//src/devices/bind/fuchsia.google.platform:fuchsia.google.platform_cpp",
     "//src/devices/bind/fuchsia.gpio:fuchsia.gpio_cpp",
     "//src/devices/bind/fuchsia.i2c:fuchsia.i2c_cpp",
+    "//src/devices/bind/fuchsia.nordic.platform:fuchsia.nordic.platform_cpp",
     "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
     "//src/devices/bind/fuchsia.power:fuchsia.power_cpp",
     "//src/devices/bind/fuchsia.pwm:fuchsia.pwm_cpp",
     "//src/devices/bind/fuchsia.register:fuchsia.register_cpp",
+    "//src/devices/bind/fuchsia.spi:fuchsia.spi_cpp",
     "//src/devices/bind/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//src/devices/bind/fuchsia.tee:fuchsia.tee_cpp",
     "//src/devices/bind/fuchsia.ti.platform:fuchsia.ti.platform_cpp",
@@ -383,7 +370,6 @@ group("tests") {
     ":nelson_aml_sdio_bind_test",
     ":nelson_aml_video_bind_test",
     ":nelson_aml_video_bind_test",
-    ":nelson_ot_radio_bind_test",
     ":nelson_selina_bind_test",
     ":nelson_wifi_bind_test",
     ":spi_0_bind_test",

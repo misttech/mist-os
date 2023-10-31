@@ -2,8 +2,37 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-using fuchsia.platform;
+composite ot_radio;
 
-fuchsia.BIND_COMPOSITE == 1;
-fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.platform.BIND_PLATFORM_DEV_VID.GENERIC;
-fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.platform.BIND_PLATFORM_DEV_DID.OT_RADIO;
+using fuchsia.gpio;
+using fuchsia.nordic.platform;
+using fuchsia.platform;
+using fuchsia.spi;
+
+primary node "spi" {
+  fuchsia.BIND_PROTOCOL == fuchsia.spi.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.nordic.platform.BIND_PLATFORM_DEV_VID.NORDIC;
+  fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.nordic.platform.BIND_PLATFORM_DEV_DID.THREAD;
+}
+
+node "gpio-int" {
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.gpio.BIND_FIDL_PROTOCOL.SERVICE;
+  fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.OT_RADIO_INTERRUPT;
+}
+
+node "gpio-reset" {
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.gpio.BIND_FIDL_PROTOCOL.SERVICE;
+  fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.OT_RADIO_RESET;
+}
+
+node "gpio-bootloader" {
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.gpio.BIND_FIDL_PROTOCOL.SERVICE;
+  fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.OT_RADIO_BOOTLOADER;
+}
+
+node "pdev" {
+  fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.platform.BIND_PLATFORM_DEV_VID.GENERIC;
+  fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.platform.BIND_PLATFORM_DEV_DID.OT_RADIO;
+  fuchsia.BIND_PLATFORM_DEV_INSTANCE_ID == 0;
+}
