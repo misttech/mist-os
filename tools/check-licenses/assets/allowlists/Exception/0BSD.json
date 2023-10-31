@@ -27,6 +27,13 @@
             ],
             "bug": "",
             "notes": ["Dart linux is not shipped."]
+          },
+          {
+            "projects": [
+              "third_party/github.com/python/typing_extensions"
+            ],
+            "bug": "",
+            "notes": []
           }
         ]
       }

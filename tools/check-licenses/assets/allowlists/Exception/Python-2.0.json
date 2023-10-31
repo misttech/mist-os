@@ -26,6 +26,14 @@
             ],
             "bug": "",
             "notes": []
+          },
+          {
+            "projects": [
+              "third_party/github.com/python/mypy",
+              "third_party/github.com/python/typing_extensions"
+            ],
+            "bug": "",
+            "notes": []
           }
         ]
       }
