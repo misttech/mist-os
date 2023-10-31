@@ -33,6 +33,7 @@ ignore_policy = struct(
         "bazel_tools",
         "fuchsia_clang",  # TODO(95670): clang bazel defs should provide licenses.
         "fuchsia_sdk",  # TODO(130784): sdk atoms should provide licenses.
+        "internal_sdk",  # TODO(130784): sdk atoms should provide licenses.
     ]),
 
     # Anything withing these package will be ignored:
