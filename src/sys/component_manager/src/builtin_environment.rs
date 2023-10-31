@@ -45,8 +45,8 @@ use {
         directory_ready_notifier::DirectoryReadyNotifier,
         framework::{
             binder::BinderCapabilityHost, lifecycle_controller::LifecycleController,
-            pkg_dir::PkgDirectory, realm::RealmCapabilityHost, realm_query::RealmQuery,
-            route_validator::RouteValidator,
+            namespace::NamespaceCapabilityHost, pkg_dir::PkgDirectory, realm::RealmCapabilityHost,
+            realm_query::RealmQuery, route_validator::RouteValidator,
         },
         inspect_sink_provider::InspectSinkProvider,
         model::events::registry::EventSubscription,
@@ -434,6 +434,7 @@ pub struct BuiltinEnvironment {
 
     pub binder_capability_host: Arc<BinderCapabilityHost>,
     pub realm_capability_host: Arc<RealmCapabilityHost>,
+    pub namespace_capability_host: Arc<NamespaceCapabilityHost>,
     pub storage_admin_capability_host: Arc<StorageAdmin>,
     pub realm_query: Option<Arc<RealmQuery>>,
     pub lifecycle_controller: Option<Arc<LifecycleController>>,
@@ -860,6 +861,9 @@ impl BuiltinEnvironment {
             Arc::new(RealmCapabilityHost::new(Arc::downgrade(&model), runtime_config.clone()));
         model.root().hooks.install(realm_capability_host.hooks()).await;
 
+        let namespace_capability_host = Arc::new(NamespaceCapabilityHost::new());
+        model.root().hooks.install(namespace_capability_host.hooks()).await;
+
         // Set up the binder service.
         let binder_capability_host = Arc::new(BinderCapabilityHost::new(Arc::downgrade(&model)));
         model.root().hooks.install(binder_capability_host.hooks()).await;
@@ -976,6 +980,7 @@ impl BuiltinEnvironment {
             model,
             binder_capability_host,
             realm_capability_host,
+            namespace_capability_host,
             storage_admin_capability_host,
             realm_query,
             lifecycle_controller,

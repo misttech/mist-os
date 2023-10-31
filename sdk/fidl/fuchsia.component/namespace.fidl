@@ -13,23 +13,26 @@ type NamespaceDictPair = resource struct {
 /// Error returned from methods in [`Namespace`].
 @available(added=HEAD)
 type NamespaceError = flexible enum {
-    /// Path has an embedded nul.
-    EMBEDDED_NUL = 1;
-
     /// The parent of a parent shares a prefix with another namespace entry
-    SHADOW = 2;
+    SHADOW = 1;
 
     /// Two entries have the same namespace path.
-    DUPLICATE = 3;
+    DUPLICATE = 2;
 
     /// Failed to convert a namespace dictionary to a directory.
-    CONVERSION = 4;
+    CONVERSION = 3;
+
+    /// A namespace entry was invalid.
+    BAD_ENTRY = 4;
+
+    /// There was an error reading from one of the dictionaries.
+    DICT_READ = 5;
 };
 
 /// Protocol for performing namespace operations.
 @available(added=HEAD)
 @discoverable
-closed protocol Namespace {
+open protocol Namespace {
     strict CreateFromDicts(resource struct {
         entries vector<NamespaceDictPair>:MAX;
     }) -> (resource struct {

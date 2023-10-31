@@ -40,10 +40,6 @@ lazy_static! {
     pub static ref SDK_REALM_SERVICE: Name = "fuchsia.component.Realm".parse().unwrap();
 }
 
-// The `fuchsia.sys2.Realm` is currently being migrated to the `fuchsia.component`
-// namespace. Until all clients of this protocol have been moved to the latter
-// namespace, the following CapabilityProvider will support both paths.
-// Tracking bug: https://fxbug.dev/85183.
 pub struct RealmCapabilityProvider {
     scope_moniker: Moniker,
     host: Arc<RealmCapabilityHost>,

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{path::Path, NamespaceError};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 /// A tree representation of a namespace.
 ///
@@ -16,7 +16,7 @@ pub struct Tree<T> {
 
 impl<T> Tree<T> {
     pub fn new() -> Self {
-        Tree { root: Node::Internal(HashMap::new()) }
+        Tree { root: Node::Internal(BTreeMap::new()) }
     }
 
     pub fn add(self: &mut Self, path: &Path, thing: T) -> Result<&mut T, NamespaceError> {
@@ -66,7 +66,7 @@ impl<T: Clone> Clone for Tree<T> {
 
 #[derive(Debug)]
 enum Node<T> {
-    Internal(HashMap<String, Node<T>>),
+    Internal(BTreeMap<String, Node<T>>),
     Leaf(T),
 }
 
@@ -82,7 +82,7 @@ impl<T> Node<T> {
                 Node::Leaf(_) => Err(AddError::Shadow),
                 Node::Internal(children) => {
                     let entry =
-                        children.entry(name).or_insert_with(|| Node::Internal(HashMap::new()));
+                        children.entry(name).or_insert_with(|| Node::Internal(BTreeMap::new()));
                     entry.add(path, thing)
                 }
             },
@@ -203,7 +203,7 @@ impl<T> Node<T> {
 
     pub fn map_ref<R>(&self, f: &mut impl FnMut(&T) -> R) -> Node<R> {
         match self {
-            Node::Internal(map) => Node::Internal(HashMap::from_iter(
+            Node::Internal(map) => Node::Internal(BTreeMap::from_iter(
                 map.iter().map(|(k, v)| (k.clone(), v.map_ref(f))),
             )),
             Node::Leaf(t) => Node::Leaf(f(t)),

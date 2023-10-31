@@ -61,6 +61,7 @@ closed protocol Dict {
     }) error DictError;
 };
 
+@discoverable
 closed protocol Sender {
     compose fuchsia.io.Openable;
     compose fuchsia.unknown.Cloneable;
