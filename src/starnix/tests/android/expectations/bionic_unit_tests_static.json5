@@ -79,9 +79,6 @@
                 // Requires prctl(PR_GET_TAGGED_ADDR_CTRL) -> PR_TAGGED_ADDR_ENABLE
                 "heap_tagging_level_DeathTest.tagged_pointer_dies",
 
-                // TODO(b/306184861): Re-enable after the fix.
-                "properties.__system_property_add_appcompat",
-
                 // Untriaged
                 "pthread.pthread_attr_getstack__main_thread",
                 "pthread.pthread_attr_setinheritsched__takes_effect_despite_SCHED_RESET_ON_FORK",
@@ -272,6 +269,9 @@
                 "malloc.zeroed_allocations_small_medium_sizes",
                 "malloc.zeroed_allocations_large_sizes",
                 "malloc.zeroed_allocations_realloc",
+
+                // TODO(b/306670972): Appears to pass in latest android roll, try removing after that.
+                "properties.__system_property_add_appcompat",
             ],
         },
     ],
