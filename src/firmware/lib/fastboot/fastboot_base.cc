@@ -7,6 +7,7 @@
 #include <assert.h>
 #include <lib/stdcompat/span.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include <string>
 

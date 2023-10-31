@@ -6,6 +6,7 @@
 #define FBL_ALLOC_CHECKER_H_
 
 #include <stddef.h>
+#include <stdlib.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
 

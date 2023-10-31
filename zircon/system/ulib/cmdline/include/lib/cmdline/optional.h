@@ -6,6 +6,7 @@
 #define CMDLINE_OPTIONAL_H_
 
 #include <cassert>
+#include <istream>
 #include <optional>
 
 namespace cmdline {
