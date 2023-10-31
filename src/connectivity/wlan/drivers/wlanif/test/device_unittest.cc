@@ -187,8 +187,8 @@ struct WlanifDeviceTest : public ::zxtest::Test,
                   SetKeysReqCompleter::Sync& completer) override {}
   void DelKeysReq(DelKeysReqRequestView request, fdf::Arena& arena,
                   DelKeysReqCompleter::Sync& completer) override {}
-  void EapolReq(EapolReqRequestView request, fdf::Arena& arena,
-                EapolReqCompleter::Sync& completer) override {}
+  void EapolTx(EapolTxRequestView request, fdf::Arena& arena,
+               EapolTxCompleter::Sync& completer) override {}
   void GetIfaceCounterStats(fdf::Arena& arena,
                             GetIfaceCounterStatsCompleter::Sync& completer) override {}
   void GetIfaceHistogramStats(fdf::Arena& arena,

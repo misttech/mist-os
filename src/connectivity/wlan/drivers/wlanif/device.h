@@ -53,7 +53,7 @@ class Device : public ddk::Device<Device, ddk::Unbindable>,
   void StopBss(const wlan_fullmac_impl_stop_bss_request_t* req);
   void SetKeysReq(const wlan_fullmac_set_keys_req_t* req, wlan_fullmac_set_keys_resp_t* out_resp);
   void DeleteKeysReq(const wlan_fullmac_del_keys_req_t* req);
-  void EapolReq(const wlan_fullmac_eapol_req_t* req);
+  void EapolTx(const wlan_fullmac_impl_eapol_tx_request_t* req);
   void QueryDeviceInfo(wlan_fullmac_query_info_t* out_resp);
   void QueryMacSublayerSupport(mac_sublayer_support_t* out_resp);
   void QuerySecuritySupport(security_support_t* out_resp);

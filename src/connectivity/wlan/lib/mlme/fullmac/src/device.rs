@@ -369,8 +369,10 @@ pub struct FullmacDeviceInterface {
     ) -> banjo_wlan_fullmac::WlanFullmacSetKeysResp,
     del_keys_req:
         extern "C" fn(device: *mut c_void, req: *mut banjo_wlan_fullmac::WlanFullmacDelKeysReq),
-    eapol_req:
-        extern "C" fn(device: *mut c_void, req: *mut banjo_wlan_fullmac::WlanFullmacEapolReq),
+    eapol_tx: extern "C" fn(
+        device: *mut c_void,
+        req: *mut banjo_wlan_fullmac::WlanFullmacImplEapolTxRequest,
+    ),
     get_iface_counter_stats: extern "C" fn(
         device: *mut c_void,
         out_status: *mut i32,
@@ -488,8 +490,8 @@ impl FullmacDeviceInterface {
     pub fn del_keys_req(&self, mut req: banjo_wlan_fullmac::WlanFullmacDelKeysReq) {
         (self.del_keys_req)(self.device, &mut req as *mut banjo_wlan_fullmac::WlanFullmacDelKeysReq)
     }
-    pub fn eapol_req(&self, req: &mut banjo_wlan_fullmac::WlanFullmacEapolReq) {
-        (self.eapol_req)(self.device, req as *mut banjo_wlan_fullmac::WlanFullmacEapolReq)
+    pub fn eapol_tx(&self, req: &mut banjo_wlan_fullmac::WlanFullmacImplEapolTxRequest) {
+        (self.eapol_tx)(self.device, req as *mut banjo_wlan_fullmac::WlanFullmacImplEapolTxRequest)
     }
     pub fn get_iface_counter_stats(&self) -> fidl_mlme::GetIfaceCounterStatsResponse {
         let mut out_status: i32 = 0;
@@ -588,8 +590,8 @@ pub mod test_utils {
         DelKeysReq {
             req: banjo_wlan_fullmac::WlanFullmacDelKeysReq,
         },
-        EapolReq {
-            req: banjo_wlan_fullmac::WlanFullmacEapolReq,
+        EapolTx {
+            req: banjo_wlan_fullmac::WlanFullmacImplEapolTxRequest,
             data: Vec<u8>,
         },
         GetIfaceCounterStats,
@@ -693,7 +695,7 @@ pub mod test_utils {
                 stop_bss: Self::stop_bss,
                 set_keys_req: Self::set_keys_req,
                 del_keys_req: Self::del_keys_req,
-                eapol_req: Self::eapol_req,
+                eapol_tx: Self::eapol_tx,
                 get_iface_counter_stats: Self::get_iface_counter_stats,
                 get_iface_histogram_stats: Self::get_iface_histogram_stats,
                 sae_handshake_resp: Self::sae_handshake_resp,
@@ -918,14 +920,14 @@ pub mod test_utils {
         }
         // Cannot mark fn unsafe because it has to match fn signature in FullDeviceInterface
         #[allow(clippy::not_unsafe_ptr_arg_deref)]
-        pub extern "C" fn eapol_req(
+        pub extern "C" fn eapol_tx(
             device: *mut c_void,
-            req: *mut banjo_wlan_fullmac::WlanFullmacEapolReq,
+            req: *mut banjo_wlan_fullmac::WlanFullmacImplEapolTxRequest,
         ) {
             let device = unsafe { &mut *(device as *mut Self) };
             let req = unsafe { *req };
             let data = unsafe { slice::from_raw_parts(req.data_list, req.data_count) }.to_vec();
-            device.captured_driver_calls.push(DriverCall::EapolReq { req, data });
+            device.captured_driver_calls.push(DriverCall::EapolTx { req, data });
         }
         // Cannot mark fn unsafe because it has to match fn signature in FullDeviceInterface
         #[allow(clippy::not_unsafe_ptr_arg_deref)]

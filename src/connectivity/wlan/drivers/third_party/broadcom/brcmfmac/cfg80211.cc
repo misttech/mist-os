@@ -4142,14 +4142,14 @@ void brcmf_if_del_keys_req(net_device* ndev,
   BRCMF_ERR("Unimplemented");
 }
 
-static void brcmf_send_eapol_confirm(net_device* ndev,
-                                     const fuchsia_wlan_fullmac_wire::WlanFullmacEapolReq* req,
-                                     zx_status_t result) {
+static void brcmf_send_eapol_confirm(
+    net_device* ndev, const fuchsia_wlan_fullmac_wire::WlanFullmacImplEapolTxRequest* req,
+    zx_status_t result) {
   fuchsia_wlan_fullmac_wire::WlanFullmacEapolConfirm confirm;
   confirm.result_code = result == ZX_OK
                             ? fuchsia_wlan_fullmac_wire::WlanEapolResult::kSuccess
                             : fuchsia_wlan_fullmac_wire::WlanEapolResult::kTransmissionFailure;
-  memcpy(confirm.dst_addr.data(), req->dst_addr.data(), ETH_ALEN);
+  memcpy(confirm.dst_addr.data(), req->dst_addr().data(), ETH_ALEN);
   BRCMF_IFDBG(
       WLANIF, ndev, "Sending EAPOL xmit confirm to SME. result: %s",
       confirm.result_code == fuchsia_wlan_fullmac_wire::WlanEapolResult::kSuccess ? "success"
@@ -4168,17 +4168,17 @@ static void brcmf_send_eapol_confirm(net_device* ndev,
 }
 
 static void brcmf_populate_eapol_eth_header(
-    uint8_t* dest, const fuchsia_wlan_fullmac_wire::WlanFullmacEapolReq* req) {
+    uint8_t* dest, const fuchsia_wlan_fullmac_wire::WlanFullmacImplEapolTxRequest* req) {
   // IEEE Std. 802.3-2015, 3.1.1
-  memcpy(dest, req->dst_addr.data(), ETH_ALEN);
-  memcpy(dest + ETH_ALEN, req->src_addr.data(), ETH_ALEN);
+  memcpy(dest, req->dst_addr().data(), ETH_ALEN);
+  memcpy(dest + ETH_ALEN, req->src_addr().data(), ETH_ALEN);
   *reinterpret_cast<uint16_t*>(dest + 2 * ETH_ALEN) = EAPOL_ETHERNET_TYPE_UINT16;
-  memcpy(dest + 2 * ETH_ALEN + sizeof(uint16_t), req->data.data(), req->data.count());
+  memcpy(dest + 2 * ETH_ALEN + sizeof(uint16_t), req->data().data(), req->data().count());
 }
 
-static void brcmf_if_eapol_req_netdev(net_device* ndev,
-                                      const fuchsia_wlan_fullmac_wire::WlanFullmacEapolReq* req,
-                                      int length) {
+static void brcmf_if_eapol_req_netdev(
+    net_device* ndev, const fuchsia_wlan_fullmac_wire::WlanFullmacImplEapolTxRequest* req,
+    int length) {
   struct brcmf_if* ifp = ndev_to_if(ndev);
   struct brcmf_pub* drvr = ifp->drvr;
   wlan::drivers::components::FrameContainer frames = brcmf_bus_acquire_tx_space(drvr->bus_if, 1);
@@ -4202,19 +4202,19 @@ static void brcmf_if_eapol_req_netdev(net_device* ndev,
 }
 
 void brcmf_if_eapol_req(net_device* ndev,
-                        const fuchsia_wlan_fullmac_wire::WlanFullmacEapolReq* req) {
+                        const fuchsia_wlan_fullmac_wire::WlanFullmacImplEapolTxRequest* req) {
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
   if (!ndev->if_proto.is_valid()) {
     BRCMF_IFDBG(WLANIF, ndev, "interface stopped -- skipping EAPOL xmit callback");
     return;
   }
 
-  BRCMF_IFDBG(WLANIF, ndev, "EAPOL xmit request from SME. data_len: %zu", req->data.count());
+  BRCMF_IFDBG(WLANIF, ndev, "EAPOL xmit request from SME. data_len: %zu", req->data().count());
 
   int packet_length;
 
   // Ethernet header length + EAPOL PDU length
-  packet_length = 2 * ETH_ALEN + sizeof(uint16_t) + req->data.count();
+  packet_length = 2 * ETH_ALEN + sizeof(uint16_t) + req->data().count();
 
   brcmf_if_eapol_req_netdev(ndev, req, packet_length);
 }

@@ -350,8 +350,8 @@ pub fn convert_delete_keys_request(
 
 pub fn convert_eapol_request(
     req: &fidl_mlme::EapolRequest,
-) -> BanjoReturnType<'_, banjo_wlan_fullmac::WlanFullmacEapolReq> {
-    BanjoReturnType::new(banjo_wlan_fullmac::WlanFullmacEapolReq {
+) -> BanjoReturnType<'_, banjo_wlan_fullmac::WlanFullmacImplEapolTxRequest> {
+    BanjoReturnType::new(banjo_wlan_fullmac::WlanFullmacImplEapolTxRequest {
         src_addr: req.src_addr,
         dst_addr: req.dst_addr,
         data_list: req.data.as_ptr(),

@@ -688,14 +688,26 @@ void WlanInterface::DelKeysReq(DelKeysReqRequestView request, fdf::Arena& arena,
   completer.buffer(arena).Reply();
 }
 
-void WlanInterface::EapolReq(EapolReqRequestView request, fdf::Arena& arena,
-                             EapolReqCompleter::Sync& completer) {
+void WlanInterface::EapolTx(EapolTxRequestView request, fdf::Arena& arena,
+                            EapolTxCompleter::Sync& completer) {
+  bool preconditions_met = true;
+  if (!request->has_data() || !request->has_src_addr() || !request->has_dst_addr()) {
+    NXPF_ERR("EAPOL request does not have all required fields: data %u, src_addr %u, dst_addr %u",
+             request->has_data(), request->has_src_addr(), request->has_dst_addr());
+    preconditions_met = false;
+  }
+
   std::optional<wlan::drivers::components::Frame> frame = context_->data_plane_->AcquireFrame();
   if (!frame.has_value()) {
     NXPF_ERR("Failed to acquire frame container for EAPOL frame");
+    preconditions_met = false;
+  }
+
+  if (!preconditions_met) {
     fuchsia_wlan_fullmac_wire::WlanFullmacEapolConfirm response{
         .result_code = fuchsia_wlan_fullmac_wire::WlanEapolResult::kTransmissionFailure,
     };
+
     auto ifc_arena = fdf::Arena::Create(0, 0);
     if (ifc_arena.is_error()) {
       NXPF_ERR("Failed to create Arena status=%s", ifc_arena.status_string());
@@ -711,17 +723,17 @@ void WlanInterface::EapolReq(EapolReqRequestView request, fdf::Arena& arena,
   }
 
   const uint32_t packet_length =
-      static_cast<uint32_t>(2ul * ETH_ALEN + sizeof(uint16_t) + request->req.data.count());
+      static_cast<uint32_t>(2ul * ETH_ALEN + sizeof(uint16_t) + request->data().count());
 
   frame->ShrinkHead(1024);
   frame->SetPortId(PortId());
   frame->SetSize(packet_length);
 
-  memcpy(frame->Data(), request->req.dst_addr.data(), ETH_ALEN);
-  memcpy(frame->Data() + ETH_ALEN, request->req.src_addr.data(), ETH_ALEN);
+  memcpy(frame->Data(), request->dst_addr().data(), ETH_ALEN);
+  memcpy(frame->Data() + ETH_ALEN, request->src_addr().data(), ETH_ALEN);
   *reinterpret_cast<uint16_t*>(frame->Data() + 2ul * ETH_ALEN) = htons(ETH_P_PAE);
-  memcpy(frame->Data() + 2ul * ETH_ALEN + sizeof(uint16_t), request->req.data.data(),
-         request->req.data.count());
+  memcpy(frame->Data() + 2ul * ETH_ALEN + sizeof(uint16_t), request->data().data(),
+         request->data().count());
 
   context_->data_plane_->NetDevQueueTx(cpp20::span<wlan::drivers::components::Frame>(&*frame, 1u));
   completer.buffer(arena).Reply();

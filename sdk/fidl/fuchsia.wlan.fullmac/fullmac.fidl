@@ -73,12 +73,6 @@ type WlanFullmacDelKeysReq = struct {
     keylist array<DeleteKeyDescriptor, WLAN_MAX_KEYLIST_SIZE>;
 };
 
-type WlanFullmacEapolReq = struct {
-    src_addr ieee80211.MacAddr;
-    dst_addr ieee80211.MacAddr;
-    data vector<uint8>:MAX;
-};
-
 /// This struct is sent from SME to wlanif, indicating the result of SAE handshake process.
 type WlanFullmacSaeHandshakeResp = struct {
     peer_sta_address ieee80211.MacAddr;
@@ -207,7 +201,7 @@ type WlanEapolResult = flexible enum : uint8 {
 
 type WlanFullmacEapolConfirm = struct {
     result_code WlanEapolResult;
-    /// This value corresponds to the dst_addr in the EapolRequest we're confirming.
+    /// This value corresponds to the dst_addr in the EapolTxRequest we're confirming.
     /// IEEE 802.11-2016 does not include this field, but we need it to disambiguate
     /// if multiple EAPoL handshakes are ongoing.
     dst_addr ieee80211.MacAddr;
@@ -640,8 +634,10 @@ closed protocol WlanFullmacImpl {
     strict DelKeysReq(struct {
         req WlanFullmacDelKeysReq;
     }) -> ();
-    strict EapolReq(struct {
-        req WlanFullmacEapolReq;
+    strict EapolTx(table {
+        1: src_addr ieee80211.MacAddr;
+        2: dst_addr ieee80211.MacAddr;
+        3: data vector<uint8>:MAX;
     }) -> ();
 
     // MLME extensions

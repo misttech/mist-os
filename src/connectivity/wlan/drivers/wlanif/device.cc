@@ -24,6 +24,7 @@
 #include "convert.h"
 #include "debug.h"
 #include "driver.h"
+#include "fidl/fuchsia.wlan.fullmac/cpp/wire_types.h"
 #include "fuchsia/wlan/common/c/banjo.h"
 #include "fuchsia/wlan/common/cpp/fidl.h"
 #include "zircon/system/public/zircon/assert.h"
@@ -529,24 +530,31 @@ void Device::DeleteKeysReq(const wlan_fullmac_del_keys_req_t* req) {
   }
 }
 
-void Device::EapolReq(const wlan_fullmac_eapol_req_t* req) {
-  fuchsia_wlan_fullmac::wire::WlanFullmacEapolReq eapol_req = {};
-
-  std::memcpy(eapol_req.src_addr.data(), req->src_addr, ETH_ALEN);
-  std::memcpy(eapol_req.dst_addr.data(), req->dst_addr, ETH_ALEN);
-  auto data = std::vector<uint8_t>(req->data_list, req->data_list + req->data_count);
-
+void Device::EapolTx(const wlan_fullmac_impl_eapol_tx_request_t* req) {
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     lerror("Arena creation failed: %s", arena.status_string());
     return;
   }
-  eapol_req.data = fidl::VectorView<uint8_t>(*arena, data);
 
-  auto result = client_.buffer(*arena)->EapolReq(eapol_req);
+  fidl::Array<uint8_t, ETH_ALEN> src_addr;
+  fidl::Array<uint8_t, ETH_ALEN> dst_addr;
+  std::memcpy(src_addr.data(), req->src_addr, ETH_ALEN);
+  std::memcpy(dst_addr.data(), req->dst_addr, ETH_ALEN);
+
+  auto data = fidl::VectorView(
+      *arena, std::vector<uint8_t>(req->data_list, req->data_list + req->data_count));
+
+  auto eapol_req = fuchsia_wlan_fullmac::wire::WlanFullmacImplEapolTxRequest::Builder(*arena)
+                       .src_addr(src_addr)
+                       .dst_addr(dst_addr)
+                       .data(data)
+                       .Build();
+
+  auto result = client_.buffer(*arena)->EapolTx(eapol_req);
 
   if (!result.ok()) {
-    lerror("EapolReq failed FIDL error: %s", result.status_string());
+    lerror("EapolTx failed FIDL error: %s", result.status_string());
     return;
   }
 }

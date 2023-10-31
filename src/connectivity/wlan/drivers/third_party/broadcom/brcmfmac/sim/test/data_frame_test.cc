@@ -374,12 +374,21 @@ void DataFrameTest::StartConnect() {
 
 void DataFrameTest::TxEapolRequest(common::MacAddr dstAddr, common::MacAddr srcAddr,
                                    const std::vector<uint8_t>& eapol) {
-  wlan_fullmac_wire::WlanFullmacEapolReq eapol_req;
-  memcpy(eapol_req.dst_addr.data(), dstAddr.byte, ETH_ALEN);
-  memcpy(eapol_req.src_addr.data(), srcAddr.byte, ETH_ALEN);
-  eapol_req.data =
-      fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(eapol.data()), eapol.size());
-  auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->EapolReq(eapol_req);
+  fidl::Array<uint8_t, ETH_ALEN> src_addr;
+  fidl::Array<uint8_t, ETH_ALEN> dst_addr;
+
+  memcpy(dst_addr.data(), dstAddr.byte, ETH_ALEN);
+  memcpy(src_addr.data(), srcAddr.byte, ETH_ALEN);
+
+  auto eapol_req =
+      wlan_fullmac_wire::WlanFullmacImplEapolTxRequest::Builder(client_ifc_.test_arena_)
+          .src_addr(src_addr)
+          .dst_addr(dst_addr)
+          .data(fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(eapol.data()),
+                                                        eapol.size()))
+          .Build();
+
+  auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->EapolTx(eapol_req);
   EXPECT_TRUE(result.ok());
 }
 

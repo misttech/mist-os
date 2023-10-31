@@ -412,12 +412,11 @@ void WlanInterface::DelKeysReq(DelKeysReqRequestView request, fdf::Arena& arena,
   completer.buffer(arena).Reply();
 }
 
-void WlanInterface::EapolReq(EapolReqRequestView request, fdf::Arena& arena,
-                             EapolReqCompleter::Sync& completer) {
+void WlanInterface::EapolTx(EapolTxRequestView request, fdf::Arena& arena,
+                            EapolTxCompleter::Sync& completer) {
   std::shared_lock<std::shared_mutex> guard(lock_);
-  const fuchsia_wlan_fullmac::wire::WlanFullmacEapolReq req = request->req;
   if (wdev_ != nullptr) {
-    brcmf_if_eapol_req(wdev_->netdev, &req);
+    brcmf_if_eapol_req(wdev_->netdev, request);
   }
   completer.buffer(arena).Reply();
 }

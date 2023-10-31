@@ -381,7 +381,7 @@ impl FullmacMlme {
             Stop(req) => self.device.stop_bss(convert_stop_bss_request(&req)),
             SetKeys(req) => self.handle_mlme_set_keys_request(req),
             DeleteKeys(req) => self.device.del_keys_req(convert_delete_keys_request(&req)),
-            Eapol(req) => self.device.eapol_req(&mut convert_eapol_request(&req)),
+            Eapol(req) => self.device.eapol_tx(&mut convert_eapol_request(&req)),
             SendMpOpenAction(..) => info!("SendMpOpenAction is unsupported"),
             SendMpConfirmAction(..) => info!("SendMpConfirmAction is unsupported"),
             MeshPeeringEstablished(..) => info!("MeshPeeringEstablished is unsupported"),
@@ -1264,7 +1264,7 @@ mod handle_mlme_request_tests {
         h.mlme.handle_mlme_request(fidl_req);
 
         let mut driver_calls = h.fake_device.captured_driver_calls.iter();
-        let (driver_req, driver_req_data) = assert_variant!(driver_calls.next(), Some(DriverCall::EapolReq { req, data }) => (req, data));
+        let (driver_req, driver_req_data) = assert_variant!(driver_calls.next(), Some(DriverCall::EapolTx { req, data }) => (req, data));
         assert_eq!(driver_req.src_addr, [1u8; 6]);
         assert_eq!(driver_req.dst_addr, [2u8; 6]);
         assert_eq!(*driver_req_data, vec![3u8; 4]);
