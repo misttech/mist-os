@@ -1,6 +1,7 @@
 """Implementation of cc_bind_rules rule"""
 
-load(":providers.bzl", "FuchsiaBindLibraryInfo")
+load(":providers.bzl", "FuchsiaBindLibraryInfo", "FuchsiaPackageResourcesInfo")
+load(":utils.bzl", "make_resource_struct")
 
 def _process_bindc_args(context):
     # Collect all the bind files and their filepaths that will be passed to bindc.
@@ -68,6 +69,14 @@ def _fuchsia_driver_bind_bytecode_impl(context):
         ],
         mnemonic = "Bindcbc",
     )
+    return [
+        FuchsiaPackageResourcesInfo(
+            resources = [make_resource_struct(
+                src = context.outputs.output,
+                dest = "meta/bind/" + context.outputs.output.basename,
+            )],
+        ),
+    ]
 
 _bind_rules_header = rule(
     implementation = _bind_rules_header_impl,

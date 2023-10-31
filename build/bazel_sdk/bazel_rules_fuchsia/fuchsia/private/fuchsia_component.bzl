@@ -41,7 +41,7 @@ def fuchsia_test_component(name, manifest, deps = None, **kwargs):
         **kwargs
     )
 
-def fuchsia_driver_component(name, manifest, driver_lib, bind_bytecode, deps = None, **kwargs):
+def fuchsia_driver_component(name, manifest, driver_lib, bind_bytecode, deps = [], **kwargs):
     """Creates a Fuchsia component that can be registered as a driver.
 
     Args:
@@ -55,14 +55,14 @@ def fuchsia_driver_component(name, manifest, driver_lib, bind_bytecode, deps = N
         deps: A list of targets that this component depends on.
         **kwargs: Extra attributes to forward to the build rule.
     """
+
     _fuchsia_component(
         name = name,
         manifest = manifest,
-        deps = deps,
-        content = {
-            driver_lib: "driver/",
-            bind_bytecode: "meta/bind/",
-        },
+        deps = deps + [
+            bind_bytecode,
+            driver_lib,
+        ],
         is_driver = True,
         **kwargs
     )
@@ -92,21 +92,6 @@ def _fuchsia_component_impl(ctx):
             for f in dep.files.to_list():
                 resources.append(make_resource_struct(src = f, dest = f.short_path))
 
-    for src, dest in ctx.attr.content.items():
-        files_list = src[DefaultInfo].files.to_list()
-        if not dest.endswith("/") and len(files_list) > 1:
-            fail("To map multiple files in %s, the content mapping %s should end with a slash to indicate a directory." % (ctx.label.name, dest))
-
-        # pkgctl does not play well with paths starting with "/"
-        dest = dest.lstrip("/")
-
-        for f in files_list:
-            d = dest
-            if dest.endswith("/"):
-                d = d + f.basename
-
-            resources.append(make_resource_struct(src = f, dest = d))
-
     return [
         _make_fuchsia_component_info(
             component_name = component_name,
@@ -116,7 +101,7 @@ def _fuchsia_component_impl(ctx):
             is_test = ctx.attr._variant == "test",
             run_tag = label_name(str(ctx.label)),
         ),
-        collect_debug_symbols(ctx.attr.deps, ctx.attr.content.keys()),
+        collect_debug_symbols(ctx.attr.deps),
     ]
 
 _fuchsia_component, _fuchsia_component_test = rule_variants(
@@ -131,11 +116,6 @@ number of dependencies which will be included in the final package.
     attrs = {
         "deps": attr.label_list(
             doc = "A list of targets that this component depends on",
-        ),
-        "content": attr.label_keyed_string_dict(
-            doc = """A map of dependencies and their destination in the Fuchsia component.
-                     If a destination ends with a slash, it is assumed to be a directory""",
-            mandatory = False,
         ),
         "manifest": attr.label(
             doc = "The component manifest file",

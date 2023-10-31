@@ -32,9 +32,19 @@ fuchsia_package_checker_test(
     size = "small",
     bind_bytecode = "meta/bind/test_driver.bindbc",
     expected_blobs_to_file_names = {
-        "driver/libtest_driver.so": "libtest_driver.so_stripped",
-        # Note; we do not currently add libraries to drivers. This will need to
-        # be fixed when we have a dynamic linker.
+        "driver/libtest_driver.so": "libtest_driver_cc_binary.so_stripped",
+        # Common files
+        # Note: all of these files are not required and will be cleaned up but we
+        # do not have a way to ignore files in this test so removing them will
+        # break the test
+        "lib/ld.so.1": "ld.so.1_stripped",
+        "lib/libc++.so.2": "libc++.so.2_stripped",
+        "lib/libc++abi.so.1": "libc++abi.so.1_stripped",
+        "lib/libunwind.so.1": "libunwind.so.1_stripped",
+        "lib/libasync-default.so": "libasync-default.so_stripped",
+        "lib/libfdio.so": "libfdio.so_stripped",
+        "lib/libsvc.so": "libsvc.so_stripped",
+        "lib/libtrace-engine.so": "libtrace-engine.so_stripped",
     },
     manifests = ["meta/test_driver.cm"],
     package_under_test = "//fuchsia/packaging/fuchsia_package/cc_driver:pkg",

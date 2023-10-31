@@ -71,6 +71,7 @@ def fuchsia_cc_driver(name, srcs = [], **kwargs):
     fuchsia_wrap_cc_binary(
         name = name,
         bin_name = "lib{}.so".format(name),
+        install_root = "driver/",
         cc_binary = ":{}_cc_binary".format(name),
         exact_cc_binary_deps = kwargs.pop("deps", None),
         visibility = visibility,
