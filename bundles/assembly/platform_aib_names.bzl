@@ -69,6 +69,7 @@ USER_PLATFORM_AIB_NAMES_RISCV64 = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + [
     "core_realm",
     "core_realm_networking",
     "core_realm_user_and_userdebug",
+    "diagnostics_triage_detect_mali",
     "element_manager",
     "factory_data",
     "factory_reset_trigger",

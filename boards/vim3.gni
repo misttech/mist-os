@@ -26,8 +26,6 @@ bazel_product_bundle_board = "vim3"
 #
 # Configuration items that need to be added to assembly
 
-board_package_labels = [ "//src/graphics/drivers/msd-arm-mali:msd-config" ]
-
 # Board file adds vulkan VCD that lets vulkan tests work on systems with Mali
 # GPUs.
 board_has_libvulkan_arm_mali = true

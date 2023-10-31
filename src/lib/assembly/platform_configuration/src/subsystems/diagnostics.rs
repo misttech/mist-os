@@ -101,6 +101,15 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
             }
         }
 
+        match context.feature_set_level {
+            FeatureSupportLevel::Bootstrap | FeatureSupportLevel::Utility => {}
+            FeatureSupportLevel::Minimal => {
+                if context.board_info.provides_feature("fuchsia::mali_gpu") {
+                    builder.platform_bundle("diagnostics_triage_detect_mali");
+                }
+            }
+        }
+
         Ok(())
     }
 }

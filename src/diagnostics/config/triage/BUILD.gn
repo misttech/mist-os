@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/config_data_for_assembly.gni")
 import("//build/config.gni")
 import("//src/diagnostics/triage/build/triage_config_test.gni")
 
@@ -64,7 +65,7 @@ config_data("brcmfmac-detect") {
 
 # This file will be included in builds that include the
 # group src/graphics/lib/magma/gnbuild/magma-arm-mali:msd-system
-config_data("mali-detect") {
+config_data_for_assembly("mali-detect") {
   for_pkg = "triage-detect"
   sources = [ "detect/mali-detect.triage" ]
 }

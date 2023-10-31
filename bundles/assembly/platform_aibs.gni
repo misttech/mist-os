@@ -118,6 +118,9 @@ user_platform_aib_names =
       "audio_device_registry",
       "camera",
 
+      # Diagnostics
+      "diagnostics_triage_detect_mali",
+
       # Fonts
       "fonts",
       "fonts_hermetic",

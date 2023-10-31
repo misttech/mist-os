@@ -1454,6 +1454,15 @@ assembly_input_bundle("input_group_two") {
   ]
 }
 
+########
+#
+# Diagnostics Triage Support
+
+# Triage-detect support for magma arm mali devices
+assembly_input_bundle("diagnostics_triage_detect_mali") {
+  config_data_labels = [ "//src/diagnostics/config/triage:mali-detect" ]
+}
+
 # Driver Framework V1 support
 #
 # feature_set_levels: minimal
