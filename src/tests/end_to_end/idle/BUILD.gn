@@ -11,6 +11,7 @@ go_library("idle_test_lib") {
     "idle_test.go",
     "measurepower.go",
   ]
+  deps = [ "//src/lib/go-benchmarking" ]
 }
 
 go_test("idle_test") {

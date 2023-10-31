@@ -14,12 +14,19 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
+
+	"go.fuchsia.dev/fuchsia/src/lib/go-benchmarking"
 )
 
+const testSuite = "fuchsia.vim3_monsoon_idle"
+
 type PowerMeasurement struct {
-	cmd     *exec.Cmd
-	outPath string
-	logger  *log.Logger
+	done     chan bool
+	cmd      *exec.Cmd
+	csvPath  string
+	jsonPath string
+	logger   *log.Logger
 }
 
 func NewPowerMeasurement(name string) (*PowerMeasurement, error) {
@@ -33,11 +40,12 @@ func NewPowerMeasurement(name string) (*PowerMeasurement, error) {
 	if err != nil {
 		return nil, fmt.Errorf("os.Getwd: %v", err)
 	}
-	outPath := filepath.Join(wd, "..", "..", "serial_logs", fmt.Sprintf("%s.csv", name))
+	csvPath := filepath.Join(wd, "..", "..", "serial_logs", fmt.Sprintf("%s.csv", name))
+	jsonPath := filepath.Join(wd, "..", "..", "serial_logs", fmt.Sprintf("%s.json", name))
 	cmd := exec.Command(measurePowerPath, "-format", "csv")
 	cmd.Env = env
 	cmd.Stderr = os.Stderr
-	pm := &PowerMeasurement{cmd: cmd, outPath: outPath, logger: logger}
+	pm := &PowerMeasurement{done: make(chan bool), cmd: cmd, csvPath: csvPath, jsonPath: jsonPath, logger: logger}
 	if err := pm.start(); err != nil {
 		return nil, fmt.Errorf("start: %s", err)
 	}
@@ -61,7 +69,7 @@ func (pm *PowerMeasurement) start() error {
 			pm.logger.Printf("measurepower stdout.Close: %s", err)
 		}
 	}()
-	outFile, err := os.Create(pm.outPath)
+	outFile, err := os.Create(pm.csvPath)
 	if err != nil {
 		return fmt.Errorf("os.Create: %v", err)
 	}
@@ -86,6 +94,8 @@ func (pm *PowerMeasurement) start() error {
 		if err := pm.backgroundCopy(stdout, outFile); err != nil {
 			pm.logger.Printf("measurepower backgroundCopy error: %s", err)
 		}
+		pm.done <- true
+		close(pm.done)
 	}()
 	return nil
 }
@@ -100,7 +110,17 @@ func (pm *PowerMeasurement) Stop() error {
 	if err := pm.cmd.Wait(); err != nil {
 		return fmt.Errorf("Wait: %s", err)
 	}
-	return nil
+	select {
+	case <-pm.done:
+		return nil
+	case <-time.After(5 * time.Second):
+		return errors.New("Backgroundcopy goroutine did not complete and return done signal within the specified time (5sec)")
+	}
+	if err := outputFile(pm.jsonPath); err != nil {
+		pm.logger.Printf("outputFile %q creation error: %s", pm.jsonPath, err)
+	} else {
+		pm.logger.Printf("Wrote benchmark values to a file: %s", pm.jsonPath)
+	}
 }
 
 func (pm *PowerMeasurement) backgroundCopy(stdout io.ReadCloser, outFile *os.File) error {
@@ -130,4 +150,38 @@ func findMeasurePowerPath(env []string) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("No MEASUREPOWER_PATH on env: %s", env)
+}
+
+func outputFile(outputFilename string) error {
+	results := benchmarking.TestResultsFile{
+		{
+			Label:     "Go/label/AveragePower",
+			TestSuite: testSuite,
+			Unit:      "Watt",
+			Values:    []float64{100},
+		},
+		{
+			Label:     "Go/label/AverageCurrent",
+			TestSuite: testSuite,
+			Unit:      "Amp",
+			Values:    []float64{200},
+		},
+		{
+			Label:     "Go/label/Duration",
+			TestSuite: testSuite,
+			Unit:      benchmarking.Milliseconds,
+			Values:    []float64{240000},
+		},
+	}
+
+	out, err := os.Create(outputFilename)
+	if err != nil {
+		return fmt.Errorf("failed to create file %q: %w", outputFilename, err)
+	}
+	defer out.Close()
+
+	if err := results.Encode(out); err != nil {
+		return fmt.Errorf("failed to write results to file %q: %w", outputFilename, err)
+	}
+	return nil
 }
