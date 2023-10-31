@@ -30,11 +30,15 @@ namespace lockdep {
 #define LOCK_DEP_ENABLE_VALIDATION 0
 #endif
 
+// Forward declaration. Most code refers to this type through the quasi-opaque
+// type LockClassId.
+class LockClassState;
+
 // Id type used to identify each lock class.
-using LockClassId = uintptr_t;
+using LockClassId = const LockClassState*;
 
 // A sentinel value indicating an empty slot in lock tracking data structures.
-constexpr LockClassId kInvalidLockClassId = 0;
+constexpr LockClassId kInvalidLockClassId = nullptr;
 
 namespace internal {
 

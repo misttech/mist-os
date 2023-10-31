@@ -136,11 +136,11 @@ class LockDependencySet {
   // Returns a reference to an entry by computing a trivial hash of the given id
   // and a linear probe offset.
   std::atomic<LockClassId>& GetEntry(LockClassId id, size_t offset) {
-    const size_t index = (id + offset) % kMaxLockDependencies;
+    const size_t index = (reinterpret_cast<uintptr_t>(id) + offset) % kMaxLockDependencies;
     return list_[index];
   }
   const std::atomic<LockClassId>& GetEntry(LockClassId id, size_t offset) const {
-    const size_t index = (id + offset) % kMaxLockDependencies;
+    const size_t index = (reinterpret_cast<uintptr_t>(id) + offset) % kMaxLockDependencies;
     return list_[index];
   }
 

@@ -27,8 +27,7 @@ namespace lockdep {
 class LockClassState {
  public:
   // Constructs an instance of LockClassState.
-  LockClassState(const char* const name, LockDependencySet* dependency_set, LockFlags flags)
-      : name_{name}, dependency_set_{dependency_set}, flags_{flags} {}
+  LockClassState(const char* const name, LockFlags flags) : name_{name}, flags_{flags} {}
 
   // Disable copy construction / assignment.
   LockClassState(const LockClassState&) = delete;
@@ -36,7 +35,7 @@ class LockClassState {
 
   // Returns the LockClassState instance for the given lock class id. The id must
   // be a valid lock class id.
-  static LockClassState* Get(LockClassId id) { return reinterpret_cast<LockClassState*>(id); }
+  static LockClassState* Get(LockClassId id) { return const_cast<LockClassState*>(id); }
 
   // Returns the type name of the lock class for the given lock class id.
   static const char* GetName(LockClassId id) { return Get(id)->name_; }
@@ -44,13 +43,13 @@ class LockClassState {
   // Returns true if lock class given by |search_id| is in the dependency set of
   // the lock class given by |id|, false otherwise.
   static bool HasLockClass(LockClassId id, LockClassId search_id) {
-    return Get(id)->dependency_set_->HasLockClass(search_id);
+    return Get(id)->dependency_set_.HasLockClass(search_id);
   }
 
   // Adds the lock class given by |add_id| to the dependency set of the lock
   // class given by |id|.
   static LockResult AddLockClass(LockClassId id, LockClassId add_id) {
-    return Get(id)->dependency_set_->AddLockClass(add_id);
+    return Get(id)->dependency_set_.AddLockClass(add_id);
   }
 
   // Returns true if the given lock class is irq-safe, false otherwise.
@@ -114,7 +113,7 @@ class LockClassState {
 
   // Returns the lock class id for this instance. The id is the address of the
   // instance.
-  LockClassId id() const { return reinterpret_cast<LockClassId>(this); }
+  LockClassId id() const { return this; }
 
   // Returns the name of this lock class.
   const char* name() const { return name_; }
@@ -123,7 +122,7 @@ class LockClassState {
   LockFlags flags() const { return flags_; }
 
   // Returns the dependency set for this lock class.
-  const LockDependencySet& dependency_set() const { return *dependency_set_; }
+  const LockDependencySet& dependency_set() const { return dependency_set_; }
 
   LockClassState* connected_set() { return LoopDetector::FindSet(&loop_node_)->ToState(); }
 
@@ -133,7 +132,7 @@ class LockClassState {
   // Resets the dependency set and disjoint set of this object. This is
   // primarily used to initialize the state between successive tests.
   void Reset() {
-    dependency_set_->clear();
+    dependency_set_.clear();
     loop_node_.Reset();
   }
 
@@ -143,12 +142,12 @@ class LockClassState {
   // The name of the lock class type.
   const char* const name_;
 
-  // The set of out edges from this node in the lock class dependency graph.
-  // Out edges represent lock classes that have been held before this class.
-  LockDependencySet* const dependency_set_;
-
   // Flags specifying which which rules to apply during lock validation.
   const LockFlags flags_;
+
+  // The set of out edges from this node in the lock class dependency graph.
+  // Out edges represent lock classes that have been held before this class.
+  LockDependencySet dependency_set_;
 
   // Head pointer to linked list of state instances.
   inline static LockClassState* head_{nullptr};
@@ -344,7 +343,7 @@ class LockClassState {
 
         if (root_a == root_b) {
           return;  // Nothing to do for nodes in the same set.
-        } else if (root_a < root_b) {
+        } else if (reinterpret_cast<uintptr_t>(root_a) < reinterpret_cast<uintptr_t>(root_b)) {
           root_b->CompareExchangeParent(&root_b, root_a);
         } else {
           root_a->CompareExchangeParent(&root_a, root_b);

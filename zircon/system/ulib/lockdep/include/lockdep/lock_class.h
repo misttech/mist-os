@@ -62,12 +62,8 @@ class LockClass {
   // Returns the name of this lock class.
   constexpr static const char* GetName() { return fbl::TypeInfo<LockClass>::Name(); }
 
-  // Lock free dependency set that tracks which lock classes have been observed
-  // being held prior to acquisitions of this lock class.
-  static LockDependencySet dependency_set_;
-
   // This static member serves a dual role:
-  //  1. Stores the id, name, and pointer to dependency set for this lock class.
+  //  1. Stores name and dependency set for this lock class.
   //  2. The address of this member serves as the unique id for this lock class.
   static LockClassState lock_class_state_;
 };
@@ -78,12 +74,7 @@ class LockClass {
 template <typename Class, typename LockType, size_t Index, LockFlags Flags>
 LockClassState LockClass<Class, LockType, Index, Flags>::lock_class_state_ = {
     LockClass<Class, LockType, Index, Flags>::GetName(),
-    &LockClass<Class, LockType, Index, Flags>::dependency_set_,
     static_cast<LockFlags>(LockTraits<LockType>::Flags | Flags)};
-
-// The storage for this static member is allocated as zeroed memory.
-template <typename Class, typename LockType, size_t Index, LockFlags Flags>
-LockDependencySet LockClass<Class, LockType, Index, Flags>::dependency_set_;
 
 // Dummy type used in place of LockClass when validation is disabled. This type
 // does not create static dependency tracking structures that LockClass does.
