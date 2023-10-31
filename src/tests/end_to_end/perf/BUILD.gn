@@ -183,39 +183,41 @@ foreach(test, shard_test_list) {
   }
 }
 
-_all_python_benchmarks = []
+_tests = [
+  {
+    name = "flatland_benchmark"
+    expected_metric_filenames = [
+      # TODO(b/305080561): enable trace publishing and add this expected metric names.
+      # "fuchsia.flatland_latency.txt"
+    ]
+  },
+  {
+    name = "input_latency_benchmark"
+    expected_metric_filenames = [
+      # TODO(b/305080563): enable trace publishing and add this expected metric names.
+      # "fuchsia.input_latency.simplest_app.txt"
+    ]
+  },
+  {
+    name = "perf_publish_example"
+    expected_metric_filenames = [ "fuchsia.example.txt" ]
+  },
+]
 
-if (is_host) {
-  _tests = [
-    {
-      name = "flatland_benchmark"
-      expected_metric_filenames = [
-        # TODO(b/305080561): enable trace publishing and add this expected metric names.
-        # "fuchsia.flatland_latency.txt"
-      ]
-    },
-    {
-      name = "input_latency_benchmark"
-      expected_metric_filenames = [
-        # TODO(b/305080563): enable trace publishing and add this expected metric names.
-        # "fuchsia.input_latency.simplest_app.txt"
-      ]
-    },
-    {
-      name = "perf_publish_example"
-      expected_metric_filenames = [ "fuchsia.example.txt" ]
-    },
-  ]
-
-  foreach(test, _tests) {
-    _name = test.name
-    python_perf_test("py_${_name}") {
+_python_benchmarks = []
+foreach(test, _tests) {
+  _name = test.name
+  _test_name = "py_${_name}"
+  if (is_host) {
+    python_perf_test(_test_name) {
       main_source = "test/${_name}.py"
       expected_metric_filenames = test.expected_metric_filenames
     }
-    _all_python_benchmarks += [ ":py_${_name}($host_toolchain)" ]
   }
+  _python_benchmarks += [ ":${_test_name}($host_toolchain)" ]
+}
 
+if (is_host) {
   metric_files = [
     # keep-sorted start
     "fuchsia.archivist.formatter.txt",
@@ -377,7 +379,7 @@ group("package_deps") {
 group("test") {
   testonly = true
 
-  deps = [ ":package_deps" ] + _all_python_benchmarks
+  deps = [ ":package_deps" ] + _python_benchmarks
 
   foreach(target_name, test_list) {
     deps += [ ":$target_name($host_toolchain)" ]
