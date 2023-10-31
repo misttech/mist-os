@@ -19,18 +19,38 @@ namespace {
 template <class Fixture>
 using LdLoadTests = Fixture;
 
-using LoadTypes = ::testing::Types<
+template <class Fixture>
+using LdLoadFailureTests = Fixture;
+
+// This lists all the types that are compatible with both LdLoadTests and LdLoadFailureTests.
+template <class... Tests>
+using TestTypes = ::testing::Types<
 // TODO(fxbug.dev/130483): The separate-process tests require symbolic
 // relocation so they can make the syscall to exit. The spawn-process
 // tests also need a loader service to get ld.so.1 itself.
 #ifdef __Fuchsia__
-    ld::testing::LdStartupCreateProcessTests<>, ld::testing::LdRemoteProcessTests,
+    ld::testing::LdStartupCreateProcessTests<>,
 #else
     ld::testing::LdStartupSpawnProcessTests,
 #endif
+    Tests...>;
+
+// This types are meaningul for the successful tests, LdLoadTests.
+using LoadTypes = TestTypes<
+// TODO(fxbug.dev/134320): LdRemoteProcessTests::Run doesn't actually run the
+// test, instead it always returns 17. This isn't suitable for failure tests
+// which don't return 17. When remote loading is implemented and these tests
+// are actually run this can be moved into the default types in TestTypes.
+#ifdef __Fuchsia__
+    ld::testing::LdRemoteProcessTests,
+#endif
     ld::testing::LdStartupInProcessTests>;
 
+// These types are the types which are compatible with the failure tests, LdLoadFailureTests.
+using FailTypes = TestTypes<>;
+
 TYPED_TEST_SUITE(LdLoadTests, LoadTypes);
+TYPED_TEST_SUITE(LdLoadFailureTests, FailTypes);
 
 TYPED_TEST(LdLoadTests, Basic) {
   constexpr int64_t kReturnValue = 17;
@@ -248,6 +268,20 @@ TYPED_TEST(LdLoadTests, TlsGlobalDynamicAccess) {
   }
 
   EXPECT_EQ(return_value, kReturnValue);
+}
+
+TYPED_TEST(LdLoadFailureTests, MissingSymbol) {
+  ASSERT_NO_FATAL_FAILURE(this->Init());
+
+  ASSERT_NO_FATAL_FAILURE(this->Needed({"libld-dep-a.so"}));
+
+  ASSERT_NO_FATAL_FAILURE(this->Load("missing-sym"));
+
+  EXPECT_EQ(this->Run(), this->kRunFailure);
+
+  this->ExpectLog(R"(undefined symbol: b
+startup dynamic linking failed with 1 errors and 0 warnings
+)");
 }
 
 }  // namespace

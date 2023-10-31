@@ -25,6 +25,8 @@ namespace ld::testing {
 // what to do.
 class LdStartupSpawnProcessTests : public ::testing::Test, public LdLoadTestsBase {
  public:
+  static constexpr int64_t kRunFailure = 128 + SIGILL;
+
   void Init(std::initializer_list<std::string_view> args = {});
 
   void Load(std::string_view executable_name);
