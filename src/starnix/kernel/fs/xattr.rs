@@ -5,8 +5,10 @@
 use starnix_lock::Mutex;
 use std::collections::{hash_map::Entry, HashMap};
 
-use super::*;
-use crate::types::*;
+use crate::{
+    fs::{FsStr, FsString, XattrOp},
+    types::{errno, error, Errno},
+};
 
 #[derive(Default)]
 pub struct MemoryXattrStorage {
