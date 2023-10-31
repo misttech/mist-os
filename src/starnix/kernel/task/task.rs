@@ -277,6 +277,9 @@ bitflags! {
         const EXITED = 0x1;
         const SIGNALS_AVAILABLE = 0x2;
         const TEMPORARY_SIGNAL_MASK = 0x4;
+        /// Whether the executor should dump the stack of this task when it exits.
+        /// Currently used to implement ExitStatus::CoreDump.
+        const DUMP_ON_EXIT = 0x8;
     }
 }
 
@@ -312,10 +315,6 @@ pub struct TaskMutableState {
 
     /// The exit status that this task exited with.
     exit_status: Option<ExitStatus>,
-
-    /// Whether the executor should dump the stack of this task when it exits. Currently used to
-    /// implement ExitStatus::CoreDump.
-    pub dump_on_exit: bool,
 
     /// Desired scheduler policy for the task.
     pub scheduler_policy: SchedulerPolicy,
@@ -773,7 +772,6 @@ impl Task {
                 clear_child_tid: UserRef::default(),
                 signals: SignalState::with_mask(signal_mask),
                 exit_status: None,
-                dump_on_exit: false,
                 scheduler_policy,
                 uts_ns,
                 no_new_privs,

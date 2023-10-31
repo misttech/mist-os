@@ -215,7 +215,7 @@ pub fn deliver_signal(
                 task.thread_group.exit(ExitStatus::Kill(siginfo));
             }
             DeliveryAction::CoreDump => {
-                task_state.dump_on_exit = true;
+                task.set_flags(&mut *task_state, TaskFlags::DUMP_ON_EXIT, true);
                 drop(task_state);
                 task.thread_group.exit(ExitStatus::CoreDump(siginfo));
             }

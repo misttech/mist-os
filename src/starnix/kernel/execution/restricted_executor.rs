@@ -12,7 +12,7 @@ use crate::{
     signals::{deliver_signal, SignalActions, SignalInfo},
     syscalls::decls::SyscallDecl,
     task::{
-        CurrentTask, ExceptionResult, ExitStatus, Kernel, ProcessGroup, ThreadGroup,
+        CurrentTask, ExceptionResult, ExitStatus, Kernel, ProcessGroup, TaskFlags, ThreadGroup,
         ThreadGroupWriteGuard,
     },
     types::*,
@@ -318,8 +318,9 @@ fn run_task(
         profile_duration!("CheckTaskExit");
         if let Some(exit_status) = process_completed_restricted_exit(current_task, &error_context)?
         {
-            let dump_on_exit = current_task.read().dump_on_exit;
-            if dump_on_exit {
+            if current_task.flags().contains(TaskFlags::DUMP_ON_EXIT) {
+                profile_duration!("RecordCoreDump");
+
                 // Make diagnostics tooling aware of the crash.
                 current_task.kernel().core_dumps.record_core_dump(&current_task.task);
 

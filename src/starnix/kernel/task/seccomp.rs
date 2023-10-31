@@ -19,7 +19,10 @@ use crate::{
     mm::MemoryAccessorExt,
     signals::{send_signal, SignalDetail, SignalInfo},
     syscalls::{decls::Syscall, SyscallArg, SyscallResult},
-    task::{CurrentTask, EventHandler, ExitStatus, Kernel, Task, WaitCanceler, WaitQueue, Waiter},
+    task::{
+        CurrentTask, EventHandler, ExitStatus, Kernel, Task, TaskFlags, WaitCanceler, WaitQueue,
+        Waiter,
+    },
     types::*,
 };
 
@@ -381,7 +384,7 @@ impl SeccompState {
                 let mut task_state = current_task.write();
 
                 if is_last_thread {
-                    task_state.dump_on_exit = true;
+                    current_task.set_flags(&mut *task_state, TaskFlags::DUMP_ON_EXIT, true);
                     current_task.set_exit_status_if_not_already(
                         &mut *task_state,
                         ExitStatus::CoreDump(siginfo),
