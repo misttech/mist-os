@@ -55,12 +55,12 @@ use {
 /// `sources` defines what are the valid sources of the capability. See [`AllowedSourcesBuilder`].
 /// `visitor` is invoked for each `Offer` and `Expose` declaration in the routing path, as well as
 /// the final `Capability` declaration if `sources` permits.
-pub async fn route_from_use<C, S, V, M>(
+pub async fn route_from_use<C, S, V>(
     use_decl: UseDecl,
     use_target: Arc<C>,
     sources: S,
     visitor: &mut V,
-    mapper: &mut M,
+    mapper: &mut dyn DebugRouteMapper,
 ) -> Result<CapabilitySource<C>, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
@@ -69,7 +69,6 @@ where
     V: ExposeVisitor,
     V: CapabilityVisitor,
     V: Clone + Send + Sync + 'static,
-    M: DebugRouteMapper + 'static,
 {
     match Use::route(use_decl, use_target.clone(), &sources, visitor, mapper).await? {
         UseResult::Source(source) => return Ok(source),
@@ -102,12 +101,12 @@ where
 /// `sources` defines what are the valid sources of the capability. See [`AllowedSourcesBuilder`].
 /// `visitor` is invoked for each `Offer` and `Expose` declaration in the routing path, as well as
 /// the final `Capability` declaration if `sources` permits.
-pub async fn route_from_registration<R, C, S, V, M>(
+pub async fn route_from_registration<R, C, S, V>(
     registration_decl: R,
     registration_target: Arc<C>,
     sources: S,
     visitor: &mut V,
-    mapper: &mut M,
+    mapper: &mut dyn DebugRouteMapper,
 ) -> Result<CapabilitySource<C>, RoutingError>
 where
     R: RegistrationDeclCommon
@@ -122,7 +121,6 @@ where
     V: ExposeVisitor,
     V: CapabilityVisitor,
     V: Clone + Send + Sync + 'static,
-    M: DebugRouteMapper + 'static,
 {
     match Registration::route(registration_decl, registration_target, &sources, visitor, mapper)
         .await?
@@ -143,12 +141,12 @@ where
 /// `sources` defines what are the valid sources of the capability. See [`AllowedSourcesBuilder`].
 /// `visitor` is invoked for each `Offer` and `Expose` declaration in the routing path, as well as
 /// the final `Capability` declaration if `sources` permits.
-pub async fn route_from_offer<C, S, V, M>(
+pub async fn route_from_offer<C, S, V>(
     offer: RouteBundle<OfferDecl>,
     offer_target: Arc<C>,
     sources: S,
     visitor: &mut V,
-    mapper: &mut M,
+    mapper: &mut dyn DebugRouteMapper,
 ) -> Result<CapabilitySource<C>, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
@@ -157,7 +155,6 @@ where
     V: ExposeVisitor,
     V: CapabilityVisitor,
     V: Clone + Send + Sync + 'static,
-    M: DebugRouteMapper + 'static,
 {
     match Offer::route(offer, offer_target, &sources, visitor, mapper).await? {
         OfferResult::Source(source) => return Ok(source),
@@ -293,12 +290,12 @@ where
 /// `sources` defines what are the valid sources of the capability. See [`AllowedSourcesBuilder`].
 /// `visitor` is invoked for each `Expose` declaration in the routing path, as well as the final
 /// `Capability` declaration if `sources` permits.
-pub async fn route_from_expose<C, S, V, M>(
+pub async fn route_from_expose<C, S, V>(
     expose: RouteBundle<ExposeDecl>,
     expose_target: Arc<C>,
     sources: S,
     visitor: &mut V,
-    mapper: &mut M,
+    mapper: &mut dyn DebugRouteMapper,
 ) -> Result<CapabilitySource<C>, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
@@ -306,7 +303,6 @@ where
     V: ExposeVisitor,
     V: CapabilityVisitor,
     V: Clone + Send + Sync + 'static,
-    M: DebugRouteMapper + 'static,
 {
     match Expose::route(expose, expose_target, &sources, visitor, mapper).await? {
         ExposeResult::Source(source) => Ok(source),
@@ -353,19 +349,18 @@ where
 ///
 /// `sources` defines what are the valid sources of the capability. See [`AllowedSourcesBuilder`].
 /// `visitor` is invoked for each `Capability` declaration if `sources` permits.
-pub async fn route_from_self<C, S, V, M>(
+pub async fn route_from_self<C, S, V>(
     use_decl: UseDecl,
     target: Arc<C>,
     sources: S,
     visitor: &mut V,
-    mapper: &mut M,
+    mapper: &mut dyn DebugRouteMapper,
 ) -> Result<CapabilitySource<C>, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
     S: Sources + 'static,
     V: CapabilityVisitor,
     V: Clone + Send + Sync + 'static,
-    M: DebugRouteMapper + 'static,
 {
     mapper.add_use(target.moniker().clone(), &use_decl.clone().into());
     let target_capabilities = target.lock_resolved_state().await?.capabilities();
@@ -389,19 +384,18 @@ where
 /// `sources` defines what are the valid sources of the capability. See [`AllowedSourcesBuilder`].
 /// `visitor` is invoked for each `Offer` declaration in the routing path, as well as the final
 /// `Capability` declaration if `sources` permits.
-pub async fn route_from_use_without_expose<C, S, V, M>(
+pub async fn route_from_use_without_expose<C, S, V>(
     use_decl: UseDecl,
     use_target: Arc<C>,
     sources: S,
     visitor: &mut V,
-    mapper: &mut M,
+    mapper: &mut dyn DebugRouteMapper,
 ) -> Result<CapabilitySource<C>, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
     S: Sources,
     V: OfferVisitor,
     V: CapabilityVisitor,
-    M: DebugRouteMapper + 'static,
 {
     match Use::route(use_decl, use_target, &sources, visitor, mapper).await? {
         UseResult::Source(source) => return Ok(source),
@@ -422,19 +416,18 @@ where
 /// `sources` defines what are the valid sources of the capability. See [`AllowedSourcesBuilder`].
 /// `visitor` is invoked for each `Offer` declaration in the routing path, as well as the final
 /// `Capability` declaration if `sources` permits.
-pub async fn route_from_offer_without_expose<C, S, V, M>(
+pub async fn route_from_offer_without_expose<C, S, V>(
     offer: RouteBundle<OfferDecl>,
     offer_target: Arc<C>,
     sources: S,
     visitor: &mut V,
-    mapper: &mut M,
+    mapper: &mut dyn DebugRouteMapper,
 ) -> Result<CapabilitySource<C>, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
     S: Sources,
     V: OfferVisitor,
     V: CapabilityVisitor,
-    M: DebugRouteMapper,
 {
     match Offer::route(offer, offer_target, &sources, visitor, mapper).await? {
         OfferResult::Source(source) => Ok(source),
@@ -460,13 +453,11 @@ where
 pub trait Sources: Clone + Send + Sync {
     /// Return the [`InternalCapability`] representing this framework capability source, or
     /// [`RoutingError::UnsupportedRouteSource`] if unsupported.
-    fn framework_source<M>(
+    fn framework_source(
         &self,
         name: Name,
-        mapper: &mut M,
-    ) -> Result<InternalCapability, RoutingError>
-    where
-        M: DebugRouteMapper;
+        mapper: &mut dyn DebugRouteMapper,
+    ) -> Result<InternalCapability, RoutingError>;
 
     /// Checks whether capability sources are supported, returning [`RoutingError::UnsupportedRouteSource`]
     /// if they are not.
@@ -486,47 +477,44 @@ pub trait Sources: Clone + Send + Sync {
     /// If found, the declaration is visited by `visitor` and the declaration is wrapped
     /// in a [`ComponentCapability`].
     /// Returns [`RoutingError::UnsupportedRouteSource`] if namespace capabilities are unsupported.
-    fn find_namespace_source<V, M>(
+    fn find_namespace_source<V>(
         &self,
         name: &Name,
         capabilities: &[CapabilityDecl],
         visitor: &mut V,
-        mapper: &mut M,
+        mapper: &mut dyn DebugRouteMapper,
     ) -> Result<Option<ComponentCapability>, RoutingError>
     where
-        V: CapabilityVisitor,
-        M: DebugRouteMapper;
+        V: CapabilityVisitor;
 
     /// Looks for a built-in capability in the list of capability sources.
     /// If found, the capability's name is wrapped in an [`InternalCapability`].
     /// Returns [`RoutingError::UnsupportedRouteSource`] if built-in capabilities are unsupported.
-    fn find_builtin_source<V, M>(
+    fn find_builtin_source<V>(
         &self,
         name: &Name,
         capabilities: &[CapabilityDecl],
         visitor: &mut V,
-        mapper: &mut M,
+        mapper: &mut dyn DebugRouteMapper,
     ) -> Result<Option<InternalCapability>, RoutingError>
     where
-        V: CapabilityVisitor,
-        M: DebugRouteMapper;
+        V: CapabilityVisitor;
 
     /// Looks for a component capability in the list of capability sources for the component instance
     /// with moniker `moniker`.
     /// If found, the declaration is visited by `visitor` and the declaration is wrapped
     /// in a [`ComponentCapability`].
     /// Returns [`RoutingError::UnsupportedRouteSource`] if component capabilities are unsupported.
-    fn find_component_source<V, M>(
+    fn find_component_source<V>(
         &self,
         name: &Name,
         moniker: &Moniker,
         capabilities: &[CapabilityDecl],
         visitor: &mut V,
-        mapper: &mut M,
+        mapper: &mut dyn DebugRouteMapper,
     ) -> Result<ComponentCapability, RoutingError>
     where
-        V: CapabilityVisitor,
-        M: DebugRouteMapper;
+        V: CapabilityVisitor;
 }
 
 /// Defines which capability source types are supported.
@@ -593,14 +581,11 @@ impl AllowedSourcesBuilder {
 // Implementation of `Sources` that allows namespace, component, and/or built-in source
 // types.
 impl Sources for AllowedSourcesBuilder {
-    fn framework_source<M>(
+    fn framework_source(
         &self,
         name: Name,
-        mapper: &mut M,
-    ) -> Result<InternalCapability, RoutingError>
-    where
-        M: DebugRouteMapper,
-    {
+        mapper: &mut dyn DebugRouteMapper,
+    ) -> Result<InternalCapability, RoutingError> {
         let source = self
             .framework
             .as_ref()
@@ -630,16 +615,15 @@ impl Sources for AllowedSourcesBuilder {
         self.namespace
     }
 
-    fn find_namespace_source<V, M>(
+    fn find_namespace_source<V>(
         &self,
         name: &Name,
         capabilities: &[CapabilityDecl],
         visitor: &mut V,
-        mapper: &mut M,
+        mapper: &mut dyn DebugRouteMapper,
     ) -> Result<Option<ComponentCapability>, RoutingError>
     where
         V: CapabilityVisitor,
-        M: DebugRouteMapper,
     {
         if self.namespace {
             if let Some(decl) = capabilities
@@ -660,16 +644,15 @@ impl Sources for AllowedSourcesBuilder {
         }
     }
 
-    fn find_builtin_source<V, M>(
+    fn find_builtin_source<V>(
         &self,
         name: &Name,
         capabilities: &[CapabilityDecl],
         visitor: &mut V,
-        mapper: &mut M,
+        mapper: &mut dyn DebugRouteMapper,
     ) -> Result<Option<InternalCapability>, RoutingError>
     where
         V: CapabilityVisitor,
-        M: DebugRouteMapper,
     {
         if self.builtin {
             if let Some(decl) = capabilities
@@ -690,17 +673,16 @@ impl Sources for AllowedSourcesBuilder {
         }
     }
 
-    fn find_component_source<V, M>(
+    fn find_component_source<V>(
         &self,
         name: &Name,
         moniker: &Moniker,
         capabilities: &[CapabilityDecl],
         visitor: &mut V,
-        mapper: &mut M,
+        mapper: &mut dyn DebugRouteMapper,
     ) -> Result<ComponentCapability, RoutingError>
     where
         V: CapabilityVisitor,
-        M: DebugRouteMapper,
     {
         if self.component {
             let decl = capabilities
@@ -737,18 +719,17 @@ enum UseResult<C: ComponentInstanceInterface> {
 impl Use {
     /// Routes the capability starting from the `use_` declaration at `target` to either a valid
     /// source (as defined by `sources`) or the Offer declaration that ends this phase of routing.
-    async fn route<C, S, V, M>(
+    async fn route<C, S, V>(
         use_: UseDecl,
         target: Arc<C>,
         sources: &S,
         visitor: &mut V,
-        mapper: &mut M,
+        mapper: &mut dyn DebugRouteMapper,
     ) -> Result<UseResult<C>, RoutingError>
     where
         C: ComponentInstanceInterface,
         S: Sources,
         V: CapabilityVisitor,
-        M: DebugRouteMapper,
     {
         mapper.add_use(target.moniker().clone(), &use_);
         match use_.source() {
@@ -868,18 +849,17 @@ where
     /// Routes the capability starting from the `registration` declaration at `target` to either a
     /// valid source (as defined by `sources`) or the Offer or Expose declaration that ends this
     /// phase of routing.
-    async fn route<C, S, V, M>(
+    async fn route<C, S, V>(
         registration: R,
         target: Arc<C>,
         sources: &S,
         visitor: &mut V,
-        mapper: &mut M,
+        mapper: &mut dyn DebugRouteMapper,
     ) -> Result<RegistrationResult<C, OfferDecl>, RoutingError>
     where
         C: ComponentInstanceInterface,
         S: Sources,
         V: CapabilityVisitor,
-        M: DebugRouteMapper,
     {
         let registration_decl: RegistrationDecl = registration.clone().into();
         mapper.add_registration(target.moniker().clone(), &registration_decl);
@@ -1006,19 +986,18 @@ enum OfferSegment<C: ComponentInstanceInterface> {
 impl Offer {
     /// Routes the capability starting from the `offer` declaration at `target` to either a valid
     /// source (as defined by `sources`) or the declaration that ends this phase of routing.
-    async fn route<C, S, V, M>(
+    async fn route<C, S, V>(
         mut offer_bundle: RouteBundle<OfferDecl>,
         mut target: Arc<C>,
         sources: &S,
         visitor: &mut V,
-        mapper: &mut M,
+        mapper: &mut dyn DebugRouteMapper,
     ) -> Result<OfferResult<C>, RoutingError>
     where
         C: ComponentInstanceInterface + 'static,
         S: Sources,
         V: OfferVisitor,
         V: CapabilityVisitor,
-        M: DebugRouteMapper,
     {
         loop {
             let visit_offer = match &offer_bundle {
@@ -1082,19 +1061,18 @@ impl Offer {
         }
     }
 
-    async fn route_segment<C, S, V, M>(
+    async fn route_segment<C, S, V>(
         offer: OfferDecl,
         target: Arc<C>,
         sources: &S,
         visitor: &mut V,
-        mapper: &mut M,
+        mapper: &mut dyn DebugRouteMapper,
     ) -> Result<OfferSegment<C>, RoutingError>
     where
         C: ComponentInstanceInterface + 'static,
         S: Sources,
         V: OfferVisitor,
         V: CapabilityVisitor,
-        M: DebugRouteMapper,
     {
         let res = match offer.source() {
             OfferSource::Void => {
@@ -1438,19 +1416,18 @@ enum ExposeSegment<C: ComponentInstanceInterface> {
 impl Expose {
     /// Routes the capability starting from the `expose` declaration at `target` to a valid source
     /// (as defined by `sources`).
-    async fn route<C, S, V, M>(
+    async fn route<C, S, V>(
         mut expose_bundle: RouteBundle<ExposeDecl>,
         mut target: Arc<C>,
         sources: &S,
         visitor: &mut V,
-        mapper: &mut M,
+        mapper: &mut dyn DebugRouteMapper,
     ) -> Result<ExposeResult<C>, RoutingError>
     where
         C: ComponentInstanceInterface,
         S: Sources,
         V: ExposeVisitor,
         V: CapabilityVisitor,
-        M: DebugRouteMapper,
     {
         loop {
             let visit_expose = match &expose_bundle {
@@ -1495,19 +1472,18 @@ impl Expose {
         }
     }
 
-    async fn route_segment<C, S, V, M>(
+    async fn route_segment<C, S, V>(
         expose: ExposeDecl,
         target: Arc<C>,
         sources: &S,
         visitor: &mut V,
-        mapper: &mut M,
+        mapper: &mut dyn DebugRouteMapper,
     ) -> Result<ExposeSegment<C>, RoutingError>
     where
         C: ComponentInstanceInterface,
         S: Sources,
         V: ExposeVisitor,
         V: CapabilityVisitor,
-        M: DebugRouteMapper,
     {
         let res = match expose.source() {
             ExposeSource::Void => {
