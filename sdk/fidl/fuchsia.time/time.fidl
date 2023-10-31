@@ -55,3 +55,12 @@ closed protocol Maintenance {
 ///
 /// [det]: https://fuchsia.dev/fuchsia-src/reference/kernel_objects/clock#error-bound
 const SIGNAL_UTC_CLOCK_SYNCHRONIZED uint32 = 0x01000000;
+
+/// Signaled on the UTC clock handle when the UTC clock is determined to have
+/// reached logging quality.
+///
+/// Logging quality timestamps are low-confidence, but presumed good enough for
+/// debug logging.
+///
+/// The value is an alias for `ZX_USER_SIGNAL_1`
+const SIGNAL_UTC_CLOCK_LOGGING_QUALITY uint32 = 0x02000000;
