@@ -14,7 +14,7 @@ use futures::FutureExt;
 use netlink::{interfaces::InterfacesHandler, Netlink, NETLINK_LOG_TAG};
 use once_cell::sync::OnceCell;
 use selinux::security_server::SecurityServer;
-use starnix_lock::RwLock;
+use starnix_lock::{declare_lock_levels, OrderedRwLock, RwLock};
 use std::{
     collections::BTreeMap,
     sync::{
@@ -47,6 +47,9 @@ use crate::{
     types::{DeviceType, Errno, OpenFlags, *},
     vdso::vdso_loader::Vdso,
 };
+
+declare_lock_levels![KernelIpTables: OrderedRwLock<IpTables>];
+use self::lock_levels::*;
 
 /// The shared, mutable state for the entire Starnix kernel.
 ///
@@ -139,7 +142,7 @@ pub struct Kernel {
     pub binders: RwLock<BTreeMap<DeviceType, Arc<BinderDriver>>>,
 
     /// The iptables used for filtering network packets.
-    pub iptables: RwLock<IpTables>,
+    pub iptables: OrderedRwLock<IpTables, KernelIpTables>,
 
     /// The futexes shared across processes.
     pub shared_futexes: FutexTable<SharedFutexKey>,
@@ -277,7 +280,7 @@ impl Kernel {
             framebuffer,
             input_device,
             binders: Default::default(),
-            iptables: RwLock::new(IpTables::new()),
+            iptables: OrderedRwLock::new(IpTables::new()),
             shared_futexes: FutexTable::<SharedFutexKey>::default(),
             root_uts_ns: Arc::new(RwLock::new(UtsNamespace::default())),
             vdso: Vdso::new(),

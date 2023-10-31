@@ -24,6 +24,7 @@ mod waiter;
 pub use abstract_socket_namespace::*;
 pub use interval_timer::*;
 pub use iptables::*;
+pub use kernel::lock_levels as kernel_lock_levels;
 pub use kernel::*;
 pub use kernel_threads::*;
 pub use net::*;

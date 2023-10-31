@@ -737,7 +737,7 @@ pub fn sys_sendto(
 }
 
 pub fn sys_getsockopt(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     level: u32,
@@ -752,7 +752,7 @@ pub fn sys_getsockopt(
     let optval = current_task.read_memory_to_vec(user_optval, optlen as usize)?;
 
     let opt_value = if socket.domain.is_inet() && IpTables::can_handle_getsockopt(level, optname) {
-        current_task.kernel().iptables.read().getsockopt(socket, optname, optval)?
+        current_task.kernel().iptables.read(locked).getsockopt(socket, optname, optval)?
     } else {
         socket.getsockopt(level, optname, optlen)?
     };
@@ -768,7 +768,7 @@ pub fn sys_getsockopt(
 }
 
 pub fn sys_setsockopt(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     level: u32,
@@ -781,7 +781,12 @@ pub fn sys_setsockopt(
 
     let user_opt = UserBuffer { address: user_optval, length: optlen as usize };
     if socket.domain.is_inet() && IpTables::can_handle_setsockopt(level, optname) {
-        current_task.kernel().iptables.write().setsockopt(current_task, socket, optname, user_opt)
+        current_task.kernel().iptables.write(locked).setsockopt(
+            current_task,
+            socket,
+            optname,
+            user_opt,
+        )
     } else {
         socket.setsockopt(current_task, level, optname, user_opt)
     }

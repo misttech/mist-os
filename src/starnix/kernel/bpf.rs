@@ -12,7 +12,7 @@
 // TODO(https://github.com/rust-lang/rust/issues/39371): remove
 #![allow(non_upper_case_globals)]
 
-use starnix_lock::OrderedMutex;
+use starnix_lock::{declare_lock_levels, OrderedMutex};
 use std::{collections::BTreeMap, ops::Bound, sync::Arc};
 use zerocopy::{AsBytes, FromBytes};
 
@@ -29,14 +29,8 @@ use crate::{
     types::{as_any::AsAny, *},
 };
 
-pub mod lock_levels {
-    use lock_sequence::lock_level;
-    use starnix_lock::OrderedMutex;
-    use std::collections::BTreeMap;
-    lock_level!(BpfMapEntries, OrderedMutex<BTreeMap<Vec<u8>, Vec<u8>>, BpfMapEntries>);
-}
-
-use crate::bpf::lock_levels::BpfMapEntries;
+declare_lock_levels![BpfMapEntries: OrderedMutex<BTreeMap<Vec<u8>, Vec<u8>>>];
+use self::lock_levels::*;
 
 /// The default selinux context to use for each BPF object.
 const DEFAULT_BPF_SELINUX_CONTEXT: &FsStr = b"u:object_r:fs_bpf:s0";
