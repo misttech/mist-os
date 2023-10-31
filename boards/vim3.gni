@@ -22,10 +22,6 @@ partitions_config_contents =
 
 bazel_product_bundle_board = "vim3"
 
-#####
-#
-# Configuration items that need to be added to assembly
-
 # Board file adds vulkan VCD that lets vulkan tests work on systems with Mali
 # GPUs.
 board_has_libvulkan_arm_mali = true
