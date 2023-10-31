@@ -1669,7 +1669,7 @@ mod tests {
             vec![
                 RouteSegment::RegisterBy {
                     moniker: Moniker::root(),
-                    capability: RegistrationDecl::Storage(storage_decl.into())
+                    capability: RegistrationDecl::Directory(storage_decl.into())
                 },
                 RouteSegment::DeclareBy {
                     moniker: Moniker::root(),

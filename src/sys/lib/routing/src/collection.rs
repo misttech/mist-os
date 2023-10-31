@@ -14,14 +14,12 @@ use {
         error::RoutingError,
         mapper::NoopRouteMapper,
         router::{
-            self, CapabilityVisitor, ErrorNotFoundFromParent, ErrorNotFoundInChild, ExposeVisitor,
-            OfferVisitor, RouteBundle, Sources,
+            self, CapabilityVisitor, ErrorNotFoundInChild, ExposeVisitor, OfferVisitor,
+            RouteBundle, Sources,
         },
     },
     async_trait::async_trait,
-    cm_rust::{
-        ExposeDecl, ExposeDeclCommon, NameMapping, OfferDecl, OfferDeclCommon, OfferServiceDecl,
-    },
+    cm_rust::{ExposeDecl, ExposeDeclCommon, NameMapping, OfferDecl, OfferServiceDecl},
     cm_types::Name,
     derivative::Derivative,
     from_enum::FromEnum,
@@ -249,11 +247,10 @@ fn get_instance_filter(offer_decl: &OfferServiceDecl) -> Vec<NameMapping> {
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = "S: Clone, V: Clone"))]
-pub(super) struct OfferAggregateServiceProvider<C: ComponentInstanceInterface, O, E, S, V> {
+pub(super) struct OfferAggregateServiceProvider<C: ComponentInstanceInterface, E, S, V> {
     /// Component that offered the aggregate service
     component: WeakComponentInstanceInterface<C>,
 
-    phantom_offer: std::marker::PhantomData<O>,
     phantom_expose: std::marker::PhantomData<E>,
 
     /// List of offer decl to follow for routing each service provider used in the overall aggregation
@@ -263,7 +260,7 @@ pub(super) struct OfferAggregateServiceProvider<C: ComponentInstanceInterface, O
     visitor: V,
 }
 
-impl<C, O, E, S, V> OfferAggregateServiceProvider<C, O, E, S, V>
+impl<C, E, S, V> OfferAggregateServiceProvider<C, E, S, V>
 where
     C: ComponentInstanceInterface + 'static,
     E: ExposeDeclCommon
@@ -272,15 +269,8 @@ where
         + Into<ExposeDecl>
         + Clone
         + 'static,
-    O: OfferDeclCommon
-        + ErrorNotFoundFromParent
-        + ErrorNotFoundInChild
-        + FromEnum<OfferDecl>
-        + Into<OfferDecl>
-        + Clone
-        + 'static,
     S: Sources + 'static,
-    V: OfferVisitor<OfferDecl = O>
+    V: OfferVisitor
         + ExposeVisitor<ExposeDecl = E>
         + CapabilityVisitor<CapabilityDecl = S::CapabilityDecl>,
     V: Send + Sync + Clone + 'static,
@@ -294,7 +284,6 @@ where
         Self {
             offer_decls,
             phantom_expose: std::marker::PhantomData::<E> {},
-            phantom_offer: std::marker::PhantomData::<O> {},
             sources,
             visitor,
             component,
@@ -302,8 +291,8 @@ where
     }
 }
 
-impl<C, O, E, S, V> FilteredAggregateCapabilityProvider<C>
-    for OfferAggregateServiceProvider<C, O, E, S, V>
+impl<C, E, S, V> FilteredAggregateCapabilityProvider<C>
+    for OfferAggregateServiceProvider<C, E, S, V>
 where
     C: ComponentInstanceInterface + 'static,
     E: ExposeDeclCommon
@@ -312,15 +301,8 @@ where
         + Into<ExposeDecl>
         + Clone
         + 'static,
-    O: OfferDeclCommon
-        + ErrorNotFoundFromParent
-        + ErrorNotFoundInChild
-        + FromEnum<OfferDecl>
-        + Into<OfferDecl>
-        + Clone
-        + 'static,
     S: Sources + 'static,
-    V: OfferVisitor<OfferDecl = O>
+    V: OfferVisitor
         + ExposeVisitor<ExposeDecl = E>
         + CapabilityVisitor<CapabilityDecl = S::CapabilityDecl>,
     V: Send + Sync + Clone + 'static,
@@ -337,14 +319,10 @@ where
             if instance_filter.is_empty() {
                 continue;
             }
-            // The visitor which we inherited from the router is parameterized on the generic
-            // type `O`. This construction with from_enum is a roundabout way of
-            // converting from the concrete variant type to the generic.
             let mut offer_decl = offer_decl.clone();
             offer_decl.source_instance_filter = None;
             offer_decl.renamed_instances = None;
             let offer_decl = OfferDecl::Service(offer_decl);
-            let offer_decl = O::from_enum(&offer_decl).unwrap().clone();
             let fut = async {
                 let component = self.component.upgrade().map_err(|e| {
                     RoutingError::unsupported_route_source(format!(

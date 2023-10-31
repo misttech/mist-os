@@ -308,7 +308,7 @@ where
         .component()
         .capability();
     let source = router::route_from_offer(
-        RouteBundle::from_offer(offer_decl),
+        RouteBundle::from_offer(offer_decl.into()),
         target.clone(),
         allowed_sources,
         &mut availability_visitor,
@@ -340,7 +340,7 @@ where
         .namespace()
         .component();
     let source = router::route_from_offer(
-        RouteBundle::from_offer(offer_decl),
+        RouteBundle::from_offer(offer_decl.into()),
         target.clone(),
         allowed_sources,
         &mut state,
@@ -366,7 +366,7 @@ where
         AvailabilityServiceVisitor::new(offer_bundle.iter().next().unwrap().availability);
     let allowed_sources = AllowedSourcesBuilder::new().component().collection();
     let source = router::route_from_offer(
-        offer_bundle,
+        offer_bundle.map(Into::into),
         target.clone(),
         allowed_sources,
         &mut availability_visitor,
@@ -390,7 +390,7 @@ where
 
     let mut availability_visitor = AvailabilityEventStreamVisitor::new(offer_decl.availability);
     let source = router::route_from_offer_without_expose(
-        RouteBundle::from_offer(offer_decl),
+        RouteBundle::from_offer(offer_decl.into()),
         target.clone(),
         allowed_sources,
         &mut availability_visitor,
@@ -412,7 +412,7 @@ where
     let mut availability_visitor = AvailabilityStorageVisitor::new(offer_decl.availability);
     let allowed_sources = AllowedSourcesBuilder::new().component();
     let source = router::route_from_offer_without_expose(
-        RouteBundle::from_offer(offer_decl),
+        RouteBundle::from_offer(offer_decl.into()),
         target.clone(),
         allowed_sources,
         &mut availability_visitor,
@@ -434,7 +434,7 @@ where
     let allowed_sources: AllowedSourcesBuilder<RunnerDecl> =
         AllowedSourcesBuilder::new().builtin().component();
     let source = router::route_from_offer(
-        RouteBundle::from_offer(offer_decl),
+        RouteBundle::from_offer(offer_decl.into()),
         target.clone(),
         allowed_sources,
         &mut NoopRunnerVisitor::new(),
@@ -455,7 +455,7 @@ where
 {
     let allowed_sources = AllowedSourcesBuilder::new().builtin().component();
     let source = router::route_from_offer(
-        RouteBundle::from_offer(offer_decl),
+        RouteBundle::from_offer(offer_decl.into()),
         target.clone(),
         allowed_sources,
         &mut NoopResolverVisitor::new(),
@@ -729,12 +729,13 @@ impl DirectoryState {
 }
 
 impl OfferVisitor for DirectoryState {
-    type OfferDecl = OfferDirectoryDecl;
-
-    fn visit(&mut self, offer: &OfferDirectoryDecl) -> Result<(), RoutingError> {
-        match offer.source {
-            OfferSource::Framework => self.finalize(fio::RW_STAR_DIR, offer.subdir.clone()),
-            _ => self.advance_with_offer(offer),
+    fn visit(&mut self, offer: &cm_rust::OfferDecl) -> Result<(), RoutingError> {
+        match offer {
+            cm_rust::OfferDecl::Directory(dir) => match dir.source {
+                OfferSource::Framework => self.finalize(fio::RW_STAR_DIR, dir.subdir.clone()),
+                _ => self.advance_with_offer(dir),
+            },
+            _ => Ok(()),
         }
     }
 }
@@ -1128,7 +1129,18 @@ pub enum RegistrationDecl {
     Resolver(ResolverRegistration),
     Runner(RunnerRegistration),
     Debug(DebugRegistration),
-    Storage(StorageDeclAsRegistration),
+    Directory(StorageDeclAsRegistration),
+}
+
+impl From<&RegistrationDecl> for cm_rust::CapabilityTypeName {
+    fn from(registration: &RegistrationDecl) -> Self {
+        match registration {
+            RegistrationDecl::Directory(_) => Self::Directory,
+            RegistrationDecl::Resolver(_) => Self::Resolver,
+            RegistrationDecl::Runner(_) => Self::Runner,
+            RegistrationDecl::Debug(_) => Self::Protocol,
+        }
+    }
 }
 
 // Error trait impls
@@ -1167,12 +1179,6 @@ impl ErrorNotFoundInChild for DebugRegistration {
             capability_name,
             capability_type: DebugRegistration::TYPE.to_string(),
         }
-    }
-}
-
-impl ErrorNotFoundFromParent for OfferProtocolDecl {
-    fn error_not_found_from_parent(moniker: Moniker, capability_name: Name) -> RoutingError {
-        RoutingError::OfferFromParentNotFound { moniker, capability_id: capability_name.into() }
     }
 }
 
@@ -1218,34 +1224,6 @@ impl ErrorNotFoundInChild for UseEventStreamDecl {
     }
 }
 
-impl ErrorNotFoundInChild for OfferProtocolDecl {
-    fn error_not_found_in_child(
-        moniker: Moniker,
-        child_moniker: ChildName,
-        capability_name: Name,
-    ) -> RoutingError {
-        RoutingError::OfferFromChildExposeNotFound {
-            moniker,
-            child_moniker,
-            capability_id: capability_name.into(),
-        }
-    }
-}
-
-impl ErrorNotFoundInChild for OfferEventStreamDecl {
-    fn error_not_found_in_child(
-        moniker: Moniker,
-        child_moniker: ChildName,
-        capability_name: Name,
-    ) -> RoutingError {
-        RoutingError::OfferFromChildExposeNotFound {
-            moniker,
-            child_moniker,
-            capability_id: capability_name.into(),
-        }
-    }
-}
-
 impl ErrorNotFoundInChild for ExposeProtocolDecl {
     fn error_not_found_in_child(
         moniker: Moniker,
@@ -1266,12 +1244,6 @@ impl ErrorNotFoundFromParent for UseServiceDecl {
     }
 }
 
-impl ErrorNotFoundFromParent for OfferServiceDecl {
-    fn error_not_found_from_parent(moniker: Moniker, capability_name: Name) -> RoutingError {
-        RoutingError::OfferFromParentNotFound { moniker, capability_id: capability_name.into() }
-    }
-}
-
 impl ErrorNotFoundInChild for UseServiceDecl {
     fn error_not_found_in_child(
         moniker: Moniker,
@@ -1286,7 +1258,7 @@ impl ErrorNotFoundInChild for UseServiceDecl {
     }
 }
 
-impl ErrorNotFoundInChild for OfferServiceDecl {
+impl ErrorNotFoundInChild for cm_rust::OfferDecl {
     fn error_not_found_in_child(
         moniker: Moniker,
         child_moniker: ChildName,
@@ -1320,7 +1292,7 @@ impl ErrorNotFoundFromParent for UseDirectoryDecl {
     }
 }
 
-impl ErrorNotFoundFromParent for OfferDirectoryDecl {
+impl ErrorNotFoundFromParent for cm_rust::OfferDecl {
     fn error_not_found_from_parent(moniker: Moniker, capability_name: Name) -> RoutingError {
         RoutingError::OfferFromParentNotFound { moniker, capability_id: capability_name.into() }
     }
@@ -1335,20 +1307,6 @@ impl ErrorNotFoundInChild for UseDirectoryDecl {
         RoutingError::UseFromChildExposeNotFound {
             child_moniker,
             moniker,
-            capability_id: capability_name.into(),
-        }
-    }
-}
-
-impl ErrorNotFoundInChild for OfferDirectoryDecl {
-    fn error_not_found_in_child(
-        moniker: Moniker,
-        child_moniker: ChildName,
-        capability_name: Name,
-    ) -> RoutingError {
-        RoutingError::OfferFromChildExposeNotFound {
-            moniker,
-            child_moniker,
             capability_id: capability_name.into(),
         }
     }
@@ -1371,12 +1329,6 @@ impl ErrorNotFoundInChild for ExposeDirectoryDecl {
 impl ErrorNotFoundFromParent for UseStorageDecl {
     fn error_not_found_from_parent(moniker: Moniker, capability_name: Name) -> RoutingError {
         RoutingError::UseFromParentNotFound { moniker, capability_id: capability_name.into() }
-    }
-}
-
-impl ErrorNotFoundFromParent for OfferStorageDecl {
-    fn error_not_found_from_parent(moniker: Moniker, capability_name: Name) -> RoutingError {
-        RoutingError::OfferFromParentNotFound { moniker, capability_id: capability_name.into() }
     }
 }
 
@@ -1425,26 +1377,6 @@ impl ErrorNotFoundInChild for RunnerRegistration {
     }
 }
 
-impl ErrorNotFoundFromParent for OfferRunnerDecl {
-    fn error_not_found_from_parent(moniker: Moniker, capability_name: Name) -> RoutingError {
-        RoutingError::OfferFromParentNotFound { moniker, capability_id: capability_name.into() }
-    }
-}
-
-impl ErrorNotFoundInChild for OfferRunnerDecl {
-    fn error_not_found_in_child(
-        moniker: Moniker,
-        child_moniker: ChildName,
-        capability_name: Name,
-    ) -> RoutingError {
-        RoutingError::OfferFromChildExposeNotFound {
-            moniker,
-            child_moniker,
-            capability_id: capability_name.into(),
-        }
-    }
-}
-
 impl ErrorNotFoundInChild for ExposeRunnerDecl {
     fn error_not_found_in_child(
         moniker: Moniker,
@@ -1484,26 +1416,6 @@ impl ErrorNotFoundInChild for ResolverRegistration {
     }
 }
 
-impl ErrorNotFoundFromParent for OfferResolverDecl {
-    fn error_not_found_from_parent(moniker: Moniker, capability_name: Name) -> RoutingError {
-        RoutingError::OfferFromParentNotFound { moniker, capability_id: capability_name.into() }
-    }
-}
-
-impl ErrorNotFoundInChild for OfferResolverDecl {
-    fn error_not_found_in_child(
-        moniker: Moniker,
-        child_moniker: ChildName,
-        capability_name: Name,
-    ) -> RoutingError {
-        RoutingError::OfferFromChildExposeNotFound {
-            moniker,
-            child_moniker,
-            capability_id: capability_name.into(),
-        }
-    }
-}
-
 impl ErrorNotFoundInChild for ExposeResolverDecl {
     fn error_not_found_in_child(
         moniker: Moniker,
@@ -1521,11 +1433,5 @@ impl ErrorNotFoundInChild for ExposeResolverDecl {
 impl ErrorNotFoundFromParent for UseEventStreamDecl {
     fn error_not_found_from_parent(moniker: Moniker, capability_name: Name) -> RoutingError {
         RoutingError::UseFromParentNotFound { moniker, capability_id: capability_name.into() }
-    }
-}
-
-impl ErrorNotFoundFromParent for OfferEventStreamDecl {
-    fn error_not_found_from_parent(moniker: Moniker, capability_name: Name) -> RoutingError {
-        RoutingError::OfferFromParentNotFound { moniker, capability_id: capability_name.into() }
     }
 }

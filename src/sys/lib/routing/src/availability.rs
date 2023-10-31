@@ -130,12 +130,8 @@ impl<O, E, C> AvailabilityVisitor<O, E, C> {
     }
 }
 
-impl<O, E, C> crate::router::OfferVisitor for AvailabilityVisitor<O, E, C>
-where
-    O: OfferDeclCommon,
-{
-    type OfferDecl = O;
-    fn visit(&mut self, offer: &Self::OfferDecl) -> Result<(), crate::RoutingError> {
+impl<O, E, C> crate::router::OfferVisitor for AvailabilityVisitor<O, E, C> {
+    fn visit(&mut self, offer: &cm_rust::OfferDecl) -> Result<(), crate::RoutingError> {
         self.state.advance_with_offer(offer).map_err(Into::into)
     }
 }
