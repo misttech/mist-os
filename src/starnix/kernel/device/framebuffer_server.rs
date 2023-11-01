@@ -26,6 +26,8 @@ use fuchsia_framebuffer::{sysmem::BufferCollectionAllocator, FrameUsage};
 use fuchsia_scenic::BufferCollectionTokenPair;
 use fuchsia_zircon as zx;
 use futures::{StreamExt, TryStreamExt};
+use starnix_lock::Mutex;
+use std::ops::DerefMut;
 use std::sync::{mpsc::channel, Arc};
 
 use crate::{logging::log_warn, types::*};
@@ -47,6 +49,12 @@ enum ExposedProtocols {
     ViewProvider(fuiapp::ViewProviderRequestStream),
 }
 
+/// The Scene states that `FramebufferServer` may serve.
+pub enum SceneState {
+    Fb,
+    Viewport,
+}
+
 /// A `FramebufferServer` contains initialized proxies to Flatland, as well as a buffer collection
 /// that is registered with Flatland.
 pub struct FramebufferServer {
@@ -61,6 +69,9 @@ pub struct FramebufferServer {
 
     /// The height of the display and framebuffer image.
     image_height: u32,
+
+    /// Keeps track if this class is serving FB or a Viewport.
+    scene_state: Arc<Mutex<SceneState>>,
 }
 
 impl FramebufferServer {
@@ -76,7 +87,13 @@ impl FramebufferServer {
         let collection =
             init_fb_scene(&flatland, &allocator, width, height).map_err(|_| errno!(EINVAL))?;
 
-        Ok(Self { flatland, collection, image_width: width, image_height: height })
+        Ok(Self {
+            flatland,
+            collection,
+            image_width: width,
+            image_height: height,
+            scene_state: Arc::new(Mutex::new(SceneState::Fb)),
+        })
     }
 
     /// Returns a clone of the VMO that is shared with Flatland.
@@ -192,8 +209,23 @@ pub fn init_viewport_scene(
     server: Arc<FramebufferServer>,
     viewport_token: fuiviews::ViewportCreationToken,
 ) {
-    // TODO(fxbug.dev/117507) : Handle multiple calls to init_viewport_scene, clean fb resources
-    // and break the present loop if started.
+    let mut scene_state = server.scene_state.lock();
+    let scene_state = scene_state.deref_mut();
+    // This handles multiple calls to init_viewport_scene and cleans fb resources.
+    // TODO(fxbug.dev/117507): Break the present loop if already started. Note that we still need to
+    // present once, taking into account the present credits
+    match scene_state {
+        SceneState::Fb => {
+            server.flatland.release_image(&FB_IMAGE_ID).expect("failed to release image");
+        }
+        SceneState::Viewport => {
+            server
+                .flatland
+                .release_viewport(&VIEWPORT_ID, zx::Time::INFINITE)
+                .expect("failed to release viewport");
+        }
+    }
+
     let (_, child_view_watcher_request) = create_proxy::<fuicomposition::ChildViewWatcherMarker>()
         .expect("failed to create child view watcher channel");
     let viewport_properties = fuicomposition::ViewportProperties {
@@ -210,6 +242,8 @@ pub fn init_viewport_scene(
         )
         .expect("failed to create child viewport");
     server.flatland.set_content(&ROOT_TRANSFORM_ID, &VIEWPORT_ID).expect("error setting content");
+
+    *scene_state = SceneState::Viewport;
 }
 
 /// Spawns a thread to serve a `ViewProvider` in `outgoing_dir`.
@@ -237,7 +271,7 @@ pub fn spawn_view_provider(
                 while let Ok(Some(event)) = request_stream.try_next().await {
                     match event {
                         fuiapp::ViewProviderRequest::CreateView2 { args, control_handle: _ } => {
-                            let  view_creation_token = args.view_creation_token.unwrap();
+                            let view_creation_token = args.view_creation_token.unwrap();
                             // We don't actually care about the parent viewport at the moment, because we don't resize.
                             let (_parent_viewport_watcher, parent_viewport_watcher_request) =
                                 create_proxy::<fuicomposition::ParentViewportWatcherMarker>()
