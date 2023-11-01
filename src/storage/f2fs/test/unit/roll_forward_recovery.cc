@@ -1217,7 +1217,7 @@ TEST(FsyncRecoveryTest, AtomicFsync) {
   // 3. currupt invalid_fsync_file's last dnode page
   block_t last_dnode_blkaddr =
       fs->GetSegmentManager().NextFreeBlkAddr(CursegType::kCursegWarmNode) - 1;
-  FsBlock<Node> node_block;
+  BlockBuffer<Node> node_block;
   fs->GetBc().Readblk(last_dnode_blkaddr, &node_block);
   ASSERT_EQ(curr_checkpoint_ver, LeToCpu(node_block->footer.cp_ver));
   ASSERT_EQ(node_block->footer.ino, invalid_fsync_vnode->Ino());

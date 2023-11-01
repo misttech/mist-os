@@ -15,15 +15,15 @@ TEST(FsckTest, InvalidSuperblockMagic) {
   ASSERT_EQ(fsck.GetValidSuperblock(), ZX_OK);
 
   // Get the first superblock.
-  FsBlock<> superblock;
+  BlockBuffer superblock;
   ASSERT_TRUE(fsck.GetSuperblock(0, superblock).is_ok());
 
   Superblock *superblock_pointer = reinterpret_cast<Superblock *>(&superblock + kSuperOffset);
-  ASSERT_EQ(fsck.SanityCheckRawSuper(superblock_pointer), ZX_OK);
+  ASSERT_EQ(fsck.SanityCheckRawSuper(*superblock_pointer), ZX_OK);
 
   // Pollute the first superblock and see validation fails.
   superblock_pointer->magic = 0xdeadbeef;
-  ASSERT_EQ(fsck.SanityCheckRawSuper(superblock_pointer), ZX_ERR_INTERNAL);
+  ASSERT_EQ(fsck.SanityCheckRawSuper(*superblock_pointer), ZX_ERR_INTERNAL);
   ASSERT_EQ(fsck.WriteBlock(&superblock, kSuperblockStart), ZX_OK);
 
   // Superblock load does not fail yet, since f2fs keeps a spare superblock.
@@ -43,14 +43,14 @@ TEST(FsckTest, InvalidCheckpointCrc) {
   ASSERT_EQ(fsck.GetValidSuperblock(), ZX_OK);
   ASSERT_EQ(fsck.GetValidCheckpoint(), ZX_OK);
 
-  FsBlock<> superblock;
+  BlockBuffer superblock;
   ASSERT_TRUE(fsck.GetSuperblock(0, superblock).is_ok());
   Superblock *superblock_pointer = reinterpret_cast<Superblock *>(&superblock + kSuperOffset);
 
   // Read the 1st checkpoint pack header.
   uint32_t first_checkpoint_header_addr = LeToCpu(superblock_pointer->cp_blkaddr);
   ASSERT_TRUE(fsck.ValidateCheckpoint(first_checkpoint_header_addr).is_ok());
-  FsBlock<Checkpoint> first_checkpoint_block;
+  BlockBuffer<Checkpoint> first_checkpoint_block;
   ASSERT_EQ(fsck.ReadBlock(&first_checkpoint_block, first_checkpoint_header_addr), ZX_OK);
 
   // Pollute the 1st checkpoint pack header and see validation fails.
@@ -67,7 +67,7 @@ TEST(FsckTest, InvalidCheckpointCrc) {
   uint32_t second_checkpoint_header_addr = LeToCpu(superblock_pointer->cp_blkaddr) +
                                            (1 << LeToCpu(superblock_pointer->log_blocks_per_seg));
   ASSERT_TRUE(fsck.ValidateCheckpoint(second_checkpoint_header_addr).is_ok());
-  FsBlock<Checkpoint> second_checkpoint_block;
+  BlockBuffer<Checkpoint> second_checkpoint_block;
   ASSERT_EQ(fsck.ReadBlock(&second_checkpoint_block, second_checkpoint_header_addr), ZX_OK);
 
   // This time pollute the checkpoint pack footer and see validation fails.
@@ -102,12 +102,12 @@ TEST(FsckTest, UnreachableNatEntry) {
   FsckWorker fsck(std::move(bc), FsckOptions{.repair = false});
 
   // Read the superblock to locate NAT.
-  FsBlock<> superblock;
+  BlockBuffer superblock;
   ASSERT_TRUE(fsck.GetSuperblock(0, superblock).is_ok());
   auto superblock_pointer = reinterpret_cast<Superblock *>(&superblock + kSuperOffset);
 
   // Read the NAT block.
-  FsBlock<NatBlock> nat_block;
+  BlockBuffer<NatBlock> nat_block;
   ASSERT_EQ(fsck.ReadBlock(&nat_block, LeToCpu(superblock_pointer->nat_blkaddr)), ZX_OK);
 
   ASSERT_EQ(LeToCpu(nat_block->entries[fake_nid].ino), 0u);
@@ -154,18 +154,18 @@ TEST(FsckTest, UnreachableNatEntryInJournal) {
   FsckWorker fsck(std::move(bc), FsckOptions{.repair = false});
 
   // Read the superblock to locate checkpoint.
-  FsBlock<> superblock;
+  BlockBuffer superblock;
   ASSERT_TRUE(fsck.GetSuperblock(0, superblock).is_ok());
   auto superblock_pointer = reinterpret_cast<Superblock *>(&superblock + kSuperOffset);
 
   // Read the checkpoint to locate hot data summary (which holds Nat journal).
-  FsBlock<Checkpoint> checkpoint;
+  BlockBuffer<Checkpoint> checkpoint;
   ASSERT_EQ(fsck.ReadBlock(&checkpoint, LeToCpu(superblock_pointer->cp_blkaddr)), ZX_OK);
   ASSERT_FALSE(checkpoint->ckpt_flags & static_cast<uint32_t>(CpFlag::kCpCompactSumFlag));
   auto summary_offset = checkpoint->cp_pack_start_sum;
 
   // Read the hot data summary.
-  FsBlock<SummaryBlock> hot_data_summary;
+  BlockBuffer<SummaryBlock> hot_data_summary;
   ASSERT_EQ(
       fsck.ReadBlock(&hot_data_summary, LeToCpu(superblock_pointer->cp_blkaddr) + summary_offset),
       ZX_OK);
@@ -224,12 +224,12 @@ TEST(FsckTest, UnreachableSitEntry) {
   FsckWorker fsck(std::move(bc), FsckOptions{.repair = false});
 
   // Read the superblock to locate SIT.
-  FsBlock<> superblock;
+  BlockBuffer superblock;
   ASSERT_TRUE(fsck.GetSuperblock(0, superblock).is_ok());
   auto superblock_pointer = reinterpret_cast<Superblock *>(&superblock + kSuperOffset);
 
   // Read the SIT block.
-  FsBlock<SitBlock> sit_block;
+  BlockBuffer<SitBlock> sit_block;
   ASSERT_EQ(fsck.ReadBlock(&sit_block, LeToCpu(superblock_pointer->sit_blkaddr)), ZX_OK);
 
   // Insert an unreachable entry and update counter.
@@ -273,19 +273,19 @@ TEST(FsckTest, UnreachableSitEntryInJournal) {
   FsckWorker fsck(std::move(bc), FsckOptions{.repair = false});
 
   // Read the superblock to locate SIT.
-  FsBlock<> superblock;
+  BlockBuffer superblock;
   ASSERT_TRUE(fsck.GetSuperblock(0, superblock).is_ok());
   auto superblock_pointer = reinterpret_cast<Superblock *>(&superblock + kSuperOffset);
 
   // Read the checkpoint to locate cold data summary (which holds Sit journal).
-  FsBlock<Checkpoint> checkpoint;
+  BlockBuffer<Checkpoint> checkpoint;
   ASSERT_EQ(fsck.ReadBlock(&checkpoint, LeToCpu(superblock_pointer->cp_blkaddr)), ZX_OK);
   ASSERT_FALSE(checkpoint->ckpt_flags & static_cast<uint32_t>(CpFlag::kCpCompactSumFlag));
   auto offset =
       LeToCpu(superblock_pointer->cp_blkaddr) + LeToCpu(checkpoint->cp_pack_start_sum) + 2;
 
   // Read the cold data summary.
-  FsBlock<SummaryBlock> cold_data_summary;
+  BlockBuffer<SummaryBlock> cold_data_summary;
   ASSERT_EQ(fsck.ReadBlock(&cold_data_summary, offset), ZX_OK);
 
   // Sit journal holds 6 summaries for open segments.
@@ -430,7 +430,7 @@ TEST(FsckTest, InvalidNatEntry) {
     nat_blkaddr += fsck.GetSuperblockInfo().GetBlocksPerSeg();
   }
 
-  FsBlock<NatBlock> nat_block;
+  BlockBuffer<NatBlock> nat_block;
   ASSERT_EQ(fsck.ReadBlock(&nat_block, nat_blkaddr), ZX_OK);
 
   // Corrupt root_ino block address.
@@ -511,7 +511,7 @@ TEST(FsckTest, InvalidSsaEntry) {
   uint32_t offset = blkoff_from_main % (1 << fsck.GetSuperblockInfo().GetLogBlocksPerSeg());
 
   {
-    FsBlock<SummaryBlock> ssa_block;
+    BlockBuffer<SummaryBlock> ssa_block;
     block_t ssa_blkaddr = fsck.GetSegmentManager().GetSumBlock(segno);
     ASSERT_EQ(fsck.ReadBlock(&ssa_block, ssa_blkaddr), ZX_OK);
 
@@ -566,7 +566,7 @@ TEST(FsckTest, WrongInodeHardlinkCount) {
   ASSERT_EQ(fsck.DoMount(), ZX_OK);
 
   // Retrieve the node block with the saved ino.
-  FsBlock<Node> node_block;
+  BlockBuffer<Node> node_block;
   auto node_info_or = fsck.ReadNodeBlock(ino, node_block);
   ASSERT_TRUE(node_info_or.is_ok());
 
@@ -612,13 +612,13 @@ TEST(FsckTest, InconsistentCheckpointNodeCount) {
   ASSERT_EQ(fsck.GetValidSuperblock(), ZX_OK);
   ASSERT_EQ(fsck.GetValidCheckpoint(), ZX_OK);
 
-  FsBlock<> superblock;
+  BlockBuffer superblock;
   ASSERT_TRUE(fsck.GetSuperblock(0, superblock).is_ok());
   Superblock *superblock_pointer = reinterpret_cast<Superblock *>(&superblock + kSuperOffset);
   ASSERT_TRUE(fsck.ValidateCheckpoint(LeToCpu(superblock_pointer->cp_blkaddr)).is_ok());
 
   // Read the 1st checkpoint pack header.
-  FsBlock<Checkpoint> checkpoint;
+  BlockBuffer<Checkpoint> checkpoint;
   ASSERT_EQ(fsck.ReadBlock(&checkpoint, LeToCpu(superblock_pointer->cp_blkaddr)), ZX_OK);
 
   // Modify the checkpoint's node count (and CRC).
@@ -701,7 +701,7 @@ TEST(FsckTest, InconsistentInodeFooter) {
   ASSERT_EQ(fsck.DoMount(), ZX_OK);
 
   // Retrieve the node block with the saved ino.
-  FsBlock<Node> node_block;
+  BlockBuffer<Node> node_block;
   auto node_info_or = fsck.ReadNodeBlock(ino, node_block);
   ASSERT_TRUE(node_info_or.is_ok());
 
@@ -759,7 +759,7 @@ TEST(FsckTest, InodeLinkCountAndBlockCount) {
   ASSERT_EQ(fsck.DoMount(), ZX_OK);
 
   // Retrieve the node block with the saved ino.
-  FsBlock<Node> node_block;
+  BlockBuffer<Node> node_block;
   auto node_info_or = fsck.ReadNodeBlock(ino, node_block);
   ASSERT_TRUE(node_info_or.is_ok());
 
@@ -788,13 +788,13 @@ TEST(FsckTest, InvalidNextOffsetInCurseg) {
   ASSERT_EQ(fsck.GetValidSuperblock(), ZX_OK);
   ASSERT_EQ(fsck.GetValidCheckpoint(), ZX_OK);
 
-  FsBlock<> superblock;
+  BlockBuffer superblock;
   ASSERT_TRUE(fsck.GetSuperblock(0, superblock).is_ok());
   Superblock *superblock_pointer = reinterpret_cast<Superblock *>(&superblock + kSuperOffset);
   ASSERT_TRUE(fsck.ValidateCheckpoint(LeToCpu(superblock_pointer->cp_blkaddr)).is_ok());
 
   // Read the 1st checkpoint pack header.
-  FsBlock<Checkpoint> checkpoint;
+  BlockBuffer<Checkpoint> checkpoint;
   ASSERT_EQ(fsck.ReadBlock(&checkpoint, LeToCpu(superblock_pointer->cp_blkaddr)), ZX_OK);
 
   // Corrupt the next_blkoff for hot node curseg (and CRC).
@@ -889,7 +889,7 @@ TEST(FsckTest, WrongDataExistFlag) {
   ASSERT_EQ(fsck.DoMount(), ZX_OK);
 
   // Retrieve node block with saved ino
-  FsBlock<Node> node_block;
+  BlockBuffer<Node> node_block;
   auto node_info_or = fsck.ReadNodeBlock(ino, node_block);
   ASSERT_TRUE(node_info_or.is_ok());
 

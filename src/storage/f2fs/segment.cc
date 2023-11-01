@@ -1401,14 +1401,13 @@ zx_status_t SegmentManager::BuildSitInfo() {
     }
   }
 
-  uint32_t bitmap_size = superblock_info_->BitmapSize(MetaBitmap::kSitBitmap);
+  uint32_t bitmap_size = superblock_info_->GetSitBitmapSize();
   // get information related with SIT
   sit_segs = LeToCpu(raw_super.segment_count_sit) >> 1;
 
   // setup SIT bitmap from ckeckpoint pack
   sit_i->sit_bitmap.Reset(GetBitSize(bitmap_size));
-  CloneBits(sit_i->sit_bitmap, superblock_info_->GetBitmap(MetaBitmap::kSitBitmap), 0,
-            GetBitSize(bitmap_size));
+  CloneBits(sit_i->sit_bitmap, superblock_info_->GetSitBitmap(), 0, GetBitSize(bitmap_size));
 
 #if 0  // porting needed
   /* init SIT information */

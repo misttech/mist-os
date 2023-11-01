@@ -13,7 +13,7 @@
 #include <safemath/checked_math.h>
 #include <storage/buffer/block_buffer.h>
 
-#include "src/storage/f2fs/f2fs_types.h"
+#include "src/storage/f2fs/common.h"
 #include "src/storage/f2fs/vmo_manager.h"
 
 namespace f2fs {

@@ -8,6 +8,7 @@
 #include <map>
 
 #include "src/storage/f2fs/bcache.h"
+#include "src/storage/f2fs/common.h"
 #include "src/storage/f2fs/f2fs_layout.h"
 #include "src/storage/f2fs/node.h"
 #include "src/storage/f2fs/segment.h"
@@ -105,10 +106,10 @@ class FsckWorker {
 
   // Even in a successful return, the returned pair can be |{*nullptr*, node_info}| if
   // |node_info.blkaddr| is |kNewAddr|.
-  zx::result<NodeInfo> ReadNodeBlock(nid_t nid, FsBlock<Node> &block);
+  zx::result<NodeInfo> ReadNodeBlock(nid_t nid, BlockBuffer<Node> &block);
   zx_status_t ValidateNodeBlock(const Node &node_block, NodeInfo node_info, FileType ftype,
                                 NodeType ntype);
-  // This function checks the sanity of a node block with respect to the traverse context and
+  // This function checks the validity of a node block with respect to the traverse context and
   // updates the context. In a successful return, this function returns a bool value to indicate
   // whether the caller should traverse deeper.
   zx::result<bool> UpdateContext(const Node &node_block, NodeInfo node_info, FileType ftype,
@@ -182,10 +183,10 @@ class FsckWorker {
   zx_status_t Run();
 
   void InitSuperblockInfo();
-  zx::result<> GetSuperblock(block_t index, FsBlock<> &superblock);
-  zx_status_t SanityCheckRawSuper(const Superblock *raw_super);
+  zx::result<> GetSuperblock(block_t index, BlockBuffer<> &superblock);
+  zx_status_t SanityCheckRawSuper(const Superblock &raw_super);
   zx_status_t GetValidSuperblock();
-  zx::result<std::pair<std::unique_ptr<FsBlock<Checkpoint>>, uint64_t>> ValidateCheckpoint(
+  zx::result<std::pair<std::unique_ptr<BlockBuffer<Checkpoint>>, uint64_t>> ValidateCheckpoint(
       block_t cp_addr);
   zx_status_t SanityCheckCkpt();
   zx_status_t GetValidCheckpoint();
@@ -205,11 +206,11 @@ class FsckWorker {
   // this function reads each block's footer in the segment and
   // restores nid part of entries in |summary_block|.
   zx_status_t RestoreNodeSummary(uint32_t segno, SummaryBlock &summary_block);
-  SegType GetSumBlockInfo(uint32_t segno, FsBlock<SummaryBlock> &summary_block);
+  SegType GetSumBlockInfo(uint32_t segno, BlockBuffer<SummaryBlock> &summary_block);
   std::pair<SegType, Summary> GetSummaryEntry(uint32_t block_address);
   void ResetCurseg(CursegType type, int modified);
   zx_status_t RestoreCursegSummaries();
-  std::unique_ptr<FsBlock<SitBlock>> GetCurrentSitPage(uint32_t segno);
+  std::unique_ptr<BlockBuffer<SitBlock>> GetCurrentSitPage(uint32_t segno);
   void SegmentInfoFromRawSit(SegmentEntry &segment_entry, const SitEntry &raw_sit);
   void CheckBlockCount(uint32_t segno, const SitEntry &raw_sit);
   zx::result<RawNatEntry> LookupNatInJournal(nid_t nid);

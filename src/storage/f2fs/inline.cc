@@ -490,7 +490,7 @@ zx_status_t File::RecoverInlineData(NodePage &page) {
       if (zx_status_t err = fs()->GetNodeManager().GetNodePage(Ino(), &ipage); err != ZX_OK) {
         return err;
       }
-      FsBlock block;
+      BlockBuffer block;
       ipage->WaitOnWriteback();
       page.Read(block.get(), InlineDataOffset(), MaxInlineData());
       ipage->Write(block.get(), InlineDataOffset(), MaxInlineData());

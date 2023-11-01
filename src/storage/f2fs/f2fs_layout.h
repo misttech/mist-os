@@ -7,7 +7,7 @@
 
 #include <safemath/checked_math.h>
 
-#include "src/storage/f2fs/f2fs_types.h"
+#include "src/storage/f2fs/common.h"
 
 namespace f2fs {
 

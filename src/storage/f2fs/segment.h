@@ -6,9 +6,9 @@
 #define SRC_STORAGE_F2FS_SEGMENT_H_
 
 #include "src/storage/f2fs/bitmap.h"
+#include "src/storage/f2fs/common.h"
 #include "src/storage/f2fs/f2fs_internal.h"
 #include "src/storage/f2fs/f2fs_layout.h"
-#include "src/storage/f2fs/f2fs_lib.h"
 #include "src/storage/f2fs/file_cache.h"
 
 namespace f2fs {
@@ -123,7 +123,7 @@ struct DirtySeglistInfo {
 
 // for active log information
 struct CursegInfo {
-  FsBlock<SummaryBlock> sum_blk;
+  BlockBuffer<SummaryBlock> sum_blk;
   uint32_t segno = 0;        // current segment number
   uint32_t zone = 0;         // current zone number
   uint32_t next_segno = 0;   // preallocated segment

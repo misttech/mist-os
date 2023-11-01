@@ -2,12 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_STORAGE_F2FS_F2FS_TYPES_H_
-#define SRC_STORAGE_F2FS_F2FS_TYPES_H_
+#ifndef SRC_STORAGE_F2FS_COMMON_H_
+#define SRC_STORAGE_F2FS_COMMON_H_
 
 #include <sys/types.h>
 #include <zircon/listnode.h>
 #include <zircon/types.h>
+
+#include <safemath/checked_math.h>
 
 #include "src/storage/lib/vfs/cpp/paged_vfs.h"
 #include "src/storage/lib/vfs/cpp/vnode.h"
@@ -66,6 +68,90 @@ constexpr uint32_t kF2fsSuperMagic = 0xF2F52010;
 constexpr uint32_t kCrcPolyLe = 0xedb88320;
 constexpr size_t kWriteTimeOut = 60;  // in seconds
 
+// Checkpoint
+inline bool VerAfter(uint64_t a, uint64_t b) { return a > b; }
+
+// CRC
+inline uint32_t F2fsCalCrc32(uint32_t crc, void *buff, uint32_t len) {
+  unsigned char *p = static_cast<unsigned char *>(buff);
+  while (len-- > 0) {
+    crc ^= *p++;
+    for (int i = 0; i < 8; ++i)
+      crc = (crc >> 1) ^ ((crc & 1) ? kCrcPolyLe : 0);
+  }
+  return crc;
+}
+
+inline uint32_t F2fsCrc32(void *buff, uint32_t len) {
+  return F2fsCalCrc32(kF2fsSuperMagic, static_cast<unsigned char *>(buff), len);
+}
+
+inline bool F2fsCrcValid(uint32_t blk_crc, void *buff, uint32_t buff_size) {
+  return F2fsCrc32(buff, buff_size) == blk_crc;
+}
+
+inline bool IsDotOrDotDot(std::string_view name) { return (name == "." || name == ".."); }
+
+template <typename T>
+inline T CheckedDivRoundUp(const T n, const T d) {
+  return safemath::CheckDiv<T>(fbl::round_up(n, d), d).ValueOrDie();
+}
+
+constexpr uint32_t kBlockSize = 4096;  // F2fs block size in byte
+template <typename T = uint8_t>
+class BlockBuffer {
+ public:
+  BlockBuffer(BlockBuffer &&block) = delete;
+  BlockBuffer &operator=(BlockBuffer &&block) = delete;
+
+  BlockBuffer() {
+    Allocate();
+    std::memset(data_, 0, kBlockSize);
+  }
+
+  BlockBuffer(const BlockBuffer &block) {
+    Allocate();
+    std::memcpy(data_, block.get(), kBlockSize);
+  }
+
+  BlockBuffer &operator=(const BlockBuffer &block) {
+    std::memcpy(data_, block.get(), kBlockSize);
+    return *this;
+  }
+
+  ~BlockBuffer() {
+    if (!data_)
+      return;
+    std::free(data_);
+  }
+
+  template <typename U = void>
+  U *get() {
+    return static_cast<U *>(data_);
+  }
+  template <typename U = void>
+  const U *get() const {
+    return static_cast<U *>(data_);
+  }
+
+  T *operator->() { return get<T>(); }
+  const T *operator->() const { return get<T>(); }
+
+  T *operator&() { return get<T>(); }
+  const T *operator&() const { return get<T>(); }
+
+  T &operator*() { return *get<T>(); }
+  const T &operator*() const { return *get<T>(); }
+
+ private:
+  void Allocate() {
+    if (data_)
+      return;
+    data_ = std::aligned_alloc(kBlockSize, kBlockSize);
+  }
+  void *data_ = nullptr;
+};
+
 }  // namespace f2fs
 
-#endif  // SRC_STORAGE_F2FS_F2FS_TYPES_H_
+#endif  // SRC_STORAGE_F2FS_COMMON_H_

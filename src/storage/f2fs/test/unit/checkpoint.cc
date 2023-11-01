@@ -124,11 +124,6 @@ class CheckpointTest : public F2fsFakeDevTestFixture {
     }
   }
 
-  void *GetBitmapPtr(Checkpoint *ckpt, MetaBitmap flag) {
-    uint32_t offset = (flag == MetaBitmap::kNatBitmap) ? ckpt->sit_ver_bitmap_bytesize : 0;
-    return &ckpt->sit_nat_version_bitmap + offset;
-  }
-
   void CreateDirs(int dir_cnt, uint64_t version) {
     fbl::RefPtr<VnodeF2fs> data_root;
     ASSERT_EQ(VnodeF2fs::Vget(fs_.get(), fs_->RawSb().root_ino, &data_root), ZX_OK);
@@ -202,7 +197,7 @@ TEST_F(CheckpointTest, NatBitmap) {
     ASSERT_EQ(cp->checkpoint_ver, expect_cp_ver);
 
     // 2. Get NAT version bitmap
-    uint8_t *version_bitmap = static_cast<uint8_t *>(GetBitmapPtr(cp, MetaBitmap::kNatBitmap));
+    uint8_t *version_bitmap = cp->sit_nat_version_bitmap + cp->sit_ver_bitmap_bytesize;
     ASSERT_NE(version_bitmap, nullptr);
 
     auto &pre_bitmap = GetPreBitmap();
@@ -267,7 +262,7 @@ TEST_F(CheckpointTest, SitBitmap) {
     ASSERT_EQ(cp->checkpoint_ver, expect_cp_ver);
 
     // 2. Get SIT version bitmap
-    uint8_t *version_bitmap = static_cast<uint8_t *>(GetBitmapPtr(cp, MetaBitmap::kSitBitmap));
+    uint8_t *version_bitmap = cp->sit_nat_version_bitmap;
     ASSERT_NE(version_bitmap, nullptr);
 
     auto &pre_bitmap = GetPreBitmap();

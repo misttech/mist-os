@@ -357,7 +357,7 @@ TEST_F(FileCacheTest, Basic) {
     LockedPage page = GetPage(i);
     ASSERT_EQ(page->IsUptodate(), true);
     ASSERT_EQ(page->IsDirty(), true);
-    FsBlock read_buffer;
+    BlockBuffer read_buffer;
     page->Read(read_buffer.get());
     ASSERT_EQ(memcmp(buf, read_buffer.get(), kPageSize), 0);
   }

@@ -300,7 +300,6 @@ zx_status_t F2fs::FillSuper() {
 
   ParseOptions();
 
-  // sanity checking of raw super
   if (err = SanityCheckRawSuper(); err != ZX_OK) {
     return err;
   }
@@ -322,7 +321,6 @@ zx_status_t F2fs::FillSuper() {
     return err;
   }
 
-  // sanity checking of checkpoint
   if (err = SanityCheckCkpt(); err != ZX_OK) {
     return err;
   }

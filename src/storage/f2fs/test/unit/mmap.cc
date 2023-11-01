@@ -10,7 +10,6 @@
 
 #include "src/storage/f2fs/f2fs.h"
 #include "src/storage/f2fs/f2fs_layout.h"
-#include "src/storage/f2fs/f2fs_types.h"
 #include "src/storage/lib/block_client/cpp/fake_block_device.h"
 #include "unit_lib.h"
 

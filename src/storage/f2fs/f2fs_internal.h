@@ -5,16 +5,14 @@
 #ifndef SRC_STORAGE_F2FS_F2FS_INTERNAL_H_
 #define SRC_STORAGE_F2FS_F2FS_INTERNAL_H_
 
-#include "src/storage/f2fs/f2fs_lib.h"
+#include "src/storage/f2fs/bitmap.h"
+#include "src/storage/f2fs/common.h"
 #include "src/storage/f2fs/mount.h"
 #include "src/storage/f2fs/node_page.h"
 
 namespace f2fs {
 
 class VnodeF2fs;
-
-// For checkpoint manager
-enum class MetaBitmap { kNatBitmap, kSitBitmap };
 
 // for the list of directory inodes
 struct DirInodeEntry {
@@ -236,11 +234,15 @@ class SuperblockInfo {
     return flags & static_cast<uint32_t>(flag);
   }
 
+  const Checkpoint &GetCheckpoint() const { return *checkpoint_block_; }
   Checkpoint &GetCheckpoint() { return *checkpoint_block_; }
-  const std::vector<FsBlock<>> &GetCheckpointTrailer() const { return checkpoint_trailer_; }
-  void SetCheckpointTrailer(std::vector<FsBlock<>> checkpoint_trailer) {
-    checkpoint_trailer_ = std::move(checkpoint_trailer);
-  }
+  BlockBuffer<Checkpoint> &GetCheckpointBlock() { return checkpoint_block_; }
+
+  void SetCheckpoint(const BlockBuffer<Checkpoint> &block) { checkpoint_block_ = block; }
+
+  const RawBitmap &GetExtraSitBitmap() const { return extra_sit_bitmap_; }
+  RawBitmap &GetExtraSitBitmap() { return extra_sit_bitmap_; }
+  void SetExtraSitBitmap(size_t num_bytes) { extra_sit_bitmap_.Reset(GetBitSize(num_bytes)); }
 
   fs::SharedMutex &GetFsLock(LockType type) { return fs_lock_[static_cast<int>(type)]; }
 
@@ -405,23 +407,23 @@ class SuperblockInfo {
   void IncreaseDirtyDir() { ++n_dirty_dirs; }
   void DecreaseDirtyDir() { --n_dirty_dirs; }
 
-  uint32_t BitmapSize(MetaBitmap flag) {
-    if (flag == MetaBitmap::kNatBitmap) {
-      return LeToCpu(checkpoint_block_->nat_ver_bitmap_bytesize);
+  // in byte
+  uint32_t GetSitBitmapSize() { return LeToCpu(checkpoint_block_->sit_ver_bitmap_bytesize); }
+  // in byte
+  uint32_t GetNatBitmapSize() { return LeToCpu(checkpoint_block_->nat_ver_bitmap_bytesize); }
+
+  uint8_t *GetNatBitmap() {
+    if (raw_superblock_->cp_payload > 0) {
+      return checkpoint_block_->sit_nat_version_bitmap;
     }
-    // MetaBitmap::kSitBitmap
-    return LeToCpu(checkpoint_block_->sit_ver_bitmap_bytesize);
+    return checkpoint_block_->sit_nat_version_bitmap + checkpoint_block_->sit_ver_bitmap_bytesize;
   }
 
-  uint8_t *GetBitmap(MetaBitmap flag) {
+  uint8_t *GetSitBitmap() {
     if (raw_superblock_->cp_payload > 0) {
-      if (flag == MetaBitmap::kNatBitmap) {
-        return checkpoint_block_->sit_nat_version_bitmap;
-      }
-      return checkpoint_trailer_[0].get<uint8_t>();
+      return static_cast<uint8_t *>(GetExtraSitBitmap().StorageUnsafe()->GetData());
     }
-    int offset = (flag == MetaBitmap::kNatBitmap) ? checkpoint_block_->sit_ver_bitmap_bytesize : 0;
-    return checkpoint_block_->sit_nat_version_bitmap + offset;
+    return checkpoint_block_->sit_nat_version_bitmap;
   }
 
   block_t StartCpAddr() {
@@ -445,8 +447,9 @@ class SuperblockInfo {
   Superblock *raw_superblock_;  // raw super block pointer
   bool is_dirty_ = false;       // dirty flag for checkpoint
 
-  FsBlock<Checkpoint> checkpoint_block_;
-  std::vector<FsBlock<>> checkpoint_trailer_;
+  BlockBuffer<Checkpoint> checkpoint_block_;
+
+  RawBitmap extra_sit_bitmap_;
 
   fs::SharedMutex mutex_;                                             // for checkpoint data
   fs::SharedMutex fs_lock_[static_cast<int>(LockType::kNrLockType)];  // for blocking FS operations

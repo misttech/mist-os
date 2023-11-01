@@ -224,7 +224,7 @@ zx_status_t F2fs::ValidateCheckpoint(block_t cp_addr, uint64_t *version, LockedP
 }
 
 zx_status_t F2fs::GetValidCheckpoint() {
-  Superblock &fsb = RawSb();
+  Superblock &sb = RawSb();
   LockedPage cp1, cp2;
   Page *cur_page = nullptr;
   uint64_t blk_size = superblock_info_->GetBlocksize();
@@ -235,11 +235,11 @@ zx_status_t F2fs::GetValidCheckpoint() {
    * Finding out valid cp block involves read both
    * sets( cp pack1 and cp pack 2)
    */
-  cp_start_blk_no = LeToCpu(fsb.cp_blkaddr);
+  cp_start_blk_no = LeToCpu(sb.cp_blkaddr);
   ValidateCheckpoint(cp_start_blk_no, &cp1_version, &cp1);
 
   /* The second checkpoint pack should start at the next segment */
-  cp_start_blk_no += 1 << LeToCpu(fsb.log_blocks_per_seg);
+  cp_start_blk_no += 1 << LeToCpu(sb.log_blocks_per_seg);
   ValidateCheckpoint(cp_start_blk_no, &cp2_version, &cp2);
 
   if (cp1 && cp2) {
@@ -247,11 +247,11 @@ zx_status_t F2fs::GetValidCheckpoint() {
       cur_page = cp2.get();
     } else {
       cur_page = cp1.get();
-      cp_start_blk_no = LeToCpu(fsb.cp_blkaddr);
+      cp_start_blk_no = LeToCpu(sb.cp_blkaddr);
     }
   } else if (cp1) {
     cur_page = cp1.get();
-    cp_start_blk_no = LeToCpu(fsb.cp_blkaddr);
+    cp_start_blk_no = LeToCpu(sb.cp_blkaddr);
   } else if (cp2) {
     cur_page = cp2.get();
   } else {
@@ -260,15 +260,18 @@ zx_status_t F2fs::GetValidCheckpoint() {
 
   cur_page->Read(&superblock_info_->GetCheckpoint(), 0, blk_size);
 
-  std::vector<FsBlock<>> checkpoint_trailer(fsb.cp_payload);
-  for (uint32_t i = 0; i < LeToCpu(fsb.cp_payload); ++i) {
-    LockedPage cp_page;
-    if (zx_status_t ret = GetMetaPage(cp_start_blk_no + 1 + i, &cp_page); ret != ZX_OK) {
-      return ret;
+  size_t num_payload = LeToCpu(sb.cp_payload);
+  if (num_payload) {
+    superblock_info_->SetExtraSitBitmap(num_payload * blk_size);
+    for (uint32_t i = 0; i < LeToCpu(num_payload); ++i) {
+      LockedPage cp_page;
+      if (zx_status_t ret = GetMetaPage(cp_start_blk_no + 1 + i, &cp_page); ret != ZX_OK) {
+        return ret;
+      }
+      CloneBits(superblock_info_->GetExtraSitBitmap(), cp_page->GetAddress(),
+                GetBitSize(i * blk_size), GetBitSize(blk_size));
     }
-    cp_page->Read(&checkpoint_trailer[i], 0, blk_size);
   }
-  superblock_info_->SetCheckpointTrailer(std::move(checkpoint_trailer));
 
   return ZX_OK;
 }
@@ -417,8 +420,8 @@ zx_status_t F2fs::DoCheckpoint(bool is_umount) {
   }
 
   // update SIT/NAT bitmap
-  GetSegmentManager().GetSitBitmap(superblock_info.GetBitmap(MetaBitmap::kSitBitmap));
-  GetNodeManager().GetNatBitmap(superblock_info.GetBitmap(MetaBitmap::kNatBitmap));
+  GetSegmentManager().GetSitBitmap(superblock_info.GetSitBitmap());
+  GetNodeManager().GetNatBitmap(superblock_info.GetNatBitmap());
 
   crc32 = CpuToLe(F2fsCrc32(&ckpt, LeToCpu(ckpt.checksum_offset)));
   std::memcpy(reinterpret_cast<uint8_t *>(&ckpt) + LeToCpu(ckpt.checksum_offset), &crc32,
@@ -434,12 +437,13 @@ zx_status_t F2fs::DoCheckpoint(bool is_umount) {
     cp_page.SetDirty();
   }
 
-  for (uint32_t i = 0; i < LeToCpu(raw_sb_->cp_payload); ++i) {
+  size_t offset = 0;
+  for (size_t i = 0; i < LeToCpu(raw_sb_->cp_payload); ++i) {
     LockedPage cp_page;
     GrabMetaPage(start_blk++, &cp_page);
-    cp_page->Write(&superblock_info.GetCheckpointTrailer()[i], 0,
-                   (1 << superblock_info.GetLogBlocksize()));
+    memcpy(cp_page->GetAddress(), &superblock_info.GetSitBitmap()[offset], cp_page->Size());
     cp_page.SetDirty();
+    offset += cp_page->Size();
   }
 
   if (superblock_info.GetVnodeSetSize(InoType::kOrphanIno) > 0) {

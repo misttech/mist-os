@@ -62,7 +62,7 @@ zx::result<std::unique_ptr<F2fs>> F2fs::Create(FuchsiaDispatcher dispatcher,
 }
 
 zx::result<std::unique_ptr<Superblock>> F2fs::LoadSuperblock(f2fs::BcacheMapper& bc) {
-  FsBlock<> block;
+  BlockBuffer block;
   constexpr int kSuperblockCount = 2;
   zx_status_t status;
   for (auto i = 0; i < kSuperblockCount; ++i) {

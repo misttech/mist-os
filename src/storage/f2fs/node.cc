@@ -272,7 +272,7 @@ void NodeManager::SetNodeAddr(NodeInfo &ni, block_t new_blkaddr) {
       entry->ClearCheckpointed();
     }
 
-    // sanity check
+    // validity check
     ZX_ASSERT(!(entry->GetBlockAddress() != ni.blk_addr));
     ZX_ASSERT(!(entry->GetBlockAddress() == kNullAddr && new_blkaddr == kNullAddr));
     ZX_ASSERT(!(entry->GetBlockAddress() == kNewAddr && new_blkaddr == kNewAddr));
@@ -1428,11 +1428,11 @@ zx_status_t NodeManager::InitNodeManager() {
     next_scan_nid_ = LeToCpu(GetSuperblockInfo().GetCheckpoint().next_free_nid);
   }
 
-  nat_bitmap_size_ = GetSuperblockInfo().BitmapSize(MetaBitmap::kNatBitmap);
+  nat_bitmap_size_ = GetSuperblockInfo().GetNatBitmapSize();
   nat_bitmap_.Reset(GetBitSize(nat_bitmap_size_));
   nat_prev_bitmap_.Reset(GetBitSize(nat_bitmap_size_));
 
-  uint8_t *version_bitmap = GetSuperblockInfo().GetBitmap(MetaBitmap::kNatBitmap);
+  uint8_t *version_bitmap = GetSuperblockInfo().GetNatBitmap();
   if (!version_bitmap)
     return ZX_ERR_INVALID_ARGS;
 

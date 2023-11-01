@@ -175,19 +175,19 @@ TEST(F2fsTest, TakeBc) {
   ASSERT_FALSE(fs->IsValid());
 }
 
-TEST(F2fsTest, FsBlock) {
-  FsBlock block;
+TEST(F2fsTest, BlockBuffer) {
+  BlockBuffer block;
   uint8_t data[kBlockSize];
-  memset(data, 0, kBlockSize);
-  ASSERT_EQ(memcmp(block.get(), data, kBlockSize), 0);
+  memset(data, 0xaa, kBlockSize);
+  memcpy(&block, data, kBlockSize);
+  ASSERT_EQ(memcmp(&block, data, kBlockSize), 0);
 
-  memset(data, 0xf2, kBlockSize);
-  FsBlock data_block(data);
-  ASSERT_EQ(memcmp(data_block.get(), data, kBlockSize), 0);
+  BlockBuffer block2(block);
+  ASSERT_EQ(memcmp(&block2, data, kBlockSize), 0);
+  memset(&block2, 0xbb, kBlockSize);
 
-  memset(data, 0xf5, kBlockSize);
-  data_block = data;
-  ASSERT_EQ(memcmp(data_block.get(), data, kBlockSize), 0);
+  block = block2;
+  ASSERT_EQ(memcmp(&block, &block2, kBlockSize), 0);
 }
 
 TEST(F2fsTest, GetFilesystemInfo) {

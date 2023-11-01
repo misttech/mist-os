@@ -26,9 +26,7 @@ size_t CountBits(const RawBitmap &bits, size_t offset, size_t len) {
 }
 
 PageBitmap::PageBitmap(void *bitmap, size_t size)
-    : bits_(static_cast<uint8_t *>(bitmap)), size_(size) {
-  ZX_DEBUG_ASSERT(size <= kBlockSize);
-}
+    : bits_(static_cast<uint8_t *>(bitmap)), size_(size) {}
 
 PageBitmap::PageBitmap(fbl::RefPtr<Page> page, void *bitmap, size_t size)
     : page_(std::move(page)), bits_(static_cast<uint8_t *>(bitmap)), size_(size) {
