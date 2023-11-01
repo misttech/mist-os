@@ -4,11 +4,12 @@
 
 use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
-use crate::logging::log_warn;
+use crate::logging::{impossible_error, log_warn};
 use crate::mm::MemoryAccessorExt;
 use crate::syscalls::*;
 use crate::task::*;
 use crate::types::*;
+use fidl::HandleBased;
 use fuchsia_zircon as zx;
 use fuchsia_zircon::AsHandleRef;
 use std::collections::HashSet;
@@ -96,6 +97,19 @@ impl SyncFile {
 
 impl FileOps for SyncFile {
     fileops_impl_nonseekable!();
+
+    fn to_handle(
+        &self,
+        _file: &FileHandle,
+        _current_task: &CurrentTask,
+    ) -> Result<Option<zx::Handle>, Errno> {
+        assert!(self.fence.sync_points.len() == 1);
+        let vmo_dupe = self.fence.sync_points[0]
+            .handle
+            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+            .map_err(impossible_error)?;
+        Ok(Some(vmo_dupe.into()))
+    }
 
     fn ioctl(
         &self,
