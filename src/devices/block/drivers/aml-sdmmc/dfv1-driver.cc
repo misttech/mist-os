@@ -40,8 +40,11 @@ zx_status_t Dfv1Driver::Bind() {
     return result.status_value();
   }
 
-  // TODO(fxbug.dev/134787): Offer SdmmcService::Name to use FIDL with the sdmmc core block driver.
-  std::array<const char*, 0> offers;  // = { fuchsia_hardware_sdmmc::SdmmcService::Name, };
+  // The FIDL SDMMC protocol is temporarily offered while we introduce the DFv1 core sdmmc driver.
+  // TODO(b/301004279): Disable this offer. This DFv1 driver will not offer the FIDL SDMMC protocol.
+  std::array offers = {
+      fuchsia_hardware_sdmmc::SdmmcService::Name,
+  };
 
   // Note: This name can't be changed without migrating users in other repos.
   zx_status_t status = DdkAdd(ddk::DeviceAddArgs("aml-sd-emmc")

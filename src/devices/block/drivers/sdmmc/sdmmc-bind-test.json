@@ -3,6 +3,21 @@
         "name": "Match",
         "expected": "match",
         "device": {
+            "fuchsia.hardware.sdmmc.SdmmcService": "fuchsia.hardware.sdmmc.SdmmcService.DriverTransport"
+        }
+    },
+    {
+        "name": "Banjo protocol is also offered",
+        "expected": "match",
+        "device": {
+            "fuchsia.hardware.sdmmc.SdmmcService": "fuchsia.hardware.sdmmc.SdmmcService.DriverTransport",
+            "fuchsia.BIND_PROTOCOL": "fuchsia.sdmmc.BIND_PROTOCOL.SDMMC"
+        }
+    },
+    {
+        "name": "Only Banjo protocol is offered",
+        "expected": "abort",
+        "device": {
             "fuchsia.BIND_PROTOCOL": "fuchsia.sdmmc.BIND_PROTOCOL.SDMMC"
         }
     },
