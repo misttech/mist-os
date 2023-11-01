@@ -17,7 +17,8 @@ using devicetree_test::LoadDtb;
 using devicetree_test::LoadedDtb;
 
 class RiscvDevictreeCpuTopologyItemTest
-    : public devicetree_test::TestMixin<devicetree_test::RiscvDevicetreeTest> {
+    : public devicetree_test::TestMixin<devicetree_test::RiscvDevicetreeTest,
+                                        devicetree_test::SyntheticDevicetreeTest> {
  public:
   static void SetUpTestSuite() {
     TestMixin<RiscvDevicetreeTest>::SetUpTestSuite();
@@ -57,6 +58,37 @@ std::optional<LoadedDtb> RiscvDevictreeCpuTopologyItemTest::riscv_cpus_nested_cl
     std::nullopt;
 std::optional<LoadedDtb> RiscvDevictreeCpuTopologyItemTest::riscv_cpus_no_cpu_map_dtb_ =
     std::nullopt;
+
+TEST_F(RiscvDevictreeCpuTopologyItemTest, MissingNode) {
+  std::array<std::byte, 1024> image_buffer;
+  std::vector<void*> allocs;
+  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  ASSERT_TRUE(image.clear().is_ok());
+
+  auto fdt = empty_fdt();
+  boot_shim::DevicetreeBootShim<boot_shim::RiscvDevictreeCpuTopologyItem> shim("test", fdt);
+  shim.set_allocator([&allocs](size_t size, size_t alignment) -> void* {
+    // Custom aligned_alloc since OS X doesnt support it in some versions.
+    void* alloc = malloc(size + alignment);
+    allocs.push_back(alloc);
+    return reinterpret_cast<void*>((reinterpret_cast<uintptr_t>(alloc) + alignment) &
+                                   ~(alignment - 1));
+  });
+  shim.Get<boot_shim::RiscvDevictreeCpuTopologyItem>().set_boot_hart_id(3);
+
+  auto release_memory = fit::defer([&]() {
+    for (auto* alloc : allocs) {
+      free(alloc);
+    }
+  });
+
+  ASSERT_TRUE(shim.Init());
+  auto clear_errors = fit::defer([&]() { image.ignore_error(); });
+  ASSERT_TRUE(shim.AppendItems(image).is_ok());
+  for (auto [header, payload] : image) {
+    EXPECT_FALSE(header->type == ZBI_TYPE_CPU_TOPOLOGY);
+  }
+}
 
 TEST_F(RiscvDevictreeCpuTopologyItemTest, CpusWithCpuMap) {
   constexpr std::array kExpectedTopology = {
@@ -208,7 +240,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, CpusWithCpuMap) {
     }
   });
 
-  shim.Init();
+  ASSERT_TRUE(shim.Init());
   auto clear_errors = fit::defer([&]() { image.ignore_error(); });
   ASSERT_TRUE(shim.AppendItems(image).is_ok());
   bool present = false;
@@ -425,7 +457,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, CpuNodesWithNestedClusters) {
     }
   });
 
-  shim.Init();
+  ASSERT_TRUE(shim.Init());
   auto clear_errors = fit::defer([&]() { image.ignore_error(); });
   ASSERT_TRUE(shim.AppendItems(image).is_ok());
   bool present = false;
@@ -557,7 +589,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, CpuNodesWithoutCpuMap) {
     }
   });
 
-  shim.Init();
+  ASSERT_TRUE(shim.Init());
   auto clear_errors = fit::defer([&]() { image.ignore_error(); });
   ASSERT_TRUE(shim.AppendItems(image).is_ok());
   bool present = false;
@@ -702,7 +734,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, Qemu) {
     }
   });
 
-  shim.Init();
+  ASSERT_TRUE(shim.Init());
   auto clear_errors = fit::defer([&]() { image.ignore_error(); });
   ASSERT_TRUE(shim.AppendItems(image).is_ok());
   bool present = false;
@@ -857,7 +889,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, VisionFive2) {
     }
   });
 
-  shim.Init();
+  ASSERT_TRUE(shim.Init());
   auto clear_errors = fit::defer([&]() { image.ignore_error(); });
   ASSERT_TRUE(shim.AppendItems(image).is_ok());
   bool present = false;
@@ -1025,7 +1057,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, HifiveSifiveUnmatched) {
     }
   });
 
-  shim.Init();
+  ASSERT_TRUE(shim.Init());
   auto clear_errors = fit::defer([&]() { image.ignore_error(); });
   ASSERT_TRUE(shim.AppendItems(image).is_ok());
   bool present = false;

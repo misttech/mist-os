@@ -53,6 +53,7 @@ devicetree::ScanState ArmDevicetreeTimerItem::OnNode(const devicetree::NodePath&
   if (compatibles &&
       std::find_first_of(kCompatibleDevices.begin(), kCompatibleDevices.end(), compatibles->begin(),
                          compatibles->end()) != kCompatibleDevices.end()) {
+    found_timer_ = true;
     auto interrupt = decoder.FindProperty("interrupts");
     if (!interrupt) {
       OnError("'timer' node did not contain interrupt information.");

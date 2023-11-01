@@ -5,7 +5,9 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/boot-shim/devicetree-boot-shim.h>
+#include <lib/boot-shim/devicetree.h>
 #include <lib/boot-shim/item-base.h>
+#include <lib/boot-shim/uart.h>
 #include <lib/devicetree/devicetree.h>
 #include <lib/devicetree/matcher.h>
 #include <lib/devicetree/testing/loaded-dtb.h>
@@ -207,6 +209,35 @@ TEST_F(DevicetreeBootShimTest, MultipleDevicetreeItemsWithNonDeviceTreeItems) {
   ASSERT_TRUE(image.clear().is_ok());
   boot_shim::DevicetreeBootShim<DevicetreeItem1, DevicetreeItem2, NonDeviceTreeItem> shim(
       "devicetree-boot-shim-test", fdt());
+  ASSERT_TRUE(shim.Init());
+
+  ASSERT_TRUE(shim.AppendItems(image).is_ok());
+  CheckZbiHasItemWithContent(image, ZBI_TYPE_CMDLINE, "--visit-count=1");
+  CheckZbiHasItemWithContent(image, ZBI_TYPE_CMDLINE, "--visit-count-b=2");
+}
+
+TEST_F(DevicetreeBootShimTest, ItemsWithoutMatchingNodes) {
+  std::array<std::byte, 256> image_buffer;
+  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  std::vector<void*> allocs;
+  ASSERT_TRUE(image.clear().is_ok());
+  // There are no nodes in the synthetic DTB that will match any real matcher, so they will produce
+  // NOTHING, but the matchers described in here will still produce items and they will
+  // not disturb each other.
+  boot_shim::DevicetreeBootShim<
+      DevicetreeItem1, DevicetreeItem2, NonDeviceTreeItem, boot_shim::UartItem<>,
+      boot_shim::ArmDevicetreePsciItem, boot_shim::ArmDevicetreeGicItem,
+      boot_shim::ArmDevictreeCpuTopologyItem, boot_shim::ArmDevicetreeTimerItem,
+      boot_shim::RiscvDevicetreePlicItem, boot_shim::RiscvDevicetreeTimerItem,
+      boot_shim::RiscvDevictreeCpuTopologyItem>
+      shim("devicetree-boot-shim-test", fdt());
+  shim.set_allocator([&allocs](size_t size, size_t alignment) -> void* {
+    // Custom aligned_alloc since OS X doesnt support it in some versions.
+    void* alloc = malloc(size + alignment);
+    allocs.push_back(alloc);
+    return reinterpret_cast<void*>((reinterpret_cast<uintptr_t>(alloc) + alignment) &
+                                   ~(alignment - 1));
+  });
   ASSERT_TRUE(shim.Init());
 
   ASSERT_TRUE(shim.AppendItems(image).is_ok());

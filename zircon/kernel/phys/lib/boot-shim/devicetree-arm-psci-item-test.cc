@@ -15,7 +15,8 @@ using devicetree_test::LoadDtb;
 using devicetree_test::LoadedDtb;
 
 class ArmDevicetreePsciItemTest
-    : public devicetree_test::TestMixin<devicetree_test::ArmDevicetreeTest> {
+    : public devicetree_test::TestMixin<devicetree_test::ArmDevicetreeTest,
+                                        devicetree_test::SyntheticDevicetreeTest> {
  public:
   static void SetUpTestSuite() {
     Mixin::SetUpTestSuite();
@@ -53,7 +54,7 @@ TEST_F(ArmDevicetreePsciItemTest, ParseSmc) {
   auto fdt = psci_smc();
   boot_shim::DevicetreeBootShim<boot_shim::ArmDevicetreePsciItem> shim("test", fdt);
 
-  shim.Init();
+  ASSERT_TRUE(shim.Init());
   EXPECT_TRUE(shim.AppendItems(image).is_ok());
 
   // Look for a gic 2 driver.
@@ -79,7 +80,7 @@ TEST_F(ArmDevicetreePsciItemTest, ParseHvc) {
   auto fdt = psci_hvc();
   boot_shim::DevicetreeBootShim<boot_shim::ArmDevicetreePsciItem> shim("test", fdt);
 
-  shim.Init();
+  ASSERT_TRUE(shim.Init());
   EXPECT_TRUE(shim.AppendItems(image).is_ok());
 
   // Look for a gic 2 driver.
@@ -105,7 +106,7 @@ TEST_F(ArmDevicetreePsciItemTest, ParseQemu) {
   auto fdt = qemu_arm_gic3();
   boot_shim::DevicetreeBootShim<boot_shim::ArmDevicetreePsciItem> shim("test", fdt);
 
-  shim.Init();
+  ASSERT_TRUE(shim.Init());
   EXPECT_TRUE(shim.AppendItems(image).is_ok());
 
   bool present = false;
@@ -130,7 +131,7 @@ TEST_F(ArmDevicetreePsciItemTest, ParseCrosvm) {
   auto fdt = crosvm_arm();
   boot_shim::DevicetreeBootShim<boot_shim::ArmDevicetreePsciItem> shim("test", fdt);
 
-  shim.Init();
+  ASSERT_TRUE(shim.Init());
   EXPECT_TRUE(shim.AppendItems(image).is_ok());
 
   bool present = false;
@@ -170,6 +171,24 @@ TEST_F(ArmDevicetreePsciItemTest, KhadasVim3) {
   }
   image.ignore_error();
   ASSERT_TRUE(present, "ZBI Driver for PSCI missing.");
+}
+
+TEST_F(ArmDevicetreePsciItemTest, MissingNode) {
+  std::array<std::byte, 256> image_buffer;
+  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  ASSERT_TRUE(image.clear().is_ok());
+
+  auto fdt = empty_fdt();
+  boot_shim::DevicetreeBootShim<boot_shim::ArmDevicetreePsciItem> shim("test", fdt);
+
+  ASSERT_TRUE(shim.Init());
+  EXPECT_TRUE(shim.AppendItems(image).is_ok());
+
+  for (auto [header, payload] : image) {
+    EXPECT_FALSE(header->type == ZBI_TYPE_KERNEL_DRIVER &&
+                 header->extra == ZBI_KERNEL_DRIVER_ARM_PSCI);
+  }
+  image.ignore_error();
 }
 
 }  // namespace

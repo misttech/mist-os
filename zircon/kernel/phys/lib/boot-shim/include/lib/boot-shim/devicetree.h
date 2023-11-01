@@ -34,6 +34,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <variant>
 
 #include <fbl/type_info.h>
@@ -56,8 +57,6 @@ class DevicetreeItemBase {
     return devicetree::ScanState::kActive;
   }
 
-  devicetree::ScanState OnScan() { return devicetree::ScanState::kActive; }
-
   void OnError(std::string_view error) {
     Log("Error on %s, %*s\n", fbl::TypeInfo<T>::Name(), static_cast<int>(error.length()),
         error.data());
@@ -66,6 +65,8 @@ class DevicetreeItemBase {
   devicetree::ScanState OnSubtree(const devicetree::NodePath&) {
     return devicetree::ScanState::kActive;
   }
+
+  devicetree::ScanState OnScan() { return devicetree::ScanState::kActive; }
 
   template <typename Shim>
   void Init(const Shim& shim) {
@@ -161,6 +162,8 @@ class ArmDevicetreePsciItem
   devicetree::ScanState OnNode(const devicetree::NodePath& path,
                                const devicetree::PropertyDecoder& decoder);
 
+  devicetree::ScanState OnScan() { return devicetree::ScanState::kDone; }
+
  private:
   devicetree::ScanState HandlePsciNode(const devicetree::NodePath& path,
                                        const devicetree::PropertyDecoder& decoder);
@@ -205,10 +208,7 @@ class ArmDevicetreeGicItem
   devicetree::ScanState OnNode(const devicetree::NodePath& path,
                                const devicetree::PropertyDecoder& decoder);
   devicetree::ScanState OnSubtree(const devicetree::NodePath& path);
-
-  devicetree::ScanState OnScan() {
-    return matched_ ? devicetree::ScanState::kDone : devicetree::ScanState::kActive;
-  }
+  devicetree::ScanState OnScan() { return devicetree::ScanState::kDone; }
 
   // Boot Shim Item API.
   static constexpr zbi_header_t ItemHeader(const zbi_dcfg_arm_gic_v2_driver_t& driver) {
@@ -254,6 +254,9 @@ class DevicetreeChosenNodeMatcherBase
   // Matcher API.
   devicetree::ScanState OnNode(const devicetree::NodePath& path,
                                const devicetree::PropertyDecoder& decoder);
+  devicetree::ScanState OnScan() {
+    return found_chosen_ ? devicetree::ScanState::kActive : devicetree::ScanState::kDone;
+  }
 
   // Accessors
 
@@ -488,6 +491,7 @@ class RiscvDevicetreeTimerItem
  public:
   devicetree::ScanState OnNode(const devicetree::NodePath& path,
                                const devicetree::PropertyDecoder& decoder);
+  devicetree::ScanState OnScan() { return devicetree::ScanState::kDone; }
 };
 
 // Parses interrupt controller node that is compatible with PLIC (Platform Level Interrupt
@@ -507,6 +511,7 @@ class RiscvDevicetreePlicItem
   // Matcher API.
   devicetree::ScanState OnNode(const devicetree::NodePath& path,
                                const devicetree::PropertyDecoder& decoder);
+  devicetree::ScanState OnScan() { return devicetree::ScanState::kDone; }
 
  private:
   devicetree::ScanState HandlePlicNode(const devicetree::NodePath& path,
@@ -537,6 +542,9 @@ class DevictreeCpuTopologyItem : public DevicetreeItemBase<DevictreeCpuTopologyI
   devicetree::ScanState OnNode(const devicetree::NodePath& path,
                                const devicetree::PropertyDecoder& decoder);
   devicetree::ScanState OnSubtree(const devicetree::NodePath& path);
+  devicetree::ScanState OnScan() {
+    return found_cpus_ ? devicetree::ScanState::kActive : devicetree::ScanState::kDone;
+  }
 
   size_t size_bytes() const { return ItemSize(node_element_count() * sizeof(zbi_topology_node_t)); }
 
@@ -654,6 +662,7 @@ class DevictreeCpuTopologyItem : public DevicetreeItemBase<DevictreeCpuTopologyI
   mutable const DevicetreeBootShimAllocator* allocator_ = nullptr;
 
   SetArchCpuInfo arch_info_setter_;
+  bool found_cpus_ = false;
 };
 
 class RiscvDevictreeCpuTopologyItem : public DevictreeCpuTopologyItem {
@@ -772,8 +781,12 @@ class ArmDevicetreeTimerItem
 
   devicetree::ScanState OnNode(const devicetree::NodePath& path,
                                const devicetree::PropertyDecoder& decoder);
+  devicetree::ScanState OnScan() {
+    return found_timer_ ? devicetree::ScanState::kActive : devicetree::ScanState::kDone;
+  }
 
  private:
+  bool found_timer_ = false;
   DevicetreeIrqResolver irq_;
   // Optional, maps to frequency override.
   std::optional<uint64_t> frequency_;

@@ -14,6 +14,23 @@ namespace devicetree_test {
 using devicetree::testing::LoadDtb;
 using devicetree::testing::LoadedDtb;
 
+// Common set of synthetic DTBs.
+class SyntheticDevicetreeTest {
+ public:
+  static void SetUpTestSuite() {
+    auto loaded_dtb = LoadDtb("empty.dtb");
+    ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
+    empty_dtb_ = std::move(loaded_dtb).value();
+  }
+
+  static void TearDownTestSuite() { empty_dtb_ = std::nullopt; }
+
+  auto empty_fdt() { return empty_dtb_->fdt(); }
+
+ private:
+  static std::optional<LoadedDtb> empty_dtb_;
+};
+
 // Devicetree Test fixture that provides members to existing ARM dtbs.
 class ArmDevicetreeTest {
  public:

@@ -17,7 +17,8 @@ using devicetree_test::LoadDtb;
 using devicetree_test::LoadedDtb;
 
 class RiscvDevicetreePlicItemTest
-    : public devicetree_test::TestMixin<devicetree_test::RiscvDevicetreeTest> {
+    : public devicetree_test::TestMixin<devicetree_test::RiscvDevicetreeTest,
+                                        devicetree_test::SyntheticDevicetreeTest> {
  public:
   static void SetUpTestSuite() {
     Mixin::SetUpTestSuite();
@@ -47,7 +48,7 @@ TEST_F(RiscvDevicetreePlicItemTest, BasicPlic) {
   auto fdt = plic();
   boot_shim::DevicetreeBootShim<boot_shim::RiscvDevicetreePlicItem> shim("test", fdt);
 
-  shim.Init();
+  ASSERT_TRUE(shim.Init());
   ASSERT_TRUE(shim.AppendItems(image).is_ok());
   auto clear_err = fit::defer([&]() { image.ignore_error(); });
 
@@ -72,7 +73,7 @@ TEST_F(RiscvDevicetreePlicItemTest, Qemu) {
   auto fdt = qemu_riscv();
   boot_shim::DevicetreeBootShim<boot_shim::RiscvDevicetreePlicItem> shim("test", fdt);
 
-  shim.Init();
+  ASSERT_TRUE(shim.Init());
   ASSERT_TRUE(shim.AppendItems(image).is_ok());
   auto clear_err = fit::defer([&]() { image.ignore_error(); });
 
@@ -97,7 +98,7 @@ TEST_F(RiscvDevicetreePlicItemTest, VisionFive2) {
   auto fdt = vision_five_2();
   boot_shim::DevicetreeBootShim<boot_shim::RiscvDevicetreePlicItem> shim("test", fdt);
 
-  shim.Init();
+  ASSERT_TRUE(shim.Init());
   ASSERT_TRUE(shim.AppendItems(image).is_ok());
   auto clear_err = fit::defer([&]() { image.ignore_error(); });
 
@@ -122,7 +123,7 @@ TEST_F(RiscvDevicetreePlicItemTest, HifiveSifiveUnmatched) {
   auto fdt = sifive_hifive_unmatched();
   boot_shim::DevicetreeBootShim<boot_shim::RiscvDevicetreePlicItem> shim("test", fdt);
 
-  shim.Init();
+  ASSERT_TRUE(shim.Init());
   ASSERT_TRUE(shim.AppendItems(image).is_ok());
   auto clear_err = fit::defer([&]() { image.ignore_error(); });
 
@@ -137,6 +138,24 @@ TEST_F(RiscvDevicetreePlicItemTest, HifiveSifiveUnmatched) {
     }
   }
   ASSERT_TRUE(present);
+}
+
+TEST_F(RiscvDevicetreePlicItemTest, MissingNode) {
+  std::array<std::byte, 512> image_buffer;
+  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  ASSERT_TRUE(image.clear().is_ok());
+
+  auto fdt = empty_fdt();
+  boot_shim::DevicetreeBootShim<boot_shim::RiscvDevicetreePlicItem> shim("test", fdt);
+
+  ASSERT_TRUE(shim.Init());
+  ASSERT_TRUE(shim.AppendItems(image).is_ok());
+  auto clear_err = fit::defer([&]() { image.ignore_error(); });
+
+  for (auto [header, payload] : image) {
+    EXPECT_FALSE(header->type == ZBI_TYPE_KERNEL_DRIVER &&
+                 header->extra == ZBI_KERNEL_DRIVER_RISCV_PLIC);
+  }
 }
 
 }  // namespace

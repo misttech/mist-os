@@ -17,7 +17,8 @@ using devicetree_test::LoadDtb;
 using devicetree_test::LoadedDtb;
 
 class ArmDevicetreeTimerItemTest
-    : public devicetree_test::TestMixin<devicetree_test::ArmDevicetreeTest> {
+    : public devicetree_test::TestMixin<devicetree_test::ArmDevicetreeTest,
+                                        devicetree_test::SyntheticDevicetreeTest> {
  public:
   static void SetUpTestSuite() {
     Mixin::SetUpTestSuite();
@@ -57,8 +58,7 @@ TEST_F(ArmDevicetreeTimerItemTest, TimerWithFrequencyOverride) {
   auto fdt = timer();
   boot_shim::DevicetreeBootShim<boot_shim::ArmDevicetreeTimerItem> shim("test", fdt);
 
-  shim.Init();
-
+  ASSERT_TRUE(shim.Init());
   auto clear_errors = fit::defer([&]() { image.ignore_error(); });
   ASSERT_TRUE(shim.AppendItems(image).is_ok());
   bool present = false;
@@ -86,8 +86,7 @@ TEST_F(ArmDevicetreeTimerItemTest, TimerWithoutFrequencyOverride) {
   auto fdt = timer_no_frequency_override();
   boot_shim::DevicetreeBootShim<boot_shim::ArmDevicetreeTimerItem> shim("test", fdt);
 
-  shim.Init();
-
+  ASSERT_TRUE(shim.Init());
   auto clear_errors = fit::defer([&]() { image.ignore_error(); });
   ASSERT_TRUE(shim.AppendItems(image).is_ok());
   bool present = false;
@@ -115,8 +114,7 @@ TEST_F(ArmDevicetreeTimerItemTest, Qemu) {
   auto fdt = qemu_arm_gic3();
   boot_shim::DevicetreeBootShim<boot_shim::ArmDevicetreeTimerItem> shim("test", fdt);
 
-  shim.Init();
-
+  ASSERT_TRUE(shim.Init());
   auto clear_errors = fit::defer([&]() { image.ignore_error(); });
   ASSERT_TRUE(shim.AppendItems(image).is_ok());
   bool present = false;
@@ -144,8 +142,7 @@ TEST_F(ArmDevicetreeTimerItemTest, Crosvm) {
   auto fdt = crosvm_arm();
   boot_shim::DevicetreeBootShim<boot_shim::ArmDevicetreeTimerItem> shim("test", fdt);
 
-  shim.Init();
-
+  ASSERT_TRUE(shim.Init());
   auto clear_errors = fit::defer([&]() { image.ignore_error(); });
   ASSERT_TRUE(shim.AppendItems(image).is_ok());
   bool present = false;
@@ -191,6 +188,25 @@ TEST_F(ArmDevicetreeTimerItemTest, KhadasVim3) {
     }
   }
   ASSERT_TRUE(present);
+}
+
+TEST_F(ArmDevicetreeTimerItemTest, MissingNode) {
+  std::array<std::byte, 1024> image_buffer;
+  std::vector<void*> allocs;
+  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  ASSERT_TRUE(image.clear().is_ok());
+
+  auto fdt = empty_fdt();
+  boot_shim::DevicetreeBootShim<boot_shim::ArmDevicetreeTimerItem> shim("test", fdt);
+
+  ASSERT_TRUE(shim.Init());
+
+  auto clear_errors = fit::defer([&]() { image.ignore_error(); });
+  ASSERT_TRUE(shim.AppendItems(image).is_ok());
+  for (auto [header, payload] : image) {
+    EXPECT_FALSE(header->type == ZBI_TYPE_KERNEL_DRIVER &&
+                 header->extra == ZBI_KERNEL_DRIVER_ARM_GENERIC_TIMER);
+  }
 }
 
 }  // namespace

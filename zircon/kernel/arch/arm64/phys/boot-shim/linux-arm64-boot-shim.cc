@@ -112,7 +112,7 @@ void PhysMain(void* flat_devicetree_blob, arch::EarlyTicks ticks) {
   shim.Get<BoardInfoItem>().set_payload(kQemuBoardInfo);
 
   // Fill DevicetreeItems.
-  shim.Init();
+  ZX_ASSERT(shim.Init());
 
   ArchSetUp(nullptr);
 

@@ -27,6 +27,7 @@ devicetree::ScanState DevictreeCpuTopologyItem::OnNode(const devicetree::NodePat
 
   if (!path.IsDescendentOf("/cpus")) {
     if (path == "/cpus") {
+      found_cpus_ = true;
       return devicetree::ScanState::kActive;
     }
     return devicetree::ScanState::kDoneWithSubtree;
@@ -455,6 +456,10 @@ fit::result<ItemBase::DataZbi::Error> DevictreeCpuTopologyItem::CalculateCluster
 
 fit::result<DevictreeCpuTopologyItem::DataZbi::Error> DevictreeCpuTopologyItem::AppendItems(
     DataZbi& zbi) const {
+  if (size_bytes() == 0) {
+    return fit::ok();
+  }
+
   ZX_ASSERT(cpu_entries_ && cpu_entry_count_);
   ZX_DEBUG_ASSERT(arch_info_setter_);
   // Resolve reference to CPU nodes from the cpu map.

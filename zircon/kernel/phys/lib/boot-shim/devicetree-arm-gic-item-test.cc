@@ -16,7 +16,8 @@ using devicetree_test::LoadDtb;
 using devicetree_test::LoadedDtb;
 
 class ArmDevicetreeGicItemTest
-    : public devicetree_test::TestMixin<devicetree_test::ArmDevicetreeTest> {
+    : public devicetree_test::TestMixin<devicetree_test::ArmDevicetreeTest,
+                                        devicetree_test::SyntheticDevicetreeTest> {
  public:
   static void SetUpTestSuite() {
     Mixin::SetUpTestSuite();
@@ -46,7 +47,7 @@ TEST_F(ArmDevicetreeGicItemTest, ParseQemuGicV2WithMsi) {
   auto fdt = qemu_arm_gic2();
   boot_shim::DevicetreeBootShim<boot_shim::ArmDevicetreeGicItem> shim("test", fdt);
 
-  shim.Init();
+  EXPECT_TRUE(shim.Init());
   EXPECT_TRUE(shim.AppendItems(image).is_ok());
 
   // Look for a gic 2 driver.
@@ -111,7 +112,7 @@ TEST_F(ArmDevicetreeGicItemTest, ParseQemuGicV3) {
   auto fdt = qemu_arm_gic3();
   boot_shim::DevicetreeBootShim<boot_shim::ArmDevicetreeGicItem> shim("test", fdt);
 
-  shim.Init();
+  EXPECT_TRUE(shim.Init());
   EXPECT_TRUE(shim.AppendItems(image).is_ok());
 
   // Look for a gic 2 driver.
@@ -142,7 +143,7 @@ TEST_F(ArmDevicetreeGicItemTest, ParseCrosvm) {
   auto fdt = crosvm_arm();
   boot_shim::DevicetreeBootShim<boot_shim::ArmDevicetreeGicItem> shim("test", fdt);
 
-  shim.Init();
+  EXPECT_TRUE(shim.Init());
   EXPECT_TRUE(shim.AppendItems(image).is_ok());
 
   // Look for a gic 2 driver.
@@ -196,6 +197,27 @@ TEST_F(ArmDevicetreeGicItemTest, KhadasVim3) {
   }
   image.ignore_error();
   ASSERT_TRUE(present, "ZBI Driver for GIC V2 missing.");
+}
+
+TEST_F(ArmDevicetreeGicItemTest, MissingNode) {
+  std::array<std::byte, 256> image_buffer;
+  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  ASSERT_TRUE(image.clear().is_ok());
+
+  auto fdt = empty_fdt();
+  boot_shim::DevicetreeBootShim<boot_shim::ArmDevicetreeGicItem> shim("test", fdt);
+
+  // shim completes successfully even when nothing is matching.
+  EXPECT_TRUE(shim.Init());
+  EXPECT_TRUE(shim.AppendItems(image).is_ok());
+
+  // Look for a gic 2 driver.
+  for (auto [header, payload] : image) {
+    EXPECT_FALSE(header->type == ZBI_TYPE_KERNEL_DRIVER &&
+                 (header->extra == ZBI_KERNEL_DRIVER_ARM_GIC_V3 ||
+                  header->extra == ZBI_KERNEL_DRIVER_ARM_GIC_V2));
+  }
+  image.ignore_error();
 }
 
 }  // namespace

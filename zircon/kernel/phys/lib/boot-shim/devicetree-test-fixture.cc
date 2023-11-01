@@ -8,6 +8,8 @@
 
 namespace devicetree_test {
 
+std::optional<LoadedDtb> SyntheticDevicetreeTest::empty_dtb_ = std::nullopt;
+
 std::optional<LoadedDtb> ArmDevicetreeTest::crosvm_arm_ = std::nullopt;
 std::optional<LoadedDtb> ArmDevicetreeTest::qemu_arm_gic3_ = std::nullopt;
 std::optional<LoadedDtb> ArmDevicetreeTest::qemu_arm_gic2_ = std::nullopt;
