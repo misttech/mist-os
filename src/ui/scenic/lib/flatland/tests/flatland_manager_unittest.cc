@@ -142,6 +142,7 @@ class FlatlandManagerTest : public LoggingEventLoop, public ::testing::Test {
     }
     if (manager_) {
       const size_t initial_session_count = manager_->GetSessionCount();
+      FX_LOGS(INFO) << "initial_session_count=" << initial_session_count;
       EXPECT_CALL(*mock_flatland_presenter_, RemoveSession(_, _))
           .Times(AtLeast(initial_session_count));
       RunLoopUntil([this, initial_session_count] {
@@ -159,6 +160,7 @@ class FlatlandManagerTest : public LoggingEventLoop, public ::testing::Test {
         std::for_each(removed_sessions_.begin(), removed_sessions_.end(), [](auto session_id) {
           FX_LOGS(INFO) << "`removed_sessions_` includes " << session_id;
         });
+        FX_LOGS(INFO) << "current_session_count=" << current_session_count;
         return current_session_count == 0 && removed_sessions_.size() == initial_session_count;
       });
     }
