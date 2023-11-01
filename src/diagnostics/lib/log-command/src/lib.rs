@@ -253,6 +253,10 @@ pub struct LogCommand {
     /// either enable this or be given a list of selectors to choose from.
     #[argh(switch)]
     pub force_select: bool,
+    /// enables structured JSON logs.
+    #[cfg(target_os = "fuchsia")]
+    #[argh(switch)]
+    pub json: bool,
 }
 
 impl Default for LogCommand {
@@ -281,6 +285,8 @@ impl Default for LogCommand {
             show_full_moniker: false,
             pid: None,
             tid: None,
+            #[cfg(target_os = "fuchsia")]
+            json: false,
         }
     }
 }

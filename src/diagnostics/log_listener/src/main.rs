@@ -9,6 +9,7 @@
 
 use anyhow::Error;
 use async_trait::async_trait;
+use ffx_writer::Format;
 use ffx_writer::MachineWriter;
 use fidl_fuchsia_diagnostics::StreamParameters;
 use fidl_fuchsia_diagnostics_host::ArchiveAccessorMarker;
@@ -79,7 +80,7 @@ async fn main() -> Result<(), Error> {
     let boot_ts = fuchsia_runtime::utc_time() - zx::Time::get_monotonic();
     let mut formatter = DefaultLogFormatter::<MachineWriter<LogEntry>>::new_from_args(
         &cmd,
-        MachineWriter::new(None),
+        MachineWriter::new(if cmd.json { Some(Format::Json) } else { None }),
     );
     formatter.set_boot_timestamp(boot_ts.into_nanos());
     let _ = read_logs_from_socket(
