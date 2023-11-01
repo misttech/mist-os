@@ -8,6 +8,7 @@ import("//build/zircon/zx_host_tool.gni")
 
 # We only calculate filesystem sizes for non-bootfs-only builds.
 assert(!bootfs_only)
+assert(!use_bazel_images_only)
 
 labels = {
   images = "//build/images/fuchsia"

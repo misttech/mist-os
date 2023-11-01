@@ -201,22 +201,25 @@ if (is_fuchsia) {
   # `package_list_from_assembly()` GN template.
   group("fuchsia") {
     testonly = fuchsia_zbi_testonly
-    public_deps = [
-      ":assembly_inputs",
-      ":fuchsia_assembly",
-      ":scrutiny_x_smoke_test",
-      ":update",
-    ]
+    public_deps = [ ":scrutiny_x_smoke_test" ]
 
     if (!use_bazel_images_only) {
-      public_deps += [ ":product_bundle" ]
+      public_deps += [
+        ":assembly_inputs",
+        ":fuchsia_assembly",
+        ":product_bundle",
+        ":update",
+      ]
     }
 
     metadata = {
-      # Only include the update package(s) manifest(s) in metadata collection.
-      # To get a file containing a list of the base & cache packages, use the
-      # `package_list_from_assembly()` GN template.
-      package_barrier = [ ":update" ]
+      package_barrier = []
+      if (!use_bazel_images_only) {
+        # Only include the update package(s) manifest(s) in metadata collection.
+        # To get a file containing a list of the base & cache packages, use the
+        # `package_list_from_assembly()` GN template.
+        package_barrier = [ ":update" ]
+      }
       assembly_inputs = [
         {
           path = rebase_path(files.assembly_inputs, root_build_dir)
@@ -224,16 +227,6 @@ if (is_fuchsia) {
       ]
     }
   }
-
-  _partitions_config = "//boards/partitions:default"
-  if (has_board) {
-    assert(partitions_config_label != false,
-           "Need to define partitions_config_label")
-    _partitions_config = partitions_config_label
-  }
-  _partitions_config_file =
-      get_label_info(_partitions_config, "target_out_dir") + "/" +
-      get_label_info(_partitions_config, "name") + ".json"
 
   assembled_system("fuchsia_assembly") {
     forward_variables_from(fuchsia_base, "*")
@@ -247,162 +240,184 @@ if (is_fuchsia) {
     must_exist_deps = must_exist
   }
 
-  update_epoch = update_platform_epoch + update_product_epoch
-  update_package("update") {
-    testonly = fuchsia_zbi_testonly
-    deps = [
-      ":fuchsia_assembly",
-      "//build/info:build_info_files",
-      _partitions_config,
-      recovery_label,
-    ]
-    partitions = _partitions_config_file
-    system_a = files.images_json
-    system_r = files.recovery_images_json
-    board_name = board_name
-    version_file = build_info_files.version
-    epoch = "${update_epoch}"
-  }
+  # Bazel assembly builds a product bundle, so we don't need to build product
+  # bundle and update packages in GN.
+  if (!use_bazel_images_only) {
+    _partitions_config = "//boards/partitions:default"
+    if (has_board) {
+      assert(partitions_config_label != false,
+             "Need to define partitions_config_label")
+      _partitions_config = partitions_config_label
+    }
+    _partitions_config_file =
+        get_label_info(_partitions_config, "target_out_dir") + "/" +
+        get_label_info(_partitions_config, "name") + ".json"
 
-  product_bundle_label = "product_bundle"
-  product_bundle(product_bundle_label) {
-    testonly = fuchsia_zbi_testonly
-    deps = [
-      ":fuchsia_assembly",
-      "//build/info:build_info_files",
-      _partitions_config,
-      recovery_label,
-    ]
-
-    update = {
+    update_epoch = update_platform_epoch + update_product_epoch
+    update_package("update") {
+      testonly = fuchsia_zbi_testonly
+      deps = [
+        ":fuchsia_assembly",
+        "//build/info:build_info_files",
+        _partitions_config,
+        recovery_label,
+      ]
+      partitions = _partitions_config_file
+      system_a = files.images_json
+      system_r = files.recovery_images_json
+      board_name = board_name
       version_file = build_info_files.version
       epoch = "${update_epoch}"
     }
 
-    partitions = _partitions_config_file
-    system_a = files.images_json
-    system_r = files.recovery_images_json
+    product_bundle_label = "product_bundle"
+    product_bundle(product_bundle_label) {
+      testonly = fuchsia_zbi_testonly
+      deps = [
+        ":fuchsia_assembly",
+        "//build/info:build_info_files",
+        _partitions_config,
+        recovery_label,
+      ]
 
-    # Add the virtual devices.
-    if (board_is_emu) {
-      virtual_devices = [
-        "$root_build_dir/virtual_device_recommended.json",
-        "$root_build_dir/virtual_device_min.json",
-        "$root_build_dir/virtual_device_large.json",
-      ]
-      deps += [
-        "//build/images/flash:virtual_device_specification_large",
-        "//build/images/flash:virtual_device_specification_min",
-        "//build/images/flash:virtual_device_specification_recommended",
-      ]
-      default_virtual_device = "virtual_device_recommended"
-    }
+      update = {
+        version_file = build_info_files.version
+        epoch = "${update_epoch}"
+      }
 
-    # Create lists of the files that are referenced by the assembly manifests.
-    _assembly_contents = [ files.qemu_kernel ]
-    if (fxfs_blob) {
-      _assembly_contents += [
-        files.fxfs,
-        files.fxfs_sparse,
-      ]
-    } else {
-      _assembly_contents += [
-        files.blobfs,
-        files.fvm,
-        files.fvm_sparse,
-      ]
-    }
-    _recovery_contents = [ files.qemu_kernel ]
-    if (files.recovery_name != "zedboot") {
+      partitions = _partitions_config_file
+      system_a = files.images_json
+      system_r = files.recovery_images_json
+
+      # Add the virtual devices.
+      if (board_is_emu) {
+        virtual_devices = [
+          "$root_build_dir/virtual_device_recommended.json",
+          "$root_build_dir/virtual_device_min.json",
+          "$root_build_dir/virtual_device_large.json",
+        ]
+        deps += [
+          "//build/images/flash:virtual_device_specification_large",
+          "//build/images/flash:virtual_device_specification_min",
+          "//build/images/flash:virtual_device_specification_recommended",
+        ]
+        default_virtual_device = "virtual_device_recommended"
+      }
+
+      # Create lists of the files that are referenced by the assembly manifests.
+      _assembly_contents = [ files.qemu_kernel ]
       if (fxfs_blob) {
-        _recovery_contents += [
-          files.recovery_fxfs,
-          files.recovery_fxfs_sparse,
+        _assembly_contents += [
+          files.fxfs,
+          files.fxfs_sparse,
         ]
       } else {
-        _recovery_contents += [
+        _assembly_contents += [
           files.blobfs,
           files.fvm,
           files.fvm_sparse,
         ]
       }
-    }
-    if (!fxfs_blob &&
-        (assembly_generate_fvm_fastboot || assembly_generate_fvm_nand)) {
-      _assembly_contents += [ files.fvm_fastboot ]
+      _recovery_contents = [ files.qemu_kernel ]
       if (files.recovery_name != "zedboot") {
-        _recovery_contents += [ files.recovery_fvm_fastboot ]
+        if (fxfs_blob) {
+          _recovery_contents += [
+            files.recovery_fxfs,
+            files.recovery_fxfs_sparse,
+          ]
+        } else {
+          _recovery_contents += [
+            files.blobfs,
+            files.fvm,
+            files.fvm_sparse,
+          ]
+        }
+      }
+      if (!fxfs_blob &&
+          (assembly_generate_fvm_fastboot || assembly_generate_fvm_nand)) {
+        _assembly_contents += [ files.fvm_fastboot ]
+        if (files.recovery_name != "zedboot") {
+          _recovery_contents += [ files.recovery_fvm_fastboot ]
+        }
+      }
+      if (custom_signing_script != "" || use_vboot) {
+        _assembly_contents += [ files.zbi_signed ]
+        _recovery_contents += [ files.recovery_zbi_signed ]
+      } else {
+        _assembly_contents += [ files.zbi ]
+        _recovery_contents += [ files.recovery_zbi ]
+      }
+      if (use_vbmeta) {
+        _assembly_contents += [ files.vbmeta ]
+        _recovery_contents += [ files.recovery_vbmeta ]
+      }
+
+      # List the contents of each input so that the outputs can be calculated.
+      partitions_contents = partitions_config_contents
+      system_a_contents = _assembly_contents
+      system_r_contents = _recovery_contents
+
+      # Skip scrutiny on slot R.
+      skip_scrutiny_recovery = true
+
+      # Skip scrutiny on slot A for particular cases.
+      if (is_coverage || custom_signing_script != "" ||
+          !run_scrutiny_verifiers) {
+        skip_scrutiny = true
+      } else {
+        scrutiny_args = {
+          assembly_image_name = "fuchsia"
+          route_sources_config = fuchsia_route_sources_config
+          static_pkgs_goldens = fuchsia_static_pkgs_goldens
+          structured_config_policy = fuchsia_structured_config_policy
+          verify_component_resolvers_allowlist =
+              fuchsia_verify_component_resolvers_allowlist
+          verify_routes_component_tree_config =
+              fuchsia_verify_routes_component_tree_config
+          verify_routes_exceptions_allowlist =
+              fuchsia_verify_routes_exceptions_allowlist
+          verify_routes_exceptions_allowlist_product =
+              fuchsia_verify_routes_exceptions_allowlist_product
+          zbi_bootfs_filelist_goldens = fuchsia_zbi_bootfs_filelist_goldens
+          zbi_bootfs_packages_goldens = fuchsia_zbi_bootfs_packages_goldens
+          zbi_kernel_cmdline_goldens = fuchsia_zbi_kernel_cmdline_goldens
+          product_assembly_config_label =
+              fuchsia_base.product_assembly_config_label
+        }
+      }
+
+      if (delivery_blob_type != false) {
+        delivery_blob_type = delivery_blob_type
       }
     }
-    if (custom_signing_script != "" || use_vboot) {
-      _assembly_contents += [ files.zbi_signed ]
-      _recovery_contents += [ files.recovery_zbi_signed ]
-    } else {
-      _assembly_contents += [ files.zbi ]
-      _recovery_contents += [ files.recovery_zbi ]
-    }
-    if (use_vbmeta) {
-      _assembly_contents += [ files.vbmeta ]
-      _recovery_contents += [ files.recovery_vbmeta ]
-    }
 
-    # List the contents of each input so that the outputs can be calculated.
-    partitions_contents = partitions_config_contents
-    system_a_contents = _assembly_contents
-    system_r_contents = _recovery_contents
+    generated_assembly_inputs("assembly_inputs") {
+      testonly = fuchsia_zbi_testonly
+      output_path = files.assembly_inputs
 
-    # Skip scrutiny on slot R.
-    skip_scrutiny_recovery = true
+      # Add the legacy AIB for the assemblies. The platform AIBs are added
+      # automatically from the build_api_module("assembly_input_archives")
+      sources = [ "${files.outdir}/legacy" ]
 
-    # Skip scrutiny on slot A for particular cases.
-    if (is_coverage || custom_signing_script != "" || !run_scrutiny_verifiers) {
-      skip_scrutiny = true
-    } else {
-      scrutiny_args = {
-        assembly_image_name = "fuchsia"
-        route_sources_config = fuchsia_route_sources_config
-        static_pkgs_goldens = fuchsia_static_pkgs_goldens
-        structured_config_policy = fuchsia_structured_config_policy
-        verify_component_resolvers_allowlist =
-            fuchsia_verify_component_resolvers_allowlist
-        verify_routes_component_tree_config =
-            fuchsia_verify_routes_component_tree_config
-        verify_routes_exceptions_allowlist =
-            fuchsia_verify_routes_exceptions_allowlist
-        verify_routes_exceptions_allowlist_product =
-            fuchsia_verify_routes_exceptions_allowlist_product
-        zbi_bootfs_filelist_goldens = fuchsia_zbi_bootfs_filelist_goldens
-        zbi_bootfs_packages_goldens = fuchsia_zbi_bootfs_packages_goldens
-        zbi_kernel_cmdline_goldens = fuchsia_zbi_kernel_cmdline_goldens
-        product_assembly_config_label =
-            fuchsia_base.product_assembly_config_label
-      }
-    }
-
-    if (delivery_blob_type != false) {
-      delivery_blob_type = delivery_blob_type
+      deps = [ ":fuchsia.legacy_input_bundle" ]
     }
   }
-  product_bundle_out_dir =
-      get_label_info(":${product_bundle_label}", "target_out_dir") + "/" +
-      product_bundle_label
 
   scrutiny_x_smoke_test("scrutiny_x_smoke_test") {
     testonly = fuchsia_zbi_testonly
     test_binary = "//src/security/bin/scrutiny_x_smoke_test"
-    product_bundle_target = ":${product_bundle_label}"
-    product_bundle_path = product_bundle_out_dir
-  }
-
-  generated_assembly_inputs("assembly_inputs") {
-    testonly = fuchsia_zbi_testonly
-    output_path = files.assembly_inputs
-
-    # Add the legacy AIB for the assemblies. The platform AIBs are added
-    # automatically from the build_api_module("assembly_input_archives")
-    sources = [ "${files.outdir}/legacy" ]
-
-    deps = [ ":fuchsia_assembly" ]
+    if (use_bazel_images_only) {
+      product_bundle_target = bazel_product_bundle_target
+      product_bundle_path =
+          get_label_info(bazel_product_bundle_target, "target_out_dir") + "/" +
+          get_label_info(bazel_product_bundle_target, "name") +
+          "/product_bundle"
+    } else {
+      product_bundle_target = ":${product_bundle_label}"
+      product_bundle_path =
+          get_label_info(":${product_bundle_label}", "target_out_dir") + "/" +
+          product_bundle_label
+    }
   }
 
   ##################################################

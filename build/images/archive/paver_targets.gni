@@ -37,12 +37,13 @@ paver_targets = [
   {
     name = "paver-script"
     outputs = [ "$root_build_dir/pave.sh" ]
-    deps = [ "//build/images/tools:bootserver" ]
+    deps = [
+      "//build/images/tools:bootserver",
+      labels.images,
+    ]
     if (use_bringup_assembly) {
-      deps += [ "//build/images/bringup" ]
       switch = "--netboot="
     } else {
-      deps += [ "//build/images/fuchsia" ]
       switch = "--pave="
     }
     extra_bootserver_arguments = ""
