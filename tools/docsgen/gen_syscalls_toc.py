@@ -76,7 +76,7 @@ def gen_readme_and_toc(data, reference_root):
 
     print(TOC_HEADER, file=toc)
     print('- title: "Overview"', file=toc)
-    print("  path: README.md", file=toc)
+    print(f"  path: {reference_root}/README.md", file=toc)
 
     topic_map = dict()
     # build a map of prefixes from the topics
