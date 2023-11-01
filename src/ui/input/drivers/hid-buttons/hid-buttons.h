@@ -7,10 +7,12 @@
 
 #include <fidl/fuchsia.buttons/cpp/wire.h>
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
-#include <fuchsia/hardware/hidbus/cpp/banjo.h>
+#include <fidl/fuchsia.input.report/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/fidl/cpp/wire/server.h>
+#include <lib/input_report_reader/reader.h>
+#include <lib/inspect/cpp/inspect.h>
 #include <lib/sync/cpp/completion.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <lib/zx/interrupt.h>
@@ -21,19 +23,15 @@
 #include <map>
 #include <optional>
 #include <set>
-#include <vector>
 
 #include <ddk/metadata/buttons.h>
 #include <ddktl/device.h>
 #include <ddktl/fidl.h>
+#include <ddktl/protocol/empty-protocol.h>
 #include <fbl/array.h>
 #include <fbl/auto_lock.h>
 #include <fbl/mutex.h>
 #include <fbl/ref_counted.h>
-#include <hid/buttons.h>
-
-#include "lib/zx/channel.h"
-#include "zircon/types.h"
 
 namespace buttons {
 
@@ -49,15 +47,15 @@ constexpr uint64_t kPortKeyPollTimer = 0x1000;
 constexpr uint64_t kDebounceThresholdNs = 50'000'000;
 
 class HidButtonsDevice;
-using DeviceType = ddk::Device<HidButtonsDevice, ddk::Unbindable>;
-class HidButtonsHidBusFunction;
-using HidBusFunctionType = ddk::Device<HidButtonsHidBusFunction>;
+using DeviceType =
+    ddk::Device<HidButtonsDevice, ddk::Messageable<fuchsia_input_report::InputDevice>::Mixin,
+                ddk::Unbindable>;
 class ButtonsNotifyInterface;
 
 using Buttons = fuchsia_buttons::Buttons;
 using ButtonType = fuchsia_buttons::wire::ButtonType;
 
-class HidButtonsDevice : public DeviceType {
+class HidButtonsDevice : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_INPUTREPORT> {
  public:
   struct Gpio {
     fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> client;
@@ -65,22 +63,33 @@ class HidButtonsDevice : public DeviceType {
     buttons_gpio_config_t config;
   };
 
-  explicit HidButtonsDevice(zx_device_t* device) : DeviceType(device) {}
+  explicit HidButtonsDevice(zx_device_t* device, async_dispatcher_t* dispatcher)
+      : DeviceType(device), dispatcher_(dispatcher) {
+    metrics_root_ = inspector_.GetRoot().CreateChild("hid-input-report-touch");
+    average_latency_usecs_ = metrics_root_.CreateUint("average_latency_usecs", 0);
+    max_latency_usecs_ = metrics_root_.CreateUint("max_latency_usecs", 0);
+    total_report_count_ = metrics_root_.CreateUint("total_report_count", 0);
+    last_event_timestamp_ = metrics_root_.CreateUint("last_event_timestamp", 0);
+  }
   virtual ~HidButtonsDevice() = default;
 
-  // Hidbus Protocol Functions.
-  zx_status_t HidbusStart(const hidbus_ifc_protocol_t* ifc) TA_EXCL(client_lock_);
-  zx_status_t HidbusQuery(uint32_t options, hid_info_t* info);
-  void HidbusStop() TA_EXCL(client_lock_);
-  zx_status_t HidbusGetDescriptor(hid_description_type_t desc_type, uint8_t* out_data_buffer,
-                                  size_t data_size, size_t* out_data_actual);
-  zx_status_t HidbusGetReport(uint8_t rpt_type, uint8_t rpt_id, uint8_t* data, size_t len,
-                              size_t* out_len) TA_EXCL(client_lock_);
-  zx_status_t HidbusSetReport(uint8_t rpt_type, uint8_t rpt_id, const uint8_t* data, size_t len);
-  zx_status_t HidbusGetIdle(uint8_t rpt_id, uint8_t* duration);
-  zx_status_t HidbusSetIdle(uint8_t rpt_id, uint8_t duration);
-  zx_status_t HidbusGetProtocol(uint8_t* protocol);
-  zx_status_t HidbusSetProtocol(uint8_t protocol);
+  // fuchsia_input_report::InputDevice required methods
+  void GetInputReportsReader(GetInputReportsReaderRequestView request,
+                             GetInputReportsReaderCompleter::Sync& completer) override;
+  void GetDescriptor(GetDescriptorCompleter::Sync& completer) override;
+  void SendOutputReport(SendOutputReportRequestView request,
+                        SendOutputReportCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+  void GetFeatureReport(GetFeatureReportCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+  void SetFeatureReport(SetFeatureReportRequestView request,
+                        SetFeatureReportCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+  void GetInputReport(GetInputReportRequestView request,
+                      GetInputReportCompleter::Sync& completer) override;
 
   // FIDL Interface Functions.
   bool GetState(ButtonType type);
@@ -95,7 +104,7 @@ class HidButtonsDevice : public DeviceType {
 
  protected:
   // Protected for unit testing.
-  void ShutDown() TA_EXCL(client_lock_);
+  void ShutDown();
 
   zx::port port_;
 
@@ -108,20 +117,43 @@ class HidButtonsDevice : public DeviceType {
 
   std::list<ButtonsNotifyInterface> interfaces_ TA_GUARDED(channels_lock_);  // owns the channels
 
-  HidButtonsHidBusFunction* hidbus_function_;
-
  private:
   friend class HidButtonsDeviceTest;
+  static constexpr size_t kFeatureAndDescriptorBufferSize = 512;
 
   int Thread();
   uint8_t ReconfigurePolarity(uint32_t idx, uint64_t int_port);
   zx_status_t ConfigureInterrupt(uint32_t idx, uint64_t int_port);
   bool MatrixScan(uint32_t row, uint32_t col, zx_duration_t delay);
 
+  struct ButtonsInputReport {
+    zx::time event_time = zx::time(ZX_TIME_INFINITE_PAST);
+    std::array<bool, BUTTONS_ID_MAX> buttons = {};
+
+    void ToFidlInputReport(
+        fidl::WireTableBuilder<::fuchsia_input_report::wire::InputReport>& input_report,
+        fidl::AnyArena& allocator);
+
+    bool operator==(const ButtonsInputReport& other) const { return buttons == other.buttons; }
+    bool operator!=(const ButtonsInputReport& other) const { return !(*this == other); }
+
+    void set(uint32_t button_id, bool pressed) {
+      if (button_id >= buttons.size()) {
+        return;
+      }
+      buttons[button_id] = pressed;
+    }
+    bool empty() const {
+      return std::all_of(buttons.cbegin(), buttons.cend(), [](bool i) { return !i; });
+    }
+  };
+  zx::result<ButtonsInputReport> GetInputReport();
+
+  async_dispatcher_t* dispatcher_;
+
   thrd_t thread_;
   libsync::Completion thread_started_;
-  fbl::Mutex client_lock_;
-  ddk::HidbusIfcProtocolClient client_ TA_GUARDED(client_lock_);
+  input_report_reader::InputReportReaderManager<ButtonsInputReport> readers_;
   fbl::Array<buttons_button_config_t> buttons_;
   fbl::Array<Gpio> gpios_;
 
@@ -129,54 +161,29 @@ class HidButtonsDevice : public DeviceType {
     bool enqueued;
     zx::timer timer;
     bool value;
+    zx::time timestamp = zx::time::infinite_past();
   };
   fbl::Array<debounce_state> debounce_states_;
   // last_report_ saved to de-duplicate reports
-  buttons_input_rpt_t last_report_;
+  ButtonsInputReport last_report_;
 
   zx::duration poll_period_{zx::duration::infinite()};
   zx::timer poll_timer_;
-};
 
-class HidButtonsHidBusFunction
-    : public HidBusFunctionType,
-      public ddk::HidbusProtocol<HidButtonsHidBusFunction, ddk::base_protocol>,
-      public fbl::RefCounted<HidButtonsHidBusFunction> {
- public:
-  explicit HidButtonsHidBusFunction(zx_device_t* device, HidButtonsDevice* peripheral)
-      : HidBusFunctionType(device), device_(peripheral) {}
-  virtual ~HidButtonsHidBusFunction() = default;
+  inspect::Inspector inspector_;
+  inspect::Node metrics_root_;
+  // Note that because this driver handles both polling and IRQ reports, latency is only measured
+  // for IRQ reports because it is not meaningful for polling.
+  inspect::UintProperty average_latency_usecs_;
+  inspect::UintProperty max_latency_usecs_;
+  // However, total_report_count_ and last_event_timestamp_ will reflect both polling and IRQ
+  // reports.
+  inspect::UintProperty total_report_count_;
+  inspect::UintProperty last_event_timestamp_;
 
-  void DdkRelease() { delete this; }
-
-  // Methods required by the ddk mixins.
-  zx_status_t HidbusStart(const hidbus_ifc_protocol_t* ifc) { return device_->HidbusStart(ifc); }
-  zx_status_t HidbusQuery(uint32_t options, hid_info_t* info) {
-    return device_->HidbusQuery(options, info);
-  }
-  void HidbusStop() { device_->HidbusStop(); }
-  zx_status_t HidbusGetDescriptor(hid_description_type_t desc_type, uint8_t* out_data_buffer,
-                                  size_t data_size, size_t* out_data_actual) {
-    return device_->HidbusGetDescriptor(desc_type, out_data_buffer, data_size, out_data_actual);
-  }
-  zx_status_t HidbusGetReport(uint8_t rpt_type, uint8_t rpt_id, uint8_t* data, size_t len,
-                              size_t* out_len) {
-    return device_->HidbusGetReport(rpt_type, rpt_id, data, len, out_len);
-  }
-  zx_status_t HidbusSetReport(uint8_t rpt_type, uint8_t rpt_id, const uint8_t* data, size_t len) {
-    return device_->HidbusSetReport(rpt_type, rpt_id, data, len);
-  }
-  zx_status_t HidbusGetIdle(uint8_t rpt_id, uint8_t* duration) {
-    return device_->HidbusGetIdle(rpt_id, duration);
-  }
-  zx_status_t HidbusSetIdle(uint8_t rpt_id, uint8_t duration) {
-    return device_->HidbusSetIdle(rpt_id, duration);
-  }
-  zx_status_t HidbusGetProtocol(uint8_t* protocol) { return device_->HidbusGetProtocol(protocol); }
-  zx_status_t HidbusSetProtocol(uint8_t protocol) { return device_->HidbusSetProtocol(protocol); }
-
- private:
-  HidButtonsDevice* device_;
+  uint64_t report_count_ = 0;
+  zx::duration total_latency_ = {};
+  zx::duration max_latency_ = {};
 };
 
 class ButtonsNotifyInterface : public fidl::WireServer<Buttons> {

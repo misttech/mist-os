@@ -111,7 +111,7 @@ TEST_F(DeviceEnumerationTest, NelsonTest) {
 
   static const char* kTouchscreenDevicePaths[] = {
       // One of these touch devices could be on P0/P1 boards.
-      "sys/platform/05:05:1/aml-gpio/gpio-2/nelson-buttons/hid-buttons/hidbus_function/hid-device/InputReport",
+      "sys/platform/05:05:1/aml-gpio/gpio-2/nelson-buttons/hid-buttons",
       // This is the only possible touch device for P2 and beyond.
       "sys/platform/1c:00:1/gt6853-touch/gt6853",
   };
