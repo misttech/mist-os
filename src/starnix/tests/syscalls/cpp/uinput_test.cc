@@ -39,6 +39,12 @@ class UinputTest : public ::testing::Test {
 
 TEST_F(UinputTest, UiSetEvbit) {
   int res = ioctl(uinput_fd_.get(), UI_SET_EVBIT, EV_KEY);
+  EXPECT_EQ(res, 0);
+
+  res = ioctl(uinput_fd_.get(), UI_SET_EVBIT, EV_ABS);
+  EXPECT_EQ(res, 0);
+
+  res = ioctl(uinput_fd_.get(), UI_SET_EVBIT, EV_REL);
   EXPECT_EQ(res, -1);
 }
 
