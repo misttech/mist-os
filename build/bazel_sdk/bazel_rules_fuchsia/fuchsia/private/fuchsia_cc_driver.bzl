@@ -13,7 +13,7 @@ restriction but until then we must include that src to properly link in the requ
 symbols.
 """
 
-def fuchsia_cc_driver(name, srcs = [], **kwargs):
+def fuchsia_cc_driver(name, srcs = [], output_name = None, **kwargs):
     """Creates a binary driver which targets Fuchsia.
 
     Wraps a cc_binary rule and provides appropriate defaults.
@@ -24,7 +24,8 @@ def fuchsia_cc_driver(name, srcs = [], **kwargs):
 
     Args:
         name: the target name
-        srcs:
+        srcs: the sources to include in the driver.
+        output_name: (optional) the name of the .so to build. If excluded will default to lib<name>.so
         **kwargs: The arguments to forward to cc_binary
     """
     if len(srcs) == 0:
@@ -68,9 +69,12 @@ def fuchsia_cc_driver(name, srcs = [], **kwargs):
         **kwargs
     )
 
+    bin_name = output_name or "lib{}".format(name)
+
     fuchsia_wrap_cc_binary(
         name = name,
-        bin_name = "lib{}.so".format(name),
+        # Ensure that our bin_name ends in .so
+        bin_name = bin_name.rstrip(".so") + ".so",
         install_root = "driver/",
         cc_binary = ":{}_cc_binary".format(name),
         exact_cc_binary_deps = kwargs.pop("deps", None),
