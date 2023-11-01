@@ -302,15 +302,9 @@ async fn create_container(
     }
 
     let node = inspect::component::inspector().root().create_child("container");
-    let kernel = Kernel::new(
-        config.name.as_bytes(),
-        kernel_cmdline,
-        features,
-        svc_dir,
-        data_dir,
-        node.create_child("kernel"),
-    )
-    .with_source_context(|| format!("creating Kernel: {}", &config.name))?;
+    let kernel =
+        Kernel::new(kernel_cmdline, features, svc_dir, data_dir, node.create_child("kernel"))
+            .with_source_context(|| format!("creating Kernel: {}", &config.name))?;
 
     let mut init_task = create_init_task(&kernel, config)
         .with_source_context(|| format!("creating init task: {:?}", &config.init))?;

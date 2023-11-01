@@ -64,15 +64,9 @@ fn create_kernel_task_and_unlocked_with_fs<'l>(
     create_fs: impl FnOnce(&Arc<Kernel>) -> FileSystemHandle,
 ) -> (Arc<Kernel>, AutoReleasableTask, Locked<'l, Unlocked>) {
     let unlocked = Unlocked::new();
-    let kernel = Kernel::new(
-        b"test-kernel",
-        b"".into(),
-        Features::default(),
-        None,
-        None,
-        fuchsia_inspect::Node::default(),
-    )
-    .expect("failed to create kernel");
+    let kernel =
+        Kernel::new(b"".into(), Features::default(), None, None, fuchsia_inspect::Node::default())
+            .expect("failed to create kernel");
 
     let fs = FsContext::new(create_fs(&kernel));
     let task = Task::create_process_without_parent(

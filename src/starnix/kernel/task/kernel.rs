@@ -40,7 +40,7 @@ use crate::{
         sysfs::{BlockDeviceDirectory, DeviceDirectory, SysFsDirectory},
         FileOps, FileSystemHandle, FsNode,
     },
-    logging::{log_error, set_zx_name},
+    logging::log_error,
     mm::{FutexTable, SharedFutexKey},
     power::PowerManager,
     task::*,
@@ -61,9 +61,6 @@ use self::lock_levels::*;
 /// The structure of this object will likely need to evolve as we implement more namespacing and
 /// isolation mechanisms, such as `namespaces(7)` and `pid_namespaces(7)`.
 pub struct Kernel {
-    /// The Zircon job object that holds the processes running in this kernel.
-    pub job: zx::Job,
-
     /// The kernel threads running on behalf of this kernel.
     pub kthreads: KernelThreads,
 
@@ -236,7 +233,6 @@ impl InterfacesHandler for InterfacesHandlerImpl {
 
 impl Kernel {
     pub fn new(
-        name: &[u8],
         cmdline: BString,
         features: Features,
         container_svc: Option<fio::DirectoryProxy>,
@@ -245,9 +241,6 @@ impl Kernel {
     ) -> Result<Arc<Kernel>, zx::Status> {
         let unix_address_maker = Box::new(|x: Vec<u8>| -> SocketAddress { SocketAddress::Unix(x) });
         let vsock_address_maker = Box::new(|x: u32| -> SocketAddress { SocketAddress::Vsock(x) });
-        let job = fuchsia_runtime::job_default().create_child_job()?;
-        set_zx_name(&job, name);
-
         let framebuffer =
             Framebuffer::new(features.aspect_ratio.as_ref()).expect("Failed to create framebuffer");
         let input_device = InputDevice::new(framebuffer.clone(), &inspect_node);
@@ -257,7 +250,6 @@ impl Kernel {
         let security_server = if features.selinux { Some(SecurityServer::new()) } else { None };
 
         let this = Arc::new(Kernel {
-            job,
             kthreads: KernelThreads::default(),
             pids: RwLock::new(PidTable::new()),
             default_abstract_socket_namespace: AbstractUnixSocketNamespace::new(unix_address_maker),
