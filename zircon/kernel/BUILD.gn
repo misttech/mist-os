@@ -32,6 +32,12 @@ declare_args() {
   # the like can be listed here to be used as a ZBI-to-ZBI boot shim
   # (e.g. //zircon/kernel/arch/x86/phys/boot-shim:x86-legacy-zbi-boot-shim)
   kernel_zbi_extra_deps = []
+
+  # A list of GN labels comprising additional dependencies of the kernel
+  # proper. This can be useful - in a prototyping or 'vendor' capacity - for
+  # injecting new instances of subsystems that the kernel has defined modularly
+  # (e.g., pdev drivers or k commands).
+  kernel_extra_deps = []
 }
 
 if (platform_enable_user_pci) {
@@ -498,12 +504,12 @@ if (is_kernel) {
 
   group("zircon-main") {
     deps = [
-      ":test",  # TODO: make optional, add testonly taint
-      "top",
+             ":test",  # TODO: make optional, add testonly taint
+             "top",
 
-      # Ensures that //docs/gen/boot-options.md is never stale.
-      "lib/boot-options:check-markdown($default_toolchain)",
-    ]
+             # Ensures that //docs/gen/boot-options.md is never stale.
+             "lib/boot-options:check-markdown($default_toolchain)",
+           ] + kernel_extra_deps
     if (current_cpu == "arm64") {
       deps += [ "platform/generic-arm" ]
     } else if (current_cpu == "riscv64") {
