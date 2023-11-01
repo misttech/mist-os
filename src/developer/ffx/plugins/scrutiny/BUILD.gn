@@ -42,3 +42,19 @@ ffx_tool("ffx_scrutiny_tool") {
   sdk_target_name = "sdk"
   sdk_category = "partner"
 }
+
+group("scrutiny") {
+  public_deps = [
+    ":ffx_scrutiny_tool",
+    ":ffx_scrutiny_tool_host_tool",
+  ]
+}
+
+group("bin") {
+  public_deps = [ ":ffx_scrutiny_tool_versioned" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [ ":ffx_scrutiny_tests($host_toolchain)" ]
+}
