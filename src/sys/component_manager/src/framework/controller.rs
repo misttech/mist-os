@@ -9,7 +9,8 @@ use {
     },
     fidl::endpoints::RequestStream,
     fidl_fuchsia_component as fcomponent, fuchsia_async as fasync, fuchsia_zircon as zx,
-    futures::TryStreamExt,
+    futures::prelude::*,
+    sandbox::Dict,
     tracing::{error, warn},
 };
 
@@ -52,10 +53,11 @@ pub async fn serve_controller(
                 };
                 let numbered_handles = args.numbered_handles.take().unwrap_or_default();
                 let Ok(namespace): Result<namespace::Namespace, _> =
-                    args.namespace_entries.take().unwrap_or_default().try_into() else {
-                        responder.send(Err(fcomponent::Error::InvalidArguments))?;
-                        continue;
-                    };
+                    args.namespace_entries.take().unwrap_or_default().try_into()
+                else {
+                    responder.send(Err(fcomponent::Error::InvalidArguments))?;
+                    continue;
+                };
                 if let Err(err) = component
                     .start(
                         &StartReason::Controller,
@@ -80,8 +82,16 @@ pub async fn serve_controller(
                 let component = component.unwrap();
                 responder.send(Ok(component.lock_execution().await.runtime.is_some()))?;
             }
-            fcomponent::ControllerRequest::GetExposedDict { .. } => {
-                unimplemented!();
+            fcomponent::ControllerRequest::GetExposedDict { dict, control_handle: _ } => {
+                // TODO(fxbug.dev/303719641): This is a stub. Actually implement
+                // the exposed sandbox and return it here.
+                let mut empty_dict = Dict::new();
+                fasync::Task::spawn(async move {
+                    if let Err(err) = empty_dict.serve_dict(dict.into_stream().unwrap()).await {
+                        warn!(%err, "failed to serve dict");
+                    }
+                })
+                .detach();
             }
         }
     }

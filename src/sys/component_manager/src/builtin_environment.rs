@@ -44,9 +44,10 @@ use {
         diagnostics::{startup::ComponentEarlyStartupTimeStats, task_metrics::ComponentTreeStats},
         directory_ready_notifier::DirectoryReadyNotifier,
         framework::{
-            binder::BinderCapabilityHost, lifecycle_controller::LifecycleController,
-            namespace::NamespaceCapabilityHost, pkg_dir::PkgDirectory, realm::RealmCapabilityHost,
-            realm_query::RealmQuery, route_validator::RouteValidator,
+            binder::BinderCapabilityHost, factory::FactoryCapabilityHost,
+            lifecycle_controller::LifecycleController, namespace::NamespaceCapabilityHost,
+            pkg_dir::PkgDirectory, realm::RealmCapabilityHost, realm_query::RealmQuery,
+            route_validator::RouteValidator,
         },
         inspect_sink_provider::InspectSinkProvider,
         model::events::registry::EventSubscription,
@@ -435,6 +436,7 @@ pub struct BuiltinEnvironment {
     pub binder_capability_host: Arc<BinderCapabilityHost>,
     pub realm_capability_host: Arc<RealmCapabilityHost>,
     pub namespace_capability_host: Arc<NamespaceCapabilityHost>,
+    pub factory_capability_host: Arc<FactoryCapabilityHost>,
     pub storage_admin_capability_host: Arc<StorageAdmin>,
     pub realm_query: Option<Arc<RealmQuery>>,
     pub lifecycle_controller: Option<Arc<LifecycleController>>,
@@ -864,6 +866,9 @@ impl BuiltinEnvironment {
         let namespace_capability_host = Arc::new(NamespaceCapabilityHost::new());
         model.root().hooks.install(namespace_capability_host.hooks()).await;
 
+        let factory_capability_host = Arc::new(FactoryCapabilityHost::new());
+        model.root().hooks.install(factory_capability_host.hooks()).await;
+
         // Set up the binder service.
         let binder_capability_host = Arc::new(BinderCapabilityHost::new(Arc::downgrade(&model)));
         model.root().hooks.install(binder_capability_host.hooks()).await;
@@ -981,6 +986,7 @@ impl BuiltinEnvironment {
             binder_capability_host,
             realm_capability_host,
             namespace_capability_host,
+            factory_capability_host,
             storage_admin_capability_host,
             realm_query,
             lifecycle_controller,

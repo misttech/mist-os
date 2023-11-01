@@ -57,7 +57,7 @@ impl<M: Capability + From<zx::Handle>> Capability for Sender<M> {
 }
 
 impl<M: Capability + From<zx::Handle>> Sender<M> {
-    fn serve_sender(self, stream: fsandbox::SenderRequestStream) -> BoxFuture<'static, ()> {
+    pub fn serve_sender(self, stream: fsandbox::SenderRequestStream) -> BoxFuture<'static, ()> {
         self.serve_sender_internal(stream).boxed()
     }
 

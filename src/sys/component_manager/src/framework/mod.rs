@@ -4,6 +4,7 @@
 
 pub mod binder;
 pub mod controller;
+pub mod factory;
 pub mod lifecycle_controller;
 pub mod namespace;
 pub mod pkg_dir;
