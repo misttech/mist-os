@@ -11,10 +11,12 @@
 #include <vector>
 
 #include "src/developer/debug/shared/status.h"
+#include "src/lib/elflib/elflib.h"
 
 namespace debug_ipc {
+struct AddressRegion;
 struct Module;
-}
+}  // namespace debug_ipc
 
 namespace debug_agent {
 
@@ -28,6 +30,19 @@ debug::Status WalkElfModules(const ProcessHandle& process, uint64_t dl_debug_add
 // Computes the modules for the given process.
 std::vector<debug_ipc::Module> GetElfModulesForProcess(const ProcessHandle& process,
                                                        uint64_t dl_debug_addr);
+
+namespace internal {
+
+struct ElfSegInfo {
+  std::vector<elflib::Elf64_Phdr> segment_headers;
+  std::optional<std::string> so_name;
+  std::string build_id;
+};
+void MergeMmapedModules(std::vector<debug_ipc::Module>& modules,
+                        const std::vector<debug_ipc::AddressRegion>& mmaps,
+                        std::function<std::optional<ElfSegInfo>(uint64_t)> get_elf_info_for_base);
+
+}  // namespace internal
 
 }  // namespace debug_agent
 

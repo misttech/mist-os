@@ -102,7 +102,6 @@ debug::Status WalkElfModules(const ProcessHandle& process, uint64_t dl_debug_add
 std::vector<debug_ipc::Module> GetElfModulesForProcess(const ProcessHandle& process,
                                                        uint64_t dl_debug_addr) {
   std::vector<debug_ipc::Module> modules;
-  std::set<uint64_t> visited_modules;
 
   // Method 1: Use the dl_debug_addr, which should be the address of a |r_debug| struct.
   if (dl_debug_addr) {
@@ -124,7 +123,6 @@ std::vector<debug_ipc::Module> GetElfModulesForProcess(const ProcessHandle& proc
       if (auto elf = elflib::ElfLib::Create(GetElfLibReader(process, module.base), module.base))
         module.build_id = elf->GetGNUBuildID();
 
-      visited_modules.insert(module.base);
       modules.push_back(std::move(module));
       return true;
     });
@@ -134,30 +132,56 @@ std::vector<debug_ipc::Module> GetElfModulesForProcess(const ProcessHandle& proc
   // obtain the debug_address, which is used for resolving TLS location.
   std::vector<debug_ipc::AddressRegion> address_regions = process.GetAddressSpace(0);
 
-  // With `-fuse-ld=lld -z noseparate-code`, multiple ELF segments could live on the same page and
-  // get mapped multiple times with different flags. For example,
-  //
-  // Program Headers:
-  //   Type           Offset   VirtAddr           PhysAddr           FileSiz  MemSiz   Flg Align
-  //   LOAD           0x000000 0x0000000000000000 0x0000000000000000 0x000858 0x000858 R   0x1000
-  //   LOAD           0x000860 0x0000000000001860 0x0000000000001860 0x000250 0x000250 R E 0x1000
-  //   LOAD           0x000ab0 0x0000000000002ab0 0x0000000000002ab0 0x000220 0x000220 RW  0x1000
-  //   LOAD           0x000cd0 0x0000000000003cd0 0x0000000000003cd0 0x000008 0x000008 RW  0x1000
-  //
-  // [zxdb] aspace
-  //           Start              End  Prot   Size     Koid       Offset  Cmt.Pgs  Name
-  //   0x15fb9584000    0x15fb9585000  r--      4K   479448          0x0        0  ...
-  //   0x15fb9585000    0x15fb9586000  r-x      4K   479449          0x0        0  ...
-  //   0x15fb9586000    0x15fb9587000  r--      4K   479450          0x0        0  ...
-  //   0x15fb9587000    0x15fb9588000  rw-      4K   479451          0x0        0  ...
-  //
-  // and the debugger will see four ELF headers from 0x15fb9584000 to 0x15fb9587000. The third has
-  // the same read-only protection at runtime because it contains read-only relocations.
-  //
-  // To solve this, we use a variable to track the end of the last module, and skip regions that
-  // overlap with the last module.
+  auto get_elf_info = [&](uint64_t base) -> std::optional<internal::ElfSegInfo> {
+    auto elf = elflib::ElfLib::Create(GetElfLibReader(process, base), base);
+    if (!elf) {
+      return std::nullopt;
+    }
+    return internal::ElfSegInfo{.segment_headers = elf->GetSegmentHeaders(),
+                                .so_name = elf->GetSoname(),
+                                .build_id = elf->GetGNUBuildID()};
+  };
+
+  internal::MergeMmapedModules(modules, address_regions, std::move(get_elf_info));
+  return modules;
+}
+
+namespace internal {
+
+// With `-fuse-ld=lld -z noseparate-code`, multiple ELF segments could live on the same page and
+// get mapped multiple times with different flags. For example,
+//
+// Program Headers:
+//   Type           Offset   VirtAddr           PhysAddr           FileSiz  MemSiz   Flg Align
+//   LOAD           0x000000 0x0000000000000000 0x0000000000000000 0x000858 0x000858 R   0x1000
+//   LOAD           0x000860 0x0000000000001860 0x0000000000001860 0x000250 0x000250 R E 0x1000
+//   LOAD           0x000ab0 0x0000000000002ab0 0x0000000000002ab0 0x000220 0x000220 RW  0x1000
+//   LOAD           0x000cd0 0x0000000000003cd0 0x0000000000003cd0 0x000008 0x000008 RW  0x1000
+//
+// [zxdb] aspace
+//           Start              End  Prot   Size     Koid       Offset  Cmt.Pgs  Name
+//   0x15fb9584000    0x15fb9585000  r--      4K   479448          0x0        0  ...
+//   0x15fb9585000    0x15fb9586000  r-x      4K   479449          0x0        0  ...
+//   0x15fb9586000    0x15fb9587000  r--      4K   479450          0x0        0  ...
+//   0x15fb9587000    0x15fb9588000  rw-      4K   479451          0x0        0  ...
+//
+// and the debugger will see four ELF headers from 0x15fb9584000 to 0x15fb9587000. The third has
+// the same read-only protection at runtime because it contains read-only relocations.
+//
+// To solve this, we use a variable to track the end of the last module, and skip regions that
+// overlap with the last module.
+void MergeMmapedModules(std::vector<debug_ipc::Module>& modules,
+                        const std::vector<debug_ipc::AddressRegion>& mmaps,
+                        std::function<std::optional<ElfSegInfo>(uint64_t)> get_elf_info_for_base) {
+  std::set<uint64_t> visited_modules;
   uint64_t end_of_last_module = 0;
-  for (const auto& region : address_regions) {
+
+  // Account for the existing modules in the visit map.
+  for (const auto& mod : modules) {
+    visited_modules.insert(mod.base);
+  }
+
+  for (const auto& region : mmaps) {
     if (region.base < end_of_last_module) {
       continue;
     }
@@ -165,28 +189,34 @@ std::vector<debug_ipc::Module> GetElfModulesForProcess(const ProcessHandle& proc
     if ((region.mmu_flags & ~ZX_VM_PERM_EXECUTE) != ZX_VM_PERM_READ) {
       continue;
     }
-    if (!visited_modules.insert(region.base).second) {
+
+    std::optional<ElfSegInfo> opt_info = get_elf_info_for_base(region.base);
+    if (!opt_info) {
       continue;
     }
-    auto elf = elflib::ElfLib::Create(GetElfLibReader(process, region.base), region.base);
-    if (!elf) {
-      continue;
-    }
-    for (auto& phdr : elf->GetSegmentHeaders()) {
+    for (auto& phdr : opt_info->segment_headers) {
       if (phdr.p_type == PT_LOAD) {
         end_of_last_module = region.base + phdr.p_vaddr + phdr.p_memsz;
       }
     }
 
+    // Don't re-insert something that already exists. This normally happens when the library was
+    // already found with "method 1" above. This must be AFTER the end_of_last_module is updated,
+    // otherwise, anything inserted from "method 1" won't be counted as covering its address range
+    // and the next item could be a duplicate.
+    if (!visited_modules.insert(region.base).second) {
+      continue;
+    }
+
     std::string name = region.name;
-    if (auto soname = elf->GetSoname()) {
+    if (auto soname = opt_info->so_name) {
       name = *soname;
     }
     modules.push_back(debug_ipc::Module{
-        .name = std::move(name), .base = region.base, .build_id = elf->GetGNUBuildID()});
+        .name = std::move(name), .base = region.base, .build_id = std::move(opt_info->build_id)});
   }
-
-  return modules;
 }
+
+}  // namespace internal
 
 }  // namespace debug_agent

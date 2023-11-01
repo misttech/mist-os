@@ -285,6 +285,7 @@ test("unit_tests") {
     "//sdk/lib/component/outgoing/cpp",
     "//src/developer/debug/ipc:tests",
     "//src/developer/debug/shared:tests",
+    "//src/lib/elflib",
     "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
