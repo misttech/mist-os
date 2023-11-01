@@ -214,7 +214,7 @@ extern "C" uintptr_t StartLd(StartupStack& stack) {
       return UniqueFdFile{std::move(fd), diag};
     }
     if (errno != ENOENT) {
-      diag.FormatError("open(2) error: ", elfldltl::PosixError{errno});
+      diag.SystemError("cannot open dependency ", soname.str(), ": ", elfldltl::PosixError{errno});
     }
     return {};
   };
