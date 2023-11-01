@@ -17,6 +17,7 @@ use {
         },
     },
     anyhow::{format_err, Context, Error},
+    cobalt_client::traits::AsEventCode,
     fidl_fuchsia_metrics::{MetricEvent, MetricEventPayload},
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
     fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_sme as fidl_sme,
@@ -333,7 +334,7 @@ pub enum TelemetryEvent {
         fulfilled_requests: usize,
         remaining_requests: usize,
     },
-    // Record the results of a completed BSS selection
+    /// Record the results of a completed BSS selection
     BssSelectionResult {
         reason: client::types::ConnectReason,
         scored_candidates: Vec<(client::types::ScannedCandidate, i16)>,
@@ -345,6 +346,11 @@ pub enum TelemetryEvent {
     },
     LongDurationConnectionScoreAverage {
         scores: Vec<TimestampedConnectionScore>,
+    },
+    /// Record recovery events and store recovery-related metadata so that the
+    /// efficacy of the recovery mechanism can be evaluated later.
+    RecoveryEvent {
+        reason: RecoveryReason,
     },
 }
 
@@ -388,6 +394,63 @@ impl ScanIssue {
         }
     }
 }
+
+pub type ClientRecoveryMechanism = metrics::ConnectivityWlanMetricDimensionClientRecoveryMechanism;
+pub type ApRecoveryMechanism = metrics::ConnectivityWlanMetricDimensionApRecoveryMechanism;
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum PhyRecoveryMechanism {
+    PhyReset,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum RecoveryReason {
+    CreateIfaceFailure(PhyRecoveryMechanism),
+    DestroyIfaceFailure(PhyRecoveryMechanism),
+    ConnectFailure(ClientRecoveryMechanism),
+    StartApFailure(ApRecoveryMechanism),
+    ScanFailure(ClientRecoveryMechanism),
+    ScanCancellation(ClientRecoveryMechanism),
+    ScanResultsEmpty(ClientRecoveryMechanism),
+}
+
+struct RecoveryRecord {
+    scan_failure: Option<RecoveryReason>,
+    scan_cancellation: Option<RecoveryReason>,
+    scan_results_empty: Option<RecoveryReason>,
+    connect_failure: Option<RecoveryReason>,
+    start_ap_failure: Option<RecoveryReason>,
+    create_iface_failure: Option<RecoveryReason>,
+    destroy_iface_failure: Option<RecoveryReason>,
+}
+
+impl RecoveryRecord {
+    fn new() -> Self {
+        RecoveryRecord {
+            scan_failure: None,
+            scan_cancellation: None,
+            scan_results_empty: None,
+            connect_failure: None,
+            start_ap_failure: None,
+            create_iface_failure: None,
+            destroy_iface_failure: None,
+        }
+    }
+
+    fn record_recovery_attempt(&mut self, reason: RecoveryReason) {
+        match reason {
+            RecoveryReason::ScanFailure(_) => self.scan_failure = Some(reason),
+            RecoveryReason::ScanCancellation(_) => self.scan_cancellation = Some(reason),
+            RecoveryReason::ScanResultsEmpty(_) => self.scan_results_empty = Some(reason),
+            RecoveryReason::ConnectFailure(_) => self.connect_failure = Some(reason),
+            RecoveryReason::StartApFailure(_) => self.start_ap_failure = Some(reason),
+            RecoveryReason::CreateIfaceFailure(_) => self.create_iface_failure = Some(reason),
+            RecoveryReason::DestroyIfaceFailure(_) => self.destroy_iface_failure = Some(reason),
+        }
+    }
+}
+
+pub type RecoveryOutcome = metrics::ConnectivityWlanMetricDimensionResult;
 
 pub type CreateMetricsLoggerFn = Box<
     dyn Fn(
@@ -1345,6 +1408,9 @@ impl Telemetry {
                     )
                     .await;
             }
+            TelemetryEvent::RecoveryEvent { reason } => {
+                self.stats_logger.log_recovery_occurrence(reason).await;
+            }
         }
     }
 
@@ -1553,6 +1619,7 @@ struct StatsLogger {
     hr_tick: u32,
     rssi_velocity_hist: HashMap<u32, fidl_fuchsia_metrics::HistogramBucket>,
     rssi_hist: HashMap<u32, fidl_fuchsia_metrics::HistogramBucket>,
+    recovery_record: RecoveryRecord,
 
     // Inspect nodes
     _time_series_inspect_node: LazyNode,
@@ -1588,6 +1655,7 @@ impl StatsLogger {
             hr_tick: 0,
             rssi_velocity_hist: HashMap::new(),
             rssi_hist: HashMap::new(),
+            recovery_record: RecoveryRecord::new(),
             _1d_counters_inspect_node,
             _7d_counters_inspect_node,
             _time_series_inspect_node,
@@ -3397,6 +3465,112 @@ impl StatsLogger {
             );
         } else {
             warn!("Connection score list is unexpectedly empty.");
+        }
+    }
+
+    async fn log_recovery_occurrence(&mut self, reason: RecoveryReason) {
+        self.recovery_record.record_recovery_attempt(reason);
+
+        let dimension = match reason {
+            RecoveryReason::CreateIfaceFailure(_) => {
+                metrics::RecoveryOccurrenceMetricDimensionReason::InterfaceCreationFailure
+            }
+            RecoveryReason::DestroyIfaceFailure(_) => {
+                metrics::RecoveryOccurrenceMetricDimensionReason::InterfaceDestructionFailure
+            }
+            RecoveryReason::ConnectFailure(_) => {
+                metrics::RecoveryOccurrenceMetricDimensionReason::ClientConnectionFailure
+            }
+            RecoveryReason::StartApFailure(_) => {
+                metrics::RecoveryOccurrenceMetricDimensionReason::ApStartFailure
+            }
+            RecoveryReason::ScanFailure(_) => {
+                metrics::RecoveryOccurrenceMetricDimensionReason::ScanFailure
+            }
+            RecoveryReason::ScanCancellation(_) => {
+                metrics::RecoveryOccurrenceMetricDimensionReason::ScanCancellation
+            }
+            RecoveryReason::ScanResultsEmpty(_) => {
+                metrics::RecoveryOccurrenceMetricDimensionReason::ScanResultsEmpty
+            }
+        };
+
+        log_cobalt_1dot1!(
+            self.cobalt_1dot1_proxy,
+            log_integer,
+            metrics::RECOVERY_OCCURRENCE_METRIC_ID,
+            1,
+            &[dimension.as_event_code()],
+        )
+    }
+
+    #[cfg(test)]
+    async fn log_post_recovery_result(&mut self, reason: RecoveryReason, outcome: RecoveryOutcome) {
+        async fn log_post_recovery_metric(
+            proxy: &mut fidl_fuchsia_metrics::MetricEventLoggerProxy,
+            metric_id: u32,
+            event_codes: &[u32],
+        ) {
+            log_cobalt_1dot1!(proxy, log_integer, metric_id, 1, event_codes,)
+        }
+
+        match reason {
+            RecoveryReason::CreateIfaceFailure(_) => {
+                log_post_recovery_metric(
+                    &mut self.cobalt_1dot1_proxy,
+                    metrics::INTERFACE_CREATION_RECOVERY_OUTCOME_METRIC_ID,
+                    &[outcome.as_event_code()],
+                )
+                .await;
+            }
+            RecoveryReason::DestroyIfaceFailure(_) => {
+                log_post_recovery_metric(
+                    &mut self.cobalt_1dot1_proxy,
+                    metrics::INTERFACE_DESTRUCTION_RECOVERY_OUTCOME_METRIC_ID,
+                    &[outcome.as_event_code()],
+                )
+                .await;
+            }
+            RecoveryReason::ConnectFailure(mechanism) => {
+                log_post_recovery_metric(
+                    &mut self.cobalt_1dot1_proxy,
+                    metrics::CONNECT_FAILURE_RECOVERY_OUTCOME_METRIC_ID,
+                    &[outcome.as_event_code(), mechanism.as_event_code()],
+                )
+                .await;
+            }
+            RecoveryReason::StartApFailure(mechanism) => {
+                log_post_recovery_metric(
+                    &mut self.cobalt_1dot1_proxy,
+                    metrics::START_ACCESS_POINT_RECOVERY_OUTCOME_METRIC_ID,
+                    &[outcome.as_event_code(), mechanism.as_event_code()],
+                )
+                .await;
+            }
+            RecoveryReason::ScanFailure(mechanism) => {
+                log_post_recovery_metric(
+                    &mut self.cobalt_1dot1_proxy,
+                    metrics::SCAN_FAILURE_RECOVERY_OUTCOME_METRIC_ID,
+                    &[outcome.as_event_code(), mechanism.as_event_code()],
+                )
+                .await;
+            }
+            RecoveryReason::ScanCancellation(mechanism) => {
+                log_post_recovery_metric(
+                    &mut self.cobalt_1dot1_proxy,
+                    metrics::SCAN_CANCELLATION_RECOVERY_OUTCOME_METRIC_ID,
+                    &[outcome.as_event_code(), mechanism.as_event_code()],
+                )
+                .await;
+            }
+            RecoveryReason::ScanResultsEmpty(mechanism) => {
+                log_post_recovery_metric(
+                    &mut self.cobalt_1dot1_proxy,
+                    metrics::EMPTY_SCAN_RESULTS_RECOVERY_OUTCOME_METRIC_ID,
+                    &[outcome.as_event_code(), mechanism.as_event_code()],
+                )
+                .await;
+            }
         }
     }
 }
@@ -7247,6 +7421,342 @@ mod tests {
         test_helper.drain_cobalt_events(&mut test_fut);
         let logged_metrics = test_helper.get_logged_metrics(metrics::AP_START_FAILURE_METRIC_ID);
         assert_eq!(logged_metrics.len(), 1);
+    }
+
+    #[test_case(
+        RecoveryReason::CreateIfaceFailure(PhyRecoveryMechanism::PhyReset),
+        metrics::RecoveryOccurrenceMetricDimensionReason::InterfaceCreationFailure ;
+        "log recovery event for iface creation failure"
+    )]
+    #[test_case(
+        RecoveryReason::DestroyIfaceFailure(PhyRecoveryMechanism::PhyReset),
+        metrics::RecoveryOccurrenceMetricDimensionReason::InterfaceDestructionFailure ;
+        "log recovery event for iface destruction failure"
+    )]
+    #[test_case(
+        RecoveryReason::ConnectFailure(ClientRecoveryMechanism::Disconnect),
+        metrics::RecoveryOccurrenceMetricDimensionReason::ClientConnectionFailure ;
+        "log recovery event for connect failure"
+    )]
+    #[test_case(
+        RecoveryReason::StartApFailure(ApRecoveryMechanism::StopAp),
+        metrics::RecoveryOccurrenceMetricDimensionReason::ApStartFailure ;
+        "log recovery event for start AP failure"
+    )]
+    #[test_case(
+        RecoveryReason::ScanFailure(ClientRecoveryMechanism::Disconnect),
+        metrics::RecoveryOccurrenceMetricDimensionReason::ScanFailure ;
+        "log recovery event for scan failure"
+    )]
+    #[test_case(
+        RecoveryReason::ScanCancellation(ClientRecoveryMechanism::Disconnect),
+         metrics::RecoveryOccurrenceMetricDimensionReason::ScanCancellation ;
+        "log recovery event for scan cancellation"
+    )]
+    #[test_case(
+        RecoveryReason::ScanResultsEmpty(ClientRecoveryMechanism::Disconnect),
+        metrics::RecoveryOccurrenceMetricDimensionReason::ScanResultsEmpty ;
+        "log recovery event for empty scan results"
+    )]
+    #[fuchsia::test(add_test_attr = false)]
+    fn test_log_recovery_occurrence(
+        reason: RecoveryReason,
+        expected_dimension: metrics::RecoveryOccurrenceMetricDimensionReason,
+    ) {
+        let (mut test_helper, mut test_fut) = setup_test();
+
+        // Send the recovery event metric.
+        test_helper.telemetry_sender.send(TelemetryEvent::RecoveryEvent { reason });
+
+        // Run the telemetry loop until it stalls.
+        assert_variant!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
+
+        // Expect that Cobalt has been notified of the recovery event
+        test_helper.drain_cobalt_events(&mut test_fut);
+        let logged_metrics = test_helper.get_logged_metrics(metrics::RECOVERY_OCCURRENCE_METRIC_ID);
+        assert_eq!(logged_metrics.len(), 1);
+
+        // Verify the reason dimension.
+        assert_eq!(logged_metrics[0].event_codes.len(), 1);
+        assert_eq!(logged_metrics[0].event_codes[0], expected_dimension.as_event_code());
+    }
+
+    #[test_case(
+        RecoveryReason::CreateIfaceFailure(PhyRecoveryMechanism::PhyReset),
+        RecoveryOutcome::Success,
+        metrics::INTERFACE_CREATION_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Success as u32] ;
+        "create iface fixed by resetting PHY"
+    )]
+    #[test_case(
+        RecoveryReason::CreateIfaceFailure(PhyRecoveryMechanism::PhyReset),
+        RecoveryOutcome::Failure,
+        metrics::INTERFACE_CREATION_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Failure as u32] ;
+        "create iface not fixed by resetting PHY"
+    )]
+    #[test_case(
+        RecoveryReason::DestroyIfaceFailure(PhyRecoveryMechanism::PhyReset),
+        RecoveryOutcome::Success,
+        metrics::INTERFACE_DESTRUCTION_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Success as u32] ;
+        "destroy iface fixed by resetting PHY"
+    )]
+    #[test_case(
+        RecoveryReason::DestroyIfaceFailure(PhyRecoveryMechanism::PhyReset),
+        RecoveryOutcome::Failure,
+        metrics::INTERFACE_DESTRUCTION_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Failure as u32] ;
+        "destroy iface not fixed by resetting PHY"
+    )]
+    #[test_case(
+        RecoveryReason::ConnectFailure(ClientRecoveryMechanism::Disconnect),
+        RecoveryOutcome::Success,
+        metrics::CONNECT_FAILURE_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Success as u32, ClientRecoveryMechanism::Disconnect as u32] ;
+        "connect works after disconnecting"
+    )]
+    #[test_case(
+        RecoveryReason::ConnectFailure(ClientRecoveryMechanism::DestroyIface),
+        RecoveryOutcome::Success,
+        metrics::CONNECT_FAILURE_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Success as u32, ClientRecoveryMechanism::DestroyIface as u32] ;
+        "connect works after destroying iface"
+    )]
+    #[test_case(
+        RecoveryReason::ConnectFailure(ClientRecoveryMechanism::PhyReset),
+        RecoveryOutcome::Success,
+        metrics::CONNECT_FAILURE_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Success as u32, ClientRecoveryMechanism::PhyReset as u32] ;
+        "connect works after resetting PHY"
+    )]
+    #[test_case(
+        RecoveryReason::ConnectFailure(ClientRecoveryMechanism::Disconnect),
+        RecoveryOutcome::Failure,
+        metrics::CONNECT_FAILURE_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Failure as u32, ClientRecoveryMechanism::Disconnect as u32] ;
+        "connect still fails after disconnecting"
+    )]
+    #[test_case(
+        RecoveryReason::ConnectFailure(ClientRecoveryMechanism::DestroyIface),
+        RecoveryOutcome::Failure,
+        metrics::CONNECT_FAILURE_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Failure as u32, ClientRecoveryMechanism::DestroyIface as u32] ;
+        "connect still fails after destroying iface"
+    )]
+    #[test_case(
+        RecoveryReason::ConnectFailure(ClientRecoveryMechanism::PhyReset),
+        RecoveryOutcome::Failure,
+        metrics::CONNECT_FAILURE_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Failure as u32, ClientRecoveryMechanism::PhyReset as u32] ;
+        "connect still fails after resetting PHY"
+    )]
+    #[test_case(
+        RecoveryReason::StartApFailure(ApRecoveryMechanism::StopAp),
+        RecoveryOutcome::Success,
+        metrics::START_ACCESS_POINT_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Success as u32, ApRecoveryMechanism::StopAp as u32] ;
+        "start AP works after stopping AP"
+    )]
+    #[test_case(
+        RecoveryReason::StartApFailure(ApRecoveryMechanism::DestroyIface),
+        RecoveryOutcome::Success,
+        metrics::START_ACCESS_POINT_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Success as u32, ApRecoveryMechanism::DestroyIface as u32] ;
+        "start AP works after destroying iface"
+    )]
+    #[test_case(
+        RecoveryReason::StartApFailure(ApRecoveryMechanism::ResetPhy),
+        RecoveryOutcome::Success,
+        metrics::START_ACCESS_POINT_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Success as u32, ApRecoveryMechanism::ResetPhy as u32] ;
+        "start AP works after resetting PHY"
+    )]
+    #[test_case(
+        RecoveryReason::StartApFailure(ApRecoveryMechanism::StopAp),
+        RecoveryOutcome::Failure,
+        metrics::START_ACCESS_POINT_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Failure as u32, ApRecoveryMechanism::StopAp as u32] ;
+        "start AP still fails after stopping AP"
+    )]
+    #[test_case(
+        RecoveryReason::StartApFailure(ApRecoveryMechanism::DestroyIface),
+        RecoveryOutcome::Failure,
+        metrics::START_ACCESS_POINT_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Failure as u32, ApRecoveryMechanism::DestroyIface as u32] ;
+        "start AP still fails after destroying iface"
+    )]
+    #[test_case(
+        RecoveryReason::StartApFailure(ApRecoveryMechanism::ResetPhy),
+        RecoveryOutcome::Failure,
+        metrics::START_ACCESS_POINT_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Failure as u32, ApRecoveryMechanism::ResetPhy as u32] ;
+        "start AP still fails after resetting PHY"
+    )]
+    #[test_case(
+        RecoveryReason::ScanFailure(ClientRecoveryMechanism::Disconnect),
+        RecoveryOutcome::Success,
+        metrics::SCAN_FAILURE_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Success as u32, ClientRecoveryMechanism::Disconnect as u32] ;
+        "scan works after disconnecting"
+    )]
+    #[test_case(
+        RecoveryReason::ScanFailure(ClientRecoveryMechanism::DestroyIface),
+        RecoveryOutcome::Success,
+        metrics::SCAN_FAILURE_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Success as u32, ClientRecoveryMechanism::DestroyIface as u32] ;
+        "scan works after destroying iface"
+    )]
+    #[test_case(
+        RecoveryReason::ScanFailure(ClientRecoveryMechanism::PhyReset),
+        RecoveryOutcome::Success,
+        metrics::SCAN_FAILURE_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Success as u32, ClientRecoveryMechanism::PhyReset as u32] ;
+        "scan works after resetting PHY"
+    )]
+    #[test_case(
+        RecoveryReason::ScanFailure(ClientRecoveryMechanism::Disconnect),
+        RecoveryOutcome::Failure,
+        metrics::SCAN_FAILURE_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Failure as u32, ClientRecoveryMechanism::Disconnect as u32] ;
+        "scan still fails after disconnecting"
+    )]
+    #[test_case(
+        RecoveryReason::ScanFailure(ClientRecoveryMechanism::DestroyIface),
+        RecoveryOutcome::Failure,
+        metrics::SCAN_FAILURE_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Failure as u32, ClientRecoveryMechanism::DestroyIface as u32] ;
+        "scan still fails after destroying iface"
+    )]
+    #[test_case(
+        RecoveryReason::ScanFailure(ClientRecoveryMechanism::PhyReset),
+        RecoveryOutcome::Failure,
+        metrics::SCAN_FAILURE_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Failure as u32, ClientRecoveryMechanism::PhyReset as u32] ;
+        "scan still fails after resetting PHY"
+    )]
+    #[test_case(
+        RecoveryReason::ScanCancellation(ClientRecoveryMechanism::Disconnect),
+        RecoveryOutcome::Success,
+        metrics::SCAN_CANCELLATION_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Success as u32, ClientRecoveryMechanism::Disconnect as u32] ;
+        "scan is no longer cancelled after disconnecting"
+    )]
+    #[test_case(
+        RecoveryReason::ScanCancellation(ClientRecoveryMechanism::DestroyIface),
+        RecoveryOutcome::Success,
+        metrics::SCAN_CANCELLATION_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Success as u32, ClientRecoveryMechanism::DestroyIface as u32] ;
+        "scan is no longer cancelled after destroying iface"
+    )]
+    #[test_case(
+        RecoveryReason::ScanCancellation(ClientRecoveryMechanism::PhyReset),
+        RecoveryOutcome::Success,
+        metrics::SCAN_CANCELLATION_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Success as u32, ClientRecoveryMechanism::PhyReset as u32] ;
+        "scan is no longer cancelled after resetting PHY"
+    )]
+    #[test_case(
+        RecoveryReason::ScanCancellation(ClientRecoveryMechanism::Disconnect),
+        RecoveryOutcome::Failure,
+        metrics::SCAN_CANCELLATION_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Failure as u32, ClientRecoveryMechanism::Disconnect as u32] ;
+        "scan is still cancelled after disconnect"
+    )]
+    #[test_case(
+        RecoveryReason::ScanCancellation(ClientRecoveryMechanism::DestroyIface),
+        RecoveryOutcome::Failure,
+        metrics::SCAN_CANCELLATION_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Failure as u32, ClientRecoveryMechanism::DestroyIface as u32] ;
+        "scan is still cancelled after destroying iface"
+    )]
+    #[test_case(
+        RecoveryReason::ScanCancellation(ClientRecoveryMechanism::PhyReset),
+        RecoveryOutcome::Failure,
+        metrics::SCAN_CANCELLATION_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Failure as u32, ClientRecoveryMechanism::PhyReset as u32] ;
+        "scan is still cancelled after resetting PHY"
+    )]
+    #[test_case(
+        RecoveryReason::ScanResultsEmpty(ClientRecoveryMechanism::Disconnect),
+        RecoveryOutcome::Success,
+        metrics::EMPTY_SCAN_RESULTS_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Success as u32, ClientRecoveryMechanism::Disconnect as u32] ;
+        "scan results not empty after disconnect"
+    )]
+    #[test_case(
+        RecoveryReason::ScanResultsEmpty(ClientRecoveryMechanism::DestroyIface),
+        RecoveryOutcome::Success,
+        metrics::EMPTY_SCAN_RESULTS_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Success as u32, ClientRecoveryMechanism::DestroyIface as u32] ;
+        "scan results not empty after destroy iface"
+    )]
+    #[test_case(
+        RecoveryReason::ScanResultsEmpty(ClientRecoveryMechanism::PhyReset),
+        RecoveryOutcome::Success,
+        metrics::EMPTY_SCAN_RESULTS_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Success as u32, ClientRecoveryMechanism::PhyReset as u32] ;
+        "scan results not empty after PHY reset"
+    )]
+    #[test_case(
+        RecoveryReason::ScanResultsEmpty(ClientRecoveryMechanism::Disconnect),
+        RecoveryOutcome::Failure,
+        metrics::EMPTY_SCAN_RESULTS_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Failure as u32, ClientRecoveryMechanism::Disconnect as u32] ;
+        "scan results still empty after disconnect"
+    )]
+    #[test_case(
+        RecoveryReason::ScanResultsEmpty(ClientRecoveryMechanism::DestroyIface),
+        RecoveryOutcome::Failure,
+        metrics::EMPTY_SCAN_RESULTS_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Failure as u32, ClientRecoveryMechanism::DestroyIface as u32] ;
+        "scan results still empty after destroy iface"
+    )]
+    #[test_case(
+        RecoveryReason::ScanResultsEmpty(ClientRecoveryMechanism::PhyReset),
+        RecoveryOutcome::Failure,
+        metrics::EMPTY_SCAN_RESULTS_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Failure as u32, ClientRecoveryMechanism::PhyReset as u32] ;
+        "scan results still empty after PHY reset"
+    )]
+    #[fuchsia::test(add_test_attr = false)]
+    fn test_log_post_recovery_result(
+        reason: RecoveryReason,
+        outcome: RecoveryOutcome,
+        expected_metric_id: u32,
+        expected_event_codes: Vec<u32>,
+    ) {
+        let mut exec = fasync::TestExecutor::new();
+
+        // Construct a StatsLogger
+        let (cobalt_1dot1_proxy, mut cobalt_1dot1_stream) =
+            create_proxy_and_stream::<fidl_fuchsia_metrics::MetricEventLoggerMarker>()
+                .expect("failed to create MetricsEventLogger proxy");
+
+        let inspector = Inspector::default();
+        let inspect_node = inspector.root().create_child("stats");
+
+        let mut stats_logger = StatsLogger::new(cobalt_1dot1_proxy, &inspect_node);
+
+        // Log the test telemetry event.
+        let fut = stats_logger.log_post_recovery_result(reason, outcome);
+        pin_mut!(fut);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Verify the metric that was emitted.
+        assert_variant!(
+            exec.run_until_stalled(&mut cobalt_1dot1_stream.next()),
+            Poll::Ready(Some(Ok(fidl_fuchsia_metrics::MetricEventLoggerRequest::LogInteger {
+                metric_id, event_codes, responder, ..
+            }))) => {
+                assert_eq!(metric_id, expected_metric_id);
+                assert_eq!(event_codes, expected_event_codes);
+
+                assert!(responder.send(Ok(())).is_ok());
+        });
+
+        // The future should complete.
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
     }
 
     #[fuchsia::test]
