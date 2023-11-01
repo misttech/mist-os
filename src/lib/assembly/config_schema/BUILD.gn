@@ -24,18 +24,12 @@ rustc_library("config_schema") {
   _git_info = "${target_gen_dir}/icu_git_info.json"
   _git_info_path = rebase_path(_git_info, root_build_dir)
   rustenv = [
-    # Needed because `include_str!` in rust is relative to
-    # the source dir in which the file using `include_str!` is located. We back out
-    # to `root_build_dir`, then go into `_git_info_path`.
+    # Needed because `include_str_from_working_dir_env!` is relative to
+    # the root_build_dir. We provide the path into `_git_info_path`.
     # See `src/platform_config/icu_config.rs` for the inclusion details.
     "ICU_GIT_INFO_JSON_FILE=${_git_info_path}",
   ]
 
-  # The approach in `rustenv` above causes the build dir to "leak", which is not
-  # recommended in remote builds.  We turn off leak detection by using this
-  # config. In general this is suboptimal, but in this particular case we don't
-  # have much choice.
-  configs += [ "//build/config/rust:output_dir_sensitive" ]
   inputs = [ _git_info ]
   deps = [
     "//src/lib/assembly/file_relative_path",
