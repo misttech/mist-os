@@ -189,14 +189,19 @@ zx_status_t PagerDispatcher::QueryDirtyRanges(fbl::RefPtr<VmObject> vmo, uint64_
   // Enumeration function that will be invoked on each dirty range found.
   VmObject::DirtyRangeEnumerateFunction copy_to_buffer =
       [&info](uint64_t range_offset, uint64_t range_len, bool range_is_zero) {
+        auto buffer_full = [&info]() {
+          return (info.index + 1) * sizeof(zx_vmo_dirty_range_t) > info.buffer_size;
+        };
         // No more space in the buffer.
-        if ((info.index + 1) * sizeof(zx_vmo_dirty_range_t) > info.buffer_size) {
+        if (buffer_full()) {
           // If we were not asked to compute the total, we can end termination early as there is
-          // nothing more to copy out.
+          // nothing more to copy out. Although we would have terminated at the bottom of this loop
+          // if out of space, this could be our first iteration and so this check is still needed.
           if (!info.compute_total) {
+            DEBUG_ASSERT(info.index == 0);
             return ZX_ERR_STOP;
           }
-          // If there is no more space in the |buffer|, only update the total without trying to copy
+          // As there is no more space in the |buffer|, only update the total without trying to copy
           // out any more ranges.
           ++info.total;
           return ZX_ERR_NEXT;
@@ -227,9 +232,16 @@ zx_status_t PagerDispatcher::QueryDirtyRanges(fbl::RefPtr<VmObject> vmo, uint64_
           return ZX_ERR_SHOULD_WAIT;
         }
         // We were able to successfully copy out this dirty range. Advance the index and continue
-        // with the enumeration.
+        // with the enumeration if we need to consider more ranges.
         ++info.index;
         ++info.total;
+        if (!info.compute_total && buffer_full()) {
+          // No need to compute the total and the buffer is full, so can cease considering
+          // additional ranges. This is equivalent to the start the loop, but by doing it here we
+          // save the need to calculate the next range before noticing the buffer is full and
+          // terminating.
+          return ZX_ERR_STOP;
+        }
         return ZX_ERR_NEXT;
       };
 

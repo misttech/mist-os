@@ -7584,4 +7584,57 @@ TEST(PagerWriteback, InvalidQuery) {
   ASSERT_EQ(ZX_ERR_ACCESS_DENIED, zx_pager_query_vmo_stats(pager.get(), vmo.get(), 0, nullptr, 0));
 }
 
+// Tests that attempt to exercise the early termination of the query dirty ranges loop to avoid
+// redundantly calculating an additional range prior to terminating if the user did not provide a
+// large enough buffer.
+TEST(PagerWriteback, QueryEarlyTermination) {
+  zx::pager pager;
+  ASSERT_OK(zx::pager::create(0, &pager));
+
+  zx::port port;
+  ASSERT_OK(zx::port::create(0, &port));
+
+  zx::vmo vmo;
+  ASSERT_OK(zx_pager_create_vmo(pager.get(), 0, port.get(), 0, zx_system_get_page_size() * 3,
+                                vmo.reset_and_get_address()));
+  // Dirty some pages first, so the query has something to enumerate.
+  zx::vmo vmo2;
+  ASSERT_OK(zx::vmo::create(zx_system_get_page_size(), 0, &vmo2));
+  ASSERT_OK(
+      zx_pager_supply_pages(pager.get(), vmo.get(), 0, zx_system_get_page_size(), vmo2.get(), 0));
+  ASSERT_OK(zx_pager_supply_pages(pager.get(), vmo.get(), zx_system_get_page_size() * 2,
+                                  zx_system_get_page_size(), vmo2.get(), 0));
+  uint64_t data = 42;
+  ASSERT_OK(vmo.write(&data, 0, sizeof(data)));
+  ASSERT_OK(vmo.write(&data, zx_system_get_page_size() * 2, sizeof(data)));
+
+  // Query with a buffer size too small to hold any of the results, but otherwise valid.
+  size_t actual = 0;
+  ASSERT_EQ(ZX_OK, zx_pager_query_dirty_ranges(pager.get(), vmo.get(), 0, zx_system_get_page_size(),
+                                               &data, sizeof(data), &actual, nullptr));
+  EXPECT_EQ(actual, 0);
+  // Now query with a buffer large enough for the first dirty range, but not the second.
+  zx_vmo_dirty_range_t dirty_range = {};
+  ASSERT_EQ(ZX_OK,
+            zx_pager_query_dirty_ranges(pager.get(), vmo.get(), 0, zx_system_get_page_size() * 3,
+                                        &dirty_range, sizeof(dirty_range), &actual, nullptr));
+  EXPECT_EQ(dirty_range.offset, 0);
+  EXPECT_EQ(dirty_range.length, zx_system_get_page_size());
+  EXPECT_EQ(actual, 1);
+  // Query again to get and check avail.
+  size_t avail = 0;
+  ASSERT_EQ(ZX_OK,
+            zx_pager_query_dirty_ranges(pager.get(), vmo.get(), 0, zx_system_get_page_size() * 3,
+                                        &dirty_range, sizeof(dirty_range), &actual, &avail));
+  EXPECT_EQ(avail, 2);
+  // Now query both ranges;
+  zx_vmo_dirty_range_t dirty_ranges[2] = {};
+  ASSERT_EQ(ZX_OK, zx_pager_query_dirty_ranges(pager.get(), vmo.get(), 0,
+                                               zx_system_get_page_size() * 3, dirty_ranges,
+                                               sizeof(zx_vmo_dirty_range_t) * 2, &actual, nullptr));
+  EXPECT_EQ(dirty_range.offset, 0);
+  EXPECT_EQ(dirty_range.length, zx_system_get_page_size());
+  EXPECT_EQ(actual, 2);
+}
+
 }  // namespace pager_tests
