@@ -105,7 +105,7 @@ static int cmd_display_mem(int argc, const cmd_args* argv, uint32_t flags) {
 
   if (argc < 3 && len == 0) {
     printf("not enough arguments\n");
-    printf("%s [-l] [-b] [address] [length]\n", argv[0].str);
+    printf("%s [-l] [-b] [-p] [address] [length]\n", argv[0].str);
     return -1;
   }
 
@@ -123,11 +123,14 @@ static int cmd_display_mem(int argc, const cmd_args* argv, uint32_t flags) {
   uint byte_order = BYTE_ORDER;
   int argindex = 1;
   bool read_address = false;
+  bool phys_addr = false;
   while (argc > argindex) {
     if (!strcmp(argv[argindex].str, "-l")) {
       byte_order = LITTLE_ENDIAN;
     } else if (!strcmp(argv[argindex].str, "-b")) {
       byte_order = BIG_ENDIAN;
+    } else if (!strcmp(argv[argindex].str, "-p")) {
+      phys_addr = true;
     } else if (!read_address) {
       address = argv[argindex].u;
       read_address = true;
@@ -138,12 +141,21 @@ static int cmd_display_mem(int argc, const cmd_args* argv, uint32_t flags) {
     argindex++;
   }
 
-  unsigned long stop = address + len;
-  int count = 0;
-
   if ((address & (size - 1)) != 0) {
     printf("unaligned address, cannot display\n");
     return -1;
+  }
+
+  if (phys_addr) {
+    // Translate to a physmap address if present.
+    void* vaddr = paddr_to_physmap(address);
+    if (!vaddr) {
+      printf("ERROR: failed to translate physical address\n");
+      return -1;
+    }
+
+    printf("physical address %#lx translated to %p\n", address, vaddr);
+    address = (unsigned long)vaddr;
   }
 
   /* preflight the start address to see if it's mapped */
@@ -151,6 +163,9 @@ static int cmd_display_mem(int argc, const cmd_args* argv, uint32_t flags) {
     printf("ERROR: address 0x%lx is unmapped\n", address);
     return -1;
   }
+
+  unsigned long stop = address + len;
+  int count = 0;
 
   for (; address < stop; address += size) {
     if (count == 0)
@@ -630,26 +645,26 @@ static int cmd_crash_syscall_instruction(int argc, const cmd_args* argv, uint32_
 }
 
 static int cmd_build_instrumentation(int argc, const cmd_args* argv, uint32_t flags) {
-  ktl::array static_features {
+  ktl::array static_features{
 #if __has_feature(address_sanitizer)
-    "address_sanitizer",
+      "address_sanitizer",
 #endif
 #if DEBUG_ASSERT_IMPLEMENTED
-        "debug_assert",
+      "debug_assert",
 #endif
 #if WITH_LOCK_DEP
-        "lockdep",
+      "lockdep",
 #endif
 #if __has_feature(safe_stack)
-        "safe_stack",
+      "safe_stack",
 #endif
 #if __has_feature(shadow_call_stack)
-        "shadow_call_stack",
+      "shadow_call_stack",
 #endif
 #if __has_feature(undefined_behavior_sanitizer)
-        "undefined_behavior_sanitizer",
+      "undefined_behavior_sanitizer",
 #endif
-    // missing: sancov, profile
+      // missing: sancov, profile
   };
   for (const auto& feature : static_features) {
     printf("build_instrumentation: %s\n", feature);
