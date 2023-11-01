@@ -88,17 +88,13 @@ impl Joined {
 
         result.map_err(|status_code| {
             sta.send_connect_conf_failure(status_code);
-            if let Err(e) = sta.ctx.device.clear_association(&sta.sta.bssid().into()) {
-                error!("Auth Alg Error: clear_connect_context failed: {}", e);
-            }
+            let _ =
+                sta.clear_association().map_err(|e| error!("Failed to clear association: {}", e));
         })
     }
 
     fn on_sme_deauthenticate<D: DeviceOps>(&mut self, sta: &mut BoundClient<'_, D>) {
-        // Clear assoc context at the device
-        if let Err(e) = sta.ctx.device.clear_association(&sta.sta.bssid().into()) {
-            warn!("SME Deauthenticate: Error clearing association in vendor driver: {}", e);
-        }
+        let _ = sta.clear_association().map_err(|e| warn!("Failed to clear association: {}", e));
     }
 }
 
@@ -137,18 +133,18 @@ impl Authenticating {
                 error!("authentication with BSS failed");
                 // TODO(fxbug.dev/83828): pass the status code from the original auth frame
                 sta.send_connect_conf_failure(fidl_ieee80211::StatusCode::RefusedReasonUnspecified);
-                if let Err(e) = sta.ctx.device.clear_association(&sta.sta.bssid().into()) {
-                    error!("Auth Failed: clear_connect_context failed: {}", e);
-                }
+                let _ = sta
+                    .clear_association()
+                    .map_err(|e| error!("Failed to clear association: {}", e));
                 AuthProgress::Failed
             }
             Err(e) => {
                 error!("Internal error while authenticating: {}", e);
                 // TODO(fxbug.dev/83828): pass the status code from the original auth frame
                 sta.send_connect_conf_failure(fidl_ieee80211::StatusCode::RefusedReasonUnspecified);
-                if let Err(e) = sta.ctx.device.clear_association(&sta.sta.bssid().into()) {
-                    error!("Auth Internal Err: clear_connect_context failed: {}", e);
-                }
+                let _ = sta
+                    .clear_association()
+                    .map_err(|e| error!("Failed to clear association: {}", e));
                 AuthProgress::Failed
             }
         }
@@ -219,17 +215,12 @@ impl Authenticating {
 
         sta.sta.connect_timeout.take();
         sta.send_connect_conf_failure(fidl_ieee80211::StatusCode::SpuriousDeauthOrDisassoc);
-        if let Err(e) = sta.ctx.device.clear_association(&sta.sta.bssid().into()) {
-            error!("Deauth Frame: clear_connect_context failed: {}", e);
-        }
+        let _ = sta.clear_association().map_err(|e| error!("Failed to clear association: {}", e));
     }
 
     fn on_sme_deauthenticate<D: DeviceOps>(&mut self, sta: &mut BoundClient<'_, D>) {
         sta.sta.connect_timeout.take();
-        // Clear assoc context at the device
-        if let Err(e) = sta.ctx.device.clear_association(&sta.sta.bssid().into()) {
-            error!("SME Deauthenticate: Error clearing association in vendor driver: {}", e);
-        }
+        let _ = sta.clear_association().map_err(|e| error!("Failed to clear association: {}", e));
     }
 }
 
@@ -432,17 +423,12 @@ impl Associating {
             { deauth_hdr.reason_code }
         );
         sta.send_connect_conf_failure(fidl_ieee80211::StatusCode::SpuriousDeauthOrDisassoc);
-        if let Err(e) = sta.ctx.device.clear_association(&sta.sta.bssid().into()) {
-            error!("Deauth Frame: clear_connect_context failed: {}", e);
-        }
+        let _ = sta.clear_association().map_err(|e| error!("Failed to clear association: {}", e));
     }
 
     fn on_sme_deauthenticate<D: DeviceOps>(&mut self, sta: &mut BoundClient<'_, D>) {
         sta.sta.connect_timeout.take();
-        // Clear assoc context at the device
-        if let Err(e) = sta.ctx.device.clear_association(&sta.sta.bssid().into()) {
-            error!("Assoc timeout: Error clearing association in vendor driver: {}", e);
-        }
+        let _ = sta.clear_association().map_err(|e| error!("Failed to clear association: {}", e));
     }
 }
 
@@ -573,9 +559,7 @@ impl Associated {
         let reason_code = fidl_ieee80211::ReasonCode::from_primitive(deauth_hdr.reason_code.0)
             .unwrap_or(fidl_ieee80211::ReasonCode::UnspecifiedReason);
         sta.send_deauthenticate_ind(reason_code, LocallyInitiated(false));
-        if let Err(e) = sta.ctx.device.clear_association(&sta.sta.bssid().into()) {
-            error!("Deauth Frame: clear_connect_context failed: {}", e);
-        }
+        let _ = sta.clear_association().map_err(|e| error!("Failed to clear association: {}", e));
     }
 
     /// Process every inbound management frame before its being handed off to a more specific
@@ -841,10 +825,7 @@ impl Associated {
         }
 
         self.pre_leaving_associated_state(sta);
-        // Clear assoc context at the device
-        if let Err(e) = sta.ctx.device.clear_association(&sta.sta.bssid().into()) {
-            error!("Error clearing association in vendor driver: {}", e);
-        }
+        let _ = sta.clear_association().map_err(|e| error!("Failed to clear association: {}", e));
 
         if let Err(e) = sta.ctx.device.send_mlme_event(fidl_mlme::MlmeEvent::DeauthenticateConf {
             resp: fidl_mlme::DeauthenticateConfirm { peer_sta_address: sta.sta.bssid().to_array() },
@@ -1173,9 +1154,9 @@ impl States {
                 }
                 sta.sta.connect_timeout.take();
                 sta.send_connect_conf_failure(fidl_ieee80211::StatusCode::RejectedSequenceTimeout);
-                if let Err(e) = sta.ctx.device.clear_association(&sta.sta.bssid().into()) {
-                    error!("Connect Timeout: clear_connect_context failed: {}", e);
-                }
+                let _ = sta
+                    .clear_association()
+                    .map_err(|e| error!("Failed to clear association: {}", e));
                 match self {
                     States::Authenticating(state) => state.transition_to(Joined).into(),
                     States::Associating(state) => state.transition_to(Joined).into(),

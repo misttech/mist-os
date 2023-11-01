@@ -95,7 +95,6 @@ class Device : public DeviceInterface,
   zx_status_t EnableBeaconing(wlan_softmac_enable_beaconing_request_t* request) final;
   zx_status_t DisableBeaconing() final;
   zx_status_t InstallKey(wlan_key_configuration_t* key_config) final;
-  zx_status_t ClearAssociation(const uint8_t[fuchsia_wlan_ieee80211_MAC_ADDR_LEN]) final;
   zx_status_t StartPassiveScan(const wlan_softmac_start_passive_scan_request_t* passive_scan_args,
                                uint64_t* out_scan_id) final;
   zx_status_t StartActiveScan(const wlan_softmac_start_active_scan_request_t* active_scan_args,

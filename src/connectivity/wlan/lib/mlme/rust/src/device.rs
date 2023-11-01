@@ -108,7 +108,10 @@ pub trait DeviceOps {
         &mut self,
         assoc_cfg: fidl_softmac::WlanAssociationConfig,
     ) -> Result<(), zx::Status>;
-    fn clear_association(&mut self, addr: &MacAddr) -> Result<(), zx::Status>;
+    fn clear_association(
+        &mut self,
+        request: &fidl_softmac::WlanSoftmacBridgeClearAssociationRequest,
+    ) -> Result<(), zx::Status>;
     fn take_mlme_event_stream(&mut self) -> Option<mpsc::UnboundedReceiver<fidl_mlme::MlmeEvent>>;
     fn send_mlme_event(&mut self, event: fidl_mlme::MlmeEvent) -> Result<(), anyhow::Error>;
     fn set_minstrel(&mut self, minstrel: crate::MinstrelWrapper);
@@ -330,11 +333,27 @@ impl DeviceOps for Device {
         zx::ok((self.raw_device.disable_beaconing)(self.raw_device.device))
     }
 
-    fn clear_association(&mut self, addr: &MacAddr) -> Result<(), zx::Status> {
+    fn clear_association(
+        &mut self,
+        request: &fidl_softmac::WlanSoftmacBridgeClearAssociationRequest,
+    ) -> Result<(), zx::Status> {
+        let addr: MacAddr = request
+            .peer_addr
+            .ok_or_else(|| {
+                error!("ClearAssociation called with no peer_addr field.");
+                zx::Status::INVALID_ARGS
+            })?
+            .into();
         if let Some(minstrel) = &self.minstrel {
-            minstrel.lock().remove_peer(addr);
+            minstrel.lock().remove_peer(&addr);
         }
-        zx::ok((self.raw_device.clear_association)(self.raw_device.device, addr.as_array()))
+        self.wlan_softmac_bridge_proxy
+            .clear_association(request, zx::Time::INFINITE)
+            .map_err(|fidl_error| {
+                error!("FIDL error during ConfigureAssoc: {:?}", fidl_error);
+                zx::Status::INTERNAL
+            })?
+            .map_err(|e| zx::Status::from_raw(e))
     }
 
     fn notify_association_complete(
@@ -647,8 +666,6 @@ pub struct DeviceInterface {
     ) -> i32,
     /// Disable beaconing on the device.
     disable_beaconing: extern "C" fn(device: *mut c_void) -> i32,
-    /// Clear the association context.
-    clear_association: extern "C" fn(device: *mut c_void, addr: &[u8; 6]) -> i32,
 }
 
 pub mod test_utils {
@@ -1043,12 +1060,16 @@ pub mod test_utils {
             Ok(())
         }
 
-        fn clear_association(&mut self, addr: &MacAddr) -> Result<(), zx::Status> {
+        fn clear_association(
+            &mut self,
+            request: &fidl_softmac::WlanSoftmacBridgeClearAssociationRequest,
+        ) -> Result<(), zx::Status> {
+            let addr: MacAddr = request.peer_addr.unwrap().into();
             let mut state = self.state.lock().unwrap();
             if let Some(minstrel) = &state.minstrel {
-                minstrel.lock().remove_peer(addr);
+                minstrel.lock().remove_peer(&addr);
             }
-            state.assocs.remove(addr);
+            state.assocs.remove(&addr);
             state.join_bss_request = None;
             Ok(())
         }
@@ -1715,7 +1736,12 @@ mod tests {
         assert!(fake_device_state.lock().unwrap().join_bss_request.is_some());
         fake_device.notify_association_complete(assoc_cfg).expect("error configuring assoc");
         assert_eq!(fake_device_state.lock().unwrap().assocs.len(), 1);
-        fake_device.clear_association(&[1, 2, 3, 4, 5, 6].into()).expect("error clearing assoc");
+        fake_device
+            .clear_association(&fidl_softmac::WlanSoftmacBridgeClearAssociationRequest {
+                peer_addr: Some([1, 2, 3, 4, 5, 6]),
+                ..Default::default()
+            })
+            .expect("error clearing assoc");
         assert_eq!(fake_device_state.lock().unwrap().assocs.len(), 0);
         assert!(fake_device_state.lock().unwrap().join_bss_request.is_none());
     }

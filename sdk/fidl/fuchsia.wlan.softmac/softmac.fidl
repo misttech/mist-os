@@ -450,20 +450,6 @@ type WlanAssociationConfig = table {
 /// `WlanSoftmac` messages transported via the driver framework channel.
 @available(added=15)
 closed protocol WlanSoftmacBridge {
-    /// Notifies the device of a successful association and configures
-    /// additional parameters necessary to participate in that association.
-    ///
-    /// # Errors
-    ///
-    /// Common errors include:
-    ///
-    /// - `ZX_ERR_BAD_STATE`: The device was not previously informed of this BSS
-    ///                       via `WlanSoftmac.JoinBss`.
-    @available(added=15)
-    strict NotifyAssociationComplete(struct {
-        assoc_cfg WlanAssociationConfig;
-    }) -> () error zx.Status;
-
     /// Gets general information about the device and its supported features.
     /// This method is safe to call even when the SoftMAC has not yet started.
     @available(added=HEAD)
@@ -481,6 +467,27 @@ closed protocol WlanSoftmacBridge {
     @selector("fuchsia.wlan.softmac/WlanSoftmac.SetChannel")
     strict SetChannel(table {
         1: channel fuchsia.wlan.common.WlanChannel;
+    }) -> () error zx.Status;
+
+    /// Notifies the device of a successful association and configures
+    /// additional parameters necessary to participate in that association.
+    ///
+    /// # Errors
+    ///
+    /// Common errors include:
+    ///
+    /// - `ZX_ERR_BAD_STATE`: The device was not previously informed of this BSS
+    ///                       via `WlanSoftmac.JoinBss`.
+    @available(added=15)
+    strict NotifyAssociationComplete(struct {
+        assoc_cfg WlanAssociationConfig;
+    }) -> () error zx.Status;
+
+    /// Notifies MAC and PHY that the peer has been de-associated.
+    @selector("fuchsia.wlan.softmac/WlanSoftmac.ClearAssociation")
+    @available(added=HEAD)
+    strict ClearAssociation(table {
+        1: peer_addr ieee80211.MacAddr;
     }) -> () error zx.Status;
 };
 
@@ -628,7 +635,7 @@ closed protocol WlanSoftmac {
     strict InstallKey(WlanKeyConfiguration) -> () error zx.Status;
 
     /// Notifies MAC and PHY that the peer has been de-associated.
-    @available(added=15)
+    @available(added=15, removed=HEAD)
     strict ClearAssociation(table {
         1: peer_addr ieee80211.MacAddr;
     }) -> () error zx.Status;

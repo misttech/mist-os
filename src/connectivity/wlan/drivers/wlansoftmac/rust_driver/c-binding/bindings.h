@@ -129,10 +129,6 @@ typedef struct {
    * Disable beaconing on the device.
    */
   int32_t (*disable_beaconing)(void *device);
-  /**
-   * Clear the association context.
-   */
-  int32_t (*clear_association)(void *device, const uint8_t (*addr)[6]);
 } rust_device_interface_t;
 
 /**

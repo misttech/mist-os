@@ -118,6 +118,47 @@ class WlanSoftmacBridgeImpl : public fidl::WireServer<fuchsia_wlan_softmac::Wlan
   explicit WlanSoftmacBridgeImpl(fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac> client)
       : client_(std::move(client)) {}
 
+  void Query(QueryCompleter::Sync& completer) override {
+    auto arena = fdf::Arena::Create(0, 0);
+    if (arena.is_error()) {
+      lerror("Arena creation failed: %s", arena.status_string());
+      completer.ReplyError(ZX_ERR_INTERNAL);
+      return;
+    }
+
+    auto result = client_.sync().buffer(*std::move(arena))->Query();
+    if (!result.ok()) {
+      lerror("Query failed (FIDL error %s)", result.status_string());
+      completer.ReplyError(result.status());
+      return;
+    }
+    if (result->is_error()) {
+      lerror("Query failed (status %s)", zx_status_get_string(result->error_value()));
+      completer.ReplyError(result->error_value());
+      return;
+    }
+    completer.ReplySuccess(*result->value());
+  }
+
+  void SetChannel(SetChannelRequestView request, SetChannelCompleter::Sync& completer) override {
+    auto arena = fdf::Arena::Create(0, 0);
+    if (arena.is_error()) {
+      lerror("Arena creation failed: %s", arena.status_string());
+      return completer.ReplyError(ZX_ERR_INTERNAL);
+    }
+
+    auto result = client_.sync().buffer(*std::move(arena))->SetChannel(*request);
+    if (!result.ok()) {
+      lerror("SetChannel failed (FIDL error %s)", result.status_string());
+      return completer.ReplyError(result.status());
+    }
+    if (result->is_error()) {
+      lerror("SetChannel failed (status %s)", zx_status_get_string(result->error_value()));
+      return completer.ReplyError(result->error_value());
+    }
+    return completer.ReplySuccess();
+  }
+
   void NotifyAssociationComplete(NotifyAssociationCompleteRequestView request,
                                  NotifyAssociationCompleteCompleter::Sync& completer) override {
     auto arena = fdf::Arena::Create(0, 0);
@@ -146,7 +187,8 @@ class WlanSoftmacBridgeImpl : public fidl::WireServer<fuchsia_wlan_softmac::Wlan
     completer.ReplySuccess();
   }
 
-  void Query(QueryCompleter::Sync& completer) override {
+  void ClearAssociation(ClearAssociationRequestView request,
+                        ClearAssociationCompleter::Sync& completer) override {
     auto arena = fdf::Arena::Create(0, 0);
     if (arena.is_error()) {
       lerror("Arena creation failed: %s", arena.status_string());
@@ -154,40 +196,18 @@ class WlanSoftmacBridgeImpl : public fidl::WireServer<fuchsia_wlan_softmac::Wlan
       return;
     }
 
-    auto result = client_.sync().buffer(*std::move(arena))->Query();
-
+    auto result = client_.sync().buffer(*std::move(arena))->ClearAssociation(*request);
     if (!result.ok()) {
-      lerror("Query failed (FIDL error %s)", result.status_string());
+      lerror("ClearAssociation failed (FIDL error %s)", result.status_string());
       completer.ReplyError(result.status());
       return;
     }
-
     if (result->is_error()) {
-      lerror("Query failed (status %s)", zx_status_get_string(result->error_value()));
+      lerror("ClearAssociation failed (status %s)", zx_status_get_string(result->error_value()));
       completer.ReplyError(result->error_value());
       return;
     }
-
-    completer.ReplySuccess(*result->value());
-  }
-
-  void SetChannel(SetChannelRequestView request, SetChannelCompleter::Sync& completer) override {
-    auto arena = fdf::Arena::Create(0, 0);
-    if (arena.is_error()) {
-      lerror("Arena creation failed: %s", arena.status_string());
-      return completer.ReplyError(ZX_ERR_INTERNAL);
-    }
-
-    auto result = client_.sync().buffer(*std::move(arena))->SetChannel(*request);
-    if (!result.ok()) {
-      lerror("SetChannel failed (FIDL error %s)", result.status_string());
-      return completer.ReplyError(result.status());
-    }
-    if (result->is_error()) {
-      lerror("SetChannel failed (status %s)", zx_status_get_string(result->error_value()));
-      return completer.ReplyError(result->error_value());
-    }
-    return completer.ReplySuccess();
+    completer.ReplySuccess();
   }
 
   static void BindSelfManagedServer(
@@ -286,9 +306,6 @@ zx_status_t WlanSoftmacHandle::Init(
       },
       .disable_beaconing = [](void* device) -> zx_status_t {
         return DEVICE(device)->DisableBeaconing();
-      },
-      .clear_association = [](void* device, const uint8_t(*addr)[6]) -> zx_status_t {
-        return DEVICE(device)->ClearAssociation(*addr);
       },
   };
 
@@ -929,30 +946,6 @@ zx_status_t Device::CancelScan(uint64_t scan_id) {
     lerror("CancelScan Failed (FIDL error %s)", result.status_string());
   }
   return result.status();
-}
-
-zx_status_t Device::ClearAssociation(const uint8_t peer_addr[fuchsia_wlan_ieee80211_MAC_ADDR_LEN]) {
-  auto arena = fdf::Arena::Create(0, 0);
-  if (arena.is_error()) {
-    lerror("Arena creation failed: %s", arena.status_string());
-    return ZX_ERR_INTERNAL;
-  }
-
-  auto builder = fuchsia_wlan_softmac::wire::WlanSoftmacClearAssociationRequest::Builder(*arena);
-  fidl::Array<uint8_t, fuchsia_wlan_ieee80211::wire::kMacAddrLen> fidl_peer_addr;
-  std::memcpy(fidl_peer_addr.begin(), peer_addr, fuchsia_wlan_ieee80211::wire::kMacAddrLen);
-  builder.peer_addr(fidl_peer_addr);
-
-  auto result = client_.sync().buffer(*std::move(arena))->ClearAssociation(builder.Build());
-  if (!result.ok()) {
-    errorf("ClearAssoc failed (FIDL error %s)", result.status_string());
-    return result.status();
-  }
-  if (result->is_error()) {
-    errorf("ClearAssoc failed (status %s)", zx_status_get_string(result->error_value()));
-    return result->error_value();
-  }
-  return ZX_OK;
 }
 
 void Device::Recv(RecvRequestView request, fdf::Arena& arena, RecvCompleter::Sync& completer) {

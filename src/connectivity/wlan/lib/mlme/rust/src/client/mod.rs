@@ -26,7 +26,7 @@ use {
     channel_switch::ChannelState,
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
     fidl_fuchsia_wlan_minstrel as fidl_minstrel, fidl_fuchsia_wlan_mlme as fidl_mlme,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_zircon as zx,
     ieee80211::{Bssid, MacAddr, MacAddrBytes, Ssid},
     scanner::Scanner,
     state::States,
@@ -1097,6 +1097,13 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
                 },
             })
             .unwrap_or_else(|e| error!("error sending MLME-DISASSOCIATE.indication: {}", e));
+    }
+
+    fn clear_association(&mut self) -> Result<(), zx::Status> {
+        self.ctx.device.clear_association(&fidl_softmac::WlanSoftmacBridgeClearAssociationRequest {
+            peer_addr: Some(self.sta.bssid().to_array()),
+            ..Default::default()
+        })
     }
 
     /// Sends an sae frame rx message to the SME.

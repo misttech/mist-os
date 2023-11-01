@@ -42,9 +42,6 @@ struct RangeWrapper {
 #define ASSERT_RANGES_EQ(a, b) \
   ASSERT_EQ(test_utils::RangeWrapper((a)), test_utils::RangeWrapper((b)))
 
-#define LIST_MAC_ADDR_BYTES(a) \
-  (a).byte[0], (a).byte[1], (a).byte[2], (a).byte[3], (a).byte[4], (a).byte[5]
-
 // clang-format off
 #define LIST_UINT32_BYTES(x) static_cast<uint8_t>((x) & 0xff), \
                              static_cast<uint8_t>(((x) >> 8) & 0xff), \
