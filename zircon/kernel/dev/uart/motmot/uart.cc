@@ -55,7 +55,9 @@
 #define UART_UINTS      (0x34)
 #define UART_UINTM      (0x38) // interrupt mask register, protect with uart_spinlock
 #define UART_UFLT_CONF  (0x40)
+#define USI_OPTION      (0xc8)
 #define UART_FIFO_DEPTH (0xdc)
+
 // clang-format on
 
 #define UARTREG(base, reg) (*REG32((base) + (reg)))
@@ -275,7 +277,7 @@ static void motmot_uart_dputs(const char* str, size_t len, bool block) {
 
     // Acquire the main uart spinlock once every iteration to try to cap the worst
     // case time holding it. If a large string is passed, for example, this routine
-    // will write up to 64 bytes at a time into the fifo per iteration, dropping and
+    // will write up to 256 bytes at a time into the fifo per iteration, dropping and
     // reacquiring the spinlock every cycle.
     Guard<MonitoredSpinLock, IrqSave> guard{uart_spinlock::Get(), SOURCE_TAG};
 
@@ -288,6 +290,11 @@ static void motmot_uart_dputs(const char* str, size_t len, bool block) {
       // characters in.
       uint32_t used_fifo = BITS_SHIFT(ufstat, 23, 16);  // tx fifo count
       size_t remaining_fifo = uart_tx_fifo_size - used_fifo;
+      if (used_fifo > uart_tx_fifo_size) [[unlikely]] {
+        // We must have read the fifo size incorrectly, push in one byte at a time
+        // as a fallback.
+        remaining_fifo = 1;
+      }
 
       to_write = ktl::min(len, remaining_fifo);
     }
@@ -347,9 +354,6 @@ void MotmotUartInitEarly(const zbi_dcfg_simple_t& config) {
   ASSERT(uart_base != 0);
   uart_irq = config.irq;
 
-  UARTREG(uart_base, UART_ULCON) = (3 << 0);  // no parity, one stop bit, 8 bit
-  UARTREG(uart_base, UART_UMCON) = 0;         // no auto flow control
-
   // read the tx and rx fifo size, useful later
   uint32_t fifo_depth = UARTREG(uart_base, UART_FIFO_DEPTH);
   uart_tx_fifo_size = BITS_SHIFT(fifo_depth, 24, 16);
@@ -363,16 +367,12 @@ void MotmotUartInitEarly(const zbi_dcfg_simple_t& config) {
     uart_rx_fifo_size = 1;
   }
 
-  pdev_register_uart(&uart_ops);
-}
+  // setup line settings
+  UARTREG(uart_base, UART_ULCON) = (3 << 0);  // no parity, one stop bit, 8 bit
+  UARTREG(uart_base, UART_UMCON) = 0;         // no auto flow control
 
-void MotmotUartInitLate() {
-  // create circular buffer to hold received data
-  uart_rx_buf.Initialize(RXBUF_SIZE, malloc(RXBUF_SIZE));
-
-  // register IRQ handler
-  zx_status_t status = register_int_handler(uart_irq, &motmot_uart_irq, nullptr);
-  DEBUG_ASSERT(status == ZX_OK);
+  // force the clock to be enabled
+  UARTREG_RMW(uart_base, USI_OPTION, (3 << 1), (1 << 1));
 
   // mask all irqs
   UARTREG(uart_base, UART_UINTM) = 0xf;  // mask CTS, TX, error, RX
@@ -393,31 +393,37 @@ void MotmotUartInitLate() {
   // enable fifos
   uartreg_or_eq(uart_base, UART_UFCON, (1 << 0));
 
-  // enable receive
+  // enable the transmitter and receiver, along with interrupt modes
   // clang-format off
-  UARTREG_RMW(uart_base, UART_UCON,
-      (0xf << 12) | (1 << 11) | (3 << 0),
+  UARTREG(uart_base, UART_UCON) =
       (3 << 12)    // default rx timeout interval
       | (0 << 11)  // disable rx timeout when rx fifo empty
+      | (1 << 8)   // level trigger
       | (1 << 7)   // rx timeout enable
       | (1 << 6)   // rx interrupt enable
-      | (1 << 0)); // rx enable interrupt mode
+      | (1 << 2)   // tx enable interrupt/polling mode
+      | (1 << 0); // rx enable interrupt/polling mode
   // clang-format on
 
-  LTRACEF("UART: FIFO_DEPTH %#x\n", UARTREG(uart_base, UART_FIFO_DEPTH));
-  LTRACEF("UCON %#x\n", UARTREG(uart_base, UART_UCON));
-  LTRACEF("UFCON %#x\n", UARTREG(uart_base, UART_UFCON));
-  LTRACEF("UMCON %#x\n", UARTREG(uart_base, UART_UMCON));
-  LTRACEF("UERSTAT %#x\n", UARTREG(uart_base, UART_UERSTAT));
+  pdev_register_uart(&uart_ops);
+}
+
+void MotmotUartInitLate() {
+  // create circular buffer to hold received data
+  uart_rx_buf.Initialize(RXBUF_SIZE, malloc(RXBUF_SIZE));
+
+  // register IRQ handler
+  zx_status_t status = register_int_handler(uart_irq, &motmot_uart_irq, nullptr);
+  DEBUG_ASSERT(status == ZX_OK);
+
+  // level triggered irq
+  configure_interrupt(uart_irq, IRQ_TRIGGER_MODE_LEVEL, IRQ_POLARITY_ACTIVE_HIGH);
 
   // unmask rx interrupt
   {
     Guard<MonitoredSpinLock, IrqSave> guard{uart_spinlock::Get(), SOURCE_TAG};
     motmot_uart_unmask_rx();
   }
-
-  // level triggered irq
-  configure_interrupt(uart_irq, IRQ_TRIGGER_MODE_LEVEL, IRQ_POLARITY_ACTIVE_HIGH);
 
   // enable interrupt
   unmask_interrupt(uart_irq);
@@ -430,6 +436,12 @@ void MotmotUartInitLate() {
     printf("UART: started IRQ driven TX\n");
     uart_tx_irq_enabled = true;
   }
+
+  LTRACEF("UART: FIFO_DEPTH %#x\n", UARTREG(uart_base, UART_FIFO_DEPTH));
+  LTRACEF("UCON %#x\n", UARTREG(uart_base, UART_UCON));
+  LTRACEF("UFCON %#x\n", UARTREG(uart_base, UART_UFCON));
+  LTRACEF("UMCON %#x\n", UARTREG(uart_base, UART_UMCON));
+  LTRACEF("UERSTAT %#x\n", UARTREG(uart_base, UART_UERSTAT));
 
   printf("UART: rx fifo len %u tx fifo len %u\n", uart_rx_fifo_size, uart_tx_fifo_size);
 }
