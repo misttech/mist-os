@@ -118,7 +118,8 @@ TEST(InspectDataTest, ParseJSON) {
     diagnostics::reader::EmplaceInspect(std::move(doc), &data);
     EXPECT_EQ("", data[0].moniker());
     EXPECT_EQ(0, data[0].version());
-    EXPECT_EQ("", data[0].metadata().filename);
+    EXPECT_EQ(std::nullopt, data[0].metadata().filename);
+    EXPECT_EQ(std::nullopt, data[0].metadata().name);
     EXPECT_EQ(std::nullopt, data[0].metadata().component_url);
     EXPECT_EQ(0, data[0].metadata().timestamp);
     EXPECT_EQ(std::nullopt, data[0].metadata().errors);
@@ -130,8 +131,7 @@ TEST(InspectDataTest, ParseJSON) {
     doc.Parse(R"({"metadata":
       {
         "filename": "fuchsia.inspect.Tree",
-        "timestamp": 39085389926,
-        "errors": null
+        "timestamp": 39085389926
       },
       "moniker": "bootstrap/archivist",
       "version": 1})");
@@ -139,6 +139,27 @@ TEST(InspectDataTest, ParseJSON) {
     EXPECT_EQ("bootstrap/archivist", data[0].moniker());
     EXPECT_EQ(1, data[0].version());
     EXPECT_EQ("fuchsia.inspect.Tree", data[0].metadata().filename);
+    EXPECT_EQ(std::nullopt, data[0].metadata().name);
+    EXPECT_EQ(std::nullopt, data[0].metadata().component_url);
+    EXPECT_EQ(39085389926, data[0].metadata().timestamp);
+    EXPECT_EQ(std::nullopt, data[0].metadata().errors);
+    EXPECT_EQ(std::nullopt, data[0].payload());
+  }
+  {
+    std::vector<diagnostics::reader::InspectData> data;
+    rapidjson::Document doc;
+    doc.Parse(R"({"metadata":
+      {
+        "name": "MyInspectTree",
+        "timestamp": 39085389926
+      },
+      "moniker": "bootstrap/archivist",
+      "version": 1})");
+    diagnostics::reader::EmplaceInspect(std::move(doc), &data);
+    EXPECT_EQ("bootstrap/archivist", data[0].moniker());
+    EXPECT_EQ(1, data[0].version());
+    EXPECT_EQ(std::nullopt, data[0].metadata().filename);
+    EXPECT_EQ("MyInspectTree", data[0].metadata().name);
     EXPECT_EQ(std::nullopt, data[0].metadata().component_url);
     EXPECT_EQ(39085389926, data[0].metadata().timestamp);
     EXPECT_EQ(std::nullopt, data[0].metadata().errors);
@@ -185,6 +206,7 @@ TEST(InspectDataTest, ParseJSON) {
     EXPECT_EQ("bootstrap/archivist", data[0].moniker());
     EXPECT_EQ(1, data[0].version());
     EXPECT_EQ("fuchsia.inspect.Tree", data[0].metadata().filename);
+    EXPECT_EQ(std::nullopt, data[0].metadata().name);
     EXPECT_EQ("fuchsia-pkg://fuchsia.com/archivist#meta/archivist.cm",
               data[0].metadata().component_url);
     EXPECT_EQ(39085389926, data[0].metadata().timestamp);

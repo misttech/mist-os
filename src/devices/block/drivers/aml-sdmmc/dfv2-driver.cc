@@ -156,8 +156,11 @@ zx::result<> Dfv2Driver::Start() {
     }
   }
 
-  exposed_inspector_.emplace(
-      inspect::ComponentInspector(outgoing()->component(), dispatcher(), inspector()));
+  auto inspect_sink = incoming()->Connect<fuchsia_inspect::InspectSink>();
+  if (inspect_sink.is_ok()) {
+    exposed_inspector_.emplace(inspect::ComponentInspector(
+        dispatcher(), {.inspector = inspector(), .client_end = std::move(inspect_sink.value())}));
+  }
 
   {
     fuchsia_hardware_sdmmc::SdmmcService::InstanceHandler handler({

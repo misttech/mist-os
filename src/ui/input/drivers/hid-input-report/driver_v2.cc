@@ -52,8 +52,9 @@ class InputReportDriver : public fdf::DriverBase {
     input_report_.emplace(std::move(hiddev));
 
     // Expose the driver's inspect data.
-    exposed_inspector_.emplace(inspect::ComponentInspector(outgoing()->component(), dispatcher(),
-                                                           input_report_->Inspector()));
+    exposed_inspector_.emplace(inspect::ComponentInspector(
+        dispatcher(), {.inspector = input_report_->Inspector(),
+                       .client_end = incoming()->Connect<fuchsia_inspect::InspectSink>().value()}));
 
     // Start the inner DFv1 driver.
     input_report_->Start();

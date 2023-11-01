@@ -2,11 +2,28 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fidl/fuchsia.inspect/cpp/wire.h>
+#include <fidl/fuchsia.inspect/cpp/fidl.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/inspect/component/cpp/component.h>
 #include <lib/inspect/component/cpp/service.h>
 
 namespace inspect {
+#if __Fuchsia_API_level__ >= 16
+ComponentInspector::ComponentInspector(async_dispatcher_t* dispatcher, PublishOptions opts)
+    : inspector_(std::move(opts.inspector)) {
+  auto client_end = opts.client_end.has_value()
+                        ? std::move(*opts.client_end)
+                        : component::Connect<fuchsia_inspect::InspectSink>().value();
+  auto endpoints = fidl::CreateEndpoints<fuchsia_inspect::Tree>();
+  auto name = std::move(opts.tree_name);
+  TreeServer::StartSelfManagedServer(inspector_, std::move(opts.tree_handler_settings), dispatcher,
+                                     std::move(endpoints->server));
+
+  fidl::Client client(std::move(client_end), dispatcher);
+  auto result = client->Publish({{.tree = std::move(endpoints->client), .name = std::move(name)}});
+  ZX_ASSERT(result.is_ok());
+}
+#else
 ComponentInspector::ComponentInspector(component::OutgoingDirectory& outgoing_directory,
                                        async_dispatcher_t* dispatcher, Inspector inspector,
                                        TreeHandlerSettings settings)
@@ -20,6 +37,7 @@ ComponentInspector::ComponentInspector(component::OutgoingDirectory& outgoing_di
 
   ZX_ASSERT(status.is_ok());
 }
+#endif  // __Fuchsia_API_level__
 
 NodeHealth& ComponentInspector::Health() {
   if (!component_health_) {

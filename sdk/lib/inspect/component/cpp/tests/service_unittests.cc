@@ -464,6 +464,9 @@ TEST_F(InspectServiceTest, ReadFromComponentInspector) {
 
   auto& app_data = data.at(app_index);
 
+  ASSERT_EQ(app_data.metadata().name, "InspectTreeServer");
+  ASSERT_EQ(app_data.metadata().filename, std::nullopt);
+
   ASSERT_EQ(1, app_data.GetByPath({"root", "val1"}).GetInt());
   ASSERT_EQ(2, app_data.GetByPath({"root", "val2"}).GetInt());
   ASSERT_EQ(3, app_data.GetByPath({"root", "val3"}).GetInt());

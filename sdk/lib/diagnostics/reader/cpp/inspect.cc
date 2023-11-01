@@ -177,7 +177,8 @@ InspectData::InspectData(rapidjson::Document document) : document_(std::move(doc
   }
 
   metadata_.timestamp = 0;
-  metadata_.filename = "";
+  metadata_.filename = {};
+  metadata_.name = {};
   metadata_.component_url = {};
   metadata_.errors = {};
 
@@ -185,6 +186,9 @@ InspectData::InspectData(rapidjson::Document document) : document_(std::move(doc
     const auto& metadata = document_[kMetadataName].GetObject();
     if (metadata.HasMember(kMetadataFilename) && metadata[kMetadataFilename].IsString()) {
       metadata_.filename = metadata[kMetadataFilename].GetString();
+    } else if (metadata.HasMember(kMetadataNameOfInspectTree) &&
+               metadata[kMetadataNameOfInspectTree].IsString()) {
+      metadata_.name = metadata[kMetadataNameOfInspectTree].GetString();
     }
     if (metadata.HasMember(kMetadataComponentURL) && metadata[kMetadataComponentURL].IsString()) {
       metadata_.component_url = metadata[kMetadataComponentURL].GetString();

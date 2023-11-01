@@ -12,6 +12,7 @@ constexpr char kPayloadName[] = "payload";
 constexpr char kVersionName[] = "version";
 constexpr char kMetadataName[] = "metadata";
 constexpr char kMetadataFilename[] = "filename";
+constexpr char kMetadataNameOfInspectTree[] = "name";
 constexpr char kMetadataComponentURL[] = "component_url";
 constexpr char kMetadataTimestamp[] = "timestamp";
 constexpr char kMetadataErrors[] = "errors";

@@ -19,7 +19,8 @@ class PackagedDriver : public fdf::DriverBase {
       : fdf::DriverBase("packaged", std::move(start_args), std::move(driver_dispatcher)) {}
 
   zx::result<> Start() override {
-    exposed_inspector_.emplace(inspect::ComponentInspector(outgoing()->component(), dispatcher()));
+    exposed_inspector_.emplace(inspect::ComponentInspector(
+        dispatcher(), {.client_end = incoming()->Connect<fuchsia_inspect::InspectSink>().value()}));
     auto& root = exposed_inspector_->root();
     root.RecordString("hello", "world");
 

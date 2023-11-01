@@ -4,38 +4,33 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/inspect/component/cpp/component.h>
-
-#include "lib/component/outgoing/cpp/outgoing_directory.h"
 
 using inspect::ComponentInspector;
 
 int main() {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   auto* dispatcher = loop.dispatcher();
-  auto out = component::OutgoingDirectory(dispatcher);
-  auto inspector = ComponentInspector(out, dispatcher);
 
-  inspector.root().RecordInt("val1", 1);
-  inspector.root().RecordInt("val2", 2);
-  inspector.root().RecordInt("val3", 3);
-  inspector.root().RecordLazyNode("child", [] {
+  auto ci = ComponentInspector(dispatcher, {.tree_name = "InspectTreeServer"});
+
+  ci.root().RecordInt("val1", 1);
+  ci.root().RecordInt("val2", 2);
+  ci.root().RecordInt("val3", 3);
+  ci.root().RecordLazyNode("child", [] {
     inspect::Inspector insp;
-    insp.GetRoot().CreateInt("val", 0, &insp);
+    insp.GetRoot().RecordInt("val", 0);
     return fpromise::make_ok_promise(std::move(insp));
   });
-  inspector.root().RecordLazyValues("values", [] {
+  ci.root().RecordLazyValues("values", [] {
     inspect::Inspector insp;
-    insp.GetRoot().CreateInt("val4", 4, &insp);
+    insp.GetRoot().RecordInt("val4", 4);
     return fpromise::make_ok_promise(std::move(insp));
   });
 
-  if (out.ServeFromStartupInfo().is_error()) {
-    return -1;
-  }
-
-  inspector.Health().Ok();
-
+  ci.Health().Ok();
   loop.Run();
+
   return 0;
 }

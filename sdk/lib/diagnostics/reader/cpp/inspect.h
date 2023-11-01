@@ -15,6 +15,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <string>
 
 #include <rapidjson/document.h>
 
@@ -29,10 +30,11 @@ class InspectData {
     std::string message;
   };
   struct InspectMetadata final {
-    std::string filename;
-    cpp17::optional<std::string> component_url;
+    std::optional<std::string> filename = {};
+    std::optional<std::string> name = {};
+    std::optional<std::string> component_url;
     uint64_t timestamp;
-    cpp17::optional<std::vector<InspectError>> errors;
+    std::optional<std::vector<InspectError>> errors;
   };
 
   // Create a new InspectData wrapper around a JSON document.
