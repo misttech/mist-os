@@ -549,14 +549,6 @@ A list of fshost options to add to the fshost config.
 
 From //build/board.gni:53
 
-### board_has_libvulkan_arm_mali
-
-Board files can set this to true if they have a package with a mali libvulkan VCD.
-
-**Current value (from the default):** `false`
-
-From //src/graphics/lib/magma/gnbuild/magma.gni:43
-
 ### board_host_labels
 
 A list of binary host tool labels to also build.
@@ -848,7 +840,7 @@ Targets that will be built as IMG vulkan ICDS.
 
 **Current value (from the default):** `[]`
 
-From //src/graphics/lib/magma/gnbuild/magma.gni:40
+From //src/graphics/lib/magma/gnbuild/magma.gni:36
 
 ### build_libvulkan_vsi_vip
 
@@ -856,7 +848,7 @@ Targets that will be built as verisilicon vulkan ICDS.
 
 **Current value (from the default):** `[]`
 
-From //src/graphics/lib/magma/gnbuild/magma.gni:37
+From //src/graphics/lib/magma/gnbuild/magma.gni:33
 
 ### build_only_labels
 
@@ -3669,15 +3661,6 @@ From //boards/common/x64-common.gni:14
 
 From //build/board.gni:8
 
-### have_libvulkan_arm_mali
-
-Driver developers can set this to true if they are manually including a Mali package. This will
-change test environments so Vulkan tests run on boards with Mali GPUs.
-
-**Current value (from the default):** `false`
-
-From //src/graphics/lib/magma/gnbuild/magma.gni:32
-
 ### hermetic_test_package_labels
 
 Fully hermetic tests (both by packaging and at runtime)
@@ -4149,6 +4132,17 @@ Extra macro definitions for kernel code, e.g. "DISABLE_KASLR",
 **Current value (from the default):** `[]`
 
 From //zircon/kernel/params.gni:82
+
+### kernel_extra_deps
+
+A list of GN labels comprising additional dependencies of the kernel
+proper. This can be useful - in a prototyping or 'vendor' capacity - for
+injecting new instances of subsystems that the kernel has defined modularly
+(e.g., pdev drivers or k commands).
+
+**Current value (from the default):** `[]`
+
+From //zircon/kernel/BUILD.gn:40
 
 ### kernel_no_userabi
 
@@ -9121,7 +9115,7 @@ From //build/images/args.gni:105
 
 **Current value (from the default):** `false`
 
-From //build/config/fuchsia/BUILD.gn:150
+From //build/config/fuchsia/BUILD.gn:158
 
 ### zircon_b_partition
 
