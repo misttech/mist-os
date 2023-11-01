@@ -74,6 +74,8 @@ def fuchsia_cc_driver(name, srcs = [], **kwargs):
         install_root = "driver/",
         cc_binary = ":{}_cc_binary".format(name),
         exact_cc_binary_deps = kwargs.pop("deps", None),
+        # We do not want libc++ and libunwind packaged since they get statically linked.
+        package_clang_dist_files = False,
         visibility = visibility,
         tags = tags,
     )

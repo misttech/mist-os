@@ -141,6 +141,7 @@ def fuchsia_wrap_cc_binary(
         exact_cc_binary_deps = None,
         sdk_root_label = "@fuchsia_sdk",
         clang_root_label = "@fuchsia_clang",
+        package_clang_dist_files = True,
         **kwargs):
     """Wrap a native cc_binary.
 
@@ -156,10 +157,18 @@ def fuchsia_wrap_cc_binary(
             them in cc_binary as well as fuchsia_wrap_cc_binary.
         sdk_root_label: Optionally override the root label of the fuchsia sdk repo.
         clang_root_label: Optionally override the root label of the fuchsia clang repo.
+        package_clang_dist_files: If True, the @fuchsia_clang//:dist files will be packaged.
         **kwargs: Arguments to forward to the fuchsia cc_binary wrapper.
     """
     if exact_cc_binary_deps == None:
         fail(_invalid_deps_message % ("binary", cc_binary))
+
+    data = [
+        "%s//pkg/sysroot:dist" % sdk_root_label,
+        "%s//:runtime" % clang_root_label,
+    ]
+    if package_clang_dist_files:
+        data.append("%s//:dist" % clang_root_label)
 
     _fuchsia_cc_binary(
         name = name,
@@ -168,11 +177,7 @@ def fuchsia_wrap_cc_binary(
         clang_debug_symbols = "%s//:debug_symbols" % clang_root_label,
         deps = exact_cc_binary_deps,
         implicit_deps = ["%s//pkg/fdio" % sdk_root_label],
-        data = [
-            "%s//pkg/sysroot:dist" % sdk_root_label,
-            "%s//:dist" % clang_root_label,
-            "%s//:runtime" % clang_root_label,
-        ],
+        data = data,
         **kwargs
     )
 
