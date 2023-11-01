@@ -124,6 +124,11 @@ func main() {
 	// to a file for debugging purposes.
 	stdout := io.Discard
 	if outDir := os.Getenv(testrunnerconstants.TestOutDirEnvKey); outDir != "" {
+		// TODO(fxbug.dev/135386): These lines are for debugging purposes to see
+		// at which step the test is hanging. Try fmt.Println() and logger.Debugf()
+		// to see if the issue has something to do with the context.
+		fmt.Println("creating serial outputs")
+		logger.Debugf(ctx, "creating serial outputs")
 		if serialOutput, err := osmisc.CreateFile(filepath.Join(outDir, "serial_output")); err != nil {
 			logger.Errorf(ctx, "%s", err)
 		} else {
@@ -134,6 +139,7 @@ func main() {
 			log := logger.NewLogger(logger.DebugLevel, color.NewColor(color.ColorAuto),
 				io.MultiWriter(os.Stdout, serialOutput), io.MultiWriter(os.Stderr, serialOutput), "seriallistener ")
 			ctx = logger.WithLogger(ctx, log)
+			defer serialOutput.Close()
 		}
 	}
 	deviceType := os.Getenv(constants.DeviceTypeEnvKey)

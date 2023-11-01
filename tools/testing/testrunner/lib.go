@@ -22,6 +22,7 @@ import (
 	"sync"
 	"time"
 
+	"go.fuchsia.dev/fuchsia/tools/botanist"
 	botanistconstants "go.fuchsia.dev/fuchsia/tools/botanist/constants"
 	"go.fuchsia.dev/fuchsia/tools/botanist/targets"
 	"go.fuchsia.dev/fuchsia/tools/integration/testsharder"
@@ -29,7 +30,6 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/lib/environment"
 	"go.fuchsia.dev/fuchsia/tools/lib/ffxutil"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
-	"go.fuchsia.dev/fuchsia/tools/lib/streams"
 	"go.fuchsia.dev/fuchsia/tools/testing/runtests"
 	"go.fuchsia.dev/fuchsia/tools/testing/tap"
 	"go.fuchsia.dev/fuchsia/tools/testing/testparser"
@@ -511,11 +511,13 @@ func runTestOnce(
 ) (*TestResult, error) {
 	// The test case parser specifically uses stdout, so we need to have a
 	// dedicated stdout buffer.
-	stdout := new(bytes.Buffer)
+	stdoutForParsing := new(bytes.Buffer)
 	stdio := new(stdioBuffer)
 
-	multistdout := io.MultiWriter(streams.Stdout(ctx), stdio, stdout)
-	multistderr := io.MultiWriter(streams.Stderr(ctx), stdio)
+	stdout, stderr, flush := botanist.NewStdioWriters(ctx)
+	defer flush()
+	multistdout := io.MultiWriter(stdout, stdio, stdoutForParsing)
+	multistderr := io.MultiWriter(stderr, stdio)
 
 	// In the case of running tests on QEMU over serial, we do not wish to
 	// forward test output to stdout, as QEMU is already redirecting serial
@@ -525,7 +527,7 @@ func runTestOnce(
 	// testrunner CLI just to sidecar the information of 'is QEMU'.
 	againstQEMU := os.Getenv(botanistconstants.NodenameEnvKey) == targets.DefaultQEMUNodename
 	if _, ok := t.(*FuchsiaSerialTester); ok && againstQEMU {
-		multistdout = io.MultiWriter(stdio, stdout)
+		multistdout = io.MultiWriter(stdio, stdoutForParsing)
 	}
 
 	startTime := clock.Now(ctx)
@@ -608,7 +610,7 @@ func runTestOnce(
 	// Only the FFXTester handles cases and output files on its own. Otherwise,
 	// parse the stdout for test cases and check the outdir for output files.
 	if len(result.Cases) == 0 && len(result.OutputFiles) == 0 {
-		result.Cases = testparser.Parse(stdout.Bytes())
+		result.Cases = testparser.Parse(stdoutForParsing.Bytes())
 		caseOutputFiles := []string{}
 		for _, tc := range result.Cases {
 			for _, of := range tc.OutputFiles {
