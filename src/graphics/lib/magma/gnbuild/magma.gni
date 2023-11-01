@@ -34,9 +34,6 @@ declare_args() {
 
   # Targets that will be built as IMG vulkan ICDS.
   build_libvulkan_img_rgx = []
-
-  # Unused, will be removed after a soft transition.
-  board_has_libvulkan_arm_mali = false
 }
 
 have_prebuilt_libvulkan_img = prebuilt_libvulkan_img_path != ""
