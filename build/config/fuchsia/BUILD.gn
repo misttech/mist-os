@@ -106,9 +106,11 @@ config("compiler") {
 }
 
 config("compiler_sysroot") {
-  cflags = [ "--sysroot=" + rebase_path(sysroot, root_build_dir) ]
-  asmflags = cflags
-  ldflags = cflags
+  if (defined(sysroot) && sysroot != "") {
+    cflags = [ "--sysroot=" + rebase_path(sysroot, root_build_dir) ]
+    asmflags = cflags
+    ldflags = cflags
+  }
 }
 
 config("compiler_target") {
@@ -118,9 +120,15 @@ config("compiler_target") {
 }
 
 config("compiler_fuchsia_api_level") {
-  cflags = [ "-ffuchsia-api-level=${platform_version.clang_fuchsia_api_level}" ]
-  asmflags = cflags
-  ldflags = cflags
+  if (is_gcc || !is_fuchsia) {
+    defines =
+        [ "__Fuchsia_API_level__=${platform_version.clang_fuchsia_api_level}" ]
+  } else {
+    cflags =
+        [ "-ffuchsia-api-level=${platform_version.clang_fuchsia_api_level}" ]
+    asmflags = cflags
+    ldflags = cflags
+  }
 }
 
 config("shared_library_config") {

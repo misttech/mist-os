@@ -99,6 +99,11 @@ config("compiler") {
     configs += [ ":clang_defaults" ]
   }
 
+  # This is done even if !is_fuchsia to catch cases like the kernel.efi
+  # environment, where current_os != "fuchsia" but nonetheless Fuchsia-specific
+  # code is built.
+  configs += [ "//build/config/fuchsia:compiler_fuchsia_api_level" ]
+
   if (is_fuchsia) {
     # ld.bfd doesn't support -z relro for the targets we use it for.
     if (!is_gcc || linker == "gold") {

@@ -10,7 +10,7 @@
 // so we define this as `((uint32_t)-1)`. clang expects API levels to be literals.
 #define FUCHSIA_HEAD 4294967295
 
-#ifdef __Fuchsia_API_level__
+#if defined(__Fuchsia_API_level__) && defined(__clang__)
 
 // An API that was added to the platform.
 //
