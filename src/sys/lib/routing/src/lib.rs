@@ -380,7 +380,7 @@ where
     let allowed_sources = AllowedSourcesBuilder::new(CapabilityTypeName::EventStream).builtin();
 
     let mut availability_visitor = AvailabilityVisitor::new(offer_decl.availability);
-    let source = router::route_from_offer_without_expose(
+    let source = router::route_from_offer(
         RouteBundle::from_offer(offer_decl.into()),
         target.clone(),
         allowed_sources.build(),
@@ -401,7 +401,7 @@ where
 {
     let mut availability_visitor = AvailabilityVisitor::new(offer_decl.availability);
     let allowed_sources = AllowedSourcesBuilder::new(CapabilityTypeName::Storage).component();
-    let source = router::route_from_offer_without_expose(
+    let source = router::route_from_offer(
         RouteBundle::from_offer(offer_decl.into()),
         target.clone(),
         allowed_sources.build(),
@@ -877,7 +877,7 @@ where
 {
     let mut availability_visitor = AvailabilityVisitor::new(use_decl.availability);
     let allowed_sources = AllowedSourcesBuilder::new(CapabilityTypeName::Storage).component();
-    let source = router::route_from_use_without_expose(
+    let source = router::route_from_use(
         use_decl.into(),
         target.clone(),
         allowed_sources.build(),
@@ -1058,7 +1058,7 @@ where
 {
     let allowed_sources = AllowedSourcesBuilder::new(CapabilityTypeName::EventStream).builtin();
     let mut availability_visitor = AvailabilityVisitor::new(use_decl.availability);
-    let source = router::route_from_use_without_expose(
+    let source = router::route_from_use(
         use_decl.into(),
         target.clone(),
         allowed_sources.build(),

@@ -14,9 +14,6 @@
 //!
 //! You can also start walking from halfway in this chain, e.g. [route_from_offer],
 //! [route_from_expose].
-//!
-//! Some capability types cannot be exposed. In that case, use a routing function suffixed with
-//! `_without_expose`.
 
 use {
     crate::{
@@ -369,77 +366,6 @@ where
         )?,
         component: target.as_weak(),
     })
-}
-
-/// Routes a capability from its `Use` declaration to its source by following `Use` and `Offer`
-/// declarations, and where this capability type does not support `Expose`.
-///
-/// Panics if an `Expose` is encountered.
-///
-/// `sources` defines what are the valid sources of the capability. See [`AllowedSourcesBuilder`].
-/// `visitor` is invoked for each `Offer` declaration in the routing path, as well as the final
-/// `Capability` declaration if `sources` permits.
-pub async fn route_from_use_without_expose<C, V>(
-    use_decl: UseDecl,
-    use_target: Arc<C>,
-    sources: Sources,
-    visitor: &mut V,
-    mapper: &mut dyn DebugRouteMapper,
-) -> Result<CapabilitySource<C>, RoutingError>
-where
-    C: ComponentInstanceInterface + 'static,
-    V: OfferVisitor,
-    V: CapabilityVisitor,
-{
-    match Use::route(use_decl, use_target, &sources, visitor, mapper).await? {
-        UseResult::Source(source) => return Ok(source),
-        UseResult::OfferFromParent(offer, component) => {
-            route_from_offer_without_expose(offer, component, sources, visitor, mapper).await
-        }
-        UseResult::ExposeFromChild(_, _) => {
-            unreachable!("found use from child but capability cannot be exposed")
-        }
-    }
-}
-
-/// Routes a capability from its `Offer` declaration to its source by following `Offer`
-/// declarations, and where this capability type does not support `Expose`.
-///
-/// Panics if an `Expose` is encountered.
-///
-/// `sources` defines what are the valid sources of the capability. See [`AllowedSourcesBuilder`].
-/// `visitor` is invoked for each `Offer` declaration in the routing path, as well as the final
-/// `Capability` declaration if `sources` permits.
-pub async fn route_from_offer_without_expose<C, V>(
-    offer: RouteBundle<OfferDecl>,
-    offer_target: Arc<C>,
-    sources: Sources,
-    visitor: &mut V,
-    mapper: &mut dyn DebugRouteMapper,
-) -> Result<CapabilitySource<C>, RoutingError>
-where
-    C: ComponentInstanceInterface + 'static,
-    V: OfferVisitor,
-    V: CapabilityVisitor,
-{
-    match Offer::route(offer, offer_target, &sources, visitor, mapper).await? {
-        OfferResult::Source(source) => Ok(source),
-        OfferResult::OfferFromChild(_, _) => {
-            // This condition should not happen since cm_fidl_validator ensures
-            // that this kind of declaration cannot exist.
-            unreachable!("found offer from child but capability cannot be exposed")
-        }
-        OfferResult::OfferFromAnonymizedAggregate(_, _) => {
-            // This condition should not happen since cm_fidl_validator ensures
-            // that this kind of declaration cannot exist.
-            unreachable!("found offer from collections but capability cannot be exposed")
-        }
-        OfferResult::OfferFromFilteredAggregate(_, _) => {
-            // This condition should not happen since cm_fidl_validator ensures
-            // that this kind of declaration cannot exist.
-            unreachable!("found offer from aggregate but capability cannot be exposed")
-        }
-    }
 }
 
 /// Defines which capability source types are supported.
