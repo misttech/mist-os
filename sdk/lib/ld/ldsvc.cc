@@ -65,12 +65,14 @@ zx::vmo LoaderServiceRpc(Diagnostics& diag, zx::unowned_channel ldsvc, LdsvcOp t
     return {};
   }
   if (rsp->rv != ZX_OK) [[unlikely]] {
-    diag.SystemError("fuchsia.ldsvc/", type.call, "(\"", name, ")\"",
-                     elfldltl::ZirconError{rsp->rv});
+    if (rsp->rv != ZX_ERR_NOT_FOUND) {
+      diag.SystemError("fuchsia.ldsvc/", type.call, "(\"", name, "\") ",
+                       elfldltl::ZirconError{rsp->rv});
+    }
     return {};
   }
   if (!vmo) [[unlikely]] {
-    diag.SystemError("fuchsia.ldsvc/", type.call, "(\"", name, ")\" returned invalid VMO handle.");
+    diag.SystemError("fuchsia.ldsvc/", type.call, "(\"", name, "\") returned invalid VMO handle.");
     return {};
   }
   return vmo;

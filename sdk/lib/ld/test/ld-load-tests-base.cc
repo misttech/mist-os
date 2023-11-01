@@ -42,4 +42,13 @@ void LdLoadTestsBase::Needed(std::initializer_list<std::string_view> names) {
   }
 }
 
+void LdLoadTestsBase::Needed(
+    std::initializer_list<std::pair<std::string_view, bool>> name_found_pairs) {
+  for (auto [name, found] : name_found_pairs) {
+    if (found) {
+      ASSERT_TRUE(elfldltl::testing::GetTestLib(name)) << name;
+    }
+  }
+}
+
 }  // namespace ld::testing

@@ -30,6 +30,8 @@ class LdLoadTestsBase {
   // LdLoadZirconLdsvcTestsBase).
   void Needed(std::initializer_list<std::string_view> names);
 
+  void Needed(std::initializer_list<std::pair<std::string_view, bool>> name_found_pairs);
+
   ~LdLoadTestsBase();
 
  private:

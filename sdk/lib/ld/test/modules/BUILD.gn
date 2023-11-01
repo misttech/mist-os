@@ -30,7 +30,10 @@ in_process_executables = [
 ]
 
 # Everything in this list does not have can_be_in_process = true.
-executables = [ ":missing-sym" ]
+executables = [
+  ":missing-dep",
+  ":missing-sym",
+]
 
 shlibs = [
   ":ld-dep-a",
@@ -503,4 +506,15 @@ ifs_shared_library("missing-sym-dep-a") {
 test_executable("missing-sym") {
   sources = [ "missing-sym.cc" ]
   deps = [ ":missing-sym-dep-a" ]
+}
+
+ifs_shared_library("missing-dep-dep") {
+  # TODO(fxbug.dev/135799): setting testonly seems to tickle a GN bug
+  #testonly = true
+  abi = "missing-dep-dep.ifs"
+}
+
+test_executable("missing-dep") {
+  sources = [ "missing-dep.cc" ]
+  deps = [ ":missing-dep-dep" ]
 }

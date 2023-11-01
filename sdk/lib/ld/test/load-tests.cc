@@ -94,7 +94,7 @@ TYPED_TEST(LdLoadTests, LoadWithNeeded) {
   ASSERT_NO_FATAL_FAILURE(this->Init());
 
   // There is only a reference to ld.so which doesn't need to be loaded to satisfy.
-  ASSERT_NO_FATAL_FAILURE(this->Needed({}));
+  ASSERT_NO_FATAL_FAILURE(this->Needed(std::initializer_list<std::string_view>{}));
 
   ASSERT_NO_FATAL_FAILURE(this->Load("ld-dep"));
 
@@ -280,6 +280,20 @@ TYPED_TEST(LdLoadFailureTests, MissingSymbol) {
   EXPECT_EQ(this->Run(), this->kRunFailure);
 
   this->ExpectLog(R"(undefined symbol: b
+startup dynamic linking failed with 1 errors and 0 warnings
+)");
+}
+
+TYPED_TEST(LdLoadFailureTests, MissingDependency) {
+  ASSERT_NO_FATAL_FAILURE(this->Init());
+
+  ASSERT_NO_FATAL_FAILURE(this->Needed({std::pair{"libmissing-dep-dep.so", false}}));
+
+  ASSERT_NO_FATAL_FAILURE(this->Load("missing-dep"));
+
+  EXPECT_EQ(this->Run(), this->kRunFailure);
+
+  this->ExpectLog(R"(cannot open dependency: libmissing-dep-dep.so
 startup dynamic linking failed with 1 errors and 0 warnings
 )");
 }

@@ -44,6 +44,17 @@ class LdLoadZirconLdsvcTestsBase : public LdLoadTestsBase {
     }
   }
 
+  // This just is a shorthand for multiple LdsvcExpectLoadObject calls.
+  void Needed(std::initializer_list<std::pair<std::string_view, bool>> name_found_pairs) {
+    for (auto [name, found] : name_found_pairs) {
+      if (found) {
+        LdsvcExpectLoadObject(name);
+      } else {
+        LdsvcExpectLoadObject(name, zx::error{ZX_ERR_NOT_FOUND});
+      }
+    }
+  }
+
  protected:
   zx::channel GetLdsvc() {
     zx::channel ldsvc;

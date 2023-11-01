@@ -333,10 +333,8 @@ struct StartupLoadModule : public StartupLoadModuleBase,
           needed_count = it->Load(diag, initial_exec, *file, max_tls_modid).needed_count;
           assert(it->IsLoaded());
         } else {
-          if (!diag.MissingDependency(it->name().str())) {
-            return;
-          }
-          continue;
+          diag.MissingDependency(it->name().str());
+          return;
         }
       }
       // The main executable is always first in the list, so its prev is

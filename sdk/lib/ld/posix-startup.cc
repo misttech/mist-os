@@ -213,6 +213,9 @@ extern "C" uintptr_t StartLd(StartupStack& stack) {
     if (fbl::unique_fd fd{open(soname.c_str(), O_RDONLY)}) {
       return UniqueFdFile{std::move(fd), diag};
     }
+    if (errno != ENOENT) {
+      diag.FormatError("open(2) error: ", elfldltl::PosixError{errno});
+    }
     return {};
   };
 
