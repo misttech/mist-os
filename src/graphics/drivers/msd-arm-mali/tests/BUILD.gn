@@ -57,7 +57,7 @@ fuchsia_unittest_package("msd-arm-mali-integration-tests") {
   ]
   manifest = "meta/msd_arm_mali_integration_tests.cml"
   test_specs = {
-    environments = arm_gpu_envs
+    environments = magma_arm_gpu_envs
     log_settings = {
       max_severity = "ERROR"
     }

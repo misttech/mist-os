@@ -46,7 +46,7 @@ fuchsia_test_component("msd_intel_gen_integration_tests_component") {
 fuchsia_test_package("msd_intel_gen_integration_tests") {
   test_components = [ ":msd_intel_gen_integration_tests_component" ]
   test_specs = {
-    environments = intel_gpu_envs
+    environments = magma_intel_gpu_envs
     log_settings = {
       max_severity = "ERROR"
     }

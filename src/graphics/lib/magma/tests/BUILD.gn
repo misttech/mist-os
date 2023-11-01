@@ -102,7 +102,7 @@ fuchsia_unittest_package("magma-conformance-tests") {
   manifest = "meta/magma-conformance-tests.cml"
   deps = [ "integration" ]
   test_specs = {
-    environments = magma_hardware_envs - [ arm_gpu_envs ]
+    environments = magma_intel_gpu_envs
     log_settings = {
       max_severity = "ERROR"
     }
@@ -114,7 +114,7 @@ fuchsia_unittest_package("magma-conformance-tests-hermetic") {
   manifest = "meta/magma-conformance-tests-hermetic.cml"
   deps = [ "integration" ]
   test_specs = {
-    environments = magma_hardware_envs - [ arm_gpu_envs ]
+    environments = magma_intel_gpu_envs
     log_settings = {
       max_severity = "ERROR"
     }
@@ -127,7 +127,7 @@ fuchsia_unittest_package("magma-conformance-tests-arm") {
   manifest = "meta/magma-conformance-tests-arm.cml"
   deps = [ "integration" ]
   test_specs = {
-    environments = arm_gpu_envs
+    environments = magma_arm_gpu_envs
     log_settings = {
       max_severity = "ERROR"
     }

@@ -95,6 +95,6 @@ fuchsia_test_component("mesa_integration_tests_component") {
 fuchsia_test_package("mesa_integration_tests") {
   test_components = [ ":mesa_integration_tests_component" ]
   test_specs = {
-    environments = intel_gpu_envs
+    environments = magma_intel_gpu_envs
   }
 }
