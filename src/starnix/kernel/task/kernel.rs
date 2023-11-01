@@ -195,6 +195,9 @@ pub struct Kernel {
 
     // Controls which processes a process is allowed to ptrace.  See Documentation/security/Yama.txt
     pub ptrace_scope: AtomicU8,
+
+    // The Fuchsia build version returned by `fuchsia.buildinfo.Provider`.
+    pub build_version: OnceCell<String>,
 }
 
 /// An implementation of [`InterfacesHandler`].
@@ -301,6 +304,7 @@ impl Kernel {
                 max_user_watches: AtomicI32::new(1048576),
             },
             ptrace_scope: AtomicU8::new(0),
+            build_version: OnceCell::new(),
         });
 
         // Make a copy of this Arc for the inspect lazy node to use but don't create an Arc cycle
