@@ -37,7 +37,7 @@ use {
 
 /// The root directory of Fuchsia package.
 #[derive(Debug)]
-pub struct RootDir<S: crate::NonMetaStorage> {
+pub struct RootDir<S> {
     pub(crate) non_meta_storage: S,
     pub(crate) hash: fuchsia_hash::Hash,
     pub(crate) meta_far: fio::FileProxy,
