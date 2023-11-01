@@ -3,13 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::{
-        fs::{file_object::FileObject, FileWriteGuardMode},
-        logging::{log_warn, not_implemented},
-        mm::{MemoryAccessor, MemoryAccessorExt},
-        syscalls::*,
-        task::*,
-    },
+    crate::{logging::not_implemented, mm::MemoryAccessorExt, syscalls::*, task::*},
     mundane::hash::{Digest, Hasher, Sha256, Sha512},
     num_derive::FromPrimitive,
     num_traits::FromPrimitive,
@@ -137,7 +131,24 @@ impl FsVerityState {
 }
 
 pub mod ioctl {
-    use super::*;
+
+    use crate::{
+        fs::{
+            fsverity::{
+                fsverity_descriptor_from_enable_arg, fsverity_enable_arg, fsverity_measurement,
+                fsverity_read_metadata_arg, FsVerityDigestHeader, FsVerityState, HashAlgorithm,
+                MetadataType,
+            },
+            FileObject, FileWriteGuardMode,
+        },
+        log_warn,
+        mm::{MemoryAccessor, MemoryAccessorExt},
+        syscalls::{SyscallResult, SUCCESS},
+        task::CurrentTask,
+        types::{errno, error, Errno, UserAddress, UserRef},
+    };
+    use num_traits::FromPrimitive;
+    use zerocopy::AsBytes;
 
     /// ioctl handler for FS_IOC_ENABLE_VERITY.
     pub fn enable(
