@@ -206,6 +206,16 @@ following ways:
    when running `ffx target list`.
 
 
+### Add target manually
+
+If no target is found after running `ffx target list`, the target may
+need to be added manually by running `ffx target add`.
+
+
+```posix-terminal
+ffx target add {{ "<var>" }}device-ip{{ "</var>" }}:{{ "<var>" }}device-port{{ "</var>" }}
+```
+
 ## Next steps
 
 To learn more about Fuchsia device commands and Fuchsia workflows, see
