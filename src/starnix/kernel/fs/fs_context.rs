@@ -5,7 +5,12 @@
 use starnix_lock::RwLock;
 use std::sync::Arc;
 
-use crate::{fs::*, logging::log_trace, task::CurrentTask, types::*};
+use crate::{
+    fs::{FileSystemHandle, Namespace, NamespaceNode},
+    logging::log_trace,
+    task::CurrentTask,
+    types::{errno, error, Access, Errno, FileMode, CAP_SYS_CHROOT},
+};
 
 /// The mutable state for an FsContext.
 ///
@@ -160,7 +165,11 @@ impl FsContext {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{fs::tmpfs::TmpFs, testing::*};
+    use crate::{
+        fs::tmpfs::TmpFs,
+        testing::{create_kernel_and_task, create_kernel_task_and_unlocked_with_pkgfs},
+        types::OpenFlags,
+    };
 
     #[::fuchsia::test]
     async fn test_umask() {
