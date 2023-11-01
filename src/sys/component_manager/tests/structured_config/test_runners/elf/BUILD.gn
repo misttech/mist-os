@@ -15,32 +15,63 @@ test("bin") {
   ]
 }
 
-fuchsia_component_manifest("manifest") {
+fuchsia_component_manifest("cpp_elf_manifest") {
   testonly = true
-  component_name = "cpp_elf_receiver"
+  component_name = "cpp_elf"
   manifest = "meta/test.cml"
+}
+
+fuchsia_component("cpp_elf") {
+  testonly = true
+  cm_label = ":cpp_elf_manifest"
+  deps = [ ":bin" ]
+}
+
+fuchsia_component_manifest("cpp_elf_processes_manifest") {
+  testonly = true
+  component_name = "cpp_elf_processes"
+  manifest = "meta/test_processes.cml"
+}
+
+fuchsia_component("cpp_elf_processes") {
+  testonly = true
+  cm_label = ":cpp_elf_processes_manifest"
+  deps = [ ":bin" ]
+}
+
+fuchsia_component_manifest("config_manifest") {
+  testonly = true
+  manifest = "meta/config.cml"
 }
 
 fuchsia_structured_config_cpp_elf_lib("config_lib") {
   testonly = true
   namespace = "receiver_config"
-  cm_label = ":manifest"
+  cm_label = ":config_manifest"
 }
 
-fuchsia_component("component") {
+fuchsia_structured_config_values("elf_values") {
   testonly = true
-  cm_label = ":manifest"
-  deps = [ ":bin" ]
-}
-
-fuchsia_structured_config_values("values") {
-  testonly = true
-  cm_label = ":manifest"
+  cm_label = ":cpp_elf_manifest"
   values_source = "values.json5"
+  component_name = "cpp_elf"
+}
+
+fuchsia_structured_config_values("elf_processes_values") {
+  testonly = true
+  cm_label = ":cpp_elf_processes_manifest"
+  values_source = "values.json5"
+  component_name = "cpp_elf_processes"
 }
 
 fuchsia_test_package("tests") {
   package_name = "sc_cpp_elf_test_runner"
-  test_components = [ ":component" ]
-  deps = [ ":values" ]
+  test_components = [
+    ":cpp_elf",
+    ":cpp_elf_processes",
+  ]
+  deps = [
+    ":elf_processes_values",
+    ":elf_values",
+  ]
 }
