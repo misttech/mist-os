@@ -21,6 +21,10 @@ When updating, please add the value in alphabetical order.
 :                                         : target. Defaults to 50 seconds.    :
 | `discovery.expire_targets`              | Determines if targets discovered   |
 :                                         : should expire. Defaults to `true`  :
+| `discovery.mdns.autoconnect`            | Determines whether to connect      |
+|                                         : automatically to targets           :
+|                                         : discovered through mDNS. Defaults  :
+:                                         : to `false`                         :
 | `discovery.zedboot.advert_port`         | Zedboot discovery port (must be a  |
 :                                         : nonzero u16)                       :
 | `discovery.zedboot.enabled`             | Determines if zedboot discovery is |

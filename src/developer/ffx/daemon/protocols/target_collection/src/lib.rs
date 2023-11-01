@@ -34,6 +34,8 @@ mod emulator_targets;
 mod reboot;
 mod target_handle;
 
+const CONFIG_MDNS_AUTOCONNECT: &'static str = "discovery.mdns.autoconnect";
+
 #[ffx_protocol(ffx::MdnsMarker, ffx::FastbootTargetStreamMarker)]
 pub struct TargetCollectionProtocol {
     tasks: TaskManager,
@@ -494,7 +496,7 @@ impl FidlProtocol for TargetCollectionProtocol {
                         // For backwards compatibility.
                         // Immediately mark the target as used then run the host pipe.
                         let autoconnect =
-                            ffx_config::get("discovery.mdns.autoconnect").await.unwrap_or(true);
+                            ffx_config::get(CONFIG_MDNS_AUTOCONNECT).await.unwrap_or(false);
                         handle_discovered_target(&tc_clone, t, &node_clone, autoconnect);
                     }
                     _ => {}
@@ -526,6 +528,7 @@ impl FidlProtocol for TargetCollectionProtocol {
                 if let Some(emu_target_action) = watcher.emulator_target_detected().await {
                     match emu_target_action {
                         EmulatorTargetAction::Add(emu_target) => {
+                            // Let's always connect to emulators -- otherwise, why would someone start an emulator?
                             handle_discovered_target(&tc2, emu_target, &node, true);
                         }
                         EmulatorTargetAction::Remove(emu_target) => {
@@ -570,7 +573,7 @@ fn handle_discovered_target(
     tc: &Rc<TargetCollection>,
     t: ffx::TargetInfo,
     overnet_node: &Arc<overnet_core::Router>,
-    is_emulator: bool,
+    autoconnect: bool,
 ) {
     tracing::debug!("Discovered target {t:?}");
 
@@ -594,7 +597,7 @@ fn handle_discovered_target(
 
     let mut update = TargetUpdateBuilder::new().net_addresses(&addrs);
 
-    if is_emulator {
+    if autoconnect {
         update = update.enable();
     }
 
