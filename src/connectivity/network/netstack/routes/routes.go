@@ -129,7 +129,7 @@ type AddResult struct {
 }
 
 func (rt *RouteTable) AddRouteLocked(route tcpip.Route, prf routetypes.Preference, metric routetypes.Metric, tracksInterface, dynamic, enabled, replaceMatchingGvisorRoutes bool, addingSet *routetypes.RouteSetId) AddResult {
-	syslog.VLogTf(syslog.DebugVerbosity, tag, "RouteTable:Adding route %s with prf=%d metric=%d, trackIf=%t, dynamic=%t, enabled=%t, replaceMatchingGvisorRoutes=%t", route, prf, metric, tracksInterface, dynamic, enabled, replaceMatchingGvisorRoutes)
+	syslog.VLogTf(syslog.DebugVerbosity, tag, "RouteTable:Adding route %s with prf=%d metric=%d, tracksInterface=%t, dynamic=%t, enabled=%t, replaceMatchingGvisorRoutes=%t", route, prf, metric, tracksInterface, dynamic, enabled, replaceMatchingGvisorRoutes)
 
 	type foldResult int
 	const (
