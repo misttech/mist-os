@@ -29,16 +29,19 @@ Before UTC time is first synchronized, the only estimate of UTC time available
 to Fuchsia is the backstop time. Backstop time by itself is not a reliable
 estimate of time as any amount of time may have passed between the time of the
 commit and the time the device is booted. To communicate this uncertainty,
-prior to the first time synchronization the UTC clock does not run and reading
-the clock returns the fixed backstop time.
+prior to the first time synchronization the UTC clock may not run, and if it
+runs it is started from the fixed backstop time. Whether the UTC clock may run
+when not synchronized is a parameter that each Fuchsia product must set based
+on the specific product's requirements.
 
-In summary, the UTC clock on Fuchsia has two states. The UTC clock starts in
-a fixed state and ends in the running state.
+In summary, the UTC clock on Fuchsia has the following states. The UTC clock
+starts in a fixed state and ends in some running state.
 
 State         | Description | Clock behavior
 --------------|-------------|---------------
 Fixed | Time has never been synchronized and is unreliable | Time is fixed at backstop.
-Running | Time has been synchronized at least once | Time is running. In this state the UTC clock on Fuchsia behaves similar to clocks on other OSs.
+Running, not synchronized | Time has not been synchronized | Time is running, starting from the backstop. In this state the UTC clock on Fuchsia behaves similar to clocks on other OSs. On entry into this state `ZX_CLOCK_STARTED` signal is asserted.
+Running, synchronized | Time has been synchronized at least once | Time is running. In this state the UTC clock reading is tracking an external time source. On entry into this state, `ZX_SIGNAL_USER_0` is asserted.
 
 ## Properties
 
@@ -52,27 +55,24 @@ synchronized from an external source, Timekeeper may jump the time backwards if
 it finds that its estimate of UTC time has drifted far ahead of the external
 source.
 
-In addition, the clock is in either a running or fixed state. The UTC
-clock is not started on creation and instead starts running when its time is
-set for the first time. Whether or not the clock is running serves as an
-indication as to whether or not the clock is synchronized.
-
 Before Timekeeper first synchronizes time, the best estimate of UTC time
-available on the device is the backstop time. During this period, the clock is
-not running. Instead, any attempt to read the clock returns the backstop time.
-In this state, the device has no indication as to how much time has passed
-since the backstop. Therefore, it is important to note that during this state
-the UTC time may contain an arbitrarily large error.
+available on the device is the backstop time. Therefore, it is important to
+note that during this state the UTC time may be reported with an arbitrarily
+large error.
 
-After Timekeeper synchronizes the time, it sets the UTC clock. This starts
-running the clock. From this point on the clock continues to run, but
-Timekeeper will continue to update the clock by adjusting the clock frequency
-to run slightly faster or slower, or by jumping the clock to a new time.
-While accuracy varies between products and time synchronization methods,
-the clock is generally within a few hundred milliseconds of the actual UTC time
-once running. Note that even when an RTC, network, or both are available, the
-UTC clock may never be synchronized as it must be retrieved over fallible
-protocols from fallible sources.
+However, the clock *may* be running regardless of whether its reading corresponds
+to actual UTC timestamp. See the clock behavior above to determine the UTC clock
+state by observing appropriate events on the UTC clock handle.
+
+After Timekeeper synchronizes the time, it sets the UTC clock. This may cause
+the clock reading to jump abruptly. From this point on, Timekeeper will
+continue to update the clock by adjusting the clock frequency to run slightly
+faster or slower, or by jumping the clock to a new time. While accuracy varies
+between products and time synchronization methods, the clock is generally
+within a few hundred milliseconds of the actual UTC time once running. Note
+that even when an RTC, network, or both are available, the UTC clock may never
+be synchronized as it must be retrieved over fallible protocols from fallible
+sources.
 
 ## Observable behaviors
 
@@ -85,18 +85,16 @@ to compensate for oscillator errors or to correct small errors.
 Timekeeper needs to correct for a large error. A large jump forward is expected
 when time is first synchronized. Subsequent jumps forwards and backwards should
 be very rare and are usually caused by errors in the time source.
-* UTC time may not be running. This occurs prior to the first time
-synchronization. Note UTC time will never run under conditions where time
-synchronization will never succeed. For example, on a device with neither an
-RTC nor network access.
+* UTC time may not be running. This may occur prior to the first time
+synchronization.
 
 ## Strategies for handling the unsynchronized state
 
 Components launched soon after a device boots, or that need to run before any
 network is available should expect to encounter situations where the UTC clock
-is not yet synchronized. In the rare case time synchronization never succeeds,
-components launched later will also see an unsynchronized clock. Some example
-strategies are:
+is not yet synchronized with UTC actual. In the rare case time synchronization
+never succeeds, components launched later will also see an unsynchronized
+clock. Some example strategies are:
 
 * Ignore the unsynchronized state and read UTC time.
 This strategy is appropriate for cases where the UTC time doesn't strictly
@@ -104,6 +102,7 @@ need to be accurate, such as generating timestamps for debug purposes. It is
 also appropriate for cases where it is known a component will not be run until
 time is synchronized. The downside of this strategy is that you may see
 consecutive timestamps that all report the same time.
+
 * Wait for UTC time to synchronize before reading the clock.
 This strategy is appropriate for cases where UTC time accuracy is critical,
 such as using UTC time to validate credentials. Note that this is not always
@@ -122,9 +121,13 @@ A handle to the UTC clock provided to the runtime is retrievable using
 the `zx_utc_reference_get` method provided in
 [`zircon/utc.h`](/zircon/third_party/ulib/musl/include/zircon/utc.h).
 
-The [`ZX_CLOCK_STARTED`](/docs/reference/kernel_objects/clock.md#starting-a-clock)
-signal is asserted when the clock is running (and therefore synchronized).
-You may check or wait for the signal using one of:
+The
+[`ZX_CLOCK_STARTED`](/docs/reference/kernel_objects/clock.md#starting-a-clock)
+signal is asserted when the clock is running. The
+`SIGNAL_UTC_CLOCK_SYNCHRONIZED`, (or equivalently `ZX_SIGNAL_USER_0`) is
+asserted when the clock is first synchronized.
+
+You may check or wait for either of the signals using one of:
 
 * [`zx_object_wait_async`](/docs/reference/syscalls/object_wait_async.md)
 * [`zx_object_wait_many`](/docs/reference/syscalls/object_wait_many.md)
