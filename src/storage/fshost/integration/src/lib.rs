@@ -200,6 +200,7 @@ pub struct TestFixture {
 
 impl TestFixture {
     pub async fn tear_down(mut self) {
+        tracing::info!(realm_name = ?self.realm.root.child_name(), "tearing down");
         self.realm.destroy().await.unwrap();
         assert_eq!(self.crash_reports.next().await, None);
         self.torn_down.0 = true;

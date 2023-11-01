@@ -69,8 +69,7 @@ pub async fn resize_volume(volume_proxy: &VolumeProxy, target_bytes: u64) -> Res
     };
     if slices_available < slice_count {
         tracing::info!(
-            "Only {:?} slices available. Some functionality
-                may be missing",
+            "Only {:?} slices available. Some functionality may be missing",
             slices_available
         );
         slice_count = slices_available;

@@ -153,16 +153,18 @@ impl Filesystem {
         }
     }
 
-    /// Runs `mkfs`, which formats the filesystem onto the block device.
+    /// Calls fuchsia.fs.startup/Startup.Format on the configured filesystem component.
     ///
-    /// Which flags are passed to the `mkfs` command are controlled by the config this `Filesystem`
-    /// was created with.
+    /// Which component is used and the options passed to it are controlled by the config this
+    /// `Filesystem` was created with.
     ///
     /// See [`FSConfig`].
     ///
     /// # Errors
     ///
-    /// Returns [`Err`] if the filesystem process failed to launch or returned a non-zero exit code.
+    /// Returns any errors from the Format method. Also returns an error if the startup protocol is
+    /// not found, if it couldn't launch or find the filesystem component, or if it couldn't get
+    /// the block device channel.
     pub async fn format(&mut self) -> Result<(), Error> {
         let channel = self.device_channel()?;
 
@@ -176,16 +178,18 @@ impl Filesystem {
         Ok(())
     }
 
-    /// Runs `fsck`, which checks and optionally repairs the filesystem on the block device.
+    /// Calls fuchsia.fs.startup/Startup.Check on the configured filesystem component.
     ///
-    /// Which flags are passed to the `fsck` command are controlled by the config this `Filesystem`
-    /// was created with.
+    /// Which component is used and the options passed to it are controlled by the config this
+    /// `Filesystem` was created with.
     ///
     /// See [`FSConfig`].
     ///
     /// # Errors
     ///
-    /// Returns [`Err`] if the filesystem process failed to launch or returned a non-zero exit code.
+    /// Returns any errors from the Check method. Also returns an error if the startup protocol is
+    /// not found, if it couldn't launch or find the filesystem component, or if it couldn't get
+    /// the block device channel.
     pub async fn fsck(&mut self) -> Result<(), Error> {
         let channel = self.device_channel()?;
         let exposed_dir = self.get_component_exposed_dir().await?;
@@ -195,7 +199,7 @@ impl Filesystem {
     }
 
     /// Serves the filesystem on the block device and returns a [`ServingSingleVolumeFilesystem`]
-    /// representing the running filesystem process.
+    /// representing the running filesystem component.
     ///
     /// # Errors
     ///
@@ -233,8 +237,8 @@ impl Filesystem {
     }
 
     /// Serves the filesystem on the block device and returns a [`ServingMultiVolumeFilesystem`]
-    /// representing the running filesystem process.  No volumes are opened; clients have to do that
-    /// explicitly.
+    /// representing the running filesystem component.  No volumes are opened; clients have to do
+    /// that explicitly.
     ///
     /// # Errors
     ///

@@ -313,8 +313,6 @@ impl FshostEnvironment {
         // Set the max partition size for data
         self.apply_data_partition_limits(device).await;
 
-        tracing::info!(path = device.path(), format = format.as_str(), "Formatting");
-
         let filesystem = match format {
             DiskFormat::Fxfs => {
                 let config =
@@ -499,7 +497,11 @@ impl FshostEnvironment {
 
         let mut format: DiskFormat = if self.config.use_disk_migration {
             let format = device.content_format().await?;
-            tracing::info!(format = format.as_str(), "launching detected format");
+            tracing::info!(
+                format = format.as_str(),
+                "Using detected disk format to potentially \
+                migrate data"
+            );
             format
         } else {
             match self.config.data_filesystem_format.as_str().into() {
@@ -749,7 +751,9 @@ impl Environment for FshostEnvironment {
             .launcher
             .reset_fvm_partition(fvm_topo_path, &mut *self.matcher_lock.lock().await)
             .await
-            .context("reset fvm")?;
+            .with_context(|| {
+                format!("Failed to reset non-blob FVM partitions on {}", fvm_topo_path)
+            })?;
         let device = device.as_mut();
 
         // Default to minfs if we don't match expected filesystems.
@@ -1210,7 +1214,7 @@ impl FilesystemLauncher {
         mut fs: fs_management::filesystem::Filesystem,
     ) -> Result<Filesystem, Error> {
         let format = fs.config().disk_format();
-        tracing::info!(?format, "Formatting");
+        tracing::info!(path = device.path(), format = format.as_str(), "Formatting");
         match format {
             DiskFormat::Fxfs => {
                 let target_bytes = self.config.data_max_bytes;
@@ -1250,6 +1254,8 @@ impl FilesystemLauncher {
         }
 
         fs.format().await.context("formatting data partition")?;
+
+        tracing::info!(path = device.path(), format = format.as_str(), "Serving");
         let filesystem = if let DiskFormat::Fxfs = format {
             let mut serving_multi_vol_fs =
                 fs.serve_multi_volume().await.context("serving multi volume data partition")?;

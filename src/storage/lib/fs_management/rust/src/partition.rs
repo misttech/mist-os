@@ -64,6 +64,7 @@ pub async fn find_partition_in(
     matcher: PartitionMatcher,
     timeout: Duration,
 ) -> Result<ControllerProxy, Error> {
+    let timeout_seconds = timeout.into_seconds();
     async {
         let mut watcher = Watcher::new(dir).await.context("making watcher")?;
         while let Some(message) = watcher.next().await {
@@ -94,7 +95,9 @@ pub async fn find_partition_in(
         }
         Err(anyhow!("Watch stream unexpectedly ended"))
     }
-    .on_timeout(timeout, || Err(anyhow!("Expected partition")))
+    .on_timeout(timeout, || {
+        Err(anyhow!("Timed out after {}s without finding expected partition", timeout_seconds))
+    })
     .await
 }
 
