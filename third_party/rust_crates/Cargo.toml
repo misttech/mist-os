@@ -106,7 +106,7 @@ futures-io = "=0.3.19"
 futures-lite = "1.11.3"
 futures-test = "=0.3.19"
 futures-util = "=0.3.19"
-getrandom = { version = "0.2.2", features = ["js"] }
+getrandom = { version = "0.2.10", features = ["js"] }
 glob = "0.3.0"
 gpt = "3.0.0"
 half = "1.6.0"
@@ -128,7 +128,7 @@ itertools = "0.10"
 itoa = "0.4"
 json5format = "0.2.6"
 lazy_static = "1.4"
-libc = { version = "0.2.138", features = ["extra_traits"] }
+libc = { version = "0.2.149", features = ["extra_traits"] }
 libm = "0.2.1"
 linked-hash-map = "0.5.3"
 lock_api = "0.4.7"
@@ -497,8 +497,8 @@ deps = [
 [gn.package.generic-array."0.14.5"]
 rustflags = [ "--cfg=relaxed_coherence" ]
 
-[gn.package.getrandom."0.2.2"]
-env_vars = [ "CARGO_PKG_NAME=getrandom", "CARGO_PKG_VERSION=0.2.2", "CARGO_MANIFEST_DIR=${gn_source_root}/third_party/rust_crates/vendor/getrandom-0.2.2" ]
+[gn.package.getrandom."0.2.10"]
+env_vars = [ "CARGO_PKG_NAME=getrandom", "CARGO_PKG_VERSION=0.2.10", "CARGO_MANIFEST_DIR=${gn_source_root}/third_party/rust_crates/vendor/getrandom-0.2.10" ]
 rustflags = []
 
 [gn.package.httparse."1.7.1"]
@@ -510,7 +510,7 @@ rustflags = ["--cfg=has_std"]
 [gn.package.js-sys."0.3.40"]
 env_vars = [ "CARGO_PKG_NAME=js-sys", "CARGO_PKG_VERSION=0.3.40", "CARGO_MANIFEST_DIR=${gn_source_root}/third_party/rust_crates/vendor/js-sys-0.3.40" ]
 
-[gn.package.libc."0.2.142"]
+[gn.package.libc."0.2.149"]
 rustflags = [
   "--cfg=libc_priv_mod_use",
   "--cfg=libc_union",
@@ -527,7 +527,7 @@ rustflags = [
   "--cfg=libc_const_extern_fn",
  ]
 
-[gn.package.libc."0.2.142".platform."cfg(target_os = \"freebsd\")"]
+[gn.package.libc."0.2.149".platform."cfg(target_os = \"freebsd\")"]
 rustflags = ["--cfg=freebsd11"]
 
 [gn.package.lock_api."0.4.7"]
@@ -688,7 +688,7 @@ group_visibility = { import = "//third_party/rust_crates/private_visibility.gni"
 [gn.package.tokio."1.20.5".platform."cfg(not(target_os = \"fuchsia\"))"]
 deps = [
   ":bytes-v1_0_1",
-  ":libc-v0_2_142",
+  ":libc-v0_2_149",
   ":memchr-v2_4_0",
   ":mio-v0_8_5",
   ":num_cpus-v1_13_0",
