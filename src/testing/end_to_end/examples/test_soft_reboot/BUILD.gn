@@ -16,7 +16,11 @@ python_mobly_test("soft_reboot_test") {
 
   params_source = "params.yaml"
 
-  environments = [ emu_env ]
+  environments = [
+    emu_env,
+    vim3_env,
+    nuc_env,
+  ]
 }
 
 python_mobly_test("soft_reboot_test_fc") {
@@ -29,7 +33,11 @@ python_mobly_test("soft_reboot_test_fc") {
   params_source = "params.yaml"
   transport = "fuchsia-controller"
 
-  environments = [ emu_env ]
+  environments = [
+    emu_env,
+    vim3_env,
+    nuc_env,
+  ]
 }
 
 group("tests") {
