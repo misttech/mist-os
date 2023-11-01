@@ -15,8 +15,11 @@ use std::{
     },
 };
 
-use super::*;
 use crate::{
+    fs::{
+        DirEntry, DirEntryHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
+        XattrOp,
+    },
     task::{CurrentTask, Kernel},
     types::{as_any::AsAny, *},
 };
