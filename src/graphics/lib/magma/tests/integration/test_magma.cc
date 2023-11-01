@@ -634,23 +634,26 @@ class TestConnection {
   void PollWithNotificationChannel(uint32_t semaphore_count) {
     ASSERT_TRUE(connection_);
 
-    std::vector<magma_poll_item_t> items;
+    std::vector<magma_poll_item_t> items(semaphore_count + 1);
+
+    static constexpr int kNotificationChannelItemIndex = 0;
+    static constexpr int kFirstSemaphoreItemIndex = 1;
 
     for (uint32_t i = 0; i < semaphore_count; i++) {
       magma_semaphore_t semaphore;
       magma_semaphore_id_t id;
       ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_create_semaphore(connection_, &semaphore, &id));
 
-      items.push_back({.semaphore = semaphore,
-                       .type = MAGMA_POLL_TYPE_SEMAPHORE,
-                       .condition = MAGMA_POLL_CONDITION_SIGNALED});
+      items[kFirstSemaphoreItemIndex + i] = {.semaphore = semaphore,
+                                             .type = MAGMA_POLL_TYPE_SEMAPHORE,
+                                             .condition = MAGMA_POLL_CONDITION_SIGNALED};
     }
 
-    items.push_back({
+    items[kNotificationChannelItemIndex] = {
         .handle = magma_connection_get_notification_channel_handle(connection_),
         .type = MAGMA_POLL_TYPE_HANDLE,
         .condition = MAGMA_POLL_CONDITION_READABLE,
-    });
+    };
 
     constexpr int64_t kTimeoutMs = 100;
     auto start = std::chrono::steady_clock::now();
@@ -665,13 +668,13 @@ class TestConnection {
     if (semaphore_count == 0)
       return;
 
-    magma_semaphore_signal(items[0].semaphore);
+    magma_semaphore_signal(items[kFirstSemaphoreItemIndex].semaphore);
 
     EXPECT_EQ(MAGMA_STATUS_OK, magma_poll(items.data(), to_uint32(items.size()), 0));
-    EXPECT_EQ(items[0].result, items[0].condition);
-    EXPECT_EQ(items[1].result, 0u);
+    EXPECT_EQ(items[kFirstSemaphoreItemIndex].result, items[kFirstSemaphoreItemIndex].condition);
+    EXPECT_EQ(items[kNotificationChannelItemIndex].result, 0u);
 
-    magma_semaphore_reset(items[0].semaphore);
+    magma_semaphore_reset(items[kFirstSemaphoreItemIndex].semaphore);
 
     start = std::chrono::steady_clock::now();
     EXPECT_EQ(MAGMA_STATUS_TIMED_OUT,
@@ -683,13 +686,13 @@ class TestConnection {
                                   .count());
 
     for (uint32_t i = 0; i < semaphore_count; i++) {
-      magma_semaphore_signal(items[i].semaphore);
+      magma_semaphore_signal(items[kFirstSemaphoreItemIndex + i].semaphore);
     }
 
     EXPECT_EQ(MAGMA_STATUS_OK, magma_poll(items.data(), to_uint32(items.size()), 0));
 
     for (uint32_t i = 0; i < items.size(); i++) {
-      if (i < items.size() - 1) {
+      if (i >= kFirstSemaphoreItemIndex) {
         EXPECT_EQ(items[i].result, items[i].condition) << "item index " << i;
       } else {
         // Notification channel
@@ -698,7 +701,8 @@ class TestConnection {
     }
 
     for (uint32_t i = 0; i < semaphore_count; i++) {
-      magma_connection_release_semaphore(connection_, items[i].semaphore);
+      magma_connection_release_semaphore(connection_,
+                                         items[kFirstSemaphoreItemIndex + i].semaphore);
     }
   }
 

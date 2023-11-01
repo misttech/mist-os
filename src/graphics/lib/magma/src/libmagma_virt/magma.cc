@@ -42,7 +42,7 @@ magma_status_t magma_poll(magma_poll_item_t* items, uint32_t count, uint64_t tim
         auto semaphore_wrapped = virtmagma_semaphore_t::Get(items[i].semaphore);
         unwrapped_items[i].semaphore = semaphore_wrapped->Object();
 
-        if (i == 0) {
+        if (file_descriptor < 0) {
           auto semaphore0_parent_wrapped = virtmagma_connection_t::Get(semaphore_wrapped->Parent());
           file_descriptor = semaphore0_parent_wrapped->Parent().fd();
         }
