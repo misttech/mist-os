@@ -233,6 +233,10 @@ if (is_fuchsia) {
     output_dir = root_build_dir
     image_name = "fuchsia"
 
+    # Bazel assembly should not depend on any targets from GN assembly other
+    # than the legacy AIB.
+    legacy_bundle_only = use_bazel_images_only
+
     create_legacy_aib_package = create_legacy_aib_archive
     create_legacy_aib_archive = create_legacy_aib_archive
 
