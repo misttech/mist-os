@@ -94,26 +94,29 @@ zx::result<fidl::VectorView<fuchsia_hardware_sdmmc::wire::SdmmcReq>> BanjoToFidl
 
 namespace sdmmc {
 
-zx_status_t SdmmcDevice::Init(bool try_to_use_fidl) {
+zx_status_t SdmmcDevice::Init(bool use_fidl) {
   // Reset any previous initializations in a way that works with unit testing.
-  use_fidl_ = try_to_use_fidl;
+  using_fidl_ = use_fidl;
 
-  if (try_to_use_fidl && root_device_ != nullptr) {
+  if (use_fidl && root_device_ != nullptr) {
     auto client_end =
         root_device_->DdkConnectRuntimeProtocol<fuchsia_hardware_sdmmc::SdmmcService::Sdmmc>();
     if (!client_end.is_ok()) {
-      use_fidl_ = false;
+      using_fidl_ = false;
     } else {
       client_ = fdf::WireSharedClient(std::move(*client_end), fdf::Dispatcher::GetCurrent()->get());
 
       fdf::Arena arena('SDMC');
       auto result = client_.sync().buffer(arena)->HostInfo();
-      use_fidl_ = result.ok();
+      using_fidl_ = result.ok();
     }
-  }
 
-  if (!use_fidl_ && !host_.is_valid()) {
-    zxlogf(ERROR, "failed to get sdmmc protocol");
+    if (!using_fidl_) {
+      zxlogf(ERROR, "Failed to get FIDL SDMMC protocol.");
+      return ZX_ERR_NOT_SUPPORTED;
+    }
+  } else if (!host_.is_valid()) {
+    zxlogf(ERROR, "Failed to get Banjo SDMMC protocol.");
     return ZX_ERR_NOT_SUPPORTED;
   }
 
@@ -247,7 +250,7 @@ void SdmmcDevice::SdmmcIoRequestWithRetries(std::vector<sdmmc_req_t> reqs,
     req.suppress_error_messages = !last_retry;
   }
 
-  if (!use_fidl_) {
+  if (!using_fidl_) {
     zx_status_t status = ZX_OK;
     for (const auto& req : reqs) {
       uint32_t unused_response[4];
@@ -696,7 +699,7 @@ zx_status_t SdmmcDevice::MmcSwitch(uint8_t index, uint8_t value) {
 }
 
 zx_status_t SdmmcDevice::HostInfo(sdmmc_host_info_t* info) {
-  if (!use_fidl_) {
+  if (!using_fidl_) {
     return host_.HostInfo(info);
   }
 
@@ -720,7 +723,7 @@ zx_status_t SdmmcDevice::HostInfo(sdmmc_host_info_t* info) {
 }
 
 zx_status_t SdmmcDevice::SetSignalVoltage(sdmmc_voltage_t voltage) {
-  if (!use_fidl_) {
+  if (!using_fidl_) {
     return host_.SetSignalVoltage(voltage);
   }
 
@@ -751,7 +754,7 @@ zx_status_t SdmmcDevice::SetSignalVoltage(sdmmc_voltage_t voltage) {
 }
 
 zx_status_t SdmmcDevice::SetBusWidth(sdmmc_bus_width_t bus_width) {
-  if (!use_fidl_) {
+  if (!using_fidl_) {
     return host_.SetBusWidth(bus_width);
   }
 
@@ -785,7 +788,7 @@ zx_status_t SdmmcDevice::SetBusWidth(sdmmc_bus_width_t bus_width) {
 }
 
 zx_status_t SdmmcDevice::SetBusFreq(uint32_t bus_freq) {
-  if (!use_fidl_) {
+  if (!using_fidl_) {
     return host_.SetBusFreq(bus_freq);
   }
 
@@ -803,7 +806,7 @@ zx_status_t SdmmcDevice::SetBusFreq(uint32_t bus_freq) {
 }
 
 zx_status_t SdmmcDevice::SetTiming(sdmmc_timing_t timing) {
-  if (!use_fidl_) {
+  if (!using_fidl_) {
     return host_.SetTiming(timing);
   }
 
@@ -855,7 +858,7 @@ zx_status_t SdmmcDevice::SetTiming(sdmmc_timing_t timing) {
 }
 
 zx_status_t SdmmcDevice::HwReset() {
-  if (!use_fidl_) {
+  if (!using_fidl_) {
     return host_.HwReset();
   }
 
@@ -873,7 +876,7 @@ zx_status_t SdmmcDevice::HwReset() {
 }
 
 zx_status_t SdmmcDevice::PerformTuning(uint32_t cmd_idx) {
-  if (!use_fidl_) {
+  if (!using_fidl_) {
     return host_.PerformTuning(cmd_idx);
   }
 
@@ -892,7 +895,7 @@ zx_status_t SdmmcDevice::PerformTuning(uint32_t cmd_idx) {
 
 zx_status_t SdmmcDevice::RegisterInBandInterrupt(
     void* interrupt_cb_ctx, const in_band_interrupt_protocol_ops_t* interrupt_cb_ops) {
-  if (!use_fidl_) {
+  if (!using_fidl_) {
     return host_.RegisterInBandInterrupt(interrupt_cb_ctx, interrupt_cb_ops);
   }
 
@@ -901,7 +904,7 @@ zx_status_t SdmmcDevice::RegisterInBandInterrupt(
 }
 
 void SdmmcDevice::AckInBandInterrupt() {
-  if (!use_fidl_) {
+  if (!using_fidl_) {
     return host_.AckInBandInterrupt();
   }
 
@@ -914,7 +917,7 @@ void SdmmcDevice::AckInBandInterrupt() {
 
 zx_status_t SdmmcDevice::RegisterVmo(uint32_t vmo_id, uint8_t client_id, zx::vmo vmo,
                                      uint64_t offset, uint64_t size, uint32_t vmo_rights) {
-  if (!use_fidl_) {
+  if (!using_fidl_) {
     return host_.RegisterVmo(vmo_id, client_id, std::move(vmo), offset, size, vmo_rights);
   }
 
@@ -933,7 +936,7 @@ zx_status_t SdmmcDevice::RegisterVmo(uint32_t vmo_id, uint8_t client_id, zx::vmo
 }
 
 zx_status_t SdmmcDevice::UnregisterVmo(uint32_t vmo_id, uint8_t client_id, zx::vmo* out_vmo) {
-  if (!use_fidl_) {
+  if (!using_fidl_) {
     return host_.UnregisterVmo(vmo_id, client_id, out_vmo);
   }
 
@@ -952,7 +955,7 @@ zx_status_t SdmmcDevice::UnregisterVmo(uint32_t vmo_id, uint8_t client_id, zx::v
 }
 
 zx_status_t SdmmcDevice::Request(const sdmmc_req_t* req, uint32_t out_response[4]) const {
-  if (!use_fidl_) {
+  if (!using_fidl_) {
     return host_.Request(req, out_response);
   }
 

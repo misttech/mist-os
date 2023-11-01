@@ -43,8 +43,8 @@ inline void BlockComplete(sdmmc::BlockOperation& txn, zx_status_t status) {
 namespace sdmmc {
 
 zx_status_t SdmmcBlockDevice::Create(zx_device_t* parent, std::unique_ptr<SdmmcDevice> sdmmc,
-                                     std::unique_ptr<SdmmcBlockDevice>* out_dev) {
-  zx_status_t status = sdmmc->Init(/*try_to_use_fidl=*/true);
+                                     bool use_fidl, std::unique_ptr<SdmmcBlockDevice>* out_dev) {
+  zx_status_t status = sdmmc->Init(use_fidl);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to initialize SdmmcDevice: %s", zx_status_get_string(status));
     return status;

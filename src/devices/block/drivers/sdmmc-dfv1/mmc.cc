@@ -529,7 +529,7 @@ void SdmmcBlockDevice::MmcSetInspectProperties() {
       root_.CreateUint("max_packed_reads_effective", max_packed_reads_effective_);
   properties_.max_packed_writes_effective_ =
       root_.CreateUint("max_packed_writes_effective", max_packed_writes_effective_);
-  properties_.use_fidl_ = root_.CreateBool("use_fidl", sdmmc_->use_fidl());
+  properties_.using_fidl_ = root_.CreateBool("using_fidl", sdmmc_->using_fidl());
 }
 
 }  // namespace sdmmc

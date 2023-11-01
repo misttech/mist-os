@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.sdmmc/cpp/wire.h>
 #include <fuchsia/hardware/sdmmc/c/banjo.h>
 #include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
@@ -70,14 +71,6 @@ constexpr wifi_config_t wifi_config = {
         },
 };
 
-static const std::vector<fpbus::Metadata> sdio_metadata{
-    {{
-        .type = DEVICE_METADATA_PRIVATE,
-        .data = std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&config),
-                                     reinterpret_cast<const uint8_t*>(&config) + sizeof(config)),
-    }},
-};
-
 static const std::vector<fpbus::Metadata> wifi_metadata{
     {{
         .type = DEVICE_METADATA_WIFI_CONFIG,
@@ -88,7 +81,30 @@ static const std::vector<fpbus::Metadata> wifi_metadata{
 };
 
 zx_status_t Vim3::SdioInit() {
-  using fuchsia_hardware_gpio::GpioFlags;
+  fidl::Arena<> fidl_arena;
+
+  fit::result sdmmc_metadata =
+      fidl::Persist(fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(fidl_arena)
+                        // TODO(fxbug.dev/134787): Use the FIDL SDMMC protocol.
+                        .use_fidl(false)
+                        .Build());
+  if (!sdmmc_metadata.is_ok()) {
+    zxlogf(ERROR, "Failed to encode SDMMC metadata: %s",
+           sdmmc_metadata.error_value().FormatDescription().c_str());
+    return sdmmc_metadata.error_value().status();
+  }
+
+  const std::vector<fpbus::Metadata> sdio_metadata{
+      {{
+          .type = DEVICE_METADATA_PRIVATE,
+          .data = std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&config),
+                                       reinterpret_cast<const uint8_t*>(&config) + sizeof(config)),
+      }},
+      {{
+          .type = DEVICE_METADATA_SDMMC,
+          .data = std::move(sdmmc_metadata.value()),
+      }},
+  };
 
   fpbus::Node sdio_dev;
   sdio_dev.name() = "vim3-sdio";
@@ -100,6 +116,7 @@ zx_status_t Vim3::SdioInit() {
   sdio_dev.bti() = sdio_btis;
   sdio_dev.metadata() = sdio_metadata;
 
+  using fuchsia_hardware_gpio::GpioFlags;
   auto config_in = [](GpioFlags input_flags) {
     return fuchsia_hardware_gpio::wire::InitCall::WithInputFlags(input_flags);
   };
@@ -133,7 +150,6 @@ zx_status_t Vim3::SdioInit() {
   gpio_init_steps_.push_back({A311D_SDIO_CLK, set_drive_strength(4'000)});
   gpio_init_steps_.push_back({A311D_SDIO_CMD, set_drive_strength(4'000)});
 
-  fidl::Arena<> fidl_arena;
   fdf::Arena sdio_arena('SDIO');
   auto result =
       pbus_.buffer(sdio_arena)

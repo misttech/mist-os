@@ -40,7 +40,7 @@ class SdioControllerDevice : public SdioControllerDeviceType,
     }
   }
 
-  static zx_status_t Create(zx_device_t* parent, std::unique_ptr<SdmmcDevice> sdmmc,
+  static zx_status_t Create(zx_device_t* parent, std::unique_ptr<SdmmcDevice> sdmmc, bool use_fidl,
                             std::unique_ptr<SdioControllerDevice>* out_dev);
   // Returns the SdmmcDevice. Used if this SdioControllerDevice fails to probe (i.e., no eligible
   // device present).
@@ -77,9 +77,9 @@ class SdioControllerDevice : public SdioControllerDeviceType,
   void InBandInterruptCallback();
 
   // Visible for testing.
-  zx_status_t Init(bool try_to_use_fidl = false) TA_EXCL(lock_) {
+  zx_status_t Init(bool use_fidl = false) TA_EXCL(lock_) {
     fbl::AutoLock _(&lock_);
-    return sdmmc_->Init(try_to_use_fidl);
+    return sdmmc_->Init(use_fidl);
   }
 
   zx_status_t StartSdioIrqThreadIfNeeded() TA_EXCL(irq_thread_lock_);

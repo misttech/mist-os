@@ -45,7 +45,8 @@ static zx::result<std::unique_ptr<SdmmcDevice>> MaybeAddDevice(
     const std::string& name, zx_device_t* zxdev, std::unique_ptr<SdmmcDevice> sdmmc,
     const fuchsia_hardware_sdmmc::wire::SdmmcMetadata& metadata) {
   std::unique_ptr<DeviceType> device;
-  if (zx_status_t st = DeviceType::Create(zxdev, std::move(sdmmc), &device) != ZX_OK) {
+  if (zx_status_t st =
+          DeviceType::Create(zxdev, std::move(sdmmc), metadata.use_fidl(), &device) != ZX_OK) {
     zxlogf(ERROR, "Failed to create %s device, retcode = %d", name.c_str(), st);
     return zx::error(st);
   }
@@ -77,6 +78,7 @@ SdmmcRootDevice::GetMetadata(fidl::AnyArena& allocator) {
                                          .enable_cache(true)
                                          .removable(false)
                                          .max_command_packing(kMaxCommandPacking)
+                                         .use_fidl(true)
                                          .Build()));
     } else {
       zxlogf(ERROR, "Failed to decode metadata: %s", decoded.status_string());
@@ -93,6 +95,7 @@ SdmmcRootDevice::GetMetadata(fidl::AnyArena& allocator) {
           .removable(decoded->has_removable() && decoded->removable())
           .max_command_packing(decoded->has_max_command_packing() ? decoded->max_command_packing()
                                                                   : kMaxCommandPacking)
+          .use_fidl(!decoded->has_use_fidl() || decoded->use_fidl())
           .Build()));
 }
 

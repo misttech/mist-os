@@ -34,12 +34,12 @@ class SdmmcDevice {
   // For testing using FIDL.
   explicit SdmmcDevice(fdf::ClientEnd<fuchsia_hardware_sdmmc::Sdmmc> client_end) {
     client_.Bind(std::move(client_end), fdf::Dispatcher::GetCurrent()->get());
-    use_fidl_ = true;
+    using_fidl_ = true;
   }
 
-  zx_status_t Init(bool try_to_use_fidl);
+  zx_status_t Init(bool use_fidl);
 
-  bool use_fidl() const { return use_fidl_; }
+  bool using_fidl() const { return using_fidl_; }
   const sdmmc_host_info_t& host_info() const { return host_info_; }
 
   bool UseDma() const { return host_info_.caps & SDMMC_HOST_CAP_DMA; }
@@ -122,7 +122,7 @@ class SdmmcDevice {
 
   inline uint32_t RcaArg() const { return rca_ << 16; }
 
-  bool use_fidl_ = false;
+  bool using_fidl_ = false;
   const SdmmcRootDevice* const root_device_ = nullptr;
   const ddk::SdmmcProtocolClient host_;
   // The FIDL client to communicate with Sdmmc device.

@@ -116,7 +116,7 @@ class SdmmcBlockDevice : public SdmmcBlockDeviceType {
   }
   ~SdmmcBlockDevice() { txn_list_.CompleteAll(ZX_ERR_INTERNAL); }
 
-  static zx_status_t Create(zx_device_t* parent, std::unique_ptr<SdmmcDevice> sdmmc,
+  static zx_status_t Create(zx_device_t* parent, std::unique_ptr<SdmmcDevice> sdmmc, bool use_fidl,
                             std::unique_ptr<SdmmcBlockDevice>* out_dev);
   // Returns the SdmmcDevice. Used if this SdmmcBlockDevice fails to probe (i.e., no eligible device
   // present).
@@ -143,7 +143,7 @@ class SdmmcBlockDevice : public SdmmcBlockDeviceType {
   void RpmbQueue(RpmbRequestInfo info) TA_EXCL(lock_);
 
   // Visible for testing.
-  zx_status_t Init(bool try_to_use_fidl = false) { return sdmmc_->Init(try_to_use_fidl); }
+  zx_status_t Init(bool use_fidl = false) { return sdmmc_->Init(use_fidl); }
   void StopWorkerThread() TA_EXCL(lock_);
   void SetBlockInfo(uint32_t block_size, uint64_t block_count);
 
@@ -233,7 +233,7 @@ class SdmmcBlockDevice : public SdmmcBlockDeviceType {
     inspect::UintProperty max_packed_writes_;            // Set once by the init thread.
     inspect::UintProperty max_packed_reads_effective_;   // Set once by the init thread.
     inspect::UintProperty max_packed_writes_effective_;  // Set once by the init thread.
-    inspect::BoolProperty use_fidl_;                     // Set once by the init thread.
+    inspect::BoolProperty using_fidl_;                   // Set once by the init thread.
   } properties_;
 };
 

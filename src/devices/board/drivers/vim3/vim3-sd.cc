@@ -64,8 +64,12 @@ constexpr device_fragment_t sd_fragments[] = {
 zx_status_t Vim3::SdInit() {
   fidl::Arena<> fidl_arena;
 
-  fit::result sdmmc_metadata = fidl::Persist(
-      fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(fidl_arena).removable(true).Build());
+  fit::result sdmmc_metadata =
+      fidl::Persist(fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(fidl_arena)
+                        .removable(true)
+                        // TODO(fxbug.dev/134787): Use the FIDL SDMMC protocol.
+                        .use_fidl(false)
+                        .Build());
   if (!sdmmc_metadata.is_ok()) {
     zxlogf(ERROR, "Failed to encode SDMMC metadata: %s",
            sdmmc_metadata.error_value().FormatDescription().c_str());

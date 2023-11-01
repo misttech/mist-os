@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.sdmmc/cpp/wire.h>
 #include <fuchsia/hardware/gpioimpl/cpp/banjo.h>
 #include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
@@ -106,15 +107,6 @@ constexpr wifi_config_t wifi_config = {
         },
 };
 
-static const std::vector<fpbus::Metadata> sd_emmc_metadata{
-    {{
-        .type = DEVICE_METADATA_PRIVATE,
-        .data = std::vector<uint8_t>(
-            reinterpret_cast<const uint8_t*>(&sd_emmc_config),
-            reinterpret_cast<const uint8_t*>(&sd_emmc_config) + sizeof(sd_emmc_config)),
-    }},
-};
-
 static const std::vector<fpbus::Metadata> wifi_metadata{
     {{
         .type = DEVICE_METADATA_WIFI_CONFIG,
@@ -124,23 +116,44 @@ static const std::vector<fpbus::Metadata> wifi_metadata{
     }},
 };
 
-static const fpbus::Node sdio_dev = []() {
-  fpbus::Node dev = {};
-  dev.name() = "sherlock-sd-emmc";
-  dev.vid() = PDEV_VID_AMLOGIC;
-  dev.pid() = PDEV_PID_GENERIC;
-  dev.did() = PDEV_DID_AMLOGIC_SDMMC_A;
-  dev.mmio() = sd_emmc_mmios;
-  dev.bti() = sd_emmc_btis;
-  dev.irq() = sd_emmc_irqs;
-  dev.metadata() = sd_emmc_metadata;
-  return dev;
-}();
-
 }  // namespace
 
 zx_status_t Sherlock::SdioInit() {
-  zx_status_t status;
+  fidl::Arena<> fidl_arena;
+
+  fit::result sdmmc_metadata =
+      fidl::Persist(fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(fidl_arena)
+                        // TODO(fxbug.dev/134787): Use the FIDL SDMMC protocol.
+                        .use_fidl(false)
+                        .Build());
+  if (!sdmmc_metadata.is_ok()) {
+    zxlogf(ERROR, "Failed to encode SDMMC metadata: %s",
+           sdmmc_metadata.error_value().FormatDescription().c_str());
+    return sdmmc_metadata.error_value().status();
+  }
+
+  const std::vector<fpbus::Metadata> sd_emmc_metadata{
+      {{
+          .type = DEVICE_METADATA_PRIVATE,
+          .data = std::vector<uint8_t>(
+              reinterpret_cast<const uint8_t*>(&sd_emmc_config),
+              reinterpret_cast<const uint8_t*>(&sd_emmc_config) + sizeof(sd_emmc_config)),
+      }},
+      {{
+          .type = DEVICE_METADATA_SDMMC,
+          .data = std::move(sdmmc_metadata.value()),
+      }},
+  };
+
+  fpbus::Node sdio_dev;
+  sdio_dev.name() = "sherlock-sd-emmc";
+  sdio_dev.vid() = PDEV_VID_AMLOGIC;
+  sdio_dev.pid() = PDEV_PID_GENERIC;
+  sdio_dev.did() = PDEV_DID_AMLOGIC_SDMMC_A;
+  sdio_dev.mmio() = sd_emmc_mmios;
+  sdio_dev.bti() = sd_emmc_btis;
+  sdio_dev.irq() = sd_emmc_irqs;
+  sdio_dev.metadata() = sd_emmc_metadata;
 
   auto set_alt_function = [&arena = gpio_init_arena_](uint64_t alt_function) {
     return fuchsia_hardware_gpio::wire::InitCall::WithAltFunction(arena, alt_function);
@@ -156,7 +169,8 @@ zx_status_t Sherlock::SdioInit() {
 
   zx::unowned_resource res(get_mmio_resource(parent()));
   zx::vmo vmo;
-  status = zx::vmo::create_physical(*res, kGpioBase, kGpioBaseOffset + T931_GPIO_LENGTH, &vmo);
+  zx_status_t status =
+      zx::vmo::create_physical(*res, kGpioBase, kGpioBaseOffset + T931_GPIO_LENGTH, &vmo);
   if (status != ZX_OK) {
     zxlogf(ERROR, "failed to create VMO: %s", zx_status_get_string(status));
     return status;
@@ -182,7 +196,6 @@ zx_status_t Sherlock::SdioInit() {
   gpio_init_steps_.push_back({T931_WIFI_REG_ON, set_alt_function(T931_WIFI_REG_ON_FN)});
   gpio_init_steps_.push_back({T931_WIFI_HOST_WAKE, set_alt_function(T931_WIFI_HOST_WAKE_FN)});
 
-  fidl::Arena<> fidl_arena;
   fdf::Arena sdio_arena('SDIO');
   auto result = pbus_.buffer(sdio_arena)
                     ->AddComposite(fidl::ToWire(fidl_arena, sdio_dev),

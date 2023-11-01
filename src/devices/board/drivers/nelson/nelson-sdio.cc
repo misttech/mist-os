@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.sdmmc/cpp/wire.h>
 #include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
@@ -94,14 +95,6 @@ constexpr wifi_config_t wifi_config = {
         },
 };
 
-static const std::vector<fpbus::Metadata> sd_emmc_metadata{
-    {{
-        .type = DEVICE_METADATA_PRIVATE,
-        .data = std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&config),
-                                     reinterpret_cast<const uint8_t*>(&config) + sizeof(config)),
-    }},
-};
-
 static const std::vector<fpbus::Metadata> wifi_metadata{
     {{
         .type = DEVICE_METADATA_WIFI_CONFIG,
@@ -111,24 +104,46 @@ static const std::vector<fpbus::Metadata> wifi_metadata{
     }},
 };
 
-static const fpbus::Node sd_emmc_dev = []() {
-  fpbus::Node dev = {};
-  dev.name() = "aml-sdio";
-  dev.vid() = PDEV_VID_AMLOGIC;
-  dev.pid() = PDEV_PID_GENERIC;
-  dev.did() = PDEV_DID_AMLOGIC_SDMMC_A;
-  dev.mmio() = sd_emmc_mmios;
-  dev.irq() = sd_emmc_irqs;
-  dev.bti() = sd_emmc_btis;
-  dev.metadata() = sd_emmc_metadata;
-  return dev;
-}();
-
 // Composite binding rules for wifi driver.
 
 // Composite binding rules for SDIO.
 
 zx_status_t Nelson::SdioInit() {
+  fidl::Arena<> fidl_arena;
+
+  fit::result sdmmc_metadata =
+      fidl::Persist(fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(fidl_arena)
+                        // TODO(fxbug.dev/134787): Use the FIDL SDMMC protocol.
+                        .use_fidl(false)
+                        .Build());
+  if (!sdmmc_metadata.is_ok()) {
+    zxlogf(ERROR, "Failed to encode SDMMC metadata: %s",
+           sdmmc_metadata.error_value().FormatDescription().c_str());
+    return sdmmc_metadata.error_value().status();
+  }
+
+  const std::vector<fpbus::Metadata> sd_emmc_metadata{
+      {{
+          .type = DEVICE_METADATA_PRIVATE,
+          .data = std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&config),
+                                       reinterpret_cast<const uint8_t*>(&config) + sizeof(config)),
+      }},
+      {{
+          .type = DEVICE_METADATA_SDMMC,
+          .data = std::move(sdmmc_metadata.value()),
+      }},
+  };
+
+  fpbus::Node sd_emmc_dev;
+  sd_emmc_dev.name() = "aml-sdio";
+  sd_emmc_dev.vid() = PDEV_VID_AMLOGIC;
+  sd_emmc_dev.pid() = PDEV_PID_GENERIC;
+  sd_emmc_dev.did() = PDEV_DID_AMLOGIC_SDMMC_A;
+  sd_emmc_dev.mmio() = sd_emmc_mmios;
+  sd_emmc_dev.irq() = sd_emmc_irqs;
+  sd_emmc_dev.bti() = sd_emmc_btis;
+  sd_emmc_dev.metadata() = sd_emmc_metadata;
+
   auto set_alt_function = [&arena = gpio_init_arena_](uint64_t alt_function) {
     return fuchsia_hardware_gpio::wire::InitCall::WithAltFunction(arena, alt_function);
   };
@@ -152,7 +167,6 @@ zx_status_t Nelson::SdioInit() {
   gpio_init_steps_.push_back({GPIO_SOC_WIFI_SDIO_CLK, set_drive_strength(4000)});
   gpio_init_steps_.push_back({GPIO_SOC_WIFI_SDIO_CMD, set_drive_strength(4000)});
 
-  fidl::Arena<> fidl_arena;
   fdf::Arena sdio_arena('SDIO');
   auto result =
       pbus_.buffer(sdio_arena)
