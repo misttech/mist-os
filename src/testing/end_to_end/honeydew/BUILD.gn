@@ -27,6 +27,8 @@ python_library("honeydew") {
     "affordances/sl4f/ui/user_input.py",
     "affordances/sl4f/wlan/wlan.py",
     "affordances/sl4f/wlan/wlan_policy.py",
+    "auxiliary_devices/__init__.py",
+    "auxiliary_devices/power_switch_dmc.py",
     "custom_types.py",
     "errors.py",
     "fuchsia_device/__init__.py",

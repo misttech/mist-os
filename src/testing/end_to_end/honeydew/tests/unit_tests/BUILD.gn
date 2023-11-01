@@ -35,6 +35,7 @@ group("tests") {
       ":custom_types_test($host_toolchain)",
       ":init_test($host_toolchain)",
       "affordances_tests:tests",
+      "auxiliary_devices_tests:tests",
       "fuchsia_device_tests:tests",
       "transports_tests:tests",
       "utils_tests:tests",

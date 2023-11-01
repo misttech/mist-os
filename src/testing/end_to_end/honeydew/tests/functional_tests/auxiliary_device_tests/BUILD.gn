@@ -4,13 +4,8 @@
 
 assert(is_host, "Python E2E tests are host-only")
 
-# Group containing all of the Lacewing example test cases.
+# Group containing all of the auxiliary devices functional test cases.
 group("tests") {
   testonly = true
-  public_deps = [
-    "test_hybrid:tests",
-    "test_multi_device:tests",
-    "test_power_cycle:tests",
-    "test_soft_reboot:tests",
-  ]
+  public_deps = [ "test_power_switch_dmc:tests" ]
 }

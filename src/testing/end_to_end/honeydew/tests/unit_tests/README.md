@@ -57,4 +57,6 @@
     fx test //src/testing/end_to_end/honeydew/tests/unit_tests/utils_tests:common_utils_test --host --output
 
     fx test //src/testing/end_to_end/honeydew/tests/unit_tests/utils_tests:http_utils_test --host --output
+
+    fx test //src/testing/end_to_end/honeydew/tests/unit_tests/auxiliary_devices_tests:power_switch_dmc_test --host --output
     ```

@@ -248,6 +248,11 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
         """
         for controller_config in self._get_controller_configs(controller_type):
             if controller_config[identifier_key] == identifier_value:
+                _LOGGER.info(
+                    "Device configuration associated with %s is %s",
+                    identifier_value,
+                    controller_config,
+                )
                 return controller_config
         return {}
 
