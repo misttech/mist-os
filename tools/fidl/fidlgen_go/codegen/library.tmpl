@@ -31,6 +31,9 @@ const (
 )
 {{end}}
 
+{{ range .Aliases -}}
+type {{ .Name }} = {{ .Type }}
+{{ end -}}
 {{ range .Enums -}}
 var _ {{ $.BindingsAlias }}.Enum = {{ .Name }}(0)
 {{ template "EnumDefinition" . }}

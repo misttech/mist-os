@@ -16,6 +16,8 @@ const (
 	ExampleConst uint32 = 0
 )
 
+type Alias = uint32
+
 var _ _bindings.Enum = ExampleEnum(0)
 
 type ExampleEnum uint32

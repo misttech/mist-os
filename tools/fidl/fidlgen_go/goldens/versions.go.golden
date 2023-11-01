@@ -16,6 +16,8 @@ const (
 	Const       uint32 = 0
 )
 
+type Alias = string
+
 var _ _bindings.Enum = Enum(0)
 
 type Enum uint32

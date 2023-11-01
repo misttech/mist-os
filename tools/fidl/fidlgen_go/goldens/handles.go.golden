@@ -11,6 +11,10 @@ import (
 	_bindings "syscall/zx/fidl"
 )
 
+type AliasedPlainHandle = _zx.Handle
+type AliasedRightsHandle = _zx.VMO
+type AliasedSubtypeHandle = _zx.VMO
+
 type Handles struct {
 	_                         struct{}                            `fidl:"s" fidl_size_v2:"136" fidl_alignment_v2:"4"`
 	PlainHandle               _zx.Handle                          `fidl_offset_v2:"0" fidl_handle_subtype:"0" fidl_handle_rights:"2147483648" fidl_bounds:"0"`

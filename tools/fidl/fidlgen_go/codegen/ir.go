@@ -62,6 +62,17 @@ type Const struct {
 	Value string
 }
 
+// Alias represents a FIDL alias as a Go type.
+//
+// That is, something like:
+//
+//	type Name = string
+type Alias struct {
+	fidlgen.Alias
+	Name string
+	Type Type
+}
+
 // Bits represents the idiomatic representation of an bits in golang.
 //
 // That is, something like:
@@ -426,6 +437,9 @@ type Root struct {
 	// BindingsAlias is the alias name of the golang package of the FIDL
 	// bindings.
 	BindingsAlias string
+
+	// Aliases represents a list of FIDL alises represented as Go types.
+	Aliases []Alias
 
 	// Bits represents a list of FIDL bits represented as Go bits.
 	Bits []Bits
@@ -813,6 +827,15 @@ func (c *compiler) compileType(val fidlgen.Type) (r Type, t StackOfBoundsTag) {
 	return
 }
 
+func (c *compiler) compileAlias(val fidlgen.Alias) Alias {
+	t, _ := c.compileType(val.Type)
+	return Alias{
+		Alias: val,
+		Name:  c.compileCompoundIdentifier(val.Name, true, ""),
+		Type:  t,
+	}
+}
+
 func (c *compiler) compileBitsMember(val fidlgen.BitsMember) BitsMember {
 	return BitsMember{
 		Attributes: val.Attributes,
@@ -1162,6 +1185,9 @@ func Compile(ir fidlgen.Root) Root {
 		BindingsAlias: BindingsAlias,
 	}
 
+	for _, v := range ir.Aliases {
+		r.Aliases = append(r.Aliases, c.compileAlias(v))
+	}
 	for _, v := range ir.Bits {
 		r.Bits = append(r.Bits, c.compileBits(v))
 	}

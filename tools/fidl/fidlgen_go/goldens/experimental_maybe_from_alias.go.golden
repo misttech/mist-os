@@ -10,6 +10,15 @@ import (
 	_bindings "syscall/zx/fidl"
 )
 
+type AliasOfArray = [1]uint64
+type AliasOfArrayContainingAliasOfArray = [2]uint64
+type AliasOfBytes = []uint8
+type AliasOfRequest = MyProtocolWithCtxInterfaceRequest
+type AliasOfString = string
+type AliasOfVectorContainingAliasOfVector = []uint64
+type U64 = uint64
+type Vector = *[]uint64
+
 type Testing struct {
 	_   struct{}                             `fidl:"s" fidl_size_v2:"704" fidl_alignment_v2:"8"`
 	U1  uint64                               `fidl_offset_v2:"0"`

@@ -12,6 +12,13 @@ import (
 	_bindings "syscall/zx/fidl"
 )
 
+type ReferenceMe = testsomeotherlibrary.ReferenceMe
+type AliasOfChannel = _zx.Channel
+type Channel = _zx.Channel
+type U32 = uint32
+type VecOfStrings = []string
+type VecOfStringsAtMost5 = []string
+
 var _ _bindings.Enum = ObjType(0)
 
 type ObjType uint32
