@@ -572,12 +572,31 @@ func compileScreamingSnakeIdentifier(val fidlgen.Identifier) string {
 	return fidlgen.ConstNameToAllCapsSnake(changeIfReserved(val))
 }
 
+func isZirconIdentifier(ci fidlgen.CompoundIdentifier) bool {
+	return len(ci.Library) == 1 && ci.Library[0] == fidlgen.Identifier("zx")
+}
+
+// We special case references to declarations from //zircon/vdso/zx:zx, since we
+// don't generate Rust bindings for that library.
+var zirconNames = map[fidlgen.EncodedCompoundIdentifier]string{
+	"zx/Rights":                "fidl::Rights",
+	"zx/ObjType":               "fidl::ObjectType",
+	"zx/CHANNEL_MAX_MSG_BYTES": "fuchsia_zircon_types::ZX_CHANNEL_MAX_MSG_BYTES",
+}
+
 // compileDeclIdentifier returns a Rust path expression referring to the given
 // declaration. It qualifies the crate name if it is external.
 func (c *compiler) compileDeclIdentifier(val fidlgen.EncodedCompoundIdentifier) string {
 	ci := val.Parse()
 	if ci.Member != "" {
 		panic(fmt.Sprintf("unexpected member: %s", val))
+	}
+	if isZirconIdentifier(ci) {
+		name, ok := zirconNames[val]
+		if !ok {
+			panic(fmt.Sprintf("unexpected zircon identifier: %s", val))
+		}
+		return name
 	}
 	var name string
 	if c.lookupDeclInfo(val).Type == fidlgen.ConstDeclType {
@@ -611,7 +630,11 @@ func (c *compiler) compileMemberIdentifier(val fidlgen.EncodedCompoundIdentifier
 	case fidlgen.BitsDeclType:
 		member = compileScreamingSnakeIdentifier(ci.Member)
 	case fidlgen.EnumDeclType:
-		member = compileCamelIdentifier(ci.Member)
+		if isZirconIdentifier(ci) && ci.Name == "ObjType" {
+			member = compileScreamingSnakeIdentifier(ci.Member)
+		} else {
+			member = compileCamelIdentifier(ci.Member)
+		}
 	default:
 		panic(fmt.Sprintf("unexpected decl type: %s", declType))
 	}

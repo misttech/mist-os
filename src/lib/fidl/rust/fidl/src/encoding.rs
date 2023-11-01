@@ -2451,6 +2451,111 @@ impl Decode<Self> for EpitaphBody {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// Zircon types
+////////////////////////////////////////////////////////////////////////////////
+
+unsafe impl TypeMarker for ObjectType {
+    type Owned = Self;
+
+    #[inline(always)]
+    fn inline_align(_context: Context) -> usize {
+        mem::align_of::<Self>()
+    }
+
+    #[inline(always)]
+    fn inline_size(_context: Context) -> usize {
+        mem::size_of::<Self>()
+    }
+}
+
+impl ValueTypeMarker for ObjectType {
+    type Borrowed<'a> = Self;
+    fn borrow(value: &<Self as TypeMarker>::Owned) -> Self::Borrowed<'_> {
+        *value
+    }
+}
+
+unsafe impl Encode<ObjectType> for ObjectType {
+    #[inline]
+    unsafe fn encode(self, encoder: &mut Encoder<'_>, offset: usize, _depth: Depth) -> Result<()> {
+        encoder.debug_check_bounds::<Self>(offset);
+        encoder.write_num(self.into_raw(), offset);
+        Ok(())
+    }
+}
+
+impl Decode<Self> for ObjectType {
+    #[inline(always)]
+    fn new_empty() -> Self {
+        ObjectType::NONE
+    }
+
+    #[inline]
+    unsafe fn decode(
+        &mut self,
+        decoder: &mut Decoder<'_>,
+        offset: usize,
+        _depth: Depth,
+    ) -> Result<()> {
+        decoder.debug_check_bounds::<Self>(offset);
+        *self = Self::from_raw(decoder.read_num(offset));
+        Ok(())
+    }
+}
+
+unsafe impl TypeMarker for Rights {
+    type Owned = Self;
+
+    #[inline(always)]
+    fn inline_align(_context: Context) -> usize {
+        mem::align_of::<Self>()
+    }
+
+    #[inline(always)]
+    fn inline_size(_context: Context) -> usize {
+        mem::size_of::<Self>()
+    }
+}
+
+impl ValueTypeMarker for Rights {
+    type Borrowed<'a> = Self;
+    fn borrow(value: &<Self as TypeMarker>::Owned) -> Self::Borrowed<'_> {
+        *value
+    }
+}
+
+unsafe impl Encode<Rights> for Rights {
+    #[inline]
+    unsafe fn encode(self, encoder: &mut Encoder<'_>, offset: usize, _depth: Depth) -> Result<()> {
+        encoder.debug_check_bounds::<Self>(offset);
+        if self.bits() & Self::all().bits() != self.bits() {
+            return Err(Error::InvalidBitsValue);
+        }
+        encoder.write_num(self.bits(), offset);
+        Ok(())
+    }
+}
+
+impl Decode<Self> for Rights {
+    #[inline(always)]
+    fn new_empty() -> Self {
+        Rights::empty()
+    }
+
+    #[inline]
+    unsafe fn decode(
+        &mut self,
+        decoder: &mut Decoder<'_>,
+        offset: usize,
+        _depth: Depth,
+    ) -> Result<()> {
+        decoder.debug_check_bounds::<Self>(offset);
+        *self = Self::from_bits(decoder.read_num(offset)).ok_or(Error::InvalidBitsValue)?;
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // Messages
 ////////////////////////////////////////////////////////////////////////////////
 

@@ -12,7 +12,7 @@ use {
         RunnerRequest, RunnerRequestStream, TableResultClassification, Test,
         UnionResultClassification, UnknownEvent, CLIENT_SUITE_VERSION,
     },
-    fidl_zx as _, fuchsia_async as fasync,
+    fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
     futures::{prelude::*, TryStreamExt},
     rust_util::{classify_error, method_name},

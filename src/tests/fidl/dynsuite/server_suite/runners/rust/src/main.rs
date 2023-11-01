@@ -157,13 +157,11 @@ async fn serve_closed_target(
             },
             ClosedTargetRequest::GetHandleRights { handle, responder } => {
                 let basic_info = handle.as_handle_ref().basic_info().unwrap();
-                let rights = fidl_zx::Rights::from_bits(basic_info.rights.bits()).unwrap();
-                responder.send(rights).unwrap();
+                responder.send(basic_info.rights).unwrap();
             }
             ClosedTargetRequest::GetSignalableEventRights { handle, responder } => {
                 let basic_info = handle.as_handle_ref().basic_info().unwrap();
-                let rights = fidl_zx::Rights::from_bits(basic_info.rights.bits()).unwrap();
-                responder.send(rights).unwrap();
+                responder.send(basic_info.rights).unwrap();
             }
             ClosedTargetRequest::EchoAsTransferableSignalableEvent { handle, responder } => {
                 responder.send(fidl::Event::from(handle))?;

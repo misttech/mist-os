@@ -13,7 +13,6 @@ use {
         RunnerRequest, RunnerRequestStream, TableResultClassification, Test,
         UnionResultClassification, UnknownEvent, CLIENT_SUITE_VERSION,
     },
-    fidl_zx as _,
     fuchsia_component::server::ServiceFs,
     fuchsia_zircon as zx,
     fuchsia_zircon::AsHandleRef,

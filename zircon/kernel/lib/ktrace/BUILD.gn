@@ -35,6 +35,7 @@ config("suppress-warning.config") {
 
     # TODO(fxbug.dev/44971): Referenced in environment configs.
     "//build/config/*",
+    "//sdk/fidl/zbi:*",
     "//sdk/lib/fit/*",
     "//sdk/lib/stdcompat/*",
     "//sdk/lib/zbi-format/*",

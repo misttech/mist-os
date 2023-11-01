@@ -152,7 +152,11 @@ template("fidl_rust") {
       if (defined(invoker.public_deps)) {
         foreach(dep, invoker.public_deps) {
           label = get_label_info(dep, "label_no_toolchain")
-          deps += [ "${label}_rust" ]
+          if (label == "//zircon/vdso/zx:zx") {
+            deps += [ "//src/lib/zircon/rust:fuchsia-zircon-types" ]
+          } else {
+            deps += [ "${label}_rust" ]
+          }
         }
       }
 

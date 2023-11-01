@@ -329,42 +329,42 @@ template("fidl") {
         deps = marker_deps
         fidl_gen_dir += "/rust"
       }
-
-      if (enable_bindlib) {
-        # Only import the fidl_bind_library() template if bindlib is enabled.
-        import("//build/bind/fidl_bind_library.gni")
-
-        # Define the bindlib bindings.
-        fidl_bind_library("${target_name}_bindlib") {
-          forward_variables_from(invoker,
-                                 [
-                                   "applicable_licenses",
-                                   "testonly",
-                                   "visibility",
-                                 ])
-          forward_variables_from(common_parameters, "*", [ "fidl_target" ])
-          fidl_gen_dir += "/bindlib"
-        }
-      }
-
-      if (enable_banjo) {
-        # Only import fidl_banjo() if banjo is enabled.
-        import("//build/banjo/fidl_banjo.gni")
-
-        # Define the banjo bindings.
-        fidl_banjo("${target_name}_banjo") {
-          forward_variables_from(invoker,
-                                 [
-                                   "testonly",
-                                   "visibility",
-                                   "public_deps",
-                                 ])
-          forward_variables_from(common_parameters, "*")
-          fidl_gen_dir += "/banjo"
-        }
-      }
     } else {
       not_needed(invoker, [ "disable_rustdoc" ])
+    }
+
+    if (enable_bindlib) {
+      # Only import the fidl_bind_library() template if bindlib is enabled.
+      import("//build/bind/fidl_bind_library.gni")
+
+      # Define the bindlib bindings.
+      fidl_bind_library("${target_name}_bindlib") {
+        forward_variables_from(invoker,
+                               [
+                                 "applicable_licenses",
+                                 "testonly",
+                                 "visibility",
+                               ])
+        forward_variables_from(common_parameters, "*", [ "fidl_target" ])
+        fidl_gen_dir += "/bindlib"
+      }
+    }
+
+    if (enable_banjo) {
+      # Only import fidl_banjo() if banjo is enabled.
+      import("//build/banjo/fidl_banjo.gni")
+
+      # Define the banjo bindings.
+      fidl_banjo("${target_name}_banjo") {
+        forward_variables_from(invoker,
+                               [
+                                 "testonly",
+                                 "visibility",
+                                 "public_deps",
+                               ])
+        forward_variables_from(common_parameters, "*")
+        fidl_gen_dir += "/banjo"
+      }
     }
 
     if (enable_zither) {

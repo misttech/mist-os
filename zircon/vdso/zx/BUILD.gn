@@ -16,4 +16,5 @@ fidl("zx") {
   api = "//sdk/fidl/zx/zx.api"
 
   enable_banjo = true
+  enable_rust = false
 }
