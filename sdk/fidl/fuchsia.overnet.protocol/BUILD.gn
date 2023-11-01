@@ -6,15 +6,9 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.overnet.protocol") {
   sources = [
-    "diagnostic.fidl",
     "labels.fidl",
-    "link_protocol.fidl",
     "peer_protocol.fidl",
-    "relay.fidl",
     "zircon_proxy.fidl",
   ]
-  public_deps = [
-    "//sdk/fidl/fuchsia.net",
-    "//zircon/vdso/zx",
-  ]
+  public_deps = [ "//zircon/vdso/zx" ]
 }

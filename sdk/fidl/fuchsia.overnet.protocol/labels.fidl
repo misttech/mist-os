@@ -14,9 +14,6 @@ type NodeId = struct {
     id uint64;
 };
 
-/// Node-local link label.
-alias LinkId = uint64;
-
 /// Length of a transfer key.
 const TRANSFER_KEY_LENGTH uint32 = 16;
 
