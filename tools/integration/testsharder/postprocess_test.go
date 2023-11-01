@@ -218,7 +218,10 @@ func TestSplitOutMultipliers(t *testing.T) {
 			},
 			targetDuration: 2 * time.Second,
 			expected: []*Shard{
-				multShard(env1, "fuchsia", 1, 2, 1),
+				withStopRepeatingAfterSecs(
+					multShard(env1, "fuchsia", 1, 10, 1),
+					map[int]int{0: 2},
+				),
 			},
 		},
 		{
@@ -387,15 +390,15 @@ func TestSplitOutMultipliers(t *testing.T) {
 			targetDuration: 10 * time.Second,
 			expected: []*Shard{
 				withStopRepeatingAfterSecs(
-					multShardWithIndex(env1, "fuchsia", 500, 10, 1, 6, 1),
+					multShardWithIndex(env1, "fuchsia", 500, 1000, 1, 6, 1),
 					map[int]int{0: 0, 1: 0},
 				),
 				withStopRepeatingAfterSecs(
-					multShardWithIndex(env1, "fuchsia", 500, 10, 2, 4, 2),
+					multShardWithIndex(env1, "fuchsia", 500, 1000, 2, 4, 2),
 					map[int]int{0: 0, 1: 0},
 				),
 				withStopRepeatingAfterSecs(
-					multShardWithIndex(env1, "fuchsia", 500, 10, 3, 5, 3),
+					multShardWithIndex(env1, "fuchsia", 500, 1000, 3, 5, 3),
 					map[int]int{0: 0, 1: 0},
 				),
 			},
@@ -415,11 +418,11 @@ func TestSplitOutMultipliers(t *testing.T) {
 			targetDuration: 10 * time.Second,
 			expected: []*Shard{
 				withStopRepeatingAfterSecs(
-					multShardWithIndex(env1, "fuchsia", 50, 10, 1, 1),
+					multShardWithIndex(env1, "fuchsia", 50, 50, 1, 1),
 					map[int]int{0: 0},
 				),
 				withStopRepeatingAfterSecs(
-					multShardWithIndex(env1, "fuchsia", 50, 10, 2, 2),
+					multShardWithIndex(env1, "fuchsia", 50, 50, 2, 2),
 					map[int]int{0: 0},
 				),
 			},

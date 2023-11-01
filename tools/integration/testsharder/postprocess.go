@@ -267,7 +267,7 @@ func SplitOutMultipliers(
 					newShard.Tests[idx] = test
 					fillUpTestIdxs = fillUpTestIdxs[:i]
 				}
-				newShard.TimeoutSecs = int(computeShardTimeout(subshard{targetDuration, newShard.Tests}).Seconds())
+				newShard.TimeoutSecs = max(newShard.TimeoutSecs, int(computeShardTimeout(subshard{targetDuration, newShard.Tests}).Seconds()))
 			}
 			shards = append(shards, newShards...)
 		}
