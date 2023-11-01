@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 """Rule for defining a pavable Fuchsia image."""
 
+load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_inputs")
 load(
     ":providers.bzl",
     "FuchsiaBoardConfigDirectoryInfo",
@@ -12,7 +13,6 @@ load(
     "FuchsiaProductConfigInfo",
     "FuchsiaProductImageInfo",
 )
-load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_inputs")
 
 # Base source for running ffx assembly product
 _PRODUCT_ASSEMBLY_RUNNER_SH_TEMPLATE = """

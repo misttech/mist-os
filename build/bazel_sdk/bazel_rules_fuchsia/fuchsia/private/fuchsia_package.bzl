@@ -5,6 +5,7 @@
 """fuchsia_package() rule."""
 
 load("//fuchsia/private/workflows:fuchsia_package_tasks.bzl", "fuchsia_package_tasks")
+load(":fuchsia_api_level.bzl", "FUCHSIA_API_LEVEL_ATTRS", "get_fuchsia_api_level")
 load(":fuchsia_component.bzl", "fuchsia_component_for_unit_test")
 load(":fuchsia_debug_symbols.bzl", "collect_debug_symbols", "get_build_id_dirs", "strip_resources")
 load(":fuchsia_transition.bzl", "fuchsia_transition")
@@ -17,7 +18,6 @@ load(
     "FuchsiaPackagedComponentInfo",
 )
 load(":utils.bzl", "fuchsia_cpu_from_ctx", "label_name", "make_resource_struct", "rule_variants", "stub_executable")
-load(":fuchsia_api_level.bzl", "FUCHSIA_API_LEVEL_ATTRS", "get_fuchsia_api_level")
 
 _FUCHSIA_OS_PLATFORM = "@platforms//os:fuchsia"
 
@@ -376,7 +376,7 @@ def _build_fuchsia_package_impl(ctx):
         output_package_manifest,
         manifest,
         meta_far,
-    ]
+    ] + build_inputs
 
     # Sanity check that we are not trying to put 2 different resources at the same mountpoint
     collected_blobs = {}

@@ -2,6 +2,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+load("//fuchsia/private:fuchsia_package.bzl", "get_driver_component_manifests")
+load("//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
+
 # buildifier: disable=module-docstring
 load(
     ":providers.bzl",
@@ -9,8 +12,6 @@ load(
     "FuchsiaProductConfigInfo",
 )
 load(":util.bzl", "extract_labels", "replace_labels_with_files")
-load("//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
-load("//fuchsia/private:fuchsia_package.bzl", "get_driver_component_manifests")
 
 # Define build types
 BUILD_TYPES = struct(
