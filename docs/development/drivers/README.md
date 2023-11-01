@@ -43,7 +43,6 @@ DFv1 to DFv2 driver migration
 Driver development guides
 
 - [Fuchsia driver development][fuchsia-driver-development]
-- [RAMdisk Device][ramdisk-device]
 - [Composite nodes][composite-nodes]
 - [Driver runtime API guidelines][driver-runtime-api-guidelines]
 - [Drivers rubric][drivers-rubric]
@@ -142,7 +141,6 @@ Concepts
 [migrate-from-banjo-to-fidl]: migration/migrate-from-banjo-to-fidl.md
 [migrate-from-dfv1-to-dfv2]: migration/migrate-from-dfv1-to-dfv2.md
 [fuchsia-driver-development]: developer_guide/driver-development.md
-[ramdisk-device]: developer_guide/ramdisk.md
 [composite-nodes]: developer_guide/composite-node.md
 [driver-runtime-api-guidelines]: developer_guide/driver-runtime-api-guidelines.md
 [drivers-rubric]: developer_guide/rubric.md

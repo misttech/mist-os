@@ -8,8 +8,6 @@
 toc:
 - title: "Fuchsia driver development"
   path: /docs/development/drivers/developer_guide/driver-development.md
-- title: "RAMdisk Device"
-  path: /docs/development/drivers/developer_guide/ramdisk.md
 - title: "Composite nodes"
   path: /docs/development/drivers/developer_guide/composite-node.md
 - title: "Driver runtime API guidelines"
