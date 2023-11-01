@@ -61,7 +61,7 @@ impl GenerateTransferManifest {
             let blob_transfer = TransferEntry {
                 artifact_type: ArtifactType::Blobs,
                 local,
-                remote: "blobs".into(),
+                remote: "".into(),
                 entries: blob_entries,
             };
             entries.push(blob_transfer);
@@ -173,7 +173,7 @@ impl GenerateTransferManifest {
         entries.push(TransferEntry {
             artifact_type: ArtifactType::Files,
             local,
-            remote: "product_bundle".into(),
+            remote: "".into(),
             entries: product_bundle_entries,
         });
 
@@ -181,7 +181,8 @@ impl GenerateTransferManifest {
         let transfer_manifest = TransferManifest::V1(TransferManifestV1 { entries });
         let transfer_manifest_path = self.out_dir.join("transfer.json");
         let file = File::create(transfer_manifest_path).context("creating transfer manifest")?;
-        serde_json::to_writer(file, &transfer_manifest).context("writing transfer manifest")?;
+        serde_json::to_writer_pretty(file, &transfer_manifest)
+            .context("writing transfer manifest")?;
         Ok(())
     }
 }
@@ -240,7 +241,7 @@ mod tests {
         serde_json::to_writer(vd_manifest_file, &vd_manifest).unwrap();
 
         let pb = ProductBundle::V2(ProductBundleV2 {
-            product_name: "".to_string(),
+            product_name: "my-product-bundle".to_string(),
             product_version: "".to_string(),
             partitions: PartitionsConfig::default(),
             sdk_version: "".to_string(),
@@ -283,7 +284,7 @@ mod tests {
                     TransferEntry {
                         artifact_type: transfer_manifest::ArtifactType::Blobs,
                         local: "product_bundle/blobs".into(),
-                        remote: "blobs".into(),
+                        remote: "".into(),
                         entries: vec![
                             ArtifactEntry { name: "050907f009ff634f9aa57bff541fb9e9c2c62b587c23578e77637cda3bd69458".into() },
                             ArtifactEntry { name: "2881455493b5870aaea36537d70a2adc635f516ac2092598f4b6056dabc6b25d".into() },
@@ -296,7 +297,7 @@ mod tests {
                     TransferEntry {
                         artifact_type: transfer_manifest::ArtifactType::Files,
                         local: "product_bundle".into(),
-                        remote: "product_bundle".into(),
+                        remote: "".into(),
                         entries: vec![
                             ArtifactEntry { name: "fvm".into() },
                             ArtifactEntry { name: "kernel".into() },

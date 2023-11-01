@@ -42,6 +42,7 @@ const (
 	packageDirName                  = "packages"
 	sdkArchivesDirName              = "sdk"
 	toolDirName                     = "tools"
+	productBundleDirName            = "product_bundles"
 
 	// A record of all of the fuchsia debug symbols processed.
 	// This is eventually consumed by crash reporting infrastructure.
@@ -131,7 +132,9 @@ Emits a GCS upload manifest for a build with the following structure:
 │   │   │   │   ├── compliance.csv
 │   │   │   │   ├── runfiles.tar.gz (zipped check-licenses configs & artifacts)
 │   │   │   │   └── license_review.zip (output of fuchsia_license_review bazel rule)
-
+│   │   │   ├── product_bundles
+│   │   │   │   └── <product bundle name>
+│   │   │   │       └── <artifacts>
 
 Where $GCS_BUCKET is defined by the infrastructure.
 
@@ -182,6 +185,7 @@ func (cmd upCommand) execute(ctx context.Context, buildDir string) error {
 	packageNamespaceDir := path.Join(cmd.namespace, packageDirName)
 	imageNamespaceDir := path.Join(cmd.namespace, imageDirName)
 	licenseNamespaceDir := path.Join(cmd.namespace, licenseDirName)
+	productBundleDir := path.Join(cmd.namespace, productBundleDirName)
 
 	uploads := []artifactory.Upload{
 		{
@@ -248,7 +252,7 @@ func (cmd upCommand) execute(ctx context.Context, buildDir string) error {
 	uploads = append(uploads, licenses...)
 
 	// Upload the product bundles.
-	pbUploads, err := artifactory.ProductBundle2Uploads(m, blobDirName, cmd.namespace)
+	pbUploads, err := artifactory.ProductBundle2Uploads(m, blobDirName, productBundleDir)
 	if err != nil {
 		return err
 	}

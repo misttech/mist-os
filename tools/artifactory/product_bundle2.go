@@ -43,19 +43,21 @@ func ProductBundle2Uploads(mods *build.Modules, blobsRemote string, productBundl
 }
 
 func productBundle2Uploads(mods productBundlesModules, blobsRemote string, productBundleRemote string) ([]Upload, error) {
-	// There should be either 0 or 1 ProductBundles.
-	if len(mods.ProductBundles()) == 0 {
-		return []Upload{}, nil
-	} else if len(mods.ProductBundles()) == 1 {
-		return uploadProductBundle(mods, mods.ProductBundles()[0].TransferManifestPath, blobsRemote, productBundleRemote)
-	} else {
-		return nil, fmt.Errorf("expected 0 or 1 ProductBundles, found %d", len(mods.ProductBundles()))
+	var uploads []Upload
+	for _, pb := range mods.ProductBundles() {
+		pbRemoteDir := path.Join(productBundleRemote, pb.Name)
+		pbUploads, err := uploadsFromProductBundle(mods, pb.TransferManifestPath, blobsRemote, pbRemoteDir)
+		if err != nil {
+			return nil, err
+		}
+		uploads = append(uploads, pbUploads...)
 	}
+	return uploads, nil
 }
 
 // Return a list of Uploads that must happen for a specific product bundle
 // transfer manifest.
-func uploadProductBundle(mods productBundlesModules, transferManifestPath string, blobsRemote string, productBundleRemote string) ([]Upload, error) {
+func uploadsFromProductBundle(mods productBundlesModules, transferManifestPath string, blobsRemote string, productBundleRemote string) ([]Upload, error) {
 	transferManifestParentPath := filepath.Dir(transferManifestPath)
 
 	data, err := os.ReadFile(path.Join(mods.BuildDir(), transferManifestPath))
@@ -87,23 +89,23 @@ func uploadProductBundle(mods productBundlesModules, transferManifestPath string
 			for _, artifact := range entry.Entries {
 				uploads = append(uploads, Upload{
 					Source:      path.Join(mods.BuildDir(), transferManifestParentPath, entry.Local, artifact.Name),
-					Destination: path.Join(remote, entry.Remote, artifact.Name),
+					Destination: path.Join(remote, artifact.Name),
 				})
 			}
 		} else if entry.Type == "blobs" {
 			remote = blobsRemote
 			uploads = append(uploads, Upload{
 				Source:      path.Join(mods.BuildDir(), transferManifestParentPath, entry.Local),
-				Destination: path.Join(remote, entry.Remote),
+				Destination: remote,
 				Deduplicate: true,
 			})
 		} else {
 			return nil, fmt.Errorf("unrecognized transfer entry type: %s", entry.Type)
 		}
 
-		// Modify the remote inside the entry, so that we can upload this transfer
-		// manifest and use it to download the artifacts.
-		entry.Remote = path.Join(remote, entry.Remote)
+		// Modify the `remote` field inside the entry, so that we can upload
+		// this transfer manifest and use it to download the artifacts.
+		entry.Remote = remote
 		newTransferEntries = append(newTransferEntries, entry)
 	}
 

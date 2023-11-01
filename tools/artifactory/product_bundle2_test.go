@@ -34,7 +34,7 @@ func TestProductBundle2Uploads(t *testing.T) {
 			{
 				Type:   "files",
 				Local:  "",
-				Remote: "product_bundle",
+				Remote: "",
 				Entries: []ArtifactEntry{
 					{
 						Name: "123",
@@ -74,6 +74,7 @@ func TestProductBundle2Uploads(t *testing.T) {
 	m := &mockProductBundlesModules{
 		productBundles: []build.ProductBundle{
 			{
+				Name:                 "my-product-bundle",
 				Path:                 dir,
 				TransferManifestPath: transferManifestName,
 			},
@@ -87,7 +88,7 @@ func TestProductBundle2Uploads(t *testing.T) {
     {
       "type": "files",
       "local": "",
-      "remote": "namespace_pb/product_bundle",
+      "remote": "PRODUCT_BUNDLES/my-product-bundle",
       "entries": [
         {
           "name": "123"
@@ -103,7 +104,7 @@ func TestProductBundle2Uploads(t *testing.T) {
     {
       "type": "blobs",
       "local": "blobs",
-      "remote": "namespace_b",
+      "remote": "BLOBS",
       "entries": [
         {
           "name": "abc"
@@ -121,29 +122,29 @@ func TestProductBundle2Uploads(t *testing.T) {
 	expected := []Upload{
 		{
 			Source:      filepath.Join(dir, "123"),
-			Destination: filepath.Join("namespace_pb", "product_bundle", "123"),
+			Destination: filepath.Join("PRODUCT_BUNDLES", "my-product-bundle", "123"),
 		},
 		{
 			Source:      filepath.Join(dir, "sub", "456"),
-			Destination: filepath.Join("namespace_pb", "product_bundle", "sub", "456"),
+			Destination: filepath.Join("PRODUCT_BUNDLES", "my-product-bundle", "sub", "456"),
 		},
 		{
 			Source:      filepath.Join(dir, "sub", "sub", "789"),
-			Destination: filepath.Join("namespace_pb", "product_bundle", "sub", "sub", "789"),
+			Destination: filepath.Join("PRODUCT_BUNDLES", "my-product-bundle", "sub", "sub", "789"),
 		},
 		{
 			Source:      filepath.Join(dir, "blobs"),
-			Destination: filepath.Join("namespace_b"),
+			Destination: filepath.Join("BLOBS"),
 			Deduplicate: true,
 		},
 		{
 			Compress:    true,
 			Contents:    []byte(expectedTransferManifest),
-			Destination: filepath.Join("namespace_pb", "transfer.json"),
+			Destination: filepath.Join("PRODUCT_BUNDLES", "my-product-bundle", "transfer.json"),
 		},
 	}
 
-	actual, err := productBundle2Uploads(m, "namespace_b", "namespace_pb")
+	actual, err := productBundle2Uploads(m, "BLOBS", "PRODUCT_BUNDLES")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
