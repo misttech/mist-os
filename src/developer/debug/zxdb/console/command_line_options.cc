@@ -119,6 +119,9 @@ const char kNoAutoAttachLimboHelp[] = R"(  --no-auto-attach-limbo
       Disables automatically attaching to all processes found in Process Limbo
       upon successful connection.)";
 
+const char kSignalWhenReadyHelp[] = R"(  --signal-when-ready=<pid>
+      Send SIGUSR1 to pid when ready for interactive commands.)";
+
 }  // namespace
 
 cmdline::Status ParseCommandLine(int argc, const char* argv[], CommandLineOptions* options,
@@ -150,6 +153,8 @@ cmdline::Status ParseCommandLine(int argc, const char* argv[], CommandLineOption
                    &CommandLineOptions::debug_adapter_port);
   parser.AddSwitch("no-auto-attach-limbo", 'n', kNoAutoAttachLimboHelp,
                    &CommandLineOptions::no_auto_attach_limbo);
+  parser.AddSwitch("signal-when-ready", 0, kSignalWhenReadyHelp,
+                   &CommandLineOptions::signal_when_ready);
 
   // Special --help switch which doesn't exist in the options structure.
   bool requested_help = false;

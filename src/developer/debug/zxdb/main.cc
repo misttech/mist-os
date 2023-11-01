@@ -4,6 +4,7 @@
 
 #include <lib/cmdline/args_parser.h>
 #include <lib/fit/defer.h>
+#include <signal.h>
 
 #include <cstdlib>
 #include <memory>
@@ -168,6 +169,14 @@ int ConsoleMain(int argc, const char* argv[]) {
             loop.QuitNow();
           } else {
             InitConsole(*console);
+
+            // The console is now ready for interactive input.
+            if (options.signal_when_ready) {
+              int rv = kill(options.signal_when_ready, SIGUSR1);
+              if (rv != 0) {
+                LOGS(Error) << "Failed to send SIGUSR1: " << strerror(errno);
+              }
+            }
           }
         }));
 
