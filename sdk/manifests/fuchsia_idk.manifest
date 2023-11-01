@@ -284,6 +284,7 @@ host_tool://tools/arm64/fidlgen_rust
 host_tool://tools/arm64/fpublish
 host_tool://tools/arm64/fserve
 host_tool://tools/arm64/fssh
+host_tool://tools/arm64/funnel
 host_tool://tools/arm64/fvm
 host_tool://tools/arm64/merkleroot
 host_tool://tools/arm64/minfs
@@ -311,6 +312,7 @@ host_tool://tools/x64/fidlgen_rust
 host_tool://tools/x64/fpublish
 host_tool://tools/x64/fserve
 host_tool://tools/x64/fssh
+host_tool://tools/x64/funnel
 host_tool://tools/x64/fvm
 host_tool://tools/x64/merkleroot
 host_tool://tools/x64/minfs

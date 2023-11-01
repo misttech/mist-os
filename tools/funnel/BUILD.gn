@@ -4,6 +4,7 @@
 
 import("//build/host.gni")
 import("//build/rust/rustc_binary.gni")
+import("//build/sdk/sdk_host_tool.gni")
 
 rustc_binary("funnel_bin") {
   output_name = "funnel"
@@ -41,6 +42,12 @@ group("funnel") {
     ":funnel_bin($host_toolchain)",
     ":funnel_bin_test($host_toolchain)",
   ]
+}
+
+sdk_host_tool("funnel_sdk") {
+  category = "partner"
+  output_name = "funnel"
+  deps = [ ":funnel_bin" ]
 }
 
 install_host_tools("host") {
