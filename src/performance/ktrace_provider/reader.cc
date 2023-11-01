@@ -17,6 +17,19 @@ Reader::Reader(const char* buffer, size_t buffer_size)
   ZX_ASSERT(reinterpret_cast<uintptr_t>(buffer) % alignof(uint64_t) == 0);
 }
 
+std::optional<uint64_t> Reader::PeekNextHeader() {
+  if (AvailableBytes() < sizeof(uint64_t)) {
+    ReadMoreData();
+  }
+
+  if (AvailableBytes() < sizeof(uint64_t)) {
+    FX_VLOGS(10) << "No more records";
+    return std::nullopt;
+  }
+
+  return {*reinterpret_cast<const uint64_t*>(current_)};
+}
+
 const uint64_t* Reader::ReadNextRecord() {
   if (AvailableBytes() < sizeof(uint64_t)) {
     ReadMoreData();
