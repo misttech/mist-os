@@ -129,12 +129,16 @@ test("syscalls_cpp_test_bin") {
     "timerfd_test.cc",
     "trivial_test.cc",
     "udev_test.cc",
-    "uinput_test.cc",
     "uio_test.cc",
     "vdso_test.cc",
     "waitpid_exit_signal_test.cc",
     "waitpid_flags_test.cc",
   ]
+  if (target_cpu == "x64") {
+    # TODO(fxbug.dev/108588): arm64 emulator does not have Vulkan support yet.
+    # This test requires test-ui-stack.
+    sources += [ "uinput_test.cc" ]
+  }
   deps = [
     ":test_utils",
     "//sdk/fidl/fuchsia.fs:fuchsia.fs_cpp",
@@ -256,6 +260,12 @@ fuchsia_test_package("starnix_syscalls_cpp_tests") {
 
   subpackages = starnix_test_subpackages
   subpackages += [ "//src/starnix/containers/debian:debian_package" ]
+
+  if (target_cpu == "x64") {
+    # TODO(fxbug.dev/108588): arm64 emulator does not have Vulkan support yet.
+    # Without Vulkan, test-ui-stack will stuck on Scenic startup.
+    subpackages += [ "//src/ui/testing/test_ui_stack:test-ui-stack" ]
+  }
 
   deps = [
     ":extended_pstate_initial_state_child_resource",
