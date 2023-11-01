@@ -17,7 +17,8 @@ namespace ld::testing {
 // This is the common base class for test fixtures to launch a Zircon process.
 class LdLoadZirconProcessTestsBase : public LdLoadZirconLdsvcTestsBase {
  public:
-  static constexpr int64_t kRunFailure = ZX_TASK_RETCODE_EXCEPTION_KILL;
+  static constexpr int64_t kRunFailureForTrap = ZX_TASK_RETCODE_EXCEPTION_KILL;
+  static constexpr int64_t kRunFailureForBadPointer = ZX_TASK_RETCODE_EXCEPTION_KILL;
 
   ~LdLoadZirconProcessTestsBase();
 

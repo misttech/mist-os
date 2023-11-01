@@ -277,7 +277,7 @@ TYPED_TEST(LdLoadFailureTests, MissingSymbol) {
 
   ASSERT_NO_FATAL_FAILURE(this->Load("missing-sym"));
 
-  EXPECT_EQ(this->Run(), this->kRunFailure);
+  EXPECT_EQ(this->Run(), this->kRunFailureForTrap);
 
   this->ExpectLog(R"(undefined symbol: b
 startup dynamic linking failed with 1 errors and 0 warnings
@@ -291,11 +291,21 @@ TYPED_TEST(LdLoadFailureTests, MissingDependency) {
 
   ASSERT_NO_FATAL_FAILURE(this->Load("missing-dep"));
 
-  EXPECT_EQ(this->Run(), this->kRunFailure);
+  EXPECT_EQ(this->Run(), this->kRunFailureForTrap);
 
   this->ExpectLog(R"(cannot open dependency: libmissing-dep-dep.so
 startup dynamic linking failed with 1 errors and 0 warnings
 )");
+}
+
+TYPED_TEST(LdLoadFailureTests, Relro) {
+  ASSERT_NO_FATAL_FAILURE(this->Init());
+
+  ASSERT_NO_FATAL_FAILURE(this->Load("relro"));
+
+  EXPECT_EQ(this->Run(), this->kRunFailureForBadPointer);
+
+  this->ExpectLog("");
 }
 
 }  // namespace

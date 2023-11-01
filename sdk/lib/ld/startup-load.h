@@ -45,8 +45,6 @@ using Phdr = typename Elf::Phdr;
 using Sym = typename Elf::Sym;
 using Dyn = typename Elf::Dyn;
 
-using RelroBounds = decltype(elfldltl::RelroBounds(Phdr{}, 0));
-
 // StartupLoadModule::Load returns this.
 struct StartupLoadResult {
   // This is the number of DT_NEEDED entries seen.  Their strings can't be
@@ -178,7 +176,7 @@ struct StartupLoadModule : public StartupLoadModuleBase,
 
   void set_relro(std::optional<Phdr> relro_phdr) {
     if (relro_phdr) {
-      relro_ = elfldltl::RelroBounds(*relro_phdr, loader_.page_size());
+      relro_ = this->load_info().RelroBounds(*relro_phdr, loader_.page_size());
     }
   }
 
@@ -354,8 +352,7 @@ struct StartupLoadModule : public StartupLoadModuleBase,
   static void RelocateModules(Diagnostics& diag, List& modules) {
     for (auto& module : modules) {
       module.Relocate(diag, modules);
-
-      // TODO: Apply relro
+      module.ProtectRelro(diag);
     }
   }
 
@@ -431,7 +428,7 @@ struct StartupLoadModule : public StartupLoadModuleBase,
 
   Loader loader_;  // Must be initialized by constructor.
   cpp20::span<const Dyn> dynamic_;
-  RelroBounds relro_{};
+  LoadInfo::Region relro_{};
 };
 
 }  // namespace ld

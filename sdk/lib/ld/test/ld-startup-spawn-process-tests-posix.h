@@ -5,6 +5,8 @@
 #ifndef LIB_LD_TEST_LD_STARTUP_SPAWN_PROCESS_TESTS_POSIX_H_
 #define LIB_LD_TEST_LD_STARTUP_SPAWN_PROCESS_TESTS_POSIX_H_
 
+#include <signal.h>
+
 #include <cstdint>
 #include <initializer_list>
 #include <string>
@@ -25,7 +27,8 @@ namespace ld::testing {
 // what to do.
 class LdStartupSpawnProcessTests : public ::testing::Test, public LdLoadTestsBase {
  public:
-  static constexpr int64_t kRunFailure = 128 + SIGILL;
+  static constexpr int64_t kRunFailureForTrap = 128 + SIGILL;
+  static constexpr int64_t kRunFailureForBadPointer = 128 + SIGSEGV;
 
   void Init(std::initializer_list<std::string_view> args = {});
 

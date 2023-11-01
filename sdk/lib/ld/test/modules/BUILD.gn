@@ -33,6 +33,7 @@ in_process_executables = [
 executables = [
   ":missing-dep",
   ":missing-sym",
+  ":relro",
 ]
 
 shlibs = [
@@ -517,4 +518,9 @@ ifs_shared_library("missing-dep-dep") {
 test_executable("missing-dep") {
   sources = [ "missing-dep.cc" ]
   deps = [ ":missing-dep-dep" ]
+}
+
+test_executable("relro") {
+  sources = [ "relro.cc" ]
+  deps = [ "//zircon/system/public" ]
 }
