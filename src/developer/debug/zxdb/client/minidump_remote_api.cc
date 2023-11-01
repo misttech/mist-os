@@ -386,6 +386,19 @@ void MinidumpRemoteAPI::Hello(const debug_ipc::HelloRequest& request,
       break;
   }
 
+  switch (minidump_->System()->GetOperatingSystem()) {
+    case crashpad::SystemSnapshot::kOperatingSystemFuchsia:
+      reply.platform = debug::Platform::kFuchsia;
+      break;
+    case crashpad::SystemSnapshot::kOperatingSystemLinux:
+      reply.platform = debug::Platform::kLinux;
+      break;
+    case crashpad::SystemSnapshot::kOperatingSystemUnknown:
+    default:
+      reply.platform = debug::Platform::kUnknown;
+      break;
+  }
+
   // Assume 4K page size since minidumps don't include this information.
   reply.page_size = 4096;
 

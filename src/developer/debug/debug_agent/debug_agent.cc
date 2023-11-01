@@ -140,6 +140,7 @@ void DebugAgent::OnHello(const debug_ipc::HelloRequest& request, debug_ipc::Hell
   reply->version = ipc_version_;
   reply->arch = arch::GetCurrentArch();
   reply->page_size = zx_system_get_page_size();
+  reply->platform = debug::CurrentSystemPlatform();
 
   // Only enable log backend after the handshake is finished.
   debug::LogBackend::Set(this, true);

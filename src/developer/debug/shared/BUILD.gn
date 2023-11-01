@@ -13,6 +13,7 @@ sdk_source_set("shared") {
   sources = [
     "address_range.cc",
     "address_range.h",
+    "arch.cc",
     "arch.h",
     "arch_arm64.h",
     "arch_x86.cc",
@@ -25,6 +26,8 @@ sdk_source_set("shared") {
     "largest_less_or_equal.h",
     "message_loop.cc",
     "message_loop.h",
+    "platform.cc",
+    "platform.h",
     "platform_message_loop.h",
     "regex.cc",
     "regex.h",

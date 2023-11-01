@@ -9,12 +9,16 @@
 
 namespace debug {
 
+// Only append to this list, the values are encoded in the IPC protocol which has stability
+// guarantees.
 enum class Arch : uint32_t {
   kUnknown = 0,
   kX64,
   kArm64,
   kRiscv64,
 };
+
+const char* ArchToString(Arch a);
 
 }  // namespace debug
 

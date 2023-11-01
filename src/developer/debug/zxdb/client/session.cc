@@ -212,28 +212,51 @@ void Session::PendingConnection::ConnectCompleteMainThread(fxl::RefPtr<PendingCo
 
 void Session::PendingConnection::DataAvailableMainThread(fxl::RefPtr<PendingConnection> owner) {
   // This function needs to manually deserialize the hello message since the Session stuff isn't
-  // connected yet.
-  constexpr size_t kHelloMessageSize =
-      debug_ipc::MsgHeader::kSerializedHeaderSize + sizeof(debug_ipc::HelloReply);
+  // connected yet. In version 58 a 32-bit "platform" enum was added.
+  if (!buffer_->stream().IsAvailable(debug_ipc::MsgHeader::kSerializedHeaderSize))
+    return;  // Wait for more data.
 
-  if (!buffer_->stream().IsAvailable(kHelloMessageSize))
+  std::vector<char> serialized_header;
+  serialized_header.resize(debug_ipc::MsgHeader::kSerializedHeaderSize);
+  buffer_->stream().Peek(serialized_header.data(), debug_ipc::MsgHeader::kSerializedHeaderSize);
+
+  // Header doesn't have a version.
+  debug_ipc::MessageReader reader(std::move(serialized_header), 0);
+  debug_ipc::MsgHeader header;
+  reader | header;
+  // Since we already validated there is enough data for the header, the header read should not
+  // fail (it's just a memcpy).
+  FX_CHECK(!reader.has_error());
+
+  // Sanity checking on the size to prevent crashes.
+  if (header.size > kMaxMessageSize) {
+    LOGS(Error) << "Bad message received of size " << static_cast<uint32_t>(header.size) << "."
+                << "(type = " << static_cast<unsigned>(header.type)
+                << ", transaction = " << static_cast<unsigned>(header.transaction_id) << ")";
+    HelloCompleteMainThread(std::move(owner), Err("Reply too large"), debug_ipc::HelloReply());
+    return;
+  }
+
+  if (!buffer_->stream().IsAvailable(header.size))
     return;  // Wait for more data.
 
   std::vector<char> serialized;
-  serialized.resize(kHelloMessageSize);
-  size_t read = buffer_->stream().Read(serialized.data(), kHelloMessageSize);
+  serialized.resize(header.size);
+  buffer_->stream().Read(serialized.data(), header.size);
 
   debug_ipc::HelloReply reply;
   Err err;
 
-  if (read != kHelloMessageSize) {
-    err = Err("Connection to the debug agent is broken.");
+  // Deserialize with version 0 to get the initial fields including the version.
+  uint32_t transaction_id = 0;
+  if (!debug_ipc::Deserialize(serialized, &reply, &transaction_id, 0) ||
+      reply.signature != debug_ipc::HelloReply::kStreamSignature) {
+    // Corrupt.
+    err = Err("Corrupted reply, service is probably not the debug agent.");
   } else {
-    uint32_t transaction_id = 0;
-    if (!debug_ipc::Deserialize(std::move(serialized), &reply, &transaction_id, 0) ||
-        reply.signature != debug_ipc::HelloReply::kStreamSignature) {
-      // Corrupt.
-      err = Err("Corrupted reply, service is probably not the debug agent.");
+    // Now deserialize with the given version to get all of the fields.
+    if (!debug_ipc::Deserialize(serialized, &reply, &transaction_id, reply.version)) {
+      err = Err("Version mismatch in reply.");
     }
   }
 
@@ -265,14 +288,15 @@ Err Session::PendingConnection::DoConnectBackgroundThread() {
 
 Session::Session()
     : remote_api_(std::make_unique<RemoteAPIImpl>(this)), system_(this), weak_factory_(this) {
-  SetArch(debug::Arch::kUnknown, 0);
+  SetArch(debug::Arch::kUnknown, debug::Platform::kUnknown, 0);
 
   ListenForSystemSettings();
 }
 
-Session::Session(std::unique_ptr<RemoteAPI> remote_api, debug::Arch arch, uint64_t page_size)
+Session::Session(std::unique_ptr<RemoteAPI> remote_api, debug::Arch arch, debug::Platform platform,
+                 uint64_t page_size)
     : remote_api_(std::move(remote_api)), system_(this), arch_(arch), weak_factory_(this) {
-  Err err = SetArch(arch, page_size);
+  Err err = SetArch(arch, platform, page_size);
   FX_DCHECK(!err.has_error());  // Should not fail for synthetically set-up architectures.
 
   ListenForSystemSettings();
@@ -305,7 +329,6 @@ void Session::OnStreamReadable() {
     // fail (it's just a memcpy).
     FX_CHECK(!reader.has_error());
 
-    // Sanity checking on the size to prevent crashes.
     if (header.size > kMaxMessageSize) {
       LOGS(Error) << "Bad message received of size " << static_cast<uint32_t>(header.size) << "."
                   << "(type = " << static_cast<unsigned>(header.type)
@@ -416,12 +439,13 @@ void Session::Connect(const SessionConnectionInfo& info, fit::callback<void(cons
       });
 }
 
-Err Session::SetArch(debug::Arch arch, uint64_t page_size) {
+Err Session::SetArch(debug::Arch arch, debug::Platform platform, uint64_t page_size) {
   arch_info_ = std::make_unique<ArchInfo>();
 
   Err arch_err = arch_info_->Init(arch, page_size);
   if (!arch_err.has_error()) {
     arch_ = arch;
+    platform_ = platform;
   } else {
     LOGS(Error) << "Fail to init ArchInfo: " << arch_err.msg();
     // Rollback to default-initialized ArchInfo;
@@ -461,7 +485,7 @@ void Session::OpenMinidump(const std::string& path, fit::callback<void(const Err
                      [callback = std::move(callback), weak_this = GetWeakPtr()](
                          const Err& err, debug_ipc::HelloReply reply) mutable {
                        if (weak_this && !err.has_error()) {
-                         weak_this->SetArch(reply.arch, reply.page_size);
+                         weak_this->SetArch(reply.arch, reply.platform, reply.page_size);
                        }
 
                        callback(err);
@@ -743,7 +767,7 @@ Err Session::ResolvePendingConnection(fxl::RefPtr<PendingConnection> pending,
   remote_api_->SetVersion(reply.version);
 
   // Initialize arch-specific stuff.
-  Err err = SetArch(reply.arch, reply.page_size);
+  Err err = SetArch(reply.arch, reply.platform, reply.page_size);
   if (err.has_error()) {
     return err;
   }

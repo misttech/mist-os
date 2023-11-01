@@ -20,11 +20,12 @@ namespace {
 template <typename RequestMsg, typename ReplyMsg>
 void DispatchMessage(RemoteAPIAdapter* adapter,
                      void (RemoteAPI::*handler)(const RequestMsg&, ReplyMsg*),
-                     std::vector<char> data, const char* type_string, uint32_t version) {
+                     std::vector<char> data, const char* type_string) {
   RequestMsg request;
 
   uint32_t transaction_id = 0;
-  if (!debug_ipc::Deserialize(std::move(data), &request, &transaction_id, version)) {
+  if (!debug_ipc::Deserialize(std::move(data), &request, &transaction_id,
+                              adapter->api()->GetVersion())) {
     LOGS(Error) << "Got bad debugger " << type_string << "Request, ignoring.";
     return;
   }
@@ -32,7 +33,10 @@ void DispatchMessage(RemoteAPIAdapter* adapter,
   ReplyMsg reply;
   (adapter->api()->*handler)(request, &reply);
 
-  adapter->stream()->Write(debug_ipc::Serialize(reply, transaction_id, version));
+  // Re-get the version after processing the handler. For the "hello" message, the version is set
+  // during processing of the message.
+  adapter->stream()->Write(
+      debug_ipc::Serialize(reply, transaction_id, adapter->api()->GetVersion()));
 }
 
 }  // namespace
@@ -60,10 +64,10 @@ void RemoteAPIAdapter::OnStreamReadable() {
 // struct type, and reply struct type are all based on the message type name.
 // For example, MsgHeader::Type::kFoo will call:
 //   api->OnFoo(FooRequest, FooReply*);
-#define DISPATCH(msg_type)                                                                 \
-  case debug_ipc::MsgHeader::Type::k##msg_type:                                            \
-    DispatchMessage<debug_ipc::msg_type##Request, debug_ipc::msg_type##Reply>(             \
-        this, &RemoteAPI::On##msg_type, std::move(buffer), #msg_type, api_->GetVersion()); \
+#define DISPATCH(msg_type)                                                     \
+  case debug_ipc::MsgHeader::Type::k##msg_type:                                \
+    DispatchMessage<debug_ipc::msg_type##Request, debug_ipc::msg_type##Reply>( \
+        this, &RemoteAPI::On##msg_type, std::move(buffer), #msg_type);         \
     break;
 
       FOR_EACH_REQUEST_TYPE(DISPATCH)

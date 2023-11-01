@@ -94,8 +94,9 @@ class RemoteAPITest : public TestWithLoop {
   // mock_remote_api();
   virtual std::unique_ptr<RemoteAPI> GetRemoteAPIImpl();
 
-  // Allows tests to override the architecture for the test to run in. Defaults to x64.
+  // Allows tests to override the architecture for the test to run in. Defaults to x64/Fuchsia.
   virtual debug::Arch GetArch() const { return debug::Arch::kX64; }
+  virtual debug::Platform GetPlatform() const { return debug::Platform::kFuchsia; }
 
  private:
   std::unique_ptr<Session> session_;

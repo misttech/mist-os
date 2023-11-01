@@ -8,6 +8,7 @@
 #include "lib/syslog/cpp/macros.h"
 #include "src/developer/debug/ipc/records.h"
 #include "src/developer/debug/shared/arch.h"
+#include "src/developer/debug/shared/platform.h"
 #include "src/developer/debug/shared/register_info.h"
 #include "src/developer/debug/shared/serialization.h"
 #include "src/developer/debug/shared/status.h"
@@ -35,7 +36,7 @@ namespace debug_ipc {
 // CURRENT_SUPPORTED_API_LEVEL is equal to FUCHSIA_API_LEVEL specified in version_history.json.
 // If not, continue reading the comments below.
 
-constexpr uint32_t kCurrentProtocolVersion = 57;
+constexpr uint32_t kCurrentProtocolVersion = 58;
 
 // How to decide kMinimumProtocolVersion
 // -------------------------------------
@@ -220,8 +221,19 @@ struct HelloReply {
   uint32_t version = 0;
   debug::Arch arch = debug::Arch::kUnknown;
   uint64_t page_size = 0;
+  debug::Platform platform = debug::Platform::kUnknown;
 
-  void Serialize(Serializer& ser, uint32_t ver) { ser | signature | version | arch | page_size; }
+  // Danger: The HelloReply is special because it is used to set up the rest of the IPC
+  // communication.
+  //
+  // It will get deserialized with |ver| = 0 to extract the |signature| and |version| member, and
+  // then it will get deserialized again with the correct version to get everything else.
+  void Serialize(Serializer& ser, uint32_t ver) {
+    ser | signature | version | arch | page_size;
+    if (ver >= 58) {
+      ser | platform;
+    }
+  }
 };
 
 enum class InferiorType : uint32_t {

@@ -13,6 +13,7 @@
 
 #include "lib/fit/function.h"
 #include "src/developer/debug/ipc/protocol.h"
+#include "src/developer/debug/shared/platform.h"
 #include "src/developer/debug/zxdb/client/arch_info.h"
 #include "src/developer/debug/zxdb/client/component_observer.h"
 #include "src/developer/debug/zxdb/client/session_observer.h"
@@ -68,7 +69,8 @@ class Session : public SettingStoreObserver {
 
   // Creates a session using a custom RemoteAPI implementation. Use for tests to mock out sending
   // IPC messages.
-  Session(std::unique_ptr<RemoteAPI> remote_api, debug::Arch arch, uint64_t page_size);
+  Session(std::unique_ptr<RemoteAPI> remote_api, debug::Arch arch, debug::Platform platform,
+          uint64_t page_size);
 
   // Creates with a previously-allocated connection. The pointer must outlive this class. In this
   // mode, the stream can not be disconnected.
@@ -143,8 +145,9 @@ class Session : public SettingStoreObserver {
   // Access to the singleton corresponding to the debugged system.
   System& system() { return system_; }
 
-  // Architecture of the attached system. Will be "kUnknown" when not connected.
+  // Platform/architecture of the attached system. Will be "kUnknown" when not connected.
   debug::Arch arch() const { return arch_; }
+  debug::Platform platform() const { return platform_; }
 
   // Architecture information of the attached system.
   const ArchInfo& arch_info() const { return *arch_info_; }
@@ -197,7 +200,7 @@ class Session : public SettingStoreObserver {
   using Callback = fit::callback<void(const Err&, std::vector<char>)>;
 
   // Set the arch_ and arch_info_ fields.
-  Err SetArch(debug::Arch arch, uint64_t page_size);
+  Err SetArch(debug::Arch arch, debug::Platform platform, uint64_t page_size);
 
   // Checks whether it's safe to begin establishing a connection. If not, the callback is invoked
   // with details. The opening_dump argument indicates whether we are trying to open a dump file
@@ -279,6 +282,7 @@ class Session : public SettingStoreObserver {
   System system_;
 
   debug::Arch arch_ = debug::Arch::kUnknown;
+  debug::Platform platform_ = debug::Platform::kUnknown;
   std::unique_ptr<ArchInfo> arch_info_;  // Guaranteed non-null.
 
   // The last connection that was made by the session. Will have an empty host and a 0 port
