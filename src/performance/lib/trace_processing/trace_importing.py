@@ -3,12 +3,18 @@
 # found in the LICENSE file.
 """Logic to deserialize a trace Model from JSON."""
 
-import json
 from collections import defaultdict
-from typing import Any, Dict, List, Optional, Self, TextIO, Tuple
+import json
+import logging
+import os
+import subprocess
+from typing import Any, Dict, List, Optional, Self, TextIO, Tuple, Union
 
 import trace_processing.trace_model as trace_model
 import trace_processing.trace_time as trace_time
+
+
+_LOGGER: logging.Logger = logging.getLogger("Performance")
 
 
 class _FlowKey:
@@ -156,7 +162,54 @@ class _AsyncKey:
         return result
 
 
-def create_model_from_file_path(path: str) -> trace_model.Model:
+def convert_trace_file_to_json(
+    trace_path: Union[str, os.PathLike],
+    trace2json_path: Union[str, os.PathLike],
+    compressed_input: bool = False,
+    compressed_output: bool = False,
+) -> str:
+    """Converts the specified trace file to JSON.
+
+    Args:
+      trace_path: The path to the trace file to convert.
+      trace2json_path: The path to the trace2json executable.
+      compressed_input: Whether the input file is compressed.
+      compressed_output: Whether the output file should be compressed.
+
+    Raises:
+      subprocess.CalledProcessError: The trace2json process returned an error.
+
+    Returns:
+      The path to the converted trace file.
+    """
+    _LOGGER.info(f"Converting {trace_path} to json")
+
+    compressed_ext: str = ".gz"
+    output_extension: str = ".json" + (
+        compressed_ext if compressed_output else ""
+    )
+    base_path, first_ext = os.path.splitext(str(trace_path))
+    if first_ext == compressed_ext:
+        base_path, _ = os.path.splitext(base_path)
+    output_path = base_path + output_extension
+
+    args: List[str] = [
+        str(trace2json_path),
+        f"--input-file={trace_path}",
+        f"--output-file={output_path}",
+    ]
+    if compressed_input or trace_path.endswith(compressed_ext):
+        args.append("--compressed-input")
+
+    _LOGGER.info(f"Running {args}")
+    subprocess.check_call(args)
+
+    return output_path
+
+
+def create_model_from_file_path(
+    path: Union[str, os.PathLike]
+) -> trace_model.Model:
     """Create a Model from a file path.
 
     Args:
@@ -166,7 +219,7 @@ def create_model_from_file_path(path: str) -> trace_model.Model:
         A Model object.
     """
 
-    with open(path, "r") as file:
+    with open(str(path), "r") as file:
         return create_model_from_file(file)
 
 
@@ -520,26 +573,30 @@ def create_model_from_json(root_object: Dict[str, Any]) -> trace_model.Model:
     # Print warnings about anomalous conditions in the trace.
     live_duration_events_count = sum(len(ds) for ds in duration_stacks.values())
     if live_duration_events_count > 0:
-        print(
+        _LOGGER.warning(
             f"Warning, finished processing trace events with "
             f"{live_duration_events_count} in progress duration events"
         )
     if live_async_events:
-        print(
+        _LOGGER.warning(
             f"Warning, finished processing trace events with "
             f"{len(live_async_events)} in progress async events"
         )
     if live_flows:
-        print(
+        _LOGGER.warning(
             f"Warning, finished processing trace events with {len(live_flows)} "
             f"in progress flow events"
         )
     if dropped_async_event_counter > 0:
-        print(f"Warning, dropped {dropped_async_event_counter} async events")
+        _LOGGER.warning(
+            f"Warning, dropped {dropped_async_event_counter} async events"
+        )
     if dropped_flow_event_counter > 0:
-        print(f"Warning, dropped {dropped_flow_event_counter} flow events")
+        _LOGGER.warning(
+            f"Warning, dropped {dropped_flow_event_counter} flow events"
+        )
     if dropped_nested_async_event_counter > 0:
-        print(
+        _LOGGER.warning(
             f"Warning, dropped {dropped_nested_async_event_counter} nested "
             f"async events"
         )
@@ -642,7 +699,9 @@ def create_model_from_json(root_object: Dict[str, Any]) -> trace_model.Model:
                 # addition to wall durations.
                 pass
             else:
-                print(f"Unknown phase {phase} from {system_trace_event}")
+                _LOGGER.warning(
+                    f"Unknown phase {phase} from {system_trace_event}"
+                )
 
     # Construct the map of Processes.
     processes: Dict[int, trace_model.Process] = {}

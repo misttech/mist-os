@@ -10,10 +10,58 @@ import unittest
 import trace_processing.trace_model as trace_model
 import trace_processing.trace_time as trace_time
 import trace_processing.trace_utils as trace_utils
+import test_utils
 
 
 class TraceUtilsTest(unittest.TestCase):
     """Trace utils tests"""
+
+    def test_compute_stats(self) -> None:
+        self.assertAlmostEqual(trace_utils.mean([1.0, 2.0, 3.0]), 2.0)
+        self.assertAlmostEqual(
+            trace_utils.variance([1.0, 2.0, 3.0]), 0.6666666666666666
+        )
+        self.assertAlmostEqual(
+            trace_utils.standard_deviation([1.0, 2.0, 3.0]),
+            0.816496580927726,
+        )
+
+        self.assertAlmostEqual(
+            trace_utils.percentile(
+                [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0], 25
+            ),
+            3.0,
+        )
+        self.assertAlmostEqual(
+            trace_utils.percentile(
+                [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0], 50
+            ),
+            5.0,
+        )
+        self.assertAlmostEqual(
+            trace_utils.percentile(
+                [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0], 75
+            ),
+            7.0,
+        )
+        self.assertAlmostEqual(
+            trace_utils.percentile(
+                [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0], 25
+            ),
+            3.25,
+        )
+        self.assertAlmostEqual(
+            trace_utils.percentile(
+                [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0], 50
+            ),
+            5.5,
+        )
+        self.assertAlmostEqual(
+            trace_utils.percentile(
+                [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0], 75
+            ),
+            7.75,
+        )
 
     def test_filter_events(self) -> None:
         events: List[trace_model.Event] = [
@@ -134,3 +182,17 @@ class TraceUtilsTest(unittest.TestCase):
             )
         )
         self.assertEqual(filtered3, [])
+
+    def test_total_event_duration(self) -> None:
+        model: trace_model.Model = test_utils.get_test_model()
+        mode_duration: trace_time.TimeDelta = (
+            trace_time.TimeDelta.from_microseconds(
+                test_utils.TEST_MODEL_END_TIME_IN_US
+            )
+            - trace_time.TimeDelta.from_microseconds(
+                test_utils.TEST_MODEL_BEGIN_TIME_IN_US
+            )
+        )
+        self.assertEqual(
+            trace_utils.total_event_duration(model.all_events()), mode_duration
+        )

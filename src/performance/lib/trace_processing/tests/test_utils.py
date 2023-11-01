@@ -9,6 +9,9 @@ import unittest
 import trace_processing.trace_model as trace_model
 import trace_processing.trace_time as trace_time
 
+TEST_MODEL_BEGIN_TIME_IN_US: float = 697503138.0
+TEST_MODEL_END_TIME_IN_US: float = 698607465.375
+
 
 def get_test_model() -> trace_model.Model:
     read_event = trace_model.DurationEvent(
@@ -48,12 +51,14 @@ def get_test_model() -> trace_model.Model:
     async_read_write_event = trace_model.AsyncEvent(
         id=43,
         duration=trace_time.TimeDelta.from_microseconds(698607461.0)
-        - trace_time.TimeDelta.from_microseconds(697503138.0),
+        - trace_time.TimeDelta.from_microseconds(TEST_MODEL_BEGIN_TIME_IN_US),
         base=trace_model.Event(
             category="io",
             name="AsyncReadWrite",
             start=trace_time.TimePoint.from_epoch_delta(
-                trace_time.TimeDelta.from_microseconds(int(697503138.0))
+                trace_time.TimeDelta.from_microseconds(
+                    int(TEST_MODEL_BEGIN_TIME_IN_US)
+                )
             ),
             pid=7009,
             tid=7022,
@@ -134,7 +139,9 @@ def get_test_model() -> trace_model.Model:
             category="system_metrics",
             name="cpu_usage",
             start=trace_time.TimePoint.from_epoch_delta(
-                trace_time.TimeDelta.from_microseconds(698607465.375)
+                trace_time.TimeDelta.from_microseconds(
+                    TEST_MODEL_END_TIME_IN_US
+                )
             ),
             pid=7010,
             tid=7023,

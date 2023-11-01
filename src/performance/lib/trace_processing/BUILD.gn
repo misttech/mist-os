@@ -9,7 +9,10 @@ python_library("trace_processing") {
   library_name = "trace_processing"
   sources = [
     "__init__.py",
+    "metrics/__init__.py",
+    "metrics/cpu.py",
     "trace_importing.py",
+    "trace_metrics.py",
     "trace_model.py",
     "trace_time.py",
     "trace_utils.py",
