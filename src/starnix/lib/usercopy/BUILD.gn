@@ -1,0 +1,76 @@
+# Copyright 2023 The Fuchsia Authors
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/toolchain/zircon/user_basic_redirect.gni")
+import("//build/zircon/hermetic_code_blob.gni")
+
+group("tests") {
+  testonly = true
+  if (target_cpu == "x64") {
+    deps = [ ":usercopy-unittests" ]
+  }
+}
+
+# TODO: Implement support for non-x86_64 arches
+
+if (target_cpu == "x64") {
+  static_library("hermetic_copy_error") {
+    sources = [ "hermetic_copy_error.S" ]
+  }
+
+  rustc_library("usercopy") {
+    edition = "2021"
+    sources = [ "src/lib.rs" ]
+    deps = [
+      "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+      "//src/lib/fdio/rust:fdio",
+      "//src/lib/fuchsia-runtime",
+      "//src/lib/zircon/rust:fuchsia-zircon",
+      "//third_party/rust_crates:zerocopy",
+    ]
+    non_rust_deps = [ ":hermetic_copy_error" ]
+    with_unit_tests = true
+    test_deps = [ "//src/lib/fuchsia" ]
+  }
+
+  fuchsia_test_component("usercopy-unittests-component") {
+    component_name = "usercopy_test"
+    manifest = "meta/usercopy_test.cml"
+    deps = [
+      ":hermetic_copy_bin.basic",
+      ":usercopy_test",
+    ]
+  }
+
+  fuchsia_test_package("usercopy-unittests") {
+    test_components = [ ":usercopy-unittests-component" ]
+  }
+
+  user_basic_redirect("hermetic_copy_bin.basic") {
+    visibility = [ ":*" ]
+    testonly = true
+
+    public_deps = [ ":hermetic_copy_bin" ]
+  }
+
+  hermetic_code_blob("hermetic_copy") {
+    public = [ "hermetic_copy.h" ]
+    sources = [ "hermetic_copy.cc" ]
+    public_deps = [ "//zircon/system/public" ]
+
+    # TODO(fxbug.dev/129545): LLD lets --no-pie trump the code generation
+    # switches, but this needs to be compiled as PIC though linked differently.
+    if (toolchain_variant.tags + [ "lto" ] - [ "lto" ] !=
+        toolchain_variant.tags) {
+      ldflags = [ "-Wl,-mllvm,-relocation-model=pic" ]
+    }
+  }
+
+  resource("hermetic_copy_bin") {
+    deps = [ ":hermetic_copy" ]
+    sources = get_target_outputs(deps[0])
+    outputs = [ "hermetic_copy.bin" ]
+  }
+}
