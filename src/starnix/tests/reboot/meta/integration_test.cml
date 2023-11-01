@@ -21,9 +21,10 @@
     offer: [
         {
             protocol: [
+                "fuchsia.buildinfo.Provider",
                 "fuchsia.kernel.Stats",
-                "fuchsia.sysinfo.SysInfo",
                 "fuchsia.kernel.VmexResource",
+                "fuchsia.sysinfo.SysInfo",
             ],
             from: "parent",
             to: "#realm_builder",

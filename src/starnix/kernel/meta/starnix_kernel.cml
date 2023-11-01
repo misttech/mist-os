@@ -48,6 +48,7 @@
         },
         {
             protocol: [
+                "fuchsia.buildinfo.Provider",
                 "fuchsia.kernel.Stats",
                 "fuchsia.net.interfaces.State",
                 "fuchsia.net.root.Interfaces",

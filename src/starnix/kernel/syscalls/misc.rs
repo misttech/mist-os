@@ -4,14 +4,21 @@
 
 use fuchsia_zircon as zx;
 
+use fidl_fuchsia_buildinfo as buildinfo;
 use fidl_fuchsia_hardware_power_statecontrol as fpower;
 use fuchsia_component::client::connect_to_protocol_sync;
+use once_cell::sync::Lazy;
 
 use crate::{
-    logging::log_info,
+    logging::{log_error, log_info},
     mm::{MemoryAccessor, MemoryAccessorExt},
     syscalls::{decls::SyscallDecl, *},
 };
+
+pub static BUILDINFO_PROVIDER: Lazy<buildinfo::ProviderSynchronousProxy> = Lazy::new(|| {
+    connect_to_protocol_sync::<buildinfo::ProviderMarker>()
+        .expect("couldn't connect to buildinfo::ProviderMarker")
+});
 
 pub fn sys_uname(
     _locked: &mut Locked<'_, Unlocked>,
@@ -38,7 +45,13 @@ pub fn sys_uname(
     } else {
         init_array(&mut result.release, b"5.7.17-starnix");
     }
-    init_array(&mut result.version, b"starnix");
+
+    let buildinfo = BUILDINFO_PROVIDER.get_build_info(zx::Time::INFINITE).map_err(|e| {
+        log_error!("FIDL error getting build info: {e}");
+        errno!(EIO)
+    })?;
+
+    init_array(&mut result.version, buildinfo.version.unwrap_or("starnix".to_string()).as_bytes());
     init_array(&mut result.machine, b"x86_64");
 
     {
