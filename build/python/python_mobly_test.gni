@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/host.gni")
 import("//build/images/tools/fastboot.gni")
 import("//build/python/python_binary.gni")
 import("//build/testing/host_test.gni")
@@ -172,10 +173,17 @@ template("python_mobly_test") {
   # form of Fuchsia interactions so including FFX in this template would
   # centralize this data deps for all users.
 
+  # TODO(fxbug.dev/308682042): ideally the `host_test` below depends directly
+  # on the data_dep: `//src/developer/ffx:suite_test_data` and uses ffx from
+  # `rebase_path("${root_out_dir}/ffx", root_build_dir)`. That works locally,
+  # but it fails in CQ due to the mobly driver ignoring this arg.
   _ffx_test_data_target = "${target_name}_ffx_bin_test_data"
   host_test_data(_ffx_test_data_target) {
-    sources = [ "${root_out_dir}/ffx" ]
-    deps = [ "//src/developer/ffx:ffx_bin" ]
+    sources = [ "${host_tools_dir}/ffx" ]
+    deps = [
+      "//src/developer/ffx:host",
+      "//src/developer/ffx:suite_test_data",
+    ]
     outputs = [ "${_test_dir}/ffx" ]
   }
 
