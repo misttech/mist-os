@@ -50,7 +50,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+
+    use super::{generic_parse_mount_options, parse};
+    use crate::fs::FsStr;
+    use std::collections::HashMap;
 
     #[::fuchsia::test]
     fn empty_data() {
