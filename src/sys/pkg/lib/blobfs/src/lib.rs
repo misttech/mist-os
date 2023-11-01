@@ -281,12 +281,16 @@ impl Client {
                         error!("Transport error on get_vmo: {:?}", e);
                         return send_on_open_with_error(describe, server_end, zx::Status::INTERNAL);
                     }
-                    Ok(Err(e)) => {
-                        warn!("Failed to get vmo: {:?}", zx::Status::from_raw(e));
+                    Ok(Err(s)) => {
+                        warn!(
+                            error = ?zx::Status::from_raw(s),
+                            blob = %hash,
+                            "Failed to get vmo from reader"
+                        );
                         return send_on_open_with_error(
                             describe,
                             server_end,
-                            zx::Status::from_raw(e),
+                            zx::Status::from_raw(s),
                         );
                     }
                     Ok(Ok(vmo)) => vmo,
