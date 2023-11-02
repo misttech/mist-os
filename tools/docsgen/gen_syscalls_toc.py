@@ -98,7 +98,7 @@ def gen_readme_and_toc(data, reference_root):
             label = entry["filename"][:-3]
             filename = entry["filename"]
             summary = entry["summary"]
-            print(f"* [{label}]({filename} - {summary}", file=readme)
+            print(f"* [{label}]({filename}) - {summary}", file=readme)
             print(f'  - title: "zx_{label}"', file=toc)
             print(f"    path: {reference_root}/{filename}", file=toc)
         print("", file=readme)
