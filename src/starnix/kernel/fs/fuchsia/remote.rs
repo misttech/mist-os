@@ -5,6 +5,7 @@
 use fidl::AsHandleRef;
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon as zx;
+use linux_uapi::SYNC_IOC_MAGIC;
 use once_cell::sync::OnceCell;
 use starnix_lock::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::sync::Arc;
@@ -16,6 +17,7 @@ use zerocopy::{AsBytes, FromBytes};
 
 use crate::{
     auth::FsCred,
+    device::sync_file::*,
     fs::{
         buffers::{InputBuffer, OutputBuffer},
         default_ioctl, default_seek, fileops_impl_directory, fileops_impl_nonseekable,
@@ -64,6 +66,7 @@ impl RemoteFs {
 }
 
 const REMOTE_FS_MAGIC: u32 = u32::from_be_bytes(*b"f.io");
+const SYNC_IOC_FILE_INFO: u8 = 4;
 
 impl FileSystemOps for RemoteFs {
     fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
@@ -1312,6 +1315,17 @@ impl FileOps for RemoteFileObject {
         request: u32,
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
+        // TODO(b/304273929): Change the SyncFence implementation to not rely on VMOs and
+        // remove this ioctl. This is temporary solution.
+        if ((request >> 8) as u8 == SYNC_IOC_MAGIC) && (request as u8 == SYNC_IOC_FILE_INFO) {
+            let mut sync_points: Vec<SyncPoint> = vec![];
+            let vmo = self.get_vmo(file, current_task, Some(8), ProtectionFlags::READ)?;
+            sync_points.push(SyncPoint { timeline: Timeline::Hwc, handle: vmo });
+            let sync_file_name: &[u8; 32] = b"hwc semaphore\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
+            let sync_file = SyncFile::new(*sync_file_name, SyncFence { sync_points });
+            return sync_file.ioctl(file, current_task, request, arg);
+        }
+
         default_ioctl(file, current_task, request, arg)
     }
 }

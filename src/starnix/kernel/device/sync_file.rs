@@ -37,6 +37,7 @@ const SYNC_IOC_FILE_INFO: u8 = 4;
 #[derive(Clone)]
 pub enum Timeline {
     Magma,
+    Hwc,
 }
 
 #[derive(PartialEq, Copy, Clone)]
@@ -198,6 +199,7 @@ impl FileOps for SyncFile {
                             };
                             let driver_name = match self.fence.sync_points[i].timeline {
                                 Timeline::Magma => b"Magma\0",
+                                Timeline::Hwc => b"Hwc\0\0\0",
                             };
                             assert!(driver_name.len() <= fence_info.driver_name.len());
                             for i in 0..driver_name.len() {

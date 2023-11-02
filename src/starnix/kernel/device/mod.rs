@@ -9,7 +9,6 @@ mod framebuffer_server;
 mod perfetto_consumer;
 mod registry;
 mod remote_binder;
-mod sync_file;
 
 pub use binder::*;
 pub use common::*;
@@ -23,6 +22,7 @@ pub mod magma;
 pub mod mem;
 pub mod misc;
 pub mod starnix;
+pub mod sync_file;
 pub mod terminal;
 pub mod uinput;
 pub mod wayland;
