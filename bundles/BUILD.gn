@@ -11,6 +11,7 @@ group("stress-tests") {
     "//src/storage/stress-tests",
     "//src/sys/component_manager/stress_tests_alt",
     "//src/ui/tests/scenic-stress-tests:tests",
+    "//src/zircon/tests/restricted-mode-shared/stress:tests",
     "//src/zircon/tests/stress-tests:tests",
   ]
 }

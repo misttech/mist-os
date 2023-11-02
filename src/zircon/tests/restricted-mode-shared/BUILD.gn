@@ -7,39 +7,8 @@ import("//build/test.gni")
 
 group("tests") {
   testonly = true
-  deps = []
-  if (!is_asan) {
-    deps += [ ":restricted-mode-shared-test" ]
-  }
-}
-
-if (!is_asan) {
-  test("bin") {
-    output_name = "restricted-mode-shared-test"
-    sources = [ "restricted-mode-shared.cc" ]
-    if (current_cpu == "x64") {
-      sources += [ "x64.S" ]
-    } else if (current_cpu == "arm64") {
-      sources += [ "arm64.S" ]
-    } else if (current_cpu == "riscv64") {
-      sources += [ "riscv64.S" ]
-    }
-
-    deps = [
-      "restricted-blob",
-      "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
-      "//sdk/lib/component/incoming/cpp",
-      "//zircon/system/ulib/zxtest",
-    ]
-  }
-
-  fuchsia_unittest_component("restricted-mode-shared") {
-    manifest = "meta/restricted-mode-shared-test.cml"
-    deps = [ ":bin" ]
-    test_type = "system"
-  }
-
-  fuchsia_test_package("restricted-mode-shared-test") {
-    test_components = [ ":restricted-mode-shared" ]
-  }
+  deps = [
+    "basic:tests",
+    "stress:tests",
+  ]
 }
