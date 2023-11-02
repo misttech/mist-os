@@ -6,12 +6,24 @@
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/component/cpp/composite_node_spec.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/ot-radio/ot-radio.h>
+
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/google/platform/cpp/bind.h>
+#include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/nordic/platform/cpp/bind.h>
+#include <bind/fuchsia/platform/cpp/bind.h>
+#include <bind/fuchsia/spi/cpp/bind.h>
 
 #include "nelson-gpios.h"
 #include "nelson.h"
-#include "src/devices/board/drivers/nelson/nelson_ot_radio_bind.h"
 #include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
+
+namespace fdf {
+using namespace fuchsia_driver_framework;
+}  // namespace fdf
 
 namespace {
 namespace fpbus = fuchsia_hardware_platform_bus;
@@ -27,34 +39,76 @@ static const std::vector<fpbus::Metadata> kNrf52811RadioMetadata{
     }},
 };
 
+const std::vector<fdf::BindRule> kSpiRules = std::vector{
+    fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_spi::BIND_PROTOCOL_DEVICE),
+    fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_VID,
+                            bind_fuchsia_nordic_platform::BIND_PLATFORM_DEV_VID_NORDIC),
+    fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_PID,
+                            bind_fuchsia_nordic_platform::BIND_PLATFORM_DEV_PID_NRF52811),
+    fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_DID,
+                            bind_fuchsia_nordic_platform::BIND_PLATFORM_DEV_DID_THREAD),
+
+};
+
+const std::vector<fdf::NodeProperty> kSpiProperties = std::vector{
+    fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_spi::BIND_PROTOCOL_DEVICE),
+    fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_VID,
+                      bind_fuchsia_nordic_platform::BIND_PLATFORM_DEV_VID_NORDIC),
+    fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_DID,
+                      bind_fuchsia_nordic_platform::BIND_PLATFORM_DEV_DID_THREAD),
+};
+
+const std::map<uint32_t, std::string> kGpioPinFunctionMap = {
+    {GPIO_TH_SOC_INT, bind_fuchsia_gpio::FUNCTION_OT_RADIO_INTERRUPT},
+    {GPIO_SOC_TH_RST_L, bind_fuchsia_gpio::FUNCTION_OT_RADIO_RESET},
+    {GPIO_SOC_TH_BOOT_MODE_L, bind_fuchsia_gpio::FUNCTION_OT_RADIO_BOOTLOADER},
+};
+
 }  // namespace
 
 namespace nelson {
 
 zx_status_t Nelson::OtRadioInit() {
-  gpio_impl_.SetAltFunction(S905D3_GPIOC(5), 0);
-  gpio_impl_.ConfigIn(S905D3_GPIOC(5), GPIO_NO_PULL);
-  gpio_impl_.SetAltFunction(S905D3_GPIOA(13), 0);  // Reset
-  gpio_impl_.ConfigOut(S905D3_GPIOA(13), 1);
-  gpio_impl_.SetAltFunction(S905D3_GPIOZ(1), 0);  // Boot mode
-  gpio_impl_.ConfigOut(S905D3_GPIOZ(1), 1);
+  gpio_impl_.SetAltFunction(GPIO_TH_SOC_INT, 0);
+  gpio_impl_.ConfigIn(GPIO_TH_SOC_INT, GPIO_NO_PULL);
+  gpio_impl_.SetAltFunction(GPIO_SOC_TH_RST_L, 0);  // Reset
+  gpio_impl_.ConfigOut(GPIO_SOC_TH_RST_L, 1);
+  gpio_impl_.SetAltFunction(GPIO_SOC_TH_BOOT_MODE_L, 0);  // Boot mode
+  gpio_impl_.ConfigOut(GPIO_SOC_TH_BOOT_MODE_L, 1);
 
   fpbus::Node dev;
   dev.name() = "nrf52811-radio";
-  dev.vid() = PDEV_VID_GENERIC;
-  dev.pid() = PDEV_PID_NELSON;
-  dev.did() = PDEV_DID_OT_RADIO;
+  dev.vid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_GENERIC;
+  dev.pid() = bind_fuchsia_google_platform::BIND_PLATFORM_DEV_PID_NELSON;
+  dev.did() = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_OT_RADIO;
   dev.metadata() = kNrf52811RadioMetadata;
+
+  std::vector<fdf::ParentSpec> parents = {fdf::ParentSpec{{kSpiRules, kSpiProperties}}};
+  parents.reserve(parents.size() + kGpioPinFunctionMap.size());
+
+  for (auto& [gpio_pin, function] : kGpioPinFunctionMap) {
+    auto rules = std::vector{
+        fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                                bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+        fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, gpio_pin),
+    };
+    auto properties = std::vector{
+        fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                          bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+        fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, function),
+    };
+    parents.push_back(fdf::ParentSpec{{rules, properties}});
+  }
 
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('RDIO');
-  fdf::WireUnownedResult result = pbus_.buffer(arena)->AddComposite(
+  fdf::WireUnownedResult result = pbus_.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, dev),
-      platform_bus_composite::MakeFidlFragment(fidl_arena, nrf52811_radio_fragments,
-                                               std::size(nrf52811_radio_fragments)),
-      "spi");
+      fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
+                                   {.name = "nrf52811_radio", .parents = parents}}));
+
   if (!result.ok()) {
-    zxlogf(ERROR, "Failed to send AddComposite request to platform bus: %s",
+    zxlogf(ERROR, "Failed to send AddCompositeNodeSpec request to platform bus: %s",
            result.status_string());
     return result.status();
   }
