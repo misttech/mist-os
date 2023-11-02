@@ -27,7 +27,7 @@ import("//src/sys/pkg/bin/package-tool/package-tool.gni")
 #  bazel_product_image_target (required)
 #    The Bazel product image target for this product bundle.
 #
-#    When set, two extra sub_targets are provided to access outputs from Bazel
+#    When set, two extra subtargets are provided to access outputs from Bazel
 #    product image build steps:
 #
 #      * ${target_name}_product_assembly: for image_assembly.json
@@ -38,10 +38,21 @@ import("//src/sys/pkg/bin/package-tool/package-tool.gni")
 #
 #    Type: label (from BUILD.bazel)
 #
+#  bazel_product_config_target (required)
+#    The Bazel product config target for the product image.
+#
+#    When set, one extra subtarget is provided to access product config from
+#    Bazel assembly build steps:
+#
+#      * ${target_name}_product_config: for product_assembly_config.json
+
+#    NOTE: This template does NOT check this is the actual product config target
+#    used in `bazel_product_bundle_target`.
+#
 #  bazel_recovery_image_target (optional)
 #    The Bazel recovery image target for this product bundle.
 #
-#    When set, one extra sub_target is provided to access outputs from Bazel
+#    When set, one extra subtarget is provided to access outputs from Bazel
 #    recovery image build steps:
 #
 #      * ${target_name}_create_recovery_system: for images.json
@@ -55,7 +66,7 @@ import("//src/sys/pkg/bin/package-tool/package-tool.gni")
 #    The Bazel fuchsia_size_checker target for this product bundle's product
 #    image.
 #
-#    When set, two extra sub_targets are provided to access outputs from Bazel
+#    When set, two extra subtargets are provided to access outputs from Bazel
 #    size checker:
 #
 #      * ${target_name}_product_size_checker: for running product size checks
@@ -68,7 +79,7 @@ import("//src/sys/pkg/bin/package-tool/package-tool.gni")
 #  bazel_elf_sizes_target (optional)
 #    The Bazel fuchsia_elf_sizes target for this product bundle's product image.
 #
-#    When set, one extra sub_target is provided to access elf_sizes.json
+#    When set, one extra subtarget is provided to access elf_sizes.json
 #    produced by Bazel.
 #
 #      * ${target_name}_elf_sizes
@@ -197,6 +208,28 @@ template("bazel_product_bundle") {
       },
     ]
     directory_timestamp_outputs = [ "${_create_system_target}/images.json" ]
+  }
+
+  if (defined(invoker.bazel_product_config_target)) {
+    _product_config_target = "${target_name}_product_config"
+    bazel_action(_product_config_target) {
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "visibility",
+                               "deps",
+                             ])
+
+      command = "build"
+      bazel_targets = [ invoker.bazel_product_config_target ]
+      bazel_inputs = _aib_bazel_inputs + invoker.bazel_inputs_from_gn
+      copy_outputs = [
+        {
+          bazel = "{{BAZEL_TARGET_OUT_PATH}}/{{BAZEL_TARGET_NAME}}_product_config.json"
+          ninja = "${_product_config_target}/product_assembly_config.json"
+        },
+      ]
+    }
   }
 
   if (defined(invoker.bazel_recovery_image_target)) {
