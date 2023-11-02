@@ -17,12 +17,8 @@
 
 #include <zxtest/zxtest.h>
 
+#include "helpers.h"
 #include "write_to_stack_blob.h"
-
-// Because zx_restricted_enter doesn't return like normal syscalls,
-// we use a wrapper function to make it easier to use.
-extern "C" zx_status_t restricted_enter_wrapper(uint32_t options,
-                                                zx_restricted_reason_t* reason_code);
 
 namespace {
 

@@ -1,0 +1,22 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/cpp/library_headers.gni")
+
+library_headers("helper_headers") {
+  include_dir = "."
+  headers = [ "helpers.h" ]
+}
+
+source_set("helpers") {
+  testonly = true
+  if (current_cpu == "x64") {
+    sources = [ "x64.S" ]
+  } else if (current_cpu == "arm64") {
+    sources = [ "arm64.S" ]
+  } else if (current_cpu == "riscv64") {
+    sources = [ "riscv64.S" ]
+  }
+  public_deps = [ ":helper_headers" ]
+}
