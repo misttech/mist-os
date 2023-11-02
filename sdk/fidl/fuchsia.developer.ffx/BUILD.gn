@@ -23,7 +23,6 @@ fidl("fuchsia.developer.ffx") {
   public_deps = [
     "//sdk/fidl/fuchsia.buildinfo",
     "//sdk/fidl/fuchsia.developer.remotecontrol",
-    "//sdk/fidl/fuchsia.device",
     "//sdk/fidl/fuchsia.gpu.agis",
     "//sdk/fidl/fuchsia.io",
     "//sdk/fidl/fuchsia.net",

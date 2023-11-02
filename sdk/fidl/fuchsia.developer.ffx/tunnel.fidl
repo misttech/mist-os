@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 library fuchsia.developer.ffx;
-using fuchsia.device;
+using fuchsia.developer.remotecontrol as rc;
 using fuchsia.net;
 
 type TunnelError = strict enum {
@@ -16,14 +16,14 @@ type TunnelError = strict enum {
 closed protocol Tunnel {
     /// Forwards a TCP port on the host to the target address, from the target node.
     strict ForwardPort(struct {
-        target string:<fuchsia.device.DEVICE_NAME_MAX>;
+        target string:<rc.NODE_NAME_MAX>;
         host_address fuchsia.net.SocketAddress;
         target_address fuchsia.net.SocketAddress;
     }) -> () error TunnelError;
 
     /// Forwards a TCP port on the target to the host address, from the host.
     strict ReversePort(struct {
-        target string:<fuchsia.device.DEVICE_NAME_MAX>;
+        target string:<rc.NODE_NAME_MAX>;
         host_address fuchsia.net.SocketAddress;
         target_address fuchsia.net.SocketAddress;
     }) -> () error TunnelError;

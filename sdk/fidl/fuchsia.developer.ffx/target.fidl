@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 library fuchsia.developer.ffx;
-using fuchsia.device;
 using fuchsia.hwinfo;
 using fuchsia.net;
 using fuchsia.buildinfo;
@@ -81,7 +80,7 @@ type CompatibilityInfo = struct {
 };
 
 type TargetInfo = table {
-    1: nodename string:fuchsia.device.DEVICE_NAME_MAX;
+    1: nodename string:rc.NODE_NAME_MAX;
     2: addresses vector<TargetAddrInfo>:256;
     3: age_ms uint64;
     4: rcs_state RemoteControlState;
@@ -304,7 +303,7 @@ closed protocol TargetCollection {
     /// If the target_id doesn't match a device name, the daaemon will attempt
     /// to interpret it as an IP.
     strict RemoveTarget(struct {
-        target_id string:fuchsia.device.DEVICE_NAME_MAX;
+        target_id string:rc.NODE_NAME_MAX;
     }) -> (struct {
         removed bool;
     });

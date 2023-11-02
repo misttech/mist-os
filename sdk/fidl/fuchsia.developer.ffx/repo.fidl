@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 library fuchsia.developer.ffx;
 
-using fuchsia.device;
+using fuchsia.developer.remotecontrol as rc;
 using fuchsia.net;
 
 const MAX_NAME uint64 = 255;
@@ -150,7 +150,7 @@ closed protocol RepositoryRegistry {
     /// `target_identifier`: The target from which to deregister this repository.
     strict DeregisterTarget(struct {
         repository_name string:MAX_NAME;
-        target_identifier string:<fuchsia.device.DEVICE_NAME_MAX, optional>;
+        target_identifier string:<rc.NODE_NAME_MAX, optional>;
     }) -> () error RepositoryError;
 
     /// List the packages in the repository named `name`.
@@ -238,7 +238,7 @@ type RepositoryTarget = table {
     /// The configured name of the repository
     1: repo_name string:MAX_NAME;
     /// The target on which to configure this repository
-    2: target_identifier string:fuchsia.device.DEVICE_NAME_MAX;
+    2: target_identifier string:rc.NODE_NAME_MAX;
     /// An optional list of hostnames. A rewrite rule will be added
     /// for each hostname in this list to resolve to this repository.
     3: aliases vector<string:MAX_NAME>:MAX_ALIASES;

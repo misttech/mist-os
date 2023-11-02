@@ -3,16 +3,15 @@
 // found in the LICENSE file.
 library fuchsia.developer.remotecontrol;
 
-using fuchsia.device;
 using fuchsia.net;
 using fuchsia.hwinfo;
 using fuchsia.buildinfo;
 
-
+const NODE_NAME_MAX uint32 = 255;
 
 type IdentifyHostResponse = table {
     1: reserved;
-    2: nodename string:fuchsia.device.DEVICE_NAME_MAX;
+    2: nodename string:NODE_NAME_MAX;
     // UTC timestamp of the target's time of boot, in nanoseconds.
     3: boot_timestamp_nanos uint64;
     4: serial_number string:fuchsia.hwinfo.MAX_VALUE_SIZE;
