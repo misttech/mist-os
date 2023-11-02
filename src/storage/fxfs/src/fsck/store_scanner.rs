@@ -17,6 +17,7 @@ use {
             ExtentValue, ObjectAttributes, ObjectDescriptor, ObjectKey, ObjectKeyData, ObjectKind,
             ObjectStore, ObjectValue, ProjectProperty, DEFAULT_DATA_ATTRIBUTE_ID,
             EXTENDED_ATTRIBUTE_RANGE_END, EXTENDED_ATTRIBUTE_RANGE_START,
+            FSVERITY_MERKLE_ATTRIBUTE_ID,
         },
         range::RangeExt,
         round::round_up,
@@ -58,6 +59,8 @@ struct ScannedFile {
     stored_refs: u64,
     // Attributes for this file.
     attributes: ScannedAttributes,
+    // True if fsverity-enabled.
+    is_verified: bool,
 }
 
 #[derive(Debug)]
@@ -190,6 +193,7 @@ impl<'a> ScannedStore<'a> {
                                     in_graveyard: false,
                                     extended_attributes: Vec::new(),
                                 },
+                                is_verified: false,
                             }),
                         );
                     }
@@ -335,6 +339,38 @@ impl<'a> ScannedStore<'a> {
                                 // Attribute records, so we should never find an attribute without
                                 // its object already encountered.  Thus, this is an orphaned
                                 // attribute.
+                                self.fsck.warning(FsckWarning::OrphanedAttribute(
+                                    self.store_id,
+                                    key.object_id,
+                                    attribute_id,
+                                ))?;
+                            }
+                        }
+                    }
+                    ObjectValue::VerifiedAttribute { size, .. } => {
+                        match self.objects.get_mut(&key.object_id) {
+                            Some(ScannedObject::File(ScannedFile {
+                                attributes,
+                                is_verified,
+                                ..
+                            })) => {
+                                attributes.attributes.push((attribute_id, *size));
+                                *is_verified = true;
+                            }
+                            Some(ScannedObject::Directory(..) | ScannedObject::Symlink(..)) => {
+                                self.fsck.error(FsckError::NonFileMarkedAsVerified(
+                                    self.store_id,
+                                    key.object_id,
+                                ))?;
+                            }
+                            Some(ScannedObject::Graveyard) => { /* NOP */ }
+                            Some(ScannedObject::Tombstone) => {
+                                self.fsck.error(FsckError::TombstonedObjectHasRecords(
+                                    self.store_id,
+                                    key.object_id,
+                                ))?;
+                            }
+                            None => {
                                 self.fsck.warning(FsckWarning::OrphanedAttribute(
                                     self.store_id,
                                     key.object_id,
@@ -778,6 +814,7 @@ fn validate_attributes(
     object_id: u64,
     attributes: &ScannedAttributes,
     is_file: bool,
+    is_verified: bool,
 ) -> Result<(), Error> {
     let ScannedAttributes {
         attributes,
@@ -798,6 +835,14 @@ fn validate_attributes(
     if is_file {
         if attributes.iter().find(|(attr_id, _)| *attr_id == DEFAULT_DATA_ATTRIBUTE_ID).is_none() {
             fsck.error(FsckError::MissingDataAttribute(store_id, object_id))?;
+        }
+        let merkle_attribute =
+            attributes.iter().find(|(attr_id, _)| *attr_id == FSVERITY_MERKLE_ATTRIBUTE_ID);
+
+        if (is_verified && merkle_attribute.is_none())
+            || (!is_verified && merkle_attribute.is_some())
+        {
+            fsck.error(FsckError::InconsistentVerifiedFile(store_id, object_id, is_verified))?;
         }
     }
 
@@ -942,7 +987,13 @@ pub(super) async fn scan_store(
     for (object_id, object) in &scanned.objects {
         num_objects += 1;
         match object {
-            ScannedObject::File(ScannedFile { parents, stored_refs, attributes, .. }) => {
+            ScannedObject::File(ScannedFile {
+                parents,
+                stored_refs,
+                attributes,
+                is_verified,
+                ..
+            }) => {
                 files += 1;
                 let observed_refs = parents.len().try_into().unwrap();
                 // observed_refs == 0 is handled separately to distinguish orphaned objects
@@ -953,7 +1004,7 @@ pub(super) async fn scan_store(
                         *stored_refs,
                     ))?;
                 }
-                validate_attributes(fsck, store_id, *object_id, attributes, true)?;
+                validate_attributes(fsck, store_id, *object_id, attributes, true, *is_verified)?;
                 if parents.is_empty() {
                     fsck.warning(FsckWarning::OrphanedObject(store_id, *object_id))?;
                 }
@@ -983,7 +1034,7 @@ pub(super) async fn scan_store(
                         *stored_sub_dirs,
                     ))?;
                 }
-                validate_attributes(fsck, store_id, *object_id, attributes, false)?;
+                validate_attributes(fsck, store_id, *object_id, attributes, false, false)?;
                 if let Some(mut oid) = parent {
                     // Check this directory is attached to a root object.
                     // SAFETY: This is safe because here and below are the only places that we
@@ -1025,7 +1076,7 @@ pub(super) async fn scan_store(
             ScannedObject::Graveyard => other += 1,
             ScannedObject::Symlink(ScannedSymlink { attributes }) => {
                 symlinks += 1;
-                validate_attributes(fsck, store_id, *object_id, attributes, false)?;
+                validate_attributes(fsck, store_id, *object_id, attributes, false, false)?;
             }
             ScannedObject::Tombstone => {
                 tombstones += 1;

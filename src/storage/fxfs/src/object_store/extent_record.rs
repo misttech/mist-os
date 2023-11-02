@@ -23,6 +23,10 @@ pub const DEFAULT_DATA_ATTRIBUTE_ID: u64 = 0;
 /// data?
 pub const BLOB_MERKLE_ATTRIBUTE_ID: u64 = 1;
 
+/// For fsverity files in Fxfs, we store the merkle tree of the verified file at a well-known
+/// attribute.
+pub const FSVERITY_MERKLE_ATTRIBUTE_ID: u64 = 2;
+
 /// ExtentKey is a child of ObjectKey for Object attributes that have attached extents
 /// (at time of writing this was only the used for file contents).
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize, TypeFingerprint)]

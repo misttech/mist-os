@@ -260,6 +260,8 @@ pub enum FsckError {
     MissingKey(u64, u64, u64),
     DuplicateKey(u64, u64, u64),
     ZombieFile(u64, u64, Vec<u64>),
+    InconsistentVerifiedFile(u64, u64, bool),
+    NonFileMarkedAsVerified(u64, u64),
 }
 
 impl FsckError {
@@ -425,6 +427,27 @@ impl FsckError {
                     store_id, object_id, parent_object_ids
                 )
             }
+            FsckError::InconsistentVerifiedFile(store_id, object_id, is_verified) => {
+                if *is_verified {
+                    format!(
+                        "Object {} in store {} is marked as fsverity-enabled but is missing a merkle
+                            attribute",
+                        store_id, object_id
+                    )
+                } else {
+                    format!(
+                        "Object {} in store {} is not marked as fsverity-enabled but a merkle
+                            attribute is present",
+                        store_id, object_id
+                    )
+                }
+            }
+            FsckError::NonFileMarkedAsVerified(store_id, object_id) => {
+                format!(
+                    "Object {} in store {} is marked as verified but is not a file",
+                    store_id, object_id
+                )
+            }
         }
     }
 
@@ -543,6 +566,12 @@ impl FsckError {
             }
             FsckError::ZombieFile(store_id, oid, parent_oids) => {
                 error!(store_id, oid, ?parent_oids, "Links exist to file in graveyard")
+            }
+            FsckError::InconsistentVerifiedFile(store_id, oid, is_verified) => {
+                error!(store_id, oid, ?is_verified, "Verified file inconsistency")
+            }
+            FsckError::NonFileMarkedAsVerified(store_id, oid) => {
+                error!(store_id, oid, "Non-file marked as verified")
             }
         }
     }

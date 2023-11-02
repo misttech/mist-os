@@ -688,6 +688,12 @@ impl DirectoryEntry for FxDirectory {
                     )
                 } else if node.is::<FxFile>() {
                     let node = node.downcast::<FxFile>().unwrap_or_else(|_| unreachable!());
+                    if flags.contains(fio::OpenFlags::RIGHT_WRITABLE) && node.verified_file() {
+                        tracing::error!(
+                            "Tried to open a verified file with the RIGHT_WRITABLE flag."
+                        );
+                        return Err(zx::Status::NOT_SUPPORTED);
+                    }
                     if flags.contains(fio::OpenFlags::BLOCK_DEVICE) {
                         let mut server =
                             BlockServer::new(node, scope, object_request.take().into_channel());

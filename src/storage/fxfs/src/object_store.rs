@@ -85,6 +85,7 @@ use {
 pub use allocator::{AllocatorInfo, AllocatorKey, AllocatorValue};
 pub use extent_record::{
     ExtentKey, ExtentValue, BLOB_MERKLE_ATTRIBUTE_ID, DEFAULT_DATA_ATTRIBUTE_ID,
+    FSVERITY_MERKLE_ATTRIBUTE_ID,
 };
 pub use journal::{
     JournalRecord, JournalRecordV20, JournalRecordV25, JournalRecordV29, JournalRecordV30,
@@ -92,9 +93,10 @@ pub use journal::{
     SuperBlockRecordV30, SuperBlockRecordV31, SuperBlockRecordV5,
 };
 pub use object_record::{
-    AttributeKey, EncryptionKeys, ExtendedAttributeValue, ObjectAttributes, ObjectAttributesV5,
-    ObjectKey, ObjectKeyData, ObjectKeyDataV5, ObjectKeyV25, ObjectKeyV5, ObjectKind, ObjectValue,
-    ObjectValueV25, ObjectValueV29, ObjectValueV30, ObjectValueV31, ObjectValueV5, ProjectProperty,
+    AttributeKey, EncryptionKeys, ExtendedAttributeValue, FsverityMetadata, ObjectAttributes,
+    ObjectAttributesV5, ObjectKey, ObjectKeyData, ObjectKeyDataV5, ObjectKeyV25, ObjectKeyV5,
+    ObjectKind, ObjectValue, ObjectValueV25, ObjectValueV29, ObjectValueV30, ObjectValueV31,
+    ObjectValueV5, ProjectProperty,
 };
 pub use transaction::Mutation;
 
@@ -801,6 +803,7 @@ impl ObjectStore {
         crypt: Option<Arc<dyn Crypt>>,
     ) -> Result<DataObjectHandle<S>, Error> {
         let store = owner.as_ref().as_ref();
+        let mut fsverity_enabled = false;
         let item = store
             .tree
             .find(&ObjectKey::attribute(
@@ -810,38 +813,45 @@ impl ObjectStore {
             ))
             .await?
             .ok_or(FxfsError::NotFound)?;
-        if let ObjectValue::Attribute { size } = item.value {
-            ensure!(size <= MAX_FILE_SIZE, FxfsError::Inconsistent);
 
-            // If a crypt service has been specified, it needs to be a permanent key because cached
-            // keys can only use the store's crypt service.
-            let permanent = if let Some(crypt) = crypt {
-                store
-                    .key_manager
-                    .get_or_insert(
-                        object_id,
-                        crypt,
-                        store.get_keys(object_id),
-                        /* permanent: */ true,
-                    )
-                    .await?;
-                true
-            } else {
-                false
-            };
+        let size = match item.value {
+            ObjectValue::Attribute { size } => size,
+            ObjectValue::VerifiedAttribute { size, .. } => {
+                fsverity_enabled = true;
+                size
+            }
+            _ => bail!(anyhow!(FxfsError::Inconsistent).context("open_object: Expected attribute")),
+        };
 
-            Ok(DataObjectHandle::new(
-                owner.clone(),
-                object_id,
-                permanent,
-                DEFAULT_DATA_ATTRIBUTE_ID,
-                size,
-                options,
-                false,
-            ))
+        ensure!(size <= MAX_FILE_SIZE, FxfsError::Inconsistent);
+
+        // If a crypt service has been specified, it needs to be a permanent key because cached
+        // keys can only use the store's crypt service.
+        let permanent = if let Some(crypt) = crypt {
+            store
+                .key_manager
+                .get_or_insert(
+                    object_id,
+                    crypt,
+                    store.get_keys(object_id),
+                    /* permanent: */ true,
+                )
+                .await?;
+            true
         } else {
-            bail!(anyhow!(FxfsError::Inconsistent).context("open_object: Expected attribute"));
-        }
+            false
+        };
+
+        Ok(DataObjectHandle::new(
+            owner.clone(),
+            object_id,
+            permanent,
+            DEFAULT_DATA_ATTRIBUTE_ID,
+            size,
+            fsverity_enabled,
+            options,
+            false,
+        ))
     }
 
     // See the comment on create_object for the semantics of the `crypt` argument.  If object_id ==
@@ -931,6 +941,7 @@ impl ObjectStore {
             permanent,
             DEFAULT_DATA_ATTRIBUTE_ID,
             0,
+            false,
             options,
             false,
         ))
@@ -2099,7 +2110,9 @@ pub async fn load_store_info(
 #[cfg(test)]
 mod tests {
     use {
-        super::{StoreInfo, MAX_STORE_INFO_SERIALIZED_SIZE, OBJECT_ID_HI_MASK},
+        super::{
+            StoreInfo, DEFAULT_DATA_ATTRIBUTE_ID, MAX_STORE_INFO_SERIALIZED_SIZE, OBJECT_ID_HI_MASK,
+        },
         crate::{
             errors::FxfsError,
             filesystem::{FxFilesystem, JournalingObject, OpenFxFilesystem, SyncOptions},
@@ -2108,10 +2121,10 @@ mod tests {
             object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle, INVALID_OBJECT_ID},
             object_store::{
                 directory::Directory,
-                object_record::{ObjectKey, ObjectValue},
+                object_record::{AttributeKey, ObjectKey, ObjectValue},
                 transaction::{lock_keys, Options},
                 volume::root_volume,
-                HandleOptions, LockKey, ObjectStore,
+                FsverityMetadata, HandleOptions, LockKey, Mutation, ObjectStore,
             },
             serialized_types::VersionedLatest,
         },
@@ -2215,6 +2228,95 @@ mod tests {
         assert!(sequences[0] <= sequences[1], "sequences: {:?}", sequences);
         // The last item came after a sync, so should be strictly greater.
         assert!(sequences[1] < sequences[2], "sequences: {:?}", sequences);
+        fs.close().await.expect("Close failed");
+    }
+
+    #[fuchsia::test]
+    async fn test_verified_file_with_verified_attribute() {
+        let fs: OpenFxFilesystem = test_filesystem().await;
+        let mut transaction = fs
+            .clone()
+            .new_transaction(lock_keys![], Options::default())
+            .await
+            .expect("new_transaction failed");
+        let store = fs.root_store();
+        let object = Arc::new(
+            ObjectStore::create_object(
+                &store,
+                &mut transaction,
+                HandleOptions::default(),
+                None,
+                None,
+            )
+            .await
+            .expect("create_object failed"),
+        );
+
+        transaction.add(
+            store.store_object_id(),
+            Mutation::replace_or_insert_object(
+                ObjectKey::attribute(
+                    object.object_id(),
+                    DEFAULT_DATA_ATTRIBUTE_ID,
+                    AttributeKey::Attribute,
+                ),
+                ObjectValue::verified_attribute(
+                    0,
+                    FsverityMetadata {
+                        version: 1,
+                        hash_algorithm: 1,
+                        log_blocksize: 8,
+                        salt_size: 0,
+                        data_size: 0,
+                        root_hash: vec![0; 64],
+                        salt: [0; 32],
+                    },
+                ),
+            ),
+        );
+
+        transaction.commit().await.unwrap();
+
+        let handle =
+            ObjectStore::open_object(&store, object.object_id(), HandleOptions::default(), None)
+                .await
+                .expect("open_object failed");
+
+        assert!(handle.verified_file());
+
+        fs.close().await.expect("Close failed");
+    }
+
+    #[fuchsia::test]
+    async fn test_verified_file_without_verified_attribute() {
+        let fs: OpenFxFilesystem = test_filesystem().await;
+        let mut transaction = fs
+            .clone()
+            .new_transaction(lock_keys![], Options::default())
+            .await
+            .expect("new_transaction failed");
+        let store = fs.root_store();
+        let object = Arc::new(
+            ObjectStore::create_object(
+                &store,
+                &mut transaction,
+                HandleOptions::default(),
+                None,
+                None,
+            )
+            .await
+            .expect("create_object failed"),
+        );
+
+        transaction.commit().await.unwrap();
+
+        let handle =
+            ObjectStore::open_object(&store, object.object_id(), HandleOptions::default(), None)
+                .await
+                .expect("open_object failed");
+
+        assert!(!handle.verified_file());
+
         fs.close().await.expect("Close failed");
     }
 

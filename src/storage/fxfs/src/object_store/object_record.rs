@@ -523,6 +523,20 @@ pub struct ChildValue {
     pub object_descriptor: ObjectDescriptor,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TypeFingerprint, Versioned)]
+#[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
+/// TODO(b/308870667): Potentially revise FsverityMetadata with stricter types and storage
+/// optimizations.
+pub struct FsverityMetadata {
+    pub version: u8,
+    pub hash_algorithm: u8,
+    pub log_blocksize: u8,
+    pub salt_size: u8,
+    pub data_size: u64,
+    pub root_hash: Vec<u8>,
+    pub salt: [u8; 32],
+}
+
 /// ObjectValue is the value of an item in the object store.
 /// Note that the tree stores deltas on objects, so these values describe deltas. Unless specified
 /// otherwise, a value indicates an insert/replace mutation.
@@ -555,6 +569,9 @@ pub enum ObjectValue {
     /// A value for an extended attribute. Either inline or a redirection to an attribute with
     /// extents.
     ExtendedAttribute(ExtendedAttributeValue),
+    /// An attribute associated with a verified file object. |size| is the size of the attribute
+    /// in bytes. |fsverity_metadata| holds the descriptor for the fsverity-enabled file.
+    VerifiedAttribute { size: u64, fsverity_metadata: FsverityMetadata },
 }
 
 #[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
@@ -718,6 +735,10 @@ impl ObjectValue {
     /// Creates an ObjectValue for an object attribute.
     pub fn attribute(size: u64) -> ObjectValue {
         ObjectValue::Attribute { size }
+    }
+    /// Creates an ObjectValue for an object attribute of a verified file.
+    pub fn verified_attribute(size: u64, fsverity_metadata: FsverityMetadata) -> ObjectValue {
+        ObjectValue::VerifiedAttribute { size, fsverity_metadata }
     }
     /// Creates an ObjectValue for an insertion/replacement of an object extent.
     pub fn extent(device_offset: u64) -> ObjectValue {

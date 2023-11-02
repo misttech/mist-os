@@ -115,6 +115,10 @@ impl FxFile {
         }
     }
 
+    pub fn verified_file(&self) -> bool {
+        self.handle.uncached_handle().verified_file()
+    }
+
     pub async fn flush(&self) -> Result<(), Error> {
         self.handle.flush().await
     }

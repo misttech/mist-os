@@ -19,9 +19,10 @@ use {
             directory::Directory,
             transaction::{self, lock_keys, LockKey, ObjectStoreMutation, Options},
             volume::root_volume,
-            AttributeKey, ChildValue, EncryptionKeys, ExtentValue, HandleOptions, Mutation,
-            ObjectAttributes, ObjectDescriptor, ObjectKey, ObjectKeyData, ObjectKind, ObjectStore,
-            ObjectValue, StoreInfo, Timestamp,
+            AttributeKey, ChildValue, EncryptionKeys, ExtentValue, FsverityMetadata, HandleOptions,
+            Mutation, ObjectAttributes, ObjectDescriptor, ObjectKey, ObjectKeyData, ObjectKind,
+            ObjectStore, ObjectValue, StoreInfo, Timestamp, DEFAULT_DATA_ATTRIBUTE_ID,
+            FSVERITY_MERKLE_ATTRIBUTE_ID,
         },
         round::round_down,
         serialized_types::VersionedLatest,
@@ -1133,6 +1134,152 @@ async fn test_children_on_file() {
         .await
         .expect_err("Fsck should fail");
     assert_matches!(test.errors()[..], [FsckIssue::Error(FsckError::ObjectHasChildren(..)), ..]);
+}
+
+#[fuchsia::test]
+async fn test_non_file_marked_as_verified() {
+    let mut test = FsckTest::new().await;
+
+    let store_id = {
+        let fs = test.filesystem();
+        let root_volume = root_volume(fs.clone()).await.unwrap();
+        let store = root_volume.new_volume("vol", None).await.unwrap();
+
+        install_items_in_store(
+            &fs,
+            store.as_ref(),
+            vec![
+                Item::new(
+                    ObjectKey::object(10),
+                    ObjectValue::Object {
+                        kind: ObjectKind::Directory { sub_dirs: 0 },
+                        attributes: ObjectAttributes { ..Default::default() },
+                    },
+                ),
+                Item::new(
+                    ObjectKey::attribute(10, DEFAULT_DATA_ATTRIBUTE_ID, AttributeKey::Attribute),
+                    ObjectValue::verified_attribute(
+                        0,
+                        FsverityMetadata {
+                            version: 1,
+                            hash_algorithm: 1,
+                            log_blocksize: 8,
+                            salt_size: 0,
+                            data_size: 0,
+                            root_hash: vec![0; 64],
+                            salt: [0; 32],
+                        },
+                    ),
+                ),
+            ],
+        )
+        .await;
+        store.store_object_id()
+    };
+
+    test.remount().await.expect("Remount failed");
+    test.run(TestOptions { volume_store_id: Some(store_id), ..Default::default() })
+        .await
+        .expect_err("Fsck should fail");
+    assert_matches!(
+        test.errors()[..],
+        [FsckIssue::Error(FsckError::NonFileMarkedAsVerified(..)), ..]
+    );
+}
+
+#[fuchsia::test]
+async fn test_verified_file_merkle_attribute_missing() {
+    let mut test = FsckTest::new().await;
+
+    let store_id = {
+        let fs = test.filesystem();
+        let root_volume = root_volume(fs.clone()).await.unwrap();
+        let store = root_volume.new_volume("vol", None).await.unwrap();
+
+        install_items_in_store(
+            &fs,
+            store.as_ref(),
+            vec![
+                Item::new(
+                    ObjectKey::object(10),
+                    ObjectValue::Object {
+                        kind: ObjectKind::File { refs: 1 },
+                        attributes: ObjectAttributes { ..Default::default() },
+                    },
+                ),
+                Item::new(
+                    ObjectKey::attribute(10, DEFAULT_DATA_ATTRIBUTE_ID, AttributeKey::Attribute),
+                    ObjectValue::verified_attribute(
+                        0,
+                        FsverityMetadata {
+                            version: 1,
+                            hash_algorithm: 1,
+                            log_blocksize: 8,
+                            salt_size: 0,
+                            data_size: 0,
+                            root_hash: vec![0; 64],
+                            salt: [0; 32],
+                        },
+                    ),
+                ),
+            ],
+        )
+        .await;
+        store.store_object_id()
+    };
+
+    test.remount().await.expect("Remount failed");
+    test.run(TestOptions { volume_store_id: Some(store_id), ..Default::default() })
+        .await
+        .expect_err("Fsck should fail");
+    assert_matches!(
+        test.errors()[..],
+        [FsckIssue::Error(FsckError::InconsistentVerifiedFile(..)), ..]
+    );
+}
+
+#[fuchsia::test]
+async fn test_file_with_merkle_attribute_not_marked_as_verified() {
+    let mut test = FsckTest::new().await;
+
+    let store_id = {
+        let fs = test.filesystem();
+        let root_volume = root_volume(fs.clone()).await.unwrap();
+        let store = root_volume.new_volume("vol", None).await.unwrap();
+
+        install_items_in_store(
+            &fs,
+            store.as_ref(),
+            vec![
+                Item::new(
+                    ObjectKey::object(10),
+                    ObjectValue::Object {
+                        kind: ObjectKind::File { refs: 1 },
+                        attributes: ObjectAttributes { ..Default::default() },
+                    },
+                ),
+                Item::new(
+                    ObjectKey::attribute(10, DEFAULT_DATA_ATTRIBUTE_ID, AttributeKey::Attribute),
+                    ObjectValue::attribute(0),
+                ),
+                Item::new(
+                    ObjectKey::attribute(10, FSVERITY_MERKLE_ATTRIBUTE_ID, AttributeKey::Attribute),
+                    ObjectValue::attribute(0),
+                ),
+            ],
+        )
+        .await;
+        store.store_object_id()
+    };
+
+    test.remount().await.expect("Remount failed");
+    test.run(TestOptions { volume_store_id: Some(store_id), ..Default::default() })
+        .await
+        .expect_err("Fsck should fail");
+    assert_matches!(
+        test.errors()[..],
+        [FsckIssue::Error(FsckError::InconsistentVerifiedFile(..)), ..]
+    );
 }
 
 #[fuchsia::test]

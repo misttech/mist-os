@@ -54,6 +54,7 @@ pub struct DataObjectHandle<S: HandleOwner> {
     handle: StoreObjectHandle<S>,
     attribute_id: u64,
     content_size: AtomicU64,
+    verified_file: bool,
 }
 
 impl<S: HandleOwner> DataObjectHandle<S> {
@@ -63,6 +64,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         permanent_keys: bool,
         attribute_id: u64,
         size: u64,
+        verified_file: bool,
         options: HandleOptions,
         trace: bool,
     ) -> Self {
@@ -70,6 +72,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
             handle: StoreObjectHandle::new(owner, object_id, permanent_keys, options, trace),
             attribute_id,
             content_size: AtomicU64::new(size),
+            verified_file,
         }
     }
 
@@ -79,6 +82,10 @@ impl<S: HandleOwner> DataObjectHandle<S> {
 
     pub fn attribute_id(&self) -> u64 {
         self.attribute_id
+    }
+
+    pub fn verified_file(&self) -> bool {
+        self.verified_file
     }
 
     pub fn store(&self) -> &ObjectStore {
