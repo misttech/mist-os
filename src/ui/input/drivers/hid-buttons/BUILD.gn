@@ -47,6 +47,7 @@ source_set("common") {
 
   public_deps = [
     ":hid-buttons-bind",
+    "//sdk/fidl/fuchsia.buttons:fuchsia.buttons_cpp",
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
     "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_cpp",
     "//src/devices/lib/driver",

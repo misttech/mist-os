@@ -27,6 +27,40 @@
 
 namespace buttons {
 
+namespace {
+
+uint32_t to_bit_mask(ButtonType type) { return 1 << static_cast<uint8_t>(type); }
+
+// Takes in a BUTTON_ID_ value and returns a bitmask of ButtonTypes that are associated with this
+// button id. Bit position corresponds to ButtonType e.g (1 << ButtonType::kVolumeUp) is the bit
+// for the volume_up button type.
+uint32_t ButtonIdToButtonTypeBitMask(uint8_t button_id) {
+  switch (button_id) {
+    case BUTTONS_ID_VOLUME_UP:
+      return to_bit_mask(ButtonType::kVolumeUp);
+    case BUTTONS_ID_VOLUME_DOWN:
+      return to_bit_mask(ButtonType::kVolumeDown);
+    case BUTTONS_ID_FDR:
+      return to_bit_mask(ButtonType::kReset);
+    case BUTTONS_ID_MIC_MUTE:
+      return to_bit_mask(ButtonType::kMute);
+    case BUTTONS_ID_PLAY_PAUSE:
+      return to_bit_mask(ButtonType::kPlayPause);
+    case BUTTONS_ID_KEY_A:
+      return to_bit_mask(ButtonType::kKeyA);
+    case BUTTONS_ID_KEY_M:
+      return to_bit_mask(ButtonType::kKeyM);
+    case BUTTONS_ID_CAM_MUTE:
+      return to_bit_mask(ButtonType::kCamMute);
+    case BUTTONS_ID_MIC_AND_CAM_MUTE:
+      return to_bit_mask(ButtonType::kCamMute) | to_bit_mask(ButtonType::kMute);
+    default:
+      return 0;
+  }
+}
+
+}  // namespace
+
 void HidButtonsDevice::ButtonsInputReport::ToFidlInputReport(
     fidl::WireTableBuilder<::fuchsia_input_report::wire::InputReport>& input_report,
     fidl::AnyArena& allocator) {
@@ -121,6 +155,26 @@ void HidButtonsDevice::Notify(uint32_t button_index) {
   }
   if (buttons_[button_index].id == BUTTONS_ID_FDR) {
     zxlogf(INFO, "FDR (up and down buttons) pressed");
+  }
+
+  // Notify anyone registered for this ButtonType.
+  {
+    fbl::AutoLock lock(&channels_lock_);
+    uint32_t types = ButtonIdToButtonTypeBitMask(buttons_[button_index].id);
+    bool button_value = debounce_states_[button_index].value;
+    // Go through each ButtonType and send notifications.
+    for (uint8_t raw_type = 0; raw_type < static_cast<uint8_t>(ButtonType::kMax); raw_type++) {
+      if ((types & (1 << raw_type)) == 0) {
+        continue;
+      }
+
+      ButtonType type = static_cast<ButtonType>(raw_type);
+      for (ButtonsNotifyInterface* interface : registered_notifiers_[type]) {
+        auto result = fidl::WireSendEvent(interface->binding())->OnNotify(type, button_value);
+        if (!result.ok())
+          zxlogf(ERROR, "OnNotify() failed: %s", result.FormatDescription().c_str());
+      }
+    }
   }
 
   debounce_states_[button_index].enqueued = false;
@@ -454,11 +508,19 @@ zx_status_t HidButtonsDevice::ConfigureInterrupt(uint32_t idx, uint64_t int_port
 
 zx_status_t HidButtonsDevice::Bind(fbl::Array<Gpio> gpios,
                                    fbl::Array<buttons_button_config_t> buttons) {
+  {
+    fbl::AutoLock lock(&channels_lock_);
+    for (uint8_t raw_type = 0; raw_type < static_cast<uint8_t>(ButtonType::kMax); raw_type++) {
+      ButtonType type = static_cast<ButtonType>(raw_type);
+      registered_notifiers_[type] = std::set<ButtonsNotifyInterface*>();
+    }
+  }
   zx_status_t status;
 
   buttons_ = std::move(buttons);
   gpios_ = std::move(gpios);
   fbl::AllocChecker ac;
+  fbl::AutoLock lock(&channels_lock_);
 
   status = zx::port::create(ZX_PORT_BIND_TO_INTERRUPT, &port_);
   if (status != ZX_OK) {
@@ -479,30 +541,31 @@ zx_status_t HidButtonsDevice::Bind(fbl::Array<Gpio> gpios,
   zx::timer::create(0, ZX_CLOCK_MONOTONIC, &poll_timer_);
 
   // Check the metadata.
-  for (auto& button : buttons_) {
-    if (button.gpioA_idx >= gpios_.size()) {
-      zxlogf(ERROR, "invalid gpioA_idx %u", button.gpioA_idx);
+  for (uint32_t i = 0; i < buttons_.size(); ++i) {
+    if (buttons_[i].gpioA_idx >= gpios_.size()) {
+      zxlogf(ERROR, "invalid gpioA_idx %u", buttons_[i].gpioA_idx);
       return ZX_ERR_INTERNAL;
     }
-    if (button.gpioB_idx >= gpios_.size()) {
-      zxlogf(ERROR, "invalid gpioB_idx %u", button.gpioB_idx);
+    if (buttons_[i].gpioB_idx >= gpios_.size()) {
+      zxlogf(ERROR, "invalid gpioB_idx %u", buttons_[i].gpioB_idx);
       return ZX_ERR_INTERNAL;
     }
-    if (gpios_[button.gpioA_idx].config.type != BUTTONS_GPIO_TYPE_INTERRUPT &&
-        gpios_[button.gpioA_idx].config.type != BUTTONS_GPIO_TYPE_POLL) {
-      zxlogf(ERROR, "invalid gpioA type %u", gpios_[button.gpioA_idx].config.type);
+    if (gpios_[buttons_[i].gpioA_idx].config.type != BUTTONS_GPIO_TYPE_INTERRUPT &&
+        gpios_[buttons_[i].gpioA_idx].config.type != BUTTONS_GPIO_TYPE_POLL) {
+      zxlogf(ERROR, "invalid gpioA type %u", gpios_[buttons_[i].gpioA_idx].config.type);
       return ZX_ERR_INTERNAL;
     }
-    if (button.type == BUTTONS_TYPE_MATRIX &&
-        gpios_[button.gpioB_idx].config.type != BUTTONS_GPIO_TYPE_MATRIX_OUTPUT) {
-      zxlogf(ERROR, "invalid matrix gpioB type %u", gpios_[button.gpioB_idx].config.type);
+    if (buttons_[i].type == BUTTONS_TYPE_MATRIX &&
+        gpios_[buttons_[i].gpioB_idx].config.type != BUTTONS_GPIO_TYPE_MATRIX_OUTPUT) {
+      zxlogf(ERROR, "invalid matrix gpioB type %u", gpios_[buttons_[i].gpioB_idx].config.type);
       return ZX_ERR_INTERNAL;
     }
-    if (button.id == BUTTONS_ID_FDR) {
-      zxlogf(INFO, "FDR (up and down buttons) setup to GPIO %u", button.gpioA_idx);
+    if (buttons_[i].id == BUTTONS_ID_FDR) {
+      zxlogf(INFO, "FDR (up and down buttons) setup to GPIO %u", buttons_[i].gpioA_idx);
     }
-    if (gpios_[button.gpioA_idx].config.type == BUTTONS_GPIO_TYPE_POLL) {
-      const auto button_poll_period = zx::duration(gpios_[button.gpioA_idx].config.poll.period);
+    if (gpios_[buttons_[i].gpioA_idx].config.type == BUTTONS_GPIO_TYPE_POLL) {
+      const auto button_poll_period =
+          zx::duration(gpios_[buttons_[i].gpioA_idx].config.poll.period);
       if (poll_period_ == zx::duration::infinite()) {
         poll_period_ = button_poll_period;
       }
@@ -510,6 +573,17 @@ zx_status_t HidButtonsDevice::Bind(fbl::Array<Gpio> gpios,
         zxlogf(ERROR, "GPIOs must have the same poll period");
         return ZX_ERR_INTERNAL;
       }
+    }
+
+    // Update the button_map_ array which maps ButtonTypes to the button.
+    uint32_t types = ButtonIdToButtonTypeBitMask(buttons_[i].id);
+    for (uint8_t raw_type = 0; raw_type < static_cast<uint8_t>(ButtonType::kMax); raw_type++) {
+      if ((types & (1 << raw_type)) == 0) {
+        continue;
+      }
+
+      ButtonType type = static_cast<ButtonType>(raw_type);
+      button_map_[type] = i;
     }
   }
 
@@ -688,6 +762,56 @@ static zx_status_t hid_buttons_bind(void* ctx, zx_device_t* parent) {
     [[maybe_unused]] auto ptr = dev.release();
   }
   return status;
+}
+
+bool HidButtonsDevice::GetState(ButtonType type) {
+  auto gpio_index = buttons_[button_map_[type]].gpioA_idx;
+  auto& gpio = gpios_[gpio_index];
+  fidl::WireResult result = gpio.client->Read();
+  if (!result.ok()) {
+    zxlogf(ERROR, "Failed to send Read request to gpio %u: %s", gpio_index, result.status_string());
+    return result.status();
+  }
+  if (result->is_error()) {
+    zxlogf(ERROR, "Failed to read gpio %u: %s", gpio_index,
+           zx_status_get_string(result->error_value()));
+    return result->error_value();
+  }
+  return static_cast<bool>(result.value()->value);
+}
+
+zx_status_t HidButtonsDevice::RegisterNotify(uint8_t types, ButtonsNotifyInterface* notify) {
+  fbl::AutoLock lock(&channels_lock_);
+  // Go through each type in ButtonType and update our registration.
+  for (uint8_t raw_type = 0; raw_type < static_cast<uint8_t>(ButtonType::kMax); raw_type++) {
+    ButtonType type = static_cast<ButtonType>(raw_type);
+    auto& notify_set = registered_notifiers_[type];
+    if ((types & (1 << raw_type)) == 0) {
+      // Our type does not exist in the bitmask and so we should de-register.
+      notify_set.erase(notify);
+    } else {
+      // Our type exists in the bitmask and so we should register.
+      notify_set.insert(notify);
+    }
+  }
+  return ZX_OK;
+}
+
+void HidButtonsDevice::ClosingChannel(ButtonsNotifyInterface* notify) {
+  fbl::AutoLock lock(&channels_lock_);
+  // Remove this notifier from anything it's registered to listen to.
+  for (auto& [type, notify_set] : registered_notifiers_) {
+    notify_set.erase(notify);
+  }
+
+  // release ownership
+  for (auto iter = interfaces_.begin(); iter != interfaces_.end(); ++iter) {
+    if (&(*iter) == notify) {
+      interfaces_.erase(iter);
+      return;
+    }
+  }
+  zxlogf(ERROR, "interfaces_ could not find channel");
 }
 
 static constexpr zx_driver_ops_t hid_buttons_driver_ops = []() {

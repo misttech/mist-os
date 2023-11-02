@@ -5,6 +5,7 @@
 #ifndef SRC_UI_INPUT_DRIVERS_HID_BUTTONS_HID_BUTTONS_H_
 #define SRC_UI_INPUT_DRIVERS_HID_BUTTONS_HID_BUTTONS_H_
 
+#include <fidl/fuchsia.buttons/cpp/wire.h>
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.input.report/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
@@ -17,6 +18,11 @@
 #include <lib/zx/interrupt.h>
 #include <lib/zx/port.h>
 #include <lib/zx/timer.h>
+
+#include <list>
+#include <map>
+#include <optional>
+#include <set>
 
 #include <ddk/metadata/buttons.h>
 #include <ddktl/device.h>
@@ -44,6 +50,10 @@ class HidButtonsDevice;
 using DeviceType =
     ddk::Device<HidButtonsDevice, ddk::Messageable<fuchsia_input_report::InputDevice>::Mixin,
                 ddk::Unbindable>;
+class ButtonsNotifyInterface;
+
+using Buttons = fuchsia_buttons::Buttons;
+using ButtonType = fuchsia_buttons::wire::ButtonType;
 
 class HidButtonsDevice : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_INPUTREPORT> {
  public:
@@ -81,10 +91,15 @@ class HidButtonsDevice : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCO
   void GetInputReport(GetInputReportRequestView request,
                       GetInputReportCompleter::Sync& completer) override;
 
+  // FIDL Interface Functions.
+  bool GetState(ButtonType type);
+  zx_status_t RegisterNotify(uint8_t types, ButtonsNotifyInterface* notify);
+
   void DdkUnbind(ddk::UnbindTxn txn);
   void DdkRelease();
 
   zx_status_t Bind(fbl::Array<Gpio> gpios, fbl::Array<buttons_button_config_t> buttons);
+  virtual void ClosingChannel(ButtonsNotifyInterface* notify);
   virtual void Notify(uint32_t button_index);
 
  protected:
@@ -92,6 +107,15 @@ class HidButtonsDevice : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCO
   void ShutDown();
 
   zx::port port_;
+
+  fbl::Mutex channels_lock_;
+  // A map of ButtonTypes to the interfaces that have to be notified when they are pressed.
+  std::map<ButtonType, std::set<ButtonsNotifyInterface*>> registered_notifiers_
+      TA_GUARDED(channels_lock_);
+  // A map of ButtonType values to an index into the buttons_ array.
+  std::map<ButtonType, uint32_t> button_map_;
+
+  std::list<ButtonsNotifyInterface> interfaces_ TA_GUARDED(channels_lock_);  // owns the channels
 
  private:
   friend class HidButtonsDeviceTest;
@@ -160,6 +184,27 @@ class HidButtonsDevice : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCO
   uint64_t report_count_ = 0;
   zx::duration total_latency_ = {};
   zx::duration max_latency_ = {};
+};
+
+class ButtonsNotifyInterface : public fidl::WireServer<Buttons> {
+ public:
+  explicit ButtonsNotifyInterface(HidButtonsDevice* peripheral) : device_(peripheral) {}
+  ~ButtonsNotifyInterface() override = default;
+
+  const fidl::ServerBindingRef<Buttons>& binding() { return *binding_; }
+
+  // Methods required by the FIDL interface
+  void GetState(GetStateRequestView request, GetStateCompleter::Sync& completer) override {
+    completer.Reply(device_->GetState(request->type));
+  }
+  void RegisterNotify(RegisterNotifyRequestView request,
+                      RegisterNotifyCompleter::Sync& completer) override {
+    completer.Reply(zx::make_result(device_->RegisterNotify(request->types, this)));
+  }
+
+ private:
+  HidButtonsDevice* device_;
+  std::optional<fidl::ServerBindingRef<Buttons>> binding_;
 };
 
 }  // namespace buttons
