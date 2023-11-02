@@ -5,11 +5,10 @@
 #ifndef SRC_DEVELOPER_DEBUG_DEBUG_AGENT_GENERAL_REGISTERS_H_
 #define SRC_DEVELOPER_DEBUG_DEBUG_AGENT_GENERAL_REGISTERS_H_
 
-#include <zircon/syscalls/debug.h>
-
 #include <optional>
 #include <vector>
 
+#include "src/developer/debug/debug_agent/arch.h"
 #include "src/developer/debug/shared/register_id.h"
 #include "src/developer/debug/shared/register_value.h"
 
@@ -20,7 +19,7 @@ namespace debug_agent {
 class GeneralRegisters {
  public:
   GeneralRegisters() : regs_() {}
-  explicit GeneralRegisters(const zx_thread_state_general_regs_t& r) : regs_(r) {}
+  explicit GeneralRegisters(const arch::PlatformGeneralRegisters& r) : regs_(r) {}
 
 #if defined(__x86_64__)
   // Instruction pointer.
@@ -42,8 +41,8 @@ class GeneralRegisters {
   // Appends the current general registers to the given high-level register record.
   void CopyTo(std::vector<debug::RegisterValue>& dest) const;
 
-  zx_thread_state_general_regs_t& GetNativeRegisters() { return regs_; }
-  const zx_thread_state_general_regs_t& GetNativeRegisters() const { return regs_; }
+  arch::PlatformGeneralRegisters& GetNativeRegisters() { return regs_; }
+  const arch::PlatformGeneralRegisters& GetNativeRegisters() const { return regs_; }
 
   // TODO: Maintain a better id <-> platform register mapping and use here and in the arch files to
   // avoid this unnecessary std::vector creation and unify with the arch::SaveGeneralRegisters()
@@ -51,7 +50,7 @@ class GeneralRegisters {
   std::optional<uint64_t> GetRegister(debug::RegisterID reg_id) const;
 
  private:
-  zx_thread_state_general_regs_t regs_;
+  arch::PlatformGeneralRegisters regs_;
 };
 
 }  // namespace debug_agent
