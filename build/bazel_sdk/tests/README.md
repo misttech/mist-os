@@ -63,9 +63,9 @@ For more options, invoke the script with `--help`.
 
 ## Direct bazel invocation
 
-Finally, it is possible, **on Linux only**, to directly invoke `bazel test`
-in this directory after some necessary preparation, i.e. for running against
-the `@fuchsia_sdk` repository:
+Finally, it is possible to directly invoke `bazel test` in this directory after
+some necessary preparation, i.e. for running against the `@fuchsia_sdk`
+repository:
 
 - After each `jiri update`, run `bazel clean --expunge` to ensure no stale
   external repositories will be used.
@@ -99,6 +99,3 @@ bazel test --config=fuchsia_x64 :tests
 
 To run against a local IDK, define `LOCAL_FUCHSIA_IDK_DIRECTORY` instead
 in your environment before invoking `bazel test ...` as above.
-
-This last method does not work on macOS because the WORKSPACE.bazel hard-codes
-linux-specific paths to host prebuilt binaries (https://fxbug.dev/124321).

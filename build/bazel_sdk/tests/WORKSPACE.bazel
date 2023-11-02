@@ -45,10 +45,19 @@ fuchsia_sdk_repository(
 
 register_toolchains("@fuchsia_sdk//:fuchsia_toolchain_sdk")
 
+# Create the @fuchsia_build_config information to get host_tag information.
+load("@fuchsia_sdk_common//:fuchsia_platform_build.bzl", "fuchsia_build_config_repository")
+
+fuchsia_build_config_repository(
+    name = "fuchsia_build_config",
+    fuchsia_source_dir = "../../..",
+)
+
+load("@fuchsia_build_config//:defs.bzl", "build_config")
+
 fuchsia_clang_repository(
     name = "fuchsia_clang",
-    # TODO(fxbug.dev/124321) Remove the need to hardcode the host here.
-    local_path = "../../../prebuilt/third_party/clang/linux-x64",
+    local_path = "../../../prebuilt/third_party/clang/" + build_config.host_tag,
 )
 
 load("@fuchsia_clang//:defs.bzl", "register_clang_toolchains")

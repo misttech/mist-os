@@ -76,15 +76,15 @@ local_repository(
     path = "build/bazel_sdk/bazel_rules_fuchsia/common",
 )
 
-load(
-    "//:build/bazel/repository_rules.bzl",
-    "fuchsia_build_config_repository",
-)
-
 # Create the @fuchsia_build_config repository which contains the defs.bzl file
 # exporting a `build_config` struct of configuration information specific to
 # the Fuchsia platform build.
 # buildifier: disable=load-on-top
+load(
+    "@fuchsia_sdk_common//:fuchsia_platform_build.bzl",
+    "fuchsia_build_config_repository",
+)
+
 fuchsia_build_config_repository(
     name = "fuchsia_build_config",
 )

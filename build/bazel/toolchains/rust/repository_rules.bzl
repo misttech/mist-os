@@ -4,15 +4,10 @@
 
 """Repository rules used to populate Rust-based repositories."""
 
-load(
-    "//:build/bazel/repository_utils.bzl",
-    "workspace_root_path",
-)
-
 def _generate_prebuilt_rust_toolchain_repository_impl(repo_ctx):
     repo_ctx.file("WORKSPACE.bazel", content = "")
 
-    workspace_dir = str(workspace_root_path(repo_ctx))
+    workspace_dir = str(repo_ctx.workspace_root)
 
     # Symlink the content of the Rust installation directory into the repository.
     # This allows us to add Bazel-specific files in this location.

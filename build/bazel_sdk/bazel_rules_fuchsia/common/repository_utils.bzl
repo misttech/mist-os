@@ -4,25 +4,6 @@
 
 """Common utilities for repository rules."""
 
-load("//:build/bazel/bazel_version_utils.bzl", "is_bazel6_or_greater")
-
-def workspace_root_path(repo_ctx):
-    """Return the main workspace repository directory.
-
-    Args:
-      repo_ctx: repository context
-    Returns:
-      A Path object for the workspace root.
-    """
-
-    # Starting with Bazel 6.0, repo_ctx.workspace_root can be used.
-    # The rest if a work-around that based on
-    # https://github.com/bazelbuild/bazel/pull/15441
-    if is_bazel6_or_greater:
-        return repo_ctx.workspace_root
-    else:
-        return repo_ctx.path(Label("@//:WORKSPACE.bazel")).dirname
-
 _FUCHSIA_HOST_OS_MAP = {
     "darwin": "mac",
     "macos": "mac",
