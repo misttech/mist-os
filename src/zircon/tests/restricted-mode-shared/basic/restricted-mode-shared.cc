@@ -20,6 +20,12 @@
 
 namespace {
 
+#if defined(__x86_64__)
+constexpr bool kUseUnifiedAspace = true;
+#else
+constexpr bool kUseUnifiedAspace = false;
+#endif  // defined(__x86_64__)
+
 void RunRestrictedMode(zx_handle_t restricted_vmar_handle, zx_status_t* result) {
   zx::vmar rvmar(restricted_vmar_handle);
 
@@ -82,6 +88,19 @@ void RunRestrictedMode(zx_handle_t restricted_vmar_handle, zx_status_t* result) 
     if (expected[i] != buffer[i]) {
       *result = ZX_ERR_INTERNAL;
       return;
+    }
+  }
+
+  // Validate that the restricted mode routine wrote the right value to the stack without going
+  // through zx_vmo_read. This only works when unified address spaces are enabled, which is
+  // currently only on x86.
+  if constexpr (kUseUnifiedAspace) {
+    memcpy(buffer, (void*)(stack_addr - 8), 8);
+    for (size_t i = 0; i < sizeof(buffer); i++) {
+      if (expected[i] != buffer[i]) {
+        *result = ZX_ERR_INTERNAL;
+        return;
+      }
     }
   }
   *result = ZX_OK;
