@@ -1,0 +1,8 @@
+TestBeds:
+  - Name: Testbed-One-BT
+    Controllers:
+      FuchsiaDevice:
+        - name: fuchsia-c863-1473-d4e9
+          ssh_private_key: ~/.ssh/fuchsia_ed25519
+        - name: fuchsia-c863-1473-8ada
+          ssh_private_key: ~/.ssh/fuchsia_ed25519
