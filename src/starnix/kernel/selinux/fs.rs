@@ -35,22 +35,25 @@ impl SeLinuxFs {
     fn new_fs(kernel: &Arc<Kernel>, options: FileSystemOptions) -> Result<FileSystemHandle, Errno> {
         let fs = FileSystem::new(kernel, CacheMode::Permanent, SeLinuxFs, options);
         let mut dir = StaticDirectoryBuilder::new(&fs);
-        dir.entry(b"load", BytesFile::new_node(SeLoad), mode!(IFREG, 0o600));
-        // TODO(https://fxbug.dev/84041) get mode from the container
-        dir.entry(
-            b"enforce",
-            BytesFile::new_node(SeEnforce { enforce: Mutex::new(false) }),
-            mode!(IFREG, 0o644),
-        );
+
+        // Read-only files & directories, exposing SELinux internal state.
         dir.entry(b"checkreqprot", BytesFile::new_node(SeCheckReqProt), mode!(IFREG, 0o644));
-        dir.entry(b"access", AccessFileNode::new(), mode!(IFREG, 0o666));
-        dir.entry(b"create", SeCreate::new_node(), mode!(IFREG, 0o644));
+        dir.entry(b"class", SeLinuxClassDirectory::new(), mode!(IFDIR, 0o777));
         dir.entry(
             b"deny_unknown",
             // Allow all unknown object classes/permissions.
             BytesFile::new_node(b"0:0\n".to_vec()),
             mode!(IFREG, 0o444),
         );
+        dir.subdir(b"initial_contexts", 0o555, |dir| {
+            dir.entry(
+                b"kernel",
+                BytesFile::new_node(b"system_u:system_r:kernel_t:s0".to_vec()),
+                mode!(IFREG, 0o444),
+            );
+        });
+        dir.entry(b"mls", BytesFile::new_node(b"1".to_vec()), mode!(IFREG, 0o444));
+        dir.entry(b"policyvers", BytesFile::new_node(b"33".to_vec()), mode!(IFREG, 0o444));
         dir.entry(
             b"status",
             // The status file needs to be mmap-able, so use a VMO-backed file.
@@ -63,18 +66,24 @@ impl SeLinuxFs {
             )?,
             mode!(IFREG, 0o444),
         );
-        dir.entry(b"class", SeLinuxClassDirectory::new(), mode!(IFDIR, 0o777));
+
+        // Write-only files used to configure and query SELinux.
+        dir.entry(b"access", AccessFileNode::new(), mode!(IFREG, 0o666));
         dir.entry(b"context", BytesFile::new_node(SeContext), mode!(IFREG, 0o666));
+        dir.entry(b"create", SeCreate::new_node(), mode!(IFREG, 0o644));
+        dir.entry(b"load", BytesFile::new_node(SeLoad), mode!(IFREG, 0o600));
+
+        // Allows the SELinux enforcing mode to be queried, or changed.
+        dir.entry(
+            b"enforce",
+            BytesFile::new_node(SeEnforce { enforce: Mutex::new(false) }),
+            // TODO(b/297313229): Get mode from the container.
+            mode!(IFREG, 0o644),
+        );
+
+        // "/dev/null" equivalent used for file descriptors redirected by SELinux.
         dir.entry_dev(b"null", DeviceFileNode, mode!(IFCHR, 0o666), DeviceType::NULL);
-        dir.entry(b"policyvers", BytesFile::new_node(b"33".to_vec()), mode!(IFREG, 0o444));
-        dir.entry(b"mls", BytesFile::new_node(b"1".to_vec()), mode!(IFREG, 0o444));
-        dir.subdir(b"initial_contexts", 0o555, |dir| {
-            dir.entry(
-                b"kernel",
-                BytesFile::new_node(b"system_u:system_r:kernel_t:s0".to_vec()),
-                mode!(IFREG, 0o444),
-            );
-        });
+
         dir.build_root();
 
         Ok(fs)
