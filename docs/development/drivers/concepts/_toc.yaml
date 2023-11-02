@@ -17,7 +17,7 @@ toc:
   section:
   - title: "Overview"
     path: /docs/development/drivers/concepts/driver_architectures/README.md
-  - title: "Input drivers drivers"
+  - title: "Input drivers"
     section:
     - include: /docs/development/drivers/concepts/driver_architectures/input_drivers/_toc.yaml
   - title: "SDMMC drivers"
