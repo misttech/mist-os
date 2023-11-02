@@ -26,7 +26,9 @@ const REBOOT_MANUALLY: &str =
      it manually and re-running the command. Otherwise, try re-running the \n\
      command.";
 
+// LINT.IfChange(fastboot_timeout)
 const TIMED_OUT: &str = "\nTimed out while waiting to rediscover device in Fastboot.";
+// LINT.ThenChange(/tools/testing/tefmocheck/string_in_log_check.go:fastboot_timeout)
 const SEND_TARGET_REBOOT: &str = "\nFailed while sending the target a reboot signal.";
 const SEND_ON_REBOOT: &str = "\nThere was an issue communication with the daemon.";
 const ZEDBOOT_COMMUNICATION: &str = "\nFailed to send the Zedboot reboot signal.";

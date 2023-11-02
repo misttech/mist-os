@@ -377,6 +377,13 @@ func infraToolLogChecks() []FailureModeCheck {
 			String: fmt.Sprintf("%s: signal: segmentation fault", botanistconstants.QEMUInvocationErrorMsg),
 			Type:   swarmingOutputType,
 		},
+		// For fxbug.dev/129363.
+		&stringInLogCheck{
+			// LINT.IfChange(fastboot_timeout)
+			String: "Timed out while waiting to rediscover device in Fastboot",
+			// LINT.ThenChange(/src/developer/ffx/lib/fastboot/src/common/fidl_fastboot_compatibility.rs:fastboot_timeout)
+			Type: swarmingOutputType,
+		},
 		// For fxbug.dev/61452.
 		&stringInLogCheck{
 			String: fmt.Sprintf("botanist ERROR: %s", botanistconstants.FailedToResolveIPErrorMsg),
