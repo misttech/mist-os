@@ -189,6 +189,7 @@ impl BuiltinEnvironmentBuilder {
                 Box::new(elf_runner::process_launcher::NamespaceConnector {})
             };
         let runner = Arc::new(ElfRunner::new(
+            fuchsia_runtime::job_default().duplicate(zx::Rights::SAME_RIGHTS).unwrap(),
             launcher_connector,
             self.utc_clock.clone(),
             self.crash_records.clone(),

@@ -60,6 +60,13 @@ pub struct Controller<C: Controllable> {
 
 pub struct ChannelEpitaph(u32);
 
+impl ChannelEpitaph {
+    pub fn ok() -> Self {
+        static_assertions::const_assert_eq!(fuchsia_zircon_types::ZX_OK, 0);
+        Self(0)
+    }
+}
+
 impl From<ChannelEpitaph> for Status {
     fn from(value: ChannelEpitaph) -> Self {
         Status::from_raw(i32::try_from(value.0).unwrap_or_else(|_| i32::MAX))
@@ -101,11 +108,8 @@ impl<C: Controllable> Controller<C> {
                     // Since stop takes some period of time to complete, call
                     // it in a separate context so we can respond to other
                     // requests.
-                    let stop_func = self.stop().await;
-                    fasync::Task::spawn(async move {
-                        stop_func.await;
-                    })
-                    .detach();
+                    let stop_func = self.stop();
+                    fasync::Task::spawn(stop_func).detach();
                 }
                 fcrunner::ComponentControllerRequest::Kill { control_handle: _c } => {
                     self.kill().await;
@@ -164,7 +168,7 @@ impl<C: Controllable> Controller<C> {
     }
 
     /// If we have a Controllable, ask it to stop the component.
-    async fn stop<'a>(&mut self) -> BoxFuture<'a, ()> {
+    fn stop<'a>(&mut self) -> BoxFuture<'a, ()> {
         if self.controllable.is_some() {
             self.controllable.as_mut().unwrap().stop()
         } else {

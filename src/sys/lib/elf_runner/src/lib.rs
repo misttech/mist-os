@@ -71,6 +71,10 @@ const DUPLICATE_CLOCK_RIGHTS: zx::Rights = zx::Rights::from_bits_truncate(
 // Builds and serves the runtime directory
 /// Runs components with ELF binaries.
 pub struct ElfRunner {
+    /// Each ELF component run by this runner will live inside a job that is a
+    /// child of this job.
+    job: zx::Job,
+
     launcher_connector: process_launcher::Connector,
 
     /// If `utc_clock` is populated then that Clock's handle will
@@ -85,11 +89,12 @@ pub struct ElfRunner {
 
 impl ElfRunner {
     pub fn new(
+        job: zx::Job,
         launcher_connector: process_launcher::Connector,
         utc_clock: Option<Arc<zx::Clock>>,
         crash_records: CrashRecords,
     ) -> ElfRunner {
-        ElfRunner { launcher_connector, utc_clock, crash_records }
+        ElfRunner { job, launcher_connector, utc_clock, crash_records }
     }
 
     /// Returns a UTC clock handle.
@@ -104,8 +109,8 @@ impl ElfRunner {
     }
 
     /// Creates a job for a component.
-    fn create_job(program_config: &ElfProgramConfig) -> Result<zx::Job, JobError> {
-        let job = job_default().create_child_job().map_err(JobError::CreateChild)?;
+    fn create_job(&self, program_config: &ElfProgramConfig) -> Result<zx::Job, JobError> {
+        let job = self.job.create_child_job().map_err(JobError::CreateChild)?;
 
         // Set timer slack.
         //
@@ -251,7 +256,7 @@ impl ElfRunner {
             .map_err(|err| StartComponentError::ProcessLauncherConnectError(err.into()))?;
 
         // Create a job for this component that will contain its process.
-        let job = ElfRunner::create_job(&program_config)?;
+        let job = self.create_job(&program_config)?;
 
         crash_handler::run_exceptions_server(
             &job,
@@ -448,7 +453,7 @@ impl ScopedElfRunner {
             while let Ok(Some(request)) = stream.try_next().await {
                 let fcrunner::ComponentRunnerRequest::Start { start_info, controller, .. } =
                     request;
-                start(runner.clone(), checker.clone(), start_info, controller).await;
+                start(&runner, checker.clone(), start_info, controller).await;
             }
         })
         .detach();
@@ -457,7 +462,7 @@ impl ScopedElfRunner {
 
 /// Starts a component by creating a new Job and Process for the component.
 async fn start(
-    runner: Arc<ElfRunner>,
+    runner: &ElfRunner,
     checker: ScopedPolicyChecker,
     start_info: fcrunner::ComponentStartInfo,
     server_end: ServerEnd<fcrunner::ComponentControllerMarker>,
@@ -530,7 +535,7 @@ async fn start(
             // intentional, non-zero exit, use that for all non-0 exit
             // codes.
             let exit_status: ChannelEpitaph = match proc_copy.info() {
-                Ok(zx::ProcessInfo { return_code: 0, .. }) => zx::Status::OK.try_into().unwrap(),
+                Ok(zx::ProcessInfo { return_code: 0, .. }) => ChannelEpitaph::ok(),
                 Ok(zx::ProcessInfo { return_code, .. }) => {
                     // Don't log SYSCALL_KILL codes because they are expected in the course
                     // of normal operation. When elf_runner process a `kill` signal for
@@ -581,7 +586,7 @@ impl ScopedElfRunner {
         start_info: fcrunner::ComponentStartInfo,
         server_end: ServerEnd<fcrunner::ComponentControllerMarker>,
     ) {
-        start(self.runner.clone(), self.checker.clone(), start_info, server_end).await
+        start(&self.runner, self.checker.clone(), start_info, server_end).await
     }
 }
 
@@ -645,6 +650,7 @@ mod tests {
 
     fn new_elf_runner_for_test() -> Arc<ElfRunner> {
         Arc::new(ElfRunner::new(
+            job_default().duplicate(zx::Rights::SAME_RIGHTS).unwrap(),
             Box::new(process_launcher::BuiltInConnector {}),
             None,
             CrashRecords::new(),
@@ -1447,7 +1453,12 @@ mod tests {
         let (payload_tx, mut payload_rx) = mpsc::unbounded();
 
         let connector = LauncherConnectorForTest { sender: payload_tx };
-        let runner = ElfRunner::new(Box::new(connector), None, CrashRecords::new());
+        let runner = ElfRunner::new(
+            job_default().duplicate(zx::Rights::SAME_RIGHTS).unwrap(),
+            Box::new(connector),
+            None,
+            CrashRecords::new(),
+        );
         let policy_checker = ScopedPolicyChecker::new(
             Arc::new(SecurityPolicy::default()),
             Moniker::try_from(vec!["foo"]).unwrap(),
