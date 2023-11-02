@@ -26,7 +26,7 @@ size_checker_input = {
   # expected to grow when there is temporarily more than 1 copy.
   icu_data_creep_limit = 9232384  # 8.80 MiB
 
-  core_limit = 15497634  # 14.78 MiB
+  core_limit = 14449058  # 13.78 MiB
   core_creep_limit = 155648  # 152.0 KiB
 
   components = [
@@ -173,6 +173,15 @@ size_checker_input = {
       ]
       limit = 16777216  # 14 MiB
       creep_limit = 428032  # 418.0 KiB
+    },
+    {
+      component = "Memory"
+      pkgs = [
+        "memory_monitor",
+        "memory_sampler",
+      ]
+      limit = 1048576  # 1 MiB
+      creep_limit = 102400  # 100 KiB
     },
     {
       component = "SetUI"

@@ -1066,9 +1066,6 @@ assembly_input_bundle("common_minimal") {
     # Activity
     "//src/sys/activity",
 
-    # Developer
-    "//src/developer/memory/monitor:monitor_without_memory_sampler",
-
     # Recovery
     "//src/recovery/factory_reset:factory_reset_pkg",
 
@@ -1162,7 +1159,6 @@ assembly_input_bundle("common_minimal") {
                     "//src/intl/tzdata_provider/meta/tzdata_provider.core_shard.cml",
                     "//src/sys/cache_manager/meta/cache_manager.core_shard.cml",
                     "//src/sys/pkg/bin/system-updater/meta/system_updater.core_shard.cml",
-                    "//src/developer/memory/monitor/meta/memory_monitor.core_shard.cml",
                     "//src/recovery/factory_reset/meta/factory_reset.core_shard.cml",
 
                     # TODO(fxbug.dev/80375): only include in eng builds
@@ -1222,6 +1218,11 @@ assembly_input_bundle("common_minimal") {
 # This is exclusive to user builds on the minimal support level.
 #
 assembly_input_bundle("minimal_user") {
+  base_packages = [
+    # memory_monitor with profiling disabled.
+    "//src/developer/memory/monitor:monitor_without_memory_sampler",
+  ]
+
   config_data = [
     {
       package_name = "cobalt"
@@ -1229,6 +1230,22 @@ assembly_input_bundle("minimal_user") {
         {
           source = "//src/cobalt/bin/app/configs/user_config.json"
           destination = "config.json"
+        },
+      ]
+    },
+  ]
+
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = [
+        {
+          # All paths must be rebased since this is passed directly to the AIB
+          # config.
+          component_name = "core"
+          shards = rebase_path(
+                  [ "//src/developer/memory/monitor/meta/memory_monitor.core_shard.cml" ],
+                  root_build_dir)
         },
       ]
     },
@@ -1302,6 +1319,10 @@ assembly_input_bundle("minimal_userdebug_and_eng") {
     "//src/diagnostics/detect:triage-detect",
     "//src/sys/pkg/bin/pkgctl",
     "//src/sys/pkg/bin/update",
+
+    # memory_monitor with profiling enabled.
+    "//src/developer/memory/monitor:monitor_with_memory_sampler",
+    "//src/performance/memory/sampler:memory_sampler",
   ]
   shell_commands = [
     {
@@ -1331,7 +1352,12 @@ assembly_input_bundle("minimal_userdebug_and_eng") {
         {
           component_name = "core"
           shards = rebase_path(
-                  [ "//src/diagnostics/detect/meta/detect.core_shard.cml" ],
+                  [
+                    "//src/diagnostics/detect/meta/detect.core_shard.cml",
+                    "//src/developer/memory/monitor/meta/memory_monitor.core_shard.cml",
+                    "//src/developer/memory/monitor/meta/memory_monitor_with_memory_sampler.core_shard.cml",
+                    "//src/performance/memory/sampler/meta/memory_sampler.core_shard.cml",
+                  ],
                   root_build_dir)
         },
       ]
