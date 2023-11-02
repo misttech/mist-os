@@ -18,6 +18,14 @@ or not. For more information, refer to
 [Lacewing Mobly Config YAML file](../README.md#Mobly-Config-YAML-File))
 
 ## Test execution in local mode
+### Hello World Test
+```shell
+$ fx set core.qemu-x64 \
+    --with-host //src/testing/end_to_end/examples:tests
+
+$ fx test //src/testing/end_to_end/examples/test_hello_world:hello_world_test_fc --e2e --output
+```
+
 ### Soft Reboot Test
 ```shell
 $ fx set core.qemu-x64 \

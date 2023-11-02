@@ -6,10 +6,11 @@ import("//build/python/python_mobly_test.gni")
 
 assert(is_host)
 
-python_mobly_test("hello_world_test") {
+python_mobly_test("hello_world_test_fc") {
   main_source = "test_hello_world.py"
   libraries = [
     "//src/testing/end_to_end/honeydew",
     "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
   ]
+  transport = "fuchsia-controller"
 }
