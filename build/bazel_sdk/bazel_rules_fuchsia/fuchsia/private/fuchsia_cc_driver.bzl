@@ -13,7 +13,7 @@ restriction but until then we must include that src to properly link in the requ
 symbols.
 """
 
-def fuchsia_cc_driver(name, srcs = [], output_name = None, **kwargs):
+def fuchsia_cc_driver(name, srcs = [], output_name = None, deps = [], **kwargs):
     """Creates a binary driver which targets Fuchsia.
 
     Wraps a cc_binary rule and provides appropriate defaults.
@@ -57,6 +57,11 @@ def fuchsia_cc_driver(name, srcs = [], output_name = None, **kwargs):
     visibility = kwargs.pop("visibility", None)
     tags = kwargs.pop("tags", None)
 
+    # Ensure we are packaging the lib/libdriver_runtime.so
+    deps.append(
+        "@fuchsia_sdk//pkg/driver_runtime_shared_lib",
+    )
+
     native.cc_binary(
         name = name + "_cc_binary",
         additional_linker_inputs = [
@@ -65,6 +70,7 @@ def fuchsia_cc_driver(name, srcs = [], output_name = None, **kwargs):
         linkopts = linkopts,
         linkshared = True,
         srcs = srcs,
+        deps = deps,
         visibility = ["//visibility:private"],
         **kwargs
     )
@@ -77,7 +83,7 @@ def fuchsia_cc_driver(name, srcs = [], output_name = None, **kwargs):
         bin_name = bin_name.rstrip(".so") + ".so",
         install_root = "driver/",
         cc_binary = ":{}_cc_binary".format(name),
-        exact_cc_binary_deps = kwargs.pop("deps", None),
+        exact_cc_binary_deps = deps,
         # We do not want libc++ and libunwind packaged since they get statically linked.
         package_clang_dist_files = False,
         visibility = visibility,
