@@ -20,7 +20,7 @@ A job is an object consisting of the following:
 + a reference to a parent job
 + a set of child jobs (each of which has this job as its parent)
 + a set of member processes
-+ a set of policies [⚠ not implemented]
++ a set of policies
 
 Jobs allow "applications" that are composed of more than one process to be
 controlled as a single entity.
