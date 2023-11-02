@@ -58,6 +58,10 @@ impl Broker {
             tracing::debug!("claims_activated = {:?})", &claims_activated);
             self.update_required_levels(&claims_activated);
         }
+        // Find claims to drop
+        let claims_to_drop_for_element = self.catalog.active_claims.to_drop_for_element(id);
+        let claims_dropped = self.check_claims_to_drop(&claims_to_drop_for_element);
+        self.update_required_levels(&claims_dropped);
     }
 
     pub fn subscribe_current_level(
@@ -93,7 +97,8 @@ impl Broker {
 
     pub fn drop_lease(&mut self, lease_id: &LeaseID) -> Result<(), Error> {
         let (_, claims) = self.catalog.drop(lease_id)?;
-        self.update_required_levels(&claims);
+        let dropped_claims = self.check_claims_to_drop(&claims);
+        self.update_required_levels(&dropped_claims);
         Ok(())
     }
 
@@ -152,6 +157,32 @@ impl Broker {
             self.catalog.activate_claim(&claim.id);
         }
         claims_to_activate
+    }
+
+    /// Examines a Vec of claims and drops any that no longer have any
+    /// dependents. Returns a Vec of dropped claims.
+    fn check_claims_to_drop(&mut self, claims: &Vec<Claim>) -> Vec<Claim> {
+        tracing::debug!("check_claims_to_drop: {:?}", claims);
+        let mut claims_to_drop = Vec::new();
+        for claim_to_check in claims {
+            let mut has_dependents = false;
+            // Only claims belonging to the same lease can be a dependent.
+            for related_claim in self.catalog.active_claims.for_lease(&claim_to_check.lease_id) {
+                if related_claim.dependency.requires == claim_to_check.dependency.level {
+                    has_dependents = true;
+                    break;
+                }
+            }
+            if has_dependents {
+                continue;
+            }
+            tracing::debug!("will drop claim: {:?}", claim_to_check);
+            claims_to_drop.push(claim_to_check.clone());
+        }
+        for claim in &claims_to_drop {
+            self.catalog.drop_claim(&claim.id);
+        }
+        claims_to_drop
     }
 
     pub fn add_element(&mut self, name: &str, _dependencies: Vec<Dependency>) -> ElementID {
@@ -280,8 +311,8 @@ impl Catalog {
 
     /// Drops an existing lease, and initiates process of releasing all
     /// associated claims.
-    /// TODO(b/300144053): Drop claims in order rather than immediately.
-    /// Returns the dropped lease, and a Vec of all claims to be released.
+    /// Returns the dropped lease, and a Vec of all active claims that have
+    /// been marked to drop.
     fn drop(&mut self, lease_id: &LeaseID) -> Result<(Lease, Vec<Claim>), Error> {
         tracing::debug!("drop({:?})", &lease_id);
         let lease = self.leases.remove(lease_id).ok_or(anyhow!("{lease_id} not found"))?;
@@ -289,32 +320,29 @@ impl Catalog {
         tracing::debug!("active_claim_ids: {:?}", &active_claims);
         let pending_claims = self.pending_claims.for_lease(&lease.id);
         tracing::debug!("pending_claim_ids: {:?}", &pending_claims);
-        // Drop all claims created for the transitive dependencies.
-        // TODO(b/300144053): Do this in the proper order.
-        let mut claims = Vec::new();
-        for claim in active_claims {
-            if let Some(removed) = self.active_claims.remove(&claim.id) {
-                tracing::debug!("removing claim: {:?}", &removed);
-                claims.push(removed);
-            } else {
-                tracing::error!("cannot remove active claim: not found: {}", claim.id);
-            }
-        }
+        // Pending claims should be dropped immediately.
         for claim in pending_claims {
             if let Some(removed) = self.pending_claims.remove(&claim.id) {
                 tracing::debug!("removing pending claim: {:?}", &removed);
-                claims.push(removed);
             } else {
                 tracing::error!("cannot remove pending claim: not found: {}", claim.id);
             }
         }
-        Ok((lease, claims))
+        // Active claims should be marked to drop in an orderly sequence.
+        let claims_marked_to_drop = self.active_claims.mark_lease_claims_to_drop(&lease.id);
+        Ok((lease, claims_marked_to_drop))
     }
 
     /// Activates a pending claim, moving it to active_claims.
     fn activate_claim(&mut self, claim_id: &ClaimID) {
         tracing::debug!("activate_claim: {:?}", claim_id);
         self.pending_claims.move_to(&claim_id, &mut self.active_claims);
+    }
+
+    /// Drops a claim, removing it from active_claims.
+    fn drop_claim(&mut self, claim_id: &ClaimID) {
+        tracing::debug!("drop_claim: {:?}", claim_id);
+        self.active_claims.remove(&claim_id);
     }
 }
 
@@ -323,6 +351,7 @@ struct ClaimTracker {
     claims: HashMap<ClaimID, Claim>,
     claims_by_required_element: HashMap<ElementID, Vec<ClaimID>>,
     claims_by_lease: HashMap<LeaseID, Vec<ClaimID>>,
+    claims_to_drop_by_element: HashMap<ElementID, Vec<ClaimID>>,
 }
 
 impl ClaimTracker {
@@ -331,6 +360,7 @@ impl ClaimTracker {
             claims: HashMap::new(),
             claims_by_required_element: HashMap::new(),
             claims_by_lease: HashMap::new(),
+            claims_to_drop_by_element: HashMap::new(),
         }
     }
 
@@ -364,7 +394,30 @@ impl ClaimTracker {
                 self.claims_by_lease.remove(&claim.lease_id);
             }
         }
+        if let Some(claim_ids) =
+            self.claims_to_drop_by_element.get_mut(&claim.dependency.level.element)
+        {
+            claim_ids.retain(|x| x != id);
+            if claim_ids.is_empty() {
+                self.claims_to_drop_by_element.remove(&claim.dependency.level.element);
+            }
+        }
         Some(claim)
+    }
+
+    /// Marks all claims associated with this lease to drop. They will be
+    /// removed in an orderly sequence (each claim will be removed only once
+    /// all claims dependent on it have already been dropped).
+    /// Returns a Vec of Claims marked to drop.
+    fn mark_lease_claims_to_drop(&mut self, lease_id: &LeaseID) -> Vec<Claim> {
+        let claims_marked = self.for_lease(lease_id);
+        for claim in &claims_marked {
+            self.claims_to_drop_by_element
+                .entry(claim.dependency.level.element.clone())
+                .or_insert(Vec::new())
+                .push(claim.id.clone());
+        }
+        claims_marked
     }
 
     /// Removes claim from this tracker, and adds it to recipient.
@@ -374,18 +427,29 @@ impl ClaimTracker {
         }
     }
 
+    fn for_claim_ids(&self, claim_ids: &Vec<ClaimID>) -> Vec<Claim> {
+        claim_ids.iter().map(|id| self.claims.get(id)).filter_map(|f| f).cloned().collect()
+    }
+
     fn for_required_element(&self, element_id: &ElementID) -> Vec<Claim> {
         let Some(claim_ids) = self.claims_by_required_element.get(element_id) else {
             return Vec::new();
         };
-        claim_ids.iter().map(|id| self.claims.get(id)).filter_map(|f| f).cloned().collect()
+        self.for_claim_ids(claim_ids)
     }
 
     fn for_lease(&self, lease_id: &LeaseID) -> Vec<Claim> {
         let Some(claim_ids) = self.claims_by_lease.get(lease_id) else {
             return Vec::new();
         };
-        claim_ids.iter().map(|id| self.claims.get(id)).filter_map(|f| f).cloned().collect()
+        self.for_claim_ids(claim_ids)
+    }
+
+    fn to_drop_for_element(&self, element_id: &ElementID) -> Vec<Claim> {
+        let Some(claim_ids) = self.claims_to_drop_by_element.get(element_id) else {
+            return Vec::new();
+        };
+        self.for_claim_ids(claim_ids)
     }
 }
 
@@ -566,22 +630,11 @@ mod tests {
             assert_eq!(claim.dependency.requires.level, PowerLevel::Binary(BinaryPowerLevel::On));
         }
 
-        // Now drop the lease and verify both claims are also dropped.
-        let (dropped, dropped_claims) = catalog.drop(&lease.id).expect("drop failed");
-        assert_eq!(dropped_claims.len(), 2);
+        // Now drop the lease.
+        let (dropped, _) = catalog.drop(&lease.id).expect("drop failed");
         assert_eq!(dropped.id, lease.id);
         assert_eq!(dropped.element, lease.element);
         assert_eq!(dropped.level, lease.level);
-        let dropped_claims_by_required_element: HashMap<ElementID, Claim> = dropped_claims
-            .into_iter()
-            .map(|c| (c.dependency.requires.element.clone(), c))
-            .collect();
-        for parent in [&parent1, &parent2] {
-            let claim = dropped_claims_by_required_element
-                .get(&parent)
-                .unwrap_or_else(|| panic!("missing claim for {:?}", parent));
-            assert_eq!(claim, claims_by_required_element.get(&parent).unwrap());
-        }
 
         // Try dropping the lease one more time, which should result in an error.
         let extra_drop = catalog.drop(&lease.id);
@@ -661,22 +714,11 @@ mod tests {
             PowerLevel::Binary(BinaryPowerLevel::On)
         );
 
-        // Now drop the lease and verify both claims are also dropped.
-        let (dropped, dropped_claims) = catalog.drop(&lease.id).expect("drop failed");
+        // Now drop the lease.
+        let (dropped, _) = catalog.drop(&lease.id).expect("drop failed");
         assert_eq!(dropped.id, lease.id);
-        assert_eq!(dropped_claims.len(), 2);
-        let dropped_claims_by_required_element: HashMap<ElementID, Claim> = dropped_claims
-            .into_iter()
-            .map(|c| (c.dependency.requires.element.clone(), c))
-            .collect();
-        let dropped_parent_claim = dropped_claims_by_required_element
-            .get(&parent)
-            .unwrap_or_else(|| panic!("missing claim for {:?}", parent));
-        assert_eq!(dropped_parent_claim, parent_claim);
-        let dropped_grandparent_claim = dropped_claims_by_required_element
-            .get(&grandparent)
-            .unwrap_or_else(|| panic!("missing claim for {:?}", grandparent));
-        assert_eq!(dropped_grandparent_claim, grandparent_claim);
+        assert_eq!(dropped.element, lease.element);
+        assert_eq!(dropped.level, lease.level);
     }
 
     #[fuchsia::test]
@@ -808,21 +850,17 @@ mod tests {
             PowerLevel::Binary(BinaryPowerLevel::On)
         );
 
-        // Now drop the first lease. Parent should still have min level ON.
-        let (dropped1, dropped_claims1) = catalog.drop(&lease1.id).expect("drop failed");
-        assert_eq!(dropped_claims1.len(), 2);
+        // Now drop the first lease.
+        let (dropped1, _) = catalog.drop(&lease1.id).expect("drop failed");
         assert_eq!(dropped1.id, lease1.id);
         assert_eq!(dropped1.element, lease1.element);
         assert_eq!(dropped1.level, lease1.level);
-        assert_eq!(dropped_claims1, claims1);
 
-        // Now drop the second lease. Parent should now have min level OFF.
-        let (dropped2, dropped_claims2) = catalog.drop(&lease2.id).expect("drop failed");
-        assert_eq!(dropped_claims2.len(), 2);
+        // Now drop the second lease.
+        let (dropped2, _) = catalog.drop(&lease2.id).expect("drop failed");
         assert_eq!(dropped2.id, lease2.id);
         assert_eq!(dropped2.element, lease2.element);
         assert_eq!(dropped2.level, lease2.level);
-        assert_eq!(dropped_claims2, claims2);
     }
 
     #[fuchsia::test]
@@ -966,7 +1004,6 @@ mod tests {
         // Raise Grandparent power level to ON, now Parent claim should be active.
         broker
             .update_current_level(&grandparent.clone(), &PowerLevel::Binary(BinaryPowerLevel::On));
-        tracing::info!("catalog after update_current_level: {:?}", &broker.catalog);
         assert_eq!(
             broker.catalog.calc_min_level(&parent.clone()),
             PowerLevel::Binary(BinaryPowerLevel::On),
@@ -978,7 +1015,8 @@ mod tests {
             "Grandparent should now have min level ON"
         );
 
-        // Now drop the lease and verify both claims are also dropped.
+        // Now drop the lease and verify Parent claim is dropped, but
+        // Grandparent claim is not yet dropped.
         broker.drop_lease(&lease.id).expect("drop failed");
         assert_eq!(
             broker.catalog.calc_min_level(&parent.clone()),
@@ -987,8 +1025,23 @@ mod tests {
         );
         assert_eq!(
             broker.catalog.calc_min_level(&grandparent.clone()),
+            PowerLevel::Binary(BinaryPowerLevel::On),
+            "Grandparent should still have min level ON"
+        );
+
+        // Lower Parent power level to OFF, now Grandparent claim should be
+        // dropped and should have min level OFF.
+        broker.update_current_level(&parent.clone(), &PowerLevel::Binary(BinaryPowerLevel::Off));
+        tracing::info!("catalog after update_current_level: {:?}", &broker.catalog);
+        assert_eq!(
+            broker.catalog.calc_min_level(&parent.clone()),
             PowerLevel::Binary(BinaryPowerLevel::Off),
-            "Grandparent should now have min level OFF after lease drop"
+            "Parent should have min level OFF"
+        );
+        assert_eq!(
+            broker.catalog.calc_min_level(&grandparent.clone()),
+            PowerLevel::Binary(BinaryPowerLevel::Off),
+            "Grandparent should now have min level OFF"
         );
     }
 
@@ -1069,7 +1122,6 @@ mod tests {
         // Raise Grandparent power level to ON, now Parent claim should be active.
         broker
             .update_current_level(&grandparent.clone(), &PowerLevel::Binary(BinaryPowerLevel::On));
-        tracing::info!("catalog after update_current_level: {:?}", &broker.catalog);
         assert_eq!(
             broker.catalog.calc_min_level(&parent.clone()),
             PowerLevel::Binary(BinaryPowerLevel::On),
@@ -1096,7 +1148,8 @@ mod tests {
             "Grandparent should still have min level ON"
         );
 
-        // Now drop the first lease. Parent should still have min level ON.
+        // Now drop the first lease. Both Parent and Grandparent should still
+        // have min level ON.
         broker.drop_lease(&lease1.id).expect("drop failed");
         assert_eq!(
             broker.catalog.calc_min_level(&parent.clone()),
@@ -1110,11 +1163,27 @@ mod tests {
         );
 
         // Now drop the second lease. Parent should now have min level OFF.
+        // Grandparent should still have min level ON.
         broker.drop_lease(&lease2.id).expect("drop failed");
         assert_eq!(
             broker.catalog.calc_min_level(&parent.clone()),
             PowerLevel::Binary(BinaryPowerLevel::Off),
             "Parent should now have min level OFF"
+        );
+        assert_eq!(
+            broker.catalog.calc_min_level(&grandparent.clone()),
+            PowerLevel::Binary(BinaryPowerLevel::On),
+            "Grandparent should still have min level ON"
+        );
+
+        // Lower Parent power level to OFF, now Grandparent claim should be
+        // dropped and should have min level OFF.
+        broker.update_current_level(&parent.clone(), &PowerLevel::Binary(BinaryPowerLevel::Off));
+        tracing::info!("catalog after update_current_level: {:?}", &broker.catalog);
+        assert_eq!(
+            broker.catalog.calc_min_level(&parent.clone()),
+            PowerLevel::Binary(BinaryPowerLevel::Off),
+            "Parent should have min level OFF"
         );
         assert_eq!(
             broker.catalog.calc_min_level(&grandparent.clone()),

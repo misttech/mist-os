@@ -226,13 +226,27 @@ async fn test_transitive() -> Result<()> {
     assert_eq!(d_req_level, PowerLevel::Binary(BinaryPowerLevel::Off));
     // TODO(b/302717376): Check Lease status here. Lease should be active.
 
-    // Drop lease for C with PB, both A and B should have required level OFF.
+    // Drop lease for C with PB, B should have required level OFF.
+    // A should still have required level ON.
     // D should still have required level OFF.
     lessor.drop_lease(&lease_id).expect("drop failed");
-    // TODO(b/300144053): Check power down sequencing here once implemented.
-    let a_req_level = level_control
-        .watch_required_level(&element_a, Some(&PowerLevel::Binary(BinaryPowerLevel::On)))
+    let a_req_level = level_control.watch_required_level(&element_a, None).await?;
+    assert_eq!(a_req_level, PowerLevel::Binary(BinaryPowerLevel::On));
+    let b_req_level = level_control
+        .watch_required_level(&element_b, Some(&PowerLevel::Binary(BinaryPowerLevel::On)))
         .await?;
+    assert_eq!(b_req_level, PowerLevel::Binary(BinaryPowerLevel::Off));
+    let d_req_level = level_control.watch_required_level(&element_d, None).await?;
+    assert_eq!(d_req_level, PowerLevel::Binary(BinaryPowerLevel::Off));
+
+    // Lower B's current level to OFF
+    // Both A and B should have required level OFF.
+    // D should still have required level OFF.
+    level_control
+        .update_current_power_level(&element_b, &PowerLevel::Binary(BinaryPowerLevel::Off))
+        .await?
+        .expect("update_current_power_level failed");
+    let a_req_level = level_control.watch_required_level(&element_a, None).await?;
     assert_eq!(a_req_level, PowerLevel::Binary(BinaryPowerLevel::Off));
     let b_req_level = level_control
         .watch_required_level(&element_b, Some(&PowerLevel::Binary(BinaryPowerLevel::On)))
@@ -380,13 +394,23 @@ async fn test_shared() -> Result<()> {
     assert_eq!(parent_req_level, PowerLevel::Binary(BinaryPowerLevel::On));
     // TODO(b/302717376): Check Lease status here. Lease 2 should still be active.
 
-    // Drop lease for C2, P and GP should have required level OFF.
+    // Drop lease for C2, P should have required level OFF.
+    // GP should still have required level ON.
     lessor.drop_lease(&lease_child_2).expect("drop failed");
-    // TODO(b/300144053): Check power down sequencing here once implemented.
-    //                    P should have required_level OFF first, then GP.
-    let grandparent_req_level = level_control
-        .watch_required_level(&grandparent, Some(&PowerLevel::Binary(BinaryPowerLevel::On)))
+    let grandparent_req_level = level_control.watch_required_level(&grandparent, None).await?;
+    assert_eq!(grandparent_req_level, PowerLevel::Binary(BinaryPowerLevel::On));
+    let parent_req_level = level_control
+        .watch_required_level(&parent, Some(&PowerLevel::Binary(BinaryPowerLevel::On)))
         .await?;
+    assert_eq!(parent_req_level, PowerLevel::Binary(BinaryPowerLevel::Off));
+
+    // Lower P's current level to OFF
+    // Both P and GP should have required level OFF.
+    level_control
+        .update_current_power_level(&parent, &PowerLevel::Binary(BinaryPowerLevel::Off))
+        .await?
+        .expect("update_current_power_level failed");
+    let grandparent_req_level = level_control.watch_required_level(&grandparent, None).await?;
     assert_eq!(grandparent_req_level, PowerLevel::Binary(BinaryPowerLevel::Off));
     let parent_req_level = level_control
         .watch_required_level(&parent, Some(&PowerLevel::Binary(BinaryPowerLevel::On)))
