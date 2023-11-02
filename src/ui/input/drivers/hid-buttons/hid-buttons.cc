@@ -24,6 +24,7 @@
 #include <ddk/metadata/buttons.h>
 #include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
+#include <hid/descriptor.h>
 
 namespace buttons {
 
@@ -59,98 +60,27 @@ uint32_t ButtonIdToButtonTypeBitMask(uint8_t button_id) {
   }
 }
 
-}  // namespace
-
-void HidButtonsDevice::ButtonsInputReport::ToFidlInputReport(
-    fidl::WireTableBuilder<::fuchsia_input_report::wire::InputReport>& input_report,
-    fidl::AnyArena& allocator) {
-  fidl::VectorView<fuchsia_input_report::wire::ConsumerControlButton> buttons_rpt(
-      allocator, fuchsia_input_report::wire::kConsumerControlMaxNumButtons);
-  size_t count = 0;
-  bool mic_mute = false;
-  bool cam_mute = false;
-  for (uint32_t id = 0; id < buttons.size(); id++) {
-    if (!buttons[id]) {
-      continue;
-    }
-
-    switch (id) {
-      case BUTTONS_ID_VOLUME_UP:
-        buttons_rpt[count] = fuchsia_input_report::ConsumerControlButton::kVolumeUp;
-        count++;
-        break;
-      case BUTTONS_ID_VOLUME_DOWN:
-        buttons_rpt[count] = fuchsia_input_report::ConsumerControlButton::kVolumeDown;
-        count++;
-        break;
-      case BUTTONS_ID_FDR:
-        buttons_rpt[count] = fuchsia_input_report::ConsumerControlButton::kFactoryReset;
-        count++;
-        break;
-      case BUTTONS_ID_MIC_MUTE:
-        if (!mic_mute) {
-          buttons_rpt[count] = fuchsia_input_report::ConsumerControlButton::kMicMute;
-          count++;
-          mic_mute = true;
-        }
-        break;
-      case BUTTONS_ID_CAM_MUTE:
-        if (!cam_mute) {
-          buttons_rpt[count] = fuchsia_input_report::ConsumerControlButton::kCameraDisable;
-          count++;
-          cam_mute = true;
-        }
-        break;
-      case BUTTONS_ID_MIC_AND_CAM_MUTE:
-        if (!mic_mute) {
-          buttons_rpt[count] = fuchsia_input_report::ConsumerControlButton::kMicMute;
-          count++;
-          mic_mute = true;
-        }
-        if (!cam_mute) {
-          buttons_rpt[count] = fuchsia_input_report::ConsumerControlButton::kCameraDisable;
-          count++;
-          cam_mute = true;
-        }
-        break;
-      default:
-        zxlogf(ERROR, "Invalid Button ID encountered %d", id);
-    }
-  }
-  buttons_rpt.set_count(count);
-
-  auto consumer_control =
-      fuchsia_input_report::wire::ConsumerControlInputReport::Builder(allocator).pressed_buttons(
-          buttons_rpt);
-  input_report.event_time(event_time.get()).consumer_control(consumer_control.Build());
+bool input_reports_are_equal(const buttons_input_rpt_t& lhs, const buttons_input_rpt_t& rhs) {
+  return (lhs.rpt_id == rhs.rpt_id && lhs.volume_up == rhs.volume_up &&
+          lhs.volume_down == rhs.volume_down && lhs.reset == rhs.reset && lhs.mute == rhs.mute &&
+          lhs.camera_access_disabled == rhs.camera_access_disabled);
 }
+
+}  // namespace
 
 void HidButtonsDevice::Notify(uint32_t button_index) {
   // HID Report
-  auto result = GetInputReport();
-  if (result.is_error()) {
-    zxlogf(ERROR, "HidbusGetReport failed %d", result.error_value());
-  } else if (last_report_ != result.value()) {
-    readers_.SendReportToAllReaders(result.value());
-    last_report_ = result.value();
-
-    if (debounce_states_[button_index].timestamp != zx::time::infinite_past()) {
-      const zx::duration latency =
-          zx::clock::get_monotonic() - debounce_states_[button_index].timestamp;
-
-      total_latency_ += latency;
-      report_count_++;
-      average_latency_usecs_.Set(total_latency_.to_usecs() / report_count_);
-
-      if (latency > max_latency_) {
-        max_latency_ = latency;
-        max_latency_usecs_.Set(max_latency_.to_usecs());
-      }
-    }
-
-    if (!last_report_.empty()) {
-      total_report_count_.Add(1);
-      last_event_timestamp_.Set(last_report_.event_time.get());
+  buttons_input_rpt_t input_rpt;
+  size_t out_len;
+  zx_status_t status =
+      HidbusGetReport(0, BUTTONS_RPT_ID_INPUT, (uint8_t*)&input_rpt, sizeof(input_rpt), &out_len);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "HidbusGetReport failed %d", status);
+  } else if (!input_reports_are_equal(last_report_, input_rpt)) {
+    fbl::AutoLock lock(&client_lock_);
+    if (client_.is_valid()) {
+      client_.IoQueue((uint8_t*)&input_rpt, sizeof(buttons_input_rpt_t), zx_clock_get_monotonic());
+      last_report_ = input_rpt;
     }
   }
   if (buttons_[button_index].id == BUTTONS_ID_FDR) {
@@ -178,7 +108,6 @@ void HidButtonsDevice::Notify(uint32_t button_index) {
   }
 
   debounce_states_[button_index].enqueued = false;
-  debounce_states_[button_index].timestamp = zx::time::infinite_past();
 }
 
 int HidButtonsDevice::Thread() {
@@ -215,7 +144,6 @@ int HidButtonsDevice::Thread() {
         if (!debounce_states_[type].enqueued) {
           debounce_states_[type].timer.wait_async(port_, kPortKeyTimerStart + type,
                                                   ZX_TIMER_SIGNALED, 0);
-          debounce_states_[type].timestamp = zx::time(packet.interrupt.timestamp);
         }
         debounce_states_[type].enqueued = true;
       }
@@ -257,40 +185,44 @@ int HidButtonsDevice::Thread() {
   return thrd_success;
 }
 
-void HidButtonsDevice::GetInputReportsReader(GetInputReportsReaderRequestView request,
-                                             GetInputReportsReaderCompleter::Sync& completer) {
-  auto status = readers_.CreateReader(dispatcher_, std::move(request->reader));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to create a reader %d", status);
+zx_status_t HidButtonsDevice::HidbusStart(const hidbus_ifc_protocol_t* ifc) {
+  fbl::AutoLock lock(&client_lock_);
+  if (client_.is_valid()) {
+    return ZX_ERR_ALREADY_BOUND;
   }
+
+  client_ = ddk::HidbusIfcProtocolClient(ifc);
+  return ZX_OK;
 }
 
-void HidButtonsDevice::GetDescriptor(GetDescriptorCompleter::Sync& completer) {
-  fidl::Arena<kFeatureAndDescriptorBufferSize> arena;
+zx_status_t HidButtonsDevice::HidbusQuery(uint32_t options, hid_info_t* info) {
+  if (!info) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+  info->dev_num = 0;
+  info->device_class = HID_DEVICE_CLASS_OTHER;
+  info->boot_device = false;
 
-  fuchsia_input_report::wire::DeviceInfo device_info;
-  device_info.vendor_id = static_cast<uint32_t>(fuchsia_input_report::VendorId::kGoogle);
-  device_info.product_id =
-      static_cast<uint32_t>(fuchsia_input_report::VendorGoogleProductId::kHidButtons);
+  return ZX_OK;
+}
 
-  const std::vector<fuchsia_input_report::ConsumerControlButton> buttons = {
-      fuchsia_input_report::ConsumerControlButton::kVolumeUp,
-      fuchsia_input_report::ConsumerControlButton::kVolumeDown,
-      fuchsia_input_report::ConsumerControlButton::kFactoryReset,
-      fuchsia_input_report::ConsumerControlButton::kCameraDisable,
-      fuchsia_input_report::ConsumerControlButton::kMicMute};
+void HidButtonsDevice::HidbusStop() {
+  fbl::AutoLock lock(&client_lock_);
+  client_.clear();
+}
 
-  const auto input = fuchsia_input_report::wire::ConsumerControlInputDescriptor::Builder(arena)
-                         .buttons(buttons)
-                         .Build();
+zx_status_t HidButtonsDevice::HidbusGetDescriptor(hid_description_type_t desc_type,
+                                                  uint8_t* out_data_buffer, size_t data_size,
+                                                  size_t* out_data_actual) {
+  const uint8_t* desc;
+  size_t desc_size = get_buttons_report_desc(&desc);
+  if (data_size < desc_size) {
+    return ZX_ERR_BUFFER_TOO_SMALL;
+  }
 
-  const auto consumer_control =
-      fuchsia_input_report::wire::ConsumerControlDescriptor::Builder(arena).input(input).Build();
-
-  completer.Reply(fuchsia_input_report::wire::DeviceDescriptor::Builder(arena)
-                      .device_info(device_info)
-                      .consumer_control(consumer_control)
-                      .Build());
+  memcpy(out_data_buffer, desc, desc_size);
+  *out_data_actual = desc_size;
+  return ZX_OK;
 }
 
 // Requires interrupts to be disabled for all rows/cols.
@@ -338,8 +270,21 @@ bool HidButtonsDevice::MatrixScan(uint32_t row, uint32_t col, zx_duration_t dela
   return static_cast<bool>(read_result.value()->value);
 }
 
-zx::result<HidButtonsDevice::ButtonsInputReport> HidButtonsDevice::GetInputReport() {
-  ButtonsInputReport input_rpt;
+zx_status_t HidButtonsDevice::HidbusGetReport(uint8_t rpt_type, uint8_t rpt_id, uint8_t* data,
+                                              size_t len, size_t* out_len) {
+  if (!data || !out_len) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+  if (rpt_id != BUTTONS_RPT_ID_INPUT) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+  *out_len = sizeof(buttons_input_rpt_t);
+  if (*out_len > len) {
+    return ZX_ERR_BUFFER_TOO_SMALL;
+  }
+
+  buttons_input_rpt_t input_rpt = {};
+  input_rpt.rpt_id = BUTTONS_RPT_ID_INPUT;
 
   for (size_t i = 0; i < buttons_.size(); ++i) {
     bool new_value = false;  // A value true means a button is pressed.
@@ -351,19 +296,19 @@ zx::result<HidButtonsDevice::ButtonsInputReport> HidButtonsDevice::GetInputRepor
       if (!read_result.ok()) {
         zxlogf(ERROR, "Failed to send Read request to gpio %u: %s", gpio_index,
                read_result.status_string());
-        return zx::error(read_result.status());
+        return read_result.status();
       }
       if (read_result->is_error()) {
         zxlogf(ERROR, "Failed to read gpio %u: %s", gpio_index,
                zx_status_get_string(read_result->error_value()));
-        return zx::error(read_result->error_value());
+        return read_result->error_value();
       }
 
       new_value = read_result.value()->value;
       zxlogf(DEBUG, "GPIO direct read %u for button %lu", new_value, i);
     } else {
       zxlogf(ERROR, "unknown button type %u", buttons_[i].type);
-      return zx::error(ZX_ERR_INTERNAL);
+      return ZX_ERR_INTERNAL;
     }
 
     if (gpios_[i].config.flags & BUTTONS_GPIO_FLAG_INVERTED) {
@@ -371,30 +316,30 @@ zx::result<HidButtonsDevice::ButtonsInputReport> HidButtonsDevice::GetInputRepor
     }
 
     zxlogf(DEBUG, "GPIO new value %u for button %lu", new_value, i);
-    input_rpt.set(buttons_[i].id, new_value);
+    fill_button_in_report(buttons_[i].id, new_value, &input_rpt);
   }
-  input_rpt.event_time = zx::clock::get_monotonic();
+  auto out = reinterpret_cast<buttons_input_rpt_t*>(data);
+  *out = input_rpt;
 
-  return zx::ok(input_rpt);
+  return ZX_OK;
 }
 
-void HidButtonsDevice::GetInputReport(GetInputReportRequestView request,
-                                      GetInputReportCompleter::Sync& completer) {
-  if (request->device_type != fuchsia_input_report::DeviceType::kConsumerControl) {
-    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-    return;
-  }
-  auto result = GetInputReport();
-  if (!result.is_ok()) {
-    completer.ReplyError(result.error_value());
-    return;
-  }
-
-  fidl::Arena<> arena;
-  auto input_report = fuchsia_input_report::wire::InputReport::Builder(arena);
-  result->ToFidlInputReport(input_report, arena);
-  completer.ReplySuccess(input_report.Build());
+zx_status_t HidButtonsDevice::HidbusSetReport(uint8_t rpt_type, uint8_t rpt_id, const uint8_t* data,
+                                              size_t len) {
+  return ZX_ERR_NOT_SUPPORTED;
 }
+
+zx_status_t HidButtonsDevice::HidbusGetIdle(uint8_t rpt_id, uint8_t* duration) {
+  return ZX_ERR_NOT_SUPPORTED;
+}
+
+zx_status_t HidButtonsDevice::HidbusSetIdle(uint8_t rpt_id, uint8_t duration) {
+  return ZX_ERR_NOT_SUPPORTED;
+}
+
+zx_status_t HidButtonsDevice::HidbusGetProtocol(uint8_t* protocol) { return ZX_ERR_NOT_SUPPORTED; }
+
+zx_status_t HidButtonsDevice::HidbusSetProtocol(uint8_t protocol) { return ZX_OK; }
 
 uint8_t HidButtonsDevice::ReconfigurePolarity(uint32_t idx, uint64_t int_port) {
   zxlogf(DEBUG, "gpio %u port %lu", idx, int_port);
@@ -646,11 +591,11 @@ zx_status_t HidButtonsDevice::Bind(fbl::Array<Gpio> gpios,
     }
   }
 
-  auto result = GetInputReport();
-  if (result.is_error()) {
-    zxlogf(ERROR, "GetInputReport failed %d", status);
-  } else {
-    last_report_ = result.value();
+  size_t out_len = 0;
+  status = HidbusGetReport(0, BUTTONS_RPT_ID_INPUT, (uint8_t*)&last_report_, sizeof(last_report_),
+                           &out_len);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "HidbusGetReport failed %d", status);
   }
 
   auto f = [](void* arg) -> int { return reinterpret_cast<HidButtonsDevice*>(arg)->Thread(); };
@@ -659,14 +604,26 @@ zx_status_t HidButtonsDevice::Bind(fbl::Array<Gpio> gpios,
     return ZX_ERR_INTERNAL;
   }
 
-  status = DdkAdd(ddk::DeviceAddArgs("hid-buttons")
-                      .set_inspect_vmo(inspector_.DuplicateVmo())
-                      .set_flags(DEVICE_ADD_NON_BINDABLE));
+  status = DdkAdd("hid-buttons", DEVICE_ADD_NON_BINDABLE);
   if (status != ZX_OK) {
     zxlogf(ERROR, "DdkAdd failed %d", status);
     ShutDown();
     return status;
   }
+
+  std::unique_ptr<HidButtonsHidBusFunction> hidbus_function(
+      new (&ac) HidButtonsHidBusFunction(zxdev(), this));
+  if (!ac.check()) {
+    DdkAsyncRemove();
+    return ZX_ERR_NO_MEMORY;
+  }
+  status = hidbus_function->DdkAdd("hidbus_function");
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "DdkAdd for Hidbus Function failed %d", status);
+    DdkAsyncRemove();
+    return status;
+  }
+  hidbus_function_ = hidbus_function.release();
 
   return ZX_OK;
 }
@@ -677,9 +634,13 @@ void HidButtonsDevice::ShutDown() {
   ZX_ASSERT(status == ZX_OK);
   thread_started_.Wait();
   thrd_join(thread_, NULL);
-  for (auto& gpio : gpios_) {
-    gpio.irq.destroy();
+  for (uint32_t i = 0; i < gpios_.size(); ++i) {
+    gpios_[i].irq.destroy();
   }
+  fbl::AutoLock lock(&client_lock_);
+  client_.clear();
+
+  hidbus_function_ = nullptr;
 }
 
 void HidButtonsDevice::DdkUnbind(ddk::UnbindTxn txn) {
@@ -691,8 +652,7 @@ void HidButtonsDevice::DdkRelease() { delete this; }
 
 static zx_status_t hid_buttons_bind(void* ctx, zx_device_t* parent) {
   fbl::AllocChecker ac;
-  auto dev = fbl::make_unique_checked<buttons::HidButtonsDevice>(
-      &ac, parent, fdf_dispatcher_get_async_dispatcher(fdf_dispatcher_get_current_dispatcher()));
+  auto dev = fbl::make_unique_checked<buttons::HidButtonsDevice>(&ac, parent);
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }

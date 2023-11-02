@@ -47,11 +47,10 @@ source_set("common") {
 
   public_deps = [
     ":hid-buttons-bind",
+    "//sdk/banjo/fuchsia.hardware.hidbus:fuchsia.hardware.hidbus_banjo_cpp",
     "//sdk/fidl/fuchsia.buttons:fuchsia.buttons_cpp",
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
-    "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_cpp",
     "//src/devices/lib/driver",
-    "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddk",
     "//src/lib/ddk:ddk-metadata-headers",
     "//src/lib/ddktl",
@@ -59,7 +58,7 @@ source_set("common") {
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/inspect",
+    "//zircon/system/ulib/hid",
     "//zircon/system/ulib/sync:sync-cpp",
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
