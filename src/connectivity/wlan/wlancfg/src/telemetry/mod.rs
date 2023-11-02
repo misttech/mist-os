@@ -1159,6 +1159,16 @@ impl Telemetry {
                             .log_reconnect_cobalt_metrics(total_downtime, disconnect_source)
                             .await;
                     }
+
+                    // Log successful post-recovery connection attempt if relevant.
+                    if let Some(recovery_reason) =
+                        self.stats_logger.recovery_record.connect_failure.take()
+                    {
+                        self.stats_logger
+                            .log_post_recovery_result(recovery_reason, RecoveryOutcome::Success)
+                            .await
+                    }
+
                     let telemetry_proxy = match fidl::endpoints::create_proxy() {
                         Ok((proxy, server)) => {
                             match self.monitor_svc_proxy.get_sme_telemetry(iface_id, server).await {
@@ -1207,7 +1217,16 @@ impl Telemetry {
                 } else if !result.is_credential_rejected {
                     // In the case where the connection failed for a reason other than a credential
                     // mismatch, log a connection failure occurrence metric.
-                    self.stats_logger.log_connection_failure().await
+                    self.stats_logger.log_connection_failure().await;
+
+                    // Log failed post-recovery connection attempt if relevant.
+                    if let Some(recovery_reason) =
+                        self.stats_logger.recovery_record.connect_failure.take()
+                    {
+                        self.stats_logger
+                            .log_post_recovery_result(recovery_reason, RecoveryOutcome::Failure)
+                            .await
+                    }
                 }
             }
             TelemetryEvent::Disconnected { track_subsequent_downtime, info } => {
@@ -3504,7 +3523,6 @@ impl StatsLogger {
         )
     }
 
-    #[cfg(test)]
     async fn log_post_recovery_result(&mut self, reason: RecoveryReason, outcome: RecoveryOutcome) {
         async fn log_post_recovery_metric(
             proxy: &mut fidl_fuchsia_metrics::MetricEventLoggerProxy,
@@ -7757,6 +7775,144 @@ mod tests {
 
         // The future should complete.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+    }
+
+    #[fuchsia::test]
+    fn test_post_recovery_connect_success() {
+        let (mut test_helper, mut test_fut) = setup_test();
+
+        // Send the recovery event metric.
+        let reason = RecoveryReason::ConnectFailure(ClientRecoveryMechanism::PhyReset);
+        let event = TelemetryEvent::RecoveryEvent { reason };
+        test_helper.telemetry_sender.send(event);
+
+        // Run the telemetry loop until it stalls.
+        assert_variant!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
+
+        // Expect that Cobalt has been notified of the recovery event
+        test_helper.drain_cobalt_events(&mut test_fut);
+        let logged_metrics = test_helper.get_logged_metrics(metrics::RECOVERY_OCCURRENCE_METRIC_ID);
+        assert_eq!(logged_metrics.len(), 1);
+
+        // Verify the reason dimension.
+        assert_eq!(
+            logged_metrics[0].event_codes,
+            vec![metrics::RecoveryOccurrenceMetricDimensionReason::ClientConnectionFailure
+                .as_event_code()]
+        );
+
+        // Send a successful connect result.
+        test_helper.telemetry_sender.send(TelemetryEvent::ConnectResult {
+            iface_id: IFACE_ID,
+            policy_connect_reason: Some(
+                client::types::ConnectReason::RetryAfterFailedConnectAttempt,
+            ),
+            result: fake_connect_result(fidl_ieee80211::StatusCode::Success),
+            multiple_bss_candidates: true,
+            ap_state: random_bss_description!(Wpa1).into(),
+            network_is_likely_hidden: false,
+        });
+
+        // Run the telemetry loop until it stalls.
+        assert_variant!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
+
+        // Verify the connect post-recovery success metric was logged.
+        test_helper.drain_cobalt_events(&mut test_fut);
+        let logged_metrics =
+            test_helper.get_logged_metrics(metrics::CONNECT_FAILURE_RECOVERY_OUTCOME_METRIC_ID);
+        assert_eq!(
+            logged_metrics[0].event_codes,
+            vec![RecoveryOutcome::Success as u32, ClientRecoveryMechanism::PhyReset as u32]
+        );
+
+        // Verify a subsequent connect result does not cause another metric to be logged.
+        test_helper.telemetry_sender.send(TelemetryEvent::ConnectResult {
+            iface_id: IFACE_ID,
+            policy_connect_reason: Some(
+                client::types::ConnectReason::RetryAfterFailedConnectAttempt,
+            ),
+            result: fake_connect_result(fidl_ieee80211::StatusCode::Success),
+            multiple_bss_candidates: true,
+            ap_state: random_bss_description!(Wpa1).into(),
+            network_is_likely_hidden: false,
+        });
+
+        assert_variant!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
+
+        test_helper.cobalt_events = Vec::new();
+        test_helper.drain_cobalt_events(&mut test_fut);
+        let logged_metrics =
+            test_helper.get_logged_metrics(metrics::CONNECT_FAILURE_RECOVERY_OUTCOME_METRIC_ID);
+        assert!(logged_metrics.is_empty());
+    }
+
+    #[fuchsia::test]
+    fn test_post_recovery_connect_failure() {
+        let (mut test_helper, mut test_fut) = setup_test();
+
+        // Send the recovery event metric.
+        let reason = RecoveryReason::ConnectFailure(ClientRecoveryMechanism::PhyReset);
+        let event = TelemetryEvent::RecoveryEvent { reason };
+        test_helper.telemetry_sender.send(event);
+
+        // Run the telemetry loop until it stalls.
+        assert_variant!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
+
+        // Expect that Cobalt has been notified of the recovery event
+        test_helper.drain_cobalt_events(&mut test_fut);
+        let logged_metrics = test_helper.get_logged_metrics(metrics::RECOVERY_OCCURRENCE_METRIC_ID);
+        assert_eq!(logged_metrics.len(), 1);
+
+        // Verify the reason dimension.
+        assert_eq!(
+            logged_metrics[0].event_codes,
+            vec![metrics::RecoveryOccurrenceMetricDimensionReason::ClientConnectionFailure
+                .as_event_code()]
+        );
+
+        // Send a failed connect result.
+        test_helper.telemetry_sender.send(TelemetryEvent::ConnectResult {
+            iface_id: IFACE_ID,
+            policy_connect_reason: Some(
+                client::types::ConnectReason::RetryAfterFailedConnectAttempt,
+            ),
+            result: fake_connect_result(fidl_ieee80211::StatusCode::RefusedReasonUnspecified),
+            multiple_bss_candidates: true,
+            ap_state: random_bss_description!(Wpa1).into(),
+            network_is_likely_hidden: false,
+        });
+
+        // Run the telemetry loop until it stalls.
+        assert_variant!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
+
+        // Verify the connect post-recovery failure metric was logged.
+        test_helper.drain_cobalt_events(&mut test_fut);
+        let logged_metrics =
+            test_helper.get_logged_metrics(metrics::CONNECT_FAILURE_RECOVERY_OUTCOME_METRIC_ID);
+        assert_eq!(
+            logged_metrics[0].event_codes,
+            vec![RecoveryOutcome::Failure as u32, ClientRecoveryMechanism::PhyReset as u32]
+        );
+
+        // Verify a subsequent connect result does not cause another metric to be logged.
+        test_helper.telemetry_sender.send(TelemetryEvent::ConnectResult {
+            iface_id: IFACE_ID,
+            policy_connect_reason: Some(
+                client::types::ConnectReason::RetryAfterFailedConnectAttempt,
+            ),
+            result: fake_connect_result(fidl_ieee80211::StatusCode::RefusedReasonUnspecified),
+            multiple_bss_candidates: true,
+            ap_state: random_bss_description!(Wpa1).into(),
+            network_is_likely_hidden: false,
+        });
+
+        assert_variant!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
+
+        test_helper.cobalt_events = Vec::new();
+        test_helper.drain_cobalt_events(&mut test_fut);
+        let logged_metrics =
+            test_helper.get_logged_metrics(metrics::CONNECT_FAILURE_RECOVERY_OUTCOME_METRIC_ID);
+        assert!(logged_metrics.is_empty());
     }
 
     #[fuchsia::test]
