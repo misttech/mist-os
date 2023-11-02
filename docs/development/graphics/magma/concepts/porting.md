@@ -27,7 +27,7 @@ The Magma system driver (MSD) is analogous to a kernel driver on other
 operating systems. At this point, consider whether to port an existing kernel
 driver from another operating system or write one from scratch.
 
-At this point you should read the [driver getting started guide][dgsd] to get
+At this point you should read the [Driver concepts][dgsd] section to get
 an understanding of the Fuchsia driver model.
 
 This choice depends on many aspects of the existing kernel driver code.
@@ -353,7 +353,7 @@ the system driver using the Zircon DDK.
 [intelgn]: /src/graphics/lib/magma/gnbuild/magma-intel-gen/BUILD.gn
 [fuchsia.hardware.clock.Clock]: /sdk/fidl/fuchsia.hardware.clock/clock.fidl
 [fuchsia.hardware.power.Device]: /sdk/fidl/fuchsia.hardware.power/power.fidl
-[dgsd]: /docs/development/drivers/concepts/getting_started.md
+[dgsd]: /docs/concepts/drivers/README.md
 [libc]: /docs/concepts/kernel/libc.md
 [fdio]: /docs/concepts/filesystems/life_of_an_open.md#fdio
 [versionscript]: /src/graphics/lib/magma/scripts/libvulkan.version

@@ -12,7 +12,3 @@ toc:
   path: /docs/development/drivers/diagnostics/logging.md
 - title: "Add tracing to a driver"
   path: /docs/development/drivers/diagnostics/tracing.md
-- title: "Bind debugger"
-  path: /docs/development/drivers/diagnostics/bind-debugger.md
-- title: "Driver utilities"
-  path: /docs/development/drivers/diagnostics/driver-utils.md

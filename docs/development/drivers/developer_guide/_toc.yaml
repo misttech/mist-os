@@ -6,20 +6,20 @@
 # before making changes to this file, and add a member of the fuchsia.dev
 # team as reviewer.
 toc:
-- title: "Fuchsia driver development"
+- title: "Fuchsia driver development (DFv1)"
   path: /docs/development/drivers/developer_guide/driver-development.md
-- title: "Composite nodes"
-  path: /docs/development/drivers/developer_guide/composite-node.md
-- title: "Driver runtime API guidelines"
-  path: /docs/development/drivers/developer_guide/driver-runtime-api-guidelines.md
-- title: "Drivers rubric"
-  path: /docs/development/drivers/developer_guide/rubric.md
+- title: "Building a Driver"
+  path: /docs/development/drivers/best_practices/build.md
+- title: "Interrupts"
+  path: /docs/development/drivers/concepts/driver_development/interrupts.md
+- title: "Platform Bus"
+  path: /docs/development/drivers/concepts/device_driver_model/platform-bus.md
 - title: "Tutorials"
   section:
   - include: /docs/development/drivers/tutorials/_toc.yaml
-- title: "Best practices"
+- title: "Testing"
   section:
-  - include: /docs/development/drivers/best_practices/_toc.yaml
-- title: "Driver-specifc guides"
+  - include: /docs/development/drivers/testing/_toc.yaml
+- title: "Debugging"
   section:
-  - include: /docs/development/drivers/driver_guides/_toc.yaml
+  - include: /docs/development/drivers/diagnostics/_toc.yaml

@@ -46,7 +46,7 @@ This page is a non-comprehensive index of the zircon documentation.
 + [System Calls](/docs/reference/syscalls/README.md)
 + [zxcrypt](/docs/concepts/filesystems/zxcrypt.md)
 
-+ [Fuchsia Driver Framework](/docs/development/drivers/concepts/getting_started.md)
++ [Driver framework (DFv2)](/docs/concepts/drivers/driver_framework.md)
 + [Driver interfaces - audio overview](/docs/development/audio/drivers/overview.md)
 
 + [libc](/docs/development/languages/c-cpp/libc.md)

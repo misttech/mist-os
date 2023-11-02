@@ -31,68 +31,65 @@ for Fuchsia:
 For more details on these concepts for the new driver framework (DFv2), see
 the [Drivers][dfv2-concepts] section under _Fundamentals_.
 
-
 ## Table of contents
 
-DFv1 to DFv2 driver migration
+### DFv1 to DFv2 driver migration
 
 - [Overview][dfv1-to-dfv2-driver-migration-overview]
 - [1. Migrate from Banjo to FIDL][migrate-from-banjo-to-fidl]
 - [2. Migrate from DFv1 to DFv2][migrate-from-dfv1-to-dfv2]
 
-Driver development guides
+### DFv2 driver development
 
-- [Fuchsia driver development][fuchsia-driver-development]
 - [Composite nodes][composite-nodes]
+- [Driver stack performance][driver-stack-performance]
+- [VMO Registration Pattern][vmo-registration-pattern]
+- [DMA][dma]
+- Tutorials
+
+  - [Bind rules tutorial][bind-rules-tutorial]
+  - [Bind library code generation tutorial][bind-library-code-generation-tutorial]
+  - [FIDL tutorial][fidl-tutorial]
+
+- Testing
+
+  - [DriverTestRealm][driver-test-realm]
+  - [Threading tips in tests][threading-tips-in-tests]
+
+- Debugging
+
+  - [Bind Debugger][bind-debugger]
+  - [Driver utilities][driver-utilities]
+
 - [Driver runtime API guidelines][driver-runtime-api-guidelines]
 - [Drivers rubric][drivers-rubric]
+
+### DFv1 driver development
+
+- [Fuchsia driver development (DFv1)][fuchsia-driver-development]
+- [Building drivers][bulding-drivers]
+- [Interrupts][interrupts]
+- [Platform Bus][platform-bus]
 - Tutorials
 
   - [Banjo tutorial][banjo-tutorial]
-  - [Bind rules tutorial][bind-rules-tutorial]
-  - [FIDL tutorial][fidl-tutorial]
-  - [Bind library code generation tutorial][bind-library-code-generation-tutorial]
+  - [Using the C++ DDK Template Library][using-cpp-ddk-template-lib]
 
-- Best practices
+- Testing
 
-  - [Building drivers][bulding-drivers]
-  - [Driver stack performance][driver-stack-performance]
-  - [VMO Registration Pattern][vmo-registration-pattern]
+  - [Driver testing][driver-testing-overview]
+  - [Mock DDK][mock-ddk]
 
-- Driver-specific guides
+- Debugging
 
-  -  Display drivers
-     -  [How to write a display driver][how-to-write-a-display-driver]
-     -  [Modifying board drivers][modifying-board-drivers]
-     -  [What does a display controller do?][what-does-a-display-controller-do]
-  -  Registers
-     -  [Registers overview][registers-overview]
-  -  USB development
-     -  [Getting descriptors and endpoints from USB][getting-descriptors-and-endpoints-from-usb]
-     -  [USB system overview][usb-system-overview]
-     -  [Lifecycle of a USB request][lifecycle-of-a-usb-request]
-     -  [USB mass storage driver][usb-mass-storage-driver]
+  - [Using Inspect for drivers][using-inspect]
+  - [Driver Logging][driver-logging]
+  - [Add tracing to a driver][add-tracing]
 
-Testing
+### DFv1 concepts
 
-- [Driver testing][driver-testing-overview]
-- [Mock DDK][mock-ddk]
-- [DriverTestRealm][driver-test-realm]
-- [Threading tips in tests][threading-tips-in-tests]
-
-Debugging
-
-- [Using Inspect for drivers][using-inspect]
-- [Driver Logging][driver-logging]
-- [Add tracing to a driver][add-tracing]
-- [Bind Debugger][bind-debugger]
-- [Driver utilities][driver-utilities]
-
-Concepts
-
-- [Getting Started][getting-started]
-- [Fuchsia Driver Framework][fuchsia-driver-framework]
-- Device Driver Model
+- [Fuchsia Driver Framework (DFv1)][fuchsia-driver-framework]
+- Device driver model
 
   - [Overview][device-driver-model-overview]
   - [Introduction][introduction]
@@ -102,33 +99,33 @@ Concepts
   - [Device driver lifecycle][device-driver-lifecycle]
   - [Device power management][device-power-management]
   - [Protocols in drivers][protocols-in-drivers]
-  - [Platform Bus][platform-bus]
   - [FIDL in drivers][fidl-in-drivers]
   - [Banjo in drivers][banjo-in-drivers]
   - [Composite devices][composite-devices]
   - [Device firmware][device-firmware]
 
-- Driver architectures
+### Driver-specific guides
 
-  -  [Overview][driver-architectures-overview]
-
-  -  Fuchsia input drivers
-
-     -  [Fuchsia input drivers][fuchsia-input-drivers]
-     -  [Input report reader library][input-report-reader-library]
-
-  -  SDMMC drivers
-
-     -  [SDMMC drivers architecture][sdmmc-drivers-architecture]
-
-- Driver development
-
-  - [Overview][driver-development-overview]
-  - [Using the C++ DDK Template Library][using-cpp-ddk-template-lib]
-  - [Configuration][configuration]
-  - [Interrupts][interrupts]
-  - [DMA][dma]
-  - [GPIO initialization][gpio-init]
+-  Board drivers
+   - [GPIO initialization][gpio-init]
+-  Display drivers
+   -  [How to write a display driver][how-to-write-a-display-driver]
+   -  [Modifying board drivers][modifying-board-drivers]
+   -  [What does a display controller do?][what-does-a-display-controller-do]
+-  PCI drivers
+   - [Configuration][configuration]
+-  Registers
+   -  [Registers overview][registers-overview]
+-  USB drivers
+   -  [Getting descriptors and endpoints from USB][getting-descriptors-and-endpoints-from-usb]
+   -  [USB system overview][usb-system-overview]
+   -  [Lifecycle of a USB request][lifecycle-of-a-usb-request]
+   -  [USB mass storage driver][usb-mass-storage-driver]
+-  Input drivers
+   -  [Fuchsia input drivers][fuchsia-input-drivers]
+   -  [Input report reader library][input-report-reader-library]
+-  SDMMC drivers
+   -  [SDMMC drivers architecture][sdmmc-drivers-architecture]
 
 <!-- Reference links -->
 
@@ -167,7 +164,6 @@ Concepts
 [bulding-drivers]: best_practices/build.md
 [driver-stack-performance]: best_practices/driver_stack_performance.md
 [vmo-registration-pattern]: best_practices/vmo-registration-pattern.md
-[getting-started]: concepts/getting_started.md
 [fuchsia-driver-framework]: concepts/fdf.md
 [device-driver-model-overview]: concepts/device_driver_model/README.md
 [introduction]: concepts/device_driver_model/introduction.md
@@ -186,7 +182,6 @@ Concepts
 [fuchsia-input-drivers]: concepts/driver_architectures/input_drivers/input.md
 [input-report-reader-library]: concepts/driver_architectures/input_drivers/input_report_reader.md
 [sdmmc-drivers-architecture]: concepts/driver_architectures/sdmmc_drivers/sdmmc.md
-[driver-development-overview]: concepts/driver_development/README.md
 [using-cpp-ddk-template-lib]: concepts/driver_development/using-ddktl.md
 [configuration]: concepts/driver_development/bar.md
 [interrupts]: concepts/driver_development/interrupts.md

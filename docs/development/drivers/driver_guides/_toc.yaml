@@ -6,12 +6,26 @@
 # before making changes to this file, and add a member of the fuchsia.dev
 # team as reviewer.
 toc:
+- title: "Board drivers"
+  section:
+  - title: "GPIO initialization"
+    path: /docs/development/drivers/concepts/driver_development/gpio-initialization.md
 - title: "Display drivers"
   section:
   - include: /docs/development/drivers/driver_guides/display/_toc.yaml
+- title: "PCI drivers"
+  section:
+  - title: "Configuration"
+    path: /docs/development/drivers/concepts/driver_development/bar.md
 - title: "Registers"
   section:
   - include: /docs/development/drivers/driver_guides/registers/_toc.yaml
-- title: "USB development"
+- title: "USB drivers"
   section:
   - include: /docs/development/drivers/driver_guides/usb/_toc.yaml
+- title: "Input drivers"
+  section:
+  - include: /docs/development/drivers/concepts/driver_architectures/input_drivers/_toc.yaml
+- title: "SDMMC drivers"
+  section:
+  - include: /docs/development/drivers/concepts/driver_architectures/sdmmc_drivers/_toc.yaml

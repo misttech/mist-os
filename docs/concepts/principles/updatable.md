@@ -3,8 +3,8 @@
 Fuchsia distributes software in packages,
 which are hermetically sealed bundles of components, related files, and dependencies.
 Fuchsia packages are designed to be updated independently or even delivered ephemerally,
-which means they can come and go from the device as needed and the software is always up to date,
-like a web page.
+which means they can come and go from the device as needed and the software is always
+up to date, like a web page.
 
 Fuchsia aims to provide drivers with a binary-stable interface.
 In the future,
@@ -15,8 +15,8 @@ to update to newer versions of Fuchsia seamlessly while keeping their existing d
 
 ## Almost all software on Fuchsia is a component
 
-**[The component framework](/docs/concepts/components/v2/introduction.md)
-makes it easier to update the system as new software is created**
+**[The component framework][components] makes it easier to update the system
+as new software is created**
 
 The kernel has a minimal set of responsibilities,
 nearly everything else is in a user space component.
@@ -27,23 +27,21 @@ Hermetic packaging of components leads to more portable software.
 
 ## Software is interchangeable and reusable
 
-**[Fuchsia Interface Definition Language (FIDL)](/docs/concepts/fidl/overview.md)
-enables loose coupling between components**
+**[Fuchsia Interface Definition Language (FIDL)][fidl] enables loose coupling
+between components**
 
 Components exchange capabilities as defined by FIDL protocols.
 Software is composed at runtime through protocols
 rather than through static composition of libraries.
 Fuchsia has no system libraries.
-Even the C standard library [(libc)](/docs/concepts/kernel/libc.md)
-is expressed as a dependency,
+Even the C standard library ([`libc`][libc]) is expressed as a dependency,
 delivered only when software needs it.
 Components can be swapped with another implementation
 as long they express the same FIDL protocol.
 
 ## Push updates and security patches to all products on demand
 
-**[Fuchsia packages](/docs/concepts/packages/package.md)
-are the units of software distribution**
+**[Fuchsia packages][fuchsia-packages] are the units of software distribution**
 
 All software is delivered in packages that
 can be updated independently and delivered on demand, like the web.
@@ -52,14 +50,12 @@ without the need for individual product coordination.
 
 ## On the roadmap
 
-This section covers features on
-[Fuchsia's roadmap](/docs/contribute/roadmap/index.md).
+This section covers features on Fuchsia's [roadmap][roadmap].
 
 ### Update the system without modifying the driver
 
-**[Drivers](/docs/development/drivers/concepts/getting_started.md)
-and system services are designed as user space components that
-can be updated independently of the core OS**
+**[Drivers][drivers] and system services are designed as user space components
+that can be updated independently of the core OS**
 
 We are designing the system so that Fuchsia products can receive system updates
 without having to modify or recompile drivers.
@@ -67,3 +63,12 @@ Drivers, system services, and end-user applications would be updated
 independently through the same mechanism, reducing the maintenance burden.
 Device owners could receive Fuchsia updates without having to update
 their drivers.
+
+<!-- Reference links -->
+
+[components]: /docs/concepts/components/v2/introduction.md
+[fidl]: /docs/concepts/fidl/overview.md
+[libc]: /docs/concepts/kernel/libc.md
+[fuchsia-packages]: /docs/concepts/packages/package.md
+[roadmap]: /docs/contribute/roadmap/index.md
+[drivers]: /docs/concepts/drivers/README.md

@@ -11,15 +11,46 @@ toc:
 - title: "DFv1 to DFv2 driver migration"
   section:
   - include: /docs/development/drivers/migration/_toc.yaml
-- title: "Driver development guides"
+- title: "DFv2 driver development"
+  section:
+  - title: "Composite nodes"
+    path: /docs/development/drivers/developer_guide/composite-node.md
+  - title: "Driver stack performance"
+    path: /docs/development/drivers/best_practices/driver_stack_performance.md
+  - title: "VMO Registration Pattern"
+    path: /docs/development/drivers/best_practices/vmo-registration-pattern.md
+  - title: "DMA"
+    path: /docs/development/drivers/concepts/driver_development/dma.md
+  - title: "Tutorials"
+    section:
+    - title: "Bind rules tutorial"
+      path: /docs/development/drivers/tutorials/bind-rules-tutorial.md
+    - title: "Bind library code generation tutorial"
+      path: /docs/development/drivers/tutorials/bind-libraries-codegen.md
+    - title: "FIDL tutorial"
+      path: /docs/development/drivers/tutorials/fidl-tutorial.md
+  - title: "Testing"
+    section:
+    - title: "DriverTestRealm"
+      path: /docs/development/drivers/testing/driver_test_realm.md
+    - title: "Threading tips in tests"
+      path: /docs/development/drivers/testing/threading-tips-in-tests.md
+  - title: "Debugging"
+    section:
+    - title: "Bind debugger"
+      path: /docs/development/drivers/diagnostics/bind-debugger.md
+    - title: "Driver utilities"
+      path: /docs/development/drivers/diagnostics/driver-utils.md
+  - title: "Driver runtime API guidelines"
+    path: /docs/development/drivers/developer_guide/driver-runtime-api-guidelines.md
+  - title: "Drivers rubric"
+    path: /docs/development/drivers/developer_guide/rubric.md
+- title: "DFv1 driver development"
   section:
   - include: /docs/development/drivers/developer_guide/_toc.yaml
-- title: "Testing"
-  section:
-  - include: /docs/development/drivers/testing/_toc.yaml
-- title: "Debugging"
-  section:
-  - include: /docs/development/drivers/diagnostics/_toc.yaml
-- title: "Concepts"
+- title: "DFv1 concepts"
   section:
   - include: /docs/development/drivers/concepts/_toc.yaml
+- title: "Driver-specifc guides"
+  section:
+  - include: /docs/development/drivers/driver_guides/_toc.yaml

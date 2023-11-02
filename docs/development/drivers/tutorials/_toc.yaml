@@ -8,9 +8,5 @@
 toc:
 - title: "Banjo tutorial"
   path: /docs/development/drivers/tutorials/banjo-tutorial.md
-- title: "Bind rules tutorial"
-  path: /docs/development/drivers/tutorials/bind-rules-tutorial.md
-- title: "FIDL tutorial"
-  path: /docs/development/drivers/tutorials/fidl-tutorial.md
-- title: "Bind library code generation tutorial"
-  path: /docs/development/drivers/tutorials/bind-libraries-codegen.md
+- title: "Using the C++ DDK template library"
+  path: /docs/development/drivers/concepts/driver_development/using-ddktl.md
