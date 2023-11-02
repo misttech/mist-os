@@ -213,7 +213,6 @@
 //src/devices/tests/banjo-proxy:child-driver
 //src/devices/tests/banjo-proxy:parent-driver
 //src/devices/tests/bind-fail-test:fuchsia_driver
-//src/devices/tests/bind-test-v2:bind-test-driver-v2-driver
 //src/devices/tests/bindlib-codegen-test:child-driver-driver
 //src/devices/tests/bindlib-codegen-test:parent-driver-driver
 //src/devices/tests/ddk-environment-test:ddk-environment-test-driver
@@ -251,8 +250,6 @@
 //src/devices/tests/runtime-composite-test/drivers:composite-driver
 //src/devices/tests/runtime-composite-test/drivers:leaf-driver
 //src/devices/tests/runtime-composite-test/drivers:root-driver
-//src/devices/tests/string-bind-test:child-driver-driver
-//src/devices/tests/string-bind-test:parent-driver-driver
 //src/devices/tests/sysdev:sysdev-driver
 //src/devices/tests/v2/compat-globals/leaf:driver
 //src/devices/tests/v2/compat-globals/root:driver

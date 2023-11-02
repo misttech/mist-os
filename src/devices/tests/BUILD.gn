@@ -8,7 +8,6 @@ group("tests") {
     "autobind:tests",
     "banjo-proxy:tests",
     "bind-fail-test",
-    "bind-test-v2",
     "bindlib-codegen-test",
     "ddk-environment-test:tests",
     "ddk-fallback-test:tests",
@@ -37,7 +36,6 @@ group("tests") {
     "node-group-test:tests",
     "nonbindable:tests",
     "runtime-composite-test:tests",
-    "string-bind-test",
     "v2:tests",
   ]
 }
@@ -48,7 +46,6 @@ group("drivers") {
     "autobind:drivers",
     "banjo-proxy:drivers",
     "bind-fail-test:driver",
-    "bind-test-v2:bind-test-driver-v2",
     "bindlib-codegen-test:child-driver",
     "bindlib-codegen-test:parent-driver",
     "ddk-environment-test:ddk-environment-test",
@@ -78,8 +75,6 @@ group("drivers") {
     "node-group-test/drivers:drivers",
     "nonbindable:drivers",
     "runtime-composite-test/drivers:drivers",
-    "string-bind-test:child-driver",
-    "string-bind-test:parent-driver",
     "sysdev:sysdev",
     "v2:drivers",
   ]
