@@ -39,9 +39,9 @@ pub enum BasemgrResult {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub enum KillBasemgrResult {
+pub enum KillSessionResult {
     Success,
-    NoBasemgrToKill,
+    NoSessionRunning,
 }
 
 #[derive(Deserialize, Default, Debug)]

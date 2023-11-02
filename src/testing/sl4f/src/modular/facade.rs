@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 use {
     crate::modular::types::{
-        BasemgrResult, KillBasemgrResult, RestartSessionResult, StartBasemgrRequest,
+        BasemgrResult, KillSessionResult, RestartSessionResult, StartBasemgrRequest,
     },
     anyhow::{format_err, Error},
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_session as fsession,
@@ -17,11 +17,6 @@ const SESSION_PARENT_MONIKER: &str = "./core/session-manager";
 const SESSION_COLLECTION_NAME: &str = "session";
 const SESSION_CHILD_NAME: &str = "session";
 const SESSION_MONIKER: &str = "./core/session-manager/session:session";
-
-enum BasemgrRuntimeState {
-    // basemgr is running as a v2 session.
-    V2Session,
-}
 
 /// Facade providing access to session testing interfaces.
 #[derive(Debug)]
@@ -55,8 +50,8 @@ impl ModularFacade {
         ModularFacade { session_launcher, session_restarter, lifecycle_controller, realm_query }
     }
 
-    /// Returns the state of the currently running basemgr instance, or None if not running.
-    async fn get_basemgr_runtime_state(&self) -> Result<Option<BasemgrRuntimeState>, Error> {
+    /// Returns true if a session is currently running.
+    pub async fn is_session_running(&self) -> Result<bool, Error> {
         Ok(self
             .realm_query
             .get_instance(SESSION_MONIKER)
@@ -64,7 +59,7 @@ impl ModularFacade {
             .ok()
             .and_then(|instance| instance.resolved_info)
             .and_then(|info| info.execution_info)
-            .map(|_| BasemgrRuntimeState::V2Session))
+            .is_some())
     }
 
     /// Restarts the currently running session.
@@ -75,10 +70,10 @@ impl ModularFacade {
         Ok(RestartSessionResult::Success)
     }
 
-    /// Facade to kill basemgr from Sl4f.
-    pub async fn kill_basemgr(&self) -> Result<KillBasemgrResult, Error> {
-        if self.get_basemgr_runtime_state().await?.is_none() {
-            return Ok(KillBasemgrResult::NoBasemgrToKill);
+    /// Facade to stop the session.
+    pub async fn stop_session(&self) -> Result<KillSessionResult, Error> {
+        if !self.is_session_running().await? {
+            return Ok(KillSessionResult::NoSessionRunning);
         }
 
         // Use a root LifecycleController to kill the session. It will send a shutdown signal to the
@@ -94,24 +89,23 @@ impl ModularFacade {
             .await?
             .map_err(|err| format_err!("failed to destroy session: {:?}", err))?;
 
-        Ok(KillBasemgrResult::Success)
+        Ok(KillSessionResult::Success)
     }
 
-    /// Starts a Modular session, either as a v2 session or by launching basemgr
-    /// as a legacy component.
+    /// Starts a session component.
     ///
-    /// If basemgr is already running, it will be shut down first.
+    /// If a session is already running, it will be stopped first.
     ///
-    /// `session_url` is required - basemgr will be started as a session with the given URL.
+    /// `session_url` is required.
     ///
     /// # Arguments
     /// * `args`: A serde_json Value parsed into [`StartBasemgrRequest`]
-    pub async fn start_basemgr(&self, args: Value) -> Result<BasemgrResult, Error> {
+    pub async fn start_session(&self, args: Value) -> Result<BasemgrResult, Error> {
         let req: StartBasemgrRequest = from_value(args)?;
 
-        // If basemgr is running, shut it down before starting a new one.
-        if self.get_basemgr_runtime_state().await?.is_some() {
-            self.kill_basemgr().await?;
+        // If a session is running, stop it before starting a new one.
+        if self.is_session_running().await? {
+            self.stop_session().await?;
         }
 
         self.launch_session(&req.session_url).await?;
@@ -133,11 +127,6 @@ impl ModularFacade {
             .await?
             .map_err(|err| format_err!("failed to launch session: {:?}", err))
     }
-
-    /// Facade that returns true if basemgr is running.
-    pub async fn is_basemgr_running(&self) -> Result<bool, Error> {
-        Ok(self.get_basemgr_runtime_state().await?.is_some())
-    }
 }
 
 #[cfg(test)]
@@ -148,7 +137,7 @@ mod tests {
                 ModularFacade, SESSION_CHILD_NAME, SESSION_COLLECTION_NAME, SESSION_MONIKER,
                 SESSION_PARENT_MONIKER,
             },
-            types::{BasemgrResult, KillBasemgrResult, RestartSessionResult},
+            types::{BasemgrResult, KillSessionResult, RestartSessionResult},
         },
         anyhow::Error,
         assert_matches::assert_matches,
@@ -168,7 +157,7 @@ mod tests {
     // of calls to launch, destroy, and restart.
     async fn test_facade<Fut>(
         run_facade_fns: impl Fn(ModularFacade) -> Fut,
-        is_basemgr_running: bool,
+        is_session_running: bool,
         expected_launch_count: usize,
         expected_destroy_count: usize,
         expected_restart_count: usize,
@@ -228,7 +217,7 @@ mod tests {
             match realm_query_request {
                 fsys::RealmQueryRequest::GetInstance { moniker, responder } => {
                     assert_eq!(moniker, SESSION_MONIKER.to_string());
-                    let instance = if is_basemgr_running {
+                    let instance = if is_session_running {
                         fsys::Instance {
                             moniker: Some(SESSION_MONIKER.to_string()),
                             url: Some("fake".to_string()),
@@ -289,16 +278,16 @@ mod tests {
     }
 
     #[fuchsia_async::run(2, test)]
-    async fn test_kill_basemgr() -> Result<(), Error> {
-        async fn kill_basemgr_steps(facade: ModularFacade) -> Result<(), Error> {
-            assert_matches!(facade.is_basemgr_running().await, Ok(true));
-            assert_matches!(facade.kill_basemgr().await, Ok(KillBasemgrResult::Success));
+    async fn test_stop_session() -> Result<(), Error> {
+        async fn stop_session_steps(facade: ModularFacade) -> Result<(), Error> {
+            assert_matches!(facade.is_session_running().await, Ok(true));
+            assert_matches!(facade.stop_session().await, Ok(KillSessionResult::Success));
             Ok(())
         }
 
         test_facade(
-            &kill_basemgr_steps,
-            true, // is_basemgr_running
+            &stop_session_steps,
+            true, // is_session_running
             0,    // SESSION_LAUNCH_CALL_COUNT
             1,    // DESTROY_CHILD_CALL_COUNT
             0,    // SESSION_RESTART_CALL_COUNT
@@ -307,21 +296,21 @@ mod tests {
     }
 
     #[fuchsia_async::run(2, test)]
-    async fn test_start_basemgr_v2_without_config() -> Result<(), Error> {
-        async fn start_basemgr_v2_steps(facade: ModularFacade) -> Result<(), Error> {
-            let start_basemgr_args = json!({
+    async fn test_start_session_without_config() -> Result<(), Error> {
+        async fn start_session_v2_steps(facade: ModularFacade) -> Result<(), Error> {
+            let start_session_args = json!({
                 "session_url": TEST_SESSION_URL,
             });
             assert_matches!(
-                facade.start_basemgr(start_basemgr_args).await,
+                facade.start_session(start_session_args).await,
                 Ok(BasemgrResult::Success)
             );
             Ok(())
         }
 
         test_facade(
-            &start_basemgr_v2_steps,
-            false, // is_basemgr_running
+            &start_session_v2_steps,
+            false, // is_session_running
             1,     // SESSION_LAUNCH_CALL_COUNT
             0,     // DESTROY_CHILD_CALL_COUNT
             0,     // SESSION_RESTART_CALL_COUNT
@@ -330,17 +319,17 @@ mod tests {
     }
 
     #[fuchsia_async::run(2, test)]
-    async fn test_start_basemgr_v2_shutdown_existing() -> Result<(), Error> {
+    async fn test_start_session_shutdown_existing() -> Result<(), Error> {
         async fn start_existing_steps(facade: ModularFacade) -> Result<(), Error> {
-            let start_basemgr_args = json!({
+            let start_session_args = json!({
                 "session_url": TEST_SESSION_URL,
             });
 
-            assert_matches!(facade.is_basemgr_running().await, Ok(true));
-            // start_basemgr() will notice that there's an existing basemgr, destroy it, then launch
+            assert_matches!(facade.is_session_running().await, Ok(true));
+            // start_session() will notice that there's an existing session, destroy it, then launch
             // the new session.
             assert_matches!(
-                facade.start_basemgr(start_basemgr_args).await,
+                facade.start_session(start_session_args).await,
                 Ok(BasemgrResult::Success)
             );
             Ok(())
@@ -348,7 +337,7 @@ mod tests {
 
         test_facade(
             &start_existing_steps,
-            true, // is_basemgr_running
+            true, // is_session_running
             1,    // SESSION_LAUNCH_CALL_COUNT
             1,    // DESTROY_CHILD_CALL_COUNT
             0,    // SESSION_RESTART_CALL_COUNT
@@ -357,16 +346,16 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_is_basemgr_running_not_running() -> Result<(), Error> {
+    async fn test_is_session_running_not_running() -> Result<(), Error> {
         async fn not_running_steps(facade: ModularFacade) -> Result<(), Error> {
-            assert_matches!(facade.is_basemgr_running().await, Ok(false));
+            assert_matches!(facade.is_session_running().await, Ok(false));
 
             Ok(())
         }
 
         test_facade(
             &not_running_steps,
-            false, // is_basemgr_running
+            false, // is_session_running
             0,     // SESSION_LAUNCH_CALL_COUNT
             0,     // DESTROY_CHILD_CALL_COUNT
             0,     // SESSION_RESTART_CALL_COUNT
@@ -375,16 +364,16 @@ mod tests {
     }
 
     #[fuchsia_async::run(2, test)]
-    async fn test_is_basemgr_running_v2() -> Result<(), Error> {
+    async fn test_is_session_running() -> Result<(), Error> {
         async fn is_running_steps(facade: ModularFacade) -> Result<(), Error> {
-            assert_matches!(facade.is_basemgr_running().await, Ok(true));
+            assert_matches!(facade.is_session_running().await, Ok(true));
 
             Ok(())
         }
 
         test_facade(
             &is_running_steps,
-            true, // is_basemgr_running
+            true, // is_session_running
             0,    // SESSION_LAUNCH_CALL_COUNT
             0,    // DESTROY_CHILD_CALL_COUNT
             0,    // SESSION_RESTART_CALL_COUNT
@@ -402,7 +391,7 @@ mod tests {
 
         test_facade(
             &restart_steps,
-            true, // is_basemgr_running
+            true, // is_session_running
             0,    // SESSION_LAUNCH_CALL_COUNT
             0,    // DESTROY_CHILD_CALL_COUNT
             1,    // SESSION_RESTART_CALL_COUNT
@@ -413,7 +402,7 @@ mod tests {
     #[fuchsia_async::run(2, test)]
     async fn test_restart_session_does_not_destroy() -> Result<(), Error> {
         async fn restart_steps(facade: ModularFacade) -> Result<(), Error> {
-            assert_matches!(facade.is_basemgr_running().await, Ok(true));
+            assert_matches!(facade.is_session_running().await, Ok(true));
 
             assert_matches!(facade.restart_session().await, Ok(RestartSessionResult::Success));
 
@@ -422,7 +411,7 @@ mod tests {
 
         test_facade(
             &restart_steps,
-            true, // is_basemgr_running
+            true, // is_session_running
             0,    // SESSION_LAUNCH_CALL_COUNT
             0,    // DESTROY_CHILD_CALL_COUNT
             1,    // SESSION_RESTART_CALL_COUNT

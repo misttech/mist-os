@@ -25,7 +25,7 @@ void main() {
 
   group(sl4f.Sl4f, () {
     test('Component search component not running', () async {
-      final result = await sl4f.Component(sl4fDriver).search('fake.cmx');
+      final result = await sl4f.Component(sl4fDriver).search('does_not_exist');
       expect(result, false);
     });
 

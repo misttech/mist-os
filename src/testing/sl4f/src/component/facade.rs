@@ -36,8 +36,7 @@ impl ComponentFacade {
     /// # Arguments
     /// * `args`: will be parsed to ComponentLaunchRequest in create_launch_app
     ///   with fields:
-    ///   - `url`: url of the component (ending in `.cmx` for CFv1 or `.cm` for
-    ///     CFv2)
+    ///   - `url`: url of the component (ending in `.cm`)
     ///   - `arguments`: optional arguments for the component (CFv1 only)
     ///   - `wait_until_stop`: if true, block until the component stops running
     pub async fn launch(&self, args: Value) -> Result<ComponentLaunchResponse, Error> {
@@ -57,16 +56,13 @@ impl ComponentFacade {
             }
             None => return Err(format_err!("Need full component url to launch")),
         };
-        if component_url.ends_with(".cmx") {
-            return Err(format_err!("CFv1 components are no longer supported"));
-        } else {
-            if req.arguments.is_some() {
-                return Err(format_err!(
-                    "CFv2 components currently don't support command line arguments"
-                ));
-            }
-            self.launch_v2(tag, &component_url, req.wait_until_stop).await
+
+        if req.arguments.is_some() {
+            return Err(format_err!(
+                "CFv2 components currently don't support command line arguments"
+            ));
         }
+        self.launch_v2(tag, &component_url, req.wait_until_stop).await
     }
 
     /// Launch component with url

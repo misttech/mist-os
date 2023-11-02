@@ -17,15 +17,15 @@ impl Facade for ModularFacade {
                 Ok(to_value(result)?)
             }
             ModularMethod::StartBasemgr => {
-                let result = self.start_basemgr(args).await?;
+                let result = self.start_session(args).await?;
                 Ok(to_value(result)?)
             }
             ModularMethod::KillBasemgr => {
-                let result = self.kill_basemgr().await?;
+                let result = self.stop_session().await?;
                 Ok(to_value(result)?)
             }
             ModularMethod::IsBasemgrRunning => {
-                let result = self.is_basemgr_running().await?;
+                let result = self.is_session_running().await?;
                 Ok(to_value(result)?)
             }
         }

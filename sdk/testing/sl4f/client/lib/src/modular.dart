@@ -25,11 +25,11 @@ class Modular {
   /// Function that makes a request to SL4F.
   final ModularRequestFn _request;
 
-  bool _controlsBasemgr = false;
+  bool _sessionWasStartedHere = false;
 
-  /// Whether this instance controls the currently running basemgr so it will
+  /// Whether this instance controls the currently running session so it will
   /// shut it down when [shutdown] is called.
-  bool get controlsBasemgr => _controlsBasemgr;
+  bool get controlsTheSession => _sessionWasStartedHere;
 
   Modular(Sl4f sl4f) : _request = sl4f.request;
 
@@ -45,17 +45,14 @@ class Modular {
   Future<String> killBasemgr() async =>
       await _request('modular_facade.KillBasemgr');
 
-  /// Launches basemgr.
+  /// Starts a session component.
   ///
-  /// This will start a modular session. Note that there can only be one global
-  /// basemgr instance running at a time. If there's a chance that basemgr is
-  /// already running use [boot] instead which refuse to launch a second
-  /// basemgr.
+  /// Note that there can only be one
+  /// session component running at a time. To automatically stop the current
+  /// session before starting a new one, use [boot].
   ///
-  /// Takes a custom [config] as JSON serialized string, or launches basemgr
-  /// with system default config if not provided.
-  ///
-  /// If [sessionUrl] provided, the given session component will be launched.
+  /// [sessionUrl] is required.
+  /// [config] is deprecated and ignored.
   Future<String> startBasemgr([String? config, String? sessionUrl]) async {
     final args = {};
     if (config != null && config.isNotEmpty) {
@@ -67,71 +64,61 @@ class Modular {
     return await _request('modular_facade.StartBasemgr', args);
   }
 
-  /// Whether basemgr is currently running on the DUT.
+  /// Whether the session is currently running on the DUT.
   ///
   /// This works whether it was started by this class or not.
   Future<bool> get isRunning async =>
       await _request('modular_facade.IsBasemgrRunning');
 
-  /// Starts basemgr only if it isn't running yet.
+  /// Starts the session only if one isn't running yet.
   ///
-  /// Takes a custom [config] as JSON serialized string, or launches basemgr
-  /// with system default config if not provided.
+  /// If [assumeControl] is true (the default) and a session wasn't running, then
+  /// this object will stop the session when [shutdown] is called with no arguments.
   ///
-  /// If [assumeControl] is true (the default) and basemgr wasn't running, then
-  /// this object will stop basemgr when [shutdown] is called with no arguments.
-  ///
-  /// If [sessionUrl] provided, the given session component will be launched.
+  /// If [sessionUrl] must be provided.
   Future<void> boot(
       {String? config, bool assumeControl = true, String? sessionUrl}) async {
     if (await isRunning) {
-      _log.info('Not taking control of basemgr, it was already running.');
+      _log.info('Not taking control of the session, it is already running.');
       return;
     }
 
-    _log.info('Booting ${sessionUrl} '
-        'with ${(config != null) ? 'custom' : 'default'} '
-        'configuration.');
-
     if (sessionUrl == null) {
-      _log.warning(
-          'The legacy basemgr.cmx component is deprecated. Please update this '
-          'client to call boot() with a sessionUrl (https://fxbug.dev/82391)');
+      _log.severe('sessionUrl is required. Aborting.');
+      return;
     }
+
+    _log.info('Starting ${sessionUrl}');
 
     await startBasemgr(config, sessionUrl);
 
-    // basemgr and all the agents can take some time to fully boot.
     var retry = 0;
     while (retry++ <= 60 && !await isRunning) {
       await Future.delayed(const Duration(seconds: 2));
     }
 
     if (!await isRunning) {
-      throw Sl4fException('Timeout for waiting basemgr to boot.');
+      throw Sl4fException('Timeout for waiting the session to start.');
     }
     if (assumeControl) {
-      _controlsBasemgr = true;
+      _sessionWasStartedHere = true;
     }
   }
 
-  /// Stops basemgr if it is controlled by this instance, or if
+  /// Stops the session if it is controlled by this instance, or if
   /// [forceShutdownBasemgr] is true.
   Future<void> shutdown({bool forceShutdownBasemgr = false}) async {
-    if (!forceShutdownBasemgr && !_controlsBasemgr) {
+    if (!forceShutdownBasemgr && !_sessionWasStartedHere) {
       _log.info(
-          'Modular SL4F client does not control basemgr, not shutting it down');
+          'Modular SL4F client does not control the session, not shutting it down');
       return;
     }
     if (!await isRunning) {
-      _log.info('Basemgr does not seem to be running before shutdown.');
-      // Running `basemgr_launcher shutdown` when basemgr is not running
-      // produces a very confusing stacktrace in the logs, so we avoid it here.
+      _log.info('There is no session running, unable to shut down.');
       return;
     }
-    _log.info('Shutting down basemgr.');
+    _log.info('Stopping the session.');
     await killBasemgr();
-    // basemgr and all the agents can take some time to fully die.
 
     final timer = Stopwatch();
     timer.start();
@@ -140,54 +127,11 @@ class Modular {
       await Future.delayed(const Duration(seconds: 2));
     }
     _log.info(
-        'Waited ${timer.elapsed.inSeconds} seconds for Basemgr to shutdown.');
+        'Waited ${timer.elapsed.inSeconds} seconds for the session to stop.');
 
     if (await isRunning) {
-      throw Sl4fException('Timeout for waiting basemgr to shut down.');
+      throw Sl4fException('Timeout for waiting the session to stop.');
     }
-    _controlsBasemgr = false;
-  }
-
-  /// Updates [extraArgs] to [componentPattern] in the modular session [config]
-  /// in json. We assume that the component_args are unique, and overwrites
-  /// args in [extraArgs] that are already exists in [config].
-  ///
-  /// Note: This method will replace existing args, if your component accepts
-  /// repeated args ex:
-  /// {
-  ///   "args": [
-  ///     "--flag_a=1",
-  ///     "--flag_a=2"
-  ///   ]
-  /// }
-  /// then calling this method with [extraArgs] = {"flag_a": 3, "flag_a": 4}
-  /// will resulted in:
-  /// {
-  ///   "args": [
-  ///     "--flag_a=3",
-  ///     "--flag_a=4"
-  ///   ]
-  /// }
-  /// Note: only args from the first matched [componentPattern] is updated.
-  String updateComponentArgs(
-      String config, RegExp componentPattern, Map<String, dynamic> extraArgs) {
-    dynamic configJson = jsonDecode(config);
-    final componentArgsBody = configJson['sessionmgr']['component_args'];
-    final componentArgs = componentArgsBody?.firstWhere(
-        (e) =>
-            e['uri'] is String &&
-            componentPattern.hasMatch(Uri.parse(e['uri']).fragment),
-        orElse: () => _log.warning('No component matched $componentPattern'));
-
-    if (componentArgs != null) {
-      // Update all the flags in [args].
-      componentArgs['args']?.removeWhere((currentArg) => extraArgs.keys
-          .contains(currentArg.split('=')[0].replaceFirst('--', '')));
-      componentArgs['args']?.addAll(extraArgs
-          .map((arg, val) =>
-              MapEntry(val != null ? '--$arg=$val' : '--$arg', ''))
-          .keys);
-    }
-    return jsonEncode(configJson);
+    _sessionWasStartedHere = false;
   }
 }
