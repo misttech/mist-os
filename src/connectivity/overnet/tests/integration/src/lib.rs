@@ -14,12 +14,10 @@ mod triangle;
 use {
     anyhow::Error,
     circuit::multi_stream::multi_stream_node_connection_to_async,
-    fidl::endpoints::ClientEnd,
-    fidl_fuchsia_overnet::{Peer, ServiceProviderMarker},
     fuchsia_async::Task,
     futures::channel::mpsc::unbounded,
     futures::prelude::*,
-    overnet_core::{log_errors, ListPeersContext, NodeId, NodeIdGenerator, Router},
+    overnet_core::{log_errors, ListablePeer, NodeId, NodeIdGenerator, Router},
     parking_lot::Mutex,
     std::sync::{
         atomic::{AtomicU64, Ordering},
@@ -27,18 +25,31 @@ use {
     },
 };
 
-pub use fidl_fuchsia_overnet::ServiceConsumerProxyInterface;
-pub use fidl_fuchsia_overnet::ServicePublisherProxyInterface;
-
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // Overnet <-> API bindings
 
-#[derive(Debug)]
 enum OvernetCommand {
-    ListPeers(futures::channel::oneshot::Sender<Vec<Peer>>),
-    RegisterService(String, ClientEnd<ServiceProviderMarker>),
+    ListPeers(futures::channel::mpsc::Sender<Vec<ListablePeer>>),
+    RegisterService(String, Box<dyn Fn(fidl::Channel) -> Result<(), Error> + Send + 'static>),
     ConnectToService(NodeId, String, fidl::Channel),
     AttachCircuitSocketLink(fidl::Socket, bool),
+}
+
+impl std::fmt::Debug for OvernetCommand {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ListPeers(arg0) => f.debug_tuple("ListPeers").field(arg0).finish(),
+            Self::RegisterService(arg0, _) => {
+                f.debug_tuple("RegisterService").field(arg0).field(&"<fn>".to_owned()).finish()
+            }
+            Self::ConnectToService(arg0, arg1, arg2) => {
+                f.debug_tuple("ConnectToService").field(arg0).field(arg1).field(arg2).finish()
+            }
+            Self::AttachCircuitSocketLink(arg0, arg1) => {
+                f.debug_tuple("AttachCircuitSocketLink").field(arg0).field(arg1).finish()
+            }
+        }
+    }
 }
 
 /// Overnet implementation for integration tests
@@ -61,7 +72,7 @@ impl Overnet {
     }
 
     fn from_router(node: Arc<Router>) -> Result<Arc<Overnet>, Error> {
-        let (tx, rx) = futures::channel::mpsc::unbounded();
+        let (tx, rx) = unbounded();
         tracing::info!(node_id = node.node_id().0, "SPAWN OVERNET");
         let tx = Mutex::new(tx);
         Ok(Arc::new(Overnet {
@@ -75,18 +86,28 @@ impl Overnet {
         Ok(self.tx.lock().unbounded_send(cmd).map_err(|_| fidl::Error::Invalid)?)
     }
 
-    /// Produce a proxy that acts as a connection to Overnet under the ServiceConsumer role
-    pub fn connect_as_service_consumer(
-        self: &Arc<Self>,
-    ) -> Result<impl ServiceConsumerProxyInterface, Error> {
-        Ok(ServiceConsumer(self.clone()))
+    pub fn register_service(
+        &self,
+        service_name: String,
+        provider: impl Fn(fidl::Channel) -> Result<(), Error> + Send + 'static,
+    ) -> Result<(), fidl::Error> {
+        self.send(OvernetCommand::RegisterService(service_name, Box::new(provider)))
     }
 
-    /// Produce a proxy that acts as a connection to Overnet under the ServicePublisher role
-    pub fn connect_as_service_publisher(
-        self: &Arc<Self>,
-    ) -> Result<impl ServicePublisherProxyInterface, Error> {
-        Ok(ServicePublisher(self.clone()))
+    pub fn connect_to_service(
+        &self,
+        node_id: NodeId,
+        service_name: String,
+        chan: fidl::Channel,
+    ) -> Result<(), fidl::Error> {
+        self.send(OvernetCommand::ConnectToService(node_id, service_name, chan))
+    }
+
+    pub fn list_peers(
+        &self,
+        sender: futures::channel::mpsc::Sender<Vec<ListablePeer>>,
+    ) -> Result<(), fidl::Error> {
+        self.send(OvernetCommand::ListPeers(sender))
     }
 
     fn attach_circuit_socket_link(
@@ -102,19 +123,20 @@ impl Overnet {
     }
 }
 
-async fn run_overnet_command(
-    node: Arc<Router>,
-    lpc: Arc<ListPeersContext>,
-    cmd: OvernetCommand,
-) -> Result<(), Error> {
+async fn run_overnet_command(node: Arc<Router>, cmd: OvernetCommand) -> Result<(), Error> {
     match cmd {
-        OvernetCommand::ListPeers(sender) => {
-            let peers = lpc.list_peers().await?;
-            let _ = sender.send(peers);
+        OvernetCommand::ListPeers(mut sender) => {
+            let lpc = node.new_list_peers_context().await;
+            Task::spawn(async move {
+                while let Ok(peers) = lpc.list_peers().await {
+                    let _ = sender.send(peers).await;
+                }
+            })
+            .detach();
             Ok(())
         }
         OvernetCommand::RegisterService(service_name, provider) => {
-            node.register_service_legacy(service_name, provider).await
+            node.register_service(service_name, provider).await
         }
         OvernetCommand::ConnectToService(node_id, service_name, channel) => {
             node.connect_to_service(node_id, &service_name, channel).await
@@ -145,16 +167,14 @@ async fn run_overnet(
 ) -> Result<(), Error> {
     let node_id = node.node_id();
     tracing::info!(?node_id, "RUN OVERNET");
-    let lpc = Arc::new(node.new_list_peers_context().await);
     // Run application loop
     rx.for_each_concurrent(None, move |cmd| {
         let node = node.clone();
-        let lpc = lpc.clone();
         async move {
             let cmd_text = format!("{:?}", cmd);
             let cmd_id = NEXT_CMD_ID.fetch_add(1, Ordering::Relaxed);
             tracing::info!(node_id = node_id.0, cmd = cmd_id, "START: {}", cmd_text);
-            if let Err(e) = run_overnet_command(node, lpc, cmd).await {
+            if let Err(e) = run_overnet_command(node, cmd).await {
                 tracing::info!(
                     node_id = node_id.0,
                     cmd = cmd_id,
@@ -170,63 +190,6 @@ async fn run_overnet(
     .await;
     tracing::info!(node_id = node_id.0, "DONE OVERNET");
     Ok(())
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-// ProxyInterface implementations
-
-struct ServicePublisher(Arc<Overnet>);
-
-impl ServicePublisherProxyInterface for ServicePublisher {
-    fn publish_service(
-        &self,
-        service_name: &str,
-        provider: ClientEnd<ServiceProviderMarker>,
-    ) -> Result<(), fidl::Error> {
-        self.0.send(OvernetCommand::RegisterService(service_name.to_string(), provider))
-    }
-}
-
-struct ServiceConsumer(Arc<Overnet>);
-
-use futures::{
-    channel::oneshot,
-    future::{err, Either, MapErr, Ready},
-};
-
-fn bad_recv(_: oneshot::Canceled) -> fidl::Error {
-    fidl::Error::PollAfterCompletion
-}
-
-impl ServiceConsumerProxyInterface for ServiceConsumer {
-    type ListPeersResponseFut = Either<
-        MapErr<oneshot::Receiver<Vec<Peer>>, fn(oneshot::Canceled) -> fidl::Error>,
-        Ready<Result<Vec<Peer>, fidl::Error>>,
-    >;
-
-    fn list_peers(&self) -> Self::ListPeersResponseFut {
-        let (sender, receiver) = futures::channel::oneshot::channel();
-        if let Err(e) = self.0.send(OvernetCommand::ListPeers(sender)) {
-            Either::Right(err(e))
-        } else {
-            // Returning an error from the receiver means that the sender disappeared without
-            // sending a response, a condition we explicitly disallow.
-            Either::Left(receiver.map_err(bad_recv))
-        }
-    }
-
-    fn connect_to_service(
-        &self,
-        node: &fidl_fuchsia_overnet_protocol::NodeId,
-        service_name: &str,
-        chan: fidl::Channel,
-    ) -> Result<(), fidl::Error> {
-        self.0.send(OvernetCommand::ConnectToService(
-            node.id.into(),
-            service_name.to_string(),
-            chan,
-        ))
-    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////

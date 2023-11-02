@@ -5,10 +5,10 @@
 use crate::error::{Error, Result};
 use crate::protocol;
 
-use futures::channel::oneshot;
 use std::collections::VecDeque;
 use std::sync::Arc;
 use std::sync::Mutex as SyncMutex;
+use tokio::sync::oneshot;
 
 /// Indicates whether a stream is open or closed, and if closed, why it closed.
 #[derive(Debug, Clone)]
@@ -22,8 +22,8 @@ enum Status {
 impl Status {
     fn is_closed(&self) -> bool {
         match self {
-            Status::Open => true,
-            Status::Closed(_) => false,
+            Status::Open => false,
+            Status::Closed(_) => true,
         }
     }
 
@@ -66,7 +66,12 @@ pub struct Reader(Arc<SyncMutex<State>>);
 impl Reader {
     /// Debug
     pub fn inspect_shutdown(&self) -> String {
-        self.0.lock().unwrap().closed.reason().unwrap_or_else(|| "No epitaph".to_owned())
+        let lock = self.0.lock().unwrap();
+        if lock.closed.is_closed() {
+            lock.closed.reason().unwrap_or_else(|| "No epitaph".to_owned())
+        } else {
+            "Not closed".to_owned()
+        }
     }
 
     /// Read bytes from the stream.
@@ -314,11 +319,15 @@ impl std::fmt::Debug for Writer {
 
 impl Drop for Writer {
     fn drop(&mut self) {
-        let mut state = self.0.lock().unwrap();
-        state.closed.close();
-        state.notify_readable.take().map(|x| {
-            let _ = x.0.send(());
-        });
+        let Some(x) = ({
+            let mut state = self.0.lock().unwrap();
+            state.closed.close();
+
+            state.notify_readable.take()
+        }) else {
+            return;
+        };
+        let _ = x.0.send(());
     }
 }
 

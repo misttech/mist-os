@@ -10,11 +10,7 @@
 use {
     super::Overnet,
     anyhow::{Context as _, Error},
-    fidl::{endpoints::ClientEnd, prelude::*},
-    fidl_fuchsia_overnet::{
-        ServiceConsumerProxyInterface, ServiceProviderRequest, ServiceProviderRequestStream,
-        ServicePublisherProxyInterface,
-    },
+    fidl::prelude::*,
     fidl_test_echo as echo,
     fuchsia_async::Task,
     futures::prelude::*,
@@ -58,30 +54,30 @@ async fn quite_large(run: usize) -> Result<(), Error> {
 // Client implementation
 
 async fn exec_client(overnet: Arc<Overnet>, text: Option<&str>) -> Result<(), Error> {
-    let svc = overnet.connect_as_service_consumer()?;
+    let (peer_sender, mut peer_receiver) = futures::channel::mpsc::channel(0);
+    overnet.list_peers(peer_sender)?;
     loop {
-        let peers = svc.list_peers().await?;
+        let peers =
+            peer_receiver.next().await.ok_or_else(|| anyhow::format_err!("List peers hung up"))?;
         tracing::info!(node_id = overnet.node_id().0, "Got peers: {:?}", peers);
         for peer in peers {
-            if peer.description.services.is_none() {
-                continue;
-            }
-            if peer
-                .description
-                .services
-                .unwrap()
-                .iter()
-                .find(|name| *name == echo::EchoMarker::PROTOCOL_NAME)
-                .is_none()
+            if peer.services.iter().find(|name| *name == echo::EchoMarker::PROTOCOL_NAME).is_none()
             {
                 continue;
             }
             let (s, p) = fidl::Channel::create();
-            svc.connect_to_service(&peer.id, echo::EchoMarker::PROTOCOL_NAME, s).unwrap();
+            overnet
+                .connect_to_service(peer.node_id, echo::EchoMarker::PROTOCOL_NAME.to_owned(), s)
+                .unwrap();
             let proxy =
                 fidl::AsyncChannel::from_channel(p).context("failed to make async channel")?;
             let cli = echo::EchoProxy::new(proxy);
-            tracing::info!(node_id = overnet.node_id().0, "Sending {:?} to {:?}", text, peer.id);
+            tracing::info!(
+                node_id = overnet.node_id().0,
+                "Sending {:?} to {:?}",
+                text,
+                peer.node_id
+            );
             assert_eq!(cli.echo_string(text).await.unwrap(), text.map(|s| s.to_string()));
             return Ok(());
         }
@@ -93,19 +89,14 @@ async fn exec_client(overnet: Arc<Overnet>, text: Option<&str>) -> Result<(), Er
 
 async fn exec_server(overnet: Arc<Overnet>) -> Result<(), Error> {
     let node_id = overnet.node_id();
-    let (s, p) = fidl::Channel::create();
-    let chan = fidl::AsyncChannel::from_channel(s).context("failed to make async channel")?;
-    overnet
-        .connect_as_service_publisher()?
-        .publish_service(echo::EchoMarker::PROTOCOL_NAME, ClientEnd::new(p))?;
-    ServiceProviderRequestStream::from_channel(chan)
-        .map_err(Into::<Error>::into)
-        .try_for_each_concurrent(None, |req| async move {
-            let ServiceProviderRequest::ConnectToService {
-                chan,
-                info: _,
-                control_handle: _control_handle,
-            } = req;
+    let (sender, receiver) = futures::channel::mpsc::unbounded();
+    overnet.register_service(echo::EchoMarker::PROTOCOL_NAME.to_owned(), move |chan| {
+        let _ = sender.unbounded_send(chan);
+        Ok(())
+    })?;
+    receiver
+        .map(Result::<_, Error>::Ok)
+        .try_for_each_concurrent(None, |chan| async move {
             tracing::info!(node_id = node_id.0, "Received service request for service");
             let chan =
                 fidl::AsyncChannel::from_channel(chan).context("failed to make async channel")?;

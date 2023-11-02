@@ -13,14 +13,10 @@ use {
         endpoints::{ClientEnd, ServerEnd},
         prelude::*,
     },
-    fidl_fuchsia_overnet::{
-        Peer, ServiceConsumerProxyInterface, ServiceProviderRequest, ServiceProviderRequestStream,
-        ServicePublisherProxyInterface,
-    },
     fidl_test_echo as echo, fidl_test_triangle as triangle,
     fuchsia_async::Task,
     futures::prelude::*,
-    overnet_core::{NodeId, NodeIdGenerator},
+    overnet_core::{ListablePeer, NodeId, NodeIdGenerator},
     std::sync::Arc,
 };
 
@@ -150,27 +146,22 @@ async fn forwarded_twice_full_transfer(run: usize) -> Result<(), Error> {
 ////////////////////////////////////////////////////////////////////////////////
 // Utilities
 
-fn has_peer_conscript(peers: &[Peer], peer_id: NodeId) -> bool {
-    let is_peer_ready = |peer: &Peer| -> bool {
-        peer.id == peer_id.into()
-            && peer.description.services.is_some()
-            && peer
-                .description
-                .services
-                .as_ref()
-                .unwrap()
-                .iter()
-                .any(|name| *name == triangle::ConscriptMarker::PROTOCOL_NAME)
+fn has_peer_conscript(peers: &[ListablePeer], peer_id: NodeId) -> bool {
+    let is_peer_ready = |peer: &ListablePeer| -> bool {
+        peer.node_id == peer_id
+            && peer.services.iter().any(|name| *name == triangle::ConscriptMarker::PROTOCOL_NAME)
     };
     peers.iter().any(|p| is_peer_ready(p))
 }
 
 fn connect_peer(
-    svc: &impl ServiceConsumerProxyInterface,
+    overnet: &Arc<Overnet>,
     node_id: NodeId,
 ) -> Result<triangle::ConscriptProxy, Error> {
     let (s, p) = fidl::Channel::create();
-    svc.connect_to_service(&node_id.into(), triangle::ConscriptMarker::PROTOCOL_NAME, s).unwrap();
+    overnet
+        .connect_to_service(node_id, triangle::ConscriptMarker::PROTOCOL_NAME.to_owned(), s)
+        .unwrap();
     let proxy = fidl::AsyncChannel::from_channel(p).context("failed to make async channel")?;
     Ok(triangle::ConscriptProxy::new(proxy))
 }
@@ -184,13 +175,17 @@ async fn exec_captain(
     overnet: Arc<Overnet>,
     text: Option<&str>,
 ) -> Result<(), Error> {
-    let svc = overnet.connect_as_service_consumer()?;
+    let (peer_sender, mut peer_receiver) = futures::channel::mpsc::channel(0);
+    overnet.list_peers(peer_sender)?;
     loop {
-        let peers = svc.list_peers().await?;
+        let peers = peer_receiver
+            .next()
+            .await
+            .ok_or_else(|| anyhow::format_err!("Peer receiver hung up"))?;
         tracing::info!(node_id = overnet.node_id().0, "Got peers: {:?}", peers);
         if has_peer_conscript(&peers, client) && has_peer_conscript(&peers, server) {
-            let client = connect_peer(&svc, client)?;
-            let server = connect_peer(&svc, server)?;
+            let client = connect_peer(&overnet, client)?;
+            let server = connect_peer(&overnet, server)?;
             let (s, p) = fidl::Channel::create();
             tracing::info!(node_id = overnet.node_id().0, "server/proxy hdls: {:?} {:?}", s, p);
             tracing::info!(node_id = overnet.node_id().0, "ENGAGE CONSCRIPTS");
@@ -243,20 +238,17 @@ async fn exec_conscript<
     overnet: Arc<Overnet>,
     action: F,
 ) -> Result<(), Error> {
-    let (s, p) = fidl::Channel::create();
-    let chan = fidl::AsyncChannel::from_channel(s).context("failed to make async channel")?;
+    let (sender, receiver) = futures::channel::mpsc::unbounded();
     let node_id = overnet.node_id();
-    overnet
-        .connect_as_service_publisher()?
-        .publish_service(triangle::ConscriptMarker::PROTOCOL_NAME, ClientEnd::new(p))?;
-    ServiceProviderRequestStream::from_channel(chan)
-        .map_err(Into::into)
-        .try_for_each_concurrent(None, |req| {
+    overnet.register_service(triangle::ConscriptMarker::PROTOCOL_NAME.to_owned(), move |chan| {
+        let _ = sender.unbounded_send(chan);
+        Ok(())
+    })?;
+    receiver
+        .map(Ok)
+        .try_for_each_concurrent(None, |chan| {
             let action = action.clone();
             async move {
-                let _ = &req;
-                let ServiceProviderRequest::ConnectToService { chan, info: _, control_handle: _ } =
-                    req;
                 tracing::info!(node_id = node_id.0, "Received service request for service");
                 let chan = fidl::AsyncChannel::from_channel(chan)
                     .context("failed to make async channel")?;
@@ -333,9 +325,13 @@ async fn run_triangle_echo_test(
     for (forwarder, target_node_id) in forwarders.into_iter() {
         background_tasks.push(Task::spawn(
             async move {
-                let svc = forwarder.clone().connect_as_service_consumer()?;
+                let (sender, mut receiver) = futures::channel::mpsc::channel(0);
+                forwarder.list_peers(sender)?;
                 loop {
-                    let peers = svc.list_peers().await?;
+                    let peers = receiver
+                        .next()
+                        .await
+                        .ok_or_else(|| anyhow::format_err!("List peers hung up"))?;
                     tracing::info!(
                         "Waiting for forwarding target {:?}; got peers {:?}",
                         target_node_id,
@@ -345,7 +341,7 @@ async fn run_triangle_echo_test(
                         break;
                     }
                 }
-                let target = connect_peer(&svc, target_node_id)?;
+                let target = connect_peer(&forwarder, target_node_id)?;
                 let own_id = forwarder.node_id();
                 exec_conscript(forwarder, move |request| {
                     conscript_forward_action(own_id, target_node_id, request, target.clone())

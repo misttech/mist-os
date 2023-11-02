@@ -13,7 +13,6 @@ group("tests_no_e2e") {
 
   deps = [
     "fidl:tests",
-    # TODO(fxb/131614): Re-enable when we can address flakiness.
-    #"integration:tests",
+    "integration:tests",
   ]
 }

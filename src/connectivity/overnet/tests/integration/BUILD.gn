@@ -12,7 +12,6 @@ rustc_test("integration") {
   deps = [
     ":echo_rust",
     ":triangle_rust",
-    "//sdk/fidl/fuchsia.overnet.protocol:fuchsia.overnet.protocol_rust",
     "//src/connectivity/overnet/lib/circuit",
     "//src/connectivity/overnet/lib/core",
     "//src/lib/fidl/rust/fidl",

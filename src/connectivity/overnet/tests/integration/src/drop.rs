@@ -8,9 +8,6 @@
 
 use super::{connect, Overnet};
 use anyhow::{format_err, Context as _, Error};
-use fidl_fuchsia_overnet::{
-    ServiceConsumerProxyInterface, ServiceProviderRequest, ServicePublisherProxyInterface,
-};
 use fuchsia_zircon_status as zx_status;
 use futures::prelude::*;
 use overnet_core::NodeIdGenerator;
@@ -43,42 +40,42 @@ async fn drop_connection_3node(run: usize) -> Result<(), Error> {
 }
 
 async fn run_drop_test(a: Arc<Overnet>, b: Arc<Overnet>) -> Result<(), Error> {
+    let a_clone = Arc::clone(&a);
     futures::future::try_join(
         async move {
-            let (cli, mut svr) = fidl::endpoints::create_request_stream()?;
-            b.connect_as_service_publisher()?.publish_service("test", cli)?;
-            let ServiceProviderRequest::ConnectToService {
-                chan,
-                info: _,
-                control_handle: _control_handle,
-            } = svr.try_next().await?.ok_or_else(|| format_err!("No test request received"))?;
+            let (sender, mut receiver) = futures::channel::mpsc::unbounded();
+            b.register_service("test".to_owned(), move |chan| {
+                let _ = sender.unbounded_send(chan);
+                Ok(())
+            })?;
+            let chan =
+                receiver.next().await.ok_or_else(|| format_err!("No test request received"))?;
             let chan = fidl::AsyncChannel::from_channel(chan)?;
             tracing::info!(node_id = b.node_id().0, "CLIENT CONNECTED TO SERVER");
             chan.write(&[], &mut vec![]).context("writing to client")?;
-            tracing::info!(node_id = b.node_id().0, "WAITING FOR CLOSE");
+            tracing::info!(node_id = b.node_id().0, "WAITING FOR CLOSE of {chan:?}");
             assert_eq!(
                 chan.recv_msg(&mut Default::default()).await,
                 Err(zx_status::Status::PEER_CLOSED)
             );
+            tracing::info!("RETURNING OBSERVER");
+            // TODO(b/306655845): Figure out why the test hangs without this and delete it.
+            drop(a_clone);
             Ok(())
         },
         async move {
             let chan = {
-                let svc = a.connect_as_service_consumer()?;
+                let (peer_sender, mut peer_receiver) = futures::channel::mpsc::channel(0);
+                a.list_peers(peer_sender)?;
                 'retry: loop {
-                    for peer in svc.list_peers().await? {
-                        if peer
-                            .description
-                            .services
-                            .unwrap_or(Vec::new())
-                            .iter()
-                            .find(|name| *name == "test")
-                            .is_none()
-                        {
+                    let peers =
+                        peer_receiver.next().await.ok_or_else(|| format_err!("Lost connection"))?;
+                    for peer in peers {
+                        if peer.services.iter().find(|name| *name == "test").is_none() {
                             continue;
                         }
                         let (s, p) = fidl::Channel::create();
-                        svc.connect_to_service(&peer.id, "test", s)?;
+                        a.connect_to_service(peer.node_id, "test".to_owned(), s)?;
                         break 'retry p;
                     }
                 }
@@ -89,6 +86,7 @@ async fn run_drop_test(a: Arc<Overnet>, b: Arc<Overnet>) -> Result<(), Error> {
             tracing::info!(node_id = a.node_id().0, "GOT MESSAGE FROM SERVER - DROPPING CLIENT");
             drop(a);
             drop(chan);
+            tracing::info!("RETURNING DROPPER");
             Ok(())
         },
     )
