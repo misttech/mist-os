@@ -81,7 +81,8 @@ impl NestedTimekeeper {
         NestedTimekeeper::new_with_rtc_options(clock, initial_rtc_time.into(), use_fake_clock).await
     }
 
-    async fn new_with_rtc_options(
+    /// Similar to [new], but accepts [RtcOptions] instead of `initial_rtc_time`.
+    pub async fn new_with_rtc_options(
         clock: Arc<zx::Clock>,
         rtc_options: RtcOptions,
         use_fake_clock: bool,

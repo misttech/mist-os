@@ -41,7 +41,8 @@ async fn serve_realm_factory(mut stream: RealmFactoryRequestStream) {
                     responder,
                     fake_utc_clock,
                 } => {
-                    let realm = realm_factory::create_realm(options, fake_utc_clock).await?;
+                    let (realm, _, _, _, _) =
+                        realm_factory::create_realm(options, fake_utc_clock).await?;
                     let request_stream = realm_server.into_stream()?;
                     task_group.spawn(async move {
                         realm_proxy::service::serve(realm, request_stream).await.unwrap();

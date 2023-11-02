@@ -20,7 +20,9 @@ fidl("test.time.realm") {
   testonly = true
   sources = [ "realm_factory.test.fidl" ]
   public_deps = [
+    "//sdk/fidl/fuchsia.hardware.rtc",
     "//sdk/fidl/fuchsia.io",
     "//sdk/fidl/fuchsia.testing.harness",
+    "//sdk/fidl/fuchsia.time.external",
   ]
 }

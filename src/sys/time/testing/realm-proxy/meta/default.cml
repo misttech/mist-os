@@ -1,0 +1,53 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "//sdk/lib/sys/component/realm_builder.shard.cml",
+        "inspect/client.shard.cml",
+        "syslog/client.shard.cml",
+    ],
+    program: {
+        runner: "elf",
+        binary: "bin/timekeeper-test-realm-factory",
+    },
+    capabilities: [
+        { protocol: "test.time.realm.RealmFactory" },
+    ],
+    offer: [
+        {
+            protocol: [
+                "fuchsia.component.Binder",
+                "fuchsia.diagnostics.ArchiveAccessor",
+                "fuchsia.logger.LogSink",
+                "fuchsia.process.Launcher",
+            ],
+            from: "parent",
+            to: "#realm_builder",
+        },
+        {
+            storage: "data",
+            from: "parent",
+            to: "#realm_builder",
+        },
+        {
+            storage: "cache",
+            from: "parent",
+            to: "#realm_builder",
+        },
+        {
+            event_stream: [
+                "capability_requested",
+                "directory_ready",
+            ],
+            from: "parent",
+            to: "#realm_builder",
+        },
+    ],
+    expose: [
+        {
+            protocol: "test.time.realm.RealmFactory",
+            from: "self",
+        },
+    ],
+}

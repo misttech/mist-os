@@ -9,6 +9,7 @@ group("realm-proxy") {
   testonly = true
   deps = [
     ":bin",
+    ":pkg",
     ":tests",
   ]
 }
@@ -28,6 +29,7 @@ rustc_binary("bin") {
   ]
   deps = [
     "../fidl:test.time.realm_rust",
+    "//sdk/fidl/fuchsia.metrics.test:fuchsia.metrics.test_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
@@ -41,4 +43,17 @@ rustc_binary("bin") {
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:tracing",
   ]
+}
+
+fuchsia_component("component") {
+  testonly = true
+  component_name = "timekeeper-test-realm-factory"
+  manifest = "meta/default.cml"
+  deps = [ ":bin" ]
+}
+
+fuchsia_package("pkg") {
+  package_name = "timekeeper-test-realm-factory"
+  testonly = true
+  deps = [ ":component" ]
 }

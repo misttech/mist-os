@@ -3,41 +3,45 @@
 // found in the LICENSE file.
 
 use anyhow::Result;
-use fidl_test_time_realm::{RealmOptions, RtcOptions};
+use fidl_fuchsia_metrics_test::MetricEventLoggerQuerierProxy;
+use fidl_test_time_realm::RealmOptions;
 use fuchsia_component_test::RealmInstance;
 use fuchsia_zircon as zx;
 use std::sync::Arc;
-use timekeeper_integration_lib::NestedTimekeeper;
+use timekeeper_integration_lib::{
+    FakeClockController, NestedTimekeeper, PushSourcePuppet, RtcOptions, RtcUpdates,
+};
 
+/// Creates a test realm using the parameters supplied.
+///
+/// Args:
+/// - `options`: the optional elements of the configuration. See [RealmOptions]
+///   for option details.
+/// - `fake_utc_clock`: the clock handle that Timekeeper will manage.
 pub async fn create_realm(
     options: RealmOptions,
     fake_utc_clock: zx::Clock,
-) -> Result<RealmInstance> {
+) -> Result<(
+    RealmInstance,
+    Arc<PushSourcePuppet>,
+    RtcUpdates,
+    MetricEventLoggerQuerierProxy,
+    Option<FakeClockController>,
+)> {
     tracing::debug!("create_realm: options: {:?}, fake_utc_clock={:?}", options, fake_utc_clock);
-    let rtc: Option<zx::Time> = options
-        .rtc
-        .map(|t| match t {
-            RtcOptions::InitialRtcTime(t) => Some(zx::Time::from_nanos(t)),
-            _ => {
-                // TODO: b/306213772 - Needs a way to serve all the *other* updates here.
-                tracing::debug!("create_realm: no support yet for all realm options");
-                unimplemented!()
-            }
-        })
-        .flatten();
-
     // TODO: b/306213772 - Figure out how to use all these return values.
-    let (
-        nested_timekeeper,
-        _push_source_puppet,
-        _rtc_updates,
-        _metric_proxy,
-        _fake_clock_controller,
-    ) = NestedTimekeeper::new(
-        Arc::new(fake_utc_clock),
-        rtc,
-        !options.use_real_monotonic_clock.unwrap_or(false),
-    )
-    .await;
-    Ok(nested_timekeeper.into())
+    let (nested_timekeeper, push_source_puppet, rtc_updates, metric_proxy, fake_clock_controller) =
+        NestedTimekeeper::new_with_rtc_options(
+            Arc::new(fake_utc_clock),
+            options.rtc.map(|r| r.into()).unwrap_or(RtcOptions::None),
+            !options.use_real_monotonic_clock.unwrap_or(false),
+        )
+        .await;
+    Ok((
+        nested_timekeeper.into(),
+        push_source_puppet,
+        rtc_updates,
+        metric_proxy,
+        fake_clock_controller,
+    ))
 }
