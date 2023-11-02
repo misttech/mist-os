@@ -385,38 +385,66 @@ class FfxCliTests(unittest.TestCase):
             timeout=10,
         )
 
+    @parameterized.expand(
+        [
+            (
+                {
+                    "label": "DeviceNotConnectedError",
+                    "side_effect": subprocess.CalledProcessError(
+                        returncode=1,
+                        cmd="ffx -t fuchsia-emulator target show",
+                        output=ffx._DEVICE_NOT_CONNECTED,
+                    ),
+                    "expected_error": errors.DeviceNotConnectedError,
+                },
+            ),
+            (
+                {
+                    "label": "FFXCommandError_because_of_CalledProcessError",
+                    "side_effect": subprocess.CalledProcessError(
+                        returncode=1,
+                        cmd="ffx -t fuchsia-emulator target show",
+                        output="command output and error",
+                    ),
+                    "expected_error": errors.FfxCommandError,
+                },
+            ),
+            (
+                {
+                    "label": "FFXCommandError_because_of_non_CalledProcessError",
+                    "side_effect": RuntimeError(
+                        "some error",
+                    ),
+                    "expected_error": errors.FfxCommandError,
+                },
+            ),
+            (
+                {
+                    "label": "TimeoutExpired",
+                    "side_effect": subprocess.TimeoutExpired(
+                        timeout=10, cmd="ffx -t fuchsia-emulator target show"
+                    ),
+                    "expected_error": subprocess.TimeoutExpired,
+                },
+            ),
+        ],
+        name_func=_custom_test_name_func,
+    )
     @mock.patch.object(
         ffx.subprocess,
         "check_output",
-        side_effect=subprocess.TimeoutExpired(
-            timeout=10, cmd="ffx -t fuchsia-emulator target show"
-        ),
         autospec=True,
     )
-    def test_ffx_run_timeout_expired_exception(
-        self, mock_subprocess_check_output
+    def test_ffx_run_exceptions(
+        self, parameterized_dict, mock_subprocess_check_output
     ) -> None:
-        """Test case for ffx.run() raises subprocess.TimeoutExpired"""
-        with self.assertRaises(subprocess.TimeoutExpired):
-            self.ffx_obj.run(cmd=_INPUT_ARGS["run_cmd"])
+        """Test case for ffx.run() raising different
+        exceptions."""
+        mock_subprocess_check_output.side_effect = parameterized_dict[
+            "side_effect"
+        ]
 
-        mock_subprocess_check_output.assert_called()
-
-    @mock.patch.object(
-        ffx.subprocess,
-        "check_output",
-        side_effect=subprocess.CalledProcessError(
-            returncode=1,
-            cmd="ffx -t fuchsia-emulator target show",
-            output="command output and error",
-        ),
-        autospec=True,
-    )
-    def test_ffx_run_ffx_command_error_exception(
-        self, mock_subprocess_check_output
-    ) -> None:
-        """Test case for ffx.run() raises errors.FfxCommandError"""
-        with self.assertRaises(errors.FfxCommandError):
+        with self.assertRaises(parameterized_dict["expected_error"]):
             self.ffx_obj.run(cmd=_INPUT_ARGS["run_cmd"])
 
         mock_subprocess_check_output.assert_called()
@@ -546,49 +574,28 @@ class FfxCliTests(unittest.TestCase):
 
         mock_ffx_get_target_information.assert_called_once()
 
-    @mock.patch.object(
-        ffx.subprocess,
-        "check_output",
-        return_value=b"",
-        autospec=True,
-    )
-    def test_wait_for_rcs_connection(
-        self, mock_subprocess_check_output
-    ) -> None:
+    @mock.patch.object(ffx.FFX, "run", return_value="", autospec=True)
+    def test_wait_for_rcs_connection(self, mock_ffx_run) -> None:
         """Test case for ffx.wait_for_rcs_connection()"""
         self.ffx_obj.wait_for_rcs_connection()
-
-        mock_subprocess_check_output.assert_called()
+        mock_ffx_run.assert_called()
 
     @parameterized.expand(
         [
             (
                 {
                     "label": "DeviceNotConnectedError",
-                    "side_effect": subprocess.CalledProcessError(
-                        returncode=1,
-                        cmd="ffx -t fuchsia-emulator target wait",
-                        output=ffx._DEVICE_NOT_CONNECTED,
+                    "side_effect": errors.DeviceNotConnectedError(
+                        "fuchsia-emulator is not connected to host"
                     ),
                     "expected_error": errors.DeviceNotConnectedError,
                 },
             ),
             (
                 {
-                    "label": "FFXCommandError_because_of_CalledProcessError",
-                    "side_effect": subprocess.CalledProcessError(
-                        returncode=1,
-                        cmd="ffx -t fuchsia-emulator target wait",
-                        output="command output and error",
-                    ),
-                    "expected_error": errors.FfxCommandError,
-                },
-            ),
-            (
-                {
-                    "label": "FFXCommandError_because_of_non_CalledProcessError",
-                    "side_effect": RuntimeError(
-                        "some error",
+                    "label": "FFXCommandError",
+                    "side_effect": errors.FfxCommandError(
+                        "command 'ffx -t fuchsia-emulator target wait' failed",
                     ),
                     "expected_error": errors.FfxCommandError,
                 },
@@ -605,120 +612,68 @@ class FfxCliTests(unittest.TestCase):
         ],
         name_func=_custom_test_name_func,
     )
-    @mock.patch.object(
-        ffx.subprocess,
-        "check_output",
-        autospec=True,
-    )
+    @mock.patch.object(ffx.FFX, "run", autospec=True)
     def test_wait_for_rcs_connection_exceptions(
-        self, parameterized_dict, mock_subprocess_check_output
+        self, parameterized_dict, mock_ffx_run
     ) -> None:
         """Test case for ffx.wait_for_rcs_connection() raising different
         exceptions."""
-        mock_subprocess_check_output.side_effect = parameterized_dict[
-            "side_effect"
-        ]
+        mock_ffx_run.side_effect = parameterized_dict["side_effect"]
 
         with self.assertRaises(parameterized_dict["expected_error"]):
             self.ffx_obj.wait_for_rcs_connection()
 
-        mock_subprocess_check_output.assert_called()
+        mock_ffx_run.assert_called()
+
+    @mock.patch.object(ffx.FFX, "run", return_value="", autospec=True)
+    def test_wait_for_rcs_disconnection(self, mock_ffx_run) -> None:
+        """Test case for ffx.wait_for_rcs_disconnection()"""
+        self.ffx_obj.wait_for_rcs_disconnection()
+        mock_ffx_run.assert_called()
 
     @parameterized.expand(
         [
             (
                 {
-                    "label": "when_rcs_connection_disconnected",
-                    "subprocess_side_effect": [
-                        subprocess.CalledProcessError(
-                            returncode=1,
-                            cmd="cmd",
-                            output="error",
-                            stderr="stderr",
-                        ),
-                        subprocess.CalledProcessError(
-                            returncode=1,
-                            cmd="cmd",
-                            output=ffx._DEVICE_NOT_CONNECTED,
-                            stderr="stderr",
-                        ),
-                    ],
+                    "label": "DeviceNotConnectedError",
+                    "side_effect": errors.DeviceNotConnectedError(
+                        "fuchsia-emulator is not connected to host"
+                    ),
+                    "expected_error": errors.DeviceNotConnectedError,
                 },
             ),
             (
                 {
-                    "label": "when_rcs_connection_timedout",
-                    "subprocess_side_effect": [
-                        subprocess.CalledProcessError(
-                            returncode=1,
-                            cmd="cmd",
-                            output="error",
-                            stderr="stderr",
-                        ),
-                        subprocess.TimeoutExpired(
-                            timeout=5,
-                            cmd="cmd",
-                        ),
-                    ],
+                    "label": "FFXCommandError",
+                    "side_effect": errors.FfxCommandError(
+                        "command 'ffx -t fuchsia-emulator target --wait "
+                        "--down' failed",
+                    ),
+                    "expected_error": errors.FfxCommandError,
                 },
             ),
             (
                 {
-                    "label": "when_rcs_connection_disconnected_after_few_attempts",
-                    "subprocess_side_effect": [
-                        RuntimeError("error"),
-                        subprocess.CalledProcessError(
-                            returncode=1,
-                            cmd="cmd",
-                            output=ffx._DEVICE_NOT_CONNECTED,
-                            stderr="stderr",
-                        ),
-                    ],
+                    "label": "TimeoutExpired",
+                    "side_effect": subprocess.TimeoutExpired(
+                        timeout=10,
+                        cmd="ffx -t fuchsia-emulator target --wait --down",
+                    ),
+                    "expected_error": subprocess.TimeoutExpired,
                 },
             ),
         ],
         name_func=_custom_test_name_func,
     )
-    @mock.patch("time.sleep", autospec=True)
-    @mock.patch("time.time", side_effect=[0, 1, 2, 3, 4, 5], autospec=True)
-    @mock.patch.object(
-        ffx.subprocess,
-        "check_output",
-        autospec=True,
-    )
-    def test_wait_for_rcs_disconnection(
-        self,
-        parameterized_output,
-        mock_subprocess_check_output,
-        mock_time,
-        mock_sleep,
+    @mock.patch.object(ffx.FFX, "run", autospec=True)
+    def test_wait_for_rcs_disconnection_exceptions(
+        self, parameterized_dict, mock_ffx_run
     ) -> None:
-        """Test case for ffx.wait_for_rcs_disconnection()"""
-        mock_subprocess_check_output.side_effect = parameterized_output[
-            "subprocess_side_effect"
-        ]
-        self.ffx_obj.wait_for_rcs_disconnection(timeout=5)
+        """Test case for ffx.wait_for_rcs_disconnection() raising different
+        exceptions."""
+        mock_ffx_run.side_effect = parameterized_dict["side_effect"]
 
-        mock_subprocess_check_output.assert_called()
-        mock_time.assert_called()
-        mock_sleep.assert_called()
+        with self.assertRaises(parameterized_dict["expected_error"]):
+            self.ffx_obj.wait_for_rcs_disconnection()
 
-    @mock.patch("time.sleep", autospec=True)
-    @mock.patch("time.time", side_effect=[0, 1, 2, 3, 4, 5], autospec=True)
-    @mock.patch.object(
-        ffx.subprocess,
-        "check_output",
-        side_effect=subprocess.CalledProcessError(returncode=1, cmd="cmd"),
-        autospec=True,
-    )
-    def test_wait_for_rcs_disconnection_exception(
-        self, mock_subprocess_check_output, mock_time, mock_sleep
-    ) -> None:
-        """Test case for ffx.wait_for_rcs_disconnection() raising
-        FfxCommandError"""
-        with self.assertRaises(errors.FfxCommandError):
-            self.ffx_obj.wait_for_rcs_disconnection(timeout=5)
-
-        mock_subprocess_check_output.assert_called()
-        mock_time.assert_called()
-        mock_sleep.assert_called()
+        mock_ffx_run.assert_called()

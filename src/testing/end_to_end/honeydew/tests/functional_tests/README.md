@@ -271,7 +271,7 @@ $ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_te
 For SL4F test
 
 ```shell
-$ fx set terminal.qemu-x64 \
+$ fx set core.qemu-x64 \
     --with //src/testing/sl4f \
     --with //src/sys/bin/start_sl4f \
     --with //src/ui/examples:flatland-examples \
@@ -329,12 +329,14 @@ $ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/transport_tes
 
 ### FFX tests
 ``` shell
-$ fx set terminal.qemu-x64 \
+$ fx set core.qemu-x64 \
     --with //src/testing/sl4f \
     --with //src/sys/bin/start_sl4f \
     --with-host //src/testing/end_to_end/honeydew/tests/functional_tests:tests
 
-$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/transport_tests/test_ffx:ffx_test --e2e --output
+$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/transport_tests/test_ffx:ffx_test_fc --e2e --output
+
+$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/transport_tests/test_ffx:ffx_wait_for_rcs_disconnection_test_fc --e2e --output
 ```
 
 [Intel NUC]: https://fuchsia.dev/fuchsia-src/development/hardware/intel_nuc
