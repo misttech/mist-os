@@ -108,6 +108,8 @@ def make_package_set_budgets(size_limits, product_config):
             # for use with bazel assembly may have an '_expanded' suffix that
             # should be removed.
             name = segments[-2].removesuffix("_expanded")
+            # Remove suffix added to all Bazel-built packages
+            name = name.removesuffix("_fuchsia_package_pkg")
         else:
             name = segments[-1]
         manifests_by_name[name] = manifest_path
