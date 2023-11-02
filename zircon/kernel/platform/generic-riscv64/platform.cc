@@ -165,13 +165,16 @@ static void topology_cpu_init() {
 
     const auto& processor = node->entity.processor;
     for (uint8_t i = 0; i < processor.logical_id_count; i++) {
-      // Skip the current (boot) hart, we are only starting secondary harts.
-      if (processor.flags == ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY) {
-        continue;
-      }
-      // Try to start the hart.
       const uint64_t hart_id = processor.architecture_info.riscv64.hart_id;
       DEBUG_ASSERT(hart_id <= UINT32_MAX);
+
+      // Skip the current (boot) hart, we are only starting secondary harts.
+      if (processor.flags == ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY ||
+          hart_id == riscv64_boot_hart_id()) {
+        continue;
+      }
+
+      // Try to start the hart.
       riscv64_start_cpu(processor.logical_ids[i], static_cast<uint32_t>(hart_id));
     }
   }
