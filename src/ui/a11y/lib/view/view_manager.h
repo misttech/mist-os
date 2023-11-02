@@ -46,7 +46,6 @@ class ViewManager : public fuchsia::accessibility::semantics::SemanticsManager,
  public:
   explicit ViewManager(std::unique_ptr<SemanticTreeServiceFactory> factory,
                        std::unique_ptr<ViewSemanticsFactory> view_semantics_factory,
-                       std::unique_ptr<AnnotationViewFactoryInterface> annotation_view_factory,
                        std::unique_ptr<ViewInjectorFactoryInterface> view_injector_factory,
                        std::unique_ptr<SemanticsEventManager> semantics_event_manager,
                        std::shared_ptr<AccessibilityViewInterface> a11y_view,
@@ -176,8 +175,6 @@ class ViewManager : public fuchsia::accessibility::semantics::SemanticsManager,
   std::unique_ptr<SemanticTreeServiceFactory> factory_;
 
   std::unique_ptr<ViewSemanticsFactory> view_semantics_factory_;
-
-  std::unique_ptr<AnnotationViewFactoryInterface> annotation_view_factory_;
 
   std::unique_ptr<ViewInjectorFactoryInterface> view_injector_factory_;
 

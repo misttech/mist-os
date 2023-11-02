@@ -21,10 +21,8 @@
 #include <fuchsia/ui/composition/cpp/fidl.h>
 #include <fuchsia/ui/input/cpp/fidl.h>
 #include <fuchsia/ui/pointerinjector/cpp/fidl.h>
-#include <fuchsia/ui/scenic/cpp/fidl.h>
 #include <fuchsia/vulkan/loader/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
-#include <lib/ui/scenic/cpp/view_ref_pair.h>
 #include <zircon/status.h>
 #include <zircon/types.h>
 
@@ -75,8 +73,7 @@ void SemanticsIntegrationTestV2::SetUp() {
   config.use_scene_owner = true;
   config.accessibility_owner = ui_testing::UITestRealm::AccessibilityOwnerType::FAKE;
   config.ui_to_client_services = {fuchsia::ui::composition::Allocator::Name_,
-                                  fuchsia::ui::composition::Flatland::Name_,
-                                  fuchsia::ui::scenic::Scenic::Name_};
+                                  fuchsia::ui::composition::Flatland::Name_};
   config.passthrough_capabilities = {
       Protocol{fuchsia::kernel::VmexResource::Name_},
       Protocol{fuchsia::process::Launcher::Name_},
@@ -105,7 +102,7 @@ void SemanticsIntegrationTestV2::BuildRealm() {
   view_manager_ = std::make_unique<a11y::ViewManager>(
       std::make_unique<a11y::SemanticTreeServiceFactory>(),
       std::make_unique<a11y::A11yViewSemanticsFactory>(),
-      std::make_unique<MockAnnotationViewFactory>(), std::make_unique<MockViewInjectorFactory>(),
+      std::make_unique<MockViewInjectorFactory>(),
       std::make_unique<a11y::A11ySemanticsEventManager>(),
       std::make_shared<MockAccessibilityView>(), context_.get());
 

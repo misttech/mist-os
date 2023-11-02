@@ -6,11 +6,9 @@
 #define SRC_UI_A11Y_LIB_VIEW_FLATLAND_ACCESSIBILITY_VIEW_H_
 
 #include <fuchsia/accessibility/scene/cpp/fidl.h>
+#include <fuchsia/ui/composition/cpp/fidl.h>
 #include <fuchsia/ui/views/cpp/fidl.h>
 #include <lib/fidl/cpp/binding_set.h>
-#include <lib/ui/scenic/cpp/commands.h>
-#include <lib/ui/scenic/cpp/resources.h>
-#include <lib/ui/scenic/cpp/view_token_pair.h>
 
 #include <memory>
 #include <optional>

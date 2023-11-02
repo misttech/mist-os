@@ -52,10 +52,6 @@ resource("semantic_tree_data_resource") {
   outputs = [ "data/{{source_file_part}}" ]
 }
 
-fuchsia_unittest_component("annotation-tests-component") {
-  deps = [ "annotation/tests" ]
-}
-
 fuchsia_unittest_component("configuration-tests-component") {
   deps = [ "configuration/tests" ]
 }
@@ -135,7 +131,6 @@ fuchsia_test_package("a11y-lib-tests") {
   ]
 
   test_components = [
-    ":annotation-tests-component",
     ":configuration-tests-component",
     ":focus-chain-manager-tests-component",
     ":gesture-arena-tests-component",

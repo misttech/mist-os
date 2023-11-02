@@ -5,10 +5,8 @@
 #include "src/ui/bin/virtual_keyboard_manager/focus_dispatcher.h"
 
 #include <fuchsia/ui/focus/cpp/fidl.h>
-#include <fuchsia/ui/input/cpp/fidl.h>
 #include <lib/async/dispatcher.h>
 #include <lib/sys/cpp/testing/component_context_provider.h>
-#include <lib/ui/scenic/cpp/commands.h>
 #include <lib/ui/scenic/cpp/view_ref_pair.h>
 #include <lib/ui/scenic/cpp/view_token_pair.h>
 #include <zircon/status.h>

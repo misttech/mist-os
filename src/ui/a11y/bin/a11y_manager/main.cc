@@ -13,7 +13,6 @@
 
 #include "src/intl/intl_services/run.h"
 #include "src/ui/a11y/bin/a11y_manager/app.h"
-#include "src/ui/a11y/lib/annotation/annotation_view.h"
 #include "src/ui/a11y/lib/screen_reader/screen_reader_context.h"
 #include "src/ui/a11y/lib/semantics/a11y_semantics_event_manager.h"
 #include "src/ui/a11y/lib/util/boot_info_manager.h"
@@ -65,7 +64,6 @@ int run_a11y_manager(int argc, const char** argv) {
       std::make_unique<a11y::SemanticTreeServiceFactory>(
           inspector->root().CreateChild("semantic_trees")),
       std::make_unique<a11y::A11yViewSemanticsFactory>(),
-      std::make_unique<a11y::AnnotationViewFactory>(),
       std::make_unique<a11y::ViewInjectorFactory>(),
       std::make_unique<a11y::A11ySemanticsEventManager>(), a11y_view, context.get());
 

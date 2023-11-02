@@ -5,10 +5,9 @@
 #ifndef SRC_UI_A11Y_LIB_VIEW_ACCESSIBILITY_VIEW_H_
 #define SRC_UI_A11Y_LIB_VIEW_ACCESSIBILITY_VIEW_H_
 
+#include <fuchsia/ui/composition/cpp/fidl.h>
 #include <fuchsia/ui/pointer/augment/cpp/fidl.h>
 #include <fuchsia/ui/views/cpp/fidl.h>
-#include <lib/ui/scenic/cpp/commands.h>
-#include <lib/ui/scenic/cpp/resources.h>
 #include <lib/ui/scenic/cpp/view_token_pair.h>
 
 namespace a11y {

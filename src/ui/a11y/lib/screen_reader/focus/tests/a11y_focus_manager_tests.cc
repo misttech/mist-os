@@ -14,7 +14,6 @@
 
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 #include "src/ui/a11y/bin/a11y_manager/tests/util/util.h"
-#include "src/ui/a11y/lib/annotation/tests/mocks/mock_annotation_view.h"
 #include "src/ui/a11y/lib/annotation/tests/mocks/mock_highlight_delegate.h"
 #include "src/ui/a11y/lib/focus_chain/tests/mocks/mock_focus_chain_registry.h"
 #include "src/ui/a11y/lib/focus_chain/tests/mocks/mock_focus_chain_requester.h"
@@ -91,14 +90,6 @@ class A11yFocusManagerTest : public gtest::RealLoopFixture {
     ASSERT_TRUE(a11y_focus.has_value());
     EXPECT_EQ(view_ref_helper.koid(), a11y_focus.value().view_ref_koid);
     EXPECT_EQ(node_id, a11y_focus.value().node_id);
-  }
-
-  MockAnnotationView* GetMockAnnotationView(zx_koid_t koid) {
-    auto view = mock_view_source_.GetViewWrapper(koid);
-    FX_CHECK(view);
-
-    auto* annotation_view = view->annotation_view();
-    return static_cast<MockAnnotationView*>(annotation_view);
   }
 
   MockSemanticTree* GetMockSemanticTree(zx_koid_t koid) {

@@ -164,7 +164,6 @@ class WebSemanticsTest : public SemanticsIntegrationTestV2 {
                        .targets = {ChildRef{kWebView}}});
     realm()->AddRoute({.capabilities = {Protocol{fuchsia::kernel::VmexResource::Name_},
                                         Protocol{fuchsia::logger::LogSink::Name_},
-                                        Protocol{fuchsia::ui::scenic::Scenic::Name_},
                                         Protocol{fuchsia::ui::composition::Allocator::Name_},
                                         Protocol{fuchsia::ui::composition::Flatland::Name_}},
                        .source = ParentRef(),

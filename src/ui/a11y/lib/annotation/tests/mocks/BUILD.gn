@@ -6,8 +6,6 @@ source_set("mocks") {
   testonly = true
 
   sources = [
-    "mock_annotation_view.cc",
-    "mock_annotation_view.h",
     "mock_highlight_delegate.cc",
     "mock_highlight_delegate.h",
   ]

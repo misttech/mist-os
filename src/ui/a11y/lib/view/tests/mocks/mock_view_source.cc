@@ -4,7 +4,6 @@
 
 #include "src/ui/a11y/lib/view/tests/mocks/mock_view_source.h"
 
-#include "src/ui/a11y/lib/annotation/tests/mocks/mock_annotation_view.h"
 #include "src/ui/a11y/lib/view/tests/mocks/mock_view_semantics.h"
 
 namespace accessibility_test {
@@ -22,9 +21,8 @@ fxl::WeakPtr<a11y::ViewWrapper> MockViewSource::GetViewWrapper(zx_koid_t koid) {
 void MockViewSource::CreateView(const ViewRefHelper& view_ref) {
   FX_CHECK(views_.count(view_ref.koid()) == 0);
 
-  views_[view_ref.koid()] = std::make_unique<a11y::ViewWrapper>(
-      view_ref.Clone(), std::make_unique<MockViewSemantics>(),
-      std::make_unique<MockAnnotationView>([]() {}, []() {}, []() {}));
+  views_[view_ref.koid()] =
+      std::make_unique<a11y::ViewWrapper>(view_ref.Clone(), std::make_unique<MockViewSemantics>());
 }
 
 MockSemanticTree* MockViewSource::GetMockSemanticTree(zx_koid_t view_ref_koid) {

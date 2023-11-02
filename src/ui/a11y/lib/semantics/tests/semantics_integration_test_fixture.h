@@ -18,7 +18,6 @@
 #include <gtest/gtest.h>
 
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
-#include "src/ui/a11y/lib/annotation/tests/mocks/mock_annotation_view.h"
 #include "src/ui/a11y/lib/semantics/a11y_semantics_event_manager.h"
 #include "src/ui/a11y/lib/view/tests/mocks/mock_accessibility_view.h"
 #include "src/ui/a11y/lib/view/tests/mocks/mock_view_injector_factory.h"

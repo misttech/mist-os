@@ -5,10 +5,8 @@
 #include "src/ui/a11y/lib/view/flatland_accessibility_view.h"
 
 #include <lib/syslog/cpp/macros.h>
-#include <lib/ui/scenic/cpp/commands.h>
 #include <lib/ui/scenic/cpp/view_creation_tokens.h>
 #include <lib/ui/scenic/cpp/view_identity.h>
-#include <lib/ui/scenic/cpp/view_token_pair.h>
 #include <zircon/status.h>
 
 #include <algorithm>

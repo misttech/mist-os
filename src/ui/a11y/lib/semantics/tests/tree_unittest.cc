@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fuchsia/accessibility/cpp/fidl.h>
+#include <fuchsia/ui/gfx/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/executor.h>
@@ -11,7 +12,6 @@
 #include <lib/inspect/testing/cpp/inspect.h>
 #include <lib/sys/cpp/testing/component_context_provider.h>
 #include <lib/syslog/cpp/macros.h>
-#include <lib/ui/scenic/cpp/commands.h>
 #include <lib/zx/event.h>
 
 #include <algorithm>
@@ -35,6 +35,19 @@ using fuchsia::accessibility::semantics::Node;
 using fuchsia::accessibility::semantics::Role;
 using ::inspect::Inspector;
 using ::testing::HasSubstr;
+
+fuchsia::ui::gfx::Matrix4Value NewMatrix4Value(const std::array<float, 4 * 4>& matrix) {
+  fuchsia::ui::gfx::Matrix4Value val;
+  val.variable_id = 0;
+
+  fuchsia::ui::gfx::mat4 mat4;
+  for (size_t index = 0; index < 4 * 4; index++) {
+    mat4.matrix[index] = matrix[index];
+  }
+  val.value = mat4;
+
+  return val;
+}
 
 // Valid tree paths.
 const std::string kSemanticTreeSingleNodePath = "/pkg/data/semantic_tree_single_node.json";
@@ -399,7 +412,7 @@ TEST_F(SemanticTreeTest, PartialUpdateCopiesNewInfo) {
   box.max.z = 10.f;
   third_root_update.set_location(box);
   third_root_update.set_transform(
-      scenic::NewMatrix4Value({2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 1}).value);
+      NewMatrix4Value({2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 1}).value);
   third_root_update.set_container_id(2u);
   updates.emplace_back(std::move(third_root_update));
 

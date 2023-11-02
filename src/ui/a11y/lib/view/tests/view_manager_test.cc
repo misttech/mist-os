@@ -19,7 +19,6 @@
 
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 #include "src/ui/a11y/bin/a11y_manager/tests/util/util.h"
-#include "src/ui/a11y/lib/annotation/tests/mocks/mock_annotation_view.h"
 #include "src/ui/a11y/lib/semantics/tests/mocks/mock_semantic_listener.h"
 #include "src/ui/a11y/lib/semantics/tests/mocks/mock_semantic_tree_service_factory.h"
 #include "src/ui/a11y/lib/semantics/tests/mocks/mock_semantics_event_manager.h"
@@ -73,8 +72,6 @@ class ViewManagerTest : public gtest::TestLoopFixture {
     auto view_semantics_factory = std::make_unique<MockViewSemanticsFactory>();
     view_semantics_factory_ = view_semantics_factory.get();
 
-    auto annotation_view_factory = std::make_unique<MockAnnotationViewFactory>();
-    annotation_view_factory_ = annotation_view_factory.get();
     auto view_injector_factory = std::make_unique<MockViewInjectorFactory>();
     auto mock_injector = std::make_shared<input_test::MockInjector>();
     mock_injector_ = mock_injector.get();
@@ -89,9 +86,8 @@ class ViewManagerTest : public gtest::TestLoopFixture {
 
     view_manager_ = std::make_unique<a11y::ViewManager>(
         std::move(tree_service_factory_), std::move(view_semantics_factory),
-        std::move(annotation_view_factory), std::move(view_injector_factory),
-        std::make_unique<MockSemanticsEventManager>(), std::move(accessibility_view),
-        context_provider_.context());
+        std::move(view_injector_factory), std::make_unique<MockSemanticsEventManager>(),
+        std::move(accessibility_view), context_provider_.context());
 
     // NOTE: SemanticListener and SemanticTree handles are ignored.
     semantics_manager()->RegisterViewForSemantics(
@@ -135,7 +131,6 @@ class ViewManagerTest : public gtest::TestLoopFixture {
   std::unique_ptr<a11y::ViewManager> view_manager_;
   MockSemanticTreeServiceFactory* tree_service_factory_ptr_;
   MockViewSemanticsFactory* view_semantics_factory_;
-  MockAnnotationViewFactory* annotation_view_factory_;
   input_test::MockInjector* mock_injector_;
   ViewRefHelper view_ref_helper_;
 };

@@ -12,7 +12,6 @@
 #include "fuchsia/accessibility/gesture/cpp/fidl.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 #include "src/ui/a11y/bin/a11y_manager/tests/util/util.h"
-#include "src/ui/a11y/lib/annotation/tests/mocks/mock_annotation_view.h"
 #include "src/ui/a11y/lib/focus_chain/tests/mocks/mock_focus_chain_registry.h"
 #include "src/ui/a11y/lib/focus_chain/tests/mocks/mock_focus_chain_requester.h"
 #include "src/ui/a11y/lib/gesture_manager/gesture_listener_registry.h"
@@ -98,9 +97,9 @@ class ScreenReaderTest : public gtest::TestLoopFixture {
     mock_gesture_handler_ = std::make_unique<MockGestureHandlerV2>();
     view_manager_ = std::make_unique<a11y::ViewManager>(
         std::make_unique<MockSemanticTreeServiceFactory>(),
-        std::make_unique<MockViewSemanticsFactory>(), std::make_unique<MockAnnotationViewFactory>(),
-        std::make_unique<MockViewInjectorFactory>(), std::make_unique<MockSemanticsEventManager>(),
-        std::make_shared<MockAccessibilityView>(), context_provider_->context());
+        std::make_unique<MockViewSemanticsFactory>(), std::make_unique<MockViewInjectorFactory>(),
+        std::make_unique<MockSemanticsEventManager>(), std::make_shared<MockAccessibilityView>(),
+        context_provider_->context());
     context_ = std::make_unique<MockScreenReaderContext>();
     context_ptr_ = context_.get();
     a11y_focus_manager_ptr_ = context_ptr_->mock_a11y_focus_manager_ptr();

@@ -35,15 +35,16 @@ executable("semantics_tests") {
     "semantic_tree_service_unittest.cc",
     "tree_unittest.cc",
   ]
-  public_deps = [ "//sdk/fidl/fuchsia.accessibility.semantics:fuchsia.accessibility.semantics_hlcpp" ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.accessibility.semantics:fuchsia.accessibility.semantics_hlcpp",
+    "//sdk/fidl/fuchsia.ui.gfx:fuchsia.ui.gfx_hlcpp",
+  ]
   deps = [
-    "//sdk/fidl/fuchsia.accessibility:fuchsia.accessibility_hlcpp",
     "//sdk/lib/fidl/cpp",
     "//sdk/lib/inspect/testing/cpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/sys/cpp/testing:unit",
     "//sdk/lib/syslog/cpp",
-    "//sdk/lib/ui/scenic/cpp",
     "//src/lib/files",
     "//src/lib/fsl",
     "//src/lib/fxl/test:gtest_main",
@@ -75,7 +76,6 @@ source_set("semantics_integration_test_fixture") {
     "//sdk/lib/fit",
     "//sdk/lib/sys/component/cpp/testing:cpp",
     "//sdk/lib/sys/cpp",
-    "//sdk/lib/ui/scenic/cpp",
     "//src/lib/fsl",
     "//src/lib/fxl",
     "//src/lib/testing/loop_fixture",
@@ -97,7 +97,6 @@ source_set("semantics_integration_test_fixture") {
     "//sdk/fidl/fuchsia.ui.app:fuchsia.ui.app_hlcpp",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//sdk/fidl/fuchsia.ui.input:fuchsia.ui.input_hlcpp",
-    "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_hlcpp",
     "//sdk/fidl/fuchsia.vulkan.loader:fuchsia.vulkan.loader_hlcpp",
     "//src/lib/testing/loop_fixture",
     "//src/ui/a11y/lib/annotation/tests/mocks",
@@ -140,7 +139,6 @@ executable("web-semantics-test-bin") {
     "//sdk/lib/sys/component/cpp/testing:cpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
-    "//sdk/lib/ui/scenic/cpp",
     "//src/chromium/web_runner_tests:mock_server",
     "//src/lib/fxl",
     "//src/lib/fxl/test:gtest_main",
