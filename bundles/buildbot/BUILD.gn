@@ -1,9 +1,0 @@
-# Copyright 2019 The Fuchsia Authors. All rights reserved.
-# Use of this source code is governed by a BSD-style license that can be
-# found in the LICENSE file.
-
-# This group contains tests that can only run with the enable_suspend flag set.
-group("host_suspend_tests_e2e") {
-  testonly = true
-  deps = [ "//src/tests/end_to_end/suspend:test($host_toolchain)" ]
-}
