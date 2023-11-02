@@ -6,18 +6,35 @@ use std::sync::{Arc, Weak};
 
 use crate::{
     auth::FsCred,
-    device::{terminal::*, DeviceMode, DeviceOps},
+    device::{
+        terminal::{TTYState, Terminal},
+        DeviceMode, DeviceOps,
+    },
     fs::{
         buffers::{InputBuffer, OutputBuffer},
         devtmpfs::{devtmpfs_create_symlink, devtmpfs_mkdir, devtmpfs_remove_child},
+        fileops_impl_nonseekable, fs_node_impl_dir_readonly,
         kobject::{KObjectDeviceAttribute, KType},
         sysfs::SysFsDirectory,
-        *,
+        CacheMode, DirEntryHandle, DirectoryEntryType, FdEvents, FileHandle, FileObject, FileOps,
+        FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle,
+        FsNodeInfo, FsNodeOps, FsStr, SpecialNode, VecDirectory, VecDirectoryEntry,
     },
     mm::MemoryAccessorExt,
-    syscalls::*,
-    task::*,
-    types::*,
+    syscalls::{
+        errno, error, ino_t, mode, not_implemented, pid_t, statfs, uapi, DeviceType, Errno,
+        OpenFlags, SyscallArg, SyscallResult, UserAddress, UserRef, DEVPTS_SUPER_MAGIC, FIOASYNC,
+        FIOCLEX, FIONBIO, FIONCLEX, FIONREAD, FIOQSIZE, SIGWINCH, SUCCESS, TCFLSH, TCGETA, TCGETS,
+        TCGETX, TCSBRK, TCSBRKP, TCSETA, TCSETAF, TCSETAW, TCSETS, TCSETSF, TCSETSW, TCSETX,
+        TCSETXF, TCSETXW, TCXONC, TIOCCBRK, TIOCCONS, TIOCEXCL, TIOCGETD, TIOCGICOUNT,
+        TIOCGLCKTRMIOS, TIOCGPGRP, TIOCGPTLCK, TIOCGPTN, TIOCGRS485, TIOCGSERIAL, TIOCGSID,
+        TIOCGSOFTCAR, TIOCGWINSZ, TIOCLINUX, TIOCMBIC, TIOCMBIS, TIOCMGET, TIOCMIWAIT, TIOCMSET,
+        TIOCNOTTY, TIOCNXCL, TIOCOUTQ, TIOCPKT, TIOCSBRK, TIOCSCTTY, TIOCSERCONFIG, TIOCSERGETLSR,
+        TIOCSERGETMULTI, TIOCSERGSTRUCT, TIOCSERGWILD, TIOCSERSETMULTI, TIOCSERSWILD, TIOCSETD,
+        TIOCSLCKTRMIOS, TIOCSPGRP, TIOCSPTLCK, TIOCSRS485, TIOCSSERIAL, TIOCSSOFTCAR, TIOCSTI,
+        TIOCSWINSZ, TIOCVHANGUP, TTY_ALT_MAJOR,
+    },
+    task::{CurrentTask, EventHandler, Kernel, WaitCanceler, Waiter},
 };
 
 // See https://www.kernel.org/doc/Documentation/admin-guide/devices.txt
@@ -600,8 +617,10 @@ mod tests {
         fs::{
             buffers::{VecInputBuffer, VecOutputBuffer},
             tmpfs::TmpFs,
+            MountInfo, NamespaceNode,
         },
         testing::*,
+        types::{FileMode, SIGCHLD, SIGTTOU},
     };
 
     fn ioctl<T: zerocopy::AsBytes + zerocopy::FromBytes + Copy>(

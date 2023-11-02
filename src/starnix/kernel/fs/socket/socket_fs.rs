@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
-    fs::*,
+    fs::{CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsStr},
     task::{CurrentTask, Kernel},
     types::{statfs, Errno, SOCKFS_MAGIC},
 };

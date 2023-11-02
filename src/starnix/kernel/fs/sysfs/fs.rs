@@ -5,12 +5,13 @@ use crate::{
     auth::FsCred,
     fs::{
         cgroup::CgroupDirectoryNode,
-        kobject::*,
+        kobject::{KObjectHandle, KType},
         sysfs::{sysfs_power_directory, CpuClassDirectory, SysFsDirectory},
-        *,
+        CacheConfig, CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions,
+        FsNodeInfo, FsNodeOps, FsStr, StaticDirectoryBuilder,
     },
-    task::*,
-    types::*,
+    task::{CurrentTask, Kernel, NetstackDevicesDirectory},
+    types::{mode, statfs, Errno, SYSFS_MAGIC},
 };
 
 use std::sync::Arc;

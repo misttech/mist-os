@@ -4,14 +4,14 @@
 
 use std::collections::VecDeque;
 
-use super::message_types::*;
+use super::message_types::{AncillaryData, Message, MessageData};
 use crate::{
     fs::{
         buffers::{InputBuffer, OutputBuffer},
         socket::SocketAddress,
         FdEvents,
     },
-    types::*,
+    types::{error, Errno},
 };
 
 #[derive(Debug, Default, Clone)]
@@ -311,6 +311,7 @@ impl MessageQueue {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::fs::UnixControlData;
 
     /// Tests that a write followed by a read returns the written message.
     #[::fuchsia::test]

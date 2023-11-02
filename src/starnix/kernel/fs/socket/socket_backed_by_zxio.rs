@@ -2,14 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::*;
-
 use crate::{
-    fs::{buffers::*, zxio::*, *},
+    fs::{
+        socket::{
+            Socket, SocketAddress, SocketDomain, SocketHandle, SocketMessageFlags, SocketOps,
+            SocketPeer, SocketProtocol, SocketShutdownFlags, SocketType,
+        },
+        zxio::{zxio_query_events, zxio_wait_async},
+        AncillaryData, FdEvents, InputBuffer, MessageReadInfo, OutputBuffer,
+    },
     logging::not_implemented,
     mm::MemoryAccessorExt,
-    task::*,
-    types::*,
+    task::{CurrentTask, EventHandler, Task, WaitCanceler, Waiter},
+    types::{
+        c_int, errno, errno_from_code, errno_from_zxio_code, error, from_status_like_fdio, uapi,
+        ucred, Errno, UserBuffer, MSG_DONTWAIT, MSG_WAITALL, SOL_SOCKET, SO_ATTACH_FILTER,
+    },
 };
 
 use fidl::endpoints::DiscoverableProtocolMarker as _;

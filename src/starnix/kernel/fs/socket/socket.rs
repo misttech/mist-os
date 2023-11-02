@@ -2,7 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::*;
+use super::{
+    new_netlink_socket, new_socket_file, socket_fs, NetlinkFamily, SocketAddress, SocketDomain,
+    SocketFile, SocketMessageFlags, SocketProtocol, SocketType, UnixSocket, VsockSocket,
+    ZxioBackedSocket,
+};
 
 use std::{collections::VecDeque, ffi::CStr, mem::size_of};
 
@@ -19,12 +23,27 @@ use static_assertions::const_assert;
 use zerocopy::{AsBytes, ByteOrder as _, FromBytes as _, NativeEndian};
 
 use crate::{
-    fs::{buffers::*, *},
+    fs::{
+        buffers::{
+            AncillaryData, InputBuffer, MessageReadInfo, OutputBuffer, VecInputBuffer,
+            VecOutputBuffer,
+        },
+        default_ioctl,
+        socket::SocketShutdownFlags,
+        Anon, FdEvents, FileHandle, FileObject, FsNodeInfo,
+    },
     logging::log_warn,
     mm::MemoryAccessorExt,
-    syscalls::*,
-    task::*,
-    types::{as_any::*, *},
+    syscalls::{
+        c_char, duration_from_timeval, errno, error, ifreq, in_addr, mode, sockaddr, sockaddr_in,
+        struct_with_union_into_bytes, timeval_from_duration, ucred, Errno, ErrnoCode, OpenFlags,
+        SyscallArg, SyscallResult, UserAddress, UserBuffer, UserRef, AF_INET, CAP_NET_RAW,
+        SIOCGIFADDR, SIOCGIFFLAGS, SIOCGIFHWADDR, SIOCGIFINDEX, SIOCGIFMTU, SIOCSIFADDR,
+        SIOCSIFFLAGS, SOL_SOCKET, SO_DOMAIN, SO_MARK, SO_PROTOCOL, SO_RCVTIMEO, SO_SNDTIMEO,
+        SO_TYPE, SUCCESS,
+    },
+    task::{CurrentTask, EventHandler, Task, WaitCanceler, Waiter},
+    types::as_any::AsAny,
 };
 
 use std::sync::Arc;
@@ -909,7 +928,11 @@ fn send_netlink_msg_and_wait_response(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::testing::*;
+    use crate::{
+        fs::UnixControlData,
+        testing::{create_kernel_and_task, map_memory},
+        types::SO_PASSCRED,
+    };
 
     #[::fuchsia::test]
     async fn test_dgram_socket() {

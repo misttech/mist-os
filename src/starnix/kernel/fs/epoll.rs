@@ -14,11 +14,14 @@ use crate::{
     arch::uapi::epoll_event,
     fs::{
         buffers::{InputBuffer, OutputBuffer},
-        *,
+        fileops_impl_nonseekable, Anon, FdEvents, FileHandle, FileObject, FileOps,
     },
-    logging::*,
-    task::*,
-    types::*,
+    logging::log_warn,
+    task::{
+        CurrentTask, EnqueueEventHandler, EventHandler, ReadyItem, ReadyItemKey, WaitCanceler,
+        WaitQueue, Waiter,
+    },
+    types::{errno, error, Errno, OpenFlags, EBADF, EINTR, EPOLLET, EPOLLONESHOT, ETIMEDOUT},
 };
 
 /// Maximum depth of epoll instances monitoring one another.
@@ -480,19 +483,22 @@ impl FileOps for EpollFileObject {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::fs::{
-        buffers::{VecInputBuffer, VecOutputBuffer},
-        fuchsia::create_fuchsia_pipe,
-        pipe::new_pipe,
-        socket::{SocketDomain, SocketType, UnixSocket},
-        FdEvents,
+    use super::{epoll_event, EpollFileObject, EventHandler, OpenFlags};
+    use crate::{
+        fs::{
+            buffers::{VecInputBuffer, VecOutputBuffer},
+            fuchsia::create_fuchsia_pipe,
+            new_eventfd,
+            pipe::new_pipe,
+            socket::{SocketDomain, SocketType, UnixSocket},
+            EventFdType, FdEvents,
+        },
+        task::Waiter,
+        testing::{create_kernel_and_task, create_task},
     };
-    use fuchsia_zircon::HandleBased;
+    use fuchsia_zircon::{self as zx, HandleBased};
     use std::sync::atomic::{AtomicU64, Ordering};
     use syncio::Zxio;
-
-    use crate::testing::*;
 
     #[::fuchsia::test]
     async fn test_epoll_read_ready() {

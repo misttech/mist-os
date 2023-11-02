@@ -6,10 +6,10 @@ use std::mem;
 use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
 use crate::{
-    fs::*,
+    fs::FsStr,
     mm::{vmo::round_up_to_increment, MemoryAccessor},
-    task::*,
-    types::*,
+    task::CurrentTask,
+    types::{errno, error, ino_t, off_t, Errno, FileMode, UserAddress, ENOSPC},
 };
 
 #[derive(Debug, Default, Copy, Clone, PartialOrd, Ord, PartialEq, Eq)]

@@ -4,12 +4,22 @@
 
 use crate::{
     auth::FsCred,
-    fs::{fuchsia::update_info_from_attrs, *},
+    fs::{
+        default_seek, emit_dotdot, fileops_impl_directory, fileops_impl_seekable,
+        fs_node_impl_dir_readonly, fs_node_impl_not_dir, fs_node_impl_symlink,
+        fuchsia::update_info_from_attrs, CacheConfig, CacheMode, DirectoryEntryType, DirentSink,
+        FdEvents, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
+        FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
+        InputBuffer, OutputBuffer, SeekTarget, SymlinkTarget, ValueOrSize,
+    },
     impossible_error,
     logging::log_warn,
     mm::ProtectionFlags,
     task::{CurrentTask, EventHandler, Kernel, WaitCanceler, Waiter},
-    types::*,
+    types::{
+        errno, error, from_status_like_fdio, ino_t, off_t, statfs, Errno, FileMode, MountFlags,
+        OpenFlags, SourceContext,
+    },
     vmex_resource::VMEX_RESOURCE,
 };
 use anyhow::{anyhow, ensure, Error};
@@ -476,12 +486,16 @@ fn to_fs_node_info(inode_num: ino_t, metadata_node: &ext4_metadata::Node) -> FsN
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use crate::{
-        fs::{buffers::VecOutputBuffer, SymlinkTarget},
-        testing::*,
+        fs::{
+            buffers::VecOutputBuffer, fuchsia::RemoteBundle, DirectoryEntryType, DirentSink, FsStr,
+            LookupContext, Namespace, SymlinkMode, SymlinkTarget,
+        },
+        testing::create_kernel_and_task,
+        types::{ino_t, off_t, Errno, FileMode, OpenFlags},
     };
     use fidl_fuchsia_io as fio;
+    use fuchsia_zircon as zx;
     use std::collections::{HashMap, HashSet};
 
     #[::fuchsia::test]

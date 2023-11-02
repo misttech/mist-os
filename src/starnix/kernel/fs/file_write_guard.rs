@@ -4,7 +4,10 @@
 
 use std::sync::Arc;
 
-use crate::{fs::fs_node::*, types::*};
+use crate::{
+    fs::fs_node::FsNodeHandle,
+    types::{errno, error, Errno, SealFlags},
+};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum FileWriteGuardMode {
@@ -172,7 +175,11 @@ impl Eq for FileWriteGuardRef {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::testing::*;
+    use crate::{
+        fs::FsNode,
+        testing::*,
+        types::{DeviceType, FileMode},
+    };
 
     fn create_fs_node() -> Arc<FsNode> {
         let (_kernel, current_task) = create_kernel_and_task();

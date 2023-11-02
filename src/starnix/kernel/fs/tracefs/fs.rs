@@ -2,11 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::tracing_directory::*;
+use super::tracing_directory::TraceMarkerFile;
 use crate::auth::FsCred;
-use crate::fs::*;
-use crate::task::*;
-use crate::types::*;
+use crate::fs::{
+    CacheMode, ConstFile, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions,
+    FsNodeInfo, FsStr, StaticDirectoryBuilder,
+};
+use crate::task::{CurrentTask, Kernel};
+use crate::types::{mode, statfs, Errno, TRACEFS_MAGIC};
 
 use std::sync::Arc;
 

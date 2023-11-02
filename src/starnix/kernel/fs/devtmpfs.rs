@@ -5,9 +5,11 @@
 use crate::{
     auth::FsCred,
     device::DeviceMode,
-    fs::{kobject::DeviceMetadata, tmpfs::*, *},
-    task::*,
-    types::*,
+    fs::{
+        kobject::DeviceMetadata, tmpfs::TmpFs, DirEntryHandle, FileSystemHandle, FsStr, MountInfo,
+    },
+    task::Kernel,
+    types::{mode, DeviceType, Errno},
 };
 use std::sync::Arc;
 

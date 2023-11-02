@@ -1,7 +1,6 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use super::*;
 
 use starnix_lock::Mutex;
 use std::{
@@ -13,10 +12,12 @@ use crate::{
     device::DeviceMode,
     fs::{
         buffers::{InputBuffer, OutputBuffer},
+        fileops_impl_seekable, fs_node_impl_not_dir,
         sysfs::SysFsDirectory,
+        FileObject, FileOps, FsNode, FsNodeOps, FsStr, FsString,
     },
-    task::*,
-    types::*,
+    task::CurrentTask,
+    types::{error, DeviceType, Errno, OpenFlags},
 };
 
 #[derive(Debug, PartialEq, Clone)]

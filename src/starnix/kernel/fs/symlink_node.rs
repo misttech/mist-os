@@ -2,11 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::*;
 use crate::{
-    fs::{fs_node_impl_symlink, fs_node_impl_xattr_delegate},
+    fs::{
+        fs_node_impl_symlink, fs_node_impl_xattr_delegate, FsNode, FsNodeOps, FsStr, FsString,
+        MemoryXattrStorage, SymlinkTarget,
+    },
     task::CurrentTask,
-    types::*,
+    types::{error, Errno},
 };
 
 /// A node that represents a symlink to another node.

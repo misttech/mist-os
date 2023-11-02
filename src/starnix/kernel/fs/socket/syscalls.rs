@@ -6,13 +6,25 @@ use fuchsia_zircon as zx;
 use lock_sequence::{Locked, Unlocked};
 use std::{convert::TryInto, mem::size_of};
 
-use super::*;
 use crate::{
-    fs::{buffers::*, *},
+    fs::{
+        buffers::{AncillaryData, ControlMsg, UserBuffersInputBuffer, UserBuffersOutputBuffer},
+        socket::{
+            new_socket_file, resolve_unix_socket_address, Socket, SocketAddress, SocketDomain,
+            SocketFile, SocketMessageFlags, SocketPeer, SocketProtocol, SocketShutdownFlags,
+            SocketType, UnixSocket, SA_FAMILY_SIZE,
+        },
+        FdEvents, FdFlags, FdNumber, FileHandle, LookupContext,
+    },
     logging::{log_trace, not_implemented},
     mm::{vmo::round_up_to_increment, MemoryAccessor, MemoryAccessorExt},
-    task::*,
-    types::*,
+    task::{CurrentTask, IpTables, Task, WaitCallback, Waiter},
+    types::{
+        cmsghdr, duration_from_timespec, errno, error, mmsghdr, msghdr, socklen_t, timespec, Errno,
+        FileMode, OpenFlags, UserAddress, UserBuffer, UserRef, EEXIST, EINPROGRESS, MSG_CTRUNC,
+        MSG_DONTWAIT, MSG_TRUNC, MSG_WAITFORONE, SHUT_RD, SHUT_RDWR, SHUT_WR, SOCK_CLOEXEC,
+        SOCK_NONBLOCK, UIO_MAXIOV,
+    },
 };
 
 pub fn sys_socket(
@@ -813,7 +825,10 @@ pub fn sys_shutdown(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::testing::*;
+    use crate::{
+        testing::*,
+        types::{AF_INET, AF_UNIX, SOCK_STREAM},
+    };
 
     #[::fuchsia::test]
     async fn test_socketpair_invalid_arguments() {

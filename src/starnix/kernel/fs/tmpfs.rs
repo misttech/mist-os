@@ -5,13 +5,21 @@
 use starnix_lock::{Mutex, MutexGuard};
 use std::sync::Arc;
 
-use super::{directory_file::MemoryDirectoryFile, *};
 use crate::{
     auth::FsCred,
+    fs::{
+        directory_file::MemoryDirectoryFile, fs_args, fs_node_impl_not_dir,
+        fs_node_impl_xattr_delegate, CacheMode, FileOps, FileSystem, FileSystemHandle,
+        FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
+        MemoryXattrStorage, SymlinkNode, VmoFileNode,
+    },
     logging::not_implemented,
     mm::PAGE_SIZE,
     task::{CurrentTask, Kernel},
-    types::*,
+    types::{
+        error, gid_t, mode, statfs, uid_t, DeviceType, Errno, FileMode, OpenFlags, SealFlags,
+        TMPFS_MAGIC,
+    },
 };
 
 pub struct TmpFs(());
@@ -330,8 +338,12 @@ impl FsNodeOps for TmpfsSpecialNode {
 mod test {
     use super::*;
     use crate::{
-        fs::buffers::{VecInputBuffer, VecOutputBuffer},
+        fs::{
+            buffers::{VecInputBuffer, VecOutputBuffer},
+            FdNumber, UnlinkKind,
+        },
         testing::*,
+        types::{errno, MountFlags},
     };
     use zerocopy::AsBytes;
 

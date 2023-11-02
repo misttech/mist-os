@@ -5,9 +5,9 @@
 use {
     crate::{
         auth::FsCred,
-        fs::*,
+        fs::{BytesFile, BytesFileOps, FileSystem, FsNode, FsNodeInfo, StaticDirectoryBuilder},
         task::{CurrentTask, Kernel},
-        types::*,
+        types::{error, mode, Errno},
     },
     std::{
         borrow::Cow,

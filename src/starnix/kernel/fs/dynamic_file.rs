@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::*;
 use crate::{
     fs::{
         buffers::{InputBuffer, OutputBuffer, VecOutputBuffer},
-        SeekTarget,
+        default_seek, fileops_impl_delegate_read_and_seek, FileObject, FileOps, FsNodeOps,
+        SeekTarget, SimpleFileNode,
     },
-    task::*,
-    types::*,
+    task::CurrentTask,
+    types::{errno, error, off_t, Errno},
 };
 use starnix_lock::Mutex;
 use std::collections::VecDeque;
@@ -322,8 +322,17 @@ impl FileOps for ConstFile {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::testing::*;
+    use crate::{
+        testing::{create_kernel_and_task, AutoReleasableTask},
+        {
+            fs::{
+                Anon, DynamicFile, DynamicFileBuf, DynamicFileSource, FileHandle, SeekTarget,
+                SequenceFileSource, VecOutputBuffer,
+            },
+            types::{Errno, OpenFlags},
+        },
+    };
+    use starnix_lock::Mutex;
     use std::sync::Arc;
 
     struct Counter {

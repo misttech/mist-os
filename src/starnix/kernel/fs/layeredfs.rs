@@ -10,8 +10,8 @@ use crate::{
         DirectoryEntryType, DirentSink, FileHandle, FileObject, FileOps, FileSystem,
         FileSystemHandle, FileSystemOps, FsNode, FsNodeOps, FsStr, FsString, MountInfo, SeekTarget,
     },
-    task::*,
-    types::*,
+    task::{CurrentTask, Kernel},
+    types::{errno, ino_t, off_t, statfs, Errno, OpenFlags},
 };
 
 /// A filesystem that will delegate most operation to a base one, but have a number of top level

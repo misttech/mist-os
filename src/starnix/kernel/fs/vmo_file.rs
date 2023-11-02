@@ -16,7 +16,7 @@ use crate::{
     logging::impossible_error,
     mm::{vmo::round_up_to_system_page_size, ProtectionFlags, PAGE_SIZE},
     task::CurrentTask,
-    types::*,
+    types::{errno, error, mode, Errno, OpenFlags, SealFlags},
     vmex_resource::VMEX_RESOURCE,
 };
 

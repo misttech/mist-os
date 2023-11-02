@@ -164,11 +164,10 @@ impl FsContext {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use crate::{
-        fs::tmpfs::TmpFs,
+        fs::{tmpfs::TmpFs, FsContext},
         testing::{create_kernel_and_task, create_kernel_task_and_unlocked_with_pkgfs},
-        types::OpenFlags,
+        types::{FileMode, OpenFlags},
     };
 
     #[::fuchsia::test]

@@ -7,10 +7,10 @@ use starnix_lock::Mutex;
 use crate::{
     fs::{
         buffers::{InputBuffer, OutputBuffer},
-        *,
+        fileops_impl_nonseekable, Anon, FdEvents, FileHandle, FileObject, FileOps,
     },
-    task::*,
-    types::*,
+    task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter},
+    types::{error, Errno, OpenFlags},
 };
 
 const DATA_SIZE: usize = 8;

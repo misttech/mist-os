@@ -18,15 +18,23 @@ use crate::{
     auth::FsCred,
     fs::{
         buffers::{InputBuffer, OutputBuffer},
+        default_ioctl, default_seek, fileops_impl_directory, fileops_impl_nonseekable,
+        fileops_impl_seekable, fs_args, fs_node_impl_not_dir, fs_node_impl_symlink,
         fsverity::FsVerityState,
-        zxio::*,
-        *,
+        zxio::{zxio_query_events, zxio_wait_async},
+        Anon, CacheConfig, CacheMode, DirectoryEntryType, DirentSink, FallocMode, FdEvents,
+        FileHandle, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
+        FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
+        SeekTarget, SymlinkTarget, ValueOrSize, XattrOp,
     },
-    logging::*,
+    logging::{impossible_error, log_warn},
     mm::ProtectionFlags,
     syscalls::{SyscallArg, SyscallResult},
-    task::*,
-    types::*,
+    task::{CurrentTask, EventHandler, Kernel, WaitCanceler, Waiter},
+    types::{
+        errno, error, from_status_like_fdio, fsverity_descriptor, ino_t, off_t, statfs, DeviceType,
+        Errno, FileMode, MountFlags, OpenFlags,
+    },
     vmex_resource::VMEX_RESOURCE,
 };
 
@@ -1463,8 +1471,12 @@ impl FsNodeOps for RemoteSymlink {
 mod test {
     use super::*;
     use crate::{
-        arch::uapi::epoll_event, auth::Credentials, fs::buffers::VecOutputBuffer, mm::PAGE_SIZE,
+        arch::uapi::epoll_event,
+        auth::Credentials,
+        fs::{buffers::VecOutputBuffer, EpollFileObject, LookupContext, Namespace, SymlinkMode},
+        mm::PAGE_SIZE,
         testing::*,
+        types::{mode, EINVAL},
     };
     use assert_matches::assert_matches;
     use fidl::endpoints::Proxy;

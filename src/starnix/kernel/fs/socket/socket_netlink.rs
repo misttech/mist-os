@@ -2,10 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::*;
-
-use std::{marker::PhantomData, num::NonZeroU32, sync::Arc};
-
 use futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use netlink::{
     messaging::{Sender, SenderReceiverProvider},
@@ -20,16 +16,36 @@ use netlink_packet_core::{NetlinkMessage, NetlinkSerializable};
 use netlink_packet_route::rtnl::RtnlMessage;
 use netlink_packet_utils::Emitable as _;
 use starnix_lock::Mutex;
-
+use std::{marker::PhantomData, num::NonZeroU32, sync::Arc};
 use zerocopy::{AsBytes, FromBytes};
 
 use crate::{
     device::{DeviceListener, DeviceListenerKey},
-    fs::{buffers::*, kobject::*, *},
+    fs::{
+        buffers::{
+            AncillaryData, InputBuffer, Message, MessageQueue, MessageReadInfo, OutputBuffer,
+            UnixControlData, VecInputBuffer,
+        },
+        kobject::{KObjectHandle, KType, UEventAction, UEventContext},
+        socket::{
+            GenericMessage, GenericNetlinkClientHandle, Socket, SocketAddress, SocketHandle,
+            SocketMessageFlags, SocketOps, SocketPeer, SocketShutdownFlags, SocketType,
+        },
+        FdEvents,
+    },
     logging::{log_error, log_info, log_warn, not_implemented},
     mm::MemoryAccessorExt,
-    task::*,
-    types::*,
+    task::{CurrentTask, EventHandler, Kernel, Task, WaitCanceler, WaitQueue, Waiter},
+    types::{
+        errno, error, nlmsghdr, sockaddr_nl, socklen_t, ucred, Errno, UserBuffer, AF_NETLINK,
+        CAP_NET_ADMIN, NETLINK_ADD_MEMBERSHIP, NETLINK_AUDIT, NETLINK_CONNECTOR, NETLINK_CRYPTO,
+        NETLINK_DNRTMSG, NETLINK_ECRYPTFS, NETLINK_FIB_LOOKUP, NETLINK_FIREWALL, NETLINK_GENERIC,
+        NETLINK_IP6_FW, NETLINK_ISCSI, NETLINK_KOBJECT_UEVENT, NETLINK_NETFILTER, NETLINK_NFLOG,
+        NETLINK_RDMA, NETLINK_ROUTE, NETLINK_SCSITRANSPORT, NETLINK_SELINUX, NETLINK_SMC,
+        NETLINK_SOCK_DIAG, NETLINK_USERSOCK, NETLINK_XFRM, NLMSG_DONE, NLM_F_MULTI, SOL_SOCKET,
+        SO_PASSCRED, SO_PROTOCOL, SO_RCVBUF, SO_RCVBUFFORCE, SO_SNDBUF, SO_SNDBUFFORCE,
+        SO_TIMESTAMP,
+    },
 };
 
 // From netlink/socket.go in gVisor.

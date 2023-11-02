@@ -2,8 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::proc_directory::*;
-use crate::{fs::*, task::*, types::*};
+use super::proc_directory::ProcDirectory;
+use crate::{
+    fs::{CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsStr},
+    task::{CurrentTask, Kernel},
+    types::{statfs, Errno, PROC_SUPER_MAGIC},
+};
 
 use std::sync::Arc;
 

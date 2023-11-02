@@ -5,12 +5,10 @@
 use crate::{
     fs::{
         buffers::{InputBuffer, OutputBuffer},
-        *,
+        default_ioctl, fileops_impl_nonseekable, Anon, FileHandle, FileObject, FileOps,
     },
     logging::log,
-    syscalls::*,
-    task::*,
-    types::*,
+    syscalls::{CurrentTask, Errno, OpenFlags, SyscallArg, SyscallResult},
 };
 
 pub struct SyslogFile;

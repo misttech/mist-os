@@ -9,13 +9,20 @@ use fuchsia_zircon as zx;
 use once_cell::sync::OnceCell;
 use std::sync::Arc;
 
-use super::*;
-use crate::auth::*;
-use crate::fs::{fileops_impl_directory, fs_node_impl_symlink};
+use crate::auth::FsCred;
+use crate::fs::{
+    default_seek, fileops_impl_directory, fs_node_impl_dir_readonly, fs_node_impl_not_dir,
+    fs_node_impl_symlink, fs_node_impl_xattr_delegate, CacheConfig, CacheMode, DirectoryEntryType,
+    DirentSink, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
+    FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, SeekTarget,
+    SymlinkTarget, VmoFileObject, XattrOp,
+};
 use crate::logging::log_warn;
-use crate::mm::*;
-use crate::task::*;
-use crate::types::*;
+use crate::mm::ProtectionFlags;
+use crate::task::{CurrentTask, Kernel};
+use crate::types::{
+    errno, error, ino_t, off_t, statfs, Errno, FileMode, MountFlags, OpenFlags, EXT4_SUPER_MAGIC,
+};
 
 mod pager;
 

@@ -12,16 +12,23 @@ use crate::{
         buffers::{InputBuffer, OutputBuffer},
         file_server::serve_file,
         fsverity::{self, FsVerityState},
-        *,
+        DirentSink, FallocMode, FdEvents, FileSystemHandle, FileWriteGuard, FileWriteGuardMode,
+        FileWriteGuardRef, FsNodeHandle, InotifyMask, NamespaceNode, RecordLockCommand,
     },
     logging::{impossible_error, not_implemented},
     mm::{
         vmo::round_up_to_system_page_size, DesiredAddress, MappedVmo, MappingName, MappingOptions,
         MemoryAccessorExt, ProtectionFlags,
     },
-    syscalls::*,
-    task::*,
-    types::{as_any::*, *},
+    syscalls::{SyscallArg, SyscallResult, SUCCESS},
+    task::{CurrentTask, EventHandler, Task, WaitCallback, WaitCanceler, Waiter},
+    types::{
+        as_any::AsAny, errno, error, fsxattr, off_t, pid_t, uapi, Errno, OpenFlags, Resource,
+        SealFlags, UserAddress, EAGAIN, ETIMEDOUT, FIONBIO, FS_IOC_ENABLE_VERITY,
+        FS_IOC_FSGETXATTR, FS_IOC_FSSETXATTR, FS_IOC_GETFLAGS, FS_IOC_MEASURE_VERITY,
+        FS_IOC_READ_VERITY_METADATA, FS_IOC_SETFLAGS, FS_VERITY_FL, SEEK_CUR, SEEK_DATA, SEEK_END,
+        SEEK_HOLE, SEEK_SET, TCGETS,
+    },
 };
 
 pub const MAX_LFS_FILESIZE: usize = 0x7fff_ffff_ffff_ffff;
@@ -419,7 +426,7 @@ macro_rules! fileops_impl_delegate_read_and_seek {
             current_task: &crate::task::CurrentTask,
             current_offset: crate::types::off_t,
             target: crate::fs::SeekTarget,
-        ) -> Result<off_t, crate::types::Errno> {
+        ) -> Result<crate::types::off_t, crate::types::Errno> {
             $delegate.seek(file, current_task, current_offset, target)
         }
     };
@@ -439,10 +446,9 @@ macro_rules! fileops_impl_seekable {
             current_offset: crate::types::off_t,
             target: crate::fs::SeekTarget,
         ) -> Result<crate::types::off_t, crate::types::Errno> {
-            use crate::types::errno::*;
             crate::fs::default_seek(current_offset, target, |offset| {
                 let eof_offset = crate::fs::default_eof_offset(file, current_task)?;
-                offset.checked_add(eof_offset).ok_or_else(|| errno!(EINVAL))
+                offset.checked_add(eof_offset).ok_or_else(|| crate::types::errno!(EINVAL))
             })
         }
     };
@@ -501,7 +507,7 @@ macro_rules! fileops_impl_dataless {
             _offset: usize,
             _data: &mut dyn crate::fs::buffers::InputBuffer,
         ) -> Result<usize, Errno> {
-            error!(EINVAL)
+            crate::types::error!(EINVAL)
         }
 
         fn read(
@@ -511,7 +517,7 @@ macro_rules! fileops_impl_dataless {
             _offset: usize,
             _data: &mut dyn crate::fs::buffers::OutputBuffer,
         ) -> Result<usize, Errno> {
-            error!(EINVAL)
+            crate::types::error!(EINVAL)
         }
     };
 }
@@ -531,8 +537,7 @@ macro_rules! fileops_impl_directory {
             _offset: usize,
             _data: &mut dyn crate::fs::buffers::OutputBuffer,
         ) -> Result<usize, crate::types::Errno> {
-            use crate::types::errno::*;
-            error!(EISDIR)
+            crate::types::error!(EISDIR)
         }
 
         fn write(
@@ -542,8 +547,7 @@ macro_rules! fileops_impl_directory {
             _offset: usize,
             _data: &mut dyn crate::fs::buffers::InputBuffer,
         ) -> Result<usize, crate::types::Errno> {
-            use crate::types::errno::*;
-            error!(EISDIR)
+            crate::types::error!(EISDIR)
         }
     };
 }

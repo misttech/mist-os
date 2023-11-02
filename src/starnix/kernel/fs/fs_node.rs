@@ -6,12 +6,27 @@ use crate::{
     arch::uapi::stat_time_t,
     auth::FsCred,
     device::DeviceMode,
-    fs::{fsverity::FsVerityState, pipe::Pipe, rw_queue::RwQueue, socket::*, *},
+    fs::{
+        fsverity::FsVerityState, inotify, pipe::Pipe, rw_queue::RwQueue, socket::SocketHandle,
+        FileHandle, FileObject, FileOps, FileSystem, FileSystemHandle, FileWriteGuard,
+        FileWriteGuardMode, FileWriteGuardState, FsStr, FsString, MountInfo, NamespaceNode,
+        OPathOps, RecordLockCommand, RecordLockOwner, RecordLocks,
+    },
     logging::log_error,
-    signals::*,
-    task::*,
-    time::*,
-    types::{as_any::AsAny, *},
+    signals::{send_signal, SignalInfo},
+    task::{CurrentTask, Kernel, WaitQueue, Waiter},
+    time::utc,
+    types::{
+        __kernel_ulong_t, as_any::AsAny, errno, error, fsverity_descriptor, gid_t, ino_t, mode,
+        statx, statx_timestamp, timespec, timespec_from_time, uapi, uid_t, Access, DeviceType,
+        Errno, FileMode, OpenFlags, Resource, CAP_CHOWN, CAP_DAC_OVERRIDE, CAP_FOWNER, CAP_FSETID,
+        CAP_MKNOD, CAP_SYS_ADMIN, EACCES, ENOSYS, FALLOC_FL_COLLAPSE_RANGE, FALLOC_FL_INSERT_RANGE,
+        FALLOC_FL_KEEP_SIZE, FALLOC_FL_PUNCH_HOLE, FALLOC_FL_UNSHARE_RANGE, FALLOC_FL_ZERO_RANGE,
+        LOCK_EX, LOCK_NB, LOCK_SH, LOCK_UN, NANOS_PER_SECOND, SIGXFSZ, STATX_ATIME,
+        STATX_ATTR_VERITY, STATX_BASIC_STATS, STATX_BLOCKS, STATX_CTIME, STATX_GID, STATX_INO,
+        STATX_MTIME, STATX_NLINK, STATX_SIZE, STATX_UID, STATX__RESERVED, XATTR_TRUSTED_PREFIX,
+        XATTR_USER_PREFIX,
+    },
 };
 use bitflags::bitflags;
 use fuchsia_zircon as zx;
@@ -727,7 +742,7 @@ where
 /// You must implement [`FsNodeOps::readlink`].
 macro_rules! fs_node_impl_symlink {
     () => {
-        fs_node_impl_not_dir!();
+        crate::fs::fs_node_impl_not_dir!();
 
         fn create_file_ops(
             &self,
@@ -750,7 +765,7 @@ macro_rules! fs_node_impl_dir_readonly {
             _mode: crate::types::FileMode,
             _owner: crate::auth::FsCred,
         ) -> Result<crate::fs::FsNodeHandle, Errno> {
-            error!(EROFS)
+            crate::types::error!(EROFS)
         }
 
         fn mknod(
@@ -762,7 +777,7 @@ macro_rules! fs_node_impl_dir_readonly {
             _dev: crate::types::DeviceType,
             _owner: crate::auth::FsCred,
         ) -> Result<crate::fs::FsNodeHandle, Errno> {
-            error!(EROFS)
+            crate::types::error!(EROFS)
         }
 
         fn create_symlink(
@@ -773,7 +788,7 @@ macro_rules! fs_node_impl_dir_readonly {
             _target: &crate::fs::FsStr,
             _owner: crate::auth::FsCred,
         ) -> Result<crate::fs::FsNodeHandle, Errno> {
-            error!(EROFS)
+            crate::types::error!(EROFS)
         }
 
         fn link(
@@ -783,7 +798,7 @@ macro_rules! fs_node_impl_dir_readonly {
             _name: &crate::fs::FsStr,
             _child: &crate::fs::FsNodeHandle,
         ) -> Result<(), Errno> {
-            error!(EROFS)
+            crate::types::error!(EROFS)
         }
 
         fn unlink(
@@ -793,7 +808,7 @@ macro_rules! fs_node_impl_dir_readonly {
             _name: &crate::fs::FsStr,
             _child: &crate::fs::FsNodeHandle,
         ) -> Result<(), Errno> {
-            error!(EROFS)
+            crate::types::error!(EROFS)
         }
     };
 }

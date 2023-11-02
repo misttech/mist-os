@@ -2,10 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::*;
 use crate::{
+    fs::{
+        fs_node_impl_not_dir, CacheMode, FileHandle, FileObject, FileOps, FileSystem,
+        FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeInfo, FsNodeOps, FsStr,
+    },
     task::{CurrentTask, Kernel},
-    types::*,
+    types::{error, ino_t, statfs, Errno, FileMode, OpenFlags, ANON_INODE_FS_MAGIC},
 };
 use std::sync::Arc;
 

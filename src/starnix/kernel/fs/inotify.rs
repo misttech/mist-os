@@ -558,8 +558,12 @@ pub type InotifyMaxUserWatches = InotifyLimitProcFile<MaxUserWatchesGetter>;
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::{fs::buffers::VecOutputBuffer, testing::*};
+    use super::{InotifyEvent, InotifyEventQueue, InotifyFileObject, DATA_SIZE};
+    use crate::{
+        fs::{buffers::VecOutputBuffer, InotifyMask, OutputBuffer, WdNumber},
+        testing::create_kernel_and_task,
+        types::{FileMode, WeakKey},
+    };
 
     #[::fuchsia::test]
     fn inotify_event() {

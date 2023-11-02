@@ -3,14 +3,17 @@
 // found in the LICENSE file.
 
 use crate::fs::buffers::InputBuffer;
-use crate::fs::*;
+use crate::fs::{
+    fileops_impl_delegate_read_and_seek, DynamicFile, DynamicFileBuf, DynamicFileSource,
+    FileObject, FileOps, FsNodeOps, SimpleFileNode,
+};
 use crate::task::CurrentTask;
-use crate::types::*;
+use crate::types::Errno;
 
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-use fuchsia_trace::*;
+use fuchsia_trace::TraceCategoryContext;
 use fuchsia_zircon as zx;
 use fuchsia_zircon::sys::zx_ticks_t;
 

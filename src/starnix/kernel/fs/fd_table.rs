@@ -7,9 +7,11 @@ use starnix_lock::Mutex;
 use std::{collections::HashMap, ops::DerefMut};
 
 use crate::{
-    fs::*,
+    fs::{FdNumber, FileHandle, RecordLockOwner},
     task::{CurrentTask, Task},
-    types::*,
+    types::{
+        errno, error, Errno, OpenFlags, OwnedRef, Releasable, ReleasableByRef, Resource, FD_CLOEXEC,
+    },
 };
 
 bitflags! {

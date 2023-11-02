@@ -10,6 +10,8 @@ use crate::{
         devpts::dev_pts_fs,
         devtmpfs::dev_tmp_fs,
         ext4::ExtFilesystem,
+        fileops_impl_dataless, fileops_impl_delegate_read_and_seek, fileops_impl_nonseekable,
+        fs_node_impl_not_dir,
         fuse::new_fuse_fs,
         overlayfs::OverlayFs,
         proc::proc_fs,
@@ -17,13 +19,19 @@ use crate::{
         sysfs::sys_fs,
         tmpfs::TmpFs,
         tracefs::trace_fs,
-        FileSystemOptions, FsStr,
+        DirEntry, DirEntryHandle, DynamicFile, DynamicFileBuf, DynamicFileSource, FdEvents,
+        FileHandle, FileObject, FileOps, FileSystemHandle, FileSystemOptions, FsNode, FsNodeHandle,
+        FsNodeOps, FsStr, FsString, InotifyMask, PathBuilder, RenameFlags, SimpleFileNode,
+        SymlinkTarget, UnlinkKind,
     },
-    mutable_state::*,
+    mutable_state::{state_accessor, state_implementation},
     selinux::fs::selinux_fs,
-    task::*,
-    time::*,
-    types::*,
+    task::{CurrentTask, EventHandler, Kernel, Task, WaitCanceler, Waiter},
+    time::utc,
+    types::{
+        errno, error, Access, ArcKey, DeviceType, Errno, FileMode, MountFlags, OpenFlags, PtrKey,
+        WeakKey, WeakRef, NAME_MAX,
+    },
 };
 use fidl_fuchsia_io as fio;
 use ref_cast::RefCast;
@@ -35,8 +43,6 @@ use std::{
     ops::{Deref, DerefMut},
     sync::{atomic::Ordering, Arc, Weak},
 };
-
-use super::*;
 
 /// A mount namespace.
 ///
@@ -1454,8 +1460,12 @@ impl Hash for NamespaceNode {
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use crate::{fs::tmpfs::TmpFs, testing::*};
+    use crate::{
+        fs::{tmpfs::TmpFs, LookupContext, Namespace, UnlinkKind, WhatToMount},
+        testing::create_kernel_and_task,
+        types::{errno, MountFlags},
+    };
+    use std::sync::Arc;
 
     #[::fuchsia::test]
     async fn test_namespace() -> anyhow::Result<()> {

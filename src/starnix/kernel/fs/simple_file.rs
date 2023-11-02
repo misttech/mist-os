@@ -2,17 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{borrow::Cow, sync::Arc};
-
-use super::*;
 use crate::{
     fs::{
         buffers::{InputBuffer, OutputBuffer},
-        fileops_impl_seekable,
+        fileops_impl_seekable, fs_node_impl_not_dir, FileObject, FileOps, FsNode, FsNodeOps,
     },
-    task::*,
-    types::{as_any::AsAny, *},
+    task::CurrentTask,
+    types::{as_any::AsAny, errno, error, Errno, OpenFlags},
 };
+use std::{borrow::Cow, sync::Arc};
 
 pub struct SimpleFileNode<F, O>
 where
