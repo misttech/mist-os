@@ -110,7 +110,14 @@ then
   # and this avoids cross-device linking problems.
   build_subdir="$(cat "$build_dir_file")"
 fi
-readonly logs_root="$project_root/$build_subdir/.reproxy_logs"
+# assume build_subdir path has depth=2
+IFS=/ read -r -a build_subdir_arr <<< "$build_subdir"
+
+readonly old_logs_root="$project_root/$build_subdir/.reproxy_logs"
+# Move the reproxy logs outside of $build_subdir so they do not get cleaned,
+# but under 'out' so it does not pollute the source root.
+readonly logs_root="$project_root/${build_subdir_arr[0]}/.reproxy_logs/${build_subdir_arr[1]}"
+mkdir -p "$old_logs_root"
 mkdir -p "$logs_root"
 
 # 'mktemp -p' still yields to TMPDIR in the environment (bug?),
@@ -120,8 +127,9 @@ readonly log_base="${reproxy_logdir##*/}"  # basename
 
 readonly _fake_tmpdir="$(mktemp -u)"
 readonly _tmpdir="${_fake_tmpdir%/*}"  # dirname
-# Symlink to the old location, where users may be accustomed to looking.
+# Symlink to the old locations, where users may be accustomed to looking.
 ln -s -f "$reproxy_logdir" "$_tmpdir"/
+( cd "$old_logs_root" && ln -s "$reproxy_logdir" . )
 
 # The socket file doesn't need to be co-located with logs.
 # Using an absolute path to the socket allows rewrapper to be invoked
