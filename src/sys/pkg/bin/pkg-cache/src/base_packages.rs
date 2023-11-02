@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use {
+    anyhow::anyhow,
     anyhow::Context as _,
     fuchsia_inspect as finspect,
     fuchsia_merkle::Hash,
@@ -11,6 +12,7 @@ use {
         collections::{HashMap, HashSet},
         sync::Arc,
     },
+    tracing::warn,
 };
 
 /// A forest of packages and the blobs they require (including subpackages).
@@ -134,8 +136,7 @@ impl<Marker: Send + Sync + 'static> FrozenIndex<Marker> {
             match (res, on_package_load_error) {
                 (Ok(p), _) => blobs.extend(p),
                 (Err(e), Fail) => Err(e)?,
-                // TODO(b/293332528) Warn on error once cache packages are always protected.
-                (Err(_e), Log) => (),
+                (Err(e), Log) => warn!("failed to load cache package: {:#}", anyhow!(e)),
             }
         }
         drop(futures);

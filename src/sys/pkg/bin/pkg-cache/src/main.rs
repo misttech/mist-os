@@ -116,19 +116,12 @@ async fn main_inner() -> Result<(), Error> {
     info!("starting package cache service");
     let inspector = finspect::Inspector::default();
 
-    let (use_fxblob, use_system_image, cache_package_protection) = {
+    let (use_fxblob, use_system_image) = {
         let config = pkg_cache_config::Config::take_from_startup_handle();
         inspector
             .root()
             .record_child("structured_config", |config_node| config.record_inspect(config_node));
-        (
-            config.use_fxblob,
-            config.use_system_image,
-            match config.protect_cache_packages {
-                true => CachePackageProtection::Always,
-                false => CachePackageProtection::TreatLikeRegular,
-            },
-        )
+        (config.use_fxblob, config.use_system_image)
     };
 
     let mut package_index = PackageIndex::new();
@@ -279,7 +272,6 @@ async fn main_inner() -> Result<(), Error> {
                         Arc::clone(&package_index),
                         commit_status_provider.clone(),
                         stream,
-                        cache_package_protection,
                     )
                     .unwrap_or_else(|e| {
                         error!("error handling fuchsia.space/Manager connection: {:#}", anyhow!(e))
@@ -396,11 +388,4 @@ async fn shell_commands_bin_dir(
     .await
     .context("serving shell-commands bin dir")?;
     Ok(client)
-}
-
-// TODO(b/293332528) Delete once cache packages are always protected.
-#[derive(Debug, Clone, Copy)]
-enum CachePackageProtection {
-    Always,
-    TreatLikeRegular,
 }

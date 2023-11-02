@@ -203,7 +203,6 @@ async fn gc_cache_packages_protected() {
         .unwrap();
     let system_image = SystemImageBuilder::new().cache_packages(&[&cache_pkg]).build().await;
     let env = TestEnv::builder()
-        .protect_cache_packages(true)
         .blobfs_from_system_image_and_extra_packages(&system_image, &[&cache_pkg])
         .await
         .build()

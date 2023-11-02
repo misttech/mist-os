@@ -24,7 +24,6 @@ pub async fn serve(
     package_index: Arc<async_lock::RwLock<PackageIndex>>,
     commit_status_provider: CommitStatusProviderProxy,
     mut stream: SpaceManagerRequestStream,
-    cache_package_protection: super::CachePackageProtection,
 ) -> Result<(), anyhow::Error> {
     let event_pair = commit_status_provider
         .is_current_system_committed()
@@ -40,7 +39,6 @@ pub async fn serve(
                 cache_packages.as_ref(),
                 &package_index,
                 &event_pair,
-                cache_package_protection,
             )
             .await,
         )?;
@@ -54,7 +52,6 @@ async fn gc(
     cache_packages: &CachePackages,
     package_index: &Arc<async_lock::RwLock<PackageIndex>>,
     event_pair: &zx::EventPair,
-    cache_package_protection: super::CachePackageProtection,
 ) -> Result<(), SpaceErrorCode> {
     info!("performing gc");
 
@@ -85,21 +82,17 @@ async fn gc(
         // the index until we are done deleting blobs guarantees we will never delete a blob
         // that resolution thinks it doesn't need to fetch.
         let package_index = package_index.read().await;
-        package_index.all_blobs().iter().for_each(|blob| {
+        let () = package_index.all_blobs().iter().for_each(|blob| {
             eligible_blobs.remove(blob);
         });
 
-        base_packages.list_blobs().iter().for_each(|blob| {
+        let () = base_packages.list_blobs().iter().for_each(|blob| {
             eligible_blobs.remove(blob);
         });
 
-        use super::CachePackageProtection::*;
-        match cache_package_protection {
-            Always => cache_packages.list_blobs().iter().for_each(|blob| {
-                eligible_blobs.remove(blob);
-            }),
-            TreatLikeRegular => (),
-        }
+        let () = cache_packages.list_blobs().iter().for_each(|blob| {
+            eligible_blobs.remove(blob);
+        });
 
         info!("Garbage collecting {} blobs...", eligible_blobs.len());
         for (i, blob) in eligible_blobs.iter().enumerate() {
