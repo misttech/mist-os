@@ -135,7 +135,7 @@
   {{- end }}
 
   {{ range .Decls }}
-    {{- if and (ne .Kind Kinds.Const) (ne .Kind Kinds.Protocol) (ne .Kind Kinds.Service) }}
+    {{- if and (ne .Kind Kinds.Alias) (ne .Kind Kinds.Const) (ne .Kind Kinds.Protocol) (ne .Kind Kinds.Service) }}
       {{- EnsureNamespace . }}
       {{- if .IsResourceType }}
         {{- IfdefFuchsia }}

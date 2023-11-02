@@ -60,6 +60,24 @@ class FdfHandles;
 
 #ifdef __Fuchsia__
 
+using AliasedPlainHandle = ::zx::handle;
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
+using AliasedSubtypeHandle = ::zx::vmo;
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
+using AliasedRightsHandle = ::zx::vmo;
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 extern "C" const fidl_type_t test_handles_HandlesTable;
 
 class Handles {

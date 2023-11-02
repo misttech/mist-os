@@ -42,6 +42,7 @@ func (ts TypeShape) HasPointer() bool {
 type declKind namespacedEnumMember
 
 type declKinds struct {
+	Alias    declKind
 	Bits     declKind
 	Const    declKind
 	Enum     declKind
@@ -229,6 +230,10 @@ func (r *Root) declsOfKind(kind declKind) []Kinded {
 		}
 	}
 	return ds
+}
+
+func (r *Root) Aliases() []Kinded {
+	return r.declsOfKind(Kinds.Alias)
 }
 
 func (r *Root) Bits() []Kinded {
@@ -500,7 +505,14 @@ func (c *compiler) isInExternalLibrary(ci fidlgen.CompoundIdentifier) bool {
 func (c *compiler) compileNameVariants(eci fidlgen.EncodedCompoundIdentifier) nameVariants {
 	ci := eci.Parse()
 
-	if isZirconIdentifier(ci) {
+	// TODO(fxbug.dev/136041): We special case zx, e.g. if ci is "zx/Rights" we
+	// emit "zx_rights_t" instead of "fidl_zx::Rights". But don't do that when
+	// compiling library zx itself, since it would apply to the left-hand side
+	// of its own definitions. Really we shouldn't be generating bindings for
+	// library zx at all, but it's difficult to avoid in the Bazel build.
+	referencingZx := isZirconLibrary(ci.Library)
+	currentlyCompilingZx := isZirconLibrary(c.library)
+	if referencingZx && !currentlyCompilingZx {
 		return commonNameVariants(zirconName(ci))
 	}
 
@@ -789,6 +801,10 @@ func compile(r fidlgen.Root) *Root {
 
 	decls := make(map[fidlgen.EncodedCompoundIdentifier]Kinded)
 	extDecls := make(map[fidlgen.EncodedCompoundIdentifier]Kinded)
+
+	for _, v := range r.Aliases {
+		decls[v.Name] = c.compileAlias(v)
+	}
 
 	for _, v := range r.Bits {
 		decls[v.Name] = c.compileBits(v)

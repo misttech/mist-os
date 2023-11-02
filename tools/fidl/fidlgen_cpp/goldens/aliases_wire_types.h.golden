@@ -37,6 +37,26 @@ using ObjType = ::test_aliases::ObjType;
 
 struct ExampleOfUseOfAliases;
 
+using U32 = uint32_t;
+
+using VecOfStrings = ::fidl::VectorView<::fidl::StringView>;
+
+using VecOfStringsAtMost5 = ::fidl::VectorView<::fidl::StringView>;
+
+#ifdef __Fuchsia__
+
+using Channel = ::zx::channel;
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
+using AliasOfChannel = ::zx::channel;
+
+#endif  // __Fuchsia__
+
+using ReferenceMe = ::test_someotherlibrary::wire::ReferenceMe;
+
 #ifdef __Fuchsia__
 
 extern "C" const fidl_type_t test_aliases_ExampleOfUseOfAliasesTable;

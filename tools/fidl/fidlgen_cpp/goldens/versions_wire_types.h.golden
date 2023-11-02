@@ -42,6 +42,8 @@ class Table;
 
 class Union;
 
+using Alias = ::fidl::StringView;
+
 extern "C" const fidl_type_t test_versions_StructTable;
 
 struct Struct {

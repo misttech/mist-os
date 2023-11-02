@@ -9,6 +9,7 @@ import("//tools/fidl/lib/fidlgentest/fidlgentest_go_test.gni")
 go_library("fidlgen_cpp") {
   deps = [ "//tools/fidl/lib/fidlgen" ]
   sources = [
+    "alias.go",
     "bits.go",
     "codegen_options.go",
     "const.go",

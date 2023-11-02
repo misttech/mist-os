@@ -27,8 +27,8 @@ var zirconNames = map[string]zxName{
 	},
 }
 
-func isZirconIdentifier(ci fidlgen.CompoundIdentifier) bool {
-	return len(ci.Library) == 1 && ci.Library[0] == fidlgen.Identifier("zx")
+func isZirconLibrary(li fidlgen.LibraryIdentifier) bool {
+	return len(li) == 1 && li[0] == fidlgen.Identifier("zx")
 }
 
 func zirconName(ci fidlgen.CompoundIdentifier) name {

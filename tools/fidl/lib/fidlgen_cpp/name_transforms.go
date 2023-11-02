@@ -193,8 +193,8 @@ func declContext(declType fidlgen.DeclType) declarationContext {
 	switch declType {
 	case fidlgen.ConstDeclType:
 		return constantContext
-	case fidlgen.BitsDeclType, fidlgen.EnumDeclType, fidlgen.StructDeclType,
-		fidlgen.TableDeclType, fidlgen.UnionDeclType:
+	case fidlgen.AliasDeclType, fidlgen.BitsDeclType, fidlgen.EnumDeclType,
+		fidlgen.StructDeclType, fidlgen.TableDeclType, fidlgen.UnionDeclType:
 		return typeContext
 	case fidlgen.ProtocolDeclType:
 		return protocolContext

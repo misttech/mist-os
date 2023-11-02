@@ -50,6 +50,7 @@ if (is_host) {
       "file_wire_test_base.tmpl",
       "file_wire_types_header.tmpl",
       "file_wire_types_source.tmpl",
+      "fragment_alias.tmpl",
       "fragment_bits.tmpl",
       "fragment_const.tmpl",
       "fragment_enum.tmpl",

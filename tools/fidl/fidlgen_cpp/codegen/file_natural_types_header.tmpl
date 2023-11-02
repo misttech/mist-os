@@ -49,6 +49,8 @@ fidl/{{ .LibraryDots }}/cpp/natural_types.h
 {{ range .Tables }}{{ template "Table:ForwardDeclaration:NaturalTypesHeader" . }}{{ end }}
 {{ range .Unions }}{{ template "Union:ForwardDeclaration:NaturalTypesHeader" . }}{{ end }}
 
+{{ range .Aliases }}{{ template "Alias:NaturalTypesHeader" . }}{{ end }}
+
 {{ range .Consts }}{{ template "Const:NaturalTypesHeader" . }}{{ end }}
 
 {{ range .Decls }}
