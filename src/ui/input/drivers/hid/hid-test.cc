@@ -6,7 +6,7 @@
 
 #include <fuchsia/hardware/hidbus/cpp/banjo.h>
 #include <lib/driver/runtime/testing/cpp/sync_helpers.h>
-#include <lib/driver/testing/cpp/driver_runtime.h>
+#include <lib/fdf/cpp/dispatcher.h>
 #include <unistd.h>
 
 #include <thread>
@@ -132,7 +132,7 @@ class HidDeviceTest : public zxtest::Test {
   HidDeviceTest() = default;
   void SetUp() override {
     // TODO(fxb/124464): Migrate test to use dispatcher integration.
-    fake_root_ = MockDevice::FakeRootParentNoDispatcherIntegrationDEPRECATED();
+    fake_root_ = MockDevice::FakeRootParent();
     client_ = ddk::HidbusProtocolClient(fake_hidbus_.GetProto());
     device_ = new HidDevice(fake_root_.get());
 
@@ -141,9 +141,6 @@ class HidDeviceTest : public zxtest::Test {
 
   void TearDown() override {
     auto child = fake_root_->GetLatestChild();
-    ASSERT_EQ(ZX_OK, fdf::RunOnDispatcherSync(dispatcher_->async_dispatcher(), [child]() {
-                       child->UnbindOp();
-                     }).status_value());
     child->UnbindOp();
     EXPECT_EQ(ZX_OK, child->WaitUntilUnbindReplyCalled());
     EXPECT_TRUE(child->UnbindReplyCalled());
@@ -167,20 +164,17 @@ class HidDeviceTest : public zxtest::Test {
     auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_input::Device>();
     ASSERT_OK(endpoints.status_value());
 
-    ASSERT_EQ(ZX_OK, fdf::RunOnDispatcherSync(
-                         dispatcher_->async_dispatcher(),
-                         [dispatcher = dispatcher_->async_dispatcher(),
-                          server = std::move(endpoints->server), device = device_]() mutable {
-                           ASSERT_OK(device->CreateInstance(dispatcher, std::move(server)));
-                         })
-                         .status_value());
+    ASSERT_OK(device_->CreateInstance(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                      std::move(endpoints->server)));
 
     sync_client_ = fidl::WireSyncClient(std::move(endpoints->client));
 
-    auto result = sync_client_->GetReportsEvent();
-    ASSERT_OK(result.status());
-    ASSERT_OK(result.value().status);
-    report_event_ = std::move(result.value().event);
+    RunSyncClientTask([&]() {
+      auto result = sync_client_->GetReportsEvent();
+      ASSERT_OK(result.status());
+      ASSERT_OK(result.value().status);
+      report_event_ = std::move(result.value().event);
+    });
   }
 
   zx_status_t ReadOneReport(uint8_t* report_data, size_t report_size, size_t* returned_size) {
@@ -189,29 +183,29 @@ class HidDeviceTest : public zxtest::Test {
       return status;
     }
 
-    auto result = sync_client_->ReadReport();
-    status = result.status();
-    if (status != ZX_OK) {
-      return status;
-    }
-    status = result.value().status;
-    if (status != ZX_OK) {
-      return status;
-    }
-    if (result.value().data.count() > report_size) {
-      return ZX_ERR_BUFFER_TOO_SMALL;
-    }
+    RunSyncClientTask([&]() {
+      auto result = sync_client_->ReadReport();
+      ASSERT_OK(result.status());
+      ASSERT_OK(result.value().status);
+      ASSERT_TRUE(result.value().data.count() <= report_size);
 
-    for (size_t i = 0; i < result.value().data.count(); i++) {
-      report_data[i] = result.value().data[i];
-    }
-    *returned_size = result.value().data.count();
+      for (size_t i = 0; i < result.value().data.count(); i++) {
+        report_data[i] = result.value().data[i];
+      }
+      *returned_size = result.value().data.count();
+    });
     return ZX_OK;
   }
 
  protected:
-  fdf_testing::DriverRuntime runtime_;
-  fdf::UnownedSynchronizedDispatcher dispatcher_ = runtime_.StartBackgroundDispatcher();
+  // Because this test is using a fidl::WireSyncClient, we need to run any ops on the client on
+  // their own thread because the testing thread is shared with the fidl::Server<finput::Device>.
+  static void RunSyncClientTask(fit::closure task) {
+    async::Loop loop{&kAsyncLoopConfigNeverAttachToThread};
+    loop.StartThread();
+    zx::result result = fdf::RunOnDispatcherSync(loop.dispatcher(), std::move(task));
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
 
   fidl::WireSyncClient<fuchsia_hardware_input::Device> sync_client_;
   zx::event report_event_;
@@ -247,13 +241,15 @@ TEST_F(HidDeviceTest, TestQuery) {
 
   SetupInstanceDriver();
 
-  auto result = sync_client_->GetDeviceIds();
-  ASSERT_OK(result.status());
-  fuchsia_hardware_input::wire::DeviceIds ids = result.value().ids;
+  RunSyncClientTask([&]() {
+    auto result = sync_client_->GetDeviceIds();
+    ASSERT_OK(result.status());
+    fuchsia_hardware_input::wire::DeviceIds ids = result.value().ids;
 
-  ASSERT_EQ(kVendorId, ids.vendor_id);
-  ASSERT_EQ(kProductId, ids.product_id);
-  ASSERT_EQ(kVersion, ids.version);
+    ASSERT_EQ(kVendorId, ids.vendor_id);
+    ASSERT_EQ(kProductId, ids.product_id);
+    ASSERT_EQ(kVersion, ids.version);
+  });
 }
 
 TEST_F(HidDeviceTest, BootMouseSendReport) {
@@ -369,7 +365,7 @@ TEST_F(HidDeviceTest, ReadReportSingleReport) {
   zx_time_t time = 0xabcd;
   fake_hidbus_.SendReportWithTime(mouse_report, sizeof(mouse_report), time);
 
-  {
+  RunSyncClientTask([&]() {
     auto result = sync_client_->ReadReport();
     ASSERT_OK(result.status());
     ASSERT_OK(result.value().status);
@@ -378,13 +374,13 @@ TEST_F(HidDeviceTest, ReadReportSingleReport) {
     for (size_t i = 0; i < result.value().data.count(); i++) {
       EXPECT_EQ(mouse_report[i], result.value().data[i]);
     }
-  }
+  });
 
-  {
+  RunSyncClientTask([&]() {
     auto result = sync_client_->ReadReport();
     ASSERT_OK(result.status());
     ASSERT_EQ(result.value().status, ZX_ERR_SHOULD_WAIT);
-  }
+  });
 }
 
 TEST_F(HidDeviceTest, ReadReportDoubleReport) {
@@ -399,7 +395,7 @@ TEST_F(HidDeviceTest, ReadReportDoubleReport) {
   zx_time_t time = 0xabcd;
   fake_hidbus_.SendReportWithTime(double_mouse_report, sizeof(double_mouse_report), time);
 
-  {
+  RunSyncClientTask([&]() {
     auto result = sync_client_->ReadReport();
     ASSERT_OK(result.status());
     ASSERT_OK(result.value().status);
@@ -408,9 +404,9 @@ TEST_F(HidDeviceTest, ReadReportDoubleReport) {
     for (size_t i = 0; i < result.value().data.count(); i++) {
       EXPECT_EQ(double_mouse_report[i], result.value().data[i]);
     }
-  }
+  });
 
-  {
+  RunSyncClientTask([&]() {
     auto result = sync_client_->ReadReport();
     ASSERT_OK(result.status());
     ASSERT_OK(result.value().status);
@@ -419,13 +415,13 @@ TEST_F(HidDeviceTest, ReadReportDoubleReport) {
     for (size_t i = 0; i < result.value().data.count(); i++) {
       EXPECT_EQ(double_mouse_report[i + sizeof(hid_boot_mouse_report_t)], result.value().data[i]);
     }
-  }
+  });
 
-  {
+  RunSyncClientTask([&]() {
     auto result = sync_client_->ReadReport();
     ASSERT_OK(result.status());
     ASSERT_EQ(result.value().status, ZX_ERR_SHOULD_WAIT);
-  }
+  });
 }
 
 TEST_F(HidDeviceTest, ReadReportsSingleReport) {
@@ -439,13 +435,15 @@ TEST_F(HidDeviceTest, ReadReportsSingleReport) {
   // Send the reports.
   fake_hidbus_.SendReport(mouse_report, sizeof(mouse_report));
 
-  auto result = sync_client_->ReadReports();
-  ASSERT_OK(result.status());
-  ASSERT_OK(result.value().status);
-  ASSERT_EQ(sizeof(mouse_report), result.value().data.count());
-  for (size_t i = 0; i < result.value().data.count(); i++) {
-    EXPECT_EQ(mouse_report[i], result.value().data[i]);
-  }
+  RunSyncClientTask([&]() {
+    auto result = sync_client_->ReadReports();
+    ASSERT_OK(result.status());
+    ASSERT_OK(result.value().status);
+    ASSERT_EQ(sizeof(mouse_report), result.value().data.count());
+    for (size_t i = 0; i < result.value().data.count(); i++) {
+      EXPECT_EQ(mouse_report[i], result.value().data[i]);
+    }
+  });
 }
 
 TEST_F(HidDeviceTest, ReadReportsDoubleReport) {
@@ -459,13 +457,15 @@ TEST_F(HidDeviceTest, ReadReportsDoubleReport) {
   // Send the reports.
   fake_hidbus_.SendReport(double_mouse_report, sizeof(double_mouse_report));
 
-  auto result = sync_client_->ReadReports();
-  ASSERT_OK(result.status());
-  ASSERT_OK(result.value().status);
-  ASSERT_EQ(sizeof(double_mouse_report), result.value().data.count());
-  for (size_t i = 0; i < result.value().data.count(); i++) {
-    EXPECT_EQ(double_mouse_report[i], result.value().data[i]);
-  }
+  RunSyncClientTask([&]() {
+    auto result = sync_client_->ReadReports();
+    ASSERT_OK(result.status());
+    ASSERT_OK(result.value().status);
+    ASSERT_EQ(sizeof(double_mouse_report), result.value().data.count());
+    for (size_t i = 0; i < result.value().data.count(); i++) {
+      EXPECT_EQ(double_mouse_report[i], result.value().data[i]);
+    }
+  });
 }
 
 TEST_F(HidDeviceTest, ReadReportsBlockingWait) {
@@ -484,15 +484,17 @@ TEST_F(HidDeviceTest, ReadReportsBlockingWait) {
   ASSERT_OK(report_event_.wait_one(DEV_STATE_READABLE, zx::time::infinite(), nullptr));
 
   // Get the report.
-  auto result = sync_client_->ReadReports();
-  ASSERT_OK(result.status());
-  ASSERT_OK(result.value().status);
-  ASSERT_EQ(sizeof(mouse_report), result.value().data.count());
-  for (size_t i = 0; i < result.value().data.count(); i++) {
-    EXPECT_EQ(mouse_report[i], result.value().data[i]);
-  }
+  RunSyncClientTask([&]() {
+    auto result = sync_client_->ReadReports();
+    ASSERT_OK(result.status());
+    ASSERT_OK(result.value().status);
+    ASSERT_EQ(sizeof(mouse_report), result.value().data.count());
+    for (size_t i = 0; i < result.value().data.count(); i++) {
+      EXPECT_EQ(mouse_report[i], result.value().data[i]);
+    }
 
-  report_thread.join();
+    report_thread.join();
+  });
 }
 
 // Test that only whole reports get sent through.
@@ -510,13 +512,15 @@ TEST_F(HidDeviceTest, ReadReportsOneAndAHalfReports) {
   uint8_t half_report[] = {0xDE, 0xAD};
   fake_hidbus_.SendReport(half_report, sizeof(half_report));
 
-  auto result = sync_client_->ReadReports();
-  ASSERT_OK(result.status());
-  ASSERT_OK(result.value().status);
-  ASSERT_EQ(sizeof(mouse_report), result.value().data.count());
-  for (size_t i = 0; i < result.value().data.count(); i++) {
-    EXPECT_EQ(mouse_report[i], result.value().data[i]);
-  }
+  RunSyncClientTask([&]() {
+    auto result = sync_client_->ReadReports();
+    ASSERT_OK(result.status());
+    ASSERT_OK(result.value().status);
+    ASSERT_EQ(sizeof(mouse_report), result.value().data.count());
+    for (size_t i = 0; i < result.value().data.count(); i++) {
+      EXPECT_EQ(mouse_report[i], result.value().data[i]);
+    }
+  });
 }
 
 // This tests that we can set the boot mode for a non-boot device, and that the device will
@@ -724,25 +728,29 @@ TEST_F(HidDeviceTest, DeviceReportReaderSingleReport) {
   {
     zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_input::DeviceReportsReader>();
     ASSERT_OK(endpoints);
-    auto& [token_client, token_server] = endpoints.value();
-    auto result = sync_client_->GetDeviceReportsReader(std::move(token_server));
-    ASSERT_OK(result.status());
-    reader =
-        fidl::WireSyncClient<fuchsia_hardware_input::DeviceReportsReader>(std::move(token_client));
+
+    RunSyncClientTask([&]() {
+      auto result = sync_client_->GetDeviceReportsReader(std::move(endpoints->server));
+      ASSERT_OK(result.status());
+      reader = fidl::WireSyncClient<fuchsia_hardware_input::DeviceReportsReader>(
+          std::move(endpoints->client));
+    });
   }
 
   // Send the reports.
   fake_hidbus_.SendReport(mouse_report, sizeof(mouse_report));
 
-  auto response = reader->ReadReports();
-  ASSERT_OK(response.status());
-  ASSERT_FALSE(response->is_error());
-  auto result = response->value();
-  ASSERT_EQ(result->reports.count(), 1);
-  ASSERT_EQ(result->reports[0].data.count(), sizeof(mouse_report));
-  for (size_t i = 0; i < result->reports[0].data.count(); i++) {
-    EXPECT_EQ(mouse_report[i], result->reports[0].data[i]);
-  }
+  RunSyncClientTask([&]() {
+    auto response = reader->ReadReports();
+    ASSERT_OK(response.status());
+    ASSERT_FALSE(response->is_error());
+    auto result = response->value();
+    ASSERT_EQ(result->reports.count(), 1);
+    ASSERT_EQ(result->reports[0].data.count(), sizeof(mouse_report));
+    for (size_t i = 0; i < result->reports[0].data.count(); i++) {
+      EXPECT_EQ(mouse_report[i], result->reports[0].data[i]);
+    }
+  });
 }
 
 TEST_F(HidDeviceTest, DeviceReportReaderDoubleReport) {
@@ -758,30 +766,34 @@ TEST_F(HidDeviceTest, DeviceReportReaderDoubleReport) {
   {
     zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_input::DeviceReportsReader>();
     ASSERT_OK(endpoints);
-    auto& [token_client, token_server] = endpoints.value();
-    auto result = sync_client_->GetDeviceReportsReader(std::move(token_server));
-    ASSERT_OK(result.status());
-    reader =
-        fidl::WireSyncClient<fuchsia_hardware_input::DeviceReportsReader>(std::move(token_client));
+
+    RunSyncClientTask([&]() {
+      auto result = sync_client_->GetDeviceReportsReader(std::move(endpoints->server));
+      ASSERT_OK(result.status());
+      reader = fidl::WireSyncClient<fuchsia_hardware_input::DeviceReportsReader>(
+          std::move(endpoints->client));
+    });
   }
 
   // Send the reports.
   fake_hidbus_.SendReport(mouse_report, sizeof(mouse_report));
   fake_hidbus_.SendReport(mouse_report_two, sizeof(mouse_report_two));
 
-  auto response = reader->ReadReports();
-  ASSERT_OK(response.status());
-  ASSERT_FALSE(response->is_error());
-  auto result = response->value();
-  ASSERT_EQ(result->reports.count(), 2);
-  ASSERT_EQ(result->reports[0].data.count(), sizeof(mouse_report));
-  for (size_t i = 0; i < result->reports[0].data.count(); i++) {
-    EXPECT_EQ(mouse_report[i], result->reports[0].data[i]);
-  }
-  ASSERT_EQ(result->reports[1].data.count(), sizeof(mouse_report));
-  for (size_t i = 0; i < result->reports[1].data.count(); i++) {
-    EXPECT_EQ(mouse_report[i], result->reports[1].data[i]);
-  }
+  RunSyncClientTask([&]() {
+    auto response = reader->ReadReports();
+    ASSERT_OK(response.status());
+    ASSERT_FALSE(response->is_error());
+    auto result = response->value();
+    ASSERT_EQ(result->reports.count(), 2);
+    ASSERT_EQ(result->reports[0].data.count(), sizeof(mouse_report));
+    for (size_t i = 0; i < result->reports[0].data.count(); i++) {
+      EXPECT_EQ(mouse_report[i], result->reports[0].data[i]);
+    }
+    ASSERT_EQ(result->reports[1].data.count(), sizeof(mouse_report));
+    for (size_t i = 0; i < result->reports[1].data.count(); i++) {
+      EXPECT_EQ(mouse_report[i], result->reports[1].data[i]);
+    }
+  });
 }
 
 TEST_F(HidDeviceTest, DeviceReportReaderTwoClients) {
@@ -797,25 +809,29 @@ TEST_F(HidDeviceTest, DeviceReportReaderTwoClients) {
   {
     zx::result endpoints1 = fidl::CreateEndpoints<fuchsia_hardware_input::DeviceReportsReader>();
     ASSERT_OK(endpoints1);
-    auto& [token_client1, token_server1] = endpoints1.value();
-    auto result1 = sync_client_->GetDeviceReportsReader(std::move(token_server1));
-    ASSERT_OK(result1.status());
-    reader1 =
-        fidl::WireSyncClient<fuchsia_hardware_input::DeviceReportsReader>(std::move(token_client1));
+
+    RunSyncClientTask([&]() {
+      auto result1 = sync_client_->GetDeviceReportsReader(std::move(endpoints1->server));
+      ASSERT_OK(result1.status());
+      reader1 = fidl::WireSyncClient<fuchsia_hardware_input::DeviceReportsReader>(
+          std::move(endpoints1->client));
+    });
 
     zx::result endpoints2 = fidl::CreateEndpoints<fuchsia_hardware_input::DeviceReportsReader>();
     ASSERT_OK(endpoints2);
-    auto& [token_client2, token_server2] = endpoints2.value();
-    auto result2 = sync_client_->GetDeviceReportsReader(std::move(token_server2));
-    ASSERT_OK(result2.status());
-    reader2 =
-        fidl::WireSyncClient<fuchsia_hardware_input::DeviceReportsReader>(std::move(token_client2));
+
+    RunSyncClientTask([&]() {
+      auto result2 = sync_client_->GetDeviceReportsReader(std::move(endpoints2->server));
+      ASSERT_OK(result2.status());
+      reader2 = fidl::WireSyncClient<fuchsia_hardware_input::DeviceReportsReader>(
+          std::move(endpoints2->client));
+    });
   }
 
   // Send the report.
   fake_hidbus_.SendReport(mouse_report, sizeof(mouse_report));
 
-  {
+  RunSyncClientTask([&]() {
     auto response = reader1->ReadReports();
     ASSERT_OK(response.status());
     ASSERT_FALSE(response->is_error());
@@ -825,9 +841,9 @@ TEST_F(HidDeviceTest, DeviceReportReaderTwoClients) {
     for (size_t i = 0; i < result->reports[0].data.count(); i++) {
       EXPECT_EQ(mouse_report[i], result->reports[0].data[i]);
     }
-  }
+  });
 
-  {
+  RunSyncClientTask([&]() {
     auto response = reader2->ReadReports();
     ASSERT_OK(response.status());
     ASSERT_FALSE(response->is_error());
@@ -837,7 +853,7 @@ TEST_F(HidDeviceTest, DeviceReportReaderTwoClients) {
     for (size_t i = 0; i < result->reports[0].data.count(); i++) {
       EXPECT_EQ(mouse_report[i], result->reports[0].data[i]);
     }
-  }
+  });
 }
 
 // Test that only whole reports get sent through.
@@ -851,11 +867,13 @@ TEST_F(HidDeviceTest, DeviceReportReaderOneAndAHalfReports) {
   {
     zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_input::DeviceReportsReader>();
     ASSERT_OK(endpoints);
-    auto& [token_client, token_server] = endpoints.value();
-    auto result = sync_client_->GetDeviceReportsReader(std::move(token_server));
-    ASSERT_OK(result.status());
-    reader =
-        fidl::WireSyncClient<fuchsia_hardware_input::DeviceReportsReader>(std::move(token_client));
+
+    RunSyncClientTask([&]() {
+      auto result = sync_client_->GetDeviceReportsReader(std::move(endpoints->server));
+      ASSERT_OK(result.status());
+      reader = fidl::WireSyncClient<fuchsia_hardware_input::DeviceReportsReader>(
+          std::move(endpoints->client));
+    });
   }
 
   // Send the report.
@@ -866,15 +884,17 @@ TEST_F(HidDeviceTest, DeviceReportReaderOneAndAHalfReports) {
   uint8_t half_report[] = {0xDE, 0xAD};
   fake_hidbus_.SendReport(half_report, sizeof(half_report));
 
-  auto response = reader->ReadReports();
-  ASSERT_OK(response.status());
-  ASSERT_FALSE(response->is_error());
-  auto result = response->value();
-  ASSERT_EQ(result->reports.count(), 1);
-  ASSERT_EQ(sizeof(mouse_report), result->reports[0].data.count());
-  for (size_t i = 0; i < result->reports[0].data.count(); i++) {
-    EXPECT_EQ(mouse_report[i], result->reports[0].data[i]);
-  }
+  RunSyncClientTask([&]() {
+    auto response = reader->ReadReports();
+    ASSERT_OK(response.status());
+    ASSERT_FALSE(response->is_error());
+    auto result = response->value();
+    ASSERT_EQ(result->reports.count(), 1);
+    ASSERT_EQ(sizeof(mouse_report), result->reports[0].data.count());
+    for (size_t i = 0; i < result->reports[0].data.count(); i++) {
+      EXPECT_EQ(mouse_report[i], result->reports[0].data[i]);
+    }
+  });
 }
 
 TEST_F(HidDeviceTest, DeviceReportReaderHangingGet) {
@@ -889,11 +909,13 @@ TEST_F(HidDeviceTest, DeviceReportReaderHangingGet) {
   {
     zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_input::DeviceReportsReader>();
     ASSERT_OK(endpoints);
-    auto& [token_client, token_server] = endpoints.value();
-    auto result = sync_client_->GetDeviceReportsReader(std::move(token_server));
-    ASSERT_OK(result.status());
-    reader =
-        fidl::WireSyncClient<fuchsia_hardware_input::DeviceReportsReader>(std::move(token_client));
+
+    RunSyncClientTask([&]() {
+      auto result = sync_client_->GetDeviceReportsReader(std::move(endpoints->server));
+      ASSERT_OK(result.status());
+      reader = fidl::WireSyncClient<fuchsia_hardware_input::DeviceReportsReader>(
+          std::move(endpoints->client));
+    });
   }
 
   // Send the reports, but delayed.
@@ -902,17 +924,19 @@ TEST_F(HidDeviceTest, DeviceReportReaderHangingGet) {
     fake_hidbus_.SendReport(mouse_report, sizeof(mouse_report));
   });
 
-  auto response = reader->ReadReports();
-  ASSERT_OK(response.status());
-  ASSERT_FALSE(response->is_error());
-  auto result = response->value();
-  ASSERT_EQ(result->reports.count(), 1);
-  ASSERT_EQ(result->reports[0].data.count(), sizeof(mouse_report));
-  for (size_t i = 0; i < result->reports[0].data.count(); i++) {
-    EXPECT_EQ(mouse_report[i], result->reports[0].data[i]);
-  }
+  RunSyncClientTask([&]() {
+    auto response = reader->ReadReports();
+    ASSERT_OK(response.status());
+    ASSERT_FALSE(response->is_error());
+    auto result = response->value();
+    ASSERT_EQ(result->reports.count(), 1);
+    ASSERT_EQ(result->reports[0].data.count(), sizeof(mouse_report));
+    for (size_t i = 0; i < result->reports[0].data.count(); i++) {
+      EXPECT_EQ(mouse_report[i], result->reports[0].data[i]);
+    }
 
-  report_thread.join();
+    report_thread.join();
+  });
 }
 
 }  // namespace hid_driver
