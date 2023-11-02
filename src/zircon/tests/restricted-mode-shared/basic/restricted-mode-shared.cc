@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fidl/fuchsia.kernel/cpp/wire.h>
-#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/zx/job.h>
 #include <lib/zx/resource.h>
 #include <lib/zx/result.h>
@@ -22,60 +20,26 @@
 
 namespace {
 
-zx::result<zx::resource> GetVmexResource() {
-  zx::result client = component::Connect<fuchsia_kernel::VmexResource>();
-  if (client.is_error()) {
-    return client.take_error();
-  }
-  fidl::WireResult result = fidl::WireCall(client.value())->Get();
-  if (!result.ok()) {
-    return zx::error(result.status());
-  }
-  return zx::ok(std::move(result.value().resource));
-}
-
 void RunRestrictedMode(zx_handle_t restricted_vmar_handle, zx_status_t* result) {
   zx::vmar rvmar(restricted_vmar_handle);
 
   // Set up the restricted mode stack.
   zx::vmo stack;
-  zx_vaddr_t stack_addr;
-  auto page_size = zx_system_get_page_size();
-  *result = zx::vmo::create(page_size, 0, &stack);
-  if (*result != ZX_OK) {
+  const uint32_t stack_size = zx_system_get_page_size();
+  zx::result<zx_vaddr_t> res = SetupStack(restricted_vmar_handle, stack_size, &stack);
+  if (res.is_error()) {
+    *result = res.status_value();
     return;
   }
-  *result = rvmar.map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, stack, 0, page_size, &stack_addr);
-  if (*result != ZX_OK) {
-    return;
-  }
+  zx_vaddr_t stack_addr = res.value();
 
   // Set up the restricted mode code segment.
-  zx::vmo cs;
-  zx::vmo cs_exe;
-  zx_vaddr_t cs_addr;
-  *result = zx::vmo::create(page_size, 0, &cs);
-  if (*result != ZX_OK) {
+  res = SetupCodeSegment(restricted_vmar_handle, write_to_stack_blob());
+  if (res.is_error()) {
+    *result = res.status_value();
     return;
   }
-  cpp20::span<const std::byte> code_blob = write_to_stack_blob();
-  *result = cs.write(code_blob.data(), 0, code_blob.size_bytes());
-  if (*result != ZX_OK) {
-    return;
-  }
-  auto vmex = GetVmexResource();
-  *result = vmex.status_value();
-  if (*result != ZX_OK) {
-    return;
-  }
-  *result = cs.replace_as_executable(*vmex, &cs_exe);
-  if (*result != ZX_OK) {
-    return;
-  }
-  *result = rvmar.map(ZX_VM_PERM_READ | ZX_VM_PERM_EXECUTE, 0, cs_exe, 0, page_size, &cs_addr);
-  if (*result != ZX_OK) {
-    return;
-  }
+  zx_vaddr_t cs_addr = res.value();
 
   // Set up the restricted state.
   zx::vmo restricted;
@@ -85,10 +49,10 @@ void RunRestrictedMode(zx_handle_t restricted_vmar_handle, zx_status_t* result) 
   }
   zx_restricted_state_t state{};
 #if defined(__x86_64__)
-  state.rsp = reinterpret_cast<uintptr_t>(stack_addr + page_size);
+  state.rsp = reinterpret_cast<uintptr_t>(stack_addr);
   state.ip = reinterpret_cast<uintptr_t>(cs_addr);
 #elif defined(__aarch64__) || defined(__riscv)  // defined(__x86_64__)
-  state.sp = reinterpret_cast<uintptr_t>(stack_addr + page_size);
+  state.sp = reinterpret_cast<uintptr_t>(stack_addr);
   state.pc = reinterpret_cast<uintptr_t>(cs_addr);
 #endif                                          // defined(__arch64__) || defined(__riscv)
   *result = restricted.write(&state, 0, sizeof(state));
@@ -109,7 +73,7 @@ void RunRestrictedMode(zx_handle_t restricted_vmar_handle, zx_status_t* result) 
 
   // Validate that the restricted mode routine wrote the right value to the stack.
   uint8_t buffer[8];
-  *result = stack.read(buffer, page_size - 8, 8);
+  *result = stack.read(buffer, stack_size - 8, 8);
   if (*result != ZX_OK) {
     return;
   }

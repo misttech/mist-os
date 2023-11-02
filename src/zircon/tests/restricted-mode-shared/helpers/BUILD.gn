@@ -11,12 +11,18 @@ library_headers("helper_headers") {
 
 source_set("helpers") {
   testonly = true
+  sources = [ "helpers.cc" ]
   if (current_cpu == "x64") {
-    sources = [ "x64.S" ]
+    sources += [ "x64.S" ]
   } else if (current_cpu == "arm64") {
-    sources = [ "arm64.S" ]
+    sources += [ "arm64.S" ]
   } else if (current_cpu == "riscv64") {
-    sources = [ "riscv64.S" ]
+    sources += [ "riscv64.S" ]
   }
   public_deps = [ ":helper_headers" ]
+  deps = [
+    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
+    "//sdk/lib/component/incoming/cpp",
+    "//zircon/system/ulib/zx",
+  ]
 }

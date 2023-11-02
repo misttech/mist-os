@@ -22,8 +22,6 @@ if (!is_asan) {
 
     deps = [
       "restricted-blob",
-      "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
-      "//sdk/lib/component/incoming/cpp",
       "//src//zircon/tests/restricted-mode-shared/helpers",
       "//zircon/system/ulib/zxtest",
     ]
