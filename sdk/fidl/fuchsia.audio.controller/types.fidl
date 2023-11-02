@@ -17,4 +17,16 @@ type Error = flexible enum {
     /// believe this operation may succeed in the future.
     /// Client can retry this request.
     UNKNOWN_CAN_RETRY = 3;
+
+    /// Necessary arguments missing on request.
+    ARGUMENTS_MISSING = 4;
+
+    /// Unsupported arguments on request.
+    INVALID_ARGUMENTS = 5;
+
+    /// Could not find a device matching client request parameters.
+    DEVICE_NOT_FOUND = 6;
+
+    /// Could not connect to device at specified location.
+    DEVICE_NOT_REACHABLE = 7;
 };

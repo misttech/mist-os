@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 mod device;
+mod error;
 mod ring_buffer;
 mod socket;
 
@@ -11,10 +12,11 @@ pub use ring_buffer::RingBuffer;
 use {
     anyhow::{self, Context, Error},
     async_lock as _,
+    error::ControllerError,
     fidl_fuchsia_audio_controller::{
         CapturerConfig, DeviceControlGetDeviceInfoResponse, DeviceControlListDevicesResponse,
-        DeviceControlRequest, DeviceControlRequestStream, GainSettings, PlayDestination,
-        PlayerPlayRequest, PlayerPlayResponse, PlayerRequest, PlayerRequestStream,
+        DeviceControlRequest, DeviceControlRequestStream, Error::ArgumentsMissing, GainSettings,
+        PlayDestination, PlayerPlayRequest, PlayerPlayResponse, PlayerRequest, PlayerRequestStream,
         RecordCancelerMarker, RecordSource, RecorderRecordRequest, RecorderRecordResponse,
         RecorderRequest, RecorderRequestStream, RendererConfig,
     },
@@ -40,20 +42,27 @@ enum IncomingRequest {
     Player(PlayerRequestStream),
     Recorder(RecorderRequestStream),
 }
+
 struct AudioDaemon {}
 impl AudioDaemon {
     async fn record_capturer(
         &self,
         request: RecorderRecordRequest,
-        stdout_local: zx::Socket,
-        stderr_local: zx::Socket,
-    ) -> Result<(), anyhow::Error> {
-        let location = request.source.ok_or(anyhow::anyhow!("Input missing."))?;
+    ) -> Result<RecorderRecordResponse, ControllerError> {
+        let location = request
+            .source
+            .ok_or(ControllerError::new(ArgumentsMissing, format!("Input missing.")))?;
+        let wav_socket = request.wav_data.ok_or(ControllerError::new(
+            ArgumentsMissing,
+            format!("Socket for wav data missing"),
+        ))?;
 
         let stop_signal = std::sync::atomic::AtomicBool::new(false);
         let cancel_server = request.canceler;
 
-        let stream_type = request.stream_type.ok_or(anyhow::anyhow!("Stream type missing"))?;
+        let stream_type = request
+            .stream_type
+            .ok_or(ControllerError::new(ArgumentsMissing, format!("Stream type missing")))?;
         let format = format_utils::Format::from(&stream_type);
 
         let duration = request
@@ -62,7 +71,7 @@ impl AudioDaemon {
 
         let mut socket = socket::Socket {
             socket: &mut fasync::Socket::from_socket(
-                stdout_local.duplicate_handle(zx::Rights::SAME_RIGHTS)?,
+                wav_socket.duplicate_handle(zx::Rights::SAME_RIGHTS)?,
             )?,
         };
 
@@ -99,8 +108,8 @@ impl AudioDaemon {
 
         let mut stream = capturer_proxy.take_event_stream();
         let mut packets_so_far = 0;
-        let mut async_stderr_writer = fidl::AsyncSocket::from_socket(stderr_local)?;
-        let mut async_stdout_writer = fidl::AsyncSocket::from_socket(stdout_local)?;
+
+        let mut async_wav_writer = fidl::AsyncSocket::from_socket(wav_socket)?;
 
         socket.write_wav_header(duration, &format).await?;
         let packet_fut = async {
@@ -117,7 +126,7 @@ impl AudioDaemon {
                             .read(&mut data[..], packet.payload_offset)
                             .map_err(|e| anyhow::anyhow!("Failed to read vmo {e}"))?;
 
-                        async_stdout_writer
+                        async_wav_writer
                             .write_all(&data)
                             .await
                             .map_err(|e| anyhow::anyhow!("Error writing to stdout socket: {e}"))?;
@@ -136,24 +145,23 @@ impl AudioDaemon {
                 }
             }
 
-            let output_message = format!(
-                "Read {} packets from AudioCapturer, totaling {} bytes. \n",
-                packets_so_far,
-                packets_so_far * bytes_per_packet
-            );
-
-            async_stderr_writer
-                .write_all(output_message.as_bytes())
-                .await
-                .map_err(|e| anyhow::anyhow!("Error writing to stderr: {}", e))
+            Ok(RecorderRecordResponse {
+                bytes_processed: Some(packets_so_far * bytes_per_packet),
+                packets_processed: Some(packets_so_far),
+                late_wakeups: None,
+                ..Default::default()
+            })
         };
 
         if let Some(cancel_server) = cancel_server {
-            futures::future::try_join(stop_listener(cancel_server, &stop_signal), packet_fut)
-                .await
-                .map(|((), ())| ())
+            let (_cancel_res, packet_res) = futures::future::try_join(
+                listener_utils::stop_listener(cancel_server, &stop_signal),
+                packet_fut,
+            )
+            .await?;
+            Ok(packet_res)
         } else {
-            packet_fut.await.map_err(|e| anyhow::anyhow!("Error processing packets: {e}"))
+            Ok(packet_fut.await?)
         }
     }
 
@@ -540,18 +548,33 @@ impl AudioDaemon {
     async fn record_device(
         &self,
         request: RecorderRecordRequest,
-        stdout_local: zx::Socket,
-        stderr_local: zx::Socket,
-    ) -> Result<(), anyhow::Error> {
-        let stream_type = request.stream_type.ok_or(anyhow::anyhow!("Stream type missing"))?;
+    ) -> Result<RecorderRecordResponse, error::ControllerError> {
+        let stream_type = request.stream_type.ok_or(error::ControllerError::new(
+            fidl_fuchsia_audio_controller::Error::ArgumentsMissing,
+            format!("Stream type missing."),
+        ))?;
+        let wav_socket = request.wav_data.ok_or(error::ControllerError::new(
+            fidl_fuchsia_audio_controller::Error::ArgumentsMissing,
+            format!("Socket for wav data missing."),
+        ))?;
+
         let device_id = request
             .source
-            .ok_or(anyhow::anyhow!("Device id argument missing."))
+            .ok_or(error::ControllerError::new(
+                fidl_fuchsia_audio_controller::Error::ArgumentsMissing,
+                format!("Record source missing."),
+            ))
             .and_then(|location| match location {
                 RecordSource::DeviceRingBuffer(device_selector) => {
-                    device_selector.id.ok_or(anyhow::anyhow!("Device ID not specified."))
+                    device_selector.id.ok_or(error::ControllerError::new(
+                        fidl_fuchsia_audio_controller::Error::ArgumentsMissing,
+                        format!("Device ID missing."),
+                    ))
                 }
-                _ => Err(anyhow::anyhow!("Expected Ring Buffer location")),
+                unknown_source => Err(error::ControllerError::new(
+                    fidl_fuchsia_audio_controller::Error::InvalidArguments,
+                    format!("Expected ring buffer source, found {unknown_source:?}"),
+                )),
             })?;
 
         let cancel_server = request.canceler;
@@ -560,32 +583,21 @@ impl AudioDaemon {
 
         let device = device::Device::connect(format!("/dev/class/audio-input/{}", device_id));
 
-        let result = match device {
-            Err(e) => Err(anyhow::anyhow!("Failed to connect to device with error: {e}")),
+        match device {
+            Err(e) => Err(error::ControllerError::new(
+                fidl_fuchsia_audio_controller::Error::DeviceNotReachable,
+                format!("Failed to connect to device with error: {e}",),
+            )),
             Ok(device) => {
                 device
                     .record(
                         format_utils::Format::from(&stream_type),
-                        fasync::Socket::from_socket(stdout_local)?,
+                        fasync::Socket::from_socket(wav_socket)?,
                         duration,
                         cancel_server,
                     )
                     .await
             }
-        };
-
-        // Record command writes output message to stderr to avoid interfering with WAV file
-        // written to stdout.
-        let mut stderr = fasync::Socket::from_socket(stderr_local)?;
-        match result {
-            Ok(message) => {
-                let _ = stderr
-                    .write_all(message.as_bytes())
-                    .await
-                    .map_err(|e| anyhow::anyhow!("Failed to write to stderr: {e}"));
-                Ok(())
-            }
-            Err(e) => Err(anyhow::anyhow!("Failed to record from device with error: {e}")),
         }
     }
 
@@ -607,13 +619,13 @@ impl AudioDaemon {
                                 fidl_fuchsia_audio_controller::Error::UnknownFatal
                             })
                         }
-                        Some(..) => {
-                            println!("No PlayDestination variant specified.");
-                            Err(fidl_fuchsia_audio_controller::Error::NotSupported)
+                        Some(unknown_destination) => {
+                            println!("Unsupported PlayDestination variant specified. Requested: {:?} not supported.", unknown_destination);
+                            Err(fidl_fuchsia_audio_controller::Error::InvalidArguments)
                         }
                         None => {
                             println!("Missing destination argument.");
-                            Err(fidl_fuchsia_audio_controller::Error::NotSupported)
+                            Err(fidl_fuchsia_audio_controller::Error::ArgumentsMissing)
                         }
                     };
 
@@ -637,51 +649,49 @@ impl AudioDaemon {
 
     async fn serve_recorder(&mut self, mut stream: RecorderRequestStream) -> Result<(), Error> {
         while let Ok(Some(request)) = stream.try_next().await {
-            let (wav_remote, wav_local) = zx::Socket::create_stream();
-            let (stderr_remote, stderr_local) = zx::Socket::create_stream();
-
             let request_name = request.method_name();
-            let request_result = match request {
+            match request {
                 RecorderRequest::Record { payload, responder } => {
-                    let response = RecorderRecordResponse {
-                        wav_data: Some(wav_remote),
-                        stderr: Some(stderr_remote),
-                        ..Default::default()
-                    };
-                    responder
-                        .send(Ok(response))
-                        .map_err(|e| anyhow::anyhow!("Could not send reponse: {}", e))?;
-
-                    let stderr_copy =
-                        stderr_local.duplicate_handle(zx::Rights::SAME_RIGHTS).map_err(|e| {
-                            anyhow::anyhow!("Could not duplicate stderr socket handle {}", e)
-                        })?;
-
-                    match payload.source {
-                        Some(RecordSource::Capturer(..)) => {
-                            self.record_capturer(payload, wav_local, stderr_copy).await
+                    let record_result = match payload.source {
+                        Some(RecordSource::Capturer(..)) | Some(RecordSource::Loopback(..)) => {
+                            self.record_capturer(payload).await
                         }
                         Some(RecordSource::DeviceRingBuffer(..)) => {
-                            self.record_device(payload, wav_local, stderr_copy).await
+                            self.record_device(payload).await
                         }
-                        Some(RecordSource::Loopback(..)) => {
-                            self.record_capturer(payload, wav_local, stderr_copy).await
+                        Some(unknown_source) => {
+                            let error_msg = format!("Unsupported RecordSource variant specified. Requested: {unknown_source:?} not supported.");
+                            println!("{error_msg}");
+                            Err(ControllerError::new(
+                                fidl_fuchsia_audio_controller::Error::InvalidArguments,
+                                error_msg,
+                            ))
                         }
-                        Some(..) => Err(anyhow::anyhow!("No RecordSource variant specified.")),
-                        None => Err(anyhow::anyhow!("RecordSource argument missing. ")),
+                        None => {
+                            println!("RecordSource argument missing.");
+                            Err(ControllerError::new(
+                                fidl_fuchsia_audio_controller::Error::ArgumentsMissing,
+                                format!("RecordSource argument missing"),
+                            ))
+                        }
+                    };
+                    match record_result {
+                        Ok(response) => {
+                            println!("Request succeeded.");
+                            responder
+                                .send(Ok(response))
+                                .map_err(|e| anyhow::anyhow!("Could not send reponse: {e}"))
+                        }
+                        Err(e) => {
+                            println!("Request {request_name} failed with error {e} \n");
+                            responder
+                                .send(Err(e.inner))
+                                .map_err(|e| anyhow::anyhow!("Could not send reponse: {e}"))
+                        }
                     }
                 }
                 _ => Err(anyhow::anyhow!("Request {request_name} not supported.")),
-            };
-            match request_result {
-                Ok(_) => println!("Request succeeded."),
-                Err(e) => {
-                    let error_msg = format!("Request {request_name} failed with error {e} \n");
-                    println!("{}", &error_msg);
-                    let mut async_stderr_writer = fidl::AsyncSocket::from_socket(stderr_local)?;
-                    let _ = async_stderr_writer.write_all(error_msg.as_bytes()).await;
-                }
-            }
+            }?;
         }
         Ok(())
     }

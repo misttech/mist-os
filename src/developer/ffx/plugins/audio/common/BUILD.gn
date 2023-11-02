@@ -12,8 +12,10 @@ rustc_library("ffx_audio_common") {
   deps = [
     "//sdk/fidl/fuchsia.audio.controller:fuchsia.audio.controller_rust",
     "//src/developer/ffx/lib/fho:lib",
+    "//src/developer/ffx/lib/timeout:lib",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
+    "//src/media/audio/services/ffxdaemon:listener-utils",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:blocking",
     "//third_party/rust_crates:futures",

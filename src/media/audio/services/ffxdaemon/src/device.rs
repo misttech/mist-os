@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_audio_controller::PlayerPlayResponse;
-
 use {
-    crate::{socket, stop_listener, RingBuffer, SECONDS_PER_NANOSECOND},
+    crate::{error::ControllerError, socket, stop_listener, RingBuffer, SECONDS_PER_NANOSECOND},
     anyhow::{self, Context, Error},
     fdio,
     fidl::endpoints::Proxy,
     fidl_fuchsia_audio_controller::{
-        DeviceInfo, DeviceInfo::StreamConfig, DeviceSelector, RecordCancelerMarker,
-        StreamConfigDeviceInfo,
+        DeviceInfo, DeviceInfo::StreamConfig, DeviceSelector, Error::UnknownCanRetry,
+        PlayerPlayResponse, RecordCancelerMarker, RecorderRecordResponse, StreamConfigDeviceInfo,
     },
     fidl_fuchsia_hardware_audio::{GainState, StreamConfigProxy},
     fidl_fuchsia_io as fio, fuchsia_async as fasync,
@@ -243,25 +241,46 @@ impl Device {
         mut data_socket: fasync::Socket,
         duration: Option<std::time::Duration>,
         cancel_server: Option<fidl::endpoints::ServerEnd<RecordCancelerMarker>>,
-    ) -> Result<String, Error> {
+    ) -> Result<RecorderRecordResponse, ControllerError> {
         let mut socket = socket::Socket { socket: &mut data_socket };
 
         let supported_formats = self.stream_config_client.get_supported_formats().await?;
         if !format.is_supported_by(&supported_formats) {
-            return Err(anyhow::anyhow!("Requested format not supported"));
+            return Err(ControllerError::new(
+                fidl_fuchsia_audio_controller::Error::InvalidArguments,
+                format!("Requested format not supported."),
+            ));
         }
 
         // Create ring buffer channel.
         let (ring_buffer_client, ring_buffer_server) =
             fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_audio::RingBufferMarker>()
-                .map_err(|e| anyhow::anyhow!("Failed to create ring buffer channel: {}", e))?;
+                .map_err(|e| {
+                    ControllerError::new(
+                        fidl_fuchsia_audio_controller::Error::UnknownFatal,
+                        format!("Failed to create ring buffer channel: {e}"),
+                    )
+                })?;
 
-        self.stream_config_client.create_ring_buffer(
-            &fidl_fuchsia_hardware_audio::Format::from(&format),
-            ring_buffer_server,
-        )?;
+        self.stream_config_client
+            .create_ring_buffer(
+                &fidl_fuchsia_hardware_audio::Format::from(&format),
+                ring_buffer_server,
+            )
+            .map_err(|e| {
+                ControllerError::new(
+                    fidl_fuchsia_audio_controller::Error::UnknownFatal,
+                    format!("Failed to create ring buffer: {e}"),
+                )
+            })?;
 
-        let ring_buffer_wrapper = RingBuffer::new(&format, ring_buffer_client).await?;
+        let ring_buffer_wrapper =
+            RingBuffer::new(&format, ring_buffer_client).await.map_err(|e| {
+                ControllerError::new(
+                    fidl_fuchsia_audio_controller::Error::UnknownFatal,
+                    format!("Failed to allocate ring buffer memory: {e}"),
+                )
+            })?;
 
         // Hardware might not use all bytes in vmo. Only want to read frames hardware will write to.
         let bytes_in_rb = ring_buffer_wrapper.num_frames * format.bytes_per_frame() as u64;
@@ -275,12 +294,13 @@ impl Device {
             .floor() as u64;
 
         if producer_bytes + bytes_per_wakeup_interval > bytes_in_rb {
-            return Err(anyhow::anyhow!(
-                "Ring buffer not large enough for driver internal delay and plugin wakeup interval.
+            return Err(ControllerError::new(
+                fidl_fuchsia_audio_controller::Error::UnknownFatal,
+                format!("Ring buffer not large enough for driver internal delay and plugin wakeup interval.
                  Ring buffer bytes: {}, bytes_per_wakeup_interval + producer bytes: {}",
                 bytes_in_rb,
                 bytes_per_wakeup_interval + producer_bytes
-            ));
+            )));
         }
 
         let safe_bytes_in_rb = bytes_in_rb - producer_bytes;
@@ -373,21 +393,24 @@ impl Device {
                     break;
                 }
             }
-            Ok(())
+            Ok(RecorderRecordResponse {
+                bytes_processed: None,
+                packets_processed: None,
+                late_wakeups: Some(late_wakeups),
+                ..Default::default()
+            })
         };
 
-        if let Some(cancel_server) = cancel_server {
-            futures::future::try_join(stop_listener(cancel_server, &stop_signal), packet_fut)
-                .await?;
-        } else {
-            packet_fut.await?;
-        }
+        let result = if let Some(cancel_server) = cancel_server {
+            let (_cancel_res, packet_res) =
+                futures::future::try_join(stop_listener(cancel_server, &stop_signal), packet_fut)
+                    .await?;
 
-        let output_message = format!(
-            "Succesfully processed all audio data. \n Woke up late {} times.\n ",
-            late_wakeups
-        );
-        Ok(output_message)
+            Ok(packet_res)
+        } else {
+            packet_fut.await
+        };
+        result.map_err(|e| ControllerError::new(UnknownCanRetry, format!("{e}")))
     }
 }
 

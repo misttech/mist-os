@@ -2,18 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use ffx_audio_record_args::AudioCaptureUsageExtended;
-
 use {
     anyhow::Result,
     async_trait::async_trait,
     blocking::Unblock,
-    ffx_audio_record_args::RecordCommand,
-    fho::{moniker, FfxContext, FfxMain, FfxTool, SimpleWriter},
+    ffx_audio_record_args::{AudioCaptureUsageExtended, RecordCommand},
+    fho::ToolIO,
+    fho::{moniker, FfxMain, FfxTool, SimpleWriter},
     fidl_fuchsia_audio_controller::{
         CapturerConfig, RecordSource, RecorderProxy, RecorderRecordRequest, StandardCapturerConfig,
     },
     fidl_fuchsia_media::AudioStreamType,
+    futures::AsyncWrite,
+    futures::FutureExt,
 };
 
 #[derive(FfxTool)]
@@ -28,7 +29,7 @@ fho::embedded_plugin!(RecordTool);
 #[async_trait(?Send)]
 impl FfxMain for RecordTool {
     type Writer = SimpleWriter;
-    async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
+    async fn main(self, writer: Self::Writer) -> fho::Result<()> {
         let capturer_usage = match self.cmd.usage {
             AudioCaptureUsageExtended::Background(usage)
             | AudioCaptureUsageExtended::Foreground(usage)
@@ -60,9 +61,10 @@ impl FfxMain for RecordTool {
             ),
         };
 
-        let (cancel_client, cancel_server) = fidl::endpoints::create_endpoints::<
-            fidl_fuchsia_audio_controller::RecordCancelerMarker,
-        >();
+        let (record_remote, record_local) = fidl::Socket::create_datagram();
+        let (cancel_proxy, cancel_server) =
+            fidl::endpoints::create_proxy::<fidl_fuchsia_audio_controller::RecordCancelerMarker>()
+                .map_err(|e| anyhow::anyhow!("FIDL Error creating canceler proxy: {e}"))?;
 
         let request = RecorderRecordRequest {
             source: Some(location),
@@ -71,46 +73,148 @@ impl FfxMain for RecordTool {
             canceler: Some(cancel_server),
             gain_settings,
             buffer_size: self.cmd.buffer_size,
+            wav_data: Some(record_remote),
             ..Default::default()
         };
 
-        let (stdout_sock, stderr_sock) = {
-            let response = self
-                .controller
-                .record(request)
-                .await
-                .user_message("Timeout awaiting record command response.")?
-                .map_err(|e| {
-                    anyhow::anyhow!(
-                        "AudioDaemon Record request failed with error {}",
-                        fuchsia_zircon_status::Status::from_raw(e)
-                    )
-                })?;
+        let mut stdout = Unblock::new(std::io::stdout());
+        let keypress_waiter = ffx_audio_common::cancel_on_keypress(
+            cancel_proxy,
+            ffx_audio_common::get_stdin_waiter().fuse(),
+        );
 
-            (
-                response.wav_data.ok_or(anyhow::anyhow!("No socket for wav data."))?,
-                response.stderr.ok_or(anyhow::anyhow!("No stderr socket."))?,
-            )
+        record_impl(self.controller, request, keypress_waiter, record_local, &mut stdout, writer)
+            .await?;
+        Ok(())
+    }
+}
+
+async fn record_impl<W>(
+    controller: RecorderProxy,
+    request: RecorderRecordRequest,
+    keypress_waiter: impl futures::Future<Output = Result<(), std::io::Error>>,
+    record_local: fidl::Socket,
+    mut wav_writer: W, // Output generalized to stdout or a test buffer. Forward data
+    // from daemon to this writer.
+    mut output_result_writer: SimpleWriter,
+) -> Result<()>
+where
+    W: AsyncWrite + std::marker::Unpin,
+{
+    let result = ffx_audio_common::record(
+        controller,
+        request,
+        record_local,
+        &mut wav_writer,
+        keypress_waiter,
+    )
+    .await;
+
+    let message = ffx_audio_common::format_record_result(result);
+    writeln!(output_result_writer.stderr(), "{}", message)
+        .map_err(|e| anyhow::anyhow!("Writing result failed with error {e}."))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ffx_audio_common::tests::SINE_WAV;
+    use ffx_writer::TestBuffers;
+    use fho::macro_deps::ffx_writer::TestBuffer;
+    use fho::SimpleWriter;
+    use futures::FutureExt;
+
+    #[fuchsia::test]
+    pub async fn test_record_no_cancel() -> Result<(), fho::Error> {
+        // Test without sending a cancel message. Still set up the canceling proxy and server,
+        // but never send the message from proxy to daemon to cancel. Test daemon should
+        // exit after duration (real daemon exits after sending all duration amount of packets).
+        let controller = ffx_audio_common::tests::fake_audio_recorder();
+        let test_buffers = TestBuffers::default();
+        let result_writer: SimpleWriter = SimpleWriter::new_test(&test_buffers);
+
+        let (cancel_proxy, cancel_server) =
+            fidl::endpoints::create_proxy::<fidl_fuchsia_audio_controller::RecordCancelerMarker>()
+                .unwrap();
+
+        let test_stdout = TestBuffer::default();
+
+        let (record_remote, record_local) = fidl::Socket::create_datagram();
+        let request = RecorderRecordRequest {
+            source: None,
+            stream_type: None,
+            duration: Some(500),
+            canceler: Some(cancel_server),
+            gain_settings: None,
+            buffer_size: None,
+            wav_data: Some(record_remote),
+            ..Default::default()
         };
 
-        let mut stdout = Unblock::new(std::io::stdout());
-        let mut stderr = Unblock::new(std::io::stderr());
+        // Pass a future that will never complete as an input waiter.
+        let keypress_waiter =
+            ffx_audio_common::cancel_on_keypress(cancel_proxy, futures::future::pending().fuse());
 
-        futures::future::try_join3(
-            futures::io::copy(
-                fidl::AsyncSocket::from_socket(stdout_sock)
-                    .user_message("Could not create async socket for stdout.")?,
-                &mut stdout,
-            ),
-            futures::io::copy(
-                fidl::AsyncSocket::from_socket(stderr_sock)
-                    .user_message("Could not create async socket for stderr.")?,
-                &mut stderr,
-            ),
-            ffx_audio_common::wait_for_keypress(cancel_client),
+        let _res = record_impl(
+            controller,
+            request,
+            keypress_waiter,
+            record_local,
+            test_stdout.clone(),
+            result_writer,
         )
-        .await
-        .map(|_| ())
-        .user_message("Error copying data from socket.")
+        .await?;
+
+        let expected_result_output =
+            format!("Successfully recorded 123 bytes of audio. \nPackets processed: 123 \nLate wakeups: Unavailable\n");
+        let stderr = test_buffers.into_stderr_str();
+        assert_eq!(stderr, expected_result_output);
+
+        let stdout = test_stdout.into_inner();
+        let expected_wav_output = Vec::from(SINE_WAV);
+        assert_eq!(stdout, expected_wav_output);
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    pub async fn test_record_immediate_cancel() -> Result<(), fho::Error> {
+        let controller = ffx_audio_common::tests::fake_audio_recorder();
+        let test_buffers = TestBuffers::default();
+        let result_writer: SimpleWriter = SimpleWriter::new_test(&test_buffers);
+
+        let (cancel_proxy, cancel_server) =
+            fidl::endpoints::create_proxy::<fidl_fuchsia_audio_controller::RecordCancelerMarker>()
+                .unwrap();
+
+        let test_stdout = TestBuffer::default();
+
+        let (record_remote, record_local) = fidl::Socket::create_datagram();
+        let request = RecorderRecordRequest {
+            source: None,
+            stream_type: None,
+            duration: None,
+            canceler: Some(cancel_server),
+            gain_settings: None,
+            buffer_size: None,
+            wav_data: Some(record_remote),
+            ..Default::default()
+        };
+
+        // Test canceler signaling. Not concerned with how much data gets back through socket.
+        // Test failing is never finishing execution before timeout.
+        let keypress_waiter =
+            ffx_audio_common::cancel_on_keypress(cancel_proxy, futures::future::ready(Ok(())));
+
+        let _res = record_impl(
+            controller,
+            request,
+            keypress_waiter,
+            record_local,
+            test_stdout.clone(),
+            result_writer,
+        )
+        .await?;
+
+        Ok(())
     }
 }

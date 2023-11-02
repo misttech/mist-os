@@ -27,6 +27,20 @@ rustc_library("format-utils") {
   sources = [ "src/format.rs" ]
 }
 
+rustc_library("listener-utils") {
+  name = "listener-utils"
+  source_root = "src/lib.rs"
+  version = "0.1.0"
+  edition = "2021"
+  deps = [
+    "//sdk/fidl/fuchsia.audio.controller:fuchsia.audio.controller_rust",
+    "//src/lib/fidl/rust/fidl",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:futures",
+  ]
+  sources = [ "src/lib.rs" ]
+}
+
 rustc_binary("bin") {
   output_name = "audio_ffx_daemon"
   edition = "2021"
@@ -37,6 +51,7 @@ rustc_binary("bin") {
 
   deps = [
     ":format-utils",
+    ":listener-utils",
     "//sdk/fidl/fuchsia.audio.controller:fuchsia.audio.controller_rust",
     "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
@@ -53,6 +68,7 @@ rustc_binary("bin") {
     "//src/lib/fuchsia-fs",
     "//src/lib/fuchsia-runtime",
     "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/lib/zircon/rust:fuchsia-zircon-status",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-lock",
     "//third_party/rust_crates:byteorder",
@@ -62,6 +78,7 @@ rustc_binary("bin") {
 
   sources = [
     "src/device.rs",
+    "src/error.rs",
     "src/main.rs",
     "src/ring_buffer.rs",
     "src/socket.rs",

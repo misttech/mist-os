@@ -38,7 +38,8 @@ ffx_plugin("ffx_audio_device") {
   test_deps = [
     "//sdk/fidl/fuchsia.media:fuchsia.media_rust",
     "//src/developer/ffx/lib/writer:lib",
-    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia",
+    "//src/media/audio/services/ffxdaemon:format-utils",
     "//third_party/rust_crates:tempfile",
   ]
 }
