@@ -409,6 +409,15 @@ impl<T> DenseMap<T> {
 
     /// Creates an iterator over the containing items and their associated keys.
     ///
+    /// The iterator will return items in insertion order.
+    pub fn insertion_ordered_iter(&self) -> InsertionOrderedIter<'_, T> {
+        let Self { data, freelist: _, allocatedlist } = self;
+        let next_idx = allocatedlist.map(|l| l.head);
+        InsertionOrderedIter { next_idx, map: data.as_ref() }
+    }
+
+    /// Creates an iterator over the containing items and their associated keys.
+    ///
     /// The iterator will return items in key order.
     pub fn key_ordered_iter(&self) -> KeyOrderedIter<'_, T> {
         IntoIterator::into_iter(self)
@@ -512,6 +521,32 @@ impl<T> DenseMap<T> {
 impl<T> Default for DenseMap<T> {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// An iterator over the keys and values stored in an [`DenseMap`].
+///
+/// This iterator returns items in insertion order.
+pub struct InsertionOrderedIter<'s, T> {
+    next_idx: Option<usize>,
+    map: &'s [DenseMapEntry<T>],
+}
+
+impl<'a, T> Iterator for InsertionOrderedIter<'a, T> {
+    type Item = (Key, &'a T);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let Self { next_idx, map } = self;
+        let k = (*next_idx)?;
+        match &map[k] {
+            DenseMapEntry::Allocated(AllocatedEntry { link: ListLink { next, prev: _ }, item }) => {
+                *next_idx = *next;
+                Some((k, item))
+            }
+            DenseMapEntry::Free(_) => {
+                unreachable!("free entry found in allocated list @ idx={}", k)
+            }
+        }
     }
 }
 
@@ -1102,7 +1137,7 @@ mod tests {
     }
 
     #[test]
-    fn test_iter() {
+    fn test_key_ordered_iter() {
         let mut map = DenseMap::new();
         assert_eq!(map.insert(1, 0), None);
         assert_eq!(map.insert(3, 1), None);
@@ -1126,12 +1161,27 @@ mod tests {
         assert_eq!(freelist, &Some(List { head: 0, tail: 5 }));
         assert_eq!(allocatedlist, &Some(List { head: 1, tail: 6 }));
         let mut c = 0;
+        let mut last_k = None;
         for (i, (k, v)) in map.key_ordered_iter().enumerate() {
             assert_eq!(i, *v as usize);
             assert_eq!(map.get(k).unwrap(), v);
+            assert!(last_k < Some(k));
+            last_k = Some(k);
             c += 1;
         }
         assert_eq!(c, 3);
+    }
+
+    #[test]
+    fn test_insertion_ordered_iter() {
+        let mut map = DenseMap::new();
+        assert_eq!(map.insert(6, 0), None);
+        assert_eq!(map.insert(3, 2), None);
+        assert_eq!(map.push(1), 0);
+        assert_eq!(map.insertion_ordered_iter().collect::<Vec<_>>(), [(6, &0), (3, &2), (0, &1)]);
+
+        assert_eq!(map.insert(3, 0), Some(2));
+        assert_eq!(map.insertion_ordered_iter().collect::<Vec<_>>(), [(6, &0), (0, &1), (3, &0)]);
     }
 
     #[test]
@@ -1158,8 +1208,11 @@ mod tests {
         );
         assert_eq!(freelist, &Some(List { head: 0, tail: 5 }));
         assert_eq!(allocatedlist, &Some(List { head: 1, tail: 6 }));
+        let mut last_k = None;
         for (k, v) in map.key_ordered_iter_mut() {
             *v += k as u32;
+            assert!(last_k < Some(k));
+            last_k = Some(k);
         }
         let DenseMap { data, freelist, allocatedlist } = &map;
         assert_eq!(
