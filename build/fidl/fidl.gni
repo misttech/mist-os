@@ -202,13 +202,47 @@ template("fidl") {
   }
 
   if (is_host) {
+    fidl_ir_root_target = "${target_name}_ir_root"
+    fidl_ir_root_base = get_label_info(":anything($fidl_toolchain)",
+                                       "root_gen_dir") + "/ir_root"
+    fidl_library_name = common_parameters.library_name
+    fidl_ir_root_dir = fidl_ir_root_base + "/" + fidl_library_name
+    fidl_ir_root_outfile = "${fidl_ir_root_base}/${fidl_library_name}/${fidl_library_name}.fidl.json"
+
+    # This is intended as an alternative easily-searchable setup to all_fidl_json.txt
+    # The only caveat is that this will fail if there are FIDL libraries with duplicate names as
+    # dependencies. A future step may be to create this directory structure in a given package's
+    # gen dir rather than the root FIDL gen dir.
+    action(fidl_ir_root_target) {
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "visibility",
+                             ])
+      sources = [ common_parameters.fidl_ir_json ]
+      script = "//build/fidl/gen_ir_root_out.py"
+      args = [
+        "--root-dir",
+        rebase_path(fidl_ir_root_base, root_build_dir),
+        "--ir-path",
+        rebase_path(common_parameters.fidl_ir_json, fidl_ir_root_dir),
+        "--library-name",
+        fidl_library_name,
+      ]
+      outputs = [ fidl_ir_root_outfile ]
+      deps = [ ":${common_parameters.fidl_target}($fidl_toolchain)" ]
+    }
+
     host_test_data("_${target_name}_host_test_data") {
       forward_variables_from(invoker,
                              [
                                "applicable_licenses",
                                "visibility",
                              ])
-      sources = [ common_parameters.fidl_ir_json ]
+      sources = [
+        common_parameters.fidl_ir_json,
+        fidl_ir_root_outfile,
+      ]
 
       # It's only necessary to depend on fidl_ir_target got get the FIDL IR json
       # file, but without depending on fidl_target, there is no entry in
@@ -216,8 +250,12 @@ template("fidl") {
       # the list of current FIDL IR json files.
       # TODO(b/295190178): append all_fidl_json.txt with inclusion of
       # fidl_ir_target target.
-      deps = [ ":${common_parameters.fidl_target}($fidl_toolchain)" ]
+      deps = [
+        ":${common_parameters.fidl_target}($fidl_toolchain)",
+        ":${fidl_ir_root_target}",
+      ]
     }
+
     group("${target_name}_host_test_data") {
       testonly = true
       deps = [ ":_${target_name}" ]

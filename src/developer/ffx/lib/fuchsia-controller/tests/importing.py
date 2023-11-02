@@ -4,6 +4,7 @@
 
 import importlib
 import unittest
+import os
 
 from fidl_codec import decode_fidl_request
 from fidl_codec import encode_fidl_message

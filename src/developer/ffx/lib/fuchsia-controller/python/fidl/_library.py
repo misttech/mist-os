@@ -37,6 +37,7 @@ from ._fidl_common import internal_kind_to_type
 from ._fidl_common import MethodInfo
 from ._server import ServerBase
 
+FIDL_IR_PATH_ENV: str = "FIDL_IR_PATH"
 LIB_MAP: Dict[str, str] = {}
 MAP_INIT = False
 
@@ -263,43 +264,20 @@ def fidl_ir_prefix_path() -> str:
 
 def get_fidl_ir_map() -> Mapping[str, str]:
     """Returns a singleton mapping of library names to FIDL files."""
-    # This operates under the assumption that the topmost element in the FIDL IR file is the name
-    # of the library. This is potentially very fragile. It is currently implemented this way to
-    # improve speed, because otherwise this function will parse an entire several-megabyte sized
-    # JSON file to look up a single top-level element. Another approach may be to use a regex or
-    # some parser that parses a JSON object only one level deep.
     global MAP_INIT
     if MAP_INIT:
         return LIB_MAP
-    string_start = '"name": "'
-    string_end = '",'
-    # TODO(fxbug.dev/128618): Create an index at build time rather than parsing everything at
-    # runtime.
-    # TODO(fxbug.dev/128218): Determining where IR is located MUST not only be done using
-    # all_fidl_json.txt; this only works in-tree, and it only works if the necessary environment
-    # parameters are set (which can be done automatically when using `fx test`, for example, but
-    # again that is only available in tree). This hinders users who are out-of-tree and who wish to
-    # simply "play around" with fuchsia controller in an interactive way.
-    prefix = fidl_ir_prefix_path()
-    with open(
-        os.path.join(prefix, "all_fidl_json.txt"), "r", encoding="UTF-8"
-    ) as f:
-        while lib := f.readline().strip():
-            full_path = os.path.join(prefix, lib)
-            try:
-                with open(full_path, "r", encoding="UTF-8") as ir_file:
-                    while line := ir_file.readline().strip():
-                        if line.startswith(string_start) and line.endswith(
-                            string_end
-                        ):
-                            lib_name = line[
-                                len(string_start) : -len(string_end)
-                            ]
-                            # This does not check for any conflicts.
-                            LIB_MAP[lib_name] = os.path.join(prefix, full_path)
-                            break
-            except FileNotFoundError:
-                continue
+    # TODO(b/308723467): Handle multiple paths.
+    default_ir_path = "fidling/gen/ir_root"
+    if FIDL_IR_PATH_ENV in os.environ:
+        default_ir_path = os.environ[FIDL_IR_PATH_ENV]
+    if not os.path.isdir(default_ir_path):
+        raise RuntimeError(
+            f"Unable to find IR path root dir at {default_ir_path}"
+        )
+    for _, dirs, _ in os.walk(default_ir_path):
+        for d in dirs:
+            LIB_MAP[d] = os.path.join(default_ir_path, d, f"{d}.fidl.json")
     MAP_INIT = True
     return LIB_MAP
 
