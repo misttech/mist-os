@@ -59,6 +59,7 @@ bitflags! {
 
 impl AccessVector {
     pub const NONE: AccessVector = AccessVector { bits: 0 };
+    pub const ALL: AccessVector = AccessVector { bits: u32::MAX };
 }
 
 impl Into<u32> for AccessVector {

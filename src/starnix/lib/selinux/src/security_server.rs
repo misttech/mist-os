@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{SecurityContext, SecurityId};
+use crate::{AccessVector, ObjectClass, SecurityContext, SecurityId};
 use starnix_lock::RwLock;
 use std::collections::HashMap;
 
@@ -49,6 +49,17 @@ impl SecurityServer {
     pub fn sid_to_security_context(&self, sid: &SecurityId) -> Option<SecurityContext> {
         self.state.read().sids.get(sid).map(Clone::clone)
     }
+
+    pub fn compute_access_vector(
+        &self,
+        _source_sid: SecurityId,
+        _target_sid: SecurityId,
+        _target_class: ObjectClass,
+    ) -> AccessVector {
+        // TODO(http://b/305722921): implement access decision logic. For now, the security server
+        // allows all permissions.
+        AccessVector::ALL
+    }
 }
 
 #[cfg(test)]
@@ -86,5 +97,18 @@ mod tests {
         let sid2 = security_server.create_sid(&security_context2);
         assert_eq!(sid1, sid2);
         assert_eq!(security_server.state.read().sids.len(), 1);
+    }
+
+    #[fuchsia::test]
+    fn compute_access_vector_allows_all() {
+        let security_context1 = SecurityContext::from("u:object_r:file_t");
+        let security_context2 = SecurityContext::from("u:unconfined_r:unconfined_t");
+        let security_server = SecurityServer::new();
+        let sid1 = security_server.create_sid(&security_context1);
+        let sid2 = security_server.create_sid(&security_context2);
+        assert_eq!(
+            security_server.compute_access_vector(sid1, sid2, ObjectClass::Process),
+            AccessVector::ALL
+        );
     }
 }
