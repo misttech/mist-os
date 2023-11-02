@@ -23,26 +23,21 @@ impl SecurityServer {
         SecurityServer { state: RwLock::new(SecurityServerState { sids: HashMap::new() }) }
     }
 
-    /// Creates a security ID for a given `security_context`.
+    /// Returns the security ID mapped to `security_context`, creating it if it does not exist.
     ///
-    /// SIDs are assigned incremental values. All objects belonging to a security context will have
-    /// the same SID associated.
-    pub fn create_sid(&self, security_context: &SecurityContext) -> SecurityId {
+    /// All objects with the same security context will have the same SID associated.
+    pub fn security_context_to_sid(&self, security_context: &SecurityContext) -> SecurityId {
         let mut state = self.state.write();
         let existing_sid =
             state.sids.iter().find(|(_, sc)| sc == &security_context).map(|(sid, _)| *sid);
-        existing_sid.map_or_else(
-            || {
-                // Create and insert a new SID for `security_context`.
-                let sid = SecurityId::from(state.sids.len() as u64);
-                if state.sids.insert(sid, security_context.clone()).is_some() {
-                    panic!("impossible error: SID already exists.");
-                }
-                sid
-            },
-            // Return the SID associated with `security_context`.
-            |sid| sid,
-        )
+        existing_sid.unwrap_or_else(|| {
+            // Create and insert a new SID for `security_context`.
+            let sid = SecurityId::from(state.sids.len() as u64);
+            if state.sids.insert(sid, security_context.clone()).is_some() {
+                panic!("impossible error: SID already exists.");
+            }
+            sid
+        })
     }
 
     /// Returns the security context mapped to `sid`.
@@ -70,7 +65,7 @@ mod tests {
     fn sid_to_security_context() {
         let security_context = SecurityContext::from("u:unconfined_r:unconfined_t");
         let security_server = SecurityServer::new();
-        let sid = security_server.create_sid(&security_context);
+        let sid = security_server.security_context_to_sid(&security_context);
         assert_eq!(
             security_server.sid_to_security_context(&sid).expect("sid not found"),
             security_context
@@ -82,8 +77,8 @@ mod tests {
         let security_context1 = SecurityContext::from("u:object_r:file_t");
         let security_context2 = SecurityContext::from("u:unconfined_r:unconfined_t");
         let security_server = SecurityServer::new();
-        let sid1 = security_server.create_sid(&security_context1);
-        let sid2 = security_server.create_sid(&security_context2);
+        let sid1 = security_server.security_context_to_sid(&security_context1);
+        let sid2 = security_server.security_context_to_sid(&security_context2);
         assert_ne!(sid1, sid2);
     }
 
@@ -93,8 +88,8 @@ mod tests {
         let security_context1 = SecurityContext::from(security_context_str);
         let security_context2 = SecurityContext::from(security_context_str);
         let security_server = SecurityServer::new();
-        let sid1 = security_server.create_sid(&security_context1);
-        let sid2 = security_server.create_sid(&security_context2);
+        let sid1 = security_server.security_context_to_sid(&security_context1);
+        let sid2 = security_server.security_context_to_sid(&security_context2);
         assert_eq!(sid1, sid2);
         assert_eq!(security_server.state.read().sids.len(), 1);
     }
