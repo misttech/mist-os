@@ -1403,6 +1403,23 @@ const std::set<std::string> kRestrictedLibcSymbols = {
     "zx_utc_reference_swap",
 };
 
+//  ________  _________  ________  ________
+// |\   ____\|\___   ___\\   __  \|\   __  \
+// \ \  \___|\|___ \  \_\ \  \|\  \ \  \|\  \
+//  \ \_____  \   \ \  \ \ \  \\\  \ \   ____\
+//   \|____|\  \   \ \  \ \ \  \\\  \ \  \___|
+//     ____\_\  \   \ \__\ \ \_______\ \__\
+//    |\_________\   \|__|  \|_______|\|__|
+//    \|_________|
+//
+// The relative component URLs for drivers which are allowed to invoke fdf_env_* APIs.
+//
+// To remove items from the allowlist, please send a change to one of the OWNERS of
+// this file to remove an element from the list below.
+const std::set<std::string> kRestrictedDriverRuntimeSymbolsDriversAllowlist = {
+    "#meta/network-device.cm",
+};
+
 const std::set<std::string> kRestrictedDriverRuntimeSymbols = {
     "fdf_env_dispatcher_create_with_owner",
     "fdf_env_dispatcher_dump",
