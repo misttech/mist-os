@@ -29,8 +29,8 @@ constexpr ktl::string_view kSink = "llvm-profile";
 constexpr ktl::string_view kModule = "zircon.elf";
 constexpr ktl::string_view kSufix = "profraw";
 
-// This holds the pinned mapping of the live-updated counters.
-KernelMappedVmo gProfdataCounters;
+// This holds the pinned mapping of the live-updated data.
+KernelMappedVmo gProfdataLiveData;
 
 }  // namespace
 
@@ -61,22 +61,32 @@ InstrumentationDataVmo LlvmProfdataVmo() {
     profdata.WriteFixedData(mapped_data);
   }
 
-  // Now map in just the pages holding the counters.  This mapping will be kept
-  // alive permanently so the live counters can be updated through it.
-  const uint64_t map_offset = ROUNDDOWN(profdata.counters_offset(), PAGE_SIZE);
+  // Now map in just the pages holding the live data.  This mapping will be
+  // kept alive permanently so the live data can be updated through it.
+  const uint64_t map_offset =
+      ROUNDDOWN(ktl::min(profdata.counters_offset(), profdata.bitmap_offset()), PAGE_SIZE);
   const size_t map_size =
-      ROUNDUP_PAGE_SIZE(profdata.counters_offset() + profdata.counters_size_bytes()) - map_offset;
-  status = gProfdataCounters.Init(ktl::move(vmo), map_offset, map_size, "llvm-profdata-counters");
+      ROUNDUP_PAGE_SIZE(ktl::max(profdata.counters_offset() + profdata.counters_size_bytes(),
+                                 profdata.bitmap_offset() + profdata.bitmap_size_bytes())) -
+      map_offset;
+  status = gProfdataLiveData.Init(ktl::move(vmo), map_offset, map_size, "llvm-profdata-live-data");
   ZX_ASSERT(status == ZX_OK);
-  ktl::span<ktl::byte> counters{
-      reinterpret_cast<ktl::byte*>(profdata.counters_offset() - map_offset +
-                                   gProfdataCounters.base_locking()),
-      profdata.counters_size_bytes(),
+  LlvmProfdata::LiveData live_data{
+      .counters{
+          reinterpret_cast<ktl::byte*>(profdata.counters_offset() - map_offset +
+                                       gProfdataLiveData.base_locking()),
+          profdata.counters_size_bytes(),
+      },
+      .bitmap{
+          reinterpret_cast<ktl::byte*>(profdata.bitmap_offset() - map_offset +
+                                       gProfdataLiveData.base_locking()),
+          profdata.bitmap_size_bytes(),
+      },
   };
 
-  // Counts up to this point have collected in global variable space.
-  // Copy those counters into the mapped VMO data.
-  profdata.CopyCounters(counters);
+  // Live data up to this point have collected in global variable space.
+  // Copy those data into the mapped VMO data.
+  profdata.CopyLiveData(live_data);
 
   // Switch instrumented code over to updating the mapped VMO data in place.
   // From this point on, the kernel's VMO mapping is used by all instrumented
@@ -85,14 +95,14 @@ InstrumentationDataVmo LlvmProfdataVmo() {
   // TODO(mcgrathr): We could theoretically decommit the global data pages
   // after this to recover that RAM.  That part of the kernel's global data
   // area should never be accessed again.
-  LlvmProfdata::UseCounters(counters);
+  LlvmProfdata::UseLiveData(live_data);
 
   auto vmo_name = instrumentation::DebugdataVmoName(kSink, kModule, kSufix, /*is_static=*/false);
 
   return {
       .announce = LlvmProfdata::kAnnounce,
       .sink_name = LlvmProfdata::kDataSinkName,
-      .handle = gProfdataCounters.Publish(ktl::string_view(vmo_name.data(), vmo_name.size()),
+      .handle = gProfdataLiveData.Publish(ktl::string_view(vmo_name.data(), vmo_name.size()),
                                           profdata.size_bytes()),
   };
 }

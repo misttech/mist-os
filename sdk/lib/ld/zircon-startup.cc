@@ -106,9 +106,9 @@ zx::eventpair PublishProfdata(Diagnostics& diag, zx::unowned_vmar vmar,
     cpp20::span vmo_data{reinterpret_cast<std::byte*>(ptr), size};
 
     // Now fill the VMO and redirect the instrumentation to update its data.
-    cpp20::span counters = profdata.WriteFixedData(vmo_data);
-    profdata.CopyCounters(counters);
-    LlvmProfdata::UseCounters(counters);
+    auto live_data = profdata.WriteFixedData(vmo_data);
+    profdata.CopyLiveData(live_data);
+    LlvmProfdata::UseLiveData(live_data);
 
     // At this point the instrumentation will no longer touch the data segment.
 

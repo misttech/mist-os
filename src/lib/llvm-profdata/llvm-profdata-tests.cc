@@ -55,17 +55,17 @@ TEST(LlvmProfdataTests, FixedData) {
   std::unique_ptr<std::byte[]> buffer(new std::byte[buffer_size]);
   const cpp20::span buffer_span(buffer.get(), buffer_size);
 
-  cpp20::span counters = data.WriteFixedData(buffer_span);
-  ASSERT_FALSE(counters.empty());
+  auto live_data = data.WriteFixedData(buffer_span);
+  ASSERT_FALSE(live_data.counters.empty());
 
   EXPECT_TRUE(data.Match(buffer_span));
 
-  cpp20::span matched_counters = data.VerifyMatch(buffer_span);
-  EXPECT_EQ(matched_counters.data(), counters.data());
-  EXPECT_EQ(matched_counters.size_bytes(), counters.size_bytes());
+  auto matched_data = data.VerifyMatch(buffer_span);
+  EXPECT_EQ(matched_data.counters.data(), live_data.counters.data());
+  EXPECT_EQ(matched_data.counters.size_bytes(), live_data.counters.size_bytes());
 }
 
-TEST(LlvmProfdataTests, CopyCounters) {
+TEST(LlvmProfdataTests, CopyLiveData) {
   LlvmProfdata data;
   data.Init(MyBuildId());
 
@@ -74,19 +74,22 @@ TEST(LlvmProfdataTests, CopyCounters) {
   std::unique_ptr<std::byte[]> buffer(new std::byte[buffer_size]);
   const cpp20::span buffer_span(buffer.get(), buffer_size);
 
-  cpp20::span counters_bytes = data.WriteFixedData(buffer_span);
-  ASSERT_FALSE(counters_bytes.empty());
+  auto live_data = data.WriteFixedData(buffer_span);
+  ASSERT_FALSE(live_data.counters.empty());
 
   const cpp20::span<uint64_t> counters{
-      reinterpret_cast<uint64_t*>(counters_bytes.data()),
-      counters_bytes.size_bytes() / sizeof(uint64_t),
+      reinterpret_cast<uint64_t*>(live_data.counters.data()),
+      live_data.counters.size_bytes() / sizeof(uint64_t),
   };
 
   // Fill the buffer with unreasonable counter values.
   std::fill(counters.begin(), counters.end(), ~uint64_t{});
 
   // Now copy out the current values.
-  data.CopyCounters(cpp20::as_writable_bytes(counters));
+  data.CopyLiveData({
+      .counters = cpp20::as_writable_bytes(counters),
+      .bitmap = live_data.bitmap,
+  });
 
   // None of the real values should be the unreasonable value.
   for (size_t i = 0; i < counters.size(); ++i) {
@@ -94,7 +97,7 @@ TEST(LlvmProfdataTests, CopyCounters) {
   }
 
   // In case the normal profile runtime is also active, reset the bias.
-  LlvmProfdata::UseLinkTimeCounters();
+  LlvmProfdata::UseLinkTimeLiveData();
 
   // Now run some instrumented code that should be sure to touch a counter.
   RunTimeCoveredFunction();
@@ -106,7 +109,10 @@ TEST(LlvmProfdataTests, CopyCounters) {
   std::fill(new_counters.begin(), new_counters.end(), ~uint64_t{});
 
   // Now copy out the new values after running covered code.
-  data.CopyCounters(cpp20::as_writable_bytes(new_counters));
+  data.CopyLiveData({
+      .counters = cpp20::as_writable_bytes(new_counters),
+      .bitmap = live_data.bitmap,
+  });
 
   uint64_t increase = 0;
   for (size_t i = 0; i < counters.size(); ++i) {
@@ -124,18 +130,41 @@ TEST(LlvmProfdataTests, CopyCounters) {
   EXPECT_GT(increase, uint64_t{0});
 }
 
-TEST(LlvmProfdataTests, MergeCounters) {
+TEST(LlvmProfdataTests, MergeLiveData) {
   static constexpr uint64_t kOldCounters[] = {1, 2, 3, 4};
   uint64_t new_counters[] = {5, 6, 7, 8};
   static_assert(std::size(kOldCounters) == std::size(new_counters));
 
-  LlvmProfdata::MergeCounters(cpp20::as_writable_bytes(cpp20::span(new_counters)),
-                              cpp20::as_bytes(cpp20::span(kOldCounters)));
+  static constexpr uint8_t kOldBitmap[] = {0, 0x01, 0x02, 0x03};
+  uint8_t new_bitmap[] = {1, 0x11, 0x20, 0x31};
+
+  constexpr auto as_falsely_writable = [](auto span) {
+    cpp20::span<const std::byte> bytes = cpp20::as_bytes(span);
+    return cpp20::span<std::byte>{
+        const_cast<std::byte*>(bytes.data()),
+        bytes.size(),
+    };
+  };
+
+  LlvmProfdata::MergeLiveData(
+      {
+          .counters = cpp20::as_writable_bytes(cpp20::span(new_counters)),
+          .bitmap = cpp20::as_writable_bytes(cpp20::span(new_bitmap)),
+      },
+      {
+          .counters = as_falsely_writable(cpp20::span(kOldCounters)),
+          .bitmap = as_falsely_writable(cpp20::span(kOldBitmap)),
+      });
 
   EXPECT_EQ(new_counters[0], 6u);
   EXPECT_EQ(new_counters[1], 8u);
   EXPECT_EQ(new_counters[2], 10u);
   EXPECT_EQ(new_counters[3], 12u);
+
+  EXPECT_EQ(new_bitmap[0], 0x01u);
+  EXPECT_EQ(new_bitmap[1], 0x11u);
+  EXPECT_EQ(new_bitmap[2], 0x22u);
+  EXPECT_EQ(new_bitmap[3], 0x33u);
 
   LlvmProfdata data;
   data.Init(MyBuildId());
@@ -145,16 +174,16 @@ TEST(LlvmProfdataTests, MergeCounters) {
   std::unique_ptr<std::byte[]> buffer(new std::byte[buffer_size]);
   const cpp20::span buffer_span(buffer.get(), buffer_size);
 
-  cpp20::span counters_bytes = data.WriteFixedData(buffer_span);
-  ASSERT_FALSE(counters_bytes.empty());
+  auto live_data = data.WriteFixedData(buffer_span);
+  ASSERT_FALSE(live_data.counters.empty());
 
   const cpp20::span<uint64_t> counters{
-      reinterpret_cast<uint64_t*>(counters_bytes.data()),
-      counters_bytes.size_bytes() / sizeof(uint64_t),
+      reinterpret_cast<uint64_t*>(live_data.counters.data()),
+      live_data.counters.size_bytes() / sizeof(uint64_t),
   };
 
   // In case the normal profile runtime is also active, reset the bias.
-  LlvmProfdata::UseLinkTimeCounters();
+  LlvmProfdata::UseLinkTimeLiveData();
 
   // Run some instrumented code that should be sure to touch a counter.
   RunTimeCoveredFunction();
@@ -165,7 +194,7 @@ TEST(LlvmProfdataTests, MergeCounters) {
   }
 
   // Now merge the current data into our synthetic starting data.
-  data.MergeCounters(cpp20::as_writable_bytes(counters));
+  data.MergeLiveData({.counters = cpp20::as_writable_bytes(counters), .bitmap = live_data.bitmap});
 
   uint64_t increase = 0;
   for (size_t i = 0; i < counters.size(); ++i) {
@@ -180,7 +209,7 @@ TEST(LlvmProfdataTests, MergeCounters) {
   EXPECT_GT(increase, uint64_t{0});
 }
 
-TEST(LlvmProfdataTests, UseCounters) {
+TEST(LlvmProfdataTests, UseLiveData) {
   LlvmProfdata data;
   data.Init(MyBuildId());
 
@@ -189,19 +218,19 @@ TEST(LlvmProfdataTests, UseCounters) {
   std::unique_ptr<std::byte[]> buffer(new std::byte[buffer_size]);
   const cpp20::span buffer_span(buffer.get(), buffer_size);
 
-  cpp20::span counters_bytes = data.WriteFixedData(buffer_span);
-  ASSERT_FALSE(counters_bytes.empty());
+  auto live_data = data.WriteFixedData(buffer_span);
+  ASSERT_FALSE(live_data.counters.empty());
 
   const cpp20::span<uint64_t> counters{
-      reinterpret_cast<uint64_t*>(counters_bytes.data()),
-      counters_bytes.size_bytes() / sizeof(uint64_t),
+      reinterpret_cast<uint64_t*>(live_data.counters.data()),
+      live_data.counters.size_bytes() / sizeof(uint64_t),
   };
 
   // Start all counters at zero.
   std::fill(counters.begin(), counters.end(), 0);
 
   if (kRelocatableCounters) {
-    LlvmProfdata::UseCounters(counters_bytes);
+    LlvmProfdata::UseLiveData(live_data);
 
     // Now run some instrumented code that should be sure to touch a counter.
     RunTimeCoveredFunction();
@@ -210,7 +239,7 @@ TEST(LlvmProfdataTests, UseCounters) {
     // normal profile runtime is enabled and using relocatable mode (as it
     // always does on Fuchsia), this will skew down the coverage numbers for
     // this test code itself.
-    LlvmProfdata::UseLinkTimeCounters();
+    LlvmProfdata::UseLinkTimeLiveData();
 
     uint64_t hits = 0;
     for (uint64_t count : counters) {

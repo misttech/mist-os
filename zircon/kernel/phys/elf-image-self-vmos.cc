@@ -31,10 +31,10 @@ void ElfImage::PublishSelfLlvmProfdata(PublishSelfCallback publish) const {
   if (profdata.size_bytes() > 0) {
     ktl::span buffer = publish(profdata.size_bytes());
 
-    // Copy the fixed data and initial counter values and then start updating
-    // the handoff data in place.
-    ktl::span counters = profdata.WriteFixedData(buffer);
-    profdata.CopyCounters(counters);
-    LlvmProfdata::UseCounters(counters);
+    // Copy the fixed data and live data values and then start updating the
+    // handoff data in place.
+    auto live_data = profdata.WriteFixedData(buffer);
+    profdata.CopyLiveData(live_data);
+    LlvmProfdata::UseLiveData(live_data);
   }
 }

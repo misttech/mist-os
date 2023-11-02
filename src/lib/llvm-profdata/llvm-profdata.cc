@@ -6,6 +6,8 @@
 #include <lib/stdcompat/span.h>
 #include <zircon/assert.h>
 
+#include <functional>
+
 #ifndef HAVE_LLVM_PROFDATA
 #error "build system regression"
 #endif
@@ -23,15 +25,15 @@
 
 void LlvmProfdata::Init(cpp20::span<const std::byte> build_id) {}
 
-cpp20::span<std::byte> LlvmProfdata::DoFixedData(cpp20::span<std::byte> data, bool match) {
+LlvmProfdata::LiveData LlvmProfdata::DoFixedData(cpp20::span<std::byte> data, bool match) {
   return {};
 }
 
-void LlvmProfdata::CopyCounters(cpp20::span<std::byte> data) {}
+void LlvmProfdata::CopyLiveData(LiveData data) {}
 
-void LlvmProfdata::MergeCounters(cpp20::span<std::byte> data) {}
+void LlvmProfdata::MergeLiveData(LiveData data) {}
 
-void LlvmProfdata::UseCounters(cpp20::span<std::byte> data) {}
+void LlvmProfdata::UseLiveData(LiveData data) {}
 
 #else  // HAVE_LLVM_PROFDATA
 
@@ -140,6 +142,9 @@ extern const int INSTR_PROF_PROFILE_RUNTIME_VAR = 0;
 [[gnu::section(".lprfc$A")]] static uint64_t CountersBegin[0] = {};
 [[gnu::section(".lprfc$Z")]] static uint64_t CountersEnd[0] = {};
 
+[[gnu::section(".lprfb$A")]] static char BitmapBegin[0] = {};
+[[gnu::section(".lprfb$Z")]] static char BitmapEnd[0] = {};
+
 #elif defined(__APPLE__)
 
 extern "C" {
@@ -158,6 +163,16 @@ extern "C" {
     "section$start$__DATA$" INSTR_PROF_CNTS_SECT_NAME);
 [[gnu::visibility("hidden")]] extern uint64_t CountersEnd[] __asm__(
     "section$end$__DATA$" INSTR_PROF_CNTS_SECT_NAME);
+
+#ifdef INSTR_PROF_BITS_SECT_NAME
+[[gnu::visibility("hidden")]] extern char BitmapBegin[] __asm__(
+    "section$start$__DATA$" INSTR_PROF_BITS_SECT_NAME);
+[[gnu::visibility("hidden")]] extern char BitmapEnd[] __asm__(
+    "section$end$__DATA$" INSTR_PROF_BITS_SECT_NAME);
+#else
+static char BitmapBegin[1] = {};
+constexpr char* BitmapEnd = BitmapBegin;
+#endif
 
 }  // extern "C"
 
@@ -198,6 +213,8 @@ PROFDATA_SECTION(const __llvm_profile_data, DataBegin, DataEnd, INSTR_PROF_DATA_
 PROFDATA_SECTION(const char, NamesBegin, NamesEnd, INSTR_PROF_NAME_COMMON, "");
 
 PROFDATA_SECTION(uint64_t, CountersBegin, CountersEnd, INSTR_PROF_CNTS_COMMON, "w");
+
+PROFDATA_SECTION(char, BitmapBegin, BitmapEnd, INSTR_PROF_BITS_COMMON, "w");
 
 }  // extern "C"
 
@@ -248,12 +265,21 @@ constexpr size_t BinaryIdsSize(cpp20::span<const std::byte> build_id) {
   return cpp20::span<uint64_t>(CountersBegin, CountersEnd - CountersBegin);
 }
 
+[[gnu::const]] cpp20::span<char> ProfBitmapData() {
+  return cpp20::span<char>(BitmapBegin, BitmapEnd - BitmapBegin);
+}
+
 [[gnu::const]] ProfRawHeader GetHeader(cpp20::span<const std::byte> build_id) {
   // These are used by the INSTR_PROF_RAW_HEADER initializers.
   const uint64_t NumData = ProfDataArray().size();
   const uint64_t PaddingBytesBeforeCounters = 0;
   const uint64_t NumCounters = ProfCountersData().size();
   const uint64_t PaddingBytesAfterCounters = 0;
+  // TODO(fxbug.dev/133950): These are not used by older InstrProfData.inc
+  // versions but are used by newer ones.  Remove the [[maybe_unused]]
+  // attributes after a new version has rolled and stuck.
+  [[maybe_unused]] const uint64_t NumBitmapBytes = ProfBitmapData().size();
+  [[maybe_unused]] const uint64_t PaddingBytesAfterBitmapBytes = 0;
   const uint64_t NamesSize = NamesEnd - NamesBegin;
   auto __llvm_profile_get_magic = []() -> uint64_t { return kMagic; };
   auto __llvm_profile_get_version = []() -> uint64_t { return INSTR_PROF_RAW_VERSION_VAR; };
@@ -269,7 +295,30 @@ constexpr size_t BinaryIdsSize(cpp20::span<const std::byte> build_id) {
 }
 
 // Don't publish anything if no functions were actually instrumented.
-[[gnu::const]] bool NoData() { return ProfCountersData().empty(); }
+[[gnu::const]] bool NoData() { return ProfCountersData().empty() && ProfBitmapData().empty(); }
+
+template <typename T, template <typename> class Op>
+void MergeData(cpp20::span<std::byte> to, cpp20::span<const std::byte> from) {
+  ZX_ASSERT(to.size_bytes() == from.size_bytes());
+  ZX_ASSERT(to.size_bytes() % sizeof(T) == 0);
+
+  cpp20::span to_data{reinterpret_cast<T*>(to.data()), to.size_bytes() / sizeof(T)};
+
+  cpp20::span from_data{reinterpret_cast<const T*>(from.data()), from.size_bytes() / sizeof(T)};
+
+  constexpr Op<T> op;
+  for (size_t i = 0; i < to_data.size(); ++i) {
+    to_data[i] = op(to_data[i], from_data[i]);
+  }
+}
+
+template <typename T, template <typename> class Op, typename FromT>
+void MergeSelfData(cpp20::span<std::byte> to, cpp20::span<FromT> from, const char* what) {
+  ZX_ASSERT_MSG(to.size_bytes() >= from.size_bytes(),
+                "merging %zu bytes of %s with only %zu bytes left!", from.size_bytes(), what,
+                to.size_bytes());
+  MergeData<T, Op>(to.subspan(0, from.size_bytes()), cpp20::as_bytes(from));
+}
 
 }  // namespace
 
@@ -297,7 +346,7 @@ void LlvmProfdata::Init(cpp20::span<const std::byte> build_id) {
   size_bytes_ += header.NamesSize + PaddingBytesAfterNames;
 }
 
-cpp20::span<std::byte> LlvmProfdata::DoFixedData(cpp20::span<std::byte> data, bool match) {
+LlvmProfdata::LiveData LlvmProfdata::DoFixedData(cpp20::span<std::byte> data, bool match) {
   if (size_bytes_ == 0) {
     return {};
   }
@@ -348,49 +397,57 @@ cpp20::span<std::byte> LlvmProfdata::DoFixedData(cpp20::span<std::byte> data, bo
                 data.size_bytes());
   cpp20::span counters_data = data.subspan(0, counters_size_bytes_);
   data = data.subspan(counters_size_bytes_);
-
   write_bytes(kPadding.subspan(0, static_cast<size_t>(header.PaddingBytesAfterCounters)),
               kPaddingDoc);
+
+  cpp20::span<std::byte> bitmap_data;
+#if INSTR_PROF_RAW_VERSION >= 9
+  // Skip over the space in the data blob for the bitmap bytes.
+  ZX_ASSERT(bitmap_size_bytes_ == ProfBitmapData().size_bytes());
+  ZX_ASSERT_MSG(data.size_bytes() >= bitmap_size_bytes_,
+                "%zu bytes of bitmap with only %zu bytes left!", bitmap_size_bytes_,
+                data.size_bytes());
+  bitmap_data = data.subspan(0, bitmap_size_bytes_);
+  data = data.subspan(bitmap_size_bytes_);
+  write_bytes(kPadding.subspan(0, static_cast<size_t>(header.PaddingBytesAfterBitmapBytes)),
+              kPaddingDoc);
+#endif
 
   auto prof_names = cpp20::span(NamesBegin, NamesEnd - NamesBegin);
   const size_t PaddingBytesAfterNames = PaddingSize(static_cast<size_t>(header.NamesSize));
   write_bytes(cpp20::as_bytes(prof_names), INSTR_PROF_NAME_SECT_NAME);
   write_bytes(kPadding.subspan(0, PaddingBytesAfterNames), kPaddingDoc);
 
-  return counters_data;
+  return {counters_data, bitmap_data};
 }
 
-void LlvmProfdata::CopyCounters(cpp20::span<std::byte> data) {
+void LlvmProfdata::CopyLiveData(LiveData data) {
   auto prof_counters = ProfCountersData();
-  ZX_ASSERT_MSG(data.size_bytes() >= prof_counters.size_bytes(),
-                "writing %zu bytes of counters with only %zu bytes left!", data.size_bytes(),
-                data.size_bytes());
-
-  memcpy(data.data(), prof_counters.data(), prof_counters.size_bytes());
-}
-
-// Instead of copying, merge the old counters with our values by summation.
-void LlvmProfdata::MergeCounters(cpp20::span<std::byte> data) {
-  auto prof_counters = ProfCountersData();
-  ZX_ASSERT_MSG(data.size_bytes() >= prof_counters.size_bytes(),
-                "merging %zu bytes of counters with only %zu bytes left!",
-                prof_counters.size_bytes(), data.size_bytes());
-  MergeCounters(data.subspan(0, prof_counters.size_bytes()), cpp20::as_bytes(prof_counters));
-}
-
-void LlvmProfdata::MergeCounters(cpp20::span<std::byte> to, cpp20::span<const std::byte> from) {
-  ZX_ASSERT(to.size_bytes() == from.size_bytes());
-  ZX_ASSERT(to.size_bytes() % sizeof(uint64_t) == 0);
-
-  cpp20::span to_counters{reinterpret_cast<uint64_t*>(to.data()),
-                          to.size_bytes() / sizeof(uint64_t)};
-
-  cpp20::span from_counters{reinterpret_cast<const uint64_t*>(from.data()),
-                            from.size_bytes() / sizeof(uint64_t)};
-
-  for (size_t i = 0; i < to_counters.size(); ++i) {
-    to_counters[i] += from_counters[i];
+  ZX_ASSERT_MSG(data.counters.size_bytes() >= prof_counters.size_bytes(),
+                "writing %zu bytes of counters with only %zu bytes left!",
+                data.counters.size_bytes(), data.counters.size_bytes());
+  if (!prof_counters.empty()) {
+    memcpy(data.counters.data(), prof_counters.data(), prof_counters.size_bytes());
   }
+
+  auto prof_bitmap = ProfBitmapData();
+  ZX_ASSERT_MSG(data.bitmap.size_bytes() >= prof_bitmap.size_bytes(),
+                "writing %zu bytes of bitmap with only %zu bytes left!", data.bitmap.size_bytes(),
+                data.bitmap.size_bytes());
+  if (!prof_bitmap.empty()) {
+    memcpy(data.bitmap.data(), prof_bitmap.data(), prof_bitmap.size_bytes());
+  }
+}
+
+// Instead of copying, merge the old counters with our values by summation and
+// the old bitmap by bitwise OR.
+void LlvmProfdata::MergeLiveData(LiveData data) {
+  MergeSelfData<uint64_t, std::plus>(data.counters, ProfCountersData(), "counters");
+}
+
+void LlvmProfdata::MergeLiveData(LiveData to, LiveData from) {
+  MergeData<uint64_t, std::plus>(to.counters, from.counters);
+  MergeData<char, std::bit_or>(to.bitmap, from.bitmap);
 }
 
 void LlvmProfdata::UseCounters(cpp20::span<std::byte> data) {
@@ -399,8 +456,8 @@ void LlvmProfdata::UseCounters(cpp20::span<std::byte> data) {
                 "cannot relocate %zu bytes of counters with only %zu bytes left!",
                 prof_counters.size_bytes(), data.size_bytes());
 
-  const uintptr_t old_addr = reinterpret_cast<uintptr_t>(prof_counters.data());
-  const uintptr_t new_addr = reinterpret_cast<uintptr_t>(data.data());
+  const intptr_t old_addr = reinterpret_cast<intptr_t>(prof_counters.data());
+  const intptr_t new_addr = reinterpret_cast<intptr_t>(data.data());
   ZX_ASSERT(new_addr % kAlign == 0);
   const intptr_t counters_bias = new_addr - old_addr;
 
@@ -412,7 +469,12 @@ void LlvmProfdata::UseCounters(cpp20::span<std::byte> data) {
   std::atomic_signal_fence(std::memory_order_seq_cst);
 }
 
-void LlvmProfdata::UseLinkTimeCounters() {
+void LlvmProfdata::UseLiveData(LiveData data) {
+  ZX_ASSERT_MSG(data.bitmap.empty(), "bitmap bytes cannot be relocated");
+  UseCounters(data.counters);
+}
+
+void LlvmProfdata::UseLinkTimeLiveData() {
   std::atomic_signal_fence(std::memory_order_seq_cst);
   INSTR_PROF_PROFILE_COUNTER_BIAS_VAR = 0;
   std::atomic_signal_fence(std::memory_order_seq_cst);
