@@ -2,8 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# AUTO-GENERATED - DO NOT EDIT!
-
 """
 IMPORTANT: This file is only used when BzlMod is NOT enabled when generating
 the Bazel workspace used by the Fuchsia platform build. Keep its content in
@@ -94,6 +92,7 @@ load("@fuchsia_build_config//:defs.bzl", "build_config")
 fuchsia_host_tag = build_config.host_tag
 fuchsia_host_tag_alt = build_config.host_tag_alt
 fuchsia_host_os = build_config.host_os
+ninja_output_dir = build_config.ninja_output_dir
 
 # Create the @fuchsia_icu_config repository which contains the constants.bzl file
 # exporting generating configuration constants related to the ICU library flavors
@@ -209,7 +208,7 @@ rules_fuchsia_deps()
 
 fuchsia_sdk_repository(
     name = "fuchsia_sdk",
-    local_paths = ["{ninja_output_dir}/sdk/exported/bazel_fuchsia_sdk_idk"],
+    local_paths = ["%s/sdk/exported/bazel_fuchsia_sdk_idk" % ninja_output_dir],
     # LINT.IfChange
     local_sdk_version_file = "//:generated_repository_hashes/fuchsia_sdk.hash",
     # LINT.ThenChange(../scripts/update-workspace.py)
@@ -218,12 +217,12 @@ fuchsia_sdk_repository(
 
 fuchsia_sdk_repository(
     name = "internal_sdk",
-    local_paths = ["{ninja_output_dir}/sdk/exported/platform"],
+    local_paths = ["%s/sdk/exported/platform" % ninja_output_dir],
     # LINT.IfChange
     local_sdk_version_file = "//:generated_repository_hashes/internal_sdk.hash",
     # LINT.ThenChange(../scripts/update-workspace.py)
     parent_sdk = "@fuchsia_sdk",
-    parent_sdk_local_paths = ["{ninja_output_dir}/sdk/exported/bazel_fuchsia_sdk_idk"],
+    parent_sdk_local_paths = ["%s/sdk/exported/bazel_fuchsia_sdk_idk" % ninja_output_dir],
     fuchsia_api_level_override = "HEAD",
 )
 

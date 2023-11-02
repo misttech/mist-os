@@ -680,13 +680,11 @@ def main():
             ),
         )
     else:
-        workspace_content = expand_template_file(
-            "template.WORKSPACE.bazel",
-            ninja_output_dir=os.path.relpath(gn_output_dir, workspace_dir),
-        )
-        generated.add_file(
+        generated.add_symlink(
             os.path.join("workspace", "WORKSPACE.bazel"),
-            workspace_content,
+            os.path.join(
+                fuchsia_dir, "build", "bazel", "toplevel.WORKSPACE.bazel"
+            ),
         )
 
     # Generate symlinks

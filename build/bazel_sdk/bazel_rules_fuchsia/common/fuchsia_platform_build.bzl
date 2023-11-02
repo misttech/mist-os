@@ -30,6 +30,44 @@ def _get_fuchsia_source_relative_path(repo_ctx, path):
     else:
         return repo_ctx.path(Label("@//:" + path))
 
+def _get_ninja_output_dir(repo_ctx):
+    """Compute the Ninja output directory used by this workspace.
+
+    Args:
+        repo_ctx: the repository context.
+    Returns:
+        a string containing the path to the ninja output directory,
+        relative to the current workspace root.
+    """
+
+    # The config file at this location contains the location of the TOPDIR
+    # used by update-workspace.py, e.g. `gen/build/bazel`. This code assumes
+    # that the workspace is one of its sub-directories, so compute a
+    # back-tracking path prefix by counting the number of path num_fragment
+    # in it.
+    config_path = _get_fuchsia_source_relative_path(
+        repo_ctx,
+        "build/bazel/config/main_workspace_top_dir",
+    )
+    top_dir = repo_ctx.read(config_path).strip()
+    num_fragments = len(top_dir.split("/"))
+    result = ".."
+    for n in range(num_fragments):
+        result += "/.."
+
+    if repo_ctx.attr.fuchsia_source_dir:
+        result = "%s/%s" % (repo_ctx.attr.fuchsia_source_dir, result)
+
+    # If a build.ninja file does not exist in the resulting file, something
+    # is wrong, so return an invalid value that will clarify the issue in
+    # future error messages if something tries to use it.
+    # Do not fail() because the resulting `build_config` can be used OOT,
+    # for example when invoking Bazel directly from //build/bazel_sdk/tests/
+    if not repo_ctx.path(result).exists:
+        result = "COULD_NOT_FIND_NINJA_OUTPUT_DIRECTORY"
+
+    return result
+
 def _get_rbe_config(repo_ctx):
     """Compute RBE-related configuration.
 
@@ -98,6 +136,8 @@ def _fuchsia_build_config_repository_impl(repo_ctx):
 
     rbe_config = _get_rbe_config(repo_ctx)
 
+    ninja_output_dir = _get_ninja_output_dir(repo_ctx)
+
     defs_content = '''# Auto-generated DO NOT EDIT
 
 build_config = struct(
@@ -131,6 +171,10 @@ build_config = struct(
 
     # The RBE container image for remote build configuration. Empty if disabled.
     rbe_container_image = "{rbe_container_image}",
+
+    # The path to the Ninja output directory, relative to the current
+    # workspace root.
+    ninja_output_dir = "{ninja_output_dir}",
 )
 '''.format(
         host_os = host_os,
@@ -142,6 +186,7 @@ build_config = struct(
         host_cpu_constraint = host_cpu_constraint,
         rbe_instance_name = rbe_config.instance_name,
         rbe_container_image = rbe_config.container_image,
+        ninja_output_dir = ninja_output_dir,
     )
 
     repo_ctx.file("WORKSPACE.bazel", "")
