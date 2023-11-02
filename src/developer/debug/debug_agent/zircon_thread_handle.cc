@@ -8,6 +8,7 @@
 
 #include <map>
 
+#include "src/developer/debug/debug_agent/zircon_arch.h"
 #include "src/developer/debug/debug_agent/zircon_suspend_handle.h"
 #include "src/developer/debug/debug_agent/zircon_utils.h"
 #include "src/developer/debug/shared/logging/logging.h"

@@ -3,6 +3,7 @@
 
 #include "src/developer/debug/debug_agent/zircon_exception_handle.h"
 
+#include "src/developer/debug/debug_agent/zircon_arch.h"
 #include "src/developer/debug/debug_agent/zircon_thread_handle.h"
 
 namespace debug_agent {

@@ -94,13 +94,6 @@ zx_status_t WriteRegisterValue(const debug::RegisterValue& reg, RegType* dest) {
   return ZX_OK;
 }
 
-// Converts a Zircon exception type to a debug_ipc one. Some exception types require querying the
-// thread's debug registers. If needed, the given thread will be used for that.
-debug_ipc::ExceptionType DecodeExceptionType(const zx::thread& thread, uint32_t exception_type);
-
-// Converts an architecture-specific exception record to a cross-platform one.
-debug_ipc::ExceptionRecord FillExceptionRecord(const zx_exception_report_t& in);
-
 // Returns true if the given opcode is a breakpoint instruction. This checked for equality with
 // kBreakInstruction and also checks other possible breakpoint encodings for the current platform.
 bool IsBreakpointInstruction(BreakInstructionType instruction);
