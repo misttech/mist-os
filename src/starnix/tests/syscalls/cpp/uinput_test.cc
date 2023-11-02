@@ -50,7 +50,23 @@ TEST_F(UinputTest, UiSetEvbit) {
 
 TEST_F(UinputTest, UiSetKeybit) {
   int res = ioctl(uinput_fd_.get(), UI_SET_KEYBIT, KEY_SPACE);
-  EXPECT_EQ(res, -1);
+  EXPECT_EQ(res, 0);
+
+  res = ioctl(uinput_fd_.get(), UI_SET_KEYBIT, KEY_A);
+  EXPECT_EQ(res, 0);
+}
+
+TEST_F(UinputTest, UiSetPropbit) {
+  int res = ioctl(uinput_fd_.get(), UI_SET_PROPBIT, INPUT_PROP_DIRECT);
+  EXPECT_EQ(res, 0);
+}
+
+TEST_F(UinputTest, UiSetAbsbit) {
+  int res = ioctl(uinput_fd_.get(), UI_SET_ABSBIT, ABS_MT_SLOT);
+  EXPECT_EQ(res, 0);
+
+  res = ioctl(uinput_fd_.get(), UI_SET_ABSBIT, ABS_MT_TOUCH_MAJOR);
+  EXPECT_EQ(res, 0);
 }
 
 TEST_F(UinputTest, UiDevSetup) {
@@ -62,7 +78,7 @@ TEST_F(UinputTest, UiDevSetup) {
   strcpy(usetup.name, "Example device");
 
   int res = ioctl(uinput_fd_.get(), UI_DEV_SETUP, KEY_SPACE);
-  EXPECT_EQ(res, -1);
+  EXPECT_EQ(res, 0);
 }
 
 TEST_F(UinputTest, UiDevCreate) {

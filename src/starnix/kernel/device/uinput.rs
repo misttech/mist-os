@@ -62,6 +62,15 @@ impl FileOps for Arc<UinputDevice> {
     ) -> Result<SyscallResult, Errno> {
         match request {
             uapi::UI_SET_EVBIT => self.ui_set_evbit(arg),
+            // `fuchsia.ui.test.input.Registry` does not use some uinput ioctl
+            // request, just ignore the request and return SUCCESS, even args
+            // is invalid.
+            uapi::UI_SET_KEYBIT
+            | uapi::UI_SET_ABSBIT
+            | uapi::UI_SET_PROPBIT
+            | uapi::UI_DEV_SETUP => Ok(SUCCESS),
+            // default_ioctl() handles file system related requests and reject
+            // others.
             _ => default_ioctl(file, current_task, request, arg),
         }
     }
@@ -71,8 +80,9 @@ impl FileOps for Arc<UinputDevice> {
 mod test {
     use super::*;
     use crate::{
+        mm::MemoryAccessorExt,
         task::Kernel,
-        testing::{create_kernel_and_task, AutoReleasableTask},
+        testing::{create_kernel_and_task, map_memory, AutoReleasableTask},
     };
     use test_case::test_case;
 
@@ -132,5 +142,94 @@ mod test {
         assert_eq!(r, Ok(SUCCESS));
         assert!(dev.inner.lock().enabled_evbits.get(uapi::EV_KEY as usize).unwrap());
         assert!(dev.inner.lock().enabled_evbits.get(uapi::EV_ABS as usize).unwrap());
+    }
+
+    #[::fuchsia::test]
+    async fn ui_set_keybit() {
+        let dev = UinputDevice::new();
+        let (_kernel, current_task, file_object) = make_kernel_objects(dev.clone());
+        let r = dev.ioctl(
+            &file_object,
+            &current_task,
+            uapi::UI_SET_KEYBIT,
+            SyscallArg::from(uapi::BTN_TOUCH as u64),
+        );
+        assert_eq!(r, Ok(SUCCESS));
+
+        // also test call multi times.
+        let r = dev.ioctl(
+            &file_object,
+            &current_task,
+            uapi::UI_SET_KEYBIT,
+            SyscallArg::from(uapi::KEY_SPACE as u64),
+        );
+        assert_eq!(r, Ok(SUCCESS));
+    }
+
+    #[::fuchsia::test]
+    async fn ui_set_absbit() {
+        let dev = UinputDevice::new();
+        let (_kernel, current_task, file_object) = make_kernel_objects(dev.clone());
+        let r = dev.ioctl(
+            &file_object,
+            &current_task,
+            uapi::UI_SET_ABSBIT,
+            SyscallArg::from(uapi::ABS_MT_SLOT as u64),
+        );
+        assert_eq!(r, Ok(SUCCESS));
+
+        // also test call multi times.
+        let r = dev.ioctl(
+            &file_object,
+            &current_task,
+            uapi::UI_SET_ABSBIT,
+            SyscallArg::from(uapi::ABS_MT_TOUCH_MAJOR as u64),
+        );
+        assert_eq!(r, Ok(SUCCESS));
+    }
+
+    #[::fuchsia::test]
+    async fn ui_set_propbit() {
+        let dev = UinputDevice::new();
+        let (_kernel, current_task, file_object) = make_kernel_objects(dev.clone());
+        let r = dev.ioctl(
+            &file_object,
+            &current_task,
+            uapi::UI_SET_PROPBIT,
+            SyscallArg::from(uapi::INPUT_PROP_DIRECT as u64),
+        );
+        assert_eq!(r, Ok(SUCCESS));
+
+        // also test call multi times.
+        let r = dev.ioctl(
+            &file_object,
+            &current_task,
+            uapi::UI_SET_PROPBIT,
+            SyscallArg::from(uapi::INPUT_PROP_DIRECT as u64),
+        );
+        assert_eq!(r, Ok(SUCCESS));
+    }
+
+    #[::fuchsia::test]
+    async fn ui_dev_setup() {
+        let dev = UinputDevice::new();
+        let (_kernel, current_task, file_object) = make_kernel_objects(dev.clone());
+        let address = map_memory(
+            &current_task,
+            UserAddress::default(),
+            std::mem::size_of::<uapi::uinput_setup>() as u64,
+        );
+        let setup = uapi::uinput_setup {
+            id: uapi::input_id { vendor: 0x18d1, product: 0xabcd, ..uapi::input_id::default() },
+            ..uapi::uinput_setup::default()
+        };
+        current_task.mm.write_object(address.into(), &setup).expect("write_memory");
+        let r = dev.ioctl(&file_object, &current_task, uapi::UI_DEV_SETUP, address.into());
+        assert_eq!(r, Ok(SUCCESS));
+
+        // also test call multi times with invalid argument.
+        let r =
+            dev.ioctl(&file_object, &current_task, uapi::UI_DEV_SETUP, SyscallArg::from(0 as u64));
+        assert_eq!(r, Ok(SUCCESS));
     }
 }
