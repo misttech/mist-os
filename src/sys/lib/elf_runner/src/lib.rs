@@ -569,10 +569,7 @@ async fn start(
                 |error| warn!(url=%resolved_url, %error, "sending diagnostics failed"),
             );
         }
-        runner::component::Controller::new(elf_component, server_stream)
-            .serve(epitaph_fn)
-            .await
-            .unwrap_or_else(|error| warn!(%error, "serving ComponentController"));
+        runner::component::Controller::new(elf_component, server_stream).serve(epitaph_fn).await;
     })
     .detach();
 }

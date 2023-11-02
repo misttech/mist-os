@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::Error,
     async_trait::async_trait,
     fidl::{endpoints::ServerEnd, epitaph::ChannelEpitaphExt, prelude::*},
     fidl_fuchsia_component as fcomp, fidl_fuchsia_component_runner as fcrunner,
@@ -126,10 +125,7 @@ impl<C: Controllable> Controller<C> {
     /// or the request stream closes. In either case the request stream is
     /// closed once this function returns since the stream itself, which owns
     /// the channel, is dropped.
-    pub async fn serve(
-        mut self,
-        exit_fut: impl Future<Output = ChannelEpitaph> + Unpin,
-    ) -> Result<(), Error> {
+    pub async fn serve(mut self, exit_fut: impl Future<Output = ChannelEpitaph> + Unpin) {
         let result_code: ChannelEpitaph = {
             // Pin the server_controller future so we can use it with select
             let request_server = self.serve_controller();
@@ -144,7 +140,7 @@ impl<C: Controllable> Controller<C> {
                     Err(_) => {
                         // Return directly because the controller channel
                         // closed so there's no point in an epitaph.
-                        return Ok(());
+                        return;
                     }
                 },
             }
@@ -158,8 +154,6 @@ impl<C: Controllable> Controller<C> {
         }
 
         self.request_stream.control_handle().shutdown_with_epitaph(result_code.into());
-
-        Ok(())
     }
 
     /// Kill the job and shutdown control handle supplied to this function.
@@ -494,7 +488,7 @@ mod tests {
 
         let epitaph_receiver = Box::pin(async move { epitaph_rx.await.unwrap() });
         // this should return after kill call
-        controller.serve(epitaph_receiver).await.expect("should not fail");
+        controller.serve(epitaph_receiver).await;
 
         // this means kill was called
         recv.await?;
@@ -552,7 +546,7 @@ mod tests {
         let mut client_stream_fut = client_stream.try_next();
         assert_matches!(poll!(Pin::new(&mut client_stream_fut)), Poll::Pending);
         teardown_fence_tx.send(()).unwrap();
-        controller_serve.await.unwrap();
+        controller_serve.await;
 
         // Check the epitaph on the controller channel, this should match what
         // is sent by `epitaph_tx`
@@ -606,7 +600,7 @@ mod tests {
         // cause the controller future to complete.
         client_proxy.kill().expect("FIDL error returned from kill request to controller");
         match exec.run_until_stalled(&mut controller_fut) {
-            Poll::Ready(Ok(())) => {}
+            Poll::Ready(()) => {}
             x => panic!("Unexpected controller poll state {:?}", x),
         }
 

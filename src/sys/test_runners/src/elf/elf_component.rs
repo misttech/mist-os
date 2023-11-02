@@ -579,7 +579,6 @@ where
     fs.serve_connection(outgoing_dir).map_err(ComponentError::ServeSuite)?;
     let (fut, abortable_handle) = abortable(fs.collect::<()>());
 
-    let url = component.url.clone();
     let component_runtime = ComponentRuntime::new(
         abortable_handle,
         suite_server_abortable_handles,
@@ -587,7 +586,6 @@ where
         component,
     );
 
-    let resolved_url = url.clone();
     fasync::Task::spawn(async move {
         // as error on abortable will always return Aborted,
         // no need to check that, as it is a valid usecase.
@@ -610,12 +608,7 @@ where
         zx::Status::OK.try_into().unwrap()
     });
 
-    fasync::Task::spawn(async move {
-        if let Err(e) = controller.serve(epitaph_fut).await {
-            error!("test '{}' controller ended with error: {:?}", resolved_url, e);
-        }
-    })
-    .detach();
+    fasync::Task::spawn(controller.serve(epitaph_fut)).detach();
 
     Ok(())
 }
