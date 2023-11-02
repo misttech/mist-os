@@ -31,6 +31,26 @@ inline zx_status_t Clone(::test::aliases::obj_type value,
 
 class ExampleOfUseOfAliases;
 
+using u32 = uint32_t;
+
+using vec_of_strings = ::std::vector<::std::string>;
+
+using vec_of_strings_at_most_5 = ::std::vector<::std::string>;
+
+#ifdef __Fuchsia__
+
+using channel = ::zx::channel;
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
+using alias_of_channel = ::zx::channel;
+
+#endif  // __Fuchsia__
+
+using ReferenceMe = ::test::someotherlibrary::ReferenceMe;
+
 #ifdef __Fuchsia__
 
 class ExampleOfUseOfAliases final {

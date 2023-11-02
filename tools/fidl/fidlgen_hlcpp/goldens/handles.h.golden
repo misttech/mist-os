@@ -39,6 +39,24 @@ class SomeProtocol_ResponseEncoder {
 
 #ifdef __Fuchsia__
 
+using aliased_plain_handle = ::zx::handle;
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
+using aliased_subtype_handle = ::zx::vmo;
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
+using aliased_rights_handle = ::zx::vmo;
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 class Handles final {
  public:
   static const fidl_type_t* FidlType;

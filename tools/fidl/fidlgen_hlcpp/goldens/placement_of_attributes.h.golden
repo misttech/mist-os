@@ -240,6 +240,8 @@ class ExampleTable final {
 
 using ExampleTablePtr = ::std::unique_ptr<ExampleTable>;
 
+using Alias = uint32_t;
+
 class ExampleUnion final {
  public:
   static const fidl_type_t* FidlType;

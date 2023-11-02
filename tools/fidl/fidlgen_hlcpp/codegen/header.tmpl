@@ -47,6 +47,7 @@
 {{- end }}
 
 {{- range .Decls }}
+{{- if Eq .Kind Kinds.Alias }}{{ template "AliasDeclaration" . }}{{- end }}
 {{- if Eq .Kind Kinds.Const }}{{ template "ConstDeclaration" . }}{{- end }}
 {{- if Eq .Kind Kinds.Protocol }}{{ template "DispatchProtocolDeclaration/DomainObjects" . }}{{- end }}
 {{- if Eq .Kind Kinds.Struct }}{{ template "StructDeclaration" . }}{{- end }}
