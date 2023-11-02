@@ -43,8 +43,8 @@
     - fidl: 'fuchsia.sys'
 
 - name: 'Developer'
-  api_primary: 'dschuyler@google.com'
-  api_secondary: 'crjohns@google.com'
+  api_primary: 'wilkinsonclay@google.com'
+  api_secondary: 'chaselatta@google.com'
   description: |
     Developer tool interfaces, such as the <a
     href='/docs/development/api/cli.md'>Command-line Tools Rubric</a>. APIs that
