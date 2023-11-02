@@ -279,7 +279,7 @@ saved to the specified directory.
 [compoennt-selectors]: /docs/reference/diagnostics/selectors.md#component-selector
 [custom-artifacts]: /docs/development/testing/components/test_runner_framework.md#custom-artifacts
 [tests-as-components]: /docs/development/testing/components/README.md
-[scripting-layer-for-fuchsia]: /docs/development/drivers/concepts/driver_development/sl4f.md
+[scripting-layer-for-fuchsia]: /docs/development/testing/sl4f.md
 [component-uri]: /docs/reference/components/url.md
 [fuchsia-package-name]: /docs/concepts/packages/package_url.md#package-name
 [resource-path]: /docs/concepts/packages/package_url.md#resource-paths

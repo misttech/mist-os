@@ -8,8 +8,6 @@
 toc:
 - title: "Overview"
   path: /docs/development/drivers/concepts/driver_development
-- title: "Scripting Layer for Fuchsia (SL4F)"
-  path: /docs/development/drivers/concepts/driver_development/sl4f.md
 - title: "Using the C++ DDK template library"
   path: /docs/development/drivers/concepts/driver_development/using-ddktl.md
 - title: "Configuration"

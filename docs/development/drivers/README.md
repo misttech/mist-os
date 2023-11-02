@@ -124,7 +124,6 @@ Concepts
 - Driver development
 
   - [Overview][driver-development-overview]
-  - [Scripting Layer for Fuchsia (SL4F)][sl4f]
   - [Using the C++ DDK Template Library][using-cpp-ddk-template-lib]
   - [Configuration][configuration]
   - [Interrupts][interrupts]
@@ -188,7 +187,6 @@ Concepts
 [input-report-reader-library]: concepts/driver_architectures/input_drivers/input_report_reader.md
 [sdmmc-drivers-architecture]: concepts/driver_architectures/sdmmc_drivers/sdmmc.md
 [driver-development-overview]: concepts/driver_development/README.md
-[sl4f]: concepts/driver_development/sl4f.md
 [using-cpp-ddk-template-lib]: concepts/driver_development/using-ddktl.md
 [configuration]: concepts/driver_development/bar.md
 [interrupts]: concepts/driver_development/interrupts.md

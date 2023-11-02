@@ -419,7 +419,7 @@ Considered alternatives are:
 * [SL4F Evolution plan](https://docs.google.com/document/d/1OmbbBuUmNr8geG3sv15hR3Bb63qROqBoF2vTMNlwaeE/edit)
 * [Host Driver Testing in Fuchsia](https://docs.google.com/document/d/1-1xYOxfWrpZsFfzN83_QQAhtMT6Pf5yCMH_luUtUius/edit)
 
-[sl4f-overview]: /docs/development/drivers/concepts/driver_development/sl4f.md
+[sl4f-overview]: /docs/development/testing/sl4f.md
 [ffx-reference]: https://fuchsia.dev/reference/tools/sdk/ffx
 [rcs-fidl-definitions]: https://fuchsia.googlesource.com/fuchsia/+/1bcf7bf350d0b37e0c50af3252785b417bb650d6/sdk/fidl/fuchsia.developer.remotecontrol/remote-control.fidl
 [fuchsia-controller-prototype]: https://fuchsia-review.git.corp.google.com/c/fuchsia/+/761245
