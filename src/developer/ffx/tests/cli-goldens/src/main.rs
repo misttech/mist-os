@@ -5,11 +5,10 @@
 use anyhow::Result;
 use argh::FromArgs;
 use ffx_command::CliArgsInfo;
-use ffx_config::{SdkRoot, TestEnv};
+use ffx_config::{environment::ExecutableKind, EnvironmentContext, SdkRoot};
 use ffx_isolate::{Isolate, SearchContext};
 use serde::Serialize;
 use std::{fs, io::Write, path::PathBuf};
-use tempfile::TempDir;
 
 #[derive(FromArgs)]
 /// CLI tool for generating golden JSON files for
@@ -65,13 +64,8 @@ fn get_tools_relpath() -> String {
 /// test artifacts, such as ssh keys.
 /// These objects need to exist for the duration of the test,
 /// since the underlying data is cleaned up when they are dropped.
-pub(crate) async fn new_ffx_isolate(
-    name: &str,
-    sdk_root_dir: PathBuf,
-) -> Result<(Isolate, TempDir, TestEnv)> {
-    let temp_dir = tempfile::TempDir::new()?;
-    assert!(temp_dir.path().exists());
-    let test_env = ffx_config::test_init().await?;
+pub(crate) async fn new_ffx_isolate(name: &str, sdk_root_dir: PathBuf) -> Result<Isolate> {
+    let context = EnvironmentContext::no_context(ExecutableKind::Test, Default::default(), None);
 
     let subtool_search_paths = Vec::<PathBuf>::new();
     let ffx_path = sdk_root_dir.join(get_tools_relpath()).join("ffx");
@@ -84,18 +78,18 @@ pub(crate) async fn new_ffx_isolate(
             subtool_search_paths,
         },
         PathBuf::from("."),
-        &test_env.context,
+        &context,
     )
     .await?;
 
-    Ok((ffx_isolate, temp_dir, test_env))
+    Ok(ffx_isolate)
 }
 
 #[fuchsia::main(logging_minimum_severity = "info")]
 async fn main() -> Result<()> {
     let args = argh::from_env::<Args>();
 
-    let (ffx_isolate, _temp_dir, _test_env) = new_ffx_isolate("cli-goldens", args.sdk_root).await?;
+    let ffx_isolate = new_ffx_isolate("cli-goldens", args.sdk_root).await?;
 
     let output = ffx_isolate.ffx(&["--machine", "json-pretty", "--help"]).await?;
 
