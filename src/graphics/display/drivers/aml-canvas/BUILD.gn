@@ -65,7 +65,6 @@ test("aml-canvas-test") {
   sources = [ "aml-canvas-test.cc" ]
   deps = [
     ":common_srcs",
-    "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/driver/runtime/testing/cpp",
     "//sdk/lib/driver/testing/cpp",
     "//src/devices/testing/fake-bti",
@@ -74,6 +73,7 @@ test("aml-canvas-test") {
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
     "//third_party/googletest:gtest",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
   ]
 }
 

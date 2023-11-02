@@ -4,7 +4,7 @@
 
 #include "src/graphics/display/drivers/aml-canvas/aml-canvas.h"
 
-#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/async-loop/cpp/loop.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/fake-bti/bti.h>
 
@@ -41,30 +41,6 @@ constexpr int kCanvasLutDataLowOffset = 0x0012 * 4;
 constexpr int kCanvasLutDataHighOffset = 0x0013 * 4;
 constexpr int kCanvasLutAddressOffset = 0x0014 * 4;
 
-class AmlCanvasWrap {
- public:
-  void Init(fdf::MmioBuffer mmio, zx::bti bti) {
-    canvas_ = std::make_unique<AmlCanvas>(fake_parent_.get(), std::move(mmio), std::move(bti));
-  }
-
-  void Serve(fidl::ServerEnd<fuchsia_hardware_amlogiccanvas::Device> server_end) {
-    binding_.emplace(dispatcher_, std::move(server_end), canvas_.get(),
-                     fidl::kIgnoreBindingClosure);
-  }
-
-  zx_status_t DdkAdd(const std::string& name) { return canvas_->DdkAdd(name.c_str()); }
-
-  void release() { [[maybe_unused]] auto ptr = canvas_.release(); }
-
- private:
-  async_dispatcher_t* dispatcher_{fdf::Dispatcher::GetCurrent()->async_dispatcher()};
-  // TODO(fxb/124464): Migrate test to use dispatcher integration.
-  std::shared_ptr<MockDevice> fake_parent_ =
-      MockDevice::FakeRootParentNoDispatcherIntegrationDEPRECATED();
-  std::unique_ptr<AmlCanvas> canvas_;
-  std::optional<fidl::ServerBinding<fuchsia_hardware_amlogiccanvas::Device>> binding_;
-};
-
 class AmlCanvasTest : public testing::Test {
  public:
   void SetUp() override {
@@ -75,49 +51,66 @@ class AmlCanvasTest : public testing::Test {
         fidl::CreateEndpoints<fuchsia_hardware_amlogiccanvas::Device>();
     ASSERT_EQ(ZX_OK, endpoints.status_value());
 
-    canvas_.SyncCall(&AmlCanvasWrap::Init, mmio_range_.GetMmioBuffer(), std::move(bti));
-    canvas_.SyncCall(&AmlCanvasWrap::Serve, std::move(endpoints.value().server));
+    // TODO(136015): This test should invoke ::Create(), which requires a FakePDevFidl.
+    canvas_ =
+        std::make_unique<AmlCanvas>(fake_root_.get(), mmio_range_.GetMmioBuffer(), std::move(bti));
 
-    canvas_client_.Bind(std::move(endpoints.value().client));
+    binding_.emplace(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                     std::move(endpoints->server), canvas_.get(), fidl::kIgnoreBindingClosure);
+
+    canvas_client_.Bind(std::move(endpoints->client));
+  }
+
+  // Because this test is using a fidl::WireSyncClient, we need to run any ops on the client on
+  // their own thread because the testing thread is shared with the client end.
+  static void RunSyncClientTask(fit::closure task) {
+    async::Loop loop{&kAsyncLoopConfigNeverAttachToThread};
+    loop.StartThread();
+    zx::result result = fdf::RunOnDispatcherSync(loop.dispatcher(), std::move(task));
+    ASSERT_EQ(ZX_OK, result.status_value());
   }
 
   void TestLifecycle() {
-    const std::string name = "aml-canvas";
-
-    EXPECT_OK(canvas_.SyncCall(&AmlCanvasWrap::DdkAdd, name));
-    canvas_.SyncCall(&AmlCanvasWrap::release);
+    EXPECT_OK(canvas_->DdkAdd("aml-canvas"));
+    EXPECT_EQ(static_cast<const unsigned long>(1), fake_root_->child_count());  // Because gtest.
+    canvas_.release();                                                          // Now DDK-managed.
   }
 
   zx_status_t CreateNewCanvas() {
     zx::vmo vmo;
     EXPECT_OK(zx::vmo::create(kVmoTestSize, 0, &vmo));
 
-    fidl::WireResult result = canvas_client_->Config(std::move(vmo), 0, test_canvas_info);
-    if (!result.ok()) {
-      return result.error().status();
-    }
-    if (result->is_error()) {
-      return result->error_value();
-    }
-
-    canvas_indices_.push_back(result->value()->canvas_idx);
-    return ZX_OK;
+    zx_status_t status{ZX_OK};
+    RunSyncClientTask([&]() {
+      fidl::WireResult result = canvas_client_->Config(std::move(vmo), 0, test_canvas_info);
+      if (!result.ok()) {
+        status = result.error().status();
+      } else if (result->is_error()) {
+        status = result->error_value();
+      } else {
+        canvas_indices_.push_back(result->value()->canvas_idx);
+      }
+    });
+    return status;
   }
 
   zx_status_t CreateNewCanvasInvalid() {
     zx::vmo vmo;
     EXPECT_OK(zx::vmo::create(kVmoTestSize, 0, &vmo));
 
-    fidl::WireResult result = canvas_client_->Config(std::move(vmo), 0, invalid_canvas_info);
-    if (!result.ok()) {
-      return result.error().status();
-    }
-    if (result->is_error()) {
-      return result->error_value();
-    }
+    zx_status_t status = ZX_OK;
+    RunSyncClientTask([&]() {
+      fidl::WireResult result = canvas_client_->Config(std::move(vmo), 0, invalid_canvas_info);
+      if (!result.ok()) {
+        status = result.error().status();
+      } else if (result->is_error()) {
+        status = result->error_value();
+      }
+    });
 
     // We should be returning an error since we are creating an invalid canvas.
-    return ZX_ERR_INTERNAL;
+    EXPECT_NE(ZX_OK, status);
+    return status;
   }
 
   zx_status_t FreeCanvas(uint8_t index) {
@@ -126,30 +119,37 @@ class AmlCanvasTest : public testing::Test {
       canvas_indices_.erase(it);
     }
 
-    fidl::WireResult result = canvas_client_->Free(index);
-    if (!result.ok()) {
-      return result.error().status();
-    }
-    if (result->is_error()) {
-      return result->error_value();
-    }
-
-    return ZX_OK;
+    zx_status_t status{ZX_OK};
+    RunSyncClientTask([&]() {
+      fidl::WireResult result = canvas_client_->Free(index);
+      if (!result.ok()) {
+        status = result.error().status();
+      } else if (result->is_error()) {
+        status = result->error_value();
+      }
+    });
+    return status;
   }
 
   zx_status_t FreeAllCanvases() {
+    zx_status_t status{ZX_OK};
     while (!canvas_indices_.empty()) {
       uint8_t index = canvas_indices_.back();
       canvas_indices_.pop_back();
-      fidl::WireResult result = canvas_client_->Free(index);
-      if (!result.ok()) {
-        return result.error().status();
-      }
-      if (result->is_error()) {
-        return result->error_value();
+
+      RunSyncClientTask([&]() {
+        auto result = canvas_client_->Free(index);
+        if (!result.ok()) {
+          status = result.error().status();
+        } else if (result->is_error()) {
+          status = result->error_value();
+        };
+      });
+      if (status != ZX_OK) {
+        return status;
       }
     }
-    return ZX_OK;
+    return status;
   }
 
   void SetRegisterExpectations() {
@@ -206,15 +206,18 @@ class AmlCanvasTest : public testing::Test {
     return lut_addr.reg_value();
   }
 
-  fdf_testing::DriverRuntime runtime_;
-  fdf::UnownedSynchronizedDispatcher dispatcher_ = runtime_.StartBackgroundDispatcher();
+  fdf_testing::DriverRuntime* runtime() { return fdf_testing::DriverRuntime::GetInstance(); }
+
+  std::shared_ptr<MockDevice> fake_root_{MockDevice::FakeRootParent()};
   std::vector<uint8_t> canvas_indices_;
 
   constexpr static int kMmioRangeSize = 0x100;
   ddk_mock::MockMmioRange mmio_range_{kMmioRangeSize, ddk_mock::MockMmioRange::Size::k32};
 
-  async_patterns::TestDispatcherBound<AmlCanvasWrap> canvas_{dispatcher_->async_dispatcher(),
-                                                             std::in_place};
+  // Note, set up to execute on testing thread.
+  std::unique_ptr<AmlCanvas> canvas_;
+
+  std::optional<fidl::ServerBinding<fuchsia_hardware_amlogiccanvas::Device>> binding_;
   fidl::WireSyncClient<fuchsia_hardware_amlogiccanvas::Device> canvas_client_;
 };
 
