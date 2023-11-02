@@ -17,6 +17,7 @@ import (
 	"regexp"
 	"time"
 
+	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/artifacts"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/avb"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/omaha_tool"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/packages"
@@ -32,7 +33,7 @@ const (
 )
 
 type client interface {
-	ExpectReboot(ctx context.Context, f func() error) error
+	ExpectReboot(ctx context.Context, build artifacts.Build, f func() error) error
 	Reboot(ctx context.Context) error
 	DisconnectionListener() <-chan struct{}
 	ServePackageRepository(
@@ -45,7 +46,7 @@ type client interface {
 }
 
 type Updater interface {
-	Update(ctx context.Context, c client) error
+	Update(ctx context.Context, c client, build artifacts.Build) error
 }
 
 func checkSyslogForUnknownFirmware(ctx context.Context, c client) error {
@@ -107,11 +108,11 @@ const (
 	defaultUpdatePackageURL = "fuchsia-pkg://fuchsia.com/update/0"
 )
 
-func (u *SystemUpdateChecker) Update(ctx context.Context, c client) error {
+func (u *SystemUpdateChecker) Update(ctx context.Context, c client, build artifacts.Build) error {
 	// If we're using the default update package url, we can directly update
 	// with it.
 	if u.updatePackageUrl == defaultUpdatePackageURL {
-		return updateCheckNow(ctx, c, u.repo, true, u.checkForUnkownFirmware)
+		return updateCheckNow(ctx, c, u.repo, true, u.checkForUnkownFirmware, build)
 	}
 
 	// Otherwise, copy the repository into a temporary directory, and publish
@@ -153,7 +154,7 @@ func (u *SystemUpdateChecker) Update(ctx context.Context, c client) error {
 		return fmt.Errorf("failed to publish %s: %w", dstUpdatePath, err)
 	}
 
-	return updateCheckNow(ctx, c, repo, true, u.checkForUnkownFirmware)
+	return updateCheckNow(ctx, c, repo, true, u.checkForUnkownFirmware, build)
 }
 
 func updateCheckNow(
@@ -162,11 +163,12 @@ func updateCheckNow(
 	repo *packages.Repository,
 	createRewriteRule bool,
 	checkForUnkownFirmware bool,
+	build artifacts.Build,
 ) error {
 	logger.Infof(ctx, "Triggering OTA")
 
 	startTime := time.Now()
-	err := c.ExpectReboot(ctx, func() error {
+	err := c.ExpectReboot(ctx, build, func() error {
 		// Since an update can trigger a reboot, we can run into all
 		// sorts of races. The two main ones are:
 		//
@@ -268,7 +270,7 @@ func NewSystemUpdater(repo *packages.Repository, updatePackageUrl string, checkF
 	return &SystemUpdater{repo: repo, updatePackageUrl: updatePackageUrl, checkForUnkownFirmware: checkForUnkownFirmware}
 }
 
-func (u *SystemUpdater) Update(ctx context.Context, c client) error {
+func (u *SystemUpdater) Update(ctx context.Context, c client, build artifacts.Build) error {
 	startTime := time.Now()
 
 	url, err := url.Parse(u.updatePackageUrl)
@@ -374,7 +376,7 @@ func NewOmahaUpdater(
 	}, nil
 }
 
-func (u *OmahaUpdater) Update(ctx context.Context, c client) error {
+func (u *OmahaUpdater) Update(ctx context.Context, c client, build artifacts.Build) error {
 	logger.Infof(ctx, "injecting omaha_url into %q", u.updatePackageURL)
 
 	srcUpdate, err := u.repo.OpenUpdatePackage(ctx, u.updatePackageURL.Path[1:])
@@ -455,5 +457,5 @@ func (u *OmahaUpdater) Update(ctx context.Context, c client) error {
 	}
 
 	// Trigger an update
-	return updateCheckNow(ctx, c, u.repo, !u.workaroundOtaNoRewriteRules, u.checkForUnkownFirmware)
+	return updateCheckNow(ctx, c, u.repo, !u.workaroundOtaNoRewriteRules, u.checkForUnkownFirmware, build)
 }

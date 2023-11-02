@@ -14,8 +14,8 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
+	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/artifacts"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/device"
-	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/ffx"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/util"
 	"go.fuchsia.dev/fuchsia/tools/botanist/constants"
 	"go.fuchsia.dev/fuchsia/tools/lib/retry"
@@ -34,8 +34,6 @@ const (
 type DeviceConfig struct {
 	sshKeyFile               string
 	deviceFinderPath         string
-	ffxPath                  string
-	ffx                      *ffx.FFXTool
 	deviceName               string
 	deviceHostname           string
 	deviceResolverMode       DeviceResolverMode
@@ -55,7 +53,6 @@ func NewDeviceConfig(fs *flag.FlagSet, testDataPath string) *DeviceConfig {
 	fs.StringVar(&c.deviceName, "device", os.Getenv(constants.NodenameEnvKey), "device name")
 	fs.StringVar(&c.deviceHostname, "device-hostname", os.Getenv(constants.DeviceAddrEnvKey), "device hostname or IPv4/IPv6 address")
 	fs.StringVar(&c.deviceResolverMode, "device-resolver", FfxResolver, "device resolver (default: ffx)")
-	fs.StringVar(&c.ffxPath, "ffx-path", "host-tools/ffx", "ffx tool path")
 	fs.IntVar(&c.deviceSshPort, "device-ssh-port", 22, "device port")
 	fs.StringVar(&c.deviceFinderPath, "device-finder-path", "", "device-finder tool path")
 	fs.StringVar(&c.SerialSocketPath, "device-serial", "", "device serial path")
@@ -75,7 +72,6 @@ func NewDeviceConfig(fs *flag.FlagSet, testDataPath string) *DeviceConfig {
 func (c *DeviceConfig) Validate() error {
 	for _, s := range []string{
 		c.sshKeyFile,
-		c.ffxPath,
 		c.SerialSocketPath,
 	} {
 		if err := util.ValidatePath(s); err != nil {
@@ -83,18 +79,6 @@ func (c *DeviceConfig) Validate() error {
 		}
 	}
 	return nil
-}
-
-func (c *DeviceConfig) FFXTool() (*ffx.FFXTool, error) {
-	if c.ffx == nil {
-		ffx, err := ffx.NewFFXTool(c.ffxPath)
-		if err != nil {
-			return nil, err
-		}
-		c.ffx = ffx
-	}
-
-	return c.ffx, nil
 }
 
 // newDeviceFinder constructs a DeviceFinder in order to help `device.Client` discover and resolve
@@ -111,7 +95,7 @@ func (c *DeviceConfig) newDeviceFinder() (*device.DeviceFinder, error) {
 	return device.NewDeviceFinder(c.deviceFinderPath), nil
 }
 
-func (c *DeviceConfig) DeviceResolver(ctx context.Context) (device.DeviceResolver, error) {
+func (c *DeviceConfig) DeviceResolver(ctx context.Context, build artifacts.Build) (device.DeviceResolver, error) {
 	if c.deviceHostname != "" {
 		return device.NewConstantHostResolver(ctx, c.deviceName, c.deviceHostname), nil
 	}
@@ -126,7 +110,7 @@ func (c *DeviceConfig) DeviceResolver(ctx context.Context) (device.DeviceResolve
 		return device.NewDeviceFinderResolver(ctx, deviceFinder, c.deviceName)
 
 	case FfxResolver:
-		ffx, err := c.FFXTool()
+		ffx, err := build.GetFfx(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -159,8 +143,27 @@ func (c *DeviceConfig) SSHPrivateKey() (ssh.Signer, error) {
 	return c.sshPrivateKey, nil
 }
 
-func (c *DeviceConfig) NewDeviceClient(ctx context.Context) (*device.Client, error) {
-	deviceResolver, err := c.DeviceResolver(ctx)
+func (c *DeviceConfig) NewDeviceClientWithCurrentBuild(ctx context.Context, archive *artifacts.Archive, outputDir string) (*device.Client, error) {
+	sshPrivateKey, err := c.SSHPrivateKey()
+	if err != nil {
+		return nil, err
+	}
+
+	build, err := archive.GetBuildByID(
+		ctx,
+		os.Getenv("BUILDBUCKET_ID"),
+		outputDir,
+		sshPrivateKey.PublicKey(),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return c.NewDeviceClientWithBuild(ctx, build)
+}
+
+func (c *DeviceConfig) NewDeviceClientWithBuild(ctx context.Context, build artifacts.Build) (*device.Client, error) {
+	deviceResolver, err := c.DeviceResolver(ctx, build)
 	if err != nil {
 		return nil, err
 	}
@@ -180,5 +183,10 @@ func (c *DeviceConfig) NewDeviceClient(ctx context.Context) (*device.Client, err
 		}
 	}
 
-	return device.NewClient(ctx, c.deviceSshPort, c.repoPort, deviceResolver, sshPrivateKey, connectBackoff, c.WorkaroundBrokenTimeSkip, serialConn)
+	ffx, err := build.GetFfx(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return device.NewClient(ctx, c.deviceSshPort, c.repoPort, deviceResolver, sshPrivateKey, connectBackoff, c.WorkaroundBrokenTimeSkip, serialConn, ffx)
 }

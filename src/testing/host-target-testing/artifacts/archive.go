@@ -52,7 +52,6 @@ func (a *Archive) GetBuildByID(
 	id string,
 	dir string,
 	publicKey ssh.PublicKey,
-	ffxPath string,
 ) (*ArtifactsBuild, error) {
 	// Make sure the build exists.
 	srcs, err := a.list(ctx, id)
@@ -71,7 +70,6 @@ func (a *Archive) GetBuildByID(
 		dir:          dir,
 		sshPublicKey: publicKey,
 		srcs:         srcsMap,
-		ffxPath:      ffxPath,
 	}, nil
 }
 

@@ -80,7 +80,6 @@ type ArtifactsBuild struct {
 	buildImageDir string
 	sshPublicKey  ssh.PublicKey
 	srcs          map[string]struct{}
-	ffxPath       string
 }
 
 func (b *ArtifactsBuild) GetBootserver(ctx context.Context) (string, error) {
@@ -358,22 +357,15 @@ func (b *ArtifactsBuild) getFfxFlasher(ctx context.Context) (*flasher.FfxFlasher
 		return nil, err
 	}
 
-	currentBuildId := os.Getenv("BUILDBUCKET_ID")
-	if currentBuildId == "" {
-		currentBuildId = b.id
-	}
-	// Use the latest ffx
 	ffxPath := filepath.Join(buildImageDir, "ffx")
-	if b.ffxPath != "" {
-		ffxPath = b.ffxPath
-	}
-
 	flashManifest := filepath.Join(buildImageDir, "flash.json")
-	if err := b.archive.download(ctx, currentBuildId, false, ffxPath, []string{"tools/linux-x64/ffx"}); err != nil {
+
+	// Always download ffx from the build to ensure compatibility.
+	if err := b.archive.download(ctx, b.id, false, ffxPath, []string{"tools/linux-x64/ffx"}); err != nil {
 		return nil, fmt.Errorf("failed to download ffxPath: %w", err)
 	}
 
-	if err := b.archive.download(ctx, currentBuildId, false, flashManifest, []string{"images/flash.json"}); err != nil {
+	if err := b.archive.download(ctx, b.id, false, flashManifest, []string{"images/flash.json"}); err != nil {
 		return nil, fmt.Errorf("failed to download flash.json for flasher: %w", err)
 	}
 
@@ -394,17 +386,13 @@ func (b *ArtifactsBuild) getScriptFlasher(ctx context.Context) (*flasher.ScriptF
 	if err != nil {
 		return nil, err
 	}
-	currentBuildId := os.Getenv("BUILDBUCKET_ID")
-	if currentBuildId == "" {
-		currentBuildId = b.id
-	}
 	flashManifest := filepath.Join(buildImageDir, "flash.json")
 	flashScript := filepath.Join(buildImageDir, "flash.sh")
-	if err := b.archive.download(ctx, currentBuildId, false, flashScript, []string{"images/flash.sh"}); err != nil {
+	if err := b.archive.download(ctx, b.id, false, flashScript, []string{"images/flash.sh"}); err != nil {
 		return nil, fmt.Errorf("failed to download flash.sh flasher: %w", err)
 	}
 
-	if err := b.archive.download(ctx, currentBuildId, false, flashManifest, []string{"images/flash.json"}); err != nil {
+	if err := b.archive.download(ctx, b.id, false, flashManifest, []string{"images/flash.json"}); err != nil {
 		return nil, fmt.Errorf("failed to download flash.json for flasher: %w", err)
 	}
 

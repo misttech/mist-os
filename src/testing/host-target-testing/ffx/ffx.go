@@ -12,6 +12,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
+	"strings"
 
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/util"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
@@ -50,6 +52,49 @@ func (f *FFXTool) Close() error {
 	return os.RemoveAll(f.isolateDir)
 }
 
+func (f *FFXTool) Version(ctx context.Context) (string, error) {
+	args := []string{"version"}
+	stdout, stderr, err := util.RunCommand(ctx, f.ffxToolPath, args...)
+	if err != nil {
+		return "", fmt.Errorf("ffx version failed: %w: %s", err, string(stderr))
+	}
+
+	if len(stdout) == 0 {
+		return "", fmt.Errorf("ffx version returned an empty string")
+	}
+
+	return strings.TrimSpace(string(stdout)), nil
+}
+
+func (f *FFXTool) DaemonStop(ctx context.Context) error {
+	args := []string{"daemon", "stop"}
+	return f.runFFXCmd(ctx, args...)
+}
+
+func (f *FFXTool) TargetWait(ctx context.Context, target string) error {
+	args := []string{"--target", target, "target", "wait"}
+	return f.runFFXCmd(ctx, args...)
+}
+
+func (f *FFXTool) TargetGetTime(ctx context.Context, target string) (int, error) {
+	args := []string{
+		"--isolate-dir", f.isolateDir,
+		"--target", target,
+		"target",
+		"get-time",
+	}
+	stdout, stderr, err := util.RunCommand(ctx, f.ffxToolPath, args...)
+	if err != nil {
+		return 0, fmt.Errorf("ffx target get-time failed: %w: %s", err, string(stderr))
+	}
+
+	if len(stdout) == 0 {
+		return 0, fmt.Errorf("ffx target get-time returned an empty string")
+	}
+
+	return strconv.Atoi(strings.TrimSpace(string(stdout)))
+}
+
 type targetEntry struct {
 	NodeName    string   `json:"nodename"`
 	Addresses   []string `json:"addresses"`
@@ -58,6 +103,7 @@ type targetEntry struct {
 
 func (f *FFXTool) TargetList(ctx context.Context) ([]targetEntry, error) {
 	args := []string{
+		"--isolate-dir", f.isolateDir,
 		"--machine",
 		"json",
 		"target",

@@ -74,7 +74,7 @@ func doTest(ctx context.Context) error {
 	}
 	defer cleanup()
 
-	deviceClient, err := c.deviceConfig.NewDeviceClient(ctx)
+	deviceClient, err := c.deviceConfig.NewDeviceClientWithCurrentBuild(ctx, c.archiveConfig.BuildArchive(), outputDir)
 	if err != nil {
 		return fmt.Errorf("failed to create ota test client: %w", err)
 	}
@@ -90,7 +90,7 @@ func doTest(ctx context.Context) error {
 	l.SetFlags(logger.Ldate | logger.Ltime | logger.LUTC | logger.Lshortfile)
 	ctx = logger.WithLogger(ctx, l)
 
-	build, err := c.buildConfig.GetBuild(ctx, deviceClient, outputDir)
+	build, err := c.buildConfig.GetBuild(ctx, outputDir)
 	if err != nil {
 		return fmt.Errorf("failed to get downgrade build: %w", err)
 	}
@@ -189,7 +189,7 @@ func doTestRecovery(
 	// // we risk leaving the ssh session in a bad state.
 	(*rpcClient).Close()
 
-	if err := device.Reconnect(ctx); err != nil {
+	if err := device.Reconnect(ctx, build); err != nil {
 		return fmt.Errorf("failed to reconnect: %w", err)
 	}
 
