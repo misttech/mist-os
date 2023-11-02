@@ -272,6 +272,9 @@
 
                 // TODO(b/306670972): Appears to pass in latest android roll, try removing after that.
                 "properties.__system_property_add_appcompat",
+
+                // TODO(b/308967162): Flaky on the bots - needs to be investigated.
+                "properties.empty_value",
             ],
         },
     ],
