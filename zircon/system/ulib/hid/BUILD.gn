@@ -12,7 +12,6 @@ zx_library("hid") {
     "hid/atlas-touchpad.h",
     "hid/boot.h",
     "hid/buttons.h",
-    "hid/visalia-touch.h",
     "hid/descriptor.h",
     "hid/egalax.h",
     "hid/eyoyo.h",
@@ -44,7 +43,6 @@ zx_library("hid") {
     "paradise.c",
     "samsung.c",
     "virtio-mouse.c",
-    "visalia-touch.c",
   ]
   deps = [
     "//src/lib/ddk:ddk-metadata-headers",

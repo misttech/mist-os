@@ -382,7 +382,6 @@
 //src/ui/backlight/drivers/vim3-pwm-backlight:vim3-pwm-backlight-driver
 //src/ui/input/drivers/adc-buttons:adc-buttons-driver
 //src/ui/input/drivers/ctaphid:ctaphid-driver
-//src/ui/input/drivers/cypress:cypress-driver
 //src/ui/input/drivers/focaltech:focaltech-driver
 //src/ui/input/drivers/focaltech:focaltech-sherlock-driver
 //src/ui/input/drivers/goldfish_sensor:sensor_fuchsia_driver

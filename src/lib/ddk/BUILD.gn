@@ -424,7 +424,6 @@ sdk_static_library("ddk") {
     "//src/ui/backlight/drivers/ti-lp8556:*",
     "//src/ui/backlight/drivers/vim3-pwm-backlight:*",
     "//src/ui/input/drivers/ctaphid:*",
-    "//src/ui/input/drivers/cypress:*",
     "//src/ui/input/drivers/focaltech:*",
     "//src/ui/input/drivers/goldfish_sensor:*",
     "//src/ui/input/drivers/goodix:*",

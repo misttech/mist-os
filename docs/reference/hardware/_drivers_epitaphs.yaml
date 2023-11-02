@@ -392,3 +392,9 @@
   available_in_git: '104162dd5cbfc2ee60e42a34c6922de8eb9e8b21'
   areas: ['Media', 'Audio']
   path: '/src/media/audio/drivers/as370-pdm-input'
+- short_description: 'Cypress Semiconductor Cy8cmbr3108 touch controller driver'
+  deletion_reason: 'Hardware is not actively supported'
+  gerrit_change_id: '941025'
+  available_in_git: 'b3d1ee97525800f1906b01f6eec0c6571cebbe03'
+  areas: ['Input']
+  path: '/src/ui/input/drivers/cypress'

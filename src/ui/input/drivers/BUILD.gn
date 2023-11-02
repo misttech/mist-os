@@ -6,7 +6,6 @@ group("drivers") {
   deps = [
     "adc-buttons",
     "ctaphid",
-    "cypress",
     "focaltech",
     "goldfish_sensor",
     "goodix",
@@ -29,7 +28,6 @@ group("tests") {
   deps = [
     "adc-buttons:tests",
     "ctaphid:tests",
-    "cypress:tests",
     "focaltech:tests",
     "goldfish_sensor:tests",
     "goodix:tests",
