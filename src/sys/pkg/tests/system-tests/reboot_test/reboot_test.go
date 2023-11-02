@@ -159,7 +159,7 @@ func doTestReboot(
 	}
 
 	// Install version N on the device if it is not already on that version.
-	expectedSystemImage, err := updatePackage.OpenPackage(ctx, "system_image/0")
+	expectedSystemImage, err := updatePackage.OpenSystemImagePackage(ctx)
 	if err != nil {
 		return fmt.Errorf("error extracting expected system image merkle: %w", err)
 	}
@@ -173,7 +173,7 @@ func doTestReboot(
 		ctx,
 		device,
 		*rpcClient,
-		&expectedSystemImage,
+		expectedSystemImage,
 		expectedConfig,
 		false,
 	); err != nil {
@@ -200,7 +200,7 @@ func doTestReboot(
 		ctx,
 		device,
 		*rpcClient,
-		&expectedSystemImage,
+		expectedSystemImage,
 		expectedConfig,
 		false,
 	); err != nil {
@@ -255,7 +255,7 @@ func initializeDevice(
 	}
 
 	// Install version N on the device if it is not already on that version.
-	expectedSystemImage, err := updatePackage.OpenPackage(ctx, "system_image/0")
+	expectedSystemImage, err := updatePackage.OpenSystemImagePackage(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error extracting expected system image merkle: %w", err)
 	}
@@ -299,7 +299,7 @@ func initializeDevice(
 		ctx,
 		device,
 		rpcClient,
-		&expectedSystemImage,
+		expectedSystemImage,
 		expectedConfig,
 		false,
 	); err != nil {

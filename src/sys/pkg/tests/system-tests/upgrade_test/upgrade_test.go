@@ -197,7 +197,7 @@ func doTestOTAs(
 	}
 
 	// Install version N on the device if it is not already on that version.
-	expectedSystemImage, err := updatePackage.OpenPackage(ctx, "system_image/0")
+	expectedSystemImage, err := updatePackage.OpenSystemImagePackage(ctx)
 	if err != nil {
 		return fmt.Errorf("error extracting expected system image merkle: %w", err)
 	}
@@ -322,7 +322,7 @@ func initializeDevice(
 	startTime := time.Now()
 
 	var repo *packages.Repository
-	var expectedSystemImage *packages.Package
+	var expectedSystemImage *packages.SystemImagePackage
 	var err error
 
 	if build != nil {
@@ -342,11 +342,11 @@ func initializeDevice(
 			return nil, err
 		}
 
-		systemImage, err := updatePackage.OpenPackage(ctx, "system_image/0")
+		systemImage, err := updatePackage.OpenSystemImagePackage(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("error extracting expected system image merkle: %w", err)
 		}
-		expectedSystemImage = &systemImage
+		expectedSystemImage = systemImage
 	}
 
 	if err := script.RunScript(ctx, device, repo, nil, c.beforeInitScript); err != nil {
@@ -355,7 +355,7 @@ func initializeDevice(
 
 	if build != nil {
 		// Only pave if the device is not running the expected version.
-		upToDate, err := check.IsDeviceUpToDate(ctx, device, *expectedSystemImage)
+		upToDate, err := check.IsDeviceUpToDate(ctx, device, expectedSystemImage)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check if up to date during initialization: %w", err)
 		}
@@ -468,7 +468,7 @@ func systemPrimeOTA(
 		return fmt.Errorf("failed to open update/0 package: %w", err)
 	}
 
-	srcSystemImage, err := srcUpdate.OpenPackage(ctx, "system_image/0")
+	srcSystemImage, err := srcUpdate.OpenSystemImagePackage(ctx)
 	if err != nil {
 		return fmt.Errorf(
 			"failed to open system_image/0 from %s update package: %w",
@@ -478,9 +478,8 @@ func systemPrimeOTA(
 	}
 
 	dstSystemImagePath := "system_image_prime/0"
-	dstSystemImage, err := repo.EditPackage(
+	dstSystemImage, err := srcSystemImage.EditContents(
 		ctx,
-		srcSystemImage,
 		dstSystemImagePath,
 		func(tempDir string) error {
 			newResource := "Hello World!"
@@ -621,7 +620,7 @@ func otaToPackage(
 		ctx,
 		device,
 		*rpcClient,
-		&dstSystemImage,
+		dstSystemImage,
 		expectedConfig,
 		checkABR,
 	); err != nil {
@@ -646,27 +645,27 @@ func AddRandomFilesToUpdate(
 	srcUpdate *packages.UpdatePackage,
 	dstSystemImagePath string,
 	dstUpdatePath string,
-) (*packages.UpdatePackage, packages.Package, error) {
-	srcSystemImage, err := srcUpdate.OpenPackage(ctx, "system_image/0")
+) (*packages.UpdatePackage, *packages.SystemImagePackage, error) {
+	srcSystemImage, err := srcUpdate.OpenSystemImagePackage(ctx)
 	if err != nil {
-		return nil, packages.Package{}, fmt.Errorf("error extracting expected system image merkle: %w", err)
+		return nil, nil, fmt.Errorf("error extracting expected system image merkle: %w", err)
 	}
 
 	otaSize, err := srcUpdate.OtaMaxNeededSize(ctx)
 	if err != nil {
-		return nil, packages.Package{}, fmt.Errorf("failed to compute size of the OTA: %w", err)
+		return nil, nil, fmt.Errorf("failed to compute size of the OTA: %w", err)
 	}
 	logger.Infof(ctx, "OTA size of %s: %d", srcUpdate.Path(), otaSize)
 
 	updateImagesSize, err := srcUpdate.UpdateAndImagesSize(ctx)
 	if err != nil {
-		return nil, packages.Package{}, fmt.Errorf("failed to compute size of the update images: %w", err)
+		return nil, nil, fmt.Errorf("failed to compute size of the update images: %w", err)
 	}
 	logger.Infof(ctx, "Update images size of %s: %d", srcUpdate.Path(), updateImagesSize)
 
 	systemImageSize, err := srcUpdate.UpdateAndSystemImageSize(ctx)
 	if err != nil {
-		return nil, packages.Package{}, fmt.Errorf("failed to compute size of the system image: %w", err)
+		return nil, nil, fmt.Errorf("failed to compute size of the system image: %w", err)
 	}
 	logger.Infof(ctx, "System image size of %s: %d", srcUpdate.Path(), systemImageSize)
 
@@ -690,7 +689,7 @@ func AddRandomFilesToUpdate(
 		// approximately full.
 
 		if c.maxOtaSize < otaSize {
-			return nil, packages.Package{}, fmt.Errorf(
+			return nil, nil, fmt.Errorf(
 				"max OTA size %d is smaller than the size of the OTA %d",
 				c.maxOtaSize,
 				otaSize,
@@ -712,7 +711,7 @@ func AddRandomFilesToUpdate(
 				bytesToAdd,
 			)
 			if err != nil {
-				return nil, packages.Package{}, fmt.Errorf(
+				return nil, nil, fmt.Errorf(
 					"failed to generate update package %s of size %d: %w",
 					dstUpdatePath,
 					bytesToAdd,
@@ -742,7 +741,7 @@ func AddRandomFilesToUpdate(
 			}
 		}
 
-		return nil, packages.Package{}, fmt.Errorf(
+		return nil, nil, fmt.Errorf(
 			"failed to generate update package less than %d",
 			c.maxOtaSize,
 		)
@@ -755,12 +754,12 @@ func GenerateUpdatePackageWithRandomFiles(
 	ctx context.Context,
 	rand *rand.Rand,
 	repo *packages.Repository,
-	srcSystemImage packages.Package,
+	srcSystemImage *packages.SystemImagePackage,
 	srcUpdate *packages.UpdatePackage,
 	dstSystemImagePath string,
 	dstUpdatePath string,
 	bytesToAdd int64,
-) (*packages.UpdatePackage, packages.Package, int64, error) {
+) (*packages.UpdatePackage, *packages.SystemImagePackage, int64, error) {
 	logger.Infof(
 		ctx,
 		"Trying to insert random files up to %d bytes into the system image %s as %s",
@@ -771,24 +770,23 @@ func GenerateUpdatePackageWithRandomFiles(
 
 	avbTool, err := c.installerConfig.AVBTool()
 	if err != nil {
-		return nil, packages.Package{}, 0, fmt.Errorf("failed to intialize AVBTool: %w", err)
+		return nil, nil, 0, fmt.Errorf("failed to intialize AVBTool: %w", err)
 	}
 
 	zbiTool, err := c.installerConfig.ZBITool()
 	if err != nil {
-		return nil, packages.Package{}, 0, fmt.Errorf("failed to initialize ZBITool: %w", err)
+		return nil, nil, 0, fmt.Errorf("failed to initialize ZBITool: %w", err)
 	}
 
-	dstSystemImage, err := repo.EditPackage(
+	dstSystemImage, err := srcSystemImage.EditContents(
 		ctx,
-		srcSystemImage,
 		dstSystemImagePath,
 		func(tempDir string) error {
 			return GenerateRandomFiles(ctx, rand, tempDir, bytesToAdd)
 		},
 	)
 	if err != nil {
-		return nil, packages.Package{}, 0, err
+		return nil, nil, 0, err
 	}
 
 	dstUpdate, err := srcUpdate.EditUpdatePackageWithNewSystemImage(
@@ -802,7 +800,7 @@ func GenerateUpdatePackageWithRandomFiles(
 		c.useNewUpdateFormat,
 	)
 	if err != nil {
-		return nil, packages.Package{}, 0, fmt.Errorf(
+		return nil, nil, 0, fmt.Errorf(
 			"failed to create the %q package: %w",
 			dstUpdatePath,
 			err,
@@ -811,7 +809,7 @@ func GenerateUpdatePackageWithRandomFiles(
 
 	otaSize, err := dstUpdate.OtaMaxNeededSize(ctx)
 	if err != nil {
-		return nil, packages.Package{}, 0, fmt.Errorf("failed to compute size of the OTA: %w", err)
+		return nil, nil, 0, fmt.Errorf("failed to compute size of the OTA: %w", err)
 	}
 	logger.Infof(
 		ctx,
@@ -822,7 +820,7 @@ func GenerateUpdatePackageWithRandomFiles(
 
 	updateImagesSize, err := dstUpdate.UpdateAndImagesSize(ctx)
 	if err != nil {
-		return nil, packages.Package{}, 0, fmt.Errorf("failed to compute size of the update images: %w", err)
+		return nil, nil, 0, fmt.Errorf("failed to compute size of the update images: %w", err)
 	}
 	logger.Infof(
 		ctx,
@@ -833,7 +831,7 @@ func GenerateUpdatePackageWithRandomFiles(
 
 	systemImageSize, err := dstUpdate.UpdateAndSystemImageSize(ctx)
 	if err != nil {
-		return nil, packages.Package{}, 0, fmt.Errorf("failed to compute size of the system image: %w", err)
+		return nil, nil, 0, fmt.Errorf("failed to compute size of the system image: %w", err)
 	}
 	logger.Infof(
 		ctx,

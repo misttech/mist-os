@@ -186,3 +186,11 @@ func (p *Package) Expand(ctx context.Context, dir string) error {
 
 	return nil
 }
+
+func (p *Package) EditContents(
+	ctx context.Context,
+	dstPath string,
+	editFunc func(tempDir string) error,
+) (Package, error) {
+	return p.repo.EditPackage(ctx, *p, dstPath, editFunc)
+}

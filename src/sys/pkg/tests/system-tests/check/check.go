@@ -19,7 +19,7 @@ import (
 func IsDeviceUpToDate(
 	ctx context.Context,
 	device *device.Client,
-	expectedSystemImage packages.Package,
+	expectedSystemImage *packages.SystemImagePackage,
 ) (bool, error) {
 	remoteSystemImageMerkle, err := device.GetSystemImageMerkle(ctx)
 	if err != nil {
@@ -132,7 +132,7 @@ func ValidateDevice(
 	ctx context.Context,
 	device *device.Client,
 	rpcClient *sl4f.Client,
-	expectedSystemImage *packages.Package,
+	expectedSystemImage *packages.SystemImagePackage,
 	expectedConfig *sl4f.Configuration,
 	warnOnABR bool,
 ) error {
@@ -140,7 +140,7 @@ func ValidateDevice(
 	// system version. Confirm the update by fetching the device's current
 	// /system/meta, and making sure it is the correct version.
 	if expectedSystemImage != nil {
-		upToDate, err := IsDeviceUpToDate(ctx, device, *expectedSystemImage)
+		upToDate, err := IsDeviceUpToDate(ctx, device, expectedSystemImage)
 		if err != nil {
 			return fmt.Errorf("failed to check if device is up to date: %w", err)
 		}

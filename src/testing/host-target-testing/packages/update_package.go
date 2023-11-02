@@ -88,6 +88,18 @@ func (u *UpdatePackage) OpenPackage(ctx context.Context, path string) (Package, 
 	return newPackage(ctx, u.r, path, merkle)
 }
 
+func (u *UpdatePackage) OpenSystemImagePackage(ctx context.Context) (*SystemImagePackage, error) {
+	p, err := u.OpenPackage(ctx, "system_image/0")
+	if err != nil {
+		return nil, err
+	}
+
+	return &SystemImagePackage{
+		p:        p,
+		packages: u.packages,
+	}, nil
+}
+
 // Extract the update package `srcUpdatePackage` into a temporary directory,
 // then build and publish it to the repository as the `dstUpdatePackage` name.
 func (u *UpdatePackage) EditUpdatePackage(
@@ -103,6 +115,64 @@ func (u *UpdatePackage) EditUpdatePackage(
 	}
 
 	return newUpdatePackage(ctx, u.r, p)
+}
+
+// Extract the update package `srcUpdatePackage` into a temporary directory,
+// then build and publish it to the repository as the `dstUpdatePackage` name.
+func (u *UpdatePackage) EditPackage(
+	ctx context.Context,
+	dstUpdatePath string,
+	editFunc func(pkg Package) (Package, error),
+) (*UpdatePackage, error) {
+	p, err := editFunc(u.p)
+	if err != nil {
+		return nil, err
+	}
+
+	return newUpdatePackage(ctx, u.r, p)
+}
+
+// EditSystemImage will extract the system image into a temporary directory,
+// provide it to the `editFunc`, then create a new update package that uses it.
+func (u *UpdatePackage) EditSystemImagePackage(
+	ctx context.Context,
+	avbTool *avb.AVBTool,
+	zbiTool *zbi.ZBITool,
+	repoName string,
+	dstUpdatePackagePath string,
+	bootfsCompression string,
+	useNewUpdateFormat bool,
+	editFunc func(systemImage *SystemImagePackage) (*SystemImagePackage, error),
+) (*UpdatePackage, *SystemImagePackage, error) {
+	srcSystemImage, err := u.OpenSystemImagePackage(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf(
+			"failed to open system_image/0 from %s update package: %w",
+			u.p.Path(),
+			err,
+		)
+	}
+
+	dstSystemImage, err := editFunc(srcSystemImage)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	dstUpdate, err := u.EditUpdatePackageWithNewSystemImage(
+		ctx,
+		avbTool,
+		zbiTool,
+		repoName,
+		dstSystemImage,
+		dstUpdatePackagePath,
+		bootfsCompression,
+		useNewUpdateFormat,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return dstUpdate, dstSystemImage, nil
 }
 
 // RehostUpdatePackage will rewrite the `packages.json` file to use `repoName`
@@ -143,7 +213,7 @@ func (u *UpdatePackage) EditUpdatePackageWithNewSystemImage(
 	avbTool *avb.AVBTool,
 	zbiTool *zbi.ZBITool,
 	repoName string,
-	systemImage Package,
+	systemImage *SystemImagePackage,
 	dstUpdatePackagePath string,
 	bootfsCompression string,
 	useNewUpdateFormat bool,
