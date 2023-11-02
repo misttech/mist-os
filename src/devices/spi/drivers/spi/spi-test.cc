@@ -201,7 +201,7 @@ class SpiDeviceTest : public zxtest::Test {
     ASSERT_OK(incoming_loop_.StartThread("incoming-loop"));
 
     // TODO(fxb/124464): Migrate test to use dispatcher integration.
-    parent_ = MockDevice::FakeRootParentNoDispatcherIntegrationDEPRECATED();
+    parent_ = MockDevice::FakeRootParent();
     ASSERT_OK(loop_.StartThread("spi-test-thread"));
 
     SetUpSpiImpl();

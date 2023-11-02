@@ -86,7 +86,6 @@ test("spi-test-bin") {
     ":common",
     "//sdk/lib/async_patterns/testing/cpp",
     "//src/devices/lib/fidl-metadata",
-    "//src/devices/testing/driver-runtime-main:zxtest",
     "//src/devices/testing/mock-ddk",
     "//zircon/system/ulib/async-default",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
