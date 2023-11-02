@@ -93,6 +93,11 @@ impl Scene for BouncingSquaresScene {
         Ok(())
     }
 
+    fn init_image(&self, _image: &mut MappedImage) -> Result<()> {
+        // No need to initialize the image since it's zeroed every frame.
+        Ok(())
+    }
+
     fn render(&mut self, image: &mut MappedImage) -> Result<()> {
         image.zero().context("failed to clear background")?;
         for s in &self.squares {

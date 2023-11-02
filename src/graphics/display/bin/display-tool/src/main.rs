@@ -85,6 +85,31 @@ struct SquaresArgs {
     id: Option<u64>,
 }
 
+/// Test the display's actual frame rate.
+///
+/// Before checking the contents shown on the display device, users must make sure that the
+/// frame rate displayed on the console (rate of frames provided by the display engine) matches
+/// the expected frame rate in the display mode specified in EDID or panel configurations.
+///
+/// This utility should be built and run in release mode for best performance.
+#[derive(FromArgs)]
+#[argh(subcommand, name = "frame-rate-test")]
+struct FrameRateTestArgs {
+    /// ID of the display to play the animation on
+    #[argh(positional)]
+    id: Option<u64>,
+
+    /// width of the rectangular grid of the test pattern, in pixels.
+    /// The default value is "min(display width, display height) / sqrt(2)".
+    #[argh(option)]
+    grid_width: Option<u32>,
+
+    /// height of the rectangular grid of the test pattern, in pixels.
+    /// The default value is "min(display width, display height) / sqrt(2)".
+    #[argh(option)]
+    grid_height: Option<u32>,
+}
+
 #[derive(FromArgs)]
 #[argh(subcommand)]
 enum SubCommands {
@@ -92,6 +117,7 @@ enum SubCommands {
     Vsync(VsyncArgs),
     Color(ColorArgs),
     Squares(SquaresArgs),
+    FrameRateTest(FrameRateTestArgs),
 }
 
 #[fasync::run_singlethreaded]
@@ -117,6 +143,15 @@ async fn main() -> Result<(), Error> {
             }
             SubCommands::Squares(args) => {
                 commands::squares(&coordinator, args.id.map(DisplayId)).await
+            }
+            SubCommands::FrameRateTest(args) => {
+                commands::frame_rate_test(
+                    &coordinator,
+                    args.id.map(DisplayId),
+                    args.grid_width,
+                    args.grid_height,
+                )
+                .await
             }
         }
     };

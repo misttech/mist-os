@@ -9,6 +9,7 @@ use {
 
 mod bouncing_squares;
 mod display_color_layer;
+mod frame_rate_test;
 mod static_config_vsync_loop;
 
 use crate::rgb::Rgb888;
@@ -100,4 +101,27 @@ pub async fn squares(coordinator: &Coordinator, id: Option<DisplayId>) -> Result
     };
 
     bouncing_squares::run(coordinator, display).await
+}
+
+pub async fn frame_rate_test(
+    coordinator: &Coordinator,
+    id: Option<DisplayId>,
+    grid_width: Option<u32>,
+    grid_height: Option<u32>,
+) -> Result<()> {
+    let displays = coordinator.displays();
+    if displays.is_empty() {
+        return Err(format_err!("no displays found"));
+    }
+
+    let display = match id {
+        // Pick the first available display if no ID was specified.
+        None => &displays[0],
+        Some(id) => displays
+            .iter()
+            .find(|d| d.id() == id)
+            .ok_or_else(|| format_err!("display with id '{:?}' not found", id))?,
+    };
+
+    frame_rate_test::run(coordinator, display, grid_width, grid_height).await
 }

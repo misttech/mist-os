@@ -27,6 +27,11 @@ pub trait Scene {
     // Update the scene contents.
     fn update(&mut self) -> Result<()>;
 
+    // Initialize the image for rendering.
+    // Invoked exactly once for every frame buffer image before it's used for
+    // rendering for the first time.
+    fn init_image(&self, image: &mut MappedImage) -> Result<()>;
+
     // Render the current scene contents to `image`.
     // `image` must not be used by the display engine during `render()`.
     fn render(&mut self, image: &mut MappedImage) -> Result<()>;
@@ -77,10 +82,11 @@ impl<'a, S: Scene> DoubleBufferedFenceLoop<'a, S> {
         for _ in 0..NUM_SWAPCHAIN_IMAGES {
             next_image_id = ImageId(next_image_id.0 + 1);
 
-            let image = MappedImage::create(
+            let mut image = MappedImage::create(
                 Image::create(coordinator.clone(), next_image_id, &params).await?,
             )?;
             let retire_event = coordinator.create_event()?;
+            scene.init_image(&mut image)?;
             image_presentations.push(Presentation::new(image, retire_event));
         }
 
