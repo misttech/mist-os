@@ -95,20 +95,16 @@ class PlatformBus : public PlatformBusType,
   // IOMMU protocol implementation.
   zx_status_t IommuGetBti(uint32_t iommu_index, uint32_t bti_id, zx::bti* out_bti);
 
-  // Returns the resource handle to be used for creating MMIO regions, IRQs, and SMC ranges.
-  // Currently this just returns the root resource, but we may change this to a more
-  // limited resource in the future.
-  // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
-  zx::unowned_resource GetResource() const {
-    return zx::unowned_resource(get_root_resource(parent()));
-  }
-
   zx::unowned_resource GetIrqResource() const {
     return zx::unowned_resource(get_irq_resource(parent()));
   }
 
   zx::unowned_resource GetMmioResource() const {
     return zx::unowned_resource(get_mmio_resource(parent()));
+  }
+
+  zx::unowned_resource GetSmcResource() const {
+    return zx::unowned_resource(get_smc_resource(parent()));
   }
 
   struct BootItemResult {

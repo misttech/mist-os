@@ -30,6 +30,7 @@
                 "fuchsia.driver.framework.DeviceGroupManager",
                 "fuchsia.kernel.IrqResource",
                 "fuchsia.kernel.MmioResource",
+                "fuchsia.kernel.SmcResource",
             ],
         },
     ],

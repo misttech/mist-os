@@ -280,7 +280,7 @@ zx_status_t PlatformDevice::PDevGetSmc(uint32_t index, zx::resource* out_resourc
     options |= ZX_RSRC_FLAG_EXCLUSIVE;
   char rsrc_name[ZX_MAX_NAME_LEN];
   snprintf(rsrc_name, ZX_MAX_NAME_LEN - 1, "%s.pbus[%u]", name_, index);
-  return zx::resource::create(*bus_->GetResource(), options, smc.service_call_num_base().value(),
+  return zx::resource::create(*bus_->GetSmcResource(), options, smc.service_call_num_base().value(),
                               smc.count().value(), rsrc_name, sizeof(rsrc_name), out_resource);
 }
 
@@ -415,8 +415,8 @@ zx_status_t PlatformDevice::RpcGetSmc(uint32_t index, zx_handle_t* out_handle,
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  const auto& root_rsrc = bus_->GetResource();
-  if (!root_rsrc->is_valid()) {
+  const auto& smc_rsrc = bus_->GetSmcResource();
+  if (!smc_rsrc->is_valid()) {
     return ZX_ERR_NO_RESOURCES;
   }
 
@@ -431,7 +431,7 @@ zx_status_t PlatformDevice::RpcGetSmc(uint32_t index, zx_handle_t* out_handle,
   char rsrc_name[ZX_MAX_NAME_LEN];
   snprintf(rsrc_name, ZX_MAX_NAME_LEN - 1, "%s.pbus[%u]", name_, index);
   zx_status_t status =
-      zx::resource::create(*root_rsrc, options, smc.service_call_num_base().value(),
+      zx::resource::create(*smc_rsrc, options, smc.service_call_num_base().value(),
                            smc.count().value(), rsrc_name, sizeof(rsrc_name), &resource);
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: pdev_rpc_get_smc: zx_resource_create failed: %d", name_, status);
