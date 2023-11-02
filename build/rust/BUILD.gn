@@ -99,6 +99,7 @@ if (current_toolchain != default_toolchain) {
     visibility = [
       # This is the supported group for developers to add tools to, going
       # forward, and the group used by `fx set --cargo-toml-gen`.
+      ":tests",
       "//:developer_host_tools",
       "//:host",
     ]
@@ -109,6 +110,7 @@ if (current_toolchain != default_toolchain) {
     visibility = [
       # The only expected use of this target, going forward (the above group)
       ":cargo_toml_gen",
+      ":tests",
 
       # `fx set ... --cargo-toml-gen` previously used the `base_package_labels`
       # GN arg, which feeds into `//:developer_base_packages`.  This is here for
@@ -194,6 +196,7 @@ if (is_host) {
 group("tests") {
   testonly = true
   deps = [
+    ":cargo_toml_gen",
     "docs/rustdoc-index",
     "docs/rustdoc-index:rustdoc-index(//build/toolchain:host_x64)",
     "tests",
