@@ -133,7 +133,7 @@ impl Topology {
         Ok(())
     }
 
-    /// Get direct dependencies for the given Element and PowerLevel.
+    /// Gets direct dependencies for the given Element and PowerLevel.
     pub fn get_direct_deps(&self, element_level: &ElementLevel) -> Vec<Dependency> {
         let targets = self
             .source_to_targets_dependencies
@@ -146,8 +146,8 @@ impl Topology {
             .collect()
     }
 
-    /// Walk the dependency graph using breadth-first search to get all
-    /// transitive dependencies for the given Element and PowerLevel.
+    /// Gets all direct and transitive dependencies for the given Element and
+    /// PowerLevel.
     pub fn get_all_deps(&self, element_level: &ElementLevel) -> Vec<Dependency> {
         let mut deps = Vec::<Dependency>::new();
         let mut element_levels = vec![element_level.clone()];
@@ -161,7 +161,7 @@ impl Topology {
         deps
     }
 
-    /// Add a direct dependency to the Topology.
+    /// Adds a direct dependency to the Topology.
     pub fn add_direct_dep(&mut self, dep: &Dependency) -> Result<(), AddDependencyError> {
         if !self.elements.contains_key(&dep.level.element) {
             return Err(AddDependencyError::ElementNotFound(dep.level.element.clone()));
@@ -179,7 +179,7 @@ impl Topology {
         Ok(())
     }
 
-    /// Remove a direct dependency from the Topology.
+    /// Removes a direct dependency from the Topology.
     pub fn remove_direct_dep(&mut self, dep: &Dependency) -> Result<(), RemoveDependencyError> {
         if !self.elements.contains_key(&dep.level.element) {
             return Err(RemoveDependencyError::NotFound(dep.clone()));
