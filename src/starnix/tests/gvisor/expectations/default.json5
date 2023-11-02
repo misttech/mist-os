@@ -562,7 +562,6 @@
                 "PtraceTest.ChangeRegSetInOptSyscall",
                 "PtraceTest.ExitWhenParentIsNotTracer_Syscall_TraceVfork_TraceVforkDone",
                 "PtraceTest.GetRegSet",
-                "PtraceTest.GetSigMask",
                 "PtraceTest.GetSiginfo_SetSiginfo_SignalInjection",
                 "PtraceTest.Int3",
                 "PtraceTest.Interrupt_Listen_RequireSeize",

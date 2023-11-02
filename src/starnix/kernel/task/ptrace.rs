@@ -126,6 +126,7 @@ pub fn ptrace_dispatch(
     }
 
     // The remaining requests (to be added) require the thread to be stopped.
+    let mut state = tracee.write();
     if tracee.load_stopped().is_waking_or_awake() {
         return error!(ESRCH);
     }
@@ -145,6 +146,31 @@ pub fn ptrace_dispatch(
             let ptr: UserRef<usize> = UserRef::from(addr);
             let val = data.ptr() as usize;
             tracee.mm.write_object(ptr, &val)?;
+            Ok(())
+        }
+        PTRACE_SETSIGMASK => {
+            // addr is the size of the buffer pointed to
+            // by data, but has to be sizeof(sigset_t).
+            if addr.ptr() != std::mem::size_of::<SigSet>() {
+                return error!(EINVAL);
+            }
+            // sigset comes from *data.
+            let src: UserRef<SigSet> = UserRef::from(data);
+            let val = current_task.mm.read_object(src)?;
+            state.signals.set_mask(val);
+
+            Ok(())
+        }
+        PTRACE_GETSIGMASK => {
+            // addr is the size of the buffer pointed to
+            // by data, but has to be sizeof(sigset_t).
+            if addr.ptr() != std::mem::size_of::<SigSet>() {
+                return error!(EINVAL);
+            }
+            // sigset goes in *data.
+            let dst: UserRef<SigSet> = UserRef::from(data);
+            let val = state.signals.mask();
+            current_task.mm.write_object(dst, &val)?;
             Ok(())
         }
         _ => {

@@ -116,10 +116,8 @@ pub fn dequeue_signal(
     registers: &mut RegisterState,
 ) {
     let mask = task_state.signals.mask();
-    let is_ptraced = task_state.is_ptraced();
-    let siginfo = task_state
-        .signals
-        .take_next_where(|sig| !mask.has_signal(sig.signal) || sig.force || is_ptraced);
+    let siginfo =
+        task_state.signals.take_next_where(|sig| !mask.has_signal(sig.signal) || sig.force);
     prepare_to_restart_syscall(
         registers,
         siginfo.as_ref().map(|siginfo| task.thread_group.signal_actions.get(siginfo.signal)),
@@ -138,7 +136,7 @@ pub fn dequeue_signal(
     };
 
     if let Some(ref siginfo) = siginfo {
-        if is_ptraced && siginfo.signal != SIGKILL {
+        if task_state.is_ptraced() && siginfo.signal != SIGKILL {
             // Indicate we will be stopping for ptrace at the next opportunity.
             // Whether you actually deliver the signal is now up to ptrace, so
             // we can return.
