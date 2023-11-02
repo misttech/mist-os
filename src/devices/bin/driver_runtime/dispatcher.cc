@@ -419,9 +419,6 @@ zx_status_t Dispatcher::CreateUnmanagedDispatcher(
       []() {
         // We want the Test dispatchers to have the allow_sync option on them which leads to this
         // adder being called. So we return success even though this is a no-op.
-        LOGF(
-            INFO,
-            "ALLOW_SYNC_CALLS enabled on unmanaged dispatcher, ensure sync calls are handled on a managed dispatcher.");
         return ZX_OK;
       },
       shutdown_observer, out_dispatcher);
