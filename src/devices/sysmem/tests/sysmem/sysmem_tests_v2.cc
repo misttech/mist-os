@@ -17,6 +17,7 @@
 #include <zircon/threads.h>
 #include <zircon/types.h>
 
+#include <algorithm>
 #include <random>
 
 #include <fbl/algorithm.h>
@@ -375,6 +376,45 @@ void set_specific_constraints_v2(fidl::SyncClient<v2::BufferCollection>& collect
   buffer_memory.inaccessible_domain_supported() = false;
   ZX_DEBUG_ASSERT(!buffer_memory.heap_permitted().has_value());
   ZX_DEBUG_ASSERT(!constraints.image_format_constraints().has_value());
+  v2::BufferCollectionSetConstraintsRequest set_constraints_request;
+  set_constraints_request.constraints() = std::move(constraints);
+  EXPECT_TRUE(collection->SetConstraints(std::move(set_constraints_request)).is_ok());
+}
+
+void set_pixel_format_modifier_constraints_v2(fidl::SyncClient<v2::BufferCollection>& collection,
+                                              std::optional<uint64_t> pixel_format_modifier,
+                                              bool has_buffer_usage) {
+  v2::BufferCollectionConstraints constraints;
+  if (has_buffer_usage) {
+    constraints.usage().emplace();
+    constraints.usage()->cpu() = v2::kCpuUsageReadOften | v2::kCpuUsageWriteOften;
+  } else {
+    constraints.usage().emplace();
+    constraints.usage()->none() = v2::kNoneUsage;
+  }
+  constraints.min_buffer_count_for_camping() = 1;
+  constraints.buffer_memory_constraints().emplace();
+  auto& buffer_memory = constraints.buffer_memory_constraints().value();
+  buffer_memory.min_size_bytes() = zx_system_get_page_size();
+  // Allow a max that's just large enough to accommodate the size implied
+  // by the min frame size and PixelFormat.
+  buffer_memory.physically_contiguous_required() = false;
+  buffer_memory.secure_required() = false;
+  buffer_memory.ram_domain_supported() = false;
+  buffer_memory.cpu_domain_supported() = true;
+  buffer_memory.inaccessible_domain_supported() = false;
+  ZX_DEBUG_ASSERT(!buffer_memory.heap_permitted().has_value());
+
+  constraints.image_format_constraints().emplace(1);
+  auto& image_format_constraints = constraints.image_format_constraints()->at(0);
+  image_format_constraints.pixel_format() = fuchsia_images2::PixelFormat::kR8G8B8A8;
+  if (pixel_format_modifier.has_value()) {
+    image_format_constraints.pixel_format_modifier() = *pixel_format_modifier;
+  }
+  image_format_constraints.color_spaces().emplace(1);
+  image_format_constraints.color_spaces()->at(0) = fuchsia_images2::ColorSpace::kSrgb;
+  image_format_constraints.min_size() = {256, 256};
+
   v2::BufferCollectionSetConstraintsRequest set_constraints_request;
   set_constraints_request.constraints() = std::move(constraints);
   EXPECT_TRUE(collection->SetConstraints(std::move(set_constraints_request)).is_ok());
@@ -6213,6 +6253,57 @@ TEST(Sysmem, SetWeakOk_ForChildNodesAlso_AllowsSysmem1Child) {
   // Despite inability to deliver close_weak_asap to a v1 Node that's weak, because the weak v1
   // Node is covered by a v2 parent node that SetWeakOk(for_child_nodes_also=true), the v1 weak
   // child Node did not cause allocation failure.
+}
+
+TEST(Sysmem, PixelFormatModifier_DoNotCare) {
+  std::random_device random_device;
+  std::mt19937 prng(random_device());
+
+  struct ModifierAndUsage {
+    std::optional<uint64_t> pixel_format_modifier;
+    bool buffer_usage;
+  };
+
+  // These settings should succeed, in any accumulation order.
+  std::vector<ModifierAndUsage> settings;
+  // no usage and un-set modifier means kFormatModifierDoNotCare
+  settings.emplace_back(ModifierAndUsage{std::nullopt, false});
+  // explicit kFormatModifierDoNotCare, with usage
+  settings.emplace_back(ModifierAndUsage{fuchsia_images2::kFormatModifierDoNotCare, true});
+  // specific pixel_format_modifier, with usage
+  settings.emplace_back(ModifierAndUsage{fuchsia_images2::kFormatModifierIntelI915XTiled, true});
+
+  constexpr uint32_t kIterationCount = 25;
+  for (uint32_t iteration = 0; iteration < kIterationCount; ++iteration) {
+    std::shuffle(settings.begin(), settings.end(), prng);
+
+    auto parent_token = create_initial_token_v2();
+    auto child_token = create_token_under_token_v2(parent_token);
+    auto child2_token = create_token_under_token_v2(child_token);
+
+    auto parent_collection = convert_token_to_collection_v2(std::move(parent_token));
+    auto child_collection = convert_token_to_collection_v2(std::move(child_token));
+    auto child2_collection = convert_token_to_collection_v2(std::move(child2_token));
+
+    set_pixel_format_modifier_constraints_v2(parent_collection, settings[0].pixel_format_modifier,
+                                             settings[0].buffer_usage);
+    set_pixel_format_modifier_constraints_v2(child_collection, settings[1].pixel_format_modifier,
+                                             settings[1].buffer_usage);
+    set_pixel_format_modifier_constraints_v2(child2_collection, settings[2].pixel_format_modifier,
+                                             settings[2].buffer_usage);
+
+    auto parent_wait_result = parent_collection->WaitForAllBuffersAllocated();
+    ASSERT_TRUE(parent_wait_result.is_ok());
+    auto child_wait_result = child_collection->WaitForAllBuffersAllocated();
+    ASSERT_TRUE(child_wait_result.is_ok());
+    auto child2_wait_result = child2_collection->WaitForAllBuffersAllocated();
+    ASSERT_TRUE(child2_wait_result.is_ok());
+
+    auto& image_constraints =
+        *parent_wait_result->buffer_collection_info()->settings()->image_format_constraints();
+    ASSERT_EQ(image_constraints.pixel_format_modifier().value(),
+              fuchsia_images2::kFormatModifierIntelI915XTiled);
+  }
 }
 
 // This test is too likely to cause an OOM which would be treated as a flake. For now we can enable

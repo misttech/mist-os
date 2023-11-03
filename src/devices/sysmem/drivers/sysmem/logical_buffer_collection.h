@@ -462,6 +462,7 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
                                             fuchsia_sysmem2::BufferMemoryConstraints& constraints);
 
   bool CheckSanitizeImageFormatConstraints(CheckSanitizeStage stage,
+                                           const fuchsia_sysmem2::BufferUsage& buffer_usage,
                                            fuchsia_sysmem2::ImageFormatConstraints& constraints);
 
   bool AccumulateConstraintBufferCollection(fuchsia_sysmem2::BufferCollectionConstraints* acc,

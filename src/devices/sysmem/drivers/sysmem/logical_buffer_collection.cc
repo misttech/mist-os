@@ -262,15 +262,27 @@ fit::result<zx_status_t, bool> IsImageFormatConstraintsPixelFormatDoNotCare(
   if (!x.pixel_format().has_value()) {
     return fit::error(ZX_ERR_INVALID_ARGS);
   }
-  if (!x.pixel_format().has_value()) {
-    return fit::error(ZX_ERR_INVALID_ARGS);
-  }
   if (*x.pixel_format() != fuchsia_images2::PixelFormat::kDoNotCare) {
     return fit::ok(false);
   }
   if (x.pixel_format_modifier().has_value() &&
-      *x.pixel_format_modifier() != fuchsia_images2::kFormatModifierNone) {
+      *x.pixel_format_modifier() != fuchsia_images2::kFormatModifierNone &&
+      *x.pixel_format_modifier() != fuchsia_images2::kFormatModifierDoNotCare) {
     return fit::error(ZX_ERR_INVALID_ARGS);
+  }
+  return fit::ok(true);
+}
+
+fit::result<zx_status_t, bool> IsImageFormatConstraintsPixelFormatModifierDoNotCare(
+    const fuchsia_sysmem2::ImageFormatConstraints& x) {
+  if (!x.pixel_format().has_value()) {
+    return fit::error(ZX_ERR_INVALID_ARGS);
+  }
+  if (!x.pixel_format_modifier().has_value()) {
+    return fit::ok(false);
+  }
+  if (*x.pixel_format_modifier() != fuchsia_images2::kFormatModifierDoNotCare) {
+    return fit::ok(false);
   }
   return fit::ok(true);
 }
@@ -345,6 +357,56 @@ void ReplicatePixelFormatDoNotCare(
   ZX_DEBUG_ASSERT(to_update[0].pixel_format_modifier().has_value() ==
                   to_match[0].pixel_format_modifier().has_value());
   // The format_modifier_value (if any) also matches.
+}
+
+void ReplicateAnyPixelFormatModifierDoNotCares(
+    const std::vector<fuchsia_sysmem2::ImageFormatConstraints>& to_match,
+    std::vector<fuchsia_sysmem2::ImageFormatConstraints>& to_update) {
+  // The kDoNotCare entries that were replicated to create these to_append entries are removed from
+  // to_update, to be replaced by to_append entries. The to_append entries are appended to to_update
+  // before returning.
+  std::vector<fuchsia_sysmem2::ImageFormatConstraints> to_append;
+
+  for (size_t ui = 0; ui < to_update.size();) {
+    auto u_pixel_format_and_modifier = PixelFormatAndModifierFromConstraints(to_update[ui]);
+    if (u_pixel_format_and_modifier.pixel_format_modifier !=
+        fuchsia_images2::kFormatModifierDoNotCare) {
+      ++ui;
+      continue;
+    }
+
+    // If to_match also has kDoNotCare (rather than a set of specific modifiers, or nothing), we'll
+    // basically move the to_update kDoNotCare entry from to_update to to_append and then back to
+    // to_update, which doesn't change anything overall, but also doesn't seem costly enough from a
+    // performance point of view to justify extra code here to avoid.
+
+    auto to_fan_out = std::move(to_update[ui]);
+
+    // to_fan_out's information is effectively being moved (along with fanning out) into to_append,
+    // so move down the last item (if this isn't already the last) to keep to_update packed
+    if (ui != to_update.size() - 1) {
+      to_update[ui] = std::move(to_update[to_update.size() - 1]);
+    }
+    to_update.resize(to_update.size() - 1);
+
+    for (size_t mi = 0; mi < to_match.size(); ++mi) {
+      auto m_pixel_format_and_modifier = PixelFormatAndModifierFromConstraints(to_match[mi]);
+      if (m_pixel_format_and_modifier.pixel_format != u_pixel_format_and_modifier.pixel_format) {
+        continue;
+      }
+      // intentional copy/clone not move
+      auto& cloned_entry = to_append.emplace_back(to_fan_out);
+      // clone the entry from to_update, but replace with to_match's pixel_format_modifier
+      cloned_entry.pixel_format_modifier() = m_pixel_format_and_modifier.pixel_format_modifier;
+    }
+
+    // intentionally don't ++ui, since this entry has changed, so still needs to be processed (or
+    // ui == size() in which case we're done)
+  }
+
+  for (auto& to_move : to_append) {
+    to_update.emplace_back(std::move(to_move));
+  }
 }
 
 void ReplicateColorSpaceDoNotCare(const std::vector<fuchsia_images2::ColorSpace>& to_match,
@@ -2345,8 +2407,10 @@ bool LogicalBufferCollection::CheckSanitizeBufferCollectionConstraints(
     return false;
   }
   bool is_pixel_format_do_not_care = is_pixel_format_do_not_care_result.value();
+
   for (uint32_t i = 0; i < constraints.image_format_constraints()->size(); ++i) {
-    if (!CheckSanitizeImageFormatConstraints(stage,
+    ZX_DEBUG_ASSERT(constraints.usage().has_value());
+    if (!CheckSanitizeImageFormatConstraints(stage, *constraints.usage(),
                                              constraints.image_format_constraints()->at(i))) {
       return false;
     }
@@ -2362,6 +2426,44 @@ bool LogicalBufferCollection::CheckSanitizeBufferCollectionConstraints(
         LogError(FROM_HERE, "at least one participant must specify PixelFormatType != DO_NOT_CARE");
         return false;
       }
+
+      for (uint32_t i = 0; i < constraints.image_format_constraints()->size(); ++i) {
+        auto& ifc = constraints.image_format_constraints()->at(i);
+
+        auto is_pixel_format_modifier_do_not_care_result =
+            IsImageFormatConstraintsPixelFormatModifierDoNotCare(ifc);
+        ZX_DEBUG_ASSERT(is_pixel_format_modifier_do_not_care_result.is_ok());
+        bool is_pixel_format_modifier_do_not_care =
+            is_pixel_format_modifier_do_not_care_result.value();
+
+        if (is_pixel_format_modifier_do_not_care) {
+          LogInfo(
+              FROM_HERE,
+              "per-PixelFormat, at least one participant must specify pixel_format_modifier != kFormatModifierDoNotCare - removing: pixel_format: %u pixel_format_modifier: 0x%" PRIx64,
+              *ifc.pixel_format(), *ifc.pixel_format_modifier());
+          // Remove by moving down last PixelFormat to this index and processing this index again,
+          // if this isn't already the last PixelFormat.
+          if (i != constraints.image_format_constraints()->size() - 1) {
+            constraints.image_format_constraints()->at(i) =
+                std::move(constraints.image_format_constraints()->at(
+                    constraints.image_format_constraints()->size() - 1));
+            --i;
+          }
+          constraints.image_format_constraints()->resize(
+              constraints.image_format_constraints()->size() - 1);
+          if (constraints.image_format_constraints()->size() == 0) {
+            // The fix is for at least one participant to specify a specific pixel_format_modifier.
+            // For this to occur, every participant must have either explicitly specified
+            // pixel_format_modifier kFormatModifierDoNotCare or sent un-set pixel_format_modifier
+            // with BufferUsage none.
+            LogError(
+                FROM_HERE,
+                "after removing pixel format that remained pixel_format_modifier kFormatModifierDoNotCare, zero pixel formats remaining");
+            return false;
+          }
+        }
+      }
+
       for (uint32_t i = 0; i < constraints.image_format_constraints()->size(); ++i) {
         auto& ifc = constraints.image_format_constraints()->at(i);
         auto is_color_space_do_not_care_result = IsColorSpaceArrayDoNotCare(*ifc.color_spaces());
@@ -2380,16 +2482,12 @@ bool LogicalBufferCollection::CheckSanitizeBufferCollectionConstraints(
           // through the color space no matter what it is with no need for sysmem to select a color
           // space and the special scenario would otherwise involve (by intent of design) _all_ the
           // participants wanting to set kDoNotCare (which would lead to this error).
-          //
-          // The preferred fix most of the time is specifying a specific color space in at least one
-          // participant.  Much less commonly, and only if actually necessary, kPassThrough can be
-          // used by all participants instead (see previous paragraph).
           LogInfo(FROM_HERE,
-                  "per-PixelFormatType, at least one participant must specify ColorSpaceType != "
-                  "kDoNotCare - removing PixelFormatType: type: %u modifier: 0x%" PRIx64,
+                  "per-PixelFormat, at least one participant must specify ColorSpaceType != "
+                  "kDoNotCare - removing: pixel_format: %u pixel_format_modifier: 0x%" PRIx64,
                   *ifc.pixel_format(),
                   ifc.pixel_format_modifier().has_value() ? *ifc.pixel_format_modifier() : 0ull);
-          // Remove by copying down last PixelFormat to this index and processing this index again,
+          // Remove by moving down last PixelFormat to this index and processing this index again,
           // if this isn't already the last PixelFormat.
           if (i != constraints.image_format_constraints()->size() - 1) {
             constraints.image_format_constraints()->at(i) =
@@ -2400,8 +2498,11 @@ bool LogicalBufferCollection::CheckSanitizeBufferCollectionConstraints(
           constraints.image_format_constraints()->resize(
               constraints.image_format_constraints()->size() - 1);
           if (constraints.image_format_constraints()->size() == 0) {
+            // The preferred fix most of the time is specifying a specific color space in at least
+            // one participant.  Much less commonly, and only if actually necessary, kPassThrough
+            // can be used by all participants instead (see previous paragraph).
             LogError(FROM_HERE,
-                     "after removing pixel format that remained ColorSpaceType kDoNotCare, zero "
+                     "after removing pixel format that remained ColorSpace kDoNotCare, zero "
                      "pixel formats remaining");
             return false;
           }
@@ -2443,8 +2544,35 @@ bool LogicalBufferCollection::CheckSanitizeBufferCollectionConstraints(
             PixelFormatAndModifierFromConstraints(constraints.image_format_constraints()->at(j));
         if (ImageFormatIsPixelFormatEqual(i_pixel_format_and_modifier,
                                           j_pixel_format_and_modifier)) {
+          // This can happen if a client is specifying two entries with same pixel_format and same
+          // pixel_format_modifier.
+          //
+          // This can also happen if such a duplicate is implied after default field handling, such
+          // as replacing "none" BufferUsage + un-set pixel_format_modifier with
+          // pixel_format_modifier kDoNotCare, along with another entry from the client with same
+          // pixel_format and explicit pixel_format_modifier kDoNotCare.
           LogError(FROM_HERE, "image format constraints %d and %d have identical formats", i, j);
           return false;
+        }
+        if (i_pixel_format_and_modifier.pixel_format == j_pixel_format_and_modifier.pixel_format) {
+          uint32_t do_not_care_index;
+          std::optional<uint32_t> problem_index;
+          if (i_pixel_format_and_modifier.pixel_format_modifier ==
+              fuchsia_images2::kFormatModifierDoNotCare) {
+            do_not_care_index = i;
+            problem_index = j;
+          } else if (j_pixel_format_and_modifier.pixel_format_modifier ==
+                     fuchsia_images2::kFormatModifierDoNotCare) {
+            do_not_care_index = j;
+            problem_index = i;
+          }
+          if (problem_index.has_value()) {
+            // kFormatModifierDoNotCare requires no other entries with same pixel_format.
+            LogError(FROM_HERE,
+                     "image format constraint at %d exists despite kFormatModifierDoNotCare at %d",
+                     *problem_index, do_not_care_index);
+            return false;
+          }
         }
       }
     }
@@ -2490,13 +2618,28 @@ bool LogicalBufferCollection::CheckSanitizeBufferMemoryConstraints(
 }
 
 bool LogicalBufferCollection::CheckSanitizeImageFormatConstraints(
-    CheckSanitizeStage stage, fuchsia_sysmem2::ImageFormatConstraints& constraints) {
+    CheckSanitizeStage stage, const fuchsia_sysmem2::BufferUsage& buffer_usage,
+    fuchsia_sysmem2::ImageFormatConstraints& constraints) {
   // We never CheckSanitizeImageFormatConstraints() on empty (aka initial) constraints.
   ZX_DEBUG_ASSERT(stage != CheckSanitizeStage::kInitial);
 
   FIELD_DEFAULT_ZERO(constraints, pixel_format);
-  // kFormatModifierNone
-  FIELD_DEFAULT_ZERO_64_BIT(constraints, pixel_format_modifier);
+
+  ZX_DEBUG_ASSERT(constraints.pixel_format_modifier().has_value() ||
+                  stage == CheckSanitizeStage::kNotAggregated);
+  if (stage == CheckSanitizeStage::kNotAggregated) {
+    if (IsAnyUsage(buffer_usage)) {
+      // kFormatModifierNone / kFormatModifierLinear is the default when there is any usage. A
+      // client with usage which doesn't care what the pixel format modifier is (what tiling is
+      // used) can explicitly specify kFormatModifierDoNotCare instead of leaving
+      // pixel_format_modifier un-set..
+      FIELD_DEFAULT_ZERO_64_BIT(constraints, pixel_format_modifier);
+    } else {
+      // A client with no usage, which also doesn't set pixel_format_modifier, doesn't prevent using
+      // a tiled format.
+      FIELD_DEFAULT(constraints, pixel_format_modifier, fuchsia_images2::kFormatModifierDoNotCare);
+    }
+  }
 
   FIELD_DEFAULT_SET_VECTOR(constraints, color_spaces, 0);
 
@@ -2548,7 +2691,13 @@ bool LogicalBufferCollection::CheckSanitizeImageFormatConstraints(
   // checked previously
   ZX_DEBUG_ASSERT(is_pixel_format_do_not_care_result.is_ok());
   bool is_pixel_format_do_not_care = is_pixel_format_do_not_care_result.value();
-  if (!is_pixel_format_do_not_care) {
+
+  auto is_pixel_format_modifier_do_not_care_result =
+      IsImageFormatConstraintsPixelFormatModifierDoNotCare(constraints);
+  ZX_DEBUG_ASSERT(is_pixel_format_modifier_do_not_care_result.is_ok());
+  bool is_pixel_format_modifier_do_not_care = is_pixel_format_modifier_do_not_care_result.value();
+
+  if (!is_pixel_format_do_not_care && !is_pixel_format_modifier_do_not_care) {
     auto pixel_format_and_modifier = PixelFormatAndModifierFromConstraints(constraints);
     if (!ImageFormatIsSupported(pixel_format_and_modifier)) {
       LogError(FROM_HERE, "Unsupported pixel format");
@@ -2852,7 +3001,7 @@ bool LogicalBufferCollection::AccumulateConstraintImageFormats(
   // acc.
   ZX_DEBUG_ASSERT(!acc->empty());
 
-  // Any pixel_format kDoNotCare can only happen with count() == 1, checked previously.  If both
+  // Any pixel_format kDoNotCare can only happen with size() == 1, checked previously.  If both
   // acc and c are indicating kDoNotCare, the result still needs to be kDoNotCare.  If only one of
   // acc or c is indicating kDoNotCare, we need to fan out the kDoNotCare (via cloning) and replace
   // each of the resulting pixel_format fields with the specific (not kDoNotCare) pixel_format(s)
@@ -2879,7 +3028,29 @@ bool LogicalBufferCollection::AccumulateConstraintImageFormats(
     ZX_DEBUG_ASSERT(acc_is_do_not_care == c_is_do_not_care);
   }
 
-  for (uint32_t ai = 0; ai < acc->size(); ++ai) {
+  // In contrast to pixel_format kDoNotCare, pixel_format_modifier kDoNotCare doesn't require
+  // vector<ImageFormatConstraints>.size() == 1. Instead, pixel_format_modifier kDoNotCare
+  // requires the number of ImageFormatConstraints with the corresponding pixel_format to be 1,
+  // checked previously.
+  //
+  // On a per-pixel_format basis:
+  //   * If both acc and c are indicating pixel_format_modifier kDoNotCare, the result still needs
+  //     to be pixel_format_modifier kDoNotCare.
+  //   * If only one of acc or c is indicating pixel_format_modifier kDoNotCare, we need to fan out
+  //     the kDoNotCare (via cloning) and replace each of the resulting pixel_format_modifier fields
+  //     with the specific (not kDoNotCare) pixel_format_modifier(s) indicated by the other (of acc
+  //     and c).
+  //
+  // After this, accumulation can proceed as normal, with pixel_format_modifier kDoNotCare (if still
+  // present) treated as any other normal pixel_format_modifier. At the end of overall accumulation,
+  // we must filter out any pixel_format(s) which still have pixel_format_modifier kDoNotCare.
+  //
+  // At the protocol layer, a pixel_format kDoNotCare also implies pixel_format_modifier kDoNotCare,
+  // but that's handled above as part of handling pixel_format kDoNotCare, not here.
+  ReplicateAnyPixelFormatModifierDoNotCares(c, *acc);
+  ReplicateAnyPixelFormatModifierDoNotCares(*acc, c);
+
+  for (size_t ai = 0; ai < acc->size(); ++ai) {
     bool is_found_in_c = false;
     for (size_t ci = 0; ci < c.size(); ++ci) {
       auto acc_pixel_format_and_modifier = PixelFormatAndModifierFromConstraints((*acc)[ai]);
@@ -3002,7 +3173,14 @@ bool LogicalBufferCollection::AccumulateConstraintImageFormat(
   // maintained during accumulation, largely thanks to each c having been checked previously
   ZX_DEBUG_ASSERT(acc_is_pixel_format_do_not_care_result.is_ok());
   bool acc_is_pixel_format_do_not_care = acc_is_pixel_format_do_not_care_result.value();
-  if (!acc_is_pixel_format_do_not_care) {
+
+  auto acc_is_pixel_format_modifier_do_not_care_result =
+      IsImageFormatConstraintsPixelFormatModifierDoNotCare(*acc);
+  ZX_DEBUG_ASSERT(acc_is_pixel_format_modifier_do_not_care_result.is_ok());
+  bool acc_is_pixel_format_modifier_do_not_care =
+      acc_is_pixel_format_modifier_do_not_care_result.value();
+
+  if (!acc_is_pixel_format_do_not_care && !acc_is_pixel_format_modifier_do_not_care) {
     auto acc_pixel_format_and_modifier = PixelFormatAndModifierFromConstraints(*acc);
     acc->size_alignment()->width() =
         std::max(acc->size_alignment()->width(),
