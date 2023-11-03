@@ -13,11 +13,16 @@
                 name: "net",
                 endpoints: [
                     { name: "client-ep" },
+                    { name: "server-ep" },
+                ],
+            },
+            {
+                name: "other",
+                endpoints: [
                     {
                         name: "client-no-addrs",
                         mac: "aa:bb:cc:dd:ee:ff",
                     },
-                    { name: "server-ep" },
                     {
                         name: "client-ipv4-fwd",
                         mac: "88:99:aa:bb:cc:dd",
