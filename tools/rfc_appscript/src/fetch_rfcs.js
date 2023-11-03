@@ -12,9 +12,11 @@ const AUTHORS_COL = 'Author(s)';
 const SUBMITTED_COL = 'Submitted';
 const STATUS_COL = 'Status';
 const NEEDS_SYNC_COL = 'Needs Sync';
+const CL_UPDATED_COL = 'CL Updated';
 
 const WIP_STATUS = 'Socialization';
 const DEFAULT_STATUS = 'Draft';
+const ABANDONED_STATUS = 'Withdrawn';
 
 const BASE_URL = 'https://fuchsia-review.googlesource.com';
 const RFCS_DIR = 'docs/contribute/governance/rfcs';
@@ -142,6 +144,8 @@ function syncRow(tableId, rowId) {
     [CL_COL]: `fxrev.dev/${cl._number}`,
     [AUTHORS_COL]: cl.owner.email,
     [SUBMITTED_COL]: cl.created,
+    [CL_UPDATED_COL]: cl.updated,
+
     [NEEDS_SYNC_COL]: false,
   };
 
@@ -151,6 +155,11 @@ function syncRow(tableId, rowId) {
     if (!row.values[STATUS_COL] || row.values[STATUS_COL] === WIP_STATUS) {
       patchedValues[STATUS_COL] = DEFAULT_STATUS;
     }
+  }
+
+  // Abandoning the CL amounts to withdrawing the RFC.
+  if (cl.status === 'ABANDONED') {
+    patchedValues[STATUS_COL] = ABANDONED_STATUS;
   }
 
   Area120Tables.Tables.Rows.patch({ values: patchedValues }, rowName);
