@@ -4,7 +4,7 @@
 
 import("//build/python/python_mobly_test.gni")
 
-assert(is_host)
+assert(is_host, "Python E2E tests are host-only")
 
 # This test uses the base Hybrid Mobly test class without extending it further.
 # We can still parameterize the test to run arbitrary hermetic tests by

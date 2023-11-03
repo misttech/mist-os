@@ -8,6 +8,7 @@ assert(is_host, "Python E2E tests are host-only")
 group("tests") {
   testonly = true
   public_deps = [
+    "test_hello_world:tests",
     "test_hybrid:tests",
     "test_multi_device:tests",
     "test_power_cycle:tests",

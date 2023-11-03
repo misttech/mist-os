@@ -2,9 +2,10 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/python/python_library.gni")
 import("//build/python/python_mobly_test.gni")
 import("//build/testing/environments.gni")
+
+assert(is_host, "Python E2E tests are host-only")
 
 python_mobly_test("multi_device_test") {
   main_source = "test_multi_device.py"
