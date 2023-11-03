@@ -1,0 +1,88 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/python/python_binary.gni")
+import("//build/python/python_host_test.gni")
+
+assert(is_host)
+
+binary_sources = [
+  "command.py",
+  "command_runner.py",
+  "execution_params.py",
+  "params.py",
+]
+
+binary_deps = []
+
+python_binary("host_test_component_runner") {
+  testonly = true
+  main_source = "main.py"
+  sources = binary_sources + [ "main.py" ]
+  deps = binary_deps
+}
+
+main_module_tests = [
+  "params",
+  "execution_params",
+  "command",
+  "command_runner",
+]
+
+test_targets = []
+test_dir = "$root_out_dir/test_data/host_test_component_runner"
+test_data_dir = "$test_dir/test_data"
+
+executable("exit") {
+  testonly = true
+  sources = [ "tests/exit.cc" ]
+  output_dir = test_data_dir
+}
+
+executable("output_mock") {
+  testonly = true
+  sources = [ "tests/output_mock.cc" ]
+  output_dir = test_data_dir
+}
+
+host_test_data("test_data") {
+  generated_executable_deps = [
+    ":exit",
+    ":output_mock",
+  ]
+
+  sources = []
+  foreach(dep, generated_executable_deps) {
+    # get_target_outputs does not work on "executables", so need to use this
+    # hack.
+    sources += [ "$test_data_dir/" + get_label_info(dep, "name") ]
+  }
+
+  deps = generated_executable_deps
+}
+
+foreach(test_name, main_module_tests) {
+  target = "host_test_component_runner.${test_name}_test"
+  main_source = "tests/${test_name}_test.py"
+  python_host_test(target) {
+    main_source = main_source
+    main_callable = "unittest.main"
+    extra_args = [ "-v" ]
+    test_dir = "$test_dir"
+    sources = binary_sources
+    libraries = binary_deps
+    deps = [ ":test_data" ]
+  }
+  test_targets += [ ":${target}" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = test_targets
+}
+
+group("host_test_component") {
+  testonly = true
+  deps = [ ":host_test_component_runner" ]
+}
