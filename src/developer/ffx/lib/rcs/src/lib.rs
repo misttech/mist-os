@@ -326,6 +326,23 @@ async fn get_cf_root_from_namespace<M: fidl::endpoints::DiscoverableProtocolMark
     Ok(proxy)
 }
 
+pub async fn kernel_stats(
+    rcs_proxy: &RemoteControlProxy,
+    timeout: Duration,
+) -> Result<fidl_fuchsia_kernel::StatsProxy> {
+    let (proxy, server_end) = fidl::endpoints::create_proxy::<fidl_fuchsia_kernel::StatsMarker>()?;
+    open_with_timeout_at(
+        timeout,
+        REMOTE_CONTROL_MONIKER,
+        OpenDirType::NamespaceDir,
+        &format!("svc/{}", fidl_fuchsia_kernel::StatsMarker::PROTOCOL_NAME),
+        rcs_proxy,
+        server_end.into_channel(),
+    )
+    .await?;
+    Ok(proxy)
+}
+
 pub async fn root_realm_query(
     rcs_proxy: &RemoteControlProxy,
     timeout: Duration,

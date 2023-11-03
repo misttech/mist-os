@@ -5,12 +5,11 @@
 use {
     anyhow::{bail, Result},
     async_trait::async_trait,
-    errors::{ffx_bail, ffx_error},
+    errors::ffx_bail,
     ffx_cpu_load_args as args_mod,
     fho::{moniker, FfxMain, FfxTool, SimpleWriter},
     fidl_fuchsia_developer_remotecontrol as rc, fidl_fuchsia_kernel as fstats,
     fidl_fuchsia_metricslogger_test::{self as fmetrics, CpuLoad, Metric},
-    fuchsia_zircon_status::Status,
 };
 
 #[derive(FfxTool)]
@@ -35,14 +34,11 @@ impl FfxMain for CpuLoadTool {
                 args_mod::SubCommand::Stop(_) => stop(cpu_logger).await?,
             },
             (None, Some(duration)) => {
-                let (stats_proxy, stats_server_end) = fidl::endpoints::create_proxy().unwrap();
-                if let Err(i) = rcs_proxy
-                    .kernel_stats(stats_server_end)
-                    .await
-                    .map_err(|err| ffx_error!("FIDL error: {err}"))?
-                {
-                    ffx_bail!("Could not open fuchsia.kernel.Stats: {}", Status::from_raw(i));
-                }
+                let stats_proxy =
+                    match rcs::kernel_stats(&rcs_proxy, std::time::Duration::from_secs(5)).await {
+                        Ok(s) => s,
+                        Err(e) => ffx_bail!("Could not open fuchsia.kernel.Stats: {e}",),
+                    };
 
                 measure(stats_proxy, duration, &mut writer).await?;
             }
