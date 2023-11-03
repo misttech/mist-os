@@ -11,4 +11,7 @@
     program: {
         binary: "test/intel-i915-test",
     },
+    use: [
+        { protocol: "fuchsia.boot.RootResource" },
+    ],
 }

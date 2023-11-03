@@ -16,7 +16,7 @@
     use: [
         {
             protocol: [
-                "fuchsia.kernel.MmioResource",
+                "fuchsia.boot.RootResource",
                 "fuchsia.scheduler.ProfileProvider",
                 "fuchsia.sysmem.Allocator",
             ],

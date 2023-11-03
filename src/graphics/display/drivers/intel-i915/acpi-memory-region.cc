@@ -35,6 +35,9 @@ zx::result<AcpiMemoryRegion> AcpiMemoryRegion::Create(zx_device_t* parent, zx_pa
   // The offset of the region's start, within the region's first page.
   const uint32_t page_offset = static_cast<uint32_t>(region_base ^ first_page_physical_address);
 
+  // TODO(fxbug.dev/31358): We use `get_root_resource()` here because we need to
+  // map some memory whose physical address is only known at runtime.
+  //
   // The IGD OpRegion specification asks the boot firmware to place the memory
   // regions we're interested in (Memory OpRegion, extended Video BIOS Table) in
   // one ACPI custom Operation Region of Type 4 (NVS = Non-Volatile Sleeping
@@ -42,7 +45,7 @@ zx::result<AcpiMemoryRegion> AcpiMemoryRegion::Create(zx_device_t* parent, zx_pa
   // that returns a VMO representing the ACPI custom Operation Region that
   // contains a given physical address.
   zx::vmo region_vmo;
-  zx_status_t status = zx::vmo::create_physical(*zx::unowned_resource(get_mmio_resource(parent)),
+  zx_status_t status = zx::vmo::create_physical(*zx::unowned_resource(get_root_resource(parent)),
                                                 first_page_physical_address, vmo_size, &region_vmo);
   if (status != ZX_OK) {
     return zx::error_result(status);
