@@ -555,6 +555,24 @@ closed protocol WlanSoftmacBridge {
     strict StartActiveScan(WlanSoftmacStartActiveScanRequest) -> (table {
         1: scan_id uint64;
     }) error zx.Status;
+
+    /// Cancels the ongoing scan corresponding to `scan_id`,
+    /// where `scan_id` is an identifier returned by
+    /// `StartPassiveScan()` or `StartActiveScan()`. If cancellation succeeds,
+    /// the server will soon call WlanSoftmacIfc.ScanComplete() with the same
+    /// `scan_id`.
+    ///
+    /// A device driver indicates support for `CancelScan()` using
+    /// `fuchsia.wlan.common/ScanOffloadExtension.scan_cancel_supported`.
+    ///
+    /// Common errors include:
+    ///
+    /// - `ZX_ERR_NOT_FOUND`: `scan_id` does not match an ongoing scan.
+    /// - `ZX_ERR_NOT_SUPPORTED`: Server does not support scan cancellation.
+    @available(added=HEAD)
+    strict CancelScan(table {
+        1: scan_id uint64;
+    }) -> () error zx.Status;
 };
 
 @discoverable
@@ -764,20 +782,20 @@ closed protocol WlanSoftmac {
         1: scan_id uint64;
     }) error zx.Status;
 
-    /// If supported, cancel the ongoing scan corresponding to `scan_id` in the
-    /// device driver, where `scan_id` is an identifier returned by
-    /// `StartPassiveScan()` or `StartActiveScan()`. The return value of this
-    /// function indicates whether a valid scan_id was passed and will be
-    /// canceled. The actual result of cancellation should be indicated by the
-    /// driver using `fuchsia.hardware.wlan.softmac/WlanSoftmacIfc.ScanComplete()`.
+    /// Cancels the ongoing scan corresponding to `scan_id`,
+    /// where `scan_id` is an identifier returned by
+    /// `StartPassiveScan()` or `StartActiveScan()`. If cancellation succeeds,
+    /// the server will soon call WlanSoftmacIfc.ScanComplete() with the same
+    /// `scan_id`.
     ///
     /// A device driver indicates support for `CancelScan()` using
     /// `fuchsia.wlan.common/ScanOffloadExtension.scan_cancel_supported`.
     ///
-    /// Common errors include: \
-    ///   ZX_ERR_NOT_FOUND: The given scan_id does not match an ongoing scan. \
-    ///   ZX_ERR_NOT_SUPPORTED: The device does not support scan cancellation.
-    @available(added=15)
+    /// Common errors include:
+    ///
+    /// - `ZX_ERR_NOT_FOUND`: `scan_id` does not match an ongoing scan.
+    /// - `ZX_ERR_NOT_SUPPORTED`: Server does not support scan cancellation.
+    @available(added=15, removed=HEAD)
     strict CancelScan(table {
         1: scan_id uint64;
     }) -> () error zx.Status;

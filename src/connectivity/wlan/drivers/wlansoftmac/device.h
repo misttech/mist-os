@@ -95,7 +95,6 @@ class Device : public DeviceInterface,
   zx_status_t EnableBeaconing(wlan_softmac_enable_beaconing_request_t* request) final;
   zx_status_t DisableBeaconing() final;
   zx_status_t InstallKey(wlan_key_configuration_t* key_config) final;
-  zx_status_t CancelScan(uint64_t scan_id) final;
   fbl::RefPtr<DeviceState> GetState() final;
   const discovery_support_t& GetDiscoverySupport() const final;
   const mac_sublayer_support_t& GetMacSublayerSupport() const final;

@@ -97,7 +97,10 @@ pub trait DeviceOps {
         &mut self,
         request: &fidl_softmac::WlanSoftmacStartActiveScanRequest,
     ) -> Result<fidl_softmac::WlanSoftmacBridgeStartActiveScanResponse, zx::Status>;
-    fn cancel_scan(&mut self, scan_id: u64) -> Result<(), zx::Status>;
+    fn cancel_scan(
+        &mut self,
+        request: &fidl_softmac::WlanSoftmacBridgeCancelScanRequest,
+    ) -> Result<(), zx::Status>;
     fn join_bss(&mut self, cfg: banjo_common::JoinBssRequest) -> Result<(), zx::Status>;
     fn enable_beaconing(
         &mut self,
@@ -310,8 +313,17 @@ impl DeviceOps for Device {
             .map_err(zx::Status::from_raw)
     }
 
-    fn cancel_scan(&mut self, scan_id: u64) -> Result<(), zx::Status> {
-        zx::ok((self.raw_device.cancel_scan)(self.raw_device.device, scan_id))
+    fn cancel_scan(
+        &mut self,
+        request: &fidl_softmac::WlanSoftmacBridgeCancelScanRequest,
+    ) -> Result<(), zx::Status> {
+        self.wlan_softmac_bridge_proxy
+            .cancel_scan(request, zx::Time::INFINITE)
+            .map_err(|fidl_error| {
+                error!("FIDL error during CancelScan: {:?}", fidl_error);
+                zx::Status::INTERNAL
+            })?
+            .map_err(zx::Status::from_raw)
     }
 
     fn join_bss(&mut self, mut cfg: banjo_common::JoinBssRequest) -> Result<(), zx::Status> {
@@ -498,8 +510,6 @@ pub struct DeviceInterface {
         device: *mut c_void,
         key: *mut banjo_wlan_softmac::WlanKeyConfiguration,
     ) -> i32,
-    /// Cancel ongoing scan in the driver
-    cancel_scan: extern "C" fn(device: *mut c_void, scan_id: u64) -> zx::sys::zx_status_t,
     /// Get discovery features supported by this WLAN interface
     get_discovery_support: extern "C" fn(device: *mut c_void) -> banjo_common::DiscoverySupport,
     /// Get MAC sublayer features supported by this WLAN interface
@@ -885,7 +895,10 @@ pub mod test_utils {
             })
         }
 
-        fn cancel_scan(&mut self, _scan_id: u64) -> Result<(), zx::Status> {
+        fn cancel_scan(
+            &mut self,
+            _request: &fidl_softmac::WlanSoftmacBridgeCancelScanRequest,
+        ) -> Result<(), zx::Status> {
             Err(zx::Status::NOT_SUPPORTED)
         }
 

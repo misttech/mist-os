@@ -171,6 +171,14 @@ class WlanSoftmacBridgeImpl : public fidl::WireServer<fuchsia_wlan_softmac::Wlan
     DispatchAndComplete(__func__, dispatcher, completer);
   }
 
+  void CancelScan(CancelScanRequestView request, CancelScanCompleter::Sync& completer) override {
+    Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::CancelScan> dispatcher =
+        [request](const auto& arena, const auto& client) {
+          return client.sync().buffer(arena)->CancelScan(*request);
+        };
+    DispatchAndComplete(__func__, dispatcher, completer);
+  }
+
   static void BindSelfManagedServer(
       async_dispatcher_t* dispatcher,
       fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac> client,
@@ -870,23 +878,6 @@ zx_status_t Device::InstallKey(wlan_key_configuration_t* key_config) {
     return result->error_value();
   }
   return ZX_OK;
-}
-
-zx_status_t Device::CancelScan(uint64_t scan_id) {
-  auto arena = fdf::Arena::Create(0, 0);
-  if (arena.is_error()) {
-    lerror("Arena creation failed: %s", arena.status_string());
-    return ZX_ERR_INTERNAL;
-  }
-
-  fidl::Arena fidl_arena;
-  auto builder = fuchsia_wlan_softmac::wire::WlanSoftmacCancelScanRequest::Builder(fidl_arena);
-  builder.scan_id(scan_id);
-  auto result = client_.sync().buffer(*std::move(arena))->CancelScan(builder.Build());
-  if (!result.ok()) {
-    lerror("CancelScan Failed (FIDL error %s)", result.status_string());
-  }
-  return result.status();
 }
 
 void Device::Recv(RecvRequestView request, fdf::Arena& arena, RecvCompleter::Sync& completer) {

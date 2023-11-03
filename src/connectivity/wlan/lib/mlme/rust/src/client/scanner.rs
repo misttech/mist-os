@@ -153,7 +153,10 @@ impl<'a, D: DeviceOps> BoundScanner<'a, D> {
         if let Some(scan) = &self.scanner.ongoing_scan {
             let discovery_support = self.ctx.device.discovery_support();
             if discovery_support.scan_offload.scan_cancel_supported {
-                self.ctx.device.cancel_scan(scan.scan_id())
+                self.ctx.device.cancel_scan(&fidl_softmac::WlanSoftmacBridgeCancelScanRequest {
+                    scan_id: Some(scan.scan_id()),
+                    ..Default::default()
+                })
             } else {
                 Err(zx::Status::NOT_SUPPORTED)
             }

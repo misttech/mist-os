@@ -84,10 +84,6 @@ typedef struct {
    */
   int32_t (*set_key)(void *device, wlan_key_configuration_t *key);
   /**
-   * Cancel ongoing scan in the driver
-   */
-  zx_status_t (*cancel_scan)(void *device, uint64_t scan_id);
-  /**
    * Get discovery features supported by this WLAN interface
    */
   discovery_support_t (*get_discovery_support)(void *device);
