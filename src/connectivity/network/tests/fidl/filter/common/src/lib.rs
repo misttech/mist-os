@@ -315,8 +315,8 @@ pub async fn test_filter<N: Netstack>(name: &str, test: Test) {
     // flakes in CQ due to ARP timeouts and ARP resolution is immaterial to the
     // tests we run here.
     let () = futures::stream::iter([
-        (&server, &server_ep, CLIENT_IPV4_SUBNET.addr, SERVER_MAC_ADDRESS),
-        (&client, &client_ep, SERVER_IPV4_SUBNET.addr, CLIENT_MAC_ADDRESS),
+        (&server, &server_ep, CLIENT_IPV4_SUBNET.addr, CLIENT_MAC_ADDRESS),
+        (&client, &client_ep, SERVER_IPV4_SUBNET.addr, SERVER_MAC_ADDRESS),
     ])
     .for_each_concurrent(None, |(realm, ep, addr, mac)| {
         realm.add_neighbor_entry(ep.id(), addr, mac).map(|r| r.expect("add_neighbor_entry"))
