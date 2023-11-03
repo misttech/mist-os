@@ -6,6 +6,8 @@
 # due to its dependencies on Escher which we do not want exposed.
 source_set("renderer") {
   sources = [
+    "cpu_renderer.cc",
+    "cpu_renderer.h",
     "mock_renderer.h",
     "null_renderer.cc",
     "null_renderer.h",

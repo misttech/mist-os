@@ -9,6 +9,7 @@ group("tests") {
   testonly = true
   public_deps = [
     ":display_integration_tests",
+    ":flatland_cpu_renderer_integration_test",
     ":flatland_integration_tests",
     ":flatland_null_renderer_integration_test",
     ":flatland_protected_memory_integration_test",
@@ -169,6 +170,25 @@ fuchsia_test_component("flatland_view_integration_test") {
   manifest = "meta/flatland_view_integration_test.cml"
   deps = [ ":flatland_view_integration_test_bin" ]
   test_type = "vulkan"
+}
+
+executable("cpu_renderer_integration_test_bin") {
+  testonly = true
+  sources = [ "flatland_integration_tests/cpu_renderer_integration_test.cc" ]
+  deps = [
+    ":common_deps",
+    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
+    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
+    "//src/ui/scenic/lib/allocation:allocation",
+    "//src/ui/scenic/lib/utils:utils",
+  ]
+}
+
+fuchsia_test_component("cpu_renderer_integration_test") {
+  component_name = "cpu_renderer_integration_test"
+  manifest = "meta/cpu_renderer_integration_test.cml"
+  deps = [ ":cpu_renderer_integration_test_bin" ]
+  test_type = "system"
 }
 
 executable("null_renderer_integration_test_bin") {
@@ -403,6 +423,16 @@ fuchsia_test_package("flatland_integration_tests") {
   ]
   test_specs = {
     environments = vulkan_envs
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+}
+
+fuchsia_test_package("flatland_cpu_renderer_integration_test") {
+  test_components = [ ":cpu_renderer_integration_test" ]
+
+  test_specs = {
     log_settings = {
       max_severity = "ERROR"
     }

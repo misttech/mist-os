@@ -22,6 +22,7 @@
 #include "src/ui/scenic/lib/display/display_power_manager.h"
 #include "src/ui/scenic/lib/flatland/engine/engine.h"
 #include "src/ui/scenic/lib/flatland/engine/engine_types.h"
+#include "src/ui/scenic/lib/flatland/renderer/cpu_renderer.h"
 #include "src/ui/scenic/lib/flatland/renderer/null_renderer.h"
 #include "src/ui/scenic/lib/flatland/renderer/vk_renderer.h"
 #include "src/ui/scenic/lib/scheduling/frame_metrics_registry.cb.h"
@@ -67,6 +68,8 @@ std::optional<uint64_t> GetDisplayMode(const scenic_structured_config::Config& v
 
 std::string ToString(RendererType type) {
   switch (type) {
+    case RendererType::CPU_RENDERER:
+      return "cpu";
     case RendererType::NULL_RENDERER:
       return "null";
     case RendererType::VULKAN:
@@ -75,6 +78,8 @@ std::string ToString(RendererType type) {
 }
 
 RendererType GetRendererType(const scenic_structured_config::Config& values) {
+  if (ToString(RendererType::CPU_RENDERER).compare(values.renderer()) == 0)
+    return RendererType::CPU_RENDERER;
   if (ToString(RendererType::NULL_RENDERER).compare(values.renderer()) == 0)
     return RendererType::NULL_RENDERER;
   if (ToString(RendererType::VULKAN).compare(values.renderer()) == 0)
@@ -394,6 +399,9 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
 
   std::shared_ptr<flatland::Renderer> flatland_renderer;
   switch (renderer_type_) {
+    case RendererType::CPU_RENDERER:
+      flatland_renderer = std::make_shared<flatland::CpuRenderer>();
+      break;
     case RendererType::NULL_RENDERER:
       flatland_renderer = std::make_shared<flatland::NullRenderer>();
       break;

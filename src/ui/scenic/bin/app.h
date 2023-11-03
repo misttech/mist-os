@@ -62,6 +62,8 @@ class DisplayInfoDelegate : public Scenic::GetDisplayInfoDelegateDeprecated {
 
 // What type of renderer is used by Scenic.
 enum class RendererType : uint8_t {
+  // Use CPU for rendering.
+  CPU_RENDERER,
   // Send all rendering operations to void.
   NULL_RENDERER,
   // Use Vulkan for rendering.
