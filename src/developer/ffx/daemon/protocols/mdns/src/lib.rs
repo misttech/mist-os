@@ -25,6 +25,7 @@ const MDNS_PORT: u16 = 5353;
 pub struct Mdns {
     mdns_task: Option<Task<()>>,
     inner: Option<Rc<MdnsProtocol>>,
+    receiver: Option<async_channel::Receiver<ffx::MdnsEventType>>,
     // If None defaults to MDNS_PORT
     mdns_port: Option<u16>,
 }
@@ -52,10 +53,9 @@ impl FidlProtocol for Mdns {
                 .map_err(Into::into),
             ffx::MdnsRequest::GetNextEvent { responder } => responder
                 .send(
-                    self.inner
+                    self.receiver
                         .as_ref()
-                        .expect("inner state should be initialized")
-                        .events_in
+                        .expect("receiver should be initialized")
                         .recv()
                         .await
                         .ok()
@@ -67,12 +67,9 @@ impl FidlProtocol for Mdns {
 
     async fn start(&mut self, _cx: &Context) -> Result<()> {
         let (sender, receiver) = async_channel::bounded::<ffx::MdnsEventType>(1);
-        let inner = Rc::new(MdnsProtocol {
-            events_in: receiver,
-            events_out: sender,
-            target_cache: Default::default(),
-        });
+        let inner = Rc::new(MdnsProtocol { events_out: sender, target_cache: Default::default() });
         self.inner.replace(inner.clone());
+        self.receiver.replace(receiver);
         let inner = Rc::downgrade(&inner);
         let mdns_port = self.mdns_port.unwrap_or(MDNS_PORT);
         self.mdns_task.replace(Task::local(discovery_loop(
@@ -158,7 +155,12 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_mdns_get_targets_empty() {
-        let mdns = Rc::new(RefCell::new(Mdns { inner: None, mdns_task: None, mdns_port: Some(0) }));
+        let mdns = Rc::new(RefCell::new(Mdns {
+            inner: None,
+            receiver: None,
+            mdns_task: None,
+            mdns_port: Some(0),
+        }));
         let daemon = FakeDaemonBuilder::new().inject_fidl_protocol::<Mdns>(mdns).build();
         let proxy = daemon.open_proxy::<ffx::MdnsMarker>().await;
         let targets = proxy.get_targets().await.unwrap();
@@ -168,8 +170,12 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_mdns_stop() {
         let daemon = FakeDaemonBuilder::new().build();
-        let protocol =
-            Rc::new(RefCell::new(Mdns { mdns_task: None, inner: None, mdns_port: Some(0) }));
+        let protocol = Rc::new(RefCell::new(Mdns {
+            mdns_task: None,
+            inner: None,
+            receiver: None,
+            mdns_port: Some(0),
+        }));
         let (proxy, task) = protocols::testing::create_proxy(protocol.clone(), &daemon).await;
         drop(proxy);
         task.await;
@@ -178,7 +184,12 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_mdns_bind_event_on_first_listen() {
-        let mdns = Rc::new(RefCell::new(Mdns { inner: None, mdns_task: None, mdns_port: Some(0) }));
+        let mdns = Rc::new(RefCell::new(Mdns {
+            inner: None,
+            receiver: None,
+            mdns_task: None,
+            mdns_port: Some(0),
+        }));
         let daemon = FakeDaemonBuilder::new().inject_fidl_protocol::<Mdns>(mdns).build();
         let proxy = daemon.open_proxy::<ffx::MdnsMarker>().await;
         while let Some(e) = proxy.get_next_event().await.unwrap() {
@@ -191,7 +202,12 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     #[ignore] // TODO(b/297919461) -- re-enable or delete
     async fn test_mdns_network_traffic_valid() {
-        let mdns = Rc::new(RefCell::new(Mdns { inner: None, mdns_task: None, mdns_port: Some(0) }));
+        let mdns = Rc::new(RefCell::new(Mdns {
+            inner: None,
+            receiver: None,
+            mdns_task: None,
+            mdns_port: Some(0),
+        }));
         let daemon = FakeDaemonBuilder::new().inject_fidl_protocol::<Mdns>(mdns).build();
         let proxy = daemon.open_proxy::<ffx::MdnsMarker>().await;
         let bound_port = wait_for_port_binds(&proxy).await;
@@ -264,7 +280,12 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_mdns_network_traffic_invalid() {
-        let mdns = Rc::new(RefCell::new(Mdns { inner: None, mdns_task: None, mdns_port: Some(0) }));
+        let mdns = Rc::new(RefCell::new(Mdns {
+            inner: None,
+            receiver: None,
+            mdns_task: None,
+            mdns_port: Some(0),
+        }));
         let daemon = FakeDaemonBuilder::new().inject_fidl_protocol::<Mdns>(mdns).build();
         let proxy = daemon.open_proxy::<ffx::MdnsMarker>().await;
         let bound_port = wait_for_port_binds(&proxy).await;
@@ -305,7 +326,12 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_mdns_network_traffic_wrong_protocol() {
-        let mdns = Rc::new(RefCell::new(Mdns { inner: None, mdns_task: None, mdns_port: Some(0) }));
+        let mdns = Rc::new(RefCell::new(Mdns {
+            inner: None,
+            receiver: None,
+            mdns_task: None,
+            mdns_port: Some(0),
+        }));
         let daemon = FakeDaemonBuilder::new().inject_fidl_protocol::<Mdns>(mdns).build();
         let proxy = daemon.open_proxy::<ffx::MdnsMarker>().await;
         let bound_port = wait_for_port_binds(&proxy).await;
@@ -353,8 +379,12 @@ mod tests {
     #[ignore] // TODO(b/297919461) -- re-enable or delete
     async fn test_new_and_rediscovered_target() {
         let daemon = FakeDaemonBuilder::new().build();
-        let protocol =
-            Rc::new(RefCell::new(Mdns { inner: None, mdns_task: None, mdns_port: Some(0) }));
+        let protocol = Rc::new(RefCell::new(Mdns {
+            inner: None,
+            receiver: None,
+            mdns_task: None,
+            mdns_port: Some(0),
+        }));
         let (proxy, _task) = protocols::testing::create_proxy(protocol.clone(), &daemon).await;
         let svc_inner = protocol.borrow().inner.as_ref().unwrap().clone();
         let nodename = "plop".to_owned();
@@ -391,8 +421,12 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_target_eviction() {
         let daemon = FakeDaemonBuilder::new().build();
-        let protocol =
-            Rc::new(RefCell::new(Mdns { inner: None, mdns_task: None, mdns_port: Some(0) }));
+        let protocol = Rc::new(RefCell::new(Mdns {
+            inner: None,
+            receiver: None,
+            mdns_task: None,
+            mdns_port: Some(0),
+        }));
         let (proxy, _task) = protocols::testing::create_proxy(protocol.clone(), &daemon).await;
         let svc_inner = protocol.borrow().inner.as_ref().unwrap().clone();
         let nodename = "plop".to_owned();
@@ -425,8 +459,12 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_target_eviction_timer_override() {
         let daemon = FakeDaemonBuilder::new().build();
-        let protocol =
-            Rc::new(RefCell::new(Mdns { inner: None, mdns_task: None, mdns_port: Some(0) }));
+        let protocol = Rc::new(RefCell::new(Mdns {
+            inner: None,
+            receiver: None,
+            mdns_task: None,
+            mdns_port: Some(0),
+        }));
         let (proxy, _task) = protocols::testing::create_proxy(protocol.clone(), &daemon).await;
         let svc_inner = protocol.borrow().inner.as_ref().unwrap().clone();
         let nodename = "plop".to_owned();
