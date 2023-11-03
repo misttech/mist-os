@@ -87,6 +87,28 @@ pub struct ElfRunner {
     crash_records: CrashRecords,
 }
 
+/// The job for a component.
+pub enum Job {
+    Single(zx::Job),
+    Multiple { parent: zx::Job, child: zx::Job },
+}
+
+impl Job {
+    fn top(&self) -> &zx::Job {
+        match self {
+            Job::Single(job) => job,
+            Job::Multiple { parent, child: _ } => parent,
+        }
+    }
+
+    fn proc(&self) -> &zx::Job {
+        match self {
+            Job::Single(job) => job,
+            Job::Multiple { parent: _, child } => child,
+        }
+    }
+}
+
 impl ElfRunner {
     pub fn new(
         job: zx::Job,
@@ -109,7 +131,7 @@ impl ElfRunner {
     }
 
     /// Creates a job for a component.
-    fn create_job(&self, program_config: &ElfProgramConfig) -> Result<zx::Job, JobError> {
+    fn create_job(&self, program_config: &ElfProgramConfig) -> Result<Job, JobError> {
         let job = self.job.create_child_job().map_err(JobError::CreateChild)?;
 
         // Set timer slack.
@@ -146,7 +168,17 @@ impl ElfRunner {
             .map_err(JobError::SetPolicy)?;
         }
 
-        Ok(job)
+        Ok(if program_config.job_with_available_exception_channel {
+            // Create a new job to hold the process because the component wants
+            // the process to be a direct child of a job that has its exception
+            // channel available for taking. Note that we (the ELF runner) uses
+            // a job's exception channel for crash recording so we create a new
+            // job underneath the original job to hold the process.
+            let child = job.create_child_job().map_err(JobError::CreateChild)?;
+            Job::Multiple { parent: job, child }
+        } else {
+            Job::Single(job)
+        })
     }
 
     fn encoded_config_into_vmo(encoded_config: fmem::Data) -> Result<zx::Vmo, ConfigDataError> {
@@ -259,7 +291,7 @@ impl ElfRunner {
         let job = self.create_job(&program_config)?;
 
         crash_handler::run_exceptions_server(
-            &job,
+            job.top(),
             moniker.clone(),
             resolved_url.clone(),
             self.crash_records.clone(),
@@ -308,7 +340,8 @@ impl ElfRunner {
         let runtime_dir_server_end = start_info
             .runtime_dir
             .ok_or(StartComponentError::StartInfoError(StartInfoError::MissingRuntimeDir))?;
-        let job_koid = job.get_koid().map_err(StartComponentError::JobGetKoidFailed)?.raw_koid();
+        let job_koid =
+            job.proc().get_koid().map_err(StartComponentError::JobGetKoidFailed)?.raw_koid();
 
         let runtime_dir = RuntimeDirBuilder::new(runtime_dir_server_end)
             .args(program_config.args.clone())
@@ -333,7 +366,8 @@ impl ElfRunner {
         handle_infos.extend(start_info.numbered_handles);
 
         // Configure the process launcher.
-        let job_dup = job
+        let proc_job_dup = job
+            .proc()
             .duplicate_handle(zx::Rights::SAME_RIGHTS)
             .map_err(StartComponentError::JobDuplicateFailed)?;
 
@@ -353,7 +387,7 @@ impl ElfRunner {
                 options: program_config.process_options(),
                 args: Some(program_config.args),
                 ns,
-                job: Some(job_dup),
+                job: Some(proc_job_dup),
                 handle_infos: Some(handle_infos),
                 name_infos: None,
                 environs: program_config.environ,
@@ -794,7 +828,7 @@ mod tests {
             job.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("job handle duplication failed");
         let component = ElfComponent::new(
             RuntimeDirectory::empty(),
-            job_copy,
+            Job::Single(job_copy),
             process,
             lifecycle_client,
             critical,

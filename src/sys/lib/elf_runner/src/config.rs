@@ -16,6 +16,7 @@ const VMEX_KEY: &str = "job_policy_ambient_mark_vmo_exec";
 const STOP_EVENT_KEY: &str = "lifecycle.stop_event";
 const STOP_EVENT_VARIANTS: [&'static str; 2] = ["notify", "ignore"];
 const USE_NEXT_VDSO_KEY: &str = "use_next_vdso";
+const JOB_WITH_AVAILABLE_EXCEPTION_CHANNEL_KEY: &str = "job_with_available_exception_channel";
 
 /// Target sink for stdout and stderr output streams.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -43,6 +44,7 @@ pub struct ElfProgramConfig {
     pub create_raw_processes: bool,
     pub is_shared_process: bool,
     pub use_next_vdso: bool,
+    pub job_with_available_exception_channel: bool,
     pub stdout_sink: StreamSink,
     pub stderr_sink: StreamSink,
     pub environ: Option<Vec<String>>,
@@ -96,6 +98,10 @@ impl ElfProgramConfig {
             create_raw_processes: runner::get_bool(program, CREATE_RAW_PROCESSES_KEY)?,
             is_shared_process: runner::get_bool(program, SHARED_PROCESS_KEY)?,
             use_next_vdso: runner::get_bool(program, USE_NEXT_VDSO_KEY)?,
+            job_with_available_exception_channel: runner::get_bool(
+                program,
+                JOB_WITH_AVAILABLE_EXCEPTION_CHANNEL_KEY,
+            )?,
             stdout_sink: get_stream_sink(&program, FORWARD_STDOUT_KEY)?,
             stderr_sink: get_stream_sink(&program, FORWARD_STDERR_KEY)?,
             environ: runner::get_environ(&program)?,

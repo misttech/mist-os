@@ -163,6 +163,22 @@ if the component also has `job_policy_create_raw_processes` set to `true`.
 }
 ```
 
+#### Job with available exception channel
+
+The `job_with_available_exception_channel` field may be used to make sure the
+component is created as a direct descendent of a job that will have its
+exception channel available for taking.
+
+```json5
+{
+    program: {
+        runner: "elf",
+        binary: "bin/foo",
+        {{ '<strong>' }}job_with_available_exception_channel: "true"{{ '</strong>' }}
+    }
+}
+```
+
 ## Further Reading
 
 For a detailed explanation of how processes are created, please see

@@ -3,12 +3,12 @@
 // found in the LICENSE file.
 
 use {
-    super::runtime_dir::RuntimeDirectory,
+    crate::{runtime_dir::RuntimeDirectory, Job},
     async_trait::async_trait,
     fidl::endpoints::Proxy,
     fidl_fuchsia_process_lifecycle::LifecycleProxy,
     fuchsia_async as fasync,
-    fuchsia_zircon::{self as zx, AsHandleRef, HandleBased, Job, Process, Task},
+    fuchsia_zircon::{self as zx, AsHandleRef, HandleBased, Process, Task},
     futures::future::{join_all, BoxFuture, FutureExt},
     runner::component::Controllable,
     std::sync::Arc,
@@ -80,8 +80,8 @@ impl ElfComponent {
     /// The rights of the job will be set such that the resulting handle will be apppropriate to
     /// use for diagnostics-only purposes. Right now that is ZX_RIGHTS_BASIC (which includes
     /// INSPECT).
-    pub fn copy_job_for_diagnostics(&self) -> Result<Job, zx::Status> {
-        self.job.duplicate_handle(zx::Rights::BASIC)
+    pub fn copy_job_for_diagnostics(&self) -> Result<zx::Job, zx::Status> {
+        self.job.top().duplicate_handle(zx::Rights::BASIC)
     }
 }
 
@@ -91,7 +91,10 @@ impl Controllable for ElfComponent {
         if self.main_process_critical {
             warn!("killing a component with 'main_process_critical', so this will also kill component_manager and all of its components");
         }
-        self.job.kill().unwrap_or_else(|error| error!(%error, "failed killing job during kill"));
+        self.job
+            .top()
+            .kill()
+            .unwrap_or_else(|error| error!(%error, "failed killing job during kill"));
     }
 
     fn stop<'a>(&mut self) -> BoxFuture<'a, ()> {
@@ -111,7 +114,7 @@ impl Controllable for ElfComponent {
                     // channel. Since there is no process it seems like killing it can't kill
                     // component manager.
                     warn!("killing job of component with 'main_process_critical' set because component has lifecycle channel, but no process main process.");
-                    self.job.kill().unwrap_or_else(|error| {
+                    self.job.top().kill().unwrap_or_else(|error| {
                         error!(%error, "failed killing job for component with no lifecycle channel")
                     });
                     return async {}.boxed();
@@ -129,11 +132,11 @@ impl Controllable for ElfComponent {
                     .map(|_: fidl::Signals| ()) // Discard.
                     .unwrap_or_else(|e| {
                         error!(
-                        "killing component's job after failure waiting on process exit, err: {}",
-                        e
-                    )
+                            "killing component's job after failure waiting on process exit, err: {}",
+                            e
+                        )
                     });
-                    job.kill().unwrap_or_else(|error| {
+                    job.top().kill().unwrap_or_else(|error| {
                         error!(%error, "failed killing job in stop after lifecycle channel closed")
                     });
                 }
@@ -149,7 +152,7 @@ impl Controllable for ElfComponent {
                         e
                         )
                     });
-                    job.kill().unwrap_or_else(|error| {
+                    job.top().kill().unwrap_or_else(|error| {
                         error!(%error, "failed killing job in stop after lifecycle channel closed")
                     });
                 }
@@ -164,7 +167,7 @@ impl Controllable for ElfComponent {
                     self.component_url
                 );
             }
-            self.job.kill().unwrap_or_else(|error| {
+            self.job.top().kill().unwrap_or_else(|error| {
                 error!(%error, "failed killing job for component with no lifecycle channel")
             });
             async {}.boxed()
@@ -183,6 +186,6 @@ impl Controllable for ElfComponent {
 impl Drop for ElfComponent {
     fn drop(&mut self) {
         // just in case we haven't killed the job already
-        self.job.kill().unwrap_or_else(|error| error!(%error, "failed to kill job in drop"));
+        self.job.top().kill().unwrap_or_else(|error| error!(%error, "failed to kill job in drop"));
     }
 }
