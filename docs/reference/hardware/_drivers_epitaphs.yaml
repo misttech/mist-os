@@ -404,3 +404,9 @@
   available_in_git: 'bb05e1f62b8802e8e55a54bcf5f5aa70c5c7ab84'
   areas: ['I2C']
   path: '/src/devices/i2c/drivers/imx8m-i2c'
+- short_description: 'NXP i.MX8-m GPIO driver'
+  deletion_reason: 'Hardware is not actively supported'
+  gerrit_change_id: '941026'
+  available_in_git: 'bb05e1f62b8802e8e55a54bcf5f5aa70c5c7ab84'
+  areas: ['GPIO']
+  path: '/src/devices/gpio/drivers/imx8m-gpio'

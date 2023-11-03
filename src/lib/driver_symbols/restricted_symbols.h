@@ -110,7 +110,6 @@ const std::set<std::string> kCreateThreadSymbolsDriversAllowlist = {
     "#meta/hid.cm",
     "#meta/i2c-hid.cm",
     "#meta/igc.cm",
-    "#meta/imx8m-gpio.cm",
     "#meta/init-test.cm",
     "#meta/integration-test.cm",
     "#meta/intel-gspi.cm",

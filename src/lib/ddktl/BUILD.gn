@@ -165,7 +165,6 @@ source_set("ddktl") {
     "//src/devices/gpio/drivers/aml-gpio:*",
     "//src/devices/gpio/drivers/as370-gpio:*",
     "//src/devices/gpio/drivers/gpio:*",
-    "//src/devices/gpio/drivers/imx8m-gpio:*",
     "//src/devices/gpio/drivers/ti-tca6408a:*",
     "//src/devices/gpio/lib/fuchsia.hardware.gpio:*",
     "//src/devices/i2c/drivers/aml-i2c:*",

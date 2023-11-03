@@ -1,9 +1,0 @@
-{
-    "short_description": "NXP imx8m GPIO driver",
-    "manufacturer": "NXP",
-    "families": [],
-    "models": [],
-    "areas": [
-        "GPIO"
-    ]
-}
