@@ -5,42 +5,11 @@
 use {
     crate::WlanSoftmacBandCapabilityExt as _,
     anyhow::{format_err, Error},
-    banjo_fuchsia_wlan_common as banjo_common, banjo_fuchsia_wlan_ieee80211 as banjo_ieee80211,
-    banjo_fuchsia_wlan_softmac as banjo_wlan_softmac, fidl_fuchsia_wlan_common as fidl_common,
-    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_mlme as fidl_mlme,
-    fidl_fuchsia_wlan_softmac as fidl_softmac,
+    banjo_fuchsia_wlan_common as banjo_common, banjo_fuchsia_wlan_softmac as banjo_wlan_softmac,
+    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
+    fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_softmac as fidl_softmac,
     std::fmt::Display,
 };
-
-#[macro_export]
-macro_rules! banjo_list_to_slice {
-    ($banjo_struct:expr, $field_prefix:ident $(,)?) => {{
-        use paste::paste;
-        paste! {
-            unsafe {
-                std::slice::from_raw_parts(
-                    $banjo_struct.[<$field_prefix _list>],
-                    $banjo_struct.[<$field_prefix _count>],
-                )
-            }
-        }
-    }};
-}
-
-#[macro_export]
-macro_rules! banjo_buffer_to_slice {
-    ($banjo_struct:expr, $field_prefix:ident $(,)?) => {{
-        use paste::paste;
-        paste! {
-            unsafe {
-                std::slice::from_raw_parts(
-                    $banjo_struct.[<$field_prefix _buffer>],
-                    $banjo_struct.[<$field_prefix _size>],
-                )
-            }
-        }
-    }};
-}
 
 #[macro_export]
 macro_rules! zeroed_array_from_prefix {
@@ -219,8 +188,10 @@ pub fn convert_ddk_spectrum_management_support(
     })
 }
 
-pub fn cssid_from_ssid_unchecked(ssid: &Vec<u8>) -> banjo_ieee80211::CSsid {
-    let mut cssid = banjo_ieee80211::CSsid {
+// TODO(b/308634817): Remove this conversion once CSsid is no longer used for
+//                    SSIDs specified for active scan requests.
+pub fn cssid_from_ssid_unchecked(ssid: &Vec<u8>) -> fidl_ieee80211::CSsid {
+    let mut cssid = fidl_ieee80211::CSsid {
         len: ssid.len() as u8,
         data: [0; fidl_ieee80211::MAX_SSID_BYTE_LEN as usize],
     };
@@ -238,55 +209,6 @@ mod tests {
             fake_spectrum_management_support,
         },
     };
-
-    #[test]
-    fn conversion_from_banjo_list_to_slice_successful() {
-        let channels = vec![3, 4, 5];
-        let ssids = vec![];
-        let mac_header = vec![0xAA, 0xAA];
-        let ies = vec![0xBB, 0xBB, 0xBB];
-        let banjo = banjo_wlan_softmac::WlanSoftmacStartActiveScanRequest {
-            min_channel_time: 0,
-            max_channel_time: 100,
-            min_home_time: 5,
-            min_probes_per_channel: 1,
-            max_probes_per_channel: 6,
-            ssids_list: ssids.as_ptr(),
-            ssids_count: ssids.len(),
-            channels_list: channels.as_ptr(),
-            channels_count: channels.len(),
-            mac_header_buffer: mac_header.as_ptr(),
-            mac_header_size: mac_header.len(),
-            ies_buffer: ies.as_ptr(),
-            ies_size: ies.len(),
-        };
-        assert_eq!(&channels, banjo_list_to_slice!(banjo, channels));
-    }
-
-    #[test]
-    fn conversion_from_banjo_buffer_to_slice_successful() {
-        let ssids_list = vec![];
-        let channels = vec![];
-        let mac_header = vec![0xAA, 0xAA];
-        let ies = vec![0xBB, 0xBB, 0xBB];
-        let banjo = banjo_wlan_softmac::WlanSoftmacStartActiveScanRequest {
-            min_channel_time: 0,
-            max_channel_time: 100,
-            min_home_time: 5,
-            min_probes_per_channel: 1,
-            max_probes_per_channel: 6,
-            ssids_list: ssids_list.as_ptr(),
-            ssids_count: ssids_list.len(),
-            channels_list: channels.as_ptr(),
-            channels_count: channels.len(),
-            mac_header_buffer: mac_header.as_ptr(),
-            mac_header_size: mac_header.len(),
-            ies_buffer: ies.as_ptr(),
-            ies_size: ies.len(),
-        };
-        assert_eq!(&mac_header, banjo_buffer_to_slice!(banjo, mac_header));
-        assert_eq!(&ies, banjo_buffer_to_slice!(banjo, ies));
-    }
 
     fn empty_rx_info() -> banjo_wlan_softmac::WlanRxInfo {
         banjo_wlan_softmac::WlanRxInfo {

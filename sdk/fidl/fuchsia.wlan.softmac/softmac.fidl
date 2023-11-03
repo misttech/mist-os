@@ -352,6 +352,12 @@ type WlanSoftmacStartActiveScanRequest = table {
     3: mac_header vector<uint8>:ieee80211.MAX_MGMT_FRAME_MAC_HEADER_BYTE_LEN;
 
     /// Buffer containing IE bytes to include in each Probe Request frame.
+    ///
+    /// The IEs specified must not result in a Probe Request MMPDU that exceed the
+    /// limits defined by IEEE Std 802.11-2016, 9.2.4.7. MMPDU limit constants can
+    /// be found in fuchsia.wlan.ieee80211. These limits are very large and will
+    /// likely not be exceeded by specifying the most common IEs found in
+    /// Probe Request frames.
     @buffer
     4: ies vector<uint8>:ieee80211.MAX_VHT_MPDU_BYTE_LEN_2;
 
@@ -490,7 +496,7 @@ closed protocol WlanSoftmacBridge {
         1: peer_addr ieee80211.MacAddr;
     }) -> () error zx.Status;
 
-    /// Start a passive scan. The server will deliver scan results
+    /// Starts a passive scan. The server will deliver scan results
     /// as Beacon frames using WlanSoftmacIfc.Recv(). When complete,
     /// the server will call WlanSoftmacIfc.ScanComplete() with the
     /// same `scan_id` returned by StartPassiveScan().
@@ -528,6 +534,25 @@ closed protocol WlanSoftmacBridge {
         /// otherwise be present on while not scanning.
         4: min_home_time zx.Duration;
     }) -> (table {
+        1: scan_id uint64;
+    }) error zx.Status;
+
+    /// Starts an active scan. The server will deliver scan results
+    /// as Beacon or Probe Response frames using WlanSoftmacIfc.Recv().
+    /// When complete, the server will call WlanSoftmacIfc.ScanComplete()
+    /// with the same `scan_id` returned by StartActiveScan().
+    ///
+    /// A device driver indicates support for `StartActiveScan()` using
+    /// `fuchsia.wlan.common/ProbeRequestOffloadExtension.supported`.
+    ///
+    /// Common errors include:
+    ///   ZX_ERR_INVALID_ARGS: The device is not capable of performing the
+    ///       requested scan, e.g. because an incompatible channel was requested.
+    ///   ZX_ERR_UNAVAILABLE: The device cannot currently perform scans.
+    ///   ZX_ERR_SHOULD_WAIT: Another scan is already in-progress.
+    @selector("fuchsia.wlan.softmac/WlanSoftmac.StartActiveScan")
+    @available(added=HEAD)
+    strict StartActiveScan(WlanSoftmacStartActiveScanRequest) -> (table {
         1: scan_id uint64;
     }) error zx.Status;
 };
@@ -721,26 +746,20 @@ closed protocol WlanSoftmac {
         1: scan_id uint64;
     }) error zx.Status;
 
-    /// Start an active scan in the device driver. Scan results will be delivered
-    /// as Beacon or Probe Response frames via WlanSoftmacIfc.Recv(). When
-    /// complete, WlanSoftmacIfc.ScanComplete() will be called with the
-    /// corresponding unique `scan_id`.
-    ///
-    /// The IEs specified must not result in a Probe Request MMPDU that exceed the
-    /// limits defined by IEEE Std 802.11-2016, 9.2.4.7. MMPDU limit constants can
-    /// be found in fuchsia.wlan.ieee80211. These limits are very large and will
-    /// likely not be exceeded by specifying the most common IEs found in
-    /// Probe Request frames.
+    /// Starts an active scan. The server will deliver scan results
+    /// as Beacon or Probe Response frames using WlanSoftmacIfc.Recv().
+    /// When complete, the server will call WlanSoftmacIfc.ScanComplete()
+    /// with the same `scan_id` returned by StartActiveScan().
     ///
     /// A device driver indicates support for `StartActiveScan()` using
     /// `fuchsia.wlan.common/ProbeRequestOffloadExtension.supported`.
     ///
-    /// Common errors include: \
+    /// Common errors include:
     ///   ZX_ERR_INVALID_ARGS: The device is not capable of performing the
-    ///       requested scan, e.g. because an incompatible channel was requested. \
-    ///   ZX_ERR_UNAVAILABLE: The device cannot currently perform scans. \
+    ///       requested scan, e.g. because an incompatible channel was requested.
+    ///   ZX_ERR_UNAVAILABLE: The device cannot currently perform scans.
     ///   ZX_ERR_SHOULD_WAIT: Another scan is already in-progress.
-    @available(added=15)
+    @available(added=15, removed=HEAD)
     strict StartActiveScan(WlanSoftmacStartActiveScanRequest) -> (table {
         1: scan_id uint64;
     }) error zx.Status;

@@ -128,7 +128,7 @@ void WlantapMac::StartActiveScan(StartActiveScanRequestView request, fdf::Arena&
 
   fidl::Arena fidl_arena;
   auto builder =
-      fuchsia_wlan_softmac::wire::WlanSoftmacStartActiveScanResponse::Builder(fidl_arena);
+      fuchsia_wlan_softmac::wire::WlanSoftmacBridgeStartActiveScanResponse::Builder(fidl_arena);
   builder.scan_id(scan_id);
   completer.buffer(arena).ReplySuccess(builder.Build());
 }

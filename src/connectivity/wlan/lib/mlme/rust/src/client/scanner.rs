@@ -6,15 +6,15 @@ use {
     crate::{
         client::{convert_beacon::construct_bss_description, Context},
         ddk_converter::cssid_from_ssid_unchecked,
-        device::{ActiveScanArgs, DeviceOps},
+        device::DeviceOps,
         error::Error,
         WlanSoftmacBandCapabilityExt as _,
     },
     anyhow::format_err,
-    banjo_fuchsia_wlan_ieee80211 as banjo_ieee80211,
     banjo_fuchsia_wlan_softmac as banjo_wlan_softmac, fidl_fuchsia_wlan_common as fidl_common,
-    fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_mlme as fidl_mlme,
-    fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_zircon as zx,
+    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
+    fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_softmac as fidl_softmac,
+    fuchsia_zircon as zx,
     ieee80211::{Bssid, MacAddr},
     thiserror::Error,
     tracing::{error, warn},
@@ -113,7 +113,7 @@ enum OngoingScan {
         /// Unique identifier returned from the device driver when the scan began.
         in_progress_device_scan_id: u64,
         /// Remaining arguments to be sent to future scan requests.
-        remaining_active_scan_args: Vec<ActiveScanArgs>,
+        remaining_active_scan_requests: Vec<fidl_softmac::WlanSoftmacStartActiveScanRequest>,
     },
 }
 
@@ -128,11 +128,6 @@ impl OngoingScan {
             }
         }
     }
-}
-
-struct ChannelList {
-    band: fidl_common::WlanBand,
-    channels: Vec<u8>,
 }
 
 impl<'a, D: DeviceOps> BoundScanner<'a, D> {
@@ -238,11 +233,7 @@ impl<'a, D: DeviceOps> BoundScanner<'a, D> {
         req: fidl_mlme::ScanRequest,
         query_response: &fidl_softmac::WlanSoftmacQueryResponse,
     ) -> Result<OngoingScan, Error> {
-        let ssids_list = req
-            .ssid_list
-            .iter()
-            .map(cssid_from_ssid_unchecked)
-            .collect::<Vec<banjo_ieee80211::CSsid>>();
+        let ssids_list = req.ssid_list.iter().map(cssid_from_ssid_unchecked).collect::<Vec<_>>();
 
         let (mac_header, _) = write_frame_with_dynamic_buf!(vec![], {
             headers: {
@@ -250,49 +241,49 @@ impl<'a, D: DeviceOps> BoundScanner<'a, D> {
             },
         })?;
 
-        let mut remaining_active_scan_args = active_scan_args_series(
+        let mut remaining_active_scan_requests = active_scan_request_series(
             // TODO(fxbug.dev/89933): A TimeUnit is generally limited to 2 octets. Conversion here
             // is required since fuchsia.wlan.mlme/ScanRequest.min_channel_time has a width of
             // four octets.
+            query_response,
+            req.channel_list,
+            ssids_list,
+            mac_header,
             zx::Duration::from(TimeUnit(req.min_channel_time as u16)).into_nanos(),
             zx::Duration::from(TimeUnit(req.max_channel_time as u16)).into_nanos(),
             MIN_HOME_TIME.into_nanos(),
             MIN_PROBES_PER_CHANNEL,
             MAX_PROBES_PER_CHANNEL,
-            ssids_list,
-            mac_header,
-            query_response,
-            req.channel_list,
         )?;
 
-        match remaining_active_scan_args.pop() {
+        match remaining_active_scan_requests.pop() {
             None => {
                 error!("unexpected empty list of active scan args");
                 return Err(Error::ScanError(ScanError::StartOffloadScanFails(
                     zx::Status::INVALID_ARGS,
                 )));
             }
-            Some(active_scan_args) => Ok(OngoingScan::ActiveOffloadScan {
+            Some(active_scan_request) => Ok(OngoingScan::ActiveOffloadScan {
                 mlme_txn_id: req.txn_id,
                 in_progress_device_scan_id: self
-                    .start_next_active_scan(active_scan_args)
+                    .start_next_active_scan(&active_scan_request)
                     .map_err(|scan_error| Error::ScanError(scan_error))?,
-                remaining_active_scan_args,
+                remaining_active_scan_requests,
             }),
         }
     }
 
     fn start_next_active_scan(
         &mut self,
-        active_scan_args: ActiveScanArgs,
+        request: &fidl_softmac::WlanSoftmacStartActiveScanRequest,
     ) -> Result<u64, ScanError> {
-        // Note: active_scan_args must outlive the WlanSoftmacStartActiveScanRequest it returns
-        // because WlanSoftmacStartActiveScanRequest contains raw pointers that must be valid
-        // for the duration of the call to Device::start_active_scan().
-        self.ctx
-            .device
-            .start_active_scan(active_scan_args)
-            .map_err(|status| ScanError::StartOffloadScanFails(status))
+        match self.ctx.device.start_active_scan(request) {
+            Ok(response) => Ok(response.scan_id.ok_or_else(|| {
+                error!("Active scan response missing scan id!");
+                ScanError::InvalidResponse
+            })?),
+            Err(status) => Err(ScanError::StartOffloadScanFails(status)),
+        }
     }
 
     /// Called when MLME receives an advertisement from the AP, e.g. a Beacon or Probe
@@ -357,7 +348,7 @@ impl<'a, D: DeviceOps> BoundScanner<'a, D> {
             Some(OngoingScan::ActiveOffloadScan {
                 mlme_txn_id,
                 in_progress_device_scan_id,
-                mut remaining_active_scan_args,
+                mut remaining_active_scan_requests,
             }) if in_progress_device_scan_id == scan_id => {
                 if status != zx::Status::OK {
                     error!("active offload scan failed: {}", status);
@@ -365,23 +356,25 @@ impl<'a, D: DeviceOps> BoundScanner<'a, D> {
                     return;
                 }
 
-                match remaining_active_scan_args.pop() {
+                match remaining_active_scan_requests.pop() {
                     None => {
                         send_on_scan_end!(mlme_txn_id, fidl_mlme::ScanResultCode::Success);
                     }
-                    Some(active_scan_args) => match self.start_next_active_scan(active_scan_args) {
-                        Ok(in_progress_device_scan_id) => {
-                            self.scanner.ongoing_scan = Some(OngoingScan::ActiveOffloadScan {
-                                mlme_txn_id,
-                                in_progress_device_scan_id,
-                                remaining_active_scan_args,
-                            });
+                    Some(active_scan_request) => {
+                        match self.start_next_active_scan(&active_scan_request) {
+                            Ok(in_progress_device_scan_id) => {
+                                self.scanner.ongoing_scan = Some(OngoingScan::ActiveOffloadScan {
+                                    mlme_txn_id,
+                                    in_progress_device_scan_id,
+                                    remaining_active_scan_requests,
+                                });
+                            }
+                            Err(scan_error) => {
+                                self.scanner.ongoing_scan.take();
+                                send_on_scan_end!(mlme_txn_id, scan_error.into());
+                            }
                         }
-                        Err(scan_error) => {
-                            self.scanner.ongoing_scan.take();
-                            send_on_scan_end!(mlme_txn_id, scan_error.into());
-                        }
-                    },
+                    }
                 }
             }
             Some(other) => {
@@ -451,59 +444,69 @@ fn band_from_channel_number(channel_number: u8) -> fidl_common::WlanBand {
     }
 }
 
-fn active_scan_args_series(
+fn active_scan_request_series(
+    query_response: &fidl_softmac::WlanSoftmacQueryResponse,
+    channels: Vec<u8>,
+    ssids: Vec<fidl_ieee80211::CSsid>,
+    mac_header: Vec<u8>,
     min_channel_time: zx::sys::zx_duration_t,
     max_channel_time: zx::sys::zx_duration_t,
     min_home_time: zx::sys::zx_duration_t,
     min_probes_per_channel: u8,
     max_probes_per_channel: u8,
-    ssids_list: Vec<banjo_ieee80211::CSsid>,
-    mac_header: Vec<u8>,
-    query_response: &fidl_softmac::WlanSoftmacQueryResponse,
-    channel_list: Vec<u8>,
-) -> Result<Vec<ActiveScanArgs>, Error> {
+) -> Result<Vec<fidl_softmac::WlanSoftmacStartActiveScanRequest>, Error> {
     // TODO(fxbug.dev/91038): The fuchsia.wlan.mlme/MLME API assumes channels numbers imply bands
     //                        and so partitioning channels must be done internally.
-    let channel_lists: [ChannelList; 2] = channel_list.into_iter().fold(
+    struct BandChannels {
+        band: fidl_common::WlanBand,
+        channels: Vec<u8>,
+    }
+    let band_channels_list: [BandChannels; 2] = channels.into_iter().fold(
         [
-            ChannelList { band: fidl_common::WlanBand::FiveGhz, channels: vec![] },
-            ChannelList { band: fidl_common::WlanBand::TwoGhz, channels: vec![] },
+            BandChannels { band: fidl_common::WlanBand::FiveGhz, channels: vec![] },
+            BandChannels { band: fidl_common::WlanBand::TwoGhz, channels: vec![] },
         ],
-        |mut channel_lists, channel| {
-            for channel_list in &mut channel_lists {
-                if band_from_channel_number(channel) == channel_list.band {
-                    channel_list.channels.push(channel);
+        |mut band_channels_list, channel| {
+            for band_channels in &mut band_channels_list {
+                if band_from_channel_number(channel) == band_channels.band {
+                    band_channels.channels.push(channel);
                 }
             }
-            channel_lists
+            band_channels_list
         },
     );
 
-    let mut active_scan_args_series = vec![];
-    for channel_list in channel_lists {
-        if !channel_list.channels.is_empty() {
-            let supported_rates = supported_rates_for_band(query_response, channel_list.band)?;
-            active_scan_args_series.push(ActiveScanArgs {
-                min_channel_time,
-                max_channel_time,
-                min_home_time,
-                min_probes_per_channel,
-                max_probes_per_channel,
-                ssids_list: ssids_list.clone(),
-                mac_header: mac_header.clone(),
-                channels: channel_list.channels,
-                // Exclude the SSID IE because the device driver will generate using ssids_list.
-                ies: write_frame_with_dynamic_buf!(vec![], {
-                    ies: {
-                        supported_rates: supported_rates,
-                        extended_supported_rates: {/* continue rates */},
+    let mut active_scan_request_series = vec![];
+    for band_channels in band_channels_list {
+        let band = band_channels.band;
+        let channels = band_channels.channels;
+        if channels.is_empty() {
+            continue;
+        }
+        let supported_rates = supported_rates_for_band(query_response, band)?;
+        active_scan_request_series.push(fidl_softmac::WlanSoftmacStartActiveScanRequest {
+            channels: Some(channels),
+            ssids: Some(ssids.clone()),
+            mac_header: Some(mac_header.clone()),
+            // Exclude the SSID IE because the device driver will generate using ssids_list.
+            ies: Some(
+                write_frame_with_dynamic_buf!(vec![], {
+                ies: {
+                    supported_rates: supported_rates,
+                    extended_supported_rates: {/* continue rates */},
                     }
                 })?
                 .0,
-            });
-        }
+            ),
+            min_channel_time: Some(min_channel_time),
+            max_channel_time: Some(max_channel_time),
+            min_home_time: Some(min_home_time),
+            min_probes_per_channel: Some(min_probes_per_channel),
+            max_probes_per_channel: Some(max_probes_per_channel),
+            ..Default::default()
+        });
     }
-    Ok(active_scan_args_series)
+    Ok(active_scan_request_series)
 }
 
 fn send_scan_result<D: DeviceOps>(txn_id: u64, bss: fidl_internal::BssDescription, device: &mut D) {
@@ -775,13 +778,13 @@ mod tests {
         );
     }
 
-    struct ExpectedDynamicActiveScanArgs {
+    struct ExpectedDynamicActiveScanRequest {
         channels: Vec<u8>,
         ies: Vec<u8>,
     }
 
     #[test_case(&[6],
-                Some(ExpectedDynamicActiveScanArgs {
+                Some(ExpectedDynamicActiveScanRequest {
                     channels: vec![6],
                     ies: vec![ 0x01, // Element ID for Supported Rates
                                0x08, // Length
@@ -792,7 +795,7 @@ mod tests {
                     ]}),
                 None; "single channel")]
     #[test_case(&[1, 2, 3, 4, 5],
-                Some(ExpectedDynamicActiveScanArgs {
+                Some(ExpectedDynamicActiveScanRequest {
                     channels: vec![1, 2, 3, 4, 5],
                     ies: vec![ 0x01, // Element ID for Supported Rates
                                0x08, // Length
@@ -804,7 +807,7 @@ mod tests {
                 None; "multiple channels 2.4GHz band")]
     #[test_case(&[36, 40, 100, 108],
                 None,
-                Some(ExpectedDynamicActiveScanArgs {
+                Some(ExpectedDynamicActiveScanRequest {
                     channels: vec![36, 40, 100, 108],
                     ies: vec![ 0x01, // Element ID for Supported Rates
                                0x08, // Length
@@ -812,7 +815,7 @@ mod tests {
                     ],
                 }); "multiple channels 5GHz band")]
     #[test_case(&[1, 2, 3, 4, 5, 36, 40, 100, 108],
-                Some(ExpectedDynamicActiveScanArgs {
+                Some(ExpectedDynamicActiveScanRequest {
                     channels: vec![1, 2, 3, 4, 5],
                     ies: vec![ 0x01, // Element ID for Supported Rates
                                0x08, // Length
@@ -821,7 +824,7 @@ mod tests {
                                0x04, // Length
                                0x30, 0x48, 0x60, 0x6c // Extended Supported Rates
                     ]}),
-                Some(ExpectedDynamicActiveScanArgs {
+                Some(ExpectedDynamicActiveScanRequest {
                     channels: vec![36, 40, 100, 108],
                     ies: vec![ 0x01, // Element ID for Supported Rates
                                0x08, // Length
@@ -830,8 +833,8 @@ mod tests {
                 }); "multiple bands")]
     fn test_start_active_scan_success(
         channel_list: &[u8],
-        expected_two_ghz_dynamic_args: Option<ExpectedDynamicActiveScanArgs>,
-        expected_five_ghz_dynamic_args: Option<ExpectedDynamicActiveScanArgs>,
+        expected_two_ghz_dynamic_args: Option<ExpectedDynamicActiveScanRequest>,
+        expected_five_ghz_dynamic_args: Option<ExpectedDynamicActiveScanRequest>,
     ) {
         let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
@@ -848,34 +851,32 @@ mod tests {
         for probe_request_ies in &[expected_two_ghz_dynamic_args, expected_five_ghz_dynamic_args] {
             match probe_request_ies {
                 None => {}
-                Some(ExpectedDynamicActiveScanArgs { channels, ies, .. }) => {
+                Some(ExpectedDynamicActiveScanRequest { channels, ies, .. }) => {
                     // Verify that active offload scan is requested
-                    assert_variant!(
-                        m.fake_device_state.lock().unwrap().captured_active_scan_args,
-                        Some(ref active_scan_args) => {
-                            assert_eq!(active_scan_args.min_channel_time, 102_400_000);
-                            assert_eq!(active_scan_args.max_channel_time, 307_200_000);
-                            assert_eq!(active_scan_args.min_home_time, 0);
-                            assert_eq!(active_scan_args.min_probes_per_channel, 0);
-                            assert_eq!(active_scan_args.max_probes_per_channel, 0);
-                            assert_eq!(active_scan_args.channels, *channels);
-                            assert_eq!(active_scan_args.ssids_list,
-                                       vec![
-                                           cssid_from_ssid_unchecked(&Ssid::try_from("foo").unwrap().into()),
-                                           cssid_from_ssid_unchecked(&Ssid::try_from("bar").unwrap().into()),
-                                       ]);
-                            assert_eq!(active_scan_args.mac_header,
-                                       vec![
-                                           0x40, 0x00, // Frame Control
-                                           0x00, 0x00, // Duration
-                                           0xff, 0xff, 0xff, 0xff, 0xff, 0xff, // Address 1
-                                           0x07, 0x07, 0x07, 0x07, 0x07, 0x07, // Address 2
-                                           0xff, 0xff, 0xff, 0xff, 0xff, 0xff, // Address 3
-                                           0x10, 0x00, // Sequence Control
-                                       ]);
-                            assert_eq!(active_scan_args.ies,
-                                       ies[..]);
-                        },
+                    assert_eq!(
+                        m.fake_device_state.lock().unwrap().captured_active_scan_request,
+                        Some(fidl_softmac::WlanSoftmacStartActiveScanRequest {
+                            channels: Some(channels.clone()),
+                            ssids: Some(vec![
+                                cssid_from_ssid_unchecked(&Ssid::try_from("foo").unwrap().into()),
+                                cssid_from_ssid_unchecked(&Ssid::try_from("bar").unwrap().into()),
+                            ]),
+                            mac_header: Some(vec![
+                                0x40, 0x00, // Frame Control
+                                0x00, 0x00, // Duration
+                                0xff, 0xff, 0xff, 0xff, 0xff, 0xff, // Address 1
+                                0x07, 0x07, 0x07, 0x07, 0x07, 0x07, // Address 2
+                                0xff, 0xff, 0xff, 0xff, 0xff, 0xff, // Address 3
+                                0x10, 0x00, // Sequence Control
+                            ]),
+                            ies: Some(ies.clone()),
+                            min_channel_time: Some(102_400_000),
+                            max_channel_time: Some(307_200_000),
+                            min_home_time: Some(0),
+                            min_probes_per_channel: Some(0),
+                            max_probes_per_channel: Some(0),
+                            ..Default::default()
+                        }),
                         "active offload scan not initiated"
                     );
                     let expected_scan_id = m.fake_device_state.lock().unwrap().next_scan_id - 1;
@@ -1022,9 +1023,8 @@ mod tests {
             .expect("expect scan req accepted");
 
         // Verify that active offload scan is requested
-        assert_variant!(
-            m.fake_device_state.lock().unwrap().captured_active_scan_args,
-            Some(_),
+        assert!(
+            m.fake_device_state.lock().unwrap().captured_active_scan_request.is_some(),
             "active offload scan not initiated"
         );
         let expected_scan_id = m.fake_device_state.lock().unwrap().next_scan_id - 1;

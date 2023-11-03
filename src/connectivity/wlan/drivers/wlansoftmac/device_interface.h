@@ -57,8 +57,6 @@ class DeviceInterface {
   virtual zx_status_t EnableBeaconing(wlan_softmac_enable_beaconing_request_t* request) = 0;
   virtual zx_status_t DisableBeaconing() = 0;
   virtual zx_status_t InstallKey(wlan_key_configuration_t* key_config) = 0;
-  virtual zx_status_t StartActiveScan(
-      const wlan_softmac_start_active_scan_request_t* active_scan_args, uint64_t* out_scan_id) = 0;
   virtual zx_status_t CancelScan(uint64_t scan_id) = 0;
 
   virtual fbl::RefPtr<DeviceState> GetState() = 0;

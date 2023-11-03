@@ -26,9 +26,6 @@ namespace wlan_ieee80211 = fuchsia_wlan_ieee80211::wire;
 static constexpr uint8_t kFakeMacAddr[wlan_ieee80211::kMacAddrLen] = {6, 5, 4, 3, 2, 2};
 static constexpr uint8_t kFakeOui[wlan_ieee80211::kOuiLen] = {9, 7, 1};
 static constexpr uint8_t kFakeChannel = 15;
-static constexpr zx_duration_t kFakeDuration = 4567;
-static constexpr uint8_t kFakeSsidLen = 9;
-static constexpr uint8_t kFakeSsid[kFakeSsidLen] = {'w', 'h', 'a', 't', 'a', 't', 'e', 's', 't'};
 static constexpr uint8_t kFakeKey[wlan_ieee80211::kMaxKeyLen] = {
     6, 9, 3, 9, 9, 3, 7, 5, 1, 0, 5, 8, 2, 0, 9, 7, 4, 9, 4, 4, 5, 9, 2, 3, 0, 7, 8, 1, 6, 4, 0, 6};
 static constexpr size_t kFakePacketSize = 50;
@@ -462,88 +459,6 @@ TEST_F(ConvertTest, ToFidlKeyConfig) {
   for (size_t i = 0; i < wlan_ieee80211::kMaxKeyLen; i++) {
     EXPECT_EQ(kFakeKey[i], out.key().data()[i]);
   }
-}
-
-TEST_F(ConvertTest, ToFidlActiveScanArgs) {
-  log::Instance::Init(0);
-  // Populate wlan_softmac_start_active_scan_request_t
-  uint8_t* channel_list =
-      (uint8_t*)calloc(wlan_ieee80211::kMaxUniqueChannelNumbers, sizeof(uint8_t));
-  for (size_t i = 0; i < wlan_ieee80211::kMaxUniqueChannelNumbers; i++) {
-    channel_list[i] = kFakeChannel;
-  }
-
-  cssid_t* ssid_list = (cssid_t*)calloc(wlan_ieee80211::kSsidListMax, sizeof(cssid_t));
-  for (size_t i = 0; i < wlan_ieee80211::kSsidListMax; i++) {
-    ssid_list[i].len = kFakeSsidLen;
-    memcpy(ssid_list[i].data, kFakeSsid, kFakeSsidLen);
-  }
-
-  uint8_t* mac_header =
-      (uint8_t*)calloc(wlan_ieee80211::kMaxMgmtFrameMacHeaderByteLen, sizeof(uint8_t));
-  for (size_t i = 0; i < wlan_ieee80211::kMaxMgmtFrameMacHeaderByteLen; i++) {
-    mac_header[i] = kRandomPopulaterUint8;
-  }
-
-  uint8_t* ies = (uint8_t*)calloc(wlan_ieee80211::kMaxVhtMpduByteLen2, sizeof(uint8_t));
-  for (size_t i = 0; i < wlan_ieee80211::kMaxVhtMpduByteLen2; i++) {
-    ies[i] = kRandomPopulaterUint8;
-  }
-
-  wlan_softmac_start_active_scan_request_t in = {
-      .channels_list = channel_list,
-      .channels_count = wlan_ieee80211::kMaxUniqueChannelNumbers,
-      .ssids_list = ssid_list,
-      .ssids_count = wlan_ieee80211::kSsidListMax,
-      .mac_header_buffer = mac_header,
-      .mac_header_size = wlan_ieee80211::kMaxMgmtFrameMacHeaderByteLen,
-      .ies_buffer = ies,
-      .ies_size = wlan_ieee80211::kMaxVhtMpduByteLen2,
-      .min_channel_time = kFakeDuration,
-      .max_channel_time = kFakeDuration,
-      .min_home_time = kFakeDuration,
-      .min_probes_per_channel = kRandomPopulaterUint8,
-      .max_probes_per_channel = kRandomPopulaterUint8,
-  };
-
-  // Conduct conversion
-  fidl::Arena arena;
-  wlan_softmac::WlanSoftmacStartActiveScanRequest out;
-  ConvertActiveScanArgs(in, &out, arena);
-
-  // Verify outputs
-  EXPECT_EQ(wlan_ieee80211::kMaxUniqueChannelNumbers, out.channels().count());
-  for (size_t i = 0; i < wlan_ieee80211::kMaxUniqueChannelNumbers; i++) {
-    EXPECT_EQ(kFakeChannel, out.channels().data()[i]);
-  }
-
-  EXPECT_EQ(wlan_ieee80211::kSsidListMax, out.ssids().count());
-  for (size_t i = 0; i < wlan_ieee80211::kSsidListMax; i++) {
-    auto& ssid = out.ssids();
-    EXPECT_EQ(kFakeSsidLen, ssid[i].len);
-    EXPECT_EQ(0, memcmp(ssid[i].data.data(), kFakeSsid, ssid[i].len));
-  }
-
-  EXPECT_EQ(wlan_ieee80211::kMaxMgmtFrameMacHeaderByteLen, out.mac_header().count());
-  for (size_t i = 0; i < wlan_ieee80211::kMaxMgmtFrameMacHeaderByteLen; i++) {
-    EXPECT_EQ(kRandomPopulaterUint8, out.mac_header().data()[i]);
-  }
-
-  EXPECT_EQ(wlan_ieee80211::kMaxVhtMpduByteLen2, out.ies().count());
-  for (size_t i = 0; i < wlan_ieee80211::kMaxVhtMpduByteLen2; i++) {
-    EXPECT_EQ(kRandomPopulaterUint8, out.ies().data()[i]);
-  }
-
-  EXPECT_EQ(kFakeDuration, out.min_channel_time());
-  EXPECT_EQ(kFakeDuration, out.max_channel_time());
-  EXPECT_EQ(kFakeDuration, out.min_home_time());
-  EXPECT_EQ(kRandomPopulaterUint8, out.min_probes_per_channel());
-  EXPECT_EQ(kRandomPopulaterUint8, out.max_probes_per_channel());
-
-  free(channel_list);
-  free(ssid_list);
-  free(mac_header);
-  free(ies);
 }
 
 }  // namespace

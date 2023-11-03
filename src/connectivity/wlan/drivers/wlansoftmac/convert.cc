@@ -529,34 +529,4 @@ zx_status_t ConvertKeyConfig(const wlan_key_configuration_t& in,
   return ZX_OK;
 }
 
-void ConvertActiveScanArgs(const wlan_softmac_start_active_scan_request_t& in,
-                           fuchsia_wlan_softmac::wire::WlanSoftmacStartActiveScanRequest* out,
-                           fidl::AnyArena& arena) {
-  auto builder = fuchsia_wlan_softmac::wire::WlanSoftmacStartActiveScanRequest::Builder(arena);
-  auto channel_vec = std::vector<uint8_t>(in.channels_list, in.channels_list + in.channels_count);
-  builder.channels(fidl::VectorView<uint8_t>(arena, channel_vec));
-  std::vector<fuchsia_wlan_ieee80211::wire::CSsid> ssids_data;
-
-  for (size_t i = 0; i < in.ssids_count; i++) {
-    fuchsia_wlan_ieee80211::wire::CSsid cssid;
-    cssid.len = in.ssids_list[i].len;
-    memcpy(cssid.data.begin(), in.ssids_list[i].data, in.ssids_list[i].len);
-    ssids_data.push_back(cssid);
-  }
-
-  auto ssids = fidl::VectorView<fuchsia_wlan_ieee80211::wire::CSsid>(arena, ssids_data);
-  builder.ssids(ssids);
-  auto mac_header_vec =
-      std::vector<uint8_t>(in.mac_header_buffer, in.mac_header_buffer + in.mac_header_size);
-  builder.mac_header(fidl::VectorView<uint8_t>(arena, mac_header_vec));
-  auto ies_vec = std::vector<uint8_t>(in.ies_buffer, in.ies_buffer + in.ies_size);
-  builder.ies(fidl::VectorView<uint8_t>(arena, ies_vec));
-  builder.min_channel_time(in.min_channel_time);
-  builder.max_channel_time(in.max_channel_time);
-  builder.min_home_time(in.min_home_time);
-  builder.min_probes_per_channel(in.min_probes_per_channel);
-  builder.max_probes_per_channel(in.max_probes_per_channel);
-  *out = builder.Build();
-}
-
 }  // namespace wlan
