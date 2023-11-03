@@ -163,11 +163,19 @@ impl Resolver for RemoteResolver {
     }
 }
 
+/// Given a ref-counted resolver, returns a boxed resolver that delegates to the ref-counted
+/// resolver.
+pub fn box_arc_resolver(
+    arc: &Arc<impl Resolver + Send + Sync + 'static>,
+) -> Box<dyn Resolver + Send + Sync + 'static> {
+    Box::new(InternalResolver(arc.clone()))
+}
+
 #[derive(Debug)]
-pub struct BuiltinResolver(pub Arc<dyn Resolver + Send + Sync + 'static>);
+struct InternalResolver(Arc<dyn Resolver + Send + Sync + 'static>);
 
 #[async_trait]
-impl Resolver for BuiltinResolver {
+impl Resolver for InternalResolver {
     async fn resolve(
         &self,
         component_address: &ComponentAddress,

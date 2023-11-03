@@ -61,7 +61,7 @@ use {
             },
             hooks::EventType,
             model::{Model, ModelParams},
-            resolver::{BuiltinResolver, ResolverRegistry},
+            resolver::{box_arc_resolver, ResolverRegistry},
             storage::admin_protocol::StorageAdmin,
         },
         root_stop_notifier::RootStopNotifier,
@@ -1261,8 +1261,7 @@ async fn register_boot_resolver(
         }
         Some(boot_resolver) => {
             let resolver = Arc::new(boot_resolver);
-            resolvers
-                .register(BOOT_SCHEME.to_string(), Box::new(BuiltinResolver(resolver.clone())));
+            resolvers.register(BOOT_SCHEME.to_string(), box_arc_resolver(&resolver));
             Ok(Some(resolver))
         }
     }
@@ -1274,7 +1273,6 @@ fn register_realm_builder_resolver(
     let realm_builder_resolver =
         RealmBuilderResolver::new().context("Failed to create realm builder resolver")?;
     let resolver = Arc::new(realm_builder_resolver);
-    resolvers
-        .register(REALM_BUILDER_SCHEME.to_string(), Box::new(BuiltinResolver(resolver.clone())));
+    resolvers.register(REALM_BUILDER_SCHEME.to_string(), box_arc_resolver(&resolver));
     Ok(resolver)
 }
