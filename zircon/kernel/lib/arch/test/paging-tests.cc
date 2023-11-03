@@ -646,6 +646,38 @@ TEST(RiscvPagingTraitTests, GetSetAccessed) {
   TestRiscvSetImpliesAccessedAndDirty<RiscvPagingLevel::k0>();
 }
 
+template <RiscvPagingLevel Level>
+void TestRiscvGetSetGlobal() {
+  //
+  // Whether the entry was 'accessed' is given via the G field.
+  //
+
+  arch::RiscvPageTableEntry<Level> entry;
+
+  for (bool t : kBools) {
+    for (bool g : kBools) {
+      entry.set_reg_value(0).set_r(t).set_g(g);
+      EXPECT_EQ(t && g, entry.global());
+
+      entry.set_reg_value(0).Set({}, RiscvPagingSettings{
+                                         .present = true,
+                                         .terminal = t,
+                                         .access = {.readable = true},
+                                         .global = g,
+                                     });
+      EXPECT_EQ(t && g, entry.global());
+    }
+  }
+}
+
+TEST(RiscvPagingTraitTests, GetSetGlobal) {
+  TestRiscvGetSetGlobal<RiscvPagingLevel::k4>();
+  TestRiscvGetSetGlobal<RiscvPagingLevel::k3>();
+  TestRiscvGetSetGlobal<RiscvPagingLevel::k2>();
+  TestRiscvGetSetGlobal<RiscvPagingLevel::k1>();
+  TestRiscvGetSetGlobal<RiscvPagingLevel::k0>();
+}
+
 template <X86PagingLevel Level>
 void TestX86GetSetPresent() {
   // Presence is controlled by the P bit.
@@ -1051,6 +1083,72 @@ TEST(X86PagingTraitTests, SetImpliesAccessedAndDirty) {
   TestX86SetImpliesAccessedAndDirty<X86PagingLevel::kPageDirectoryPointerTable>();
   TestX86SetImpliesAccessedAndDirty<X86PagingLevel::kPageDirectory>();
   TestX86SetImpliesAccessedAndDirty<X86PagingLevel::kPageTable>();
+}
+
+template <X86PagingLevel Level>
+void TestX86GetSetGlobal() {
+  arch::X86PagingStructure<Level> entry;
+
+  // Non-terminal entries ignore settings of `global = true`.
+  if constexpr (kX86LevelCanBeNonTerminal<Level>) {
+    entry.set_reg_value(0)
+        .Set({}, X86PagingSettings{.present = true, .terminal = false})
+        .set_g(false);
+    EXPECT_FALSE(entry.global());
+
+    entry.set_reg_value(0)
+        .Set({}, X86PagingSettings{.present = true, .terminal = false})
+        .set_g(true);
+    EXPECT_FALSE(entry.global());
+
+    entry.set_reg_value(0).Set({}, X86PagingSettings{
+                                       .present = true,
+                                       .terminal = false,
+                                       .global = false,
+                                   });
+    EXPECT_FALSE(entry.global());
+
+    entry.set_reg_value(0).Set({}, X86PagingSettings{
+                                       .present = true,
+                                       .terminal = false,
+                                       .global = true,
+                                   });
+    EXPECT_FALSE(entry.global());
+  }
+
+  if constexpr (kX86LevelCanBeTerminal<Level>) {
+    entry.set_reg_value(0)
+        .Set({}, X86PagingSettings{.present = true, .terminal = true})
+        .set_g(false);
+    EXPECT_FALSE(entry.global());
+
+    entry.set_reg_value(0)
+        .Set({}, X86PagingSettings{.present = true, .terminal = true})
+        .set_g(true);
+    EXPECT_TRUE(entry.global());
+
+    entry.set_reg_value(0).Set({}, X86PagingSettings{
+                                       .present = true,
+                                       .terminal = true,
+                                       .global = false,
+                                   });
+    EXPECT_FALSE(entry.global());
+
+    entry.set_reg_value(0).Set({}, X86PagingSettings{
+                                       .present = true,
+                                       .terminal = true,
+                                       .global = true,
+                                   });
+    EXPECT_TRUE(entry.global());
+  }
+}
+
+TEST(X86PagingTraitTests, GetSetGlobal) {
+  TestX86GetSetGlobal<X86PagingLevel::kPml5Table>();
+  TestX86GetSetGlobal<X86PagingLevel::kPml4Table>();
+  TestX86GetSetGlobal<X86PagingLevel::kPageDirectoryPointerTable>();
+  TestX86GetSetGlobal<X86PagingLevel::kPageDirectory>();
+  TestX86GetSetGlobal<X86PagingLevel::kPageTable>();
 }
 
 template <ArmPagingLevel Level>
@@ -1716,6 +1814,74 @@ TEST(ArmPagingTraitTests, SetImpliesAccessed) {
   TestArmSetImpliesAccessed<ArmPagingLevel::k1>();
   TestArmSetImpliesAccessed<ArmPagingLevel::k2>();
   TestArmSetImpliesAccessed<ArmPagingLevel::k3>();
+}
+
+template <ArmPagingLevel Level>
+void TestArmGetSetGlobal() {
+  ArmTableEntry<Level> entry;
+
+  if constexpr (kArmLevelCanBeTable<Level>) {
+    entry.set_reg_value(0).SetAsTable();
+    EXPECT_FALSE(entry.global());
+  }
+  if constexpr (kArmLevelCanBePage<Level>) {
+    entry.set_reg_value(0).SetAsPage().set_ng(true);
+    EXPECT_FALSE(entry.global());
+
+    entry.set_reg_value(0).SetAsPage().set_ng(false);
+    EXPECT_TRUE(entry.global());
+  }
+  if constexpr (kArmLevelCanBeBlock<Level>) {
+    entry.set_reg_value(0).SetAsBlock().set_ng(true);
+    EXPECT_FALSE(entry.global());
+
+    entry.set_reg_value(0).SetAsBlock().set_ng(false);
+    EXPECT_TRUE(entry.global());
+  }
+
+  // Non-terminal entries never report 'global'.
+  if constexpr (kArmLevelCanBeNonTerminal<Level>) {
+    entry.set_reg_value(0).Set({}, ArmPagingSettings{
+                                       .present = true,
+                                       .terminal = false,
+                                       .access = {.readable = true},
+                                       .global = false,
+                                   });
+    EXPECT_FALSE(entry.global());
+
+    entry.set_reg_value(0).Set({}, ArmPagingSettings{
+                                       .present = true,
+                                       .terminal = false,
+                                       .access = {.readable = true},
+                                       .global = true,
+                                   });
+    EXPECT_FALSE(entry.global());
+  }
+
+  if constexpr (kArmLevelCanBeTerminal<Level>) {
+    entry.set_reg_value(0).Set({}, ArmPagingSettings{
+                                       .present = true,
+                                       .terminal = true,
+                                       .access = {.readable = true},
+                                       .global = false,
+                                   });
+    EXPECT_FALSE(entry.global());
+
+    entry.set_reg_value(0).Set({}, ArmPagingSettings{
+                                       .present = true,
+                                       .terminal = true,
+                                       .access = {.readable = true},
+                                       .global = true,
+                                   });
+    EXPECT_TRUE(entry.global());
+  }
+}
+
+TEST(ArmPagingTraitTests, GetSetGlobal) {
+  TestArmGetSetGlobal<ArmPagingLevel::k0>();
+  TestArmGetSetGlobal<ArmPagingLevel::k1>();
+  TestArmGetSetGlobal<ArmPagingLevel::k2>();
+  TestArmGetSetGlobal<ArmPagingLevel::k3>();
 }
 
 // Represents a 512 entry page table and owns its own storage.

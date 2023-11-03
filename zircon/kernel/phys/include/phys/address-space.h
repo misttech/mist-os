@@ -139,6 +139,10 @@ class AddressSpace {
   //
   // If execute-only access is requested and the hardware does not support
   // this, the permissions will be fixed up as RX.
+  //
+  // If the requested virtual address range is in the upper address space, the
+  // settings will also be fixed up to be global (as these ranges are intended
+  // for permanent kernel mappings).
   fit::result<MapError> Map(uint64_t vaddr, uint64_t size, uint64_t paddr, MapSettings settings);
 
   fit::result<MapError> IdentityMap(uint64_t addr, uint64_t size, MapSettings settings) {

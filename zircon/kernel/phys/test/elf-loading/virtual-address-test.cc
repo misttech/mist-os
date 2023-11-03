@@ -65,7 +65,6 @@ int PhysLoadTestMain(KernelStorage kernelfs) {
   Allocation loaded = elf.Load(kLoadAddress);
   elf.Relocate();
 
-  // TODO(fxbug.dev/91187): Map as global.
   // TODO(fxbug.dev/91187): Set up C++ ABI support and map and jump into a
   // loaded C++ program.
   if (auto result = elf.MapInto(*gAddressSpace); result.is_error()) {

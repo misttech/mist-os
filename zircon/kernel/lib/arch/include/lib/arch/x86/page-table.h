@@ -231,6 +231,8 @@ class X86PagingTraitsBase::TableEntry
 
   constexpr bool accessed() const { return a(); }
 
+  constexpr bool global() const { return terminal() ? g() : false; }
+
   constexpr SelfType& Set(const SystemState& state, const PagingSettings& settings) {
     set_p(settings.present);
     if (!settings.present) {
@@ -263,6 +265,8 @@ class X86PagingTraitsBase::TableEntry
         ZX_DEBUG_ASSERT_MSG((fbl::ExtractBits<20, 13, uint64_t>(settings.address) == 0),
                             "%#" PRIx64, settings.address);
       }
+
+      set_g(settings.global);
     }
     set_base_address_51_13(fbl::ExtractBits<51, 13, uint64_t>(settings.address) << 13);
     if (!(terminal() && (kPde || kPdpte))) {

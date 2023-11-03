@@ -49,6 +49,7 @@ struct PagingSettings {
   bool terminal = false;
   AccessPermissions access;
   MemoryType memory = DefaultMemoryValue;
+  bool global = false;
 };
 
 // See Paging<PagingTraits>::MemoryType below.
@@ -56,8 +57,7 @@ template <typename MemoryType, auto& DefaultMemoryValue = kDefaultConstructedVal
 struct MapSettings {
   AccessPermissions access;
   MemoryType memory = DefaultMemoryValue;
-
-  // TODO(fxbug.dev/129344): global.
+  bool global = false;
 };
 
 }  // namespace internal
@@ -137,8 +137,6 @@ struct ExamplePagingTraits {
   ///
   /// internal::PagingSettings may be instantiated to satisfy these
   /// requirements.
-  ///
-  /// TODO(fxbug.dev/129344): Extend with a 'global' setting.
   using PagingSettings = internal::PagingSettings<MemoryType>;
 
   /// The register type representing a page table entry at a given level. It
@@ -189,6 +187,13 @@ struct ExamplePagingTraits {
     /// automatically - but otherwise software must do so and contend with
     /// access faults when unset.
     constexpr bool accessed() const { return false; }
+
+    /// If terminal, whether the associated page is 'global'. A page being
+    /// designated as such prevents its TLB entries from being affected by
+    /// normal TLB invalidations. This is useful in the case of mappings that
+    /// are expected to exist within different page table trees being switched
+    /// between. If non-terminal, this is expected to return false.
+    constexpr bool global() const { return false; }
 
     /// Returns the memory type of the associated page, which may require
     /// access to system state to decode.
@@ -734,6 +739,7 @@ class Paging : public PagingTraits {
         settings.address = output_paddr_;
         settings.access = settings_.access;
         settings.memory = settings_.memory;
+        settings.global = settings_.global;
       } else {
         std::optional<uint64_t> new_table_paddr = allocator_(kTableSize<Level>, kTableAlignment);
         if (!new_table_paddr) {

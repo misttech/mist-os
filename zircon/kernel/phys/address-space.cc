@@ -49,12 +49,14 @@ fit::result<AddressSpace::MapError> AddressSpace::Map(uint64_t vaddr, uint64_t s
                 "virtual address %#" PRIx64 " must be < %#" PRIx64 " or >= %#" PRIx64, vaddr,
                 kLowerVirtualAddressRangeEnd, kUpperVirtualAddressRangeStart);
 
-  // Fix-up execute-only permissions if the hardware does not actually permit that.
+  bool upper = vaddr >= kUpperVirtualAddressRangeStart;
+
+  // Fix-up settings per documented behavior.
   if constexpr (!kExecuteOnlyAllowed) {
     settings.access.readable |= !settings.access.writable && settings.access.executable;
   }
+  settings.global = upper;
 
-  bool upper = vaddr >= kUpperVirtualAddressRangeStart;
   if constexpr (kDualSpaces) {
     if (upper) {
       return UpperPaging::Map(upper_root_paddr_, paddr_to_io_, permanent_allocator(), state_, vaddr,

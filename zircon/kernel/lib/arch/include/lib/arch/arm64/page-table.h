@@ -373,6 +373,10 @@ class ArmAddressTranslationDescriptor
     return IsPage() ? AsPage().af() : IsBlock() ? AsBlock().af() : false;
   }
 
+  constexpr bool global() const {
+    return IsPage() ? !AsPage().ng() : IsBlock() ? !AsBlock().ng() : false;
+  }
+
   constexpr ArmMairAttribute Memory(const ArmSystemPagingState& state) const {
     auto memory = [&state](const auto& desc) {
       return *state.mair.GetAttribute(static_cast<unsigned int>(desc.attr_index()));
@@ -401,8 +405,8 @@ class ArmAddressTranslationDescriptor
         ZX_PANIC("level cannot be terminal");
       }
 
-      auto set_memory = [&](auto& desc) {
-        desc.set_sh(state.shareability);
+      auto set_terminal = [&](auto& desc) {
+        desc.set_af(true).set_ng(!settings.global).set_sh(state.shareability);
         std::optional<unsigned int> index = state.mair.GetIndex(settings.memory);
         ZX_DEBUG_ASSERT_MSG(index,
                             "memory attribute %#" PRIx8 " not configured in MAIR (%#" PRIx64 ")",
@@ -411,9 +415,9 @@ class ArmAddressTranslationDescriptor
         desc.set_attr_index(*index);
       };
       if (IsPage()) {
-        set_memory(AsPage().set_af(true));
+        set_terminal(AsPage());
       } else {
-        set_memory(AsBlock().set_af(true));
+        set_terminal(AsBlock());
       }
     } else {
       if constexpr (Table::kValid) {
@@ -611,6 +615,7 @@ class ArmAddressTranslationPageDescriptor
   // Bits [49:12] conditionally represent the output address field, which is
   // handled manually below.
 
+  DEF_BIT(11, ng);  // Not Global
   DEF_BIT(10, af);  // Access Flag
 
   DEF_COND_ENUM_FIELD(ArmShareabilityAttribute, 9, 8, sh, kWidth48);  // SHareability
@@ -718,7 +723,7 @@ class ArmAddressTranslationBlockDescriptor
 
   DEF_BIT(16, nt);  // Block translation entry
 
-  DEF_RSVDZ_BIT(11);
+  DEF_BIT(11, ng);  // Not Global
   DEF_BIT(10, af);  // Access Flag
 
   DEF_COND_ENUM_FIELD(ArmShareabilityAttribute, 9, 8, sh, kWidth48);  // SHareability
