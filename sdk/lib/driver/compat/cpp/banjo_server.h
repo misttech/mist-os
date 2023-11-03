@@ -23,9 +23,9 @@ class BanjoServer {
     compat_device_.proto_ops.ops = ops;
   }
 
-  fuchsia_driver_framework::NodeSymbol symbol() const {
+  fuchsia_driver_framework::NodeSymbol symbol(std::string_view symbol_name = kDeviceSymbol) const {
     return fuchsia_driver_framework::NodeSymbol{{
-        .name = kDeviceSymbol,
+        .name = std::string(symbol_name),
         .address = reinterpret_cast<uint64_t>(&compat_device_),
     }};
   }

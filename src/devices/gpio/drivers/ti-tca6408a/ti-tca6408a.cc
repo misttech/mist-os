@@ -144,8 +144,7 @@ zx::result<> TiTca6408aDevice::ServeMetadata(
   std::string topological_path(topo.value().path.get());
   topological_path += "/";
   topological_path += node_name_val;
-
-  compat_server_ = compat::DeviceServer("default", 0, topological_path);
+  compat_server_.Init("default", topological_path);
 
   // Serve Metadata.
   for (auto& meta : metadata) {

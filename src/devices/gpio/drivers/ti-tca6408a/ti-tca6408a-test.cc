@@ -79,7 +79,7 @@ class FakeTiTca6408aDevice : public fake_i2c::FakeI2c {
 struct IncomingNamespace {
   fdf_testing::TestNode node_{std::string("root")};
   fdf_testing::TestEnvironment env_{fdf::Dispatcher::GetCurrent()->get()};
-  compat::DeviceServer device_server_{"pdev", 0, ""};
+  compat::DeviceServer device_server_;
   FakeTiTca6408aDevice fake_i2c_;
 };
 
@@ -106,6 +106,8 @@ class TiTca6408aTest : public zxtest::Test {
       auto init_result =
           incoming->env_.Initialize(std::move(start_args_result->incoming_directory_server));
       ASSERT_TRUE(init_result.is_ok());
+
+      incoming->device_server_.Init("pdev", "");
 
       // Serve metadata.
       auto status = incoming->device_server_.AddMetadata(DEVICE_METADATA_PRIVATE, &kPinIndexOffset,

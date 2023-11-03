@@ -18,30 +18,56 @@ class ChildBanjoTransportDriver : public fdf::DriverBase {
                             fdf::UnownedSynchronizedDispatcher driver_dispatcher)
       : DriverBase("transport-child", std::move(start_args), std::move(driver_dispatcher)) {}
 
-  zx::result<> Start() override {
+  void Start(fdf::StartCompleter completer) override {
     parent_node_.Bind(std::move(node()));
 
     // Connect to the `fuchsia.examples.gizmo.Misc` protocol provided by the parent.
     zx::result client = compat::ConnectBanjo<ddk::MiscProtocolClient>(symbols());
     if (client.is_error()) {
       FDF_SLOG(ERROR, "Failed to connect client", KV("status", client.status_string()));
-      return client.take_error();
+      completer(client.take_error());
+      return;
     }
     client_ = *client;
 
     zx_status_t status = QueryParent();
     if (status != ZX_OK) {
       parent_node_ = {};
-      return zx::error(status);
+      completer(zx::error(status));
+      return;
     }
 
-    zx::result result = AddChild();
-    if (result.is_error()) {
-      FDF_SLOG(ERROR, "Failed to add child", KV("status", result.status_string()));
-      return result.take_error();
-    }
+    auto compat = incoming()->Connect<fuchsia_driver_compat::Service::Device>();
+    ZX_ASSERT(compat.is_ok());
+    compat_.Bind(std::move(compat.value()), dispatcher());
 
-    return zx::ok();
+    compat_->GetTopologicalPath().Then(
+        [this, completer = std::move(completer)](
+            fidl::WireUnownedResult<fuchsia_driver_compat::Device::GetTopologicalPath>&
+                result) mutable {
+          if (!result.ok()) {
+            FDF_LOG(ERROR, "Failed to get child topo path: %s", result.FormatDescription().c_str());
+            completer(zx::error(result.error().status()));
+            return;
+          }
+
+          std::string expected = "sys/test/transport-parent";
+          std::string actual = std::string(result->path.get());
+          if (actual != expected) {
+            FDF_LOG(INFO, "Unexpected child topo path: %s", actual.c_str());
+            completer(zx::error(ZX_ERR_INTERNAL));
+            return;
+          }
+
+          zx::result add_result = AddChild();
+          if (add_result.is_error()) {
+            FDF_SLOG(ERROR, "Failed to add child", KV("status", add_result.status_string()));
+            completer(add_result.take_error());
+            return;
+          }
+
+          completer(zx::ok());
+        });
   }
 
   zx_status_t QueryParent() {
@@ -97,6 +123,8 @@ class ChildBanjoTransportDriver : public fdf::DriverBase {
 
     return zx::ok();
   }
+
+  fidl::WireClient<fuchsia_driver_compat::Device> compat_;
 
   ddk::MiscProtocolClient client_;
 

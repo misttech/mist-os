@@ -92,67 +92,54 @@ void DriverLogWarning(const char* message) { FDF_LOG(WARNING, "%s", message); }
 
 void DriverLogError(const char* message) { FDF_LOG(ERROR, "%s", message); }
 
-zx::result<> Dfv2Driver::Start() {
+void Dfv2Driver::Start(fdf::StartCompleter completer) {
   parent_.Bind(std::move(node()));
+  start_completer_.emplace(std::move(completer));
+  compat_server_.OnInitialized(fit::bind_member<&Dfv2Driver::CompatServerInitialized>(this));
+}
+
+void Dfv2Driver::CompatServerInitialized(zx::result<> compat_result) {
+  if (compat_result.is_error()) {
+    return CompleteStart(compat_result.take_error());
+  }
 
   aml_sdmmc_config_t config;
   {
     zx::result result = incoming()->Connect<fuchsia_driver_compat::Service::Device>();
     if (result.is_error() || !result->is_valid()) {
       FDF_LOG(ERROR, "Failed to connect to compat service: %s", result.status_string());
-      return result.take_error();
+      return CompleteStart(result.take_error());
     }
     auto parent_compat = fidl::WireSyncClient(std::move(result.value()));
 
     fidl::WireResult metadata = parent_compat->GetMetadata();
     if (!metadata.ok()) {
       FDF_LOG(ERROR, "Call to GetMetadata failed: %s", metadata.status_string());
-      return zx::error(metadata.status());
+      return CompleteStart(zx::error(metadata.status()));
     }
     if (metadata->is_error()) {
       FDF_LOG(ERROR, "Failed to GetMetadata: %s", zx_status_get_string(metadata->error_value()));
-      return metadata->take_error();
+      return CompleteStart(metadata->take_error());
     }
 
     zx::result parsed_metadata = ParseMetadata(metadata.value()->metadata);
     if (parsed_metadata.is_error()) {
       FDF_LOG(ERROR, "Failed to ParseMetadata: %s",
               zx_status_get_string(parsed_metadata.error_value()));
-      return parsed_metadata.take_error();
+      return CompleteStart(parsed_metadata.take_error());
     }
     config = parsed_metadata.value();
-
-    fidl::WireResult parent_path = parent_compat->GetTopologicalPath();
-    if (!parent_path.ok()) {
-      FDF_LOG(ERROR, "Call to GetTopologicalPath failed: %s", parent_path.status_string());
-      return zx::error(parent_path.status());
-    }
-
-    // TODO(fxbug.dev/135057): Automatically construct the topological path.
-    std::string topological_path(parent_path.value().path.get());
-    if (node_name().has_value()) {
-      topological_path += "/" + node_name().value();
-    }
-    topological_path += "/" + std::string(name());
-
-    compat_server_ = compat::DeviceServer(std::string(name()), ZX_PROTOCOL_SDMMC, topological_path,
-                                          std::nullopt, banjo_server_.callback());
-    zx_status_t status = compat_server_.Serve(dispatcher(), outgoing().get());
-    if (status != ZX_OK) {
-      FDF_LOG(ERROR, "Failed to start compat server: %s", zx_status_get_string(status));
-      return zx::error(status);
-    }
   }
 
   {
     zx::result pdev = incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>();
     if (pdev.is_error() || !pdev->is_valid()) {
       FDF_LOG(ERROR, "Failed to connect to platform device: %s", pdev.status_string());
-      return pdev.take_error();
+      return CompleteStart(pdev.take_error());
     }
 
     if (zx::result status = InitResources(std::move(pdev.value()), config); status.is_error()) {
-      return status.take_error();
+      return CompleteStart(status.take_error());
     }
   }
 
@@ -169,7 +156,7 @@ zx::result<> Dfv2Driver::Start() {
     auto result = outgoing()->AddService<fuchsia_hardware_sdmmc::SdmmcService>(std::move(handler));
     if (result.is_error()) {
       FDF_LOG(ERROR, "Failed to add service: %s", result.status_string());
-      return result.take_error();
+      return CompleteStart(result.take_error());
     }
   }
 
@@ -178,7 +165,7 @@ zx::result<> Dfv2Driver::Start() {
   if (!controller_endpoints.is_ok()) {
     FDF_LOG(ERROR, "Failed to create controller endpoints: %s",
             controller_endpoints.status_string());
-    return controller_endpoints.take_error();
+    return CompleteStart(controller_endpoints.take_error());
   }
 
   controller_.Bind(std::move(controller_endpoints->client));
@@ -219,12 +206,12 @@ zx::result<> Dfv2Driver::Start() {
   auto result = parent_->AddChild(args, std::move(controller_endpoints->server), {});
   if (!result.ok()) {
     FDF_LOG(ERROR, "Failed to add child: %s", result.status_string());
-    return zx::error(result.status());
+    return CompleteStart(zx::error(result.status()));
   }
 
   FDF_LOG(INFO, "Completed start hook");
 
-  return zx::ok();
+  return CompleteStart(zx::ok());
 }
 
 zx::result<> Dfv2Driver::InitResources(
@@ -340,6 +327,12 @@ zx::result<> Dfv2Driver::InitResources(
 
 void Dfv2Driver::Serve(fdf::ServerEnd<fuchsia_hardware_sdmmc::Sdmmc> request) {
   fdf::BindServer(driver_dispatcher()->get(), std::move(request), this);
+}
+
+void Dfv2Driver::CompleteStart(zx::result<> result) {
+  ZX_ASSERT(start_completer_.has_value());
+  start_completer_.value()(result);
+  start_completer_.reset();
 }
 
 }  // namespace aml_sdmmc

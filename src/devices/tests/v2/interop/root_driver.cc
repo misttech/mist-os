@@ -22,14 +22,21 @@ class RootDriver : public fdf::DriverBase {
   RootDriver(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
       : fdf::DriverBase("root", std::move(start_args), std::move(driver_dispatcher)) {}
 
-  zx::result<> Start() override {
+  void Start(fdf::StartCompleter completer) override {
     node_.Bind(std::move(node()), dispatcher());
-    child_ = compat::DeviceServer("v1", 0, "root/v1");
-    auto status = child_->Serve(dispatcher(), &outgoing()->component());
-    if (status != ZX_OK) {
-      FDF_LOG(ERROR, "Failed to serve compat device server: %s", zx_status_get_string(status));
-      node_.AsyncTeardown();
-      return zx::error(status);
+    start_completer_.emplace(std::move(completer));
+    child_.OnInitialized(fit::bind_member<&RootDriver::CompatServerInitialized>(this));
+  }
+
+  void CompleteStart(zx::result<> result) {
+    ZX_ASSERT(start_completer_.has_value());
+    start_completer_.value()(result);
+    start_completer_.reset();
+  }
+
+  void CompatServerInitialized(zx::result<> compat_result) {
+    if (compat_result.is_error()) {
+      return CompleteStart(compat_result.take_error());
     }
 
     // Set the symbols of the node that a driver will have access to.
@@ -43,7 +50,7 @@ class RootDriver : public fdf::DriverBase {
     fdf::NodeProperty property =
         fdf::MakeProperty(1 /* BIND_PROTOCOL */, bind_fuchsia_test::BIND_PROTOCOL_COMPAT_CHILD);
 
-    auto offers = child_->CreateOffers();
+    auto offers = child_.CreateOffers();
 
     fdf::NodeAddArgs args(
         {.name = "v1", .offers = offers, .symbols = {{symbol}}, .properties = {{property}}});
@@ -51,7 +58,7 @@ class RootDriver : public fdf::DriverBase {
     // Create endpoints of the `NodeController` for the node.
     auto endpoints = fidl::CreateEndpoints<fdf::NodeController>();
     if (endpoints.is_error()) {
-      return endpoints.take_error();
+      return CompleteStart(endpoints.take_error());
     }
 
     node_->AddChild({std::move(args), std::move(endpoints->server), {}})
@@ -66,7 +73,7 @@ class RootDriver : public fdf::DriverBase {
 
           controller_.Bind(std::move(client), dispatcher());
         });
-    return zx::ok();
+    CompleteStart(zx::ok());
   }
 
  private:
@@ -77,8 +84,12 @@ class RootDriver : public fdf::DriverBase {
       .get_protocol = [](void*, uint32_t, void*) { return ZX_OK; },
   };
 
+  std::optional<fdf::StartCompleter> start_completer_;
+
   compat::device_t compat_device_ = compat::kDefaultDevice;
-  std::optional<compat::DeviceServer> child_;
+  compat::DeviceServer child_{dispatcher(), incoming(), outgoing(),
+                              node_name(),  "v1",       std::unordered_set<uint32_t>{},
+                              std::nullopt};
 };
 
 }  // namespace

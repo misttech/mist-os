@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <fidl/fuchsia.hardware.sdmmc/cpp/driver/fidl.h>
 #include <fuchsia/hardware/sdmmc/cpp/banjo.h>
+#include <lib/ddk/metadata.h>
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/inspect/component/cpp/component.h>
@@ -18,13 +19,16 @@
 
 namespace aml_sdmmc {
 
+// Note: This name can't be changed without migrating users in other repos.
+constexpr std::string_view kDriverName = "aml-sd-emmc";
+
 class Dfv2Driver : public fdf::DriverBase, public ddk::SdmmcProtocol<Dfv2Driver>, public AmlSdmmc {
  public:
   Dfv2Driver(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
-      : fdf::DriverBase("aml-sdmmc", std::move(start_args), std::move(dispatcher)) {}
+      : fdf::DriverBase(kDriverName, std::move(start_args), std::move(dispatcher)) {}
   ~Dfv2Driver() override = default;
 
-  zx::result<> Start() override;
+  void Start(fdf::StartCompleter completer) override;
 
   // ddk::SdmmcProtocol methods exposed
   zx_status_t SdmmcHostInfo(sdmmc_host_info_t* out_info) { return HostInfo(out_info); }
@@ -55,13 +59,31 @@ class Dfv2Driver : public fdf::DriverBase, public ddk::SdmmcProtocol<Dfv2Driver>
 
   void Serve(fdf::ServerEnd<fuchsia_hardware_sdmmc::Sdmmc> request);
 
+  void CompatServerInitialized(zx::result<> compat_result);
+  void CompleteStart(zx::result<> result);
+
+  compat::DeviceServer::BanjoConfig get_banjo_config() {
+    compat::DeviceServer::BanjoConfig config{ZX_PROTOCOL_SDMMC};
+    config.callbacks[ZX_PROTOCOL_SDMMC] = banjo_server_.callback();
+    return config;
+  }
+
   std::optional<inspect::ComponentInspector> exposed_inspector_;
 
   fidl::WireSyncClient<fuchsia_driver_framework::Node> parent_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
 
+  std::optional<fdf::StartCompleter> start_completer_;
+
   compat::BanjoServer banjo_server_{name().data(), ZX_PROTOCOL_SDMMC, this, &sdmmc_protocol_ops_};
-  compat::DeviceServer compat_server_;
+  compat::DeviceServer compat_server_{
+      dispatcher(),
+      incoming(),
+      outgoing(),
+      node_name(),
+      name(),
+      std::unordered_set<uint32_t>{DEVICE_METADATA_SDMMC, DEVICE_METADATA_GPT_INFO},
+      get_banjo_config()};
 };
 
 }  // namespace aml_sdmmc

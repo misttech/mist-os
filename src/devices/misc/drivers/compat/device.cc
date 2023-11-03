@@ -367,21 +367,24 @@ zx_status_t Device::Add(device_add_args_t* zx_args, zx_device_t** out) {
     }
   }
 
-  device->device_server_ = DeviceServer(
-      outgoing_name, zx_args->proto_id, device->topological_path_, std::move(service_offers),
+  DeviceServer::BanjoConfig banjo_config{zx_args->proto_id};
+  banjo_config.callbacks[zx_args->proto_id] =
       [device =
            std::weak_ptr(device)](uint32_t proto_id) -> zx::result<DeviceServer::GenericProtocol> {
-        DeviceServer::GenericProtocol protocol;
-        std::shared_ptr dev = device.lock();
-        if (!dev) {
-          return zx::error(ZX_ERR_BAD_STATE);
-        }
-        zx_status_t status = dev->GetProtocol(proto_id, &protocol);
-        if (status != ZX_OK) {
-          return zx::error(status);
-        }
-        return zx::ok(protocol);
-      });
+    DeviceServer::GenericProtocol protocol;
+    std::shared_ptr dev = device.lock();
+    if (!dev) {
+      return zx::error(ZX_ERR_BAD_STATE);
+    }
+    zx_status_t status = dev->GetProtocol(proto_id, &protocol);
+    if (status != ZX_OK) {
+      return zx::error(status);
+    }
+    return zx::ok(protocol);
+  };
+
+  device->device_server_.Init(outgoing_name, device->topological_path_, std::move(service_offers),
+                              std::move(banjo_config));
 
   // Add the metadata from add_args:
   for (size_t i = 0; i < zx_args->metadata_count; i++) {
@@ -437,7 +440,6 @@ zx_status_t Device::ExportAfterInit() {
 zx_status_t Device::CreateNode() {
   // Create NodeAddArgs from `zx_args`.
   fidl::Arena arena;
-
   auto offers = device_server_.CreateOffers(arena);
 
   std::vector<fdf::wire::NodeSymbol> symbols;

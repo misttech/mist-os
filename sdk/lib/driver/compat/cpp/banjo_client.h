@@ -12,8 +12,9 @@ namespace compat {
 
 template <typename Client>
 zx::result<Client> ConnectBanjo(
-    const std::optional<std::vector<fuchsia_driver_framework::NodeSymbol>>& symbols) {
-  auto parent_symbol = fdf_internal::GetSymbol<device_t*>(symbols, kDeviceSymbol);
+    const std::optional<std::vector<fuchsia_driver_framework::NodeSymbol>>& symbols,
+    std::string_view symbol_name = kDeviceSymbol) {
+  auto parent_symbol = fdf_internal::GetSymbol<device_t*>(symbols, symbol_name);
 
   typename Client::Proto proto = {};
   if (parent_symbol->proto_ops.id != Client::kProtocolId) {
