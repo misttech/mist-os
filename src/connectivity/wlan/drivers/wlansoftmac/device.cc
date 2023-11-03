@@ -18,6 +18,7 @@
 #include <lib/zx/time.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
+#include <zircon/errors.h>
 #include <zircon/status.h>
 #include <zircon/syscalls.h>
 #include <zircon/syscalls/port.h>
@@ -69,15 +70,18 @@ wlansoftmac_buffer_provider_ops_t rust_buffer_provider{
     },
 };
 
-static constexpr inline Device* DEV(void* ctx) { return static_cast<Device*>(ctx); }
+namespace {
 
-static zx_protocol_device_t eth_device_ops = {
+constexpr inline DeviceInterface* DEVICE(void* c) { return static_cast<DeviceInterface*>(c); }
+constexpr inline Device* DEV(void* ctx) { return static_cast<Device*>(ctx); }
+
+zx_protocol_device_t eth_device_ops = {
     .version = DEVICE_OPS_VERSION,
     .unbind = [](void* ctx) { DEV(ctx)->EthUnbind(); },
     .release = [](void* ctx) { DEV(ctx)->EthReleaseAndDeleteThis(); },
 };
 
-static ethernet_impl_protocol_ops_t ethernet_impl_ops = {
+ethernet_impl_protocol_ops_t ethernet_impl_ops = {
     .query = [](void* ctx, uint32_t options, ethernet_info_t* info) -> zx_status_t {
       return DEV(ctx)->EthernetImplQuery(options, info);
     },
@@ -90,26 +94,25 @@ static ethernet_impl_protocol_ops_t ethernet_impl_ops = {
            ethernet_impl_queue_tx_callback completion_cb,
            void* cookie) { DEV(ctx)->EthernetImplQueueTx(options, netbuf, completion_cb, cookie); },
     .set_param = [](void* ctx, uint32_t param, int32_t value, const uint8_t* data, size_t data_size)
-        -> zx_status_t { return DEV(ctx)->EthernetImplSetParam(param, value, data, data_size); },
+        -> zx_status_t { return Device::EthernetImplSetParam(param, value, data, data_size); },
 };
+
+}  // namespace
 
 WlanSoftmacHandle::WlanSoftmacHandle(DeviceInterface* device)
     : device_(device),
       inner_handle_(nullptr),
       wlan_softmac_bridge_server_loop_(&kAsyncLoopConfigNeverAttachToThread) {
-  ldebug(0, NULL, "Entering.");
+  ldebug(0, nullptr, "Entering.");
 }
 
 WlanSoftmacHandle::~WlanSoftmacHandle() {
-  ldebug(0, NULL, "Entering.");
+  ldebug(0, nullptr, "Entering.");
   if (inner_handle_ != nullptr) {
     delete_sta(inner_handle_);
   }
 }
 
-static constexpr inline DeviceInterface* DEVICE(void* c) {
-  return static_cast<DeviceInterface*>(c);
-}
 // WlanSoftmacBridgeImpl hosts methods migrated from Banjo data structures
 // to FIDL data structures. This server implementation was modeled after
 // https://fuchsia.dev/fuchsia-src/development/languages/fidl/tutorials/cpp/basics/server.
@@ -174,13 +177,13 @@ class WlanSoftmacBridgeImpl : public fidl::WireServer<fuchsia_wlan_softmac::Wlan
       fidl::ServerEnd<fuchsia_wlan_softmac::WlanSoftmacBridge> server_end) {
     std::unique_ptr impl = std::make_unique<WlanSoftmacBridgeImpl>(std::move(client));
     fidl::BindServer(dispatcher, std::move(server_end), std::move(impl),
-                     std::mem_fn(&WlanSoftmacBridgeImpl::OnUnbound));
+                     &WlanSoftmacBridgeImpl::OnUnbound);
   }
 
   // TODO(issues.fuchsia.dev/306181180): This method should probably trigger
   // shutdown of the device if called outside of a normal shutdown sequence.
-  void OnUnbound(fidl::UnbindInfo info,
-                 fidl::ServerEnd<fuchsia_wlan_softmac::WlanSoftmacBridge> server_end) {
+  static void OnUnbound([[maybe_unused]] WlanSoftmacBridgeImpl* impl_ptr, fidl::UnbindInfo info,
+                        fidl::ServerEnd<fuchsia_wlan_softmac::WlanSoftmacBridge> server_end) {
     if (info.is_user_initiated()) {
       // This is part of the normal shutdown sequence.
     } else if (info.is_peer_closed()) {
@@ -338,17 +341,18 @@ zx_status_t WlanSoftmacHandle::QueueEthFrameTx(std::unique_ptr<Packet> pkt) {
 
 Device::Device(zx_device_t* device)
     : ddk::Device<Device, ddk::Unbindable>(device), parent_(device) {
-  ldebug(0, NULL, "Entering.");
+  ldebug(0, nullptr, "Entering.");
   linfo("Creating a new WLAN device.");
   state_ = fbl::AdoptRef(new DeviceState);
   // Create a dispatcher to wait on the runtime channel.
   auto dispatcher =
       fdf::SynchronizedDispatcher::Create(fdf::SynchronizedDispatcher::Options::kAllowSyncCalls,
                                           "wlansoftmacifc_server", [&](fdf_dispatcher_t*) {
-                                            if (unbind_txn_ != std::nullopt)
+                                            if (unbind_txn_ != std::nullopt) {
                                               unbind_txn_->Reply();
-                                            else
+                                            } else {
                                               device_unbind_reply(ethdev_);
+                                            }
                                           });
 
   if (dispatcher.is_error()) {
@@ -371,14 +375,14 @@ Device::Device(zx_device_t* device)
   client_dispatcher_ = *std::move(dispatcher);
 }
 
-Device::~Device() { ldebug(0, NULL, "Entering."); }
+Device::~Device() { ldebug(0, nullptr, "Entering."); }
 
 // Disable thread safety analysis, as this is a part of device initialization.
 // All thread-unsafe work should occur before multiple threads are possible
 // (e.g., before MainLoop is started and before DdkAdd() is called), or locks
 // should be held.
 zx_status_t Device::Bind() __TA_NO_THREAD_SAFETY_ANALYSIS {
-  ldebug(0, NULL, "Entering.");
+  ldebug(0, nullptr, "Entering.");
   linfo("Binding our new WLAN softmac device.");
 
   zx_status_t status;
@@ -442,8 +446,8 @@ zx_status_t Device::Bind() __TA_NO_THREAD_SAFETY_ANALYSIS {
     return mac_sublayer_result.status();
   }
 
-  if ((status = ConvertMacSublayerSupport(mac_sublayer_result->value()->resp,
-                                          &mac_sublayer_support_)) != ZX_OK) {
+  status = ConvertMacSublayerSupport(mac_sublayer_result->value()->resp, &mac_sublayer_support_);
+  if (status != ZX_OK) {
     lerror("MacSublayerSupport conversion failed (%s)", zx_status_get_string(status));
     return status;
   }
@@ -483,7 +487,7 @@ zx_status_t Device::Bind() __TA_NO_THREAD_SAFETY_ANALYSIS {
 
   /* End of data type conversion. */
 
-  softmac_handle_.reset(new WlanSoftmacHandle(this));
+  softmac_handle_ = std::make_unique<WlanSoftmacHandle>(this);
   status = softmac_handle_->Init(client_.Clone());
   if (status != ZX_OK) {
     lerror("could not initialize Rust WlanSoftmac: %d", status);
@@ -519,7 +523,7 @@ std::unique_ptr<Packet> Device::PreparePacket(const void* data, size_t length, P
     return nullptr;
   }
 
-  auto packet = std::unique_ptr<Packet>(new Packet(std::move(buffer), length));
+  auto packet = std::make_unique<Packet>(std::move(buffer), length);
   packet->set_peer(peer);
   zx_status_t status = packet->CopyFrom(data, length, 0);
   if (status != ZX_OK) {
@@ -541,13 +545,13 @@ void Device::ShutdownMainLoop() {
 // ddk ethernet_impl_protocol_ops methods
 
 void Device::EthUnbind() {
-  ldebug(0, NULL, "Entering.");
+  ldebug(0, nullptr, "Entering.");
   ShutdownMainLoop();
   client_dispatcher_.ShutdownAsync();
 }
 
 void Device::EthReleaseAndDeleteThis() {
-  ldebug(0, NULL, "Entering.");
+  ldebug(0, nullptr, "Entering.");
   // The lifetime of this device is managed by the parent ethernet device, but we don't
   // have a mechanism to make this explicit. EthUnbind is already called at this point,
   // so it's safe to clean up our memory usage.
@@ -567,7 +571,7 @@ void Device::DdkUnbind(ddk::UnbindTxn txn) {
 void Device::DdkRelease() { delete this; }
 
 zx_status_t Device::EthernetImplQuery(uint32_t options, ethernet_info_t* info) {
-  ldebug(0, NULL, "Entering.");
+  ldebug(0, nullptr, "Entering.");
   if (info == nullptr)
     return ZX_ERR_INVALID_ARGS;
 
@@ -588,10 +592,9 @@ zx_status_t Device::EthernetImplQuery(uint32_t options, ethernet_info_t* info) {
     return mac_sublayer_result.status();
   }
 
-  zx_status_t status = ZX_OK;
   mac_sublayer_support_t mac_sublayer;
-  if ((status = ConvertMacSublayerSupport(mac_sublayer_result->value()->resp, &mac_sublayer)) !=
-      ZX_OK) {
+  zx_status_t status = ConvertMacSublayerSupport(mac_sublayer_result->value()->resp, &mac_sublayer);
+  if (status != ZX_OK) {
     lerror("MacSublayerSupport conversion failed (%s)", zx_status_get_string(status));
     return status;
   }
@@ -606,7 +609,7 @@ zx_status_t Device::EthernetImplQuery(uint32_t options, ethernet_info_t* info) {
 }
 
 zx_status_t Device::EthernetImplStart(const ethernet_ifc_protocol_t* ifc) {
-  ldebug(0, NULL, "Entering.");
+  ldebug(0, nullptr, "Entering.");
   ZX_DEBUG_ASSERT(ifc != nullptr);
 
   std::lock_guard<std::mutex> lock(ethernet_proxy_lock_);
@@ -618,7 +621,7 @@ zx_status_t Device::EthernetImplStart(const ethernet_ifc_protocol_t* ifc) {
 }
 
 void Device::EthernetImplStop() {
-  ldebug(0, NULL, "Entering.");
+  ldebug(0, nullptr, "Entering.");
 
   std::lock_guard<std::mutex> lock(ethernet_proxy_lock_);
   if (!ethernet_proxy_.is_valid()) {
@@ -650,25 +653,19 @@ void Device::EthernetImplQueueTx(uint32_t options, ethernet_netbuf_t* netbuf,
 
 zx_status_t Device::EthernetImplSetParam(uint32_t param, int32_t value, const void* data,
                                          size_t data_size) {
-  ldebug(0, NULL, "Entering.");
-
-  zx_status_t status = ZX_ERR_NOT_SUPPORTED;
-
-  switch (param) {
-    case ETHERNET_SETPARAM_PROMISC:
-      // See fxbug.dev/28881: In short, the bridge mode doesn't require WLAN
-      // promiscuous mode enabled.
-      //               So we give a warning and return OK here to continue the
-      //               bridging.
-      // TODO(fxbug.dev/29113): To implement the real promiscuous mode.
-      if (value == 1) {  // Only warn when enabling.
-        lwarn("WLAN promiscuous not supported yet. see fxbug.dev/29113");
-      }
-      status = ZX_OK;
-      break;
+  ldebug(0, nullptr, "Entering.");
+  if (param == ETHERNET_SETPARAM_PROMISC) {
+    // See fxbug.dev/28881: In short, the bridge mode doesn't require WLAN
+    // promiscuous mode enabled.
+    //               So we give a warning and return OK here to continue the
+    //               bridging.
+    // TODO(fxbug.dev/29113): To implement the real promiscuous mode.
+    if (value == 1) {  // Only warn when enabling.
+      lwarn("WLAN promiscuous not supported yet. see fxbug.dev/29113");
+    }
+    return ZX_OK;
   }
-
-  return status;
+  return ZX_ERR_NOT_SUPPORTED;
 }
 
 zx_status_t Device::Start(const rust_wlan_softmac_ifc_protocol_copy_t* ifc,
@@ -692,11 +689,12 @@ zx_status_t Device::Start(const rust_wlan_softmac_ifc_protocol_copy_t* ifc,
   // The protocol functions are stored in this class, which will act as
   // the server end of WlanSoftmacifc FIDL protocol, and this set of function pointers will be
   // called in the handler functions of FIDL server end.
-  wlan_softmac_ifc_protocol_ops_.reset(new wlan_softmac_ifc_protocol_ops_t{
-      .recv = ifc->ops->recv,
-      .report_tx_result = ifc->ops->report_tx_result,
-      .notify_scan_complete = ifc->ops->scan_complete,
-  });
+  wlan_softmac_ifc_protocol_ops_ =
+      std::make_unique<wlan_softmac_ifc_protocol_ops_t>(wlan_softmac_ifc_protocol_ops_t{
+          .recv = ifc->ops->recv,
+          .report_tx_result = ifc->ops->report_tx_result,
+          .notify_scan_complete = ifc->ops->scan_complete,
+      });
 
   wlan_softmac_ifc_protocol_ = std::make_unique<wlan_softmac_ifc_protocol_t>();
   wlan_softmac_ifc_protocol_->ops = wlan_softmac_ifc_protocol_ops_.get();
@@ -737,10 +735,10 @@ zx_status_t Device::QueueTx(std::unique_ptr<Packet> packet, wlan_tx_info_t tx_in
     return ZX_ERR_INTERNAL;
   }
 
-  zx_status_t status = ZX_OK;
   fuchsia_wlan_softmac::wire::WlanTxPacket fidl_tx_packet;
-  if ((status = ConvertTxPacket(packet->data(), packet->len(), tx_info, &fidl_tx_packet)) !=
-      ZX_OK) {
+  zx_status_t status = status =
+      ConvertTxPacket(packet->data(), packet->len(), tx_info, &fidl_tx_packet);
+  if (status != ZX_OK) {
     lerror("WlanTxPacket conversion failed: %s", zx_status_get_string(status));
     return status;
   }
@@ -774,9 +772,9 @@ zx_status_t Device::JoinBss(join_bss_request_t* cfg) {
     return ZX_ERR_INTERNAL;
   }
 
-  zx_status_t status = ZX_OK;
   fuchsia_wlan_common::wire::JoinBssRequest fidl_bss_config;
-  if ((status = ConvertJoinBssRequest(*cfg, &fidl_bss_config, *arena)) != ZX_OK) {
+  zx_status_t status = ConvertJoinBssRequest(*cfg, &fidl_bss_config, *arena);
+  if (status != ZX_OK) {
     lerror("JoinBssRequest conversion failed: %s", zx_status_get_string(status));
     return status;
   }
@@ -854,10 +852,10 @@ zx_status_t Device::InstallKey(wlan_key_configuration_t* key_config) {
     return ZX_ERR_INTERNAL;
   }
 
-  zx_status_t status = ZX_OK;
   fidl::Arena fidl_arena;
   fuchsia_wlan_softmac::wire::WlanKeyConfiguration fidl_key_config;
-  if ((status = ConvertKeyConfig(*key_config, &fidl_key_config, fidl_arena)) != ZX_OK) {
+  zx_status_t status = ConvertKeyConfig(*key_config, &fidl_key_config, fidl_arena);
+  if (status != ZX_OK) {
     lerror("WlanKeyConfiguration conversion failed: %s", zx_status_get_string(status));
     return status;
   }
@@ -892,7 +890,6 @@ zx_status_t Device::CancelScan(uint64_t scan_id) {
 }
 
 void Device::Recv(RecvRequestView request, fdf::Arena& arena, RecvCompleter::Sync& completer) {
-  zx_status_t status = ZX_OK;
   wlan_rx_packet_t rx_packet;
 
   {
@@ -908,7 +905,8 @@ void Device::Recv(RecvRequestView request, fdf::Arena& arena, RecvCompleter::Syn
       rx_packet_buffer = pre_alloc_recv_buffer_;
     }
 
-    if ((status = ConvertRxPacket(request->packet, &rx_packet, rx_packet_buffer)) != ZX_OK) {
+    zx_status_t status = ConvertRxPacket(request->packet, &rx_packet, rx_packet_buffer);
+    if (status != ZX_OK) {
       lerror("RxPacket conversion failed: %s", zx_status_get_string(status));
     }
 
@@ -927,10 +925,9 @@ void Device::Recv(RecvRequestView request, fdf::Arena& arena, RecvCompleter::Syn
 
 void Device::ReportTxResult(ReportTxResultRequestView request, fdf::Arena& arena,
                             ReportTxResultCompleter::Sync& completer) {
-  zx_status_t status = ZX_OK;
   wlan_tx_result_t tx_result;
-
-  if ((status = ConvertTxStatus(request->tx_result, &tx_result)) != ZX_OK) {
+  zx_status_t status = ConvertTxStatus(request->tx_result, &tx_result);
+  if (status != ZX_OK) {
     lerror("TxStatus conversion failed: %s", zx_status_get_string(status));
   }
 

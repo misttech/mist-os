@@ -81,8 +81,8 @@ class Device : public DeviceInterface,
   void EthernetImplStop() __TA_EXCLUDES(ethernet_proxy_lock_);
   void EthernetImplQueueTx(uint32_t options, ethernet_netbuf_t* netbuf,
                            ethernet_impl_queue_tx_callback completion_cb, void* cookie);
-  zx_status_t EthernetImplSetParam(uint32_t param, int32_t value, const void* data,
-                                   size_t data_size);
+  static zx_status_t EthernetImplSetParam(uint32_t param, int32_t value, const void* data,
+                                          size_t data_size);
 
   // DeviceInterface methods
   zx_status_t Start(const rust_wlan_softmac_ifc_protocol_copy_t* ifc,
@@ -118,7 +118,7 @@ class Device : public DeviceInterface,
 
   zx_status_t AddEthDevice();
 
-  std::unique_ptr<Packet> PreparePacket(const void* data, size_t length, Packet::Peer peer);
+  static std::unique_ptr<Packet> PreparePacket(const void* data, size_t length, Packet::Peer peer);
   template <typename T>
   std::unique_ptr<Packet> PreparePacket(const void* data, size_t length, Packet::Peer peer,
                                         const T& ctrl_data) {
