@@ -144,14 +144,11 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
         for fx_device in self.fuchsia_devices:
             try:
                 fx_device.snapshot(directory=directory)
-            except NotImplementedError:
-                _LOGGER.warning(
-                    "Taking snapshot is not yet supported by %s",
+            except Exception as err:  # pylint: disable=broad-except
+                _LOGGER.exception(
+                    "Unable to take snapshot of %s. Failed with error: %s",
                     fx_device.device_name,
-                )
-            except Exception:  # pylint: disable=broad-except
-                _LOGGER.warning(
-                    "Unable to take snapshot of %s", fx_device.device_name
+                    err,
                 )
 
     def _get_controller_configs(
@@ -302,11 +299,12 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
         for fx_device in self.fuchsia_devices:
             try:
                 fx_device.log_message_to_device(message, level)
-            except Exception:  # pylint: disable=broad-except
-                _LOGGER.warning(
-                    "Unable to log message '%s' on '%s'",
+            except Exception as err:  # pylint: disable=broad-except
+                _LOGGER.exception(
+                    "Unable to log message '%s' on '%s'. Failed with error: %s",
                     message,
                     fx_device.device_name,
+                    err,
                 )
 
     def _process_user_params(self) -> None:
