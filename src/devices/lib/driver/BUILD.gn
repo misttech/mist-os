@@ -130,7 +130,6 @@ group("driver") {
     "//src/devices/i2c/drivers/aml-i2c:*",
     "//src/devices/i2c/drivers/dw-i2c:*",
     "//src/devices/i2c/drivers/i2c:*",
-    "//src/devices/i2c/drivers/imx8m-i2c:*",
     "//src/devices/i2c/drivers/intel-i2c:*",
     "//src/devices/internal/drivers/fragment:*",
     "//src/devices/internal/drivers/fragment:*",

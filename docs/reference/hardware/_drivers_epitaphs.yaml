@@ -398,3 +398,9 @@
   available_in_git: 'b3d1ee97525800f1906b01f6eec0c6571cebbe03'
   areas: ['Input']
   path: '/src/ui/input/drivers/cypress'
+- short_description: 'NXP i.MX8-m I2C driver'
+  deletion_reason: 'Hardware is not actively supported'
+  gerrit_change_id: '941172'
+  available_in_git: 'bb05e1f62b8802e8e55a54bcf5f5aa70c5c7ab84'
+  areas: ['I2C']
+  path: '/src/devices/i2c/drivers/imx8m-i2c'

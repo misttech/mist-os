@@ -1,9 +1,0 @@
-{
-    "short_description": "NXP imx8m I2C driver",
-    "manufacturer": "NXP",
-    "families": [],
-    "models": [],
-    "areas": [
-        "I2C"
-    ]
-}
