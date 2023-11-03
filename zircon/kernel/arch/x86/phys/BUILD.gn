@@ -305,7 +305,7 @@ if (current_toolchain == default_toolchain) {
       "//zircon/kernel/lib/ktl",
       "//zircon/kernel/phys:address-space.header",
       "//zircon/kernel/phys:allocation",
-      "//zircon/kernel/phys:symbolize",
+      "//zircon/kernel/phys:main",
       "//zircon/kernel/phys/lib/memalloc",
     ]
     include_dirs = [ "//." ]

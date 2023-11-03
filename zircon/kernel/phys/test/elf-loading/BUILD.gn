@@ -8,7 +8,36 @@ import("//build/dist/resource.gni")
 import("//build/testing/zbi_test.gni")
 import("//zircon/kernel/kernel_package.gni")
 import("//zircon/kernel/phys/kernel_elf_interp.gni")
+import("//zircon/kernel/phys/test/physload_binary_test.gni")
 import("//zircon/kernel/phys/zbi_executable.gni")
+
+source_set("get-int.source") {
+  sources = [ "get-int.cc" ]
+}
+
+template("get_int") {
+  loadable_module(target_name) {
+    visibility = [ ":*" ]
+    testonly = true
+    ldflags = [ "-Wl,-e,GetInt" ]
+
+    deps = [ ":get-int.source" ]
+    if (defined(invoker.deps)) {
+      deps += invoker.deps
+    }
+
+    metadata = {
+      # This is the same metadata as a resource() target would have.
+      distribution_entries = [
+        {
+          source = rebase_path("$root_out_dir/$target_name.so", root_build_dir)
+          destination = target_name
+          label = get_label_info(":$target_name", "label_with_toolchain")
+        },
+      ]
+    }
+  }
+}
 
 zbi_executable("basic-elf-loading-test") {
   visibility = [ ":*" ]
@@ -37,32 +66,15 @@ kernel_elf_interp("basic-elf-loading-test.interp") {
   deps = [ ":basic-elf-loading-test" ]
 }
 
-loadable_module("get-int") {
-  visibility = [ ":*" ]
-  testonly = true
-
-  sources = [ "get-int.cc" ]
-  ldflags = [ "-Wl,-e,GetInt" ]
-
-  deps = [ ":basic-elf-loading-test.interp" ]
-
-  metadata = {
-    # This is the same metadata as a resource() target would have.
-    distribution_entries = [
-      {
-        source = rebase_path("$root_out_dir/$target_name.so", root_build_dir)
-        destination = target_name
-        label = get_label_info(":$target_name", "label_with_toolchain")
-      },
-    ]
-  }
-}
-
 kernel_package("basic-elf-loading-test-data") {
   visibility = [ ":*" ]
   testonly = true
 
-  deps = [ ":get-int($phys_toolchain)" ]
+  deps = [ ":get-int.basic-elf-loading-test($phys_toolchain)" ]
+}
+
+get_int("get-int.basic-elf-loading-test") {
+  deps = [ ":basic-elf-loading-test.interp" ]
 }
 
 zbi_test("zbi-basic-elf-loading-test") {
@@ -72,8 +84,44 @@ zbi_test("zbi-basic-elf-loading-test") {
   ]
 }
 
+physload_binary_test("virtual-address-loading-test") {
+  visibility = [ ":*" ]
+
+  has_patches = false
+
+  sources = [ "virtual-address-test.cc" ]
+
+  deps = [
+    "//src/lib/elfldltl",
+    "//src/lib/zbitl",
+    "//zircon/kernel/lib/arch",
+    "//zircon/kernel/lib/ktl",
+    "//zircon/kernel/lib/libc",
+    "//zircon/kernel/phys:address-space",
+    "//zircon/kernel/phys:elf-image",
+    "//zircon/kernel/phys:kernel-package",
+    "//zircon/kernel/phys:symbolize",
+  ]
+
+  data_deps = [ ":get-int.virtual-address-loading-test($phys_toolchain)" ]
+}
+
+kernel_elf_interp("virtual-address-loading-test.interp") {
+  visibility = [ ":*" ]
+  testonly = true
+
+  deps = [ ":virtual-address-loading-test.binary" ]
+}
+
+get_int("get-int.virtual-address-loading-test") {
+  deps = [ ":virtual-address-loading-test.interp" ]
+}
+
 group("elf-loading") {
   testonly = true
 
-  deps = [ ":zbi-basic-elf-loading-test" ]
+  deps = [
+    ":virtual-address-loading-test",
+    ":zbi-basic-elf-loading-test",
+  ]
 }

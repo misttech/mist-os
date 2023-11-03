@@ -16,9 +16,8 @@
 #include <ktl/byte.h>
 #include <ktl/optional.h>
 #include <ktl/span.h>
+#include <phys/address-space.h>
 #include <phys/allocation.h>
-
-#include "phys/address-space.h"
 
 #include <ktl/enforce.h>
 

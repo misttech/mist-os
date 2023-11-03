@@ -28,7 +28,7 @@
 namespace {
 
 // The name of ELF module to be loaded.
-constexpr ktl::string_view kGetInt = "get-int";
+constexpr ktl::string_view kGetInt = "get-int.basic-elf-loading-test";
 
 // The BOOTFS namespace under which kGetInt lives.
 constexpr ktl::string_view kNamespace = "basic-elf-loading-test-data";
@@ -69,13 +69,13 @@ int TestMain(void* zbi_ptr, arch::EarlyTicks) {
 
   ZX_ASSERT(!elf.has_patches());
 
-  // If the file can't be loaded in place, this Allocation owns its image.
-  Allocation loaded = elf.Load();
-  elf.Relocate();
-
   // The GN target for get-int uses kernel_elf_interp() on this test binary.
   printf("Verifying PT_INTERP matches test build ID...\n");
   elf.AssertInterpMatchesBuildId(kGetInt, symbolize.build_id());
+
+  // If the file can't be loaded in place, this Allocation owns its image.
+  Allocation loaded = elf.Load();
+  elf.Relocate();
 
   // Since Context() was called above ContextOnLoad() should have printed
   // inside elf.Load() above.  Now that the new module list is in place,

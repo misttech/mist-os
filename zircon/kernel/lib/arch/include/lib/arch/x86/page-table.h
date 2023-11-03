@@ -87,12 +87,7 @@ struct X86PagingTraitsBase {
 
   static constexpr auto kVirtualAddressExtension = VirtualAddressExtension::kCanonical;
 
-  // Whether the given access permission are valid for an X86 page table entry.
-  static constexpr bool IsValidPageAccess(const SystemState& state,
-                                          const AccessPermissions& access) {
-    // Must always be readable.
-    return access.readable;
-  }
+  static constexpr bool kExecuteOnlyAllowed = false;
 
   template <X86PagingLevel Level>
   static constexpr bool LevelCanBeTerminal(const SystemState& state) {
@@ -251,7 +246,7 @@ class X86PagingTraitsBase::TableEntry
     }
 
     const AccessPermissions& access = settings.access;
-    ZX_DEBUG_ASSERT(IsValidPageAccess(state, access));
+    ZX_DEBUG_ASSERT(access.readable);
     set_r_w(access.writable)
         .set_xd(!access.executable)
         .set_u_s(access.user_accessible)

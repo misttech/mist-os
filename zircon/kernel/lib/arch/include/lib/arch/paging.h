@@ -210,11 +210,11 @@ struct ExamplePagingTraits {
     /// Once a setting is applied, the corresponding getter should return
     /// reflect that identically.
     ///
-    /// If `settings.terminal` is true, then it is the responsibility to have
-    /// called `Traits::IsValidPageAccess()` on the provided access permissions
-    /// before making this call; otherwise if
-    /// `!Traits::kNonTerminalAccessPermissions` then the provided access
-    /// permissions are expected to be maximally permissive.
+    /// If `settings.terminal` is true, then it is the responsibility of the
+    /// user to check that the provided access permissions are valid (e.g.,
+    /// in consultation with Traits::kExecuteOnlyAllowed) before making this
+    /// call; otherwise if `!Traits::kNonTerminalAccessPermissions` then the
+    /// provided access permissions are expected to be maximally permissive.
     ///
     /// Where the qualifiers make sense (which is implementation-specific), a
     /// call to Set() will result in a present entry being updated as accessed.
@@ -245,6 +245,9 @@ struct ExamplePagingTraits {
   template <LevelType Level>
   static constexpr unsigned int kNumTableEntriesLog2 = 1;
 
+  /// Whether the hardware permits execute-only mappings.
+  static constexpr bool kExecuteOnlyAllowed = false;
+
   /// Whether access permissions may be set on non-terminal entries so as to
   /// narrow access for later levels. If false, then access permissions are
   /// only applicable to terminal entries - and those provided to
@@ -263,12 +266,6 @@ struct ExamplePagingTraits {
 
   /// Parameterizes the unaddressable virtual address space bits.
   static constexpr auto kVirtualAddressExtension = VirtualAddressExtension::kCanonical;
-
-  /// Whether the given set of access permissions is generally valid for a
-  /// page, as applied at the terminal level.
-  static bool IsValidPageAccess(const SystemState& state, const AccessPermissions& access) {
-    return false;
-  }
 
   /// Whether the given level can generally feature terminal entries.
   template <LevelType Level>

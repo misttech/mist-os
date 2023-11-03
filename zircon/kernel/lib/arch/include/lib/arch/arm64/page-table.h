@@ -158,9 +158,7 @@ struct ArmPagingTraits {
   }();
   static constexpr auto kLevels = cpp20::span{kAllLevels}.subspan(kFirstLevelIndex);
 
-  static constexpr bool IsValidPageAccess(const SystemState&, const AccessPermissions&) {
-    return true;
-  }
+  static constexpr bool kExecuteOnlyAllowed = false;
 
   template <ArmAddressTranslationLevel Level>
   static constexpr bool LevelCanBeTerminal(const SystemState& state) {
@@ -454,6 +452,8 @@ class ArmAddressTranslationDescriptor
 
   constexpr SelfType& Set(const ArmSystemPagingState& state, const AccessPermissions& access) {
     if (terminal()) {
+      ZX_DEBUG_ASSERT(access.readable);
+
       ArmAccessPermissions ap = [&]() {
         if (access.writable) {
           if (access.user_accessible) {

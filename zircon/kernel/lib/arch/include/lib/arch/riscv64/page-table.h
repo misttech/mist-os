@@ -107,11 +107,7 @@ struct RiscvPagingTraitsBase {
 
   static constexpr auto kVirtualAddressExtension = VirtualAddressExtension::kCanonical;
 
-  static constexpr bool IsValidPageAccess(const SystemState& state,
-                                          const AccessPermissions& access) {
-    // A page is either readable or execute-only.
-    return access.readable || !access.writable;
-  }
+  static constexpr bool kExecuteOnlyAllowed = true;
 
   template <RiscvPagingLevel Level>
   static constexpr bool LevelCanBeTerminal(const SystemState& state) {
@@ -205,7 +201,7 @@ class RiscvPagingTraitsBase::TableEntry
 
     const AccessPermissions& access = settings.access;
     if (settings.terminal) {
-      ZX_DEBUG_ASSERT(IsValidPageAccess(state, access));
+      ZX_DEBUG_ASSERT(access.readable || !access.writable);
       set_r(access.readable)
           .set_w(access.writable)
           .set_x(access.executable)

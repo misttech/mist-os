@@ -140,34 +140,6 @@ TEST(RiscvPagingTraitTests, GetSetPresent) {
 }
 
 template <RiscvPagingLevel Level>
-void TestRiscvIsValidPageAccess() {
-  // Any set of page permissions must either be readable or execute-only.
-  for (bool r : kBools) {
-    for (bool w : kBools) {
-      for (bool x : kBools) {
-        for (bool u : kBools) {
-          AccessPermissions access = {
-              .readable = r,
-              .writable = w,
-              .executable = x,
-              .user_accessible = u,
-          };
-          EXPECT_EQ(r || !w, arch::RiscvPagingTraitsBase::IsValidPageAccess({}, access));
-        }
-      }
-    }
-  }
-}
-
-TEST(RiscvPagingTraitTests, IsValidPageAccess) {
-  TestRiscvIsValidPageAccess<RiscvPagingLevel::k4>();
-  TestRiscvIsValidPageAccess<RiscvPagingLevel::k3>();
-  TestRiscvIsValidPageAccess<RiscvPagingLevel::k2>();
-  TestRiscvIsValidPageAccess<RiscvPagingLevel::k1>();
-  TestRiscvIsValidPageAccess<RiscvPagingLevel::k0>();
-}
-
-template <RiscvPagingLevel Level>
 void TestRiscvGetSetReadable() {
   //
   // Readability is controlled by the R bit.
@@ -716,33 +688,6 @@ TEST(X86PagingTraitTests, GetSetPresent) {
   TestX86GetSetPresent<X86PagingLevel::kPageDirectoryPointerTable>();
   TestX86GetSetPresent<X86PagingLevel::kPageDirectory>();
   TestX86GetSetPresent<X86PagingLevel::kPageTable>();
-}
-
-template <X86PagingLevel Level>
-void TestX86CheckAccessPermissions() {
-  for (bool r : kBools) {
-    for (bool w : kBools) {
-      for (bool x : kBools) {
-        for (bool u : kBools) {
-          AccessPermissions access = {
-              .readable = r,
-              .writable = w,
-              .executable = x,
-              .user_accessible = u,
-          };
-          EXPECT_EQ(r, arch::X86PagingTraitsBase::IsValidPageAccess({}, access));
-        }
-      }
-    }
-  }
-}
-
-TEST(X86PagingTraitTests, CheckAccessPermissions) {
-  TestX86CheckAccessPermissions<X86PagingLevel::kPml5Table>();
-  TestX86CheckAccessPermissions<X86PagingLevel::kPml4Table>();
-  TestX86CheckAccessPermissions<X86PagingLevel::kPageDirectoryPointerTable>();
-  TestX86CheckAccessPermissions<X86PagingLevel::kPageDirectory>();
-  TestX86CheckAccessPermissions<X86PagingLevel::kPageTable>();
 }
 
 template <X86PagingLevel Level>
@@ -1852,18 +1797,27 @@ class PagingHelper {
   std::map<uint64_t, std::unique_ptr<Table>> tables_;
 };
 
-TEST(PagingTests, Compilation) {
+template <typename PagingTraits>
+void PagingCompilationTest() {
   // The point here is not really to check that the traits structs are empty,
   // but rather to force the compiler to instantiate arch::Paging for each
   // trait, which in turn checks that the traits meet the expected API.
-  static_assert(std::is_empty_v<arch::Paging<arch::ExamplePagingTraits>>);
-  static_assert(std::is_empty_v<arch::Paging<arch::RiscvSv39PagingTraits>>);
-  static_assert(std::is_empty_v<arch::Paging<arch::RiscvSv48PagingTraits>>);
-  static_assert(std::is_empty_v<arch::Paging<arch::RiscvSv57PagingTraits>>);
-  static_assert(std::is_empty_v<arch::Paging<arch::X86FourLevelPagingTraits>>);
-  static_assert(std::is_empty_v<arch::Paging<arch::X86FiveLevelPagingTraits>>);
-  static_assert(std::is_empty_v<arch::Paging<arch::ArmLowerPagingTraits>>);
-  static_assert(std::is_empty_v<arch::Paging<arch::ArmUpperPagingTraits>>);
+  static_assert(std::is_empty_v<arch::Paging<PagingTraits>>);
+
+  // Check that the static members expected of traits that are not referenced
+  // directly by arch::Paging are indeed defined.
+  static_assert(std::is_same_v<std::decay_t<decltype(PagingTraits::kExecuteOnlyAllowed)>, bool>);
+}
+
+TEST(PagingTests, Compilation) {
+  PagingCompilationTest<arch::ExamplePagingTraits>();
+  PagingCompilationTest<arch::RiscvSv39PagingTraits>();
+  PagingCompilationTest<arch::RiscvSv48PagingTraits>();
+  PagingCompilationTest<arch::RiscvSv57PagingTraits>();
+  PagingCompilationTest<arch::X86FourLevelPagingTraits>();
+  PagingCompilationTest<arch::X86FiveLevelPagingTraits>();
+  PagingCompilationTest<arch::ArmLowerPagingTraits>();
+  PagingCompilationTest<arch::ArmUpperPagingTraits>();
 }
 
 // The following macros are expected to be used on test cases given as

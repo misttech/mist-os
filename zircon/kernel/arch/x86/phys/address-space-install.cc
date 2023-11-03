@@ -6,7 +6,7 @@
 
 #include <lib/arch/x86/system.h>
 
-#include "phys/address-space.h"
+#include <phys/address-space.h>
 
 #include <ktl/enforce.h>
 

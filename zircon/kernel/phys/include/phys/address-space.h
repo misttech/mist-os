@@ -134,6 +134,11 @@ class AddressSpace {
 
   const SystemState& state() const { return state_; }
 
+  // Maps the provided page-aligned physical memory region at the given virtual
+  // address.
+  //
+  // If execute-only access is requested and the hardware does not support
+  // this, the permissions will be fixed up as RX.
   fit::result<MapError> Map(uint64_t vaddr, uint64_t size, uint64_t paddr, MapSettings settings);
 
   fit::result<MapError> IdentityMap(uint64_t addr, uint64_t size, MapSettings settings) {
@@ -178,6 +183,9 @@ class AddressSpace {
       *LowerPaging::kLowerVirtualAddressRangeEnd;
   static constexpr uint64_t kUpperVirtualAddressRangeStart =
       *UpperPaging::kUpperVirtualAddressRangeStart;
+
+  static_assert(LowerPaging::kExecuteOnlyAllowed == UpperPaging::kExecuteOnlyAllowed);
+  static constexpr bool kExecuteOnlyAllowed = LowerPaging::kExecuteOnlyAllowed;
 
   void AllocateRootPageTables();
   void IdentityMapRam();

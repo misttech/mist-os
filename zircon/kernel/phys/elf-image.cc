@@ -18,6 +18,7 @@
 #include <ktl/atomic.h>
 #include <ktl/move.h>
 #include <ktl/variant.h>
+#include <phys/address-space.h>
 #include <phys/allocation.h>
 #include <phys/symbolize.h>
 
@@ -219,6 +220,26 @@ void ElfImage::Relocate() {
     // Make sure everything is written before the image is used as code.
     ktl::atomic_signal_fence(ktl::memory_order_seq_cst);
   }
+}
+
+fit::result<AddressSpace::MapError> ElfImage::MapInto(AddressSpace& aspace) {
+  fit::result<AddressSpace::MapError> result = fit::ok();
+  load_info().VisitSegments([&](const auto& segment) {
+    uint64_t vaddr = segment.vaddr() + load_bias();
+    uint64_t paddr = physical_load_address() + segment.offset();
+    const AddressSpace::MapSettings settings = {
+        .access =
+            {
+                .readable = segment.readable(),
+                .writable = segment.writable(),
+                .executable = segment.executable(),
+            },
+        .memory = kArchNormalMemoryType,
+    };
+    result = aspace.Map(vaddr, segment.memsz(), paddr, settings);
+    return result.is_ok();
+  });
+  return result;
 }
 
 void ElfImage::AssertInterpMatchesBuildId(ktl::string_view prefix,

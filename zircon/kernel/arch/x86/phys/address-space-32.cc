@@ -10,10 +10,9 @@
 #include <zircon/assert.h>
 
 #include <hwreg/x86msr.h>
+#include <phys/address-space.h>
 #include <phys/allocation.h>
-#include <phys/symbolize.h>
-
-#include "phys/address-space.h"
+#include <phys/main.h>
 
 void ArchSetUpAddressSpaceEarly(AddressSpace& aspace) {}
 

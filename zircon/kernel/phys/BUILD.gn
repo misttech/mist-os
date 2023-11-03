@@ -271,6 +271,7 @@ if (toolchain_environment == "kernel.phys" ||
   source_set("address-space.header") {
     visibility = [
       ":address-space",
+      ":elf-image",
       "$arch_phys:address-space",
     ]
 
@@ -284,6 +285,7 @@ if (toolchain_environment == "kernel.phys" ||
     public_deps = [
       ":allocation",
       "//zircon/kernel/lib/ktl",
+      "//zircon/kernel/lib/libc",
 
       # <phys/address-space.h> has #include <lib/arch/paging.h>
       # <phys/arch/address-space.h> has #include <lib/arch/${zircon_cpu}/page-table.h>
@@ -584,6 +586,7 @@ if (toolchain_environment == "kernel.phys" ||
     ]
     public_configs = [ ":includes" ]
     public_deps = [
+      ":address-space.header",
       "//sdk/lib/fit",
       "//src/lib/elfldltl",
       "//src/lib/zbitl",
@@ -594,6 +597,7 @@ if (toolchain_environment == "kernel.phys" ||
       "//zircon/system/ulib/zx",
     ]
     deps = [
+      ":address-space",
       ":allocation",
       ":handoff",
       "//src/lib/llvm-profdata",

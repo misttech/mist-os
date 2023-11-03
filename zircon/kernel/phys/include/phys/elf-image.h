@@ -29,6 +29,7 @@
 #include <ktl/string_view.h>
 #include <ktl/type_traits.h>
 
+#include "address-space.h"
 #include "allocation.h"
 
 class ElfImage {
@@ -152,6 +153,11 @@ class ElfImage {
 
   // Apply relocations to the image in place after setting the load address.
   void Relocate();
+
+  // Maps the image at its loaded address, mapping each of its load segments
+  // with appropriate access permissions (modulo the execute-only exception of
+  // AddressSpace::Map()). Must be called after Load().
+  fit::result<AddressSpace::MapError> MapInto(AddressSpace& aspace);
 
   // Panic if the loaded file doesn't have a PT_INTERP matching the hex string
   // corresponding to this build ID note; the prefix is used in panic messages.
