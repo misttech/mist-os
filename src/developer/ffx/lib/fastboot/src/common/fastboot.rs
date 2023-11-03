@@ -239,6 +239,9 @@ impl fastboot::UploadProgressListener for ProgressListener {
     }
 }
 
+/// Timeout in seconds to wait for target after a reboot to fastboot mode
+const FASTBOOT_REBOOT_RECONNECT_TIMEOUT: &str = "fastboot.reboot.reconnect_timeout";
+
 impl<T: AsyncRead + AsyncWrite + Unpin + Debug> FastbootProxy<T> {
     async fn reconnect(&mut self) -> Result<()> {
         // Explicitly here.
@@ -428,10 +431,12 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
                         send_res
                     );
                 }
+                let reboot_sleep_duration =
+                    Duration::seconds(get(FASTBOOT_REBOOT_RECONNECT_TIMEOUT).await.unwrap_or(10));
                 tracing::warn!(
                     "Sleeping for 5 seconds to give the target time to reboot to bootloader."
                 );
-                Timer::new(Duration::seconds(5).to_std()?).await;
+                Timer::new(reboot_sleep_duration.to_std()?).await;
             }
             Reply::Fail(s) => bail!("Failed to reboot to bootloader: {}", s),
             _ => {
