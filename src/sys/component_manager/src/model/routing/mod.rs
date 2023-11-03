@@ -20,10 +20,10 @@ use {
     ::routing::{
         self, capability_source::ComponentCapability,
         component_instance::ComponentInstanceInterface, error::AvailabilityRoutingError,
-        mapper::NoopRouteMapper, router::RouteBundle,
+        mapper::NoopRouteMapper,
     },
     async_trait::async_trait,
-    cm_rust::{CapabilityTypeName, ExposeDecl, ExposeDeclCommon, UseDecl, UseStorageDecl},
+    cm_rust::{ExposeDecl, ExposeDeclCommon, UseDecl, UseStorageDecl},
     fidl::epitaph::ChannelEpitaphExt,
     fuchsia_zircon as zx,
     moniker::MonikerBase,
@@ -137,11 +137,11 @@ pub(super) async fn route_and_open_capability(
 /// be installed in a namespace.
 pub fn request_for_namespace_capability_use(use_decl: UseDecl) -> Option<RouteRequest> {
     match use_decl {
-        UseDecl::Directory(decl) => Some(RouteRequest::UseDirectory(decl)),
-        UseDecl::Protocol(decl) => Some(RouteRequest::UseProtocol(decl)),
-        UseDecl::Service(decl) => Some(RouteRequest::UseService(decl)),
-        UseDecl::Storage(decl) => Some(RouteRequest::UseStorage(decl)),
-        _ => None,
+        UseDecl::Directory(_)
+        | UseDecl::Protocol(_)
+        | UseDecl::Service(_)
+        | UseDecl::Storage(_) => Some(use_decl.into()),
+        UseDecl::Runner(_) | UseDecl::EventStream(_) => None,
     }
 }
 
@@ -153,42 +153,15 @@ pub fn request_for_namespace_capability_use(use_decl: UseDecl) -> Option<RouteRe
 /// REQUIRES: `exposes.len() > 1` only if it is a service.
 pub fn request_for_namespace_capability_expose(exposes: Vec<&ExposeDecl>) -> Option<RouteRequest> {
     let first_expose = exposes.first().expect("invalid empty expose list");
-    let first_type_name = CapabilityTypeName::from(*first_expose);
-    assert!(
-        exposes.iter().all(|e| {
-            let type_name: CapabilityTypeName = CapabilityTypeName::from(*e);
-            first_type_name == type_name && first_expose.target_name() == e.target_name()
-        }),
-        "invalid expose input: {:?}",
-        exposes
-    );
     match first_expose {
-        cm_rust::ExposeDecl::Protocol(e) => {
-            assert!(exposes.len() == 1, "multiple exposes");
-            Some(RouteRequest::ExposeProtocol(e.clone()))
-        }
-        cm_rust::ExposeDecl::Service(_) => {
-            // Gather the exposes into a bundle. Services can aggregate, in which case
-            // multiple expose declarations map to one expose directory entry.
-            let exposes: Vec<_> = exposes
-                .into_iter()
-                .filter_map(|e| match e {
-                    cm_rust::ExposeDecl::Service(e) => Some(e.clone()),
-                    _ => None,
-                })
-                .collect();
-            Some(RouteRequest::ExposeService(RouteBundle::from_exposes(exposes)))
-        }
-        cm_rust::ExposeDecl::Directory(e) => {
-            assert!(exposes.len() == 1, "multiple exposes");
-            Some(RouteRequest::ExposeDirectory(e.clone()))
-        }
+        cm_rust::ExposeDecl::Protocol(_)
+        | cm_rust::ExposeDecl::Service(_)
+        | cm_rust::ExposeDecl::Directory(_) => Some(exposes.into()),
         cm_rust::ExposeDecl::Runner(_) | cm_rust::ExposeDecl::Resolver(_) => {
-            // Runners, resolvers, and event streams do not add directory entries.
+            // Runners and resolvers do not add directory entries.
             None
         }
         cm_rust::ExposeDecl::Dictionary(_) => {
-            assert!(exposes.len() == 1, "multiple exposes");
             // TODO(fxbug.dev/301674053): Support this.
             None
         }

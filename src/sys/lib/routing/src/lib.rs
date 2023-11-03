@@ -36,13 +36,13 @@ use {
         walk_state::WalkState,
     },
     cm_rust::{
-        Availability, CapabilityTypeName, ExposeDirectoryDecl, ExposeProtocolDecl,
-        ExposeServiceDecl, ExposeSource, OfferDirectoryDecl, OfferEventStreamDecl,
-        OfferProtocolDecl, OfferResolverDecl, OfferRunnerDecl, OfferServiceDecl, OfferSource,
-        OfferStorageDecl, RegistrationDeclCommon, RegistrationSource, ResolverRegistration,
-        RunnerRegistration, SourceName, StorageDecl, StorageDirectorySource, UseDeclCommon,
-        UseDirectoryDecl, UseEventStreamDecl, UseProtocolDecl, UseRunnerDecl, UseServiceDecl,
-        UseSource, UseStorageDecl,
+        Availability, CapabilityTypeName, ExposeDecl, ExposeDeclCommon, ExposeDirectoryDecl,
+        ExposeProtocolDecl, ExposeResolverDecl, ExposeRunnerDecl, ExposeServiceDecl, ExposeSource,
+        OfferDirectoryDecl, OfferEventStreamDecl, OfferProtocolDecl, OfferResolverDecl,
+        OfferRunnerDecl, OfferServiceDecl, OfferSource, OfferStorageDecl, RegistrationDeclCommon,
+        RegistrationSource, ResolverRegistration, RunnerRegistration, SourceName, StorageDecl,
+        StorageDirectorySource, UseDecl, UseDeclCommon, UseDirectoryDecl, UseEventStreamDecl,
+        UseProtocolDecl, UseRunnerDecl, UseServiceDecl, UseSource, UseStorageDecl,
     },
     cm_types::Name,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio,
@@ -62,6 +62,8 @@ pub enum RouteRequest {
     ExposeDirectory(ExposeDirectoryDecl),
     ExposeProtocol(ExposeProtocolDecl),
     ExposeService(RouteBundle<ExposeServiceDecl>),
+    ExposeRunner(ExposeRunnerDecl),
+    ExposeResolver(ExposeResolverDecl),
 
     // Route a capability from a realm's environment.
     Resolver(ResolverRegistration),
@@ -87,6 +89,67 @@ pub enum RouteRequest {
     OfferResolver(OfferResolverDecl),
 }
 
+impl From<UseDecl> for RouteRequest {
+    fn from(decl: UseDecl) -> Self {
+        match decl {
+            UseDecl::Directory(decl) => Self::UseDirectory(decl),
+            UseDecl::Protocol(decl) => Self::UseProtocol(decl),
+            UseDecl::Service(decl) => Self::UseService(decl),
+            UseDecl::Storage(decl) => Self::UseStorage(decl),
+            UseDecl::EventStream(decl) => Self::UseEventStream(decl),
+            UseDecl::Runner(decl) => Self::UseRunner(decl),
+        }
+    }
+}
+
+impl From<Vec<&ExposeDecl>> for RouteRequest {
+    fn from(exposes: Vec<&ExposeDecl>) -> Self {
+        let first_expose = exposes.first().expect("invalid empty expose list");
+        let first_type_name = CapabilityTypeName::from(*first_expose);
+        assert!(
+            exposes.iter().all(|e| {
+                let type_name: CapabilityTypeName = CapabilityTypeName::from(*e);
+                first_type_name == type_name && first_expose.target_name() == e.target_name()
+            }),
+            "invalid expose input: {:?}",
+            exposes
+        );
+        match first_expose {
+            ExposeDecl::Protocol(e) => {
+                assert!(exposes.len() == 1, "multiple exposes");
+                Self::ExposeProtocol(e.clone())
+            }
+            ExposeDecl::Service(_) => {
+                // Gather the exposes into a bundle. Services can aggregate, in which case
+                // multiple expose declarations map to one expose directory entry.
+                let exposes: Vec<_> = exposes
+                    .into_iter()
+                    .filter_map(|e| match e {
+                        cm_rust::ExposeDecl::Service(e) => Some(e.clone()),
+                        _ => None,
+                    })
+                    .collect();
+                Self::ExposeService(RouteBundle::from_exposes(exposes))
+            }
+            ExposeDecl::Directory(e) => {
+                assert!(exposes.len() == 1, "multiple exposes");
+                Self::ExposeDirectory(e.clone())
+            }
+            ExposeDecl::Runner(e) => {
+                assert!(exposes.len() == 1, "multiple exposes");
+                Self::ExposeRunner(e.clone())
+            }
+            ExposeDecl::Resolver(e) => {
+                assert!(exposes.len() == 1, "multiple exposes");
+                Self::ExposeResolver(e.clone())
+            }
+            ExposeDecl::Dictionary(_) => {
+                todo!("fxbug.dev/301674053: implement dictionary routing");
+            }
+        }
+    }
+}
+
 impl RouteRequest {
     /// Return `true` if the RouteRequest is a `use` capability declaration, and
     /// the `availability` is `optional` (the target declares that it does not
@@ -107,6 +170,8 @@ impl RouteRequest {
             | ExposeDirectory(_)
             | ExposeProtocol(_)
             | ExposeService(_)
+            | ExposeRunner(_)
+            | ExposeResolver(_)
             | Resolver(_)
             | StorageBackingDirectory(_)
             | UseRunner(_) => false,
@@ -134,6 +199,12 @@ impl std::fmt::Display for RouteRequest {
             }
             Self::ExposeService(e) => {
                 write!(f, "service {:?}", e)
+            }
+            Self::ExposeRunner(e) => {
+                write!(f, "runner `{}`", e.target_name)
+            }
+            Self::ExposeResolver(e) => {
+                write!(f, "resolver `{}`", e.target_name)
             }
             Self::Resolver(r) => {
                 write!(f, "resolver `{}`", r.resolver)
@@ -226,6 +297,12 @@ where
         }
         RouteRequest::ExposeService(expose_bundle) => {
             route_service_from_expose(expose_bundle, target, mapper).await
+        }
+        RouteRequest::ExposeRunner(expose_runner_decl) => {
+            route_runner_from_expose(expose_runner_decl, target, mapper).await
+        }
+        RouteRequest::ExposeResolver(expose_resolver_decl) => {
+            route_resolver_from_expose(expose_resolver_decl, target, mapper).await
         }
 
         // Route a resolver or runner from an environment
@@ -575,7 +652,6 @@ async fn route_protocol_from_expose<C>(
 where
     C: ComponentInstanceInterface + 'static,
 {
-    // This is a noop visitor for exposes
     let mut availability_visitor = AvailabilityVisitor::new(expose_decl.availability);
     let allowed_sources = AllowedSourcesBuilder::new(CapabilityTypeName::Protocol)
         .framework(InternalCapability::Protocol)
@@ -588,6 +664,60 @@ where
         target.clone(),
         allowed_sources.build(),
         &mut availability_visitor,
+        mapper,
+    )
+    .await?;
+
+    target.policy_checker().can_route_capability(&source, target.moniker())?;
+    Ok(RouteSource::new(source))
+}
+
+async fn route_runner_from_expose<C>(
+    expose_decl: ExposeRunnerDecl,
+    target: &Arc<C>,
+    mapper: &mut dyn DebugRouteMapper,
+) -> Result<RouteSource<C>, RoutingError>
+where
+    C: ComponentInstanceInterface + 'static,
+{
+    let allowed_sources = AllowedSourcesBuilder::new(CapabilityTypeName::Runner)
+        .framework(InternalCapability::Runner)
+        .builtin()
+        .namespace()
+        .component()
+        .capability();
+    let source = router::route_from_expose(
+        RouteBundle::from_expose(expose_decl.into()),
+        target.clone(),
+        allowed_sources.build(),
+        &mut NoopVisitor::new(),
+        mapper,
+    )
+    .await?;
+
+    target.policy_checker().can_route_capability(&source, target.moniker())?;
+    Ok(RouteSource::new(source))
+}
+
+async fn route_resolver_from_expose<C>(
+    expose_decl: ExposeResolverDecl,
+    target: &Arc<C>,
+    mapper: &mut dyn DebugRouteMapper,
+) -> Result<RouteSource<C>, RoutingError>
+where
+    C: ComponentInstanceInterface + 'static,
+{
+    let allowed_sources = AllowedSourcesBuilder::new(CapabilityTypeName::Resolver)
+        .framework(InternalCapability::Resolver)
+        .builtin()
+        .namespace()
+        .component()
+        .capability();
+    let source = router::route_from_expose(
+        RouteBundle::from_expose(expose_decl.into()),
+        target.clone(),
+        allowed_sources.build(),
+        &mut NoopVisitor::new(),
         mapper,
     )
     .await?;

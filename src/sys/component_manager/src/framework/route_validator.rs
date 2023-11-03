@@ -178,9 +178,8 @@ impl RouteValidator {
                     name: use_.source_name().as_str().into(),
                     decl_type: fsys::DeclType::Use,
                 };
-                let request = routing::request_for_namespace_capability_use(use_.clone())
-                    .ok_or(fsys::RouteValidatorError::InvalidArguments)?;
-                Ok((target, request))
+                let request = use_.clone().into();
+                (target, request)
             });
 
             let exposes = routing::aggregate_exposes(&resolved.decl().exposes);
@@ -189,11 +188,10 @@ impl RouteValidator {
                     name: target_name.into(),
                     decl_type: fsys::DeclType::Expose,
                 };
-                let request = routing::request_for_namespace_capability_expose(e)
-                    .ok_or(fsys::RouteValidatorError::InvalidArguments)?;
-                Ok((target, request))
+                let request = e.into();
+                (target, request)
             });
-            use_requests.chain(expose_requests).collect()
+            Ok(use_requests.chain(expose_requests).collect())
         } else {
             // Return results that fuzzy match (substring match) `target.name`.
             let targets = targets
@@ -225,10 +223,8 @@ impl RouteValidator {
                                     name: u.source_name().to_string(),
                                     decl_type: target.decl_type,
                                 };
-                                let res = routing::request_for_namespace_capability_use(u.clone())
-                                    .ok_or(fsys::RouteValidatorError::InvalidArguments)
-                                    .map(|request| (target, request));
-                                Some(res)
+                                let request = u.clone().into();
+                                Some(Ok((target, request)))
                             })
                             .collect();
                         matching_requests.into_iter()
@@ -246,10 +242,8 @@ impl RouteValidator {
                                     name: target_name.into(),
                                     decl_type: target.decl_type,
                                 };
-                                let res = routing::request_for_namespace_capability_expose(e)
-                                    .ok_or(fsys::RouteValidatorError::InvalidArguments)
-                                    .map(|request| (target, request));
-                                Some(res)
+                                let request = e.into();
+                                Some(Ok((target, request)))
                             })
                             .collect();
                         matching_requests.into_iter()
@@ -439,15 +433,14 @@ async fn validate_uses(
     for use_ in uses {
         let capability = Some(use_.source_name().to_string());
         let decl_type = Some(fsys::DeclType::Use);
-        if let Some(route_request) = routing::request_for_namespace_capability_use(use_) {
-            let error = if let Err(e) = route_request.route(&instance).await {
-                Some(fsys::RouteError { summary: Some(e.to_string()), ..Default::default() })
-            } else {
-                None
-            };
+        let route_request = RouteRequest::from(use_);
+        let error = if let Err(e) = route_request.route(&instance).await {
+            Some(fsys::RouteError { summary: Some(e.to_string()), ..Default::default() })
+        } else {
+            None
+        };
 
-            reports.push(fsys::RouteReport { capability, decl_type, error, ..Default::default() })
-        }
+        reports.push(fsys::RouteReport { capability, decl_type, error, ..Default::default() })
     }
     reports
 }
@@ -462,15 +455,14 @@ async fn validate_exposes(
     for (target_name, e) in exposes {
         let capability = Some(target_name.to_string());
         let decl_type = Some(fsys::DeclType::Expose);
-        if let Some(route_request) = routing::request_for_namespace_capability_expose(e) {
-            let error = if let Err(e) = route_request.route(instance).await {
-                Some(fsys::RouteError { summary: Some(e.to_string()), ..Default::default() })
-            } else {
-                None
-            };
+        let route_request = RouteRequest::from(e);
+        let error = if let Err(e) = route_request.route(instance).await {
+            Some(fsys::RouteError { summary: Some(e.to_string()), ..Default::default() })
+        } else {
+            None
+        };
 
-            reports.push(fsys::RouteReport { capability, decl_type, error, ..Default::default() })
-        }
+        reports.push(fsys::RouteReport { capability, decl_type, error, ..Default::default() })
     }
     reports
 }
@@ -949,25 +941,23 @@ mod tests {
             availability: Availability::Required,
         });
 
-        let expose_from_child_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
+        let expose_from_child_decl = ExposeDecl::Resolver(ExposeResolverDecl {
             source: ExposeSource::Child("my_child".into()),
             source_name: "qax.qux".parse().unwrap(),
             source_dictionary: None,
             target: ExposeTarget::Parent,
             target_name: "foo.buz".parse().unwrap(),
-            availability: cm_rust::Availability::Required,
         });
 
-        let expose_from_self_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
+        let expose_from_self_decl = ExposeDecl::Resolver(ExposeResolverDecl {
             source: ExposeSource::Self_,
             source_name: "qax.qux".parse().unwrap(),
             source_dictionary: None,
             target: ExposeTarget::Parent,
             target_name: "qax.qux".parse().unwrap(),
-            availability: cm_rust::Availability::Required,
         });
 
-        let capability_decl = ProtocolDecl {
+        let capability_decl = ResolverDecl {
             name: "qax.qux".parse().unwrap(),
             source_path: Some("/svc/qax.qux".parse().unwrap()),
         };
@@ -984,7 +974,7 @@ mod tests {
             (
                 "my_child",
                 ComponentDeclBuilder::new()
-                    .protocol(capability_decl)
+                    .resolver(capability_decl)
                     .expose(expose_from_self_decl)
                     .build(),
             ),
