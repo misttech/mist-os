@@ -253,4 +253,12 @@ pub enum Commands {
         /// file at the file path provided.
         output: Option<PathBuf>,
     },
+
+    #[structopt(name = "debug-print-cm")]
+    /// print pretty rust-debug-format-string representation of .cm file
+    DebugPrintCm {
+        #[structopt(name = "FILE", parse(from_os_str))]
+        /// file to process
+        file: PathBuf,
+    },
 }

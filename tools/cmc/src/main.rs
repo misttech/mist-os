@@ -14,6 +14,7 @@ use structopt::StructOpt;
 
 #[allow(unused)] // A test-only macro is defined on all builds.
 mod compile;
+mod debug_print_cm;
 mod format;
 mod include;
 mod merge;
@@ -141,6 +142,10 @@ fn run_cmc() -> Result<(), Error> {
                 None => println!("{}", docs),
                 Some(path) => fs::write(path, docs)?,
             }
+        }
+        opts::Commands::DebugPrintCm { file } => {
+            path_exists(&file)?;
+            debug_print_cm::debug_print_cm(&file)?
         }
     }
     if let Some(stamp_path) = opt.stamp {
