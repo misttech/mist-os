@@ -37,8 +37,6 @@ toc:
       path: /docs/development/drivers/testing/threading-tips-in-tests.md
   - title: "Debugging"
     section:
-    - title: "Bind debugger"
-      path: /docs/development/drivers/diagnostics/bind-debugger.md
     - title: "Driver utilities"
       path: /docs/development/drivers/diagnostics/driver-utils.md
   - title: "Driver runtime API guidelines"

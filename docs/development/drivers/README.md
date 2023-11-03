@@ -58,7 +58,6 @@ the [Drivers][dfv2-concepts] section under _Fundamentals_.
 
 - Debugging
 
-  - [Bind Debugger][bind-debugger]
   - [Driver utilities][driver-utilities]
 
 - [Driver runtime API guidelines][driver-runtime-api-guidelines]
@@ -155,7 +154,6 @@ the [Drivers][dfv2-concepts] section under _Fundamentals_.
 [using-inspect]: diagnostics/inspect.md
 [driver-logging]: diagnostics/logging.md
 [add-tracing]: diagnostics/tracing.md
-[bind-debugger]: diagnostics/bind-debugger.md
 [driver-utilities]: diagnostics/driver-utils.md
 [banjo-tutorial]: tutorials/banjo-tutorial.md
 [bind-rules-tutorial]: tutorials/bind-rules-tutorial.md

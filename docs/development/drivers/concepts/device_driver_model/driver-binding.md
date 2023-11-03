@@ -236,7 +236,8 @@ The JSON specification must be a list of test case objects, where each object co
  - `name` A string for the name of the test case.
  - `expected` The expected result. Must be `“match”` or `“abort”`.
  - `device` A list of string key value pairs describing the properties of a device. This is
-   similar to the debugger's [device specifications](/docs/development/drivers/diagnostics/bind-debugger.md#device-specification).
+   similar to the debugger's device specifications (see
+   [this example](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/bindc/examples/gizmo.dev)).
 
 If the test is for a composite device, then each node in the device can have a
 list of test case objects. The JSON specification for the unit tests will be a
