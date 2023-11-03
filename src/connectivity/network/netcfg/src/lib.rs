@@ -1937,6 +1937,17 @@ impl<'a> NetCfg<'a> {
                         e.context("error getting stable name"),
                     )))
                 }
+                // TODO(fxbug.dev/56559): When a unique name can not be found with
+                // the provided naming rule, escalate. If the pre-existing
+                // interface is found to be the same logical interface with the
+                // same name, remove the existing interface and install this one.
+                // When it is a different logical interface, reject installing
+                // the new interface into netstack.
+                Err(interface::NameGenerationError::AlreadyExistsError(e)) => {
+                    return Err(devices::AddDeviceError::Other(errors::Error::Fatal(
+                        e.context("error attempting to add an interface with the same name"),
+                    )))
+                }
             }
         } else {
             self.persisted_interface_config.generate_temporary_name(interface_type)

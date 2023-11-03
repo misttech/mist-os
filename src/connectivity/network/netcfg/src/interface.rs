@@ -361,6 +361,7 @@ impl<'a> FileBackedConfig<'a> {
 #[derive(Debug)]
 pub enum NameGenerationError<'a> {
     GenerationError(anyhow::Error),
+    AlreadyExistsError(anyhow::Error),
     FileUpdateError { name: &'a str, err: anyhow::Error },
 }
 
@@ -449,9 +450,12 @@ impl MatchingRule {
 #[derive(Debug, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "lowercase")]
 pub enum DynamicNameCompositionRule {}
-
 impl DynamicNameCompositionRule {
-    fn get_name(&self, _info: &devices::DeviceInfo) -> &str {
+    fn get_name(
+        &self,
+        _configs: &[InterfaceConfig],
+        _info: &devices::DeviceInfo,
+    ) -> Result<String, anyhow::Error> {
         match *self {}
     }
 }
@@ -476,31 +480,56 @@ pub struct NamingRule {
     /// must apply for the naming scheme to take effect.
     #[allow(unused)]
     pub matchers: HashSet<MatchingRule>,
-    // TODO(fxbug.dev/135098): Add static naming rules
     // TODO(fxbug.dev/135106): Add dynamic naming rules
     /// The rules to apply to the interface to produce the interface's name.
-    #[allow(unused)]
     pub naming_scheme: Vec<NameCompositionRule>,
 }
 
 impl NamingRule {
     // An interface's name is determined by extracting the name of each rule,
-    // in order, and concatenating the results.
+    // in order, and concatenating the results. Returns an error if the
+    // interface name cannot be generated.
     #[allow(unused)]
-    fn get_name(&self, info: &devices::DeviceInfo) -> String {
-        self.naming_scheme
+    fn generate_name(
+        &self,
+        interfaces: &[InterfaceConfig],
+        info: &devices::DeviceInfo,
+    ) -> Result<String, NameGenerationError<'_>> {
+        let name = self
+            .naming_scheme
             .iter()
             .map(|rule| match rule {
-                NameCompositionRule::Static(s) => &s.as_str(),
-                NameCompositionRule::Dynamic(rule) => rule.get_name(info),
+                NameCompositionRule::Static(s) => Ok(s.clone()),
+                // Dynamic rules require the knowledge of `DeviceInfo`
+                // properties and existing interface names.
+                NameCompositionRule::Dynamic(rule) => {
+                    rule.get_name(interfaces, info).map_err(NameGenerationError::GenerationError)
+                }
             })
-            .collect()
+            .collect::<Result<String, NameGenerationError<'_>>>()?;
+
+        if interfaces.iter().any(|interface| interface.name == name) {
+            // TODO(fxbug.dev/56559): When a unique name can not be found with
+            // the provided naming rule, escalate. If the pre-existing
+            // interface is found to be the same logical interface with the
+            // same name, remove the existing interface and install this one.
+            // When it is a different logical interface, reject installing
+            // the new interface into netstack.
+            return Err(NameGenerationError::AlreadyExistsError(anyhow::format_err!(
+                "interface name {name} was not unique for mac={:?}, topo_path={}",
+                info.mac,
+                info.topological_path
+            )));
+        }
+
+        Ok(name)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_matches::assert_matches;
     use std::io::Write;
     use test_case::test_case;
 
@@ -1044,10 +1073,21 @@ mod tests {
         assert!(!does_interface_match);
     }
 
+    // Arbitrary values for devices::DeviceInfo for cases where DeviceInfo has
+    // no impact on the test.
+    fn default_device_info() -> devices::DeviceInfo {
+        devices::DeviceInfo {
+            device_class: fhwnet::DeviceClass::Ethernet,
+            mac: None,
+            topological_path: "".to_owned(),
+        }
+    }
+
     #[test_case(
         vec![NameCompositionRule::Static(String::from("x"))],
+        default_device_info(),
         "x";
-        "single_rule"
+        "single_static"
     )]
     #[test_case(
         vec![
@@ -1055,23 +1095,36 @@ mod tests {
             NameCompositionRule::Static(String::from("x")),
             NameCompositionRule::Static(String::from("100"))
         ],
+        default_device_info(),
         "ethx100";
-        "multiple_rules"
+        "multiple_static"
     )]
-    fn test_static_naming_rules(
-        static_rules: Vec<NameCompositionRule>,
+    fn test_generate_name_from_naming_rule(
+        composition_rules: Vec<NameCompositionRule>,
+        info: devices::DeviceInfo,
         expected_name: &'static str,
     ) {
-        let naming_rule = NamingRule { matchers: HashSet::new(), naming_scheme: static_rules };
+        let naming_rule = NamingRule { matchers: HashSet::new(), naming_scheme: composition_rules };
 
-        // DeviceInfo does not impact static naming rules, so use arbitrary values.
-        let info = devices::DeviceInfo {
-            device_class: fhwnet::DeviceClass::Ethernet,
-            mac: None,
-            topological_path: "".to_owned(),
+        let name = naming_rule.generate_name(&[], &info);
+        assert_eq!(name.unwrap(), expected_name.to_owned());
+    }
+
+    #[test]
+    fn test_generate_name_from_naming_rule_interface_name_exists() {
+        let shared_interface_name = "x".to_owned();
+        let interfaces = vec![InterfaceConfig {
+            id: PersistentIdentifier::TopologicalPath("".to_owned()),
+            name: shared_interface_name.clone(),
+            device_class: crate::InterfaceType::Ethernet,
+        }];
+
+        let naming_rule = NamingRule {
+            matchers: HashSet::new(),
+            naming_scheme: vec![NameCompositionRule::Static(shared_interface_name)],
         };
 
-        let name = naming_rule.get_name(&info);
-        assert_eq!(name, expected_name.to_owned());
+        let name = naming_rule.generate_name(&interfaces, &default_device_info());
+        assert_matches!(name, Err(NameGenerationError::AlreadyExistsError(_)));
     }
 }
