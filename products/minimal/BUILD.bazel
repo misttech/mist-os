@@ -14,6 +14,8 @@ load(
     "fuchsia_product_image",
 )
 
+package(default_visibility = ["//visibility:public"])
+
 # LINT.IfChange
 _PRODUCT_CONFIG_BASE_JSON = {
     "platform": {
