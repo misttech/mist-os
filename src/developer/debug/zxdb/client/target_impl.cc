@@ -197,6 +197,7 @@ void TargetImpl::OnProcessExiting(int return_code, uint64_t timestamp) {
   for (auto& observer : session()->process_observers())
     observer.WillDestroyProcess(process_.get(), ProcessObserver::DestroyReason::kExit, return_code,
                                 timestamp);
+  symbols_.WillDestroyProcess();
 
   process_.reset();
 }
@@ -276,6 +277,7 @@ void TargetImpl::OnKillOrDetachReply(ProcessObserver::DestroyReason reason, cons
     // observer specification.
     for (auto& observer : session()->process_observers())
       observer.WillDestroyProcess(process_.get(), reason, 0, timestamp);
+    symbols_.WillDestroyProcess();
 
     process_.reset();
   }

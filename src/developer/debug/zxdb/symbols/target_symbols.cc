@@ -24,11 +24,14 @@ bool TargetSymbols::ModuleRefComparePtr::operator()(const fxl::RefPtr<ModuleSymb
 
 TargetSymbols::TargetSymbols(SystemSymbols* system_symbols) : system_symbols_(system_symbols) {}
 TargetSymbols::TargetSymbols(const TargetSymbols& other)
-    : system_symbols_(other.system_symbols_), modules_(other.modules_) {}
+    : system_symbols_(other.system_symbols_),
+      modules_(other.modules_),
+      recent_modules_(other.recent_modules_) {}
 TargetSymbols::~TargetSymbols() {}
 
 TargetSymbols& TargetSymbols::operator=(const TargetSymbols& other) {
   modules_ = other.modules_;
+  recent_modules_ = other.recent_modules_;
   return *this;
 }
 
@@ -110,6 +113,11 @@ std::string TargetSymbols::GetShortestUniqueFileName(std::string_view file_name)
       return result;
   }
   return result;
+}
+
+void TargetSymbols::WillDestroyProcess() {
+  recent_modules_.clear();
+  recent_modules_.insert(modules_.begin(), modules_.end());
 }
 
 }  // namespace zxdb

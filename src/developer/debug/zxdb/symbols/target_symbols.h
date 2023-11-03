@@ -82,6 +82,10 @@ class TargetSymbols {
   // If the name isn't in the index, returns just the file part.
   std::string GetShortestUniqueFileName(std::string_view file_name) const;
 
+  // A notification that the process associated with this target will be destroyed soon.
+  // We use this notification to manage our ModuleSymbols cache.
+  void WillDestroyProcess();
+
  private:
   // Comparison functor for modules. Does a pointer-identity comparison of the refptr.
   struct ModuleRefComparePtr {
@@ -93,6 +97,10 @@ class TargetSymbols {
   // Since there are no addresses, there is no real ordering of these modules. Track them by pointer
   // identity to make keeping in sync with the ProcessSymbols more efficient.
   std::set<fxl::RefPtr<ModuleSymbols>, ModuleRefComparePtr> modules_;
+
+  // We keep a reference to recently used modules so that they stay alive in the system symbols
+  // cache.
+  std::set<fxl::RefPtr<ModuleSymbols>, ModuleRefComparePtr> recent_modules_;
 };
 
 }  // namespace zxdb
