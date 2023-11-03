@@ -20,7 +20,7 @@ per-file             sync-to = olivernewman@google.com
 
 per-file             set = olivernewman@google.com
 
-per-file             test = anmittal@google.com,crjohns@google.com,dworsham@google.com
+per-file             test = file: /src/sys/test_manager/OWNERS
 
 per-file             testgen = crjohns@google.com,dworsham@google.com,kjharland@google.com
 

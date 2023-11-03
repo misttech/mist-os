@@ -1,4 +1,2 @@
+include /src/sys/test_manager/OWNERS
 aaronwood@google.com
-anmittal@google.com
-crjohns@google.com
-dworsham@google.com

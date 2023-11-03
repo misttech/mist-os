@@ -1,5 +1,3 @@
-anmittal@google.com
-crjohns@google.com
-dworsham@google.com
+include /src/sys/test_manager/OWNERS
+
 kjharland@google.com
-miguelfrde@google.com

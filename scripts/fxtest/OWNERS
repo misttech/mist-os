@@ -1,5 +1,2 @@
 include /tools/devshell/OWNERS
-
-anmittal@google.com
-crjohns@google.com
-dworsham@google.com
+include /src/sys/test_manager/OWNERS
