@@ -146,6 +146,30 @@ fuchsia_product_bundle(
 )
 
 fuchsia_product_image(
+    name = "image.vim3",
+    board_config = "//boards:vim3",
+    legacy_aib = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
+    platform_aibs = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
+    product_config = ":product_config",
+)
+
+fuchsia_elf_sizes(
+    name = "elf_sizes.vim3",
+    product_image = ":image.vim3",
+)
+
+fuchsia_product_bundle(
+    name = "product_bundle.vim3",
+    board_name = "vim3",
+    partitions_config = "//build/bazel/assembly/partitions_configurations:vim3",
+    product_image = ":image.vim3",
+    product_name = "fuchsia",
+    recovery = "//products/zedboot:vim3",
+    repository_keys = "//src/sys/pkg/repositories/devhost/keys",
+    update_epoch = "1",
+)
+
+fuchsia_product_image(
     name = "image.riscv64",
     board_config = "//boards:riscv64",
     legacy_aib = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
