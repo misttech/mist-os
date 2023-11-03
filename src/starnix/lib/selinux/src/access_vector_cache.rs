@@ -2,59 +2,92 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{
-    AccessQueryable, AccessVector, DenyAll, MutableAccessQueryable, ObjectClass, SecurityId,
+use super::{AccessVector, ObjectClass, SecurityId};
+
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Arc,
 };
 
-use std::{
-    borrow::{Borrow, BorrowMut},
-    marker::PhantomData,
-    sync::atomic::{AtomicU64, Ordering},
-};
-
-/// A cache of access vectors that associate source SID, target SID, and object type to a set of
-/// rights permitted for the source accessing the target object.
-pub trait MutableAccessVectorCache {
-    /// Removes all entries from the nearest cache without notifying additional delegate caches
-    /// encapsulated in this cache. Note that the "nearest cache" may be a delegate in cases where,
-    /// for example, the implementation manages synchronization but delegates storage of cache
-    /// entries.
-    fn local_reset(&mut self);
-
-    /// Removes all entries from this cache and any delegate caches encapsulated in this cache.
-    fn reset(&mut self);
+/// An interface for computing the rights permitted to a source accessing a target of a particular
+/// SELinux object type. This interface requires implementers to update state via interior mutability.
+pub trait Query {
+    /// Computes the [`AccessVector`] permitted to `source_sid` for accessing `target_sid`, an
+    /// object of of type `target_class`.
+    fn query(
+        &self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        target_class: ObjectClass,
+    ) -> AccessVector;
 }
 
-/// A [`MutableAccessVectorCache`] that uses interior mutability.
-pub trait AccessVectorCache {
-    /// Removes all entries from the nearest cache without notifying additional delegate caches
-    /// encapsulated in this cache. Note that the "nearest cache" may be a delegate in cases where,
-    /// for example, the implementation manages synchronization but delegates storage of cache
-    /// entries.
-    fn local_reset(&self);
-
-    /// Removes all entries from this cache and any delegate caches encapsulated in this cache.
-    fn reset(&self);
+/// An interface for computing the rights permitted to a source accessing a target of a particular
+/// SELinux object type.
+pub trait QueryMut {
+    /// Computes the [`AccessVector`] permitted to `source_sid` for accessing `target_sid`, an
+    /// object of type `target_class`.
+    fn query(
+        &mut self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        target_class: ObjectClass,
+    ) -> AccessVector;
 }
 
-impl<AVC: AccessVectorCache> MutableAccessVectorCache for AVC {
-    fn local_reset(&mut self) {
-        (self as &dyn AccessVectorCache).local_reset()
-    }
-
-    fn reset(&mut self) {
-        (self as &dyn AccessVectorCache).reset()
+impl<Q: Query> QueryMut for Q {
+    fn query(
+        &mut self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        target_class: ObjectClass,
+    ) -> AccessVector {
+        (self as &dyn Query).query(source_sid, target_sid, target_class)
     }
 }
 
-impl AccessVectorCache for DenyAll {
-    /// A no-op implementation: [`DenyAll`] has no state to reset when it is being treated as a
-    /// cache to be reset.
-    fn local_reset(&self) {}
+/// An interface for emptying caches that store [`Query`] input/output pairs. This interface
+/// requires implementers to update state via interior mutability.
+pub trait Reset {
+    /// Removes all entries from this cache and any reset delegate caches encapsulated in this
+    /// cache. Returns true only if the cache is still valid after reset.
+    fn reset(&self) -> bool;
+}
 
+/// An interface for emptying caches that store [`Query`] input/output pairs.
+pub trait ResetMut {
+    /// Removes all entries from this cache and any reset delegate caches encapsulated in this
+    /// cache. Returns true only if the cache is still valid after reset.
+    fn reset(&mut self) -> bool;
+}
+
+impl<R: Reset> ResetMut for R {
+    fn reset(&mut self) -> bool {
+        (self as &dyn Reset).reset()
+    }
+}
+
+/// A default implementation for [`AccessQueryable`] that permits no [`AccessVector`].
+#[derive(Default)]
+pub struct DenyAll;
+
+impl Query for DenyAll {
+    fn query(
+        &self,
+        _source_sid: SecurityId,
+        _target_sid: SecurityId,
+        _target_class: ObjectClass,
+    ) -> AccessVector {
+        AccessVector::NONE
+    }
+}
+
+impl Reset for DenyAll {
     /// A no-op implementation: [`DenyAll`] has no state to reset and no delegates to notify
     /// when it is being treated as a cache to be reset.
-    fn reset(&self) {}
+    fn reset(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Clone, Copy, Default)]
@@ -67,11 +100,11 @@ struct QueryAndResult {
 
 /// An empty access vector cache that delegates to an [`AccessQueryable`].
 #[derive(Default)]
-pub struct EmptyAccessVectorCache<D: AccessQueryable + AccessVectorCache = DenyAll> {
+pub struct Empty<D = DenyAll> {
     delegate: D,
 }
 
-impl<D: AccessQueryable + AccessVectorCache> EmptyAccessVectorCache<D> {
+impl<D> Empty<D> {
     /// Constructs an empty access vector cache that delegates to `delegate`.
     ///
     /// TODO: Eliminate `dead_code` guard.
@@ -81,9 +114,9 @@ impl<D: AccessQueryable + AccessVectorCache> EmptyAccessVectorCache<D> {
     }
 }
 
-impl<D: AccessQueryable + AccessVectorCache> AccessQueryable for EmptyAccessVectorCache<D> {
+impl<D: QueryMut> QueryMut for Empty<D> {
     fn query(
-        &self,
+        &mut self,
         source_sid: SecurityId,
         target_sid: SecurityId,
         target_class: ObjectClass,
@@ -92,58 +125,42 @@ impl<D: AccessQueryable + AccessVectorCache> AccessQueryable for EmptyAccessVect
     }
 }
 
-impl<D: AccessQueryable + AccessVectorCache> AccessVectorCache for EmptyAccessVectorCache<D> {
-    fn local_reset(&self) {}
-
-    fn reset(&self) {
+impl<D: ResetMut> ResetMut for Empty<D> {
+    fn reset(&mut self) -> bool {
         self.delegate.reset()
     }
 }
 
 /// Default size of a fixed-sized (pre-allocated) access vector cache.
-const DEFAULT_FIXED_ACCESS_VECTOR_CACHE_SIZE: usize = 10;
+const DEFAULT_FIXED_SIZE: usize = 10;
 
 /// An access vector cache of fixed size and memory allocation. The underlying caching strategy is
 /// FIFO. Entries are evicted one at a time when entries are added to a full cache.
 ///
 /// This implementation is thread-hostile; it expects all operations to be executed on the same
 /// thread.
-pub struct FixedAccessVectorCache<
-    B: Borrow<D>,
-    D: AccessQueryable + AccessVectorCache = DenyAll,
-    const SIZE: usize = DEFAULT_FIXED_ACCESS_VECTOR_CACHE_SIZE,
-> {
+pub struct Fixed<D = DenyAll, const SIZE: usize = DEFAULT_FIXED_SIZE> {
     cache: [QueryAndResult; SIZE],
     next_index: usize,
     is_full: bool,
-    delegate: B,
-    // Type must depend on `D` to be parameterized by `D`.
-    _marker: PhantomData<D>,
+    delegate: D,
 }
 
-impl<B: Borrow<D>, D: AccessQueryable + AccessVectorCache, const SIZE: usize>
-    FixedAccessVectorCache<B, D, SIZE>
-{
+impl<D, const SIZE: usize> Fixed<D, SIZE> {
     /// Constructs a fixed-size access vector cache that delegates to `delegate`.
     ///
     /// # Panics
     ///
-    /// This will panic when `SIZE` is 0; i.e., for any `FixedAccessVectorCache<B, D, 0>`.
+    /// This will panic when `SIZE` is 0; i.e., for any `Fixed<D, 0>`.
     ///
     /// TODO: Eliminate `dead_code` guard.
     #[allow(dead_code)]
-    pub fn new(delegate: B) -> Self {
+    pub fn new(delegate: D) -> Self {
         if SIZE == 0 {
             panic!("cannot instantiate fixed access vector cache of size 0");
         }
         let empty_cache_item: QueryAndResult = QueryAndResult::default();
-        Self {
-            cache: [empty_cache_item; SIZE],
-            next_index: 0,
-            is_full: false,
-            delegate,
-            _marker: PhantomData,
-        }
+        Self { cache: [empty_cache_item; SIZE], next_index: 0, is_full: false, delegate }
     }
 
     /// Returns a boolean indicating whether the local cache is empty.
@@ -163,9 +180,7 @@ impl<B: Borrow<D>, D: AccessQueryable + AccessVectorCache, const SIZE: usize>
     }
 }
 
-impl<B: Borrow<D> + Send, D: AccessQueryable + AccessVectorCache, const SIZE: usize>
-    MutableAccessQueryable for FixedAccessVectorCache<B, D, SIZE>
-{
+impl<D: QueryMut, const SIZE: usize> QueryMut for Fixed<D, SIZE> {
     fn query(
         &mut self,
         source_sid: SecurityId,
@@ -191,7 +206,7 @@ impl<B: Borrow<D> + Send, D: AccessQueryable + AccessVectorCache, const SIZE: us
             }
         }
 
-        let access_vector = self.delegate.borrow().query(source_sid, target_sid, target_class);
+        let access_vector = self.delegate.query(source_sid, target_sid, target_class);
 
         self.insert(QueryAndResult { source_sid, target_sid, target_class, access_vector });
 
@@ -199,140 +214,94 @@ impl<B: Borrow<D> + Send, D: AccessQueryable + AccessVectorCache, const SIZE: us
     }
 }
 
-impl<B: Borrow<D>, D: AccessQueryable + AccessVectorCache, const SIZE: usize>
-    MutableAccessVectorCache for FixedAccessVectorCache<B, D, SIZE>
-{
-    fn local_reset(&mut self) {
+impl<D, const SIZE: usize> ResetMut for Fixed<D, SIZE> {
+    fn reset(&mut self) -> bool {
         self.next_index = 0;
         self.is_full = false;
-    }
-
-    fn reset(&mut self) {
-        self.local_reset();
-        self.delegate.borrow().reset();
+        true
     }
 }
 
+/// A wrapper around an atomic integer that implements [`Reset`]. Instances of this type are used as
+/// a version number to indicate when a cache needs to be emptied.
 #[derive(Default)]
-pub struct CacheVersion {
-    local_version: AtomicU64,
-    global_version: AtomicU64,
-}
+pub struct AtomicVersion(AtomicU64);
 
-impl CacheVersion {
-    pub fn local_version(&self) -> u64 {
-        self.local_version.load(Ordering::Relaxed)
+impl AtomicVersion {
+    /// Atomically load the version number.
+    pub fn version(&self) -> u64 {
+        self.0.load(Ordering::Relaxed)
     }
 
-    pub fn global_version(&self) -> u64 {
-        self.global_version.load(Ordering::Relaxed)
-    }
-
-    pub fn increment_local_version(&self) {
-        self.local_version.fetch_add(1, Ordering::Relaxed);
-    }
-
-    pub fn increment_global_version(&self) {
-        self.global_version.fetch_add(1, Ordering::Relaxed);
+    /// Atomically increment the version number.
+    pub fn increment_version(&self) {
+        self.0.fetch_add(1, Ordering::Relaxed);
     }
 }
 
-impl AccessVectorCache for CacheVersion {
-    fn local_reset(&self) {
-        self.increment_local_version();
+impl Reset for AtomicVersion {
+    fn reset(&self) -> bool {
+        self.increment_version();
+        true
     }
+}
 
-    fn reset(&self) {
-        self.increment_global_version();
+impl<Q: Query> Query for Arc<Q> {
+    fn query(
+        &self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        target_class: ObjectClass,
+    ) -> AccessVector {
+        self.as_ref().query(source_sid, target_sid, target_class)
+    }
+}
+
+impl<R: Reset> Reset for Arc<R> {
+    fn reset(&self) -> bool {
+        self.as_ref().reset()
     }
 }
 
 /// An access vector cache that may be reset from any thread, but expects to always be queried
 /// from the same thread. The cache does not implement any specific caching strategies, but
-/// delegates *all* operations, *including* `local_reset()`.
+/// delegates *all* operations.
 ///
-/// Resets are delegated lazily during queries. `local_reset()` and `reset()` induce an internal
-/// state change that results in at most one `local_reset()` or `reset()` call to the delegate on
-/// the next query. This strategy allows [`ThreadLocalQueryAccessVectorCache`] to expose
-/// thread-safe reset implementation over thread-hostile access vector cache implementations.
-pub struct ThreadLocalQueryAccessVectorCache<
-    BCV: Borrow<CacheVersion>,
-    BD: BorrowMut<D>,
-    D: MutableAccessQueryable + MutableAccessVectorCache = DenyAll,
-> {
-    delegate: BD,
-    current_local_version: u64,
-    current_global_version: u64,
-    active_version: BCV,
-    // Type must depend on `D` to be parameterized by `D`.
-    _marker: PhantomData<D>,
+/// Resets are delegated lazily during queries.  A `reset()` induces an internal state change that
+/// results in at most one `reset()` call to the query delegate on the next query. This strategy
+/// allows [`ThreadLocalQuery`] to expose thread-safe reset implementation over thread-hostile
+/// access vector cache implementations.
+pub struct ThreadLocalQuery<D = DenyAll> {
+    delegate: D,
+    current_version: u64,
+    active_version: Arc<AtomicVersion>,
 }
 
-impl<
-        BCV: Borrow<CacheVersion>,
-        BD: BorrowMut<D>,
-        D: MutableAccessQueryable + MutableAccessVectorCache,
-    > ThreadLocalQueryAccessVectorCache<BCV, BD, D>
-{
-    /// Constructs a [`ThreadLocalQueryAccessVectorCache`] that delegates to `delegate`.
+impl<D> ThreadLocalQuery<D> {
+    /// Constructs a [`ThreadLocalQuery`] that delegates to `delegate`.
     ///
     /// TODO: Eliminate `dead_code` guard.
     #[allow(dead_code)]
-    pub fn new(active_version: BCV, delegate: BD) -> Self {
-        Self {
-            delegate,
-            current_local_version: Default::default(),
-            current_global_version: Default::default(),
-            active_version,
-            _marker: PhantomData,
-        }
+    pub fn new(active_version: Arc<AtomicVersion>, delegate: D) -> Self {
+        Self { delegate, current_version: Default::default(), active_version }
     }
 }
 
-impl<
-        BCV: Borrow<CacheVersion> + Send,
-        BD: BorrowMut<D> + Send,
-        D: MutableAccessQueryable + MutableAccessVectorCache,
-    > MutableAccessQueryable for ThreadLocalQueryAccessVectorCache<BCV, BD, D>
-{
+impl<D: QueryMut + ResetMut> QueryMut for ThreadLocalQuery<D> {
     fn query(
         &mut self,
         source_sid: SecurityId,
         target_sid: SecurityId,
         target_class: ObjectClass,
     ) -> AccessVector {
-        // Check global version first because `reset()` subsumes `local_reset()`.
-        let global_version = self.active_version.borrow().global_version();
-        if self.current_global_version != global_version {
-            self.current_global_version = global_version;
-            self.current_local_version = self.active_version.borrow().local_version();
-            self.delegate.borrow_mut().reset();
-        } else {
-            // Check need for `local_reset()` only when `reset()` was not required.
-            let local_version = self.active_version.borrow().local_version();
-            if self.current_local_version != local_version {
-                self.current_local_version = local_version;
-                self.delegate.borrow_mut().local_reset();
-            }
+        let version = self.active_version.as_ref().version();
+        if self.current_version != version {
+            self.current_version = version;
+            self.delegate.reset();
         }
 
         // Allow `self.delegate` to implement caching strategy and prepare response.
-        self.delegate.borrow_mut().query(source_sid, target_sid, target_class)
-    }
-}
-
-impl<
-        BCV: Borrow<CacheVersion>,
-        BD: BorrowMut<D>,
-        D: MutableAccessQueryable + MutableAccessVectorCache,
-    > MutableAccessVectorCache for ThreadLocalQueryAccessVectorCache<BCV, BD, D>
-{
-    fn local_reset(&mut self) {
-        self.active_version.borrow().local_reset();
-    }
-
-    fn reset(&mut self) {
-        self.active_version.borrow().reset();
+        self.delegate.query(source_sid, target_sid, target_class)
     }
 }
 
@@ -340,7 +309,6 @@ impl<
 mod tests {
     use super::*;
 
-    use once_cell::sync::Lazy;
     use std::{
         collections::HashSet,
         sync::{
@@ -351,20 +319,15 @@ mod tests {
     };
 
     #[derive(Default)]
-    struct CountingAccessVectorCache<D: AccessQueryable + AccessVectorCache = DenyAll> {
+    struct Counter<D = DenyAll> {
         query_count: AtomicUsize,
-        local_reset_count: AtomicUsize,
         reset_count: AtomicUsize,
         delegate: D,
     }
 
-    impl<D: AccessQueryable + AccessVectorCache> CountingAccessVectorCache<D> {
+    impl<D> Counter<D> {
         fn query_count(&self) -> usize {
             self.query_count.load(Ordering::Relaxed)
-        }
-
-        fn local_reset_count(&self) -> usize {
-            self.local_reset_count.load(Ordering::Relaxed)
         }
 
         fn reset_count(&self) -> usize {
@@ -372,7 +335,7 @@ mod tests {
         }
     }
 
-    impl<D: AccessQueryable + AccessVectorCache> AccessQueryable for CountingAccessVectorCache<D> {
+    impl<D: Query> Query for Counter<D> {
         fn query(
             &self,
             source_sid: SecurityId,
@@ -384,27 +347,23 @@ mod tests {
         }
     }
 
-    impl<D: AccessQueryable + AccessVectorCache> AccessVectorCache for CountingAccessVectorCache<D> {
-        fn local_reset(&self) {
-            self.local_reset_count.fetch_add(1, Ordering::Relaxed);
-        }
-
-        fn reset(&self) {
+    impl<D: Reset> Reset for Counter<D> {
+        fn reset(&self) -> bool {
             self.reset_count.fetch_add(1, Ordering::Relaxed);
             self.delegate.reset();
+            true
         }
     }
 
     #[fuchsia::test]
     fn empty_access_vector_cache_default_deny_all() {
-        let avc = EmptyAccessVectorCache::<DenyAll>::default();
+        let mut avc = Empty::<DenyAll>::default();
         assert_eq!(AccessVector::NONE, avc.query(0.into(), 0.into(), ObjectClass::Process));
     }
 
     #[fuchsia::test]
     fn fixed_access_vector_cache_add_entry() {
-        let mut avc: FixedAccessVectorCache<_, _, 10> =
-            FixedAccessVectorCache::new(CountingAccessVectorCache::<DenyAll>::default());
+        let mut avc = Fixed::<_, 10>::new(Counter::<DenyAll>::default());
         assert_eq!(0, avc.delegate.query_count());
         assert_eq!(AccessVector::NONE, avc.query(0.into(), 0.into(), ObjectClass::Process));
         assert_eq!(1, avc.delegate.query_count());
@@ -415,26 +374,10 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn fixed_access_vector_cache_local_reset() {
-        let mut avc: FixedAccessVectorCache<_, _, 10> =
-            FixedAccessVectorCache::new(CountingAccessVectorCache::<DenyAll>::default());
-
-        // No reset signals (local or otherwise) propagated to delegate.
-        assert_eq!(0, avc.delegate.reset_count());
-        assert_eq!(0, avc.delegate.local_reset_count());
-        avc.local_reset();
-        assert_eq!(0, avc.delegate.reset_count());
-        assert_eq!(0, avc.delegate.local_reset_count());
-    }
-
-    #[fuchsia::test]
     fn fixed_access_vector_cache_reset() {
-        let mut avc: FixedAccessVectorCache<_, _, 10> =
-            FixedAccessVectorCache::new(CountingAccessVectorCache::<DenyAll>::default());
+        let mut avc = Fixed::<_, 10>::new(Counter::<DenyAll>::default());
 
-        assert_eq!(0, avc.delegate.reset_count());
         avc.reset();
-        assert_eq!(1, avc.delegate.reset_count());
         assert_eq!(0, avc.next_index);
         assert_eq!(false, avc.is_full);
 
@@ -444,17 +387,14 @@ mod tests {
         assert_eq!(1, avc.next_index);
         assert_eq!(false, avc.is_full);
 
-        assert_eq!(1, avc.delegate.reset_count());
         avc.reset();
-        assert_eq!(2, avc.delegate.reset_count());
         assert_eq!(0, avc.next_index);
         assert_eq!(false, avc.is_full);
     }
 
     #[fuchsia::test]
     fn fixed_access_vector_cache_fill() {
-        let mut avc: FixedAccessVectorCache<_, _, 10> =
-            FixedAccessVectorCache::new(CountingAccessVectorCache::<DenyAll>::default());
+        let mut avc = Fixed::<_, 10>::new(Counter::<DenyAll>::default());
 
         for i in 0..10 {
             avc.query(i.into(), 0.into(), ObjectClass::Process);
@@ -479,8 +419,7 @@ mod tests {
 
     #[fuchsia::test]
     fn fixed_access_vector_cache_full_miss() {
-        let mut avc: FixedAccessVectorCache<_, _, 10> =
-            FixedAccessVectorCache::new(CountingAccessVectorCache::<DenyAll>::default());
+        let mut avc = Fixed::<_, 10>::new(Counter::<DenyAll>::default());
 
         // Fill with (i, 0, 0 => 0), then overwrite (0, 0, 0 => 0) with (10, 0, 0 => 0).
         for i in 0..11 {
@@ -514,36 +453,15 @@ mod tests {
 
     #[fuchsia::test]
     fn thread_local_query_access_vector_cache_reset() {
-        static CACHE_VERSION: Lazy<CacheVersion> = Lazy::new(|| Default::default());
-        let mut avc = ThreadLocalQueryAccessVectorCache::new(
-            &*CACHE_VERSION,
-            CountingAccessVectorCache::<DenyAll>::default(),
-        );
+        let cache_version = Arc::new(AtomicVersion::default());
+        let mut avc = ThreadLocalQuery::new(cache_version.clone(), Counter::<DenyAll>::default());
 
         // Reset deferred to next query.
         assert_eq!(0, avc.delegate.reset_count());
-        avc.reset();
+        cache_version.reset();
         assert_eq!(0, avc.delegate.reset_count());
         avc.query(0.into(), 0.into(), ObjectClass::Process);
         assert_eq!(1, avc.delegate.reset_count());
-
-        // Local reset deferred to next query.
-        assert_eq!(0, avc.delegate.local_reset_count());
-        avc.local_reset();
-        assert_eq!(0, avc.delegate.local_reset_count());
-        avc.query(0.into(), 0.into(), ObjectClass::Process);
-        assert_eq!(1, avc.delegate.local_reset_count());
-
-        // Reset + local reset = reset deferred to next query.
-        assert_eq!(1, avc.delegate.reset_count());
-        assert_eq!(1, avc.delegate.local_reset_count());
-        avc.reset();
-        avc.local_reset();
-        assert_eq!(1, avc.delegate.reset_count());
-        assert_eq!(1, avc.delegate.local_reset_count());
-        avc.query(0.into(), 0.into(), ObjectClass::Process);
-        assert_eq!(2, avc.delegate.reset_count());
-        assert_eq!(1, avc.delegate.local_reset_count());
     }
 
     #[fuchsia::test]
@@ -553,7 +471,7 @@ mod tests {
         }
     }
 
-    /// Tests cache coherence over two policy changes over a [`ThreadLocalQueryAccessVectorCache`].
+    /// Tests cache coherence over two policy changes over a [`ThreadLocalQuery`].
     async fn test_thread_local_query_access_vector_cache_coherence() {
         const NO_RIGHTS: u32 = 0;
         const READ_RIGHTS: u32 = 1;
@@ -561,27 +479,27 @@ mod tests {
 
         let active_policy: Arc<AtomicU32> = Arc::new(Default::default());
 
-        struct PolicyServer<B: Borrow<AtomicU32>> {
-            policy: B,
+        struct PolicyServer {
+            policy: Arc<AtomicU32>,
         }
 
-        impl<B: Borrow<AtomicU32>> PolicyServer<B> {
+        impl PolicyServer {
             fn set_policy(&self, policy: u32) {
                 if policy > 2 {
                     panic!("attempt to set policy to invalid value: {}", policy);
                 }
-                self.policy.borrow().store(policy, Ordering::Relaxed);
+                self.policy.as_ref().store(policy, Ordering::Relaxed);
             }
         }
 
-        impl<B: Borrow<AtomicU32> + Send + Sync> AccessQueryable for PolicyServer<B> {
+        impl Query for PolicyServer {
             fn query(
                 &self,
                 _source_sid: SecurityId,
                 _target_sid: SecurityId,
                 _target_class: ObjectClass,
             ) -> AccessVector {
-                let policy = self.policy.borrow().load(Ordering::Relaxed);
+                let policy = self.policy.as_ref().load(Ordering::Relaxed);
                 if policy == NO_RIGHTS {
                     AccessVector::NONE
                 } else if policy == READ_RIGHTS {
@@ -594,24 +512,19 @@ mod tests {
             }
         }
 
-        impl<B: Borrow<AtomicU32>> AccessVectorCache for PolicyServer<B> {
-            fn local_reset(&self) {}
-
-            fn reset(&self) {}
+        impl Reset for PolicyServer {
+            fn reset(&self) -> bool {
+                true
+            }
         }
 
-        let policy_server: Arc<PolicyServer<Arc<AtomicU32>>> =
+        let policy_server: Arc<PolicyServer> =
             Arc::new(PolicyServer { policy: active_policy.clone() });
-        let cache_version = Arc::new(CacheVersion::default());
+        let cache_version = Arc::new(AtomicVersion::default());
 
-        let fixed_avc = FixedAccessVectorCache::<
-            Arc<PolicyServer<Arc<AtomicU32>>>,
-            PolicyServer<Arc<AtomicU32>>,
-            10,
-        >::new(policy_server.clone());
+        let fixed_avc = Fixed::<_, 10>::new(policy_server.clone());
         let cache_version_for_avc = cache_version.clone();
-        let mut query_avc =
-            ThreadLocalQueryAccessVectorCache::new(cache_version_for_avc, fixed_avc);
+        let mut query_avc = ThreadLocalQuery::new(cache_version_for_avc, fixed_avc);
 
         policy_server.set_policy(NO_RIGHTS);
         let (tx, rx) = futures::channel::oneshot::channel();
@@ -630,7 +543,7 @@ mod tests {
         let set_read_thread = spawn(move || {
             std::thread::sleep(std::time::Duration::from_micros(1));
             policy_server.set_policy(READ_RIGHTS);
-            cache_version_for_read.local_reset();
+            cache_version_for_read.reset();
         });
 
         let policy_server = PolicyServer { policy: active_policy.clone() };
@@ -638,7 +551,7 @@ mod tests {
         let set_write_thread = spawn(move || {
             std::thread::sleep(std::time::Duration::from_micros(2));
             policy_server.set_policy(WRITE_RIGHTS);
-            cache_version_for_write.local_reset();
+            cache_version_for_write.reset();
         });
 
         set_read_thread.join().expect("join set-policy-to-read");
