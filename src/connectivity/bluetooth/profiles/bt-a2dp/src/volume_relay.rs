@@ -19,6 +19,44 @@ use {
     tracing::{info, trace, warn},
 };
 
+struct SetVolumeRequest {
+    prev_volume: u8,
+    responder: Option<fidl_fuchsia_bluetooth_avrcp::AbsoluteVolumeHandlerSetVolumeResponder>,
+}
+
+impl SetVolumeRequest {
+    fn new(
+        current: u8,
+        responder: fidl_fuchsia_bluetooth_avrcp::AbsoluteVolumeHandlerSetVolumeResponder,
+    ) -> Self {
+        Self { prev_volume: current, responder: Some(responder) }
+    }
+
+    fn is_volume_changed(&self, new_volume: u8) -> bool {
+        self.prev_volume != new_volume
+    }
+
+    /// Regardless of if the new volume is the same or different from the
+    /// previous volume, send a response back using the SetVolumeResponder.
+    /// Consumes self.
+    fn send(mut self, new_volume: u8) -> bool {
+        let _ = self.responder.take().unwrap().send(new_volume);
+        self.is_volume_changed(new_volume)
+    }
+
+    /// Sends a response back using the SetVolumeResponder if the
+    /// new volume is different from the previous volume.
+    /// Returns true if the response was sent. False if the response
+    /// wasn't sent due to volume being unchanged.
+    fn send_if_changed(&mut self, new_volume: u8) -> bool {
+        if !self.is_volume_changed(new_volume) {
+            return false;
+        }
+        let _ = self.responder.take().unwrap().send(new_volume);
+        true
+    }
+}
+
 pub(crate) struct VolumeRelay {
     /// A sender that when sent will cause the relay task to stop. None if the task is not running.
     _stop: Option<Sender<()>>,
@@ -132,7 +170,6 @@ impl VolumeRelay {
 
             select! {
                 _ = stop_signal => {
-                    trace!("AVRCP volume relay ending on stop signal");
                     break Ok(());
                 },
                 avrcp_request = avrcp_request_fut => {
@@ -150,7 +187,7 @@ impl VolumeRelay {
                                 let _ = responder.send(current_volume);
                                 continue;
                             }
-                            hanging_setvolumes.push(responder);
+                            hanging_setvolumes.push(SetVolumeRequest::new(current_volume, responder));
                             if setvolume_timeout.is_terminated() {
                                 setvolume_timeout.set(Timer::new(SETVOLUME_TIMEOUT.after_now()).fuse());
                             }
@@ -165,10 +202,11 @@ impl VolumeRelay {
                     }
                 },
                 _ = setvolume_timeout => {
-                    for responder in hanging_setvolumes.drain(..) {
-                        info!("Timed out - reporting result of SetVolume as {}", current_volume);
-                        let _  = responder.send(current_volume);
-                    }
+                    hanging_setvolumes.drain(..).for_each(|req| {
+                        let changed = req.send(current_volume);
+                        // TODO(b/250265882): convert the log back to trace once issue is resolved.
+                        info!("Timed out - reporting result of SetVolume as {current_volume}. Volume changed: {changed}");
+                    });
                 },
                 watch_response = sys_volume_watch_fut => {
                     let settings = match watch_response {
@@ -187,10 +225,7 @@ impl VolumeRelay {
 
                     trace!("System media volume level now at {:?} in AVRCP", current_volume);
                     if hanging_setvolumes.len() > 0 {
-                        for responder in hanging_setvolumes.drain(..) {
-                            trace!("Reporting result of SetVolume as {}", current_volume);
-                            let _  = responder.send(current_volume);
-                        }
+                        hanging_setvolumes.retain_mut(|req| !req.send_if_changed(current_volume));
                         // When the change is the result of a setvolume command, the onchanged
                         // hanging is _not_ updated.
                         last_onchanged = Some(current_volume);
@@ -395,7 +430,7 @@ mod tests {
         let (volume_client, watch_responder) =
             finish_relay_setup(&mut relay_fut, &mut exec, avrcp_requests, &mut settings_requests);
 
-        // The volume set here does not need to match below.
+        // Case 1. Volume set request is sent. The volume set here does not need to match below.
         let volume_set_fut = volume_client.set_volume(0);
         pin_mut!(volume_set_fut);
 
@@ -426,11 +461,10 @@ mod tests {
             Ok(NEW_AVRCP_VOLUME)
         );
 
-        let _watch_responder = expect_audio_watch(&mut exec, &mut settings_requests);
+        let watch_responder = expect_audio_watch(&mut exec, &mut settings_requests);
 
-        // We get another command, but this time, it didn't produce a new volume result (because it
+        // Case 2. We get another command, but this time, it didn't produce a new volume result (because it
         // didn't change the volume)
-
         let volume_set_fut = volume_client.set_volume(0);
         pin_mut!(volume_set_fut);
 
@@ -451,12 +485,52 @@ mod tests {
         exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
 
         // The maximum time we will wait for a new volume is 100 milliseconds.
+        exec.set_fake_time(105.millis().after_now());
+        let _ = exec.wake_expired_timers();
+
+        exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
+
+        // Because no change was sent from Media, the last value from media is sent.
+        assert_matches!(
+            exec.run_until_stalled(&mut volume_set_fut).expect("should be ready"),
+            Ok(NEW_AVRCP_VOLUME)
+        );
+
+        // Case 3. We get another command. This time, it produced a new volume result, but it's the same value
+        // as before. We won't get a response until timeout.
+        let volume_set_fut = volume_client.set_volume(110);
+        pin_mut!(volume_set_fut);
+
+        exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
+
+        exec.run_until_stalled(&mut volume_set_fut).expect_pending("should be pending");
+
+        let request_fut = settings_requests.select_next_some();
+        pin_mut!(request_fut);
+
+        match exec.run_until_stalled(&mut request_fut).expect("should be ready") {
+            Ok(settings::AudioRequest::Set { responder, .. }) => {
+                let _ = responder.send(Ok(())).unwrap();
+            }
+            x => panic!("Expected Ready audio set request and got: {:?}", x),
+        };
+
+        exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
+
+        // Volume is same as before (L432 was also the same value).
+        respond_to_audio_watch(watch_responder, NEW_MEDIA_VOLUME);
+
+        // Set volume request should still be pending.
+        exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
+        exec.run_until_stalled(&mut volume_set_fut).expect_pending("should be pending");
+
+        // Wait for maximum time.
         exec.set_fake_time(101.millis().after_now());
         let _ = exec.wake_expired_timers();
 
         exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
 
-        // Because no change was sent from Media, the last value from media is sent
+        // Because no change was sent from Media, the last value from media is sent.
         assert_matches!(
             exec.run_until_stalled(&mut volume_set_fut).expect("should be ready"),
             Ok(NEW_AVRCP_VOLUME)
