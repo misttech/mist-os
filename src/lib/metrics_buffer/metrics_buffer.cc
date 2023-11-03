@@ -128,7 +128,7 @@ void MetricsBuffer::LogEventCount(uint32_t metric_id, std::vector<uint32_t> dime
   std::lock_guard<std::mutex> lock(lock_);
   ZX_DEBUG_ASSERT(!!loop_ == !!cobalt_logger_);
   bool was_empty = pending_counts_.empty();
-  PendingCountsKey key(metric_id, std::move(dimension_values));
+  MetricKey key(metric_id, std::move(dimension_values));
   pending_counts_[key] += count;
   if (was_empty) {
     // We don't try to process locally, because if we're logging infrequently then the optimization
@@ -141,6 +141,32 @@ void MetricsBuffer::LogEventCount(uint32_t metric_id, std::vector<uint32_t> dime
 
 void MetricsBuffer::LogEvent(uint32_t metric_id, std::vector<uint32_t> dimension_values) {
   LogEventCount(metric_id, std::move(dimension_values), 1);
+}
+
+void MetricsBuffer::LogString(uint32_t metric_id, std::vector<uint32_t> dimension_values,
+                              std::string string_value) {
+  std::lock_guard<std::mutex> lock(lock_);
+  ZX_DEBUG_ASSERT(!!loop_ == !!cobalt_logger_);
+  bool was_empty = pending_strings_.empty();
+  MetricKey key(metric_id, std::move(dimension_values));
+  // By design, this emplace can fail if a matching string is already in the set.
+  pending_strings_[key].emplace(std::move(string_value));
+  if (was_empty) {
+    TryPostFlushCountsLocked();
+  }
+}
+
+void MetricsBuffer::LogHistogramValue(const HistogramInfo& histogram_info,
+                                      std::vector<uint32_t> dimension_values, int64_t value) {
+  std::lock_guard<std::mutex> lock(lock_);
+  ZX_DEBUG_ASSERT(!!loop_ == !!cobalt_logger_);
+  bool was_empty = pending_histograms_.empty();
+  MetricKey key(histogram_info.metric_id, std::move(dimension_values));
+  uint32_t bucket_index = histogram_info.bucket_config->BucketIndex(value);
+  pending_histograms_[key][bucket_index]++;
+  if (was_empty) {
+    TryPostFlushCountsLocked();
+  }
 }
 
 void MetricsBuffer::FlushPendingEventCounts() {
@@ -156,21 +182,66 @@ void MetricsBuffer::FlushPendingEventCounts() {
     return;
   }
   last_flushed_ = zx::clock::get_monotonic();
-  PendingCounts snapped_pending_event_counts;
-  snapped_pending_event_counts.swap(pending_counts_);
-  auto iter = snapped_pending_event_counts.begin();
+
   constexpr uint32_t kMaxBatchSize = 64;
   std::vector<fuchsia_metrics::MetricEvent> batch;
-  while (iter != snapped_pending_event_counts.end()) {
-    auto [key, count] = *iter;
-    iter++;
+
+  PendingCounts snapped_pending_event_counts;
+  snapped_pending_event_counts.swap(pending_counts_);
+  for (auto& [key, count] : snapped_pending_event_counts) {
     batch.emplace_back(key.metric_id(), key.dimension_values(),
                        fuchsia_metrics::MetricEventPayload::WithCount(count));
     ZX_DEBUG_ASSERT(batch.size() <= kMaxBatchSize);
-    if (batch.size() == kMaxBatchSize || iter == snapped_pending_event_counts.end()) {
+    if (batch.size() == kMaxBatchSize) {
       cobalt_logger_->LogMetricEvents(std::move(batch));
-      ZX_DEBUG_ASSERT(batch.empty());
+      batch.clear();
     }
+  }
+
+  PendingStrings snapped_pending_strings;
+  snapped_pending_strings.swap(pending_strings_);
+  for (auto& [key, strings] : snapped_pending_strings) {
+    for (auto& string : strings) {
+      batch.emplace_back(key.metric_id(), key.dimension_values(),
+                         fuchsia_metrics::MetricEventPayload::WithStringValue(string));
+      ZX_DEBUG_ASSERT(batch.size() <= kMaxBatchSize);
+      if (batch.size() == kMaxBatchSize) {
+        cobalt_logger_->LogMetricEvents(std::move(batch));
+        batch.clear();
+      }
+    }
+  }
+
+  PendingHistograms snapped_pending_histograms;
+  snapped_pending_histograms.swap(pending_histograms_);
+  for (auto& [histogram_key, pending_buckets] : snapped_pending_histograms) {
+    std::vector<fuchsia_metrics::HistogramBucket> buckets;
+    auto bucket_iter = pending_buckets.begin();
+    while (bucket_iter != pending_buckets.end()) {
+      auto [bucket_index, tally] = *bucket_iter;
+      bucket_iter++;
+      fuchsia_metrics::HistogramBucket bucket;
+      bucket.index() = bucket_index;
+      bucket.count() = tally;
+      buckets.emplace_back(std::move(bucket));
+      if (buckets.size() == fuchsia_metrics::kMaxHistogramBuckets ||
+          bucket_iter == pending_buckets.end()) {
+        batch.emplace_back(histogram_key.metric_id(), histogram_key.dimension_values(),
+                           fuchsia_metrics::MetricEventPayload::WithHistogram(std::move(buckets)));
+        buckets.clear();
+        ZX_DEBUG_ASSERT(batch.size() <= kMaxBatchSize);
+        if (batch.size() == kMaxBatchSize) {
+          cobalt_logger_->LogMetricEvents(std::move(batch));
+          batch.clear();
+        }
+      }
+    }
+  }
+
+  ZX_DEBUG_ASSERT(batch.size() < kMaxBatchSize);
+  if (!batch.empty()) {
+    cobalt_logger_->LogMetricEvents(std::move(batch));
+    batch.clear();
   }
 }
 
@@ -184,17 +255,16 @@ void MetricsBuffer::TryPostFlushCountsLocked() {
   }
 }
 
-MetricsBuffer::PendingCountsKey::PendingCountsKey(uint32_t metric_id,
-                                                  std::vector<uint32_t> dimension_values)
+MetricsBuffer::MetricKey::MetricKey(uint32_t metric_id, std::vector<uint32_t> dimension_values)
     : metric_id_(metric_id), dimension_values_(std::move(dimension_values)) {}
 
-uint32_t MetricsBuffer::PendingCountsKey::metric_id() const { return metric_id_; }
+uint32_t MetricsBuffer::MetricKey::metric_id() const { return metric_id_; }
 
-const std::vector<uint32_t>& MetricsBuffer::PendingCountsKey::dimension_values() const {
+const std::vector<uint32_t>& MetricsBuffer::MetricKey::dimension_values() const {
   return dimension_values_;
 }
 
-size_t MetricsBuffer::PendingCountsKeyHash::operator()(const PendingCountsKey& key) const noexcept {
+size_t MetricsBuffer::MetricKeyHash::operator()(const MetricKey& key) const noexcept {
   // Rely on size_t being unsigned so it'll wrap without being undefined behavior.
   size_t hash = hash_uint32_(key.metric_id());
   for (auto value : key.dimension_values()) {
@@ -203,8 +273,8 @@ size_t MetricsBuffer::PendingCountsKeyHash::operator()(const PendingCountsKey& k
   return hash;
 }
 
-bool MetricsBuffer::PendingCountsKeyEqual::operator()(const PendingCountsKey& lhs,
-                                                      const PendingCountsKey& rhs) const noexcept {
+bool MetricsBuffer::MetricKeyEqual::operator()(const MetricKey& lhs,
+                                               const MetricKey& rhs) const noexcept {
   if (lhs.metric_id() != rhs.metric_id()) {
     return false;
   }
@@ -224,6 +294,14 @@ MetricBuffer MetricsBuffer::CreateMetricBuffer(uint32_t metric_id) {
   return MetricBuffer(shared_from_this(), metric_id);
 }
 
+StringMetricBuffer MetricsBuffer::CreateStringMetricBuffer(uint32_t metric_id) {
+  return StringMetricBuffer(shared_from_this(), metric_id);
+}
+
+HistogramMetricBuffer MetricsBuffer::CreateHistogramMetricBuffer(HistogramInfo histogram_info) {
+  return HistogramMetricBuffer(shared_from_this(), std::move(histogram_info));
+}
+
 MetricBuffer::MetricBuffer(std::shared_ptr<MetricsBuffer> parent, uint32_t metric_id)
     : parent_(parent), metric_id_(metric_id) {}
 
@@ -233,6 +311,22 @@ void MetricBuffer::LogEvent(std::vector<uint32_t> dimension_values) {
 
 void MetricBuffer::LogEventCount(std::vector<uint32_t> dimension_values, uint32_t count) {
   parent_->LogEventCount(metric_id_, std::move(dimension_values), count);
+}
+
+StringMetricBuffer::StringMetricBuffer(std::shared_ptr<MetricsBuffer> parent, uint32_t metric_id)
+    : parent_(parent), metric_id_(metric_id) {}
+
+void StringMetricBuffer::LogString(std::vector<uint32_t> dimension_values,
+                                   std::string string_value) {
+  parent_->LogString(metric_id_, std::move(dimension_values), std::move(string_value));
+}
+
+HistogramMetricBuffer::HistogramMetricBuffer(std::shared_ptr<MetricsBuffer> parent,
+                                             HistogramInfo histogram_info)
+    : parent_(parent), histogram_info_(std::move(histogram_info)) {}
+
+void HistogramMetricBuffer::LogValue(std::vector<uint32_t> dimension_values, int64_t value) {
+  parent_->LogHistogramValue(histogram_info_, std::move(dimension_values), value);
 }
 
 }  // namespace cobalt

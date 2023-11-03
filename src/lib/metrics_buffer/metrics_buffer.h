@@ -11,9 +11,11 @@
 
 #include <memory>
 #include <unordered_map>
+#include <unordered_set>
 
 #include "fidl/fuchsia.io/cpp/markers.h"
 #include "src/lib/metrics_buffer/metrics_impl.h"
+#include "third_party/cobalt/src/lib/client/cpp/buckets_config.h"
 
 namespace cobalt {
 
@@ -36,6 +38,81 @@ class MetricBuffer {
   MetricBuffer(std::shared_ptr<MetricsBuffer> parent, uint32_t metric_id);
   std::shared_ptr<MetricsBuffer> parent_;
   uint32_t metric_id_ = 0;
+};
+
+// This class is a convenience interface which remembers a metric_id.
+class StringMetricBuffer {
+ public:
+  StringMetricBuffer(const StringMetricBuffer& to_copy) = delete;
+  StringMetricBuffer& operator=(const StringMetricBuffer& to_copy) = delete;
+  StringMetricBuffer(StringMetricBuffer&& to_move) = default;
+  StringMetricBuffer& operator=(StringMetricBuffer&& to_move) = default;
+  ~StringMetricBuffer() = default;
+
+  void LogString(std::vector<uint32_t> dimension_values, std::string string_value);
+
+ private:
+  friend class MetricsBuffer;
+  StringMetricBuffer(std::shared_ptr<MetricsBuffer> parent, uint32_t metric_id);
+  std::shared_ptr<MetricsBuffer> parent_;
+  uint32_t metric_id_ = 0;
+};
+
+struct HistogramInfo {
+  uint32_t metric_id = 0;
+  std::unique_ptr<cobalt::config::IntegerBucketConfig> bucket_config;
+};
+
+// If metrics.cb.h codegen provides a non-macro way in future, switch to that.
+#define COBALT_EXPONENTIAL_HISTOGRAM_INFO(base_name)                                   \
+  [] {                                                                                 \
+    ::cobalt::HistogramInfo result;                                                    \
+    result.metric_id = base_name##MetricId;                                            \
+    ::cobalt::IntegerBuckets bucket_proto;                                             \
+    ::cobalt::ExponentialIntegerBuckets* exp = bucket_proto.mutable_exponential();     \
+    exp->set_floor(base_name##IntBucketsFloor);                                        \
+    exp->set_num_buckets(base_name##IntBucketsNumBuckets);                             \
+    exp->set_initial_step(base_name##IntBucketsInitialStep);                           \
+    exp->set_step_multiplier(base_name##IntBucketsStepMultiplier);                     \
+    result.bucket_config =                                                             \
+        cobalt::config::IntegerBucketConfig::CreateFromProto(std::move(bucket_proto)); \
+    return result;                                                                     \
+  }()
+
+#define COBALT_LINEAR_HISTOGRAM_INFO(base_name)                                        \
+  [] {                                                                                 \
+    HistogramInfo result;                                                              \
+    result.metric_id = base_name##MetricId;                                            \
+    cobalt::IntegerBuckets bucket_proto;                                               \
+    cobalt::LinearIntegerBuckets* linear = bucket_proto.mutable_linear();              \
+    linear->set_floor(base_name##IntBucketsFloor);                                     \
+    linear->set_num_buckets(base_name##IntBucketsNumBuckets);                          \
+    linear->set_step_size(base_nameIntBucketsStepSize);                                \
+    result.bucket_config =                                                             \
+        cobalt::config::IntegerBucketConfig::CreateFromProto(std::move(bucket_proto)); \
+    return result;                                                                     \
+  }()
+
+// This class is a convenience interface which remembers metric_id + bucket_config, and calculates
+// which bucket for the caller.
+class HistogramMetricBuffer {
+ public:
+  HistogramMetricBuffer(const HistogramMetricBuffer& to_copy) = delete;
+  HistogramMetricBuffer& operator=(const HistogramMetricBuffer& to_copy) = delete;
+  HistogramMetricBuffer(HistogramMetricBuffer&& to_move) = default;
+  HistogramMetricBuffer& operator=(HistogramMetricBuffer&& to_move) = default;
+  ~HistogramMetricBuffer() = default;
+
+  // This computes which histogram bucket, and adds 1 to the tally of that bucket.
+  void LogValue(std::vector<uint32_t> dimension_values, int64_t value);
+
+ private:
+  friend class MetricsBuffer;
+  // For the second parameter, see COBALT_EXPONENTIAL_HISTOGRAM_INFO() and
+  // COBALT_LINEAR_HISTOGRAM_INFO() defined above.
+  HistogramMetricBuffer(std::shared_ptr<MetricsBuffer> parent, HistogramInfo histogram_info);
+  std::shared_ptr<MetricsBuffer> parent_;
+  HistogramInfo histogram_info_;
 };
 
 // The purpose of this class is to ensure the rate of messages to Cobalt stays reasonable, per
@@ -78,6 +155,15 @@ class MetricsBuffer final : public std::enable_shared_from_this<MetricsBuffer> {
 
   void LogEventCount(uint32_t metric_id, std::vector<uint32_t> dimension_values, uint32_t count);
 
+  // The string_value is not an arbitrary string; it must be one of the potential strings defined in
+  // the metric definition, or the string_value ends up getting ignored.
+  void LogString(uint32_t metric_id, std::vector<uint32_t> dimension_values,
+                 std::string string_value);
+
+  // This computes which histogram bucket, and adds 1 to the tally of that bucket.
+  void LogHistogramValue(const HistogramInfo& histogram_info,
+                         std::vector<uint32_t> dimension_values, int64_t value);
+
   // Use sparingly, only when it's appropriate to force the counts to flush to Cobalt, which will
   // typically only be before orderly exit or in situations like driver suspend.  Over-use of this
   // method will break the purpose of using this class, which is to ensure the rate of messages to
@@ -85,6 +171,8 @@ class MetricsBuffer final : public std::enable_shared_from_this<MetricsBuffer> {
   void ForceFlush() __TA_EXCLUDES(lock_);
 
   MetricBuffer CreateMetricBuffer(uint32_t metric_id);
+  StringMetricBuffer CreateStringMetricBuffer(uint32_t metric_id);
+  HistogramMetricBuffer CreateHistogramMetricBuffer(HistogramInfo histogram_info);
 
  private:
   explicit MetricsBuffer(uint32_t project_id) __TA_EXCLUDES(lock_);
@@ -92,25 +180,56 @@ class MetricsBuffer final : public std::enable_shared_from_this<MetricsBuffer> {
   MetricsBuffer(uint32_t project_id, std::shared_ptr<sys::ServiceDirectory> service_directory)
       __TA_EXCLUDES(lock_);
 
-  class PendingCountsKey {
+  class MetricKey {
    public:
-    PendingCountsKey(uint32_t metric_id, std::vector<uint32_t> dimension_values);
+    MetricKey(uint32_t metric_id, std::vector<uint32_t> dimension_values);
 
     uint32_t metric_id() const;
     const std::vector<uint32_t>& dimension_values() const;
 
    private:
-    uint32_t metric_id_;
+    uint32_t metric_id_ = 0;
     std::vector<uint32_t> dimension_values_;
   };
-  struct PendingCountsKeyHash {
-    size_t operator()(const PendingCountsKey& key) const noexcept;
+  struct MetricKeyHash {
+    size_t operator()(const MetricKey& key) const noexcept;
 
    private:
     std::hash<uint32_t> hash_uint32_;
   };
-  struct PendingCountsKeyEqual {
-    bool operator()(const PendingCountsKey& lhs, const PendingCountsKey& rhs) const noexcept;
+  struct MetricKeyEqual {
+    bool operator()(const MetricKey& lhs, const MetricKey& rhs) const noexcept;
+  };
+
+  // We don't keep a count per string; instead we collapse out any additional string instances per
+  // flush period, since each tally of a string would require an additional item in the batch. We
+  // want to avoid creating a large number of items in a batch or a large number of batches due to
+  // a noisy string. We also want to avoid using unbounded memory in the MetricsBuffer. We could
+  // achieve this with a cap on how many instances of the same string we're willing to buffer and
+  // batch, but for now we just cap at buffering 1 of a given string at any given time.
+  class PendingStringsItem {
+   public:
+    PendingStringsItem(uint32_t metric_id, std::vector<uint32_t> dimension_values,
+                       std::string string_value);
+
+    uint32_t metric_id() const;
+    const std::vector<uint32_t>& dimension_values() const;
+    const std::string& string_value() const;
+
+   private:
+    uint32_t metric_id_ = 0;
+    std::vector<uint32_t> dimension_values_;
+    std::string string_value_;
+  };
+  struct PendingStringsItemHash {
+    size_t operator()(const PendingStringsItem& item) const noexcept;
+
+   private:
+    std::hash<uint32_t> hash_uint32_;
+    std::hash<std::string> hash_string_;
+  };
+  struct PendingStringsItemEqual {
+    bool operator()(const PendingStringsItem& lhs, const PendingStringsItem& rhs) const noexcept;
   };
 
   void TryPostFlushCountsLocked() __TA_REQUIRES(lock_);
@@ -133,9 +252,26 @@ class MetricsBuffer final : public std::enable_shared_from_this<MetricsBuffer> {
   zx::time last_flushed_ __TA_GUARDED(lock_) = zx::time::infinite_past();
 
   // From component and event to event count.
-  using PendingCounts =
-      std::unordered_map<PendingCountsKey, int64_t, PendingCountsKeyHash, PendingCountsKeyEqual>;
+  using PendingCounts = std::unordered_map<MetricKey, int64_t, MetricKeyHash, MetricKeyEqual>;
   PendingCounts pending_counts_ __TA_GUARDED(lock_);
+
+  // We don't keep a count per string; instead we collapse out any additional string instances per
+  // flush period, since each tally of a string would require an additional item in the batch. We
+  // want to avoid creating a large number of items in a batch or a large number of batches due to
+  // a noisy string. We also want to avoid using unbounded memory in the MetricsBuffer. We could
+  // achieve this with a cap on how many instances of the same string we're willing to buffer and
+  // batch, but for now we just cap at buffering 1 of a given string at any given time.
+  using PendingStrings =
+      std::unordered_map<MetricKey, std::unordered_set<std::string>, MetricKeyHash, MetricKeyEqual>;
+  PendingStrings pending_strings_ __TA_GUARDED(lock_);
+
+  // key - bucket index
+  // value - how many tallies to add to bucket
+  using PendingBuckets = std::unordered_map<uint32_t, uint32_t>;
+  using PendingHistograms =
+      std::unordered_map<MetricKey, PendingBuckets, MetricKeyHash, MetricKeyEqual>;
+
+  PendingHistograms pending_histograms_ __TA_GUARDED(lock_);
 
   zx::duration min_logging_period_ = kDefaultMinLoggingPeriod;
 };

@@ -18,6 +18,7 @@ source_set("metrics_buffer") {
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/sys/cpp",
     "//src/lib/fidl/cpp/contrib/connection:service_hub_connector",
+    "//third_party/cobalt/src/lib/client/cpp:buckets_config",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/syslog",

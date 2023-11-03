@@ -33,8 +33,8 @@
 #include <fbl/vector.h>
 #include <region-alloc/region-alloc.h>
 
-#include "memory_allocator.h"
-#include "sysmem_metrics.h"
+#include "src/devices/sysmem/drivers/sysmem/memory_allocator.h"
+#include "src/devices/sysmem/drivers/sysmem/sysmem_metrics.h"
 
 namespace sys {
 class ServiceDirectory;
@@ -43,9 +43,9 @@ class ServiceDirectory;
 namespace sysmem_driver {
 
 // For now, sysmem-connector (not a driver) uses DriverConnector, both to get Allocator channels,
-// and to notice when/if sysmem crashes.  Iff DFv2 allows for sysmem-connector to potentially
-// connect via FidlDevice (see below) instead, we could potentially move this protocol to FidlDevice
-// or combine with fuchsia_hardware_sysmem::Sysmem.  But for now DriverConnector is still a separate
+// and to notice when/if sysmem crashes. Iff DFv2 allows for sysmem-connector to potentially connect
+// via FidlDevice (see below) instead, we could potentially move this protocol to FidlDevice or
+// combine with fuchsia_hardware_sysmem::Sysmem. But for now DriverConnector is still a separate
 // protocol for use by sysmem-connector, not for use by other drivers.
 
 class Device;
@@ -94,12 +94,12 @@ class Device final : public DdkDeviceType,
       fidl::ClientEnd<fuchsia_sysmem::SecureMem> secure_mem_connection);
   [[nodiscard]] zx_status_t CommonSysmemUnregisterSecureMem();
 
-  // SysmemProtocol "direct == true" Banjo implementation. This will be removed soon in favor of
-  // a FIDL implementation.  Currently these complain to the log on first use, and then delegate to
-  // the "Common" methods above.
+  // SysmemProtocol "direct == true" Banjo implementation. This will be removed soon in favor of a
+  // FIDL implementation. Currently these complain to the log on first use, and then delegate to the
+  // "Common" methods above.
   //
-  // This "direct == true" implementation is used when the banjo protocol is requested on
-  // "sysmem" instead of "sysmem-banjo".
+  // This "direct == true" implementation is used when the banjo protocol is requested on "sysmem"
+  // instead of "sysmem-banjo".
   //
   // Requesting banjo using "sysmem-banjo" is slightly preferred over "sysmem" (worth the CL), but
   // switching to sysmem FIDL is much better, since sysmem banjo is deprecated.
@@ -132,10 +132,9 @@ class Device final : public DdkDeviceType,
 
   [[nodiscard]] uint32_t pdev_device_info_pid();
 
-  // Track/untrack the token by the koid of the server end of its FIDL
-  // channel.  TrackToken() is only allowed after/during token->OnServerKoid().
-  // UntrackToken() is allowed even if there was never a token->OnServerKoid()
-  // (in which case it's a nop).
+  // Track/untrack the token by the koid of the server end of its FIDL channel. TrackToken() is only
+  // allowed after/during token->OnServerKoid(). UntrackToken() is allowed even if there was never a
+  // token->OnServerKoid() (in which case it's a nop).
   //
   // While tracked, a token can be found with FindTokenByServerChannelKoid().
   void TrackToken(BufferCollectionToken* token);
@@ -144,8 +143,7 @@ class Device final : public DdkDeviceType,
   // Finds and removes token_server_koid from unfound_token_koids_.
   [[nodiscard]] bool TryRemoveKoidFromUnfoundTokenList(zx_koid_t token_server_koid);
 
-  // Find the BufferCollectionToken (if any) by the koid of the server end of
-  // its FIDL channel.
+  // Find the BufferCollectionToken (if any) by the koid of the server end of its FIDL channel.
   [[nodiscard]] BufferCollectionToken* FindTokenByServerChannelKoid(zx_koid_t token_server_koid);
 
   struct FindLogicalBufferByVmoKoidResult {
@@ -154,15 +152,13 @@ class Device final : public DdkDeviceType,
   };
   [[nodiscard]] FindLogicalBufferByVmoKoidResult FindLogicalBufferByVmoKoid(zx_koid_t vmo_koid);
 
-  // Get allocator for |settings|. Returns NULL if allocator is not
-  // registered for settings.
+  // Get allocator for |settings|. Returns NULL if allocator is not registered for settings.
   [[nodiscard]] MemoryAllocator* GetAllocator(
       const fuchsia_sysmem2::BufferMemorySettings& settings);
 
   // Get heap properties of a specific memory heap allocator.
   //
-  // Clients should guarantee that the heap is valid and already registered
-  // to sysmem driver.
+  // Clients should guarantee that the heap is valid and already registered to sysmem driver.
   [[nodiscard]] const fuchsia_sysmem2::HeapProperties& GetHeapProperties(
       fuchsia_sysmem2::HeapType heap) const;
 

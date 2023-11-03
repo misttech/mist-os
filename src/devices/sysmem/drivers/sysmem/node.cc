@@ -90,9 +90,8 @@ void Node::SetErrorHandler(fit::function<void(zx_status_t)> error_handler) {
 
 void Node::Fail(zx_status_t epitaph) { CloseChannel(epitaph); }
 
-void Node::SetDebugClientInfoInternal(std::string name, uint64_t id) {
-  node_properties().client_debug_info().name = std::move(name);
-  node_properties().client_debug_info().id = id;
+void Node::SetDebugClientInfoInternal(ClientDebugInfo debug_info) {
+  node_properties().client_debug_info() = debug_info;
   debug_id_property_ =
       inspect_node_.CreateUint("debug_id", node_properties().client_debug_info().id);
   debug_name_property_ =

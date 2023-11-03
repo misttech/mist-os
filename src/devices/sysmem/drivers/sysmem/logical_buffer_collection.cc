@@ -574,7 +574,10 @@ void LogicalBufferCollection::BindSharedCollection(Device* parent_device,
 
   if (client_debug_info) {
     // The info will be propagated into the logcial buffer collection when the token closes.
-    token->SetDebugClientInfoInternal(client_debug_info->name, client_debug_info->id);
+    //
+    // Intentionally copying *client_debug_info not moving, since allocator may be used for more
+    // BindSharedCollection(s).
+    token->SetDebugClientInfoInternal(*client_debug_info);
   }
 
   // At this point, the token will process the rest of its previously queued
@@ -4287,6 +4290,9 @@ void LogicalBuffer::ComplainLoudlyAboutStillExistingWeakVmoHandles() {
                                       : "Unknown";
     auto* client_debug_info = weak_parent->get_client_debug_info();
     ZX_DEBUG_ASSERT(client_debug_info);
+
+    logical_buffer_collection_->parent_device_->metrics().LogCloseWeakAsapTakingTooLong();
+
     // The client may have created a child VMO based on the handed-out VMO and closed the handed-out
     // VMO, which still counts as failure to close the handed-out weak VMO in a timely manner; the
     // originally-handed-out koid may or may not be useful.
@@ -4519,6 +4525,14 @@ LogicalBuffer::LogicalBuffer(fbl::RefPtr<LogicalBufferCollection> logical_buffer
         // This timer, if it was set, is cancelled now; the -> instead of . here is significant;
         // we're intentinoally ending the TaskScope, not just this shared_ptr<> to it.
         complain_about_leaked_weak_timer_task_scope->reset();
+
+        if (close_weak_asap_time_.has_value()) {
+          zx::duration close_weak_asap_duration =
+              zx::clock::get_monotonic() - *close_weak_asap_time_;
+          logical_buffer_collection_->parent_device_->metrics().LogCloseWeakAsapDuration(
+              close_weak_asap_duration);
+        }
+
         // This won't find a node if do_delete is running in a sufficiently-early error path.
         auto buffer_node =
             logical_buffer_collection_->buffers_.extract(tracked_parent_vmo->buffer_index());
@@ -4577,6 +4591,9 @@ LogicalBuffer::LogicalBuffer(fbl::RefPtr<LogicalBufferCollection> logical_buffer
         // signal client_weak_asap client_end(s) to tell clients holding weak VMOs to close any weak
         // VMOs asap, now that there are zero strong VMOs
         close_weak_asap_.reset();
+        if (!weak_parent_vmos_.empty()) {
+          close_weak_asap_time_ = zx::clock::get_monotonic();
+        }
 
         // ~local_tracked_strong_parent_vmo will close its vmo_, which may trigger
         // tracked_parent_vmo's do_delete defined above (if zero weak outstanding already)

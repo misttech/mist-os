@@ -128,7 +128,7 @@ class Node : public fbl::RefCounted<Node> {
 
   Device* parent_device() const;
 
-  void SetDebugClientInfoInternal(std::string name, uint64_t id);
+  void SetDebugClientInfoInternal(ClientDebugInfo debug_info);
 
  protected:
   // Called during Bind() to perform the sub-class protocol-specific bind itself.
@@ -215,8 +215,12 @@ class Node : public fbl::RefCounted<Node> {
       FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "SetDebugClientInfo() after Close()");
       return;
     }
-    SetDebugClientInfoInternal(std::string(request.name().begin(), request.name().end()),
-                               request.id());
+
+    ClientDebugInfo debug_info;
+    debug_info.name = std::string(request.name().begin(), request.name().end());
+    debug_info.id = request.id();
+
+    SetDebugClientInfoInternal(std::move(debug_info));
   }
 
   template <class SetDebugClientInfoRequest, class SetDebugClientInfoCompleterSync>
@@ -234,9 +238,12 @@ class Node : public fbl::RefCounted<Node> {
       FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "SetDebugClientInfo() requires id set");
       return;
     }
-    SetDebugClientInfoInternal(
-        std::string(request.name().value().begin(), request.name().value().end()),
-        request.id().value());
+
+    ClientDebugInfo debug_info;
+    debug_info.name = std::string(request.name()->begin(), request.name()->end());
+    debug_info.id = *request.id();
+
+    SetDebugClientInfoInternal(std::move(debug_info));
   }
 
   template <class SetDebugTimeoutLogDeadlineRequestView,

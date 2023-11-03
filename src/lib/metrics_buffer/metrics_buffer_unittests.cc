@@ -27,6 +27,11 @@
 
 namespace {
 
+// project_id, metric_id, bucket_index, count
+using Histograms =
+    std::unordered_map<uint32_t,
+                       std::unordered_map<uint32_t, std::unordered_map<uint32_t, uint32_t>>>;
+
 class ServerAndClient {
  public:
   ServerAndClient() : loop_(&kAsyncLoopConfigNeverAttachToThread), dispatcher_(loop_.dispatcher()) {
@@ -100,6 +105,20 @@ class ServerAndClient {
     }
   }
 
+  void WaitUntilBucketUpdateCountAtLeast(uint32_t count) {
+    while (true) {
+      uint64_t actual_count;
+      {  // scope lock
+        std::lock_guard<std::mutex> lock(lock_);
+        actual_count = bucket_update_count_;
+      }
+      if (actual_count >= count) {
+        return;
+      }
+      zx::nanosleep(zx::deadline_after(zx::msec(1)));
+    }
+  }
+
   uint32_t logger_factory_message_count() {
     std::lock_guard<std::mutex> lock(lock_);
     return logger_factory_message_count_;
@@ -143,6 +162,34 @@ class ServerAndClient {
     return last_event_;
   }
 
+  struct LastString {
+    LastString() = default;
+    LastString(const LastString& to_copy) = default;
+    LastString& operator=(const LastString& to_copy) = default;
+    LastString(LastString& to_move) = default;
+    LastString& operator=(LastString&& to_move) = default;
+
+    uint32_t project_id = 0;
+    uint32_t metric_id = 0;
+    std::vector<uint32_t> event_codes;
+    std::string string_value;
+  };
+  const LastString GetLastString() {
+    std::lock_guard<std::mutex> lock(lock_);
+    return last_string_;
+  }
+
+  const Histograms GetHistograms() {
+    std::lock_guard<std::mutex> lock(lock_);
+    // copy
+    return histograms_;
+  }
+
+  std::vector<uint32_t> GetLastHistogramEventCodes() {
+    std::lock_guard<std::mutex> lock(lock_);
+    return last_histogram_event_codes_;
+  }
+
   void IncLoggerFactoryMessageCount() {
     std::lock_guard<std::mutex> lock(lock_);
     ++logger_factory_message_count_;
@@ -164,6 +211,28 @@ class ServerAndClient {
     max_count_per_aggregated_event_ = std::max(max_count_per_aggregated_event_, count);
     // This must go last, as the test is relying on >= release semantics here.
     event_count_ += count;
+  }
+
+  void RecordString(uint32_t project_id, uint32_t metric_id, std::vector<uint32_t> event_codes,
+                    std::string string_value) {
+    std::lock_guard<std::mutex> lock(lock_);
+    last_string_.project_id = project_id;
+    last_string_.metric_id = metric_id;
+    last_string_.event_codes = std::move(event_codes);
+    last_string_.string_value = std::move(string_value);
+    ++aggregated_events_count_;
+    event_count_ += 1;
+  }
+
+  void RecordHistogram(uint32_t project_id, uint32_t metric_id, std::vector<uint32_t> event_codes,
+                       std::vector<fuchsia_metrics::wire::HistogramBucket> buckets) {
+    std::lock_guard<std::mutex> lock(lock_);
+    for (auto& bucket : buckets) {
+      histograms_[project_id][metric_id][bucket.index] += bucket.count;
+      bucket_update_count_ += 1;
+    }
+    last_histogram_event_codes_ = std::move(event_codes);
+    event_count_ += 1;
   }
 
   std::shared_ptr<sys::ServiceDirectory> aux_service_directory() {
@@ -228,10 +297,26 @@ class ServerAndClient {
                          LogMetricEventsCompleter::Sync& completer) override {
       parent_->IncLoggerMessageCount();
       for (auto& event : request->events) {
-        parent_->RecordAggregatedEvent(
-            project_id_, event.metric_id,
-            std::vector<uint32_t>(event.event_codes.begin(), event.event_codes.end()),
-            event.payload.count());
+        if (event.payload.is_count()) {
+          parent_->RecordAggregatedEvent(
+              project_id_, event.metric_id,
+              std::vector<uint32_t>(event.event_codes.begin(), event.event_codes.end()),
+              event.payload.count());
+        } else if (event.payload.is_string_value()) {
+          parent_->RecordString(
+              project_id_, event.metric_id,
+              std::vector<uint32_t>(event.event_codes.begin(), event.event_codes.end()),
+              std::string(event.payload.string_value().data(),
+                          event.payload.string_value().size()));
+        } else if (event.payload.is_histogram()) {
+          parent_->RecordHistogram(
+              project_id_, event.metric_id,
+              std::vector<uint32_t>(event.event_codes.begin(), event.event_codes.end()),
+              std::vector<fuchsia_metrics::wire::HistogramBucket>(event.payload.histogram().begin(),
+                                                                  event.payload.histogram().end()));
+        } else {
+          ZX_PANIC("unexpected");
+        }
       }
       completer.ReplySuccess();
     }
@@ -251,6 +336,12 @@ class ServerAndClient {
   // the "count" of all delivered aggregated events is summed here
   uint64_t event_count_ = 0;
   LastEvent last_event_;
+
+  LastString last_string_;
+
+  Histograms histograms_;
+  std::vector<uint32_t> last_histogram_event_codes_;
+  uint64_t bucket_update_count_ = 0;
 
   // server end
   async::Loop loop_;
@@ -389,6 +480,52 @@ TEST_F(MetricsBufferTest, BatchingHappens) {
   printf("success: %u went around again: %u\n", success_count, failure_count);
   EXPECT_EQ(1u, success_count);
   EXPECT_LT(failure_count, 50u);
+}
+
+TEST_F(MetricsBufferTest, Strings) {
+  auto& s = state();
+
+  auto metrics_buffer = cobalt::MetricsBuffer::Create(42, s.aux_service_directory());
+  metrics_buffer->SetMinLoggingPeriod(zx::msec(10));
+  auto string_buffer = metrics_buffer->CreateStringMetricBuffer(12);
+
+  string_buffer.LogString({1u}, "the_string");
+  string_buffer.LogString({1u}, "other_string");
+
+  s.WaitUntilEventCountAtLeast(2);
+
+  auto e = s.GetLastString();
+  EXPECT_EQ(42u, e.project_id);
+  EXPECT_EQ(12u, e.metric_id);
+  EXPECT_TRUE(e.string_value == "the_string" || e.string_value == "other_string");
+}
+
+TEST_F(MetricsBufferTest, Histograms) {
+  auto& s = state();
+
+  auto metrics_buffer = cobalt::MetricsBuffer::Create(42, s.aux_service_directory());
+  metrics_buffer->SetMinLoggingPeriod(zx::msec(10));
+
+  const uint32_t kFooMetricId = 12;
+  const uint32_t kFooIntBucketsFloor = 1;
+  const uint32_t kFooIntBucketsNumBuckets = 12;
+  const uint32_t kFooIntBucketsInitialStep = 1;
+  const uint32_t kFooIntBucketsStepMultiplier = 2;
+  auto histogram_buffer =
+      metrics_buffer->CreateHistogramMetricBuffer(COBALT_EXPONENTIAL_HISTOGRAM_INFO(kFoo));
+
+  histogram_buffer.LogValue({13, 14}, 7);
+  histogram_buffer.LogValue({13, 14}, 15);
+
+  s.WaitUntilBucketUpdateCountAtLeast(2);
+
+  auto histograms = s.GetHistograms();
+  auto last_histogram_event_codes = s.GetLastHistogramEventCodes();
+
+  EXPECT_EQ(2u, histograms[42][12].size());
+  // buckets: underflow bucket, [1, 2), [2, 3), [3, 5), [5, 9), [9, 17)
+  EXPECT_EQ(1u, histograms[42][12][4]);
+  EXPECT_EQ(1u, histograms[42][12][5]);
 }
 
 }  // namespace

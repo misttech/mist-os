@@ -199,6 +199,13 @@ class LogicalBuffer {
   // ~strong_parent_vmo_.
   std::optional<CloseWeakAsap> close_weak_asap_;
   bool close_weak_asap_created_ = false;
+  // If there were any outstanding weak VMOs when *close_weak_asap_ was deleted, this is when
+  // close_weak_asap_ was deleted, signalling clients via ZX_EVENTPAIR_PEER_CLOSED. If there were
+  // no outstanding weak VMOs when close_weak_asap_ was deleted, we don't add tallies to
+  // weak_vmo_histograms because we want the histograms to only include logical buffer collections
+  // that had any weak VMOs that needed to be closed; this is to avoid a bunch of tallies for
+  // strong-only collections adding a bunch of tally counts in low duration histogram buckets.
+  std::optional<zx::time> close_weak_asap_time_;
 
   // Set to a failing status if LogicalBuffer::LogicalBuffer() failed.
   zx_status_t error_ = ZX_OK;
