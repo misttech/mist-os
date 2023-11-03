@@ -20,10 +20,21 @@ const BASE_URL = 'https://fuchsia-review.googlesource.com';
 const RFCS_DIR = 'docs/contribute/governance/rfcs';
 const SUBJECT_TAG = '[rfc]';
 
+// Run _fetchRfcs() on the main 'prod' tracker.
+function fetchRfcs() {
+  _fetchRfcs('bbfvcDiuyZ08S5ZJ7vN4ZI');
+}
+
+// Run _fetchRfcs() on a test copy of the tracker.
+function fetchRfcsTest() {
+  // Put your personal test Table's ID here:
+  _fetchRfcs('');
+}
+
 // Gets the list of open RFC CLs from gerrit and compares that to the set of
 // RFCs in the tracker. For any CLs missing from the tracker, creates stub rows
 // with just the change_id filled in.
-function fetchRfc(tableId) {
+function _fetchRfcs(tableId) {
   const gerritCls = _fetchOpenRfcsCls();
   const trackerCls = _getExistingRfcs(tableId);
 
@@ -64,7 +75,7 @@ function _fetchOpenRfcsCls() {
   return changeIds;
 }
 
-// Returns {[change_id]: {name: "row_name"}, ...}
+// Returns {[change_id]: {name: 'row_name'}, ...}
 function _getExistingRfcs(tableId) {
   // In order to limit total response sizes,
   // https://developers.google.com/apps-script/advanced/tables?hl=en#read_rows_of_a_table has clients
@@ -99,11 +110,11 @@ function _getExistingRfcs(tableId) {
 //
 // See https://gerrit-review.googlesource.com/Documentation/rest-api-changes.html for documentation.
 function _doGerritRequest(url) {
-  console.log("Gerrit RPC: ", url);
+  console.log('Gerrit RPC: ', url);
   const response = UrlFetchApp.fetch(url);
   const rawJson = response.getContentText().substring(5);
 
-  console.log("Gerrit Response: ", rawJson);
+  console.log('Gerrit Response: ', rawJson);
 
   return JSON.parse(rawJson);
 }
@@ -115,7 +126,7 @@ function syncRow(tableId, rowId) {
   const rowName = `tables/${tableId}/rows/${rowId}`;
   const row = Area120Tables.Tables.Rows.get(rowName);
 
-  console.log("Row before: ", row);
+  console.log('Row before: ', row);
 
   const changeId = row.values[CHANGE_ID_COL];
 
@@ -123,7 +134,7 @@ function syncRow(tableId, rowId) {
     BASE_URL + `/changes/${changeId}?o=DETAILED_ACCOUNTS` //  include _account_id, email and username fields when referencing accounts.
   );
 
-  // Remove subject prefix tags (e.g. "[rfc][docs]")
+  // Remove subject prefix tags (e.g. '[rfc][docs]')
   const title = cl.subject.replace(/^(\S+]\s)/i, '');
 
   const patchedValues = {
@@ -135,10 +146,10 @@ function syncRow(tableId, rowId) {
   };
 
   if (cl.work_in_progress) {
-    patchedValues[STATUS_COL] = WIP_STATUS
+    patchedValues[STATUS_COL] = WIP_STATUS;
   } else {
     if (!row.values[STATUS_COL] || row.values[STATUS_COL] === WIP_STATUS) {
-      patchedValues[STATUS_COL] = DEFAULT_STATUS
+      patchedValues[STATUS_COL] = DEFAULT_STATUS;
     }
   }
 
