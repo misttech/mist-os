@@ -102,8 +102,8 @@ void RunVerbBacktrace(const Command& cmd, fxl::RefPtr<CommandContext> cmd_contex
 }  // namespace
 
 VerbRecord GetBacktraceVerbRecord() {
-  VerbRecord backtrace(&RunVerbBacktrace, {"backtrace", "bt"}, kBacktraceShortHelp, kBacktraceHelp,
-                       CommandGroup::kQuery);
+  VerbRecord backtrace(&RunVerbBacktrace, {"backtrace", "where", "bt"}, kBacktraceShortHelp,
+                       kBacktraceHelp, CommandGroup::kQuery);
   SwitchRecord force_types(kForceAllTypes, false, "types", 't');
   SwitchRecord raw(kRawOutput, false, "raw", 'r');
   SwitchRecord verbose(kVerboseBacktrace, false, "verbose", 'v');
