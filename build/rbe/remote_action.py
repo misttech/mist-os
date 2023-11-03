@@ -2397,11 +2397,14 @@ def auto_relaunch_with_reproxy(
 
     python = cl_utils.relpath(Path(sys.executable), start=Path(os.curdir))
     relaunch_args = ["--", str(python), "-S", str(script)] + argv
-    reproxy_wrap = cl_utils.qualify_tool_path(fuchsia.REPROXY_WRAP)
+    # Wrap verbosely when auto-re-launching with reproxy wrapper, because
+    # this is typically used for one-off commands during debug.
+    # Normal builds should already be wrapped, and should not require auto-re-launching.
+    reproxy_wrap = [cl_utils.qualify_tool_path(fuchsia.REPROXY_WRAP), "-v"]
     if args.verbose:
-        cmd_str = cl_utils.command_quoted_str([reproxy_wrap] + relaunch_args)
+        cmd_str = cl_utils.command_quoted_str(reproxy_wrap + relaunch_args)
         msg(f"Automatically re-launching: {cmd_str}")
-    cl_utils.exec_relaunch([reproxy_wrap] + relaunch_args)
+    cl_utils.exec_relaunch(reproxy_wrap + relaunch_args)
     assert False, "exec_relaunch() should never return"
 
 

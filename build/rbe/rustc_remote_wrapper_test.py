@@ -978,7 +978,7 @@ class MainTests(unittest.TestCase):
         self.assertEqual(relaunch_cmd[0], str(fuchsia.REPROXY_WRAP))
         cmd_slices = cl_utils.split_into_subsequences(relaunch_cmd[1:], "--")
         reproxy_args, self_script, wrapped_command = cmd_slices
-        self.assertEqual(reproxy_args, [])
+        self.assertEqual(reproxy_args, ["-v"])
         self.assertIn("python", self_script[0])
         self.assertTrue(self_script[-1].endswith("rustc_remote_wrapper.py"))
         self.assertEqual(wrapped_command, argv[1:])
