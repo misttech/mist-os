@@ -71,25 +71,6 @@ rustc_library("fuchsia-pkg") {
 }
 
 if (is_fuchsia) {
-  fuchsia_package("package_for_archive") {
-    testonly = true
-    deps = [
-      ":dup1",
-      ":dup2",
-    ]
-    subpackages = [ ":subpackage_for_archive" ]
-  }
-
-  fuchsia_package("subpackage_for_archive") {
-    testonly = true
-    deps = [ ":dup3" ]
-  }
-
-  fuchsia_package_archive("test_package_archive") {
-    testonly = true
-    package = ":package_for_archive"
-  }
-
   resource("dup1") {
     testonly = true
     sources = [ "duplicate-blob.txt" ]
@@ -133,31 +114,11 @@ if (is_fuchsia) {
 }
 
 if (is_host) {
-  # manually get path to output, dep'ing on the archive through the host toolchain causes a cycle
-  _archive_out_dir = get_label_info(":test_package_archive($default_toolchain)",
-                                    "target_out_dir")
-  _test_package_archive_path = "$_archive_out_dir/package_for_archive.far"
-  config("archived_package_path_config") {
-    rustenv = [ "TEST_PACKAGE_ARCHIVE=" +
-                rebase_path(_test_package_archive_path, "src") ]
-  }
-
   rustc_test("lib_test") {
     edition = "2021"
     output_name = "fuchsia_pkg_lib_test"
-    deps =
-        lib_deps + test_deps + [ ":test_package_archive($default_toolchain)" ]
-    inputs = [ _test_package_archive_path ]
+    deps = lib_deps + test_deps
     sources = lib_sources
-    configs += [
-      ":archived_package_path_config",
-
-      # The archive file is referenced from the source dir *to* the
-      # output dir, which means the output dir leaks into the command.
-      # This command will only succeed with a matching output dir,
-      # so we must disable working-dir canonicalization.
-      "//build/config/rust:output_dir_sensitive",
-    ]
   }
 }
 
