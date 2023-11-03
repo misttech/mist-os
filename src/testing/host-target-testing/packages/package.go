@@ -10,11 +10,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand"
 	"os"
 	"path/filepath"
 
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/build"
 	far "go.fuchsia.dev/fuchsia/src/sys/pkg/lib/far/go"
+	"go.fuchsia.dev/fuchsia/tools/lib/logger"
+)
+
+const (
+	BlobBlockSize = 4096
 )
 
 type FileData []byte
@@ -245,4 +251,151 @@ func (p *Package) TransitiveBlobSize(ctx context.Context) (uint64, error) {
 	}
 
 	return p.repo.sumBlobSizes(ctx, blobs)
+}
+
+// AddRandomFiles will add random files to this package that increases the
+// package size up to `maxSize` bytes. Each file will be less than 10MiB.
+func (p *Package) AddRandomFiles(
+	ctx context.Context,
+	rand *rand.Rand,
+	dstPath string,
+	maxSize uint64,
+) (Package, error) {
+	initialSize, err := p.TransitiveBlobSize(ctx)
+	if err != nil {
+		return Package{}, err
+	}
+
+	return p.addRandomFiles(ctx, rand, dstPath, initialSize, maxSize)
+}
+
+func (p *Package) addRandomFiles(
+	ctx context.Context,
+	rand *rand.Rand,
+	dstPath string,
+	initialSize uint64,
+	maxSize uint64,
+) (Package, error) {
+	logger.Infof(
+		ctx,
+		"Trying to grow package %s with size %d to up to %d bytes",
+		p.path,
+		initialSize,
+		maxSize,
+	)
+
+	if maxSize < initialSize {
+		return Package{}, fmt.Errorf(
+			"initial package %s with size %d is greater than the max size %d",
+			p.path,
+			initialSize,
+			maxSize,
+		)
+	}
+
+	bytesToAdd := maxSize - initialSize
+	for bytesToAdd > 0 {
+		dstPackage, err := p.repo.EditPackage(ctx, *p, dstPath, func(tempDir string) error {
+			return generateRandomFiles(ctx, rand, tempDir, bytesToAdd)
+		})
+		if err != nil {
+			return Package{}, fmt.Errorf(
+				"failed to create the package %s: %w",
+				dstPath,
+				err,
+			)
+		}
+
+		size, err := p.TransitiveBlobSize(ctx)
+		if err != nil {
+			return Package{}, err
+		}
+
+		if maxSize < size {
+			logger.Warningf(
+				ctx,
+				"package %s with size %d is bigger than %d, trying again",
+				dstPackage.Path(),
+				size,
+				maxSize,
+			)
+
+			// Shrink the package size by the amount we overshot by.
+			bytesToAdd -= size - maxSize
+		} else {
+			logger.Infof(
+				ctx,
+				"Accepting package %s with size %d is smaller than %d",
+				dstPackage.Path(),
+				size,
+				maxSize,
+			)
+			return dstPackage, nil
+		}
+	}
+
+	return Package{}, fmt.Errorf(
+		"failed to generate package %s with size less than %d",
+		dstPath,
+		maxSize,
+	)
+}
+
+// GenerateRandomFiles will create a number of files that sum up to
+// `bytesToAdd` random bytes, each which will be less than 10MiB.
+func generateRandomFiles(
+	ctx context.Context,
+	rand *rand.Rand,
+	tempDir string,
+	bytesToAdd uint64,
+) error {
+	otaTestDir := filepath.Join(tempDir, "ota-test")
+	if err := os.Mkdir(otaTestDir, 0700); err != nil {
+		return fmt.Errorf("failed to create %s: %w", otaTestDir, err)
+	}
+
+	index := 0
+	bytes := [BlobBlockSize]byte{}
+
+	const maxBlobSize = BlobBlockSize * 1000
+
+	for bytesToAdd > 0 {
+		// Create blobs up to 4MiB.
+		var blobSize uint64
+		if maxBlobSize < bytesToAdd {
+			blobSize = maxBlobSize
+		} else {
+			blobSize = bytesToAdd
+		}
+		bytesToAdd -= blobSize
+
+		blobPath := filepath.Join(otaTestDir, fmt.Sprintf("ota-test-file-%06d", index))
+		f, err := os.Create(blobPath)
+		if err != nil {
+			return fmt.Errorf("failed to create %s: %w", blobPath, err)
+		}
+		defer f.Close()
+
+		for blobSize > 0 {
+			var n uint64
+			if blobSize < BlobBlockSize {
+				n = blobSize
+			} else {
+				n = BlobBlockSize
+			}
+			blobSize -= n
+
+			if _, err := rand.Read(bytes[:n]); err != nil {
+				return fmt.Errorf("failed to read %d random bytes: %w", n, err)
+			}
+
+			if _, err := f.Write(bytes[:n]); err != nil {
+				return fmt.Errorf("failed to write random bytes to %s: %w", blobPath, err)
+			}
+		}
+
+		index += 1
+	}
+
+	return nil
 }

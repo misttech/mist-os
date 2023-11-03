@@ -137,7 +137,6 @@ func (u *UpdatePackage) EditContents(
 // then build and publish it to the repository as the `dstUpdatePackage` name.
 func (u *UpdatePackage) EditPackage(
 	ctx context.Context,
-	dstUpdatePath string,
 	editFunc func(pkg Package) (Package, error),
 ) (*UpdatePackage, error) {
 	p, err := editFunc(u.p)
@@ -282,7 +281,10 @@ func (u *UpdatePackage) EditUpdatePackageWithNewSystemImage(
 				dstUpdatePackagePath,
 				useNewUpdateFormat,
 				tempDir,
-				func(zbiPath string, vbmetaPath string) error {
+				func(tempDir string, zbiName string, vbmetaName string) error {
+					zbiPath := filepath.Join(tempDir, zbiName)
+					vbmetaPath := filepath.Join(tempDir, vbmetaName)
+
 					if err := zbiTool.UpdateZBIWithNewSystemImageMerkle(
 						ctx,
 						systemImage.Merkle(),
@@ -344,7 +346,8 @@ func (u *UpdatePackage) EditUpdatePackageWithVBMetaProperties(
 				dstUpdatePackagePath,
 				useNewUpdateFormat,
 				tempDir,
-				func(zbiPath string, vbmetaPath string) error {
+				func(tempDir string, zbiName string, vbmetaName string) error {
+					vbmetaPath := filepath.Join(tempDir, vbmetaName)
 					logger.Infof(ctx, "updating vbmeta %q", vbmetaPath)
 
 					if err := util.AtomicallyWriteFile(vbmetaPath, 0600, func(f *os.File) error {
@@ -375,7 +378,7 @@ func (u *UpdatePackage) editZbiAndVbmeta(
 	dstUpdatePackagePath string,
 	useNewUpdateFormat bool,
 	tempDir string,
-	editFunc func(zbiPath string, vbmetaPath string) error,
+	editFunc func(tempDir string, zbiName string, vbmetaName string) error,
 ) error {
 	if u.hasImagesManifest {
 		updateImages, err := u.OpenUpdateImages(ctx)
@@ -393,8 +396,8 @@ func (u *UpdatePackage) editZbiAndVbmeta(
 			return err
 		}
 	} else {
-		zbiPath := filepath.Join(tempDir, "zbi")
-		vbmetaPath := filepath.Join(tempDir, "fuchsia.vbmeta")
+		zbiName := "zbi"
+		vbmetaName := "fuchsia.vbmeta"
 
 		if useNewUpdateFormat {
 			imagesPath := filepath.Join(tempDir, "images.json.orig")
@@ -424,15 +427,15 @@ func (u *UpdatePackage) editZbiAndVbmeta(
 				return err
 			}
 
-			if err := os.Remove(zbiPath); err != nil {
+			if err := os.Remove(filepath.Join(tempDir, zbiName)); err != nil {
 				return err
 			}
 
-			if err := os.Remove(vbmetaPath); err != nil {
+			if err := os.Remove(filepath.Join(tempDir, vbmetaName)); err != nil {
 				return err
 			}
 		} else {
-			if err := editFunc(zbiPath, vbmetaPath); err != nil {
+			if err := editFunc(tempDir, zbiName, vbmetaName); err != nil {
 				return err
 			}
 		}
@@ -446,13 +449,13 @@ func (u *UpdatePackage) replaceUpdateImages(
 	dstUpdatePackagePath string,
 	tempDir string,
 	srcUpdateImages *UpdateImages,
-	editFunc func(zbiPath string, vbmetaPath string) error,
+	editFunc func(tempDir string, zbiName string, vbmetaName string) error,
 ) error {
 	dstUpdatePackageParts := strings.Split(dstUpdatePackagePath, "/")
 	dstUpdatePackageName := dstUpdatePackageParts[0]
 	dstZbiPackagePath := fmt.Sprintf("%s_update_images_zbi", dstUpdatePackageName)
 
-	dstUpdateImages, err := srcUpdateImages.EditZbiAndVbmeta(
+	dstUpdateImages, err := srcUpdateImages.EditZbiAndVbmetaContents(
 		ctx,
 		dstZbiPackagePath,
 		editFunc,
@@ -467,4 +470,11 @@ func (u *UpdatePackage) replaceUpdateImages(
 	}
 
 	return nil
+}
+
+// UpdatePackageSize returns the transitive space needed to install the update
+// package and all subpackage blobs. It does not include update image blobs, or
+// system image blobs.
+func (u *UpdatePackage) UpdatePackageSize(ctx context.Context) (uint64, error) {
+	return u.p.TransitiveBlobSize(ctx)
 }

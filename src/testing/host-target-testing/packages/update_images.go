@@ -7,9 +7,10 @@ package packages
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"net/url"
-	"path/filepath"
 
+	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/build"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/util"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 )
@@ -152,25 +153,95 @@ func (u *UpdateImages) vbmetaPath() string {
 	return u.vbmetaUrl.Fragment
 }
 
-func (u *UpdateImages) EditZbiAndVbmeta(
+// Create a new zbi+vbmeta package
+func (u *UpdateImages) EditZbiAndVbmetaPackage(
 	ctx context.Context,
-	dstPath string,
-	editFunc func(zbiPath string, vbmetaPath string) error,
+	editFunc func(p Package, zbiName string, vbmetaName string) (Package, error),
 ) (*UpdateImages, error) {
-	// Create a new zbi+vbmeta package
-	dstZbi, err := u.zbiPackage.EditContents(ctx, dstPath, func(tempDir string) error {
-		zbiPath := filepath.Join(tempDir, u.zbiUrl.Fragment)
-		vbmetaPath := filepath.Join(tempDir, u.vbmetaUrl.Fragment)
-
-		if err := editFunc(zbiPath, vbmetaPath); err != nil {
-			return err
-		}
-
-		return nil
-	})
+	dstZbi, err := editFunc(u.zbiPackage, u.zbiUrl.Fragment, u.vbmetaUrl.Fragment)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create zbi package %s: %w", dstPath, err)
+		return nil, err
 	}
 
 	return u.replaceZbiPackage(ctx, dstZbi)
+
+}
+
+func (u *UpdateImages) EditZbiAndVbmetaContents(
+	ctx context.Context,
+	dstPath string,
+	editFunc func(tempDir string, zbiName string, vbmetaName string) error,
+) (*UpdateImages, error) {
+	return u.EditZbiAndVbmetaPackage(
+		ctx,
+		func(p Package, zbiName string, vbmetaName string) (Package, error) {
+			return p.EditContents(ctx, dstPath, func(tempDir string) error {
+				return editFunc(tempDir, zbiName, vbmetaName)
+			})
+		},
+	)
+}
+
+func (u *UpdateImages) UpdateImagesSize(ctx context.Context) (uint64, error) {
+	visitedPackages := make(map[build.MerkleRoot]struct{})
+	blobs := make(map[build.MerkleRoot]struct{})
+
+	for _, partition := range u.images.Contents.Partitions {
+		url, merkle, err := util.ParsePackageUrl(partition.Url)
+		if err != nil {
+			return 0, err
+		}
+
+		pkg, err := newPackage(ctx, u.repo, url.Path[1:], merkle)
+		if err != nil {
+			return 0, err
+		}
+
+		if err := pkg.transitiveBlobs(ctx, visitedPackages, blobs); err != nil {
+			return 0, err
+		}
+	}
+
+	for _, firmware := range u.images.Contents.Firmware {
+		url, merkle, err := util.ParsePackageUrl(firmware.Url)
+		if err != nil {
+			return 0, err
+		}
+
+		pkg, err := newPackage(ctx, u.repo, url.Path[1:], merkle)
+		if err != nil {
+			return 0, err
+		}
+
+		if err := pkg.transitiveBlobs(ctx, visitedPackages, blobs); err != nil {
+			return 0, err
+		}
+	}
+
+	return u.repo.sumBlobSizes(ctx, blobs)
+}
+
+func (u *UpdateImages) AddRandomFiles(
+	ctx context.Context,
+	rand *rand.Rand,
+	dstUpdateImagesPath string,
+	maxSize uint64,
+) (*UpdateImages, error) {
+	initialSize, err := u.UpdateImagesSize(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return u.EditZbiAndVbmetaPackage(
+		ctx,
+		func(p Package, zbiName string, vbmetaName string) (Package, error) {
+			return p.addRandomFiles(
+				ctx,
+				rand,
+				dstUpdateImagesPath,
+				initialSize,
+				maxSize,
+			)
+		},
+	)
 }

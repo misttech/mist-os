@@ -6,6 +6,7 @@ package packages
 
 import (
 	"context"
+	"math/rand"
 
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/build"
 )
@@ -28,7 +29,16 @@ func (u *SystemImagePackage) EditContents(
 	dstSystemImagePath string,
 	editFunc func(tempDir string) error,
 ) (*SystemImagePackage, error) {
-	p, err := u.p.EditContents(ctx, dstSystemImagePath, editFunc)
+	return u.EditPackage(ctx, func(p Package) (Package, error) {
+		return p.EditContents(ctx, dstSystemImagePath, editFunc)
+	})
+}
+
+func (u *SystemImagePackage) EditPackage(
+	ctx context.Context,
+	editFunc func(p Package) (Package, error),
+) (*SystemImagePackage, error) {
+	p, err := editFunc(u.p)
 	if err != nil {
 		return nil, err
 	}
@@ -61,4 +71,20 @@ func (u *SystemImagePackage) SystemImageSize(ctx context.Context) (uint64, error
 	}
 
 	return u.p.repo.sumBlobSizes(ctx, blobs)
+}
+
+func (u *SystemImagePackage) AddRandomFiles(
+	ctx context.Context,
+	rand *rand.Rand,
+	dstSystemImagePath string,
+	maxSize uint64,
+) (*SystemImagePackage, error) {
+	initialSize, err := u.SystemImageSize(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return u.EditPackage(ctx, func(p Package) (Package, error) {
+		return u.p.addRandomFiles(ctx, rand, dstSystemImagePath, initialSize, maxSize)
+	})
 }

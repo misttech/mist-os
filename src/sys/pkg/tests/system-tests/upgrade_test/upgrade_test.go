@@ -14,6 +14,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -29,10 +30,6 @@ import (
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/util"
 	"go.fuchsia.dev/fuchsia/tools/lib/color"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
-)
-
-const (
-	blobBlockSize = 4096
 )
 
 var c *config
@@ -438,7 +435,6 @@ func systemOTA(
 		rpcClient,
 		repo,
 		updatePackage,
-		"ota-test-system_image/0",
 		"ota-test-update/0",
 		checkABR,
 		checkForUnknownFirmware,
@@ -532,7 +528,6 @@ func systemPrimeOTA(
 		rpcClient,
 		repo,
 		dstUpdate,
-		"ota-test-system_image_prime2/0",
 		"ota-test-update_prime2/0",
 		checkABR,
 		true,
@@ -546,7 +541,6 @@ func otaToPackage(
 	rpcClient **sl4f.Client,
 	repo *packages.Repository,
 	srcUpdate *packages.UpdatePackage,
-	dstSystemImagePath string,
 	dstUpdatePath string,
 	checkABR bool,
 	checkForUnknownFirmware bool,
@@ -556,7 +550,6 @@ func otaToPackage(
 		rand,
 		repo,
 		srcUpdate,
-		dstSystemImagePath,
 		dstUpdatePath,
 	)
 	if err != nil {
@@ -643,227 +636,119 @@ func AddRandomFilesToUpdate(
 	rand *rand.Rand,
 	repo *packages.Repository,
 	srcUpdate *packages.UpdatePackage,
-	dstSystemImagePath string,
 	dstUpdatePath string,
 ) (*packages.UpdatePackage, *packages.SystemImagePackage, error) {
-	srcSystemImage, err := srcUpdate.OpenSystemImagePackage(ctx)
-	if err != nil {
-		return nil, nil, fmt.Errorf("error extracting expected system image merkle: %w", err)
-	}
-
-	systemImageSize, err := srcSystemImage.SystemImageSize(ctx)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to compute size of the system image: %w", err)
-	}
-	logger.Infof(ctx, "System image size of %s: %d", srcUpdate.Path(), systemImageSize)
-
-	if c.maxSystemImageSize == 0 {
-		// We just want to add a random file or so to the update package so
-		// it's unique.
-		dstUpdate, dstSystemImage, _, err := GenerateUpdatePackageWithRandomFiles(
-			ctx,
-			rand,
-			repo,
-			srcSystemImage,
-			srcUpdate,
-			dstSystemImagePath,
-			dstUpdatePath,
-			blobBlockSize,
-		)
-
-		return dstUpdate, dstSystemImage, err
-	} else {
-		// Otherwise, we want to fill out the update package until it's
-		// approximately full.
-
-		if c.maxSystemImageSize < systemImageSize {
-			return nil, nil, fmt.Errorf(
-				"max system image size %d is smaller than the size of the system image %d",
-				c.maxSystemImageSize,
-				systemImageSize,
-			)
-		}
-
-		// We'll keep generating update packages with random files until we get
-		// one that's approximately the same size as the max system image size.
-		bytesToAdd := c.maxSystemImageSize - systemImageSize
-		for bytesToAdd > 0 {
-			dstUpdate, dstSystemImage, systemImageSize, err := GenerateUpdatePackageWithRandomFiles(
-				ctx,
-				rand,
-				repo,
-				srcSystemImage,
-				srcUpdate,
-				dstSystemImagePath,
-				dstUpdatePath,
-				bytesToAdd,
-			)
-			if err != nil {
-				return nil, nil, fmt.Errorf(
-					"failed to generate update package %s of size %d: %w",
-					dstUpdatePath,
-					bytesToAdd,
-					err,
-				)
-			}
-
-			if c.maxSystemImageSize < systemImageSize {
-				logger.Warningf(
-					ctx,
-					"System image size %d is bigger than %d, trying again",
-					systemImageSize,
-					c.maxSystemImageSize,
-				)
-
-				// Shrink the system image size by the amount we overshot by.
-				bytesToAdd -= systemImageSize - c.maxSystemImageSize
-			} else {
-				logger.Infof(
-					ctx,
-					"Accepting update package %s, system image size %d is smaller than %d",
-					dstUpdate.Path(),
-					systemImageSize,
-					c.maxSystemImageSize,
-				)
-				return dstUpdate, dstSystemImage, nil
-			}
-		}
-
-		return nil, nil, fmt.Errorf(
-			"failed to generate update package less than %d",
-			c.maxSystemImageSize,
-		)
-	}
-}
-
-// GenerateRandomFiles will create a number of files that sum up to
-// `bytesToAdd` random bytes, each which will be less than 10MiB.
-func GenerateUpdatePackageWithRandomFiles(
-	ctx context.Context,
-	rand *rand.Rand,
-	repo *packages.Repository,
-	srcSystemImage *packages.SystemImagePackage,
-	srcUpdate *packages.UpdatePackage,
-	dstSystemImagePath string,
-	dstUpdatePath string,
-	bytesToAdd uint64,
-) (*packages.UpdatePackage, *packages.SystemImagePackage, uint64, error) {
-	logger.Infof(
-		ctx,
-		"Trying to insert random files up to %d bytes into the system image %s as %s",
-		bytesToAdd,
-		srcSystemImage.Path(),
-		dstSystemImagePath,
-	)
-
 	avbTool, err := c.installerConfig.AVBTool()
 	if err != nil {
-		return nil, nil, 0, fmt.Errorf("failed to intialize AVBTool: %w", err)
+		return nil, nil, fmt.Errorf("failed to intialize AVBTool: %w", err)
 	}
 
 	zbiTool, err := c.installerConfig.ZBITool()
 	if err != nil {
-		return nil, nil, 0, fmt.Errorf("failed to initialize ZBITool: %w", err)
+		return nil, nil, fmt.Errorf("failed to initialize ZBITool: %w", err)
 	}
 
-	dstSystemImage, err := srcSystemImage.EditContents(
-		ctx,
-		dstSystemImagePath,
-		func(tempDir string) error {
-			return GenerateRandomFiles(ctx, rand, tempDir, bytesToAdd)
-		},
-	)
+	srcSystemImage, err := srcUpdate.OpenSystemImagePackage(ctx)
 	if err != nil {
-		return nil, nil, 0, err
+		return nil, nil, err
 	}
 
-	dstUpdate, err := srcUpdate.EditUpdatePackageWithNewSystemImage(
+	systemImageSize, err := srcSystemImage.SystemImageSize(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error determining system image size: %w", err)
+	}
+
+	// If we didn't specify a max system image size, use the max size with an
+	// extra block to make it unique. Otherwise, make sure the current system
+	// size is less than the max size.
+	maxSystemImageSize := c.maxSystemImageSize
+	if maxSystemImageSize == 0 {
+		maxSystemImageSize = systemImageSize + packages.BlobBlockSize
+	} else if maxSystemImageSize < systemImageSize {
+		return nil, nil, fmt.Errorf(
+			"max system image size %d is smaller than the size of the system image %d",
+			c.maxSystemImageSize,
+			systemImageSize,
+		)
+	}
+
+	dstUpdateParts := strings.Split(dstUpdatePath, "/")
+	dstUpdateName := dstUpdateParts[0]
+
+	// Add random files to the system image package in the update.
+	dstSystemImagePath := fmt.Sprintf("%s_system_image/0", dstUpdateName)
+	dstUpdate, dstSystemImage, err := srcUpdate.EditSystemImagePackage(
 		ctx,
 		avbTool,
 		zbiTool,
 		"fuchsia.com",
-		dstSystemImage,
 		dstUpdatePath,
 		c.bootfsCompression,
 		c.useNewUpdateFormat,
+		func(systemImage *packages.SystemImagePackage) (*packages.SystemImagePackage, error) {
+			return systemImage.AddRandomFiles(
+				ctx,
+				rand,
+				dstSystemImagePath,
+				maxSystemImageSize,
+			)
+		},
 	)
 	if err != nil {
-		return nil, nil, 0, fmt.Errorf(
-			"failed to create the %q package: %w",
+		return nil, nil, fmt.Errorf(
+			"failed to add random files to system images %q in update package %q: %w",
+			dstSystemImagePath,
 			dstUpdatePath,
 			err,
 		)
 	}
 
-	systemImageSize, err := dstSystemImage.SystemImageSize(ctx)
-	if err != nil {
-		return nil, nil, 0, fmt.Errorf("failed to compute size of the system image: %w", err)
-	}
-	logger.Infof(
-		ctx,
-		"Created update package %s with system image size: %d",
-		dstUpdate.Path(),
-		systemImageSize,
-	)
-
-	return dstUpdate, dstSystemImage, systemImageSize, nil
-}
-
-// GenerateRandomFiles will create a number of files that sum up to
-// `bytesToAdd` random bytes, each which will be less than 10MiB.
-func GenerateRandomFiles(
-	ctx context.Context,
-	rand *rand.Rand,
-	tempDir string,
-	bytesToAdd uint64,
-) error {
-	otaTestDir := filepath.Join(tempDir, "ota-test")
-	if err := os.Mkdir(otaTestDir, 0700); err != nil {
-		return fmt.Errorf("failed to create %s: %w", otaTestDir, err)
-	}
-
-	index := 0
-	bytes := [blobBlockSize]byte{}
-
-	const maxBlobSize = blobBlockSize * 1000
-
-	for bytesToAdd > 0 {
-		// Create blobs up to 4MiB.
-		var blobSize uint64
-		if maxBlobSize < bytesToAdd {
-			blobSize = maxBlobSize
-		} else {
-			blobSize = bytesToAdd
-		}
-		bytesToAdd -= blobSize
-
-		blobPath := filepath.Join(otaTestDir, fmt.Sprintf("ota-test-file-%06d", index))
-		f, err := os.Create(blobPath)
+	// Optionally add random files to zbi package in the update images.
+	if c.maxUpdateImagesSize != 0 {
+		dstZbiPath := fmt.Sprintf("%s_update_images_zbi/0", dstUpdateName)
+		dstUpdate, _, err = dstUpdate.EditUpdateImages(
+			ctx,
+			dstUpdatePath,
+			func(updateImages *packages.UpdateImages) (*packages.UpdateImages, error) {
+				return updateImages.AddRandomFiles(
+					ctx,
+					rand,
+					dstZbiPath,
+					c.maxUpdateImagesSize,
+				)
+			},
+		)
 		if err != nil {
-			return fmt.Errorf("failed to create %s: %w", blobPath, err)
+			return nil, nil, fmt.Errorf(
+				"failed to add random files to zbi package %q in update package %q: %w",
+				dstZbiPath,
+				dstUpdatePath,
+				err,
+			)
 		}
-		defer f.Close()
-
-		for blobSize > 0 {
-			var n uint64
-			if blobSize < blobBlockSize {
-				n = blobSize
-			} else {
-				n = blobBlockSize
-			}
-			blobSize -= n
-
-			if _, err := rand.Read(bytes[:n]); err != nil {
-				return fmt.Errorf("failed to read %d random bytes: %w", n, err)
-			}
-
-			if _, err := f.Write(bytes[:n]); err != nil {
-				return fmt.Errorf("failed to write random bytes to %s: %w", blobPath, err)
-			}
-		}
-
-		index += 1
 	}
 
-	return nil
+	// Optionally add random files to the update package.
+	if c.maxUpdatePackageSize != 0 {
+		dstUpdate, err = dstUpdate.EditPackage(
+			ctx,
+			func(p packages.Package) (packages.Package, error) {
+				return p.AddRandomFiles(
+					ctx,
+					rand,
+					dstUpdatePath,
+					c.maxUpdatePackageSize,
+				)
+			},
+		)
+		if err != nil {
+			return nil, nil, fmt.Errorf(
+				"failed to add random files to update package %q: %w",
+				dstUpdatePath,
+				err,
+			)
+		}
+	}
+
+	return dstUpdate, dstSystemImage, nil
 }

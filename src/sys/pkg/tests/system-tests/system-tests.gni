@@ -134,6 +134,15 @@ _environment_service_account =
 #   max_system_image_size
 #   - Optional: the maximum size of the system image. The system image package
 #     will be artificially extended to this size or less.
+#
+#   max_update_images_size
+#   - Optional: the maximum size of the update images. The update images will
+#     be artificially extended to this size or less.
+#   - Type: integer greater than or equal to 0
+#
+#   max_update_package_size
+#   - Optional: the maximum size of the update package. The update package will
+#     be artificially extended to this size or less.
 #   - Type: integer greater than or equal to 0
 #
 #   use_new_update_format
@@ -334,6 +343,26 @@ template("system_test_upgrade_suite") {
       _args += [
         "-max-system-image-size",
         invoker.max_system_image_size,
+      ]
+    }
+
+    if (defined(invoker.max_update_images_size)) {
+      assert(
+          invoker.max_update_images_size != "",
+          "'${_host_test_target_name}' cannot have an empty max_update_images_size")
+      _args += [
+        "-max-update-images-size",
+        invoker.max_update_images_size,
+      ]
+    }
+
+    if (defined(invoker.max_update_package_size)) {
+      assert(
+          invoker.max_update_package_size != "",
+          "'${_host_test_target_name}' cannot have an empty max_update_package_size")
+      _args += [
+        "-max-update-package-size",
+        invoker.max_update_package_size,
       ]
     }
 
