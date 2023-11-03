@@ -149,7 +149,7 @@ func (u *SystemUpdateChecker) Update(ctx context.Context, c client, build artifa
 	}
 
 	dstUpdatePath := "update/0"
-	_, err = srcUpdate.EditUpdatePackage(ctx, dstUpdatePath, func(tempDir string) error { return nil })
+	_, err = srcUpdate.EditContents(ctx, dstUpdatePath, func(tempDir string) error { return nil })
 	if err != nil {
 		return fmt.Errorf("failed to publish %s: %w", dstUpdatePath, err)
 	}

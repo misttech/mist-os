@@ -100,16 +100,32 @@ func (u *UpdatePackage) OpenSystemImagePackage(ctx context.Context) (*SystemImag
 	}, nil
 }
 
+func (u *UpdatePackage) OpenUpdateImages(ctx context.Context) (*UpdateImages, error) {
+	f, err := u.p.Open(ctx, "images.json")
+	if err != nil {
+		return nil, fmt.Errorf(
+			"update package %s does not have an images.json",
+			u.p.Path(),
+		)
+	}
+	defer f.Close()
+
+	images, err := util.ParseImagesJSON(f)
+	if err != nil {
+		return nil, err
+	}
+
+	return newUpdateImages(ctx, u.r, images)
+}
+
 // Extract the update package `srcUpdatePackage` into a temporary directory,
 // then build and publish it to the repository as the `dstUpdatePackage` name.
-func (u *UpdatePackage) EditUpdatePackage(
+func (u *UpdatePackage) EditContents(
 	ctx context.Context,
-	dstUpdatePackage string,
-	editFunc func(path string) error,
+	dstUpdatePackagePath string,
+	editFunc func(tempDir string) error,
 ) (*UpdatePackage, error) {
-	p, err := u.r.EditPackage(ctx, u.p, dstUpdatePackage, func(tempDir string) error {
-		return editFunc(tempDir)
-	})
+	p, err := u.p.EditContents(ctx, dstUpdatePackagePath, editFunc)
 	if err != nil {
 		return nil, err
 	}
@@ -175,6 +191,44 @@ func (u *UpdatePackage) EditSystemImagePackage(
 	return dstUpdate, dstSystemImage, nil
 }
 
+// EditImagesPackage will extract the system image into a temporary directory,
+// provide it to the `editFunc`, then create a new update package that uses it.
+func (u *UpdatePackage) EditUpdateImages(
+	ctx context.Context,
+	dstUpdatePackagePath string,
+	editFunc func(updateImages *UpdateImages) (*UpdateImages, error),
+) (*UpdatePackage, *UpdateImages, error) {
+	srcUpdateImages, err := u.OpenUpdateImages(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	dstUpdateImages, err := editFunc(srcUpdateImages)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	dstUpdate, err := u.EditContents(ctx, dstUpdatePackagePath, func(tempDir string) error {
+		imagesPath := filepath.Join(tempDir, "images.json")
+		f, err := os.Open(imagesPath)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+
+		if err := util.UpdateImagesJSON(imagesPath, dstUpdateImages.images); err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return dstUpdate, dstUpdateImages, nil
+}
+
 // RehostUpdatePackage will rewrite the `packages.json` file to use `repoName`
 // path, to avoid collisions with the `fuchsia.com` repository name.
 func (u *UpdatePackage) RehostUpdatePackage(
@@ -182,7 +236,7 @@ func (u *UpdatePackage) RehostUpdatePackage(
 	dstUpdatePath string,
 	repoName string,
 ) (*UpdatePackage, error) {
-	return u.EditUpdatePackage(ctx, dstUpdatePath, func(tempDir string) error {
+	return u.EditContents(ctx, dstUpdatePath, func(tempDir string) error {
 		packagesJsonPath := filepath.Join(tempDir, "packages.json")
 		logger.Infof(ctx, "setting host name in %q to %q", packagesJsonPath, repoName)
 
@@ -218,12 +272,12 @@ func (u *UpdatePackage) EditUpdatePackageWithNewSystemImage(
 	bootfsCompression string,
 	useNewUpdateFormat bool,
 ) (*UpdatePackage, error) {
-	return u.EditUpdatePackage(
+	return u.EditContents(
 		ctx,
 		dstUpdatePackagePath,
 		func(tempDir string) error {
 			// Update the update package's zbi and vbmeta to point at this system image.
-			if err := u.editUpdateImages(
+			if err := u.editZbiAndVbmeta(
 				ctx,
 				dstUpdatePackagePath,
 				useNewUpdateFormat,
@@ -276,7 +330,7 @@ func (u *UpdatePackage) EditUpdatePackageWithVBMetaProperties(
 	useNewUpdateFormat bool,
 	editFunc func(path string) error,
 ) (*UpdatePackage, error) {
-	return u.EditUpdatePackage(
+	return u.EditContents(
 		ctx,
 		dstUpdatePackagePath,
 		func(tempDir string) error {
@@ -285,7 +339,7 @@ func (u *UpdatePackage) EditUpdatePackageWithVBMetaProperties(
 			}
 
 			// Update the update package's zbi and vbmeta to point at this system image.
-			if err := u.editUpdateImages(
+			if err := u.editZbiAndVbmeta(
 				ctx,
 				dstUpdatePackagePath,
 				useNewUpdateFormat,
@@ -313,10 +367,10 @@ func (u *UpdatePackage) EditUpdatePackageWithVBMetaProperties(
 	)
 }
 
-// editUpdateImages will allow the `editFunc` to modify the zbi and vbmeta from
+// editZbiAndVbmeta will allow the `editFunc` to modify the zbi and vbmeta from
 // an update package, whether or not those files are in a side-package listed in
 // the images.json file, or directly embedded in the update package.
-func (u *UpdatePackage) editUpdateImages(
+func (u *UpdatePackage) editZbiAndVbmeta(
 	ctx context.Context,
 	dstUpdatePackagePath string,
 	useNewUpdateFormat bool,
@@ -324,12 +378,16 @@ func (u *UpdatePackage) editUpdateImages(
 	editFunc func(zbiPath string, vbmetaPath string) error,
 ) error {
 	if u.hasImagesManifest {
-		if err := editUpdateImagesManifest(
+		updateImages, err := u.OpenUpdateImages(ctx)
+		if err != nil {
+			return err
+		}
+
+		if err := u.replaceUpdateImages(
 			ctx,
-			u.r,
 			dstUpdatePackagePath,
 			tempDir,
-			u.images,
+			updateImages,
 			editFunc,
 		); err != nil {
 			return err
@@ -351,12 +409,16 @@ func (u *UpdatePackage) editUpdateImages(
 				return err
 			}
 
-			if err := editUpdateImagesManifest(
+			updateImages, err := newUpdateImages(ctx, u.r, images)
+			if err != nil {
+				return err
+			}
+
+			if err := u.replaceUpdateImages(
 				ctx,
-				u.r,
 				dstUpdatePackagePath,
 				tempDir,
-				images,
+				updateImages,
 				editFunc,
 			); err != nil {
 				return err
@@ -379,104 +441,28 @@ func (u *UpdatePackage) editUpdateImages(
 	return nil
 }
 
-func editUpdateImagesManifest(
+func (u *UpdatePackage) replaceUpdateImages(
 	ctx context.Context,
-	repo *Repository,
 	dstUpdatePackagePath string,
 	tempDir string,
-	images util.ImagesManifest,
+	srcUpdateImages *UpdateImages,
 	editFunc func(zbiPath string, vbmetaPath string) error,
 ) error {
 	dstUpdatePackageParts := strings.Split(dstUpdatePackagePath, "/")
 	dstUpdatePackageName := dstUpdatePackageParts[0]
+	dstZbiPackagePath := fmt.Sprintf("%s_update_images_zbi", dstUpdatePackageName)
 
-	// Create a new zbi+vbmeta package that points at the system image package.
-	srcZbiUrl, srcZbiMerkle, err := images.GetPartition("fuchsia", "zbi")
-	if err != nil {
-		return fmt.Errorf("failed to read zbi from images manifest: %w", err)
-	}
-
-	if srcZbiUrl.Fragment == "" {
-		return fmt.Errorf("url must have fragment for zbi: %q", srcZbiUrl)
-	}
-
-	srcVbmetaUrl, srcVbmetaMerkle, err := images.GetPartition("fuchsia", "vbmeta")
-	if err != nil {
-		return fmt.Errorf("failed to read vbmeta from images manifest: %w", err)
-	}
-
-	if srcVbmetaUrl.Fragment == "" {
-		return fmt.Errorf("url must have fragment for vbmeta: %q", srcVbmetaUrl)
-	}
-
-	// The zbi and vbmeta package must be the same, since generating the vbmeta
-	// for a zbi modifies the zbi.
-	if srcZbiMerkle != srcVbmetaMerkle {
-		return fmt.Errorf("zbi and vbmeta package must be the same: %s != %s", srcZbiUrl, srcVbmetaUrl)
-	}
-
-	srcImagesPath := srcZbiUrl.Path[1:]
-	srcImagesPackage, err := newPackage(ctx, repo, srcImagesPath, srcZbiMerkle)
-	if err != nil {
-		return fmt.Errorf("could not parse package %s: %w", srcImagesPath, err)
-	}
-
-	// Create a new zbi+vbmeta package
-	dstImagesPackagePath := fmt.Sprintf("%s_images_fuchsia", dstUpdatePackageName)
-	dstImagesPackage, err := repo.EditPackage(
+	dstUpdateImages, err := srcUpdateImages.EditZbiAndVbmeta(
 		ctx,
-		srcImagesPackage,
-		dstImagesPackagePath,
-		func(imagesTempDir string) error {
-			zbiPath := filepath.Join(imagesTempDir, srcZbiUrl.Fragment)
-			vbmetaPath := filepath.Join(imagesTempDir, srcVbmetaUrl.Fragment)
-
-			return editFunc(zbiPath, vbmetaPath)
-		},
+		dstZbiPackagePath,
+		editFunc,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to create fuchsia images package: %w", err)
-	}
-
-	// Update the zbi partition entry.
-	dstZbiUrl := fmt.Sprintf(
-		"fuchsia-pkg://%s/%s?hash=%s#%s",
-		srcZbiUrl.Host,
-		dstImagesPackage.Path(),
-		dstImagesPackage.Merkle(),
-		srcZbiUrl.Fragment,
-	)
-	logger.Infof(ctx, "updating update image zbi package url to %s", dstZbiUrl)
-
-	zbiBlobPath, err := dstImagesPackage.FilePath(ctx, srcZbiUrl.Fragment)
-	if err != nil {
-		return fmt.Errorf("failed to find zbi blob path for %s: %w", srcZbiUrl.Fragment, err)
-	}
-
-	if err := images.SetPartition("fuchsia", "zbi", dstZbiUrl, zbiBlobPath); err != nil {
-		return fmt.Errorf("failed to set zbi partition: %w", err)
-	}
-
-	dstVbmetaUrl := fmt.Sprintf(
-		"fuchsia-pkg://%s/%s?hash=%s#%s",
-		srcVbmetaUrl.Host,
-		dstImagesPackage.Path(),
-		dstImagesPackage.Merkle(),
-		srcVbmetaUrl.Fragment,
-	)
-	logger.Infof(ctx, "updating update image vbmeta package url to %s", dstVbmetaUrl)
-
-	vbmetaBlobPath, err := dstImagesPackage.FilePath(ctx, srcVbmetaUrl.Fragment)
-	if err != nil {
-		return fmt.Errorf("failed to find zbi blob path for %s: %w", srcVbmetaUrl.Fragment, err)
-	}
-
-	if err := images.SetPartition("fuchsia", "vbmeta", dstVbmetaUrl, vbmetaBlobPath); err != nil {
-		return fmt.Errorf("failed to set vbmeta partition: %w", err)
+		return err
 	}
 
 	imagesPath := filepath.Join(tempDir, "images.json")
-	if err := util.UpdateImagesJSON(imagesPath, images); err != nil {
+	if err := util.UpdateImagesJSON(imagesPath, dstUpdateImages.images); err != nil {
 		return err
 	}
 

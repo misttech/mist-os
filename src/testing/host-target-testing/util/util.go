@@ -321,6 +321,26 @@ type ImagesManifest struct {
 	Contents ImagesContent `json:"contents"`
 }
 
+func (i *ImagesManifest) Clone() ImagesManifest {
+	partitions := []ImagePartition{}
+	for _, p := range i.Contents.Partitions {
+		partitions = append(partitions, p)
+	}
+
+	firmware := []ImageFirmware{}
+	for _, f := range i.Contents.Firmware {
+		firmware = append(firmware, f)
+	}
+
+	return ImagesManifest{
+		Version: i.Version,
+		Contents: ImagesContent{
+			Partitions: partitions,
+			Firmware:   firmware,
+		},
+	}
+}
+
 func (i *ImagesManifest) GetPartition(slot string, typ string) (*url.URL, build.MerkleRoot, error) {
 	found := false
 	var partition ImagePartition
