@@ -669,7 +669,7 @@ fn maybe_generate_direct_offer_from_all(
             !offer_to_all_would_duplicate(&local_offer, direct, target).unwrap()
         }) && !local_offer.from.iter().any(|from| from == &disallowed_offer_source)
         {
-            local_offer.to = OneOrMany::One(OfferToRef::Named((*target).clone()));
+            local_offer.to = Some(OneOrMany::One(OfferToRef::Named((*target).clone())));
             returned_offers.push(local_offer);
         }
     }
@@ -683,11 +683,11 @@ fn expand_offer_to_all(
     collections: &BTreeSet<&Name>,
 ) -> Result<Vec<Offer>, Error> {
     let offers_to_all =
-        offers_in.iter().filter(|offer| matches!(offer.to, OneOrMany::One(OfferToRef::All)));
+        offers_in.iter().filter(|offer| matches!(offer.to, Some(OneOrMany::One(OfferToRef::All))));
 
     let mut direct_offers = offers_in
         .iter()
-        .filter(|o| !matches!(o.to, OneOrMany::One(OfferToRef::All)))
+        .filter(|o| !matches!(o.to, Some(OneOrMany::One(OfferToRef::All))))
         .map(Offer::clone)
         .collect::<Vec<Offer>>();
 
@@ -1470,9 +1470,15 @@ fn extract_offer_sources_and_targets(
     let source_dictionary = extract_source_dictionary(options, offer)?;
     let target_names = all_target_capability_names(offer, offer)
         .ok_or_else(|| Error::internal("no capability".to_string()))?;
-
+    let targets: Vec<AnyRef<'_>> = offer
+        .to
+        .iter()
+        .flatten()
+        .map(Into::into)
+        .chain(offer.into.iter().flatten().map(|into| AnyRef::Named(into)))
+        .collect();
     for source in sources {
-        for to in &offer.to {
+        for target in &targets {
             for target_name in &target_names {
                 // When multiple source names are provided, there is no way to alias each one,
                 // so we can assume source_name == target_name.  When one source name is provided,
@@ -1485,7 +1491,7 @@ fn extract_offer_sources_and_targets(
                 };
                 let target = translate_target_ref(
                     options,
-                    to.into(),
+                    target.clone(),
                     all_children,
                     all_collections,
                     all_capability_names,
@@ -4054,18 +4060,18 @@ mod tests {
                         "protocol": "A",
                         "from": "parent",
                         "in": "dict/1",
-                        "to": "#dict",
+                        "into": "dict",
                     },
                     {
                         "directory": "B",
                         "from": "#child",
-                        "to": "#dict",
+                        "into": "dict",
                     },
                     {
                         "service": "B",
                         "from": "parent",
                         "in": "dict/2",
-                        "to": "#dict",
+                        "into": "dict",
                         "as": "C",
                     },
                 ],
@@ -4988,7 +4994,7 @@ mod tests {
             assert_eq!(from, &OneOrMany::One(OfferFromRef::Parent {}));
             assert_eq!(
                 to,
-                &OneOrMany::One(OfferToRef::Named(Name::from_str("something").unwrap())),
+                &Some(OneOrMany::One(OfferToRef::Named(Name::from_str("something").unwrap()))),
             );
         });
 
@@ -5012,7 +5018,7 @@ mod tests {
             assert_eq!(from, &OneOrMany::One(OfferFromRef::Parent {}));
             assert_eq!(
                 to,
-                &OneOrMany::One(OfferToRef::Named(Name::from_str("something").unwrap())),
+                &Some(OneOrMany::One(OfferToRef::Named(Name::from_str("something").unwrap()))),
             );
         });
 
