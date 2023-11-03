@@ -253,8 +253,6 @@ class DeviceTest : public zxtest::Test {
   auto& get_device() { return *device_; }
 
   void SetUp() override {
-    EXPECT_OK(fidl_loop_.StartThread("usb-device-test-fidl-loop"));
-
     auto hci_endpoints = fidl::CreateEndpoints<fuchsia_hardware_usb_hci::UsbHci>();
     ASSERT_OK(hci_endpoints);
     auto result = fdf::RunOnDispatcherSync(dispatcher_->async_dispatcher(), [&]() {
@@ -267,7 +265,7 @@ class DeviceTest : public zxtest::Test {
     EXPECT_TRUE(result.is_ok());
     auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_usb_device::Device>();
     ASSERT_OK(endpoints.status_value());
-    fidl::BindServer(fidl_loop_.dispatcher(), std::move(endpoints->server), device_);
+    fidl::BindServer(dispatcher_->async_dispatcher(), std::move(endpoints->server), device_);
     fidl_.Bind(std::move(endpoints->client));
   }
 
@@ -323,13 +321,12 @@ class DeviceTest : public zxtest::Test {
   void SetEmptyState(bool should_return_empty) { hci_.SetEmptyState(should_return_empty); }
 
  protected:
-  // TODO(fxb/124464): Migrate test to use dispatcher integration.
-  std::shared_ptr<MockDevice> root_ = MockDevice::FakeRootParentNoDispatcherIntegrationDEPRECATED();
+  std::shared_ptr<MockDevice> root_{MockDevice::FakeRootParent()};
 
  private:
-  fdf_testing::DriverRuntime runtime_;
-  async::Loop fidl_loop_{&kAsyncLoopConfigNeverAttachToThread};
-  fdf::UnownedSynchronizedDispatcher dispatcher_ = runtime_.StartBackgroundDispatcher();
+  fdf_testing::DriverRuntime* runtime() { return fdf_testing::DriverRuntime::GetInstance(); }
+
+  fdf::UnownedSynchronizedDispatcher dispatcher_{runtime()->StartBackgroundDispatcher()};
   fbl::RefPtr<FakeTimer> timer_;
   fidl::WireSyncClient<fuchsia_hardware_usb_device::Device> fidl_;
   FakeHci hci_;
