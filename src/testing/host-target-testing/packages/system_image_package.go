@@ -38,3 +38,27 @@ func (u *SystemImagePackage) EditContents(
 		packages: u.packages,
 	}, nil
 }
+
+// SystemImageSize returns the transitive space needed to store all the blobs
+// in the system image. It does not include the update image package
+// blobs, since those are garbage collected during the OTA.
+func (u *SystemImagePackage) SystemImageSize(ctx context.Context) (uint64, error) {
+	visitedPackages := make(map[build.MerkleRoot]struct{})
+
+	// This will contain all the blobs in the system image packages, and
+	// any of its subpackages.
+	blobs := u.p.Blobs()
+
+	for path, merkle := range u.packages {
+		pkg, err := newPackage(ctx, u.p.repo, path, merkle)
+		if err != nil {
+			return 0, err
+		}
+
+		if err := pkg.transitiveBlobs(ctx, visitedPackages, blobs); err != nil {
+			return 0, err
+		}
+	}
+
+	return u.p.repo.sumBlobSizes(ctx, blobs)
+}

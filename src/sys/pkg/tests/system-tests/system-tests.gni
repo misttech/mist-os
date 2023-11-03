@@ -131,9 +131,9 @@ _environment_service_account =
 #     installing the downgrade build.
 #   - Type: boolean, default false
 #
-#   max_ota_size
-#   - Optional: the maximum size of the OTA test. The update packages will
-#     be artificially extended to this size or less.
+#   max_system_image_size
+#   - Optional: the maximum size of the system image. The system image package
+#     will be artificially extended to this size or less.
 #   - Type: integer greater than or equal to 0
 #
 #   use_new_update_format
@@ -327,12 +327,13 @@ template("system_test_upgrade_suite") {
       _args += [ "-build-expect-unknown-firmware" ]
     }
 
-    if (defined(invoker.max_ota_size)) {
-      assert(invoker.max_ota_size != "",
-             "'${_host_test_target_name}' cannot have an empty max_ota_size")
+    if (defined(invoker.max_system_image_size)) {
+      assert(
+          invoker.max_system_image_size != "",
+          "'${_host_test_target_name}' cannot have an empty max_system_image_size")
       _args += [
-        "-max-ota-size",
-        invoker.max_ota_size,
+        "-max-system-image-size",
+        invoker.max_system_image_size,
       ]
     }
 

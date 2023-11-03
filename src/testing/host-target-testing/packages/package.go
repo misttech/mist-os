@@ -194,3 +194,55 @@ func (p *Package) EditContents(
 ) (Package, error) {
 	return p.repo.EditPackage(ctx, *p, dstPath, editFunc)
 }
+
+// TransitiveBlobs returns all the blobs in this package and subpackages.
+func (p *Package) TransitiveBlobs(ctx context.Context) (map[build.MerkleRoot]struct{}, error) {
+	visitedPackages := make(map[build.MerkleRoot]struct{})
+	blobs := make(map[build.MerkleRoot]struct{})
+
+	if err := p.transitiveBlobs(ctx, visitedPackages, blobs); err != nil {
+		return nil, err
+	}
+
+	return blobs, nil
+}
+
+func (p *Package) transitiveBlobs(
+	ctx context.Context,
+	visitedPackages map[build.MerkleRoot]struct{},
+	blobs map[build.MerkleRoot]struct{},
+) error {
+	// Exit early if we've already processed this package.
+	if _, ok := visitedPackages[p.merkle]; ok {
+		return nil
+	}
+	visitedPackages[p.merkle] = struct{}{}
+
+	for blob := range p.Blobs() {
+		blobs[blob] = struct{}{}
+	}
+
+	// Recurse into any subpackages.
+	for path, merkle := range p.Subpackages() {
+		pkg, err := newPackage(ctx, p.repo, path, merkle)
+		if err != nil {
+			return err
+		}
+
+		if err := pkg.transitiveBlobs(ctx, visitedPackages, blobs); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// TransitiveBlobSize computes total size of all the blobs in this package and subpackages.
+func (p *Package) TransitiveBlobSize(ctx context.Context) (uint64, error) {
+	blobs, err := p.TransitiveBlobs(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	return p.repo.sumBlobSizes(ctx, blobs)
+}

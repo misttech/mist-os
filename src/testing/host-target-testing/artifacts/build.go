@@ -243,7 +243,7 @@ func (fs *proxyBlobStore) OpenBlob(ctx context.Context, deliveryBlobType *int, m
 	return os.Open(path)
 }
 
-func (fs *proxyBlobStore) BlobSize(ctx context.Context, deliveryBlobType *int, merkle pmBuild.MerkleRoot) (int64, error) {
+func (fs *proxyBlobStore) BlobSize(ctx context.Context, deliveryBlobType *int, merkle pmBuild.MerkleRoot) (uint64, error) {
 	f, err := fs.OpenBlob(ctx, deliveryBlobType, merkle)
 	if err != nil {
 		return 0, err
@@ -251,7 +251,10 @@ func (fs *proxyBlobStore) BlobSize(ctx context.Context, deliveryBlobType *int, m
 	defer f.Close()
 
 	if s, err := f.Stat(); err == nil {
-		return s.Size(), nil
+		if s.Size() < 0 {
+			return 0, fmt.Errorf("merkle %s has size less than zero: %d", merkle, s.Size())
+		}
+		return uint64(s.Size()), nil
 	} else {
 		return 0, err
 	}

@@ -651,25 +651,13 @@ func AddRandomFilesToUpdate(
 		return nil, nil, fmt.Errorf("error extracting expected system image merkle: %w", err)
 	}
 
-	otaSize, err := srcUpdate.OtaMaxNeededSize(ctx)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to compute size of the OTA: %w", err)
-	}
-	logger.Infof(ctx, "OTA size of %s: %d", srcUpdate.Path(), otaSize)
-
-	updateImagesSize, err := srcUpdate.UpdateAndImagesSize(ctx)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to compute size of the update images: %w", err)
-	}
-	logger.Infof(ctx, "Update images size of %s: %d", srcUpdate.Path(), updateImagesSize)
-
-	systemImageSize, err := srcUpdate.UpdateAndSystemImageSize(ctx)
+	systemImageSize, err := srcSystemImage.SystemImageSize(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to compute size of the system image: %w", err)
 	}
 	logger.Infof(ctx, "System image size of %s: %d", srcUpdate.Path(), systemImageSize)
 
-	if c.maxOtaSize == 0 {
+	if c.maxSystemImageSize == 0 {
 		// We just want to add a random file or so to the update package so
 		// it's unique.
 		dstUpdate, dstSystemImage, _, err := GenerateUpdatePackageWithRandomFiles(
@@ -688,19 +676,19 @@ func AddRandomFilesToUpdate(
 		// Otherwise, we want to fill out the update package until it's
 		// approximately full.
 
-		if c.maxOtaSize < otaSize {
+		if c.maxSystemImageSize < systemImageSize {
 			return nil, nil, fmt.Errorf(
-				"max OTA size %d is smaller than the size of the OTA %d",
-				c.maxOtaSize,
-				otaSize,
+				"max system image size %d is smaller than the size of the system image %d",
+				c.maxSystemImageSize,
+				systemImageSize,
 			)
 		}
 
 		// We'll keep generating update packages with random files until we get
-		// one that's approximately the same size as the max OTA size.
-		bytesToAdd := c.maxOtaSize - otaSize
+		// one that's approximately the same size as the max system image size.
+		bytesToAdd := c.maxSystemImageSize - systemImageSize
 		for bytesToAdd > 0 {
-			dstUpdate, dstSystemImage, otaSize, err := GenerateUpdatePackageWithRandomFiles(
+			dstUpdate, dstSystemImage, systemImageSize, err := GenerateUpdatePackageWithRandomFiles(
 				ctx,
 				rand,
 				repo,
@@ -719,23 +707,23 @@ func AddRandomFilesToUpdate(
 				)
 			}
 
-			if c.maxOtaSize < otaSize {
+			if c.maxSystemImageSize < systemImageSize {
 				logger.Warningf(
 					ctx,
-					"OTA size %d is bigger than %d, trying again",
-					otaSize,
-					c.maxOtaSize,
+					"System image size %d is bigger than %d, trying again",
+					systemImageSize,
+					c.maxSystemImageSize,
 				)
 
-				// Shrink the OTA size by the amount we overshot by.
-				bytesToAdd -= otaSize - c.maxOtaSize
+				// Shrink the system image size by the amount we overshot by.
+				bytesToAdd -= systemImageSize - c.maxSystemImageSize
 			} else {
 				logger.Infof(
 					ctx,
-					"Accepting update package %s, OTA size %d is smaller than %d",
+					"Accepting update package %s, system image size %d is smaller than %d",
 					dstUpdate.Path(),
-					otaSize,
-					c.maxOtaSize,
+					systemImageSize,
+					c.maxSystemImageSize,
 				)
 				return dstUpdate, dstSystemImage, nil
 			}
@@ -743,7 +731,7 @@ func AddRandomFilesToUpdate(
 
 		return nil, nil, fmt.Errorf(
 			"failed to generate update package less than %d",
-			c.maxOtaSize,
+			c.maxSystemImageSize,
 		)
 	}
 }
@@ -758,8 +746,8 @@ func GenerateUpdatePackageWithRandomFiles(
 	srcUpdate *packages.UpdatePackage,
 	dstSystemImagePath string,
 	dstUpdatePath string,
-	bytesToAdd int64,
-) (*packages.UpdatePackage, *packages.SystemImagePackage, int64, error) {
+	bytesToAdd uint64,
+) (*packages.UpdatePackage, *packages.SystemImagePackage, uint64, error) {
 	logger.Infof(
 		ctx,
 		"Trying to insert random files up to %d bytes into the system image %s as %s",
@@ -807,29 +795,7 @@ func GenerateUpdatePackageWithRandomFiles(
 		)
 	}
 
-	otaSize, err := dstUpdate.OtaMaxNeededSize(ctx)
-	if err != nil {
-		return nil, nil, 0, fmt.Errorf("failed to compute size of the OTA: %w", err)
-	}
-	logger.Infof(
-		ctx,
-		"Created update package %s with OTA size %d",
-		dstUpdate.Path(),
-		otaSize,
-	)
-
-	updateImagesSize, err := dstUpdate.UpdateAndImagesSize(ctx)
-	if err != nil {
-		return nil, nil, 0, fmt.Errorf("failed to compute size of the update images: %w", err)
-	}
-	logger.Infof(
-		ctx,
-		"Created update package %s with update images size: %d",
-		dstUpdate.Path(),
-		updateImagesSize,
-	)
-
-	systemImageSize, err := dstUpdate.UpdateAndSystemImageSize(ctx)
+	systemImageSize, err := dstSystemImage.SystemImageSize(ctx)
 	if err != nil {
 		return nil, nil, 0, fmt.Errorf("failed to compute size of the system image: %w", err)
 	}
@@ -840,7 +806,7 @@ func GenerateUpdatePackageWithRandomFiles(
 		systemImageSize,
 	)
 
-	return dstUpdate, dstSystemImage, otaSize, nil
+	return dstUpdate, dstSystemImage, systemImageSize, nil
 }
 
 // GenerateRandomFiles will create a number of files that sum up to
@@ -849,7 +815,7 @@ func GenerateRandomFiles(
 	ctx context.Context,
 	rand *rand.Rand,
 	tempDir string,
-	bytesToAdd int64,
+	bytesToAdd uint64,
 ) error {
 	otaTestDir := filepath.Join(tempDir, "ota-test")
 	if err := os.Mkdir(otaTestDir, 0700); err != nil {
@@ -863,7 +829,7 @@ func GenerateRandomFiles(
 
 	for bytesToAdd > 0 {
 		// Create blobs up to 4MiB.
-		var blobSize int64
+		var blobSize uint64
 		if maxBlobSize < bytesToAdd {
 			blobSize = maxBlobSize
 		} else {
@@ -879,7 +845,7 @@ func GenerateRandomFiles(
 		defer f.Close()
 
 		for blobSize > 0 {
-			var n int64
+			var n uint64
 			if blobSize < blobBlockSize {
 				n = blobSize
 			} else {

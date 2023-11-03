@@ -24,7 +24,7 @@ type BlobStore interface {
 	Dir() string
 	BlobPath(ctx context.Context, deliveryBlobType *int, merkle build.MerkleRoot) (string, error)
 	OpenBlob(ctx context.Context, deliveryBlobType *int, merkle build.MerkleRoot) (*os.File, error)
-	BlobSize(ctx context.Context, deliveryBlobType *int, merkle build.MerkleRoot) (int64, error)
+	BlobSize(ctx context.Context, deliveryBlobType *int, merkle build.MerkleRoot) (uint64, error)
 }
 
 type DirBlobStore struct {
@@ -51,7 +51,7 @@ func (fs *DirBlobStore) OpenBlob(ctx context.Context, deliveryBlobType *int, mer
 	return os.Open(path)
 }
 
-func (fs *DirBlobStore) BlobSize(ctx context.Context, deliveryBlobType *int, merkle build.MerkleRoot) (int64, error) {
+func (fs *DirBlobStore) BlobSize(ctx context.Context, deliveryBlobType *int, merkle build.MerkleRoot) (uint64, error) {
 	path, err := fs.BlobPath(ctx, deliveryBlobType, merkle)
 	if err != nil {
 		return 0, err
@@ -62,7 +62,12 @@ func (fs *DirBlobStore) BlobSize(ctx context.Context, deliveryBlobType *int, mer
 		return 0, err
 	}
 
-	return s.Size(), nil
+	size := s.Size()
+	if size < 0 {
+		return 0, fmt.Errorf("merkle %s has size less than zero: %d", merkle, size)
+	}
+
+	return uint64(size), nil
 }
 
 func (fs *DirBlobStore) Dir() string {
@@ -194,8 +199,23 @@ func (r *Repository) OpenBlob(ctx context.Context, merkle build.MerkleRoot) (*os
 	return r.blobStore.OpenBlob(ctx, r.deliveryBlobType, merkle)
 }
 
-func (r *Repository) BlobSize(ctx context.Context, merkle build.MerkleRoot) (int64, error) {
+func (r *Repository) BlobSize(ctx context.Context, merkle build.MerkleRoot) (uint64, error) {
 	return r.blobStore.BlobSize(ctx, r.deliveryBlobType, merkle)
+}
+
+// sumBlobSizes sums up all the blob sizes from the blob store.
+func (r *Repository) sumBlobSizes(ctx context.Context, blobs map[build.MerkleRoot]struct{}) (uint64, error) {
+	totalSize := uint64(0)
+	for blob := range blobs {
+		size, err := r.BlobSize(ctx, blob)
+		if err != nil {
+			return 0, nil
+		}
+
+		totalSize += size
+	}
+
+	return totalSize, nil
 }
 
 func (r *Repository) Serve(ctx context.Context, localHostname string, repoName string, repoPort int) (*Server, error) {
