@@ -34,7 +34,10 @@ rustc_library("usercopy") {
   ]
   non_rust_deps = [ ":hermetic_copy_error" ]
   with_unit_tests = true
-  test_deps = [ "//src/lib/fuchsia" ]
+  test_deps = [
+    "//src/lib/fuchsia",
+    "//third_party/rust_crates:test-case",
+  ]
 }
 
 fuchsia_test_component("usercopy-unittests-component") {

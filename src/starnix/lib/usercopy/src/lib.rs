@@ -32,6 +32,9 @@ pub struct Usercopy {
 
     // Handle to the exception handling thread.
     join_handle: Option<std::thread::JoinHandle<()>>,
+
+    // The range of the restricted address space.
+    restricted_address_range: Range<usize>,
 }
 
 impl Usercopy {
@@ -65,6 +68,7 @@ impl Usercopy {
         let shutdown_event_clone =
             shutdown_event.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap();
 
+        let faultable_addresses = restricted_address_range.clone();
         let join_handle = std::thread::spawn(move || {
             let exception_channel_result =
                 fuchsia_runtime::job_default().create_exception_channel();
@@ -126,7 +130,7 @@ impl Usercopy {
                     let report = thread.get_exception_report().unwrap();
 
                     let fault_address = unsafe { report.context.arch.x86_64.cr2 };
-                    if !restricted_address_range.contains(&(fault_address as usize)) {
+                    if !faultable_addresses.contains(&(fault_address as usize)) {
                         continue;
                     }
 
@@ -137,7 +141,7 @@ impl Usercopy {
 
                 // To avoid unused errors.
                 #[cfg(not(target_arch = "x86_64"))]
-                let _ = restricted_address_range;
+                let _ = faultable_addresses;
 
                 excp.set_exception_state(&zx::sys::ZX_EXCEPTION_STATE_HANDLED).unwrap();
             }
@@ -152,7 +156,12 @@ impl Usercopy {
 
         let ptr = hermetic_copy_mapped_addr as *const ();
         let hermetic_copy_fn: HermeticCopyFn = unsafe { std::mem::transmute(ptr) };
-        Ok(Some(Self { hermetic_copy_fn, shutdown_event, join_handle: Some(join_handle) }))
+        Ok(Some(Self {
+            hermetic_copy_fn,
+            shutdown_event,
+            join_handle: Some(join_handle),
+            restricted_address_range,
+        }))
     }
 
     // Copies data from |source| to the restricted address |dest_addr|.
@@ -162,9 +171,10 @@ impl Usercopy {
         // Assumption: The address 0 is invalid and cannot be mapped.  The error encoding scheme has
         // a collision on the value 0 - it could mean that there was a fault at the address 0 or
         // that there was no fault. We want to treat an attempt to copy to 0 as a fault always.
-        if dest_addr == 0 {
+        if dest_addr == 0 || !self.restricted_address_range.contains(&dest_addr) {
             return Err(0);
         }
+
         let ret = unsafe {
             (self.hermetic_copy_fn)(
                 dest_addr as *mut std::ffi::c_void,
@@ -187,9 +197,10 @@ impl Usercopy {
         // Assumption: The address 0 is invalid and cannot be mapped.  The error encoding scheme has
         // a collision on the value 0 - it could mean that there was a fault at the address 0 or
         // that there was no fault. We want to treat an attempt to copy from 0 as a fault always.
-        if source_addr == 0 {
+        if source_addr == 0 || !self.restricted_address_range.contains(&source_addr) {
             return Err(0);
         }
+
         let ret = unsafe {
             (self.hermetic_copy_fn)(
                 dest.as_ptr() as *mut std::ffi::c_void,
@@ -216,6 +227,8 @@ impl Drop for Usercopy {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    use test_case::test_case;
 
     macro_rules! new_usercopy_for_test {
         ($stmt:expr) => {{
@@ -351,24 +364,30 @@ mod test {
         assert_eq!(&dest[32..128], &[0 as u8; 96]);
     }
 
+    #[test_case(0)]
+    #[test_case(10)]
+    #[test_case(2)]
     #[::fuchsia::test]
-    fn fault_on_zero_address_copyin() {
+    fn starting_fault_address_copyin(addr: usize) {
         let usercopy = new_usercopy_for_test!(Usercopy::new(0..1));
 
         let mut dest = vec![0u8];
 
-        let result = usercopy.copyin(0, &mut dest);
+        let result = usercopy.copyin(addr, &mut dest);
 
         assert_eq!(result, Err(0));
     }
 
+    #[test_case(0)]
+    #[test_case(1)]
+    #[test_case(2)]
     #[::fuchsia::test]
-    fn fault_on_zero_address_copyout() {
+    fn starting_fault_address_copyout(addr: usize) {
         let usercopy = new_usercopy_for_test!(Usercopy::new(0..1));
 
         let source = vec![0u8];
 
-        let result = usercopy.copyout(&source, 0);
+        let result = usercopy.copyout(&source, addr);
 
         assert_eq!(result, Err(0));
     }
