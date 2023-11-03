@@ -93,8 +93,8 @@ void FullmacMlme::Init() {
       },
       .del_keys_req = [](void *device,
                          wlan_fullmac_del_keys_req_t *req) { DEVICE(device)->DeleteKeysReq(req); },
-      .eapol_req = [](void *device,
-                      wlan_fullmac_impl_eapol_tx_request_t *req) { DEVICE(device)->EapolTx(req); },
+      .eapol_tx = [](void *device,
+                     wlan_fullmac_impl_eapol_tx_request_t *req) { DEVICE(device)->EapolTx(req); },
       .get_iface_counter_stats = [](void *device,
                                     int32_t *out_status) -> wlan_fullmac_iface_counter_stats_t {
         wlan_fullmac_iface_counter_stats_t out_stats;

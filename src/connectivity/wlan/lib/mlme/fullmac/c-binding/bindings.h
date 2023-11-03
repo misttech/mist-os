@@ -79,7 +79,7 @@ typedef struct {
   void (*stop_bss)(void *device, wlan_fullmac_impl_stop_bss_request_t *req);
   wlan_fullmac_set_keys_resp_t (*set_keys_req)(void *device, wlan_fullmac_set_keys_req_t *req);
   void (*del_keys_req)(void *device, wlan_fullmac_del_keys_req_t *req);
-  void (*eapol_req)(void *device, wlan_fullmac_impl_eapol_tx_request_t *req);
+  void (*eapol_tx)(void *device, wlan_fullmac_impl_eapol_tx_request_t *req);
   wlan_fullmac_iface_counter_stats_t (*get_iface_counter_stats)(void *device, int32_t *out_status);
   wlan_fullmac_iface_histogram_stats_t (*get_iface_histogram_stats)(void *device,
                                                                     int32_t *out_status);
