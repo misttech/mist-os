@@ -11,7 +11,7 @@ declare_args() {
 }
 
 fuchsia_driver("msd_arm-driver") {
-  output_name = "libmsd_arm"
+  output_name = "msd_arm"
   assert_no_deps = [ "//zircon/system/ulib/trace-engine:trace-engine-static" ]
 
   deps = [
@@ -22,7 +22,7 @@ fuchsia_driver("msd_arm-driver") {
 }
 
 fuchsia_driver_component("msd_arm") {
-  component_name = "libmsd_arm"
+  component_name = "msd_arm"
   deps = [
     ":msd_arm-driver",
     ":msd_arm_bind",
@@ -35,7 +35,7 @@ fuchsia_driver_component("msd_arm") {
 # "rebind" driver has different bind rules so it can be bound the second time.
 # TODO(fxbug.dev/124976): Unify rebind and production drivers.
 fuchsia_driver_component("msd_arm_rebind") {
-  component_name = "libmsd_arm_rebind"
+  component_name = "msd_arm_rebind"
   deps = [
     ":msd_arm-driver",
     ":msd_arm_rebind_bind",
@@ -46,7 +46,7 @@ fuchsia_driver_component("msd_arm_rebind") {
 
 fuchsia_driver("msd_arm_test-driver") {
   testonly = true
-  output_name = "libmsd_arm_test"
+  output_name = "msd_arm_test"
   assert_no_deps = [ "//zircon/system/ulib/trace-engine:trace-engine-static" ]
 
   deps = [
@@ -60,7 +60,7 @@ fuchsia_driver("msd_arm_test-driver") {
 
 fuchsia_driver_component("msd_arm_test") {
   testonly = true
-  component_name = "libmsd_arm_test"
+  component_name = "msd_arm_test"
   deps = [
     ":msd_arm_test-driver",
     ":msd_arm_test_bind",
@@ -131,7 +131,7 @@ source_set("msd_arm_test_entry_dfv2") {
 }
 
 fuchsia_driver("msd_arm-dfv2-driver") {
-  output_name = "libmsd_arm_dfv2"
+  output_name = "msd_arm_dfv2"
   deps = [
     ":msd_arm_entry_dfv2",
     "src",
@@ -143,7 +143,7 @@ fuchsia_driver("msd_arm-dfv2-driver") {
 }
 
 fuchsia_driver_component("msd_arm_dfv2") {
-  component_name = "libmsd_arm_dfv2"
+  component_name = "msd_arm_dfv2"
   deps = [
     ":msd_arm-dfv2-driver",
     ":msd_arm_bind",
@@ -157,7 +157,7 @@ fuchsia_driver_component("msd_arm_dfv2") {
 # TODO(fxbug.dev/124976): Unify rebind and production drivers.
 fuchsia_driver_component("msd_arm_rebind_dfv2") {
   testonly = true
-  component_name = "libmsd_arm_rebind_dfv2"
+  component_name = "msd_arm_rebind_dfv2"
   deps = [
     ":msd_arm-dfv2-driver",
     ":msd_arm_rebind_bind",
@@ -168,7 +168,7 @@ fuchsia_driver_component("msd_arm_rebind_dfv2") {
 
 fuchsia_driver("msd_arm_test-dfv2-driver") {
   testonly = true
-  output_name = "libmsd_arm_test_dfv2"
+  output_name = "msd_arm_test_dfv2"
   deps = [
     ":msd_arm_test_entry_dfv2",
     "src",
@@ -181,7 +181,7 @@ fuchsia_driver("msd_arm_test-dfv2-driver") {
 
 fuchsia_driver_component("msd_arm_test_dfv2") {
   testonly = true
-  component_name = "libmsd_arm_test_dfv2"
+  component_name = "msd_arm_test_dfv2"
   deps = [
     ":msd_arm_test-dfv2-driver",
     ":msd_arm_test_bind",

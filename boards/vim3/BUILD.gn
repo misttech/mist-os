@@ -269,7 +269,7 @@ board_input_bundle("main_bundle") {
     {
       package_target = "//src/graphics/drivers/msd-arm-mali:msd-arm-mali-dfv2"
       package_set = "base"
-      driver_components = [ "meta/libmsd_arm_dfv2.cm" ]
+      driver_components = [ "meta/msd_arm_dfv2.cm" ]
     },
     {
       package_target = "//src/graphics/drivers/msd-vsi-vip"

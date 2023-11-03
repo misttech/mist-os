@@ -23,9 +23,9 @@ class RegisteredTestDriver {
       ASSERT_TRUE(endpoints.is_ok());
 
       const char* kDFv2DriverManifestUrl =
-          "fuchsia-pkg://fuchsia.com/msd-arm-mali-dfv2#meta/libmsd_arm_dfv2.cm";
+          "fuchsia-pkg://fuchsia.com/msd-arm-mali-dfv2#meta/msd_arm_dfv2.cm";
       auto driver_info = development_client->GetDriverInfo(
-          {{kDFv2DriverManifestUrl, "fuchsia-pkg://fuchsia.com/msd-arm-mali#meta/libmsd_arm.cm"},
+          {{kDFv2DriverManifestUrl, "fuchsia-pkg://fuchsia.com/msd-arm-mali#meta/msd_arm.cm"},
            std::move(endpoints->server)});
 
       ASSERT_TRUE(driver_info.is_ok()) << driver_info.error_value();
@@ -74,10 +74,10 @@ class RegisteredTestDriver {
 
   // TODO(fxbug.dev/124976): Unify rebind and production drivers.
   const char* GetRebindDriverSuffix() {
-    return is_dfv2_ ? "libmsd_arm_rebind_dfv2.cm" : "libmsd_arm_rebind.cm";
+    return is_dfv2_ ? "msd_arm_rebind_dfv2.cm" : "msd_arm_rebind.cm";
   }
   const char* GetTestDriverSuffix() {
-    return is_dfv2_ ? "libmsd_arm_test_dfv2.cm" : "libmsd_arm_test.cm";
+    return is_dfv2_ ? "msd_arm_test_dfv2.cm" : "msd_arm_test.cm";
   }
 
   const char* GetParentTopologicalPath() {
