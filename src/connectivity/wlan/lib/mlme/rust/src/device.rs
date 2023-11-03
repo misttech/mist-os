@@ -365,7 +365,7 @@ impl DeviceOps for Device {
         self.wlan_softmac_bridge_proxy
             .clear_association(request, zx::Time::INFINITE)
             .map_err(|fidl_error| {
-                error!("FIDL error during ConfigureAssoc: {:?}", fidl_error);
+                error!("FIDL error during ClearAssociation: {:?}", fidl_error);
                 zx::Status::INTERNAL
             })?
             .map_err(zx::Status::from_raw)
@@ -381,7 +381,7 @@ impl DeviceOps for Device {
         self.wlan_softmac_bridge_proxy
             .notify_association_complete(&assoc_cfg, zx::Time::INFINITE)
             .map_err(|fidl_error| {
-                error!("FIDL error during ConfigureAssoc: {:?}", fidl_error);
+                error!("FIDL error during NotifyAssociationComplete: {:?}", fidl_error);
                 zx::Status::INTERNAL
             })?
             .map_err(zx::Status::from_raw)
