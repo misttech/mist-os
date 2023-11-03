@@ -21,7 +21,6 @@ import (
 
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/build"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/artifacts"
-	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/ffx"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/packages"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/paver"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/sl4f"
@@ -41,7 +40,6 @@ type Client struct {
 	workaroundBrokenTimeSkip bool
 	bootCounter              *uint32
 	repoPort                 int
-	ffx                      *ffx.FFXTool
 }
 
 // NewClient creates a new Client.
@@ -54,7 +52,6 @@ func NewClient(
 	sshConnectBackoff retry.Backoff,
 	workaroundBrokenTimeSkip bool,
 	serialConn *SerialConn,
-	ffx *ffx.FFXTool,
 ) (*Client, error) {
 	sshConfig, err := newSSHConfig(privateKey)
 	if err != nil {
@@ -96,7 +93,6 @@ func NewClient(
 		workaroundBrokenTimeSkip: workaroundBrokenTimeSkip,
 		bootCounter:              bootCounter,
 		repoPort:                 repoPort,
-		ffx:                      ffx,
 	}
 
 	if err := c.postConnectSetup(ctx); err != nil {
@@ -146,68 +142,36 @@ func (c *Client) postConnectSetup(ctx context.Context) error {
 	return c.setInitialMonotonicTime(ctx)
 }
 
-func (c *Client) Reconnect(ctx context.Context, build artifacts.Build) error {
+func (c *Client) Reconnect(ctx context.Context) error {
 	if err := c.sshClient.Reconnect(ctx); err != nil {
 		return err
-	}
-
-	if build != nil {
-		// Clean up the old ffx and daemon.
-		if err := c.ffx.DaemonStop(ctx); err != nil {
-			return fmt.Errorf("failed stopping the daemon: %w", err)
-		}
-		if err := c.ffx.Close(); err != nil {
-			return fmt.Errorf("failed cleaning up the old ffx: %w", err)
-		}
-
-		logger.Infof(ctx, "Sleeping 2s to avoid the daemon restart flake b/287782239")
-		time.Sleep(2 * time.Second)
-
-		// Set the new ffx.
-		ffx, err := build.GetFfx(ctx)
-		if err != nil {
-			return err
-		}
-		c.ffx = ffx
-
-		// Make sure the target is added.
-		deviceHostname, err := c.deviceResolver.ResolveName(ctx)
-		if err != nil {
-			return fmt.Errorf("error resolving device host: %w", err)
-		}
-		if err := c.ffx.TargetAdd(ctx, deviceHostname); err != nil {
-			return fmt.Errorf("failed to add target to ffx: %w", err)
-		}
-		if err := c.ffx.TargetWait(ctx, deviceHostname); err != nil {
-			return fmt.Errorf("failed waiting for target: %w", err)
-		}
 	}
 
 	return c.postConnectSetup(ctx)
 }
 
 func (c *Client) setInitialMonotonicTime(ctx context.Context) error {
-	deviceHostname, err := c.deviceResolver.ResolveName(ctx)
-	if err != nil {
-		return fmt.Errorf("error resolving device host: %w", err)
-	}
+	var b bytes.Buffer
+	cmd := []string{"/boot/bin/clock", "--monotonic"}
 
 	// Get the device's monotonic time.
 	t0 := time.Now()
-	t, err := c.ffx.TargetGetTime(ctx, deviceHostname)
+	err := c.sshClient.Run(ctx, cmd, &b, os.Stderr)
 	t1 := time.Now()
 
 	if err != nil {
 		c.initialMonotonicTime = time.Time{}
-		ffx_version, version_err := c.ffx.Version(ctx)
-		if version_err != nil {
-			return version_err
-		}
-		return fmt.Errorf("Getting the target time failed: %w. This could be due to version mismatch between ffx and the target. The ffx version is: %s", err, ffx_version)
+		return err
 	}
 
 	// Estimate the latency as half the time to execute the command.
 	latency := t1.Sub(t0) / 2
+
+	t, err := strconv.Atoi(strings.TrimSpace(b.String()))
+	if err != nil {
+		c.initialMonotonicTime = time.Time{}
+		return err
+	}
 
 	// The output from `clock --monotonic` is in nanoseconds.
 	monotonicTime := (time.Duration(t) * time.Nanosecond) - latency
@@ -260,7 +224,7 @@ func (c *Client) GetSystemImageMerkle(ctx context.Context) (build.MerkleRoot, er
 func (c *Client) Reboot(ctx context.Context) error {
 	logger.Infof(ctx, "rebooting")
 
-	return c.ExpectReboot(ctx, nil, func() error {
+	return c.ExpectReboot(ctx, func() error {
 		// Run the reboot in the background, which gives us a chance to
 		// observe us successfully executing the reboot command.
 		cmd := []string{"dm", "reboot", "&", "exit", "0"}
@@ -359,7 +323,7 @@ func (c *Client) ExpectDisconnect(ctx context.Context, f func() error) error {
 // reconnect, we check if `/tmp/ota_test_should_reboot` exists. If not, exit
 // with `nil`. Otherwise, we failed to reboot, or some competing test is also
 // trying to reboot the device. Either way, err out.
-func (c *Client) ExpectReboot(ctx context.Context, build artifacts.Build, f func() error) error {
+func (c *Client) ExpectReboot(ctx context.Context, f func() error) error {
 	// Generate a unique value.
 	b := make([]byte, 16)
 	_, err := rand.Read(b)
@@ -412,7 +376,7 @@ func (c *Client) ExpectReboot(ctx context.Context, build artifacts.Build, f func
 
 	logger.Infof(ctx, "device disconnected, waiting for device to boot")
 
-	if err := c.Reconnect(ctx, build); err != nil {
+	if err := c.Reconnect(ctx); err != nil {
 		return fmt.Errorf("failed to reconnect: %w", err)
 	}
 

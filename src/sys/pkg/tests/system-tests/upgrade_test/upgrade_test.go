@@ -24,7 +24,6 @@ import (
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/artifacts"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/device"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/errutil"
-	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/ffx"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/packages"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/sl4f"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/util"
@@ -70,47 +69,26 @@ func TestOTA(t *testing.T) {
 
 	defer c.installerConfig.Shutdown(ctx)
 
-	outputDir, cleanup, err := c.archiveConfig.OutputDir()
-	if err != nil {
-		t.Fatalf("failed to get output directory: %v", err)
-	}
-	defer cleanup()
-
-	// Get the latest build so that we can connect to the device using the compatible ffx.
-	sshPrivateKey, err := c.deviceConfig.SSHPrivateKey()
-	if err != nil {
-		t.Fatalf("failed to get sshPrivateKey: %v", err)
-	}
-	build, err := c.archiveConfig.BuildArchive().GetBuildByID(
-		ctx,
-		os.Getenv("BUILDBUCKET_ID"),
-		outputDir,
-		sshPrivateKey.PublicKey(),
-	)
-	if err != nil {
-		t.Fatalf("failed to get latest build: %v", err)
-	}
-
-	// Get the latest ffx from the latest build.
-	latestFfx, err := build.GetFfx(ctx)
-	if err != nil {
-		t.Fatalf("failed to get latestFfx: %v", err)
-	}
-
-	deviceClient, err := c.deviceConfig.NewDeviceClientWithBuild(ctx, build)
+	deviceClient, err := c.deviceConfig.NewDeviceClient(ctx)
 	if err != nil {
 		t.Fatalf("failed to create ota test client: %v", err)
 	}
 	defer deviceClient.Close()
 
-	if err := doTest(ctx, outputDir, deviceClient, latestFfx); err != nil {
+	if err := doTest(ctx, deviceClient); err != nil {
 		logger.Errorf(ctx, "test failed: %v", err)
 		errutil.HandleError(ctx, c.deviceConfig.SerialSocketPath, err)
 		t.Fatal(err)
 	}
 }
 
-func doTest(ctx context.Context, outputDir string, deviceClient *device.Client, latestFfx *ffx.FFXTool) error {
+func doTest(ctx context.Context, deviceClient *device.Client) error {
+	outputDir, cleanup, err := c.archiveConfig.OutputDir()
+	if err != nil {
+		return fmt.Errorf("failed to get output directory: %w", err)
+	}
+	defer cleanup()
+
 	l := logger.NewLogger(
 		logger.TraceLevel,
 		color.NewColor(color.ColorAuto),
@@ -122,7 +100,7 @@ func doTest(ctx context.Context, outputDir string, deviceClient *device.Client, 
 	ctx = logger.WithLogger(ctx, l)
 
 	// Adapt the builds for the device.
-	chainedBuilds, err := c.chainedBuildConfig.GetBuilds(ctx, outputDir)
+	chainedBuilds, err := c.chainedBuildConfig.GetBuilds(ctx, deviceClient, outputDir)
 	if err != nil {
 		return fmt.Errorf("failed to get builds: %w", err)
 	}
@@ -148,7 +126,7 @@ func doTest(ctx context.Context, outputDir string, deviceClient *device.Client, 
 
 	ch := make(chan *sl4f.Client, 1)
 	if err := util.RunWithTimeout(ctx, c.paveTimeout, func() error {
-		rpcClient, err := initializeDevice(ctx, deviceClient, initialBuild, latestFfx)
+		rpcClient, err := initializeDevice(ctx, deviceClient, initialBuild)
 		ch <- rpcClient
 		return err
 	}); err != nil {
@@ -164,13 +142,12 @@ func doTest(ctx context.Context, outputDir string, deviceClient *device.Client, 
 		}
 	}()
 
-	return testOTAs(ctx, deviceClient, latestFfx, chainedBuilds, &rpcClient)
+	return testOTAs(ctx, deviceClient, chainedBuilds, &rpcClient)
 }
 
 func testOTAs(
 	ctx context.Context,
 	device *device.Client,
-	latestFfx *ffx.FFXTool,
 	builds []artifacts.Build,
 	rpcClient **sl4f.Client,
 ) error {
@@ -184,7 +161,7 @@ func testOTAs(
 			}
 
 			if err := util.RunWithTimeout(ctx, c.cycleTimeout, func() error {
-				return doTestOTAs(ctx, device, latestFfx, build, rpcClient, checkPrime)
+				return doTestOTAs(ctx, device, build, rpcClient, checkPrime)
 			}); err != nil {
 				return fmt.Errorf("OTA Attempt %d failed: %w", i, err)
 			}
@@ -197,7 +174,6 @@ func testOTAs(
 func doTestOTAs(
 	ctx context.Context,
 	device *device.Client,
-	latestFfx *ffx.FFXTool,
 	build artifacts.Build,
 	rpcClient **sl4f.Client,
 	checkPrime bool,
@@ -206,9 +182,11 @@ func doTestOTAs(
 
 	startTime := time.Now()
 
-	// We need to use the latest ffx to ensure that we can resign the metadata
-	// with a non-expired timestamp.
-	repo, err := build.GetPackageRepository(ctx, artifacts.PrefetchBlobs, latestFfx)
+	ffx, err := c.deviceConfig.FFXTool()
+	if err != nil {
+		return fmt.Errorf("error getting FFXTool: %w", err)
+	}
+	repo, err := build.GetPackageRepository(ctx, artifacts.PrefetchBlobs, ffx)
 	if err != nil {
 		return fmt.Errorf("error getting repository: %w", err)
 	}
@@ -253,9 +231,8 @@ func doTestOTAs(
 		}
 
 		// Reset our client state since the device has _potentially_ rebooted
-		// We configure the new device with the new build to get the compatible ffx.
 		device.Close()
-		newClient, err := c.deviceConfig.NewDeviceClientWithBuild(ctx, build)
+		newClient, err := c.deviceConfig.NewDeviceClient(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to create ota test client: %w", err)
 		}
@@ -281,7 +258,6 @@ func doTestOTAs(
 				repo,
 				true,
 				!c.buildExpectUnknownFirmware,
-				build,
 			); lastError == nil {
 				logger.Infof(ctx, "OTA from N-1 -> N successful in %s", time.Now().Sub(otaTime))
 				break
@@ -302,9 +278,8 @@ func doTestOTAs(
 			}
 
 			// Reset our client state since the device has _potentially_ rebooted
-			// We configure the new device with the new build to get the compatible ffx.
 			device.Close()
-			newClient, err := c.deviceConfig.NewDeviceClientWithBuild(ctx, build)
+			newClient, err := c.deviceConfig.NewDeviceClient(ctx)
 			if err != nil {
 				return fmt.Errorf("failed to create ota test client: %w", err)
 			}
@@ -328,7 +303,7 @@ func doTestOTAs(
 
 	logger.Infof(ctx, "starting OTA N -> N' test")
 	otaTime := time.Now()
-	if err := systemPrimeOTA(ctx, rand, device, rpcClient, repo, false, build); err != nil {
+	if err := systemPrimeOTA(ctx, rand, device, rpcClient, repo, false); err != nil {
 		return fmt.Errorf("OTA from N -> N' failed: %w", err)
 	}
 	logger.Infof(ctx, "OTA from N -> N' successful in %s", time.Now().Sub(otaTime))
@@ -341,7 +316,6 @@ func initializeDevice(
 	ctx context.Context,
 	device *device.Client,
 	build artifacts.Build,
-	latestFfx *ffx.FFXTool,
 ) (*sl4f.Client, error) {
 	logger.Infof(ctx, "Initializing device")
 
@@ -352,11 +326,13 @@ func initializeDevice(
 	var err error
 
 	if build != nil {
+		ffx, err := c.deviceConfig.FFXTool()
+		if err != nil {
+			return nil, fmt.Errorf("error getting FFXTool: %w", err)
+		}
 		// We don't need to prefetch all the blobs, since we only use a subset of
 		// packages from the repository, like run, sl4f.
-		// We need to use the latest ffx to ensure that we can resign the metadata
-		// with a non-expired timestamp.
-		repo, err = build.GetPackageRepository(ctx, artifacts.LazilyFetchBlobs, latestFfx)
+		repo, err = build.GetPackageRepository(ctx, artifacts.LazilyFetchBlobs, ffx)
 		if err != nil {
 			return nil, fmt.Errorf("error getting downgrade repository: %w", err)
 		}
@@ -449,7 +425,6 @@ func systemOTA(
 	repo *packages.Repository,
 	checkABR bool,
 	checkForUnknownFirmware bool,
-	build artifacts.Build,
 ) error {
 	updatePackage, err := repo.OpenUpdatePackage(ctx, "update/0")
 	if err != nil {
@@ -467,7 +442,6 @@ func systemOTA(
 		"ota-test-update/0",
 		checkABR,
 		checkForUnknownFirmware,
-		build,
 	)
 }
 
@@ -478,7 +452,6 @@ func systemPrimeOTA(
 	rpcClient **sl4f.Client,
 	repo *packages.Repository,
 	checkABR bool,
-	build artifacts.Build,
 ) error {
 	avbTool, err := c.installerConfig.AVBTool()
 	if err != nil {
@@ -563,7 +536,6 @@ func systemPrimeOTA(
 		"ota-test-update_prime2/0",
 		checkABR,
 		true,
-		build,
 	)
 }
 
@@ -578,7 +550,6 @@ func otaToPackage(
 	dstUpdatePath string,
 	checkABR bool,
 	checkForUnknownFirmware bool,
-	build artifacts.Build,
 ) error {
 	dstUpdate, dstSystemImage, err := AddRandomFilesToUpdate(
 		ctx,
@@ -625,7 +596,7 @@ func otaToPackage(
 		return fmt.Errorf("failed to create updater: %w", err)
 	}
 
-	if err := u.Update(ctx, device, build); err != nil {
+	if err := u.Update(ctx, device); err != nil {
 		return fmt.Errorf("failed to download OTA: %w", err)
 	}
 

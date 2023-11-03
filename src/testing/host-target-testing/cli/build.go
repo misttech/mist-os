@@ -10,6 +10,7 @@ import (
 	"fmt"
 
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/artifacts"
+	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/device"
 )
 
 type repeatableBuildKind int
@@ -114,7 +115,7 @@ func (c *BuildConfig) getBuildID(ctx context.Context) (string, error) {
 	return c.buildID, nil
 }
 
-func (c *BuildConfig) GetBuild(ctx context.Context, dir string) (artifacts.Build, error) {
+func (c *BuildConfig) GetBuild(ctx context.Context, deviceClient *device.Client, dir string) (artifacts.Build, error) {
 	sshPrivateKey, err := c.deviceConfig.SSHPrivateKey()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get ssh key: %w", err)
@@ -127,7 +128,11 @@ func (c *BuildConfig) GetBuild(ctx context.Context, dir string) (artifacts.Build
 
 	var build artifacts.Build
 	if buildID != "" {
-		build, err = c.archiveConfig.BuildArchive().GetBuildByID(ctx, buildID, dir, sshPrivateKey.PublicKey())
+		ffxPath := ""
+		if c.useLatestFfx {
+			ffxPath = c.deviceConfig.ffxPath
+		}
+		build, err = c.archiveConfig.BuildArchive().GetBuildByID(ctx, buildID, dir, sshPrivateKey.PublicKey(), ffxPath)
 	} else if c.fuchsiaBuildDir != "" {
 		build, err = artifacts.NewFuchsiaDirBuild(c.fuchsiaBuildDir, sshPrivateKey.PublicKey()), nil
 	} else if c.productBundleDir != "" {
@@ -187,6 +192,7 @@ func NewRepeatableBuildConfig(
 
 func (c *RepeatableBuildConfig) GetBuilds(
 	ctx context.Context,
+	deviceClient *device.Client,
 	outputDir string,
 ) ([]artifacts.Build, error) {
 	sshPrivateKey, err := c.deviceConfig.SSHPrivateKey()
@@ -209,6 +215,7 @@ func (c *RepeatableBuildConfig) GetBuilds(
 				buildID,
 				outputDir,
 				sshPrivateKey.PublicKey(),
+				c.deviceConfig.ffxPath,
 			)
 			if err != nil {
 				return nil, err
@@ -221,6 +228,7 @@ func (c *RepeatableBuildConfig) GetBuilds(
 				b.value,
 				outputDir,
 				sshPrivateKey.PublicKey(),
+				c.deviceConfig.ffxPath,
 			)
 			if err != nil {
 				return nil, err
@@ -241,6 +249,7 @@ func (c *RepeatableBuildConfig) GetBuilds(
 			c.defaultBuildID,
 			outputDir,
 			sshPrivateKey.PublicKey(),
+			c.deviceConfig.ffxPath,
 		)
 		if err != nil {
 			return nil, err

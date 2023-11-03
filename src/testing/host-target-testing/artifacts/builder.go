@@ -36,7 +36,7 @@ func (b *Builder) GetLatestBuild(ctx context.Context, dir string, publicKey ssh.
 		return nil, err
 	}
 
-	return b.archive.GetBuildByID(ctx, id, dir, publicKey)
+	return b.archive.GetBuildByID(ctx, id, dir, publicKey, "")
 }
 
 func (b *Builder) String() string {
