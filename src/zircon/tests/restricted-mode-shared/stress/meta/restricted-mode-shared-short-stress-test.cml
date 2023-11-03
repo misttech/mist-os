@@ -11,4 +11,9 @@
         use_next_vdso: "true",
         is_shared_process: "true",
     },
+    use: [
+        {
+            protocol: [ "fuchsia.kernel.VmexResource" ],
+        },
+    ],
 }

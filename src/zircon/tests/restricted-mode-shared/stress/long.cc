@@ -7,5 +7,12 @@
 #include "lib.h"
 
 TEST(RestrictedModeUnifiedStress, SharedRegionTestLong) {
-  Orchestrator(zx::sec(3600), zx::sec(30));
+  Orchestrator(zx::sec(3600), zx::sec(30), TestMode::Shared);
 }
+
+// TODO(https://fxbug.dev/132980): Enable on other architectures as they support unified aspaces.
+#if defined(__x86_64__)
+TEST(RestrictedModeUnifiedStress, RestrictedRegionTestLong) {
+  Orchestrator(zx::sec(3600), zx::sec(30), TestMode::Restricted);
+}
+#endif  // defined(__x86_64__)

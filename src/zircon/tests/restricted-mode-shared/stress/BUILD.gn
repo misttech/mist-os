@@ -26,7 +26,11 @@ source_set("lib") {
   testonly = true
   sources = [ "lib.cc" ]
   public_deps = [ ":lib_headers" ]
-  deps = [ "//zircon/system/ulib/zxtest" ]
+  deps = [
+    "restricted-blob",
+    "//src/zircon/tests/restricted-mode-shared/helpers",
+    "//zircon/system/ulib/zxtest",
+  ]
 }
 
 test_types = [
