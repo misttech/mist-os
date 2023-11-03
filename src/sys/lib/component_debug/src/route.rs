@@ -5,7 +5,7 @@
 use {
     anyhow::{format_err, Result},
     fidl_fuchsia_sys2 as fsys,
-    moniker::{Moniker, MonikerBase},
+    moniker::{ExtendedMoniker, Moniker},
     prettytable::{cell, format::consts::FORMAT_CLEAN, row, Table},
     std::fmt,
 };
@@ -145,9 +145,9 @@ fn add_report(report: RouteReport, table: &mut Table) {
     };
     table.add_row(row!(r->"Result: ", &format!("{} {}", mark, summary)));
     if let Some(source_moniker) = report.source_moniker {
-        let source_moniker = match Moniker::parse_str(&source_moniker) {
+        let source_moniker = match ExtendedMoniker::parse_str(&source_moniker) {
             Ok(m) => m.to_string(),
-            Err(_) => "<invalid moniker>".to_string(),
+            Err(e) => format!("<invalid moniker>: {}: {}", e.to_string(), source_moniker),
         };
         table.add_row(row!(r->"Source: ", source_moniker));
     }
@@ -177,6 +177,7 @@ mod test {
     use {
         super::*, assert_matches::assert_matches, fidl::endpoints, fuchsia_async as fasync,
         futures::TryStreamExt,
+        moniker::MonikerBase,
     };
 
     fn route_validator(
@@ -251,7 +252,7 @@ mod test {
                 fsys::RouteReport {
                     capability: Some("fuchsia.foo.bar".into()),
                     decl_type: Some(fsys::DeclType::Use),
-                    source_moniker: Some("/src".into()),
+                    source_moniker: Some("<component manager>".into()),
                     error: None,
                     ..Default::default()
                 },
@@ -292,7 +293,7 @@ mod test {
                 error_summary: None,
                 source_moniker: Some(m),
                 service_instances: None,
-            } if capability == "fuchsia.foo.bar" && m == "/src"
+            } if capability == "fuchsia.foo.bar" && m == "<component manager>"
         );
 
         let report = reports.remove(0);
