@@ -37,6 +37,7 @@
 
 #include "convert.h"
 #include "device_interface.h"
+#include "fidl/fuchsia.wlan.softmac/cpp/natural_types.h"
 
 namespace wlan {
 
@@ -210,6 +211,32 @@ class WlanSoftmacBridgeImpl : public fidl::WireServer<fuchsia_wlan_softmac::Wlan
     completer.ReplySuccess();
   }
 
+  void StartPassiveScan(StartPassiveScanRequestView request,
+                        StartPassiveScanCompleter::Sync& completer) override {
+    auto arena = fdf::Arena::Create(0, 0);
+    if (arena.is_error()) {
+      lerror("Arena creation failed: %s", arena.status_string());
+      completer.ReplyError(ZX_ERR_INTERNAL);
+      return;
+    }
+
+    auto result = client_.sync().buffer(*std::move(arena))->StartPassiveScan(*request);
+
+    if (!result.ok()) {
+      lerror("StartPassiveScan failed (FIDL error %s)", result.status_string());
+      completer.ReplyError(result.status());
+      return;
+    }
+
+    if (result->is_error()) {
+      lerror("StartPassiveScan failed (status %s)", zx_status_get_string(result->error_value()));
+      completer.ReplyError(result->error_value());
+      return;
+    }
+
+    completer.ReplySuccess(*result->value());
+  }
+
   static void BindSelfManagedServer(
       async_dispatcher_t* dispatcher,
       fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac> client,
@@ -264,11 +291,6 @@ zx_status_t WlanSoftmacHandle::Init(
       },
       .set_key = [](void* device, wlan_key_configuration_t* key) -> zx_status_t {
         return DEVICE(device)->InstallKey(key);
-      },
-      .start_passive_scan = [](void* device,
-                               const wlan_softmac_start_passive_scan_request_t* passive_scan_args,
-                               uint64_t* out_scan_id) -> zx_status_t {
-        return DEVICE(device)->StartPassiveScan(passive_scan_args, out_scan_id);
       },
       .start_active_scan = [](void* device,
                               const wlan_softmac_start_active_scan_request_t* active_scan_args,
@@ -872,32 +894,6 @@ zx_status_t Device::InstallKey(wlan_key_configuration_t* key_config) {
     lerror("InstallKey failed (status %s)", zx_status_get_string(result->error_value()));
     return result->error_value();
   }
-  return ZX_OK;
-}
-
-zx_status_t Device::StartPassiveScan(
-    const wlan_softmac_start_passive_scan_request_t* passive_scan_args, uint64_t* out_scan_id) {
-  auto arena = fdf::Arena::Create(0, 0);
-  if (arena.is_error()) {
-    lerror("Arena creation failed: %s", arena.status_string());
-    return ZX_ERR_INTERNAL;
-  }
-
-  fidl::Arena fidl_arena;
-  fuchsia_wlan_softmac::wire::WlanSoftmacStartPassiveScanRequest fidl_passive_scan_args;
-  ConvertPassiveScanArgs(*passive_scan_args, &fidl_passive_scan_args, fidl_arena);
-
-  auto result = client_.sync().buffer(*std::move(arena))->StartPassiveScan(fidl_passive_scan_args);
-  if (!result.ok()) {
-    lerror("StartPassiveScan failed (FIDL error %s)", result.status_string());
-    return result.status();
-  }
-  if (result->is_error()) {
-    lerror("StartPassiveScan failed (status %s)", zx_status_get_string(result->error_value()));
-    return result->error_value();
-  }
-
-  *out_scan_id = result->value()->scan_id();
   return ZX_OK;
 }
 

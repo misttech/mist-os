@@ -6,7 +6,7 @@ use {
     crate::{
         client::{convert_beacon::construct_bss_description, Context},
         ddk_converter::cssid_from_ssid_unchecked,
-        device::{ActiveScanArgs, DeviceOps, PassiveScanArgs},
+        device::{ActiveScanArgs, DeviceOps},
         error::Error,
         WlanSoftmacBandCapabilityExt as _,
     },
@@ -41,6 +41,8 @@ pub enum ScanError {
     MaxChannelTimeLtMin,
     #[error("fail starting device scan: {}", _0)]
     StartOffloadScanFails(zx::Status),
+    #[error("invalid response")]
+    InvalidResponse,
 }
 
 impl From<ScanError> for zx::Status {
@@ -51,6 +53,7 @@ impl From<ScanError> for zx::Status {
                 zx::Status::INVALID_ARGS
             }
             ScanError::StartOffloadScanFails(status) => status,
+            ScanError::InvalidResponse => zx::Status::INVALID_ARGS,
         }
     }
 }
@@ -66,6 +69,7 @@ impl From<ScanError> for fidl_mlme::ScanResultCode {
                 fidl_mlme::ScanResultCode::NotSupported
             }
             ScanError::StartOffloadScanFails(..) => fidl_mlme::ScanResultCode::InternalError,
+            ScanError::InvalidResponse => fidl_mlme::ScanResultCode::InternalError,
         }
     }
 }
@@ -209,18 +213,23 @@ impl<'a, D: DeviceOps> BoundScanner<'a, D> {
             in_progress_device_scan_id: self
                 .ctx
                 .device
-                .start_passive_scan(PassiveScanArgs {
-                    channels: req.channel_list,
+                .start_passive_scan(&fidl_softmac::WlanSoftmacBridgeStartPassiveScanRequest {
+                    channels: Some(req.channel_list),
                     // TODO(fxbug.dev/89933): A TimeUnit is generally limited to 2 octets. Conversion here
                     // is required since fuchsia.wlan.mlme/ScanRequest.min_channel_time has a width of
                     // four octets.
-                    min_channel_time: zx::Duration::from(TimeUnit(req.min_channel_time as u16))
-                        .into_nanos(),
-                    max_channel_time: zx::Duration::from(TimeUnit(req.max_channel_time as u16))
-                        .into_nanos(),
-                    min_home_time: MIN_HOME_TIME.into_nanos(),
+                    min_channel_time: Some(
+                        zx::Duration::from(TimeUnit(req.min_channel_time as u16)).into_nanos(),
+                    ),
+                    max_channel_time: Some(
+                        zx::Duration::from(TimeUnit(req.max_channel_time as u16)).into_nanos(),
+                    ),
+                    min_home_time: Some(MIN_HOME_TIME.into_nanos()),
+                    ..Default::default()
                 })
-                .map_err(|status| Error::ScanError(ScanError::StartOffloadScanFails(status)))?,
+                .map_err(|status| Error::ScanError(ScanError::StartOffloadScanFails(status)))?
+                .scan_id
+                .ok_or(Error::ScanError(ScanError::InvalidResponse))?,
         })
     }
 
@@ -728,15 +737,15 @@ mod tests {
         scanner.bind(&mut ctx).on_sme_scan(passive_scan_req()).expect("expect scan req accepted");
 
         // Verify that passive offload scan is requested
-        assert_variant!(
-            m.fake_device_state.lock().unwrap().captured_passive_scan_args,
-            Some(ref passive_scan_args) => {
-                assert_eq!(passive_scan_args.channels, vec![6]);
-                assert_eq!(passive_scan_args.min_channel_time, 102_400_000);
-                assert_eq!(passive_scan_args.max_channel_time, 307_200_000);
-                assert_eq!(passive_scan_args.min_home_time, 0);
-            },
-            "passive offload scan not initiated"
+        assert_eq!(
+            m.fake_device_state.lock().unwrap().captured_passive_scan_request,
+            Some(fidl_softmac::WlanSoftmacBridgeStartPassiveScanRequest {
+                channels: Some(vec![6]),
+                min_channel_time: Some(102_400_000),
+                max_channel_time: Some(307_200_000),
+                min_home_time: Some(0),
+                ..Default::default()
+            }),
         );
         let expected_scan_id = m.fake_device_state.lock().unwrap().next_scan_id - 1;
 
@@ -966,7 +975,7 @@ mod tests {
 
         // Verify that passive offload scan is requested
         assert_variant!(
-            m.fake_device_state.lock().unwrap().captured_passive_scan_args,
+            m.fake_device_state.lock().unwrap().captured_passive_scan_request,
             Some(_),
             "passive offload scan not initiated"
         );

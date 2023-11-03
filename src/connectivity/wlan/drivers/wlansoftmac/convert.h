@@ -45,9 +45,6 @@ void ConvertEnableBeaconing(const wlan_softmac_enable_beaconing_request_t& in,
 zx_status_t ConvertKeyConfig(const wlan_key_configuration_t& in,
                              fuchsia_wlan_softmac::wire::WlanKeyConfiguration* out,
                              fidl::AnyArena& arena);
-void ConvertPassiveScanArgs(const wlan_softmac_start_passive_scan_request_t& in,
-                            fuchsia_wlan_softmac::wire::WlanSoftmacStartPassiveScanRequest* out,
-                            fidl::AnyArena& arena);
 void ConvertActiveScanArgs(const wlan_softmac_start_active_scan_request_t& in,
                            fuchsia_wlan_softmac::wire::WlanSoftmacStartActiveScanRequest* out,
                            fidl::AnyArena& arena);

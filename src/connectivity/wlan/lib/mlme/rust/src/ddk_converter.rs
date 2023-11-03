@@ -242,12 +242,23 @@ mod tests {
     #[test]
     fn conversion_from_banjo_list_to_slice_successful() {
         let channels = vec![3, 4, 5];
-        let banjo = banjo_wlan_softmac::WlanSoftmacStartPassiveScanRequest {
-            channels_list: channels.as_ptr(),
-            channels_count: channels.len(),
+        let ssids = vec![];
+        let mac_header = vec![0xAA, 0xAA];
+        let ies = vec![0xBB, 0xBB, 0xBB];
+        let banjo = banjo_wlan_softmac::WlanSoftmacStartActiveScanRequest {
             min_channel_time: 0,
             max_channel_time: 100,
             min_home_time: 5,
+            min_probes_per_channel: 1,
+            max_probes_per_channel: 6,
+            ssids_list: ssids.as_ptr(),
+            ssids_count: ssids.len(),
+            channels_list: channels.as_ptr(),
+            channels_count: channels.len(),
+            mac_header_buffer: mac_header.as_ptr(),
+            mac_header_size: mac_header.len(),
+            ies_buffer: ies.as_ptr(),
+            ies_size: ies.len(),
         };
         assert_eq!(&channels, banjo_list_to_slice!(banjo, channels));
     }

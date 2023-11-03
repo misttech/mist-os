@@ -116,7 +116,7 @@ void WlantapMac::StartPassiveScan(StartPassiveScanRequestView request, fdf::Aren
   listener_->WlantapMacStartScan(scan_id);
   fidl::Arena fidl_arena;
   auto builder =
-      fuchsia_wlan_softmac::wire::WlanSoftmacStartPassiveScanResponse::Builder(fidl_arena);
+      fuchsia_wlan_softmac::wire::WlanSoftmacBridgeStartPassiveScanResponse::Builder(fidl_arena);
   builder.scan_id(scan_id);
   completer.buffer(arena).ReplySuccess(builder.Build());
 }

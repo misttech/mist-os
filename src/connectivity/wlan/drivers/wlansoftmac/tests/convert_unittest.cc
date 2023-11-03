@@ -464,40 +464,6 @@ TEST_F(ConvertTest, ToFidlKeyConfig) {
   }
 }
 
-TEST_F(ConvertTest, ToFidlPassiveScanArgs) {
-  log::Instance::Init(0);
-  // Populate wlan_softmac_start_passive_scan_request_t
-  uint8_t* channel_list =
-      (uint8_t*)calloc(wlan_ieee80211::kMaxUniqueChannelNumbers, sizeof(uint8_t));
-  for (size_t i = 0; i < wlan_ieee80211::kMaxUniqueChannelNumbers; i++) {
-    channel_list[i] = kFakeChannel;
-  }
-
-  wlan_softmac_start_passive_scan_request_t in = {
-      .channels_list = channel_list,
-      .channels_count = wlan_ieee80211::kMaxUniqueChannelNumbers,
-      .min_channel_time = kFakeDuration,
-      .max_channel_time = kFakeDuration,
-      .min_home_time = kFakeDuration,
-  };
-
-  // Conduct conversion
-  fidl::Arena arena;
-  wlan_softmac::WlanSoftmacStartPassiveScanRequest out;
-  ConvertPassiveScanArgs(in, &out, arena);
-
-  // Verify outputs
-  EXPECT_EQ(wlan_ieee80211::kMaxUniqueChannelNumbers, out.channels().count());
-  for (size_t i = 0; i < wlan_ieee80211::kMaxUniqueChannelNumbers; i++) {
-    EXPECT_EQ(kFakeChannel, out.channels().data()[i]);
-  }
-  EXPECT_EQ(kFakeDuration, out.min_channel_time());
-  EXPECT_EQ(kFakeDuration, out.max_channel_time());
-  EXPECT_EQ(kFakeDuration, out.min_home_time());
-
-  free(channel_list);
-}
-
 TEST_F(ConvertTest, ToFidlActiveScanArgs) {
   log::Instance::Init(0);
   // Populate wlan_softmac_start_active_scan_request_t
