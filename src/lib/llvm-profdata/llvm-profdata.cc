@@ -142,8 +142,13 @@ extern const int INSTR_PROF_PROFILE_RUNTIME_VAR = 0;
 [[gnu::section(".lprfc$A")]] static uint64_t CountersBegin[0] = {};
 [[gnu::section(".lprfc$Z")]] static uint64_t CountersEnd[0] = {};
 
+#ifdef INSTR_PROF_BITS_SECT_NAME
 [[gnu::section(".lprfb$A")]] static char BitmapBegin[0] = {};
 [[gnu::section(".lprfb$Z")]] static char BitmapEnd[0] = {};
+#else
+static char BitmapBegin[1] = {};
+constexpr char* BitmapEnd = BitmapBegin;
+#endif
 
 #elif defined(__APPLE__)
 
