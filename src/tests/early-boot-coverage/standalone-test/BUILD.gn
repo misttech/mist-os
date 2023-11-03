@@ -38,6 +38,17 @@ if (is_fuchsia) {
     sources = [ "standalone-main.cc" ]
     configs += [ ":coverage" ]
 
+    # In the coverage or profile variant, make sure the variant's flags can't
+    # interfere with the flags from our own config.
+    configs += [
+      "//build/config/profile",
+      "//build/config/profile:coverage",
+    ]
+    configs -= [
+      "//build/config/profile",
+      "//build/config/profile:coverage",
+    ]
+
     deps = [
       "//src/lib/llvm-profdata:coverage-example",
       "//src/zircon/testing/standalone-test",
