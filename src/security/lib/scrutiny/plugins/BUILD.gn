@@ -141,12 +141,7 @@ if (is_host) {
       "//src/developer/ffx/plugins/scrutiny/verify/*",
     ]
 
-    configs += [
-      ":test_config",
-
-      # TODO(fxbug.dev/92670): Needed by test.  Remove when fixed.
-      "//build/config/rust:output_dir_sensitive",
-    ]
+    configs += [ ":test_config" ]
 
     deps = [
       "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",

@@ -122,9 +122,6 @@ if (is_host) {
       "src/zbi.rs",
       "src/zstd.rs",
     ]
-
-    # TODO(fxbug.dev/92670): Needed by test.  Remove when fixed.
-    configs += [ "//build/config/rust:output_dir_sensitive" ]
   }
 
   config("test_config") {
@@ -145,9 +142,6 @@ if (is_host) {
     ]
 
     configs += [ ":test_config" ]
-
-    # TODO(fxbug.dev/92670): Needed by test.  Remove when fixed.
-    configs += [ "//build/config/rust:output_dir_sensitive" ]
 
     deps = [
       ":testdata($host_toolchain)",
