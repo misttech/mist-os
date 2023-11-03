@@ -3,20 +3,18 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, bail, Context, Error, Result};
+use include_str_from_working_dir::include_str_from_working_dir_env;
 use proc_macro::TokenStream;
 use quote::quote;
 use serde_json::Value;
-use std::{
-    convert::{TryFrom, TryInto},
-    env,
-};
+use std::convert::{TryFrom, TryInto};
 
 const FFX_CONFIG_DEFAULT: &'static str = "ffx_config_default";
 
 #[proc_macro]
 pub fn include_default(_input: TokenStream) -> TokenStream {
     // Test deserializing the default configuration file at compile time.
-    let default = include_str!(env!("FFX_DEFAULT_CONFIG_JSON"));
+    let default = include_str_from_working_dir_env!("FFX_DEFAULT_CONFIG_JSON");
     // This is being used as a way of validating the default json.
     // This should not happen as the JSON file is built using json_merge which does validation, but
     // leaving this here as the last line of defense.

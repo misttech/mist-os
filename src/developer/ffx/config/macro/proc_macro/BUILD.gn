@@ -11,9 +11,8 @@ config_target = "//src/developer/ffx:ffx-defaults.json"
 config_path =
     get_label_info(config_target, "target_out_dir") + "/ffx-defaults.json"
 
-# Rust looks for files included with `include_str` relative to the
-# callsite. Rebase the config path relative to the files in src/.
-rebased_config_path = rebase_path(config_path, "src")
+# This path can now be relative to where rustc is invoked.
+rebased_config_path = rebase_path(config_path, root_build_dir)
 
 rustc_macro("config-proc-macros") {
   name = "config_proc_macros"
@@ -22,13 +21,8 @@ rustc_macro("config-proc-macros") {
 
   rustenv = [ "FFX_DEFAULT_CONFIG_JSON=$rebased_config_path" ]
 
-  # The config_path file is referenced from the source dir *to* the
-  # output dir, which means the output dir leaks into the command.
-  # This command will only succeed with a matching output dir,
-  # so we must disable working-dir canonicalization.
-  configs += [ "//build/config/rust:output_dir_sensitive" ]
-
   deps = [
+    "//src/lib/include_str_from_working_dir",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:proc-macro2",
     "//third_party/rust_crates:quote",
