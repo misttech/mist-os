@@ -167,7 +167,7 @@ func (r *RunCommand) SetFlags(f *flag.FlagSet) {
 	f.BoolVar(&r.testrunnerOptions.UseSerial, "use-serial", false, "Use serial to run tests on the target.")
 }
 
-func (r *RunCommand) setupFFX(ctx context.Context, fuchsiaTargets []targets.FuchsiaTarget, primaryTarget targets.FuchsiaTarget, removeFFXOutputsDir *bool) (func(), error) {
+func (r *RunCommand) setupFFX(ctx context.Context, fuchsiaTargets []targets.FuchsiaTarget, primaryTarget targets.FuchsiaTarget) (func(), error) {
 	var cleanup func()
 	ffxOutputsDir := filepath.Join(os.Getenv(testrunnerconstants.TestOutDirEnvKey), "ffx_outputs")
 
@@ -236,9 +236,6 @@ func (r *RunCommand) setupFFX(ctx context.Context, fuchsiaTargets []targets.Fuch
 			<-cmdWait
 			if err := daemonLog.Close(); err != nil {
 				logger.Errorf(ctx, "failed to close ffx daemon log: %s", err)
-			}
-			if *removeFFXOutputsDir {
-				os.RemoveAll(ffxOutputsDir)
 			}
 		}
 	}
@@ -458,8 +455,7 @@ func (r *RunCommand) execute(ctx context.Context, args []string) error {
 	// streamed from.
 	primaryTarget := fuchsiaTargets[0]
 
-	removeFFXOutputsDir := false
-	cleanup, err := r.setupFFX(ctx, fuchsiaTargets, primaryTarget, &removeFFXOutputsDir)
+	cleanup, err := r.setupFFX(ctx, fuchsiaTargets, primaryTarget)
 	if cleanup != nil {
 		defer cleanup()
 	}
@@ -492,9 +488,6 @@ func (r *RunCommand) execute(ctx context.Context, args []string) error {
 		return err
 	}
 
-	// In the case of a successful run, remove the ffx_outputs dir which contains ffx logs.
-	// These logs can be very large, so we should only upload them in the case of a failure.
-	removeFFXOutputsDir = true
 	return nil
 }
 
