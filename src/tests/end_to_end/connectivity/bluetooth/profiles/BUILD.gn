@@ -1,0 +1,10 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+assert(is_host, "Bluetooth E2E Profile tests are host-only")
+
+group("e2e_tests_smoke") {
+  testonly = true
+  public_deps = [ "gap:e2e_gap_test" ]
+}

@@ -1,6 +1,7 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
+assert(is_host, "Bluetooth E2E tests are host-only")
 
 import("//build/python/python_library.gni")
 
@@ -12,4 +13,9 @@ python_library("bluetooth_utils") {
     "__init__.py",
     "bluetooth_utils.py",
   ]
+}
+
+group("e2e_tests_smoke") {
+  testonly = true
+  public_deps = [ "profiles:e2e_tests_smoke" ]
 }
