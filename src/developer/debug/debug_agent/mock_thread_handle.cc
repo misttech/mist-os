@@ -10,7 +10,7 @@
 
 namespace debug_agent {
 
-zx::thread MockThreadHandle::null_handle_;
+NativeThreadHandle MockThreadHandle::null_handle_;
 
 MockThreadHandle::MockThreadHandle(zx_koid_t thread_koid, std::string name)
     : thread_koid_(thread_koid), name_(std::move(name)), suspend_count_(std::make_shared<int>(0)) {

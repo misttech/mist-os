@@ -10,7 +10,7 @@
 
 namespace debug_agent {
 
-zx::process MockProcessHandle::null_handle_;
+NativeProcessHandle MockProcessHandle::null_handle_;
 
 MockProcessHandle::MockProcessHandle(zx_koid_t process_koid, std::string name)
     : process_koid_(process_koid), name_(std::move(name)) {

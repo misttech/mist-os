@@ -7,13 +7,18 @@
 
 #include <lib/fit/function.h>
 #include <lib/fit/result.h>
-#include <lib/zx/process.h>
 #include <zircon/types.h>
 
 #include <memory>
 #include <vector>
 
 #include "src/developer/debug/shared/status.h"
+
+#if defined(__Fuchsia__)
+#include <lib/zx/process.h>
+#elif defined(__linux__)
+#include "src/developer/debug/debug_agent/linux_task.h"
+#endif
 
 namespace debug_ipc {
 struct AddressRegion;
@@ -62,6 +67,13 @@ class ThreadHandle;
 // matches the value of ZX_PROP_PROCESS_BREAK_ON_LOAD. If so, it should update the module list and
 // continue the execution.
 // LINT.ThenChange(//src/starnix/kernel/execution/shared.rs)
+#if defined(__Fuchsia__)
+using NativeProcessHandle = zx::process;
+#elif defined(__linux__)
+using NativeProcessHandle = fxl::RefPtr<LinuxTask>;
+#else
+#error Unknown platform
+#endif
 
 class ProcessHandle {
  public:
@@ -71,8 +83,8 @@ class ProcessHandle {
   // object would encapsulate all details about the process for testing purposes and this getter
   // would be removed. In testing situations, the returned value may be an empty object,
   // TODO(brettw) Remove this.
-  virtual const zx::process& GetNativeHandle() const = 0;
-  virtual zx::process& GetNativeHandle() = 0;
+  virtual const NativeProcessHandle& GetNativeHandle() const = 0;
+  virtual NativeProcessHandle& GetNativeHandle() = 0;
 
   virtual zx_koid_t GetKoid() const = 0;
   virtual std::string GetName() const = 0;

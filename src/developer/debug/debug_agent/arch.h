@@ -65,24 +65,10 @@ uint32_t GetHardwareWatchpointCount();
 // Converts the given register structure to a vector of debug_ipc registers.
 void SaveGeneralRegs(const PlatformGeneralRegisters& input, std::vector<debug::RegisterValue>& out);
 
-// The registers in the given category are appended to the given output vector.
-zx_status_t ReadRegisters(const zx::thread& thread, const debug::RegisterCategory& cat,
-                          std::vector<debug::RegisterValue>& out);
-
-// The registers must all be in the same category.
-zx_status_t WriteRegisters(zx::thread& thread, const debug::RegisterCategory& cat,
-                           const std::vector<debug::RegisterValue>& registers);
-
 // Given the current register value in |regs|, applies to it the new updated values for the
 // registers listed in |updates|.
 zx_status_t WriteGeneralRegisters(const std::vector<debug::RegisterValue>& updates,
                                   PlatformGeneralRegisters* regs);
-zx_status_t WriteFloatingPointRegisters(const std::vector<debug::RegisterValue>& update,
-                                        zx_thread_state_fp_regs_t* regs);
-zx_status_t WriteVectorRegisters(const std::vector<debug::RegisterValue>& update,
-                                 zx_thread_state_vector_regs_t* regs);
-zx_status_t WriteDebugRegisters(const std::vector<debug::RegisterValue>& update,
-                                zx_thread_state_debug_regs_t* regs);
 
 // Writes the register data to the given output variable, checking that the register data is
 // the same size as the output.

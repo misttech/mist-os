@@ -5,8 +5,6 @@
 #ifndef SRC_DEVELOPER_DEBUG_DEBUG_AGENT_THREAD_HANDLE_H_
 #define SRC_DEVELOPER_DEBUG_DEBUG_AGENT_THREAD_HANDLE_H_
 
-#include <lib/zx/thread.h>
-
 #include <optional>
 #include <vector>
 
@@ -17,8 +15,23 @@
 #include "src/developer/debug/debug_agent/watchpoint_info.h"
 #include "src/developer/debug/ipc/records.h"
 #include "src/developer/debug/shared/register_info.h"
+#include "src/lib/fxl/memory/ref_counted.h"
+
+#if defined(__Fuchsia__)
+#include <lib/zx/thread.h>
+#elif defined(__linux__)
+#include "src/developer/debug/debug_agent/linux_task.h"
+#endif
 
 namespace debug_agent {
+
+#if defined(__Fuchsia__)
+using NativeThreadHandle = zx::thread;
+#elif defined(__linux__)
+using NativeThreadHandle = fxl::RefPtr<LinuxTask>;
+#else
+#error Unknown platform
+#endif
 
 // An abstract wrapper around an OS thread primitive. This abstraction is to allow mocking.
 class ThreadHandle {
@@ -49,8 +62,8 @@ class ThreadHandle {
   // object would encapsulate all details about the thread for testing purposes and this getter
   // would be removed. In testing situations, the returned value may be an empty object,
   // TODO(brettw) Remove this.
-  virtual const zx::thread& GetNativeHandle() const = 0;
-  virtual zx::thread& GetNativeHandle() = 0;
+  virtual const NativeThreadHandle& GetNativeHandle() const = 0;
+  virtual NativeThreadHandle& GetNativeHandle() = 0;
 
   virtual zx_koid_t GetKoid() const = 0;
   virtual std::string GetName() const = 0;

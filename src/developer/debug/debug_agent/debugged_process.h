@@ -17,7 +17,6 @@
 #include "src/developer/debug/debug_agent/process_handle_observer.h"
 #include "src/developer/debug/debug_agent/stdio_handles.h"
 #include "src/developer/debug/ipc/protocol.h"
-#include "src/developer/debug/shared/buffered_zx_socket.h"
 #include "src/developer/debug/shared/message_loop.h"
 #include "src/lib/fxl/macros.h"
 

@@ -6,6 +6,7 @@
 
 #include "src/developer/debug/debug_agent/arch.h"
 #include "src/developer/debug/debug_agent/test_utils.h"
+#include "src/developer/debug/debug_agent/zircon_arch.h"
 #include "src/developer/debug/shared/logging/file_line_function.h"
 #include "src/developer/debug/shared/register_test_support.h"
 #include "src/developer/debug/shared/zx_status.h"

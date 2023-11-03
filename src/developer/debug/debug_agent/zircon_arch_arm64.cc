@@ -12,6 +12,7 @@
 #include "src/developer/debug/debug_agent/arch.h"
 #include "src/developer/debug/debug_agent/arch_types.h"
 #include "src/developer/debug/debug_agent/debugged_thread.h"
+#include "src/developer/debug/debug_agent/zircon_arch.h"
 #include "src/developer/debug/ipc/decode_exception.h"
 #include "src/developer/debug/shared/logging/logging.h"
 #include "src/developer/debug/shared/register_info.h"

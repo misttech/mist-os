@@ -45,8 +45,8 @@ class MockProcessHandle final : public ProcessHandle {
   bool is_attached() const { return is_attached_; }
 
   // ProcessHandle implementation.
-  const zx::process& GetNativeHandle() const override { return null_handle_; }
-  zx::process& GetNativeHandle() override { return null_handle_; }
+  const NativeProcessHandle& GetNativeHandle() const override { return null_handle_; }
+  NativeProcessHandle& GetNativeHandle() override { return null_handle_; }
   zx_koid_t GetKoid() const override { return process_koid_; }
   std::string GetName() const override { return name_; }
   std::vector<std::unique_ptr<ThreadHandle>> GetChildThreads() const override;
@@ -71,7 +71,7 @@ class MockProcessHandle final : public ProcessHandle {
  private:
   // Always null, for returning only from the getters above.
   // TODO(brettw) Remove this when the ThreadHandle no longer exposes a zx::thread getter.
-  static zx::process null_handle_;
+  static NativeProcessHandle null_handle_;
 
   zx_koid_t process_koid_;
   zx_koid_t job_koid_ = ZX_KOID_INVALID;

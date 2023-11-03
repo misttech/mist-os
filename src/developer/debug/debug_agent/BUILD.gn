@@ -53,14 +53,26 @@ static_library("lib") {
     "stdio_handles.h",
     "system_interface.cc",
     "system_interface.h",
-    "test_realm.cc",
-    "test_realm.h",
     "thread_handle.h",
     "time.h",
     "unwind.cc",
     "unwind.h",
     "watchpoint.cc",
     "watchpoint.h",
+  ]
+
+  public_deps = [
+    "//sdk/lib/fit",
+    "//src/developer/debug/ipc",
+    "//src/developer/debug/shared",
+    "//src/lib/containers/cpp",
+    "//third_party/googletest:gtest_prod",
+    "//zircon/system/ulib/zx",
+  ]
+
+  deps = [
+    "//src/lib/elflib",
+    "//src/lib/unwinder",
   ]
 
   # OS-independent architecture specific files.
@@ -86,6 +98,8 @@ static_library("lib") {
 
   if (is_fuchsia) {
     sources += [
+      "test_realm.cc",
+      "test_realm.h",
       "zircon_arch.h",
       "zircon_binary_launcher.cc",
       "zircon_binary_launcher.h",
@@ -109,6 +123,27 @@ static_library("lib") {
       "zircon_utils.h",
     ]
 
+    public_deps += [
+      "//sdk/fidl/fuchsia.exception:fuchsia.exception_cpp",
+      "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+      "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
+      "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_cpp",
+      "//sdk/fidl/fuchsia.test.manager:fuchsia.test.manager_cpp",
+      "//sdk/lib/syslog/cpp",
+      "//src/lib/fxl",
+      "//src/lib/process",
+      "//third_party/crashpad/src/minidump",
+      "//third_party/crashpad/src/snapshot",
+      "//third_party/crashpad/src/util",
+      "//zircon/system/ulib/async-loop:async-loop-cpp",
+      "//zircon/system/ulib/async-loop:async-loop-default",
+    ]
+
+    deps += [
+      "//sdk/lib/component/incoming/cpp",
+      "//src/lib/diagnostics/accessor2logger",
+    ]
+
     # Fuchsia architecture-specific files.
     if (current_cpu == "x64") {
       sources += [ "zircon_arch_x64.cc" ]
@@ -123,35 +158,6 @@ static_library("lib") {
       assert(false, "Un-supported CPU: ${current_cpu}")
     }
   }
-
-  deps = [
-    "//sdk/lib/component/incoming/cpp",
-    "//src/lib/diagnostics/accessor2logger",
-    "//src/lib/elflib",
-    "//src/lib/unwinder",
-  ]
-
-  public_deps = [
-    "//sdk/fidl/fuchsia.exception:fuchsia.exception_cpp",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
-    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
-    "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_cpp",
-    "//sdk/fidl/fuchsia.test.manager:fuchsia.test.manager_cpp",
-    "//sdk/lib/fit",
-    "//sdk/lib/syslog/cpp",
-    "//src/developer/debug/ipc",
-    "//src/developer/debug/shared",
-    "//src/lib/containers/cpp",
-    "//src/lib/fxl",
-    "//src/lib/process",
-    "//third_party/crashpad/src/minidump",
-    "//third_party/crashpad/src/snapshot",
-    "//third_party/crashpad/src/util",
-    "//third_party/googletest:gtest_prod",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/zx",
-  ]
 
   # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
@@ -260,57 +266,66 @@ source_set("test_lib") {
 test("unit_tests") {
   output_name = "debug_agent_unit_tests"
 
-  sources = [
-    "align_unittest.cc",
-    "automation_instruction_executor_unittest.cc",
-    "breakpoint_unittest.cc",
-    "debug_agent_unittest.cc",
-    "debugged_process_unittest.cc",
-    "debugged_thread_breakpoint_unittest.cc",
-    "debugged_thread_unittest.cc",
-    "elf_utils_unittest.cc",
-    "filter_unittest.cc",
-    "hardware_breakpoint_unittest.cc",
-    "software_breakpoint_unittest.cc",
-    "system_interface_unittest.cc",
-    "time_zircon_unittest.cc",
-    "unwind_unittest.cc",
-    "watchpoint_unittest.cc",
-    "zircon_limbo_provider_unittest.cc",
-    "zircon_system_interface_unittest.cc",
-  ]
-
-  if (current_cpu == "x64") {
-    sources += [
-      "arch_x64_unittest.cc",
-      "debug_registers_x64_unittest.cc",
-    ]
-  } else if (current_cpu == "arm64") {
-    sources += [
-      "arch_arm64_unittest.cc",
-      "debug_registers_arm64_unittest.cc",
-    ]
-  } else if (current_cpu == "riscv64") {
-    # TODO(https://fxbug.dev/123097): Implement this.
-    sources += [
-      # "arch_riscv64_unittest.cc",
-      # "debug_registers_riscv64_unittest.cc",
-    ]
-  } else {
-    assert(false, "Un-supported CPU: ${current_cpu}")
-  }
+  sources = [ "align_unittest.cc" ]
 
   deps = [
     ":test_lib",
-    "//sdk/lib/component/incoming/cpp",
-    "//sdk/lib/component/outgoing/cpp",
-    "//src/developer/debug/ipc:tests",
-    "//src/developer/debug/shared:tests",
     "//src/lib/elflib",
     "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
   ]
+
+  if (is_fuchsia) {
+    sources += [
+      "automation_instruction_executor_unittest.cc",
+      "breakpoint_unittest.cc",
+      "debug_agent_unittest.cc",
+      "debugged_process_unittest.cc",
+      "debugged_thread_breakpoint_unittest.cc",
+      "debugged_thread_unittest.cc",
+      "elf_utils_unittest.cc",
+      "filter_unittest.cc",
+      "hardware_breakpoint_unittest.cc",
+      "software_breakpoint_unittest.cc",
+      "system_interface_unittest.cc",
+      "time_zircon_unittest.cc",
+      "unwind_unittest.cc",
+      "watchpoint_unittest.cc",
+      "zircon_limbo_provider_unittest.cc",
+      "zircon_system_interface_unittest.cc",
+    ]
+
+    if (current_cpu == "x64") {
+      sources += [
+        "arch_x64_unittest.cc",
+        "debug_registers_x64_unittest.cc",
+      ]
+    } else if (current_cpu == "arm64") {
+      sources += [
+        "arch_arm64_unittest.cc",
+        "debug_registers_arm64_unittest.cc",
+      ]
+    } else if (current_cpu == "riscv64") {
+      # TODO(https://fxbug.dev/123097): Implement this.
+      sources += [
+        # "arch_riscv64_unittest.cc",
+        # "debug_registers_riscv64_unittest.cc",
+      ]
+    } else {
+      assert(false, "Un-supported CPU: ${current_cpu}")
+    }
+
+    deps += [
+      "//sdk/lib/component/incoming/cpp",
+      "//sdk/lib/component/outgoing/cpp",
+
+      # Only include these here in the Fuchsia build because on the host build they're included in
+      # the zxdb_unit_tests.
+      "//src/developer/debug/ipc:tests",
+      "//src/developer/debug/shared:tests",
+    ]
+  }
 
   # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
@@ -347,4 +362,7 @@ group("tests") {
     ":debug_agent_integration_tests",
     ":debug_agent_unit_tests",
   ]
+  if (host_os == "linux") {
+    deps += [ ":unit_tests($host_toolchain)" ]
+  }
 }

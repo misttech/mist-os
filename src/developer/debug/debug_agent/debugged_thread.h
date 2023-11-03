@@ -41,8 +41,8 @@ class DebuggedThread {
   bool is_client_suspended() const { return client_suspend_handle_.get(); }
 
   // TODO(brettw) remove this and have all callers use thread_handle().
-  zx::thread& handle() { return thread_handle_->GetNativeHandle(); }
-  const zx::thread& handle() const { return thread_handle_->GetNativeHandle(); }
+  NativeThreadHandle& handle() { return thread_handle_->GetNativeHandle(); }
+  const NativeThreadHandle& handle() const { return thread_handle_->GetNativeHandle(); }
 
   ExceptionHandle* exception_handle() { return exception_handle_.get(); }
   const ExceptionHandle* exception_handle() const { return exception_handle_.get(); }

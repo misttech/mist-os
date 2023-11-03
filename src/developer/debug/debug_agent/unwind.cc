@@ -10,7 +10,7 @@
 #include "src/developer/debug/debug_agent/process_handle.h"
 #include "src/developer/debug/debug_agent/thread_handle.h"
 #include "src/developer/debug/ipc/unwinder_support.h"
-#include "src/lib/unwinder/fuchsia.h"
+#include "src/lib/unwinder/platform.h"
 #include "src/lib/unwinder/unwind.h"
 
 namespace debug_agent {
@@ -27,8 +27,10 @@ void AddThreadRegs(const GeneralRegisters& source, debug_ipc::StackFrame* dest) 
   const auto& native_regs = source.GetNativeRegisters();
 
 #if defined(__x86_64__)
-  dest->regs.emplace_back(RegisterID::kX64_fsbase, native_regs.fs_base);
-  dest->regs.emplace_back(RegisterID::kX64_gsbase, native_regs.gs_base);
+  // Linux defines fs_base and gs_base as "unsigned long long" which requires a cast to be
+  // unambiguous given the many Register constructor variants.
+  dest->regs.emplace_back(RegisterID::kX64_fsbase, static_cast<uint64_t>(native_regs.fs_base));
+  dest->regs.emplace_back(RegisterID::kX64_gsbase, static_cast<uint64_t>(native_regs.gs_base));
 #elif defined(__aarch64__)
   dest->regs.emplace_back(RegisterID::kARMv8_tpidr, native_regs.tpidr);
 #else
@@ -42,13 +44,20 @@ zx_status_t UnwindStack(const ProcessHandle& process, const ModuleList& modules,
                         const ThreadHandle& thread, const GeneralRegisters& regs, size_t max_depth,
                         std::vector<debug_ipc::StackFrame>* stack) {
   // Prepare arguments for unwinder::Unwind.
+#if defined(__Fuchsia__)
   unwinder::FuchsiaMemory memory(process.GetNativeHandle().get());
+#elif defined(__linux__)
+  unwinder::LinuxMemory memory(process.GetKoid());
+#else
+#error Need unwinder memory for this platform.
+#endif
+
   std::vector<uint64_t> module_bases;
   module_bases.reserve(modules.modules().size());
   for (const auto& module : modules.modules()) {
     module_bases.push_back(module.base);
   }
-  auto registers = unwinder::FromFuchsiaRegisters(regs.GetNativeRegisters());
+  auto registers = unwinder::FromPlatformRegisters(regs.GetNativeRegisters());
 
   // Request one more frame for the CFA of the last frame.
   auto frames = unwinder::Unwind(&memory, module_bases, registers, max_depth + 1);

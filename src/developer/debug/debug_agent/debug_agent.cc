@@ -36,6 +36,10 @@
 #include "src/lib/fxl/strings/concatenate.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
+#if defined(__linux__)
+#include <unistd.h>
+#endif
+
 namespace debug_agent {
 
 namespace {
@@ -139,8 +143,15 @@ void DebugAgent::OnHello(const debug_ipc::HelloRequest& request, debug_ipc::Hell
   // Signature is default-initialized.
   reply->version = ipc_version_;
   reply->arch = arch::GetCurrentArch();
-  reply->page_size = zx_system_get_page_size();
   reply->platform = debug::CurrentSystemPlatform();
+
+#if defined(__Fuchsia__)
+  reply->page_size = zx_system_get_page_size();
+#elif defined(__linux__)
+  reply->page_size = getpagesize();
+#else
+#error Need platform page size.
+#endif
 
   // Only enable log backend after the handshake is finished.
   debug::LogBackend::Set(this, true);
