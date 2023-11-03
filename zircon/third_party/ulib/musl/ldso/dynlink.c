@@ -217,7 +217,8 @@ __asm__(
 #elif defined(__aarch64__)
     "brk #0\n"
 #elif defined(__riscv)
-    "ebreak\n"
+    // Use explicit c.ebreak to ensure it's a known 2-byte instruction.
+    "c.ebreak\n"
 #else
 #error "what machine?"
 #endif

@@ -25,7 +25,5 @@ fuchsia_unittest_package("inspector-test-pkg") {
 
 group("tests") {
   testonly = true
-  if (current_cpu != "riscv64") {  # TODO(fxbug.dev/132879): not working yet
-    deps = [ ":inspector-test-pkg" ]
-  }
+  deps = [ ":inspector-test-pkg" ]
 }

@@ -15,27 +15,32 @@
 
 namespace {
 
+#if defined(__aarch64__)
+#define BKPT_PC_ADVANCE 4
+#elif defined(__riscv)
+// Note this assumes `c.ebreak`, which is what `ebreak` produces when C is
+// enabled, and thus what `__builtin_debugtrap()` thus will produce.
+#define BKPT_PC_ADVANCE 2
+#else
+#define BKPT_PC_ADVANCE 0
+#endif
+
 // A ZX_EXCP_SW_BREAKPOINT requires some registers tune-up in order to be handled correctly
 // depending on the architecture. This functions takes care of the correct setup of the program
 // counter so that the exception can be resumed successfully.
 zx_status_t cleanup_breakpoint(zx_handle_t thread) {
-#if defined(__x86_64__)
-  // On x86, the pc is left at one past the s/w break insn,
-  // so there's nothing more we need to do.
-  return ZX_OK;
-#elif defined(__aarch64__) || defined(__riscv)
-  // Skip past the brk instruction.
+#if BKPT_PC_ADVANCE > 0
+  // Skip past the breakpoint instruction.
   zx_thread_state_general_regs_t regs = {};
   zx_status_t status =
       zx_thread_read_state(thread, ZX_THREAD_STATE_GENERAL_REGS, &regs, sizeof(regs));
   if (status != ZX_OK)
     return status;
 
-  regs.pc += 4;
+  regs.pc += BKPT_PC_ADVANCE;
   return zx_thread_write_state(thread, ZX_THREAD_STATE_GENERAL_REGS, &regs, sizeof(regs));
-#else
-  return ZX_ERR_NOT_SUPPORTED;
 #endif
+  return ZX_OK;
 }
 
 struct dyn_break_on_load_state_t {
@@ -63,6 +68,14 @@ void dyn_break_on_load_test_handler(inferior_data_t* data, const zx_port_packet_
   ASSERT_EQ(status, ZX_OK);
 
   switch (info.type) {
+    case ZX_EXCP_THREAD_STARTING: {
+      printf("thread started\n");
+      break;
+    }
+    case ZX_EXCP_THREAD_EXITING: {
+      printf("thread exited\n");
+      break;
+    }
     case ZX_EXCP_SW_BREAKPOINT: {
       printf("Got ld.so breakpoint.\n");
       test_state->dyn_load_count++;
@@ -101,7 +114,7 @@ void dyn_break_on_load_test_handler(inferior_data_t* data, const zx_port_packet_
       rip = regs.pc;
 #endif
 
-      // The address of the breakpoint should euqal to the value of ZX_PROP_PROCESS_BREAK_ON_LOAD.
+      // The address of the breakpoint should equal the value of ZX_PROP_PROCESS_BREAK_ON_LOAD.
       uintptr_t break_on_load_addr;
       status = zx_object_get_property(test_state->process_handle, ZX_PROP_PROCESS_BREAK_ON_LOAD,
                                       &break_on_load_addr, sizeof(break_on_load_addr));
@@ -111,10 +124,17 @@ void dyn_break_on_load_test_handler(inferior_data_t* data, const zx_port_packet_
 
       break;
     }
-    default:
+    default: {
       printf("Unexpected exception %s (%u) on thread %lu\n", tu_exception_to_string(info.type),
              info.type, info.tid);
+      zx::thread thread;
+      status = exception.get_thread(&thread);
+      ASSERT_EQ(status, ZX_OK);
+      zx_thread_state_general_regs_t regs = {};
+      read_inferior_gregs(thread.get(), &regs);
+      dump_gregs(thread.get(), &regs);
       break;
+    }
   }
 
   uint32_t state = ZX_EXCEPTION_STATE_HANDLED;

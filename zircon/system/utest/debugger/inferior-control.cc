@@ -157,6 +157,7 @@ void setup_inferior(const char* name, springboard_t** out_sb, zx_handle_t* out_i
 
   const char* test_child_path = g_program_path;
   const char* const argv[] = {test_child_path, name};
+  const char* const envp[] = {"LD_DEBUG=1"};
 
   // Only pass stdout and stderr.
   zx_handle_t handles[3];
@@ -169,8 +170,8 @@ void setup_inferior(const char* name, springboard_t** out_sb, zx_handle_t* out_i
   handle_ids[2] = PA_USER0;
 
   printf("Creating process \"%s\"\n", name);
-  springboard_t* sb = tu_launch_init(zx_job_default(), name, std::size(argv), argv, 0, NULL,
-                                     std::size(handles), handles, handle_ids);
+  springboard_t* sb = tu_launch_init(zx_job_default(), name, std::size(argv), argv, std::size(envp),
+                                     envp, std::size(handles), handles, handle_ids);
 
   // Note: |inferior| is a borrowed handle here.
   zx_handle_t inferior = springboard_get_process_handle(sb);

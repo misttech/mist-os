@@ -19,6 +19,16 @@
 
 namespace {
 
+#if defined(__aarch64__)
+#define BKPT_PC_ADVANCE 4
+#elif defined(__riscv)
+// Note this assumes `c.ebreak`, which is what `ebreak` produces when C is
+// enabled, and thus what `__builtin_debugtrap()` thus will produce.
+#define BKPT_PC_ADVANCE 2
+#else
+#define BKPT_PC_ADVANCE 0
+#endif
+
 // Test utilities ----------------------------------------------------------------------------------
 
 constexpr int kLoopThreadCount = 5;
@@ -75,9 +85,10 @@ std::string GetProcessName() {
 }
 
 void ResumeException(ThreadContext* context, ExceptionReport* report) {
-#if defined(__aarch64__)
-  // Skip past the brk instruction. Otherwise the breakpoint will trigger again.
-  report->regs.pc += 4;
+#if BKPT_PC_ADVANCE > 0
+  // Skip past the breakpoint instruction.
+  // Otherwise the breakpoint will trigger again.
+  report->regs.pc += BKPT_PC_ADVANCE;
   ASSERT_OK(context->thread->write_state(ZX_THREAD_STATE_GENERAL_REGS, &report->regs,
                                          sizeof(report->regs)));
 #endif
@@ -122,7 +133,7 @@ __asm__(
     // a val_expression rule to test the unwinder's val_expression support.
     // DW_CFA_val_expression, regno 1, BLOCK(DW_OP_breg1 0)
     ".cfi_escape 0x16, 1, 2, 0x71, 0\n"
-    "ebreak\n"
+    "c.ebreak\n"
 #elif defined(__x86_64__)
     ".cfi_return_column 16\n"
     // DW_CFA_val_expression, regno 16, BLOCK(DW_OP_breg16 0)
