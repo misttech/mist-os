@@ -961,13 +961,13 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                         if current_range.end <= current_range.start {
                             current_range = ranges.next().unwrap().clone();
                         }
-                        let l = std::cmp::min(len, current_range.end - current_range.start);
-                        let tail = checksums.split_off((l / block_size) as usize);
+                        let chunk_len = std::cmp::min(len, current_range.end - current_range.start);
+                        let tail = checksums.split_off((chunk_len / block_size) as usize);
                         mutations.push(Mutation::merge_object(
                             ObjectKey::extent(
                                 self.object_id(),
                                 attribute_id,
-                                current_range.start..current_range.start + l,
+                                current_range.start..current_range.start + chunk_len,
                             ),
                             ObjectValue::Extent(ExtentValue::with_checksum(
                                 device_offset,
@@ -975,9 +975,9 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                             )),
                         ));
                         checksums = tail;
-                        device_offset += l;
-                        len -= l;
-                        current_range.start += l;
+                        device_offset += chunk_len;
+                        len -= chunk_len;
+                        current_range.start += chunk_len;
                     }
                 }
                 Result::<_, Error>::Ok(mutations)
