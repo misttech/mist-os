@@ -21,14 +21,22 @@ pub(crate) fn do_ssh(host: String, target: TargetInfo, repo_port: u32) -> Result
 }
 
 fn build_ssh_args(target: TargetInfo, repo_port: u32) -> Result<Vec<String>> {
-    let target_ip: TargetAddr = target
+    let mut addrs: Vec<TargetAddr> = target
         .addresses
         .ok_or("target address list uninitialized")
         .map_err(|e| anyhow!("Error getting target addresses: {}", e))?
+        .into_iter()
+        .map(|addrinfo| TargetAddr::from(addrinfo))
+        .collect::<Vec<TargetAddr>>();
+
+    // Flip the sorting so that Ipv6 comes before Ipv4 as we will take the first
+    // address, and (generally) Ipv4 addresses from the Target are ephemeral
+    addrs.sort_by(|a, b| b.cmp(a));
+
+    let target_ip = addrs
         .first()
         .ok_or("target address list was empty")
-        .map_err(|e| anyhow!("Error getting target addresses: {}", e))?
-        .into();
+        .map_err(|e| anyhow!("Error getting target addresses: {}", e))?;
 
     let res: Vec<String> = vec![
         // We want ipv6 binds for the port forwards
@@ -70,9 +78,9 @@ fn build_ssh_args(target: TargetInfo, repo_port: u32) -> Result<Vec<String>> {
 mod test {
     use super::*;
     use fidl_fuchsia_developer_ffx::{TargetAddrInfo, TargetIp};
-    use fidl_fuchsia_net::{IpAddress, Ipv6Address};
+    use fidl_fuchsia_net::{IpAddress, Ipv4Address, Ipv6Address};
     use pretty_assertions::assert_eq;
-    use std::net::Ipv6Addr;
+    use std::net::{Ipv4Addr, Ipv6Addr};
 
     #[test]
     fn test_make_args() -> Result<()> {
@@ -83,9 +91,14 @@ mod test {
             scope_id: 2,
         });
 
+        let src_ipv4 = TargetAddrInfo::Ip(TargetIp {
+            ip: IpAddress::Ipv4(Ipv4Address { addr: Ipv4Addr::new(127, 0, 0, 1).octets() }),
+            scope_id: 0,
+        });
+
         let target = TargetInfo {
             nodename: Some("kiriona".to_string()),
-            addresses: Some(vec![src]),
+            addresses: Some(vec![src_ipv4, src]),
             ..Default::default()
         };
 
