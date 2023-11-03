@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+assert(is_fuchsia, "component manager is for the Fuchsia toolchain only")
+
 import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/component/component_id_index.gni")
 import("//build/component/config.gni")
@@ -342,11 +344,21 @@ group("tests") {
 
   deps = [
     ":component-manager-tests",
+    ":hermetic_tests",
+    "lib:non_hermetic_tests",
+    "tests:non_hermetic_tests",
+  ]
+}
+
+group("hermetic_tests") {
+  testonly = true
+
+  deps = [
     "bedrock:tests",
-    "lib:tests",
+    "lib:hermetic_tests",
     "stress_tests",
     "stress_tests_alt:component-manager-stress-tests-short",
-    "tests",
+    "tests:hermetic_tests",
   ]
 }
 

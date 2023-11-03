@@ -2,17 +2,28 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+assert(is_fuchsia, "component manager is for the Fuchsia toolchain only")
+
 import("//build/rust/rustc_binary.gni")
 
-group("tests") {
+group("non_hermetic_tests") {
   testonly = true
+  deps = [
+    "bootfs:tests",
+    "capability_provider_vfs_compliance:tests",
+    "fuchsia_boot_resolver:tests($default_toolchain)",
+    "job_with_available_exception_channel:tests",
+    "security_policy:tests",
+    "structured_config:tests",
+  ]
+}
 
+group("hermetic_tests") {
+  testonly = true
   deps = [
     "abi_compatibility:tests",
     "attributed_logging:attributed-logging-test",
     "binder:tests",
-    "bootfs:tests",
-    "capability_provider_vfs_compliance:tests",
     "collections:collections_integration_test",
     "component-time:tests",
     "controller:tests",
@@ -22,21 +33,27 @@ group("tests") {
     "dynamic_offers:tests",
     "elf_runner:tests",
     "events:events_integration_test",
-    "fuchsia_boot_resolver:tests($default_toolchain)",
-    "job_with_available_exception_channel:tests",
     "lifecycle_controller:tests",
     "namespace_capabilities:tests",
     "panic-test:component_manager_panic_test",
     "pkg_from_framework:tests",
+    "realm:realm_integration_tests",
     "reboot_on_terminate:tests",
     "resolvers:tests",
     "rights:tests",
     "routing:tests",
-    "security_policy:tests",
+    "security_policy/capability_allowlist:security-policy-capability-allowlist-integration-test",
+    "security_policy/next_vdso:security-policy-next-vdso-test",
     "services:tests",
     "shutdown:shutdown_integration_test",
     "storage:storage_integration_test",
-    "structured_config:tests",
+    "structured_config/client_integration/cpp_driver:cpp_driver",
+    "structured_config/client_integration/cpp_elf:cpp_elf",
+    "structured_config/client_integration/cpp_elf_hlcpp:cpp_elf_hlcpp",
+    "structured_config/client_integration/rust:rust",
+    "structured_config/different_values:different_values_false",
+    "structured_config/different_values:different_values_true",
+    "structured_config/parent_overrides:parent_overrides_integration_test",
     "utc-time:tests",
   ]
 

@@ -2,10 +2,14 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-group("tests") {
+group("non_hermetic_tests") {
+  testonly = true
+  deps = [ "logger:tests" ]
+}
+
+group("hermetic_tests") {
   testonly = true
   deps = [
-    "logger:tests",
     "processargs:tests",
     "sandbox:tests",
     "serve_processargs:tests",
