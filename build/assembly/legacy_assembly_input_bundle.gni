@@ -23,17 +23,6 @@ import("//build/zbi/kernel_cmdline.gni")
 #   bundle_name [optional; default: legacy]
 #     [string] A different name for the bundle, if not the name of the target.
 #
-#   kernel_zbi (optional; default: "//zircon/kernel")
-#     [label] Label of the zircon kernel to use.  This needs to use the `images`
-#     metadata key to provide the `path` and `name` fields (see the
-#     build_api_module("images")` in `//BUILD.gn`).  The default value is most likely
-#     the correct one.  This should only be overridden in special circumstances.
-#
-#   kernel_image_name (optional; default: "kernel")
-#     [string] The image name of the 'kernel_zbi' as seen in images.json. This is used
-#     as an override, that in conjunction with 'kernel_zbi' allows selecting a custom zbi
-#     image as the kernel zbi.
-#
 #   bundles_dir [optional; default: target_out_dir]
 #     [GN file path] path to a dir to use instead of $target_out_dir as the
 #     parent of the legacy input bundle.
@@ -109,16 +98,6 @@ template("legacy_assembly_input_bundle") {
                            "create_package_archive",
                          ])
 
-  kernel_zbi = "//zircon/kernel"
-  if (defined(invoker.kernel_zbi)) {
-    kernel_zbi = invoker.kernel_zbi
-  }
-
-  kernel_name = "kernel"
-  if (defined(invoker.kernel_image_name)) {
-    kernel_name = invoker.kernel_image_name
-  }
-
   bootfs_package_labels = []
   if (defined(invoker.bootfs_package_labels)) {
     bootfs_package_labels += invoker.bootfs_package_labels
@@ -171,7 +150,6 @@ template("legacy_assembly_input_bundle") {
     extra_base_deps_list =
         "${target_name}_package_manifest_list.extra_base_deps"
     bootfs_package_list = "${target_name}_bootfs_package_list"
-    kernel_image_metadata = "${target_name}_kernel_image_metadata"
     kernel_cmdline_args = "${target_name}_kernel_cmdline_args"
     boot_args = "${target_name}_boot_args"
     config_data = "${target_name}.config-data"
@@ -208,8 +186,6 @@ template("legacy_assembly_input_bundle") {
     extra_base_deps_list =
         "$target_out_dir/package_lists/${target_name}_extra_base_deps"
     bootfs_package_list = "$target_out_dir/package_lists/${target_name}_bootfs"
-    kernel_image_metadata =
-        "$target_out_dir/${target_name}_kernel_image.gn_meta.json"
     kernel_cmdline_args =
         "$target_out_dir/${target_name}_kernel_cmdline_args.json"
     boot_args = "$target_out_dir/${target_name}_boot_args"
@@ -481,20 +457,6 @@ template("legacy_assembly_input_bundle") {
     deps = bootfs_package_labels
   }
 
-  # Find the kernel image metadata, which includes the location of the assembled kernel ZBI.
-  generated_file(labels.kernel_image_metadata) {
-    forward_variables_from(invoker,
-                           [
-                             "testonly",
-                             "visibility",
-                           ])
-
-    data_keys = [ "images" ]
-    outputs = [ files.kernel_image_metadata ]
-    output_conversion = "json"
-    deps = [ kernel_zbi ]
-  }
-
   # Accumulate the list of cmdline dependencies by first taking the
   # directly-specified arguments, creating a new metadata target, and adding it
   # to the list of all metadata targets, then second walking the metadata to
@@ -563,7 +525,7 @@ template("legacy_assembly_input_bundle") {
                              "testonly",
                              "visibility",
                            ])
-    deps = invoker.bootfs_labels + [ kernel_zbi ]
+    deps = invoker.bootfs_labels
   }
 
   fuchsia_package(labels.bootfs_files_package) {
@@ -617,10 +579,6 @@ template("legacy_assembly_input_bundle") {
       rebase_path(files.extra_base_deps_list, root_build_dir),
       "--bootfs-packages-list",
       rebase_path(files.bootfs_package_list, root_build_dir),
-      "--kernel-image-metadata",
-      rebase_path(files.kernel_image_metadata, root_build_dir),
-      "--kernel-image-name",
-      kernel_name,
       "--kernel-cmdline",
       rebase_path(files.kernel_cmdline_args, root_build_dir),
       "--kernel-clock-backstop",
@@ -660,7 +618,6 @@ template("legacy_assembly_input_bundle") {
       files.extra_base_deps_list,
       files.bootfs_package_list,
       build_info_files.minimum_utc_stamp,
-      files.kernel_image_metadata,
       files.kernel_cmdline_args,
       files.boot_args,
       files.base_driver_package_list,
@@ -683,7 +640,6 @@ template("legacy_assembly_input_bundle") {
       ":${labels.extra_base_deps_list}",
       ":${labels.extra_base_list}",
       ":${labels.kernel_cmdline_args}",
-      ":${labels.kernel_image_metadata}",
       "//build/info:latest-commit-date",
     ]
 

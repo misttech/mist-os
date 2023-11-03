@@ -1,0 +1,154 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/assembly/assembly_input_bundle_archive.gni")
+import("//build/assembly/assembly_input_bundle_package.gni")
+import("//build/bazel/bazel_inputs.gni")
+import("//build/python/python_action.gni")
+
+# Creates an Assembly Input Bundle for the kernel.
+#
+# This is a specialized template that is only used once, to define the AIB that
+# includes the kernel image itself.
+#
+# For the standard (build-defined) kernel at //zircon/kernel, use this without
+# any additional parameters.
+#
+# The following parameters are for when this template is being used to create a
+# platform AIB for a non-standard kernel image (such as the "cuckoo" boot-test
+# images).
+#
+# Parameters:
+#
+#   kernel_zbi (optional; default: "//zircon/kernel")
+#     [label] Label of the zircon kernel to use.  This needs to use the `images`
+#     metadata key to provide the `path` and `name` fields (see the
+#     build_api_module("images")` in `//BUILD.gn`).  The default value is most likely
+#     the correct one.  This should only be overridden in special circumstances.
+#
+#   kernel_image_name (optional; default: "kernel")
+#     [string] The image name of the 'kernel_zbi' as seen in images.json. This is used
+#     as an override, that in conjunction with 'kernel_zbi' allows selecting a custom zbi
+#     image as the kernel zbi.
+#
+#   bundle_name [optional; default: legacy]
+#     [string] A different name for the bundle, if not the name of the target.
+#
+#   bundles_dir [optional; default: target_out_dir]
+#     [GN file path] path to a dir to use instead of $target_out_dir as the
+#     parent of the legacy input bundle.
+#
+#
+template("kernel_assembly_input_bundle") {
+  forward_variables_from(invoker,
+                         [
+                           "bundles_dir",
+                           "bundle_name",
+                           "kernel_zbi",
+                           "kernel_image_name",
+                         ])
+
+  if (!defined(kernel_zbi)) {
+    # Default to the canonical kernel target.
+    kernel_zbi = "//zircon/kernel"
+  }
+
+  if (!defined(kernel_image_name)) {
+    kernel_image_name = "kernel"
+  }
+
+  if (!defined(bundles_dir)) {
+    bundles_dir = target_out_dir
+  }
+
+  if (!defined(bundle_name)) {
+    bundle_name = target_name
+  }
+
+  labels = {
+    # The AIB itself
+    assembly_input_bundle = "$target_name.bundle"
+
+    bazel_inputs = "${target_name}_bazel_inputs"
+
+    kernel_image_metadata = "${target_name}_kernel_image_metadata"
+  }
+
+  files = {
+    kernel_image_metadata =
+        "$target_out_dir/${target_name}_kernel_image.gn_meta.json"
+
+    # Outputs
+
+    # The directory where all the bundle contents are written to
+    assembly_input_bundle_dir = "${bundles_dir}/${bundle_name}"
+
+    # The "official" outputs file that we create in that directory
+    assembly_input_bundle_config =
+        "${assembly_input_bundle_dir}/assembly_config.json"
+  }
+
+  # Write the kernel image metadata to a file, as this is the only way to get
+  # the path to the kernel ZBI.
+  generated_file(labels.kernel_image_metadata) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
+
+    data_keys = [ "images" ]
+    walk_keys = [ "images_barrier" ]
+    outputs = [ files.kernel_image_metadata ]
+    output_conversion = "json"
+    deps = [ kernel_zbi ]
+  }
+
+  python_action(labels.assembly_input_bundle) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
+
+    binary_label = "//build/assembly/scripts:kernel_aib_tool"
+
+    outputs = [ files.assembly_input_bundle_config ]
+    args = [
+      "--kernel-image-metadata",
+      rebase_path(files.kernel_image_metadata, root_build_dir),
+      "--kernel-image-name",
+      kernel_image_name,
+      "--outdir",
+      rebase_path(files.assembly_input_bundle_dir, root_build_dir),
+    ]
+    deps = [ ":${labels.kernel_image_metadata}" ]
+    inputs = [ files.kernel_image_metadata ]
+    metadata = {
+      images_barrier = []
+    }
+  }
+
+  # Make generated AIBs available to Bazel builds.
+  bazel_input_resource_directory(labels.bazel_inputs) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
+    source_dir = files.assembly_input_bundle_dir
+    dest_dir = rebase_path(files.assembly_input_bundle_dir, root_out_dir)
+    deps = [ ":${labels.assembly_input_bundle}" ]
+  }
+
+  group(target_name) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
+    deps = [ ":${labels.bazel_inputs}" ]
+    public_deps = [ ":${labels.assembly_input_bundle}" ]
+  }
+}

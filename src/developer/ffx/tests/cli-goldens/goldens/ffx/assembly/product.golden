@@ -118,6 +118,18 @@
       "short": null,
       "description": "mode indicating where to place packages.",
       "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "custom-kernel-aib"
+        }
+      },
+      "optionality": "optional",
+      "long": "--custom-kernel-aib",
+      "short": null,
+      "description": "path to an AIB containing a customized kernel zbi to use instead of the one in the platform AIBs.",
+      "hidden": false
     }
   ],
   "notes": [],

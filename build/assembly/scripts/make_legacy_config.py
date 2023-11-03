@@ -156,10 +156,6 @@ def main():
     parser.add_argument(
         "--kernel-clock-backstop", type=argparse.FileType("r"), required=True
     )
-    parser.add_argument(
-        "--kernel-image-metadata", type=argparse.FileType("r"), required=True
-    )
-    parser.add_argument("--kernel-image-name", required=True)
     parser.add_argument("--boot-args", type=argparse.FileType("r"))
     parser.add_argument("--bootfs-packages-list", type=argparse.FileType("r"))
 
@@ -276,18 +272,7 @@ def main():
         for extra_dep in extra_deps_file_packages:
             system.append(extra_dep["package_manifest"])
 
-    # ZBI Config
-    kernel_metadata = json.load(args.kernel_image_metadata)
-
-    # The build_api_module("images") entry with name "kernel" and type "zbi"
-    # is the kernel ZBI to include in the bootable ZBI.  There can be only one.
-    [kernel_path] = [
-        image["path"]
-        for image in kernel_metadata
-        if image["name"] == args.kernel_image_name and image["type"] == "zbi"
-    ]
     kernel = KernelInfo()
-    kernel.path = kernel_path
     kernel.args.update(json.load(args.kernel_cmdline))
     kernel.clock_backstop = json.load(args.kernel_clock_backstop)
 

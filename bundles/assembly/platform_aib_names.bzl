@@ -10,6 +10,7 @@ load("@fuchsia_icu_config//:constants.bzl", "icu_flavors")
 # feature-set-level assemblies.  This is a subset of the overall platform AIBs
 # so that these systems (e.g. bringup) don't need to build the entire platform.
 BOOTSTRAP_USER_PLATFORM_AIB_NAMES = [
+    "zircon",
     "bootstrap",
     "driver_framework_v1",
     "driver_framework_v2",

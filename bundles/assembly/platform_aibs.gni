@@ -12,6 +12,9 @@ platform_aibs_dir = get_label_info("//bundles/assembly", "target_out_dir")
 # feature-set-level assemblies.  This is a subset of the overall platform AIBs
 # so that these systems (e.g. bringup) don't need to build the entire platform.
 bootstrap_user_platform_aib_names = [
+  # The kernel itself
+  "zircon",
+
   # The bootstrap feature-set-level
   "bootstrap",
 

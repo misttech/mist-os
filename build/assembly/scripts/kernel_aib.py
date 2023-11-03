@@ -1,0 +1,69 @@
+#!/usr/bin/env fuchsia-vendored-python
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+"""Make the Kernel's Assembly Input Bundle
+
+"""
+
+import argparse
+from collections import defaultdict
+import json
+import os
+import sys
+import logging
+from typing import Dict, List, Set, Tuple, Optional
+
+from assembly import (
+    AssemblyInputBundle,
+    AIBCreator,
+    KernelInfo,
+)
+
+logger = logging.getLogger()
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Create an assemblyinput bundle that includes the zircon kernel"
+    )
+
+    parser.add_argument(
+        "--kernel-image-metadata", type=argparse.FileType("r"), required=True
+    )
+    parser.add_argument("--kernel-image-name", required=True)
+    parser.add_argument("--outdir", required=True)
+    args = parser.parse_args()
+
+    kernel_metadata = json.load(args.kernel_image_metadata)
+
+    # The build_api_module("images") entry with name "kernel" and type "zbi"
+    # is the kernel ZBI to include in the bootable ZBI.  There can be only one.
+    [kernel_path] = [
+        image["path"]
+        for image in kernel_metadata
+        if image["name"] == args.kernel_image_name and image["type"] == "zbi"
+    ]
+    kernel = KernelInfo()
+    kernel.path = kernel_path
+
+    aib_creator = AIBCreator(args.outdir)
+    aib_creator.kernel = kernel
+
+    (
+        assembly_input_bundle,
+        assembly_config_manifest_path,
+        deps,
+    ) = aib_creator.build()
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except AssemblyInputBundleCreationException as exc:
+        logger.exception(
+            "A problem occured building the kernel assembly input bundle"
+        )
+    finally:
+        sys.exit()

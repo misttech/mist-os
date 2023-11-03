@@ -4,6 +4,7 @@
 
 import("//build/assembly/assembly_input_bundle.gni")
 import("//build/assembly/assembly_resources_directory.gni")
+import("//build/assembly/kernel_aib.gni")
 import("//build/bazel/bazel_inputs.gni")
 import("//build/icu/icu_assembly_input_bundle.gni")
 import("//bundles/assembly/platform_aibs.gni")
@@ -58,6 +59,14 @@ group("assembly") {
 
   # eng_platform_aib_labels come from //bundles/assembly/platform_aibs.gni.
   deps = eng_platform_aib_labels
+}
+
+########
+#
+# The Zircon kernel itself
+#
+# This uses a specialized template to create the AIB.
+kernel_assembly_input_bundle("zircon") {
 }
 
 ########

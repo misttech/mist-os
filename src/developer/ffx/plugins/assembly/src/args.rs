@@ -316,6 +316,11 @@ pub struct ProductArgs {
     /// mode indicating where to place packages.
     #[argh(option, default = "default_package_mode()")]
     pub mode: PackageMode,
+
+    /// path to an AIB containing a customized kernel zbi to use instead of the
+    /// one in the platform AIBs.
+    #[argh(option)]
+    pub custom_kernel_aib: Option<Utf8PathBuf>,
 }
 
 #[derive(Debug, Default, PartialEq)]

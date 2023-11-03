@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/assembly/hermetic_inputs_for_image_assembly.gni")
+import("//build/assembly/kernel_aib.gni")
 import("//build/assembly/legacy_assembly_input_bundle.gni")
 import("//build/bazel/bazel_inputs.gni")
 import("//build/board.gni")
@@ -294,8 +295,6 @@ template("assembled_system") {
                              "testonly",
                              "visibility",
                              "include_config_data",
-                             "kernel_zbi",
-                             "kernel_image_name",
                              "bootfs_package_labels",
                              "bootfs_labels",
                              "system_image_deps",
@@ -509,6 +508,10 @@ template("assembled_system") {
           invoker.board_config_label != false) {
         board_config_label = invoker.board_config_label
       }
+
+      if (defined(invoker.kernel_zbi)) {
+        custom_kernel_aib = "${_namespace}.custom_kernel_aib"
+      }
     }
 
     # Intermediate files produced for Image Assembly.
@@ -625,6 +628,11 @@ template("assembled_system") {
           platform_common_aibs = user_platform_aib_files
         }
       }
+
+      if (defined(labels.custom_kernel_aib)) {
+        custom_kernel_aib = "${outdir}/custom_kernel_aib"
+        custom_kernel_aib_manifest = "${custom_kernel_aib}/assembly_config.json"
+      }
     }
 
     # Create GN groups for each of the package sets.
@@ -674,6 +682,20 @@ template("assembled_system") {
     check_production_tag = false
     if (defined(invoker.check_production_tag)) {
       check_production_tag = invoker.check_production_tag
+    }
+
+    # Create the AIB for a custom kernel zbi, if one was provided.
+    if (defined(labels.custom_kernel_aib)) {
+      kernel_assembly_input_bundle(labels.custom_kernel_aib) {
+        forward_variables_from(invoker,
+                               [
+                                 "kernel_zbi",
+                                 "kernel_image_name",
+                                 "testonly",
+                               ])
+        bundles_dir = files.outdir
+        bundle_name = "custom_kernel_aib"
+      }
     }
 
     # Run product assembly.
@@ -743,6 +765,15 @@ template("assembled_system") {
       }
       if (defined(labels.board_config_label)) {
         deps += [ labels.board_config_label ]
+      }
+
+      if (defined(labels.custom_kernel_aib)) {
+        args += [
+          "--custom-kernel-aib",
+          rebase_path(files.custom_kernel_aib_manifest, root_build_dir),
+        ]
+        deps += [ ":${labels.custom_kernel_aib}" ]
+        inputs += [ files.custom_kernel_aib_manifest ]
       }
 
       outputs = [ files.regenerated_image_assembly_config ]

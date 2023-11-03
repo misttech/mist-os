@@ -28,6 +28,7 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
         additional_packages_path,
         package_validation,
         mode,
+        custom_kernel_aib,
     } = args;
 
     info!("Reading configuration files.");
@@ -38,7 +39,7 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
 
     let board_info_path = board_info;
     let board_info = util::read_config::<BoardInformation>(&board_info_path)
-        .context("REading board information")?
+        .context("Reading board information")?
         // and then resolve the file-relative paths to be relative to the cwd instead.
         .resolve_paths_from_file(&board_info_path)
         .context("Resolving paths in board configuration.")?;
@@ -97,6 +98,16 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
     // Now that all the configuration has been determined, create the builder
     // and start doing the work of creating the image assembly config.
     let mut builder = ImageAssemblyConfigBuilder::new(config.platform.build_type.clone());
+
+    // Add the special platform AIB for the zircon kernel, or if provided, an
+    // AIB that contains a custom kernel to use instead.
+    let kernel_aib_path = match custom_kernel_aib {
+        None => make_bundle_path(&input_bundles_dir, "zircon"),
+        Some(custom_kernel_aib_path) => custom_kernel_aib_path,
+    };
+    builder
+        .add_bundle(&kernel_aib_path)
+        .with_context(|| format!("Adding kernel input bundle ({kernel_aib_path})"))?;
 
     // Set the configuration for the rest of the packages.
     for (package, config) in configuration.package_configs {
