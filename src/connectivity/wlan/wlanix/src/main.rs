@@ -13,12 +13,9 @@ use {
     netlink_packet_core::{NetlinkDeserializable, NetlinkHeader, NetlinkSerializable},
     netlink_packet_generic::GenlMessage,
     parking_lot::Mutex,
-    std::{
-        convert::{TryFrom, TryInto},
-        sync::Arc,
-    },
+    std::{convert::TryInto, sync::Arc},
     tracing::{error, info, warn},
-    wlan_common::channel::Channel,
+    wlan_common::channel::{Cbw, Channel},
 };
 
 mod ifaces;
@@ -494,6 +491,28 @@ fn build_nl80211_done() -> fidl_wlanix::Nl80211Message {
     }
 }
 
+fn get_supported_frequencies() -> Vec<Vec<Nl80211FrequencyAttr>> {
+    // TODO(fxbug.dev/128604): Reevaluate this list later. This does not reflect
+    // actual support. We should instead get supported frequencies from the phy.
+    #[rustfmt::skip]
+    let channels = vec![
+        // 2.4 GHz
+        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
+        // 5 GHz
+        36, 40, 44, 48, 52, 56, 60, 64,
+        100, 104, 108, 112, 116, 120, 124, 128, 132, 136, 140, 144,
+        149, 153, 157, 161, 165,
+    ];
+    channels
+        .into_iter()
+        .map(|channel_idx| {
+            // We report the frequency of the beacon, which is always 20MHz on the primary channel.
+            let freq = Channel::new(channel_idx, Cbw::Cbw20).get_center_freq().unwrap();
+            vec![Nl80211FrequencyAttr::Frequency(freq.into())]
+        })
+        .collect()
+}
+
 async fn handle_nl80211_message<I: IfaceManager>(
     netlink_message: fidl_wlanix::Nl80211Message,
     responder: fidl_wlanix::Nl80211MessageResponder,
@@ -525,17 +544,9 @@ async fn handle_nl80211_message<I: IfaceManager>(
                         // Phy ID
                         Nl80211Attr::Wiphy(0),
                         // Supported bands
-                        Nl80211Attr::WiphyBands(vec![vec![Nl80211BandAttr::Frequencies({
-                            // Hardcode US non-DFS frequencies for now.
-                            vec![
-                                2412, 2417, 2422, 2427, 2432, 2437, 2442, 2447, 2452, 2457, 2462,
-                                2467, 2472, 2484, 5180, 5190, 5200, 5210, 5220, 5230, 5240, 5745,
-                                5755, 5765, 5775, 5785, 5795, 5805, 5825,
-                            ]
-                            .into_iter()
-                            .map(|freq| vec![Nl80211FrequencyAttr::Frequency(freq)])
-                            .collect()
-                        })]]),
+                        Nl80211Attr::WiphyBands(vec![vec![Nl80211BandAttr::Frequencies(
+                            get_supported_frequencies(),
+                        )]]),
                         // Scan capabilities
                         Nl80211Attr::MaxScanSsids(32),
                         Nl80211Attr::MaxScheduledScanSsids(32),
@@ -647,7 +658,7 @@ async fn handle_nl80211_message<I: IfaceManager>(
 
 fn convert_scan_result(result: fidl_sme::ScanResult) -> Nl80211Attr {
     use crate::nl80211::{ChainSignalAttr, Nl80211BssAttr};
-    let channel = Channel::try_from(result.bss_description.channel).unwrap();
+    let channel = Channel::new(result.bss_description.channel.primary, Cbw::Cbw20);
     let center_freq = channel.get_center_freq().expect("Failed to get center freq").into();
     Nl80211Attr::Bss(vec![
         Nl80211BssAttr::Bssid(result.bss_description.bssid),
