@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{AccessVector, ObjectClass, SecurityContext, SecurityId};
-use starnix_lock::RwLock;
+use starnix_lock::Mutex;
 use std::collections::HashMap;
 
 pub struct SecurityServerState {
@@ -14,20 +14,20 @@ pub struct SecurityServerState {
 
 pub struct SecurityServer {
     /// The mutable state of the security server.
-    state: RwLock<SecurityServerState>,
+    state: Mutex<SecurityServerState>,
 }
 
 impl SecurityServer {
     pub fn new() -> SecurityServer {
         // TODO(http://b/304732283): initialize the access vector cache.
-        SecurityServer { state: RwLock::new(SecurityServerState { sids: HashMap::new() }) }
+        SecurityServer { state: Mutex::new(SecurityServerState { sids: HashMap::new() }) }
     }
 
     /// Returns the security ID mapped to `security_context`, creating it if it does not exist.
     ///
     /// All objects with the same security context will have the same SID associated.
     pub fn security_context_to_sid(&self, security_context: &SecurityContext) -> SecurityId {
-        let mut state = self.state.write();
+        let mut state = self.state.lock();
         let existing_sid =
             state.sids.iter().find(|(_, sc)| sc == &security_context).map(|(sid, _)| *sid);
         existing_sid.unwrap_or_else(|| {
@@ -42,7 +42,7 @@ impl SecurityServer {
 
     /// Returns the security context mapped to `sid`.
     pub fn sid_to_security_context(&self, sid: &SecurityId) -> Option<SecurityContext> {
-        self.state.read().sids.get(sid).map(Clone::clone)
+        self.state.lock().sids.get(sid).map(Clone::clone)
     }
 
     pub fn compute_access_vector(
@@ -91,7 +91,7 @@ mod tests {
         let sid1 = security_server.security_context_to_sid(&security_context1);
         let sid2 = security_server.security_context_to_sid(&security_context2);
         assert_eq!(sid1, sid2);
-        assert_eq!(security_server.state.read().sids.len(), 1);
+        assert_eq!(security_server.state.lock().sids.len(), 1);
     }
 
     #[fuchsia::test]
