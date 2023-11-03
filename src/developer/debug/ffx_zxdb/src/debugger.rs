@@ -5,7 +5,8 @@
 use anyhow::{Context, Result};
 use errors::ffx_error;
 use fidl_fuchsia_debugger::DebugAgentProxy;
-use fuchsia_async::unblock;
+use fuchsia_async::{unblock, Task};
+use signal_hook::{consts::signal::SIGUSR1, iterator::Signals};
 use std::{path::PathBuf, process::Command};
 
 use crate::{debug_agent::DebugAgentSocket, spawn_forward_task, CommandBuilder};
@@ -48,10 +49,62 @@ impl Debugger {
 
     /// Run the debugger with the given `command` instead of `self.command`.
     pub async fn run_with_command(self, mut command: Command) -> Result<()> {
-        let mut child = command.spawn()?;
-        let _task = spawn_forward_task(self.socket);
+        let session = DebuggerSession {
+            child: command.spawn()?,
+            _forward_task: spawn_forward_task(self.socket),
+        };
+        session.wait().await
+    }
 
-        if let Some(exit_code) = unblock(move || child.wait()).await?.code() {
+    /// Spawn an interactive session with the debugger.
+    fn spawn(self) -> Result<DebuggerSession> {
+        Ok(DebuggerSession {
+            child: self.command.build().spawn()?,
+            _forward_task: spawn_forward_task(self.socket),
+        })
+    }
+
+    /// Start an interactive session with the debugger.
+    ///
+    /// The future returned by this function resolves when the debugger is ready for interactive
+    /// user input.
+    ///
+    /// To wait for the interactive session with the user to complete, use the `wait` function on
+    /// the returned `DebuggerSession`.
+    pub async fn start(mut self) -> Result<DebuggerSession> {
+        let mut signals = Signals::new(&[SIGUSR1]).unwrap();
+
+        let pid = std::process::id();
+        self.command.push_str(&format!("--signal-when-ready={pid}"));
+
+        let session = self.spawn()?;
+
+        unblock(move || {
+            let signal = signals.forever().next();
+            assert_eq!(signal, Some(SIGUSR1));
+        })
+        .await;
+
+        Ok(session)
+    }
+
+    /// Run the debugger.
+    ///
+    /// The future returned by this function resolves when the user's interactive session with the
+    /// debugger is complete.
+    pub async fn run(self) -> Result<()> {
+        self.spawn()?.wait().await
+    }
+}
+
+pub struct DebuggerSession {
+    child: std::process::Child,
+    _forward_task: Task<()>,
+}
+
+impl DebuggerSession {
+    pub async fn wait(mut self) -> Result<()> {
+        if let Some(exit_code) = unblock(move || self.child.wait()).await?.code() {
             if exit_code == 0 {
                 Ok(())
             } else {
@@ -60,14 +113,5 @@ impl Debugger {
         } else {
             Err(ffx_error!("zxdb terminated by signal").into())
         }
-    }
-
-    /// Run the debugger.
-    ///
-    /// The future returned by this function resolves when the user's interactive session with the
-    /// debugger is complete.
-    pub async fn run(self) -> Result<()> {
-        let command = self.command.build();
-        self.run_with_command(command).await
     }
 }

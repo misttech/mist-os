@@ -10,14 +10,17 @@ use ffx_core::ffx_command;
 #[argh(
     subcommand,
     name = "debug",
-    description = "Debug components with zxdb.",
+    description = "Debug a running component with zxdb.",
     example = "To debug the `brightness_manager` component instance, all of the
 following commands are valid:
 
     $ ffx component debug /core/brightness_manager
     $ ffx component debug fuchsia-pkg://fuchsia.com/brightness_manager#meta/brightness_manager.cm
     $ ffx component debug meta/brightness_manager.cm
-    $ ffx component debug brightness_manager",
+    $ ffx component debug brightness_manager
+
+If the component is not yet running, consider `ffx component start --debug`
+to start the component in the debugger.",
     note = "This command supports partial matches over the moniker, URL and instance ID"
 )]
 

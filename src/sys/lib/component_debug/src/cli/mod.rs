@@ -8,6 +8,7 @@ pub mod create;
 pub mod destroy;
 pub mod doctor;
 pub mod explore;
+pub mod format;
 pub mod graph;
 pub mod list;
 pub mod reload;
@@ -18,8 +19,6 @@ pub mod show;
 pub mod start;
 pub mod stop;
 pub mod storage;
-
-mod format;
 
 pub use {
     capability::capability_cmd,

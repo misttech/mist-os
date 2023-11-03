@@ -2,18 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::Result;
 use async_trait::async_trait;
-use component_debug::cli::start_cmd;
+use component_debug::{
+    cli::format::format_start_error, lifecycle::start_instance, query::get_cml_moniker_from_query,
+};
 use errors::FfxError;
 use ffx_component::rcs::{connect_to_lifecycle_controller, connect_to_realm_query};
 use ffx_component_start_args::ComponentStartCommand;
-use fho::{FfxMain, FfxTool, SimpleWriter};
+use ffx_zxdb::Debugger;
+use fho::{moniker, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_developer_remotecontrol as rc;
 
 #[derive(FfxTool)]
 pub struct StartTool {
     #[command]
     cmd: ComponentStartCommand,
+
+    #[with(moniker("/core/debug_agent"))]
+    debugger_proxy: fidl_fuchsia_debugger::DebugAgentProxy,
+
     rcs: rc::RemoteControlProxy,
 }
 
@@ -23,14 +31,36 @@ fho::embedded_plugin!(StartTool);
 impl FfxMain for StartTool {
     type Writer = SimpleWriter;
 
-    async fn main(self, writer: Self::Writer) -> fho::Result<()> {
-        let lifecycle_controller = connect_to_lifecycle_controller(&self.rcs).await?;
-        let realm_query = connect_to_realm_query(&self.rcs).await?;
-
-        // All errors from component_debug library are user-visible.
-        start_cmd(self.cmd.query, lifecycle_controller, realm_query, writer)
-            .await
-            .map_err(|e| FfxError::Error(e, 1))?;
+    async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
+        start_tool_impl(self).await.map_err(|e| FfxError::Error(e, 1))?;
         Ok(())
     }
+}
+
+async fn start_tool_impl(tool: StartTool) -> Result<()> {
+    let lifecycle_controller = connect_to_lifecycle_controller(&tool.rcs).await?;
+    let realm_query = connect_to_realm_query(&tool.rcs).await?;
+    let moniker = get_cml_moniker_from_query(&tool.cmd.query, &realm_query).await?;
+
+    // If the user wants to debug the component, we need to start the debugger with a breakpoint
+    // on `_start`, which will give the user a chance to set any further breakpoints they want.
+    let maybe_session = if tool.cmd.debug {
+        let mut debugger = Debugger::new(tool.debugger_proxy).await?;
+        debugger.command.attach(&format!("{}", moniker));
+        debugger.command.break_at("_start");
+        let session = debugger.start().await?;
+        Some(session)
+    } else {
+        None
+    };
+
+    start_instance(&lifecycle_controller, &moniker)
+        .await
+        .map_err(|e| format_start_error(&moniker, e))?;
+
+    // Wait for the user to interactively debug the component.
+    if let Some(session) = maybe_session {
+        session.wait().await?;
+    }
+    Ok(())
 }

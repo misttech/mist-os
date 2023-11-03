@@ -45,9 +45,9 @@ impl CommandBuilder {
         self.args.extend(args.iter().map(|s| s.into()));
     }
 
-    pub fn attach(&mut self, attach: &String) {
+    pub fn attach(&mut self, attach: &str) {
         self.args.push(OsString::from("--attach"));
-        self.args.push(attach.into());
+        self.args.push(OsString::from(attach));
     }
 
     pub fn attach_each(&mut self, attach: &Vec<String>) {
@@ -64,9 +64,13 @@ impl CommandBuilder {
         self.attach(&format!("--job {koid}"));
     }
 
-    pub fn execute(&mut self, execute: &String) {
+    pub fn break_at(&mut self, location: &str) {
+        self.execute(&format!("break {location}"));
+    }
+
+    pub fn execute(&mut self, execute: &str) {
         self.args.push(OsString::from("--execute"));
-        self.args.push(execute.into());
+        self.args.push(OsString::from(execute));
     }
 
     pub fn execute_each(&mut self, execute: &Vec<String>) {
