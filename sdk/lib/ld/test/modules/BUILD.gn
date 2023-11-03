@@ -121,6 +121,7 @@ template("test_executable") {
   }
   foreach(suffix, suffices) {
     executable(target_name + suffix) {
+      visibility = [ ":*" ]
       testonly = true
 
       deps = []
@@ -173,7 +174,10 @@ foreach(in_process,
       ":semantic-interposition",
     ]
     sources = [ "ensure-test-thread-pointer.cc" ]
-    deps = [ "//zircon/system/public" ]
+    deps = [
+      ":test-module.deps",
+      "//zircon/system/public",
+    ]
     if (is_fuchsia) {
       if (in_process == "") {
         sources += [ "zircon-test-start.cc" ]
@@ -190,6 +194,24 @@ foreach(in_process,
     # is built, after variant selection.  So it gets the right version of
     # ld-startup installed where the test needs to find it.
     data_deps = [ "..:ld-startup.test-data($shlib_toolchain)" ]
+  }
+}
+
+# These are things that every test module of all target types implicitly
+# depends on.
+group("test-module.deps") {
+  visibility = [ ":*" ]
+
+  # TODO(fxbug.dev/135799): setting testonly seems to tickle a GN bug
+  #testonly = true
+
+  # When llvm-profdata instrumentation is in use, it may generate calls to
+  # functions that are supplied by the runtime.  Even though the modules aren't
+  # actually using the runtime to extract their data (yet, anyway), they link
+  # in the runtime to make sure any such references are satisfied at link time.
+  if (toolchain_variant.tags + [ "llvm-profdata" ] - [ "llvm-profdata" ] !=
+      toolchain_variant.tags) {
+    deps = [ "//src/lib/llvm-profdata" ]
   }
 }
 
@@ -212,14 +234,23 @@ config("nostdlibs") {
 
 template("test_shared_library") {
   shared_library(target_name) {
+    visibility = [ ":*" ]
+
+    # TODO(fxbug.dev/135799): setting testonly seems to tickle a GN bug
+    #testonly = true
+
+    deps = []
+    public_deps = []
     ldflags = []
-    public_deps = [ "//sdk/lib/ld:standalone" ]
     forward_variables_from(invoker,
                            "*",
                            [
                              "configs",
                              "remove_configs",
                            ])
+
+    public_deps += [ "//sdk/lib/ld:standalone" ]
+    deps += [ ":test-module.deps" ]
 
     if (is_linux) {
       configs -= [ "//build/config/linux:implicit-host-libs" ]
@@ -468,6 +499,11 @@ test_executable("tls-ie") {
 }
 
 ifs_shared_library("tls-ie-dep-weak") {
+  visibility = [ ":*" ]
+
+  # TODO(fxbug.dev/135799): setting testonly seems to tickle a GN bug
+  #testonly = true
+
   abi = "tls-ie-dep-weak.ifs"
 
   public = [ "tls-ie-dep.h" ]
