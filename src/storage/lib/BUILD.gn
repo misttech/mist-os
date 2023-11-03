@@ -19,6 +19,7 @@ group("tests") {
     "delivery_blob:tests",
     "disk_inspector:tests",
     "fs_management:tests",
+    "fsverity-merkle:tests",
     "ftl:tests",
     "key-bag:tests",
     "paver:tests",
