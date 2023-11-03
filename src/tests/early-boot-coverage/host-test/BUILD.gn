@@ -33,9 +33,9 @@ go_library("lib") {
 
 host_test_data("coverage_tools") {
   sources = [
-    "//prebuilt/third_party/clang/${host_platform}/bin/llvm-cov",
-    "//prebuilt/third_party/clang/${host_platform}/bin/llvm-cxxfilt",
-    "//prebuilt/third_party/clang/${host_platform}/bin/llvm-profdata",
+    "$clang_prefix/llvm-cov",
+    "$clang_prefix/llvm-cxxfilt",
+    "$clang_prefix/llvm-profdata",
   ]
 }
 

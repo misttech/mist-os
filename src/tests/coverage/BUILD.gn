@@ -206,9 +206,9 @@ go_library("lib") {
 if (is_host) {
   host_test_data("clang_coverage_test_deps") {
     sources = [
+      "$clang_prefix/llvm-cov",
+      "$clang_prefix/llvm-profdata",
       "$host_out_dir/covargs",
-      "//prebuilt/third_party/clang/${host_platform}/bin/llvm-cov",
-      "//prebuilt/third_party/clang/${host_platform}/bin/llvm-profdata",
       "clang_golden_coverage.json",
     ]
 
@@ -227,8 +227,8 @@ if (is_host) {
 
   host_test_data("rust_coverage_test_deps") {
     sources = [
+      "$clang_prefix/llvm-cov",
       "$host_out_dir/covargs",
-      "//prebuilt/third_party/clang/${host_platform}/bin/llvm-cov",
       "rust_golden_coverage.json",
     ]
 
@@ -264,12 +264,9 @@ if (is_host) {
       rebase_path("clang_golden_coverage.json", root_build_dir),
       "--host",
       "--llvm-cov",
-      rebase_path("//prebuilt/third_party/clang/${host_platform}/bin/llvm-cov",
-                  root_build_dir),
+      rebase_path("$clang_prefix/llvm-cov", root_build_dir),
       "--llvm-profdata",
-      rebase_path(
-          "//prebuilt/third_party/clang/${host_platform}/bin/llvm-profdata",
-          root_build_dir),
+      rebase_path("$clang_prefix/llvm-profdata", root_build_dir),
     ]
   }
 }
@@ -296,12 +293,9 @@ go_test("clang_coverage_tests_on_target") {
       "--golden-coverage",
       rebase_path("clang_golden_coverage.json", root_build_dir),
       "--llvm-cov",
-      rebase_path("//prebuilt/third_party/clang/${host_platform}/bin/llvm-cov",
-                  root_build_dir),
+      rebase_path("$clang_prefix/llvm-cov", root_build_dir),
       "--llvm-profdata",
-      rebase_path(
-          "//prebuilt/third_party/clang/${host_platform}/bin/llvm-profdata",
-          root_build_dir),
+      rebase_path("$clang_prefix/llvm-profdata", root_build_dir),
     ]
   }
 }
@@ -325,8 +319,7 @@ if (is_host) {
       rebase_path("rust_golden_coverage.json", root_build_dir),
       "--host",
       "--llvm-cov",
-      rebase_path("//prebuilt/third_party/clang/${host_platform}/bin/llvm-cov",
-                  root_build_dir),
+      rebase_path("$clang_prefix/llvm-cov", root_build_dir),
       "--llvm-profdata",
       "$out_rustc_prefix/bin/llvm-profdata",
     ]
@@ -356,8 +349,7 @@ go_test("rust_coverage_tests_on_target") {
       "--golden-coverage",
       rebase_path("rust_golden_coverage.json", root_build_dir),
       "--llvm-cov",
-      rebase_path("//prebuilt/third_party/clang/${host_platform}/bin/llvm-cov",
-                  root_build_dir),
+      rebase_path("$clang_prefix/llvm-cov", root_build_dir),
       "--llvm-profdata",
       "$out_rustc_prefix/bin/llvm-profdata",
     ]
