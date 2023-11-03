@@ -14,7 +14,7 @@ if (is_host) {
     ]
     transport = "fuchsia-controller"
     params_source = "params.yaml"
-    environments = [ nuc_env ]
+    environments = [ vim3_env ]
   }
 
   # Group containing all of the Fastboot transport functional test cases.
