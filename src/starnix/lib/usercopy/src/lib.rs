@@ -11,6 +11,7 @@ use fuchsia_zircon as zx;
 use zerocopy::FromBytes;
 use zx::{AsHandleRef, HandleBased, Task};
 
+#[cfg(target_arch = "x86_64")]
 extern "C" {
     // This function generates a "return" from the usercopy routine with an error.
     fn hermetic_copy_error();
@@ -34,7 +35,13 @@ pub struct Usercopy {
 }
 
 impl Usercopy {
-    pub fn new(restricted_address_range: Range<usize>) -> Result<Self, zx::Status> {
+    /// Returns a new instance of `Usercopy` if unified address spaces is
+    /// supported on the target architecture.
+    pub fn new(restricted_address_range: Range<usize>) -> Result<Option<Self>, zx::Status> {
+        if cfg!(not(target_arch = "x86_64")) {
+            return Ok(None);
+        }
+
         let hermetic_copy_blob = fdio::open_fd(
             "/pkg/hermetic_copy.bin",
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
@@ -103,12 +110,11 @@ impl Usercopy {
 
                 let excp = zx::Exception::from_handle(buf.take_handle(0).unwrap());
 
-                let thread = excp.get_thread().unwrap();
-
-                let mut regs = thread.read_state_general_regs().unwrap();
-
                 #[cfg(target_arch = "x86_64")]
                 {
+                    let thread = excp.get_thread().unwrap();
+                    let mut regs = thread.read_state_general_regs().unwrap();
+
                     let pc = regs.rip as usize;
                     if !(hermetic_copy_mapped_addr
                         ..hermetic_copy_mapped_addr + hermetic_copy_size as usize)
@@ -129,6 +135,10 @@ impl Usercopy {
                     thread.write_state_general_regs(regs).unwrap();
                 }
 
+                // To avoid unused errors.
+                #[cfg(not(target_arch = "x86_64"))]
+                let _ = restricted_address_range;
+
                 excp.set_exception_state(&zx::sys::ZX_EXCEPTION_STATE_HANDLED).unwrap();
             }
         });
@@ -142,7 +152,7 @@ impl Usercopy {
 
         let ptr = hermetic_copy_mapped_addr as *const ();
         let hermetic_copy_fn: HermeticCopyFn = unsafe { std::mem::transmute(ptr) };
-        Ok(Self { hermetic_copy_fn, shutdown_event, join_handle: Some(join_handle) })
+        Ok(Some(Self { hermetic_copy_fn, shutdown_event, join_handle: Some(join_handle) }))
     }
 
     // Copies data from |source| to the restricted address |dest_addr|.
@@ -207,6 +217,19 @@ impl Drop for Usercopy {
 mod test {
     use super::*;
 
+    macro_rules! new_usercopy_for_test {
+        ($stmt:expr) => {{
+            let usercopy = $stmt.unwrap();
+            if cfg!(target_arch = "x86_64") {
+                usercopy.unwrap()
+            } else {
+                // Skip test if not a supported architecture
+                assert!(usercopy.is_none());
+                return;
+            }
+        }};
+    }
+
     #[::fuchsia::test]
     fn copyout_no_fault() {
         let page_size = zx::system_get_page_size() as usize;
@@ -221,7 +244,7 @@ mod test {
             .map(0, &dest_vmo, 0, page_size, zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE)
             .unwrap();
 
-        let usercopy = Usercopy::new(mapped_addr..mapped_addr + page_size).unwrap();
+        let usercopy = new_usercopy_for_test!(Usercopy::new(mapped_addr..mapped_addr + page_size));
 
         let result = usercopy.copyout(&source, mapped_addr);
 
@@ -253,7 +276,8 @@ mod test {
             )
             .unwrap();
 
-        let usercopy = Usercopy::new(mapped_addr..mapped_addr + page_size * 2).unwrap();
+        let usercopy =
+            new_usercopy_for_test!(Usercopy::new(mapped_addr..mapped_addr + page_size * 2));
 
         let dest_addr = mapped_addr + page_size - 32;
 
@@ -283,7 +307,7 @@ mod test {
 
         unsafe { std::slice::from_raw_parts_mut(mapped_addr as *mut u8, 128) }.fill('a' as u8);
 
-        let usercopy = Usercopy::new(mapped_addr..mapped_addr + page_size).unwrap();
+        let usercopy = new_usercopy_for_test!(Usercopy::new(mapped_addr..mapped_addr + page_size));
 
         let result = usercopy.copyin(mapped_addr, &mut dest);
 
@@ -316,7 +340,8 @@ mod test {
 
         unsafe { std::slice::from_raw_parts_mut(source_addr as *mut u8, 32) }.fill('a' as u8);
 
-        let usercopy = Usercopy::new(mapped_addr..mapped_addr + page_size * 2).unwrap();
+        let usercopy =
+            new_usercopy_for_test!(Usercopy::new(mapped_addr..mapped_addr + page_size * 2));
 
         let result = usercopy.copyin(source_addr, &mut dest);
 
@@ -328,7 +353,7 @@ mod test {
 
     #[::fuchsia::test]
     fn fault_on_zero_address_copyin() {
-        let usercopy = Usercopy::new(0..1).unwrap();
+        let usercopy = new_usercopy_for_test!(Usercopy::new(0..1));
 
         let mut dest = vec![0u8];
 
@@ -339,7 +364,7 @@ mod test {
 
     #[::fuchsia::test]
     fn fault_on_zero_address_copyout() {
-        let usercopy = Usercopy::new(0..1).unwrap();
+        let usercopy = new_usercopy_for_test!(Usercopy::new(0..1));
 
         let source = vec![0u8];
 
