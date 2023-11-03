@@ -8,8 +8,7 @@ import("//src/sys/core/build/core_shard.gni")
 import("epoch/generate_epoch.gni")
 
 base_epoch_file = "$target_out_dir/epoch.json"
-source_dir = "//" + rebase_path("src", "//")
-rebased_epoch_file = rebase_path(base_epoch_file, source_dir)
+rebased_epoch_file = rebase_path(base_epoch_file, root_build_dir)
 
 generate_epoch("epoch.json") {
   output_file = "$base_epoch_file"
@@ -41,6 +40,7 @@ rustc_binary("bin") {
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-fs",
     "//src/lib/fuchsia-url",
+    "//src/lib/include_str_from_working_dir",
     "//src/lib/mundane",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/sys/lib/fidl-fuchsia-pkg-ext",

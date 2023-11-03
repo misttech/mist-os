@@ -21,6 +21,7 @@ use {
     fuchsia_hash::Hash,
     fuchsia_url::{AbsoluteComponentUrl, AbsolutePackageUrl, PinnedAbsolutePackageUrl},
     futures::{channel::oneshot, prelude::*, stream::FusedStream},
+    include_str_from_working_dir::include_str_from_working_dir_env,
     parking_lot::Mutex,
     sha2::{Digest, Sha256},
     std::{collections::HashSet, pin::Pin, sync::Arc, time::Duration},
@@ -61,7 +62,7 @@ pub(super) use {
 };
 
 const COBALT_FLUSH_TIMEOUT: Duration = Duration::from_secs(30);
-const SOURCE_EPOCH_RAW: &str = include_str!(env!("EPOCH_PATH"));
+const SOURCE_EPOCH_RAW: &str = include_str_from_working_dir_env!("EPOCH_PATH");
 
 /// Error encountered in the Prepare state.
 #[derive(Debug, Error)]
