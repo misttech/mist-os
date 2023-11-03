@@ -53,10 +53,10 @@ pub enum Error {
     FileDirectoryCollision { path: String },
 }
 
-impl Error {
-    fn to_zx_status(&self) -> zx::Status {
+impl From<&Error> for zx::Status {
+    fn from(e: &Error) -> Self {
         use {fuchsia_fs::node::OpenError, Error::*};
-        match self {
+        match e {
             MissingMetaFar => zx::Status::NOT_FOUND,
             OpenMetaFar(OpenError::OpenError(s)) => *s,
             OpenMetaFar(_) => zx::Status::INTERNAL,
@@ -148,7 +148,7 @@ pub async fn serve_path(
             let () = send_on_open_with_error(
                 flags.contains(fio::OpenFlags::DESCRIBE),
                 server_end,
-                e.to_zx_status(),
+                (&e).into(),
             );
             return Err(e);
         }
