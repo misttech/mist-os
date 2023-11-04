@@ -183,42 +183,51 @@ func (u *UpdateImages) EditZbiAndVbmetaContents(
 }
 
 func (u *UpdateImages) UpdateImagesSize(ctx context.Context) (uint64, error) {
+	blobs, err := u.UpdateImagesBlobs(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	return u.repo.sumBlobSizes(ctx, blobs)
+}
+
+func (u *UpdateImages) UpdateImagesBlobs(ctx context.Context) (map[build.MerkleRoot]struct{}, error) {
 	visitedPackages := make(map[build.MerkleRoot]struct{})
 	blobs := make(map[build.MerkleRoot]struct{})
 
 	for _, partition := range u.images.Contents.Partitions {
 		url, merkle, err := util.ParsePackageUrl(partition.Url)
 		if err != nil {
-			return 0, err
+			return nil, err
 		}
 
 		pkg, err := newPackage(ctx, u.repo, url.Path[1:], merkle)
 		if err != nil {
-			return 0, err
+			return nil, err
 		}
 
 		if err := pkg.transitiveBlobs(ctx, visitedPackages, blobs); err != nil {
-			return 0, err
+			return nil, err
 		}
 	}
 
 	for _, firmware := range u.images.Contents.Firmware {
 		url, merkle, err := util.ParsePackageUrl(firmware.Url)
 		if err != nil {
-			return 0, err
+			return nil, err
 		}
 
 		pkg, err := newPackage(ctx, u.repo, url.Path[1:], merkle)
 		if err != nil {
-			return 0, err
+			return nil, err
 		}
 
 		if err := pkg.transitiveBlobs(ctx, visitedPackages, blobs); err != nil {
-			return 0, err
+			return nil, err
 		}
 	}
 
-	return u.repo.sumBlobSizes(ctx, blobs)
+	return blobs, nil
 }
 
 func (u *UpdateImages) AddRandomFiles(
@@ -227,7 +236,7 @@ func (u *UpdateImages) AddRandomFiles(
 	dstUpdateImagesPath string,
 	maxSize uint64,
 ) (*UpdateImages, error) {
-	initialSize, err := u.UpdateImagesSize(ctx)
+	initialBlobs, err := u.UpdateImagesBlobs(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -239,8 +248,8 @@ func (u *UpdateImages) AddRandomFiles(
 				ctx,
 				rand,
 				dstUpdateImagesPath,
-				initialSize,
 				maxSize,
+				initialBlobs,
 			)
 		},
 	)

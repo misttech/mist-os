@@ -261,25 +261,31 @@ func (p *Package) AddRandomFiles(
 	dstPath string,
 	maxSize uint64,
 ) (Package, error) {
-	initialSize, err := p.TransitiveBlobSize(ctx)
+	initialBlobs, err := p.TransitiveBlobs(ctx)
 	if err != nil {
 		return Package{}, err
 	}
 
-	return p.addRandomFiles(ctx, rand, dstPath, initialSize, maxSize)
+	return p.addRandomFiles(ctx, rand, dstPath, maxSize, initialBlobs)
 }
 
 func (p *Package) addRandomFiles(
 	ctx context.Context,
 	rand *rand.Rand,
 	dstPath string,
-	initialSize uint64,
 	maxSize uint64,
+	initialBlobs map[build.MerkleRoot]struct{},
 ) (Package, error) {
+	initialSize, err := p.repo.sumBlobSizes(ctx, initialBlobs)
+	if err != nil {
+		return Package{}, err
+	}
+
 	logger.Infof(
 		ctx,
-		"Trying to grow package %s with size %d to up to %d bytes",
+		"Trying to grow package %s with %d blobs and size %d to up to %d bytes",
 		p.path,
+		len(initialBlobs),
 		initialSize,
 		maxSize,
 	)
@@ -306,7 +312,20 @@ func (p *Package) addRandomFiles(
 			)
 		}
 
-		size, err := p.TransitiveBlobSize(ctx)
+		// Find all the blobs we just added to the package.
+		blobs, err := dstPackage.TransitiveBlobs(ctx)
+		if err != nil {
+			return Package{}, err
+		}
+
+		// Merge the package blobs with our initial blob set, since there could
+		// be external blobs we want to include, such as from the system image
+		// packages or the update images.
+		for blob := range initialBlobs {
+			blobs[blob] = struct{}{}
+		}
+
+		size, err := dstPackage.repo.sumBlobSizes(ctx, blobs)
 		if err != nil {
 			return Package{}, err
 		}

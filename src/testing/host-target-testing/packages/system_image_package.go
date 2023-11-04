@@ -53,38 +53,61 @@ func (u *SystemImagePackage) EditPackage(
 // in the system image. It does not include the update image package
 // blobs, since those are garbage collected during the OTA.
 func (u *SystemImagePackage) SystemImageSize(ctx context.Context) (uint64, error) {
-	visitedPackages := make(map[build.MerkleRoot]struct{})
-
-	// This will contain all the blobs in the system image packages, and
-	// any of its subpackages.
-	blobs := u.p.Blobs()
-
-	for path, merkle := range u.packages {
-		pkg, err := newPackage(ctx, u.p.repo, path, merkle)
-		if err != nil {
-			return 0, err
-		}
-
-		if err := pkg.transitiveBlobs(ctx, visitedPackages, blobs); err != nil {
-			return 0, err
-		}
+	blobs, err := u.SystemImageBlobs(ctx)
+	if err != nil {
+		return 0, err
 	}
 
 	return u.p.repo.sumBlobSizes(ctx, blobs)
 }
 
+// SystemImageBlobs returns the transitive blobs in the system image and the
+// available set package blobs contained in the system image.
+func (u *SystemImagePackage) SystemImageBlobs(ctx context.Context) (map[build.MerkleRoot]struct{}, error) {
+	visitedPackages := make(map[build.MerkleRoot]struct{})
+
+	// This will contain all the blobs in the system image packages, and
+	// any of its subpackages.
+	blobs, err := u.p.TransitiveBlobs(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	for path, merkle := range u.packages {
+		pkg, err := newPackage(ctx, u.p.repo, path, merkle)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := pkg.transitiveBlobs(ctx, visitedPackages, blobs); err != nil {
+			return nil, err
+		}
+	}
+
+	return blobs, nil
+}
+
+// AddRandomFiles will extend the system image package such that the total size
+// of the system image package blobs and the available set package blobs is less
+// than or equal to `maxSize`.
 func (u *SystemImagePackage) AddRandomFiles(
 	ctx context.Context,
 	rand *rand.Rand,
 	dstSystemImagePath string,
 	maxSize uint64,
 ) (*SystemImagePackage, error) {
-	initialSize, err := u.SystemImageSize(ctx)
+	initialBlobs, err := u.SystemImageBlobs(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	return u.EditPackage(ctx, func(p Package) (Package, error) {
-		return u.p.addRandomFiles(ctx, rand, dstSystemImagePath, initialSize, maxSize)
+		return p.addRandomFiles(
+			ctx,
+			rand,
+			dstSystemImagePath,
+			maxSize,
+			initialBlobs,
+		)
 	})
 }
