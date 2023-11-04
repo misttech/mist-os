@@ -20,7 +20,7 @@
       "optionality": "optional",
       "long": "--debugger",
       "short": null,
-      "description": "start zxdb in another debugger. Valid options are lldb (preferred) and gdb.",
+      "description": "start zxdb in another debugger. Currently, the only valid option is \"lldb\".",
       "hidden": false
     },
     {
