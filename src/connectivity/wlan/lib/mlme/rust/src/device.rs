@@ -11,7 +11,7 @@ use {
     fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_zircon as zx,
     futures::channel::mpsc,
     ieee80211::{MacAddr, MacAddrBytes},
-    std::{ffi::c_void, sync::Arc},
+    std::{ffi::c_void, fmt::Display, sync::Arc},
     tracing::error,
     wlan_common::{mac::FrameControl, tx_vector, TimeUnit},
 };
@@ -58,6 +58,21 @@ impl Device {
             event_receiver: Some(event_receiver),
             event_sink,
         }
+    }
+
+    fn flatten_and_log_error<T>(
+        method_name: impl Display,
+        result: Result<Result<T, zx::zx_status_t>, fidl::Error>,
+    ) -> Result<T, zx::Status> {
+        result
+            .map_err(|fidl_error| {
+                error!("FIDL error during {}: {:?}", method_name, fidl_error);
+                zx::Status::INTERNAL
+            })?
+            .map_err(|status| {
+                error!("{} failed: {:?}", method_name, status);
+                zx::Status::from_raw(status)
+            })
     }
 }
 
@@ -184,13 +199,10 @@ impl DeviceOps for Device {
     fn wlan_softmac_query_response(
         &mut self,
     ) -> Result<fidl_softmac::WlanSoftmacQueryResponse, zx::Status> {
-        self.wlan_softmac_bridge_proxy
-            .query(zx::Time::INFINITE)
-            .map_err(|error| {
-                error!("FIDL error during Query: {:?}", error);
-                zx::Status::INTERNAL
-            })?
-            .map_err(zx::Status::from_raw)
+        Self::flatten_and_log_error(
+            "Query",
+            self.wlan_softmac_bridge_proxy.query(zx::Time::INFINITE),
+        )
     }
 
     fn discovery_support(&mut self) -> banjo_common::DiscoverySupport {
@@ -291,39 +303,30 @@ impl DeviceOps for Device {
         &mut self,
         request: &fidl_softmac::WlanSoftmacBridgeStartPassiveScanRequest,
     ) -> Result<fidl_softmac::WlanSoftmacBridgeStartPassiveScanResponse, zx::Status> {
-        self.wlan_softmac_bridge_proxy
-            .start_passive_scan(request, zx::Time::INFINITE)
-            .map_err(|fidl_error| {
-                error!("FIDL error during StartPassiveScan: {:?}", fidl_error);
-                zx::Status::INTERNAL
-            })?
-            .map_err(zx::Status::from_raw)
+        Self::flatten_and_log_error(
+            "StartPassiveScan",
+            self.wlan_softmac_bridge_proxy.start_passive_scan(request, zx::Time::INFINITE),
+        )
     }
 
     fn start_active_scan(
         &mut self,
         request: &fidl_softmac::WlanSoftmacStartActiveScanRequest,
     ) -> Result<fidl_softmac::WlanSoftmacBridgeStartActiveScanResponse, zx::Status> {
-        self.wlan_softmac_bridge_proxy
-            .start_active_scan(request, zx::Time::INFINITE)
-            .map_err(|fidl_error| {
-                error!("FIDL error during StartActiveScan: {:?}", fidl_error);
-                zx::Status::INTERNAL
-            })?
-            .map_err(zx::Status::from_raw)
+        Self::flatten_and_log_error(
+            "StartActiveScan",
+            self.wlan_softmac_bridge_proxy.start_active_scan(request, zx::Time::INFINITE),
+        )
     }
 
     fn cancel_scan(
         &mut self,
         request: &fidl_softmac::WlanSoftmacBridgeCancelScanRequest,
     ) -> Result<(), zx::Status> {
-        self.wlan_softmac_bridge_proxy
-            .cancel_scan(request, zx::Time::INFINITE)
-            .map_err(|fidl_error| {
-                error!("FIDL error during CancelScan: {:?}", fidl_error);
-                zx::Status::INTERNAL
-            })?
-            .map_err(zx::Status::from_raw)
+        Self::flatten_and_log_error(
+            "CancelScan",
+            self.wlan_softmac_bridge_proxy.cancel_scan(request, zx::Time::INFINITE),
+        )
     }
 
     fn join_bss(&mut self, mut cfg: banjo_common::JoinBssRequest) -> Result<(), zx::Status> {
@@ -362,13 +365,10 @@ impl DeviceOps for Device {
         if let Some(minstrel) = &self.minstrel {
             minstrel.lock().remove_peer(&addr);
         }
-        self.wlan_softmac_bridge_proxy
-            .clear_association(request, zx::Time::INFINITE)
-            .map_err(|fidl_error| {
-                error!("FIDL error during ClearAssociation: {:?}", fidl_error);
-                zx::Status::INTERNAL
-            })?
-            .map_err(zx::Status::from_raw)
+        Self::flatten_and_log_error(
+            "ClearAssociation",
+            self.wlan_softmac_bridge_proxy.clear_association(request, zx::Time::INFINITE),
+        )
     }
 
     fn notify_association_complete(
@@ -378,13 +378,11 @@ impl DeviceOps for Device {
         if let Some(minstrel) = &self.minstrel {
             minstrel.lock().add_peer(&assoc_cfg)?;
         }
-        self.wlan_softmac_bridge_proxy
-            .notify_association_complete(&assoc_cfg, zx::Time::INFINITE)
-            .map_err(|fidl_error| {
-                error!("FIDL error during NotifyAssociationComplete: {:?}", fidl_error);
-                zx::Status::INTERNAL
-            })?
-            .map_err(zx::Status::from_raw)
+        Self::flatten_and_log_error(
+            "NotifyAssociationComplete",
+            self.wlan_softmac_bridge_proxy
+                .notify_association_complete(&assoc_cfg, zx::Time::INFINITE),
+        )
     }
 
     fn take_mlme_event_stream(&mut self) -> Option<mpsc::UnboundedReceiver<fidl_mlme::MlmeEvent>> {
