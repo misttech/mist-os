@@ -7,7 +7,7 @@ use super::{AccessVector, ObjectClass, SecurityId};
 use starnix_lock::Mutex;
 use std::sync::{
     atomic::{AtomicU64, Ordering},
-    Arc,
+    Arc, Weak,
 };
 
 /// An interface for computing the rights permitted to a source accessing a target of a particular
@@ -66,6 +66,10 @@ impl<R: Reset> ResetMut for R {
     fn reset(&mut self) -> bool {
         (self as &dyn Reset).reset()
     }
+}
+
+pub trait ProxyMut<D> {
+    fn set_delegate(&mut self, delegate: D) -> D;
 }
 
 /// A default implementation for [`AccessQueryable`] that permits no [`AccessVector`].
@@ -223,6 +227,13 @@ impl<D, const SIZE: usize> ResetMut for Fixed<D, SIZE> {
     }
 }
 
+impl<D, const SIZE: usize> ProxyMut<D> for Fixed<D, SIZE> {
+    fn set_delegate(&mut self, mut delegate: D) -> D {
+        std::mem::swap(&mut self.delegate, &mut delegate);
+        delegate
+    }
+}
+
 /// A locked access vector cache.
 pub struct Locked<D = DenyAll> {
     delegate: Arc<Mutex<D>>,
@@ -258,6 +269,15 @@ impl<D: QueryMut> Query for Locked<D> {
 impl<D: ResetMut> Reset for Locked<D> {
     fn reset(&self) -> bool {
         self.delegate.lock().reset()
+    }
+}
+
+impl<D> Locked<D> {
+    pub fn set_stateful_cache_delegate<PD>(&self, delegate: PD) -> PD
+    where
+        D: ProxyMut<PD>,
+    {
+        self.delegate.lock().set_delegate(delegate)
     }
 }
 
@@ -302,6 +322,25 @@ impl<R: Reset> Reset for Arc<R> {
     }
 }
 
+impl<Q: Query> Query for Weak<Q> {
+    fn query(
+        &self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        target_class: ObjectClass,
+    ) -> AccessVector {
+        self.upgrade()
+            .map(|q| q.query(source_sid, target_sid, target_class))
+            .unwrap_or(AccessVector::NONE)
+    }
+}
+
+impl<R: Reset> Reset for Weak<R> {
+    fn reset(&self) -> bool {
+        self.upgrade().as_deref().map(Reset::reset).unwrap_or(false)
+    }
+}
+
 /// An access vector cache that may be reset from any thread, but expects to always be queried
 /// from the same thread. The cache does not implement any specific caching strategies, but
 /// delegates *all* operations.
@@ -341,6 +380,67 @@ impl<D: QueryMut + ResetMut> QueryMut for ThreadLocalQuery<D> {
 
         // Allow `self.delegate` to implement caching strategy and prepare response.
         self.delegate.query(source_sid, target_sid, target_class)
+    }
+}
+
+/// Composite access vector cache manager that delegates queries to security server type, `SS`, and
+/// owns a shared cache of size `SHARED_SIZE`, and can produce thread-local caches of size
+/// `THREAD_LOCAL_SIZE`.
+pub struct Manager<SS, const SHARED_SIZE: usize = 1000, const THREAD_LOCAL_SIZE: usize = 10> {
+    shared_cache: Locked<Fixed<Weak<SS>, THREAD_LOCAL_SIZE>>,
+    thread_local_version: Arc<AtomicVersion>,
+}
+
+impl<SS, const SHARED_SIZE: usize, const THREAD_LOCAL_SIZE: usize>
+    Manager<SS, SHARED_SIZE, THREAD_LOCAL_SIZE>
+{
+    /// Constructs a [`Manager`] that initially has no security server delegate (i.e., will default
+    /// to deny all requests).
+    ///
+    /// TODO: Eliminate `dead_code` guard.
+    #[allow(dead_code)]
+    pub fn new() -> Self {
+        Self {
+            shared_cache: Locked::new(Fixed::new(Weak::<SS>::new())),
+            thread_local_version: Arc::new(AtomicVersion::default()),
+        }
+    }
+
+    /// Sets the security server delegate that is consulted when there is no cache hit on a query.
+    pub fn set_security_server(&self, security_server: Weak<SS>) -> Weak<SS> {
+        self.shared_cache.set_stateful_cache_delegate(security_server)
+    }
+
+    /// Constructs a new thread-local cache that will delegate to the shared cache managed by this
+    /// manager (which, in turn, delegates to its security server).
+    pub fn new_thread_local_cache(
+        &self,
+    ) -> ThreadLocalQuery<Fixed<Locked<Fixed<Weak<SS>, THREAD_LOCAL_SIZE>>, THREAD_LOCAL_SIZE>>
+    {
+        ThreadLocalQuery::new(
+            self.thread_local_version.clone(),
+            Fixed::new(self.shared_cache.clone()),
+        )
+    }
+}
+
+impl<SS, const SHARED_SIZE: usize, const THREAD_LOCAL_SIZE: usize> Reset
+    for Manager<SS, SHARED_SIZE, THREAD_LOCAL_SIZE>
+{
+    /// Resets caches owned by this manager. If owned caches delegate to a security server that is
+    /// reloading its policy, the security server must reload its policy (and start serving the new
+    /// policy) *before* invoking `Manager::reset()` on any managers that delegate to that security
+    /// server. This is because the [`Manager`]-managed caches are consulted by [`Query`] clients
+    /// *before* the security server; performing reload/reset in the reverse order could move stale
+    /// queries into reset caches before policy reload is complete.
+    fn reset(&self) -> bool {
+        // Layered cache stale entries avoided only if shared cache reset first, then thread-local
+        // caches are reset. This is because thread-local caches are consulted by `Query` clients
+        // before the shared cache; performing reset in the reverse order could move stale queries
+        // into reset caches.
+        self.shared_cache.reset();
+        self.thread_local_version.reset();
+        true
     }
 }
 
@@ -775,6 +875,242 @@ mod tests {
                     prev_rights = rights;
                 }
             }
+        }
+    }
+
+    struct SecurityServer {
+        manager: Manager<SecurityServer>,
+        policy: Arc<AtomicU32>,
+    }
+
+    impl SecurityServer {
+        fn manager(&self) -> &Manager<SecurityServer> {
+            &self.manager
+        }
+    }
+
+    impl Query for SecurityServer {
+        fn query(
+            &self,
+            _source_sid: SecurityId,
+            _target_sid: SecurityId,
+            _target_class: ObjectClass,
+        ) -> AccessVector {
+            let policy = self.policy.as_ref().load(Ordering::Relaxed);
+            if policy == NO_RIGHTS {
+                AccessVector::NONE
+            } else if policy == READ_RIGHTS {
+                AccessVector::READ
+            } else if policy == WRITE_RIGHTS {
+                AccessVector::WRITE
+            } else {
+                panic!("query found invalid policy: {}", policy);
+            }
+        }
+    }
+
+    impl Reset for SecurityServer {
+        fn reset(&self) -> bool {
+            true
+        }
+    }
+
+    #[fuchsia::test]
+    async fn manager_cache_coherence() {
+        for _ in 0..10 {
+            test_manager_cache_coherence().await
+        }
+    }
+
+    /// Tests cache coherence over two policy changes over a `Locked<Fixed>`.
+    async fn test_manager_cache_coherence() {
+        //
+        // Test setup
+        //
+
+        let (active_policy, security_server) = {
+            // Carefully initialize strong and weak references between security server and its cache
+            // manager.
+
+            let manager = Manager::new();
+
+            // Initialize `security_server` to own `manager`.
+            let active_policy: Arc<AtomicU32> = Arc::new(Default::default());
+            let security_server =
+                Arc::new(SecurityServer { manager, policy: active_policy.clone() });
+
+            // Replace `security_server.manager`'s  empty `Weak` with `Weak<security_server>` to
+            // start servering `security_server`'s policy out of `security_server.manager`'s cache.
+            security_server
+                .as_ref()
+                .manager()
+                .set_security_server(Arc::downgrade(&security_server));
+
+            (active_policy, security_server)
+        };
+
+        fn set_policy(owner: &Arc<AtomicU32>, policy: u32) {
+            if policy > 2 {
+                panic!("attempt to set policy to invalid value: {}", policy);
+            }
+            owner.as_ref().store(policy, Ordering::Relaxed);
+        }
+
+        // Ensure the initial policy is `NO_RIGHTS`.
+        set_policy(&active_policy, NO_RIGHTS);
+
+        //
+        // Test run: Two threads will query the AVC many times while two other threads make policy
+        // changes.
+        //
+
+        // Allow both query threads to synchronize on "last policy change has been made". Query
+        // threads use this signal to ensure at least some of their queries occur after the last
+        // policy change.
+        let (tx_last_policy_change_1, rx_last_policy_change_1) =
+            futures::channel::oneshot::channel();
+        let (tx_last_policy_change_2, rx_last_policy_change_2) =
+            futures::channel::oneshot::channel();
+
+        // Set up two querying threads. The number of iterations in each thread is highly likely
+        // to perform queries that overlap with the two policy changes, but to be sure, use
+        // `rx_last_policy_change_#` to synchronize  before last queries.
+        let (tx1, rx1) = futures::channel::oneshot::channel();
+        let mut avc_for_query_1 = security_server.manager().new_thread_local_cache();
+        let query_thread_1 = spawn(|| async move {
+            let mut trace = vec![];
+
+            for sid in thread_rng().sample_iter(&Uniform::new(0, 20)).take(2000) {
+                trace.push((sid, avc_for_query_1.query(sid.into(), 0.into(), ObjectClass::Process)))
+            }
+
+            rx_last_policy_change_1.await.expect("receive last-policy-change signal (1)");
+
+            for sid in thread_rng().sample_iter(&Uniform::new(0, 20)).take(10) {
+                trace.push((sid, avc_for_query_1.query(sid.into(), 0.into(), ObjectClass::Process)))
+            }
+
+            tx1.send(trace).expect("send trace 1");
+
+            //
+            // Test expectations: After `<final-policy-reset>; avc.reset(); avc.query();`, all
+            // caches (including those that lazily reset on next query) must contain *only* items
+            // consistent with the final policy: `(_, _, ) => WRITE`.
+            //
+
+            for item in avc_for_query_1.delegate.cache.iter() {
+                assert_eq!(AccessVector::WRITE, item.access_vector);
+            }
+        });
+        let (tx2, rx2) = futures::channel::oneshot::channel();
+        let mut avc_for_query_2 = security_server.manager().new_thread_local_cache();
+        let query_thread_2 = spawn(|| async move {
+            let mut trace = vec![];
+
+            for sid in thread_rng().sample_iter(&Uniform::new(10, 30)).take(2000) {
+                trace.push((sid, avc_for_query_2.query(sid.into(), 0.into(), ObjectClass::Process)))
+            }
+
+            rx_last_policy_change_2.await.expect("receive last-policy-change signal (2)");
+
+            for sid in thread_rng().sample_iter(&Uniform::new(10, 30)).take(10) {
+                trace.push((sid, avc_for_query_2.query(sid.into(), 0.into(), ObjectClass::Process)))
+            }
+
+            tx2.send(trace).expect("send trace 2");
+
+            //
+            // Test expectations: After `<final-policy-reset>; avc.reset(); avc.query();`, all
+            // caches (including those that lazily reset on next query) must contain *only* items
+            // consistent with the final policy: `(_, _, ) => WRITE`.
+            //
+
+            for item in avc_for_query_2.delegate.cache.iter() {
+                assert_eq!(AccessVector::WRITE, item.access_vector);
+            }
+        });
+
+        // Set up two threads that will update the security policy *first*, then reset caches.
+        // The threads synchronize to ensure a policy order of NONE->READ->WRITE.
+        let active_policy_for_set_read = active_policy.clone();
+        let security_server_for_set_read = security_server.clone();
+        let (tx_set_read, rx_set_read) = futures::channel::oneshot::channel();
+        let set_read_thread = spawn(move || {
+            // Allow some queries to accumulate before first policy change.
+            std::thread::sleep(std::time::Duration::from_micros(1));
+
+            // Set security server policy *first*, then reset caches. This is normally the
+            // responsibility of the security server.
+            set_policy(&active_policy_for_set_read, READ_RIGHTS);
+            security_server_for_set_read.manager().reset();
+
+            tx_set_read.send(true).expect("send set-read signal")
+        });
+        let active_policy_for_set_write = active_policy.clone();
+        let security_server_for_set_write = security_server.clone();
+        let set_write_thread = spawn(|| async move {
+            // Complete set-read before executing set-write.
+            rx_set_read.await.expect("receive set-read signal");
+            std::thread::sleep(std::time::Duration::from_micros(1));
+
+            // Set security server policy *first*, then reset caches. This is normally the
+            // responsibility of the security server.
+            set_policy(&active_policy_for_set_write, WRITE_RIGHTS);
+            security_server_for_set_write.manager().reset();
+
+            tx_last_policy_change_1.send(true).expect("send last-policy-change signal (1)");
+            tx_last_policy_change_2.send(true).expect("send last-policy-change signal (2)");
+        });
+
+        // Join all threads.
+        set_read_thread.join().expect("join set-policy-to-read");
+        let _ = set_write_thread.join().expect("join set-policy-to-write").await;
+        let _ = query_thread_1.join().expect("join query").await;
+        let _ = query_thread_2.join().expect("join query").await;
+
+        // Receive traces from query threads.
+        let trace_1 = rx1.await.expect("receive trace 1");
+        let trace_2 = rx2.await.expect("receive trace 2");
+
+        //
+        // Test expectations: Inspect individual query thread traces separately. For each thread,
+        // group `(sid, 0, 0) -> AccessVector` trace items by `sid`, keeping them in chronological
+        // order. Every such grouping should observe at most `NONE->READ`, `READ->WRITE`
+        // transitions. Any other transitions suggests out-of-order "jitter" from stale cache items.
+        //
+        // We cannot expect stronger guarantees (e.g., across different queries). For example, the
+        // following scheduling is possible:
+        //
+        // 1. Policy change thread changes policy from NONE to READ;
+        // 2. Query thread qt queries q1, which as never been queried before. Result: READ.
+        // 3. Query thread qt queries q0, which was cached before policy reload. Result: NONE.
+        // 4. All caches reset.
+        //
+        // Notice that, ignoring query inputs, qt observes `..., READ, NONE`. However, such a
+        // sequence must not occur when observing qt's trace filtered by query input (q1, q0, etc.).
+        //
+        // Finally, the shared (`Locked`) cache should contain only entries consistent with
+        // the final policy: `(_, _, ) => WRITE`.
+        //
+
+        for trace in [trace_1, trace_2] {
+            let mut trace_by_sid = HashMap::<u64, Vec<AccessVector>>::new();
+            for (sid, access_vector) in trace {
+                trace_by_sid.entry(sid).or_insert(vec![]).push(access_vector);
+            }
+            for access_vectors in trace_by_sid.values() {
+                let initial_rights = AccessVector::NONE;
+                let mut prev_rights = &initial_rights;
+                for rights in access_vectors.iter() {
+                    // Note: `WRITE > READ > NONE`.
+                    assert!(rights >= prev_rights);
+                    prev_rights = rights;
+                }
+            }
+        }
+
+        for item in security_server.manager().shared_cache.delegate.lock().cache.iter() {
+            assert_eq!(AccessVector::WRITE, item.access_vector);
         }
     }
 }
