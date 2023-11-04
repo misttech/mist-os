@@ -107,15 +107,10 @@ template("coverage_verification_test") {
   test_config = {
     # Binaries used for the test.
     bin = {
-      llvm_profdata = rebase_path(
-              "//prebuilt/third_party/clang/${host_platform}/bin/llvm-profdata",
-              root_build_dir)
-      llvm_cov = rebase_path(
-              "//prebuilt/third_party/clang/${host_platform}/bin/llvm-cov",
-              root_build_dir)
-      llvm_cxxfilt = rebase_path(
-              "//prebuilt/third_party/clang/${host_platform}/bin/llvm-cxxfilt",
-              root_build_dir)
+      llvm_profdata =
+          rebase_path("${clang_prefix}/llvm-profdata", root_build_dir)
+      llvm_cov = rebase_path("${clang_prefix}/llvm-cov", root_build_dir)
+      llvm_cxxfilt = rebase_path("${clang_prefix}/llvm-cxxfilt", root_build_dir)
       fvm = rebase_path(fvm_host_tool, root_build_dir)
     }
 
