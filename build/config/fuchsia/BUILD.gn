@@ -83,6 +83,22 @@ config("compiler") {
                                 []),
                     root_build_dir)
 
+    # When linking C++ runtime libraries into Rust binaries, we should use
+    # the correct multilib variant.
+    #
+    # TODO(fxbug.dev/95670): Rather then hardcoding the directory names here,
+    # these should ideally come from runtime.json.
+    _multilib_dir = ""
+    if (toolchain_variant.tags + [ "asan" ] - [ "asan" ] !=
+        toolchain_variant.tags) {
+      _multilib_dir = "/asan+noexcept"
+    } else if (toolchain_variant.tags + [ "hwasan" ] - [ "hwasan" ] !=
+               toolchain_variant.tags) {
+      _multilib_dir = "/hwasan+noexcept"
+    } else {
+      _multilib_dir = "/noexcept"
+    }
+
     rustflags = [
       "-L",
       rebase_path(rust_sysroot_dir, root_build_dir) + "/lib",
@@ -92,9 +108,8 @@ config("compiler") {
       # These could alternatively come from clang's '--print-search-dirs', but that would require an
       # exec_script and post-processing of the output or a JSON file generated during the toolchain
       # build.
-      "-Clink-arg=-L" + rebased_clang_prefix + "/../lib/" +
-          current_target_tuple,
-      "-Clink-arg=-L" + _clang_resource_dir + "/lib/" + current_target_tuple,
+      "-Clink-arg=-L${rebased_clang_prefix}/../lib/${current_target_tuple}",
+      "-Clink-arg=-L${_clang_resource_dir}/lib/${current_target_tuple}${_multilib_dir}",
       "-Clink-arg=--pack-dyn-relocs=relr",
       "-Clink-arg=-dynamic-linker=ld.so.1",
       "-Clink-arg=--icf=all",
