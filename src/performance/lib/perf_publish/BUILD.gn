@@ -11,6 +11,7 @@ python_library("perf_publish") {
     "__init__.py",
     "metrics_allowlist.py",
     "publish.py",
+    "summarize.py",
   ]
 }
 

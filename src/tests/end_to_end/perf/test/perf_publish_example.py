@@ -33,7 +33,7 @@ class ExampleMetricPublishing(fuchsia_base_test.FuchsiaBaseTest):
             json.dump(fuchsiaperf_data, f, indent=4)
 
         publish.publish_fuchsiaperf(
-            test_perf_file,
+            [test_perf_file],
             "fuchsia.example.txt",
         )
 

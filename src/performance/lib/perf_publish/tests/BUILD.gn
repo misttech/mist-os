@@ -14,7 +14,11 @@ if (is_host) {
 
   python_host_test("metrics_allowlist_test") {
     main_source = "metrics_allowlist_test.py"
-    sources = [ "metrics_allowlist_test.py" ]
+    libraries = [ "//src/performance/lib/perf_publish" ]
+  }
+
+  python_host_test("summarize_test") {
+    main_source = "summarize_test.py"
     libraries = [ "//src/performance/lib/perf_publish" ]
   }
 
@@ -30,5 +34,6 @@ group("tests") {
   public_deps = [
     ":metrics_allowlist_test($host_toolchain)",
     ":perf_publish_test($host_toolchain)",
+    ":summarize_test($host_toolchain)",
   ]
 }

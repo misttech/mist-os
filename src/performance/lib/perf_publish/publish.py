@@ -8,9 +8,10 @@ import os
 import re
 import subprocess
 import time
-from typing import Any, Self, Union
+from typing import Any, Iterable, Self, Union
 
 import perf_publish.metrics_allowlist as metrics_allowlist
+import perf_publish.summarize as summarize
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -27,8 +28,10 @@ _TEST_SUITE_REGEX: re.Pattern = re.compile(
 _LABEL_REGEX: re.Pattern = re.compile(r"^[A-Za-z0-9_/.:=+<>\\ -]+$")
 
 _FUCHSIA_PERF_EXT: str = ".fuchsiaperf.json"
+_FUCHSIA_PERF_FULL_EXT: str = ".fuchsiaperf_full.json"
 _CATAPULT_UPLOAD_ENABLED_EXT: str = ".catapult_json"
 _CATAPULT_UPLOAD_DISABLED_EXT: str = ".catapult_json_disabled"
+_SUMMARIZED_RESULTS_FILE: str = f"results{_FUCHSIA_PERF_EXT}"
 
 ENV_CATAPULT_DASHBOARD_MASTER: str = "CATAPULT_DASHBOARD_MASTER"
 ENV_CATAPULT_DASHBOARD_BOT: str = "CATAPULT_DASHBOARD_BOT"
@@ -41,7 +44,7 @@ ENV_FUCHSIA_EXPECTED_METRIC_NAMES_DEST_DIR: str = (
 
 
 def publish_fuchsiaperf(
-    fuchsia_perf_file_path: Union[str, os.PathLike],
+    fuchsia_perf_file_paths: Iterable[Union[str, os.PathLike]],
     expected_metric_names_filename: str,
     env: Union[dict[str, str], type(os.environ)] = os.environ,
     converter_path: Union[str, os.PathLike] | None = None,
@@ -49,20 +52,21 @@ def publish_fuchsiaperf(
     """Publishes the given metrics.
 
     Args:
-        fuchsia_perf_file_path: path to the fuchsiaperf.json file containing the metrics.
+        fuchsia_perf_file_paths: paths to the fuchsiaperf.json files containing the metrics. These
+            will be summarized into a single fuchsiaperf.json file.
         env: map holding the environment variables.
         converter_path: path to the catapult_converter binary.
         expected_metric_names_filename: allows to optionally validate the metrics in the perf file
             against a set of expected metrics.
     """
-    converter = CatapultConverter.from_env(fuchsia_perf_file_path, env)
+    converter = CatapultConverter.from_env(fuchsia_perf_file_paths, env)
     converter.run(expected_metric_names_filename, converter_path=converter_path)
 
 
 class CatapultConverter:
     def __init__(
         self,
-        fuchsia_perf_file_path: Union[str, os.PathLike],
+        fuchsia_perf_file_paths: Iterable[Union[str, os.PathLike]],
         master: str | None = None,
         bot: str | None = None,
         build_bucket_id: str | None = None,
@@ -75,7 +79,8 @@ class CatapultConverter:
         """Creates a new catapult converter.
 
         Args:
-            fuchsia_perf_file_path: path to the fuchsiaperf.json file containing the metrics.
+            fuchsia_perf_file_paths: paths to the fuchsiaperf.json files containing the metrics.
+                These will be summarized into a single fuchsiaperf.json file.
             fuchsia_expected_metric_names_dest_dir: directory to which expected metrics are written.
             current_time: the current time, useful for testing. Defaults to time.time.
             subprocess_check_call: allows to execute a process raising an exception on error.
@@ -129,11 +134,19 @@ class CatapultConverter:
                 "Catapult-related infra env vars are not set consistently"
             )
 
-        self._results_path: str = str(fuchsia_perf_file_path)
-        if not self._results_path.endswith(_FUCHSIA_PERF_EXT):
-            return ValueError(
-                f"The given fuchsia_perf_file must end with {_FUCHSIA_PERF_EXT}"
-            )
+        fuchsia_perf_file_paths = self._check_extension_and_relocate(
+            fuchsia_perf_file_paths
+        )
+
+        results = summarize.summarize_perf_files(fuchsia_perf_file_paths)
+        self._results_path = os.path.join(
+            os.path.dirname(fuchsia_perf_file_paths[0]),
+            _SUMMARIZED_RESULTS_FILE,
+        )
+        assert not os.path.exists(self._results_path)
+        with open(self._results_path, "w") as f:
+            summarize.write_fuchsiaperf_json(f, results)
+
         catapult_extension = (
             _CATAPULT_UPLOAD_ENABLED_EXT
             if self._upload_enabled
@@ -144,10 +157,41 @@ class CatapultConverter:
             + catapult_extension
         )
 
+    def _check_extension_and_relocate(self, fuchsia_perf_file_paths):
+        fuchsia_perf_file_paths = list(map(str, fuchsia_perf_file_paths))
+        if len(fuchsia_perf_file_paths) == 0:
+            raise ValueError("Expected at least one fuchsiaperf.json file")
+        files_with_wrong_ext = []
+        files_to_rename = []
+        paths = []
+
+        for p in fuchsia_perf_file_paths:
+            if p.endswith(_FUCHSIA_PERF_EXT):
+                files_to_rename.append(p)
+            elif p.endswith(_FUCHSIA_PERF_FULL_EXT):
+                paths.append(p)
+            else:
+                files_with_wrong_ext.append(p)
+
+        if files_with_wrong_ext:
+            raise ValueError(
+                f"The following files must end with {_FUCHSIA_PERF_FULL_EXT} or {_FUCHSIA_PERF_EXT}:"
+                "\n- {}\n".format("\n- ".join(files_with_wrong_ext))
+            )
+
+        for file in files_to_rename:
+            file_without_suffix = file.removesuffix(_FUCHSIA_PERF_EXT)
+            new_file = f"{file_without_suffix}{_FUCHSIA_PERF_FULL_EXT}"
+            assert not os.path.exists(new_file)
+            os.rename(file, new_file)
+            paths.append(new_file)
+
+        return paths
+
     @classmethod
     def from_env(
         cls,
-        fuchsia_perf_file_path: Union[str, os.PathLike],
+        fuchsia_perf_file_paths: Iterable[Union[str, os.PathLike]],
         env: Union[dict[str, str], type(os.environ)] = os.environ,
         current_time: int | None = None,
         subprocess_check_call: Any = subprocess.check_call,
@@ -155,14 +199,14 @@ class CatapultConverter:
         """Creates a new catapult converter using the environment variables.
 
         Args:
-            fuchsia_perf_file_path: path to the fuchsiaperf.json file containing the metrics.
+            fuchsia_perf_file_paths: paths to the fuchsiaperf.json files containing the metrics.
             env: map holding the environment variables.
             current_time: the current time, useful for testing. Defaults to time.time.
             subprocess_check_call: allows to execute a process raising an exception on error.
                 Useful for testing. Defaults to subprocess.check_call.
         """
         return cls(
-            fuchsia_perf_file_path,
+            fuchsia_perf_file_paths,
             master=env.get(ENV_CATAPULT_DASHBOARD_MASTER),
             bot=env.get(ENV_CATAPULT_DASHBOARD_BOT),
             build_bucket_id=env.get(ENV_BUILDBUCKET_ID),
