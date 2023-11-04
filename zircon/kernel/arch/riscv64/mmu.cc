@@ -163,28 +163,27 @@ constexpr pte_t mmu_non_leaf_pte(paddr_t pa, bool global) {
 
 void update_pte(volatile pte_t* pte, pte_t newval) { *pte = newval; }
 
-int first_used_page_table_entry(const volatile pte_t* page_table) {
-  const int count = 1U << (PAGE_SIZE_SHIFT - 3);
+zx::result<size_t> first_used_page_table_entry(const volatile pte_t* page_table) {
+  const size_t count = 1U << (PAGE_SIZE_SHIFT - 3);
 
-  for (int i = 0; i < count; i++) {
+  for (size_t i = 0; i < count; i++) {
     pte_t pte = page_table[i];
     if (riscv64_pte_is_valid(pte)) {
-      return i;
+      return zx::ok(i);
     }
   }
-  return -1;
+  return zx::error(ZX_ERR_NOT_FOUND);
 }
 
 bool page_table_is_clear(const volatile pte_t* page_table) {
-  const int index = first_used_page_table_entry(page_table);
-  const bool clear = index == -1;
-  if (clear) {
+  const zx::result<size_t> index_result = first_used_page_table_entry(page_table);
+  if (index_result.is_error()) {
     LTRACEF("page table at %p is clear\n", page_table);
   } else {
-    LTRACEF("page_table at %p still in use, index %d is %#" PRIx64 "\n", page_table, index,
-            page_table[index]);
+    LTRACEF("page_table at %p still in use, index %zu is %#" PRIx64 "\n", page_table, *index_result,
+            page_table[*index_result]);
   }
-  return clear;
+  return index_result.is_error();
 }
 
 constexpr Riscv64AspaceType AspaceTypeFromFlags(uint mmu_flags) {
@@ -210,7 +209,7 @@ constexpr ktl::string_view Riscv64AspaceTypeName(Riscv64AspaceType type) {
     case Riscv64AspaceType::kGuest:
       return "guest";
   }
-  __UNREACHABLE;
+  __builtin_abort();
 }
 
 constexpr bool IsUserBaseSizeValid(vaddr_t base, size_t size) {
@@ -516,47 +515,38 @@ zx_status_t Riscv64ArchVmAspace::QueryLocked(vaddr_t vaddr, paddr_t* paddr, uint
   }
 }
 
-zx_status_t Riscv64ArchVmAspace::AllocPageTable(paddr_t* paddrp) {
+zx::result<paddr_t> Riscv64ArchVmAspace::AllocPageTable() {
   // Allocate a page from the pmm via function pointer passed to us in Init().
   // The default is pmm_alloc_page so test and explicitly call it to avoid any unnecessary
   // virtual functions.
   vm_page_t* page;
-  zx_status_t status;
-  if (likely(!test_page_alloc_func_)) {
-    status = pmm_alloc_page(0, &page, paddrp);
-  } else {
-    status = test_page_alloc_func_(0, &page, paddrp);
-  }
+  paddr_t paddr;
+  const zx_status_t status = likely(!test_page_alloc_func_)
+                                 ? pmm_alloc_page(0, &page, &paddr)
+                                 : test_page_alloc_func_(0, &page, &paddr);
   if (status != ZX_OK) {
-    return status;
+    return zx::error_result(status);
   }
+  DEBUG_ASSERT(is_physmap_phys_addr(paddr));
 
   page->set_state(vm_page_state::MMU);
   pt_pages_++;
 
   LOCAL_KTRACE("page table alloc");
+  LTRACEF("allocated 0x%lx\n", paddr);
 
-  LTRACEF("allocated 0x%lx\n", *paddrp);
-
-  if (!is_physmap_phys_addr(*paddrp)) {
-    while (1)
-      __asm__("nop");
-  }
-  return ZX_OK;
+  return zx::ok(paddr);
 }
 
 void Riscv64ArchVmAspace::FreePageTable(void* vaddr, paddr_t paddr, ConsistencyManager& cm) {
   LTRACEF("vaddr %p paddr 0x%lx\n", vaddr, paddr);
-
   LOCAL_KTRACE("page table free");
 
-  vm_page_t* page = paddr_to_vm_page(paddr);
-  if (!page) {
-    panic("bad page table paddr 0x%lx\n", paddr);
-  }
+  vm_page_t* const page = paddr_to_vm_page(paddr);
+  DEBUG_ASSERT(page != nullptr);
   DEBUG_ASSERT(page->state() == vm_page_state::MMU);
-  cm.FreePage(page);
 
+  cm.FreePage(page);
   pt_pages_--;
 }
 
@@ -571,12 +561,12 @@ zx_status_t Riscv64ArchVmAspace::SplitLargePage(vaddr_t vaddr, uint level, vaddr
 
   LTRACEF("old leaf table entry is %#lx\n", old_pte);
 
-  paddr_t paddr;
-  zx_status_t ret = AllocPageTable(&paddr);
-  if (ret) {
+  const zx::result<paddr_t> result = AllocPageTable();
+  if (result.is_error()) {
     TRACEF("failed to allocate page table\n");
-    return ret;
+    return result.error_value();
   }
+  const paddr_t paddr = result.value();
 
   const auto new_page_table = static_cast<volatile pte_t*>(paddr_to_physmap(paddr));
 
@@ -648,9 +638,10 @@ void Riscv64ArchVmAspace::FlushAsid() const {
   }
 }
 
-ssize_t Riscv64ArchVmAspace::UnmapPageTable(vaddr_t vaddr, vaddr_t vaddr_rel, size_t size,
-                                            EnlargeOperation enlarge, uint level,
-                                            volatile pte_t* page_table, ConsistencyManager& cm) {
+zx::result<size_t> Riscv64ArchVmAspace::UnmapPageTable(vaddr_t vaddr, vaddr_t vaddr_rel,
+                                                       size_t size, EnlargeOperation enlarge,
+                                                       uint level, volatile pte_t* page_table,
+                                                       ConsistencyManager& cm) {
   const vaddr_t block_size = page_size_per_level(level);
   const vaddr_t block_mask = block_size - 1;
 
@@ -668,12 +659,12 @@ ssize_t Riscv64ArchVmAspace::UnmapPageTable(vaddr_t vaddr, vaddr_t vaddr_rel, si
     // If the input range partially covers a large page, attempt to split.
     if (level > 0 && riscv64_pte_is_valid(pte) && riscv64_pte_is_leaf(pte) &&
         chunk_size != block_size) {
-      zx_status_t s = SplitLargePage(vaddr, level, index, page_table, cm);
+      const zx_status_t status = SplitLargePage(vaddr, level, index, page_table, cm);
       // If the split failed then we just fall through and unmap the entire large page.
-      if (likely(s == ZX_OK)) {
+      if (likely(status == ZX_OK)) {
         pte = page_table[index];
       } else if (enlarge == EnlargeOperation::No) {
-        return s;
+        return zx::error_result(status);
       }
     }
 
@@ -684,9 +675,9 @@ ssize_t Riscv64ArchVmAspace::UnmapPageTable(vaddr_t vaddr, vaddr_t vaddr_rel, si
           static_cast<volatile pte_t*>(paddr_to_physmap(page_table_paddr));
 
       // Recurse a level.
-      ssize_t result =
+      zx::result<size_t> result =
           UnmapPageTable(vaddr, vaddr_rem, chunk_size, enlarge, level - 1, next_page_table, cm);
-      if (result < 0) {
+      if (result.is_error()) {
         return result;
       }
 
@@ -727,12 +718,13 @@ ssize_t Riscv64ArchVmAspace::UnmapPageTable(vaddr_t vaddr, vaddr_t vaddr_rel, si
     unmap_size += chunk_size;
   }
 
-  return unmap_size;
+  return zx::ok(unmap_size);
 }
 
-ssize_t Riscv64ArchVmAspace::MapPageTable(vaddr_t vaddr_in, vaddr_t vaddr_rel_in, paddr_t paddr_in,
-                                          size_t size_in, pte_t attrs, uint level,
-                                          volatile pte_t* page_table, ConsistencyManager& cm) {
+zx::result<size_t> Riscv64ArchVmAspace::MapPageTable(vaddr_t vaddr_in, vaddr_t vaddr_rel_in,
+                                                     paddr_t paddr_in, size_t size_in, pte_t attrs,
+                                                     uint level, volatile pte_t* page_table,
+                                                     ConsistencyManager& cm) {
   vaddr_t vaddr = vaddr_in;
   vaddr_t vaddr_rel = vaddr_rel_in;
   paddr_t paddr = paddr_in;
@@ -747,13 +739,14 @@ ssize_t Riscv64ArchVmAspace::MapPageTable(vaddr_t vaddr_in, vaddr_t vaddr_rel_in
 
   if ((vaddr_rel | paddr | size) & (PAGE_MASK)) {
     TRACEF("not page aligned\n");
-    return ZX_ERR_INVALID_ARGS;
+    return zx::error_result(ZX_ERR_INVALID_ARGS);
   }
 
   auto cleanup = fit::defer([&]() {
     AssertHeld(lock_);
-    UnmapPageTable(vaddr_in, vaddr_rel_in, size_in - size, EnlargeOperation::No, level, page_table,
-                   cm);
+    zx::result<size_t> result = UnmapPageTable(vaddr_in, vaddr_rel_in, size_in - size,
+                                               EnlargeOperation::No, level, page_table, cm);
+    DEBUG_ASSERT(result.is_ok());
   });
 
   size_t mapped_size = 0;
@@ -771,11 +764,12 @@ ssize_t Riscv64ArchVmAspace::MapPageTable(vaddr_t vaddr_in, vaddr_t vaddr_rel_in
       volatile pte_t* next_page_table = nullptr;
 
       if (!riscv64_pte_is_valid(pte)) {
-        zx_status_t ret = AllocPageTable(&page_table_paddr);
-        if (ret) {
+        zx::result<paddr_t> result = AllocPageTable();
+        if (result.is_error()) {
           TRACEF("failed to allocate page table\n");
-          return NULL;
+          return result.take_error();
         }
+        page_table_paddr = result.value();
         allocated_page_table = true;
         void* pt_vaddr = paddr_to_physmap(page_table_paddr);
 
@@ -798,13 +792,13 @@ ssize_t Riscv64ArchVmAspace::MapPageTable(vaddr_t vaddr_in, vaddr_t vaddr_rel_in
         LTRACEF("found page table %#" PRIxPTR "\n", page_table_paddr);
         next_page_table = static_cast<volatile pte_t*>(paddr_to_physmap(page_table_paddr));
       } else {
-        return ZX_ERR_ALREADY_EXISTS;
+        return zx::error_result(ZX_ERR_ALREADY_EXISTS);
       }
       DEBUG_ASSERT(next_page_table);
 
-      ssize_t ret =
+      zx::result<size_t> result =
           MapPageTable(vaddr, vaddr_rem, paddr, chunk_size, attrs, level - 1, next_page_table, cm);
-      if (ret < 0) {
+      if (result.is_error()) {
         if (allocated_page_table) {
           // We just allocated this page table. The unmap in err will not clean it up as the size
           // we pass in will not cause us to look at this page table. This is reasonable as if we
@@ -820,13 +814,13 @@ ssize_t Riscv64ArchVmAspace::MapPageTable(vaddr_t vaddr_in, vaddr_t vaddr_rel_in
           cm.FlushEntry(vaddr, false);
           FreePageTable(const_cast<pte_t*>(next_page_table), page_table_paddr, cm);
         }
-        return ret;
+        return result;
       }
-      DEBUG_ASSERT(static_cast<size_t>(ret) == chunk_size);
+      DEBUG_ASSERT(result.value() == chunk_size);
     } else {
       if (riscv64_pte_is_valid(pte)) {
         LTRACEF("page table entry already in use, index %#" PRIxPTR ", %#" PRIx64 "\n", index, pte);
-        return ZX_ERR_ALREADY_EXISTS;
+        return zx::error_result(ZX_ERR_ALREADY_EXISTS);
       }
 
       pte = riscv64_pte_pa_to_pte(paddr) | attrs;
@@ -841,7 +835,7 @@ ssize_t Riscv64ArchVmAspace::MapPageTable(vaddr_t vaddr_in, vaddr_t vaddr_rel_in
   }
 
   cleanup.cancel();
-  return mapped_size;
+  return zx::ok(mapped_size);
 }
 
 zx_status_t Riscv64ArchVmAspace::ProtectPageTable(vaddr_t vaddr_in, vaddr_t vaddr_rel_in,
@@ -1020,35 +1014,28 @@ void Riscv64ArchVmAspace::MarkAccessedPageTable(vaddr_t vaddr, vaddr_t vaddr_rel
   }
 }
 
-ssize_t Riscv64ArchVmAspace::MapPages(vaddr_t vaddr, paddr_t paddr, size_t size, pte_t attrs,
-                                      ConsistencyManager& cm) {
+zx::result<size_t> Riscv64ArchVmAspace::MapPages(vaddr_t vaddr, paddr_t paddr, size_t size,
+                                                 pte_t attrs, ConsistencyManager& cm) {
   LOCAL_KTRACE("mmu map", (vaddr & ~PAGE_MASK) | ((size >> PAGE_SIZE_SHIFT) & PAGE_MASK));
   uint level = RISCV64_MMU_PT_LEVELS - 1;
-  ssize_t ret = MapPageTable(vaddr, vaddr, paddr, size, attrs, level, tt_virt_, cm);
+  zx::result<size_t> ret = MapPageTable(vaddr, vaddr, paddr, size, attrs, level, tt_virt_, cm);
   mb();
   return ret;
 }
 
-ssize_t Riscv64ArchVmAspace::UnmapPages(vaddr_t vaddr, size_t size, EnlargeOperation enlarge,
-                                        ConsistencyManager& cm) {
+zx::result<size_t> Riscv64ArchVmAspace::UnmapPages(vaddr_t vaddr, size_t size,
+                                                   EnlargeOperation enlarge,
+                                                   ConsistencyManager& cm) {
   LOCAL_KTRACE("mmu unmap", (vaddr & ~PAGE_MASK) | ((size >> PAGE_SIZE_SHIFT) & PAGE_MASK));
   uint level = RISCV64_MMU_PT_LEVELS - 1;
-  ssize_t ret = UnmapPageTable(vaddr, vaddr, size, enlarge, level, tt_virt_, cm);
-  return ret;
+  return UnmapPageTable(vaddr, vaddr, size, enlarge, level, tt_virt_, cm);
 }
 
 zx_status_t Riscv64ArchVmAspace::ProtectPages(vaddr_t vaddr, size_t size, pte_t attrs) {
   LOCAL_KTRACE("mmu protect", (vaddr & ~PAGE_MASK) | ((size >> PAGE_SIZE_SHIFT) & PAGE_MASK));
   uint level = RISCV64_MMU_PT_LEVELS - 1;
   ConsistencyManager cm(*this);
-  zx_status_t ret = ProtectPageTable(vaddr, vaddr, size, attrs, level, tt_virt_, cm);
-  return ret;
-}
-
-void Riscv64ArchVmAspace::MmuParamsFromFlags(uint mmu_flags, pte_t* attrs) {
-  if (attrs) {
-    *attrs = mmu_flags_to_pte_attr(mmu_flags, IsKernel());
-  }
+  return ProtectPageTable(vaddr, vaddr, size, attrs, level, tt_virt_, cm);
 }
 
 zx_status_t Riscv64ArchVmAspace::MapContiguous(vaddr_t vaddr, paddr_t paddr, size_t count,
@@ -1079,25 +1066,22 @@ zx_status_t Riscv64ArchVmAspace::MapContiguous(vaddr_t vaddr, paddr_t paddr, siz
     return ZX_OK;
   }
 
-  ssize_t ret;
-  {
-    Guard<Mutex> a{&lock_};
-    if (mmu_flags & ARCH_MMU_FLAG_PERM_EXECUTE) {
-      Riscv64VmICacheConsistencyManager cache_cm;
-      cache_cm.SyncAddr(reinterpret_cast<vaddr_t>(paddr_to_physmap(paddr)), count * PAGE_SIZE);
-    }
-    pte_t attrs;
-    MmuParamsFromFlags(mmu_flags, &attrs);
-    ConsistencyManager cm(*this);
-    ret = MapPages(vaddr, paddr, count * PAGE_SIZE, attrs, cm);
+  Guard<Mutex> a{&lock_};
+
+  if (mmu_flags & ARCH_MMU_FLAG_PERM_EXECUTE) {
+    Riscv64VmICacheConsistencyManager cache_cm;
+    cache_cm.SyncAddr(reinterpret_cast<vaddr_t>(paddr_to_physmap(paddr)), count * PAGE_SIZE);
   }
 
+  ConsistencyManager cm(*this);
+  const pte_t attrs = mmu_flags_to_pte_attr(mmu_flags, IsKernel());
+  zx::result<size_t> result = MapPages(vaddr, paddr, count * PAGE_SIZE, attrs, cm);
   if (mapped) {
-    *mapped = (ret > 0) ? (ret / PAGE_SIZE) : 0u;
+    *mapped = result.is_ok() ? result.value() / PAGE_SIZE : 0u;
     DEBUG_ASSERT(*mapped <= count);
   }
 
-  return (ret < 0) ? (zx_status_t)ret : ZX_OK;
+  return result.status_value();
 }
 
 zx_status_t Riscv64ArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count, uint mmu_flags,
@@ -1140,30 +1124,29 @@ zx_status_t Riscv64ArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count,
         cache_cm.SyncAddr(reinterpret_cast<vaddr_t>(paddr_to_physmap(phys[idx])), PAGE_SIZE);
       }
     }
-    pte_t attrs;
-    MmuParamsFromFlags(mmu_flags, &attrs);
 
-    ssize_t ret;
     size_t idx = 0;
     ConsistencyManager cm(*this);
     auto undo = fit::defer([&]() TA_NO_THREAD_SAFETY_ANALYSIS {
       if (idx > 0) {
-        UnmapPages(vaddr, idx * PAGE_SIZE, EnlargeOperation::No, cm);
+        zx::result<size_t> result = UnmapPages(vaddr, idx * PAGE_SIZE, EnlargeOperation::No, cm);
+        DEBUG_ASSERT(result.is_ok());
       }
     });
 
+    const pte_t attrs = mmu_flags_to_pte_attr(mmu_flags, IsKernel());
     vaddr_t v = vaddr;
     for (; idx < count; ++idx) {
       paddr_t paddr = phys[idx];
       DEBUG_ASSERT(IS_PAGE_ALIGNED(paddr));
-      ret = MapPages(v, paddr, PAGE_SIZE, attrs, cm);
-      if (ret < 0) {
-        zx_status_t status = static_cast<zx_status_t>(ret);
-        if (status != ZX_ERR_ALREADY_EXISTS || existing_action == ExistingEntryAction::Error) {
-          return status;
+      zx::result<size_t> result = MapPages(v, paddr, PAGE_SIZE, attrs, cm);
+      if (result.is_error()) {
+        if (result.error_value() != ZX_ERR_ALREADY_EXISTS ||
+            existing_action == ExistingEntryAction::Error) {
+          return result.error_value();
         }
       } else {
-        total_mapped += ret / PAGE_SIZE;
+        total_mapped += result.value() / PAGE_SIZE;
       }
 
       v += PAGE_SIZE;
@@ -1203,14 +1186,14 @@ zx_status_t Riscv64ArchVmAspace::Unmap(vaddr_t vaddr, size_t count, EnlargeOpera
   Guard<Mutex> a{&lock_};
 
   ConsistencyManager cm(*this);
-  ssize_t ret = UnmapPages(vaddr, count * PAGE_SIZE, enlarge, cm);
+  zx::result<size_t> result = UnmapPages(vaddr, count * PAGE_SIZE, enlarge, cm);
 
   if (unmapped) {
-    *unmapped = (ret > 0) ? (ret / PAGE_SIZE) : 0u;
+    *unmapped = result.is_ok() ? result.value() / PAGE_SIZE : 0u;
     DEBUG_ASSERT(*unmapped <= count);
   }
 
-  return (ret < 0) ? (zx_status_t)ret : 0;
+  return result.status_value();
 }
 
 zx_status_t Riscv64ArchVmAspace::Protect(vaddr_t vaddr, size_t count, uint mmu_flags) {
@@ -1251,15 +1234,8 @@ zx_status_t Riscv64ArchVmAspace::Protect(vaddr_t vaddr, size_t count, uint mmu_f
     vm_mmu_protect_make_execute_pages.Add(pages_synced);
   }
 
-  int ret;
-  {
-    pte_t attrs;
-    MmuParamsFromFlags(mmu_flags, &attrs);
-
-    ret = ProtectPages(vaddr, count * PAGE_SIZE, attrs);
-  }
-
-  return ret;
+  const pte_t attrs = mmu_flags_to_pte_attr(mmu_flags, IsKernel());
+  return ProtectPages(vaddr, count * PAGE_SIZE, attrs);
 }
 
 zx_status_t Riscv64ArchVmAspace::HarvestAccessed(vaddr_t vaddr, size_t count,
@@ -1370,11 +1346,11 @@ zx_status_t Riscv64ArchVmAspace::Init() {
     }
 
     // allocate a top level page table to serve as the translation table
-    paddr_t pa;
-    zx_status_t status = AllocPageTable(&pa);
-    if (status != ZX_OK) {
-      return status;
+    const zx::result<paddr_t> result = AllocPageTable();
+    if (result.is_error()) {
+      return result.error_value();
     }
+    const paddr_t pa = result.value();
 
     volatile pte_t* va = static_cast<volatile pte_t*>(paddr_to_physmap(pa));
     tt_virt_ = va;
@@ -1407,23 +1383,21 @@ zx_status_t Riscv64ArchVmAspace::Destroy() {
   canary_.Assert();
   LTRACEF("aspace %p\n", this);
 
-  Guard<Mutex> a{&lock_};
+  Guard<Mutex> guard{&lock_};
 
-  // Not okay to destroy the kernel address space
+  // Not okay to destroy the kernel address space.
   DEBUG_ASSERT(type_ != Riscv64AspaceType::kKernel);
 
   // Check to see if the top level page table is empty. If not the user didn't
-  // properly unmap everything before destroying the aspace
-  const int index = first_used_page_table_entry(tt_virt_);
-  if (index != -1 && index >= (1 << (PAGE_SIZE_SHIFT - 2))) {
-    panic("top level page table still in use! aspace %p tt_virt %p index %d entry %" PRIx64 "\n",
-          this, tt_virt_, index, tt_virt_[index]);
-  }
-
-  if (pt_pages_ != 1) {
-    panic("allocated page table count is wrong, aspace %p count %zu (should be 1)\n", this,
-          pt_pages_);
-  }
+  // properly unmap everything before destroying the aspace.
+  const zx::result<size_t> index_result = first_used_page_table_entry(tt_virt_);
+  DEBUG_ASSERT_MSG(
+      index_result.is_error() || *index_result < (1 << (PAGE_SIZE_SHIFT - 2)),
+      "Top level page table still in use: aspace %p tt_virt %p index %zu entry %" PRIx64, this,
+      tt_virt_, *index_result,
+      *index_result < (1 << (PAGE_SIZE_SHIFT - 2)) ? tt_virt_[*index_result] : 0);
+  DEBUG_ASSERT_MSG(pt_pages_ == 1, "Too many page table pages: aspace %p pt_pages_ %zu", this,
+                   pt_pages_);
 
   if (riscv_use_asid) {
     // Flush the ASID associated with this aspace
