@@ -32,7 +32,7 @@ use std::{
 };
 use tokio::{
     io::{copy_buf, AsyncBufRead, AsyncRead, AsyncReadExt, BufReader},
-    process::Child,
+    process::{Child, ChildStderr, ChildStdout},
 };
 
 const BUFFER_SIZE: usize = 65536;
@@ -202,20 +202,11 @@ fn setup_watchdogs() {
 }
 
 async fn write_ssh_log(prefix: &str, line: &String) {
-    let ctx = match ffx_config::global_env_context() {
-        Some(c) => c,
-        None => {
-            tracing::warn!("Couldn't open ssh log file, due to no global env context");
-            return;
-        }
-    };
-    if !ffx_config::logging::debugging_on(&ctx).await {
-        return;
-    }
     // Skip keepalives, which will show up in the steady-state
     if line.contains("keepalive") {
         return;
     }
+    let ctx = ffx_config::global_env_context().expect("Global env context uninitialized");
     let mut f = match ffx_config::logging::log_file_with_info(&ctx, "ssh", true).await {
         Ok((f, _)) => f,
         Err(e) => {
@@ -353,8 +344,6 @@ impl HostPipeChild {
 
         let mut ssh = ssh_cmd.spawn().map_err(|e| PipeError::SpawnError(e.to_string()))?;
 
-        let mut error_message = String::from("");
-
         let (pipe_rx, mut pipe_tx) = tokio::io::split(overnet_pipe(node).map_err(|e| {
             PipeError::PipeCreationFailed(
                 format!("creating local overnet pipe: {e}"),
@@ -372,7 +361,7 @@ impl HostPipeChild {
             .take()
             .ok_or(PipeError::Error("unable to get stdin from target pipe".into()))?;
 
-        let mut stderr = ssh
+        let stderr = ssh
             .stderr
             .take()
             .ok_or(PipeError::Error("unable to stderr from target pipe".into()))?;
@@ -381,64 +370,50 @@ impl HostPipeChild {
         // which signifies the STDOUT has been closed, or the $SSH_CONNECTION
         // value.
         let mut stdout = BufReader::with_capacity(BUFFER_SIZE, stdout);
+        // Also read stderr to determine whether we are talking to an old remote_control_runner that
+        // doesn't support the `--abi-revision` argument.
+        let mut stderr = BufReader::with_capacity(BUFFER_SIZE, stderr);
 
         tracing::debug!("Awaiting client address from ssh connection");
+        let ssh_timeout = Duration::from_secs(ssh_timeout as u64);
         let (ssh_host_address, compatibility_status) =
-            match parse_ssh_connection(&mut stdout, Some(ssh_timeout))
-                .on_timeout(Duration::from_secs(ssh_timeout as u64), || {
-                    Err(ParseSshConnectionError::Timeout)
+            match parse_ssh_output(&mut stdout, &mut stderr, verbose_ssh)
+                .on_timeout(ssh_timeout, || {
+                    Err(PipeError::ConnectionFailed(format!(
+                        "ssh connection timed out after {ssh_timeout:?}"
+                    )))
                 })
                 .await
-                .context("reading ssh connection")
             {
-                Ok((addr, compatibility_status)) => (Some(HostAddr(addr)), compatibility_status),
+                Ok(res) => res,
                 Err(e) => {
-                    error_message = format!("Failed to read ssh client address: {e:?}");
-                    tracing::error!("{error_message}");
-                    (None, None)
+                    ssh.kill().await?;
+                    // Flush any remaining lines, but let's not wait more than one second
+                    let mut lb = LineBuffer::new();
+                    while let Ok(line) = read_ssh_line(&mut lb, &mut stderr)
+                        .on_timeout(Duration::from_secs(1), || {
+                            Err(ParseSshConnectionError::Timeout)
+                        })
+                        .await
+                    {
+                        if verbose_ssh {
+                            write_ssh_log("E", &line).await;
+                        }
+                        tracing::error!("SSH stderr: {line}");
+                    }
+
+                    if let Some(status) = ssh.try_wait()? {
+                        tracing::error!("Target pipe exited with {status}");
+                    } else {
+                        tracing::error!(
+                            "ssh child has not ended, trying one more time then ignoring it."
+                        );
+                        fuchsia_async::Timer::new(std::time::Duration::from_secs(2)).await;
+                        tracing::error!("ssh child status is {:?}", ssh.try_wait());
+                    }
+                    return Err(e);
                 }
             };
-        // Check for early exit.
-        if ssh_host_address.is_none() {
-            let mut lb = LineBuffer::new();
-            while let Ok(l) = read_ssh_line(&mut lb, &mut stderr).await {
-                write_ssh_log("E", &l).await;
-                // If we are running with "ssh -v", the stderr will also contain the initial
-                // "OpenSSH" line; then any additional debugging messages will begin with "debug1".
-                if l.contains("OpenSSH") {
-                    continue;
-                }
-                if l.starts_with("debug1:") {
-                    continue;
-                }
-                // At this point, we just want to look at one line to see if it is the compatibility
-                // failure.
-                tracing::debug!("Reading stderr:  {}", l);
-                let err = if l.contains("Unrecognized argument: --abi-revision") {
-                    // It is an older image, so use the legacy command.
-                    tracing::info!("Target does not support abi compatibility check, reverting to legacy connection");
-                    PipeError::NoCompatibilityCheck
-                } else {
-                    PipeError::ConnectionFailed(format!("{:?}", l))
-                };
-
-                ssh.kill().await?;
-                while let Ok(line) = read_ssh_line(&mut lb, &mut stderr).await {
-                    tracing::error!("SSH stderr: {line}");
-                }
-
-                if let Some(status) = ssh.try_wait()? {
-                    tracing::error!("Target pipe exited with {status}");
-                } else {
-                    tracing::error!(
-                        "ssh child has not ended, trying one more time then ignoring it."
-                    );
-                    fuchsia_async::Timer::new(std::time::Duration::from_secs(2)).await;
-                    tracing::error!("ssh child status is {:?}", ssh.try_wait());
-                }
-                return Err(err);
-            }
-        }
 
         let copy_in = async move {
             if let Err(e) = copy_buf(&mut stdout, &mut pipe_tx).await {
@@ -486,22 +461,18 @@ impl HostPipeChild {
             }
         };
 
-        if ssh_host_address.is_some() {
-            tracing::debug!("Establishing host-pipe process to target");
-            Ok((
-                ssh_host_address,
-                HostPipeChild {
-                    inner: ssh,
-                    task: Some(Task::local(async move {
-                        futures::join!(copy_in, copy_out, log_stderr);
-                    })),
-                    compatibility_status,
-                    address: addr,
-                },
-            ))
-        } else {
-            return Err(PipeError::ConnectionFailed(error_message));
-        }
+        tracing::debug!("Establishing host-pipe process to target");
+        Ok((
+            Some(ssh_host_address),
+            HostPipeChild {
+                inner: ssh,
+                task: Some(Task::local(async move {
+                    futures::join!(copy_in, copy_out, log_stderr);
+                })),
+                compatibility_status,
+                address: addr,
+            },
+        ))
     }
 }
 
@@ -575,7 +546,6 @@ async fn read_ssh_line<R: AsyncRead + Unpin>(
 #[tracing::instrument(skip(rdr))]
 async fn read_ssh_line_with_timeouts<R: AsyncBufRead + Unpin>(
     rdr: &mut R,
-    timeout: Option<u16>,
 ) -> Result<String, ParseSshConnectionError> {
     let mut time = 0;
     let wait_time = 2;
@@ -589,13 +559,8 @@ async fn read_ssh_line_with_timeouts<R: AsyncBufRead + Unpin>(
                 return Ok(s);
             }
             Err(ParseSshConnectionError::Timeout) => {
-                tracing::debug!("No line after {time}, line so far: {:?}", lb.line());
                 time += wait_time;
-                if let Some(t) = timeout {
-                    if time > t.into() {
-                        return Err(ParseSshConnectionError::Timeout);
-                    }
-                }
+                tracing::debug!("No line after {time}, line so far: {:?}", lb.line());
             }
             Err(e) => {
                 return Err(e);
@@ -604,18 +569,20 @@ async fn read_ssh_line_with_timeouts<R: AsyncBufRead + Unpin>(
     }
 }
 
-#[tracing::instrument(skip(rdr))]
+#[tracing::instrument(skip(stdout))]
 async fn parse_ssh_connection<R: AsyncBufRead + Unpin>(
-    rdr: &mut R,
-    timeout: Option<u16>,
+    stdout: &mut R,
+    verbose: bool,
 ) -> std::result::Result<(String, Option<CompatibilityInfo>), ParseSshConnectionError> {
-    let line = read_ssh_line_with_timeouts(rdr, timeout).await?;
+    let line = read_ssh_line_with_timeouts(stdout).await?;
     if line.is_empty() {
-        tracing::error!("Failed to first line");
+        tracing::error!("Failed to read first line from stdout");
         return Err(std::io::Error::from(std::io::ErrorKind::UnexpectedEof).into());
     }
 
-    write_ssh_log("O", &line).await;
+    if verbose {
+        write_ssh_log("O", &line).await;
+    }
 
     if line.starts_with("{") {
         parse_ssh_connection_with_info(&line)
@@ -702,6 +669,76 @@ fn parse_ssh_connection_legacy(
     }
 
     Ok((client_address.to_string(), None))
+}
+
+#[tracing::instrument(skip(stderr))]
+async fn parse_ssh_error<R: AsyncBufRead + Unpin>(stderr: &mut R, verbose: bool) -> PipeError {
+    loop {
+        let l = match read_ssh_line_with_timeouts(stderr).await {
+            Err(e) => {
+                tracing::error!("reading ssh stderr: {e:?}");
+                return PipeError::NoCompatibilityCheck;
+            }
+            Ok(l) => l,
+        };
+        // Sadly, this is just reading buffered data, so timestamps in the log will be
+        // incorrect
+        if verbose {
+            write_ssh_log("E", &l).await;
+        }
+        // If we are running with "ssh -v", the stderr will also contain the initial
+        // "OpenSSH" line.
+        if l.contains("OpenSSH") {
+            continue;
+        }
+        // It also may contain a warning about adding an address to the list of known hosts
+        if l.starts_with("Warning: Permanently added") {
+            continue;
+        }
+        // Or a warning about authentication
+        if l.starts_with("Authenticated to ") {
+            continue;
+        }
+        // Additional debugging messages will begin with "debug1".
+        if l.starts_with("debug1:") {
+            continue;
+        }
+        // At this point, we just want to look at one line to see if it is the compatibility
+        // failure.
+        tracing::debug!("Reading stderr:  {l}");
+        return if l.contains("Unrecognized argument: --abi-revision") {
+            // It is an older image, so use the legacy command.
+            tracing::info!(
+                "Target does not support abi compatibility check, reverting to legacy connection"
+            );
+            PipeError::NoCompatibilityCheck
+        } else {
+            PipeError::ConnectionFailed(format!("{:?}", l))
+        };
+    }
+}
+
+async fn parse_ssh_output(
+    stdout: &mut BufReader<ChildStdout>,
+    stderr: &mut BufReader<ChildStderr>,
+    verbose_ssh: bool,
+) -> std::result::Result<(HostAddr, Option<CompatibilityInfo>), PipeError> {
+    let res =
+        match parse_ssh_connection(stdout, verbose_ssh).await.context("reading ssh connection") {
+            Ok((addr, compatibility_status)) => (Some(HostAddr(addr)), compatibility_status),
+            Err(e) => {
+                let error_message = format!("Failed to read ssh client address: {e:?}");
+                tracing::error!("{error_message}");
+                (None, None)
+            }
+        };
+    // Check for early exit.
+    if let (Some(addr), compat) = res {
+        Ok((addr, compat))
+    } else {
+        // If we failed to parse the ssh connection, there might be information in stderr
+        Err(parse_ssh_error(stderr, verbose_ssh).await)
+    }
 }
 
 impl Drop for HostPipeChild {
@@ -1166,7 +1203,7 @@ mod test {
                 ("fe80::111:2222:3333:444%ethxc2".to_string(), None),
             ),
         ] {
-            match parse_ssh_connection(&mut line.as_bytes(), None).await {
+            match parse_ssh_connection(&mut line.as_bytes(), false).await {
                 Ok(actual) => assert_eq!(expected, actual),
                 res => panic!(
                     "unexpected result for {:?}: expected {:?}, got {:?}",
@@ -1187,7 +1224,7 @@ mod test {
             &"++ ++\n"[..],
             &"## 192.168.1.1 1234 10.0.0.1 22 ##\n"[..],
         ] {
-            let res = parse_ssh_connection(&mut line.as_bytes(), None).await;
+            let res = parse_ssh_connection(&mut line.as_bytes(), false).await;
             assert_matches!(res, Err(ParseSshConnectionError::Parse(_)));
         }
         for line in [
@@ -1201,7 +1238,7 @@ mod test {
             &"++ 192.168.1.1 1234 10.0.0.1 22 "[..],
             &"++ 192.168.1.1 1234 10.0.0.1 22 ++"[..],
         ] {
-            let res = parse_ssh_connection(&mut line.as_bytes(), None).await;
+            let res = parse_ssh_connection(&mut line.as_bytes(), false).await;
             assert_matches!(res, Err(ParseSshConnectionError::UnexpectedEOF(_)));
         }
     }
