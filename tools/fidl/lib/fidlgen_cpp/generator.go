@@ -14,7 +14,7 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/fidl/lib/fidlgen"
 )
 
-var clangFormatArgs = []string{"--style={BasedOnStyle: google, ColumnLimit: 0}"}
+var clangFormatArgs = []string{"--assume-filename=src.cpp", "--style={BasedOnStyle: google, ColumnLimit: 0}"}
 
 type Generator struct {
 	gen       *fidlgen.Generator
