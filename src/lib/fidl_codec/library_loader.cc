@@ -39,8 +39,8 @@ Enum::Enum(std::string name, uint64_t size, std::unique_ptr<Type> type,
            std::vector<EnumOrBitsMember> members)
     : EnumOrBits(std::move(name), size, std::move(type), std::move(members)) {}
 
-const Enum& Enum::TransportErrorEnum() {
-  static Enum result("TransportError", 4, std::make_unique<Int32Type>(),
+const Enum& Enum::FrameworkErrorEnum() {
+  static Enum result("FrameworkError", 4, std::make_unique<Int32Type>(),
                      {EnumOrBitsMember("UNKNOWN_METHOD", 2, true)});
   return result;
 }

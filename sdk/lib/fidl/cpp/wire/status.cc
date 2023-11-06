@@ -27,8 +27,8 @@ const char* const kErrorSyncEventUnhandledTransitionalEvent = "unhandled transit
 const char* const kCallerAllocatedBufferTooSmall =
     "buffer provided to caller-allocating flavor is too small";
 const char* const kUnknownMethod = "server did not recognize this method";
-const char* const kUnsupportedTransportError =
-    "server sent a transport_err value that is not supported";
+const char* const kUnsupportedFrameworkError =
+    "server sent a framework_err value that is not supported";
 
 bool IsFatalErrorUniversal(fidl::Reason error) {
   switch (error) {

@@ -2714,8 +2714,8 @@ namespace internal {
           case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayResult::Tag::kResponse:
             hlcpp.set_response(::fidl::NaturalToHLCPP(std::move(value.response().value())));
             break;
-          case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayResult::Tag::kTransportErr:
-            hlcpp.set_transport_err(::fidl::NaturalToHLCPP(std::move(value.transport_err().value())));
+          case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayResult::Tag::kFrameworkErr:
+            hlcpp.set_framework_err(::fidl::NaturalToHLCPP(std::move(value.framework_err().value())));
             break;
         default:
           break;
@@ -2729,9 +2729,9 @@ namespace internal {
           case ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWay_Result::Tag::kResponse:
             return _NaturalUnion::WithResponse(
                   ::fidl::HLCPPToNatural(std::move(value.response())));
-          case ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWay_Result::Tag::kTransportErr:
-            return _NaturalUnion::WithTransportErr(
-                  ::fidl::HLCPPToNatural(std::move(value.transport_err())));
+          case ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWay_Result::Tag::kFrameworkErr:
+            return _NaturalUnion::WithFrameworkErr(
+                  ::fidl::HLCPPToNatural(std::move(value.framework_err())));
           default:
             ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWay_Result");
       }
@@ -2742,8 +2742,8 @@ namespace internal {
           case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsResult::Tag::kResponse:
             hlcpp.set_response(::fidl::NaturalToHLCPP(std::move(value.response().value())));
             break;
-          case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsResult::Tag::kTransportErr:
-            hlcpp.set_transport_err(::fidl::NaturalToHLCPP(std::move(value.transport_err().value())));
+          case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsResult::Tag::kFrameworkErr:
+            hlcpp.set_framework_err(::fidl::NaturalToHLCPP(std::move(value.framework_err().value())));
             break;
         default:
           break;
@@ -2757,9 +2757,9 @@ namespace internal {
           case ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayFields_Result::Tag::kResponse:
             return _NaturalUnion::WithResponse(
                   ::fidl::HLCPPToNatural(std::move(value.response())));
-          case ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayFields_Result::Tag::kTransportErr:
-            return _NaturalUnion::WithTransportErr(
-                  ::fidl::HLCPPToNatural(std::move(value.transport_err())));
+          case ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayFields_Result::Tag::kFrameworkErr:
+            return _NaturalUnion::WithFrameworkErr(
+                  ::fidl::HLCPPToNatural(std::move(value.framework_err())));
           default:
             ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayFields_Result");
       }
@@ -2792,8 +2792,8 @@ namespace internal {
           case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionResult::Tag::kResponse:
             hlcpp.set_response(::fidl::NaturalToHLCPP(std::move(value.response().value())));
             break;
-          case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionResult::Tag::kTransportErr:
-            hlcpp.set_transport_err(::fidl::NaturalToHLCPP(std::move(value.transport_err().value())));
+          case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionResult::Tag::kFrameworkErr:
+            hlcpp.set_framework_err(::fidl::NaturalToHLCPP(std::move(value.framework_err().value())));
             break;
         default:
           break;
@@ -2807,9 +2807,9 @@ namespace internal {
           case ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnion_Result::Tag::kResponse:
             return _NaturalUnion::WithResponse(
                   ::fidl::HLCPPToNatural(std::move(value.response())));
-          case ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnion_Result::Tag::kTransportErr:
-            return _NaturalUnion::WithTransportErr(
-                  ::fidl::HLCPPToNatural(std::move(value.transport_err())));
+          case ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnion_Result::Tag::kFrameworkErr:
+            return _NaturalUnion::WithFrameworkErr(
+                  ::fidl::HLCPPToNatural(std::move(value.framework_err())));
           default:
             ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnion_Result");
       }
@@ -2820,8 +2820,8 @@ namespace internal {
           case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableResult::Tag::kResponse:
             hlcpp.set_response(::fidl::NaturalToHLCPP(std::move(value.response().value())));
             break;
-          case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableResult::Tag::kTransportErr:
-            hlcpp.set_transport_err(::fidl::NaturalToHLCPP(std::move(value.transport_err().value())));
+          case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableResult::Tag::kFrameworkErr:
+            hlcpp.set_framework_err(::fidl::NaturalToHLCPP(std::move(value.framework_err().value())));
             break;
         default:
           break;
@@ -2835,9 +2835,9 @@ namespace internal {
           case ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTable_Result::Tag::kResponse:
             return _NaturalUnion::WithResponse(
                   ::fidl::HLCPPToNatural(std::move(value.response())));
-          case ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTable_Result::Tag::kTransportErr:
-            return _NaturalUnion::WithTransportErr(
-                  ::fidl::HLCPPToNatural(std::move(value.transport_err())));
+          case ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTable_Result::Tag::kFrameworkErr:
+            return _NaturalUnion::WithFrameworkErr(
+                  ::fidl::HLCPPToNatural(std::move(value.framework_err())));
           default:
             ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTable_Result");
       }
@@ -2851,8 +2851,8 @@ namespace internal {
           case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayErrResult::Tag::kErr:
             hlcpp.set_err(::fidl::NaturalToHLCPP(std::move(value.err().value())));
             break;
-          case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayErrResult::Tag::kTransportErr:
-            hlcpp.set_transport_err(::fidl::NaturalToHLCPP(std::move(value.transport_err().value())));
+          case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayErrResult::Tag::kFrameworkErr:
+            hlcpp.set_framework_err(::fidl::NaturalToHLCPP(std::move(value.framework_err().value())));
             break;
         default:
           break;
@@ -2869,9 +2869,9 @@ namespace internal {
           case ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayErr_Result::Tag::kErr:
             return _NaturalUnion::WithErr(
                   ::fidl::HLCPPToNatural(std::move(value.err())));
-          case ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayErr_Result::Tag::kTransportErr:
-            return _NaturalUnion::WithTransportErr(
-                  ::fidl::HLCPPToNatural(std::move(value.transport_err())));
+          case ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayErr_Result::Tag::kFrameworkErr:
+            return _NaturalUnion::WithFrameworkErr(
+                  ::fidl::HLCPPToNatural(std::move(value.framework_err())));
           default:
             ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayErr_Result");
       }
@@ -2885,8 +2885,8 @@ namespace internal {
           case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult::Tag::kErr:
             hlcpp.set_err(::fidl::NaturalToHLCPP(std::move(value.err().value())));
             break;
-          case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult::Tag::kTransportErr:
-            hlcpp.set_transport_err(::fidl::NaturalToHLCPP(std::move(value.transport_err().value())));
+          case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult::Tag::kFrameworkErr:
+            hlcpp.set_framework_err(::fidl::NaturalToHLCPP(std::move(value.framework_err().value())));
             break;
         default:
           break;
@@ -2903,9 +2903,9 @@ namespace internal {
           case ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Result::Tag::kErr:
             return _NaturalUnion::WithErr(
                   ::fidl::HLCPPToNatural(std::move(value.err())));
-          case ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Result::Tag::kTransportErr:
-            return _NaturalUnion::WithTransportErr(
-                  ::fidl::HLCPPToNatural(std::move(value.transport_err())));
+          case ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Result::Tag::kFrameworkErr:
+            return _NaturalUnion::WithFrameworkErr(
+                  ::fidl::HLCPPToNatural(std::move(value.framework_err())));
           default:
             ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Result");
       }
@@ -2941,8 +2941,8 @@ namespace internal {
           case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult::Tag::kErr:
             hlcpp.set_err(::fidl::NaturalToHLCPP(std::move(value.err().value())));
             break;
-          case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult::Tag::kTransportErr:
-            hlcpp.set_transport_err(::fidl::NaturalToHLCPP(std::move(value.transport_err().value())));
+          case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult::Tag::kFrameworkErr:
+            hlcpp.set_framework_err(::fidl::NaturalToHLCPP(std::move(value.framework_err().value())));
             break;
         default:
           break;
@@ -2959,9 +2959,9 @@ namespace internal {
           case ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Result::Tag::kErr:
             return _NaturalUnion::WithErr(
                   ::fidl::HLCPPToNatural(std::move(value.err())));
-          case ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Result::Tag::kTransportErr:
-            return _NaturalUnion::WithTransportErr(
-                  ::fidl::HLCPPToNatural(std::move(value.transport_err())));
+          case ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Result::Tag::kFrameworkErr:
+            return _NaturalUnion::WithFrameworkErr(
+                  ::fidl::HLCPPToNatural(std::move(value.framework_err())));
           default:
             ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Result");
       }
@@ -2975,8 +2975,8 @@ namespace internal {
           case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableErrResult::Tag::kErr:
             hlcpp.set_err(::fidl::NaturalToHLCPP(std::move(value.err().value())));
             break;
-          case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableErrResult::Tag::kTransportErr:
-            hlcpp.set_transport_err(::fidl::NaturalToHLCPP(std::move(value.transport_err().value())));
+          case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableErrResult::Tag::kFrameworkErr:
+            hlcpp.set_framework_err(::fidl::NaturalToHLCPP(std::move(value.framework_err().value())));
             break;
         default:
           break;
@@ -2993,9 +2993,9 @@ namespace internal {
           case ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Result::Tag::kErr:
             return _NaturalUnion::WithErr(
                   ::fidl::HLCPPToNatural(std::move(value.err())));
-          case ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Result::Tag::kTransportErr:
-            return _NaturalUnion::WithTransportErr(
-                  ::fidl::HLCPPToNatural(std::move(value.transport_err())));
+          case ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Result::Tag::kFrameworkErr:
+            return _NaturalUnion::WithFrameworkErr(
+                  ::fidl::HLCPPToNatural(std::move(value.framework_err())));
           default:
             ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Result");
       }
@@ -4254,8 +4254,8 @@ namespace internal {
           case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayResult::Tag::kResponse:
             hlcpp.set_response(::fidl::NaturalToHLCPP(std::move(value.response().value())));
             break;
-          case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayResult::Tag::kTransportErr:
-            hlcpp.set_transport_err(::fidl::NaturalToHLCPP(std::move(value.transport_err().value())));
+          case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayResult::Tag::kFrameworkErr:
+            hlcpp.set_framework_err(::fidl::NaturalToHLCPP(std::move(value.framework_err().value())));
             break;
         default:
           break;
@@ -4269,9 +4269,9 @@ namespace internal {
           case ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWay_Result::Tag::kResponse:
             return _NaturalUnion::WithResponse(
                   ::fidl::HLCPPToNatural(std::move(value.response())));
-          case ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWay_Result::Tag::kTransportErr:
-            return _NaturalUnion::WithTransportErr(
-                  ::fidl::HLCPPToNatural(std::move(value.transport_err())));
+          case ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWay_Result::Tag::kFrameworkErr:
+            return _NaturalUnion::WithFrameworkErr(
+                  ::fidl::HLCPPToNatural(std::move(value.framework_err())));
           default:
             ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWay_Result");
       }
@@ -4282,8 +4282,8 @@ namespace internal {
           case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult::Tag::kResponse:
             hlcpp.set_response(::fidl::NaturalToHLCPP(std::move(value.response().value())));
             break;
-          case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult::Tag::kTransportErr:
-            hlcpp.set_transport_err(::fidl::NaturalToHLCPP(std::move(value.transport_err().value())));
+          case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult::Tag::kFrameworkErr:
+            hlcpp.set_framework_err(::fidl::NaturalToHLCPP(std::move(value.framework_err().value())));
             break;
         default:
           break;
@@ -4297,9 +4297,9 @@ namespace internal {
           case ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Result::Tag::kResponse:
             return _NaturalUnion::WithResponse(
                   ::fidl::HLCPPToNatural(std::move(value.response())));
-          case ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Result::Tag::kTransportErr:
-            return _NaturalUnion::WithTransportErr(
-                  ::fidl::HLCPPToNatural(std::move(value.transport_err())));
+          case ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Result::Tag::kFrameworkErr:
+            return _NaturalUnion::WithFrameworkErr(
+                  ::fidl::HLCPPToNatural(std::move(value.framework_err())));
           default:
             ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Result");
       }
@@ -4332,8 +4332,8 @@ namespace internal {
           case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult::Tag::kResponse:
             hlcpp.set_response(::fidl::NaturalToHLCPP(std::move(value.response().value())));
             break;
-          case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult::Tag::kTransportErr:
-            hlcpp.set_transport_err(::fidl::NaturalToHLCPP(std::move(value.transport_err().value())));
+          case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult::Tag::kFrameworkErr:
+            hlcpp.set_framework_err(::fidl::NaturalToHLCPP(std::move(value.framework_err().value())));
             break;
         default:
           break;
@@ -4347,9 +4347,9 @@ namespace internal {
           case ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Result::Tag::kResponse:
             return _NaturalUnion::WithResponse(
                   ::fidl::HLCPPToNatural(std::move(value.response())));
-          case ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Result::Tag::kTransportErr:
-            return _NaturalUnion::WithTransportErr(
-                  ::fidl::HLCPPToNatural(std::move(value.transport_err())));
+          case ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Result::Tag::kFrameworkErr:
+            return _NaturalUnion::WithFrameworkErr(
+                  ::fidl::HLCPPToNatural(std::move(value.framework_err())));
           default:
             ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Result");
       }
@@ -4360,8 +4360,8 @@ namespace internal {
           case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult::Tag::kResponse:
             hlcpp.set_response(::fidl::NaturalToHLCPP(std::move(value.response().value())));
             break;
-          case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult::Tag::kTransportErr:
-            hlcpp.set_transport_err(::fidl::NaturalToHLCPP(std::move(value.transport_err().value())));
+          case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult::Tag::kFrameworkErr:
+            hlcpp.set_framework_err(::fidl::NaturalToHLCPP(std::move(value.framework_err().value())));
             break;
         default:
           break;
@@ -4375,9 +4375,9 @@ namespace internal {
           case ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Result::Tag::kResponse:
             return _NaturalUnion::WithResponse(
                   ::fidl::HLCPPToNatural(std::move(value.response())));
-          case ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Result::Tag::kTransportErr:
-            return _NaturalUnion::WithTransportErr(
-                  ::fidl::HLCPPToNatural(std::move(value.transport_err())));
+          case ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Result::Tag::kFrameworkErr:
+            return _NaturalUnion::WithFrameworkErr(
+                  ::fidl::HLCPPToNatural(std::move(value.framework_err())));
           default:
             ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Result");
       }
@@ -4391,8 +4391,8 @@ namespace internal {
           case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult::Tag::kErr:
             hlcpp.set_err(::fidl::NaturalToHLCPP(std::move(value.err().value())));
             break;
-          case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult::Tag::kTransportErr:
-            hlcpp.set_transport_err(::fidl::NaturalToHLCPP(std::move(value.transport_err().value())));
+          case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult::Tag::kFrameworkErr:
+            hlcpp.set_framework_err(::fidl::NaturalToHLCPP(std::move(value.framework_err().value())));
             break;
         default:
           break;
@@ -4409,9 +4409,9 @@ namespace internal {
           case ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Result::Tag::kErr:
             return _NaturalUnion::WithErr(
                   ::fidl::HLCPPToNatural(std::move(value.err())));
-          case ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Result::Tag::kTransportErr:
-            return _NaturalUnion::WithTransportErr(
-                  ::fidl::HLCPPToNatural(std::move(value.transport_err())));
+          case ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Result::Tag::kFrameworkErr:
+            return _NaturalUnion::WithFrameworkErr(
+                  ::fidl::HLCPPToNatural(std::move(value.framework_err())));
           default:
             ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Result");
       }
@@ -4425,8 +4425,8 @@ namespace internal {
           case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult::Tag::kErr:
             hlcpp.set_err(::fidl::NaturalToHLCPP(std::move(value.err().value())));
             break;
-          case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult::Tag::kTransportErr:
-            hlcpp.set_transport_err(::fidl::NaturalToHLCPP(std::move(value.transport_err().value())));
+          case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult::Tag::kFrameworkErr:
+            hlcpp.set_framework_err(::fidl::NaturalToHLCPP(std::move(value.framework_err().value())));
             break;
         default:
           break;
@@ -4443,9 +4443,9 @@ namespace internal {
           case ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Result::Tag::kErr:
             return _NaturalUnion::WithErr(
                   ::fidl::HLCPPToNatural(std::move(value.err())));
-          case ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Result::Tag::kTransportErr:
-            return _NaturalUnion::WithTransportErr(
-                  ::fidl::HLCPPToNatural(std::move(value.transport_err())));
+          case ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Result::Tag::kFrameworkErr:
+            return _NaturalUnion::WithFrameworkErr(
+                  ::fidl::HLCPPToNatural(std::move(value.framework_err())));
           default:
             ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Result");
       }
@@ -4481,8 +4481,8 @@ namespace internal {
           case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult::Tag::kErr:
             hlcpp.set_err(::fidl::NaturalToHLCPP(std::move(value.err().value())));
             break;
-          case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult::Tag::kTransportErr:
-            hlcpp.set_transport_err(::fidl::NaturalToHLCPP(std::move(value.transport_err().value())));
+          case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult::Tag::kFrameworkErr:
+            hlcpp.set_framework_err(::fidl::NaturalToHLCPP(std::move(value.framework_err().value())));
             break;
         default:
           break;
@@ -4499,9 +4499,9 @@ namespace internal {
           case ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Result::Tag::kErr:
             return _NaturalUnion::WithErr(
                   ::fidl::HLCPPToNatural(std::move(value.err())));
-          case ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Result::Tag::kTransportErr:
-            return _NaturalUnion::WithTransportErr(
-                  ::fidl::HLCPPToNatural(std::move(value.transport_err())));
+          case ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Result::Tag::kFrameworkErr:
+            return _NaturalUnion::WithFrameworkErr(
+                  ::fidl::HLCPPToNatural(std::move(value.framework_err())));
           default:
             ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Result");
       }
@@ -4515,8 +4515,8 @@ namespace internal {
           case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult::Tag::kErr:
             hlcpp.set_err(::fidl::NaturalToHLCPP(std::move(value.err().value())));
             break;
-          case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult::Tag::kTransportErr:
-            hlcpp.set_transport_err(::fidl::NaturalToHLCPP(std::move(value.transport_err().value())));
+          case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult::Tag::kFrameworkErr:
+            hlcpp.set_framework_err(::fidl::NaturalToHLCPP(std::move(value.framework_err().value())));
             break;
         default:
           break;
@@ -4533,9 +4533,9 @@ namespace internal {
           case ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Result::Tag::kErr:
             return _NaturalUnion::WithErr(
                   ::fidl::HLCPPToNatural(std::move(value.err())));
-          case ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Result::Tag::kTransportErr:
-            return _NaturalUnion::WithTransportErr(
-                  ::fidl::HLCPPToNatural(std::move(value.transport_err())));
+          case ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Result::Tag::kFrameworkErr:
+            return _NaturalUnion::WithFrameworkErr(
+                  ::fidl::HLCPPToNatural(std::move(value.framework_err())));
           default:
             ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Result");
       }

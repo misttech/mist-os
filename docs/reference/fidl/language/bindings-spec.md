@@ -392,11 +392,10 @@ transaction IDs.
 
 * Validation errors during encode, if validation is performed.
 * Decode errors.
-* Errors from the underlying transport mechanism. Note: this does not include
-  the `transport_err` member from the family of result unions sent by a server
-  in response to an unknown flexible interaction.
+* Errors from the underlying transport mechanism.
 
-By comparison, domain errors found in a method declaration are not terminal.
+By comparison, domain errors (in methods declared with `error` syntax) and
+framework errors (in `flexible` two-way methods) are not terminal.
 
 ### Terminal error handling
 

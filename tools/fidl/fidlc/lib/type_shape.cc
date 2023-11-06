@@ -143,7 +143,7 @@ class UnalignedSizeVisitor final : public TypeShapeVisitor<DataSize> {
 
   std::any Visit(const flat::InternalType& object) override {
     switch (object.subtype) {
-      case fidl::types::InternalSubtype::kTransportErr:
+      case fidl::types::InternalSubtype::kFrameworkErr:
         return DataSize(4);
     }
   }
@@ -289,7 +289,7 @@ class AlignmentVisitor final : public TypeShapeVisitor<DataSize> {
 
   std::any Visit(const flat::InternalType& object) override {
     switch (object.subtype) {
-      case fidl::types::InternalSubtype::kTransportErr:
+      case fidl::types::InternalSubtype::kFrameworkErr:
         return DataSize(4);
     }
   }
@@ -421,7 +421,7 @@ class DepthVisitor : public TypeShapeVisitor<DataSize> {
 
   std::any Visit(const flat::InternalType& object) override {
     switch (object.subtype) {
-      case fidl::types::InternalSubtype::kTransportErr:
+      case fidl::types::InternalSubtype::kFrameworkErr:
         return DataSize(0);
     }
   }
@@ -596,7 +596,7 @@ class MaxHandlesVisitor final : public flat::Object::Visitor<DataSize> {
 
   std::any Visit(const flat::InternalType& object) override {
     switch (object.subtype) {
-      case fidl::types::InternalSubtype::kTransportErr:
+      case fidl::types::InternalSubtype::kFrameworkErr:
         return DataSize(0);
     }
   }
@@ -758,7 +758,7 @@ class MaxOutOfLineVisitor final : public TypeShapeVisitor<DataSize> {
 
   std::any Visit(const flat::InternalType& object) override {
     switch (object.subtype) {
-      case fidl::types::InternalSubtype::kTransportErr:
+      case fidl::types::InternalSubtype::kFrameworkErr:
         return DataSize(0);
     }
   }
@@ -954,7 +954,7 @@ class HasPaddingVisitor final : public TypeShapeVisitor<bool> {
 
   std::any Visit(const flat::InternalType& object) override {
     switch (object.subtype) {
-      case fidl::types::InternalSubtype::kTransportErr:
+      case fidl::types::InternalSubtype::kFrameworkErr:
         return false;
     }
   }
@@ -1110,7 +1110,7 @@ class HasEnvelopeVisitor final : public TypeShapeVisitor<bool> {
 
   std::any Visit(const flat::InternalType& object) override {
     switch (object.subtype) {
-      case fidl::types::InternalSubtype::kTransportErr:
+      case fidl::types::InternalSubtype::kFrameworkErr:
         return false;
     }
   }
@@ -1210,7 +1210,7 @@ class HasFlexibleEnvelopeVisitor final : public TypeShapeVisitor<bool> {
 
   std::any Visit(const flat::InternalType& object) override {
     switch (object.subtype) {
-      case fidl::types::InternalSubtype::kTransportErr:
+      case fidl::types::InternalSubtype::kFrameworkErr:
         return false;
     }
   }

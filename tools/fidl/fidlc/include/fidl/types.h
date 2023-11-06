@@ -95,7 +95,7 @@ enum struct PrimitiveSubtype {
 };
 
 enum struct InternalSubtype {
-  kTransportErr,
+  kFrameworkErr,
 };
 
 enum struct MessageKind {

@@ -1758,13 +1758,13 @@ class UnknownInteractionsProtocolFlexibleTwoWayResult {
     std::variant<
       std::monostate
         , ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayResponse
-        , ::fidl::internal::TransportErr>;
+        , ::fidl::internal::FrameworkErr>;
 
  public:
   // TODO: share union tag types between wire & natural.
   enum class Tag : fidl_xunion_tag_t {
     kResponse = 1,  // 0x1
-    kTransportErr = 3,  // 0x3
+    kFrameworkErr = 3,  // 0x3
   };
 
   UnknownInteractionsProtocolFlexibleTwoWayResult(UnknownInteractionsProtocolFlexibleTwoWayResult&& other) noexcept
@@ -1816,24 +1816,24 @@ class UnknownInteractionsProtocolFlexibleTwoWayResult {
       storage_->emplace<1>(std::move(value));
       return *this;
     }
-    static UnknownInteractionsProtocolFlexibleTwoWayResult WithTransportErr(::fidl::internal::TransportErr val) {
+    static UnknownInteractionsProtocolFlexibleTwoWayResult WithFrameworkErr(::fidl::internal::FrameworkErr val) {
       return UnknownInteractionsProtocolFlexibleTwoWayResult(std::make_shared<Storage_>(
         std::in_place_index_t<2>{},
         std::move(val)));
     }
 
-    const ::fidl::internal::UnionMemberView<2, Storage_> transport_err() const {
+    const ::fidl::internal::UnionMemberView<2, Storage_> framework_err() const {
       return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
     }
 
-    ::fidl::internal::UnionMemberView<2, Storage_> transport_err() {
+    ::fidl::internal::UnionMemberView<2, Storage_> framework_err() {
       return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
     }
 
-    // Sets the union to hold the transport_err member.
+    // Sets the union to hold the framework_err member.
     //
     
-    UnknownInteractionsProtocolFlexibleTwoWayResult& transport_err(::fidl::internal::TransportErr value) {
+    UnknownInteractionsProtocolFlexibleTwoWayResult& framework_err(::fidl::internal::FrameworkErr value) {
       storage_->emplace<2>(std::move(value));
       return *this;
     }
@@ -1855,7 +1855,7 @@ class UnknownInteractionsProtocolFlexibleTwoWayResult {
   static constexpr size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayResult::Tag tag) {
     switch (tag) {
         case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayResult::Tag::kResponse: return 1;
-        case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayResult::Tag::kTransportErr: return 2;
+        case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayResult::Tag::kFrameworkErr: return 2;
       default: {
           decoder->SetError(::fidl::internal::kCodingErrorUnknownUnionTag);
         return 0;
@@ -1866,7 +1866,7 @@ class UnknownInteractionsProtocolFlexibleTwoWayResult {
   static constexpr std::optional<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayResult::Tag> IndexToTag(size_t index) {
     switch (index) {
         case 1: return ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayResult::Tag::kResponse;
-        case 2: return ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayResult::Tag::kTransportErr;
+        case 2: return ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayResult::Tag::kFrameworkErr;
         default: return std::nullopt;
     }
   }
@@ -1959,13 +1959,13 @@ class UnknownInteractionsProtocolFlexibleTwoWayFieldsResult {
     std::variant<
       std::monostate
         , ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse
-        , ::fidl::internal::TransportErr>;
+        , ::fidl::internal::FrameworkErr>;
 
  public:
   // TODO: share union tag types between wire & natural.
   enum class Tag : fidl_xunion_tag_t {
     kResponse = 1,  // 0x1
-    kTransportErr = 3,  // 0x3
+    kFrameworkErr = 3,  // 0x3
   };
 
   UnknownInteractionsProtocolFlexibleTwoWayFieldsResult(UnknownInteractionsProtocolFlexibleTwoWayFieldsResult&& other) noexcept
@@ -2017,24 +2017,24 @@ class UnknownInteractionsProtocolFlexibleTwoWayFieldsResult {
       storage_->emplace<1>(std::move(value));
       return *this;
     }
-    static UnknownInteractionsProtocolFlexibleTwoWayFieldsResult WithTransportErr(::fidl::internal::TransportErr val) {
+    static UnknownInteractionsProtocolFlexibleTwoWayFieldsResult WithFrameworkErr(::fidl::internal::FrameworkErr val) {
       return UnknownInteractionsProtocolFlexibleTwoWayFieldsResult(std::make_shared<Storage_>(
         std::in_place_index_t<2>{},
         std::move(val)));
     }
 
-    const ::fidl::internal::UnionMemberView<2, Storage_> transport_err() const {
+    const ::fidl::internal::UnionMemberView<2, Storage_> framework_err() const {
       return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
     }
 
-    ::fidl::internal::UnionMemberView<2, Storage_> transport_err() {
+    ::fidl::internal::UnionMemberView<2, Storage_> framework_err() {
       return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
     }
 
-    // Sets the union to hold the transport_err member.
+    // Sets the union to hold the framework_err member.
     //
     
-    UnknownInteractionsProtocolFlexibleTwoWayFieldsResult& transport_err(::fidl::internal::TransportErr value) {
+    UnknownInteractionsProtocolFlexibleTwoWayFieldsResult& framework_err(::fidl::internal::FrameworkErr value) {
       storage_->emplace<2>(std::move(value));
       return *this;
     }
@@ -2056,7 +2056,7 @@ class UnknownInteractionsProtocolFlexibleTwoWayFieldsResult {
   static constexpr size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsResult::Tag tag) {
     switch (tag) {
         case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsResult::Tag::kResponse: return 1;
-        case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsResult::Tag::kTransportErr: return 2;
+        case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsResult::Tag::kFrameworkErr: return 2;
       default: {
           decoder->SetError(::fidl::internal::kCodingErrorUnknownUnionTag);
         return 0;
@@ -2067,7 +2067,7 @@ class UnknownInteractionsProtocolFlexibleTwoWayFieldsResult {
   static constexpr std::optional<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsResult::Tag> IndexToTag(size_t index) {
     switch (index) {
         case 1: return ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsResult::Tag::kResponse;
-        case 2: return ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsResult::Tag::kTransportErr;
+        case 2: return ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsResult::Tag::kFrameworkErr;
         default: return std::nullopt;
     }
   }
@@ -2198,13 +2198,13 @@ class UnknownInteractionsProtocolFlexibleTwoWayUnionResult {
     std::variant<
       std::monostate
         , ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionResponse
-        , ::fidl::internal::TransportErr>;
+        , ::fidl::internal::FrameworkErr>;
 
  public:
   // TODO: share union tag types between wire & natural.
   enum class Tag : fidl_xunion_tag_t {
     kResponse = 1,  // 0x1
-    kTransportErr = 3,  // 0x3
+    kFrameworkErr = 3,  // 0x3
   };
 
   UnknownInteractionsProtocolFlexibleTwoWayUnionResult(UnknownInteractionsProtocolFlexibleTwoWayUnionResult&& other) noexcept
@@ -2256,24 +2256,24 @@ class UnknownInteractionsProtocolFlexibleTwoWayUnionResult {
       storage_->emplace<1>(std::move(value));
       return *this;
     }
-    static UnknownInteractionsProtocolFlexibleTwoWayUnionResult WithTransportErr(::fidl::internal::TransportErr val) {
+    static UnknownInteractionsProtocolFlexibleTwoWayUnionResult WithFrameworkErr(::fidl::internal::FrameworkErr val) {
       return UnknownInteractionsProtocolFlexibleTwoWayUnionResult(std::make_shared<Storage_>(
         std::in_place_index_t<2>{},
         std::move(val)));
     }
 
-    const ::fidl::internal::UnionMemberView<2, Storage_> transport_err() const {
+    const ::fidl::internal::UnionMemberView<2, Storage_> framework_err() const {
       return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
     }
 
-    ::fidl::internal::UnionMemberView<2, Storage_> transport_err() {
+    ::fidl::internal::UnionMemberView<2, Storage_> framework_err() {
       return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
     }
 
-    // Sets the union to hold the transport_err member.
+    // Sets the union to hold the framework_err member.
     //
     
-    UnknownInteractionsProtocolFlexibleTwoWayUnionResult& transport_err(::fidl::internal::TransportErr value) {
+    UnknownInteractionsProtocolFlexibleTwoWayUnionResult& framework_err(::fidl::internal::FrameworkErr value) {
       storage_->emplace<2>(std::move(value));
       return *this;
     }
@@ -2295,7 +2295,7 @@ class UnknownInteractionsProtocolFlexibleTwoWayUnionResult {
   static constexpr size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionResult::Tag tag) {
     switch (tag) {
         case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionResult::Tag::kResponse: return 1;
-        case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionResult::Tag::kTransportErr: return 2;
+        case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionResult::Tag::kFrameworkErr: return 2;
       default: {
           decoder->SetError(::fidl::internal::kCodingErrorUnknownUnionTag);
         return 0;
@@ -2306,7 +2306,7 @@ class UnknownInteractionsProtocolFlexibleTwoWayUnionResult {
   static constexpr std::optional<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionResult::Tag> IndexToTag(size_t index) {
     switch (index) {
         case 1: return ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionResult::Tag::kResponse;
-        case 2: return ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionResult::Tag::kTransportErr;
+        case 2: return ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionResult::Tag::kFrameworkErr;
         default: return std::nullopt;
     }
   }
@@ -2385,13 +2385,13 @@ class UnknownInteractionsProtocolFlexibleTwoWayTableResult {
     std::variant<
       std::monostate
         , ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableResponse
-        , ::fidl::internal::TransportErr>;
+        , ::fidl::internal::FrameworkErr>;
 
  public:
   // TODO: share union tag types between wire & natural.
   enum class Tag : fidl_xunion_tag_t {
     kResponse = 1,  // 0x1
-    kTransportErr = 3,  // 0x3
+    kFrameworkErr = 3,  // 0x3
   };
 
   UnknownInteractionsProtocolFlexibleTwoWayTableResult(UnknownInteractionsProtocolFlexibleTwoWayTableResult&& other) noexcept
@@ -2443,24 +2443,24 @@ class UnknownInteractionsProtocolFlexibleTwoWayTableResult {
       storage_->emplace<1>(std::move(value));
       return *this;
     }
-    static UnknownInteractionsProtocolFlexibleTwoWayTableResult WithTransportErr(::fidl::internal::TransportErr val) {
+    static UnknownInteractionsProtocolFlexibleTwoWayTableResult WithFrameworkErr(::fidl::internal::FrameworkErr val) {
       return UnknownInteractionsProtocolFlexibleTwoWayTableResult(std::make_shared<Storage_>(
         std::in_place_index_t<2>{},
         std::move(val)));
     }
 
-    const ::fidl::internal::UnionMemberView<2, Storage_> transport_err() const {
+    const ::fidl::internal::UnionMemberView<2, Storage_> framework_err() const {
       return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
     }
 
-    ::fidl::internal::UnionMemberView<2, Storage_> transport_err() {
+    ::fidl::internal::UnionMemberView<2, Storage_> framework_err() {
       return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
     }
 
-    // Sets the union to hold the transport_err member.
+    // Sets the union to hold the framework_err member.
     //
     
-    UnknownInteractionsProtocolFlexibleTwoWayTableResult& transport_err(::fidl::internal::TransportErr value) {
+    UnknownInteractionsProtocolFlexibleTwoWayTableResult& framework_err(::fidl::internal::FrameworkErr value) {
       storage_->emplace<2>(std::move(value));
       return *this;
     }
@@ -2482,7 +2482,7 @@ class UnknownInteractionsProtocolFlexibleTwoWayTableResult {
   static constexpr size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableResult::Tag tag) {
     switch (tag) {
         case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableResult::Tag::kResponse: return 1;
-        case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableResult::Tag::kTransportErr: return 2;
+        case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableResult::Tag::kFrameworkErr: return 2;
       default: {
           decoder->SetError(::fidl::internal::kCodingErrorUnknownUnionTag);
         return 0;
@@ -2493,7 +2493,7 @@ class UnknownInteractionsProtocolFlexibleTwoWayTableResult {
   static constexpr std::optional<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableResult::Tag> IndexToTag(size_t index) {
     switch (index) {
         case 1: return ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableResult::Tag::kResponse;
-        case 2: return ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableResult::Tag::kTransportErr;
+        case 2: return ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableResult::Tag::kFrameworkErr;
         default: return std::nullopt;
     }
   }
@@ -2587,14 +2587,14 @@ class UnknownInteractionsProtocolFlexibleTwoWayErrResult {
       std::monostate
         , ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayErrResponse
         , int32_t
-        , ::fidl::internal::TransportErr>;
+        , ::fidl::internal::FrameworkErr>;
 
  public:
   // TODO: share union tag types between wire & natural.
   enum class Tag : fidl_xunion_tag_t {
     kResponse = 1,  // 0x1
     kErr = 2,  // 0x2
-    kTransportErr = 3,  // 0x3
+    kFrameworkErr = 3,  // 0x3
   };
 
   UnknownInteractionsProtocolFlexibleTwoWayErrResult(UnknownInteractionsProtocolFlexibleTwoWayErrResult&& other) noexcept
@@ -2667,24 +2667,24 @@ class UnknownInteractionsProtocolFlexibleTwoWayErrResult {
       storage_->emplace<2>(std::move(value));
       return *this;
     }
-    static UnknownInteractionsProtocolFlexibleTwoWayErrResult WithTransportErr(::fidl::internal::TransportErr val) {
+    static UnknownInteractionsProtocolFlexibleTwoWayErrResult WithFrameworkErr(::fidl::internal::FrameworkErr val) {
       return UnknownInteractionsProtocolFlexibleTwoWayErrResult(std::make_shared<Storage_>(
         std::in_place_index_t<3>{},
         std::move(val)));
     }
 
-    const ::fidl::internal::UnionMemberView<3, Storage_> transport_err() const {
+    const ::fidl::internal::UnionMemberView<3, Storage_> framework_err() const {
       return ::fidl::internal::UnionMemberView<3, Storage_>(storage_);
     }
 
-    ::fidl::internal::UnionMemberView<3, Storage_> transport_err() {
+    ::fidl::internal::UnionMemberView<3, Storage_> framework_err() {
       return ::fidl::internal::UnionMemberView<3, Storage_>(storage_);
     }
 
-    // Sets the union to hold the transport_err member.
+    // Sets the union to hold the framework_err member.
     //
     
-    UnknownInteractionsProtocolFlexibleTwoWayErrResult& transport_err(::fidl::internal::TransportErr value) {
+    UnknownInteractionsProtocolFlexibleTwoWayErrResult& framework_err(::fidl::internal::FrameworkErr value) {
       storage_->emplace<3>(std::move(value));
       return *this;
     }
@@ -2708,7 +2708,7 @@ class UnknownInteractionsProtocolFlexibleTwoWayErrResult {
     switch (tag) {
         case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayErrResult::Tag::kResponse: return 1;
         case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayErrResult::Tag::kErr: return 2;
-        case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayErrResult::Tag::kTransportErr: return 3;
+        case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayErrResult::Tag::kFrameworkErr: return 3;
       default: {
           decoder->SetError(::fidl::internal::kCodingErrorUnknownUnionTag);
         return 0;
@@ -2720,7 +2720,7 @@ class UnknownInteractionsProtocolFlexibleTwoWayErrResult {
     switch (index) {
         case 1: return ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayErrResult::Tag::kResponse;
         case 2: return ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayErrResult::Tag::kErr;
-        case 3: return ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayErrResult::Tag::kTransportErr;
+        case 3: return ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayErrResult::Tag::kFrameworkErr;
         default: return std::nullopt;
     }
   }
@@ -2814,14 +2814,14 @@ class UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult {
       std::monostate
         , ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse
         , int32_t
-        , ::fidl::internal::TransportErr>;
+        , ::fidl::internal::FrameworkErr>;
 
  public:
   // TODO: share union tag types between wire & natural.
   enum class Tag : fidl_xunion_tag_t {
     kResponse = 1,  // 0x1
     kErr = 2,  // 0x2
-    kTransportErr = 3,  // 0x3
+    kFrameworkErr = 3,  // 0x3
   };
 
   UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult(UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult&& other) noexcept
@@ -2894,24 +2894,24 @@ class UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult {
       storage_->emplace<2>(std::move(value));
       return *this;
     }
-    static UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult WithTransportErr(::fidl::internal::TransportErr val) {
+    static UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult WithFrameworkErr(::fidl::internal::FrameworkErr val) {
       return UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult(std::make_shared<Storage_>(
         std::in_place_index_t<3>{},
         std::move(val)));
     }
 
-    const ::fidl::internal::UnionMemberView<3, Storage_> transport_err() const {
+    const ::fidl::internal::UnionMemberView<3, Storage_> framework_err() const {
       return ::fidl::internal::UnionMemberView<3, Storage_>(storage_);
     }
 
-    ::fidl::internal::UnionMemberView<3, Storage_> transport_err() {
+    ::fidl::internal::UnionMemberView<3, Storage_> framework_err() {
       return ::fidl::internal::UnionMemberView<3, Storage_>(storage_);
     }
 
-    // Sets the union to hold the transport_err member.
+    // Sets the union to hold the framework_err member.
     //
     
-    UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult& transport_err(::fidl::internal::TransportErr value) {
+    UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult& framework_err(::fidl::internal::FrameworkErr value) {
       storage_->emplace<3>(std::move(value));
       return *this;
     }
@@ -2935,7 +2935,7 @@ class UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult {
     switch (tag) {
         case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult::Tag::kResponse: return 1;
         case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult::Tag::kErr: return 2;
-        case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult::Tag::kTransportErr: return 3;
+        case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult::Tag::kFrameworkErr: return 3;
       default: {
           decoder->SetError(::fidl::internal::kCodingErrorUnknownUnionTag);
         return 0;
@@ -2947,7 +2947,7 @@ class UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult {
     switch (index) {
         case 1: return ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult::Tag::kResponse;
         case 2: return ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult::Tag::kErr;
-        case 3: return ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult::Tag::kTransportErr;
+        case 3: return ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult::Tag::kFrameworkErr;
         default: return std::nullopt;
     }
   }
@@ -3079,14 +3079,14 @@ class UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult {
       std::monostate
         , ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse
         , int32_t
-        , ::fidl::internal::TransportErr>;
+        , ::fidl::internal::FrameworkErr>;
 
  public:
   // TODO: share union tag types between wire & natural.
   enum class Tag : fidl_xunion_tag_t {
     kResponse = 1,  // 0x1
     kErr = 2,  // 0x2
-    kTransportErr = 3,  // 0x3
+    kFrameworkErr = 3,  // 0x3
   };
 
   UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult(UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult&& other) noexcept
@@ -3159,24 +3159,24 @@ class UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult {
       storage_->emplace<2>(std::move(value));
       return *this;
     }
-    static UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult WithTransportErr(::fidl::internal::TransportErr val) {
+    static UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult WithFrameworkErr(::fidl::internal::FrameworkErr val) {
       return UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult(std::make_shared<Storage_>(
         std::in_place_index_t<3>{},
         std::move(val)));
     }
 
-    const ::fidl::internal::UnionMemberView<3, Storage_> transport_err() const {
+    const ::fidl::internal::UnionMemberView<3, Storage_> framework_err() const {
       return ::fidl::internal::UnionMemberView<3, Storage_>(storage_);
     }
 
-    ::fidl::internal::UnionMemberView<3, Storage_> transport_err() {
+    ::fidl::internal::UnionMemberView<3, Storage_> framework_err() {
       return ::fidl::internal::UnionMemberView<3, Storage_>(storage_);
     }
 
-    // Sets the union to hold the transport_err member.
+    // Sets the union to hold the framework_err member.
     //
     
-    UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult& transport_err(::fidl::internal::TransportErr value) {
+    UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult& framework_err(::fidl::internal::FrameworkErr value) {
       storage_->emplace<3>(std::move(value));
       return *this;
     }
@@ -3200,7 +3200,7 @@ class UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult {
     switch (tag) {
         case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult::Tag::kResponse: return 1;
         case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult::Tag::kErr: return 2;
-        case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult::Tag::kTransportErr: return 3;
+        case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult::Tag::kFrameworkErr: return 3;
       default: {
           decoder->SetError(::fidl::internal::kCodingErrorUnknownUnionTag);
         return 0;
@@ -3212,7 +3212,7 @@ class UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult {
     switch (index) {
         case 1: return ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult::Tag::kResponse;
         case 2: return ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult::Tag::kErr;
-        case 3: return ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult::Tag::kTransportErr;
+        case 3: return ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult::Tag::kFrameworkErr;
         default: return std::nullopt;
     }
   }
@@ -3292,14 +3292,14 @@ class UnknownInteractionsProtocolFlexibleTwoWayTableErrResult {
       std::monostate
         , ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse
         , int32_t
-        , ::fidl::internal::TransportErr>;
+        , ::fidl::internal::FrameworkErr>;
 
  public:
   // TODO: share union tag types between wire & natural.
   enum class Tag : fidl_xunion_tag_t {
     kResponse = 1,  // 0x1
     kErr = 2,  // 0x2
-    kTransportErr = 3,  // 0x3
+    kFrameworkErr = 3,  // 0x3
   };
 
   UnknownInteractionsProtocolFlexibleTwoWayTableErrResult(UnknownInteractionsProtocolFlexibleTwoWayTableErrResult&& other) noexcept
@@ -3372,24 +3372,24 @@ class UnknownInteractionsProtocolFlexibleTwoWayTableErrResult {
       storage_->emplace<2>(std::move(value));
       return *this;
     }
-    static UnknownInteractionsProtocolFlexibleTwoWayTableErrResult WithTransportErr(::fidl::internal::TransportErr val) {
+    static UnknownInteractionsProtocolFlexibleTwoWayTableErrResult WithFrameworkErr(::fidl::internal::FrameworkErr val) {
       return UnknownInteractionsProtocolFlexibleTwoWayTableErrResult(std::make_shared<Storage_>(
         std::in_place_index_t<3>{},
         std::move(val)));
     }
 
-    const ::fidl::internal::UnionMemberView<3, Storage_> transport_err() const {
+    const ::fidl::internal::UnionMemberView<3, Storage_> framework_err() const {
       return ::fidl::internal::UnionMemberView<3, Storage_>(storage_);
     }
 
-    ::fidl::internal::UnionMemberView<3, Storage_> transport_err() {
+    ::fidl::internal::UnionMemberView<3, Storage_> framework_err() {
       return ::fidl::internal::UnionMemberView<3, Storage_>(storage_);
     }
 
-    // Sets the union to hold the transport_err member.
+    // Sets the union to hold the framework_err member.
     //
     
-    UnknownInteractionsProtocolFlexibleTwoWayTableErrResult& transport_err(::fidl::internal::TransportErr value) {
+    UnknownInteractionsProtocolFlexibleTwoWayTableErrResult& framework_err(::fidl::internal::FrameworkErr value) {
       storage_->emplace<3>(std::move(value));
       return *this;
     }
@@ -3413,7 +3413,7 @@ class UnknownInteractionsProtocolFlexibleTwoWayTableErrResult {
     switch (tag) {
         case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableErrResult::Tag::kResponse: return 1;
         case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableErrResult::Tag::kErr: return 2;
-        case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableErrResult::Tag::kTransportErr: return 3;
+        case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableErrResult::Tag::kFrameworkErr: return 3;
       default: {
           decoder->SetError(::fidl::internal::kCodingErrorUnknownUnionTag);
         return 0;
@@ -3425,7 +3425,7 @@ class UnknownInteractionsProtocolFlexibleTwoWayTableErrResult {
     switch (index) {
         case 1: return ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableErrResult::Tag::kResponse;
         case 2: return ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableErrResult::Tag::kErr;
-        case 3: return ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableErrResult::Tag::kTransportErr;
+        case 3: return ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableErrResult::Tag::kFrameworkErr;
         default: return std::nullopt;
     }
   }
@@ -12023,13 +12023,13 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayResult {
     std::variant<
       std::monostate
         , ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayResponse
-        , ::fidl::internal::TransportErr>;
+        , ::fidl::internal::FrameworkErr>;
 
  public:
   // TODO: share union tag types between wire & natural.
   enum class Tag : fidl_xunion_tag_t {
     kResponse = 1,  // 0x1
-    kTransportErr = 3,  // 0x3
+    kFrameworkErr = 3,  // 0x3
   };
 
   UnknownInteractionsDriverProtocolFlexibleTwoWayResult(UnknownInteractionsDriverProtocolFlexibleTwoWayResult&& other) noexcept
@@ -12081,24 +12081,24 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayResult {
       storage_->emplace<1>(std::move(value));
       return *this;
     }
-    static UnknownInteractionsDriverProtocolFlexibleTwoWayResult WithTransportErr(::fidl::internal::TransportErr val) {
+    static UnknownInteractionsDriverProtocolFlexibleTwoWayResult WithFrameworkErr(::fidl::internal::FrameworkErr val) {
       return UnknownInteractionsDriverProtocolFlexibleTwoWayResult(std::make_shared<Storage_>(
         std::in_place_index_t<2>{},
         std::move(val)));
     }
 
-    const ::fidl::internal::UnionMemberView<2, Storage_> transport_err() const {
+    const ::fidl::internal::UnionMemberView<2, Storage_> framework_err() const {
       return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
     }
 
-    ::fidl::internal::UnionMemberView<2, Storage_> transport_err() {
+    ::fidl::internal::UnionMemberView<2, Storage_> framework_err() {
       return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
     }
 
-    // Sets the union to hold the transport_err member.
+    // Sets the union to hold the framework_err member.
     //
     
-    UnknownInteractionsDriverProtocolFlexibleTwoWayResult& transport_err(::fidl::internal::TransportErr value) {
+    UnknownInteractionsDriverProtocolFlexibleTwoWayResult& framework_err(::fidl::internal::FrameworkErr value) {
       storage_->emplace<2>(std::move(value));
       return *this;
     }
@@ -12120,7 +12120,7 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayResult {
   static constexpr size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayResult::Tag tag) {
     switch (tag) {
         case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayResult::Tag::kResponse: return 1;
-        case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayResult::Tag::kTransportErr: return 2;
+        case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayResult::Tag::kFrameworkErr: return 2;
       default: {
           decoder->SetError(::fidl::internal::kCodingErrorUnknownUnionTag);
         return 0;
@@ -12131,7 +12131,7 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayResult {
   static constexpr std::optional<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayResult::Tag> IndexToTag(size_t index) {
     switch (index) {
         case 1: return ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayResult::Tag::kResponse;
-        case 2: return ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayResult::Tag::kTransportErr;
+        case 2: return ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayResult::Tag::kFrameworkErr;
         default: return std::nullopt;
     }
   }
@@ -12224,13 +12224,13 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult {
     std::variant<
       std::monostate
         , ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse
-        , ::fidl::internal::TransportErr>;
+        , ::fidl::internal::FrameworkErr>;
 
  public:
   // TODO: share union tag types between wire & natural.
   enum class Tag : fidl_xunion_tag_t {
     kResponse = 1,  // 0x1
-    kTransportErr = 3,  // 0x3
+    kFrameworkErr = 3,  // 0x3
   };
 
   UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult(UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult&& other) noexcept
@@ -12282,24 +12282,24 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult {
       storage_->emplace<1>(std::move(value));
       return *this;
     }
-    static UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult WithTransportErr(::fidl::internal::TransportErr val) {
+    static UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult WithFrameworkErr(::fidl::internal::FrameworkErr val) {
       return UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult(std::make_shared<Storage_>(
         std::in_place_index_t<2>{},
         std::move(val)));
     }
 
-    const ::fidl::internal::UnionMemberView<2, Storage_> transport_err() const {
+    const ::fidl::internal::UnionMemberView<2, Storage_> framework_err() const {
       return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
     }
 
-    ::fidl::internal::UnionMemberView<2, Storage_> transport_err() {
+    ::fidl::internal::UnionMemberView<2, Storage_> framework_err() {
       return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
     }
 
-    // Sets the union to hold the transport_err member.
+    // Sets the union to hold the framework_err member.
     //
     
-    UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult& transport_err(::fidl::internal::TransportErr value) {
+    UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult& framework_err(::fidl::internal::FrameworkErr value) {
       storage_->emplace<2>(std::move(value));
       return *this;
     }
@@ -12321,7 +12321,7 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult {
   static constexpr size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult::Tag tag) {
     switch (tag) {
         case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult::Tag::kResponse: return 1;
-        case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult::Tag::kTransportErr: return 2;
+        case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult::Tag::kFrameworkErr: return 2;
       default: {
           decoder->SetError(::fidl::internal::kCodingErrorUnknownUnionTag);
         return 0;
@@ -12332,7 +12332,7 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult {
   static constexpr std::optional<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult::Tag> IndexToTag(size_t index) {
     switch (index) {
         case 1: return ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult::Tag::kResponse;
-        case 2: return ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult::Tag::kTransportErr;
+        case 2: return ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult::Tag::kFrameworkErr;
         default: return std::nullopt;
     }
   }
@@ -12463,13 +12463,13 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult {
     std::variant<
       std::monostate
         , ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse
-        , ::fidl::internal::TransportErr>;
+        , ::fidl::internal::FrameworkErr>;
 
  public:
   // TODO: share union tag types between wire & natural.
   enum class Tag : fidl_xunion_tag_t {
     kResponse = 1,  // 0x1
-    kTransportErr = 3,  // 0x3
+    kFrameworkErr = 3,  // 0x3
   };
 
   UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult(UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult&& other) noexcept
@@ -12521,24 +12521,24 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult {
       storage_->emplace<1>(std::move(value));
       return *this;
     }
-    static UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult WithTransportErr(::fidl::internal::TransportErr val) {
+    static UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult WithFrameworkErr(::fidl::internal::FrameworkErr val) {
       return UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult(std::make_shared<Storage_>(
         std::in_place_index_t<2>{},
         std::move(val)));
     }
 
-    const ::fidl::internal::UnionMemberView<2, Storage_> transport_err() const {
+    const ::fidl::internal::UnionMemberView<2, Storage_> framework_err() const {
       return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
     }
 
-    ::fidl::internal::UnionMemberView<2, Storage_> transport_err() {
+    ::fidl::internal::UnionMemberView<2, Storage_> framework_err() {
       return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
     }
 
-    // Sets the union to hold the transport_err member.
+    // Sets the union to hold the framework_err member.
     //
     
-    UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult& transport_err(::fidl::internal::TransportErr value) {
+    UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult& framework_err(::fidl::internal::FrameworkErr value) {
       storage_->emplace<2>(std::move(value));
       return *this;
     }
@@ -12560,7 +12560,7 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult {
   static constexpr size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult::Tag tag) {
     switch (tag) {
         case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult::Tag::kResponse: return 1;
-        case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult::Tag::kTransportErr: return 2;
+        case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult::Tag::kFrameworkErr: return 2;
       default: {
           decoder->SetError(::fidl::internal::kCodingErrorUnknownUnionTag);
         return 0;
@@ -12571,7 +12571,7 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult {
   static constexpr std::optional<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult::Tag> IndexToTag(size_t index) {
     switch (index) {
         case 1: return ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult::Tag::kResponse;
-        case 2: return ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult::Tag::kTransportErr;
+        case 2: return ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult::Tag::kFrameworkErr;
         default: return std::nullopt;
     }
   }
@@ -12650,13 +12650,13 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult {
     std::variant<
       std::monostate
         , ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse
-        , ::fidl::internal::TransportErr>;
+        , ::fidl::internal::FrameworkErr>;
 
  public:
   // TODO: share union tag types between wire & natural.
   enum class Tag : fidl_xunion_tag_t {
     kResponse = 1,  // 0x1
-    kTransportErr = 3,  // 0x3
+    kFrameworkErr = 3,  // 0x3
   };
 
   UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult(UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult&& other) noexcept
@@ -12708,24 +12708,24 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult {
       storage_->emplace<1>(std::move(value));
       return *this;
     }
-    static UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult WithTransportErr(::fidl::internal::TransportErr val) {
+    static UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult WithFrameworkErr(::fidl::internal::FrameworkErr val) {
       return UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult(std::make_shared<Storage_>(
         std::in_place_index_t<2>{},
         std::move(val)));
     }
 
-    const ::fidl::internal::UnionMemberView<2, Storage_> transport_err() const {
+    const ::fidl::internal::UnionMemberView<2, Storage_> framework_err() const {
       return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
     }
 
-    ::fidl::internal::UnionMemberView<2, Storage_> transport_err() {
+    ::fidl::internal::UnionMemberView<2, Storage_> framework_err() {
       return ::fidl::internal::UnionMemberView<2, Storage_>(storage_);
     }
 
-    // Sets the union to hold the transport_err member.
+    // Sets the union to hold the framework_err member.
     //
     
-    UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult& transport_err(::fidl::internal::TransportErr value) {
+    UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult& framework_err(::fidl::internal::FrameworkErr value) {
       storage_->emplace<2>(std::move(value));
       return *this;
     }
@@ -12747,7 +12747,7 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult {
   static constexpr size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult::Tag tag) {
     switch (tag) {
         case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult::Tag::kResponse: return 1;
-        case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult::Tag::kTransportErr: return 2;
+        case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult::Tag::kFrameworkErr: return 2;
       default: {
           decoder->SetError(::fidl::internal::kCodingErrorUnknownUnionTag);
         return 0;
@@ -12758,7 +12758,7 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult {
   static constexpr std::optional<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult::Tag> IndexToTag(size_t index) {
     switch (index) {
         case 1: return ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult::Tag::kResponse;
-        case 2: return ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult::Tag::kTransportErr;
+        case 2: return ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult::Tag::kFrameworkErr;
         default: return std::nullopt;
     }
   }
@@ -12852,14 +12852,14 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult {
       std::monostate
         , ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse
         , int32_t
-        , ::fidl::internal::TransportErr>;
+        , ::fidl::internal::FrameworkErr>;
 
  public:
   // TODO: share union tag types between wire & natural.
   enum class Tag : fidl_xunion_tag_t {
     kResponse = 1,  // 0x1
     kErr = 2,  // 0x2
-    kTransportErr = 3,  // 0x3
+    kFrameworkErr = 3,  // 0x3
   };
 
   UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult(UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult&& other) noexcept
@@ -12932,24 +12932,24 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult {
       storage_->emplace<2>(std::move(value));
       return *this;
     }
-    static UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult WithTransportErr(::fidl::internal::TransportErr val) {
+    static UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult WithFrameworkErr(::fidl::internal::FrameworkErr val) {
       return UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult(std::make_shared<Storage_>(
         std::in_place_index_t<3>{},
         std::move(val)));
     }
 
-    const ::fidl::internal::UnionMemberView<3, Storage_> transport_err() const {
+    const ::fidl::internal::UnionMemberView<3, Storage_> framework_err() const {
       return ::fidl::internal::UnionMemberView<3, Storage_>(storage_);
     }
 
-    ::fidl::internal::UnionMemberView<3, Storage_> transport_err() {
+    ::fidl::internal::UnionMemberView<3, Storage_> framework_err() {
       return ::fidl::internal::UnionMemberView<3, Storage_>(storage_);
     }
 
-    // Sets the union to hold the transport_err member.
+    // Sets the union to hold the framework_err member.
     //
     
-    UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult& transport_err(::fidl::internal::TransportErr value) {
+    UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult& framework_err(::fidl::internal::FrameworkErr value) {
       storage_->emplace<3>(std::move(value));
       return *this;
     }
@@ -12973,7 +12973,7 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult {
     switch (tag) {
         case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult::Tag::kResponse: return 1;
         case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult::Tag::kErr: return 2;
-        case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult::Tag::kTransportErr: return 3;
+        case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult::Tag::kFrameworkErr: return 3;
       default: {
           decoder->SetError(::fidl::internal::kCodingErrorUnknownUnionTag);
         return 0;
@@ -12985,7 +12985,7 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult {
     switch (index) {
         case 1: return ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult::Tag::kResponse;
         case 2: return ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult::Tag::kErr;
-        case 3: return ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult::Tag::kTransportErr;
+        case 3: return ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult::Tag::kFrameworkErr;
         default: return std::nullopt;
     }
   }
@@ -13079,14 +13079,14 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult {
       std::monostate
         , ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse
         , int32_t
-        , ::fidl::internal::TransportErr>;
+        , ::fidl::internal::FrameworkErr>;
 
  public:
   // TODO: share union tag types between wire & natural.
   enum class Tag : fidl_xunion_tag_t {
     kResponse = 1,  // 0x1
     kErr = 2,  // 0x2
-    kTransportErr = 3,  // 0x3
+    kFrameworkErr = 3,  // 0x3
   };
 
   UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult(UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult&& other) noexcept
@@ -13159,24 +13159,24 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult {
       storage_->emplace<2>(std::move(value));
       return *this;
     }
-    static UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult WithTransportErr(::fidl::internal::TransportErr val) {
+    static UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult WithFrameworkErr(::fidl::internal::FrameworkErr val) {
       return UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult(std::make_shared<Storage_>(
         std::in_place_index_t<3>{},
         std::move(val)));
     }
 
-    const ::fidl::internal::UnionMemberView<3, Storage_> transport_err() const {
+    const ::fidl::internal::UnionMemberView<3, Storage_> framework_err() const {
       return ::fidl::internal::UnionMemberView<3, Storage_>(storage_);
     }
 
-    ::fidl::internal::UnionMemberView<3, Storage_> transport_err() {
+    ::fidl::internal::UnionMemberView<3, Storage_> framework_err() {
       return ::fidl::internal::UnionMemberView<3, Storage_>(storage_);
     }
 
-    // Sets the union to hold the transport_err member.
+    // Sets the union to hold the framework_err member.
     //
     
-    UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult& transport_err(::fidl::internal::TransportErr value) {
+    UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult& framework_err(::fidl::internal::FrameworkErr value) {
       storage_->emplace<3>(std::move(value));
       return *this;
     }
@@ -13200,7 +13200,7 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult {
     switch (tag) {
         case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult::Tag::kResponse: return 1;
         case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult::Tag::kErr: return 2;
-        case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult::Tag::kTransportErr: return 3;
+        case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult::Tag::kFrameworkErr: return 3;
       default: {
           decoder->SetError(::fidl::internal::kCodingErrorUnknownUnionTag);
         return 0;
@@ -13212,7 +13212,7 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult {
     switch (index) {
         case 1: return ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult::Tag::kResponse;
         case 2: return ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult::Tag::kErr;
-        case 3: return ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult::Tag::kTransportErr;
+        case 3: return ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult::Tag::kFrameworkErr;
         default: return std::nullopt;
     }
   }
@@ -13344,14 +13344,14 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult {
       std::monostate
         , ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse
         , int32_t
-        , ::fidl::internal::TransportErr>;
+        , ::fidl::internal::FrameworkErr>;
 
  public:
   // TODO: share union tag types between wire & natural.
   enum class Tag : fidl_xunion_tag_t {
     kResponse = 1,  // 0x1
     kErr = 2,  // 0x2
-    kTransportErr = 3,  // 0x3
+    kFrameworkErr = 3,  // 0x3
   };
 
   UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult(UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult&& other) noexcept
@@ -13424,24 +13424,24 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult {
       storage_->emplace<2>(std::move(value));
       return *this;
     }
-    static UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult WithTransportErr(::fidl::internal::TransportErr val) {
+    static UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult WithFrameworkErr(::fidl::internal::FrameworkErr val) {
       return UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult(std::make_shared<Storage_>(
         std::in_place_index_t<3>{},
         std::move(val)));
     }
 
-    const ::fidl::internal::UnionMemberView<3, Storage_> transport_err() const {
+    const ::fidl::internal::UnionMemberView<3, Storage_> framework_err() const {
       return ::fidl::internal::UnionMemberView<3, Storage_>(storage_);
     }
 
-    ::fidl::internal::UnionMemberView<3, Storage_> transport_err() {
+    ::fidl::internal::UnionMemberView<3, Storage_> framework_err() {
       return ::fidl::internal::UnionMemberView<3, Storage_>(storage_);
     }
 
-    // Sets the union to hold the transport_err member.
+    // Sets the union to hold the framework_err member.
     //
     
-    UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult& transport_err(::fidl::internal::TransportErr value) {
+    UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult& framework_err(::fidl::internal::FrameworkErr value) {
       storage_->emplace<3>(std::move(value));
       return *this;
     }
@@ -13465,7 +13465,7 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult {
     switch (tag) {
         case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult::Tag::kResponse: return 1;
         case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult::Tag::kErr: return 2;
-        case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult::Tag::kTransportErr: return 3;
+        case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult::Tag::kFrameworkErr: return 3;
       default: {
           decoder->SetError(::fidl::internal::kCodingErrorUnknownUnionTag);
         return 0;
@@ -13477,7 +13477,7 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult {
     switch (index) {
         case 1: return ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult::Tag::kResponse;
         case 2: return ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult::Tag::kErr;
-        case 3: return ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult::Tag::kTransportErr;
+        case 3: return ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult::Tag::kFrameworkErr;
         default: return std::nullopt;
     }
   }
@@ -13557,14 +13557,14 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult {
       std::monostate
         , ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse
         , int32_t
-        , ::fidl::internal::TransportErr>;
+        , ::fidl::internal::FrameworkErr>;
 
  public:
   // TODO: share union tag types between wire & natural.
   enum class Tag : fidl_xunion_tag_t {
     kResponse = 1,  // 0x1
     kErr = 2,  // 0x2
-    kTransportErr = 3,  // 0x3
+    kFrameworkErr = 3,  // 0x3
   };
 
   UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult(UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult&& other) noexcept
@@ -13637,24 +13637,24 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult {
       storage_->emplace<2>(std::move(value));
       return *this;
     }
-    static UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult WithTransportErr(::fidl::internal::TransportErr val) {
+    static UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult WithFrameworkErr(::fidl::internal::FrameworkErr val) {
       return UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult(std::make_shared<Storage_>(
         std::in_place_index_t<3>{},
         std::move(val)));
     }
 
-    const ::fidl::internal::UnionMemberView<3, Storage_> transport_err() const {
+    const ::fidl::internal::UnionMemberView<3, Storage_> framework_err() const {
       return ::fidl::internal::UnionMemberView<3, Storage_>(storage_);
     }
 
-    ::fidl::internal::UnionMemberView<3, Storage_> transport_err() {
+    ::fidl::internal::UnionMemberView<3, Storage_> framework_err() {
       return ::fidl::internal::UnionMemberView<3, Storage_>(storage_);
     }
 
-    // Sets the union to hold the transport_err member.
+    // Sets the union to hold the framework_err member.
     //
     
-    UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult& transport_err(::fidl::internal::TransportErr value) {
+    UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult& framework_err(::fidl::internal::FrameworkErr value) {
       storage_->emplace<3>(std::move(value));
       return *this;
     }
@@ -13678,7 +13678,7 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult {
     switch (tag) {
         case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult::Tag::kResponse: return 1;
         case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult::Tag::kErr: return 2;
-        case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult::Tag::kTransportErr: return 3;
+        case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult::Tag::kFrameworkErr: return 3;
       default: {
           decoder->SetError(::fidl::internal::kCodingErrorUnknownUnionTag);
         return 0;
@@ -13690,7 +13690,7 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult {
     switch (index) {
         case 1: return ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult::Tag::kResponse;
         case 2: return ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult::Tag::kErr;
-        case 3: return ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult::Tag::kTransportErr;
+        case 3: return ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult::Tag::kFrameworkErr;
         default: return std::nullopt;
     }
   }

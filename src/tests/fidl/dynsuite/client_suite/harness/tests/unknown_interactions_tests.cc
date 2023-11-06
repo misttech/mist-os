@@ -304,7 +304,7 @@ CLIENT_TEST(15, TwoWayFlexibleSendMismatchedStrictnessUnknownMethodResponse) {
 
 // The client should tear down when it calls a flexible two-way method and
 // receives a framework error response other than "unsupported method".
-CLIENT_TEST(16, TwoWayFlexibleSendOtherTransportErrResponse) {
+CLIENT_TEST(16, TwoWayFlexibleSendOtherFrameworkErrResponse) {
   Header header = {
       .txid = kTxidNotKnown,
       .dynamic_flags = kDynamicFlagsFlexible,
@@ -478,7 +478,7 @@ CLIENT_TEST(22, TwoWayFlexibleErrorSyntaxSendMismatchedStrictnessUnknownMethodRe
 
 // The client should tear down when it calls a flexible fallible two-way method
 // and receives a framework error response other than "unsupported method".
-CLIENT_TEST(23, TwoWayFlexibleErrorSyntaxSendOtherTransportErrResponse) {
+CLIENT_TEST(23, TwoWayFlexibleErrorSyntaxSendOtherFrameworkErrResponse) {
   Header header = {
       .txid = kTxidNotKnown,
       .dynamic_flags = kDynamicFlagsFlexible,

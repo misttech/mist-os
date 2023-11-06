@@ -572,15 +572,15 @@ open protocol Example {
   ASSERT_NULL(error.maybe_used);
   ASSERT_STREQ("err", std::string(error.span->data()).c_str());
 
-  const fidl::flat::Union::Member& transport_error = result_union->members.at(2);
-  ASSERT_NOT_NULL(transport_error.maybe_used);
-  ASSERT_STREQ("transport_err", std::string(transport_error.maybe_used->name.data()).c_str());
+  const fidl::flat::Union::Member& framework_error = result_union->members.at(2);
+  ASSERT_NOT_NULL(framework_error.maybe_used);
+  ASSERT_STREQ("framework_err", std::string(framework_error.maybe_used->name.data()).c_str());
 
-  ASSERT_NOT_NULL(transport_error.maybe_used->type_ctor->type);
-  ASSERT_EQ(transport_error.maybe_used->type_ctor->type->kind, fidl::flat::Type::Kind::kInternal);
-  auto transport_err_internal_type =
-      static_cast<const fidl::flat::InternalType*>(transport_error.maybe_used->type_ctor->type);
-  ASSERT_EQ(transport_err_internal_type->subtype, fidl::types::InternalSubtype::kTransportErr);
+  ASSERT_NOT_NULL(framework_error.maybe_used->type_ctor->type);
+  ASSERT_EQ(framework_error.maybe_used->type_ctor->type->kind, fidl::flat::Type::Kind::kInternal);
+  auto framework_err_internal_type =
+      static_cast<const fidl::flat::InternalType*>(framework_error.maybe_used->type_ctor->type);
+  ASSERT_EQ(framework_err_internal_type->subtype, fidl::types::InternalSubtype::kFrameworkErr);
 }
 
 TEST(MethodTests, GoodFlexibleErrorResponseUnion) {
@@ -625,14 +625,14 @@ open protocol Example {
       static_cast<const fidl::flat::PrimitiveType*>(error.maybe_used->type_ctor->type);
   ASSERT_EQ(err_primitive_type->subtype, fidl::types::PrimitiveSubtype::kUint32);
 
-  const fidl::flat::Union::Member& transport_error = result_union->members.at(2);
-  ASSERT_NOT_NULL(transport_error.maybe_used);
-  ASSERT_STREQ("transport_err", std::string(transport_error.maybe_used->name.data()).c_str());
+  const fidl::flat::Union::Member& framework_error = result_union->members.at(2);
+  ASSERT_NOT_NULL(framework_error.maybe_used);
+  ASSERT_STREQ("framework_err", std::string(framework_error.maybe_used->name.data()).c_str());
 
-  ASSERT_NOT_NULL(transport_error.maybe_used->type_ctor->type);
-  ASSERT_EQ(transport_error.maybe_used->type_ctor->type->kind, fidl::flat::Type::Kind::kInternal);
-  auto transport_err_internal_type =
-      static_cast<const fidl::flat::InternalType*>(transport_error.maybe_used->type_ctor->type);
-  ASSERT_EQ(transport_err_internal_type->subtype, fidl::types::InternalSubtype::kTransportErr);
+  ASSERT_NOT_NULL(framework_error.maybe_used->type_ctor->type);
+  ASSERT_EQ(framework_error.maybe_used->type_ctor->type->kind, fidl::flat::Type::Kind::kInternal);
+  auto framework_err_internal_type =
+      static_cast<const fidl::flat::InternalType*>(framework_error.maybe_used->type_ctor->type);
+  ASSERT_EQ(framework_err_internal_type->subtype, fidl::types::InternalSubtype::kFrameworkErr);
 }
 }  // namespace

@@ -211,7 +211,7 @@ fn two_way_flexible_sync_send_unknown_response() {
         &[
             0x02, 0x00, 0x80, 0x01, //
             0x9d, 0x60, 0x95, 0x03, 0x7a, 0x51, 0x33, 0x1f, //
-            // Result union with transport_err
+            // Result union with framework_err
             // ordinal  ---------------------------------|
             0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //
             // inline value -----|  nhandles |  flags ---|
@@ -229,7 +229,7 @@ fn two_way_flexible_sync_send_unknown_response() {
 }
 
 #[test]
-fn two_way_flexible_sync_send_other_transport_error() {
+fn two_way_flexible_sync_send_other_framework_error() {
     let err = run_two_way_sync(
         |client| client.flexible_two_way(Time::after(2.seconds())),
         &[
@@ -239,7 +239,7 @@ fn two_way_flexible_sync_send_other_transport_error() {
         &[
             0x02, 0x00, 0x80, 0x01, //
             0x9d, 0x60, 0x95, 0x03, 0x7a, 0x51, 0x33, 0x1f, //
-            // Result union with transport_err
+            // Result union with framework_err
             // ordinal  ---------------------------------|
             0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //
             // inline value -----|  nhandles |  flags ---|
@@ -305,7 +305,7 @@ fn two_way_flexible_err_sync_send_unknown_response() {
         &[
             0x02, 0x00, 0x80, 0x01, //
             0x62, 0xbd, 0x20, 0xcb, 0xde, 0x05, 0x69, 0x70, //
-            // Result union with transport_err
+            // Result union with framework_err
             // ordinal  ---------------------------------|
             0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //
             // inline value -----|  nhandles |  flags ---|
@@ -323,7 +323,7 @@ fn two_way_flexible_err_sync_send_unknown_response() {
 }
 
 #[test]
-fn two_way_flexible_err_sync_send_other_transport_error() {
+fn two_way_flexible_err_sync_send_other_framework_error() {
     let err = run_two_way_sync(
         |client| client.flexible_two_way_err(Time::after(2.seconds())),
         &[
@@ -333,7 +333,7 @@ fn two_way_flexible_err_sync_send_other_transport_error() {
         &[
             0x02, 0x00, 0x80, 0x01, //
             0x62, 0xbd, 0x20, 0xcb, 0xde, 0x05, 0x69, 0x70, //
-            // Result union with transport_err
+            // Result union with framework_err
             // ordinal  ---------------------------------|
             0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //
             // inline value -----|  nhandles |  flags ---|
@@ -700,7 +700,7 @@ async fn two_way_flexible_async_send_unknown_response() {
         &[
             0x02, 0x00, 0x80, 0x01, //
             0x9d, 0x60, 0x95, 0x03, 0x7a, 0x51, 0x33, 0x1f, //
-            // Result union with transport_err
+            // Result union with framework_err
             // ordinal  ---------------------------------|
             0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //
             // inline value -----|  nhandles |  flags ---|
@@ -719,7 +719,7 @@ async fn two_way_flexible_async_send_unknown_response() {
 }
 
 #[fasync::run_singlethreaded(test)]
-async fn two_way_flexible_async_send_other_transport_error() {
+async fn two_way_flexible_async_send_other_framework_error() {
     let err = run_two_way_async(
         |client| client.flexible_two_way(),
         &[
@@ -729,7 +729,7 @@ async fn two_way_flexible_async_send_other_transport_error() {
         &[
             0x02, 0x00, 0x80, 0x01, //
             0x9d, 0x60, 0x95, 0x03, 0x7a, 0x51, 0x33, 0x1f, //
-            // Result union with transport_err
+            // Result union with framework_err
             // ordinal  ---------------------------------|
             0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //
             // inline value -----|  nhandles |  flags ---|
@@ -798,7 +798,7 @@ async fn two_way_flexible_err_async_send_unknown_response() {
         &[
             0x02, 0x00, 0x80, 0x01, //
             0x62, 0xbd, 0x20, 0xcb, 0xde, 0x05, 0x69, 0x70, //
-            // Result union with transport_err
+            // Result union with framework_err
             // ordinal  ---------------------------------|
             0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //
             // inline value -----|  nhandles |  flags ---|
@@ -817,7 +817,7 @@ async fn two_way_flexible_err_async_send_unknown_response() {
 }
 
 #[fasync::run_singlethreaded(test)]
-async fn two_way_flexible_err_async_send_other_transport_error() {
+async fn two_way_flexible_err_async_send_other_framework_error() {
     let err = run_two_way_async(
         |client| client.flexible_two_way_err(),
         &[
@@ -827,7 +827,7 @@ async fn two_way_flexible_err_async_send_other_transport_error() {
         &[
             0x02, 0x00, 0x80, 0x01, //
             0x62, 0xbd, 0x20, 0xcb, 0xde, 0x05, 0x69, 0x70, //
-            // Result union with transport_err
+            // Result union with framework_err
             // ordinal  ---------------------------------|
             0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //
             // inline value -----|  nhandles |  flags ---|
@@ -1494,7 +1494,7 @@ async fn receive_unknown_two_way_flexible() {
         &[
             0xab, 0xcd, 0x00, 0x00, 0x02, 0x00, 0x80, 0x01, //
             0x10, 0xff, 0x10, 0xff, 0x10, 0xff, 0x10, 0xff, //
-            // Result union with transport_err:
+            // Result union with framework_err:
             // ordinal  ---------------------------------|
             0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //
             // inline value -----|  nhandles |  flags ---|

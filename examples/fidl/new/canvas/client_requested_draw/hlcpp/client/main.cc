@@ -96,7 +96,7 @@ int main(int argc, const char** argv) {
       // Now, inform the server that we are ready to receive more updates whenever they are ready
       // for us.
       FX_LOGS(INFO) << "Ready request sent";
-      instance_proxy->Ready([&](fpromise::result<void, fidl::TransportErr> result) {
+      instance_proxy->Ready([&](fpromise::result<void, fidl::FrameworkErr> result) {
         if (result.is_error()) {
           // Check that our flexible two-way call was known to the server and handle the case of an
           // unknown method appropriately. In the case of this example, there is nothing we can do

@@ -85,7 +85,7 @@ func (*runnerImpl) IsTestEnabled(_ fidl.Context, test clientsuite.Test) (bool, e
 			return false
 		case clientsuite.TestTwoWayFlexibleSendMismatchedStrictnessUnknownMethodResponse:
 			return false
-		case clientsuite.TestTwoWayFlexibleSendOtherTransportErrResponse:
+		case clientsuite.TestTwoWayFlexibleSendOtherFrameworkErrResponse:
 			return false
 		case clientsuite.TestTwoWayFlexibleSendNonEmptyPayloadSuccessResponse:
 			return false
@@ -99,7 +99,7 @@ func (*runnerImpl) IsTestEnabled(_ fidl.Context, test clientsuite.Test) (bool, e
 			return false
 		case clientsuite.TestTwoWayFlexibleErrorSyntaxSendMismatchedStrictnessUnknownMethodResponse:
 			return false
-		case clientsuite.TestTwoWayFlexibleErrorSyntaxSendOtherTransportErrResponse:
+		case clientsuite.TestTwoWayFlexibleErrorSyntaxSendOtherFrameworkErrResponse:
 			return false
 		case clientsuite.TestTwoWayFlexibleErrorSyntaxSendNonEmptyPayloadSuccessResponse:
 			return false

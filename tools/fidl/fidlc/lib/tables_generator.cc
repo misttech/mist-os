@@ -50,8 +50,8 @@ std::string PrimitiveSubtypeToString(fidl::types::PrimitiveSubtype subtype) {
 std::string InternalSubtypeToString(fidl::types::InternalSubtype subtype) {
   using fidl::types::InternalSubtype;
   switch (subtype) {
-    case InternalSubtype::kTransportErr:
-      return "TransportErr";
+    case InternalSubtype::kFrameworkErr:
+      return "FrameworkErr";
   }
 }
 
@@ -86,7 +86,7 @@ std::string TableTypeName([[maybe_unused]] const Type& type) {
     return "FidlCodedPrimitive";
   if constexpr (std::is_same_v<T, fidl::coded::InternalType>) {
     switch (static_cast<const fidl::coded::InternalType*>(&type)->subtype) {
-      case types::InternalSubtype::kTransportErr:
+      case types::InternalSubtype::kFrameworkErr:
         return "FidlCodedEnum";
     }
   }

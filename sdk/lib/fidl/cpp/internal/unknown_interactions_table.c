@@ -5,7 +5,7 @@
 #include "lib/fidl/cpp/internal/unknown_interactions_table.h"
 
 static const FidlXUnionField kUnknownMethodResponseFields[] = {
-    {.type = NULL}, {.type = NULL}, {.type = (fidl_type_t*)(&fidl_internal_kTransportErrTable)}};
+    {.type = NULL}, {.type = NULL}, {.type = (fidl_type_t*)(&fidl_internal_kFrameworkErrTable)}};
 
 const FidlCodedXUnion kFidlInternalUnknownMethodResponseTable = {
     .tag = kFidlTypeXUnion,

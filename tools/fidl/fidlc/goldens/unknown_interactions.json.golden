@@ -10875,10 +10875,10 @@
         {
           "ordinal": 3,
           "reserved": false,
-          "name": "transport_err",
+          "name": "framework_err",
           "type": {
             "kind": "internal",
-            "subtype": "transport_error",
+            "subtype": "framework_error",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -10976,10 +10976,10 @@
         {
           "ordinal": 3,
           "reserved": false,
-          "name": "transport_err",
+          "name": "framework_err",
           "type": {
             "kind": "internal",
-            "subtype": "transport_error",
+            "subtype": "framework_error",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -11063,10 +11063,10 @@
         {
           "ordinal": 3,
           "reserved": false,
-          "name": "transport_err",
+          "name": "framework_err",
           "type": {
             "kind": "internal",
-            "subtype": "transport_error",
+            "subtype": "framework_error",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -11164,10 +11164,10 @@
         {
           "ordinal": 3,
           "reserved": false,
-          "name": "transport_err",
+          "name": "framework_err",
           "type": {
             "kind": "internal",
-            "subtype": "transport_error",
+            "subtype": "framework_error",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -11251,10 +11251,10 @@
         {
           "ordinal": 3,
           "reserved": false,
-          "name": "transport_err",
+          "name": "framework_err",
           "type": {
             "kind": "internal",
-            "subtype": "transport_error",
+            "subtype": "framework_error",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -11405,10 +11405,10 @@
         {
           "ordinal": 3,
           "reserved": false,
-          "name": "transport_err",
+          "name": "framework_err",
           "type": {
             "kind": "internal",
-            "subtype": "transport_error",
+            "subtype": "framework_error",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -11545,10 +11545,10 @@
         {
           "ordinal": 3,
           "reserved": false,
-          "name": "transport_err",
+          "name": "framework_err",
           "type": {
             "kind": "internal",
-            "subtype": "transport_error",
+            "subtype": "framework_error",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -11632,10 +11632,10 @@
         {
           "ordinal": 3,
           "reserved": false,
-          "name": "transport_err",
+          "name": "framework_err",
           "type": {
             "kind": "internal",
-            "subtype": "transport_error",
+            "subtype": "framework_error",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -12611,10 +12611,10 @@
         {
           "ordinal": 3,
           "reserved": false,
-          "name": "transport_err",
+          "name": "framework_err",
           "type": {
             "kind": "internal",
-            "subtype": "transport_error",
+            "subtype": "framework_error",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -12712,10 +12712,10 @@
         {
           "ordinal": 3,
           "reserved": false,
-          "name": "transport_err",
+          "name": "framework_err",
           "type": {
             "kind": "internal",
-            "subtype": "transport_error",
+            "subtype": "framework_error",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -12799,10 +12799,10 @@
         {
           "ordinal": 3,
           "reserved": false,
-          "name": "transport_err",
+          "name": "framework_err",
           "type": {
             "kind": "internal",
-            "subtype": "transport_error",
+            "subtype": "framework_error",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -12900,10 +12900,10 @@
         {
           "ordinal": 3,
           "reserved": false,
-          "name": "transport_err",
+          "name": "framework_err",
           "type": {
             "kind": "internal",
-            "subtype": "transport_error",
+            "subtype": "framework_error",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -12987,10 +12987,10 @@
         {
           "ordinal": 3,
           "reserved": false,
-          "name": "transport_err",
+          "name": "framework_err",
           "type": {
             "kind": "internal",
-            "subtype": "transport_error",
+            "subtype": "framework_error",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -13141,10 +13141,10 @@
         {
           "ordinal": 3,
           "reserved": false,
-          "name": "transport_err",
+          "name": "framework_err",
           "type": {
             "kind": "internal",
-            "subtype": "transport_error",
+            "subtype": "framework_error",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -13281,10 +13281,10 @@
         {
           "ordinal": 3,
           "reserved": false,
-          "name": "transport_err",
+          "name": "framework_err",
           "type": {
             "kind": "internal",
-            "subtype": "transport_error",
+            "subtype": "framework_error",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -13368,10 +13368,10 @@
         {
           "ordinal": 3,
           "reserved": false,
-          "name": "transport_err",
+          "name": "framework_err",
           "type": {
             "kind": "internal",
-            "subtype": "transport_error",
+            "subtype": "framework_error",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,

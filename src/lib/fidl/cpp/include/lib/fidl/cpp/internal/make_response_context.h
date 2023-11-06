@@ -27,10 +27,10 @@ auto ConvertResponseDomainObjectToResult(
     }
   }
   if constexpr (kHasFrameworkError) {
-    if (domain_object.transport_err().has_value()) {
-      ::fidl::internal::TransportErr transport_err = domain_object.transport_err().value();
-      switch (transport_err) {
-        case ::fidl::internal::TransportErr::kUnknownMethod: {
+    if (domain_object.framework_err().has_value()) {
+      ::fidl::internal::FrameworkErr framework_err = domain_object.framework_err().value();
+      switch (framework_err) {
+        case ::fidl::internal::FrameworkErr::kUnknownMethod: {
           return ResultType{::fit::error(::fidl::Error::UnknownMethod())};
         }
       }

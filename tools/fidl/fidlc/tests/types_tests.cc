@@ -711,11 +711,11 @@ TEST(InternalTypes, CannotReferToUnqualifiedInternalType) {
 library example;
 
 type Foo = struct {
-    foo TransportErr;
+    foo FrameworkErr;
 };
 )FIDL");
 
-  library.ExpectFail(fidl::ErrNameNotFound, "TransportErr", "example");
+  library.ExpectFail(fidl::ErrNameNotFound, "FrameworkErr", "example");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -724,11 +724,11 @@ TEST(InternalTypes, CannotReferToQualifiedInternalType) {
 library example;
 
 type Foo = struct {
-    foo fidl.TransportErr;
+    foo fidl.FrameworkErr;
 };
 )FIDL");
 
-  library.ExpectFail(fidl::ErrNameNotFound, "TransportErr", "fidl");
+  library.ExpectFail(fidl::ErrNameNotFound, "FrameworkErr", "fidl");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

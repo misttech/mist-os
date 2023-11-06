@@ -84,8 +84,8 @@ class ConsumeStep : public Compiler::Step {
   // The generated type includes both the outer wrapping struct and the result union.
   bool CreateMethodResult(const std::shared_ptr<NamingContext>& success_variant_context,
                           const std::shared_ptr<NamingContext>& err_variant_context,
-                          const std::shared_ptr<NamingContext>& transport_err_variant_context,
-                          bool has_err, bool has_transport_err, SourceSpan response_span,
+                          const std::shared_ptr<NamingContext>& framework_err_variant_context,
+                          bool has_err, bool has_framework_err, SourceSpan response_span,
                           raw::ProtocolMethod* method,
                           std::unique_ptr<TypeConstructor> success_variant,
                           std::unique_ptr<TypeConstructor>* out_payload);
@@ -95,8 +95,8 @@ class ConsumeStep : public Compiler::Step {
   // Decl for default underlying type to use for bits and enums.
   Decl* default_underlying_type_;
 
-  // Decl for the type to use for transport_err.
-  Decl* transport_err_type_;
+  // Decl for the type to use for framework_err.
+  Decl* framework_err_type_;
 };
 
 }  // namespace fidl::flat

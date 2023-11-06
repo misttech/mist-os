@@ -15,7 +15,7 @@ from fuchsia_controller_py import ZxStatus
 from fidl import DomainError
 from fidl import StopServer
 from fidl import StopEventHandler
-from fidl import TransportError
+from fidl import FrameworkError
 
 
 class TestEchoer(ffx.Echo.Server):
@@ -69,7 +69,7 @@ class FlexibleMethodTesterServer(fc_test.FlexibleMethodTester.Server):
         # This should be handled internally, but right now there's not really
         # a good way to force this interaction without making multiple FIDL
         # versions run in this program simultaneously somehow.
-        return TransportError.UNKNOWN_METHOD
+        return FrameworkError.UNKNOWN_METHOD
 
 
 class TestEventHandler(fc_othertest.CrossLibraryNoop.EventHandler):
@@ -216,7 +216,7 @@ class ServerTests(unittest.IsolatedAsyncioTestCase):
         t_server = FlexibleMethodTesterServer(server)
         server_task = asyncio.get_running_loop().create_task(t_server.serve())
         res = await t_client.some_method()
-        self.assertEqual(res.transport_err, TransportError.UNKNOWN_METHOD)
+        self.assertEqual(res.framework_err, FrameworkError.UNKNOWN_METHOD)
         server_task.cancel()
 
     async def test_sending_and_receiving_event(self):

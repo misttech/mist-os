@@ -213,7 +213,7 @@ struct Builtin : public Decl {
     // Layouts (aliases)
     kByte,
     // Layouts (internal)
-    kTransportErr,
+    kFrameworkErr,
     // Constraints
     kOptional,
     kMax,

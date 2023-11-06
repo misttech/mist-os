@@ -13,11 +13,11 @@ namespace fidl::internal {
 
 UnknownMethodReply UnknownMethodReply::MakeReplyFor(uint64_t method_ordinal,
                                                     ::fidl::MessageDynamicFlags dynamic_flags) {
-  const fidl_union_tag_t kTransportErrTag = 3;
+  const fidl_union_tag_t kFrameworkErrTag = 3;
   const zx_status_t kUnknownMethodStatus = ZX_ERR_NOT_SUPPORTED;
   UnknownMethodReply reply{
       .body{
-          .tag = kTransportErrTag,
+          .tag = kFrameworkErrTag,
           .envelope =
               {
                   .num_handles = 0,

@@ -558,7 +558,7 @@ var primitiveTypes = map[fidlgen.PrimitiveSubtype]string{
 var internalTypes = map[fidlgen.InternalSubtype]string{
 	// No actual internal type is defined because we don't support unknown
 	// interactions in Go currently.
-	fidlgen.TransportErr: "int32",
+	fidlgen.FrameworkErr: "int32",
 }
 
 var handleTypes = map[fidlgen.HandleSubtype]string{

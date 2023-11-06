@@ -6,7 +6,7 @@ import importlib.abc
 import sys
 
 from ._async_socket import AsyncSocket
-from ._fidl_common import TransportError
+from ._fidl_common import FrameworkError
 from ._ipc import GlobalHandleWaker
 from ._ipc import HandleWaker
 from ._library import load_module
@@ -17,7 +17,12 @@ class FIDLImportFinder(importlib.abc.MetaPathFinder):
 
     def find_module(self, fullname: str, path=None):
         """Override from abc.MetaPathFinder."""
-        if fullname.startswith("fidl._") or fullname == "fidl.TransportError":
+        # TODO(fxbug.dev/109789): Remove "TransportError".
+        if (
+            fullname.startswith("fidl._")
+            or fullname == "fidl.FrameworkError"
+            or fullname == "fidl.TransportError"
+        ):
             return __loader__
         elif fullname.startswith("fidl."):
             return self

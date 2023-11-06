@@ -212,7 +212,7 @@ In asynchronous two-way calls, the user passes a continuation in the form of a
 callback. There are some choices for surfacing errors:
 
 - **Response callbacks** are only invoked when the client receives a response
-from the server. They are suitable when there is no need to propagate transport
+from the server. They are suitable when there is no need to propagate framework
 error information on a per-call basis. The async client callbacks in HLCPP are
 response callbacks.
 
@@ -225,7 +225,7 @@ the original call in case of errors.
 **Result callbacks** are the only option in the unified bindings, since they
 convey strictly more information than response callbacks, and meshes better with
 newer FIDL features such as unknown interactions. The user is free to return
-early if they are not interested in transport errors.
+early if they are not interested in framework errors.
 
 #### Natural API
 
@@ -258,7 +258,7 @@ The precise definition that it expands to depends on the shape of the method:
     `fit::result<fidl::Error>`.
   - When the method response has a body: `fidl::Result<FooMethod>` inherits
     `fit::result<fidl::Error, FooMethodPayload>`, where `fidl::Error` is a type
-    representing any transport error or protocol level terminal errors such as
+    representing any framework error or protocol level terminal errors such as
     epitaphs.
 * When the method uses the error syntax:
   - When the method response payload is an empty struct:
@@ -268,15 +268,15 @@ The precise definition that it expands to depends on the shape of the method:
     `fidl::Result<FooMethod>` inherits
   `fit::result<fidl::ErrorsIn<FooMethod>, FooMethodPayload>`.
 
-`ErrorsIn` is used to implement [error folding][error-folding] of transport
-and application errors, such that one may query `is_ok()` once on the result
+`ErrorsIn` is used to implement [error folding][error-folding] of framework
+and domain errors, such that one may query `is_ok()` once on the result
 object to determine whether the call succeeded at all layers of abstractions:
 
 ```c++
 // |ErrorsIn<Method>| represents the set of all possible errors during
 // |Method|:
-// - Transport errors
-// - Application errors in the |Method| error syntax
+// - Framework errors
+// - Domain errors in the |Method| error syntax
 class fidl::ErrorsIn<fuchsia_example::Speak::TryGreet> {
  public:
   bool is_framework_error();
@@ -339,12 +339,12 @@ client->TryGreet({std::string("hi")}).Then(
       //         fidl::ErrorsIn<fuchsia_example::Speak::TryGreet>,
       //         fuchsia_example::SpeakTryGreetPayload>;
 
-      // Check both transport and application error.
+      // Check both framework and domain error.
       if (!result.is_ok()) {
         FX_LOGS(ERROR) << "TryGreet failed: " << result.error_value();
         // Digging deeper, if desired.
         if (result.error_value().is_domain_error()) {
-          FX_LOGS(ERROR) << "TryGreet failed with application error: "
+          FX_LOGS(ERROR) << "TryGreet failed with domain error: "
                          << result.error_value().domain_error();
         }
         return;
@@ -359,7 +359,7 @@ client->TryEmptyAck().Then(
       // fidl::Result<fuchsia_example::Speak::TryGreet> =
       //     fit::result<fidl::ErrorsIn<fuchsia_example::Speak::TryEmptyAck>>;
 
-      // Check both transport and application error.
+      // Check both framework and domain error.
       if (!result.is_ok()) {
         FX_LOGS(ERROR) << "TryEmptyAck failed: " << result.error_value();
         return;
@@ -499,11 +499,11 @@ class fidl::Event<Method> { ... };
   - When the event has no body, `fidl::Event<FooMethod>` is empty.
 * When the event uses the error syntax:
   - When the success payload is not an empty struct, `fidl::Event<FooMethod>`
-    inherits `fit::result<ApplicationError, FooMethodPayload>`, where
-    `ApplicationError` is the corresponding application error type for that
+    inherits `fit::result<DomainError, FooMethodPayload>`, where
+    `DomainError` is the corresponding domain error type for that
     event.
   - When the success payload is an empty struct, `fidl::Event<FooMethod>`
-    inherits `fit::result<ApplicationError>`.
+    inherits `fit::result<DomainError>`.
 
 Note: an alternative to the second bullet is to simply omit the corresponding
 `fidl::Event<FooMethod>` in case of events with absent bodies. Here we choose to
@@ -602,31 +602,31 @@ used in method responses with a third variant:
 type result = union {
     1: response struct { pong Pong; };
     2: err uint32;
-    3: transport_err zx.Status;  // used to communication unknown method errors.
+    3: framework_err zx.Status;  // used to communication unknown method errors.
 };
 ```
 
 When exposing this feature in the unified bindings, we should aim for the
 following to make it safe and ergonomic:
 
-* Server authors should not be able to manually respond with the `transport_err`
+* Server authors should not be able to manually respond with the `framework_err`
   variant from inside a method handler. By definition, the method is known to
   the server if the code reaches a particular method handler.
 * Client users should still be able to use `fit::result` types, which has two
   variants, even when the result union on the wire has three variants.
 
 To achieve these, our idea is to decouple the physical shape of the result union
-from the user API. On the server side, the `transport_err` is completely hidden
+from the user API. On the server side, the `framework_err` is completely hidden
 from the user - the binding runtime knows when to response with that error. On
-the client side, the `transport_err` combined into other kinds of transport
+the client side, the `framework_err` combined into other kinds of framework
 errors.
 
 This means for example the server completer of a flexible two-way method using
-error syntax will take `fit::result<ApplicationError, FooPayload>`, and that of
+error syntax will take `fit::result<DomainError, FooPayload>`, and that of
 a flexible two-way method not using the error syntax will simply take
 `FooPayload`.
 
-On the client side, users can ask the transport error object if the method was
+On the client side, users can ask the framework error object if the method was
 unknown:
 
 ```c++

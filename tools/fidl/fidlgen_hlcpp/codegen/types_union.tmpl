@@ -172,16 +172,16 @@ class {{ .Name }} final {
     if (is_err()) {
       return fpromise::error({{ .Result.CombinedErrorDecl }}(std::in_place_index<0>, err()));
     }
-    if (is_transport_err()) {
-      return fpromise::error({{ .Result.CombinedErrorDecl }}(std::in_place_index<1>, transport_err()));
+    if (is_framework_err()) {
+      return fpromise::error({{ .Result.CombinedErrorDecl }}(std::in_place_index<1>, framework_err()));
     }
     {{- else if .Result.HasError }}
     if (is_err()) {
       return fpromise::error(err());
     }
     {{- else }}
-    if (is_transport_err()) {
-      return fpromise::error(transport_err());
+    if (is_framework_err()) {
+      return fpromise::error(framework_err());
     }
     {{- end }}
     {{- if eq 0 .Result.ValueArity }}

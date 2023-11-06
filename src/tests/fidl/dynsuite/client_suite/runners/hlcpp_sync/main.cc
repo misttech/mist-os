@@ -334,8 +334,8 @@ class RunnerServer : public fidl::clientsuite::Runner {
     if (status == ZX_OK) {
       if (result.is_response()) {
         callback(fidl::clientsuite::EmptyResultClassification::WithSuccess({}));
-      } else if (result.is_transport_err()) {
-        ZX_ASSERT(result.transport_err() == fidl::TransportErr::kUnknownMethod);
+      } else if (result.is_framework_err()) {
+        ZX_ASSERT(result.framework_err() == fidl::FrameworkErr::kUnknownMethod);
         callback(fidl::clientsuite::EmptyResultClassification::WithFidlError(
             fidl::clientsuite::FidlErrorKind::UNKNOWN_METHOD));
       } else {
@@ -356,8 +356,8 @@ class RunnerServer : public fidl::clientsuite::Runner {
       if (result.is_response()) {
         callback(fidl::clientsuite::NonEmptyResultClassification::WithSuccess(
             std::move(result.response())));
-      } else if (result.is_transport_err()) {
-        ZX_ASSERT(result.transport_err() == fidl::TransportErr::kUnknownMethod);
+      } else if (result.is_framework_err()) {
+        ZX_ASSERT(result.framework_err() == fidl::FrameworkErr::kUnknownMethod);
         callback(fidl::clientsuite::NonEmptyResultClassification::WithFidlError(
             fidl::clientsuite::FidlErrorKind::UNKNOWN_METHOD));
       } else {
@@ -380,8 +380,8 @@ class RunnerServer : public fidl::clientsuite::Runner {
       } else if (result.is_err()) {
         callback(fidl::clientsuite::EmptyResultWithErrorClassification::WithApplicationError(
             std::move(result.err())));
-      } else if (result.is_transport_err()) {
-        ZX_ASSERT(result.transport_err() == fidl::TransportErr::kUnknownMethod);
+      } else if (result.is_framework_err()) {
+        ZX_ASSERT(result.framework_err() == fidl::FrameworkErr::kUnknownMethod);
         callback(fidl::clientsuite::EmptyResultWithErrorClassification::WithFidlError(
             fidl::clientsuite::FidlErrorKind::UNKNOWN_METHOD));
       } else {
@@ -405,8 +405,8 @@ class RunnerServer : public fidl::clientsuite::Runner {
       } else if (result.is_err()) {
         callback(fidl::clientsuite::NonEmptyResultWithErrorClassification::WithApplicationError(
             std::move(result.err())));
-      } else if (result.is_transport_err()) {
-        ZX_ASSERT(result.transport_err() == fidl::TransportErr::kUnknownMethod);
+      } else if (result.is_framework_err()) {
+        ZX_ASSERT(result.framework_err() == fidl::FrameworkErr::kUnknownMethod);
         callback(fidl::clientsuite::NonEmptyResultWithErrorClassification::WithFidlError(
             fidl::clientsuite::FidlErrorKind::UNKNOWN_METHOD));
       } else {

@@ -26,7 +26,7 @@ static_assert(
 using ::test_error_methods::MyError;
 using ErrorsInMethod = fidl::ErrorsIn<test_error_methods::ErrorMethods::ManyArgsCustomError>;
 
-TEST(ErrorsInMethod, TransportError) {
+TEST(ErrorsInMethod, FrameworkError) {
   ErrorsInMethod error(fidl::Status::UnknownOrdinal());
   EXPECT_TRUE(error.is_framework_error());
   EXPECT_FALSE(error.is_domain_error());

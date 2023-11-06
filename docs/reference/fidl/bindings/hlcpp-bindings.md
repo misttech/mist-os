@@ -577,11 +577,11 @@ to represent the response that is interchangeable with an `fpromise::result`.
   * Interchangeable with `fpromise::result<GameState, MoveError>`
 * `GetState`:
   * Generates class `TicTacToe_GetState_Result`
-  * Interchangeable with `fpromise::result<GameState, fidl::TransportErr>`
+  * Interchangeable with `fpromise::result<GameState, fidl::FrameworkErr>`
 * `DryRunMove`:
   * Generates class `TicTacToe_DryRunMove_Result`
   * Interchangeable with
-    `fpromise::result<GameState, std::variant<MoveError, fidl::TransportErr>>`
+    `fpromise::result<GameState, std::variant<MoveError, fidl::FrameworkErr>>`
 
  Using this feature, example implementations of these methods on the server side
  could look like:
@@ -598,7 +598,7 @@ void MakeMove(uint8_t row, uint8_t col, MakeMoveCallback callback) override {
 void GetState(MakeMoveCallback callback) override {
   callback(fpromise::ok(game_state_.state()));
   // The server application code *must not* attempt to send a
-  // fidl::TransportErr. If it does, the server binding will panic.
+  // fidl::FrameworkErr. If it does, the server binding will panic.
   }
 
 void DryRynMove(uint8_t row, uint8_t col, MakeMoveCallback callback) override {
@@ -607,7 +607,7 @@ void DryRynMove(uint8_t row, uint8_t col, MakeMoveCallback callback) override {
     callback(fpromise::ok(game_state_.state()));
   }
   // The server application code *must not* attempt to send a
-  // fidl::TransportErr. If it does, the server binding will panic.
+  // fidl::FrameworkErr. If it does, the server binding will panic.
   callback(fpromise::error(error.value()));
 }
 ```
@@ -617,12 +617,12 @@ An example of using this on the client side, in the async case would be:
 ```c++
 async_game->MakeMove([&](fpromise::result<GameState, MoveError> response) { ... });
 async_game->GetState(
-    [&](fpromise::result<GameState, fidl::TransportErr> response) { ... });
+    [&](fpromise::result<GameState, fidl::FrameworkErr> response) { ... });
 async_game->DryRunMove(
-    [&](fpromise::result<GameState, std::variant<MoveError, fidl::TransportErr>> response) { ... });
+    [&](fpromise::result<GameState, std::variant<MoveError, fidl::FrameworkErr>> response) { ... });
 ```
 
-On the client side, `fidl::TransportErr` means that the flexible two-way
+On the client side, `fidl::FrameworkErr` means that the flexible two-way
 interaction was not known to the server.
 
 When generating code, the FIDL toolchain treats `TicTacToe_*_Result` as a
@@ -641,7 +641,7 @@ When generating code, the FIDL toolchain treats `TicTacToe_*_Result` as a
 * `err` is the error type, which is `MoveError` in the examples of both
   `MakeMove` and `DryRunMove`.
   * This variant only exists if the method uses error syntax.
-* `transport_err` always has the type `fidl::TransportErr`.
+* `framework_err` always has the type `fidl::FrameworkErr`.
   * This variant only exists if the method is `flexible`.
 
 The `TicTacToe_*_Result` types provide all the methods available to a [regular
@@ -702,8 +702,8 @@ an unknown flexible method that it can handle.
 There is no way for the client to tell if a `flexible` one way-method was known
 to the server or not. For `flexible` two-way methods, the [result
 union](#protocols-results) can be used to tell whether the method was known to
-the server. If the `transport_err` variant of the `TicTacToe_<Method>_Result`
-class is set or the converted `fpromise::result` has the `fidl::TransportErr`
+the server. If the `framework_err` variant of the `TicTacToe_<Method>_Result`
+class is set or the converted `fpromise::result` has the `fidl::FrameworkErr`
 error set, that means that the server did not recognize the method.
 
 The API for sending one-way methods and receiving events is the same for `strict`

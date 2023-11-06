@@ -20,8 +20,8 @@ ConsumeStep::ConsumeStep(Compiler* compiler, std::unique_ptr<raw::File> file)
       file_(std::move(file)),
       default_underlying_type_(
           all_libraries()->root_library()->declarations.LookupBuiltin(Builtin::Identity::kUint32)),
-      transport_err_type_(all_libraries()->root_library()->declarations.LookupBuiltin(
-          Builtin::Identity::kTransportErr)) {}
+      framework_err_type_(all_libraries()->root_library()->declarations.LookupBuiltin(
+          Builtin::Identity::kFrameworkErr)) {}
 
 void ConsumeStep::RunImpl() {
   // All fidl files in a library should agree on the library name.
@@ -274,15 +274,15 @@ static std::unique_ptr<TypeConstructor> IdentifierTypeForDecl(Decl* decl) {
 bool ConsumeStep::CreateMethodResult(
     const std::shared_ptr<NamingContext>& success_variant_context,
     const std::shared_ptr<NamingContext>& err_variant_context,
-    const std::shared_ptr<NamingContext>& transport_err_variant_context, bool has_err,
-    bool has_transport_err, SourceSpan response_span, raw::ProtocolMethod* method,
+    const std::shared_ptr<NamingContext>& framework_err_variant_context, bool has_err,
+    bool has_framework_err, SourceSpan response_span, raw::ProtocolMethod* method,
     std::unique_ptr<TypeConstructor> success_variant,
     std::unique_ptr<TypeConstructor>* out_payload) {
   ZX_ASSERT_MSG(
-      has_err || has_transport_err,
+      has_err || has_framework_err,
       "method should only use a result union if it has a result union and/or is flexible");
   ZX_ASSERT(err_variant_context != nullptr);
-  ZX_ASSERT(transport_err_variant_context != nullptr);
+  ZX_ASSERT(framework_err_variant_context != nullptr);
 
   auto ordinal_source = raw::TokenChain(fidl::Token(), fidl::Token());
   std::vector<Union::Member> result_members;
@@ -290,7 +290,7 @@ bool ConsumeStep::CreateMethodResult(
   enum {
     kSuccessOrdinal = 1,
     kErrorOrdinal = 2,
-    kTransportErrorOrdinal = 3,
+    kFrameworkErrorOrdinal = 3,
   };
 
   result_members.emplace_back(
@@ -320,16 +320,16 @@ bool ConsumeStep::CreateMethodResult(
         err_variant_context->name(), std::make_unique<AttributeList>()));
   }
 
-  if (has_transport_err) {
-    std::unique_ptr<TypeConstructor> error_type_ctor = IdentifierTypeForDecl(transport_err_type_);
-    ZX_ASSERT_MSG(error_type_ctor != nullptr, "missing transport_err type ctor");
+  if (has_framework_err) {
+    std::unique_ptr<TypeConstructor> error_type_ctor = IdentifierTypeForDecl(framework_err_type_);
+    ZX_ASSERT_MSG(error_type_ctor != nullptr, "missing framework_err type ctor");
     result_members.emplace_back(
         method->source_signature(),
-        ConsumeOrdinal(std::make_unique<raw::Ordinal64>(ordinal_source, kTransportErrorOrdinal)),
-        std::move(error_type_ctor), transport_err_variant_context->name(),
+        ConsumeOrdinal(std::make_unique<raw::Ordinal64>(ordinal_source, kFrameworkErrorOrdinal)),
+        std::move(error_type_ctor), framework_err_variant_context->name(),
         std::make_unique<AttributeList>());
   }
-  // transport_err is not defined if the method is not flexible.
+  // framework_err is not defined if the method is not flexible.
 
   auto result_context = err_variant_context->parent();
   auto result_name = Name::CreateAnonymous(library(), response_span, result_context,
@@ -385,18 +385,18 @@ void ConsumeStep::ConsumeProtocolDeclaration(
     bool has_error = false;
     if (has_response) {
       has_error = method->maybe_error_ctor != nullptr;
-      // has_transport_error is true for flexible two-way methods. We already
+      // has_framework_error is true for flexible two-way methods. We already
       // checked has_response in the outer if block, so to see whether this is a
       // two-way method or an event, we check has_request here.
-      bool has_transport_error = has_request && strictness == types::Strictness::kFlexible;
+      bool has_framework_error = has_request && strictness == types::Strictness::kFlexible;
 
       const auto response_context = has_request ? protocol_context->EnterResponse(method_name)
                                                 : protocol_context->EnterEvent(method_name);
 
-      if (has_error || has_transport_error) {
+      if (has_error || has_framework_error) {
         SourceSpan response_span = method->maybe_response->span();
         std::shared_ptr<NamingContext> success_variant_context, err_variant_context,
-            transport_err_variant_context;
+            framework_err_variant_context;
 
         // In protocol P, if method M is flexible or uses the error syntax, its
         // response is the following compiler-generated union:
@@ -407,7 +407,7 @@ void ConsumeStep::ConsumeProtocolDeclaration(
         //       // The "error variant". Marked `reserved` if there is no error.
         //       2: err @generated_name("P_M_Error") [user specified error type];
         //       // Omitted for strict methods.
-        //       3: transport_err fidl.TransportErr;
+        //       3: framework_err fidl.FrameworkErr;
         //     };
         //
         // This naming scheme is inconsistent with other compiler-generated
@@ -427,8 +427,8 @@ void ConsumeStep::ConsumeProtocolDeclaration(
             response_context->EnterMember(generated_source_file()->AddLine("err"));
         err_variant_context->set_name_override(
             utils::StringJoin({protocol_name.decl_name(), method_name.data(), "Error"}, "_"));
-        transport_err_variant_context =
-            response_context->EnterMember(generated_source_file()->AddLine("transport_err"));
+        framework_err_variant_context =
+            response_context->EnterMember(generated_source_file()->AddLine("framework_err"));
 
         std::unique_ptr<TypeConstructor> result_payload;
 
@@ -438,10 +438,10 @@ void ConsumeStep::ConsumeProtocolDeclaration(
           return;
         }
 
-        ZX_ASSERT_MSG(err_variant_context != nullptr && transport_err_variant_context != nullptr,
+        ZX_ASSERT_MSG(err_variant_context != nullptr && framework_err_variant_context != nullptr,
                       "error type contexts should have been computed");
         if (!CreateMethodResult(success_variant_context, err_variant_context,
-                                transport_err_variant_context, has_error, has_transport_error,
+                                framework_err_variant_context, has_error, has_framework_error,
                                 response_span, method.get(), std::move(result_payload),
                                 &maybe_response))
           return;

@@ -110,7 +110,7 @@ const struct FidlCodedStruct test_protocollayouts_OpenProtocolFlexibleTwoWayNoEr
 static const struct FidlUnionField Fields69test_protocollayouts_OpenProtocolFlexibleTwoWayNoErrorResponseMessage[] = {
     /*FidlUnionField*/{.type=(fidl_type_t*)(&test_protocollayouts_imported_ComposedOpenProtocol_FlexibleTwoWayNoError_ResponseTable)},
     /*FidlUnionField*/{.type=NULL},
-    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kTransportErrTable)}
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kFrameworkErrTable)}
 };
 const struct FidlCodedUnion test_protocollayouts_OpenProtocolFlexibleTwoWayNoErrorResponseMessageTable = {.tag=kFidlTypeUnion, .field_count=3u, .fields=Fields69test_protocollayouts_OpenProtocolFlexibleTwoWayNoErrorResponseMessage, .nullable=kFidlNullability_Nonnullable, .name="test.protocollayouts/OpenProtocolFlexibleTwoWayNoErrorResponseMessage", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
 const struct FidlCodedStruct test_protocollayouts_OpenProtocolFlexibleTwoWayWithErrorRequestMessageTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=4u, .name="test.protocollayouts/OpenProtocolFlexibleTwoWayWithErrorRequestMessage"};
@@ -118,7 +118,7 @@ const struct FidlCodedStruct test_protocollayouts_OpenProtocolFlexibleTwoWayWith
 static const struct FidlUnionField Fields71test_protocollayouts_OpenProtocolFlexibleTwoWayWithErrorResponseMessage[] = {
     /*FidlUnionField*/{.type=(fidl_type_t*)(&test_protocollayouts_imported_ComposedOpenProtocol_FlexibleTwoWayWithError_ResponseTable)},
     /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kInt32Table)},
-    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kTransportErrTable)}
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kFrameworkErrTable)}
 };
 const struct FidlCodedUnion test_protocollayouts_OpenProtocolFlexibleTwoWayWithErrorResponseMessageTable = {.tag=kFidlTypeUnion, .field_count=3u, .fields=Fields71test_protocollayouts_OpenProtocolFlexibleTwoWayWithErrorResponseMessage, .nullable=kFidlNullability_Nonnullable, .name="test.protocollayouts/OpenProtocolFlexibleTwoWayWithErrorResponseMessage", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
 const struct FidlCodedStruct test_protocollayouts_OpenProtocolFlexibleEventEventMessageTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=4u, .name="test.protocollayouts/OpenProtocolFlexibleEventEventMessage"};

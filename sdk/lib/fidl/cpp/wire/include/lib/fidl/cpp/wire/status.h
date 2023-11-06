@@ -177,7 +177,7 @@ extern const char* const kErrorSyncEventBufferTooSmall;
 extern const char* const kErrorSyncEventUnhandledTransitionalEvent;
 extern const char* const kCallerAllocatedBufferTooSmall;
 extern const char* const kUnknownMethod;
-extern const char* const kUnsupportedTransportError;
+extern const char* const kUnsupportedFrameworkError;
 
 // Given a fatal error, |IsFatalErrorUniversal| detects if it universally
 // applies to all operations on the connection. For example, if the async

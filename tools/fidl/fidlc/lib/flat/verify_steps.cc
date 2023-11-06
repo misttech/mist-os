@@ -89,7 +89,7 @@ types::Resourceness VerifyResourcenessStep::EffectiveResourceness(const Type* ty
       return types::Resourceness::kValue;
     case Type::Kind::kInternal: {
       switch (static_cast<const InternalType*>(type)->subtype) {
-        case fidl::types::InternalSubtype::kTransportErr:
+        case fidl::types::InternalSubtype::kFrameworkErr:
           return types::Resourceness::kValue;
       }
     }
@@ -243,7 +243,7 @@ void VerifyHandleTransportCompatibilityStep::CheckHandleTransportUsages(
       return;
     case Type::Kind::kInternal: {
       switch (static_cast<const InternalType*>(type)->subtype) {
-        case fidl::types::InternalSubtype::kTransportErr:
+        case fidl::types::InternalSubtype::kFrameworkErr:
           return;
       }
     }

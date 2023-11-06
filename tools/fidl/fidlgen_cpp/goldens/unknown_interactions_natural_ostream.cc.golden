@@ -683,8 +683,8 @@
           case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayResult::Tag::kResponse:
             os << "response(" << fidl::ostream::Formatted<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayResponse>(value.response().value()) << ")";
             break;
-          case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayResult::Tag::kTransportErr:
-            os << "transport_err(" << fidl::ostream::Formatted<::fidl::internal::TransportErr>(value.transport_err().value()) << ")";
+          case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayResult::Tag::kFrameworkErr:
+            os << "framework_err(" << fidl::ostream::Formatted<::fidl::internal::FrameworkErr>(value.framework_err().value()) << ")";
             break;
         default:
           os << "Unknown";
@@ -697,8 +697,8 @@
           case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsResult::Tag::kResponse:
             os << "response(" << fidl::ostream::Formatted<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse>(value.response().value()) << ")";
             break;
-          case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsResult::Tag::kTransportErr:
-            os << "transport_err(" << fidl::ostream::Formatted<::fidl::internal::TransportErr>(value.transport_err().value()) << ")";
+          case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsResult::Tag::kFrameworkErr:
+            os << "framework_err(" << fidl::ostream::Formatted<::fidl::internal::FrameworkErr>(value.framework_err().value()) << ")";
             break;
         default:
           os << "Unknown";
@@ -722,8 +722,8 @@
           case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionResult::Tag::kResponse:
             os << "response(" << fidl::ostream::Formatted<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionResponse>(value.response().value()) << ")";
             break;
-          case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionResult::Tag::kTransportErr:
-            os << "transport_err(" << fidl::ostream::Formatted<::fidl::internal::TransportErr>(value.transport_err().value()) << ")";
+          case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionResult::Tag::kFrameworkErr:
+            os << "framework_err(" << fidl::ostream::Formatted<::fidl::internal::FrameworkErr>(value.framework_err().value()) << ")";
             break;
         default:
           os << "Unknown";
@@ -736,8 +736,8 @@
           case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableResult::Tag::kResponse:
             os << "response(" << fidl::ostream::Formatted<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableResponse>(value.response().value()) << ")";
             break;
-          case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableResult::Tag::kTransportErr:
-            os << "transport_err(" << fidl::ostream::Formatted<::fidl::internal::TransportErr>(value.transport_err().value()) << ")";
+          case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableResult::Tag::kFrameworkErr:
+            os << "framework_err(" << fidl::ostream::Formatted<::fidl::internal::FrameworkErr>(value.framework_err().value()) << ")";
             break;
         default:
           os << "Unknown";
@@ -753,8 +753,8 @@
           case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayErrResult::Tag::kErr:
             os << "err(" << fidl::ostream::Formatted<int32_t>(value.err().value()) << ")";
             break;
-          case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayErrResult::Tag::kTransportErr:
-            os << "transport_err(" << fidl::ostream::Formatted<::fidl::internal::TransportErr>(value.transport_err().value()) << ")";
+          case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayErrResult::Tag::kFrameworkErr:
+            os << "framework_err(" << fidl::ostream::Formatted<::fidl::internal::FrameworkErr>(value.framework_err().value()) << ")";
             break;
         default:
           os << "Unknown";
@@ -770,8 +770,8 @@
           case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult::Tag::kErr:
             os << "err(" << fidl::ostream::Formatted<int32_t>(value.err().value()) << ")";
             break;
-          case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult::Tag::kTransportErr:
-            os << "transport_err(" << fidl::ostream::Formatted<::fidl::internal::TransportErr>(value.transport_err().value()) << ")";
+          case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult::Tag::kFrameworkErr:
+            os << "framework_err(" << fidl::ostream::Formatted<::fidl::internal::FrameworkErr>(value.framework_err().value()) << ")";
             break;
         default:
           os << "Unknown";
@@ -798,8 +798,8 @@
           case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult::Tag::kErr:
             os << "err(" << fidl::ostream::Formatted<int32_t>(value.err().value()) << ")";
             break;
-          case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult::Tag::kTransportErr:
-            os << "transport_err(" << fidl::ostream::Formatted<::fidl::internal::TransportErr>(value.transport_err().value()) << ")";
+          case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult::Tag::kFrameworkErr:
+            os << "framework_err(" << fidl::ostream::Formatted<::fidl::internal::FrameworkErr>(value.framework_err().value()) << ")";
             break;
         default:
           os << "Unknown";
@@ -815,8 +815,8 @@
           case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableErrResult::Tag::kErr:
             os << "err(" << fidl::ostream::Formatted<int32_t>(value.err().value()) << ")";
             break;
-          case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableErrResult::Tag::kTransportErr:
-            os << "transport_err(" << fidl::ostream::Formatted<::fidl::internal::TransportErr>(value.transport_err().value()) << ")";
+          case ::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableErrResult::Tag::kFrameworkErr:
+            os << "framework_err(" << fidl::ostream::Formatted<::fidl::internal::FrameworkErr>(value.framework_err().value()) << ")";
             break;
         default:
           os << "Unknown";
@@ -1453,8 +1453,8 @@
           case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayResult::Tag::kResponse:
             os << "response(" << fidl::ostream::Formatted<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayResponse>(value.response().value()) << ")";
             break;
-          case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayResult::Tag::kTransportErr:
-            os << "transport_err(" << fidl::ostream::Formatted<::fidl::internal::TransportErr>(value.transport_err().value()) << ")";
+          case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayResult::Tag::kFrameworkErr:
+            os << "framework_err(" << fidl::ostream::Formatted<::fidl::internal::FrameworkErr>(value.framework_err().value()) << ")";
             break;
         default:
           os << "Unknown";
@@ -1467,8 +1467,8 @@
           case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult::Tag::kResponse:
             os << "response(" << fidl::ostream::Formatted<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse>(value.response().value()) << ")";
             break;
-          case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult::Tag::kTransportErr:
-            os << "transport_err(" << fidl::ostream::Formatted<::fidl::internal::TransportErr>(value.transport_err().value()) << ")";
+          case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult::Tag::kFrameworkErr:
+            os << "framework_err(" << fidl::ostream::Formatted<::fidl::internal::FrameworkErr>(value.framework_err().value()) << ")";
             break;
         default:
           os << "Unknown";
@@ -1492,8 +1492,8 @@
           case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult::Tag::kResponse:
             os << "response(" << fidl::ostream::Formatted<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse>(value.response().value()) << ")";
             break;
-          case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult::Tag::kTransportErr:
-            os << "transport_err(" << fidl::ostream::Formatted<::fidl::internal::TransportErr>(value.transport_err().value()) << ")";
+          case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult::Tag::kFrameworkErr:
+            os << "framework_err(" << fidl::ostream::Formatted<::fidl::internal::FrameworkErr>(value.framework_err().value()) << ")";
             break;
         default:
           os << "Unknown";
@@ -1506,8 +1506,8 @@
           case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult::Tag::kResponse:
             os << "response(" << fidl::ostream::Formatted<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse>(value.response().value()) << ")";
             break;
-          case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult::Tag::kTransportErr:
-            os << "transport_err(" << fidl::ostream::Formatted<::fidl::internal::TransportErr>(value.transport_err().value()) << ")";
+          case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult::Tag::kFrameworkErr:
+            os << "framework_err(" << fidl::ostream::Formatted<::fidl::internal::FrameworkErr>(value.framework_err().value()) << ")";
             break;
         default:
           os << "Unknown";
@@ -1523,8 +1523,8 @@
           case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult::Tag::kErr:
             os << "err(" << fidl::ostream::Formatted<int32_t>(value.err().value()) << ")";
             break;
-          case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult::Tag::kTransportErr:
-            os << "transport_err(" << fidl::ostream::Formatted<::fidl::internal::TransportErr>(value.transport_err().value()) << ")";
+          case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult::Tag::kFrameworkErr:
+            os << "framework_err(" << fidl::ostream::Formatted<::fidl::internal::FrameworkErr>(value.framework_err().value()) << ")";
             break;
         default:
           os << "Unknown";
@@ -1540,8 +1540,8 @@
           case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult::Tag::kErr:
             os << "err(" << fidl::ostream::Formatted<int32_t>(value.err().value()) << ")";
             break;
-          case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult::Tag::kTransportErr:
-            os << "transport_err(" << fidl::ostream::Formatted<::fidl::internal::TransportErr>(value.transport_err().value()) << ")";
+          case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult::Tag::kFrameworkErr:
+            os << "framework_err(" << fidl::ostream::Formatted<::fidl::internal::FrameworkErr>(value.framework_err().value()) << ")";
             break;
         default:
           os << "Unknown";
@@ -1568,8 +1568,8 @@
           case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult::Tag::kErr:
             os << "err(" << fidl::ostream::Formatted<int32_t>(value.err().value()) << ")";
             break;
-          case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult::Tag::kTransportErr:
-            os << "transport_err(" << fidl::ostream::Formatted<::fidl::internal::TransportErr>(value.transport_err().value()) << ")";
+          case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult::Tag::kFrameworkErr:
+            os << "framework_err(" << fidl::ostream::Formatted<::fidl::internal::FrameworkErr>(value.framework_err().value()) << ")";
             break;
         default:
           os << "Unknown";
@@ -1585,8 +1585,8 @@
           case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult::Tag::kErr:
             os << "err(" << fidl::ostream::Formatted<int32_t>(value.err().value()) << ")";
             break;
-          case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult::Tag::kTransportErr:
-            os << "transport_err(" << fidl::ostream::Formatted<::fidl::internal::TransportErr>(value.transport_err().value()) << ")";
+          case ::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult::Tag::kFrameworkErr:
+            os << "framework_err(" << fidl::ostream::Formatted<::fidl::internal::FrameworkErr>(value.framework_err().value()) << ")";
             break;
         default:
           os << "Unknown";

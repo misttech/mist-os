@@ -209,8 +209,8 @@ void JSONGenerator::Generate(const flat::Type* value) {
       case flat::Type::Kind::kInternal: {
         const auto* type = static_cast<const flat::InternalType*>(value);
         switch (type->subtype) {
-          case types::InternalSubtype::kTransportErr:
-            GenerateObjectMember("subtype", std::string_view("transport_error"));
+          case types::InternalSubtype::kFrameworkErr:
+            GenerateObjectMember("subtype", std::string_view("framework_error"));
             break;
         }
         break;
@@ -544,7 +544,7 @@ void JSONGenerator::GenerateParameterizedType(TypeKind parent_type_kind, const f
         ZX_PANIC("unexpected kind");
       case flat::Type::Kind::kInternal: {
         switch (static_cast<const flat::InternalType*>(type)->subtype) {
-          case types::InternalSubtype::kTransportErr:
+          case types::InternalSubtype::kFrameworkErr:
             ZX_PANIC("unexpected kind");
         }
       }

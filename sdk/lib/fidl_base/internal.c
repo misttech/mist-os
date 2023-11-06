@@ -35,23 +35,23 @@ const struct FidlCodedPrimitive fidl_internal_kFloat32Table = {
 const struct FidlCodedPrimitive fidl_internal_kFloat64Table = {
     .tag = kFidlTypePrimitive, .type = kFidlCodedPrimitiveSubtype_Float64};
 
-static bool EnumValidatorForTransportErr(uint64_t v) {
+static bool EnumValidatorForFrameworkErr(uint64_t v) {
   switch (v) {
     // C99 6.3.1.3(2): conversion to unsigned should produce the two's
     // complement.
-    case (uint64_t)FIDL_TRANSPORT_ERR_UNKNOWN_METHOD:
+    case (uint64_t)FIDL_FRAMEWORK_ERR_UNKNOWN_METHOD:
       return true;
     default:
       return false;
   }
 }
 
-const struct FidlCodedEnum fidl_internal_kTransportErrTable = {
+const struct FidlCodedEnum fidl_internal_kFrameworkErrTable = {
     .tag = kFidlTypeEnum,
     .underlying_type = kFidlCodedPrimitiveSubtype_Int32,
     .strictness = kFidlStrictness_Strict,
-    .validate = &EnumValidatorForTransportErr,
-    .name = "fidl/TransportErr"};
+    .validate = &EnumValidatorForFrameworkErr,
+    .name = "fidl/FrameworkErr"};
 
 zx_rights_t subtract_rights(zx_rights_t minuend, zx_rights_t subtrahend) {
   return minuend & ~subtrahend;

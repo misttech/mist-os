@@ -135,7 +135,7 @@ class Enum : public EnumOrBits {
   // the member.
   std::string GetName(uint64_t absolute_value, bool negative) const;
 
-  static const Enum& TransportErrorEnum();
+  static const Enum& FrameworkErrorEnum();
 
  private:
   Enum(std::string name, uint64_t size, std::unique_ptr<Type> type,

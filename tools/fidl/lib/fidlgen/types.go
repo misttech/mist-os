@@ -295,7 +295,7 @@ func (typ PrimitiveSubtype) NumberOfBytes() int {
 type InternalSubtype string
 
 const (
-	TransportErr InternalSubtype = "transport_error"
+	FrameworkErr InternalSubtype = "framework_error"
 )
 
 type HandleSubtype string
@@ -1499,9 +1499,9 @@ func (m *Method) HasResultUnion() bool {
 	return m.ValueType != nil
 }
 
-// HasTransportError returns true if the method uses a result union with
-// transport_err variant. This is true if it is a flexible two-way method.
-func (m *Method) HasTransportError() bool {
+// HasFrameworkError returns true if the method uses a result union with
+// framework_err variant. This is true if it is a flexible two-way method.
+func (m *Method) HasFrameworkError() bool {
 	return m.HasRequest && m.HasResponse && m.IsFlexible()
 }
 

@@ -5,7 +5,7 @@
 #ifndef LIB_FIDL_CPP_WIRE_BASE_WIRE_RESULT_H_
 #define LIB_FIDL_CPP_WIRE_BASE_WIRE_RESULT_H_
 
-#include <lib/fidl/cpp/wire/internal/transport_err.h>
+#include <lib/fidl/cpp/wire/internal/framework_err.h>
 #include <lib/fidl/cpp/wire/message.h>
 #include <lib/fidl/cpp/wire/status.h>
 #include <lib/fidl/cpp/wire/wire_messaging_declarations.h>
@@ -130,21 +130,21 @@ class BaseWireResult<FidlMethod, std::enable_if_t<FidlMethod::kHasServerToClient
   // result.
   //
   // For this template, which is only for methods with no domain error and
-  // an empty payload, this method just checks if transport_err is used (if the
+  // an empty payload, this method just checks if framework_err is used (if the
   // method is flexible) and changes the status to
   // |Status::UnknownMethod()| if necessary.
   void ExtractValueFromDecoded(::fidl::WireResponse<FidlMethod>* raw_response) {
     static_assert(!FidlMethod::kHasNonEmptyUserFacingResponse);
     static_assert(FidlMethod::kHasFrameworkError);
     // For a flexible method, we need to check whether the result is success
-    // or transport_err.
-    if (raw_response->is_transport_err()) {
-      switch (raw_response->transport_err()) {
-        case ::fidl::internal::TransportErr::kUnknownMethod:
+    // or framework_err.
+    if (raw_response->is_framework_err()) {
+      switch (raw_response->framework_err()) {
+        case ::fidl::internal::FrameworkErr::kUnknownMethod:
           SetStatus(::fidl::Status::UnknownMethod());
           return;
       }
-      ZX_PANIC("Unknown transport_err");
+      ZX_PANIC("Unknown framework_err");
     } else {
       ZX_ASSERT_MSG(raw_response->is_response(), "Unknown FIDL result union variant");
     }
@@ -226,7 +226,7 @@ class BaseWireResult<
   // for the |Unwrap| accessors.
   void ExtractValueFromDecoded(::fidl::WireResponse<FidlMethod>* raw_response) {
     if constexpr (FidlMethod::kHasDomainError && FidlMethod::kHasFrameworkError) {
-      if (raw_response->is_transport_err()) {
+      if (raw_response->is_framework_err()) {
         SetStatus(::fidl::Status::UnknownMethod());
       } else if (raw_response->is_err()) {
         result_ = fit::error(raw_response->err());
@@ -239,7 +239,7 @@ class BaseWireResult<
         }
       }
     } else if constexpr (FidlMethod::kHasFrameworkError) {
-      if (raw_response->is_transport_err()) {
+      if (raw_response->is_framework_err()) {
         SetStatus(::fidl::Status::UnknownMethod());
       } else {
         // Result must be non-empty, because if there is no domain error

@@ -9,4 +9,4 @@ from ._fidl_common import StopServer
 from ._import import AsyncSocket
 from ._import import GlobalHandleWaker
 from ._import import HandleWaker
-from ._import import TransportError
+from ._import import FrameworkError

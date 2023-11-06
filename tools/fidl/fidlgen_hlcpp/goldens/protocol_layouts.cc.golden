@@ -3990,7 +3990,7 @@ class OpenProtocol_FlexibleTwoWayNoError_Responder final {
   void operator()(::test::protocollayouts::imported::ComposedOpenProtocol_FlexibleTwoWayNoError_Result ComposedOpenProtocol_FlexibleTwoWayNoError_Result) {
     ::fidl::MessageEncoder _encoder(::test::protocollayouts::internal::kOpenProtocol_FlexibleTwoWayNoError_Ordinal, ::test::protocollayouts::internal::kOpenProtocol_FlexibleTwoWayNoError_DynamicFlags);
     const fidl_type_t* resp_type =&::test::protocollayouts::_internal::test_protocollayouts_imported_ComposedOpenProtocol_FlexibleTwoWayNoError_ResultTable;
-    ZX_ASSERT_MSG(!ComposedOpenProtocol_FlexibleTwoWayNoError_Result.is_transport_err(), "Applications must not explicitly send transport_err for flexible methods.");
+    ZX_ASSERT_MSG(!ComposedOpenProtocol_FlexibleTwoWayNoError_Result.is_framework_err(), "Applications must not explicitly send framework_err for flexible methods.");
     response_.Send(resp_type, ::test::protocollayouts::OpenProtocol_ResponseEncoder::FlexibleTwoWayNoError(&_encoder, &ComposedOpenProtocol_FlexibleTwoWayNoError_Result));
   }
 
@@ -4006,7 +4006,7 @@ class OpenProtocol_FlexibleTwoWayWithError_Responder final {
   void operator()(::test::protocollayouts::imported::ComposedOpenProtocol_FlexibleTwoWayWithError_Result ComposedOpenProtocol_FlexibleTwoWayWithError_Result) {
     ::fidl::MessageEncoder _encoder(::test::protocollayouts::internal::kOpenProtocol_FlexibleTwoWayWithError_Ordinal, ::test::protocollayouts::internal::kOpenProtocol_FlexibleTwoWayWithError_DynamicFlags);
     const fidl_type_t* resp_type =&::test::protocollayouts::_internal::test_protocollayouts_imported_ComposedOpenProtocol_FlexibleTwoWayWithError_ResultTable;
-    ZX_ASSERT_MSG(!ComposedOpenProtocol_FlexibleTwoWayWithError_Result.is_transport_err(), "Applications must not explicitly send transport_err for flexible methods.");
+    ZX_ASSERT_MSG(!ComposedOpenProtocol_FlexibleTwoWayWithError_Result.is_framework_err(), "Applications must not explicitly send framework_err for flexible methods.");
     response_.Send(resp_type, ::test::protocollayouts::OpenProtocol_ResponseEncoder::FlexibleTwoWayWithError(&_encoder, &ComposedOpenProtocol_FlexibleTwoWayWithError_Result));
   }
 

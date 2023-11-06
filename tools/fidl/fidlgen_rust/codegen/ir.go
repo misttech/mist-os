@@ -890,7 +890,7 @@ func (c *compiler) compileType(val fidlgen.Type) Type {
 		}
 	case fidlgen.InternalType:
 		switch val.InternalSubtype {
-		case fidlgen.TransportErr:
+		case fidlgen.FrameworkErr:
 			s := "fidl::encoding::FrameworkErr"
 			t.Fidl = s
 			t.Owned = s
@@ -1275,10 +1275,10 @@ func (c *compiler) compileResponse(m fidlgen.Method) Payload {
 	var p Payload
 
 	// Set FidlType and OwnedType, which are different for each of the 3 cases.
-	if m.HasTransportError() && m.HasError {
+	if m.HasFrameworkError() && m.HasError {
 		p.FidlType = fmt.Sprintf("fidl::encoding::FlexibleResultType<%s, %s>", inner.FidlType, errType.Fidl)
 		p.OwnedType = fmt.Sprintf("fidl::encoding::FlexibleResult<%s, %s>", inner.OwnedType, errType.Owned)
-	} else if m.HasTransportError() {
+	} else if m.HasFrameworkError() {
 		p.FidlType = fmt.Sprintf("fidl::encoding::FlexibleType<%s>", inner.FidlType)
 		p.OwnedType = fmt.Sprintf("fidl::encoding::Flexible<%s>", inner.OwnedType)
 	} else if m.HasError {
@@ -1322,7 +1322,7 @@ func (c *compiler) compileResponse(m fidlgen.Method) Payload {
 	}
 
 	// For FlexibleType and FlexibleResultType, we need to wrap the value before encoding.
-	if m.HasTransportError() {
+	if m.HasFrameworkError() {
 		name, _, _ := strings.Cut(p.OwnedType, "<")
 		p.EncodeExpr = fmt.Sprintf("%s::new(%s)", name, p.EncodeExpr)
 	}

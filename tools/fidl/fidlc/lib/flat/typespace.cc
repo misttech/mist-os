@@ -49,8 +49,8 @@ static std::optional<types::PrimitiveSubtype> BuiltinToPrimitiveSubtype(Builtin:
 
 static std::optional<types::InternalSubtype> BuiltinToInternalSubtype(Builtin::Identity id) {
   switch (id) {
-    case Builtin::Identity::kTransportErr:
-      return types::InternalSubtype::kTransportErr;
+    case Builtin::Identity::kFrameworkErr:
+      return types::InternalSubtype::kFrameworkErr;
     default:
       return std::nullopt;
   }
@@ -128,7 +128,7 @@ class Typespace::Creator : private ReporterMixin {
   const Type* CreateStringArrayType();
   const Type* CreateVectorType();
   const Type* CreateBytesType();
-  const Type* CreateTransportErrType();
+  const Type* CreateFrameworkErrType();
   const Type* CreateBoxType();
   const Type* CreateHandleType(Resource* resource);
   const Type* CreateTransportSideType(TransportSide end);
@@ -214,7 +214,7 @@ const Type* Typespace::Creator::Create() {
       return CreateTransportSideType(TransportSide::kServer);
     case Builtin::Identity::kByte:
       return CreatePrimitiveType(types::PrimitiveSubtype::kUint8);
-    case Builtin::Identity::kTransportErr:
+    case Builtin::Identity::kFrameworkErr:
       return CreateInternalType(BuiltinToInternalSubtype(builtin->id).value());
     case Builtin::Identity::kOptional:
     case Builtin::Identity::kMax:

@@ -741,7 +741,7 @@ func (m Method) HasDomainError() bool {
 }
 
 // Returns true if the method has a result payload and the payload has the
-// `transport_err` variant used for transport errors.
+// `framework_err` variant used for transport errors.
 func (m Method) HasFrameworkError() bool {
 	return m.Result != nil && m.Result.HasFrameworkError
 }

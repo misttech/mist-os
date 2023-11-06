@@ -229,8 +229,8 @@ pub enum PrimitiveSubtype {
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum InternalSubtype {
-    #[serde(rename = "transport_error")]
-    TransportErr,
+    #[serde(rename = "framework_error")]
+    FrameworkErr,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

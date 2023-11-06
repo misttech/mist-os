@@ -53,12 +53,13 @@ class StopEventHandler(Exception):
 
 
 def internal_kind_to_type(internal_kind: str):
-    if internal_kind == "transport_error":
-        return TransportError
+    # TODO(fxbug.dev/109789): Remove "transport_error".
+    if internal_kind == "framework_error" or internal_kind == "transport_error":
+        return FrameworkError
     raise RuntimeError(f"Unrecognized internal type: {internal_kind}")
 
 
-class TransportError(IntEnum):
+class FrameworkError(IntEnum):
     UNKNOWN_METHOD = -2
 
 
@@ -67,7 +68,7 @@ class GenericResult:
     fidl_type: str
     response: typing.Optional[object] = None
     err: typing.Optional[object] = None
-    transport_err: TransportError | None = None
+    framework_err: FrameworkError | None = None
 
     @property
     def __fidl_type__(self):

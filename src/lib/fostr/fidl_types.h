@@ -8,7 +8,7 @@
 #include <array>
 #include <sstream>
 
-#include "lib/fidl/cpp/transport_err.h"
+#include "lib/fidl/cpp/framework_err.h"
 #include "lib/fidl/cpp/vector.h"
 #include "src/lib/fostr/hex_dump.h"
 #include "src/lib/fostr/indent.h"
@@ -162,8 +162,8 @@ std::ostream& operator<<(std::ostream& os, const VectorPtr<uint8_t>& value);
 template <>
 std::ostream& operator<<(std::ostream& os, const VectorPtr<int8_t>& value);
 
-inline std::ostream& operator<<(std::ostream& os, const internal::TransportErr& value) {
-  if (value == internal::TransportErr::kUnknownMethod) {
+inline std::ostream& operator<<(std::ostream& os, const internal::FrameworkErr& value) {
+  if (value == internal::FrameworkErr::kUnknownMethod) {
     return os << "<unknown method>";
   }
   return os << "<transport error>";

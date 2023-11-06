@@ -92,9 +92,9 @@ class ServerBase(object):
                 res = GenericResult(
                     fidl_type=info.response_identifier, err=res.error
                 )
-            elif type(res) is TransportError:
+            elif type(res) is FrameworkError:
                 res = GenericResult(
-                    fidl_type=info.response_identifier, transport_err=res
+                    fidl_type=info.response_identifier, framework_err=res
                 )
             else:
                 res = GenericResult(

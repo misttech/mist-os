@@ -371,8 +371,8 @@ struct ResponseCompleter {
 
 enum class ResultUnionTag : fidl_union_tag_t {
   kSuccess = 1,
-  kApplicationError = 2,
-  kTransportError = 3,
+  kDomainError = 2,
+  kFrameworkError = 3,
 };
 
 class InlineValue : public std::array<uint8_t, 4> {
@@ -589,7 +589,7 @@ TEST_F(UnknownInteractions, TwoWayFlexibleAsyncSendUnknownResponse) {
   EXPECT_NE(0, received.txid());
 
   auto server_reply = MakeMessage<test::UnknownInteractionsDriverProtocol::FlexibleTwoWay>(
-      fidl::MessageDynamicFlags::kFlexibleMethod, ResultUnionTag::kTransportError,
+      fidl::MessageDynamicFlags::kFlexibleMethod, ResultUnionTag::kFrameworkError,
       ZX_ERR_NOT_SUPPORTED);
   received.reply(server, server_reply);
 
@@ -600,7 +600,7 @@ TEST_F(UnknownInteractions, TwoWayFlexibleAsyncSendUnknownResponse) {
   EXPECT_EQ(fidl::Reason::kUnknownMethod, result.value().error_value().reason());
 }
 
-TEST_F(UnknownInteractions, TwoWayFlexibleAsyncSendOtherTransportError) {
+TEST_F(UnknownInteractions, TwoWayFlexibleAsyncSendOtherFrameworkError) {
   auto server = TakeServerChannel();
 
   ResponseCompleter<fdf::Result<test::UnknownInteractionsDriverProtocol::FlexibleTwoWay>>
@@ -618,7 +618,7 @@ TEST_F(UnknownInteractions, TwoWayFlexibleAsyncSendOtherTransportError) {
   EXPECT_NE(0, received.txid());
 
   auto server_reply = MakeMessage<test::UnknownInteractionsDriverProtocol::FlexibleTwoWay>(
-      fidl::MessageDynamicFlags::kFlexibleMethod, ResultUnionTag::kTransportError,
+      fidl::MessageDynamicFlags::kFlexibleMethod, ResultUnionTag::kFrameworkError,
       ZX_ERR_ACCESS_DENIED);
   received.reply(server, server_reply);
 
@@ -629,7 +629,7 @@ TEST_F(UnknownInteractions, TwoWayFlexibleAsyncSendOtherTransportError) {
   EXPECT_EQ(fidl::Reason::kDecodeError, result.value().error_value().reason());
 }
 
-TEST_F(UnknownInteractions, TwoWayFlexibleAsyncSendOkTransportErr) {
+TEST_F(UnknownInteractions, TwoWayFlexibleAsyncSendOkFrameworkErr) {
   auto server = TakeServerChannel();
 
   ResponseCompleter<fdf::Result<test::UnknownInteractionsDriverProtocol::FlexibleTwoWay>>
@@ -647,7 +647,7 @@ TEST_F(UnknownInteractions, TwoWayFlexibleAsyncSendOkTransportErr) {
   EXPECT_NE(0, received.txid());
 
   auto server_reply = MakeMessage<test::UnknownInteractionsDriverProtocol::FlexibleTwoWay>(
-      fidl::MessageDynamicFlags::kFlexibleMethod, ResultUnionTag::kTransportError, ZX_OK);
+      fidl::MessageDynamicFlags::kFlexibleMethod, ResultUnionTag::kFrameworkError, ZX_OK);
   received.reply(server, server_reply);
 
   auto result = response_completer.WaitForResponse();
@@ -675,7 +675,7 @@ TEST_F(UnknownInteractions, TwoWayFlexibleAsyncSendErrorVariant) {
   EXPECT_NE(0, received.txid());
 
   auto server_reply = MakeMessage<test::UnknownInteractionsDriverProtocol::FlexibleTwoWay>(
-      fidl::MessageDynamicFlags::kFlexibleMethod, ResultUnionTag::kApplicationError, 0x100);
+      fidl::MessageDynamicFlags::kFlexibleMethod, ResultUnionTag::kDomainError, 0x100);
   received.reply(server, server_reply);
 
   auto result = response_completer.WaitForResponse();
@@ -731,7 +731,7 @@ TEST_F(UnknownInteractions, TwoWayFlexibleFieldsAsyncSendUnknownResponse) {
   EXPECT_NE(0, received.txid());
 
   auto server_reply = MakeMessage<test::UnknownInteractionsDriverProtocol::FlexibleTwoWayFields>(
-      fidl::MessageDynamicFlags::kFlexibleMethod, ResultUnionTag::kTransportError,
+      fidl::MessageDynamicFlags::kFlexibleMethod, ResultUnionTag::kFrameworkError,
       ZX_ERR_NOT_SUPPORTED);
   received.reply(server, server_reply);
 
@@ -788,7 +788,7 @@ TEST_F(UnknownInteractions, TwoWayFlexibleErrAsyncSendUnknownResponse) {
   EXPECT_NE(0, received.txid());
 
   auto server_reply = MakeMessage<test::UnknownInteractionsDriverProtocol::FlexibleTwoWayErr>(
-      fidl::MessageDynamicFlags::kFlexibleMethod, ResultUnionTag::kTransportError,
+      fidl::MessageDynamicFlags::kFlexibleMethod, ResultUnionTag::kFrameworkError,
       ZX_ERR_NOT_SUPPORTED);
   received.reply(server, server_reply);
 
@@ -800,7 +800,7 @@ TEST_F(UnknownInteractions, TwoWayFlexibleErrAsyncSendUnknownResponse) {
   EXPECT_EQ(fidl::Reason::kUnknownMethod, result.value().error_value().framework_error().reason());
 }
 
-TEST_F(UnknownInteractions, TwoWayFlexibleErrAsyncSendOtherTransportError) {
+TEST_F(UnknownInteractions, TwoWayFlexibleErrAsyncSendOtherFrameworkError) {
   auto server = TakeServerChannel();
 
   ResponseCompleter<fdf::Result<test::UnknownInteractionsDriverProtocol::FlexibleTwoWayErr>>
@@ -819,7 +819,7 @@ TEST_F(UnknownInteractions, TwoWayFlexibleErrAsyncSendOtherTransportError) {
   EXPECT_NE(0, received.txid());
 
   auto server_reply = MakeMessage<test::UnknownInteractionsDriverProtocol::FlexibleTwoWayErr>(
-      fidl::MessageDynamicFlags::kFlexibleMethod, ResultUnionTag::kTransportError,
+      fidl::MessageDynamicFlags::kFlexibleMethod, ResultUnionTag::kFrameworkError,
       ZX_ERR_ACCESS_DENIED);
   received.reply(server, server_reply);
 
@@ -850,7 +850,7 @@ TEST_F(UnknownInteractions, TwoWayFlexibleErrAsyncSendErrorVariant) {
   EXPECT_NE(0, received.txid());
 
   auto server_reply = MakeMessage<test::UnknownInteractionsDriverProtocol::FlexibleTwoWayErr>(
-      fidl::MessageDynamicFlags::kFlexibleMethod, ResultUnionTag::kApplicationError, 0x100);
+      fidl::MessageDynamicFlags::kFlexibleMethod, ResultUnionTag::kDomainError, 0x100);
   received.reply(server, server_reply);
 
   auto result = response_completer.WaitForResponse();
@@ -907,7 +907,7 @@ TEST_F(UnknownInteractions, TwoWayFlexibleFieldsErrAsyncSendUnknownResponse) {
   EXPECT_NE(0, received.txid());
 
   auto server_reply = MakeMessage<test::UnknownInteractionsDriverProtocol::FlexibleTwoWayFieldsErr>(
-      fidl::MessageDynamicFlags::kFlexibleMethod, ResultUnionTag::kTransportError,
+      fidl::MessageDynamicFlags::kFlexibleMethod, ResultUnionTag::kFrameworkError,
       ZX_ERR_NOT_SUPPORTED);
   received.reply(server, server_reply);
 
@@ -938,7 +938,7 @@ TEST_F(UnknownInteractions, TwoWayFlexibleFieldsErrAsyncSendErrorVariant) {
   EXPECT_NE(0, received.txid());
 
   auto server_reply = MakeMessage<test::UnknownInteractionsDriverProtocol::FlexibleTwoWayFieldsErr>(
-      fidl::MessageDynamicFlags::kFlexibleMethod, ResultUnionTag::kApplicationError, 0x100);
+      fidl::MessageDynamicFlags::kFlexibleMethod, ResultUnionTag::kDomainError, 0x100);
   received.reply(server, server_reply);
 
   auto result = response_completer.WaitForResponse();
@@ -1109,8 +1109,7 @@ TEST_F(UnknownInteractions, FlexibleTwoWayErrResponseError) {
   auto received = ReadResult<32>::ReadFromChannel(client, Dispatcher());
   ASSERT_OK(received.status);
   auto expected = MakeMessage<::test::UnknownInteractionsDriverProtocol::FlexibleTwoWayErr>(
-      0xABCD, ::fidl::MessageDynamicFlags::kFlexibleMethod, ResultUnionTag::kApplicationError,
-      3203);
+      0xABCD, ::fidl::MessageDynamicFlags::kFlexibleMethod, ResultUnionTag::kDomainError, 3203);
   EXPECT_EQ(expected, received.buf);
 }
 
@@ -1154,8 +1153,7 @@ TEST_F(UnknownInteractions, FlexibleTwoWayFieldsErrResponseError) {
   auto received = ReadResult<32>::ReadFromChannel(client, Dispatcher());
   ASSERT_OK(received.status);
   auto expected = MakeMessage<::test::UnknownInteractionsDriverProtocol::FlexibleTwoWayFieldsErr>(
-      0xABCD, ::fidl::MessageDynamicFlags::kFlexibleMethod, ResultUnionTag::kApplicationError,
-      3203);
+      0xABCD, ::fidl::MessageDynamicFlags::kFlexibleMethod, ResultUnionTag::kDomainError, 3203);
   EXPECT_EQ(expected, received.buf);
 }
 
@@ -1247,7 +1245,7 @@ TEST_F(UnknownInteractions, UnknownFlexibleTwoWay) {
   EXPECT_EQ(ZX_OK, received.status);
   auto expected =
       MakeMessage<FakeUnknownMethod>(0xABCD, ::fidl::MessageDynamicFlags::kFlexibleMethod,
-                                     ResultUnionTag::kTransportError, ZX_ERR_NOT_SUPPORTED);
+                                     ResultUnionTag::kFrameworkError, ZX_ERR_NOT_SUPPORTED);
   EXPECT_EQ(expected, received.buf);
 }
 

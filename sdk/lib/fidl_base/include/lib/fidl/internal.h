@@ -555,7 +555,7 @@ extern const struct FidlCodedPrimitive fidl_internal_kUint64Table;
 extern const struct FidlCodedPrimitive fidl_internal_kFloat32Table;
 extern const struct FidlCodedPrimitive fidl_internal_kFloat64Table;
 
-extern const struct FidlCodedEnum fidl_internal_kTransportErrTable;
+extern const struct FidlCodedEnum fidl_internal_kFrameworkErrTable;
 
 // Backwards-compatible names
 typedef struct FidlCodedUnion FidlCodedXUnion;

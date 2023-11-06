@@ -340,10 +340,10 @@ func (r *Root) Namespace() namespace {
 	panic("not reached")
 }
 
-var transportErr nameVariants = nameVariants{
-	HLCPP:   makeName("fidl::TransportErr"),
-	Unified: makeName("fidl::internal::TransportErr"),
-	Wire:    makeName("fidl::internal::TransportErr"),
+var frameworkErr nameVariants = nameVariants{
+	HLCPP:   makeName("fidl::FrameworkErr"),
+	Unified: makeName("fidl::internal::FrameworkErr"),
+	Wire:    makeName("fidl::internal::FrameworkErr"),
 }
 
 // Result holds information about error results on methods.
@@ -398,13 +398,13 @@ func (r Result) BuildPayload(varName string) string {
 // error, or both combined in std::variant if it has both.
 func (r Result) CombinedErrorDecl() string {
 	if r.HasError && r.HasFrameworkError {
-		return fmt.Sprintf("std::variant<%s, %s>", r.ErrorDecl, transportErr)
+		return fmt.Sprintf("std::variant<%s, %s>", r.ErrorDecl, frameworkErr)
 	}
 	if r.HasError {
 		return r.ErrorDecl.String()
 	}
 	if r.HasFrameworkError {
-		return transportErr.String()
+		return frameworkErr.String()
 	}
 	panic("Result had neither application error nor transport error")
 }
@@ -644,8 +644,8 @@ func (c *compiler) compileType(val fidlgen.Type) Type {
 		r.WireFieldConstraint = "fidl::internal::WireCodingConstraintEmpty"
 	case fidlgen.InternalType:
 		switch val.InternalSubtype {
-		case fidlgen.TransportErr:
-			r.nameVariants = transportErr
+		case fidlgen.FrameworkErr:
+			r.nameVariants = frameworkErr
 			r.Kind = TypeKinds.Enum
 			r.WireFamily = FamilyKinds.TrivialCopy
 			r.NaturalFieldConstraint = "fidl::internal::NaturalCodingConstraintEmpty"

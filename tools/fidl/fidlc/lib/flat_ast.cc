@@ -93,7 +93,7 @@ bool Builtin::IsInternal() const {
     case Identity::kMax:
     case Identity::kHead:
       return false;
-    case Identity::kTransportErr:
+    case Identity::kFrameworkErr:
       return true;
   }
 }
@@ -240,7 +240,7 @@ std::unique_ptr<Library> Library::CreateRootLibrary() {
   insert("client_end", Builtin::Identity::kClientEnd);
   insert("server_end", Builtin::Identity::kServerEnd);
   insert("byte", Builtin::Identity::kByte);
-  insert("TransportErr", Builtin::Identity::kTransportErr);
+  insert("FrameworkErr", Builtin::Identity::kFrameworkErr);
   insert("optional", Builtin::Identity::kOptional);
   insert("MAX", Builtin::Identity::kMax);
   insert("HEAD", Builtin::Identity::kHead);

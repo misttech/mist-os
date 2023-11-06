@@ -35,7 +35,7 @@ fn can_derive_partialeq(
         Type::Handle { .. } => Ok(true),
         Type::Request { .. } => Ok(true),
         Type::Primitive { .. } => Ok(true),
-        Type::Internal { subtype: InternalSubtype::TransportErr } => Ok(true),
+        Type::Internal { subtype: InternalSubtype::FrameworkErr } => Ok(true),
         Type::Identifier { identifier: type_id, .. } => {
             if type_id.is_base_type() {
                 return Ok(true);

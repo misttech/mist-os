@@ -925,7 +925,7 @@
         "internal-subtype": {
             "description": "Definition of internal sub-type",
             "enum": [
-                "transport_error"
+                "framework_error"
             ],
             "type": "string"
         },

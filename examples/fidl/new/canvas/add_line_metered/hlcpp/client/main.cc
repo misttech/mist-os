@@ -92,7 +92,7 @@ int main(int argc, const char** argv) {
                   << " }, Point { x: " << line[0].x << ", y: " << line[0].y << " }]";
 
     // [START diff_1]
-    instance_proxy->AddLine(line, [&](fpromise::result<void, fidl::TransportErr> result) {
+    instance_proxy->AddLine(line, [&](fpromise::result<void, fidl::FrameworkErr> result) {
       if (result.is_error()) {
         // Check that our flexible two-way call was known to the server and handle the case of an
         // unknown method appropriately. In the case of this example, there is nothing we can do to
