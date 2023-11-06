@@ -21,30 +21,28 @@ import("//build/compiled_action.gni")
 #       Input product bundle directory.
 #       Type: GN path string.
 #
-#    outputs: (required)
-#       The usual GN meaning. Must be a singleton list.
+#    output_dir: (optional)
+#       Output path location, defaults to target_out_dir
 #       Type: GN path string.
 #
 #   testonly, visibility
 #       Usual GN meaning.
 #
 template("product_bundle_transfer_manifest") {
-  assert(
-      defined(invoker.outputs),
-      "product_bundle_transfer_manifest(${target_name}) must define `outputs`")
   _product_bundle_dir = invoker.product_bundle_dir
   _product_bundle_target = invoker.product_bundle_target
+
+  _out_dir = target_out_dir
+  if (defined(invoker.output_dir)) {
+    _out_dir = invoker.output_dir
+  }
 
   compiled_action(target_name) {
     forward_variables_from(invoker,
                            [
-                             "outputs",
                              "testonly",
                              "visibility",
                            ])
-
-    assert(outputs != [], "no outputs defined")
-    assert(outputs == [ outputs[0] ], "too many outputs defined")
 
     tool = "//tools/pbtool"
 
@@ -60,13 +58,14 @@ template("product_bundle_transfer_manifest") {
 
     deps = [ _product_bundle_target ]
     inputs = [ "${_product_bundle_dir}/product_bundle.json" ]
+    outputs = [ "${_out_dir}/transfer.json" ]
 
     args = [
       "generate-transfer-manifest",
       "--product-bundle",
       rebase_path(_product_bundle_dir, root_build_dir),
-      "--output",
-      rebase_path(outputs[0], root_build_dir),
+      "--out-dir",
+      rebase_path(_out_dir, root_build_dir),
     ]
   }
 }

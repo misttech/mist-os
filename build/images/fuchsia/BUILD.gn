@@ -277,7 +277,6 @@ if (is_fuchsia) {
     product_bundle_label = "product_bundle"
     product_bundle(product_bundle_label) {
       testonly = fuchsia_zbi_testonly
-      name = main_product_bundle_name
       deps = [
         ":fuchsia_assembly",
         "//build/info:build_info_files",

@@ -261,7 +261,7 @@ impl AssemblyManifest {
 
         // Write the images manifest.
         let images_json = File::create(path).context("Creating assembly manifest")?;
-        serde_json::to_writer_pretty(
+        serde_json::to_writer(
             images_json,
             &SerializationHelper { images: assembly_manifest.images },
         )
@@ -528,19 +528,13 @@ impl<'de> Deserialize<'de> for Image {
     where
         D: Deserializer<'de>,
     {
-        // Due to historical reasons, there are images where "name" has come to
-        // parameterize the image type itself. Outside of those cases, the name
-        // is just a human-readable bit of metadata identifying a given
-        // instance of that image and so we disregard such incoming values.
-        // These images are renamed with with their canonical Assembly names
-        // (e.g., "zircon-a") at serialization-time.
         let helper = ImageDeserializeHelper::deserialize(deserializer)?;
         match (&helper.partition_type[..], &helper.name[..], &helper.signed) {
             ("far", "base-package", None) => Ok(Image::BasePackage(helper.path)),
-            ("zbi", _, signed) => {
-                Ok(Image::ZBI { path: helper.path, signed: signed.is_some_and(|s| s) })
+            ("zbi", "zircon-a", Some(signed)) => {
+                Ok(Image::ZBI { path: helper.path, signed: *signed })
             }
-            ("vbmeta", _, None) => Ok(Image::VBMeta(helper.path)),
+            ("vbmeta", "zircon-a", None) => Ok(Image::VBMeta(helper.path)),
             ("blk", "blob", None) => {
                 if let Some(contents) = helper.contents {
                     let ImageContentsDeserializeHelper::Blobfs(contents) = contents;
@@ -568,18 +562,18 @@ impl<'de> Deserialize<'de> for Image {
             }
             ("blk", "storage-sparse", None) => Ok(Image::FVMSparse(helper.path)),
             ("blk", "fvm.fastboot", None) => Ok(Image::FVMFastboot(helper.path)),
-            ("kernel", _, None) => Ok(Image::QemuKernel(helper.path)),
+            ("kernel", "qemu-kernel", None) => Ok(Image::QemuKernel(helper.path)),
             (partition_type, name, _) => Err(de::Error::unknown_variant(
                 &format!("({partition_type}, {name})"),
                 &[
                     "(far, base-package)",
-                    "(zbi, _)",
-                    "(vbmeta, _)",
+                    "(zbi, zircon-a)",
+                    "(vbmeta, zircon-a)",
                     "(blk, blob)",
                     "(blk, storage-full)",
                     "(blk, storage-sparse)",
                     "(blk, fvm.fastboot)",
-                    "(kernel, _)",
+                    "(kernel, qemu-kernel)",
                 ],
             )),
         }
@@ -741,6 +735,19 @@ mod tests {
     }
 
     #[test]
+    fn deserialize_zbi_missing_signed() {
+        let invalid = json!([
+            {
+                "type": "zbi",
+                "name": "zircon-a",
+                "path": "path/to/fuchsia.zbi",
+            }
+        ]);
+        let result: Result<SerializationHelper, _> = serde_json::from_value(invalid);
+        assert!(result.unwrap_err().is_data());
+    }
+
+    #[test]
     fn deserialize() {
         let manifest: AssemblyManifest = generate_test_manifest();
         assert_eq!(manifest.images.len(), 8);
@@ -806,61 +813,6 @@ mod tests {
         ]);
         let result: Result<SerializationHelper, _> = serde_json::from_value(invalid);
         assert!(result.unwrap_err().is_data());
-    }
-
-    #[test]
-    fn deserialize_zbi_with_arbitrary_name() {
-        let value = json!([
-            {
-                "type": "zbi",
-                "name": "my-zbi",
-                "path": "path/to/my.zbi",
-            }
-        ]);
-
-        let expected = AssemblyManifest {
-            images: vec![Image::ZBI { path: "path/to/my.zbi".into(), signed: false }],
-        };
-
-        let result: Result<SerializationHelper, _> = serde_json::from_value(value);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), SerializationHelper { images: expected.images });
-    }
-
-    #[test]
-    fn deserialize_vbmeta_with_arbitrary_name() {
-        let value = json!([
-            {
-                "type": "vbmeta",
-                "name": "my-vbmeta",
-                "path": "path/to/my.vbmeta",
-            }
-        ]);
-
-        let expected = AssemblyManifest { images: vec![Image::VBMeta("path/to/my.vbmeta".into())] };
-
-        let result: Result<SerializationHelper, _> = serde_json::from_value(value);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), SerializationHelper { images: expected.images });
-    }
-
-    #[test]
-    fn deserialize_qemu_kernel_with_arbitrary_name() {
-        let value = json!([
-            {
-                "type": "kernel",
-                "name": "my-qemu-kernel",
-                "path": "path/to/my-qemu-kernel.bin",
-            }
-        ]);
-
-        let expected = AssemblyManifest {
-            images: vec![Image::QemuKernel("path/to/my-qemu-kernel.bin".into())],
-        };
-
-        let result: Result<SerializationHelper, _> = serde_json::from_value(value);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), SerializationHelper { images: expected.images });
     }
 
     #[test]

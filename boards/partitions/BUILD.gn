@@ -4,9 +4,6 @@
 
 import("//build/assembly/generated_partitions_config.gni")
 
-assert(current_toolchain == default_toolchain,
-       "//boards/paritions/* is only valid in the Fuchsia toolchain")
-
 _standard_names = {
   zbi_a = "zircon_a"
   zbi_b = "zircon_b"

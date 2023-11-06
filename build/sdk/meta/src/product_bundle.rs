@@ -185,7 +185,7 @@ impl ProductBundle {
         };
         let product_bundle_path = path.as_ref().join("product_bundle.json");
         let file = File::create(product_bundle_path).context("creating product bundle file")?;
-        serde_json::to_writer_pretty(file, &helper).context("writing product bundle file")?;
+        serde_json::to_writer(file, &helper).context("writing product bundle file")?;
         Ok(())
     }
 

@@ -26,7 +26,7 @@ pub struct GenerateTransferManifest {
 
     /// path to the directory to write the transfer.json manifest.
     #[argh(option)]
-    output: Utf8PathBuf,
+    out_dir: Utf8PathBuf,
 }
 
 impl GenerateTransferManifest {
@@ -38,12 +38,8 @@ impl GenerateTransferManifest {
             ProductBundle::V2(pb) => pb,
         };
 
-        let out_dir = self.output.parent().unwrap();
-        std::fs::create_dir_all(&out_dir).context("creating output directory")?;
         let canonical_out_dir =
-            &out_dir.canonicalize_utf8().context("canonicalizing output directory")?;
-        let canonical_output = canonical_out_dir.join(&self.output.file_name().unwrap());
-
+            &self.out_dir.canonicalize_utf8().context("canonicalizing out_dir")?;
         let canonical_product_bundle_path = &self
             .product_bundle
             .canonicalize_utf8()
@@ -183,7 +179,8 @@ impl GenerateTransferManifest {
 
         // Write the transfer manifest.
         let transfer_manifest = TransferManifest::V1(TransferManifestV1 { entries });
-        let file = File::create(canonical_output).context("creating transfer manifest")?;
+        let transfer_manifest_path = self.out_dir.join("transfer.json");
+        let file = File::create(transfer_manifest_path).context("creating transfer manifest")?;
         serde_json::to_writer_pretty(file, &transfer_manifest)
             .context("writing transfer manifest")?;
         Ok(())
@@ -270,12 +267,14 @@ mod tests {
         });
         pb.write(&pb_path).unwrap();
 
-        let output = tempdir.join("transfer.json");
-        let cmd =
-            GenerateTransferManifest { product_bundle: pb_path.clone(), output: output.clone() };
+        let cmd = GenerateTransferManifest {
+            product_bundle: pb_path.clone(),
+            out_dir: tempdir.to_path_buf(),
+        };
         cmd.generate().await.unwrap();
 
-        let transfer_manifest_file = File::open(output).unwrap();
+        let output = tempdir.join("transfer.json");
+        let transfer_manifest_file = File::open(&output).unwrap();
         let transfer_manifest: TransferManifest =
             serde_json::from_reader(transfer_manifest_file).unwrap();
         assert_eq!(
