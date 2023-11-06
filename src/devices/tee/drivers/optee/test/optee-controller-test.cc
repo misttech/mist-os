@@ -260,11 +260,7 @@ class FakeDdkOptee : public zxtest::Test {
   FakePDev pdev_;
   FakeRpmbService rpmb_service_;
 
-  fdf_testing::DriverRuntime runtime_;
-
-  // TODO(fxb/124464): Migrate test to use dispatcher integration.
-  std::shared_ptr<MockDevice> parent_ =
-      MockDevice::FakeRootParentNoDispatcherIntegrationDEPRECATED();
+  std::shared_ptr<MockDevice> parent_{MockDevice::FakeRootParent()};
   OpteeController* optee_ = nullptr;
 
   async::Loop clients_loop_;

@@ -106,7 +106,6 @@ test("optee-controller-test-bin") {
   deps = [
     ":optee_lib",
     "//sdk/lib/component/outgoing/cpp",
-    "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//sdk/lib/driver/runtime:driver_runtime_env",
     "//sdk/lib/driver/runtime/testing/cpp",
     "//src/devices/lib/driver:driver_runtime",
