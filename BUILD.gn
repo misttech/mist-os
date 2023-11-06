@@ -1361,6 +1361,7 @@ build_api_module("cipd_assembly_artifacts") {
 build_api_module("assembly_input_archives") {
   testonly = true
   data_keys = [ "assembly_input_archives" ]
+  walk_keys = [ "assembly_input_archives_barrier" ]
   deps = [
     # The platform bundles
     "//bundles/assembly",

@@ -38,6 +38,7 @@ template("generated_assembly_inputs") {
                            ])
     outputs = [ files.platform_aibs ]
     data_keys = [ "assembly_input_archives" ]
+    walk_keys = [ "assembly_input_archives_barrier" ]
     output_conversion = "json"
 
     deps = []

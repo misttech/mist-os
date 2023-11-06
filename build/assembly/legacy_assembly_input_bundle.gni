@@ -685,6 +685,7 @@ template("legacy_assembly_input_bundle") {
       package_barrier = []
       config_package_barrier = []
       distribution_entries_barrier = []
+      assembly_input_archives_barrier = []
     }
   }
 
