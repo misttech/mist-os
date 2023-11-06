@@ -1785,6 +1785,8 @@ async fn installer_creates_datapath<N: Netstack, I: net_types::ip::Ip>(test_name
     const SUBNET: fidl_fuchsia_net::Subnet = fidl_subnet!("192.168.0.0/24");
     const ALICE_IP_V4: fidl_fuchsia_net::Subnet = fidl_subnet!("192.168.0.1/24");
     const BOB_IP_V4: fidl_fuchsia_net::Subnet = fidl_subnet!("192.168.0.2/24");
+    const ALICE_MAC: fnet::MacAddress = fidl_mac!("02:00:00:00:00:01");
+    const BOB_MAC: fnet::MacAddress = fidl_mac!("02:00:00:00:00:02");
 
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let network = sandbox
@@ -1804,124 +1806,129 @@ async fn installer_creates_datapath<N: Netstack, I: net_types::ip::Ip>(test_name
             Option<fidl_fuchsia_net_interfaces_admin::AddressStateProviderProxy>,
     }
 
-    let realms_stream = futures::stream::iter([("alice", ALICE_IP_V4), ("bob", BOB_IP_V4)]).then(
-        |(name, ipv4_addr)| {
-            let sandbox = &sandbox;
-            let network = &network;
-            async move {
-                let test_name = format!("{}_{}", test_name, name);
-                let realm =
-                    sandbox.create_netstack_realm::<N, _>(test_name.clone()).expect("create realm");
-                let endpoint = network
-                    .create_endpoint(test_name)
-                    .panic_on_timeout(format!("create {} endpoint", name))
-                    .await
-                    .expect("create endpoint");
-                let () = endpoint
-                    .set_link_up(true)
-                    .panic_on_timeout(format!("set {} link up", name))
-                    .await
-                    .expect("set link up");
-                let installer = realm
-                    .connect_to_protocol::<fidl_fuchsia_net_interfaces_admin::InstallerMarker>()
-                    .expect("connect to protocol");
+    let realms_stream =
+        futures::stream::iter([("alice", ALICE_IP_V4, ALICE_MAC), ("bob", BOB_IP_V4, BOB_MAC)])
+            .then(|(name, ipv4_addr, mac)| {
+                let sandbox = &sandbox;
+                let network = &network;
+                async move {
+                    let test_name = format!("{}_{}", test_name, name);
+                    let realm = sandbox
+                        .create_netstack_realm::<N, _>(test_name.clone())
+                        .expect("create realm");
+                    let endpoint = network
+                        .create_endpoint_with(
+                            test_name,
+                            netemul::new_endpoint_config(netemul::DEFAULT_MTU, Some(mac)),
+                        )
+                        .panic_on_timeout(format!("create {} endpoint", name))
+                        .await
+                        .expect("create endpoint");
+                    let () = endpoint
+                        .set_link_up(true)
+                        .panic_on_timeout(format!("set {} link up", name))
+                        .await
+                        .expect("set link up");
+                    let installer = realm
+                        .connect_to_protocol::<fidl_fuchsia_net_interfaces_admin::InstallerMarker>()
+                        .expect("connect to protocol");
 
-                let (device, port_id) = endpoint
-                    .get_netdevice()
-                    .panic_on_timeout(format!("get {} netdevice", name))
-                    .await
-                    .expect("get netdevice");
-                let (device_control, device_control_server_end) = fidl::endpoints::create_proxy::<
-                    fidl_fuchsia_net_interfaces_admin::DeviceControlMarker,
-                >()
-                .expect("create proxy");
-                let () = installer
-                    .install_device(device, device_control_server_end)
-                    .expect("install device");
-
-                let (control, control_server_end) =
-                    fidl_fuchsia_net_interfaces_ext::admin::Control::create_endpoints()
+                    let (device, port_id) = endpoint
+                        .get_netdevice()
+                        .panic_on_timeout(format!("get {} netdevice", name))
+                        .await
+                        .expect("get netdevice");
+                    let (device_control, device_control_server_end) =
+                        fidl::endpoints::create_proxy::<
+                            fidl_fuchsia_net_interfaces_admin::DeviceControlMarker,
+                        >()
                         .expect("create proxy");
-                let () = device_control
-                    .create_interface(
-                        &port_id,
-                        control_server_end,
-                        &fidl_fuchsia_net_interfaces_admin::Options {
-                            name: Some(name.to_string()),
-                            metric: None,
-                            ..Default::default()
-                        },
-                    )
-                    .expect("create interface");
-                let iface_id = control
-                    .get_id()
-                    .panic_on_timeout(format!("get {} interface id", name))
-                    .await
-                    .expect("get id");
+                    let () = installer
+                        .install_device(device, device_control_server_end)
+                        .expect("install device");
 
-                let did_enable = control
-                    .enable()
-                    .panic_on_timeout(format!("enable {} interface", name))
-                    .await
-                    .expect("calling enable")
-                    .expect("enable failed");
-                assert!(did_enable);
-
-                let (addr, address_state_provider) = match I::VERSION {
-                    net_types::ip::IpVersion::V4 => {
-                        let address_state_provider = interfaces::add_address_wait_assigned(
-                            &control,
-                            ipv4_addr,
-                            fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
+                    let (control, control_server_end) =
+                        fidl_fuchsia_net_interfaces_ext::admin::Control::create_endpoints()
+                            .expect("create proxy");
+                    let () = device_control
+                        .create_interface(
+                            &port_id,
+                            control_server_end,
+                            &fidl_fuchsia_net_interfaces_admin::Options {
+                                name: Some(name.to_string()),
+                                metric: None,
+                                ..Default::default()
+                            },
                         )
-                        .panic_on_timeout(format!("add {} ipv4 address", name))
+                        .expect("create interface");
+                    let iface_id = control
+                        .get_id()
+                        .panic_on_timeout(format!("get {} interface id", name))
                         .await
-                        .expect("add address");
+                        .expect("get id");
 
-                        // Adding addresses through Control does not add the subnet
-                        // routes.
-                        let stack = realm
-                            .connect_to_protocol::<fidl_fuchsia_net_stack::StackMarker>()
-                            .expect("connect to protocol");
-                        let () = stack
-                            .add_forwarding_entry(&fidl_fuchsia_net_stack::ForwardingEntry {
-                                subnet: SUBNET,
-                                device_id: iface_id,
-                                next_hop: None,
-                                metric: 0,
-                            })
-                            .panic_on_timeout(format!("add {} route", name))
+                    let did_enable = control
+                        .enable()
+                        .panic_on_timeout(format!("enable {} interface", name))
+                        .await
+                        .expect("calling enable")
+                        .expect("enable failed");
+                    assert!(did_enable);
+
+                    let (addr, address_state_provider) = match I::VERSION {
+                        net_types::ip::IpVersion::V4 => {
+                            let address_state_provider = interfaces::add_address_wait_assigned(
+                                &control,
+                                ipv4_addr,
+                                fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
+                            )
+                            .panic_on_timeout(format!("add {} ipv4 address", name))
                             .await
-                            .expect("send add route")
-                            .expect("add route");
-                        let fidl_fuchsia_net_ext::IpAddress(addr) = ipv4_addr.addr.into();
-                        (addr, Some(address_state_provider))
+                            .expect("add address");
+
+                            // Adding addresses through Control does not add the subnet
+                            // routes.
+                            let stack = realm
+                                .connect_to_protocol::<fidl_fuchsia_net_stack::StackMarker>()
+                                .expect("connect to protocol");
+                            let () = stack
+                                .add_forwarding_entry(&fidl_fuchsia_net_stack::ForwardingEntry {
+                                    subnet: SUBNET,
+                                    device_id: iface_id,
+                                    next_hop: None,
+                                    metric: 0,
+                                })
+                                .panic_on_timeout(format!("add {} route", name))
+                                .await
+                                .expect("send add route")
+                                .expect("add route");
+                            let fidl_fuchsia_net_ext::IpAddress(addr) = ipv4_addr.addr.into();
+                            (addr, Some(address_state_provider))
+                        }
+                        net_types::ip::IpVersion::V6 => {
+                            let ipv6 = netstack_testing_common::interfaces::wait_for_v6_ll(
+                        &realm
+                            .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
+                            .expect("connect to protocol"),
+                        iface_id,
+                    )
+                    .panic_on_timeout(format!("wait for {} ipv6 address", name))
+                    .await
+                    .expect("get ipv6 link local");
+                            (net_types::ip::IpAddr::V6(ipv6).into(), None)
+                        }
+                    };
+                    RealmInfo {
+                        realm,
+                        addr,
+                        iface_id,
+                        endpoint,
+                        device_control,
+                        control,
+                        address_state_provider,
                     }
-                    net_types::ip::IpVersion::V6 => {
-                        let ipv6 = netstack_testing_common::interfaces::wait_for_v6_ll(
-                            &realm
-                                .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
-                                .expect("connect to protocol"),
-                            iface_id,
-                        )
-                        .panic_on_timeout(format!("wait for {} ipv6 address", name))
-                        .await
-                        .expect("get ipv6 link local");
-                        (net_types::ip::IpAddr::V6(ipv6).into(), None)
-                    }
-                };
-                RealmInfo {
-                    realm,
-                    addr,
-                    iface_id,
-                    endpoint,
-                    device_control,
-                    control,
-                    address_state_provider,
                 }
-            }
-        },
-    );
+            });
     futures::pin_mut!(realms_stream);
 
     // Can't drop any of the fields of RealmInfo to maintain objects alive.
@@ -1942,7 +1949,7 @@ async fn installer_creates_datapath<N: Netstack, I: net_types::ip::Ip>(test_name
         realm: bob_realm,
         endpoint: _bob_endpoint,
         addr: bob_addr,
-        iface_id: _,
+        iface_id: bob_iface_id,
         device_control: _bob_device_control,
         control: _bob_control,
         address_state_provider: _bob_asp,
@@ -1951,6 +1958,28 @@ async fn installer_creates_datapath<N: Netstack, I: net_types::ip::Ip>(test_name
         .panic_on_timeout("setup bob fixture")
         .await
         .expect("create alice realm");
+
+    // Put Alice and Bob in each other's neighbor table. We've observed flakes
+    // in CQ due to ARP timeouts and ARP resolution is immaterial to the tests
+    // we run here.
+    alice_realm
+        .add_neighbor_entry(
+            alice_iface_id,
+            fidl_fuchsia_net_ext::IpAddress(bob_addr).into(),
+            BOB_MAC,
+        )
+        .panic_on_timeout("wait for Alice to add a static neighbor")
+        .await
+        .expect("add static neighbor");
+    bob_realm
+        .add_neighbor_entry(
+            bob_iface_id,
+            fidl_fuchsia_net_ext::IpAddress(alice_addr).into(),
+            ALICE_MAC,
+        )
+        .panic_on_timeout("wait for Bob to add a static neighbor")
+        .await
+        .expect("add static neighbor");
 
     const PORT: u16 = 8080;
     let (bob_addr, bind_ip) = match bob_addr {
