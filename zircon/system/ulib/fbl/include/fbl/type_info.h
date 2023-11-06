@@ -6,6 +6,7 @@
 #define FBL_TYPE_INFO_H_
 
 #include <stddef.h>
+
 #include <utility>
 
 //
@@ -42,14 +43,13 @@ namespace fbl {
 //      // Function body...
 //  }
 //
+namespace internal {
+
 template <typename T>
 class TypeInfo {
  public:
-  // Returns the string name for type T.
-  static const char* Name() {
-    static constexpr TypeInfo type_info;
-    return type_info.name;
-  }
+  constexpr TypeInfo() : TypeInfo(std::make_index_sequence<Size>{}) {}
+  constexpr const char* Name() const { return name_; }
 
  private:
   struct Info {
@@ -77,12 +77,23 @@ class TypeInfo {
   static constexpr size_t Offset = Get().kOffset;
   static constexpr const char* BaseName = Get().kName;
 
-  constexpr TypeInfo() : TypeInfo(std::make_index_sequence<Size>{}) {}
   template <size_t... Is>
   constexpr TypeInfo(std::index_sequence<Is...>)
-      : name{(Is < Size - 1 ? BaseName[Offset + Is] : '\0')...} {}
+      : name_{(Is < Size - 1 ? BaseName[Offset + Is] : '\0')...} {}
 
-  const char name[Size];
+  const char name_[Size];
+};
+
+}  // namespace internal
+
+template <typename T>
+class TypeInfo {
+ public:
+  // Returns the string name for type T.
+  static constexpr const char* Name() { return storage_.Name(); }
+
+ private:
+  static constexpr internal::TypeInfo<T> storage_{};
 };
 
 }  // namespace fbl
