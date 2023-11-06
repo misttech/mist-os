@@ -1,0 +1,5 @@
+Name: gfxstream
+URL: https://android.googlesource.com/platform/hardware/google/aemu/+/refs/heads/main
+License: Apache 2.0
+License File: src/LICENSE
+Description: This is an utility library for common functions used in the Android Emulator.

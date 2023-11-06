@@ -1,0 +1,5 @@
+Name: gfxstream
+URL: https://android.googlesource.com/platform/hardware/google/gfxstream/+/refs/heads/main
+License: Apache 2.0
+License File: src/LICENSE
+Description: Graphics Streaming Kit is a code generator that makes it easier to serialize and forward graphics API calls from one place to another.
