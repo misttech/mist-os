@@ -34,13 +34,8 @@ class BanjoServer {
     return fdf::MakeProperty(1 /*BIND_PROTOCOL */, compat_device_.proto_ops.id);
   }
 
-  DeviceServer::GetBanjoProtoCb callback() {
-    return [this](uint32_t protocol) -> zx::result<DeviceServer::GenericProtocol> {
-      if (protocol == compat_device_.proto_ops.id) {
-        return zx::ok(proto());
-      }
-      return zx::error(ZX_ERR_NOT_SUPPORTED);
-    };
+  DeviceServer::SpecificGetBanjoProtoCb callback() {
+    return [this]() -> DeviceServer::GenericProtocol { return proto(); };
   }
 
  private:

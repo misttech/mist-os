@@ -58,11 +58,13 @@ class DeviceServer : public fidl::WireServer<fuchsia_driver_compat::Device> {
     async::TaskClosure task;
   };
 
-  using GetBanjoProtoCb = fit::function<zx::result<GenericProtocol>(BanjoProtoId)>;
+  using SpecificGetBanjoProtoCb = fit::function<GenericProtocol()>;
+  using GenericGetBanjoProtoCb = fit::function<zx::result<GenericProtocol>(BanjoProtoId)>;
 
   struct BanjoConfig {
     BanjoProtoId default_proto_id = 0;
-    std::unordered_map<BanjoProtoId, GetBanjoProtoCb> callbacks = {};
+    GenericGetBanjoProtoCb generic_callback = nullptr;
+    std::unordered_map<BanjoProtoId, SpecificGetBanjoProtoCb> callbacks = {};
   };
 
   // Initialize empty. Can use |Init| to fill in information later.

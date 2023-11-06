@@ -368,7 +368,7 @@ zx_status_t Device::Add(device_add_args_t* zx_args, zx_device_t** out) {
   }
 
   DeviceServer::BanjoConfig banjo_config{zx_args->proto_id};
-  banjo_config.callbacks[zx_args->proto_id] =
+  banjo_config.generic_callback =
       [device =
            std::weak_ptr(device)](uint32_t proto_id) -> zx::result<DeviceServer::GenericProtocol> {
     DeviceServer::GenericProtocol protocol;

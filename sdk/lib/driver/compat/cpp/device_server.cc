@@ -225,21 +225,30 @@ void DeviceServer::GetBanjoProtocol(GetBanjoProtocolRequestView request,
     return;
   }
 
+  // If there is a specific entry for the proto_id, use it. Otherwise use the generic one
+  // if one was provided.
+  GenericProtocol result;
   auto entry = banjo_config_->callbacks.find(request->proto_id);
   if (entry == banjo_config_->callbacks.end()) {
-    completer.ReplyError(ZX_ERR_NOT_FOUND);
-    return;
+    if (!banjo_config_->generic_callback) {
+      completer.ReplyError(ZX_ERR_NOT_FOUND);
+      return;
+    }
+
+    zx::result generic_result = banjo_config_->generic_callback(request->proto_id);
+    if (generic_result.is_error()) {
+      completer.ReplyError(ZX_ERR_NOT_FOUND);
+      return;
+    }
+
+    result = generic_result.value();
+  } else {
+    auto& get_banjo_protocol = entry->second;
+    result = get_banjo_protocol();
   }
 
-  auto& get_banjo_protocol = entry->second;
-  zx::result result = get_banjo_protocol(request->proto_id);
-  if (result.is_error()) {
-    completer.ReplyError(ZX_ERR_NOT_FOUND);
-    return;
-  }
-
-  completer.ReplySuccess(reinterpret_cast<uint64_t>(result->ops),
-                         reinterpret_cast<uint64_t>(result->ctx));
+  completer.ReplySuccess(reinterpret_cast<uint64_t>(result.ops),
+                         reinterpret_cast<uint64_t>(result.ctx));
 }
 
 void DeviceServer::BeginAsyncInit() {
