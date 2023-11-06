@@ -26,5 +26,5 @@ done
 
 echo "#!/bin/bash" > "$OUTFILE"
 echo "" >> "$OUTFILE"
-echo "${TOOL} ${TOOL_ARGS[*]}" '"$@"' >> "$OUTFILE"
+echo "exec ${TOOL} ${TOOL_ARGS[*]}" '"$@"' >> "$OUTFILE"
 chmod a+x "$OUTFILE"
