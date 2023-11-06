@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 library fuchsia.pkg;
 
+using fuchsia.url;
+
 /// A content-addressed merkle root that describes an artifact that is tracked by the
 /// packaging system.
 type BlobId = struct {
@@ -19,13 +21,13 @@ type BlobInfo = struct {
 /// A fuchsia-pkg:// URL indicating a package.
 /// https://fuchsia.dev/fuchsia-src/concepts/packages/package_url#package_identity
 type PackageUrl = struct {
-    url string:2048;
+    url string:fuchsia.url.MAX_URL_LENGTH;
 };
 
 /// A fuchsia-pkg:// URL indicating a repository.
 /// https://fuchsia.dev/fuchsia-src/concepts/packages/package_url#repository_identity
 type RepositoryUrl = struct {
-    url string:2048;
+    url string:fuchsia.url.MAX_URL_LENGTH;
 };
 
 /// A single entry in the package index.
