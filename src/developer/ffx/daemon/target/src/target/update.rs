@@ -50,6 +50,8 @@ impl<'a> Default for Connection<'a> {
 struct Trivia {
     build_config: Option<Option<BuildConfig>>,
     boot_timestamp_nanos: Option<Option<u64>>,
+
+    rcs_compatibility: Option<Option<compat_info::CompatibilityInfo>>,
 }
 
 /// Records how to update a target.
@@ -258,6 +260,11 @@ impl<'a> TargetUpdateBuilder<'a> {
         self
     }
 
+    pub fn rcs_compatibility(mut self, info: Option<compat_info::CompatibilityInfo>) -> Self {
+        self.trivia.rcs_compatibility = Some(info);
+        self
+    }
+
     pub fn build(self) -> TargetUpdate<'a> {
         self.0
     }
@@ -353,12 +360,18 @@ impl super::Target {
             }
         }
 
-        if let Trivia { build_config: Some(ref mut build_config), .. } = update.trivia {
-            self.build_config.replace(std::mem::take(build_config));
+        let Trivia { build_config, boot_timestamp_nanos, rcs_compatibility } = update.trivia;
+
+        if let Some(build_config) = build_config {
+            self.build_config.replace(build_config);
         }
 
-        if let Trivia { boot_timestamp_nanos: Some(ts), .. } = update.trivia {
+        if let Some(ts) = boot_timestamp_nanos {
             self.boot_timestamp_nanos.replace(ts);
+        }
+
+        if let Some(info) = rcs_compatibility {
+            self.compatibility_status.replace(info);
         }
     }
 }
@@ -382,10 +395,17 @@ mod tests {
         assert_eq!(*target.ssh_host_address.borrow(), None);
         assert_eq!(*target.build_config.borrow(), None);
         assert_eq!(*target.boot_timestamp_nanos.borrow(), None);
+        assert_eq!(*target.compatibility_status.borrow(), None);
 
         let host_addr = HostAddr::from("foo".to_string());
         let build_config =
             BuildConfig { product_config: "product".into(), board_config: "board".into() };
+
+        let compatibility = compat_info::CompatibilityInfo {
+            status: compat_info::CompatibilityState::Error,
+            platform_abi: 0,
+            message: "Error message here".into(),
+        };
 
         target.apply_update(
             TargetUpdateBuilder::new()
@@ -398,6 +418,7 @@ mod tests {
                 .ssh_host_addr(Some(host_addr.clone()))
                 .build_config(Some(build_config.clone()))
                 .boot_timestamp_nanos(Some(1234))
+                .rcs_compatibility(Some(compatibility.clone()))
                 .build(),
         );
 
@@ -412,6 +433,7 @@ mod tests {
         assert_eq!(*target.ssh_host_address.borrow(), Some(host_addr));
         assert_eq!(*target.build_config.borrow(), Some(build_config));
         assert_eq!(*target.boot_timestamp_nanos.borrow(), Some(1234));
+        assert_eq!(*target.compatibility_status.borrow(), Some(compatibility));
 
         target.apply_update(
             TargetUpdateBuilder::new()
@@ -419,6 +441,7 @@ mod tests {
                 .ssh_host_addr(None)
                 .build_config(None)
                 .boot_timestamp_nanos(None)
+                .rcs_compatibility(None)
                 .build(),
         );
 
@@ -426,6 +449,7 @@ mod tests {
         assert_eq!(*target.ssh_host_address.borrow(), None);
         assert_eq!(*target.build_config.borrow(), None);
         assert_eq!(*target.boot_timestamp_nanos.borrow(), None);
+        assert_eq!(*target.compatibility_status.borrow(), None);
     }
 
     #[fuchsia_async::run_singlethreaded(test)]

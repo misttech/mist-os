@@ -781,6 +781,14 @@ mod tests {
         let temp = tempdir().expect("cannot get tempdir");
         init_test_config(&env, temp.path()).await;
 
+        // Disable mDNS autoconnect to prevent RCS connection attempts in this test.
+        env.context
+            .query("discovery.mdns.autoconnect")
+            .level(Some(ConfigLevel::User))
+            .set(json!(false))
+            .await
+            .unwrap();
+
         const NAME: &'static str = "foo";
         const NAME2: &'static str = "bar";
         const NAME3: &'static str = "baz";
@@ -851,6 +859,38 @@ mod tests {
             // targets when there is a partial match.
             name == NAME3 || name == NAME2
         }));
+
+        // Regression test for b/308490757:
+        // Targets with a long compatibility message fail to send across FIDL boundary.
+        let compatibility = ffx::CompatibilityInfo {
+            state: ffx::CompatibilityState::Unsupported,
+            platform_abi: 1234,
+            message: r"Somehow, some way, this target is incompatible.
+                To convey this information, this exceptionally long message contains information,
+                some of which is unrelated to the problem.
+
+                Did you know: They did surgery on a grape."
+                .into(),
+        };
+
+        {
+            let tc = fake_daemon.get_target_collection().await.unwrap();
+
+            tc.update_target(
+                &[TargetUpdateFilter::LegacyNodeName(NAME)],
+                TargetUpdateBuilder::new()
+                    .rcs_compatibility(Some(compatibility.clone().into()))
+                    .build(),
+                false,
+            );
+        }
+
+        match &*list_targets(Some(NAME), &tc).await {
+            [target] if target.nodename.as_deref() == Some(NAME) => {
+                assert_eq!(target.compatibility, Some(compatibility));
+            }
+            list => panic!("Expected single target '{NAME}', got {list:?}"),
+        }
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
