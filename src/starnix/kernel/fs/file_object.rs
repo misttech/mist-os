@@ -24,7 +24,7 @@ use crate::{
     task::{CurrentTask, EventHandler, Task, WaitCallback, WaitCanceler, Waiter},
     types::{
         as_any::AsAny, errno, error, fsxattr, off_t, pid_t, uapi, Errno, OpenFlags, Resource,
-        SealFlags, UserAddress, EAGAIN, ETIMEDOUT, FIONBIO, FS_IOC_ENABLE_VERITY,
+        SealFlags, UserAddress, EAGAIN, ETIMEDOUT, FIONBIO, FIONREAD, FS_IOC_ENABLE_VERITY,
         FS_IOC_FSGETXATTR, FS_IOC_FSSETXATTR, FS_IOC_GETFLAGS, FS_IOC_MEASURE_VERITY,
         FS_IOC_READ_VERITY_METADATA, FS_IOC_SETFLAGS, FS_VERITY_FL, SEEK_CUR, SEEK_DATA, SEEK_END,
         SEEK_HOLE, SEEK_SET, TCGETS,
@@ -573,7 +573,20 @@ pub fn default_ioctl(
             file.update_file_flags(OpenFlags::NONBLOCK, OpenFlags::NONBLOCK);
             Ok(SUCCESS)
         }
+        FIONREAD => {
+            not_implemented!("FIONREAD");
+            if !file.name.entry.node.is_reg() {
+                return error!(ENOTTY);
+            }
 
+            let size =
+                file.name.entry.node.refresh_info(current_task).map_err(|_| errno!(EINVAL))?.size;
+            let offset = usize::try_from(*file.offset.lock()).map_err(|_| errno!(EINVAL))?;
+            let remaining =
+                if size < offset { 0 } else { i32::try_from(size - offset).unwrap_or(i32::MAX) };
+            current_task.write_object(arg.into(), &remaining)?;
+            Ok(SUCCESS)
+        }
         FS_IOC_FSGETXATTR => {
             not_implemented!("FS_IOC_FSGETXATTR");
             let arg = UserAddress::from(arg).into();
