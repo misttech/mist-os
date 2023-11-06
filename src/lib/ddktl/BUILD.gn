@@ -133,7 +133,6 @@ source_set("ddktl") {
     "//src/devices/block/drivers/core:*",
     "//src/devices/block/drivers/ftl:*",
     "//src/devices/block/drivers/gpt:*",
-    "//src/devices/block/drivers/imx8m-sdmmc:*",
     "//src/devices/block/drivers/mbr:*",
     "//src/devices/block/drivers/ramdisk:*",
     "//src/devices/block/drivers/sdmmc:*",

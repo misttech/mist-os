@@ -169,7 +169,6 @@ sdk_static_library("ddk") {
     "//src/devices/block/drivers/core:*",
     "//src/devices/block/drivers/ftl:*",
     "//src/devices/block/drivers/gpt:*",
-    "//src/devices/block/drivers/imx8m-sdmmc:*",
     "//src/devices/block/drivers/mbr:*",
     "//src/devices/block/drivers/nvme:*",
     "//src/devices/block/drivers/pci-sdhci:*",

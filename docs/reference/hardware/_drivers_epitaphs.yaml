@@ -416,3 +416,9 @@
   available_in_git: 'bb05e1f62b8802e8e55a54bcf5f5aa70c5c7ab84'
   areas: ['GPIO']
   path: '/src/devices/gpio/drivers/imx8m-gpio'
+- short_description: 'NXP i.MX8-m SDMMC driver'
+  deletion_reason: 'Hardware is not actively supported'
+  gerrit_change_id: '941027'
+  available_in_git: 'bb05e1f62b8802e8e55a54bcf5f5aa70c5c7ab84'
+  areas: ['Block']
+  path: '/src/devices/block/drivers/imx8m-sdmmc'
