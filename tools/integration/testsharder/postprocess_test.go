@@ -1085,8 +1085,7 @@ func TestWithTargetDuration(t *testing.T) {
 		actual, _ := WithTargetDuration(defaultInput, 5, 0, 2, 0, durations)
 		expectedTests := [][]string{
 			{test(1)},
-			{test(2), test(4), test(6)},
-			{test(5), test(3)},
+			{test(2), test(3), test(4), test(5), test(6)},
 		}
 		assertShardsContainTests(t, actual, expectedTests)
 	})

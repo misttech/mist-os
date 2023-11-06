@@ -448,6 +448,7 @@ func WithTargetDuration(
 	if targetDuration > 0 {
 		for env, shards := range shardsPerEnv {
 			totalTestsPerEnv := 0
+			minTargetDurationForEnv := time.Duration(0)
 			targetDurationForEnv := targetDuration
 			var shardDuration time.Duration
 			for _, shard := range shards {
@@ -458,6 +459,7 @@ func WithTargetDuration(
 				for _, t := range shard.Tests {
 					duration := testDurations.Get(t).MedianDuration
 					if duration > targetDurationForEnv {
+						minTargetDurationForEnv = duration
 						targetDurationForEnv = duration
 					}
 					shardDuration += duration * time.Duration(t.minRequiredRuns())
@@ -487,7 +489,13 @@ func WithTargetDuration(
 				}
 			}
 			if subShardCount > 0 {
-				targetDurationForEnv = time.Duration(divRoundUp(int(shardDuration), subShardCount))
+				newTargetDurationForEnv := time.Duration(divRoundUp(int(shardDuration), subShardCount))
+				// In the case where maxShardSize > 0 and we try to increase the number of shards,
+				// the new target duration would be decreased. However, we still need to make sure
+				// it's greater than the minimum reuired target duration.
+				if newTargetDurationForEnv > minTargetDurationForEnv {
+					targetDurationForEnv = newTargetDurationForEnv
+				}
 			}
 			if targetDurationForEnv > largestTargetDuration {
 				largestTargetDuration = targetDurationForEnv
