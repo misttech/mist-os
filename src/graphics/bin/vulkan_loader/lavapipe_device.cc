@@ -29,7 +29,11 @@ bool LavapipeDevice::Initialize(const std::string& name, inspect::Node* parent) 
   std::string component_url = "fuchsia-pkg://fuchsia.com/libvulkan_lavapipe#meta/vulkan.cm";
   data.RecordString("component_url", component_url);
 
-  icd_list_.Add(app()->CreateIcdComponent(component_url));
+  zx::result icd_component = app()->CreateIcdComponent(component_url);
+  if (icd_component.is_error()) {
+    FX_LOGS(ERROR) << "Failed to create ICD component: " << icd_component.status_string();
+  }
+  icd_list_.Add(std::move(*icd_component));
   icds().push_back(std::move(data));
 
   return true;

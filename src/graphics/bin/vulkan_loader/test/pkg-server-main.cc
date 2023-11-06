@@ -2,16 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/gpu/magma/cpp/fidl_test_base.h>
-#include <fuchsia/io/cpp/fidl.h>
-#include <fuchsia/process/lifecycle/cpp/fidl.h>
+#include <fidl/fuchsia.gpu.magma/cpp/test_base.h>
+#include <fidl/fuchsia.io/cpp/wire.h>
+#include <fidl/fuchsia.process.lifecycle/cpp/test_base.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/sys/cpp/component_context.h>
 #include <lib/syslog/cpp/macros.h>
+#include <zircon/process.h>
 #include <zircon/processargs.h>
 
-#include "sdk/lib/fidl/cpp/binding_set.h"
 #include "src/lib/fxl/command_line.h"
 #include "src/lib/fxl/log_settings_command_line.h"
 #include "src/storage/lib/vfs/cpp/pseudo_dir.h"
@@ -19,89 +18,95 @@
 #include "src/storage/lib/vfs/cpp/synchronous_vfs.h"
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
 
-class FakeMagmaDevice : public fuchsia::gpu::magma::testing::CombinedDevice_TestBase {
+class FakeMagmaDevice : public fidl::testing::TestBase<fuchsia_gpu_magma::CombinedDevice> {
  public:
-  void NotImplemented_(const std::string& name) override {
-    FX_LOGS(ERROR) << "Magma doing notimplemented with " << name;
-  }
+  explicit FakeMagmaDevice(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
 
-  void GetIcdList(GetIcdListCallback callback) override {
-    fuchsia::gpu::magma::IcdInfo info;
-    info.set_component_url(
-        "fuchsia-pkg://fuchsia.com/vulkan_loader_tests#meta/test_vulkan_driver.cm");
-    info.set_flags(fuchsia::gpu::magma::IcdFlags::SUPPORTS_VULKAN);
-    std::vector<fuchsia::gpu::magma::IcdInfo> vec;
-    vec.push_back(std::move(info));
-    callback(std::move(vec));
-  }
+  void CloseAll() { bindings_.CloseAll(ZX_OK); }
 
-  void Query(fuchsia::gpu::magma::QueryId id, QueryCallback callback) override {
-    fuchsia::gpu::magma::Device_Query_Result result;
-    result.set_response(fuchsia::gpu::magma::Device_Query_Response::WithSimpleResult(5));
-    callback(std::move(result));
+  auto ProtocolConnector() {
+    return [this](fidl::ServerEnd<fuchsia_gpu_magma::CombinedDevice> server_end) -> zx_status_t {
+      bindings_.AddBinding(dispatcher_, std::move(server_end), this, fidl::kIgnoreBindingClosure);
+      return ZX_OK;
+    };
   }
-
-  fidl::InterfaceRequestHandler<fuchsia::gpu::magma::CombinedDevice> GetHandler() {
-    return bindings_.GetHandler(this);
-  }
-
-  void CloseAll() { bindings_.CloseAll(); }
 
  private:
-  fidl::BindingSet<fuchsia::gpu::magma::CombinedDevice> bindings_;
+  void GetIcdList(GetIcdListCompleter::Sync& completer) override {
+    fuchsia_gpu_magma::IcdInfo info;
+    info.component_url() =
+        "fuchsia-pkg://fuchsia.com/vulkan_loader_tests#meta/test_vulkan_driver.cm";
+    info.flags() = fuchsia_gpu_magma::IcdFlags::kSupportsVulkan;
+    completer.Reply(std::vector{std::move(info)});
+  }
+
+  void Query(QueryRequest& request, QueryCompleter::Sync& completer) override {
+    completer.Reply(fit::ok(fuchsia_gpu_magma::DeviceQueryResponse::WithSimpleResult(5)));
+  }
+
+  void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override {
+    ZX_PANIC("unexpected call to %s", name.c_str());
+  }
+
+  async_dispatcher_t* dispatcher_;
+  fidl::ServerBindingGroup<fuchsia_gpu_magma::CombinedDevice> bindings_;
 };
-class LifecycleHandler : public fuchsia::process::lifecycle::Lifecycle {
+class LifecycleHandler : public fidl::testing::TestBase<fuchsia_process_lifecycle::Lifecycle> {
  public:
-  explicit LifecycleHandler(async::Loop* loop) : loop_(loop) {
-    zx::channel channel = zx::channel(zx_take_startup_handle(PA_LIFECYCLE));
-    bindings_.AddBinding(
-        this, fidl::InterfaceRequest<fuchsia::process::lifecycle::Lifecycle>(std::move(channel)),
-        loop_->dispatcher());
-  }
-  void Stop() override {
-    loop_->Quit();
-    bindings_.CloseAll();
+  static LifecycleHandler Create(async::Loop* loop) {
+    fidl::ServerEnd server_end = fidl::ServerEnd<fuchsia_process_lifecycle::Lifecycle>{
+        zx::channel(zx_take_startup_handle(PA_LIFECYCLE))};
+    ZX_ASSERT_MSG(server_end.is_valid(), "Invalid handle for PA_LIFECYCLE!");
+    return LifecycleHandler(loop, std::move(server_end));
   }
 
  private:
-  async::Loop* loop_;
+  explicit LifecycleHandler(async::Loop* loop,
+                            fidl::ServerEnd<fuchsia_process_lifecycle::Lifecycle> server_end)
+      : loop_(loop),
+        binding_(loop->dispatcher(), std::move(server_end), this, fidl::kIgnoreBindingClosure) {}
 
-  fidl::BindingSet<fuchsia::process::lifecycle::Lifecycle> bindings_;
+  void Stop(StopCompleter::Sync& completer) override {
+    loop_->Quit();
+    binding_.Close(ZX_OK);
+  }
+
+  void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override {
+    ZX_PANIC("unexpected call to %s", name.c_str());
+  }
+
+  async::Loop* loop_;
+  fidl::ServerBinding<fuchsia_process_lifecycle::Lifecycle> binding_;
 };
 
 int main(int argc, const char* const* argv) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
-  LifecycleHandler handler(&loop);
+  LifecycleHandler handler = LifecycleHandler::Create(&loop);
   fxl::SetLogSettingsFromCommandLine(fxl::CommandLineFromArgcArgv(argc, argv));
 
-  // Use fs:: instead of vfs:: because vfs doesn't support executable directories.
   fs::SynchronousVfs vfs(loop.dispatcher());
   auto root = fbl::MakeRefCounted<fs::PseudoDir>();
 
   // Add a dev directory that the loader can watch for devices to be added.
   auto dev_gpu_dir = fbl::MakeRefCounted<fs::PseudoDir>();
   root->AddEntry("dev-gpu", dev_gpu_dir);
-  FakeMagmaDevice magma_device;
-  dev_gpu_dir->AddEntry(
-      "000", fbl::MakeRefCounted<fs::Service>([&magma_device](zx::channel channel) {
-        magma_device.GetHandler()(
-            fidl::InterfaceRequest<fuchsia::gpu::magma::CombinedDevice>(std::move(channel)));
-        return ZX_OK;
-      }));
+  FakeMagmaDevice magma_device(loop.dispatcher());
+  zx_status_t status = dev_gpu_dir->AddEntry(
+      "000", fbl::MakeRefCounted<fs::Service>(magma_device.ProtocolConnector()));
+  ZX_ASSERT_MSG(status == ZX_OK, "Failed to add device: %s", zx_status_get_string(status));
 
   auto dev_goldfish_dir = fbl::MakeRefCounted<fs::PseudoDir>();
-  root->AddEntry("dev-goldfish-pipe", dev_goldfish_dir);
+  status = root->AddEntry("dev-goldfish-pipe", dev_goldfish_dir);
+  ZX_ASSERT_MSG(status == ZX_OK, "Failed to add goldfish pipe: %s", zx_status_get_string(status));
 
   auto dev_dir = fbl::MakeRefCounted<fs::PseudoDir>();
-  root->AddEntry("dev", dev_gpu_dir);
+  status = root->AddEntry("dev", dev_gpu_dir);
+  ZX_ASSERT_MSG(status == ZX_OK, "Failed to add /dev: %s", zx_status_get_string(status));
 
   fidl::ServerEnd<fuchsia_io::Directory> dir_request{
       zx::channel(zx_take_startup_handle(PA_DIRECTORY_REQUEST))};
-  if (zx_status_t status = vfs.ServeDirectory(root, std::move(dir_request), fs::Rights::ReadOnly());
-      status != ZX_OK) {
-    FX_PLOGST(FATAL, nullptr, status) << "Failed to serve outgoing.";
-    return -1;
-  }
+  status = vfs.ServeDirectory(root, std::move(dir_request), fs::Rights::ReadOnly());
+  ZX_ASSERT_MSG(status == ZX_OK, "Failed to serve outgoing: %s", zx_status_get_string(status));
 
   loop.Run();
   return 0;

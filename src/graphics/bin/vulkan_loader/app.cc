@@ -4,11 +4,10 @@
 
 #include "src/graphics/bin/vulkan_loader/app.h"
 
+#include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
 #include <lib/fdio/directory.h>
-#include <lib/vfs/cpp/pseudo_dir.h>
-#include <lib/vfs/cpp/remote_dir.h>
 
 #include "src/graphics/bin/vulkan_loader/goldfish_device.h"
 #include "src/graphics/bin/vulkan_loader/icd_component.h"
@@ -16,19 +15,35 @@
 #include "src/graphics/bin/vulkan_loader/magma_device.h"
 #include "src/storage/lib/vfs/cpp/remote_dir.h"
 
-LoaderApp::LoaderApp(sys::ComponentContext* context, async_dispatcher_t* dispatcher,
+namespace {
+zx::result<fidl::ClientEnd<fuchsia_component::Realm>> GetRealmClient() {
+  auto endpoints = fidl::CreateEndpoints<fuchsia_component::Realm>();
+  if (endpoints.is_error()) {
+    FX_LOGS(INFO) << "Failed to create endpoints: " << endpoints.status_string();
+    return endpoints.take_error();
+  }
+  if (auto result = component::Connect(std::move(endpoints->server)); result.is_error()) {
+    return result.take_error();
+  }
+  return zx::ok(std::move(endpoints->client));
+}
+}  // namespace
+
+LoaderApp::LoaderApp(component::OutgoingDirectory* outgoing_dir, async_dispatcher_t* dispatcher,
                      structured_config_lib::Config structured_config)
-    : context_(context),
+    : outgoing_dir_(outgoing_dir),
       dispatcher_(dispatcher),
-      inspector_(context),
-      device_fs_(dispatcher),
-      manifest_fs_(dispatcher),
+      inspector_(dispatcher, {}),
+      debug_fs_(dispatcher),
       fdio_loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {
   fdio_loop_.StartThread("fdio_loop");
   inspector_.Health().StartingUp();
   config_node_ = inspector_.root().CreateChild("config");
   devices_node_ = inspector_.root().CreateChild("devices");
   icds_node_ = inspector_.root().CreateChild("icds");
+
+  debug_root_node_ = fbl::MakeRefCounted<fs::PseudoDir>();
+  device_root_node_ = fbl::MakeRefCounted<fs::PseudoDir>();
   manifest_fs_root_node_ = fbl::MakeRefCounted<fs::PseudoDir>();
 
   allow_magma_icds_ = structured_config.allow_magma_icds();
@@ -39,67 +54,63 @@ LoaderApp::LoaderApp(sys::ComponentContext* context, async_dispatcher_t* dispatc
 LoaderApp::~LoaderApp() = default;
 
 zx_status_t LoaderApp::InitDeviceFs() {
-  device_root_node_ = fbl::MakeRefCounted<fs::PseudoDir>();
-
   const char* kDevClassList[] = {"gpu", "goldfish-pipe", "goldfish-control",
                                  "goldfish-address-space", "goldfish-sync"};
 
   auto class_node = fbl::MakeRefCounted<fs::PseudoDir>();
-  device_root_node_->AddEntry("class", class_node);
+  ZX_ASSERT(device_root_node_->AddEntry("class", class_node) == ZX_OK);
 
   for (const char* dev_class : kDevClassList) {
-    fidl::InterfaceHandle<fuchsia::io::Directory> gpu_dir;
+    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ZX_ASSERT(endpoints.is_ok());
     std::string input_path = std::string("/dev/class/") + dev_class;
 
     // NB: RIGHT_READABLE is needed here because downstream code in vulkan will attempt to open this
     // directory using POSIX APIs which cannot express opening without any rights.
     zx_status_t status =
-        fdio_open(input_path.c_str(), static_cast<uint32_t>(fuchsia::io::OpenFlags::RIGHT_READABLE),
-                  gpu_dir.NewRequest().TakeChannel().release());
+        fdio_open(input_path.c_str(), static_cast<uint32_t>(fuchsia_io::OpenFlags::kRightReadable),
+                  endpoints->server.TakeChannel().release());
     if (status != ZX_OK) {
       FX_PLOGS(ERROR, status) << "Failed to open " << input_path;
       return status;
     }
 
-    class_node->AddEntry(dev_class,
-                         fbl::MakeRefCounted<fs::RemoteDir>(
-                             fidl::ClientEnd<fuchsia_io::Directory>(gpu_dir.TakeChannel())));
+    ZX_ASSERT(class_node->AddEntry(dev_class, fbl::MakeRefCounted<fs::RemoteDir>(
+                                                  std::move(endpoints->client))) == ZX_OK);
   }
 
-  zx::channel client, server;
-  if (zx_status_t status = zx::channel::create(0, &client, &server); status != ZX_OK) {
-    return status;
-  }
-  auto devfs_out = std::make_unique<vfs::RemoteDir>(std::move(client));
-  if (zx_status_t status = ServeDeviceFs(std::move(server)); status != ZX_OK) {
-    return status;
-  }
-  context_->outgoing()->debug_dir()->AddEntry("device-fs", std::move(devfs_out));
   return ZX_OK;
 }
 
-zx_status_t LoaderApp::ServeDeviceFs(zx::channel dir_request) {
-  return device_fs_.ServeDirectory(device_root_node_,
-                                   fidl::ServerEnd<fuchsia_io::Directory>{std::move(dir_request)},
-                                   fs::Rights::ReadOnly());
+zx_status_t LoaderApp::ServeDeviceFs(fidl::ServerEnd<fuchsia_io::Directory> server_end) {
+  return debug_fs_.ServeDirectory(device_root_node_, std::move(server_end), fs::Rights::ReadOnly());
 }
 
-zx_status_t LoaderApp::ServeManifestFs(zx::channel dir_request) {
-  return manifest_fs_.ServeDirectory(manifest_fs_root_node_,
-                                     fidl::ServerEnd<fuchsia_io::Directory>{std::move(dir_request)},
-                                     fs::Rights::ReadOnly());
+zx_status_t LoaderApp::ServeManifestFs(fidl::ServerEnd<fuchsia_io::Directory> server_end) {
+  return debug_fs_.ServeDirectory(manifest_fs_root_node_, std::move(server_end),
+                                  fs::Rights::ReadOnly());
 }
 
-zx_status_t LoaderApp::InitManifestFs() {
-  zx::channel client, server;
-  if (zx_status_t status = zx::channel::create(0, &client, &server); status != ZX_OK) {
+zx_status_t LoaderApp::InitDebugFs() {
+  if (zx_status_t status = InitDeviceFs(); status != ZX_OK) {
+    FX_PLOGS(ERROR, status) << "Failed to initialize device-fs: ";
     return status;
   }
-  auto devfs_out = std::make_unique<vfs::RemoteDir>(std::move(client));
-  if (zx_status_t status = ServeManifestFs(std::move(server)); status != ZX_OK) {
+  ZX_ASSERT(debug_root_node_->AddEntry("device-fs", device_root_node_) == ZX_OK);
+  ZX_ASSERT(debug_root_node_->AddEntry("manifest-fs", manifest_fs_root_node_) == ZX_OK);
+  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  if (zx_status_t status = debug_fs_.ServeDirectory(debug_root_node_, std::move(endpoints->server),
+                                                    fs::Rights::ReadOnly());
+      status != ZX_OK) {
+    FX_PLOGS(ERROR, status) << "Failed to serve debug filesystem: ";
     return status;
   }
-  context_->outgoing()->debug_dir()->AddEntry("manifest-fs", std::move(devfs_out));
+  if (auto result = outgoing_dir_->AddDirectory(std::move(endpoints->client), "debug");
+      result.is_error()) {
+    FX_LOGS(ERROR) << "Failed to add debug filesystem to outgoing directory: "
+                   << result.status_string();
+    return result.status_value();
+  }
   return ZX_OK;
 }
 
@@ -114,9 +125,11 @@ zx_status_t LoaderApp::InitDeviceWatcher() {
           if (filename == ".") {
             return;
           }
-          auto device = MagmaDevice::Create(this, dir, filename, &devices_node_);
-          if (device) {
-            devices_.emplace_back(std::move(device));
+          zx::result device = MagmaDevice::Create(this, dir, filename, &devices_node_);
+          if (device.is_ok()) {
+            devices_.emplace_back(std::move(*device));
+          } else {
+            FX_LOGS(ERROR) << "Failed to create MagmaDevice: " << device.status_string();
           }
         },
         [gpu_watcher_token = std::move(gpu_watcher_token)]() {
@@ -167,15 +180,21 @@ void LoaderApp::RemoveDevice(GpuDevice* device) {
   devices_.erase(it, devices_.end());
 }
 
-std::shared_ptr<IcdComponent> LoaderApp::CreateIcdComponent(const std::string& component_url) {
+zx::result<std::shared_ptr<IcdComponent>> LoaderApp::CreateIcdComponent(
+    const std::string& component_url) {
   FIT_DCHECK_IS_THREAD_VALID(main_thread_);
   if (icd_components_.find(component_url) != icd_components_.end()) {
-    return icd_components_[component_url];
+    return zx::ok(icd_components_[component_url]);
   }
-
+  zx::result realm_client = GetRealmClient();
+  if (realm_client.is_error()) {
+    FX_LOGS(ERROR) << "Failed to connect to Realm protocol: " << realm_client.status_string();
+    return realm_client.take_error();
+  }
   auto [it, inserted] = icd_components_.emplace(
-      component_url, IcdComponent::Create(context_, this, &icds_node_, component_url));
-  return it->second;
+      component_url,
+      IcdComponent::Create(this, std::move(*realm_client), &icds_node_, component_url));
+  return zx::ok(it->second);
 }
 
 void LoaderApp::NotifyIcdsChanged() {

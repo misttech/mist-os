@@ -5,6 +5,7 @@
 #include "src/graphics/bin/vulkan_loader/icd_component.h"
 
 #include <dirent.h>
+#include <fidl/fuchsia.component.decl/cpp/wire.h>
 #include <lib/async/cpp/task.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/io.h>
@@ -70,15 +71,26 @@ const char* kCollectionName = "icd-loaders";
 
 }  // namespace
 
+IcdComponent::IcdComponent(LoaderApp* app, fidl::ClientEnd<fuchsia_component::Realm> realm,
+                           std::string component_url)
+    : app_(app),
+      realm_(std::move(realm), app->dispatcher()),
+      component_url_(std::move(component_url)) {}
+
 IcdComponent::~IcdComponent() {
   RemoveManifestFromFs();
   if (realm_ && !child_instance_name_.empty()) {
-    fuchsia::component::decl::ChildRef child_ref;
-
-    child_ref.name = child_instance_name_;
-    child_ref.collection = kCollectionName;
-    realm_->DestroyChild(std::move(child_ref),
-                         [](fpromise::result<void, fuchsia::component::Error> result) {});
+    fuchsia_component_decl::wire::ChildRef child_ref{
+        .name = fidl::StringView::FromExternal(child_instance_name_),
+        .collection = fidl::StringView::FromExternal(kCollectionName),
+    };
+    auto result = realm_.sync()->DestroyChild(child_ref);
+    if (!result.ok()) {
+      FX_LOGS(ERROR) << child_instance_name_ << " DestroyChild transport error: " << result;
+    } else if (result->is_error()) {
+      FX_LOGS(ERROR) << child_instance_name_
+                     << " DestroyChild error: " << static_cast<uint32_t>(result->error_value());
+    }
   }
 }
 
@@ -98,8 +110,7 @@ void IcdComponent::RemoveManifestFromFs() {
   }
 }
 
-void IcdComponent::Initialize(sys::ComponentContext* context, inspect::Node* parent_node) {
-  realm_ = context->svc()->Connect<fuchsia::component::Realm>();
+void IcdComponent::Initialize(inspect::Node* parent_node) {
   static uint64_t name_id;
   auto pending_action_token = app_->GetPendingActionToken();
 
@@ -107,56 +118,79 @@ void IcdComponent::Initialize(sys::ComponentContext* context, inspect::Node* par
   node_ = parent_node->CreateChild(child_instance_name_);
   initialization_status_ = node_.CreateString("status", "uninitialized");
   node_.CreateString("component_url", component_url_, &value_list_);
-  fuchsia::component::decl::CollectionRef collection;
-  collection.name = kCollectionName;
-  fuchsia::component::decl::Child decl;
-  decl.set_name(child_instance_name_);
-  decl.set_url(component_url_);
-  decl.set_startup(fuchsia::component::decl::StartupMode::LAZY);
+  fidl::Arena arena;
+  fuchsia_component_decl::wire::CollectionRef collection{
+      .name = fidl::StringView::FromExternal(kCollectionName),
+  };
+  fuchsia_component_decl::wire::Child decl =
+      fuchsia_component_decl::wire::Child::Builder(arena)
+          .name(child_instance_name_)
+          .url(component_url_)
+          .startup(fuchsia_component_decl::wire::StartupMode::kLazy)
+          .Build();
+
   auto failure_callback =
       fit::defer_callback([this, pending_action_token = std::move(pending_action_token)]() {
         std::lock_guard lock(vmo_lock_);
         stage_ = LookupStages::kFailed;
         app_->NotifyIcdsChanged();
       });
-  realm_->CreateChild(
-      collection, std::move(decl), fuchsia::component::CreateChildArgs(),
-      [this, failure_callback = std::move(failure_callback)](
-          fpromise::result<void, fuchsia::component::Error> response) mutable {
-        if (response.is_error()) {
-          FX_LOGS(INFO) << component_url_ << " CreateChild err "
-                        << static_cast<uint32_t>(response.error());
-          node_.CreateUint("create_response", static_cast<uint32_t>(response.error()),
+
+  realm_->CreateChild(collection, decl, fuchsia_component::wire::CreateChildArgs())
+      .Then([this, failure_callback = std::move(failure_callback)](
+                fidl::WireUnownedResult<fuchsia_component::Realm::CreateChild>& result) mutable {
+        if (!result.ok()) {
+          FX_LOGS(ERROR) << component_url_ << " CreateChild transport error: " << result;
+          node_.CreateUint("create_response", static_cast<uint32_t>(result.status()), &value_list_);
+          child_instance_name_ = "";
+          return;
+        }
+        if (result->is_error()) {
+          FX_LOGS(ERROR) << component_url_
+                         << " CreateChild error: " << static_cast<uint32_t>(result->error_value());
+          node_.CreateUint("create_response", static_cast<uint32_t>(result->error_value()),
                            &value_list_);
           child_instance_name_ = "";
           return;
         }
+
         initialization_status_.Set("created");
 
-        fuchsia::component::decl::ChildRef child_ref;
+        fuchsia_component_decl::wire::ChildRef child_ref{
+            .name = fidl::StringView::FromExternal(child_instance_name_),
+            .collection = fidl::StringView::FromExternal(kCollectionName),
+        };
 
-        child_ref.name = child_instance_name_;
-        child_ref.collection = kCollectionName;
+        auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+        if (endpoints.is_error()) {
+          FX_LOGS(ERROR) << "Failed to create endpoints: " << endpoints.status_string();
+          return;
+        }
 
-        fidl::InterfaceHandle<fuchsia::io::Directory> directory;
-        auto directory_request = directory.NewRequest();
-        realm_->OpenExposedDir(
-            child_ref, std::move(directory_request),
-            [this, directory = std::move(directory),
-             failure_callback = std::move(failure_callback)](
-                fpromise::result<void, fuchsia::component::Error> response) mutable {
-              if (response.is_error()) {
-                FX_LOGS(INFO) << component_url_ << " OpenExposedDir failed with error "
-                              << static_cast<uint32_t>(response.error());
-                node_.CreateUint("bind_response", static_cast<uint32_t>(response.error()),
+        realm_->OpenExposedDir(child_ref, std::move(endpoints->server))
+            .Then([this, client_end = std::move(endpoints->client),
+                   failure_callback = std::move(failure_callback)](
+                      fidl::WireUnownedResult<fuchsia_component::Realm::OpenExposedDir>&
+                          result) mutable {
+              if (!result.ok()) {
+                FX_LOGS(ERROR) << component_url_ << " OpenExposedDir transport error: " << result;
+                node_.CreateUint("bind_response", static_cast<uint32_t>(result.status()),
                                  &value_list_);
                 return;
               }
+              if (result->is_error()) {
+                FX_LOGS(ERROR) << component_url_ << " OpenExposedDir error: "
+                               << static_cast<uint32_t>(result->error_value());
+                node_.CreateUint("bind_response", static_cast<uint32_t>(result->error_value()),
+                                 &value_list_);
+                return;
+              }
+
               initialization_status_.Set("bound");
               async::PostTask(
                   app_->fdio_loop_dispatcher(), [this, shared_this = this->shared_from_this(),
                                                  failure_callback = std::move(failure_callback),
-                                                 directory = std::move(directory)]() mutable {
+                                                 directory = std::move(client_end)]() mutable {
                     ReadFromComponent(std::move(failure_callback), std::move(directory));
                   });
             });
@@ -255,28 +289,37 @@ zx::result<zx::vmo> IcdComponent::CloneVmo() const {
 
 // See the accompanying README.md for a description of what a Vulkan component needs to have.
 void IcdComponent::ReadFromComponent(fit::deferred_callback failure_callback,
-                                     fidl::InterfaceHandle<fuchsia::io::Directory> out_dir) {
+                                     fidl::ClientEnd<fuchsia_io::Directory> out_dir) {
   initialization_status_.Set("reading from package");
-  fidl::InterfaceHandle<fuchsia::io::Directory> metadata_loader;
+  auto metadata_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  if (metadata_endpoints.is_error()) {
+    FX_LOGS(ERROR) << "Failed to create endpoints: " << metadata_endpoints.status_string();
+    return;
+  }
+
   zx_status_t status = fdio_open_at(out_dir.channel().get(), "metadata",
-                                    static_cast<uint32_t>(fuchsia::io::OpenFlags::RIGHT_READABLE),
-                                    metadata_loader.NewRequest().TakeChannel().release());
+                                    static_cast<uint32_t>(fuchsia_io::OpenFlags::kRightReadable),
+                                    metadata_endpoints->server.TakeChannel().release());
   if (status != ZX_OK) {
     FX_PLOGS(ERROR, status) << component_url_ << " Failed opening metadata dir";
     return;
   }
-  fidl::InterfaceHandle<fuchsia::io::Directory> contents_loader;
+  auto contents_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  if (contents_endpoints.is_error()) {
+    FX_LOGS(ERROR) << "Failed to create endpoints: " << contents_endpoints.status_string();
+    return;
+  }
   status = fdio_open_at(out_dir.channel().get(), "contents",
-                        static_cast<uint32_t>(fuchsia::io::OpenFlags::RIGHT_READABLE |
-                                              fuchsia::io::OpenFlags::RIGHT_EXECUTABLE),
-                        contents_loader.NewRequest().TakeChannel().release());
+                        static_cast<uint32_t>(fuchsia_io::OpenFlags::kRightReadable |
+                                              fuchsia_io::OpenFlags::kRightExecutable),
+                        contents_endpoints->server.TakeChannel().release());
   if (status != ZX_OK) {
     FX_PLOGS(ERROR, status) << component_url_ << " Failed opening pkg dir";
     return;
   }
   fbl::unique_fd metadata_dir_fd;
-  zx_handle_t metadata_channel = metadata_loader.TakeChannel().release();
-  status = fdio_fd_create(metadata_channel, metadata_dir_fd.reset_and_get_address());
+  status = fdio_fd_create(metadata_endpoints->client.TakeChannel().release(),
+                          metadata_dir_fd.reset_and_get_address());
   if (status != ZX_OK) {
     FX_PLOGS(ERROR, status) << component_url_ << " Failed creating FD for metadata";
     return;
@@ -290,7 +333,7 @@ void IcdComponent::ReadFromComponent(fit::deferred_callback failure_callback,
   }
 
   fbl::unique_fd contents_dir_fd;
-  status = fdio_fd_create(contents_loader.TakeChannel().release(),
+  status = fdio_fd_create(contents_endpoints->client.TakeChannel().release(),
                           contents_dir_fd.reset_and_get_address());
   if (status != ZX_OK) {
     FX_PLOGS(ERROR, status) << component_url_ << " Failed creating FD";
@@ -316,18 +359,18 @@ void IcdComponent::ReadFromComponent(fit::deferred_callback failure_callback,
 
   initialization_status_.Set("opening VMO");
   status = fdio_open_fd_at(contents_dir_fd.get(), file_path.c_str(),
-                           static_cast<uint32_t>(fuchsia::io::OpenFlags::RIGHT_READABLE |
-                                                 fuchsia::io::OpenFlags::RIGHT_EXECUTABLE),
+                           static_cast<uint32_t>(fuchsia_io::OpenFlags::kRightReadable |
+                                                 fuchsia_io::OpenFlags::kRightExecutable),
                            fd.reset_and_get_address());
   if (status != ZX_OK) {
-    FX_LOGS(ERROR) << component_url_ << " Could not open path " << file_path << ":" << status;
+    FX_PLOGS(ERROR, status) << component_url_ << " Could not open path " << file_path;
     return;
   }
   zx::vmo vmo;
   status = fdio_get_vmo_exec(fd.get(), vmo.reset_and_get_address());
   fd.reset();
   if (status != ZX_OK) {
-    FX_LOGS(ERROR) << component_url_ << " Could not clone vmo exec: " << status;
+    FX_PLOGS(ERROR, status) << component_url_ << " Could not clone vmo exec";
     return;
   }
   // Create another pending action token to keep everything alive until we're done initializing

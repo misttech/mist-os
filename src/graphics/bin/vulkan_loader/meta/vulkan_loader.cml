@@ -9,6 +9,7 @@
     program: {
         runner: "elf",
         binary: "bin/vulkan_loader",
+        lifecycle: { stop_event: "notify" },
     },
     collections: [
         {

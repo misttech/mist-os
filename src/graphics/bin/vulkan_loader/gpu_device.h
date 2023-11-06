@@ -5,7 +5,7 @@
 #ifndef SRC_GRAPHICS_BIN_VULKAN_LOADER_GPU_DEVICE_H_
 #define SRC_GRAPHICS_BIN_VULKAN_LOADER_GPU_DEVICE_H_
 
-#include <lib/sys/inspect/cpp/component.h>
+#include <lib/inspect/cpp/inspect.h>
 
 #include <cstdint>
 #include <vector>

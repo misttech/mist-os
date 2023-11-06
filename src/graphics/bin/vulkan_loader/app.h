@@ -6,12 +6,11 @@
 #define SRC_GRAPHICS_BIN_VULKAN_LOADER_APP_H_
 
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/fit/defer.h>
 #include <lib/fit/thread_checker.h>
-#include <lib/sys/cpp/component_context.h>
-#include <lib/sys/inspect/cpp/component.h>
+#include <lib/inspect/component/cpp/component.h>
 
-#include <list>
 #include <unordered_map>
 
 #include "src/graphics/bin/vulkan_loader/gpu_device.h"
@@ -22,8 +21,6 @@
 #include "src/lib/fxl/synchronization/thread_annotations.h"
 #include "src/storage/lib/vfs/cpp/pseudo_dir.h"
 #include "src/storage/lib/vfs/cpp/synchronous_vfs.h"
-#include "src/storage/lib/vfs/cpp/vfs.h"
-#include "src/storage/lib/vfs/cpp/vfs_types.h"
 
 class MagmaDevice;
 class IcdComponent;
@@ -56,19 +53,20 @@ class LoaderApp {
     FXL_DISALLOW_COPY_ASSIGN_AND_MOVE(PendingActionToken);
   };
 
-  explicit LoaderApp(sys::ComponentContext* context, async_dispatcher_t* dispatcher,
+  explicit LoaderApp(component::OutgoingDirectory* outgoing_dir, async_dispatcher_t* dispatcher,
                      structured_config_lib::Config structured_config);
 
   ~LoaderApp();
 
   zx_status_t InitDeviceWatcher();
 
-  zx_status_t InitDeviceFs();
-  zx_status_t InitManifestFs();
-  zx_status_t ServeDeviceFs(zx::channel dir_request);
-  zx_status_t ServeManifestFs(zx::channel dir_request);
+  zx_status_t ServeDeviceFs(fidl::ServerEnd<fuchsia_io::Directory> server_end);
+  zx_status_t ServeManifestFs(fidl::ServerEnd<fuchsia_io::Directory> server_end);
 
-  std::shared_ptr<IcdComponent> CreateIcdComponent(const std::string& component_url);
+  // Initialize and serve the debug directory for the loader app.
+  zx_status_t InitDebugFs();
+
+  zx::result<std::shared_ptr<IcdComponent>> CreateIcdComponent(const std::string& component_url);
 
   void AddDevice(std::unique_ptr<GpuDevice> device) { devices_.push_back(std::move(device)); }
   void RemoveDevice(GpuDevice* device);
@@ -85,6 +83,7 @@ class LoaderApp {
   size_t device_count() const { return devices_.size(); }
   const std::vector<std::unique_ptr<GpuDevice>>& devices() const { return devices_; }
 
+  async_dispatcher_t* dispatcher() { return dispatcher_; }
   async_dispatcher_t* fdio_loop_dispatcher() { return fdio_loop_.dispatcher(); }
 
   std::unique_ptr<PendingActionToken> GetPendingActionToken();
@@ -101,11 +100,13 @@ class LoaderApp {
   void NotifyIcdsChangedOnMainThread();
   void NotifyIcdsChangedLocked() FXL_REQUIRE(pending_action_mutex_);
 
+  zx_status_t InitDeviceFs();
+
   FIT_DECLARE_THREAD_CHECKER(main_thread_)
 
-  sys::ComponentContext* context_;
+  component::OutgoingDirectory* outgoing_dir_;
   async_dispatcher_t* dispatcher_;
-  sys::ComponentInspector inspector_;
+  inspect::ComponentInspector inspector_;
   inspect::Node devices_node_;
   inspect::Node config_node_;
   inspect::Node icds_node_;
@@ -116,10 +117,9 @@ class LoaderApp {
   // Keep track of the number of pending operations that have the potential to modify the tree.
   uint64_t pending_action_count_ FXL_GUARDED_BY(pending_action_mutex_) = 0;
 
-  fs::SynchronousVfs device_fs_;
+  fs::SynchronousVfs debug_fs_;
+  fbl::RefPtr<fs::PseudoDir> debug_root_node_;
   fbl::RefPtr<fs::PseudoDir> device_root_node_;
-
-  fs::SynchronousVfs manifest_fs_;
   fbl::RefPtr<fs::PseudoDir> manifest_fs_root_node_;
 
   std::unique_ptr<fsl::DeviceWatcher> gpu_watcher_;

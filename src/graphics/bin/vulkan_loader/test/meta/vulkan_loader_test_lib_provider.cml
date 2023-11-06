@@ -6,6 +6,7 @@
     program: {
         runner: "elf",
         binary: "bin/pkg-server",
+        lifecycle: { stop_event: "notify" },
     },
     capabilities: [
         {

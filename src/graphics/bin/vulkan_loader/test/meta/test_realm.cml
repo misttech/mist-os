@@ -11,6 +11,7 @@
         {
             name: "test_lib_provider",
             url: "fuchsia-pkg://fuchsia.com/vulkan_loader_tests#meta/vulkan_loader_test_lib_provider.cm",
+            startup: "eager",
         },
     ],
     offer: [

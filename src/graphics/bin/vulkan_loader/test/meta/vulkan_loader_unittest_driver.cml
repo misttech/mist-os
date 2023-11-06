@@ -10,6 +10,12 @@
     program: {
         binary: "bin/vulkan_loader_unittest",
     },
+    collections: [
+        {
+            name: "icd-loaders",
+            durability: "transient",
+        },
+    ],
     use: [
         {
             protocol: "fuchsia.component.Realm",

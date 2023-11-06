@@ -5,17 +5,16 @@
 #ifndef SRC_GRAPHICS_BIN_VULKAN_LOADER_ICD_COMPONENT_H_
 #define SRC_GRAPHICS_BIN_VULKAN_LOADER_ICD_COMPONENT_H_
 
-#include <fuchsia/component/cpp/fidl.h>
-#include <fuchsia/component/decl/cpp/fidl.h>
+#include <fidl/fuchsia.component/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/component/incoming/cpp/service.h>
 #include <lib/fit/defer.h>
-#include <lib/sys/cpp/component_context.h>
+#include <lib/inspect/cpp/inspect.h>
 #include <lib/zx/result.h>
 #include <zircon/types.h>
 
 #include "rapidjson/document.h"
-#include "sdk/lib/sys/inspect/cpp/component.h"
 #include "src/lib/fxl/synchronization/thread_annotations.h"
 #include "src/storage/lib/vfs/cpp/pseudo_file.h"
 
@@ -28,20 +27,21 @@ class IcdComponent : public std::enable_shared_from_this<IcdComponent> {
  public:
   enum class LookupStages { kStarted, kFailed, kFinished };
 
-  static std::shared_ptr<IcdComponent> Create(sys::ComponentContext* context, LoaderApp* app,
+  static std::shared_ptr<IcdComponent> Create(LoaderApp* app,
+                                              fidl::ClientEnd<fuchsia_component::Realm> realm,
                                               inspect::Node* parent_node,
                                               std::string component_url) {
-    auto component = std::make_shared<IcdComponent>(app, std::move(component_url));
-    component->Initialize(context, parent_node);
+    auto component =
+        std::make_shared<IcdComponent>(app, std::move(realm), std::move(component_url));
+    component->Initialize(parent_node);
     return component;
   }
 
-  explicit IcdComponent(LoaderApp* app, std::string component_url)
-      : app_(app), component_url_(std::move(component_url)) {}
-
+  explicit IcdComponent(LoaderApp* app, fidl::ClientEnd<fuchsia_component::Realm> realm,
+                        std::string component_url);
   ~IcdComponent();
 
-  void Initialize(sys::ComponentContext* context, inspect::Node* parent_node);
+  void Initialize(inspect::Node* parent_node);
 
   // Attempts to read and store manifest.json. Returns the library path if available.
   std::optional<std::string> ReadManifest(int contents_dir_fd, const std::string& manifest_path);
@@ -93,14 +93,14 @@ class IcdComponent : public std::enable_shared_from_this<IcdComponent> {
   };
 
   void ReadFromComponent(fit::deferred_callback failure_callback,
-                         fidl::InterfaceHandle<fuchsia::io::Directory> out_dir);
+                         fidl::ClientEnd<fuchsia_io::Directory> out_dir);
 
   LoaderApp* const app_;
 
+  fidl::WireClient<fuchsia_component::Realm> realm_;
   const std::string component_url_;
   inspect::Node node_;
   inspect::ValueList value_list_;
-  fuchsia::component::RealmPtr realm_;
   std::string child_instance_name_;
   inspect::StringProperty initialization_status_;
 

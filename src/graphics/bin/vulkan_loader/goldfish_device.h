@@ -5,8 +5,8 @@
 #ifndef SRC_GRAPHICS_BIN_VULKAN_LOADER_GOLDFISH_DEVICE_H_
 #define SRC_GRAPHICS_BIN_VULKAN_LOADER_GOLDFISH_DEVICE_H_
 
-#include <fuchsia/hardware/goldfish/cpp/fidl.h>
-#include <lib/sys/inspect/cpp/component.h>
+#include <fidl/fuchsia.hardware.goldfish/cpp/wire.h>
+#include <lib/inspect/cpp/inspect.h>
 
 #include <string>
 
@@ -15,8 +15,8 @@
 #include "src/lib/fxl/macros.h"
 
 class LoaderApp;
-
-class GoldfishDevice : public GpuDevice {
+class GoldfishDevice : public GpuDevice,
+                       public fidl::WireAsyncEventHandler<fuchsia_hardware_goldfish::PipeDevice> {
  public:
   static std::unique_ptr<GoldfishDevice> Create(LoaderApp* app,
                                                 const fidl::ClientEnd<fuchsia_io::Directory>& dir,
@@ -25,13 +25,15 @@ class GoldfishDevice : public GpuDevice {
   IcdList& icd_list() override { return icd_list_; }
 
  private:
+  void on_fidl_error(fidl::UnbindInfo unbind_info) override;
+
   explicit GoldfishDevice(LoaderApp* app) : GpuDevice(app) {}
 
   bool Initialize(const fidl::ClientEnd<fuchsia_io::Directory>& dir, const std::string& name,
                   inspect::Node* parent);
 
   IcdList icd_list_;
-  fuchsia::hardware::goldfish::PipeDevicePtr device_;
+  fidl::WireClient<fuchsia_hardware_goldfish::PipeDevice> device_;
 
   FXL_DISALLOW_COPY_ASSIGN_AND_MOVE(GoldfishDevice);
 };
