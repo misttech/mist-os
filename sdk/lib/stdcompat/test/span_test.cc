@@ -58,6 +58,17 @@ struct NoBeginAndEnd {
   size_t size() const { return 0; }
 };
 
+struct BeginAndEndMismatch {
+  struct iter {};
+
+  int* data() { return nullptr; }
+  const int* data() const { return nullptr; }
+  size_t size() const { return 0; }
+
+  int* begin() { return nullptr; }
+  iter end() { return {}; }
+};
+
 TEST(SpanCompatibleTraitTest, CheckForDataSizeAndConversionValidation) {
   using ::cpp20::internal::is_well_formed_data_and_size;
 
@@ -83,6 +94,7 @@ TEST(SpanCompatibleTraitTest, CheckForWellAndIllformedTypes) {
   static_assert(is_span_compatible_v<const NoDataOverload, const int> == false, "");
   static_assert(is_span_compatible_v<NoSizeOverload, const int> == false, "");
   static_assert(is_span_compatible_v<NoBeginAndEnd, const int> == false, "");
+  static_assert(is_span_compatible_v<BeginAndEndMismatch, const int> == false, "");
 
   // Discard array and span specializations.
   static_assert(is_span_compatible_v<cpp20::span<const int>, int> == false, "");

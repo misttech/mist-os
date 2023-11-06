@@ -189,8 +189,8 @@ struct has_range_begin_and_end : std::false_type {};
 template <typename T>
 struct has_range_begin_and_end<T, std::void_t<decltype(std::begin(std::declval<T>())),
                                               decltype(std::begin(std::declval<T>()))>>
-    : std::is_same<decltype(std::begin(std::declval<T>())),
-                   decltype(std::begin(std::declval<T>()))> {};
+    : std::is_same<decltype(std::begin(std::declval<T>())), decltype(std::end(std::declval<T>()))> {
+};
 
 template <typename T, class ElementType>
 static constexpr bool is_span_compatible_v =
