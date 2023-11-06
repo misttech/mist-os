@@ -105,8 +105,6 @@ struct WlanInterfaceTest : public zxtest::Test,
   WlanInterfaceTest() : test_arena_(nullptr) {}
 
   void SetUp() override {
-    // TODO(fxb/124464): Migrate test to use dispatcher integration.
-    parent_ = MockDevice::FakeRootParentNoDispatcherIntegrationDEPRECATED();
     ASSERT_OK(wlan::nxpfmac::TestDataPlane::Create(this, &mock_bus_, mlan_mocks_.GetAdapter(),
                                                    &test_data_plane_));
 
@@ -123,28 +121,12 @@ struct WlanInterfaceTest : public zxtest::Test,
     context_.ioctl_adapter_ = ioctl_adapter_.get();
     context_.data_plane_ = test_data_plane_->GetDataPlane();
     context_.device_ = test_device_;
-
-    auto driver_dispatcher = fdf::SynchronizedDispatcher::Create(
-        fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "test-driver-dispatcher",
-        [&](fdf_dispatcher_t*) { driver_completion_.Signal(); });
-    ASSERT_FALSE(driver_dispatcher.is_error());
-    driver_dispatcher_ = *std::move(driver_dispatcher);
-
-    auto server_dispatcher = fdf::SynchronizedDispatcher::Create(
-        {}, "test-server-dispatcher", [&](fdf_dispatcher_t*) { server_completion_.Signal(); });
-    ASSERT_FALSE(driver_dispatcher.is_error());
-    server_dispatcher_ = *std::move(server_dispatcher);
   }
 
   void TearDown() override {
     test_data_plane_.reset();
-    mock_ddk::ReleaseFlaggedDevices(parent_.get(), driver_dispatcher_.async_dispatcher());
+    mock_ddk::ReleaseFlaggedDevices(parent_.get(), driver_dispatcher_->async_dispatcher());
 
-    driver_dispatcher_.ShutdownAsync();
-    driver_completion_.Wait();
-
-    server_dispatcher_.ShutdownAsync();
-    server_completion_.Wait();
     // Destroy the dataplane before the mock device. This ensures a safe destruction before the
     // parent device of the NetworkDeviceImpl device goes away.
     delete context_.device_;
@@ -156,7 +138,7 @@ struct WlanInterfaceTest : public zxtest::Test,
                                     DeviceContext* context, const uint8_t mac_address[ETH_ALEN],
                                     zx::channel&& mlme_channel) {
     libsync::Completion created;
-    async::PostTask(driver_dispatcher_.async_dispatcher(), [&]() {
+    async::PostTask(driver_dispatcher_->async_dispatcher(), [&]() {
       ASSERT_EQ(ZX_OK, test_device_->CreateInterface(parent, name, iface_index, role, context,
                                                      mac_address, std::move(mlme_channel)));
       created.Signal();
@@ -170,7 +152,7 @@ struct WlanInterfaceTest : public zxtest::Test,
     // it manipulates a `driver::OutgoingDirectory` which can only be accessed
     // on the same fdf dispatcher that created it.
     libsync::Completion served;
-    async::PostTask(driver_dispatcher_.async_dispatcher(), [&]() {
+    async::PostTask(driver_dispatcher_->async_dispatcher(), [&]() {
       ASSERT_EQ(ZX_OK, test_device_->ServeIfaceProtocol(std::move(outgoing_dir_endpoints->server)));
       served.Signal();
     });
@@ -260,7 +242,7 @@ struct WlanInterfaceTest : public zxtest::Test,
   void StartInterface() {
     auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_fullmac::WlanFullmacImplIfc>();
     EXPECT_FALSE(endpoints.is_error());
-    fdf::BindServer(server_dispatcher_.get(), std::move(endpoints->server), this);
+    fdf::BindServer(server_dispatcher_->get(), std::move(endpoints->server), this);
 
     auto result = client_.buffer(test_arena_)->Start(std::move(endpoints->client));
     ASSERT_TRUE(result.ok());
@@ -420,6 +402,8 @@ struct WlanInterfaceTest : public zxtest::Test,
     completer.buffer(arena).Reply();
   }
 
+  fdf_testing::DriverRuntime* runtime() { return fdf_testing::DriverRuntime::GetInstance(); }
+
   WlanFullmacIfcResultStorage ifc_results_;
 
   network_device_ifc_protocol_ops_t netdev_ifc_proto_ops_{.add_port = &OnAddPort,
@@ -443,17 +427,9 @@ struct WlanInterfaceTest : public zxtest::Test,
   DeviceContext context_;
   // This data member MUST BE LAST, because it needs to be destroyed first, ensuring that whatever
   // interface lifetimes are managed by it are destroyed before other data members.
-  std::shared_ptr<MockDevice> parent_;
-
-  // Driver dispatcher that manages the lifecycle of interface device, and carries it's outgoing
-  // directory operations.
-  fdf::Dispatcher driver_dispatcher_;
-  libsync::Completion driver_completion_;
-
-  // This test class servers as the server end of WlanPhyImplIfc protocol, this dispatcher binds to
-  // this class to dispatcher FIDL requests.
-  fdf::Dispatcher server_dispatcher_;
-  libsync::Completion server_completion_;
+  std::shared_ptr<MockDevice> parent_{MockDevice::FakeRootParent()};
+  fdf::UnownedSynchronizedDispatcher driver_dispatcher_{runtime()->StartBackgroundDispatcher()};
+  fdf::UnownedSynchronizedDispatcher server_dispatcher_{runtime()->StartBackgroundDispatcher()};
 
   // The FIDL client used to communicate with the interface device which is created in this test.
   fdf::WireSyncClient<fuchsia_wlan_fullmac::WlanFullmacImpl> client_;

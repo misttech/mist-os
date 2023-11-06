@@ -29,12 +29,12 @@ test("nxpfmac_test") {
   ]
   deps = [
     ":mlan_mocks",
+    "//sdk/lib/driver/runtime:driver_runtime_cpp",
+    "//sdk/lib/driver/testing/cpp",
     "//sdk/lib/fdio",
     "//src/connectivity/wlan/drivers/testing/lib/sim-env",
     "//src/connectivity/wlan/drivers/third_party/nxp/nxpfmac:core",
-    "//src/devices/testing/driver-runtime-main:zxtest",
     "//src/devices/testing/mock-ddk",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/mock-function",
     "//zircon/system/ulib/zxtest:zxtest",
   ]

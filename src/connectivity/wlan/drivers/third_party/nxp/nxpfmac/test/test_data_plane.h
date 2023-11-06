@@ -43,10 +43,7 @@ class TestDataPlane {
   std::unique_ptr<std::thread> async_remove_watcher_;
   std::shared_ptr<zx_device_t> net_device_ = nullptr;
   std::unique_ptr<DataPlane> data_plane_;
-
-  // TODO(fxb/124464): Migrate test to use dispatcher integration.
-  std::shared_ptr<MockDevice> parent_{
-      MockDevice::FakeRootParentNoDispatcherIntegrationDEPRECATED()};
+  std::shared_ptr<MockDevice> parent_{MockDevice::FakeRootParent()};
 };
 
 }  // namespace wlan::nxpfmac

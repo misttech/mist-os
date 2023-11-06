@@ -14,6 +14,7 @@
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/client_connection.h"
 
 #include <lib/async/cpp/task.h>
+#include <lib/fdf/cpp/dispatcher.h>
 #include <lib/mock-function/mock-function.h>
 #include <lib/sync/completion.h>
 #include <netinet/ether.h>
@@ -22,6 +23,7 @@
 
 #include <zxtest/zxtest.h>
 
+#include "sdk/lib/driver/testing/cpp/driver_runtime.h"
 #include "src/connectivity/wlan/drivers/testing/lib/sim-env/sim-env.h"
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/device.h"
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/device_context.h"
@@ -98,14 +100,10 @@ struct TestDataPlaneIfc : public wlan::nxpfmac::DataPlaneIfc {
 
 struct ClientConnectionTest : public zxtest::Test {
   void SetUp() override {
-    event_loop_ = std::make_unique<async::Loop>(&kAsyncLoopConfigNeverAttachToThread);
-    event_loop_->StartThread();
     auto ioctl_adapter = wlan::nxpfmac::IoctlAdapter::Create(mocks_.GetAdapter(), &mock_bus_);
     ASSERT_OK(ioctl_adapter.status_value());
     ioctl_adapter_ = std::move(ioctl_adapter.value());
     key_ring_ = std::make_unique<wlan::nxpfmac::KeyRing>(ioctl_adapter_.get(), kTestBssIndex);
-    // TODO(fxb/124464): Migrate test to use dispatcher integration.
-    parent_ = MockDevice::FakeRootParentNoDispatcherIntegrationDEPRECATED();
     ASSERT_OK(TestDevice::Create(parent_.get(), env_.GetDispatcher(), &device_destructed_,
                                  &test_device_));
     ASSERT_OK(wlan::nxpfmac::TestDataPlane::Create(&data_plane_ifc_, &mock_bus_,
@@ -133,7 +131,6 @@ struct ClientConnectionTest : public zxtest::Test {
   void TearDown() override {
     delete context_.device_;
     context_.device_ = nullptr;
-    event_loop_->Shutdown();
   }
 
   mlan_status HandleOtherIoctls(pmlan_ioctl_req req) {
@@ -145,7 +142,7 @@ struct ClientConnectionTest : public zxtest::Test {
     if (req->req_id == MLAN_IOCTL_SCAN) {
       // For scans we must send a scan report to continue the scanning process.
       zxlogf(INFO, "Posting event");
-      async::PostTask(event_loop_->dispatcher(), [this]() {
+      async::PostTask(dispatcher_->async_dispatcher(), [this]() {
         zxlogf(INFO, "Sending event");
         mlan_event event{.event_id = MLAN_EVENT_ID_DRV_SCAN_REPORT};
         event_handler_.OnEvent(&event);
@@ -172,9 +169,12 @@ struct ClientConnectionTest : public zxtest::Test {
     return MLAN_STATUS_FAILURE;
   }
 
+  fdf_testing::DriverRuntime *runtime() { return fdf_testing::DriverRuntime::GetInstance(); }
+
+  std::shared_ptr<MockDevice> parent_{MockDevice::FakeRootParent()};
+  fdf::UnownedSynchronizedDispatcher dispatcher_{runtime()->StartBackgroundDispatcher()};
   fidl::Arena<wlan::nxpfmac::kConnectReqBufferSize> request_arena_;
   fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectRequest default_request_;
-  std::unique_ptr<async::Loop> event_loop_;
   wlan::simulation::Environment env_ = {};
   TestDevice *test_device_ = nullptr;
   wlan::nxpfmac::MlanMockAdapter mocks_;
@@ -187,7 +187,6 @@ struct ClientConnectionTest : public zxtest::Test {
   std::unique_ptr<wlan::nxpfmac::TestDataPlane> test_data_plane_;
   TestClientConnectionIfc test_ifc_;
   sync_completion_t device_destructed_;
-  std::shared_ptr<MockDevice> parent_;
 };
 
 TEST_F(ClientConnectionTest, Constructible) {

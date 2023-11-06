@@ -13,36 +13,46 @@
 
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/moal_shim.h"
 
+#include <lib/fdf/cpp/dispatcher.h>
+
+#include <memory>
+
 #include <zxtest/zxtest.h>
 
+#include "sdk/lib/driver/testing/cpp/driver_runtime.h"
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/device.h"
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/device_context.h"
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/event_handler.h"
+#include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace {
 
 struct DispatcherDevice : public wlan::nxpfmac::Device {
-  DispatcherDevice() : Device(nullptr) {}
-  zx_status_t Init() { return loop_.StartThread(); }
-  async_dispatcher_t* GetDispatcher() override { return loop_.dispatcher(); }
+  explicit DispatcherDevice(async_dispatcher_t* dispatcher)
+      : Device{nullptr}, dispatcher_{dispatcher} {}
+
+  async_dispatcher_t* GetDispatcher() override { return dispatcher_; }
   zx_status_t Init(mlan_device* mlan_dev, wlan::nxpfmac::BusInterface** out_bus) override {
     return ZX_OK;
   }
   zx_status_t LoadFirmware(const char* path, zx::vmo* out_fw, size_t*) override { return ZX_OK; }
   void Shutdown() override {}
-
-  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
+  async_dispatcher_t* dispatcher_;
 };
 
 struct MoalShimTest : public zxtest::Test {
   void SetUp() override {
-    ASSERT_OK(device_.Init());
     context_.device_ = &device_;
     context_.event_handler_ = &event_handler_;
     wlan::nxpfmac::populate_callbacks(&mlan_device_);
   }
+
+  fdf_testing::DriverRuntime* runtime() { return fdf_testing::DriverRuntime::GetInstance(); }
+
+  std::shared_ptr<MockDevice> root_{MockDevice::FakeRootParent()};
+  fdf::UnownedSynchronizedDispatcher dispatcher_{runtime()->StartBackgroundDispatcher()};
   mlan_device mlan_device_;
-  DispatcherDevice device_;
+  DispatcherDevice device_{dispatcher_->async_dispatcher()};
   wlan::nxpfmac::EventHandler event_handler_;
   wlan::nxpfmac::DeviceContext context_{};
 };

@@ -14,12 +14,14 @@
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/device.h"
 
 #include <fuchsia/hardware/network/driver/cpp/banjo.h>
+#include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fdio/directory.h>
 #include <lib/mock-function/mock-function.h>
 
 #include <fbl/string_buffer.h>
 #include <zxtest/zxtest.h>
 
+#include "sdk/lib/driver/testing/cpp/driver_runtime.h"
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/device_context.h"
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/test/mlan_mocks.h"
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/test/mock_bus.h"
@@ -102,35 +104,26 @@ struct TestDevice : public Device {
 
 struct DeviceTest : public zxtest::Test {
   void SetUp() override {
-    // TODO(fxb/124464): Migrate test to use dispatcher integration.
-    parent_ = MockDevice::FakeRootParentNoDispatcherIntegrationDEPRECATED();
-
-    auto dispatcher = fdf::SynchronizedDispatcher::Create(
-        {.value = FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS}, "TestDriverDispatcher",
-        [&](fdf_dispatcher_t*) { sync_completion_signal(&dispatcher_completion_); });
-
-    ASSERT_FALSE(dispatcher.is_error());
-    driver_dispatcher_ = std::move(*dispatcher);
-    // Create the device on driver dispatcher because the outgoing directory is required to be
-    // accessed by a single dispatcher.
-    libsync::Completion created;
-    async::PostTask(driver_dispatcher_.async_dispatcher(), [&]() {
+    // The Device underlying the TestDevice grabs the current dispatcher on DdkInit. We'll need to
+    // run ::Create on a dispatcher other than the fg dispatcher.
+    libsync::Completion cmp;
+    async::PostTask(driver_dispatcher_->async_dispatcher(), [&]() {
       ASSERT_OK(TestDevice::Create(parent_.get(), device_destructed_, &device_));
-      created.Signal();
+      cmp.Signal();
     });
-    created.Wait();
+    cmp.Wait();
 
     auto outgoing_dir_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ASSERT_FALSE(outgoing_dir_endpoints.is_error());
 
-    // Serve WlanPhyImplProtocol to the device's outgoing directory on the driver dispatcher.
-    libsync::Completion served;
-    async::PostTask(driver_dispatcher_.async_dispatcher(), [&]() {
+    // Note that outgoing_dir_.AddService() uses the dispatcher bound above.
+    cmp.Reset();
+    async::PostTask(driver_dispatcher_->async_dispatcher(), [&]() {
       ASSERT_EQ(ZX_OK,
                 device_->ServeWlanPhyImplProtocol(std::move(outgoing_dir_endpoints->server)));
-      served.Signal();
+      cmp.Signal();
     });
-    served.Wait();
+    cmp.Wait();
 
     wlan::nxpfmac::set_mlan_register_mock_adapter(&mlan_mocks_);
     ddk::InitTxn txn(parent_->GetLatestChild());
@@ -180,28 +173,26 @@ struct DeviceTest : public zxtest::Test {
     // Make sure net_device is released first, otherwise it will block the release of phy_device.
     ASSERT_NOT_NULL(net_device.get());
     device_async_remove(net_device.get());
-    mock_ddk::ReleaseFlaggedDevices(net_device.get(), driver_dispatcher_.async_dispatcher());
+
+    mock_ddk::ReleaseFlaggedDevices(net_device.get(), driver_dispatcher_->async_dispatcher());
     net_device.reset();
 
-    // Explicitly release phy_device on driver_dispatcher_to ensure the OutgoingDirectory is only
-    // accessed from a single dispatcher.
     ASSERT_NOT_NULL(phy_device.get());
     device_async_remove(phy_device.get());
-    mock_ddk::ReleaseFlaggedDevices(phy_device.get(), driver_dispatcher_.async_dispatcher());
+    mock_ddk::ReleaseFlaggedDevices(phy_device.get(), driver_dispatcher_->async_dispatcher());
     phy_device.reset();
 
     parent_.reset();
 
     sync_completion_wait(&device_destructed_, ZX_TIME_INFINITE);
-    driver_dispatcher_.ShutdownAsync();
-    sync_completion_wait(&dispatcher_completion_, ZX_TIME_INFINITE);
   }
 
-  std::shared_ptr<MockDevice> parent_;
+  fdf_testing::DriverRuntime* runtime() { return fdf_testing::DriverRuntime::GetInstance(); }
+
+  std::shared_ptr<MockDevice> parent_{MockDevice::FakeRootParent()};
   sync_completion_t device_destructed_;
   TestDevice* device_ = nullptr;
-  sync_completion_t dispatcher_completion_;
-  fdf::Dispatcher driver_dispatcher_;
+  fdf::UnownedSynchronizedDispatcher driver_dispatcher_{runtime()->StartBackgroundDispatcher()};
   wlan::nxpfmac::MlanMockAdapter mlan_mocks_;
   fdf::WireSyncClient<fuchsia_wlan_phyimpl::WlanPhyImpl> wlanphy_client_;
 };
