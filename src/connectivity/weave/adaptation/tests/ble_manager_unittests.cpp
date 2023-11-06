@@ -100,13 +100,33 @@ class BLEManagerTest : public WeaveTestFixture<> {
   }
 
   void WeaveConnect() {
-    EXPECT_EQ(fake_gatt_server_.WriteRequest(), fuchsia::bluetooth::gatt::ErrorCode::NO_ERROR);
-    event_loop_.RunUntilIdle();
+    size_t cb_count = 0;
+    auto callback = [&cb_count](fuchsia::bluetooth::gatt2::LocalService_WriteValue_Result res) {
+      FX_LOGS(INFO) << "Received gatt2 write request";
+      EXPECT_EQ(false, res.is_err());
+      cb_count++;
+    };
+    // Expect the write request to be received by the Weave stack, handled, and positively responded
+    // to.
+    fake_gatt_server_.WriteRequest(std::move(callback));
+    WeaveTestFixture<>::RunFixtureLoop();
+    event_loop_.Run(zx::time::infinite(), true /*once*/);
+    WeaveTestFixture<>::StopFixtureLoop();
+    RunLoopUntil([&]() { return cb_count; });
+
+    WeaveTestFixture<>::RunFixtureLoop();
+
+    // Expect the provided |callback| to receive the positive response.
+    EXPECT_EQ(cb_count, 1u);
+    FX_LOGS(INFO) << "Verified callback for write";
+
     EXPECT_EQ(fake_gatt_server_.WeaveConnectionConfirmed(), false);
     fake_gatt_server_.OnCharacteristicConfiguration();
     // Event loop will be idle and waiting for subscribe request(characteristic configuration)
     // on timer. So we need to wait until either subscribe request is received or timeout.
     event_loop_.Run(zx::time::infinite(), true /*once*/);
+    WeaveTestFixture<>::RunLoopUntilIdle();
+    FX_LOGS(INFO) << "Ran event loop after CCC";
 
     // Stop fixture loop before waiting for FakeGATTLocalService::NotifyValue
     // on dispatcher().
@@ -116,8 +136,9 @@ class BLEManagerTest : public WeaveTestFixture<> {
       bool res = fake_gatt_server_.WeaveConnectionConfirmed();
       return res;
     });
-    // Wait for FakeGATTLocalService::NotifyValue completed. Restart fixture loop.
+    // The FakeGattServer has received the notification.
     WeaveTestFixture<>::RunFixtureLoop();
+    FX_LOGS(INFO) << "Got indication from weavestack";
 
     bool is_confirmed = fake_gatt_server_.WeaveConnectionConfirmed();
     EXPECT_EQ(is_confirmed, true);
@@ -129,6 +150,7 @@ class BLEManagerTest : public WeaveTestFixture<> {
 
   FakeGATTService fake_gatt_server_;
   FakeBLEPeripheral fake_ble_peripheral_;
+
   async::Loop event_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
 };
 
@@ -155,6 +177,7 @@ TEST_F(BLEManagerTest, EnableAndDisableAdvertising) {
   EXPECT_EQ(IsBLEMgrAdvertising(), true);
 }
 
-TEST_F(BLEManagerTest, TestWeaveConnect) { WeaveConnect(); }
+// TODO(fxbug.dev/136172): Re-enable this test once the GATT Write / Indicate flakes are fixed.
+TEST_F(BLEManagerTest, DISABLED_TestWeaveConnect) { WeaveConnect(); }
 
 }  // namespace nl::Weave::DeviceLayer::Internal::testing

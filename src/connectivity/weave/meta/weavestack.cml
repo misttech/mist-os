@@ -22,7 +22,7 @@
     use: [
         {
             protocol: [
-                "fuchsia.bluetooth.gatt.Server",
+                "fuchsia.bluetooth.gatt2.Server",
                 "fuchsia.bluetooth.le.Peripheral",
                 "fuchsia.buildinfo.Provider",
                 "fuchsia.factory.WeaveFactoryStoreProvider",

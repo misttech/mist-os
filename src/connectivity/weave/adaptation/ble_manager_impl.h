@@ -6,7 +6,7 @@
 
 #if WEAVE_DEVICE_CONFIG_ENABLE_WOBLE
 
-#include <fuchsia/bluetooth/gatt/cpp/fidl.h>
+#include <fuchsia/bluetooth/gatt2/cpp/fidl.h>
 #include <fuchsia/bluetooth/le/cpp/fidl.h>
 #include <lib/fidl/cpp/binding.h>
 #include <lib/sys/cpp/component_context.h>
@@ -44,7 +44,7 @@ class BLEManagerImpl final : public BLEManager,
                              private ::nl::Ble::BleLayer,
                              private BlePlatformDelegate,
                              private BleApplicationDelegate,
-                             private fuchsia::bluetooth::gatt::LocalServiceDelegate {
+                             private fuchsia::bluetooth::gatt2::LocalService {
   // Allow the BLEManager interface class to delegate method calls to
   // the implementation methods provided by this class.
   friend BLEManager;
@@ -97,14 +97,18 @@ class BLEManagerImpl final : public BLEManager,
 
   void NotifyWeaveConnectionClosed(BLE_CONNECTION_OBJECT conId) override {}
 
-  // ===== Members that implement virtual methods on LocalServiceDelegate
-
-  void OnCharacteristicConfiguration(uint64_t characteristic_id, std::string peer_id, bool notify,
-                                     bool indicate) override;
-  void OnReadValue(uint64_t id, int32_t offset, OnReadValueCallback callback) override;
-  void OnWriteValue(uint64_t id, uint16_t offset, std::vector<uint8_t> value,
-                    OnWriteValueCallback callback) override;
-  void OnWriteWithoutResponse(uint64_t id, uint16_t offset, std::vector<uint8_t> value) override {}
+  // ===== Members that implement virtual methods on LocalService
+  void CharacteristicConfiguration(::fuchsia::bluetooth::PeerId peer_id,
+                                   ::fuchsia::bluetooth::gatt2::Handle handle, bool notify,
+                                   bool indicate,
+                                   CharacteristicConfigurationCallback callback) override;
+  void ReadValue(::fuchsia::bluetooth::PeerId peer_id, ::fuchsia::bluetooth::gatt2::Handle handle,
+                 int32_t offset, ReadValueCallback callback) override;
+  void WriteValue(::fuchsia::bluetooth::gatt2::LocalServiceWriteValueRequest request,
+                  WriteValueCallback callback) override;
+  void PeerUpdate(::fuchsia::bluetooth::gatt2::LocalServicePeerUpdateRequest request,
+                  PeerUpdateCallback callback) override{};
+  void ValueChangedCredit(uint8_t additional_credit) override{};
 
   // Drives the global |BLEManagerImpl| instance's BLE state.
   // This method will be scheduled on and called from platform manager's event loop.
@@ -128,7 +132,7 @@ class BLEManagerImpl final : public BLEManager,
     WoBLEConState(BLEManagerImpl *connection_instance) : instance(connection_instance) {}
     BLEManagerImpl *instance;
     PacketBuffer *pending_ind_buf;
-    std::string peer_id;
+    fuchsia::bluetooth::PeerId peer_id;
   };
 
   WoBLEConState woble_connection_;
@@ -137,10 +141,10 @@ class BLEManagerImpl final : public BLEManager,
   uint16_t flags_;
   WoBLEServiceMode service_mode_;
 
-  // Proxy to the gatt.Server service.
-  fuchsia::bluetooth::gatt::ServerSyncPtr gatt_server_;
-  fidl::Binding<fuchsia::bluetooth::gatt::LocalServiceDelegate> gatt_binding_;
-  fuchsia::bluetooth::gatt::LocalServiceSyncPtr service_;
+  // Client connection to the gatt2.Server service.
+  fuchsia::bluetooth::gatt2::ServerSyncPtr gatt_server_;
+  // The published GATT service for the Weave application.
+  fidl::Binding<fuchsia::bluetooth::gatt2::LocalService> gatt_service_;
   // Proxy to the le.Peripheral service which we use for advertising to solicit connections.
   fuchsia::bluetooth::le::PeripheralSyncPtr peripheral_;
   fidl::InterfacePtr<fuchsia::bluetooth::le::AdvertisingHandle> adv_handle_;

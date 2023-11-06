@@ -30,7 +30,7 @@ class EmptyResource {};
 // resource will be constructed before the RealLoopFixture is set up and
 // destroyed after the RealLoopFixture is torn down.
 //
-// Resource must be default-constructible. If the subclass needs to connntrol
+// Resource must be default-constructible. If the subclass needs to control
 // construction or use a non-default-constructible resource, then a resource of
 // unique_ptr<ActualResource> may be used instead.
 template <class Resource = internal::EmptyResource>

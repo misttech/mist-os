@@ -18,7 +18,7 @@
         },
         {
             protocol: [
-                "fuchsia.bluetooth.gatt.Server",
+                "fuchsia.bluetooth.gatt2.Server",
                 "fuchsia.bluetooth.le.Peripheral",
             ],
             from: "#bluetooth-core",
