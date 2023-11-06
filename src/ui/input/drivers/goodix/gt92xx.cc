@@ -10,6 +10,7 @@
 #include <lib/ddk/platform-defs.h>
 #include <lib/ddk/trace/event.h>
 #include <lib/fit/defer.h>
+#include <lib/zx/clock.h>
 #include <lib/zx/profile.h>
 #include <lib/zx/thread.h>
 #include <lib/zx/time.h>
@@ -17,7 +18,6 @@
 #include <zircon/syscalls.h>
 #include <zircon/threads.h>
 
-#include <iterator>
 #include <utility>
 
 #include <fbl/algorithm.h>
@@ -25,6 +25,43 @@
 #include <fbl/vector.h>
 
 namespace goodix {
+
+namespace {
+
+constexpr fuchsia_input_report::wire::Axis XYAxis(int64_t max) {
+  return {
+      .range = {.min = 0, .max = max},
+      .unit =
+          {
+              .type = fuchsia_input_report::wire::UnitType::kOther,
+              .exponent = 0,
+          },
+  };
+}
+
+constexpr size_t kXMax = 600;
+constexpr size_t kYMax = 1024;
+
+}  // namespace
+
+void Gt92xxDevice::GtInputReport::ToFidlInputReport(
+    fidl::WireTableBuilder<::fuchsia_input_report::wire::InputReport>& input_report,
+    fidl::AnyArena& allocator) {
+  fidl::VectorView<fuchsia_input_report::wire::ContactInputReport> contact_rpt(allocator,
+                                                                               contact_count);
+  for (size_t i = 0; i < contact_count; i++) {
+    contact_rpt[i] = fuchsia_input_report::wire::ContactInputReport::Builder(allocator)
+                         .contact_id(contacts[i].finger_id)
+                         .position_x(contacts[i].x)
+                         .position_y(contacts[i].y)
+                         .Build();
+  }
+
+  auto touch_report =
+      fuchsia_input_report::wire::TouchInputReport::Builder(allocator).contacts(contact_rpt);
+  input_report.event_time(event_time.get()).touch(touch_report.Build());
+}
+
 // clang-format off
 // Configuration data
 // first two bytes contain starting register address (part of i2c transaction)
@@ -64,6 +101,15 @@ fbl::Vector<uint8_t> Gt92xxDevice::GetConfData() {
 // clang-format on
 
 int Gt92xxDevice::Thread() {
+  // Format of data as it is read from the device
+  struct FingerReport {
+    uint8_t id;
+    uint16_t x;
+    uint16_t y;
+    uint16_t size;
+    uint8_t reserved;
+  } __PACKED;
+
   zx_status_t status;
   zx::time timestamp;
   zxlogf(INFO, "gt92xx: entering irq thread");
@@ -101,20 +147,33 @@ int Gt92xxDevice::Thread() {
       // Clear touch status after reading reports
       Write(GT_REG_TOUCH_STATUS, 0);
       if (status == ZX_OK) {
-        fbl::AutoLock lock(&client_lock_);
-        gt_rpt_.rpt_id = GT92XX_RPT_ID_TOUCH;
-        gt_rpt_.contact_count = num_reports;
+        GtInputReport report;
+        report.event_time = timestamp;
+        report.contact_count =
+            std::min(num_reports, static_cast<uint8_t>(report.contacts.max_size()));
         // We are reusing same HID report as ft3x77 to simplify astro integration
         // so we need to copy from device format to HID structure format
-        for (uint32_t i = 0; i < kMaxPoints; i++) {
-          gt_rpt_.fingers[i].finger_id =
-              static_cast<uint8_t>((reports[i].id << 2) | ((i < num_reports) ? 1 : 0));
-          gt_rpt_.fingers[i].y = reports[i].x;
-          gt_rpt_.fingers[i].x = reports[i].y;
+        for (uint32_t i = 0; i < report.contact_count; i++) {
+          report.contacts[i].finger_id = reports[i].id;
+          report.contacts[i].y = reports[i].x;
+          report.contacts[i].x = reports[i].y;
         }
-        if (client_.is_valid()) {
-          client_.IoQueue(reinterpret_cast<uint8_t*>(&gt_rpt_), sizeof(gt92xx_touch_t),
-                          timestamp.get());
+        readers_.SendReportToAllReaders(report);
+
+        const zx::duration latency = zx::clock::get_monotonic() - timestamp;
+
+        total_latency_ += latency;
+        report_count_++;
+        average_latency_usecs_.Set(total_latency_.to_usecs() / report_count_);
+
+        if (latency > max_latency_) {
+          max_latency_ = latency;
+          max_latency_usecs_.Set(max_latency_.to_usecs());
+        }
+
+        if (num_reports > 0) {
+          total_report_count_.Add(1);
+          last_event_timestamp_.Set(timestamp.get());
         }
       }
     } else {
@@ -152,7 +211,8 @@ zx_status_t Gt92xxDevice::Create(zx_device_t* device) {
   }
 
   auto goodix_dev = std::make_unique<Gt92xxDevice>(
-      device, std::move(i2c), std::move(int_gpio.value()), std::move(reset_gpio.value()));
+      device, fdf_dispatcher_get_async_dispatcher(fdf_dispatcher_get_current_dispatcher()),
+      std::move(i2c), std::move(int_gpio.value()), std::move(reset_gpio.value()));
 
   zx_status_t status = goodix_dev->Init();
   if (status != ZX_OK) {
@@ -250,6 +310,12 @@ zx_status_t Gt92xxDevice::Init() {
   irq_ = std::move(interrupt_result.value()->irq);
 
   LogFirmwareStatus();
+
+  metrics_root_ = inspector_.GetRoot().CreateChild("hid-input-report-touch");
+  average_latency_usecs_ = metrics_root_.CreateUint("average_latency_usecs", 0);
+  max_latency_usecs_ = metrics_root_.CreateUint("max_latency_usecs", 0);
+  total_report_count_ = metrics_root_.CreateUint("total_report_count", 0);
+  last_event_timestamp_ = metrics_root_.CreateUint("last_event_timestamp", 0);
   return ZX_OK;
 }
 
@@ -316,17 +382,6 @@ zx_status_t Gt92xxDevice::HWReset() {
   return ZX_OK;
 }
 
-zx_status_t Gt92xxDevice::HidbusQuery(uint32_t options, hid_info_t* info) {
-  if (!info) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-  info->dev_num = 0;
-  info->device_class = HID_DEVICE_CLASS_OTHER;
-  info->boot_device = false;
-
-  return ZX_OK;
-}
-
 void Gt92xxDevice::DdkRelease() { delete this; }
 
 void Gt92xxDevice::DdkUnbind(ddk::UnbindTxn txn) {
@@ -338,64 +393,49 @@ zx_status_t Gt92xxDevice::ShutDown() {
   running_.store(false);
   irq_.destroy();
   thrd_join(thread_, NULL);
-  {
-    fbl::AutoLock lock(&client_lock_);
-    client_.clear();
-  }
   return ZX_OK;
 }
 
-zx_status_t Gt92xxDevice::HidbusGetDescriptor(hid_description_type_t desc_type,
-                                              uint8_t* out_data_buffer, size_t data_size,
-                                              size_t* out_data_actual) {
-  const uint8_t* desc;
-  size_t desc_size = get_gt92xx_report_desc(&desc);
-  if (data_size < desc_size) {
-    return ZX_ERR_BUFFER_TOO_SMALL;
+void Gt92xxDevice::GetInputReportsReader(GetInputReportsReaderRequestView request,
+                                         GetInputReportsReaderCompleter::Sync& completer) {
+  auto status = readers_.CreateReader(dispatcher_, std::move(request->reader));
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to create a reader %d", status);
   }
-  memcpy(out_data_buffer, desc, desc_size);
-  *out_data_actual = desc_size;
-
-  return ZX_OK;
 }
 
-zx_status_t Gt92xxDevice::HidbusGetReport(uint8_t rpt_type, uint8_t rpt_id, uint8_t* data,
-                                          size_t len, size_t* out_len) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
+void Gt92xxDevice::GetDescriptor(GetDescriptorCompleter::Sync& completer) {
+  fidl::Arena<kFeatureAndDescriptorBufferSize> allocator;
 
-zx_status_t Gt92xxDevice::HidbusSetReport(uint8_t rpt_type, uint8_t rpt_id, const uint8_t* data,
-                                          size_t len) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
+  fuchsia_input_report::wire::DeviceInfo device_info;
+  device_info.vendor_id = static_cast<uint32_t>(fuchsia_input_report::wire::VendorId::kGoogle);
+  device_info.product_id =
+      static_cast<uint32_t>(fuchsia_input_report::wire::VendorGoogleProductId::kGoodixTouchscreen);
 
-zx_status_t Gt92xxDevice::HidbusGetIdle(uint8_t rpt_id, uint8_t* duration) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
-zx_status_t Gt92xxDevice::HidbusSetIdle(uint8_t rpt_id, uint8_t duration) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
-zx_status_t Gt92xxDevice::HidbusGetProtocol(uint8_t* protocol) { return ZX_ERR_NOT_SUPPORTED; }
-
-zx_status_t Gt92xxDevice::HidbusSetProtocol(uint8_t protocol) { return ZX_OK; }
-
-void Gt92xxDevice::HidbusStop() {
-  fbl::AutoLock lock(&client_lock_);
-  client_.clear();
-}
-
-zx_status_t Gt92xxDevice::HidbusStart(const hidbus_ifc_protocol_t* ifc) {
-  fbl::AutoLock lock(&client_lock_);
-  if (client_.is_valid()) {
-    zxlogf(ERROR, "gt92xx: Already bound!");
-    return ZX_ERR_ALREADY_BOUND;
-  } else {
-    client_ = ddk::HidbusIfcProtocolClient(ifc);
-    zxlogf(INFO, "gt92xx: started");
+  fidl::VectorView<fuchsia_input_report::wire::ContactInputDescriptor> contacts(allocator,
+                                                                                kMaxPoints);
+  for (auto& c : contacts) {
+    c = fuchsia_input_report::wire::ContactInputDescriptor::Builder(allocator)
+            .position_x(XYAxis(kXMax))
+            .position_y(XYAxis(kYMax))
+            .Build();
   }
-  return ZX_OK;
+
+  const auto input = fuchsia_input_report::wire::TouchInputDescriptor::Builder(allocator)
+                         .touch_type(fuchsia_input_report::wire::TouchType::kTouchscreen)
+                         .max_contacts(kMaxPoints)
+                         .contacts(contacts)
+                         .Build();
+
+  const auto touch =
+      fuchsia_input_report::wire::TouchDescriptor::Builder(allocator).input(input).Build();
+
+  const auto descriptor = fuchsia_input_report::wire::DeviceDescriptor::Builder(allocator)
+                              .device_info(device_info)
+                              .touch(touch)
+                              .Build();
+
+  completer.Reply(descriptor);
 }
 
 zx::result<uint8_t> Gt92xxDevice::Read(uint16_t addr) {

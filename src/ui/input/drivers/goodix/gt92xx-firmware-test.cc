@@ -210,9 +210,10 @@ class FakeTouchDevice : public fake_i2c::FakeI2c {
 
 class Gt92xxTestDevice : public Gt92xxDevice {
  public:
-  Gt92xxTestDevice(ddk::I2cChannel i2c, fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> intr,
+  Gt92xxTestDevice(async_dispatcher_t* dispatcher, ddk::I2cChannel i2c,
+                   fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> intr,
                    fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> reset, zx_device_t* parent)
-      : Gt92xxDevice(parent, std::move(i2c), std::move(intr), std::move(reset)) {}
+      : Gt92xxDevice(parent, dispatcher, std::move(i2c), std::move(intr), std::move(reset)) {}
 
   void Running(bool run) { Gt92xxDevice::running_.store(run); }
 
@@ -253,7 +254,7 @@ class GoodixTest : public zxtest::Test {
     EXPECT_TRUE(endpoints.is_ok());
     fidl::BindServer(fidl_servers_loop_.dispatcher(), std::move(endpoints->server), &i2c_);
     fake_parent_ = MockDevice::FakeRootParent();
-    device_.emplace(std::move(endpoints->client), std::move(intr_gpio_client),
+    device_.emplace(nullptr, std::move(endpoints->client), std::move(intr_gpio_client),
                     std::move(reset_gpio_client), fake_parent_.get());
   }
 

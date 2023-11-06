@@ -6,10 +6,11 @@
 #define SRC_UI_INPUT_DRIVERS_GOODIX_GT92XX_H_
 
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
-#include <fuchsia/hardware/hidbus/cpp/banjo.h>
+#include <fidl/fuchsia.input.report/cpp/wire.h>
 #include <lib/ddk/device.h>
 #include <lib/device-protocol/i2c-channel.h>
 #include <lib/fzl/vmo-mapper.h>
+#include <lib/input_report_reader/reader.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/interrupt.h>
@@ -21,9 +22,9 @@
 #include <utility>
 
 #include <ddktl/device.h>
+#include <ddktl/protocol/empty-protocol.h>
 #include <fbl/mutex.h>
 #include <fbl/vector.h>
-#include <hid/gt92xx.h>
 
 // clang-format off
 #define GT_REG_DSP_CONTROL      0x4010
@@ -67,8 +68,12 @@
 
 namespace goodix {
 
-class Gt92xxDevice : public ddk::Device<Gt92xxDevice, ddk::Unbindable>,
-                     public ddk::HidbusProtocol<Gt92xxDevice, ddk::base_protocol> {
+class Gt92xxDevice;
+using DeviceType =
+    ddk::Device<Gt92xxDevice, ddk::Messageable<fuchsia_input_report::InputDevice>::Mixin,
+                ddk::Unbindable>;
+
+class Gt92xxDevice : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_INPUTREPORT> {
  public:
   struct SectionInfo {
     uint16_t address;
@@ -76,10 +81,11 @@ class Gt92xxDevice : public ddk::Device<Gt92xxDevice, ddk::Unbindable>,
     uint8_t copy_command;
   };
 
-  Gt92xxDevice(zx_device_t* device, ddk::I2cChannel i2c,
+  Gt92xxDevice(zx_device_t* device, async_dispatcher_t* dispatcher, ddk::I2cChannel i2c,
                fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> intr,
                fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> reset)
-      : ddk::Device<Gt92xxDevice, ddk::Unbindable>(device),
+      : DeviceType(device),
+        dispatcher_(dispatcher),
         i2c_(std::move(i2c)),
         int_gpio_(std::move(intr)),
         reset_gpio_(std::move(reset)) {}
@@ -89,21 +95,27 @@ class Gt92xxDevice : public ddk::Device<Gt92xxDevice, ddk::Unbindable>,
   static zx_status_t Create(zx_device_t* device);
 
   void DdkRelease();
-  void DdkUnbind(ddk::UnbindTxn txn) __TA_EXCLUDES(client_lock_);
+  void DdkUnbind(ddk::UnbindTxn txn);
 
-  // Hidbus required methods
-  void HidbusStop();
-  zx_status_t HidbusGetDescriptor(hid_description_type_t desc_type, uint8_t* out_data_buffer,
-                                  size_t data_size, size_t* out_data_actual);
-  zx_status_t HidbusGetReport(uint8_t rpt_type, uint8_t rpt_id, uint8_t* data, size_t len,
-                              size_t* out_len);
-  zx_status_t HidbusSetReport(uint8_t rpt_type, uint8_t rpt_id, const uint8_t* data, size_t len);
-  zx_status_t HidbusGetIdle(uint8_t rpt_id, uint8_t* duration);
-  zx_status_t HidbusSetIdle(uint8_t rpt_id, uint8_t duration);
-  zx_status_t HidbusGetProtocol(uint8_t* protocol);
-  zx_status_t HidbusSetProtocol(uint8_t protocol);
-  zx_status_t HidbusStart(const hidbus_ifc_protocol_t* ifc) __TA_EXCLUDES(client_lock_);
-  zx_status_t HidbusQuery(uint32_t options, hid_info_t* info) __TA_EXCLUDES(client_lock_);
+  // fuchsia_input_report::InputDevice required methods
+  void GetInputReportsReader(GetInputReportsReaderRequestView request,
+                             GetInputReportsReaderCompleter::Sync& completer) override;
+  void GetDescriptor(GetDescriptorCompleter::Sync& completer) override;
+  void SendOutputReport(SendOutputReportRequestView request,
+                        SendOutputReportCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+  void GetFeatureReport(GetFeatureReportCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+  void SetFeatureReport(SetFeatureReportRequestView request,
+                        SetFeatureReportCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+  void GetInputReport(GetInputReportRequestView request,
+                      GetInputReportCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
 
  protected:
   zx_status_t Init();
@@ -112,22 +124,30 @@ class Gt92xxDevice : public ddk::Device<Gt92xxDevice, ddk::Unbindable>,
   int Thread();
 
  private:
-  // Format of data as it is read from the device
-  struct FingerReport {
-    uint8_t id;
-    uint16_t x;
-    uint16_t y;
-    uint16_t size;
-    uint8_t reserved;
-  } __PACKED;
+  static constexpr size_t kFeatureAndDescriptorBufferSize = 512;
 
   static constexpr uint32_t kMaxPoints = 5;
+
+  struct GtInputReport {
+    zx::time event_time = zx::time(ZX_TIME_INFINITE_PAST);
+    uint8_t contact_count;
+    struct Contact {
+      uint8_t finger_id;
+      uint16_t x;
+      uint16_t y;
+    };
+    std::array<Contact, kMaxPoints> contacts;
+
+    void ToFidlInputReport(
+        fidl::WireTableBuilder<::fuchsia_input_report::wire::InputReport>& input_report,
+        fidl::AnyArena& allocator);
+  };
 
   static constexpr int kI2cRetries = 5;
 
   static bool ProductIdsMatch(const uint8_t* firmware_product_id, const uint8_t* chip_product_id);
 
-  zx_status_t ShutDown() __TA_EXCLUDES(client_lock_);
+  zx_status_t ShutDown();
 
   void LogFirmwareStatus();
 
@@ -196,18 +216,28 @@ class Gt92xxDevice : public ddk::Device<Gt92xxDevice, ddk::Unbindable>,
   zx_status_t Write(uint16_t addr, uint8_t val);
   zx_status_t Write(uint8_t* buf, size_t len);
 
+  async_dispatcher_t* dispatcher_;
+
   ddk::I2cChannel i2c_;
   fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> int_gpio_;
   fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> reset_gpio_;
 
-  gt92xx_touch_t gt_rpt_ __TA_GUARDED(client_lock_);
   thrd_t thread_;
-  fbl::Mutex client_lock_;
-  ddk::HidbusIfcProtocolClient client_ __TA_GUARDED(client_lock_);
+  input_report_reader::InputReportReaderManager<GtInputReport> readers_;
 
   inspect::Inspector inspector_;
   inspect::Node node_;
   inspect::ValueList values_;
+
+  inspect::Node metrics_root_;
+  inspect::UintProperty average_latency_usecs_;
+  inspect::UintProperty max_latency_usecs_;
+  inspect::UintProperty total_report_count_;
+  inspect::UintProperty last_event_timestamp_;
+
+  uint64_t report_count_ = 0;
+  zx::duration total_latency_ = {};
+  zx::duration max_latency_ = {};
 
   enum {
     kNoFirmware = 0,         // No firmware file was supplied

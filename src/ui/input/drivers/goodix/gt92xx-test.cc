@@ -10,10 +10,7 @@
 #include <lib/ddk/metadata.h>
 #include <lib/mock-i2c/mock-i2c.h>
 
-#include <atomic>
-
 #include <ddk/metadata/buttons.h>
-#include <hid/gt92xx.h>
 #include <zxtest/zxtest.h>
 
 #include "src/devices/gpio/testing/fake-gpio/fake-gpio.h"
@@ -23,9 +20,10 @@ namespace goodix {
 
 class Gt92xxTestDevice : public Gt92xxDevice {
  public:
-  Gt92xxTestDevice(ddk::I2cChannel i2c, fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> intr,
+  Gt92xxTestDevice(async_dispatcher_t* dispatcher, ddk::I2cChannel i2c,
+                   fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> intr,
                    fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> reset, zx_device_t* parent)
-      : Gt92xxDevice(parent, std::move(i2c), std::move(intr), std::move(reset)) {}
+      : Gt92xxDevice(parent, dispatcher, std::move(i2c), std::move(intr), std::move(reset)) {}
 
   void Running(bool run) { Gt92xxDevice::running_.store(run); }
 
@@ -63,8 +61,9 @@ class Gt92xxTest : public zxtest::Test {
     ASSERT_TRUE(endpoints.is_ok());
     fidl::BindServer(fidl_servers_loop_.dispatcher(), std::move(endpoints->server), &mock_i2c_);
     fake_parent_ = MockDevice::FakeRootParent();
-    device_.emplace(std::move(endpoints->client), std::move(intr_gpio_client),
-                    std::move(reset_gpio_client), fake_parent_.get());
+    device_.emplace(input_report_loop_.dispatcher(), std::move(endpoints->client),
+                    std::move(intr_gpio_client), std::move(reset_gpio_client), fake_parent_.get());
+    EXPECT_OK(input_report_loop_.RunUntilIdle());
   }
 
   void TearDown() override {}
@@ -84,6 +83,23 @@ class Gt92xxTest : public zxtest::Test {
               intr_states[1].sub_state);
   }
 
+  fidl::WireClient<fuchsia_input_report::InputReportsReader> GetReader() {
+    auto endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputDevice>();
+    EXPECT_OK(endpoints);
+    fidl::BindServer(input_report_loop_.dispatcher(), std::move(endpoints->server), &*device_);
+    fidl::WireSyncClient<fuchsia_input_report::InputDevice> client(std::move(endpoints->client));
+
+    auto reader_endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputReportsReader>();
+    EXPECT_OK(reader_endpoints.status_value());
+    auto result = client->GetInputReportsReader(std::move(reader_endpoints->server));
+    EXPECT_TRUE(result.ok());
+    auto reader = fidl::WireClient<fuchsia_input_report::InputReportsReader>(
+        std::move(reader_endpoints->client), input_report_loop_.dispatcher());
+    EXPECT_OK(input_report_loop_.RunUntilIdle());
+
+    return reader;
+  }
+
   async::Loop fidl_servers_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
   async_patterns::TestDispatcherBound<fake_gpio::FakeGpio> reset_gpio_{
       fidl_servers_loop_.dispatcher(), std::in_place};
@@ -92,23 +108,9 @@ class Gt92xxTest : public zxtest::Test {
   mock_i2c::MockI2c mock_i2c_;
   std::optional<Gt92xxTestDevice> device_;
   std::shared_ptr<MockDevice> fake_parent_;
+
+  async::Loop input_report_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
 };
-
-static std::atomic<uint8_t> rpt_ran = 0;
-
-void rpt_handler(void* ctx, const uint8_t* buffer, size_t size, zx_time_t time) {
-  gt92xx_touch_t touch_rpt = {};
-  touch_rpt.rpt_id = GT92XX_RPT_ID_TOUCH;
-  touch_rpt.fingers[0] = {0x01, 0x110, 0x100};
-  touch_rpt.fingers[1] = {0x05, 0x220, 0x200};
-  touch_rpt.fingers[2] = {0x09, 0x330, 0x300};
-  touch_rpt.fingers[3] = {0x0d, 0x440, 0x400};
-  touch_rpt.fingers[4] = {0x11, 0x550, 0x500};
-  touch_rpt.contact_count = 5;
-  ASSERT_BYTES_EQ(buffer, &touch_rpt, size);
-  EXPECT_EQ(size, sizeof(touch_rpt));
-  rpt_ran.store(1);
-}
 
 TEST_F(Gt92xxTest, Init) {
   mock_i2c_
@@ -150,6 +152,64 @@ TEST_F(Gt92xxTest, InitForceConfig) {
   InitDevice();
 }
 
+TEST_F(Gt92xxTest, TestGetDescriptor) {
+  ASSERT_OK(input_report_loop_.StartThread("input-report-loop"));
+
+  auto endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputDevice>();
+  ASSERT_OK(endpoints);
+  fidl::BindServer(input_report_loop_.dispatcher(), std::move(endpoints->server), &*device_);
+  fidl::WireSyncClient<fuchsia_input_report::InputDevice> client(std::move(endpoints->client));
+
+  auto result = client->GetDescriptor();
+  EXPECT_TRUE(result.ok());
+  auto descriptor = result->descriptor;
+
+  EXPECT_TRUE(descriptor.has_device_info());
+  EXPECT_EQ(descriptor.device_info().vendor_id,
+            static_cast<uint32_t>(fuchsia_input_report::wire::VendorId::kGoogle));
+  EXPECT_EQ(
+      descriptor.device_info().product_id,
+      static_cast<uint32_t>(fuchsia_input_report::wire::VendorGoogleProductId::kGoodixTouchscreen));
+
+  EXPECT_TRUE(descriptor.has_touch());
+  EXPECT_FALSE(descriptor.has_consumer_control());
+  EXPECT_FALSE(descriptor.has_keyboard());
+  EXPECT_FALSE(descriptor.has_mouse());
+  EXPECT_FALSE(descriptor.has_sensor());
+
+  EXPECT_TRUE(descriptor.touch().has_input());
+  EXPECT_FALSE(descriptor.touch().has_feature());
+
+  EXPECT_TRUE(descriptor.touch().input().has_touch_type());
+  EXPECT_EQ(descriptor.touch().input().touch_type(),
+            fuchsia_input_report::wire::TouchType::kTouchscreen);
+
+  EXPECT_TRUE(descriptor.touch().input().has_max_contacts());
+  EXPECT_EQ(descriptor.touch().input().max_contacts(), 5);
+
+  EXPECT_FALSE(descriptor.touch().input().has_buttons());
+  EXPECT_TRUE(descriptor.touch().input().has_contacts());
+  EXPECT_EQ(descriptor.touch().input().contacts().count(), 5);
+
+  for (const auto& c : descriptor.touch().input().contacts()) {
+    EXPECT_TRUE(c.has_position_x());
+    EXPECT_TRUE(c.has_position_y());
+    EXPECT_FALSE(c.has_contact_height());
+    EXPECT_FALSE(c.has_contact_width());
+    EXPECT_FALSE(c.has_pressure());
+
+    EXPECT_EQ(c.position_x().range.min, 0);
+    EXPECT_EQ(c.position_x().range.max, 600);
+    EXPECT_EQ(c.position_x().unit.type, fuchsia_input_report::wire::UnitType::kOther);
+    EXPECT_EQ(c.position_x().unit.exponent, 0);
+
+    EXPECT_EQ(c.position_y().range.min, 0);
+    EXPECT_EQ(c.position_y().range.max, 1024);
+    EXPECT_EQ(c.position_y().unit.type, fuchsia_input_report::wire::UnitType::kOther);
+    EXPECT_EQ(c.position_y().unit.exponent, 0);
+  }
+}
+
 TEST_F(Gt92xxTest, TestReport) {
   mock_i2c_
       .ExpectWrite({static_cast<uint8_t>(GT_REG_TOUCH_STATUS >> 8),
@@ -166,17 +226,159 @@ TEST_F(Gt92xxTest, TestReport) {
   EXPECT_OK(device_->StartThread());
   zx_nanosleep(zx_deadline_after(ZX_MSEC(10)));
 
-  hidbus_ifc_protocol_ops_t ops = {};
-  ops.io_queue = rpt_handler;
+  auto reader = GetReader();
+  reader->ReadInputReports().Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_ok());
+    auto& reports = result->value()->reports;
 
-  hidbus_ifc_protocol_t protocol = {};
-  protocol.ops = &ops;
-  device_->HidbusStart(&protocol);
-  zx_nanosleep(zx_deadline_after(ZX_MSEC(10)));
+    ASSERT_EQ(reports.count(), 1);
+    auto& report = reports[0];
+
+    ASSERT_TRUE(report.has_event_time());
+    ASSERT_TRUE(report.has_touch());
+    auto& touch_report = report.touch();
+
+    ASSERT_TRUE(touch_report.has_contacts());
+    ASSERT_EQ(touch_report.contacts().count(), 5);
+    EXPECT_EQ(touch_report.contacts()[0].contact_id(), 0);
+    EXPECT_EQ(touch_report.contacts()[0].position_x(), 0x110);
+    EXPECT_EQ(touch_report.contacts()[0].position_y(), 0x100);
+
+    EXPECT_EQ(touch_report.contacts()[1].contact_id(), 1);
+    EXPECT_EQ(touch_report.contacts()[1].position_x(), 0x220);
+    EXPECT_EQ(touch_report.contacts()[1].position_y(), 0x200);
+
+    EXPECT_EQ(touch_report.contacts()[2].contact_id(), 2);
+    EXPECT_EQ(touch_report.contacts()[2].position_x(), 0x330);
+    EXPECT_EQ(touch_report.contacts()[2].position_y(), 0x300);
+
+    EXPECT_EQ(touch_report.contacts()[3].contact_id(), 3);
+    EXPECT_EQ(touch_report.contacts()[3].position_x(), 0x440);
+    EXPECT_EQ(touch_report.contacts()[3].position_y(), 0x400);
+
+    EXPECT_EQ(touch_report.contacts()[4].contact_id(), 4);
+    EXPECT_EQ(touch_report.contacts()[4].position_x(), 0x550);
+    EXPECT_EQ(touch_report.contacts()[4].position_y(), 0x500);
+
+    input_report_loop_.Quit();
+  });
+
   device_->Trigger();
-  while (!rpt_ran.load()) {
-    zx_nanosleep(zx_deadline_after(ZX_MSEC(10)));
-  }
+  EXPECT_EQ(input_report_loop_.Run(), ZX_ERR_CANCELED);
+
+  EXPECT_OK(device_->StopThread());
+}
+
+TEST_F(Gt92xxTest, TestReportMoreContacts) {
+  mock_i2c_
+      .ExpectWrite({static_cast<uint8_t>(GT_REG_TOUCH_STATUS >> 8),
+                    static_cast<uint8_t>(GT_REG_TOUCH_STATUS & 0xff)})
+      .ExpectReadStop({0x87})
+      .ExpectWrite(
+          {static_cast<uint8_t>(GT_REG_REPORTS >> 8), static_cast<uint8_t>(GT_REG_REPORTS & 0xff)})
+      .ExpectReadStop({0x00, 0x00, 0x01, 0x10, 0x01, 0x01, 0x01, 0x00, 0x01, 0x00,
+                       0x02, 0x20, 0x02, 0x01, 0x01, 0x00, 0x02, 0x00, 0x03, 0x30,
+                       0x03, 0x01, 0x01, 0x00, 0x03, 0x00, 0x04, 0x40, 0x04, 0x01,
+                       0x01, 0x00, 0x04, 0x00, 0x05, 0x50, 0x05, 0x01, 0x01, 0x00})
+      .ExpectWriteStop({static_cast<uint8_t>(GT_REG_TOUCH_STATUS >> 8),
+                        static_cast<uint8_t>(GT_REG_TOUCH_STATUS & 0xff), 0x00});
+  EXPECT_OK(device_->StartThread());
+  zx_nanosleep(zx_deadline_after(ZX_MSEC(10)));
+
+  auto reader = GetReader();
+  reader->ReadInputReports().Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_ok());
+    auto& reports = result->value()->reports;
+
+    ASSERT_EQ(reports.count(), 1);
+    auto& report = reports[0];
+
+    ASSERT_TRUE(report.has_event_time());
+    ASSERT_TRUE(report.has_touch());
+    auto& touch_report = report.touch();
+
+    ASSERT_TRUE(touch_report.has_contacts());
+    ASSERT_EQ(touch_report.contacts().count(), 5);
+    EXPECT_EQ(touch_report.contacts()[0].contact_id(), 0);
+    EXPECT_EQ(touch_report.contacts()[0].position_x(), 0x110);
+    EXPECT_EQ(touch_report.contacts()[0].position_y(), 0x100);
+
+    EXPECT_EQ(touch_report.contacts()[1].contact_id(), 1);
+    EXPECT_EQ(touch_report.contacts()[1].position_x(), 0x220);
+    EXPECT_EQ(touch_report.contacts()[1].position_y(), 0x200);
+
+    EXPECT_EQ(touch_report.contacts()[2].contact_id(), 2);
+    EXPECT_EQ(touch_report.contacts()[2].position_x(), 0x330);
+    EXPECT_EQ(touch_report.contacts()[2].position_y(), 0x300);
+
+    EXPECT_EQ(touch_report.contacts()[3].contact_id(), 3);
+    EXPECT_EQ(touch_report.contacts()[3].position_x(), 0x440);
+    EXPECT_EQ(touch_report.contacts()[3].position_y(), 0x400);
+
+    EXPECT_EQ(touch_report.contacts()[4].contact_id(), 4);
+    EXPECT_EQ(touch_report.contacts()[4].position_x(), 0x550);
+    EXPECT_EQ(touch_report.contacts()[4].position_y(), 0x500);
+
+    input_report_loop_.Quit();
+  });
+
+  device_->Trigger();
+  EXPECT_EQ(input_report_loop_.Run(), ZX_ERR_CANCELED);
+
+  EXPECT_OK(device_->StopThread());
+}
+
+TEST_F(Gt92xxTest, TestReportLessContacts) {
+  mock_i2c_
+      .ExpectWrite({static_cast<uint8_t>(GT_REG_TOUCH_STATUS >> 8),
+                    static_cast<uint8_t>(GT_REG_TOUCH_STATUS & 0xff)})
+      .ExpectReadStop({0x83})
+      .ExpectWrite(
+          {static_cast<uint8_t>(GT_REG_REPORTS >> 8), static_cast<uint8_t>(GT_REG_REPORTS & 0xff)})
+      .ExpectReadStop({0x00, 0x00, 0x01, 0x10, 0x01, 0x01, 0x01, 0x00, 0x01, 0x00,
+                       0x02, 0x20, 0x02, 0x01, 0x01, 0x00, 0x02, 0x00, 0x03, 0x30,
+                       0x03, 0x01, 0x01, 0x00, 0x03, 0x00, 0x04, 0x40, 0x04, 0x01,
+                       0x01, 0x00, 0x04, 0x00, 0x05, 0x50, 0x05, 0x01, 0x01, 0x00})
+      .ExpectWriteStop({static_cast<uint8_t>(GT_REG_TOUCH_STATUS >> 8),
+                        static_cast<uint8_t>(GT_REG_TOUCH_STATUS & 0xff), 0x00});
+  EXPECT_OK(device_->StartThread());
+  zx_nanosleep(zx_deadline_after(ZX_MSEC(10)));
+
+  auto reader = GetReader();
+  reader->ReadInputReports().Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_ok());
+    auto& reports = result->value()->reports;
+
+    ASSERT_EQ(reports.count(), 1);
+    auto& report = reports[0];
+
+    ASSERT_TRUE(report.has_event_time());
+    ASSERT_TRUE(report.has_touch());
+    auto& touch_report = report.touch();
+
+    ASSERT_TRUE(touch_report.has_contacts());
+    ASSERT_EQ(touch_report.contacts().count(), 3);
+    EXPECT_EQ(touch_report.contacts()[0].contact_id(), 0);
+    EXPECT_EQ(touch_report.contacts()[0].position_x(), 0x110);
+    EXPECT_EQ(touch_report.contacts()[0].position_y(), 0x100);
+
+    EXPECT_EQ(touch_report.contacts()[1].contact_id(), 1);
+    EXPECT_EQ(touch_report.contacts()[1].position_x(), 0x220);
+    EXPECT_EQ(touch_report.contacts()[1].position_y(), 0x200);
+
+    EXPECT_EQ(touch_report.contacts()[2].contact_id(), 2);
+    EXPECT_EQ(touch_report.contacts()[2].position_x(), 0x330);
+    EXPECT_EQ(touch_report.contacts()[2].position_y(), 0x300);
+
+    input_report_loop_.Quit();
+  });
+
+  device_->Trigger();
+  EXPECT_EQ(input_report_loop_.Run(), ZX_ERR_CANCELED);
+
   EXPECT_OK(device_->StopThread());
 }
 

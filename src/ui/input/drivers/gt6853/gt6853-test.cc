@@ -495,9 +495,9 @@ TEST_F(Gt6853Test, GetDescriptor) {
 
   EXPECT_EQ(response.value().descriptor.device_info().vendor_id,
             static_cast<uint32_t>(fuchsia_input_report::wire::VendorId::kGoogle));
-  EXPECT_EQ(response.value().descriptor.device_info().product_id,
-            static_cast<uint32_t>(
-                fuchsia_input_report::wire::VendorGoogleProductId::kFocaltechTouchscreen));
+  EXPECT_EQ(
+      response.value().descriptor.device_info().product_id,
+      static_cast<uint32_t>(fuchsia_input_report::wire::VendorGoogleProductId::kGoodixTouchscreen));
 
   for (size_t i = 0; i < 10; i++) {
     const auto& contact = response.value().descriptor.touch().input().contacts()[i];
