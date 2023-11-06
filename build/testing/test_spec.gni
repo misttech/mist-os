@@ -109,9 +109,12 @@ if (allowed_device_types == []) {
   }
 }
 
-# Describes the target device environment in which a test should run. This
-# specification is written in JSON to the build directory, to be aggregated
-# at test-time.
+# Describes the target device environment in which a test should
+# run. This specification is written to a tests.json file in the build
+# directory, to be aggregated at test-time.
+#
+# The format is documented at
+# https://fuchsia.dev/fuchsia-src/reference/testing/tests-json-format
 #
 # Parameters
 #

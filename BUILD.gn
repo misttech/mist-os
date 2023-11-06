@@ -837,6 +837,12 @@ build_api_module("prebuilt_package_flavors") {
 #  Below, the "testing root" refers to $root_build_dir on host, and the full
 #  filesystem path from the root on device.
 #
+#  This rule outputs the tests.json file in the build directory,
+#  which is aggregated at test time.
+#
+#  The format is documented at
+#  https://fuchsia.dev/fuchsia-src/reference/testing/tests-json-format
+#
 # Type: list(scope)
 #
 #   * name
