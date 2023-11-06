@@ -4,14 +4,6 @@
         "skips": [
             {
                 "notes": [
-                    "Temporary skip, to allow gfxstream and aemu auxiliary files to land."
-                ],
-                "paths": [
-                    "third_party/gfxstream"
-                ]
-            },
-            {
-                "notes": [
                     "Legacy GN license checker does not know how to process SPDX files.",
                     "This is a temporary skip until either the old system is updated to read spdx,",
                     "or the new bazel-based GN metadata solution is enabled across the tree.",
