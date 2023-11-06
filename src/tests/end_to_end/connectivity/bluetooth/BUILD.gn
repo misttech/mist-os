@@ -19,3 +19,8 @@ group("e2e_tests_smoke") {
   testonly = true
   public_deps = [ "profiles:e2e_tests_smoke" ]
 }
+
+group("e2e_tests_profile") {
+  testonly = true
+  public_deps = [ "profiles:e2e_tests_profile" ]
+}
