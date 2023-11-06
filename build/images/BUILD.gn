@@ -19,6 +19,7 @@ import("//build/images/vboot/vboot.gni")
 import("//build/info/info.gni")
 import("//build/product.gni")
 import("//build/sdk/config.gni")
+import("//build/sdk/product_bundle.gni")
 import("//build/security.gni")
 import("//build/zbi/zbi_input.gni")
 import("//build/zircon/tools.gni")
@@ -193,6 +194,8 @@ compiled_action("uefi-disk") {
     rebase_path("$root_build_dir"),
     "--arch",
     target_cpu,
+    "--product-bundle-name",
+    main_product_bundle_name,
     "--bootloader",
     bootloader_path,
     "--depfile",

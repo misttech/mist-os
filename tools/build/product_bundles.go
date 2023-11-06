@@ -24,6 +24,10 @@ type ProductBundle struct {
 	// The URL to the transfer manifest for the product bundle. i.e. it will
 	// have a "file://" prefix if the file is local.
 	TransferManifestUrl string `json:"transfer_manifest_url"`
+
+	// Json is the path (relative to the build directory) of the JSON
+	// representation of the product bundle.
+	Json string `json:"json"`
 }
 
 // ProductBundlesManifest is a JSON list of product bundles produced by the

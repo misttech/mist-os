@@ -59,6 +59,7 @@ template("efi_test") {
     }
 
     metadata = {
+      images_barrier = []
       images = [
         {
           label = efi_label

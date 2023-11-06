@@ -10,10 +10,16 @@ import("//build/security/verifier/scrutiny_verifiers.gni")
 import("//sdk/config.gni")
 import("//src/developer/ffx/build/ffx_action.gni")
 
+# The name of the main product bundle produced by a build.
+main_product_bundle_name = "${build_info_product}.${build_info_board}"
+
 # Generate a product bundle that can be used to flash, emulate, or update a
 # product onto a Fuchsia target.
 #
 # Arguments
+#   name (required)
+#     [string] The name of the product bundle.
+#
 #   partitions (required)
 #     [path] The path to the partitions config.
 #
@@ -91,7 +97,12 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #     [bool] Whether to skip creating transfer manifest
 #
 template("product_bundle") {
-  assert(defined(invoker.partitions), "Need to define partitions")
+  assert(defined(invoker.partitions),
+         "product_bundle(${target_name}) must define `partitions`")
+  assert(defined(invoker.name),
+         "product_bundle(${target_name}) must define `name`")
+
+  product_name = invoker.name
 
   labels = {
     hermetic_inputs = "${target_name}_hermetic_inputs"
@@ -109,7 +120,7 @@ template("product_bundle") {
     target_out_dir = target_out_dir
     product_bundle_manifest = "${outdir}/product_bundle.json"
     vd_dir = "${outdir}/virtual_devices"
-    transfer_manifest = "$target_out_dir/transfer.json"
+    transfer_manifest = "$target_out_dir/${product_name}.transfer.json"
     tuf_keys = "//src/sys/pkg/repositories/devhost/keys"
   }
 
@@ -244,7 +255,6 @@ template("product_bundle") {
     # the sdk version. So far they have been the same value.
     assert(sdk_id != "")
     product_version = sdk_id
-    product_name = "${build_info_product}.${build_info_board}"
     args = [
       "--config",
       "product.experimental=true",
@@ -352,12 +362,9 @@ template("product_bundle") {
                                "visibility",
                              ])
       product_bundle_target = ":${labels.product_bundle}"
-      output_dir = files.target_out_dir
-      product_bundle_dir = files.outdir
 
-      # The definition of metadata.product_bundles.transfer_manifest_path
-      # below depends on the following assertion.
-      assert("${output_dir}/transfer.json" == files.transfer_manifest)
+      product_bundle_dir = files.outdir
+      outputs = [ files.transfer_manifest ]
     }
   }
 
@@ -419,13 +426,14 @@ template("product_bundle") {
         {
           label = get_label_info(":$target_name", "label_with_toolchain")
           path = rebase_path(files.outdir, root_build_dir)
-          name = "${build_info_product}.${build_info_board}"
+          name = product_name
           product_version = product_version
           if (!skip_transfer_manifest) {
             transfer_manifest_path =
                 rebase_path(files.transfer_manifest, root_build_dir)
             transfer_manifest_url = "file://" + transfer_manifest_path
           }
+          json = rebase_path(files.product_bundle_manifest, root_build_dir)
         },
       ]
     }

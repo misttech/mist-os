@@ -1423,11 +1423,12 @@ build_api_module("detailed_size_checker_data") {
   deps = [ "//build/images:default-images" ]
 }
 
-# Contains information about 0 or 1 product bundles produced by the build.
+# Contains information about the product bundles produced by the build.
 #
 # Type: list(scope)
 #   name
-#     Required: <product.board> name of the product bundle.
+#     Required: The name of the product bundle. The main product bundle is
+#               expected to have the name $product.$board.
 #   path
 #     Required: Path to the product bundle directory.
 #   product_version
@@ -1440,6 +1441,9 @@ build_api_module("detailed_size_checker_data") {
 #               local, otherwise it's the remote location of the transfer.json.
 #   label
 #     Required: Label (with toolchain) that generated this product bundle.
+#   json
+#     Required: Path the JSON representation of the product bundle.
+#
 build_api_module("product_bundles") {
   testonly = true
   data_keys = [ "product_bundles" ]
@@ -1447,14 +1451,15 @@ build_api_module("product_bundles") {
 
   # Product bundles are not built in SDK-only builds.
   if (has_board) {
-    deps = [ "//build/images:default-images" ]
+    deps = [
+      "//build/images:default-images",
+      "//bundles/boot_tests",
+    ]
   }
 }
 
-# Some tools make assumptions about this when trying to look up product bundles
-# produced by the build, so adding a check to prevent unexpected failures, until
-# we figure out how to support multiple PBs in the future.
-action("check_product_bundles_manifest") {
+# Checks that product bundle names are unique.
+action("product_bundles.check") {
   testonly = true
 
   outs = get_target_outputs(":product_bundles")
@@ -1540,6 +1545,7 @@ group("default") {
   testonly = true
   deps = [
     "//:host",
+    "//:product_bundles.check",
     "//:test-list",
     "//build/assembly:validate_product_defs",
 
@@ -1550,10 +1556,6 @@ group("default") {
     "//bundles/boot_tests",
     "//sdk",
   ]
-
-  if (!use_bringup_assembly) {
-    deps += [ "//:check_product_bundles_manifest" ]
-  }
 
   # SDK-only builds must not attempt to build images.
   if (has_board) {

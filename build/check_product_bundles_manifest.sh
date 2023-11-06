@@ -4,8 +4,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# This scripts asserts there's one and only one product bundle included in the
-# input product bundles manifest.
+# This scripts asserts product bundle names are unique.
 
 # Usage:
 #
@@ -17,10 +16,9 @@ readonly jq=$1
 readonly pb_manifest=$2
 readonly stamp_file=$3
 
-pb_count="$(${jq} '. | length' ${pb_manifest})"
-if [ "${pb_count}" -ne 1 ]; then
-  echo "Expecting exactly 1 product bundle from ${pb_manifest}, got ${pb_count}."
-  ${jq} '.' ${pb_manifest}
+duplicates=($(${jq} --raw-output 'group_by(.name) | map(select(length > 1) | .[0].name) | .[]' "${pb_manifest}"))
+if (( ${#duplicates[@]} )); then
+  echo "Found product bundles in ${pb_manifest} with duplicate names: ${duplicates[@]}."
   exit 1
 fi
 touch "${stamp_file}"
