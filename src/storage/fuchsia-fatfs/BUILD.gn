@@ -190,6 +190,14 @@ slow_fs_test_suite("fatfs") {
     "//src/storage/fuchsia-fatfs:fatfs",
   ]
   component_deps = [ ":test_fatfs_component_manifest_shard" ]
+
+  # TODO(b/297201368): These tests are disabled in the regular test suite above due to timeouts.
+  if (current_cpu == "riscv64") {
+    extra_components = [
+      ":fatfs-full-tests",
+      ":fatfs-attr-tests",
+    ]
+  }
 }
 
 group("tests") {

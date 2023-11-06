@@ -255,7 +255,7 @@ fs_test_suite("minfs") {
     deps += [ ":minfs-power-test" ]
   }
 
-  # TODO(b/297201368): These tests timeout on RISC-V builders currently.
+  # TODO(b/297201368): These tests timeout only on the RISC-V builders currently.
   if (current_cpu == "riscv64") {
     omit_components = [
       ":minfs-full-tests",
@@ -271,4 +271,13 @@ slow_fs_test_suite("minfs") {
     ":minfs_validate_fs_test_config",
     "//src/storage/minfs/bin:minfs-test-component",
   ]
+
+  # TODO(b/297201368): These tests are disabled in the regular test suite above due to timeouts.
+  if (current_cpu == "riscv64") {
+    extra_components = [
+      ":minfs-full-tests",
+      ":minfs-resize-tests",
+      ":minfs-integration-fs-tests",
+    ]
+  }
 }
