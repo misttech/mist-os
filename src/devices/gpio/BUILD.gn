@@ -6,7 +6,6 @@ group("drivers") {
   testonly = true
   deps = [
     "drivers/aml-gpio",
-    "drivers/as370-gpio",
     "drivers/gpio",
     "drivers/ti-tca6408a",
   ]

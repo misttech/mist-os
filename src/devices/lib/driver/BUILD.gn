@@ -123,7 +123,6 @@ group("driver") {
     "//src/devices/cpu/drivers/aml-cpu:*",
     "//src/devices/cpu/drivers/aml-cpu-legacy:*",
     "//src/devices/gpio/drivers/aml-gpio:*",
-    "//src/devices/gpio/drivers/as370-gpio:*",
     "//src/devices/gpio/drivers/gpio:*",
     "//src/devices/gpio/drivers/ti-tca6408a:*",
     "//src/devices/i2c/drivers/aml-i2c:*",

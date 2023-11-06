@@ -398,6 +398,12 @@
   available_in_git: 'b3d1ee97525800f1906b01f6eec0c6571cebbe03'
   areas: ['Input']
   path: '/src/ui/input/drivers/cypress'
+- short_description: 'Synaptics AS370 GPIO driver'
+  deletion_reason: 'Hardware is not actively supported'
+  gerrit_change_id: '941574'
+  available_in_git: '0b75758859a98bdd384ff2e947febf09e7585fff'
+  areas: ['GPIO']
+  path: '/src/devices/gpio/drivers/as370-gpio'
 - short_description: 'NXP i.MX8-m I2C driver'
   deletion_reason: 'Hardware is not actively supported'
   gerrit_change_id: '941172'

@@ -7,7 +7,6 @@ group("tests") {
 
   deps = [
     "aml-gpio:tests",
-    "as370-gpio:tests",
     "gpio:tests",
     "ti-tca6408a:tests",
   ]

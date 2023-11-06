@@ -1,9 +1,0 @@
-{
-    "short_description": "Synaptics GPIO driver",
-    "manufacturer": "Synaptics",
-    "families": [],
-    "models": [],
-    "areas": [
-        "GPIO"
-    ]
-}
