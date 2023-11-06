@@ -17,11 +17,7 @@ extern "C" {
     fn hermetic_copy_error();
 }
 
-type HermeticCopyFn = unsafe extern "C" fn(
-    dest: *mut std::ffi::c_void,
-    source: *const std::ffi::c_void,
-    len: usize,
-) -> usize;
+type HermeticCopyFn = unsafe extern "C" fn(dest: *mut u8, source: *const u8, len: usize) -> usize;
 
 pub struct Usercopy {
     // Pointer to the hermetic_copy routine loaded into memory.
@@ -177,8 +173,8 @@ impl Usercopy {
 
         let ret = unsafe {
             (self.hermetic_copy_fn)(
-                dest_addr as *mut std::ffi::c_void,
-                source.as_ptr() as *const std::ffi::c_void,
+                dest_addr as *mut u8,
+                source.as_ptr() as *const u8,
                 source.len(),
             )
         };
@@ -202,11 +198,7 @@ impl Usercopy {
         }
 
         let ret = unsafe {
-            (self.hermetic_copy_fn)(
-                dest.as_ptr() as *mut std::ffi::c_void,
-                source_addr as *const std::ffi::c_void,
-                dest.len(),
-            )
+            (self.hermetic_copy_fn)(dest.as_ptr() as *mut u8, source_addr as *const u8, dest.len())
         };
         if ret == 0 {
             Ok(())
@@ -269,11 +261,26 @@ mod test {
         );
     }
 
+    #[test_case(1, 2)]
+    #[test_case(1, 4)]
+    #[test_case(1, 8)]
+    #[test_case(1, 16)]
+    #[test_case(1, 32)]
+    #[test_case(1, 64)]
+    #[test_case(1, 128)]
+    #[test_case(1, 256)]
+    #[test_case(1, 512)]
+    #[test_case(1, 1024)]
+    #[test_case(32, 64)]
+    #[test_case(32, 128)]
+    #[test_case(32, 256)]
+    #[test_case(32, 512)]
+    #[test_case(32, 1024)]
     #[::fuchsia::test]
-    fn copyout_fault() {
+    fn copyout_fault(offset: usize, buf_len: usize) {
         let page_size = zx::system_get_page_size() as usize;
 
-        let source = vec!['a' as u8; 128];
+        let source = vec!['a' as u8; buf_len];
 
         let dest_vmo = zx::Vmo::create(page_size as u64).unwrap();
 
@@ -292,15 +299,15 @@ mod test {
         let usercopy =
             new_usercopy_for_test!(Usercopy::new(mapped_addr..mapped_addr + page_size * 2));
 
-        let dest_addr = mapped_addr + page_size - 32;
+        let dest_addr = mapped_addr + page_size - offset;
 
         let result = usercopy.copyout(&source, dest_addr);
 
-        assert_eq!(result, Err(32));
+        assert_eq!(result, Err(offset));
 
         assert_eq!(
-            unsafe { std::slice::from_raw_parts(dest_addr as *const u8, 32) },
-            &['a' as u8; 32]
+            unsafe { std::slice::from_raw_parts(dest_addr as *const u8, offset) },
+            &vec!['a' as u8; offset][..],
         );
     }
 
@@ -329,11 +336,26 @@ mod test {
         assert_eq!(dest, &['a' as u8; 128]);
     }
 
+    #[test_case(1, 2)]
+    #[test_case(1, 4)]
+    #[test_case(1, 8)]
+    #[test_case(1, 16)]
+    #[test_case(1, 32)]
+    #[test_case(1, 64)]
+    #[test_case(1, 128)]
+    #[test_case(1, 256)]
+    #[test_case(1, 512)]
+    #[test_case(1, 1024)]
+    #[test_case(32, 64)]
+    #[test_case(32, 128)]
+    #[test_case(32, 256)]
+    #[test_case(32, 512)]
+    #[test_case(32, 1024)]
     #[::fuchsia::test]
-    fn copyin_fault() {
+    fn copyin_fault(offset: usize, buf_len: usize) {
         let page_size = zx::system_get_page_size() as usize;
 
-        let mut dest = vec![0u8; 128];
+        let mut dest = vec![0u8; buf_len];
 
         let source_vmo = zx::Vmo::create(page_size as u64).unwrap();
 
@@ -349,23 +371,23 @@ mod test {
             )
             .unwrap();
 
-        let source_addr = mapped_addr + page_size - 32;
+        let source_addr = mapped_addr + page_size - offset;
 
-        unsafe { std::slice::from_raw_parts_mut(source_addr as *mut u8, 32) }.fill('a' as u8);
+        unsafe { std::slice::from_raw_parts_mut(source_addr as *mut u8, offset) }.fill('a' as u8);
 
         let usercopy =
             new_usercopy_for_test!(Usercopy::new(mapped_addr..mapped_addr + page_size * 2));
 
         let result = usercopy.copyin(source_addr, &mut dest);
 
-        assert_eq!(result, Err(32));
+        assert_eq!(result, Err(offset));
 
-        assert_eq!(&dest[0..32], &['a' as u8; 32]);
-        assert_eq!(&dest[32..128], &[0 as u8; 96]);
+        assert_eq!(&dest[0..offset], &vec!['a' as u8; offset]);
+        assert_eq!(&dest[offset..], &vec![0 as u8; buf_len - offset]);
     }
 
     #[test_case(0)]
-    #[test_case(10)]
+    #[test_case(1)]
     #[test_case(2)]
     #[::fuchsia::test]
     fn starting_fault_address_copyin(addr: usize) {
