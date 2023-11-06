@@ -10,13 +10,13 @@
 
 #include <stdint.h>
 #include <sys/types.h>
-#include <ktl/atomic.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
 #include <fbl/canary.h>
 #include <kernel/thread.h>
 #include <kernel/timer.h>
+#include <ktl/atomic.h>
 
 // Rules for Events and AutounsignalEvents:
 // - Events may be signaled from interrupt context *but* preemption must be
@@ -38,7 +38,7 @@
 
 class Event {
  public:
-  constexpr explicit Event(bool initial = false) : Event(initial, Flags(0)) {}
+  constexpr explicit Event(bool initial = false) : Event(initial, Flags::NONE) {}
 
   ~Event();
 
@@ -79,6 +79,7 @@ class Event {
 
  protected:
   enum Flags : uint32_t {
+    NONE = 0,
     AUTOUNSIGNAL = 1,
   };
 

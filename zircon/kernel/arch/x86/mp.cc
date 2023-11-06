@@ -59,13 +59,12 @@ static uint8_t unsafe_kstack[PAGE_SIZE] __ALIGNED(16);
 #define unsafe_kstack_end nullptr
 #endif
 
-// Holds an array of MwaitMonitor objects used to signal that a CPU is
-// about-to-enter or should-wake-from the idle thread.
+// Holds an array of MwaitMonitor objects used to signal that a CPU is about-to-enter or
+// should-wake-from the idle thread.
 MwaitMonitorArray gMwaitMonitorArray;
 
-// Fake monitor to use until smp is initialized. The size of
-// the memory range doesn't matter, since it won't actually get
-// used in a non-smp environment.
+// Fake monitor to use until smp is initialized. The size of the memory range doesn't matter, since
+// it won't actually get used in a non-smp environment.
 MwaitMonitor gFakeMonitor;
 
 // For use with gMonitorArray.
@@ -79,8 +78,8 @@ x86_idle_states_t fake_supported_idle_states = {
 };
 X86IdleStates fake_idle_states = X86IdleStates(&fake_supported_idle_states);
 
-// Pre-initialize the per cpu structure for the boot cpu. Referenced by
-// early boot code prior to being able to initialize via code.
+// Pre-initialize the per cpu structure for the boot cpu. Referenced by early boot code prior to
+// being able to initialize via code.
 struct x86_percpu bp_percpu = {
     .direct = &bp_percpu,
     .current_thread = {},
@@ -125,10 +124,9 @@ zx_status_t x86_allocate_ap_structures(uint32_t* apic_ids, uint8_t cpu_count) {
     }
     memset(ap_percpus, 0, len);
 
-    // TODO(maniscalco): There's a data race here that we should fix.  We could
-    // be racing with the idle thread on this CPU.  Consider reworking the
-    // monitor initialization sequence or perhaps upgrading this to an atomic.
-    // Same goes for the assignment to |bp_percpu.monitor| below.
+    // TODO(maniscalco): There's a data race here that we should fix.  We could be racing with the
+    // idle thread on this CPU.  Consider reworking the monitor initialization sequence or perhaps
+    // upgrading this to an atomic.  Same goes for the assignment to |bp_percpu.monitor| below.
     use_monitor = arch::BootCpuid<arch::CpuidFeatureFlagsC>().monitor() &&
                   arch::BootCpuidSupports<arch::CpuidMonitorMwaitB>() &&
                   !x86_get_microarch_config()->idle_prefer_hlt;
@@ -197,8 +195,8 @@ void x86_init_percpu(cpu_num_t cpu_num) {
   DEBUG_ASSERT(percpu->cpu_num == cpu_num);
   DEBUG_ASSERT(percpu->direct == percpu);
 
-  // Assembly code has already set up %gs.base so that this function's
-  // own code can use it implicitly for stack-protector or safe-stack.
+  // Assembly code has already set up %gs.base so that this function's own code can use it
+  // implicitly for stack-protector or safe-stack.
   DEBUG_ASSERT(read_msr(X86_MSR_IA32_GS_BASE) == (uintptr_t)percpu);
 
   /* set the KERNEL_GS_BASE MSR to 0 */
@@ -213,9 +211,8 @@ void x86_init_percpu(cpu_num_t cpu_num) {
 
   gdt_load(gdt_get());
 
-  // Disable the LDT so userspace cannot make
-  // segment selectors that point to it.
-  // See fxbug.dev/79060
+  // Disable the LDT so userspace cannot make segment selectors that point to it.  See
+  // fxbug.dev/79060
   arch::DisableLdt();
 
   x86_initialize_percpu_tss();
@@ -223,8 +220,7 @@ void x86_init_percpu(cpu_num_t cpu_num) {
   // Setup the post early boot IDT
   if (cpu_num == 0) {
     idt_setup(&_idt);
-    // Setup alternate stacks to guarantee stack sanity when handling these
-    // interrupts
+    // Setup alternate stacks to guarantee stack consistency when handling these interrupts.
     idt_set_ist_index(&_idt, X86_INT_NMI, NMI_IST_INDEX);
     idt_set_ist_index(&_idt, X86_INT_MACHINE_CHECK, MCE_IST_INDEX);
     idt_set_ist_index(&_idt, X86_INT_DOUBLE_FAULT, DBF_IST_INDEX);
@@ -259,10 +255,9 @@ void x86_init_percpu(cpu_num_t cpu_num) {
                   X86_FLAGS_STATUS_MASK; /* clear all status flags, interrupt disabled, trap flag */
   write_msr(X86_MSR_IA32_FMASK, mask);
 
-  // Apply the same mask to our current flags, to ensure that flags are
-  // set to known-good values, because some flags may be inherited by
-  // later kernel threads.  We do this just in case any bad values were
-  // left behind by firmware or the bootloader.
+  // Apply the same mask to our current flags, to ensure that flags are set to known-good values,
+  // because some flags may be inherited by later kernel threads.  We do this just in case any bad
+  // values were left behind by firmware or the bootloader.
   x86_restore_flags(x86_save_flags() & ~mask);
 
   /* enable syscall instruction */
@@ -327,12 +322,11 @@ void arch_mp_reschedule(cpu_mask_t mask) {
       cpu_mask_t cpu_mask = cpu_num_to_mask(cpu_id);
       struct x86_percpu* percpu = cpu_id ? &ap_percpus[cpu_id - 1] : &bp_percpu;
 
-      // When a cpu sees that it is about to start the idle thread, it sets its own
-      // monitor flag. When a cpu is rescheduling another cpu, if it sees the monitor flag
-      // set, it can clear the flag to wake up the other cpu w/o an IPI. When the other
-      // cpu wakes up, the idle thread sees the cleared flag and preempts itself. Both of
-      // these operations are under the scheduler lock, so there are no races where the
-      // wrong signal can be sent.
+      // When a cpu sees that it is about to start the idle thread, it sets its own monitor flag.
+      // When a cpu is rescheduling another cpu, if it sees the monitor flag set, it can clear the
+      // flag to wake up the other cpu w/o an IPI. When the other cpu wakes up, the idle thread sees
+      // the cleared flag and preempts itself. Both of these operations are under the scheduler
+      // lock, so there are no races where the wrong signal can be sent.
       const uint8_t old_target_state = percpu->monitor->Exchange(kTargetStateNotIdle);
       if (old_target_state != kTargetStateIdle) {
         // CPU was not idle.  We'll need to send it an IPI.
@@ -343,11 +337,11 @@ void arch_mp_reschedule(cpu_mask_t mask) {
   } else {
     needs_ipi = mask;
     // We are attempting to wake the set up CPUs in |mask| and cause them to schedule a new thread.
-    // A target CPU spins for a short time before execuing halt; before it spins, it sets the
-    // |halt_interlock| flag to '1'. Before a target CPU executes the halt instruction, it sets
-    // the |halt_interlock| flag to '2' and skips the halt if the flag was cleared while spinning.
-    // Try to clear the |halt_interlock| flag from 1 -> 0. If we do so, we can skip sending an
-    // IPI and prevent an unnecessary halt instruction.
+    // A target CPU spins for a short time before executing halt; before it spins, it sets the
+    // |halt_interlock| flag to '1'. Before a target CPU executes the halt instruction, it sets the
+    // |halt_interlock| flag to '2' and skips the halt if the flag was cleared while spinning.  Try
+    // to clear the |halt_interlock| flag from 1 -> 0. If we do so, we can skip sending an IPI and
+    // prevent an unnecessary halt instruction.
     while (mask) {
       cpu_num_t cpu_id = lowest_cpu_set(mask);
       cpu_mask_t cpu_mask = cpu_num_to_mask(cpu_id);
@@ -366,129 +360,116 @@ void arch_mp_reschedule(cpu_mask_t mask) {
   }
 }
 
-__NO_RETURN int arch_idle_thread_routine(void*) {
+void arch_idle_enter(zx_duration_t max_latency) {
   struct x86_percpu* percpu = x86_get_percpu();
   const cpu_mask_t local_reschedule_mask = cpu_num_to_mask(arch_curr_cpu_num());
   PreemptionState& preemption_state = Thread::Current::preemption_state();
 
   if (use_monitor) {
-    for (;;) {
-      bool rsb_maybe_empty = false;
+    bool rsb_maybe_empty = false;
 
-      // It's critical that the monitor only indidates this CPU is idle when
-      // this thread cannot be preempted.  If we are preempted while "showing
-      // idle", the signaling CPU may see we're idle, elide the IPI and result
-      // in a lost reschedule event.  Prior to re-enabling preemption
-      // (i.e. prior to destroying this RAII object), we must set the moniotor
-      // to "not idle".
-      AutoPreemptDisabler preempt_disabled;
-      percpu->monitor->Write(kTargetStateIdle);
+    // It's critical that the monitor only indidates this CPU is idle when this thread cannot be
+    // preempted.  If we are preempted while "showing idle", the signaling CPU may see we're idle,
+    // elide the IPI and result in a lost reschedule event.  Prior to re-enabling preemption (i.e.
+    // prior to destroying this RAII object), we must set the moniotor to "not idle".
+    AutoPreemptDisabler preempt_disabled;
+    percpu->monitor->Write(kTargetStateIdle);
 
-      while (percpu->monitor->Read() == kTargetStateIdle && !preemption_state.preempts_pending()) {
-        X86IdleState* next_state = percpu->idle_states->PickIdleState();
-        rsb_maybe_empty |= x86_intel_idle_state_may_empty_rsb(next_state);
-        ktrace::Scope trace = KTRACE_CPU_BEGIN_SCOPE_ENABLE(
-            LOCAL_KTRACE_ENABLE, "kernel:sched", "idle", ("mwait hint", next_state->MwaitHint()));
+    while (percpu->monitor->Read() == kTargetStateIdle && !preemption_state.preempts_pending()) {
+      X86IdleState* next_state = percpu->idle_states->PickIdleState();
+      rsb_maybe_empty |= x86_intel_idle_state_may_empty_rsb(next_state);
+      ktrace::Scope trace = KTRACE_CPU_BEGIN_SCOPE_ENABLE(
+          LOCAL_KTRACE_ENABLE, "kernel:sched", "idle", ("mwait hint", next_state->MwaitHint()));
 
-        // 1) Disable interrupts
-        // 2) Arm the monitor
-        // 3) Check our monitor flag and whether or not we have pending interrupts
-        // 4) Re-enable interrupts as we drop into mwait.
-        //
-        // We perform the final check in step #3 to make sure that no one ended
-        // up writing to percpu->monitor just before we managed to arm the
-        // monitor in step #2.  We keep interrupts disabled during this sequence
-        // in order to make sure that we don't take an interrupt between steps
-        // #3 and #4 and then fail to drop out of mwait as a result.  Interrupts
-        // will be re-enabled on the instruction immediately before the mwait
-        // instruction, placing it in the interrupt shadow and guaranteeing that
-        // we enter the mwait before any interrupts can actually fire.
-        //
-        arch_disable_ints();
-        percpu->monitor->PrepareForWait();
-        if (percpu->monitor->Read() == kTargetStateIdle && !preemption_state.preempts_pending()) {
-          auto start = current_time();
-          // AMD-SB-1045: Clear the RAS before a thread enters MWAIT to prevent paired hyperthreads
-          // from consuming this thread's RAS entries.
-          if (x86_cpu_vulnerable_to_rsb_cross_thread()) {
-            x86_ras_fill();
-          }
-          x86_enable_ints_and_mwait(next_state->MwaitHint());
-          auto duration = zx_time_sub_time(current_time(), start);
-          percpu->idle_states->RecordDuration(duration);
-          next_state->RecordDuration(duration);
-          next_state->CountEntry();
-        } else {
-          arch_enable_ints();
-        }
-      }
-
-      // Spectre V2: If we enter a deep sleep state, fill the RSB before RET-ing from this function.
-      // (CVE-2017-5715, see Intel "Deep Dive: Retpoline: A Branch Target Injection Mitigation").
-      if (x86_cpu_vulnerable_to_rsb_underflow() & rsb_maybe_empty) {
-        x86_ras_fill();
-      }
-
-      // At this point, we woke up either because another CPU poked us, or
-      // because we have a local preempt pending.  When we cycle through our
-      // loop, our AutoPreemptDisabler will destruct and perform trigger a
-      // preempt operation, but only if we have a local preemption pending.
-      // This may not be the case if we woke up from being poked instead of
-      // because of an interrupt causing a thread to be assigned to this core.
+      // 1) Disable interrupts 2) Arm the monitor 3) Check our monitor flag and whether or not we
+      // have pending interrupts 4) Re-enable interrupts as we drop into mwait.
       //
-      // So, simply unconditionally force there to be a local preempt pending
-      // and let the APD destructor take care of things for us.  We are about to
-      // re-enable preemption, it is critical that we update our state to
-      // Not-Idle to avoid the possibility of a lost reschedule event.  See the
-      // related comment earlier in this function where the
-      // |AutoPreemptDisabler| is constructed.
-      preemption_state.preempts_pending_add(local_reschedule_mask);
-      percpu->monitor->Write(kTargetStateNotIdle);
-    }
-  } else {
-    for (;;) {
-      AutoPreemptDisabler preempt_disabled;
-      // Set the halt_interlock flag and spin for a little bit, in case a wakeup happens very
-      // shortly before we decide to go to sleep. If the halt_interlock flag is changed, another CPU
-      // has woken us, avoid the halt instruction.
-      ktrace::Scope trace =
-          KTRACE_CPU_BEGIN_SCOPE_ENABLE(LOCAL_KTRACE_ENABLE, "kernel:sched", "idle");
-      constexpr int kPauseIterations = 3000;
-      uint32_t halt_interlock_spinning = 1;
-      percpu->halt_interlock.store(1, ktl::memory_order_relaxed);
-      for (int i = 0; i < kPauseIterations && !preemption_state.preempts_pending(); i++) {
-        arch::Yield();
-        if (percpu->halt_interlock.load(ktl::memory_order_relaxed) != 1) {
-          break;
-        }
-      }
-      // Compare-exchange halt_interlock from 1 -> 2, to indicate we are no longer spinning.
-      // If the halt_interlock flag was changed, another CPU must have done it; avoid HLT and
-      // switch to a new runnable thread. Otherwise, setting it to '2' re-enables reschedule
-      // IPIs.
-      bool no_fast_wakeup =
-          percpu->halt_interlock.compare_exchange_strong(halt_interlock_spinning, 2);
-      if (no_fast_wakeup && !preemption_state.preempts_pending()) {
-        arch_disable_ints();
-        // AMD-SB-1045: Clear the RAS before a thread enters HLT to prevent paired hyperthreads
+      // We perform the final check in step #3 to make sure that no one ended up writing to
+      // percpu->monitor just before we managed to arm the monitor in step #2.  We keep interrupts
+      // disabled during this sequence in order to make sure that we don't take an interrupt between
+      // steps #3 and #4 and then fail to drop out of mwait as a result.  Interrupts will be
+      // re-enabled on the instruction immediately before the mwait instruction, placing it in the
+      // interrupt shadow and guaranteeing that we enter the mwait before any interrupts can
+      // actually fire.
+      //
+      arch_disable_ints();
+      percpu->monitor->PrepareForWait();
+      if (percpu->monitor->Read() == kTargetStateIdle && !preemption_state.preempts_pending()) {
+        auto start = current_time();
+        // AMD-SB-1045: Clear the RAS before a thread enters MWAIT to prevent paired hyperthreads
         // from consuming this thread's RAS entries.
         if (x86_cpu_vulnerable_to_rsb_cross_thread()) {
           x86_ras_fill();
         }
-        if (!preemption_state.preempts_pending()) {
-          x86_enable_ints_and_hlt();
-        } else {
-          // Re-enable interrupts if a reschedule IPI, timer tick, or other PreemptSetPending
-          // happened and we didn't call x86_idle.
-          arch_enable_ints();
-        }
+        x86_enable_ints_and_mwait(next_state->MwaitHint());
+        auto duration = zx_time_sub_time(current_time(), start);
+        percpu->idle_states->RecordDuration(duration);
+        next_state->RecordDuration(duration);
+        next_state->CountEntry();
+      } else {
+        arch_enable_ints();
       }
-
-      // See the comment above in the monitor/mwait version of this loop.  Make
-      // sure we have a local preempt pending before we drop our auto-preempt
-      // disabler.
-      preemption_state.preempts_pending_add(local_reschedule_mask);
     }
+
+    // Spectre V2: If we enter a deep sleep state, fill the RSB before RET-ing from this function.
+    // (CVE-2017-5715, see Intel "Deep Dive: Retpoline: A Branch Target Injection Mitigation").
+    if (x86_cpu_vulnerable_to_rsb_underflow() & rsb_maybe_empty) {
+      x86_ras_fill();
+    }
+
+    // At this point, we woke up either because another CPU poked us, or because we have a local
+    // preempt pending.  When we exit this block, our AutoPreemptDisabler will destruct and perform
+    // trigger a preempt operation, but only if we have a local preemption pending.  This may not be
+    // the case if we woke up from being poked instead of because of an interrupt causing a thread
+    // to be assigned to this core.
+    //
+    // So, simply unconditionally force there to be a local preempt pending and let the APD
+    // destructor take care of things for us.  We are about to re-enable preemption, it is critical
+    // that we update our state to Not-Idle to avoid the possibility of a lost reschedule event.
+    // See the related comment earlier in this function where the |AutoPreemptDisabler| is
+    // constructed.
+    preemption_state.preempts_pending_add(local_reschedule_mask);
+    percpu->monitor->Write(kTargetStateNotIdle);
+  } else {
+    AutoPreemptDisabler preempt_disabled;
+    // Set the halt_interlock flag and spin for a little bit, in case a wakeup happens very shortly
+    // before we decide to go to sleep. If the halt_interlock flag is changed, another CPU has woken
+    // us, avoid the halt instruction.
+    ktrace::Scope trace =
+        KTRACE_CPU_BEGIN_SCOPE_ENABLE(LOCAL_KTRACE_ENABLE, "kernel:sched", "idle");
+    constexpr int kPauseIterations = 3000;
+    uint32_t halt_interlock_spinning = 1;
+    percpu->halt_interlock.store(1, ktl::memory_order_relaxed);
+    for (int i = 0; i < kPauseIterations && !preemption_state.preempts_pending(); i++) {
+      arch::Yield();
+      if (percpu->halt_interlock.load(ktl::memory_order_relaxed) != 1) {
+        break;
+      }
+    }
+    // Compare-exchange halt_interlock from 1 -> 2, to indicate we are no longer spinning.  If the
+    // halt_interlock flag was changed, another CPU must have done it; avoid HLT and switch to a new
+    // runnable thread. Otherwise, setting it to '2' re-enables reschedule IPIs.
+    bool no_fast_wakeup =
+        percpu->halt_interlock.compare_exchange_strong(halt_interlock_spinning, 2);
+    if (no_fast_wakeup && !preemption_state.preempts_pending()) {
+      arch_disable_ints();
+      // AMD-SB-1045: Clear the RAS before a thread enters HLT to prevent paired hyperthreads from
+      // consuming this thread's RAS entries.
+      if (x86_cpu_vulnerable_to_rsb_cross_thread()) {
+        x86_ras_fill();
+      }
+      if (!preemption_state.preempts_pending()) {
+        x86_enable_ints_and_hlt();
+      } else {
+        // Re-enable interrupts if a reschedule IPI, timer tick, or other PreemptSetPending happened
+        // and we didn't call x86_idle.
+        arch_enable_ints();
+      }
+    }
+
+    // See the comment above in the monitor/mwait version of this loop.  Make sure we have a local
+    // preempt pending before we drop our auto-preempt disabler.
+    preemption_state.preempts_pending_add(local_reschedule_mask);
   }
 }
 
@@ -537,8 +518,7 @@ void x86_ipi_halt_handler(void*) {
   }
 }
 
-// Forcibly stops all other CPUs except the current one and the BSP (which is
-// cpu 0)
+// Forcibly stops all other CPUs except the current one and the BSP (which is cpu 0)
 void x86_force_halt_all_but_local_and_bsp(void) {
   cpu_num_t self = arch_curr_cpu_num();
   for (cpu_num_t i = 1; i < x86_num_cpus; ++i) {

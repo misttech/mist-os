@@ -16,6 +16,7 @@
 #include <fbl/intrusive_double_list.h>
 #include <kernel/cpu.h>
 #include <kernel/mutex.h>
+#include <kernel/spinlock.h>
 #include <kernel/thread.h>
 #include <ktl/atomic.h>
 
@@ -46,13 +47,11 @@ void mp_sync_exec(mp_ipi_target_t, cpu_mask_t mask, mp_sync_task_t task, void* c
 
 zx_status_t mp_hotplug_cpu_mask(cpu_mask_t mask);
 
+void mp_unplug_current_cpu(Guard<MonitoredSpinLock, NoIrqSave>&& guard) TA_REQ(thread_lock);
+
 // Unplug the cpu specified by |mask|, waiting, up to |deadline| for its "shutdown" thread to
 // complete.
-//
-// If |leaked_thread| is non-null and a "shutdown" thread was created, it will be assigned to
-// |leaked_thread| so the caller can |Forget| it.
-zx_status_t mp_unplug_cpu_mask(cpu_mask_t mask, zx_time_t deadline,
-                               Thread** leaked_thread = nullptr);
+zx_status_t mp_unplug_cpu_mask(cpu_mask_t mask, zx_time_t deadline);
 
 static inline zx_status_t mp_hotplug_cpu(cpu_num_t cpu) {
   return mp_hotplug_cpu_mask(cpu_num_to_mask(cpu));

@@ -16,27 +16,27 @@
 #include <lib/boot-options/boot-options.h>
 #include <lib/console.h>
 #include <platform.h>
-#include <stdlib.h>
 #include <string.h>
 #include <trace.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
+#include <arch/arm64.h>
 #include <arch/arm64/feature.h>
 #include <arch/arm64/mmu.h>
 #include <arch/arm64/registers.h>
 #include <arch/arm64/uarch.h>
+#include <arch/interrupt.h>
 #include <arch/mp.h>
 #include <arch/ops.h>
 #include <arch/regs.h>
 #include <arch/vm.h>
 #include <kernel/cpu.h>
+#include <kernel/mp.h>
 #include <kernel/thread.h>
 #include <ktl/atomic.h>
 #include <lk/init.h>
 #include <lk/main.h>
-
-#include "arch/arm64.h"
 
 #include <ktl/enforce.h>
 
@@ -227,11 +227,7 @@ void arch_late_init_percpu(void) {
       !gBootOptions->arm64_disable_spec_mitigations && arm64_uarch_needs_spectre_v2_mitigation();
 }
 
-__NO_RETURN int arch_idle_thread_routine(void*) {
-  for (;;) {
-    __asm__ volatile("wfi");
-  }
-}
+void arch_idle_enter(zx_duration_t max_latency) { __asm__ volatile("wfi"); }
 
 void arch_setup_uspace_iframe(iframe_t* iframe, uintptr_t pc, uintptr_t sp, uintptr_t arg1,
                               uintptr_t arg2) {

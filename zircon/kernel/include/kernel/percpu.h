@@ -17,6 +17,7 @@
 #include <kernel/align.h>
 #include <kernel/cpu_search_set.h>
 #include <kernel/dpc.h>
+#include <kernel/idle_power_thread.h>
 #include <kernel/scheduler.h>
 #include <kernel/stats.h>
 #include <kernel/thread.h>
@@ -53,8 +54,8 @@ struct percpu {
   // thread/cpu level statistics
   struct cpu_stats stats;
 
-  // per cpu idle thread
-  Thread idle_thread;
+  // per cpu idle/power thread
+  IdlePowerThread idle_power_thread;
 
   // kernel counters arena
   int64_t* counters;

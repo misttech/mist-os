@@ -9,9 +9,9 @@
 #include <kernel/event.h>
 #include <kernel/spinlock.h>
 
-class MpUnplugEvent {
+class MpUnplugEvent : protected Event {
  public:
-  MpUnplugEvent() = default;
+  explicit constexpr MpUnplugEvent(bool initial = false) : MpUnplugEvent(initial, Flags::NONE) {}
   ~MpUnplugEvent() = default;
 
   MpUnplugEvent(const MpUnplugEvent&) = delete;
@@ -29,14 +29,13 @@ class MpUnplugEvent {
     // signaling a thread, and it becomes scheduled on our CPU, we could end up
     // attempting to context switch during `event_.Signal()` while holding a
     // spinlock, which would produce a panic.
-    DEBUG_ASSERT(arch_ints_disabled());
     AutoPreemptDisabler apd;
-    Guard<SpinLock, NoIrqSave> guard{&lock_};
-    event_.Signal();
+    Guard<SpinLock, IrqSave> guard{&lock_};
+    Event::Signal();
   }
 
   zx_status_t WaitDeadline(zx_time_t deadline, Interruptible interruptible) {
-    const zx_status_t ret = event_.WaitDeadline(deadline, interruptible);
+    const zx_status_t ret = Event::WaitDeadline(deadline, interruptible);
 
     // Bouncing through the lock on our way out ensures that our signaler has
     // completely exited the event's Signal operation before we get of our
@@ -45,9 +44,17 @@ class MpUnplugEvent {
     return ret;
   }
 
+ protected:
+  constexpr MpUnplugEvent(bool initial, Flags flags) : Event(initial, flags) {}
+
  private:
-  Event event_{};
   DECLARE_SPINLOCK(MpUnplugEvent) lock_{};
+};
+
+class AutounsignalMpUnplugEvent : public MpUnplugEvent {
+ public:
+  explicit constexpr AutounsignalMpUnplugEvent(bool initial = false)
+      : MpUnplugEvent(initial, Flags::AUTOUNSIGNAL) {}
 };
 
 #endif  // ZIRCON_KERNEL_INCLUDE_ARCH_MP_UNPLUG_EVENT_H_

@@ -26,9 +26,9 @@ static int resume_cpu_test_thread(void* arg) {
 }
 
 // "Unplug" online secondary (non-BOOT) cores
-static zx_status_t unplug_all_cores(Thread** leaked_threads) {
+static zx_status_t unplug_all_cores() {
   cpu_mask_t cpumask = mp_get_online_mask() & ~cpu_num_to_mask(BOOT_CPU_ID);
-  return mp_unplug_cpu_mask(cpumask, ZX_TIME_INFINITE, leaked_threads);
+  return mp_unplug_cpu_mask(cpumask, ZX_TIME_INFINITE);
 }
 
 static zx_status_t hotplug_core(cpu_num_t i) {
@@ -64,7 +64,7 @@ static zx_status_t wait_for_cpu_offline(cpu_num_t i) {
       print_time = zx_time_add_duration(current_time(), ZX_SEC(5));
       printf("Still waiting for CPU %u to go offline, waiting 5 more seconds\n", i);
     }
-    Thread::Current::SleepRelative(ZX_MSEC(10));
+    Thread::Current::SleepRelative(ZX_USEC(200));
   }
 }
 
@@ -78,7 +78,7 @@ static void wait_for_cpu_active(cpu_num_t i) {
       print_time = zx_time_add_duration(current_time(), ZX_SEC(5));
       printf("Still waiting for CPU %u to become active, waiting 5 more seconds\n", i);
     }
-    Thread::Current::SleepRelative(ZX_MSEC(10));
+    Thread::Current::SleepRelative(ZX_USEC(200));
   }
 }
 
@@ -95,8 +95,7 @@ static void wait_for_cpu_active(cpu_num_t i) {
   }
   Thread::Current::MigrateToCpu(BOOT_CPU_ID);
   // "Unplug" online secondary (non-BOOT) cores
-  Thread* leaked_threads[SMP_MAX_CPUS] = {};
-  ASSERT_OK(unplug_all_cores(leaked_threads), "unplugging all cores failed");
+  ASSERT_OK(unplug_all_cores(), "unplugging all cores failed");
   for (cpu_num_t i = 0; i < num_cores; i++) {
     if (i == BOOT_CPU_ID) {
       continue;
@@ -118,12 +117,6 @@ static void wait_for_cpu_active(cpu_num_t i) {
     nt->Resume();
     ASSERT_OK(nt->Join(nullptr, ZX_TIME_INFINITE), "thread join failed");
     ASSERT_EQ(i, running_core, "Thread not running on hotplugged core");
-  }
-
-  for (Thread* leaked_thread : leaked_threads) {
-    if (leaked_thread) {
-      leaked_thread->Forget();
-    }
   }
 
   END_TEST;

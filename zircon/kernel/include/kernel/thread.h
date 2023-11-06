@@ -841,6 +841,15 @@ class PreemptionState {
     return false;
   }
 
+  // Resets the preemption state. This should only be called when reviving an
+  // idle/power thread that halted while taking a CPU offline.
+  void Reset() {
+    state_ = 0;
+    preempts_pending_ = 0;
+    timeslice_extension_ = 0;
+    timeslice_extension_deadline_ = 0;
+  }
+
  private:
   friend class PreemptDisableTestAccess;
 
@@ -1034,6 +1043,12 @@ struct Thread {
   ~Thread();
 
   static Thread* CreateIdleThread(cpu_num_t cpu_num);
+
+  // Revive the idle/power thread for the given CPU so that it starts fresh after
+  // halting while taking the CPU offline. Most state is preserved, including
+  // stack memory locations (useful for debugging) and accumulated runtime stats.
+  static void ReviveIdlePowerThread(cpu_num_t cpu_num);
+
   // Creates a thread with |name| that will execute |entry| at |priority|. |arg|
   // will be passed to |entry| when executed, the return value of |entry| will be
   // passed to Exit().

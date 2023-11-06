@@ -17,6 +17,7 @@
 #include <string.h>
 #include <zircon/errors.h>
 #include <zircon/listnode.h>
+#include <zircon/time.h>
 #include <zircon/types.h>
 
 #include <new>
@@ -439,6 +440,11 @@ void Scheduler::RemoveFirstThread(Thread* thread) {
 // threads. If there is no eligible work, attempt to steal work from other busy
 // CPUs.
 Thread* Scheduler::DequeueThread(SchedTime now, Guard<MonitoredSpinLock, NoIrqSave>& queue_guard) {
+  percpu& self = percpu::Get(this_cpu_);
+  if (self.idle_power_thread.pending_power_work()) {
+    return &self.idle_power_thread.thread();
+  }
+
   if (IsDeadlineThreadEligible(now)) {
     return DequeueDeadlineThread(now);
   }
@@ -453,7 +459,7 @@ Thread* Scheduler::DequeueThread(SchedTime now, Guard<MonitoredSpinLock, NoIrqSa
     thread = StealWork(now);
   });
 
-  return thread != nullptr ? thread : &percpu::Get(this_cpu()).idle_thread;
+  return thread != nullptr ? thread : &self.idle_power_thread.thread();
 }
 
 // Attempts to steal work from other busy CPUs and move it to the local run
@@ -611,7 +617,8 @@ Thread* Scheduler::FindEarlierDeadlineThread(SchedTime eligible_time, SchedTime 
 }
 
 // Returns the time that the next deadline task will become eligible or infinite
-// if there are no ready deadline tasks.
+// if there are no ready deadline tasks or there is pending work for the idle
+// thread to perform.
 SchedTime Scheduler::GetNextEligibleTime() {
   return deadline_run_queue_.is_empty() ? SchedTime{ZX_TIME_INFINITE}
                                         : deadline_run_queue_.front().scheduler_state().start_time_;
@@ -1119,9 +1126,12 @@ void Scheduler::RescheduleCommon(SchedTime now, EndTraceCallback end_outer_trace
     ktrace::Scope trace_stop_preemption = LOCAL_KTRACE_BEGIN_SCOPE(DETAILED, "idle");
     next_state->last_started_running_ = now;
 
-    // If there are no tasks to run in the future, disable the preemption timer.
-    // Otherwise, set the preemption time to the earliest eligible time.
-    target_preemption_time_ns_ = GetNextEligibleTime();
+    // If there are no tasks to run in the future or there is idle/power work to
+    // perform, disable the preemption timer.  Otherwise, set the preemption
+    // time to the earliest eligible time.
+    target_preemption_time_ns_ = percpu::Get(this_cpu_).idle_power_thread.pending_power_work()
+                                     ? SchedTime(ZX_TIME_INFINITE)
+                                     : GetNextEligibleTime();
     percpu::Get(current_cpu).timer_queue.PreemptReset(target_preemption_time_ns_.raw_value());
   } else if (timeslice_expired || next_thread != current_thread) {
     ktrace::Scope trace_start_preemption = LOCAL_KTRACE_BEGIN_SCOPE(DETAILED, "next_slice");

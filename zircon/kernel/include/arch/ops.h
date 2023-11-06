@@ -15,6 +15,7 @@
 #include <stdint.h>
 #include <sys/types.h>
 #include <zircon/compiler.h>
+#include <zircon/time.h>
 
 #include <arch/defines.h>
 #include <kernel/cpu.h>
@@ -48,7 +49,7 @@ void arch_sync_cache_range(vaddr_t start, size_t len);
 class MpUnplugEvent;
 void arch_flush_state_and_halt(MpUnplugEvent *flush_done) __NO_RETURN;
 
-int arch_idle_thread_routine(void *) __NO_RETURN;
+void arch_idle_enter(zx_duration_t max_latency);
 
 // Arch optimized version of a page zero routine against a page aligned buffer.
 // Usually implemented in or called from assembly.

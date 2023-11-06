@@ -43,6 +43,7 @@
 #include <kernel/auto_preempt_disabler.h>
 #include <kernel/cpu.h>
 #include <kernel/dpc.h>
+#include <kernel/idle_power_thread.h>
 #include <kernel/lockdep.h>
 #include <kernel/mp.h>
 #include <kernel/percpu.h>
@@ -1457,7 +1458,7 @@ void thread_init_early() {
   percpu::InitializeBoot();
 
   // create a thread to cover the current running state
-  Thread* t = &percpu::Get(0).idle_thread;
+  Thread* t = &percpu::Get(0).idle_power_thread.thread();
   thread_construct_first(t, "bootstrap");
 }
 
@@ -1575,7 +1576,7 @@ void Thread::Current::BecomeIdle() {
   // We're now properly in the idle routine. Reenable interrupts and drop
   // into the idle routine, never return.
   arch_enable_ints();
-  arch_idle_thread_routine(nullptr);
+  IdlePowerThread::Run(nullptr);
 
   __UNREACHABLE;
 }
@@ -1614,9 +1615,26 @@ void thread_secondary_cpu_entry() {
 
   mp_set_curr_cpu_active(true);
 
-  percpu::GetCurrent().dpc_queue.InitForCurrentCpu();
+  percpu& current_cpu = percpu::GetCurrent();
 
-  // Remove ourselves from the Scheduler's bookkeeping
+  // Signal the idle/power thread to transition to online but don't wait for it, since it cannot run
+  // until this thread either blocks or exits below. The idle thread will run immediately upon exit
+  // and complete the transition, if necessary.
+  const IdlePowerThread::TransitionResult result =
+      current_cpu.idle_power_thread.TransitionToOnline(ZX_TIME_INFINITE_PAST);
+
+  // The first time a secondary CPU comes online after boot the CPU power thread is already in the
+  // online state. If the CPU power thread is not in its initial online state, it is being returned
+  // to online from offline or suspend and needs to be revived to resume its normal function.
+  if (result.starting_state != IdlePowerThread::State::Online) {
+    Thread::ReviveIdlePowerThread(arch_curr_cpu_num());
+  }
+
+  // CAREFUL: This must happen after the idle/power thread is revived, since creating the DPC thread
+  // can contend on VM locks and could cause this CPU to go idle.
+  current_cpu.dpc_queue.InitForCurrentCpu();
+
+  // Remove ourselves from the Scheduler's bookkeeping.
   {
     Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
     Scheduler::RemoveFirstThread(Thread::Current::Get());
@@ -1624,7 +1642,7 @@ void thread_secondary_cpu_entry() {
 
   mp_signal_curr_cpu_ready();
 
-  // Exit from our bootstrap thread, and enter the scheduler on this cpu
+  // Exit from our bootstrap thread, and enter the scheduler on this cpu.
   Thread::Current::Exit(0);
 }
 
@@ -1637,8 +1655,9 @@ Thread* Thread::CreateIdleThread(cpu_num_t cpu_num) {
   char name[16];
   snprintf(name, sizeof(name), "idle %u", cpu_num);
 
-  Thread* t = Thread::CreateEtc(&percpu::Get(cpu_num).idle_thread, name, arch_idle_thread_routine,
-                                nullptr, SchedulerState::BaseProfile{IDLE_PRIORITY}, nullptr);
+  Thread* t = Thread::CreateEtc(&percpu::Get(cpu_num).idle_power_thread.thread(), name,
+                                IdlePowerThread::Run, nullptr,
+                                SchedulerState::BaseProfile{IDLE_PRIORITY}, nullptr);
   if (t == nullptr) {
     return t;
   }
@@ -1648,6 +1667,18 @@ Thread* Thread::CreateIdleThread(cpu_num_t cpu_num) {
   Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
   Scheduler::UnblockIdle(t);
   return t;
+}
+
+void Thread::ReviveIdlePowerThread(cpu_num_t cpu_num) {
+  DEBUG_ASSERT(cpu_num != 0 && cpu_num < SMP_MAX_CPUS);
+  Thread* thread = &percpu::Get(cpu_num).idle_power_thread.thread();
+
+  DEBUG_ASSERT(thread->flags() & THREAD_FLAG_IDLE);
+  DEBUG_ASSERT(thread->scheduler_state().hard_affinity() == cpu_num_to_mask(cpu_num));
+  DEBUG_ASSERT(thread->task_state().entry() == IdlePowerThread::Run);
+
+  arch_thread_initialize(thread, reinterpret_cast<vaddr_t>(Thread::Trampoline));
+  thread->preemption_state().Reset();
 }
 
 /**

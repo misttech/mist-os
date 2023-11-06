@@ -14,6 +14,7 @@
 #include <string.h>
 #include <trace.h>
 #include <zircon/errors.h>
+#include <zircon/time.h>
 #include <zircon/types.h>
 
 #include <arch/mp.h>
@@ -88,8 +89,4 @@ void arch_late_init_percpu() {
   mp_set_curr_cpu_online(true);
 }
 
-__NO_RETURN int arch_idle_thread_routine(void*) {
-  for (;;) {
-    __wfi();
-  }
-}
+void arch_idle_enter(zx_duration_t max_latency) { __wfi(); }

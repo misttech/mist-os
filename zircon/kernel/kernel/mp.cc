@@ -23,7 +23,6 @@
 #include <zircon/types.h>
 
 #include <arch/mp.h>
-#include <arch/mp_unplug_event.h>
 #include <arch/ops.h>
 #include <dev/interrupt.h>
 #include <fbl/algorithm.h>
@@ -34,6 +33,7 @@
 #include <kernel/event.h>
 #include <kernel/mp.h>
 #include <kernel/mutex.h>
+#include <kernel/percpu.h>
 #include <kernel/scheduler.h>
 #include <kernel/spinlock.h>
 #include <kernel/stats.h>
@@ -215,23 +215,17 @@ void mp_sync_exec(mp_ipi_target_t target, cpu_mask_t mask, mp_sync_task_t task, 
   mp.ipi_task_lock.ReleaseIrqRestore(irqstate);
 }
 
-static void mp_unplug_trampoline() TA_REQ(thread_lock) __NO_RETURN;
-static void mp_unplug_trampoline() {
-  Thread* ct = Thread::Current::Get();
-  auto unplug_done = reinterpret_cast<MpUnplugEvent*>(ct->task_state().arg());
+void mp_unplug_current_cpu(Guard<MonitoredSpinLock, NoIrqSave>&& incoming_guard) {
+  Guard<MonitoredSpinLock, NoIrqSave> guard{AdoptLock, ktl::move(incoming_guard)};
 
   lockup_secondary_shutdown();
-
-  // We're still holding the incoming lock from the reschedule that took us here.
-  DEBUG_ASSERT(ct->scheduler_state().previous_thread() != nullptr);
-  ct->scheduler_state().previous_thread()->get_lock().AssertHeld();
 
   Scheduler::MigrateUnpinnedThreads();
   DEBUG_ASSERT(!mp_is_cpu_active(arch_curr_cpu_num()));
 
   // Now that this CPU is no longer active, it is critical that this thread
   // never block.  If this thread blocks, the scheduler may attempt to select
-  // this CPU's idle thread to run.  Doing so would violate an invariant: tasks
+  // this CPU's power thread to run.  Doing so would violate an invariant: tasks
   // may only be scheduled on active CPUs.
   DEBUG_ASSERT(arch_blocking_disallowed());
 
@@ -246,11 +240,10 @@ static void mp_unplug_trampoline() {
   // We had better not be holding any OwnedWaitQueues at this point in time
   // (it is unclear how we would have ever obtained any in the first place
   // since everything this thread ever does is in this function).
-  ct->wait_queue_state().AssertNoOwnedWaitQueues();
+  Thread::Current::Get()->wait_queue_state().AssertNoOwnedWaitQueues();
 
-  // Release the incoming lock but do *not* enable interrupts, we want this CPU
-  // to never receive another interrupt.
-  Scheduler::LockHandoff();
+  // Release the thread lock while keeping interrupts disabled.
+  guard.Release();
 
   // Stop and then shutdown this CPU's platform timer.
   platform_stop_timer();
@@ -261,8 +254,8 @@ static void mp_unplug_trampoline() {
   // resetting the whole system).
   shutdown_interrupts_curr_cpu();
 
-  // flush all of our caches
-  arch_flush_state_and_halt(unplug_done);
+  // Flush all of our caches and signal offline complete.
+  percpu::GetCurrent().idle_power_thread.FlushAndHalt();
 }
 
 // Hotplug the given cpus.  Blocks until the CPUs are up, or a failure is
@@ -292,21 +285,8 @@ zx_status_t mp_hotplug_cpu_mask(cpu_mask_t cpu_mask) {
 }
 
 // Unplug a single CPU.  Must be called while holding the hotplug lock
-static zx_status_t mp_unplug_cpu_mask_single_locked(cpu_num_t cpu_id, zx_time_t deadline,
-                                                    Thread** leaked_thread) {
+static zx_status_t mp_unplug_cpu_mask_single_locked(cpu_num_t cpu_id, zx_time_t deadline) {
   percpu& percpu_to_unplug = percpu::Get(cpu_id);
-
-  Thread* thread = nullptr;
-  auto cleanup_thread = fit::defer([&thread, &leaked_thread, cpu_id]() {
-    // TODO(fxbug.dev/34447): Work around a race in thread cleanup by leaking the thread and stack
-    // structure. Since we're only using this while turning off the system currently, it's not a big
-    // problem leaking the thread structure and stack.
-    if (leaked_thread) {
-      *leaked_thread = thread;
-    } else if (thread != nullptr) {
-      TRACEF("WARNING: leaking thread for cpu %u\n", cpu_id);
-    }
-  });
 
   // Wait for |percpu_to_unplug| to complete any in-progress DPCs and terminate its DPC thread.
   // Later, once nothing is running on it, we'll migrate its queued DPCs to another CPU.
@@ -315,53 +295,13 @@ static zx_status_t mp_unplug_cpu_mask_single_locked(cpu_num_t cpu_id, zx_time_t 
     return status;
   }
 
-  // TODO(maniscalco): |cpu_to_unplug| is about to shutdown.  We should ensure it has no pinned
-  // threads (except maybe the idle thread).  Once we're confident we've terminated/migrated them
-  // all, this would be a good place to DEBUG_ASSERT.
-
-  // Create a thread for the unplug.  We will cause the target CPU to
-  // context switch to this thread.  After this happens, it should no
-  // longer be accessing system state and can be safely shut down.
-  //
-  // This thread is pinned to the target CPU and set to run with the
-  // highest priority.  This should cause it to pick up the thread
-  // immediately (or very soon, if for some reason there is another
-  // HIGHEST_PRIORITY task scheduled in between when we resume the
-  // thread and when the CPU is woken up).
-  MpUnplugEvent unplug_done;
-  thread = Thread::CreateEtc(nullptr, "unplug_thread", nullptr, &unplug_done,
-                             SchedulerState::BaseProfile{HIGHEST_PRIORITY}, mp_unplug_trampoline);
-  if (thread == nullptr) {
-    return ZX_ERR_NO_MEMORY;
-  }
-
   status = platform_mp_prep_cpu_unplug(cpu_id);
   if (status != ZX_OK) {
     return status;
   }
 
-  // Pin to the target CPU
-  thread->SetCpuAffinity(cpu_num_to_mask(cpu_id));
-
-  thread->SetBaseProfile(SchedulerState::BaseProfile{
-      SchedDeadlineParams{SchedDuration{ZX_MSEC(9)}, SchedDuration{ZX_MSEC(10)}}});
-
-  status = thread->DetachAndResume();
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  // Wait for the unplug thread to get scheduled on the target.
-  //
-  // TODO(johngro): Look into a better way to do this.  We are in serious
-  // trouble if this wait operation fails.  We have our unplug event on our
-  // stack, but the thread we created to unplug the CPU has either not signaled
-  // it in time, or we had some other trouble waiting on our event.  Unwinding
-  // now, as we are about to do, leaves us in a situation where the thread may
-  // suddenly come back to life and start to corrupt our stack as it tries to
-  // signal a MpUnplugEvent object which no longer exists.
-  status = unplug_done.WaitDeadline(deadline, Interruptible::No);
-  ASSERT(status == ZX_OK);
+  // Request to take the target offline.
+  status = percpu_to_unplug.idle_power_thread.TransitionToOffline(deadline).status;
   if (status != ZX_OK) {
     return status;
   }
@@ -381,11 +321,7 @@ static zx_status_t mp_unplug_cpu_mask_single_locked(cpu_num_t cpu_id, zx_time_t 
 //
 // This should be called in a thread context.
 //
-// |leaked_threads| is an optional array of pointers to threads with length
-// |SMP_MAX_CPUS|. If null, the threads used to "cleanup" each CPU will be
-// leaked. If non-null, they will be returned to the caller so that the caller
-// can |thread_forget| them.
-zx_status_t mp_unplug_cpu_mask(cpu_mask_t cpu_mask, zx_time_t deadline, Thread** leaked_threads) {
+zx_status_t mp_unplug_cpu_mask(cpu_mask_t cpu_mask, zx_time_t deadline) {
   DEBUG_ASSERT(!arch_ints_disabled());
   Guard<Mutex> lock(&mp.hotplug_lock);
 
@@ -398,8 +334,7 @@ zx_status_t mp_unplug_cpu_mask(cpu_mask_t cpu_mask, zx_time_t deadline, Thread**
     cpu_num_t cpu_id = highest_cpu_set(cpu_mask);
     cpu_mask &= ~cpu_num_to_mask(cpu_id);
 
-    zx_status_t status = mp_unplug_cpu_mask_single_locked(
-        cpu_id, deadline, leaked_threads ? &leaked_threads[cpu_id] : nullptr);
+    zx_status_t status = mp_unplug_cpu_mask_single_locked(cpu_id, deadline);
     if (status != ZX_OK) {
       return status;
     }
