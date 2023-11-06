@@ -521,7 +521,10 @@ config("default_frame_pointers") {
 }
 
 config("frame_pointers") {
-  cflags = [ "-fno-omit-frame-pointer" ]
+  cflags = [
+    "-fno-omit-frame-pointer",
+    "-momit-leaf-frame-pointer",
+  ]
   ldflags = cflags
   rustflags = [ "-Cforce-frame-pointers" ]
   if (zircon_toolchain != false) {

@@ -65,12 +65,35 @@ hermetic_code_blob("hermetic_copy") {
   sources = [ "hermetic_copy.cc" ]
   public_deps = [ "//zircon/system/public" ]
 
+  # hermetic_copy_error.S assumes it can "unwind" the hermetic code blob from a
+  # fault just by popping the frame pointer and returning.  So it needs to know
+  # for sure there will be a frame pointer and nothing else on the stack other
+  # than the return address from the original call.
+  #
+  # TODO(jamesr): This is not remotely safe to assume about compiled code. The
+  # only safe way to unwind is to rely on full DWARF CFI and use the full
+  # unwinder.  However, the hermetic code blob is detached from any metadata
+  # such as CFI, so there is no way to make it unwindable.  Without that, the
+  # only truly safe option is to implement the copy routine in assembly for
+  # each machine and have a manually-maintained contract with the error
+  # recovery code about how to correctly unwind it.  It's easy for that
+  # contract to be simple since such a copy routine is usually just a leaf
+  # routine that doesn't spill any call-saved registers such that nothing but
+  # the return instruction is required.  But writing it in assembly is the only
+  # way to ensure the code meets such a contract.
+  add_configs = [ ":leaf-frame-pointer" ]
+
   # TODO(fxbug.dev/129545): LLD lets --no-pie trump the code generation
   # switches, but this needs to be compiled as PIC though linked differently.
   if (toolchain_variant.tags + [ "lto" ] - [ "lto" ] !=
       toolchain_variant.tags) {
     ldflags = [ "-Wl,-mllvm,-relocation-model=pic" ]
   }
+}
+
+config("leaf-frame-pointer") {
+  visibility = [ ":*" ]
+  cflags = [ "-mno-omit-leaf-frame-pointer" ]
 }
 
 resource("hermetic_copy_bin") {
