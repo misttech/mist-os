@@ -52,12 +52,7 @@ template("python_perf_test") {
 
   python_mobly_test("${target_name}") {
     forward_variables_from(invoker, [ "main_source" ])
-
-    libraries = [
-      "//src/performance/lib/perf_publish",
-      "//src/testing/end_to_end/honeydew",
-      "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
-    ]
+    libraries = [ "//src/performance/lib/perf_test" ]
     if (defined(invoker.libraries)) {
       libraries += invoker.libraries
     }

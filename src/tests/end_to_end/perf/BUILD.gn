@@ -34,7 +34,6 @@ test_list = [
   "netstack_tun_socket_benchmarks_test",
   "network_device_microbenchmarks_test",
   "perftest_trace_events_test",
-  "rust_inspect_benchmarks_test",
   "storage_benchmarks_test",
   "tracing_microbenchmarks_test",
 
@@ -201,6 +200,15 @@ _tests = [
   {
     name = "perf_publish_example"
     expected_metric_filenames = [ "fuchsia.example.txt" ]
+    libraries = [ "//src/performance/lib/perf_publish" ]
+  },
+  {
+    name = "rust_inspect_benchmark"
+    expected_metric_filenames = [
+      "fuchsia.rust_inspect.benchmarks.txt",
+      "fuchsia.rust_inspect.reader_benchmarks.txt",
+      "fuchsia.rust_inspect.selectors.txt",
+    ]
   },
 ]
 
@@ -212,6 +220,9 @@ foreach(test, _tests) {
     python_perf_test(_test_name) {
       main_source = "test/${_name}.py"
       expected_metric_filenames = test.expected_metric_filenames
+      if (defined(test.libraries)) {
+        libraries = test.libraries
+      }
     }
   }
   _python_benchmarks += [ ":${_test_name}($host_toolchain)" ]
@@ -266,9 +277,6 @@ if (is_host) {
     "fuchsia.network.socket.tun.netstack3.txt",
     "fuchsia.network.socket.tun.txt",
     "fuchsia.network.udp_serde.txt",
-    "fuchsia.rust_inspect.benchmarks.txt",
-    "fuchsia.rust_inspect.reader_benchmarks.txt",
-    "fuchsia.rust_inspect.selectors.txt",
     "fuchsia.starnix.gvisor_benchmarks.clock_getres.txt",
     "fuchsia.starnix.gvisor_benchmarks.clock_gettime.txt",
     "fuchsia.starnix.gvisor_benchmarks.dup.txt",
