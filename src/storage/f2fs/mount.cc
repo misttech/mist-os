@@ -50,8 +50,4 @@ zx_status_t MountOptions::SetValue(const MountOption option, const size_t value)
   return ZX_OK;
 }
 
-uint64_t MountOptions::ToBit(const MountOption option) {
-  return 1ULL << static_cast<size_t>(option);
-}
-
 }  // namespace f2fs

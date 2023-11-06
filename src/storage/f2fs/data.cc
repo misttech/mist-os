@@ -441,7 +441,7 @@ zx::result<block_t> VnodeF2fs::GetBlockAddrForDataPage(LockedPage &page) {
     new_blk_addr = *addr_or;
     SetDataBlkaddr(dnode_page.GetPage<NodePage>(), ofs_in_dnode, new_blk_addr);
     UpdateExtentCache(new_blk_addr, file_offset);
-    UpdateVersion(LeToCpu(fs()->GetSuperblockInfo().GetCheckpoint().checkpoint_ver));
+    UpdateVersion(LeToCpu(superblock_info_.GetCheckpoint().checkpoint_ver));
   }
 
   return zx::ok(new_blk_addr);
@@ -489,7 +489,7 @@ zx::result<std::vector<LockedPage>> VnodeF2fs::WriteBegin(const size_t offset, c
   const size_t offset_end = safemath::CheckAdd<size_t>(offset, len).ValueOrDie();
   const pgoff_t index_end = CheckedDivRoundUp<pgoff_t>(offset_end, kBlockSize);
 
-  fs::SharedLock rlock(fs()->GetSuperblockInfo().GetFsLock(LockType::kFileOp));
+  fs::SharedLock rlock(superblock_info_.GetFsLock(LockType::kFileOp));
   std::vector<LockedPage> data_pages;
   data_pages.reserve(index_end - index_start);
   auto pages_or = GrabCachePages(index_start, index_end);

@@ -97,7 +97,7 @@ class CheckpointTest : public F2fsFakeDevTestFixture {
   }
 
   void GetLastCheckpoint(uint32_t expect_cp_position, bool after_mkfs, LockedPage *cp_out) {
-    Superblock &raw_superblock = fs_->RawSb();
+    Superblock &raw_superblock = fs_->GetSuperblockInfo().GetSuperblock();
     Checkpoint *cp_block1 = nullptr, *cp_block2 = nullptr;
     LockedPage cp_page1, cp_page2;
 
@@ -126,7 +126,7 @@ class CheckpointTest : public F2fsFakeDevTestFixture {
 
   void CreateDirs(int dir_cnt, uint64_t version) {
     fbl::RefPtr<VnodeF2fs> data_root;
-    ASSERT_EQ(VnodeF2fs::Vget(fs_.get(), fs_->RawSb().root_ino, &data_root), ZX_OK);
+    ASSERT_EQ(VnodeF2fs::Vget(fs_.get(), fs_->GetSuperblockInfo().GetRootIno(), &data_root), ZX_OK);
     Dir *root_dir = static_cast<Dir *>(data_root.get());
 
     for (int i = 0; i < dir_cnt; ++i) {
@@ -140,7 +140,7 @@ class CheckpointTest : public F2fsFakeDevTestFixture {
 
   void CreateFiles(int file_cnt, uint64_t version) {
     fbl::RefPtr<VnodeF2fs> data_root;
-    ASSERT_EQ(VnodeF2fs::Vget(fs_.get(), fs_->RawSb().root_ino, &data_root), ZX_OK);
+    ASSERT_EQ(VnodeF2fs::Vget(fs_.get(), fs_->GetSuperblockInfo().GetRootIno(), &data_root), ZX_OK);
     Dir *root_dir = static_cast<Dir *>(data_root.get());
 
     for (int i = 0; i < file_cnt; ++i) {
@@ -966,7 +966,7 @@ TEST_F(CheckpointTest, ValidateCheckpointFirstCpPackDiskFail) {
   op.bSync = true;
   fs_->GetMetaVnode().Writeback(op);
 
-  block_t cp_start_blk_no = LeToCpu(fs_->RawSb().cp_blkaddr);
+  block_t cp_start_blk_no = LeToCpu(fs_->GetSuperblockInfo().GetSuperblock().cp_blkaddr);
   block_t target_addr = cp_start_blk_no * kDefaultSectorsPerBlock;
 
   auto hook = [target_addr](const block_fifo_request_t &_req, const zx::vmo *_vmo) {
@@ -995,7 +995,7 @@ TEST_F(CheckpointTest, ValidateCheckpointSecondCpPackDiskFail) {
   op.bSync = true;
   fs_->GetMetaVnode().Writeback(op);
 
-  block_t cp_start_blk_no = LeToCpu(fs_->RawSb().cp_blkaddr);
+  block_t cp_start_blk_no = LeToCpu(fs_->GetSuperblockInfo().GetSuperblock().cp_blkaddr);
   block_t first_cp_blk_no = cp_start_blk_no;
 
   LockedPage cp_page;
@@ -1070,7 +1070,7 @@ TEST_F(CheckpointTest, FlushSitEntriesDiskFail) {
   op.bSync = true;
   fs_->GetMetaVnode().Writeback(op);
 
-  block_t cp_start_blk_no = LeToCpu(fs_->RawSb().cp_blkaddr);
+  block_t cp_start_blk_no = LeToCpu(fs_->GetSuperblockInfo().GetSuperblock().cp_blkaddr);
 
   LockedPage cp_page;
   ASSERT_EQ(fs_->GetMetaPage(cp_start_blk_no, &cp_page), ZX_OK);

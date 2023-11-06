@@ -15,7 +15,7 @@ File::File(F2fs *fs, ino_t ino, umode_t mode) : VnodeF2fs(fs, ino, mode) {}
 //   return 0;
 //   //   Page *page = vmf->page;
 //   //   VnodeF2fs *vnode = this;
-//   //   // SuperblockInfo &superblock_info = Vfs()->GetSuperblockInfo();
+//   //   // SuperblockInfo &superblock_info = Vsuperblock_info_;
 //   //   Page *node_page;
 //   //   block_t old_blk_addr;
 //   //   DnodeOfData dn;
@@ -148,7 +148,7 @@ File::File(F2fs *fs, ino_t ino, umode_t mode) : VnodeF2fs(fs, ino, mode) {}
 // }
 
 // int File::ExpandInodeData(loff_t offset, off_t len, int mode) {
-//   SuperblockInfo &superblock_info = Vfs()->GetSuperblockInfo();
+//   SuperblockInfo &superblock_info = Vsuperblock_info_;
 //   pgoff_t pg_start, pg_end;
 //   loff_t new_size = i_size;
 //   loff_t off_start, off_end;
@@ -338,7 +338,7 @@ zx_status_t File::DoWrite(const void *data, size_t len, size_t offset, size_t *o
     return ZX_OK;
   }
 
-  if (offset + len > static_cast<size_t>(MaxFileSize(fs()->RawSb().log_blocksize))) {
+  if (offset + len > MaxFileSize()) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -393,7 +393,7 @@ zx_status_t File::Write(const void *data, size_t len, size_t offset, size_t *out
   TRACE_DURATION("f2fs", "File::Write", "event", "File::Write", "ino", Ino(), "offset",
                  offset / kBlockSize, "length", len / kBlockSize);
 
-  if (fs()->GetSuperblockInfo().TestCpFlags(CpFlag::kCpErrorFlag)) {
+  if (superblock_info_.TestCpFlags(CpFlag::kCpErrorFlag)) {
     return ZX_ERR_BAD_STATE;
   }
   return DoWrite(data, len, offset, out_actual);
@@ -404,7 +404,7 @@ zx_status_t File::Append(const void *data, size_t len, size_t *out_end, size_t *
   TRACE_DURATION("f2fs", "File::Append", "event", "File::Append", "ino", Ino(), "offset", off,
                  "length", len);
 
-  if (fs()->GetSuperblockInfo().TestCpFlags(CpFlag::kCpErrorFlag)) {
+  if (superblock_info_.TestCpFlags(CpFlag::kCpErrorFlag)) {
     *out_end = off;
     return ZX_ERR_BAD_STATE;
   }
@@ -416,7 +416,7 @@ zx_status_t File::Append(const void *data, size_t len, size_t *out_end, size_t *
 zx_status_t File::Truncate(size_t len) {
   TRACE_DURATION("f2fs", "File::Truncate", "event", "File::Truncate", "ino", Ino(), "length", len);
 
-  if (fs()->GetSuperblockInfo().TestCpFlags(CpFlag::kCpErrorFlag)) {
+  if (superblock_info_.TestCpFlags(CpFlag::kCpErrorFlag)) {
     return ZX_ERR_BAD_STATE;
   }
 
@@ -424,7 +424,7 @@ zx_status_t File::Truncate(size_t len) {
     return ZX_OK;
   }
 
-  if (len > static_cast<size_t>(MaxFileSize(fs()->RawSb().log_blocksize)))
+  if (len > MaxFileSize())
     return ZX_ERR_INVALID_ARGS;
 
   if (TestFlag(InodeInfoFlag::kInlineData)) {
@@ -438,9 +438,9 @@ zx_status_t File::Truncate(size_t len) {
   return DoTruncate(len);
 }
 
-loff_t File::MaxFileSize(unsigned bits) {
-  loff_t result = GetAddrsPerInode();
-  loff_t leaf_count = kAddrsPerBlock;
+size_t File::MaxFileSize() {
+  size_t result = GetAddrsPerInode();
+  size_t leaf_count = kAddrsPerBlock;
 
   // two direct node blocks
   result += (leaf_count * 2);
@@ -453,7 +453,7 @@ loff_t File::MaxFileSize(unsigned bits) {
   leaf_count *= kNidsPerBlock;
   result += leaf_count;
 
-  result <<= bits;
+  result <<= superblock_info_.GetLogBlocksize();
   return result;
 }
 
@@ -470,7 +470,7 @@ zx_status_t File::GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo *out_vmo) {
 }
 
 void File::VmoDirty(uint64_t offset, uint64_t length) {
-  if (unlikely(offset + length > static_cast<size_t>(MaxFileSize(fs()->RawSb().log_blocksize)))) {
+  if (unlikely(offset + length > MaxFileSize())) {
     return ReportPagerError(ZX_PAGER_OP_DIRTY, offset, length, ZX_ERR_BAD_STATE);
   }
   // There's no need to touch anything when it is being purged, migrating inline data, or an

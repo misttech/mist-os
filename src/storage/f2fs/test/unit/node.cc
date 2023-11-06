@@ -435,7 +435,7 @@ TEST_F(NodeManagerTest, NodePageExceptionCase) {
   vnode->SetBlocks(0);
 
   // Check MaxNid
-  const Superblock &sb_raw = superblock_info.GetRawSuperblock();
+  const Superblock &sb_raw = superblock_info.GetSuperblock();
   uint32_t nat_segs = LeToCpu(sb_raw.segment_count_nat) >> 1;
   uint32_t nat_blocks = nat_segs << LeToCpu(sb_raw.log_blocks_per_seg);
   ASSERT_EQ(fs_->GetNodeManager().GetMaxNid(), kNatEntryPerBlock * nat_blocks);

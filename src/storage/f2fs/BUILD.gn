@@ -42,7 +42,6 @@ static_library("f2fs") {
     "segment.h",
     "storage_buffer.cc",
     "storage_buffer.h",
-    "super.cc",
     "third_party/ext2_hash/hash.cc",
     "third_party/ext2_hash/hash.h",
     "vnode.cc",

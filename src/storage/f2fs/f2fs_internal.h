@@ -14,12 +14,6 @@ namespace f2fs {
 
 class VnodeF2fs;
 
-// for the list of directory inodes
-struct DirInodeEntry {
-  list_node_t list;            // list head
-  VnodeF2fs *vnode = nullptr;  // vfs inode pointer
-};
-
 inline int NatsInCursum(SummaryBlock *sum) { return LeToCpu(sum->n_nats); }
 inline int SitsInCursum(SummaryBlock *sum) { return LeToCpu(sum->n_sits); }
 
@@ -37,8 +31,6 @@ inline uint32_t SegnoInJournal(SummaryBlock *sum, int i) { return sum->sit_j.ent
 inline void SetSegnoInJournal(SummaryBlock *sum, int i, uint32_t segno) {
   sum->sit_j.entries[i].segno = segno;
 }
-
-int UpdateNatsInCursum(SummaryBlock *raw_summary, int i);
 
 // For INODE and NODE manager
 constexpr int kXattrNodeOffset = -1;
@@ -196,11 +188,14 @@ class SuperblockInfo {
   SuperblockInfo &operator=(const SuperblockInfo &) = delete;
   SuperblockInfo(SuperblockInfo &&) = delete;
   SuperblockInfo &operator=(SuperblockInfo &&) = delete;
+  SuperblockInfo() = delete;
+  SuperblockInfo(std::unique_ptr<Superblock> sb, MountOptions options = {})
+      : sb_(std::move(sb)), mount_options_(options), nr_pages_{} {
+    InitFromSuperblock();
+  }
 
-  SuperblockInfo() : nr_pages_{} {}
-
-  Superblock &GetRawSuperblock() { return *raw_superblock_; }
-  void SetRawSuperblock(Superblock *raw_sb) { raw_superblock_ = raw_sb; }
+  Superblock &GetSuperblock() { return *sb_; }
+  const Superblock &GetSuperblock() const { return *sb_; }
 
   bool IsDirty() const { return is_dirty_; }
   void SetDirty() { is_dirty_ = true; }
@@ -238,7 +233,22 @@ class SuperblockInfo {
   Checkpoint &GetCheckpoint() { return *checkpoint_block_; }
   BlockBuffer<Checkpoint> &GetCheckpointBlock() { return checkpoint_block_; }
 
-  void SetCheckpoint(const BlockBuffer<Checkpoint> &block) { checkpoint_block_ = block; }
+  zx_status_t SetCheckpoint(const BlockBuffer<Checkpoint> &block) {
+    if (zx_status_t status = CheckBlockSize(*block); status != ZX_OK) {
+      return status;
+    }
+    checkpoint_block_ = block;
+    InitFromCheckpoint();
+    return ZX_OK;
+  }
+  zx_status_t SetCheckpoint(const fbl::RefPtr<Page> &page) {
+    if (zx_status_t status = CheckBlockSize(*page->GetAddress<Checkpoint>()); status != ZX_OK) {
+      return status;
+    }
+    page->Read(&checkpoint_block_, 0, kBlockSize);
+    InitFromCheckpoint();
+    return ZX_OK;
+  }
 
   const RawBitmap &GetExtraSitBitmap() const { return extra_sit_bitmap_; }
   RawBitmap &GetExtraSitBitmap() { return extra_sit_bitmap_; }
@@ -263,35 +273,26 @@ class SuperblockInfo {
   void AddVnodeToVnodeSet(InoType type, nid_t ino) {
     vnode_set_[static_cast<uint8_t>(type)].AddVnode(ino);
   }
-
   void RemoveVnodeFromVnodeSet(InoType type, nid_t ino) {
     vnode_set_[static_cast<uint8_t>(type)].RemoveVnode(ino);
   }
-
   bool FindVnodeFromVnodeSet(InoType type, nid_t ino) {
     return vnode_set_[static_cast<uint8_t>(type)].FindVnode(ino);
   }
-
   uint64_t GetVnodeSetSize(InoType type) {
     return vnode_set_[static_cast<uint8_t>(type)].GetSize();
   }
-
   void ForAllVnodesInVnodeSet(InoType type, fit::function<void(nid_t)> callback) {
     vnode_set_[static_cast<uint8_t>(type)].ForAllVnodes(std::move(callback));
   }
 
   block_t GetLogSectorsPerBlock() const { return log_sectors_per_block_; }
-
   void SetLogSectorsPerBlock(block_t log_sectors_per_block) {
     log_sectors_per_block_ = log_sectors_per_block;
   }
-
   block_t GetLogBlocksize() const { return log_blocksize_; }
-
   void SetLogBlocksize(block_t log_blocksize) { log_blocksize_ = log_blocksize; }
-
   block_t GetBlocksize() const { return blocksize_; }
-
   void SetBlocksize(block_t blocksize) { blocksize_ = blocksize; }
 
   uint32_t GetRootIno() const { return root_ino_num_; }
@@ -302,27 +303,17 @@ class SuperblockInfo {
   void SetMetaIno(uint32_t meta_ino) { meta_ino_num_ = meta_ino; }
 
   block_t GetLogBlocksPerSeg() const { return log_blocks_per_seg_; }
-
   void SetLogBlocksPerSeg(block_t log_blocks_per_seg) { log_blocks_per_seg_ = log_blocks_per_seg; }
-
   block_t GetBlocksPerSeg() const { return blocks_per_seg_; }
-
   void SetBlocksPerSeg(block_t blocks_per_seg) { blocks_per_seg_ = blocks_per_seg; }
-
   block_t GetSegsPerSec() const { return segs_per_sec_; }
-
   void SetSegsPerSec(block_t segs_per_sec) { segs_per_sec_ = segs_per_sec; }
-
   block_t GetSecsPerZone() const { return secs_per_zone_; }
-
   void SetSecsPerZone(block_t secs_per_zone) { secs_per_zone_ = secs_per_zone; }
-
   block_t GetTotalSections() const { return total_sections_; }
 
   void SetTotalSections(block_t total_sections) { total_sections_ = total_sections; }
-
   nid_t GetTotalNodeCount() const { return total_node_count_; }
-
   void SetTotalNodeCount(nid_t total_node_count) { total_node_count_ = total_node_count; }
 
   nid_t GetTotalValidNodeCount() const { return total_valid_node_count_; }
@@ -337,26 +328,16 @@ class SuperblockInfo {
     total_valid_inode_count_ = total_valid_inode_count;
   }
 
-  size_t GetActiveLogs() const { return active_logs_; }
-
-  void SetActiveLogs(size_t active_logs) { active_logs_ = active_logs; }
-
   block_t GetUserBlockCount() const { return user_block_count_; }
-
   void SetUserBlockCount(block_t user_block_count) { user_block_count_ = user_block_count; }
-
   block_t GetTotalValidBlockCount() const { return total_valid_block_count_; }
-
   void SetTotalValidBlockCount(block_t total_valid_block_count) {
     total_valid_block_count_ = total_valid_block_count;
   }
-
   block_t GetAllocValidBlockCount() const { return alloc_valid_block_count_; }
-
   void SetAllocValidBlockCount(block_t alloc_valid_block_count) {
     alloc_valid_block_count_ = alloc_valid_block_count;
   }
-
   block_t GetLastValidBlockCount() const { return last_valid_block_count_; }
 
   void SetLastValidBlockCount(block_t last_valid_block_count) {
@@ -367,21 +348,26 @@ class SuperblockInfo {
 
   void IncNextGeneration() { ++s_next_generation_; }
 
-  void ClearOpt(MountOption option) { mount_opt_ &= ~MountOptions::ToBit(option); }
-  void SetOpt(MountOption option) { mount_opt_ |= MountOptions::ToBit(option); }
-  bool TestOpt(MountOption option) const { return (mount_opt_ & MountOptions::ToBit(option)) != 0; }
+  const std::vector<std::string> &GetExtensionList() const { return extension_list_; }
+  size_t GetActiveLogs() const {
+    auto ret = mount_options_.GetValue(MountOption::kActiveLogs);
+    ZX_DEBUG_ASSERT(ret.is_ok());
+    return *ret;
+  }
+  void ClearOpt(MountOption option) { mount_options_.SetValue(option, 0); }
+  void SetOpt(MountOption option) { mount_options_.SetValue(option, 1); }
+  bool TestOpt(MountOption option) const {
+    if (auto ret = mount_options_.GetValue(option); ret.is_ok() && *ret) {
+      return true;
+    }
+    return false;
+  }
 
   void IncSegmentCount(int type) { ++segment_count_[type]; }
   uint64_t GetSegmentCount(int type) const { return segment_count_[type]; }
-
   void IncBlockCount(int type) { ++block_count_[type]; }
-
   uint32_t GetLastVictim(int mode) const { return last_victim_[mode]; }
-
   void SetLastVictim(int mode, uint32_t last_victim) { last_victim_[mode] = last_victim; }
-
-  const std::vector<std::string> &GetExtensionList() const { return extension_list_; }
-  void SetExtensionList(std::vector<std::string> list) { extension_list_ = std::move(list); }
 
   std::mutex &GetStatLock() { return stat_lock_; }
 
@@ -391,13 +377,11 @@ class SuperblockInfo {
                               std::memory_order_release);
     SetDirty();
   }
-
   void DecreasePageCount(CountType count_type) {
     // Use release-acquire ordering with nr_pages_.
     atomic_fetch_sub_explicit(&nr_pages_[static_cast<int>(count_type)], 1,
                               std::memory_order_release);
   }
-
   int GetPageCount(CountType count_type) const {
     // Use release-acquire ordering with nr_pages_.
     return atomic_load_explicit(&nr_pages_[static_cast<int>(count_type)],
@@ -408,44 +392,98 @@ class SuperblockInfo {
   void DecreaseDirtyDir() { --n_dirty_dirs; }
 
   // in byte
-  uint32_t GetSitBitmapSize() { return LeToCpu(checkpoint_block_->sit_ver_bitmap_bytesize); }
-  // in byte
-  uint32_t GetNatBitmapSize() { return LeToCpu(checkpoint_block_->nat_ver_bitmap_bytesize); }
-
+  uint32_t GetSitBitmapSize() const { return LeToCpu(checkpoint_block_->sit_ver_bitmap_bytesize); }
+  uint32_t GetNatBitmapSize() const { return LeToCpu(checkpoint_block_->nat_ver_bitmap_bytesize); }
   uint8_t *GetNatBitmap() {
-    if (raw_superblock_->cp_payload > 0) {
+    if (LeToCpu(sb_->cp_payload) > 0) {
       return checkpoint_block_->sit_nat_version_bitmap;
     }
     return checkpoint_block_->sit_nat_version_bitmap + checkpoint_block_->sit_ver_bitmap_bytesize;
   }
-
   uint8_t *GetSitBitmap() {
-    if (raw_superblock_->cp_payload > 0) {
+    if (LeToCpu(sb_->cp_payload) > 0) {
       return static_cast<uint8_t *>(GetExtraSitBitmap().StorageUnsafe()->GetData());
     }
     return checkpoint_block_->sit_nat_version_bitmap;
   }
 
-  block_t StartCpAddr() {
+  block_t StartCpAddr() const {
     block_t start_addr;
     uint64_t ckpt_version = LeToCpu(checkpoint_block_->checkpoint_ver);
-
-    start_addr = LeToCpu(raw_superblock_->cp_blkaddr);
+    start_addr = LeToCpu(sb_->cp_blkaddr);
 
     // odd numbered checkpoint should at cp segment 0
     // and even segent must be at cp segment 1
     if (!(ckpt_version & 1)) {
       start_addr += blocks_per_seg_;
     }
-
     return start_addr;
   }
-
-  block_t StartSumAddr() { return LeToCpu(checkpoint_block_->cp_pack_start_sum); }
+  block_t StartSumAddr() const { return LeToCpu(checkpoint_block_->cp_pack_start_sum); }
+  block_t GetNumCpPayload() const { return cp_payload_; }
 
  private:
-  Superblock *raw_superblock_;  // raw super block pointer
-  bool is_dirty_ = false;       // dirty flag for checkpoint
+  void InitFromSuperblock() {
+    SetLogSectorsPerBlock(LeToCpu(sb_->log_sectors_per_block));
+    SetLogBlocksize(LeToCpu(sb_->log_blocksize));
+    SetBlocksize(1 << GetLogBlocksize());
+    SetLogBlocksPerSeg(LeToCpu(sb_->log_blocks_per_seg));
+    SetBlocksPerSeg(1 << GetLogBlocksPerSeg());
+    SetSegsPerSec(LeToCpu(sb_->segs_per_sec));
+    SetSecsPerZone(LeToCpu(sb_->secs_per_zone));
+    SetTotalSections(LeToCpu(sb_->section_count));
+    SetTotalNodeCount((LeToCpu(sb_->segment_count_nat) / 2) * GetBlocksPerSeg() *
+                      kNatEntryPerBlock);
+    SetRootIno(LeToCpu(sb_->root_ino));
+    SetNodeIno(LeToCpu(sb_->node_ino));
+    SetMetaIno(LeToCpu(sb_->meta_ino));
+    cp_payload_ = LeToCpu(sb_->cp_payload);
+
+    ZX_ASSERT(sb_->extension_count < kMaxExtension);
+    for (size_t index = 0; index < sb_->extension_count; ++index) {
+      ZX_ASSERT(sb_->extension_list[index][7] == '\0');
+      extension_list_.push_back(reinterpret_cast<char *>(sb_->extension_list[index]));
+    }
+    ZX_ASSERT(sb_->extension_count == extension_list_.size());
+  }
+
+  void InitFromCheckpoint() {
+    SetTotalValidNodeCount(LeToCpu(GetCheckpoint().valid_node_count));
+    SetTotalValidInodeCount(GetCheckpoint().valid_inode_count);
+    SetUserBlockCount(LeToCpu(static_cast<block_t>(GetCheckpoint().user_block_count)));
+    SetTotalValidBlockCount(LeToCpu(static_cast<block_t>(GetCheckpoint().valid_block_count)));
+    SetLastValidBlockCount(GetTotalValidBlockCount());
+    SetAllocValidBlockCount(0);
+  }
+
+  zx_status_t CheckBlockSize(const Checkpoint &ckpt) const {
+    size_t total = LeToCpu(sb_->segment_count);
+    size_t fsmeta = LeToCpu(sb_->segment_count_ckpt);
+    fsmeta += LeToCpu(sb_->segment_count_sit);
+    fsmeta += LeToCpu(sb_->segment_count_nat);
+    fsmeta += LeToCpu(ckpt.rsvd_segment_count);
+    fsmeta += LeToCpu(sb_->segment_count_ssa);
+    if (fsmeta >= total) {
+      return ZX_ERR_BAD_STATE;
+    }
+
+    size_t sit_ver_bitmap_bytesize =
+        ((LeToCpu(sb_->segment_count_sit) / 2) << LeToCpu(sb_->log_blocks_per_seg)) / 8;
+    size_t nat_ver_bitmap_bytesize =
+        ((LeToCpu(sb_->segment_count_nat) / 2) << LeToCpu(sb_->log_blocks_per_seg)) / 8;
+    block_t nat_blocks = (LeToCpu(sb_->segment_count_nat) >> 1) << LeToCpu(sb_->log_blocks_per_seg);
+
+    if (ckpt.sit_ver_bitmap_bytesize != sit_ver_bitmap_bytesize ||
+        ckpt.nat_ver_bitmap_bytesize != nat_ver_bitmap_bytesize ||
+        ckpt.next_free_nid >= kNatEntryPerBlock * nat_blocks) {
+      return ZX_ERR_BAD_STATE;
+    }
+
+    return ZX_OK;
+  }
+
+  std::unique_ptr<Superblock> sb_;
+  bool is_dirty_ = false;  // dirty flag for checkpoint
 
   BlockBuffer<Checkpoint> checkpoint_block_;
 
@@ -462,6 +500,7 @@ class SuperblockInfo {
   // for inode number management
   VnodeSet vnode_set_[static_cast<uint8_t>(InoType::kNrInoType)];
 
+  MountOptions mount_options_;
   uint64_t n_dirty_dirs = 0;           // # of dir inodes
   block_t log_sectors_per_block_ = 0;  // log2 sectors per block
   block_t log_blocksize_ = 0;          // log2 block size
@@ -477,16 +516,15 @@ class SuperblockInfo {
   nid_t total_node_count_ = 0;         // total node block count
   nid_t total_valid_node_count_ = 0;   // valid node block count
   nid_t total_valid_inode_count_ = 0;  // valid inode count
-  size_t active_logs_ = 0;             // # of active logs
 
+  block_t cp_payload_ = 0;
   block_t user_block_count_ = 0;         // # of user blocks
   block_t total_valid_block_count_ = 0;  // # of valid blocks
   block_t alloc_valid_block_count_ = 0;  // # of allocated blocks
   block_t last_valid_block_count_ = 0;   // for recovery
   uint32_t s_next_generation_ = 0;       // for NFS support
   std::atomic<int> nr_pages_[static_cast<int>(CountType::kNrCountType)] = {
-      0};                   // # of pages, see count_type
-  uint64_t mount_opt_ = 0;  // set with kMountOptxxxx bits according to F2fs::mount_options_
+      0};  // # of pages, see count_type
 
   uint64_t segment_count_[2] = {0};  // # of allocated segments
   uint64_t block_count_[2] = {0};    // # of allocated blocks

@@ -12,15 +12,50 @@
 #include <zircon/assert.h>
 #include <zircon/errors.h>
 
+#include <safemath/checked_math.h>
+
 namespace f2fs {
 
+static zx_status_t CheckBlockSize(const Superblock& sb) {
+  if (kF2fsSuperMagic != LeToCpu(sb.magic)) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  block_t blocksize =
+      safemath::CheckLsh<block_t>(1, LeToCpu(sb.log_blocksize)).ValueOrDefault(kUint32Max);
+  if (blocksize != kPageSize)
+    return ZX_ERR_INVALID_ARGS;
+  // 512/1024/2048/4096 sector sizes are supported.
+  if (LeToCpu(sb.log_sectorsize) > kMaxLogSectorSize ||
+      LeToCpu(sb.log_sectorsize) < kMinLogSectorSize)
+    return ZX_ERR_INVALID_ARGS;
+  if ((LeToCpu(sb.log_sectors_per_block) + LeToCpu(sb.log_sectorsize)) != kMaxLogSectorSize)
+    return ZX_ERR_INVALID_ARGS;
+  return ZX_OK;
+}
+
+zx::result<std::unique_ptr<Superblock>> LoadSuperblock(BcacheMapper& bc) {
+  BlockBuffer block;
+  constexpr int kSuperblockCount = 2;
+  zx_status_t status;
+  for (auto i = 0; i < kSuperblockCount; ++i) {
+    if (status = bc.Readblk(kSuperblockStart + i, block.get()); status != ZX_OK) {
+      continue;
+    }
+    auto superblock = std::make_unique<Superblock>();
+    std::memcpy(superblock.get(), block.get<uint8_t>() + kSuperOffset, sizeof(Superblock));
+    if (status = CheckBlockSize(*superblock); status != ZX_OK) {
+      continue;
+    }
+    return zx::ok(std::move(superblock));
+  }
+  FX_LOGS(ERROR) << "failed to read superblock." << status;
+  return zx::error(status);
+}
+
 F2fs::F2fs(FuchsiaDispatcher dispatcher, std::unique_ptr<f2fs::BcacheMapper> bc,
-           std::unique_ptr<Superblock> sb, const MountOptions& mount_options, PlatformVfs* vfs)
-    : dispatcher_(dispatcher),
-      vfs_(vfs),
-      bc_(std::move(bc)),
-      mount_options_(mount_options),
-      raw_sb_(std::move(sb)) {
+           const MountOptions& mount_options, PlatformVfs* vfs)
+    : dispatcher_(dispatcher), vfs_(vfs), bc_(std::move(bc)), mount_options_(mount_options) {
   inspect_tree_ = std::make_unique<InspectTree>(this);
   zx::event::create(0, &fs_id_);
 }
@@ -48,32 +83,13 @@ zx::result<std::unique_ptr<F2fs>> F2fs::Create(FuchsiaDispatcher dispatcher,
     return superblock_or.take_error();
   }
 
-  auto fs =
-      std::make_unique<F2fs>(dispatcher, std::move(bc), std::move(*superblock_or), options, vfs);
-
-  if (zx_status_t status = fs->FillSuper(); status != ZX_OK) {
+  auto fs = std::make_unique<F2fs>(dispatcher, std::move(bc), options, vfs);
+  if (zx_status_t status = fs->LoadSuper(std::move(*superblock_or)); status != ZX_OK) {
     FX_LOGS(ERROR) << "failed to initialize fs." << status;
     return zx::error(status);
   }
-
   fs->StartMemoryPressureWatcher();
-
   return zx::ok(std::move(fs));
-}
-
-zx::result<std::unique_ptr<Superblock>> F2fs::LoadSuperblock(f2fs::BcacheMapper& bc) {
-  BlockBuffer block;
-  constexpr int kSuperblockCount = 2;
-  zx_status_t status;
-  for (auto i = 0; i < kSuperblockCount; ++i) {
-    if (status = bc.Readblk(kSuperblockStart + i, block.get()); status == ZX_OK) {
-      auto superblock = std::make_unique<Superblock>();
-      std::memcpy(superblock.get(), block.get<uint8_t>() + kSuperOffset, sizeof(Superblock));
-      return zx::ok(std::move(superblock));
-    }
-  }
-  FX_LOGS(ERROR) << "failed to read superblock." << status;
-  return zx::error(status);
 }
 
 void F2fs::Sync(SyncCallback closure) {
@@ -197,7 +213,7 @@ zx::result<> F2fs::MakeReadOperations(zx::vmo& vmo, std::vector<block_t>& addrs,
     if (ret.status_value() == ZX_ERR_UNAVAILABLE || ret.status_value() == ZX_ERR_PEER_CLOSED) {
       // It is not available when the block device is ZX_ERR_UNAVAILABLE or
       // ZX_ERR_PEER_CLOSED state. Set kCpErrorFlag to enter read-only mode.
-      GetSuperblockInfo().SetCpFlags(CpFlag::kCpErrorFlag);
+      superblock_info_->SetCpFlags(CpFlag::kCpErrorFlag);
     }
   }
   return ret;
@@ -211,7 +227,7 @@ zx::result<> F2fs::MakeReadOperations(std::vector<LockedPage>& pages, std::vecto
     if (ret.status_value() == ZX_ERR_UNAVAILABLE || ret.status_value() == ZX_ERR_PEER_CLOSED) {
       // It is not available when the block device is ZX_ERR_UNAVAILABLE or
       // ZX_ERR_PEER_CLOSED state. Set kCpErrorFlag to enter read-only mode.
-      GetSuperblockInfo().SetCpFlags(CpFlag::kCpErrorFlag);
+      superblock_info_->SetCpFlags(CpFlag::kCpErrorFlag);
     }
   }
   return ret;
@@ -221,4 +237,242 @@ zx_status_t F2fs::MakeTrimOperation(block_t blk_addr, block_t nblocks) const {
   return GetBc().Trim(blk_addr, nblocks);
 }
 
+void F2fs::PutSuper() {
+#if 0  // porting needed
+  // DestroyStats(superblock_info_.get());
+  // StopGcThread(superblock_info_.get());
+#endif
+
+  WriteCheckpoint(false, true);
+  if (superblock_info_->TestCpFlags(CpFlag::kCpErrorFlag)) {
+    // In the checkpoint error case, flush the dirty vnode list.
+    GetVCache().ForDirtyVnodesIf([&](fbl::RefPtr<VnodeF2fs>& vnode) {
+      ZX_ASSERT(vnode->ClearDirty());
+      return ZX_OK;
+    });
+  }
+  SetTearDown();
+  writer_.reset();
+  reader_.reset();
+  ResetPsuedoVnodes();
+  GetVCache().Reset();
+  GetDirEntryCache().Reset();
+
+  node_manager_->DestroyNodeManager();
+  segment_manager_->DestroySegmentManager();
+
+  node_manager_.reset();
+  segment_manager_.reset();
+  gc_manager_.reset();
+  superblock_info_.reset();
+}
+
+void F2fs::ScheduleWriteback(size_t num_pages) {
+  // Schedule a Writer task for kernel to reclaim memory pages until the current memory pressure
+  // becomes normal. If memory pressure events are not available, the task runs until the number of
+  // dirty Pages is less than kMaxDirtyDataPages / 4. |writeback_flag_| ensures that neither
+  // checkpoint nor gc runs during this writeback. If there is not enough space, stop writeback as
+  // flushing N of dirty Pages can produce N of additional dirty node Pages in the worst case.
+  if (HasNotEnoughMemory() && writeback_flag_.try_acquire()) {
+    auto promise = fpromise::make_promise([this]() mutable {
+      while (!segment_manager_->HasNotEnoughFreeSecs() && CanReclaim() && !StopWriteback()) {
+        GetVCache().ForDirtyVnodesIf(
+            [&](fbl::RefPtr<VnodeF2fs>& vnode) {
+              WritebackOperation op = {.bReclaim = true};
+              vnode->Writeback(op);
+              return ZX_OK;
+            },
+            [](fbl::RefPtr<VnodeF2fs>& vnode) {
+              if (!vnode->IsDir() && vnode->GetDirtyPageList().Size()) {
+                return ZX_OK;
+              }
+              return ZX_ERR_NEXT;
+            });
+      }
+      // Wake waiters of WaitForWriteback().
+      writeback_flag_.release();
+      return fpromise::ok();
+    });
+    writer_->ScheduleWriteback(std::move(promise));
+  }
+}
+
+void F2fs::SyncFs(bool bShutdown) {
+  // TODO:: Consider !superblock_info_.IsDirty()
+  if (bShutdown) {
+    FX_LOGS(INFO) << "prepare for shutdown";
+    // Stop writeback before umount.
+    FlagAcquireGuard flag(&stop_reclaim_flag_);
+    ZX_DEBUG_ASSERT(flag.IsAcquired());
+    ZX_ASSERT(WaitForWriteback().is_ok());
+    // Stop listening to memorypressure.
+    memory_pressure_watcher_.reset();
+
+    // Flush every dirty Pages.
+    while (superblock_info_->GetPageCount(CountType::kDirtyData)) {
+      // If necessary, do gc.
+      if (segment_manager_->HasNotEnoughFreeSecs()) {
+        if (auto ret = gc_manager_->F2fsGc(); ret.is_error()) {
+          // If CpFlag::kCpErrorFlag is set, it cannot be synchronized to disk. So we will drop all
+          // dirty pages.
+          if (superblock_info_->TestCpFlags(CpFlag::kCpErrorFlag)) {
+            break;
+          }
+          // F2fsGc() returns ZX_ERR_UNAVAILABLE when there is no available victim section,
+          // otherwise BUG
+          ZX_DEBUG_ASSERT(ret.error_value() == ZX_ERR_UNAVAILABLE);
+        }
+      }
+      WritebackOperation op = {.to_write = kDefaultBlocksPerSegment};
+      op.if_vnode = [](fbl::RefPtr<VnodeF2fs>& vnode) {
+        if (!vnode->IsDir()) {
+          return ZX_OK;
+        }
+        return ZX_ERR_NEXT;
+      };
+      FlushDirtyDataPages(op);
+    }
+  } else {
+    WriteCheckpoint(false, false);
+  }
+}
+
+#if 0  // porting needed
+// int F2fs::F2fsStatfs(dentry *dentry /*, kstatfs *buf*/) {
+  // super_block *sb = dentry->d_sb;
+  // SuperblockInfo *superblock_info = F2FS_SB(sb);
+  // u64 id = huge_encode_dev(sb->s_bdev->bd_dev);
+  // block_t total_count, user_block_count, start_count, ovp_count;
+
+  // total_count = LeToCpu(superblock_info->raw_super->block_count);
+  // user_block_count = superblock_info->GetUserBlockCount();
+  // start_count = LeToCpu(superblock_info->raw_super->segment0_blkaddr);
+  // ovp_count = GetSmInfo(superblock_info).ovp_segments << superblock_info->GetLogBlocksPerSeg();
+  // buf->f_type = kF2fsSuperMagic;
+  // buf->f_bsize = superblock_info->GetBlocksize();
+
+  // buf->f_blocks = total_count - start_count;
+  // buf->f_bfree = buf->f_blocks - ValidUserBlocks(superblock_info) - ovp_count;
+  // buf->f_bavail = user_block_count - ValidUserBlocks(superblock_info);
+
+  // buf->f_files = ValidInodeCount(superblock_info);
+  // buf->f_ffree = superblock_info->GetTotalNodeCount() - ValidNodeCount(superblock_info);
+
+  // buf->f_namelen = kMaxNameLen;
+  // buf->f_fsid.val[0] = (u32)id;
+  // buf->f_fsid.val[1] = (u32)(id >> 32);
+
+  // return 0;
+// }
+
+// VnodeF2fs *F2fs::F2fsNfsGetInode(uint64_t ino, uint32_t generation) {
+//   fbl::RefPtr<VnodeF2fs> vnode_refptr;
+//   VnodeF2fs *vnode = nullptr;
+//   int err;
+
+//   if (ino < superblock_info_->GetRootIno())
+//     return (VnodeF2fs *)ErrPtr(-ESTALE);
+
+//   /*
+//    * f2fs_iget isn't quite right if the inode is currently unallocated!
+//    * However f2fs_iget currently does appropriate checks to handle stale
+//    * inodes so everything is OK.
+//    */
+//   err = VnodeF2fs::Vget(this, ino, &vnode_refptr);
+//   if (err)
+//     return (VnodeF2fs *)ErrPtr(err);
+//   vnode = vnode_refptr.get();
+//   if (generation && vnode->i_generation != generation) {
+//     /* we didn't find the right inode.. */
+//     return (VnodeF2fs *)ErrPtr(-ESTALE);
+//   }
+//   return vnode;
+// }
+
+// struct fid {};
+
+// dentry *F2fs::F2fsFhToDentry(fid *fid, int fh_len, int fh_type) {
+//   return generic_fh_to_dentry(sb, fid, fh_len, fh_type,
+//             f2fs_nfs_get_inode);
+// }
+
+// dentry *F2fs::F2fsFhToParent(fid *fid, int fh_len, int fh_type) {
+//   return generic_fh_to_parent(sb, fid, fh_len, fh_type,
+//             f2fs_nfs_get_inode);
+// }
+#endif
+
+void F2fs::Reset() {
+  ResetPsuedoVnodes();
+  if (node_manager_) {
+    node_manager_->DestroyNodeManager();
+    node_manager_.reset();
+  }
+  if (segment_manager_) {
+    segment_manager_->DestroySegmentManager();
+    segment_manager_.reset();
+  }
+  gc_manager_.reset();
+  superblock_info_.reset();
+}
+
+zx_status_t F2fs::LoadSuper(std::unique_ptr<Superblock> sb) {
+  auto reset = fit::defer([&] { Reset(); });
+
+  // allocate memory for f2fs-specific super block info
+  superblock_info_ = std::make_unique<SuperblockInfo>(std::move(sb), mount_options_);
+  superblock_info_->ClearOnRecovery();
+
+  node_vnode_ = std::make_unique<VnodeF2fs>(this, superblock_info_->GetNodeIno(), 0);
+  meta_vnode_ = std::make_unique<VnodeF2fs>(this, superblock_info_->GetMetaIno(), 0);
+
+  reader_ = std::make_unique<Reader>(bc_.get(), kDefaultBlocksPerSegment);
+  writer_ = std::make_unique<Writer>(
+      bc_.get(),
+      safemath::CheckMul<size_t>(superblock_info_->GetActiveLogs(), kDefaultBlocksPerSegment)
+          .ValueOrDie());
+
+  if (zx_status_t err = GetValidCheckpoint(); err != ZX_OK) {
+    return err;
+  }
+
+  segment_manager_ = std::make_unique<SegmentManager>(this);
+  node_manager_ = std::make_unique<NodeManager>(this);
+  gc_manager_ = std::make_unique<GcManager>(this);
+  if (zx_status_t err = segment_manager_->BuildSegmentManager(); err != ZX_OK) {
+    return err;
+  }
+
+  if (zx_status_t err = node_manager_->BuildNodeManager(); err != ZX_OK) {
+    return err;
+  }
+
+  // if there are nt orphan nodes free them
+  if (zx_status_t err = PurgeOrphanInodes(); err != ZX_OK) {
+    return err;
+  }
+
+  // read root inode and dentry
+  if (zx_status_t err = VnodeF2fs::Vget(this, superblock_info_->GetRootIno(), &root_vnode_);
+      err != ZX_OK) {
+    return err;
+  }
+
+  // root vnode is corrupted
+  if (!root_vnode_->IsDir() || !root_vnode_->GetBlocks() || !root_vnode_->GetSize()) {
+    return ZX_ERR_INTERNAL;
+  }
+
+  if (!superblock_info_->TestOpt(MountOption::kDisableRollForward)) {
+    RecoverFsyncData();
+  }
+
+  // TODO(https://fxbug.dev/119887): enable a thread for background gc
+  // After POR, we can run background GC thread
+  // err = StartGcThread(superblock_info);
+  // if (err)
+  //   goto fail;
+  reset.cancel();
+  return ZX_OK;
+}
 }  // namespace f2fs

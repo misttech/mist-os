@@ -451,6 +451,7 @@ class VnodeF2fs : public fs::PagedVnode,
                         const zx_status_t err) __TA_EXCLUDES(mutex_);
   void ReportPagerErrorUnsafe(const uint32_t op, const uint64_t offset, const uint64_t length,
                               const zx_status_t err) __TA_REQUIRES_SHARED(mutex_);
+  SuperblockInfo &superblock_info_;
 
  private:
   zx::result<block_t> GetBlockAddrForDataPage(LockedPage &page);

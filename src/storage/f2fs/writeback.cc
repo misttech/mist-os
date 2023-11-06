@@ -67,7 +67,7 @@ fpromise::promise<> Writer::GetTaskForWriteIO(sync_completion_t *completion) {
                         io_status == ZX_ERR_PEER_CLOSED) {
                       // When it fails to write metadata or the block device is not available,
                       // set kCpErrorFlag to enter read-only mode.
-                      page->GetVnode().fs()->GetSuperblockInfo().SetCpFlags(CpFlag::kCpErrorFlag);
+                      page->fs()->GetSuperblockInfo().SetCpFlags(CpFlag::kCpErrorFlag);
                     } else {
                       // When IO errors occur with node and data Pages, just set a dirty flag
                       // to retry it with another LBA.

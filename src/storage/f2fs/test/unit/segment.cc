@@ -456,15 +456,15 @@ TEST(SegmentManagerOptionTest, DestroySegmentManagerExceptionCase) {
   MountOptions mount_options;
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
-  auto superblock = F2fs::LoadSuperblock(*bc);
+  auto superblock = LoadSuperblock(*bc);
   ASSERT_TRUE(superblock.is_ok());
   // Create a vfs object for unit tests.
   auto vfs_or = Runner::CreateRunner(loop.dispatcher());
   ZX_ASSERT(vfs_or.is_ok());
-  std::unique_ptr<F2fs> fs = std::make_unique<F2fs>(
-      loop.dispatcher(), std::move(bc), std::move(*superblock), mount_options, (*vfs_or).get());
+  std::unique_ptr<F2fs> fs =
+      std::make_unique<F2fs>(loop.dispatcher(), std::move(bc), mount_options, (*vfs_or).get());
 
-  ASSERT_EQ(fs->FillSuper(), ZX_OK);
+  ASSERT_EQ(fs->LoadSuper(std::move(*superblock)), ZX_OK);
 
   fs->WriteCheckpoint(false, true);
 
@@ -546,16 +546,16 @@ TEST(SegmentManagerExceptionTest, BuildSitEntriesDiskFail) {
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
-  auto superblock = F2fs::LoadSuperblock(*bc);
+  auto superblock = LoadSuperblock(*bc);
   ASSERT_TRUE(superblock.is_ok());
 
   // Create a vfs object for unit tests.
   auto vfs_or = Runner::CreateRunner(loop.dispatcher());
   ASSERT_TRUE(vfs_or.is_ok());
-  std::unique_ptr<F2fs> fs = std::make_unique<F2fs>(
-      loop.dispatcher(), std::move(bc), std::move(*superblock), MountOptions{}, (*vfs_or).get());
+  std::unique_ptr<F2fs> fs =
+      std::make_unique<F2fs>(loop.dispatcher(), std::move(bc), MountOptions{}, (*vfs_or).get());
 
-  ASSERT_EQ(fs->FillSuper(), ZX_OK);
+  ASSERT_EQ(fs->LoadSuper(std::move(*superblock)), ZX_OK);
 
   pgoff_t target_addr = fs->GetSegmentManager().CurrentSitAddr(0) * kDefaultSectorsPerBlock;
 

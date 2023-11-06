@@ -14,7 +14,7 @@ class GcManager {
   GcManager(GcManager &&) = delete;
   GcManager &operator=(GcManager &&) = delete;
   GcManager() = delete;
-  GcManager(F2fs *fs) : fs_(fs), cur_victim_sec_(kNullSecNo) {}
+  GcManager(F2fs *fs);
 
   zx::result<uint32_t> F2fsGc() __TA_EXCLUDES(gc_mutex_);
 
@@ -42,6 +42,7 @@ class GcManager {
       __TA_REQUIRES(gc_mutex_);
 
   F2fs *fs_ = nullptr;
+  SuperblockInfo &superblock_info_;
   std::mutex gc_mutex_;      // mutex for GC
   uint32_t cur_victim_sec_;  // current victim section num
 

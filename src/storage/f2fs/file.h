@@ -47,7 +47,7 @@ class File : public VnodeF2fs, public fbl::Recyclable<File> {
   zx_status_t TruncateInline(size_t len, bool is_recover);
   zx_status_t ConvertInlineData();
 
-  loff_t MaxFileSize(unsigned bits);
+  size_t MaxFileSize();
 };
 
 }  // namespace f2fs

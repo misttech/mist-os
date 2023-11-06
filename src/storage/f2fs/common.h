@@ -66,7 +66,8 @@ constexpr uint32_t kBitsPerByte = 8;
 constexpr uint32_t kShiftForBitSize = 3;
 constexpr uint32_t kF2fsSuperMagic = 0xF2F52010;
 constexpr uint32_t kCrcPolyLe = 0xedb88320;
-constexpr size_t kWriteTimeOut = 60;  // in seconds
+constexpr size_t kWriteTimeOut = 60;   // in seconds
+constexpr uint32_t kBlockSize = 4096;  // F2fs block size in byte
 
 // Checkpoint
 inline bool VerAfter(uint64_t a, uint64_t b) { return a > b; }
@@ -97,7 +98,6 @@ inline T CheckedDivRoundUp(const T n, const T d) {
   return safemath::CheckDiv<T>(fbl::round_up(n, d), d).ValueOrDie();
 }
 
-constexpr uint32_t kBlockSize = 4096;  // F2fs block size in byte
 template <typename T = uint8_t>
 class BlockBuffer {
  public:

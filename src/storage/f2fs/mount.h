@@ -8,8 +8,6 @@
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <fidl/fuchsia.process.lifecycle/cpp/wire.h>
 
-#include "src/storage/f2fs/bcache.h"
-
 namespace f2fs {
 
 enum class MountOption {
@@ -38,7 +36,6 @@ class MountOptions {
 
   zx::result<size_t> GetValue(const MountOption option) const;
   zx_status_t SetValue(const MountOption option, const size_t value);
-  static uint64_t ToBit(const MountOption option);
   static std::vector<MountOption> Iter() {
     std::vector<MountOption> iter;
     for (size_t i = 0; i < kMaxOptionCount; ++i) {

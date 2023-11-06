@@ -14,40 +14,42 @@ namespace f2fs {
 namespace {
 using Runner = ComponentRunner;
 
+static void WriteSuperblock(const Superblock &sb, BcacheMapper &bc) {
+  BlockBuffer block;
+  memcpy(block.get<uint8_t>() + kSuperOffset, &sb, sizeof(Superblock));
+  bc.Writeblk(0, &block);
+  bc.Writeblk(1, &block);
+}
+
 TEST(SuperblockTest, SanityCheckRawSuper) {
   std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDevWithOptions(&bc, MkfsOptions{});
-
-  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
-
-  auto superblock = F2fs::LoadSuperblock(*bc);
+  auto superblock = LoadSuperblock(*bc);
   ASSERT_TRUE(superblock.is_ok());
-  Superblock *superblock_ptr = (*superblock).get();
 
-  // Create a vfs object for unit tests.
-  auto vfs_or = Runner::CreateRunner(loop.dispatcher());
-  ZX_ASSERT(vfs_or.is_ok());
-  std::unique_ptr<F2fs> fs = std::make_unique<F2fs>(
-      loop.dispatcher(), std::move(bc), std::move(*superblock), MountOptions{}, (*vfs_or).get());
-  // Check SanityCheckRawSuper
-  ASSERT_EQ(fs->FillSuper(), ZX_OK);
+  // Check exception cases
+  BlockBuffer<Superblock> corrupted;
+  std::memcpy(&corrupted, (*superblock).get(), sizeof(Superblock));
+  corrupted->log_sectors_per_block = kDefaultSectorsPerBlock;
+  corrupted->log_sectorsize = kMaxLogSectorSize;
+  WriteSuperblock(*corrupted, *bc);
+  ASSERT_EQ(LoadSuperblock(*bc).status_value(), ZX_ERR_INVALID_ARGS);
 
-  // Check SanityCheckRawSuper exception case
-  superblock_ptr->log_sectors_per_block = kDefaultSectorsPerBlock;
-  superblock_ptr->log_sectorsize = kMaxLogSectorSize;
-  ASSERT_EQ(fs->FillSuper(), ZX_ERR_INVALID_ARGS);
+  std::memcpy(&corrupted, (*superblock).get(), sizeof(Superblock));
+  corrupted->log_sectorsize = kMaxLogSectorSize + 1;
+  WriteSuperblock(*corrupted, *bc);
+  ASSERT_EQ(LoadSuperblock(*bc).status_value(), ZX_ERR_INVALID_ARGS);
 
-  superblock_ptr->log_sectorsize = kMaxLogSectorSize + 1;
-  ASSERT_EQ(fs->FillSuper(), ZX_ERR_INVALID_ARGS);
+  std::memcpy(&corrupted, (*superblock).get(), sizeof(Superblock));
+  corrupted->log_blocksize = kMaxLogSectorSize + 1;
+  WriteSuperblock(*corrupted, *bc);
+  ASSERT_EQ(LoadSuperblock(*bc).status_value(), ZX_ERR_INVALID_ARGS);
 
-  superblock_ptr->log_blocksize = kMaxLogSectorSize + 1;
-  ASSERT_EQ(fs->FillSuper(), ZX_ERR_INVALID_ARGS);
-
-  superblock_ptr->magic = 0xF2F5FFFF;
-  ASSERT_EQ(fs->FillSuper(), ZX_ERR_INVALID_ARGS);
-
-  fs->GetVCache().Reset();
-  fs->Reset();
+  std::memcpy(&corrupted, (*superblock).get(), sizeof(Superblock));
+  corrupted->magic = 0xF2F5FFFF;
+  corrupted->log_blocksize = kMaxLogSectorSize + 1;
+  WriteSuperblock(*corrupted, *bc);
+  ASSERT_EQ(LoadSuperblock(*bc).status_value(), ZX_ERR_INVALID_ARGS);
 }
 
 TEST(SuperblockTest, GetValidCheckpoint) {
@@ -56,22 +58,17 @@ TEST(SuperblockTest, GetValidCheckpoint) {
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
-  auto superblock = F2fs::LoadSuperblock(*bc);
-  ASSERT_TRUE(superblock.is_ok());
-  Superblock *superblock_ptr = (*superblock).get();
-
   // Create a vfs object for unit tests.
   auto vfs_or = Runner::CreateRunner(loop.dispatcher());
   ZX_ASSERT(vfs_or.is_ok());
-  std::unique_ptr<F2fs> fs = std::make_unique<F2fs>(
-      loop.dispatcher(), std::move(bc), std::move(*superblock), MountOptions{}, (*vfs_or).get());
+  std::unique_ptr<F2fs> fs =
+      std::make_unique<F2fs>(loop.dispatcher(), std::move(bc), MountOptions{}, (*vfs_or).get());
 
-  // Check GetValidCheckpoint
-  ASSERT_EQ(fs->FillSuper(), ZX_OK);
-
+  auto superblock = LoadSuperblock(fs->GetBc());
+  ASSERT_TRUE(superblock.is_ok());
+  superblock->cp_blkaddr = LeToCpu(superblock->cp_blkaddr) + 2;
   // Check GetValidCheckpoint exception case
-  superblock_ptr->cp_blkaddr = LeToCpu(superblock_ptr->cp_blkaddr) + 2;
-  ASSERT_EQ(fs->FillSuper(), ZX_ERR_INVALID_ARGS);
+  ASSERT_EQ(fs->LoadSuper(std::move(*superblock)), ZX_ERR_INVALID_ARGS);
 
   fs->GetVCache().Reset();
   fs->Reset();
@@ -83,25 +80,22 @@ TEST(SuperblockTest, SanityCheckCkpt) {
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
-  auto superblock = F2fs::LoadSuperblock(*bc);
-  ASSERT_TRUE(superblock.is_ok());
-  Superblock *superblock_ptr = (*superblock).get();
-
   // Create a vfs object for unit tests.
   auto vfs_or = Runner::CreateRunner(loop.dispatcher());
   ZX_ASSERT(vfs_or.is_ok());
-  std::unique_ptr<F2fs> fs = std::make_unique<F2fs>(
-      loop.dispatcher(), std::move(bc), std::move(*superblock), MountOptions{}, (*vfs_or).get());
-
-  // Check SanityCheckCkpt
-  ASSERT_EQ(fs->FillSuper(), ZX_OK);
+  std::unique_ptr<F2fs> fs =
+      std::make_unique<F2fs>(loop.dispatcher(), std::move(bc), MountOptions{}, (*vfs_or).get());
 
   // Check SanityCheckCkpt exception case
-  superblock_ptr->segment_count_nat = 0;
-  ASSERT_EQ(fs->FillSuper(), ZX_ERR_BAD_STATE);
+  auto superblock = LoadSuperblock(fs->GetBc());
+  ASSERT_TRUE(superblock.is_ok());
+  superblock->segment_count_nat = 0;
+  ASSERT_EQ(fs->LoadSuper(std::move(*superblock)), ZX_ERR_BAD_STATE);
 
-  superblock_ptr->segment_count = 0;
-  ASSERT_EQ(fs->FillSuper(), ZX_ERR_BAD_STATE);
+  superblock = LoadSuperblock(fs->GetBc());
+  ASSERT_TRUE(superblock.is_ok());
+  superblock->segment_count = 0;
+  ASSERT_EQ(fs->LoadSuper(std::move(*superblock)), ZX_ERR_BAD_STATE);
 
   fs->GetVCache().Reset();
   fs->Reset();
@@ -113,16 +107,15 @@ TEST(SuperblockTest, Reset) {
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
-  auto superblock = F2fs::LoadSuperblock(*bc);
-  ASSERT_TRUE(superblock.is_ok());
-
   // Create a vfs object for unit tests.
   auto vfs_or = Runner::CreateRunner(loop.dispatcher());
   ZX_ASSERT(vfs_or.is_ok());
-  std::unique_ptr<F2fs> fs = std::make_unique<F2fs>(
-      loop.dispatcher(), std::move(bc), std::move(*superblock), MountOptions{}, (*vfs_or).get());
+  std::unique_ptr<F2fs> fs =
+      std::make_unique<F2fs>(loop.dispatcher(), std::move(bc), MountOptions{}, (*vfs_or).get());
 
-  ASSERT_EQ(fs->FillSuper(), ZX_OK);
+  auto superblock = LoadSuperblock(fs->GetBc());
+  ASSERT_TRUE(superblock.is_ok());
+  ASSERT_EQ(fs->LoadSuper(std::move(*superblock)), ZX_OK);
   fs->GetVCache().Reset();
 
   ASSERT_TRUE(fs->IsValid());
@@ -138,7 +131,9 @@ TEST(SuperblockTest, Reset) {
   ASSERT_FALSE(fs->IsValid());
   ASSERT_TRUE(fs->GetRootVnode().is_error());
 
-  ASSERT_EQ(fs->FillSuper(), ZX_OK);
+  superblock = LoadSuperblock(fs->GetBc());
+  ASSERT_TRUE(superblock.is_ok());
+  ASSERT_EQ(fs->LoadSuper(std::move(*superblock)), ZX_OK);
   fs->GetVCache().Reset();
 
   ASSERT_TRUE(fs->IsValid());

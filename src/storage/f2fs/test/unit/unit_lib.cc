@@ -126,7 +126,7 @@ void FileTester::SuddenPowerOff(std::unique_ptr<F2fs> fs, std::unique_ptr<Bcache
 }
 
 void FileTester::CreateRoot(F2fs *fs, fbl::RefPtr<VnodeF2fs> *out) {
-  ASSERT_EQ(VnodeF2fs::Vget(fs, fs->RawSb().root_ino, out), ZX_OK);
+  ASSERT_EQ(VnodeF2fs::Vget(fs, fs->GetSuperblockInfo().GetRootIno(), out), ZX_OK);
   ASSERT_EQ((*out)->Open((*out)->ValidateOptions(fs::VnodeConnectionOptions()).value(), nullptr),
             ZX_OK);
 }

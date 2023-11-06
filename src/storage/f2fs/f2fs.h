@@ -86,6 +86,8 @@
 
 namespace f2fs {
 
+zx::result<std::unique_ptr<Superblock>> LoadSuperblock(BcacheMapper &bc);
+
 class F2fs final {
  public:
   // Not copyable or moveable
@@ -95,14 +97,11 @@ class F2fs final {
   F2fs &operator=(F2fs &&) = delete;
 
   explicit F2fs(FuchsiaDispatcher dispatcher, std::unique_ptr<f2fs::BcacheMapper> bc,
-                std::unique_ptr<Superblock> sb, const MountOptions &mount_options,
-                PlatformVfs *vfs);
+                const MountOptions &mount_options, PlatformVfs *vfs);
 
   static zx::result<std::unique_ptr<F2fs>> Create(FuchsiaDispatcher dispatcher,
                                                   std::unique_ptr<f2fs::BcacheMapper> bc,
                                                   const MountOptions &options, PlatformVfs *vfs);
-
-  static zx::result<std::unique_ptr<Superblock>> LoadSuperblock(f2fs::BcacheMapper &bc);
 
   zx::result<fs::FilesystemInfo> GetFilesystemInfo();
   DirEntryCache &GetDirEntryCache() { return dir_entry_cache_; }
@@ -126,10 +125,6 @@ class F2fs final {
   BcacheMapper &GetBc() const {
     ZX_DEBUG_ASSERT(bc_ != nullptr);
     return *bc_;
-  }
-  Superblock &RawSb() const {
-    ZX_DEBUG_ASSERT(raw_sb_ != nullptr);
-    return *raw_sb_;
   }
   SuperblockInfo &GetSuperblockInfo() const {
     ZX_DEBUG_ASSERT(superblock_info_ != nullptr);
@@ -167,23 +162,18 @@ class F2fs final {
   }
   void ResetGcManager() { gc_manager_.reset(); }
 
-  // super.cc
+  // f2fs.cc
   void PutSuper();
   void SyncFs(bool bShutdown = false);
-  zx_status_t SanityCheckRawSuper();
-  zx_status_t SanityCheckCkpt();
-  void InitSuperblockInfo();
-  zx_status_t FillSuper();
-  void ParseOptions();
+  zx_status_t LoadSuper(std::unique_ptr<Superblock> sb);
   void Reset();
-
-  // checkpoint.cc
   zx_status_t GrabMetaPage(pgoff_t index, LockedPage *out);
   zx_status_t GetMetaPage(pgoff_t index, LockedPage *out);
-
   bool CanReclaim() const;
   bool IsTearDown() const;
   void SetTearDown();
+
+  // checkpoint.cc
   zx_status_t CheckOrphanSpace();
   void AddOrphanInode(VnodeF2fs *vnode);
   void PurgeOrphanInode(nid_t ino);
@@ -240,7 +230,6 @@ class F2fs final {
   void IncValidInodeCount();
   void DecValidInodeCount();
   uint32_t ValidInodeCount();
-
   VnodeF2fs &GetNodeVnode() { return *node_vnode_; }
   VnodeF2fs &GetMetaVnode() { return *meta_vnode_; }
   zx::result<fbl::RefPtr<VnodeF2fs>> GetRootVnode() {
@@ -310,6 +299,7 @@ class F2fs final {
 
  private:
   void StartMemoryPressureWatcher();
+
   // Flush all dirty meta Pages.
   pgoff_t FlushDirtyMetaPages(bool is_commit);
   // Flush all dirty data Pages that meet |operation|.if_vnode and if_page.
@@ -328,7 +318,6 @@ class F2fs final {
 
   MountOptions mount_options_;
 
-  std::unique_ptr<Superblock> raw_sb_;
   std::unique_ptr<SuperblockInfo> superblock_info_;
   std::unique_ptr<SegmentManager> segment_manager_;
   std::unique_ptr<NodeManager> node_manager_;
@@ -349,8 +338,6 @@ class F2fs final {
   std::atomic<MemoryPressure> current_memory_pressure_level_ = MemoryPressure::kUnknown;
   std::unique_ptr<MemoryPressureWatcher> memory_pressure_watcher_;
 };
-
-f2fs_hash_t DentryHash(std::string_view name);
 
 }  // namespace f2fs
 

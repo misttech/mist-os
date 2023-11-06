@@ -22,8 +22,8 @@ void InspectTree::Initialize() {
         .id = fs_info.value().fs_id,
         .type = fidl::ToUnderlying(fs_info.value().fs_type),
         .name = fs_info.value().name,
-        .version_major = fs_->GetSuperblockInfo().GetRawSuperblock().major_ver,
-        .version_minor = fs_->GetSuperblockInfo().GetRawSuperblock().minor_ver,
+        .version_major = LeToCpu(fs_->GetSuperblockInfo().GetSuperblock().major_ver),
+        .version_minor = LeToCpu(fs_->GetSuperblockInfo().GetSuperblock().minor_ver),
         .block_size = fs_info.value().block_size,
         .max_filename_length = fs_info.value().max_filename_size,
     };

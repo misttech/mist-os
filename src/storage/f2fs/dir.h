@@ -8,6 +8,7 @@
 namespace f2fs {
 
 extern const unsigned char kFiletypeTable[];
+f2fs_hash_t DentryHash(std::string_view name);
 
 class Dir : public VnodeF2fs, public fbl::Recyclable<Dir> {
  public:

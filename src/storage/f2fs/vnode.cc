@@ -10,7 +10,11 @@
 namespace f2fs {
 
 VnodeF2fs::VnodeF2fs(F2fs *fs, ino_t ino, umode_t mode)
-    : PagedVnode(*fs->vfs()), ino_(ino), fs_(fs), mode_(mode) {
+    : PagedVnode(*fs->vfs()),
+      superblock_info_(fs->GetSuperblockInfo()),
+      ino_(ino),
+      fs_(fs),
+      mode_(mode) {
   if (IsMeta() || IsNode()) {
     InitFileCache();
   }
@@ -38,15 +42,9 @@ bool VnodeF2fs::IsFifo() const { return S_ISFIFO(mode_); }
 
 bool VnodeF2fs::HasGid() const { return mode_ & S_ISGID; }
 
-bool VnodeF2fs::IsNode() const {
-  SuperblockInfo &superblock_info = fs()->GetSuperblockInfo();
-  return ino_ == superblock_info.GetNodeIno();
-}
+bool VnodeF2fs::IsNode() const { return ino_ == superblock_info_.GetNodeIno(); }
 
-bool VnodeF2fs::IsMeta() const {
-  SuperblockInfo &superblock_info = fs()->GetSuperblockInfo();
-  return ino_ == superblock_info.GetMetaIno();
-}
+bool VnodeF2fs::IsMeta() const { return ino_ == superblock_info_.GetMetaIno(); }
 
 zx_status_t VnodeF2fs::GetNodeInfoForProtocol([[maybe_unused]] fs::VnodeProtocol protocol,
                                               [[maybe_unused]] fs::Rights rights,
@@ -369,9 +367,8 @@ void VnodeF2fs::RecycleNode() {
       FX_LOGS(WARNING) << "Vnode[" << GetNameView().data() << ":" << GetKey()
                        << "] is deleted with " << GetDirtyPageCount() << " of dirty pages"
                        << ". CpFlag::kCpErrorFlag is "
-                       << (fs()->GetSuperblockInfo().TestCpFlags(CpFlag::kCpErrorFlag)
-                               ? "set."
-                               : "not set.");
+                       << (superblock_info_.TestCpFlags(CpFlag::kCpErrorFlag) ? "set."
+                                                                              : "not set.");
     }
     file_cache_->Reset();
     fs()->GetVCache().Downgrade(this);
@@ -581,13 +578,11 @@ void VnodeF2fs::UpdateInodePage(LockedPage &inode_page) {
 }
 
 zx_status_t VnodeF2fs::UpdateInodePage() {
-  SuperblockInfo &superblock_info = fs()->GetSuperblockInfo();
-
-  if (ino_ == superblock_info.GetNodeIno() || ino_ == superblock_info.GetMetaIno()) {
+  if (ino_ == superblock_info_.GetNodeIno() || ino_ == superblock_info_.GetMetaIno()) {
     return ZX_OK;
   }
 
-  fs::SharedLock rlock(superblock_info.GetFsLock(LockType::kNodeOp));
+  fs::SharedLock rlock(superblock_info_.GetFsLock(LockType::kNodeOp));
   LockedPage node_page;
   if (zx_status_t ret = fs()->GetNodeManager().GetNodePage(ino_, &node_page); ret != ZX_OK) {
     return ret;
@@ -646,17 +641,16 @@ void VnodeF2fs::TruncateDataBlocks(NodePage &node_page) {
 }
 
 zx_status_t VnodeF2fs::TruncateBlocks(uint64_t from) {
-  SuperblockInfo &superblock_info = fs()->GetSuperblockInfo();
-  uint32_t blocksize = superblock_info.GetBlocksize();
+  uint32_t blocksize = superblock_info_.GetBlocksize();
 
   if (from > GetSize()) {
     return ZX_OK;
   }
 
   pgoff_t free_from =
-      safemath::CheckRsh(fbl::round_up(from, blocksize), superblock_info.GetLogBlocksize())
+      safemath::CheckRsh(fbl::round_up(from, blocksize), superblock_info_.GetLogBlocksize())
           .ValueOrDie();
-  fs::SharedLock rlock(superblock_info.GetFsLock(LockType::kFileOp));
+  fs::SharedLock rlock(superblock_info_.GetFsLock(LockType::kFileOp));
   // Invalidate data pages starting from |free_from|. It safely removes any pages updating their
   // block addrs before purging the addrs in nodes.
   InvalidatePages(free_from);
@@ -751,9 +745,7 @@ void VnodeF2fs::ReleasePagedVmoUnsafe() {
 }
 
 void VnodeF2fs::EvictVnode() {
-  SuperblockInfo &superblock_info = fs()->GetSuperblockInfo();
-
-  if (ino_ == superblock_info.GetNodeIno() || ino_ == superblock_info.GetMetaIno()) {
+  if (ino_ == superblock_info_.GetNodeIno() || ino_ == superblock_info_.GetMetaIno()) {
     return;
   }
 
@@ -768,7 +760,7 @@ void VnodeF2fs::EvictVnode() {
   }
 
   {
-    fs::SharedLock rlock(superblock_info.GetFsLock(LockType::kFileOp));
+    fs::SharedLock rlock(superblock_info_.GetFsLock(LockType::kFileOp));
     fs()->GetNodeManager().RemoveInodePage(this);
   }
   fs()->EvictVnode(this);
@@ -849,10 +841,10 @@ bool VnodeF2fs::NeedToCheckpoint() {
   if (NeedToSyncDir()) {
     return true;
   }
-  if (fs()->GetSuperblockInfo().TestOpt(MountOption::kDisableRollForward)) {
+  if (superblock_info_.TestOpt(MountOption::kDisableRollForward)) {
     return true;
   }
-  if (fs()->GetSuperblockInfo().FindVnodeFromVnodeSet(InoType::kModifiedDirIno, GetParentNid())) {
+  if (superblock_info_.FindVnodeFromVnodeSet(InoType::kModifiedDirIno, GetParentNid())) {
     return true;
   }
   return false;
@@ -870,7 +862,7 @@ uint64_t VnodeF2fs::GetSize() const {
 
 zx_status_t VnodeF2fs::SyncFile(loff_t start, loff_t end, int datasync) {
   // When kCpErrorFlag is set, write is not allowed.
-  if (fs()->GetSuperblockInfo().TestCpFlags(CpFlag::kCpErrorFlag)) {
+  if (superblock_info_.TestCpFlags(CpFlag::kCpErrorFlag)) {
     return ZX_ERR_BAD_STATE;
   }
 
@@ -891,7 +883,7 @@ zx_status_t VnodeF2fs::SyncFile(loff_t start, loff_t end, int datasync) {
     fs()->SyncFs();
     ClearFlag(InodeInfoFlag::kNeedCp);
     // Check if checkpoint errors happen during fsync().
-    if (fs()->GetSuperblockInfo().TestCpFlags(CpFlag::kCpErrorFlag)) {
+    if (superblock_info_.TestCpFlags(CpFlag::kCpErrorFlag)) {
       return ZX_ERR_BAD_STATE;
     }
   } else {

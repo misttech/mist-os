@@ -26,6 +26,9 @@ SectionEntry &SegmentManager::GetSectionEntry(uint32_t segno) {
   return sit_info_->sec_entries[GetSecNo(segno)];
 }
 
+SegmentManager::SegmentManager(F2fs *fs) : fs_(fs), superblock_info_(fs->GetSuperblockInfo()) {}
+SegmentManager::SegmentManager(SuperblockInfo &info) : superblock_info_(info) {}
+
 uint32_t SegmentManager::GetValidBlocks(uint32_t segno, uint32_t section) {
   // In order to get # of valid blocks in a section instantly from many
   // segments, f2fs manages two counting structures separately.
@@ -68,8 +71,8 @@ uint32_t SegmentManager::FindNextInuse(uint32_t max, uint32_t start) {
 }
 
 void SegmentManager::SetFree(uint32_t segno) {
-  uint32_t secno = segno / superblock_info_->GetSegsPerSec();
-  uint32_t start_segno = secno * superblock_info_->GetSegsPerSec();
+  uint32_t secno = segno / superblock_info_.GetSegsPerSec();
+  uint32_t start_segno = secno * superblock_info_.GetSegsPerSec();
 
   std::lock_guard segmap_lock(free_info_->segmap_lock);
   free_info_->free_segmap.ClearOne(segno);
@@ -77,7 +80,7 @@ void SegmentManager::SetFree(uint32_t segno) {
 
   size_t dirty_seg;
   if (!free_info_->free_segmap.Scan(start_segno, TotalSegs(), false, &dirty_seg) &&
-      dirty_seg < start_segno + superblock_info_->GetSegsPerSec()) {
+      dirty_seg < start_segno + superblock_info_.GetSegsPerSec()) {
     return;
   }
   free_info_->free_secmap.ClearOne(secno);
@@ -85,7 +88,7 @@ void SegmentManager::SetFree(uint32_t segno) {
 }
 
 void SegmentManager::SetInuse(uint32_t segno) {
-  uint32_t secno = segno / superblock_info_->GetSegsPerSec();
+  uint32_t secno = segno / superblock_info_.GetSegsPerSec();
   free_info_->free_segmap.SetOne(segno);
   --free_info_->free_segments;
   if (!free_info_->free_secmap.GetOne(secno)) {
@@ -95,8 +98,8 @@ void SegmentManager::SetInuse(uint32_t segno) {
 }
 
 void SegmentManager::SetTestAndFree(uint32_t segno) {
-  uint32_t secno = segno / superblock_info_->GetSegsPerSec();
-  uint32_t start_segno = secno * superblock_info_->GetSegsPerSec();
+  uint32_t secno = segno / superblock_info_.GetSegsPerSec();
+  uint32_t start_segno = secno * superblock_info_.GetSegsPerSec();
   std::lock_guard segmap_lock(free_info_->segmap_lock);
   if (free_info_->free_segmap.GetOne(segno)) {
     free_info_->free_segmap.ClearOne(segno);
@@ -104,7 +107,7 @@ void SegmentManager::SetTestAndFree(uint32_t segno) {
 
     size_t next;
     if (!free_info_->free_segmap.Scan(start_segno, TotalSegs(), false, &next)) {
-      if (next < start_segno + superblock_info_->GetSegsPerSec())
+      if (next < start_segno + superblock_info_.GetSegsPerSec())
         return;
     }
     if (free_info_->free_secmap.GetOne(secno)) {
@@ -115,7 +118,7 @@ void SegmentManager::SetTestAndFree(uint32_t segno) {
 }
 
 void SegmentManager::SetTestAndInuse(uint32_t segno) {
-  uint32_t secno = segno / superblock_info_->GetSegsPerSec();
+  uint32_t secno = segno / superblock_info_.GetSegsPerSec();
   std::lock_guard segmap_lock(free_info_->segmap_lock);
   if (!free_info_->free_segmap.GetOne(segno)) {
     free_info_->free_segmap.SetOne(segno);
@@ -157,14 +160,14 @@ block_t SegmentManager::DirtySegments() {
 }
 
 block_t SegmentManager::OverprovisionSections() {
-  return GetOPSegmentsCount() / superblock_info_->GetSegsPerSec();
+  return GetOPSegmentsCount() / superblock_info_.GetSegsPerSec();
 }
 
 block_t SegmentManager::ReservedSections() {
-  return GetReservedSegmentsCount() / superblock_info_->GetSegsPerSec();
+  return GetReservedSegmentsCount() / superblock_info_.GetSegsPerSec();
 }
 bool SegmentManager::NeedSSR() {
-  return (!superblock_info_->TestOpt(MountOption::kForceLfs) &&
+  return (!superblock_info_.TestOpt(MountOption::kForceLfs) &&
           FreeSections() < static_cast<uint32_t>(OverprovisionSections()));
 }
 
@@ -180,7 +183,7 @@ int SegmentManager::GetSsrSegment(CursegType type) {
 
 uint32_t SegmentManager::Utilization() {
   return static_cast<uint32_t>(static_cast<int64_t>(fs_->ValidUserBlocks()) * 100 /
-                               static_cast<int64_t>(superblock_info_->GetUserBlockCount()));
+                               static_cast<int64_t>(superblock_info_.GetUserBlockCount()));
 }
 
 // Sometimes f2fs may be better to drop out-of-place update policy.
@@ -191,7 +194,7 @@ constexpr uint32_t kMinIpuUtil = 100;
 bool SegmentManager::NeedInplaceUpdate(VnodeF2fs *vnode) {
   if (vnode->IsDir())
     return false;
-  if (superblock_info_->TestOpt(MountOption::kForceLfs)) {
+  if (superblock_info_.TestOpt(MountOption::kForceLfs)) {
     return false;
   }
   return NeedSSR() && Utilization() > kMinIpuUtil;
@@ -234,14 +237,14 @@ void SegmentManager::CheckBlockCount(uint32_t segno, SitEntry &raw_sit) {
   int valid_blocks = 0;
 
   // check segment usage
-  ZX_ASSERT(!(GetSitVblocks(raw_sit) > superblock_info_->GetBlocksPerSeg()));
+  ZX_ASSERT(!(GetSitVblocks(raw_sit) > superblock_info_.GetBlocksPerSeg()));
 
   // check boundary of a given segment number
   ZX_ASSERT(!(segno > end_segno));
 
   // check bitmap with valid block count
   PageBitmap bits(raw_sit.valid_map, kSitVBlockMapSizeInBit);
-  for (uint32_t i = 0; i < superblock_info_->GetBlocksPerSeg(); ++i) {
+  for (uint32_t i = 0; i < superblock_info_.GetBlocksPerSeg(); ++i) {
     if (bits.Test(ToMsbFirst(i)))
       ++valid_blocks;
   }
@@ -292,23 +295,21 @@ void SegmentManager::SetSummary(Summary *sum, nid_t nid, uint32_t ofs_in_node, u
 }
 
 block_t SegmentManager::StartSumBlock() {
-  return superblock_info_->StartCpAddr() +
-         LeToCpu(superblock_info_->GetCheckpoint().cp_pack_start_sum);
+  return superblock_info_.StartCpAddr() +
+         LeToCpu(superblock_info_.GetCheckpoint().cp_pack_start_sum);
 }
 
 block_t SegmentManager::SumBlkAddr(int base, int type) {
-  return superblock_info_->StartCpAddr() +
-         LeToCpu(superblock_info_->GetCheckpoint().cp_pack_total_block_count) - (base + 1) + type;
+  return superblock_info_.StartCpAddr() +
+         LeToCpu(superblock_info_.GetCheckpoint().cp_pack_total_block_count) - (base + 1) + type;
 }
 
 bool SegmentManager::SecUsageCheck(unsigned int secno) {
   return IsCurSec(secno) || (fs_->GetGcManager().GetCurVictimSec() == secno);
 }
 
-SegmentManager::SegmentManager(F2fs *fs) : fs_(fs) { superblock_info_ = &fs->GetSuperblockInfo(); }
-
 bool SegmentManager::HasNotEnoughFreeSecs(uint32_t freed) {
-  if (superblock_info_->IsOnRecovery())
+  if (superblock_info_.IsOnRecovery())
     return false;
 
   return (FreeSections() + freed) <= (fs_->GetFreeSectionsForDirtyPages() + ReservedSections());
@@ -317,7 +318,7 @@ bool SegmentManager::HasNotEnoughFreeSecs(uint32_t freed) {
 // This function balances dirty node and dentry pages.
 // In addition, it controls garbage collection.
 void SegmentManager::BalanceFs() {
-  if (superblock_info_->IsOnRecovery()) {
+  if (superblock_info_.IsOnRecovery()) {
     return;
   }
 
@@ -366,7 +367,7 @@ void SegmentManager::RemoveDirtySegment(uint32_t segno, DirtyType dirty_type) {
       dirty_info_->dirty_segmap[static_cast<int>(dirty_type)].ClearOne(segno);
       --dirty_info_->nr_dirty[static_cast<int>(dirty_type)];
     }
-    if (GetValidBlocks(segno, superblock_info_->GetSegsPerSec()) == 0) {
+    if (GetValidBlocks(segno, superblock_info_.GetSegsPerSec()) == 0) {
       dirty_info_->victim_secmap.ClearOne(GetSecNo(segno));
     }
   }
@@ -388,7 +389,7 @@ void SegmentManager::LocateDirtySegment(uint32_t segno) {
   if (valid_blocks == 0) {
     LocateDirtySegment(segno, DirtyType::kPre);
     RemoveDirtySegment(segno, DirtyType::kDirty);
-  } else if (valid_blocks < superblock_info_->GetBlocksPerSeg()) {
+  } else if (valid_blocks < superblock_info_.GetBlocksPerSeg()) {
     LocateDirtySegment(segno, DirtyType::kDirty);
   } else {
     // Recovery routine with SSR needs this
@@ -410,7 +411,7 @@ void SegmentManager::SetPrefreeAsFreeSegments() {
 void SegmentManager::ClearPrefreeSegments() {
   const uint32_t total_segs = TotalSegs();
   bool need_align =
-      superblock_info_->TestOpt(MountOption::kForceLfs) && superblock_info_->GetSegsPerSec() > 1;
+      superblock_info_.TestOpt(MountOption::kForceLfs) && superblock_info_.GetSegsPerSec() > 1;
 
   std::lock_guard seglist_lock(dirty_info_->seglist_lock);
   for (size_t segno = 0; !dirty_info_->dirty_segmap[static_cast<int>(DirtyType::kPre)].Scan(
@@ -418,8 +419,8 @@ void SegmentManager::ClearPrefreeSegments() {
     uint32_t start = safemath::checked_cast<uint32_t>(segno);
     uint32_t end;
     if (need_align) {
-      start = GetSecNo(start) * superblock_info_->GetSegsPerSec();
-      end = start + superblock_info_->GetSegsPerSec();
+      start = GetSecNo(start) * superblock_info_.GetSegsPerSec();
+      end = start + superblock_info_.GetSegsPerSec();
     } else {
       if (dirty_info_->dirty_segmap[static_cast<int>(DirtyType::kPre)].Scan(start + 1, total_segs,
                                                                             true, &segno)) {
@@ -436,13 +437,13 @@ void SegmentManager::ClearPrefreeSegments() {
     }
     segno = end;
 
-    if (!superblock_info_->TestOpt(MountOption::kDiscard)) {
+    if (!superblock_info_.TestOpt(MountOption::kDiscard)) {
       continue;
     }
 
     if (!need_align) {
       block_t num_of_blocks =
-          (safemath::CheckSub<block_t>(end, start) * superblock_info_->GetBlocksPerSeg())
+          (safemath::CheckSub<block_t>(end, start) * superblock_info_.GetBlocksPerSeg())
               .ValueOrDie();
       fs_->MakeTrimOperation(StartBlock(start), num_of_blocks);
     } else {
@@ -452,14 +453,14 @@ void SegmentManager::ClearPrefreeSegments() {
       while (start < end) {
         uint32_t secno = GetSecNo(start);
         uint32_t start_segno =
-            safemath::CheckMul(secno, superblock_info_->GetSegsPerSec()).ValueOrDie();
-        if (!IsCurSec(secno) && GetValidBlocks(start, superblock_info_->GetSegsPerSec()) == 0) {
-          block_t num_of_blocks = safemath::CheckMul<block_t>(superblock_info_->GetSegsPerSec(),
-                                                              superblock_info_->GetBlocksPerSeg())
+            safemath::CheckMul(secno, superblock_info_.GetSegsPerSec()).ValueOrDie();
+        if (!IsCurSec(secno) && GetValidBlocks(start, superblock_info_.GetSegsPerSec()) == 0) {
+          block_t num_of_blocks = safemath::CheckMul<block_t>(superblock_info_.GetSegsPerSec(),
+                                                              superblock_info_.GetBlocksPerSeg())
                                       .ValueOrDie();
           fs_->MakeTrimOperation(StartBlock(start_segno), num_of_blocks);
         }
-        start = safemath::CheckAdd(start_segno, superblock_info_->GetSegsPerSec()).ValueOrDie();
+        start = safemath::CheckAdd(start_segno, superblock_info_.GetSegsPerSec()).ValueOrDie();
       }
     }
   }
@@ -486,10 +487,10 @@ void SegmentManager::UpdateSitEntry(block_t blkaddr, int del) {
   SegmentEntry &segment_entry = GetSegmentEntry(segno);
 
   new_vblocks = segment_entry.valid_blocks + del;
-  offset = GetSegOffFromSeg0(blkaddr) & (superblock_info_->GetBlocksPerSeg() - 1);
+  offset = GetSegOffFromSeg0(blkaddr) & (superblock_info_.GetBlocksPerSeg() - 1);
 
   ZX_ASSERT(!((new_vblocks >> (sizeof(uint16_t) << 3) ||
-               (new_vblocks > superblock_info_->GetBlocksPerSeg()))));
+               (new_vblocks > superblock_info_.GetBlocksPerSeg()))));
 
   segment_entry.valid_blocks = static_cast<uint16_t>(new_vblocks);
   segment_entry.mtime = GetMtime();
@@ -511,7 +512,7 @@ void SegmentManager::UpdateSitEntry(block_t blkaddr, int del) {
   // update total number of valid blocks to be written in ckpt area
   sit_info_->written_valid_blocks += del;
 
-  if (superblock_info_->GetSegsPerSec() > 1)
+  if (superblock_info_.GetSegsPerSec() > 1)
     GetSectionEntry(segno).valid_blocks += del;
 }
 
@@ -545,14 +546,13 @@ void SegmentManager::AddSumEntry(CursegType type, Summary *sum, uint16_t offset)
 
 // Calculate the number of current summary pages for writing
 int SegmentManager::NpagesForSummaryFlush() {
-  SuperblockInfo &superblock_info = fs_->GetSuperblockInfo();
   uint32_t total_size_bytes = 0;
   uint32_t valid_sum_count = 0;
 
   for (int i = static_cast<int>(CursegType::kCursegHotData);
        i <= static_cast<int>(CursegType::kCursegColdData); ++i) {
-    if (superblock_info.GetCheckpoint().alloc_type[i] == static_cast<uint8_t>(AllocMode::kSSR)) {
-      valid_sum_count += superblock_info.GetBlocksPerSeg();
+    if (superblock_info_.GetCheckpoint().alloc_type[i] == static_cast<uint8_t>(AllocMode::kSSR)) {
+      valid_sum_count += superblock_info_.GetBlocksPerSeg();
     } else {
       valid_sum_count += CursegBlkoff(i);
     }
@@ -588,11 +588,10 @@ void SegmentManager::WriteSumPage(SummaryBlock *sum_blk, block_t blk_addr) {
 // TODO: after LFS allocation available, raise out of space event of inspect tree when new segment
 // cannot be allocated.
 void SegmentManager::GetNewSegment(uint32_t *newseg, bool new_sec, AllocDirection dir) {
-  SuperblockInfo &superblock_info = fs_->GetSuperblockInfo();
-  uint32_t total_secs = superblock_info.GetTotalSections();
+  uint32_t total_secs = superblock_info_.GetTotalSections();
   uint32_t segno, secno, zoneno;
-  uint32_t total_zones = superblock_info.GetTotalSections() / superblock_info.GetSecsPerZone();
-  uint32_t hint = *newseg / superblock_info.GetSegsPerSec();
+  uint32_t total_zones = superblock_info_.GetTotalSections() / superblock_info_.GetSecsPerZone();
+  uint32_t hint = *newseg / superblock_info_.GetSegsPerSec();
   uint32_t old_zoneno = GetZoneNoFromSegNo(*newseg);
   uint32_t left_start = hint;
   bool find_another = true;
@@ -616,7 +615,7 @@ void SegmentManager::GetNewSegment(uint32_t *newseg, bool new_sec, AllocDirectio
     return go_left;
   };
 
-  if (!new_sec && ((*newseg + 1) % superblock_info.GetSegsPerSec())) {
+  if (!new_sec && ((*newseg + 1) % superblock_info_.GetSegsPerSec())) {
     size_t free_seg;
     if (free_info_->free_segmap.Scan(*newseg + 1, TotalSegs(), true, &free_seg)) {
       free_seg = TotalSegs();
@@ -642,14 +641,14 @@ void SegmentManager::GetNewSegment(uint32_t *newseg, bool new_sec, AllocDirectio
     }
 
     hint = secno;
-    segno = secno * superblock_info.GetSegsPerSec();
-    zoneno = secno / superblock_info.GetSecsPerZone();
+    segno = secno * superblock_info_.GetSegsPerSec();
+    zoneno = secno / superblock_info_.GetSecsPerZone();
 
     // give up on finding another zone
     if (!find_another) {
       break;
     }
-    if (superblock_info.GetSecsPerZone() == 1) {
+    if (superblock_info_.GetSecsPerZone() == 1) {
       break;
     }
     if (zoneno == old_zoneno) {
@@ -675,11 +674,11 @@ void SegmentManager::GetNewSegment(uint32_t *newseg, bool new_sec, AllocDirectio
     }
     // zone is in use, try another
     if (go_left) {
-      hint = zoneno * superblock_info.GetSecsPerZone() - 1;
+      hint = zoneno * superblock_info_.GetSecsPerZone() - 1;
     } else if (zoneno + 1 >= total_zones) {
       hint = 0;
     } else {
-      hint = (zoneno + 1) * superblock_info.GetSecsPerZone();
+      hint = (zoneno + 1) * superblock_info_.GetSecsPerZone();
     }
     find_another = false;
   }
@@ -710,7 +709,6 @@ void SegmentManager::ResetCurseg(CursegType type, int modified) {
 // Allocate a current working segment.
 // This function always allocates a free segment in LFS manner.
 void SegmentManager::NewCurseg(CursegType type, bool new_sec) {
-  SuperblockInfo &superblock_info = fs_->GetSuperblockInfo();
   CursegInfo *curseg = CURSEG_I(type);
   uint32_t segno = curseg->segno;
   AllocDirection dir = AllocDirection::kAllocLeft;
@@ -719,7 +717,7 @@ void SegmentManager::NewCurseg(CursegType type, bool new_sec) {
   if (type == CursegType::kCursegWarmData || type == CursegType::kCursegColdData)
     dir = AllocDirection::kAllocRight;
 
-  if (superblock_info.TestOpt(MountOption::kNoHeap))
+  if (superblock_info_.TestOpt(MountOption::kNoHeap))
     dir = AllocDirection::kAllocRight;
 
   GetNewSegment(&segno, new_sec, dir);
@@ -729,10 +727,9 @@ void SegmentManager::NewCurseg(CursegType type, bool new_sec) {
 }
 
 void SegmentManager::NextFreeBlkoff(CursegInfo *seg, block_t start) {
-  SuperblockInfo &superblock_info = fs_->GetSuperblockInfo();
   SegmentEntry &segment_entry = GetSegmentEntry(seg->segno);
   block_t ofs;
-  for (ofs = start; ofs < superblock_info.GetBlocksPerSeg(); ++ofs) {
+  for (ofs = start; ofs < superblock_info_.GetBlocksPerSeg(); ++ofs) {
     if (!segment_entry.ckpt_valid_map.GetOne(ToMsbFirst(ofs)) &&
         !segment_entry.cur_valid_map.GetOne(ToMsbFirst(ofs)))
       break;
@@ -780,7 +777,6 @@ void SegmentManager::ChangeCurseg(CursegType type, bool reuse) {
 // Allocate a segment for new block allocations in CURSEG_I(type).
 // This function is supposed to be successful. Otherwise, BUG.
 void SegmentManager::AllocateSegmentByDefault(CursegType type, bool force) {
-  SuperblockInfo &superblock_info = fs_->GetSuperblockInfo();
   CursegInfo *curseg = CURSEG_I(type);
 
   if (force) {
@@ -794,7 +790,7 @@ void SegmentManager::AllocateSegmentByDefault(CursegType type, bool force) {
       NewCurseg(type, false);
     }
   }
-  superblock_info.IncSegmentCount(curseg->alloc_type);
+  superblock_info_.IncSegmentCount(curseg->alloc_type);
 }
 
 void SegmentManager::AllocateNewSegments() {
@@ -811,9 +807,8 @@ void SegmentManager::AllocateNewSegments() {
 }
 
 bool SegmentManager::HasCursegSpace(CursegType type) {
-  SuperblockInfo &superblock_info = fs_->GetSuperblockInfo();
   CursegInfo *curseg = CURSEG_I(type);
-  return curseg->next_blkoff < superblock_info.GetBlocksPerSeg();
+  return curseg->next_blkoff < superblock_info_.GetBlocksPerSeg();
 }
 
 CursegType SegmentManager::GetSegmentType2(Page &page, PageType p_type) {
@@ -862,8 +857,7 @@ CursegType SegmentManager::GetSegmentType6(Page &page, PageType p_type) {
 }
 
 CursegType SegmentManager::GetSegmentType(Page &page, PageType p_type) {
-  SuperblockInfo &superblock_info = fs_->GetSuperblockInfo();
-  switch (superblock_info.GetActiveLogs()) {
+  switch (superblock_info_.GetActiveLogs()) {
     case 2:
       return GetSegmentType2(page, p_type);
     case 4:
@@ -896,7 +890,7 @@ zx::result<block_t> SegmentManager::GetBlockAddrOnSegment(LockedPage &page, bloc
     {
       std::lock_guard sentry_lock(sit_info_->sentry_lock);
       RefreshNextBlkoff(curseg);
-      superblock_info_->IncBlockCount(curseg->alloc_type);
+      superblock_info_.IncBlockCount(curseg->alloc_type);
 
       // SIT information should be updated before segment allocation,
       // since SSR needs latest valid block information.
@@ -1014,7 +1008,7 @@ void SegmentManager::RecoverDataPage(Summary &sum, block_t old_blkaddr, block_t 
   }
 
   curseg->next_blkoff = safemath::checked_cast<uint16_t>(GetSegOffFromSeg0(new_blkaddr) &
-                                                         (superblock_info_->GetBlocksPerSeg() - 1));
+                                                         (superblock_info_.GetBlocksPerSeg() - 1));
   AddSumEntry(type, &sum, curseg->next_blkoff);
 
   RefreshSitEntry(old_blkaddr, new_blkaddr);
@@ -1025,7 +1019,7 @@ void SegmentManager::RecoverDataPage(Summary &sum, block_t old_blkaddr, block_t 
 }
 
 zx_status_t SegmentManager::ReadCompactedSummaries() {
-  Checkpoint &ckpt = superblock_info_->GetCheckpoint();
+  Checkpoint &ckpt = superblock_info_.GetCheckpoint();
   LockedPage page;
   block_t start;
   int offset;
@@ -1060,7 +1054,7 @@ zx_status_t SegmentManager::ReadCompactedSummaries() {
     seg_i->next_blkoff = blk_off;
 
     if (seg_i->alloc_type == static_cast<uint8_t>(AllocMode::kSSR))
-      blk_off = static_cast<uint16_t>(superblock_info_->GetBlocksPerSeg());
+      blk_off = static_cast<uint16_t>(superblock_info_.GetBlocksPerSeg());
 
     for (int j = 0; j < blk_off; ++j) {
       page->Read(&seg_i->sum_blk->entries[j], offset, kSummarySize);
@@ -1079,7 +1073,7 @@ zx_status_t SegmentManager::ReadCompactedSummaries() {
 }
 
 zx_status_t SegmentManager::ReadNormalSummaries(int type) {
-  Checkpoint &ckpt = superblock_info_->GetCheckpoint();
+  Checkpoint &ckpt = superblock_info_.GetCheckpoint();
   SummaryBlock *sum;
   CursegInfo *curseg;
   uint16_t blk_off;
@@ -1090,14 +1084,14 @@ zx_status_t SegmentManager::ReadNormalSummaries(int type) {
   if (IsDataSeg(static_cast<CursegType>(type))) {
     segno = LeToCpu(ckpt.cur_data_segno[type]);
     blk_off = LeToCpu(ckpt.cur_data_blkoff[type - static_cast<int>(CursegType::kCursegHotData)]);
-    if (superblock_info_->TestCpFlags(CpFlag::kCpUmountFlag)) {
+    if (superblock_info_.TestCpFlags(CpFlag::kCpUmountFlag)) {
       blk_addr = SumBlkAddr(kNrCursegType, type);
     } else
       blk_addr = SumBlkAddr(kNrCursegDataType, type);
   } else {
     segno = LeToCpu(ckpt.cur_node_segno[type - static_cast<int>(CursegType::kCursegHotNode)]);
     blk_off = LeToCpu(ckpt.cur_node_blkoff[type - static_cast<int>(CursegType::kCursegHotNode)]);
-    if (superblock_info_->TestCpFlags(CpFlag::kCpUmountFlag)) {
+    if (superblock_info_.TestCpFlags(CpFlag::kCpUmountFlag)) {
       blk_addr = SumBlkAddr(kNrCursegNodeType, type - static_cast<int>(CursegType::kCursegHotNode));
     } else
       blk_addr = GetSumBlock(segno);
@@ -1110,9 +1104,9 @@ zx_status_t SegmentManager::ReadNormalSummaries(int type) {
   sum = new_page->GetAddress<SummaryBlock>();
 
   if (IsNodeSeg(static_cast<CursegType>(type))) {
-    if (superblock_info_->TestCpFlags(CpFlag::kCpUmountFlag)) {
+    if (superblock_info_.TestCpFlags(CpFlag::kCpUmountFlag)) {
       Summary *ns = &sum->entries[0];
-      for (uint32_t i = 0; i < superblock_info_->GetBlocksPerSeg(); ++i, ++ns) {
+      for (uint32_t i = 0; i < superblock_info_.GetBlocksPerSeg(); ++i, ++ns) {
         ns->version = 0;
         ns->ofs_in_node = 0;
       }
@@ -1139,7 +1133,7 @@ zx_status_t SegmentManager::ReadNormalSummaries(int type) {
 zx_status_t SegmentManager::RestoreCursegSummaries() {
   int type = static_cast<int>(CursegType::kCursegHotData);
 
-  if (superblock_info_->TestCpFlags(CpFlag::kCpCompactSumFlag)) {
+  if (superblock_info_.TestCpFlags(CpFlag::kCpCompactSumFlag)) {
     // restore for compacted data summary
     if (ReadCompactedSummaries())
       return ZX_ERR_INVALID_ARGS;
@@ -1175,8 +1169,8 @@ void SegmentManager::WriteCompactedSummaries(block_t blkaddr) {
        i <= static_cast<int>(CursegType::kCursegColdData); ++i) {
     uint16_t blkoff;
     seg_i = CURSEG_I(static_cast<CursegType>(i));
-    if (superblock_info_->GetCheckpoint().alloc_type[i] == static_cast<uint8_t>(AllocMode::kSSR)) {
-      blkoff = static_cast<uint16_t>(superblock_info_->GetBlocksPerSeg());
+    if (superblock_info_.GetCheckpoint().alloc_type[i] == static_cast<uint8_t>(AllocMode::kSSR)) {
+      blkoff = static_cast<uint16_t>(superblock_info_.GetBlocksPerSeg());
     } else {
       blkoff = CursegBlkoff(i);
     }
@@ -1216,7 +1210,7 @@ void SegmentManager::WriteNormalSummaries(block_t blkaddr, CursegType type) {
 }
 
 void SegmentManager::WriteDataSummaries(block_t start_blk) {
-  if (superblock_info_->TestCpFlags(CpFlag::kCpCompactSumFlag)) {
+  if (superblock_info_.TestCpFlags(CpFlag::kCpCompactSumFlag)) {
     WriteCompactedSummaries(start_blk);
   } else {
     WriteNormalSummaries(start_blk, CursegType::kCursegHotData);
@@ -1224,7 +1218,7 @@ void SegmentManager::WriteDataSummaries(block_t start_blk) {
 }
 
 void SegmentManager::WriteNodeSummaries(block_t start_blk) {
-  if (superblock_info_->TestCpFlags(CpFlag::kCpUmountFlag))
+  if (superblock_info_.TestCpFlags(CpFlag::kCpUmountFlag))
     WriteNormalSummaries(start_blk, CursegType::kCursegHotNode);
 }
 
@@ -1375,8 +1369,8 @@ zx_status_t SegmentManager::FlushSitEntries() {
 }
 
 zx_status_t SegmentManager::BuildSitInfo() {
-  const Superblock &raw_super = superblock_info_->GetRawSuperblock();
-  Checkpoint &ckpt = superblock_info_->GetCheckpoint();
+  const Superblock &raw_super = superblock_info_.GetSuperblock();
+  Checkpoint &ckpt = superblock_info_.GetCheckpoint();
   uint32_t sit_segs;
 
   // allocate memory for SIT information
@@ -1394,20 +1388,20 @@ zx_status_t SegmentManager::BuildSitInfo() {
     sit_i->sentries[start].ckpt_valid_map.Reset(GetBitSize(kSitVBlockMapSize));
   }
 
-  if (superblock_info_->GetSegsPerSec() > 1) {
-    if (sit_i->sec_entries = std::make_unique<SectionEntry[]>(superblock_info_->GetTotalSections());
+  if (superblock_info_.GetSegsPerSec() > 1) {
+    if (sit_i->sec_entries = std::make_unique<SectionEntry[]>(superblock_info_.GetTotalSections());
         !sit_i->sec_entries) {
       return ZX_ERR_NO_MEMORY;
     }
   }
 
-  uint32_t bitmap_size = superblock_info_->GetSitBitmapSize();
+  uint32_t bitmap_size = superblock_info_.GetSitBitmapSize();
   // get information related with SIT
   sit_segs = LeToCpu(raw_super.segment_count_sit) >> 1;
 
   // setup SIT bitmap from ckeckpoint pack
   sit_i->sit_bitmap.Reset(GetBitSize(bitmap_size));
-  CloneBits(sit_i->sit_bitmap, superblock_info_->GetSitBitmap(), 0, GetBitSize(bitmap_size));
+  CloneBits(sit_i->sit_bitmap, superblock_info_.GetSitBitmap(), 0, GetBitSize(bitmap_size));
 
 #if 0  // porting needed
   /* init SIT information */
@@ -1416,12 +1410,12 @@ zx_status_t SegmentManager::BuildSitInfo() {
   auto cur_time = time(nullptr);
 
   sit_i->sit_base_addr = LeToCpu(raw_super.sit_blkaddr);
-  sit_i->sit_blocks = sit_segs << superblock_info_->GetLogBlocksPerSeg();
+  sit_i->sit_blocks = sit_segs << superblock_info_.GetLogBlocksPerSeg();
   sit_i->written_valid_blocks = LeToCpu(static_cast<block_t>(ckpt.valid_block_count));
   sit_i->bitmap_size = bitmap_size;
   sit_i->dirty_sentries = 0;
   sit_i->sents_per_block = kSitEntryPerBlock;
-  sit_i->elapsed_time = LeToCpu(superblock_info_->GetCheckpoint().elapsed_time);
+  sit_i->elapsed_time = LeToCpu(superblock_info_.GetCheckpoint().elapsed_time);
   sit_i->mounted_time = cur_time;
   return ZX_OK;
 }
@@ -1433,14 +1427,14 @@ zx_status_t SegmentManager::BuildFreeSegmap() {
   if (zx_status_t status = free_info_->free_segmap.Reset(TotalSegs()); status != ZX_OK) {
     return status;
   }
-  if (zx_status_t status = free_info_->free_secmap.Reset(superblock_info_->GetTotalSections());
+  if (zx_status_t status = free_info_->free_secmap.Reset(superblock_info_.GetTotalSections());
       status != ZX_OK) {
     return status;
   }
 
   // set all segments as dirty temporarily
   free_info_->free_segmap.Set(0, TotalSegs());
-  free_info_->free_secmap.Set(0, superblock_info_->GetTotalSections());
+  free_info_->free_secmap.Set(0, superblock_info_.GetTotalSections());
 
   // init free segmap information
   free_info_->start_segno = GetSegNoFromSeg0(main_blkaddr_);
@@ -1490,7 +1484,7 @@ zx_status_t SegmentManager::BuildSitEntries() {
     }
     CheckBlockCount(start, sit);
     SegInfoFromRawSit(segment_entry, sit);
-    if (superblock_info_->GetSegsPerSec() > 1) {
+    if (superblock_info_.GetSegsPerSec() > 1) {
       SectionEntry &e = GetSectionEntry(start);
       e.valid_blocks += segment_entry.valid_blocks;
     }
@@ -1517,7 +1511,7 @@ void SegmentManager::InitDirtySegmap() {
   /* find dirty segment based on free segmap */
   for (uint32_t segno = 0; (segno = FindNextInuse(TotalSegs(), segno)) < TotalSegs(); ++segno) {
     size_t valid_blocks = GetValidBlocks(segno, 0);
-    if (valid_blocks >= superblock_info_->GetBlocksPerSeg() || !valid_blocks) {
+    if (valid_blocks >= superblock_info_.GetBlocksPerSeg() || !valid_blocks) {
       continue;
     }
     std::lock_guard seglist_lock(dirty_info_->seglist_lock);
@@ -1533,7 +1527,7 @@ zx_status_t SegmentManager::BuildDirtySegmap() {
   }
 
   InitDirtySegmap();
-  return dirty_info_->victim_secmap.Reset(superblock_info_->GetTotalSections());
+  return dirty_info_->victim_secmap.Reset(superblock_info_.GetTotalSections());
 }
 
 // Update min, max modified time for cost-benefit GC algorithm
@@ -1542,14 +1536,14 @@ void SegmentManager::InitMinMaxMtime() {
 
   sit_info_->min_mtime = LLONG_MAX;
 
-  for (uint32_t segno = 0; segno < TotalSegs(); segno += superblock_info_->GetSegsPerSec()) {
+  for (uint32_t segno = 0; segno < TotalSegs(); segno += superblock_info_.GetSegsPerSec()) {
     uint64_t mtime = 0;
 
-    for (uint32_t i = 0; i < superblock_info_->GetSegsPerSec(); ++i) {
+    for (uint32_t i = 0; i < superblock_info_.GetSegsPerSec(); ++i) {
       mtime += GetSegmentEntry(segno + i).mtime;
     }
 
-    mtime /= static_cast<uint64_t>(superblock_info_->GetSegsPerSec());
+    mtime /= static_cast<uint64_t>(superblock_info_.GetSegsPerSec());
 
     if (sit_info_->min_mtime > mtime) {
       sit_info_->min_mtime = mtime;
@@ -1559,8 +1553,8 @@ void SegmentManager::InitMinMaxMtime() {
 }
 
 zx_status_t SegmentManager::BuildSegmentManager() {
-  const Superblock &raw_super = superblock_info_->GetRawSuperblock();
-  Checkpoint &ckpt = superblock_info_->GetCheckpoint();
+  const Superblock &raw_super = superblock_info_.GetSuperblock();
+  Checkpoint &ckpt = superblock_info_.GetCheckpoint();
 
   seg0_blkaddr_ = LeToCpu(raw_super.segment0_blkaddr);
   main_blkaddr_ = LeToCpu(raw_super.main_blkaddr);

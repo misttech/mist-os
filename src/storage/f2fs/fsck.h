@@ -182,13 +182,9 @@ class FsckWorker {
   void DoUmount();
   zx_status_t Run();
 
-  void InitSuperblockInfo();
-  zx::result<> GetSuperblock(block_t index, BlockBuffer<> &superblock);
-  zx_status_t SanityCheckRawSuper(const Superblock &raw_super);
   zx_status_t GetValidSuperblock();
   zx::result<std::pair<std::unique_ptr<BlockBuffer<Checkpoint>>, uint64_t>> ValidateCheckpoint(
       block_t cp_addr);
-  zx_status_t SanityCheckCkpt();
   zx_status_t GetValidCheckpoint();
   zx_status_t InitNodeManager();
   zx_status_t BuildNodeManager();
@@ -230,12 +226,12 @@ class FsckWorker {
   bool IsValidNid(nid_t nid);
   bool IsValidBlockAddress(uint32_t addr);
   block_t StartSummaryBlock() {
-    return superblock_info_.StartCpAddr() +
-           LeToCpu(superblock_info_.GetCheckpoint().cp_pack_start_sum);
+    return superblock_info_->StartCpAddr() +
+           LeToCpu(superblock_info_->GetCheckpoint().cp_pack_start_sum);
   }
   block_t SummaryBlockAddress(int base, int type) {
-    return superblock_info_.StartCpAddr() +
-           LeToCpu(superblock_info_.GetCheckpoint().cp_pack_total_block_count) - (base + 1) + type;
+    return superblock_info_->StartCpAddr() +
+           LeToCpu(superblock_info_->GetCheckpoint().cp_pack_total_block_count) - (base + 1) + type;
   }
   static void NodeInfoFromRawNat(NodeInfo &ni, RawNatEntry &raw_nat) {
     ni.ino = LeToCpu(raw_nat.ino);
@@ -269,14 +265,13 @@ class FsckWorker {
   }
 
   // For testing
-  SuperblockInfo &GetSuperblockInfo() { return superblock_info_; }
+  SuperblockInfo &GetSuperblockInfo() { return *superblock_info_; }
 
  private:
   // Saves the traverse context. It should be re-initialized every traverse.
   FsckInfo fsck_;
   const FsckOptions fsck_options_;
-  std::unique_ptr<Superblock> sb_;
-  SuperblockInfo superblock_info_;
+  std::unique_ptr<SuperblockInfo> superblock_info_;
   std::unique_ptr<NodeManager> node_manager_;
   std::unique_ptr<SegmentManager> segment_manager_;
   std::unique_ptr<BcacheMapper> bc_;

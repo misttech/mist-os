@@ -40,7 +40,7 @@ void DoMkfs(std::unique_ptr<BcacheMapper> bcache, const MkfsOptions &options, bo
 }
 
 void ReadSuperblock(BcacheMapper &bc, std::unique_ptr<Superblock> *out) {
-  auto sb_or = F2fs::LoadSuperblock(bc);
+  auto sb_or = LoadSuperblock(bc);
   ASSERT_TRUE(sb_or.is_ok());
   *out = std::move(*sb_or);
 }
@@ -399,7 +399,7 @@ TEST(FormatFilesystemTest, BlockSize) {
   uint32_t total_size = 104'857'600;
 
   for (uint32_t block_size : block_size_array) {
-    uint64_t block_count = total_size / block_size;
+    uint32_t block_count = total_size / block_size;
     MkfsOptions mkfs_options;
     auto device = std::make_unique<FakeBlockDevice>(FakeBlockDevice::Config{
         .block_count = block_count, .block_size = block_size, .supports_trim = true});
@@ -433,10 +433,10 @@ TEST(FormatFilesystemTest, BlockSize) {
       FileTester::CreateRoot(fs.get(), &root);
       fbl::RefPtr<Dir> root_dir = fbl::RefPtr<Dir>::Downcast(std::move(root));
 
-      Superblock &fsb = fs->RawSb();
-      ASSERT_EQ(1 << fsb.log_sectorsize, static_cast<const int32_t>(block_size));
-      ASSERT_EQ(1 << fs->GetSuperblockInfo().GetLogSectorsPerBlock(),
-                static_cast<const int32_t>((1 << kMaxLogSectorSize) / block_size));
+      ASSERT_EQ(uint32_t(1) << LeToCpu(fs->GetSuperblockInfo().GetSuperblock().log_sectorsize),
+                block_size);
+      ASSERT_EQ(uint32_t(1) << fs->GetSuperblockInfo().GetLogSectorsPerBlock(),
+                (uint32_t(1) << kMaxLogSectorSize) / block_size);
 
       ASSERT_EQ(root_dir->Close(), ZX_OK);
       root_dir.reset();
@@ -472,8 +472,8 @@ TEST(FormatFilesystemTest, MkfsSmallVolume) {
       async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
       FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
 
-      Superblock &fsb = fs->RawSb();
-      ASSERT_EQ(fsb.segment_count_main, static_cast<uint32_t>(volume_size / 2 - 8));
+      Superblock &sb = fs->GetSuperblockInfo().GetSuperblock();
+      ASSERT_EQ(LeToCpu(sb.segment_count_main), static_cast<uint32_t>(volume_size / 2 - 8));
 
       FileTester::Unmount(std::move(fs), &bc);
       EXPECT_EQ(Fsck(std::move(bc), FsckOptions{.repair = false}), ZX_OK);

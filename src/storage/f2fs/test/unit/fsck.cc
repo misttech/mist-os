@@ -10,42 +10,40 @@ namespace {
 TEST(FsckTest, InvalidSuperblockMagic) {
   std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc);
+  auto sb_or = LoadSuperblock(*bc);
+  ASSERT_TRUE(sb_or.is_ok());
+
   FsckWorker fsck(std::move(bc), FsckOptions{.repair = false});
-
   ASSERT_EQ(fsck.GetValidSuperblock(), ZX_OK);
 
-  // Get the first superblock.
-  BlockBuffer superblock;
-  ASSERT_TRUE(fsck.GetSuperblock(0, superblock).is_ok());
-
-  Superblock *superblock_pointer = reinterpret_cast<Superblock *>(&superblock + kSuperOffset);
-  ASSERT_EQ(fsck.SanityCheckRawSuper(*superblock_pointer), ZX_OK);
-
-  // Pollute the first superblock and see validation fails.
+  // Pollute the first superblock.
+  Superblock *superblock_pointer = (*sb_or).get();
   superblock_pointer->magic = 0xdeadbeef;
-  ASSERT_EQ(fsck.SanityCheckRawSuper(*superblock_pointer), ZX_ERR_INTERNAL);
-  ASSERT_EQ(fsck.WriteBlock(&superblock, kSuperblockStart), ZX_OK);
 
-  // Superblock load does not fail yet, since f2fs keeps a spare superblock.
+  BlockBuffer block;
+  memcpy(block.get<uint8_t>() + kSuperOffset, superblock_pointer, sizeof(Superblock));
+  ASSERT_EQ(fsck.WriteBlock(&block, kSuperblockStart), ZX_OK);
+
+  // 2nd superblock should be ok.
   ASSERT_EQ(fsck.GetValidSuperblock(), ZX_OK);
+  ASSERT_EQ(fsck.Run(), ZX_OK);
 
   // Pollute the second superblock, fsck won't proceed.
-  ASSERT_EQ(fsck.WriteBlock(&superblock, kSuperblockStart + 1), ZX_OK);
-  ASSERT_EQ(fsck.GetValidSuperblock(), ZX_ERR_NOT_FOUND);
+  ASSERT_EQ(fsck.WriteBlock(&block, kSuperblockStart + 1), ZX_OK);
   ASSERT_EQ(fsck.Run(), ZX_ERR_NOT_FOUND);
 }
 
 TEST(FsckTest, InvalidCheckpointCrc) {
   std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc);
-  FsckWorker fsck(std::move(bc), FsckOptions{.repair = false});
+  auto sb_or = LoadSuperblock(*bc);
+  ASSERT_TRUE(sb_or.is_ok());
 
+  FsckWorker fsck(std::move(bc), FsckOptions{.repair = false});
   ASSERT_EQ(fsck.GetValidSuperblock(), ZX_OK);
   ASSERT_EQ(fsck.GetValidCheckpoint(), ZX_OK);
 
-  BlockBuffer superblock;
-  ASSERT_TRUE(fsck.GetSuperblock(0, superblock).is_ok());
-  Superblock *superblock_pointer = reinterpret_cast<Superblock *>(&superblock + kSuperOffset);
+  Superblock *superblock_pointer = (*sb_or).get();
 
   // Read the 1st checkpoint pack header.
   uint32_t first_checkpoint_header_addr = LeToCpu(superblock_pointer->cp_blkaddr);
@@ -99,12 +97,11 @@ TEST(FsckTest, UnreachableNatEntry) {
 
   std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc);
+  auto sb_or = LoadSuperblock(*bc);
+  ASSERT_TRUE(sb_or.is_ok());
   FsckWorker fsck(std::move(bc), FsckOptions{.repair = false});
 
-  // Read the superblock to locate NAT.
-  BlockBuffer superblock;
-  ASSERT_TRUE(fsck.GetSuperblock(0, superblock).is_ok());
-  auto superblock_pointer = reinterpret_cast<Superblock *>(&superblock + kSuperOffset);
+  Superblock *superblock_pointer = (*sb_or).get();
 
   // Read the NAT block.
   BlockBuffer<NatBlock> nat_block;
@@ -151,12 +148,11 @@ TEST(FsckTest, UnreachableNatEntryInJournal) {
 
   std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc);
+  auto sb_or = LoadSuperblock(*bc);
+  ASSERT_TRUE(sb_or.is_ok());
   FsckWorker fsck(std::move(bc), FsckOptions{.repair = false});
 
-  // Read the superblock to locate checkpoint.
-  BlockBuffer superblock;
-  ASSERT_TRUE(fsck.GetSuperblock(0, superblock).is_ok());
-  auto superblock_pointer = reinterpret_cast<Superblock *>(&superblock + kSuperOffset);
+  Superblock *superblock_pointer = (*sb_or).get();
 
   // Read the checkpoint to locate hot data summary (which holds Nat journal).
   BlockBuffer<Checkpoint> checkpoint;
@@ -221,12 +217,11 @@ TEST(FsckTest, UnreachableSitEntry) {
 
   std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc);
+  auto sb_or = LoadSuperblock(*bc);
+  ASSERT_TRUE(sb_or.is_ok());
   FsckWorker fsck(std::move(bc), FsckOptions{.repair = false});
 
-  // Read the superblock to locate SIT.
-  BlockBuffer superblock;
-  ASSERT_TRUE(fsck.GetSuperblock(0, superblock).is_ok());
-  auto superblock_pointer = reinterpret_cast<Superblock *>(&superblock + kSuperOffset);
+  Superblock *superblock_pointer = (*sb_or).get();
 
   // Read the SIT block.
   BlockBuffer<SitBlock> sit_block;
@@ -270,12 +265,11 @@ TEST(FsckTest, UnreachableSitEntryInJournal) {
 
   std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc);
+  auto sb_or = LoadSuperblock(*bc);
+  ASSERT_TRUE(sb_or.is_ok());
   FsckWorker fsck(std::move(bc), FsckOptions{.repair = false});
 
-  // Read the superblock to locate SIT.
-  BlockBuffer superblock;
-  ASSERT_TRUE(fsck.GetSuperblock(0, superblock).is_ok());
-  auto superblock_pointer = reinterpret_cast<Superblock *>(&superblock + kSuperOffset);
+  Superblock *superblock_pointer = (*sb_or).get();
 
   // Read the checkpoint to locate cold data summary (which holds Sit journal).
   BlockBuffer<Checkpoint> checkpoint;
@@ -607,14 +601,14 @@ TEST(FsckTest, WrongInodeHardlinkCount) {
 TEST(FsckTest, InconsistentCheckpointNodeCount) {
   std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc);
+  auto sb_or = LoadSuperblock(*bc);
+  ASSERT_TRUE(sb_or.is_ok());
   FsckWorker fsck(std::move(bc), FsckOptions{.repair = false});
 
   ASSERT_EQ(fsck.GetValidSuperblock(), ZX_OK);
   ASSERT_EQ(fsck.GetValidCheckpoint(), ZX_OK);
 
-  BlockBuffer superblock;
-  ASSERT_TRUE(fsck.GetSuperblock(0, superblock).is_ok());
-  Superblock *superblock_pointer = reinterpret_cast<Superblock *>(&superblock + kSuperOffset);
+  Superblock *superblock_pointer = (*sb_or).get();
   ASSERT_TRUE(fsck.ValidateCheckpoint(LeToCpu(superblock_pointer->cp_blkaddr)).is_ok());
 
   // Read the 1st checkpoint pack header.
@@ -783,14 +777,14 @@ TEST(FsckTest, InodeLinkCountAndBlockCount) {
 TEST(FsckTest, InvalidNextOffsetInCurseg) {
   std::unique_ptr<BcacheMapper> bc;
   FileTester::MkfsOnFakeDev(&bc);
+  auto sb_or = LoadSuperblock(*bc);
+  ASSERT_TRUE(sb_or.is_ok());
   FsckWorker fsck(std::move(bc), FsckOptions{.repair = false});
 
   ASSERT_EQ(fsck.GetValidSuperblock(), ZX_OK);
   ASSERT_EQ(fsck.GetValidCheckpoint(), ZX_OK);
 
-  BlockBuffer superblock;
-  ASSERT_TRUE(fsck.GetSuperblock(0, superblock).is_ok());
-  Superblock *superblock_pointer = reinterpret_cast<Superblock *>(&superblock + kSuperOffset);
+  Superblock *superblock_pointer = (*sb_or).get();
   ASSERT_TRUE(fsck.ValidateCheckpoint(LeToCpu(superblock_pointer->cp_blkaddr)).is_ok());
 
   // Read the 1st checkpoint pack header.

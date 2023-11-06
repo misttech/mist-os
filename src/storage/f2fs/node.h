@@ -196,8 +196,6 @@ class NodeManager {
   RawBitmap &GetNatBitmap() { return nat_bitmap_; }
   void GetNatBitmap(void *out);
 
-  SuperblockInfo &GetSuperblockInfo();
-
   zx::result<> AllocNid(nid_t &out) __TA_EXCLUDES(free_nid_tree_lock_);
   zx::result<nid_t> GetNextFreeNid() __TA_EXCLUDES(free_nid_tree_lock_);
   int AddFreeNid(nid_t nid) __TA_EXCLUDES(free_nid_tree_lock_);
@@ -252,7 +250,7 @@ class NodeManager {
   zx_status_t InitNodeManager();
 
   F2fs *const fs_ = nullptr;
-  SuperblockInfo *superblock_info_ = nullptr;
+  SuperblockInfo &superblock_info_;
   block_t nat_blkaddr_ = 0;  // starting block address of NAT
 
   fs::SharedMutex nat_tree_lock_;   // protect nat_tree_lock
