@@ -2,11 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+composite ti_ina231;
+
+using fuchsia.i2c;
+using fuchsia.platform;
 using fuchsia.ti.platform;
 
-fuchsia.BIND_COMPOSITE == 1;
-fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.ti.platform.BIND_PLATFORM_DEV_VID.TI;
-accept fuchsia.BIND_PLATFORM_DEV_DID {
-  fuchsia.ti.platform.BIND_PLATFORM_DEV_DID.INA231_MLB,
-  fuchsia.ti.platform.BIND_PLATFORM_DEV_DID.INA231_SPEAKERS
+primary node "i2c" {
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.i2c.BIND_FIDL_PROTOCOL.DEVICE;
+  accept fuchsia.BIND_I2C_ADDRESS {
+    fuchsia.ti.platform.BIND_I2C_ADDRESS.INA231_MLB,
+    fuchsia.ti.platform.BIND_I2C_ADDRESS.INA231_SPEAKERS
+  }
+}
+
+node "pdev" {
+  fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.ti.platform.BIND_PLATFORM_DEV_VID.TI;
+  accept fuchsia.BIND_PLATFORM_DEV_DID {
+    fuchsia.ti.platform.BIND_PLATFORM_DEV_DID.INA231_MLB,
+    fuchsia.ti.platform.BIND_PLATFORM_DEV_DID.INA231_SPEAKERS
+  }
+  fuchsia.BIND_PLATFORM_DEV_INSTANCE_ID == 0;
 }

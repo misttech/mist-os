@@ -1,20 +1,50 @@
 [
     {
-        "device": {
-            "fuchsia.BIND_COMPOSITE": "1",
-            "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.ti.platform.BIND_PLATFORM_DEV_DID.INA231_MLB",
-            "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.ti.platform.BIND_PLATFORM_DEV_VID.TI"
-        },
-        "expected": "match",
-        "name": "ti-ina231"
+        "node": "i2c",
+        "tests": [
+            {
+                "name": "Match mlb",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_I2C_ADDRESS": "fuchsia.ti.platform.BIND_I2C_ADDRESS.INA231_MLB",
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.i2c.BIND_FIDL_PROTOCOL.DEVICE"
+                }
+            },
+            {
+                "name": "Match speakers",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_I2C_ADDRESS": "fuchsia.ti.platform.BIND_I2C_ADDRESS.INA231_SPEAKERS",
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.i2c.BIND_FIDL_PROTOCOL.DEVICE"
+                }
+            }
+        ]
     },
     {
-        "device": {
-            "fuchsia.BIND_COMPOSITE": "1",
-            "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.ti.platform.BIND_PLATFORM_DEV_DID.INA231_SPEAKERS",
-            "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.ti.platform.BIND_PLATFORM_DEV_VID.TI"
-        },
-        "expected": "match",
-        "name": "ti-ina231"
+        "node": "pdev",
+        "tests": [
+            {
+                "name": "Match mlb",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.platform.BIND_PROTOCOL.DEVICE",
+                    "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.ti.platform.BIND_PLATFORM_DEV_VID.TI",
+                    "fuchsia.BIND_PLATFORM_DEV_PID": "fuchsia.google.platform.BIND_PLATFORM_DEV_PID.NELSON",
+                    "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.ti.platform.BIND_PLATFORM_DEV_DID.INA231_MLB",
+                    "fuchsia.BIND_PLATFORM_DEV_INSTANCE_ID": "0"
+                }
+            },
+            {
+                "name": "Match speaker",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.platform.BIND_PROTOCOL.DEVICE",
+                    "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.ti.platform.BIND_PLATFORM_DEV_VID.TI",
+                    "fuchsia.BIND_PLATFORM_DEV_PID": "fuchsia.google.platform.BIND_PLATFORM_DEV_PID.NELSON",
+                    "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.ti.platform.BIND_PLATFORM_DEV_DID.INA231_SPEAKERS",
+                    "fuchsia.BIND_PLATFORM_DEV_INSTANCE_ID": "0"
+                }
+            }
+        ]
     }
 ]

@@ -8,22 +8,29 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/component/cpp/composite_node_spec.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 
 #include <bind/fuchsia/amlogic/platform/s905d3/cpp/bind.h>
 #include <bind/fuchsia/codec/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/google/platform/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/i2c/cpp/bind.h>
+#include <bind/fuchsia/platform/cpp/bind.h>
 #include <bind/fuchsia/power/cpp/bind.h>
 #include <bind/fuchsia/ti/platform/cpp/bind.h>
 #include <ddktl/device.h>
 
 #include "nelson-gpios.h"
 #include "nelson.h"
-#include "src/devices/board/drivers/nelson/ti_ina231_mlb_bind.h"
-#include "src/devices/board/drivers/nelson/ti_ina231_mlb_proto_bind.h"
-#include "src/devices/board/drivers/nelson/ti_ina231_speakers_bind.h"
 #include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 #include "src/devices/power/drivers/ti-ina231/ti-ina231-metadata.h"
+
+namespace fdf {
+using namespace fuchsia_driver_framework;
+}  // namespace fdf
+
 namespace nelson {
 namespace fpbus = fuchsia_hardware_platform_bus;
 
@@ -73,24 +80,36 @@ static const std::vector<fpbus::Metadata> kSpeakersMetadata{
     }},
 };
 
-zx_status_t Nelson::PowerInit() {
+zx_status_t AddMlbComposite(fdf::WireSyncClient<fpbus::PlatformBus>& pbus,
+                            fidl::AnyArena& fidl_arena, fdf::Arena& arena) {
   fpbus::Node mlb_dev;
   mlb_dev.name() = "ti-ina231-mlb";
-  mlb_dev.vid() = PDEV_VID_TI;
-  mlb_dev.pid() = PDEV_PID_NELSON;
-  mlb_dev.did() = PDEV_DID_TI_INA231_MLB;
+  mlb_dev.vid() = bind_fuchsia_ti_platform::BIND_PLATFORM_DEV_VID_TI;
+  mlb_dev.pid() = bind_fuchsia_google_platform::BIND_PLATFORM_DEV_PID_NELSON;
+  mlb_dev.did() = bind_fuchsia_ti_platform::BIND_PLATFORM_DEV_DID_INA231_MLB;
   mlb_dev.metadata() = kMlbMetadata;
 
-  fidl::Arena<> fidl_arena;
-  fdf::Arena mlb_arena('TMLB');
-  fdf::WireUnownedResult result = pbus_.buffer(mlb_arena)->AddComposite(
+  const auto kI2cRules = std::vector{
+      fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                              bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID, bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_3),
+      fdf::MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS,
+                              bind_fuchsia_ti_platform::BIND_I2C_ADDRESS_INA231_MLB),
+  };
+  const auto kI2cProperties = std::vector{
+      fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
+      fdf::MakeProperty(bind_fuchsia::I2C_ADDRESS,
+                        bind_fuchsia_ti_platform::BIND_I2C_ADDRESS_INA231_MLB),
+  };
+
+  const std::vector<fdf::ParentSpec> kParents{{kI2cRules, kI2cProperties}};
+  auto result = pbus.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, mlb_dev),
-      platform_bus_composite::MakeFidlFragment(fidl_arena, ti_ina231_mlb_fragments,
-                                               std::size(ti_ina231_mlb_fragments)),
-      "i2c");
+      fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
+                                   {.name = "ti_ina231_mlb", .parents = kParents}}));
   if (!result.ok()) {
-    zxlogf(ERROR, "Failed to send AddComposite request to platform bus: %s",
-           result.status_string());
+    zxlogf(ERROR, "Failed to send AddCompositeNodeSpec request failed to platform bus: %s",
+           result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
@@ -98,30 +117,61 @@ zx_status_t Nelson::PowerInit() {
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }
+  return ZX_OK;
+}
 
+zx_status_t AddSpeakerComposite(fdf::WireSyncClient<fpbus::PlatformBus>& pbus,
+                                fidl::AnyArena& fidl_arena, fdf::Arena& arena) {
   fpbus::Node speakers_dev;
   speakers_dev.name() = "ti-ina231-speakers";
-  speakers_dev.vid() = PDEV_VID_TI;
-  speakers_dev.pid() = PDEV_PID_NELSON;
-  speakers_dev.did() = PDEV_DID_TI_INA231_SPEAKERS;
+  speakers_dev.vid() = bind_fuchsia_ti_platform::BIND_PLATFORM_DEV_VID_TI;
+  speakers_dev.pid() = bind_fuchsia_google_platform::BIND_PLATFORM_DEV_PID_NELSON;
+  speakers_dev.did() = bind_fuchsia_ti_platform::BIND_PLATFORM_DEV_DID_INA231_SPEAKERS;
   speakers_dev.metadata() = kSpeakersMetadata;
 
-  fdf::Arena speakers_arena('SPKR');
-  result = pbus_.buffer(speakers_arena)
-               ->AddComposite(fidl::ToWire(fidl_arena, speakers_dev),
-                              platform_bus_composite::MakeFidlFragment(
-                                  fidl_arena, ti_ina231_speakers_fragments,
-                                  std::size(ti_ina231_speakers_fragments)),
-                              "i2c");
+  const auto kI2cRules = std::vector{
+      fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                              bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID, bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_3),
+      fdf::MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS,
+                              bind_fuchsia_ti_platform::BIND_I2C_ADDRESS_INA231_SPEAKERS),
+  };
+  const auto kI2cProperties = std::vector{
+      fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
+      fdf::MakeProperty(bind_fuchsia::I2C_ADDRESS,
+                        bind_fuchsia_ti_platform::BIND_I2C_ADDRESS_INA231_SPEAKERS),
+  };
+
+  const std::vector<fdf::ParentSpec> kParents{{kI2cRules, kI2cProperties}};
+  auto result = pbus.buffer(arena)->AddCompositeNodeSpec(
+      fidl::ToWire(fidl_arena, speakers_dev),
+      fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
+                                   {.name = "ti_ina231_speakers", .parents = kParents}}));
   if (!result.ok()) {
-    zxlogf(ERROR, "Failed to send AddComposite request to platform bus: %s",
-           result.status_string());
+    zxlogf(ERROR, "Failed to send AddCompositeNodeSpec request failed to platform bus: %s",
+           result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
     zxlogf(ERROR, "Failed to add ti-ina231-speakers composite to platform device: %s",
            zx_status_get_string(result->error_value()));
     return result->error_value();
+  }
+  return ZX_OK;
+}
+
+zx_status_t Nelson::PowerInit() {
+  fidl::Arena<> fidl_arena;
+  fdf::Arena mlb_arena('TMLB');
+  zx_status_t status = AddMlbComposite(pbus_, fidl_arena, mlb_arena);
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  fdf::Arena speakers_arena('SPKR');
+  status = AddSpeakerComposite(pbus_, fidl_arena, speakers_arena);
+  if (status != ZX_OK) {
+    return status;
   }
 
   const ddk::BindRule kGpioRules[] = {
@@ -158,10 +208,10 @@ zx_status_t Nelson::PowerInit() {
                         bind_fuchsia_amlogic_platform_s905d3::BIND_POWER_SENSOR_DOMAIN_AUDIO),
   };
 
-  zx_status_t status = DdkAddCompositeNodeSpec(
-      "brownout_protection", ddk::CompositeNodeSpec(kCodecRules, kCodecProperties)
-                                 .AddParentSpec(kGpioRules, kGpioProperties)
-                                 .AddParentSpec(kPowerSensorRules, kPowerSensorProperties));
+  status = DdkAddCompositeNodeSpec("brownout_protection",
+                                   ddk::CompositeNodeSpec(kCodecRules, kCodecProperties)
+                                       .AddParentSpec(kGpioRules, kGpioProperties)
+                                       .AddParentSpec(kPowerSensorRules, kPowerSensorProperties));
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s AddCompositeSpec (brownout-protection)  %d", __FUNCTION__, status);
     return status;
