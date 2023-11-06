@@ -7,9 +7,14 @@ use anyhow::{anyhow, Result};
 use fidl_fuchsia_developer_ffx::TargetInfo;
 use std::process::Command;
 
-pub(crate) fn do_ssh(host: String, target: TargetInfo, repo_port: u32) -> Result<()> {
+pub(crate) fn do_ssh(
+    host: String,
+    target: TargetInfo,
+    repo_port: u32,
+    additional_port_forwards: Vec<u32>,
+) -> Result<()> {
     let mut ssh_cmd = &mut Command::new("ssh");
-    for arg in build_ssh_args(target, repo_port)?.iter() {
+    for arg in build_ssh_args(target, repo_port, additional_port_forwards)?.iter() {
         ssh_cmd = ssh_cmd.arg(arg);
     }
     ssh_cmd = ssh_cmd.arg(host);
@@ -20,7 +25,11 @@ pub(crate) fn do_ssh(host: String, target: TargetInfo, repo_port: u32) -> Result
     Ok(())
 }
 
-fn build_ssh_args(target: TargetInfo, repo_port: u32) -> Result<Vec<String>> {
+fn build_ssh_args(
+    target: TargetInfo,
+    repo_port: u32,
+    additional_port_forwards: Vec<u32>,
+) -> Result<Vec<String>> {
     let mut addrs: Vec<TargetAddr> = target
         .addresses
         .ok_or("target address list uninitialized")
@@ -38,7 +47,7 @@ fn build_ssh_args(target: TargetInfo, repo_port: u32) -> Result<Vec<String>> {
         .ok_or("target address list was empty")
         .map_err(|e| anyhow!("Error getting target addresses: {}", e))?;
 
-    let res: Vec<String> = vec![
+    let mut res: Vec<String> = vec![
         // We want ipv6 binds for the port forwards
         "-o AddressFamily inet6".into(),
         // We do not want multiplexing
@@ -69,7 +78,10 @@ fn build_ssh_args(target: TargetInfo, repo_port: u32) -> Result<Vec<String>> {
         format!("-o RemoteForward 5554 [{target_ip}]:5554"),
     ];
 
-    // TODO: additional forwards
+    let additional_forwards = additional_port_forwards
+        .into_iter()
+        .map(|p| format!("-o RemoteForward {p} [{target_ip}]:{p}"));
+    res.extend(additional_forwards);
 
     Ok(res)
 }
@@ -102,7 +114,7 @@ mod test {
             ..Default::default()
         };
 
-        let got = build_ssh_args(target, 8081)?;
+        let got = build_ssh_args(target, 8081, vec![5555])?;
 
         let want: Vec<&str> = vec![
             "-o AddressFamily inet6",
@@ -120,6 +132,7 @@ mod test {
             "-o RemoteForward 9080 [ff00::]:80",
             "-o RemoteForward 8888 [ff00::]:8888",
             "-o RemoteForward 5554 [ff00::]:5554",
+            "-o RemoteForward 5555 [ff00::]:5555",
         ];
 
         assert_eq!(got, want);
@@ -138,7 +151,7 @@ mod test {
         let target =
             TargetInfo { nodename: None, addresses: Some(vec![src]), ..Default::default() };
 
-        let got = build_ssh_args(target, 8081)?;
+        let got = build_ssh_args(target, 8081, vec![])?;
 
         let want: Vec<&str> = vec![
             "-o AddressFamily inet6",
@@ -167,13 +180,13 @@ mod test {
         let nodename = Some("cytherea".to_string());
         {
             let target = TargetInfo { nodename: nodename.clone(), ..Default::default() };
-            let res = build_ssh_args(target, 9091);
+            let res = build_ssh_args(target, 9091, vec![]);
             assert!(res.is_err());
         }
         {
             let target =
                 TargetInfo { nodename: nodename.clone(), addresses: None, ..Default::default() };
-            let res = build_ssh_args(target, 9091);
+            let res = build_ssh_args(target, 9091, vec![]);
             assert!(res.is_err());
         }
         {
@@ -182,7 +195,7 @@ mod test {
                 addresses: Some(vec![]),
                 ..Default::default()
             };
-            let res = build_ssh_args(target, 9091);
+            let res = build_ssh_args(target, 9091, vec![]);
             assert!(res.is_err());
         }
     }
@@ -194,7 +207,7 @@ mod test {
             addresses: None,
             ..Default::default()
         };
-        let res = build_ssh_args(target, 9091);
+        let res = build_ssh_args(target, 9091, vec![]);
         assert!(res.is_err());
     }
 }
