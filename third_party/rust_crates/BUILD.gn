@@ -25,6 +25,10 @@ group("aes-gcm-siv") {
   public_deps = [ ":aes-gcm-siv-v0_11_1" ]
 }
 
+group("ahash") {
+  public_deps = [ ":ahash-v0_8_6" ]
+}
+
 group("ansi_term") {
   public_deps = [ ":ansi_term-v0_12_1" ]
 }
@@ -1348,6 +1352,48 @@ rust_library("aes-gcm-siv-v0_11_1") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":aes-gcm-siv-v0_11_1.license" ]
+}
+
+license("ahash-v0_8_6.license") {
+  public_package_name = "ahash"
+  license_files = [
+    "//third_party/rust_crates/vendor/ahash-0.8.6/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/ahash-0.8.6/LICENSE-MIT",
+  ]
+}
+
+rust_library("ahash-v0_8_6") {
+  crate_name = "ahash"
+  crate_root = "//third_party/rust_crates/vendor/ahash-0.8.6/src/lib.rs"
+  output_name = "ahash-c0866eecdfac783f"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":cfg-if-v1_0_0" ]
+  deps += [ ":getrandom-v0_2_10" ]
+  deps += [ ":zerocopy-v0_7_15" ]
+  if (!(false && false)) {
+    deps += [ ":once_cell-v1_17_1" ]
+  }
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2018",
+    "-Cmetadata=c0866eecdfac783f",
+    "-Cextra-filename=-c0866eecdfac783f",
+    "--cfg=feature=\"getrandom\"",
+    "--cfg=feature=\"runtime-rng\"",
+  ]
+  if (current_cpu == "x64" || current_cpu == "arm64" || false || false ||
+      false || false) {
+    rustflags += [ "--cfg=feature=\"folded_multiply\"" ]
+  }
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":ahash-v0_8_6.license" ]
 }
 
 license("aho-corasick-v0_7_18.license") {
@@ -9079,6 +9125,7 @@ rust_library("once_cell-v1_17_1") {
     "--cfg=feature=\"parking_lot_core\"",
     "--cfg=feature=\"race\"",
     "--cfg=feature=\"std\"",
+    "--cfg=feature=\"unstable\"",
   ]
 
   visibility = [ ":*" ]
