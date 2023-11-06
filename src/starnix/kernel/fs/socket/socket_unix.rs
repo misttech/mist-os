@@ -200,7 +200,7 @@ impl UnixSocket {
 
         self.check_type_for_connect(socket, peer, &listener.address)?;
 
-        if queue.sockets.len() >= queue.backlog {
+        if queue.sockets.len() > queue.backlog {
             return error!(EAGAIN);
         }
 

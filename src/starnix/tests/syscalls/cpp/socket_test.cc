@@ -141,6 +141,28 @@ TEST(UnixSocket, BigWrite) {
   delete[] read_info.mem;
 }
 
+TEST(UnixSocket, ConnectZeroBacklog) {
+  char* tmp = getenv("TEST_TMPDIR");
+  auto socket_path =
+      tmp == nullptr ? "/tmp/socktest_connect" : std::string(tmp) + "/socktest_connect";
+  struct sockaddr_un sun;
+  sun.sun_family = AF_UNIX;
+  strcpy(sun.sun_path, socket_path.c_str());
+  struct sockaddr* addr = reinterpret_cast<struct sockaddr*>(&sun);
+
+  auto server = socket(AF_UNIX, SOCK_STREAM, 0);
+  ASSERT_EQ(bind(server, addr, sizeof(sun)), 0);
+  ASSERT_EQ(listen(server, 0), 0);
+
+  auto client = socket(AF_UNIX, SOCK_STREAM, 0);
+  ASSERT_GT(client, -1);
+  ASSERT_EQ(connect(client, addr, sizeof(sun)), 0);
+
+  ASSERT_EQ(unlink(socket_path.c_str()), 0);
+  ASSERT_EQ(close(client), 0);
+  ASSERT_EQ(close(server), 0);
+}
+
 class UnixSocketTest : public testing::Test {
   // SetUp() - make socket
  protected:
