@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fuchsia/hardware/sdmmc/cpp/banjo.h>
+#include <lib/dma-buffer/buffer.h>
 #include <lib/driver/outgoing/cpp/outgoing_directory.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zx/interrupt.h>
@@ -14,7 +15,6 @@
 #include <ddktl/device.h>
 
 #include "aml-sdmmc.h"
-#include "io-buffer.h"
 
 namespace aml_sdmmc {
 

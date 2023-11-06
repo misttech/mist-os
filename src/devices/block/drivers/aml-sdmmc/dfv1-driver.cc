@@ -112,9 +112,10 @@ zx_status_t Dfv1Driver::Create(void* ctx, zx_device_t* parent) {
     }
   }
 
-  aml_sdmmc::IoBuffer descs_buffer;
-  status = descs_buffer.Init(bti.get(), kMaxDmaDescriptors * sizeof(aml_sdmmc_desc_t),
-                             IO_BUFFER_RW | IO_BUFFER_CONTIG);
+  auto buffer_factory = dma_buffer::CreateBufferFactory();
+  std::unique_ptr<dma_buffer::ContiguousBuffer> descs_buffer;
+  status = buffer_factory->CreateContiguous(bti, kMaxDmaDescriptors * sizeof(aml_sdmmc_desc_t), 0,
+                                            &descs_buffer);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to allocate dma descriptors");
     return status;

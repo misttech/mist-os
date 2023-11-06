@@ -9,6 +9,7 @@
 #include <fidl/fuchsia.hardware.sdmmc/cpp/driver/fidl.h>
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <fuchsia/hardware/sdmmc/cpp/banjo.h>
+#include <lib/dma-buffer/buffer.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/mmio/mmio.h>
 #include <lib/stdcompat/span.h>
@@ -24,7 +25,6 @@
 #include <fbl/auto_lock.h>
 #include <soc/aml-common/aml-sdmmc.h>
 
-#include "io-buffer.h"
 #include "src/lib/vmo_store/vmo_store.h"
 
 namespace aml_sdmmc {
@@ -63,7 +63,7 @@ class AmlSdmmc : public fdf::WireServer<fuchsia_hardware_sdmmc::Sdmmc> {
 
   void SetUpResources(zx::bti bti, fdf::MmioBuffer mmio, const aml_sdmmc_config_t& config,
                       zx::interrupt irq, fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> reset_gpio,
-                      aml_sdmmc::IoBuffer descs_buffer) TA_EXCL(lock_);
+                      std::unique_ptr<dma_buffer::ContiguousBuffer> descs_buffer) TA_EXCL(lock_);
 
   // fuchsia_hardware_sdmmc::Sdmmc implementation
   void HostInfo(fdf::Arena& arena, HostInfoCompleter::Sync& completer) override;
@@ -210,7 +210,7 @@ class AmlSdmmc : public fdf::WireServer<fuchsia_hardware_sdmmc::Sdmmc> {
   }
 
   aml_sdmmc_desc_t* descs() const TA_REQ(lock_) {
-    return static_cast<aml_sdmmc_desc_t*>(descs_buffer_.virt());
+    return static_cast<aml_sdmmc_desc_t*>(descs_buffer_->virt());
   }
 
   zx_status_t SdmmcRequestLocked(const sdmmc_req_t* req, uint32_t out_response[4]) TA_REQ(lock_);
@@ -261,7 +261,7 @@ class AmlSdmmc : public fdf::WireServer<fuchsia_hardware_sdmmc::Sdmmc> {
   aml_sdmmc_config_t board_config_;
 
   sdmmc_host_info_t dev_info_;
-  aml_sdmmc::IoBuffer descs_buffer_ TA_GUARDED(lock_);
+  std::unique_ptr<dma_buffer::ContiguousBuffer> descs_buffer_ TA_GUARDED(lock_);
   uint32_t max_freq_, min_freq_;
 
   // TODO(fxbug.dev/134787): Remove redundant locking when Banjo is removed.

@@ -54,7 +54,7 @@ namespace aml_sdmmc {
 void AmlSdmmc::SetUpResources(zx::bti bti, fdf::MmioBuffer mmio, const aml_sdmmc_config_t& config,
                               zx::interrupt irq,
                               fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> reset_gpio,
-                              aml_sdmmc::IoBuffer descs_buffer) {
+                              std::unique_ptr<dma_buffer::ContiguousBuffer> descs_buffer) {
   fbl::AutoLock lock(&lock_);
 
   mmio_ = std::move(mmio);
@@ -487,7 +487,7 @@ zx_status_t AmlSdmmc::SetSignalVoltage(sdmmc_voltage_t voltage) {
 }
 
 aml_sdmmc_desc_t* AmlSdmmc::SetupCmdDesc(const sdmmc_req_t& req) {
-  aml_sdmmc_desc_t* const desc = reinterpret_cast<aml_sdmmc_desc_t*>(descs_buffer_.virt());
+  aml_sdmmc_desc_t* const desc = reinterpret_cast<aml_sdmmc_desc_t*>(descs_buffer_->virt());
   auto cmd_cfg = AmlSdmmcCmdCfg::Get().FromValue(0);
   if (req.cmd_flags == 0) {
     cmd_cfg.set_no_resp(1);
@@ -687,7 +687,7 @@ zx::result<aml_sdmmc_desc_t*> AmlSdmmc::PopulateDescriptors(const sdmmc_req_t& r
 
   const bool use_block_mode = (1 << log2_ceil(req.blocksize)) == req.blocksize;
   const aml_sdmmc_desc_t* const descs_end =
-      descs() + (descs_buffer_.size() / sizeof(aml_sdmmc_desc_t));
+      descs() + (descs_buffer_->size() / sizeof(aml_sdmmc_desc_t));
 
   const size_t max_desc_size =
       use_block_mode ? req.blocksize * AmlSdmmcCmdCfg::kMaxBlockCount : req.blocksize;
@@ -1232,8 +1232,8 @@ zx_status_t AmlSdmmc::SdmmcRequestLocked(const sdmmc_req_t* req, uint32_t out_re
   zx_paddr_t desc_phys;
 
   auto start_reg = AmlSdmmcStart::Get().ReadFrom(&*mmio_);
-  desc_phys = descs_buffer_.phys();
-  descs_buffer_.CacheFlush(0, descs_buffer_.size());
+  desc_phys = descs_buffer_->phys();
+  zx_cache_flush(descs_buffer_->virt(), descs_buffer_->size(), ZX_CACHE_FLUSH_DATA);
   // Read desc from external DDR
   start_reg.set_desc_int(0);
 
@@ -1293,7 +1293,7 @@ void AmlSdmmc::ShutDown() {
     shutdown_ = true;
 
     // DdkRelease() is not always called after this, so manually unpin the DMA buffer.
-    descs_buffer_.release();
+    descs_buffer_.reset();
   }
 }
 

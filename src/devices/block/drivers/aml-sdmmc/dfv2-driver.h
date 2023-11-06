@@ -9,13 +9,13 @@
 #include <fidl/fuchsia.hardware.sdmmc/cpp/driver/fidl.h>
 #include <fuchsia/hardware/sdmmc/cpp/banjo.h>
 #include <lib/ddk/metadata.h>
+#include <lib/dma-buffer/buffer.h>
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/inspect/component/cpp/component.h>
 #include <lib/zx/result.h>
 
 #include "aml-sdmmc.h"
-#include "io-buffer.h"
 
 namespace aml_sdmmc {
 

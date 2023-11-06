@@ -29,7 +29,7 @@ namespace aml_sdmmc {
 class TestDfv1Driver : public Dfv1Driver {
  public:
   TestDfv1Driver(zx_device_t* parent, fdf::MmioBuffer mmio, zx::bti bti, fdf::MmioView view,
-                 aml_sdmmc::IoBuffer descs_buffer)
+                 std::unique_ptr<dma_buffer::ContiguousBuffer> descs_buffer)
       : Dfv1Driver(parent), view_(view) {
     // Pass BTI ownership to Dfv1Driver, but keep a copy of the handle so we can get a list of
     // VMOs that are pinned when a request is made.
@@ -145,10 +145,11 @@ class AmlSdmmcTest : public zxtest::Test {
     zx::bti bti;
     ASSERT_OK(fake_bti_create(bti.reset_and_get_address()));
 
-    aml_sdmmc::IoBuffer descs_buffer;
-    EXPECT_OK(descs_buffer.Init(bti.get(), AmlSdmmc::kMaxDmaDescriptors * sizeof(aml_sdmmc_desc_t),
-                                IO_BUFFER_RW | IO_BUFFER_CONTIG));
-    descs_ = descs_buffer.virt();
+    auto buffer_factory = dma_buffer::CreateBufferFactory();
+    std::unique_ptr<dma_buffer::ContiguousBuffer> descs_buffer;
+    EXPECT_OK(buffer_factory->CreateContiguous(
+        bti, AmlSdmmc::kMaxDmaDescriptors * sizeof(aml_sdmmc_desc_t), 0, &descs_buffer));
+    descs_ = descs_buffer->virt();
 
     dut_ = new TestDfv1Driver(root_.get(), std::move(mmio_buffer), std::move(bti), *mmio_,
                               std::move(descs_buffer));
@@ -227,10 +228,11 @@ class AmlSdmmcTest : public zxtest::Test {
     mock_dev_->WaitUntilAsyncRemoveCalled();
     mock_ddk::ReleaseFlaggedDevices(dut_->zxdev());
 
-    aml_sdmmc::IoBuffer descs_buffer;
-    EXPECT_OK(descs_buffer.Init(bti.get(), AmlSdmmc::kMaxDmaDescriptors * sizeof(aml_sdmmc_desc_t),
-                                IO_BUFFER_RW | IO_BUFFER_CONTIG));
-    descs_ = descs_buffer.virt();
+    auto buffer_factory = dma_buffer::CreateBufferFactory();
+    std::unique_ptr<dma_buffer::ContiguousBuffer> descs_buffer;
+    EXPECT_OK(buffer_factory->CreateContiguous(
+        bti, AmlSdmmc::kMaxDmaDescriptors * sizeof(aml_sdmmc_desc_t), 0, &descs_buffer));
+    descs_ = descs_buffer->virt();
 
     dut_ = new TestDfv1Driver(root_.get(), CreateMmioBufferAndUpdateView(S912_SD_EMMC_B_LENGTH),
                               std::move(bti), *mmio_, std::move(descs_buffer));

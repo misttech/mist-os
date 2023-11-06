@@ -23,7 +23,6 @@ fuchsia_driver("aml-sdmmc-driver-dfv1") {
   sources = [
     "aml-sdmmc.cc",
     "dfv1-driver.cc",
-    "io-buffer.c",
   ]
   deps = [
     ":aml-sdmmc-bind",
@@ -37,6 +36,7 @@ fuchsia_driver("aml-sdmmc-driver-dfv1") {
     "//src/devices/block/lib/sdmmc",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/amlogic",
+    "//src/devices/lib/dma-buffer",
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
     "//src/devices/lib/mmio",
@@ -69,7 +69,6 @@ test("aml-sdmmc-test-bin") {
     "aml-sdmmc-test.cc",
     "aml-sdmmc.cc",
     "dfv1-driver.cc",
-    "io-buffer.c",
   ]
   deps = [
     ":aml-sdmmc-bind",
@@ -83,6 +82,7 @@ test("aml-sdmmc-test-bin") {
     "//src/devices/block/lib/sdmmc",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/amlogic",
+    "//src/devices/lib/dma-buffer",
     "//src/devices/lib/driver:driver_runtime",
     "//src/devices/lib/mmio",
     "//src/devices/lib/mmio:test_helper",
@@ -128,7 +128,6 @@ fuchsia_driver("aml-sdmmc-driver-dfv2") {
   sources = [
     "aml-sdmmc.cc",
     "dfv2-driver.cc",
-    "io-buffer.c",
   ]
   deps = [
     ":aml-sdmmc-bind",
@@ -147,6 +146,7 @@ fuchsia_driver("aml-sdmmc-driver-dfv2") {
     "//src/devices/block/lib/sdmmc",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/amlogic",
+    "//src/devices/lib/dma-buffer",
     "//src/devices/lib/mmio",
     "//src/lib/vmo_store",
     "//zircon/system/ulib/hwreg",
