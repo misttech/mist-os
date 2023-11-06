@@ -8,7 +8,6 @@ use {
     anyhow::{format_err, Result},
     args::RegisterCommand,
     fidl_fuchsia_driver_development as fdd, fidl_fuchsia_driver_registrar as fdr,
-    fidl_fuchsia_pkg as fpkg,
     fuchsia_zircon_status::Status,
     std::io::Write,
 };
@@ -24,8 +23,7 @@ pub async fn register(
         "Registering {}, restarting driver hosts, and attempting to bind to unbound nodes",
         cmd.url
     )?;
-    let register_result =
-        driver_registrar_proxy.register(&fpkg::PackageUrl { url: cmd.url.to_string() }).await?;
+    let register_result = driver_registrar_proxy.register(&cmd.url).await?;
 
     match register_result {
         Ok(_) => {}

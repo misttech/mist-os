@@ -232,11 +232,9 @@ async fn test_replace_target() -> Result<()> {
     .await?;
 
     // Now we can register our target_2 replacement.
-    let target_2_replacemnt_url = fp::PackageUrl {
-        url: "fuchsia-pkg://fuchsia.com/target_2_replacement#meta/target_2_replacement.cm"
-            .to_string(),
-    };
-    let register_result = driver_registrar.register(&target_2_replacemnt_url).await;
+    let target_2_replacemnt_url =
+        "fuchsia-pkg://fuchsia.com/target_2_replacement#meta/target_2_replacement.cm";
+    let register_result = driver_registrar.register(target_2_replacemnt_url).await;
     match register_result {
         Ok(Ok(())) => {}
         Ok(Err(err)) => {
@@ -330,11 +328,9 @@ async fn test_replace_target() -> Result<()> {
     .await?;
 
     // Now we can register our composite replacement.
-    let composite_replacemnt_url = fp::PackageUrl {
-        url: "fuchsia-pkg://fuchsia.com/composite_replacement#meta/composite_replacement.cm"
-            .to_string(),
-    };
-    let register_result = driver_registrar.register(&composite_replacemnt_url).await;
+    let composite_replacemnt_url =
+        "fuchsia-pkg://fuchsia.com/composite_replacement#meta/composite_replacement.cm";
+    let register_result = driver_registrar.register(composite_replacemnt_url).await;
     match register_result {
         Ok(Ok(())) => {}
         Ok(Err(err)) => {

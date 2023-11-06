@@ -52,20 +52,18 @@ class RegisteredTestDriver {
     registrar_client_ = fidl::WireSyncClient(std::move(*registrar));
 
     {
-      auto result =
-          registrar_client_->Register(fuchsia_pkg::wire::PackageUrl{fidl::StringView::FromExternal(
-              std::string("fuchsia-pkg://fuchsia.com/msd-arm-mali-integration-tests#meta/") +
-              GetTestDriverSuffix())});
+      auto result = registrar_client_->Register(fidl::StringView::FromExternal(
+          std::string("fuchsia-pkg://fuchsia.com/msd-arm-mali-integration-tests#meta/") +
+          GetTestDriverSuffix()));
 
       ASSERT_TRUE(result.ok()) << result.status_string();
       ASSERT_FALSE(result->is_error()) << result->error_value();
     }
 
     {
-      auto result =
-          registrar_client_->Register(fuchsia_pkg::wire::PackageUrl{fidl::StringView::FromExternal(
-              std::string("fuchsia-pkg://fuchsia.com/msd-arm-mali-integration-tests#meta/") +
-              GetRebindDriverSuffix())});
+      auto result = registrar_client_->Register(fidl::StringView::FromExternal(
+          std::string("fuchsia-pkg://fuchsia.com/msd-arm-mali-integration-tests#meta/") +
+          GetRebindDriverSuffix()));
 
       ASSERT_TRUE(result.ok()) << result.status_string();
       ASSERT_FALSE(result->is_error()) << result->error_value();

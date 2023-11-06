@@ -6,7 +6,6 @@ use {
     anyhow::{anyhow, Context, Result},
     fidl_fuchsia_driver_development as fdd, fidl_fuchsia_driver_framework as fdf,
     fidl_fuchsia_driver_registrar as fdr, fidl_fuchsia_driver_test as fdt,
-    fidl_fuchsia_pkg as fpkg,
     fuchsia_async::{self as fasync},
     fuchsia_component_test::{RealmBuilder, RealmInstance},
     fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
@@ -111,7 +110,7 @@ async fn test_register_driver() -> Result<()> {
 
     // Register the driver through a package url.
     driver_registrar
-        .register(&fpkg::PackageUrl { url: EPHEMERAL_FAKE_DRIVER_URL.to_string() })
+        .register(EPHEMERAL_FAKE_DRIVER_URL)
         .await
         .map_err(|e| anyhow!("Failed to call register driver: {}", e))?
         .map_err(|e| anyhow!("Failed to register driver with err: {}", e))?;

@@ -596,10 +596,7 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
           // Register all urls
           for (auto& driver_url : driver_urls) {
             FX_SLOG(INFO, "Registering ephemeral driver", KV("url", driver_url));
-            fuchsia_pkg::wire::PackageUrl pkg_url{
-                .url = fidl::StringView::FromExternal(driver_url),
-            };
-            auto result = driver_registrar->Register(pkg_url);
+            auto result = driver_registrar->Register(fidl::StringView::FromExternal(driver_url));
             if (!result.ok()) {
               FX_SLOG(ERROR, "Could not register driver", KV("url", driver_url));
               completer.Reply(zx::error(result.status()));
