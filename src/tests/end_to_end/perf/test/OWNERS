@@ -2,6 +2,7 @@ per-file netstack_benchmarks_test.dart = iyerm@google.com
 per-file netstack3_benchmarks_test.dart = file: /src/connectivity/network/netstack3/bench/OWNERS
 per-file netstack_iperf_test.dart = iyerm@google.com
 per-file archivist_benchmark.py = file: /src/diagnostics/OWNERS
+per-file diagnostics_log_rust_benchmark.py = file: /src/diagnostics/OWNERS
 per-file rust_inspect_benchmark.py = file: /src/diagnostics/OWNERS
 per-file selectors_benchmark.py = file: /src/diagnostics/OWNERS
 per-file storage_benchmarks_test.dart = file: /src/storage/OWNERS

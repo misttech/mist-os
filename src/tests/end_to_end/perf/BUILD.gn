@@ -38,13 +38,6 @@ test_list = [
   # keep-sorted end
 ]
 
-# TODO(https://fxbug.dev/131000): diagnostics_log_encoding_bench
-# currently fails to build for ARM64/VIM3 due to a toolchain bug.
-# Re-enable it for ARM64 when the bug is fixed.
-if (target_cpu != "arm64") {
-  test_list += [ "diagnostics_log_rust_benchmarks_test" ]
-}
-
 if (!is_asan && host_os == "linux") {
   test_list += [
     "starnix_benchmarks_test",
@@ -189,6 +182,13 @@ _tests = [
     ]
   },
   {
+    name = "diagnostics_log_rust_benchmark"
+    expected_metric_filenames = [
+      "fuchsia.diagnostics_log_rust.core.txt",
+      "fuchsia.diagnostics_log_rust.encoding.txt",
+    ]
+  },
+  {
     name = "flatland_benchmark"
     expected_metric_filenames = [
       # TODO(b/305080561): enable trace publishing and add this expected metric names.
@@ -241,8 +241,6 @@ if (is_host) {
   metric_files = [
     # keep-sorted start
     "fuchsia.audio.txt",
-    "fuchsia.diagnostics_log_rust.core.txt",
-    "fuchsia.diagnostics_log_rust.encoding.txt",
     "fuchsia.driver_runtime_microbenchmarks.txt",
     "fuchsia.extended_pstate.txt",
     "fuchsia.fidl_microbenchmarks.cpp.txt",
@@ -397,6 +395,13 @@ group("test") {
 
   foreach(target_name, test_list) {
     deps += [ ":$target_name($host_toolchain)" ]
+  }
+
+  # TODO(https://fxbug.dev/131000): diagnostics_log_encoding_bench
+  # currently fails to build for ARM64/VIM3 due to a toolchain bug.
+  # Re-enable it for ARM64 when the bug is fixed.
+  if (target_cpu == "arm64") {
+    deps -= [ ":py_diagnostics_log_rust_benchmark($host_toolchain)" ]
   }
 }
 
