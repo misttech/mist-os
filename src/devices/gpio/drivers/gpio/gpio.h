@@ -209,7 +209,7 @@ class GpioInitDevice : public GpioInitDeviceType {
   void DdkRelease() { delete this; }
 
  private:
-  static zx_status_t ConfigureGpios(const fuchsia_hardware_gpio::wire::InitMetadata& metadata,
+  static zx_status_t ConfigureGpios(const fuchsia_hardware_gpioimpl::wire::InitMetadata& metadata,
                                     const GpioImplProxy& gpio);
 };
 

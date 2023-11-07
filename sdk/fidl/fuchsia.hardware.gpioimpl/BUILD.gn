@@ -5,7 +5,10 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.gpioimpl") {
-  sources = [ "gpio-impl.fidl" ]
+  sources = [
+    "gpio-impl.fidl",
+    "init.fidl",
+  ]
   contains_drivers = true
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.gpio",

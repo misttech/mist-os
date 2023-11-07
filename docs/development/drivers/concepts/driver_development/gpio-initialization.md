@@ -14,21 +14,21 @@ an example.
 
 Consider a case where an SDMMC driver requires pins to be configured with a
 certain alt function and drive strength. To do this, the board driver would
-create a list of `fuchsia.hardware.gpio.InitStep` objects specifying the GPIO
-protocol calls to make, and the GPIO index to make them on:
+create a list of `fuchsia.hardware.gpioimpl.InitStep` objects specifying the
+GPIO protocol calls to make, and the GPIO index to make them on:
 
 ```cpp
-#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
+#include <fidl/fuchsia.hardware.gpioimpl/cpp/wire.h>
 
 // Helper lambda to simplify the following code.
 auto sdmmc_gpio = [&](uint64_t alt_function, uint64_t drive_strength_ua) {
-  return fuchsia_hardware_gpio::wire::InitOptions::Builder(arena)
+  return fuchsia_hardware_gpioimpl::wire::InitOptions::Builder(arena)
       .alt_function(alt_function)
       .drive_strength_ua(drive_strength_ua)
       .Build();
 };
 
-const fuchsia_hardware_gpio::wire::InitStep init_steps[] = {
+const fuchsia_hardware_gpioimpl::wire::InitStep init_steps[] = {
     {SDMMC_GPIO_0, sdmmc_gpio(SDMMC_GPIO_0_ALT_FUNCTION, 4000)},
     {SDMMC_GPIO_1, sdmmc_gpio(SDMMC_GPIO_1_ALT_FUNCTION, 4000)},
     {SDMMC_GPIO_2, sdmmc_gpio(SDMMC_GPIO_2_ALT_FUNCTION, 4000)},
@@ -42,8 +42,8 @@ This list is then given to the GPIO driver as metadata:
 
 ```cpp
 {% verbatim %}
-fuchsia_hardware_gpio::wire::InitMetadata metadata;
-metadata.steps = fidl::VectorView<fuchsia_hardware_gpio::wire::InitStep>::FromExternal(
+fuchsia_hardware_gpioimpl::wire::InitMetadata metadata;
+metadata.steps = fidl::VectorView<fuchsia_hardware_gpioimpl::wire::InitStep>::FromExternal(
     init_steps, std::size(init_steps));
 
 fit::result encoded = fidl::Persist(metadata);
@@ -109,5 +109,5 @@ have or cannot parse the initialization metadata.
 ## GPIO initialization options
 
 See the full list of initialization options and their explanations in the
-[fuchsia.hardware.gpio](/sdk/fidl/fuchsia.hardware.gpio/init.fidl) FIDL
+[fuchsia.hardware.gpioimpl](/sdk/fidl/fuchsia.hardware.gpioimpl/init.fidl) FIDL
 specification.

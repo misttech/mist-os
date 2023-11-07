@@ -98,7 +98,7 @@ zx_status_t Vim3::EmmcInit() {
   emmc_dev.boot_metadata() = emmc_boot_metadata;
 
   auto set_alt_function = [&arena = gpio_init_arena_](uint64_t alt_function) {
-    return fuchsia_hardware_gpio::wire::InitCall::WithAltFunction(arena, alt_function);
+    return fuchsia_hardware_gpioimpl::wire::InitCall::WithAltFunction(arena, alt_function);
   };
 
   // set alternate functions to enable EMMC
@@ -116,7 +116,7 @@ zx_status_t Vim3::EmmcInit() {
   gpio_init_steps_.push_back({A311D_GPIOBOOT(13), set_alt_function(A311D_GPIOBOOT_13_EMMC_DS_FN)});
 
   gpio_init_steps_.push_back(
-      {A311D_GPIOBOOT(14), fuchsia_hardware_gpio::wire::InitCall::WithOutputValue(1)});
+      {A311D_GPIOBOOT(14), fuchsia_hardware_gpioimpl::wire::InitCall::WithOutputValue(1)});
 
   fdf::Arena arena('EMMC');
   auto result = pbus_.buffer(arena)->AddComposite(

@@ -142,11 +142,11 @@ zx_status_t Astro::SdEmmcConfigurePortB() {
                        kGpioBaseOffset + (S905D2_PERIPHS_PIN_MUX_2 << 2));
 
   auto set_alt_function = [&arena = gpio_init_arena_](uint64_t alt_function) {
-    return fuchsia_hardware_gpio::wire::InitCall::WithAltFunction(arena, alt_function);
+    return fuchsia_hardware_gpioimpl::wire::InitCall::WithAltFunction(arena, alt_function);
   };
 
   auto set_drive_strength = [&arena = gpio_init_arena_](uint64_t drive_strength_ua) {
-    return fuchsia_hardware_gpio::wire::InitCall::WithDriveStrengthUa(arena, drive_strength_ua);
+    return fuchsia_hardware_gpioimpl::wire::InitCall::WithDriveStrengthUa(arena, drive_strength_ua);
   };
 
   // Clear GPIO_X
@@ -168,7 +168,7 @@ zx_status_t Astro::SdEmmcConfigurePortB() {
 
   // Enable output from SDMMC port B on GPIOX_4.
   gpio_init_steps_.push_back(
-      {S905D2_WIFI_SDIO_CLK, fuchsia_hardware_gpio::wire::InitCall::WithOutputValue(1)});
+      {S905D2_WIFI_SDIO_CLK, fuchsia_hardware_gpioimpl::wire::InitCall::WithOutputValue(1)});
 
   gpio_init_steps_.push_back({S905D2_WIFI_SDIO_D0, set_drive_strength(4'000)});
   gpio_init_steps_.push_back({S905D2_WIFI_SDIO_D1, set_drive_strength(4'000)});

@@ -198,7 +198,7 @@ zx_status_t GpioDevice::Create(void* ctx, zx_device_t* parent) {
 void GpioInitDevice::Create(zx_device_t* parent, GpioImplProxy gpio) {
   // Don't add the init device if anything goes wrong here, as the hardware may be in a state that
   // child devices don't expect.
-  auto decoded = ddk::GetEncodedMetadata<fuchsia_hardware_gpio::wire::InitMetadata>(
+  auto decoded = ddk::GetEncodedMetadata<fuchsia_hardware_gpioimpl::wire::InitMetadata>(
       parent, DEVICE_METADATA_GPIO_INIT);
   if (!decoded.is_ok()) {
     if (decoded.status_value() == ZX_ERR_NOT_FOUND) {
@@ -231,7 +231,7 @@ void GpioInitDevice::Create(zx_device_t* parent, GpioImplProxy gpio) {
 }
 
 zx_status_t GpioInitDevice::ConfigureGpios(
-    const fuchsia_hardware_gpio::wire::InitMetadata& metadata, const GpioImplProxy& gpio) {
+    const fuchsia_hardware_gpioimpl::wire::InitMetadata& metadata, const GpioImplProxy& gpio) {
   // Stop processing the list if any call returns an error so that GPIOs are not accidentally put
   // into an unexpected state.
   for (const auto& step : metadata.steps) {

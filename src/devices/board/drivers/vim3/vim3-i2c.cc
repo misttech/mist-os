@@ -192,7 +192,7 @@ zx_status_t AddI2cBus(const I2cBus& bus,
 
 zx_status_t Vim3::I2cInit() {
   auto set_alt_function = [&arena = gpio_init_arena_](uint64_t alt_function) {
-    return fuchsia_hardware_gpio::wire::InitCall::WithAltFunction(arena, alt_function);
+    return fuchsia_hardware_gpioimpl::wire::InitCall::WithAltFunction(arena, alt_function);
   };
 
   // AO

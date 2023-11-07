@@ -2,14 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-library fuchsia.hardware.gpio;
+library fuchsia.hardware.gpioimpl;
 
+using fuchsia.hardware.gpio;
 using zx;
 
 /// A fuchsia.hardware.gpio.Gpio call to make as part of an `InitStep`.
 type InitCall = flexible union {
     /// If set, the GPIO core driver will call `ConfigIn` with the given flags.
-    1: input_flags GpioFlags;
+    1: input_flags fuchsia.hardware.gpio.GpioFlags;
     /// If set, the GPIO core driver will call `ConfigOut` with the given output value.
     2: output_value uint8;
     /// If set, the GPIO core driver will call `SetAltFunction` with the given alt function value

@@ -142,8 +142,8 @@ fpbus::Node CreateGpioExpanderPbusNode() {
 }
 
 zx_status_t Vim3::GpioInit() {
-  fuchsia_hardware_gpio::wire::InitMetadata metadata;
-  metadata.steps = fidl::VectorView<fuchsia_hardware_gpio::wire::InitStep>::FromExternal(
+  fuchsia_hardware_gpioimpl::wire::InitMetadata metadata;
+  metadata.steps = fidl::VectorView<fuchsia_hardware_gpioimpl::wire::InitStep>::FromExternal(
       gpio_init_steps_.data(), gpio_init_steps_.size());
 
   const fit::result encoded_metadata = fidl::Persist(metadata);

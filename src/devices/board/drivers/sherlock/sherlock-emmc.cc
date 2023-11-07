@@ -84,15 +84,15 @@ zx_status_t Sherlock::EmmcInit() {
   using fuchsia_hardware_gpio::GpioFlags;
 
   auto set_alt_function = [&arena = gpio_init_arena_](uint64_t alt_function) {
-    return fuchsia_hardware_gpio::wire::InitCall::WithAltFunction(arena, alt_function);
+    return fuchsia_hardware_gpioimpl::wire::InitCall::WithAltFunction(arena, alt_function);
   };
 
   auto set_drive_strength = [&arena = gpio_init_arena_](uint64_t drive_strength_ua) {
-    return fuchsia_hardware_gpio::wire::InitCall::WithDriveStrengthUa(arena, drive_strength_ua);
+    return fuchsia_hardware_gpioimpl::wire::InitCall::WithDriveStrengthUa(arena, drive_strength_ua);
   };
 
   auto config_in = [](GpioFlags input_flags) {
-    return fuchsia_hardware_gpio::wire::InitCall::WithInputFlags(input_flags);
+    return fuchsia_hardware_gpioimpl::wire::InitCall::WithInputFlags(input_flags);
   };
 
   // set alternate functions to enable EMMC

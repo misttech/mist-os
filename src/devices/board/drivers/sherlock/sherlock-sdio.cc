@@ -156,7 +156,7 @@ zx_status_t Sherlock::SdioInit() {
   sdio_dev.metadata() = sd_emmc_metadata;
 
   auto set_alt_function = [&arena = gpio_init_arena_](uint64_t alt_function) {
-    return fuchsia_hardware_gpio::wire::InitCall::WithAltFunction(arena, alt_function);
+    return fuchsia_hardware_gpioimpl::wire::InitCall::WithAltFunction(arena, alt_function);
   };
 
   // Configure eMMC-SD soc pads.

@@ -211,8 +211,8 @@ zx_status_t Sherlock::GpioInit() {
   static_assert(std::size(gpio_pins) + std::size(gpio_c_pins) == GPIO_PIN_COUNT,
                 "Incorrect pin count.");
 
-  fuchsia_hardware_gpio::wire::InitMetadata metadata;
-  metadata.steps = fidl::VectorView<fuchsia_hardware_gpio::wire::InitStep>::FromExternal(
+  fuchsia_hardware_gpioimpl::wire::InitMetadata metadata;
+  metadata.steps = fidl::VectorView<fuchsia_hardware_gpioimpl::wire::InitStep>::FromExternal(
       gpio_init_steps_.data(), gpio_init_steps_.size());
 
   const fit::result encoded_metadata = fidl::Persist(metadata);

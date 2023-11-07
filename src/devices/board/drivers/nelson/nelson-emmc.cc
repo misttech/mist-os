@@ -89,7 +89,7 @@ static const std::vector<fpbus::BootMetadata> emmc_boot_metadata{
 
 zx_status_t Nelson::EmmcInit() {
   auto set_alt_function = [&arena = gpio_init_arena_](uint64_t alt_function) {
-    return fuchsia_hardware_gpio::wire::InitCall::WithAltFunction(arena, alt_function);
+    return fuchsia_hardware_gpioimpl::wire::InitCall::WithAltFunction(arena, alt_function);
   };
 
   // set alternate functions to enable EMMC

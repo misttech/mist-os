@@ -175,19 +175,19 @@ zx_status_t Nelson::AudioInit() {
   };
 
   auto set_alt_function = [&arena = gpio_init_arena_](uint64_t alt_function) {
-    return fuchsia_hardware_gpio::wire::InitCall::WithAltFunction(arena, alt_function);
+    return fuchsia_hardware_gpioimpl::wire::InitCall::WithAltFunction(arena, alt_function);
   };
 
   auto set_drive_strength = [&arena = gpio_init_arena_](uint64_t drive_strength_ua) {
-    return fuchsia_hardware_gpio::wire::InitCall::WithDriveStrengthUa(arena, drive_strength_ua);
+    return fuchsia_hardware_gpioimpl::wire::InitCall::WithDriveStrengthUa(arena, drive_strength_ua);
   };
 
   auto config_out = [](uint8_t output_value) {
-    return fuchsia_hardware_gpio::wire::InitCall::WithOutputValue(output_value);
+    return fuchsia_hardware_gpioimpl::wire::InitCall::WithOutputValue(output_value);
   };
 
   auto sleep = [&arena = gpio_init_arena_](zx::duration delay) {
-    return fuchsia_hardware_gpio::wire::InitCall::WithDelay(arena, delay.get());
+    return fuchsia_hardware_gpioimpl::wire::InitCall::WithDelay(arena, delay.get());
   };
 
   // TDM pin assignments.

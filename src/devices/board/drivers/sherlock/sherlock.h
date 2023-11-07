@@ -5,7 +5,7 @@
 #ifndef SRC_DEVICES_BOARD_DRIVERS_SHERLOCK_SHERLOCK_H_
 #define SRC_DEVICES_BOARD_DRIVERS_SHERLOCK_SHERLOCK_H_
 
-#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
+#include <fidl/fuchsia.hardware.gpioimpl/cpp/wire.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fuchsia/hardware/clockimpl/cpp/banjo.h>
 #include <fuchsia/hardware/gpioimpl/cpp/banjo.h>
@@ -139,7 +139,7 @@ class Sherlock : public SherlockType {
   ddk::GpioImplProtocolClient gpio_impl_;
   ddk::ClockImplProtocolClient clk_impl_;
   fidl::Arena<> gpio_init_arena_;
-  std::vector<fuchsia_hardware_gpio::wire::InitStep> gpio_init_steps_;
+  std::vector<fuchsia_hardware_gpioimpl::wire::InitStep> gpio_init_steps_;
   thrd_t thread_;
 
   std::optional<uint8_t> board_rev_;
