@@ -2111,6 +2111,10 @@ impl ScopedInstance {
         Ok(ExecutionController::new(execution_proxy))
     }
 
+    pub fn controller(&self) -> &fcomponent::ControllerProxy {
+        &self.controller_proxy
+    }
+
     /// Connect to exposed fuchsia.component.Binder protocol of instance, thus
     /// triggering it to start.
     /// Note: This will only work if the component exposes this protocol in its

@@ -4,10 +4,13 @@
 
 use {
     anyhow::{Error, Result},
+    fidl::endpoints,
+    fidl_fuchsia_component_sandbox as fsandbox,
     fidl_fuchsia_testing_harness::{OperationError, RealmProxy_Request, RealmProxy_RequestStream},
+    fuchsia_async as fasync,
     fuchsia_component_test::RealmInstance,
     fuchsia_zircon as zx,
-    futures::StreamExt,
+    futures::{Future, StreamExt, TryStreamExt},
     tracing::error,
 };
 
@@ -112,4 +115,50 @@ pub async fn serve_with_proxy<P: RealmProxy>(
 pub async fn serve(realm: RealmInstance, stream: RealmProxy_RequestStream) -> Result<(), Error> {
     let proxy = RealmInstanceProxy(realm);
     serve_with_proxy(proxy, stream).await
+}
+
+/// Dispatches incoming connections on `receiver_stream to `request_stream_handler`.
+/// `receiver_stream` is a sandbox receiver channel.
+///
+/// Example:
+///
+/// async fn handle_echo_request_stream(mut stream: fecho::EchoRequestStream) {
+///     while let Ok(Some(_request)) = stream.try_next().await {
+///         // ... handle request ...
+///     }
+/// }
+/// ...
+/// task_group.spawn(async move {
+///     let _ = realm_proxy::service::handle_receiver::<fecho::EchoMarker, _, _>(
+///         echo_receiver_stream,
+///         handle_echo_request_stream,
+///     )
+///     .await
+///     .map_err(|e| {
+///         error!("Failed to serve echo stream: {}", e);
+///     });
+/// });
+pub async fn handle_receiver<T, Fut, F>(
+    mut receiver_stream: fsandbox::ReceiverRequestStream,
+    request_stream_handler: F,
+) -> Result<(), fidl::Error>
+where
+    T: endpoints::ProtocolMarker,
+    Fut: Future<Output = ()> + Send,
+    F: Fn(T::RequestStream) -> Fut + Send + Sync + Copy + 'static,
+{
+    let mut task_group = fasync::TaskGroup::new();
+    while let Some(request) = receiver_stream.try_next().await? {
+        match request {
+            fsandbox::ReceiverRequest::Receive { capability, control_handle: _control_handle } => {
+                task_group.spawn(async move {
+                    let server_end =
+                        endpoints::ServerEnd::<T>::new(fidl::Channel::from(capability));
+                    let stream: T::RequestStream = server_end.into_stream().unwrap();
+                    request_stream_handler(stream).await;
+                });
+            }
+        }
+    }
+    Ok(())
 }

@@ -3,11 +3,67 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{bail, Error, Result},
+    anyhow::{bail, format_err, Error, Result},
+    fdio::Namespace,
     fidl::endpoints::{create_endpoints, ClientEnd, DiscoverableProtocolMarker},
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_sandbox as fsandbox,
     fidl_fuchsia_testing_harness::{RealmProxy_Marker, RealmProxy_Proxy},
     fuchsia_component::client::connect_to_protocol,
+    uuid::Uuid,
 };
+
+pub struct InstalledNamespace {
+    prefix: String,
+}
+
+impl InstalledNamespace {
+    pub fn prefix(&self) -> &str {
+        &self.prefix
+    }
+}
+
+impl Drop for InstalledNamespace {
+    fn drop(&mut self) {
+        let Ok(namespace) = Namespace::installed() else {
+            return;
+        };
+        let _ = namespace.unbind(&self.prefix);
+    }
+}
+
+/// Converts the given dict to a namespace and adds it this component's namespace.
+pub async fn extend_namespace(dict: ClientEnd<fsandbox::DictMarker>) -> Result<InstalledNamespace> {
+    let namespace_proxy = connect_to_protocol::<fcomponent::NamespaceMarker>()?;
+    // TODO: What should we use for the namespace's unique id? Could also
+    // consider an atomic counter, or the name of the test
+    let prefix = format!("/dict-{}", Uuid::new_v4());
+    let dicts = vec![fcomponent::NamespaceDictPair { path: prefix.clone().into(), dict }];
+    let mut namespace_entries =
+        namespace_proxy.create_from_dicts(dicts).await?.map_err(|e| format_err!("{:?}", e))?;
+    let namespace = Namespace::installed()?;
+    let count = namespace_entries.len();
+    if count != 1 {
+        bail!(
+            "namespace {prefix} should have exactly one entry but it has {count}. This suggests a \
+            bug in the namespace protocol. {namespace_entries:?}"
+        );
+    }
+    let entry = namespace_entries.remove(0);
+    if entry.path.is_none() || entry.directory.is_none() {
+        bail!(
+            "namespace {prefix} contains incomplete entry. This suggests a bug in the namespace \
+            protocol {entry:?}"
+        );
+    }
+    if entry.path.as_ref().unwrap() != &prefix {
+        bail!(
+            "namespace {prefix} does not match path. This suggests a bug in the namespace protocol. \
+            {entry:?}"
+        );
+    }
+    namespace.bind(&prefix, entry.directory.unwrap())?;
+    Ok(InstalledNamespace { prefix })
+}
 
 // RealmProxyClient is a client for fuchsia.testing.harness.RealmProxy.
 //
