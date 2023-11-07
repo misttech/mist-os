@@ -896,8 +896,8 @@ maintaining the set of items according to the protocol's contract.
     pub fn set_price(&mut self, item_id: u64, new_price: u32) -> Result<(), Error> { /* ... */ }
     pub fn add_stock(&mut self, item_id: u64, additional_quantity: i32) -> Result<(), Error> { /* ... */ }
 
-    pub fn create_cart(self: Arc<Mutex<Self>>) -> Cart {
-      Cart::new(self.downgrade())
+    pub fn create_cart(self_: Arc<Mutex<Self>>) -> Cart {
+      Cart::new(self_.downgrade())
     }
   }
   ```
