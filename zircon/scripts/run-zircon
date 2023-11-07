@@ -527,13 +527,7 @@ case $ARCH in
           GIC=host
         elif (( $DO_HVF )); then
           ARGS+=" -machine accel=hvf"
-          if [[ $HOST_ARCH == "arm64" ]]; then
-            # M1s only support 36 bits of physical address space.
-            ARGS+=",highmem=off"
-          fi
           ARGS+=" -cpu host"
-          # at the moment GICv3 appears to not pass through HVF properly
-          GIC=2
         else
           # Ask for all of the features TCG emulates
           ARGS+=" -machine virtualization=true -cpu max"
