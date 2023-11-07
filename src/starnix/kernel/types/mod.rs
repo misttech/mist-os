@@ -4,7 +4,6 @@
 
 mod arc_key;
 mod auth;
-mod device_type;
 mod file_mode;
 mod mount_flags;
 mod open_flags;
@@ -18,6 +17,7 @@ mod user_address;
 mod user_buffer;
 
 pub mod as_any;
+pub mod device_type;
 pub mod errno;
 pub mod kcmp;
 pub mod ownership;
@@ -29,8 +29,8 @@ pub(crate) use union::struct_with_union_into_bytes;
 
 pub use arc_key::{ArcKey, PtrKey, WeakKey};
 pub use device_type::{
-    DeviceType, DYN_MAJOR, INPUT_MAJOR, KEYBOARD_INPUT_MINOR, LOOP_MAJOR, MEM_MAJOR,
-    TOUCH_INPUT_MINOR, TTY_ALT_MAJOR,
+    DeviceType, DYN_MAJOR, INPUT_MAJOR, KEYBOARD_INPUT_MINOR, LOOP_MAJOR, TOUCH_INPUT_MINOR,
+    TTY_ALT_MAJOR,
 };
 pub(crate) use file_mode::mode;
 pub use file_mode::{Access, FileMode};
@@ -69,13 +69,13 @@ pub(crate) use crate::types::errno::{
 };
 pub use errno::{
     Errno, ErrnoCode, ErrnoResultExt, SourceContext, EACCES, EAGAIN, EBADF, EEXIST, EINPROGRESS,
-    EINTR, EINVAL, ENAMETOOLONG, ENOENT, ENOSPC, ENOSYS, ENOTDIR, EPERM, ERESTART, ERESTARTNOHAND,
-    ERESTARTNOINTR, ERESTARTSYS, ERESTART_RESTARTBLOCK, ETIMEDOUT,
+    EINTR, ENAMETOOLONG, ENOENT, ENOSPC, ENOSYS, ENOTDIR, EPERM, ERESTARTNOHAND, ERESTARTNOINTR,
+    ERESTARTSYS, ERESTART_RESTARTBLOCK, ETIMEDOUT,
 };
 
 pub use signals::{
     SigSet, Signal, UncheckedSignal, SIGABRT, SIGALRM, SIGBUS, SIGCHLD, SIGCONT, SIGFPE, SIGHUP,
-    SIGILL, SIGINT, SIGIO, SIGKILL, SIGPIPE, SIGPROF, SIGPWR, SIGQUIT, SIGRTMIN, SIGSEGV,
-    SIGSTKFLT, SIGSTOP, SIGSYS, SIGTERM, SIGTRAP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG, SIGUSR1,
-    SIGUSR2, SIGVTALRM, SIGWINCH, SIGXCPU, SIGXFSZ, UNBLOCKABLE_SIGNALS,
+    SIGILL, SIGINT, SIGIO, SIGKILL, SIGPIPE, SIGPROF, SIGPWR, SIGQUIT, SIGSEGV, SIGSTKFLT, SIGSTOP,
+    SIGSYS, SIGTERM, SIGTRAP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG, SIGUSR1, SIGUSR2, SIGVTALRM,
+    SIGWINCH, SIGXCPU, SIGXFSZ, UNBLOCKABLE_SIGNALS,
 };

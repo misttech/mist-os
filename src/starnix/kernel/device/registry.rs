@@ -330,7 +330,7 @@ impl DeviceOps for Arc<RwLock<DynRegistry>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{device::mem::DevNull, fs::*, testing::*, types::MEM_MAJOR};
+    use crate::{device::mem::DevNull, fs::*, testing::*, types::device_type::MEM_MAJOR};
 
     #[::fuchsia::test]
     fn registry_fails_to_add_duplicate_device() {

@@ -1491,7 +1491,7 @@ mod test {
         fs::{buffers::VecOutputBuffer, EpollFileObject, LookupContext, Namespace, SymlinkMode},
         mm::PAGE_SIZE,
         testing::*,
-        types::{mode, EINVAL},
+        types::{errno::EINVAL, mode},
     };
     use assert_matches::assert_matches;
     use fidl::endpoints::Proxy;

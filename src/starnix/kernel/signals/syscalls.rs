@@ -841,6 +841,7 @@ mod tests {
         mm::{vmo::round_up_to_system_page_size, PAGE_SIZE},
         signals::testing::dequeue_signal_for_test,
         testing::*,
+        types::signals::SIGRTMIN,
     };
     use std::convert::TryInto;
     use zerocopy::AsBytes;
