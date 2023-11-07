@@ -5,8 +5,6 @@
 #include "src/developer/debug/zxdb/console/analytics.h"
 
 #include "src/developer/debug/zxdb/client/setting_schema_definition.h"
-#include "src/lib/analytics/cpp/core_dev_tools/general_parameters.h"
-#include "src/lib/analytics/cpp/core_dev_tools/system_info.h"
 
 namespace zxdb {
 

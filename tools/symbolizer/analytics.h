@@ -10,8 +10,6 @@
 
 #include "src/developer/debug/ipc/protocol.h"
 #include "src/lib/analytics/cpp/core_dev_tools/analytics.h"
-#include "src/lib/analytics/cpp/core_dev_tools/general_parameters.h"
-#include "src/lib/analytics/cpp/google_analytics/timing.h"
 #include "src/lib/fxl/strings/substitute.h"
 
 namespace symbolizer {
@@ -45,9 +43,6 @@ class SymbolizationAnalyticsBuilder {
   void TotalTimerStop();
   void DownloadTimerStart();
   void DownloadTimerStop();
-
-  // Build the timing hit
-  analytics::google_analytics::Timing BuildUaHit() const;
 
   // Build the symbolize event
   std::unique_ptr<SymbolizationEvent> BuildGa4Event() const;
@@ -83,7 +78,6 @@ class Analytics : public analytics::core_dev_tools::Analytics<Analytics> {
   static constexpr int64_t kQuitTimeoutMs = 500;
   static constexpr char kMeasurementId[] = "G-B0SP6NVLC6";
   static constexpr char kMeasurementKey[] = "ABmnNSKcQX21P9EcYQDt2Q";
-  static constexpr char kTrackingId[] = "UA-127897021-14";
   static constexpr char kEnableArgs[] = "--analytics=enable";
   static constexpr char kDisableArgs[] = "--analytics=disable";
   static constexpr char kStatusArgs[] = "--analytics-show";

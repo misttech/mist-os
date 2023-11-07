@@ -18,10 +18,8 @@
 #include "src/lib/analytics/cpp/core_dev_tools/ga4_common_events.h"
 #include "src/lib/analytics/cpp/core_dev_tools/general_parameters.h"
 #include "src/lib/analytics/cpp/core_dev_tools/google_analytics_4_client.h"
-#include "src/lib/analytics/cpp/core_dev_tools/google_analytics_client.h"
 #include "src/lib/analytics/cpp/core_dev_tools/persistent_status.h"
 #include "src/lib/analytics/cpp/core_dev_tools/system_info.h"
-#include "src/lib/analytics/cpp/google_analytics/noop_client.h"
 #include "src/lib/analytics/cpp/google_analytics_4/testing_client.h"
 #include "src/lib/analytics/cpp/metric_properties/metric_properties.h"
 
@@ -94,9 +92,8 @@ class Analytics {
     }
 
     if (enable_on_bots && IsEnabled()) {
-      FX_DCHECK(!client_ua_ && !client_ga4_ && !client_is_cleaned_up_);
+      FX_DCHECK(!client_ga4_ && !client_is_cleaned_up_);
       CreateAndPrepareGa4Client(bot);
-      CreateAndPrepareGoogleAnalyticsClient(bot);
     }
   }
 
@@ -135,12 +132,6 @@ class Analytics {
     }
   }
 
-  static void IfEnabledSendGoogleAnalyticsHit(const google_analytics::Hit& hit) {
-    if (IsEnabled()) {
-      SendGoogleAnalyticsHit(hit);
-    }
-  }
-
   static void IfEnabledSendGa4Event(std::unique_ptr<google_analytics_4::Event> event) {
     if (IsEnabled()) {
       SendGa4Event(std::move(event));
@@ -148,8 +139,6 @@ class Analytics {
   }
 
   static void CleanUp() {
-    delete client_ua_;
-    client_ua_ = nullptr;
     delete client_ga4_;
     client_ga4_ = nullptr;
     client_is_cleaned_up_ = true;
@@ -160,24 +149,11 @@ class Analytics {
   // sender function will be called with the POST body (passed as `const
   // std::string&`), which is the JSON representation of a Measurement object.
   static void InitTestingClient(std::function<void(const std::string&)> sender) {
-    client_ua_ = new google_analytics::NoOpClient();
     client_ga4_ = new google_analytics_4::TestingClient(std::move(sender));
     T::SetRuntimeAnalyticsStatus(AnalyticsStatus::kEnabled);
   }
 
  protected:
-  static constexpr char kEventCategoryGeneral[] = "general";
-  static constexpr char kEventActionInvoke[] = "invoke";
-
-  static void SendGoogleAnalyticsHit(const google_analytics::Hit& hit) {
-    if (!client_is_cleaned_up_) {
-      if (!client_ua_) {
-        CreateAndPrepareGoogleAnalyticsClient();
-      }
-      client_ua_->AddHit(hit);
-    }
-  }
-
   static void SendGa4Event(std::unique_ptr<google_analytics_4::Event> event) {
     if (!client_is_cleaned_up_) {
       if (!client_ga4_) {
@@ -198,10 +174,6 @@ class Analytics {
   inline static bool enabled_runtime_ = false;
 
  private:
-  static constexpr char kEventCategoryAnalytics[] = "analytics";
-  static constexpr char kEventActionEnable[] = "manual-enable";
-  static constexpr char kEventActionDisable[] = "disable";
-
   // Init analytics status, and show suitable welcome messages if on the first run.
   static void Init(AnalyticsOption analytics_option) {
     internal::PersistentStatus persistent_status(T::kToolName);
@@ -251,11 +223,6 @@ class Analytics {
 
   static void InitSubLaunchedFirst() { T::SetRuntimeAnalyticsStatus(AnalyticsStatus::kDisabled); }
 
-  static void CreateAndPrepareGoogleAnalyticsClient(std::optional<BotInfo> bot = std::nullopt) {
-    client_ua_ = new GoogleAnalyticsClient(T::kQuitTimeoutMs);
-    internal::PrepareGoogleAnalyticsClient(*client_ua_, T::kToolName, T::kTrackingId, bot);
-  }
-
   static void CreateAndPrepareGa4Client(std::optional<BotInfo> bot = std::nullopt) {
     client_ga4_ = new Ga4Client(T::kQuitTimeoutMs);
     internal::PrepareGa4Client(*client_ga4_, T::kToolVersion, T::kMeasurementId, T::kMeasurementKey,
@@ -263,12 +230,10 @@ class Analytics {
   }
 
   static void SendAnalyticsManualEnableEvent() {
-    SendGoogleAnalyticsHit(google_analytics::Event(kEventCategoryAnalytics, kEventActionEnable));
     SendGa4Event(ChangeAnalyticsStatusEvent::CreateManuallyEnabledEvent());
   }
 
   static void SendAnalyticsDisableEvent() {
-    SendGoogleAnalyticsHit(google_analytics::Event(kEventCategoryAnalytics, kEventActionDisable));
     SendGa4Event(ChangeAnalyticsStatusEvent::CreateDisabledEvent());
   }
 
@@ -278,7 +243,6 @@ class Analytics {
   // (1) there is no ownership transfer
   // (2) the life time of the pointed-to object is managed manually
   // (3) using a raw pointer here makes code simpler and easier to read
-  inline static google_analytics::Client* client_ua_ = nullptr;
   inline static google_analytics_4::Client* client_ga4_ = nullptr;
 };
 

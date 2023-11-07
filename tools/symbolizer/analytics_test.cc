@@ -31,23 +31,6 @@ TEST(AnalyticsTest, SymbolizationAnalyticsBuilder) {
   builder.DownloadTimerStop();
   builder.TotalTimerStop();
 
-  auto parameters_ua = builder.BuildUaHit().parameters();
-  ASSERT_GE(std::stoll(parameters_ua["utt"]), std::stoll(parameters_ua["cm11"]));
-  ASSERT_GE(std::stoll(parameters_ua["cm11"]), 0LL);
-  parameters_ua["utt"] = "100";
-  parameters_ua["cm11"] = "50";
-
-  const std::map<std::string, std::string> expected_result_ua{
-      {"t", "timing"}, {"utc", "symbolization"},
-      {"utv", ""},     {"cm1", "1"},
-      {"cm2", "2"},    {"cm3", "3"},
-      {"cm4", "4"},    {"cm5", "5"},
-      {"cm6", "6"},    {"cm7", "1"},
-      {"cm8", "1"},    {"cm9", "1"},
-      {"cm10", "0"},   {"cm11", "50"},
-      {"utt", "100"}};
-  EXPECT_THAT(parameters_ua, ContainerEq(expected_result_ua));
-
   auto event = builder.BuildGa4Event();
   EXPECT_EQ(event->name(), "symbolize");
   ASSERT_TRUE(event->parameters_opt().has_value());
