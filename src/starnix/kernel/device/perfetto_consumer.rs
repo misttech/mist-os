@@ -4,10 +4,9 @@
 
 use std::collections::VecDeque;
 use std::ffi::CString;
-use std::ops::DerefMut;
 use std::sync::{Arc, Mutex};
 
-use lock_sequence::Unlocked;
+use lock_sequence::{Locked, Unlocked};
 use perfetto_consumer_proto::perfetto::protos::{
     ipc_frame, trace_config::buffer_config::FillPolicy, trace_config::BufferConfig,
     trace_config::DataSource, DataSourceConfig, DisableTracingRequest, EnableTracingRequest,
@@ -26,13 +25,12 @@ use crate::types::*;
 
 use fuchsia_trace::{category_enabled, trace_state, ProlongedContext, TraceState};
 
-/// Rust function to call when the trace state changes.
+/// Context for the function that is called when the trace state changes.
 ///
 /// Passing functions to C bindings typically requires a static function
-/// pointer, which prevents using closures. This level of indirection
-/// allows the initialization to create a closure object and store it at
-/// a static location which allows it to be invoked by the static function.
-static CALLBACK: Mutex<Option<Box<dyn FnMut() + Send>>> = Mutex::new(None);
+/// pointer, which prevents using closures.
+/// Using a mutex to guard the state allows it to be used in a static function.
+static CALLBACK_CONTEXT: Mutex<Option<(CurrentTask, CallbackState)>> = Mutex::new(None);
 
 const PERFETTO_BUFFER_SIZE_KB: u32 = 63488;
 
@@ -118,10 +116,12 @@ struct PerfettoConnection {
 impl PerfettoConnection {
     /// Opens a socket sonnection to the specified socket path and initializes the requisite
     /// bookkeeping information.
-    fn new(current_task: &CurrentTask, socket_path: &[u8]) -> Result<Self, anyhow::Error> {
-        // TODO: Don't use syscall here, extract the needed logic somewhere else
-        let mut locked = Unlocked::new();
-        let conn_fd = sys_socket(&mut locked, current_task, AF_UNIX.into(), SOCK_STREAM, 0)?;
+    fn new(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        socket_path: &[u8],
+    ) -> Result<Self, anyhow::Error> {
+        let conn_fd = sys_socket(locked, current_task, AF_UNIX.into(), SOCK_STREAM, 0)?;
         let conn_file = current_task.files.get(conn_fd)?;
         let conn_socket = conn_file.node().socket().ok_or_else(|| errno!(ENOTSOCK))?;
         let peer = SocketPeer::Handle(resolve_unix_socket_address(current_task, socket_path)?);
@@ -294,11 +294,13 @@ struct CallbackState {
 impl CallbackState {
     fn connection(
         &mut self,
+        locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
     ) -> Result<&mut PerfettoConnection, anyhow::Error> {
         match self.connection {
             None => {
-                self.connection = Some(PerfettoConnection::new(current_task, &self.socket_path)?);
+                self.connection =
+                    Some(PerfettoConnection::new(locked, current_task, &self.socket_path)?);
                 Ok(self.connection.as_mut().unwrap())
             }
             Some(ref mut conn) => Ok(conn),
@@ -307,13 +309,14 @@ impl CallbackState {
 
     fn on_state_change(
         &mut self,
+        locked: &mut Locked<'_, Unlocked>,
         new_state: TraceState,
         current_task: &CurrentTask,
     ) -> Result<(), anyhow::Error> {
         match new_state {
             TraceState::Started => {
                 self.prolonged_context = ProlongedContext::acquire();
-                let connection = self.connection(current_task)?;
+                let connection = self.connection(locked, current_task)?;
                 // A fixed set of data sources that may be of interest. As demand for other sources
                 // is found, add them here, and it may become worthwhile to allow this set to be
                 // configurable per trace session.
@@ -417,7 +420,7 @@ impl CallbackState {
                     let read_buffers_request;
                     let blob_name_ref;
                     {
-                        let connection = self.connection(current_task)?;
+                        let connection = self.connection(locked, current_task)?;
                         disable_request =
                             connection.disable_tracing(current_task, DisableTracingRequest {})?;
                         loop {
@@ -443,7 +446,7 @@ impl CallbackState {
                     // session), the loop will read past and ignore them.
                     loop {
                         let frame = self
-                            .connection(current_task)?
+                            .connection(locked, current_task)?
                             .frame_reader
                             .next_frame_blocking(current_task)?;
                         if frame.request_id != Some(read_buffers_request) {
@@ -496,7 +499,7 @@ impl CallbackState {
                     // so we don't need to worry about tracking the request id to match to the
                     // response.
                     let _free_buffers_request_id = self
-                        .connection(current_task)?
+                        .connection(locked, current_task)?
                         .free_buffers(current_task, FreeBuffersRequest { buffer_ids: vec![0] })?;
                 }
             }
@@ -518,7 +521,7 @@ pub fn start_perfetto_consumer_thread(
         // Perfetto consumer runs in a separate thread, not in the init task proper.
         Some(init_task.fs().fork()),
     )?;
-    let mut callback_state = CallbackState {
+    let callback_state = CallbackState {
         prev_state: TraceState::Stopped,
         socket_path: socket_path.to_owned(),
         connection: None,
@@ -526,20 +529,19 @@ pub fn start_perfetto_consumer_thread(
         packet_data: Vec::new(),
     };
 
-    // Store a closure in the static CALLBACK mutex for c_callback to call.
-    let callback = move || {
-        let state = trace_state();
-        callback_state.on_state_change(state, &task).unwrap_or_else(|e| {
-            log_error!("perfetto_consumer callback error: {:?}", e);
-        })
-    };
-    *CALLBACK.lock().unwrap() = Some(Box::new(callback));
+    // Store the context that on_state_change needs in a mutex for c_callback to use.
+    *CALLBACK_CONTEXT.lock().unwrap() = Some((task, callback_state));
     fuchsia_trace_observer::start_trace_observer(c_callback);
     Ok(())
 }
 
 extern "C" fn c_callback() {
-    if let &mut Some(ref mut f) = CALLBACK.lock().unwrap().deref_mut() {
-        f();
-    }
+    // This code is always executed on its own thread
+    let mut locked = Unlocked::new();
+    let (current_task, mut callback_state) = CALLBACK_CONTEXT.lock().unwrap().take().unwrap();
+
+    let state = trace_state();
+    callback_state.on_state_change(&mut locked, state, &current_task).unwrap_or_else(|e| {
+        log_error!("perfetto_consumer callback error: {:?}", e);
+    })
 }
