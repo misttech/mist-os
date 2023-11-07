@@ -6,10 +6,12 @@
 // Common definitions for the lockdep library.
 //
 
-#pragma once
+#ifndef LOCKDEP_COMMON_H_
+#define LOCKDEP_COMMON_H_
 
 #include <stddef.h>
 #include <stdint.h>
+
 #include <type_traits>
 
 #include <lockdep/runtime_api.h>
@@ -136,3 +138,5 @@ inline const char* ToString(LockResult result) {
 }
 
 }  // namespace lockdep
+
+#endif  // LOCKDEP_COMMON_H_

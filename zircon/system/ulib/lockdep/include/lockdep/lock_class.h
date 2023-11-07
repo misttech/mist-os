@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#pragma once
+#ifndef LOCKDEP_LOCK_CLASS_H_
+#define LOCKDEP_LOCK_CLASS_H_
 
 #include <zircon/compiler.h>
 
@@ -328,3 +329,5 @@ class SingletonLockDep : public Lock<LockType_> {
 };
 
 }  // namespace lockdep
+
+#endif  // LOCKDEP_LOCK_CLASS_H_

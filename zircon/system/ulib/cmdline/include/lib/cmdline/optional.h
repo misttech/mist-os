@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef CMDLINE_OPTIONAL_H_
-#define CMDLINE_OPTIONAL_H_
+#ifndef LIB_CMDLINE_OPTIONAL_H_
+#define LIB_CMDLINE_OPTIONAL_H_
 
 #include <cassert>
 #include <istream>
@@ -111,4 +111,4 @@ bool operator!=(const Optional<T>& lhs, const Optional<T>& rhs) {
 
 }  // namespace cmdline
 
-#endif  // CMDLINE_OPTIONAL_H_
+#endif  // LIB_CMDLINE_OPTIONAL_H_

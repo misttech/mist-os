@@ -11,9 +11,9 @@
 #include "devicetree-test-fixture.h"
 
 namespace {
+using devicetree::MemoryReservation;
 using devicetree_test::LoadDtb;
 using devicetree_test::LoadedDtb;
-using devicetree::MemoryReservation;
 
 class MemoryMatcherTest : public devicetree_test::TestMixin<devicetree_test::RiscvDevicetreeTest,
                                                             devicetree_test::ArmDevicetreeTest> {

@@ -55,7 +55,7 @@ class LruIsolate {
 
   // Adds a page to be potentially replaced with a loaned page.
   // Requires PageQueues lock to be held
-  void AddLoanReplacement(vm_page_t* page, PageQueues* pq) TA_REQ(pq->get_lock()) {
+  void AddLoanReplacement(vm_page_t* page, PageQueues* pq) TA_REQ(pq -> get_lock()) {
     DEBUG_ASSERT(page);
     VmCowPages* cow = reinterpret_cast<VmCowPages*>(page->object.get_object());
     DEBUG_ASSERT(cow);
@@ -68,7 +68,7 @@ class LruIsolate {
   // Add a page to be reclaimed. Actual reclamation will only be done if the `SetLruAction` is
   // compatible with the page and its VMO owner.
   // Requires PageQueues lock to be held
-  void AddReclaimable(vm_page_t* page, PageQueues* pq) TA_REQ(pq->get_lock()) {
+  void AddReclaimable(vm_page_t* page, PageQueues* pq) TA_REQ(pq -> get_lock()) {
     DEBUG_ASSERT(page);
     if (lru_action_ == LruAction::None) {
       return;
@@ -1313,8 +1313,7 @@ bool PageQueues::DebugPageIsSpecificQueue(const vm_page_t* page, PageQueue queue
 }
 
 bool PageQueues::DebugPageIsPagerBacked(const vm_page_t* page, size_t* queue) const {
-  return DebugPageIsSpecificReclaim(
-      page, [](auto cow) { return cow->can_evict(); }, queue);
+  return DebugPageIsSpecificReclaim(page, [](auto cow) { return cow->can_evict(); }, queue);
 }
 
 bool PageQueues::DebugPageIsPagerBackedDontNeed(const vm_page_t* page) const {
@@ -1331,8 +1330,7 @@ bool PageQueues::DebugPageIsAnonymous(const vm_page_t* page) const {
   if (ReclaimIsOnlyPagerBacked()) {
     return page->object.get_page_queue_ref().load(ktl::memory_order_relaxed) == PageQueueAnonymous;
   }
-  return DebugPageIsSpecificReclaim(
-      page, [](auto cow) { return !cow->can_evict(); }, nullptr);
+  return DebugPageIsSpecificReclaim(page, [](auto cow) { return !cow->can_evict(); }, nullptr);
 }
 
 bool PageQueues::DebugPageIsWired(const vm_page_t* page) const {
@@ -1348,8 +1346,7 @@ bool PageQueues::DebugPageIsAnonymousZeroFork(const vm_page_t* page) const {
     return page->object.get_page_queue_ref().load(ktl::memory_order_relaxed) ==
            PageQueueAnonymousZeroFork;
   }
-  return DebugPageIsSpecificReclaim(
-      page, [](auto cow) { return !cow->can_evict(); }, nullptr);
+  return DebugPageIsSpecificReclaim(page, [](auto cow) { return !cow->can_evict(); }, nullptr);
 }
 
 bool PageQueues::DebugPageIsAnyAnonymous(const vm_page_t* page) const {
