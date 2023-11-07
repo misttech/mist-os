@@ -74,6 +74,8 @@ impl Config {
         })
     }
 
+    // TODO(fxbug.dev/135159): Remove this function when its behavior can
+    // be specified by default naming configuration
     // We use MAC addresses to identify USB devices; USB devices are those devices whose
     // topological path contains "/usb/". We use topological paths to identify on-board
     // devices; on-board devices are those devices whose topological path does not
@@ -114,25 +116,24 @@ impl Config {
             "x"
         );
 
-        let last_byte = octets[octets.len() - 1];
-        for i in 0u8..255u8 {
-            let candidate = ((last_byte as u16 + i as u16) % 256 as u16) as u8;
+        let mut offset = 0u8;
+        loop {
+            let candidate = get_mac_identifier_from_octets(octets, interface_type, offset)?;
+
             if self.interfaces.iter().any(|interface| {
                 interface.name.starts_with(&prefix)
                     && u8::from_str_radix(&interface.name[prefix.len()..], 16) == Ok(candidate)
             }) {
-                continue; // if the candidate is used, try next one
-            } else {
-                return Ok(format!("{}{:x}", prefix, candidate));
+                // if the candidate is used, try the next one
+                offset += 1;
+                continue;
             }
+            return Ok(format!("{prefix}{candidate:x}"));
         }
-        Err(anyhow::format_err!(
-            "could not find unique name for mac={}, interface_type={:?}",
-            fidl_fuchsia_net_ext::MacAddress { octets: octets },
-            interface_type
-        ))
     }
 
+    // TODO(fxbug.dev/135159): Remove this function when its behavior can
+    // be specified by default naming configuration
     fn generate_name_from_topological_path(
         &self,
         topological_path: &str,
@@ -198,6 +199,26 @@ fn name_matches_interface_type(name: &str, interface_type: &crate::InterfaceType
         crate::InterfaceType::Wlan => name.starts_with(INTERFACE_PREFIX_WLAN),
         crate::InterfaceType::Ethernet => name.starts_with(INTERFACE_PREFIX_ETHERNET),
     }
+}
+
+// Get the NormalizedMac using the last octet of the MAC address. The offset
+// modifies the last_byte in an attempt to avoid naming conflicts.
+fn get_mac_identifier_from_octets(
+    octets: [u8; 6],
+    interface_type: crate::InterfaceType,
+    offset: u8,
+) -> Result<u8, anyhow::Error> {
+    if offset == u8::MAX {
+        return Err(anyhow::format_err!(
+            "could not find unique identifier for mac={}, interface_type={:?}",
+            fidl_fuchsia_net_ext::MacAddress { octets: octets },
+            interface_type
+        ));
+    }
+
+    let last_byte = octets[octets.len() - 1];
+    let (identifier, _) = last_byte.overflowing_add(offset);
+    Ok(identifier)
 }
 
 #[derive(Debug)]
@@ -447,16 +468,41 @@ impl MatchingRule {
 // TODO(fxbug.dev/135106): Create dynamic naming rules
 // A naming rule that uses device information to produce a component of
 // the interface's name.
-#[derive(Debug, Deserialize, PartialEq)]
-#[serde(deny_unknown_fields, rename_all = "lowercase")]
-pub enum DynamicNameCompositionRule {}
+#[derive(Debug, Eq, Hash, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "snake_case")]
+pub enum DynamicNameCompositionRule {
+    // A unique value seeded by the final octet of the interface's MAC address.
+    NormalizedMac,
+}
+
+impl DynamicNameCompositionRule {
+    // `true` when a rule can be re-tried to produce a different name.
+    fn rule_supports_retry(&self) -> bool {
+        match *self {
+            DynamicNameCompositionRule::NormalizedMac => true,
+        }
+    }
+}
+
 impl DynamicNameCompositionRule {
     fn get_name(
         &self,
-        _configs: &[InterfaceConfig],
-        _info: &devices::DeviceInfo,
+        info: &devices::DeviceInfo,
+        attempt_num: u8,
     ) -> Result<String, anyhow::Error> {
-        match *self {}
+        match *self {
+            DynamicNameCompositionRule::NormalizedMac => info
+                .mac
+                .map(|mac| {
+                    let mac_identifier = get_mac_identifier_from_octets(
+                        mac.octets,
+                        info.device_class.into(),
+                        attempt_num,
+                    )?;
+                    Ok(format!("{mac_identifier:x}"))
+                })
+                .unwrap_or(Ok("".to_string())),
+        }
     }
 }
 
@@ -495,34 +541,46 @@ impl NamingRule {
         interfaces: &[InterfaceConfig],
         info: &devices::DeviceInfo,
     ) -> Result<String, NameGenerationError<'_>> {
-        let name = self
-            .naming_scheme
-            .iter()
-            .map(|rule| match rule {
-                NameCompositionRule::Static(s) => Ok(s.clone()),
-                // Dynamic rules require the knowledge of `DeviceInfo`
-                // properties and existing interface names.
-                NameCompositionRule::Dynamic(rule) => {
-                    rule.get_name(interfaces, info).map_err(NameGenerationError::GenerationError)
+        // Determine whether any rules present support retrying for a unique name.
+        let should_reattempt_on_conflict = self.naming_scheme.iter().any(|rule| match rule {
+            NameCompositionRule::Dynamic(dynamic_rule) => dynamic_rule.rule_supports_retry(),
+            _ => false,
+        });
+
+        let mut attempt_num = 0u8;
+        let name = loop {
+            let name = self
+                .naming_scheme
+                .iter()
+                .map(|rule| match rule {
+                    NameCompositionRule::Static(s) => Ok(s.clone()),
+                    // Dynamic rules require the knowledge of `DeviceInfo` properties.
+                    NameCompositionRule::Dynamic(rule) => rule
+                        .get_name(info, attempt_num)
+                        .map_err(NameGenerationError::GenerationError),
+                })
+                .collect::<Result<String, NameGenerationError<'_>>>()?;
+
+            if interfaces.iter().any(|interface| interface.name == name) {
+                if should_reattempt_on_conflict {
+                    attempt_num += 1;
+                    // Try to generate another name with the modified attempt number.
+                    continue;
                 }
-            })
-            .collect::<Result<String, NameGenerationError<'_>>>()?;
-
-        if interfaces.iter().any(|interface| interface.name == name) {
-            // TODO(fxbug.dev/56559): When a unique name can not be found with
-            // the provided naming rule, escalate. If the pre-existing
-            // interface is found to be the same logical interface with the
-            // same name, remove the existing interface and install this one.
-            // When it is a different logical interface, reject installing
-            // the new interface into netstack.
-            return Err(NameGenerationError::AlreadyExistsError(anyhow::format_err!(
-                "interface name {name} was not unique for mac={:?}, topo_path={}",
-                info.mac,
-                info.topological_path
-            )));
-        }
-
-        Ok(name)
+                // TODO(fxbug.dev/56559): When a unique name can not be found with
+                // the provided naming rule, escalate. If the pre-existing
+                // interface is found to be the same logical interface with the
+                // same name, remove the existing interface and install this one.
+                // When it is a different logical interface, reject installing
+                // the new interface into netstack.
+                return Err(NameGenerationError::AlreadyExistsError(anyhow::format_err!(
+                    "interface name {name} was not unique for mac={:?}, topo_path={}",
+                    info.mac,
+                    info.topological_path
+                )));
+            }
+            return Ok(name);
+        };
     }
 }
 
@@ -745,6 +803,54 @@ mod tests {
         let persistent_id = config
             .generate_identifier(topo_usb.into(), fidl_fuchsia_net_ext::MacAddress { octets });
         assert!(config.generate_name(&persistent_id, crate::InterfaceType::Wlan).is_err());
+    }
+
+    #[test]
+    fn test_get_usb_255_with_naming_rule() {
+        let topo_usb = "/dev/pci-00:14.0-fidl/xhci/usb/004/004/ifc-000/ax88179/ethernet";
+
+        let naming_rule = NamingRule {
+            matchers: HashSet::new(),
+            naming_scheme: vec![
+                NameCompositionRule::Dynamic(DynamicNameCompositionRule::NormalizedMac),
+                NameCompositionRule::Dynamic(DynamicNameCompositionRule::NormalizedMac),
+            ],
+        };
+
+        // test cases for 256 usb interfaces
+        let mut config = Config { interfaces: vec![] };
+        for n in 0u8..255u8 {
+            let octets = [n, 0x01, 0x01, 0x01, 0x01, 00];
+            let persistent_id = config
+                .generate_identifier(topo_usb.into(), fidl_fuchsia_net_ext::MacAddress { octets });
+
+            let info = devices::DeviceInfo {
+                device_class: fhwnet::DeviceClass::Ethernet,
+                mac: Some(fidl_fuchsia_net_ext::MacAddress { octets }),
+                topological_path: topo_usb.into(),
+            };
+
+            let name = naming_rule
+                .generate_name(&config.interfaces, &info)
+                .expect("failed to generate the name");
+            // With only NormalizedMac as a NameCompositionRule, the name
+            // should simply be the NormalizedMac itself.
+            assert_eq!(name, format!("{n:x}{n:x}"));
+
+            config.interfaces.push(InterfaceConfig {
+                id: persistent_id,
+                name: name,
+                device_class: crate::InterfaceType::Ethernet,
+            });
+        }
+
+        let octets = [0x00, 0x00, 0x01, 0x01, 0x01, 00];
+        let info = devices::DeviceInfo {
+            device_class: fhwnet::DeviceClass::Ethernet,
+            mac: Some(fidl_fuchsia_net_ext::MacAddress { octets }),
+            topological_path: topo_usb.into(),
+        };
+        assert!(naming_rule.generate_name(&config.interfaces, &info).is_err());
     }
 
     #[test]
@@ -1083,6 +1189,14 @@ mod tests {
         }
     }
 
+    fn device_info_from_octets(octets: [u8; 6]) -> devices::DeviceInfo {
+        devices::DeviceInfo {
+            device_class: fhwnet::DeviceClass::Ethernet,
+            mac: Some(fidl_fuchsia_net_ext::MacAddress { octets }),
+            topological_path: "".to_owned(),
+        }
+    }
+
     #[test_case(
         vec![NameCompositionRule::Static(String::from("x"))],
         default_device_info(),
@@ -1093,13 +1207,28 @@ mod tests {
         vec![
             NameCompositionRule::Static(String::from("eth")),
             NameCompositionRule::Static(String::from("x")),
-            NameCompositionRule::Static(String::from("100"))
+            NameCompositionRule::Static(String::from("100")),
         ],
         default_device_info(),
         "ethx100";
         "multiple_static"
     )]
-    fn test_generate_name_from_naming_rule(
+    #[test_case(
+        vec![NameCompositionRule::Dynamic(DynamicNameCompositionRule::NormalizedMac)],
+        device_info_from_octets([0x1, 0x1, 0x1, 0x1, 0x1, 0x1]),
+        "1";
+        "normalized_mac"
+    )]
+    #[test_case(
+        vec![
+            NameCompositionRule::Static(String::from("eth")),
+            NameCompositionRule::Dynamic(DynamicNameCompositionRule::NormalizedMac),
+        ],
+        device_info_from_octets([0x1, 0x1, 0x1, 0x1, 0x1, 0x9]),
+        "eth9";
+        "normalized_mac_with_static"
+    )]
+    fn test_naming_rules(
         composition_rules: Vec<NameCompositionRule>,
         info: devices::DeviceInfo,
         expected_name: &'static str,
@@ -1111,7 +1240,7 @@ mod tests {
     }
 
     #[test]
-    fn test_generate_name_from_naming_rule_interface_name_exists() {
+    fn test_generate_name_from_naming_rule_interface_name_exists_no_reattempt() {
         let shared_interface_name = "x".to_owned();
         let interfaces = vec![InterfaceConfig {
             id: PersistentIdentifier::TopologicalPath("".to_owned()),
@@ -1126,5 +1255,45 @@ mod tests {
 
         let name = naming_rule.generate_name(&interfaces, &default_device_info());
         assert_matches!(name, Err(NameGenerationError::AlreadyExistsError(_)));
+    }
+
+    // This test is different from `test_get_usb_255_with_naming_rule` as this
+    // test increments the last byte, ensuring that the offset is reset prior
+    // to each name being generated.
+    #[test]
+    fn test_generate_name_from_naming_rule_many_unique_macs() {
+        let topo_usb = "/dev/pci-00:14.0-fidl/xhci/usb/004/004/ifc-000/ax88179/ethernet";
+
+        let naming_rule = NamingRule {
+            matchers: HashSet::new(),
+            naming_scheme: vec![NameCompositionRule::Dynamic(
+                DynamicNameCompositionRule::NormalizedMac,
+            )],
+        };
+
+        // test cases for 256 usb interfaces
+        let mut config = Config { interfaces: vec![] };
+
+        for n in 0u8..255u8 {
+            let octets = [0x01, 0x01, 0x01, 0x01, 0x01, n];
+            let persistent_id = config
+                .generate_identifier(topo_usb.into(), fidl_fuchsia_net_ext::MacAddress { octets });
+            let info = devices::DeviceInfo {
+                device_class: fhwnet::DeviceClass::Ethernet,
+                mac: Some(fidl_fuchsia_net_ext::MacAddress { octets }),
+                topological_path: topo_usb.into(),
+            };
+
+            let name = naming_rule
+                .generate_name(&config.interfaces, &info)
+                .expect("failed to generate the name");
+            assert_eq!(name, format!("{n:x}"));
+
+            config.interfaces.push(InterfaceConfig {
+                id: persistent_id,
+                name: name,
+                device_class: crate::InterfaceType::Ethernet,
+            });
+        }
     }
 }

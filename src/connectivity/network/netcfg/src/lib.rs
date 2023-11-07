@@ -4523,7 +4523,8 @@ mod tests {
         {"topological_path": "abcde"},
         {"any": true}
     ], "naming_scheme": [
-        { "static": "x" }
+        { "static": "x" },
+        { "dynamic": "normalized_mac" }
     ] } ]
 }
 "#;
@@ -4589,7 +4590,12 @@ mod tests {
                 interface::MatchingRule::TopologicalPath(glob::Pattern::new("abcde").unwrap()),
                 interface::MatchingRule::Any(true),
             ]),
-            naming_scheme: vec![interface::NameCompositionRule::Static("x".to_owned())],
+            naming_scheme: vec![
+                interface::NameCompositionRule::Static("x".to_owned()),
+                interface::NameCompositionRule::Dynamic(
+                    interface::DynamicNameCompositionRule::NormalizedMac,
+                ),
+            ],
         }]);
         assert_eq!(interface_naming_policy, expected_naming_policy);
     }
