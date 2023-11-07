@@ -11,11 +11,12 @@ namespace forensics {
 
 UtcClockReadyWatcher::UtcClockReadyWatcher(async_dispatcher_t* dispatcher,
                                            zx::unowned_clock clock_handle)
-    : wait_for_clock_sync_(this, clock_handle->get_handle(),
-                           fuchsia::time::SIGNAL_UTC_CLOCK_SYNCHRONIZED,
-                           /*options=*/0) {
-  if (const zx_status_t status = wait_for_clock_sync_.Begin(dispatcher); status != ZX_OK) {
-    FX_PLOGS(FATAL, status) << "Failed to wait for clock sync";
+    : wait_for_logging_quality_clock_(this, clock_handle->get_handle(),
+                                      fuchsia::time::SIGNAL_UTC_CLOCK_LOGGING_QUALITY,
+                                      /*options=*/0) {
+  if (const zx_status_t status = wait_for_logging_quality_clock_.Begin(dispatcher);
+      status != ZX_OK) {
+    FX_PLOGS(FATAL, status) << "Failed to wait for logging quality clock";
   }
 }
 
@@ -30,12 +31,14 @@ void UtcClockReadyWatcher::OnClockReady(::fit::callback<void()> callback) {
 
 bool UtcClockReadyWatcher::IsUtcClockReady() const { return is_utc_clock_ready_; }
 
-void UtcClockReadyWatcher::OnClockSync(async_dispatcher_t* dispatcher, async::WaitBase* wait,
-                                       zx_status_t status, const zx_packet_signal_t* signal) {
+void UtcClockReadyWatcher::OnClockLoggingQuality(async_dispatcher_t* dispatcher,
+                                                 async::WaitBase* wait, zx_status_t status,
+                                                 const zx_packet_signal_t* signal) {
   if (status != ZX_OK) {
-    FX_PLOGS(WARNING, status) << "Wait for clock sync completed with error, trying again";
+    FX_PLOGS(WARNING, status)
+        << "Wait for logging quality clock completed with error, trying again";
 
-    // Attempt to wait for the clock to sync again.
+    // Attempt to wait for the clock to achieve logging quality again.
     wait->Begin(dispatcher);
     return;
   }

@@ -28,12 +28,12 @@ class TimeProviderTest : public UnitTestFixture {
   }
 
  protected:
-  void SyncClock() {
+  void SignalLoggingQualityClock() {
     if (const zx_status_t status =
             clock_handle_.signal(/*clear_mask=*/0,
-                                 /*set_mask=*/fuchsia::time::SIGNAL_UTC_CLOCK_SYNCHRONIZED);
+                                 /*set_mask=*/fuchsia::time::SIGNAL_UTC_CLOCK_LOGGING_QUALITY);
         status != ZX_OK) {
-      FX_PLOGS(FATAL, status) << "Failed to sync clock";
+      FX_PLOGS(FATAL, status) << "Failed to achieve logging quality clock";
     }
   }
 
@@ -49,19 +49,19 @@ class TimeProviderTest : public UnitTestFixture {
   std::unique_ptr<TimeProvider> time_provider_;
 };
 
-TEST_F(TimeProviderTest, Check_ClockSynced) {
+TEST_F(TimeProviderTest, Check_LoggingQualityClock) {
   SetUpTimeProvider();
   EXPECT_FALSE(time_provider_->Get().at(kDeviceUtcTimeKey).HasValue());
 
-  SyncClock();
+  SignalLoggingQualityClock();
   RunLoopUntilIdle();
 
   ASSERT_TRUE(time_provider_->Get().at(kDeviceUtcTimeKey).HasValue());
   EXPECT_EQ(time_provider_->Get().at(kDeviceUtcTimeKey).Value(), kTimeStr);
 }
 
-TEST_F(TimeProviderTest, Check_ClockSyncedBeforeFeedback) {
-  SyncClock();
+TEST_F(TimeProviderTest, Check_LoggingQualityClockBeforeFeedback) {
+  SignalLoggingQualityClock();
   SetUpTimeProvider();
   RunLoopUntilIdle();
 
@@ -74,6 +74,18 @@ TEST_F(TimeProviderTest, Check_NotReadyOnClockStarted) {
   EXPECT_FALSE(time_provider_->Get().at(kDeviceUtcTimeKey).HasValue());
 
   ASSERT_EQ(clock_handle_.update(zx::clock::update_args().set_value(zx::time(kTime.get()))), ZX_OK);
+  RunLoopUntilIdle();
+
+  EXPECT_FALSE(time_provider_->Get().at(kDeviceUtcTimeKey).HasValue());
+}
+
+TEST_F(TimeProviderTest, Check_NotReadyOnClockSynchronized) {
+  SetUpTimeProvider();
+  EXPECT_FALSE(time_provider_->Get().at(kDeviceUtcTimeKey).HasValue());
+
+  ASSERT_EQ(clock_handle_.signal(
+                /*clear_mask=*/0, /*set_mask=*/fuchsia::time::SIGNAL_UTC_CLOCK_SYNCHRONIZED),
+            ZX_OK);
   RunLoopUntilIdle();
 
   EXPECT_FALSE(time_provider_->Get().at(kDeviceUtcTimeKey).HasValue());

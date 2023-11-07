@@ -33,14 +33,14 @@ class UtcClockReadyWatcher : public UtcClockReadyWatcherBase {
   bool IsUtcClockReady() const override;
 
  private:
-  void OnClockSync(async_dispatcher_t* dispatcher, async::WaitBase* wait, zx_status_t status,
-                   const zx_packet_signal_t* signal);
+  void OnClockLoggingQuality(async_dispatcher_t* dispatcher, async::WaitBase* wait,
+                             zx_status_t status, const zx_packet_signal_t* signal);
 
   std::vector<::fit::callback<void()>> callbacks_;
   bool is_utc_clock_ready_ = false;
 
-  async::WaitMethod<UtcClockReadyWatcher, &UtcClockReadyWatcher::OnClockSync> wait_for_clock_sync_{
-      this};
+  async::WaitMethod<UtcClockReadyWatcher, &UtcClockReadyWatcher::OnClockLoggingQuality>
+      wait_for_logging_quality_clock_{this};
 };
 }  // namespace forensics
 

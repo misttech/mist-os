@@ -13,7 +13,7 @@
 
 namespace forensics {
 
-// Provides the UTC time only if the device's UTC clock has synced.
+// Provides the UTC time only if the device's UTC clock has achieved logging quality.
 //
 // Can be configured to record the UTC-monotonic difference from the previous boot by providing a
 // non-nullopt |utc_monotonic_difference_path|.
@@ -37,8 +37,8 @@ class UtcTimeProvider {
   UtcTimeProvider(UtcClockReadyWatcherBase* utc_clock_ready_watcher, timekeeper::Clock* clock,
                   std::optional<PreviousBootFile> utc_monotonic_difference_file);
 
-  // Keep waiting on the clock handle until the clock has synced.
-  void OnClockSync();
+  // Keep waiting on the clock handle until the clock has achieved logging quality.
+  void OnClockLoggingQuality();
 
   timekeeper::Clock* clock_;
 

@@ -38,12 +38,12 @@ class UtcTimeProviderTest : public UnitTestFixture {
   }
 
  protected:
-  void SyncClock() {
+  void SignalLoggingQualityClock() {
     if (const zx_status_t status =
             clock_handle_.signal(/*clear_mask=*/0,
-                                 /*set_mask=*/fuchsia::time::SIGNAL_UTC_CLOCK_SYNCHRONIZED);
+                                 /*set_mask=*/fuchsia::time::SIGNAL_UTC_CLOCK_LOGGING_QUALITY);
         status != ZX_OK) {
-      FX_PLOGS(FATAL, status) << "Failed to sync clock";
+      FX_PLOGS(FATAL, status) << "Failed to achieve logging quality clock";
     }
   }
 
@@ -56,7 +56,7 @@ class UtcTimeProviderTest : public UnitTestFixture {
 
 TEST_F(UtcTimeProviderTest, Check_CurrentUtcMonotonicDifference) {
   clock_.Set(zx::time(0));
-  SyncClock();
+  SignalLoggingQualityClock();
   RunLoopUntilIdle();
 
   zx::time monotonic = clock_.Now();
@@ -88,7 +88,7 @@ TEST_F(UtcTimeProviderTest, Check_ReadsPreviousBootUtcMonotonicDifference) {
 }
 
 TEST_F(UtcTimeProviderTest, Check_WritesPreviousBootUtcMonotonicDifference) {
-  SyncClock();
+  SignalLoggingQualityClock();
   RunLoopUntilIdle();
 
   // |is_first_instance| is true becuase the previous UTC-monotonic difference should be read.
@@ -112,6 +112,15 @@ TEST_F(UtcTimeProviderTest, Check_WritesPreviousBootUtcMonotonicDifference) {
 
 TEST_F(UtcTimeProviderTest, Check_NotReadyOnClockStarted) {
   ASSERT_EQ(clock_handle_.update(zx::clock::update_args().set_value(zx::time(kTime.get()))), ZX_OK);
+  RunLoopUntilIdle();
+
+  EXPECT_FALSE(utc_provider_->CurrentUtcMonotonicDifference().has_value());
+}
+
+TEST_F(UtcTimeProviderTest, Check_NotReadyOnClockSynchronized) {
+  ASSERT_EQ(clock_handle_.signal(
+                /*clear_mask=*/0, /*set_mask=*/fuchsia::time::SIGNAL_UTC_CLOCK_SYNCHRONIZED),
+            ZX_OK);
   RunLoopUntilIdle();
 
   EXPECT_FALSE(utc_provider_->CurrentUtcMonotonicDifference().has_value());

@@ -30,7 +30,8 @@ UtcTimeProvider::UtcTimeProvider(UtcClockReadyWatcherBase* utc_clock_ready_watch
       utc_monotonic_difference_file_(std::move(utc_monotonic_difference_file)),
       previous_boot_utc_monotonic_difference_(std::nullopt),
       utc_clock_ready_watcher_(utc_clock_ready_watcher) {
-  utc_clock_ready_watcher->OnClockReady(fit::bind_member<&UtcTimeProvider::OnClockSync>(this));
+  utc_clock_ready_watcher->OnClockReady(
+      fit::bind_member<&UtcTimeProvider::OnClockLoggingQuality>(this));
 
   if (!utc_monotonic_difference_file_.has_value()) {
     return;
@@ -72,7 +73,7 @@ std::optional<zx::duration> UtcTimeProvider::PreviousBootUtcMonotonicDifference(
   return previous_boot_utc_monotonic_difference_;
 }
 
-void UtcTimeProvider::OnClockSync() {
+void UtcTimeProvider::OnClockLoggingQuality() {
   // Write the current difference between the UTC and monotonic clocks.
   if (utc_monotonic_difference_file_.has_value()) {
     const timekeeper::time_utc current_utc_time = CurrentUtcTimeRaw(clock_);
