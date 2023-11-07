@@ -63,14 +63,14 @@ zx_status_t Dfv1Driver::Create(void* ctx, zx_device_t* parent) {
   zx::bti bti;
   zx_status_t status = ZX_OK;
   if ((status = pdev.GetBti(0, &bti)) != ZX_OK) {
-    zxlogf(ERROR, "Failed to get BTI: %d", status);
+    zxlogf(ERROR, "Failed to get BTI: %s", zx_status_get_string(status));
     return status;
   }
 
   std::optional<fdf::MmioBuffer> mmio;
   status = pdev.MapMmio(0, &mmio);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to get mmio: %d", status);
+    zxlogf(ERROR, "Failed to get mmio: %s", zx_status_get_string(status));
     return status;
   }
 
@@ -79,13 +79,13 @@ zx_status_t Dfv1Driver::Create(void* ctx, zx_device_t* parent) {
   size_t actual;
   status = device_get_metadata(parent, DEVICE_METADATA_PRIVATE, &config, sizeof(config), &actual);
   if (status != ZX_OK || actual != sizeof(config)) {
-    zxlogf(ERROR, "Failed to get metadata: %d", status);
+    zxlogf(ERROR, "Failed to get metadata: %s", zx_status_get_string(status));
     return status;
   }
 
   zx::interrupt irq;
   if ((status = pdev.GetInterrupt(0, &irq)) != ZX_OK) {
-    zxlogf(ERROR, "Failed to get interrupt: %d", status);
+    zxlogf(ERROR, "Failed to get interrupt: %s", zx_status_get_string(status));
     return status;
   }
 
@@ -121,7 +121,7 @@ zx_status_t Dfv1Driver::Create(void* ctx, zx_device_t* parent) {
 
   pdev_device_info_t dev_info;
   if ((status = pdev.GetDeviceInfo(&dev_info)) != ZX_OK) {
-    zxlogf(ERROR, "Failed to get device info: %d", status);
+    zxlogf(ERROR, "Failed to get device info: %s", zx_status_get_string(status));
     return status;
   }
 

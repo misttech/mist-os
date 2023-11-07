@@ -109,7 +109,7 @@ zx::result<std::array<uint32_t, AmlSdmmc::kResponseCount>> AmlSdmmc::WaitForInte
   zx_status_t status = WaitForInterruptImpl();
 
   if (status != ZX_OK) {
-    DriverLog(ERROR, "WaitForInterruptImpl got %d", status);
+    DriverLog(ERROR, "WaitForInterruptImpl returned %s", zx_status_get_string(status));
     return zx::error(status);
   }
 
@@ -595,7 +595,7 @@ zx::result<aml_sdmmc_desc_t*> AmlSdmmc::SetupOwnedVmoDescs(const sdmmc_req_t& re
     zx_status_t status = vmo.GetPinnedRegions(offset + vmo.meta().offset, buffer.size, regions,
                                               std::size(regions), &region_count);
     if (status != ZX_OK && status != ZX_ERR_BUFFER_TOO_SMALL) {
-      DriverLog(ERROR, "failed to get pinned regions: %d", status);
+      DriverLog(ERROR, "failed to get pinned regions: %s", zx_status_get_string(status));
       return zx::error(status);
     }
 
@@ -633,7 +633,7 @@ zx::result<std::pair<aml_sdmmc_desc_t*, fzl::PinnedVmo>> AmlSdmmc::SetupUnownedV
   zx_status_t status = pinned_vmo.PinRange(
       buffer.offset & ~PageMask(), pagecount * zx_system_get_page_size(), *vmo, bti_, options);
   if (status != ZX_OK) {
-    DriverLog(ERROR, "bti-pin failed with error %d", status);
+    DriverLog(ERROR, "bti-pin failed: %s", zx_status_get_string(status));
     return zx::error(status);
   }
 
@@ -697,7 +697,7 @@ zx::result<aml_sdmmc_desc_t*> AmlSdmmc::PopulateDescriptors(const sdmmc_req_t& r
     const size_t desc_size = std::min(region.size, max_desc_size);
 
     if (desc >= descs_end) {
-      DriverLog(ERROR, "request with more than %zu chunks is unsupported\n", kMaxDmaDescriptors);
+      DriverLog(ERROR, "request with more than %zu chunks is unsupported", kMaxDmaDescriptors);
       return zx::error(ZX_ERR_NOT_SUPPORTED);
     }
     if (region.phys_addr % AmlSdmmcCmdCfg::kDataAddrAlignment != 0) {
