@@ -61,11 +61,32 @@ void InputReport::HidReportListenerReceiveReport(const uint8_t* report, size_t r
                                                  zx_time_t report_time) {
   fbl::AutoLock lock(&readers_lock_);
   for (auto& device : devices_) {
-    // Find the matching device. In particular, if a device has report id (report id != 0),
-    // the device's report id must match the report's id.
-    if (device->InputReportId() && *device->InputReportId() != 0 &&
-        *device->InputReportId() != report[0]) {
+    // A Device may not have input reports at all: for example, a
+    // TouchConfiguration Device takes only feature reports but no input
+    // report. We should ignore all such devices when handling input reports.
+    if (!device->InputReportId().has_value()) {
       continue;
+    }
+
+    // TODO(fxbug.dev/136154): For Devices accepting input reports, there are
+    // two possible cases: [1] the Device may have its dedicated report ID,
+    // which can be any integer value in [1, 255]; or [2] the Device doesn't
+    // have its dedicated report ID which is allowed if there is only one
+    // report. Currently for [2], this library sets the report_id field to 0,
+    // which is a value reserved by the USB-HID standard.
+    //
+    // Instead of using a placeholder value (0) that is reserved by the specs,
+    // we should use a different way to indicate that the Device takes input
+    // reports but without report IDs.
+    const uint8_t device_input_report_id = *device->InputReportId();
+    static constexpr uint8_t kInputReportIdForDevicesWithoutReportIds = 0;
+    if (device_input_report_id != kInputReportIdForDevicesWithoutReportIds) {
+      // If a device has a report ID, it must match the ID from the incoming
+      // report.
+      const uint8_t incoming_input_report_id = report[0];
+      if (device_input_report_id != incoming_input_report_id) {
+        continue;
+      }
     }
 
     for (auto& reader : readers_list_) {
