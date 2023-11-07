@@ -783,7 +783,16 @@ impl BinderProcess {
                 return Ok(());
             }
             Handle::Object { index } => {
-                self.lock().handles.get(index).ok_or_else(|| errno!(ENOENT))?
+                let (proxy, guard) =
+                    self.lock().handles.get(index).ok_or_else(|| errno!(ENOENT))?;
+
+                // The object must have strong reference when used to find its owner process,
+                // but there is no need to keep it alive afterwards.
+                let mut actions = RefCountActions::default();
+                guard.release(&mut actions);
+                actions.release(());
+
+                proxy
             }
         };
         if let Some(owner) = proxy.owner.upgrade() {
@@ -804,17 +813,17 @@ impl BinderProcess {
         handle: Handle,
         cookie: binder_uintptr_t,
     ) -> Result<(), Errno> {
-        let proxy = match handle {
+        let owner = match handle {
             Handle::ContextManager => {
                 not_implemented!("clear death notification for service manager");
                 self.enqueue_command(Command::ClearDeathNotificationDone(cookie));
                 return Ok(());
             }
             Handle::Object { index } => {
-                self.lock().handles.force_get(index).ok_or_else(|| errno!(ENOENT))?
+                self.lock().handles.get_owner(index).ok_or_else(|| errno!(ENOENT))?
             }
         };
-        if let Some(owner) = proxy.owner.upgrade() {
+        if let Some(owner) = owner.upgrade() {
             let mut owner = owner.lock();
             if let Some((idx, _)) = owner
                 .death_subscribers
@@ -860,35 +869,15 @@ impl<'a> BinderProcessGuard<'a> {
 
     /// Inserts a reference to a binder object, returning a handle that represents it.
     /// The handle may be an existing handle if the object was already present in the table.
-    /// A new handle will have a single strong reference, an existing handle will have its strong
-    /// reference count incremented by one.
+    /// The object must have at least a strong reference guarded by `guard` to ensure it is kept
+    /// alive until it is added to the transaction.
     /// Returns the handle representing the object.
     pub fn insert_for_transaction(
-        self,
-        target_process: &BinderProcess,
-        object: Arc<BinderObject>,
+        &mut self,
+        guard: StrongRefGuard,
         actions: &mut RefCountActions,
     ) -> Handle {
-        // Increment the strong reference count of this object, while keeping the lock on the
-        // source process. This ensures the object cannot be release before being installed into
-        // the handle table to the target process. Moreover, this doesn't creates any new refcount
-        // operation, as `HandleTable::insert_for_transaction` also increase the strong reference
-        // count of the object.
-        let guard = object.inc_strong(actions);
-
-        // Now that the object has at least one strong reference, release the lock on the source
-        // process, so that the lock on the target process can be acquired.
-        std::mem::drop(self);
-
-        // Create a handle in the receiving process that references the binder object
-        // in the sender's process. A new strong reference will be taken on `object`.
-        let handle = target_process.lock().handles.insert_for_transaction(object, actions);
-
-        // Now that the object is kept by the target process handle table, the initial strong
-        // increment can be released.
-        guard.release(actions);
-
-        handle
+        self.handles.insert_for_transaction(guard, actions)
     }
 
     /// Handle a binder thread's request to increment/decrement a strong/weak reference to a remote
@@ -969,18 +958,21 @@ impl<'a> BinderProcessGuard<'a> {
         binder_thread: &Arc<BinderThread>,
         local: LocalBinderObject,
         flags: u32,
-    ) -> Arc<BinderObject> {
+    ) -> StrongRefGuard {
         if let Some(object) = self.find_object(&local) {
-            Arc::clone(object)
+            // The ref count can grow back from 0 in this instance because the object is being
+            // registered again by its owner.
+            object.inc_strong_unchecked(binder_thread)
         } else {
-            let object = BinderObject::new(self.base, local, flags);
-            self.objects.insert(object.local.weak_ref_addr, object.clone());
+            let (object, guard) = BinderObject::new(self.base, local, flags);
 
             // Tell the owning process that a remote process now has a strong reference to
-            // to this object.
+            // this object.
             binder_thread.lock().enqueue_command(Command::AcquireRef(object.local));
 
-            object
+            self.objects.insert(object.local.weak_ref_addr, object);
+
+            guard
         }
     }
 
@@ -1348,12 +1340,12 @@ impl Drop for BinderObjectRef {
 impl BinderObjectRef {
     /// Build a new reference to the given object. The reference will start with a strong count of
     /// 1.
-    fn new(binder_object: Arc<BinderObject>, actions: &mut RefCountActions) -> Self {
-        let strong_guard = binder_object.inc_strong(actions);
+    fn new(guard: StrongRefGuard) -> Self {
+        let binder_object = guard.binder_object.clone();
         Self {
             binder_object,
             strong_count: 1,
-            strong_guard: Some(strong_guard),
+            strong_guard: Some(guard),
             weak_count: 0,
             weak_guard: None,
         }
@@ -1390,11 +1382,26 @@ impl BinderObjectRef {
     /// Increments the strong reference count of the binder object reference.
     /// Takes a `RefCountActions` that must be `release`d without holding a lock on
     /// `BinderProcess`.
-    fn inc_strong(&mut self, actions: &mut RefCountActions) {
+    fn inc_strong(&mut self, _actions: &mut RefCountActions) -> Result<(), Errno> {
         assert!(self.has_ref());
         if self.strong_count == 0 {
-            let guard = self.binder_object.inc_strong(actions);
+            let guard = self.binder_object.inc_strong_checked()?;
             self.strong_guard = Some(guard);
+        }
+        self.strong_count += 1;
+        Ok(())
+    }
+
+    /// Increments the strong reference count of the binder object reference while holding a strong
+    /// reference guard on the object.
+    /// Takes a `RefCountActions` that must be `release`d without holding a lock on
+    /// `BinderProcess`.
+    fn inc_strong_with_guard(&mut self, guard: StrongRefGuard, actions: &mut RefCountActions) {
+        assert!(self.has_ref());
+        if self.strong_count == 0 {
+            self.strong_guard = Some(guard);
+        } else {
+            guard.release(actions);
         }
         self.strong_count += 1;
     }
@@ -1466,8 +1473,6 @@ impl BinderObjectRef {
 /// operation.
 #[derive(Debug)]
 enum RefCountAction {
-    /// Send a AcquireRef command to the owning process.
-    Acquire(Arc<BinderObject>),
     /// Send a ReleaseRef command to the owning process.
     Release(Arc<BinderObject>),
     /// Send a IncRef command to the owning process.
@@ -1482,11 +1487,6 @@ impl RefCountAction {
     /// so that the object can be removed from the process table.
     fn enqueue(&self) -> Option<(TempRef<'_, BinderProcess>, Arc<BinderObject>)> {
         match self {
-            Self::Acquire(object) => {
-                if let Some(binder_process) = object.owner.upgrade() {
-                    binder_process.enqueue_command(Command::AcquireRef(object.local));
-                }
-            }
             Self::Release(object) => {
                 if let Some(binder_process) = object.owner.upgrade() {
                     binder_process.enqueue_command(Command::ReleaseRef(object.local));
@@ -1550,23 +1550,26 @@ impl Releasable for Vec<RefCountAction> {
 impl HandleTable {
     /// Inserts a reference to a binder object, returning a handle that represents it.
     /// The handle may be an existing handle if the object was already present in the table.
+    /// Transfer the reference represented by `guard` to the handle.
     /// A new handle will have a single strong reference, an existing handle will have its strong
     /// reference count incremented by one.
     /// Takes a `RefCountActions` that must be `release`d without holding a lock on
     /// `BinderProcess` and the handle representing the object.
     fn insert_for_transaction(
         &mut self,
-        object: Arc<BinderObject>,
+        guard: StrongRefGuard,
         actions: &mut RefCountActions,
     ) -> Handle {
-        let index = if let Some((existing_idx, object_ref)) = self.find_ref_for_object(&object) {
+        let index = if let Some((existing_idx, object_ref)) =
+            self.find_ref_for_object(&guard.binder_object)
+        {
             // Increment the number of reference to the handle as expected by the caller.
-            object_ref.inc_strong(actions);
+            object_ref.inc_strong_with_guard(guard, actions);
             existing_idx
         } else {
             // The new handle will be created with a strong reference as expected by the
             // caller.
-            self.table.insert(BinderObjectRef::new(object, actions))
+            self.table.insert(BinderObjectRef::new(guard))
         };
         Handle::Object { index }
     }
@@ -1579,20 +1582,20 @@ impl HandleTable {
     }
 
     /// Retrieves a reference to a binder object at index `idx`. Returns None if the index doesn't
-    /// exist or the object has no strong reference.
-    fn get(&self, idx: usize) -> Option<Arc<BinderObject>> {
+    /// exist or the object has no strong reference, otherwise returns the object and a guard to
+    /// ensure it is kept alive while used.
+    fn get(&self, idx: usize) -> Option<(Arc<BinderObject>, StrongRefGuard)> {
         let object_ref = self.table.get(idx)?;
-        if object_ref.binder_object.has_strong() {
-            Some(object_ref.binder_object.clone())
-        } else {
-            None
+        match object_ref.binder_object.inc_strong_checked() {
+            Ok(guard) => Some((object_ref.binder_object.clone(), guard)),
+            _ => None,
         }
     }
 
-    /// Retrieves a reference to a binder object at index `idx`, whether the object has strong
+    /// Retrieves the owner of the binder object at index `idx`, whether the object has strong
     /// references or not.
-    fn force_get(&self, idx: usize) -> Option<Arc<BinderObject>> {
-        self.table.get(idx).map(|r| r.binder_object.clone())
+    fn get_owner(&self, idx: usize) -> Option<WeakRef<BinderProcess>> {
+        self.table.get(idx).map(|r| r.binder_object.owner.clone())
     }
 
     /// Increments the strong reference count of the binder object reference at index `idx`,
@@ -1600,7 +1603,7 @@ impl HandleTable {
     /// Takes a `RefCountActions` that must be `release`d without holding a lock on
     /// `BinderProcess`.
     fn inc_strong(&mut self, idx: usize, actions: &mut RefCountActions) -> Result<(), Errno> {
-        Ok(self.table.get_mut(idx).ok_or_else(|| errno!(ENOENT))?.inc_strong(actions))
+        Ok(self.table.get_mut(idx).ok_or_else(|| errno!(ENOENT))?.inc_strong(actions)?)
     }
 
     /// Increments the weak reference count of the binder object reference at index `idx`, failing
@@ -2238,22 +2241,28 @@ type WeakRefGuard = RefGuard<WeakRefReleaser>;
 impl BinderObject {
     /// Creates a new BinderObject. It is the responsibility of the caller to sent a `BR_ACQUIRE`
     /// to the owning process.
-    fn new(owner: &BinderProcess, local: LocalBinderObject, flags: u32) -> Arc<Self> {
+    fn new(
+        owner: &BinderProcess,
+        local: LocalBinderObject,
+        flags: u32,
+    ) -> (Arc<Self>, StrongRefGuard) {
         log_trace!(
             "New binder object {:?} in process {:?} with flags {:?}",
             local,
             owner.identifier,
             flags
         );
-        Arc::new(Self {
+        let object = Arc::new(Self {
             owner: owner.weak_self.clone(),
             local,
             flags,
             state: Mutex::new(BinderObjectMutableState {
-                strong_count: ObjectReferenceCount::WaitingAck(0),
+                strong_count: ObjectReferenceCount::WaitingAck(1),
                 ..Default::default()
             }),
-        })
+        });
+        let guard = StrongRefGuard::new(object.clone());
+        (object, guard)
     }
 
     fn new_context_manager_marker(context_manager: &BinderProcess, flags: u32) -> Arc<Self> {
@@ -2270,11 +2279,6 @@ impl BinderObject {
         self.state.lock()
     }
 
-    /// Returns whether the object has any strong reference.
-    fn has_strong(&self) -> bool {
-        self.lock().strong_count.count() > 0
-    }
-
     /// Returns whether the object has any reference, or is waiting for an acknowledgement from the
     /// owning process. The object cannot be removed from the object table has long as this is
     /// true.
@@ -2283,14 +2287,29 @@ impl BinderObject {
         state.weak_count.has_ref() || state.strong_count.has_ref()
     }
 
-    /// Increments the strong reference count of the binder object.
+    /// Increments the strong reference count of the binder object. Allows to raise the strong
+    /// count from 0 to 1.
     /// Takes a `RefCountActions` that must be `release`d without holding a lock on
     /// `BinderProcess`.
-    fn inc_strong(self: &Arc<Self>, actions: &mut RefCountActions) -> StrongRefGuard {
-        if self.lock().strong_count.inc() {
-            actions.push(RefCountAction::Acquire(self.clone()));
+    fn inc_strong_unchecked(self: &Arc<Self>, binder_thread: &Arc<BinderThread>) -> StrongRefGuard {
+        let mut state = self.lock();
+        if state.strong_count.inc() {
+            binder_thread.lock().enqueue_command(Command::AcquireRef(self.local));
         }
-        StrongRefGuard::new(self.clone())
+        StrongRefGuard::new(Arc::clone(self))
+    }
+
+    /// Increments the strong reference count of the binder object. Fails is the current strong
+    /// count is 0.
+    /// Takes a `RefCountActions` that must be `release`d without holding a lock on
+    /// `BinderProcess`.
+    fn inc_strong_checked(self: &Arc<Self>) -> Result<StrongRefGuard, Errno> {
+        let mut state = self.lock();
+        if state.strong_count.count() == 0 {
+            return error!(EINVAL);
+        }
+        assert!(!state.strong_count.inc());
+        Ok(StrongRefGuard::new(Arc::clone(self)))
     }
 
     /// Increments the weak reference count of the binder object.
@@ -3098,30 +3117,27 @@ impl BinderDriver {
         binder_thread: &Arc<BinderThread>,
         data: binder_transaction_data_sg,
     ) -> Result<(), TransactionError> {
+        // SAFETY: Transactions can only refer to handles.
+        let handle = unsafe { data.transaction_data.target.handle }.into();
+
+        let (object, target_proc, mut guard) = match handle {
+            Handle::ContextManager => {
+                let (object, owner) = self.get_context_manager(current_task)?;
+                (object, Some(owner), None)
+            }
+            Handle::Object { index } => {
+                let binder_proc = binder_proc.lock();
+                let (object, guard) =
+                    binder_proc.handles.get(index).ok_or(TransactionError::Failure)?;
+                let owner = object.owner.upgrade().map(TempRef::into_static);
+                (object, owner, Some(guard))
+            }
+        };
+
         let mut actions = RefCountActions::default();
         release_after!(actions, (), {
-            // SAFETY: Transactions can only refer to handles.
-            let handle = unsafe { data.transaction_data.target.handle }.into();
-
-            let (object, target_proc, mut guard) = match handle {
-                Handle::ContextManager => {
-                    let (object, owner) = self.get_context_manager(current_task)?;
-                    (object, owner, None)
-                }
-                Handle::Object { index } => {
-                    let binder_proc = binder_proc.lock();
-                    let object = binder_proc.handles.get(index).ok_or(TransactionError::Failure)?;
-                    let owner = object
-                        .owner
-                        .upgrade()
-                        .map(TempRef::into_static)
-                        .ok_or(TransactionError::Dead)?;
-                    let guard = object.inc_strong(&mut actions);
-                    (object, owner, Some(guard))
-                }
-            };
-
             release_after!(guard, &mut actions, {
+                let target_proc = target_proc.ok_or(TransactionError::Dead)?;
                 let weak_task = current_task.get_task(target_proc.pid);
                 let target_task = weak_task.upgrade().ok_or_else(|| TransactionError::Dead)?;
                 let security_context: Option<FsString> = if object.flags
@@ -3538,54 +3554,42 @@ impl BinderDriver {
                                 serialized_object
                             }
                             Handle::Object { index } => {
-                                let mut actions = RefCountActions::default();
-                                release_after!(
-                                    actions,
-                                    (),
-                                    || -> Result::<SerializedBinderObject, TransactionError> {
-                                        let source_proc = source_proc.lock();
-                                        let proxy = source_proc
-                                            .handles
-                                            .get(index)
-                                            .ok_or(TransactionError::Failure)?;
-                                        let binder_object = if proxy.owner.as_ptr() == target_proc {
-                                            // The binder object belongs to the receiving process.
+                                // 1. Find the object and add a guard on it in the
+                                //    transaction to ensures the receiving process keep
+                                //    it alive until the transactions is finished
+                                let (proxy, guard) = source_proc
+                                    .lock()
+                                    .handles
+                                    .get(index)
+                                    .ok_or(TransactionError::Failure)?;
+                                if proxy.owner.as_ptr() == target_proc {
+                                    // The binder object belongs to the receiving process.
 
-                                            // 1. Add a guard on the object in the transaction to
-                                            //    ensures the receiving process keep it alive until the
-                                            //    transactions is finished
-                                            let guard = proxy.inc_strong(&mut actions);
-                                            transaction_state.push_guard(guard);
+                                    transaction_state.push_guard(guard);
 
-                                            // 2. Convert the binder object from a handle to a local object.
-                                            SerializedBinderObject::Object {
-                                                local: proxy.local,
-                                                flags,
-                                            }
-                                        } else {
-                                            // The binder object does not belong to the receiving
-                                            // process.
+                                    // 2. Convert the binder object from a handle to a local object.
+                                    SerializedBinderObject::Object { local: proxy.local, flags }
+                                } else {
+                                    // The binder object does not belong to the receiving
+                                    // process.
 
-                                            // Insert the handle in the handle table of the receiving process
-                                            // and add a strong reference to it to ensure it survives for the
-                                            // lifetime of the transaction.
-                                            let new_handle = source_proc.insert_for_transaction(
-                                                target_proc,
-                                                proxy.clone(),
-                                                &mut actions,
-                                            );
-                                            // Tie this handle's strong reference to be held as long as this
-                                            // buffer.
-                                            transaction_state.push_handle(new_handle);
-                                            SerializedBinderObject::Handle {
-                                                handle: new_handle,
-                                                flags,
-                                                cookie,
-                                            }
-                                        };
-                                        Ok(binder_object)
+                                    // Insert the handle in the handle table of the receiving process
+                                    // and add a strong reference to it to ensure it survives for the
+                                    // lifetime of the transaction.
+                                    let mut actions = RefCountActions::default();
+                                    let new_handle = target_proc
+                                        .lock()
+                                        .insert_for_transaction(guard, &mut actions);
+                                    actions.release(());
+                                    // Tie this handle's strong reference to be held as long as this
+                                    // buffer.
+                                    transaction_state.push_handle(new_handle);
+                                    SerializedBinderObject::Handle {
+                                        handle: new_handle,
+                                        flags,
+                                        cookie,
                                     }
-                                )?
+                                }
                             }
                         }
                     }
@@ -3596,16 +3600,15 @@ impl BinderDriver {
                             // to translate this address to some handle.
 
                             // Register this binder object if it hasn't already been registered.
-                            let mut source_proc = source_proc.lock();
-                            let object =
-                                source_proc.find_or_register_object(source_thread, local, flags);
+                            let guard = source_proc.lock().find_or_register_object(
+                                source_thread,
+                                local,
+                                flags,
+                            );
                             // Create a handle in the receiving process that references the binder object
                             // in the sender's process.
-                            let handle = source_proc.insert_for_transaction(
-                                target_proc,
-                                object,
-                                &mut actions,
-                            );
+                            let handle =
+                                target_proc.lock().insert_for_transaction(guard, &mut actions);
                             // Tie this handle's strong reference to be held as long as this buffer.
                             transaction_state.push_handle(handle);
 
@@ -4305,11 +4308,11 @@ pub mod tests {
         owner: &BinderProcess,
         weak_ref_addr: UserAddress,
         strong_ref_addr: UserAddress,
-    ) -> Arc<BinderObject> {
-        let object =
+    ) -> (Arc<BinderObject>, StrongRefGuard) {
+        let (object, guard) =
             BinderObject::new(owner, LocalBinderObject { weak_ref_addr, strong_ref_addr }, 0);
         owner.lock().objects.insert(weak_ref_addr, object.clone());
-        object
+        (object, guard)
     }
 
     fn assert_flags_are_equivalent(f1: fbinder::FileFlags, f2: OpenFlags) {
@@ -4364,7 +4367,7 @@ pub mod tests {
         let proc_1 = test.new_process();
         let proc_2 = test.new_process();
 
-        let transaction_ref = BinderObject::new(
+        let (transaction_ref, guard) = BinderObject::new(
             &proc_1.proc,
             LocalBinderObject {
                 weak_ref_addr: UserAddress::from(0xffffffffffffffff),
@@ -4377,22 +4380,25 @@ pub mod tests {
         }
 
         // Insert the transaction once.
-        let _ = proc_2.proc.lock().handles.insert_for_transaction(
-            transaction_ref.clone(),
-            &mut RefCountActions::default_released(),
-        );
+        let _ = proc_2
+            .proc
+            .lock()
+            .handles
+            .insert_for_transaction(guard, &mut RefCountActions::default_released());
 
+        let guard = transaction_ref.inc_strong_checked().expect("inc_strong");
         // Insert the same object.
-        let handle = proc_2.proc.lock().handles.insert_for_transaction(
-            transaction_ref.clone(),
-            &mut RefCountActions::default_released(),
-        );
+        let handle = proc_2
+            .proc
+            .lock()
+            .handles
+            .insert_for_transaction(guard, &mut RefCountActions::default_released());
 
         // The object should be present in the handle table until a strong decrement.
-        assert!(Arc::ptr_eq(
-            &proc_2.proc.lock().handles.get(handle.object_index()).expect("valid object"),
-            &transaction_ref
-        ));
+        let (retrieved_object, guard) =
+            proc_2.proc.lock().handles.get(handle.object_index()).expect("valid object");
+        assert!(Arc::ptr_eq(&retrieved_object, &transaction_ref));
+        guard.release(&mut RefCountActions::default_released());
 
         // Drop the transaction reference.
         proc_2
@@ -4403,10 +4409,10 @@ pub mod tests {
             .expect("dec_strong");
 
         // The handle should not have been dropped, as it was already in the table beforehand.
-        assert!(Arc::ptr_eq(
-            &proc_2.proc.lock().handles.get(handle.object_index()).expect("valid object"),
-            &transaction_ref
-        ));
+        let (retrieved_object, guard) =
+            proc_2.proc.lock().handles.get(handle.object_index()).expect("valid object");
+        assert!(Arc::ptr_eq(&retrieved_object, &transaction_ref));
+        guard.release(&mut RefCountActions::default_released());
     }
 
     #[fuchsia::test]
@@ -4415,7 +4421,7 @@ pub mod tests {
         let proc_1 = test.new_process();
         let proc_2 = test.new_process();
 
-        let transaction_ref = BinderObject::new(
+        let (transaction_ref, guard) = BinderObject::new(
             &proc_1.proc,
             LocalBinderObject {
                 weak_ref_addr: UserAddress::from(0xffffffffffffffff),
@@ -4428,16 +4434,17 @@ pub mod tests {
         }
 
         // Transactions always take a strong reference to binder objects.
-        let handle = proc_2.proc.lock().handles.insert_for_transaction(
-            transaction_ref.clone(),
-            &mut RefCountActions::default_released(),
-        );
+        let handle = proc_2
+            .proc
+            .lock()
+            .handles
+            .insert_for_transaction(guard, &mut RefCountActions::default_released());
 
         // The object should be present in the handle table until a strong decrement.
-        assert!(Arc::ptr_eq(
-            &proc_2.proc.lock().handles.get(handle.object_index()).expect("valid object"),
-            &transaction_ref
-        ));
+        let (retrieved_object, guard) =
+            proc_2.proc.lock().handles.get(handle.object_index()).expect("valid object");
+        assert!(Arc::ptr_eq(&retrieved_object, &transaction_ref));
+        guard.release(&mut RefCountActions::default_released());
 
         // Drop the transaction reference.
         proc_2
@@ -4457,7 +4464,7 @@ pub mod tests {
         let proc_1 = test.new_process();
         let proc_2 = test.new_process();
 
-        let transaction_ref = BinderObject::new(
+        let (transaction_ref, guard) = BinderObject::new(
             &proc_1.proc,
             LocalBinderObject {
                 weak_ref_addr: UserAddress::from(0xffffffffffffffff),
@@ -4466,11 +4473,12 @@ pub mod tests {
             0,
         );
 
-        // Simulate another process keeping a strong reference.
-        let guard = transaction_ref.inc_strong(&mut RefCountActions::default_released());
+        // Keep guard to simulate another process keeping a reference.
+        let other_process_guard = transaction_ref.inc_strong_checked();
+
         scopeguard::defer! {
             // Other process releases the object.
-            guard.release(&mut RefCountActions::default_released());
+            other_process_guard.release(&mut RefCountActions::default_released());
             // Ack the initial acquire.
             transaction_ref.ack_acquire(&mut RefCountActions::default_released()).expect("ack_acquire");
             // Ack the subsequent incref from the test.
@@ -4478,10 +4486,11 @@ pub mod tests {
         }
 
         // The handle starts with a strong ref.
-        let handle = proc_2.proc.lock().handles.insert_for_transaction(
-            transaction_ref.clone(),
-            &mut RefCountActions::default_released(),
-        );
+        let handle = proc_2
+            .proc
+            .lock()
+            .handles
+            .insert_for_transaction(guard, &mut RefCountActions::default_released());
 
         // Acquire a weak reference.
         proc_2
@@ -4492,10 +4501,10 @@ pub mod tests {
             .expect("inc_weak");
 
         // The object should be present in the handle table.
-        assert!(Arc::ptr_eq(
-            &proc_2.proc.lock().handles.get(handle.object_index()).expect("valid object"),
-            &transaction_ref
-        ));
+        let (retrieved_object, guard) =
+            proc_2.proc.lock().handles.get(handle.object_index()).expect("valid object");
+        assert!(Arc::ptr_eq(&retrieved_object, &transaction_ref));
+        guard.release(&mut RefCountActions::default_released());
 
         // Drop the strong reference. The handle should still be present as there is an outstanding
         // weak reference.
@@ -4505,10 +4514,10 @@ pub mod tests {
             .handles
             .dec_strong(handle.object_index(), &mut RefCountActions::default_released())
             .expect("dec_strong");
-        assert!(Arc::ptr_eq(
-            &proc_2.proc.lock().handles.get(handle.object_index()).expect("valid object"),
-            &transaction_ref
-        ));
+        let (retrieved_object, guard) =
+            proc_2.proc.lock().handles.get(handle.object_index()).expect("valid object");
+        assert!(Arc::ptr_eq(&retrieved_object, &transaction_ref));
+        guard.release(&mut RefCountActions::default_released());
 
         // Drop the weak reference. The handle should now be gone, even though the underlying object
         // is still alive (another process could have references to it).
@@ -4839,7 +4848,7 @@ pub mod tests {
             strong_ref_addr: UserAddress::const_from(0x0000000000000100),
         };
 
-        let object = register_binder_object(
+        let (object, guard) = register_binder_object(
             &proc.proc,
             LOCAL_BINDER_OBJECT.weak_ref_addr,
             LOCAL_BINDER_OBJECT.strong_ref_addr,
@@ -4847,6 +4856,7 @@ pub mod tests {
 
         let mut actions = RefCountActions::default();
         object.ack_acquire(&mut actions).expect("ack_acquire");
+        guard.release(&mut actions);
         actions.release(());
 
         assert_matches!(
@@ -4860,7 +4870,7 @@ pub mod tests {
         let test = TranslateHandlesTestFixture::new();
         let proc = test.new_process();
 
-        let object = BinderObject::new(
+        let (object, guard) = BinderObject::new(
             &proc.proc,
             LocalBinderObject {
                 weak_ref_addr: UserAddress::from(0x0000000000000010),
@@ -4869,13 +4879,13 @@ pub mod tests {
             0,
         );
         // Simulate another process keeping a strong reference.
-        let guard = object.inc_strong(&mut RefCountActions::default_released());
+        let other_process_guard = object.inc_strong_checked();
 
         let mut handle_table = HandleTable::default();
 
         // Starts with one strong reference.
-        let handle = handle_table
-            .insert_for_transaction(object.clone(), &mut RefCountActions::default_released());
+        let handle =
+            handle_table.insert_for_transaction(guard, &mut RefCountActions::default_released());
 
         handle_table
             .inc_strong(handle.object_index(), &mut RefCountActions::default_released())
@@ -4904,11 +4914,12 @@ pub mod tests {
             .expect_err("dec_strong -1");
 
         // The object should still take up an entry in the handle table, as there is 1 weak
-        // reference and it is maintained alive by anotger process.
-        handle_table.get(handle.object_index()).expect("object still exists");
+        // reference and it is maintained alive by another process.
+        let (_, guard) = handle_table.get(handle.object_index()).expect("object still exists");
+        guard.release(&mut RefCountActions::default_released());
 
         // Simulate another process droppping its reference.
-        guard.release(&mut RefCountActions::default_released());
+        other_process_guard.release(&mut RefCountActions::default_released());
         // Ack the initial acquire.
         object.ack_acquire(&mut RefCountActions::default_released()).expect("ack_acquire");
         // Ack the subsequent incref from the test.
@@ -5341,12 +5352,13 @@ pub mod tests {
         assert_eq!(&expected_transaction_data, &transaction_data);
 
         // Verify that a handle was created in the receiver.
-        let object = receiver
+        let (object, guard) = receiver
             .proc
             .lock()
             .handles
             .get(EXPECTED_HANDLE.object_index())
             .expect("expected handle not present");
+        guard.release(&mut RefCountActions::default_released());
         assert_eq!(object.owner.as_ptr(), OwnedRef::as_ptr(&sender.proc));
         assert_eq!(object.local, BINDER_OBJECT);
 
@@ -5372,16 +5384,17 @@ pub mod tests {
             weak_ref_addr: UserAddress::from(0x0000000000000010),
             strong_ref_addr: UserAddress::from(0x0000000000000100),
         };
-        let binder_object = BinderObject::new(&receiver.proc, local_binder_object, 0);
+        let (binder_object, guard) = BinderObject::new(&receiver.proc, local_binder_object, 0);
         scopeguard::defer! {
             binder_object.ack_acquire(&mut RefCountActions::default_released()).expect("ack_acquire");
         }
 
         // Pretend the binder object was given to the sender earlier, so it can be sent back.
-        let handle = sender.proc.lock().handles.insert_for_transaction(
-            binder_object.clone(),
-            &mut RefCountActions::default_released(),
-        );
+        let handle = sender
+            .proc
+            .lock()
+            .handles
+            .insert_for_transaction(guard, &mut RefCountActions::default_released());
         // Clear the strong reference.
         scopeguard::defer! {
             sender.proc.lock().handles.dec_strong(handle.object_index(), &mut RefCountActions::default_released()).expect("dec_strong");
@@ -5444,18 +5457,22 @@ pub mod tests {
         const RECEIVING_HANDLE: Handle = Handle::from_raw(2);
 
         // Pretend the binder object was given to the sender earlier.
-        let handle = sender.proc.lock().handles.insert_for_transaction(
-            BinderObject::new(&owner.proc, binder_object, 0),
-            &mut RefCountActions::default_released(),
-        );
+        let (_, guard) = BinderObject::new(&owner.proc, binder_object, 0);
+        let handle = sender
+            .proc
+            .lock()
+            .handles
+            .insert_for_transaction(guard, &mut RefCountActions::default_released());
         assert_eq!(SENDING_HANDLE, handle);
 
         // Give the receiver another handle so that the input handle number and output handle
         // number aren't the same.
-        receiver.proc.lock().handles.insert_for_transaction(
-            BinderObject::new(&owner.proc, LocalBinderObject::default(), 0),
-            &mut RefCountActions::default_released(),
-        );
+        let (_, guard) = BinderObject::new(&owner.proc, LocalBinderObject::default(), 0);
+        receiver
+            .proc
+            .lock()
+            .handles
+            .insert_for_transaction(guard, &mut RefCountActions::default_released());
 
         const DATA_PREAMBLE: &[u8; 5] = b"stuff";
 
@@ -5499,12 +5516,13 @@ pub mod tests {
         assert_eq!(&expected_transaction_data, &transaction_data);
 
         // Verify that a handle was created in the receiver.
-        let object = receiver
+        let (object, guard) = receiver
             .proc
             .lock()
             .handles
             .get(RECEIVING_HANDLE.object_index())
             .expect("expected handle not present");
+        guard.release(&mut RefCountActions::default_released());
         assert_eq!(object.owner.as_ptr(), OwnedRef::as_ptr(&owner.proc));
         assert_eq!(object.local, binder_object);
         transaction_state.release(());
@@ -5531,14 +5549,14 @@ pub mod tests {
         const RECEIVING_HANDLE_OTHER: Handle = Handle::from_raw(3);
 
         // Add both objects (sender owned and other owned) to sender handle table.
-        let sender_object = BinderObject::new(&sender.proc, binder_object_addr, 0);
-        let other_object = BinderObject::new(&other_proc.proc, binder_object_addr, 0);
+        let (_, sender_guard) = BinderObject::new(&sender.proc, binder_object_addr, 0);
+        let (_, other_guard) = BinderObject::new(&other_proc.proc, binder_object_addr, 0);
         assert_eq!(
             sender
                 .proc
                 .lock()
                 .handles
-                .insert_for_transaction(sender_object, &mut RefCountActions::default_released()),
+                .insert_for_transaction(sender_guard, &mut RefCountActions::default_released()),
             SENDING_HANDLE_SENDER
         );
         assert_eq!(
@@ -5546,18 +5564,18 @@ pub mod tests {
                 .proc
                 .lock()
                 .handles
-                .insert_for_transaction(other_object, &mut RefCountActions::default_released()),
+                .insert_for_transaction(other_guard, &mut RefCountActions::default_released()),
             SENDING_HANDLE_OTHER
         );
 
         // Give the receiver another handle so that the input handle numbers and output handle
         // numbers aren't the same.
-        let obj = BinderObject::new(&other_proc.proc, LocalBinderObject::default(), 0);
+        let (_, guard) = BinderObject::new(&other_proc.proc, LocalBinderObject::default(), 0);
         receiver
             .proc
             .lock()
             .handles
-            .insert_for_transaction(obj, &mut RefCountActions::default_released());
+            .insert_for_transaction(guard, &mut RefCountActions::default_released());
 
         const DATA_PREAMBLE: &[u8; 5] = b"stuff";
 
@@ -5616,20 +5634,22 @@ pub mod tests {
         assert_eq!(&expected_transaction_data, &transaction_data);
 
         // Verify that two handles were created in the receiver.
-        let object = receiver
+        let (object, guard) = receiver
             .proc
             .lock()
             .handles
             .get(RECEIVING_HANDLE_SENDER.object_index())
             .expect("expected handle not present");
+        guard.release(&mut RefCountActions::default_released());
         assert_eq!(object.owner.as_ptr(), OwnedRef::as_ptr(&sender.proc));
         assert_eq!(object.local, binder_object_addr);
-        let object = receiver
+        let (object, guard) = receiver
             .proc
             .lock()
             .handles
             .get(RECEIVING_HANDLE_OTHER.object_index())
             .expect("expected handle not present");
+        guard.release(&mut RefCountActions::default_released());
         assert_eq!(object.owner.as_ptr(), OwnedRef::as_ptr(&other_proc.proc));
         assert_eq!(object.local, binder_object_addr);
         transaction_state.release(());
@@ -5927,12 +5947,12 @@ pub mod tests {
 
         // Insert a binder object for the receiver, and grab a handle to it in the sender.
         const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
-        let object = register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
+        let (_, guard) = register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
         let handle = sender
             .proc
             .lock()
             .handles
-            .insert_for_transaction(object, &mut RefCountActions::default_released());
+            .insert_for_transaction(guard, &mut RefCountActions::default_released());
 
         // Open a file in the sender process that we won't be using. It is there to occupy a file
         // descriptor so that the translation doesn't happen to use the same FDs for receiver and
@@ -6118,12 +6138,12 @@ pub mod tests {
 
         // Insert a binder object for the receiver, and grab a handle to it in the sender.
         const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
-        let object = register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
+        let (_, guard) = register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
         let handle = sender
             .proc
             .lock()
             .handles
-            .insert_for_transaction(object, &mut RefCountActions::default_released());
+            .insert_for_transaction(guard, &mut RefCountActions::default_released());
 
         // Open a file in the sender process that we won't be using. It is there to occupy a file
         // descriptor so that the translation doesn't happen to use the same FDs for receiver and
@@ -6236,12 +6256,12 @@ pub mod tests {
 
         // Insert a binder object for the receiver, and grab a handle to it in the sender.
         const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
-        let object = register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
+        let (_, guard) = register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
         let handle = sender
             .proc
             .lock()
             .handles
-            .insert_for_transaction(object, &mut RefCountActions::default_released());
+            .insert_for_transaction(guard, &mut RefCountActions::default_released());
 
         // Open a file in the sender process that we won't be using. It is there to occupy a file
         // descriptor so that the translation doesn't happen to use the same FDs for receiver and
@@ -6594,7 +6614,7 @@ pub mod tests {
         let client = test.new_process();
 
         // Register an object with the owner.
-        let object = owner.proc.lock().find_or_register_object(
+        let guard = owner.proc.lock().find_or_register_object(
             &owner.thread,
             LocalBinderObject {
                 weak_ref_addr: UserAddress::from(0x0000000000000001),
@@ -6604,14 +6624,14 @@ pub mod tests {
         );
 
         // Keep a weak reference to the object.
-        let weak_object = Arc::downgrade(&object);
+        let weak_object = Arc::downgrade(&guard.binder_object);
 
         // Insert a handle to the object in the client. This also retains a strong reference.
         let handle = client
             .proc
             .lock()
             .handles
-            .insert_for_transaction(object, &mut RefCountActions::default_released());
+            .insert_for_transaction(guard, &mut RefCountActions::default_released());
 
         // Grab a weak reference.
         client
@@ -6626,18 +6646,15 @@ pub mod tests {
 
         // Confirm that the object is considered dead. The representation is still alive, but the
         // owner is dead.
-        assert!(
-            client
-                .proc
-                .lock()
-                .handles
-                .get(handle.object_index())
-                .expect("object should be present")
-                .owner
-                .upgrade()
-                .is_none(),
-            "owner should be dead"
-        );
+        let (object, guard) = client
+            .proc
+            .lock()
+            .handles
+            .get(handle.object_index())
+            .expect("expected handle not present");
+        guard.release(&mut RefCountActions::default_released());
+        assert!(object.owner.upgrade().is_none(), "owner should be dead");
+        std::mem::drop(object);
 
         // Decrement the weak reference. This should prove that the handle is still occupied.
         client
@@ -6672,7 +6689,7 @@ pub mod tests {
         let receiver = test.new_process();
 
         // Register an object with the owner.
-        let object = sender.proc.lock().find_or_register_object(
+        let guard = sender.proc.lock().find_or_register_object(
             &sender.thread,
             LocalBinderObject {
                 weak_ref_addr: UserAddress::from(0x0000000000000001),
@@ -6686,7 +6703,7 @@ pub mod tests {
             .proc
             .lock()
             .handles
-            .insert_for_transaction(object, &mut RefCountActions::default_released());
+            .insert_for_transaction(guard, &mut RefCountActions::default_released());
 
         const DEATH_NOTIFICATION_COOKIE: binder_uintptr_t = 0xDEADBEEF;
 
@@ -6713,7 +6730,7 @@ pub mod tests {
         let receiver = test.new_process();
 
         // Register an object with the sender.
-        let object = sender.proc.lock().find_or_register_object(
+        let guard = sender.proc.lock().find_or_register_object(
             &sender.thread,
             LocalBinderObject {
                 weak_ref_addr: UserAddress::from(0x0000000000000001),
@@ -6727,7 +6744,7 @@ pub mod tests {
             .proc
             .lock()
             .handles
-            .insert_for_transaction(object, &mut RefCountActions::default_released());
+            .insert_for_transaction(guard, &mut RefCountActions::default_released());
 
         // Now the sender process dies.
         std::mem::drop(sender);
@@ -6756,7 +6773,7 @@ pub mod tests {
         let client = test.new_process();
 
         // Register an object with the owner.
-        let object = owner.proc.lock().find_or_register_object(
+        let guard = owner.proc.lock().find_or_register_object(
             &owner.thread,
             LocalBinderObject {
                 weak_ref_addr: UserAddress::from(0x0000000000000001),
@@ -6770,7 +6787,7 @@ pub mod tests {
             .proc
             .lock()
             .handles
-            .insert_for_transaction(object, &mut RefCountActions::default_released());
+            .insert_for_transaction(guard, &mut RefCountActions::default_released());
 
         let death_notification_cookie = 0xDEADBEEF;
 
@@ -6972,12 +6989,13 @@ pub mod tests {
             )
             .expect("failed to translate handles");
 
-        let object = receiver
+        let (object, guard) = receiver
             .proc
             .lock()
             .handles
             .get(EXPECTED_HANDLE.object_index())
             .expect("expected handle not present");
+        guard.release(&mut RefCountActions::default_released());
         object.ack_acquire(&mut RefCountActions::default_released()).expect("ack_acquire");
 
         // Verify that a strong acquire command is sent to the sender process (on the same thread
@@ -7028,12 +7046,13 @@ pub mod tests {
 
         // Insert a binder object for the receiver, and grab a handle to it in the sender.
         const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
-        let object = register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
+        let (object, guard) =
+            register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
         let handle = sender
             .proc
             .lock()
             .handles
-            .insert_for_transaction(object.clone(), &mut RefCountActions::default_released());
+            .insert_for_transaction(guard, &mut RefCountActions::default_released());
 
         // Construct a oneway transaction to send from the sender to the receiver.
         const FIRST_TRANSACTION_CODE: u32 = 42;
@@ -7145,12 +7164,13 @@ pub mod tests {
 
         // Insert a binder object for the receiver, and grab a handle to it in the sender.
         const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
-        let object = register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
+        let (object, guard) =
+            register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
         let handle = sender
             .proc
             .lock()
             .handles
-            .insert_for_transaction(object.clone(), &mut RefCountActions::default_released());
+            .insert_for_transaction(guard, &mut RefCountActions::default_released());
 
         // Construct a oneway transaction to send from the sender to the receiver.
         const ONEWAY_TRANSACTION_CODE: u32 = 42;
@@ -7228,12 +7248,12 @@ pub mod tests {
 
         // Insert a binder object for the receiver, and grab a handle to it in the sender.
         const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
-        let object = register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
+        let (_, guard) = register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
         let handle = sender
             .proc
             .lock()
             .handles
-            .insert_for_transaction(object, &mut RefCountActions::default_released());
+            .insert_for_transaction(guard, &mut RefCountActions::default_released());
 
         // Construct a synchronous transaction to send from the sender to the receiver.
         const FIRST_TRANSACTION_CODE: u32 = 42;
@@ -7279,12 +7299,12 @@ pub mod tests {
 
         // Insert a binder object for the receiver, and grab a handle to it in the sender.
         const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
-        let object = register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
+        let (_, guard) = register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
         let handle = sender
             .proc
             .lock()
             .handles
-            .insert_for_transaction(object, &mut RefCountActions::default_released());
+            .insert_for_transaction(guard, &mut RefCountActions::default_released());
 
         // Construct a synchronous transaction to send from the sender to the receiver.
         const FIRST_TRANSACTION_CODE: u32 = 42;
@@ -7330,12 +7350,12 @@ pub mod tests {
 
         // Insert a binder object for the receiver, and grab a handle to it in the sender.
         const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
-        let object = register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
+        let (_, guard) = register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
         let handle = sender
             .proc
             .lock()
             .handles
-            .insert_for_transaction(object, &mut RefCountActions::default_released());
+            .insert_for_transaction(guard, &mut RefCountActions::default_released());
 
         // Construct a synchronous transaction to send from the sender to the receiver.
         const FIRST_TRANSACTION_CODE: u32 = 42;
