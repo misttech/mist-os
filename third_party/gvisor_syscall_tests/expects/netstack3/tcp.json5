@@ -31,6 +31,12 @@
                 "AllInetTests/SimpleTcpSocketTest.ShutdownReadWriteConnectingSocket/*",
                 "AllInetTests/SimpleTcpSocketTest.SelfConnectSendRecv/*",
                 "AllInetTests/SimpleTcpSocketTest.SelfConnectRecvShutdownRead/*",
+
+                // These tests fail, but are slow to do so. Skip them
+                // instead to avoid the test runner from timing out.
+                "AllTCPSockets/TCPSocketPairTest.RSTSentOnCloseWithUnreadData/*",
+                "AllTCPSockets/TCPSocketPairTest.RSTCausesPollHUP/*",
+                "AllTCPSockets/TCPSocketPairTest.RSTSentOnCloseWithUnreadDataAllowsReadBuffered/*",
             ],
         },
         {
@@ -96,9 +102,6 @@
                 "AllTCPSockets/TCPSocketPairTest.ShortTcpInfoSucceeds/*",
                 "AllTCPSockets/TCPSocketPairTest.ZeroTcpInfoSucceeds/*",
                 "AllTCPSockets/TCPSocketPairTest.CheckTcpInfoFields/*",
-                "AllTCPSockets/TCPSocketPairTest.RSTSentOnCloseWithUnreadData/*",
-                "AllTCPSockets/TCPSocketPairTest.RSTCausesPollHUP/*",
-                "AllTCPSockets/TCPSocketPairTest.RSTSentOnCloseWithUnreadDataAllowsReadBuffered/*",
                 "AllTCPSockets/TCPSocketPairTest.ShutdownRdUnreadDataShouldCauseNoPacketsUnlessClosed/*",
                 "AllTCPSockets/TCPSocketPairTest.TCPCorkDefault/*",
                 "AllTCPSockets/TCPSocketPairTest.SetTCPCork/*",
