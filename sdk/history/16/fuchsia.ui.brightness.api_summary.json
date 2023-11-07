@@ -27,6 +27,21 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.ui.brightness/ColorAdjustment.SetDiscreteColorAdjustment",
+        "strictness": "flexible",
+        "ordinal": "5249241333554762180",
+        "direction": "two_way",
+        "request": "fuchsia.ui.brightness/ColorAdjustmentSetDiscreteColorAdjustmentRequest",
+        "response": "fuchsia.ui.brightness/ColorAdjustment_SetDiscreteColorAdjustment_Response"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.ui.brightness/ColorAdjustment",
+        "openness": "open",
+        "transport": "channel"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.ui.brightness/ColorAdjustmentHandler.SetColorAdjustment",
         "strictness": "strict",
         "ordinal": "7095308169090099773",
@@ -48,6 +63,16 @@
     {
         "kind": "struct",
         "name": "fuchsia.ui.brightness/ColorAdjustmentHandlerSetColorAdjustmentRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.brightness/ColorAdjustmentSetDiscreteColorAdjustmentRequest.color_adjustment",
+        "ordinal": "1",
+        "type": "fuchsia.ui.brightness/ColorAdjustmentTable"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.brightness/ColorAdjustmentSetDiscreteColorAdjustmentRequest"
     },
     {
         "kind": "table/member",
