@@ -4,7 +4,6 @@
 
 #include <bitset>
 
-#include "src/devices/block/drivers/ufs/logical_unit.h"
 #include "unit-lib.h"
 
 namespace ufs {
@@ -19,9 +18,6 @@ class BlockOpTest : public UfsTest {
     }
 
     zx_device* lu_dev = device_->GetLatestChild();
-    lu_dev->InitOp();
-    lu_dev->WaitUntilInitReplyCalled(zx::time::infinite());
-    ASSERT_OK(lu_dev->InitReplyCallStatus());
 
     ddk::BlockImplProtocolClient::CreateFromDevice(lu_dev, &client_);
     client_.Query(&info_, &op_size_);
@@ -121,6 +117,78 @@ TEST_F(BlockOpTest, WriteTest) {
 
   ASSERT_EQ(std::memcmp(buf, mapped_vaddr, ufs_mock_device::kMockBlockSize), 0);
   ASSERT_OK(zx::vmar::root_self()->unmap(vaddr, ufs_mock_device::kMockBlockSize));
+}
+
+TEST_F(BlockOpTest, FuaWriteTest) {
+  const uint8_t kTestLun = 0;
+
+  sync_completion_t done;
+  auto callback = [](void* ctx, zx_status_t status, block_op_t* op) {
+    EXPECT_OK(status);
+    sync_completion_signal(static_cast<sync_completion_t*>(ctx));
+  };
+
+  zx::vmo vmo;
+  ASSERT_OK(zx::vmo::create(ufs_mock_device::kMockBlockSize, 0, &vmo));
+
+  zx_vaddr_t vaddr;
+  ASSERT_OK(zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo, 0,
+                                       ufs_mock_device::kMockBlockSize, &vaddr));
+  char* mapped_vaddr = reinterpret_cast<char*>(vaddr);
+  std::strncpy(mapped_vaddr, "test", ufs_mock_device::kMockBlockSize);
+
+  auto block_op = std::make_unique<uint8_t[]>(op_size_);
+  auto op = reinterpret_cast<block_op_t*>(block_op.get());
+  *op = {
+      .rw =
+          {
+              .command =
+                  {
+                      .opcode = BLOCK_OPCODE_WRITE,
+                      .flags = BLOCK_IO_FLAG_FORCE_ACCESS,  // FUA flag
+                  },
+              .vmo = vmo.get(),
+              .length = 1,
+              .offset_dev = 0,
+              .offset_vmo = 0,
+          },
+  };
+  client_.Queue(op, callback, &done);
+  sync_completion_wait(&done, ZX_TIME_INFINITE);
+
+  // Check that the FUA bit is set.
+  ScsiCommandUpiu scsi_upiu(
+      *ufs_->GetTransferRequestProcessor().GetRequestList().GetDescriptorBuffer<CommandUpiuData>(
+          0));
+  scsi::Write10CDB* scsi_cdb =
+      reinterpret_cast<scsi::Write10CDB*>(scsi_upiu.GetData<CommandUpiuData>()->cdb);
+  ASSERT_EQ(scsi_cdb->force_unit_access(), true);
+
+  char buf[ufs_mock_device::kMockBlockSize];
+  ASSERT_OK(mock_device_->BufferRead(kTestLun, buf, 1, 0));
+
+  ASSERT_EQ(std::memcmp(buf, mapped_vaddr, ufs_mock_device::kMockBlockSize), 0);
+  ASSERT_OK(zx::vmar::root_self()->unmap(vaddr, ufs_mock_device::kMockBlockSize));
+}
+
+TEST_F(BlockOpTest, FlushTest) {
+  sync_completion_t done;
+  auto callback = [](void* ctx, zx_status_t status, block_op_t* op) {
+    EXPECT_OK(status);
+    sync_completion_signal(static_cast<sync_completion_t*>(ctx));
+  };
+
+  auto block_op = std::make_unique<uint8_t[]>(op_size_);
+  auto op = reinterpret_cast<block_op_t*>(block_op.get());
+  op->rw.command = {.opcode = BLOCK_OPCODE_FLUSH, .flags = 0};
+  client_.Queue(op, callback, &done);
+  sync_completion_wait(&done, ZX_TIME_INFINITE);
+
+  // Check that the FLUSH operation is correctly converted to a SYNCHRONIZE CACHE 10 command.
+  ScsiCommandUpiu scsi_upiu(
+      *ufs_->GetTransferRequestProcessor().GetRequestList().GetDescriptorBuffer<CommandUpiuData>(
+          0));
+  ASSERT_EQ(scsi_upiu.GetOpcode(), scsi::Opcode::SYNCHRONIZE_CACHE_10);
 }
 
 TEST_F(BlockOpTest, IoRangeExceptionTest) {

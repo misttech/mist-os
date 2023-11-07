@@ -134,10 +134,10 @@ class AbstractRequestUpiu : public AbstractUpiu {
   virtual DataDirection GetDataDirection() const { return DataDirection::kNone; }
 
   // Get the offset that ResponseUpiu will be written to.
-  uint16_t GetResponseOffset() const { return sizeof(RequestData); }
+  static constexpr uint16_t GetResponseOffset() { return sizeof(RequestData); }
 
   // Get the length of the ResponseUpiu.
-  uint16_t GetResponseLength() const { return sizeof(ResponseData); }
+  static constexpr uint16_t GetResponseLength() { return sizeof(ResponseData); }
 
  private:
   std::unique_ptr<RequestData> data_ = nullptr;

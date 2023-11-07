@@ -153,9 +153,16 @@ zx::result<std::unique_ptr<ResponseUpiu>> TransferRequestProcessor::SendScsiUpiu
     return zx::error(ZX_ERR_NO_RESOURCES);
   }
 
-  TRACE_DURATION("ufs", "SendScsiUpiu", "slot", slot.value(), "offset",
-                 request.GetStartLba().has_value() ? request.GetStartLba().value() : 0, "length",
-                 request.GetTransferBytes());
+  uint32_t offset = 0;
+  uint32_t length = 0;
+  if (io_cmd != nullptr) {
+    offset = safemath::checked_cast<uint32_t>(io_cmd->disk_op.op.command.opcode == BLOCK_OPCODE_TRIM
+                                                  ? io_cmd->disk_op.op.trim.offset_dev
+                                                  : io_cmd->disk_op.op.rw.offset_dev);
+    length = io_cmd->disk_op.op.command.opcode == BLOCK_OPCODE_TRIM ? io_cmd->disk_op.op.trim.length
+                                                                    : io_cmd->disk_op.op.rw.length;
+  }
+  TRACE_DURATION("ufs", "SendScsiUpiu", "slot", slot.value(), "offset", offset, "length", length);
 
   zx::result<void *> response;
   // Admin commands should be performed synchronously and non-admin (data) commands should be
@@ -204,10 +211,10 @@ zx::result<void *> TransferRequestProcessor::SendRequestUsingSlot(
 
     if (io_cmd) {
       // Non-admin (data) command.
-      offset = io_cmd->op.rw.offset_vmo * io_cmd->block_size_bytes;
-      length = static_cast<uint64_t>(io_cmd->op.rw.length) * io_cmd->block_size_bytes;
-      option =
-          (io_cmd->op.command.opcode == BLOCK_OPCODE_READ) ? ZX_BTI_PERM_WRITE : ZX_BTI_PERM_READ;
+      offset = io_cmd->disk_op.op.rw.offset_vmo * io_cmd->block_size_bytes;
+      length = static_cast<uint64_t>(io_cmd->disk_op.op.rw.length) * io_cmd->block_size_bytes;
+      option = (io_cmd->disk_op.op.command.opcode == BLOCK_OPCODE_READ) ? ZX_BTI_PERM_WRITE
+                                                                        : ZX_BTI_PERM_READ;
     } else {
       // Admin command.
       offset = 0;
@@ -365,7 +372,7 @@ uint32_t TransferRequestProcessor::RequestCompletion() {
           }
         }
         if (request_slot.io_cmd) {
-          request_slot.io_cmd->Complete(result.status_value());
+          request_slot.io_cmd->disk_op.Complete(result.status_value());
         } else {
           request_slot.result = result.status_value();
         }

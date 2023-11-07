@@ -270,14 +270,12 @@ TEST_F(RequestProcessorTest, SendRequestUsingSlot) {
   auto slot = ufs_->GetTransferRequestProcessor().ReserveSlot();
   ASSERT_OK(slot);
 
-  // Make SCSI UPIU
-  constexpr uint32_t block_offset = 0;
-  constexpr uint16_t block_length = 1;
-
-  std::vector<zx_paddr_t> data_paddrs;
-
   // Send scsi command with SendRequestUsingSlot()
-  ScsiSynchronizeCache10Upiu upiu(block_offset, block_length);
+  uint8_t cdb_buffer[6] = {};
+  auto cdb = reinterpret_cast<scsi::TestUnitReadyCDB *>(cdb_buffer);
+  cdb->opcode = scsi::Opcode::TEST_UNIT_READY;
+
+  ScsiCommandUpiu upiu(cdb_buffer, sizeof(*cdb), DataDirection::kNone);
   auto response_or = ufs_->GetTransferRequestProcessor().SendRequestUsingSlot<ScsiCommandUpiu>(
       upiu, kTestLun, slot.value(), std::nullopt, nullptr, /*is_sync*/ true);
   ASSERT_OK(response_or);
@@ -310,14 +308,12 @@ TEST_F(RequestProcessorTest, SendRequestUsingSlotTimeout) {
   auto slot = ufs_->GetTransferRequestProcessor().ReserveSlot();
   ASSERT_OK(slot);
 
-  // Make SCSI UPIU
-  constexpr uint32_t block_offset = 0;
-  constexpr uint16_t block_length = 1;
-
-  std::vector<zx_paddr_t> data_paddrs;
-
   // Send scsi command with SendRequestUsingSlot()
-  ScsiSynchronizeCache10Upiu upiu(block_offset, block_length);
+  uint8_t cdb_buffer[6] = {};
+  auto cdb = reinterpret_cast<scsi::TestUnitReadyCDB *>(cdb_buffer);
+  cdb->opcode = scsi::Opcode::TEST_UNIT_READY;
+
+  ScsiCommandUpiu upiu(cdb_buffer, sizeof(*cdb), DataDirection::kNone);
   auto response_or = ufs_->GetTransferRequestProcessor().SendRequestUsingSlot<ScsiCommandUpiu>(
       upiu, kTestLun, slot.value(), std::nullopt, nullptr, /*is_sync*/ true);
   ASSERT_EQ(response_or.status_value(), ZX_ERR_TIMED_OUT);
@@ -327,14 +323,12 @@ TEST_F(RequestProcessorTest, SendScsiUpiu) {
   ASSERT_NO_FATAL_FAILURE(RunInit());
   constexpr uint8_t kTestLun = 0;
 
-  // Make SCSI UPIU
-  constexpr uint32_t block_offset = 0;
-  constexpr uint16_t block_length = 1;
-
-  std::vector<zx_paddr_t> data_paddrs;
-
   // Send scsi command with SendScsiUpiu()
-  ScsiSynchronizeCache10Upiu upiu(block_offset, block_length);
+  uint8_t cdb_buffer[6] = {};
+  auto cdb = reinterpret_cast<scsi::TestUnitReadyCDB *>(cdb_buffer);
+  cdb->opcode = scsi::Opcode::TEST_UNIT_READY;
+
+  ScsiCommandUpiu upiu(cdb_buffer, sizeof(*cdb), DataDirection::kNone);
   auto response_or = ufs_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun);
   ASSERT_OK(response_or);
 
@@ -363,14 +357,12 @@ TEST_F(RequestProcessorTest, SendScsiUpiuTimeout) {
 
   ufs_->GetTransferRequestProcessor().SetTimeoutMsec(100);
 
-  // Make SCSI UPIU
-  constexpr uint32_t block_offset = 0;
-  constexpr uint16_t block_length = 1;
-
-  std::vector<zx_paddr_t> data_paddrs;
-
   // Send scsi command with SendScsiUpiu()
-  ScsiSynchronizeCache10Upiu upiu(block_offset, block_length);
+  uint8_t cdb_buffer[6] = {};
+  auto cdb = reinterpret_cast<scsi::TestUnitReadyCDB *>(cdb_buffer);
+  cdb->opcode = scsi::Opcode::TEST_UNIT_READY;
+
+  ScsiCommandUpiu upiu(cdb_buffer, sizeof(*cdb), DataDirection::kNone);
   auto response_or = ufs_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun);
   ASSERT_EQ(response_or.status_value(), ZX_ERR_TIMED_OUT);
 }
@@ -381,14 +373,11 @@ TEST_F(RequestProcessorTest, SendScsiUpiuWithAdminSlotIsFull) {
 
   ASSERT_OK(ufs_->GetTransferRequestProcessor().ReserveAdminSlot());
 
-  // Make SCSI UPIU
-  constexpr uint32_t block_offset = 0;
-  constexpr uint16_t block_length = 1;
+  uint8_t cdb_buffer[6] = {};
+  auto cdb = reinterpret_cast<scsi::TestUnitReadyCDB *>(cdb_buffer);
+  cdb->opcode = scsi::Opcode::TEST_UNIT_READY;
 
-  std::vector<zx_paddr_t> data_paddrs;
-  data_paddrs.resize(block_length, 0);
-
-  ScsiSynchronizeCache10Upiu upiu(block_offset, block_length);
+  ScsiCommandUpiu upiu(cdb_buffer, sizeof(*cdb), DataDirection::kNone);
   auto response = ufs_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun);
   ASSERT_EQ(response.status_value(), ZX_ERR_NO_RESOURCES);
 }
@@ -404,15 +393,13 @@ TEST_F(RequestProcessorTest, SendScsiUpiuWithSlotIsFull) {
     ASSERT_OK(ufs_->GetTransferRequestProcessor().ReserveSlot());
   }
 
-  // Make SCSI UPIU
-  constexpr uint32_t block_offset = 0;
-  constexpr uint16_t block_length = 1;
-
-  std::vector<zx_paddr_t> data_paddrs;
-  data_paddrs.resize(block_length, 0);
-
   IoCommand empty_io_cmd;
-  ScsiSynchronizeCache10Upiu upiu(block_offset, block_length);
+
+  uint8_t cdb_buffer[6] = {};
+  auto cdb = reinterpret_cast<scsi::TestUnitReadyCDB *>(cdb_buffer);
+  cdb->opcode = scsi::Opcode::TEST_UNIT_READY;
+
+  ScsiCommandUpiu upiu(cdb_buffer, sizeof(*cdb), DataDirection::kNone);
   auto response =
       ufs_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun, std::nullopt, &empty_io_cmd);
   ASSERT_EQ(response.status_value(), ZX_ERR_NO_RESOURCES);

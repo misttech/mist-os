@@ -12,10 +12,8 @@
 
 #include <vector>
 
+#include <fbl/auto_lock.h>
 #include <safemath/safe_conversions.h>
-
-#include "fbl/auto_lock.h"
-#include "logical_unit.h"
 
 namespace ufs {
 
@@ -74,55 +72,30 @@ void Ufs::ProcessIoSubmissions() {
       return;
     }
 
-    zx::pmt pmt;
-    std::unique_ptr<ScsiCommandUpiu> upiu;
-    std::optional<zx::unowned_vmo> vmo;
-
-    const uint32_t opcode = io_cmd->op.command.opcode;
-    switch (opcode) {
-      case BLOCK_OPCODE_READ:
-      case BLOCK_OPCODE_WRITE: {
-        vmo = zx::unowned_vmo(io_cmd->op.rw.vmo);
-
-        // TODO(fxbug.dev/124835): Support the use of READ(16), WRITE(16) CDBs
-        if ((io_cmd->op.rw.offset_dev > UINT32_MAX) || (io_cmd->op.rw.length > UINT16_MAX)) {
-          zxlogf(ERROR, "Cannot handle block offset(%lu) or length(%u).", io_cmd->op.rw.offset_dev,
-                 io_cmd->op.rw.length);
-          io_cmd->Complete(ZX_ERR_NOT_SUPPORTED);
-          return;
-        }
-
-        const uint32_t block_offset = safemath::checked_cast<uint32_t>(io_cmd->op.rw.offset_dev);
-        const uint16_t block_length = safemath::checked_cast<uint16_t>(io_cmd->op.rw.length);
-        const uint32_t block_size = io_cmd->block_size_bytes;
-
-        if (opcode == BLOCK_OPCODE_READ) {
-          upiu = std::make_unique<ScsiRead10Upiu>(block_offset, block_length, block_size,
-                                                  /*fua=*/false, 0);
-        } else {
-          upiu = std::make_unique<ScsiWrite10Upiu>(block_offset, block_length, block_size,
-                                                   /*fua=*/false, 0);
-        }
-
-      } break;
-      case BLOCK_OPCODE_TRIM: {
-        if (io_cmd->op.trim.length > UINT16_MAX) {
-          zxlogf(ERROR, "Cannot handle trim block length(%d).", io_cmd->op.trim.length);
-          io_cmd->Complete(ZX_ERR_NOT_SUPPORTED);
-          return;
-        }
-        upiu = std::make_unique<ScsiUnmapUpiu>(static_cast<uint16_t>(io_cmd->op.trim.length));
-        break;
-      }
-      case BLOCK_OPCODE_FLUSH:
-        // TODO(fxbug.dev/124835): Use Synchronize Cache (10)
-        io_cmd->Complete(ZX_OK);
-        // TODO(fxbug.dev/124835): Use break;
-        return;
+    DataDirection data_direction = DataDirection::kNone;
+    if (io_cmd->is_write) {
+      data_direction = DataDirection::kHostToDevice;
+    } else if (io_cmd->disk_op.op.command.opcode == BLOCK_OPCODE_READ) {
+      data_direction = DataDirection::kDeviceToHost;
     }
 
+    std::optional<zx::unowned_vmo> vmo_optional = std::nullopt;
+    if (data_direction != DataDirection::kNone) {
+      vmo_optional = zx::unowned_vmo(io_cmd->disk_op.op.rw.vmo);
+    }
+
+    const uint32_t transfer_bytes = io_cmd->disk_op.op.rw.length * io_cmd->block_size_bytes;
+    if (transfer_bytes > max_transfer_bytes_) {
+      zxlogf(ERROR,
+             "Request exceeding max transfer size. transfer_bytes=%d, max_transfer_bytes_=%d",
+             transfer_bytes, max_transfer_bytes_);
+      io_cmd->disk_op.Complete(ZX_ERR_INVALID_ARGS);
+      continue;
+    }
+
+    ScsiCommandUpiu upiu(io_cmd->cdb_buffer, io_cmd->cdb_length, data_direction, transfer_bytes);
     auto response =
-        transfer_request_processor_->SendScsiUpiu(*upiu, io_cmd->lun_id, std::move(vmo), io_cmd);
+        transfer_request_processor_->SendScsiUpiu(upiu, io_cmd->lun, vmo_optional, io_cmd);
     if (response.is_error()) {
       if (response.error_value() == ZX_ERR_NO_RESOURCES) {
         fbl::AutoLock lock(&commands_lock_);
@@ -131,7 +104,7 @@ void Ufs::ProcessIoSubmissions() {
       }
       zxlogf(ERROR, "Failed to submit SCSI command (command %p): %s", io_cmd,
              response.status_string());
-      io_cmd->Complete(response.error_value());
+      io_cmd->disk_op.Complete(response.error_value());
     }
   }
 }
@@ -236,7 +209,25 @@ int Ufs::IoLoop() {
   return thrd_success;
 }
 
-void Ufs::QueueIoCommand(IoCommand* io_cmd) {
+void Ufs::ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
+                              uint32_t block_size_bytes, scsi::DiskOp* disk_op) {
+  IoCommand* io_cmd = containerof(disk_op, IoCommand, disk_op);
+  if (lun > UINT8_MAX) {
+    disk_op->Complete(ZX_ERR_OUT_OF_RANGE);
+    return;
+  }
+  if (cdb.iov_len > sizeof(io_cmd->cdb_buffer)) {
+    disk_op->Complete(ZX_ERR_NOT_SUPPORTED);
+    return;
+  }
+
+  memcpy(io_cmd->cdb_buffer, cdb.iov_base, cdb.iov_len);
+  io_cmd->cdb_length = safemath::checked_cast<uint8_t>(cdb.iov_len);
+  io_cmd->lun = safemath::checked_cast<uint8_t>(lun);
+  io_cmd->block_size_bytes = block_size_bytes;
+  io_cmd->is_write = is_write;
+
+  // Queue transaction.
   {
     fbl::AutoLock lock(&commands_lock_);
     list_add_tail(&pending_commands_, &io_cmd->node);
@@ -244,11 +235,76 @@ void Ufs::QueueIoCommand(IoCommand* io_cmd) {
   sync_completion_signal(&io_signal_);
 }
 
+zx_status_t Ufs::ExecuteCommandSync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
+                                    iovec data) {
+  if (lun > UINT8_MAX) {
+    return ZX_ERR_OUT_OF_RANGE;
+  }
+  uint8_t lun_id = safemath::checked_cast<uint8_t>(lun);
+  if (data.iov_len > max_transfer_bytes_) {
+    zxlogf(ERROR, "Request exceeding max transfer size. transfer_bytes=%zu, max_transfer_bytes_=%d",
+           data.iov_len, max_transfer_bytes_);
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  DataDirection data_direction = DataDirection::kNone;
+  if (is_write) {
+    data_direction = DataDirection::kHostToDevice;
+  } else if (data.iov_base != nullptr) {
+    data_direction = DataDirection::kDeviceToHost;
+  }
+
+  std::optional<zx::unowned_vmo> vmo_optional = std::nullopt;
+  zx::vmo data_vmo;
+  fzl::VmoMapper mapper;
+  if (data_direction != DataDirection::kNone) {
+    // Allocate a response data buffer.
+    // TODO(fxbug.dev/124835): We need to pre-allocate a data buffer that will be used in the Sync
+    // command.
+    const uint32_t data_buffer_size =
+        fbl::round_up(safemath::checked_cast<uint32_t>(data.iov_len), zx_system_get_page_size());
+    if (zx_status_t status = zx::vmo::create(data_buffer_size, 0, &data_vmo); status != ZX_OK) {
+      return status;
+    }
+
+    // Allocate a buffer for SCSI response data.
+    if (zx_status_t status = mapper.Map(data_vmo, 0, data_buffer_size); status != ZX_OK) {
+      zxlogf(ERROR, "Failed to map IO buffer: %s", zx_status_get_string(status));
+      return status;
+    }
+    vmo_optional = zx::unowned_vmo(data_vmo);
+  }
+
+  if (data_direction == DataDirection::kHostToDevice) {
+    memcpy(mapper.start(), data.iov_base, data.iov_len);
+  }
+
+  ScsiCommandUpiu upiu(static_cast<uint8_t*>(cdb.iov_base),
+                       safemath::checked_cast<uint8_t>(cdb.iov_len), data_direction,
+                       safemath::checked_cast<uint32_t>(data.iov_len));
+  if (auto response = transfer_request_processor_->SendScsiUpiu(upiu, lun_id, vmo_optional);
+      response.is_error()) {
+    zxlogf(ERROR, "Failed to send SCSI command: opcode:0x%x ,%s",
+           static_cast<uint8_t>(upiu.GetOpcode()), response.status_string());
+    return response.error_value();
+  }
+
+  if (data_direction == DataDirection::kDeviceToHost) {
+    memcpy(data.iov_base, mapper.start(), data.iov_len);
+  }
+  return ZX_OK;
+}
+
 zx_status_t Ufs::Init() {
   list_initialize(&pending_commands_);
 
   if (zx::result<> result = InitController(); result.is_error()) {
-    zxlogf(ERROR, "Failed to init UFS controller: %s", result.status_string());
+    zxlogf(ERROR, "Failed to initialize UFS controller: %s", result.status_string());
+    return result.error_value();
+  }
+
+  if (zx::result<> result = InitDeviceInterface(); result.is_error()) {
+    zxlogf(ERROR, "Failed to initialize device interface: %s", result.status_string());
     return result.error_value();
   }
 
@@ -257,31 +313,18 @@ zx_status_t Ufs::Init() {
     return result.error_value();
   }
 
-  if (zx::result<> result = ScanLogicalUnits(); result.is_error()) {
-    zxlogf(ERROR, "Failed to scan logical units: %s", result.status_string());
-    return result.error_value();
+  zx::result<uint8_t> lun_count;
+  if (lun_count = AddLogicalUnits(); lun_count.is_error()) {
+    zxlogf(ERROR, "Failed to scan logical units: %s", lun_count.status_string());
+    return lun_count.error_value();
   }
 
-  uint8_t lun_count = 0;
-  for (uint8_t i = 0; i < kMaxLun; ++i) {
-    // If |is_present| is true, then the block device has been initialized.
-    if (block_devices_[i].is_present) {
-      if (zx_status_t status = LogicalUnit::Bind(*this, block_devices_[i], i); status != ZX_OK) {
-        zxlogf(ERROR, "Failed to add logical unit %u: %s", i, zx_status_get_string(status));
-        return status;
-      }
-      ++lun_count;
-    }
-  }
-
-  if (lun_count == 0) {
+  if (lun_count.value() == 0) {
     zxlogf(ERROR, "Bind Error. There is no available LUN(lun_count = 0).");
     return ZX_ERR_BAD_STATE;
   }
-  logical_unit_count_ = lun_count;
+  logical_unit_count_ = lun_count.value();
   zxlogf(INFO, "Bind Success");
-
-  DumpRegisters();
 
   return ZX_OK;
 }
@@ -358,22 +401,6 @@ zx::result<> Ufs::InitController() {
     return zx::error(status);
   }
   io_thread_started_ = true;
-
-  // TODO(fxbug.dev/124835): We need to check if retry is needed in the real HW and remove it if
-  // not.
-  // Initialise the device interface. If it fails, retry twice.
-  zx::result<> result;
-  for (uint32_t retry = 3; retry > 0; --retry) {
-    if (result = InitDeviceInterface(); result.is_error()) {
-      zxlogf(WARNING, "Device init failed: %s, retrying", result.status_string());
-    } else {
-      break;
-    }
-  }
-  if (result.is_error()) {
-    zxlogf(ERROR, "Failed to initialize device interface: %s", result.status_string());
-    return result.take_error();
-  }
 
   return zx::ok();
 }
@@ -464,7 +491,7 @@ zx::result<> Ufs::InitDeviceInterface() {
   return zx::ok();
 }
 
-zx::result<> Ufs::ScanLogicalUnits() {
+zx::result<uint8_t> Ufs::AddLogicalUnits() {
   uint8_t max_luns = 0;
   if (device_manager_->GetGeometryDescriptor().bMaxNumberLU == 0) {
     max_luns = 8;
@@ -477,22 +504,9 @@ zx::result<> Ufs::ScanLogicalUnits() {
   }
   ZX_ASSERT(max_luns <= kMaxLun);
 
-  // Allocate a response data buffer.
-  const uint32_t kPageSize = zx_system_get_page_size();
-  zx::vmo data_vmo;
-  if (zx_status_t status = zx::vmo::create(kPageSize, 0, &data_vmo); status != ZX_OK) {
-    return zx::error(status);
-  }
-
-  // Allocate a buffer for SCSI response data.
-  fzl::VmoMapper mapper;
-  if (zx_status_t status = mapper.Map(data_vmo, 0, kPageSize); status != ZX_OK) {
-    zxlogf(ERROR, "Failed to map IO buffer: %s", zx_status_get_string(status));
-    return zx::error(status);
-  }
-
-  for (uint8_t i = 0; i < max_luns; ++i) {
-    zx::result<UnitDescriptor> unit_descriptor = device_manager_->ReadUnitDescriptor(i);
+  uint8_t lun_count = 0;
+  for (uint8_t lun = 0; lun < max_luns; ++lun) {
+    zx::result<UnitDescriptor> unit_descriptor = device_manager_->ReadUnitDescriptor(lun);
     if (unit_descriptor.is_error()) {
       continue;
     }
@@ -501,108 +515,88 @@ zx::result<> Ufs::ScanLogicalUnits() {
       continue;
     }
 
-    BlockDevice& block_device = block_devices_[i];
-    block_device.is_present = true;
-    block_device.lun = i;
-
-    block_device.name = std::string("ufs") + std::to_string(i);
-
     if (unit_descriptor->bLogicalBlockSize >= sizeof(size_t) * 8) {
       zxlogf(ERROR, "Cannot handle the unit descriptor bLogicalBlockSize = %d.",
              unit_descriptor->bLogicalBlockSize);
       return zx::error(ZX_ERR_OUT_OF_RANGE);
     }
 
-    block_device.block_size = 1 << unit_descriptor->bLogicalBlockSize;
-    block_device.block_count = betoh64(unit_descriptor->qLogicalBlockCount);
+    size_t block_size = 1 << unit_descriptor->bLogicalBlockSize;
+    uint64_t block_count = betoh64(unit_descriptor->qLogicalBlockCount);
 
-    if (block_device.block_size < kBlockSize ||
-        block_device.block_size <
+    if (block_size < kBlockSize ||
+        block_size <
             static_cast<size_t>(device_manager_->GetGeometryDescriptor().bMinAddrBlockSize) *
                 kSectorSize ||
-        block_device.block_size >
+        block_size >
             static_cast<size_t>(device_manager_->GetGeometryDescriptor().bMaxInBufferSize) *
                 kSectorSize ||
-        block_device.block_size >
+        block_size >
             static_cast<size_t>(device_manager_->GetGeometryDescriptor().bMaxOutBufferSize) *
                 kSectorSize) {
-      zxlogf(ERROR, "Cannot handle logical block size of %zu.", block_device.block_size);
+      zxlogf(ERROR, "Cannot handle logical block size of %zu.", block_size);
       return zx::error(ZX_ERR_OUT_OF_RANGE);
     }
-    ZX_ASSERT_MSG(block_device.block_size == kBlockSize,
-                  "Currently, it only supports a 4KB block size.");
+    ZX_ASSERT_MSG(block_size == kBlockSize, "Currently, it only supports a 4KB block size.");
 
-    // Verify that the Lun is ready. This command ignores unit attention errors if they occur.
-    ScsiTestUnitReadyUpiu unit_ready_upiu;
-    if (auto response = transfer_request_processor_->SendScsiUpiu(unit_ready_upiu, i);
-        response.is_error()) {
+    // Verify that the Lun is ready. This command expects a unit attention error.
+    // In some cases, unit attention may not occur if the device has not performed a power cycle. In
+    // this case, TestUnitReady() returns ZX_OK.
+    if (zx_status_t status = TestUnitReady(kPlaceholderTarget, lun); status != ZX_OK) {
       // Get the previous response from the admin slot.
       auto response_upiu = std::make_unique<ResponseUpiu>(
           transfer_request_processor_->GetRequestList().GetDescriptorBuffer(
-              kAdminCommandSlotNumber, unit_ready_upiu.GetResponseOffset()));
+              kAdminCommandSlotNumber, ScsiCommandUpiu::GetResponseOffset()));
       auto* response_data =
           reinterpret_cast<scsi::FixedFormatSenseDataHeader*>(response_upiu->GetSenseData());
       if (response_data->sense_key() != scsi::SenseKey::UNIT_ATTENTION) {
-        zxlogf(ERROR, "Failed to send SCSI command: %s", response.status_string());
-        return response.take_error();
+        zxlogf(ERROR, "Failed to send SCSI TEST UNIT READY command: %s",
+               zx_status_get_string(status));
+        return zx::error(status);
       }
-      zxlogf(DEBUG, "Expected Unit Attention error: %s", response.status_string());
+      zxlogf(DEBUG, "Expected Unit Attention error: %s", zx_status_get_string(status));
     }
 
     // Send request sense commands to clear the Unit Attention Condition(UAC) of LUs. UAC is a
     // condition which needs to be serviced before the logical unit can process commands.
     // This command will get sense data, but ignore it for now because our goal is to clear the
     // UAC.
-    ScsiRequestSenseUpiu request_sense_upiu;
-    if (auto response = transfer_request_processor_->SendScsiUpiu(request_sense_upiu, i,
-                                                                  zx::unowned_vmo(data_vmo));
-        response.is_error()) {
-      zxlogf(ERROR, "Failed to send SCSI command: %s", response.status_string());
-      return response.take_error();
+    uint8_t request_sense_data[sizeof(scsi::FixedFormatSenseDataHeader)];
+    if (zx_status_t status =
+            RequestSense(kPlaceholderTarget, lun,
+                         {request_sense_data, sizeof(scsi::FixedFormatSenseDataHeader)});
+        status != ZX_OK) {
+      zxlogf(ERROR, "Failed to send SCSI REQUEST SENSE command: %s", zx_status_get_string(status));
+      return zx::error(status);
     }
 
     // Verify that the Lun is ready. This command expects a success.
-    if (auto response = transfer_request_processor_->SendScsiUpiu(unit_ready_upiu, i);
-        response.is_error()) {
-      zxlogf(ERROR, "Failed to send SCSI command: %s", response.status_string());
-      return response.take_error();
+    if (zx_status_t status = TestUnitReady(kPlaceholderTarget, lun); status != ZX_OK) {
+      zxlogf(ERROR, "Failed to send SCSI TEST UNIT READY command: %s",
+             zx_status_get_string(status));
+      return zx::error(status);
     }
 
-    // Checks for block size consistency.
-    ScsiReadCapacity10Upiu read_capacity_upiu;
-    if (auto response = transfer_request_processor_->SendScsiUpiu(read_capacity_upiu, i,
-                                                                  zx::unowned_vmo(data_vmo));
-        response.is_error()) {
-      zxlogf(ERROR, "Failed to send SCSI READ CAPACITY 10 command: %s", response.status_string());
-      return response.take_error();
+    zx::result disk = scsi::Disk::Bind(zxdev(), this, kPlaceholderTarget, lun, max_transfer_bytes_);
+    if (disk.is_error()) {
+      zxlogf(ERROR, "UFS: device_add for block device failed: %s", disk.status_string());
+      return disk.take_error();
     }
-    auto* read_capacity_data = reinterpret_cast<scsi::ReadCapacity10ParameterData*>(mapper.start());
-    const uint32_t block_length_in_bytes = betoh32(read_capacity_data->block_length_in_bytes);
-    if (block_device.block_size != block_length_in_bytes) {
-      zxlogf(WARNING,
-             "The block size(%ld) from the unit descriptor and the block size(%d) from the READ "
-             "CAPACITY are different.",
-             block_device.block_size, block_length_in_bytes);
+
+    if (disk->block_size_bytes() != block_size || disk->block_count() != block_count) {
+      zxlogf(INFO, "Failed to check for disk consistency. (block_size=%d/%zu, block_count=%ld/%ld)",
+             disk->block_size_bytes(), block_size, disk->block_count(), block_count);
+      return zx::error(ZX_ERR_BAD_STATE);
     }
-    // TODO(fxbug.dev/124835): If the value of |returned_logical_block_address| is UINT32_MAX, READ
-    // CAPACITY 16 should be used instead of READ CAPACITY 10.
-    const uint32_t returned_logical_block_address =
-        betoh32(read_capacity_data->returned_logical_block_address);
-    if ((block_device.block_count != returned_logical_block_address + 1) &&
-        (returned_logical_block_address != UINT32_MAX)) {
-      zxlogf(WARNING,
-             "The block count(%ld) from the unit descriptor and the block count(%d) from the READ "
-             "CAPACITY are different.",
-             block_device.block_count, returned_logical_block_address + 1);
-    }
-    zxlogf(INFO, "LUN-%d block_size=%zu, block_count=%ld", i, block_device.block_size,
-           block_device.block_count);
+    zxlogf(INFO, "LUN-%d block_size=%zu, block_count=%ld", lun, block_size, block_count);
+
+    ++lun_count;
   }
 
   // TODO(fxbug.dev/124835): Send a request sense command to clear the UAC of a well-known LU.
   // TODO(fxbug.dev/124835): We need to implement the processing of a well-known LU.
 
-  return zx::ok();
+  return zx::ok(lun_count);
 }
 
 void Ufs::DumpRegisters() {

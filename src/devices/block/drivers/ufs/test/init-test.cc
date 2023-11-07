@@ -42,7 +42,7 @@ TEST_F(InitTest, GetControllerDescriptor) {
   EXPECT_EQ(ufs_->GetDeviceManager().GetGeometryDescriptor().bMaxNumberLU, 0x01);
 }
 
-TEST_F(InitTest, ScanLogicalUnits) {
+TEST_F(InitTest, AddLogicalUnits) {
   constexpr uint8_t kDefualtLunCount = 1;
   constexpr uint8_t kMaxLunCount = 8;
 

@@ -9,8 +9,10 @@
 #include <lib/device-protocol/pci.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/inspect/cpp/inspect.h>
+#include <lib/scsi/disk.h>
 
 #include <ddktl/device.h>
+#include <fbl/array.h>
 #include <fbl/condition_variable.h>
 #include <fbl/intrusive_double_list.h>
 #include <fbl/string_printf.h>
@@ -24,6 +26,8 @@ namespace ufs {
 constexpr uint32_t kMaxLun = 32;
 constexpr uint32_t kDeviceInitTimeoutMs = 2000;
 constexpr uint32_t kHostControllerTimeoutUs = 1000;
+constexpr uint32_t kMaxTransferSize1MiB = 1024 * 1024;
+constexpr uint8_t kPlaceholderTarget = 0;
 
 constexpr uint32_t kBlockSize = 4096;
 constexpr uint32_t kSectorSize = 512;
@@ -46,23 +50,16 @@ enum NotifyEvent {
   kPostPowerModeChange,
 };
 
-struct BlockDevice {
-  bool is_present = false;
-  std::string name;
-  uint8_t lun = 0;
-  size_t block_size = 0;
-  uint64_t block_count = 0;
-};
-
 struct IoCommand {
-  void Complete(zx_status_t status) { completion_cb(cookie, status, &op); }
+  scsi::DiskOp disk_op;
 
-  block_op_t op;
-  block_impl_queue_callback completion_cb;
-  void *cookie;
-
-  uint8_t lun_id;
+  // Ufs::ExecuteCommandAsync() checks that the incoming CDB's size does not exceed
+  // this buffer's.
+  uint8_t cdb_buffer[16];
+  uint8_t cdb_length;
+  uint8_t lun;
   uint32_t block_size_bytes;
+  bool is_write;
 
   list_node_t node;
 };
@@ -72,7 +69,7 @@ class Ufs;
 using HostControllerCallback = fit::function<zx::result<>(NotifyEvent, uint64_t data)>;
 
 using UfsDeviceType = ddk::Device<Ufs, ddk::Initializable>;
-class Ufs : public UfsDeviceType {
+class Ufs : public scsi::Controller, public UfsDeviceType {
  public:
   static constexpr char kDriverName[] = "ufs";
 
@@ -84,13 +81,20 @@ class Ufs : public UfsDeviceType {
         irq_mode_(irq_mode),
         irq_(std::move(irq)),
         bti_(std::move(bti)) {}
-  ~Ufs() = default;
+  ~Ufs() override = default;
 
   static zx_status_t Bind(void *ctx, zx_device_t *parent);
   zx_status_t AddDevice();
 
   void DdkInit(ddk::InitTxn txn);
   void DdkRelease();
+
+  // scsi::Controller
+  size_t BlockOpSize() override { return sizeof(IoCommand); }
+  zx_status_t ExecuteCommandSync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
+                                 iovec data) override;
+  void ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
+                           uint32_t block_size_bytes, scsi::DiskOp *disk_op) override;
 
   // TODO(fxbug.dev/124835): Implement inspector.
 
@@ -149,7 +153,7 @@ class Ufs : public UfsDeviceType {
   zx::result<> InitController();
   zx::result<> InitDeviceInterface();
   zx::result<> GetControllerDescriptor();
-  zx::result<> ScanLogicalUnits();
+  zx::result<uint8_t> AddLogicalUnits();
 
   zx_status_t EnableHostController();
   zx_status_t DisableHostController();
@@ -161,8 +165,6 @@ class Ufs : public UfsDeviceType {
   zx::bti bti_;
   inspect::Inspector inspector_;
   inspect::Node inspect_node_;
-
-  BlockDevice block_devices_[kMaxLun];
 
   fbl::Mutex commands_lock_;
   // The pending list consists of commands that have been received via QueueIoCommand() and are
@@ -189,6 +191,10 @@ class Ufs : public UfsDeviceType {
 
   bool driver_shutdown_ = false;
   bool disable_completion_ = false;
+
+  // The maximum transfer size supported by UFSHCI spec is 65535 * 256 KiB. However, we limit the
+  // maximum transfer size to 1MiB for performance reason.
+  uint32_t max_transfer_bytes_ = kMaxTransferSize1MiB;
 };
 
 }  // namespace ufs

@@ -57,7 +57,16 @@ TEST_F(ScsiCommandTest, Read10) {
   std::strncpy(buf, kTestString, sizeof(buf));
   ASSERT_OK(mock_device_->BufferWrite(kTestLun, buf, GetBlockCount(), block_offset));
 
-  ScsiRead10Upiu upiu(block_offset, GetBlockCount(), GetBlockSize(), /*fua=*/false, 0);
+  // Make READ 10 CDB
+  uint8_t cdb_buffer[10] = {};
+  auto cdb = reinterpret_cast<scsi::Read10CDB *>(cdb_buffer);
+  cdb->opcode = scsi::Opcode::READ_10;
+  cdb->logical_block_address = htobe32(block_offset);
+  cdb->transfer_length = htobe16(GetBlockCount());
+  cdb->set_force_unit_access(false);
+
+  ScsiCommandUpiu upiu(cdb_buffer, sizeof(*cdb), DataDirection::kDeviceToHost,
+                       GetBlockCount() * GetBlockSize());
   ASSERT_EQ(upiu.GetOpcode(), scsi::Opcode::READ_10);
   ASSERT_OK(
       ufs_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun, zx::unowned_vmo(GetVmo())));
@@ -73,7 +82,16 @@ TEST_F(ScsiCommandTest, Write10) {
   constexpr char kTestString[] = "test";
   std::strncpy(static_cast<char *>(GetVirtualAddress()), kTestString, kMockBlockSize);
 
-  ScsiWrite10Upiu upiu(block_offset, GetBlockCount(), GetBlockSize(), /*fua=*/false, 0);
+  // Make WRITE 10 CDB
+  uint8_t cdb_buffer[10] = {};
+  auto cdb = reinterpret_cast<scsi::Write10CDB *>(cdb_buffer);
+  cdb->opcode = scsi::Opcode::WRITE_10;
+  cdb->logical_block_address = htobe32(block_offset);
+  cdb->transfer_length = htobe16(GetBlockCount());
+  cdb->set_force_unit_access(false);
+
+  ScsiCommandUpiu upiu(cdb_buffer, sizeof(*cdb), DataDirection::kHostToDevice,
+                       GetBlockCount() * GetBlockSize());
   ASSERT_EQ(upiu.GetOpcode(), scsi::Opcode::WRITE_10);
   ASSERT_OK(
       ufs_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun, zx::unowned_vmo(GetVmo())));
@@ -89,7 +107,11 @@ TEST_F(ScsiCommandTest, Write10) {
 TEST_F(ScsiCommandTest, TestUnitReady) {
   const uint8_t kTestLun = 0;
 
-  ScsiTestUnitReadyUpiu upiu;
+  uint8_t cdb_buffer[6] = {};
+  auto cdb = reinterpret_cast<scsi::TestUnitReadyCDB *>(cdb_buffer);
+  cdb->opcode = scsi::Opcode::TEST_UNIT_READY;
+
+  ScsiCommandUpiu upiu(cdb_buffer, sizeof(*cdb), DataDirection::kNone);
   ASSERT_EQ(upiu.GetOpcode(), scsi::Opcode::TEST_UNIT_READY);
   auto response = ufs_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun);
   ASSERT_OK(response);
@@ -112,7 +134,13 @@ TEST_F(ScsiCommandTest, TestUnitReady) {
 TEST_F(ScsiCommandTest, ReadCapacity10) {
   const uint8_t kTestLun = 0;
 
-  ScsiReadCapacity10Upiu upiu;
+  // Make READ CAPACITY 10 CDB
+  uint8_t cdb_buffer[10] = {};
+  auto cdb = reinterpret_cast<scsi::ReadCapacity10CDB *>(cdb_buffer);
+  cdb->opcode = scsi::Opcode::READ_CAPACITY_10;
+
+  ScsiCommandUpiu upiu(cdb_buffer, sizeof(*cdb), DataDirection::kDeviceToHost,
+                       sizeof(scsi::ReadCapacity10ParameterData));
   ASSERT_EQ(upiu.GetOpcode(), scsi::Opcode::READ_CAPACITY_10);
   ASSERT_OK(
       ufs_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun, zx::unowned_vmo(GetVmo())));
@@ -129,7 +157,14 @@ TEST_F(ScsiCommandTest, ReadCapacity10) {
 TEST_F(ScsiCommandTest, RequestSense) {
   const uint8_t kTestLun = 0;
 
-  ScsiRequestSenseUpiu upiu;
+  // Make REQUEST SENSE CDB
+  uint8_t cdb_buffer[6] = {};
+  auto cdb = reinterpret_cast<scsi::RequestSenseCDB *>(cdb_buffer);
+  cdb->opcode = scsi::Opcode::REQUEST_SENSE;
+  cdb->allocation_length = static_cast<uint8_t>(sizeof(scsi::FixedFormatSenseDataHeader));
+
+  ScsiCommandUpiu upiu(cdb_buffer, sizeof(*cdb), DataDirection::kDeviceToHost,
+                       cdb->allocation_length);
   ASSERT_EQ(upiu.GetOpcode(), scsi::Opcode::REQUEST_SENSE);
   ASSERT_OK(
       ufs_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun, zx::unowned_vmo(GetVmo())));
@@ -144,43 +179,17 @@ TEST_F(ScsiCommandTest, SynchronizeCache10) {
   const uint8_t kTestLun = 0;
   uint32_t block_offset = 0;
 
-  ScsiSynchronizeCache10Upiu cache_upiu(block_offset, GetBlockCount());
+  // Make SYNCHRONIZE CACHE 10 CDB
+  uint8_t cdb_buffer[10] = {};
+  auto cdb = reinterpret_cast<scsi::SynchronizeCache10CDB *>(cdb_buffer);
+  cdb->opcode = scsi::Opcode::SYNCHRONIZE_CACHE_10;
+  cdb->logical_block_address = htobe32(block_offset);
+  cdb->num_blocks = htobe16(GetBlockCount());
+
+  ScsiCommandUpiu cache_upiu(cdb_buffer, sizeof(*cdb), DataDirection::kNone);
   ASSERT_EQ(cache_upiu.GetOpcode(), scsi::Opcode::SYNCHRONIZE_CACHE_10);
   ASSERT_OK(ufs_->GetTransferRequestProcessor().SendScsiUpiu(cache_upiu, kTestLun,
                                                              zx::unowned_vmo(GetVmo())));
-}
-
-TEST(ScsiCommandTest, uint24_t) {
-  ASSERT_EQ(sizeof(uint24_t), 3);
-
-  // Little-endian
-  uint32_t value_32 = 0x123456;  // MSB = 0x12, LSB = 0x56
-  uint24_t *value_24_ptr = reinterpret_cast<uint24_t *>(&value_32);
-
-  // Little-endian
-  ASSERT_EQ(value_24_ptr->byte[0], 0x56);  // LSB
-  ASSERT_EQ(value_24_ptr->byte[1], 0x34);
-  ASSERT_EQ(value_24_ptr->byte[2], 0x12);  // MSB
-}
-
-TEST(ScsiCommandTest, htobe24) {
-  // Little-endian
-  uint32_t unsigned_int_32 = 0x123456;  // MSB = 0x12, LSB = 0x56
-
-  // Big-endian
-  uint24_t big_24 = htobe24(unsigned_int_32);
-  ASSERT_EQ(big_24.byte[0], 0x12);  // MSB
-  ASSERT_EQ(big_24.byte[1], 0x34);
-  ASSERT_EQ(big_24.byte[2], 0x56);  // LSB
-}
-
-TEST(ScsiCommandTest, betoh24) {
-  // Big-endian
-  uint24_t big_24 = {0x12, 0x34, 0x56};  // MSB = 0x12, LSB = 0x56
-
-  // Little-endian
-  uint32_t unsigned_int_32 = betoh24(big_24);
-  ASSERT_EQ(unsigned_int_32, 0x123456);  // MSB = 0x12, LSB = 0x56
 }
 
 }  // namespace ufs

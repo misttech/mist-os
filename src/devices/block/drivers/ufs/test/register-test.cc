@@ -58,7 +58,11 @@ TEST_F(RegisterTest, InterruptStatus) {
       InterruptStatusReg::Get().ReadFrom(&ufs_->GetMmio()).uic_command_completion_status());
 
   // Send UPIU command to set |utp_transfer_request_completion_status|
-  ScsiTestUnitReadyUpiu unit_ready_upiu;
+  uint8_t cdb_buffer[6] = {};
+  auto cdb = reinterpret_cast<scsi::TestUnitReadyCDB*>(cdb_buffer);
+  cdb->opcode = scsi::Opcode::TEST_UNIT_READY;
+
+  ScsiCommandUpiu unit_ready_upiu(cdb_buffer, sizeof(*cdb), DataDirection::kNone);
   EXPECT_OK(ufs_->GetTransferRequestProcessor().SendScsiUpiu(unit_ready_upiu, 0));
 
   // InterruptStatus is cleared by Isr().
