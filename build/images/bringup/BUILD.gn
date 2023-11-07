@@ -131,6 +131,8 @@ product_bundle("product_bundle") {
     _partitions_config,
     recovery_label,
   ]
+
+  name = main_product_bundle_name
   partitions = _partitions_config_file
   system_a = files.images_json
   system_r = files.recovery_images_json
