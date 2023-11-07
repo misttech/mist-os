@@ -212,16 +212,18 @@ impl FxDeliveryBlob {
     }
 
     async fn allocate(&self, size: usize) -> Result<(), Error> {
-        let mut transaction = self.handle.new_transaction().await?;
-        let size: u64 = size.try_into()?;
-        self.handle
-            .preallocate_range(
-                &mut transaction,
-                0..round_up(size, self.handle.block_size()).ok_or(FxfsError::OutOfRange)?,
-            )
-            .await?;
-        self.handle.grow(&mut transaction, 0, size).await?;
-        transaction.commit().await?;
+        let size = size as u64;
+        let mut range = 0..round_up(size, self.handle.block_size()).ok_or(FxfsError::OutOfRange)?;
+        let mut first_time = true;
+        while range.start < range.end {
+            let mut transaction = self.handle.new_transaction().await?;
+            if first_time {
+                self.handle.grow(&mut transaction, 0, size).await?;
+                first_time = false;
+            }
+            self.handle.preallocate_range(&mut transaction, &mut range).await?;
+            transaction.commit().await?;
+        }
         Ok(())
     }
 
@@ -553,6 +555,7 @@ mod tests {
         core::ops::Range,
         delivery_blob::{CompressionMode, Type1Blob},
         fidl_fuchsia_fxfs::CreateBlobError,
+        fidl_fuchsia_io::UnlinkOptions,
         fuchsia_async as fasync,
         fuchsia_merkle::MerkleTreeBuilder,
         fuchsia_zircon::Status,
@@ -928,6 +931,75 @@ mod tests {
             }
         }
         assert_eq!(fixture.read_blob(hash).await, data);
+        fixture.close().await;
+    }
+
+    #[fasync::run(10, test)]
+    async fn test_allocate_with_large_transaction() {
+        const NUM_BLOBS: usize = 1024;
+        let fixture = new_blob_fixture().await;
+
+        let mut data = [0; 128];
+        let mut hashes = Vec::new();
+
+        // It doesn't matter if these blobs are compressed. We just need to fragment space.
+        for _ in 0..NUM_BLOBS {
+            thread_rng().fill(&mut data[..]);
+            let hash = fixture.write_blob(&data, CompressionMode::Never).await;
+            hashes.push(hash);
+        }
+
+        // Delete every second blob, fragmenting free space.
+        for ix in 0..NUM_BLOBS / 2 {
+            fixture
+                .root()
+                .unlink(&format!("{}", hashes[ix * 2]), &UnlinkOptions::default())
+                .await
+                .expect("FIDL failed")
+                .expect("unlink failed");
+        }
+
+        // Create one large blob (reusing fragmented extents).
+        {
+            let mut data = vec![1; 1024921];
+            thread_rng().fill(&mut data[..]);
+
+            let mut builder = MerkleTreeBuilder::new();
+            builder.write(&data);
+            let hash = builder.finish().root();
+            let compressed_data = Type1Blob::generate(&data, CompressionMode::Always);
+            assert!(compressed_data.len() as u64 > *RING_BUFFER_SIZE);
+
+            let writer =
+                fixture.create_blob(&hash.into(), false).await.expect("failed to create blob");
+            let vmo = writer
+                .get_vmo(compressed_data.len() as u64)
+                .await
+                .expect("transport error on get_vmo")
+                .expect("failed to get vmo");
+
+            let vmo_size = vmo.get_size().expect("failed to get vmo size");
+
+            let list_of_writes = generate_list_of_writes(compressed_data.len() as u64);
+            let mut write_offset = 0;
+            for range in list_of_writes {
+                let len = range.end - range.start;
+                vmo.write(
+                    &compressed_data[range.start as usize..range.end as usize],
+                    write_offset % vmo_size,
+                )
+                .expect("failed to write to vmo");
+                let _ = writer
+                    .bytes_ready(len)
+                    .await
+                    .expect("transport error on bytes_ready")
+                    .expect("failed to write data to vmo.");
+                write_offset += len;
+            }
+            // Ensure that the blob is readable and matches what we expect.
+            assert_eq!(fixture.read_blob(hash).await, data);
+        }
+
         fixture.close().await;
     }
 }

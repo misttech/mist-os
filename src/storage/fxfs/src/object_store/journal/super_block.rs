@@ -596,13 +596,12 @@ impl<'a, S: HandleOwner> SuperBlockWriter<'a, S> {
                 ..Default::default()
             })
             .await?;
-        let allocated = self
-            .handle
-            .preallocate_range(
-                &mut transaction,
-                self.next_extent_offset..self.next_extent_offset + SUPER_BLOCK_CHUNK_SIZE,
-            )
-            .await?;
+        let mut file_range =
+            self.next_extent_offset..self.next_extent_offset + SUPER_BLOCK_CHUNK_SIZE;
+        let allocated = self.handle.preallocate_range(&mut transaction, &mut file_range).await?;
+        if file_range.start < file_range.end {
+            bail!("preallocate_range returned too little space");
+        }
         transaction.commit().await?;
         for device_range in allocated {
             self.next_extent_offset += device_range.end - device_range.start;

@@ -1000,10 +1000,14 @@ impl Journal {
         )
         .await
         .context("create journal")?;
+        let mut file_range = 0..self.chunk_size();
         journal_handle
-            .preallocate_range(&mut transaction, 0..self.chunk_size())
+            .preallocate_range(&mut transaction, &mut file_range)
             .await
             .context("preallocate journal")?;
+        if file_range.start < file_range.end {
+            bail!("preallocate_range returned too little space");
+        }
 
         // Write the root store object info.
         root_store.create(&mut transaction).await?;
@@ -1124,7 +1128,9 @@ impl Journal {
             })
             .await?;
         if let Some(size) = size {
-            handle.preallocate_range(&mut transaction, size..size + self.chunk_size()).await?;
+            handle
+                .preallocate_range(&mut transaction, &mut (size..size + self.chunk_size()))
+                .await?;
         }
         if let Some(zero_offset) = zero_offset {
             handle.zero(&mut transaction, 0..zero_offset).await?;

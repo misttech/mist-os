@@ -24,6 +24,7 @@ use {
                 ObjectStoreMutation, Options, Transaction,
             },
             HandleOptions, HandleOwner, ObjectStore, StoreObjectHandle, TrimMode, TrimResult,
+            TRANSACTION_MUTATION_THRESHOLD,
         },
         range::RangeExt,
         round::{round_down, round_up},
@@ -656,11 +657,22 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         Ok(())
     }
 
-    // Must be multiple of block size.
+    /// Attempts to pre-allocate a `file_range` of bytes for this object.
+    /// Returns a set of device ranges (i.e. potentially multiple extents).
+    ///
+    /// It may not be possible to preallocate the entire requested range in one request
+    /// due to limitations on transaction size. In such cases, we will preallocate as much as
+    /// we can up to some (arbitrary, internal) limit on transaction size.
+    ///
+    /// `file_range.start` is modified to point at the end of the logical range
+    /// that was preallocated such that repeated calls to `preallocate_range` with new
+    /// transactions can be used to preallocate ranges of any size.
+    ///
+    /// Requested range must be a multiple of block size.
     pub async fn preallocate_range<'a>(
         &'a self,
         transaction: &mut Transaction<'a>,
-        mut file_range: Range<u64>,
+        file_range: &mut Range<u64>,
     ) -> Result<Vec<Range<u64>>, Error> {
         let block_size = self.block_size();
         assert!(file_range.is_aligned(block_size));
@@ -773,9 +785,13 @@ impl<S: HandleOwner> DataObjectHandle<S> {
             );
             ranges.push(device_range);
             // If we didn't allocate all that we requested, we'll loop around and try again.
+            // ... unless we have filled the transaction. The caller should check file_range.
+            if transaction.mutations().len() > TRANSACTION_MUTATION_THRESHOLD {
+                break;
+            }
         }
         // Update the file size if it changed.
-        if file_range.end > self.txn_get_size(transaction) {
+        if file_range.start > round_up(self.txn_get_size(transaction), block_size).unwrap() {
             transaction.add_with_object(
                 self.store().store_object_id,
                 Mutation::replace_or_insert_object(
@@ -784,7 +800,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                         self.attribute_id(),
                         AttributeKey::Attribute,
                     ),
-                    ObjectValue::attribute(file_range.end),
+                    ObjectValue::attribute(file_range.start),
                 ),
                 AssocObj::Borrowed(self),
             );
@@ -1516,14 +1532,14 @@ mod tests {
         let allocated_before = allocator.get_allocated_bytes();
         let mut transaction = object.new_transaction().await.expect("new_transaction failed");
         object
-            .preallocate_range(&mut transaction, 0..fs.block_size() as u64)
+            .preallocate_range(&mut transaction, &mut (0..fs.block_size() as u64))
             .await
             .expect("preallocate_range failed");
         transaction.commit().await.expect("commit failed");
         assert!(object.get_size() < 1048576);
         let mut transaction = object.new_transaction().await.expect("new_transaction failed");
         object
-            .preallocate_range(&mut transaction, 0..1048576)
+            .preallocate_range(&mut transaction, &mut (0..1048576))
             .await
             .expect("preallocate_range failed");
         transaction.commit().await.expect("commit failed");
@@ -1582,7 +1598,7 @@ mod tests {
         let mut transaction = object.new_transaction().await.expect("new_transaction failed");
         let offset = TEST_DATA_OFFSET - TEST_DATA_OFFSET % fs.block_size() as u64;
         object
-            .preallocate_range(&mut transaction, offset..offset + fs.block_size() as u64)
+            .preallocate_range(&mut transaction, &mut (offset..offset + fs.block_size() as u64))
             .await
             .expect("preallocate_range failed");
         transaction.commit().await.expect("commit failed");
@@ -1618,7 +1634,7 @@ mod tests {
         // Now preallocate some space (exactly one block)
         let mut transaction = object.new_transaction().await.expect("new_transaction failed");
         object
-            .preallocate_range(&mut transaction, 0..4096 as u64)
+            .preallocate_range(&mut transaction, &mut (0..4096 as u64))
             .await
             .expect("preallocate_range failed");
         transaction.commit().await.expect("commit failed");
@@ -1683,19 +1699,19 @@ mod tests {
         // Let's create some non-holes
         let mut transaction = object.new_transaction().await.expect("new_transaction failed");
         object
-            .preallocate_range(&mut transaction, 4096..8192 as u64)
+            .preallocate_range(&mut transaction, &mut (4096..8192 as u64))
             .await
             .expect("preallocate_range failed");
         object
-            .preallocate_range(&mut transaction, 16384..32768 as u64)
+            .preallocate_range(&mut transaction, &mut (16384..32768 as u64))
             .await
             .expect("preallocate_range failed");
         object
-            .preallocate_range(&mut transaction, 65536..131072 as u64)
+            .preallocate_range(&mut transaction, &mut (65536..131072 as u64))
             .await
             .expect("preallocate_range failed");
         object
-            .preallocate_range(&mut transaction, 262144..524288 as u64)
+            .preallocate_range(&mut transaction, &mut (262144..524288 as u64))
             .await
             .expect("preallocate_range failed");
         transaction.commit().await.expect("commit failed");
@@ -2465,10 +2481,8 @@ mod tests {
         // preallocate_range...
         let mut transaction = object.new_transaction().await.expect("new_transaction failed");
         let before = after;
-        object
-            .preallocate_range(&mut transaction, offset..offset + fs.block_size() as u64)
-            .await
-            .expect("extend failed");
+        let mut file_range = offset..offset + fs.block_size() as u64;
+        object.preallocate_range(&mut transaction, &mut file_range).await.expect("extend failed");
         transaction.commit().await.expect("commit failed");
         let after = object.get_properties().await.expect("get_properties failed").allocated_size;
         assert_eq!(after, before + fs.block_size() as u64);
