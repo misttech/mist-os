@@ -1,0 +1,2 @@
+per-file input.rs = file:/src/ui/lib/input_pipeline/OWNERS
+per-file uinput.rs = file:/src/ui/lib/input_pipeline/OWNERS
