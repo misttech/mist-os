@@ -36,6 +36,7 @@ def _fuchsia_toolchain_info_impl(ctx):
         fidlc = ctx.executable.fidlc,
         fidlgen_hlcpp = ctx.executable.fidlgen_hlcpp,
         fidlgen_cpp = ctx.executable.fidlgen_cpp,
+        funnel = ctx.executable.funnel,
         fvm = ctx.executable.fvm,
         fvm_manifest = ctx.file.fvm_manifest,
         gtest_runner_shard = ctx.attr.gtest_runner_shard,
@@ -208,6 +209,13 @@ included in the Fuchsia IDK.
         "fidlgen_cpp": attr.label(
             doc = "fidlgen_cpp tool executable.",
             mandatory = False,
+            cfg = "exec",
+            executable = True,
+            allow_single_file = True,
+        ),
+        "funnel": attr.label(
+            doc = "funnel tool executable.",
+            mandatory = True,
             cfg = "exec",
             executable = True,
             allow_single_file = True,

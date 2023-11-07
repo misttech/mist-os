@@ -7,8 +7,8 @@
 # This is referenced by //fuchsia/private/fuchsia_sdk_repository.bzl, see
 # the `fuchsia_sdk_repository` rule for more information.
 load("@fuchsia_sdk//fuchsia:defs.bzl", "fuchsia_debug_symbols", "fuchsia_toolchain_info")
-load("api_version.bzl", "DEFAULT_FIDL_TARGET_API", "DEFAULT_TARGET_API")
 load("@fuchsia_sdk//fuchsia/workspace:sdk_host_tool.bzl", "sdk_host_tool")
+load("api_version.bzl", "DEFAULT_FIDL_TARGET_API", "DEFAULT_TARGET_API")
 
 # Export all files as individual targets.
 exports_files(glob(["**/*"]))
@@ -74,6 +74,7 @@ fuchsia_toolchain_info(
     fidlgen_cpp = "//tools:{{HOST_CPU}}/fidlgen_cpp",
     fidlgen_hlcpp = "//tools:{{HOST_CPU}}/fidlgen_hlcpp",
     fssh = "//tools:{{HOST_CPU}}/fssh",
+    funnel = "//tools:{{HOST_CPU}}/funnel",
     fvm = "//tools:{{HOST_CPU}}/fvm",
     fvm_manifest = "//tools:{{HOST_CPU}}/fvm-meta.json",
     gtest_runner_shard = "sys/testing/gtest_runner.shard.cml",
