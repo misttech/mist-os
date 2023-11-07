@@ -543,7 +543,8 @@ async fn on_terminate_stop_triggers_reboot() {
         .start_instance(&vec!["system"].try_into().unwrap(), &StartReason::Debug)
         .await
         .unwrap();
-    let component = test.model.look_up(&vec!["system"].try_into().unwrap()).await.unwrap();
+    let component =
+        test.model.find_and_maybe_resolve(&vec!["system"].try_into().unwrap()).await.unwrap();
     let stop = async move {
         ActionSet::register(component.clone(), StopAction::new(false)).await.unwrap();
     };
@@ -600,7 +601,8 @@ async fn on_terminate_exit_triggers_reboot() {
         .start_instance(&vec!["system"].try_into().unwrap(), &StartReason::Debug)
         .await
         .unwrap();
-    let component = test.model.look_up(&vec!["system"].try_into().unwrap()).await.unwrap();
+    let component =
+        test.model.find_and_maybe_resolve(&vec!["system"].try_into().unwrap()).await.unwrap();
     let info = ComponentInfo::new(component.clone()).await;
     test.mock_runner.abort_controller(&info.channel_id);
     let reason = match receiver.next().await.unwrap() {
@@ -653,7 +655,8 @@ async fn reboot_shutdown_does_not_trigger_reboot() {
         .start_instance(&vec!["system"].try_into().unwrap(), &StartReason::Debug)
         .await
         .unwrap();
-    let component = test.model.look_up(&vec!["system"].try_into().unwrap()).await.unwrap();
+    let component =
+        test.model.find_and_maybe_resolve(&vec!["system"].try_into().unwrap()).await.unwrap();
     ActionSet::register(component.clone(), ShutdownAction::new()).await.unwrap();
     assert!(!test.model.top_instance().has_reboot_task().await);
 }
@@ -704,7 +707,8 @@ async fn on_terminate_with_missing_reboot_protocol_panics() {
         .start_instance(&vec!["system"].try_into().unwrap(), &StartReason::Debug)
         .await
         .unwrap();
-    let component = test.model.look_up(&vec!["system"].try_into().unwrap()).await.unwrap();
+    let component =
+        test.model.find_and_maybe_resolve(&vec!["system"].try_into().unwrap()).await.unwrap();
     let info = ComponentInfo::new(component.clone()).await;
     test.mock_runner.abort_controller(&info.channel_id);
     let () = pending().await;
@@ -757,7 +761,8 @@ async fn on_terminate_with_failed_reboot_panics() {
         .start_instance(&vec!["system"].try_into().unwrap(), &StartReason::Debug)
         .await
         .unwrap();
-    let component = test.model.look_up(&vec!["system"].try_into().unwrap()).await.unwrap();
+    let component =
+        test.model.find_and_maybe_resolve(&vec!["system"].try_into().unwrap()).await.unwrap();
     let info = ComponentInfo::new(component.clone()).await;
     test.mock_runner.abort_controller(&info.channel_id);
     match receiver.next().await.unwrap() {

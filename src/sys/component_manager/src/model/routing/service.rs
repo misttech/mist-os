@@ -891,11 +891,16 @@ mod tests {
             ChildDeclBuilder::new_lazy_child("baz"),
         )
         .await;
-        let foo_component = test.model.look_up(&"coll1:foo".parse().unwrap()).await.unwrap();
-        let bar_component = test.model.look_up(&"coll1:bar".parse().unwrap()).await.unwrap();
-        let baz_component = test.model.look_up(&"coll2:baz".parse().unwrap()).await.unwrap();
-        let static_a_component = test.model.look_up(&"static_a".parse().unwrap()).await.unwrap();
-        let static_b_component = test.model.look_up(&"static_b".parse().unwrap()).await.unwrap();
+        let foo_component =
+            test.model.find_and_maybe_resolve(&"coll1:foo".parse().unwrap()).await.unwrap();
+        let bar_component =
+            test.model.find_and_maybe_resolve(&"coll1:bar".parse().unwrap()).await.unwrap();
+        let baz_component =
+            test.model.find_and_maybe_resolve(&"coll2:baz".parse().unwrap()).await.unwrap();
+        let static_a_component =
+            test.model.find_and_maybe_resolve(&"static_a".parse().unwrap()).await.unwrap();
+        let static_b_component =
+            test.model.find_and_maybe_resolve(&"static_b".parse().unwrap()).await.unwrap();
 
         let provider = MockAnonymizedCapabilityProvider {
             instances: hashmap! {
@@ -966,10 +971,13 @@ mod tests {
             assert!(instance_dir_contents.iter().find(|d| d.name == "member").is_some());
         }
 
-        let baz_component =
-            test.model.look_up(&vec!["coll2:baz"].try_into().unwrap()).await.unwrap();
+        let baz_component = test
+            .model
+            .find_and_maybe_resolve(&vec!["coll2:baz"].try_into().unwrap())
+            .await
+            .unwrap();
         let static_a_component =
-            test.model.look_up(&vec!["static_a"].try_into().unwrap()).await.unwrap();
+            test.model.find_and_maybe_resolve(&vec!["static_a"].try_into().unwrap()).await.unwrap();
 
         // Add entries from the children again. This should be a no-op since all of them are
         // already there and we prevent duplicates.
@@ -1029,8 +1037,11 @@ mod tests {
         // should be no entries in a non initialized collection service dir.
         assert_eq!(instance_names.len(), 0);
 
-        let foo_component =
-            test.model.look_up(&vec!["coll1:foo"].try_into().unwrap()).await.unwrap();
+        let foo_component = test
+            .model
+            .find_and_maybe_resolve(&vec!["coll1:foo"].try_into().unwrap())
+            .await
+            .unwrap();
 
         // Test that starting an instance results in the collection service directory adding the
         // relevant instances.
@@ -1038,8 +1049,11 @@ mod tests {
         let entries = wait_for_dir_content_change(&dir_proxy, entries).await;
         assert_eq!(entries.len(), 1);
 
-        let baz_component =
-            test.model.look_up(&vec!["coll2:baz"].try_into().unwrap()).await.unwrap();
+        let baz_component = test
+            .model
+            .find_and_maybe_resolve(&vec!["coll2:baz"].try_into().unwrap())
+            .await
+            .unwrap();
 
         // Test with second collection
         baz_component.start(&StartReason::Eager, None, vec![], vec![]).await.unwrap();
@@ -1047,7 +1061,7 @@ mod tests {
         assert_eq!(entries.len(), 3);
 
         let static_a_component =
-            test.model.look_up(&vec!["static_a"].try_into().unwrap()).await.unwrap();
+            test.model.find_and_maybe_resolve(&vec!["static_a"].try_into().unwrap()).await.unwrap();
 
         // Test with static child
         static_a_component.start(&StartReason::Eager, None, vec![], vec![]).await.unwrap();
@@ -1067,16 +1081,22 @@ mod tests {
         let instance_names: HashSet<String> = entries.iter().map(|d| d.name.clone()).collect();
         assert_eq!(instance_names.len(), 6);
 
-        let foo_component =
-            test.model.look_up(&vec!["coll1:foo"].try_into().unwrap()).await.unwrap();
+        let foo_component = test
+            .model
+            .find_and_maybe_resolve(&vec!["coll1:foo"].try_into().unwrap())
+            .await
+            .unwrap();
 
         // Test that removal of instances works
         foo_component.stop().await.unwrap();
         let entries = wait_for_dir_content_change(&dir_proxy, entries).await;
         assert_eq!(entries.len(), 5);
 
-        let baz_component =
-            test.model.look_up(&vec!["coll2:baz"].try_into().unwrap()).await.unwrap();
+        let baz_component = test
+            .model
+            .find_and_maybe_resolve(&vec!["coll2:baz"].try_into().unwrap())
+            .await
+            .unwrap();
 
         // Test with second collection
         baz_component.stop().await.unwrap();
@@ -1084,7 +1104,7 @@ mod tests {
         assert_eq!(entries.len(), 3);
 
         let static_a_component =
-            test.model.look_up(&vec!["static_a"].try_into().unwrap()).await.unwrap();
+            test.model.find_and_maybe_resolve(&vec!["static_a"].try_into().unwrap()).await.unwrap();
 
         // Test with static child
         static_a_component.stop().await.unwrap();
@@ -1128,8 +1148,11 @@ mod tests {
             ChildDeclBuilder::new_lazy_child("bar"),
         )
         .await;
-        let foo_component =
-            test.model.look_up(&vec!["coll1:foo"].try_into().unwrap()).await.unwrap();
+        let foo_component = test
+            .model
+            .find_and_maybe_resolve(&vec!["coll1:foo"].try_into().unwrap())
+            .await
+            .unwrap();
 
         let provider = MockAnonymizedCapabilityProvider {
             instances: hashmap! {
@@ -1205,12 +1228,18 @@ mod tests {
             ChildDeclBuilder::new_lazy_child("bar"),
         )
         .await;
-        let foo_component =
-            test.model.look_up(&vec!["coll1:foo"].try_into().unwrap()).await.unwrap();
-        let bar_component =
-            test.model.look_up(&vec!["coll2:bar"].try_into().unwrap()).await.unwrap();
+        let foo_component = test
+            .model
+            .find_and_maybe_resolve(&vec!["coll1:foo"].try_into().unwrap())
+            .await
+            .unwrap();
+        let bar_component = test
+            .model
+            .find_and_maybe_resolve(&vec!["coll2:bar"].try_into().unwrap())
+            .await
+            .unwrap();
         let static_a_component =
-            test.model.look_up(&vec!["static_a"].try_into().unwrap()).await.unwrap();
+            test.model.find_and_maybe_resolve(&vec!["static_a"].try_into().unwrap()).await.unwrap();
 
         let provider = MockAnonymizedCapabilityProvider {
             instances: hashmap! {
@@ -1292,7 +1321,7 @@ mod tests {
         .await;
         let foo_component = test
             .model
-            .look_up(&vec!["coll1:foo"].try_into().unwrap())
+            .find_and_maybe_resolve(&vec!["coll1:foo"].try_into().unwrap())
             .await
             .expect("failed to find foo instance");
         let provider = MockOfferCapabilityProvider {

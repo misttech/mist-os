@@ -127,13 +127,16 @@ impl LifecycleController {
     ) -> Result<(), fsys::CreateError> {
         let parent_moniker = join_monikers(scope_moniker, &parent_moniker)
             .map_err(|_| fsys::CreateError::BadMoniker)?;
-        let parent_component = self.model.look_up(&parent_moniker).await.map_err(|e| match e {
-            ModelError::PathIsNotUtf8 { path: _ }
-            | ModelError::UnexpectedComponentManagerMoniker
-            | ModelError::ComponentInstanceError { err: _ } => fsys::CreateError::InstanceNotFound,
-            ModelError::MonikerError { err: _ } => fsys::CreateError::BadMoniker,
-            _ => fsys::CreateError::Internal,
-        })?;
+        let parent_component =
+            self.model.find_and_maybe_resolve(&parent_moniker).await.map_err(|e| match e {
+                ModelError::PathIsNotUtf8 { path: _ }
+                | ModelError::UnexpectedComponentManagerMoniker
+                | ModelError::ComponentInstanceError { err: _ } => {
+                    fsys::CreateError::InstanceNotFound
+                }
+                ModelError::MonikerError { err: _ } => fsys::CreateError::BadMoniker,
+                _ => fsys::CreateError::Internal,
+            })?;
 
         cm_fidl_validator::validate_dynamic_child(&child_decl).map_err(|error| {
             warn!(%parent_moniker, %error, "failed to create dynamic child. child decl is invalid");
@@ -461,10 +464,16 @@ mod tests {
         });
 
         lifecycle_proxy.resolve_instance(".").await.unwrap().unwrap();
-        let component_a =
-            test_model_result.model.look_up(&vec!["a"].try_into().unwrap()).await.unwrap();
-        let component_b =
-            test_model_result.model.look_up(&vec!["a", "b"].try_into().unwrap()).await.unwrap();
+        let component_a = test_model_result
+            .model
+            .find_and_maybe_resolve(&vec!["a"].try_into().unwrap())
+            .await
+            .unwrap();
+        let component_b = test_model_result
+            .model
+            .find_and_maybe_resolve(&vec!["a", "b"].try_into().unwrap())
+            .await
+            .unwrap();
         assert!(is_resolved(&component_a).await);
         assert!(is_resolved(&component_b).await);
 

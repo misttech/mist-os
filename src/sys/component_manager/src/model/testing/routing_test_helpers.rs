@@ -389,7 +389,8 @@ impl RoutingTest {
         collection: &'a str,
         name: &'a str,
     ) {
-        let component = self.model.look_up(&moniker).await.expect("failed to look up component");
+        let component =
+            self.model.find_and_maybe_resolve(&moniker).await.expect("failed to look up component");
         self.model
             .start_instance(&component.moniker, &StartReason::Eager)
             .await
@@ -908,7 +909,7 @@ impl RoutingTestModel for RoutingTest {
         &self,
         moniker: &Moniker,
     ) -> Result<Arc<ComponentInstance>, anyhow::Error> {
-        self.model.look_up(&moniker).await.map_err(|err| anyhow!(err))
+        self.model.find_and_maybe_resolve(&moniker).await.map_err(|err| anyhow!(err))
     }
 
     async fn check_open_file(&self, moniker: Moniker, path: cm_types::Path) {
@@ -1510,7 +1511,7 @@ pub mod capability_util {
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
         let component = model
-            .look_up(moniker)
+            .find_and_maybe_resolve(moniker)
             .await
             .unwrap_or_else(|e| panic!("component not found {}: {}", moniker, e));
         model.start_instance(moniker, &StartReason::Eager).await.expect("failed to start instance");

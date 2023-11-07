@@ -56,9 +56,9 @@ impl EventSource {
         let subscriber = {
             let model = model.upgrade().ok_or(EventsError::ModelNotAvailable)?;
             match &subscriber {
-                ExtendedMoniker::ComponentInstance(m) => {
-                    WeakExtendedInstance::Component(model.look_up(&m).await?.as_weak())
-                }
+                ExtendedMoniker::ComponentInstance(m) => WeakExtendedInstance::Component(
+                    model.find_and_maybe_resolve(&m).await?.as_weak(),
+                ),
                 ExtendedMoniker::ComponentManager => {
                     WeakExtendedInstance::AboveRoot(Arc::downgrade(model.top_instance()))
                 }

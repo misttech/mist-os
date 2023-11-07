@@ -620,7 +620,7 @@ impl RouteAndOpenCapabilityError {
 
 #[derive(Debug, Clone, Error)]
 pub enum StartActionError {
-    #[error("Couldn't start `{moniker}` because it was shutdown")]
+    #[error("Couldn't start `{moniker}` because it has been destroyed")]
     InstanceShutDown { moniker: Moniker },
     #[error("Couldn't start `{moniker}` because it has been destroyed")]
     InstanceDestroyed { moniker: Moniker },

@@ -580,7 +580,7 @@ mod tests {
         let test = RoutingTest::new("a", components).await;
         let b_component = test
             .model
-            .look_up(&vec!["b"].try_into().unwrap())
+            .find_and_maybe_resolve(&vec!["b"].try_into().unwrap())
             .await
             .expect("failed to find component for b:0");
         let dir_source_path: cm_types::Path = "/data".parse().unwrap();
@@ -671,7 +671,7 @@ mod tests {
         let test = RoutingTest::new("a", components).await;
         let b_component = test
             .model
-            .look_up(&vec!["b"].try_into().unwrap())
+            .find_and_maybe_resolve(&vec!["b"].try_into().unwrap())
             .await
             .expect("failed to find component for b:0");
         let dir_source_path: cm_types::Path = "/data".parse().unwrap();
@@ -793,7 +793,7 @@ mod tests {
         let test = RoutingTest::new("a", components).await;
         let b_component = test
             .model
-            .look_up(&vec!["b"].try_into().unwrap())
+            .find_and_maybe_resolve(&vec!["b"].try_into().unwrap())
             .await
             .expect("failed to find component for b:0");
         let dir_source_path: cm_types::Path = "/data".parse().unwrap();
@@ -929,7 +929,7 @@ mod tests {
         let test = RoutingTest::new("a", components).await;
         let b_component = test
             .model
-            .look_up(&vec!["b"].try_into().unwrap())
+            .find_and_maybe_resolve(&vec!["b"].try_into().unwrap())
             .await
             .expect("failed to find component for b:0");
         let dir_source_path: cm_types::Path = "/data".parse().unwrap();

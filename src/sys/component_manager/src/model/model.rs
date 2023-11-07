@@ -80,7 +80,7 @@ impl Model {
 
     /// Looks up a component by moniker. The component instance in the component will be
     /// resolved if that has not already happened.
-    pub async fn look_up(
+    pub async fn find_and_maybe_resolve(
         &self,
         look_up_moniker: &Moniker,
     ) -> Result<Arc<ComponentInstance>, ModelError> {
@@ -188,7 +188,7 @@ impl Model {
         moniker: &'a Moniker,
         reason: &StartReason,
     ) -> Result<Arc<ComponentInstance>, ModelError> {
-        let component = self.look_up(moniker).await?;
+        let component = self.find_and_maybe_resolve(moniker).await?;
         component.start(reason, None, vec![], vec![]).await?;
         Ok(component)
     }

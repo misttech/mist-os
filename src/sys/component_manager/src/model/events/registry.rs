@@ -299,7 +299,7 @@ impl EventRegistry {
         events: &HashSet<UseEventStreamDecl>,
     ) -> Result<RouteEventsResult, ModelError> {
         let model = self.model.upgrade().ok_or(EventsError::ModelNotAvailable)?;
-        let component = model.look_up(&target_moniker).await?;
+        let component = model.find_and_maybe_resolve(&target_moniker).await?;
         let decl = {
             let state = component.lock_state().await;
             match *state {

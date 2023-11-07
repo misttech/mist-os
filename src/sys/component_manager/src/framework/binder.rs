@@ -118,7 +118,8 @@ impl BinderCapabilityHost {
         // do here.
         if capability_provider.is_none() && capability.matches_protocol(&BINDER_SERVICE) {
             let model = self.model.upgrade().ok_or(ModelError::ModelNotAvailable)?;
-            let target = WeakComponentInstance::new(&model.look_up(&target_moniker).await?);
+            let target =
+                WeakComponentInstance::new(&model.find_and_maybe_resolve(&target_moniker).await?);
             Ok(Some(Box::new(BinderCapabilityProvider::new(source, target))
                 as Box<dyn CapabilityProvider>))
         } else {
@@ -217,12 +218,12 @@ mod tests {
             let builtin_environment = self.builtin_environment.lock().await;
             let source = builtin_environment
                 .model
-                .look_up(&source)
+                .find_and_maybe_resolve(&source)
                 .await
                 .expect("failed to look up source moniker");
             let target = builtin_environment
                 .model
-                .look_up(&target)
+                .find_and_maybe_resolve(&target)
                 .await
                 .expect("failed to look up target moniker");
 

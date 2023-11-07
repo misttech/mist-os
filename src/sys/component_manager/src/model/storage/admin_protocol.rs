@@ -351,7 +351,7 @@ impl StorageAdmin {
                             .map_err(|_| fcomponent::Error::InvalidArguments)?;
                         let moniker = component.moniker.concat(&moniker);
                         let root_component = model
-                            .look_up(&moniker)
+                            .find_and_maybe_resolve(&moniker)
                             .await
                             .map_err(|_| fcomponent::Error::InstanceNotFound)?;
                         Ok(root_component)
