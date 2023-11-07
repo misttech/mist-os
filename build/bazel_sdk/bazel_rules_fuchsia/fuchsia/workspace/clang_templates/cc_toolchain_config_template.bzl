@@ -8,11 +8,7 @@ Clang toolchain configuration.
 
 load(
     "@bazel_tools//tools/cpp:cc_toolchain_config_lib.bzl",
-    "feature",
-    "flag_group",
-    "flag_set",
     "tool_path",
-    "with_feature_set",
 )
 load(
     "@bazel_tools//tools/cpp:toolchain_utils.bzl",
@@ -20,29 +16,10 @@ load(
     "use_cpp_toolchain",
 )
 load("@bazel_tools//tools/build_defs/cc:action_names.bzl", "ACTION_NAMES")
-load("@%{SDK_ROOT}//:api_version.bzl", "DEFAULT_CLANG_TARGET_API")
-
-def _sanitizer_feature(name, fsanitize):
-    return feature(
-        name = name,
-        flag_sets = [
-            flag_set(
-                actions = [
-                    ACTION_NAMES.c_compile,
-                    ACTION_NAMES.cpp_compile,
-                    ACTION_NAMES.cpp_module_compile,
-                    ACTION_NAMES.cpp_link_executable,
-                    ACTION_NAMES.cpp_link_dynamic_library,
-                    ACTION_NAMES.cpp_link_nodeps_dynamic_library,
-                ],
-                flag_groups = [flag_group(flags = ["-fsanitize=" + fsanitize])],
-            ),
-        ],
-        implies = ["sanitizer"],
-    )
+load("@fuchsia_clang//:cc_features.bzl", "features", "sanitizer_features")
 
 def _cc_toolchain_config_impl(ctx):
-    target_system_name = ctx.attr.cpu + "-fuchsia"
+    target_system_name = ctx.attr.cpu + "-unknown-fuchsia"
     tool_paths = [
         tool_path(
             name = "ar",
@@ -97,217 +74,7 @@ def _cc_toolchain_config_impl(ctx):
             path = "bin/ld.lld",
         ),
     ]
-    features = [
-        # Redefine the dependency_file feature to use -MMD instead of -MD
-        # to make remote builds work properly.
-        feature(
-            name = "dependency_file",
-            enabled = True,
-            flag_sets = [
-                flag_set(
-                    actions = [
-                        ACTION_NAMES.assemble,
-                        ACTION_NAMES.preprocess_assemble,
-                        ACTION_NAMES.c_compile,
-                        ACTION_NAMES.cpp_compile,
-                        ACTION_NAMES.cpp_module_compile,
-                        ACTION_NAMES.objc_compile,
-                        ACTION_NAMES.objcpp_compile,
-                        ACTION_NAMES.cpp_header_parsing,
-                        ACTION_NAMES.clif_match,
-                    ],
-                    flag_groups = [
-                        flag_group(
-                            flags = ["-MMD", "-MF", "%{dependency_file}"],
-                            expand_if_available = "dependency_file",
-                        ),
-                    ],
-                ),
-            ],
-        ),
-        feature(
-            name = "default_compile_flags",
-            flag_sets = [
-                flag_set(
-                    actions = [
-                        ACTION_NAMES.assemble,
-                        ACTION_NAMES.preprocess_assemble,
-                        ACTION_NAMES.linkstamp_compile,
-                        ACTION_NAMES.c_compile,
-                        ACTION_NAMES.cpp_compile,
-                        ACTION_NAMES.cpp_header_parsing,
-                        ACTION_NAMES.cpp_module_compile,
-                        ACTION_NAMES.cpp_module_codegen,
-                        ACTION_NAMES.lto_backend,
-                        ACTION_NAMES.clif_match,
-                    ],
-                    flag_groups = [
-                        flag_group(
-                            flags = [
-                                "--target=" + target_system_name,
-                                "-Wall",
-                                "-Werror",
-                                "-Wextra-semi",
-                                "-Wnewline-eof",
-                                "-Wshadow",
-                                "-ffunction-sections",
-                                "-fdata-sections",
-                                "-fdiagnostics-color",
-                            ],
-                        ),
-                    ],
-                ),
-                flag_set(
-                    actions = [
-                        ACTION_NAMES.linkstamp_compile,
-                        ACTION_NAMES.cpp_compile,
-                        ACTION_NAMES.cpp_header_parsing,
-                        ACTION_NAMES.cpp_module_compile,
-                        ACTION_NAMES.cpp_module_codegen,
-                        ACTION_NAMES.lto_backend,
-                        ACTION_NAMES.clif_match,
-                    ],
-                    flag_groups = [
-                        flag_group(
-                            flags = [
-                                "-std=c++17",
-                                "-xc++",
-                                # Needed to compile shared libraries.
-                                "-fPIC",
-                            ],
-                        ),
-                    ],
-                ),
-            ],
-            enabled = True,
-        ),
-        feature(
-            name = "default_link_flags",
-            flag_sets = [
-                flag_set(
-                    actions = [
-                        ACTION_NAMES.cpp_link_executable,
-                        ACTION_NAMES.cpp_link_dynamic_library,
-                        ACTION_NAMES.cpp_link_nodeps_dynamic_library,
-                    ],
-                    flag_groups = [
-                        flag_group(
-                            flags = [
-                                "--target=" + target_system_name,
-                                "--driver-mode=g++",
-                                "-lzircon",
-                            ],
-                        ),
-                    ],
-                ),
-            ],
-            enabled = True,
-        ),
-        feature(
-            name = "supports_pic",
-            enabled = True,
-        ),
-        feature(
-            name = "coverage",
-            flag_sets = [
-                flag_set(
-                    actions = [
-                        ACTION_NAMES.c_compile,
-                        ACTION_NAMES.cpp_compile,
-                        ACTION_NAMES.cpp_link_dynamic_library,
-                        ACTION_NAMES.cpp_link_executable,
-                        ACTION_NAMES.cpp_link_nodeps_dynamic_library,
-                    ],
-                    flag_groups = [
-                        flag_group(
-                            flags = [
-                                "-fprofile-instr-generate",
-                                "-fcoverage-mapping",
-                            ],
-                        ),
-                    ],
-                ),
-                flag_set(
-                    actions = [
-                        ACTION_NAMES.c_compile,
-                        ACTION_NAMES.cpp_compile,
-                        ACTION_NAMES.cpp_module_compile,
-                    ],
-                    flag_groups = [
-                        flag_group(
-                            flags = [
-                                "-O1",
-                            ],
-                        ),
-                    ],
-                ),
-                flag_set(
-                    actions = [
-                        ACTION_NAMES.cpp_link_dynamic_library,
-                        ACTION_NAMES.cpp_link_executable,
-                        ACTION_NAMES.cpp_link_nodeps_dynamic_library,
-                    ],
-                    flag_groups = [
-                        flag_group(
-                            flags = [
-                                # The statically-linked profiling runtime depends on libzircon.
-                                "-lzircon",
-                            ],
-                        ),
-                    ],
-                ),
-            ],
-        ),
-        feature(
-            name = "ml_inliner",
-            flag_sets = [
-                flag_set(
-                    actions = [
-                        ACTION_NAMES.c_compile,
-                        ACTION_NAMES.cpp_compile,
-                        ACTION_NAMES.cpp_module_compile,
-                    ],
-                    flag_groups = [
-                        flag_group(
-                            flags = [
-                                "-mllvm",
-                                "-enable-ml-inliner=release",
-                            ],
-                        ),
-                    ],
-                    with_features = [with_feature_set(
-                        features = ["opt"],
-                    )],
-                ),
-            ],
-        ),
-        feature(
-            name = "sanitizer",
-            flag_sets = [
-                flag_set(
-                    actions = [
-                        ACTION_NAMES.c_compile,
-                        ACTION_NAMES.cpp_compile,
-                        ACTION_NAMES.cpp_module_compile,
-                    ],
-                    flag_groups = [
-                        flag_group(
-                            flags = [
-                                "-fno-omit-frame-pointer",
-                                "-g3",
-                                "-O1",
-                            ],
-                        ),
-                    ],
-                ),
-            ],
-        ),
-        _sanitizer_feature("asan", "address"),
-        _sanitizer_feature("lsan", "leak"),
-        _sanitizer_feature("msan", "memory"),
-        _sanitizer_feature("tsan", "thread"),
-        _sanitizer_feature("ubsan", "undefined"),
-    ]
+
     return cc_common.create_cc_toolchain_config_info(
         ctx = ctx,
         toolchain_identifier = "crosstool-1.x.x-llvm-fuchsia-" + ctx.attr.cpu,
@@ -328,8 +95,19 @@ def _cc_toolchain_config_impl(ctx):
             "%{CROSSTOOL_ROOT}/lib/clang/%{CLANG_VERSION}/share",  # Platform libc++.
         ],
         builtin_sysroot = "%{SYSROOT_PATH_PREFIX}" + ctx.attr.cpu,
-        features = features,
         cc_target_os = "fuchsia",
+        features = [
+            features.default_compile_flags,
+            features.default_link_flags,
+            features.dbg,
+            features.opt,
+            features.target_system_name(target_system_name),
+            features.dependency_file,
+            features.supports_pic,
+            features.coverage,
+            features.ml_inliner,
+            features.static_cpp_standard_library,
+        ] + sanitizer_features,
     )
 
 cc_toolchain_config = rule(

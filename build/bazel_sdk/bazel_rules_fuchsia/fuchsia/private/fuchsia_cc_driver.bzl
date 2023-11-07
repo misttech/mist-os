@@ -26,6 +26,7 @@ def fuchsia_cc_driver(name, srcs = [], output_name = None, deps = [], **kwargs):
         name: the target name
         srcs: the sources to include in the driver.
         output_name: (optional) the name of the .so to build. If excluded will default to lib<name>.so
+        deps: The deps for the driver
         **kwargs: The arguments to forward to cc_binary
     """
     if len(srcs) == 0:
@@ -35,17 +36,11 @@ def fuchsia_cc_driver(name, srcs = [], output_name = None, deps = [], **kwargs):
     # for all drivers
     linkopts = kwargs.pop("linkopts", [])
     linkopts.extend([
-        # Statically link c++ since it is does not have a stable ABI.
-        "-static-libstdc++",
-
         # We need to run our own linker script to limit the symbols that are exported
         # and to make the driver framework symbols global.
         "-Wl,--undefined-version",
         "-Wl,--version-script",
         "$(location @fuchsia_sdk//fuchsia/private:driver.ld)",
-
-        # Adding this reduce the size of our binary.
-        "-Wl,--gc-sections",
     ])
 
     # Remove this value because we want to set it on our own. If we don't
@@ -71,6 +66,10 @@ def fuchsia_cc_driver(name, srcs = [], output_name = None, deps = [], **kwargs):
         linkshared = True,
         srcs = srcs,
         deps = deps,
+        features = kwargs.pop("features", []) + [
+            # Ensure that we are statically linking c++.
+            "static_cpp_standard_library",
+        ],
         visibility = ["//visibility:private"],
         **kwargs
     )

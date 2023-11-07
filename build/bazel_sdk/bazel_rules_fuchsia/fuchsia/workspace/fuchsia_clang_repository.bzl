@@ -56,9 +56,13 @@ def _fuchsia_clang_repository_impl(ctx):
 
     crosstool_template = Label("//fuchsia/workspace/clang_templates:crosstool_template.BUILD")
     toolchain_config_template = Label("//fuchsia/workspace/clang_templates:cc_toolchain_config_template.bzl")
+    cc_features_file = Label("//fuchsia/workspace/clang_templates:cc_features.bzl")
+    defs_template_file = Label("//fuchsia/workspace/clang_templates:defs.bzl")
 
     ctx.path(crosstool_template)
     ctx.path(toolchain_config_template)
+    ctx.path(cc_features_file)
+    ctx.path(defs_template_file)
 
     # Hack to get the path to the sysroot directory, see
     # https://github.com/bazelbuild/bazel/issues/3901
@@ -67,8 +71,13 @@ def _fuchsia_clang_repository_impl(ctx):
     ctx.file("WORKSPACE.bazel", content = "", executable = False)
 
     ctx.symlink(
-        Label("//fuchsia/workspace/clang_templates:defs.bzl"),
+        defs_template_file,
         "defs.bzl",
+    )
+
+    ctx.symlink(
+        cc_features_file,
+        "cc_features.bzl",
     )
 
     # Create symlinks to the @fuchsia_sdk sysroots, which allows defining
