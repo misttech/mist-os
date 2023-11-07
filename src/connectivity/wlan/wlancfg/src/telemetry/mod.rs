@@ -2407,6 +2407,8 @@ impl StatsLogger {
 
     async fn log_active_scan_requested_cobalt_metrics(&mut self, num_ssids_requested: usize) {
         use metrics::ActiveScanRequestedForNetworkSelectionMigratedMetricDimensionActiveScanSsidsRequested as ActiveScanSsidsRequested;
+        // FIXME(http://b/309552229): This can be removed after the rust compiler is rolled.
+        #[allow(unreachable_patterns)]
         let active_scan_ssids_requested_dim = match num_ssids_requested {
             0 => ActiveScanSsidsRequested::Zero,
             1 => ActiveScanSsidsRequested::One,
@@ -2436,6 +2438,8 @@ impl StatsLogger {
         num_ssids_requested: usize,
     ) {
         use metrics::ActiveScanRequestedForPolicyApiMetricDimensionActiveScanSsidsRequested as ActiveScanSsidsRequested;
+        // FIXME(http://b/309552229): This can be removed after the rust compiler is rolled.
+        #[allow(unreachable_patterns)]
         let active_scan_ssids_requested_dim = match num_ssids_requested {
             0 => ActiveScanSsidsRequested::Zero,
             1 => ActiveScanSsidsRequested::One,
@@ -2469,6 +2473,8 @@ impl StatsLogger {
 
         // Count the total number of saved networks
         use metrics::SavedNetworksMigratedMetricDimensionSavedNetworks as SavedNetworksCount;
+        // FIXME(http://b/309552229): This can be removed after the rust compiler is rolled.
+        #[allow(unreachable_patterns)]
         let num_networks = match saved_network_count {
             0 => SavedNetworksCount::Zero,
             1 => SavedNetworksCount::One,
@@ -2491,6 +2497,8 @@ impl StatsLogger {
         // Count the number of configs for each saved network
         use metrics::SavedConfigurationsForSavedNetworkMigratedMetricDimensionSavedConfigurations as ConfigCountDimension;
         for config_count in config_count_per_saved_network {
+            // FIXME(http://b/309552229): This can be removed after the rust compiler is rolled.
+            #[allow(unreachable_patterns)]
             let num_configs = match config_count {
                 0 => ConfigCountDimension::Zero,
                 1 => ConfigCountDimension::One,
@@ -2539,6 +2547,8 @@ impl StatsLogger {
         use metrics::SavedNetworkInScanResultMigratedMetricDimensionBssCount as BssCount;
         for bss_count in bss_count_per_saved_network {
             // Record how many BSSs are visible in the scan results for this saved network.
+            // FIXME(http://b/309552229): This can be removed after the rust compiler is rolled.
+            #[allow(unreachable_patterns)]
             let bss_count_metric = match bss_count {
                 0 => BssCount::Zero, // The ::Zero enum exists, but we shouldn't get a scan result with no BSS
                 1 => BssCount::One,
@@ -2560,6 +2570,8 @@ impl StatsLogger {
         }
 
         use metrics::ScanResultsReceivedMigratedMetricDimensionSavedNetworksCount as SavedNetworkCount;
+        // FIXME(http://b/309552229): This can be removed after the rust compiler is rolled.
+        #[allow(unreachable_patterns)]
         let saved_network_count_metric = match saved_network_count {
             0 => SavedNetworkCount::Zero,
             1 => SavedNetworkCount::One,
@@ -2580,6 +2592,8 @@ impl StatsLogger {
         });
 
         use metrics::SavedNetworkInScanResultWithActiveScanMigratedMetricDimensionActiveScanSsidsObserved as ActiveScanSsidsObserved;
+        // FIXME(http://b/309552229): This can be removed after the rust compiler is rolled.
+        #[allow(unreachable_patterns)]
         let actively_scanned_networks_metrics = match saved_network_count_found_by_active_scan {
             0 => ActiveScanSsidsObserved::Zero,
             1 => ActiveScanSsidsObserved::One,
@@ -3074,6 +3088,8 @@ impl StatsLogger {
     ) {
         let fulfilled_requests_dim = {
             use metrics::ConnectivityWlanMetricDimensionScanRequestsFulfilled::*;
+            // FIXME(http://b/309552229): This can be removed after the rust compiler is rolled.
+            #[allow(unreachable_patterns)]
             match fulfilled_requests {
                 0 => Zero,
                 1 => One,
@@ -3088,6 +3104,8 @@ impl StatsLogger {
         };
         let remaining_requests_dim = {
             use metrics::ConnectivityWlanMetricDimensionScanRequestsRemaining::*;
+            // FIXME(http://b/309552229): This can be removed after the rust compiler is rolled.
+            #[allow(unreachable_patterns)]
             match remaining_requests {
                 0 => Zero,
                 1 => One,
