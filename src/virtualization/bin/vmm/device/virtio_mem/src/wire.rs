@@ -6,7 +6,7 @@
 
 use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
-pub use zerocopy::byteorder::little_endian::{U16 as LE16, U32 as LE32, U64 as LE64};
+pub use zerocopy::byteorder::little_endian::{U16 as LE16, U64 as LE64};
 
 // 5.15.1 Virtqueues
 //

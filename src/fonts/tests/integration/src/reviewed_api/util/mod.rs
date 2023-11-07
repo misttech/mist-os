@@ -4,10 +4,8 @@
 
 pub use {
     crate::util,
-    crate::FONTS_ALIASED_CM,
     anyhow::{Context as _, Error},
     fidl_fuchsia_fonts as fonts, fidl_fuchsia_intl as intl, fuchsia_async as fasync,
-    fuchsia_component_test::ScopedInstance,
     fuchsia_zircon as zx,
     fuchsia_zircon::AsHandleRef,
 };

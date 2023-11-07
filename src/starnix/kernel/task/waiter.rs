@@ -1015,8 +1015,9 @@ mod tests {
     use crate::{
         fs::{
             buffers::{VecInputBuffer, VecOutputBuffer},
+            eventfd::{new_eventfd, EventFdType},
             fuchsia::*,
-            new_eventfd, EventFdType, FdEvents,
+            FdEvents,
         },
         testing::*,
     };

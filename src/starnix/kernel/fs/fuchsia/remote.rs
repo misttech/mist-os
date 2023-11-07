@@ -33,9 +33,10 @@ use crate::{
     mm::ProtectionFlags,
     syscalls::{SyscallArg, SyscallResult},
     task::{CurrentTask, EventHandler, Kernel, WaitCanceler, Waiter},
+    types::errno::errno,
     types::{
-        errno, error, from_status_like_fdio, fsverity_descriptor, ino_t, off_t, statfs, DeviceType,
-        Errno, FileMode, MountFlags, OpenFlags,
+        error, from_status_like_fdio, fsverity_descriptor, ino_t, off_t, statfs, DeviceType, Errno,
+        FileMode, MountFlags, OpenFlags,
     },
     vmex_resource::VMEX_RESOURCE,
 };

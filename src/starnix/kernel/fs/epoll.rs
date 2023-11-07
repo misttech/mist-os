@@ -487,11 +487,11 @@ mod tests {
     use crate::{
         fs::{
             buffers::{VecInputBuffer, VecOutputBuffer},
+            eventfd::{new_eventfd, EventFdType},
             fuchsia::create_fuchsia_pipe,
-            new_eventfd,
             pipe::new_pipe,
             socket::{SocketDomain, SocketType, UnixSocket},
-            EventFdType, FdEvents,
+            FdEvents,
         },
         task::Waiter,
         testing::{create_kernel_and_task, create_task},

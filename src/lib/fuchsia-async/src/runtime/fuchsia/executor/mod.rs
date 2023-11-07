@@ -11,8 +11,6 @@ mod time;
 
 pub use common::EHandle;
 pub use local::{LocalExecutor, TestExecutor};
-pub use packets::{
-    need_signal_or_peer_closed, schedule_packet, PacketReceiver, ReceiverRegistration,
-};
+pub use packets::{need_signal_or_peer_closed, PacketReceiver, ReceiverRegistration};
 pub use send::SendExecutor;
 pub use time::{Duration, Time};

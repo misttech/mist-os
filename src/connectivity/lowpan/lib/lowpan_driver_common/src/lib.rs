@@ -47,13 +47,6 @@ pub(crate) mod prelude_internal {
     pub use crate::{ZxResult, ZxStatus};
     pub use anyhow::{format_err, Context as _};
     pub use async_trait::async_trait;
-    pub use fasync::TimeoutExt as _;
-    pub use fidl_fuchsia_net_ext as fnet_ext;
-    pub use fuchsia_async as fasync;
-
-    pub use net_declare::{fidl_ip, fidl_ip_v6};
-
-    pub use crate::pii::MarkPii;
 }
 
 pub mod lowpan_fidl {

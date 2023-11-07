@@ -3,14 +3,9 @@
 // found in the LICENSE file
 
 pub use {
-    crate::util,
-    crate::FONTS_EPHEMERAL_CM,
-    anyhow::{Context as _, Error},
-    fidl::endpoints::create_proxy,
-    fidl_fuchsia_fonts as fonts, fidl_fuchsia_fonts_experimental as fonts_exp,
-    fidl_fuchsia_intl::LocaleId,
+    crate::util, anyhow::Error, fidl::endpoints::create_proxy, fidl_fuchsia_fonts as fonts,
+    fidl_fuchsia_fonts_experimental as fonts_exp, fidl_fuchsia_intl::LocaleId,
     fuchsia_async as fasync,
-    futures::lock::Mutex,
 };
 
 pub type ProviderFactory = util::TypedProviderFactory<fonts_exp::ProviderMarker>;

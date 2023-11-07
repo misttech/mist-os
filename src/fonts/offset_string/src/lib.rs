@@ -10,8 +10,6 @@ use {
 
 mod conversions;
 
-pub use crate::conversions::*;
-
 /// A compact representation of a set of unsigned integer ranges.
 ///
 /// The primary use case is succinctly encoding a large set of Unicode code points in JSON.

@@ -27,18 +27,15 @@ mod thread_to_host;
 #[cfg(test)]
 mod tests;
 
-pub use border_agent::*;
 pub use connectivity_state::*;
 pub use convert::*;
 use driver_state::*;
 pub use error_adapter::*;
-pub use host_to_thread::*;
 use lowpan_driver_common::net::{BackboneInterface, NetworkInterface};
 use lowpan_driver_common::AsyncCondition;
 use multicast_routing_manager::MulticastRoutingManager;
 pub use nat64::*;
 pub use srp_proxy::*;
-pub use thread_to_host::*;
 
 const DEFAULT_SCAN_DWELL_TIME_MS: u32 = 200;
 

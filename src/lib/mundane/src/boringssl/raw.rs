@@ -13,9 +13,9 @@
 //! (e.g., `void` functions).
 
 pub use bssl_sys::{
-    CBB_cleanup, CBB_len, CBS_init, CBS_len, CRYPTO_memcmp, EC_GROUP_get_curve_name,
-    ED25519_keypair, ED25519_keypair_from_seed, ERR_print_errors_cb, HMAC_CTX_init, HMAC_size,
-    RC4_set_key, RSA_bits, RC4,
+    CBB_len, CBS_init, CBS_len, CRYPTO_memcmp, EC_GROUP_get_curve_name, ED25519_keypair,
+    ED25519_keypair_from_seed, ERR_print_errors_cb, HMAC_CTX_init, HMAC_size, RC4_set_key,
+    RSA_bits, RC4,
 };
 
 use std::convert::TryInto;
@@ -207,8 +207,7 @@ pub unsafe fn ECDSA_sign(
 #[allow(non_snake_case)]
 #[must_use]
 pub unsafe fn ECDSA_size(key: *const EC_KEY) -> Result<NonZeroUsize, BoringError> {
-    NonZeroUsize::new(ffi::ECDSA_size(key))
-        .ok_or_else(|| BoringError::consume_stack("ECDSA_size"))
+    NonZeroUsize::new(ffi::ECDSA_size(key)).ok_or_else(|| BoringError::consume_stack("ECDSA_size"))
 }
 
 #[allow(non_snake_case)]

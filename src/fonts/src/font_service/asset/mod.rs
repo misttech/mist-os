@@ -11,6 +11,9 @@ mod loader;
 
 pub use {
     asset::{Asset, AssetId},
-    collection::{AssetCollection, AssetCollectionBuilder, AssetCollectionError},
+    collection::{AssetCollection, AssetCollectionBuilder},
     loader::{AssetLoader, AssetLoaderImpl},
 };
+
+#[cfg(test)]
+pub(crate) use collection::AssetCollectionError;

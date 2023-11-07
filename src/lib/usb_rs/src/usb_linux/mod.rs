@@ -5,7 +5,7 @@
 mod usbdevice_fs;
 use usbdevice_fs::*;
 mod discovery;
-pub use discovery::{wait_for_devices, DeviceStream};
+pub use discovery::wait_for_devices;
 
 use futures::future::poll_fn;
 use futures::task::AtomicWaker;
@@ -455,11 +455,14 @@ impl Interface {
                     continue;
                 }
 
-                let Some((id, urb)) = inner.urbs.iter().enumerate().find(
-                        |(_, urb)| std::ptr::eq(urb.urb.get(), out_ptr)
-                    ) else {
-                        panic!("Reap'd URB we did not sow!");
-                    };
+                let Some((id, urb)) = inner
+                    .urbs
+                    .iter()
+                    .enumerate()
+                    .find(|(_, urb)| std::ptr::eq(urb.urb.get(), out_ptr))
+                else {
+                    panic!("Reap'd URB we did not sow!");
+                };
 
                 let count = urb.refs.fetch_sub(1, Ordering::Relaxed);
                 urb.waker.wake();
@@ -676,8 +679,8 @@ mod test {
             let mut buffers = self.endpoint_buffers.lock().unwrap();
             buffers.get_mut(&address).and_then(|x| {
                 let EndpointBuffer::Data(x) = x else {
-                        panic!("Target read from buffer with host reads waiting");
-                    };
+                    panic!("Target read from buffer with host reads waiting");
+                };
                 x.pop_back()
             })
         }

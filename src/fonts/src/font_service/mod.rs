@@ -38,7 +38,7 @@ use {
 };
 
 pub use {
-    asset::{AssetId, AssetLoader, AssetLoaderImpl},
+    asset::{AssetId, AssetLoader},
     builder::FontServiceBuilder,
 };
 
