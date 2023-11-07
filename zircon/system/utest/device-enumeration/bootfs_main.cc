@@ -44,7 +44,7 @@ fbl::String GetTestFilter() {
     return "*Sherlock*";
   } else if (board_name == "nelson") {
     return "*Nelson*";
-  } else if (board_name == "NUC7i5DNB") {
+  } else if (board_name == "NUC7i5DNB" || board_name == "NUC11TNBv5") {
     return "*Nuc*";
   } else if (board_name == "Standard PC (Q35 + ICH9, 2009)") {
     // QEMU and AEMU with emulated Q35 boards have this board name.
