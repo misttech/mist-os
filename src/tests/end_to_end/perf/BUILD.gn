@@ -19,7 +19,6 @@ import("//src/tests/end_to_end/perf/python_perf_test.gni")
 test_list = [
   # keep-sorted start
   "audio_mixer_profiler_test",
-  "diagnostics_benchmarks_test",
   "driver_runtime_microbenchmarks_test",
   "extended_pstate_benchmarks_test",
   "fidlc_microbenchmarks_test",
@@ -216,6 +215,10 @@ _tests = [
       "fuchsia.rust_inspect.selectors.txt",
     ]
   },
+  {
+    name = "selectors_benchmark"
+    expected_metric_filenames = [ "fuchsia.diagnostics.txt" ]
+  },
 ]
 
 _python_benchmarks = []
@@ -238,7 +241,6 @@ if (is_host) {
   metric_files = [
     # keep-sorted start
     "fuchsia.audio.txt",
-    "fuchsia.diagnostics.txt",
     "fuchsia.diagnostics_log_rust.core.txt",
     "fuchsia.diagnostics_log_rust.encoding.txt",
     "fuchsia.driver_runtime_microbenchmarks.txt",
