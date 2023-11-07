@@ -208,7 +208,7 @@ void BlockDevice::OpenSession(OpenSessionRequestView request,
     if (zx_status_t status = device_set_profile_by_role(zxdev(), thrd_get_zx_handle(thread),
                                                         role_name, strlen(role_name));
         status != ZX_OK) {
-      zxlogf(WARNING, "block: Failed to apply role to block server: %s\n",
+      zxlogf(WARNING, "block: Failed to apply role to block server: %s",
              zx_status_get_string(status));
     }
   }
@@ -354,14 +354,14 @@ zx_status_t BlockDevice::Bind(void* ctx, zx_device_t* dev) {
 
   // The Block Implementation Protocol is required.
   if (!bdev->parent_protocol_.is_valid()) {
-    printf("ERROR: block device: does not support block protocol\n");
+    zxlogf(ERROR, "block device: does not support block protocol");
     return ZX_ERR_NOT_SUPPORTED;
   }
 
   bdev->parent_protocol_.Query(&bdev->info_, &bdev->parent_op_size_);
 
   if (bdev->info_.max_transfer_size < bdev->info_.block_size) {
-    printf("ERROR: block device: has smaller max xfer (0x%x) than block size (0x%x)\n",
+    zxlogf(ERROR, "block device: has smaller max xfer (0x%x) than block size (0x%x)",
            bdev->info_.max_transfer_size, bdev->info_.block_size);
     return ZX_ERR_NOT_SUPPORTED;
   }
@@ -369,7 +369,7 @@ zx_status_t BlockDevice::Bind(void* ctx, zx_device_t* dev) {
   bdev->io_op_ = std::make_unique<uint8_t[]>(bdev->OpSize());
   size_t block_size = bdev->info_.block_size;
   if ((block_size < 512) || (block_size & (block_size - 1))) {
-    printf("block: device: invalid block size: %zu\n", block_size);
+    zxlogf(ERROR, "block device: invalid block size: %zu", block_size);
     return ZX_ERR_NOT_SUPPORTED;
   }
 
