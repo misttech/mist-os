@@ -16,6 +16,11 @@
         fallback: "false",
     },
     use: [
-        { protocol: ["fuchsia.kernel.InfoResource", "fuchsia.scheduler.ProfileProvider"] },
+        {
+            protocol: [
+                "fuchsia.kernel.InfoResource",
+                "fuchsia.scheduler.ProfileProvider",
+            ],
+        },
     ],
 }
