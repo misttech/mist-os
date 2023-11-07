@@ -85,7 +85,9 @@ constexpr bool DecodeDynamic(DiagnosticsType&& diagnostics, Memory&& memory, con
     ok = static_cast<Observer&>(observer).Observe(diagnostics, memory, dt, entry.val);
     return true;
   };
+
   ((entry.tag == Tags && call_observer(DynamicTagMatch<Tags>{})) || ...);
+
   return ok;
 }
 
@@ -649,7 +651,7 @@ template <class Elf, ElfDynTag... Tag>
 class DynamicTagCountObserver
     : public DynamicTagObserver<DynamicTagCountObserver<Elf, Tag...>, Tag...> {
  public:
-  size_t count() const { return count_; }
+  explicit DynamicTagCountObserver(size_t& count) : count_(count) {}
 
   template <class DiagnosticsType, class Memory, ElfDynTag Match>
   constexpr bool Observe(DiagnosticsType&, Memory&, DynamicTagMatch<Match>,
@@ -665,7 +667,7 @@ class DynamicTagCountObserver
   }
 
  private:
-  size_t count_ = 0;
+  size_t& count_;
 };
 
 // An observer that will match the given tag and add its value to the provided

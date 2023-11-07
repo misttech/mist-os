@@ -85,7 +85,7 @@ std::pair<StartupModule*, size_t> LoadExecutable(Diagnostics& diag, StartupData&
   // Allocate the StartupModule for the main executable.
   StartupModule* main_executable = StartupModule::New(diag, scratch, {}, startup.page_size);
   fbl::AllocChecker ac;
-  main_executable->NewModule("", initial_exec, ac);
+  main_executable->NewModule(abi::Abi<>::kExecutableName, initial_exec, ac);
   CheckAlloc(diag, ac, "passive ABI module");
   Module& module = main_executable->module();
 
@@ -102,6 +102,9 @@ std::pair<StartupModule*, size_t> LoadExecutable(Diagnostics& diag, StartupData&
   auto phdr_info = DecodeModulePhdrs(
       diag, phdrs, main_executable->load_info().GetPhdrObserver(startup.page_size),
       PhdrPhdrObserver{phdr_phdr}, elfldltl::PhdrRelroObserver<elfldltl::Elf<>>(relro_phdr));
+  if (!phdr_info) {
+    return {};
+  }
 
   main_executable->set_relro(relro_phdr);
 
@@ -124,11 +127,11 @@ std::pair<StartupModule*, size_t> LoadExecutable(Diagnostics& diag, StartupData&
   // the executable image, but the object will never be destroyed anyway.
   main_executable->memory() = ModuleMemory{module};
 
-  if (phdr_info.tls_phdr) {
-    main_executable->SetTls(diag, main_executable->memory(), 1, *phdr_info.tls_phdr);
+  if (phdr_info->tls_phdr) {
+    main_executable->SetTls(diag, main_executable->memory(), 1, *phdr_info->tls_phdr);
   }
 
-  size_t needed_count = main_executable->DecodeDynamic(diag, phdr_info.dyn_phdr);
+  size_t needed_count = main_executable->DecodeDynamic(diag, phdr_info->dyn_phdr);
 
   return {main_executable, needed_count};
 }

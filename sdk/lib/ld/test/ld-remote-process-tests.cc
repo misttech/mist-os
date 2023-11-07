@@ -4,6 +4,8 @@
 
 #include "ld-remote-process-tests.h"
 
+#include <lib/elfldltl/testing/diagnostics.h>
+#include <lib/ld/remote-load-module.h>
 #include <lib/zx/job.h>
 #include <zircon/process.h>
 
@@ -62,7 +64,19 @@ void LdRemoteProcessTests::Needed(std::initializer_list<std::string_view> names)
 }
 
 void LdRemoteProcessTests::Load(std::string_view executable_name) {
-  // TODO(fxbug.dev/134320): implement remote loading.
+  using RemoteModule = RemoteLoadModule<>;
+
+  auto diag = elfldltl::testing::ExpectOkDiagnostics();
+
+  const std::string executable_path = std::filesystem::path("test") / "bin" / executable_name;
+
+  auto exec = std::make_unique<RemoteModule>(abi::Abi<>::kExecutableName);
+
+  zx::vmo vmo;
+  ASSERT_NO_FATAL_FAILURE(vmo = elfldltl::testing::GetTestLibVmo(executable_path));
+  auto info = exec->Decode(diag, std::move(vmo));
+
+  // TODO(fxbug.dev/134320): dependency enqueuing, relocation, loading.
 }
 
 int64_t LdRemoteProcessTests::Run() {

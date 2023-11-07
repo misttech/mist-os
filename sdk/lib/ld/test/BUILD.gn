@@ -75,6 +75,7 @@ source_set("load-tests") {
   ]
   deps = [
     "..:abi-headers",
+    "..:headers",
     "..:posix-header",
     "//src/lib/elfldltl",
     "//src/lib/elfldltl/testing",

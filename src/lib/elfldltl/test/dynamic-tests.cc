@@ -1554,11 +1554,12 @@ TYPED_TEST(ElfldltlDynamicTests, ObserveNeededEmpty) {
       {.tag = elfldltl::ElfDynTag::kNull},
   };
 
-  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, memory, cpp20::span(dyn),
-                                      elfldltl::DynamicNeededObserver(si, [](std::string_view) {
-                                        ADD_FAILURE();
-                                        return false;
-                                      })));
+  EXPECT_TRUE(
+      elfldltl::DecodeDynamic(diag, memory, cpp20::span(dyn),
+                              elfldltl::DynamicNeededObserver(si, [](std::string_view needed) {
+                                ADD_FAILURE() << "Unexpected needed entry:", needed.data();
+                                return false;
+                              })));
 }
 
 TYPED_TEST(ElfldltlDynamicTests, ObserveNeeded) {

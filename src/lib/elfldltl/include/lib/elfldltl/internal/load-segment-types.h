@@ -46,9 +46,6 @@ constexpr bool VisitEach(F&& f, V&& v, std::index_sequence<I...>) {
   return result;
 }
 
-template <class SegmentType>
-using NoSegmentWrapper = SegmentType;
-
 // This is used to implement the LoadInfo::ConstantSegment type below.
 template <typename SegmentType>
 class LoadConstantSegmentType : public SegmentType {

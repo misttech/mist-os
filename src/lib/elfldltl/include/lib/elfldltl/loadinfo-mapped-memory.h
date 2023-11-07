@@ -55,7 +55,7 @@ class LoadInfoMappedMemory : public DirectMemory {
     }
 
     auto read_underlying = [this, target_vaddr,
-                            count](auto segment) -> std::optional<cpp20::span<const T>> {
+                            count](const auto& segment) -> std::optional<cpp20::span<const T>> {
       const size_type offset_in_segment = target_vaddr - segment.vaddr();
       if (segment.filesz() < offset_in_segment) [[unlikely]] {
         return std::nullopt;

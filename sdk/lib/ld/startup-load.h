@@ -117,9 +117,14 @@ struct StartupLoadModule : public StartupLoadModuleBase,
 
     // Decode phdrs to fill LoadInfo and other things.
     std::optional<Phdr> relro_phdr;
-    auto [dyn_phdr, tls_phdr, stack_size] =
+    auto result =
         DecodeModulePhdrs(diag, phdrs, this->load_info().GetPhdrObserver(loader_.page_size()),
                           elfldltl::PhdrRelroObserver<elfldltl::Elf<>>(relro_phdr));
+    if (!result) {
+      return {};
+    }
+
+    auto [dyn_phdr, tls_phdr, stack_size] = *result;
     set_relro(relro_phdr);
 
     // load_info() now has enough information to actually load the file.
@@ -130,12 +135,8 @@ struct StartupLoadModule : public StartupLoadModuleBase,
     // Now the module's image is in memory!  Allocate the Module object and
     // start filling it in with pointers into the loaded image.
 
-    // Though stored as std::string_view, which isn't in general guaranteed to
-    // be NUL-terminated, the name always comes from a DT_NEEDED string in
-    // another module's DT_STRTAB, or from an empty string literal.  So in fact
-    // it is already NUL-terminated and can be used as a C string for link_map.
     fbl::AllocChecker ac;
-    this->NewModule(this->name().c_str(), allocator, ac);
+    this->NewModule(this->name(), allocator, ac);
     CheckAlloc(diag, ac, "passive ABI module");
 
     // All modules allocated by StartupModule are part of the initial exec set
@@ -145,7 +146,8 @@ struct StartupLoadModule : public StartupLoadModuleBase,
     // This fills in the vaddr bounds and phdrs fields.  Note that module.phdrs
     // might remain empty if the phdrs aren't in the load image, so keep using
     // the stack copy read from the file instead.
-    SetModuleLoadInfo(this->module(), ehdr, this->load_info(), loader_.load_bias(), memory());
+    SetModuleVaddrBounds(this->module(), this->load_info(), loader_.load_bias());
+    SetModulePhdrs(this->module(), ehdr, this->load_info(), memory());
 
     // If there was a PT_TLS, fill in tls_module() to be published later.
     if (tls_phdr) {
@@ -194,11 +196,12 @@ struct StartupLoadModule : public StartupLoadModuleBase,
 
   // Returns number of DT_NEEDED entries. See StartupLoadResult, for why that is useful.
   size_t DecodeDynamic(Diagnostics& diag, const std::optional<typename Elf::Phdr>& dyn_phdr) {
-    elfldltl::DynamicTagCountObserver<Elf, elfldltl::ElfDynTag::kNeeded> needed;
+    using NeededObserver = elfldltl::DynamicTagCountObserver<Elf, elfldltl::ElfDynTag::kNeeded>;
+    size_t count = 0;
     // Save the span of Dyn entries for LoadDeps to scan later.
-    dynamic_ = DecodeModuleDynamic(module(), diag, memory(), dyn_phdr, needed,
+    dynamic_ = DecodeModuleDynamic(module(), diag, memory(), dyn_phdr, NeededObserver(count),
                                    elfldltl::DynamicRelocationInfoObserver(reloc_info()));
-    return needed.count();
+    return count;
   }
 
   // This must be the last method called before the StartupLoadModule is destroyed.

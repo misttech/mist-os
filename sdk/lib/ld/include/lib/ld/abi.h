@@ -110,15 +110,18 @@ struct Abi {
   // then `$tp + .static_tls_offsets[tls_modid - 1]` will yield a pointer with
   // the space and alignment expected by that module's PT_TLS.
   elfldltl::TlsLayout<Elf> static_tls_layout;
-};
 
-// This is the DT_SONAME value representing the ABI declared in this file.
-inline constexpr elfldltl::Soname<> kSoname{"ld.so.1"};
+  // This is the DT_SONAME value representing the ABI declared in this file.
+  static constexpr elfldltl::Soname<Elf> kSoname{"ld.so.1"};
+
+  // The soname for the main executable is an empty string.
+  static constexpr elfldltl::Soname<Elf> kExecutableName{""};
+};
 
 // This is the standard PT_INTERP value for using a compatible dynamic linker
 // as the startup dynamic linker.  The actual PT_INTERP value in an executable
 // ET_DYN file might have a prefix to select a particular implementation.
-inline constexpr std::string_view kInterp = kSoname.str();
+inline constexpr std::string_view kInterp = Abi<>::kSoname.str();
 
 // These are the sole exported symbols, with hash values cached statically.
 inline constexpr elfldltl::SymbolName kAbiSymbol{"_ld_abi"};

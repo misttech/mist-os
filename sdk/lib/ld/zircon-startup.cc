@@ -56,9 +56,8 @@ struct LoadExecutableResult : public StartupLoadResult {
 LoadExecutableResult LoadExecutable(Diagnostics& diag, StartupData& startup,
                                     ScratchAllocator& scratch, InitialExecAllocator& initial_exec,
                                     zx::vmo vmo) {
-  constexpr elfldltl::Soname<> kEmpty{""};
   LoadExecutableResult result = {
-      .module = StartupModule::New(diag, scratch, kEmpty, startup.vmar),
+      .module = StartupModule::New(diag, scratch, abi::Abi<>::kExecutableName, startup.vmar),
   };
   if (!vmo) [[unlikely]] {
     diag.SystemError("no executable VMO in bootstrap message");

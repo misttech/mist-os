@@ -158,6 +158,10 @@ constexpr bool WithLoadHeadersFromFile(Diagnostics& diagnostics, File& file, Cal
   }
 }
 
+// The default template parameter for LoadInfo; see below.
+template <class SegmentType>
+using NoSegmentWrapper = SegmentType;
+
 // elfldltl::LoadInfo<Elf, Container, ...> holds all the information an ELF
 // loader needs to know.  It holds representations of the PT_LOAD segments
 // in terms that matter to loading, using Container<Segment, ...>.  The
@@ -191,7 +195,8 @@ constexpr bool WithLoadHeadersFromFile(Diagnostics& diagnostics, File& file, Cal
 // This can override the methods and/or add additional ones.  The segments will
 // be constructed only as the built-in types are constructed, so subclasses
 // should just delegate to the base class constructors (`using Base::Base;`)
-// with any new members default-constructed.
+// with any new members default-constructed. elfldltl::NoSegmentWrapper is a
+// do-nothing template alias that's the default for SegmentWrapper.
 //
 // In addition to the standard members, a segment subclass should override the
 // (templated) `bool CanMerge(const auto&) const` method to return false if
@@ -215,7 +220,7 @@ constexpr bool WithLoadHeadersFromFile(Diagnostics& diagnostics, File& file, Cal
 //
 template <class Elf, template <typename> class Container,
           PhdrLoadPolicy Policy = PhdrLoadPolicy::kBasic,
-          template <class SegmentType> class SegmentWrapper = internal::NoSegmentWrapper>
+          template <class SegmentType> class SegmentWrapper = NoSegmentWrapper>
 class LoadInfo {
  private:
   using Types = internal::LoadSegmentTypes<typename Elf::size_type>;

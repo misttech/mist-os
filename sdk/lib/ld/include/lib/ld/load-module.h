@@ -48,7 +48,8 @@ template <class LoadModule>
 class LoadModuleRef;
 
 template <class ElfLayout, template <typename> class SegmentContainer,
-          LoadModuleInline InlineModule, LoadModuleRelocInfo WithRelocInfo>
+          LoadModuleInline InlineModule, LoadModuleRelocInfo WithRelocInfo,
+          template <class SegmentType> class SegmentWrapper = elfldltl::NoSegmentWrapper>
 class LoadModule {
  public:
   using Elf = ElfLayout;
@@ -56,7 +57,8 @@ class LoadModule {
   using size_type = typename Elf::size_type;
   using Module = typename abi::Abi<Elf>::Module;
   using TlsModule = typename abi::Abi<Elf>::TlsModule;
-  using LoadInfo = elfldltl::LoadInfo<Elf, SegmentContainer>;
+  using LoadInfo =
+      elfldltl::LoadInfo<Elf, SegmentContainer, elfldltl::PhdrLoadPolicy::kBasic, SegmentWrapper>;
   using RelocationInfo = elfldltl::RelocationInfo<Elf>;
   using Soname = elfldltl::Soname<Elf>;
   using Ref = LoadModuleRef<LoadModule>;
@@ -117,9 +119,10 @@ class LoadModule {
   // constructs Module{...}).
   template <typename... Args, bool Inline = InlineModule == LoadModuleInline::kYes,
             typename = std::enable_if_t<Inline>>
-  constexpr void EmplaceModule(Args&&... args) {
+  constexpr void EmplaceModule(Soname name, Args&&... args) {
     assert(!module_);
     module_.emplace(std::forward<Args>(args)...);
+    module_->link_map.name = name.c_str();
   }
 
   // In an instantiation with InlineModule=false, NewModule(a..., c...) does
@@ -127,10 +130,10 @@ class LoadModule {
   // fbl::AllocChecker that indicates whether `new` succeeded.
   template <typename... NewArgs, bool Inline = InlineModule == LoadModuleInline::kYes,
             typename = std::enable_if_t<!Inline>>
-  constexpr void NewModule(const char* name, NewArgs&&... new_args) {
+  constexpr void NewModule(elfldltl::Soname<> name, NewArgs&&... new_args) {
     assert(!module_);
     module_ = new (std::forward<NewArgs>(new_args)...) Module;
-    module_->link_map.name = name;
+    module_->link_map.name = name.c_str();
   }
 
   LoadInfo& load_info() { return load_info_; }

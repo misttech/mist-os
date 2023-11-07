@@ -35,7 +35,7 @@ extern "C" int64_t TestStart() {
   }
 
   const auto& second = *it++;
-  if (second.soname != ld::abi::kSoname) {
+  if (second.soname != ld::abi::Abi<>::kSoname) {
     return 4;
   }
   if (!within_module(second, &ld::abi::_ld_abi)) {
