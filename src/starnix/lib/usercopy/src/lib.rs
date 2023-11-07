@@ -235,11 +235,19 @@ mod test {
         }};
     }
 
+    #[test_case(0)]
+    #[test_case(1)]
+    #[test_case(7)]
+    #[test_case(8)]
+    #[test_case(9)]
+    #[test_case(128)]
+    #[test_case(zx::system_get_page_size() as usize - 1)]
+    #[test_case(zx::system_get_page_size() as usize)]
     #[::fuchsia::test]
-    fn copyout_no_fault() {
+    fn copyout_no_fault(buf_len: usize) {
         let page_size = zx::system_get_page_size() as usize;
 
-        let source = vec!['a' as u8; 128];
+        let source = vec!['a' as u8; page_size];
 
         let dest_vmo = zx::Vmo::create(page_size as u64).unwrap();
 
@@ -256,8 +264,8 @@ mod test {
         assert_eq!(result, Ok(()));
 
         assert_eq!(
-            unsafe { std::slice::from_raw_parts(mapped_addr as *const u8, 128) },
-            &['a' as u8; 128]
+            unsafe { std::slice::from_raw_parts(mapped_addr as *const u8, buf_len) },
+            &vec!['a' as u8; buf_len]
         );
     }
 
@@ -311,11 +319,19 @@ mod test {
         );
     }
 
+    #[test_case(0)]
+    #[test_case(1)]
+    #[test_case(7)]
+    #[test_case(8)]
+    #[test_case(9)]
+    #[test_case(128)]
+    #[test_case(zx::system_get_page_size() as usize - 1)]
+    #[test_case(zx::system_get_page_size() as usize)]
     #[::fuchsia::test]
-    fn copyin_no_fault() {
+    fn copyin_no_fault(buf_len: usize) {
         let page_size = zx::system_get_page_size() as usize;
 
-        let mut dest = vec![0u8; 128];
+        let mut dest = vec![0u8; buf_len];
 
         let source_vmo = zx::Vmo::create(page_size as u64).unwrap();
 
@@ -325,7 +341,7 @@ mod test {
             .map(0, &source_vmo, 0, page_size, zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE)
             .unwrap();
 
-        unsafe { std::slice::from_raw_parts_mut(mapped_addr as *mut u8, 128) }.fill('a' as u8);
+        unsafe { std::slice::from_raw_parts_mut(mapped_addr as *mut u8, buf_len) }.fill('a' as u8);
 
         let usercopy = new_usercopy_for_test!(Usercopy::new(mapped_addr..mapped_addr + page_size));
 
@@ -333,7 +349,7 @@ mod test {
 
         assert_eq!(result, Ok(()));
 
-        assert_eq!(dest, &['a' as u8; 128]);
+        assert_eq!(&dest, &vec!['a' as u8; buf_len]);
     }
 
     #[test_case(1, 2)]
