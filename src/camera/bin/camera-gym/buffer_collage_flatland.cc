@@ -16,8 +16,6 @@
 #include <lib/fpromise/promise.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace/event.h>
-#include <lib/ui/scenic/cpp/commands.h>
-#include <lib/ui/scenic/cpp/resources.h>
 #include <lib/ui/scenic/cpp/view_identity.h>
 #include <lib/ui/scenic/cpp/view_token_pair.h>
 #include <lib/zx/eventpair.h>

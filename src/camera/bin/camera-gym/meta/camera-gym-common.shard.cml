@@ -19,7 +19,6 @@
                 "fuchsia.camera3.DeviceWatcher",
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.tracing.provider.Registry",
-                "fuchsia.ui.scenic.Scenic",
             ],
         },
     ],

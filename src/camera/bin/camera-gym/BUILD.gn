@@ -35,8 +35,6 @@ group("tests") {
 
 source_set("lib") {
   sources = [
-    "buffer_collage.cc",
-    "buffer_collage.h",
     "buffer_collage_flatland.cc",
     "buffer_collage_flatland.h",
     "controller_receiver.cc",
@@ -60,7 +58,6 @@ source_set("lib") {
     "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_hlcpp",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
     "//sdk/fidl/fuchsia.ui.app:fuchsia.ui.app_hlcpp",
-    "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_hlcpp",
     "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_hlcpp",
     "//sdk/lib/fit",
     "//sdk/lib/fit-promise",
@@ -150,28 +147,15 @@ template("camera_gym_component") {
   }
 }
 
-# Note: This defaults to Flatland, use camera-gym-gfx for GFX implementation.
 camera_gym_component("auto") {
   component_name = "camera-gym"
   manifest = "meta/camera-gym.cml"
-}
-
-camera_gym_component("gfx_manual") {
-  component_name = "camera-gym-gfx-manual"
-  manifest = "meta/camera-gym-gfx-manual.cml"
-}
-
-camera_gym_component("gfx") {
-  component_name = "camera-gym-gfx"
-  manifest = "meta/camera-gym-gfx.cml"
 }
 
 fuchsia_package("camera_gym_pkg") {
   package_name = "camera-gym"
   deps = [
     ":camera_gym_auto",
-    ":camera_gym_gfx",
-    ":camera_gym_gfx_manual",
     "controller_client:bin",
   ]
 }

@@ -18,7 +18,6 @@
 #include <lib/fpromise/promise.h>
 #include <lib/fpromise/result.h>
 #include <lib/syslog/cpp/macros.h>
-#include <lib/ui/scenic/cpp/resources.h>
 
 #include <cstdint>
 #include <map>
