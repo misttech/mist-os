@@ -18,7 +18,6 @@ import("//src/tests/end_to_end/perf/python_perf_test.gni")
 
 test_list = [
   # keep-sorted start
-  "archivist_benchmarks_test",
   "audio_mixer_profiler_test",
   "diagnostics_benchmarks_test",
   "driver_runtime_microbenchmarks_test",
@@ -184,6 +183,13 @@ foreach(test, shard_test_list) {
 
 _tests = [
   {
+    name = "archivist_benchmark"
+    expected_metric_filenames = [
+      "fuchsia.archivist.formatter.txt",
+      "fuchsia.archivist.logging.txt",
+    ]
+  },
+  {
     name = "flatland_benchmark"
     expected_metric_filenames = [
       # TODO(b/305080561): enable trace publishing and add this expected metric names.
@@ -231,8 +237,6 @@ foreach(test, _tests) {
 if (is_host) {
   metric_files = [
     # keep-sorted start
-    "fuchsia.archivist.formatter.txt",
-    "fuchsia.archivist.logging.txt",
     "fuchsia.audio.txt",
     "fuchsia.diagnostics.txt",
     "fuchsia.diagnostics_log_rust.core.txt",
