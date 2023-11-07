@@ -1,42 +1,48 @@
 {
-  "result": {
-    "allowlists": [
-      {
-        "name": "0BSD",
-        "matchType": "Exception",
-        "entries": [
-          {
-            "projects": [
-              "prebuilt/third_party/cmake/linux-x64"
-            ],
-            "bug": "",
-            "notes": ["CMAKE is not shipped."]
-          },
-          {
-            "projects": [
-              "prebuilt/third_party/vpython",
-              "prebuilt/third_party/python3/linux-x64",
-              "prebuilt/third_party/lldb/linux-x64"
-            ],
-            "bug": "",
-            "notes": ["Python is not shipped."]
-          },
-          {
-            "projects": [
-              "prebuilt/third_party/dart/linux-x64"
-            ],
-            "bug": "",
-            "notes": ["Dart linux is not shipped."]
-          },
-          {
-            "projects": [
-              "third_party/github.com/python/typing_extensions"
-            ],
-            "bug": "",
-            "notes": []
-          }
+    "result": {
+        "allowlists": [
+            {
+                "name": "0BSD",
+                "matchType": "Exception",
+                "entries": [
+                    {
+                        "projects": [
+                            "prebuilt/third_party/cmake/linux-x64"
+                        ],
+                        "bug": "",
+                        "notes": [
+                            "CMAKE is not shipped."
+                        ]
+                    },
+                    {
+                        "projects": [
+                            "prebuilt/third_party/vpython",
+                            "prebuilt/third_party/python3/linux-x64",
+                            "prebuilt/third_party/lldb/linux-x64"
+                        ],
+                        "bug": "",
+                        "notes": [
+                            "Python is not shipped."
+                        ]
+                    },
+                    {
+                        "projects": [
+                            "prebuilt/third_party/dart/linux-x64"
+                        ],
+                        "bug": "",
+                        "notes": [
+                            "Dart linux is not shipped."
+                        ]
+                    },
+                    {
+                        "projects": [
+                            "third_party/github.com/python/typing_extensions"
+                        ],
+                        "bug": "",
+                        "notes": []
+                    }
+                ]
+            }
         ]
-      }
-    ]
-  }
+    }
 }
