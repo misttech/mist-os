@@ -17,6 +17,13 @@ if (is_host) {
     ]
   }
 
+  python_host_test("base_mobly_driver_test") {
+    main_source = "base_mobly_driver_test.py"
+    sources =
+        [ "//src/testing/end_to_end/mobly_driver/drivers/base_mobly_driver.py" ]
+    libraries = [ "//third_party/parameterized" ]
+  }
+
   python_host_test("mobly_driver_lib_test") {
     main_source = "mobly_driver_lib_test.py"
     sources = [
@@ -51,6 +58,7 @@ group("tests") {
   testonly = true
   public_deps = [
     ":api_mobly_test($host_toolchain)",
+    ":base_mobly_driver_test($host_toolchain)",
     ":driver_factory_test($host_toolchain)",
     ":mobly_driver_lib_test($host_toolchain)",
     "drivers:tests",

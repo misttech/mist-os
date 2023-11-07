@@ -36,7 +36,7 @@ class InfraDriver(base_mobly_driver.BaseDriver):
     def __init__(
         self,
         tb_json_path: str,
-        log_path: str,
+        log_path: Optional[str] = None,
         params_path: Optional[str] = None,
     ) -> None:
         """Initializes the instance.
@@ -45,10 +45,12 @@ class InfraDriver(base_mobly_driver.BaseDriver):
           tb_json_path: absolute path to the testbed definition JSON file.
           log_path: absolute path to directory for storing Mobly test output.
           params_path: absolute path to the Mobly testbed params file.
+
+        Raises:
+          KeyError if required environment variables not found.
         """
-        super().__init__(params_path=params_path)
+        super().__init__(log_path=log_path, params_path=params_path)
         self._tb_json_path = tb_json_path
-        self._log_path = log_path
 
     def generate_test_config(self, transport: Optional[str] = None) -> str:
         """Returns a Mobly test config in YAML format.

@@ -11,6 +11,7 @@ from unittest import mock
 from parameterized import parameterized
 
 import api_infra
+import base_mobly_driver
 import common
 import driver_factory
 import infra_driver
@@ -22,12 +23,18 @@ class DriverFactoryTest(unittest.TestCase):
 
     @parameterized.expand(
         [
-            ("local_env", {}, local_driver.LocalDriver),
+            (
+                "local_env",
+                {
+                    base_mobly_driver.TEST_OUTDIR_ENV: "log/path",
+                },
+                local_driver.LocalDriver,
+            ),
             (
                 "infra_env",
                 {
                     api_infra.BOT_ENV_TESTBED_CONFIG: "botanist.json",
-                    api_infra.BOT_ENV_TEST_OUTDIR: "/tmp/log",
+                    base_mobly_driver.TEST_OUTDIR_ENV: "log/path",
                 },
                 infra_driver.InfraDriver,
             ),

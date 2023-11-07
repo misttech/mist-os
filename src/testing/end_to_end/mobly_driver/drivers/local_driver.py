@@ -28,6 +28,7 @@ class LocalDriver(base_mobly_driver.BaseDriver):
 
     def __init__(
         self,
+        log_path: Optional[str] = None,
         config_path: Optional[str] = None,
         params_path: Optional[str] = None,
         ffx_path: Optional[str] = None,
@@ -35,11 +36,15 @@ class LocalDriver(base_mobly_driver.BaseDriver):
         """Initializes the instance.
 
         Args:
+          log_path: absolute path to directory for storing Mobly test output.
           config_path: absolute path to the Mobly test config file.
           params_path: absolute path to the Mobly test params file.
           ffx_path: absolute path to the FFX binary.
+
+        Raises:
+          KeyError if required environment variables not found.
         """
-        super().__init__(params_path=params_path)
+        super().__init__(log_path=log_path, params_path=params_path)
         self._config_path = config_path
         self._ffx_path = ffx_path
 
@@ -123,7 +128,7 @@ class LocalDriver(base_mobly_driver.BaseDriver):
 
         return api_mobly.new_testbed_config(
             testbed_name="GeneratedLocalTestbed",
-            log_path="/tmp/logs/mobly",
+            log_path=self._log_path,
             mobly_controllers=mobly_controllers,
             test_params_dict={},
             botanist_honeydew_map={},

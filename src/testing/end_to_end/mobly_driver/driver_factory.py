@@ -58,7 +58,6 @@ class DriverFactory:
         try:
             return infra_driver.InfraDriver(
                 tb_json_path=os.environ[api_infra.BOT_ENV_TESTBED_CONFIG],
-                log_path=os.environ[api_infra.BOT_ENV_TEST_OUTDIR],
                 params_path=self._params_path,
             )
         except KeyError as e:

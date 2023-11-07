@@ -7,8 +7,12 @@
 See mobly_driver_lib.py's `run()` method to understand how BaseDriver's
 interface is used.
 """
+import os
 from abc import ABC, abstractmethod
 from typing import Optional
+
+
+TEST_OUTDIR_ENV = "FUCHSIA_TEST_OUTDIR"
 
 
 class BaseDriver(ABC):
@@ -17,12 +21,22 @@ class BaseDriver(ABC):
     provide environment-specific implementations.
     """
 
-    def __init__(self, params_path: Optional[str] = None) -> None:
+    def __init__(
+        self, log_path: Optional[str] = None, params_path: Optional[str] = None
+    ) -> None:
         """Initializes the instance.
+
         Args:
+          log_path: absolute path to directory for storing Mobly test output.
           params_path: absolute path to the Mobly testbed params file.
+
+        Raises:
+          KeyError if required environment variables not found.
         """
         self._params_path = params_path
+        self._log_path = (
+            log_path if log_path is not None else os.environ[TEST_OUTDIR_ENV]
+        )
 
     @abstractmethod
     def generate_test_config(self, transport: Optional[str] = None) -> str:
