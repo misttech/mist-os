@@ -375,11 +375,23 @@ class ParseState {
     if (coll_size_ >= kMaxCollectionCount)
       return kParseOverflow;
 
-    if (parent_coll_ == nullptr) {
-      // The first collection must be an application collection.
-      if (!is_app_collection(data))
-        return kParseUnexpectedCol;
-    }
+    // TODO(b/309225864): The USB-HID 1.11 standard (Section 8.4 "Report
+    // Constraints") states that each top-level collection must be an
+    // Application collection. However, there are devices that don't comply
+    // with these requirements. These devices may assign other collection
+    // types (such as Logical) for the top-level collections.
+    //
+    // In order to support such non-HID-compliant devices, when the parser
+    // sees a non-Application top-level collection, instead of aborting the
+    // whole parsing process, the parser treats it the same way as an
+    // Application one.
+    //
+    // TODO(fxbug.dev/136142): We should print out a warning if the top-level
+    // collection is not of Application type, so that users can know that
+    // this library made the best effort to parse the descriptor and it may
+    // deviate from the behavior expected by the manufacturers. Currently,
+    // we don't have a good way of logging for this library; we should add
+    // the logs once this library has proper logging support.
 
     uint32_t usage = usages_.values().is_empty() ? 0 : usages_.values()[0];
 

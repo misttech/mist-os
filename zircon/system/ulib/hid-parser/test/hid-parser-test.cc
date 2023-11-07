@@ -15,6 +15,8 @@
 #include <zxtest/zxtest.h>
 
 // See hid-report-data.cpp for the definitions of the test data.
+// TODO(fxbug.dev/136147): These descriptors are used only in the tests. We can
+// replace them with constexpr definitions in a header.
 extern "C" const uint8_t hp_mouse_r_desc[46];
 extern "C" const uint8_t trinket_r_desc[173];
 extern "C" const uint8_t ps3_ds_r_desc[148];
@@ -22,6 +24,7 @@ extern "C" const uint8_t acer12_touch_r_desc[660];
 extern "C" const uint8_t eve_tablet_r_desc[28];
 extern "C" const uint8_t asus_touch_desc[945];
 extern "C" const uint8_t eve_touchpad_v2_r_desc[560];
+extern "C" const uint8_t kWingcoolS838FTouchInterfaceDescriptor[454];
 
 namespace {
 struct Stats {
@@ -52,8 +55,6 @@ size_t ItemizeHIDReportDesc(const uint8_t* rpt_desc, size_t desc_len, Stats* sta
 
   return (desc_len - len);
 }
-
-}  // namespace.
 
 TEST(HidHelperTest, ItemizeAcer12Rpt1) {
   Stats stats = {};
@@ -868,3 +869,50 @@ TEST(HidHelperTest, ParseEveTouchpadV2) {
   ASSERT_EQ(ix, dev->report[0].input_count);
   hid::FreeDeviceDescriptor(dev);
 }
+
+// The HID descriptor of the Wingcool S838F touch interface doesn't fully
+// comply with the HID standards because it has a toplevel collection which is
+// not of "Application" type. This test case ensures that `hid-parser` can
+// still parse the descriptor despite the incompliance.
+TEST(HidHelperTest, ParseWingcoolS838FTouchInterface) {
+  hid::DeviceDescriptor* dev = nullptr;
+  auto res = hid::ParseReportDescriptor(kWingcoolS838FTouchInterfaceDescriptor,
+                                        sizeof(kWingcoolS838FTouchInterfaceDescriptor), &dev);
+  ASSERT_EQ(res, hid::ParseResult::kParseOk);
+
+  // The touch interface has totally 5 report IDs.
+  EXPECT_EQ(dev->rep_count, 5);
+
+  EXPECT_EQ(dev->report[0].report_id, 13u);
+  EXPECT_EQ(dev->report[0].input_count, 36u);
+  EXPECT_EQ(dev->report[0].output_count, 0u);
+  EXPECT_EQ(dev->report[0].feature_count, 0u);
+
+  EXPECT_EQ(dev->report[1].report_id, 7u);
+  EXPECT_EQ(dev->report[1].input_count, 0u);
+  EXPECT_EQ(dev->report[1].output_count, 0u);
+  EXPECT_EQ(dev->report[1].feature_count, 1u);
+
+  EXPECT_EQ(dev->report[2].report_id, 33u);
+  EXPECT_EQ(dev->report[2].input_count, 0u);
+  EXPECT_EQ(dev->report[2].output_count, 0u);
+  EXPECT_EQ(dev->report[2].feature_count, 2u);
+
+  // Reports [3] and [4] come from the top-level collection that doesn't have
+  // a correct type. These reports should still be parsed and included in the
+  // parsing results.
+
+  EXPECT_EQ(dev->report[3].report_id, 11u);
+  EXPECT_EQ(dev->report[3].input_count, 504u);
+  EXPECT_EQ(dev->report[3].output_count, 0u);
+  EXPECT_EQ(dev->report[3].feature_count, 0u);
+
+  EXPECT_EQ(dev->report[4].report_id, 12);
+  EXPECT_EQ(dev->report[4].input_count, 0u);
+  EXPECT_EQ(dev->report[4].output_count, 0u);
+  EXPECT_EQ(dev->report[4].feature_count, 1u);
+
+  hid::FreeDeviceDescriptor(dev);
+}
+
+}  // namespace
