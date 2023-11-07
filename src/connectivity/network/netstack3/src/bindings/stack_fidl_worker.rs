@@ -4,7 +4,7 @@
 
 use super::{
     routes,
-    util::{TryFromFidlWithContext as _, TryIntoCore as _},
+    util::{TaskWaitGroupSpawner, TryFromFidlWithContext as _, TryIntoCore as _},
     Ctx,
 };
 
@@ -25,6 +25,7 @@ impl StackFidlWorker {
     pub(crate) async fn serve(
         netstack: crate::bindings::Netstack,
         stream: StackRequestStream,
+        spawner: TaskWaitGroupSpawner,
     ) -> Result<(), fidl::Error> {
         stream
             .try_fold(Self { netstack }, |mut worker, req| async {
@@ -59,11 +60,23 @@ impl StackFidlWorker {
                         responder.send(Err(fidl_net_stack::Error::NotSupported)).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
                     }
                     StackRequest::GetDnsServerWatcher { watcher, control_handle: _ } => {
-                        let () = watcher
-                            .close_with_epitaph(fuchsia_zircon::Status::NOT_SUPPORTED)
-                            .unwrap_or_else(|e| {
-                                debug!("failed to close DNS server watcher {:?}", e)
-                            });
+                        let stream = match watcher.into_stream() {
+                            Ok(stream) => stream,
+                            Err(e) => {
+                                error!("error getting DnsServerWatcherRequestStream: {e:?}");
+                                return Ok(worker);
+                            },
+                        };
+                        spawner.spawn(
+                            crate::bindings::name_worker::serve(
+                                worker.netstack.clone(),
+                                stream,
+                            ).unwrap_or_else(
+                                |e| {
+                                    error!("error while serving DnsServerWatcher: {e:?}")
+                                }
+                            )
+                        );
                     }
                     StackRequest::SetDhcpClientEnabled { responder, id: _, enable } => {
                         // TODO(https://fxbug.dev/81593): Remove this once
