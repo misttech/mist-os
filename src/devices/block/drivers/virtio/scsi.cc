@@ -411,27 +411,18 @@ zx_status_t ScsiDevice::WorkerThread() {
 zx_status_t ScsiDevice::Init() {
   LTRACE_ENTRY;
 
-  virtio::Device::DeviceReset();
-  virtio::Device::ReadDeviceConfig<uint32_t>(offsetof(virtio_scsi_config, num_queues),
-                                             &config_.num_queues);
-  virtio::Device::ReadDeviceConfig<uint32_t>(offsetof(virtio_scsi_config, seg_max),
-                                             &config_.seg_max);
-  virtio::Device::ReadDeviceConfig<uint32_t>(offsetof(virtio_scsi_config, max_sectors),
-                                             &config_.max_sectors);
-  virtio::Device::ReadDeviceConfig<uint32_t>(offsetof(virtio_scsi_config, cmd_per_lun),
-                                             &config_.cmd_per_lun);
-  virtio::Device::ReadDeviceConfig<uint32_t>(offsetof(virtio_scsi_config, event_info_size),
-                                             &config_.event_info_size);
-  virtio::Device::ReadDeviceConfig<uint32_t>(offsetof(virtio_scsi_config, sense_size),
-                                             &config_.sense_size);
-  virtio::Device::ReadDeviceConfig<uint32_t>(offsetof(virtio_scsi_config, cdb_size),
-                                             &config_.cdb_size);
-  virtio::Device::ReadDeviceConfig<uint16_t>(offsetof(virtio_scsi_config, max_channel),
-                                             &config_.max_channel);
-  virtio::Device::ReadDeviceConfig<uint16_t>(offsetof(virtio_scsi_config, max_target),
-                                             &config_.max_target);
-  virtio::Device::ReadDeviceConfig<uint32_t>(offsetof(virtio_scsi_config, max_lun),
-                                             &config_.max_lun);
+  DeviceReset();
+  ReadDeviceConfig<uint32_t>(offsetof(virtio_scsi_config, num_queues), &config_.num_queues);
+  ReadDeviceConfig<uint32_t>(offsetof(virtio_scsi_config, seg_max), &config_.seg_max);
+  ReadDeviceConfig<uint32_t>(offsetof(virtio_scsi_config, max_sectors), &config_.max_sectors);
+  ReadDeviceConfig<uint32_t>(offsetof(virtio_scsi_config, cmd_per_lun), &config_.cmd_per_lun);
+  ReadDeviceConfig<uint32_t>(offsetof(virtio_scsi_config, event_info_size),
+                             &config_.event_info_size);
+  ReadDeviceConfig<uint32_t>(offsetof(virtio_scsi_config, sense_size), &config_.sense_size);
+  ReadDeviceConfig<uint32_t>(offsetof(virtio_scsi_config, cdb_size), &config_.cdb_size);
+  ReadDeviceConfig<uint16_t>(offsetof(virtio_scsi_config, max_channel), &config_.max_channel);
+  ReadDeviceConfig<uint16_t>(offsetof(virtio_scsi_config, max_target), &config_.max_target);
+  ReadDeviceConfig<uint32_t>(offsetof(virtio_scsi_config, max_lun), &config_.max_lun);
 
   // Validate config.
   {
@@ -441,17 +432,14 @@ zx_status_t ScsiDevice::Init() {
     }
   }
 
-  virtio::Device::DriverStatusAck();
+  DriverStatusAck();
 
-  if (!(virtio::Device::DeviceFeaturesSupported() & VIRTIO_F_VERSION_1)) {
-    // Declaring non-support until there is a need in the future.
-    zxlogf(ERROR, "Legacy virtio interface is not supported by this driver");
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  virtio::Device::DriverFeaturesAck(VIRTIO_F_VERSION_1);
-  if (zx_status_t status = virtio::Device::DeviceStatusFeaturesOk(); status != ZX_OK) {
-    zxlogf(ERROR, "Feature negotiation failed: %s", zx_status_get_string(status));
-    return status;
+  if (DeviceFeaturesSupported() & VIRTIO_F_VERSION_1) {
+    DriverFeaturesAck(VIRTIO_F_VERSION_1);
+    if (zx_status_t status = DeviceStatusFeaturesOk(); status != ZX_OK) {
+      zxlogf(ERROR, "Feature negotiation failed: %s", zx_status_get_string(status));
+      return status;
+    }
   }
 
   if (!bti().is_valid()) {
@@ -486,12 +474,12 @@ zx_status_t ScsiDevice::Init() {
     active_ios_ = 0;
     scsi_transport_tag_ = 0;
   }
-  virtio::Device::StartIrqThread();
-  virtio::Device::DriverStatusOk();
+  StartIrqThread();
+  DriverStatusOk();
 
   // Synchronize against Unbind()/Release() before the worker thread is running.
   fbl::AutoLock lock(&lock_);
-  auto status = DdkAdd("virtio-scsi");
+  auto status = DdkAdd(ddk::DeviceAddArgs("virtio-scsi").set_flags(DEVICE_ADD_NON_BINDABLE));
   device_ = zxdev();
   if (status != ZX_OK) {
     zxlogf(ERROR, "failed to run DdkAdd");
@@ -520,7 +508,7 @@ void ScsiDevice::DdkRelease() {
     }
   }
   thrd_join(worker_thread_, nullptr);
-  virtio::Device::Release();
+  Release();
 }
 
 }  // namespace virtio
