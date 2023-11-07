@@ -5,20 +5,23 @@
 #ifndef SRC_CAMERA_DRIVERS_TEST_UTILS_BUTTON_CHECKER_H_
 #define SRC_CAMERA_DRIVERS_TEST_UTILS_BUTTON_CHECKER_H_
 
-#include <fuchsia/hardware/input/cpp/fidl.h>
-#include <zircon/types.h>
+#include <fidl/fuchsia.input.report/cpp/fidl.h>
+#include <lib/async-loop/cpp/loop.h>
 
-#include <memory>
-#include <utility>
 #include <vector>
 
-#include <hid-parser/report.h>
-#include <hid-parser/usages.h>
+#include "src/lib/fsl/io/device_watcher.h"
 
 // This class connects to input devices and allows for queries to input buttons or switches.
 // Currently, this class only supports checking the state of the mute switch.
 class ButtonChecker {
  public:
+  static constexpr auto kDevicePath = "/dev/class/input-report";
+  ButtonChecker()
+      : device_watcher_(fsl::DeviceWatcher::CreateWithIdleCallback(
+            kDevicePath, fit::bind_member<&ButtonChecker::ExistsCallback>(this),
+            fit::bind_member<&ButtonChecker::IdleCallback>(this), loop_.dispatcher())) {}
+
   enum class ButtonState {
     UNKNOWN,  // Button state could not be determined or is undefined.
     DOWN,     // Button is pressed, on, or active.
@@ -32,14 +35,16 @@ class ButtonChecker {
   ButtonState GetMuteState();
 
  private:
-  // Create a device proxy on the provided filesystem path. Returns an unbound proxy on failure.
-  static fuchsia::hardware::input::DeviceSyncPtr BindDevice(const std::string& path);
+  // Function called when a device is found. Checks device's descriptor for the mute button. If mute
+  // button is found adds it to devices_.
+  void ExistsCallback(const fidl::ClientEnd<fuchsia_io::Directory>& dir,
+                      const std::string& filename);
+  // Function called when all devices are found. Stops device_watcher_.
+  void IdleCallback();
 
-  // Populates a report field for a mute button, if present, on the device. Returns false iff the
-  // field was successfully populated.
-  static bool GetMuteFieldForDevice(fuchsia::hardware::input::DeviceSyncPtr& device,
-                                    hid::ReportField* mute_field_out);
-  std::vector<std::pair<fuchsia::hardware::input::DeviceSyncPtr, hid::ReportField>> devices_;
+  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
+  std::unique_ptr<fsl::DeviceWatcher> device_watcher_;
+  std::vector<fidl::SyncClient<fuchsia_input_report::InputDevice>> devices_;
 };
 
 // Convenience wrapper to check the mute state of a device. Returns true if the device is confirmed

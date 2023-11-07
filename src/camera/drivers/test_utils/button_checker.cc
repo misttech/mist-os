@@ -4,36 +4,21 @@
 
 #include "button_checker.h"
 
-#include <lib/fdio/directory.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/syslog/cpp/macros.h>
-#include <lib/zx/channel.h>
-#include <unistd.h>
 
 #include <cstring>
-#include <filesystem>
 #include <iostream>
 #include <string>
 
-#include <fbl/unique_fd.h>
-
-constexpr auto kDevicePath = "/dev/class/input";
 constexpr auto kTag = "button_checker";
 
 std::unique_ptr<ButtonChecker> ButtonChecker::Create() {
   auto checker = std::make_unique<ButtonChecker>();
-
-  std::error_code ec{};
-  auto it = std::filesystem::directory_iterator(kDevicePath, ec);
-  if (ec) {
-    FX_LOGST(ERROR, kTag) << "Unable to open " << kDevicePath << ": " << ec.message();
+  auto status = checker->loop_.Run();
+  if (status != ZX_ERR_CANCELED) {
+    FX_LOGST(ERROR, kTag) << "Could not run button checker " << status;
     return nullptr;
-  }
-  for (const auto& entry : it) {
-    auto device = BindDevice(entry.path());
-    hid::ReportField mute_field{};
-    if (device && !GetMuteFieldForDevice(device, &mute_field)) {
-      checker->devices_.emplace_back(std::move(device), mute_field);
-    }
   }
 
   if (checker->devices_.empty()) {
@@ -48,26 +33,27 @@ ButtonChecker::ButtonState ButtonChecker::GetMuteState() {
   auto state = ButtonState::UNKNOWN;
   for (auto& device : devices_) {
     // Get the report for the mute field.
-    zx_status_t status_return = ZX_OK;
-    std::vector<uint8_t> report;
-    zx_status_t status = device.first->GetReport(fuchsia::hardware::input::ReportType::INPUT,
-                                                 device.second.report_id, &status_return, &report);
-    if (status != ZX_OK) {
-      FX_PLOGST(ERROR, kTag, status);
-      return ButtonState::UNKNOWN;
-    }
-    if (status_return != ZX_OK) {
-      FX_PLOGST(ERROR, kTag, status_return);
+    auto result = device->GetInputReport(fuchsia_input_report::DeviceType::kConsumerControl);
+    if (result.is_error()) {
+      FX_LOGST(ERROR, kTag) << "GetInputReport failed " << result.error_value().FormatDescription();
       return ButtonState::UNKNOWN;
     }
 
-    // Extract the value from the report.
-    double field_value = 0.0;
-    if (!hid::ExtractAsUnit(report.data(), report.size(), device.second.attr, &field_value)) {
-      FX_LOGST(ERROR, kTag) << "Failed to extract HID field value";
+    const auto& consumer_control = result->report().consumer_control();
+    if (!consumer_control) {
+      FX_LOGST(ERROR, kTag) << "Invalid input report. Must have consumer_control.";
       return ButtonState::UNKNOWN;
     }
-    ButtonState state_for_device = field_value > 0 ? ButtonState::DOWN : ButtonState::UP;
+    const auto& pressed_buttons = consumer_control->pressed_buttons();
+    if (!pressed_buttons) {
+      FX_LOGST(ERROR, kTag) << "Invalid input report. Must have pressed_buttons.";
+      return ButtonState::UNKNOWN;
+    }
+    auto state_for_device =
+        (std::find(pressed_buttons->begin(), pressed_buttons->end(),
+                   fuchsia_input_report::ConsumerControlButton::kMicMute) != pressed_buttons->end())
+            ? ButtonState::DOWN
+            : ButtonState::UP;
 
     // Make sure that devices don't have conflicting states.
     if (state != ButtonState::UNKNOWN && state != state_for_device) {
@@ -80,68 +66,47 @@ ButtonChecker::ButtonState ButtonChecker::GetMuteState() {
   return state;
 }
 
-fuchsia::hardware::input::DeviceSyncPtr ButtonChecker::BindDevice(const std::string& path) {
-  fuchsia::hardware::input::ControllerSyncPtr controller;
-  if (zx_status_t status =
-          fdio_service_connect(path.c_str(), controller.NewRequest().TakeChannel().release());
-      status != ZX_OK) {
-    FX_PLOGST(ERROR, kTag, status) << "Error connecting to controller " << path;
-    return nullptr;
+void ButtonChecker::ExistsCallback(const fidl::ClientEnd<fuchsia_io::Directory>& dir,
+                                   const std::string& filename) {
+  FX_LOGST(DEBUG, kTag) << "Reading reports from " << filename.c_str();
+
+  zx::result connection = component::ConnectAt<fuchsia_input_report::InputDevice>(dir, filename);
+  if (connection.is_error()) {
+    FX_LOGST(ERROR, kTag) << "Could not open " << filename.c_str() << ": "
+                          << connection.status_string();
+    return;
   }
 
-  fuchsia::hardware::input::DeviceSyncPtr device;
-  if (zx_status_t status = controller->OpenSession(device.NewRequest()); status != ZX_OK) {
-    FX_PLOGST(ERROR, kTag, status) << "Error opening session " << path;
-    return nullptr;
+  auto device = fidl::SyncClient(std::move(connection.value()));
+  const auto descriptor = device->GetDescriptor();
+  if (descriptor.is_error()) {
+    FX_LOGST(ERROR, kTag) << "GetDescriptor failed for " << filename.c_str() << ": "
+                          << descriptor.error_value().FormatDescription();
+    return;
   }
 
-  return device;
+  // Find mute button and if it exists, add to list of devices.
+  const auto& consumer_control = descriptor->descriptor().consumer_control();
+  if (!consumer_control) {
+    return;
+  }
+  const auto& input = consumer_control->input();
+  if (!input) {
+    return;
+  }
+  const auto& buttons = input->buttons();
+  if (!buttons) {
+    return;
+  }
+  if (std::find(buttons->begin(), buttons->end(),
+                fuchsia_input_report::ConsumerControlButton::kMicMute) != buttons->end()) {
+    devices_.emplace_back(std::move(device));
+  }
 }
 
-bool ButtonChecker::GetMuteFieldForDevice(fuchsia::hardware::input::DeviceSyncPtr& device,
-                                          hid::ReportField* mute_field_out) {
-  FX_CHECK(mute_field_out);
-  auto kMuteButtonUsage =
-      hid::USAGE(hid::usage::Page::kTelephony, hid::usage::Telephony::kPhoneMute);
-
-  // Get the report descriptor.
-  std::vector<uint8_t> desc;
-  zx_status_t status = device->GetReportDesc(&desc);
-  if (status != ZX_OK) {
-    FX_PLOGST(ERROR, kTag, status);
-    return true;
-  }
-
-  // Parse the descriptor.
-  hid::DeviceDescriptor* device_descriptor_ptr = nullptr;
-  auto parse_result = hid::ParseReportDescriptor(desc.data(), desc.size(), &device_descriptor_ptr);
-  if (parse_result != hid::kParseOk) {
-    FX_LOGST(ERROR, kTag) << "HID Parse Failure: " << parse_result;
-    return true;
-  }
-  std::unique_ptr<hid::DeviceDescriptor, decltype(&hid::FreeDeviceDescriptor)> device_descriptor(
-      device_descriptor_ptr, &hid::FreeDeviceDescriptor);
-
-  // Loop over the descriptor reports and their fields.
-  bool found_mute_field = false;
-  for (size_t report_index = 0; report_index < device_descriptor->rep_count; ++report_index) {
-    const auto& report_descriptor = device_descriptor->report[report_index];
-    for (size_t field_index = 0; field_index < report_descriptor.input_count; ++field_index) {
-      const auto& input_field = report_descriptor.input_fields[field_index];
-
-      // If the report desc is for the mute button, save out the field metadata.
-      if (input_field.attr.usage == kMuteButtonUsage) {
-        if (found_mute_field && memcmp(mute_field_out, &input_field, sizeof(input_field)) != 0) {
-          FX_LOGST(ERROR, kTag) << "Multiple mute fields found in same device";
-          return true;
-        }
-        *mute_field_out = input_field;
-        found_mute_field = true;
-      }
-    }
-  }
-
-  return !found_mute_field;
+void ButtonChecker::IdleCallback() {
+  // Once we've found all the existing devices, stop watching.
+  loop_.Quit();
 }
 
 bool VerifyDeviceUnmuted(bool consider_unknown_as_unmuted) {
