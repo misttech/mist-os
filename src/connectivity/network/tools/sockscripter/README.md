@@ -26,6 +26,23 @@ installs two functions: `sockscripterl` to run the host binary and
 The `sockscripter.sh` script also provides a bash complete script and assigns
 it to the `sockscripterl` and `sockscripterf` functions.
 
+## Linux Permissions
+
+When running sockscripter on a Linux host, certain operations require elevated
+privledges.
+
+  * Packet Sockets require `CAP_NET_RAW`: run
+
+  ```
+  enter_ambient_caps_shell.sh
+  ```
+
+  * ICMP Sockets require that your user belong to the `ping_group_range`: run
+
+  ```
+  sudo sysctl -w net.ipv4.ping_group_range='0 4294967294'
+  ```
+
 ## Examples
 
 Sending a multicast packet:
