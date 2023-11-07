@@ -69,19 +69,23 @@ the future.
 
 This syscall will move the pages in `[src_offset, src_offset + length)`
 from `src_vmo` to `[offset, offset + length)` in `dst_vmo`. It is functionally
-equivalent to a `memcpy` from `src_vmo` to `dst_vmo` followed by a decommit of
+equivalent to a `memmove` from `src_vmo` to `dst_vmo` followed by a decommit of
 the associated pages in `src_vmo`. However, the mechanism by which this is
 achieved is different; the backing pages are actually moved between VMOs
-instead of copying data. This allows for much better performance. The reader
-may be wondering why the syscall is called `zx_vmo_transfer_data` and not
-`zx_vmo_transfer_pages` if it moves pages. This was a deliberate choice made
-in case we wanted to relax the strict page alignment requirement in the future.
-For example, we may want to support the use case in which a user requests a
-page and a half to be transferred. In this case, we would move the first page
-and then copy out the remaining half page. This would still be more efficient
-than a naive copy by the user, as it would allow us to bypass zeroing the
-destination pages. Note that the initial implementation does not support this
-use case; it is mentioned here only to provide context on the naming choice.
+instead of copying data. This allows for much better performance. Despite this
+different mechanism, this syscall presents the same semantics as `memmove`, in
+that providing overlapping source and destination regions is supported.
+
+The reader may be wondering why the syscall is called `zx_vmo_transfer_data`
+and not `zx_vmo_transfer_pages` if it moves pages. This was a deliberate choice
+made in case we wanted to relax the strict page alignment requirement in the
+future. For example, we may want to support the use case in which a user
+requests a page and a half to be transferred. In this case, we would move the
+first page and then copy out the remaining half page. This would still be more
+efficient than a naive copy by the user, as it would allow us to bypass zeroing
+the destination pages. Note that the initial implementation does not support
+this use case; it is mentioned here only to provide context on the naming
+choice.
 
 Existing pages in the destination range will be overwritten. All mappings of
 the destination VMO will also see the new contents. If the destination VMO has
@@ -93,43 +97,40 @@ out.
 
 The move can fail for a variety of reasons. Refer to the the errors section
 below for a complete enumeration of possible error codes and the scenarios that
-return them. If the move fails with `ZX_ERR_NO_MEMORY`, then any number of
-pages in the `src` VMO may have been moved to `dst`. We make no guarantees as
-to exactly how much data was moved, as providing such guarantees would require
-allocating memory that we do not have. On all other errors, we guarantee that
-both the source and destination VMOs are left unchanged.
+return them.
 
-There are several additional constraints that we place on the inputs. These can
-be divided into two classes of constraints: removable and permanent. Removable
-constraints are ones we place on the inputs for simplicity of implementation,
-and could be removed in the future if a suitable use case arose. In contrast,
-permanent constraints are ones that are required to maintain the functionality
-of the syscall.
+If the move fails, then any number of pages in the `src_vmo` VMO may have been
+moved to `dst_vmo`. We make no guarantees as to exactly how much data was moved.
+However, we can guarantee that the call will succeed when the following
+conditions are met:
 
-Let's start with the removable constraints:
+1. None of the conditions that would result in the errors listed below are met.
+1. The `src_vmo` and `dst_vmo` are not modified by any other threads while this
+operation is running.
 
-1. `offset`, `src_offset`, and `length` must be page aligned, as the syscall
-works by moving pages between VMOs.
-1. The source VMO (pointed to by `src_vmo`) cannot be pager-backed, cannot
-have children, and cannot have a parent.
-
-Here are the permanent constraints:
-
-1. Neither the source nor the destination VMOs can be physical or contiguous.
-1. No pages in the source or destination region can be pinned.
+A "modification" in this context refers to a write/resize/pin on either the VMO
+directly or on a reference to the VMO (e.g. slices, reference children, etc.).
+Modifying a parent, child, or sibling of any kind of snapshot should not result
+in any error, although depending on the snapshot you may get write tearing.
+Write tearing could occur if you manipulate the parent of a
+`SNAPSHOT_AT_LEAST_ON_WRITE` VMO as the actual transfer has no promised
+atomicity. Note that in the case of transferring pages from a SNAPSHOT child we
+may need to perform copies, i.e. allocate new pages, if that particular page has
+not yet been copy-on-written.
 
 Here are the errors this syscall can return and what they mean:
 
 * `ZX_ERR_BAD_HANDLE`:  `src_vmo` or `dst_vmo` is not a valid VMO handle.
 * `ZX_ERR_INVALID_ARGS`: `offset`, `length`, or `src_offset` is not page
-    aligned, or `src_vmo` and `dst_vmo` point to the same VMO.
+    aligned. As discussed earlier, we may want to remove this constraint in the
+    future.
 * `ZX_ERR_ACCESS_DENIED`: `src_vmo` does not have `ZX_RIGHT_WRITE` and
     `ZX_RIGHT_READ`, or `dst_vmo` does not have `ZX_RIGHT_WRITE`.
-* `ZX_ERR_BAD_STATE`: `src_vmo` is not in a state where it can supply the
-    required pages. This is often due to violations of removable constraint
-    number 2 above.
-* `ZX_ERR_NOT_SUPPORTED`: `src_vmo` and/or `dst_vmo` is a physical vmo or a
-    contiguous vmo.
+* `ZX_ERR_BAD_STATE`: Pages in the specified range in `src_vmo` or `dst_vmo`
+    are pinned.
+* `ZX_ERR_NOT_SUPPORTED`: Either `src_vmo` or `dst_vmo` are physical,
+    contiguous, or pager-backed VMOs. We may be able to support pager-backed
+    VMOs in the future.
 * `ZX_ERR_OUT_OF_RANGE`: The specified range in `dst_vmo` or `src_vmo` is
     invalid.
 * `ZX_ERR_NO_MEMORY`: Failure due to lack of memory.
