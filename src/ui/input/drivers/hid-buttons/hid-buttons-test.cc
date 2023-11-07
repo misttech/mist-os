@@ -13,6 +13,7 @@
 #include <zircon/assert.h>
 
 #include <cstddef>
+#include <set>
 
 #include <ddk/metadata/buttons.h>
 #include <zxtest/zxtest.h>
@@ -105,17 +106,9 @@ class HidButtonsDeviceTest : public HidButtonsDevice {
   explicit HidButtonsDeviceTest(zx_device_t* fake_parent, async_dispatcher_t* dispatcher)
       : HidButtonsDevice(fake_parent, dispatcher) {}
 
-  void FakeInterrupt() {
+  void FakeInterrupt(uint32_t i = 0) {
     // Issue the first interrupt.
-    zx_port_packet packet = {kPortKeyInterruptStart + 0, ZX_PKT_TYPE_USER, ZX_OK, {}};
-    zx_status_t status = port_.queue(&packet);
-    ZX_ASSERT(status == ZX_OK);
-  }
-
-  void FakeInterrupt(ButtonType type) {
-    // Issue the first interrupt.
-    zx_port_packet packet = {
-        kPortKeyInterruptStart + button_map_[type], ZX_PKT_TYPE_USER, ZX_OK, {}};
+    zx_port_packet packet = {kPortKeyInterruptStart + i, ZX_PKT_TYPE_USER, ZX_OK, {}};
     zx_status_t status = port_.queue(&packet);
     ZX_ASSERT(status == ZX_OK);
   }
@@ -125,23 +118,12 @@ class HidButtonsDeviceTest : public HidButtonsDevice {
     sync_completion_reset(&debounce_threshold_passed_);
   }
 
-  void ClosingChannel(ButtonsNotifyInterface* interface) override {
-    HidButtonsDevice::ClosingChannel(interface);
-    sync_completion_signal(&test_channels_cleared_);
-  }
-
   void Notify(uint32_t type) override {
     HidButtonsDevice::Notify(type);
     sync_completion_signal(&debounce_threshold_passed_);
   }
 
-  void Wait() {
-    sync_completion_wait(&test_channels_cleared_, ZX_TIME_INFINITE);
-    sync_completion_reset(&test_channels_cleared_);
-  }
-
  private:
-  sync_completion_t test_channels_cleared_;
   sync_completion_t debounce_threshold_passed_;
 };
 
@@ -514,7 +496,7 @@ TEST_F(HidButtonsTest, DuplicateReports) {
                       zx::ok<uint8_t>(1));  // Read value to prepare report.
   GetGpio(2).SyncCall(&fake_gpio::FakeGpio::PushReadResponse,
                       zx::ok<uint8_t>(1));  // Read value to prepare report.
-  device().FakeInterrupt(ButtonType::kReset);
+  device().FakeInterrupt(2);
   device().DebounceWait();
 
   ReconfigureGpioPolarity(0, 0, fuchsia_hardware_gpio::GpioPolarity::kHigh);
@@ -524,7 +506,7 @@ TEST_F(HidButtonsTest, DuplicateReports) {
                       zx::ok<uint8_t>(1));  // Read value to prepare report.
   GetGpio(2).SyncCall(&fake_gpio::FakeGpio::PushReadResponse,
                       zx::ok<uint8_t>(0));  // Read value to prepare report.
-  device().FakeInterrupt(ButtonType::kVolumeUp);
+  device().FakeInterrupt(0);
   device().DebounceWait();
 
   ReconfigureGpioPolarity(2, 0, fuchsia_hardware_gpio::GpioPolarity::kHigh);
@@ -534,7 +516,7 @@ TEST_F(HidButtonsTest, DuplicateReports) {
                       zx::ok<uint8_t>(1));  // Read value to prepare report.
   GetGpio(2).SyncCall(&fake_gpio::FakeGpio::PushReadResponse,
                       zx::ok<uint8_t>(0));  // Read value to prepare report.
-  device().FakeInterrupt(ButtonType::kReset);
+  device().FakeInterrupt(2);
   device().DebounceWait();
 
   reader->ReadInputReports().Then([&](auto& result) {
@@ -590,7 +572,7 @@ TEST_F(HidButtonsTest, CamMute) {
                       zx::ok<uint8_t>(0));  // Read value to prepare report.
   GetGpio(2).SyncCall(&fake_gpio::FakeGpio::PushReadResponse,
                       zx::ok<uint8_t>(1));  // Read value to prepare report.
-  device().FakeInterrupt(ButtonType::kCamMute);
+  device().FakeInterrupt(2);
   device().DebounceWait();
 
   reader->ReadInputReports().Then([&](auto& result) {
@@ -622,7 +604,7 @@ TEST_F(HidButtonsTest, CamMute) {
                       zx::ok<uint8_t>(0));  // Read value to prepare report.
   GetGpio(2).SyncCall(&fake_gpio::FakeGpio::PushReadResponse,
                       zx::ok<uint8_t>(0));  // Read value to prepare report.
-  device().FakeInterrupt(ButtonType::kCamMute);
+  device().FakeInterrupt(2);
   device().DebounceWait();
 
   reader->ReadInputReports().Then([&](auto& result) {
