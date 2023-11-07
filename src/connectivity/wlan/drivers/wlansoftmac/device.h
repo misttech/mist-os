@@ -21,9 +21,6 @@
 
 #include <memory>
 #include <mutex>
-#include <thread>
-#include <tuple>
-#include <unordered_set>
 
 #include <ddktl/device.h>
 #include <fbl/intrusive_double_list.h>
