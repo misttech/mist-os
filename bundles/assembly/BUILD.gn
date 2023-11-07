@@ -342,7 +342,6 @@ assembly_input_bundle("bootstrap_eng") {
     "//src/devices/block/bin/iotime:bootfs",
     "//src/devices/block/bin/lsblk:bootfs",
     "//src/devices/block/bin/sdio:bootfs",
-    "//src/devices/clock/bin/clock:bootfs",
     "//src/devices/cpu/bin/cpuctl:bootfs",
     "//src/devices/gpio/bin/gpioutil:bootfs",
     "//src/devices/i2c/bin:bootfs",
@@ -485,6 +484,11 @@ assembly_input_bundle("sl4f") {
       ]
     },
   ]
+}
+
+# Includes the bin/clock and clkctl developer tools
+assembly_input_bundle("clock_development_tools") {
+  bootfs_files_labels = [ "//src/devices/clock/bin/clock:bootfs" ]
 }
 
 ########

@@ -38,6 +38,7 @@ BOOTSTRAP_USER_PLATFORM_AIB_NAMES = [
 # so that these systems (e.g. bringup) don't need to build the entire platform.
 BOOTSTRAP_USERDEBUG_PLATFORM_AIB_NAMES = [
     "bootstrap_userdebug",
+    "clock_development_tools",
     "kernel_args_userdebug",
 ]
 
