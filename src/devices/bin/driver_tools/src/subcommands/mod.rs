@@ -14,8 +14,6 @@ pub mod list_composites;
 pub mod list_devices;
 pub mod list_hosts;
 #[cfg(not(target_os = "fuchsia"))]
-pub mod lsblk;
-#[cfg(not(target_os = "fuchsia"))]
 pub mod lspci;
 #[cfg(not(target_os = "fuchsia"))]
 pub mod lsusb;

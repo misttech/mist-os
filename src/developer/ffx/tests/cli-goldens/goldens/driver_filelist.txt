@@ -19,7 +19,6 @@ ffx/driver/list-composites.golden
 ffx/driver/list-devices.golden
 ffx/driver/list-hosts.golden
 ffx/driver/list.golden
-ffx/driver/lsblk.golden
 ffx/driver/lspci.golden
 ffx/driver/lsusb.golden
 ffx/driver/print-input-report.golden

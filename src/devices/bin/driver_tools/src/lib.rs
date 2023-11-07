@@ -2,10 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#[cfg(not(target_os = "fuchsia"))]
-#[macro_use]
-extern crate lazy_static;
-
 pub mod args;
 mod common;
 mod subcommands;
@@ -111,14 +107,6 @@ pub async fn driver(
             )
             .await
             .context("list-composite-node-specs subcommand failed")?;
-        }
-        #[cfg(not(target_os = "fuchsia"))]
-        DriverSubCommand::Lsblk(subcmd) => {
-            let dev = driver_connector
-                .get_dev_proxy(subcmd.select)
-                .await
-                .context("Failed to get dev proxy")?;
-            subcommands::lsblk::lsblk(subcmd, dev).await.context("Lsblk subcommand failed")?;
         }
         #[cfg(not(target_os = "fuchsia"))]
         DriverSubCommand::Lspci(subcmd) => {

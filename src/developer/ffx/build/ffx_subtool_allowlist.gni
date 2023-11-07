@@ -27,10 +27,7 @@ ffx_subtool_fidl_allowlist = [
   "//sdk/fidl/fuchsia.exception:fuchsia.exception",
 
   # used by ffx driver
-  "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block",
-  "//sdk/fidl/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition",
   "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci",
-  "//sdk/fidl/fuchsia.hardware.skipblock:fuchsia.hardware.skipblock",
   "//sdk/fidl/fuchsia.hardware.usb.device:fuchsia.hardware.usb.device",
 
   # used by ffx profile memory
