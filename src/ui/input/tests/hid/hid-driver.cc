@@ -15,6 +15,7 @@
 #include <lib/driver_test_realm/realm_builder/cpp/lib.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/fd.h>
+#include <lib/hid/boot.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/sys/component/cpp/testing/realm_builder_types.h>
 #include <stdio.h>
@@ -22,7 +23,6 @@
 #include <zircon/syscalls.h>
 
 #include <fbl/unique_fd.h>
-#include <hid/boot.h>
 #include <zxtest/zxtest.h>
 
 namespace {

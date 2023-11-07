@@ -6,10 +6,9 @@
 #define SRC_UI_INPUT_LIB_HID_INPUT_REPORT_AXIS_H_
 
 #include <fidl/fuchsia.input.report/cpp/wire.h>
-
-#include <hid-parser/parser.h>
-#include <hid-parser/units.h>
-#include <hid-parser/usages.h>
+#include <lib/hid-parser/parser.h>
+#include <lib/hid-parser/units.h>
+#include <lib/hid-parser/usages.h>
 
 namespace hid_input_report {
 

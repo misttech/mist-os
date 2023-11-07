@@ -36,7 +36,7 @@ fuchsia_driver("virtio_input-driver") {
     "//src/devices/bus/lib/virtio",
     "//src/devices/lib/driver",
     "//src/lib/ddktl",
-    "//zircon/system/ulib/hid",
+    "//src/ui/input/lib/hid",
   ]
 }
 
@@ -71,10 +71,10 @@ test("virtio-input-test") {
     "//src/devices/testing/fake-bti",
     "//src/devices/testing/no_ddk",
     "//src/ui/input/lib/hid-input-report",
+    "//src/ui/input/lib/hid-parser",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/hid-parser",
     "//zircon/system/ulib/zxtest",
   ]
 

@@ -11,6 +11,10 @@
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/watcher.h>
 #include <lib/fit/defer.h>
+#include <lib/hid-parser/parser.h>
+#include <lib/hid-parser/report.h>
+#include <lib/hid-parser/units.h>
+#include <lib/hid-parser/usages.h>
 #include <lib/zx/event.h>
 #include <limits.h>
 #include <stdio.h>
@@ -28,10 +32,6 @@
 #include <vector>
 
 #include <fbl/algorithm.h>
-#include <hid-parser/parser.h>
-#include <hid-parser/report.h>
-#include <hid-parser/units.h>
-#include <hid-parser/usages.h>
 
 // defined in report.cpp
 void print_report_descriptor(const uint8_t* rpt_desc, size_t desc_len);

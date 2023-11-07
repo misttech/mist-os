@@ -29,7 +29,7 @@ pub struct KeyStroke {
 ///
 /// This is an inverse of [hid/hid.h:hid_map_key].
 ///
-/// [hid/hid.h:hid_map_key]: https://fuchsia.googlesource.com/fuchsia/+/ef9c451ba83a3ece22cad66b9dcfb446be291966/zircon/system/ulib/hid/include/hid/hid.h#30
+/// [hid/hid.h:hid_map_key]: https://fuchsia.googlesource.com/fuchsia/+/ef9c451ba83a3ece22cad66b9dcfb446be291966/src/ui/input/lib/hid/include/hid/hid.h#30
 #[derive(Debug)]
 pub struct InverseKeymap {
     map: HashMap<char, KeyStroke>,

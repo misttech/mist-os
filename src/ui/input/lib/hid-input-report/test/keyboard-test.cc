@@ -6,11 +6,11 @@
 
 #include <fuchsia/input/cpp/fidl.h>
 #include <lib/fit/defer.h>
+#include <lib/hid/boot.h>
+#include <lib/hid/usages.h>
 
 #include <variant>
 
-#include <hid/boot.h>
-#include <hid/usages.h>
 #include <zxtest/zxtest.h>
 
 #include "src/ui/input/lib/hid-input-report/device.h"

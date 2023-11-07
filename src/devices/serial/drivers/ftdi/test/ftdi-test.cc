@@ -13,6 +13,7 @@
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/watcher.h>
+#include <lib/hid/boot.h>
 #include <lib/usb-virtual-bus-launcher/usb-virtual-bus-launcher.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -21,7 +22,6 @@
 #include <ctime>
 
 #include <fbl/string.h>
-#include <hid/boot.h>
 #include <usb/usb.h>
 #include <zxtest/zxtest.h>
 

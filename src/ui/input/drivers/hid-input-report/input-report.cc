@@ -7,6 +7,9 @@
 #include <lib/ddk/debug.h>
 #include <lib/fidl/epitaph.h>
 #include <lib/fit/defer.h>
+#include <lib/hid-parser/parser.h>
+#include <lib/hid-parser/report.h>
+#include <lib/hid-parser/usages.h>
 #include <lib/trace/internal/event_common.h>
 #include <lib/zx/clock.h>
 #include <threads.h>
@@ -16,9 +19,6 @@
 
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
-#include <hid-parser/parser.h>
-#include <hid-parser/report.h>
-#include <hid-parser/usages.h>
 
 #include "src/ui/input/lib/hid-input-report/device.h"
 

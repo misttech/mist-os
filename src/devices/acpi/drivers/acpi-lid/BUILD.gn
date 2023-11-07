@@ -26,8 +26,8 @@ common_deps = [
   "//src/devices/lib/acpi",
   "//src/devices/lib/driver:driver_runtime",
   "//src/lib/ddktl",
+  "//src/ui/input/lib/hid",
   "//zircon/system/ulib/fbl",
-  "//zircon/system/ulib/hid",
   "//zircon/system/ulib/zx",
 ]
 

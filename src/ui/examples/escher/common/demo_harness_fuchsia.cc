@@ -6,11 +6,10 @@
 
 #include <lib/async/cpp/task.h>
 #include <lib/async/default.h>
+#include <lib/hid/usages.h>
 #include <lib/zx/time.h>
 
 #include <memory>
-
-#include <hid/usages.h>
 
 #include "lib/vfs/cpp/pseudo_dir.h"
 #include "src/ui/examples/escher/common/demo.h"

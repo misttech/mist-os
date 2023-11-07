@@ -7,13 +7,13 @@
 #include <fidl/fuchsia.hardware.input/cpp/wire.h>
 #include <fidl/fuchsia.hardware.input/cpp/wire_types.h>
 #include <lib/ddk/driver.h>
+#include <lib/hid/boot.h>
 #include <zircon/syscalls.h>
 
 #include <map>
 #include <sstream>
 
 #include <ddktl/device.h>
-#include <hid/boot.h>
 
 #include "src/ui/input/drivers/pc-ps2/commands.h"
 #include "src/ui/input/drivers/pc-ps2/controller.h"

@@ -8,6 +8,7 @@
 #include <lib/async-loop/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/ddk/metadata.h>
+#include <lib/hid/gt92xx.h>
 #include <lib/mock-i2c/mock-i2c.h>
 
 #include <ddk/metadata/buttons.h>

@@ -10,6 +10,7 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/irq.h>
+#include <lib/hid/boot.h>
 #include <lib/input_report_reader/reader.h>
 #include <lib/zx/interrupt.h>
 
@@ -18,7 +19,6 @@
 #include <ddktl/device.h>
 #include <ddktl/protocol/empty-protocol.h>
 #include <ddktl/unbind-txn.h>
-#include <hid/boot.h>
 
 #include "src/ui/input/drivers/pc-ps2/controller.h"
 

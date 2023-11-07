@@ -285,8 +285,6 @@ group("deprecated_zx_wrapper_allowlist") {
     "//zircon/system/ulib/fs-host:*",
     "//zircon/system/ulib/fzl:*",
     "//zircon/system/ulib/gfx:*",
-    "//zircon/system/ulib/hid:*",
-    "//zircon/system/ulib/hid-parser:*",
     "//zircon/system/ulib/hwreg:*",
     "//zircon/system/ulib/hwreg-i2c:*",
     "//zircon/system/ulib/hwreg/test/asm:*",

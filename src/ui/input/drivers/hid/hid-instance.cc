@@ -10,6 +10,7 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/trace/event.h>
+#include <lib/hid/boot.h>
 #include <stdlib.h>
 #include <string.h>
 #include <zircon/assert.h>
@@ -18,7 +19,6 @@
 #include <memory>
 
 #include <fbl/auto_lock.h>
-#include <hid/boot.h>
 
 #include "hid.h"
 

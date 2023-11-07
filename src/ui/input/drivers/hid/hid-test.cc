@@ -7,15 +7,15 @@
 #include <fuchsia/hardware/hidbus/cpp/banjo.h>
 #include <lib/driver/runtime/testing/cpp/sync_helpers.h>
 #include <lib/fdf/cpp/dispatcher.h>
+#include <lib/hid/ambient-light.h>
+#include <lib/hid/boot.h>
+#include <lib/hid/paradise.h>
 #include <unistd.h>
 
 #include <thread>
 #include <vector>
 
 #include <fbl/ref_ptr.h>
-#include <hid/ambient-light.h>
-#include <hid/boot.h>
-#include <hid/paradise.h>
 #include <zxtest/zxtest.h>
 
 #include "src/devices/testing/mock-ddk/mock-device.h"

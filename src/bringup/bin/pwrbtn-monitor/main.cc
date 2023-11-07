@@ -20,6 +20,8 @@
 #include <lib/fdio/fdio.h>
 #include <lib/fdio/watcher.h>
 #include <lib/fit/defer.h>
+#include <lib/hid-parser/parser.h>
+#include <lib/hid-parser/usages.h>
 #include <lib/svc/outgoing.h>
 #include <lib/sys/cpp/service_directory.h>
 #include <lib/zx/channel.h>
@@ -38,8 +40,6 @@
 #include <fbl/array.h>
 #include <fbl/string.h>
 #include <fbl/unique_fd.h>
-#include <hid-parser/parser.h>
-#include <hid-parser/usages.h>
 #include <src/sys/lib/stdout-to-debuglog/cpp/stdout-to-debuglog.h>
 
 #include "src/bringup/bin/pwrbtn-monitor/monitor.h"

@@ -36,11 +36,11 @@ fuchsia_driver("hid-driver") {
     "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddk",
     "//src/lib/listnode",
+    "//src/ui/input/lib/hid",
+    "//src/ui/input/lib/hid-parser",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/hid",
-    "//zircon/system/ulib/hid-parser",
     "//zircon/system/ulib/trace",
   ]
 
@@ -81,11 +81,11 @@ test("hid-test") {
     "//src/devices/testing/mock-ddk",
     "//src/lib/ddk",
     "//src/lib/listnode",
+    "//src/ui/input/lib/hid",
+    "//src/ui/input/lib/hid-parser",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/hid",
-    "//zircon/system/ulib/hid-parser",
     "//zircon/system/ulib/trace",
     "//zircon/system/ulib/zxtest",
   ]

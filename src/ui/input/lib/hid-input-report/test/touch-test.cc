@@ -5,11 +5,11 @@
 #include "src/ui/input/lib/hid-input-report/touch.h"
 
 #include <lib/fit/defer.h>
+#include <lib/hid/atlas-touchpad.h>
+#include <lib/hid/paradise.h>
 
 #include <variant>
 
-#include <hid/atlas-touchpad.h>
-#include <hid/paradise.h>
 #include <zxtest/zxtest.h>
 
 #include "src/ui/input/lib/hid-input-report/device.h"

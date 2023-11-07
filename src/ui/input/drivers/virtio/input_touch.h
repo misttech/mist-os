@@ -4,7 +4,7 @@
 #ifndef SRC_UI_INPUT_DRIVERS_VIRTIO_INPUT_TOUCH_H_
 #define SRC_UI_INPUT_DRIVERS_VIRTIO_INPUT_TOUCH_H_
 
-#include <hid/paradise.h>
+#include <lib/hid/paradise.h>
 
 #include "input_device.h"
 

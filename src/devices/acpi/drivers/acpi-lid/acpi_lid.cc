@@ -10,9 +10,8 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/fdf/cpp/dispatcher.h>
+#include <lib/hid/descriptor.h>
 #include <lib/zx/clock.h>
-
-#include <hid/descriptor.h>
 
 #include "lib/ddk/device.h"
 #include "src/devices/lib/acpi/client.h"

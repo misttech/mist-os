@@ -6,6 +6,13 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
+#include <lib/hid/acer12.h>
+#include <lib/hid/ambient-light.h>
+#include <lib/hid/boot.h>
+#include <lib/hid/buttons.h>
+#include <lib/hid/gt92xx.h>
+#include <lib/hid/paradise.h>
+#include <lib/hid/usages.h>
 #include <lib/inspect/testing/cpp/zxtest/inspect.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/eventpair.h>
@@ -13,13 +20,6 @@
 #include <zircon/syscalls.h>
 
 #include <ddk/metadata/buttons.h>
-#include <hid/acer12.h>
-#include <hid/ambient-light.h>
-#include <hid/boot.h>
-#include <hid/buttons.h>
-#include <hid/gt92xx.h>
-#include <hid/paradise.h>
-#include <hid/usages.h>
 #include <zxtest/zxtest.h>
 
 #include "driver_v1.h"

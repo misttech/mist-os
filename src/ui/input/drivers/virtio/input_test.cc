@@ -5,8 +5,8 @@
 #include <fuchsia/hardware/hidbus/c/banjo.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/fit/defer.h>
+#include <lib/hid/boot.h>
 
-#include <hid/boot.h>
 #include <virtio/input.h>
 #include <zxtest/zxtest.h>
 

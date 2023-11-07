@@ -516,10 +516,10 @@ library_headers("ddk-metadata-headers") {
     "//src/ui/input/drivers/goodix:*",
     "//src/ui/input/drivers/hid-buttons:*",
     "//src/ui/input/drivers/hid-input-report:*",
+    "//src/ui/input/lib/hid:*",
     "//src/ui/input/lib/hid-input-report:*",
     "//src/ui/light/drivers/aml-light:*",
     "//src/ui/light/drivers/lp50xx-light:*",
-    "//zircon/system/ulib/hid:*",
   ]
 }
 

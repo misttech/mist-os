@@ -33,7 +33,6 @@ group("tests") {
     "ffl:tests",
     "fzl:tests",
     "gfx:tests",
-    "hid-parser:tests",
     "hwreg:tests",
     "id_allocator:tests",
     "image-format:tests",

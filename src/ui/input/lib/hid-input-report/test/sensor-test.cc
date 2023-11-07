@@ -5,12 +5,12 @@
 #include "src/ui/input/lib/hid-input-report/sensor.h"
 
 #include <lib/fit/defer.h>
+#include <lib/hid-parser/usages.h>
+#include <lib/hid/ambient-light.h>
+#include <lib/hid/multi-sensor.h>
 
 #include <variant>
 
-#include <hid-parser/usages.h>
-#include <hid/ambient-light.h>
-#include <hid/multi-sensor.h>
 #include <zxtest/zxtest.h>
 
 #include "src/ui/input/lib/hid-input-report/device.h"

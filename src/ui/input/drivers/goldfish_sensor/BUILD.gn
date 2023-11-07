@@ -110,8 +110,8 @@ fuchsia_library_fuzzer("goldfish-sensor-parser-fuzzer") {
     "tests/parser_fuzztest.cc",
   ]
   deps = [
+    "//src/ui/input/lib/hid-parser",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/hid-parser",
   ]
 }
 

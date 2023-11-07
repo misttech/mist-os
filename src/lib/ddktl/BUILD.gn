@@ -367,12 +367,12 @@ source_set("ddktl") {
     "//src/ui/input/drivers/pc-ps2:*",
     "//src/ui/input/drivers/usb-hid:*",
     "//src/ui/input/drivers/virtio:*",
+    "//src/ui/input/lib/hid:*",
     "//src/ui/input/testing/mock-hidbus-ifc:*",
     "//src/ui/light/drivers/aml-light:*",
     "//src/ui/light/drivers/lp50xx-light:*",
     "//tools/create/goldens/my-driver-cpp:*",
     "//vendor/*",
-    "//zircon/system/ulib/hid:*",
     "//zircon/system/ulib/hwreg/test:*",
     "//zircon/vdso/zx:*",
   ]

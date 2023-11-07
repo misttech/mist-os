@@ -4,6 +4,7 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/hid/boot.h>
 #include <lib/sync/completion.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/interrupt.h>
@@ -11,7 +12,6 @@
 
 #include <condition_variable>
 
-#include <hid/boot.h>
 #include <zxtest/zxtest.h>
 
 #include "src/devices/testing/mock-ddk/mock-device.h"

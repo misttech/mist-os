@@ -9,6 +9,7 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/hid/descriptor.h>
 #include <lib/zx/clock.h>
 #include <string.h>
 #include <threads.h>

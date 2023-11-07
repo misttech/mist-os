@@ -6,6 +6,7 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/ddk/device.h>
+#include <lib/hid/usages.h>
 #include <lib/sync/completion.h>
 
 #include <string>
@@ -14,7 +15,6 @@
 #include <fbl/auto_lock.h>
 #include <fbl/mutex.h>
 #include <gtest/gtest.h>
-#include <hid/usages.h>
 
 #include "fuchsia/input/report/cpp/fidl.h"
 #include "src/ui/input/testing/fake_input_report_device/fake.h"

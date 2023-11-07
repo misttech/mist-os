@@ -5,12 +5,11 @@
 #ifndef SRC_UI_INPUT_LIB_HID_INPUT_REPORT_DEVICE_H_
 #define SRC_UI_INPUT_LIB_HID_INPUT_REPORT_DEVICE_H_
 
+#include <lib/hid-parser/parser.h>
+#include <lib/hid-parser/report.h>
+#include <lib/hid-parser/units.h>
 #include <stddef.h>
 #include <stdint.h>
-
-#include <hid-parser/parser.h>
-#include <hid-parser/report.h>
-#include <hid-parser/units.h>
 
 #include "src/ui/input/lib/hid-input-report/axis.h"
 

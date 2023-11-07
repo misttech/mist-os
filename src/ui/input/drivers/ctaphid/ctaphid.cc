@@ -9,14 +9,14 @@
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/fit/defer.h>
+#include <lib/hid-parser/parser.h>
+#include <lib/hid-parser/report.h>
+#include <lib/hid-parser/usages.h>
 #include <zircon/status.h>
 #include <zircon/syscalls.h>
 
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
-#include <hid-parser/parser.h>
-#include <hid-parser/report.h>
-#include <hid-parser/usages.h>
 
 namespace ctaphid {
 

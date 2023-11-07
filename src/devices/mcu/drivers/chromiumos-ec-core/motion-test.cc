@@ -5,12 +5,12 @@
 #include "src/devices/mcu/drivers/chromiumos-ec-core/motion.h"
 
 #include <inttypes.h>
+#include <lib/hid-parser/parser.h>
 
 #include <memory>
 #include <vector>
 
 #include <chromiumos-platform-ec/ec_commands.h>
-#include <hid-parser/parser.h>
 #include <zxtest/zxtest.h>
 
 #include "fuchsia/hardware/hidbus/c/banjo.h"

@@ -29,10 +29,10 @@ common_deps = [
   "//src/devices/lib/driver:driver_runtime",
   "//src/lib/ddk",
   "//src/lib/ddktl",
+  "//src/ui/input/lib/hid",
   "//zircon/system/ulib/async-loop:async-loop-cpp",
   "//zircon/system/ulib/async-loop:async-loop-default",
   "//zircon/system/ulib/fbl",
-  "//zircon/system/ulib/hid",
   "//zircon/system/ulib/hwreg",
   "//zircon/system/ulib/zircon-internal",
 ]

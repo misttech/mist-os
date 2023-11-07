@@ -4,14 +4,13 @@
 
 #include "src/ui/input/lib/hid-input-report/keyboard.h"
 
+#include <lib/hid-parser/parser.h>
+#include <lib/hid-parser/report.h>
+#include <lib/hid-parser/units.h>
+#include <lib/hid-parser/usages.h>
+#include <lib/hid/usages.h>
 #include <lib/stdcompat/span.h>
 #include <stdint.h>
-
-#include <hid-parser/parser.h>
-#include <hid-parser/report.h>
-#include <hid-parser/units.h>
-#include <hid-parser/usages.h>
-#include <hid/usages.h>
 
 #include "src/ui/input/lib/hid-input-report/device.h"
 

@@ -4,7 +4,7 @@
 #ifndef SRC_UI_INPUT_DRIVERS_VIRTIO_INPUT_MOUSE_H_
 #define SRC_UI_INPUT_DRIVERS_VIRTIO_INPUT_MOUSE_H_
 
-#include <hid/virtio-mouse.h>
+#include <lib/hid/virtio-mouse.h>
 
 #include "src/ui/input/drivers/virtio/input_device.h"
 

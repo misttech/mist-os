@@ -20,6 +20,7 @@
 #include <fidl/fuchsia.hardware.acpi/cpp/wire_types.h>
 #include <lib/ddk/debug.h>
 #include <lib/fit/defer.h>
+#include <lib/hid/descriptor.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <zircon/compiler.h>
@@ -35,7 +36,6 @@
 #include <fbl/alloc_checker.h>
 #include <fbl/array.h>
 #include <fbl/auto_lock.h>
-#include <hid/descriptor.h>
 
 #include "chromiumos_ec_core.h"
 #include "src/devices/mcu/drivers/chromiumos-ec-core/subdriver.h"

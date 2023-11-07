@@ -3,12 +3,12 @@
 // found in the LICENSE file.
 
 #include <lib/fit/defer.h>
+#include <lib/hid/buttons.h>
 
 #include <variant>
 #include <vector>
 
 #include <ddk/metadata/buttons.h>
-#include <hid/buttons.h>
 #include <zxtest/zxtest.h>
 
 #include "src/ui/input/lib/hid-input-report/consumer_control.h"

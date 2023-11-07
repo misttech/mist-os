@@ -11,6 +11,9 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
+#include <lib/hid-parser/item.h>
+#include <lib/hid-parser/parser.h>
+#include <lib/hid-parser/usages.h>
 
 #include <array>
 #include <memory>
@@ -23,9 +26,6 @@
 #include <fbl/intrusive_double_list.h>
 #include <fbl/mutex.h>
 #include <fbl/ref_ptr.h>
-#include <hid-parser/item.h>
-#include <hid-parser/parser.h>
-#include <hid-parser/usages.h>
 
 #include "hid-instance.h"
 

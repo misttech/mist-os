@@ -7,6 +7,7 @@ group("tests") {
 
   deps = [
     "hid-input-report:test",
+    "hid-parser:tests",
     "injector/tests",
   ]
 }

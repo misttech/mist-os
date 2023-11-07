@@ -4,6 +4,7 @@
 
 #include <fuchsia/hardware/hidbus/cpp/banjo.h>
 #include <lib/ddk/debug.h>
+#include <lib/hid/descriptor.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,7 +19,6 @@
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
 #include <fbl/mutex.h>
-#include <hid/descriptor.h>
 
 #include "acpi-private.h"
 #include "dev.h"

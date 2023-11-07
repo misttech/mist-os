@@ -4,13 +4,12 @@
 
 #include "src/ui/input/lib/hid-input-report/sensor.h"
 
+#include <lib/hid-parser/parser.h>
+#include <lib/hid-parser/report.h>
+#include <lib/hid-parser/units.h>
+#include <lib/hid-parser/usages.h>
 #include <stdint.h>
 #include <zircon/compiler.h>
-
-#include <hid-parser/parser.h>
-#include <hid-parser/report.h>
-#include <hid-parser/units.h>
-#include <hid-parser/usages.h>
 
 #include "src/ui/input/lib/hid-input-report/axis.h"
 #include "src/ui/input/lib/hid-input-report/device.h"

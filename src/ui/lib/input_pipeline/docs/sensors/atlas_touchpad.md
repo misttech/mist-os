@@ -105,7 +105,7 @@ Notes
 * The units and ranges in the HID descriptor differ from those seen by the
   input pipeline, because of translation done by the driver stack. See
   * [Unit translation for descriptors](https://cs.opensource.google/fuchsia/fuchsia/+/main:src/ui/input/lib/hid-input-report/axis.cc;l=16?q=hidunittollcppunit&ss=fuchsia%2Ffuchsia)
-  * [Value translation for reports](https://cs.opensource.google/fuchsia/fuchsia/+/main:zircon/system/ulib/hid-parser/units.cc;l=237?q=hid-parser%2Funits.cc&ss=fuchsia%2Ffuchsia)
+  * [Value translation for reports](https://cs.opensource.google/fuchsia/fuchsia/+/main:src/ui/input/lib/hid-parser/units.cc;l=237?q=hid-parser%2Funits.cc&ss=fuchsia%2Ffuchsia)
 
 ```
 0x05, 0x01,        // Usage Page (Generic Desktop Ctrls)

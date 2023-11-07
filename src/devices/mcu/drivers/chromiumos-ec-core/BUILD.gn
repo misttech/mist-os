@@ -78,7 +78,7 @@ source_set("motion") {
   public_deps = [
     ":core",
     "//sdk/banjo/fuchsia.hardware.hidbus:fuchsia.hardware.hidbus_banjo_cpp",
-    "//zircon/system/ulib/hid",
+    "//src/ui/input/lib/hid",
   ]
 }
 
@@ -139,7 +139,7 @@ test("chromiumos-ec-motion-unit-tests") {
   deps = [
     ":motion",
     ":test-common",
-    "//zircon/system/ulib/hid-parser",
+    "//src/ui/input/lib/hid-parser",
   ]
 }
 
