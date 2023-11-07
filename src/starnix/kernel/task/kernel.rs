@@ -32,7 +32,7 @@ use crate::{
     fs::{
         devtmpfs::devtmpfs_create_device,
         inotify::InotifyLimits,
-        kobject::*,
+        kobject::{KObjectDeviceAttribute, KType, UEventAction},
         socket::{
             GenericMessage, GenericNetlink, NetlinkSenderReceiverProvider, NetlinkToClientSender,
             SocketAddress,
@@ -43,8 +43,11 @@ use crate::{
     logging::log_error,
     mm::{FutexTable, SharedFutexKey},
     power::PowerManager,
-    task::*,
-    types::{DeviceType, Errno, OpenFlags, *},
+    task::{
+        AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask, IpTables,
+        KernelThreads, NetstackDevices, PidTable, StopState, UtsNamespace, UtsNamespaceHandle,
+    },
+    types::{errno, from_status_like_fdio, DeviceType, Errno, OpenFlags},
     vdso::vdso_loader::Vdso,
 };
 

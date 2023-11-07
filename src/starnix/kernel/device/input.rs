@@ -6,15 +6,22 @@ use crate::{
     device::{framebuffer::Framebuffer, DeviceMode},
     fs::{
         buffers::{InputBuffer, OutputBuffer},
+        fileops_impl_nonseekable,
         kobject::{KObjectDeviceAttribute, KType},
         sysfs::SysFsDirectory,
-        *,
+        FdEvents, FileObject, FileOps, FsNode,
     },
-    logging::*,
+    logging::{log_info, log_warn, not_implemented},
     mm::MemoryAccessorExt,
-    syscalls::*,
+    syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::{CurrentTask, EventHandler, Kernel, WaitCanceler, WaitQueue, Waiter},
-    types::*,
+    types::{
+        errno::{error, Errno},
+        timeval, timeval_from_time, uapi, DeviceType, OpenFlags, UserAddress, UserRef, ABS_CNT,
+        ABS_X, ABS_Y, BTN_MISC, BTN_TOOL_FINGER, BTN_TOUCH, BUS_VIRTUAL, FF_CNT, INPUT_MAJOR,
+        INPUT_PROP_CNT, INPUT_PROP_DIRECT, KEYBOARD_INPUT_MINOR, KEY_CNT, KEY_POWER, LED_CNT,
+        MSC_CNT, REL_CNT, SW_CNT, TOUCH_INPUT_MINOR,
+    },
 };
 
 use fidl::endpoints::Proxy as _; // for `on_closed()`
@@ -875,9 +882,10 @@ mod test {
 
     use super::*;
     use crate::{
-        fs::buffers::VecOutputBuffer,
+        fs::{buffers::VecOutputBuffer, FileHandle},
         task::Kernel,
         testing::{create_kernel_and_task, map_memory, AutoReleasableTask},
+        types::errno::EAGAIN,
     };
     use anyhow::anyhow;
     use assert_matches::assert_matches;

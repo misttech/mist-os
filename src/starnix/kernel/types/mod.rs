@@ -25,42 +25,57 @@ pub mod range_ext;
 pub mod signals;
 pub mod uapi;
 
-pub(crate) use union::*;
+pub(crate) use union::struct_with_union_into_bytes;
 
-pub use arc_key::*;
-pub use auth::*;
-pub use device_type::*;
-pub use errno::*;
-pub use file_mode::*;
-pub use mount_flags::*;
-pub use open_flags::*;
-pub use ownership::*;
-pub use personality::*;
-pub use resource_limits::*;
-pub use seal_flags::*;
-pub use signals::*;
-pub use stats::*;
-pub use time::*;
+pub use arc_key::{ArcKey, PtrKey, WeakKey};
+pub use device_type::{
+    DeviceType, DYN_MAJOR, INPUT_MAJOR, KEYBOARD_INPUT_MINOR, LOOP_MAJOR, MEM_MAJOR,
+    TOUCH_INPUT_MINOR, TTY_ALT_MAJOR,
+};
+pub(crate) use file_mode::mode;
+pub use file_mode::{Access, FileMode};
+pub use mount_flags::MountFlags;
+pub use open_flags::OpenFlags;
+pub(crate) use ownership::{async_release_after, release_after, release_on_error};
+pub use ownership::{
+    debug_assert_no_local_temp_ref, OwnedRef, OwnedRefByRef, Releasable, ReleasableByRef,
+    ReleaseGuard, TempRef, TempRefKey, WeakRef,
+};
+pub use personality::PersonalityFlags;
+pub use resource_limits::{Resource, ResourceLimits};
+pub use seal_flags::SealFlags;
+pub use stats::TaskTimeStats;
+pub use time::{
+    duration_from_poll_timeout, duration_from_timespec, duration_from_timeval,
+    duration_to_scheduler_clock, itimerspec_from_deadline_interval, time_from_timespec,
+    timespec_from_duration, timespec_from_time, timespec_is_zero, timeval_from_duration,
+    timeval_from_time, NANOS_PER_SECOND, SCHEDULER_CLOCK_HZ,
+};
 pub use uapi::*;
 pub use user_address::*;
 pub use user_buffer::*;
 
 // Manually export names that are ambiguous between the name below and the one defined in uapi.
 pub use auth::{
-    CAP_CHOWN, CAP_DAC_OVERRIDE, CAP_DAC_READ_SEARCH, CAP_FOWNER, CAP_FSETID, CAP_KILL,
-    CAP_LINUX_IMMUTABLE, CAP_MAC_OVERRIDE, CAP_MKNOD, CAP_NET_ADMIN, CAP_NET_RAW, CAP_SETGID,
-    CAP_SETPCAP, CAP_SETUID, CAP_SYS_ADMIN, CAP_SYS_BOOT, CAP_SYS_CHROOT, CAP_SYS_NICE,
-    CAP_SYS_PTRACE, CAP_SYS_RESOURCE, CAP_WAKE_ALARM,
+    Capabilities, PtraceAccessMode, CAP_CHOWN, CAP_DAC_OVERRIDE, CAP_DAC_READ_SEARCH, CAP_FOWNER,
+    CAP_FSETID, CAP_KILL, CAP_LINUX_IMMUTABLE, CAP_MAC_OVERRIDE, CAP_MKNOD, CAP_NET_ADMIN,
+    CAP_NET_RAW, CAP_SETGID, CAP_SETPCAP, CAP_SETUID, CAP_SYS_ADMIN, CAP_SYS_BOOT, CAP_SYS_CHROOT,
+    CAP_SYS_NICE, CAP_SYS_PTRACE, CAP_SYS_RESOURCE, CAP_WAKE_ALARM, PTRACE_MODE_ATTACH_REALCREDS,
+    PTRACE_MODE_FSCREDS, PTRACE_MODE_REALCREDS,
 };
 
+pub(crate) use crate::types::errno::{
+    errno, errno_from_code, errno_from_zxio_code, error, from_status_like_fdio,
+};
 pub use errno::{
-    EACCES, EAGAIN, EBADF, EEXIST, EINPROGRESS, EINTR, EINVAL, ENAMETOOLONG, ENOENT, ENOSPC,
-    ENOSYS, ENOTDIR, EPERM, ETIMEDOUT,
+    Errno, ErrnoCode, ErrnoResultExt, SourceContext, EACCES, EAGAIN, EBADF, EEXIST, EINPROGRESS,
+    EINTR, EINVAL, ENAMETOOLONG, ENOENT, ENOSPC, ENOSYS, ENOTDIR, EPERM, ERESTART, ERESTARTNOHAND,
+    ERESTARTNOINTR, ERESTARTSYS, ERESTART_RESTARTBLOCK, ETIMEDOUT,
 };
 
 pub use signals::{
-    SIGABRT, SIGALRM, SIGBUS, SIGCHLD, SIGCONT, SIGFPE, SIGHUP, SIGILL, SIGINT, SIGIO, SIGKILL,
-    SIGPIPE, SIGPROF, SIGPWR, SIGQUIT, SIGRTMIN, SIGSEGV, SIGSTKFLT, SIGSTOP, SIGSYS, SIGTERM,
-    SIGTRAP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG, SIGUSR1, SIGUSR2, SIGVTALRM, SIGWINCH, SIGXCPU,
-    SIGXFSZ,
+    SigSet, Signal, UncheckedSignal, SIGABRT, SIGALRM, SIGBUS, SIGCHLD, SIGCONT, SIGFPE, SIGHUP,
+    SIGILL, SIGINT, SIGIO, SIGKILL, SIGPIPE, SIGPROF, SIGPWR, SIGQUIT, SIGRTMIN, SIGSEGV,
+    SIGSTKFLT, SIGSTOP, SIGSYS, SIGTERM, SIGTRAP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG, SIGUSR1,
+    SIGUSR2, SIGVTALRM, SIGWINCH, SIGXCPU, SIGXFSZ, UNBLOCKABLE_SIGNALS,
 };

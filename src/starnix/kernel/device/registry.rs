@@ -5,8 +5,8 @@
 use crate::{
     fs::{kobject::*, sysfs::SysFsDirectory, FileOps, FsNode},
     logging::log_error,
-    task::*,
-    types::*,
+    task::CurrentTask,
+    types::{errno, error, DeviceType, Errno, OpenFlags, DYN_MAJOR},
 };
 
 use starnix_lock::{Mutex, RwLock};
@@ -330,7 +330,7 @@ impl DeviceOps for Arc<RwLock<DynRegistry>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{device::mem::DevNull, fs::*, testing::*};
+    use crate::{device::mem::DevNull, fs::*, testing::*, types::MEM_MAJOR};
 
     #[::fuchsia::test]
     fn registry_fails_to_add_duplicate_device() {

@@ -8,7 +8,11 @@ use std::{
     sync::{Arc, Weak},
 };
 
-use crate::{fs::socket::*, task::CurrentTask, types::*};
+use crate::{
+    fs::socket::{Socket, SocketAddress, SocketHandle},
+    task::CurrentTask,
+    types::{errno, error, Errno},
+};
 
 /// A registry of abstract sockets.
 ///
