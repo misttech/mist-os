@@ -81,7 +81,7 @@ inline void Scheduler::UpdateTotalExpectedRuntime(SchedDuration delta_ns) {
   DEBUG_ASSERT(total_expected_runtime_ns_ >= 0);
   const SchedDuration scaled_ns = ScaleUp(total_expected_runtime_ns_);
   exported_total_expected_runtime_ns_ = scaled_ns;
-  LOCAL_KTRACE_COUNTER(COUNTER, "Demand", scaled_ns.raw_value());
+  LOCAL_KTRACE_COUNTER(COUNTER, "Stats", this_cpu(), ("Demand", scaled_ns.raw_value()));
 }
 
 // Updates the total deadline utilization estimator with the given delta. The
@@ -92,12 +92,13 @@ inline void Scheduler::UpdateTotalDeadlineUtilization(SchedUtilization delta) {
   DEBUG_ASSERT(total_deadline_utilization_ >= 0);
   const SchedUtilization scaled = ScaleUp(total_deadline_utilization_);
   exported_total_deadline_utilization_ = scaled;
-  LOCAL_KTRACE_COUNTER(COUNTER, "Utilization", ffl::Round<uint64_t>(scaled * 10000));
+  LOCAL_KTRACE_COUNTER(COUNTER, "Stats", this_cpu(),
+                       ("Utilization", ffl::Round<uint64_t>(scaled * 1000)));
 }
 
 inline void Scheduler::TraceTotalRunnableThreads() const {
-  LOCAL_KTRACE_COUNTER(COUNTER, "Queue Length",
-                       runnable_fair_task_count_ + runnable_deadline_task_count_);
+  LOCAL_KTRACE_COUNTER(COUNTER, "Stats", this_cpu(),
+                       ("Queue Length", runnable_fair_task_count_ + runnable_deadline_task_count_));
 }
 
 inline void Scheduler::RescheduleMask(cpu_mask_t cpus_to_reschedule_mask) {
