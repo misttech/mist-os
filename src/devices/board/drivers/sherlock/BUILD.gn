@@ -46,18 +46,6 @@ driver_bind_rules("sherlock-spi-bind") {
   ]
 }
 
-driver_bind_rules("sherlock-tee-bind") {
-  rules = "bind/sherlock-tee.bind"
-  header_output = "sherlock-tee-bind.h"
-  bind_output = "sherlock-tee-bind.bc"
-  tests = "bind-tests/sherlock-tee-test.json"
-  deps = [
-    "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.rpmb",
-    "//src/devices/bind/fuchsia.sysmem",
-  ]
-}
-
 driver_bind_rules("sherlock-video-bind") {
   rules = "bind/sherlock-video.bind"
   header_output = "sherlock-video-bind.h"
@@ -278,7 +266,6 @@ template("sherlock_driver") {
       ":sherlock-pwm-bind_header",
       ":sherlock-sdio-bind_header",
       ":sherlock-spi-bind_header",
-      ":sherlock-tee-bind_header",
       ":sherlock-thermal-bind_header",
       ":sherlock-tweeter-left-bind_header",
       ":sherlock-tweeter-right-bind_header",
@@ -322,6 +309,7 @@ template("sherlock_driver") {
       "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
       "//src/devices/bind/fuchsia.pwm:fuchsia.pwm_cpp",
       "//src/devices/bind/fuchsia.register:fuchsia.register_cpp",
+      "//src/devices/bind/fuchsia.rpmb:fuchsia.rpmb_cpp",
       "//src/devices/bind/fuchsia.sony.platform:fuchsia.sony.platform_cpp",
       "//src/devices/bind/fuchsia.spi:fuchsia.spi_cpp",
       "//src/devices/bind/fuchsia.sysmem:fuchsia.sysmem_cpp",

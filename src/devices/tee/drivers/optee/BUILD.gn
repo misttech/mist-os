@@ -11,7 +11,10 @@ driver_bind_rules("optee-bind") {
   rules = "optee.bind"
   bind_output = "optee.bindbc"
   tests = "optee-bind-test.json"
-  deps = [ "//src/devices/bind/fuchsia.platform" ]
+  deps = [
+    "//src/devices/bind/fuchsia.platform",
+    "//src/devices/bind/fuchsia.rpmb",
+  ]
 }
 
 source_set("optee_lib") {

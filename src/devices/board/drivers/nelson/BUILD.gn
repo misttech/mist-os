@@ -132,18 +132,6 @@ driver_bind_rules("spi_1_bind") {
   ]
 }
 
-driver_bind_rules("nelson_tee_bind") {
-  rules = "bind/nelson_tee.bind"
-  header_output = "nelson_tee_bind.h"
-  bind_output = "nelson_tee_bind.bc"
-  tests = "bind-tests/nelson_tee-test.json"
-  deps = [
-    "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.rpmb",
-    "//src/devices/bind/fuchsia.sysmem",
-  ]
-}
-
 driver_bind_rules("aml_thermal_pll_bind") {
   rules = "bind/aml_thermal_pll.bind"
   header_output = "aml_thermal_pll_bind.h"
@@ -233,7 +221,6 @@ fuchsia_driver("nelson-module-driver") {
     ":nelson_aml_video_bind_header",
     ":nelson_emmc_bind_header",
     ":nelson_selina_bind_header",
-    ":nelson_tee_bind_header",
     ":nelson_wifi_bind_header",
     ":nelson_xhci_bind_header",
     ":pwm_init_bind_header",
@@ -271,6 +258,7 @@ fuchsia_driver("nelson-module-driver") {
     "//src/devices/bind/fuchsia.power:fuchsia.power_cpp",
     "//src/devices/bind/fuchsia.pwm:fuchsia.pwm_cpp",
     "//src/devices/bind/fuchsia.register:fuchsia.register_cpp",
+    "//src/devices/bind/fuchsia.rpmb:fuchsia.rpmb_cpp",
     "//src/devices/bind/fuchsia.spi:fuchsia.spi_cpp",
     "//src/devices/bind/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//src/devices/bind/fuchsia.tee:fuchsia.tee_cpp",

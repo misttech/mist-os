@@ -37,17 +37,6 @@ driver_bind_rules("astro-pwm-bind") {
   ]
 }
 
-driver_bind_rules("astro-tee-bind") {
-  rules = "bind/astro-tee.bind"
-  header_output = "astro-tee-bind.h"
-  bind_output = "astro-tee-bind.bc"
-  tests = "bind-tests/astro-tee-test.json"
-  deps = [
-    "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.sysmem",
-  ]
-}
-
 driver_bind_rules("astro-video-bind") {
   rules = "bind/astro-video.bind"
   header_output = "astro-video-bind.h"
@@ -167,7 +156,6 @@ fuchsia_driver("astro-driver") {
     ":astro-aml-sdio-bind_header",
     ":astro-bind",
     ":astro-pwm-bind_header",
-    ":astro-tee-bind_header",
     ":astro-video-bind_header",
     ":astro-wifi-bind_header",
     ":astro-xhci-bind_header",
@@ -204,6 +192,7 @@ fuchsia_driver("astro-driver") {
     "//src/devices/bind/fuchsia.power:fuchsia.power_cpp",
     "//src/devices/bind/fuchsia.pwm:fuchsia.pwm_cpp",
     "//src/devices/bind/fuchsia.register:fuchsia.register_cpp",
+    "//src/devices/bind/fuchsia.rpmb:fuchsia.rpmb_cpp",
     "//src/devices/bind/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//src/devices/bind/fuchsia.tee:fuchsia.tee_cpp",
     "//src/devices/bind/fuchsia.ti.platform:fuchsia.ti.platform_cpp",
@@ -259,7 +248,6 @@ group("tests") {
     ":astro-aml-sdio-bind_test",
     ":astro-bind_test",
     ":astro-pwm-bind_test",
-    ":astro-tee-bind_test",
     ":astro-video-bind_test",
     ":astro-wifi-bind_test",
     ":astro-xhci-bind_test",

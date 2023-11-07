@@ -9,15 +9,23 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/component/cpp/composite_node_spec.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/stdcompat/span.h>
 #include <zircon/syscalls/smc.h>
 
 #include <cstdint>
 
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/platform/cpp/bind.h>
+
 #include "astro.h"
-#include "src/devices/board/drivers/astro/astro-tee-bind.h"
 #include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 #include "src/devices/lib/fidl-metadata/tee.h"
+
+namespace fdf {
+using namespace fuchsia_driver_framework;
+}  // namespace fdf
 
 namespace astro {
 namespace fpbus = fuchsia_hardware_platform_bus;
@@ -71,9 +79,9 @@ zx_status_t Astro::TeeInit() {
 
   fpbus::Node tee_dev;
   tee_dev.name() = "tee";
-  tee_dev.vid() = PDEV_VID_GENERIC;
-  tee_dev.pid() = PDEV_PID_GENERIC;
-  tee_dev.did() = PDEV_DID_OPTEE;
+  tee_dev.vid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_GENERIC;
+  tee_dev.pid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC;
+  tee_dev.did() = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_OPTEE;
   tee_dev.mmio() = astro_tee_mmios;
   tee_dev.bti() = astro_tee_btis;
   tee_dev.smc() = astro_tee_smcs;
@@ -100,17 +108,16 @@ zx_status_t Astro::TeeInit() {
 
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('TEE_');
-  auto result = pbus_.buffer(arena)->AddComposite(
+  auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, tee_dev),
-      platform_bus_composite::MakeFidlFragment(fidl_arena, tee_fragments, std::size(tee_fragments)),
-      "pdev");
+      fidl::ToWire(fidl_arena, fdf::CompositeNodeSpec{{.name = "tee", .parents = {}}}));
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddComposite Tee(tee_dev) request failed: %s", __func__,
+    zxlogf(ERROR, "AddCompositeNodeSpec Tee(tee_dev) request failed: %s",
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddComposite Tee(tee_dev) failed: %s", __func__,
+    zxlogf(ERROR, "AddCompositeNodeSpec Tee(tee_dev) failed: %s",
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }

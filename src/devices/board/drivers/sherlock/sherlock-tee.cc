@@ -9,15 +9,23 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/component/cpp/composite_node_spec.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/stdcompat/span.h>
 #include <zircon/syscalls/smc.h>
 
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/platform/cpp/bind.h>
+#include <bind/fuchsia/rpmb/cpp/bind.h>
 #include <fbl/algorithm.h>
 
 #include "sherlock.h"
-#include "src/devices/board/drivers/sherlock/sherlock-tee-bind.h"
 #include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 #include "src/devices/lib/fidl-metadata/tee.h"
+
+namespace fdf {
+using namespace fuchsia_driver_framework;
+}  // namespace fdf
 
 namespace sherlock {
 namespace fpbus = fuchsia_hardware_platform_bus;
@@ -64,14 +72,22 @@ static tee_thread_config_t tee_thread_cfg[] = {
          {0xe043cde0, 0x61d0, 0x11e5, {0x9c, 0x26, 0x00, 0x02, 0xa5, 0xd5, 0xc5, 0x1b}}  // widevine
      }}};
 
+const std::vector<fdf::BindRule> kRpmbRules = std::vector{fdf::MakeAcceptBindRule(
+    bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_rpmb::BIND_FIDL_PROTOCOL_DEVICE)};
+
+const std::vector<fdf::NodeProperty> kRpmbProperties = std::vector{
+    fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_rpmb::BIND_FIDL_PROTOCOL_DEVICE)};
+
+const std::vector<fdf::ParentSpec> kTeeCompositeParents = {{kRpmbRules, kRpmbProperties}};
+
 zx_status_t Sherlock::TeeInit() {
   std::vector<fpbus::Metadata> metadata;
 
   fpbus::Node tee_dev;
   tee_dev.name() = "tee";
-  tee_dev.vid() = PDEV_VID_GENERIC;
-  tee_dev.pid() = PDEV_PID_GENERIC;
-  tee_dev.did() = PDEV_DID_OPTEE;
+  tee_dev.vid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_GENERIC;
+  tee_dev.pid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC;
+  tee_dev.did() = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_OPTEE;
   tee_dev.mmio() = sherlock_tee_mmios;
   tee_dev.bti() = sherlock_tee_btis;
   tee_dev.smc() = sherlock_tee_smcs;
@@ -98,17 +114,17 @@ zx_status_t Sherlock::TeeInit() {
 
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('TEE_');
-  auto result = pbus_.buffer(arena)->AddComposite(
+  auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, tee_dev),
-      platform_bus_composite::MakeFidlFragment(fidl_arena, tee_fragments, std::size(tee_fragments)),
-      "pdev");
+      fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
+                                   {.name = "tee", .parents = kTeeCompositeParents}}));
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddComposite Tee(tee_dev) request failed: %s", __func__,
+    zxlogf(ERROR, "AddCompositeNodeSpec Tee(tee_dev) request failed: %s",
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddComposite Tee(tee_dev) failed: %s", __func__,
+    zxlogf(ERROR, "AddCompositeNodeSpec Tee(tee_dev) failed: %s",
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }
