@@ -180,8 +180,10 @@ zx::result<uint32_t> Controller::ReportLuns(uint8_t target) {
   zx_status_t status =
       ExecuteCommandSync(target, 0, {&cdb, sizeof(cdb)}, /*is_write=*/false, {&data, sizeof(data)});
   if (status != ZX_OK) {
-    zxlogf(WARNING, "REPORT_LUNS failed for target %u: %s", target, zx_status_get_string(status));
+    // Do not log the error, as it generates too many messages. Instead, log on success.
     return zx::error(status);
+  } else {
+    zxlogf(DEBUG, "REPORT_LUNS succeeded for target %u.", target);
   }
 
   // data.lun_list_length is the number of bytes of LUN structures.
