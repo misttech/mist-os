@@ -6,7 +6,7 @@
 #include <lib/hid/boot.h>
 #include <lib/hid/paradise.h>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 TEST(HidDescriptorTest, GetReportsSizeWithIds) {
   size_t len;

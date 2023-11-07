@@ -13,7 +13,7 @@
 
 #include <iterator>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 // This should contain all unit types except None and Other.
 constexpr hid::unit::UnitType units[] = {

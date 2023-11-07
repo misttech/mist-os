@@ -11,7 +11,9 @@
 #include <stdio.h>
 #include <unistd.h>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
+
+#include "src/ui/input/lib/hid-parser/test/util.h"
 
 // See hid-utest-data.cpp for the definitions of the test data
 extern "C" const uint8_t push_pop_test[70];
@@ -63,15 +65,15 @@ TEST(HidParserHelperTest, ParsePushPop) {
 
   // A single report with id zero, this means no report id.
   ASSERT_EQ(dev->rep_count, 1u);
-  EXPECT_EQ(dev->report[0].report_id, 0);
+  EXPECT_EQ(dev->report[0].report_id, 0u);
 
   // The only report has 12 fields.
-  EXPECT_EQ(dev->report[0].input_count, 12);
+  EXPECT_EQ(dev->report[0].input_count, 12u);
   const auto fields = dev->report[0].input_fields;
 
   // All fields are input type with report id = 0.
   for (uint8_t ix = 0; ix != dev->report[0].input_count; ++ix) {
-    EXPECT_EQ(fields[ix].report_id, 0);
+    EXPECT_EQ(fields[ix].report_id, 0u);
     EXPECT_EQ(fields[ix].type, hid::kInput);
   }
 
@@ -79,24 +81,24 @@ TEST(HidParserHelperTest, ParsePushPop) {
   auto expected_flags = hid::kData | hid::kAbsolute | hid::kScalar;
 
   for (uint8_t ix = 0; ix != 3; ++ix) {
-    EXPECT_EQ(fields[ix].attr.usage.page, hid::usage::Page::kButton);
+    EXPECT_EQ(fields[ix].attr.usage.page, ToUnderlyingType(hid::usage::Page::kButton));
     EXPECT_EQ(fields[ix].attr.usage.usage, uint32_t(ix + 1));
-    EXPECT_EQ(fields[ix].attr.bit_sz, 1);
+    EXPECT_EQ(fields[ix].attr.bit_sz, 1u);
     EXPECT_EQ(fields[ix].attr.logc_mm.min, 0);
     EXPECT_EQ(fields[ix].attr.logc_mm.max, 1);
     EXPECT_EQ(expected_flags & fields[ix].flags, expected_flags);
   }
 
   // Next field is 5 bits constant. Aka padding.
-  EXPECT_EQ(fields[3].attr.bit_sz, 5);
+  EXPECT_EQ(fields[3].attr.bit_sz, 5u);
   EXPECT_EQ(hid::kConstant & fields[3].flags, hid::kConstant);
 
   // Next comes 'X' field, 8 bits data, relative.
   expected_flags = hid::kData | hid::kRelative | hid::kScalar;
 
-  EXPECT_EQ(fields[4].attr.usage.page, hid::usage::Page::kGenericDesktop);
-  EXPECT_EQ(fields[4].attr.usage.usage, hid::usage::GenericDesktop::kX);
-  EXPECT_EQ(fields[4].attr.bit_sz, 8);
+  EXPECT_EQ(fields[4].attr.usage.page, ToUnderlyingType(hid::usage::Page::kGenericDesktop));
+  EXPECT_EQ(fields[4].attr.usage.usage, ToUnderlyingType(hid::usage::GenericDesktop::kX));
+  EXPECT_EQ(fields[4].attr.bit_sz, 8u);
   EXPECT_EQ(fields[4].attr.logc_mm.min, -127);
   EXPECT_EQ(fields[4].attr.logc_mm.max, 127);
   EXPECT_EQ(fields[4].attr.phys_mm.min, -127);
@@ -104,9 +106,9 @@ TEST(HidParserHelperTest, ParsePushPop) {
   EXPECT_EQ(expected_flags & fields[4].flags, expected_flags);
 
   // Next comes 'Y' field, same as 'X'.
-  EXPECT_EQ(fields[5].attr.usage.page, hid::usage::Page::kGenericDesktop);
-  EXPECT_EQ(fields[5].attr.usage.usage, hid::usage::GenericDesktop::kY);
-  EXPECT_EQ(fields[5].attr.bit_sz, 8);
+  EXPECT_EQ(fields[5].attr.usage.page, ToUnderlyingType(hid::usage::Page::kGenericDesktop));
+  EXPECT_EQ(fields[5].attr.usage.usage, ToUnderlyingType(hid::usage::GenericDesktop::kY));
+  EXPECT_EQ(fields[5].attr.bit_sz, 8u);
   EXPECT_EQ(fields[5].attr.logc_mm.min, -127);
   EXPECT_EQ(fields[5].attr.logc_mm.max, 127);
   EXPECT_EQ(fields[5].attr.phys_mm.min, -127);
@@ -115,17 +117,17 @@ TEST(HidParserHelperTest, ParsePushPop) {
 
   // Next comes 'X' and 'Y' field again
   expected_flags = hid::kData | hid::kRelative | hid::kScalar;
-  EXPECT_EQ(fields[6].attr.usage.page, hid::usage::Page::kGenericDesktop);
-  EXPECT_EQ(fields[6].attr.usage.usage, hid::usage::GenericDesktop::kX);
-  EXPECT_EQ(fields[6].attr.bit_sz, 8);
+  EXPECT_EQ(fields[6].attr.usage.page, ToUnderlyingType(hid::usage::Page::kGenericDesktop));
+  EXPECT_EQ(fields[6].attr.usage.usage, ToUnderlyingType(hid::usage::GenericDesktop::kX));
+  EXPECT_EQ(fields[6].attr.bit_sz, 8u);
   EXPECT_EQ(fields[6].attr.logc_mm.min, -127);
   EXPECT_EQ(fields[6].attr.logc_mm.max, 127);
   EXPECT_EQ(fields[6].attr.phys_mm.min, -127);
   EXPECT_EQ(fields[6].attr.phys_mm.max, 127);
   EXPECT_EQ(expected_flags & fields[6].flags, expected_flags);
-  EXPECT_EQ(fields[7].attr.usage.page, hid::usage::Page::kGenericDesktop);
-  EXPECT_EQ(fields[7].attr.usage.usage, hid::usage::GenericDesktop::kY);
-  EXPECT_EQ(fields[7].attr.bit_sz, 8);
+  EXPECT_EQ(fields[7].attr.usage.page, ToUnderlyingType(hid::usage::Page::kGenericDesktop));
+  EXPECT_EQ(fields[7].attr.usage.usage, ToUnderlyingType(hid::usage::GenericDesktop::kY));
+  EXPECT_EQ(fields[7].attr.bit_sz, 8u);
   EXPECT_EQ(fields[7].attr.logc_mm.min, -127);
   EXPECT_EQ(fields[7].attr.logc_mm.max, 127);
   EXPECT_EQ(fields[7].attr.phys_mm.min, -127);
@@ -133,16 +135,16 @@ TEST(HidParserHelperTest, ParsePushPop) {
   EXPECT_EQ(expected_flags & fields[7].flags, expected_flags);
 
   // Next is the popped padding field
-  EXPECT_EQ(fields[8].attr.bit_sz, 5);
+  EXPECT_EQ(fields[8].attr.bit_sz, 5u);
   EXPECT_EQ(hid::kConstant & fields[8].flags, hid::kConstant);
 
   // Last 3 fields are the popped buttons
   expected_flags = hid::kData | hid::kAbsolute | hid::kScalar;
 
   for (uint8_t ix = 9; ix != 12; ++ix) {
-    EXPECT_EQ(fields[ix].attr.usage.page, hid::usage::Page::kButton);
-    EXPECT_EQ(fields[ix].attr.usage.usage, ix - 8);
-    EXPECT_EQ(fields[ix].attr.bit_sz, 1);
+    EXPECT_EQ(fields[ix].attr.usage.page, ToUnderlyingType(hid::usage::Page::kButton));
+    EXPECT_EQ(fields[ix].attr.usage.usage, static_cast<uint32_t>(ix - 8));
+    EXPECT_EQ(fields[ix].attr.bit_sz, 1u);
     EXPECT_EQ(fields[ix].attr.logc_mm.min, 0);
     EXPECT_EQ(fields[ix].attr.logc_mm.max, 1);
     EXPECT_EQ(expected_flags & fields[ix].flags, expected_flags);
@@ -152,8 +154,8 @@ TEST(HidParserHelperTest, ParsePushPop) {
 
 TEST(HidParserHelperTest, UsageHelper) {
   auto usage = hid::USAGE(hid::usage::Page::kDigitizer, hid::usage::Digitizer::kContactID);
-  EXPECT_EQ(usage.page, static_cast<uint16_t>(hid::usage::Page::kDigitizer));
-  EXPECT_EQ(usage.usage, static_cast<uint32_t>(hid::usage::Digitizer::kContactID));
+  EXPECT_EQ(usage.page, ToUnderlyingType(hid::usage::Page::kDigitizer));
+  EXPECT_EQ(usage.usage, ToUnderlyingType(hid::usage::Digitizer::kContactID));
 }
 
 TEST(HidParserHelperTest, MinMaxOperators) {
@@ -185,52 +187,52 @@ TEST(HidParserHelperTest, ExtractTests) {
   attr.bit_sz = 8;
   ret = ExtractUint(report, report_len, attr, &int8);
   EXPECT_TRUE(ret);
-  EXPECT_EQ(int8, 0x0F);
+  EXPECT_EQ(int8, 0x0Fu);
 
   attr.offset = 2;
   attr.bit_sz = 6;
   ret = ExtractUint(report, report_len, attr, &int8);
   EXPECT_TRUE(ret);
-  EXPECT_EQ(int8, 0x03);
+  EXPECT_EQ(int8, 0x03u);
 
   attr.offset = 3;
   attr.bit_sz = 2;
   ret = ExtractUint(report, report_len, attr, &int8);
   EXPECT_TRUE(ret);
-  EXPECT_EQ(int8, 0x01);
+  EXPECT_EQ(int8, 0x01u);
 
   // Test over a byte boundary
   attr.offset = 4;
   attr.bit_sz = 8;
   ret = ExtractUint(report, report_len, attr, &int8);
   EXPECT_TRUE(ret);
-  EXPECT_EQ(int8, 0xF0);
+  EXPECT_EQ(int8, 0xF0u);
 
   uint16_t int16;
   attr.offset = 0;
   attr.bit_sz = 16;
   ret = ExtractUint(report, report_len, attr, &int16);
   EXPECT_TRUE(ret);
-  EXPECT_EQ(int16, 0x0F0F);
+  EXPECT_EQ(int16, 0x0F0Fu);
 
   attr.offset = 4;
   attr.bit_sz = 16;
   ret = ExtractUint(report, report_len, attr, &int16);
   EXPECT_TRUE(ret);
-  EXPECT_EQ(int16, 0xF0F0);
+  EXPECT_EQ(int16, 0xF0F0u);
 
   uint32_t int32;
   attr.offset = 0;
   attr.bit_sz = 32;
   ret = ExtractUint(report, report_len, attr, &int32);
   EXPECT_TRUE(ret);
-  EXPECT_EQ(int32, 0x0F0F0F0F);
+  EXPECT_EQ(int32, 0x0F0F0F0Fu);
 
   attr.offset = 4;
   attr.bit_sz = 32;
   ret = ExtractUint(report, report_len, attr, &int32);
   EXPECT_TRUE(ret);
-  EXPECT_EQ(int32, 0xF0F0F0F0);
+  EXPECT_EQ(int32, 0xF0F0F0F0u);
 
   // Test that it fails if the attr is too large
   attr.offset = 0;
@@ -289,7 +291,7 @@ TEST(HidParserHelperTest, ExtractAsUnitTests) {
 
   ret = ExtractAsUnit(report, report_len, attr, &val_out);
   EXPECT_TRUE(ret);
-  EXPECT_EQ(static_cast<uint32_t>(val_out), 0xF);
+  EXPECT_EQ(static_cast<uint32_t>(val_out), 0x0Fu);
 
   // Test a signed conversion with a negative number that x3 the number
   attr.offset = 0;
@@ -640,7 +642,7 @@ TEST(HidParserHelperTest, InsertTests) {
   attr.offset = 0;
   ASSERT_TRUE(InsertUint(report, report_len, attr, 0xFFFFFFFF));
   ASSERT_TRUE(ExtractUint(report, report_len, attr, &value_out));
-  EXPECT_EQ(0x1, value_out);
+  EXPECT_EQ(0x1u, value_out);
   for (int i = 0; i < 8; i++) {
     report[i] = 0;
   }
@@ -649,7 +651,7 @@ TEST(HidParserHelperTest, InsertTests) {
   attr.offset = 0;
   ASSERT_TRUE(InsertUint(report, report_len, attr, 0xFFFFFFFF));
   ASSERT_TRUE(ExtractUint(report, report_len, attr, &value_out));
-  EXPECT_EQ(0xF, value_out);
+  EXPECT_EQ(0xFu, value_out);
   for (int i = 0; i < 8; i++) {
     report[i] = 0;
   }
@@ -658,33 +660,33 @@ TEST(HidParserHelperTest, InsertTests) {
   attr.offset = 4;
   ASSERT_TRUE(InsertUint(report, report_len, attr, 0xFFFFFFFF));
   ASSERT_TRUE(ExtractUint(report, report_len, attr, &value_out));
-  EXPECT_EQ(0xF0, report[0]);
-  EXPECT_EQ(0x0F, report[1]);
-  EXPECT_EQ(0xFF, value_out);
+  EXPECT_EQ(0xF0u, report[0]);
+  EXPECT_EQ(0x0Fu, report[1]);
+  EXPECT_EQ(0xFFu, value_out);
 
   attr.bit_sz = 32;
   attr.offset = 0;
   ASSERT_TRUE(InsertUint(report, report_len, attr, 0xFFFFFFFF));
   ASSERT_TRUE(ExtractUint(report, report_len, attr, &value_out));
-  EXPECT_EQ(0xFFFFFFFF, value_out);
+  EXPECT_EQ(0xFFFFFFFFu, value_out);
 
   attr.bit_sz = 32;
   attr.offset = 0;
   ASSERT_TRUE(InsertUint(report, report_len, attr, 0x12345678));
   ASSERT_TRUE(ExtractUint(report, report_len, attr, &value_out));
-  EXPECT_EQ(0x12345678, value_out);
+  EXPECT_EQ(0x12345678u, value_out);
 
   attr.bit_sz = 16;
   attr.offset = 8;
   ASSERT_TRUE(InsertUint(report, report_len, attr, 0x12345678));
   ASSERT_TRUE(ExtractUint(report, report_len, attr, &value_out));
-  EXPECT_EQ(0x5678, value_out);
+  EXPECT_EQ(0x5678u, value_out);
 
   attr.bit_sz = 16;
   attr.offset = 3;
   ASSERT_TRUE(InsertUint(report, report_len, attr, 0x12345678));
   ASSERT_TRUE(ExtractUint(report, report_len, attr, &value_out));
-  EXPECT_EQ(0x5678, value_out);
+  EXPECT_EQ(0x5678u, value_out);
 
   // Test that Insert and Extract give back the same number.
   double double_out;

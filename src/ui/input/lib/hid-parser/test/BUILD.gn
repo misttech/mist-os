@@ -23,13 +23,15 @@ test("hid-parser") {
     "hid-report-data.cc",
     "hid-units-test.cc",
     "hid-utest-data.cc",
+    "util.h",
   ]
   deps = [
     "//sdk/lib/fdio",
+    "//src/lib/fxl/test:gtest_main",
     "//src/ui/input/lib/hid",
     "//src/ui/input/lib/hid-parser",
+    "//third_party/googletest:gtest",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/zxtest",
   ]
 }
 
