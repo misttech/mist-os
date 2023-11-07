@@ -122,12 +122,16 @@ impl RouteValidator {
         targets: Vec<fsys::RouteTarget>,
     ) -> Result<Vec<fsys::RouteReport>, fsys::RouteValidatorError> {
         // Construct the complete moniker using the scope moniker and the moniker string.
+
         let moniker = Moniker::try_from(moniker_str)
             .map_err(|_| fsys::RouteValidatorError::InvalidArguments)?;
         let moniker = scope_moniker.concat(&moniker);
 
-        let instance =
-            self.model.find(&moniker).await.ok_or(fsys::RouteValidatorError::InstanceNotFound)?;
+        let instance = self
+            .model
+            .find_and_maybe_resolve(&moniker)
+            .await
+            .map_err(|_| fsys::RouteValidatorError::InstanceNotFound)?;
         let state = instance.lock_state().await;
         let resolved = match *state {
             InstanceState::Resolved(ref r) => r,
