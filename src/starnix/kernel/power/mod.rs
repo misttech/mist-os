@@ -4,6 +4,8 @@
 
 mod manager;
 mod suspend_stats;
+mod wakeup_count;
 
 pub use manager::*;
 pub use suspend_stats::*;
+pub use wakeup_count::*;

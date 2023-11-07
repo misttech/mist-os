@@ -6,6 +6,7 @@ use {
     crate::{
         auth::FsCred,
         fs::{BytesFile, BytesFileOps, FileSystem, FsNode, FsNodeInfo, StaticDirectoryBuilder},
+        power::PowerWakeupCountFile,
         task::{CurrentTask, Kernel},
         types::{error, mode, Errno},
     },
@@ -47,6 +48,7 @@ pub fn sysfs_power_directory(
     kernel: Weak<Kernel>,
 ) {
     dir.subdir(b"power", 0o755, |dir| {
+        dir.entry(b"wakeup_count", PowerWakeupCountFile::new_node(), mode!(IFREG, 0o644));
         dir.subdir(b"suspend_stats", 0o755, |dir| {
             dir.node(
                 b"success",
