@@ -30,7 +30,9 @@ mod boto;
 
 const FILE_NAME: &str = "credentials.json";
 const VERSION_1_LABEL: &str = "1";
-const BOTO_CLIENT_ID: &str = "909320924072.apps.googleusercontent.com";
+
+/// We are using client id of gcloud app. This value can be gotten by `gcloud config get auth/client_id`
+const BOTO_CLIENT_ID: &str = "32555940559.apps.googleusercontent.com";
 
 /// For a web site, a client secret is kept locked away in a secure server. This
 /// is not a web site and the value is needed, so a non-secret "secret" is used.
@@ -39,7 +41,7 @@ const BOTO_CLIENT_ID: &str = "909320924072.apps.googleusercontent.com";
 /// installed application/utility such as gsutil.  Of course, in such cases the
 /// "secret" is actually publicly known; security depends entirely on the
 /// secrecy of refresh tokens, which effectively become bearer tokens."
-const BOTO_CLIENT_SECRET: &str = "p3RlpR10xMFh9ZXBS/ZNLYUu";
+const BOTO_CLIENT_SECRET: &str = "ZmssLNjJy2998hD4CTg2ejr2";
 
 const GCLOUD_PATH: &str = ".config/gcloud/application_default_credentials.json";
 
@@ -114,10 +116,13 @@ impl Credentials {
     /// empty set of credentials.
     pub async fn load_or_new() -> Self {
         let instance = if let Ok(instance) = load_from_home_data() {
+            tracing::debug!("Load credential from home data");
             instance
         } else if let Ok(instance) = legacy_read().await {
+            tracing::debug!("Get credential through legacy_read");
             instance
         } else {
+            tracing::debug!("Create new credential");
             Credentials::new()
         };
         tracing::debug!("Loaded credentials version {}", instance.version);
