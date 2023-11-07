@@ -55,25 +55,6 @@ class AsyncSocket:
                     raise e
             await self.waker.wait_channel_ready(self.socket)
 
-    async def read_all(self) -> bytearray:
-        """Attempts to read all data on the socket until it is closed.
-
-        Returns:
-            All bytes read on the socket.
-
-        Raises:
-            Any ZX errors encountered besides ZX_ERR_SHOULD_WAIT and ZX_ERR_PEER_CLOSED.
-        """
-        output = bytearray()
-        while True:
-            try:
-                output.extend(await self.read())
-            except fc.ZxStatus as zx:
-                if zx.args[0] != fc.ZxStatus.ZX_ERR_PEER_CLOSED:
-                    raise zx
-                break
-        return output
-
     def write(self, buf: bytes) -> None:
         """Does a blocking write on the socket.
 
