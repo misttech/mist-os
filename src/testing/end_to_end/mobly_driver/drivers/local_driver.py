@@ -4,15 +4,13 @@
 # found in the LICENSE file.
 """Implements BaseDriver for the local execution environment."""
 
-import json
-import subprocess
-import tempfile
 from typing import Any, Dict, List, Optional
 
 import yaml
 
 import api_infra
 import api_mobly
+import api_ffx
 import base_mobly_driver
 import common
 
@@ -28,6 +26,7 @@ class LocalDriver(base_mobly_driver.BaseDriver):
 
     def __init__(
         self,
+        multi_device: bool = False,
         log_path: Optional[str] = None,
         config_path: Optional[str] = None,
         params_path: Optional[str] = None,
@@ -36,6 +35,7 @@ class LocalDriver(base_mobly_driver.BaseDriver):
         """Initializes the instance.
 
         Args:
+          multi_device: whether the Mobly test requires 2+ devices to run.
           log_path: absolute path to directory for storing Mobly test output.
           config_path: absolute path to the Mobly test config file.
           params_path: absolute path to the Mobly test params file.
@@ -45,59 +45,52 @@ class LocalDriver(base_mobly_driver.BaseDriver):
           KeyError if required environment variables not found.
         """
         super().__init__(log_path=log_path, params_path=params_path)
+        self._multi_device = multi_device
         self._config_path = config_path
-        self._ffx_path = ffx_path
+        self._ffx_client = api_ffx.FfxClient(ffx_path)
 
-    def _list_local_fuchsia_targets(self) -> List[str]:
-        """Returns Fuchsia target names detected on the host.
+    def _get_test_targets(self) -> List[str]:
+        """Returns Fuchsia target names to use in Mobly test.
+
+        * If multi-device test, return all discovered target(s).
+        * If single-device test and default device is not set, return all
+          discovered target(s).
+        * If single-device test and default device is set, return only default
+          target(s).
 
         Returns:
           A list of Fuchsia target names.
 
         Raises:
-          common.InvalidFormatException if unable to extract target names from
-            device discovery output.
           common.DriverException if device discovery command fails or no devices
             detected.
         """
-        # Run `ffx` command in isolation mode.
-        with tempfile.TemporaryDirectory() as iso_dir:
-            try:
-                cmd = [
-                    self._ffx_path,
-                    "--isolate-dir",
-                    iso_dir,
-                    "--machine",
-                    "json",
-                    "target",
-                    "list",
-                ]
-                output = subprocess.check_output(cmd, timeout=5).decode()
-            except (
-                subprocess.CalledProcessError,
-                subprocess.TimeoutExpired,
-            ) as e:
-                raise common.DriverException(
-                    f"Failed to enumerate devices via {cmd}: {e}"
-                )
-
-        target_names: List[str] = []
         try:
-            target_names = [t["nodename"] for t in json.loads(output)]
-        except json.JSONDecodeError as e:
-            raise common.InvalidFormatException(
-                f"Failed to decode output from {cmd}: {e}"
+            res: api_ffx.TargetListResult = self._ffx_client.target_list(
+                # Run without isolate dir to access relevant "default" device.
+                isolate_dir=None
             )
-        except KeyError as e:
-            raise common.InvalidFormatException(f"Unexpected FFX output: {e}")
+        except (api_ffx.CommandException, api_ffx.OutputFormatException) as e:
+            raise common.DriverException(
+                "Failed to enumarate local targets: {e}"
+            )
 
-        if len(target_names) == 0:
+        test_targets: List[str] = res.all_nodes
+        if self._multi_device:
+            print(f"Multi-device: test with all discovered target(s).")
+        elif not res.default_nodes:
+            print(f"No default target set: test with all discovered target(s).")
+        else:
+            print(f"Default target set: test with default target(s).")
+            test_targets = res.default_nodes
+
+        if len(test_targets) == 0:
             # Raise exception here because any meaningful Mobly test should run
             # against at least one Fuchsia target.
             raise common.DriverException("No devices found.")
 
-        print(f"Found {len(target_names)} Fuchsia target(s): {target_names}")
-        return target_names
+        print(f"Target(s) to use in Mobly test: {test_targets}")
+        return test_targets
 
     def _generate_config_from_env(self) -> api_mobly.MoblyConfigComponent:
         """Returns Mobly device config generated from local environment.
@@ -115,7 +108,7 @@ class LocalDriver(base_mobly_driver.BaseDriver):
             detected.
         """
         mobly_controllers: List[str] = []
-        for target in self._list_local_fuchsia_targets():
+        for target in self._get_test_targets():
             mobly_controllers.append(
                 {
                     "type": api_infra.FUCHSIA_DEVICE,

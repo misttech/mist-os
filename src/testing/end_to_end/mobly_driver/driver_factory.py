@@ -25,16 +25,19 @@ class DriverFactory:
 
     def __init__(
         self,
+        multi_device: bool = False,
         config_path: Optional[str] = None,
         params_path: Optional[str] = None,
         ffx_path: Optional[str] = None,
     ) -> None:
         """Initializes the instance.
         Args:
+          multi_device: whether the Mobly test requires 2+ devices to run.
           config_path: absolute path to the Mobly test config file.
           params_path: absolute path to the Mobly testbed params file.
           ffx_path: absolute path to the FFX binary.
         """
+        self._multi_device = multi_device
         self._config_path = config_path
         self._params_path = params_path
         self._ffx_path = ffx_path
@@ -51,6 +54,7 @@ class DriverFactory:
         botanist_config_path = os.getenv(api_infra.BOT_ENV_TESTBED_CONFIG)
         if not botanist_config_path:
             return local_driver.LocalDriver(
+                multi_device=self._multi_device,
                 config_path=self._config_path,
                 params_path=self._params_path,
                 ffx_path=self._ffx_path,

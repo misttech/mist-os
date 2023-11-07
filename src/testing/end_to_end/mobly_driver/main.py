@@ -42,6 +42,13 @@ parser.add_argument(
     help="value to use in mobly config for host->device transport type.",
 )
 parser.add_argument(
+    "-multi_device",
+    action="store_const",
+    const=True,
+    default=False,
+    help="Whether the mobly test requires 2+ Fuchsia devices to run.",
+)
+parser.add_argument(
     "-v",
     action="store_const",
     const=True,
@@ -59,6 +66,7 @@ def main():
     underlying Mobly test.
     """
     factory = driver_factory.DriverFactory(
+        multi_device=args.multi_device,
         config_path=args.config_yaml_path,
         params_path=args.params_yaml_path,
         ffx_path=args.ffx_path,

@@ -107,7 +107,12 @@ import("//build/testing/host_test_data.gni")
 #    Type: list(string)
 #    Default: empty list
 #
-#   timeout_secs (optional)
+#  multi_fuchsia_device (optional)
+#    Whether a test is a multi-device test (requires 2+ fuchsia devices).
+#    Type: boolean
+#    Default: false
+#
+#  timeout_secs (optional)
 #     [int] The infra timeout in seconds for the test.
 #
 #  deps
@@ -231,6 +236,10 @@ template("python_mobly_test") {
       invoker.transport,
     ]
   }
+  if (defined(invoker.multi_fuchsia_device) && invoker.multi_fuchsia_device) {
+    _host_test_args += [ "-multi_device" ]
+  }
+
   _additional_deps = []
 
   # If specified, define test params data target and data path add to host args.

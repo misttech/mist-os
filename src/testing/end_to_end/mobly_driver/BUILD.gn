@@ -19,6 +19,10 @@ if (is_host) {
     ]
   }
 
+  python_library("api_ffx") {
+    sources = [ "api_ffx.py" ]
+  }
+
   python_library("mobly_driver_lib") {
     sources = [ "mobly_driver_lib.py" ]
     library_deps = [ "drivers:base_mobly_driver" ]
@@ -41,6 +45,7 @@ if (is_host) {
     testonly = true
     main_source = "main.py"
     sources = [
+      "api_ffx.py",
       "api_infra.py",
       "api_mobly.py",
       "driver_factory.py",

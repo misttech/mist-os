@@ -4,12 +4,12 @@
 # found in the LICENSE file.
 """Unit tests for Mobly driver's local_driver.py."""
 
-import subprocess
 import unittest
 from unittest.mock import ANY, patch
 
 from parameterized import parameterized
 
+import api_ffx
 import common
 import local_driver
 
@@ -99,13 +99,18 @@ class LocalDriverTest(unittest.TestCase):
     @patch("builtins.print")
     @patch("yaml.dump", return_value="yaml_str")
     @patch(
-        "subprocess.check_output",
-        return_value=b'[{"nodename": "dut_1"}, {"nodename": "dut_2"}]',
+        "api_ffx.FfxClient.target_list",
         autospec=True,
+        return_value=api_ffx.TargetListResult(
+            all_nodes=["dut_1", "dut_2"], default_nodes=[]
+        ),
     )
     @patch("api_mobly.new_testbed_config", autospec=True)
     def test_generate_test_config_from_env_success(
-        self, mock_new_tb_config, mock_check_output, *unused_args
+        self,
+        mock_new_tb_config,
+        mock_ffx_target_list,
+        *unused_args,
     ):
         """Test case for successful env config generation"""
         driver = local_driver.LocalDriver(log_path="log/path")
@@ -117,12 +122,99 @@ class LocalDriverTest(unittest.TestCase):
         self.assertEqual([c["name"] for c in controllers], ["dut_1", "dut_2"])
         self.assertEqual(ret, "yaml_str")
 
+    @parameterized.expand(
+        [
+            (
+                "default_nodes exist, prefer all_nodes",
+                ["dut_1"],
+            ),
+            ("default_nodes empty, prefer all_nodes", []),
+        ]
+    )
+    @patch("builtins.print")
+    @patch("yaml.dump", return_value="yaml_str")
+    @patch("api_ffx.FfxClient.target_list", autospec=True)
+    @patch("api_mobly.new_testbed_config", autospec=True)
+    def test_multi_device_config_generation(
+        self,
+        unused_name,
+        default_nodes,
+        mock_new_tb_config,
+        mock_ffx_target_list,
+        *unused_args,
+    ):
+        """Test case for multi-device config generation."""
+        mock_ffx_target_list.return_value = api_ffx.TargetListResult(
+            all_nodes=["dut_1", "dut_2"], default_nodes=default_nodes
+        )
+
+        driver = local_driver.LocalDriver(
+            log_path="log/path", multi_device=True
+        )
+        ret = driver.generate_test_config()
+
+        mock_new_tb_config.assert_called()
+        controllers = mock_new_tb_config.call_args.kwargs["mobly_controllers"]
+        self.assertEqual([c["name"] for c in controllers], ["dut_1", "dut_2"])
+        self.assertEqual(ret, "yaml_str")
+
+    @parameterized.expand(
+        [
+            ("default_nodes exist, prefer default_nodes", ["dut_1"], ["dut_1"]),
+            ("default_nodes empty, prefer all_nodes", [], ["dut_1", "dut_2"]),
+        ]
+    )
+    @patch("builtins.print")
+    @patch("yaml.dump", return_value="yaml_str")
+    @patch("api_ffx.FfxClient.target_list", autospec=True)
+    @patch("api_mobly.new_testbed_config", autospec=True)
+    def test_single_device_config_generation(
+        self,
+        unused_name,
+        default_nodes,
+        want_nodes,
+        mock_new_tb_config,
+        mock_ffx_target_list,
+        *unused_args,
+    ):
+        """Test case for single-device config generation."""
+        mock_ffx_target_list.return_value = api_ffx.TargetListResult(
+            all_nodes=["dut_1", "dut_2"], default_nodes=default_nodes
+        )
+
+        driver = local_driver.LocalDriver(
+            log_path="log/path", multi_device=False
+        )
+        ret = driver.generate_test_config()
+
+        mock_new_tb_config.assert_called()
+        controllers = mock_new_tb_config.call_args.kwargs["mobly_controllers"]
+        self.assertEqual([c["name"] for c in controllers], want_nodes)
+        self.assertEqual(ret, "yaml_str")
+
     @patch("builtins.print")
     @patch(
-        "subprocess.check_output",
-        side_effect=subprocess.CalledProcessError(
-            returncode=1, cmd=[], stderr="some error"
+        "api_ffx.FfxClient.target_list",
+        autospec=True,
+        return_value=api_ffx.TargetListResult(
+            all_nodes=[],
+            default_nodes=[],
         ),
+    )
+    def test_config_generation_no_devices_raises_exception(
+        self, mock_check_output, *unused_args
+    ):
+        """Test case for exception being raised when no devices are found"""
+        driver = local_driver.LocalDriver(
+            log_path="log/path",
+        )
+        with self.assertRaises(common.DriverException):
+            ret = driver.generate_test_config()
+
+    @patch("builtins.print")
+    @patch(
+        "api_ffx.FfxClient.target_list",
+        side_effect=api_ffx.CommandException(),
         autospec=True,
     )
     def test_generate_test_config_from_env_discovery_failure_raises_exception(
