@@ -4,7 +4,10 @@
 
 use {
     crate::fuchsia::{
-        directory::FxDirectory, errors::map_to_status, node::FxNode, volume::FxVolume,
+        directory::FxDirectory,
+        errors::map_to_status,
+        node::FxNode,
+        volume::{info_to_filesystem_info, FxVolume},
     },
     anyhow::Error,
     async_trait::async_trait,
@@ -170,6 +173,16 @@ impl Node for FxSymlink {
             .await
             .map_err(map_to_status)?;
         dir.link_object(transaction, &name, self.object_id(), ObjectDescriptor::Symlink).await
+    }
+
+    fn query_filesystem(&self) -> Result<fio::FilesystemInfo, zx::Status> {
+        let store = self.handle.store();
+        Ok(info_to_filesystem_info(
+            store.filesystem().get_info(),
+            store.filesystem().block_size(),
+            store.object_count(),
+            self.handle.owner().id(),
+        ))
     }
 }
 

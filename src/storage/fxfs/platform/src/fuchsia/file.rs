@@ -343,6 +343,16 @@ impl vfs::node::Node for FxFile {
         }
         dir.link_object(transaction, &name, object_id, ObjectDescriptor::File).await
     }
+
+    fn query_filesystem(&self) -> Result<fio::FilesystemInfo, Status> {
+        let store = self.handle.store();
+        Ok(info_to_filesystem_info(
+            store.filesystem().get_info(),
+            store.filesystem().block_size(),
+            store.object_count(),
+            self.handle.owner().id(),
+        ))
+    }
 }
 
 #[async_trait]
@@ -472,16 +482,6 @@ impl File for FxFile {
         }
 
         Ok(())
-    }
-
-    fn query_filesystem(&self) -> Result<fio::FilesystemInfo, Status> {
-        let store = self.handle.store();
-        Ok(info_to_filesystem_info(
-            store.filesystem().get_info(),
-            store.filesystem().block_size(),
-            store.object_count(),
-            self.handle.owner().id(),
-        ))
     }
 }
 

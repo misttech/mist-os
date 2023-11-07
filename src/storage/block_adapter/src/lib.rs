@@ -148,10 +148,6 @@ impl File for BlockFile {
     async fn sync(&self, _mode: SyncMode) -> Result<(), zx::Status> {
         self.block_client.flush().await.map_err(map_to_status)
     }
-
-    fn query_filesystem(&self) -> Result<fio::FilesystemInfo, zx::Status> {
-        Err(zx::Status::NOT_SUPPORTED)
-    }
 }
 
 #[async_trait]

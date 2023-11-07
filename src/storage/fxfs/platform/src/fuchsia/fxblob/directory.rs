@@ -529,6 +529,10 @@ impl vfs::node::Node for BlobDirectory {
     ) -> Result<fio::NodeAttributes2, Status> {
         self.directory.get_attributes(requested_attributes).await
     }
+
+    fn query_filesystem(&self) -> Result<FilesystemInfo, Status> {
+        self.directory.query_filesystem()
+    }
 }
 
 /// Implements VFS entry container trait for directories, allowing manipulation of their contents.
@@ -553,10 +557,6 @@ impl vfs::directory::entry_container::Directory for BlobDirectory {
 
     fn unregister_watcher(self: Arc<Self>, key: usize) {
         self.directory.clone().unregister_watcher(key)
-    }
-
-    fn query_filesystem(&self) -> Result<FilesystemInfo, Status> {
-        self.directory.query_filesystem()
     }
 }
 

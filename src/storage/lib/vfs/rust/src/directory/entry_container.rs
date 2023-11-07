@@ -76,11 +76,6 @@ pub trait Directory: DirectoryEntry + Node {
     /// Unregister a watcher from this directory. The watcher should no longer
     /// receive events.
     fn unregister_watcher(self: Arc<Self>, key: usize);
-
-    /// Returns information about the filesystem.
-    fn query_filesystem(&self) -> Result<fio::FilesystemInfo, Status> {
-        Err(Status::NOT_SUPPORTED)
-    }
 }
 
 /// This trait indicates a directory that can be mutated by adding and removing entries.

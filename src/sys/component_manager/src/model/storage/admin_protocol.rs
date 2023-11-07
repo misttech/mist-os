@@ -1409,6 +1409,22 @@ mod tests {
         ) -> Result<fio::NodeAttributes2, zx::Status> {
             Err(zx::Status::INTERNAL)
         }
+
+        fn query_filesystem(&self) -> Result<fio::FilesystemInfo, zx::Status> {
+            Ok(fio::FilesystemInfo {
+                total_bytes: self.total.into(),
+                used_bytes: self.used.into(),
+                total_nodes: 0,
+                used_nodes: 0,
+                free_shared_pool_bytes: 0,
+                fs_id: 0,
+                block_size: 512,
+                max_filename_size: 100,
+                fs_type: 0,
+                padding: 0,
+                name: [0; 32],
+            })
+        }
     }
 
     #[async_trait]
@@ -1432,22 +1448,6 @@ mod tests {
 
         fn unregister_watcher(self: Arc<Self>, _key: usize) {
             panic!("not implemented!");
-        }
-
-        fn query_filesystem(&self) -> Result<fio::FilesystemInfo, zx::Status> {
-            Ok(fio::FilesystemInfo {
-                total_bytes: self.total.into(),
-                used_bytes: self.used.into(),
-                total_nodes: 0,
-                used_nodes: 0,
-                free_shared_pool_bytes: 0,
-                fs_id: 0,
-                block_size: 512,
-                max_filename_size: 100,
-                fs_type: 0,
-                padding: 0,
-                name: [0; 32],
-            })
         }
     }
 

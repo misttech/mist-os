@@ -848,6 +848,10 @@ impl vfs::node::Node for FatDirectory {
     fn close(self: Arc<Self>) {
         self.close_ref(&self.filesystem.lock().unwrap());
     }
+
+    fn query_filesystem(&self) -> Result<fio::FilesystemInfo, Status> {
+        self.filesystem.query_filesystem()
+    }
 }
 
 #[async_trait]
@@ -968,10 +972,6 @@ impl Directory for FatDirectory {
 
     fn unregister_watcher(self: Arc<Self>, key: usize) {
         self.data.write().unwrap().watchers.remove(key);
-    }
-
-    fn query_filesystem(&self) -> Result<fio::FilesystemInfo, Status> {
-        self.filesystem.query_filesystem()
     }
 }
 

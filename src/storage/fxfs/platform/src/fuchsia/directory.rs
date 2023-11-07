@@ -811,6 +811,16 @@ impl vfs::node::Node for FxDirectory {
             }
         ))
     }
+
+    fn query_filesystem(&self) -> Result<fio::FilesystemInfo, zx::Status> {
+        let store = self.directory.store();
+        Ok(info_to_filesystem_info(
+            store.filesystem().get_info(),
+            store.filesystem().block_size(),
+            store.object_count(),
+            self.volume().id(),
+        ))
+    }
 }
 
 #[async_trait]
@@ -925,16 +935,6 @@ impl vfs::directory::entry_container::Directory for FxDirectory {
 
     fn unregister_watcher(self: Arc<Self>, key: usize) {
         self.watchers.lock().unwrap().remove(key);
-    }
-
-    fn query_filesystem(&self) -> Result<fio::FilesystemInfo, zx::Status> {
-        let store = self.directory.store();
-        Ok(info_to_filesystem_info(
-            store.filesystem().get_info(),
-            store.filesystem().block_size(),
-            store.object_count(),
-            self.volume().id(),
-        ))
     }
 }
 

@@ -169,11 +169,6 @@ pub trait File: Node {
     /// to the next layer in the storage stack.
     async fn sync(&self, mode: SyncMode) -> Result<(), Status>;
 
-    /// Returns information about the filesystem.
-    fn query_filesystem(&self) -> Result<fio::FilesystemInfo, Status> {
-        Err(Status::NOT_SUPPORTED)
-    }
-
     /// Returns an optional event for the file which signals `fuchsia.io2.FileSignal` events to
     /// clients (e.g. when a file becomes readable).  See `fuchsia.io2.File.Describe`.
     fn event(&self) -> Result<Option<zx::Event>, Status> {

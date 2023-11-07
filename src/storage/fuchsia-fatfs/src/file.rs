@@ -282,6 +282,10 @@ impl vfs::node::Node for FatFile {
     fn close(self: Arc<Self>) {
         self.close_ref(&self.filesystem.lock().unwrap());
     }
+
+    fn query_filesystem(&self) -> Result<fio::FilesystemInfo, Status> {
+        self.filesystem.query_filesystem()
+    }
 }
 
 impl Debug for FatFile {
@@ -362,10 +366,6 @@ impl VfsFile for FatFile {
 
         file.flush().map_err(fatfs_error_to_status)?;
         Ok(())
-    }
-
-    fn query_filesystem(&self) -> Result<fio::FilesystemInfo, Status> {
-        self.filesystem.query_filesystem()
     }
 }
 

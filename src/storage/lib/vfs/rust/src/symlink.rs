@@ -183,8 +183,10 @@ impl<T: Symlink> Connection<T> {
                 responder.send(fio::SYMLINK_PROTOCOL_NAME.as_bytes())?;
             }
             fio::SymlinkRequest::QueryFilesystem { responder } => {
-                // TODO(fxbug.dev/123390): Support QueryFilesystem
-                responder.send(zx::Status::NOT_SUPPORTED.into_raw(), None)?;
+                match self.symlink.query_filesystem() {
+                    Err(status) => responder.send(status.into_raw(), None)?,
+                    Ok(info) => responder.send(0, Some(&info))?,
+                }
             }
         }
         Ok(false)

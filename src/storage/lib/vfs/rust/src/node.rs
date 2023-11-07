@@ -57,6 +57,11 @@ pub trait Node: DirectoryEntry {
     ) -> Result<(), zx::Status> {
         Err(zx::Status::NOT_SUPPORTED)
     }
+
+    /// Returns information about the filesystem.
+    fn query_filesystem(&self) -> Result<fio::FilesystemInfo, zx::Status> {
+        Err(zx::Status::NOT_SUPPORTED)
+    }
 }
 
 /// Represents a FIDL (limited) node connection.
