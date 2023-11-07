@@ -299,7 +299,7 @@ class CxxLinkRemoteAction(object):
                     shared=self.cxx_action.shared,
                     rtlib=self.cxx_action.rtlib,
                     unwindlib=self.unwindlib,
-                    profile=self.cxx_action.profile_instr_generate,
+                    profile=self.cxx_action.any_profile,
                     sanitizers=self.cxx_action.sanitizers,
                 )
             )

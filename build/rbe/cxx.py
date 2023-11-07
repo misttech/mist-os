@@ -65,11 +65,20 @@ def _cxx_command_scanner() -> argparse.ArgumentParser:
         help="output is linked shared",
     )
     parser.add_argument(
+        "-fprofile-generate",
+        dest="profile_generate",
+        type=Path,
+        default=None,
+        help="generate profiling instrumented code (named directory)",
+        metavar="DIR",
+    )
+    parser.add_argument(
         "-fprofile-instr-generate",
         dest="profile_instr_generate",
-        default=False,
-        action="store_true",
-        help="generate profiling instrumentation",
+        type=Path,
+        default=None,
+        help="generate profiling instrumented code (named file)",
+        metavar="FILE",
     )
     parser.add_argument(
         "-fprofile-list",
@@ -429,10 +438,16 @@ def _assign_explicit_flag_defaults(opts: Iterable[str]) -> Iterable[str]:
     because with nargs='?', the former will try to consume the following
     argument.  Instead we make the implicit default explicit just for
     easy parsing.
+
+    Default values are taken from `clang --help` documentation.
     """
     for opt in opts:
         if opt == "-flto":
             yield "-flto=full"
+        elif opt == "-fprofile-generate":
+            yield "-fprofile-generate=."  # directory
+        elif opt == "-fprofile-instr-generate":
+            yield "-fprofile-instr-generate=default.profraw"  # file
         else:
             yield opt
 
@@ -645,8 +660,16 @@ class CxxAction(object):
         return self._attributes.profile_list
 
     @property
-    def profile_instr_generate(self) -> bool:
+    def profile_generate(self) -> Optional[Path]:
+        return self._attributes.profile_generate
+
+    @property
+    def profile_instr_generate(self) -> Optional[Path]:
         return self._attributes.profile_instr_generate
+
+    @property
+    def any_profile(self) -> bool:
+        return self.profile_generate or self.profile_instr_generate
 
     @property
     def lto(self) -> Optional[str]:

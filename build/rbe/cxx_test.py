@@ -77,7 +77,8 @@ class CxxActionTests(unittest.TestCase):
         self.assertIsNone(c.sysroot)
         self.assertEqual(c.libdirs, [])
         self.assertIsNone(c.profile_list)
-        self.assertFalse(c.profile_instr_generate)
+        self.assertIsNone(c.profile_generate)
+        self.assertIsNone(c.profile_instr_generate)
         self.assertFalse(c.shared)
         self.assertEqual(c.sanitizers, set())
         self.assertFalse(c.using_asan)
@@ -627,6 +628,43 @@ class CxxActionTests(unittest.TestCase):
         self.assertEqual(c.profile_list, profile)
         self.assertEqual(set(c.input_files()), {source, profile})
 
+    def test_profile_generate(self):
+        source = Path("hello.cc")
+        ii_file = Path("hello.ii")
+        output = Path("hello.o")
+        c = cxx.CxxAction(
+            _strs(
+                [
+                    "clang++",
+                    "-c",
+                    source,
+                    "-o",
+                    output,
+                    "-fprofile-generate",
+                ]
+            )
+        )
+        self.assertEqual(c.profile_generate, Path("."))
+
+    def test_profile_generate_with_dir(self):
+        source = Path("hello.cc")
+        ii_file = Path("hello.ii")
+        output = Path("hello.o")
+        pdir = Path("my/pg/dir")
+        c = cxx.CxxAction(
+            _strs(
+                [
+                    "clang++",
+                    "-c",
+                    source,
+                    "-o",
+                    output,
+                    f"-fprofile-generate={pdir}",
+                ]
+            )
+        )
+        self.assertEqual(c.profile_generate, pdir)
+
     def test_profile_instr_generate(self):
         source = Path("hello.cc")
         ii_file = Path("hello.ii")
@@ -643,7 +681,26 @@ class CxxActionTests(unittest.TestCase):
                 ]
             )
         )
-        self.assertTrue(c.profile_instr_generate)
+        self.assertEqual(c.profile_instr_generate, Path("default.profraw"))
+
+    def test_profile_instr_generate_with_file(self):
+        source = Path("hello.cc")
+        ii_file = Path("hello.ii")
+        output = Path("hello.o")
+        pfile = Path("pg/path/to/file.profraw")
+        c = cxx.CxxAction(
+            _strs(
+                [
+                    "clang++",
+                    "-c",
+                    source,
+                    "-o",
+                    output,
+                    f"-fprofile-instr-generate={pfile}",
+                ]
+            )
+        )
+        self.assertEqual(c.profile_instr_generate, pfile)
 
     def test_uses_macos_sdk(self):
         sysroot = Path("/Library/Developer/blah")
