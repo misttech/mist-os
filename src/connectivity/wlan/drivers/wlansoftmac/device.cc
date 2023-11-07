@@ -347,21 +347,14 @@ zx_status_t WlanSoftmacHandle::QueueEthFrameTx(std::unique_ptr<Packet> pkt) {
   return ZX_OK;
 }
 
-Device::Device(zx_device_t* device)
-    : ddk::Device<Device, ddk::Unbindable>(device), parent_(device) {
+Device::Device(zx_device_t* device) : parent_(device) {
   ldebug(0, nullptr, "Entering.");
   linfo("Creating a new WLAN device.");
   state_ = fbl::AdoptRef(new DeviceState);
   // Create a dispatcher to wait on the runtime channel.
-  auto dispatcher =
-      fdf::SynchronizedDispatcher::Create(fdf::SynchronizedDispatcher::Options::kAllowSyncCalls,
-                                          "wlansoftmacifc_server", [&](fdf_dispatcher_t*) {
-                                            if (unbind_txn_ != std::nullopt) {
-                                              unbind_txn_->Reply();
-                                            } else {
-                                              device_unbind_reply(ethdev_);
-                                            }
-                                          });
+  auto dispatcher = fdf::SynchronizedDispatcher::Create(
+      fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "wlansoftmacifc_server",
+      [&](fdf_dispatcher_t*) { device_unbind_reply(ethdev_); });
 
   if (dispatcher.is_error()) {
     ZX_ASSERT_MSG(false, "Creating server dispatcher error: %s",
@@ -393,14 +386,21 @@ zx_status_t Device::Bind() __TA_NO_THREAD_SAFETY_ANALYSIS {
   ldebug(0, nullptr, "Entering.");
   linfo("Binding our new WLAN softmac device.");
 
-  zx_status_t status;
-
-  auto client_end = DdkConnectRuntimeProtocol<fuchsia_wlan_softmac::Service::WlanSoftmac>();
-  if (client_end.is_error()) {
-    lerror("DDdkConnectRuntimeProtocol failed: %s", client_end.status_string());
-    return client_end.status_value();
+  auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_softmac::Service::WlanSoftmac::ProtocolType>();
+  if (endpoints.is_error()) {
+    lerror("Failed to create FDF endpoints: %s", zx_status_get_string(endpoints.status_value()));
+    return endpoints.status_value();
   }
-  client_ = fdf::WireSharedClient(*std::move(client_end), client_dispatcher_.get());
+
+  auto status = device_connect_runtime_protocol(
+      parent_, fuchsia_wlan_softmac::Service::WlanSoftmac::ServiceName,
+      fuchsia_wlan_softmac::Service::WlanSoftmac::Name, endpoints->server.TakeChannel().release());
+  if (status != ZX_OK) {
+    lerror("Failed to connect to WlanSoftmac service: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  client_ = fdf::WireSharedClient(std::move(endpoints->client), client_dispatcher_.get());
 
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
@@ -565,18 +565,6 @@ void Device::EthReleaseAndDeleteThis() {
   // so it's safe to clean up our memory usage.
   delete this;
 }
-
-void Device::DdkInit(ddk::InitTxn txn) {}
-
-void Device::DdkUnbind(ddk::UnbindTxn txn) {
-  // Saving the input UnbindTxn to the device, ::ddk::UnbindTxn::Reply() will be called with this
-  // UnbindTxn in the shutdown callback of the dispatcher, so that we can make sure DdkUnbind()
-  // won't end before the dispatcher shutdown.
-  unbind_txn_ = std::move(txn);
-  client_dispatcher_.ShutdownAsync();
-}
-
-void Device::DdkRelease() { delete this; }
 
 zx_status_t Device::EthernetImplQuery(uint32_t options, ethernet_info_t* info) {
   ldebug(0, nullptr, "Entering.");

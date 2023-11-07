@@ -57,7 +57,6 @@ class WlanSoftmacHandle {
 };
 
 class Device : public DeviceInterface,
-               ddk::Device<Device, ddk::Unbindable>,
                public fdf::WireServer<fuchsia_wlan_softmac::WlanSoftmacIfc> {
  public:
   explicit Device(zx_device_t* device);
@@ -70,9 +69,6 @@ class Device : public DeviceInterface,
   // Releases the corresponding Ethernet device and `delete`s the `Device`
   // (`this`).
   void EthReleaseAndDeleteThis();
-  void DdkInit(ddk::InitTxn txn);
-  void DdkUnbind(ddk::UnbindTxn txn);
-  void DdkRelease();
 
   // ddk ethernet_impl_protocol_ops methods
   zx_status_t EthernetImplQuery(uint32_t options, ethernet_info_t* info);
@@ -166,9 +162,6 @@ class Device : public DeviceInterface,
 
   // Dispatcher for being a FIDL server dispatching requests from WlanSoftmacIfc protocol.
   fdf::Dispatcher server_dispatcher_;
-
-  // Store unbind txn for async reply.
-  std::optional<::ddk::UnbindTxn> unbind_txn_;
 
   // Preallocated buffer for small frames
   uint8_t pre_alloc_recv_buffer_[PRE_ALLOC_RECV_BUFFER_SIZE];
