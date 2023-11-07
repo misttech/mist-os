@@ -126,6 +126,11 @@ the [Drivers][dfv2-concepts] section under _Fundamentals_.
 -  SDMMC drivers
    -  [SDMMC drivers architecture][sdmmc-drivers-architecture]
 
+### Others
+
+- [Deleting drivers][deleting-drivers]
+
+
 <!-- Reference links -->
 
 [dfv2-concepts]: /docs/concepts/drivers/README.md
@@ -160,6 +165,7 @@ the [Drivers][dfv2-concepts] section under _Fundamentals_.
 [fidl-tutorial]: tutorials/fidl-tutorial.md
 [bind-library-code-generation-tutorial]: tutorials/bind-libraries-codegen.md
 [bulding-drivers]: best_practices/build.md
+[deleting-drivers]: best_practices/deleting.md
 [driver-stack-performance]: best_practices/driver_stack_performance.md
 [vmo-registration-pattern]: best_practices/vmo-registration-pattern.md
 [fuchsia-driver-framework]: concepts/fdf.md
