@@ -55,15 +55,26 @@ pub fn sys_clock_gettime(
     tp_addr: UserRef<timespec>,
 ) -> Result<(), Errno> {
     let nanos = if which_clock < 0 {
+        profile_duration!("GetDynamicClock");
         get_dynamic_clock(current_task, which_clock)?
     } else {
         match which_clock as u32 {
-            CLOCK_REALTIME | CLOCK_REALTIME_COARSE => utc_now().into_nanos(),
+            CLOCK_REALTIME | CLOCK_REALTIME_COARSE => {
+                profile_duration!("GetUtcTime");
+                utc_now().into_nanos()
+            }
             CLOCK_MONOTONIC | CLOCK_MONOTONIC_COARSE | CLOCK_MONOTONIC_RAW | CLOCK_BOOTTIME => {
+                profile_duration!("GetMonotonic");
                 zx::Time::get_monotonic().into_nanos()
             }
-            CLOCK_THREAD_CPUTIME_ID => get_thread_cpu_time(current_task, current_task.id)?,
-            CLOCK_PROCESS_CPUTIME_ID => get_process_cpu_time(current_task, current_task.id)?,
+            CLOCK_THREAD_CPUTIME_ID => {
+                profile_duration!("GetThreadCpuTime");
+                get_thread_cpu_time(current_task, current_task.id)?
+            }
+            CLOCK_PROCESS_CPUTIME_ID => {
+                profile_duration!("GetProcessCpuTime");
+                get_process_cpu_time(current_task, current_task.id)?
+            }
             _ => return error!(EINVAL),
         }
     };
