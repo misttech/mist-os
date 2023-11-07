@@ -668,6 +668,32 @@ class DynamicTagCountObserver
   size_t count_ = 0;
 };
 
+// An observer that will match the given tag and add its value to the provided
+// container. This observer will call the `push_back` method from the
+// container.h API with `Elf::size_type` values onto the container.
+template <class Elf, ElfDynTag Tag, class Container, const std::string_view& ErrorString>
+class DynamicValueCollectionObserver
+    : public DynamicTagObserver<DynamicValueCollectionObserver<Elf, Tag, Container, ErrorString>,
+                                Tag> {
+ public:
+  explicit DynamicValueCollectionObserver(Container& values) : values_(values) {}
+
+  template <class DiagnosticsType, class Memory, ElfDynTag Match>
+  constexpr bool Observe(DiagnosticsType& diag, Memory&, DynamicTagMatch<Match>,
+                         typename Elf::size_type val) {
+    static_assert(Match == Tag);
+    return values_.push_back(diag, ErrorString, val);
+  }
+
+  template <class DiagnosticsType, class Memory>
+  constexpr bool Finish(DiagnosticsType&, Memory&) {
+    return true;
+  }
+
+ private:
+  Container& values_;
+};
+
 }  // namespace elfldltl
 
 #endif  // SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_DYNAMIC_H_

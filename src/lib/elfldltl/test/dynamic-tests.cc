@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/elfldltl/container.h>
 #include <lib/elfldltl/diagnostics.h>
 #include <lib/elfldltl/dynamic.h>
 #include <lib/elfldltl/machine.h>
@@ -1591,6 +1592,48 @@ TYPED_TEST(ElfldltlDynamicTests, ObserveNeeded) {
 
   EXPECT_TRUE(elfldltl::DecodeDynamic(diag, memory, cpp20::span(dyn),
                                       elfldltl::DynamicNeededObserver(si, expect_next)));
+}
+
+TYPED_TEST(ElfldltlDynamicTests, ObserveValueCollection) {
+  using Elf = typename TestFixture::Elf;
+  using size_type = typename Elf::size_type;
+
+  auto diag = ExpectOkDiagnostics();
+
+  elfldltl::DirectMemory memory({}, 0);
+
+  TestSymtab<Elf> symtab;
+
+  auto val0 = symtab.AddString("zero.so");
+  auto val1 = symtab.AddString("one.so");
+  auto val2 = symtab.AddString("two.so");
+  auto val3 = symtab.AddString("three.so");
+
+  const typename Elf::Dyn dyn[] = {
+      {.tag = elfldltl::ElfDynTag::kNeeded, .val = val0},
+      {.tag = elfldltl::ElfDynTag::kNeeded, .val = val1},
+      {.tag = elfldltl::ElfDynTag::kNeeded, .val = val2},
+      {.tag = elfldltl::ElfDynTag::kNeeded, .val = val3},
+      // These tags should not be matched or collected by the observer.
+      {.tag = elfldltl::ElfDynTag::kSoname, .val = 0x1},
+      {.tag = elfldltl::ElfDynTag::kSymTab, .val = 0x2},
+      {.tag = elfldltl::ElfDynTag::kSymEnt, .val = 0x3},
+      {.tag = elfldltl::ElfDynTag::kNull},
+  };
+
+  static const constexpr std::string_view kCollectionError = "Failed to push value to collection.";
+  elfldltl::StdContainer<std::vector>::Container<size_type> values;
+  EXPECT_TRUE(elfldltl::DecodeDynamic(
+      diag, memory, cpp20::span(dyn),
+      elfldltl::DynamicValueCollectionObserver<
+          Elf, elfldltl::ElfDynTag::kNeeded,
+          elfldltl::StdContainer<std::vector>::Container<size_type>, kCollectionError>(values)));
+
+  EXPECT_EQ(values.size(), 4u);
+  EXPECT_EQ(values[0], val0);
+  EXPECT_EQ(values[1], val1);
+  EXPECT_EQ(values[2], val2);
+  EXPECT_EQ(values[3], val3);
 }
 
 }  // namespace
