@@ -1,0 +1,21 @@
+import("//build/components.gni")
+import("//build/test.gni")
+
+group("squareload") {
+  testonly = true
+  public_deps = [ ":squareload_test" ]
+}
+
+executable("squareload_bin") {
+  output_name = "squareload"
+  testonly = true
+  deps = [
+    "//src/lib/fxl/test:gtest_main",
+    "//third_party/googletest:gtest",
+  ]
+  sources = [ "main.cc" ]
+}
+
+fuchsia_unittest_package("squareload_test") {
+  deps = [ ":squareload_bin" ]
+}
