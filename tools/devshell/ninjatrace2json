@@ -24,11 +24,13 @@ fx ninjatrace2json [options]
 
 Options:
   --help|-h: print this help and exit
+  --dev: if set, use the locally built ninjatrace binary, instead of the prebuilt one.
   --rbe-rpl-path: when provided, interleave remote execution stats from RBE into
       the main trace
 EOF
 }
 
+dev=0
 rbe_rpl_path=''
 # Extract script options before --
 for opt; do
@@ -49,6 +51,7 @@ for opt; do
       usage
       exit
       ;;
+    --dev) dev=1 ;;
     --rbe-rpl-path=*) rbe_rpl_path="$optarg" ;;
     --rbe-rpl-path) prev_opt='rbe_rpl_path' ;;
     *)
@@ -87,6 +90,11 @@ test -z "${rbe_rpl_path}" || {
   )
 }
 
-"${HOST_OUT_DIR}/ninjatrace" "${ninjatrace_args[@]}"
+ninjatrace="${PREBUILT_NINJATRACE}"
+if [[ "$dev" == 1 ]]; then
+  ninjatrace="${HOST_OUT_DIR}/ninjatrace"
+fi
+
+"${ninjatrace}" "${ninjatrace_args[@]}"
 
 echo "Now visit chrome://tracing and load ${FUCHSIA_BUILD_DIR}/ninjatrace.json"
