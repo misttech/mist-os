@@ -62,18 +62,18 @@ impl FdTableEntry {
 /// Having the map a separate data structure allows us to memoize next_fd, which is the
 /// lowest numbered file descriptor not in use.
 #[derive(Clone, Debug)]
-struct FdMap {
+struct FdTableStore {
     map: HashMap<FdNumber, FdTableEntry>,
     next_fd: FdNumber,
 }
 
-impl Default for FdMap {
+impl Default for FdTableStore {
     fn default() -> Self {
-        FdMap { map: HashMap::default(), next_fd: FdNumber::from_raw(0) }
+        FdTableStore { map: HashMap::default(), next_fd: FdNumber::from_raw(0) }
     }
 }
 
-impl FdMap {
+impl FdTableStore {
     fn insert_entry(
         &mut self,
         fd: FdNumber,
@@ -129,21 +129,21 @@ impl FdMap {
 
 #[derive(Debug, Default)]
 struct FdTableInner {
-    map_handle: Mutex<FdMap>,
+    store: Mutex<FdTableStore>,
 }
 
 impl FdTableInner {
     fn id(&self) -> FdTableId {
-        FdTableId::new(&self.map_handle.lock().map as *const HashMap<FdNumber, FdTableEntry>)
+        FdTableId::new(&self.store.lock().map as *const HashMap<FdNumber, FdTableEntry>)
     }
 
     fn unshare(&self) -> OwnedRef<FdTableInner> {
         let inner = {
-            let new_fdmap = self.map_handle.lock().clone();
-            FdTableInner { map_handle: Mutex::new(new_fdmap) }
+            let new_store = self.store.lock().clone();
+            FdTableInner { store: Mutex::new(new_store) }
         };
         let id = inner.id();
-        inner.map_handle.lock().map.values_mut().for_each(|entry| entry.fd_table_id = id);
+        inner.store.lock().map.values_mut().for_each(|entry| entry.fd_table_id = id);
         OwnedRef::new(inner)
     }
 }
@@ -158,7 +158,7 @@ impl Releasable for FdTableInner {
 
 #[derive(Debug, Default)]
 pub struct FdTable {
-    table: Mutex<OwnedRef<FdTableInner>>,
+    inner: Mutex<OwnedRef<FdTableInner>>,
 }
 
 pub enum TargetFdNumber {
@@ -174,21 +174,21 @@ pub enum TargetFdNumber {
 
 impl FdTable {
     pub fn id(&self) -> FdTableId {
-        self.table.lock().id()
+        self.inner.lock().id()
     }
 
     pub fn fork(&self) -> FdTable {
-        let table = Mutex::new(self.table.lock().unshare());
-        FdTable { table }
+        let inner = Mutex::new(self.inner.lock().unshare());
+        FdTable { inner }
     }
 
     pub fn unshare(&self, current_task: &CurrentTask) {
-        let old_table = {
-            let mut table = self.table.lock();
-            let new_table = table.unshare();
-            std::mem::replace(table.deref_mut(), new_table)
+        let old_inner = {
+            let mut innner = self.inner.lock();
+            let new_inner = innner.unshare();
+            std::mem::replace(innner.deref_mut(), new_inner)
         };
-        old_table.release(current_task);
+        old_inner.release(current_task);
     }
 
     pub fn exec(&self) {
@@ -211,8 +211,8 @@ impl FdTable {
         {
             let rlimit = task.thread_group.get_rlimit(Resource::NOFILE);
             let id = self.id();
-            let inner = self.table.lock();
-            let mut state = inner.map_handle.lock();
+            let inner = self.inner.lock();
+            let mut state = inner.store.lock();
             removed_entry = state.insert_entry(fd, rlimit, FdTableEntry::new(file, id, flags))?;
         }
         // Drop the removed entry after we drop the table lock.
@@ -232,8 +232,8 @@ impl FdTable {
         {
             let rlimit = task.thread_group.get_rlimit(Resource::NOFILE);
             let id = self.id();
-            let inner = self.table.lock();
-            let mut state = inner.map_handle.lock();
+            let inner = self.inner.lock();
+            let mut state = inner.store.lock();
             fd = state.next_fd;
             removed_entry = state.insert_entry(fd, rlimit, FdTableEntry::new(file, id, flags))?;
         }
@@ -258,8 +258,8 @@ impl FdTable {
         let result = {
             let rlimit = task.thread_group.get_rlimit(Resource::NOFILE);
             let id = self.id();
-            let inner = self.table.lock();
-            let mut state = inner.map_handle.lock();
+            let inner = self.inner.lock();
+            let mut state = inner.store.lock();
             let file = state
                 .map
                 .get(&oldfd)
@@ -296,8 +296,8 @@ impl FdTable {
 
     pub fn get_with_flags(&self, fd: FdNumber) -> Result<(FileHandle, FdFlags), Errno> {
         profile_duration!("GetFdWithFlags");
-        let inner = self.table.lock();
-        let state = inner.map_handle.lock();
+        let inner = self.inner.lock();
+        let state = inner.store.lock();
         state
             .map
             .get(&fd)
@@ -318,8 +318,8 @@ impl FdTable {
         // Drop the file object only after releasing the writer lock in case
         // the close() function on the FileOps calls back into the FdTable.
         let removed = {
-            let inner = self.table.lock();
-            let mut state = inner.map_handle.lock();
+            let inner = self.inner.lock();
+            let mut state = inner.store.lock();
             state.remove_entry(&fd)
         };
         if removed.is_some() {
@@ -335,9 +335,9 @@ impl FdTable {
 
     pub fn set_fd_flags(&self, fd: FdNumber, flags: FdFlags) -> Result<(), Errno> {
         profile_duration!("SetFdFlags");
-        self.table
+        self.inner
             .lock()
-            .map_handle
+            .store
             .lock()
             .map
             .get_mut(&fd)
@@ -353,7 +353,7 @@ impl FdTable {
     {
         profile_duration!("RetainFds");
         let mut doomed = vec![];
-        self.table.lock().map_handle.lock().retain(|fd, entry| {
+        self.inner.lock().store.lock().retain(|fd, entry| {
             if f(*fd, &mut entry.flags) {
                 true
             } else {
@@ -367,7 +367,7 @@ impl FdTable {
 
     /// Returns a vector of all current file descriptors in the table.
     pub fn get_all_fds(&self) -> Vec<FdNumber> {
-        self.table.lock().map_handle.lock().map.keys().cloned().collect()
+        self.inner.lock().store.lock().map.keys().cloned().collect()
     }
 }
 
@@ -375,14 +375,14 @@ impl ReleasableByRef for FdTable {
     type Context<'a> = &'a CurrentTask;
     /// Drop the fd table, closing any files opened exclusively by this table.
     fn release(&self, current_task: &CurrentTask) {
-        let table = OwnedRef::take(&mut self.table.lock());
-        table.release(current_task);
+        let inner = OwnedRef::take(&mut self.inner.lock());
+        inner.release(current_task);
     }
 }
 
 impl Clone for FdTable {
     fn clone(&self) -> Self {
-        FdTable { table: Mutex::new(self.table.lock().clone()) }
+        FdTable { inner: Mutex::new(self.inner.lock().clone()) }
     }
 }
 
