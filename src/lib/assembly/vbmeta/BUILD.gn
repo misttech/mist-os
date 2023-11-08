@@ -151,14 +151,6 @@ rustc_test("integration_test") {
   ]
 }
 
-group("host_tests") {
-  testonly = true
-  deps = [
-    ":integration_test",
-    ":vbmeta_test",
-  ]
-}
-
 rustc_binary("bin") {
   name = "vbmeta"
   edition = "2021"

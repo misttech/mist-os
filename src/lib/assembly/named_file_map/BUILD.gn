@@ -28,8 +28,3 @@ rustc_library("named_file_map") {
     "src/named_file_map.rs",
   ]
 }
-
-group("host_tests") {
-  testonly = true
-  deps = [ ":named_file_map_test" ]
-}

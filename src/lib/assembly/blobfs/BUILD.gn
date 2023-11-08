@@ -39,8 +39,3 @@ rustc_library("blobfs") {
     "//third_party/rust_crates:tempfile",
   ]
 }
-
-group("host_tests") {
-  testonly = true
-  deps = [ ":blobfs_test" ]
-}

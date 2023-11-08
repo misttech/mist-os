@@ -17,8 +17,3 @@ rustc_library("validate_util") {
   ]
   sources = [ "src/lib.rs" ]
 }
-
-group("host_tests") {
-  testonly = true
-  deps = [ ":validate_util_test" ]
-}

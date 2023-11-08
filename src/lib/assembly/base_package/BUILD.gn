@@ -30,8 +30,3 @@ rustc_library("base_package") {
     "src/lib.rs",
   ]
 }
-
-group("host_tests") {
-  testonly = true
-  deps = [ ":base_package_test" ]
-}

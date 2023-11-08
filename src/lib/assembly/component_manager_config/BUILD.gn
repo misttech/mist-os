@@ -32,8 +32,3 @@ rustc_library("component_manager_config") {
     "//third_party/rust_crates:tempfile",
   ]
 }
-
-group("host_tests") {
-  testonly = true
-  deps = [ ":component_manager_config_test" ]
-}

@@ -35,8 +35,3 @@ rustc_library("domain_config") {
     "//third_party/rust_crates:tempfile",
   ]
 }
-
-group("host_tests") {
-  testonly = true
-  deps = [ ":domain_config_test" ]
-}

@@ -22,8 +22,3 @@ rustc_library("zbi") {
     "src/zbi.rs",
   ]
 }
-
-group("host_tests") {
-  testonly = true
-  deps = [ ":zbi_test" ]
-}

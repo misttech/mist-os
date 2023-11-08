@@ -2,42 +2,44 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-if (is_host) {
-  group("host_tests") {
-    testonly = true
-    deps = [
-      "assembly_manifest:host_tests",
-      "base_package:host_tests",
-      "blobfs:host_tests",
-      "component_id_index:host_tests",
-      "component_manager_config:host_tests",
-      "components:host_tests",
-      "config_data:host_tests",
-      "config_schema:host_tests",
-      "domain_config:host_tests",
-      "driver_manifest:host_tests",
-      "file_relative_path:host_tests",
-      "fvm:host_tests",
-      "fxfs:host_tests",
-      "images_config:host_tests",
-      "named_file_map:host_tests",
-      "package_copy:host_tests",
-      "package_list:host_tests",
-      "package_utils:host_tests",
-      "partitions_config:host_tests",
-      "platform_configuration:host_tests",
-      "shell_commands:host_tests",
-      "structured_config:host_tests",
-      "subpackage_blobs_package:host_tests",
-      "test_util:host_tests",
-      "tool:host_tests",
-      "update_package:host_tests",
-      "update_packages_manifest:host_tests",
-      "util:host_tests",
-      "validate_product:host_tests",
-      "validate_util:host_tests",
-      "vbmeta:host_tests",
-      "zbi:host_tests",
-    ]
-  }
+import("//build/testing/standardized_test_groups.gni")
+
+standardized_test_groups("tests") {
+  host = [
+    "//src/lib/assembly/assembly_manifest:assembly_manifest_test",
+    "//src/lib/assembly/base_package:base_package_test",
+    "//src/lib/assembly/blobfs:blobfs_test",
+    "//src/lib/assembly/component_id_index:component_id_index_test",
+    "//src/lib/assembly/component_manager_config:component_manager_config_test",
+    "//src/lib/assembly/components:components_test",
+    "//src/lib/assembly/config_data:config_data_test",
+    "//src/lib/assembly/config_schema:config_schema_test",
+    "//src/lib/assembly/domain_config:domain_config_test",
+    "//src/lib/assembly/driver_manifest:driver_manifest_test",
+    "//src/lib/assembly/file_relative_path:file_relative_path_derive_test",
+    "//src/lib/assembly/file_relative_path:file_relative_path_test",
+    "//src/lib/assembly/fvm:fvm_test",
+    "//src/lib/assembly/fxfs:fxfs_test",
+    "//src/lib/assembly/images_config:images_config_test",
+    "//src/lib/assembly/named_file_map:named_file_map_test",
+    "//src/lib/assembly/package_copy:package_copy_test",
+    "//src/lib/assembly/package_list:package_list_test",
+    "//src/lib/assembly/package_utils:package_utils_test",
+    "//src/lib/assembly/partitions_config:partitions_config_test",
+    "//src/lib/assembly/platform_configuration:platform_configuration_test",
+    "//src/lib/assembly/shell_commands:shell_commands_test",
+    "//src/lib/assembly/subpackage_blobs_package:subpackage_blobs_package_test",
+    "//src/lib/assembly/test_util:test_util_test",
+    "//src/lib/assembly/tool:tool_test",
+    "//src/lib/assembly/update_package:update_package_test",
+    "//src/lib/assembly/update_packages_manifest:update_packages_manifest_test",
+    "//src/lib/assembly/util:util_test",
+    "//src/lib/assembly/validate_product:validate_product_test",
+    "//src/lib/assembly/validate_util:validate_util_test",
+    "//src/lib/assembly/vbmeta:integration_test",
+    "//src/lib/assembly/vbmeta:vbmeta_test",
+    "//src/lib/assembly/zbi:zbi_test",
+    "//src/lib/assembly/structured_config/tests/malformed_fail",
+    "//src/lib/assembly/structured_config/tests/repackaging_pass",
+  ]
 }

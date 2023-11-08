@@ -93,7 +93,7 @@ if (is_host) {
     visibility = [ ":*" ]
   }
 
-  group("host_tests") {
+  group("repackaging_pass") {
     testonly = true
     deps = [ ":structured_config_repackaging_test" ]
 

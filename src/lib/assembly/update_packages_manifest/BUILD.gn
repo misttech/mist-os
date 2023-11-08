@@ -25,8 +25,3 @@ rustc_library("update_packages_manifest") {
     "src/update_packages_manifest.rs",
   ]
 }
-
-group("host_tests") {
-  testonly = true
-  deps = [ ":update_packages_manifest_test" ]
-}

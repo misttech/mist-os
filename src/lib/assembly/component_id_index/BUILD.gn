@@ -30,8 +30,3 @@ rustc_library("component_id_index") {
     "src/lib.rs",
   ]
 }
-
-group("host_tests") {
-  testonly = true
-  deps = [ ":component_id_index_test" ]
-}

@@ -29,8 +29,3 @@ rustc_library("subpackage_blobs_package") {
     "src/subpackage_blobs_package.rs",
   ]
 }
-
-group("host_tests") {
-  testonly = true
-  deps = [ ":subpackage_blobs_package_test" ]
-}

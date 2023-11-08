@@ -58,7 +58,7 @@ if (is_host) {
     visibility = [ ":*" ]
   }
 
-  group("host_tests") {
+  group("malformed_fail") {
     testonly = true
     deps = [ ":structured_config_malformed_test" ]
 

@@ -52,11 +52,3 @@ rustc_test("file_relative_path_derive_test") {
   source_root = "src/macro_test.rs"
   sources = [ "src/macro_test.rs" ]
 }
-
-group("host_tests") {
-  testonly = true
-  deps = [
-    ":file_relative_path_derive_test",
-    ":file_relative_path_test",
-  ]
-}

@@ -24,8 +24,3 @@ rustc_library("fvm") {
     "src/nand.rs",
   ]
 }
-
-group("host_tests") {
-  testonly = true
-  deps = [ ":fvm_test" ]
-}

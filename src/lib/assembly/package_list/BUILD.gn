@@ -25,8 +25,3 @@ rustc_library("package_list") {
   ]
   test_deps = [ "//third_party/rust_crates:serde_json" ]
 }
-
-group("host_tests") {
-  testonly = true
-  deps = [ ":package_list_test" ]
-}

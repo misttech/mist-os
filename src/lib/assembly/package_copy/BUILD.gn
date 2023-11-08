@@ -25,8 +25,3 @@ rustc_library("package_copy") {
   ]
   test_deps = [ "//third_party/rust_crates:tempfile" ]
 }
-
-group("host_tests") {
-  testonly = true
-  deps = [ ":package_copy_test" ]
-}

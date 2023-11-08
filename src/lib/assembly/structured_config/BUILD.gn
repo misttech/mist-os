@@ -26,8 +26,3 @@ rustc_library("structured_config") {
     "//tools/lib/config_value_file",
   ]
 }
-
-group("host_tests") {
-  testonly = true
-  deps = [ "tests:host_tests" ]
-}

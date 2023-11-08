@@ -27,8 +27,3 @@ rustc_library("config_data") {
     "src/lib.rs",
   ]
 }
-
-group("host_tests") {
-  testonly = true
-  deps = [ ":config_data_test" ]
-}

@@ -20,8 +20,3 @@ rustc_library("package_utils") {
     "src/package_utils.rs",
   ]
 }
-
-group("host_tests") {
-  testonly = true
-  deps = [ ":package_utils_test" ]
-}

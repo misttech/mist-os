@@ -26,8 +26,3 @@ rustc_library("images_config") {
     "src/product_filesystem_config.rs",
   ]
 }
-
-group("host_tests") {
-  testonly = true
-  deps = [ ":images_config_test" ]
-}

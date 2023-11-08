@@ -32,8 +32,3 @@ rustc_library("fxfs") {
     "src/lib.rs",
   ]
 }
-
-group("host_tests") {
-  testonly = true
-  deps = [ ":fxfs_test" ]
-}

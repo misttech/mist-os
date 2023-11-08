@@ -27,8 +27,3 @@ rustc_library("components") {
   ]
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
-
-group("host_tests") {
-  testonly = true
-  deps = [ ":components_test" ]
-}

@@ -25,8 +25,3 @@ rustc_library("shell_commands") {
     "src/shell_commands.rs",
   ]
 }
-
-group("host_tests") {
-  testonly = true
-  deps = [ ":shell_commands_test" ]
-}

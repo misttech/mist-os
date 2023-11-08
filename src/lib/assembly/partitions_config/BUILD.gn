@@ -23,8 +23,3 @@ rustc_library("partitions_config") {
     "src/partitions_config.rs",
   ]
 }
-
-group("host_tests") {
-  testonly = true
-  deps = [ ":partitions_config_test" ]
-}

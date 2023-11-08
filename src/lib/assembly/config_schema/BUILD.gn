@@ -84,8 +84,3 @@ rustc_library("config_schema") {
   ]
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
-
-group("host_tests") {
-  testonly = true
-  deps = [ ":config_schema_test" ]
-}

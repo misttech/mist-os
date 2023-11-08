@@ -20,8 +20,3 @@ rustc_library("test_util") {
   ]
   sources = [ "src/lib.rs" ]
 }
-
-group("host_tests") {
-  testonly = true
-  deps = [ ":test_util_test" ]
-}

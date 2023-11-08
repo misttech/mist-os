@@ -71,8 +71,3 @@ rustc_library("platform_configuration") {
   ]
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
-
-group("host_tests") {
-  testonly = true
-  deps = [ ":platform_configuration_test" ]
-}

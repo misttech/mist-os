@@ -36,8 +36,3 @@ rustc_library("update_package") {
     "//third_party/rust_crates:tempfile",
   ]
 }
-
-group("host_tests") {
-  testonly = true
-  deps = [ ":update_package_test" ]
-}
