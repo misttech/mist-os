@@ -103,10 +103,6 @@ class HdmiHost {
 
   zx_status_t EdidTransfer(const i2c_impl_op_t* op_list, size_t op_count);
 
-  void UpdateOutputColorFormat(fuchsia_hardware_hdmi::wire::ColorFormat output_color_format) {
-    color_.output_color_format = output_color_format;
-  }
-
   // Returns true iff a display timing is supported by the display engine driver
   // and can be used in a display configuration.
   bool IsDisplayTimingSupported(const display::DisplayTiming& timing) const;
@@ -127,12 +123,6 @@ class HdmiHost {
   std::optional<fdf::MmioBuffer> vpu_mmio_;
   std::optional<fdf::MmioBuffer> hhi_mmio_;
   std::optional<fdf::MmioBuffer> gpio_mux_mmio_;
-
-  fuchsia_hardware_hdmi::wire::ColorParam color_{
-      .input_color_format = fuchsia_hardware_hdmi::wire::ColorFormat::kCf444,
-      .output_color_format = fuchsia_hardware_hdmi::wire::ColorFormat::kCf444,
-      .color_depth = fuchsia_hardware_hdmi::wire::ColorDepth::kCd24B,
-  };
 };
 
 }  // namespace amlogic_display

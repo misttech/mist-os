@@ -294,8 +294,30 @@ zx_status_t HdmiHost::ModeSet(const display::DisplayTiming& timing) {
   WRITE32_REG(HHI, HHI_VDAC_CNTL1_G12A, 8);  // set Cdac_pwd [whatever that is]
 
   fidl::Arena<2048> allocator;
+  static constexpr fuchsia_hardware_hdmi::wire::ColorParam kColorParams{
+      .input_color_format = fuchsia_hardware_hdmi::wire::ColorFormat::kCf444,
+
+      // We choose the RGB 4:4:4 encoding unconditionally for the HDMI output
+      // signals. This implies that we avoid YCbCr encodings, even if they are
+      // unsupported.
+      //
+      // The HDMI specificiaton v1.4b, Section 6.2.3 "Pixel Encoding
+      // Requirements" (page 106) requires that all HDMI sources and sinks
+      // support RGB 4:4:4 encoding. Thus we think this approach will work with
+      // all of our devices.
+      //
+      // Also, we encountered hardware (Yongxing HDMI to MIPI-DSI converters
+      // board v1.2, using the Toshiba TC358870XBG converter chip, provided with
+      // the Amelin AML028-30MB-A1 assembly) that claims support for the YCbCr
+      // 4:4:4 pixel encoding in EDID, but does not display colors correctly
+      // when we use that encoding. That hardware should be considered when
+      // changing this strategy.
+      .output_color_format = fuchsia_hardware_hdmi::wire::ColorFormat::kCfRgb,
+
+      .color_depth = fuchsia_hardware_hdmi::wire::ColorDepth::kCd24B,
+  };
   fuchsia_hardware_hdmi::wire::DisplayMode hdmi_fidl_mode =
-      ToHdmiFidlDisplayMode(allocator, timing, color_);
+      ToHdmiFidlDisplayMode(allocator, timing, kColorParams);
   auto res = hdmi_->ModeSet(1, hdmi_fidl_mode);  // only supports 1 display for now
   if ((res.status() != ZX_OK) || res->is_error()) {
     zxlogf(ERROR, "Unable to initialize interface");

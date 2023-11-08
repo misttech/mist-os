@@ -336,11 +336,7 @@ zx::result<> Vout::ApplyConfiguration(const display::DisplayTiming& timing) {
 zx::result<> Vout::OnDisplaysChanged(added_display_info_t& info) {
   switch (type_) {
     case VoutType::kDsi:
-      return zx::ok();
     case VoutType::kHdmi:
-      hdmi_.hdmi_host->UpdateOutputColorFormat(
-          info.is_standard_srgb_out ? fuchsia_hardware_hdmi::wire::ColorFormat::kCfRgb
-                                    : fuchsia_hardware_hdmi::wire::ColorFormat::kCf444);
       return zx::ok();
   }
   ZX_ASSERT_MSG(false, "Invalid Vout type: %u", static_cast<uint8_t>(type_));
