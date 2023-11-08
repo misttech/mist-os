@@ -165,6 +165,11 @@ void riscv64_page_fault_handler(int64_t cause, uint64_t tval, struct iframe_t* f
                   (pf_flags & VMM_PF_FLAG_WRITE) ? "write" : "read", tval);
   }
 
+  // Locally sfence.vma the address in case this is a spurious page fault.
+  if (is_user_accessible(tval)) {
+    riscv64_tlb_flush_address_one_asid(tval, riscv64_current_asid());
+  }
+
   // Check if the current thread was expecting a data fault and we should return to its handler.
   // If the capture bit was set we should run the dfr routine first before calling the page fault
   // handler along with captured data about the exception.
@@ -176,6 +181,7 @@ void riscv64_page_fault_handler(int64_t cause, uint64_t tval, struct iframe_t* f
     return;
   }
 
+  // Reenable interrupts and call the upper VM layers to handle the fault.
   arch_enable_ints();
   CPU_STATS_INC(page_faults);
   zx_status_t pf_status = vmm_page_fault_handler(tval, pf_flags);

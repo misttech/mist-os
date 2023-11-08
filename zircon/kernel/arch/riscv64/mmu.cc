@@ -83,6 +83,7 @@ KCOUNTER(cm_asid_invalidate, "mmu.consistency_manager.asid_invalidate")
 KCOUNTER(cm_global_invalidate, "mmu.consistency_manager.global_invalidate")
 KCOUNTER(cm_page_run_invalidate, "mmu.consistency_manager.page_run_invalidate")
 KCOUNTER(cm_single_page_invalidate, "mmu.consistency_manager.single_page_invalidate")
+KCOUNTER(cm_local_page_invalidate, "mmu.consistency_manager.local_page_invalidate")
 
 KCOUNTER(vm_mmu_protect_make_execute_calls, "vm.mmu.protect.make_execute_calls")
 KCOUNTER(vm_mmu_protect_make_execute_pages, "vm.mmu.protect.make_execute_pages")
@@ -826,6 +827,21 @@ zx::result<size_t> Riscv64ArchVmAspace::MapPageTable(vaddr_t vaddr_in, vaddr_t v
       pte = riscv64_pte_pa_to_pte(paddr) | attrs;
       LTRACEF("pte %p[%#" PRIxPTR "] = %#" PRIx64 "\n", page_table, index, pte);
       page_table[index] = pte;
+
+      // Flush the TLB on map as well, unlike most architectures.
+      if (IsKernel()) {
+        // Normally we only need a local fence here and secondary cpus at worse would only
+        // get a spurious page fault. However, since spurious PFs are not tolerated in the
+        // kernel we want to do a full flush via the ConsistencyManager for kernel addresses.
+        cm.FlushEntry(vaddr, true);
+      } else if (IsUser()) {
+        // Perform a local sfence.vma on the single page in the local asid. If another cpu were
+        // to page fault on this user address, it will sfence.vma in its PF handler.
+        riscv64_tlb_flush_address_one_asid(vaddr, asid_);
+        kcounter_add(cm_local_page_invalidate, 1);
+      } else [[unlikely]] {
+        PANIC_UNIMPLEMENTED;
+      }
     }
     vaddr += chunk_size;
     vaddr_rel += chunk_size;
