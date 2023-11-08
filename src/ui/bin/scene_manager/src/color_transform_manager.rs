@@ -8,7 +8,8 @@ use {
         ColorTransformHandlerRequestStream,
     },
     fidl_fuchsia_ui_brightness::{
-        ColorAdjustmentHandlerRequest, ColorAdjustmentHandlerRequestStream,
+        ColorAdjustmentHandlerRequest, ColorAdjustmentHandlerRequestStream, ColorAdjustmentRequest,
+        ColorAdjustmentRequestStream,
     },
     fidl_fuchsia_ui_display_color as fidl_color,
     fidl_fuchsia_ui_policy::{DisplayBacklightRequest, DisplayBacklightRequestStream},
@@ -26,7 +27,9 @@ const ZERO_OFFSET: [f32; 3] = [0., 0., 0.];
 /// - fuchsia.ui.policy.DisplayBacklight
 /// - fuchsia.accessibility.ColorTransformHandler
 /// - fuchsia.ui.brightness.ColorAdjustmentHandler (Note: it ignores these
-///   requests if a11y color correction is currently applied.)
+///   requests if a11y color correction is currently applied.) - DEPRECATED
+/// - fuchsia.ui.brightness.ColorAdjustment (Note: it ignores these requests if
+///   a11y color correction is currently applied.) - PREFERRED
 ///
 /// It makes outgoing calls to fuchsia.ui.display.color.Converter.
 pub struct ColorTransformManager {
@@ -180,7 +183,7 @@ impl ColorTransformManager {
         .detach()
     }
 
-    pub fn handle_color_adjustment_request_stream(
+    pub fn handle_color_adjustment_handler_request_stream(
         manager: Arc<Mutex<Self>>,
         mut request_stream: ColorAdjustmentHandlerRequestStream,
     ) {
@@ -215,6 +218,52 @@ impl ColorTransformManager {
             }
         })
         .detach()
+    }
+
+    pub fn handle_color_adjustment_request_stream(
+        manager: Arc<Mutex<Self>>,
+        mut request_stream: ColorAdjustmentRequestStream,
+    ) {
+        fasync::Task::local(async move {
+          loop {
+              let request = request_stream.try_next().await;
+              match request {
+                  Ok(Some(ColorAdjustmentRequest::SetDiscreteColorAdjustment{ color_adjustment, responder})) => {
+                      let mut manager = manager.lock().await;
+                      if manager.state.is_active() {
+                          info!("Ignoring SetDiscreteColorAdjustment because color correction is currently active.");
+                      } else {
+                      if let Some(matrix) = color_adjustment.matrix {
+                          manager.set_scenic_color_conversion(ColorTransformMatrix {
+                              matrix,
+                              pre_offset: ZERO_OFFSET,
+                              post_offset: ZERO_OFFSET,
+                          }).await;
+                      } else {
+                          warn!("Ignoring SetDiscreteColorAdjustment - `matrix` is empty.");
+                      }
+                  }
+                  match responder.send() {
+                    Ok(_) => {}
+                    Err(e) => {
+                        error!("Error responding to SetDiscreteColorAdjustment(): {}", e);
+                    }
+                }
+                  }
+                  Ok(Some(ColorAdjustmentRequest::_UnknownMethod { ordinal, .. })) => {
+                    warn!("Unknown ColorAdjustmentRequest ordinal: {}", ordinal);
+                }
+                  Ok(None) => {
+                      return;
+                  }
+                  Err(e) => {
+                      error!("Error obtaining ColorAdjustmentRequest: {}", e);
+                      return;
+                  }
+              }
+          }
+      })
+      .detach()
     }
 
     pub fn handle_display_backlight_request_stream(
@@ -255,7 +304,8 @@ mod tests {
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_accessibility::{ColorTransformHandlerMarker, ColorTransformHandlerProxy};
     use fidl_fuchsia_ui_brightness::{
-        ColorAdjustmentHandlerMarker, ColorAdjustmentHandlerProxy, ColorAdjustmentTable,
+        ColorAdjustmentHandlerMarker, ColorAdjustmentHandlerProxy, ColorAdjustmentMarker,
+        ColorAdjustmentProxy, ColorAdjustmentTable,
     };
     use fidl_fuchsia_ui_display_color::{
         ConversionProperties, ConverterRequest, ConverterRequestStream,
@@ -383,10 +433,20 @@ mod tests {
         client
     }
 
-    fn create_color_adjustment_stream(
+    fn create_color_adjustment_handler_stream(
         manager: Arc<Mutex<ColorTransformManager>>,
     ) -> ColorAdjustmentHandlerProxy {
         let (client, server) = create_proxy_and_stream::<ColorAdjustmentHandlerMarker>().unwrap();
+        super::ColorTransformManager::handle_color_adjustment_handler_request_stream(
+            manager, server,
+        );
+        client
+    }
+
+    fn create_color_adjustment_stream(
+        manager: Arc<Mutex<ColorTransformManager>>,
+    ) -> ColorAdjustmentProxy {
+        let (client, server) = create_proxy_and_stream::<ColorAdjustmentMarker>().unwrap();
         super::ColorTransformManager::handle_color_adjustment_request_stream(manager, server);
         client
     }
@@ -522,11 +582,95 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn test_color_adjustment_manager() -> Result<()> {
-        let mut exec = fasync::TestExecutor::new();
+    #[fuchsia::test]
+    async fn test_color_adjustment() -> Result<()> {
         let (manager, mut converter, _) = init();
         let color_adjustment_proxy = create_color_adjustment_stream(Arc::clone(&manager));
+
+        color_adjustment_proxy
+            .set_discrete_color_adjustment(&ColorAdjustmentTable {
+                matrix: Some([1.; 9]),
+                ..Default::default()
+            })
+            .await
+            .expect("failed to set discrete color adjustment");
+
+        let properties = converter.expect_set_values().await;
+        assert_eq!(properties.coefficients, Some([1.; 9]));
+        assert_eq!(properties.preoffsets, Some([0.; 3]));
+        assert_eq!(properties.postoffsets, Some([0.; 3]));
+
+        converter.expect_no_requests().await;
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn test_color_adjustment_rejects_bad_requests() -> Result<()> {
+        let (manager, converter, _) = init();
+        let color_adjustment_proxy = create_color_adjustment_stream(Arc::clone(&manager));
+
+        color_adjustment_proxy
+            .set_discrete_color_adjustment(&ColorAdjustmentTable::default())
+            .await
+            .expect("failed to set discrete color adjustment");
+
+        converter.expect_no_requests().await;
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn test_color_adjustment_noop_when_a11y_active() -> Result<()> {
+        let (manager, mut converter, _) = init();
+        let color_transform_proxy = create_color_transform_stream(Arc::clone(&manager));
+        let color_adjustment_proxy = create_color_adjustment_stream(Arc::clone(&manager));
+
+        color_transform_proxy
+            .set_color_transform_configuration(&color_transform_configuration())
+            .await?;
+        converter.expect_set_values().await;
+
+        // SetColorAdjustment is a no-op because a11y settings are active.
+        color_adjustment_proxy
+            .set_discrete_color_adjustment(&ColorAdjustmentTable {
+                matrix: Some([4.; 9]),
+                ..Default::default()
+            })
+            .await
+            .expect("failed to set discrete color adjustment");
+        converter.expect_no_requests().await;
+
+        // Deactivate a11y settings.
+        color_transform_proxy
+            .set_color_transform_configuration(&ColorTransformConfiguration {
+                color_inversion_enabled: Some(false),
+                color_correction: Some(ColorCorrectionMode::Disabled),
+                color_adjustment_matrix: Some([0.; 9]),
+                color_adjustment_pre_offset: Some([0.; 3]),
+                color_adjustment_post_offset: Some([0.; 3]),
+                ..Default::default()
+            })
+            .await?;
+        converter.expect_set_values().await;
+
+        // Now SetColorAdjustment has an effect.
+        color_adjustment_proxy
+            .set_discrete_color_adjustment(&ColorAdjustmentTable {
+                matrix: Some([5.; 9]),
+                ..Default::default()
+            })
+            .await
+            .expect("failed to set discrete color adjustment");
+        converter.expect_set_values().await;
+
+        converter.expect_no_requests().await;
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    fn test_color_adjustment_handler() -> Result<()> {
+        let mut exec = fasync::TestExecutor::new();
+        let (manager, mut converter, _) = init();
+        let color_adjustment_proxy = create_color_adjustment_handler_stream(Arc::clone(&manager));
 
         color_adjustment_proxy.set_color_adjustment(&ColorAdjustmentTable {
             matrix: Some([1.; 9]),
@@ -542,11 +686,11 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn test_color_adjustment_manager_rejects_bad_requests() -> Result<()> {
+    #[fuchsia::test]
+    fn test_color_adjustment_handler_rejects_bad_requests() -> Result<()> {
         let mut exec = fasync::TestExecutor::new();
         let (manager, converter, _) = init();
-        let color_adjustment_proxy = create_color_adjustment_stream(Arc::clone(&manager));
+        let color_adjustment_proxy = create_color_adjustment_handler_stream(Arc::clone(&manager));
 
         color_adjustment_proxy.set_color_adjustment(&ColorAdjustmentTable::default())?;
 
@@ -554,12 +698,12 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn test_color_adjustment_manager_noop_when_a11y_active() -> Result<()> {
+    #[fuchsia::test]
+    fn test_color_adjustment_handler_noop_when_a11y_active() -> Result<()> {
         let mut exec = fasync::TestExecutor::new();
         let (manager, mut converter, _) = init();
         let color_transform_proxy = create_color_transform_stream(Arc::clone(&manager));
-        let color_adjustment_proxy = create_color_adjustment_stream(Arc::clone(&manager));
+        let color_adjustment_proxy = create_color_adjustment_handler_stream(Arc::clone(&manager));
 
         let _ = color_transform_proxy
             .set_color_transform_configuration(&color_transform_configuration());

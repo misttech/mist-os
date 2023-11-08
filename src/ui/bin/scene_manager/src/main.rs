@@ -26,7 +26,9 @@ use {
         RegistryRequest as A11yViewRegistryRequest,
         RegistryRequestStream as A11yViewRegistryRequestStream,
     },
-    fidl_fuchsia_ui_brightness::ColorAdjustmentHandlerRequestStream,
+    fidl_fuchsia_ui_brightness::{
+        ColorAdjustmentHandlerRequestStream, ColorAdjustmentRequestStream,
+    },
     fidl_fuchsia_ui_composition as flatland, fidl_fuchsia_ui_composition_internal as fcomp,
     fidl_fuchsia_ui_display_color as color, fidl_fuchsia_ui_display_singleton as singleton_display,
     fidl_fuchsia_ui_focus::FocusChainProviderRequestStream,
@@ -57,6 +59,7 @@ mod media_buttons_listener_registry_server;
 
 enum ExposedServices {
     AccessibilityViewRegistry(A11yViewRegistryRequestStream),
+    ColorAdjustment(ColorAdjustmentRequestStream),
     ColorAdjustmentHandler(ColorAdjustmentHandlerRequestStream),
     MediaButtonsListenerRegistry(MediaButtonsListenerRegistryRequestStream),
     DisplayBacklight(DisplayBacklightRequestStream),
@@ -114,6 +117,7 @@ async fn inner_main() -> Result<(), Error> {
     fs.dir("svc")
         .add_fidl_service(ExposedServices::AccessibilityViewRegistry)
         .add_fidl_service(ExposedServices::ColorAdjustmentHandler)
+        .add_fidl_service(ExposedServices::ColorAdjustment)
         .add_fidl_service(ExposedServices::MediaButtonsListenerRegistry)
         .add_fidl_service(ExposedServices::DisplayBacklight)
         .add_fidl_service(ExposedServices::FactoryResetCountdown)
@@ -291,6 +295,12 @@ async fn inner_main() -> Result<(), Error> {
             )
             .detach(),
             ExposedServices::ColorAdjustmentHandler(request_stream) => {
+                ColorTransformManager::handle_color_adjustment_handler_request_stream(
+                    Arc::clone(&color_transform_manager),
+                    request_stream,
+                );
+            }
+            ExposedServices::ColorAdjustment(request_stream) => {
                 ColorTransformManager::handle_color_adjustment_request_stream(
                     Arc::clone(&color_transform_manager),
                     request_stream,
