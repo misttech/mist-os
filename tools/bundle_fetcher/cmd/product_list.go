@@ -143,7 +143,7 @@ func (cmd *productListCmd) executeWithSink(ctx context.Context, sink bundler.Dat
 			return fmt.Errorf("unable to read build info for build_id %s: %s %w", buildID, buildInfoPath, err)
 		}
 
-		transferManifestUrl := getTransferManifestPath(ctx, sink, cmd.gcsBucket, buildsDirName, buildID, productName)
+		transferManifestUrl := getTransferManifestPath(ctx, cmd.gcsBucket, buildsDirName, buildID, productName)
 
 		for _, productBundle := range *productBundles {
 			// Only include "main" product bundle of each build
@@ -178,15 +178,9 @@ func (cmd *productListCmd) executeWithSink(ctx context.Context, sink bundler.Dat
 }
 
 // getTransferManifestPath will build the transfer manifest path. This path will
-// be builds/<buildid>/product_bundles/<product_name>/transfer.json if the path
-// exists. If not, the path will fallback to legacy location
-// builds/<buildid>/transfer.json
-func getTransferManifestPath(ctx context.Context, sink bundler.DataSink, gcsBucket, buildsDirName, buildID, productName string) string {
+// be builds/<buildid>/product_bundles/<product_name>/transfer.json.
+func getTransferManifestPath(ctx context.Context, gcsBucket, buildsDirName, buildID, productName string) string {
 	transferManifestPath := path.Join(buildsDirName, buildID, productBundlesDirName, productName, transferJSONName)
-	exist, err := sink.DoesPathExist(ctx, transferManifestPath)
-	if !exist || err != nil {
-		transferManifestPath = path.Join(buildsDirName, buildID, transferJSONName)
-	}
 	return fmt.Sprintf("gs://%s/%s", gcsBucket, transferManifestPath)
 }
 
