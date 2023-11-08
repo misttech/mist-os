@@ -188,7 +188,7 @@ func (u *UpdateImages) UpdateImagesSize(ctx context.Context) (uint64, error) {
 		return 0, err
 	}
 
-	return u.repo.sumBlobBlockSizes(ctx, blobs)
+	return u.repo.sumBlobSizes(ctx, blobs)
 }
 
 func (u *UpdateImages) UpdateImagesBlobs(ctx context.Context) (map[build.MerkleRoot]struct{}, error) {

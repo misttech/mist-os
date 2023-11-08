@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	BlobBlockSize = 8192
+	BlobBlockSize = 4096
 )
 
 type FileData []byte
@@ -250,7 +250,7 @@ func (p *Package) TransitiveBlobSize(ctx context.Context) (uint64, error) {
 		return 0, err
 	}
 
-	return p.repo.sumBlobBlockSizes(ctx, blobs)
+	return p.repo.sumBlobSizes(ctx, blobs)
 }
 
 // AddRandomFiles will add random files to this package that increases the
@@ -276,7 +276,7 @@ func (p *Package) addRandomFiles(
 	maxSize uint64,
 	initialBlobs map[build.MerkleRoot]struct{},
 ) (Package, error) {
-	initialSize, err := p.repo.sumBlobBlockSizes(ctx, initialBlobs)
+	initialSize, err := p.repo.sumBlobSizes(ctx, initialBlobs)
 	if err != nil {
 		return Package{}, err
 	}
@@ -325,7 +325,7 @@ func (p *Package) addRandomFiles(
 			blobs[blob] = struct{}{}
 		}
 
-		size, err := p.repo.sumBlobBlockSizes(ctx, blobs)
+		size, err := dstPackage.repo.sumBlobSizes(ctx, blobs)
 		if err != nil {
 			return Package{}, err
 		}

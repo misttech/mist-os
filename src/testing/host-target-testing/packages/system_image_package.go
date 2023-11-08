@@ -58,7 +58,7 @@ func (u *SystemImagePackage) SystemImageSize(ctx context.Context) (uint64, error
 		return 0, err
 	}
 
-	return u.p.repo.sumBlobBlockSizes(ctx, blobs)
+	return u.p.repo.sumBlobSizes(ctx, blobs)
 }
 
 // SystemImageBlobs returns the transitive blobs in the system image and the
