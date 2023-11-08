@@ -15,7 +15,7 @@ use {
     },
     async_lock::Mutex,
     async_trait::async_trait,
-    diagnostics_data::{Data, DiagnosticsData},
+    diagnostics_data::{Data, DiagnosticsData, Metadata},
     fidl::endpoints::{ControlHandle, RequestStream},
     fidl_fuchsia_diagnostics::{
         self, ArchiveAccessorRequest, ArchiveAccessorRequestStream, BatchIteratorControlHandle,
@@ -518,7 +518,7 @@ impl BatchIterator {
         let truncation_counter = SchemaTruncationCounter::new();
         let stream_owned_counter_for_fut = Arc::clone(&truncation_counter);
 
-        let data = data.then(move |d| {
+        let data = data.then(move |mut d| {
             let stream_owned_counter = Arc::clone(&stream_owned_counter_for_fut);
             let result_stats = Arc::clone(&result_stats_for_fut);
             let budget_tracker = Arc::clone(&budget_tracker_shared);
@@ -537,7 +537,7 @@ impl BatchIterator {
                 let mut unlocked_counter = stream_owned_counter.lock().await;
                 let mut tracker_guard = budget_tracker.lock().await;
                 unlocked_counter.total_schemas += 1;
-                if D::has_errors(&d.metadata) {
+                if d.metadata.has_errors() {
                     result_stats.add_result_error();
                 }
 
@@ -560,15 +560,11 @@ impl BatchIterator {
                                 } else {
                                     result_stats.add_schema_truncated();
                                     unlocked_counter.truncated_schemas += 1;
-
-                                    let new_data = d.dropped_payload_schema(
-                                        "Schema failed to fit component budget.".to_string(),
-                                    );
-
+                                    d.drop_payload();
                                     // TODO(66085): If a payload is truncated, cache the
                                     // new schema so that we can reuse if other schemas from
                                     // the same component get dropped.
-                                    SerializedVmo::serialize(&new_data, D::DATA_TYPE, format)
+                                    SerializedVmo::serialize(&d, D::DATA_TYPE, format)
                                 }
                             }
                             None => Ok(contents),

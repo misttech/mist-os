@@ -111,51 +111,42 @@ impl Default for DataSource {
     }
 }
 
-/// Metadata contained in a `DiagnosticsData` object.
-#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
-#[serde(untagged)]
-pub enum Metadata {
-    Empty,
-    Inspect(InspectMetadata),
-    Logs(LogsMetadata),
+pub trait MetadataError {
+    fn dropped_payload() -> Self;
 }
 
-impl Default for Metadata {
-    fn default() -> Self {
-        Metadata::Empty
+pub trait Metadata: DeserializeOwned + Serialize + Clone + Send {
+    /// The type of error returned in this metadata.
+    type Error: Clone + MetadataError;
+
+    /// Returns the component URL which generated this value.
+    fn component_url(&self) -> Option<&str>;
+
+    /// Returns the timestamp at which this value was recorded.
+    fn timestamp(&self) -> Timestamp;
+
+    /// Returns the errors recorded with this value, if any.
+    fn errors(&self) -> Option<&[Self::Error]>;
+
+    /// Overrides the errors associated with this value.
+    fn set_errors(&mut self, errors: Vec<Self::Error>);
+
+    /// Returns whether any errors are recorded on this value.
+    fn has_errors(&self) -> bool {
+        self.errors().map(|e| !e.is_empty()).unwrap_or_default()
     }
 }
 
 /// A trait implemented by marker types which denote "kinds" of diagnostics data.
 pub trait DiagnosticsData {
     /// The type of metadata included in results of this type.
-    type Metadata: DeserializeOwned + Serialize + Clone + Send + 'static;
+    type Metadata: Metadata;
 
     /// The type of key used for indexing node hierarchies in the payload.
     type Key: AsRef<str> + Clone + DeserializeOwned + Eq + FromStr + Hash + Send + 'static;
 
-    /// The type of error returned in this metadata.
-    type Error: Clone;
-
     /// Used to query for this kind of metadata in the ArchiveAccessor.
     const DATA_TYPE: DataType;
-
-    /// Returns the component URL which generated this value.
-    fn component_url(metadata: &Self::Metadata) -> Option<&str>;
-
-    /// Returns the timestamp at which this value was recorded.
-    fn timestamp(metadata: &Self::Metadata) -> Timestamp;
-
-    /// Returns the errors recorded with this value, if any.
-    fn errors(metadata: &Self::Metadata) -> &Option<Vec<Self::Error>>;
-
-    /// Returns whether any errors are recorded on this value.
-    fn has_errors(metadata: &Self::Metadata) -> bool {
-        Self::errors(metadata).as_ref().map(|e| !e.is_empty()).unwrap_or_default()
-    }
-    /// Transforms a Metdata string into a errorful metadata, overriding any other
-    /// errors.
-    fn override_error(metadata: Self::Metadata, error: String) -> Self::Metadata;
 }
 
 /// Inspect carries snapshots of data trees hosted by components.
@@ -165,28 +156,26 @@ pub struct Inspect;
 impl DiagnosticsData for Inspect {
     type Metadata = InspectMetadata;
     type Key = String;
-    type Error = InspectError;
     const DATA_TYPE: DataType = DataType::Inspect;
+}
 
-    fn component_url(metadata: &Self::Metadata) -> Option<&str> {
-        metadata.component_url.as_ref().map(|s| s.as_str())
+impl Metadata for InspectMetadata {
+    type Error = InspectError;
+
+    fn component_url(&self) -> Option<&str> {
+        self.component_url.as_ref().map(|s| s.as_str())
     }
 
-    fn timestamp(metadata: &Self::Metadata) -> Timestamp {
-        Timestamp(metadata.timestamp)
+    fn timestamp(&self) -> Timestamp {
+        Timestamp(self.timestamp)
     }
 
-    fn errors(metadata: &Self::Metadata) -> &Option<Vec<Self::Error>> {
-        &metadata.errors
+    fn errors(&self) -> Option<&[Self::Error]> {
+        self.errors.as_ref().map(|errors| errors.as_slice())
     }
 
-    fn override_error(metadata: Self::Metadata, error: String) -> Self::Metadata {
-        InspectMetadata {
-            name: metadata.name,
-            component_url: metadata.component_url,
-            timestamp: metadata.timestamp,
-            errors: Some(vec![InspectError { message: error.into() }]),
-        }
+    fn set_errors(&mut self, errors: Vec<Self::Error>) {
+        self.errors = Some(errors);
     }
 }
 
@@ -197,35 +186,26 @@ pub struct Logs;
 impl DiagnosticsData for Logs {
     type Metadata = LogsMetadata;
     type Key = LogsField;
-    type Error = LogError;
     const DATA_TYPE: DataType = DataType::Logs;
+}
 
-    fn component_url(metadata: &Self::Metadata) -> Option<&str> {
-        metadata.component_url.as_ref().map(|s| s.as_str())
+impl Metadata for LogsMetadata {
+    type Error = LogError;
+
+    fn component_url(&self) -> Option<&str> {
+        self.component_url.as_ref().map(|s| s.as_str())
     }
 
-    fn timestamp(metadata: &Self::Metadata) -> Timestamp {
-        Timestamp(metadata.timestamp)
+    fn timestamp(&self) -> Timestamp {
+        Timestamp(self.timestamp)
     }
 
-    fn errors(metadata: &Self::Metadata) -> &Option<Vec<Self::Error>> {
-        &metadata.errors
+    fn errors(&self) -> Option<&[Self::Error]> {
+        self.errors.as_ref().map(|errors| errors.as_slice())
     }
 
-    fn override_error(metadata: Self::Metadata, error: String) -> Self::Metadata {
-        LogsMetadata {
-            severity: metadata.severity,
-            component_url: metadata.component_url,
-            timestamp: metadata.timestamp,
-            errors: Some(vec![LogError::Other { message: error }]),
-            file: metadata.file,
-            line: metadata.line,
-            pid: metadata.pid,
-            tags: metadata.tags,
-            tid: metadata.tid,
-            dropped: None,
-            size_bytes: None,
-        }
+    fn set_errors(&mut self, errors: Vec<Self::Error>) {
+        self.errors = Some(errors);
     }
 }
 
@@ -518,17 +498,11 @@ where
     D: DiagnosticsData,
 {
     /// Returns a [`Data`] with an error indicating that the payload was dropped.
-    pub fn dropped_payload_schema(self, error_string: String) -> Data<D>
-    where
-        D: DiagnosticsData,
-    {
-        Data {
-            metadata: D::override_error(self.metadata, error_string),
-            moniker: self.moniker,
-            data_source: self.data_source,
-            version: self.version,
-            payload: None,
-        }
+    pub fn drop_payload(&mut self) {
+        self.metadata.set_errors(vec![
+            <<D as DiagnosticsData>::Metadata as Metadata>::Error::dropped_payload(),
+        ]);
+        self.payload = None;
     }
 
     /// Uses a set of Selectors to filter self's payload and returns the resulting
@@ -1466,11 +1440,25 @@ pub enum LogError {
     Other { message: String },
 }
 
+const DROPPED_PAYLOAD_MSG: &str = "Schema failed to fit component budget.";
+
+impl MetadataError for LogError {
+    fn dropped_payload() -> Self {
+        Self::Other { message: DROPPED_PAYLOAD_MSG.into() }
+    }
+}
+
 /// Possible error that can come in a `DiagnosticsData` object where the data source is
 /// `DataSource::Inspect`..
 #[derive(Debug, PartialEq, Clone, Eq)]
 pub struct InspectError {
     pub message: String,
+}
+
+impl MetadataError for InspectError {
+    fn dropped_payload() -> Self {
+        Self { message: "Schema failed to fit component budget.".into() }
+    }
 }
 
 impl fmt::Display for InspectError {
@@ -1498,16 +1486,6 @@ impl<'de> Deserialize<'de> for InspectError {
     {
         let message = String::deserialize(de)?;
         Ok(Self { message })
-    }
-}
-
-impl Metadata {
-    /// Returns the inspect metadata or None if the metadata contained is not for inspect.
-    pub fn inspect(&self) -> Option<&InspectMetadata> {
-        match self {
-            Metadata::Inspect(m) => Some(m),
-            _ => None,
-        }
     }
 }
 
