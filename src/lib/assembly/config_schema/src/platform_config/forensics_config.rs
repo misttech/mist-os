@@ -16,5 +16,10 @@ pub struct ForensicsConfig {
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct FeedbackConfig {
+    #[serde(default)]
     pub low_memory: bool,
+    #[serde(default)]
+    pub large_disk: bool,
+    #[serde(default)]
+    pub remote_device_id_provider: bool,
 }
