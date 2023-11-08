@@ -1415,9 +1415,7 @@ impl Telemetry {
             }
             TelemetryEvent::ScanEvent { inspect_data, scan_defects } => {
                 self.log_scan_event_inspect(inspect_data);
-                for defect in scan_defects {
-                    self.stats_logger.log_scan_issue(defect).await;
-                }
+                self.stats_logger.log_scan_issues(scan_defects).await;
             }
             TelemetryEvent::LongDurationConnectionScoreAverage { scores } => {
                 self.stats_logger
@@ -3017,8 +3015,35 @@ impl StatsLogger {
         )
     }
 
-    async fn log_scan_issue(&mut self, issue: ScanIssue) {
-        log_cobalt_1dot1!(self.cobalt_1dot1_proxy, log_occurrence, issue.as_metric_id(), 1, &[])
+    async fn log_scan_issues(&mut self, issues: Vec<ScanIssue>) {
+        // If this is a scan result following a recovery intervention, judge whether or not the
+        // recovery mechanism was successful.
+        if let Some(reason) = self.recovery_record.scan_failure.take() {
+            let outcome = match issues.contains(&ScanIssue::ScanFailure) {
+                true => RecoveryOutcome::Failure,
+                false => RecoveryOutcome::Success,
+            };
+            self.log_post_recovery_result(reason, outcome).await;
+        }
+        if let Some(reason) = self.recovery_record.scan_cancellation.take() {
+            let outcome = match issues.contains(&ScanIssue::AbortedScan) {
+                true => RecoveryOutcome::Failure,
+                false => RecoveryOutcome::Success,
+            };
+            self.log_post_recovery_result(reason, outcome).await;
+        }
+        if let Some(reason) = self.recovery_record.scan_results_empty.take() {
+            let outcome = match issues.contains(&ScanIssue::EmptyScanResults) {
+                true => RecoveryOutcome::Failure,
+                false => RecoveryOutcome::Success,
+            };
+            self.log_post_recovery_result(reason, outcome).await;
+        }
+
+        // Log general occurrence metrics for any observed defects
+        for issue in issues {
+            log_cobalt_1dot1!(self.cobalt_1dot1_proxy, log_occurrence, issue.as_metric_id(), 1, &[])
+        }
     }
 
     async fn log_connection_failure(&mut self) {
@@ -7931,6 +7956,247 @@ mod tests {
         let logged_metrics =
             test_helper.get_logged_metrics(metrics::CONNECT_FAILURE_RECOVERY_OUTCOME_METRIC_ID);
         assert!(logged_metrics.is_empty());
+    }
+
+    fn test_generic_post_recovery_event(
+        recovery_event: TelemetryEvent,
+        post_recovery_event: TelemetryEvent,
+        duplicate_check_event: TelemetryEvent,
+        expected_metric_id: u32,
+        dimensions: Vec<u32>,
+    ) {
+        let (mut test_helper, mut test_fut) = setup_test();
+
+        // Send the recovery event metric
+        test_helper.telemetry_sender.send(recovery_event);
+        assert_variant!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
+
+        // Send the post-recovery result metric
+        test_helper.telemetry_sender.send(post_recovery_event);
+        assert_variant!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
+
+        // Get the metric that was logged and verify that it was constructed properly.
+        test_helper.drain_cobalt_events(&mut test_fut);
+        let logged_metrics = test_helper.get_logged_metrics(expected_metric_id);
+
+        assert_eq!(logged_metrics.len(), 1);
+        assert_eq!(logged_metrics[0].event_codes, dimensions);
+
+        // Re-send the result metric and verify that nothing new was logged.
+        test_helper.cobalt_events = Vec::new();
+        test_helper.telemetry_sender.send(duplicate_check_event);
+        assert_variant!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
+        let logged_metrics = test_helper.get_logged_metrics(expected_metric_id);
+        assert!(logged_metrics.is_empty());
+    }
+
+    #[test_case(
+        TelemetryEvent::RecoveryEvent {
+            reason: RecoveryReason::ScanFailure(ClientRecoveryMechanism::Disconnect)
+        },
+        TelemetryEvent::ScanEvent {
+            inspect_data: ScanEventInspectData { unknown_protection_ies: vec![] },
+            scan_defects: vec![]
+        },
+        TelemetryEvent::ScanEvent {
+            inspect_data: ScanEventInspectData { unknown_protection_ies: vec![] },
+            scan_defects: vec![]
+        },
+        metrics::SCAN_FAILURE_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Success as u32, ClientRecoveryMechanism::Disconnect as u32] ;
+        "Scan succeeds after recovery with no other defects"
+    )]
+    #[test_case(
+        TelemetryEvent::RecoveryEvent {
+            reason: RecoveryReason::ScanFailure(ClientRecoveryMechanism::Disconnect)
+        },
+        TelemetryEvent::ScanEvent {
+            inspect_data: ScanEventInspectData { unknown_protection_ies: vec![] },
+            scan_defects: vec![ScanIssue::ScanFailure]
+        },
+        TelemetryEvent::ScanEvent {
+            inspect_data: ScanEventInspectData { unknown_protection_ies: vec![] },
+            scan_defects: vec![ScanIssue::ScanFailure]
+        },
+        metrics::SCAN_FAILURE_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Failure as u32, ClientRecoveryMechanism::Disconnect as u32] ;
+        "Scan still fails following recovery"
+    )]
+    #[test_case(
+        TelemetryEvent::RecoveryEvent {
+            reason: RecoveryReason::ScanFailure(ClientRecoveryMechanism::DestroyIface)
+        },
+        TelemetryEvent::ScanEvent {
+            inspect_data: ScanEventInspectData { unknown_protection_ies: vec![] },
+            scan_defects: vec![ScanIssue::AbortedScan]
+        },
+        TelemetryEvent::ScanEvent {
+            inspect_data: ScanEventInspectData { unknown_protection_ies: vec![] },
+            scan_defects: vec![ScanIssue::AbortedScan]
+        },
+        metrics::SCAN_FAILURE_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Success as u32, ClientRecoveryMechanism::DestroyIface as u32] ;
+        "Scan succeeds after recovery but the scan was cancelled"
+    )]
+    #[test_case(
+        TelemetryEvent::RecoveryEvent {
+            reason: RecoveryReason::ScanFailure(ClientRecoveryMechanism::PhyReset)
+        },
+        TelemetryEvent::ScanEvent {
+            inspect_data: ScanEventInspectData { unknown_protection_ies: vec![] },
+            scan_defects: vec![ScanIssue::EmptyScanResults]
+        },
+        TelemetryEvent::ScanEvent {
+            inspect_data: ScanEventInspectData { unknown_protection_ies: vec![] },
+            scan_defects: vec![ScanIssue::EmptyScanResults]
+        },
+        metrics::SCAN_FAILURE_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Success as u32, ClientRecoveryMechanism::PhyReset as u32] ;
+        "Scan succeeds after recovery but the results are empty"
+    )]
+    #[test_case(
+        TelemetryEvent::RecoveryEvent {
+            reason: RecoveryReason::ScanCancellation(ClientRecoveryMechanism::Disconnect)
+        },
+        TelemetryEvent::ScanEvent {
+            inspect_data: ScanEventInspectData { unknown_protection_ies: vec![] },
+            scan_defects: vec![]
+        },
+        TelemetryEvent::ScanEvent {
+            inspect_data: ScanEventInspectData { unknown_protection_ies: vec![] },
+            scan_defects: vec![]
+        },
+        metrics::SCAN_CANCELLATION_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Success as u32, ClientRecoveryMechanism::Disconnect as u32] ;
+        "Scan no longer cancelled after recovery"
+    )]
+    #[test_case(
+        TelemetryEvent::RecoveryEvent {
+            reason: RecoveryReason::ScanCancellation(ClientRecoveryMechanism::Disconnect)
+        },
+        TelemetryEvent::ScanEvent {
+            inspect_data: ScanEventInspectData { unknown_protection_ies: vec![] },
+            scan_defects: vec![ScanIssue::ScanFailure]
+        },
+        TelemetryEvent::ScanEvent {
+            inspect_data: ScanEventInspectData { unknown_protection_ies: vec![] },
+            scan_defects: vec![ScanIssue::ScanFailure]
+        },
+        metrics::SCAN_CANCELLATION_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Success as u32, ClientRecoveryMechanism::Disconnect as u32] ;
+        "Scan not cancelled after recovery but fails instead"
+    )]
+    #[test_case(
+        TelemetryEvent::RecoveryEvent {
+            reason: RecoveryReason::ScanCancellation(ClientRecoveryMechanism::DestroyIface)
+        },
+        TelemetryEvent::ScanEvent {
+            inspect_data: ScanEventInspectData { unknown_protection_ies: vec![] },
+            scan_defects: vec![ScanIssue::AbortedScan]
+        },
+        TelemetryEvent::ScanEvent {
+            inspect_data: ScanEventInspectData { unknown_protection_ies: vec![] },
+            scan_defects: vec![ScanIssue::AbortedScan]
+        },
+        metrics::SCAN_CANCELLATION_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Failure as u32, ClientRecoveryMechanism::DestroyIface as u32] ;
+        "Scan still cancelled after recovery"
+    )]
+    #[test_case(
+        TelemetryEvent::RecoveryEvent {
+            reason: RecoveryReason::ScanCancellation(ClientRecoveryMechanism::PhyReset)
+        },
+        TelemetryEvent::ScanEvent {
+            inspect_data: ScanEventInspectData { unknown_protection_ies: vec![] },
+            scan_defects: vec![ScanIssue::EmptyScanResults]
+        },
+        TelemetryEvent::ScanEvent {
+            inspect_data: ScanEventInspectData { unknown_protection_ies: vec![] },
+            scan_defects: vec![ScanIssue::EmptyScanResults]
+        },
+        metrics::SCAN_CANCELLATION_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Success as u32, ClientRecoveryMechanism::PhyReset as u32] ;
+        "Scan not cancelled after recovery but results are empty"
+    )]
+    #[test_case(
+        TelemetryEvent::RecoveryEvent {
+            reason: RecoveryReason::ScanResultsEmpty(ClientRecoveryMechanism::Disconnect)
+        },
+        TelemetryEvent::ScanEvent {
+            inspect_data: ScanEventInspectData { unknown_protection_ies: vec![] },
+            scan_defects: vec![]
+        },
+        TelemetryEvent::ScanEvent {
+            inspect_data: ScanEventInspectData { unknown_protection_ies: vec![] },
+            scan_defects: vec![]
+        },
+        metrics::EMPTY_SCAN_RESULTS_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Success as u32, ClientRecoveryMechanism::Disconnect as u32] ;
+        "Scan results not empty after recovery and no other errors"
+    )]
+    #[test_case(
+        TelemetryEvent::RecoveryEvent {
+            reason: RecoveryReason::ScanResultsEmpty(ClientRecoveryMechanism::Disconnect)
+        },
+        TelemetryEvent::ScanEvent {
+            inspect_data: ScanEventInspectData { unknown_protection_ies: vec![] },
+            scan_defects: vec![ScanIssue::ScanFailure]
+        },
+        TelemetryEvent::ScanEvent {
+            inspect_data: ScanEventInspectData { unknown_protection_ies: vec![] },
+            scan_defects: vec![ScanIssue::ScanFailure]
+        },
+        metrics::EMPTY_SCAN_RESULTS_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Success as u32, ClientRecoveryMechanism::Disconnect as u32] ;
+        "Scan results no longer empty after recovery, but scan fails"
+    )]
+    #[test_case(
+        TelemetryEvent::RecoveryEvent {
+            reason: RecoveryReason::ScanResultsEmpty(ClientRecoveryMechanism::DestroyIface)
+        },
+        TelemetryEvent::ScanEvent {
+            inspect_data: ScanEventInspectData { unknown_protection_ies: vec![] },
+            scan_defects: vec![ScanIssue::AbortedScan]
+        },
+        TelemetryEvent::ScanEvent {
+            inspect_data: ScanEventInspectData { unknown_protection_ies: vec![] },
+            scan_defects: vec![ScanIssue::AbortedScan]
+        },
+        metrics::EMPTY_SCAN_RESULTS_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Success as u32, ClientRecoveryMechanism::DestroyIface as u32] ;
+        "Scan results not empty after recovery but scan is cancelled"
+    )]
+    #[test_case(
+        TelemetryEvent::RecoveryEvent {
+            reason: RecoveryReason::ScanResultsEmpty(ClientRecoveryMechanism::PhyReset)
+        },
+        TelemetryEvent::ScanEvent {
+            inspect_data: ScanEventInspectData { unknown_protection_ies: vec![] },
+            scan_defects: vec![ScanIssue::EmptyScanResults]
+        },
+        TelemetryEvent::ScanEvent {
+            inspect_data: ScanEventInspectData { unknown_protection_ies: vec![] },
+            scan_defects: vec![ScanIssue::EmptyScanResults]
+        },
+        metrics::EMPTY_SCAN_RESULTS_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Failure as u32, ClientRecoveryMechanism::PhyReset as u32] ;
+        "Scan results still empty after recovery"
+    )]
+    #[fuchsia::test(add_test_attr = false)]
+    fn test_post_recovery_scan_metrics(
+        recovery_event: TelemetryEvent,
+        post_recovery_event: TelemetryEvent,
+        duplicate_check_event: TelemetryEvent,
+        expected_metric_id: u32,
+        dimensions: Vec<u32>,
+    ) {
+        test_generic_post_recovery_event(
+            recovery_event,
+            post_recovery_event,
+            duplicate_check_event,
+            expected_metric_id,
+            dimensions,
+        );
     }
 
     #[fuchsia::test]
