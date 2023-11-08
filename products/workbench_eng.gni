@@ -44,9 +44,6 @@ zedboot_product_assembly_config_label = "//products/zedboot"
 # Kernel command line arguments.
 product_bootfs_labels = [ "//products/kernel_cmdline:oom.reboot-timeout--low" ]
 
-fuchsia_structured_config_policy =
-    "//products/minimal/minimal_user_structured_config_policy.json5"
-
 extra_bazel_assembly_targets =
     [ "//build/bazel/assembly/assembly_outputs:verifications" ]
 
