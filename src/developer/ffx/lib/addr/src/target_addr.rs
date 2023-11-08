@@ -12,14 +12,31 @@ use std::{
     str::FromStr,
 };
 
-#[derive(Hash, Clone, Debug, Copy, Eq, PartialEq)]
+#[derive(Clone, Debug, Copy)]
 pub struct TargetAddr(SocketAddr);
+
+// Only compare `TargetAddr` by ip and port, since we want to deduplicate targets if they are
+// addressable over multiple IPv6 interfaces.
+impl std::hash::Hash for TargetAddr {
+    fn hash<H>(&self, state: &mut H)
+    where
+        H: std::hash::Hasher,
+    {
+        (self.0.ip(), self.0.port()).hash(state)
+    }
+}
+
+impl PartialEq for TargetAddr {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.ip() == other.0.ip() && self.0.port() == other.0.port()
+    }
+}
+
+impl Eq for TargetAddr {}
 
 impl Ord for TargetAddr {
     fn cmp(&self, other: &Self) -> Ordering {
-        let this_socket = SocketAddr::from(self);
-        let other_socket = SocketAddr::from(other);
-        this_socket.cmp(&other_socket)
+        self.0.ip().cmp(&other.0.ip()).then(self.0.port().cmp(&other.0.port()))
     }
 }
 
