@@ -201,6 +201,7 @@ _tests = [
       # TODO(b/305080563): enable trace publishing and add this expected metric names.
       # "fuchsia.input_latency.simplest_app.txt"
     ]
+    transport = "sl4f"
   },
   {
     name = "perf_publish_example"
@@ -231,6 +232,9 @@ foreach(test, _tests) {
       expected_metric_filenames = test.expected_metric_filenames
       if (defined(test.libraries)) {
         libraries = test.libraries
+      }
+      if (defined(test.transport)) {
+        transport = test.transport
       }
     }
   }

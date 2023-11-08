@@ -22,6 +22,13 @@ import("//build/testing/host_test_data.gni")
 #     Type: list(string)
 #     Default: empty list
 #
+#   transport (optional)
+#     Force a specific host->device transport.
+#     Any transport supported by honeydew can be used here, but recommended
+#     values are "sl4f", "fc", or "fuchsia-controller".
+#     Type: string
+#     Default: "fuchsia-controller"
+#
 #   environments (optional)
 #     Additional environments in which the test can run.
 #     Type: list(string)
@@ -68,6 +75,11 @@ template("python_perf_test") {
     ]
     if (defined(invoker.environments)) {
       environments += invoker.environments
+    }
+
+    transport = "fuchsia-controller"
+    if (defined(invoker.transport)) {
+      transport = invoker.transport
     }
   }
 }
