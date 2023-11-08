@@ -7,7 +7,7 @@ you to develop in a remote workflow from your remote host.
 ## Usage
 
 ```
-Usage: funnel -h <host> [-t <target-name>] [-r <repository-port>]
+Usage: funnel -h <host> [-t <target-name>] [-r <repository-port>] [-p <additional-port-forwards...>]
 
 ffx Remote forwarding.
 
@@ -16,6 +16,9 @@ Options:
   -t, --target-name the name of the target to forward
   -r, --repository-port
                     the repository port to forward to the remote host
+  -p, --additional-port-forwards
+                    additional ports to forward from the remote host to the
+                    target
   --help            display usage information
 ```
 
@@ -26,6 +29,4 @@ This binary is intended to replace the existing `fssh tunnel` command
 
 ## TODO
 
-* Target selection when more than one target is detected.
-* Additional port forwards
 * Auto add and remove targets when the ssh connection is established/dropped.
