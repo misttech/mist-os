@@ -25,7 +25,7 @@ use ffx_fastboot::{
 };
 use fho::{FfxContext, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_developer_ffx::{
-    FastbootInterface as FidlFastbootInterface, TargetProxy, TargetRebootState,
+    FastbootInterface as FidlFastbootInterface, TargetInfo, TargetProxy, TargetRebootState,
 };
 use fidl_fuchsia_developer_ffx::{FastbootProxy, TargetState};
 use fuchsia_async::Timer;
@@ -56,12 +56,28 @@ impl FfxMain for BootloaderTool {
         }
 
         let mut info = self.target_proxy.identity().await.map_err(|e| anyhow!(e))?;
+
+        fn display_name(info: &TargetInfo) -> &str {
+            info.nodename.as_deref().or(info.serial_number.as_deref()).unwrap_or("<unknown>")
+        }
+
         match info.target_state {
             Some(TargetState::Fastboot) => {
                 // Nothing to do
                 tracing::debug!("Target already in Fastboot state");
             }
+            Some(TargetState::Disconnected) => {
+                // Nothing to do, for a slightly different reason.
+                // Since there's no knowledge about the state of the target, assume the
+                // target is in Fastboot.
+                tracing::info!("Target not connected, assuming Fastboot state");
+            }
             Some(mode) => {
+                // Wait 10 seconds to allow the target to fully cycle to the bootloader
+                write!(writer, "Waiting for 10 seconds for Target to reboot")
+                    .user_message("Error writing user message")?;
+                writer.flush().user_message("Error flushing writer buffer")?;
+
                 // Tell the target to reboot to the bootloader
                 tracing::debug!("Target in {:#?} state. Rebooting to bootloader...", mode);
                 self.target_proxy
@@ -70,11 +86,6 @@ impl FfxMain for BootloaderTool {
                     .user_message("Got error rebooting")?
                     .map_err(|e| anyhow!("Got error rebooting target: {:#?}", e))
                     .user_message("Got an error rebooting")?;
-
-                // Wait 10 seconds to allow the  target to fully cycle to the bootloader
-                write!(writer, "Waiting for 10 seconds for Target to reboot")
-                    .user_message("Error writing user message")?;
-                writer.flush().user_message("Error flushing writer buffer")?;
 
                 Timer::new(
                     Duration::seconds(10)
@@ -99,7 +110,9 @@ impl FfxMain for BootloaderTool {
             }
         };
         match info.fastboot_interface {
-            None => ffx_bail!("Unknown fastboot interface state"),
+            None => {
+                ffx_bail!("Could not connect to {}: Target not in fastboot", display_name(&info))
+            }
             Some(FidlFastbootInterface::Usb) => {
                 let serial_num = info.serial_number.ok_or_else(|| {
                     anyhow!("Target was detected in Fastboot USB but did not have a serial number")

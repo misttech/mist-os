@@ -21,12 +21,14 @@ use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_hardware_power_statecontrol::{AdminMarker, AdminProxy, RebootReason};
 use fidl_fuchsia_io::OpenFlags;
 use fidl_fuchsia_sys2 as fsys;
+use fuchsia_async::TimeoutExt;
 use futures::TryFutureExt;
 use std::net::{IpAddr, SocketAddr};
 use std::process::Command;
 use std::rc::Rc;
 use std::rc::Weak;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::{Receiver, Sender};
 
@@ -246,6 +248,10 @@ impl RebootController {
                         .map_err(|e| {
                             tracing::warn!("error getting admin proxy: {}", e);
                             TargetRebootError::TargetCommunication
+                        })
+                        .on_timeout(Duration::from_secs(5), || {
+                            tracing::warn!("timed out getting admin proxy");
+                            Err(TargetRebootError::TargetCommunication)
                         })
                         .await
                     {
