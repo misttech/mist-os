@@ -356,6 +356,10 @@ func (*fakeDataSinkCopier) Copy(_ []runtests.DataSinkReference, _ string) (runte
 	return runtests.DataSinkMap{}, nil
 }
 
+func (*fakeDataSinkCopier) RemoveAll(_ string) error {
+	return nil
+}
+
 func (c *fakeDataSinkCopier) Reconnect() error {
 	c.reconnectCalls++
 	return nil

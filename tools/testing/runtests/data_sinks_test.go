@@ -29,6 +29,10 @@ func (v fakeViewer) copyFile(remote, local string) error {
 	return nil
 }
 
+func (v fakeViewer) removeAll(_ string) error {
+	return nil
+}
+
 func (v fakeViewer) close() error {
 	return nil
 }

@@ -52,6 +52,11 @@ func (c DataSinkCopier) GetAllDataSinks(remoteDir string) ([]DataSink, error) {
 	return getAllDataSinks(c.viewer, remoteDir)
 }
 
+// RemoveAll removes all files at remoteDir.
+func (c DataSinkCopier) RemoveAll(remoteDir string) error {
+	return c.viewer.removeAll(remoteDir)
+}
+
 // Reconnect should be called after the sshClient has been disconnected and
 // reconnected. It closes the old viewer and creates a new viewer using the
 // refreshed sshClient.
@@ -94,6 +99,7 @@ type remoteViewer interface {
 	summary(string) (*TestSummary, error)
 	getAllDataSinks(string) ([]string, error)
 	copyFile(string, string) error
+	removeAll(string) error
 	close() error
 }
 
@@ -151,6 +157,19 @@ func (v sftpViewer) copyFile(remote, local string) error {
 
 	_, err = io.Copy(localFile, remoteFile)
 	return err
+}
+
+func (v sftpViewer) removeAll(remoteDir string) error {
+	walker := v.client.Walk(remoteDir)
+	for walker.Step() {
+		if walker.Stat() == nil || walker.Stat().IsDir() {
+			continue
+		}
+		if err := v.client.Remove(walker.Path()); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (v sftpViewer) close() error {

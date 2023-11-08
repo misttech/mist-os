@@ -161,7 +161,7 @@ func GetCoverageDataFromTest(t *testing.T, outDir string, config *Config) []stri
 
 	test_ctx := context.Background()
 	t.Logf("Running Test: %s", config.Test.Name)
-	test_result, err := runner.Test(test_ctx, shard, os.Stdout, os.Stdout, "unused-out-dir")
+	test_result, err := runner.Test(test_ctx, shard, os.Stdout, os.Stdout, "")
 	if err != nil {
 		t.Fatalf("Test execution failed. Reason: %s", err)
 	}

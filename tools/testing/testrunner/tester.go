@@ -116,6 +116,7 @@ type dataSinkCopier interface {
 	GetAllDataSinks(remoteDir string) ([]runtests.DataSink, error)
 	GetReferences(remoteDir string) (map[string]runtests.DataSinkReference, error)
 	Copy(sinks []runtests.DataSinkReference, localDir string) (runtests.DataSinkMap, error)
+	RemoveAll(remoteDir string) error
 	Reconnect() error
 	Close() error
 }
@@ -601,15 +602,16 @@ func (t *FFXTester) testWithFile(ctx context.Context, test testsharder.Test, std
 	if err != nil {
 		return nil, err
 	}
-	return t.processTestResult(runResult, test, clock.Now(ctx).Sub(startTime))
-}
-
-func (t *FFXTester) processTestResult(runResult *ffxutil.TestRunResult, test testsharder.Test, totalDuration time.Duration) (*TestResult, error) {
 	if runResult == nil {
 		return nil, fmt.Errorf("no test result was found")
 	}
 	testOutDir := runResult.GetTestOutputDir()
 	t.testOutDirs = append(t.testOutDirs, testOutDir)
+	return processTestResult(runResult, test, clock.Now(ctx).Sub(startTime), false)
+}
+
+func processTestResult(runResult *ffxutil.TestRunResult, test testsharder.Test, totalDuration time.Duration, removeProfiles bool) (*TestResult, error) {
+	testOutDir := runResult.GetTestOutputDir()
 	suiteResults, err := runResult.GetSuiteResults()
 	if err != nil {
 		return nil, err
@@ -636,6 +638,10 @@ func (t *FFXTester) processTestResult(runResult *ffxutil.TestRunResult, test tes
 	var stdioPath string
 	suiteArtifactDir := filepath.Join(testOutDir, suiteResult.ArtifactDir)
 	for artifact, metadata := range suiteResult.Artifacts {
+		if _, err := os.Stat(filepath.Join(suiteArtifactDir, artifact)); os.IsNotExist(err) {
+			// Don't record artifacts that don't exist.
+			continue
+		}
 		if metadata.ArtifactType == ffxutil.ReportType {
 			// Copy the report log into the filename expected by infra.
 			// TODO(fxbug.dev/91013): Remove dependencies on this filename.
@@ -668,6 +674,10 @@ func (t *FFXTester) processTestResult(runResult *ffxutil.TestRunResult, test tes
 		var failReason string
 		testCaseArtifactDir := filepath.Join(testOutDir, testCase.ArtifactDir)
 		for artifact, metadata := range testCase.Artifacts {
+			if _, err := os.Stat(filepath.Join(testCaseArtifactDir, artifact)); os.IsNotExist(err) {
+				// Don't record artifacts that don't exist.
+				continue
+			}
 			// Get the failReason from the stderr log.
 			// TODO(ihuh): The stderr log may contain unsymbolized logs.
 			// Consider symbolizing them within ffx or testrunner.
@@ -699,6 +709,18 @@ func (t *FFXTester) processTestResult(runResult *ffxutil.TestRunResult, test tes
 	// test duration to more accurately capture the total duration of the test.
 	overhead := totalDuration - testResult.Duration()
 	testResult.EndTime = testResult.EndTime.Add(overhead)
+	// The runResult's artifacts should contain a directory with the profiles from
+	// component v2 tests along with a summary.json that lists the data sinks per test.
+	// It should also contain a second directory with early boot data sinks.
+	// TODO(fxbug.dev/124611): Merge profiles on host when using ffx test. When using
+	// run-test-suite, we can just remove the entire artifact directory because we'll
+	// scp the profiles off the target at the end of the task instead.
+	if removeProfiles {
+		runArtifactDir := filepath.Join(testOutDir, runResult.ArtifactDir)
+		if err := os.RemoveAll(runArtifactDir); err != nil {
+			return testResult, err
+		}
+	}
 	return testResult, nil
 }
 
@@ -711,17 +733,6 @@ func (t *FFXTester) UpdateOutputDir(oldDir, newDir string) {
 			break
 		}
 	}
-}
-
-// RemoveAllOutputDirs removes the test output directories for all calls to Test().
-func (t *FFXTester) RemoveAllOutputDirs() error {
-	var errs []string
-	for _, outDir := range t.testOutDirs {
-		if err := os.RemoveAll(outDir); err != nil {
-			errs = append(errs, fmt.Sprintf("failed to remove %s: %s", outDir, err))
-		}
-	}
-	return fmt.Errorf(strings.Join(errs, "; "))
 }
 
 // RemoveAllEmptyOutputDirs cleans up the output dirs by removing all empty
@@ -1016,16 +1027,60 @@ func (t *FuchsiaSSHTester) runSSHCommandWithRetry(ctx context.Context, command [
 }
 
 // Test runs a test over SSH.
-func (t *FuchsiaSSHTester) Test(ctx context.Context, test testsharder.Test, stdout io.Writer, stderr io.Writer, _ string) (*TestResult, error) {
+func (t *FuchsiaSSHTester) Test(ctx context.Context, test testsharder.Test, stdout io.Writer, stderr io.Writer, outDir string) (*TestResult, error) {
 	testResult := BaseTestResultFromTest(test)
 	command, err := commandForTest(&test, false, test.Timeout)
 	if err != nil {
 		testResult.FailReason = err.Error()
 		return testResult, nil
 	}
+	// Set the output directory to retrieve test outputs.
+	targetOutDir := fmt.Sprintf("/tmp/%s", strings.ReplaceAll(test.Name, "/", "_"))
+	// Setting an output directory adds latency to test execution for coverage builds
+	// which produce a lot of output files. Since we will collect the profiles at
+	// the end anyway, don't use --deprecated-output-directory for coverage builders.
+	setOutputDir := !strings.Contains(os.Getenv("BUILDER_NAME"), "coverage")
+	if setOutputDir {
+		command = append(command, "--deprecated-output-directory", targetOutDir)
+	}
+	startTime := clock.Now(ctx)
 	testErr := t.runSSHCommandWithRetry(ctx, command, stdout, stderr)
 	if testErr == nil {
 		testResult.Result = runtests.TestSuccess
+	}
+
+	// Collect test outputs. This is a best effort. If any of the following steps
+	// to process the outputs fail, just log the failure but don't fail the test.
+	if setOutputDir {
+		outputs, err := t.copier.GetAllDataSinks(targetOutDir)
+		if err != nil {
+			logger.Debugf(ctx, "failed to get test outputs: %s", err)
+		}
+		if len(outputs) > 0 && outDir != "" {
+			// If there were test outputs, copy them to the outDir to be recorded as OutputFiles.
+			// As this code will be deprecated once we migrate to ffx, we reuse the existing
+			// sink structure as a temporary hack even though these are just arbitrary
+			// output files, so the sink type does not matter.
+			sinkMap := runtests.DataSinkMap{"outputfile": []runtests.DataSink{}}
+			for _, output := range outputs {
+				sinkMap["outputfile"] = append(sinkMap["outputfile"], output)
+			}
+			sinkRef := runtests.DataSinkReference{Sinks: sinkMap, RemoteDir: targetOutDir}
+			if err := t.copySinks(ctx, []runtests.DataSinkReference{sinkRef}, outDir); err != nil {
+				logger.Debugf(ctx, "failed to copy test outputs to host: %s", err)
+			}
+			if err := t.copier.RemoveAll(targetOutDir); err != nil {
+				logger.Debugf(ctx, "failed to remove test outputs: %s", err)
+			}
+			// Using --deprecated-output-directory should produce outputs following the same
+			// schema as `ffx test` outputs, so we can process them like ffx test outputs.
+			runResult, err := ffxutil.GetRunResult(outDir)
+			if err != nil {
+				logger.Debugf(ctx, "failed to get run result: %s", err)
+			} else if runResult != nil {
+				return processTestResult(runResult, test, clock.Now(ctx).Sub(startTime), true)
+			}
+		}
 	}
 
 	if sshutil.IsConnectionError(testErr) {

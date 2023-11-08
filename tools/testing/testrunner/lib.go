@@ -212,17 +212,12 @@ func execute(
 				return fmt.Errorf("failed to initialize ffx tester: %w", err)
 			}
 			defer func() {
-				// outputs.Record() moves output files to paths within the output directory
-				// specified by test name.
-				// Remove the ffx test out dirs which would now only contain empty directories
-				// and summary.jsons that don't point to real paths anymore.
-				if opts.FFXExperimentLevel >= 2 {
-					// Leave the summary.jsons for debugging.
-					err = ffxTester.RemoveAllEmptyOutputDirs()
-				} else {
-					err = ffxTester.RemoveAllOutputDirs()
+				// TODO(fxbug.dev/124611): Once profiles are being merged on the host, this
+				// will leave empty artifact directories within each test's output directories
+				// from where the profiles originated from. Clean up empty directories.
+				if err := ffxTester.RemoveAllEmptyOutputDirs(); err != nil {
+					logger.Debugf(ctx, "%s", err)
 				}
-				logger.Debugf(ctx, "%s", err)
 			}()
 			fuchsiaTester = ffxTester
 		}
