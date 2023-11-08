@@ -140,6 +140,32 @@ func TestGetAvailableImages(t *testing.T) {
 	}
 
 	bucket = "new"
+	version = "non_default**"
+	images, err = testSDK.GetAvailableImages(version, bucket)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(images) != 2 {
+		t.Fatalf("Expected 2 images, got %v: %v", len(images), images)
+	}
+	expectedImages := []GCSImage{
+		{
+			Bucket:  "new",
+			Version: "non_default1",
+			Name:    "priv-image1",
+		}, {
+			Bucket:  "new",
+			Version: "non_default2",
+			Name:    "priv-image1",
+		},
+	}
+	if diff := cmp.Diff(expectedImages, images, cmpopts.SortSlices(func(a, b GCSImage) bool {
+		return a.Bucket == b.Bucket && a.Version == b.Version && a.Name == b.Name
+	})); diff != "" {
+		t.Errorf("GetAvailableImages() mismatch (-want +got):\n%s", diff)
+	}
+
+	bucket = "new"
 	version = "multi-version**"
 	images, err = testSDK.GetAvailableImages(version, bucket)
 	if err != nil {
@@ -148,7 +174,7 @@ func TestGetAvailableImages(t *testing.T) {
 	if len(images) != 4 {
 		t.Fatalf("Expected 4 images, got %v: %v", len(images), images)
 	}
-	expectedImages := []GCSImage{
+	expectedImages = []GCSImage{
 		{
 			Bucket:  "new",
 			Version: "multi-version1",
@@ -1419,6 +1445,10 @@ func fakeGSUtil(args []string) {
 			expected = []string{args[0], args[1]}
 			fmt.Print("gs://new/development/multi-version1/images/priv-image1.tgz\n")
 			fmt.Print("gs://new/development/multi-version2/images/priv-image1.tgz\n")
+		case "gs://new/development/non_default**/images*":
+			expected = []string{args[0], args[1]}
+			fmt.Print("gs://new/development/non_default1/images/priv-image1.tgz\n")
+			fmt.Print("gs://new/development/non_default2/images/priv-image1.tgz\n")
 		case "gs://fuchsia/development/unknown/images*":
 			expected = []string{args[0], args[1]}
 			fmt.Fprintf(os.Stderr, "CommandException: One or more URLs matched no objects.")

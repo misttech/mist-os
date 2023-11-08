@@ -332,12 +332,15 @@ func (sdk SDKProperties) GetAvailableImagesContext(ctx context.Context, version 
 		buckets = []string{bucket, defaultBucketName}
 	}
 
+	var latestErr error
+	var successfulBucket bool
 	for _, b := range buckets {
 		url := fmt.Sprintf("gs://%v/development/%v/images*", b, version)
 		args := []string{"ls", url}
 		output, err := runGSUtil(ctx, args)
 		if err != nil {
-			return images, err
+			latestErr = err
+			continue
 		}
 		for _, line := range strings.Split(strings.TrimSuffix(string(output), "\n"), "\n") {
 			if len(filepath.Base(line)) >= 4 {
@@ -348,6 +351,10 @@ func (sdk SDKProperties) GetAvailableImagesContext(ctx context.Context, version 
 				log.Warningf("Could not parse image name: %v", line)
 			}
 		}
+		successfulBucket = true
+	}
+	if !successfulBucket {
+		return images, latestErr
 	}
 	return images, nil
 }
