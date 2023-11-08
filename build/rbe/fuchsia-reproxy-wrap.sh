@@ -49,6 +49,7 @@ example:
 options:
   --cfg FILE: reclient config for reproxy
   --bindir DIR: location of reproxy tools
+  -t: print additional timestamps for measuring overhead.
   -v | --verbose: print events verbosely
   All other flags before -- are forwarded to the reproxy bootstrap.
 
@@ -60,6 +61,7 @@ EOF
 }
 
 verbose=0
+print_times=0
 bootstrap_options=()
 # Extract script options before --
 for opt
@@ -84,6 +86,7 @@ do
     --cfg) prev_opt=config ;;
     --bindir=*) reclient_bindir="$optarg" ;;
     --bindir) prev_opt=reclient_bindir ;;
+    -t) print_times=1 ;;
     -v | --verbose) verbose=1 ;;
     # stop option processing
     --) shift; break ;;
@@ -93,6 +96,12 @@ do
   shift
 done
 test -z "$prev_out" || { echo "Option is missing argument to set $prev_opt." ; exit 1;}
+
+function _timetrace() {
+  [[ "$print_times" == 0 ]] || timetrace "$@"
+}
+
+_timetrace "main start (after option processing)"
 
 readonly reproxy_cfg="$config"
 readonly bootstrap="$reclient_bindir"/bootstrap
@@ -263,6 +272,7 @@ function cleanup() {
 # Use the same config for bootstrap as for reproxy.
 # This also checks for authentication, and prompts the user to
 # re-authenticate if needed.
+_timetrace "Bootstrapping reproxy"
 "${bootstrap_env[@]}" \
   "$bootstrap" \
   --re_proxy="$reproxy" \
@@ -274,16 +284,20 @@ function cleanup() {
   echo "logs: $reproxy_logdir"
   echo "socket: $socket_path"
 }
+_timetrace "Bootstrapping reproxy (done)"
 
 test "$BUILD_METRICS_ENABLED" = 0 || {
+  _timetrace "Authenticating for metrics upload"
   # Pre-authenticate for uploading metrics and logs
   "$script_dir"/upload_reproxy_logs.sh --auth-only
 
   # Generate a uuid for uploading logs and metrics.
   echo "$build_uuid" > "$reproxy_logdir"/build_id
+  _timetrace "Authenticating for metrics upload (done)"
 }
 
 shutdown() {
+  _timetrace "Shutting down reproxy"
   # b/188923283 -- added --cfg to shut down properly
   "${bootstrap_env[@]}" \
     "$bootstrap" \
@@ -292,10 +306,12 @@ shutdown() {
   [[ "$verbose" != 1 ]] || {
     cat "$reproxy_logdir"/shutdown.stdout
   }
+  _timetrace "Shutting down reproxy (done)"
 
   cleanup
 
   test "$BUILD_METRICS_ENABLED" = 0 || {
+    _timetrace "Processing RBE logs and uploading to BigQuery"
     # This script uses the 'bq' CLI tool, which is installed in the
     # same path as `gcloud`.
     # This is experimental and runs a bit noisily for the moment.
@@ -309,6 +325,7 @@ shutdown() {
       --bq-metrics-table="$cloud_project:$dataset".rbe_client_metrics_developer \
       "$reproxy_logdir"
       # The upload exit status does not propagate from inside a trap call.
+    _timetrace "Processing RBE logs and uploading to BigQuery (done)"
   }
 }
 
@@ -317,4 +334,6 @@ trap shutdown EXIT
 
 # original command is in "$@"
 # Do not 'exec' this, so that trap takes effect.
+_timetrace "Running wrapped command"
 "${rewrapper_env[@]}" "$@"
+_timetrace "Running wrapped command (done)"
