@@ -258,11 +258,11 @@ pub struct SignalInfo {
 
 impl SignalInfo {
     pub fn default(signal: Signal) -> Self {
-        Self::new(signal, SI_KERNEL, SignalDetail::default())
+        Self::new(signal, SI_KERNEL as i32, SignalDetail::default())
     }
 
-    pub fn new(signal: Signal, code: u32, detail: SignalDetail) -> Self {
-        Self { signal, errno: 0, code: code as i32, detail, force: false }
+    pub fn new(signal: Signal, code: i32, detail: SignalDetail) -> Self {
+        Self { signal, errno: 0, code, detail, force: false }
     }
 
     // TODO(tbodt): Add a bound requiring siginfo_t to be FromBytes. This will help ensure the
@@ -506,7 +506,7 @@ mod test {
         assert_eq!(
             &SignalInfo::new(
                 SIGCHLD,
-                CLD_EXITED,
+                CLD_EXITED as i32,
                 SignalDetail::SigChld { pid: 123, uid: 456, status: 2 }
             )
             .as_siginfo_bytes(),

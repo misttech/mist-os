@@ -226,7 +226,7 @@ async fn serve_component_controller(
                             task.as_ref(),
                             signals::SignalInfo::new(
                                 SIGINT,
-                                SI_KERNEL,
+                                SI_KERNEL as i32,
                                 signals::SignalDetail::default(),
                             ),
                         );
@@ -239,7 +239,7 @@ async fn serve_component_controller(
                             &task,
                             signals::SignalInfo::new(
                                 SIGKILL,
-                                SI_KERNEL,
+                                SI_KERNEL as i32,
                                 signals::SignalDetail::default(),
                             ),
                         );

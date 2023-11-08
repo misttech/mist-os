@@ -152,13 +152,13 @@ impl ExitStatus {
         }
     }
 
-    pub fn signal_info_code(&self) -> u32 {
+    pub fn signal_info_code(&self) -> i32 {
         match self {
-            ExitStatus::Exit(_) => CLD_EXITED,
-            ExitStatus::Kill(_) => CLD_KILLED,
-            ExitStatus::CoreDump(_) => CLD_DUMPED,
-            ExitStatus::Stop(_) => CLD_STOPPED,
-            ExitStatus::Continue(_) => CLD_CONTINUED,
+            ExitStatus::Exit(_) => CLD_EXITED as i32,
+            ExitStatus::Kill(_) => CLD_KILLED as i32,
+            ExitStatus::CoreDump(_) => CLD_DUMPED as i32,
+            ExitStatus::Stop(_) => CLD_STOPPED as i32,
+            ExitStatus::Continue(_) => CLD_CONTINUED as i32,
         }
     }
 
@@ -2367,7 +2367,7 @@ impl CurrentTask {
                 };
                 ExceptionResult::Signal(SignalInfo::new(
                     signo,
-                    SI_KERNEL,
+                    SI_KERNEL as i32,
                     SignalDetail::SigFault { addr: decoded.faulting_address },
                 ))
             }
