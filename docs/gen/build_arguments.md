@@ -3264,15 +3264,6 @@ The product assembly config used to configure the main Fuchsia image.
 
 From //build/product.gni:41
 
-### fuchsia_route_sources_config
-
-An optional file path to the route_sources verifier configuration to be used
-on the assembled fuchsia system.
-
-**Current value (from the default):** `""`
-
-From //build/security.gni:143
-
 ### fuchsia_sdk_root
 
 Consumers of the Fuchsia SDK instantiate templates for various SDK parts at
@@ -3286,129 +3277,6 @@ non-SDK buildroots.
 **Current value (from the default):** `""`
 
 From //build/fuchsia/sdk.gni:17
-
-### fuchsia_static_pkgs_goldens
-
-An optional list of golden files for fuchsia.zbi static pkgs list. If
-specified, they would be compared against fuchsia.zbi static pkgs list
-during build time. At least one of the golden files must match.
-In normal case, there should only be one golden file in this list.
-During a soft transition where changes are made in a different repo than
-the golden file repo, user need to
-1. copy the old golden file before the change to '*.orig'
-2. create a new golden file reflecting the changes
-3. add both the old golden file and new golden file to this list. e.g. there
-would be 'product.txt' and 'product.txt.orig' in this list and check in the
-above changes.
-4. check in the changes that is made in a different repo.
-5. delete 'product.txt.orig' and remove it from this list.
-
-**Current value (from the default):** `[]`
-
-From //build/security.gni:114
-
-### fuchsia_structured_config_policy
-
-An optional file path to the structured configuration policy to be used on the
-assembled fuchsia system. Defaults to no enforcement. Policy must be provided
-for any product which is not an `eng` build type.
-
-**Current value (from the default):** `""`
-
-From //build/security.gni:134
-
-### fuchsia_verify_component_resolvers_allowlist
-
-**Current value (from the default):** `"//src/security/policy/component_resolvers_policy.json5"`
-
-From //build/security.gni:197
-
-### fuchsia_verify_routes_component_tree_config
-
-An optional component tree configuration file used to finalize dynamic
-elements of the component tree constructed for route verification on the
-fuchsia assembled system. When non-empty, this value is passed as the
-`--component-tree-config` option to `ffx scrutiny verify routes` to verify
-routes in the fuchsia component tree.
-
-**Current value (from the default):** `""`
-
-From //build/security.gni:182
-
-### fuchsia_verify_routes_exceptions_allowlist
-
-**Current value (from the default):** `"//src/security/policy/build/verify_routes_exceptions_allowlist.json5"`
-
-From //build/security.gni:155
-
-### fuchsia_verify_routes_exceptions_allowlist_product
-
-Same as fuchsia_verify_routes_exceptions_allowlist, except these allowlists
-get added according to product-specific configuration.
-
-**Current value (from the default):** `[]`
-
-From //build/security.gni:171
-
-### fuchsia_zbi_bootfs_filelist_goldens
-
-An optional list of golden files for fuchsia.zbi bootFS file list. If
-specified, they would be compared against fuchsia.zbi bootFS file list
-during build time. At least one of the golden files must match.
-In normal case, there should only be one golden file in this list.
-During a soft transition where changes are made in a different repo than
-the golden file repo, user need to
-1. copy the old golden file before the change to '*.orig'
-2. create a new golden file reflecting the changes
-3. add both the old golden file and new golden file to this list. e.g. there
-would be 'product.txt' and 'product.txt.orig' in this list and check in the
-above changes.
-4. check in the changes that is made in a different repo.
-5. delete 'product.txt.orig' and remove it from this list.
-
-**Current value (from the default):** `[]`
-
-From //build/security.gni:54
-
-### fuchsia_zbi_bootfs_packages_goldens
-
-An optional list of golden files for fuchsia.zbi bootFS package index. If
-specified, they would be compared against fuchsia.zbi bootFS package index
-during build time. At least one of the golden files must match.
-In normal case, there should only be one golden file in this list.
-During a soft transition where changes are made in a different repo than
-the golden file repo, user need to
-1. copy the old golden file before the change to '*.orig'
-2. create a new golden file reflecting the changes
-3. add both the old golden file and new golden file to this list. e.g. there
-would be 'product.txt' and 'product.txt.orig' in this list and check in the
-above changes.
-4. check in the changes that is made in a different repo.
-5. delete 'product.txt.orig' and remove it from this list.
-
-**Current value (from the default):** `[]`
-
-From //build/security.gni:84
-
-### fuchsia_zbi_kernel_cmdline_goldens
-
-An optional list of golden files for fuchsia.zbi kernel cmdline args. If
-specified, they would be compared against fuchsia.zbi kernel cmdline during
-build time.
-In normal case, there should only be golden file in this list.
-During a soft transition where changes are made in a different repo than
-the golden file repo, user need to
-1. copy the old golden file before the change to '*.orig'
-2. create a new golden file reflecting the changes
-3. add both the old golden file and new golden file to this list. e.g. there
-would be 'product.txt' and 'product.txt.orig' in this list and check in the
-above changes.
-4. check in the changes that is made in a different repo.
-5. delete 'product.txt.orig' and remove it from this list.
-
-**Current value (from the default):** `[]`
-
-From //build/security.gni:24
 
 ### futex_tracing_enabled
 
@@ -6997,6 +6865,40 @@ From //third_party/pigweed/src/pw_toolchain/static_analysis_toolchain.gni:33
 
 From //third_party/pigweed/src/pw_toolchain/rbe.gni:20
 
+### pw_trace_BACKEND
+
+Default backend for the pw_trace module is pw_trace:null.
+
+**Current value (from the default):** `"//third_party/pigweed/src/pw_trace:null"`
+
+From //third_party/pigweed/src/pw_trace/backend.gni:19
+
+### pw_trace_CONFIG
+
+The build target that overrides the default configuration options for this
+module. This should point to a source set that provides defines through a
+public config (which may -include a file or add defines directly).
+
+**Current value (from the default):** `"//third_party/pigweed/src/pw_build:empty"`
+
+From //third_party/pigweed/src/pw_trace_tokenized/config.gni:23
+
+### pw_trace_tokenized_BUFFER_SIZE
+
+Trace buffer size in bytes. Set to 0 to disable.
+
+**Current value (from the default):** `256`
+
+From //third_party/pigweed/src/pw_trace_tokenized/config.gni:29
+
+### pw_trace_tokenizer_time
+
+Tokenizer trace time, gets included if provided
+
+**Current value (from the default):** `""`
+
+From //third_party/pigweed/src/pw_trace_tokenized/config.gni:26
+
 ### pw_transfer_CONFIG
 
 The build target that overrides the default configuration options for this
@@ -7251,149 +7153,6 @@ assembly work until that's been addressed.
 
 From //build/images/args.gni:20
 
-### recovery_route_sources_config
-
-An optional file path to the route_sources verifier configuration to be used
-on the assembled recovery system.
-
-**Current value (from the default):** `""`
-
-From //build/security.gni:147
-
-### recovery_static_pkgs_goldens
-
-An optional list of golden files for recovery.zbi static pkgs list. If
-specified, they would be compared against recovery.zbi static pkgs list
-during build time.  At least one of the golden files must match.
-In normal case, there should only be golden file in this list.
-During a soft transition where changes are made in a different repo than
-the golden file repo, user need to
-1. copy the old golden file before the change to '*.orig'
-2. create a new golden file reflecting the changes
-3. add both the old golden file and new golden file to this list. e.g. there
-would be 'product.txt' and 'product.txt.orig' in this list and check in the
-above changes.
-4. check in the changes that is made in a different repo.
-5. delete 'product.txt.orig' and remove it from this list.
-
-**Current value (from the default):** `[]`
-
-From //build/security.gni:129
-
-### recovery_structured_config_policy
-
-An optional file path to the structured configuration policy to be used on the
-assembled recovery system. Defaults to no enforcement. Policy must be provided
-for any product which is not an `eng` build type.
-
-**Current value (from the default):** `""`
-
-From //build/security.gni:139
-
-### recovery_verify_component_resolvers_allowlist
-
-**Current value (from the default):** `"//src/security/policy/component_resolvers_policy.json5"`
-
-From //build/security.gni:205
-
-### recovery_verify_routes_component_tree_config
-
-An optional component tree configuration file used to finalize dynamic
-elements of the component tree constructed for route verification on the
-recovery assembled system. When non-empty, this value is passed as the
-`--component-tree-config` option to `ffx scrutiny verify routes` to verify
-routes in the fuchsia component tree.
-
-**Current value (from the default):** `""`
-
-From //build/security.gni:189
-
-### recovery_verify_routes_exceptions_allowlist
-
-An optional list of (capability, moniker) pairs that determine exceptions
-to the verify_route.gni build rule that prevents v2 components from
-attempting to use capabilities they were not offered in the recovery
-system. Generally new entries should not be added to this allowlist and acts
-as a marker for future technical debt to clean up.
-
-The path to this list defaults to "" because most build configurations do
-perform recovery build verification. The canonical allowlist for build
-configurations that do perform recovery build verification is
-"//src/security/policy/build/verify_routes_exceptions_allowlist.json5".
-
-**Current value (from the default):** `""`
-
-From //build/security.gni:167
-
-### recovery_verify_routes_exceptions_allowlist_product
-
-Same as recovery_verify_routes_exceptions_allowlist, except these allowlists
-get added according to product-specific configuration.
-
-**Current value (from the default):** `[]`
-
-From //build/security.gni:175
-
-### recovery_zbi_bootfs_filelist_goldens
-
-An optional list of golden files for recovery.zbi bootFS file list. If
-specified, they would be compared against recovery.zbi bootFS file list
-during build time.  At least one of the golden files must match.
-In normal case, there should only be golden file in this list.
-During a soft transition where changes are made in a different repo than
-the golden file repo, user need to
-1. copy the old golden file before the change to '*.orig'
-2. create a new golden file reflecting the changes
-3. add both the old golden file and new golden file to this list. e.g. there
-would be 'product.txt' and 'product.txt.orig' in this list and check in the
-above changes.
-4. check in the changes that is made in a different repo.
-5. delete 'product.txt.orig' and remove it from this list.
-
-**Current value (from the default):** `[]`
-
-From //build/security.gni:69
-
-### recovery_zbi_bootfs_packages_goldens
-
-An optional list of golden files for recovery.zbi bootfs package index. If
-specified, they would be compared against recovery.zbi bootfs package index
-during build time.  At least one of the golden files must match.
-In normal case, there should only be golden file in this list.
-During a soft transition where changes are made in a different repo than
-the golden file repo, user need to
-1. copy the old golden file before the change to '*.orig'
-2. create a new golden file reflecting the changes
-3. add both the old golden file and new golden file to this list. e.g. there
-would be 'product.txt' and 'product.txt.orig' in this list and check in the
-above changes.
-4. check in the changes that is made in a different repo.
-5. delete 'product.txt.orig' and remove it from this list.
-
-**Current value (from the default):** `[]`
-
-From //build/security.gni:99
-
-### recovery_zbi_kernel_cmdline_goldens
-
-An optional list of golden files for recovery.zbi kernel cmdline args. If
-specified, they would be compared against recovery.zbi kernel cmdline
-during build time. At least one of the golden files must match.
-In normal case, there should only be one golden file in this list.
-During a soft transition where changes are made in a different repo than
-the golden file repo, user need to
-1. copy the old golden file before the change to '*.orig'
-2. create a new golden file reflecting the changes
-3. add both the old golden file and new golden file to this list. e.g. there
-would be 'product.txt' and 'product.txt.orig' in this list and check in the
-above changes.
-4. check in the changes that is made in a different repo.
-5. delete 'product.txt.orig' and remove it from this list.
-
-**Current value (from the default):** `[]`
-
-From //build/security.gni:39
-
 ### remove_default_configs
 
 **Current value for `target_cpu = "arm64"`:** `["//third_party/pigweed/src/pw_build:reduced_size"]`
@@ -7466,14 +7225,6 @@ From //build/toolchain/restat.gni:19
 **Current value (from the default):** `"//prebuilt/third_party/fonts/roboto/Roboto-Regular.ttf"`
 
 From //src/recovery/system/system_recovery_args.gni:10
-
-### run_scrutiny_verifiers
-
-Whether the scrutiny verifiers should be ran.
-
-**Current value (from the default):** `false`
-
-From //build/security.gni:9
 
 ### rust_cap_lints
 
@@ -8346,7 +8097,7 @@ Default value is 'all', it is preferable to set to 'none' for production
 
 **Current value (from the default):** `"all"`
 
-From //build/security.gni:218
+From //build/security.gni:19
 
 ### tests_in_base
 
