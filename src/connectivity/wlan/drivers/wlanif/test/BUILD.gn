@@ -29,7 +29,6 @@ test("device_unittest") {
     "//sdk/fidl/fuchsia.wlan.sme:fuchsia.wlan.sme_hlcpp",
     "//sdk/lib/sys/cpp/testing:cpp",
     "//src/connectivity/wlan/drivers/wlanif:lib_source",
-    "//src/connectivity/wlan/lib/mlme/cpp:mlme",
     "//src/devices/lib/driver",
     "//src/devices/testing/mock-ddk",
     "//src/lib/ddk",

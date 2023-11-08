@@ -12,23 +12,17 @@
 #include <fuchsia/wlan/internal/cpp/fidl.h>
 #include <fuchsia/wlan/mlme/cpp/fidl.h>
 
-#include <memory>
-
-#include "src/connectivity/wlan/lib/common/cpp/include/wlan/common/channel.h"
-#include "src/connectivity/wlan/lib/mlme/cpp/include/wlan/mlme/mac_frame.h"
-
 namespace wlan_fullmac_test {
 
 namespace wlan_common = ::fuchsia::wlan::common;
 namespace wlan_ieee80211 = ::fuchsia::wlan::ieee80211;
-namespace wlan_internal = ::fuchsia::wlan::internal;
 namespace wlan_mlme = ::fuchsia::wlan::mlme;
 
 bss_description_t CreateBssDescription(wlan_channel_t channel) {
   wlan::common::MacAddr bssid(kBssid1);
 
   bss_description_t bss_desc = {};
-  std::memcpy((void*)bss_desc.bssid, bssid.byte, ETH_MAC_SIZE);
+  std::memcpy((void*)bss_desc.bssid, bssid.byte, wlan_ieee80211::MAC_ADDR_LEN);
   bss_desc.bss_type = BSS_TYPE_INFRASTRUCTURE;
   bss_desc.beacon_period = kBeaconPeriodTu;
   bss_desc.capability_info = 1 | 1 << 5;  // ESS and short preamble bits
