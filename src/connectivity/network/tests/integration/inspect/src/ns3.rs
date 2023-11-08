@@ -229,12 +229,60 @@ async fn inspect_counters(name: &str) {
         "Counters": {
             "IPv4": {
                 PacketTx: 1u64,
-                PacketRx: 1u64,
+                "PacketRx": {
+                    Received: 1u64,
+                    Dispatched: 1u64,
+                    Delivered: 1u64,
+                    OtherHost: 0u64,
+                    ParameterProblem: 0u64,
+                    UnspecifiedDst: 0u64,
+                    UnspecifiedSrc: 0u64,
+                    Dropped: 0u64,
+                },
+                "Forwarding": {
+                    Forwarded: 0u64,
+                    NoRouteToHost: 0u64,
+                    MtuExceeded: 0u64,
+                    TtlExpired: 0u64,
+                },
+                RxIcmpError: 0u64,
+                "Fragments": {
+                    ReassemblyError: 0u64,
+                    NeedMoreFragments: 0u64,
+                    InvalidFragment: 0u64,
+                    CacheFull: 0u64,
+                },
             },
             "IPv6": {
                 PacketTx: 0u64,
-                PacketRx: 0u64,
-            }
+                "PacketRx": {
+                    Received: 0u64,
+                    Dispatched: 0u64,
+                    DeliveredMulticast: 0u64,
+                    DeliveredUnicast: 0u64,
+                    OtherHost: 0u64,
+                    ParameterProblem: 0u64,
+                    UnspecifiedDst: 0u64,
+                    UnspecifiedSrc: 0u64,
+                    Dropped: 0u64,
+                    DroppedTentativeDst: 0u64,
+                    DroppedNonUnicastSrc: 0u64,
+                    DroppedExtensionHeader: 0u64,
+                },
+                "Forwarding": {
+                    Forwarded: 0u64,
+                    NoRouteToHost: 0u64,
+                    MtuExceeded: 0u64,
+                    TtlExpired: 0u64,
+                },
+                RxIcmpError: 0u64,
+                "Fragments": {
+                    ReassemblyError: 0u64,
+                    NeedMoreFragments: 0u64,
+                    InvalidFragment: 0u64,
+                    CacheFull: 0u64,
+                },
+            },
         }
     })
 }

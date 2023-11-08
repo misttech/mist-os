@@ -240,11 +240,113 @@ pub(crate) fn counters(ctx: &Ctx) -> fuchsia_inspect::Inspector {
             let Self(inspector) = self;
             inspector.root().record_child("IPv4", |node| {
                 node.record_uint("PacketTx", counters.ipv4_common.send_ip_packet.get());
-                node.record_uint("PacketRx", counters.ipv4_common.receive_ip_packet.get());
+                node.record_child("PacketRx", |node| {
+                    node.record_uint("Received", counters.ipv4_common.receive_ip_packet.get());
+                    node.record_uint(
+                        "Dispatched",
+                        counters.ipv4_common.dispatch_receive_ip_packet.get(),
+                    );
+                    node.record_uint("Delivered", counters.ipv4.deliver.get());
+                    node.record_uint(
+                        "OtherHost",
+                        counters.ipv4_common.dispatch_receive_ip_packet_other_host.get(),
+                    );
+                    node.record_uint(
+                        "ParameterProblem",
+                        counters.ipv4_common.parameter_problem.get(),
+                    );
+                    node.record_uint(
+                        "UnspecifiedDst",
+                        counters.ipv4_common.unspecified_destination.get(),
+                    );
+                    node.record_uint(
+                        "UnspecifiedSrc",
+                        counters.ipv4_common.unspecified_source.get(),
+                    );
+                    node.record_uint("Dropped", counters.ipv4_common.dropped.get());
+                });
+                node.record_child("Forwarding", |node| {
+                    node.record_uint("Forwarded", counters.ipv4_common.forward.get());
+                    node.record_uint("NoRouteToHost", counters.ipv4_common.no_route_to_host.get());
+                    node.record_uint("MtuExceeded", counters.ipv4_common.mtu_exceeded.get());
+                    node.record_uint("TtlExpired", counters.ipv4_common.ttl_expired.get());
+                });
+                node.record_uint("RxIcmpError", counters.ipv4_common.receive_icmp_error.get());
+                node.record_child("Fragments", |node| {
+                    node.record_uint(
+                        "ReassemblyError",
+                        counters.ipv4_common.fragment_reassembly_error.get(),
+                    );
+                    node.record_uint(
+                        "NeedMoreFragments",
+                        counters.ipv4_common.need_more_fragments.get(),
+                    );
+                    node.record_uint(
+                        "InvalidFragment",
+                        counters.ipv4_common.invalid_fragment.get(),
+                    );
+                    node.record_uint("CacheFull", counters.ipv4_common.fragment_cache_full.get());
+                });
             });
             inspector.root().record_child("IPv6", |node| {
                 node.record_uint("PacketTx", counters.ipv6_common.send_ip_packet.get());
-                node.record_uint("PacketRx", counters.ipv6_common.receive_ip_packet.get());
+                node.record_child("PacketRx", |node| {
+                    node.record_uint("Received", counters.ipv6_common.receive_ip_packet.get());
+                    node.record_uint(
+                        "Dispatched",
+                        counters.ipv6_common.dispatch_receive_ip_packet.get(),
+                    );
+                    node.record_uint("DeliveredMulticast", counters.ipv6.deliver_multicast.get());
+                    node.record_uint("DeliveredUnicast", counters.ipv6.deliver_unicast.get());
+                    node.record_uint(
+                        "OtherHost",
+                        counters.ipv6_common.dispatch_receive_ip_packet_other_host.get(),
+                    );
+                    node.record_uint(
+                        "ParameterProblem",
+                        counters.ipv6_common.parameter_problem.get(),
+                    );
+                    node.record_uint(
+                        "UnspecifiedDst",
+                        counters.ipv6_common.unspecified_destination.get(),
+                    );
+                    node.record_uint(
+                        "UnspecifiedSrc",
+                        counters.ipv6_common.unspecified_source.get(),
+                    );
+                    node.record_uint("Dropped", counters.ipv6_common.dropped.get());
+                    node.record_uint("DroppedTentativeDst", counters.ipv6.drop_for_tentative.get());
+                    node.record_uint(
+                        "DroppedNonUnicastSrc",
+                        counters.ipv6.non_unicast_source.get(),
+                    );
+                    node.record_uint(
+                        "DroppedExtensionHeader",
+                        counters.ipv6.extension_header_discard.get(),
+                    );
+                });
+                node.record_child("Forwarding", |node| {
+                    node.record_uint("Forwarded", counters.ipv6_common.forward.get());
+                    node.record_uint("NoRouteToHost", counters.ipv6_common.no_route_to_host.get());
+                    node.record_uint("MtuExceeded", counters.ipv6_common.mtu_exceeded.get());
+                    node.record_uint("TtlExpired", counters.ipv6_common.ttl_expired.get());
+                });
+                node.record_uint("RxIcmpError", counters.ipv6_common.receive_icmp_error.get());
+                node.record_child("Fragments", |node| {
+                    node.record_uint(
+                        "ReassemblyError",
+                        counters.ipv6_common.fragment_reassembly_error.get(),
+                    );
+                    node.record_uint(
+                        "NeedMoreFragments",
+                        counters.ipv6_common.need_more_fragments.get(),
+                    );
+                    node.record_uint(
+                        "InvalidFragment",
+                        counters.ipv6_common.invalid_fragment.get(),
+                    );
+                    node.record_uint("CacheFull", counters.ipv6_common.fragment_cache_full.get());
+                });
             });
         }
     }

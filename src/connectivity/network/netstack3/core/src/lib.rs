@@ -74,7 +74,7 @@ use crate::{
             Ipv4DeviceTimerId, Ipv6DeviceTimerId,
         },
         icmp::{BufferIcmpContext, IcmpContext, IcmpRxCounters, IcmpTxCounters, NdpCounters},
-        IpCounters, IpLayerTimerId, Ipv4State, Ipv6State,
+        IpCounters, IpLayerTimerId, Ipv4Counters, Ipv4State, Ipv6Counters, Ipv6State,
     },
     transport::{
         tcp::socket::TcpBindingsTypes, udp::UdpCounters, TransportLayerState, TransportLayerTimerId,
@@ -252,6 +252,10 @@ pub struct StackCounters<'a> {
     pub ipv4_common: &'a IpCounters<Ipv4>,
     /// IPv6 layer common counters.
     pub ipv6_common: &'a IpCounters<Ipv6>,
+    /// IPv4 layer specific counters.
+    pub ipv4: &'a Ipv4Counters,
+    /// IPv6 layer specific counters.
+    pub ipv6: &'a Ipv6Counters,
 }
 
 /// Visitor for stack counters.
@@ -265,6 +269,8 @@ pub fn inspect_counters<C: NonSyncContext, V: CounterVisitor>(sync_ctx: &SyncCtx
     let counters = StackCounters {
         ipv4_common: sync_ctx.state.ip_counters::<Ipv4>(),
         ipv6_common: sync_ctx.state.ip_counters::<Ipv6>(),
+        ipv4: sync_ctx.state.ipv4().counters(),
+        ipv6: sync_ctx.state.ipv6().counters(),
     };
     visitor.visit_counters(counters);
 }
