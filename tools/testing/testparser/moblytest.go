@@ -19,13 +19,15 @@ import (
 )
 
 const (
-	// LINT.IfChange
-	moblyTestPreamblePatternStr = `^\[=====MOBLY RESULTS=====\]$`
-	// LINT.ThenChange(//src/testing/end_to_end/mobly_driver/api_infra.py)
-	moblyTestCaseType = "Record"
+	moblyTestPreamblePatternStr         = `^======== Mobly config content ========$`
+	moblyTestResultYAMLHeaderPatternStr = `^\[=====MOBLY RESULTS=====\]$`
+	moblyTestCaseType                   = "Record"
 )
 
-var moblyTestPreamblePattern = regexp.MustCompile(moblyTestPreamblePatternStr)
+var (
+	moblyTestPreamblePattern         = regexp.MustCompile(moblyTestPreamblePatternStr)
+	moblyTestResultYAMLHeaderPattern = regexp.MustCompile(moblyTestResultYAMLHeaderPatternStr)
+)
 
 type moblyTestCase struct {
 	BeginTimeMillis int `yaml:"Begin Time,omitempty"`
@@ -41,6 +43,17 @@ type moblyTestCase struct {
 	Type string `yaml:"Type,omitempty"`
 }
 
+func matchYAMLHeader(lines [][]byte) [][]byte {
+	for num, line := range lines {
+		if moblyTestResultYAMLHeaderPattern.Match(line) {
+			// Skip the matched YAML header line.
+			return lines[num+1:]
+		}
+	}
+	fmt.Fprintf(os.Stderr, "Unepxected Mobly output, Mobly result YAML header line missing: %s\n", moblyTestResultYAMLHeaderPatternStr)
+	return nil
+}
+
 func parseMoblyTest(lines [][]byte) []runtests.TestCaseResult {
 	var res []runtests.TestCaseResult
 
@@ -49,9 +62,9 @@ func parseMoblyTest(lines [][]byte) []runtests.TestCaseResult {
 		return res
 	}
 
-	// Decode YAML document.
-	// Skip the first line since it's the non-YAML preamble.
-	data := bytes.Join(lines[1:], []byte{'\n'})
+	// Find YAML header and decode YAML document.
+	yamlLines := matchYAMLHeader(lines)
+	data := bytes.Join(yamlLines, []byte{'\n'})
 	reader := bytes.NewReader(data)
 	d := yaml.NewDecoder(reader)
 

@@ -10,6 +10,7 @@ import time
 from tempfile import NamedTemporaryFile
 from typing import Optional
 
+import api_infra
 import base_mobly_driver
 
 
@@ -61,7 +62,7 @@ def _execute_test(
 
     with NamedTemporaryFile(mode="w") as tmp_config:
         config = driver.generate_test_config(transport)
-        print("======== Mobly config content ========", flush=True)
+        print(api_infra.TESTPARSER_PREAMBLE, flush=True)
         print(config, flush=True)
         print("======================================", flush=True)
         tmp_config.write(config)

@@ -123,7 +123,7 @@ class InfraMoblyDriverTest(unittest.TestCase):
         "api_mobly.get_latest_test_output_dir_symlink_path",
         return_value="path/to/remove",
     )
-    @patch("api_infra.TESTPARSER_PREAMBLE", "---MOCK_PREAMBLE---")
+    @patch("api_infra.TESTPARSER_RESULT_HEADER", "---MOCK_HEADER---")
     @patch("builtins.open", new_callable=mock_open, read_data="test_result")
     @patch("os.remove")
     @patch("builtins.print")
@@ -132,13 +132,17 @@ class InfraMoblyDriverTest(unittest.TestCase):
         driver = infra_driver.InfraDriver(tb_json_path="", log_path="")
         driver.teardown()
 
-        self.assertIn(call("---MOCK_PREAMBLE---"), mock_print.call_args_list)
-        self.assertIn(call("test_result"), mock_print.call_args_list)
+        self.assertIn(
+            call("---MOCK_HEADER---", flush=True), mock_print.call_args_list
+        )
+        self.assertIn(
+            call("test_result", flush=True), mock_print.call_args_list
+        )
         mock_rm.assert_called_once_with("path/to/remove")
 
     @patch("api_mobly.get_result_path")
     @patch("api_mobly.get_latest_test_output_dir_symlink_path")
-    @patch("api_infra.TESTPARSER_PREAMBLE")
+    @patch("api_infra.TESTPARSER_RESULT_HEADER")
     @patch("builtins.open", side_effect=OSError)
     @patch("os.remove", side_effect=OSError)
     @patch("builtins.print")

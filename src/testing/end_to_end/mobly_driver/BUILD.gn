@@ -25,7 +25,10 @@ if (is_host) {
 
   python_library("mobly_driver_lib") {
     sources = [ "mobly_driver_lib.py" ]
-    library_deps = [ "drivers:base_mobly_driver" ]
+    library_deps = [
+      ":api_infra",
+      "drivers:base_mobly_driver",
+    ]
   }
 
   python_library("driver_factory") {

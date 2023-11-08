@@ -1305,6 +1305,20 @@ func TestParseNetworkConformanceTest(t *testing.T) {
 
 func TestParseMoblyTest(t *testing.T) {
 	stdout := `
+Running [InfraDriver]
+======== Mobly config content ========
+MoblyParams:
+  LogPath: /tmp
+TestBeds:
+- Controllers:
+    FuchsiaDevice:
+    - name: fuchsia-emulator
+      transport: fuchsia-controller
+  Name: InfraTestbed
+  TestParams: {}
+
+======================================
+
 [=====MOBLY RESULTS=====]
 ---
 Requested Tests:
