@@ -30,7 +30,7 @@ Image::Image(Controller* controller, const image_t& info, zx::vmo vmo, inspect::
 Image::~Image() {
   ZX_ASSERT(!std::atomic_load(&in_use_));
   ZX_ASSERT(!InDoublyLinkedList());
-  controller_->ReleaseImage(this);
+  controller_->ReleaseImage(&info());
 }
 
 void Image::InitializeInspect(inspect::Node* parent_node) {

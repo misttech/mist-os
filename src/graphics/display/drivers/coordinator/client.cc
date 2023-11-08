@@ -138,16 +138,13 @@ zx_status_t Client::ImportImageForDisplay(
   dc_image.width = image_config.width;
   dc_image.type = image_config.type;
 
-  const uint64_t banjo_driver_buffer_collection_id =
-      display::ToBanjoDriverBufferCollectionId(collections.driver_buffer_collection_id);
-  zx_status_t status = controller_->dc()->ImportImage(&dc_image, banjo_driver_buffer_collection_id,
-                                                      buffer_id.buffer_index);
+  zx_status_t status = controller_->driver()->ImportImage(
+      &dc_image, collections.driver_buffer_collection_id, buffer_id.buffer_index);
   if (status != ZX_OK) {
     return status;
   }
 
-  auto release_image =
-      fit::defer([this, &dc_image]() { controller_->dc()->ReleaseImage(&dc_image); });
+  auto release_image = fit::defer([this, &dc_image]() { controller_->ReleaseImage(&dc_image); });
 
   fbl::AllocChecker alloc_checker;
   fbl::RefPtr<Image> image = fbl::AdoptRef(
@@ -220,10 +217,8 @@ void Client::ImportBufferCollection(ImportBufferCollectionRequestView request,
 
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       controller_->GetNextDriverBufferCollectionId();
-  const uint64_t banjo_driver_buffer_collection_id =
-      display::ToBanjoDriverBufferCollectionId(driver_buffer_collection_id);
-  zx_status_t import_status = controller_->dc()->ImportBufferCollection(
-      banjo_driver_buffer_collection_id, request->buffer_collection_token.TakeChannel());
+  zx_status_t import_status = controller_->driver()->ImportBufferCollection(
+      driver_buffer_collection_id, request->buffer_collection_token.TakeChannel());
   if (import_status != ZX_OK) {
     zxlogf(WARNING, "Cannot import BufferCollection to display driver: %s",
            zx_status_get_string(import_status));
@@ -245,10 +240,8 @@ void Client::ReleaseBufferCollection(ReleaseBufferCollectionRequestView request,
     return;
   }
 
-  const uint64_t banjo_driver_buffer_collection_id =
-      display::ToBanjoDriverBufferCollectionId(it->second.driver_buffer_collection_id);
   // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
-  controller_->dc()->ReleaseBufferCollection(banjo_driver_buffer_collection_id);
+  controller_->driver()->ReleaseBufferCollection(it->second.driver_buffer_collection_id);
 
   collection_map_.erase(it);
 }
@@ -272,10 +265,8 @@ void Client::SetBufferCollectionConstraints(
 
   zx_status_t status = ZX_ERR_INTERNAL;
 
-  const uint64_t banjo_driver_buffer_collection_id =
-      display::ToBanjoDriverBufferCollectionId(collections.driver_buffer_collection_id);
-  status = controller_->dc()->SetBufferCollectionConstraints(&dc_image,
-                                                             banjo_driver_buffer_collection_id);
+  status = controller_->driver()->SetBufferCollectionConstraints(
+      &dc_image, collections.driver_buffer_collection_id);
   if (status != ZX_OK) {
     zxlogf(WARNING,
            "Cannot set BufferCollection constraints using imported buffer collection (id=%lu) %s.",
@@ -775,20 +766,15 @@ zx_status_t Client::ImportImageForCapture(
     return ZX_ERR_INVALID_ARGS;
   }
   const auto& collections = it->second;
-  const uint64_t banjo_driver_buffer_collection_id =
-      display::ToBanjoDriverBufferCollectionId(collections.driver_buffer_collection_id);
-
-  uint64_t banjo_driver_capture_image_id = INVALID_ID;
-  zx_status_t status = controller_->dc()->ImportImageForCapture(
-      banjo_driver_buffer_collection_id, buffer_id.buffer_index, &banjo_driver_capture_image_id);
+  DriverCaptureImageId driver_capture_image_id = ToDriverCaptureImageId(INVALID_ID);
+  zx_status_t status = controller_->driver()->ImportImageForCapture(
+      collections.driver_buffer_collection_id, buffer_id.buffer_index, &driver_capture_image_id);
   if (status != ZX_OK) {
     return status;
   }
-  auto release_image = fit::defer([this, banjo_driver_capture_image_id]() {
-    controller_->dc()->ReleaseCapture(banjo_driver_capture_image_id);
+  auto release_image = fit::defer([this, driver_capture_image_id]() {
+    controller_->driver()->ReleaseCapture(driver_capture_image_id);
   });
-  const DriverCaptureImageId driver_capture_image_id =
-      ToDriverCaptureImageId(banjo_driver_capture_image_id);
 
   fbl::AllocChecker alloc_checker;
   fbl::RefPtr<CaptureImage> capture_image = fbl::AdoptRef(new (&alloc_checker) CaptureImage(
@@ -834,8 +820,7 @@ void Client::StartCapture(StartCaptureRequestView request, StartCaptureCompleter
   }
 
   capture_fence_id_ = ToEventId(request->signal_event_id);
-  auto status = controller_->dc()->StartCapture(
-      ToBanjoDriverCaptureImageId(image->driver_capture_image_id()));
+  auto status = controller_->driver()->StartCapture(image->driver_capture_image_id());
   if (status == ZX_OK) {
     fbl::AutoLock lock(controller_->mtx());
     proxy_->EnableCapture(true);
@@ -850,15 +835,11 @@ void Client::StartCapture(StartCaptureRequestView request, StartCaptureCompleter
 
 void Client::SetMinimumRgb(SetMinimumRgbRequestView request,
                            SetMinimumRgbCompleter::Sync& completer) {
-  if (controller_->dc_clamp_rgb() == nullptr) {
-    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-    return;
-  }
   if (!is_owner_) {
     completer.ReplyError(ZX_ERR_NOT_CONNECTED);
     return;
   }
-  auto status = controller_->dc_clamp_rgb()->SetMinimumRgb(request->minimum_rgb);
+  auto status = controller_->driver()->SetMinimumRgb(request->minimum_rgb);
   if (status == ZX_OK) {
     client_minimum_rgb_ = request->minimum_rgb;
     completer.ReplySuccess();
@@ -869,9 +850,8 @@ void Client::SetMinimumRgb(SetMinimumRgbRequestView request,
 
 void Client::SetDisplayPower(SetDisplayPowerRequestView request,
                              SetDisplayPowerCompleter::Sync& completer) {
-  ZX_DEBUG_ASSERT(controller_->dc());
   const DisplayId display_id = ToDisplayId(request->display_id);
-  auto status = controller_->dc()->SetDisplayPower(ToBanjoDisplayId(display_id), request->power_on);
+  auto status = controller_->driver()->SetDisplayPower(display_id, request->power_on);
   if (status == ZX_OK) {
     completer.ReplySuccess();
   } else {
@@ -979,7 +959,7 @@ bool Client::CheckConfig(fhd::wire::ConfigResult* res,
   }
 
   size_t client_composition_opcodes_count_actual;
-  uint32_t display_cfg_result = controller_->dc()->CheckConfiguration(
+  uint32_t display_cfg_result = controller_->driver()->CheckConfiguration(
       configs, config_idx, client_composition_opcodes, client_composition_opcodes_count,
       &client_composition_opcodes_count_actual);
 
@@ -1374,9 +1354,7 @@ void Client::TearDown() {
 
   // Release all imported buffer collections on display drivers.
   for (const auto& [k, v] : collection_map_) {
-    const uint64_t banjo_driver_buffer_collection_id =
-        display::ToBanjoDriverBufferCollectionId(v.driver_buffer_collection_id);
-    controller_->dc()->ReleaseBufferCollection(banjo_driver_buffer_collection_id);
+    controller_->driver()->ReleaseBufferCollection(v.driver_buffer_collection_id);
   }
   collection_map_.clear();
 
@@ -1503,8 +1481,8 @@ Client::Init(fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end) 
               return endpoints.error_value();
             }
             auto& [sysmem_allocator_client, sysmem_allocator_server] = endpoints.value();
-            if (zx_status_t status =
-                    controller_->dc()->GetSysmemConnection(sysmem_allocator_server.TakeChannel());
+            if (zx_status_t status = controller_->driver()->GetSysmemConnection(
+                    sysmem_allocator_server.TakeChannel());
                 status != ZX_OK) {
               return status;
             }
@@ -1585,9 +1563,7 @@ void ClientProxy::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_i
 
 void ClientProxy::ReapplySpecialConfigs() {
   ZX_DEBUG_ASSERT(mtx_trylock(controller_->mtx()) == thrd_busy);
-  if (controller_->dc_clamp_rgb()) {
-    controller_->dc_clamp_rgb()->SetMinimumRgb(handler_.GetMinimumRgb());
-  }
+  controller_->driver()->SetMinimumRgb(handler_.GetMinimumRgb());
 }
 
 void ClientProxy::ReapplyConfig() {

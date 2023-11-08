@@ -36,6 +36,7 @@
 #include "src/graphics/display/drivers/coordinator/client-id.h"
 #include "src/graphics/display/drivers/coordinator/client-priority.h"
 #include "src/graphics/display/drivers/coordinator/display-info.h"
+#include "src/graphics/display/drivers/coordinator/driver.h"
 #include "src/graphics/display/drivers/coordinator/id-map.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
@@ -103,7 +104,7 @@ class Controller : public DeviceType,
   void ApplyConfig(DisplayConfig* configs[], int32_t count, ConfigStamp config_stamp,
                    uint32_t layer_stamp, ClientId client_id) __TA_EXCLUDES(mtx());
 
-  void ReleaseImage(Image* image);
+  void ReleaseImage(image_t* image);
   void ReleaseCaptureImage(DriverCaptureImageId driver_capture_image_id);
 
   // |mtx()| must be held for as long as |edid| and |params| are retained.
@@ -120,13 +121,8 @@ class Controller : public DeviceType,
       __TA_REQUIRES(mtx());
   bool GetDisplayPhysicalDimensions(DisplayId display_id, uint32_t* horizontal_size_mm,
                                     uint32_t* vertical_size_mm) __TA_REQUIRES(mtx());
-  ddk::DisplayControllerImplProtocolClient* dc() { return &dc_; }
-  ddk::DisplayClampRgbImplProtocolClient* dc_clamp_rgb() {
-    if (dc_clamp_rgb_.is_valid()) {
-      return &dc_clamp_rgb_;
-    }
-    return nullptr;
-  }
+  Driver* driver() { return &driver_; }
+
   bool supports_capture() { return supports_capture_; }
 
   async::Loop& loop() { return loop_; }
@@ -202,8 +198,7 @@ class Controller : public DeviceType,
   async::Loop loop_;
   thrd_t loop_thread_;
   async_watchdog::Watchdog watchdog_;
-  ddk::DisplayControllerImplProtocolClient dc_;
-  ddk::DisplayClampRgbImplProtocolClient dc_clamp_rgb_;
+  Driver driver_;
 
   std::atomic<zx::time> last_vsync_timestamp_{};
   inspect::UintProperty last_vsync_ns_property_;

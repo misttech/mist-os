@@ -4,8 +4,6 @@
 
 #include "src/graphics/display/drivers/coordinator/controller.h"
 
-#include <fuchsia/hardware/display/clamprgb/cpp/banjo.h>
-#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/async/cpp/task.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
@@ -126,9 +124,9 @@ void Controller::PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) {
     uint32_t display_cfg_result;
     client_composition_opcode_t layer_result = 0;
     size_t display_layer_results_count;
-    display_cfg_result = dc_.CheckConfiguration(test_configs, 1, &layer_result,
-                                                /*client_composition_opcodes_count=*/1,
-                                                &display_layer_results_count);
+    display_cfg_result = driver_.CheckConfiguration(test_configs, 1, &layer_result,
+                                                    /*client_composition_opcodes_count=*/1,
+                                                    &display_layer_results_count);
     if (display_cfg_result == CONFIG_CHECK_RESULT_OK) {
       fbl::AllocChecker ac;
       info->edid->timings.push_back(*timing, &ac);
@@ -204,7 +202,7 @@ void Controller::DisplayControllerInterfaceOnDisplaysChanged(
     if (info->edid.has_value()) {
       fbl::Array<uint8_t> eld;
       ComputeEld(info->edid->base, eld);
-      dc_.SetEld(ToBanjoDisplayId(info->id), eld.get(), eld.size());
+      driver_.SetEld(info->id, eld.get(), eld.size());
     }
     auto* display_info = out_display_info_list ? &out_display_info_list[i] : nullptr;
     if (display_info && info->edid.has_value()) {
@@ -640,10 +638,10 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count, ConfigStam
   }
 
   const config_stamp_t banjo_config_stamp = ToBanjoConfigStamp(applied_config_stamp);
-  dc_.ApplyConfiguration(display_configs, display_count, &banjo_config_stamp);
+  driver_.ApplyConfiguration(display_configs, display_count, &banjo_config_stamp);
 }
 
-void Controller::ReleaseImage(Image* image) { dc_.ReleaseImage(&image->info()); }
+void Controller::ReleaseImage(image_t* image) { driver_.ReleaseImage(image); }
 
 void Controller::ReleaseCaptureImage(DriverCaptureImageId driver_capture_image_id) {
   if (!supports_capture_) {
@@ -653,8 +651,7 @@ void Controller::ReleaseCaptureImage(DriverCaptureImageId driver_capture_image_i
     return;
   }
 
-  const zx_status_t release_status =
-      dc_.ReleaseCapture(ToBanjoDriverCaptureImageId(driver_capture_image_id));
+  const zx_status_t release_status = driver_.ReleaseCapture(driver_capture_image_id);
   if (release_status == ZX_ERR_SHOULD_WAIT) {
     ZX_DEBUG_ASSERT_MSG(pending_release_capture_image_id_ == kInvalidDriverCaptureImageId,
                         "multiple pending releases for capture images");
@@ -945,15 +942,11 @@ ConfigStamp Controller::TEST_controller_stamp() const {
 zx_status_t Controller::Bind(std::unique_ptr<display::Controller>* device_ptr) {
   ZX_DEBUG_ASSERT_MSG(device_ptr && device_ptr->get() == this, "Wrong controller passed to Bind()");
 
-  zx_status_t status;
-  dc_ = ddk::DisplayControllerImplProtocolClient(parent_);
-  if (!dc_.is_valid()) {
-    ZX_DEBUG_ASSERT_MSG(false, "Display controller bind mismatch");
-    return ZX_ERR_NOT_SUPPORTED;
+  zx_status_t status = driver_.Bind();
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to bind driver %d", status);
+    return status;
   }
-
-  // optional display controller clamp rgb protocol client
-  dc_clamp_rgb_ = ddk::DisplayClampRgbImplProtocolClient(parent_);
 
   status = loop_.StartThread("display-client-loop", &loop_thread_);
   if (status != ZX_OK) {
@@ -961,9 +954,10 @@ zx_status_t Controller::Bind(std::unique_ptr<display::Controller>* device_ptr) {
     return status;
   }
 
-  if ((status = DdkAdd(ddk::DeviceAddArgs("display-coordinator")
-                           .set_flags(DEVICE_ADD_NON_BINDABLE)
-                           .set_inspect_vmo(inspector_.DuplicateVmo()))) != ZX_OK) {
+  status = DdkAdd(ddk::DeviceAddArgs("display-coordinator")
+                      .set_flags(DEVICE_ADD_NON_BINDABLE)
+                      .set_inspect_vmo(inspector_.DuplicateVmo()));
+  if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to add display core device %d", status);
     return status;
   }
@@ -980,9 +974,9 @@ zx_status_t Controller::Bind(std::unique_ptr<display::Controller>* device_ptr) {
 
   [[maybe_unused]] auto ptr = device_ptr->release();
 
-  dc_.SetDisplayControllerInterface(this, &display_controller_interface_protocol_ops_);
+  driver_.SetDisplayControllerInterface(&display_controller_interface_protocol_ops_);
 
-  status = dc_.SetDisplayCaptureInterface(this, &display_capture_interface_protocol_ops_);
+  status = driver_.SetDisplayCaptureInterface(&display_capture_interface_protocol_ops_);
   supports_capture_ = (status == ZX_OK);
   zxlogf(INFO, "Display capture is%s supported: %s", supports_capture_ ? "" : " not",
          zx_status_get_string(status));
@@ -1021,7 +1015,7 @@ void Controller::DdkRelease() {
     fbl::AutoLock lock(mtx());
     ++controller_stamp_;
     const config_stamp_t banjo_config_stamp = ToBanjoConfigStamp(controller_stamp_);
-    dc_.ApplyConfiguration(&configs, 0, &banjo_config_stamp);
+    driver_.ApplyConfiguration(&configs, 0, &banjo_config_stamp);
   }
   delete this;
 }
@@ -1033,7 +1027,8 @@ Controller::Controller(zx_device_t* parent, inspect::Inspector inspector)
       inspector_(std::move(inspector)),
       loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
       watchdog_("display-client-loop", kWatchdogWarningIntervalMs, kWatchdogTimeoutMs,
-                loop_.dispatcher()) {
+                loop_.dispatcher()),
+      driver_(Driver(this, parent)) {
   mtx_init(&mtx_, mtx_plain);
   root_ = inspector_.GetRoot().CreateChild("display");
   last_vsync_ns_property_ = root_.CreateUint("last_vsync_timestamp_ns", 0);
