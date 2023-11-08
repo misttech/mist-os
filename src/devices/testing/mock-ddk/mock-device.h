@@ -11,6 +11,7 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
+#include <lib/fdf/cpp/channel.h>
 #include <lib/fidl/cpp/wire/wire_messaging.h>
 #include <lib/fit/function.h>
 #include <lib/stdcompat/span.h>
@@ -275,6 +276,17 @@ struct MockDevice : public std::enable_shared_from_this<MockDevice> {
                                                            const char* service_name,
                                                            const char* protocol_name,
                                                            zx_handle_t request);
+
+  zx_status_t ConnectToRuntimeProtocol(const char* service_name, const char* protocol_name,
+                                       fdf::Channel request, const char* fragment_name = "");
+  friend zx_status_t device_connect_runtime_protocol(zx_device_t* device, const char* service_name,
+                                                     const char* protocol_name,
+                                                     fdf_handle_t request);
+  friend zx_status_t device_connect_fragment_runtime_protocol(zx_device_t* device,
+                                                              const char* fragment_name,
+                                                              const char* service_name,
+                                                              const char* protocol_name,
+                                                              fdf_handle_t request);
 
   // device_get_metadata calls GetMetadata:
   zx_status_t GetMetadata(uint32_t type, void* buf, size_t buflen, size_t* actual);

@@ -2,11 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fidl.examples.echo/cpp/driver/wire.h>
 #include <fidl/fidl.examples.echo/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/loop.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/binding_priv.h>
 #include <lib/ddk/driver.h>
+#include <lib/driver/outgoing/cpp/outgoing_directory.h>
+#include <lib/fdf/cpp/arena.h>
 #include <lib/fidl/cpp/wire/connect_service.h>
 #include <lib/fidl/cpp/wire/wire_messaging.h>
 #include <lib/zx/result.h>
@@ -18,8 +22,6 @@
 #include <zxtest/zxtest.h>
 
 #include "src/devices/testing/mock-ddk/mock-device.h"
-#include "zircon/system/ulib/async-loop/include/lib/async-loop/cpp/loop.h"
-#include "zircon/system/ulib/async-loop/include/lib/async-loop/loop.h"
 
 TEST(MockDdk, BasicOps) {
   zx_protocol_device_t ops = {};
@@ -594,6 +596,71 @@ TEST(MockDdk, SetFragments) {
             ZX_OK);
 }
 
+class DriverEchoServer : public fdf::WireServer<fidl_examples_echo::DriverEcho> {
+ public:
+  void Bind(fdf::ServerEnd<fidl_examples_echo::DriverEcho> request) {
+    fdf::BindServer(fdf_dispatcher_get_current_dispatcher(), std::move(request), this);
+  }
+
+ private:
+  void EchoString(EchoStringRequestView request, fdf::Arena& arena,
+                  EchoStringCompleter::Sync& completer) override {
+    completer.buffer(arena).Reply(request->value);
+  }
+};
+
+TEST(MockDdk, SetRuntimeService) {
+  auto parent = MockDevice::FakeRootParent();  // Hold on to the parent during the test.
+  auto result = TestDevice::Bind(parent.get());
+  ASSERT_OK(result.status_value());
+  TestDevice* test_device = result.value();
+
+  // Initially, the device will fail to get a protocol:
+  EXPECT_FALSE(test_device->DdkConnectRuntimeProtocol<fidl_examples_echo::DriverEchoService::Echo>()
+                   .is_ok());
+
+  auto runtime = mock_ddk::GetDriverRuntime();
+  auto* dispatcher = fdf::Dispatcher::GetCurrent()->get();
+
+  DriverEchoServer server;
+  auto outgoing = fdf::OutgoingDirectory::Create(dispatcher);
+
+  // So we add the necessary service to the parent:
+
+  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  ASSERT_OK(endpoints.status_value());
+
+  auto service_result = outgoing.AddService<fidl_examples_echo::DriverEchoService>(
+      fidl_examples_echo::DriverEchoService::InstanceHandler({
+          .echo = server.bind_handler(dispatcher),
+      }));
+  EXPECT_OK(service_result.status_value());
+
+  EXPECT_OK(outgoing.Serve(std::move(endpoints->server)).status_value());
+
+  parent->AddFidlService(fidl_examples_echo::DriverEchoService::Name, std::move(endpoints->client));
+
+  // Service is available after being set.
+  auto echo_client =
+      test_device->DdkConnectRuntimeProtocol<fidl_examples_echo::DriverEchoService::Echo>();
+  ASSERT_OK(echo_client.status_value());
+
+  ASSERT_TRUE(echo_client.value().is_valid());
+  fdf::WireClient client(std::move(*echo_client), fdf::Dispatcher::GetCurrent()->get());
+
+  constexpr std::string_view kInput = "Test String";
+
+  auto arena = fdf::Arena::Create(0, 'TEST');
+  ASSERT_OK(arena.status_value());
+  client.buffer(*arena)
+      ->EchoString(fidl::StringView::FromExternal(kInput))
+      .ThenExactlyOnce(
+          [&](fdf::WireUnownedResult<fidl_examples_echo::DriverEcho::EchoString>& result) {
+            EXPECT_OK(result.status());
+            EXPECT_EQ(result.value().response.get(), kInput);
+          });
+  runtime->RunUntilIdle();
+}
 // In case a device loads firmware as part of its initialization, MockDevice provides
 // a way to set firmware that can be accessed by the load_firmware call.
 TEST(MockDdk, LoadFirmware) {

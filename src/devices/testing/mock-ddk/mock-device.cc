@@ -6,6 +6,7 @@
 
 #include <lib/async/cpp/task.h>
 #include <lib/component/incoming/cpp/protocol.h>
+#include <lib/fdf/cpp/protocol.h>
 
 #include <algorithm>
 #include <latch>
@@ -313,8 +314,22 @@ zx_status_t MockDevice::ConnectToFidlProtocol(const char* service_name, const ch
     return ZX_ERR_NOT_FOUND;
   }
   const std::string path = std::string("svc/") + service_name + "/default/" + protocol_name;
-  return component::internal::ConnectAtRaw(ns->second, std::move(request), path.c_str())
-      .status_value();
+  return component::internal::ConnectAtRaw(ns->second, std::move(request), path).status_value();
+}
+
+zx_status_t MockDevice::ConnectToRuntimeProtocol(const char* service_name,
+                                                 const char* protocol_name, fdf::Channel request,
+                                                 const char* fragment_name) {
+  zx::channel client_token, server_token;
+  auto status = zx::channel::create(0, &client_token, &server_token);
+  if (status != ZX_OK) {
+    return status;
+  }
+  status = fdf::ProtocolConnect(std::move(client_token), std::move(request));
+  if (status != ZX_OK) {
+    return status;
+  }
+  return ConnectToFidlProtocol(service_name, protocol_name, std::move(server_token), fragment_name);
 }
 
 size_t MockDevice::descendant_count() const {

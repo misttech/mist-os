@@ -192,6 +192,29 @@ __EXPORT zx_status_t device_connect_fragment_fidl_protocol(zx_device_t* device,
                                        fragment_name);
 }
 
+__EXPORT zx_status_t device_connect_runtime_protocol(zx_device_t* device, const char* service_name,
+                                                     const char* protocol_name,
+                                                     fdf_handle_t request) {
+  std::lock_guard guard(libdriver_lock);
+  if (!device) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+  return device->ConnectToRuntimeProtocol(service_name, protocol_name, fdf::Channel(request));
+}
+
+__EXPORT zx_status_t device_connect_fragment_runtime_protocol(zx_device_t* device,
+                                                              const char* fragment_name,
+                                                              const char* service_name,
+                                                              const char* protocol_name,
+                                                              fdf_handle_t request) {
+  std::lock_guard guard(libdriver_lock);
+  if (!device) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+  return device->ConnectToRuntimeProtocol(service_name, protocol_name, fdf::Channel(request),
+                                          fragment_name);
+}
+
 // Unsupported calls:
 __EXPORT
 zx_status_t device_set_profile_by_role(zx_device_t* device, zx_handle_t thread, const char* role,
