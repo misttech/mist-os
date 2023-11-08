@@ -159,8 +159,18 @@ func TestParseArgsAndEnv(t *testing.T) {
 			expectErr: true,
 		},
 		{
+			name:      "rejects --goma and --cxx-rbe",
+			args:      []string{"core.x64", "--goma", "--cxx-rbe"},
+			expectErr: true,
+		},
+		{
 			name:      "rejects --goma and --no-goma",
 			args:      []string{"core.x64", "--goma", "--no-goma"},
+			expectErr: true,
+		},
+		{
+			name:      "rejects --cxx-rbe and --no-cxx-rbe",
+			args:      []string{"core.x64", "--cxx-rbe", "--no-cxx-rbe"},
 			expectErr: true,
 		},
 		{
@@ -305,11 +315,13 @@ func (r fakeSubprocessRunner) Run(context.Context, []string, subprocess.RunOptio
 }
 
 func TestConstructStaticSpec(t *testing.T) {
+	rbeSupported := rbeIsSupported()
 	testCases := []struct {
-		name     string
-		args     *setArgs
-		runner   fakeSubprocessRunner
-		expected *fintpb.Static
+		name      string
+		args      *setArgs
+		runner    fakeSubprocessRunner
+		expected  *fintpb.Static
+		expectErr bool
 	}{
 		{
 			name: "basic",
@@ -326,6 +338,7 @@ func TestConstructStaticSpec(t *testing.T) {
 				jsonIDEScripts:   []string{"foo.py"},
 				gnArgs:           []string{"args"},
 				noGoma:           true,
+				disableCxxRbe:    true,
 			},
 			expected: &fintpb.Static{
 				Board:            "boards/arm64.gni",
@@ -362,48 +375,89 @@ func TestConstructStaticSpec(t *testing.T) {
 			},
 		},
 		{
-			name: "goma enabled by default",
+			name: "goma default",
 			args: &setArgs{},
 			expected: &fintpb.Static{
-				UseGoma: true,
+				UseGoma:      false, // deprecated
+				CxxRbeEnable: rbeSupported,
 			},
 		},
 		{
 			name:   "goma disabled if goma auth fails",
-			args:   &setArgs{},
+			args:   &setArgs{useGoma: true},
 			runner: fakeSubprocessRunner{fail: true},
 			expected: &fintpb.Static{
 				UseGoma: false,
 			},
 		},
 		{
+			name: "cxx-rbe default",
+			args: &setArgs{},
+			expected: &fintpb.Static{
+				CxxRbeEnable: rbeSupported,
+			},
+		},
+		{
+			name: "cxx-rbe enabled",
+			args: &setArgs{enableCxxRbe: true},
+			expected: &fintpb.Static{
+				CxxRbeEnable: true,
+			},
+			expectErr: !rbeSupported,
+		},
+		{
+			name: "cxx-rbe disabled",
+			args: &setArgs{disableCxxRbe: true},
+			expected: &fintpb.Static{
+				CxxRbeEnable: false,
+			},
+		},
+		{
+			name: "rust-rbe default",
+			args: &setArgs{disableCxxRbe: true},
+			expected: &fintpb.Static{
+				RustRbeEnable: false,
+			},
+		},
+		{
+			name: "rust-rbe enabled",
+			args: &setArgs{disableCxxRbe: true, enableRustRbe: true},
+			expected: &fintpb.Static{
+				RustRbeEnable: true,
+			},
+			expectErr: !rbeSupported,
+		},
+		{
 			name: "fuzzer variants",
 			args: &setArgs{
 				fuzzSanitizers: []string{"asan", "ubsan"},
+				disableCxxRbe:  true,
 			},
 			expected: &fintpb.Static{
-				UseGoma:  true,
+				UseGoma:  false,
 				Variants: append(fuzzerVariants("asan"), fuzzerVariants("ubsan")...),
 			},
 		},
 		{
 			name: "netboot",
 			args: &setArgs{
-				netboot: true,
+				netboot:       true,
+				disableCxxRbe: true,
 			},
 			expected: &fintpb.Static{
-				UseGoma: true,
+				UseGoma: false,
 				GnArgs:  []string{"enable_netboot=true"},
 			},
 		},
 		{
 			name: "cargo toml gen",
 			args: &setArgs{
-				basePackages: []string{"foo"},
-				cargoTOMLGen: true,
+				basePackages:  []string{"foo"},
+				cargoTOMLGen:  true,
+				disableCxxRbe: true,
 			},
 			expected: &fintpb.Static{
-				UseGoma:      true,
+				UseGoma:      false,
 				BasePackages: []string{"foo"},
 				HostLabels:   []string{"//build/rust:cargo_toml_gen"},
 			},
@@ -435,7 +489,13 @@ func TestConstructStaticSpec(t *testing.T) {
 			fx := fxRunner{sr: tc.runner, checkoutDir: checkoutDir}
 			got, err := constructStaticSpec(ctx, fx, checkoutDir, tc.args)
 			if err != nil {
-				t.Fatal(err)
+				if tc.expectErr {
+					return
+				} else {
+					t.Fatal(err)
+				}
+			} else if tc.expectErr {
+				t.Errorf("Expected an error, but got nil.")
 			}
 
 			if diff := cmp.Diff(expected, got, protocmp.Transform()); diff != "" {

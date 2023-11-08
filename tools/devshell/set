@@ -54,14 +54,13 @@
 ##                         individual fuzzers, e.g. "--variant asan-fuzzer/foo".
 ##   --goma|--no-goma      Whether to use the goma service during the build. Goma
 ##                         attempts to make builds faster using remote build
-##                         servers. Defaults to detecting whether goma has been
-##                         set up via `fx goma`.
-##   --cxx-rbe             If set, use reclient (RBE) to build C++ targets.
-##                         This takes precedence over --goma.
-##                         Default: disabled
-##   --rust-rbe            If set, use the remote backend (RBE) service for building
-##                         Rust targets.  RBE offloads work onto remote servers and
-##                         offers caching benefits to accelerate builds.
+##                         servers. Defaults to false. Deprecated and replaced
+##                         with --[no-]cxx-rbe.
+##   --cxx-rbe             If set, use reclient (RBE) to remotely build and
+##                         cache C++ targets.
+##                         Default: enabled on linux-x64, disabled elsewhere.
+##   --rust-rbe            If set, use the remote backend (RBE) service for
+##                         building and caching Rust targets.
 ##                         Default: disabled
 ##   --ide                 Pass --ide=VALUE to gn when generating to create project
 ##                         files usable with that IDE. Useful values include "vs"
