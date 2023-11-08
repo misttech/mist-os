@@ -100,7 +100,7 @@ pub struct Kernel {
     // Owned by selinux/fs.rs
     pub selinux_fs: OnceCell<FileSystemHandle>,
     // The SELinux security server. Initialized if SELinux is enabled.
-    pub security_server: Option<SecurityServer>,
+    pub security_server: Option<Arc<SecurityServer>>,
     // Owned by tracefs/fs.rs
     pub trace_fs: OnceCell<FileSystemHandle>,
 

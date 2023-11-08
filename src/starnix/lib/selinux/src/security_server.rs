@@ -4,7 +4,7 @@
 
 use crate::{AccessVector, ObjectClass, SecurityContext, SecurityId};
 use starnix_lock::Mutex;
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 pub struct SecurityServerState {
     // TODO(http://b/308175643): reference count SIDs, so that when the last SELinux object
@@ -18,9 +18,9 @@ pub struct SecurityServer {
 }
 
 impl SecurityServer {
-    pub fn new() -> SecurityServer {
+    pub fn new() -> Arc<SecurityServer> {
         // TODO(http://b/304732283): initialize the access vector cache.
-        SecurityServer { state: Mutex::new(SecurityServerState { sids: HashMap::new() }) }
+        Arc::new(SecurityServer { state: Mutex::new(SecurityServerState { sids: HashMap::new() }) })
     }
 
     /// Returns the security ID mapped to `security_context`, creating it if it does not exist.
