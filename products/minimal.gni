@@ -22,6 +22,9 @@ legacy_base_package_labels = [ "//src/developer/memory/buckets" ]
 fuchsia_product_assembly_config_label = "//products/minimal"
 zedboot_product_assembly_config_label = "//products/zedboot"
 
+fuchsia_structured_config_policy =
+    "//products/minimal/minimal_user_structured_config_policy.json5"
+
 bazel_product_bundle_prefix = "//products/minimal:product_bundle"
 extra_bazel_assembly_targets =
     [ "//build/bazel/assembly/assembly_outputs:verifications" ]

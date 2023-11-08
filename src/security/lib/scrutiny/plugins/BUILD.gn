@@ -86,6 +86,8 @@ if (is_fuchsia) {
   product_bundle("product_bundle") {
     testonly = true
     name = "scrutiny"
+    skip_scrutiny = true
+    skip_scrutiny_recovery = true
     deps = [
       ":assembly",
       ":partitions",

@@ -295,6 +295,10 @@ template("boot_test") {
 
     partitions = get_label_info(_partitions_config, "target_out_dir") + "/" +
                  get_label_info(_partitions_config, "name") + ".json"
+
+    # This is a testing product bundle, so no need for a scrutiny check for this.
+    skip_scrutiny = true
+    skip_scrutiny_recovery = true
   }
 
   # If host_cpu != target_cpu, then we make sure to define a separate boot

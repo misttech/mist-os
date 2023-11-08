@@ -280,6 +280,22 @@ func genArgs(ctx context.Context, staticSpec *fintpb.Static, contextSpec *fintpb
 		imports = append(imports, staticSpec.Board)
 	}
 
+	// We may want to run scrutiny verifiers on specific product+board
+	// combinations. If a file exists at //scrutiny_configs/product_board.gni
+	// then we include it, and the build will run the verifiers.
+	if staticSpec.Product != "" && staticSpec.Board != "" {
+		product := strings.Split(filepath.Base(staticSpec.Product), ".")[0]
+		board := strings.Split(filepath.Base(staticSpec.Board), ".")[0]
+		productUnderscoreBoard := product + "_" + board
+		scrutinyConfigPath, err := findGNIFile(contextSpec.CheckoutDir, "scrutiny_configs", productUnderscoreBoard)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check if scrutiny config exists: %w", err)
+		}
+		if scrutinyConfigPath != "" {
+			imports = append(imports, scrutinyConfigPath)
+		}
+	}
+
 	if contextSpec.SdkId != "" {
 		vars["sdk_id"] = contextSpec.SdkId
 	}

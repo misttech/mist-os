@@ -69,6 +69,9 @@ legacy_cache_package_labels += [
 fuchsia_product_assembly_config_label = "//products/terminal"
 zedboot_product_assembly_config_label = "//products/zedboot"
 
+fuchsia_structured_config_policy =
+    "//products/terminal/terminal_user_structured_config_policy.json5"
+
 # Include the session framework
 core_realm_shards += [ "//src/session/bin/session_manager:terminal_core_shard" ]
 

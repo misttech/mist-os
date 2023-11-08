@@ -1,0 +1,106 @@
+# Copyright 2021 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/dev.gni")
+import("//src/developer/ffx/build/ffx_action.gni")
+
+# Check the bootfs filelist extracted from ZBI against a golden file.
+#
+# Parameters
+#
+#   product_bundle_path (required)
+#     [path] Path to product bundle.
+#
+#   goldens (required)
+#     [list of strings] Path to a list of golden files that contain golden
+#     bootfs file list in the format of one file name per line. The actual
+#     bootfs filelist must match either one of the goldens. There should be only
+#     one golden file in this list for normal case and two golden files, one for
+#     the old golden file, one for the new golden file during a soft transition.
+#
+#   golden_packages (required)
+#     [list of strings] Path to a list of golden files that contain golden
+#     bootfs index in the format of one package name per line. The actual
+#     bootfs package index must match either one of the goldens. There should be
+#     only one golden file in this list for normal case and two golden files,
+#     one for the old golden file, one for the new golden file during a soft
+#     transition.
+#
+#   recovery (optional)
+#     [bool] Analyze recovery images rather than default fuchsia images.
+#
+#   deps, public_deps, data_deps (optional)
+#     Usual GN meaning.
+
+template("verify_bootfs_filelist") {
+  assert(defined(invoker.product_bundle_path),
+         "verify_bootfs_filelist() must specify product_bundle_path")
+  assert(defined(invoker.goldens),
+         "verify_bootfs_filelist() must specify goldens")
+  assert(defined(invoker.golden_packages),
+         "verify_bootfs_filelist() must specify a golden_packages.")
+
+  ffx_action(target_name) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "deps",
+                             "public_deps",
+                             "data_deps",
+                             "visibility",
+                           ])
+    stamp_file = "$target_gen_dir/$target_name.verified"
+    depfile = "$target_gen_dir/$target_name.d"
+    pb_manifest = "${invoker.product_bundle_path}/product_bundle.json"
+
+    # This verifiers reads blobs from the product bundle, but we do not know
+    # which blobs ahead of time, therefore we allow everything inside the
+    # product bundle directory.
+    hermetic_action_ignored_prefixes = [ invoker.product_bundle_path ]
+
+    inputs = [ pb_manifest ] + invoker.goldens + invoker.golden_packages
+    outputs = [ stamp_file ]
+
+    # The target below is generated as a part of the `ffx_tool` action at
+    # `//src/developer/ffx/plugins/scrutiny:ffx_scrutiny_tool`. See there
+    # for more information.
+    ffx_tool = "//src/developer/ffx/plugins/scrutiny:ffx_scrutiny_tool"
+    ffx_tool_output_name = "ffx-scrutiny"
+
+    args = [
+      "scrutiny",
+      "verify",
+      "--depfile",
+      rebase_path(depfile, root_build_dir),
+      "--stamp",
+      rebase_path(stamp_file, root_build_dir),
+    ]
+
+    if (defined(invoker.recovery) && invoker.recovery) {
+      args += [ "--recovery" ]
+    }
+
+    args += [
+      "bootfs",
+      "--product-bundle",
+      rebase_path(invoker.product_bundle_path, root_build_dir),
+    ]
+
+    if (invoker.golden_packages != []) {
+      foreach(golden_package, invoker.golden_packages) {
+        args += [
+          "--golden-packages",
+          rebase_path(golden_package, root_build_dir),
+        ]
+      }
+    }
+
+    foreach(golden, invoker.goldens) {
+      args += [
+        "--golden",
+        rebase_path(golden, root_build_dir),
+      ]
+    }
+  }
+}
