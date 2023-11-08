@@ -161,7 +161,12 @@ class FlatlandManagerTest : public LoggingEventLoop, public ::testing::Test {
           FX_LOGS(INFO) << "`removed_sessions_` includes " << session_id;
         });
         FX_LOGS(INFO) << "current_session_count=" << current_session_count;
-        return current_session_count == 0 && removed_sessions_.size() == initial_session_count;
+
+        // We can't test for equality between `removed_sessions_.size()` and `initial_session_count`
+        // due to a race condition: the about-to-be-destroyed session might already have been
+        // removed from the manager, but the presenter is not notified until the end of the Flatland
+        // destructor, which occurs on a different thread.
+        return current_session_count == 0 && removed_sessions_.size() >= initial_session_count;
       });
     }
 
