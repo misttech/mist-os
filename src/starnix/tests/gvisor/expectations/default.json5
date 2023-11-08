@@ -1051,6 +1051,7 @@
                 "JobControlTest.SetForegroundProcessGroupSIGTTOUBackground",
                 "JobControlTest.SetForegroundProcessGroupDifferentSession",
                 "JobControlTest.SetForegroundProcessGroupNegPgid",
+                "JobControlTest.SetTTY",
 
                 // sigstop_test
 
