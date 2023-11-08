@@ -11,6 +11,7 @@
 
 #include <arch/defines.h>
 #include <arch/kernel_aspace.h>
+#include <arch/riscv64.h>
 
 // These macros assume the sv39 virtual memory scheme which maps 39-bit
 // virtual addresses to 56-bit physical addresses.  For details see sections
@@ -72,7 +73,7 @@
 #include <inttypes.h>
 #include <sys/types.h>
 
-typedef uintptr_t pte_t;
+using pte_t = uintptr_t;
 
 // Kernel's use of asids:
 //   When using asids, the kernel aspace (active when in kernel threads or idle) will be assigned
@@ -112,7 +113,9 @@ inline void riscv64_tlb_flush_all() { __asm__("sfence.vma  zero, zero" ::: "memo
 
 // Flush all non global pages from this ASID
 inline void riscv64_tlb_flush_asid(uint16_t asid) {
-  __asm__ __volatile__("sfence.vma  zero, %0" ::"r"(asid) : "memory");
+  // Cast the 16bit asid value to a 64bit value before passing into the inline asm to make sure
+  // the compiler masks out any potential stray bits.
+  __asm__ __volatile__("sfence.vma  zero, %0" ::"r"(static_cast<uint64_t>(asid)) : "memory");
 }
 
 // Flush all pages with this address from all ASIDs, including global pages
@@ -122,7 +125,14 @@ inline void riscv64_tlb_flush_address_all_asids(vaddr_t va) {
 
 // Flush all pages with this address from one ASID, not including global pages
 inline void riscv64_tlb_flush_address_one_asid(vaddr_t va, uint16_t asid) {
-  __asm__ __volatile__("sfence.vma  %0, %1" ::"r"(va), "r"(asid) : "memory");
+  // Cast the 16bit asid value to a 64bit value before passing into the inline asm to make sure
+  // the compiler masks out any potential stray bits.
+  __asm__ __volatile__("sfence.vma  %0, %1" ::"r"(va), "r"(static_cast<uint64_t>(asid)) : "memory");
+}
+
+// Extract the asid field out of the SATP register
+inline uint16_t riscv64_current_asid() {
+  return (riscv64_csr_read(RISCV64_CSR_SATP) >> RISCV64_SATP_ASID_SHIFT) & RISCV64_SATP_ASID_MASK;
 }
 
 #endif  // __ASSEMBLER__
