@@ -536,7 +536,11 @@ impl ObjectManager {
                         .unwrap()
                         .disown_reservation(txn_reservation.owner_object_id(), txn_space);
                 }
-                *hold_amount -= txn_space;
+                if let Some(amount) = hold_amount.checked_sub(txn_space) {
+                    *hold_amount = amount;
+                } else {
+                    panic!("Transaction was larger than metadata reservation");
+                }
                 reservation.add(txn_space);
             }
             MetadataReservation::Reservation(txn_reservation) => {

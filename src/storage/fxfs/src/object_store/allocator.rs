@@ -280,7 +280,13 @@ impl<T: Borrow<U> + Clone + Send + Sync, U: ReservationOwner + ?Sized> Reservati
         amount: u64,
     ) {
         assert_eq!(self.owner_object_id, other.owner_object_id());
-        self.inner.lock().unwrap().amount -= amount;
+        let mut inner = self.inner.lock().unwrap();
+        if let Some(amount) = inner.amount.checked_sub(amount) {
+            inner.amount = amount;
+        } else {
+            std::mem::drop(inner);
+            panic!("Insufficient reservation space");
+        }
         other.add(amount);
     }
 }

@@ -2966,4 +2966,30 @@ mod tests {
     async fn test_reopen_read_only_after_crypt_failure() {
         reopen_after_crypt_failure_inner(true).await;
     }
+
+    #[fuchsia::test(threads = 10)]
+    #[should_panic(expected = "Insufficient reservation space")]
+    #[cfg(debug_assertions)]
+    async fn large_transaction_causes_panic_in_debug_builds() {
+        let fs = test_filesystem().await;
+        let root_volume = root_volume(fs.clone()).await.expect("root_volume failed");
+        let store = root_volume.new_volume("vol", None).await.expect("new_volume failed");
+        let root_directory =
+            Directory::open(&store, store.root_directory_object_id()).await.expect("open failed");
+        let mut transaction = fs
+            .clone()
+            .new_transaction(
+                lock_keys![LockKey::object(store.store_object_id(), root_directory.object_id())],
+                Options::default(),
+            )
+            .await
+            .expect("transaction");
+        for i in 0..500 {
+            root_directory
+                .create_symlink(&mut transaction, b"link", &format!("{}", i))
+                .await
+                .expect("symlink");
+        }
+        assert_eq!(transaction.commit().await.expect("commit"), 0);
+    }
 }
