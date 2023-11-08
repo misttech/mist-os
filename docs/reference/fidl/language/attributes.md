@@ -78,7 +78,7 @@ Note: Not implemented.
 
 **MEANING**:
 Assigns a name to use for service discovery. That is to say, a `@discoverable`
-protocol can be served under the given name, and and clients that connect to
+protocol can be served under the given name, and clients that connect to
 that protocol can search for it under the same name. This makes it possible to
 have a client search for the correct name without manually ensuring that the
 lookup name matches the one passed on the server side.
