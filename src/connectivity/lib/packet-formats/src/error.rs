@@ -115,8 +115,11 @@ impl IpParseErrorAction {
 #[allow(missing_docs)]
 #[derive(Error, Debug, PartialEq)]
 pub enum IpParseError<I: IcmpIpExt> {
-    #[error("Parsing Error")]
-    Parse { error: ParseError },
+    #[error("Parsing Error: {error:?}")]
+    Parse {
+        #[from]
+        error: ParseError,
+    },
     /// For errors where an ICMP Parameter Problem error needs to be sent to the
     /// source of a packet.
     #[error("Parameter Problem")]
@@ -158,12 +161,6 @@ pub enum IpParseError<I: IcmpIpExt> {
         /// [`must_send_icmp`]: crate::error::IpParseError::ParameterProblem::must_send_icmp
         action: IpParseErrorAction,
     },
-}
-
-impl<I: IcmpIpExt> From<ParseError> for IpParseError<I> {
-    fn from(error: ParseError) -> Self {
-        IpParseError::Parse { error }
-    }
 }
 
 impl<I: IcmpIpExt> From<OptionParseErr> for IpParseError<I> {

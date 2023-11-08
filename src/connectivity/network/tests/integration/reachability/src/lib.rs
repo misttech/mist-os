@@ -91,6 +91,7 @@ impl InterfaceConfig {
 
 /// Try to parse `frame` as an ICMP or ICMPv6 Echo Request message, and if successful returns the
 /// Echo Reply message that the netstack would expect as a reply.
+#[track_caller]
 fn reply_if_echo_request(
     frame: Vec<u8>,
     want: State,
@@ -143,7 +144,7 @@ fn reply_if_echo_request(
             error: packet_formats::error::ParseError::NotExpected,
         }) => {}
         Err(e) => {
-            panic!("parse packet as ICMPv4 error: {}", e);
+            panic!("parse packet as ICMPv4 error: {}\n{:02x?}", e, frame);
         }
     }
 
@@ -193,7 +194,7 @@ fn reply_if_echo_request(
             error: packet_formats::error::ParseError::NotExpected,
         }) => {}
         Err(e) => {
-            panic!("parse packet as ICMPv6 error: {}", e);
+            panic!("parse packet as ICMPv6 error: {}\n{:02x?}", e, frame);
         }
     }
     None
