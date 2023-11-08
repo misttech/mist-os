@@ -56,9 +56,12 @@
 ##                         attempts to make builds faster using remote build
 ##                         servers. Defaults to false. Deprecated and replaced
 ##                         with --[no-]cxx-rbe.
-##   --cxx-rbe             If set, use reclient (RBE) to remotely build and
+##   --cxx-rbe             If set, use reclient (RBE) to remotely compile and
 ##                         cache C++ targets.
 ##                         Default: enabled on linux-x64, disabled elsewhere.
+##   --link-rbe            If set, use reclient (RBE) to remotely link and
+##                         cache C++ targets.
+##                         Default: disabled
 ##   --rust-rbe            If set, use the remote backend (RBE) service for
 ##                         building and caching Rust targets.
 ##                         Default: disabled

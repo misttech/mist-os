@@ -413,6 +413,21 @@ func TestConstructStaticSpec(t *testing.T) {
 			},
 		},
 		{
+			name: "link-rbe default",
+			args: &setArgs{disableCxxRbe: true},
+			expected: &fintpb.Static{
+				LinkRbeEnable: false,
+			},
+		},
+		{
+			name: "link-rbe enabled",
+			args: &setArgs{disableCxxRbe: true, enableLinkRbe: true},
+			expected: &fintpb.Static{
+				LinkRbeEnable: true,
+			},
+			expectErr: !rbeSupported,
+		},
+		{
 			name: "rust-rbe default",
 			args: &setArgs{disableCxxRbe: true},
 			expected: &fintpb.Static{
