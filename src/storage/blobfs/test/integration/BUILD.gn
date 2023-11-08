@@ -470,4 +470,9 @@ fuchsia_test_package("blobfs-integration-package") {
     ":external-decompressor-integration",
     "//src/storage/blobfs/bin:blobfs-component",
   ]
+
+  # TODO(b/297201368): These tests timeout on RISC-V builders currently.
+  if (current_cpu == "riscv64") {
+    test_components -= [ ":blobfs-integration" ]
+  }
 }
