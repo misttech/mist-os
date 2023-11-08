@@ -17,7 +17,7 @@ use {
     async_trait::async_trait,
     fprint::TypeFingerprint,
     serde::{Deserialize, Serialize},
-    std::{fmt::Debug, hash::Hash, marker::PhantomData, sync::Arc},
+    std::{fmt::Debug, future::Future, hash::Hash, marker::PhantomData, pin::Pin, sync::Arc},
 };
 
 // Force keys to be sorted first by a u64, so that they can be located approximately based on only
@@ -334,10 +334,14 @@ pub trait LayerIterator<K, V>: Send + Sync {
 
 pub type BoxedLayerIterator<'iter, K, V> = Box<dyn LayerIterator<K, V> + 'iter>;
 
-#[async_trait]
 impl<'iter, K, V> LayerIterator<K, V> for BoxedLayerIterator<'iter, K, V> {
-    async fn advance(&mut self) -> Result<(), Error> {
-        (**self).advance().await
+    // Manual expansion of `async_trait` to avoid double boxing the `Future`.
+    fn advance<'a, 'b>(&'a mut self) -> Pin<Box<dyn Future<Output = Result<(), Error>> + Send + 'b>>
+    where
+        'a: 'b,
+        Self: 'b,
+    {
+        (**self).advance()
     }
     fn get(&self) -> Option<ItemRef<'_, K, V>> {
         (**self).get()
