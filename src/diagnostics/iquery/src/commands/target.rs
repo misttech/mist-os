@@ -13,7 +13,7 @@ use {
     async_trait::async_trait,
     component_debug::dirs::*,
     diagnostics_data::{Data, DiagnosticsData},
-    diagnostics_reader::ArchiveReader,
+    diagnostics_reader::{ArchiveReader, RetryConfig},
     fidl_fuchsia_diagnostics::{
         ArchiveAccessorMarker, ArchiveAccessorProxy, Selector, StringSelector, TreeSelector,
     },
@@ -49,7 +49,7 @@ impl DiagnosticsProvider for ArchiveAccessorProvider {
         let selectors = selectors.iter().map(|s| s.as_ref());
         ArchiveReader::new()
             .with_archive(archive)
-            .retry_if_empty(false)
+            .retry(RetryConfig::never())
             .add_selectors(selectors)
             .snapshot::<D>()
             .await

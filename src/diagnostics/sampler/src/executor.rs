@@ -99,7 +99,7 @@ use {
     diagnostics_hierarchy::{
         ArrayContent, DiagnosticsHierarchy, ExponentialHistogram, LinearHistogram, Property,
     },
-    diagnostics_reader::{ArchiveReader, Inspect},
+    diagnostics_reader::{ArchiveReader, Inspect, RetryConfig},
     fidl_fuchsia_metrics::{
         HistogramBucket, MetricEvent, MetricEventLoggerFactoryMarker,
         MetricEventLoggerFactoryProxy, MetricEventLoggerProxy, MetricEventPayload, ProjectSpec,
@@ -174,7 +174,7 @@ impl TaskCancellation {
         }
 
         let mut reader = ArchiveReader::new();
-        reader.retry_if_empty(false).add_selectors(mondo_selectors_set.into_iter());
+        reader.retry(RetryConfig::never()).add_selectors(mondo_selectors_set.into_iter());
 
         let mut reboot_processor =
             RebootSnapshotProcessor { reader, project_samplers, moniker_to_projects_map };
@@ -633,7 +633,7 @@ impl ProjectSampler {
             metric.selectors = SelectorList(active_selectors);
         }
         self.archive_reader = ArchiveReader::new();
-        self.archive_reader.retry_if_empty(false).add_selectors(all_selectors.into_iter());
+        self.archive_reader.retry(RetryConfig::never()).add_selectors(all_selectors.into_iter());
         self.moniker_to_selector_map = HashMap::new();
         for (metric_index, metric) in self.metrics.iter().enumerate() {
             for (selector_index, selector) in metric.selectors.iter().enumerate() {

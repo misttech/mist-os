@@ -154,7 +154,7 @@ pub async fn get_inspect_data(
             ])
             .with_tree_selector(tree_selector.into()),
         )
-        // Enable `retry_if_empty` to prevent races in test realm bringup where
+        // Enable `retry on empty` to prevent races in test realm bringup where
         // we may end up reaching `ArchiveReader` before it has observed
         // the component starting.
         //
@@ -162,7 +162,7 @@ pub async fn get_inspect_data(
         // will be possible to wait on the event of Archivist obtaining a handle
         // to the component's diagnostics, and then request the snapshot of
         // inspect data once that event is received.
-        .retry_if_empty(true);
+        .retry(diagnostics_reader::RetryConfig::EMPTY);
 
     // Loop to wait for the component to begin publishing inspect data after it
     // starts.

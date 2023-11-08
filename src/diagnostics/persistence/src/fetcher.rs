@@ -4,7 +4,7 @@
 
 use crate::file_handler::{self, PersistData, PersistPayload, PersistSchema, Timestamps};
 use diagnostics_data::{Data, DiagnosticsHierarchy, Inspect};
-use diagnostics_reader::ArchiveReader;
+use diagnostics_reader::{ArchiveReader, RetryConfig};
 use fidl_fuchsia_diagnostics::ArchiveAccessorProxy;
 use fidl_fuchsia_diagnostics::Selector;
 use fuchsia_async::{self as fasync, Task};
@@ -198,7 +198,10 @@ async fn fetch_and_save(
     };
 
     let mut source = ArchiveReader::new();
-    source.with_archive(proxy.clone()).retry_if_empty(false).add_selectors(selectors.into_iter());
+    source
+        .with_archive(proxy.clone())
+        .retry(RetryConfig::never())
+        .add_selectors(selectors.into_iter());
 
     // Do the fetch and record the timestamps.
     let before_utc = utc_now();

@@ -54,7 +54,6 @@ async fn read_components_inspect() {
     let data = ArchiveReader::new()
         .with_archive(accessor)
         .add_selector("child:root")
-        .retry_if_empty(true)
         .with_minimum_schema_count(1)
         .snapshot::<Inspect>()
         .await

@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use diagnostics_data::DiagnosticsData;
+use bitflags::bitflags;
+use diagnostics_data::{DiagnosticsData, Metadata, MetadataError};
 use fidl;
 use fidl_fuchsia_diagnostics::{
     ArchiveAccessorMarker, ArchiveAccessorProxy, BatchIteratorMarker, BatchIteratorProxy,
@@ -124,22 +125,14 @@ impl ToSelectorArguments for Selector {
     }
 }
 
-/// Utility for reading inspect data of a running component using the injected Archive
-/// Reader service.
-#[derive(Clone)]
-pub struct ArchiveReader {
-    archive: Arc<Mutex<Option<ArchiveAccessorProxy>>>,
-    selectors: Vec<SelectorArgument>,
-    should_retry: bool,
-    minimum_schema_count: usize,
-    timeout: Option<Duration>,
-    batch_retrieval_timeout_seconds: Option<i64>,
-    max_aggregated_content_size_bytes: Option<u64>,
-}
-
 // Before unsealing this, consider whether your code belongs in this file.
 pub trait SerializableValue: private::Sealed {
     const FORMAT_OF_VALUE: Format;
+}
+
+pub trait CheckResponse: private::Sealed {
+    fn has_payload(&self) -> bool;
+    fn was_fully_filtered(&self) -> bool;
 }
 
 // The "sealed trait" pattern.
@@ -150,13 +143,143 @@ mod private {
 }
 impl private::Sealed for serde_json::Value {}
 impl private::Sealed for serde_cbor::Value {}
+impl<D: DiagnosticsData> private::Sealed for Data<D> {}
+
+impl<D: DiagnosticsData> CheckResponse for Data<D> {
+    fn has_payload(&self) -> bool {
+        self.payload.is_some()
+    }
+
+    fn was_fully_filtered(&self) -> bool {
+        self.metadata
+            .errors()
+            .map(|errors| {
+                errors
+                    .iter()
+                    .filter_map(|error| error.message())
+                    .any(|msg| msg.contains("Inspect hierarchy was fully filtered"))
+            })
+            .unwrap_or(false)
+    }
+}
 
 impl SerializableValue for serde_json::Value {
     const FORMAT_OF_VALUE: Format = Format::Json;
 }
 
+const FULLY_FILTERED_MSG: &str = "Inspect hierarchy was fully filtered";
+
+impl CheckResponse for serde_json::Value {
+    fn has_payload(&self) -> bool {
+        match self {
+            serde_json::Value::Object(obj) => {
+                obj.get("payload").map(|p| !matches!(p, serde_json::Value::Null)).is_some()
+            }
+            _ => false,
+        }
+    }
+
+    fn was_fully_filtered(&self) -> bool {
+        self.as_object()
+            .and_then(|obj| obj.get("metadata"))
+            .and_then(|metadata| metadata.as_object())
+            .and_then(|metadata| metadata.get("errors"))
+            .and_then(|errors| errors.as_array())
+            .map(|errors| {
+                errors
+                    .iter()
+                    .filter_map(|error| error.as_object())
+                    .filter_map(|error| error.get("message"))
+                    .filter_map(|msg| msg.as_str())
+                    .any(|message| message.starts_with(FULLY_FILTERED_MSG))
+            })
+            .unwrap_or(false)
+    }
+}
+
 impl SerializableValue for serde_cbor::Value {
     const FORMAT_OF_VALUE: Format = Format::Cbor;
+}
+
+impl CheckResponse for serde_cbor::Value {
+    fn has_payload(&self) -> bool {
+        match self {
+            serde_cbor::Value::Map(m) => m
+                .get(&serde_cbor::Value::Text("payload".into()))
+                .map(|p| !matches!(p, serde_cbor::Value::Null))
+                .is_some(),
+            _ => false,
+        }
+    }
+
+    fn was_fully_filtered(&self) -> bool {
+        let this = match self {
+            serde_cbor::Value::Map(m) => m,
+            _ => unreachable!("Only objects are expected"),
+        };
+        let metadata = match this.get(&serde_cbor::Value::Text("metadata".into())) {
+            Some(serde_cbor::Value::Map(m)) => m,
+            _ => unreachable!("All objects have a metadata field"),
+        };
+        let errors = match metadata.get(&serde_cbor::Value::Text("errors".into())) {
+            None => return false, // if no errors, then we can't possibly be fully filtered.
+            Some(serde_cbor::Value::Array(a)) => a,
+            _ => unreachable!("We either get an array or we get nothing"),
+        };
+        errors
+            .iter()
+            .filter_map(|error| match error {
+                serde_cbor::Value::Map(m) => Some(m),
+                _ => None,
+            })
+            .filter_map(|error| error.get(&serde_cbor::Value::Text("message".into())))
+            .filter_map(|msg| match msg {
+                serde_cbor::Value::Text(s) => Some(s),
+                _ => None,
+            })
+            .any(|message| message.starts_with(FULLY_FILTERED_MSG))
+    }
+}
+
+bitflags! {
+    /// Retry configuration for ArchiveReader.
+    pub struct RetryConfig: u8 {
+        /// ArchiveReader will retry on empty responses.
+        const EMPTY = 0b00000001;
+        /// ArchiveReader will retry when the returned hierarchy has been fully filtered.
+        const FULLY_FILTERED = 0x00000010;
+    }
+}
+
+impl RetryConfig {
+    pub fn always() -> Self {
+        Self::all()
+    }
+
+    pub fn never() -> Self {
+        Self::empty()
+    }
+
+    fn on_empty(&self) -> bool {
+        self.intersects(Self::EMPTY)
+    }
+
+    fn on_fully_filtered(&self) -> bool {
+        self.intersects(Self::FULLY_FILTERED)
+    }
+}
+
+/// Utility for reading inspect data of a running component using the injected Archive
+/// Reader service.
+#[derive(Clone)]
+pub struct ArchiveReader {
+    archive: Arc<Mutex<Option<ArchiveAccessorProxy>>>,
+    selectors: Vec<SelectorArgument>,
+    retry_config: RetryConfig,
+    minimum_schema_count: usize,
+    timeout: Option<Duration>,
+    batch_retrieval_timeout_seconds: Option<i64>,
+    max_aggregated_content_size_bytes: Option<u64>,
 }
 
 impl ArchiveReader {
@@ -167,7 +290,7 @@ impl ArchiveReader {
         Self {
             timeout: None,
             selectors: vec![],
-            should_retry: true,
+            retry_config: RetryConfig::always(),
             archive: Arc::new(Mutex::new(None)),
             minimum_schema_count: 1,
             batch_retrieval_timeout_seconds: None,
@@ -195,9 +318,20 @@ impl ArchiveReader {
         self.add_selector(selector)
     }
 
-    /// Requests to retry when an empty result is received.
-    pub fn retry_if_empty(&mut self, retry: bool) -> &mut Self {
-        self.should_retry = retry;
+    /// Sets a custom retry configuration. By default we always retry.
+    pub fn retry(&mut self, config: RetryConfig) -> &mut Self {
+        self.retry_config = config;
+        self
+    }
+
+    // TODO(b/308979621): soft-migrate and remove.
+    #[doc(hidden)]
+    pub fn retry_if_empty(&mut self, enable: bool) -> &mut Self {
+        if enable {
+            self.retry_config = self.retry_config | RetryConfig::EMPTY;
+        } else {
+            self.retry_config = self.retry_config - RetryConfig::EMPTY;
+        }
         self
     }
 
@@ -266,7 +400,7 @@ impl ArchiveReader {
     pub async fn snapshot_raw<D, T>(&self) -> Result<T, Error>
     where
         D: DiagnosticsData,
-        T: for<'a> Deserialize<'a> + SerializableValue + From<Vec<T>>,
+        T: for<'a> Deserialize<'a> + SerializableValue + From<Vec<T>> + CheckResponse,
     {
         let data_future = self.snapshot_inner::<D, T>(T::FORMAT_OF_VALUE);
         let data = match self.timeout {
@@ -293,18 +427,23 @@ impl ArchiveReader {
     async fn snapshot_inner<D, T>(&self, format: Format) -> Result<Vec<T>, Error>
     where
         D: DiagnosticsData,
-        T: for<'a> Deserialize<'a>,
+        T: for<'a> Deserialize<'a> + CheckResponse,
     {
         loop {
             let mut result = Vec::new();
             let iterator = self.batch_iterator::<D>(StreamMode::Snapshot, format)?;
-            drain_batch_iterator(iterator, |d| {
+            drain_batch_iterator(iterator, |d: T| {
                 result.push(d);
                 async {}
             })
             .await?;
 
-            if result.len() < self.minimum_schema_count && self.should_retry {
+            if (self.retry_config.on_empty() && result.len() < self.minimum_schema_count)
+                || (self.retry_config.on_fully_filtered()
+                    && result
+                        .iter()
+                        .any(|entry| !entry.has_payload() && entry.was_fully_filtered()))
+            {
                 fasync::Timer::new(fasync::Time::after(RETRY_DELAY_MS.millis())).await;
             } else {
                 return Ok(result);

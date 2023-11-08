@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use diagnostics_reader::{ArchiveReader, Inspect};
+use diagnostics_reader::{ArchiveReader, Inspect, RetryConfig};
 use fidl_fuchsia_component::BinderMarker;
 use fidl_fuchsia_diagnostics_persist::{
     DataPersistenceMarker, DataPersistenceProxy, PersistResult,
@@ -252,7 +252,7 @@ async fn diagnostics_persistence_integration() {
 /// the Inspect source is actually publishing data to avoid a race condition.
 async fn wait_for_inspect_source() {
     let mut inspect_fetcher = ArchiveReader::new();
-    inspect_fetcher.retry_if_empty(false);
+    inspect_fetcher.retry(RetryConfig::never());
     inspect_fetcher.add_selector("realm_builder*/single_counter:root");
     let start_time = Time::get_monotonic();
 
@@ -542,7 +542,7 @@ fn collapse_realm_builder_strings(data: &str) -> String {
 /// Verify that the expected data is published by Persistence in its Inspect hierarchy.
 async fn verify_diagnostics_persistence_publication(published: Published) {
     let mut inspect_fetcher = ArchiveReader::new();
-    inspect_fetcher.retry_if_empty(false);
+    inspect_fetcher.retry(RetryConfig::never());
     inspect_fetcher.add_selector("realm_builder*/persistence:root");
     loop {
         let published_inspect =

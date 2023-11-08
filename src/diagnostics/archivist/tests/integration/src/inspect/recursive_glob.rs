@@ -32,7 +32,6 @@ async fn read_components_recursive_glob() {
     let data_vec = ArchiveReader::new()
         .add_selector("child_a/**:root")
         .with_archive(accessor)
-        .retry_if_empty(true)
         .with_minimum_schema_count(expected_monikers.len())
         .snapshot::<Inspect>()
         .await
@@ -78,7 +77,6 @@ async fn read_components_subtree_with_recursive_glob() {
         .add_selector("child_a/**:root")
         .add_selector("child_a:root")
         .with_archive(accessor)
-        .retry_if_empty(true)
         .with_minimum_schema_count(expected_monikers.len())
         .snapshot::<Inspect>()
         .await

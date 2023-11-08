@@ -74,7 +74,6 @@ async fn get_coredumps_from_inspect() -> Option<Vec<CoredumpReport>> {
     let kernel_inspect = ArchiveReader::new()
         .select_all_for_moniker("kernel")
         .with_minimum_schema_count(1)
-        .retry_if_empty(true)
         .snapshot::<Inspect>()
         .await
         .ok()?;

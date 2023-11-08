@@ -4,7 +4,7 @@
 
 use {
     anyhow::{bail, Error},
-    diagnostics_reader::{ArchiveReader, Inspect},
+    diagnostics_reader::{ArchiveReader, Inspect, RetryConfig},
     tracing::*,
 };
 
@@ -45,7 +45,7 @@ impl InspectFetcher {
         let mut reader = ArchiveReader::new();
         reader
             .with_archive(proxy)
-            .retry_if_empty(false)
+            .retry(RetryConfig::never())
             .add_selectors(Self::process_selectors(selectors)?.into_iter());
         Ok(InspectFetcher { reader: Some(reader) })
     }

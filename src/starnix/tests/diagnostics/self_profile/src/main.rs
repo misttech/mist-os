@@ -23,7 +23,7 @@ async fn main() {
         run_pipe_writer(&mut event_stream).await;
     }
 
-    let snapshot = ArchiveReader::new().retry_if_empty(true).snapshot::<Inspect>().await.unwrap();
+    let snapshot = ArchiveReader::new().snapshot::<Inspect>().await.unwrap();
     let summaries = SelfProfilesReport::from_snapshot(&snapshot).unwrap();
     assert_ne!(summaries, &[], "summaries should not be empty");
     let summary = &summaries[0];

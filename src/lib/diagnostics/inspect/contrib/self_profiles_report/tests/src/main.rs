@@ -30,8 +30,7 @@ async fn main() {
     for _ in 0..100 {
         puppet.run_profiled_function().await.unwrap();
     }
-    let first_snapshot =
-        ArchiveReader::new().retry_if_empty(true).snapshot::<Inspect>().await.unwrap();
+    let first_snapshot = ArchiveReader::new().snapshot::<Inspect>().await.unwrap();
     let first_summaries = SelfProfilesReport::from_snapshot(&first_snapshot).unwrap();
     assert_eq!(
         first_summaries.len(),
@@ -44,8 +43,7 @@ async fn main() {
     for _ in 0..100 {
         puppet.run_profiled_function().await.unwrap();
     }
-    let second_snapshot =
-        ArchiveReader::new().retry_if_empty(true).snapshot::<Inspect>().await.unwrap();
+    let second_snapshot = ArchiveReader::new().snapshot::<Inspect>().await.unwrap();
     let second_summaries = SelfProfilesReport::from_snapshot(&second_snapshot).unwrap();
     assert_eq!(
         second_summaries, first_summaries,

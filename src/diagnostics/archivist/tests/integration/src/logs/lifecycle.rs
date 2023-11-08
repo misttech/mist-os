@@ -9,7 +9,7 @@ use crate::{
 };
 use component_events::{events::*, matcher::*};
 use diagnostics_assertions::assert_data_tree;
-use diagnostics_reader::{ArchiveReader, Data, Logs};
+use diagnostics_reader::{ArchiveReader, Data, Logs, RetryConfig};
 use fidl_fuchsia_component as fcomponent;
 use fidl_fuchsia_diagnostics::ArchiveAccessorMarker;
 use fuchsia_async as fasync;
@@ -36,7 +36,7 @@ async fn test_logs_lifecycle() {
     reader
         .with_archive(accessor)
         .with_minimum_schema_count(0) // we want this to return even when no log messages
-        .retry_if_empty(false);
+        .retry(RetryConfig::never());
 
     let (mut subscription, mut errors) =
         reader.snapshot_then_subscribe::<Logs>().unwrap().split_streams();
@@ -49,7 +49,7 @@ async fn test_logs_lifecycle() {
     let moniker = "coll:log_and_exit";
 
     let mut event_stream = EventStream::open().await.unwrap();
-    reader.retry_if_empty(true);
+    reader.retry(RetryConfig::EMPTY);
     for i in 1..50 {
         // launch our child, wait for it to exit, and destroy (so all its outgoing log connections
         // are processed) before asserting on its logs

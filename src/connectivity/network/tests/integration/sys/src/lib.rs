@@ -307,7 +307,8 @@ where
 
         // Retrieve the inspect payload from the archivist.
         let mut archive_reader = diagnostics_reader::ArchiveReader::new();
-        let archive_reader = archive_reader.add_selectors(selectors).retry_if_empty(true);
+        let archive_reader =
+            archive_reader.add_selectors(selectors).retry(diagnostics_reader::RetryConfig::EMPTY);
         let inspect_payload = archive_reader
             .snapshot::<diagnostics_reader::Inspect>()
             .await

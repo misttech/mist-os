@@ -34,11 +34,7 @@ async fn component_selectors_filter_logs() {
 
     // Start listening
     let mut reader = ArchiveReader::new();
-    reader
-        .add_selector("coll\\:a:root")
-        .with_archive(accessor)
-        .with_minimum_schema_count(5)
-        .retry_if_empty(true);
+    reader.add_selector("coll\\:a:root").with_archive(accessor).with_minimum_schema_count(5);
 
     let (mut stream, mut errors) =
         reader.snapshot_then_subscribe::<Logs>().unwrap().split_streams();

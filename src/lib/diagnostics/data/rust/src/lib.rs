@@ -113,6 +113,7 @@ impl Default for DataSource {
 
 pub trait MetadataError {
     fn dropped_payload() -> Self;
+    fn message(&self) -> Option<&str>;
 }
 
 pub trait Metadata: DeserializeOwned + Serialize + Clone + Send {
@@ -1446,6 +1447,14 @@ impl MetadataError for LogError {
     fn dropped_payload() -> Self {
         Self::Other { message: DROPPED_PAYLOAD_MSG.into() }
     }
+
+    fn message(&self) -> Option<&str> {
+        match self {
+            Self::FailedToParseRecord(msg) => Some(msg.as_str()),
+            Self::Other { message } => Some(message.as_str()),
+            _ => None,
+        }
+    }
 }
 
 /// Possible error that can come in a `DiagnosticsData` object where the data source is
@@ -1458,6 +1467,10 @@ pub struct InspectError {
 impl MetadataError for InspectError {
     fn dropped_payload() -> Self {
         Self { message: "Schema failed to fit component budget.".into() }
+    }
+
+    fn message(&self) -> Option<&str> {
+        Some(self.message.as_str())
     }
 }
 

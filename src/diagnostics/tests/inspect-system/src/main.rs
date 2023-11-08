@@ -8,7 +8,7 @@ mod metrics;
 use {
     anyhow::{self, bail, Error},
     diagnostics::RequestId,
-    diagnostics_reader::{ArchiveReader, Inspect},
+    diagnostics_reader::{ArchiveReader, Inspect, RetryConfig},
     fasync::Duration,
     fidl_fuchsia_diagnostics::{
         ArchiveAccessorMarker, ArchiveAccessorProxy, BatchIteratorMarker,
@@ -178,7 +178,7 @@ async fn handle_invocation(moniker: &str, stdout: zx::Socket) -> Result<(), Erro
     let mut selectors = vec![];
     for value in ArchiveReader::new()
         .add_selector(format!("{}:root", moniker))
-        .retry_if_empty(false)
+        .retry(RetryConfig::never())
         .with_archive(proxy)
         .with_timeout(Duration::from_seconds(15))
         .snapshot::<Inspect>()
@@ -314,7 +314,7 @@ async fn get_test_cases(rid: RequestId) -> Result<Vec<ftest::Case>, Error> {
     let mut ret = vec![];
 
     for value in ArchiveReader::new()
-        .retry_if_empty(false)
+        .retry(RetryConfig::never())
         .with_archive(proxy)
         .with_timeout(Duration::from_seconds(60))
         .snapshot::<Inspect>()

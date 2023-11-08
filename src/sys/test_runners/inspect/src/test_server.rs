@@ -6,7 +6,7 @@ use {
     crate::error::ComponentError,
     crate::eval::EvaluationContext,
     crate::spec::{Accessor, ProgramSpec},
-    diagnostics_reader::{ArchiveReader, Inspect},
+    diagnostics_reader::{ArchiveReader, Inspect, RetryConfig},
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_diagnostics as fdiagnostics,
     fidl_fuchsia_io as fio, fidl_fuchsia_test as ftest, fuchsia_async as fasync,
@@ -127,7 +127,7 @@ impl TestServer {
             test_stdout!(logs, "Attempting read");
 
             match ArchiveReader::new()
-                .retry_if_empty(false)
+                .retry(RetryConfig::never())
                 .with_archive(proxy)
                 .with_timeout(end_time - start_time)
                 .add_selector(case.selector.as_str())
