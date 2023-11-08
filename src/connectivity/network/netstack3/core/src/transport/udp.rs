@@ -454,9 +454,8 @@ impl DatagramSocketSpec for Udp {
     type ConnIpAddr<I: IpExt> = I::DualStackConnIpAddr<Self>;
     type ConnStateExtra = ();
     type ConnState<I: IpExt, D: Debug + Eq + Hash> = I::DualStackConnState<D, Self>;
-    type UnboundSharingState<I: IpExt> = Sharing;
     type SocketMapSpec<I: IpExt, D: WeakId> = (Self, I, D);
-    type ListenerSharingState = Sharing;
+    type SharingState = Sharing;
 
     type Serializer<I: IpExt, B: BufferMut> = Nested<B, UdpPacketBuilder<I::Addr>>;
     type SerializeError = Infallible;
@@ -2147,10 +2146,6 @@ impl<
 
     fn to_other_receiving_id(&self, id: SocketId<Ipv6>) -> EitherIpSocket<Udp> {
         EitherIpSocket::V6(id)
-    }
-
-    fn to_other_conn_sharing_state(&self, state: Sharing) -> Sharing {
-        state
     }
 
     type LocalIdAllocator = Option<PortAlloc<UdpBoundSocketMap<Ipv6, SC::WeakDeviceId>>>;

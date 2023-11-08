@@ -952,11 +952,9 @@ impl DatagramSocketSpec for Icmp {
 
     type OtherStackIpOptions<I: datagram::IpExt> = ();
 
-    type ListenerSharingState = ();
+    type SharingState = ();
 
     type SocketMapSpec<I: datagram::IpExt + datagram::DualStackIpExt, D: WeakId> = (Self, I, D);
-
-    type UnboundSharingState<I: datagram::IpExt> = ();
 
     fn ip_proto<I: IpProtoExt>() -> I::Proto {
         I::map_ip((), |()| Ipv4Proto::Icmp, |()| Ipv6Proto::Icmpv6)
