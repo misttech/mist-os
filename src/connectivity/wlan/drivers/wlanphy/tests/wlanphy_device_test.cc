@@ -43,9 +43,7 @@ namespace {
 class WlanphyDeviceTest : public ::zxtest::Test,
                           public fdf::WireServer<fuchsia_wlan_phyimpl::WlanPhyImpl> {
  public:
-  WlanphyDeviceTest()
-      : client_loop_phy_(async::Loop(&kAsyncLoopConfigNoAttachToCurrentThread)),
-        fake_wlan_phy_impl_device_(MockDevice::FakeRootParentNoDispatcherIntegrationDEPRECATED()) {
+  WlanphyDeviceTest() {
     zx_status_t status = ZX_OK;
 
     // Create end points for the protocol fuchsia_wlan_device::Phy, these two end points will be
@@ -58,22 +56,13 @@ class WlanphyDeviceTest : public ::zxtest::Test,
     auto endpoints_phy_impl = fdf::CreateEndpoints<fuchsia_wlan_phyimpl::WlanPhyImpl>();
     ASSERT_FALSE(endpoints_phy_impl.is_error());
 
-    status = client_loop_phy_.StartThread("fake-wlandevicemonitor-loop");
-    // There is a return value in ASSERT_EQ(), cannot apply here.
-    EXPECT_EQ(ZX_OK, status);
-
-    // Cache the client dispatcher of fuchsia_wlan_device::Phy protocol.
-    client_dispatcher_phy_ = client_loop_phy_.dispatcher();
-
-    // Create the client for the protocol fuchsia_wlan_device::Phy based on dispatcher end
-    // point.
+    auto* test_dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
     client_phy_ = fidl::WireSharedClient<fuchsia_wlan_device::Phy>(std::move(endpoints_phy->client),
-                                                                   client_dispatcher_phy_);
+                                                                   test_dispatcher);
 
     libsync::Completion wlanphy_created;
     async::PostTask(driver_dispatcher_->async_dispatcher(), [&]() {
-      wlanphy_device_ =
-          new Device(fake_wlan_phy_impl_device_.get(), std::move(endpoints_phy_impl->client));
+      wlanphy_device_ = new Device(fake_root_.get(), std::move(endpoints_phy_impl->client));
 
       EXPECT_EQ(ZX_OK, wlanphy_device_->DeviceAdd());
 
@@ -93,8 +82,7 @@ class WlanphyDeviceTest : public ::zxtest::Test,
     EXPECT_OK(status);
     EXPECT_NOT_NULL(wlanphy_device_);
 
-    fdf::BindServer(server_dispatcher_phy_impl_->get(), std::move(endpoints_phy_impl->server),
-                    this);
+    fdf::BindServer(phy_impl_dispatcher_->get(), std::move(endpoints_phy_impl->server), this);
 
     // Initialize struct to avoid random values.
     memset(static_cast<void*>(&create_iface_req_), 0, sizeof(create_iface_req_));
@@ -207,21 +195,18 @@ class WlanphyDeviceTest : public ::zxtest::Test,
   void* dummy_ctx_;
 
  private:
-  fdf_testing::DriverRuntime runtime_;
-  async::Loop client_loop_phy_;
+  fdf_testing::DriverRuntime* runtime() { return fdf_testing::DriverRuntime::GetInstance(); }
 
-  // Dispatcher for the FIDL client sending requests to wlanphy device.
-  async_dispatcher_t* client_dispatcher_phy_;
+  // fake zx_device as the the parent of wlanphy device.
+  std::shared_ptr<MockDevice> fake_root_{MockDevice::FakeRootParent()};
 
   // Dispatcher for being a driver transport FIDL server to receive and dispatch requests from
   // wlanphy device.
-  fdf::UnownedSynchronizedDispatcher server_dispatcher_phy_impl_ =
-      runtime_.StartBackgroundDispatcher();
-  // The driver dispatcher used for testing.
-  fdf::UnownedSynchronizedDispatcher driver_dispatcher_ = runtime_.StartBackgroundDispatcher();
+  fdf::UnownedSynchronizedDispatcher phy_impl_dispatcher_{runtime()->StartBackgroundDispatcher()};
 
-  // fake zx_device as the the parent of wlanphy device.
-  std::shared_ptr<MockDevice> fake_wlan_phy_impl_device_;
+  // The driver dispatcher used for testing.
+  fdf::UnownedSynchronizedDispatcher driver_dispatcher_{runtime()->StartBackgroundDispatcher()};
+
   Device* wlanphy_device_;
 };
 
