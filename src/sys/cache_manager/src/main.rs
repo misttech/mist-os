@@ -56,11 +56,11 @@ async fn monitor_storage(storage_admin: &fsys::StorageAdminProxy, config: Config
     // If we are over the threshold, clear the cache. This panics if we lose the
     // connect to the StorageAdminProtocol.
 
-    error!(
+    info!(
         "cache will be cleared when storage passes {}% capacity",
         config.cache_clearing_threshold
     );
-    error!("checking storage every {} milliseconds", config.storage_checking_frequency);
+    info!("checking storage every {} milliseconds", config.storage_checking_frequency);
 
     loop {
         fasync::Timer::new(std::time::Duration::from_millis(config.storage_checking_frequency))
