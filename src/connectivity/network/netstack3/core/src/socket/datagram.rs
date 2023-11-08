@@ -710,18 +710,18 @@ pub(crate) trait DualStackDatagramBoundStateContext<I: IpExt, C, S: DatagramSock
     /// `S::ListenerIpAddr<I>` and the appropriate [`DualStackListenerIpAddr`].
     fn converter(&self) -> Self::Converter;
 
-    /// Converts a socket ID to a receiving ID.
+    /// Converts a socket ID to a bound socket ID.
     ///
-    /// Converts a socket ID for IP version `I` into a receiving ID that can be
-    /// inserted into the demultiplexing map for IP version `I::OtherVersion`.
-    fn to_other_receiving_id(
+    /// Converts a socket ID for IP version `I` into a bound socket ID that can
+    /// be inserted into the demultiplexing map for IP version `I::OtherVersion`.
+    fn to_other_bound_socket_id(
         &self,
         id: S::SocketId<I>,
     ) -> <S::SocketMapSpec<I::OtherVersion, Self::WeakDeviceId> as DatagramSocketMapSpec<
         I::OtherVersion,
         Self::WeakDeviceId,
         S::AddrSpec,
-    >>::ReceivingId;
+    >>::BoundSocketId;
 
     /// Converts an other-IP-version address to an address for IP version `I`.
     fn from_other_ip_addr(&self, addr: <I::OtherVersion as Ip>::Addr) -> I::Addr;
@@ -951,14 +951,14 @@ where
         self.uninstantiable_unreachable()
     }
 
-    fn to_other_receiving_id(
+    fn to_other_bound_socket_id(
         &self,
         _id: S::SocketId<I>,
     ) -> <S::SocketMapSpec<I::OtherVersion, Self::WeakDeviceId> as DatagramSocketMapSpec<
         I::OtherVersion,
         Self::WeakDeviceId,
         S::AddrSpec,
-    >>::ReceivingId {
+    >>::BoundSocketId {
         self.uninstantiable_unreachable()
     }
 
@@ -1192,7 +1192,7 @@ where
 /// `I: Ip` describes the type of packets that can be received by sockets in
 /// the map.
 pub(crate) trait DatagramSocketMapSpec<I: Ip, D: Id, A: SocketMapAddrSpec>:
-    SocketMapStateSpec<ListenerId = Self::ReceivingId, ConnId = Self::ReceivingId>
+    SocketMapStateSpec<ListenerId = Self::BoundSocketId, ConnId = Self::BoundSocketId>
     + SocketMapConflictPolicy<
         ListenerAddr<ListenerIpAddr<I::Addr, A::LocalIdentifier>, D>,
         <Self as SocketMapStateSpec>::ListenerSharingState,
@@ -1210,16 +1210,14 @@ pub(crate) trait DatagramSocketMapSpec<I: Ip, D: Id, A: SocketMapAddrSpec>:
     /// The type of IDs stored in a [`BoundSocketMap`] for which this is the
     /// specification.
     ///
-    /// When the bound socket map is used to demultiplex an incoming packet,
-    /// this is the type of the identifier(s) that will be selected as
-    /// candidates for receiving. This can be the same as
-    /// [`DatagramSocketSpec::SocketId`] but doesn't have to be. In the case of
+    /// This can be the same as [`DatagramSocketSpec::SocketId`] but doesn't
+    /// have to be. In the case of
     /// dual-stack sockets, for example, an IPv4 socket will have type
     /// `DatagramSocketSpec::SocketId<Ipv4>` but the IPv4 demultiplexing map
-    /// might have `ReceivingId=Either<DatagramSocketSpec::SocketId<Ipv4>,
+    /// might have `BoundSocketId=Either<DatagramSocketSpec::SocketId<Ipv4>,
     /// DatagramSocketSpec::SocketId<Ipv6>>` to allow looking up IPv6 sockets
     /// when receiving IPv4 packets.
-    type ReceivingId: Clone + Debug;
+    type BoundSocketId: Clone + Debug;
 }
 
 /// Common features of dual-stack sockets that vary by IP version.
@@ -1247,7 +1245,7 @@ pub(crate) trait DualStackIpExt: Ip + crate::ip::IpExt {
     /// [`EitherIpSocket<S>]`: [EitherIpSocket]
     // TODO(https://fxbug.dev/21198): Extract the necessary GAT from
     // DatagramSocketSpec into its own trait and use that as the bound here.
-    type DualStackReceivingId<S: DatagramSocketSpec>: Clone + Debug + Eq;
+    type DualStackBoundSocketId<S: DatagramSocketSpec>: Clone + Debug + Eq;
 
     /// The IP options type for the other stack that will be held for a socket.
     ///
@@ -1268,20 +1266,20 @@ pub(crate) trait DualStackIpExt: Ip + crate::ip::IpExt {
         + AsRef<IpOptions<Self, D, S>>
         + AsMut<IpOptions<Self, D, S>>;
 
-    /// Convert a socket ID into a `Self::DualStackReceivingId`.
+    /// Convert a socket ID into a `Self::DualStackBoundSocketId`.
     ///
     /// For coherency reasons this can't be a `From` bound on
-    /// `DualStackReceivingId`. If more methods are added, consider moving this
-    /// to its own dedicated trait that bounds `DualStackReceivingId`.
-    fn into_dual_stack_receiving_id<S: DatagramSocketSpec>(
+    /// `DualStackBoundSocketId`. If more methods are added, consider moving
+    /// this to its own dedicated trait that bounds `DualStackBoundSocketId`.
+    fn into_dual_stack_bound_socket_id<S: DatagramSocketSpec>(
         id: S::SocketId<Self>,
-    ) -> Self::DualStackReceivingId<S>
+    ) -> Self::DualStackBoundSocketId<S>
     where
         Self: IpExt;
 
-    /// Convert a `Self::DualStackReceivingId` into an [`DualStackIpSocket`].
+    /// Convert a `Self::DualStackBoundSocketId` into an [`DualStackIpSocket`].
     fn as_dual_stack_ip_socket<'a, S: DatagramSocketSpec>(
-        id: &'a Self::DualStackReceivingId<S>,
+        id: &'a Self::DualStackBoundSocketId<S>,
     ) -> DualStackIpSocket<'a, Self, S>;
 
     /// Retrieves the associated connection address from the connection state.
@@ -1313,7 +1311,7 @@ impl DualStackIpExt for Ipv4 {
     type OtherVersion = Ipv6;
 
     /// Incoming IPv4 packets may be received by either IPv4 or IPv6 sockets.
-    type DualStackReceivingId<S: DatagramSocketSpec> = EitherIpSocket<S>;
+    type DualStackBoundSocketId<S: DatagramSocketSpec> = EitherIpSocket<S>;
     type OtherStackIpOptions<State: Clone + Debug + Default> = ();
     /// IPv4 sockets can't listen on dual-stack addresses.
     type DualStackListenerIpAddr<LocalIdentifier: Clone + Debug> =
@@ -1328,14 +1326,14 @@ impl DualStackIpExt for Ipv4 {
     type DualStackConnState<D: Eq + Hash + Debug, S: DatagramSocketSpec> =
         ConnState<Self, D, S, IpOptions<Self, D, S>>;
 
-    fn into_dual_stack_receiving_id<S: DatagramSocketSpec>(
+    fn into_dual_stack_bound_socket_id<S: DatagramSocketSpec>(
         id: S::SocketId<Self>,
-    ) -> Self::DualStackReceivingId<S> {
+    ) -> Self::DualStackBoundSocketId<S> {
         EitherIpSocket::V4(id)
     }
 
     fn as_dual_stack_ip_socket<'a, S: DatagramSocketSpec>(
-        id: &'a Self::DualStackReceivingId<S>,
+        id: &'a Self::DualStackBoundSocketId<S>,
     ) -> DualStackIpSocket<'a, Self, S> {
         match id {
             EitherIpSocket::V4(id) => DualStackIpSocket::CurrentStack(id),
@@ -1356,7 +1354,7 @@ impl DualStackIpExt for Ipv6 {
     type OtherVersion = Ipv4;
 
     /// Incoming IPv6 packets may only be received by IPv6 sockets.
-    type DualStackReceivingId<S: DatagramSocketSpec> = S::SocketId<Self>;
+    type DualStackBoundSocketId<S: DatagramSocketSpec> = S::SocketId<Self>;
     type OtherStackIpOptions<State: Clone + Debug + Default> = State;
     /// IPv6 listeners can listen on dual-stack addresses (if the protocol
     /// and socket are dual-stack-enabled).
@@ -1374,14 +1372,14 @@ impl DualStackIpExt for Ipv6 {
     type DualStackConnState<D: Eq + Hash + Debug, S: DatagramSocketSpec> =
         DualStackConnState<Self, D, S>;
 
-    fn into_dual_stack_receiving_id<S: DatagramSocketSpec>(
+    fn into_dual_stack_bound_socket_id<S: DatagramSocketSpec>(
         id: S::SocketId<Self>,
-    ) -> Self::DualStackReceivingId<S> {
+    ) -> Self::DualStackBoundSocketId<S> {
         id
     }
 
     fn as_dual_stack_ip_socket<'a, S: DatagramSocketSpec>(
-        id: &'a Self::DualStackReceivingId<S>,
+        id: &'a Self::DualStackBoundSocketId<S>,
     ) -> DualStackIpSocket<'a, Self, S> {
         DualStackIpSocket::CurrentStack(id)
     }
@@ -1491,14 +1489,14 @@ pub(crate) trait DatagramSocketSpec {
     /// Returns the IP protocol of this datagram specification.
     fn ip_proto<I: IpProtoExt>() -> I::Proto;
 
-    /// Converts [`Self::SocketId`] to [`DatagramSocketMapSpec::ReceivingId`].
+    /// Converts [`Self::SocketId`] to [`DatagramSocketMapSpec::BoundSocketId`].
     ///
     /// Constructs a socket identifier to its in-demultiplexing map form. For
     /// protocols with dual-stack sockets, like UDP, implementations should
     /// perform a transformation. Otherwise it should be the identity function.
-    fn make_receiving_map_id<I: IpExt, D: device::WeakId>(
+    fn make_bound_socket_map_id<I: IpExt, D: device::WeakId>(
         s: Self::SocketId<I>,
-    ) -> <Self::SocketMapSpec<I, D> as DatagramSocketMapSpec<I, D, Self::AddrSpec>>::ReceivingId;
+    ) -> <Self::SocketMapSpec<I, D> as DatagramSocketMapSpec<I, D, Self::AddrSpec>>::BoundSocketId;
 
     /// The type of serializer returned by [`DatagramSocketSpec::make_packet`]
     /// for a given IP version and buffer type.
@@ -1605,7 +1603,7 @@ enum SingleStackRemove<I: IpExt, D: WeakId, S: DatagramSocketSpec> {
         ip_options: IpOptions<I, D, S>,
         sharing: S::SharingState,
         socket_id:
-            <S::SocketMapSpec<I, D> as DatagramSocketMapSpec<I, D, S::AddrSpec>>::ReceivingId,
+            <S::SocketMapSpec<I, D> as DatagramSocketMapSpec<I, D, S::AddrSpec>>::BoundSocketId,
     },
     Connected {
         // The socket's address, stored as a concrete `ConnIpAddr`.
@@ -1622,7 +1620,7 @@ enum SingleStackRemove<I: IpExt, D: WeakId, S: DatagramSocketSpec> {
         ip_options: IpOptions<I, D, S>,
         sharing: S::SharingState,
         socket_id:
-            <S::SocketMapSpec<I, D> as DatagramSocketMapSpec<I, D, S::AddrSpec>>::ReceivingId,
+            <S::SocketMapSpec<I, D> as DatagramSocketMapSpec<I, D, S::AddrSpec>>::BoundSocketId,
     },
 }
 
@@ -1648,7 +1646,7 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> SingleStackRemoveOperation<I, D
                     associated_addr: associated_addr.clone(),
                     ip_options: ip_options.clone(),
                     sharing: sharing.clone(),
-                    socket_id: S::make_receiving_map_id(socket_id),
+                    socket_id: S::make_bound_socket_map_id(socket_id),
                 }
             }
             BoundSocketState::Connected { state, sharing } => {
@@ -1667,7 +1665,7 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> SingleStackRemoveOperation<I, D
                     associated_addr,
                     ip_options: socket.options().clone(),
                     sharing: sharing.clone(),
-                    socket_id: S::make_receiving_map_id(socket_id),
+                    socket_id: S::make_bound_socket_map_id(socket_id),
                 }
             }
         })
@@ -1803,7 +1801,7 @@ enum DualStackRemove<I: IpExt, D: WeakId, S: DatagramSocketSpec> {
             I::OtherVersion,
             D,
             S::AddrSpec,
-        >>::ReceivingId,
+        >>::BoundSocketId,
     },
     ListenerBothStacks {
         identifier: <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
@@ -1815,12 +1813,12 @@ enum DualStackRemove<I: IpExt, D: WeakId, S: DatagramSocketSpec> {
         ip_options: IpOptions<I, D, S>,
         sharing: S::SharingState,
         socket_id:
-            <S::SocketMapSpec<I, D> as DatagramSocketMapSpec<I, D, S::AddrSpec>>::ReceivingId,
+            <S::SocketMapSpec<I, D> as DatagramSocketMapSpec<I, D, S::AddrSpec>>::BoundSocketId,
         other_socket_id: <S::SocketMapSpec<I::OtherVersion, D> as DatagramSocketMapSpec<
             I::OtherVersion,
             D,
             S::AddrSpec,
-        >>::ReceivingId,
+        >>::BoundSocketId,
     },
     // TODO(https://fxbug.dev/135204): Support removing connected sockets in the
     // other stack.
@@ -1850,8 +1848,8 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> DualStackRemoveOperation<I, D, 
                             associated_addr: associated_addr.clone(),
                             ip_options: ip_options.clone(),
                             sharing: sharing.clone(),
-                            socket_id: S::make_receiving_map_id(socket_id.clone()),
-                            other_socket_id: sync_ctx.to_other_receiving_id(socket_id),
+                            socket_id: S::make_bound_socket_map_id(socket_id.clone()),
+                            other_socket_id: sync_ctx.to_other_bound_socket_id(socket_id),
                         }
                     }
                     // Bound in this stack, with/without dual-stack enabled.
@@ -1861,7 +1859,7 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> DualStackRemoveOperation<I, D, 
                             associated_addr: associated_addr.clone(),
                             ip_options: ip_options.clone(),
                             sharing: sharing.clone(),
-                            socket_id: S::make_receiving_map_id(socket_id),
+                            socket_id: S::make_bound_socket_map_id(socket_id),
                         })
                     }
                     // Dual-stack enabled, bound only in the other stack.
@@ -1871,7 +1869,7 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> DualStackRemoveOperation<I, D, 
                             associated_addr: associated_addr.clone(),
                             ip_options: ip_options.clone(),
                             sharing: sharing.clone(),
-                            socket_id: sync_ctx.to_other_receiving_id(socket_id),
+                            socket_id: sync_ctx.to_other_bound_socket_id(socket_id),
                         }
                     }
                     (DualStackListenerIpAddr::OtherStack(_), false)
@@ -1899,7 +1897,7 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> DualStackRemoveOperation<I, D, 
                             associated_addr,
                             ip_options: socket.options().clone(),
                             sharing: sharing.clone(),
-                            socket_id: S::make_receiving_map_id(socket_id),
+                            socket_id: S::make_bound_socket_map_id(socket_id),
                         })
                     }
                     DualStackConnState::OtherStack(state) => {
@@ -1967,17 +1965,17 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> DualStackRemoveOperation<I, D, 
                 socket_id,
                 other_socket_id,
             } => {
-                let paired_receiving_ids =
-                    PairedReceivingIds { this: socket_id, other: other_socket_id };
+                let paired_bound_socket_ids =
+                    PairedBoundSocketIds { this: socket_id, other: other_socket_id };
                 PairedSocketMapMut::<_, _, S> { bound: sockets, other_bound: other_sockets }
                     .remove_listener(
                         &DualStackUnspecifiedAddr,
                         identifier,
                         &device,
-                        &paired_receiving_ids,
+                        &paired_bound_socket_ids,
                     );
-                let PairedReceivingIds { this: socket_id, other: other_socket_id } =
-                    paired_receiving_ids;
+                let PairedBoundSocketIds { this: socket_id, other: other_socket_id } =
+                    paired_bound_socket_ids;
                 DualStackRemoveInfo(DualStackRemove::ListenerBothStacks {
                     identifier,
                     device,
@@ -2092,7 +2090,7 @@ trait BoundStateHandler<I: IpExt, S: DatagramSocketSpec, D: device::WeakId> {
     /// The type of address that can be inserted or removed for listeners.
     type ListenerAddr: Clone;
     /// The type of ID that can be inserted or removed.
-    type ReceivingId;
+    type BoundSocketId;
 
     /// Checks whether an entry could be inserted for the specified address and
     /// identifier.
@@ -2118,7 +2116,7 @@ trait BoundStateHandler<I: IpExt, S: DatagramSocketSpec, D: device::WeakId> {
         identifier: <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
         device: Option<D>,
         sharing: S::SharingState,
-        id: Self::ReceivingId,
+        id: Self::BoundSocketId,
     ) -> Result<(), LocalAddressError>;
 
     /// Removes `id` at listener address, assuming it exists.
@@ -2129,7 +2127,7 @@ trait BoundStateHandler<I: IpExt, S: DatagramSocketSpec, D: device::WeakId> {
         addr: &Self::ListenerAddr,
         identifier: <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
         device: &Option<D>,
-        id: &Self::ReceivingId,
+        id: &Self::BoundSocketId,
     );
 }
 
@@ -2145,8 +2143,8 @@ impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> BoundStateHandler<I, S,
     for BoundSocketMap<I, D, S::AddrSpec, S::SocketMapSpec<I, D>>
 {
     type ListenerAddr = Option<SocketIpAddr<I::Addr>>;
-    type ReceivingId =
-        <S::SocketMapSpec<I, D> as DatagramSocketMapSpec<I, D, S::AddrSpec>>::ReceivingId;
+    type BoundSocketId =
+        <S::SocketMapSpec<I, D> as DatagramSocketMapSpec<I, D, S::AddrSpec>>::BoundSocketId;
     fn is_listener_entry_available(
         &self,
         addr: Self::ListenerAddr,
@@ -2171,7 +2169,7 @@ impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> BoundStateHandler<I, S,
         identifier: <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
         device: Option<D>,
         sharing: S::SharingState,
-        id: Self::ReceivingId,
+        id: Self::BoundSocketId,
     ) -> Result<(), LocalAddressError> {
         try_insert_single_listener(self, addr, identifier, device, sharing, id).map(|_entry| ())
     }
@@ -2181,7 +2179,7 @@ impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> BoundStateHandler<I, S,
         addr: &Self::ListenerAddr,
         identifier: <<S as DatagramSocketSpec>::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
         device: &Option<D>,
-        id: &Self::ReceivingId,
+        id: &Self::BoundSocketId,
     ) {
         remove_single_listener(self, addr, identifier, device, id)
     }
@@ -2197,13 +2195,13 @@ struct PairedSocketMapMut<'a, I: IpExt, D: device::WeakId, S: DatagramSocketSpec
     >,
 }
 
-struct PairedReceivingIds<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> {
-    this: <S::SocketMapSpec<I, D> as DatagramSocketMapSpec<I, D, S::AddrSpec>>::ReceivingId,
+struct PairedBoundSocketIds<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> {
+    this: <S::SocketMapSpec<I, D> as DatagramSocketMapSpec<I, D, S::AddrSpec>>::BoundSocketId,
     other: <S::SocketMapSpec<I::OtherVersion, D> as DatagramSocketMapSpec<
         I::OtherVersion,
         D,
         S::AddrSpec,
-    >>::ReceivingId,
+    >>::BoundSocketId,
 }
 
 /// Implementation for a pair of demultiplexing maps for different IP versions.
@@ -2211,7 +2209,7 @@ impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> BoundStateHandler<I, S,
     for PairedSocketMapMut<'_, I, D, S>
 {
     type ListenerAddr = DualStackUnspecifiedAddr;
-    type ReceivingId = PairedReceivingIds<I, D, S>;
+    type BoundSocketId = PairedBoundSocketIds<I, D, S>;
 
     fn is_listener_entry_available(
         &self,
@@ -2235,10 +2233,10 @@ impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> BoundStateHandler<I, S,
         identifier: <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
         device: Option<D>,
         sharing: S::SharingState,
-        id: Self::ReceivingId,
+        id: Self::BoundSocketId,
     ) -> Result<(), LocalAddressError> {
         let PairedSocketMapMut { bound: this, other_bound: other } = self;
-        let PairedReceivingIds { this: this_id, other: other_id } = id;
+        let PairedBoundSocketIds { this: this_id, other: other_id } = id;
         try_insert_single_listener(this, None, identifier, device.clone(), sharing.clone(), this_id)
             .and_then(|first_entry| {
                 match try_insert_single_listener(other, None, identifier, device, sharing, other_id)
@@ -2257,10 +2255,10 @@ impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> BoundStateHandler<I, S,
         DualStackUnspecifiedAddr: &Self::ListenerAddr,
         identifier: <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
         device: &Option<D>,
-        id: &PairedReceivingIds<I, D, S>,
+        id: &PairedBoundSocketIds<I, D, S>,
     ) {
         let PairedSocketMapMut { bound: this, other_bound: other } = self;
-        let PairedReceivingIds { this: this_id, other: other_id } = id;
+        let PairedBoundSocketIds { this: this_id, other: other_id } = id;
         remove_single_listener(this, &None, identifier, device, this_id);
         remove_single_listener(other, &None, identifier, device, other_id);
     }
@@ -2586,7 +2584,7 @@ fn listen_inner<
             let converter = either_dual_stack.to_converter();
             sync_ctx
                 .with_bound_sockets_mut(|sync_ctx, bound, _allocator| {
-                    let id = S::make_receiving_map_id(id);
+                    let id = S::make_bound_socket_map_id(id);
 
                     try_bind_single_stack::<I, S, _, _>(
                         sync_ctx,
@@ -2612,7 +2610,7 @@ fn listen_inner<
                 })
         }
         BoundOperation::OnlyOtherStack(sync_ctx, addr) => {
-            let id = sync_ctx.to_other_receiving_id(id);
+            let id = sync_ctx.to_other_bound_socket_id(id);
             sync_ctx
                 .with_other_bound_sockets_mut(|sync_ctx, other_bound| {
                     try_bind_single_stack::<_, S, _, _>(
@@ -2636,9 +2634,9 @@ fn listen_inner<
                 })
         }
         BoundOperation::DualStackAnyAddr(sync_ctx) => {
-            let ids = PairedReceivingIds {
-                this: S::make_receiving_map_id(id.clone()),
-                other: sync_ctx.to_other_receiving_id(id),
+            let ids = PairedBoundSocketIds {
+                this: S::make_bound_socket_map_id(id.clone()),
+                other: sync_ctx.to_other_bound_socket_id(id),
             };
             sync_ctx
                 .with_both_bound_sockets_mut(
@@ -2875,7 +2873,7 @@ pub(crate) fn connect<
                         let bound_addr = match bound.conns_mut().try_insert(
                             conn_addr,
                             sharing.clone(),
-                            S::make_receiving_map_id(id.clone()),
+                            S::make_bound_socket_map_id(id.clone()),
                         ) {
                             Ok(bound_entry) => bound_entry.get_addr().clone(),
                             Err((
@@ -2945,7 +2943,7 @@ pub(crate) fn connect<
                         let bound_addr = match bound.conns_mut().try_insert(
                             conn_addr,
                             sharing.clone(),
-                            S::make_receiving_map_id(id.clone()),
+                            S::make_bound_socket_map_id(id.clone()),
                         ) {
                             Ok(bound_entry) => bound_entry.get_addr().clone(),
                             Err((
@@ -3062,7 +3060,7 @@ pub(crate) fn disconnect_connected<
             }
         };
 
-        let id = S::make_receiving_map_id(id);
+        let id = S::make_bound_socket_map_id(id);
         let bound_addr = DatagramBoundStateContext::<I, _, _>::with_bound_sockets_mut(
             sync_ctx,
             |_sync_ctx, bound, _allocator| {
@@ -3535,7 +3533,7 @@ pub(crate) fn set_device<
                         |sync_ctx, bound, _allocator| {
                             let entry = bound
                                 .listeners_mut()
-                                .entry(&S::make_receiving_map_id(id.clone()), &bound_addr)
+                                .entry(&S::make_bound_socket_map_id(id.clone()), &bound_addr)
                                 .unwrap_or_else(|| panic!("invalid listener ID {:?}", id));
                             let new_addr = ListenerAddr {
                                 device: new_device.map(|d| sync_ctx.downgrade_device_id(d)),
@@ -3623,7 +3621,7 @@ pub(crate) fn set_device<
 
                                 let entry = bound
                                     .conns_mut()
-                                    .entry(&S::make_receiving_map_id(id.clone()), addr)
+                                    .entry(&S::make_bound_socket_map_id(id.clone()), addr)
                                     .unwrap_or_else(|| panic!("invalid conn ID {:?}", id));
                                 let new_addr = ConnAddr {
                                     device: new_socket.device().cloned(),
@@ -4216,9 +4214,9 @@ mod test {
             I::map_ip((), |()| FAKE_DATAGRAM_IPV4_PROTOCOL, |()| FAKE_DATAGRAM_IPV6_PROTOCOL)
         }
 
-        fn make_receiving_map_id<I: IpExt, D: device::WeakId>(
+        fn make_bound_socket_map_id<I: IpExt, D: device::WeakId>(
             s: Self::SocketId<I>,
-        ) -> <Self::SocketMapSpec<I, D> as DatagramSocketMapSpec<I, D, Self::AddrSpec>>::ReceivingId
+        ) -> <Self::SocketMapSpec<I, D> as DatagramSocketMapSpec<I, D, Self::AddrSpec>>::BoundSocketId
         {
             s
         }
@@ -4252,7 +4250,7 @@ mod test {
     impl<I: IpExt, D: device::WeakId> DatagramSocketMapSpec<I, D, FakeAddrSpec>
         for (FakeStateSpec, I, D)
     {
-        type ReceivingId = Id;
+        type BoundSocketId = Id;
     }
 
     impl<I: IpExt, D: device::WeakId>
@@ -4645,7 +4643,7 @@ mod test {
             addr.to_ipv6_mapped()
         }
 
-        fn to_other_receiving_id(&self, id: Id) -> Id {
+        fn to_other_bound_socket_id(&self, id: Id) -> Id {
             id
         }
 

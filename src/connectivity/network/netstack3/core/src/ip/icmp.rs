@@ -960,13 +960,13 @@ impl DatagramSocketSpec for Icmp {
         I::map_ip((), |()| Ipv4Proto::Icmp, |()| Ipv6Proto::Icmpv6)
     }
 
-    fn make_receiving_map_id<I: datagram::IpExt, D: WeakId>(
+    fn make_bound_socket_map_id<I: datagram::IpExt, D: WeakId>(
         s: Self::SocketId<I>,
     ) -> <Self::SocketMapSpec<I, D> as datagram::DatagramSocketMapSpec<
         I,
         D,
         Self::AddrSpec,
-    >>::ReceivingId{
+    >>::BoundSocketId{
         s
     }
 
@@ -1268,7 +1268,7 @@ impl<I: IpExt> SocketMapAddrStateSpec for SocketId<I> {
 }
 
 impl<I: IpExt, D: WeakId> DatagramSocketMapSpec<I, D, IcmpAddrSpec> for (Icmp, I, D) {
-    type ReceivingId = SocketId<I>;
+    type BoundSocketId = SocketId<I>;
 }
 
 impl<AA, I: IpExt, D: WeakId> SocketMapConflictPolicy<AA, (), I, D, IcmpAddrSpec> for (Icmp, I, D)

@@ -391,8 +391,8 @@ fn check_posix_sharing<I: IpExt, D: WeakId>(
 }
 
 impl<I: IpExt, D: Id> SocketMapStateSpec for (Udp, I, D) {
-    type ListenerId = I::DualStackReceivingId<Udp>;
-    type ConnId = I::DualStackReceivingId<Udp>;
+    type ListenerId = I::DualStackBoundSocketId<Udp>;
+    type ConnId = I::DualStackBoundSocketId<Udp>;
 
     type AddrVecTag = AddrVecTag;
 
@@ -464,10 +464,10 @@ impl DatagramSocketSpec for Udp {
         IpProto::Udp.into()
     }
 
-    fn make_receiving_map_id<I: IpExt, D: WeakId>(
+    fn make_bound_socket_map_id<I: IpExt, D: WeakId>(
         s: Self::SocketId<I>,
-    ) -> I::DualStackReceivingId<Udp> {
-        I::into_dual_stack_receiving_id(s)
+    ) -> I::DualStackBoundSocketId<Udp> {
+        I::into_dual_stack_bound_socket_id(s)
     }
 
     fn make_packet<I: IpExt, B: BufferMut>(
@@ -498,16 +498,16 @@ impl DatagramSocketSpec for Udp {
 }
 
 impl<I: IpExt, D: WeakId> DatagramSocketMapSpec<I, D, IpPortSpec> for (Udp, I, D) {
-    type ReceivingId = I::DualStackReceivingId<Udp>;
+    type BoundSocketId = I::DualStackBoundSocketId<Udp>;
 }
 
 enum LookupResult<'a, I: IpExt, D: Id> {
     Conn(
-        &'a I::DualStackReceivingId<Udp>,
+        &'a I::DualStackBoundSocketId<Udp>,
         ConnAddr<ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>, D>,
     ),
     Listener(
-        &'a I::DualStackReceivingId<Udp>,
+        &'a I::DualStackBoundSocketId<Udp>,
         ListenerAddr<ListenerIpAddr<I::Addr, NonZeroU16>, D>,
     ),
 }
@@ -1451,7 +1451,7 @@ fn try_dual_stack_deliver<
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
-    socket: I::DualStackReceivingId<Udp>,
+    socket: I::DualStackBoundSocketId<Udp>,
     device: &SC::DeviceId,
     (dst_ip, dst_port): (I::Addr, NonZeroU16),
     (src_ip, src_port): (I::Addr, Option<NonZeroU16>),
@@ -1462,7 +1462,7 @@ fn try_dual_stack_deliver<
     struct Inputs<I: IpExt> {
         src_ip: I::Addr,
         dst_ip: I::Addr,
-        socket: I::DualStackReceivingId<Udp>,
+        socket: I::DualStackBoundSocketId<Udp>,
     }
 
     struct Outputs<I: IpExt> {
@@ -2144,7 +2144,7 @@ impl<
         addr.to_ipv6_mapped()
     }
 
-    fn to_other_receiving_id(&self, id: SocketId<Ipv6>) -> EitherIpSocket<Udp> {
+    fn to_other_bound_socket_id(&self, id: SocketId<Ipv6>) -> EitherIpSocket<Udp> {
         EitherIpSocket::V6(id)
     }
 
