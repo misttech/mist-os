@@ -180,6 +180,22 @@ impl AsRef<str> for Path {
     }
 }
 
+impl TryInto<Path> for String {
+    type Error = Status;
+
+    fn try_into(self) -> Result<Path, Self::Error> {
+        Path::validate_and_split(self)
+    }
+}
+
+impl TryInto<Path> for &str {
+    type Error = Status;
+
+    fn try_into(self) -> Result<Path, Self::Error> {
+        Path::validate_and_split(self)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -676,5 +692,27 @@ mod tests {
         assert_eq!(path.as_ref(), "c/");
         path.next();
         assert_eq!(path.as_ref(), ".");
+    }
+
+    #[test]
+    fn str_try_into() {
+        let valid = "abc";
+        let path: Path = valid.try_into().unwrap();
+        assert_eq!(path.as_str(), "abc");
+
+        let invalid = "..";
+        let path: Result<Path, _> = invalid.try_into();
+        assert!(path.is_err());
+    }
+
+    #[test]
+    fn string_try_into() {
+        let valid = "abc".to_string();
+        let path: Path = valid.try_into().unwrap();
+        assert_eq!(path.as_str(), "abc");
+
+        let invalid = "..".to_string();
+        let path: Result<Path, _> = invalid.try_into();
+        assert!(path.is_err());
     }
 }
