@@ -366,10 +366,13 @@ async fn starting_state(
 
     let ap_config = fidl_sme::ApConfig::from(req.clone());
     let start_result = match deps.proxy.start(&ap_config).await {
-        Ok(fidl_sme::StartApResultCode::Success) => Ok(()),
+        Ok(fidl_sme::StartApResultCode::Success) => {
+            deps.telemetry_sender.send(TelemetryEvent::StartApResult(Ok(())));
+            Ok(())
+        }
         Ok(code) => {
             // Log a metric indicating that starting the AP failed.
-            deps.telemetry_sender.send(TelemetryEvent::ApStartFailure);
+            deps.telemetry_sender.send(TelemetryEvent::StartApResult(Err(())));
             if let Err(e) =
                 deps.defect_sender.unbounded_send(Defect::Iface(IfaceFailure::ApStartFailure {
                     iface_id: deps.iface_id,
@@ -1393,8 +1396,11 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
         assert_variant!(exec.run_until_stalled(&mut stop_receiver), Poll::Ready(Ok(())));
 
-        // No metric should be logged in this case.
-        assert_variant!(test_values.telemetry_receiver.try_next(), Err(_));
+        // The successful AP start should be logged.
+        assert_variant!(
+            test_values.telemetry_receiver.try_next(),
+            Ok(Some(TelemetryEvent::StartApResult(Ok(()))))
+        );
     }
 
     #[fuchsia::test]
@@ -1505,8 +1511,11 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
         assert_variant!(exec.run_until_stalled(&mut second_start_receiver), Poll::Ready(Ok(())));
 
-        // No metric should be logged in this case.
-        assert_variant!(test_values.telemetry_receiver.try_next(), Err(_));
+        // The successful AP start event should be logged.
+        assert_variant!(
+            test_values.telemetry_receiver.try_next(),
+            Ok(Some(TelemetryEvent::StartApResult(Ok(()))))
+        );
     }
 
     #[fuchsia::test]
@@ -1571,8 +1580,11 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut exit_receiver), Poll::Ready(Ok(())));
         assert_variant!(exec.run_until_stalled(&mut start_receiver), Poll::Ready(Ok(())));
 
-        // No metric should be logged in this case and the sender should be dropped.
-        assert_variant!(test_values.telemetry_receiver.try_next(), Ok(None));
+        // The AP start success event should be logged to telemetry.
+        assert_variant!(
+            test_values.telemetry_receiver.try_next(),
+            Ok(Some(TelemetryEvent::StartApResult(Ok(()))))
+        );
     }
 
     #[fuchsia::test]
@@ -1751,7 +1763,7 @@ mod tests {
         // A metric should be logged for the failure to start the AP.
         assert_variant!(
             test_values.telemetry_receiver.try_next(),
-            Ok(Some(TelemetryEvent::ApStartFailure))
+            Ok(Some(TelemetryEvent::StartApResult(Err(()))))
         );
 
         // A defect should be sent as well.
@@ -1836,7 +1848,7 @@ mod tests {
         // A metric should be logged for the failure to start the AP.
         assert_variant!(
             test_values.telemetry_receiver.try_next(),
-            Ok(Some(TelemetryEvent::ApStartFailure))
+            Ok(Some(TelemetryEvent::StartApResult(Err(()))))
         );
 
         // A defect should be sent as well.
@@ -1959,7 +1971,7 @@ mod tests {
         // A metric should be logged for the failure to start the AP.
         assert_variant!(
             test_values.telemetry_receiver.try_next(),
-            Ok(Some(TelemetryEvent::ApStartFailure))
+            Ok(Some(TelemetryEvent::StartApResult(Err(()))))
         );
 
         // A defect should be sent as well.
@@ -2068,7 +2080,7 @@ mod tests {
         // A metric should be logged for the failure to start the AP.
         assert_variant!(
             test_values.telemetry_receiver.try_next(),
-            Ok(Some(TelemetryEvent::ApStartFailure))
+            Ok(Some(TelemetryEvent::StartApResult(Err(()))))
         );
 
         // A defect should be sent as well.
