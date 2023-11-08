@@ -83,7 +83,7 @@ impl InterfaceConfig {
             addr_v4: net_ip_v4!("192.168.1.2"),
             gateway_v6: net_ip_v6!("fe81::1"),
             addr_v6: net_ip_v6!("fe81::2"),
-            gateway_mac: net_mac!("03:00:00:00:00:01"),
+            gateway_mac: net_mac!("04:00:00:00:00:01"),
             metric,
         }
     }
