@@ -32,12 +32,10 @@ fxfs_deps = [
   "//third_party/rust_crates:linked-hash-map",
   "//third_party/rust_crates:num-traits",
   "//third_party/rust_crates:once_cell",
-  "//third_party/rust_crates:pin-project",
   "//third_party/rust_crates:rand",
   "//third_party/rust_crates:rustc-hash",
   "//third_party/rust_crates:scopeguard",
   "//third_party/rust_crates:serde",
-  "//third_party/rust_crates:slab",
   "//third_party/rust_crates:static_assertions",
   "//third_party/rust_crates:thiserror",
   "//third_party/rust_crates:tracing",
@@ -51,7 +49,6 @@ fxfs_test_deps = [
 
 fxfs_sources = [
   "src/checksum.rs",
-  "src/data_buffer.rs",
   "src/debug_assert_not_too_long.rs",
   "src/drop_event.rs",
   "src/errors.rs",

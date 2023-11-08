@@ -11,7 +11,6 @@
 //! Fuchsia specific bindings are primarily found under [server].
 
 pub mod checksum;
-pub mod data_buffer;
 pub mod drop_event;
 
 #[macro_use]

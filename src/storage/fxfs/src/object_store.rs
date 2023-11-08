@@ -1392,7 +1392,7 @@ impl ObjectStore {
         &self,
         object_ids: impl std::iter::IntoIterator<Item = u64>,
         crypt: Option<Arc<dyn Crypt>>,
-    ) -> Result<Vec<CachingObjectHandle<ObjectStore>>, Error> {
+    ) -> Result<Vec<CachingObjectHandle<DataObjectHandle<ObjectStore>>>, Error> {
         let parent_store = self.parent_store.as_ref().unwrap();
         let mut handles = Vec::new();
         let mut sizes = Vec::new();
