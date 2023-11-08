@@ -8,8 +8,8 @@ use {
     crate::model::{
         actions::{Action, ActionKey},
         component::{
-            ComponentInstance, ExecutionState, InstanceState, Package, Runtime, SandboxDispatcher,
-            StartReason, WeakComponentInstance,
+            ComponentInstance, ExecutionState, InstanceState, Package, ResolvedInstanceState,
+            Runtime, SandboxDispatcher, StartReason, WeakComponentInstance,
         },
         error::{StartActionError, StructuredConfigError},
         hooks::{Event, EventPayload, RuntimeInfo},
@@ -26,10 +26,10 @@ use {
         endpoints::{create_proxy, DiscoverableProtocolMarker},
         Vmo,
     },
-    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata,
-    fidl_fuchsia_diagnostics_types as fdiagnostics, fidl_fuchsia_io as fio,
-    fidl_fuchsia_logger as flogger, fidl_fuchsia_mem as fmem, fidl_fuchsia_process as fprocess,
-    fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
+    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_runner as fcrunner,
+    fidl_fuchsia_data as fdata, fidl_fuchsia_diagnostics_types as fdiagnostics,
+    fidl_fuchsia_io as fio, fidl_fuchsia_logger as flogger, fidl_fuchsia_mem as fmem,
+    fidl_fuchsia_process as fprocess, fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
     futures::channel::oneshot,
     moniker::Moniker,
     std::sync::Arc,
@@ -111,10 +111,15 @@ async fn do_start(
     })?;
 
     // Find the runner to use.
-    let runner = component.resolve_runner().await.map_err(|err| {
-        warn!(moniker = %component.moniker, %err, "Failed to resolve runner.");
-        err
-    })?;
+    let runner = {
+        let resolved_state = component.lock_resolved_state().await.map_err(|err| {
+            StartActionError::ResolveActionError { moniker: component.moniker.clone(), err }
+        })?;
+        resolve_runner(component, &*resolved_state).await.map_err(|err| {
+            warn!(moniker = %component.moniker, %err, "Failed to resolve runner.");
+            err
+        })?
+    };
 
     // Generate the Runtime which will be set in the Execution.
     let (pending_runtime, start_info, break_on_start) = make_execution_runtime(
@@ -226,6 +231,36 @@ pub fn should_return_early(
     } else {
         None
     }
+}
+
+/// Returns a RemoteRunner routed to the component's runner, if it specifies one.
+///
+/// Returns None if the component's decl does not specify a runner.
+async fn resolve_runner(
+    component: &Arc<ComponentInstance>,
+    resolved_state: &ResolvedInstanceState,
+) -> Result<Option<RemoteRunner>, StartActionError> {
+    let Some(runner) = resolved_state.decl().get_runner() else {
+        return Ok(None);
+    };
+
+    // Open up a channel to the runner.
+    let (client, server) = create_proxy::<fcrunner::ComponentRunnerMarker>().unwrap();
+    let mut server_channel = server.into_channel();
+    let options = OpenOptions {
+        flags: fio::OpenFlags::NOT_DIRECTORY,
+        relative_path: "".into(),
+        server_chan: &mut server_channel,
+    };
+    route_and_open_capability(RouteRequest::UseRunner(runner.clone()), component, options)
+        .await
+        .map_err(|err| StartActionError::ResolveRunnerError {
+            moniker: component.moniker.clone(),
+            err: Box::new(err),
+            runner: runner.source_name,
+        })?;
+
+    return Ok(Some(RemoteRunner::new(client)));
 }
 
 /// Returns a configured Runtime for a component and the start info (without actually starting

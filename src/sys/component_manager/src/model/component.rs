@@ -23,12 +23,10 @@ use {
         hooks::{Event, EventPayload, Hooks},
         ns_dir::NamespaceDir,
         routing::{
-            self, route_and_open_capability,
+            self,
             service::{AnonymizedAggregateServiceDir, AnonymizedServiceRoute},
-            OpenOptions, RouteRequest,
         },
     },
-    crate::runner::RemoteRunner,
     crate::sandbox_util::{Sandbox, SandboxWaiter},
     ::namespace::Entry as NamespaceEntry,
     ::routing::{
@@ -67,7 +65,6 @@ use {
         handle::fuchsia_handles::Channel,
     },
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_hardware_power_statecontrol as fstatecontrol, fidl_fuchsia_io as fio,
     fidl_fuchsia_process as fprocess, fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
     fuchsia_component::client,
@@ -525,52 +522,6 @@ impl ComponentInstance {
     /// success or error.
     pub async fn unresolve(self: &Arc<Self>) -> Result<(), UnresolveActionError> {
         ActionSet::register(self.clone(), UnresolveAction::new()).await
-    }
-
-    /// Resolves the runner that can start this component.
-    ///
-    /// If the component has no program declaration, returns `None`.
-    pub async fn resolve_runner<'a>(
-        self: &'a Arc<Self>,
-    ) -> Result<Option<RemoteRunner>, StartActionError> {
-        // Fetch component declaration.
-        let runner = {
-            let state = self.lock_state().await;
-            match *state {
-                InstanceState::Resolved(ref s) => s.decl.get_runner(),
-                InstanceState::Destroyed => {
-                    return Err(StartActionError::InstanceDestroyed {
-                        moniker: self.moniker.clone(),
-                    });
-                }
-                _ => {
-                    panic!("resolve_runner: not resolved")
-                }
-            }
-        };
-
-        let Some(runner) = runner else {
-            return Ok(None);
-        };
-
-        // Open up a channel to the runner.
-        let (client, server) =
-            endpoints::create_proxy::<fcrunner::ComponentRunnerMarker>().unwrap();
-        let mut server_channel = server.into_channel();
-        let options = OpenOptions {
-            flags: fio::OpenFlags::NOT_DIRECTORY,
-            relative_path: "".into(),
-            server_chan: &mut server_channel,
-        };
-        route_and_open_capability(RouteRequest::UseRunner(runner.clone()), self, options)
-            .await
-            .map_err(|err| StartActionError::ResolveRunnerError {
-                err: Box::new(err),
-                moniker: self.moniker.clone(),
-                runner: runner.source_name,
-            })?;
-
-        return Ok(Some(RemoteRunner::new(client)));
     }
 
     /// Adds the dynamic child defined by `child_decl` to the given `collection_name`.
