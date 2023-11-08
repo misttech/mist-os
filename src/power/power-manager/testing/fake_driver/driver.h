@@ -46,7 +46,7 @@ class Driver : public fdf::DriverBase {
   TemperatureDeviceProtocolServer temperature_server_;
   ControlDeviceProtocolServer control_server_;
 
-  float temperature_;
+  float temperature_ = 0.0f;
 };
 
 }  // namespace fake_driver
