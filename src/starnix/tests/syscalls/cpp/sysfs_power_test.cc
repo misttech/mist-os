@@ -12,8 +12,8 @@
 #include "src/starnix/tests/syscalls/cpp/test_helper.h"
 
 using testing::ContainsRegex;
-using testing::EndsWith;
 using testing::IsSupersetOf;
+using testing::MatchesRegex;
 
 class SysfsPowerTest : public ::testing::Test {
  public:
@@ -77,4 +77,15 @@ TEST_F(SysfsPowerTest, WakeupCountFileWrite) {
   std::string wakeup_count_str;
   EXPECT_TRUE(files::ReadFileToString("/sys/power/wakeup_count", &wakeup_count_str));
   EXPECT_TRUE(files::WriteFile("/sys/power/wakeup_count", wakeup_count_str));
+}
+
+TEST_F(SysfsPowerTest, SuspendStateFileContainsExpectedContents) {
+  std::string states_str;
+  EXPECT_TRUE(files::ReadFileToString("/sys/power/state", &states_str));
+  EXPECT_THAT(states_str, MatchesRegex("([mem|freeze|disk|standby]\\s?)*\n"));
+}
+
+TEST_F(SysfsPowerTest, SuspendStateFileWriteFails) {
+  ASSERT_FALSE(files::WriteFile("/sys/power/state", "test"));
+  ASSERT_FALSE(files::WriteFile("/sys/power/state", "disk"));
 }

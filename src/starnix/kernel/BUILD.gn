@@ -338,6 +338,7 @@ rustc_binary("starnix_kernel_bin") {
     "mutable_state.rs",
     "power/manager.rs",
     "power/mod.rs",
+    "power/state.rs",
     "power/suspend_stats.rs",
     "power/wakeup_count.rs",
     "selinux/fs.rs",
