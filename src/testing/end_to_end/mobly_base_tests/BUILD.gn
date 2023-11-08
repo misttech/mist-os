@@ -42,5 +42,8 @@ python_library("fuchsia_power_base_test") {
     "__init__.py",
     "fuchsia_power_base_test.py",
   ]
-  library_deps = [ ":fuchsia_base_hybrid_test" ]
+  library_deps = [
+    ":fuchsia_base_hybrid_test",
+    "//src/performance/lib/perf_publish",
+  ]
 }
