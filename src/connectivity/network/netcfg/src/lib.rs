@@ -4523,6 +4523,7 @@ mod tests {
         {"topological_path": "abcde"},
         {"any": true}
     ], "naming_scheme": [
+        { "dynamic": "device_class" },
         { "static": "x" },
         { "dynamic": "normalized_mac" }
     ] } ]
@@ -4591,6 +4592,9 @@ mod tests {
                 interface::MatchingRule::Any(true),
             ]),
             naming_scheme: vec![
+                interface::NameCompositionRule::Dynamic(
+                    interface::DynamicNameCompositionRule::DeviceClass,
+                ),
                 interface::NameCompositionRule::Static("x".to_owned()),
                 interface::NameCompositionRule::Dynamic(
                     interface::DynamicNameCompositionRule::NormalizedMac,

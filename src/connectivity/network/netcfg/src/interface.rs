@@ -471,6 +471,7 @@ impl MatchingRule {
 #[derive(Debug, Eq, Hash, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum DynamicNameCompositionRule {
+    DeviceClass,
     // A unique value seeded by the final octet of the interface's MAC address.
     NormalizedMac,
 }
@@ -479,6 +480,7 @@ impl DynamicNameCompositionRule {
     // `true` when a rule can be re-tried to produce a different name.
     fn rule_supports_retry(&self) -> bool {
         match *self {
+            DynamicNameCompositionRule::DeviceClass => false,
             DynamicNameCompositionRule::NormalizedMac => true,
         }
     }
@@ -491,6 +493,11 @@ impl DynamicNameCompositionRule {
         attempt_num: u8,
     ) -> Result<String, anyhow::Error> {
         match *self {
+            DynamicNameCompositionRule::DeviceClass => Ok(match info.device_class.into() {
+                crate::InterfaceType::Wlan => INTERFACE_PREFIX_WLAN,
+                crate::InterfaceType::Ethernet => INTERFACE_PREFIX_ETHERNET,
+            }
+            .to_string()),
             DynamicNameCompositionRule::NormalizedMac => info
                 .mac
                 .map(|mac| {
@@ -548,7 +555,7 @@ impl NamingRule {
         });
 
         let mut attempt_num = 0u8;
-        let name = loop {
+        loop {
             let name = self
                 .naming_scheme
                 .iter()
@@ -580,7 +587,7 @@ impl NamingRule {
                 )));
             }
             return Ok(name);
-        };
+        }
     }
 }
 
@@ -1133,14 +1140,7 @@ mod tests {
         expected_device_class: DeviceClass,
         want_match: bool,
     ) {
-        let device_info = devices::DeviceInfo {
-            device_class: device_class_input,
-            // `mac` and `topological_path` have no effect on `DeviceClass`
-            // matching for the provided test cases, so we use
-            // arbitrary values.
-            mac: Default::default(),
-            topological_path: Default::default(),
-        };
+        let device_info = device_info_from_device_class(device_class_input);
 
         // Verify the `DeviceClass` determined from the device info.
         let device_class: DeviceClass = device_info.device_class.into();
@@ -1197,6 +1197,22 @@ mod tests {
         }
     }
 
+    fn device_info_from_device_class(device_class: fhwnet::DeviceClass) -> devices::DeviceInfo {
+        devices::DeviceInfo { device_class, mac: None, topological_path: "".to_owned() }
+    }
+
+    fn new_device_info(
+        device_class: fhwnet::DeviceClass,
+        octets: [u8; 6],
+        topo_path: &str,
+    ) -> devices::DeviceInfo {
+        devices::DeviceInfo {
+            device_class,
+            mac: Some(fidl_fuchsia_net_ext::MacAddress { octets }),
+            topological_path: topo_path.to_owned(),
+        }
+    }
+
     #[test_case(
         vec![NameCompositionRule::Static(String::from("x"))],
         default_device_info(),
@@ -1227,6 +1243,41 @@ mod tests {
         device_info_from_octets([0x1, 0x1, 0x1, 0x1, 0x1, 0x9]),
         "eth9";
         "normalized_mac_with_static"
+    )]
+    #[test_case(
+        vec![NameCompositionRule::Dynamic(DynamicNameCompositionRule::DeviceClass)],
+        device_info_from_device_class(fhwnet::DeviceClass::Ethernet),
+        "eth";
+        "eth_device_class"
+    )]
+    #[test_case(
+        vec![NameCompositionRule::Dynamic(DynamicNameCompositionRule::DeviceClass)],
+        device_info_from_device_class(fhwnet::DeviceClass::Wlan),
+        "wlan";
+        "wlan_device_class"
+    )]
+    #[test_case(
+        vec![
+            NameCompositionRule::Dynamic(DynamicNameCompositionRule::DeviceClass),
+            NameCompositionRule::Static(String::from("x")),
+        ],
+        device_info_from_device_class(fhwnet::DeviceClass::Ethernet),
+        "ethx";
+        "device_class_with_static"
+    )]
+    #[test_case(
+        vec![
+            NameCompositionRule::Dynamic(DynamicNameCompositionRule::DeviceClass),
+            NameCompositionRule::Static(String::from("x")),
+            NameCompositionRule::Dynamic(DynamicNameCompositionRule::NormalizedMac),
+        ],
+        new_device_info(
+            fhwnet::DeviceClass::Wlan,
+            [0x1, 0x1, 0x1, 0x1, 0x1, 0x8],
+            "",
+        ),
+        "wlanx8";
+        "device_class_with_static_with_normalized_mac"
     )]
     fn test_naming_rules(
         composition_rules: Vec<NameCompositionRule>,
