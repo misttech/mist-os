@@ -46,26 +46,6 @@ async fn main() -> Result<(), anyhow::Error> {
         .for_each_concurrent(None, |IncomingRequest::Launcher(mut stream)| async move {
             while let Some(Ok(request)) = stream.next().await {
                 match request {
-                    // TODO(fxbug.dev/127317) This is the old name for `ExploreComponentOverPty`.
-                    // Remove it once no ffx binaries depend on it.
-                    LauncherRequest::LaunchWithPty {
-                        moniker,
-                        pty,
-                        tool_urls,
-                        command,
-                        ns_layout,
-                        responder,
-                    } => {
-                        let result = crate::launch::component::explore_over_pty(
-                            &moniker, pty, tool_urls, command, ns_layout,
-                        )
-                        .await
-                        .map(|p| {
-                            info!("launched Dash for instance {}", moniker);
-                            notify_on_process_exit(p, responder.control_handle().clone());
-                        });
-                        let _ = responder.send(result);
-                    }
                     LauncherRequest::ExploreComponentOverPty {
                         moniker,
                         pty,
@@ -76,26 +56,6 @@ async fn main() -> Result<(), anyhow::Error> {
                     } => {
                         let result = crate::launch::component::explore_over_pty(
                             &moniker, pty, tool_urls, command, ns_layout,
-                        )
-                        .await
-                        .map(|p| {
-                            info!("launched Dash for instance {}", moniker);
-                            notify_on_process_exit(p, responder.control_handle().clone());
-                        });
-                        let _ = responder.send(result);
-                    }
-                    // TODO(fxbug.dev/127317) This is the old name for `ExploreComponentOverSocket`.
-                    // Remove it once no ffx binaries depend on it.
-                    LauncherRequest::LaunchWithSocket {
-                        moniker,
-                        socket,
-                        tool_urls,
-                        command,
-                        ns_layout,
-                        responder,
-                    } => {
-                        let result = crate::launch::component::explore_over_socket(
-                            &moniker, socket, tool_urls, command, ns_layout,
                         )
                         .await
                         .map(|p| {
