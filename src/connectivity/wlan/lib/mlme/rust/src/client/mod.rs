@@ -322,7 +322,13 @@ impl<D: DeviceOps> ClientMlme<D> {
                             },
                         })?;
                     }
-                    Err(Error::Status(format!("No client sta."), zx::Status::BAD_STATE))
+                    Err(Error::Status(
+                        format!(
+                            "Failed to handle {} MLME request when this ClientMlme has no sta.",
+                            other_message.name()
+                        ),
+                        zx::Status::BAD_STATE,
+                    ))
                 }
                 Some(sta) => Ok(sta
                     .bind(&mut self.ctx, &mut self.scanner, &mut self.channel_state)
@@ -1092,7 +1098,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
             .send_mlme_event(fidl_mlme::MlmeEvent::DisassociateInd {
                 ind: fidl_mlme::DisassociateIndication {
                     peer_sta_address: self.sta.bssid().to_array(),
-                    reason_code: reason_code,
+                    reason_code,
                     locally_initiated: locally_initiated.0,
                 },
             })
