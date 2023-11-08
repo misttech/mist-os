@@ -228,11 +228,6 @@ void AmlogicDisplay::DisplayControllerImplSetDisplayControllerInterface(
     added_display_args_t args;
     vout_->PopulateAddedDisplayArgs(&args, display_id_, kSupportedBanjoPixelFormats);
     dc_intf_.OnDisplaysChanged(&args, 1, nullptr, 0, &info, 1, nullptr);
-    zx::result<> vout_result = vout_->OnDisplaysChanged(info);
-    if (!vout_result.is_ok()) {
-      zxlogf(ERROR, "Failed to propagate default display info to Vout: %s",
-             vout_result.status_string());
-    }
   }
 }
 
@@ -1198,14 +1193,6 @@ void AmlogicDisplay::HpdThreadEntryPoint() {
           /*removed_display_list=*/&banjo_removed_display_id, removed_display_count,
           /*out_display_info_list=*/&added_display_info,
           /*display_info_count=*/added_display_count, /*out_display_info_actual=*/nullptr);
-      if (display_added) {
-        // See if we need to change output color to RGB
-        zx::result<> result = vout_->OnDisplaysChanged(added_display_info);
-        if (!result.is_ok()) {
-          zxlogf(ERROR, "Failed to change Vout display configuration: %s", result.status_string());
-          break;
-        }
-      }
     }
   }
 }

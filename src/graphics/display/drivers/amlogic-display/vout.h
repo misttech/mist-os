@@ -76,8 +76,6 @@ class Vout : public ddk::I2cImplProtocol<Vout> {
   // Vout must be of `kHdmi` type.
   zx::result<> ApplyConfiguration(const display::DisplayTiming& timing);
 
-  zx::result<> OnDisplaysChanged(added_display_info_t& info);
-
   // Required functions for I2cImpl
   zx_status_t I2cImplGetMaxTransferSize(size_t* out_size) {
     *out_size = UINT32_MAX;

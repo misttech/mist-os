@@ -333,15 +333,6 @@ zx::result<> Vout::ApplyConfiguration(const display::DisplayTiming& timing) {
   return zx::ok();
 }
 
-zx::result<> Vout::OnDisplaysChanged(added_display_info_t& info) {
-  switch (type_) {
-    case VoutType::kDsi:
-    case VoutType::kHdmi:
-      return zx::ok();
-  }
-  ZX_ASSERT_MSG(false, "Invalid Vout type: %u", static_cast<uint8_t>(type_));
-}
-
 zx_status_t Vout::I2cImplTransact(const i2c_impl_op_t* op_list, size_t op_count) {
   switch (type_) {
     case VoutType::kHdmi:
