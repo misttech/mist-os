@@ -966,7 +966,10 @@ impl ThreadGroup {
 
             let process_state = &mut task_ref.thread_group.write();
             let mut task_state = task_ref.write();
-            if task_state.ptrace.as_ref().map_or(false, |ptrace| ptrace.waitable.is_some())
+            if task_state
+                .ptrace
+                .as_ref()
+                .map_or(false, |ptrace| ptrace.is_waitable(task_ref.load_stopped(), options))
                 || process_state.waitable.is_some()
             {
                 // We've identified a potential target.  Need to return either
@@ -1018,11 +1021,7 @@ impl ThreadGroup {
                         exit_status_fn = Some(&ExitStatus::Stop);
                     }
                     if let Some(mut exit_status_fn) = exit_status_fn {
-                        let siginfo = if options.keep_waitable_state {
-                            ptrace.waitable.clone().unwrap()
-                        } else {
-                            ptrace.waitable.take().unwrap()
-                        };
+                        let siginfo = ptrace.get_last_signal(options.keep_waitable_state);
                         if siginfo.signal == SIGKILL {
                             exit_status_fn = &ExitStatus::Kill
                         }

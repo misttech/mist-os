@@ -6,12 +6,28 @@ use crate::{
     fs::parse_unsigned_file,
     mm::{DumpPolicy, MemoryAccessorExt},
     not_implemented,
-    signals::{send_signal, SignalInfo},
+    signals::syscalls::WaitingOptions,
+    signals::{
+        send_signal, send_signal_first, SignalDetail, SignalInfo, SignalInfoHeader, SI_HEADER_SIZE,
+    },
     task::{waiter::WaitQueue, CurrentTask, Kernel, StopState, Task, ThreadGroup},
     types::*,
 };
 
 use std::sync::{atomic::Ordering, Arc};
+use zerocopy::FromBytes;
+
+/// For most of the time, for the purposes of ptrace, a tracee is either "going"
+/// or "stopped".  However, after certain ptrace calls, there are special rules
+/// to be followed.
+#[derive(Clone, Default, PartialEq)]
+pub enum PtraceStatus {
+    /// Proceed as otherwise indicated by the task's stop status.
+    #[default]
+    Default,
+    /// Resuming after a ptrace_cont with a signal, so do not stop for signal-delivery-stop
+    Continuing,
+}
 
 /// Per-task ptrace-related state
 pub struct PtraceState {
@@ -28,7 +44,15 @@ pub struct PtraceState {
 
     /// The signal that caused the task to enter the given state (for
     /// signal-delivery-stop)
-    pub waitable: Option<SignalInfo>,
+    pub last_signal: Option<SignalInfo>,
+
+    /// Whether waitpid() will return the last signal.  The presence of last_signal
+    /// can't be used for that, because that needs to be saved for GETSIGINFO.
+    pub last_signal_waitable: bool,
+
+    /// Indicates whether the last ptrace call put this thread into a state with
+    /// special semantics for stopping behavior.
+    pub stop_status: PtraceStatus,
 }
 
 impl PtraceState {
@@ -37,14 +61,41 @@ impl PtraceState {
             pid,
             tracee_waiters: WaitQueue::default(),
             tracer_waiters: WaitQueue::default(),
-            waitable: None,
+            last_signal: None,
+            last_signal_waitable: false,
+            stop_status: PtraceStatus::default(),
         }
+    }
+
+    pub fn is_waitable(&self, stop: StopState, options: &WaitingOptions) -> bool {
+        if !options.wait_for_continued && !stop.is_stopping_or_stopped() {
+            // Only waiting for stops, but is not stopped.
+            return false;
+        }
+        self.last_signal_waitable && !stop.is_in_progress()
+    }
+
+    pub fn set_last_signal(&mut self, mut signal: Option<SignalInfo>) {
+        if let Some(ref mut siginfo) = signal {
+            // We don't want waiters to think the process was unstopped because
+            // of a sigkill. They will get woken when the process dies.
+            if siginfo.signal == SIGKILL {
+                return;
+            }
+            self.last_signal_waitable = true;
+            self.last_signal = signal;
+        }
+    }
+
+    pub fn get_last_signal(&mut self, keep_signal_waitable: bool) -> SignalInfo {
+        self.last_signal_waitable = keep_signal_waitable;
+        self.last_signal.clone().unwrap()
     }
 }
 
 /// Scope definitions for Yama.  For full details, see ptrace(2).
 /// 1 means tracer needs to have CAP_SYS_PTRACE or be a parent / child
-/// proces. This is the default.
+/// process. This is the default.
 const RESTRICTED_SCOPE: u8 = 1;
 /// 2 means tracer needs to have CAP_SYS_PTRACE
 const ADMIN_ONLY_SCOPE: u8 = 2;
@@ -54,11 +105,14 @@ const NO_ATTACH_SCOPE: u8 = 3;
 /// Continues the target thread, optionally detaching from it.
 fn ptrace_cont(tracee: &Task, data: &UserAddress, detach: bool) -> Result<(), Errno> {
     let data = data.ptr() as u64;
-    if data != 0 {
+    let new_state;
+    let mut siginfo = if data != 0 {
         let signal = Signal::try_from(UncheckedSignal::new(data))?;
-        let siginfo = SignalInfo::default(signal);
-        send_signal(&tracee, siginfo);
-    }
+        Some(SignalInfo::default(signal))
+    } else {
+        None
+    };
+
     let mut state = tracee.write();
     if tracee.load_stopped().is_waking_or_awake() {
         if detach {
@@ -66,9 +120,36 @@ fn ptrace_cont(tracee: &Task, data: &UserAddress, detach: bool) -> Result<(), Er
         }
         return error!(EIO);
     }
+
+    if let Some(ref mut ptrace) = &mut state.ptrace {
+        if data != 0 {
+            new_state = PtraceStatus::Continuing;
+            if let Some(ref mut last_signal) = &mut ptrace.last_signal {
+                if let Some(si) = siginfo {
+                    let new_signal = si.signal;
+                    last_signal.signal = new_signal;
+                }
+                siginfo = Some(last_signal.clone());
+            }
+        } else {
+            new_state = PtraceStatus::Default;
+        }
+        ptrace.stop_status = new_state;
+        ptrace.last_signal = None;
+    }
+
     tracee.set_stopped(&mut *state, StopState::Waking, None);
+
     if detach {
         state.set_ptrace(None)?;
+    }
+    drop(state);
+    tracee.thread_group.set_stopped(StopState::Waking, None, false);
+
+    if let Some(siginfo) = siginfo {
+        // siginfo is replacing the signal that caused the ptrace-stop we're currently
+        // in, so has to go first.
+        send_signal_first(&tracee, siginfo);
     }
     Ok(())
 }
@@ -171,6 +252,43 @@ pub fn ptrace_dispatch(
             let dst: UserRef<SigSet> = UserRef::from(data);
             let val = state.signals.mask();
             current_task.mm.write_object(dst, &val)?;
+            Ok(())
+        }
+        PTRACE_GETSIGINFO => {
+            let dst: UserRef<u8> = UserRef::from(data);
+            if let Some(ptrace) = &state.ptrace {
+                if let Some(signal) = ptrace.last_signal.as_ref() {
+                    current_task.mm.write_objects(dst, &signal.as_siginfo_bytes())?;
+                } else {
+                    return error!(EINVAL);
+                }
+            }
+            Ok(())
+        }
+        PTRACE_SETSIGINFO => {
+            // Rust will let us do this cast in a const assignment but not in a
+            // const generic constraint.
+            const SI_MAX_SIZE_AS_USIZE: usize = SI_MAX_SIZE as usize;
+
+            let siginfo_mem = current_task.read_memory_to_array::<SI_MAX_SIZE_AS_USIZE>(data)?;
+            let header = SignalInfoHeader::read_from(&siginfo_mem[..SI_HEADER_SIZE]).unwrap();
+
+            let mut bytes = [0u8; SI_MAX_SIZE as usize - SI_HEADER_SIZE];
+            bytes.copy_from_slice(&siginfo_mem[SI_HEADER_SIZE..SI_MAX_SIZE as usize]);
+            let details = SignalDetail::Raw { data: bytes };
+            let unchecked_signal = UncheckedSignal::new(header.signo as u64);
+            let signal = Signal::try_from(unchecked_signal)?;
+
+            let siginfo = SignalInfo {
+                signal,
+                errno: header.errno,
+                code: header.code,
+                detail: details,
+                force: false,
+            };
+            if let Some(ref mut ptrace) = &mut state.ptrace {
+                ptrace.last_signal = Some(siginfo);
+            }
             Ok(())
         }
         _ => {

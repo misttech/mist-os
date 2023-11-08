@@ -20,7 +20,23 @@ use crate::{
 use lock_sequence::{Locked, Unlocked};
 use starnix_lock::RwLockWriteGuard;
 
+/// Indicates where in the signal queue a signal should go.  Signals
+/// can jump the queue when being injected by tools like ptrace.
+#[derive(PartialEq)]
+enum SignalPriority {
+    First,
+    Last,
+}
+
+pub fn send_signal_first(task: &Task, siginfo: SignalInfo) {
+    send_signal_prio(task, siginfo, SignalPriority::First)
+}
+
 pub fn send_signal(task: &Task, siginfo: SignalInfo) {
+    send_signal_prio(task, siginfo, SignalPriority::Last)
+}
+
+fn send_signal_prio(task: &Task, siginfo: SignalInfo, prio: SignalPriority) {
     let mut task_state = task.write();
 
     let is_masked = task_state.signals.mask().has_signal(siginfo.signal);
@@ -32,9 +48,13 @@ pub fn send_signal(task: &Task, siginfo: SignalInfo) {
     // Enqueue any signal that is blocked by the current mask or blocked by the original mask,
     // since it can be unmasked later.
     // But don't enqueue an ignored signal. See SigtimedwaitTest.IgnoredUnmaskedSignal gvisor test.
-    // If it is ptraced, enqueue it, so it can do the signal-delivery-stop.
+    // In either case, if it is ptraced, enqueue it, so it can do the signal-delivery-stop.
     if is_masked || was_masked || action != DeliveryAction::Ignore || task_state.is_ptraced() {
-        task_state.signals.enqueue(siginfo.clone());
+        if prio == SignalPriority::First {
+            task_state.signals.jump_queue(siginfo.clone());
+        } else {
+            task_state.signals.enqueue(siginfo.clone());
+        }
         task.set_flags(&mut *task_state, TaskFlags::SIGNALS_AVAILABLE, true);
     }
 
@@ -46,8 +66,6 @@ pub fn send_signal(task: &Task, siginfo: SignalInfo) {
         task.interrupt();
     }
 
-    // Unstop the process for SIGCONT. Also unstop for SIGKILL, the only signal that can interrupt
-    // a stopped process.
     // Unstop the process for SIGCONT. Also unstop for SIGKILL, the only signal that can interrupt
     // a stopped process.
     if siginfo.signal == SIGCONT {
@@ -136,7 +154,7 @@ pub fn dequeue_signal(
     };
 
     if let Some(ref siginfo) = siginfo {
-        if task_state.is_ptraced() && siginfo.signal != SIGKILL {
+        if task_state.ptrace_on_signal_consume() && siginfo.signal != SIGKILL {
             // Indicate we will be stopping for ptrace at the next opportunity.
             // Whether you actually deliver the signal is now up to ptrace, so
             // we can return.

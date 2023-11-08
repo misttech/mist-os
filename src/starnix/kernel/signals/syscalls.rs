@@ -268,7 +268,11 @@ pub fn sys_signalfd4(
     }
 }
 
-fn send_unchecked_signal(task: &Task, unchecked_signal: &UncheckedSignal) -> Result<(), Errno> {
+fn send_unchecked_signal(
+    task: &Task,
+    unchecked_signal: &UncheckedSignal,
+    si_code: i32,
+) -> Result<(), Errno> {
     // 0 is a sentinel value used to do permission checks.
     let sentinel_signal = UncheckedSignal::from(0);
     if *unchecked_signal == sentinel_signal {
@@ -277,10 +281,7 @@ fn send_unchecked_signal(task: &Task, unchecked_signal: &UncheckedSignal) -> Res
 
     send_signal(
         task,
-        SignalInfo {
-            code: SI_USER as i32,
-            ..SignalInfo::default(Signal::try_from(unchecked_signal)?)
-        },
+        SignalInfo { code: si_code, ..SignalInfo::default(Signal::try_from(unchecked_signal)?) },
     );
     Ok(())
 }
@@ -342,7 +343,7 @@ pub fn sys_kill(
             if !current_task.can_signal(&target, &unchecked_signal) {
                 return error!(EPERM);
             }
-            send_unchecked_signal(&target, &unchecked_signal)?;
+            send_unchecked_signal(&target, &unchecked_signal, SI_USER as i32)?;
         }
         pid if pid == -1 => {
             // "If pid equals -1, then sig is sent to every process for which
@@ -407,7 +408,7 @@ pub fn sys_tkill(
     if !current_task.can_signal(&target, &unchecked_signal) {
         return error!(EPERM);
     }
-    send_unchecked_signal(&target, &unchecked_signal)
+    send_unchecked_signal(&target, &unchecked_signal, SI_TKILL)
 }
 
 pub fn sys_tgkill(
@@ -439,7 +440,7 @@ pub fn sys_tgkill(
         return error!(EPERM);
     }
 
-    send_unchecked_signal(&target, &unchecked_signal)
+    send_unchecked_signal(&target, &unchecked_signal, SI_TKILL)
 }
 
 pub fn sys_rt_sigreturn(
@@ -572,7 +573,7 @@ where
             continue;
         }
 
-        match send_unchecked_signal(&target, unchecked_signal) {
+        match send_unchecked_signal(&target, unchecked_signal, SI_USER as i32) {
             Ok(_) => sent_signal = true,
             Err(errno) => last_error = errno,
         }
@@ -683,12 +684,14 @@ fn wait_on_pid(
                 current_task.thread_group.get_ptracees_and(
                     selector,
                     &pids,
-                    &mut |_, task_state: &TaskMutableState| {
+                    &mut |task: WeakRef<Task>, task_state: &TaskMutableState| {
                         if let Some(ptrace) = &task_state.ptrace {
                             has_any_tracee = true;
                             ptrace.tracer_waiters.wait_async(&waiter);
-                            if ptrace.waitable.is_some() {
-                                has_waitable_tracee = true;
+                            if let Some(task_ref) = task.upgrade() {
+                                if ptrace.is_waitable(task_ref.load_stopped(), options) {
+                                    has_waitable_tracee = true;
+                                }
                             }
                         }
                     },

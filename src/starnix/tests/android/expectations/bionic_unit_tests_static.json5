@@ -50,9 +50,6 @@
                 // Ptrace
                 "PtraceResumptionTest.*",
 
-                // Timers
-                "time.timer_delete_from_timer_thread",
-
                 // Our test runner doesn't understand DISABLED
                 "android_mallopt.DISABLED_multiple_enable_gwp_asan",
                 "malloc.DISABLED_alloc_after_fork",

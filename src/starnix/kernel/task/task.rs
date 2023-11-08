@@ -128,12 +128,27 @@ pub enum ExitStatus {
 impl ExitStatus {
     /// Converts the given exit status to a status code suitable for returning from wait syscalls.
     pub fn wait_status(&self) -> i32 {
+        let maybe_ptrace = |siginfo: &SignalInfo| {
+            if ((siginfo.code >> 8) as u32) == PTRACE_EVENT_STOP {
+                (PTRACE_EVENT_STOP << 16) as i32
+            } else {
+                0
+            }
+        };
         match self {
             ExitStatus::Exit(status) => (*status as i32) << 8,
             ExitStatus::Kill(siginfo) => siginfo.signal.number() as i32,
             ExitStatus::CoreDump(siginfo) => (siginfo.signal.number() as i32) | 0x80,
-            ExitStatus::Continue(_) => 0xffff,
-            ExitStatus::Stop(siginfo) => 0x7f + ((siginfo.signal.number() as i32) << 8),
+            ExitStatus::Continue(siginfo) => {
+                if maybe_ptrace(siginfo) != 0 {
+                    (siginfo.signal.number() as i32) | maybe_ptrace(siginfo)
+                } else {
+                    0xffff
+                }
+            }
+            ExitStatus::Stop(siginfo) => {
+                (0x7f + ((siginfo.signal.number() as i32) << 8)) | maybe_ptrace(siginfo)
+            }
         }
     }
 
@@ -408,6 +423,17 @@ impl TaskMutableState {
 
     pub fn is_ptraced(&self) -> bool {
         self.ptrace.is_some()
+    }
+
+    pub fn ptrace_on_signal_consume(&mut self) -> bool {
+        self.ptrace.as_mut().map_or(false, |ptrace: &mut PtraceState| {
+            if ptrace.stop_status == PtraceStatus::Continuing {
+                ptrace.stop_status = PtraceStatus::Default;
+                false
+            } else {
+                true
+            }
+        })
     }
 
     pub fn notify_ptracers(&mut self) {
@@ -695,14 +721,8 @@ impl Task {
         // stopped inside user code, task will need to be either restarted or
         // stopped here.
         self.store_stopped(stopped, guard);
-        if let Some(signal) = &siginfo {
-            if let Some(ref mut ptrace) = &mut guard.ptrace {
-                // We don't want waiters to think the process was unstopped because
-                // of a sigkill. They will get woken when the process dies.
-                if signal.signal != SIGKILL {
-                    ptrace.waitable = siginfo;
-                }
-            }
+        if let Some(ref mut ptrace) = &mut guard.ptrace {
+            ptrace.set_last_signal(siginfo);
         }
         if stopped == StopState::Waking || stopped == StopState::ForceWaking {
             guard.notify_ptracees();

@@ -4,7 +4,7 @@
 
 use starnix_lock::RwLock;
 use starnix_sync::InterruptibleEvent;
-use std::{collections::VecDeque, sync::Arc};
+use std::{collections::VecDeque, convert::TryFrom, sync::Arc};
 use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
 use crate::{
@@ -186,6 +186,13 @@ impl SignalState {
             self.queue.push_back(siginfo);
             self.signal_wait.notify_all();
         }
+    }
+
+    /// Used by ptrace to provide a replacement for the signal that might have been
+    /// delivered when the task entered signal-delivery-stop.
+    pub fn jump_queue(&mut self, siginfo: SignalInfo) {
+        self.queue.push_front(siginfo);
+        self.signal_wait.notify_all();
     }
 
     pub fn is_empty(&self) -> bool {
