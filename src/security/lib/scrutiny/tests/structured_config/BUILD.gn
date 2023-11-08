@@ -152,6 +152,7 @@ if (is_fuchsia) {
 
   product_bundle("product_bundle") {
     testonly = true
+    name = "scrutiny-structured-config-test"
     skip_scrutiny = true
     skip_scrutiny_recovery = true
     deps = [

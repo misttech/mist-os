@@ -117,9 +117,10 @@ func uploadsFromProductBundle(mods productBundlesModules, transferManifestPath s
 		return nil, err
 	}
 	uploads = append(uploads, Upload{
-		Compress:    true,
-		Contents:    updatedTransferManifest,
-		Destination: path.Join(productBundleRemote, filepath.Base(transferManifestPath)),
+		Compress: true,
+		Contents: updatedTransferManifest,
+		// Consumers rely on the manifest being named transfer.json.
+		Destination: path.Join(productBundleRemote, "transfer.json"),
 	})
 
 	return uploads, nil

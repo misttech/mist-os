@@ -115,6 +115,7 @@ template("zbi_test") {
     }
 
     metadata = {
+      images_barrier = []
       images = [
         {
           label = get_label_info(":$zbi_target", "label_with_toolchain")
