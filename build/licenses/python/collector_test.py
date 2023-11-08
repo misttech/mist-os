@@ -568,6 +568,16 @@ class CollectorTest(unittest.TestCase):
         )
         self._collect_and_assert_licenses({})
 
+    #################### Ignored licenses
+
+    def test_ignores_the_no_license_label(self):
+        self._add_applicable_licenses_metadata(
+            target="//third_party/foo",
+            licenses=["//build/licenses:no_license(//some:toolchain)"],
+        )
+
+        self._collect_and_assert_licenses({})
+
 
 if __name__ == "__main__":
     unittest.main()

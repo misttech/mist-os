@@ -2849,6 +2849,7 @@ template("variant_target") {
     copy(target_name) {
       forward_variables_from(target_invoker,
                              [
+                               "applicable_licenses",
                                "testonly",
                                "visibility",
                              ])

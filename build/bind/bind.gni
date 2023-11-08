@@ -133,7 +133,7 @@ template("_bind_library_sdk") {
 #   deps (optional)
 #     [list of labels]: List of bind_library targets included by the bind rules.
 #
-#   visibility
+#   applicable_licenses, visibility
 #     Forwarded from invoker.
 #
 template("bind_host_test") {
@@ -147,7 +147,11 @@ template("bind_host_test") {
     if (is_host) {
       deps = [ ":${test_target}" ]
     }
-    forward_variables_from(invoker, [ "visibility" ])
+    forward_variables_from(invoker,
+                           [
+                             "applicable_licenses",
+                             "visibility",
+                           ])
   }
 
   if (is_host) {
@@ -210,6 +214,7 @@ template("bind_host_test") {
   } else {
     not_needed(invoker,
                [
+                 "applicable_licenses",
                  "deps",
                  "tests",
                  "rules",
@@ -240,7 +245,7 @@ template("bind_host_test") {
 #   deps (optional)
 #     [list of labels]: List of bind_library targets included by the bind rules.
 #
-#   visibility
+#   applicable_licenses, visibility
 #     Forwarded from invoker.
 #
 template("bind_test") {
@@ -249,7 +254,11 @@ template("bind_test") {
   test_target = "${target_name}_test"
 
   group(target_name) {
-    forward_variables_from(invoker, [ "visibility" ])
+    forward_variables_from(invoker,
+                           [
+                             "applicable_licenses",
+                             "visibility",
+                           ])
     testonly = true
 
     # Redirect to the host toolchain.
@@ -268,6 +277,7 @@ template("bind_test") {
     tests = invoker.tests
     forward_variables_from(invoker,
                            [
+                             "applicable_licenses",
                              "deps",
                              "visibility",
                            ])
@@ -308,7 +318,7 @@ template("bind_test") {
 #   generate_bytecode (optional)
 #     [bool]: Output a bytecode file, instead of a C header file.
 #
-#   testonly, visibility
+#   applicable_licenses, testonly, visibility
 #     Forwarded from invoker.
 #
 template("bindc") {
@@ -341,6 +351,7 @@ template("bindc") {
     visibility = [ ":*" ]
     forward_variables_from(invoker,
                            [
+                             "applicable_licenses",
                              "deps",
                              "testonly",
                            ])
@@ -351,6 +362,7 @@ template("bindc") {
   compiled_action(target_name) {
     forward_variables_from(invoker,
                            [
+                             "applicable_licenses",
                              "testonly",
                              "visibility",
                            ])
@@ -454,7 +466,7 @@ template("bindc") {
 #     TODO(fxbug.dev/43400): Eventually this option should be removed when we can define this
 #     configuration in the driver's component manifest.
 #
-#   testonly, visibility
+#   applicable_licenses, testonly, visibility
 #     Forwarded from invoker.
 #
 template("driver_bind_rules") {
@@ -473,6 +485,7 @@ template("driver_bind_rules") {
     bindc(header_file_target) {
       forward_variables_from(invoker,
                              [
+                               "applicable_licenses",
                                "rules",
                                "deps",
                                "testonly",
@@ -489,6 +502,7 @@ template("driver_bind_rules") {
   bindc(bytecode_file_target) {
     forward_variables_from(invoker,
                            [
+                             "applicable_licenses",
                              "rules",
                              "deps",
                              "testonly",
@@ -504,6 +518,7 @@ template("driver_bind_rules") {
   group(target_name) {
     forward_variables_from(invoker,
                            [
+                             "applicable_licenses",
                              "testonly",
                              "visibility",
                            ])
@@ -517,6 +532,7 @@ template("driver_bind_rules") {
     bind_test("${target_name}_test") {
       forward_variables_from(invoker,
                              [
+                               "applicable_licenses",
                                "rules",
                                "deps",
                                "tests",

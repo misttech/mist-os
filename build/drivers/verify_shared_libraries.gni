@@ -27,6 +27,7 @@ template("verify_shared_libraries") {
 
     forward_variables_from(invoker,
                            [
+                             "applicable_licenses",
                              "deps",
                              "testonly",
                            ])

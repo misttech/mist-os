@@ -81,6 +81,7 @@ import("//tools/cmc/build/cmc.gni")
 #      The device categories this driver is for. (The values must be from FHCP.json)
 #      This is a requirement for certification of the driver.
 #      Type: array of scopes
+#   applicable_licenses
 #   deps
 #   testonly
 #   visibility
@@ -105,6 +106,7 @@ template("fuchsia_driver_component") {
         visibility = [ ":*" ]
         forward_variables_from(invoker,
                                [
+                                 "applicable_licenses",
                                  "deps",
                                  "testonly",
                                ])
@@ -119,7 +121,11 @@ template("fuchsia_driver_component") {
       }
       action(manifest_target) {
         visibility = [ ":*" ]
-        forward_variables_from(invoker, [ "testonly" ])
+        forward_variables_from(invoker,
+                               [
+                                 "applicable_licenses",
+                                 "testonly",
+                               ])
         deps = [ ":${distribution_manifest_target}" ]
         script = "//build/drivers/create_component_manifest.py"
         inputs = [ distribution_manifest_file ]
@@ -179,7 +185,11 @@ template("fuchsia_driver_component") {
       full_manifest_target = "${target_name}_full_manifest"
       cmc_merge(full_manifest_target) {
         visibility = [ ":*" ]
-        forward_variables_from(invoker, [ "testonly" ])
+        forward_variables_from(invoker,
+                               [
+                                 "applicable_licenses",
+                                 "testonly",
+                               ])
         output_name = invoker.target_name + ".cml"
         deps = [ ":${manifest_target}" ]
         sources = []
@@ -217,7 +227,11 @@ template("fuchsia_driver_component") {
       doc_input = invoker.info
       action(doc_target) {
         visibility = [ ":*" ]
-        forward_variables_from(invoker, [ "testonly" ])
+        forward_variables_from(invoker,
+                               [
+                                 "applicable_licenses",
+                                 "testonly",
+                               ])
         script = "//build/drivers/create_driver_doc.py"
         inputs = [
           driver_path,
@@ -244,6 +258,7 @@ template("fuchsia_driver_component") {
       }
       forward_variables_from(invoker,
                              [
+                               "applicable_licenses",
                                "cm_label",
                                "component_name",
                                "deps",
@@ -293,7 +308,11 @@ template("fuchsia_driver_component") {
     }
   } else {
     group(target_name) {
-      forward_variables_from(invoker, [ "testonly" ])
+      forward_variables_from(invoker,
+                             [
+                               "applicable_licenses",
+                               "testonly",
+                             ])
       deps = [ ":$target_name($default_toolchain)" ]
     }
     not_needed(invoker, "*")

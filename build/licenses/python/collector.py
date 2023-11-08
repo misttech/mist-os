@@ -138,6 +138,13 @@ class CollectorStats:
     licenses_from_golibs: int = 0
 
 
+_ignored_license_labels = set(
+    [
+        GnLabel.from_str("//build/licenses:no_license"),
+    ]
+)
+
+
 @dataclasses.dataclass
 class Collector:
     """Collects licenses from build information"""
@@ -180,6 +187,15 @@ class Collector:
     def _add_license_from_metadata(
         self, license_metadata_label: GnLabel, used_by_target: GnLabel
     ):
+        if (
+            license_metadata_label.without_toolchain()
+            in _ignored_license_labels
+        ):
+            logging.debug(
+                "Ignoring %s used by %s", license_metadata_label, used_by_target
+            )
+            return
+
         if license_metadata_label not in self.metadata_db.licenses_by_label:
             self._add_error(
                 CollectorError(
@@ -364,6 +380,12 @@ class Collector:
 
             license_labels = target_metadata.license_labels
             if license_labels:
+                logging.debug(
+                    "Found applicable_licenses labels %s for %s",
+                    license_labels,
+                    label,
+                )
+
                 self.stats.targets_with_licenses += 1
                 license_found = True
                 for license_label in license_labels:
@@ -384,6 +406,12 @@ class Collector:
             is_empty_readme_ok = (
                 is_group_target and not resources
             ) or is_resource_of_target_with_licenses
+
+            logging.debug(
+                "No licenses found for %s so looking at README.fuchsia files instead (empty_ok)...",
+                label,
+                is_empty_readme_ok,
+            )
             license_found = self._add_license_from_readme(
                 label=label,
                 resource_of=resource_of,

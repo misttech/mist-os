@@ -9,6 +9,15 @@ license("fuchsia_license") {
   license_files = [ "//LICENSE" ]
 }
 
+# Use this special no_license target for code that is wrongly identified
+# as requiring `applicable_licenses`. For example, private code that is
+# placed under third_party/* directories for legacy reasons.
+# `generated_licenses_spdx.gni` ignores this applicable license label
+# automatically.
+group("no_license") {
+  public_deps = []
+}
+
 group("tests") {
   testonly = true
   deps = [

@@ -173,6 +173,7 @@ template("link_output_rspfile") {
   generated_file(target_name) {
     forward_variables_from(invoker,
                            [
+                             "applicable_licenses",
                              "deps",
                              "outputs",
                              "testonly",
@@ -235,6 +236,7 @@ template("image_binary") {
   link_output_rspfile(rspfile_target) {
     forward_variables_from(invoker,
                            [
+                             "applicable_licenses",
                              "deps",
                              "testonly",
                            ])
@@ -247,7 +249,11 @@ template("image_binary") {
     image_deps += [ ":$check_target" ]
     toolchain_utils_action(check_target) {
       visibility = image_target_visibility
-      forward_variables_from(invoker, [ "testonly" ])
+      forward_variables_from(invoker,
+                             [
+                               "applicable_licenses",
+                               "testonly",
+                             ])
       deps = [ ":$rspfile_target" ]
       sources = [ rspfile ]
       outputs = [ "$target_out_dir/$image_target.pure-stamp" ]
@@ -270,6 +276,7 @@ template("image_binary") {
     deps = image_deps
     forward_variables_from(invoker,
                            [
+                             "applicable_licenses",
                              "metadata",
                              "output_dir",
                              "output_extension",

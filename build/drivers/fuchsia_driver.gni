@@ -30,6 +30,7 @@ template("fuchsia_driver") {
   link_output_rspfile(shared_libraries_used_target) {
     forward_variables_from(invoker,
                            [
+                             "applicable_licenses",
                              "deps",
                              "testonly",
                            ])
@@ -38,7 +39,11 @@ template("fuchsia_driver") {
 
   # Checks the driver's shared libraries against an allowlist.
   verify_shared_libraries(check_target) {
-    forward_variables_from(invoker, [ "testonly" ])
+    forward_variables_from(invoker,
+                           [
+                             "applicable_licenses",
+                             "testonly",
+                           ])
     target_label = driver_label
     libraries_used_file = shared_libraries_used_file
     libraries_allowlist_file = "//build/drivers/driver_shared_library_allowlist"
@@ -56,12 +61,17 @@ template("fuchsia_driver") {
 
     assert_no_deps = []
 
-    # Explicitly forward visibility, implicitly forward everything else.
+    # Explicitly forward applicable_licenses and visibility, implicitly forward everything else.
     # See comment in //build/config/BUILDCONFIG.gn for details on this pattern.
-    forward_variables_from(invoker, [ "visibility" ])
+    forward_variables_from(invoker,
+                           [
+                             "applicable_licenses",
+                             "visibility",
+                           ])
     forward_variables_from(invoker,
                            "*",
                            [
+                             "applicable_licenses",
                              "test",
                              "visibility",
                            ])
