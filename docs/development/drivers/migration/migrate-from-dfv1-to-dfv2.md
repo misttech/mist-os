@@ -51,6 +51,18 @@ or edge cases that may apply to your driver.
   (by manually creating `compat::DeviceServer`) for enabling the drivers
   in different framework versions to talk to each other.
 
+- **Can DFv2 drivers talk to Banjo protocols using the compatibility shim?**
+
+  While it's strongly recommended that your DFv1 driver is migrated from
+  Banjo to FIDL, if it is necessary for a DFv2 driver to talk
+  to some existing Banjo protocols, the compatibility shim provides the
+  following features:
+
+  - `compat::BanjoServer` makes it easier to serve Banjo
+    (see [`banjo_server.h`][banjo-server-h]).
+  - `compat::ConnectBanjo` makes it easier to connect to Banjo
+    (see [`banjo_client.h`][banjo-client-h]).
+
 - **What has changed in the new DFv2 driver interfaces?**
 
   One major change in DFv2 is that drivers take control of the life cycle
@@ -904,6 +916,8 @@ All the **source code files** mentioned in this section:
 - [`//sdk/lib/driver/component/cpp/driver_base.h`][driver-base-h-70]
 - [`//sdk/lib/driver/component/cpp/tests/driver_base_test.cc`][driver-base-test-cc]
 - [`//sdk/lib/driver/component/cpp/tests/driver_fidl_test.cc`][driver-fidl-test-cc]
+- [`//sdk/lib/driver/compat/cpp/banjo_server.h`][banjo-server-h]
+- [`//sdk/lib/driver/compat/cpp/banjo_client.h`][banjo-client-h]
 - [`//sdk/lib/driver/compat/cpp/device_server.h`][device-server-h-23]
 - [`//sdk/lib/driver/testing/cpp/driver_runtime.h`][driver-testing-runtime]
 - [`//src/connectivity/wlan/testing/wlantap-driver/wlantap-driver.cc`][wlantap-driver]
@@ -994,4 +1008,7 @@ All the **documentation pages** mentioned in this section:
 [gc-msd-arm-mali-top-level]: https://fuchsia-review.git.corp.google.com/c/fuchsia/+/853637
 [gc-driver-testing]: https://fuchsia-review.git.corp.google.com/c/fuchsia/+/770412
 [driver-communication]: /docs/concepts/drivers/driver_communication.md
+[banjo-server-h]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/lib/driver/compat/cpp/banjo_server.h
+[banjo-client-h]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/lib/driver/compat/cpp/banjo_client.h
+
 

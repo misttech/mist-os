@@ -26,7 +26,7 @@ Notice the following key differences between DFv1 and DFv2:
 
   Important: Although not strictly required, it is **strongly recommended**
   to migrate existing Banjo protocols to FIDL when migrating your DFv1 driver
-  to DFv2. Using Banjo in a DFv2 driver is cumbersome.
+  to DFv2.
 
 Here is a list for the expected conditions of your driver after completing
 the  migration to DFv2:

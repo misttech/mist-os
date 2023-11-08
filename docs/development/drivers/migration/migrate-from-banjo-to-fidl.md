@@ -8,7 +8,7 @@ to use FIDL first before [migrating it to DFv2][migrate-from-dfv1-to-dfv2].
 
 Important: Although not strictly required, it is **strongly recommended** to
 migrate existing Banjo protocols to FIDL when migrating your DFv1 driver to
-DFv2. Using Banjo in a DFv2 driver is cumbersome.
+DFv2.
 
 Driver migration from Banjo to FIDL can be summarized as follows:
 
