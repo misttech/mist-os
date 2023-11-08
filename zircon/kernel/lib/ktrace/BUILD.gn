@@ -44,6 +44,7 @@ config("suppress-warning.config") {
     "//src/lib/zbitl/*",
     "//src/performance/lib/fxt/*",
     "//third_party/zstd/*",
+    "//vendor/google/*",
     "//zircon/kernel/*",
     "//zircon/system/public/*",
     "//zircon/system/ulib/*",
