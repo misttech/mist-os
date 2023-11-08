@@ -220,7 +220,7 @@ mod tests {
     use super::*;
     use chrono::Utc;
     use ffx_daemon_events::TargetConnectionState;
-    use ffx_daemon_target::target::{TargetAddrEntry, TargetAddrType, TargetUpdateBuilder};
+    use ffx_daemon_target::target::{TargetAddrEntry, TargetAddrStatus, TargetUpdateBuilder};
     use fidl::prelude::*;
     use fidl_fuchsia_developer_remotecontrol as fidl_rcs;
     use fidl_fuchsia_io as fio;
@@ -289,7 +289,7 @@ mod tests {
             vec![TargetAddrEntry::new(
                 SocketAddr::from_str(TEST_SOCKETADDR).unwrap().into(),
                 Utc::now(),
-                TargetAddrType::Ssh,
+                TargetAddrStatus::ssh().manually_added(),
             )]
             .into_iter(),
         );

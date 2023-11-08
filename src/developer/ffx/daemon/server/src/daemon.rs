@@ -907,7 +907,7 @@ mod test {
     use addr::TargetAddr;
     use assert_matches::assert_matches;
     use chrono::Utc;
-    use ffx_daemon_target::target::{TargetAddrEntry, TargetAddrType};
+    use ffx_daemon_target::target::{TargetAddrEntry, TargetAddrStatus};
     use fidl_fuchsia_developer_ffx::{DaemonMarker, DaemonProxy};
     use fidl_fuchsia_developer_remotecontrol::RemoteControlMarker;
     use fuchsia_async::Task;
@@ -1044,22 +1044,22 @@ mod test {
         let mut daemon = Daemon::new(socket_path);
         let expiring_target = Target::new_with_addr_entries(
             Some("goodbye-world"),
-            vec![TargetAddrEntry {
-                addr: TargetAddr::from_str("127.0.0.1:8088").unwrap(),
-                timestamp: Utc::now(),
-                addr_type: TargetAddrType::Manual(Some(SystemTime::now())),
-            }]
+            vec![TargetAddrEntry::new(
+                TargetAddr::from_str("127.0.0.1:8088").unwrap(),
+                Utc::now(),
+                TargetAddrStatus::ssh().manually_added_until(SystemTime::now()),
+            )]
             .into_iter(),
         );
         expiring_target.set_ssh_port(Some(8022));
 
         let persistent_target = Target::new_with_addr_entries(
             Some("i-will-stick-around"),
-            vec![TargetAddrEntry {
-                addr: TargetAddr::from_str("127.0.0.1:8089").unwrap(),
-                timestamp: Utc::now(),
-                addr_type: TargetAddrType::Manual(None),
-            }]
+            vec![TargetAddrEntry::new(
+                TargetAddr::from_str("127.0.0.1:8089").unwrap(),
+                Utc::now(),
+                TargetAddrStatus::ssh().manually_added(),
+            )]
             .into_iter(),
         );
         persistent_target.set_ssh_port(Some(8023));

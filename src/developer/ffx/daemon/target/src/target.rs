@@ -53,19 +53,77 @@ const CONFIG_HOST_PIPE_SSH_TIMEOUT: &str = "daemon.host_pipe_ssh_timeout";
 pub(crate) type SharedIdentity = Rc<Identity>;
 pub(crate) type WeakIdentity = Weak<Identity>;
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub enum TargetAddrType {
-    Ssh,
-    Manual(Option<SystemTime>),
-    Netsvc,
-    Fastboot(FastbootInterface),
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct TargetAddrStatus {
+    // TODO(b/308703153): Add timestamp once the address is turned into a map key.
+    pub(crate) protocol: TargetProtocol,
+    pub(crate) transport: TargetTransport,
+    pub(crate) source: TargetSource,
+}
+
+impl TargetAddrStatus {
+    pub fn ssh() -> Self {
+        Self {
+            protocol: TargetProtocol::Ssh,
+            transport: TargetTransport::Network,
+            source: TargetSource::Discovered,
+        }
+    }
+
+    pub fn fastboot(interface: TargetTransport) -> Self {
+        Self {
+            protocol: TargetProtocol::Fastboot,
+            transport: interface,
+            source: TargetSource::Discovered,
+        }
+    }
+
+    pub fn netsvc() -> Self {
+        Self {
+            protocol: TargetProtocol::Netsvc,
+            transport: TargetTransport::Network,
+            source: TargetSource::Discovered,
+        }
+    }
+
+    pub fn manually_added(self) -> Self {
+        Self { source: TargetSource::Manual, ..self }
+    }
+
+    pub fn manually_added_until(self, expires_after: SystemTime) -> Self {
+        Self { source: TargetSource::Ephemeral { expires_after }, ..self }
+    }
+
+    pub fn protocol(&self) -> TargetProtocol {
+        self.protocol
+    }
+
+    pub fn transport(&self) -> TargetTransport {
+        self.transport
+    }
+
+    pub fn source(&self) -> TargetSource {
+        self.source
+    }
+
+    pub fn is_manual(&self) -> bool {
+        !matches!(self.source, TargetSource::Discovered)
+    }
 }
 
 #[derive(Debug, Clone)]
 pub struct TargetAddrEntry {
     pub addr: TargetAddr,
     pub timestamp: DateTime<Utc>,
-    pub addr_type: TargetAddrType,
+    pub(crate) status: TargetAddrStatus,
+}
+
+impl std::ops::Deref for TargetAddrEntry {
+    type Target = TargetAddrStatus;
+
+    fn deref(&self) -> &Self::Target {
+        &self.status
+    }
 }
 
 impl Hash for TargetAddrEntry {
@@ -86,15 +144,15 @@ impl PartialEq for TargetAddrEntry {
 impl Eq for TargetAddrEntry {}
 
 impl TargetAddrEntry {
-    pub fn new(addr: TargetAddr, timestamp: DateTime<Utc>, addr_type: TargetAddrType) -> Self {
-        Self { addr, timestamp, addr_type }
+    pub fn new(addr: TargetAddr, timestamp: DateTime<Utc>, status: TargetAddrStatus) -> Self {
+        Self { addr, timestamp, status }
     }
 }
 
 /// This imple is intended mainly for testing.
 impl From<TargetAddr> for TargetAddrEntry {
     fn from(addr: TargetAddr) -> Self {
-        Self { addr, timestamp: Utc::now(), addr_type: TargetAddrType::Ssh }
+        Self { addr, timestamp: Utc::now(), status: TargetAddrStatus::ssh() }
     }
 }
 
@@ -133,6 +191,27 @@ impl Into<FastbootInterface> for TargetTransport {
             TargetTransport::NetworkUdp => FastbootInterface::Udp,
             TargetTransport::Usb => FastbootInterface::Usb,
         }
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum TargetSource {
+    Manual,
+    Discovered,
+    Ephemeral { expires_after: SystemTime },
+}
+
+impl TargetSource {
+    fn merge(&mut self, other: Self) {
+        use TargetSource::*;
+        *self = match (*self, other) {
+            (Discovered, _) => other,
+            (Manual, _) | (_, Manual) => Manual,
+            (Ephemeral { expires_after: a }, Ephemeral { expires_after: b }) => {
+                Ephemeral { expires_after: std::cmp::max(a, b) }
+            }
+            (_, Discovered) => return,
+        };
     }
 }
 
@@ -278,7 +357,9 @@ impl Target {
         }
         let now = Utc::now();
         target.addrs_extend(
-            addrs.iter().map(|addr| TargetAddrEntry::new(*addr, now.clone(), TargetAddrType::Ssh)),
+            addrs
+                .iter()
+                .map(|addr| TargetAddrEntry::new(*addr, now.clone(), TargetAddrStatus::ssh())),
         );
         target
     }
@@ -313,15 +394,17 @@ impl Target {
             target.replace_identity(identity);
         }
 
+        let transport = match interface {
+            FastbootInterface::Tcp => TargetTransport::Network,
+            FastbootInterface::Udp => TargetTransport::NetworkUdp,
+            FastbootInterface::Usb => TargetTransport::Usb,
+        };
+
         target.addrs.replace(
             addrs
                 .iter()
                 .map(|e| {
-                    TargetAddrEntry::new(
-                        *e,
-                        Utc::now(),
-                        TargetAddrType::Fastboot(interface.clone()),
-                    )
+                    TargetAddrEntry::new(*e, Utc::now(), TargetAddrStatus::fastboot(transport))
                 })
                 .collect(),
         );
@@ -341,7 +424,7 @@ impl Target {
         target.addrs.replace(
             addrs
                 .iter()
-                .map(|e| TargetAddrEntry::new(*e, Utc::now(), TargetAddrType::Netsvc))
+                .map(|e| TargetAddrEntry::new(*e, Utc::now(), TargetAddrStatus::netsvc()))
                 .collect(),
         );
         target.update_connection_state(|_| TargetConnectionState::Zedboot(Instant::now()));
@@ -406,18 +489,11 @@ impl Target {
                     .borrow()
                     .clone()
                     .into_iter()
-                    .filter(|addr| match addr.addr_type {
-                        TargetAddrType::Fastboot(_) => true,
-                        _ => false,
-                    })
+                    .filter(|addr| matches!(addr.protocol, TargetProtocol::Fastboot))
                     .take(1)
                     .next()
                 {
-                    match f_addr.addr_type {
-                        TargetAddrType::Fastboot(t @ FastbootInterface::Udp)
-                        | TargetAddrType::Fastboot(t @ FastbootInterface::Tcp) => Some(t),
-                        _ => None,
-                    }
+                    Some(f_addr.transport.into())
                 } else {
                     // We did not get any addresses that were fastboot addresses
                     // do we have a serial number? If so throw it as USB
@@ -567,14 +643,13 @@ impl Target {
                 }
             }
 
-            match (&e1.addr_type, &e2.addr_type) {
+            match (e1.is_manual(), e2.is_manual()) {
                 // Note: for manually added addresses, they are ordered strictly
                 // by recency, not link-local first.
-                (TargetAddrType::Manual(_), TargetAddrType::Manual(_)) => recency(e1, e2),
-                (TargetAddrType::Manual(_), TargetAddrType::Ssh) => Ordering::Less,
-                (TargetAddrType::Ssh, TargetAddrType::Manual(_)) => Ordering::Greater,
-                (TargetAddrType::Ssh, TargetAddrType::Ssh) => link_local_recency(e1, e2),
-                _ => Ordering::Less, // Should not get here due to filtering in next line.
+                (true, true) => recency(e1, e2),
+                (true, false) => Ordering::Less,
+                (false, true) => Ordering::Greater,
+                (false, false) => link_local_recency(e1, e2),
             }
         };
 
@@ -582,10 +657,7 @@ impl Target {
             .addrs
             .borrow()
             .iter()
-            .filter(|t| match t.addr_type {
-                TargetAddrType::Manual(_) | TargetAddrType::Ssh => true,
-                _ => false,
-            })
+            .filter(|t| matches!(t.protocol, TargetProtocol::Ssh))
             .sorted_by(|e1, e2| manual_link_local_recency(e1, e2))
             .next()
             .map(|e| e.addr);
@@ -605,10 +677,7 @@ impl Target {
             .borrow()
             .iter()
             .sorted_by(|e1, e2| recency(e1, e2))
-            .find(|t| match t.addr_type {
-                TargetAddrType::Netsvc => true,
-                _ => false,
-            })
+            .find(|t| matches!(t.protocol, TargetProtocol::Netsvc))
             .map(|addr_entry| addr_entry.addr.clone())
     }
 
@@ -620,14 +689,8 @@ impl Target {
             .borrow()
             .iter()
             .sorted_by(|e1, e2| recency(e1, e2))
-            .find(|t| match t.addr_type {
-                TargetAddrType::Fastboot(_) => true,
-                _ => false,
-            })
-            .map(|addr_entry| match addr_entry.addr_type {
-                TargetAddrType::Fastboot(ref f) => (addr_entry.addr.clone(), f.clone()),
-                _ => unreachable!(),
-            })
+            .find(|t| matches!(t.protocol, TargetProtocol::Fastboot))
+            .map(|addr_entry| (addr_entry.addr, addr_entry.transport.into()))
     }
 
     pub fn ssh_address_info(&self) -> Option<ffx::TargetAddrInfo> {
@@ -762,7 +825,19 @@ impl Target {
                     } else {
                         let current = SystemTime::now();
                         if timeout.is_none() || current < timeout.unwrap() {
-                            new_state = TargetConnectionState::Manual(last_seen)
+                            new_state = match former_state {
+                                TargetConnectionState::Fastboot(old_last_seen) => {
+                                    TargetConnectionState::Fastboot(
+                                        last_seen.unwrap_or(old_last_seen),
+                                    )
+                                }
+                                TargetConnectionState::Zedboot(old_last_seen) => {
+                                    TargetConnectionState::Zedboot(
+                                        last_seen.unwrap_or(old_last_seen),
+                                    )
+                                }
+                                _ => TargetConnectionState::Manual(last_seen),
+                            };
                         }
                     }
                 }
@@ -850,7 +925,7 @@ impl Target {
                 TargetAddrEntry::new(
                     e.addr,
                     Utc::now(),
-                    TargetAddrType::Fastboot(interface.clone()),
+                    TargetAddrStatus::fastboot(TargetTransport::Network).manually_added(),
                 )
             })
             .collect();
@@ -906,8 +981,8 @@ impl Target {
         *addrs = addrs
             .clone()
             .into_iter()
-            .filter(|entry| match (&entry.addr_type, &entry.addr.ip()) {
-                (TargetAddrType::Manual(_), _) => true,
+            .filter(|entry| match (entry.is_manual(), &entry.addr.ip()) {
+                (true, _) => true,
                 (_, IpAddr::V6(v)) => entry.addr.scope_id() != 0 || !v.is_link_local_addr(),
                 _ => true,
             })
@@ -921,8 +996,8 @@ impl Target {
         *addrs = addrs
             .clone()
             .into_iter()
-            .filter(|entry| match (&entry.addr_type, &entry.addr.ip(), entry.addr.port()) {
-                (TargetAddrType::Manual(_), _, _) => true,
+            .filter(|entry| match (entry.is_manual(), &entry.addr.ip(), entry.addr.port()) {
+                (true, _, _) => true,
                 (_, IpAddr::V4(v), p) => !(v.is_loopback() && p == 0),
                 _ => true,
             })
@@ -961,10 +1036,7 @@ impl Target {
         self.addrs
             .borrow()
             .iter()
-            .filter_map(|entry| match entry.addr_type {
-                TargetAddrType::Manual(_) => Some(entry.addr.clone()),
-                _ => None,
-            })
+            .filter_map(|entry| entry.is_manual().then(|| entry.addr))
             .collect()
     }
 
@@ -1016,6 +1088,12 @@ impl Target {
                     continue;
                 }
             }
+
+            if let Some(entry) = addrs.get(&addr) {
+                // If the existing entry was not from discovery, unmark the incoming entry as well.
+                addr.status.source.merge(entry.source);
+            }
+
             addrs.replace(addr);
         }
     }
@@ -1070,7 +1148,7 @@ impl Target {
         }
 
         if self.host_pipe.borrow().is_some() {
-            tracing::debug!("Host pipe is already set for {}@{}.", self.nodename_str(), self.id());
+            // tracing::debug!("Host pipe is already set for {}@{}.", self.nodename_str(), self.id());
             return;
         }
 
@@ -1284,21 +1362,15 @@ impl Target {
     }
 
     pub fn is_manual(&self) -> bool {
-        self.addrs
-            .borrow()
-            .iter()
-            .any(|addr_entry| matches!(addr_entry.addr_type, TargetAddrType::Manual(_)))
+        self.addrs.borrow().iter().any(|addr_entry| addr_entry.is_manual())
     }
 
     pub fn get_manual_timeout(&self) -> Option<SystemTime> {
         let addrs = self.addrs.borrow();
-        let entry = addrs
-            .iter()
-            .find(|addr_entry| matches!(addr_entry.addr_type, TargetAddrType::Manual(_)))?;
-        match entry.addr_type {
-            TargetAddrType::Manual(timeout) => timeout,
+        addrs.iter().find_map(|addr_entry| match addr_entry.source {
+            TargetSource::Ephemeral { expires_after } => Some(expires_after),
             _ => None,
-        }
+        })
     }
 
     pub fn is_waiting_for_rcs_identity(&self) -> bool {
@@ -1799,6 +1871,27 @@ mod test {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_expire_state_manual_fastboot() {
+        let t = Target::new_with_addr_entries(
+            Some("platypodes-are-venomous"),
+            [TargetAddrEntry::new(
+                TargetAddr::new("::1".parse::<IpAddr>().unwrap().into(), 0, 0),
+                Utc::now(),
+                TargetAddrStatus::fastboot(TargetTransport::Network).manually_added(),
+            )]
+            .into_iter(),
+        );
+        assert!(t.is_manual());
+
+        let then = Instant::now() - (FASTBOOT_MAX_AGE + Duration::from_secs(1));
+        t.update_connection_state(|_| TargetConnectionState::Fastboot(then));
+
+        t.expire_state();
+
+        assert_eq!(t.get_connection_state(), TargetConnectionState::Fastboot(then));
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
     async fn test_target_addresses_order_preserved() {
         let t = Target::new_named("this-is-a-target-i-guess");
         let addrs_pre = vec![
@@ -1817,7 +1910,7 @@ mod test {
                 TargetAddrEntry::new(
                     TargetAddr::from(e),
                     Utc.ymd(2014 + (i as i32), 10, 31).and_hms(9, 10, 12),
-                    TargetAddrType::Ssh,
+                    TargetAddrStatus::ssh(),
                 )
             })
             .collect::<Vec<TargetAddrEntry>>();
@@ -1855,7 +1948,7 @@ mod test {
                 TargetAddrEntry::new(
                     TargetAddr::from(e),
                     Utc.ymd(2014 + (i as i32), 10, 31).and_hms(9, 10, 12),
-                    TargetAddrType::Ssh,
+                    TargetAddrStatus::ssh(),
                 )
             })
             .collect::<Vec<TargetAddrEntry>>();
@@ -1870,7 +1963,8 @@ mod test {
         let target_addr: TargetAddr = TargetAddr::new("fe80::2".parse().unwrap(), 1, 0);
         let target = Target::new_with_addr_entries(
             Some("foo"),
-            vec![TargetAddrEntry::new(target_addr, Utc::now(), TargetAddrType::Ssh)].into_iter(),
+            vec![TargetAddrEntry::new(target_addr, Utc::now(), TargetAddrStatus::ssh())]
+                .into_iter(),
         );
 
         assert!(target.set_preferred_ssh_address(target_addr));
@@ -1883,7 +1977,7 @@ mod test {
             vec![TargetAddrEntry::new(
                 TargetAddr::new("::1".parse::<IpAddr>().unwrap().into(), 0, 0),
                 Utc::now(),
-                TargetAddrType::Ssh,
+                TargetAddrStatus::ssh(),
             )]
             .into_iter(),
         );
@@ -1910,12 +2004,12 @@ mod test {
             TargetAddrEntry::new(
                 TargetAddr::new("2000::1".parse().unwrap(), 0, 0),
                 start.into(),
-                TargetAddrType::Ssh,
+                TargetAddrStatus::ssh(),
             ),
             TargetAddrEntry::new(
                 TargetAddr::new("fe80::1".parse().unwrap(), 2, 0),
                 start.into(),
-                TargetAddrType::Ssh,
+                TargetAddrStatus::ssh(),
             ),
         ]);
         assert_eq!(
@@ -1928,12 +2022,12 @@ mod test {
             TargetAddrEntry::new(
                 TargetAddr::new("2000::1".parse().unwrap(), 0, 0),
                 start.into(),
-                TargetAddrType::Ssh,
+                TargetAddrStatus::ssh(),
             ),
             TargetAddrEntry::new(
                 TargetAddr::new("fe80::1".parse().unwrap(), 2, 0),
                 (start - Duration::from_secs(1)).into(),
-                TargetAddrType::Ssh,
+                TargetAddrStatus::ssh(),
             ),
         ]);
         assert_eq!(
@@ -1946,12 +2040,12 @@ mod test {
             TargetAddrEntry::new(
                 TargetAddr::new("fe80::2".parse().unwrap(), 1, 0),
                 start.into(),
-                TargetAddrType::Ssh,
+                TargetAddrStatus::ssh(),
             ),
             TargetAddrEntry::new(
                 TargetAddr::new("fe80::1".parse().unwrap(), 2, 0),
                 (start - Duration::from_secs(1)).into(),
-                TargetAddrType::Ssh,
+                TargetAddrStatus::ssh(),
             ),
         ]);
         assert_eq!(
@@ -1964,12 +2058,12 @@ mod test {
             TargetAddrEntry::new(
                 TargetAddr::new("fe80::2".parse().unwrap(), 1, 0),
                 start.into(),
-                TargetAddrType::Ssh,
+                TargetAddrStatus::ssh(),
             ),
             TargetAddrEntry::new(
                 TargetAddr::new("2000::1".parse().unwrap(), 0, 0),
                 (start - Duration::from_secs(1)).into(),
-                TargetAddrType::Manual(None),
+                TargetAddrStatus::ssh().manually_added(),
             ),
         ]);
         assert_eq!(
@@ -1982,12 +2076,12 @@ mod test {
             TargetAddrEntry::new(
                 TargetAddr::new("2000::1".parse().unwrap(), 0, 0),
                 start.into(),
-                TargetAddrType::Ssh,
+                TargetAddrStatus::ssh(),
             ),
             TargetAddrEntry::new(
                 TargetAddr::new("2000::2".parse().unwrap(), 0, 0),
                 (start + Duration::from_secs(1)).into(),
-                TargetAddrType::Ssh,
+                TargetAddrStatus::ssh(),
             ),
         ]);
         assert_eq!(
@@ -1999,11 +2093,11 @@ mod test {
         // User expressed a preferred SSH address. Prefer it over all other
         // addresses (even manual).
         let addrs = BTreeSet::from_iter(vec![
-            TargetAddrEntry::new(preferred_target_addr, start.into(), TargetAddrType::Ssh),
+            TargetAddrEntry::new(preferred_target_addr, start.into(), TargetAddrStatus::ssh()),
             TargetAddrEntry::new(
                 TargetAddr::new("2000::1".parse().unwrap(), 0, 0),
                 (start - Duration::from_secs(1)).into(),
-                TargetAddrType::Manual(None),
+                TargetAddrStatus::ssh().manually_added(),
             ),
         ]);
 
@@ -2019,7 +2113,7 @@ mod test {
             vec![TargetAddrEntry::new(
                 TargetAddr::new("::1".parse::<IpAddr>().unwrap().into(), 0, 0),
                 Utc::now(),
-                TargetAddrType::Ssh,
+                TargetAddrStatus::ssh(),
             )]
             .into_iter(),
         );
@@ -2043,7 +2137,7 @@ mod test {
             vec![TargetAddrEntry::new(
                 TargetAddr::new("::1".parse::<IpAddr>().unwrap().into(), 0, 0),
                 Utc::now(),
-                TargetAddrType::Ssh,
+                TargetAddrStatus::ssh(),
             )]
             .into_iter(),
         );
@@ -2134,7 +2228,7 @@ mod test {
             TargetAddrEntry::new(
                 TargetAddr::new("2000::1".parse().unwrap(), 0, 0),
                 Utc::now().into(),
-                TargetAddrType::Netsvc,
+                TargetAddrStatus::netsvc(),
             )
             .into(),
         );
@@ -2142,7 +2236,7 @@ mod test {
             TargetAddrEntry::new(
                 TargetAddr::new("fe80::1".parse().unwrap(), 0, 0),
                 Utc::now().into(),
-                TargetAddrType::Ssh,
+                TargetAddrStatus::ssh(),
             )
             .into(),
         );
@@ -2165,7 +2259,7 @@ mod test {
         target.addrs_insert_entry(TargetAddrEntry::new(
             TargetAddr::new("::1".parse().unwrap(), 0, 0),
             Utc::now(),
-            TargetAddrType::Manual(None),
+            TargetAddrStatus::ssh().manually_added(),
         ));
         assert!(target.is_manual());
 
@@ -2181,7 +2275,7 @@ mod test {
         target.addrs_insert_entry(TargetAddrEntry::new(
             TargetAddr::new("::1".parse().unwrap(), 0, 0),
             Utc::now(),
-            TargetAddrType::Manual(None),
+            TargetAddrStatus::ssh().manually_added(),
         ));
         assert!(target.is_manual());
         assert_eq!(target.get_manual_timeout(), None);
@@ -2191,7 +2285,7 @@ mod test {
         target.addrs_insert_entry(TargetAddrEntry::new(
             TargetAddr::new("::1".parse().unwrap(), 0, 0),
             Utc::now(),
-            TargetAddrType::Manual(Some(now)),
+            TargetAddrStatus::ssh().manually_added_until(now),
         ));
         assert!(target.is_manual());
         assert_eq!(target.get_manual_timeout(), Some(now));
@@ -2205,7 +2299,7 @@ mod test {
         target.addrs_insert_entry(TargetAddrEntry::new(
             TargetAddr::new("::1".parse().unwrap(), 0, 0),
             Utc::now(),
-            TargetAddrType::Manual(None),
+            TargetAddrStatus::ssh().manually_added(),
         ));
         target.set_state(TargetConnectionState::Manual(None));
 
@@ -2236,7 +2330,8 @@ mod test {
         target.addrs_insert_entry(TargetAddrEntry::new(
             TargetAddr::new("::1".parse().unwrap(), 0, 0),
             Utc::now(),
-            TargetAddrType::Manual(Some(SystemTime::now() - Duration::from_secs(3600))),
+            TargetAddrStatus::ssh()
+                .manually_added_until(SystemTime::now() - Duration::from_secs(3600)),
         ));
         target.set_state(TargetConnectionState::Manual(Some(Instant::now())));
 
@@ -2267,7 +2362,8 @@ mod test {
         target.addrs_insert_entry(TargetAddrEntry::new(
             TargetAddr::new("::1".parse().unwrap(), 0, 0),
             Utc::now(),
-            TargetAddrType::Manual(Some(SystemTime::now() + Duration::from_secs(3600))),
+            TargetAddrStatus::ssh()
+                .manually_added_until(SystemTime::now() + Duration::from_secs(3600)),
         ));
         target.set_state(TargetConnectionState::Manual(Some(Instant::now())));
 
@@ -2410,7 +2506,7 @@ mod test {
                 std::iter::once(TargetAddrEntry::new(
                     SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 22).into(),
                     chrono::MIN_DATETIME,
-                    TargetAddrType::Manual(None),
+                    TargetAddrStatus::ssh().manually_added(),
                 )),
             );
 

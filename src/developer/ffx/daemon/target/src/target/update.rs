@@ -9,7 +9,7 @@ use crate::overnet::host_pipe::HostAddr;
 use std::net::{Ipv4Addr, Ipv6Addr};
 
 use super::{
-    BuildConfig, Identity, SharedIdentity, TargetAddrEntry, TargetAddrType, TargetProtocol,
+    BuildConfig, Identity, SharedIdentity, TargetAddrEntry, TargetAddrStatus, TargetProtocol,
     TargetTransport,
 };
 use std::{
@@ -82,23 +82,30 @@ pub struct TargetUpdate<'a> {
 }
 
 impl<'a> TargetUpdate<'a> {
-    fn determine_addr_type(&self) -> Option<TargetAddrType> {
+    fn determine_addr_status(&self) -> Option<TargetAddrStatus> {
         let connection = self.connection.as_ref()?;
 
         use ConnectionKind::*;
-        Some(match connection.kind {
+        let mut status = match connection.kind {
             Disconnected => return None,
             // An assumption that may not be correct going forward.
-            Rcs(_) => TargetAddrType::Ssh,
+            Rcs(_) => TargetAddrStatus::ssh(),
             Found { protocol: TargetProtocol::Fastboot, transport } => {
-                TargetAddrType::Fastboot(transport.into())
+                TargetAddrStatus::fastboot(transport)
             }
-            Found { protocol: TargetProtocol::Ssh, .. } if self.manual_target => {
-                TargetAddrType::Manual(self.expiry)
+            Found { protocol: TargetProtocol::Ssh, .. } => TargetAddrStatus::ssh(),
+            Found { protocol: TargetProtocol::Netsvc, .. } => TargetAddrStatus::netsvc(),
+        };
+
+        if self.manual_target {
+            if let Some(expiry) = self.expiry {
+                status = status.manually_added_until(expiry);
+            } else {
+                status = status.manually_added();
             }
-            Found { protocol: TargetProtocol::Ssh, .. } => TargetAddrType::Ssh,
-            Found { protocol: TargetProtocol::Netsvc, .. } => TargetAddrType::Netsvc,
-        })
+        }
+
+        Some(status)
     }
 }
 
@@ -273,7 +280,7 @@ impl<'a> TargetUpdateBuilder<'a> {
 impl super::Target {
     /// Updates the state of the target with the changes described in `update`.
     pub fn apply_update(&self, mut update: TargetUpdate<'_>) {
-        let addr_type = update.determine_addr_type();
+        let addr_status = update.determine_addr_status();
 
         match update.enabled {
             _ if update.manual_target => self.enable(),
@@ -295,14 +302,14 @@ impl super::Target {
         }
 
         if let Some(connection) = update.connection.take() {
-            if let Some(addr_type) = addr_type {
+            if let Some(status) = addr_status {
                 let now = Utc::now();
 
                 self.addrs_extend(
                     connection
                         .net_address
                         .iter()
-                        .map(|addr| TargetAddrEntry::new((*addr).into(), now, addr_type.clone())),
+                        .map(|addr| TargetAddrEntry::new((*addr).into(), now, status)),
                 );
             }
 
@@ -380,6 +387,7 @@ impl super::Target {
 mod tests {
     use super::{super::*, *};
 
+    use assert_matches::assert_matches;
     use fidl_fuchsia_overnet_protocol::NodeId;
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -462,10 +470,10 @@ mod tests {
         ];
 
         #[track_caller]
-        fn expect_addr_type(target: &Target, addr_type: TargetAddrType) {
+        fn expect_addr_type(target: &Target, addr_type: TargetAddrStatus) {
             let addrs = target.addrs.borrow();
             for addr in addrs.iter() {
-                assert_eq!(addr.addr_type, addr_type);
+                assert_eq!(addr.status, addr_type);
             }
         }
 
@@ -481,7 +489,7 @@ mod tests {
             );
 
             assert_eq!(target.get_connection_state(), TargetConnectionState::Mdns(now));
-            expect_addr_type(&target, TargetAddrType::Ssh);
+            expect_addr_type(&target, TargetAddrStatus::ssh());
         }
 
         {
@@ -496,7 +504,7 @@ mod tests {
             );
 
             assert_eq!(target.get_connection_state(), TargetConnectionState::Fastboot(now));
-            expect_addr_type(&target, TargetAddrType::Fastboot(FastbootInterface::Tcp));
+            expect_addr_type(&target, TargetAddrStatus::fastboot(TargetTransport::Network));
         }
 
         {
@@ -511,7 +519,7 @@ mod tests {
             );
 
             assert_eq!(target.get_connection_state(), TargetConnectionState::Zedboot(now));
-            expect_addr_type(&target, TargetAddrType::Netsvc);
+            expect_addr_type(&target, TargetAddrStatus::netsvc());
         }
 
         {
@@ -527,16 +535,36 @@ mod tests {
             );
 
             assert_eq!(target.get_connection_state(), TargetConnectionState::Manual(None));
-            expect_addr_type(&target, TargetAddrType::Manual(None));
+            expect_addr_type(&target, TargetAddrStatus::ssh().manually_added());
         }
 
         {
             let target = Target::new();
-            let expire = Some(SystemTime::now() + Duration::from_secs(60));
 
             target.apply_update(
                 TargetUpdateBuilder::new()
-                    .manual_target(expire)
+                    .manual_target(None)
+                    .last_seen(now)
+                    .discovered(TargetProtocol::Fastboot, TargetTransport::Network)
+                    .net_addresses(ADDRS)
+                    .build(),
+            );
+
+            assert_matches!(target.get_connection_state(), TargetConnectionState::Fastboot(..));
+            expect_addr_type(
+                &target,
+                TargetAddrStatus::fastboot(TargetTransport::Network).manually_added(),
+            );
+            assert!(target.is_manual());
+        }
+
+        {
+            let target = Target::new();
+            let expire = SystemTime::now() + Duration::from_secs(60);
+
+            target.apply_update(
+                TargetUpdateBuilder::new()
+                    .manual_target(Some(expire))
                     .last_seen(now)
                     .discovered(TargetProtocol::Ssh, TargetTransport::Network)
                     .net_addresses(ADDRS)
@@ -544,7 +572,7 @@ mod tests {
             );
 
             assert_eq!(target.get_connection_state(), TargetConnectionState::Manual(Some(now)));
-            expect_addr_type(&target, TargetAddrType::Manual(expire));
+            expect_addr_type(&target, TargetAddrStatus::ssh().manually_added_until(expire));
         }
     }
 

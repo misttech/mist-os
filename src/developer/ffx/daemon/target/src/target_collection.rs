@@ -5,7 +5,7 @@
 use crate::{
     target::{
         self, DiscoveredTarget, Identity, IdentityCmp, SharedIdentity, Target, TargetAddrEntry,
-        TargetAddrType, TargetUpdate, WeakIdentity,
+        TargetAddrStatus, TargetUpdate, WeakIdentity,
     },
     MDNS_MAX_AGE,
 };
@@ -331,7 +331,10 @@ impl TargetCollection {
         for target in expired {
             self.remove_ephemeral_target(target);
         }
-        eprintln!("expired: {expired_manual_addrs:?}");
+
+        if !expired_manual_addrs.is_empty() {
+            tracing::debug!("Expired manual addresses: {expired_manual_addrs:?}");
+        }
         expired_manual_addrs
     }
 
@@ -618,7 +621,7 @@ impl TargetCollection {
             let is_too_old = Utc::now().signed_duration_since(t.timestamp).num_milliseconds()
                 as i128
                 > MDNS_MAX_AGE.as_millis() as i128;
-            !is_too_old || matches!(t.addr_type, TargetAddrType::Manual(_))
+            !is_too_old || t.is_manual()
         });
         to_update.update_boot_timestamp(new_target.boot_timestamp_nanos());
 
@@ -1160,8 +1163,9 @@ impl<'a> TargetUpdateFilter<'a> {
                         }
                         _ => target_addrs.contains(&TargetAddrEntry::new(
                             (*addr).into(),
+                            // NOTE: The following fields do not matter for address lookups
                             chrono::MIN_DATETIME,
-                            TargetAddrType::Ssh,
+                            TargetAddrStatus::ssh(),
                         )),
                     }
                 })
@@ -1173,9 +1177,7 @@ impl<'a> TargetUpdateFilter<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::target::{
-        TargetAddrEntry, TargetAddrType, TargetProtocol, TargetTransport, TargetUpdateBuilder,
-    };
+    use crate::target::{TargetAddrEntry, TargetProtocol, TargetTransport, TargetUpdateBuilder};
     use chrono::{TimeZone, Utc};
     use ffx_daemon_events::TargetConnectionState;
     use fuchsia_async::Task;
@@ -1258,17 +1260,17 @@ mod tests {
         let tae1 = TargetAddrEntry {
             addr: TargetAddr::new(a1, 1, 0),
             timestamp: Utc.ymd(2014, 10, 31).and_hms(9, 10, 12),
-            addr_type: TargetAddrType::Ssh,
+            status: TargetAddrStatus::ssh(),
         };
         let tae2 = TargetAddrEntry {
             addr: TargetAddr::new(a2, 1, 0),
             timestamp: Utc.ymd(2014, 10, 31).and_hms(9, 10, 12),
-            addr_type: TargetAddrType::Ssh,
+            status: TargetAddrStatus::ssh(),
         };
         let tae3 = TargetAddrEntry {
             addr: TargetAddr::new(a3, 1, 0),
             timestamp: Utc.ymd(2014, 10, 31).and_hms(9, 10, 12),
-            addr_type: TargetAddrType::Manual(None),
+            status: TargetAddrStatus::ssh().manually_added(),
         };
         t.addrs.borrow_mut().insert(tae1);
         t.addrs.borrow_mut().insert(tae2);
@@ -1664,7 +1666,7 @@ mod tests {
         t2.addrs.borrow_mut().replace(TargetAddrEntry::new(
             TargetAddr::new(ip, 0, 0),
             Utc::now(),
-            TargetAddrType::Ssh,
+            TargetAddrStatus::ssh(),
         ));
         let fut = TargetUpdatedFut::new(t2, tc.clone(), wait_fut);
         assert_eq!(fut.await.nodename().unwrap(), target_name);
@@ -1688,7 +1690,7 @@ mod tests {
         t2.addrs.borrow_mut().replace(TargetAddrEntry::new(
             TargetAddr::new(ip, 0xbadf00d, 0),
             Utc::now(),
-            TargetAddrType::Ssh,
+            TargetAddrStatus::ssh(),
         ));
 
         let tc = TargetCollection::new_with_queue();
