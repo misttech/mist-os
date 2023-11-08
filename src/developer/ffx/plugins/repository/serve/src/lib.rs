@@ -129,27 +129,18 @@ impl FfxMain for ServeTool {
         };
         let task = fasync::Task::local(server_fut);
 
-        let (repo_proxy, repo_server) = fidl::endpoints::create_proxy::<RepositoryManagerMarker>()
-            .map_err(|e| anyhow!("Failed to create proxy for RepositoryManagerMarker: {:?}", e))?;
-        rcs::connect_with_timeout::<RepositoryManagerMarker>(
+        let repo_proxy = rcs::connect_to_protocol::<RepositoryManagerMarker>(
             TIMEOUT,
             REPOSITORY_MANAGER_MONIKER,
             &self.rcs_proxy,
-            repo_server.into_channel(),
         )
         .await
         .map_err(|e| anyhow!("Failed to bind RepositoryManager to stream: {:?}", e))?;
 
-        let (engine_proxy, engine_server) = fidl::endpoints::create_proxy::<EngineMarker>()
-            .map_err(|e| anyhow!("Failed to create proxy for EngineMarker: {:?}", e))?;
-        rcs::connect_with_timeout::<EngineMarker>(
-            TIMEOUT,
-            ENGINE_MONIKER,
-            &self.rcs_proxy,
-            engine_server.into_channel(),
-        )
-        .await
-        .map_err(|e| anyhow!("Failed to bind Engine to stream: {:?}", e))?;
+        let engine_proxy =
+            rcs::connect_to_protocol::<EngineMarker>(TIMEOUT, ENGINE_MONIKER, &self.rcs_proxy)
+                .await
+                .map_err(|e| anyhow!("Failed to bind Engine to stream: {:?}", e))?;
 
         register_target_with_fidl_proxies(
             repo_proxy,

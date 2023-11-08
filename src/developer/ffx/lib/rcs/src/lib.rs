@@ -298,6 +298,17 @@ pub async fn connect_with_timeout<P: DiscoverableProtocolMarker>(
     .await
 }
 
+pub async fn connect_to_protocol<P: DiscoverableProtocolMarker>(
+    dur: Duration,
+    moniker: &str,
+    rcs_proxy: &RemoteControlProxy,
+) -> Result<P::Proxy> {
+    let (proxy, server_end) =
+        fidl::endpoints::create_proxy::<P>().context("failed to create proxy")?;
+    connect_with_timeout::<P>(dur, moniker, rcs_proxy, server_end.into_channel()).await?;
+    Ok(proxy)
+}
+
 pub async fn open_with_timeout<P: DiscoverableProtocolMarker>(
     dur: Duration,
     moniker: &str,

@@ -63,16 +63,6 @@ pub async fn connect_to_contoller(
     rcs_proxy: &rc::RemoteControlProxy,
     moniker: Option<String>,
 ) -> Result<ControllerProxy> {
-    let (controller_proxy, controller_server_end) =
-        fidl::endpoints::create_proxy::<ControllerMarker>().context("failed to create proxy")?;
-
     let moniker = find_moniker(&rcs_proxy, moniker).await?;
-    rcs::connect_with_timeout::<ControllerMarker>(
-        TIMEOUT,
-        &moniker,
-        &rcs_proxy,
-        controller_server_end.into_channel(),
-    )
-    .await?;
-    Ok(controller_proxy)
+    rcs::connect_to_protocol::<ControllerMarker>(TIMEOUT, &moniker, &rcs_proxy).await
 }
