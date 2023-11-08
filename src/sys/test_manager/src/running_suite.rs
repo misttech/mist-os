@@ -49,6 +49,7 @@ use {
     resolver::AllowedPackages,
     std::{
         collections::HashSet,
+        fmt,
         sync::{
             atomic::{AtomicU32, Ordering},
             Arc,
@@ -542,12 +543,20 @@ pub(crate) async fn enumerate_test_cases(
     Ok(invocations)
 }
 
-#[derive(Debug)]
 pub(crate) struct CaseMatcher {
     /// Patterns specifying cases to include.
     includes: Vec<glob::Pattern>,
     /// Patterns specifying cases to exclude.
     excludes: Vec<glob::Pattern>,
+}
+
+impl fmt::Debug for CaseMatcher {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CaseMatcher")
+            .field("includes", &self.includes.iter().map(|p| p.to_string()).collect::<Vec<_>>())
+            .field("excludes", &self.excludes.iter().map(|p| p.to_string()).collect::<Vec<_>>())
+            .finish()
+    }
 }
 
 impl CaseMatcher {
