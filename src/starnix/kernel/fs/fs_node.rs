@@ -1495,15 +1495,16 @@ impl FsNode {
         let mut new_info = info.clone();
         mutator(&mut new_info)?;
         let mut has = zxio_node_attr_has_t { ..Default::default() };
-        has.modification_time = info.time_status_change != new_info.time_status_change;
+        has.modification_time = info.time_modify != new_info.time_modify;
         has.mode = info.mode != new_info.mode;
         has.uid = info.uid != new_info.uid;
         has.gid = info.gid != new_info.gid;
         has.rdev = info.rdev != new_info.rdev;
+        // Call `update_attributes(..)` to persist the changes for the following fields.
         if has.modification_time || has.mode || has.uid || has.gid || has.rdev {
             self.ops().update_attributes(&new_info, has)?;
-            *info = new_info;
         }
+        *info = new_info;
         Ok(())
     }
 
@@ -1849,7 +1850,10 @@ impl FsNode {
         }
 
         if !matches!((atime, mtime), (TimeUpdateType::Omit, TimeUpdateType::Omit)) {
-            self.update_info(|info| {
+            // This function is called by `utimes(..)` which will update the access and
+            // modification time. We need to call `update_attributes()` to update the mtime of
+            // filesystems that manages file timestamps.
+            self.update_attributes(|info| {
                 let now = utc::utc_now();
                 info.time_status_change = now;
                 let get_time = |time: TimeUpdateType| match time {
@@ -1863,7 +1867,8 @@ impl FsNode {
                 if let Some(time) = get_time(mtime) {
                     info.time_modify = time;
                 }
-            });
+                Ok(())
+            })?;
         }
         Ok(())
     }

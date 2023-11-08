@@ -31,7 +31,7 @@ use std::{
     io::Read,
     sync::{Arc, Mutex},
 };
-use syncio::zxio_node_attributes_t;
+use syncio::{zxio_node_attr_has_t, zxio_node_attributes_t};
 
 use ext4_metadata::Metadata;
 
@@ -193,6 +193,12 @@ impl FsNodeOps for File {
             // TODO(fxbug.dev/293607051): Plumb through storage size from underlying connection.
             storage_size: 0,
             link_count: 1,
+            has: zxio_node_attr_has_t {
+                content_size: true,
+                storage_size: true,
+                link_count: true,
+                ..Default::default()
+            },
             ..Default::default()
         };
         let mut info = info.write();

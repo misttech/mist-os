@@ -274,6 +274,7 @@ pub fn new_remote_file(
             content_size: true,
             storage_size: true,
             link_count: true,
+            modification_time: true,
             ..Default::default()
         })
         .map_err(|status| from_status_like_fdio!(status))?;
@@ -305,14 +306,26 @@ pub fn create_fuchsia_pipe(
     new_remote_file(current_task.kernel(), socket.into(), flags)
 }
 
+// Update info from attrs if they are set.
 pub fn update_info_from_attrs(info: &mut FsNodeInfo, attrs: &zxio_node_attributes_t) {
     /// st_blksize is measured in units of 512 bytes.
     const BYTES_PER_BLOCK: usize = 512;
     // TODO - store these in FsNodeState and convert on fstat
-    info.size = attrs.content_size.try_into().unwrap_or(std::usize::MAX);
-    info.blocks = usize::try_from(attrs.storage_size).unwrap_or(std::usize::MAX) / BYTES_PER_BLOCK;
+    if attrs.has.content_size {
+        info.size = attrs.content_size.try_into().unwrap_or(std::usize::MAX);
+    }
+    if attrs.has.storage_size {
+        info.blocks =
+            usize::try_from(attrs.storage_size).unwrap_or(std::usize::MAX) / BYTES_PER_BLOCK;
+    }
     info.blksize = BYTES_PER_BLOCK;
-    info.link_count = attrs.link_count.try_into().unwrap_or(std::usize::MAX);
+    if attrs.has.link_count {
+        info.link_count = attrs.link_count.try_into().unwrap_or(std::usize::MAX);
+    }
+    if attrs.has.modification_time {
+        info.time_modify =
+            zx::Time::from_nanos(attrs.modification_time.try_into().unwrap_or(i64::MAX));
+    }
 }
 
 fn get_mode(attrs: &zxio_node_attributes_t) -> Result<FileMode, Errno> {
@@ -700,6 +713,7 @@ impl FsNodeOps for RemoteNode {
                 content_size: true,
                 storage_size: true,
                 link_count: true,
+                modification_time: true,
                 ..Default::default()
             })
             .map_err(|status| from_status_like_fdio!(status))?;
@@ -1488,7 +1502,10 @@ mod test {
     use crate::{
         arch::uapi::epoll_event,
         auth::Credentials,
-        fs::{buffers::VecOutputBuffer, EpollFileObject, LookupContext, Namespace, SymlinkMode},
+        fs::{
+            buffers::{VecInputBuffer, VecOutputBuffer},
+            EpollFileObject, LookupContext, Namespace, SymlinkMode, TimeUpdateType,
+        },
         mm::PAGE_SIZE,
         testing::*,
         types::{errno::EINVAL, mode},
@@ -2196,6 +2213,171 @@ mod test {
         })
         .await;
 
+        fixture.close().await;
+    }
+
+    #[::fuchsia::test]
+    async fn test_time_modify_persists() {
+        let fixture = TestFixture::new().await;
+        let (server, client) = zx::Channel::create();
+        fixture
+            .root()
+            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
+            .expect("clone failed");
+
+        const MODE: FileMode = FileMode::from_bits(FileMode::IFREG.bits() | 0o467);
+
+        let (kernel, current_task) = create_kernel_and_task();
+        let last_modified = fasync::unblock(move || {
+            let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+            let fs = RemoteFs::new_fs(
+                &kernel,
+                client,
+                FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
+                rights,
+            )
+            .expect("new_fs failed");
+            let ns: Arc<Namespace> = Namespace::new(fs);
+            current_task.fs().set_umask(FileMode::from_bits(0));
+            let child = ns
+                .root()
+                .create_node(&current_task, b"file", MODE, DeviceType::NONE)
+                .expect("create_node failed");
+            // Write to file (this should update mtime (time_modify))
+            let file = child.open(&current_task, OpenFlags::RDWR, true).expect("open failed");
+            // Call `refresh_info(..)` to refresh `time_modify` with the time managed by the
+            // underlying filesystem
+            let time_before_write = child
+                .entry
+                .node
+                .refresh_info(&current_task)
+                .expect("refresh info failed")
+                .time_modify;
+            let write_bytes: [u8; 5] = [1, 2, 3, 4, 5];
+            let written = file
+                .write(&current_task, &mut VecInputBuffer::new(&write_bytes))
+                .expect("write failed");
+            assert_eq!(written, write_bytes.len());
+            let last_modified = child
+                .entry
+                .node
+                .refresh_info(&current_task)
+                .expect("refresh info failed")
+                .time_modify;
+            assert!(last_modified > time_before_write);
+            last_modified
+        })
+        .await;
+
+        // Tear down the kernel and open the file again. Check that modification time is when we
+        // last modified the contents of the file
+        let fixture = TestFixture::open(
+            fixture.close().await,
+            TestFixtureOptions {
+                encrypted: true,
+                as_blob: false,
+                format: false,
+                serve_volume: false,
+            },
+        )
+        .await;
+        let (server, client) = zx::Channel::create();
+        fixture
+            .root()
+            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
+            .expect("clone failed");
+        let (kernel, current_task) = create_kernel_and_task();
+        let refreshed_modified_time = fasync::unblock(move || {
+            let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+            let fs = RemoteFs::new_fs(
+                &kernel,
+                client,
+                FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
+                rights,
+            )
+            .expect("new_fs failed");
+            let ns = Namespace::new(fs);
+            let mut context = LookupContext::new(SymlinkMode::NoFollow);
+            let child = ns
+                .root()
+                .lookup_child(&current_task, &mut context, b"file")
+                .expect("lookup_child failed");
+            let last_modified = child
+                .entry
+                .node
+                .refresh_info(&current_task)
+                .expect("refresh info failed")
+                .time_modify;
+            last_modified
+        })
+        .await;
+        assert_eq!(last_modified, refreshed_modified_time);
+
+        fixture.close().await;
+    }
+
+    #[::fuchsia::test]
+    async fn test_update_atime_mtime() {
+        let fixture = TestFixture::new().await;
+        let (server, client) = zx::Channel::create();
+        fixture
+            .root()
+            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
+            .expect("clone failed");
+
+        const MODE: FileMode = FileMode::from_bits(FileMode::IFREG.bits() | 0o467);
+
+        let (kernel, current_task) = create_kernel_and_task();
+        fasync::unblock(move || {
+            let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+            let fs = RemoteFs::new_fs(
+                &kernel,
+                client,
+                FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
+                rights,
+            )
+            .expect("new_fs failed");
+            let ns: Arc<Namespace> = Namespace::new(fs);
+            current_task.fs().set_umask(FileMode::from_bits(0));
+            let child = ns
+                .root()
+                .create_node(&current_task, b"file", MODE, DeviceType::NONE)
+                .expect("create_node failed");
+
+            let info_original =
+                child.entry.node.refresh_info(&current_task).expect("refresh_info failed").clone();
+
+            child
+                .entry
+                .node
+                .update_atime_mtime(
+                    &current_task,
+                    &child.mount,
+                    TimeUpdateType::Time(zx::Time::from_nanos(30)),
+                    TimeUpdateType::Omit,
+                )
+                .expect("update_atime_mtime failed");
+            let info_after_update =
+                child.entry.node.refresh_info(&current_task).expect("refresh info failed").clone();
+            assert_eq!(info_after_update.time_modify, info_original.time_modify);
+            assert_eq!(info_after_update.time_access, zx::Time::from_nanos(30));
+
+            child
+                .entry
+                .node
+                .update_atime_mtime(
+                    &current_task,
+                    &child.mount,
+                    TimeUpdateType::Omit,
+                    TimeUpdateType::Time(zx::Time::from_nanos(50)),
+                )
+                .expect("update_atime_mtime failed");
+            let info_after_update2 =
+                child.entry.node.refresh_info(&current_task).expect("refresh_info failed").clone();
+            assert_eq!(info_after_update2.time_modify, zx::Time::from_nanos(50));
+            assert_eq!(info_after_update2.time_access, zx::Time::from_nanos(30));
+        })
+        .await;
         fixture.close().await;
     }
 }
