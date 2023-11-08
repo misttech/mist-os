@@ -593,6 +593,9 @@ impl Drop for RealmInstance {
     /// To ensure local components are shutdown in an orderly manner (i.e. after their dependent
     /// clients) upon `drop`, keep the local_component_runner_task alive in an async task until the
     /// destroy_waiter synchronously destroys the realm.
+    ///
+    /// Remember that you *must* keep a life reference to a `RealmInstance` to ensure that your
+    /// realm stays running.
     fn drop(&mut self) {
         if !self.root.destroy_waiter_taken() {
             let destroy_waiter = self.root.take_destroy_waiter();
@@ -606,6 +609,9 @@ impl Drop for RealmInstance {
             })
             .detach();
         }
+        // Check if this is what you wanted. If you expected the realm to live longer than it did,
+        // you must keep a live reference to it.
+        debug!("RealmInstance is now shut down - the realm will be destroyed.");
     }
 }
 
