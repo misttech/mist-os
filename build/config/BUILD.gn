@@ -748,6 +748,7 @@ config("Wno-vla-cxx-extension") {
     "//src/developer/memory/metrics/tests:*",
     "//src/devices/block/bin/gpt:*",
     "//src/devices/block/bin/iochk:*",
+    "//src/devices/block/drivers/aml-sdmmc:*",
     "//src/devices/block/drivers/zxcrypt:*",
     "//src/devices/spi/bin/spiutil:*",
     "//src/devices/usb/bin/usbctl:*",
