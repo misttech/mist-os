@@ -93,16 +93,3 @@ declare_args() {
   partitions_config_label = false
   partitions_config_contents = []
 }
-
-# Ensure that partitions_config_label is default_toolchain-qualified.
-if (partitions_config_label != false) {
-  if (partitions_config_label ==
-      get_label_info(partitions_config_label, "label_no_toolchain")) {
-    partitions_config_label = "$partitions_config_label($default_toolchain)"
-  } else {
-    assert(
-        get_label_info(partitions_config_label, "toolchain") ==
-            default_toolchain,
-        "partitions_config_label (\"$partitions_config_label\") should be a target in the default_toolchain")
-  }
-}

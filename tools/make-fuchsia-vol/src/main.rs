@@ -17,7 +17,7 @@ use {
     rand::{RngCore, SeedableRng},
     rand_xorshift::XorShiftRng,
     sdk_metadata::{LoadedProductBundle, ProductBundle},
-    serde::{Deserialize, Serialize},
+    serde::Deserialize,
     std::{
         collections::{BTreeMap, HashMap},
         fs::{File, OpenOptions},
@@ -45,14 +45,6 @@ const INSTALLER_GUID: PartType = part_type("4DCE98CE-E77E-45C1-A863-CAF92F1330C1
 const FVM_GUID: PartType = part_type("41D0E340-57E3-954E-8C1E-17ECAC44CFF5");
 const DATA_GUID: PartType = part_type("08185F0C-892D-428A-A789-DBEEC8F55E6A");
 
-// The relevant part of the product bundle metadata schema, as realized by
-// entries in the product_bundles.json build API module.
-#[derive(Deserialize, Serialize)]
-struct ProductBundleMetadata {
-    name: String,
-    path: Utf8PathBuf,
-}
-
 /// make-fuchsia-vol
 #[derive(FromArgs, Debug)]
 struct TopLevel {
@@ -73,11 +65,6 @@ struct TopLevel {
     /// used (e.g. if there is only one PBM available).
     #[argh(option)]
     product_bundle: Option<Utf8PathBuf>,
-
-    /// the name of a particular product bundle to use, consulted if
-    /// --product-bundle is unset.
-    #[argh(option)]
-    product_bundle_name: Option<String>,
 
     /// the architecture of the target CPU (x64|arm64)
     #[argh(option, default = "Arch::X64")]
@@ -768,26 +755,38 @@ fn get_build_product_bundle_path(
     args: &TopLevel,
     dependencies: &mut Vec<&Utf8Path>,
 ) -> Result<Option<Utf8PathBuf>, Error> {
-    let Some(build_dir) = &args.fuchsia_build_dir else { return Ok(None) };
-    let Some(name) = &args.product_bundle_name else { return Ok(None) };
+    let Some(build_dir) = &args.fuchsia_build_dir else { return Ok(None); };
 
-    dependencies.push(Utf8Path::new("product_bundles.json"));
-    let product_bundles_path = &build_dir.join(dependencies.last().unwrap());
-    let f = match File::open(product_bundles_path) {
+    let product_bundles_path = Utf8Path::new("product_bundles.json");
+    dependencies.push(product_bundles_path);
+
+    let f = match File::open(&build_dir.join(product_bundles_path)) {
         Ok(f) => f,
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
-            bail!("{product_bundles_path} not found");
+            return Ok(None);
         }
         Err(err) => {
             return Err(err.into());
         }
     };
 
-    let product_bundles: Vec<ProductBundleMetadata> = serde_json::from_reader(BufReader::new(f))?;
-    match product_bundles.iter().find(|&pb| &pb.name == name) {
-        None => Ok(None),
-        Some(pb) => Ok(Some(build_dir.join(&pb.path))),
+    #[derive(Deserialize)]
+    struct ProductBundlePath {
+        path: Utf8PathBuf,
     }
+
+    let mut product_bundle_paths: Vec<ProductBundlePath> =
+        serde_json::from_reader(BufReader::new(f))?;
+
+    let Some(product_bundle_path) = product_bundle_paths.pop() else {
+        bail!("{product_bundles_path} does not contain any entries");
+    };
+
+    if !product_bundle_paths.is_empty() {
+        bail!("{product_bundles_path} should only contain a single entry");
+    }
+
+    Ok(Some(build_dir.join(product_bundle_path.path)))
 }
 
 fn read_file(path: impl AsRef<std::path::Path>) -> Result<Vec<u8>, Error> {
@@ -995,7 +994,7 @@ mod tests {
     }
 
     #[test]
-    fn test_with_product_bundle_name() {
+    fn test_with_fuchsia_dir() {
         let tmp = tempfile::tempdir().unwrap();
         let dir = Utf8Path::from_path(tmp.path()).unwrap();
 
@@ -1009,12 +1008,6 @@ mod tests {
             current_exe.parent().unwrap().join("make-fuchsia-vol_test_data"),
         )
         .unwrap();
-
-        {
-            let f = File::create(test_data_dir.join("product_bundles.json")).unwrap();
-            let pbs: [ProductBundleMetadata; 0] = [];
-            serde_json::to_writer(&f, &pbs).unwrap();
-        }
 
         const IMAGE_SIZE: usize = 67108864;
 
@@ -1055,8 +1048,6 @@ mod tests {
                 dir.join("placeholder.10").as_str(),
                 "--fuchsia-build-dir",
                 test_data_dir.as_str(),
-                "--product-bundle-name",
-                "my-product-bundle",
             ],
         )
         .unwrap())
@@ -1066,7 +1057,7 @@ mod tests {
     }
 
     #[test]
-    fn test_with_product_bundle_path() {
+    fn test_with_product_bundle() {
         let tmp = tempfile::tempdir().unwrap();
         let dir = Utf8Path::from_path(tmp.path()).unwrap();
 

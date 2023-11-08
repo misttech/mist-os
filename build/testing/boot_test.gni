@@ -25,6 +25,12 @@ _all_emu_types = [
 # hosts even when $target_cpu != $host_cpu in order to take advantage of KVM,
 # HVF, etc.
 #
+# Subtargets
+#
+#   * $target_name.product_bundle
+#     - The associated product_bundle() target, creating a testing product
+#       bundle based on the images comprising the boot test.
+#
 # Parameters
 #
 #  * output_name
@@ -33,9 +39,6 @@ _all_emu_types = [
 #
 #  * cpu_for_host
 #    - Required: The host CPU to generate the test for.
-#
-#  * deps
-#    - Optional: The usual GN meaning.
 #
 # See boot_test() for all other parameters.
 template("_boot_test") {
@@ -93,16 +96,12 @@ template("_boot_test") {
     forward_variables_from(invoker,
                            [
                              "assert_no_deps",
-                             "deps",
                              "visibility",
                            ])
 
     timeout_secs = timeout_secs
 
-    if (!defined(deps)) {
-      deps = []
-    }
-    deps += [ ":$script_target" ]
+    deps = [ ":$script_target" ]
 
     if (defined(invoker.efi_disk)) {
       deps += [ invoker.efi_disk ]
@@ -173,12 +172,6 @@ template("_boot_test") {
 # less geared towards automation, but for now boot tests can be discovered and
 # run locally with `fx run-boot-test`.
 #
-# Subtargets
-#
-#   * $target_name.product_bundle
-#     - The associated product_bundle() target, creating a testing product
-#       bundle based on the images comprising the boot test.
-#
 # Parameters:
 #
 #  * device_types
@@ -214,12 +207,10 @@ template("boot_test") {
       "boot_test(\"$target_name\") must define at least one of `zbi`, `qemu_kernel`, `vbmeta`, `efi_disk`")
 
   main_target = target_name
-  image_manifest_target = "_boot_test.${target_name}.image_manifest"
-  rebased_image_manifest_target =
-      "_boot_test.${target_name}.rebased_image_manifest"
-  product_bundle_target = "$target_name.product_bundle"
 
-  image_manifest = "${target_gen_dir}/${main_target}.images.json"
+  image_manifest_target = "_boot_test.${target_name}.images_manifest"
+  product_bundle_target = target_name + ".product_bundle"
+
   generated_file(image_manifest_target) {
     forward_variables_from(invoker,
                            [
@@ -229,7 +220,6 @@ template("boot_test") {
                            ])
     testonly = true
     data_keys = [ "images" ]
-    walk_keys = [ "images_barrier" ]
     output_conversion = "json"
 
     deps = []
@@ -248,57 +238,33 @@ template("boot_test") {
     # if (defined(efi_disk)) {
     #   deps += [ efi_disk ]
     # }
-    outputs = [ image_manifest ]
+    outputs = [ "${target_out_dir}/${main_target}.images.json" ]
   }
 
-  # The above generated_file() contains path fields that are relative to the
-  # build directory. `ffx product create`, however, expects these paths to be
-  # relative to the manifest itself. To account for the mismatch we run the
-  # metadata through some simple post-processing.
-  rebased_image_manifest = "${target_out_dir}/${main_target}.images.json"
-  action(rebased_image_manifest_target) {
-    testonly = true
-
-    sources = [ image_manifest ]
-    outputs = [ rebased_image_manifest ]
-
-    script = "//build/testing/rebase_metadata_paths.py"
-    args = [
-      "--root-build-dir",
-      ".",
-      "--new-base",
-      rebase_path(get_path_info(outputs[0], "dir"), root_build_dir),
-      "--metadata",
-      rebase_path(sources[0], root_build_dir),
-      "--output",
-      rebase_path(outputs[0], root_build_dir),
-    ]
-
-    deps = [ ":$image_manifest_target" ]
+  _partitions_config = "//boards/partitions:default"
+  if (has_board) {
+    assert(partitions_config_label != false,
+           "Need to define partitions_config_label")
+    _partitions_config = partitions_config_label
   }
+  _partitions_config_file =
+      get_label_info(_partitions_config, "target_out_dir") + "/" +
+      get_label_info(_partitions_config, "name") + ".json"
 
   product_bundle(product_bundle_target) {
     testonly = true
-
-    name = main_target
-    system_a = rebased_image_manifest
-    deps = [ ":$rebased_image_manifest_target" ]
-
-    _partitions_config = "//boards/partitions:default($default_toolchain)"
-    if (has_board) {
-      assert(partitions_config_label != false,
-             "Need to define partitions_config_label")
-      _partitions_config = partitions_config_label
-      partitions_contents = partitions_config_contents
-    }
-    deps += [ _partitions_config ]
-
-    partitions = get_label_info(_partitions_config, "target_out_dir") + "/" +
-                 get_label_info(_partitions_config, "name") + ".json"
+    forward_variables_from(invoker, [ "deps" ])
+    system_a = ":image_manifest_target"
+    partitions = _partitions_config_file
+    deps = [ _partitions_config ]
 
     # This is a testing product bundle, so no need for a scrutiny check for this.
     skip_scrutiny = true
     skip_scrutiny_recovery = true
+
+    # This Product bundle will not be distributed and only for testing purpose,
+    # so not need to create transfer manifest.
+    skip_transfer_manifest = true
   }
 
   # If host_cpu != target_cpu, then we make sure to define a separate boot
@@ -320,7 +286,6 @@ template("boot_test") {
       visibility = [ ":*" ]
       output_name = main_target
       label = ":$main_target"
-      deps = [ ":$product_bundle_target" ]
     }
 
     _boot_test("$main_target.emu") {
@@ -352,7 +317,6 @@ template("boot_test") {
       label = ":$main_target"
       forward_variables_from(invoker, "*")
       cpu_for_host = host_cpu
-      deps = [ ":$product_bundle_target" ]
     }
   }
 }
