@@ -118,11 +118,8 @@ async fn do_resolve(component: &Arc<ComponentInstance>) -> Result<Component, Res
                 state.set(InstanceState::Resolved(
                     ResolvedInstanceState::new(
                         component,
-                        component_info.decl.clone(),
-                        component_info.package.clone(),
-                        component_info.config.clone(),
+                        component_info.clone(),
                         component_address,
-                        component_info.context_to_resolve_children.clone(),
                         component_sandboxes,
                     )
                     .await?,

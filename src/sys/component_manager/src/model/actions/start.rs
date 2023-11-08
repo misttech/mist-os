@@ -128,7 +128,7 @@ async fn do_start(
         resolved_component.resolved_url.clone(),
         resolved_component.package.as_ref(),
         &resolved_component.decl,
-        resolved_component.config,
+        resolved_component.config.clone(),
         start_reason.clone(),
         execution_controller_task,
         numbered_handles,
@@ -420,9 +420,9 @@ mod tests {
                     ActionSet, ShutdownAction, StartAction, StopAction,
                 },
                 component::{
-                    ComponentInstance, ExecutionState, InstanceState, ResolvedInstanceState,
-                    Runtime, SandboxDispatcher, StartReason, UnresolvedInstanceState,
-                    WeakComponentInstance,
+                    Component, ComponentInstance, ExecutionState, InstanceState,
+                    ResolvedInstanceState, Runtime, SandboxDispatcher, StartReason,
+                    UnresolvedInstanceState, WeakComponentInstance,
                 },
                 error::{ModelError, StartActionError},
                 hooks::{Event, EventType, Hook, HooksRegistration},
@@ -636,13 +636,18 @@ mod tests {
         let mut sandbox_finalization_output = ComponentSandboxes::default();
         let name = Name::new(TEST_CHILD_NAME).unwrap();
         sandbox_finalization_output.child_sandboxes.insert(name, Sandbox::new());
+        let resolved_component = Component {
+            resolved_url: "".to_string(),
+            context_to_resolve_children: None,
+            decl,
+            package: None,
+            config: None,
+            abi_revision: None,
+        };
         let ris = ResolvedInstanceState::new(
             &child,
-            decl,
-            None,
-            None,
+            resolved_component,
             ComponentAddress::from_absolute_url(&child.component_url).unwrap(),
-            None,
             sandbox_finalization_output,
         )
         .await

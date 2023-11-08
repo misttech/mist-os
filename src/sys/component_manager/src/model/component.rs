@@ -807,7 +807,7 @@ impl ComponentInstance {
         let uses = {
             let state = self.lock_state().await;
             match *state {
-                InstanceState::Resolved(ref s) => s.decl.uses.clone(),
+                InstanceState::Resolved(ref s) => s.resolved_component.decl.uses.clone(),
                 _ => {
                     // The instance was never resolved and therefore never ran, it can't possibly
                     // have storage to clean up.
@@ -1269,7 +1269,7 @@ impl shutdown::Component for ResolvedInstanceState {
     }
 
     fn environments(&self) -> Vec<cm_rust::EnvironmentDecl> {
-        self.decl.environments.clone()
+        self.resolved_component.decl.environments.clone()
     }
 
     fn children(&self) -> Vec<shutdown::Child> {
@@ -1288,8 +1288,8 @@ pub struct ResolvedInstanceState {
     /// The ExecutionScope for this component. Pseudo directories should be hosted with this
     /// scope to tie their life-time to that of the component.
     execution_scope: ExecutionScope,
-    /// The component's declaration.
-    decl: ComponentDecl,
+    /// Result of resolving the component.
+    pub resolved_component: Component,
     /// All child instances, indexed by child moniker.
     children: HashMap<ChildName, Arc<ComponentInstance>>,
     /// The next unique identifier for a dynamic children created in this realm.
@@ -1301,10 +1301,6 @@ pub struct ResolvedInstanceState {
     exposed_dir: ExposedDir,
     /// Hosts a directory mapping the component's namespace.
     ns_dir: NamespaceDir,
-    /// Contains information about the package, if one exists
-    package: Option<Package>,
-    /// Contains the resolved configuration fields for this component, if they exist
-    config: Option<ConfigFields>,
     /// Dynamic offers targeting this component's dynamic children.
     ///
     /// Invariant: the `target` field of all offers must refer to a live dynamic
@@ -1314,10 +1310,6 @@ pub struct ResolvedInstanceState {
     /// The as-resolved location of the component: either an absolute component
     /// URL, or (with a package context) a relative path URL.
     address: ComponentAddress,
-    /// The context to be used to resolve a component from a path
-    /// relative to this component (for example, a component in a subpackage).
-    /// If `None`, the resolver cannot resolve relative path component URLs.
-    context_to_resolve_children: Option<ComponentResolutionContext>,
     /// Anonymized service directories aggregated from collections and children.
     pub anonymized_services: HashMap<AnonymizedServiceRoute, Arc<AnonymizedAggregateServiceDir>>,
 
@@ -1340,36 +1332,34 @@ pub struct ResolvedInstanceState {
 impl ResolvedInstanceState {
     pub async fn new(
         component: &Arc<ComponentInstance>,
-        decl: ComponentDecl,
-        package: Option<Package>,
-        config: Option<ConfigFields>,
+        resolved_component: Component,
         address: ComponentAddress,
-        context_to_resolve_children: Option<ComponentResolutionContext>,
         component_sandboxes: ComponentSandboxes,
     ) -> Result<Self, ResolveActionError> {
         // TODO(https://fxbug.dev/120627): Determine whether this is expected to fail.
-        let exposed_dir =
-            ExposedDir::new(ExecutionScope::new(), WeakComponentInstance::new(&component), &decl)?;
+        let exposed_dir = ExposedDir::new(
+            ExecutionScope::new(),
+            WeakComponentInstance::new(&component),
+            &resolved_component.decl,
+        )?;
         let ns_dir = NamespaceDir::new(
             ExecutionScope::new(),
             WeakComponentInstance::new(&component),
-            &decl,
-            package.clone().map(|p| p.package_dir),
+            &resolved_component.decl,
+            resolved_component.package.clone().map(|p| p.package_dir),
         )?;
+        let environments = Self::instantiate_environments(component, &resolved_component.decl);
         let mut state = Self {
             execution_scope: ExecutionScope::new(),
+            resolved_component,
             children: HashMap::new(),
             next_dynamic_instance_id: 1,
-            environments: Self::instantiate_environments(component, &decl),
+            environments,
             exposed_dir,
             ns_dir,
-            package,
-            config,
             dynamic_offers: vec![],
             address,
-            context_to_resolve_children,
             anonymized_services: HashMap::new(),
-            decl,
             sandbox_from_parent: component_sandboxes.sandbox_from_parent,
             program_sandbox: component_sandboxes.program_sandbox.clone(),
             collection_sandboxes: component_sandboxes.collection_sandboxes,
@@ -1419,12 +1409,12 @@ impl ResolvedInstanceState {
 
     /// Returns a reference to the component's validated declaration.
     pub fn decl(&self) -> &ComponentDecl {
-        &self.decl
+        &self.resolved_component.decl
     }
 
     #[cfg(test)]
     pub fn decl_as_mut(&mut self) -> &mut ComponentDecl {
-        &mut self.decl
+        &mut self.resolved_component.decl
     }
 
     /// This component's `ExecutionScope`.
@@ -1477,12 +1467,12 @@ impl ResolvedInstanceState {
 
     /// Returns the resolved structured configuration of this instance, if any.
     pub fn config(&self) -> Option<&ConfigFields> {
-        self.config.as_ref()
+        self.resolved_component.config.as_ref()
     }
 
     /// Returns information about the package of the instance, if any.
     pub fn package(&self) -> Option<&Package> {
-        self.package.as_ref()
+        self.resolved_component.package.as_ref()
     }
 
     /// Removes a child.
@@ -1724,7 +1714,7 @@ impl ResolvedInstanceState {
         all_dynamic_offers.append(&mut dynamic_offers.clone());
         cm_fidl_validator::validate_dynamic_offers(
             &all_dynamic_offers,
-            &self.decl.clone().native_into_fidl(),
+            &self.resolved_component.decl.clone().native_into_fidl(),
         )?;
         // Manifest validation is not informed of the contents of collections, and is thus unable
         // to confirm the source exists if it's in a collection. Let's check that here.
@@ -1745,7 +1735,7 @@ impl ResolvedInstanceState {
     ) -> Result<(), ResolveActionError> {
         // We can't hold an immutable reference to `self` while passing a mutable reference later
         // on. To get around this, clone the children.
-        let children = self.decl.children.clone();
+        let children = self.resolved_component.decl.children.clone();
         for child in &children {
             let child_name = Name::new(&child.name).unwrap();
             let child_sandbox = child_sandboxes.remove(&child_name).expect("missing child sandbox");
@@ -1764,23 +1754,29 @@ impl ResolvedInstanceInterface for ResolvedInstanceState {
     type Component = ComponentInstance;
 
     fn uses(&self) -> Vec<UseDecl> {
-        self.decl.uses.clone()
+        self.resolved_component.decl.uses.clone()
     }
 
     fn exposes(&self) -> Vec<cm_rust::ExposeDecl> {
-        self.decl.exposes.clone()
+        self.resolved_component.decl.exposes.clone()
     }
 
     fn offers(&self) -> Vec<cm_rust::OfferDecl> {
-        self.decl.offers.iter().chain(self.dynamic_offers.iter()).cloned().collect()
+        self.resolved_component
+            .decl
+            .offers
+            .iter()
+            .chain(self.dynamic_offers.iter())
+            .cloned()
+            .collect()
     }
 
     fn capabilities(&self) -> Vec<cm_rust::CapabilityDecl> {
-        self.decl.capabilities.clone()
+        self.resolved_component.decl.capabilities.clone()
     }
 
     fn collections(&self) -> Vec<cm_rust::CollectionDecl> {
-        self.decl.collections.clone()
+        self.resolved_component.decl.collections.clone()
     }
 
     fn get_child(&self, moniker: &ChildName) -> Option<Arc<ComponentInstance>> {
@@ -1799,7 +1795,7 @@ impl ResolvedInstanceInterface for ResolvedInstanceState {
     }
 
     fn context_to_resolve_children(&self) -> Option<ComponentResolutionContext> {
-        self.context_to_resolve_children.clone()
+        self.resolved_component.context_to_resolve_children.clone()
     }
 }
 
@@ -3387,13 +3383,18 @@ pub mod tests {
     async fn new_resolved() -> InstanceState {
         let comp = new_component().await;
         let decl = ComponentDeclBuilder::new().build();
+        let resolved_component = Component {
+            resolved_url: "".to_string(),
+            context_to_resolve_children: None,
+            decl,
+            package: None,
+            config: None,
+            abi_revision: None,
+        };
         let ris = ResolvedInstanceState::new(
             &comp,
-            decl,
-            None,
-            None,
+            resolved_component,
             ComponentAddress::from(&comp.component_url, &comp).await.unwrap(),
-            None,
             ComponentSandboxes::default(),
         )
         .await
@@ -3511,6 +3512,7 @@ pub mod tests {
             .lock_resolved_state()
             .await
             .expect("failed to get resolved state")
+            .resolved_component
             .decl
             .collections
             .iter()
