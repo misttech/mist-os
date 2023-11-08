@@ -115,14 +115,6 @@ impl TryFrom<UncheckedSignal> for Signal {
     }
 }
 
-impl TryFrom<&UncheckedSignal> for Signal {
-    type Error = Errno;
-
-    fn try_from(value: &UncheckedSignal) -> Result<Self, Self::Error> {
-        Self::try_from(*value)
-    }
-}
-
 impl fmt::Display for Signal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if !self.is_real_time() {

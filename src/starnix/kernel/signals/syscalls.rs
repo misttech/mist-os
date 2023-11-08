@@ -270,12 +270,12 @@ pub fn sys_signalfd4(
 
 fn send_unchecked_signal(
     task: &Task,
-    unchecked_signal: &UncheckedSignal,
+    unchecked_signal: UncheckedSignal,
     si_code: i32,
 ) -> Result<(), Errno> {
     // 0 is a sentinel value used to do permission checks.
     let sentinel_signal = UncheckedSignal::from(0);
-    if *unchecked_signal == sentinel_signal {
+    if unchecked_signal == sentinel_signal {
         return Ok(());
     }
 
@@ -288,12 +288,12 @@ fn send_unchecked_signal(
 
 fn send_unchecked_signal_info(
     task: &Task,
-    unchecked_signal: &UncheckedSignal,
+    unchecked_signal: UncheckedSignal,
     info: SignalInfo,
 ) -> Result<(), Errno> {
     // 0 is a sentinel value used to do permission checks.
     let sentinel_signal = UncheckedSignal::from(0);
-    if *unchecked_signal == sentinel_signal {
+    if unchecked_signal == sentinel_signal {
         return Ok(());
     }
 
@@ -330,7 +330,7 @@ pub fn sys_kill(
             };
 
             let target_thread_group_lock = target_thread_group.read();
-            let target = match target_thread_group_lock.get_signal_target(&unchecked_signal) {
+            let target = match target_thread_group_lock.get_signal_target(unchecked_signal) {
                 Some(task) => task,
 
                 // The task is a zombine by now, so the signal can be dropped.
@@ -340,10 +340,10 @@ pub fn sys_kill(
             let target = TempRef::into_static(target);
             std::mem::drop(target_thread_group_lock);
 
-            if !current_task.can_signal(&target, &unchecked_signal) {
+            if !current_task.can_signal(&target, unchecked_signal) {
                 return error!(EPERM);
             }
-            send_unchecked_signal(&target, &unchecked_signal, SI_USER as i32)?;
+            send_unchecked_signal(&target, unchecked_signal, SI_USER as i32)?;
         }
         pid if pid == -1 => {
             // "If pid equals -1, then sig is sent to every process for which
@@ -357,7 +357,7 @@ pub fn sys_kill(
             let thread_groups = pids.get_thread_groups();
             signal_thread_groups(
                 current_task,
-                &unchecked_signal,
+                unchecked_signal,
                 thread_groups.into_iter().filter(|thread_group| {
                     if current_task.thread_group == *thread_group {
                         return false;
@@ -387,7 +387,7 @@ pub fn sys_kill(
                     .flat_map(|pg| pg.read().thread_groups().collect::<Vec<_>>())
                     .collect::<Vec<_>>()
             };
-            signal_thread_groups(current_task, &unchecked_signal, thread_groups.into_iter())?;
+            signal_thread_groups(current_task, unchecked_signal, thread_groups.into_iter())?;
         }
     };
 
@@ -405,10 +405,10 @@ pub fn sys_tkill(
     }
     let weak_target = current_task.get_task(tid);
     let target = Task::from_weak(&weak_target)?;
-    if !current_task.can_signal(&target, &unchecked_signal) {
+    if !current_task.can_signal(&target, unchecked_signal) {
         return error!(EPERM);
     }
-    send_unchecked_signal(&target, &unchecked_signal, SI_TKILL)
+    send_unchecked_signal(&target, unchecked_signal, SI_TKILL)
 }
 
 pub fn sys_tgkill(
@@ -436,11 +436,11 @@ pub fn sys_tgkill(
         return error!(EINVAL);
     }
 
-    if !current_task.can_signal(&target, &unchecked_signal) {
+    if !current_task.can_signal(&target, unchecked_signal) {
         return error!(EPERM);
     }
 
-    send_unchecked_signal(&target, &unchecked_signal, SI_TKILL)
+    send_unchecked_signal(&target, unchecked_signal, SI_TKILL)
 }
 
 pub fn sys_rt_sigreturn(
@@ -494,11 +494,11 @@ pub fn sys_rt_tgsigqueueinfo(
     if target.get_pid() != tgid {
         return error!(EINVAL);
     }
-    if !current_task.can_signal(&target, &unchecked_signal) {
+    if !current_task.can_signal(&target, unchecked_signal) {
         return error!(EPERM);
     }
 
-    send_unchecked_signal_info(&target, &unchecked_signal, signal_info)?;
+    send_unchecked_signal_info(&target, unchecked_signal, signal_info)?;
     Ok(())
 }
 
@@ -531,11 +531,11 @@ pub fn sys_pidfd_send_signal(
         read_siginfo(current_task, signal, siginfo_ref)?
     };
 
-    if !current_task.can_signal(&target, &unchecked_signal) {
+    if !current_task.can_signal(&target, unchecked_signal) {
         return error!(EPERM);
     }
 
-    send_unchecked_signal_info(&target, &unchecked_signal, signal_info)?;
+    send_unchecked_signal_info(&target, unchecked_signal, signal_info)?;
     Ok(())
 }
 
@@ -551,7 +551,7 @@ pub fn sys_pidfd_send_signal(
 /// Returns Ok(()) if at least one signal was sent, otherwise the last error that was encountered.
 fn signal_thread_groups<F>(
     task: &Task,
-    unchecked_signal: &UncheckedSignal,
+    unchecked_signal: UncheckedSignal,
     thread_groups: F,
 ) -> Result<(), Errno>
 where
@@ -1494,7 +1494,7 @@ mod tests {
         let task2 = task1.clone_task_for_test(0, Some(SIGCHLD));
         task2.set_creds(Credentials::with_ids(2, 2));
 
-        assert!(!task1.can_signal(&task2, &SIGINT.into()));
+        assert!(!task1.can_signal(&task2, SIGINT.into()));
         assert_eq!(sys_kill(&mut locked, &task2, task1.id, SIGINT.into()), error!(EPERM));
         assert_eq!(task1.read().signals.queued_count(SIGINT), 0);
     }
@@ -1509,7 +1509,7 @@ mod tests {
         task2.thread_group.setsid().expect("setsid");
         task2.set_creds(Credentials::with_ids(2, 2));
 
-        assert!(!task2.can_signal(&task1, &SIGINT.into()));
+        assert!(!task2.can_signal(&task1, SIGINT.into()));
         assert_eq!(sys_kill(&mut locked, &task2, -task1.id, SIGINT.into()), error!(EPERM));
         assert_eq!(task1.read().signals.queued_count(SIGINT), 0);
     }

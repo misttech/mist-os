@@ -136,7 +136,7 @@ impl IntervalTimer {
                     SignalEventNotify::Signal => self.signal_event.signo.and_then(|signal| {
                         thread_group
                             .read()
-                            .get_signal_target(&signal.into())
+                            .get_signal_target(signal.into())
                             .map(TempRef::into_static)
                     }),
                     SignalEventNotify::None => None, // No need to do anything.

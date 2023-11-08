@@ -1440,7 +1440,7 @@ impl Task {
         self.creds().as_fscred()
     }
 
-    pub fn can_signal(&self, target: &Task, unchecked_signal: &UncheckedSignal) -> bool {
+    pub fn can_signal(&self, target: &Task, unchecked_signal: UncheckedSignal) -> bool {
         // If both the tasks share a thread group the signal can be sent. This is not documented
         // in kill(2) because kill does not support task-level granularity in signal sending.
         if self.thread_group == target.thread_group {
