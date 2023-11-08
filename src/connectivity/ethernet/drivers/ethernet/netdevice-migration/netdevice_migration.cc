@@ -232,18 +232,6 @@ void NetdeviceMigration::NetworkDeviceImplStart(network_device_impl_start_callba
       callback(cookie, ZX_ERR_ALREADY_BOUND);
       return;
     }
-  }
-  // Do not hold the lock across the ethernet_.Start() call because the Netdevice contract ensures
-  // that a subsequent Start() or Stop() call will not occur until after this one has returned via
-  // the callback.
-  if (zx_status_t status = ethernet_.Start(this, &ethernet_ifc_protocol_ops_); status != ZX_OK) {
-    zxlogf(WARNING, "failed to start device: %s", zx_status_get_string(status));
-    callback(cookie, status);
-    return;
-  }
-  {
-    std::lock_guard rx_lock(rx_lock_);
-    std::lock_guard tx_lock(tx_lock_);
     rx_started_ = true;
     tx_started_ = true;
   }
@@ -430,42 +418,55 @@ void NetdeviceMigration::NetworkDeviceImplQueueTx(const tx_buffer_t* buffers_lis
 void NetdeviceMigration::NetworkDeviceImplQueueRxSpace(const rx_space_buffer_t* buffers_list,
                                                        size_t buffers_count)
     __TA_EXCLUDES(rx_lock_) {
-  std::lock_guard rx_lock(rx_lock_);
-  if (size_t total_rx_buffers = rx_spaces_.size() + buffers_count;
-      total_rx_buffers > info_.rx_depth) {
-    // Client has violated API contract: "The total number of outstanding rx buffers given to a
-    // device will never exceed the reported [`DeviceInfo.rx_depth`] value."
-    zxlogf(ERROR, "total received rx buffers %ld > rx_depth %d", total_rx_buffers, info_.rx_depth);
-    DdkAsyncRemove();
-    return;
-  }
-  cpp20::span buffers(buffers_list, buffers_count);
-  if (!rx_started_) {
-    zxlogf(ERROR, "rx buffers queued before start call");
-    for (const rx_space_buffer_t& space : buffers) {
-      rx_buffer_part_t part = {
-          .id = space.id,
-          .length = 0,
-      };
-      rx_buffer_t buf = {
-          .meta = {.frame_type =
-                       static_cast<uint8_t>(fuchsia_hardware_network::FrameType::kEthernet)},
-          .data_list = &part,
-          .data_count = 1,
-      };
-      netdevice_.CompleteRx(&buf, 1);
-    }
-    return;
-  }
-  for (const rx_space_buffer_t& space : buffers) {
-    if (space.region.length < info_.min_rx_buffer_length ||
-        space.region.length > info_.max_buffer_length) {
-      zxlogf(ERROR, "rx buffer queued with length %ld, outside valid range [%du, %du]",
-             space.region.length, info_.min_rx_buffer_length, info_.max_buffer_length);
+  bool rx_space_queued = true;
+  {
+    std::lock_guard rx_lock(rx_lock_);
+    if (size_t total_rx_buffers = rx_spaces_.size() + buffers_count;
+        total_rx_buffers > info_.rx_depth) {
+      // Client has violated API contract: "The total number of outstanding rx buffers given to a
+      // device will never exceed the reported [`DeviceInfo.rx_depth`] value."
+      zxlogf(ERROR, "total received rx buffers %ld > rx_depth %d", total_rx_buffers,
+             info_.rx_depth);
       DdkAsyncRemove();
       return;
     }
-    rx_spaces_.push(space);
+    cpp20::span buffers(buffers_list, buffers_count);
+    if (!rx_started_) {
+      zxlogf(ERROR, "rx buffers queued before start call");
+      for (const rx_space_buffer_t& space : buffers) {
+        rx_buffer_part_t part = {
+            .id = space.id,
+            .length = 0,
+        };
+        rx_buffer_t buf = {
+            .meta = {.frame_type =
+                         static_cast<uint8_t>(fuchsia_hardware_network::FrameType::kEthernet)},
+            .data_list = &part,
+            .data_count = 1,
+        };
+        netdevice_.CompleteRx(&buf, 1);
+      }
+      return;
+    }
+    for (const rx_space_buffer_t& space : buffers) {
+      if (space.region.length < info_.min_rx_buffer_length ||
+          space.region.length > info_.max_buffer_length) {
+        zxlogf(ERROR, "rx buffer queued with length %ld, outside valid range [%du, %du]",
+               space.region.length, info_.min_rx_buffer_length, info_.max_buffer_length);
+        DdkAsyncRemove();
+        return;
+      }
+      rx_spaces_.push(space);
+    }
+    std::swap(rx_space_queued, rx_space_queued_);
+  }
+  if (!rx_space_queued) {
+    // Do not hold the lock across the ethernet_.Start() call because the Netdevice contract ensures
+    // that a subsequent Start() or Stop() call will not occur until after this one has returned via
+    // the callback.
+    if (zx_status_t status = ethernet_.Start(this, &ethernet_ifc_protocol_ops_); status != ZX_OK) {
+      zxlogf(WARNING, "failed to start device: %s", zx_status_get_string(status));
+    }
   }
 }
 

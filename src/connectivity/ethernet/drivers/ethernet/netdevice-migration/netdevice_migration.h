@@ -165,6 +165,7 @@ class NetdeviceMigration
   // Use a queue to enforce FIFO ordering. With LIFO ordering, some buffers will sit unused unless
   // the driver hits buffer starvation, which could obscure bugs related to malformed buffers.
   std::queue<rx_space_buffer_t> rx_spaces_ __TA_GUARDED(rx_lock_);
+  bool rx_space_queued_ __TA_GUARDED(rx_lock_) = false;
 
   network::SharedLock vmo_lock_ __TA_ACQUIRED_BEFORE(tx_lock_) __TA_ACQUIRED_AFTER(rx_lock_);
   NetdeviceMigrationVmoStore vmo_store_ __TA_GUARDED(vmo_lock_);

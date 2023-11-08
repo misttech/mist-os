@@ -154,10 +154,6 @@ class NetdeviceMigrationTest : public ::testing::Test {
   }
 
   void NetdevImplStart(zx_status_t expected) {
-    if (expected != ZX_ERR_ALREADY_BOUND) {
-      EXPECT_CALL(mock_ethernet_impl_, EthernetImplStart(testing::_))
-          .WillOnce(testing::Return(expected));
-    }
     std::optional<zx_status_t> callback_status;
     device_->NetworkDeviceImplStart(
         [](void* ctx, zx_status_t status) {
@@ -226,6 +222,17 @@ class NetdeviceMigrationTest : public ::testing::Test {
     Device().NetworkDeviceImplQueueTx(&buf, 1);
   }
 
+  void QueueRxSpace(const rx_space_buffer_t* buffers, size_t buffers_count) {
+    if (!queued_rx_space_) {
+      // The call to Ethernet.Start is deferred to the first call to QueueRxSpace to ensure there
+      // are receive buffers available as soon as Start is called. After the first call it is not
+      // expected to be called again.
+      EXPECT_CALL(mock_ethernet_impl_, EthernetImplStart(testing::_));
+      queued_rx_space_ = true;
+    }
+    Device().NetworkDeviceImplQueueRxSpace(buffers, buffers_count);
+  }
+
   MockDevice& Parent() { return *parent_; }
   testing::StrictMock<const MockNetworkDeviceIfc>& MockNetworkDevice() {
     return mock_network_device_ifc_;
@@ -239,6 +246,7 @@ class NetdeviceMigrationTest : public ::testing::Test {
   testing::StrictMock<const MockNetworkDeviceIfc> mock_network_device_ifc_;
   testing::StrictMock<const MockEthernetImpl> mock_ethernet_impl_;
   std::unique_ptr<netdevice_migration::NetdeviceMigration> device_;
+  bool queued_rx_space_ = false;
 };
 
 class NetdeviceMigrationDefaultSetupTest : public NetdeviceMigrationTest {
@@ -336,10 +344,6 @@ TEST_F(NetdeviceMigrationDefaultSetupTest, NetworkDeviceImplStartStop) {
     // Step calls ImplStart if set, ImplStop otherwise.
     std::optional<zx_status_t> start_status;
   } kTestSteps[] = {
-      {
-          .name = "failed start",
-          .start_status = ZX_ERR_INTERNAL,
-      },
       {
           .name = "successful start",
           .device_started = true,
@@ -509,11 +513,11 @@ TEST_F(NetdeviceMigrationDefaultSetupTest, NetworkDeviceImplQueueRxSpace) {
   // An unstarted netdevice will immediately return queued buffers.
   EXPECT_CALL(MockNetworkDevice(), NetworkDeviceIfcCompleteRx(testing::_, 1))
       .Times(std::size(spaces));
-  Device().NetworkDeviceImplQueueRxSpace(spaces, std::size(spaces));
+  QueueRxSpace(spaces, std::size(spaces));
   ASSERT_NO_FATAL_FAILURE(NetdevImplStart(ZX_OK));
   netdevice_migration::NetdeviceMigrationTestHelper helper(Device());
   helper.WithRxSpaces<void>([](auto& rx_spaces) { EXPECT_TRUE(rx_spaces.empty()); });
-  Device().NetworkDeviceImplQueueRxSpace(spaces, std::size(spaces));
+  QueueRxSpace(spaces, std::size(spaces));
   helper.WithRxSpaces<void>([&spaces](auto& rx_spaces) {
     ASSERT_EQ(rx_spaces.size(), std::size(spaces));
     for (const rx_space_buffer_t& space : spaces) {
@@ -577,7 +581,7 @@ TEST_F(NetdeviceMigrationDefaultSetupTest, EthernetIfcRecv) {
               },
       },
   };
-  Device().NetworkDeviceImplQueueRxSpace(spaces, std::size(spaces));
+  QueueRxSpace(spaces, std::size(spaces));
   constexpr uint8_t rcvd[] = {0, 1, 2, 3, 4, 5, 6, 7};
   EXPECT_CALL(
       MockNetworkDevice(),
@@ -638,7 +642,7 @@ TEST_P(RecvFailedPreconditionTest, RemovesDriver) {
               },
       },
   };
-  Device().NetworkDeviceImplQueueRxSpace(spaces, std::size(spaces));
+  QueueRxSpace(spaces, std::size(spaces));
   uint8_t bytes[input.buf_len];
   auto* device = TakeDevice();
   ASSERT_OK(device->DeviceAdd());
@@ -1002,7 +1006,7 @@ TEST_F(NetdeviceMigrationDefaultSetupTest, ReturnsRxBuffersOnStop) {
   ASSERT_NO_FATAL_FAILURE(NetdevImplStart(ZX_OK));
   netdevice_migration::NetdeviceMigrationTestHelper helper(Device());
   helper.WithRxSpaces<void>([](auto& rx_spaces) { EXPECT_TRUE(rx_spaces.empty()); });
-  Device().NetworkDeviceImplQueueRxSpace(spaces, std::size(spaces));
+  QueueRxSpace(spaces, std::size(spaces));
   helper.WithRxSpaces<void>([&spaces, &kBufId](auto& rx_spaces) {
     ASSERT_EQ(rx_spaces.size(), std::size(spaces));
     EXPECT_EQ(rx_spaces.front().id, kBufId);
