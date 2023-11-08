@@ -158,7 +158,7 @@ async fn do_resolve(component: &Arc<ComponentInstance>) -> Result<Component, Res
 pub mod tests {
     use {
         crate::model::{
-            actions::test_utils::{is_executing, is_resolved, is_stopped},
+            actions::test_utils::{is_resolved, is_stopped},
             actions::{ActionSet, ResolveAction, ShutdownAction, StartAction, StopAction},
             component::StartReason,
             error::ResolveActionError,
@@ -186,7 +186,7 @@ pub mod tests {
         let test = ActionsTest::new("root", components, None).await;
         let component_root = test.look_up(Moniker::root()).await;
         let component_a = test.start(vec!["a"].try_into().unwrap()).await;
-        assert!(is_executing(&component_a).await);
+        assert!(component_a.is_started().await);
         assert!(is_resolved(&component_root).await);
         assert!(is_resolved(&component_a).await);
 

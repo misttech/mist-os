@@ -467,10 +467,6 @@ pub(crate) mod test_utils {
         routing::component_instance::ComponentInstanceInterface,
     };
 
-    pub async fn is_executing(component: &ComponentInstance) -> bool {
-        component.lock_execution().await.runtime.is_some()
-    }
-
     /// Verifies that a child component is deleted by checking its InstanceState and verifying that
     /// it does not exist in the InstanceState of its parent. Assumes the parent is not destroyed
     /// yet.
@@ -503,10 +499,7 @@ pub(crate) mod test_utils {
     pub async fn is_stopped(component: &ComponentInstance, moniker: &ChildName) -> bool {
         match *component.lock_state().await {
             InstanceState::Resolved(ref s) => match s.get_child(moniker) {
-                Some(child) => {
-                    let child_execution = child.lock_execution().await;
-                    child_execution.runtime.is_none()
-                }
+                Some(child) => !child.is_started().await,
                 None => false,
             },
             InstanceState::Destroyed => false,

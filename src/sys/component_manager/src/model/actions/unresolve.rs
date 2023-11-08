@@ -97,7 +97,7 @@ async fn do_unresolve(component: &Arc<ComponentInstance>) -> Result<(), Unresolv
 pub mod tests {
     use {
         crate::model::{
-            actions::test_utils::{is_destroyed, is_discovered, is_executing, is_resolved},
+            actions::test_utils::{is_destroyed, is_discovered, is_resolved},
             actions::{ActionSet, ShutdownAction, UnresolveAction},
             component::{ComponentInstance, StartReason},
             error::UnresolveActionError,
@@ -323,11 +323,11 @@ pub mod tests {
             .start_instance(&component_b.moniker, &StartReason::Eager)
             .await
             .expect("could not start coll:b");
-        assert!(is_executing(&component_container).await);
+        assert!(component_container.is_started().await);
         assert!(is_resolved(&component_a).await);
         assert!(is_resolved(&component_b).await);
-        assert!(is_executing(&component_a).await);
-        assert!(is_executing(&component_b).await);
+        assert!(component_a.is_started().await);
+        assert!(component_b.is_started().await);
         (test, component_container, component_a, component_b)
     }
 

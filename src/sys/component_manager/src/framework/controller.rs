@@ -35,12 +35,10 @@ pub async fn serve_controller(
                     responder.send(Err(fcomponent::Error::InstanceNotFound))?;
                     continue;
                 };
-                let execution = component.lock_execution().await;
-                if execution.runtime.is_some() {
+                if component.is_started().await {
                     responder.send(Err(fcomponent::Error::InstanceAlreadyStarted))?;
                     continue;
                 }
-                drop(execution);
                 let execution_controller_stream = execution_controller.into_stream()?;
                 let control_handle = execution_controller_stream.control_handle();
                 let execution_controller = ExecutionControllerTask {
@@ -80,7 +78,7 @@ pub async fn serve_controller(
                     continue;
                 }
                 let component = component.unwrap();
-                responder.send(Ok(component.lock_execution().await.runtime.is_some()))?;
+                responder.send(Ok(component.is_started().await))?;
             }
             fcomponent::ControllerRequest::GetExposedDict { dict, control_handle: _ } => {
                 // TODO(fxbug.dev/303719641): This is a stub. Actually implement

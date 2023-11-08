@@ -441,16 +441,19 @@ impl ComponentInstance {
     }
 
     /// Locks and returns the instance's mutable state.
+    // TODO(b/309656051): Remove this method from ComponentInstance's public API
     pub async fn lock_state(&self) -> MutexGuard<'_, InstanceState> {
         self.state.lock().await
     }
 
     /// Locks and returns the instance's execution state.
+    // TODO(b/309656051): Remove this method from ComponentInstance's public API
     pub async fn lock_execution(&self) -> MutexGuard<'_, ExecutionState> {
         self.execution.lock().await
     }
 
     /// Locks and returns the instance's action set.
+    // TODO(b/309656051): Remove this method from ComponentInstance's public API
     pub async fn lock_actions(&self) -> MutexGuard<'_, ActionSet> {
         self.actions.lock().await
     }
@@ -467,10 +470,16 @@ impl ComponentInstance {
         self.blocking_task_group.clone()
     }
 
+    /// Returns true if the component is started, i.e. when it has a runtime.
+    pub async fn is_started(&self) -> bool {
+        self.lock_execution().await.is_started()
+    }
+
     /// Locks and returns a lazily resolved and populated `ResolvedInstanceState`. Does not
     /// register a `Resolve` action unless the resolved state is not already populated, so this
     /// function can be called re-entrantly from a Resolved hook. Returns an `InstanceNotFound`
     /// error if the instance is destroyed.
+    // TODO(b/309656051): Remove this method from ComponentInstance's public API
     pub async fn lock_resolved_state<'a>(
         self: &'a Arc<Self>,
     ) -> Result<MappedMutexGuard<'a, InstanceState, ResolvedInstanceState>, ResolveActionError>
@@ -1191,6 +1200,11 @@ impl ExecutionState {
     /// Creates a new ExecutionState.
     pub fn new() -> Self {
         Self { shut_down: false, runtime: None }
+    }
+
+    /// Returns whether the component is started, i.e. if it has a runtime.
+    pub fn is_started(&self) -> bool {
+        self.runtime.is_some()
     }
 
     /// Returns whether the instance has shut down.
@@ -2780,9 +2794,8 @@ pub mod tests {
             .wait_for_urls(&["test:///root_resolved", "test:///a_resolved", "test:///b_resolved"])
             .await;
 
-        // Check that the eagerly-started 'b' has a runtime, which indicates
-        // it is running.
-        assert!(component_b.lock_execution().await.runtime.is_some());
+        // Check that the eager 'b' has started.
+        assert!(component_b.is_started().await);
 
         let b_info = ComponentInfo::new(component_b.clone()).await;
         b_info.check_not_shut_down(&test.runner).await;
@@ -3745,10 +3758,7 @@ pub mod tests {
         .await
         .expect("failed to start child");
 
-        {
-            let execution = child.lock_execution().await;
-            assert!(execution.runtime.is_some());
-        }
+        assert!(child.is_started().await);
 
         // Log a message using the child's scoped logger.
         child.with_logger_as_default(|| info!("hello world")).await;

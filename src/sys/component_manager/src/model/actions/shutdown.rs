@@ -802,10 +802,7 @@ mod tests {
     use {
         super::*,
         crate::model::{
-            actions::{
-                test_utils::{is_executing, is_unresolved},
-                StopAction,
-            },
+            actions::{test_utils::is_unresolved, StopAction},
             component::StartReason,
             testing::{
                 test_helpers::{
@@ -2833,7 +2830,7 @@ mod tests {
             .start_instance(&component.moniker, &StartReason::Eager)
             .await
             .expect("could not start a");
-        assert!(is_executing(&component).await);
+        assert!(component.is_started().await);
         let a_info = ComponentInfo::new(component.clone()).await;
 
         // Register shutdown action, and wait for it. Component should shut down (no more
@@ -2899,10 +2896,10 @@ mod tests {
             .start_instance(&component_c.moniker, &StartReason::Eager)
             .await
             .expect("could not start c");
-        assert!(is_executing(&component_container).await);
-        assert!(is_executing(&component_a).await);
-        assert!(is_executing(&component_b).await);
-        assert!(is_executing(&component_c).await);
+        assert!(component_container.is_started().await);
+        assert!(component_a.is_started().await);
+        assert!(component_b.is_started().await);
+        assert!(component_c.is_started().await);
         assert!(has_child(&component_container, "coll:a").await);
         assert!(has_child(&component_container, "coll:b").await);
 
@@ -3029,10 +3026,10 @@ mod tests {
             .start_instance(&component_c.moniker, &StartReason::Eager)
             .await
             .expect("could not start c");
-        assert!(is_executing(&component_container).await);
-        assert!(is_executing(&component_a).await);
-        assert!(is_executing(&component_b).await);
-        assert!(is_executing(&component_c).await);
+        assert!(component_container.is_started().await);
+        assert!(component_a.is_started().await);
+        assert!(component_b.is_started().await);
+        assert!(component_c.is_started().await);
         assert!(has_child(&component_container, "coll:a").await);
         assert!(has_child(&component_container, "coll:b").await);
 
@@ -3099,8 +3096,8 @@ mod tests {
         let test = ActionsTest::new("root", components, None).await;
         let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
         let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
-        assert!(!is_executing(&component_a).await);
-        assert!(!is_executing(&component_b).await);
+        assert!(!component_a.is_started().await);
+        assert!(!component_b.is_started().await);
 
         // Register shutdown action on "a", and wait for it.
         ActionSet::register(component_a.clone(), ShutdownAction::new())
@@ -3144,7 +3141,7 @@ mod tests {
             .start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start a");
-        assert!(is_executing(&component_a).await);
+        assert!(component_a.is_started().await);
 
         // Register shutdown action on "a", and wait for it.
         ActionSet::register(component_a.clone(), ShutdownAction::new())
@@ -3206,10 +3203,10 @@ mod tests {
             .start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start a");
-        assert!(is_executing(&component_a).await);
-        assert!(is_executing(&component_b).await);
-        assert!(is_executing(&component_c).await);
-        assert!(is_executing(&component_d).await);
+        assert!(component_a.is_started().await);
+        assert!(component_b.is_started().await);
+        assert!(component_c.is_started().await);
+        assert!(component_d.is_started().await);
 
         let component_a_info = ComponentInfo::new(component_a).await;
         let component_b_info = ComponentInfo::new(component_b).await;
@@ -3346,11 +3343,11 @@ mod tests {
             .start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start a");
-        assert!(is_executing(&component_a).await);
-        assert!(is_executing(&component_b).await);
-        assert!(is_executing(&component_c).await);
-        assert!(is_executing(&component_d).await);
-        assert!(is_executing(&component_e).await);
+        assert!(component_a.is_started().await);
+        assert!(component_b.is_started().await);
+        assert!(component_c.is_started().await);
+        assert!(component_d.is_started().await);
+        assert!(component_e.is_started().await);
 
         let component_a_info = ComponentInfo::new(component_a).await;
         let component_b_info = ComponentInfo::new(component_b).await;
@@ -3541,12 +3538,12 @@ mod tests {
             .start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start a");
-        assert!(is_executing(&component_a).await);
-        assert!(is_executing(&component_b).await);
-        assert!(is_executing(&component_c).await);
-        assert!(is_executing(&component_d).await);
-        assert!(is_executing(&component_e).await);
-        assert!(is_executing(&component_f).await);
+        assert!(component_a.is_started().await);
+        assert!(component_b.is_started().await);
+        assert!(component_c.is_started().await);
+        assert!(component_d.is_started().await);
+        assert!(component_e.is_started().await);
+        assert!(component_f.is_started().await);
 
         let component_a_info = ComponentInfo::new(component_a).await;
         let component_b_info = ComponentInfo::new(component_b).await;
@@ -3775,12 +3772,12 @@ mod tests {
             .start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start a");
-        assert!(is_executing(&component_a).await);
-        assert!(is_executing(&component_b).await);
-        assert!(is_executing(&component_c).await);
-        assert!(is_executing(&component_d).await);
-        assert!(is_executing(&component_e).await);
-        assert!(is_executing(&component_f).await);
+        assert!(component_a.is_started().await);
+        assert!(component_b.is_started().await);
+        assert!(component_c.is_started().await);
+        assert!(component_d.is_started().await);
+        assert!(component_e.is_started().await);
+        assert!(component_f.is_started().await);
 
         let component_a_info = ComponentInfo::new(component_a).await;
         let component_b_info = ComponentInfo::new(component_b).await;
@@ -4363,9 +4360,9 @@ mod tests {
             .start_instance(&component_b2.moniker, &StartReason::Eager)
             .await
             .expect("could not start b2");
-        assert!(is_executing(&component_a).await);
-        assert!(is_executing(&component_b).await);
-        assert!(is_executing(&component_b2).await);
+        assert!(component_a.is_started().await);
+        assert!(component_b.is_started().await);
+        assert!(component_b2.is_started().await);
 
         let component_a_info = ComponentInfo::new(component_a).await;
         let component_b_info = ComponentInfo::new(component_b).await;
@@ -4428,10 +4425,10 @@ mod tests {
             .start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start a");
-        assert!(is_executing(&component_a).await);
-        assert!(is_executing(&component_b).await);
-        assert!(is_executing(&component_c).await);
-        assert!(is_executing(&component_d).await);
+        assert!(component_a.is_started().await);
+        assert!(component_b.is_started().await);
+        assert!(component_c.is_started().await);
+        assert!(component_d.is_started().await);
 
         let component_a_info = ComponentInfo::new(component_a).await;
         let component_b_info = ComponentInfo::new(component_b).await;

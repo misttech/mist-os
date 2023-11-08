@@ -129,7 +129,7 @@ pub mod tests {
         super::*,
         crate::model::{
             actions::{
-                test_utils::{is_child_deleted, is_destroyed, is_executing},
+                test_utils::{is_child_deleted, is_destroyed},
                 ActionNotifier, ShutdownAction,
             },
             component::{Component, StartReason},
@@ -169,7 +169,7 @@ pub mod tests {
             .start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start a");
-        assert!(is_executing(&component_a).await);
+        assert!(component_a.is_started().await);
 
         // Register shutdown first because DestroyChild requires the component to be shut down.
         ActionSet::register(component_a.clone(), ShutdownAction::new())
@@ -250,9 +250,9 @@ pub mod tests {
             .start_instance(&component_b.moniker, &StartReason::Eager)
             .await
             .expect("could not start coll:b");
-        assert!(is_executing(&component_container).await);
-        assert!(is_executing(&component_a).await);
-        assert!(is_executing(&component_b).await);
+        assert!(component_container.is_started().await);
+        assert!(component_a.is_started().await);
+        assert!(component_b.is_started().await);
 
         // Register destroy child action, and wait for it. Components should be destroyed.
         let component_container = test.look_up(vec!["container"].try_into().unwrap()).await;
@@ -660,7 +660,7 @@ pub mod tests {
             .start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start a");
-        assert!(is_executing(&component_a).await);
+        assert!(component_a.is_started().await);
         // Get component_b without resolving it.
         let component_b = match *component_a.lock_state().await {
             InstanceState::Resolved(ref s) => {
@@ -739,11 +739,11 @@ pub mod tests {
             .start_instance(&component_x.moniker, &StartReason::Eager)
             .await
             .expect("could not start x");
-        assert!(is_executing(&component_a).await);
-        assert!(is_executing(&component_b).await);
-        assert!(is_executing(&component_c).await);
-        assert!(is_executing(&component_d).await);
-        assert!(is_executing(&component_x).await);
+        assert!(component_a.is_started().await);
+        assert!(component_b.is_started().await);
+        assert!(component_c.is_started().await);
+        assert!(component_d.is_started().await);
+        assert!(component_x.is_started().await);
 
         // Register destroy action on "a", and wait for it. This should cause all components
         // in "a"'s component to be shut down and destroyed, in bottom-up order, but "x" is still
@@ -762,7 +762,7 @@ pub mod tests {
         assert!(is_destroyed(&component_b).await);
         assert!(is_destroyed(&component_c).await);
         assert!(is_destroyed(&component_d).await);
-        assert!(is_executing(&component_x).await);
+        assert!(component_x.is_started().await);
         {
             // Expect only "x" as child of root.
             let state = component_root.lock_state().await;
@@ -860,9 +860,9 @@ pub mod tests {
             .start_instance(&component_b2.moniker, &StartReason::Eager)
             .await
             .expect("could not start b2");
-        assert!(is_executing(&component_a).await);
-        assert!(is_executing(&component_b).await);
-        assert!(is_executing(&component_b2).await);
+        assert!(component_a.is_started().await);
+        assert!(component_b.is_started().await);
+        assert!(component_b2.is_started().await);
 
         // Register destroy action on "a", and wait for it. This should cause all components
         // that were started to be destroyed, in bottom-up order.
@@ -944,10 +944,10 @@ pub mod tests {
             .start_instance(&component_a.moniker, &StartReason::Eager)
             .await
             .expect("could not start a");
-        assert!(is_executing(&component_a).await);
-        assert!(is_executing(&component_b).await);
-        assert!(is_executing(&component_c).await);
-        assert!(is_executing(&component_d).await);
+        assert!(component_a.is_started().await);
+        assert!(component_b.is_started().await);
+        assert!(component_c.is_started().await);
+        assert!(component_d.is_started().await);
 
         // Mock a failure to delete "d".
         {
