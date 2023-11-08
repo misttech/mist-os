@@ -159,6 +159,27 @@
         "type": "uint32"
     },
     {
+        "kind": "enum/member",
+        "name": "fuchsia.accessibility.semantics/EnabledState.DISABLED",
+        "value": "2"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.accessibility.semantics/EnabledState.ENABLED",
+        "value": "1"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.accessibility.semantics/EnabledState.INDETERMINATE",
+        "value": "3"
+    },
+    {
+        "kind": "enum",
+        "name": "fuchsia.accessibility.semantics/EnabledState",
+        "strictness": "strict",
+        "type": "uint32"
+    },
+    {
         "kind": "table/member",
         "name": "fuchsia.accessibility.semantics/Hit.node_id",
         "ordinal": "1",
@@ -715,6 +736,12 @@
         "name": "fuchsia.accessibility.semantics/States.checked_state",
         "ordinal": "2",
         "type": "fuchsia.accessibility.semantics/CheckedState"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.accessibility.semantics/States.enabled_state",
+        "ordinal": "11",
+        "type": "fuchsia.accessibility.semantics/EnabledState"
     },
     {
         "kind": "table/member",
