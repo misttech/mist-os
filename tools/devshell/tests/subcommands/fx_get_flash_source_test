@@ -36,7 +36,9 @@ BT_SET_UP() {
   # Set up mock build API modules.
   cat > "${BT_TEMP_DIR}/out/default/args.json" <<EOF
 {
-  "use_bazel_images_only": false
+  "use_bazel_images_only": false,
+  "build_info_product": "core",
+  "build_info_board": "x64"
 }
 EOF
 
@@ -60,6 +62,15 @@ EOF
     "product_version": "12.99991231.0.1",
     "transfer_manifest_path": "obj/build/images/fuchsia/transfer.json",
     "transfer_manifest_url": "file://obj/build/images/fuchsia/transfer.json"
+  },
+  {
+    "json": "kernel.phys32/obj/zircon/kernel/phys/test/qemu-hello-world-test.linuxboot.product_bundle/product_bundle.json",
+    "label": "//zircon/kernel/phys/test:qemu-hello-world-test.linuxboot.product_bundle(//zircon/kernel/arch/x86/phys:kernel.phys32)",
+    "name": "qemu-hello-world-test.linuxboot",
+    "path": "kernel.phys32/obj/zircon/kernel/phys/test/qemu-hello-world-test.linuxboot.product_bundle",
+    "product_version": "16.99991231.0.1",
+    "transfer_manifest_path": "kernel.phys32/obj/zircon/kernel/phys/test/qemu-hello-world-test.linuxboot.transfer.json",
+    "transfer_manifest_url": "file://kernel.phys32/obj/zircon/kernel/phys/test/qemu-hello-world-test.linuxboot.transfer.json"
   }
 ]
 EOF
@@ -115,7 +126,9 @@ EOF
 TEST_fx-get-flash-source-product-bundle() {
   cat > "${BT_TEMP_DIR}/out/default/args.json" <<EOF
 {
-  "use_bazel_images_only": true
+  "use_bazel_images_only": true,
+  "build_info_product": "core",
+  "build_info_board": "x64"
 }
 EOF
 
@@ -130,7 +143,9 @@ echo "Fake build output for testing - should be ignored"
 INPUT
   cat > "${BT_TEMP_DIR}/out/default/args.json" <<EOF
 {
-  "use_bazel_images_only": true
+  "use_bazel_images_only": true,
+  "build_info_product": "core",
+  "build_info_board": "x64"
 }
 EOF
   BT_EXPECT_EQ "$(${fx} get-flash-source --build)" "product-bundle:obj/build/images/fuchsia/product_bundle"

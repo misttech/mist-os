@@ -75,13 +75,16 @@ function _build_gn_label {
 
 use_bazel_images_only="$(_query_manifest "${ARGS_JSON}" .use_bazel_images_only)"
 if [[ "${use_bazel_images_only}" == "true" ]]; then
-    product_bundle="$(_query_manifest "${PRODUCT_BUNDLES_JSON}" '.[] | .path')"
+    product="$(_query_manifest "${ARGS_JSON}" .build_info_product)"
+    board="$(_query_manifest "${ARGS_JSON}" .build_info_board)"
+    product_bundle_name="${product}.${board}"
+    product_bundle="$(_query_manifest "${PRODUCT_BUNDLES_JSON}" '.[] | select(.name == "'${product_bundle_name}'") | .path')"
     if [[ -z "${product_bundle}" ]]; then
       fx-error "Failed to find a product bundle"
       exit 1
     fi
     if $build ; then
-      product_bundle_label="$(_query_manifest "${PRODUCT_BUNDLES_JSON}" '.[] | .label')"
+      product_bundle_label="$(_query_manifest "${PRODUCT_BUNDLES_JSON}" '.[] | select(.name == "'${product_bundle_name}'")| .label')"
       _build_gn_label "${product_bundle_label}"
     fi
     echo "product-bundle:${product_bundle}"
