@@ -2,17 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use include_bytes_from_working_dir::include_bytes_from_working_dir_env;
+use include_str_from_working_dir::include_str_from_working_dir_env;
+use std::convert::TryFrom;
 use vbmeta::Key;
 use vbmeta::VBMeta;
 use vbmeta::{HashDescriptor, Salt};
 
-use std::convert::TryFrom;
-
-const PEM: &str = include_str!(env!("AVB_KEY"));
-const METADATA: &[u8] = include_bytes!(env!("AVB_METADATA"));
+const PEM: &str = include_str_from_working_dir_env!("AVB_KEY");
+const METADATA: &[u8] = include_bytes_from_working_dir_env!("AVB_METADATA");
 const SALT: &str = env!("SALT");
-const IMAGE: &[u8] = include_bytes!(env!("IMAGE"));
-const EXPECTED_VBMETA: &[u8] = include_bytes!(env!("EXPECTED_VBMETA"));
+const IMAGE: &[u8] = include_bytes_from_working_dir_env!("IMAGE");
+const EXPECTED_VBMETA: &[u8] = include_bytes_from_working_dir_env!("EXPECTED_VBMETA");
 
 #[test]
 fn avbtool_comparison() {

@@ -106,17 +106,13 @@ action("expected_vbmeta") {
   ]
 }
 
-# Rust tooling needs the files passed through ENV to be relative to the
-# directory of the test source file.
-source_dir = "//" + rebase_path("tests", "//")
-avb_key_path = rebase_path(test_avb_key, source_dir)
-avb_metadata_path = rebase_path(test_avb_atx_metadata, source_dir)
-test_image_path = rebase_path(test_image, source_dir)
+avb_key_path = rebase_path(test_avb_key, root_build_dir)
+avb_metadata_path = rebase_path(test_avb_atx_metadata, root_build_dir)
+test_image_path = rebase_path(test_image, root_build_dir)
 
 avb_outputs = get_target_outputs(":expected_vbmeta")
-expected_vbmeta_path = avb_outputs[0]
-expected_vbmeta_path_source_relative =
-    rebase_path(expected_vbmeta_path, source_dir)
+expected_vbmeta = avb_outputs[0]
+expected_vbmeta_path = rebase_path(expected_vbmeta, root_build_dir)
 
 rustc_test("integration_test") {
   edition = "2021"
@@ -124,6 +120,8 @@ rustc_test("integration_test") {
   sources = [ "tests/integration_test.rs" ]
   deps = [
     ":vbmeta",
+    "//src/lib/include_bytes_from_working_dir",
+    "//src/lib/include_str_from_working_dir",
     "//third_party/rust_crates:hex",
   ]
 
@@ -135,19 +133,16 @@ rustc_test("integration_test") {
   rustenv = [
     "AVB_KEY=$avb_key_path",
     "AVB_METADATA=$avb_metadata_path",
-    "EXPECTED_VBMETA=$expected_vbmeta_path_source_relative",
+    "EXPECTED_VBMETA=$expected_vbmeta_path",
     "SALT=" + salt,
     "IMAGE=$test_image_path",
   ]
 
-  # TODO(fxbug.dev/92670): source file references output-dir in env var,
-  # so the remote build won't work with a renamed output-dir.
-  configs += [ "//build/config/rust:output_dir_sensitive" ]
   inputs = [
     test_avb_key,
     test_avb_atx_metadata,
     test_image,
-    expected_vbmeta_path,
+    expected_vbmeta,
   ]
 }
 
