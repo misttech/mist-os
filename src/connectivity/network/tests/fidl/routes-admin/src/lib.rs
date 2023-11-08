@@ -42,7 +42,13 @@ struct TestSetup<'a, I: Ip + FidlRouteIpExt + FidlRouteAdminIpExt> {
     network: netemul::TestNetwork<'a>,
     interface: netemul::TestInterface<'a>,
     set_provider: <I::SetProviderMarker as ProtocolMarker>::Proxy,
+    global_set_provider: <I::GlobalSetProviderMarker as ProtocolMarker>::Proxy,
     state: <I::StateMarker as ProtocolMarker>::Proxy,
+}
+
+enum SystemRouteProtocol {
+    NetRootRoutes,
+    NetStack,
 }
 
 impl<'a, I: Ip + FidlRouteIpExt + FidlRouteAdminIpExt> TestSetup<'a, I> {
@@ -56,8 +62,12 @@ impl<'a, I: Ip + FidlRouteIpExt + FidlRouteAdminIpExt> TestSetup<'a, I> {
         let set_provider = realm
             .connect_to_protocol::<I::SetProviderMarker>()
             .expect("connect to routes-admin SetProvider");
+        let global_set_provider = realm
+            .connect_to_protocol::<I::GlobalSetProviderMarker>()
+            .expect("connect to global route set provider");
+
         let state = realm.connect_to_protocol::<I::StateMarker>().expect("connect to routes State");
-        TestSetup { realm, network, interface, set_provider, state }
+        TestSetup { realm, network, interface, set_provider, global_set_provider, state }
     }
 }
 
@@ -89,10 +99,13 @@ fn test_route<I: Ip>(
 }
 
 #[netstack_test]
-#[test_case(true, METRIC_TRACKS_INTERFACE; "explicitly removing the route")]
-#[test_case(false, METRIC_TRACKS_INTERFACE; "dropping the route set")]
-#[test_case(true, fnet_routes::SpecifiedMetric::ExplicitMetric(0); "explicit zero metric")]
-#[test_case(true, fnet_routes::SpecifiedMetric::ExplicitMetric(12345); "explicit non-zero metric")]
+#[test_case(true, METRIC_TRACKS_INTERFACE, false; "explicitly removing the route")]
+#[test_case(true, METRIC_TRACKS_INTERFACE, true; "explicitly removing the route, global")]
+#[test_case(false, METRIC_TRACKS_INTERFACE, false; "dropping the route set")]
+#[test_case(true, fnet_routes::SpecifiedMetric::ExplicitMetric(0), false; "explicit zero metric")]
+#[test_case(true, fnet_routes::SpecifiedMetric::ExplicitMetric(0), true; "explicit zero metric, global")]
+#[test_case(true, fnet_routes::SpecifiedMetric::ExplicitMetric(12345), false; "explicit non-zero metric")]
+#[test_case(true, fnet_routes::SpecifiedMetric::ExplicitMetric(12345), true; "explicit non-zero metric, global")]
 async fn add_remove_route<
     I: net_types::ip::Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
     N: Netstack,
@@ -100,10 +113,17 @@ async fn add_remove_route<
     name: &str,
     explicit_remove: bool,
     metric: fnet_routes::SpecifiedMetric,
+    global: bool,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
-    let TestSetup { realm: _realm, network: _network, interface, set_provider, state } =
-        TestSetup::<I>::new::<N>(&sandbox, name).await;
+    let TestSetup {
+        realm: _realm,
+        network: _network,
+        interface,
+        set_provider,
+        global_set_provider,
+        state,
+    } = TestSetup::<I>::new::<N>(&sandbox, name).await;
 
     let routes_stream =
         fnet_routes_ext::event_stream_from_state::<I>(&state).expect("should succeed");
@@ -116,7 +136,12 @@ async fn add_remove_route<
 
     println!("initial routes = {routes:?}");
 
-    let proxy = fnet_routes_ext::admin::new_route_set::<I>(&set_provider).expect("new route set");
+    let proxy = if global {
+        fnet_routes_ext::admin::new_global_route_set::<I>(&global_set_provider)
+            .expect("new global route set")
+    } else {
+        fnet_routes_ext::admin::new_route_set::<I>(&set_provider).expect("new route set")
+    };
 
     let route_to_add = test_route(&interface, metric);
 
@@ -263,8 +288,14 @@ async fn validates_route_v4<N: Netstack>(
     specified_properties: Option<fnet_routes::SpecifiedRouteProperties>,
 ) -> Result<(), fnet_routes_admin::RouteSetError> {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
-    let TestSetup { realm: _realm, network: _network, interface, set_provider, state: _ } =
-        TestSetup::<Ipv4>::new::<N>(&sandbox, name).await;
+    let TestSetup {
+        realm: _realm,
+        network: _network,
+        interface,
+        set_provider,
+        global_set_provider: _,
+        state: _,
+    } = TestSetup::<Ipv4>::new::<N>(&sandbox, name).await;
     let proxy =
         fnet_routes_ext::admin::new_route_set::<Ipv4>(&set_provider).expect("new route set");
     let route = fnet_routes::RouteV4 {
@@ -358,8 +389,14 @@ async fn validates_route_v6<N: Netstack>(
     specified_properties: Option<fnet_routes::SpecifiedRouteProperties>,
 ) -> Result<(), fnet_routes_admin::RouteSetError> {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
-    let TestSetup { realm: _realm, network: _network, interface, set_provider, state: _ } =
-        TestSetup::<Ipv6>::new::<N>(&sandbox, name).await;
+    let TestSetup {
+        realm: _realm,
+        network: _network,
+        interface,
+        set_provider,
+        global_set_provider: _,
+        state: _,
+    } = TestSetup::<Ipv6>::new::<N>(&sandbox, name).await;
     let proxy =
         fnet_routes_ext::admin::new_route_set::<Ipv6>(&set_provider).expect("new route set");
     let route = fnet_routes::RouteV6 {
@@ -379,15 +416,24 @@ async fn validates_route_v6<N: Netstack>(
 }
 
 #[netstack_test]
+#[test_case(SystemRouteProtocol::NetRootRoutes; "fuchsia.net.root/Routes")]
+#[test_case(SystemRouteProtocol::NetStack; "fuchsia.net.stack/Stack")]
 async fn add_route_twice_with_same_set<
     I: net_types::ip::Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
     N: Netstack,
 >(
     name: &str,
+    system_route_protocol: SystemRouteProtocol,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
-    let TestSetup { realm: _realm, network: _network, interface, set_provider, state } =
-        TestSetup::<I>::new::<N>(&sandbox, name).await;
+    let TestSetup {
+        realm: _realm,
+        network: _network,
+        interface,
+        set_provider,
+        global_set_provider,
+        state,
+    } = TestSetup::<I>::new::<N>(&sandbox, name).await;
 
     let routes_stream =
         fnet_routes_ext::event_stream_from_state::<I>(&state).expect("should succeed");
@@ -398,7 +444,15 @@ async fn add_route_twice_with_same_set<
             .await
             .expect("collect routes should succeed");
 
-    let proxy = fnet_routes_ext::admin::new_route_set::<I>(&set_provider).expect("new route set");
+    let proxy = match system_route_protocol {
+        SystemRouteProtocol::NetRootRoutes => {
+            fnet_routes_ext::admin::new_global_route_set::<I>(&global_set_provider)
+                .expect("new global route set")
+        }
+        SystemRouteProtocol::NetStack => {
+            fnet_routes_ext::admin::new_route_set::<I>(&set_provider).expect("new route set")
+        }
+    };
 
     let route_to_add = test_route(&interface, METRIC_TRACKS_INTERFACE);
 
@@ -454,8 +508,14 @@ async fn add_route_with_multiple_route_sets<
     name: &str,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
-    let TestSetup { realm: _realm, network: _network, interface, set_provider, state } =
-        TestSetup::<I>::new::<N>(&sandbox, name).await;
+    let TestSetup {
+        realm: _realm,
+        network: _network,
+        interface,
+        set_provider,
+        global_set_provider: _,
+        state,
+    } = TestSetup::<I>::new::<N>(&sandbox, name).await;
 
     let routes_stream =
         fnet_routes_ext::event_stream_from_state::<I>(&state).expect("should succeed");
@@ -526,14 +586,17 @@ async fn add_route_with_multiple_route_sets<
 }
 
 #[netstack_test]
+#[test_case(SystemRouteProtocol::NetRootRoutes; "fuchsia.net.root/Routes")]
+#[test_case(SystemRouteProtocol::NetStack; "fuchsia.net.stack/Stack")]
 async fn add_remove_system_route<
     I: net_types::ip::Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
     N: Netstack,
 >(
     name: &str,
+    system_route_protocol: SystemRouteProtocol,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
-    let TestSetup { realm, network: _network, interface, set_provider, state } =
+    let TestSetup { realm, network: _network, interface, set_provider, global_set_provider, state } =
         TestSetup::<I>::new::<N>(&sandbox, name).await;
 
     let routes_stream =
@@ -547,18 +610,33 @@ async fn add_remove_system_route<
 
     let route_set =
         fnet_routes_ext::admin::new_route_set::<I>(&set_provider).expect("new route set");
-    let fuchsia_net_stack = realm
-        .connect_to_protocol::<fnet_stack::StackMarker>()
-        .expect("connect to fuchsia.net.stack.Stack");
-
     let route_to_add = test_route::<I>(&interface, METRIC_TRACKS_INTERFACE);
 
-    // Add a "system route" with fuchsia.net.stack.
-    fuchsia_net_stack
-        .add_forwarding_entry(&route_to_add.try_into().expect("convert to ForwardingEntry"))
-        .await
-        .expect("should not have FIDL error")
-        .expect("should succeed");
+    // Add a "system route".
+    match system_route_protocol {
+        SystemRouteProtocol::NetRootRoutes => {
+            let proxy = fnet_routes_ext::admin::new_global_route_set::<I>(&global_set_provider)
+                .expect("new global route set");
+
+            assert!(fnet_routes_ext::admin::add_route::<I>(
+                &proxy,
+                &route_to_add.try_into().expect("convert to FIDL")
+            )
+            .await
+            .expect("no FIDL error")
+            .expect("add route"));
+        }
+        SystemRouteProtocol::NetStack => {
+            let fuchsia_net_stack = realm
+                .connect_to_protocol::<fnet_stack::StackMarker>()
+                .expect("connect to fuchsia.net.stack.Stack");
+            fuchsia_net_stack
+                .add_forwarding_entry(&route_to_add.try_into().expect("convert to ForwardingEntry"))
+                .await
+                .expect("should not have FIDL error")
+                .expect("should succeed");
+        }
+    }
 
     fnet_routes_ext::wait_for_routes::<I, _, _>(&mut routes_stream, &mut routes, |routes| {
         routes.iter().any(|installed_route| &installed_route.route == &route_to_add)
@@ -604,14 +682,17 @@ async fn add_remove_system_route<
 }
 
 #[netstack_test]
+#[test_case(SystemRouteProtocol::NetRootRoutes; "fuchsia.net.root/Routes")]
+#[test_case(SystemRouteProtocol::NetStack; "fuchsia.net.stack/Stack")]
 async fn system_removes_route_from_route_set<
     I: net_types::ip::Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
     N: Netstack,
 >(
     name: &str,
+    system_route_protocol: SystemRouteProtocol,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
-    let TestSetup { realm, network: _network, interface, set_provider, state } =
+    let TestSetup { realm, network: _network, interface, set_provider, global_set_provider, state } =
         TestSetup::<I>::new::<N>(&sandbox, name).await;
 
     let routes_stream =
@@ -625,10 +706,6 @@ async fn system_removes_route_from_route_set<
 
     let route_set =
         fnet_routes_ext::admin::new_route_set::<I>(&set_provider).expect("new route set");
-    let fuchsia_net_stack = realm
-        .connect_to_protocol::<fnet_stack::StackMarker>()
-        .expect("connect to fuchsia.net.stack.Stack");
-
     let route_to_add = test_route::<I>(&interface, METRIC_TRACKS_INTERFACE);
 
     // Add a route with the RouteSet.
@@ -647,11 +724,30 @@ async fn system_removes_route_from_route_set<
     .expect("should succeed");
 
     // Have the "system" remove that route out from under the RouteSet.
-    fuchsia_net_stack
-        .del_forwarding_entry(&route_to_add.try_into().expect("convert to ForwardingEntry"))
-        .await
-        .expect("should not have FIDL error")
-        .expect("should succeed");
+    match system_route_protocol {
+        SystemRouteProtocol::NetRootRoutes => {
+            let proxy = fnet_routes_ext::admin::new_global_route_set::<I>(&global_set_provider)
+                .expect("new global route set");
+
+            assert!(fnet_routes_ext::admin::remove_route::<I>(
+                &proxy,
+                &route_to_add.try_into().expect("convert to FIDL")
+            )
+            .await
+            .expect("no FIDL error")
+            .expect("add route"));
+        }
+        SystemRouteProtocol::NetStack => {
+            let fuchsia_net_stack = realm
+                .connect_to_protocol::<fnet_stack::StackMarker>()
+                .expect("connect to fuchsia.net.stack.Stack");
+            fuchsia_net_stack
+                .del_forwarding_entry(&route_to_add.try_into().expect("convert to ForwardingEntry"))
+                .await
+                .expect("should not have FIDL error")
+                .expect("should succeed");
+        }
+    }
 
     // The route should disappear.
     fnet_routes_ext::wait_for_routes::<I, _, _>(&mut routes_stream, &mut routes, |routes| {
@@ -672,21 +768,27 @@ async fn system_removes_route_from_route_set<
     .expect("remove route"));
 }
 
-// TODO(https://fxbug.dev/130864): This test case doesn't entirely make sense to
-// live here as it does not involve the routes-admin FIDL API, but this is the
-// best place to park it until fuchsia.net.stack.Stack/{Add, Del}ForwardingEntry
-// is removed, as it's part of generally validating the correctness of the
-// changes supporting the routes-admin implementation.
+// TODO(https://fxbug.dev/130864): Remove all uses of {Add,Del}ForwardingEntry
+// from this file.
 #[netstack_test]
+#[test_case(SystemRouteProtocol::NetRootRoutes; "fuchsia.net.root/Routes")]
+#[test_case(SystemRouteProtocol::NetStack; "fuchsia.net.stack/Stack")]
 async fn root_route_apis_can_remove_loopback_route<
     I: net_types::ip::Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
     N: Netstack,
 >(
     name: &str,
+    system_route_protocol: SystemRouteProtocol,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
-    let TestSetup { realm, network: _network, interface: _interface, set_provider: _, state } =
-        TestSetup::<I>::new::<N>(&sandbox, name).await;
+    let TestSetup {
+        realm,
+        network: _network,
+        interface: _interface,
+        set_provider: _,
+        global_set_provider,
+        state,
+    } = TestSetup::<I>::new::<N>(&sandbox, name).await;
 
     let routes_stream =
         fnet_routes_ext::event_stream_from_state::<I>(&state).expect("should succeed");
@@ -719,14 +821,31 @@ async fn root_route_apis_can_remove_loopback_route<
         .expect("should have exactly one loopback route");
 
     // Remove the loopback route.
-    let fuchsia_net_stack = realm
-        .connect_to_protocol::<fnet_stack::StackMarker>()
-        .expect("connect to fuchsia.net.stack.Stack");
-    fuchsia_net_stack
-        .del_forwarding_entry(&loopback_route.route.try_into().expect("convert to ForwardingEntry"))
-        .await
-        .expect("should not have FIDL error")
-        .expect("should succeed");
+    match system_route_protocol {
+        SystemRouteProtocol::NetRootRoutes => {
+            let proxy = fnet_routes_ext::admin::new_global_route_set::<I>(&global_set_provider)
+                .expect("new global route set");
+            assert!(fnet_routes_ext::admin::remove_route::<I>(
+                &proxy,
+                &loopback_route.route.try_into().expect("convert to FIDL")
+            )
+            .await
+            .expect("should not have FIDL error")
+            .expect("should succeed"));
+        }
+        SystemRouteProtocol::NetStack => {
+            let fuchsia_net_stack = realm
+                .connect_to_protocol::<fnet_stack::StackMarker>()
+                .expect("connect to fuchsia.net.stack.Stack");
+            fuchsia_net_stack
+                .del_forwarding_entry(
+                    &loopback_route.route.try_into().expect("convert to ForwardingEntry"),
+                )
+                .await
+                .expect("should not have FIDL error")
+                .expect("should succeed");
+        }
+    }
 
     // Loopback route should disappear.
     fnet_routes_ext::wait_for_routes::<I, _, _>(&mut routes_stream, &mut routes, |routes| {
@@ -753,8 +872,14 @@ async fn removing_one_default_route_does_not_flip_presence<
     removal_case: DefaultRouteRemovalCase,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
-    let TestSetup { realm: _realm, network: _network, interface, set_provider, state } =
-        TestSetup::<I>::new::<N>(&sandbox, name).await;
+    let TestSetup {
+        realm: _realm,
+        network: _network,
+        interface,
+        set_provider,
+        global_set_provider: _,
+        state,
+    } = TestSetup::<I>::new::<N>(&sandbox, name).await;
 
     let routes_stream =
         fnet_routes_ext::event_stream_from_state::<I>(&state).expect("should succeed");
@@ -886,4 +1011,65 @@ async fn removing_one_default_route_does_not_flip_presence<
     // Ensure route sets are kept alive all the way through (unless they were
     // explicitly dropped above).
     drop((opt_route_set_1, route_set_2));
+}
+
+#[netstack_test]
+async fn dropping_global_route_set_does_not_remove_routes<
+    I: net_types::ip::Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
+    N: Netstack,
+>(
+    name: &str,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let TestSetup {
+        realm: _,
+        network: _network,
+        interface,
+        set_provider: _,
+        global_set_provider,
+        state,
+    } = TestSetup::<I>::new::<N>(&sandbox, name).await;
+
+    let routes_stream =
+        fnet_routes_ext::event_stream_from_state::<I>(&state).expect("should succeed");
+    pin_mut!(routes_stream);
+
+    let mut routes =
+        fnet_routes_ext::collect_routes_until_idle::<I, HashSet<_>>(&mut routes_stream)
+            .await
+            .expect("collect routes should succeed");
+
+    let route_to_add = test_route::<I>(&interface, METRIC_TRACKS_INTERFACE);
+
+    // Create a new global route set and add a new route with it.
+    let proxy = fnet_routes_ext::admin::new_global_route_set::<I>(&global_set_provider)
+        .expect("new global route set");
+    assert!(fnet_routes_ext::admin::add_route::<I>(
+        &proxy,
+        &route_to_add.try_into().expect("convert to FIDL")
+    )
+    .await
+    .expect("no FIDL error")
+    .expect("add route"));
+
+    fnet_routes_ext::wait_for_routes::<I, _, _>(&mut routes_stream, &mut routes, |routes| {
+        routes.iter().any(|installed_route| &installed_route.route == &route_to_add)
+    })
+    .await
+    .expect("should succeed");
+
+    // Drop the route set.  Since this is a global route set, the route created
+    // by this route set should not be removed.  This is unlike a user route
+    // set.
+    drop(proxy);
+
+    assert_matches!(
+        fnet_routes_ext::wait_for_routes::<I, _, _>(&mut routes_stream, &mut routes, |routes| {
+            routes.iter().any(|installed_route| &installed_route.route == &route_to_add)
+        })
+        .map(Some)
+        .on_timeout(ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT, || None)
+        .await,
+        None
+    );
 }

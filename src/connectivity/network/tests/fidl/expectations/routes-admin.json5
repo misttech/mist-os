@@ -9,5 +9,16 @@
                 "*",
             ],
         },
+        {
+            type: "expect_failure",
+            matchers: [
+                "*_ns3*global",
+                "*_ns3*root_routes",
+                "dropping_global_route_set_does_not_remove_routes_*_ns3",
+                "*_ns2*global",
+                "*_ns2*root_routes",
+                "dropping_global_route_set_does_not_remove_routes_*_ns2",
+            ],
+        },
     ],
 }

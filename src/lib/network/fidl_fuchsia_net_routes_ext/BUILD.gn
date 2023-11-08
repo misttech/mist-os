@@ -11,6 +11,7 @@ rustc_library("fidl_fuchsia_net_routes_ext") {
   deps = [
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//sdk/fidl/fuchsia.net.interfaces.admin:fuchsia.net.interfaces.admin_rust",
+    "//sdk/fidl/fuchsia.net.root:fuchsia.net.root_rust",
     "//sdk/fidl/fuchsia.net.routes:fuchsia.net.routes_rust",
     "//sdk/fidl/fuchsia.net.routes.admin:fuchsia.net.routes.admin_rust",
     "//sdk/fidl/fuchsia.net.stack:fuchsia.net.stack_rust",
