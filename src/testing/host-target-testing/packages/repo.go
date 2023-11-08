@@ -204,7 +204,7 @@ func (r *Repository) BlobSize(ctx context.Context, merkle build.MerkleRoot) (uin
 }
 
 // sumBlobSizes sums up all the blob sizes from the blob store.
-func (r *Repository) sumBlobSizes(ctx context.Context, blobs map[build.MerkleRoot]struct{}) (uint64, error) {
+func (r *Repository) sumBlobBlockSizes(ctx context.Context, blobs map[build.MerkleRoot]struct{}) (uint64, error) {
 	totalSize := uint64(0)
 	for blob := range blobs {
 		size, err := r.BlobSize(ctx, blob)
@@ -212,7 +212,7 @@ func (r *Repository) sumBlobSizes(ctx context.Context, blobs map[build.MerkleRoo
 			return 0, nil
 		}
 
-		totalSize += size
+		totalSize += size + (BlobBlockSize - size%BlobBlockSize)
 	}
 
 	return totalSize, nil
