@@ -25,4 +25,4 @@ available_in_git: 'f441460db6b70ba38150c3437f42ff3d045d2b71'
 path: '/src/devices/fw/drivers/qcom-pil'
 ```
 
-[driver-epitaphs]: /docs/reference/hardware/_drivers_epitaphs.yaml
+[driver-epitaphs]: https://cs.opensource.google/fuchsia/fuchsia/+/main:docs/reference/hardware/_drivers_epitaphs.yaml
