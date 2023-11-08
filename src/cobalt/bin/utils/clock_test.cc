@@ -50,12 +50,12 @@ class FuchsiaSystemClockTest : public ::gtest::TestLoopFixture {
     EXPECT_EQ(ZX_OK, zircon_clock_.update(args));
   }
 
-  void SignalClockSynced() {
+  void SignalLoggingQualityClock() {
     if (const zx_status_t status =
             zircon_clock_.signal(/*clear_mask=*/0,
-                                 /*set_mask=*/fuchsia::time::SIGNAL_UTC_CLOCK_SYNCHRONIZED);
+                                 /*set_mask=*/fuchsia::time::SIGNAL_UTC_CLOCK_LOGGING_QUALITY);
         status != ZX_OK) {
-      FX_PLOGS(FATAL, status) << "Failed to sync clock";
+      FX_PLOGS(FATAL, status) << "Failed to achieve logging quality clock";
     }
   }
 
@@ -74,8 +74,20 @@ TEST_F(FuchsiaSystemClockTest, AwaitExternalSourceNotTriggeredOnClockReady) {
   EXPECT_FALSE(called);
 }
 
+TEST_F(FuchsiaSystemClockTest, AwaitExternalSourceNotTriggeredOnClockSynced) {
+  ASSERT_EQ(zircon_clock_.signal(
+                /*clear_mask=*/0, /*set_mask=*/fuchsia::time::SIGNAL_UTC_CLOCK_SYNCHRONIZED),
+            ZX_OK);
+
+  bool called = false;
+  clock_->AwaitExternalSource([&called]() { called = true; });
+  RunLoopUntilIdle();
+
+  EXPECT_FALSE(called);
+}
+
 TEST_F(FuchsiaSystemClockTest, AwaitExternalSourceInitiallyAccurate) {
-  SignalClockSynced();
+  SignalLoggingQualityClock();
 
   bool called = false;
   clock_->AwaitExternalSource([&called]() { called = true; });
@@ -91,7 +103,7 @@ TEST_F(FuchsiaSystemClockTest, AwaitExternalSourceInitiallyInaccurate) {
 
   EXPECT_FALSE(called);
 
-  SignalClockSynced();
+  SignalLoggingQualityClock();
   RunLoopUntilIdle();
 
   EXPECT_TRUE(called);
@@ -111,7 +123,7 @@ TEST_F(FuchsiaSystemClockTest, AwaitExternalSourceInitiallyInaccurate) {
 TEST_F(FuchsiaSystemClockTest, NowBeforeInitialized) { EXPECT_EQ(clock_->now(), std::nullopt); }
 
 TEST_F(FuchsiaSystemClockTest, NowAfterInitialized) {
-  SignalClockSynced();
+  SignalLoggingQualityClock();
 
   clock_->AwaitExternalSource([]() {});
 
@@ -123,7 +135,7 @@ TEST_F(FuchsiaSystemClockTest, NowAfterInitialized) {
 // Tests our use of an atomic_bool. We can set |accurate_| true in
 // one thread and read it as true in another thread.
 TEST_F(FuchsiaSystemClockTest, NowFromAnotherThread) {
-  SignalClockSynced();
+  SignalLoggingQualityClock();
   clock_->AwaitExternalSource([]() {});
 
   RunLoopUntilIdle();

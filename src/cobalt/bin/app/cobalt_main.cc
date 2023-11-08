@@ -122,7 +122,7 @@ std::string ReadBoardName(const std::shared_ptr<sys::ServiceDirectory>& services
 }
 
 // Replaces the UTC clock installed in the process' namespace with a fake one
-// that is always started. This is intended to simulate a synchronized clock in
+// that is always "logging quality." This is intended to simulate a synchronized clock in
 // test environments without network and should not be used outside of tests.
 void ReplaceRuntimeClock() {
   zx::clock current_clock(zx_utc_reference_get());
@@ -138,9 +138,9 @@ void ReplaceRuntimeClock() {
 
   if (const zx_status_t status =
           replacement.signal(/*clear_mask=*/0,
-                             /*set_mask=*/fuchsia::time::SIGNAL_UTC_CLOCK_SYNCHRONIZED);
+                             /*set_mask=*/fuchsia::time::SIGNAL_UTC_CLOCK_LOGGING_QUALITY);
       status != ZX_OK) {
-    FX_PLOGS(FATAL, status) << "Failed to sync clock";
+    FX_PLOGS(FATAL, status) << "Failed to achieve logging quality clock";
   }
 
   zx_utc_reference_swap(replacement.release(), current_clock.reset_and_get_address());

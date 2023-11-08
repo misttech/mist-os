@@ -56,7 +56,7 @@ class FuchsiaSystemClock : public FuchsiaSystemClockInterface {
 
   // Wait for the system clock to become accurate, then call the callback.
   //
-  // Uses a clock handle to wait for the SIGNAL_UTC_CLOCK_SYNCHRONIZED signal to be asserted.
+  // Uses a clock handle to wait for the SIGNAL_UTC_CLOCK_LOGGING_QUALITY signal to be asserted.
   void AwaitExternalSource(std::function<void()> callback) override;
 
  private:
