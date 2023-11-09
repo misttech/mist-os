@@ -423,7 +423,6 @@ zx_status_t Device::Bind() __TA_NO_THREAD_SAFETY_ANALYSIS {
     lerror("Query result missing sta_addr.");
     return ZX_ERR_INTERNAL;
   }
-  state_->set_address(common::MacAddr(query_result->value()->sta_addr().data()));
 
   auto discovery_arena = fdf::Arena::Create(0, 0);
   if (discovery_arena.is_error()) {
@@ -571,15 +570,26 @@ zx_status_t Device::EthernetImplQuery(uint32_t options, ethernet_info_t* info) {
   if (info == nullptr)
     return ZX_ERR_INVALID_ARGS;
 
-  memset(info, 0, sizeof(*info));
-  state_->address().CopyTo(info->mac);
-  info->features = ETHERNET_FEATURE_WLAN;
-
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     lerror("Arena creation failed: %s", arena.status_string());
     return ZX_ERR_INTERNAL;
   }
+
+  auto query_result = client_.sync().buffer(*std::move(arena))->Query();
+  if (!query_result.ok()) {
+    lerror("Failed getting query result (FIDL error %s)", query_result.status_string());
+    return query_result.status();
+  }
+  if (query_result->is_error()) {
+    lerror("Failed getting query result (status %s)",
+           zx_status_get_string(query_result->error_value()));
+    return query_result->error_value();
+  }
+
+  memset(info, 0, sizeof(*info));
+  common::MacAddr(query_result->value()->sta_addr().data()).CopyTo(info->mac);
+  info->features = ETHERNET_FEATURE_WLAN;
 
   auto mac_sublayer_result = client_.sync().buffer(*std::move(arena))->QueryMacSublayerSupport();
   if (!mac_sublayer_result.ok()) {

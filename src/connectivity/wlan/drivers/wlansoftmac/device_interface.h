@@ -29,14 +29,10 @@ class Packet;
 // interacting with external systems.
 class DeviceState : public fbl::RefCounted<DeviceState> {
  public:
-  const common::MacAddr& address() const { return addr_; }
-  void set_address(const common::MacAddr& addr) { addr_ = addr; }
-
   bool online() { return online_; }
   void set_online(bool online) { online_ = online; }
 
  private:
-  common::MacAddr addr_;
   bool online_ = false;
 };
 
