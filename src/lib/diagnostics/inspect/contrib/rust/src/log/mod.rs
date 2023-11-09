@@ -23,7 +23,7 @@ mod impls;
 mod wrappers;
 
 pub use fuchsia_inspect::StringReference;
-pub use wrappers::{InspectBytes, InspectList, InspectListClosure};
+pub use wrappers::{InspectBytes, InspectList, InspectListClosure, InspectUintArray};
 
 use fuchsia_inspect::Node;
 
@@ -430,6 +430,25 @@ mod tests {
                         "1": 34u64,
                         "2": 58u64,
                     }
+                }
+            }
+        });
+    }
+
+    #[fuchsia::test]
+    fn test_log_inspect_uint_array() {
+        let executor = fasync::TestExecutor::new_with_fake_time();
+        executor.set_fake_time(fasync::Time::from_nanos(12345));
+        let (inspector, mut node) = inspector_and_list_node();
+        let list = [1u32, 2, 3, 4, 5, 6];
+
+        inspect_log!(node, list: InspectUintArray::new(&list));
+
+        assert_data_tree!(inspector, root: {
+            list_node: {
+                "0": {
+                    "@time": 12345i64,
+                    list: vec![1u64, 2, 3, 4, 5, 6],
                 }
             }
         });

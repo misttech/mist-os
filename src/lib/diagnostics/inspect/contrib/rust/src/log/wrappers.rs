@@ -4,8 +4,8 @@
 
 use {
     super::WriteInspect,
-    fuchsia_inspect::{Node, StringReference},
-    std::convert::AsRef,
+    fuchsia_inspect::{ArrayProperty, Node, StringReference},
+    std::{convert::AsRef, marker::PhantomData},
 };
 
 /// Wrapper to log bytes in an `inspect_log!` or `inspect_insert!` macro.
@@ -88,5 +88,28 @@ where
         }
 
         writer.record(child);
+    }
+}
+
+/// Wrapper to log uint array in an `inspect_log!` or `inspect_insert!` macro.
+pub struct InspectUintArray<T: AsRef<[I]>, I: Into<u64> + Clone> {
+    pub items: T,
+    _phantom: PhantomData<I>,
+}
+
+impl<T: AsRef<[I]>, I: Into<u64> + Clone> InspectUintArray<T, I> {
+    pub fn new(items: T) -> Self {
+        Self { items, _phantom: PhantomData }
+    }
+}
+
+impl<T: AsRef<[I]>, I: Into<u64> + Clone> WriteInspect for InspectUintArray<T, I> {
+    fn write_inspect(&self, node: &Node, key: impl Into<StringReference>) {
+        let iter = self.items.as_ref().iter();
+        let inspect_array = node.create_uint_array(key, iter.len());
+        for (i, c) in iter.enumerate() {
+            inspect_array.set(i, (*c).clone());
+        }
+        node.record(inspect_array);
     }
 }
