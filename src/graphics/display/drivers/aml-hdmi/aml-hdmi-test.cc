@@ -58,8 +58,8 @@ class StubHdmiIpBase : public HdmiIpBase {
   StubHdmiIpBase() = default;
   ~StubHdmiIpBase() override = default;
 
-  void WriteIpReg(uint32_t addr, uint32_t data) override {}
-  uint32_t ReadIpReg(uint32_t addr) override { return 0; }
+  void WriteIpReg(uint32_t addr, uint8_t data) override {}
+  uint8_t ReadIpReg(uint32_t addr) override { return 0; }
 };
 
 class FakeAmlHdmiDevice : public AmlHdmiDevice {

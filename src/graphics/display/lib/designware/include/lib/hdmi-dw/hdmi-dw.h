@@ -41,8 +41,8 @@ class HdmiDw {
   void PrintRegisters();
 
  private:
-  void WriteReg(uint32_t addr, uint32_t data) { base_->WriteIpReg(addr, data); }
-  uint32_t ReadReg(uint32_t addr) { return base_->ReadIpReg(addr); }
+  void WriteReg(uint32_t addr, uint8_t data) { base_->WriteIpReg(addr, data); }
+  uint8_t ReadReg(uint32_t addr) { return base_->ReadIpReg(addr); }
 
   void PrintReg(std::string name, uint8_t reg);
 

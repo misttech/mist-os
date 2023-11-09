@@ -12,8 +12,8 @@ class HdmiIpBase {
   HdmiIpBase() = default;
   virtual ~HdmiIpBase() = default;
 
-  virtual void WriteIpReg(uint32_t addr, uint32_t data) = 0;
-  virtual uint32_t ReadIpReg(uint32_t addr) = 0;
+  virtual void WriteIpReg(uint32_t addr, uint8_t data) = 0;
+  virtual uint8_t ReadIpReg(uint32_t addr) = 0;
 };
 
 #endif  // SRC_GRAPHICS_DISPLAY_LIB_HDMI_INCLUDE_LIB_HDMI_BASE_H_

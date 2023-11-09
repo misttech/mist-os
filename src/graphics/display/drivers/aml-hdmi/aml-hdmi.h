@@ -102,11 +102,11 @@ class AmlHdmiDevice : public DeviceType, public HdmiIpBase, public fbl::RefCount
   // The secure monitor call resource `smc_` must be valid.
   zx_status_t InitializeHdcp14();
 
-  void WriteIpReg(uint32_t addr, uint32_t data) override {
+  void WriteIpReg(uint32_t addr, uint8_t data) override {
     fbl::AutoLock lock(&register_lock_);
     hdmitx_mmio_->Write8(data, addr);
   }
-  uint32_t ReadIpReg(uint32_t addr) override {
+  uint8_t ReadIpReg(uint32_t addr) override {
     fbl::AutoLock lock(&register_lock_);
     return hdmitx_mmio_->Read8(addr);
   }

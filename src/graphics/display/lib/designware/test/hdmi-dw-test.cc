@@ -174,8 +174,8 @@ class FakeHdmiIpBase : public HdmiIpBase {
  public:
   explicit FakeHdmiIpBase(fdf::MmioBuffer mmio) : HdmiIpBase(), mmio_(std::move(mmio)) {}
 
-  void WriteIpReg(uint32_t addr, uint32_t data) { mmio_.Write8(data, addr); }
-  uint32_t ReadIpReg(uint32_t addr) { return mmio_.Read8(addr); }
+  void WriteIpReg(uint32_t addr, uint8_t data) { mmio_.Write8(data, addr); }
+  uint8_t ReadIpReg(uint32_t addr) { return mmio_.Read8(addr); }
 
  private:
   fdf::MmioBuffer mmio_;
