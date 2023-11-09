@@ -24,7 +24,7 @@ namespace {
 ErrorOr<std::string> ReadAnnotation(const std::string& filepath) {
   std::string content;
   if (!files::ReadFileToString(filepath, &content)) {
-    FX_LOGS(ERROR) << "Failed to read content from " << filepath;
+    FX_LOGS(WARNING) << "Failed to read content from " << filepath;
     return Error::kFileReadFailure;
   }
   return std::string(fxl::TrimString(content, "\r\n"));
