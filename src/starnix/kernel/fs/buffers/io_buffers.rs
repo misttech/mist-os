@@ -162,14 +162,18 @@ pub trait InputBuffer: std::fmt::Debug {
 }
 
 /// An OutputBuffer that write data to user space memory through a `MemoryManager`.
-pub struct UserBuffersOutputBuffer<'a> {
+///
+/// `USE_VMO` indicates whether the data should be written through a VMO. If `false`,
+/// the user space memory is assumed to be mapped in the current address space and
+/// the memory will be written to directly instead of going through the VMO.
+pub struct UserBuffersOutputBuffer<'a, const USE_VMO: bool = false> {
     mm: &'a MemoryManager,
     buffers: Vec<UserBuffer>,
     available: usize,
     bytes_written: usize,
 }
 
-impl<'a> std::fmt::Debug for UserBuffersOutputBuffer<'a> {
+impl<'a, const USE_VMO: bool> std::fmt::Debug for UserBuffersOutputBuffer<'a, USE_VMO> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("UserBuffersOutputBuffer")
             .field("buffers", &self.buffers)
@@ -179,13 +183,19 @@ impl<'a> std::fmt::Debug for UserBuffersOutputBuffer<'a> {
     }
 }
 
-impl<'a> UserBuffersOutputBuffer<'a> {
-    pub fn new(mm: &'a MemoryManager, buffers: Vec<UserBuffer>) -> Result<Self, Errno> {
+impl<'a, const USE_VMO: bool> UserBuffersOutputBuffer<'a, USE_VMO> {
+    fn new_inner(mm: &'a MemoryManager, buffers: Vec<UserBuffer>) -> Result<Self, Errno> {
         let (mut buffers, available) =
             UserBuffer::cap_buffers_to_max_rw_count(mm.maximum_valid_user_address, buffers)?;
         // Reverse the buffers as the element will be removed as they are handled.
         buffers.reverse();
         Ok(Self { mm, buffers, available, bytes_written: 0 })
+    }
+}
+
+impl<'a> UserBuffersOutputBuffer<'a> {
+    pub fn new(mm: &'a MemoryManager, buffers: Vec<UserBuffer>) -> Result<Self, Errno> {
+        Self::new_inner(mm, buffers)
     }
 
     pub fn new_at(
@@ -197,7 +207,13 @@ impl<'a> UserBuffersOutputBuffer<'a> {
     }
 }
 
-impl<'a> OutputBuffer for UserBuffersOutputBuffer<'a> {
+impl<'a> UserBuffersOutputBuffer<'a, true> {
+    pub fn vmo_new(mm: &'a MemoryManager, buffers: Vec<UserBuffer>) -> Result<Self, Errno> {
+        Self::new_inner(mm, buffers)
+    }
+}
+
+impl<'a, const USE_VMO: bool> OutputBuffer for UserBuffersOutputBuffer<'a, USE_VMO> {
     fn write_each(&mut self, callback: &mut OutputBufferCallback<'_>) -> Result<usize, Errno> {
         let mut bytes_written = 0;
         while let Some(mut buffer) = self.buffers.pop() {
@@ -209,7 +225,11 @@ impl<'a> OutputBuffer for UserBuffersOutputBuffer<'a> {
             if result > buffer.length {
                 return error!(EINVAL);
             }
-            bytes_written += self.mm.write_memory(buffer.address, &bytes[0..result])?;
+            bytes_written += if USE_VMO {
+                self.mm.vmo_write_memory(buffer.address, &bytes[0..result])
+            } else {
+                self.mm.write_memory(buffer.address, &bytes[0..result])
+            }?;
             buffer.advance(result)?;
             self.available -= result;
             self.bytes_written += result;
@@ -254,14 +274,18 @@ impl<'a> OutputBuffer for UserBuffersOutputBuffer<'a> {
 }
 
 /// An InputBuffer that read data from user space memory through a `MemoryManager`.
-pub struct UserBuffersInputBuffer<'a> {
+///
+/// `USE_VMO` indicates whether the data should be read through a VMO. If `false`,
+/// the user space memory is assumed to be mapped in the current address space and
+/// the memory will be read directly instead of going through the VMO.
+pub struct UserBuffersInputBuffer<'a, const USE_VMO: bool = false> {
     mm: &'a MemoryManager,
     buffers: Vec<UserBuffer>,
     available: usize,
     bytes_read: usize,
 }
 
-impl<'a> std::fmt::Debug for UserBuffersInputBuffer<'a> {
+impl<'a, const USE_VMO: bool> std::fmt::Debug for UserBuffersInputBuffer<'a, USE_VMO> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("UserBuffersOutputBuffer")
             .field("buffers", &self.buffers)
@@ -271,13 +295,19 @@ impl<'a> std::fmt::Debug for UserBuffersInputBuffer<'a> {
     }
 }
 
-impl<'a> UserBuffersInputBuffer<'a> {
-    pub fn new(mm: &'a MemoryManager, buffers: Vec<UserBuffer>) -> Result<Self, Errno> {
+impl<'a, const USE_VMO: bool> UserBuffersInputBuffer<'a, USE_VMO> {
+    fn new_inner(mm: &'a MemoryManager, buffers: Vec<UserBuffer>) -> Result<Self, Errno> {
         let (mut buffers, available) =
             UserBuffer::cap_buffers_to_max_rw_count(mm.maximum_valid_user_address, buffers)?;
         // Reverse the buffers as the element will be removed as they are handled.
         buffers.reverse();
         Ok(Self { mm, buffers, available, bytes_read: 0 })
+    }
+}
+
+impl<'a> UserBuffersInputBuffer<'a> {
+    pub fn new(mm: &'a MemoryManager, buffers: Vec<UserBuffer>) -> Result<Self, Errno> {
+        Self::new_inner(mm, buffers)
     }
 
     pub fn new_at(
@@ -289,14 +319,24 @@ impl<'a> UserBuffersInputBuffer<'a> {
     }
 }
 
-impl<'a> InputBuffer for UserBuffersInputBuffer<'a> {
+impl<'a> UserBuffersInputBuffer<'a, true> {
+    pub fn vmo_new(mm: &'a MemoryManager, buffers: Vec<UserBuffer>) -> Result<Self, Errno> {
+        Self::new_inner(mm, buffers)
+    }
+}
+
+impl<'a, const USE_VMO: bool> InputBuffer for UserBuffersInputBuffer<'a, USE_VMO> {
     fn peek_each(&mut self, callback: &mut InputBufferCallback<'_>) -> Result<usize, Errno> {
         let mut read = 0;
         for buffer in self.buffers.iter().rev() {
             if buffer.is_null() {
                 continue;
             }
-            let bytes = self.mm.read_memory_to_vec(buffer.address, buffer.length)?;
+            let bytes = if USE_VMO {
+                self.mm.vmo_read_memory_to_vec(buffer.address, buffer.length)
+            } else {
+                self.mm.read_memory_to_vec(buffer.address, buffer.length)
+            }?;
             let result = callback(&bytes)?;
             if result > buffer.length {
                 return error!(EINVAL);

@@ -217,7 +217,7 @@ pub fn ptrace_dispatch(
             // NB: The behavior of the syscall is different from the behavior in ptrace(2),
             // which is provided by libc.
             let src: UserRef<usize> = UserRef::from(addr);
-            let val = tracee.mm.read_object(src)?;
+            let val = tracee.mm.vmo_read_object(src)?;
 
             let dst: UserRef<usize> = UserRef::from(data);
             current_task.mm.write_object(dst, &val)?;
@@ -226,7 +226,7 @@ pub fn ptrace_dispatch(
         PTRACE_POKEDATA | PTRACE_POKETEXT => {
             let ptr: UserRef<usize> = UserRef::from(addr);
             let val = data.ptr() as usize;
-            tracee.mm.write_object(ptr, &val)?;
+            tracee.mm.vmo_write_object(ptr, &val)?;
             Ok(())
         }
         PTRACE_SETSIGMASK => {

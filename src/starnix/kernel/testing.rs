@@ -393,6 +393,9 @@ impl MemoryAccessor for AutoReleasableTask {
     fn read_memory_to_slice(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
         (**self).read_memory_to_slice(addr, bytes)
     }
+    fn vmo_read_memory_to_slice(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
+        (**self).vmo_read_memory_to_slice(addr, bytes)
+    }
     fn read_memory_partial_to_slice(
         &self,
         addr: UserAddress,
@@ -400,11 +403,24 @@ impl MemoryAccessor for AutoReleasableTask {
     ) -> Result<usize, Errno> {
         (**self).read_memory_partial_to_slice(addr, bytes)
     }
+    fn vmo_read_memory_partial_to_slice(
+        &self,
+        addr: UserAddress,
+        bytes: &mut [u8],
+    ) -> Result<usize, Errno> {
+        (**self).vmo_read_memory_partial_to_slice(addr, bytes)
+    }
     fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
         (**self).write_memory(addr, bytes)
     }
+    fn vmo_write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
+        (**self).vmo_write_memory(addr, bytes)
+    }
     fn write_memory_partial(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
         (**self).write_memory_partial(addr, bytes)
+    }
+    fn vmo_write_memory_partial(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
+        (**self).vmo_write_memory_partial(addr, bytes)
     }
     fn zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
         (**self).zero(addr, length)

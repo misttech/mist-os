@@ -2615,6 +2615,10 @@ const MAX_PROCESS_READ_WRITE_MEMORY_BUFFER_SIZE: usize = 64 * 1024 * 1024;
 
 impl MemoryAccessor for RemoteResourceAccessor {
     fn read_memory_to_slice(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
+        self.vmo_read_memory_to_slice(addr, bytes)
+    }
+
+    fn vmo_read_memory_to_slice(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
         profile_duration!("RemoteReadMemory");
         let mut index = 0;
         while index < bytes.len() {
@@ -2639,6 +2643,14 @@ impl MemoryAccessor for RemoteResourceAccessor {
 
     fn read_memory_partial_to_slice(
         &self,
+        addr: UserAddress,
+        bytes: &mut [u8],
+    ) -> Result<usize, Errno> {
+        self.vmo_read_memory_partial_to_slice(addr, bytes)
+    }
+
+    fn vmo_read_memory_partial_to_slice(
+        &self,
         _addr: UserAddress,
         _bytes: &mut [u8],
     ) -> Result<usize, Errno> {
@@ -2646,6 +2658,10 @@ impl MemoryAccessor for RemoteResourceAccessor {
     }
 
     fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
+        self.vmo_write_memory(addr, bytes)
+    }
+
+    fn vmo_write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
         profile_duration!("RemoteWriteMemory");
         let vmo = zx::Vmo::create(bytes.len() as u64).map_err(|_| errno!(EINVAL))?;
         vmo.write(bytes, 0).map_err(|_| errno!(EFAULT))?;
@@ -2657,7 +2673,11 @@ impl MemoryAccessor for RemoteResourceAccessor {
         Ok(bytes.len())
     }
 
-    fn write_memory_partial(&self, _addr: UserAddress, _bytes: &[u8]) -> Result<usize, Errno> {
+    fn write_memory_partial(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
+        self.vmo_write_memory_partial(addr, bytes)
+    }
+
+    fn vmo_write_memory_partial(&self, _addr: UserAddress, _bytes: &[u8]) -> Result<usize, Errno> {
         error!(ENOTSUP)
     }
 

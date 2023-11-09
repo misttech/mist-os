@@ -23,6 +23,11 @@ declare_args() {
 
   # Whether or not syscall status inspect is enabled globally.
   starnix_syscall_stats = false
+
+  # Whether or not unified address spaces are leveraged.
+  # TODO(https://fxbug.dev/132980): Enable on other platforms once Zircon
+  # support is available.
+  starnix_unified_aspace = target_cpu == "x64"
 }
 
 rust_proto_library("perfetto_consumer_proto") {
@@ -133,6 +138,7 @@ rustc_binary("starnix_kernel_bin") {
     "//src/starnix/lib/starnix-sync",
     "//src/starnix/lib/syncio",
     "//src/starnix/lib/ubpf",
+    "//src/starnix/lib/usercopy",
     "//src/storage/ext4/lib/metadata",
     "//src/storage/ext4/read-only:ext4-read-only",
     "//src/storage/lib/vfs/rust:vfs",
@@ -417,6 +423,9 @@ rustc_binary("starnix_kernel_bin") {
   }
   if (starnix_syscall_stats) {
     features += [ "syscall_stats" ]
+  }
+  if (starnix_unified_aspace) {
+    features += [ "unified_aspace" ]
   }
 
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]

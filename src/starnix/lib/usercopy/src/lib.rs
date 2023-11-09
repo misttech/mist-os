@@ -402,12 +402,18 @@ mod test {
         assert_eq!(&dest[offset..], &vec![0 as u8; buf_len - offset]);
     }
 
-    #[test_case(0)]
-    #[test_case(1)]
-    #[test_case(2)]
+    #[test_case(0..1, 0)]
+    #[test_case(0..1, 1)]
+    #[test_case(0..1, 2)]
+    #[test_case(5..10, 0)]
+    #[test_case(5..10, 1)]
+    #[test_case(5..10, 2)]
+    #[test_case(5..10, 5)]
+    #[test_case(5..10, 7)]
+    #[test_case(5..10, 10)]
     #[::fuchsia::test]
-    fn starting_fault_address_copyin(addr: usize) {
-        let usercopy = new_usercopy_for_test!(Usercopy::new(0..1));
+    fn starting_fault_address_copyin(range: Range<usize>, addr: usize) {
+        let usercopy = new_usercopy_for_test!(Usercopy::new(range));
 
         let mut dest = vec![0u8];
 
@@ -416,12 +422,18 @@ mod test {
         assert_eq!(result, Err(0));
     }
 
-    #[test_case(0)]
-    #[test_case(1)]
-    #[test_case(2)]
+    #[test_case(0..1, 0)]
+    #[test_case(0..1, 1)]
+    #[test_case(0..1, 2)]
+    #[test_case(5..10, 0)]
+    #[test_case(5..10, 1)]
+    #[test_case(5..10, 2)]
+    #[test_case(5..10, 5)]
+    #[test_case(5..10, 7)]
+    #[test_case(5..10, 10)]
     #[::fuchsia::test]
-    fn starting_fault_address_copyout(addr: usize) {
-        let usercopy = new_usercopy_for_test!(Usercopy::new(0..1));
+    fn starting_fault_address_copyout(range: Range<usize>, addr: usize) {
+        let usercopy = new_usercopy_for_test!(Usercopy::new(range));
 
         let source = vec![0u8];
 

@@ -273,7 +273,7 @@ pub fn sys_process_vm_readv(
     // TODO(tbodt): According to the man page, this syscall was added to Linux specifically to
     // avoid doing two copies like other IPC mechanisms require. We should avoid this too at some
     // point.
-    let mut input = UserBuffersInputBuffer::new(&remote_task.mm, remote_iov)?;
+    let mut input = UserBuffersInputBuffer::vmo_new(&remote_task.mm, remote_iov)?;
     let mut output = UserBuffersOutputBuffer::new(&current_task.mm, local_iov)?;
     output.write_buffer(&mut input)
 }
@@ -318,7 +318,7 @@ pub fn sys_process_vm_writev(
     // avoid doing two copies like other IPC mechanisms require. We should avoid this too at some
     // point.
     let mut input = UserBuffersInputBuffer::new(&current_task.mm, local_iov)?;
-    let mut output = UserBuffersOutputBuffer::new(&remote_task.mm, remote_iov)?;
+    let mut output = UserBuffersOutputBuffer::vmo_new(&remote_task.mm, remote_iov)?;
     output.write_buffer(&mut input)
 }
 

@@ -660,7 +660,7 @@ impl FileOps for MemFile {
                 data.write_each(&mut |bytes| {
                     let actual = task
                         .mm
-                        .read_memory_partial_to_slice(addr, bytes)
+                        .vmo_read_memory_partial_to_slice(addr, bytes)
                         .map_err(|_| errno!(EIO))?;
                     addr += actual;
                     Ok(actual)
@@ -685,7 +685,7 @@ impl FileOps for MemFile {
                 let result = data.peek_each(&mut |bytes| {
                     let actual = task
                         .mm
-                        .write_memory_partial(addr + written, bytes)
+                        .vmo_write_memory_partial(addr + written, bytes)
                         .map_err(|_| errno!(EIO))?;
                     written += actual;
                     Ok(actual)

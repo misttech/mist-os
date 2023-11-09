@@ -96,6 +96,10 @@ impl MemoryAccessor for CurrentTask {
         self.mm.read_memory_to_slice(addr, bytes)
     }
 
+    fn vmo_read_memory_to_slice(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
+        self.mm.vmo_read_memory_to_slice(addr, bytes)
+    }
+
     fn read_memory_partial_to_slice(
         &self,
         addr: UserAddress,
@@ -104,12 +108,28 @@ impl MemoryAccessor for CurrentTask {
         self.mm.read_memory_partial_to_slice(addr, bytes)
     }
 
+    fn vmo_read_memory_partial_to_slice(
+        &self,
+        addr: UserAddress,
+        bytes: &mut [u8],
+    ) -> Result<usize, Errno> {
+        self.mm.vmo_read_memory_partial_to_slice(addr, bytes)
+    }
+
     fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
         self.mm.write_memory(addr, bytes)
     }
 
+    fn vmo_write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
+        self.mm.vmo_write_memory(addr, bytes)
+    }
+
     fn write_memory_partial(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
         self.mm.write_memory_partial(addr, bytes)
+    }
+
+    fn vmo_write_memory_partial(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
+        self.mm.vmo_write_memory_partial(addr, bytes)
     }
 
     fn zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
@@ -1327,7 +1347,7 @@ impl Task {
             }
 
             if flags & (CLONE_CHILD_SETTID as u64) != 0 {
-                child.mm.write_object(user_child_tid, &child.id)?;
+                child.mm.vmo_write_object(user_child_tid, &child.id)?;
             }
             Ok(())
         });
@@ -2391,6 +2411,10 @@ impl MemoryAccessor for Task {
         self.mm.read_memory_to_slice(addr, bytes)
     }
 
+    fn vmo_read_memory_to_slice(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
+        self.mm.vmo_read_memory_to_slice(addr, bytes)
+    }
+
     fn read_memory_partial_to_slice(
         &self,
         addr: UserAddress,
@@ -2399,12 +2423,28 @@ impl MemoryAccessor for Task {
         self.mm.read_memory_partial_to_slice(addr, bytes)
     }
 
+    fn vmo_read_memory_partial_to_slice(
+        &self,
+        addr: UserAddress,
+        bytes: &mut [u8],
+    ) -> Result<usize, Errno> {
+        self.mm.vmo_read_memory_partial_to_slice(addr, bytes)
+    }
+
     fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
         self.mm.write_memory(addr, bytes)
     }
 
+    fn vmo_write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
+        self.mm.vmo_write_memory(addr, bytes)
+    }
+
     fn write_memory_partial(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
         self.mm.write_memory_partial(addr, bytes)
+    }
+
+    fn vmo_write_memory_partial(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
+        self.mm.vmo_write_memory_partial(addr, bytes)
     }
 
     fn zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
