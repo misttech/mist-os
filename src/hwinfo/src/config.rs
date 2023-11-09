@@ -66,7 +66,7 @@ impl DeviceInfo {
         device_info.serial_number = match read_factory_file(SERIAL_TXT, proxy_handle).await {
             Ok(content) => Some(content),
             Err(err) => {
-                tracing::error!("Failed to read factory file {}: {}", SERIAL_TXT.to_string(), err);
+                tracing::warn!("Failed to read factory file {}: {}", SERIAL_TXT, err);
                 None
             }
         };
@@ -290,10 +290,10 @@ impl ProductInfo {
         let mut product_info = ProductInfo::new();
         product_info.load_from_structured_config();
         if let Err(err) = product_info.load_from_hw_file(HW_TXT, proxy_handle).await {
-            tracing::error!("Failed to load hw.txt due to {}", err);
+            tracing::warn!("Failed to load hw.txt due to {}", err);
         }
         if let Err(err) = product_info.load_from_locale_list(LOCALE_LIST_FILE, proxy_handle).await {
-            tracing::error!("Failed to load locale_list.txt due to {}", err);
+            tracing::warn!("Failed to load locale_list.txt due to {}", err);
         }
         product_info
     }
