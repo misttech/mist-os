@@ -109,4 +109,6 @@ sdk_host_tool(name = "pm")
 
 sdk_host_tool(name = "far")
 
+sdk_host_tool(name = "funnel")
+
 {{__FUCHSIA_SDK_INCLUDE__}}
