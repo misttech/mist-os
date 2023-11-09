@@ -23,7 +23,7 @@ MagmaSystemConnection::~MagmaSystemConnection() {
   // away due to the shutdown.
   context_map_.clear();
   for (auto iter = buffer_map_.begin(); iter != buffer_map_.end();) {
-    msd_connection()->ReleaseBuffer(*iter->second.buffer->msd_buf());
+    msd_connection()->ReleaseBuffer(*iter->second->msd_buf());
     iter = buffer_map_.erase(iter);
   }
 
@@ -145,14 +145,13 @@ magma::Status MagmaSystemConnection::ImportBuffer(zx::handle handle, uint64_t id
   buffer->set_local_id(id);
 
   auto iter = buffer_map_.find(id);
-  if (iter != buffer_map_.end()) {
-    iter->second.refcount++;
-    return MAGMA_STATUS_OK;
-  }
+  if (iter != buffer_map_.end())
+    return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "buffer id %lu already imported", id);
 
-  BufferReference ref;
-  ref.buffer = MagmaSystemBuffer::Create(owner_->driver(), std::move(buffer));
-  buffer_map_.insert({id, ref});
+  auto sys_buffer = MagmaSystemBuffer::Create(owner_->driver(), std::move(buffer));
+  MAGMA_DASSERT(sys_buffer);
+
+  buffer_map_.insert({id, std::move(sys_buffer)});
 
   return MAGMA_STATUS_OK;
 }
@@ -163,10 +162,7 @@ magma::Status MagmaSystemConnection::ReleaseBuffer(uint64_t id) {
     return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "Attempting to free invalid buffer id %lu",
                           id);
 
-  if (--iter->second.refcount > 0)
-    return MAGMA_STATUS_OK;
-
-  msd_connection()->ReleaseBuffer(*iter->second.buffer->msd_buf());
+  msd_connection()->ReleaseBuffer(*iter->second->msd_buf());
   buffer_map_.erase(iter);
 
   return MAGMA_STATUS_OK;
@@ -181,14 +177,14 @@ magma::Status MagmaSystemConnection::MapBuffer(uint64_t id, uint64_t hw_va, uint
   if (length + offset < length)
     return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "Offset overflows");
 
-  if (length + offset > iter->second.buffer->size())
+  if (length + offset > iter->second->size())
     return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "Offset + length too large for buffer");
 
   if (!flags)
     return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "Flags must be nonzero");
 
   magma::Status status =
-      msd_connection()->MapBuffer(*iter->second.buffer->msd_buf(), hw_va, offset, length, flags);
+      msd_connection()->MapBuffer(*iter->second->msd_buf(), hw_va, offset, length, flags);
   if (!status.ok())
     return MAGMA_DRET_MSG(status.get(), "msd_connection_map_buffer failed");
 
@@ -200,7 +196,7 @@ magma::Status MagmaSystemConnection::UnmapBuffer(uint64_t id, uint64_t hw_va) {
   if (iter == buffer_map_.end())
     return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "Attempting to unmap invalid buffer id");
 
-  magma::Status status = msd_connection()->UnmapBuffer(*iter->second.buffer->msd_buf(), hw_va);
+  magma::Status status = msd_connection()->UnmapBuffer(*iter->second->msd_buf(), hw_va);
   if (!status.ok())
     return MAGMA_DRET_MSG(status.get(), "msd_connection_unmap_buffer failed");
 
@@ -215,10 +211,10 @@ magma::Status MagmaSystemConnection::BufferRangeOp(uint64_t id, uint32_t op, uin
   if (start + length < start) {
     return MAGMA_DRETF(false, "Offset overflows");
   }
-  if (start + length > iter->second.buffer->size()) {
+  if (start + length > iter->second->size()) {
     return MAGMA_DRETF(false, "Page offset too large for buffer");
   }
-  return msd_connection()->BufferRangeOp(*iter->second.buffer->msd_buf(), op, start, length);
+  return msd_connection()->BufferRangeOp(*iter->second->msd_buf(), op, start, length);
 }
 
 void MagmaSystemConnection::SetNotificationCallback(
@@ -424,7 +420,7 @@ std::shared_ptr<MagmaSystemBuffer> MagmaSystemConnection::LookupBuffer(uint64_t 
   if (iter == buffer_map_.end())
     return MAGMA_DRETP(nullptr, "Attempting to lookup invalid buffer id");
 
-  return iter->second.buffer;
+  return iter->second;
 }
 
 std::shared_ptr<MagmaSystemSemaphore> MagmaSystemConnection::LookupSemaphore(uint64_t id) {

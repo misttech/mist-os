@@ -115,11 +115,8 @@ TEST(MagmaSystemConnection, BufferManagement) {
   zx::handle duplicate_handle2;
   ASSERT_TRUE(buf->duplicate_handle(&duplicate_handle2));
 
-  EXPECT_TRUE(connection.ImportBuffer(std::move(duplicate_handle2), id));
-
-  // freeing the allocated buffer should cause refcount to drop to 1
-  EXPECT_TRUE(connection.ReleaseBuffer(id));
-  EXPECT_NE(connection.LookupBuffer(id), nullptr);
+  // Can't import the same id twice
+  EXPECT_FALSE(connection.ImportBuffer(std::move(duplicate_handle2), id));
 
   // freeing the allocated buffer should work
   EXPECT_TRUE(connection.ReleaseBuffer(id));

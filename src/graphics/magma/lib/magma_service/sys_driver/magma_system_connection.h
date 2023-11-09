@@ -104,11 +104,6 @@ class MagmaSystemConnection : private MagmaSystemContext::Owner,
   }
 
  private:
-  // TODO(fxbug.dev/100552) - disallow importing an ID multiple times.
-  struct BufferReference {
-    uint64_t refcount = 1;
-    std::shared_ptr<MagmaSystemBuffer> buffer;
-  };
   struct PoolReference {
     std::unique_ptr<msd::PerfCountPool> msd_pool;
     std::unique_ptr<msd::PerfCountPoolServer> platform_pool;
@@ -132,7 +127,7 @@ class MagmaSystemConnection : private MagmaSystemContext::Owner,
   Owner* owner_;
   std::unique_ptr<msd::Connection> msd_connection_;
   std::unordered_map<uint32_t, std::unique_ptr<MagmaSystemContext>> context_map_;
-  std::unordered_map<uint64_t, BufferReference> buffer_map_;
+  std::unordered_map<uint64_t, std::shared_ptr<MagmaSystemBuffer>> buffer_map_;
   std::unordered_map<uint64_t, std::shared_ptr<MagmaSystemSemaphore>> semaphore_map_;
 
   msd::NotificationHandler* notification_handler_ = nullptr;
