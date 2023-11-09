@@ -34,7 +34,8 @@ void ConsumeStep::RunImpl() {
     library()->arbitrary_name_span = file_->library_decl->span();
   } else {
     if (new_name != library()->name) {
-      Fail(ErrFilesDisagreeOnLibraryName, file_->library_decl->path->components[0]->span());
+      reporter()->Fail(ErrFilesDisagreeOnLibraryName,
+                       file_->library_decl->path->components[0]->span());
       return;
     }
     // Prefer setting arbitrary_name_span to a file which has attributes on the
@@ -77,12 +78,12 @@ Decl* ConsumeStep::RegisterDecl(std::unique_ptr<Decl> decl) {
   if (name.span()) {
     if (library()->dependencies.Contains(name.span()->source_file().filename(),
                                          {name.span()->data()})) {
-      Fail(ErrDeclNameConflictsWithLibraryImport, name.span().value(), name);
+      reporter()->Fail(ErrDeclNameConflictsWithLibraryImport, name.span().value(), name);
     } else if (auto canonical_decl_name = utils::canonicalize(name.decl_name());
                library()->dependencies.Contains(name.span()->source_file().filename(),
                                                 {canonical_decl_name})) {
-      Fail(ErrDeclNameConflictsWithLibraryImportCanonical, name.span().value(), name,
-           canonical_decl_name);
+      reporter()->Fail(ErrDeclNameConflictsWithLibraryImportCanonical, name.span().value(), name,
+                       canonical_decl_name);
     }
   }
   return decl_ptr;
@@ -187,8 +188,8 @@ void ConsumeStep::ConsumeLiteralConstant(raw::LiteralConstant* raw_constant,
 
 void ConsumeStep::ConsumeUsing(std::unique_ptr<raw::Using> using_directive) {
   if (using_directive->attributes != nullptr) {
-    Fail(ErrAttributesNotAllowedOnLibraryImport, using_directive->span(),
-         using_directive->attributes.get());
+    reporter()->Fail(ErrAttributesNotAllowedOnLibraryImport, using_directive->span(),
+                     using_directive->attributes.get());
     return;
   }
 
@@ -199,7 +200,8 @@ void ConsumeStep::ConsumeUsing(std::unique_ptr<raw::Using> using_directive) {
 
   Library* dep_library = all_libraries()->Lookup(library_name);
   if (!dep_library) {
-    Fail(ErrUnknownLibrary, using_directive->using_path->components[0]->span(), library_name);
+    reporter()->Fail(ErrUnknownLibrary, using_directive->using_path->components[0]->span(),
+                     library_name);
     return;
   }
 
@@ -210,15 +212,15 @@ void ConsumeStep::ConsumeUsing(std::unique_ptr<raw::Using> using_directive) {
     case Dependencies::RegisterResult::kSuccess:
       break;
     case Dependencies::RegisterResult::kDuplicate:
-      Fail(ErrDuplicateLibraryImport, using_directive->span(), library_name);
+      reporter()->Fail(ErrDuplicateLibraryImport, using_directive->span(), library_name);
       return;
     case Dependencies::RegisterResult::kCollision:
       if (using_directive->maybe_alias) {
-        Fail(ErrConflictingLibraryImportAlias, using_directive->span(), library_name,
-             using_directive->maybe_alias->span().data());
+        reporter()->Fail(ErrConflictingLibraryImportAlias, using_directive->span(), library_name,
+                         using_directive->maybe_alias->span().data());
         return;
       }
-      Fail(ErrConflictingLibraryImport, using_directive->span(), library_name);
+      reporter()->Fail(ErrConflictingLibraryImport, using_directive->span(), library_name);
       return;
   }
 }
@@ -572,7 +574,7 @@ void ConsumeStep::MaybeOverrideName(AttributeList& attributes, NamingContext* co
   if (utils::IsValidIdentifierComponent(str)) {
     context->set_name_override(std::move(str));
   } else {
-    Fail(ErrInvalidGeneratedName, arg->span);
+    reporter()->Fail(ErrInvalidGeneratedName, arg->span);
   }
 }
 
@@ -614,7 +616,7 @@ bool ConsumeStep::ConsumeValueLayout(std::unique_ptr<raw::Layout> layout,
 
   if (layout->members.empty()) {
     if (strictness != types::Strictness::kFlexible)
-      return Fail(ErrMustHaveOneMember, layout->span());
+      return reporter()->Fail(ErrMustHaveOneMember, layout->span());
   }
 
   Decl* decl = RegisterDecl(
@@ -695,7 +697,7 @@ bool ConsumeStep::ConsumeStructLayout(std::unique_ptr<raw::Layout> layout,
 
     Attribute* allow_struct_defaults = attributes->Get("allow_deprecated_struct_defaults");
     if (!allow_struct_defaults && default_value != nullptr) {
-      Fail(ErrDeprecatedStructDefaults, mem->span());
+      reporter()->Fail(ErrDeprecatedStructDefaults, mem->span());
     }
 
     members.emplace_back(std::move(type_ctor), member->identifier->span(), std::move(default_value),
@@ -857,7 +859,7 @@ void ConsumeStep::ConsumeTypeDeclaration(std::unique_ptr<raw::TypeDeclaration> t
       return;
     }
     auto named_ref = static_cast<raw::NamedLayoutReference*>(layout_ref.get());
-    Fail(ErrNewTypesNotAllowed, type_decl->span(), name, named_ref->span().data());
+    reporter()->Fail(ErrNewTypesNotAllowed, type_decl->span(), name, named_ref->span().data());
     return;
   }
 

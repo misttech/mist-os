@@ -23,7 +23,7 @@ namespace fidl::flat {
 
 Compiler::Compiler(Libraries* all_libraries, const VersionSelection* version_selection,
                    ordinals::MethodHasher method_hasher, ExperimentalFlags experimental_flags)
-    : ReporterMixin(all_libraries->reporter()),
+    : reporter_(all_libraries->reporter()),
       library_(std::make_unique<Library>()),
       all_libraries_(all_libraries),
       version_selection(version_selection),
@@ -35,7 +35,7 @@ bool Compiler::ConsumeFile(std::unique_ptr<raw::File> file) {
 }
 
 bool Compiler::Compile() {
-  auto checkpoint = reporter()->Checkpoint();
+  auto checkpoint = reporter_->Checkpoint();
 
   if (!AvailabilityStep(this).Run())
     return false;
@@ -80,7 +80,8 @@ VirtualSourceFile* Compiler::Step::generated_source_file() {
 bool Libraries::Insert(std::unique_ptr<Library> library) {
   auto [_, inserted] = libraries_by_name_.try_emplace(library->name, library.get());
   if (!inserted) {
-    return Fail(ErrMultipleLibrariesWithSameName, library->arbitrary_name_span, library->name);
+    return reporter_->Fail(ErrMultipleLibrariesWithSameName, library->arbitrary_name_span,
+                           library->name);
   }
   libraries_.push_back(std::move(library));
   return true;
@@ -169,7 +170,7 @@ void Libraries::WarnOnAttributeTypo(const Attribute* attribute) const {
     auto supplied_name = attribute_name;
     auto edit_distance = EditDistance(supplied_name, suspected_name);
     if (0 < edit_distance && edit_distance < 2) {
-      Warn(WarnAttributeTypo, attribute->span, supplied_name, suspected_name);
+      reporter_->Warn(WarnAttributeTypo, attribute->span, supplied_name, suspected_name);
     }
   }
 }

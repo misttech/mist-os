@@ -20,7 +20,7 @@ bool TypeResolver::ResolveParamAsType(const Reference& layout,
     // if there were no errors reported but we couldn't resolve to a type, it must
     // mean that the parameter referred to a non-type, so report a new error here.
     if (check.NoNewErrors()) {
-      return Fail(ErrExpectedType, param->span);
+      return reporter()->Fail(ErrExpectedType, param->span);
     }
     // otherwise, there was an error during the type resolution process, so we
     // should just report that rather than add an extra error here
@@ -41,30 +41,30 @@ bool TypeResolver::ResolveParamAsSize(const Reference& layout,
     case LayoutParameter::Kind::kLiteral: {
       auto literal_param = static_cast<LiteralLayoutParameter*>(param.get());
       if (!ResolveSizeBound(literal_param->literal.get(), out_size))
-        return Fail(ErrCouldNotResolveSizeBound, literal_param->span);
+        return reporter()->Fail(ErrCouldNotResolveSizeBound, literal_param->span);
       break;
     }
     case LayoutParameter::kType: {
       auto type_param = static_cast<TypeLayoutParameter*>(param.get());
-      return Fail(ErrExpectedValueButGotType, type_param->span,
-                  type_param->type_ctor->layout.resolved().name());
+      return reporter()->Fail(ErrExpectedValueButGotType, type_param->span,
+                              type_param->type_ctor->layout.resolved().name());
     }
     case LayoutParameter::Kind::kIdentifier: {
       auto ambig_param = static_cast<IdentifierLayoutParameter*>(param.get());
       auto as_constant = ambig_param->AsConstant();
       if (!as_constant) {
-        return Fail(ErrExpectedValueButGotType, ambig_param->span,
-                    ambig_param->reference.resolved().name());
+        return reporter()->Fail(ErrExpectedValueButGotType, ambig_param->span,
+                                ambig_param->reference.resolved().name());
       }
       if (!ResolveSizeBound(as_constant, out_size)) {
-        return Fail(ErrCannotResolveConstantValue, ambig_param->span);
+        return reporter()->Fail(ErrCannotResolveConstantValue, ambig_param->span);
       }
       break;
     }
   }
   ZX_ASSERT(*out_size);
   if ((*out_size)->value == 0)
-    return Fail(ErrMustHaveNonZeroSize, param->span, layout.resolved().name());
+    return reporter()->Fail(ErrMustHaveNonZeroSize, param->span, layout.resolved().name());
   return true;
 }
 

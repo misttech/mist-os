@@ -215,14 +215,12 @@ bool MergeConstraint(Reporter* reporter, const Name& layout_name, const Constrai
 
 // Base type for the |Constraints| struct.
 struct ConstraintsBase {
-  virtual bool OnUnexpectedConstraint(TypeResolver* resolver, std::optional<SourceSpan> params_span,
+  virtual bool OnUnexpectedConstraint(TypeResolver* resolver, Reporter* reporter,
+                                      std::optional<SourceSpan> params_span,
                                       const Name& layout_name, Resource* resource,
                                       size_t num_constraints,
                                       const std::vector<std::unique_ptr<Constant>>& params,
                                       size_t param_index) const;
-
-  // Helper to deal with include orderings...
-  static Reporter* ReporterForTypeResolver(TypeResolver* resolver);
 };
 
 // |Constraints| holds multiple kinds of constraints (indicated by template parameters) and provides
@@ -256,30 +254,32 @@ struct Constraints : public Constraint<Ks>..., public ConstraintsBase {
   // Resolve the constraints in the params, then optionally populate the layout invocation and merge
   // the resolved constraints with the ones in this object.
   template <typename M>
-  bool ResolveAndMergeConstraints(TypeResolver* resolver, std::optional<SourceSpan> params_span,
-                                  const Name& layout_name, Resource* resource,
+  bool ResolveAndMergeConstraints(TypeResolver* resolver, Reporter* reporter,
+                                  std::optional<SourceSpan> params_span, const Name& layout_name,
+                                  Resource* resource,
                                   const std::vector<std::unique_ptr<Constant>>& params,
                                   M* out_merged,
                                   LayoutInvocation* layout_invocation = nullptr) const {
     static_assert(std::is_base_of_v<std::remove_reference_t<decltype(*this)>, M>);
     M resolved;
-    if (!resolved.ResolveConstraints(resolver, params_span, layout_name, resource, params)) {
+    if (!resolved.ResolveConstraints(resolver, reporter, params_span, layout_name, resource,
+                                     params)) {
       return false;
     }
     if (layout_invocation) {
       resolved.PopulateLayoutInvocation(layout_invocation);
     }
     if (out_merged) {
-      return M::MergeConstraints(ReporterForTypeResolver(resolver), layout_name, *this, resolved,
-                                 out_merged);
+      return M::MergeConstraints(reporter, layout_name, *this, resolved, out_merged);
     }
     return true;
   }
 
  private:
   // Resolve all of the constraints against the params supplied into this object.
-  bool ResolveConstraints(TypeResolver* resolver, std::optional<SourceSpan> params_span,
-                          const Name& layout_name, Resource* resource,
+  bool ResolveConstraints(TypeResolver* resolver, Reporter* reporter,
+                          std::optional<SourceSpan> params_span, const Name& layout_name,
+                          Resource* resource,
                           const std::vector<std::unique_ptr<Constant>>& params) {
     size_t num_params = params.size();
     constexpr size_t num_constraints = sizeof...(Ks);
@@ -296,8 +296,8 @@ struct Constraints : public Constraint<Ks>..., public ConstraintsBase {
       }
       if (constraint_index == num_constraints) {
         // Ran out of constraint kinds trying to match this item.
-        return OnUnexpectedConstraint(resolver, params_span, layout_name, resource, num_constraints,
-                                      params, param_index);
+        return OnUnexpectedConstraint(resolver, reporter, params_span, layout_name, resource,
+                                      num_constraints, params, param_index);
       }
       constraint_index++;
     }
@@ -400,13 +400,15 @@ struct Constraints<> : ConstraintsBase {
   Constraints(const Constraints&) = default;
   Constraints(Constraints&&) noexcept = default;
 
-  bool ResolveAndMergeConstraints(TypeResolver* resolver, std::optional<SourceSpan> params_span,
-                                  const Name& layout_name, Resource* resource,
+  bool ResolveAndMergeConstraints(TypeResolver* resolver, Reporter* reporter,
+                                  std::optional<SourceSpan> params_span, const Name& layout_name,
+                                  Resource* resource,
                                   const std::vector<std::unique_ptr<Constant>>& params,
                                   nullptr_t out_merged,
                                   LayoutInvocation* layout_invocation = nullptr) const {
     if (!params.empty()) {
-      return OnUnexpectedConstraint(resolver, params_span, layout_name, resource, 0, params, 0);
+      return OnUnexpectedConstraint(resolver, reporter, params_span, layout_name, resource, 0,
+                                    params, 0);
     }
     return true;
   }

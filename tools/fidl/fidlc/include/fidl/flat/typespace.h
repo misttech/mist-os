@@ -26,12 +26,14 @@ struct TypeConstraints;
 // the same type.
 //
 // TODO(fxbug.dev/76219): Implement canonicalization.
-class Typespace final : private ReporterMixin {
+class Typespace final {
  public:
   // Initializes the typespace with builtin types from the root library.
   explicit Typespace(const Library* root_library, Reporter* reporter);
   Typespace(const Typespace&) = delete;
   Typespace(Typespace&&) = default;
+
+  Reporter* reporter() { return reporter_; }
 
   const Type* Create(TypeResolver* resolver, const Reference& layout,
                      const LayoutParameterList& parameters, const TypeConstraints& constraints,
@@ -47,6 +49,8 @@ class Typespace final : private ReporterMixin {
   class Creator;
 
   const Type* Intern(std::unique_ptr<Type> type);
+
+  Reporter* reporter_;
 
   std::vector<std::unique_ptr<Type>> types_;
   std::map<types::PrimitiveSubtype, std::unique_ptr<PrimitiveType>> primitive_types_;

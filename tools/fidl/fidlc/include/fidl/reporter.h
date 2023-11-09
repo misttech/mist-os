@@ -89,42 +89,6 @@ class Reporter {
   std::vector<std::unique_ptr<Diagnostic>> warnings_;
 };
 
-// ReporterMixin enables classes to call certain Reporter methods unqualified.
-// It is meant to be used with private or protected inheritance. For example:
-//
-//     class Foo : private ReporterMixin {
-//         Foo(Reporter* r) : ReporterMixin(r) {}
-//         void DoSomething() {
-//             if (/* ... */) Fail(...);  // instead of reporter_->Fail(...);
-//         }
-//     };
-//
-// Note: All ReporterMixin methods must be const, otherwise classes using the
-// mixin would not be able to call them in const contexts.
-class ReporterMixin {
- public:
-  explicit ReporterMixin(Reporter* reporter) : reporter_(reporter) {}
-
-  Reporter* reporter() const { return reporter_; }
-
-  void Report(std::unique_ptr<Diagnostic> diag) const { reporter_->Report(std::move(diag)); }
-
-  template <ErrorId Id, typename... Args>
-  bool Fail(const ErrorDef<Id, Args...>& def, SourceSpan span,
-            const identity_t<Args>&... args) const {
-    return reporter_->Fail(def, span, args...);
-  }
-
-  template <ErrorId Id, typename... Args>
-  void Warn(const WarningDef<Id, Args...>& def, SourceSpan span,
-            const identity_t<Args>&... args) const {
-    reporter_->Warn(def, span, args...);
-  }
-
- private:
-  Reporter* reporter_;
-};
-
 }  // namespace fidl
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_REPORTER_H_

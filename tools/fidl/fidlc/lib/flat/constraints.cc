@@ -141,7 +141,7 @@ bool ConstraintStorage<ConstraintKind::kUtf8>::ReportMergeFailure(Reporter* repo
 }
 
 ////////// ConstraintsBase
-bool ConstraintsBase::OnUnexpectedConstraint(TypeResolver* resolver,
+bool ConstraintsBase::OnUnexpectedConstraint(TypeResolver* resolver, Reporter* reporter,
                                              std::optional<SourceSpan> params_span,
                                              const Name& layout_name, Resource* resource,
                                              size_t num_constraints,
@@ -149,13 +149,10 @@ bool ConstraintsBase::OnUnexpectedConstraint(TypeResolver* resolver,
                                              size_t param_index) const {
   ZX_ASSERT(params_span.has_value());
   if (params.size() > num_constraints) {
-    return resolver->Fail(ErrTooManyConstraints, params_span.value(), layout_name, num_constraints,
+    return reporter->Fail(ErrTooManyConstraints, params_span.value(), layout_name, num_constraints,
                           params.size());
   }
-  return resolver->Fail(ErrUnexpectedConstraint, params[param_index]->span, layout_name);
-}
-Reporter* ConstraintsBase::ReporterForTypeResolver(TypeResolver* resolver) {
-  return resolver->reporter();
+  return reporter->Fail(ErrUnexpectedConstraint, params[param_index]->span, layout_name);
 }
 
 }  // namespace fidl::flat

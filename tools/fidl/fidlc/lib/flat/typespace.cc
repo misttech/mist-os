@@ -56,7 +56,7 @@ static std::optional<types::InternalSubtype> BuiltinToInternalSubtype(Builtin::I
   }
 }
 
-Typespace::Typespace(const Library* root_library, Reporter* reporter) : ReporterMixin(reporter) {
+Typespace::Typespace(const Library* root_library, Reporter* reporter) : reporter_(reporter) {
   for (auto& builtin : root_library->declarations.builtins) {
     if (auto subtype = BuiltinToPrimitiveSubtype(builtin->id)) {
       primitive_types_.emplace(subtype.value(),
@@ -103,13 +103,12 @@ const Type* Typespace::Intern(std::unique_ptr<Type> type) {
   return types_.back().get();
 }
 
-class Typespace::Creator : private ReporterMixin {
+class Typespace::Creator {
  public:
   Creator(Typespace* typespace, TypeResolver* resolver, const Reference& layout,
           const LayoutParameterList& parameters, const TypeConstraints& constraints,
           LayoutInvocation* out_params)
-      : ReporterMixin(typespace->reporter()),
-        typespace_(typespace),
+      : typespace_(typespace),
         resolver_(resolver),
         layout_(layout),
         parameters_(parameters),
@@ -119,6 +118,8 @@ class Typespace::Creator : private ReporterMixin {
   const Type* Create();
 
  private:
+  Reporter* reporter() { return typespace_->reporter(); }
+
   bool EnsureNumberOfLayoutParams(size_t expected_params);
 
   const Type* CreatePrimitiveType(types::PrimitiveSubtype subtype);
@@ -175,7 +176,7 @@ const Type* Typespace::Creator::Create() {
     case Decl::Kind::kConst:
     case Decl::Kind::kProtocol:
     case Decl::Kind::kService:
-      Fail(ErrExpectedType, layout_.span());
+      reporter()->Fail(ErrExpectedType, layout_.span());
       return nullptr;
   }
 
@@ -219,7 +220,7 @@ const Type* Typespace::Creator::Create() {
     case Builtin::Identity::kOptional:
     case Builtin::Identity::kMax:
     case Builtin::Identity::kHead:
-      Fail(ErrExpectedType, layout_.span());
+      reporter()->Fail(ErrExpectedType, layout_.span());
       return nullptr;
   }
 }
@@ -230,8 +231,8 @@ bool Typespace::Creator::EnsureNumberOfLayoutParams(size_t expected_params) {
     return true;
   }
   auto span = num_params == 0 ? layout_.span() : parameters_.span.value();
-  return Fail(ErrWrongNumberOfLayoutParameters, span, layout_.resolved().name(), expected_params,
-              num_params);
+  return reporter()->Fail(ErrWrongNumberOfLayoutParameters, span, layout_.resolved().name(),
+                          expected_params, num_params);
 }
 
 const Type* Typespace::Creator::CreatePrimitiveType(types::PrimitiveSubtype subtype) {
@@ -239,8 +240,8 @@ const Type* Typespace::Creator::CreatePrimitiveType(types::PrimitiveSubtype subt
     return nullptr;
   }
   std::unique_ptr<Type> constrained_type;
-  typespace_->GetPrimitiveType(subtype)->ApplyConstraints(resolver_, constraints_, layout_,
-                                                          &constrained_type, out_params_);
+  typespace_->GetPrimitiveType(subtype)->ApplyConstraints(resolver_, reporter(), constraints_,
+                                                          layout_, &constrained_type, out_params_);
   return typespace_->Intern(std::move(constrained_type));
 }
 
@@ -249,8 +250,8 @@ const Type* Typespace::Creator::CreateInternalType(types::InternalSubtype subtyp
     return nullptr;
   }
   std::unique_ptr<Type> constrained_type;
-  typespace_->GetInternalType(subtype)->ApplyConstraints(resolver_, constraints_, layout_,
-                                                         &constrained_type, out_params_);
+  typespace_->GetInternalType(subtype)->ApplyConstraints(resolver_, reporter(), constraints_,
+                                                         layout_, &constrained_type, out_params_);
   return typespace_->Intern(std::move(constrained_type));
 }
 
@@ -272,7 +273,8 @@ const Type* Typespace::Creator::CreateArrayType() {
 
   ArrayType type(layout_.resolved().name(), element_type, size);
   std::unique_ptr<Type> constrained_type;
-  type.ApplyConstraints(resolver_, constraints_, layout_, &constrained_type, out_params_);
+  type.ApplyConstraints(resolver_, reporter(), constraints_, layout_, &constrained_type,
+                        out_params_);
   return typespace_->Intern(std::move(constrained_type));
 }
 
@@ -292,7 +294,8 @@ const Type* Typespace::Creator::CreateStringArrayType() {
   ArrayType type(layout_.resolved().name(), uint8_type, size);
   type.utf8 = true;
   std::unique_ptr<Type> constrained_type;
-  type.ApplyConstraints(resolver_, constraints_, layout_, &constrained_type, out_params_);
+  type.ApplyConstraints(resolver_, reporter(), constraints_, layout_, &constrained_type,
+                        out_params_);
   return typespace_->Intern(std::move(constrained_type));
 }
 
@@ -308,7 +311,8 @@ const Type* Typespace::Creator::CreateVectorType() {
 
   VectorType type(layout_.resolved().name(), element_type);
   std::unique_ptr<Type> constrained_type;
-  type.ApplyConstraints(resolver_, constraints_, layout_, &constrained_type, out_params_);
+  type.ApplyConstraints(resolver_, reporter(), constraints_, layout_, &constrained_type,
+                        out_params_);
   return typespace_->Intern(std::move(constrained_type));
 }
 
@@ -324,7 +328,8 @@ const Type* Typespace::Creator::CreateZxExperimentalPointerType() {
 
   ZxExperimentalPointerType type(layout_.resolved().name(), element_type);
   std::unique_ptr<Type> constrained_type;
-  type.ApplyConstraints(resolver_, constraints_, layout_, &constrained_type, out_params_);
+  type.ApplyConstraints(resolver_, reporter(), constraints_, layout_, &constrained_type,
+                        out_params_);
   return typespace_->Intern(std::move(constrained_type));
 }
 
@@ -334,7 +339,8 @@ const Type* Typespace::Creator::CreateStringType() {
 
   StringType type(layout_.resolved().name());
   std::unique_ptr<Type> constrained_type;
-  type.ApplyConstraints(resolver_, constraints_, layout_, &constrained_type, out_params_);
+  type.ApplyConstraints(resolver_, reporter(), constraints_, layout_, &constrained_type,
+                        out_params_);
   return typespace_->Intern(std::move(constrained_type));
 }
 
@@ -342,14 +348,15 @@ const Type* Typespace::Creator::CreateHandleType(Resource* resource) {
   if (!EnsureNumberOfLayoutParams(0))
     return nullptr;
   if (auto cycle = resolver_->GetDeclCycle(resource); cycle) {
-    Fail(ErrIncludeCycle, resource->name.span().value(), cycle.value());
+    reporter()->Fail(ErrIncludeCycle, resource->name.span().value(), cycle.value());
     return nullptr;
   }
   resolver_->CompileDecl(resource);
 
   HandleType type(layout_.resolved().name(), resource);
   std::unique_ptr<Type> constrained_type;
-  type.ApplyConstraints(resolver_, constraints_, layout_, &constrained_type, out_params_);
+  type.ApplyConstraints(resolver_, reporter(), constraints_, layout_, &constrained_type,
+                        out_params_);
   return typespace_->Intern(std::move(constrained_type));
 }
 
@@ -362,7 +369,8 @@ const Type* Typespace::Creator::CreateTransportSideType(TransportSide end) {
 
   TransportSideType type(layout_.resolved().name(), end, kChannelTransport);
   std::unique_ptr<Type> constrained_type;
-  type.ApplyConstraints(resolver_, constraints_, layout_, &constrained_type, out_params_);
+  type.ApplyConstraints(resolver_, reporter(), constraints_, layout_, &constrained_type,
+                        out_params_);
   return typespace_->Intern(std::move(constrained_type));
 }
 
@@ -380,13 +388,14 @@ const Type* Typespace::Creator::CreateIdentifierType(TypeDecl* type_decl) {
 
   IdentifierType type(type_decl);
   std::unique_ptr<Type> constrained_type;
-  type.ApplyConstraints(resolver_, constraints_, layout_, &constrained_type, out_params_);
+  type.ApplyConstraints(resolver_, reporter(), constraints_, layout_, &constrained_type,
+                        out_params_);
   return typespace_->Intern(std::move(constrained_type));
 }
 
 const Type* Typespace::Creator::CreateAliasType(Alias* alias) {
   if (auto cycle = resolver_->GetDeclCycle(alias); cycle) {
-    Fail(ErrIncludeCycle, alias->name.span().value(), cycle.value());
+    reporter()->Fail(ErrIncludeCycle, alias->name.span().value(), cycle.value());
     return nullptr;
   }
   resolver_->CompileDecl(alias);
@@ -401,7 +410,8 @@ const Type* Typespace::Creator::CreateAliasType(Alias* alias) {
   const auto& aliased_type = alias->partial_type_ctor->type;
   out_params_->from_alias = alias;
   std::unique_ptr<Type> constrained_type;
-  aliased_type->ApplyConstraints(resolver_, constraints_, layout_, &constrained_type, out_params_);
+  aliased_type->ApplyConstraints(resolver_, reporter(), constraints_, layout_, &constrained_type,
+                                 out_params_);
   return typespace_->Intern(std::move(constrained_type));
 }
 
@@ -437,16 +447,17 @@ const Type* Typespace::Creator::CreateBoxType() {
   if (!IsStruct(boxed_type)) {
     if (boxed_type) {
       if (CannotBeBoxedNorOptional(boxed_type)) {
-        Fail(ErrCannotBeBoxedNorOptional, parameters_.items[0]->span, boxed_type->name);
+        reporter()->Fail(ErrCannotBeBoxedNorOptional, parameters_.items[0]->span, boxed_type->name);
       } else {
-        Fail(ErrCannotBeBoxedShouldBeOptional, parameters_.items[0]->span, boxed_type->name);
+        reporter()->Fail(ErrCannotBeBoxedShouldBeOptional, parameters_.items[0]->span,
+                         boxed_type->name);
       }
     }
     return nullptr;
   }
   const auto* inner = static_cast<const IdentifierType*>(boxed_type);
   if (inner->nullability == types::Nullability::kNullable) {
-    Fail(ErrBoxedTypeCannotBeOptional, parameters_.items[0]->span);
+    reporter()->Fail(ErrBoxedTypeCannotBeOptional, parameters_.items[0]->span);
     return nullptr;
   }
   // We disallow specifying the boxed type as nullable in FIDL source but
@@ -465,7 +476,8 @@ const Type* Typespace::Creator::CreateBoxType() {
 
   BoxType type(layout_.resolved().name(), boxed_type);
   std::unique_ptr<Type> constrained_type;
-  type.ApplyConstraints(resolver_, constraints_, layout_, &constrained_type, out_params_);
+  type.ApplyConstraints(resolver_, reporter(), constraints_, layout_, &constrained_type,
+                        out_params_);
   return typespace_->Intern(std::move(constrained_type));
 }
 

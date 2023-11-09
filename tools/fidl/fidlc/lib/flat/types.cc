@@ -17,40 +17,41 @@ namespace fidl::flat {
 const HandleRights HandleType::kSameRights = HandleRights(0x80000000);
 
 bool RejectOptionalConstraints::OnUnexpectedConstraint(
-    TypeResolver* resolver, std::optional<SourceSpan> params_span, const Name& layout_name,
-    Resource* resource, size_t num_constraints,
+    TypeResolver* resolver, Reporter* reporter, std::optional<SourceSpan> params_span,
+    const Name& layout_name, Resource* resource, size_t num_constraints,
     const std::vector<std::unique_ptr<Constant>>& params, size_t param_index) const {
   if (params.size() == 1 && resolver->ResolveAsOptional(params[0].get())) {
-    return resolver->Fail(ErrCannotBeOptional, params[0]->span, layout_name);
+    return reporter->Fail(ErrCannotBeOptional, params[0]->span, layout_name);
   }
-  return ConstraintsBase::OnUnexpectedConstraint(resolver, params_span, layout_name, resource,
-                                                 num_constraints, params, param_index);
+  return ConstraintsBase::OnUnexpectedConstraint(resolver, reporter, params_span, layout_name,
+                                                 resource, num_constraints, params, param_index);
 }
 
-bool ArrayConstraints::OnUnexpectedConstraint(TypeResolver* resolver,
+bool ArrayConstraints::OnUnexpectedConstraint(TypeResolver* resolver, Reporter* reporter,
                                               std::optional<SourceSpan> params_span,
                                               const Name& layout_name, Resource* resource,
                                               size_t num_constraints,
                                               const std::vector<std::unique_ptr<Constant>>& params,
                                               size_t param_index) const {
   if (params.size() == 1 && resolver->ResolveAsOptional(params[0].get())) {
-    return resolver->Fail(ErrCannotBeOptional, params[0]->span, layout_name);
+    return reporter->Fail(ErrCannotBeOptional, params[0]->span, layout_name);
   }
-  return ConstraintsBase::OnUnexpectedConstraint(resolver, params_span, layout_name, resource,
-                                                 num_constraints, params, param_index);
+  return ConstraintsBase::OnUnexpectedConstraint(resolver, reporter, params_span, layout_name,
+                                                 resource, num_constraints, params, param_index);
 }
 
-bool ArrayType::ApplyConstraints(TypeResolver* resolver, const TypeConstraints& constraints,
-                                 const Reference& layout, std::unique_ptr<Type>* out_type,
+bool ArrayType::ApplyConstraints(TypeResolver* resolver, Reporter* reporter,
+                                 const TypeConstraints& constraints, const Reference& layout,
+                                 std::unique_ptr<Type>* out_type,
                                  LayoutInvocation* out_params) const {
   Constraints c;
-  if (!ResolveAndMergeConstraints(resolver, constraints.span, layout.resolved().name(), nullptr,
-                                  constraints.items, &c, out_params)) {
+  if (!ResolveAndMergeConstraints(resolver, reporter, constraints.span, layout.resolved().name(),
+                                  nullptr, constraints.items, &c, out_params)) {
     return false;
   }
 
   if (c.utf8 && !resolver->experimental_flags().IsFlagEnabled(ExperimentalFlags::Flag::kZxCTypes)) {
-    return resolver->Fail(ErrExperimentalZxCTypesDisallowed, layout.span(),
+    return reporter->Fail(ErrExperimentalZxCTypesDisallowed, layout.span(),
                           layout.resolved().name());
   }
 
@@ -58,25 +59,26 @@ bool ArrayType::ApplyConstraints(TypeResolver* resolver, const TypeConstraints& 
   return true;
 }
 
-bool VectorConstraints::OnUnexpectedConstraint(TypeResolver* resolver,
+bool VectorConstraints::OnUnexpectedConstraint(TypeResolver* resolver, Reporter* reporter,
                                                std::optional<SourceSpan> params_span,
                                                const Name& layout_name, Resource* resource,
                                                size_t num_constraints,
                                                const std::vector<std::unique_ptr<Constant>>& params,
                                                size_t param_index) const {
   if (!params.empty() && param_index == 0) {
-    return resolver->Fail(ErrCouldNotResolveSizeBound, params[0]->span);
+    return reporter->Fail(ErrCouldNotResolveSizeBound, params[0]->span);
   }
-  return ConstraintsBase::OnUnexpectedConstraint(resolver, params_span, layout_name, resource,
-                                                 num_constraints, params, param_index);
+  return ConstraintsBase::OnUnexpectedConstraint(resolver, reporter, params_span, layout_name,
+                                                 resource, num_constraints, params, param_index);
 }
 
-bool VectorType::ApplyConstraints(TypeResolver* resolver, const TypeConstraints& constraints,
-                                  const Reference& layout, std::unique_ptr<Type>* out_type,
+bool VectorType::ApplyConstraints(TypeResolver* resolver, Reporter* reporter,
+                                  const TypeConstraints& constraints, const Reference& layout,
+                                  std::unique_ptr<Type>* out_type,
                                   LayoutInvocation* out_params) const {
   Constraints c;
-  if (!ResolveAndMergeConstraints(resolver, constraints.span, layout.resolved().name(), nullptr,
-                                  constraints.items, &c, out_params)) {
+  if (!ResolveAndMergeConstraints(resolver, reporter, constraints.span, layout.resolved().name(),
+                                  nullptr, constraints.items, &c, out_params)) {
     return false;
   }
 
@@ -84,12 +86,13 @@ bool VectorType::ApplyConstraints(TypeResolver* resolver, const TypeConstraints&
   return true;
 }
 
-bool StringType::ApplyConstraints(TypeResolver* resolver, const TypeConstraints& constraints,
-                                  const Reference& layout, std::unique_ptr<Type>* out_type,
+bool StringType::ApplyConstraints(TypeResolver* resolver, Reporter* reporter,
+                                  const TypeConstraints& constraints, const Reference& layout,
+                                  std::unique_ptr<Type>* out_type,
                                   LayoutInvocation* out_params) const {
   Constraints c;
-  if (!ResolveAndMergeConstraints(resolver, constraints.span, layout.resolved().name(), nullptr,
-                                  constraints.items, &c, out_params)) {
+  if (!ResolveAndMergeConstraints(resolver, reporter, constraints.span, layout.resolved().name(),
+                                  nullptr, constraints.items, &c, out_params)) {
     return false;
   }
 
@@ -98,13 +101,14 @@ bool StringType::ApplyConstraints(TypeResolver* resolver, const TypeConstraints&
   return true;
 }
 
-bool HandleType::ApplyConstraints(TypeResolver* resolver, const TypeConstraints& constraints,
-                                  const Reference& layout, std::unique_ptr<Type>* out_type,
+bool HandleType::ApplyConstraints(TypeResolver* resolver, Reporter* reporter,
+                                  const TypeConstraints& constraints, const Reference& layout,
+                                  std::unique_ptr<Type>* out_type,
                                   LayoutInvocation* out_params) const {
   ZX_ASSERT(resource_decl);
 
   Constraints c;
-  if (!ResolveAndMergeConstraints(resolver, constraints.span, layout.resolved().name(),
+  if (!ResolveAndMergeConstraints(resolver, reporter, constraints.span, layout.resolved().name(),
                                   resource_decl, constraints.items, &c, out_params)) {
     return false;
   }
@@ -114,27 +118,28 @@ bool HandleType::ApplyConstraints(TypeResolver* resolver, const TypeConstraints&
 }
 
 bool TransportSideConstraints::OnUnexpectedConstraint(
-    TypeResolver* resolver, std::optional<SourceSpan> params_span, const Name& layout_name,
-    Resource* resource, size_t num_constraints,
+    TypeResolver* resolver, Reporter* reporter, std::optional<SourceSpan> params_span,
+    const Name& layout_name, Resource* resource, size_t num_constraints,
     const std::vector<std::unique_ptr<Constant>>& params, size_t param_index) const {
   if (!params.empty() && param_index == 0) {
-    return resolver->Fail(ErrMustBeAProtocol, params[0]->span, layout_name);
+    return reporter->Fail(ErrMustBeAProtocol, params[0]->span, layout_name);
   }
-  return ConstraintsBase::OnUnexpectedConstraint(resolver, params_span, layout_name, resource,
-                                                 num_constraints, params, param_index);
+  return ConstraintsBase::OnUnexpectedConstraint(resolver, reporter, params_span, layout_name,
+                                                 resource, num_constraints, params, param_index);
 }
 
-bool TransportSideType::ApplyConstraints(TypeResolver* resolver, const TypeConstraints& constraints,
+bool TransportSideType::ApplyConstraints(TypeResolver* resolver, Reporter* reporter,
+                                         const TypeConstraints& constraints,
                                          const Reference& layout, std::unique_ptr<Type>* out_type,
                                          LayoutInvocation* out_params) const {
   Constraints c;
-  if (!ResolveAndMergeConstraints(resolver, constraints.span, layout.resolved().name(), nullptr,
-                                  constraints.items, &c, out_params)) {
+  if (!ResolveAndMergeConstraints(resolver, reporter, constraints.span, layout.resolved().name(),
+                                  nullptr, constraints.items, &c, out_params)) {
     return false;
   }
 
   if (!c.HasConstraint<ConstraintKind::kProtocol>()) {
-    return resolver->Fail(ErrProtocolConstraintRequired, layout.span(), layout.resolved().name());
+    return reporter->Fail(ErrProtocolConstraintRequired, layout.span(), layout.resolved().name());
   }
 
   const Attribute* transport_attribute = c.protocol_decl->attributes->Get("transport");
@@ -158,8 +163,9 @@ IdentifierType::IdentifierType(TypeDecl* type_decl, Constraints constraints)
       Constraints(std::move(constraints)),
       type_decl(type_decl) {}
 
-bool IdentifierType::ApplyConstraints(TypeResolver* resolver, const TypeConstraints& constraints,
-                                      const Reference& layout, std::unique_ptr<Type>* out_type,
+bool IdentifierType::ApplyConstraints(TypeResolver* resolver, Reporter* reporter,
+                                      const TypeConstraints& constraints, const Reference& layout,
+                                      std::unique_ptr<Type>* out_type,
                                       LayoutInvocation* out_params) const {
   const auto& layout_name = layout.resolved().name();
 
@@ -167,12 +173,12 @@ bool IdentifierType::ApplyConstraints(TypeResolver* resolver, const TypeConstrai
     // Currently, we are disallowing optional on new-types. And since new-types are semi-opaque
     // wrappers around types, we need not bother about other constraints. So no constraints for
     // you, new-types!
-    return resolver->Fail(ErrNewTypeCannotHaveConstraint, constraints.span.value(), layout_name);
+    return reporter->Fail(ErrNewTypeCannotHaveConstraint, constraints.span.value(), layout_name);
   }
 
   Constraints c;
-  if (!ResolveAndMergeConstraints(resolver, constraints.span, layout.resolved().name(), nullptr,
-                                  constraints.items, &c, out_params)) {
+  if (!ResolveAndMergeConstraints(resolver, reporter, constraints.span, layout.resolved().name(),
+                                  nullptr, constraints.items, &c, out_params)) {
     return false;
   }
 
@@ -183,7 +189,7 @@ bool IdentifierType::ApplyConstraints(TypeResolver* resolver, const TypeConstrai
     case Decl::Kind::kTable:
     case Decl::Kind::kOverlay:
       if (c.HasConstraint<ConstraintKind::kNullability>()) {
-        return resolver->Fail(ErrCannotBeOptional, constraints.span.value(), layout_name);
+        return reporter->Fail(ErrCannotBeOptional, constraints.span.value(), layout_name);
       }
       break;
 
@@ -193,7 +199,7 @@ bool IdentifierType::ApplyConstraints(TypeResolver* resolver, const TypeConstrai
         // Structs are nullable in the sense that they can be boxed. But we are
         // disallowing optional to be used on struct.
         if (c.HasConstraint<ConstraintKind::kNullability>()) {
-          return resolver->Fail(ErrStructCannotBeOptional, constraints.span.value(), layout_name);
+          return reporter->Fail(ErrStructCannotBeOptional, constraints.span.value(), layout_name);
         }
       }
       break;
@@ -227,23 +233,24 @@ bool IdentifierType::ApplyConstraints(TypeResolver* resolver, const TypeConstrai
   return true;
 }
 
-bool BoxConstraints::OnUnexpectedConstraint(TypeResolver* resolver,
+bool BoxConstraints::OnUnexpectedConstraint(TypeResolver* resolver, Reporter* reporter,
                                             std::optional<SourceSpan> params_span,
                                             const Name& layout_name, Resource* resource,
                                             size_t num_constraints,
                                             const std::vector<std::unique_ptr<Constant>>& params,
                                             size_t param_index) const {
   if (params.size() == 1 && resolver->ResolveAsOptional(params[0].get())) {
-    return resolver->Fail(ErrBoxCannotBeOptional, params[0]->span);
+    return reporter->Fail(ErrBoxCannotBeOptional, params[0]->span);
   }
-  return ConstraintsBase::OnUnexpectedConstraint(resolver, params_span, layout_name, resource,
-                                                 num_constraints, params, param_index);
+  return ConstraintsBase::OnUnexpectedConstraint(resolver, reporter, params_span, layout_name,
+                                                 resource, num_constraints, params, param_index);
 }
-bool BoxType::ApplyConstraints(TypeResolver* resolver, const TypeConstraints& constraints,
-                               const Reference& layout, std::unique_ptr<Type>* out_type,
+bool BoxType::ApplyConstraints(TypeResolver* resolver, Reporter* reporter,
+                               const TypeConstraints& constraints, const Reference& layout,
+                               std::unique_ptr<Type>* out_type,
                                LayoutInvocation* out_params) const {
-  if (!ResolveAndMergeConstraints(resolver, constraints.span, layout.resolved().name(), nullptr,
-                                  constraints.items, nullptr)) {
+  if (!ResolveAndMergeConstraints(resolver, reporter, constraints.span, layout.resolved().name(),
+                                  nullptr, constraints.items, nullptr)) {
     return false;
   }
 
@@ -251,7 +258,7 @@ bool BoxType::ApplyConstraints(TypeResolver* resolver, const TypeConstraints& co
   return true;
 }
 
-bool UntypedNumericType::ApplyConstraints(TypeResolver* resolver,
+bool UntypedNumericType::ApplyConstraints(TypeResolver* resolver, Reporter* reporter,
                                           const TypeConstraints& constraints,
                                           const Reference& layout, std::unique_ptr<Type>* out_type,
                                           LayoutInvocation* out_params) const {
@@ -284,11 +291,12 @@ uint32_t PrimitiveType::SubtypeSize(types::PrimitiveSubtype subtype) {
   }
 }
 
-bool PrimitiveType::ApplyConstraints(TypeResolver* resolver, const TypeConstraints& constraints,
-                                     const Reference& layout, std::unique_ptr<Type>* out_type,
+bool PrimitiveType::ApplyConstraints(TypeResolver* resolver, Reporter* reporter,
+                                     const TypeConstraints& constraints, const Reference& layout,
+                                     std::unique_ptr<Type>* out_type,
                                      LayoutInvocation* out_params) const {
-  if (!ResolveAndMergeConstraints(resolver, constraints.span, layout.resolved().name(), nullptr,
-                                  constraints.items, nullptr)) {
+  if (!ResolveAndMergeConstraints(resolver, reporter, constraints.span, layout.resolved().name(),
+                                  nullptr, constraints.items, nullptr)) {
     return false;
   }
 
@@ -296,35 +304,36 @@ bool PrimitiveType::ApplyConstraints(TypeResolver* resolver, const TypeConstrain
        subtype == types::PrimitiveSubtype::kZxUintptr64 ||
        subtype == types::PrimitiveSubtype::kZxUchar) &&
       !resolver->experimental_flags().IsFlagEnabled(ExperimentalFlags::Flag::kZxCTypes)) {
-    return resolver->Fail(ErrExperimentalZxCTypesDisallowed, layout.span(),
+    return reporter->Fail(ErrExperimentalZxCTypesDisallowed, layout.span(),
                           layout.resolved().name());
   }
   *out_type = std::make_unique<PrimitiveType>(name, subtype);
   return true;
 }
 
-bool InternalType::ApplyConstraints(TypeResolver* resolver, const TypeConstraints& constraints,
-                                    const Reference& layout, std::unique_ptr<Type>* out_type,
+bool InternalType::ApplyConstraints(TypeResolver* resolver, Reporter* reporter,
+                                    const TypeConstraints& constraints, const Reference& layout,
+                                    std::unique_ptr<Type>* out_type,
                                     LayoutInvocation* out_params) const {
-  if (!ResolveAndMergeConstraints(resolver, constraints.span, layout.resolved().name(), nullptr,
-                                  constraints.items, nullptr)) {
+  if (!ResolveAndMergeConstraints(resolver, reporter, constraints.span, layout.resolved().name(),
+                                  nullptr, constraints.items, nullptr)) {
     return false;
   }
   *out_type = std::make_unique<InternalType>(name, subtype);
   return true;
 }
 
-bool ZxExperimentalPointerType::ApplyConstraints(TypeResolver* resolver,
+bool ZxExperimentalPointerType::ApplyConstraints(TypeResolver* resolver, Reporter* reporter,
                                                  const TypeConstraints& constraints,
                                                  const Reference& layout,
                                                  std::unique_ptr<Type>* out_type,
                                                  LayoutInvocation* out_params) const {
-  if (!ResolveAndMergeConstraints(resolver, constraints.span, layout.resolved().name(), nullptr,
-                                  constraints.items, nullptr)) {
+  if (!ResolveAndMergeConstraints(resolver, reporter, constraints.span, layout.resolved().name(),
+                                  nullptr, constraints.items, nullptr)) {
     return false;
   }
   if (!resolver->experimental_flags().IsFlagEnabled(ExperimentalFlags::Flag::kZxCTypes)) {
-    return resolver->Fail(ErrExperimentalZxCTypesDisallowed, layout.span(),
+    return reporter->Fail(ErrExperimentalZxCTypesDisallowed, layout.span(),
                           layout.resolved().name());
   }
   *out_type = std::make_unique<ZxExperimentalPointerType>(name, pointee_type);

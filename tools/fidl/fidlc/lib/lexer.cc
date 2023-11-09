@@ -202,7 +202,7 @@ Token Lexer::LexStringLiteral() {
       case '\n':
       case '\r': {
         SourceSpan span(std::string_view(current_ - 1, 1), source_file_);
-        Fail(ErrUnexpectedLineBreak, span);
+        reporter_->Fail(ErrUnexpectedLineBreak, span);
         state = kNormal;
         break;
       }
@@ -211,7 +211,7 @@ Token Lexer::LexStringLiteral() {
           SourceSpan span(std::string_view(current_ - 1, 1), source_file_);
           char buf[3];
           snprintf(buf, sizeof buf, "%x", curr);
-          Fail(ErrUnexpectedControlCharacter, span, std::string_view(buf));
+          reporter_->Fail(ErrUnexpectedControlCharacter, span, std::string_view(buf));
           state = kNormal;
         }
         break;
@@ -238,7 +238,7 @@ Token Lexer::LexStringLiteral() {
             break;
           default:
             SourceSpan span(std::string_view(current_ - 2, 2), source_file_);
-            Fail(ErrInvalidEscapeSequence, span, span.data());
+            reporter_->Fail(ErrInvalidEscapeSequence, span, span.data());
             state = kNormal;
         }
         break;
@@ -250,7 +250,7 @@ Token Lexer::LexStringLiteral() {
         } else {
           // Saw something like "\ua" which is invalid.
           SourceSpan span(std::string_view(current_ - 3, 2), source_file_);
-          Fail(ErrUnicodeEscapeMissingBraces, span);
+          reporter_->Fail(ErrUnicodeEscapeMissingBraces, span);
           if (curr == '"') {
             return Finish(Token::Kind::kStringLiteral);
           }
@@ -266,7 +266,7 @@ Token Lexer::LexStringLiteral() {
           SourceSpan span(
               std::string_view(current_ - 4 - unicode_hex_digits, unicode_hex_digits + 3),
               source_file_);
-          Fail(ErrUnicodeEscapeUnterminated, span);
+          reporter_->Fail(ErrUnicodeEscapeUnterminated, span);
           return Finish(Token::Kind::kStringLiteral);
         } else if (curr == '}') {
           // Saw "\u{...}", now validate the "..." part.
@@ -274,23 +274,23 @@ Token Lexer::LexStringLiteral() {
             SourceSpan span(
                 std::string_view(current_ - 4 - unicode_hex_digits, unicode_hex_digits + 4),
                 source_file_);
-            Fail(ErrUnicodeEscapeEmpty, span);
+            reporter_->Fail(ErrUnicodeEscapeEmpty, span);
           } else if (unicode_hex_digits > 6) {
             SourceSpan span(std::string_view(current_ - 1 - unicode_hex_digits, unicode_hex_digits),
                             source_file_);
-            Fail(ErrUnicodeEscapeTooLong, span);
+            reporter_->Fail(ErrUnicodeEscapeTooLong, span);
           } else {
             SourceSpan span(std::string_view(current_ - 1 - unicode_hex_digits, unicode_hex_digits),
                             source_file_);
             auto codepoint = utils::decode_unicode_hex(span.data());
             if (codepoint > 0x10ffff) {
-              Fail(ErrUnicodeEscapeTooLarge, span, span.data());
+              reporter_->Fail(ErrUnicodeEscapeTooLarge, span, span.data());
             }
           }
           state = kNormal;
         } else {
           SourceSpan span(std::string_view(current_ - 1, 1), source_file_);
-          Fail(ErrInvalidHexDigit, span, curr);
+          reporter_->Fail(ErrInvalidHexDigit, span, curr);
           state = kNormal;
         }
         break;
@@ -450,7 +450,7 @@ Token Lexer::Lex() {
             return LexCommentOrDocComment();
           default: {
             SourceSpan span(std::string_view(token_start_, token_size_), source_file_);
-            Fail(ErrInvalidCharacter, span, span.data());
+            reporter_->Fail(ErrInvalidCharacter, span, span.data());
             continue;
           }
         }  // switch
@@ -493,7 +493,7 @@ Token Lexer::Lex() {
 
       default: {
         SourceSpan span(std::string_view(token_start_, token_size_), source_file_);
-        Fail(ErrInvalidCharacter, span, span.data());
+        reporter_->Fail(ErrInvalidCharacter, span, span.data());
         continue;
       }
     }  // switch

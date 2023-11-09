@@ -312,10 +312,9 @@ ResolveStep::Context ResolveStep::ConstraintContext(const TypeConstructor* type_
 
 // Helper for looking up names as libraries, decls, or members. The Try* methods
 // do not report an error, while the Must* methods do.
-class ResolveStep::Lookup final : ReporterMixin {
+class ResolveStep::Lookup final {
  public:
-  Lookup(ResolveStep* step, const Reference& ref)
-      : ReporterMixin(step->reporter()), step_(step), ref_(ref) {}
+  Lookup(ResolveStep* step, const Reference& ref) : step_(step), ref_(ref) {}
 
   const Library* TryLibrary(const std::vector<std::string_view>& name) {
     auto root_library = step_->all_libraries()->root_library();
@@ -351,7 +350,7 @@ class ResolveStep::Lookup final : ReporterMixin {
     if (auto key = TryDecl(library, name)) {
       return key;
     }
-    Fail(ErrNameNotFound, ref_.span(), name, library->name);
+    reporter()->Fail(ErrNameNotFound, ref_.span(), name, library->name);
     return std::nullopt;
   }
 
@@ -385,14 +384,16 @@ class ResolveStep::Lookup final : ReporterMixin {
         }
         break;
       default:
-        Fail(ErrCannotReferToMember, ref_.span(), parent);
+        reporter()->Fail(ErrCannotReferToMember, ref_.span(), parent);
         return nullptr;
     }
-    Fail(ErrMemberNotFound, ref_.span(), parent, name);
+    reporter()->Fail(ErrMemberNotFound, ref_.span(), parent, name);
     return nullptr;
   }
 
  private:
+  Reporter* reporter() { return step_->reporter(); }
+
   ResolveStep* step_;
   const Reference& ref_;
 };
@@ -445,7 +446,7 @@ void ResolveStep::ParseReference(Reference& ref, Context context) {
   // decide what value to use if the const it's referencing has different values
   // at different versions?
   if (context.enclosing->kind == Element::Kind::kLibrary) {
-    Fail(ErrReferenceInLibraryAttribute, ref.span());
+    reporter()->Fail(ErrReferenceInLibraryAttribute, ref.span());
     ref.MarkFailed();
     return;
   }
@@ -501,7 +502,7 @@ void ResolveStep::ParseSourcedReference(Reference& ref, Context context) {
       } else if (context.allow_contextual) {
         ref.MarkContextual();
       } else {
-        Fail(ErrNameNotFound, ref.span(), components[0], library()->name);
+        reporter()->Fail(ErrNameNotFound, ref.span(), components[0], library()->name);
       }
       break;
     }
@@ -513,7 +514,7 @@ void ResolveStep::ParseSourcedReference(Reference& ref, Context context) {
           ref.SetKey(key.value());
         }
       } else {
-        Fail(ErrNameNotFound, ref.span(), components[0], library()->name);
+        reporter()->Fail(ErrNameNotFound, ref.span(), components[0], library()->name);
       }
       break;
     }
@@ -529,7 +530,8 @@ void ResolveStep::ParseSourcedReference(Reference& ref, Context context) {
           ref.SetKey(key.value().Member(components.back()));
         }
       } else {
-        Fail(ErrUnknownDependentLibrary, ref.span(), long_library_name, short_library_name);
+        reporter()->Fail(ErrUnknownDependentLibrary, ref.span(), long_library_name,
+                         short_library_name);
       }
       break;
     }
@@ -595,13 +597,13 @@ void ResolveStep::ResolveContextualReference(Reference& ref, Context context) {
   auto name = ref.contextual().name;
   auto subtype_enum = context.maybe_resource_subtype;
   if (!subtype_enum) {
-    Fail(ErrNameNotFound, ref.span(), name, library()->name);
+    reporter()->Fail(ErrNameNotFound, ref.span(), name, library()->name);
     return;
   }
   Lookup lookup(this, ref);
   auto member = lookup.TryMember(subtype_enum, name);
   if (!member) {
-    Fail(ErrNameNotFound, ref.span(), name, library()->name);
+    reporter()->Fail(ErrNameNotFound, ref.span(), name, library()->name);
     return;
   }
   ref.ResolveTo(Reference::Target(member, subtype_enum));
@@ -642,7 +644,7 @@ Decl* ResolveStep::LookupDeclByKey(const Reference& ref, Context context) {
     }
     // TODO(fxbug.dev/67858): Provide a nicer error message in the case where a
     // decl with that name does exist, but in a different version range.
-    Fail(ErrNameNotFound, ref.span(), key.decl_name, key.library->name);
+    reporter()->Fail(ErrNameNotFound, ref.span(), key.decl_name, key.library->name);
     return nullptr;
   }
   // Case #2: source and target libraries are versioned in different platforms.
@@ -655,7 +657,7 @@ Decl* ResolveStep::LookupDeclByKey(const Reference& ref, Context context) {
   }
   // TODO(fxbug.dev/67858): Provide a nicer error message in the case where
   // a decl with that name does exist, but in a different version range.
-  Fail(ErrNameNotFound, ref.span(), key.decl_name, key.library->name);
+  reporter()->Fail(ErrNameNotFound, ref.span(), key.decl_name, key.library->name);
   return nullptr;
 }
 
@@ -664,7 +666,7 @@ void ResolveStep::ValidateReference(const Reference& ref, Context context) {
     return;
   }
   if (!ref.IsSynthetic() && ref.resolved().name().as_anonymous()) {
-    Fail(ErrAnonymousNameReference, ref.span(), ref.resolved().name());
+    reporter()->Fail(ErrAnonymousNameReference, ref.span(), ref.resolved().name());
   }
   if (context.enclosing->kind == Element::Kind::kLibrary) {
     // A library element can reference things via attribute arguments. The only
@@ -704,12 +706,12 @@ void ResolveStep::ValidateReference(const Reference& ref, Context context) {
   auto& target_platform = ref.resolved().library()->platform.value();
 
   if (source_platform == target_platform) {
-    Fail(ErrInvalidReferenceToDeprecated, ref.span(), target, source->availability.range(),
-         source_platform, source);
+    reporter()->Fail(ErrInvalidReferenceToDeprecated, ref.span(), target,
+                     source->availability.range(), source_platform, source);
   } else {
-    Fail(ErrInvalidReferenceToDeprecatedOtherPlatform, ref.span(), target,
-         target->availability.range(), target_platform, source, source->availability.range(),
-         source_platform);
+    reporter()->Fail(ErrInvalidReferenceToDeprecatedOtherPlatform, ref.span(), target,
+                     target->availability.range(), target_platform, source,
+                     source->availability.range(), source_platform);
   }
 }
 

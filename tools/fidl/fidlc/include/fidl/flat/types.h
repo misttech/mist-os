@@ -94,23 +94,26 @@ struct Type : public Object {
   // Apply the provided constraints to this type, returning the newly constrained
   // Type and recording the invocation inside resolved_args.
   // For types in the new syntax, we receive the unresolved TypeConstraints.
-  virtual bool ApplyConstraints(TypeResolver* resolver, const TypeConstraints& constraints,
-                                const Reference& layout, std::unique_ptr<Type>* out_type,
+  virtual bool ApplyConstraints(TypeResolver* resolver, Reporter* reporter,
+                                const TypeConstraints& constraints, const Reference& layout,
+                                std::unique_ptr<Type>* out_type,
                                 LayoutInvocation* out_params) const = 0;
 };
 
 struct RejectOptionalConstraints : public Constraints<> {
   using Constraints::Constraints;
-  bool OnUnexpectedConstraint(TypeResolver* resolver, std::optional<SourceSpan> params_span,
-                              const Name& layout_name, Resource* resource, size_t num_constraints,
+  bool OnUnexpectedConstraint(TypeResolver* resolver, Reporter* reporter,
+                              std::optional<SourceSpan> params_span, const Name& layout_name,
+                              Resource* resource, size_t num_constraints,
                               const std::vector<std::unique_ptr<Constant>>& params,
                               size_t param_index) const override;
 };
 
 struct ArrayConstraints : public Constraints<ConstraintKind::kUtf8> {
   using Constraints::Constraints;
-  bool OnUnexpectedConstraint(TypeResolver* resolver, std::optional<SourceSpan> params_span,
-                              const Name& layout_name, Resource* resource, size_t num_constraints,
+  bool OnUnexpectedConstraint(TypeResolver* resolver, Reporter* reporter,
+                              std::optional<SourceSpan> params_span, const Name& layout_name,
+                              Resource* resource, size_t num_constraints,
                               const std::vector<std::unique_ptr<Constant>>& params,
                               size_t param_index) const override;
 };
@@ -139,8 +142,9 @@ struct ArrayType final : public Type, public ArrayConstraints {
         .Compare(*element_type, *o.element_type);
   }
 
-  bool ApplyConstraints(TypeResolver* resolver, const TypeConstraints& constraints,
-                        const Reference& layout, std::unique_ptr<Type>* out_type,
+  bool ApplyConstraints(TypeResolver* resolver, Reporter* reporter,
+                        const TypeConstraints& constraints, const Reference& layout,
+                        std::unique_ptr<Type>* out_type,
                         LayoutInvocation* out_params) const override;
 
   bool IsStringArray() const { return utf8; }
@@ -148,8 +152,9 @@ struct ArrayType final : public Type, public ArrayConstraints {
 
 struct VectorConstraints : public Constraints<ConstraintKind::kSize, ConstraintKind::kNullability> {
   using Constraints::Constraints;
-  bool OnUnexpectedConstraint(TypeResolver* resolver, std::optional<SourceSpan> params_span,
-                              const Name& layout_name, Resource* resource, size_t num_constraints,
+  bool OnUnexpectedConstraint(TypeResolver* resolver, Reporter* reporter,
+                              std::optional<SourceSpan> params_span, const Name& layout_name,
+                              Resource* resource, size_t num_constraints,
                               const std::vector<std::unique_ptr<Constant>>& params,
                               size_t param_index) const override;
 };
@@ -179,8 +184,9 @@ struct VectorType final : public Type, public VectorConstraints {
         .Compare(*element_type, *o.element_type);
   }
 
-  bool ApplyConstraints(TypeResolver* resolver, const TypeConstraints& constraints,
-                        const Reference& layout, std::unique_ptr<Type>* out_type,
+  bool ApplyConstraints(TypeResolver* resolver, Reporter* reporter,
+                        const TypeConstraints& constraints, const Reference& layout,
+                        std::unique_ptr<Type>* out_type,
                         LayoutInvocation* out_params) const override;
 };
 
@@ -202,8 +208,9 @@ struct StringType final : public Type, public VectorConstraints {
     return Type::Compare(o).Compare(MaxSize(), o.MaxSize());
   }
 
-  bool ApplyConstraints(TypeResolver* resolver, const TypeConstraints& constraints,
-                        const Reference& layout, std::unique_ptr<Type>* out_type,
+  bool ApplyConstraints(TypeResolver* resolver, Reporter* reporter,
+                        const TypeConstraints& constraints, const Reference& layout,
+                        std::unique_ptr<Type>* out_type,
                         LayoutInvocation* out_params) const override;
 };
 
@@ -241,8 +248,9 @@ struct HandleType final : public Type, HandleConstraints {
         .Compare(*rights_val, *other_rights_val);
   }
 
-  bool ApplyConstraints(TypeResolver* resolver, const TypeConstraints& constraints,
-                        const Reference& layout, std::unique_ptr<Type>* out_type,
+  bool ApplyConstraints(TypeResolver* resolver, Reporter* reporter,
+                        const TypeConstraints& constraints, const Reference& layout,
+                        std::unique_ptr<Type>* out_type,
                         LayoutInvocation* out_params) const override;
 
   const static HandleRights kSameRights;
@@ -263,8 +271,9 @@ struct PrimitiveType final : public Type, public RejectOptionalConstraints {
     return Type::Compare(o).Compare(subtype, o.subtype);
   }
 
-  bool ApplyConstraints(TypeResolver* resolver, const TypeConstraints& constraints,
-                        const Reference& layout, std::unique_ptr<Type>* out_type,
+  bool ApplyConstraints(TypeResolver* resolver, Reporter* reporter,
+                        const TypeConstraints& constraints, const Reference& layout,
+                        std::unique_ptr<Type>* out_type,
                         LayoutInvocation* out_params) const override;
 
  private:
@@ -288,8 +297,9 @@ struct InternalType final : public Type, public Constraints<> {
     return Type::Compare(o).Compare(subtype, o.subtype);
   }
 
-  bool ApplyConstraints(TypeResolver* resolver, const TypeConstraints& constraints,
-                        const Reference& layout, std::unique_ptr<Type>* out_type,
+  bool ApplyConstraints(TypeResolver* resolver, Reporter* reporter,
+                        const TypeConstraints& constraints, const Reference& layout,
+                        std::unique_ptr<Type>* out_type,
                         LayoutInvocation* out_params) const override;
 
  private:
@@ -313,8 +323,9 @@ struct IdentifierType final : public Type, public Constraints<ConstraintKind::kN
     return Type::Compare(o).Compare(name, o.name);
   }
 
-  bool ApplyConstraints(TypeResolver* resolver, const TypeConstraints& constraints,
-                        const Reference& layout, std::unique_ptr<Type>* out_type,
+  bool ApplyConstraints(TypeResolver* resolver, Reporter* reporter,
+                        const TypeConstraints& constraints, const Reference& layout,
+                        std::unique_ptr<Type>* out_type,
                         LayoutInvocation* out_params) const override;
 };
 
@@ -326,8 +337,9 @@ enum class TransportSide {
 struct TransportSideConstraints
     : public Constraints<ConstraintKind::kProtocol, ConstraintKind::kNullability> {
   using Constraints::Constraints;
-  bool OnUnexpectedConstraint(TypeResolver* resolver, std::optional<SourceSpan> params_span,
-                              const Name& layout_name, Resource* resource, size_t num_constraints,
+  bool OnUnexpectedConstraint(TypeResolver* resolver, Reporter* reporter,
+                              std::optional<SourceSpan> params_span, const Name& layout_name,
+                              Resource* resource, size_t num_constraints,
                               const std::vector<std::unique_ptr<Constant>>& params,
                               size_t param_index) const override;
 };
@@ -360,15 +372,17 @@ struct TransportSideType final : public Type, public TransportSideConstraints {
         .Compare(protocol_decl, o.protocol_decl);
   }
 
-  bool ApplyConstraints(TypeResolver* resolver, const TypeConstraints& constraints,
-                        const Reference& layout, std::unique_ptr<Type>* out_type,
+  bool ApplyConstraints(TypeResolver* resolver, Reporter* reporter,
+                        const TypeConstraints& constraints, const Reference& layout,
+                        std::unique_ptr<Type>* out_type,
                         LayoutInvocation* out_params) const override;
 };
 
 struct BoxConstraints : public Constraints<> {
   using Constraints::Constraints;
-  bool OnUnexpectedConstraint(TypeResolver* resolver, std::optional<SourceSpan> params_span,
-                              const Name& layout_name, Resource* resource, size_t num_constraints,
+  bool OnUnexpectedConstraint(TypeResolver* resolver, Reporter* reporter,
+                              std::optional<SourceSpan> params_span, const Name& layout_name,
+                              Resource* resource, size_t num_constraints,
                               const std::vector<std::unique_ptr<Constant>>& params,
                               size_t param_index) const override;
 };
@@ -391,8 +405,9 @@ struct BoxType final : public Type, public BoxConstraints {
     return Type::Compare(o).Compare(name, o.name).Compare(boxed_type, o.boxed_type);
   }
 
-  bool ApplyConstraints(TypeResolver* resolver, const TypeConstraints& constraints,
-                        const Reference& layout, std::unique_ptr<Type>* out_type,
+  bool ApplyConstraints(TypeResolver* resolver, Reporter* reporter,
+                        const TypeConstraints& constraints, const Reference& layout,
+                        std::unique_ptr<Type>* out_type,
                         LayoutInvocation* out_params) const override;
 };
 
@@ -401,8 +416,9 @@ struct UntypedNumericType final : public Type, public Constraints<> {
 
   explicit UntypedNumericType(const Name& name) : Type(name, Kind::kUntypedNumeric) {}
   std::any AcceptAny(VisitorAny* visitor) const override;
-  bool ApplyConstraints(TypeResolver* resolver, const TypeConstraints& constraints,
-                        const Reference& layout, std::unique_ptr<Type>* out_type,
+  bool ApplyConstraints(TypeResolver* resolver, Reporter* reporter,
+                        const TypeConstraints& constraints, const Reference& layout,
+                        std::unique_ptr<Type>* out_type,
                         LayoutInvocation* out_params) const override;
 };
 
@@ -421,8 +437,9 @@ struct ZxExperimentalPointerType final : public Type, public Constraints<> {
     return Type::Compare(o).Compare(pointee_type, o.pointee_type);
   }
 
-  bool ApplyConstraints(TypeResolver* resolver, const TypeConstraints& constraints,
-                        const Reference& layout, std::unique_ptr<Type>* out_type,
+  bool ApplyConstraints(TypeResolver* resolver, Reporter* reporter,
+                        const TypeConstraints& constraints, const Reference& layout,
+                        std::unique_ptr<Type>* out_type,
                         LayoutInvocation* out_params) const override;
 };
 

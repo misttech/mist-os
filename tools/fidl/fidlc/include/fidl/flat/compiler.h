@@ -23,7 +23,7 @@ namespace fidl::flat {
 class Libraries;
 
 // Compiler consumes raw::File ASTs and produces a compiled flat::Library.
-class Compiler final : private ReporterMixin {
+class Compiler final {
  public:
   Compiler(Libraries* all_libraries, const VersionSelection* version_selection,
            ordinals::MethodHasher method_hasher, ExperimentalFlags experimental_flags);
@@ -41,15 +41,16 @@ class Compiler final : private ReporterMixin {
   // tries to process the entire library rather than stopping after the first
   // error. For certain major steps, we abort compilation if the step fails,
   // meaning later steps can rely on invariants from that step succeeding.
-  class Step : protected ReporterMixin {
+  class Step {
    public:
-    explicit Step(Compiler* compiler) : ReporterMixin(compiler->reporter()), compiler_(compiler) {}
+    explicit Step(Compiler* compiler) : compiler_(compiler) {}
     Step(const Step&) = delete;
 
     bool Run();
 
    protected:
     Compiler* compiler() { return compiler_; }
+    Reporter* reporter() { return compiler_->reporter_; }
     Library* library() { return compiler_->library_.get(); }
     const Libraries* all_libraries() { return compiler_->all_libraries_; }
     Typespace* typespace();
@@ -59,7 +60,7 @@ class Compiler final : private ReporterMixin {
     const ExperimentalFlags& experimental_flags() { return compiler_->experimental_flags_; }
 
    private:
-    // Implementations must report errors via ReporterMixin. If no errors are
+    // Implementations must report errors via reporter(). If no errors are
     // reported, the step is considered successful.
     virtual void RunImpl() = 0;
 
@@ -67,6 +68,7 @@ class Compiler final : private ReporterMixin {
   };
 
  private:
+  Reporter* reporter_;
   std::unique_ptr<Library> library_;
   Libraries* all_libraries_;
   const VersionSelection* version_selection;
@@ -80,10 +82,10 @@ struct Compilation;
 // all of them (e.g. the shared typespace). The libraries must be inserted in
 // order: first the dependencies, with each one only depending on those that
 // came before it, and lastly the target library.
-class Libraries : private ReporterMixin {
+class Libraries {
  public:
   explicit Libraries(Reporter* reporter, VirtualSourceFile* generated_source_file)
-      : ReporterMixin(reporter),
+      : reporter_(reporter),
         root_library_(Library::CreateRootLibrary()),
         typespace_(root_library_.get(), reporter),
         attribute_schemas_(AttributeSchema::OfficialAttributes()),
@@ -134,11 +136,12 @@ class Libraries : private ReporterMixin {
   // official attribute.
   void WarnOnAttributeTypo(const Attribute* attribute) const;
 
-  using ReporterMixin::reporter;
+  Reporter* reporter() { return reporter_; }
   Typespace* typespace() { return &typespace_; }
   VirtualSourceFile* generated_source_file() { return generated_source_file_; }
 
  private:
+  Reporter* reporter_;
   std::unique_ptr<Library> root_library_;
   std::vector<std::unique_ptr<Library>> libraries_;
   std::map<std::vector<std::string_view>, Library*> libraries_by_name_;

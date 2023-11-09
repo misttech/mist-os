@@ -130,19 +130,19 @@ void AvailabilityStep::CompileAvailabilityFromAttribute(Element* element, Attrib
   const auto legacy = attribute->GetArg("legacy");
 
   if (attribute->args.empty()) {
-    Fail(ErrAvailableMissingArguments, attribute->span);
+    reporter()->Fail(ErrAvailableMissingArguments, attribute->span);
   }
   if (note && !deprecated) {
-    Fail(ErrNoteWithoutDeprecation, attribute->span);
+    reporter()->Fail(ErrNoteWithoutDeprecation, attribute->span);
   }
   if (!is_library && platform) {
-    Fail(ErrPlatformNotOnLibrary, platform->span);
+    reporter()->Fail(ErrPlatformNotOnLibrary, platform->span);
   }
   if (is_library && !added && !attribute->args.empty()) {
-    Fail(ErrLibraryAvailabilityMissingAdded, attribute->span);
+    reporter()->Fail(ErrLibraryAvailabilityMissingAdded, attribute->span);
   }
   if (!is_library && !library()->attributes->Get("available")) {
-    Fail(ErrMissingLibraryAvailability, attribute->span, library()->name);
+    reporter()->Fail(ErrMissingLibraryAvailability, attribute->span, library()->name);
     // Return early to avoid confusing error messages about inheritance
     // conflicts with the default @available(added=HEAD) on the library.
     element->availability.Fail();
@@ -159,7 +159,8 @@ void AvailabilityStep::CompileAvailabilityFromAttribute(Element* element, Attrib
     const auto library_platform = GetPlatform(platform).value_or(GetDefaultPlatform());
     library()->platform = library_platform;
     if (!version_selection()->Contains(library_platform)) {
-      Fail(ErrPlatformVersionNotSelected, attribute->span, library()->name, library_platform);
+      reporter()->Fail(ErrPlatformVersionNotSelected, attribute->span, library()->name,
+                       library_platform);
     }
     if (!init_args.added) {
       // Return early to avoid letting the -inf from Availability::Unbounded()
@@ -179,7 +180,7 @@ void AvailabilityStep::CompileAvailabilityFromAttribute(Element* element, Attrib
     if (removed) {
       msg.append(" < removed");
     }
-    Fail(ErrInvalidAvailabilityOrder, attribute->span, msg);
+    reporter()->Fail(ErrInvalidAvailabilityOrder, attribute->span, msg);
     // Return early to avoid confusing error messages about inheritance
     // conflicts for an availability that isn't even self-consistent.
     return;
@@ -206,8 +207,9 @@ void AvailabilityStep::CompileAvailabilityFromAttribute(Element* element, Attrib
     }
     child_what = arg->name.value().data();
     const auto* inherited_arg = AncestorArgument(element, parent_what);
-    Fail(ErrAvailabilityConflictsWithParent, arg->span, arg, arg->value->span.data(), inherited_arg,
-         inherited_arg->value->span.data(), inherited_arg->span, child_what, when, parent_what);
+    reporter()->Fail(ErrAvailabilityConflictsWithParent, arg->span, arg, arg->value->span.data(),
+                     inherited_arg, inherited_arg->value->span.data(), inherited_arg->span,
+                     child_what, when, parent_what);
   };
 
   // Reports an error for the legacy arg given its status.
@@ -217,12 +219,12 @@ void AvailabilityStep::CompileAvailabilityFromAttribute(Element* element, Attrib
       case Availability::InheritResult::LegacyStatus::kOk:
         break;
       case Availability::InheritResult::LegacyStatus::kNeverRemoved:
-        Fail(ErrLegacyWithoutRemoval, arg->span, arg);
+        reporter()->Fail(ErrLegacyWithoutRemoval, arg->span, arg);
         break;
       case Availability::InheritResult::LegacyStatus::kWithoutParent: {
         const auto* inherited_arg = AncestorArgument(element, "removed");
-        Fail(ErrLegacyConflictsWithParent, arg->span, arg, arg->value->span.data(), inherited_arg,
-             inherited_arg->value->span.data(), inherited_arg->span);
+        reporter()->Fail(ErrLegacyConflictsWithParent, arg->span, arg, arg->value->span.data(),
+                         inherited_arg, inherited_arg->value->span.data(), inherited_arg->span);
         break;
       }
     }
@@ -252,7 +254,7 @@ std::optional<Platform> AvailabilityStep::GetPlatform(const AttributeArg* maybe_
       static_cast<const StringConstantValue*>(&maybe_arg->value->Value())->MakeContents();
   auto platform = Platform::Parse(str);
   if (!platform) {
-    Fail(ErrInvalidPlatform, maybe_arg->value->span, str);
+    reporter()->Fail(ErrInvalidPlatform, maybe_arg->value->span, str);
     return std::nullopt;
   }
   return platform;
@@ -273,7 +275,7 @@ std::optional<Version> AvailabilityStep::GetVersion(const AttributeArg* maybe_ar
   // specified on the command line, or in FIDL libraries via the `legacy`
   // argument to @available.
   if (!version || version == Version::Legacy()) {
-    Fail(ErrInvalidVersion, maybe_arg->value->span, value);
+    reporter()->Fail(ErrInvalidVersion, maybe_arg->value->span, value);
     return std::nullopt;
   }
   return version;
@@ -368,17 +370,18 @@ void AvailabilityStep::VerifyNoDeclOverlaps() {
       // versioned libraries where the version sets match exactly.
       if (set == other_set) {
         if (name == other_name) {
-          Fail(ErrNameCollision, span, name, other_span);
+          reporter()->Fail(ErrNameCollision, span, name, other_span);
         } else {
-          Fail(ErrNameCollisionCanonical, span, name, other_name, other_span, canonical_name);
+          reporter()->Fail(ErrNameCollisionCanonical, span, name, other_name, other_span,
+                           canonical_name);
         }
       } else {
         if (name == other_name) {
-          Fail(ErrNameOverlap, span, name, other_span, overlap.value(),
-               library()->platform.value());
+          reporter()->Fail(ErrNameOverlap, span, name, other_span, overlap.value(),
+                           library()->platform.value());
         } else {
-          Fail(ErrNameOverlapCanonical, span, name, other_name, other_span, canonical_name,
-               overlap.value(), library()->platform.value());
+          reporter()->Fail(ErrNameOverlapCanonical, span, name, other_name, other_span,
+                           canonical_name, overlap.value(), library()->platform.value());
         }
       }
       break;

@@ -155,6 +155,8 @@ void AttributeSchema::Validate(Reporter* reporter, const ExperimentalFlags flags
 }
 
 void AttributeSchema::ResolveArgs(CompileStep* step, Attribute* attribute) const {
+  Reporter* reporter = step->reporter();
+
   switch (kind_) {
     case Kind::kValidateOnly:
     case Kind::kUseEarly:
@@ -173,23 +175,23 @@ void AttributeSchema::ResolveArgs(CompileStep* step, Attribute* attribute) const
   // Name the anonymous argument (if present).
   if (auto anon_arg = attribute->GetStandaloneAnonymousArg()) {
     if (arg_schemas_.empty()) {
-      step->Fail(ErrAttributeDisallowsArgs, attribute->span, attribute);
+      reporter->Fail(ErrAttributeDisallowsArgs, attribute->span, attribute);
       return;
     }
     if (arg_schemas_.size() > 1) {
-      step->Fail(ErrAttributeArgNotNamed, attribute->span, anon_arg->value->span.data());
+      reporter->Fail(ErrAttributeArgNotNamed, attribute->span, anon_arg->value->span.data());
       return;
     }
     anon_arg->name = step->generated_source_file()->AddLine(arg_schemas_.begin()->first);
   } else if (arg_schemas_.size() == 1 && attribute->args.size() == 1) {
-    step->Fail(ErrAttributeArgMustNotBeNamed, attribute->span);
+    reporter->Fail(ErrAttributeArgMustNotBeNamed, attribute->span);
   }
 
   // Resolve each argument by name.
   for (auto& arg : attribute->args) {
     const auto it = arg_schemas_.find(arg->name.value().data());
     if (it == arg_schemas_.end()) {
-      step->Fail(ErrUnknownAttributeArg, attribute->span, attribute, arg->name.value().data());
+      reporter->Fail(ErrUnknownAttributeArg, attribute->span, attribute, arg->name.value().data());
       continue;
     }
     const auto& [name, schema] = *it;
@@ -203,9 +205,9 @@ void AttributeSchema::ResolveArgs(CompileStep* step, Attribute* attribute) const
       continue;
     }
     if (arg_schemas_.size() == 1) {
-      step->Fail(ErrMissingRequiredAnonymousAttributeArg, attribute->span, attribute);
+      reporter->Fail(ErrMissingRequiredAnonymousAttributeArg, attribute->span, attribute);
     } else {
-      step->Fail(ErrMissingRequiredAttributeArg, attribute->span, attribute, name);
+      reporter->Fail(ErrMissingRequiredAttributeArg, attribute->span, attribute, name);
     }
   }
 }
@@ -256,6 +258,7 @@ bool AttributeArgSchema::TryResolveAsHead(CompileStep* step, Reference& referenc
 
 void AttributeArgSchema::ResolveArg(CompileStep* step, Attribute* attribute, AttributeArg* arg,
                                     bool literal_only) const {
+  Reporter* reporter = step->reporter();
   Constant* constant = arg->value.get();
   ZX_ASSERT_MSG(!constant->IsResolved(), "argument should not be resolved yet");
 
@@ -276,7 +279,8 @@ void AttributeArgSchema::ResolveArg(CompileStep* step, Attribute* attribute, Att
   }
 
   if (literal_only && constant->kind != Constant::Kind::kLiteral) {
-    step->Fail(ErrAttributeArgRequiresLiteral, constant->span, arg->name.value().data(), attribute);
+    reporter->Fail(ErrAttributeArgRequiresLiteral, constant->span, arg->name.value().data(),
+                   attribute);
     return;
   }
 
@@ -331,12 +335,14 @@ void AttributeArgSchema::ResolveArg(CompileStep* step, Attribute* attribute, Att
       break;
   }
   if (!step->ResolveConstant(constant, target_type)) {
-    step->Fail(ErrCouldNotResolveAttributeArg, arg->span);
+    reporter->Fail(ErrCouldNotResolveAttributeArg, arg->span);
   }
 }
 
 // static
 void AttributeSchema::ResolveArgsWithoutSchema(CompileStep* step, Attribute* attribute) {
+  Reporter* reporter = step->reporter();
+
   // For attributes with a single, anonymous argument like `@foo("bar")`, assign
   // a default name so that arguments are always named after compilation.
   if (auto anon_arg = attribute->GetStandaloneAnonymousArg()) {
@@ -351,7 +357,7 @@ void AttributeSchema::ResolveArgsWithoutSchema(CompileStep* step, Attribute* att
 
     auto inferred_type = step->InferType(arg->value.get());
     if (!inferred_type) {
-      step->Fail(ErrCouldNotResolveAttributeArg, attribute->span);
+      reporter->Fail(ErrCouldNotResolveAttributeArg, attribute->span);
       continue;
     }
     // Only string or bool supported.
@@ -373,7 +379,7 @@ void AttributeSchema::ResolveArgsWithoutSchema(CompileStep* step, Attribute* att
       case Type::Kind::kHandle:
       case Type::Kind::kTransportSide:
       case Type::Kind::kUntypedNumeric:
-        step->Fail(ErrCanOnlyUseStringOrBool, attribute->span, arg.get(), attribute);
+        reporter->Fail(ErrCanOnlyUseStringOrBool, attribute->span, arg.get(), attribute);
         continue;
     }
     ZX_ASSERT_MSG(step->ResolveConstant(arg->value.get(), inferred_type),

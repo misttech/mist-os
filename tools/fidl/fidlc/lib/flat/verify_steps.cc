@@ -26,8 +26,8 @@ void VerifyResourcenessStep::VerifyDecl(const Decl* decl) {
       if (struct_decl->resourceness == types::Resourceness::kValue) {
         for (const auto& member : struct_decl->members) {
           if (EffectiveResourceness(member.type_ctor->type) == types::Resourceness::kResource) {
-            Fail(ErrTypeMustBeResource, struct_decl->name.span().value(), struct_decl->name,
-                 member.name.data(), "struct");
+            reporter()->Fail(ErrTypeMustBeResource, struct_decl->name.span().value(),
+                             struct_decl->name, member.name.data(), "struct");
           }
         }
       }
@@ -40,8 +40,8 @@ void VerifyResourcenessStep::VerifyDecl(const Decl* decl) {
           if (member.maybe_used) {
             const auto& used = *member.maybe_used;
             if (EffectiveResourceness(used.type_ctor->type) == types::Resourceness::kResource) {
-              Fail(ErrTypeMustBeResource, table_decl->name.span().value(), table_decl->name,
-                   used.name.data(), "table");
+              reporter()->Fail(ErrTypeMustBeResource, table_decl->name.span().value(),
+                               table_decl->name, used.name.data(), "table");
             }
           }
         }
@@ -55,8 +55,8 @@ void VerifyResourcenessStep::VerifyDecl(const Decl* decl) {
           if (member.maybe_used) {
             const auto& used = *member.maybe_used;
             if (EffectiveResourceness(used.type_ctor->type) == types::Resourceness::kResource) {
-              Fail(ErrTypeMustBeResource, union_decl->name.span().value(), union_decl->name,
-                   used.name.data(), "union");
+              reporter()->Fail(ErrTypeMustBeResource, union_decl->name.span().value(),
+                               union_decl->name, used.name.data(), "union");
             }
           }
         }
@@ -70,7 +70,7 @@ void VerifyResourcenessStep::VerifyDecl(const Decl* decl) {
           if (member.maybe_used) {
             const auto& used = *member.maybe_used;
             if (EffectiveResourceness(used.type_ctor->type) == types::Resourceness::kResource) {
-              Fail(ErrOverlayMemberMustBeValue, overlay_decl->name.span().value());
+              reporter()->Fail(ErrOverlayMemberMustBeValue, overlay_decl->name.span().value());
             }
           }
         }
@@ -266,8 +266,8 @@ void VerifyHandleTransportCompatibilityStep::CheckHandleTransportUsages(
                                 std::string(resource->name.decl_name());
       std::optional<HandleClass> handle_class = HandleClassFromName(handle_name);
       if (!handle_class.has_value() || !transport.IsCompatible(handle_class.value())) {
-        Fail(ErrHandleUsedInIncompatibleTransport, source_span, handle_name, transport.name,
-             protocol);
+        reporter()->Fail(ErrHandleUsedInIncompatibleTransport, source_span, handle_name,
+                         transport.name, protocol);
       }
       return;
     }
@@ -277,8 +277,8 @@ void VerifyHandleTransportCompatibilityStep::CheckHandleTransportUsages(
       Transport transport_side_transport = Transport::FromTransportName(transport_name).value();
       if (!transport_side_transport.handle_class.has_value() ||
           !transport.IsCompatible(transport_side_transport.handle_class.value())) {
-        Fail(ErrTransportEndUsedInIncompatibleTransport, source_span, transport_name,
-             transport.name, protocol);
+        reporter()->Fail(ErrTransportEndUsedInIncompatibleTransport, source_span, transport_name,
+                         transport.name, protocol);
       }
       return;
     }
@@ -372,8 +372,8 @@ void VerifyInlineSizeStep::RunImpl() {
   for (auto& struct_decl : library()->declarations.structs) {
     auto inline_size = struct_decl->typeshape(WireFormat::kV2).inline_size;
     if (inline_size > limit) {
-      Fail(ErrInlineSizeExceedsLimit, struct_decl->name.span().value(), struct_decl->name,
-           inline_size, limit);
+      reporter()->Fail(ErrInlineSizeExceedsLimit, struct_decl->name.span().value(),
+                       struct_decl->name, inline_size, limit);
     }
   }
 }
@@ -392,8 +392,8 @@ void VerifyOpenInteractionsStep::VerifyProtocolOpenness(const Protocol& protocol
     ZX_ASSERT_MSG(target->kind == Element::Kind::kProtocol, "composed protocol not a protocol");
     auto composed_protocol = static_cast<const Protocol*>(target);
     if (!IsAllowedComposition(protocol.openness, composed_protocol->openness)) {
-      Fail(ErrComposedProtocolTooOpen, composed.reference.span(), protocol.openness, protocol.name,
-           composed_protocol->openness, composed_protocol->name);
+      reporter()->Fail(ErrComposedProtocolTooOpen, composed.reference.span(), protocol.openness,
+                       protocol.name, composed_protocol->openness, composed_protocol->name);
     }
   }
 
@@ -402,14 +402,15 @@ void VerifyOpenInteractionsStep::VerifyProtocolOpenness(const Protocol& protocol
       if (method.has_request && method.has_response) {
         // This is a two-way method, so it must be in an open protocol.
         if (protocol.openness != types::Openness::kOpen) {
-          Fail(ErrFlexibleTwoWayMethodRequiresOpenProtocol, method.name, protocol.openness);
+          reporter()->Fail(ErrFlexibleTwoWayMethodRequiresOpenProtocol, method.name,
+                           protocol.openness);
         }
       } else {
         // This is an event or one-way method, so it can be in either an open
         // protocol or an ajar protocol.
         if (protocol.openness == types::Openness::kClosed) {
-          Fail(ErrFlexibleOneWayMethodInClosedProtocol, method.name,
-               method.has_request ? "one-way method" : "event");
+          reporter()->Fail(ErrFlexibleOneWayMethodInClosedProtocol, method.name,
+                           method.has_request ? "one-way method" : "event");
         }
       }
     }

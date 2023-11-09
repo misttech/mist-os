@@ -13,14 +13,11 @@ namespace fidl::flat {
 class CompileStep;
 
 // TypeResolver exposes Resolve* methods from CompileStep to Typespace and Type.
-class TypeResolver : private ReporterMixin {
+class TypeResolver {
  public:
-  explicit TypeResolver(CompileStep* compile_step)
-      : ReporterMixin(compile_step->reporter()), compile_step_(compile_step) {}
+  explicit TypeResolver(CompileStep* compile_step) : compile_step_(compile_step) {}
 
-  using ReporterMixin::Fail;
-  using ReporterMixin::reporter;
-
+  Reporter* reporter() { return compile_step_->reporter(); }
   const ExperimentalFlags& experimental_flags() const {
     return compile_step_->experimental_flags();
   }

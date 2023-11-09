@@ -199,7 +199,7 @@ class Parser {
     };
   }
 
-  // Parser defines these methods rather than using ReporterMixin because:
+  // Parser defines these methods rather than using Reporter directly because:
   // * They skip reporting if there are already unrecovered errors.
   // * They use a default error, ErrUnexpectedToken.
   // * They use a default span, last_token_.span().

@@ -337,7 +337,7 @@ void SortStep::RunImpl() {
     // so the list should always end up with at least two elements.
     ZX_ASSERT(cycle.size() > 1);
 
-    Fail(ErrIncludeCycle, cycle.front()->name.span().value(), cycle);
+    reporter()->Fail(ErrIncludeCycle, cycle.front()->name.span().value(), cycle);
   }
 }
 
