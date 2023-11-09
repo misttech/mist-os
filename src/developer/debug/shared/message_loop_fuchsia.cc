@@ -12,7 +12,9 @@
 #include <lib/zx/process.h>
 #include <stdio.h>
 #include <zircon/syscalls/exception.h>
+#include <zircon/types.h>
 
+#include "src/developer/debug/shared/channel_watcher.h"
 #include "src/developer/debug/shared/event_handlers.h"
 #include "src/developer/debug/shared/logging/logging.h"
 #include "src/developer/debug/shared/message_loop.h"
@@ -59,6 +61,14 @@ const MessageLoopFuchsia::WatchInfo* MessageLoopFuchsia::FindWatchInfo(int id) c
   if (it == watches_.end())
     return nullptr;
   return &it->second;
+}
+
+int MessageLoopFuchsia::GetNextWatchID() {
+  std::lock_guard<std::mutex> guard(mutex_);
+
+  int watch_id = next_watch_id_;
+  next_watch_id_++;
+  return watch_id;
 }
 
 zx_status_t MessageLoopFuchsia::AddSignalHandler(int id, zx_handle_t object, zx_signals_t signals,
@@ -122,13 +132,7 @@ MessageLoop::WatchHandle MessageLoopFuchsia::WatchFD(WatchMode mode, int fd, FDW
   if (info.fd_handle == ZX_HANDLE_INVALID)
     return WatchHandle();
 
-  int watch_id;
-  {
-    std::lock_guard<std::mutex> guard(mutex_);
-
-    watch_id = next_watch_id_;
-    next_watch_id_++;
-  }
+  int watch_id = GetNextWatchID();
 
   zx_status_t status = AddSignalHandler(watch_id, info.fd_handle, signals, &info);
   if (status != ZX_OK)
@@ -146,13 +150,7 @@ zx_status_t MessageLoopFuchsia::WatchSocket(WatchMode mode, zx_handle_t socket_h
   info.socket_watcher = watcher;
   info.socket_handle = socket_handle;
 
-  int watch_id;
-  {
-    std::lock_guard<std::mutex> guard(mutex_);
-
-    watch_id = next_watch_id_;
-    next_watch_id_++;
-  }
+  int watch_id = GetNextWatchID();
 
   zx_signals_t signals = ZX_SOCKET_PEER_CLOSED;
   if (mode == WatchMode::kRead || mode == WatchMode::kReadWrite)
@@ -162,6 +160,27 @@ zx_status_t MessageLoopFuchsia::WatchSocket(WatchMode mode, zx_handle_t socket_h
     signals |= ZX_SOCKET_WRITABLE;
 
   zx_status_t status = AddSignalHandler(watch_id, socket_handle, signals, &info);
+  if (status != ZX_OK)
+    return status;
+
+  watches_[watch_id] = std::move(info);
+  *out = WatchHandle(this, watch_id);
+  return ZX_OK;
+}
+
+zx_status_t MessageLoopFuchsia::WatchChannel(zx_handle_t channel, ChannelWatcher* watcher,
+                                             MessageLoop::WatchHandle* out) {
+  WatchInfo info;
+  info.type = WatchType::kChannel;
+  info.mode = debug::MessageLoop::WatchMode::kRead;
+  info.channel_watcher = watcher;
+  info.channel_handle = channel;
+
+  int watch_id = GetNextWatchID();
+
+  zx_signals_t signals = ZX_CHANNEL_READABLE | ZX_CHANNEL_PEER_CLOSED;
+
+  zx_status_t status = AddSignalHandler(watch_id, channel, signals, &info);
   if (status != ZX_OK)
     return status;
 
@@ -257,6 +276,7 @@ void MessageLoopFuchsia::HandleChannelException(const ChannelExceptionHandler& h
 
   // We should only receive exceptions here.
   switch (watch_info->type) {
+    case WatchType::kChannel:
     case WatchType::kFdio:
     case WatchType::kSocket:
       FX_NOTREACHED() << "Should only receive exceptions.";
@@ -340,6 +360,7 @@ void MessageLoopFuchsia::StopWatching(int id) {
     case WatchType::kFdio:
       fdio_unsafe_release(info.fdio);
       __FALLTHROUGH;
+    case WatchType::kChannel:
     case WatchType::kSocket:
       RemoveSignalHandler(&info);
       break;
@@ -461,8 +482,28 @@ void MessageLoopFuchsia::OnSocketSignal(int watch_id, const WatchInfo& info,
     info.socket_watcher->OnSocketWritable(info.socket_handle);
 }
 
+void MessageLoopFuchsia::OnChannelSignal(int watch_id, const WatchInfo& info,
+                                         zx_signals_t observed) {
+  // Dispatch readable signal. Note there's no need to check the mode since ChannelWatcher only
+  // cares about readable (and peer closed) events.
+  //
+  // Note: checking the READABLE bit before checking PEER_CLOSED is important. If we check for
+  // PEER_CLOSED first and return, there may be outstanding data left in the channel that hasn't
+  // been read. By checking READABLE first and returning, we ensure that the channel is completely
+  // drained before acknowledging the PEER_CLOSED signal.
+  if (observed & ZX_CHANNEL_READABLE) {
+    info.channel_watcher->OnChannelReadable(info.channel_handle);
+    return;
+  }
+
+  if (observed & ZX_CHANNEL_PEER_CLOSED)
+    info.channel_watcher->OnChannelClosed(info.channel_handle);
+}
+
 const char* WatchTypeToString(WatchType type) {
   switch (type) {
+    case debug::WatchType::kChannel:
+      return "Channel";
     case WatchType::kFdio:
       return "FDIO";
     case WatchType::kJobExceptions:

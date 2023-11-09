@@ -21,6 +21,7 @@ sdk_source_set("shared") {
     "buffered_fd.cc",
     "buffered_fd.h",
     "buffered_stream.h",
+    "channel_watcher.h",
     "handle_info.cc",
     "handle_info.h",
     "largest_less_or_equal.h",

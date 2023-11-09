@@ -20,12 +20,13 @@
 
 namespace debug {
 
+class ChannelWatcher;
 class ExceptionHandler;
 class SignalHandler;
 class SocketWatcher;
 class ZirconExceptionWatcher;
 
-enum class WatchType : uint32_t { kFdio, kProcessExceptions, kJobExceptions, kSocket };
+enum class WatchType : uint32_t { kChannel, kFdio, kProcessExceptions, kJobExceptions, kSocket };
 const char* WatchTypeToString(WatchType);
 
 // MessageLoop is a virtual class to enable tests to intercept watch messages.
@@ -63,6 +64,14 @@ class MessageLoopFuchsia : public MessageLoop {
   virtual zx_status_t WatchSocket(WatchMode mode, zx_handle_t socket_handle, SocketWatcher* watcher,
                                   WatchHandle* out);
 
+  // Similar to |WatchSocket| above, but watches a channel. There is no current usecase for anything
+  // other than reading from channels, so there is no mode argument. The watcher must outlive the
+  // returned WatchHandle, and this can only be called from the MessageLoop thread. The WatchHandle
+  // may unregister from a callback, since we only care about when the channel becomes readable. If
+  // this is modified in the future to watch for both readable and writable events, then the same
+  // restriction as |WatchSocket| will apply.
+  virtual zx_status_t WatchChannel(zx_handle_t channel, ChannelWatcher* watcher, WatchHandle* out);
+
   // Attaches to the exception port of the given process and issues callbacks on the given watcher.
   // The watcher must outlive the returned WatchHandle. Must only be called on the message loop
   // thread.
@@ -95,6 +104,9 @@ class MessageLoopFuchsia : public MessageLoop {
  private:
   const WatchInfo* FindWatchInfo(int id) const;
 
+  // Safely increment |next_watch_id| to the next value.
+  int GetNextWatchID();
+
   // MessageLoop protected implementation.
   uint64_t GetMonotonicNowNS() const override;
   void RunImpl() override;
@@ -117,6 +129,7 @@ class MessageLoopFuchsia : public MessageLoop {
   void OnProcessTerminated(const WatchInfo&, zx_signals_t observed);
 
   void OnSocketSignal(int watch_id, const WatchInfo& info, zx_signals_t observed);
+  void OnChannelSignal(int watch_id, const WatchInfo& info, zx_signals_t observed);
 
   std::map<int, WatchInfo> watches_;
 
@@ -167,6 +180,10 @@ struct MessageLoopFuchsia::WatchInfo {
   // Socket-specific parameters.
   SocketWatcher* socket_watcher = nullptr;
   zx_handle_t socket_handle = ZX_HANDLE_INVALID;
+
+  // Channel-specific parameters. Currently this is only going to support mode == WatchMode::kRead.
+  ChannelWatcher* channel_watcher = nullptr;
+  zx_handle_t channel_handle = ZX_HANDLE_INVALID;
 
   // Task-exception-specific parameters, can be of job or process type.
   ZirconExceptionWatcher* exception_watcher = nullptr;

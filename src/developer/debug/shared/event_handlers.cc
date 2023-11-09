@@ -84,6 +84,9 @@ void SignalHandler::Handler(async_dispatcher_t*, async_wait_t* wait, zx_status_t
   status = StartListening(signal_handler.handle_.get());
   FX_DCHECK(status == ZX_OK) << "Got: " << ZxStatusToString(status);
   switch (watch_info->type) {
+    case WatchType::kChannel:
+      loop->OnChannelSignal(watch_info_id, *watch_info, signal->observed);
+      break;
     case WatchType::kFdio:
       loop->OnFdioSignal(watch_info_id, *watch_info, signal->observed);
       break;
