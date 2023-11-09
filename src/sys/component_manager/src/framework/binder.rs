@@ -4,10 +4,10 @@
 
 use {
     crate::{
-        capability::{CapabilityProvider, CapabilitySource},
+        capability::{CapabilityProvider, CapabilitySource, FrameworkCapabilityProvider},
         model::{
             component::{StartReason, WeakComponentInstance},
-            error::{CapabilityProviderError, ModelError},
+            error::ModelError,
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
             model::Model,
             routing::report_routing_failure,
@@ -15,16 +15,12 @@ use {
     },
     async_trait::async_trait,
     cm_types::Name,
-    cm_util::channel,
-    cm_util::TaskGroup,
-    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
+    fidl::endpoints::ServerEnd,
+    fidl_fuchsia_component as fcomponent, fuchsia_zircon as zx,
     lazy_static::lazy_static,
     moniker::{ExtendedMoniker, Moniker},
     routing::capability_source::{ComponentCapability, InternalCapability},
-    std::{
-        path::PathBuf,
-        sync::{Arc, Weak},
-    },
+    std::sync::{Arc, Weak},
     tracing::warn,
 };
 
@@ -50,41 +46,31 @@ impl BinderCapabilityProvider {
 }
 
 #[async_trait]
-impl CapabilityProvider for BinderCapabilityProvider {
-    async fn open(
-        self: Box<Self>,
-        task_group: TaskGroup,
-        _flags: fio::OpenFlags,
-        _relative_path: PathBuf,
-        server_end: &mut zx::Channel,
-    ) -> Result<(), CapabilityProviderError> {
-        let target = self.target.clone();
-        let source = self.source.clone();
-        let server_end = channel::take_channel(server_end);
-
-        task_group.spawn(async move {
-            let source = match source.upgrade().map_err(|e| ModelError::from(e)) {
-                Ok(source) => source,
-                Err(err) => {
-                    report_routing_failure_to_target(target, err, server_end).await;
-                    return;
-                }
-            };
-
-            let start_reason = StartReason::AccessCapability {
-                target: target.moniker.clone(),
-                name: BINDER_SERVICE.clone(),
-            };
-            match source.start(&start_reason, None, vec![], vec![]).await {
-                Ok(_) => {
-                    source.scope_to_runtime(server_end).await;
-                }
-                Err(err) => {
-                    report_routing_failure_to_target(target, err.into(), server_end).await;
-                }
+impl FrameworkCapabilityProvider for BinderCapabilityProvider {
+    type Marker = fcomponent::BinderMarker;
+    async fn open_protocol(self: Box<Self>, server_end: ServerEnd<Self::Marker>) {
+        let server_end = server_end.into_channel().into();
+        let target = self.target;
+        let source = match self.source.upgrade().map_err(|e| ModelError::from(e)) {
+            Ok(source) => source,
+            Err(err) => {
+                report_routing_failure_to_target(target, err, server_end).await;
+                return;
             }
-        });
-        Ok(())
+        };
+
+        let start_reason = StartReason::AccessCapability {
+            target: target.moniker.clone(),
+            name: BINDER_SERVICE.clone(),
+        };
+        match source.start(&start_reason, None, vec![], vec![]).await {
+            Ok(_) => {
+                source.scope_to_runtime(server_end).await;
+            }
+            Err(err) => {
+                report_routing_failure_to_target(target, err.into(), server_end).await;
+            }
+        }
     }
 }
 
@@ -188,7 +174,7 @@ mod tests {
         cm_rust_testing::*,
         cm_util::TaskGroup,
         fidl::{client::Client, handle::AsyncChannel},
-        fuchsia_zircon as zx,
+        fidl_fuchsia_io as fio, fuchsia_zircon as zx,
         futures::{lock::Mutex, StreamExt},
         moniker::{Moniker, MonikerBase},
         std::path::PathBuf,

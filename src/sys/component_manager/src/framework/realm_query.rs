@@ -4,10 +4,10 @@
 
 use {
     crate::{
-        capability::{CapabilityProvider, CapabilitySource, PERMITTED_FLAGS},
+        capability::{CapabilityProvider, CapabilitySource, FrameworkCapabilityProvider},
         model::{
             component::{ComponentInstance, InstanceState},
-            error::{CapabilityProviderError, ModelError},
+            error::ModelError,
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
             model::Model,
             namespace::create_namespace,
@@ -18,14 +18,12 @@ use {
     async_trait::async_trait,
     cm_rust::NativeIntoFidl,
     cm_types::Name,
-    cm_util::channel,
-    cm_util::TaskGroup,
     fidl::{
         endpoints::{ClientEnd, ServerEnd},
         prelude::*,
     },
     fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_component_runner as fcrunner,
-    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
+    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
     fuchsia_zircon::sys::ZX_CHANNEL_MAX_MSG_BYTES,
     futures::lock::Mutex,
     futures::StreamExt,
@@ -39,7 +37,6 @@ use {
     },
     std::{
         convert::TryFrom,
-        path::PathBuf,
         sync::{Arc, Weak},
     },
     tracing::{trace, warn},
@@ -235,38 +232,10 @@ impl RealmQueryCapabilityProvider {
 }
 
 #[async_trait]
-impl CapabilityProvider for RealmQueryCapabilityProvider {
-    async fn open(
-        self: Box<Self>,
-        task_group: TaskGroup,
-        flags: fio::OpenFlags,
-        relative_path: PathBuf,
-        server_end: &mut zx::Channel,
-    ) -> Result<(), CapabilityProviderError> {
-        let forbidden = flags - PERMITTED_FLAGS;
-        if !forbidden.is_empty() {
-            warn!(?forbidden, "RealmQuery capability");
-            return Err(CapabilityProviderError::BadFlags);
-        }
-
-        if relative_path.components().count() != 0 {
-            warn!(
-                path=%relative_path.display(),
-                "RealmQuery capability got open request with non-empty",
-            );
-            return Err(CapabilityProviderError::BadPath);
-        }
-
-        let server_end = channel::take_channel(server_end);
-
-        let server_end = ServerEnd::<fsys::RealmQueryMarker>::new(server_end);
-        let stream: fsys::RealmQueryRequestStream =
-            server_end.into_stream().map_err(|_| CapabilityProviderError::StreamCreationError)?;
-        task_group.spawn(async move {
-            self.query.serve(self.scope_moniker, stream).await;
-        });
-
-        Ok(())
+impl FrameworkCapabilityProvider for RealmQueryCapabilityProvider {
+    type Marker = fsys::RealmQueryMarker;
+    async fn open_protocol(self: Box<Self>, server_end: ServerEnd<Self::Marker>) {
+        self.query.serve(self.scope_moniker, server_end.into_stream().unwrap()).await;
     }
 }
 
@@ -616,7 +585,7 @@ async fn connect_to_storage_admin(
 
     task_group.spawn(async move {
         if let Err(error) = Arc::new(storage_admin)
-            .serve(storage_decl, instance.as_weak(), server_end.into_channel().into())
+            .serve(storage_decl, instance.as_weak(), server_end.into_stream().unwrap())
             .await
         {
             warn!(
@@ -792,6 +761,7 @@ mod tests {
         component_id_index::InstanceId,
         fidl::endpoints::{create_endpoints, create_proxy, create_proxy_and_stream},
         fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_io as fio, fuchsia_async as fasync,
+        fuchsia_zircon as zx,
         routing_test_helpers::component_id_index::make_index_file,
     };
 

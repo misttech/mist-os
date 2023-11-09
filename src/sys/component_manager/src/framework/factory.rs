@@ -4,26 +4,23 @@
 
 use {
     crate::{
-        capability::{CapabilityProvider, CapabilitySource},
+        capability::{CapabilityProvider, CapabilitySource, FrameworkCapabilityProvider},
         model::{
-            error::{CapabilityProviderError, ModelError},
+            error::ModelError,
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
         },
     },
     ::routing::capability_source::InternalCapability,
     async_trait::async_trait,
     cm_types::Name,
-    cm_util::{channel, TaskGroup},
+    cm_util::TaskGroup,
     fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker, ServerEnd},
-    fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_zircon as zx,
+    fidl_fuchsia_component_sandbox as fsandbox,
     futures::prelude::*,
     lazy_static::lazy_static,
     moniker::Moniker,
     sandbox::{Dict, Handle, Receiver},
-    std::{
-        path::PathBuf,
-        sync::{Arc, Weak},
-    },
+    std::sync::{Arc, Weak},
     tracing::warn,
 };
 
@@ -42,29 +39,16 @@ impl FactoryCapabilityProvider {
 }
 
 #[async_trait]
-impl CapabilityProvider for FactoryCapabilityProvider {
-    async fn open(
-        self: Box<Self>,
-        task_group: TaskGroup,
-        _flags: fio::OpenFlags,
-        _relative_path: PathBuf,
-        server_end: &mut zx::Channel,
-    ) -> Result<(), CapabilityProviderError> {
-        let server_end = channel::take_channel(server_end);
-        let host = self.host.clone();
-        let server_end = ServerEnd::<fsandbox::FactoryMarker>::new(server_end);
-        let stream: fsandbox::FactoryRequestStream =
-            server_end.into_stream().map_err(|_| CapabilityProviderError::StreamCreationError)?;
-        task_group.spawn(async move {
-            // We only need to look up the component matching this scope.
-            // These operations should all work, even if the component is not running.
-            let serve_result = host.serve(stream).await;
-            if let Err(error) = serve_result {
-                // TODO: Set an epitaph to indicate this was an unexpected error.
-                warn!(%error, "serve failed");
-            }
-        });
-        Ok(())
+impl FrameworkCapabilityProvider for FactoryCapabilityProvider {
+    type Marker = fsandbox::FactoryMarker;
+    async fn open_protocol(self: Box<Self>, server_end: ServerEnd<Self::Marker>) {
+        // We only need to look up the component matching this scope.
+        // These operations should all work, even if the component is not running.
+        let serve_result = self.host.serve(server_end.into_stream().unwrap()).await;
+        if let Err(error) = serve_result {
+            // TODO: Set an epitaph to indicate this was an unexpected error.
+            warn!(%error, "serve failed");
+        }
     }
 }
 
@@ -198,7 +182,7 @@ mod tests {
         assert_matches::assert_matches,
         fidl::endpoints,
         fuchsia_async as fasync,
-        fuchsia_zircon::{AsHandleRef, HandleBased},
+        fuchsia_zircon::{self as zx, AsHandleRef, HandleBased},
     };
 
     #[fuchsia::test]

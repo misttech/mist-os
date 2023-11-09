@@ -4,18 +4,18 @@
 
 use {
     crate::{
-        capability::{CapabilityProvider, CapabilitySource},
+        capability::{CapabilityProvider, CapabilitySource, FrameworkCapabilityProvider},
         model::{
-            error::{CapabilityProviderError, ModelError},
+            error::ModelError,
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
         },
     },
     ::routing::capability_source::InternalCapability,
     async_trait::async_trait,
     cm_types::Name,
-    cm_util::{channel, TaskGroup},
+    cm_util::TaskGroup,
     fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd},
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio, fuchsia_zircon as zx,
+    fidl_fuchsia_component as fcomponent,
     futures::{
         channel::mpsc::{unbounded, UnboundedSender},
         prelude::*,
@@ -25,10 +25,7 @@ use {
     namespace::{self, NamespaceError},
     sandbox::AnyCapability,
     serve_processargs::{BuildNamespaceError, NamespaceBuilder},
-    std::{
-        path::PathBuf,
-        sync::{Arc, Weak},
-    },
+    std::sync::{Arc, Weak},
     tracing::warn,
 };
 
@@ -48,29 +45,15 @@ impl NamespaceCapabilityProvider {
 }
 
 #[async_trait]
-impl CapabilityProvider for NamespaceCapabilityProvider {
-    async fn open(
-        self: Box<Self>,
-        task_group: TaskGroup,
-        _flags: fio::OpenFlags,
-        _relative_path: PathBuf,
-        server_end: &mut zx::Channel,
-    ) -> Result<(), CapabilityProviderError> {
-        let server_end = channel::take_channel(server_end);
-        let host = self.host.clone();
-        let server_end = ServerEnd::<fcomponent::NamespaceMarker>::new(server_end);
-        let stream: fcomponent::NamespaceRequestStream =
-            server_end.into_stream().map_err(|_| CapabilityProviderError::StreamCreationError)?;
-        task_group.spawn(async move {
-            // We only need to look up the component matching this scope.
-            // These operations should all work, even if the component is not running.
-            let serve_result = host.serve(stream).await;
-            if let Err(error) = serve_result {
-                // TODO: Set an epitaph to indicate this was an unexpected error.
-                warn!(%error, "serve failed");
-            }
-        });
-        Ok(())
+impl FrameworkCapabilityProvider for NamespaceCapabilityProvider {
+    type Marker = fcomponent::NamespaceMarker;
+
+    async fn open_protocol(self: Box<Self>, server_end: ServerEnd<Self::Marker>) {
+        let serve_result = self.host.serve(server_end.into_stream().unwrap()).await;
+        if let Err(error) = serve_result {
+            // TODO: Set an epitaph to indicate this was an unexpected error.
+            warn!(%error, "serve failed");
+        }
     }
 }
 

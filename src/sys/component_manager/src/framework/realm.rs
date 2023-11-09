@@ -4,10 +4,10 @@
 
 use {
     crate::{
-        capability::{CapabilityProvider, CapabilitySource},
+        capability::{CapabilityProvider, CapabilitySource, FrameworkCapabilityProvider},
         model::{
             component::{ComponentInstance, WeakComponentInstance},
-            error::{CapabilityProviderError, ModelError, OpenExposedDirError},
+            error::{ModelError, OpenExposedDirError},
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
             model::Model,
         },
@@ -19,25 +19,21 @@ use {
     cm_fidl_validator,
     cm_rust::FidlIntoNative,
     cm_types::Name,
-    cm_util::channel,
-    cm_util::TaskGroup,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_io as fio, fuchsia_async as fasync,
     futures::prelude::*,
     lazy_static::lazy_static,
     moniker::{ChildName, ChildNameBase, Moniker},
     std::{
         cmp,
-        path::PathBuf,
         sync::{Arc, Weak},
     },
     tracing::{debug, error, warn},
 };
 
 lazy_static! {
-    // Path for SDK clients.
-    pub static ref SDK_REALM_SERVICE: Name = "fuchsia.component.Realm".parse().unwrap();
+    pub static ref REALM_SERVICE: Name = "fuchsia.component.Realm".parse().unwrap();
 }
 
 pub struct RealmCapabilityProvider {
@@ -52,35 +48,23 @@ impl RealmCapabilityProvider {
 }
 
 #[async_trait]
-impl CapabilityProvider for RealmCapabilityProvider {
-    async fn open(
-        self: Box<Self>,
-        task_group: TaskGroup,
-        _flags: fio::OpenFlags,
-        _relative_path: PathBuf,
-        server_end: &mut zx::Channel,
-    ) -> Result<(), CapabilityProviderError> {
-        let server_end = channel::take_channel(server_end);
-        let host = self.host.clone();
-        let server_end = ServerEnd::<fcomponent::RealmMarker>::new(server_end);
-        let stream: fcomponent::RealmRequestStream =
-            server_end.into_stream().map_err(|_| CapabilityProviderError::StreamCreationError)?;
-        task_group.spawn(async move {
-            // We only need to look up the component matching this scope.
-            // These operations should all work, even if the component is not running.
-            if let Some(model) = host.model.upgrade() {
-                if let Ok(component) = model.find_and_maybe_resolve(&self.scope_moniker).await {
-                    let weak = WeakComponentInstance::new(&component);
-                    drop(component);
-                    let serve_result = host.serve(weak, stream).await;
-                    if let Err(error) = serve_result {
-                        // TODO: Set an epitaph to indicate this was an unexpected error.
-                        warn!(%error, "serve failed");
-                    }
+impl FrameworkCapabilityProvider for RealmCapabilityProvider {
+    type Marker = fcomponent::RealmMarker;
+
+    async fn open_protocol(self: Box<Self>, server_end: ServerEnd<Self::Marker>) {
+        // We only need to look up the component matching this scope.
+        // These operations should all work, even if the component is not running.
+        if let Some(model) = self.host.model.upgrade() {
+            if let Ok(component) = model.find_and_maybe_resolve(&self.scope_moniker).await {
+                let weak = WeakComponentInstance::new(&component);
+                drop(component);
+                let serve_result = self.host.serve(weak, server_end.into_stream().unwrap()).await;
+                if let Err(error) = serve_result {
+                    // TODO: Set an epitaph to indicate this was an unexpected error.
+                    warn!(%error, "serve failed");
                 }
             }
-        });
-        Ok(())
+        }
     }
 }
 
@@ -234,7 +218,7 @@ impl RealmCapabilityHost {
     ) -> Result<Option<Box<dyn CapabilityProvider>>, ModelError> {
         // If some other capability has already been installed, then there's nothing to
         // do here.
-        if capability_provider.is_none() && capability.matches_protocol(&SDK_REALM_SERVICE) {
+        if capability_provider.is_none() && capability.matches_protocol(&REALM_SERVICE) {
             return Ok(Some(Box::new(RealmCapabilityProvider::new(scope_moniker, self.clone()))
                 as Box<dyn CapabilityProvider>));
         }

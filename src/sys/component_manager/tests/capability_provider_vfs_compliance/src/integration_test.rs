@@ -11,39 +11,49 @@ use futures::StreamExt;
 
 #[fasync::run_singlethreaded(test)]
 async fn component_manager_namespace() {
-    let non_hanging_nodes = [
+    let working_nodes = [
+        "/svc/fuchsia.component.Binder",
+        "/svc/fuchsia.component.Namespace",
+        "/svc/fuchsia.component.Realm",
+        "/svc/fuchsia.component.sandbox.Factory",
         "/svc/fuchsia.sys2.LifecycleController",
         "/svc/fuchsia.sys2.RouteValidator",
         "/svc/fuchsia.sys2.StorageAdmin",
+        "/svc/fuchsia.sys2.RealmQuery",
+        "/svc/fuchsia.boot.Arguments",
+        "/svc/fuchsia.boot.FactoryItems",
+        "/svc/fuchsia.boot.Items",
+        "/svc/fuchsia.boot.ReadOnlyLog",
+        "/svc/fuchsia.boot.RootResource",
+        "/svc/fuchsia.boot.WriteOnlyLog",
+        "/svc/fuchsia.kernel.CpuResource",
+        "/svc/fuchsia.kernel.DebugResource",
+        "/svc/fuchsia.kernel.HypervisorResource",
+        "/svc/fuchsia.kernel.InfoResource",
+        "/svc/fuchsia.kernel.IrqResource",
+        "/svc/fuchsia.kernel.MexecResource",
+        "/svc/fuchsia.kernel.MmioResource",
+        "/svc/fuchsia.kernel.PowerResource",
+        "/svc/fuchsia.kernel.RootJob",
+        "/svc/fuchsia.kernel.RootJobForInspect",
+        "/svc/fuchsia.kernel.Stats",
+        "/svc/fuchsia.kernel.VmexResource",
+        "/svc/fuchsia.process.Launcher",
+        "/svc/fuchsia.sys2.CrashIntrospect",
     ];
-
-    let nonhanging_failed_opens = non_hanging_nodes.iter().map(|node_path| async move {
+    let working_opens = working_nodes.iter().map(|node_path| async move {
         assert_matches!(
             validate_open_with_node_reference_and_describe(node_path).await,
-            Err(OpenError::OnOpenDecode(fidl::Error::ClientChannelClosed { .. })),
-            "Opening capability: {} with DESCRIBE|NODE_REFERENCE did not produce closed stream.",
+            Ok(()),
+            "Opening capability: {} with DESCRIBE|NODE_REFERENCE did not produce open stream.",
             node_path
         );
     });
 
-    let () = futures::future::join_all(nonhanging_failed_opens).await.into_iter().collect();
+    let () = futures::future::join_all(working_opens).await.into_iter().collect();
 
-    let hanging_nodes = [
-        "/svc/fuchsia.boot.Arguments",
-        "/svc/fuchsia.component.Binder",
-        "/svc/fuchsia.component.Realm",
-        "/svc/fuchsia.boot.FactoryItems",
-        "/svc/fuchsia.boot.Items",
-        "/svc/fuchsia.boot.ReadOnlyLog",
-        "/svc/fuchsia.boot.WriteOnlyLog",
-        "/svc/fuchsia.kernel.Stats",
-        "/svc/fuchsia.logger.LogSink",
-        "/svc/fuchsia.process.Launcher",
-        "/svc/fuchsia.sys2.CrashIntrospect",
-        "/svc/fuchsia.sys2.CrashIntrospect",
-    ];
-
-    let hanging_failed_opens = hanging_nodes.iter().map(|node_path| async move {
+    let hanging_nodes = ["/svc/fuchsia.logger.LogSink"];
+    let hanging_opens = hanging_nodes.iter().map(|node_path| async move {
         let hanging_err = validate_open_with_node_reference_and_describe(node_path)
             .on_timeout(std::time::Duration::from_secs(2), || {
                 Err(OpenError::OpenError(zx_status::Status::TIMED_OUT))
@@ -58,27 +68,7 @@ async fn component_manager_namespace() {
         );
     });
 
-    let () = futures::future::join_all(hanging_failed_opens).await.into_iter().collect();
-
-    // Security checks prevent access to the below protocols, although they are still
-    // hosted in component manager.
-    // TODO(https://fxbug.dev/104365): Give this test permission to access these
-    // resources as we expand io compliance enforcement in CM.
-    // let _hanging_resources = [
-    //     "/svc/fuchsia.kernel.RootJob",
-    //     "/svc/fuchsia.kernel.RootJobForInspect",
-    //     "/svc/fuchsia.boot.RootResource",
-    //     "/svc/fuchsia.kernel.CpuResource",
-    //     "/svc/fuchsia.kernel.DebugResource",
-    //     "/svc/fuchsia.kernel.HypervisorResource",
-    //     "/svc/fuchsia.kernel.InfoResource",
-    //     "/svc/fuchsia.kernel.IoportResource",
-    //     "/svc/fuchsia.kernel.IrqResource",
-    //     "/svc/fuchsia.kernel.MmioResource",
-    //     "/svc/fuchsia.kernel.PowerResource",
-    //     "/svc/fuchsia.kernel.SmcResource",
-    //     "/svc/fuchsia.kernel.VmexResource",
-    // ];
+    let () = futures::future::join_all(hanging_opens).await.into_iter().collect();
 }
 
 async fn validate_open_with_node_reference_and_describe(path: &str) -> Result<(), OpenError> {

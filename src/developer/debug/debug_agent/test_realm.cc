@@ -217,7 +217,7 @@ fit::result<debug::Status, TestRealmAndOffers> GetTestRealmAndOffers(
 
   auto [realm_client_end, realm_server_end] = *fidl::CreateEndpoints<fuchsia_component::Realm>();
   auto realm_open_res =
-      directory->Open({fuchsia_io::OpenFlags::kRightReadable, fuchsia_io::ModeType(0),
+      directory->Open({fuchsia_io::OpenFlags(0), fuchsia_io::ModeType(0),
                        fidl::DiscoverableProtocolName<fuchsia_component::Realm>,
                        fidl::ServerEnd<fuchsia_io::Node>(realm_server_end.TakeChannel())});
   if (realm_open_res.is_error()) {

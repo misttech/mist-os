@@ -12,7 +12,8 @@ use {
         epitaph::ChannelEpitaphExt,
         AsyncChannel,
     },
-    fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_io as fio, fuchsia_async as fasync,
+    fuchsia_zircon::{self as zx, HandleBased},
     futures::{
         future::BoxFuture,
         stream::{FuturesUnordered, StreamExt},
@@ -20,7 +21,9 @@ use {
     lazy_static::lazy_static,
     moniker::Moniker,
     sandbox::{AnyCapability, AsTrait, AsTraitError, Capability, Data, Dict, Receiver, Sender},
+    std::sync::Arc,
     tracing::warn,
+    vfs::{directory::entry::DirectoryEntry, execution_scope::ExecutionScope, path::Path},
 };
 
 lazy_static! {
@@ -284,7 +287,7 @@ impl SandboxWaiter {
 /// handle each new message from the receiver.
 pub struct LaunchTaskOnReceive {
     receiver: Receiver<Message>,
-    task_to_launch: Box<
+    task_to_launch: Arc<
         dyn Fn(Message) -> BoxFuture<'static, Result<(), anyhow::Error>> + Sync + Send + 'static,
     >,
     // Note that we explicitly need a `WeakTaskGroup` because if our `run` call is scheduled on the
@@ -301,7 +304,7 @@ impl LaunchTaskOnReceive {
         task_name: impl Into<String>,
         receiver: Receiver<Message>,
         policy: Option<(GlobalPolicyChecker, CapabilitySource<ComponentInstance>)>,
-        task_to_launch: Box<
+        task_to_launch: Arc<
             dyn Fn(Message) -> BoxFuture<'static, Result<(), anyhow::Error>>
                 + Sync
                 + Send
@@ -325,13 +328,33 @@ impl LaunchTaskOnReceive {
                     continue;
                 }
             }
+            // The open must be wrapped in a [vfs] to correctly implement the full
+            // contract of `fuchsia.io`, including OPEN_FLAGS_DESCRIBE, etc.
+            //
+            // TODO(fxbug.dev/296309292): This technically does not implement the full
+            // contract because it does not handle the path. Service vfs is supposed
+            // to reject the request if the path is nonempty. However, the path is
+            // currently not delivered in the message.
+            let flags = message.flags;
+            let target = message.target;
+            let server_end = zx::Channel::from(message.handle).into();
+            let task_to_launch = self.task_to_launch.clone();
+            let task_group = self.task_group.clone();
             let task_name = self.task_name.clone();
-            let fut = (self.task_to_launch)(message);
-            self.task_group.spawn(async move {
-                if let Err(error) = fut.await {
-                    warn!(%error, "{} failed", task_name);
-                }
-            });
+            let service = vfs::service::endpoint(
+                move |_scope: ExecutionScope, server_end: fuchsia_async::Channel| {
+                    let handle = server_end.into_zx_channel().into_handle();
+                    let message = Message { handle, flags, target: target.clone() };
+                    let fut = (task_to_launch)(message);
+                    let task_name = task_name.clone();
+                    task_group.spawn(async move {
+                        if let Err(error) = fut.await {
+                            warn!(%error, "{} failed", task_name);
+                        }
+                    });
+                },
+            );
+            service.open(ExecutionScope::new(), flags, Path::dot(), server_end);
         }
     }
 }

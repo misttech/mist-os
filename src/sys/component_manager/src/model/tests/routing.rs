@@ -15,7 +15,7 @@
 use {
     crate::{
         capability::{CapabilityProvider, CapabilitySource},
-        framework::realm::SDK_REALM_SERVICE,
+        framework::realm::REALM_SERVICE,
         model::{
             actions::{ActionSet, DestroyAction, DestroyChildAction, ShutdownAction},
             component::StartReason,
@@ -175,7 +175,7 @@ async fn use_framework_service() {
         ) -> Result<Option<Box<dyn CapabilityProvider>>, ModelError> {
             // If some other capability has already been installed, then there's nothing to
             // do here.
-            if capability.matches_protocol(&SDK_REALM_SERVICE) {
+            if capability.matches_protocol(&REALM_SERVICE) {
                 Ok(Some(Box::new(MockRealmCapabilityProvider::new(
                     scope_moniker.clone(),
                     self.clone(),

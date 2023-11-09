@@ -4,10 +4,10 @@
 
 use {
     crate::{
-        capability::{CapabilityProvider, CapabilitySource, PERMITTED_FLAGS},
+        capability::{CapabilityProvider, CapabilitySource, FrameworkCapabilityProvider},
         model::{
             component::{ComponentInstance, InstanceState, ResolvedInstanceState},
-            error::{CapabilityProviderError, ModelError},
+            error::ModelError,
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
             model::Model,
             routing::{self, service::AnonymizedServiceRoute, Route, RouteRequest, RoutingError},
@@ -16,17 +16,13 @@ use {
     async_trait::async_trait,
     cm_rust::{ExposeDecl, SourceName, UseDecl},
     cm_types::Name,
-    cm_util::channel,
-    cm_util::TaskGroup,
     fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd},
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_sys2 as fsys,
     futures::{future::join_all, lock::Mutex, TryStreamExt},
     lazy_static::lazy_static,
     moniker::{ExtendedMoniker, Moniker, MonikerBase},
     std::{
         cmp::Ordering,
-        path::PathBuf,
         sync::{Arc, Weak},
     },
     tracing::warn,
@@ -394,38 +390,11 @@ impl RouteValidatorCapabilityProvider {
 }
 
 #[async_trait]
-impl CapabilityProvider for RouteValidatorCapabilityProvider {
-    async fn open(
-        self: Box<Self>,
-        task_group: TaskGroup,
-        flags: fio::OpenFlags,
-        relative_path: PathBuf,
-        server_end: &mut zx::Channel,
-    ) -> Result<(), CapabilityProviderError> {
-        let forbidden = flags - PERMITTED_FLAGS;
-        if !forbidden.is_empty() {
-            warn!(?forbidden, "RouteValidator capability");
-            return Err(CapabilityProviderError::BadFlags);
-        }
+impl FrameworkCapabilityProvider for RouteValidatorCapabilityProvider {
+    type Marker = fsys::RouteValidatorMarker;
 
-        if relative_path.components().count() != 0 {
-            warn!(
-                path=%relative_path.display(),
-                "RouteValidator capability got open request with non-empty",
-            );
-            return Err(CapabilityProviderError::BadPath);
-        }
-
-        let server_end = channel::take_channel(server_end);
-
-        let server_end = ServerEnd::<fsys::RouteValidatorMarker>::new(server_end);
-        let stream: fsys::RouteValidatorRequestStream =
-            server_end.into_stream().map_err(|_| CapabilityProviderError::StreamCreationError)?;
-        task_group.spawn(async move {
-            self.query.serve(self.scope_moniker, stream).await;
-        });
-
-        Ok(())
+    async fn open_protocol(self: Box<Self>, server_end: ServerEnd<Self::Marker>) {
+        self.query.serve(self.scope_moniker, server_end.into_stream().unwrap()).await;
     }
 }
 
@@ -489,7 +458,7 @@ mod tests {
         cm_rust::*,
         cm_rust_testing::ComponentDeclBuilder,
         fidl::endpoints,
-        fidl_fuchsia_component_decl as fdecl, fuchsia_async as fasync,
+        fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, fuchsia_async as fasync,
     };
 
     #[derive(Ord, PartialOrd, Eq, PartialEq)]

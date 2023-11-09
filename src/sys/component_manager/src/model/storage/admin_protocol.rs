@@ -12,10 +12,10 @@
 
 use {
     crate::{
-        capability::{CapabilityProvider, CapabilitySource, PERMITTED_FLAGS},
+        capability::{CapabilityProvider, CapabilitySource, FrameworkCapabilityProvider},
         model::{
             component::{ComponentInstance, WeakComponentInstance},
-            error::{CapabilityProviderError, ModelError},
+            error::ModelError,
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
             model::Model,
             routing::{Route, RouteSource},
@@ -28,15 +28,12 @@ use {
     cm_moniker::InstancedMoniker,
     cm_rust::{ExposeDecl, OfferDecl, StorageDecl, UseDecl},
     cm_types::Name,
-    cm_util::channel,
-    cm_util::TaskGroup,
     component_id_index::InstanceId,
     fidl::{endpoints::ServerEnd, prelude::*},
     fidl_fuchsia_component as fcomponent,
     fidl_fuchsia_io::{self as fio, DirectoryProxy, DirentType},
     fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
     fuchsia_fs::directory as ffs_dir,
-    fuchsia_zircon as zx,
     futures::{
         stream::{FuturesUnordered, StreamExt},
         Future, TryFutureExt, TryStreamExt,
@@ -163,39 +160,16 @@ impl StorageAdminProtocolProvider {
 }
 
 #[async_trait]
-impl CapabilityProvider for StorageAdminProtocolProvider {
-    async fn open(
-        self: Box<Self>,
-        task_group: TaskGroup,
-        flags: fio::OpenFlags,
-        relative_path: PathBuf,
-        server_end: &mut zx::Channel,
-    ) -> Result<(), CapabilityProviderError> {
-        let forbidden = flags - PERMITTED_FLAGS;
-        if !forbidden.is_empty() {
-            warn!(?forbidden, "StorageAdmin protocol");
-            return Err(CapabilityProviderError::BadFlags);
+impl FrameworkCapabilityProvider for StorageAdminProtocolProvider {
+    type Marker = fsys::StorageAdminMarker;
+    async fn open_protocol(self: Box<Self>, server_end: ServerEnd<Self::Marker>) {
+        if let Err(error) = self
+            .storage_admin
+            .serve(self.storage_decl, self.component, server_end.into_stream().unwrap())
+            .await
+        {
+            warn!(?error, "failed to serve storage admin protocol");
         }
-
-        if relative_path.components().count() != 0 {
-            warn!(
-                path=%relative_path.display(),
-                "StorageAdmin protocol got open request with non-empty",
-            );
-            return Err(CapabilityProviderError::BadPath);
-        }
-
-        let server_end = channel::take_channel(server_end);
-
-        let storage_decl = self.storage_decl.clone();
-        let component = self.component.clone();
-        let storage_admin = self.storage_admin.clone();
-        task_group.spawn(async move {
-            if let Err(error) = storage_admin.serve(storage_decl, component, server_end).await {
-                warn!(?error, "failed to serve storage admin protocol");
-            }
-        });
-        Ok(())
     }
 }
 
@@ -292,7 +266,7 @@ impl StorageAdmin {
         self: Arc<Self>,
         storage_decl: StorageDecl,
         component: WeakComponentInstance,
-        server_end: zx::Channel,
+        mut stream: fsys::StorageAdminRequestStream,
     ) -> Result<(), Error> {
         let storage_source = RouteSource {
             source: CapabilitySource::Component {
@@ -311,10 +285,6 @@ impl StorageAdmin {
                 e,
             )
         })?;
-
-        let mut stream = ServerEnd::<fsys::StorageAdminMarker>::new(server_end)
-            .into_stream()
-            .expect("could not convert channel into stream");
 
         while let Some(request) = stream.try_next().await? {
             match request {

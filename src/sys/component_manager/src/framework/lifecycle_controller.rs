@@ -3,28 +3,25 @@
 // found in the LICENSE file.
 
 use {
-    crate::capability::{CapabilityProvider, CapabilitySource, PERMITTED_FLAGS},
+    crate::capability::{CapabilityProvider, CapabilitySource, FrameworkCapabilityProvider},
     crate::model::{
         actions::{ActionSet, StopAction},
         component::StartReason,
-        error::{CapabilityProviderError, ModelError},
+        error::ModelError,
         hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
         model::Model,
     },
     async_trait::async_trait,
     cm_rust::FidlIntoNative,
     cm_types::Name,
-    cm_util::channel,
-    cm_util::TaskGroup,
     fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
+    fidl_fuchsia_sys2 as fsys,
     futures::lock::Mutex,
     futures::prelude::*,
     lazy_static::lazy_static,
     moniker::{ChildName, Moniker, MonikerBase, MonikerError},
     std::convert::TryFrom,
-    std::path::PathBuf,
     std::sync::{Arc, Weak},
     tracing::warn,
 };
@@ -282,38 +279,11 @@ impl LifecycleControllerCapabilityProvider {
 }
 
 #[async_trait]
-impl CapabilityProvider for LifecycleControllerCapabilityProvider {
-    async fn open(
-        self: Box<Self>,
-        task_group: TaskGroup,
-        flags: fio::OpenFlags,
-        relative_path: PathBuf,
-        server_end: &mut zx::Channel,
-    ) -> Result<(), CapabilityProviderError> {
-        let forbidden = flags - PERMITTED_FLAGS;
-        if !forbidden.is_empty() {
-            warn!(?forbidden, "LifecycleController capability");
-            return Err(CapabilityProviderError::BadFlags);
-        }
+impl FrameworkCapabilityProvider for LifecycleControllerCapabilityProvider {
+    type Marker = fsys::LifecycleControllerMarker;
 
-        if relative_path.components().count() != 0 {
-            warn!(
-                path=%relative_path.display(),
-                "LifecycleController capability got open request with non-empty",
-            );
-            return Err(CapabilityProviderError::BadPath);
-        }
-
-        let server_end = channel::take_channel(server_end);
-
-        let server_end = ServerEnd::<fsys::LifecycleControllerMarker>::new(server_end);
-        let stream: fsys::LifecycleControllerRequestStream =
-            server_end.into_stream().map_err(|_| CapabilityProviderError::StreamCreationError)?;
-        task_group.spawn(async move {
-            self.control.serve(self.scope_moniker, stream).await;
-        });
-
-        Ok(())
+    async fn open_protocol(self: Box<Self>, server_end: ServerEnd<Self::Marker>) {
+        self.control.serve(self.scope_moniker, server_end.into_stream().unwrap()).await;
     }
 }
 

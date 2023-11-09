@@ -515,8 +515,6 @@ pub enum CapabilityProviderError {
     StreamCreationError,
     #[error("bad path")]
     BadPath,
-    #[error("bad flags")]
-    BadFlags,
     #[error("error in pkg dir capability provider: {err}")]
     PkgDirError {
         #[from]
@@ -543,7 +541,7 @@ impl CapabilityProviderError {
     pub fn as_zx_status(&self) -> zx::Status {
         match self {
             Self::StreamCreationError => zx::Status::BAD_HANDLE,
-            Self::BadFlags | Self::BadPath => zx::Status::INVALID_ARGS,
+            Self::BadPath => zx::Status::INVALID_ARGS,
             Self::PkgDirError { err } => err.as_zx_status(),
             Self::EventSourceError { err } => err.as_zx_status(),
             Self::ComponentProviderError { err } => err.as_zx_status(),
