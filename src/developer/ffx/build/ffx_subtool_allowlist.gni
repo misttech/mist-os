@@ -63,9 +63,6 @@ ffx_subtool_fidl_allowlist = [
   # used by ffx process
   "//sdk/fidl/fuchsia.process.explorer:fuchsia.process.explorer",
 
-  # used by ffx driver
-  "//sdk/fidl/fuchsia.storage.metrics:fuchsia.storage.metrics",
-
   # used by ffx test
   "//sdk/fidl/fuchsia.test.manager:fuchsia.test.manager",
 
