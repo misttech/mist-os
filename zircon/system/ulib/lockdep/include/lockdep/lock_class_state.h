@@ -11,7 +11,6 @@
 
 #include <algorithm>
 #include <atomic>
-#include <type_traits>
 
 #include <fbl/algorithm.h>
 #include <lockdep/common.h>
@@ -20,25 +19,120 @@
 
 namespace lockdep {
 
-// Type that holds the essential information and state for a lock class. This is
-// used by ThreadLockState to uniformly operate on the variety of lock classes
-// created by each template instantiation of LockClass. Each template
-// instantiation of LockClass creates a unique static instance of LockClassState.
+// The LockClassState type and its derivatives hold essential metadata and state
+// for a lock class. This is used by ThreadLockState and the loop detector logic
+// to uniformly operate on the variety of lock classes created by each template
+// instantiation of LockClass. Each template instantiation of LockClass creates
+// a unique static instance of LockClassState, or a derivative, depending on
+// whether validation or metadata only compile time options are enabled.
+
+// Empty base class that provides the basic interface with no internal state.
 class LockClassState {
  public:
   // Constructs an instance of LockClassState.
-  LockClassState(const char* const name, LockFlags flags) : name_{name}, flags_{flags} {}
+  constexpr LockClassState() = default;
+  constexpr LockClassState(const char* name, LockFlags flags) {}
 
   // Disable copy construction / assignment.
   LockClassState(const LockClassState&) = delete;
   LockClassState& operator=(const LockClassState&) = delete;
 
-  // Returns the LockClassState instance for the given lock class id. The id must
-  // be a valid lock class id.
+  // Returns the LockClassState instance for the given lock class id. The id
+  // must be a valid lock class id.
   static LockClassState* Get(LockClassId id) { return const_cast<LockClassState*>(id); }
 
+  // Returns the lock class id for this instance. The id is the address of the
+  // instance.
+  LockClassId id() const { return this; }
+};
+
+// A derivative of LockClassState that stores basic metadata about the lock
+// class, such as the name and lock flags. This type is used when metadata
+// only mode is selected at compile time.
+class MetadataLockClassState : public LockClassState {
+ public:
+  // Constructs an instance of MetadataLockClassState.
+  constexpr MetadataLockClassState(const char* const name, LockFlags flags) : name_{name} {}
+
+  // Disable copy construction / assignment.
+  MetadataLockClassState(const MetadataLockClassState&) = delete;
+  MetadataLockClassState& operator=(const MetadataLockClassState&) = delete;
+
+  // Returns the MetadataLockClassState instance for the given lock class id.
+  // The id must be a valid lock class id. This method intentionally shadows
+  // LockClassState::Get.
+  static MetadataLockClassState* Get(LockClassId id) {
+    ZX_DEBUG_ASSERT(kLockMetadataAvailable);
+    return static_cast<MetadataLockClassState*>(LockClassState::Get(id));
+  }
+
   // Returns the type name of the lock class for the given lock class id.
-  static const char* GetName(LockClassId id) { return Get(id)->name_; }
+  static const char* GetName(LockClassId id) { return Get(id)->name(); }
+
+  // Returns the name of this lock class.
+  const char* name() const { return name_; }
+
+ private:
+  // The name of the lock class type.
+  const char* const name_;
+};
+
+// A derivative of MetadataLockClassState that provides full state necessary for
+// runtime lock validation. This type is used when lock validation is enabled at
+// compile time.
+class ValidatorLockClassState : public MetadataLockClassState {
+ public:
+  // Constructs an instance of ValidatorLockClassState.
+  ValidatorLockClassState(const char* const name, LockFlags flags)
+      : MetadataLockClassState{name, flags}, flags_{flags} {}
+
+  // Disable copy construction / assignment.
+  ValidatorLockClassState(const ValidatorLockClassState&) = delete;
+  ValidatorLockClassState& operator=(const ValidatorLockClassState&) = delete;
+
+  // Returns the ValidatorLockClassState instance for the given lock class id.
+  // The id must be a valid lock class id. This method intentionally shadows
+  // MetadataLockClassState::Get.
+  static ValidatorLockClassState* Get(LockClassId id) {
+    ZX_DEBUG_ASSERT(kLockValidationEnabled);
+    return static_cast<ValidatorLockClassState*>(MetadataLockClassState::Get(id));
+  }
+
+  // Returns true if the given lock class is irq-safe, false otherwise.
+  static bool IsIrqSafe(LockClassId id) { return !!(Get(id)->flags() & LockFlagsIrqSafe); }
+
+  // Returns true if the given lock class is nestable, false otherwise.
+  static bool IsNestable(LockClassId id) { return !!(Get(id)->flags() & LockFlagsNestable); }
+
+  // Returns true if the given lock class is multi-acquire, false otherwise.
+  static bool IsMultiAcquire(LockClassId id) {
+    return !!(Get(id)->flags() & LockFlagsMultiAcquire);
+  }
+
+  static bool IsLeaf(LockClassId id) { return !!(Get(id)->flags() & LockFlagsLeaf); }
+
+  // Returns true if reporting is disabled for the given lock class, false
+  // otherwise.
+  static bool IsReportingDisabled(LockClassId id) {
+    return !!(Get(id)->flags() & LockFlagsReportingDisabled);
+  }
+
+  // Returns true if the validator should abort the program if it detects an
+  // invalid re-acquire with this lock class.
+  static bool IsReAcquireFatal(LockClassId id) {
+    return !!(Get(id)->flags() & LockFlagsReAcquireFatal);
+  }
+
+  // Returns true if the lock should not be added to the active lock list
+  // during an acquire.
+  static bool IsActiveListDisabled(LockClassId id) {
+    return !!(Get(id)->flags() & LockFlagsActiveListDisabled);
+  }
+
+  // Returns true if the lock should not be tracked.
+  static bool IsTrackingDisabled(LockClassId id) {
+    return !!(Get(id)->flags() & LockFlagsTrackingDisabled);
+  }
 
   // Returns true if lock class given by |search_id| is in the dependency set of
   // the lock class given by |id|, false otherwise.
@@ -52,48 +146,17 @@ class LockClassState {
     return Get(id)->dependency_set_.AddLockClass(add_id);
   }
 
-  // Returns true if the given lock class is irq-safe, false otherwise.
-  static bool IsIrqSafe(LockClassId id) { return !!(Get(id)->flags_ & LockFlagsIrqSafe); }
+  // Return the flags of this lock class.
+  LockFlags flags() const { return flags_; }
 
-  // Returns true if the given lock class is nestable, false otherwise.
-  static bool IsNestable(LockClassId id) { return !!(Get(id)->flags_ & LockFlagsNestable); }
-
-  // Returns true if the given lock class is multi-acquire, false otherwise.
-  static bool IsMultiAcquire(LockClassId id) { return !!(Get(id)->flags_ & LockFlagsMultiAcquire); }
-
-  static bool IsLeaf(LockClassId id) { return !!(Get(id)->flags_ & LockFlagsLeaf); }
-
-  // Returns true if reporting is disabled for the given lock class, false
-  // otherwise.
-  static bool IsReportingDisabled(LockClassId id) {
-    return !!(Get(id)->flags_ & LockFlagsReportingDisabled);
-  }
-
-  // Returns true if the validator should abort the program if it detects an
-  // invalid re-acquire with this lock class.
-  static bool IsReAcquireFatal(LockClassId id) {
-    return !!(Get(id)->flags_ & LockFlagsReAcquireFatal);
-  }
-
-  // Returns true if the lock should not be added to the active lock list
-  // during an acquire.
-  static bool IsActiveListDisabled(LockClassId id) {
-    return !!(Get(id)->flags_ & LockFlagsActiveListDisabled);
-  }
-
-  // Returns true if the lock should not be tracked.
-  static bool IsTrackingDisabled(LockClassId id) {
-    return !!(Get(id)->flags_ & LockFlagsTrackingDisabled);
-  }
-
-  // Iterator type to traverse the set of LockClassState instances.
+  // Iterator type to traverse the set of ValidatorLockClassState instances.
   class Iterator {
    public:
     Iterator() = default;
     Iterator(const Iterator&) = default;
     Iterator& operator=(const Iterator&) = default;
 
-    LockClassState& operator*() { return *state_; }
+    ValidatorLockClassState& operator*() { return *state_; }
     Iterator operator++() {
       state_ = state_->next_;
       return *this;
@@ -104,27 +167,17 @@ class LockClassState {
     Iterator end() { return {nullptr}; }
 
    private:
-    Iterator(LockClassState* state) : state_{state} {}
-    LockClassState* state_{nullptr};
+    Iterator(ValidatorLockClassState* state) : state_{state} {}
+    ValidatorLockClassState* state_{nullptr};
   };
 
   // Returns an iterator for the init-time linked list of state instances.
   static Iterator Iter() { return {}; }
 
-  // Returns the lock class id for this instance. The id is the address of the
-  // instance.
-  LockClassId id() const { return this; }
-
-  // Returns the name of this lock class.
-  const char* name() const { return name_; }
-
-  // Return the flags of this lock class.
-  LockFlags flags() const { return flags_; }
-
   // Returns the dependency set for this lock class.
   const LockDependencySet& dependency_set() const { return dependency_set_; }
 
-  LockClassState* connected_set() { return LoopDetector::FindSet(&loop_node_)->ToState(); }
+  ValidatorLockClassState* connected_set() { return LoopDetector::FindSet(&loop_node_)->ToState(); }
 
   uint64_t index() const { return loop_node_.index; }
   uint64_t least() const { return loop_node_.least; }
@@ -139,10 +192,7 @@ class LockClassState {
  private:
   friend class SingletonLoopDetector;
 
-  // The name of the lock class type.
-  const char* const name_;
-
-  // Flags specifying which which rules to apply during lock validation.
+  // Flags specifying which rules to apply during lock validation.
   const LockFlags flags_;
 
   // The set of out edges from this node in the lock class dependency graph.
@@ -150,25 +200,29 @@ class LockClassState {
   LockDependencySet dependency_set_;
 
   // Head pointer to linked list of state instances.
-  inline static LockClassState* head_{nullptr};
+  inline static ValidatorLockClassState* head_{nullptr};
 
   // Linked list pointer to the next state instance. This list is constructed
   // by a global initializer and never modified again. The list is used by the
   // loop detector and runtime lock inspection commands to access the complete
   // list of lock classes.
-  LockClassState* next_{InitNext(this)};
+  ValidatorLockClassState* next_{InitNext(this)};
 
   // Updates the linked list to include the given state node and returns the
   // previous head. This is used by the global initializer to setup the
   // next_ member.
-  static LockClassState* InitNext(LockClassState* state) {
-    LockClassState* head = head_;
+  static ValidatorLockClassState* InitNext(ValidatorLockClassState* state) {
+    ValidatorLockClassState* head = head_;
     head_ = state;
     return head;
   }
 
   // Per-lock class state used by the loop detection algorithm.
   struct LoopNode {
+    LoopNode(ValidatorLockClassState* state) : state{state} {}
+
+    ValidatorLockClassState* const state;
+
     // The parent of the disjoint sets this node belongs to. Nodes start out
     // alone in their own set. Sets are joined by the loop detector when
     // found within a cycle.
@@ -183,16 +237,10 @@ class LockClassState {
     uint64_t index{0};
     uint64_t least{0};
 
-    // Returns a pointer to the LockClassState instance that contains this
+    // Returns a pointer to the ValidatorLockClassState instance that contains this
     // LoopNode. This allows the loop detector to mostly operate in terms
     // of LoopNode instances, simplifying expressions in the main algorithm.
-    LockClassState* ToState() {
-      static_assert(std::is_standard_layout<LockClassState>::value,
-                    "LockClassState must be standard layout!");
-      uint8_t* byte_pointer = reinterpret_cast<uint8_t*>(this);
-      uint8_t* state_pointer = byte_pointer - __offsetof(LockClassState, loop_node_);
-      return reinterpret_cast<LockClassState*>(state_pointer);
-    }
+    ValidatorLockClassState* ToState() const { return state; }
 
     // Performs a relaxed, weak compare exchange on the parent pointer of
     // this loop node. Due to the loops in FindSet() and UnionSet() this
@@ -211,7 +259,7 @@ class LockClassState {
   };
 
   // Loop detector node.
-  LoopNode loop_node_;
+  LoopNode loop_node_{this};
 
   // Loop detection using Tarjan's strongly connected components algorithm to
   // efficiently identify loops and disjoint set structures to store and
@@ -242,7 +290,7 @@ class LockClassState {
       // with indices less than or equal to the generation are revisited.
       generation = index;
 
-      for (auto& state : LockClassState::Iter()) {
+      for (auto& state : ValidatorLockClassState::Iter()) {
         if (state.loop_node_.index <= generation)
           Connect(&state.loop_node_);
       }
@@ -361,7 +409,7 @@ class SingletonLoopDetector {
   static void LoopDetectionPass() { detector_.DetectionPass(); }
 
  private:
-  inline static LockClassState::LoopDetector detector_;
+  inline static ValidatorLockClassState::LoopDetector detector_;
 };
 
 // Runs a loop detection pass to find circular lock dependencies. This must be

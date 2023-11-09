@@ -18,7 +18,7 @@ namespace lockdep {
 // Forward declarations.
 class AcquiredLockEntry;
 class ThreadLockState;
-class LockClassState;
+class ValidatorLockClassState;
 enum class LockResult : uint8_t;
 enum LockFlags : uint16_t;
 
@@ -32,7 +32,7 @@ extern void SystemLockValidationFatal(AcquiredLockEntry* lock_entry, ThreadLockS
                                       void* caller_address, void* caller_frame, LockResult result);
 
 // System-defined hook to report detection of a circular lock dependency.
-extern void SystemCircularLockDependencyDetected(LockClassState* connected_set_root);
+extern void SystemCircularLockDependencyDetected(ValidatorLockClassState* connected_set_root);
 
 // System-defined hook that returns the ThreadLockState instance for the current
 // thread.

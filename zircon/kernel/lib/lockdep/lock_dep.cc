@@ -19,6 +19,7 @@
 #include <kernel/thread_lock.h>
 #include <ktl/atomic.h>
 #include <lk/init.h>
+#include <lockdep/lock_class_state.h>
 #include <lockdep/lockdep.h>
 #include <vm/vm.h>
 
@@ -62,20 +63,20 @@ void LockDepInit(unsigned /*level*/) {
 // Dumps the state of the lock dependency graph.
 void DumpLockClassState() {
   printf("Lock class states:\n");
-  for (auto& state : lockdep::LockClassState::Iter()) {
+  for (auto& state : lockdep::ValidatorLockClassState::Iter()) {
     printf("  %s {\n", state.name());
     for (lockdep::LockClassId id : state.dependency_set()) {
-      printf("    %s\n", lockdep::LockClassState::GetName(id));
+      printf("    %s\n", lockdep::ValidatorLockClassState::GetName(id));
     }
     printf("  }\n");
   }
   printf("\nConnected sets:\n");
-  for (auto& state : lockdep::LockClassState::Iter()) {
+  for (auto& state : lockdep::ValidatorLockClassState::Iter()) {
     // Only handle root nodes in the outer loop. The nested loop will pick
     // up all of the child nodes under each parent node.
     if (state.connected_set() == &state) {
       printf("{\n");
-      for (auto& other_state : lockdep::LockClassState::Iter()) {
+      for (auto& other_state : lockdep::ValidatorLockClassState::Iter()) {
         if (other_state.connected_set() == &state)
           printf("  %s\n", other_state.name());
       }
@@ -141,10 +142,10 @@ void SystemLockValidationError(AcquiredLockEntry* bad_entry, AcquiredLockEntry* 
   KERNEL_OOPS("Lock validation failed for thread %p pid %" PRIu64 " tid %" PRIu64 " (%s:%s):\n",
               current_thread, pid, tid, owner_name, current_thread->name());
   printf("Reason: %s\n", ToString(result));
-  printf("Bad lock: name=%s order=%" PRIu64 "\n", LockClassState::GetName(bad_entry->id()),
+  printf("Bad lock: name=%s order=%" PRIu64 "\n", ValidatorLockClassState::GetName(bad_entry->id()),
          bad_entry->order());
-  printf("Conflict: name=%s order=%" PRIu64 "\n", LockClassState::GetName(conflicting_entry->id()),
-         conflicting_entry->order());
+  printf("Conflict: name=%s order=%" PRIu64 "\n",
+         ValidatorLockClassState::GetName(conflicting_entry->id()), conflicting_entry->order());
   printf("caller=%p frame=%p\n", caller_address, caller_frame);
 
   Backtrace bt;
@@ -157,14 +158,15 @@ void SystemLockValidationError(AcquiredLockEntry* bad_entry, AcquiredLockEntry* 
 void SystemLockValidationFatal(AcquiredLockEntry* lock_entry, ThreadLockState* state,
                                void* caller_address, void* caller_frame, LockResult result) {
   panic("Fatal lock violation detected! name=%s, reason=%s, pc=%p, stack frame=%p\n",
-        LockClassState::GetName(lock_entry->id()), ToString(result), caller_address, caller_frame);
+        ValidatorLockClassState::GetName(lock_entry->id()), ToString(result), caller_address,
+        caller_frame);
 }
 
 // Prints a kernel oops when a circular lock dependency is detected.
-void SystemCircularLockDependencyDetected(LockClassState* connected_set_root) {
+void SystemCircularLockDependencyDetected(ValidatorLockClassState* connected_set_root) {
   KERNEL_OOPS("Circular lock dependency detected:\n");
 
-  for (auto& node : lockdep::LockClassState::Iter()) {
+  for (auto& node : lockdep::ValidatorLockClassState::Iter()) {
     if (node.connected_set() == connected_set_root)
       printf("  %s\n", node.name());
   }

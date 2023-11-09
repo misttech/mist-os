@@ -36,6 +36,9 @@ declare_args() {
   # Enable kernel lock dependency tracking.
   enable_lock_dep = false
 
+  # Enable kernel lock dependency metadata only (ignored if enable_lock_dep is true).
+  enable_lock_dep_metadata_only = false
+
   # Enable lock contention tracing.
   lock_tracing_enabled = false
 
@@ -139,9 +142,6 @@ declare_args() {
   # disabled.
   enable_lock_dep_tests = enable_lock_dep
 }
-
-assert(!enable_lock_dep_tests || enable_lock_dep,
-       "enable_lock_dep_tests=true requires enable_lock_dep=true")
 
 kernel_test_device_types = [
   "AEMU",

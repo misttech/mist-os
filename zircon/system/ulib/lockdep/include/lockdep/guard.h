@@ -157,11 +157,11 @@ class __TA_SCOPED_CAPABILITY
                                   Args&&... state_args) __TA_ACQUIRE(lock)
       __TA_ACQUIRE(lock->capability())
       : Guard{OrderedLock, lock, order, std::forward<Args>(state_args)...} {
-    ZX_DEBUG_ASSERT(lock->id() == kInvalidLockClassId || LockClassState::IsNestable(lock->id()));
+    ZX_DEBUG_ASSERT(!kLockValidationEnabled || ValidatorLockClassState::IsNestable(lock->id()));
   }
 
   // Acquires the given type erased lock and its alias. Only the first lock is
-  // actually acquired, the alias verified to be the same lock by a runtime
+  // actually acquired, the alias is verified to be the same lock by a runtime
   // check and its capability is acquired to satisfy static analysis.
   //
   // This constructor participates in overload resolution when the underlying
@@ -177,7 +177,7 @@ class __TA_SCOPED_CAPABILITY
   }
 
   // Acquires the given type erased lock and its alias. Only the first lock is
-  // actually acquired, the alias verified to be the same lock by a runtime
+  // actually acquired, the alias is verified to be the same lock by a runtime
   // check and its capability is acquired to satisfy static analysis.
   //
   // This constructor participates in overload resolution when the underlying
@@ -456,11 +456,11 @@ class __TA_SCOPED_CAPABILITY Guard<LockType, Option, internal::EnableIfShared<Lo
                                   Args&&... state_args) __TA_ACQUIRE_SHARED(lock)
       __TA_ACQUIRE_SHARED(lock->capability())
       : Guard{OrderedLock, lock, order, std::forward<Args>(state_args)...} {
-    ZX_DEBUG_ASSERT(lock->id() == kInvalidLockClassId || LockClassState::IsNestable(lock->id()));
+    ZX_DEBUG_ASSERT(!kLockValidationEnabled || ValidatorLockClassState::IsNestable(lock->id()));
   }
 
   // Acquires the given type erased lock and its alias. Only the first lock is
-  // actually acquired, the alias verified to be the same lock by a runtime
+  // actually acquired, the alias is verified to be the same lock by a runtime
   // check and its capability is acquired to satisfy static analysis.
   //
   // This constructor participates in overload resolution when the underlying
@@ -477,7 +477,7 @@ class __TA_SCOPED_CAPABILITY Guard<LockType, Option, internal::EnableIfShared<Lo
   }
 
   // Acquires the given type erased lock and its alias. Only the first lock is
-  // actually acquired, the alias verified to be the same lock by a runtime
+  // actually acquired, the alias is verified to be the same lock by a runtime
   // check and its capability is acquired to satisfy static analysis.
   //
   // This constructor participates in overload resolution when the underlying
@@ -511,6 +511,9 @@ class __TA_SCOPED_CAPABILITY Guard<LockType, Option, internal::EnableIfShared<Lo
 
   // Returns true if this guard wraps |lock|.
   bool wraps_lock(const LockType& lock) const { return &lock == validator_.lock(); }
+
+  // Read-only access to the underlying |lock|.
+  const LockType* lock() const { return validator_.lock(); }
 
   // Releases this scoped capability without releasing the underlying lock or
   // un-tracking the lock in the validator. Returns an rvalue reference to the

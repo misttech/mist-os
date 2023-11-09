@@ -91,10 +91,10 @@ class ThreadLockState {
   // Attempts to add the given lock class to the acquired lock list. Lock
   // ordering and other checks are performed here.
   void Acquire(AcquiredLockEntry* lock_entry) {
-    if (LockClassState::IsTrackingDisabled(lock_entry->id()))
+    if (ValidatorLockClassState::IsTrackingDisabled(lock_entry->id()))
       return;
 
-    if (LockClassState::IsReportingDisabled(lock_entry->id()))
+    if (ValidatorLockClassState::IsReportingDisabled(lock_entry->id()))
       reporting_disabled_count_++;
 
     // If reporting is disabled don't modify last_result_.  For example, we
@@ -118,21 +118,22 @@ class ThreadLockState {
     //  6. Adds each lock class already in the list to the dependency set of the
     //     given lock class.
     for (AcquiredLockEntry& entry : acquired_locks_) {
-      if (LockClassState::IsLeaf(entry.id())) {
+      if (ValidatorLockClassState::IsLeaf(entry.id())) {
         Report(lock_entry, &entry, LockResult::AcquireAfterLeaf);
       } else if (entry.id() == lock_entry->id()) {
         if (lock_entry->address() == entry.address()) {
           Report(lock_entry, &entry, LockResult::Reentrance);
-        } else if (!LockClassState::IsMultiAcquire(lock_entry->id()) &&
+        } else if (!ValidatorLockClassState::IsMultiAcquire(lock_entry->id()) &&
                    lock_entry->order() <= entry.order()) {
-          if (!LockClassState::IsNestable(lock_entry->id()) && lock_entry->order() == 0) {
+          if (!ValidatorLockClassState::IsNestable(lock_entry->id()) && lock_entry->order() == 0) {
             Report(lock_entry, &entry, LockResult::AlreadyAcquired);
           } else {
             Report(lock_entry, &entry, LockResult::InvalidNesting);
           }
         }
       } else {
-        const LockResult result = LockClassState::AddLockClass(lock_entry->id(), entry.id());
+        const LockResult result =
+            ValidatorLockClassState::AddLockClass(lock_entry->id(), entry.id());
         if (result == LockResult::Success) {
           // A new edge has been added to the graph, trigger a loop
           // detection pass.
@@ -148,30 +149,30 @@ class ThreadLockState {
         // added for this ordered pair of locks; when the edge already
         // exists these tests have been performed before.
         if (result == LockResult::Success) {
-          const bool entry_irqsafe = LockClassState::IsIrqSafe(entry.id());
-          const bool lock_entry_irqsafe = LockClassState::IsIrqSafe(lock_entry->id());
+          const bool entry_irqsafe = ValidatorLockClassState::IsIrqSafe(entry.id());
+          const bool lock_entry_irqsafe = ValidatorLockClassState::IsIrqSafe(lock_entry->id());
           if (entry_irqsafe && !lock_entry_irqsafe) {
             Report(lock_entry, &entry, LockResult::InvalidIrqSafety);
           }
 
-          if (LockClassState::HasLockClass(entry.id(), lock_entry->id())) {
+          if (ValidatorLockClassState::HasLockClass(entry.id(), lock_entry->id())) {
             Report(lock_entry, &entry, LockResult::OutOfOrder);
           }
         }
       }
     }
 
-    if (!LockClassState::IsActiveListDisabled(lock_entry->id())) {
+    if (!ValidatorLockClassState::IsActiveListDisabled(lock_entry->id())) {
       acquired_locks_.push_back(lock_entry);
     }
   }
 
   // Removes the given lock entry from the acquired lock list.
   void Release(AcquiredLockEntry* entry) {
-    if (LockClassState::IsTrackingDisabled(entry->id()))
+    if (ValidatorLockClassState::IsTrackingDisabled(entry->id()))
       return;
 
-    if (LockClassState::IsReportingDisabled(entry->id()))
+    if (ValidatorLockClassState::IsReportingDisabled(entry->id()))
       reporting_disabled_count_--;
 
     if (entry->InContainer())
@@ -210,7 +211,7 @@ class ThreadLockState {
   void Report(AcquiredLockEntry* bad_entry, AcquiredLockEntry* conflicting_entry,
               LockResult result) {
     if ((result == LockResult::AlreadyAcquired || result == LockResult::InvalidNesting) &&
-        LockClassState::IsReAcquireFatal(bad_entry->id())) {
+        ValidatorLockClassState::IsReAcquireFatal(bad_entry->id())) {
       SystemLockValidationFatal(bad_entry, this, __GET_CALLER(0), __GET_FRAME(0),
                                 LockResult::AlreadyAcquired);
     }
@@ -261,7 +262,7 @@ class ThreadLockState {
 
 // Defined after ThreadLockState because of dependency on its methods.
 inline void AcquiredLockEntry::Replace(AcquiredLockEntry* target) {
-  LockFlags flags = LockClassState::Get(id_)->flags();
+  LockFlags flags = ValidatorLockClassState::Get(id_)->flags();
   ThreadLockState::Get(flags)->Replace(target, this);
 }
 

@@ -25,12 +25,22 @@ namespace lockdep {
 #define LOCK_DEP_MAX_DEPENDENCIES 31
 #endif
 
-// Configures whether lock validation is enabled or not. Defaults to disabled.
-// When disabled the locking utilities simply lock the underlying lock types,
-// without performing any validation operations.
-#ifndef LOCK_DEP_ENABLE_VALIDATION
-#define LOCK_DEP_ENABLE_VALIDATION 0
+// Configures the level of feature support in lockdep:
+// * 0: All runtime features disabled (default).
+// * 1: Lock class metadata enabled.
+// * 2: Lock validation enabled.
+#ifndef LOCK_DEP_ENABLED_FEATURE_LEVEL
+#define LOCK_DEP_ENABLED_FEATURE_LEVEL 0
 #endif
+
+#define LOCK_DEP_STRINGIFY(x) LOCK_DEP_STRINGIFY2(x)
+#define LOCK_DEP_STRINGIFY2(x) #x
+
+// Assert the enabled feature level is valid.
+static_assert(
+    static_cast<int>(LOCK_DEP_ENABLED_FEATURE_LEVEL) >= 0 &&
+        static_cast<int>(LOCK_DEP_ENABLED_FEATURE_LEVEL) <= 2,
+    "Invalid value for LOCK_DEP_FEATURE_LEVEL: " LOCK_DEP_STRINGIFY(LOCK_DEP_FEATURE_LEVEL));
 
 // Forward declaration. Most code refers to this type through the quasi-opaque
 // type LockClassId.
@@ -77,14 +87,37 @@ constexpr size_t kMaxLockDependencies = internal::NextPrime(LOCK_DEP_MAX_DEPENDE
 // Check to make sure that the requested max does not exceed the prime table.
 static_assert(kMaxLockDependencies != 0, "LOCK_DEP_MAX_DEPENDENCIES too large!");
 
+// Enumeration of supported feature levels.
+enum class FeatureLevel : uint8_t {
+  Disabled = 0,
+  MetadataOnly = 1,
+  Validation = 2,
+};
+
+// The enabled feature level.
+constexpr FeatureLevel kEnabledFeatureLevel =
+    static_cast<FeatureLevel>(LOCK_DEP_ENABLED_FEATURE_LEVEL);
+
+// Whether or not lock metadata is enabled when validation is disabled.
+constexpr bool kLockMetadataOnlyEnabled = kEnabledFeatureLevel == FeatureLevel::MetadataOnly;
+
 // Whether or not lock validation is globally enabled.
-constexpr bool kLockValidationEnabled = static_cast<bool>(LOCK_DEP_ENABLE_VALIDATION);
+constexpr bool kLockValidationEnabled = kEnabledFeatureLevel == FeatureLevel::Validation;
+
+// Whether or not lock metadata is available.
+constexpr bool kLockMetadataAvailable = kLockValidationEnabled || kLockMetadataOnlyEnabled;
 
 // Utility template alias to simplify selecting different types based whether
 // lock validation is enabled or disabled.
 template <typename EnabledType, typename DisabledType>
 using IfLockValidationEnabled =
-    typename std::conditional<kLockValidationEnabled, EnabledType, DisabledType>::type;
+    std::conditional_t<kLockValidationEnabled, EnabledType, DisabledType>;
+
+// Utility template alias to simplify selecting different types based on whether
+// lock metadata is available.
+template <typename AvailableType, typename UnavailableType>
+using IfLockMetadataAvailable =
+    std::conditional_t<kLockMetadataAvailable, AvailableType, UnavailableType>;
 
 // Result type that represents whether a lock attempt was successful, or if not
 // which check failed.

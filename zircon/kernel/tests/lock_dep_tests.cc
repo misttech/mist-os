@@ -282,7 +282,7 @@ lockdep::LockResult GetLastResult(const GuardType&) {
 
 static void ResetTrackingState() {
 #if WITH_LOCK_DEP
-  for (auto& state : lockdep::LockClassState::Iter())
+  for (auto& state : lockdep::ValidatorLockClassState::Iter())
     state.Reset();
 #endif
 }
@@ -395,13 +395,13 @@ static bool lock_dep_dynamic_analysis_tests() {
   using lockdep::Guard;
   using lockdep::GuardMultiple;
   using lockdep::kInvalidLockClassId;
-  using lockdep::LockClassState;
   using lockdep::LockFlagsLeaf;
   using lockdep::LockFlagsMultiAcquire;
   using lockdep::LockFlagsNestable;
   using lockdep::LockFlagsReAcquireFatal;
   using lockdep::LockResult;
   using lockdep::ThreadLockState;
+  using lockdep::ValidatorLockClassState;
   using test::Bar;
   using test::Baz;
   using test::Foo;
@@ -1202,11 +1202,13 @@ static bool lock_dep_dynamic_analysis_tests() {
       EXPECT_EQ(LockResult::Success, test::GetLastResult(guard_a));
     }
 
+#if WITH_LOCK_DEP
     // Ensure that the loop detection pass completes before the test ends to
     // avoid triggering lockdep failures in CQ/CI. Use an infinite timeout and
     // let test infra kill the test due to timeout instead.
     zx_status_t status = TriggerAndWaitForLoopDetection(ZX_TIME_INFINITE);
     EXPECT_EQ(ZX_OK, status);
+#endif
   }
 
   // Test CallUntracked operation.
