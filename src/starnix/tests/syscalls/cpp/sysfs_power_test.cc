@@ -89,3 +89,15 @@ TEST_F(SysfsPowerTest, SuspendStateFileWriteFails) {
   ASSERT_FALSE(files::WriteFile("/sys/power/state", "test"));
   ASSERT_FALSE(files::WriteFile("/sys/power/state", "disk"));
 }
+
+TEST_F(SysfsPowerTest, SyncOnSuspendFileContainsExpectedContents) {
+  std::string sync_on_suspend_str;
+  EXPECT_TRUE(files::ReadFileToString("/sys/power/sync_on_suspend", &sync_on_suspend_str));
+  EXPECT_THAT(sync_on_suspend_str, ContainsRegex("(0|1)\n"));
+}
+
+TEST_F(SysfsPowerTest, SyncOnSuspendFileWrite) {
+  EXPECT_FALSE(files::WriteFile("/sys/power/sync_on_suspend", "test"));
+  EXPECT_FALSE(files::WriteFile("/sys/power/sync_on_suspend", std::to_string(2)));
+  EXPECT_TRUE(files::WriteFile("/sys/power/sync_on_suspend", std::to_string(0)));
+}

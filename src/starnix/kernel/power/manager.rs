@@ -13,6 +13,7 @@ use std::{collections::HashSet, sync::Arc};
 #[derive(Default)]
 pub struct PowerManager {
     suspend_stats: Arc<Mutex<SuspendStats>>,
+    pub enable_sync_on_suspend: Mutex<bool>,
 }
 
 impl PowerManager {
@@ -28,6 +29,7 @@ impl PowerManager {
     pub fn suspend(&self, _state: SuspendState) -> Result<(), Errno> {
         // TODO(b/303507442): Execute ops of suspend state transition via SPLA Suspend fidl api.
         not_implemented!("PowerManager::suspend");
+        // TODO(b/287114999): Check `enable_sync_on_suspend` to execute sync on all filesystems.
         error!(ENOTSUP)
     }
 }

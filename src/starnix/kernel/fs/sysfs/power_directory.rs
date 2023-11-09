@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::power::PowerSyncOnSuspendFile;
+
 use {
     crate::{
         auth::FsCred,
@@ -50,6 +52,7 @@ pub fn sysfs_power_directory(
     dir.subdir(b"power", 0o755, |dir| {
         dir.entry(b"wakeup_count", PowerWakeupCountFile::new_node(), mode!(IFREG, 0o644));
         dir.entry(b"state", PowerStateFile::new_node(), mode!(IFREG, 0o644));
+        dir.entry(b"sync_on_suspend", PowerSyncOnSuspendFile::new_node(), mode!(IFREG, 0o644));
         dir.subdir(b"suspend_stats", 0o755, |dir| {
             dir.node(
                 b"success",
