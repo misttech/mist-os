@@ -640,7 +640,7 @@ template("legacy_assembly_input_bundle") {
       ":${labels.extra_base_deps_list}",
       ":${labels.extra_base_list}",
       ":${labels.kernel_cmdline_args}",
-      "//build/info:latest-commit-date",
+      "//build/info:build_info_files",
     ]
 
     if (_shell_command_packages != []) {

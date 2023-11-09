@@ -13,14 +13,20 @@ if (current_toolchain == default_toolchain) {
   action("gen_version_info") {
     script = "gn_write_version_info.sh"
 
-    # Ensure this action is invoked if integration HEAD moves
-    inputs = [ "//integration/.git/HEAD" ]
+    inputs = [
+      build_info_files.latest_commit_hash,
+      build_info_files.minimum_utc_stamp,
+    ]
     outputs = [ "$target_out_dir/ffx_version_info.txt" ]
 
-    args = [
-      rebase_path(outputs[0], root_build_dir),
-      rebase_path("//integration/.git", root_build_dir),
-    ]
+    args = rebase_path([
+                         outputs[0],
+                         build_info_files.latest_commit_hash,
+                         build_info_files.minimum_utc_stamp,
+                       ],
+                       root_build_dir)
+
+    deps = [ "//build/info:build_info_files" ]
   }
 
   compiled_action("version-info.bin") {

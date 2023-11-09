@@ -5,20 +5,24 @@
 
 set -e
 OUTFILE="$1"
-GIT_DIR="$2"
 
-if [ ! -d "$GIT_DIR" ]; then
-  echo >&2 "Invalid GIT_DIR provided: $GIT_DIR"
-fi
+HASH_FILE="$2"
+DATE_FILE="$3"
 
-# The --no-optional-locks is used to ensure that git read-only
-# operations do not modify the index (https://fxbug.dev/93875).
-GIT_REV="$(git --no-optional-locks --git-dir=${GIT_DIR} rev-parse HEAD 2>/dev/null)"
-VERSION_INFO="$(TZ=UTC git --no-optional-locks --git-dir=${GIT_DIR} show --no-patch --no-notes --pretty='%H-%ct' ${GIT_REV} 2> /dev/null)"
-if [ -z "$VERSION_INFO" ]; then
-  echo >&2 "Failed to gather version information from ${GIT_DIR}"
+COMMIT_HASH="$(cat $HASH_FILE)"
+COMMIT_DATE="$(cat $DATE_FILE)"
+
+if [ -z "$COMMIT_HASH" ]; then
+  echo >&2 "Commit hash file was invalid: $HASH_FILE"
   exit 1
 fi
+
+if [ -z "$COMMIT_DATE" ]; then
+  echo >&2 "Commit date file was invalid: $DATE_FILE"
+  exit 1
+fi
+
+VERSION_INFO="${COMMIT_HASH}-${COMMIT_DATE}"
 
 # Update the existing file only if it's changed.
 if [ ! -r "$OUTFILE" ] || [ "$(<"$OUTFILE")" != "$VERSION_INFO" ]; then

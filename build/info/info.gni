@@ -21,6 +21,7 @@ build_info_files = {
   board = "$root_build_dir/board.txt"
   version = "$root_build_dir/version.txt"
   jiri_snapshot = "//.jiri_root/update_history/latest"
+  latest_commit_hash = "$root_build_dir/latest-commit-hash.txt"
   latest_commit_date = "$root_build_dir/latest-commit-date.txt"
   minimum_utc_stamp = "$root_build_dir/minimum-utc-stamp.txt"
 }
