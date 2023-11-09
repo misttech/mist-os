@@ -31,7 +31,13 @@ source_set("sources") {
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
-  sources = [ "aml-gpu.cc" ]
+  sources = [
+    "aml-gpu.cc",
+    "aml-gpu.h",
+    "s905d2-gpu.h",
+    "s912-gpu.h",
+    "t931-gpu.h",
+  ]
   public_deps = [
     ":aml_gpu_bind",
     "//sdk/fidl/fuchsia.hardware.gpu.amlogic:fuchsia.hardware.gpu.amlogic_cpp",
@@ -51,6 +57,7 @@ source_set("sources") {
     "//src/lib/ddktl",
     "//zircon/system/ulib/inspect",
     "//zircon/system/ulib/sync",
+    "//zircon/system/ulib/sync:sync-cpp",
     "//zircon/system/ulib/trace",
   ]
 }
