@@ -34,6 +34,7 @@ if (is_host) {
     deps = [
       "//src/lib/fidl/rust/fidl",
       "//src/lib/fuchsia-async",
+      "//src/lib/include_bytes_from_working_dir",
       "//src/starnix/tools/tar_to_pkg:tar_img_extract",
       "//src/sys/pkg/lib/fuchsia-pkg",
       "//third_party/rust_crates:anyhow",
@@ -57,13 +58,11 @@ if (is_host) {
       _default_init_x64_path,
     ]
 
-    # The code being compiled uses these paths to embed the corresponding generated files at compile
-    # time, which makes the resulting files less reusable for caching because they depend on the
-    # path of the output directory.
-    configs += [ "//build/config/rust:output_dir_sensitive" ]
     rustenv = [
-      "DEFAULT_INIT_ARM64_PATH=" + rebase_path(_default_init_arm64_path, "src"),
-      "DEFAULT_INIT_X64_PATH=" + rebase_path(_default_init_x64_path, "src"),
+      "DEFAULT_INIT_ARM64_PATH=" +
+          rebase_path(_default_init_arm64_path, root_build_dir),
+      "DEFAULT_INIT_X64_PATH=" +
+          rebase_path(_default_init_x64_path, root_build_dir),
     ]
   }
 
