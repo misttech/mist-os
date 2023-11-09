@@ -111,15 +111,6 @@ struct MockDevice : public std::enable_shared_from_this<MockDevice> {
     return std::shared_ptr<MockDevice>(new MockDevice(mock_ddk::GetDriverRuntime()));
   }
 
-  // DEPRECATED!
-  // This is here only for soft migration of tests that manually manage the runtime and dispatchers
-  // today. For new tests, use `FakeRootParent`.
-  // Create a Root Parent.  This device has limited functionality.
-  // TODO(fxb/124464): Remove when all usages are removed.
-  static std::shared_ptr<MockDevice> FakeRootParentNoDispatcherIntegrationDEPRECATED() {
-    return std::shared_ptr<MockDevice>(new MockDevice());
-  }
-
   ~MockDevice();
 
   // Calls for tracking libdriver calls made that reference this device:
