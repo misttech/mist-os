@@ -653,7 +653,7 @@ impl FileOps for MemFile {
     fn read(
         &self,
         _file: &FileObject,
-        _current_task: &CurrentTask,
+        current_task: &CurrentTask,
         offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
@@ -667,10 +667,12 @@ impl FileOps for MemFile {
             TaskStateCode::Running | TaskStateCode::Sleeping => {
                 let mut addr = UserAddress::default() + offset;
                 data.write_each(&mut |bytes| {
-                    let actual = task
-                        .mm
-                        .vmo_read_memory_partial_to_slice(addr, bytes)
-                        .map_err(|_| errno!(EIO))?;
+                    let actual = if current_task.has_same_address_space(&task) {
+                        task.mm.read_memory_partial_to_slice(addr, bytes)
+                    } else {
+                        task.mm.vmo_read_memory_partial_to_slice(addr, bytes)
+                    }
+                    .map_err(|_| errno!(EIO))?;
                     addr += actual;
                     Ok(actual)
                 })
@@ -681,7 +683,7 @@ impl FileOps for MemFile {
     fn write(
         &self,
         _file: &FileObject,
-        _current_task: &CurrentTask,
+        current_task: &CurrentTask,
         offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
@@ -692,10 +694,12 @@ impl FileOps for MemFile {
                 let addr = UserAddress::default() + offset;
                 let mut written = 0;
                 let result = data.peek_each(&mut |bytes| {
-                    let actual = task
-                        .mm
-                        .vmo_write_memory_partial(addr + written, bytes)
-                        .map_err(|_| errno!(EIO))?;
+                    let actual = if current_task.has_same_address_space(&task) {
+                        task.mm.write_memory_partial(addr + written, bytes)
+                    } else {
+                        task.mm.vmo_write_memory_partial(addr + written, bytes)
+                    }
+                    .map_err(|_| errno!(EIO))?;
                     written += actual;
                     Ok(actual)
                 });

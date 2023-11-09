@@ -709,6 +709,10 @@ pub struct PageFaultExceptionReport {
 }
 
 impl Task {
+    pub fn has_same_address_space(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.mm, &other.mm)
+    }
+
     pub fn flags(&self) -> TaskFlags {
         self.flags.load(Ordering::Relaxed)
     }
