@@ -18,7 +18,10 @@ use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_mlme as fidl_mlme,
     fuchsia_zircon as zx,
     ieee80211::{MacAddr, MacAddrBytes, Ssid},
-    std::collections::{HashMap, VecDeque},
+    std::{
+        collections::{HashMap, VecDeque},
+        fmt::Display,
+    },
     tracing::error,
     wlan_common::{
         ie,
@@ -135,6 +138,15 @@ impl InfraBss {
         ctx: &mut Context<D>,
         keylist: &[fidl_mlme::SetKeyDescriptor],
     ) -> Result<(), Error> {
+        fn key_type_name(key_type: fidl_mlme::KeyType) -> impl Display {
+            match key_type {
+                fidl_mlme::KeyType::Group => "GTK",
+                fidl_mlme::KeyType::Pairwise => "PTK",
+                fidl_mlme::KeyType::PeerKey => "peer key",
+                fidl_mlme::KeyType::Igtk => "IGTK",
+            }
+        }
+
         if self.rsne.is_none() {
             return Err(Error::Status(
                 format!("cannot set keys for an unprotected BSS"),
@@ -143,9 +155,10 @@ impl InfraBss {
         }
 
         for key_desc in keylist {
-            ctx.device
-                .set_key(KeyConfig::from(key_desc))
-                .map_err(|s| Error::Status(format!("failed to set keys on PHY"), s))?;
+            let key_type = key_desc.key_type;
+            ctx.device.set_key(KeyConfig::from(key_desc)).map_err(|status| {
+                Error::Status(format!("failed to set {} on PHY", key_type_name(key_type)), status)
+            })?;
         }
         Ok(())
     }
