@@ -9,7 +9,6 @@
 #include <vector>
 
 #include "tools/fidl/fidlc/include/fidl/diagnostic_types.h"
-#include "tools/fidl/fidlc/include/fidl/fixables.h"
 #include "tools/fidl/fidlc/include/fidl/flat_ast.h"
 #include "tools/fidl/fidlc/include/fidl/source_span.h"
 #include "tools/fidl/fidlc/include/fidl/versioning_types.h"
@@ -395,12 +394,10 @@ constexpr ErrorDef<189, std::string_view> ErrUnicodeEscapeTooLarge(
 constexpr RetiredDef<190> ErrSimpleProtocolMustBeClosed;
 constexpr ErrorDef<191, std::string_view> ErrMethodMustDefineStrictness(
     "Method {0} must explicitly specify strict or flexible. (The default is changing "
-    "from strict to flexible, and explicit modifiers are mandatory during the migration.)",
-    {.fixable = Fixable::Kind::kProtocolModifier});
+    "from strict to flexible, and explicit modifiers are mandatory during the migration.)");
 constexpr ErrorDef<192, std::string_view> ErrProtocolMustDefineOpenness(
     "Protocol {0} must explicitly specify open, ajar, or closed. (The default is changing "
-    "from closed to open, and explicit modifiers are mandatory during the migration.)",
-    {.fixable = Fixable::Kind::kProtocolModifier});
+    "from closed to open, and explicit modifiers are mandatory during the migration.)");
 constexpr ErrorDef<193, flat::Name> ErrCannotBeBoxedNorOptional("type {0} cannot be boxed");
 constexpr RetiredDef<194> ErrEmptyPayloadStructsWhenResultUnion;
 constexpr RetiredDef<195> ErrExperimentalOverflowingAttributeMissingExperimentalFlag;

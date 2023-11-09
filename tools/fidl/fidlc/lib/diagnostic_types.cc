@@ -305,29 +305,12 @@ std::string DiagnosticDef::FormatId() const {
   return id_str;
 }
 
-std::string Diagnostic::Format(const ProgramInvocation& program_invocation) const {
+std::string Diagnostic::Format() const {
   std::ostringstream out;
   out << msg;
   if (def.opts.documented) {
     out << " [https://fuchsia.dev/error/" << def.FormatId() << "]";
   }
-
-  if (auto fixable = def.opts.fixable) {
-    ZX_ASSERT(program_invocation.is_populated());
-    std::ostringstream fixme;
-    fixme << "\n\n  This is a fixable error.\n"
-          << "  Please run the following command to update your FIDL files and fix the issue:\n\n"
-          << "    [[[ FIXME ]]]\n\n"
-          << "    >>> " << program_invocation.binary_path()
-          << "/fidl-fix --fix=" << Fixable::Get(fixable.value()).name
-          << program_invocation.ExperimentsAsString(" --experimental=", " ")
-          << program_invocation.VersionSelectionAsString(" --available=", " ")
-          << program_invocation.DependenciesAsString(" --dep=", ",") << " "
-          << program_invocation.LibraryFilesAsString(" ").value() << "\n\n"
-          << "    [[[ /FIXME ]]]\n\n";
-    out << fixme.str();
-  }
-
   return out.str();
 }
 

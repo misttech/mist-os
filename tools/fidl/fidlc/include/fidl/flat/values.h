@@ -10,7 +10,6 @@
 #include <type_traits>
 
 #include "tools/fidl/fidlc/include/fidl/flat/reference.h"
-#include "tools/fidl/fidlc/include/fidl/flat/sourced.h"
 #include "tools/fidl/fidlc/include/fidl/flat/traits.h"
 #include "tools/fidl/fidlc/include/fidl/raw_ast.h"
 #include "tools/fidl/fidlc/include/fidl/source_span.h"
@@ -219,13 +218,12 @@ struct StringConstantValue final : ConstantValue {
 // Const. For the _value_, see ConstantValue.) A Constant can either be a
 // reference to another constant (IdentifierConstant), a literal value
 // (LiteralConstant). Every Constant resolves to a concrete ConstantValue.
-struct Constant : public Sourced, HasClone<Constant> {
+struct Constant : HasClone<Constant> {
   virtual ~Constant() = default;
 
   enum struct Kind { kIdentifier, kLiteral, kBinaryOperator };
 
-  explicit Constant(raw::SourceElement::Signature signature, Kind kind, SourceSpan span)
-      : Sourced(signature), kind(kind), span(span), value_(nullptr) {}
+  explicit Constant(Kind kind, SourceSpan span) : kind(kind), span(span), value_(nullptr) {}
 
   bool IsResolved() const { return value_ != nullptr; }
   void ResolveTo(std::unique_ptr<ConstantValue> value, const Type* type);
@@ -250,28 +248,26 @@ struct Constant : public Sourced, HasClone<Constant> {
 };
 
 struct IdentifierConstant final : Constant {
-  explicit IdentifierConstant(raw::SourceElement::Signature signature,
-                              const raw::CompoundIdentifier& name, SourceSpan span)
-      : Constant(signature, Kind::kIdentifier, span), reference(name) {}
+  explicit IdentifierConstant(const raw::CompoundIdentifier& name, SourceSpan span)
+      : Constant(Kind::kIdentifier, span), reference(name) {}
   // This constructor is needed for IdentifierLayoutParameter::Disambiguate().
-  explicit IdentifierConstant(raw::SourceElement::Signature signature, Reference reference,
-                              SourceSpan span)
-      : Constant(signature, Kind::kIdentifier, span), reference(std::move(reference)) {}
+  explicit IdentifierConstant(Reference reference, SourceSpan span)
+      : Constant(Kind::kIdentifier, span), reference(std::move(reference)) {}
 
   Reference reference;
 
  private:
   std::unique_ptr<Constant> CloneImpl() const override {
-    return std::make_unique<IdentifierConstant>(source_signature(), reference, span);
+    return std::make_unique<IdentifierConstant>(reference, span);
   }
 };
 
 struct LiteralConstant final : Constant {
-  explicit LiteralConstant(raw::SourceElement::Signature signature, const raw::Literal* literal)
-      : Constant(signature, Kind::kLiteral, literal->span()), literal(literal) {}
+  explicit LiteralConstant(const raw::Literal* literal)
+      : Constant(Kind::kLiteral, literal->span()), literal(literal) {}
 
   std::unique_ptr<LiteralConstant> CloneLiteralConstant() const {
-    return std::make_unique<LiteralConstant>(source_signature(), literal);
+    return std::make_unique<LiteralConstant>(literal);
   }
 
   // Owned by Library::raw_literals.
@@ -284,11 +280,10 @@ struct LiteralConstant final : Constant {
 struct BinaryOperatorConstant final : Constant {
   enum struct Operator { kOr };
 
-  explicit BinaryOperatorConstant(raw::SourceElement::Signature signature,
-                                  std::unique_ptr<Constant> left_operand,
+  explicit BinaryOperatorConstant(std::unique_ptr<Constant> left_operand,
                                   std::unique_ptr<Constant> right_operand, Operator op,
                                   SourceSpan span)
-      : Constant(signature, Kind::kBinaryOperator, span),
+      : Constant(Kind::kBinaryOperator, span),
         left_operand(std::move(left_operand)),
         right_operand(std::move(right_operand)),
         op(op) {}
@@ -299,8 +294,8 @@ struct BinaryOperatorConstant final : Constant {
 
  private:
   std::unique_ptr<Constant> CloneImpl() const override {
-    return std::make_unique<BinaryOperatorConstant>(source_signature(), left_operand->Clone(),
-                                                    right_operand->Clone(), op, span);
+    return std::make_unique<BinaryOperatorConstant>(left_operand->Clone(), right_operand->Clone(),
+                                                    op, span);
   }
 };
 

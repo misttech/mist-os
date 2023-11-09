@@ -6,13 +6,9 @@
 
 #include <zircon/assert.h>
 
-#include <fstream>
-
 #include <re2/re2.h>
 
 #include "lib/stdcompat/span.h"
-#include "tools/fidl/fidlc/include/fidl/token_list.h"
-#include "tools/fidl/fidlc/include/fidl/utils.h"
 
 namespace fidl::linter {
 
@@ -24,7 +20,7 @@ LintingTreeCallbacks::LintingTreeCallbacks() {
     explicit CallbackTreeVisitor(const LintingTreeCallbacks& callbacks) : callbacks_(callbacks) {}
 
     void OnFile(const std::unique_ptr<raw::File>& element) override {
-      token_pointer_list_ = raw::TokenPointerListBuilder(element).Build();
+      tokens_ = element->tokens;
 
       for (auto& callback : callbacks_.file_callbacks_) {
         callback(*element);
@@ -174,8 +170,8 @@ LintingTreeCallbacks::LintingTreeCallbacks() {
 
     void ProcessGaps(const fidl::Token& next_non_gap_token) {
       std::vector<SourceSpan> current_comment_block;
-      while (*token_pointer_list_[next_token_index_] < next_non_gap_token) {
-        const fidl::Token current_token = *token_pointer_list_[next_token_index_];
+      while (tokens_[next_token_index_].ptr() < next_non_gap_token.ptr()) {
+        const fidl::Token current_token = tokens_[next_token_index_];
         if (current_token.kind() == Token::kComment) {
           if (current_token.leading_newlines() > 1) {
             OnComment(current_comment_block);
@@ -203,8 +199,8 @@ LintingTreeCallbacks::LintingTreeCallbacks() {
 
     const LintingTreeCallbacks& callbacks_;
 
-    // An ordered list of all tokens (including comments) in the source file.
-    std::vector<const Token*> token_pointer_list_;
+    // An ordered list of all tokens (including comments) in the current source file.
+    cpp20::span<Token> tokens_;
 
     // The index of the next token to be visited.
     size_t next_token_index_ = 0;

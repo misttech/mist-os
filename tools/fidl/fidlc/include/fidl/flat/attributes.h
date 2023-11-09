@@ -10,17 +10,15 @@
 #include <memory>
 #include <optional>
 
-#include "tools/fidl/fidlc/include/fidl/flat/sourced.h"
 #include "tools/fidl/fidlc/include/fidl/flat/traits.h"
 #include "tools/fidl/fidlc/include/fidl/flat/values.h"
 #include "tools/fidl/fidlc/include/fidl/source_span.h"
 
 namespace fidl::flat {
 
-struct AttributeArg final : public Sourced, public HasClone<AttributeArg> {
-  AttributeArg(raw::SourceElement::Signature signature, std::optional<SourceSpan> name,
-               std::unique_ptr<Constant> value, SourceSpan span)
-      : Sourced(signature), name(name), value(std::move(value)), span(span) {}
+struct AttributeArg final : public HasClone<AttributeArg> {
+  AttributeArg(std::optional<SourceSpan> name, std::unique_ptr<Constant> value, SourceSpan span)
+      : name(name), value(std::move(value)), span(span) {}
 
   std::unique_ptr<AttributeArg> Clone() const override;
 
@@ -36,10 +34,9 @@ struct AttributeArg final : public Sourced, public HasClone<AttributeArg> {
   static constexpr std::string_view kDefaultAnonymousName = "value";
 };
 
-struct Attribute final : public MaybeSourced, public HasClone<Attribute> {
-  Attribute(std::optional<raw::SourceElement::Signature> maybe_signature, SourceSpan name,
-            std::vector<std::unique_ptr<AttributeArg>> args, SourceSpan span)
-      : MaybeSourced(maybe_signature), name(name), args(std::move(args)), span(span) {}
+struct Attribute final : public HasClone<Attribute> {
+  Attribute(SourceSpan name, std::vector<std::unique_ptr<AttributeArg>> args, SourceSpan span)
+      : name(name), args(std::move(args)), span(span) {}
 
   const AttributeArg* GetArg(std::string_view arg_name) const;
 

@@ -12,9 +12,7 @@
 #include <sstream>
 #include <string_view>
 
-#include "tools/fidl/fidlc/include/fidl/fixables.h"
 #include "tools/fidl/fidlc/include/fidl/flat_ast.h"
-#include "tools/fidl/fidlc/include/fidl/program_invocation.h"
 #include "tools/fidl/fidlc/include/fidl/source_span.h"
 #include "tools/fidl/fidlc/include/fidl/token.h"
 #include "tools/fidl/fidlc/include/fidl/types.h"
@@ -125,8 +123,6 @@ enum class DiagnosticKind {
 struct DiagnosticOptions {
   // If true, the error message will link to the diagnostic on fuchsia.dev.
   bool documented = true;
-  // If set, the error message will instruct the user to run fidl-fix.
-  std::optional<Fixable::Kind> fixable;
 };
 
 struct DiagnosticDef {
@@ -198,7 +194,7 @@ struct Diagnostic {
   }
 
   // Formats the error message to a string.
-  std::string Format(const ProgramInvocation& program_invocation) const;
+  std::string Format() const;
 
   const DiagnosticDef& def;
   const SourceSpan span;

@@ -5,10 +5,7 @@
 #ifndef TOOLS_FIDL_FIDLC_INCLUDE_FIDL_REPORTER_H_
 #define TOOLS_FIDL_FIDLC_INCLUDE_FIDL_REPORTER_H_
 
-#include <algorithm>
 #include <cassert>
-#include <optional>
-#include <sstream>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -16,13 +13,8 @@
 
 #include "tools/fidl/fidlc/include/fidl/diagnostic_types.h"
 #include "tools/fidl/fidlc/include/fidl/diagnostics.h"
-#include "tools/fidl/fidlc/include/fidl/experimental_flags.h"
-#include "tools/fidl/fidlc/include/fidl/fixables.h"
-#include "tools/fidl/fidlc/include/fidl/program_invocation.h"
-#include "tools/fidl/fidlc/include/fidl/source_manager.h"
 #include "tools/fidl/fidlc/include/fidl/source_span.h"
 #include "tools/fidl/fidlc/include/fidl/utils.h"
-#include "tools/fidl/fidlc/include/fidl/versioning_types.h"
 
 namespace fidl {
 
@@ -31,12 +23,6 @@ using utils::identity_t;
 class Reporter {
  public:
   Reporter() = default;
-  Reporter(std::string binary_path, ExperimentalFlags experimental_flags,
-           const VersionSelection* version_selection,
-           const std::vector<SourceManager>* source_managers)
-      : program_invocation_(ProgramInvocation(std::move(binary_path), experimental_flags,
-                                              version_selection, source_managers)) {}
-
   Reporter(const Reporter&) = delete;
 
   class Counts {
@@ -79,11 +65,8 @@ class Reporter {
   // Creates a checkpoint. This lets you detect how many new errors
   // have been added since the checkpoint.
   Counts Checkpoint() const { return Counts(this); }
-  const ProgramInvocation& program_invocation() const { return program_invocation_; }
   const std::vector<std::unique_ptr<Diagnostic>>& errors() const { return errors_; }
   const std::vector<std::unique_ptr<Diagnostic>>& warnings() const { return warnings_; }
-  bool ignore_fixables() const { return ignore_fixables_; }
-  void set_ignore_fixables(bool value) { ignore_fixables_ = value; }
   void set_warnings_as_errors(bool value) { warnings_as_errors_ = value; }
 
   // Formats a diagnostic message for the command line, displaying the filename,
@@ -98,13 +81,6 @@ class Reporter {
   void AddWarning(std::unique_ptr<Diagnostic> warning);
 
   bool warnings_as_errors_ = false;
-
-  // This mode is useful when we are running |fidl-fix| itself. We don't want parsing to fail due
-  // to the error we are trying to fix, or for one fixable error to interfere with the fixing
-  // operation on another, so we just turn off collection of such errors altogether when needed.
-  bool ignore_fixables_ = false;
-
-  const ProgramInvocation program_invocation_;
 
   // The reporter collects error and warnings separately so that we can easily
   // keep track of the current number of errors during compilation. The number

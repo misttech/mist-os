@@ -5,13 +5,13 @@
 #ifndef TOOLS_FIDL_FIDLC_INCLUDE_FIDL_SPAN_SEQUENCE_TREE_VISITOR_H_
 #define TOOLS_FIDL_FIDLC_INCLUDE_FIDL_SPAN_SEQUENCE_TREE_VISITOR_H_
 
+#include <lib/stdcompat/span.h>
 #include <zircon/assert.h>
 
 #include <stack>
 
 #include "tools/fidl/fidlc/include/fidl/raw_ast.h"
 #include "tools/fidl/fidlc/include/fidl/span_sequence.h"
-#include "tools/fidl/fidlc/include/fidl/token_list.h"
 #include "tools/fidl/fidlc/include/fidl/tree_visitor.h"
 
 namespace fidl::fmt {
@@ -23,7 +23,7 @@ using SpanSequenceList = std::vector<std::unique_ptr<SpanSequence>>;
 // from which that raw AST was generated.
 class SpanSequenceTreeVisitor : public raw::DeclarationOrderTreeVisitor {
  public:
-  explicit SpanSequenceTreeVisitor(raw::TokenPointerList tokens) : tokens_(std::move(tokens)) {}
+  explicit SpanSequenceTreeVisitor(cpp20::span<Token> tokens) : tokens_(tokens) {}
   void OnAliasDeclaration(const std::unique_ptr<raw::AliasDeclaration>& element) override;
   void OnAttributeArg(const std::unique_ptr<raw::AttributeArg>& element) override;
   void OnAttribute(const std::unique_ptr<raw::Attribute>& element) override;
@@ -139,7 +139,7 @@ class SpanSequenceTreeVisitor : public raw::DeclarationOrderTreeVisitor {
   // last processed node and the one currently being visited."
   template <typename T>
   class Builder {
-    static_assert(std::is_base_of<SpanSequence, T>::value,
+    static_assert(std::is_base_of_v<SpanSequence, T>,
                   "T of Builder<T> must inherit from SpanSequence");
 
    public:
@@ -190,7 +190,7 @@ class SpanSequenceTreeVisitor : public raw::DeclarationOrderTreeVisitor {
   // instead.
   template <typename T>
   class SpanBuilder : public Builder<T> {
-    static_assert(std::is_base_of<CompositeSpanSequence, T>::value,
+    static_assert(std::is_base_of_v<CompositeSpanSequence, T>,
                   "T of SpanBuilder<T> must inherit from CompositeSpanSequence");
 
    public:
@@ -333,7 +333,7 @@ class SpanSequenceTreeVisitor : public raw::DeclarationOrderTreeVisitor {
   std::stack<SpanSequenceList> building_;
 
   // An ordered list of all tokens (including comments) in the source file.
-  std::vector<const Token*> tokens_;
+  cpp20::span<Token> tokens_;
 
   // The index of the next token to be visited.
   size_t next_token_index_ = 0;

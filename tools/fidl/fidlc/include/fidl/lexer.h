@@ -67,8 +67,8 @@ class Lexer : private ReporterMixin {
   const char* current_ = nullptr;
   const char* end_of_file_ = nullptr;
   const char* token_start_ = nullptr;
+  bool start_of_file_ = true;
   size_t token_size_ = 0u;
-  uint32_t next_ordinal_ = 0;
   uint16_t leading_newlines_ = 0;
 };
 

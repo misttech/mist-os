@@ -8,7 +8,6 @@
 
 #include "tools/fidl/fidlc/include/fidl/raw_ast.h"
 #include "tools/fidl/fidlc/include/fidl/span_sequence.h"
-#include "tools/fidl/fidlc/include/fidl/token_list.h"
 #include "tools/fidl/fidlc/include/fidl/tree_visitor.h"
 
 namespace fidl::fmt {
@@ -187,13 +186,13 @@ std::optional<std::unique_ptr<SpanSequence>> SpanSequenceTreeVisitor::IngestUpTo
     const std::optional<Token> until, SpanSequence::Position position) {
   auto atomic = std::make_unique<AtomicSpanSequence>(position);
   while (next_token_index_ < tokens_.size()) {
-    const Token& token = *(tokens_[next_token_index_]);
-    if (until.has_value() && (token == until.value() || until.value() < token)) {
+    const Token& token = tokens_[next_token_index_];
+    if (until.has_value() && token.ptr() >= until.value().ptr()) {
       break;
     }
 
     ZX_ASSERT(next_token_index_ > 0);
-    const Token& prev_token = *(tokens_[next_token_index_ - 1]);
+    const Token& prev_token = tokens_[next_token_index_ - 1];
     IngestToken(token, prev_token, token.leading_newlines(), atomic.get());
     next_token_index_ += 1;
   }
@@ -208,17 +207,17 @@ std::optional<std::unique_ptr<SpanSequence>> SpanSequenceTreeVisitor::IngestUpTo
     const std::optional<Token> until, SpanSequence::Position position) {
   auto atomic = std::make_unique<AtomicSpanSequence>(position);
   while (next_token_index_ < tokens_.size()) {
-    const Token& token = *(tokens_[next_token_index_]);
-    if (until.has_value() && until.value() < token) {
+    const Token& token = tokens_[next_token_index_];
+    if (until.has_value() && until.value().ptr() < token.ptr()) {
       break;
     }
 
     ZX_ASSERT(next_token_index_ > 0);
-    const Token& prev_token = *(tokens_[next_token_index_ - 1]);
+    const Token& prev_token = tokens_[next_token_index_ - 1];
     IngestToken(token, prev_token, token.leading_newlines(), atomic.get());
     next_token_index_ += 1;
 
-    if (until.has_value() && token == until.value()) {
+    if (until.has_value() && token.ptr() == until.value().ptr()) {
       break;
     }
   }
@@ -235,9 +234,9 @@ SpanSequenceTreeVisitor::IngestUpToAndIncludingTokenKind(
   auto atomic = std::make_unique<AtomicSpanSequence>(position);
   bool found = false;
   while (next_token_index_ < tokens_.size()) {
-    const Token& token = *(tokens_[next_token_index_]);
+    const Token& token = tokens_[next_token_index_];
     ZX_ASSERT(next_token_index_ > 0);
-    const Token& prev_token = *(tokens_[next_token_index_ - 1]);
+    const Token& prev_token = tokens_[next_token_index_ - 1];
 
     // If we have found the token kind we're looking for, make sure to capture any trailing inline
     // comments!
@@ -785,7 +784,7 @@ void SpanSequenceTreeVisitor::OnProtocolDeclaration(
   if (!element->composed_protocols.empty() && !element->methods.empty()) {
     // If the protocol has both methods and compositions, compare the addresses of the first
     // character of the first element of each to determine which is the first child start token.
-    if (element->composed_protocols[0]->start() < element->methods[0]->start()) {
+    if (element->composed_protocols[0]->start().ptr() < element->methods[0]->start().ptr()) {
       first_child_start_token = element->composed_protocols[0]->start();
     } else {
       first_child_start_token = element->methods[0]->start();

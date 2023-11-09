@@ -2,16 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <errno.h>
 #include <lib/cmdline/status.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <zircon/assert.h>
 
-#include <fstream>
 #include <iostream>
 #include <memory>
-#include <optional>
 #include <string>
 #include <vector>
 
@@ -20,7 +17,6 @@
 #include "tools/fidl/fidlc/include/fidl/lexer.h"
 #include "tools/fidl/fidlc/include/fidl/linter.h"
 #include "tools/fidl/fidlc/include/fidl/parser.h"
-#include "tools/fidl/fidlc/include/fidl/program_invocation.h"
 #include "tools/fidl/fidlc/include/fidl/source_manager.h"
 #include "tools/fidl/fidlc/include/fidl/tree_visitor.h"
 #include "tools/fidl/fidlc/linter/command_line_options.h"
@@ -44,8 +40,7 @@ namespace {
   exit(2);  // Exit code 1 is reserved to indicate lint findings
 }
 
-fidl::Finding DiagnosticToFinding(const fidl::Diagnostic& diag,
-                                  const fidl::ProgramInvocation& program_invocation) {
+fidl::Finding DiagnosticToFinding(const fidl::Diagnostic& diag) {
   const char* check_id = nullptr;
   switch (diag.def.kind) {
     case fidl::DiagnosticKind::kError:
@@ -57,7 +52,7 @@ fidl::Finding DiagnosticToFinding(const fidl::Diagnostic& diag,
     case fidl::DiagnosticKind::kRetired:
       ZX_PANIC("should never emit a retired diagnostic");
   }
-  return fidl::Finding(diag.span, check_id, diag.Format(program_invocation));
+  return fidl::Finding(diag.span, check_id, diag.Format());
 }
 
 void Lint(const fidl::SourceFile& source_file, fidl::Findings* findings,
@@ -70,7 +65,7 @@ void Lint(const fidl::SourceFile& source_file, fidl::Findings* findings,
   fidl::Parser parser(&lexer, &reporter, experimental_flags);
   std::unique_ptr<fidl::raw::File> ast = parser.Parse();
   for (auto* diag : reporter.Diagnostics()) {
-    findings->push_back(DiagnosticToFinding(*diag, reporter.program_invocation()));
+    findings->push_back(DiagnosticToFinding(*diag));
   }
   if (!parser.Success()) {
     return;

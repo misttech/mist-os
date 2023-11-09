@@ -4,7 +4,6 @@
 
 group("fidl") {
   public_deps = [
-    ":fidl-fix",
     ":fidl-lint",
     ":fidlfmt",
     "fidl_api_diff:host",
@@ -29,12 +28,6 @@ group("fidl") {
 group("fidlfmt") {
   if (current_os != "fuchsia") {
     deps = [ "fidlc:fidl-format" ]
-  }
-}
-
-group("fidl-fix") {
-  if (current_os != "fuchsia") {
-    deps = [ "fidlc:fidl-fix" ]
   }
 }
 

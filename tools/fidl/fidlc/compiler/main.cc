@@ -407,10 +407,8 @@ int compile(fidl::Reporter* reporter, const std::string& library_name,
 
 int main(int argc, char* argv[]) {
   auto args = std::make_unique<ArgvArguments>(argc, argv);
-
-  // Parse the program name, and extract the path to this binary from it.
-  std::string prog_name = args->Claim();
-  std::string binary_path = prog_name.substr(0, prog_name.find_last_of("\\/"));
+  // Parse the program name.
+  args->Claim();
   if (!args->Remaining()) {
     Usage();
     exit(0);
@@ -509,7 +507,7 @@ int main(int argc, char* argv[]) {
     auto path = std::filesystem::path(json_path).replace_extension("index.json");
     outputs.emplace_back(Behavior::kIndex, path);
   }
-  fidl::Reporter reporter(binary_path, experimental_flags, &version_selection, &source_managers);
+  fidl::Reporter reporter;
   fidl::VirtualSourceFile virtual_file("generated");
   reporter.set_warnings_as_errors(warnings_as_errors);
   auto status = compile(&reporter, library_name, dep_file_path, source_list, outputs,

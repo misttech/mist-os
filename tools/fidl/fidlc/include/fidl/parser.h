@@ -89,9 +89,9 @@ class Parser {
     explicit ASTScope(Parser* parser) : parser_(parser) {
       parser_->active_ast_scopes_.emplace_back(Token(), Token());
     }
-    raw::TokenChain GetTokenChain() {
+    raw::SourceElement GetSourceElement() {
       parser_->active_ast_scopes_.back().set_end(parser_->previous_token_);
-      return raw::TokenChain(parser_->active_ast_scopes_.back());
+      return raw::SourceElement(parser_->active_ast_scopes_.back());
     }
     ~ASTScope() { parser_->active_ast_scopes_.pop_back(); }
 
@@ -355,9 +355,8 @@ class Parser {
   const Reporter::Counts checkpoint_;
   const ExperimentalFlags experimental_flags_;
 
-  // The stack of information interesting to the currently active ASTScope
-  // objects.
-  std::vector<raw::TokenChain> active_ast_scopes_;
+  // The stack of information interesting to the currently active ASTScope objects.
+  std::vector<raw::SourceElement> active_ast_scopes_;
 
   // The token before last_token_ (below).
   Token previous_token_;

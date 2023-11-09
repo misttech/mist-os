@@ -11,7 +11,7 @@
 namespace fidl::flat {
 
 std::unique_ptr<AttributeArg> AttributeArg::Clone() const {
-  return std::make_unique<AttributeArg>(source_signature(), name, value->Clone(), span);
+  return std::make_unique<AttributeArg>(name, value->Clone(), span);
 }
 
 const AttributeArg* Attribute::GetArg(std::string_view arg_name) const {
@@ -35,8 +35,7 @@ AttributeArg* Attribute::GetStandaloneAnonymousArg() const {
 }
 
 std::unique_ptr<Attribute> Attribute::Clone() const {
-  auto attribute =
-      std::make_unique<Attribute>(maybe_source_signature(), name, utils::MapClone(args), span);
+  auto attribute = std::make_unique<Attribute>(name, utils::MapClone(args), span);
   attribute->compiled = compiled;
   return attribute;
 }

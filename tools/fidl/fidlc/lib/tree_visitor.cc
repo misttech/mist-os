@@ -10,8 +10,6 @@
 
 namespace fidl::raw {
 
-using OrdinalThenSubOrdinal = std::pair<uint32_t, uint32_t>;
-
 void DeclarationOrderTreeVisitor::OnFile(const std::unique_ptr<File>& element) {
   OnSourceElementStart(*element);
   OnLibraryDeclaration(element->library_decl);
@@ -34,44 +32,36 @@ void DeclarationOrderTreeVisitor::OnFile(const std::unique_ptr<File>& element) {
     kUsing,
   };
 
-  std::map<OrdinalThenSubOrdinal, Next> m;
+  std::map<const char*, Next> m;
   for (;;) {
-    // We want to visit these in declaration order, rather than grouped
-    // by type of declaration.  std::map is sorted by key.  For each of
-    // these lists of declarations, we make a map where the key is "the
-    // next start location of the earliest element in the list" to a
-    // variable representing the type.  We then identify which type was
-    // put earliest in the map.  That will be the earliest declaration
-    // in the file.  We then visit the declaration accordingly.
+    // We want to visit these in declaration order, rather than grouped by type
+    // of declaration, so we put them in a map keyed by source position.
     m.clear();
     if (alias_decls_it != element->alias_list.end()) {
-      m[{(*alias_decls_it)->start().ordinal(), (*alias_decls_it)->start().sub_ordinal()}] = kAlias;
+      m[(*alias_decls_it)->start().ptr()] = kAlias;
     }
     if (const_decls_it != element->const_declaration_list.end()) {
-      m[{(*const_decls_it)->start().ordinal(), (*const_decls_it)->start().sub_ordinal()}] = kConst;
+      m[(*const_decls_it)->start().ptr()] = kConst;
     }
     if (protocol_decls_it != element->protocol_declaration_list.end()) {
       if (*protocol_decls_it == nullptr) {
         // Used to indicate empty, so let's wind it forward.
         protocol_decls_it = element->protocol_declaration_list.end();
       } else {
-        m[{(*protocol_decls_it)->start().ordinal(), (*protocol_decls_it)->start().sub_ordinal()}] =
-            kProtocol;
+        m[(*protocol_decls_it)->start().ptr()] = kProtocol;
       }
     }
     if (resource_decls_it != element->resource_declaration_list.end()) {
-      m[{(*resource_decls_it)->start().ordinal(), (*resource_decls_it)->start().sub_ordinal()}] =
-          kResource;
+      m[(*resource_decls_it)->start().ptr()] = kResource;
     }
     if (service_decls_it != element->service_declaration_list.end()) {
-      m[{(*service_decls_it)->start().ordinal(), (*service_decls_it)->start().sub_ordinal()}] =
-          kService;
+      m[(*service_decls_it)->start().ptr()] = kService;
     }
     if (type_decls_it != element->type_decls.end()) {
-      m[{(*type_decls_it)->start().ordinal(), (*type_decls_it)->start().sub_ordinal()}] = kTypeDecl;
+      m[(*type_decls_it)->start().ptr()] = kTypeDecl;
     }
     if (using_decls_it != element->using_list.end()) {
-      m[{(*using_decls_it)->start().ordinal(), (*using_decls_it)->start().sub_ordinal()}] = kUsing;
+      m[(*using_decls_it)->start().ptr()] = kUsing;
     }
     if (m.empty())
       break;
@@ -127,15 +117,15 @@ void DeclarationOrderTreeVisitor::OnProtocolDeclaration(
     kMethod,
   };
 
-  std::map<OrdinalThenSubOrdinal, Next> m;
+  std::map<const char*, Next> m;
   for (;;) {
     // Sort in declaration order.
     m.clear();
     if (compose_it != element->composed_protocols.end()) {
-      m[{(*compose_it)->start().ordinal(), (*compose_it)->start().sub_ordinal()}] = kCompose;
+      m[(*compose_it)->start().ptr()] = kCompose;
     }
     if (methods_it != element->methods.end()) {
-      m[{(*methods_it)->start().ordinal(), (*methods_it)->start().sub_ordinal()}] = kMethod;
+      m[(*methods_it)->start().ptr()] = kMethod;
     }
     if (m.empty())
       return;

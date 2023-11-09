@@ -93,9 +93,6 @@ void Reporter::Report(std::unique_ptr<Diagnostic> diag) {
   ZX_ASSERT_MSG(diag, "should not report nullptr diagnostic");
   ZX_ASSERT_MSG(diag->def.id <= kNumDiagnosticDefs,
                 "a static_assert should have ensured id <= kNumDiagnosticDefs");
-  if (diag->def.opts.fixable && ignore_fixables_) {
-    return;
-  }
   switch (diag->def.kind) {
     case DiagnosticKind::kError:
       AddError(std::move(diag));
@@ -153,7 +150,7 @@ void Reporter::PrintReports(bool enable_color) const {
       qualifier = "warning";
     }
 
-    auto msg = Format(qualifier, diag->span, diag->Format(program_invocation()), enable_color);
+    auto msg = Format(qualifier, diag->span, diag->Format(), enable_color);
     fprintf(stderr, "%s\n", msg.c_str());
     // There should never be errors in virtual files. These contain code
     // synthesized by the compiler, and the user has no control over them.

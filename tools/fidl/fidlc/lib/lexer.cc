@@ -155,7 +155,7 @@ Token Lexer::Finish(Token::Kind kind) {
   ZX_ASSERT(kind != Token::Kind::kIdentifier);
   ResetResult result = Reset(Token::Kind::kIdentifier);
   return Token(SourceSpan(result.data, source_file_), result.leading_newlines, kind,
-               Token::Subkind::kNone, next_ordinal_++);
+               Token::Subkind::kNone);
 }
 
 Token Lexer::LexEndOfStream() { return Finish(Token::Kind::kEndOfFile); }
@@ -175,7 +175,7 @@ Token Lexer::LexIdentifier() {
   if (lookup != token_subkinds.end())
     subkind = lookup->second;
   return Token(SourceSpan(identifier_result.data, source_file_), identifier_result.leading_newlines,
-               Token::Kind::kIdentifier, subkind, next_ordinal_++);
+               Token::Kind::kIdentifier, subkind);
 }
 
 static bool IsHexDigit(char c) {
@@ -350,7 +350,8 @@ Token Lexer::Lex() {
   ZX_ASSERT_MSG(token_start_ <= end_of_file_, "already reached EOF");
   ZX_ASSERT_MSG(current_ <= end_of_file_ + 1, "current_ is past null terminator");
 
-  if (next_ordinal_ == 0) {
+  if (start_of_file_) {
+    start_of_file_ = false;
     return Finish(Token::Kind::kStartOfFile);
   }
 

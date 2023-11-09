@@ -22,8 +22,6 @@
 #include "tools/fidl/fidlc/include/fidl/ordinals.h"
 #include "tools/fidl/fidlc/include/fidl/parser.h"
 #include "tools/fidl/fidlc/include/fidl/source_file.h"
-#include "tools/fidl/fidlc/include/fidl/source_map.h"
-#include "tools/fidl/fidlc/include/fidl/source_map_generator.h"
 #include "tools/fidl/fidlc/include/fidl/tables_generator.h"
 #include "tools/fidl/fidlc/include/fidl/utils.h"
 #include "tools/fidl/fidlc/include/fidl/versioning_types.h"
@@ -312,8 +310,8 @@ class TestLibrary final : public SharedInterface {
         std::string_view beginning(source_file->data().data(), 0);
         fidl::SourceSpan span(beginning, *source_file);
         const auto& error = errors().at(0);
-        auto error_msg = fidl::Reporter::Format(
-            "error", error->span, error->Format(reporter()->program_invocation()), /*color=*/false);
+        auto error_msg =
+            fidl::Reporter::Format("error", error->span, error->Format(), /*color=*/false);
         findings_.emplace_back(span, "parser-error", error_msg + "\n");
         return false;
       }
@@ -342,12 +340,6 @@ class TestLibrary final : public SharedInterface {
     auto tables_generator = fidl::TablesGenerator(compilation_.get());
     auto out = tables_generator.Produce();
     return out.str();
-  }
-
-  fidl::SourceMap GenerateSourceMap(std::string_view library_name) {
-    auto source_map_generator =
-        fidl::SourceMapGenerator(LookupLibrary(library_name), experimental_flags());
-    return source_map_generator.Produce();
   }
 
   // Note: We don't provide a convenient library() method because inspecting a
