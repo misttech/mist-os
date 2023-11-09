@@ -254,7 +254,7 @@ if (bazel_product_bundle_prefix != false &&
   bazel_product_bundle_target = ""
 }
 
-if (vendor_product_dir != false || vendor_product_dir != false) {
+if (vendor_product_dir != false || vendor_board_dir != false) {
   if (vendor_product_dir != false) {
     product_bundle_dir = vendor_product_dir
   } else {
