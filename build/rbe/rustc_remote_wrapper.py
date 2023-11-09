@@ -482,9 +482,16 @@ class RustRemoteAction(object):
         if dep_status != 0:
             cmd_str = cl_utils.command_quoted_str(dep_only_command)
             self._prepare_status = dep_status
-            raise RemoteInputProcessingError(
-                f"Error: Local generation of depfile failed (exit={dep_status}): {cmd_str}"
-            )
+            if self.verbose:
+                # This is really a lot of information, which is only interesting
+                # in limited circumstances. So we don't print it unless requested.
+                raise RemoteInputProcessingError(
+                    f"Error: Local generation of depfile failed (exit={dep_status}): {cmd_str}"
+                )
+            else:
+                raise RemoteInputProcessingError(
+                    f"Error: Local generation of depfile failed (exit={dep_status}), use --verbose to see the command line."
+                )
 
         # There is a phony dep for each input that is needed.
         deps = list(depfile.parse_lines(_readlines_from_file(local_depfile)))
