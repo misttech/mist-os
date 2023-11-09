@@ -1291,7 +1291,7 @@ void CompileStep::CompileProtocol(Protocol* protocol_declaration) {
       for (const auto part : library()->name) {
         method_name << part << '.';
       }
-      method_name << protocol_declaration->GetName() << "." << method.name.data();
+      method_name << protocol_declaration->name.decl_name() << "." << method.name.data();
       bool allowed = transitional_allowlist.find(method_name.str()) != transitional_allowlist.end();
 
       if (!allowed) {

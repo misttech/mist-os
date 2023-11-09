@@ -101,6 +101,10 @@ struct Element {
   // directly bound to a type declaration as in `type Foo = struct { ... };`).
   bool IsAnonymousLayout() const;
 
+  // Returns the element's name, or null if unnamed (e.g. reserved fields).
+  // The name is unqualified, e.g. "MyProtocol" or "MyMethod".
+  std::optional<std::string_view> GetName() const;
+
   Kind kind;
   std::unique_ptr<AttributeList> attributes;
   Availability availability;
@@ -163,8 +167,6 @@ struct Decl : public MaybeSourced, public Element {
 
   const Kind kind;
   const Name name;
-
-  std::string GetName() const;
 
   // Runs a function on every member of the decl, if it has any. Note that
   // unlike Library::TraverseElements, it does not call `fn(this)`.

@@ -62,7 +62,55 @@ bool Element::IsAnonymousLayout() const {
   }
 }
 
-std::string Decl::GetName() const { return std::string(name.decl_name()); }
+std::optional<std::string_view> Element::GetName() const {
+  switch (kind) {
+    case Kind::kLibrary:
+      ZX_PANIC("should not call GetName() on a library element");
+    case Kind::kBits:
+    case Kind::kBuiltin:
+    case Kind::kConst:
+    case Kind::kEnum:
+    case Kind::kProtocol:
+    case Kind::kResource:
+    case Kind::kService:
+    case Kind::kStruct:
+    case Kind::kTable:
+    case Kind::kAlias:
+    case Kind::kUnion:
+    case Kind::kNewType:
+    case Kind::kOverlay:
+      return static_cast<const Decl*>(this)->name.decl_name();
+    case Kind::kBitsMember:
+      return static_cast<const Bits::Member*>(this)->name.data();
+    case Kind::kEnumMember:
+      return static_cast<const Enum::Member*>(this)->name.data();
+    case Kind::kProtocolCompose:
+      return std::nullopt;
+    case Kind::kProtocolMethod:
+      return static_cast<const Protocol::Method*>(this)->name.data();
+    case Kind::kResourceProperty:
+      return static_cast<const Resource::Property*>(this)->name.data();
+    case Kind::kServiceMember:
+      return static_cast<const Service::Member*>(this)->name.data();
+    case Kind::kStructMember:
+      return static_cast<const Struct::Member*>(this)->name.data();
+    case Kind::kTableMember:
+      if (auto& used = static_cast<const Table::Member*>(this)->maybe_used) {
+        return used->name.data();
+      }
+      return std::nullopt;
+    case Kind::kUnionMember:
+      if (auto& used = static_cast<const Union::Member*>(this)->maybe_used) {
+        return used->name.data();
+      }
+      return std::nullopt;
+    case Kind::kOverlayMember:
+      if (auto& used = static_cast<const Overlay::Member*>(this)->maybe_used) {
+        return used->name.data();
+      }
+      return std::nullopt;
+  }
+}
 
 bool Builtin::IsInternal() const {
   switch (id) {

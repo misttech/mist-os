@@ -39,7 +39,7 @@ alias Unversioned = vector<uint8>:100;
   EXPECT_EQ(alias_versions->Oldest(), alias_versions->Newest());
   EXPECT_EQ(alias_versions->Oldest(), alias_versions->At(fidl::Version::Head()));
   EXPECT_NULL(alias_versions->At(fidl::Version::From(2).value()));
-  EXPECT_SUBSTR(alias_versions->Oldest()->GetName(), "Unversioned");
+  EXPECT_STREQ(alias_versions->Oldest()->name.decl_name(), "Unversioned");
 
   auto raw_type_ctor = std::move(raw_alias->type_ctor);
   auto type_ctor_unique =
@@ -131,7 +131,7 @@ type Unversioned = bits : uint32 {
   EXPECT_EQ(bits_versions->Oldest(), bits_versions->Newest());
   EXPECT_EQ(bits_versions->Oldest(), bits_versions->At(fidl::Version::Head()));
   EXPECT_NULL(bits_versions->At(fidl::Version::From(2).value()));
-  EXPECT_SUBSTR(bits_versions->Oldest()->GetName(), "Unversioned");
+  EXPECT_STREQ(bits_versions->Oldest()->name.decl_name(), "Unversioned");
 
   auto raw_subtype_ctor = std::move(raw_layout->subtype_ctor);
   auto subtype_ctor_unique =
@@ -187,7 +187,7 @@ type Versioned = flexible bits : uint32 {
   EXPECT_NE(bits_versions->Oldest(), bits_versions->Newest());
   EXPECT_EQ(bits_versions->Oldest(), bits_versions->At(fidl::Version::From(1).value()));
   EXPECT_EQ(bits_versions->Newest(), bits_versions->At(fidl::Version::From(2).value()));
-  EXPECT_SUBSTR(bits_versions->Oldest()->GetName(), "Versioned");
+  EXPECT_STREQ(bits_versions->Oldest()->name.decl_name(), "Versioned");
 
   auto raw_subtype_ctor = std::move(raw_layout->subtype_ctor);
   auto subtype_ctor_unique =
@@ -258,7 +258,7 @@ const BIN_OP uint8 = 2 | LITERAL;
   EXPECT_EQ(literal_const_versions->size(), 1);
   EXPECT_EQ(literal_const_versions->Oldest(), literal_const_versions->Newest());
   EXPECT_EQ(literal_const_versions->Oldest(), literal_const_versions->At(fidl::Version::Head()));
-  EXPECT_SUBSTR(literal_const_versions->Oldest()->GetName(), "LITERAL");
+  EXPECT_STREQ(literal_const_versions->Oldest()->name.decl_name(), "LITERAL");
 
   auto raw_literal_type_ctor = std::move(raw_literal_const->type_ctor);
   auto literal_type_ctor_unique =
@@ -282,7 +282,7 @@ const BIN_OP uint8 = 2 | LITERAL;
   EXPECT_EQ(bin_op_const_versions->size(), 1);
   EXPECT_EQ(bin_op_const_versions->Oldest(), bin_op_const_versions->Newest());
   EXPECT_EQ(bin_op_const_versions->Oldest(), bin_op_const_versions->At(fidl::Version::Head()));
-  EXPECT_SUBSTR(bin_op_const_versions->Oldest()->GetName(), "BIN_OP");
+  EXPECT_STREQ(bin_op_const_versions->Oldest()->name.decl_name(), "BIN_OP");
 
   auto raw_bin_op_type_ctor = std::move(raw_bin_op_const->type_ctor);
   auto bin_op_type_ctor_unique =
@@ -345,7 +345,7 @@ type Unversioned = enum : uint32 {
   EXPECT_EQ(enum_versions->size(), 1);
   EXPECT_EQ(enum_versions->Oldest(), enum_versions->Newest());
   EXPECT_EQ(enum_versions->Oldest(), enum_versions->At(fidl::Version::Head()));
-  EXPECT_SUBSTR(enum_versions->Oldest()->GetName(), "Unversioned");
+  EXPECT_STREQ(enum_versions->Oldest()->name.decl_name(), "Unversioned");
 
   auto raw_subtype_ctor = std::move(raw_layout->subtype_ctor);
   auto subtype_ctor_unique =
@@ -401,7 +401,7 @@ type Versioned = flexible enum : uint32 {
   EXPECT_NE(enum_versions->Oldest(), enum_versions->Newest());
   EXPECT_EQ(enum_versions->Oldest(), enum_versions->At(fidl::Version::From(1).value()));
   EXPECT_EQ(enum_versions->Newest(), enum_versions->At(fidl::Version::From(2).value()));
-  EXPECT_SUBSTR(enum_versions->Oldest()->GetName(), "Versioned");
+  EXPECT_STREQ(enum_versions->Oldest()->name.decl_name(), "Versioned");
 
   auto raw_subtype_ctor = std::move(raw_layout->subtype_ctor);
   auto subtype_ctor_unique =
@@ -471,7 +471,7 @@ protocol Unversioned {
   EXPECT_EQ(protocol_versions->size(), 1);
   EXPECT_EQ(protocol_versions->Oldest(), protocol_versions->Newest());
   EXPECT_EQ(protocol_versions->Oldest(), protocol_versions->At(fidl::Version::Head()));
-  EXPECT_SUBSTR(protocol_versions->Oldest()->GetName(), "Unversioned");
+  EXPECT_STREQ(protocol_versions->Oldest()->name.decl_name(), "Unversioned");
 
   auto raw_member = std::move(raw_protocol_decl->methods[0]);
   auto raw_method = static_cast<fidl::raw::ProtocolMethod*>(raw_member.get());
@@ -530,9 +530,9 @@ protocol Versioned {
       source_map.GetVersioned<fidl::flat::Protocol>(raw_protocol_decl->source_signature());
   EXPECT_EQ(protocol_versions->size(), 2);
   EXPECT_NE(protocol_versions->Oldest(), protocol_versions->Newest());
-  EXPECT_SUBSTR(protocol_versions->Oldest()->GetName(), "Versioned");
+  EXPECT_STREQ(protocol_versions->Oldest()->name.decl_name(), "Versioned");
   EXPECT_EQ(protocol_versions->Oldest()->availability.range().pair().first, fidl::Version::From(1));
-  EXPECT_SUBSTR(protocol_versions->Newest()->GetName(), "Versioned");
+  EXPECT_STREQ(protocol_versions->Newest()->name.decl_name(), "Versioned");
   EXPECT_EQ(protocol_versions->Newest()->availability.range().pair().first, fidl::Version::From(2));
 
   auto raw_removed_compose = std::move(raw_protocol_decl->composed_protocols[0]);
@@ -627,7 +627,7 @@ resource_definition Unversioned : uint32 {
   EXPECT_EQ(resource_versions->Oldest(), resource_versions->Newest());
   EXPECT_EQ(resource_versions->Oldest(), resource_versions->At(fidl::Version::Head()));
   EXPECT_EQ(resource_versions->Oldest(), resource_versions->At(fidl::Version::Head()));
-  EXPECT_SUBSTR(resource_versions->Oldest()->GetName(), "Unversioned");
+  EXPECT_STREQ(resource_versions->Oldest()->name.decl_name(), "Unversioned");
 
   auto raw_subtype_ctor = std::move(raw_resource_decl->maybe_type_ctor);
   auto subtype_ctor_unique =
@@ -684,9 +684,9 @@ resource_definition Versioned : uint32 {
   EXPECT_NE(resource_versions->Oldest(), resource_versions->Newest());
   EXPECT_EQ(resource_versions->Oldest(), resource_versions->At(fidl::Version::From(1).value()));
   EXPECT_EQ(resource_versions->Newest(), resource_versions->At(fidl::Version::From(2).value()));
-  EXPECT_SUBSTR(resource_versions->Oldest()->GetName(), "Versioned");
+  EXPECT_STREQ(resource_versions->Oldest()->name.decl_name(), "Versioned");
   EXPECT_EQ(resource_versions->Oldest()->availability.range().pair().first, fidl::Version::From(1));
-  EXPECT_SUBSTR(resource_versions->Newest()->GetName(), "Versioned");
+  EXPECT_STREQ(resource_versions->Newest()->name.decl_name(), "Versioned");
   EXPECT_EQ(resource_versions->Newest()->availability.range().pair().first, fidl::Version::From(2));
 
   auto raw_subtype_ctor = std::move(raw_resource_decl->maybe_type_ctor);
@@ -755,7 +755,7 @@ service Unversioned {
   EXPECT_EQ(service_versions->size(), 1);
   EXPECT_EQ(service_versions->Oldest(), service_versions->Newest());
   EXPECT_EQ(service_versions->Oldest(), service_versions->At(fidl::Version::Head()));
-  EXPECT_SUBSTR(service_versions->Oldest()->GetName(), "Unversioned");
+  EXPECT_STREQ(service_versions->Oldest()->name.decl_name(), "Unversioned");
 
   auto raw_member = std::move(raw_service_decl->members[0]);
   auto raw_service_member = static_cast<fidl::raw::ServiceMember*>(raw_member.get());
@@ -801,9 +801,9 @@ service Versioned {
       source_map.GetVersioned<fidl::flat::Service>(raw_service_decl->source_signature());
   EXPECT_EQ(service_versions->size(), 2);
   EXPECT_NE(service_versions->Oldest(), service_versions->Newest());
-  EXPECT_SUBSTR(service_versions->Oldest()->GetName(), "Versioned");
+  EXPECT_STREQ(service_versions->Oldest()->name.decl_name(), "Versioned");
   EXPECT_EQ(service_versions->Oldest()->availability.range().pair().first, fidl::Version::From(1));
-  EXPECT_SUBSTR(service_versions->Newest()->GetName(), "Versioned");
+  EXPECT_STREQ(service_versions->Newest()->name.decl_name(), "Versioned");
   EXPECT_EQ(service_versions->Newest()->availability.range().pair().first, fidl::Version::From(2));
 
   auto raw_removed_member = std::move(raw_service_decl->members[0]);
@@ -864,7 +864,7 @@ type Unversioned = struct {
   EXPECT_EQ(struct_versions->size(), 1);
   EXPECT_EQ(struct_versions->Oldest(), struct_versions->Newest());
   EXPECT_EQ(struct_versions->Oldest(), struct_versions->At(fidl::Version::Head()));
-  EXPECT_SUBSTR(struct_versions->Oldest()->GetName(), "Unversioned");
+  EXPECT_STREQ(struct_versions->Oldest()->name.decl_name(), "Unversioned");
 
   auto raw_member = std::move(raw_layout->members[0]);
   auto raw_struct_member = static_cast<fidl::raw::StructLayoutMember*>(raw_member.get());
@@ -912,10 +912,10 @@ type Versioned = struct {
       source_map.GetVersioned<fidl::flat::Struct>(raw_outer_layout->source_signature());
   EXPECT_EQ(outer_struct_versions->size(), 2);
   EXPECT_NE(outer_struct_versions->Oldest(), outer_struct_versions->Newest());
-  EXPECT_SUBSTR(outer_struct_versions->Oldest()->GetName(), "Versioned");
+  EXPECT_STREQ(outer_struct_versions->Oldest()->name.decl_name(), "Versioned");
   EXPECT_EQ(outer_struct_versions->Oldest()->availability.range().pair().first,
             fidl::Version::From(1));
-  EXPECT_SUBSTR(outer_struct_versions->Newest()->GetName(), "Versioned");
+  EXPECT_STREQ(outer_struct_versions->Newest()->name.decl_name(), "Versioned");
   EXPECT_EQ(outer_struct_versions->Newest()->availability.range().pair().first,
             fidl::Version::From(2));
 
@@ -1013,7 +1013,7 @@ type Unversioned = table {
   EXPECT_EQ(table_versions->size(), 1);
   EXPECT_EQ(table_versions->Oldest(), table_versions->Newest());
   EXPECT_EQ(table_versions->Oldest(), table_versions->At(fidl::Version::Head()));
-  EXPECT_SUBSTR(table_versions->Oldest()->GetName(), "Unversioned");
+  EXPECT_STREQ(table_versions->Oldest()->name.decl_name(), "Unversioned");
 
   auto raw_member = std::move(raw_layout->members[0]);
   auto raw_table_member = static_cast<fidl::raw::OrdinaledLayoutMember*>(raw_member.get());
@@ -1064,10 +1064,10 @@ type Versioned = table {
             outer_table_versions->At(fidl::Version::From(1).value()));
   EXPECT_EQ(outer_table_versions->Newest(),
             outer_table_versions->At(fidl::Version::From(2).value()));
-  EXPECT_SUBSTR(outer_table_versions->Oldest()->GetName(), "Versioned");
+  EXPECT_STREQ(outer_table_versions->Oldest()->name.decl_name(), "Versioned");
   EXPECT_EQ(outer_table_versions->Oldest()->availability.range().pair().first,
             fidl::Version::From(1));
-  EXPECT_SUBSTR(outer_table_versions->Newest()->GetName(), "Versioned");
+  EXPECT_STREQ(outer_table_versions->Newest()->name.decl_name(), "Versioned");
   EXPECT_EQ(outer_table_versions->Newest()->availability.range().pair().first,
             fidl::Version::From(2));
 
@@ -1164,7 +1164,7 @@ type Unversioned = union {
   EXPECT_EQ(union_versions->size(), 1);
   EXPECT_EQ(union_versions->Oldest(), union_versions->Newest());
   EXPECT_EQ(union_versions->Oldest(), union_versions->At(fidl::Version::Head()));
-  EXPECT_SUBSTR(union_versions->Oldest()->GetName(), "Unversioned");
+  EXPECT_STREQ(union_versions->Oldest()->name.decl_name(), "Unversioned");
 
   auto raw_member = std::move(raw_layout->members[0]);
   auto raw_union_member = static_cast<fidl::raw::OrdinaledLayoutMember*>(raw_member.get());
@@ -1211,10 +1211,10 @@ type Versioned = union {
       source_map.GetVersioned<fidl::flat::Union>(raw_outer_layout->source_signature());
   EXPECT_EQ(outer_union_versions->size(), 2);
   EXPECT_NE(outer_union_versions->Oldest(), outer_union_versions->Newest());
-  EXPECT_SUBSTR(outer_union_versions->Oldest()->GetName(), "Versioned");
+  EXPECT_STREQ(outer_union_versions->Oldest()->name.decl_name(), "Versioned");
   EXPECT_EQ(outer_union_versions->Oldest()->availability.range().pair().first,
             fidl::Version::From(1));
-  EXPECT_SUBSTR(outer_union_versions->Newest()->GetName(), "Versioned");
+  EXPECT_STREQ(outer_union_versions->Newest()->name.decl_name(), "Versioned");
   EXPECT_EQ(outer_union_versions->Newest()->availability.range().pair().first,
             fidl::Version::From(2));
 

@@ -262,8 +262,8 @@ void VerifyHandleTransportCompatibilityStep::CheckHandleTransportUsages(
                                         protocol, source_span, seen);
     case Type::Kind::kHandle: {
       const Resource* resource = static_cast<const HandleType*>(type)->resource_decl;
-      std::string handle_name =
-          LibraryName(resource->name.library()->name, ".") + "." + resource->GetName();
+      std::string handle_name = LibraryName(resource->name.library()->name, ".") + "." +
+                                std::string(resource->name.decl_name());
       std::optional<HandleClass> handle_class = HandleClassFromName(handle_name);
       if (!handle_class.has_value() || !transport.IsCompatible(handle_class.value())) {
         Fail(ErrHandleUsedInIncompatibleTransport, source_span, handle_name, transport.name,

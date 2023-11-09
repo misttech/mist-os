@@ -369,7 +369,7 @@ class TestLibrary final : public SharedInterface {
 
   const fidl::flat::Bits* LookupBits(std::string_view name) {
     for (const auto& bits_decl : compilation_->declarations.bits) {
-      if (bits_decl->GetName() == name) {
+      if (bits_decl->name.decl_name() == name) {
         return bits_decl;
       }
     }
@@ -378,7 +378,7 @@ class TestLibrary final : public SharedInterface {
 
   const fidl::flat::Const* LookupConstant(std::string_view name) {
     for (const auto& const_decl : compilation_->declarations.consts) {
-      if (const_decl->GetName() == name) {
+      if (const_decl->name.decl_name() == name) {
         return const_decl;
       }
     }
@@ -387,7 +387,7 @@ class TestLibrary final : public SharedInterface {
 
   const fidl::flat::Enum* LookupEnum(std::string_view name) {
     for (const auto& enum_decl : compilation_->declarations.enums) {
-      if (enum_decl->GetName() == name) {
+      if (enum_decl->name.decl_name() == name) {
         return enum_decl;
       }
     }
@@ -396,7 +396,7 @@ class TestLibrary final : public SharedInterface {
 
   const fidl::flat::Resource* LookupResource(std::string_view name) {
     for (const auto& resource_decl : compilation_->declarations.resources) {
-      if (resource_decl->GetName() == name) {
+      if (resource_decl->name.decl_name() == name) {
         return resource_decl;
       }
     }
@@ -405,7 +405,7 @@ class TestLibrary final : public SharedInterface {
 
   const fidl::flat::Service* LookupService(std::string_view name) {
     for (const auto& service_decl : compilation_->declarations.services) {
-      if (service_decl->GetName() == name) {
+      if (service_decl->name.decl_name() == name) {
         return service_decl;
       }
     }
@@ -414,7 +414,7 @@ class TestLibrary final : public SharedInterface {
 
   const fidl::flat::Struct* LookupStruct(std::string_view name) {
     for (const auto& struct_decl : compilation_->declarations.structs) {
-      if (struct_decl->GetName() == name) {
+      if (struct_decl->name.decl_name() == name) {
         return struct_decl;
       }
     }
@@ -423,7 +423,7 @@ class TestLibrary final : public SharedInterface {
 
   const fidl::flat::NewType* LookupNewType(std::string_view name) {
     for (const auto& new_type_decl : compilation_->declarations.new_types) {
-      if (new_type_decl->GetName() == name) {
+      if (new_type_decl->name.decl_name() == name) {
         return new_type_decl;
       }
     }
@@ -432,7 +432,7 @@ class TestLibrary final : public SharedInterface {
 
   const fidl::flat::Table* LookupTable(std::string_view name) {
     for (const auto& table_decl : compilation_->declarations.tables) {
-      if (table_decl->GetName() == name) {
+      if (table_decl->name.decl_name() == name) {
         return table_decl;
       }
     }
@@ -441,7 +441,7 @@ class TestLibrary final : public SharedInterface {
 
   const fidl::flat::Alias* LookupAlias(std::string_view name) {
     for (const auto& alias_decl : compilation_->declarations.aliases) {
-      if (alias_decl->GetName() == name) {
+      if (alias_decl->name.decl_name() == name) {
         return alias_decl;
       }
     }
@@ -450,7 +450,7 @@ class TestLibrary final : public SharedInterface {
 
   const fidl::flat::Union* LookupUnion(std::string_view name) {
     for (const auto& union_decl : compilation_->declarations.unions) {
-      if (union_decl->GetName() == name) {
+      if (union_decl->name.decl_name() == name) {
         return union_decl;
       }
     }
@@ -458,7 +458,7 @@ class TestLibrary final : public SharedInterface {
   }
   const fidl::flat::Overlay* LookupOverlay(std::string_view name) {
     for (const auto& overlay_decl : compilation_->declarations.overlays) {
-      if (overlay_decl->GetName() == name) {
+      if (overlay_decl->name.decl_name() == name) {
         return overlay_decl;
       }
     }
@@ -467,7 +467,7 @@ class TestLibrary final : public SharedInterface {
 
   const fidl::flat::Protocol* LookupProtocol(std::string_view name) {
     for (const auto& protocol_decl : compilation_->declarations.protocols) {
-      if (protocol_decl->GetName() == name) {
+      if (protocol_decl->name.decl_name() == name) {
         return protocol_decl;
       }
     }
