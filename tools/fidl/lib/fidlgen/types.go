@@ -81,7 +81,6 @@ type Experiment string
 // the source of truth for this mirror.
 const (
 	ExperimentAllowNewTypes       Experiment = "allow_new_types"
-	ExperimentNoOptionalStructs   Experiment = "no_optional_structs"
 	ExperimentOutputIndexJSON     Experiment = "output_index_json"
 	ExperimentUnknownInteractions Experiment = "unknown_interactions"
 )

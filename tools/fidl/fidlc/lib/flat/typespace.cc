@@ -456,10 +456,8 @@ const Type* Typespace::Creator::CreateBoxType() {
     return nullptr;
   }
   const auto* inner = static_cast<const IdentifierType*>(boxed_type);
-  if (inner->nullability == types::Nullability::kNullable) {
-    reporter()->Fail(ErrBoxedTypeCannotBeOptional, parameters_.items[0]->span);
-    return nullptr;
-  }
+  ZX_ASSERT_MSG(inner->nullability == types::Nullability::kNonnullable,
+                "the inner type must be non-nullable because it is a struct");
   // We disallow specifying the boxed type as nullable in FIDL source but
   // then mark the boxed type as nullable, so that internally it shares the
   // same code path as its old syntax equivalent (a nullable struct). This

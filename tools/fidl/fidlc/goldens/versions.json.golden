@@ -34,7 +34,6 @@
     }
   ],
   "experiments": [
-    "no_optional_structs",
     "output_index_json",
     "transitional_allow_list"
   ],

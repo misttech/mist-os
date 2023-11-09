@@ -34,7 +34,6 @@ std::map<const std::string_view, const ExperimentalFlags::Flag> ExperimentalFlag
     {"unknown_interactions", Flag::kUnknownInteractions},
     {"unknown_interactions_mandate", Flag::kUnknownInteractionsMandate},
     {"unknown_interactions_new_defaults", Flag::kUnknownInteractionsNewDefaults},
-    {"no_optional_structs", Flag::kNoOptionalStructs},
     {"allow_new_types", Flag::kAllowNewTypes},
     {"output_index_json", Flag::kOutputIndexJson},
     {"zx_c_types", Flag::kZxCTypes},

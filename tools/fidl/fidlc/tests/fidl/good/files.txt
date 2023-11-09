@@ -195,7 +195,6 @@ fi-0166.test.fidl
 fi-0167.test.fidl
 fi-0168.test.fidl
 fi-0169.test.fidl
-fi-0170.test.fidl
 fi-0171.test.fidl
 fi-0172.test.fidl
 fi-0173.test.fidl

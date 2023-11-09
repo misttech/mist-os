@@ -329,23 +329,9 @@ TEST(StructsTests, BadBoxCannotBeOptional) {
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
-TEST(StructsTests, GoodWithoutFlagStructCanBeOptional) {
-  TestLibrary library(R"FIDL(
-library example;
-
-type SomeStruct = struct {};
-
-type Foo = struct {
-  foo SomeStruct:optional;
-};
-)FIDL");
-  ASSERT_COMPILED(library);
-}
-
-TEST(StructsTests, BadWithFlagStructCannotBeOptional) {
+TEST(StructsTests, BadStructCannotBeOptional) {
   TestLibrary library;
   library.AddFile("bad/fi-0159.test.fidl");
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kNoOptionalStructs);
   library.ExpectFail(fidl::ErrStructCannotBeOptional, "Date");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }

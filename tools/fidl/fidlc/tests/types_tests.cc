@@ -215,13 +215,6 @@ TEST(NewSyntaxTests, BadTypeDeclOfNewTypeErrors) {
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
-TEST(NewSyntaxTests, BadBoxWithDoubleOptionality) {
-  TestLibrary library;
-  library.AddFile("bad/fi-0170.test.fidl");
-  library.ExpectFail(fidl::ErrBoxedTypeCannotBeOptional);
-  ASSERT_COMPILER_DIAGNOSTICS(library);
-}
-
 TEST(NewSyntaxTests, GoodTypeParameters) {
   TestLibrary library(R"FIDL(
 library example;

@@ -444,7 +444,7 @@ func TestNoEdgesToNullableTypes(t *testing.T) {
 	library example;
 
 	type A = struct {
-		nullable B:optional;
+		nullable box<B>;
 	};
 
 	type B = struct {

@@ -22,7 +22,6 @@ class ExperimentalFlags {
     kNoop = 1 << 0,
 
     kAllowNewTypes = 1 << 1,
-    kNoOptionalStructs = 1 << 2,
     kOutputIndexJson = 1 << 3,
 
     // TODO(fxbug.dev/110021): A temporary measure describe in

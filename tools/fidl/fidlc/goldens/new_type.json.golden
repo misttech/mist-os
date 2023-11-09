@@ -2,7 +2,6 @@
   "name": "test.newtype",
   "experiments": [
     "allow_new_types",
-    "no_optional_structs",
     "output_index_json",
     "transitional_allow_list"
   ],

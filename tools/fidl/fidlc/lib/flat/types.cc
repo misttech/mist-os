@@ -194,13 +194,8 @@ bool IdentifierType::ApplyConstraints(TypeResolver* resolver, Reporter* reporter
       break;
 
     case Decl::Kind::kStruct:
-      if (resolver->experimental_flags().IsFlagEnabled(
-              ExperimentalFlags::Flag::kNoOptionalStructs)) {
-        // Structs are nullable in the sense that they can be boxed. But we are
-        // disallowing optional to be used on struct.
-        if (c.HasConstraint<ConstraintKind::kNullability>()) {
-          return reporter->Fail(ErrStructCannotBeOptional, constraints.span.value(), layout_name);
-        }
+      if (c.HasConstraint<ConstraintKind::kNullability>()) {
+        return reporter->Fail(ErrStructCannotBeOptional, constraints.span.value(), layout_name);
       }
       break;
 
