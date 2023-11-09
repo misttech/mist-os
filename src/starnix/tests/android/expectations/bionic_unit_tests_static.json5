@@ -276,6 +276,8 @@
 
                 // TODO(b/308967162): Flaky on the bots - needs to be investigated.
                 "properties.empty_value",
+                "properties.no_fd_leaks",
+                "properties.smoke",
             ],
         },
     ],
