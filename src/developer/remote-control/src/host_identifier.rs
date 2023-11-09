@@ -68,7 +68,7 @@ impl HostIdentifier {
                 Ok(Ok(serial)) => break 'serial Some(serial),
                 Ok(Err(status)) => {
                     let status = zx::Status::from_raw(status);
-                    error!(%status, "Failed to get serial from SysInfo")
+                    warn!(%status, "Failed to get serial from SysInfo")
                 }
                 Err(err) => error!(%err, "SysInfoProxy internal err"),
             }
