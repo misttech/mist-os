@@ -37,6 +37,7 @@ use crate::{
     context::{CounterContext, InstantBindingsTypes, InstantContext, RecvFrameContext},
     counters::Counter,
     device::{
+        arp::ArpCounters,
         ethernet::{
             EthernetDeviceStateBuilder, EthernetIpLinkDeviceDynamicStateContext,
             EthernetLinkDevice, EthernetTimerId,
@@ -401,11 +402,16 @@ pub(crate) struct DeviceLayerState<C: DeviceLayerTypes> {
     origin: OriginTracker,
     shared_sockets: HeldSockets<C>,
     counters: DeviceCounters,
+    arp_counters: ArpCounters,
 }
 
 impl<C: DeviceLayerTypes> DeviceLayerState<C> {
     pub(crate) fn counters(&self) -> &DeviceCounters {
         &self.counters
+    }
+
+    pub(crate) fn arp_counters(&self) -> &ArpCounters {
+        &self.arp_counters
     }
 }
 
@@ -472,6 +478,7 @@ impl<C: DeviceLayerTypes + socket::NonSyncContext<DeviceId<C>>> DeviceLayerState
             origin: OriginTracker::new(),
             shared_sockets: Default::default(),
             counters: Default::default(),
+            arp_counters: Default::default(),
         }
     }
 

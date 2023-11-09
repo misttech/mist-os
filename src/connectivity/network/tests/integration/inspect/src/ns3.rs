@@ -227,6 +227,20 @@ async fn inspect_counters(name: &str) {
     println!("Got inspect data: {:#?}", data);
     diagnostics_assertions::assert_data_tree!(data, "root": contains {
         "Counters": {
+            "Arp": {
+                "Rx": {
+                    TotalPackets: 0u64,
+                    Requests: 0u64,
+                    Responses: 0u64,
+                    Malformed: 0u64,
+                    NonLocalDstAddr: 0u64,
+                },
+                "Tx": {
+                    Requests: 0u64,
+                    RequestsNonLocalSrcAddr: 0u64,
+                    Responses: 0u64,
+                },
+            },
             "IPv4": {
                 PacketTx: 1u64,
                 "PacketRx": {

@@ -6,6 +6,7 @@
 
 use core::time::Duration;
 
+use lock_order::{lock::UnlockedAccess, Locked};
 use net_types::{
     ip::{Ipv4, Ipv4Addr},
     SpecifiedAddr, UnicastAddr, UnicastAddress, Witness as _,
@@ -18,14 +19,15 @@ use packet_formats::{
 use tracing::{debug, trace, warn};
 
 use crate::{
-    context::{SendFrameContext, TimerContext, TracingContext},
+    context::{CounterContext, SendFrameContext, TimerContext, TracingContext},
+    counters::Counter,
     device::{link::LinkDevice, DeviceIdContext, FrameDestination},
     ip::device::nud::{
         BufferNudContext, BufferNudSenderContext, ConfirmationFlags, DynamicNeighborUpdateSource,
         LinkResolutionContext, LinkResolutionNotifier, NudConfigContext, NudContext, NudHandler,
         NudState, NudTimerId,
     },
-    Instant,
+    Instant, NonSyncContext, SyncCtx,
 };
 
 // NOTE(joshlf): This may seem a bit odd. Why not just say that `ArpDevice` is a
@@ -65,6 +67,46 @@ pub(crate) struct ArpFrameMetadata<D: ArpDevice, DeviceId> {
     pub(super) device_id: DeviceId,
     /// The destination hardware address.
     pub(super) dst_addr: D::HType,
+}
+
+/// Counters for the ARP layer.
+#[derive(Default)]
+pub struct ArpCounters {
+    /// Count of ARP packets received from the link layer.
+    pub rx_packets: Counter,
+    /// Count of received ARP packets that were dropped due to being unparsable.
+    pub rx_malformed_packets: Counter,
+    /// Count of ARP request packets received.
+    pub rx_requests: Counter,
+    /// Count of ARP response packets received.
+    pub rx_responses: Counter,
+    /// Count of non-gratuitous ARP packets received and dropped because the
+    /// destination address is non-local.
+    pub rx_dropped_non_local_target: Counter,
+    /// Count of ARP request packets sent.
+    pub tx_requests: Counter,
+    /// Count of ARP request packets not sent because the source address was
+    /// unknown or unassigned.
+    pub tx_requests_dropped_no_local_addr: Counter,
+    /// Count of ARP response packets sent.
+    pub tx_responses: Counter,
+}
+
+impl<C: NonSyncContext> UnlockedAccess<crate::lock_ordering::ArpCounters> for SyncCtx<C> {
+    type Data = ArpCounters;
+    type Guard<'l> = &'l ArpCounters where Self: 'l;
+
+    fn access(&self) -> Self::Guard<'_> {
+        self.state.arp_counters()
+    }
+}
+
+impl<NonSyncCtx: NonSyncContext, L> CounterContext<ArpCounters>
+    for Locked<&SyncCtx<NonSyncCtx>, L>
+{
+    fn with_counters<O, F: FnOnce(&ArpCounters) -> O>(&self, cb: F) -> O {
+        cb(self.unlocked_access::<crate::lock_ordering::ArpCounters>())
+    }
 }
 
 /// An execution context for the ARP protocol that allows sending IP packets to
@@ -177,8 +219,11 @@ pub(crate) trait BufferArpContext<B: BufferMut, D: ArpDevice, C: ArpNonSyncCtx<D
     ) -> O;
 }
 
-impl<D: ArpDevice, C: ArpNonSyncCtx<D, SC::DeviceId>, SC: ArpContext<D, C>> NudContext<Ipv4, D, C>
-    for SC
+impl<
+        D: ArpDevice,
+        C: ArpNonSyncCtx<D, SC::DeviceId>,
+        SC: ArpContext<D, C> + CounterContext<ArpCounters>,
+    > NudContext<Ipv4, D, C> for SC
 {
     type ConfigCtx<'a> = <SC as ArpContext<D, C>>::ConfigCtx<'a>;
 
@@ -214,7 +259,7 @@ impl<
         B: BufferMut,
         D: ArpDevice,
         C: ArpNonSyncCtx<D, SC::DeviceId>,
-        SC: BufferArpContext<B, D, C>,
+        SC: BufferArpContext<B, D, C> + CounterContext<ArpCounters>,
     > BufferNudContext<B, Ipv4, D, C> for SC
 {
     type BufferSenderCtx<'a> = <SC as BufferArpContext<B, D, C>>::BufferArpSenderCtx<'a>;
@@ -271,7 +316,8 @@ impl<
         C: ArpNonSyncCtx<D, SC::DeviceId>,
         SC: ArpContext<D, C>
             + SendFrameContext<C, B, ArpFrameMetadata<D, Self::DeviceId>>
-            + NudHandler<Ipv4, D, C>,
+            + NudHandler<Ipv4, D, C>
+            + CounterContext<ArpCounters>,
     > ArpPacketHandler<B, D, C> for SC
 {
     /// Handles an inbound ARP packet.
@@ -292,7 +338,8 @@ fn handle_packet<
     B: BufferMut,
     SC: ArpContext<D, C>
         + SendFrameContext<C, B, ArpFrameMetadata<D, SC::DeviceId>>
-        + NudHandler<Ipv4, D, C>,
+        + NudHandler<Ipv4, D, C>
+        + CounterContext<ArpCounters>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -300,6 +347,9 @@ fn handle_packet<
     frame_dst: FrameDestination,
     mut buffer: B,
 ) {
+    sync_ctx.with_counters(|counters| {
+        counters.rx_packets.increment();
+    });
     // TODO(wesleyac) Add support for probe.
     let packet = match buffer.parse::<ArpPacket<_, D::HType, Ipv4Addr>>() {
         Ok(packet) => packet,
@@ -311,6 +361,9 @@ fn handle_packet<
             // conditionals indicate an end of processing and a discarding of
             // the packet."
             debug!("discarding malformed ARP packet: {}", err);
+            sync_ctx.with_counters(|counters| {
+                counters.rx_malformed_packets.increment();
+            });
             return;
         }
     };
@@ -321,9 +374,22 @@ fn handle_packet<
     }
 
     let op = match packet.operation() {
-        ArpOp::Request => ValidArpOp::Request,
-        ArpOp::Response => ValidArpOp::Response,
+        ArpOp::Request => {
+            sync_ctx.with_counters(|counters| {
+                counters.rx_requests.increment();
+            });
+            ValidArpOp::Request
+        }
+        ArpOp::Response => {
+            sync_ctx.with_counters(|counters| {
+                counters.rx_responses.increment();
+            });
+            ValidArpOp::Response
+        }
         ArpOp::Other(o) => {
+            sync_ctx.with_counters(|counters| {
+                counters.rx_malformed_packets.increment();
+            });
             debug!("dropping arp packet with op = {:?}", o);
             return;
         }
@@ -432,6 +498,9 @@ fn handle_packet<
             (source, PacketKind::AddressedToMe)
         }
         (false, false) => {
+            sync_ctx.with_counters(|counters| {
+                counters.rx_dropped_non_local_target.increment();
+            });
             trace!(
                 "non-gratuitous ARP packet not targetting us; sender = {}, target={}",
                 sender_addr,
@@ -466,6 +535,9 @@ fn handle_packet<
             DynamicNeighborUpdateSource::Probe => {
                 let self_hw_addr = sync_ctx.get_hardware_addr(ctx, &device_id);
 
+                sync_ctx.with_counters(|counters| {
+                    counters.tx_responses.increment();
+                });
                 debug!("sending ARP response for {target_addr} to {sender_addr}");
 
                 // TODO(joshlf): Do something if send_frame returns an error?
@@ -497,7 +569,11 @@ fn handle_packet<
 // [RFC 4861 section 10]: https://tools.ietf.org/html/rfc4861#section-10
 const DEFAULT_ARP_REQUEST_PERIOD: Duration = crate::ip::device::state::RETRANS_TIMER_DEFAULT.get();
 
-fn send_arp_request<D: ArpDevice, C: ArpNonSyncCtx<D, SC::DeviceId>, SC: ArpContext<D, C>>(
+fn send_arp_request<
+    D: ArpDevice,
+    C: ArpNonSyncCtx<D, SC::DeviceId>,
+    SC: ArpContext<D, C> + CounterContext<ArpCounters>,
+>(
     sync_ctx: &mut SC,
     ctx: &mut C,
     device_id: &SC::DeviceId,
@@ -508,6 +584,9 @@ fn send_arp_request<D: ArpDevice, C: ArpNonSyncCtx<D, SC::DeviceId>, SC: ArpCont
         let self_hw_addr = sync_ctx.get_hardware_addr(ctx, device_id);
         // TODO(joshlf): Do something if send_frame returns an error?
         let dst_addr = remote_link_addr.unwrap_or(D::HType::BROADCAST);
+        sync_ctx.with_counters(|counters| {
+            counters.tx_requests.increment();
+        });
         debug!("sending ARP request for {lookup_addr} to {dst_addr:?}");
         let _ = SendFrameContext::send_frame(
             sync_ctx,
@@ -532,6 +611,9 @@ fn send_arp_request<D: ArpDevice, C: ArpNonSyncCtx<D, SC::DeviceId>, SC: ArpCont
         // So, if this is the case, we do not send an ARP request.
         // TODO(wesleyac): Should we cache these, and send packets once we have
         // an address?
+        sync_ctx.with_counters(|counters| {
+            counters.tx_requests_dropped_no_local_addr.increment();
+        });
         debug!("Not sending ARP request, since we don't know our local protocol address");
     }
 }
@@ -604,6 +686,7 @@ mod tests {
         >,
         inner: FakeArpInnerCtx,
         config: FakeArpConfigCtx,
+        counters: ArpCounters,
     }
 
     /// A fake `BufferArpSenderContext` that sends IP packets.
@@ -620,6 +703,7 @@ mod tests {
                 arp_state: ArpState::default(),
                 inner: FakeArpInnerCtx,
                 config: FakeArpConfigCtx,
+                counters: Default::default(),
             }
         }
     }
@@ -696,7 +780,7 @@ mod tests {
             FakeLinkDeviceId: &FakeLinkDeviceId,
             cb: F,
         ) -> O {
-            let FakeArpCtx { arp_state, config, proto_addr: _, hw_addr: _, inner: _ } =
+            let FakeArpCtx { arp_state, config, proto_addr: _, hw_addr: _, inner: _, counters: _ } =
                 self.get_mut();
             cb(arp_state, config)
         }
@@ -738,6 +822,12 @@ mod tests {
             _body: S,
         ) -> Result<(), S> {
             Ok(())
+        }
+    }
+
+    impl CounterContext<ArpCounters> for FakeCtxImpl {
+        fn with_counters<O, F: FnOnce(&ArpCounters) -> O>(&self, cb: F) -> O {
+            cb(&self.get_ref().counters)
         }
     }
 

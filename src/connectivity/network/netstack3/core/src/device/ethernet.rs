@@ -1407,6 +1407,7 @@ mod tests {
     use crate::{
         context::testutil::{FakeFrameCtx, FakeInstant, FakeLinkResolutionNotifier},
         device::{
+            arp::ArpCounters,
             socket::Frame,
             testutil::{set_forwarding_enabled, FakeDeviceId, FakeWeakDeviceId},
             update_ipv6_configuration, DeviceId,
@@ -1431,6 +1432,7 @@ mod tests {
         dynamic_state: DynamicEthernetDeviceState,
         tx_queue: TransmitQueueState<(), Buf<Vec<u8>>, BufVecU8Allocator>,
         counters: DeviceCounters,
+        arp_counters: ArpCounters,
     }
 
     impl FakeEthernetCtx {
@@ -1444,6 +1446,7 @@ mod tests {
                 dynamic_state: DynamicEthernetDeviceState::new(max_frame_size),
                 tx_queue: Default::default(),
                 counters: Default::default(),
+                arp_counters: Default::default(),
             }
         }
     }
@@ -1795,6 +1798,12 @@ mod tests {
         ) -> Option<Self::DeviceId> {
             let FakeWeakDeviceId(id) = weak_device_id;
             Some(id.clone())
+        }
+    }
+
+    impl CounterContext<ArpCounters> for FakeCtx {
+        fn with_counters<O, F: FnOnce(&ArpCounters) -> O>(&self, cb: F) -> O {
+            cb(&self.as_ref().get_ref().arp_counters)
         }
     }
 

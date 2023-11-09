@@ -65,7 +65,7 @@ use crate::{context::CounterContext, counters::Counter};
 use crate::{
     context::{EventContext, InstantBindingsTypes, RngContext, TimerContext, TracingContext},
     device::{
-        ethernet::EthernetLinkDevice, DeviceCounters, DeviceId, DeviceLayerState,
+        arp::ArpCounters, ethernet::EthernetLinkDevice, DeviceCounters, DeviceId, DeviceLayerState,
         DeviceLayerTimerId, DeviceLayerTypes,
     },
     ip::{
@@ -237,6 +237,10 @@ impl<BT: BindingsTypes> StackState<BT> {
         &self.device.counters()
     }
 
+    pub(crate) fn arp_counters(&self) -> &ArpCounters {
+        &self.device.arp_counters()
+    }
+
     pub(crate) fn udp_counters<I: Ip>(&self) -> &UdpCounters<I> {
         &self.transport.udp_counters::<I>()
     }
@@ -256,6 +260,8 @@ pub struct StackCounters<'a> {
     pub ipv4: &'a Ipv4Counters,
     /// IPv6 layer specific counters.
     pub ipv6: &'a Ipv6Counters,
+    /// ARP layer counters.
+    pub arp: &'a ArpCounters,
 }
 
 /// Visitor for stack counters.
@@ -271,6 +277,7 @@ pub fn inspect_counters<C: NonSyncContext, V: CounterVisitor>(sync_ctx: &SyncCtx
         ipv6_common: sync_ctx.state.ip_counters::<Ipv6>(),
         ipv4: sync_ctx.state.ipv4().counters(),
         ipv6: sync_ctx.state.ipv6().counters(),
+        arp: sync_ctx.state.arp_counters(),
     };
     visitor.visit_counters(counters);
 }

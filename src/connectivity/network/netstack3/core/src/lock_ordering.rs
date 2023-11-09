@@ -141,6 +141,8 @@ pub(crate) enum NdpCounters {}
 pub(crate) enum TimerCounters {}
 // Provides unlocked access of DeviceCounters.
 pub(crate) enum DeviceCounters {}
+// Provides unlocked access of ArpCounters.
+pub(crate) enum ArpCounters {}
 // Provides unlocked access of UdpCounters.
 pub(crate) struct UdpCounters<I>(PhantomData<I>, Never);
 // Provides unlocked access of SlaacCounters.

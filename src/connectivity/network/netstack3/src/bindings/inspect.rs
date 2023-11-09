@@ -238,6 +238,26 @@ pub(crate) fn counters(ctx: &Ctx) -> fuchsia_inspect::Inspector {
     impl netstack3_core::CounterVisitor for Visitor {
         fn visit_counters(&self, counters: netstack3_core::StackCounters<'_>) {
             let Self(inspector) = self;
+            inspector.root().record_child("Arp", |node| {
+                node.record_child("Rx", |node| {
+                    node.record_uint("TotalPackets", counters.arp.rx_packets.get());
+                    node.record_uint("Requests", counters.arp.rx_requests.get());
+                    node.record_uint("Responses", counters.arp.rx_responses.get());
+                    node.record_uint("Malformed", counters.arp.rx_malformed_packets.get());
+                    node.record_uint(
+                        "NonLocalDstAddr",
+                        counters.arp.rx_dropped_non_local_target.get(),
+                    );
+                });
+                node.record_child("Tx", |node| {
+                    node.record_uint("Requests", counters.arp.tx_requests.get());
+                    node.record_uint(
+                        "RequestsNonLocalSrcAddr",
+                        counters.arp.tx_requests_dropped_no_local_addr.get(),
+                    );
+                    node.record_uint("Responses", counters.arp.tx_responses.get());
+                });
+            });
             inspector.root().record_child("IPv4", |node| {
                 node.record_uint("PacketTx", counters.ipv4_common.send_ip_packet.get());
                 node.record_child("PacketRx", |node| {
