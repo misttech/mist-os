@@ -13,11 +13,11 @@ func (c NoTestsRanCheck) Check(to *TestingOutputs) bool {
 }
 
 func (c NoTestsRanCheck) Name() string {
-	return "no_tests_ran"
+	return "no_tests_ran_or_cleanup_failed"
 }
 
 func (c NoTestsRanCheck) DebugText() string {
-	return "The task didn't run any tests, or didn't produce any test results."
+	return "The task didn't run any tests, didn't produce any test results, or failed to properly clean up its test artifacts."
 }
 
 func (c NoTestsRanCheck) OutputFiles() []string {
