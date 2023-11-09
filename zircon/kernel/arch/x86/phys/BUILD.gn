@@ -224,6 +224,9 @@ if (current_toolchain == default_toolchain) {
         "//zircon/kernel/lib/ktl",
         "//zircon/kernel/lib/libc",
       ]
+
+      # Allow the inclusion of <ktl/enforce.h> to bypass this check.
+      cflags = [ "-Wno-include-angled-in-module-purview" ]
     }
 
     # Just putting this in deps of a phys_executable() in the kernel.phys32
