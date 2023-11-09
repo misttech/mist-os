@@ -4526,7 +4526,8 @@ mod tests {
         { "dynamic": "device_class" },
         { "static": "x" },
         { "dynamic": "normalized_mac" },
-        { "dynamic": "bus_type" }
+        { "dynamic": "bus_type" },
+        { "dynamic": "bus_path" }
     ] } ]
 }
 "#;
@@ -4602,6 +4603,9 @@ mod tests {
                 ),
                 interface::NameCompositionRule::Dynamic(
                     interface::DynamicNameCompositionRule::BusType,
+                ),
+                interface::NameCompositionRule::Dynamic(
+                    interface::DynamicNameCompositionRule::BusPath,
                 ),
             ],
         }]);

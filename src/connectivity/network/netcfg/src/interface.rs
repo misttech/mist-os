@@ -139,41 +139,15 @@ impl Config {
         topological_path: &str,
         interface_type: crate::InterfaceType,
     ) -> Result<String, anyhow::Error> {
-        let prefix = match interface_type {
+        let interface_type = match interface_type {
             crate::InterfaceType::Wlan => INTERFACE_PREFIX_WLAN,
             crate::InterfaceType::Ethernet => INTERFACE_PREFIX_ETHERNET,
         };
+        let bus_type = get_bus_type_for_topological_path(topological_path)?.to_string();
+        let bus_path = get_normalized_bus_path_for_topo_path(topological_path)?;
 
-        let (suffix, pat) = match get_bus_type_for_topological_path(topological_path)? {
-            BusType::USB => ("u", "/PCI0/bus/"),
-            BusType::PCI => ("p", "/PCI0/bus/"),
-            BusType::SDIO => ("s", "/platform/"),
-        };
+        let name = format!("{}{}{}", interface_type, bus_type, bus_path);
 
-        let index = topological_path.find(pat).ok_or_else(|| {
-            anyhow::format_err!(
-                "unexpected topological path {}: {} is not found",
-                topological_path,
-                pat
-            )
-        })?;
-        let topological_path = &topological_path[index + pat.len()..];
-        let index = topological_path.find('/').ok_or_else(|| {
-            anyhow::format_err!(
-                "unexpected topological path suffix {}: '/' is not found after {}",
-                topological_path,
-                pat
-            )
-        })?;
-
-        let mut name = format!("{}{}", prefix, suffix);
-        for digit in topological_path[..index]
-            .trim_end_matches(|c: char| !c.is_digit(16) || c == '0')
-            .chars()
-            .filter(|c| c.is_digit(16))
-        {
-            name.push(digit);
-        }
         Ok(name)
     }
 
@@ -204,6 +178,8 @@ fn name_matches_interface_type(name: &str, interface_type: &crate::InterfaceType
 
 // Get the NormalizedMac using the last octet of the MAC address. The offset
 // modifies the last_byte in an attempt to avoid naming conflicts.
+// For example, a MAC of `[0x1, 0x1, 0x1, 0x1, 0x1, 0x9]` with offset 0
+// becomes `9`.
 fn get_mac_identifier_from_octets(
     octets: [u8; 6],
     interface_type: crate::InterfaceType,
@@ -220,6 +196,37 @@ fn get_mac_identifier_from_octets(
     let last_byte = octets[octets.len() - 1];
     let (identifier, _) = last_byte.overflowing_add(offset);
     Ok(identifier)
+}
+
+// Get the normalized bus path for a topological path.
+// For example, a PCI device at `02:00.1` becomes `02001`.
+fn get_normalized_bus_path_for_topo_path(topological_path: &str) -> Result<String, anyhow::Error> {
+    let pattern = match get_bus_type_for_topological_path(topological_path)? {
+        BusType::USB | BusType::PCI => "/PCI0/bus/",
+        BusType::SDIO => "/platform/",
+    };
+
+    let index = topological_path.find(pattern).ok_or_else(|| {
+        anyhow::format_err!(
+            "unexpected topological path {}: {} is not found",
+            topological_path,
+            pattern
+        )
+    })?;
+    let topological_path = &topological_path[index + pattern.len()..];
+    let index = topological_path.find('/').ok_or_else(|| {
+        anyhow::format_err!(
+            "unexpected topological path suffix {}: '/' is not found after {}",
+            topological_path,
+            pattern
+        )
+    })?;
+
+    Ok(topological_path[..index]
+        .trim_end_matches(|c: char| !c.is_digit(16) || c == '0')
+        .chars()
+        .filter(|c| c.is_digit(16))
+        .collect())
 }
 
 #[derive(Debug)]
@@ -483,6 +490,7 @@ impl MatchingRule {
 #[derive(Debug, Eq, Hash, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum DynamicNameCompositionRule {
+    BusPath,
     BusType,
     DeviceClass,
     // A unique value seeded by the final octet of the interface's MAC address.
@@ -493,7 +501,9 @@ impl DynamicNameCompositionRule {
     // `true` when a rule can be re-tried to produce a different name.
     fn rule_supports_retry(&self) -> bool {
         match *self {
-            DynamicNameCompositionRule::BusType | DynamicNameCompositionRule::DeviceClass => false,
+            DynamicNameCompositionRule::BusPath
+            | DynamicNameCompositionRule::BusType
+            | DynamicNameCompositionRule::DeviceClass => false,
             DynamicNameCompositionRule::NormalizedMac => true,
         }
     }
@@ -506,6 +516,9 @@ impl DynamicNameCompositionRule {
         attempt_num: u8,
     ) -> Result<String, anyhow::Error> {
         match *self {
+            DynamicNameCompositionRule::BusPath => {
+                get_normalized_bus_path_for_topo_path(&info.topological_path)
+            }
             DynamicNameCompositionRule::BusType => {
                 get_bus_type_for_topological_path(&info.topological_path).map(|t| t.to_string())
             }
@@ -1299,7 +1312,7 @@ mod tests {
         vec![
             NameCompositionRule::Dynamic(DynamicNameCompositionRule::DeviceClass),
             NameCompositionRule::Dynamic(DynamicNameCompositionRule::BusType),
-            NameCompositionRule::Static(String::from("0014")),
+            NameCompositionRule::Dynamic(DynamicNameCompositionRule::BusPath),
         ],
         new_device_info(
             fhwnet::DeviceClass::Ethernet,
@@ -1307,13 +1320,13 @@ mod tests {
             "/dev/sys/platform/pt/PCI0/bus/00:14.0_/00:14.0/ethernet",
         ),
         "ethp0014";
-        "device_class_with_pci_bus_type_with_static"
+        "device_class_with_pci_bus_type_with_bus_path"
     )]
     #[test_case(
         vec![
             NameCompositionRule::Dynamic(DynamicNameCompositionRule::DeviceClass),
             NameCompositionRule::Dynamic(DynamicNameCompositionRule::BusType),
-            NameCompositionRule::Static(String::from("0014")),
+            NameCompositionRule::Dynamic(DynamicNameCompositionRule::BusPath),
         ],
         new_device_info(
             fhwnet::DeviceClass::Ethernet,
@@ -1321,7 +1334,7 @@ mod tests {
             "/dev/sys/platform/pt/PCI0/bus/00:14.0/00:14.0/xhci/usb/004/004/ifc-000/ax88179/ethernet",
         ),
         "ethu0014";
-        "device_class_with_usb_bus_type_with_static"
+        "device_class_with_usb_bus_type_with_bus_path"
     )]
     fn test_naming_rules(
         composition_rules: Vec<NameCompositionRule>,
