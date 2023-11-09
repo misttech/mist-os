@@ -143,10 +143,11 @@ impl Config {
             crate::InterfaceType::Wlan => INTERFACE_PREFIX_WLAN,
             crate::InterfaceType::Ethernet => INTERFACE_PREFIX_ETHERNET,
         };
-        let (suffix, pat) = if topological_path.contains("/PCI0/bus/") {
-            ("p", "/PCI0/bus/")
-        } else {
-            ("s", "/platform/")
+
+        let (suffix, pat) = match get_bus_type_for_topological_path(topological_path)? {
+            BusType::USB => ("u", "/PCI0/bus/"),
+            BusType::PCI => ("p", "/PCI0/bus/"),
+            BusType::SDIO => ("s", "/platform/"),
         };
 
         let index = topological_path.find(pat).ok_or_else(|| {
@@ -394,6 +395,17 @@ pub enum BusType {
     SDIO,
 }
 
+impl std::fmt::Display for BusType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let name = match *self {
+            Self::USB => "u",
+            Self::PCI => "p",
+            Self::SDIO => "s",
+        };
+        write!(f, "{}", name)
+    }
+}
+
 // Extract the `BusType` for a device given the topological path.
 fn get_bus_type_for_topological_path(topological_path: &str) -> Result<BusType, anyhow::Error> {
     if topological_path.contains("/PCI0") {
@@ -471,6 +483,7 @@ impl MatchingRule {
 #[derive(Debug, Eq, Hash, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum DynamicNameCompositionRule {
+    BusType,
     DeviceClass,
     // A unique value seeded by the final octet of the interface's MAC address.
     NormalizedMac,
@@ -480,7 +493,7 @@ impl DynamicNameCompositionRule {
     // `true` when a rule can be re-tried to produce a different name.
     fn rule_supports_retry(&self) -> bool {
         match *self {
-            DynamicNameCompositionRule::DeviceClass => false,
+            DynamicNameCompositionRule::BusType | DynamicNameCompositionRule::DeviceClass => false,
             DynamicNameCompositionRule::NormalizedMac => true,
         }
     }
@@ -493,6 +506,9 @@ impl DynamicNameCompositionRule {
         attempt_num: u8,
     ) -> Result<String, anyhow::Error> {
         match *self {
+            DynamicNameCompositionRule::BusType => {
+                get_bus_type_for_topological_path(&info.topological_path).map(|t| t.to_string())
+            }
             DynamicNameCompositionRule::DeviceClass => Ok(match info.device_class.into() {
                 crate::InterfaceType::Wlan => INTERFACE_PREFIX_WLAN,
                 crate::InterfaceType::Ethernet => INTERFACE_PREFIX_ETHERNET,
@@ -1278,6 +1294,34 @@ mod tests {
         ),
         "wlanx8";
         "device_class_with_static_with_normalized_mac"
+    )]
+    #[test_case(
+        vec![
+            NameCompositionRule::Dynamic(DynamicNameCompositionRule::DeviceClass),
+            NameCompositionRule::Dynamic(DynamicNameCompositionRule::BusType),
+            NameCompositionRule::Static(String::from("0014")),
+        ],
+        new_device_info(
+            fhwnet::DeviceClass::Ethernet,
+            [0x1, 0x1, 0x1, 0x1, 0x1, 0x1],
+            "/dev/sys/platform/pt/PCI0/bus/00:14.0_/00:14.0/ethernet",
+        ),
+        "ethp0014";
+        "device_class_with_pci_bus_type_with_static"
+    )]
+    #[test_case(
+        vec![
+            NameCompositionRule::Dynamic(DynamicNameCompositionRule::DeviceClass),
+            NameCompositionRule::Dynamic(DynamicNameCompositionRule::BusType),
+            NameCompositionRule::Static(String::from("0014")),
+        ],
+        new_device_info(
+            fhwnet::DeviceClass::Ethernet,
+            [0x1, 0x1, 0x1, 0x1, 0x1, 0x1],
+            "/dev/sys/platform/pt/PCI0/bus/00:14.0/00:14.0/xhci/usb/004/004/ifc-000/ax88179/ethernet",
+        ),
+        "ethu0014";
+        "device_class_with_usb_bus_type_with_static"
     )]
     fn test_naming_rules(
         composition_rules: Vec<NameCompositionRule>,

@@ -4525,7 +4525,8 @@ mod tests {
     ], "naming_scheme": [
         { "dynamic": "device_class" },
         { "static": "x" },
-        { "dynamic": "normalized_mac" }
+        { "dynamic": "normalized_mac" },
+        { "dynamic": "bus_type" }
     ] } ]
 }
 "#;
@@ -4598,6 +4599,9 @@ mod tests {
                 interface::NameCompositionRule::Static("x".to_owned()),
                 interface::NameCompositionRule::Dynamic(
                     interface::DynamicNameCompositionRule::NormalizedMac,
+                ),
+                interface::NameCompositionRule::Dynamic(
+                    interface::DynamicNameCompositionRule::BusType,
                 ),
             ],
         }]);
