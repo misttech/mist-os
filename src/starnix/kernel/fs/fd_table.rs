@@ -4,7 +4,7 @@
 
 use bitflags::bitflags;
 use starnix_lock::Mutex;
-use std::{collections::HashMap, ops::DerefMut};
+use std::ops::DerefMut;
 
 use crate::{
     fs::{FdNumber, FileHandle, RecordLockOwner},
@@ -24,7 +24,7 @@ bitflags! {
 pub struct FdTableId(usize);
 
 impl FdTableId {
-    fn new(id: *const HashMap<FdNumber, FdTableEntry>) -> Self {
+    fn new(id: *const Vec<Option<FdTableEntry>>) -> Self {
         Self(id as usize)
     }
 
@@ -63,13 +63,13 @@ impl FdTableEntry {
 /// lowest numbered file descriptor not in use.
 #[derive(Clone, Debug)]
 struct FdTableStore {
-    map: HashMap<FdNumber, FdTableEntry>,
+    entries: Vec<Option<FdTableEntry>>,
     next_fd: FdNumber,
 }
 
 impl Default for FdTableStore {
     fn default() -> Self {
-        FdTableStore { map: HashMap::default(), next_fd: FdNumber::from_raw(0) }
+        FdTableStore { entries: Default::default(), next_fd: FdNumber::from_raw(0) }
     }
 }
 
@@ -90,15 +90,40 @@ impl FdTableStore {
         if raw_fd == self.next_fd.raw() {
             self.next_fd = self.calculate_lowest_available_fd(&FdNumber::from_raw(raw_fd + 1));
         }
-        Ok(self.map.insert(fd, entry))
+        let raw_fd = raw_fd as usize;
+        if raw_fd >= self.entries.len() {
+            self.entries.resize(raw_fd + 1, None);
+        }
+        let mut entry = Some(entry);
+        std::mem::swap(&mut entry, &mut self.entries[raw_fd]);
+        Ok(entry)
     }
 
     fn remove_entry(&mut self, fd: &FdNumber) -> Option<FdTableEntry> {
-        let removed = self.map.remove(fd);
-        if removed.is_some() && fd.raw() < self.next_fd.raw() {
+        let raw_fd = fd.raw() as usize;
+        if raw_fd >= self.entries.len() {
+            return None;
+        }
+        let mut removed = None;
+        std::mem::swap(&mut removed, &mut self.entries[raw_fd]);
+        if removed.is_some() && raw_fd < self.next_fd.raw() as usize {
             self.next_fd = *fd;
         }
         removed
+    }
+
+    fn get(&self, fd: FdNumber) -> Option<&FdTableEntry> {
+        match self.entries.get(fd.raw() as usize) {
+            Some(Some(entry)) => Some(entry),
+            _ => None,
+        }
+    }
+
+    fn get_mut(&mut self, fd: FdNumber) -> Option<&mut FdTableEntry> {
+        match self.entries.get_mut(fd.raw() as usize) {
+            Some(Some(entry)) => Some(entry),
+            _ => None,
+        }
     }
 
     // Returns the (possibly memoized) lowest available FD >= minfd in this map.
@@ -112,17 +137,24 @@ impl FdTableStore {
     // Recalculates the lowest available FD >= minfd based on the contents of the map.
     fn calculate_lowest_available_fd(&self, minfd: &FdNumber) -> FdNumber {
         let mut fd = *minfd;
-        while self.map.contains_key(&fd) {
+        while self.get(fd).is_some() {
             fd = FdNumber::from_raw(fd.raw() + 1);
         }
         fd
     }
 
-    pub fn retain<F>(&mut self, f: F)
+    pub fn retain<F>(&mut self, mut f: F)
     where
         F: FnMut(&FdNumber, &mut FdTableEntry) -> bool,
     {
-        self.map.retain(f);
+        for (index, maybe_entry) in self.entries.iter_mut().enumerate() {
+            let fd = FdNumber::from_raw(index as i32);
+            if let Some(entry) = maybe_entry {
+                if !f(&fd, entry) {
+                    *maybe_entry = None;
+                }
+            }
+        }
         self.next_fd = self.calculate_lowest_available_fd(&FdNumber::from_raw(0));
     }
 }
@@ -134,7 +166,7 @@ struct FdTableInner {
 
 impl FdTableInner {
     fn id(&self) -> FdTableId {
-        FdTableId::new(&self.store.lock().map as *const HashMap<FdNumber, FdTableEntry>)
+        FdTableId::new(&self.store.lock().entries as *const Vec<Option<FdTableEntry>>)
     }
 
     fn unshare(&self) -> OwnedRef<FdTableInner> {
@@ -143,7 +175,11 @@ impl FdTableInner {
             FdTableInner { store: Mutex::new(new_store) }
         };
         let id = inner.id();
-        inner.store.lock().map.values_mut().for_each(|entry| entry.fd_table_id = id);
+        for maybe_entry in inner.store.lock().entries.iter_mut() {
+            if let Some(entry) = maybe_entry {
+                entry.fd_table_id = id;
+            }
+        }
         OwnedRef::new(inner)
     }
 }
@@ -260,11 +296,8 @@ impl FdTable {
             let id = self.id();
             let inner = self.inner.lock();
             let mut state = inner.store.lock();
-            let file = state
-                .map
-                .get(&oldfd)
-                .map(|entry| entry.file.clone())
-                .ok_or_else(|| errno!(EBADF))?;
+            let file =
+                state.get(oldfd).map(|entry| entry.file.clone()).ok_or_else(|| errno!(EBADF))?;
 
             let fd = match target {
                 TargetFdNumber::Specific(fd) => {
@@ -298,11 +331,7 @@ impl FdTable {
         profile_duration!("GetFdWithFlags");
         let inner = self.inner.lock();
         let state = inner.store.lock();
-        state
-            .map
-            .get(&fd)
-            .map(|entry| (entry.file.clone(), entry.flags))
-            .ok_or_else(|| errno!(EBADF))
+        state.get(fd).map(|entry| (entry.file.clone(), entry.flags)).ok_or_else(|| errno!(EBADF))
     }
 
     pub fn get_unless_opath(&self, fd: FdNumber) -> Result<FileHandle, Errno> {
@@ -339,8 +368,7 @@ impl FdTable {
             .lock()
             .store
             .lock()
-            .map
-            .get_mut(&fd)
+            .get_mut(fd)
             .map(|entry| {
                 entry.flags = flags;
             })
@@ -367,7 +395,17 @@ impl FdTable {
 
     /// Returns a vector of all current file descriptors in the table.
     pub fn get_all_fds(&self) -> Vec<FdNumber> {
-        self.inner.lock().store.lock().map.keys().cloned().collect()
+        self.inner
+            .lock()
+            .store
+            .lock()
+            .entries
+            .iter()
+            .enumerate()
+            .filter_map(|(index, maybe_entry)| {
+                maybe_entry.as_ref().map(|_| FdNumber::from_raw(index as i32))
+            })
+            .collect()
     }
 }
 
