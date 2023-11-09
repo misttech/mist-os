@@ -89,7 +89,7 @@ Prior to building a custom Rust toolchain for Fuchsia, you need to do the follow
    DEV_ROOT={{ '<var>' }}DEV_ROOT{{ '</var>' }}
 
    $DEV_ROOT/infra/fuchsia/prebuilt/tools/vpython3 \
-     $DEV_ROOT/infra/fuchsia/recipes/recipes/contrib/rust_toolchain.resources/generate_config.py \
+     $DEV_ROOT/infra/fuchsia/recipes/recipes/rust_toolchain.resources/generate_config.py \
        config_toml \
        --clang-prefix=$DEV_ROOT/clang \
        --host-sysroot=$DEV_ROOT/sysroot/linux \
@@ -98,7 +98,7 @@ Prior to building a custom Rust toolchain for Fuchsia, you need to do the follow
       | tee fuchsia-config.toml
 
    $DEV_ROOT/infra/fuchsia/prebuilt/tools/vpython3 \
-       $DEV_ROOT/infra/fuchsia/recipes/recipes/contrib/rust_toolchain.resources/generate_config.py \
+       $DEV_ROOT/infra/fuchsia/recipes/recipes/rust_toolchain.resources/generate_config.py \
          environment \
          --eval \
          --clang-prefix=$DEV_ROOT/clang \
@@ -135,7 +135,7 @@ Prior to building a custom Rust toolchain for Fuchsia, you need to do the follow
    ( source fuchsia-env.sh && ./x.py install --config fuchsia-config.toml ) && \
    rm -rf install/fuchsia-rust/lib/.build-id && \
    $DEV_ROOT/infra/fuchsia/prebuilt/tools/vpython3 \
-     $DEV_ROOT/infra/fuchsia/recipes/recipes/contrib/rust_toolchain.resources/generate_config.py \
+     $DEV_ROOT/infra/fuchsia/recipes/recipes/rust_toolchain.resources/generate_config.py \
        runtime \
      | $DEV_ROOT/infra/fuchsia/prebuilt/tools/vpython3 \
          $DEV_ROOT/infra/fuchsia/recipes/recipe_modules/toolchain/resources/runtimes.py \
