@@ -1392,21 +1392,19 @@ impl ObjectStore {
         &self,
         object_ids: impl std::iter::IntoIterator<Item = u64>,
         crypt: Option<Arc<dyn Crypt>>,
-    ) -> Result<Vec<CachingObjectHandle<DataObjectHandle<ObjectStore>>>, Error> {
+    ) -> Result<Vec<DataObjectHandle<ObjectStore>>, Error> {
         let parent_store = self.parent_store.as_ref().unwrap();
         let mut handles = Vec::new();
         let mut sizes = Vec::new();
         for object_id in object_ids {
-            let handle = CachingObjectHandle::new(
-                ObjectStore::open_object(
-                    &parent_store,
-                    object_id,
-                    HandleOptions::default(),
-                    crypt.clone(),
-                )
-                .await
-                .with_context(|| format!("Failed to open layer file {}", object_id))?,
-            );
+            let handle = ObjectStore::open_object(
+                &parent_store,
+                object_id,
+                HandleOptions::default(),
+                crypt.clone(),
+            )
+            .await
+            .with_context(|| format!("Failed to open layer file {}", object_id))?;
             sizes.push(handle.get_size());
             handles.push(handle);
         }

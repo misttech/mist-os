@@ -26,7 +26,7 @@ use {
             transaction::{
                 lock_keys, AllocatorMutation, AssocObj, LockKey, Mutation, Options, Transaction,
             },
-            tree, CachingObjectHandle, DirectWriter, HandleOptions, ObjectStore,
+            tree, DirectWriter, HandleOptions, ObjectStore,
         },
         range::RangeExt,
         round::{round_div, round_down},
@@ -715,16 +715,14 @@ impl SimpleAllocator {
             let mut handles = Vec::new();
             let mut total_size = 0;
             for object_id in &info.layers {
-                let handle = CachingObjectHandle::new(
-                    ObjectStore::open_object(
-                        &root_store,
-                        *object_id,
-                        HandleOptions::default(),
-                        None,
-                    )
-                    .await
-                    .context("Failed to open allocator layer file")?,
-                );
+                let handle = ObjectStore::open_object(
+                    &root_store,
+                    *object_id,
+                    HandleOptions::default(),
+                    None,
+                )
+                .await
+                .context("Failed to open allocator layer file")?;
                 total_size += handle.get_size();
                 handles.push(handle);
             }
@@ -1627,7 +1625,7 @@ impl JournalingObject for SimpleAllocator {
         );
         root_store.remove_from_graveyard(&mut transaction, object_id);
 
-        let layers = layers_from_handles([CachingObjectHandle::new(layer_object_handle)]).await?;
+        let layers = layers_from_handles([layer_object_handle]).await?;
         transaction
             .commit_with_callback(|_| {
                 self.tree.set_layers(layers);

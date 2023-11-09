@@ -3,14 +3,11 @@
 // found in the LICENSE file.
 
 use {
-    crate::{
-        object_handle::{ObjectHandle, ReadObjectHandle},
-        round::round_down,
-    },
+    crate::object_handle::{ObjectHandle, ReadObjectHandle},
     anyhow::Error,
     async_trait::async_trait,
     event_listener::{Event, EventListener},
-    std::{sync::RwLock, vec::Vec},
+    std::{cell::UnsafeCell, sync::RwLock, vec::Vec},
     storage_device::buffer::{Buffer, MutableBufferRef},
 };
 
@@ -25,7 +22,12 @@ fn block_aligned_size(source: &impl ReadObjectHandle) -> usize {
 /// An `ObjectHandle` that caches the data that it reads in from a `ReadObjectHandle`.
 pub struct CachingObjectHandle<S> {
     source: S,
-    inner: RwLock<Inner>,
+
+    // TODO(fxbug.dev/294080669): Add a way to purge chunks that haven't been recently used when
+    // under memory pressure.
+    buffer: UnsafeCell<Vec<u8>>,
+
+    chunk_states: RwLock<Vec<ChunkState>>,
 
     // Reads that are waiting on another read to load a chunk will wait on this event. There's only
     // 1 event for all chunks so a read may receive a notification for a different chunk than the
@@ -35,12 +37,8 @@ pub struct CachingObjectHandle<S> {
     event: Event,
 }
 
-struct Inner {
-    // TODO(fxbug.dev/294080669): Add a way to purge chunks that haven't been recently used when
-    // under memory pressure.
-    buffer: Vec<u8>,
-    chunk_states: Vec<ChunkState>,
-}
+// SAFETY: Only `buffer` isn't Sync. Access to `buffer` is synchronized with `chunk_states`.
+unsafe impl<S> Sync for CachingObjectHandle<S> {}
 
 impl<S: ReadObjectHandle> CachingObjectHandle<S> {
     pub fn new(source: S) -> Self {
@@ -51,56 +49,42 @@ impl<S: ReadObjectHandle> CachingObjectHandle<S> {
 
         Self {
             source,
+            buffer: UnsafeCell::new(vec![0; aligned_size]),
+            chunk_states: RwLock::new(vec![ChunkState::Missing; chunk_count]),
             event: Event::new(),
-            inner: RwLock::new(Inner {
-                buffer: vec![0; aligned_size],
-                chunk_states: vec![ChunkState::Missing; chunk_count],
-            }),
         }
     }
 
-    async fn read(&self, offset: usize, mut read_buf: &mut [u8]) -> Result<usize, Error> {
+    /// Reads in the required data from `source` and caches it. A slice into the cached data is
+    /// returned. The slice will be shorter than `length` when reading beyond the end of `source`.
+    pub async fn read(&self, offset: usize, length: usize) -> Result<&[u8], Error> {
         let source_size = self.source.get_size() as usize;
         if offset >= source_size {
-            return Ok(0);
+            return Ok(&[]);
         }
-        let read_len = if offset + read_buf.len() > source_size {
-            source_size - offset
-        } else {
-            read_buf.len()
-        };
+        let read_end = std::cmp::min(offset + length, source_size);
+        let first_chunk = offset / CHUNK_SIZE;
+        let last_chunk = read_end.div_ceil(CHUNK_SIZE);
 
-        // If the read spans multiple chunks that are missing then this will sequentially load each
-        // chunk. Loading multiple chunks in a single read rarely ever happens and the overhead of
-        // doing it in parallel isn't worth the slow down to the much more common cases of loading
-        // only 1 chunk or reading from already populated chunks.
-        for chunk in ChunkingIterator::new(offset, read_len) {
-            let (head, tail) = read_buf.split_at_mut(chunk.read_end - chunk.read_start);
-            read_buf = tail;
-            self.read_chunk(chunk, head).await?;
+        for chunk in first_chunk..last_chunk {
+            self.load_chunk(chunk).await?;
         }
-        Ok(read_len)
+        // SAFETY: All of the relevant chunks were loaded above which means that they are present
+        // and won't be modified again.
+        Ok(unsafe { &(&*self.buffer.get())[offset..read_end] })
     }
 
-    async fn read_chunk(
-        &self,
-        read_chunk: ChunkingIteratorChunk,
-        buf: &mut [u8],
-    ) -> Result<(), Error> {
-        debug_assert!(read_chunk.read_end - read_chunk.read_start == buf.len());
+    async fn load_chunk(&self, chunk_num: usize) -> Result<(), Error> {
         enum Action {
             Wait(EventListener),
             Load,
         }
         loop {
             let action = {
-                let inner = self.inner.read().unwrap();
-                match inner.chunk_states[read_chunk.chunk_num] {
+                let chunk_states = self.chunk_states.read().unwrap();
+                match chunk_states[chunk_num] {
                     ChunkState::Missing => Action::Load,
                     ChunkState::Present => {
-                        buf.copy_from_slice(
-                            &inner.buffer[read_chunk.read_start..read_chunk.read_end],
-                        );
                         return Ok(());
                     }
                     ChunkState::Pending => Action::Wait(self.event.listen()),
@@ -110,42 +94,47 @@ impl<S: ReadObjectHandle> CachingObjectHandle<S> {
                 Action::Wait(listener) => listener.await,
                 Action::Load => {
                     {
-                        let mut inner = self.inner.write().unwrap();
-                        if inner.chunk_states[read_chunk.chunk_num] != ChunkState::Missing {
+                        let mut chunk_states = self.chunk_states.write().unwrap();
+                        if chunk_states[chunk_num] != ChunkState::Missing {
                             // If the state changed between dropping the read lock and acquiring the
                             // write lock then go back to the start.
                             continue;
                         }
-                        inner.chunk_states[read_chunk.chunk_num] = ChunkState::Pending;
+                        chunk_states[chunk_num] = ChunkState::Pending;
                     }
                     // If this future is dropped or reading fails then put the chunk back into the
                     // `Missing` state.
                     let drop_guard = scopeguard::guard((), |_| {
                         {
-                            let mut inner = self.inner.write().unwrap();
-                            debug_assert!(
-                                inner.chunk_states[read_chunk.chunk_num] == ChunkState::Pending
-                            );
-                            inner.chunk_states[read_chunk.chunk_num] = ChunkState::Missing;
+                            let mut chunk_states = self.chunk_states.write().unwrap();
+                            debug_assert!(chunk_states[chunk_num] == ChunkState::Pending);
+                            chunk_states[chunk_num] = ChunkState::Missing;
                         }
-                        self.event.notify(usize::MAX)
+                        self.event.notify(usize::MAX);
                     });
 
-                    let read_start = read_chunk.chunk_num * CHUNK_SIZE;
+                    let read_start = chunk_num * CHUNK_SIZE;
                     let read_end =
                         std::cmp::min(read_start + CHUNK_SIZE, block_aligned_size(&self.source));
                     let mut read_buf = self.source.allocate_buffer(read_end - read_start);
                     let amount_read =
                         self.source.read(read_start as u64, read_buf.as_mut()).await?;
-                    read_buf.as_mut_slice()[amount_read..].fill(0);
+
+                    // SAFETY: This chunk is currently pending which prevents this chunk of the
+                    // buffer from being read. The chunk_states lock ensures that only 1 future can
+                    // put a chunk into the pending state at a time and that's the only future that
+                    // can be modifying this chunk of the buffer.
+                    unsafe {
+                        let buf = &mut *self.buffer.get();
+                        buf[read_start..(read_start + amount_read)]
+                            .copy_from_slice(&read_buf.as_slice()[..amount_read]);
+                        buf[(read_start + amount_read)..read_end].fill(0);
+                    };
 
                     {
-                        let mut inner = self.inner.write().unwrap();
-                        inner.buffer[read_start..read_end].copy_from_slice(read_buf.as_slice());
-                        buf.copy_from_slice(
-                            &inner.buffer[read_chunk.read_start..read_chunk.read_end],
-                        );
-                        inner.chunk_states[read_chunk.chunk_num] = ChunkState::Present;
+                        let mut chunk_states = self.chunk_states.write().unwrap();
+                        debug_assert!(chunk_states[chunk_num] == ChunkState::Pending);
+                        chunk_states[chunk_num] = ChunkState::Present;
                     }
                     self.event.notify(usize::MAX);
 
@@ -178,7 +167,10 @@ impl<S: ReadObjectHandle> ObjectHandle for CachingObjectHandle<S> {
 #[async_trait]
 impl<S: ReadObjectHandle> ReadObjectHandle for CachingObjectHandle<S> {
     async fn read(&self, offset: u64, mut buf: MutableBufferRef<'_>) -> Result<usize, Error> {
-        Self::read(self, offset as usize, buf.as_mut_slice()).await
+        let buf = buf.as_mut_slice();
+        let slice = self.read(offset as usize, buf.len()).await?;
+        buf[0..slice.len()].copy_from_slice(slice);
+        Ok(slice.len())
     }
 
     fn get_size(&self) -> u64 {
@@ -193,48 +185,10 @@ enum ChunkState {
     Pending,
 }
 
-/// An iterator that splits a range into smaller ranges along `CHUNK_SIZE` boundaries.
-struct ChunkingIterator {
-    read_start: usize,
-    read_len: usize,
-}
-
-impl ChunkingIterator {
-    fn new(start: usize, len: usize) -> Self {
-        Self { read_start: start, read_len: len }
-    }
-}
-
-#[derive(PartialEq, Eq, Debug)]
-struct ChunkingIteratorChunk {
-    chunk_num: usize,
-    read_start: usize,
-    read_end: usize,
-}
-
-impl Iterator for ChunkingIterator {
-    type Item = ChunkingIteratorChunk;
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.read_len == 0 {
-            return None;
-        }
-        let aligned_start = round_down(self.read_start, CHUNK_SIZE);
-        let next_start = aligned_start + CHUNK_SIZE;
-        let chunk = ChunkingIteratorChunk {
-            chunk_num: aligned_start / CHUNK_SIZE,
-            read_start: self.read_start,
-            read_end: std::cmp::min(next_start, self.read_start + self.read_len),
-        };
-        self.read_start = next_start;
-        self.read_len -= chunk.read_end - chunk.read_start;
-        Some(chunk)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use {
-        super::{CachingObjectHandle, ChunkingIterator, ChunkingIteratorChunk, CHUNK_SIZE},
+        super::{CachingObjectHandle, CHUNK_SIZE},
         crate::object_handle::{ObjectHandle, ReadObjectHandle},
         anyhow::Error,
         async_trait::async_trait,
@@ -249,80 +203,6 @@ mod tests {
             Device,
         },
     };
-
-    #[fuchsia::test]
-    fn test_chunking_iterator_first_whole_chunk() {
-        let elements: Vec<_> = ChunkingIterator::new(0, CHUNK_SIZE).collect();
-        assert_eq!(
-            elements,
-            [ChunkingIteratorChunk { chunk_num: 0, read_start: 0, read_end: CHUNK_SIZE }]
-        );
-    }
-
-    #[fuchsia::test]
-    fn test_chunking_iterator_multiple_whole_chunks() {
-        let elements: Vec<_> = ChunkingIterator::new(CHUNK_SIZE * 2, CHUNK_SIZE * 3).collect();
-        assert_eq!(
-            elements,
-            [
-                ChunkingIteratorChunk {
-                    chunk_num: 2,
-                    read_start: CHUNK_SIZE * 2,
-                    read_end: CHUNK_SIZE * 3
-                },
-                ChunkingIteratorChunk {
-                    chunk_num: 3,
-                    read_start: CHUNK_SIZE * 3,
-                    read_end: CHUNK_SIZE * 4
-                },
-                ChunkingIteratorChunk {
-                    chunk_num: 4,
-                    read_start: CHUNK_SIZE * 4,
-                    read_end: CHUNK_SIZE * 5
-                }
-            ]
-        );
-    }
-
-    #[fuchsia::test]
-    fn test_chunking_iterator_partial_chunk() {
-        let elements: Vec<_> = ChunkingIterator::new(CHUNK_SIZE / 4, CHUNK_SIZE / 2).collect();
-        assert_eq!(
-            elements,
-            [ChunkingIteratorChunk {
-                chunk_num: 0,
-                read_start: CHUNK_SIZE / 4,
-                read_end: CHUNK_SIZE / 4 * 3,
-            },]
-        );
-    }
-
-    #[fuchsia::test]
-    fn test_chunking_iterator_multiple_unaligned_chunks() {
-        let elements: Vec<_> =
-            ChunkingIterator::new(CHUNK_SIZE * 2 + CHUNK_SIZE / 4, CHUNK_SIZE * 2 + CHUNK_SIZE / 4)
-                .collect();
-        assert_eq!(
-            elements,
-            [
-                ChunkingIteratorChunk {
-                    chunk_num: 2,
-                    read_start: CHUNK_SIZE * 2 + CHUNK_SIZE / 4,
-                    read_end: CHUNK_SIZE * 3,
-                },
-                ChunkingIteratorChunk {
-                    chunk_num: 3,
-                    read_start: CHUNK_SIZE * 3,
-                    read_end: CHUNK_SIZE * 4
-                },
-                ChunkingIteratorChunk {
-                    chunk_num: 4,
-                    read_start: CHUNK_SIZE * 4,
-                    read_end: CHUNK_SIZE * 4 + CHUNK_SIZE / 2,
-                },
-            ]
-        );
-    }
 
     // Fills a buffer with a pattern seeded by counter.
     fn fill_buf(buf: &mut [u8], counter: u8) {
@@ -411,9 +291,8 @@ mod tests {
         source.start();
         let caching_object_handle = CachingObjectHandle::new(source);
 
-        let mut buf = vec![0; 4096];
-        assert_eq!(caching_object_handle.read(0, &mut buf).await.unwrap(), 4096);
-        assert_eq!(buf, make_buf(1, 4096));
+        let slice = caching_object_handle.read(0, 4096).await.unwrap();
+        assert_eq!(slice, make_buf(1, 4096));
     }
 
     #[fuchsia::test]
@@ -424,14 +303,12 @@ mod tests {
         let caching_object_handle = CachingObjectHandle::new(source);
 
         let expected = make_buf(1, 4096);
-        let mut buf1 = vec![0; 4096];
-        assert_eq!(caching_object_handle.read(0, &mut buf1).await.unwrap(), 4096);
-        assert_eq!(buf1, expected);
+        let slice = caching_object_handle.read(0, 4096).await.unwrap();
+        assert_eq!(slice, expected);
 
         // The chunk was already populated so this read receives the same value as the above read.
-        let mut buf2 = vec![0; 4096];
-        assert_eq!(caching_object_handle.read(0, &mut buf2).await.unwrap(), 4096);
-        assert_eq!(buf2, expected);
+        let slice = caching_object_handle.read(0, 4096).await.unwrap();
+        assert_eq!(slice, expected);
     }
 
     #[fuchsia::test]
@@ -440,30 +317,23 @@ mod tests {
         let source = FakeSource::new(device, 4096);
         let caching_object_handle = CachingObjectHandle::new(source);
 
-        let mut buf1 = vec![0; 4096];
-        let mut buf2 = vec![0; 4096];
-        {
-            let mut read_fut1 = std::pin::pin!(caching_object_handle.read(0, &mut buf1));
-            let mut read_fut2 = std::pin::pin!(caching_object_handle.read(0, &mut buf2));
+        let mut read_fut1 = std::pin::pin!(caching_object_handle.read(0, 4096));
+        let mut read_fut2 = std::pin::pin!(caching_object_handle.read(0, 4096));
 
-            // The first future will transition the chunk from `Missing` to `Pending` and then wait
-            // on the source.
-            assert!(futures::poll!(&mut read_fut1).is_pending());
-            // The second future will wait on the event.
-            assert!(futures::poll!(&mut read_fut2).is_pending());
-            caching_object_handle.source.start();
-            // Even though the source is ready the second future can't make progress.
-            assert!(futures::poll!(&mut read_fut2).is_pending());
-            // The first future reads from the source, transition the chunk from `Pending` to
-            // `Present`, and then notifies the event.
-            assert_eq!(read_fut1.await.unwrap(), 4096);
-            // The event has been notified and the second future can now complete.
-            assert_eq!(read_fut2.await.unwrap(), 4096);
-        }
-
+        // The first future will transition the chunk from `Missing` to `Pending` and then wait
+        // on the source.
+        assert!(futures::poll!(&mut read_fut1).is_pending());
+        // The second future will wait on the event.
+        assert!(futures::poll!(&mut read_fut2).is_pending());
+        caching_object_handle.source.start();
+        // Even though the source is ready the second future can't make progress.
+        assert!(futures::poll!(&mut read_fut2).is_pending());
+        // The first future reads from the source, transition the chunk from `Pending` to
+        // `Present`, and then notifies the event.
         let expected = make_buf(1, 4096);
-        assert_eq!(buf1, expected);
-        assert_eq!(buf2, expected);
+        assert_eq!(read_fut1.await.unwrap(), expected);
+        // The event has been notified and the second future can now complete.
+        assert_eq!(read_fut2.await.unwrap(), expected);
     }
 
     #[fuchsia::test]
@@ -472,40 +342,30 @@ mod tests {
         let source = FakeSource::new(device, CHUNK_SIZE + 4096);
         let caching_object_handle = CachingObjectHandle::new(source);
 
-        let mut buf1 = vec![0; 4096];
-        let mut buf2 = vec![0; 4096];
-        let mut buf3 = vec![0; 4096];
-        {
-            let mut read_fut1 = std::pin::pin!(caching_object_handle.read(0, &mut buf1));
-            let mut read_fut2 = std::pin::pin!(caching_object_handle.read(CHUNK_SIZE, &mut buf2));
-            let mut read_fut3 = std::pin::pin!(caching_object_handle.read(0, &mut buf3));
+        let mut read_fut1 = std::pin::pin!(caching_object_handle.read(0, 4096));
+        let mut read_fut2 = std::pin::pin!(caching_object_handle.read(CHUNK_SIZE, 4096));
+        let mut read_fut3 = std::pin::pin!(caching_object_handle.read(0, 4096));
 
-            // The first and second futures will transition their chunks from `Missing` to `Pending`
-            // and then wait on the source.
-            assert!(futures::poll!(&mut read_fut1).is_pending());
-            assert!(futures::poll!(&mut read_fut2).is_pending());
-            // The third future will wait on the event.
-            assert!(futures::poll!(&mut read_fut3).is_pending());
-            caching_object_handle.source.start();
-            // Even though the source is ready the third future can't make progress.
-            assert!(futures::poll!(&mut read_fut3).is_pending());
-            // The second future will read from the source and notify the event.
-            assert_eq!(read_fut2.await.unwrap(), 4096);
-            // The event was notified but the first chunk is still `Pending` so the third future
-            // resumes waiting.
-            assert!(futures::poll!(&mut read_fut3).is_pending());
-            // The first future will read from the source, transition the first chunk to `Present`,
-            // and notify the event.
-            assert_eq!(read_fut1.await.unwrap(), 4096);
-            // The first chunk is now present so the third future can complete.
-            assert_eq!(read_fut3.await.unwrap(), 4096);
-        }
-
-        let expected1 = make_buf(1, 4096);
-        let expected2 = make_buf(2, 4096);
-        assert_eq!(buf1, expected1);
-        assert_eq!(buf2, expected2);
-        assert_eq!(buf3, expected1);
+        // The first and second futures will transition their chunks from `Missing` to `Pending`
+        // and then wait on the source.
+        assert!(futures::poll!(&mut read_fut1).is_pending());
+        assert!(futures::poll!(&mut read_fut2).is_pending());
+        // The third future will wait on the event.
+        assert!(futures::poll!(&mut read_fut3).is_pending());
+        caching_object_handle.source.start();
+        // Even though the source is ready the third future can't make progress.
+        assert!(futures::poll!(&mut read_fut3).is_pending());
+        // The second future will read from the source and notify the event.
+        assert_eq!(read_fut2.await.unwrap(), make_buf(2, 4096));
+        // The event was notified but the first chunk is still `Pending` so the third future
+        // resumes waiting.
+        assert!(futures::poll!(&mut read_fut3).is_pending());
+        // The first future will read from the source, transition the first chunk to `Present`,
+        // and notify the event.
+        let expected = make_buf(1, 4096);
+        assert_eq!(read_fut1.await.unwrap(), expected);
+        // The first chunk is now present so the third future can complete.
+        assert_eq!(read_fut3.await.unwrap(), expected);
     }
 
     #[fuchsia::test]
@@ -514,34 +374,24 @@ mod tests {
         let source = FakeSource::new(device, 4096);
         let caching_object_handle = CachingObjectHandle::new(source);
 
-        let mut buf1 = vec![0; 4096];
-        let mut buf2 = vec![0; 4096];
+        let mut read_fut2 = std::pin::pin!(caching_object_handle.read(0, 4096));
         {
-            let mut read_fut2 = std::pin::pin!(caching_object_handle.read(0, &mut buf2));
-            {
-                let mut read_fut1 = std::pin::pin!(caching_object_handle.read(0, &mut buf1));
+            let mut read_fut1 = std::pin::pin!(caching_object_handle.read(0, 4096));
 
-                // The first future will transition the chunk from `Missing` to `Pending` and then
-                // wait on the source.
-                assert!(futures::poll!(&mut read_fut1).is_pending());
-                // The second future will wait on the event.
-                assert!(futures::poll!(&mut read_fut2).is_pending());
-                caching_object_handle.source.start();
-                // Even though the source is ready the second future can't make progress.
-                assert!(futures::poll!(&mut read_fut2).is_pending());
-            }
-            // The first future was dropped which transitioned the chunk from `Pending` to `Missing`
-            // and notified the event. When the second future is polled it transitions the chunk
-            // from `Missing` back to `Pending`, reads from the source, and then transitions the
-            // chunk to `Present`.
-            assert_eq!(read_fut2.await.unwrap(), 4096);
+            // The first future will transition the chunk from `Missing` to `Pending` and then
+            // wait on the source.
+            assert!(futures::poll!(&mut read_fut1).is_pending());
+            // The second future will wait on the event.
+            assert!(futures::poll!(&mut read_fut2).is_pending());
+            caching_object_handle.source.start();
+            // Even though the source is ready the second future can't make progress.
+            assert!(futures::poll!(&mut read_fut2).is_pending());
         }
-
-        // The first future didn't complete so it's buffer wasn't modified.
-        assert_eq!(buf1, vec![0; 4096]);
-        // The second future completed and it shows that the chunk was populated from the second
-        // read on the source.
-        assert_eq!(buf2, make_buf(2, 4096));
+        // The first future was dropped which transitioned the chunk from `Pending` to `Missing`
+        // and notified the event. When the second future is polled it transitions the chunk
+        // from `Missing` back to `Pending`, reads from the source, and then transitions the
+        // chunk to `Present`.
+        assert_eq!(read_fut2.await.unwrap(), make_buf(2, 4096));
     }
 
     #[fuchsia::test]
@@ -551,9 +401,8 @@ mod tests {
         source.start();
         let caching_object_handle = CachingObjectHandle::new(source);
 
-        let mut buf = vec![3; 10];
-        assert_eq!(caching_object_handle.read(500, &mut buf).await.unwrap(), 0);
-        assert_eq!(buf, vec![3; 10]);
+        let slice = caching_object_handle.read(500, 10).await.unwrap();
+        assert!(slice.is_empty());
     }
 
     #[fuchsia::test]
@@ -565,10 +414,8 @@ mod tests {
         source.start();
         let caching_object_handle = CachingObjectHandle::new(source);
 
-        let mut buf = vec![3; READ_SIZE];
-        assert_eq!(caching_object_handle.read(0, &mut buf).await.unwrap(), SOURCE_SIZE);
-        assert_eq!(buf[..SOURCE_SIZE], make_buf(1, SOURCE_SIZE));
-        assert_eq!(buf[SOURCE_SIZE..], vec![3; READ_SIZE - SOURCE_SIZE]);
+        let slice = caching_object_handle.read(0, READ_SIZE).await.unwrap();
+        assert_eq!(slice, make_buf(1, SOURCE_SIZE));
     }
 
     #[fuchsia::test]
@@ -579,10 +426,9 @@ mod tests {
         source.start();
         let caching_object_handle = CachingObjectHandle::new(source);
 
-        let mut buf = vec![0; SOURCE_SIZE];
-        assert_eq!(caching_object_handle.read(0, &mut buf).await.unwrap(), SOURCE_SIZE);
-        assert_eq!(buf[0..CHUNK_SIZE], make_buf(1, CHUNK_SIZE));
-        assert_eq!(buf[CHUNK_SIZE..SOURCE_SIZE], make_buf(2, SOURCE_SIZE - CHUNK_SIZE));
+        let slice = caching_object_handle.read(0, SOURCE_SIZE).await.unwrap();
+        assert_eq!(slice[0..CHUNK_SIZE], make_buf(1, CHUNK_SIZE));
+        assert_eq!(slice[CHUNK_SIZE..SOURCE_SIZE], make_buf(2, SOURCE_SIZE - CHUNK_SIZE));
     }
 
     #[fuchsia::test]
@@ -592,7 +438,28 @@ mod tests {
         source.start();
         let caching_object_handle = CachingObjectHandle::new(source);
 
-        let mut buf = vec![0; 10];
-        assert_eq!(caching_object_handle.read(0, &mut buf).await.unwrap(), 0);
+        let slice = caching_object_handle.read(0, 10).await.unwrap();
+        assert!(slice.is_empty());
+    }
+
+    #[fuchsia::test]
+    async fn test_read_with_read_object_handle() {
+        let device = Arc::new(FakeDevice::new(1024, 512));
+        let source = FakeSource::new(device.clone(), CHUNK_SIZE + 8192);
+        source.start();
+        let caching_object_handle = CachingObjectHandle::new(source);
+
+        let mut buf = device.allocate_buffer(4096);
+        assert_eq!(
+            ReadObjectHandle::read(
+                &caching_object_handle,
+                (CHUNK_SIZE + 4096) as u64,
+                buf.as_mut()
+            )
+            .await
+            .unwrap(),
+            4096
+        );
+        assert_eq!(buf.as_slice(), make_buf(1, 4096));
     }
 }

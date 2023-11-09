@@ -20,8 +20,8 @@ use {
             object_manager::{ObjectManager, ReservationUpdate},
             object_record::{ObjectKey, ObjectValue},
             transaction::{lock_keys, AssociatedObject, LockKey, Mutation},
-            tree, AssocObj, CachingObjectHandle, DirectWriter, EncryptedMutations, HandleOptions,
-            LockState, ObjectStore, Options, StoreInfo, Transaction, MAX_ENCRYPTED_MUTATIONS_SIZE,
+            tree, AssocObj, DirectWriter, EncryptedMutations, HandleOptions, LockState,
+            ObjectStore, Options, StoreInfo, Transaction, MAX_ENCRYPTED_MUTATIONS_SIZE,
         },
         serialized_types::{Version, VersionedLatest},
         trace_duration,
@@ -214,8 +214,7 @@ impl ObjectStore {
         transaction.commit().await?;
         let (layers_to_keep, old_layers) = tree::flush(&self.tree, writer).await?;
 
-        let mut new_layers =
-            layers_from_handles([CachingObjectHandle::new(new_object_tree_layer)]).await?;
+        let mut new_layers = layers_from_handles([new_object_tree_layer]).await?;
         new_layers.extend(layers_to_keep.iter().map(|l| (*l).clone()));
 
         new_store_info.layers = Vec::new();

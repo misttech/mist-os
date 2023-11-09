@@ -44,7 +44,8 @@ use {
         lsm_tree::types::{
             BoxedLayerIterator, Item, ItemRef, Key, Layer, LayerIterator, LayerWriter, Value,
         },
-        object_handle::{ReadObjectHandle, WriteBytes},
+        object_handle::{ObjectHandle, ReadObjectHandle, WriteBytes},
+        object_store::CachingObjectHandle,
         round::{how_many, round_down, round_up},
         serialized_types::{
             Version, Versioned, VersionedLatest, INTERBLOCK_SEEK_VERSION, LATEST_VERSION,
@@ -84,7 +85,7 @@ pub struct LayerInfo {
 /// Implements a very primitive persistent layer where items are packed into blocks and searching
 /// for items is done via a simple binary search.
 pub struct SimplePersistentLayer {
-    object_handle: Box<dyn ReadObjectHandle>,
+    object_handle: CachingObjectHandle<Box<dyn ReadObjectHandle>>,
     layer_info: LayerInfo,
     size: u64,
     seek_table: Option<Vec<u64>>,
@@ -92,16 +93,15 @@ pub struct SimplePersistentLayer {
 }
 
 struct BufferCursor<'a> {
-    buffer: Buffer<'a>,
+    buffer: &'a [u8],
     pos: usize,
-    len: usize,
 }
 
 impl std::io::Read for BufferCursor<'_> {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        let to_read = std::cmp::min(buf.len(), self.len.saturating_sub(self.pos));
+        let to_read = std::cmp::min(buf.len(), self.buffer.len().saturating_sub(self.pos));
         if to_read > 0 {
-            buf[..to_read].copy_from_slice(&self.buffer.as_slice()[self.pos..self.pos + to_read]);
+            buf[..to_read].copy_from_slice(&self.buffer[self.pos..self.pos + to_read]);
             self.pos += to_read;
         }
         Ok(to_read)
@@ -134,11 +134,7 @@ impl<K: Key, V: Value> Iterator<'_, K, V> {
     fn new<'iter>(layer: &'iter SimplePersistentLayer, pos: u64) -> Iterator<'iter, K, V> {
         Iterator {
             layer,
-            buffer: BufferCursor {
-                buffer: layer.object_handle.allocate_buffer(layer.layer_info.block_size as usize),
-                pos: 0,
-                len: 0,
-            },
+            buffer: BufferCursor { buffer: &[], pos: 0 },
             pos,
             item_index: 0,
             item_count: 0,
@@ -179,14 +175,13 @@ impl<'iter, K: Key, V: Value> LayerIterator<K, V> for Iterator<'iter, K, V> {
                 self.item = None;
                 return Ok(());
             }
-            let len = self
+            self.buffer.buffer = self
                 .layer
                 .object_handle
-                .read(self.pos, self.buffer.buffer.as_mut())
+                .read(self.pos as usize, self.layer.layer_info.block_size as usize)
                 .await
                 .context("Reading during advance")?;
             self.buffer.pos = 0;
-            self.buffer.len = len;
             debug!(
                 pos = self.pos,
                 object_size = self.layer.size,
@@ -333,7 +328,7 @@ impl SimplePersistentLayer {
         let (seek_table, data_size) = parse_seek_table(&object_handle, &layer_info, buffer).await?;
 
         Ok(Arc::new(SimplePersistentLayer {
-            object_handle: Box::new(object_handle),
+            object_handle: CachingObjectHandle::new(Box::new(object_handle)),
             layer_info,
             size: data_size,
             seek_table,
@@ -345,7 +340,7 @@ impl SimplePersistentLayer {
 #[async_trait]
 impl<K: Key, V: Value> Layer<K, V> for SimplePersistentLayer {
     fn handle(&self) -> Option<&dyn ReadObjectHandle> {
-        Some(self.object_handle.as_ref())
+        Some(&self.object_handle)
     }
 
     async fn seek<'a>(&'a self, bound: Bound<&K>) -> Result<BoxedLayerIterator<'a, K, V>, Error> {

@@ -6,6 +6,7 @@ use {
     crate::object_store::{PosixAttributes, Timestamp},
     anyhow::Error,
     async_trait::async_trait,
+    std::{future::Future, pin::Pin},
     storage_device::buffer::{Buffer, BufferRef, MutableBufferRef},
 };
 
@@ -96,4 +97,42 @@ pub trait WriteBytes {
     /// Moves the offset forward by `amount`, which will result in zeroes in the output stream, even
     /// if no other data is appended to it.
     async fn skip(&mut self, amount: u64) -> Result<(), Error>;
+}
+
+impl ReadObjectHandle for Box<dyn ReadObjectHandle> {
+    // Manual expansion of `async_trait` to avoid double boxing the `Future`.
+    fn read<'a, 'b, 'c>(
+        &'a self,
+        offset: u64,
+        buf: MutableBufferRef<'b>,
+    ) -> Pin<Box<dyn Future<Output = Result<usize, Error>> + Send + 'c>>
+    where
+        'a: 'c,
+        'b: 'c,
+        Self: 'c,
+    {
+        (**self).read(offset, buf)
+    }
+
+    fn get_size(&self) -> u64 {
+        (**self).get_size()
+    }
+}
+
+impl ObjectHandle for Box<dyn ReadObjectHandle> {
+    fn object_id(&self) -> u64 {
+        (**self).object_id()
+    }
+
+    fn block_size(&self) -> u64 {
+        (**self).block_size()
+    }
+
+    fn allocate_buffer(&self, size: usize) -> Buffer<'_> {
+        (**self).allocate_buffer(size)
+    }
+
+    fn set_trace(&self, v: bool) {
+        (**self).set_trace(v)
+    }
 }
