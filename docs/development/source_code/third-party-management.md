@@ -1,4 +1,4 @@
-# Adding third-party code to Fuchsia
+# Third-party source code management
 
 Third-party code is part of the Fuchsia checkout but is neither copyrighted by
 the Fuchsia authors nor subject to Fuchsia's [license]. In other words, any code
@@ -115,8 +115,7 @@ add complexity to common global maintenance tasks such as:
 
 Please exercise careful deliberation when stepping off the beaten path.
 
-
-# Migrating legacy third-party code to current layout
+## Migrating legacy third-party code to current layout
 
 Bringing all the existing //third_party code to the layout documented above
 is WIP, and contributions are welcome.
