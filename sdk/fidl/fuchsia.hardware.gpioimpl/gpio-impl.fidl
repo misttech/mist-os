@@ -6,6 +6,18 @@ library fuchsia.hardware.gpioimpl;
 using fuchsia.hardware.gpio;
 using zx;
 
+
+const MAX_GPIO_NAME_LEN uint32 = 64;
+
+type Pin = struct {
+    /// An identifying number for this pin, set by the GPIO core driver as the fuchsia.BIND_GPIO_PIN
+    /// bind property. Must be unique for this GPIO controller.
+    pin uint32;
+    /// A human-readable, informational name for this pin. Optional, but helpful for manual testing
+    /// purposes.
+    name string:<MAX_GPIO_NAME_LEN, optional>;
+};
+
 @transport("Driver")
 open protocol GpioImpl {
     /// Configures a GPIO for input.
@@ -77,6 +89,30 @@ open protocol GpioImpl {
     strict ReleaseInterrupt(struct {
         index uint32;
     }) -> () error zx.Status;
+
+    /// Returns a vector of pins on this controller to be exposed by the GPIO core driver.
+    strict GetPins() -> (struct {
+        pins vector<Pin>:MAX;
+    });
+
+    /// Returns a vector of initialization steps to be performed by the GPIO core driver in its
+    /// start hook. Steps are processed sequentially in the order that they appear in the vector. If
+    /// no steps are provided, the core driver does not add an init device.
+    strict GetInitSteps() -> (struct {
+        steps vector<InitStep>:MAX;
+    });
+
+    /// Returns a number that uniquely identifies this GPIO controller device. The GPIO core driver
+    /// will use this to create bind properties for pin devices so that controllers can have
+    /// overlapping pin numbers. Thus, every (controller, pin) combination will identify at most one
+    /// pin device.
+    ///
+    /// On platforms that will only ever have one GPIO controller device, or that will not have
+    /// overlapping pin numbers across devices, this method can just return some hardcoded value.
+    /// Otherwise, a value such as the controller's devicetree phandle could be returned.
+    strict GetControllerId() -> (struct {
+        controller_id uint32;
+    });
 };
 
 service Service {

@@ -35,6 +35,9 @@ class TiTca6408a : public fdf::Server<fuchsia_hardware_gpioimpl::GpioImpl> {
   void GetInterrupt(GetInterruptRequest& request, GetInterruptCompleter::Sync& completer) override;
   void ReleaseInterrupt(ReleaseInterruptRequest& request,
                         ReleaseInterruptCompleter::Sync& completer) override;
+  void GetPins(GetPinsCompleter::Sync& completer) override;
+  void GetInitSteps(GetInitStepsCompleter::Sync& completer) override;
+  void GetControllerId(GetControllerIdCompleter::Sync& completer) override;
 
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_hardware_gpioimpl::GpioImpl> metadata,

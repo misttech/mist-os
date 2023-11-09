@@ -75,6 +75,9 @@ class MockGpioImplFidl : public fdf::WireServer<fuchsia_hardware_gpioimpl::GpioI
                     fdf::Arena& arena, GetInterruptCompleter::Sync& completer) override {}
   void ReleaseInterrupt(fuchsia_hardware_gpioimpl::wire::GpioImplReleaseInterruptRequest* request,
                         fdf::Arena& arena, ReleaseInterruptCompleter::Sync& completer) override {}
+  void GetPins(fdf::Arena& arena, GetPinsCompleter::Sync& completer) override {}
+  void GetInitSteps(fdf::Arena& arena, GetInitStepsCompleter::Sync& completer) override {}
+  void GetControllerId(fdf::Arena& arena, GetControllerIdCompleter::Sync& completer) override {}
 };
 
 class GpioTest : public zxtest::Test {

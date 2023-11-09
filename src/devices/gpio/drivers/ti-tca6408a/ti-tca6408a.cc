@@ -309,6 +309,12 @@ void TiTca6408a::SetPolarity(SetPolarityRequest& request, SetPolarityCompleter::
   completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
 }
 
+void TiTca6408a::GetPins(GetPinsCompleter::Sync& completer) {}
+
+void TiTca6408a::GetInitSteps(GetInitStepsCompleter::Sync& completer) {}
+
+void TiTca6408a::GetControllerId(GetControllerIdCompleter::Sync& completer) {}
+
 zx::result<uint8_t> TiTca6408a::ReadBit(Register reg, uint32_t index) {
   const auto bit = static_cast<uint8_t>(1 << (index - pin_index_offset_));
   const auto address = static_cast<uint8_t>(reg);
