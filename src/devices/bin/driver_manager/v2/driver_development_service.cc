@@ -77,7 +77,9 @@ zx::result<fdd::wire::DeviceInfo> CreateDeviceInfo(fidl::AnyArena& allocator,
     auto result = driver_host->GetProcessKoid();
     if (result.is_error()) {
       // ZX_ERR_SHOULD_WAIT means the driver host hasn't been fully connected to yet.
-      if (result.error_value() != ZX_ERR_SHOULD_WAIT) {
+      // ZX_ERR_PEER_CLOSED means the host closed while we tried to query it.
+      if (result.error_value() != ZX_ERR_SHOULD_WAIT &&
+          result.error_value() != ZX_ERR_PEER_CLOSED) {
         LOGF(ERROR, "Failed to get the process KOID of a driver host: %s",
              zx_status_get_string(result.status_value()));
         return zx::error(result.status_value());
