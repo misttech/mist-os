@@ -250,7 +250,10 @@ impl Kernel {
 
         let core_dumps = CoreDumpList::new(inspect_node.create_child("coredumps"));
 
-        let security_server = if features.selinux { Some(SecurityServer::new()) } else { None };
+        let security_server = match features.selinux {
+            Some(mode) => Some(SecurityServer::new(mode)),
+            _ => None,
+        };
 
         let this = Arc::new(Kernel {
             kthreads: KernelThreads::default(),
@@ -436,8 +439,11 @@ impl Kernel {
         Ok(client_end)
     }
 
-    pub fn mock_selinux(&self) -> bool {
-        self.features.mock_selinux
+    /// Returns true if SELinux is enabled with a hard-coded fake policy.
+    /// This is a temporary API, for use at call-sites which the SELinux
+    /// implementation does not yet support.
+    pub fn has_fake_selinux(&self) -> bool {
+        self.security_server.as_ref().map_or(false, |s| s.is_fake())
     }
 
     fn get_thread_groups_inspect(&self) -> fuchsia_inspect::Inspector {

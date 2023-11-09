@@ -652,11 +652,17 @@ impl Kernel {
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
                 options,
             )?,
-            b"selinuxfs" => selinux_fs(self, options).clone(),
+            b"selinuxfs" => {
+                if self.security_server.is_some() {
+                    selinux_fs(self, options).clone()
+                } else {
+                    return error!(ENODEV, String::from_utf8_lossy(fs_type));
+                }
+            }
             b"sysfs" => sys_fs(self, options).clone(),
             b"tmpfs" => {
                 let fs = TmpFs::new_fs_with_options(self, options)?;
-                if self.mock_selinux() {
+                if self.has_fake_selinux() {
                     let label = b"u:object_r:tmpfs:s0";
                     fs.selinux_context.set(label.to_vec()).unwrap();
                 }

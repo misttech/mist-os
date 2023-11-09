@@ -13,6 +13,7 @@ use crate::{
 use anyhow::{anyhow, Context, Error};
 use bstr::BString;
 use fuchsia_zircon as zx;
+use selinux::security_server;
 use std::sync::Arc;
 
 use fidl_fuchsia_sysinfo as fsysinfo;
@@ -24,9 +25,8 @@ use fidl_fuchsia_ui_views as fuiviews;
 /// A collection of parsed features, and their arguments.
 #[derive(Default, Debug)]
 pub struct Features {
-    pub mock_selinux: bool,
-
-    pub selinux: bool,
+    /// Configures whether SELinux is fully enabled, faked, or unavailable.
+    pub selinux: Option<security_server::Mode>,
 
     pub framebuffer: bool,
 
@@ -80,7 +80,10 @@ pub fn parse_features(entries: &Vec<String>) -> Result<Features, Error> {
             ("custom_artifacts", _) => features.custom_artifacts = true,
             ("framebuffer", _) => features.framebuffer = true,
             ("magma", _) => features.magma = true,
-            ("mock_selinux", _) => features.mock_selinux = true,
+
+            // TODO(b/304518554): Remove this old synonym.
+            ("mock_selinux", _) => features.selinux = Some(security_server::Mode::Fake),
+
             ("perfetto", Some(socket_path)) => {
                 features.perfetto = Some(socket_path.to_string());
             }
@@ -88,8 +91,18 @@ pub fn parse_features(entries: &Vec<String>) -> Result<Features, Error> {
                 return Err(anyhow!("Perfetto feature must contain a socket path"));
             }
             ("self_profile", _) => features.self_profile = true,
-            ("selinux", _) => features.selinux = true,
-            ("selinux_enabled", _) => features.mock_selinux = true,
+            ("selinux", mode_arg) => features.selinux = match mode_arg.as_ref() {
+                Some(mode) => if mode == "fake" {
+                    Some(security_server::Mode::Fake)
+                } else {
+                    return Err(anyhow!("Invalid SELinux mode"));
+                },
+                None => Some(security_server::Mode::Enable),
+            },
+
+            // TODO(b/304518554): Remove this old synonym.
+            ("selinux_enabled", _) => features.selinux = Some(security_server::Mode::Fake),
+
             ("test_data", _) => features.test_data = true,
             (f, _) => {
                 return Err(anyhow!("Unsupported feature: {}", f));

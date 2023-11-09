@@ -6,6 +6,14 @@ use crate::{AccessVector, ObjectClass, SecurityContext, SecurityId};
 use starnix_lock::Mutex;
 use std::{collections::HashMap, sync::Arc};
 
+/// Specifies whether the implementation should be fully functional, or provide
+/// only hard-coded fake information.
+#[derive(Copy, Clone, Debug)]
+pub enum Mode {
+    Enable,
+    Fake,
+}
+
 pub struct SecurityServerState {
     // TODO(http://b/308175643): reference count SIDs, so that when the last SELinux object
     // referencing a SID gets destroyed, the entry is removed from the map.
@@ -13,14 +21,19 @@ pub struct SecurityServerState {
 }
 
 pub struct SecurityServer {
+    /// Determines whether the security server is enabled, or only provides
+    /// a hard-coded set of fake responses.
+    mode: Mode,
+
     /// The mutable state of the security server.
     state: Mutex<SecurityServerState>,
 }
 
 impl SecurityServer {
-    pub fn new() -> Arc<SecurityServer> {
+    pub fn new(mode: Mode) -> Arc<SecurityServer> {
         // TODO(http://b/304732283): initialize the access vector cache.
-        Arc::new(SecurityServer { state: Mutex::new(SecurityServerState { sids: HashMap::new() }) })
+        let state = Mutex::new(SecurityServerState { sids: HashMap::new() });
+        Arc::new(SecurityServer { mode, state })
     }
 
     /// Returns the security ID mapped to `security_context`, creating it if it does not exist.
@@ -55,6 +68,14 @@ impl SecurityServer {
         // allows all permissions.
         AccessVector::ALL
     }
+
+    /// Returns true if the `SecurityServer` is using hard-code fake policy.
+    pub fn is_fake(&self) -> bool {
+        match self.mode {
+            Mode::Fake => true,
+            _ => false,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -64,7 +85,7 @@ mod tests {
     #[fuchsia::test]
     fn sid_to_security_context() {
         let security_context = SecurityContext::from("u:unconfined_r:unconfined_t");
-        let security_server = SecurityServer::new();
+        let security_server = SecurityServer::new(Mode::Enable);
         let sid = security_server.security_context_to_sid(&security_context);
         assert_eq!(
             security_server.sid_to_security_context(&sid).expect("sid not found"),
@@ -76,7 +97,7 @@ mod tests {
     fn sids_for_different_security_contexts_differ() {
         let security_context1 = SecurityContext::from("u:object_r:file_t");
         let security_context2 = SecurityContext::from("u:unconfined_r:unconfined_t");
-        let security_server = SecurityServer::new();
+        let security_server = SecurityServer::new(Mode::Enable);
         let sid1 = security_server.security_context_to_sid(&security_context1);
         let sid2 = security_server.security_context_to_sid(&security_context2);
         assert_ne!(sid1, sid2);
@@ -87,7 +108,7 @@ mod tests {
         let security_context_str = "u:unconfined_r:unconfined_t";
         let security_context1 = SecurityContext::from(security_context_str);
         let security_context2 = SecurityContext::from(security_context_str);
-        let security_server = SecurityServer::new();
+        let security_server = SecurityServer::new(Mode::Enable);
         let sid1 = security_server.security_context_to_sid(&security_context1);
         let sid2 = security_server.security_context_to_sid(&security_context2);
         assert_eq!(sid1, sid2);
@@ -98,12 +119,21 @@ mod tests {
     fn compute_access_vector_allows_all() {
         let security_context1 = SecurityContext::from("u:object_r:file_t");
         let security_context2 = SecurityContext::from("u:unconfined_r:unconfined_t");
-        let security_server = SecurityServer::new();
+        let security_server = SecurityServer::new(Mode::Enable);
         let sid1 = security_server.security_context_to_sid(&security_context1);
         let sid2 = security_server.security_context_to_sid(&security_context2);
         assert_eq!(
             security_server.compute_access_vector(sid1, sid2, ObjectClass::Process),
             AccessVector::ALL
         );
+    }
+
+    #[fuchsia::test]
+    fn fake_security_server_is_fake() {
+        let security_server = SecurityServer::new(Mode::Enable);
+        assert_eq!(security_server.is_fake(), false);
+
+        let fake_security_server = SecurityServer::new(Mode::Fake);
+        assert_eq!(fake_security_server.is_fake(), true);
     }
 }
