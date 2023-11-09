@@ -9,17 +9,16 @@
 
 use {
     crate::{
-        builtin::{capability::BuiltinCapability, runner::BuiltinRunnerFactory},
+        builtin::runner::BuiltinRunnerFactory,
         model::resolver::{self, Resolver},
     },
+    ::routing::policy::ScopedPolicyChecker,
     ::routing::resolving::{ComponentAddress, ResolvedComponent, ResolverError},
-    ::routing::{capability_source::InternalCapability, policy::ScopedPolicyChecker},
     anyhow::Error,
     async_trait::async_trait,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_component_runner as fcrunner,
     fuchsia_component::client as fclient,
-    futures::TryStreamExt,
     std::convert::TryInto,
     std::sync::Arc,
 };
@@ -107,41 +106,6 @@ impl Resolver for RealmBuilderResolver {
             config_values,
             abi_revision: abi_revision.map(Into::into),
         })
-    }
-}
-
-#[async_trait]
-impl BuiltinCapability for RealmBuilderResolver {
-    const NAME: &'static str = "realm_builder_resolver";
-    type Marker = fresolution::ResolverMarker;
-
-    async fn serve(
-        self: Arc<Self>,
-        mut stream: fresolution::ResolverRequestStream,
-    ) -> Result<(), Error> {
-        while let Some(request) = stream.try_next().await? {
-            match request {
-                fresolution::ResolverRequest::Resolve { component_url, responder } => {
-                    responder.send(self.resolve_async(&component_url, None).await)?;
-                }
-                fresolution::ResolverRequest::ResolveWithContext {
-                    component_url,
-                    context,
-                    responder,
-                } => {
-                    responder.send(self.resolve_async(&component_url, Some(&context)).await)?;
-                }
-            }
-        }
-        Ok(())
-    }
-
-    fn matches_routed_capability(&self, capability: &InternalCapability) -> bool {
-        let res = match capability {
-            InternalCapability::Resolver(name) if *name == Self::NAME => true,
-            _ => false,
-        };
-        res
     }
 }
 
