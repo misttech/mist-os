@@ -43,9 +43,9 @@ class FuchsiaPowerBaseTest(fuchsia_hybrid_base_test.FuchsiaHybridBaseTest):
         super().__init__(config)
         self._metrics = {
             "sampleCount": 0,
-            "avgPower": 0,
-            "minPower": float("inf"),
             "maxPower": float("-inf"),
+            "meanPower": 0,
+            "minPower": float("inf"),
         }
 
     def _find_measurepower_path(self):
@@ -118,9 +118,9 @@ class FuchsiaPowerBaseTest(fuchsia_hybrid_base_test.FuchsiaHybridBaseTest):
         power = voltage * current * 1e-3  # in Watts
         self._metrics = {
             "sampleCount": n,
-            "avgPower": self._avg(m["avgPower"], power, n),
-            "minPower": min(m["minPower"], power),
             "maxPower": max(m["maxPower"], power),
+            "meanPower": self._avg(m["meanPower"], power, n),
+            "minPower": min(m["minPower"], power),
         }
 
     def _power_metric(self):
@@ -137,22 +137,16 @@ class FuchsiaPowerBaseTest(fuchsia_hybrid_base_test.FuchsiaHybridBaseTest):
         suite = f"fuchsia.power.{self._power_metric()}"
         result = [
             {
-                "label": "SampleCount",
-                "test_suite": suite,
-                "unit": "count_biggerIsBetter",
-                "values": [m["sampleCount"]],
-            },
-            {
-                "label": "AvgPower",
-                "test_suite": suite,
-                "unit": "Watts",
-                "values": [m["avgPower"]],
-            },
-            {
                 "label": "MinPower",
                 "test_suite": suite,
                 "unit": "Watts",
                 "values": [m["minPower"]],
+            },
+            {
+                "label": "MeanPower",
+                "test_suite": suite,
+                "unit": "Watts",
+                "values": [m["meanPower"]],
             },
             {
                 "label": "MaxPower",
