@@ -397,6 +397,11 @@ class FuchsiaDevice(
         Returns:
             Bytes containing snapshot data as a zip archive.
         """
+        # Ensure device is healthy and ready to send FIDL requests before
+        # sending snapshot command.
+        self.fuchsia_controller.create_context()
+        self.health_check()
+
         channel_server, channel_client = fcp.Channel.create()
         params = f_feedback.GetSnapshotParameters(
             # Set timeout to 2 minutes in nanoseconds.

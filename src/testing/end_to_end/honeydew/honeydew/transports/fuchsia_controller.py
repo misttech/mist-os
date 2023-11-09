@@ -64,6 +64,13 @@ class FuchsiaController:
             # "daemon.autostart" to "false".
             config["daemon.autostart"] = "false"
 
+            msg: str = (
+                f"Creating Fuchsia-Controller Context with "
+                f"target='{self._name}', config='{config}'"
+            )
+            if isolate_dir:
+                msg = f"{msg}, isolate_dir={isolate_dir.directory()}"
+            _LOGGER.debug(msg)
             self._ctx = fuchsia_controller.Context(
                 config=config, isolate_dir=isolate_dir, target=self._name
             )

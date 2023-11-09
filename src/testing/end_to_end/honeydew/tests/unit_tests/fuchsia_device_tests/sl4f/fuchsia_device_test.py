@@ -267,12 +267,23 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
         return_value={"result": {"zip": _BASE64_ENCODED_STR}},
         autospec=True,
     )
-    def test_send_snapshot_command(self, mock_sl4f_run) -> None:
+    @mock.patch.object(
+        fuchsia_device.FuchsiaDevice, "health_check", autospec=True
+    )
+    @mock.patch.object(
+        fuchsia_device.sl4f_transport.SL4F, "start_server", autospec=True
+    )
+    def test_send_snapshot_command(
+        self, mock_sl4f_start_server, mock_health_check, mock_sl4f_run
+    ) -> None:
         """Testcase for FuchsiaDevice._send_snapshot_command()"""
         # pylint: disable=protected-access
         base64_bytes = self.fd_obj._send_snapshot_command()
 
         self.assertEqual(base64_bytes, base64.b64decode(_BASE64_ENCODED_STR))
+
+        mock_sl4f_start_server.assert_called()
+        mock_health_check.assert_called()
         mock_sl4f_run.assert_called()
 
 

@@ -522,11 +522,26 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
             _file_read_result([]),
         ],
     )
-    def test_send_snapshot_command(self, *unused_args) -> None:
+    @mock.patch.object(
+        fuchsia_device.base_fuchsia_device.BaseFuchsiaDevice,
+        "health_check",
+        autospec=True,
+    )
+    @mock.patch.object(
+        fuchsia_device.fuchsia_controller_transport.fuchsia_controller,
+        "Context",
+        autospec=True,
+    )
+    def test_send_snapshot_command(
+        self, mock_fc_context, mock_health_check, *unused_args
+    ) -> None:
         """Testcase for FuchsiaDevice._send_snapshot_command()"""
         # pylint: disable=protected-access
         data = self.fd_obj._send_snapshot_command()
         self.assertEqual(len(data), 15)
+
+        mock_fc_context.assert_called()
+        mock_health_check.assert_called()
 
     @mock.patch.object(
         f_feedback.DataProvider.Client,
@@ -537,8 +552,18 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
             fuchsia_controller.ZxStatus.ZX_ERR_INVALID_ARGS
         ),
     )
+    @mock.patch.object(
+        fuchsia_device.base_fuchsia_device.BaseFuchsiaDevice,
+        "health_check",
+        autospec=True,
+    )
+    @mock.patch.object(
+        fuchsia_device.fuchsia_controller_transport.fuchsia_controller,
+        "Context",
+        autospec=True,
+    )
     def test_send_snapshot_command_get_snapshot_error(
-        self, *unused_args
+        self, mock_fc_context, mock_health_check, *unused_args
     ) -> None:
         """Testcase for FuchsiaDevice._send_snapshot_command() when the
         get_snapshot FIDL call raises an exception.
@@ -546,6 +571,9 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         # pylint: disable=protected-access
         with self.assertRaises(errors.FuchsiaControllerError):
             self.fd_obj._send_snapshot_command()
+
+        mock_fc_context.assert_called()
+        mock_health_check.assert_called()
 
     @mock.patch.object(
         f_feedback.DataProvider.Client,
@@ -561,13 +589,27 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
             fuchsia_controller.ZxStatus.ZX_ERR_INVALID_ARGS
         ),
     )
-    def test_send_snapshot_command_get_attr_error(self, *unused_args) -> None:
+    @mock.patch.object(
+        fuchsia_device.base_fuchsia_device.BaseFuchsiaDevice,
+        "health_check",
+        autospec=True,
+    )
+    @mock.patch.object(
+        fuchsia_device.fuchsia_controller_transport.fuchsia_controller,
+        "Context",
+        autospec=True,
+    )
+    def test_send_snapshot_command_get_attr_error(
+        self, mock_fc_context, mock_health_check, *unused_args
+    ) -> None:
         """Testcase for FuchsiaDevice._send_snapshot_command() when the get_attr
         FIDL call raises an exception.
         ZX_ERR_INVALID_ARGS was chosen arbitrarily for this purpose."""
         # pylint: disable=protected-access
         with self.assertRaises(errors.FuchsiaControllerError):
             self.fd_obj._send_snapshot_command()
+        mock_fc_context.assert_called()
+        mock_health_check.assert_called()
 
     @mock.patch.object(
         f_feedback.DataProvider.Client,
@@ -582,8 +624,18 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
             fuchsia_controller.ZxStatus.ZX_ERR_INVALID_ARGS, 0
         ),
     )
+    @mock.patch.object(
+        fuchsia_device.base_fuchsia_device.BaseFuchsiaDevice,
+        "health_check",
+        autospec=True,
+    )
+    @mock.patch.object(
+        fuchsia_device.fuchsia_controller_transport.fuchsia_controller,
+        "Context",
+        autospec=True,
+    )
     def test_send_snapshot_command_get_attr_status_not_ok(
-        self, *unused_args
+        self, mock_fc_context, mock_health_check, *unused_args
     ) -> None:
         """Testcase for FuchsiaDevice._send_snapshot_command() when the get_attr
         FIDL call returns a non-OK status code.
@@ -591,6 +643,8 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         # pylint: disable=protected-access
         with self.assertRaises(errors.FuchsiaControllerError):
             self.fd_obj._send_snapshot_command()
+        mock_fc_context.assert_called()
+        mock_health_check.assert_called()
 
     @mock.patch.object(
         f_feedback.DataProvider.Client,
@@ -611,13 +665,27 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
             fuchsia_controller.ZxStatus.ZX_ERR_INVALID_ARGS
         ),
     )
-    def test_send_snapshot_command_read_error(self, *unused_args) -> None:
+    @mock.patch.object(
+        fuchsia_device.base_fuchsia_device.BaseFuchsiaDevice,
+        "health_check",
+        autospec=True,
+    )
+    @mock.patch.object(
+        fuchsia_device.fuchsia_controller_transport.fuchsia_controller,
+        "Context",
+        autospec=True,
+    )
+    def test_send_snapshot_command_read_error(
+        self, mock_fc_context, mock_health_check, *unused_args
+    ) -> None:
         """Testcase for FuchsiaDevice._send_snapshot_command() when the read
         FIDL call raises an exception.
         ZX_ERR_INVALID_ARGS was chosen arbitrarily for this purpose."""
         # pylint: disable=protected-access
         with self.assertRaises(errors.FuchsiaControllerError):
             self.fd_obj._send_snapshot_command()
+        mock_fc_context.assert_called()
+        mock_health_check.assert_called()
 
     @mock.patch.object(
         f_feedback.DataProvider.Client,
@@ -641,12 +709,26 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
             _file_read_result([]),
         ],
     )
-    def test_send_snapshot_command_size_mismatch(self, *unused_args) -> None:
+    @mock.patch.object(
+        fuchsia_device.base_fuchsia_device.BaseFuchsiaDevice,
+        "health_check",
+        autospec=True,
+    )
+    @mock.patch.object(
+        fuchsia_device.fuchsia_controller_transport.fuchsia_controller,
+        "Context",
+        autospec=True,
+    )
+    def test_send_snapshot_command_size_mismatch(
+        self, mock_fc_context, mock_health_check, *unused_args
+    ) -> None:
         """Testcase for FuchsiaDevice._send_snapshot_command() when the number
         of bytes read from channel doesn't match the file's content size."""
         # pylint: disable=protected-access
         with self.assertRaises(errors.FuchsiaControllerError):
             self.fd_obj._send_snapshot_command()
+        mock_fc_context.assert_called()
+        mock_health_check.assert_called()
 
 
 if __name__ == "__main__":

@@ -303,6 +303,11 @@ class FuchsiaDevice(
         Returns:
             Bytes containing snapshot data as a zip archive.
         """
+        # Ensure device is healthy and ready to accept SL4F requests before
+        # sending snapshot command.
+        self.sl4f.start_server()
+        self.health_check()
+
         snapshot_resp: dict[str, Any] = self.sl4f.run(
             method=_SL4F_METHODS["Snapshot"], timeout=_TIMEOUTS["SNAPSHOT"]
         )
