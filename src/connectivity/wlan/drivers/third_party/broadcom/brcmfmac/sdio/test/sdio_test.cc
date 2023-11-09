@@ -35,6 +35,8 @@
 #include <wifi/wifi-config.h>
 #include <zxtest/zxtest.h>
 
+#include "sdk/lib/driver/testing/cpp/driver_runtime.h"
+
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/bus.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/common.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/device.h"
@@ -181,7 +183,13 @@ class FakeSdioBus {
   std::optional<zx_vaddr_t> mapped_vmo_addr_;
 };
 
-TEST(Sdio, IntrRegisterStartup) {
+class SdioTest : public zxtest::Test {
+ protected:
+   fdf_testing::DriverRuntime* runtime() { return fdf_testing::DriverRuntime::GetInstance(); }
+   std::shared_ptr<MockDevice> root_{MockDevice::FakeRootParent()};
+};
+
+TEST_F(SdioTest, IntrRegisterStartup) {
   FakeSdioDevice device;
   brcmf_sdio_dev sdio_dev = {};
   sdio_func func1 = {};
@@ -225,7 +233,7 @@ TEST(Sdio, IntrRegisterStartup) {
   zx_handle_close(sdio_dev.irq_handle);
 }
 
-TEST(Sdio, IntrRegisterFwReload) {
+TEST_F(SdioTest, IntrRegisterFwReload) {
   FakeSdioDevice device;
   brcmf_sdio_dev sdio_dev = {};
   sdio_func func1 = {};
@@ -265,7 +273,7 @@ TEST(Sdio, IntrRegisterFwReload) {
   zx_handle_close(sdio_dev.irq_handle);
 }
 
-TEST(Sdio, IntrDeregister) {
+TEST_F(SdioTest, IntrDeregister) {
   FakeSdioDevice device;
   brcmf_sdio_dev sdio_dev = {};
   sdio_func func1 = {};
@@ -309,7 +317,7 @@ TEST(Sdio, IntrDeregister) {
   sdio2.VerifyAndClear();
 }
 
-TEST(Sdio, VendorControl) {
+TEST_F(SdioTest, VendorControl) {
   brcmf_sdio_dev sdio_dev = {};
 
   MockSdio sdio1;
@@ -333,7 +341,7 @@ TEST(Sdio, VendorControl) {
   sdio1.VerifyAndClear();
 }
 
-TEST(Sdio, Transfer) {
+TEST_F(SdioTest, Transfer) {
   FakeSdioDevice device;
   std::unique_ptr<FakeSdioBus> sdio_bus;
   ASSERT_OK(FakeSdioBus::Create(&sdio_bus));
@@ -358,7 +366,7 @@ TEST(Sdio, Transfer) {
   sdio2.VerifyAndClear();
 }
 
-TEST(Sdio, IoAbort) {
+TEST_F(SdioTest, IoAbort) {
   brcmf_sdio_dev sdio_dev = {};
 
   MockSdio sdio1;
@@ -378,7 +386,7 @@ TEST(Sdio, IoAbort) {
   sdio2.VerifyAndClear();
 }
 
-TEST(Sdio, RamRw) {
+TEST_F(SdioTest, RamRw) {
   FakeSdioDevice device;
   std::unique_ptr<FakeSdioBus> sdio_bus;
   ASSERT_OK(FakeSdioBus::Create(&sdio_bus));
@@ -412,7 +420,7 @@ TEST(Sdio, RamRw) {
 
 // This test case verifies that whether an error will returned when transfer size is
 // not divisible by 4.
-TEST(Sdio, AlignSize) {
+TEST_F(SdioTest, AlignSize) {
   FakeSdioDevice device;
   std::unique_ptr<FakeSdioBus> sdio_bus;
   ASSERT_OK(FakeSdioBus::Create(&sdio_bus));
@@ -445,7 +453,7 @@ zx_status_t fake_brcmf_schedule_recovery_worker(struct brcmf_pub* drvr) {
 }
 
 // Verify sdio_timeout recovery trigger logic in brcmf_sdiod_transfer_vmos().
-TEST(Sdio, SdioTimeoutRecoveryVmos) {
+TEST_F(SdioTest, SdioTimeoutRecoveryVmos) {
   FakeSdioDevice device;
   std::unique_ptr<FakeSdioBus> sdio_bus;
   ASSERT_OK(FakeSdioBus::Create(&sdio_bus));
@@ -538,7 +546,7 @@ TEST(Sdio, SdioTimeoutRecoveryVmos) {
 }
 
 // Verify sdio_timeout recovery trigger logic in brcmf_sdiod_transfer_vmo().
-TEST(Sdio, SdioTimeoutRecoveryVmo) {
+TEST_F(SdioTest, SdioTimeoutRecoveryVmo) {
   FakeSdioDevice device;
   std::unique_ptr<FakeSdioBus> sdio_bus;
   ASSERT_OK(FakeSdioBus::Create(&sdio_bus));
@@ -699,14 +707,14 @@ static zx_status_t sdio_bus_txctl_test(enum brcmf_sdiod_state sdiod_state,
   return status;
 }
 
-TEST(Sdio, TxCtlSdioDown) {
+TEST_F(SdioTest, TxCtlSdioDown) {
   zx_status_t status = sdio_bus_txctl_test(
       BRCMF_SDIOD_DOWN, ZX_MSEC(CTL_DONE_TIMEOUT_MSEC), "brcmf_wq/txctl_sdio_down",
       [](WorkItem* work_item) {}, 0, 0);
   EXPECT_EQ(status, ZX_ERR_IO);
 }
 
-TEST(Sdio, TxCtlOk) {
+TEST_F(SdioTest, TxCtlOk) {
   zx_status_t status = sdio_bus_txctl_test(
       BRCMF_SDIOD_DATA, ZX_MSEC(CTL_DONE_TIMEOUT_MSEC), "brcmf_wq/txctl_ok",
       [](WorkItem* work) {
@@ -721,13 +729,13 @@ TEST(Sdio, TxCtlOk) {
   EXPECT_EQ(status, ZX_OK);
 }
 
-TEST(Sdio, TxCtlTimeout) {
+TEST_F(SdioTest, TxCtlTimeout) {
   zx_status_t status = sdio_bus_txctl_test(
       BRCMF_SDIOD_DATA, ZX_MSEC(1), "brcmf_wq/txctl_timeout", [](WorkItem* work) {}, 0, 1);
   EXPECT_EQ(status, ZX_ERR_TIMED_OUT);
 }
 
-TEST(Sdio, TxCtlTimeoutUnexpectedCtrlFrameStatClear) {
+TEST_F(SdioTest, TxCtlTimeoutUnexpectedCtrlFrameStatClear) {
   zx_status_t status = sdio_bus_txctl_test(
       BRCMF_SDIOD_DATA, ZX_MSEC(1), "brcmf_wq/txctl_timeout_unexpected_ctrl_frame_stat_clear",
       [](WorkItem* work) {
@@ -738,7 +746,7 @@ TEST(Sdio, TxCtlTimeoutUnexpectedCtrlFrameStatClear) {
   EXPECT_EQ(status, ZX_ERR_TIMED_OUT);
 }
 
-TEST(Sdio, TxCtlCtrlFrameStateNotCleared) {
+TEST_F(SdioTest, TxCtlCtrlFrameStateNotCleared) {
   zx_status_t status = sdio_bus_txctl_test(
       BRCMF_SDIOD_DATA, ZX_MSEC(CTL_DONE_TIMEOUT_MSEC),
       "brcmf_wq/txctl_ctrl_frame_stat_not_cleared",
@@ -751,7 +759,7 @@ TEST(Sdio, TxCtlCtrlFrameStateNotCleared) {
   EXPECT_EQ(status, ZX_ERR_SHOULD_WAIT);
 }
 
-TEST(Sdio, TxCtlCtrlFrameStateClearedWithError) {
+TEST_F(SdioTest, TxCtlCtrlFrameStateClearedWithError) {
   zx_status_t status = sdio_bus_txctl_test(
       BRCMF_SDIOD_DATA, ZX_MSEC(CTL_DONE_TIMEOUT_MSEC),
       "brcmf_wq/txctl_ctrl_frame_stat_cleared_with_error",
@@ -767,12 +775,10 @@ TEST(Sdio, TxCtlCtrlFrameStateClearedWithError) {
   EXPECT_EQ(status, ZX_ERR_NO_MEMORY);
 }
 
-TEST(Sdio, SdioDeviceMultipleShutdowns) {
-  // TODO(fxb/124464): Migrate test to use dispatcher integration.
-  auto parent = MockDevice::FakeRootParentNoDispatcherIntegrationDEPRECATED();
-  wlan::brcmfmac::SdioDevice::Create(parent.get());
+TEST_F(SdioTest, SdioDeviceMultipleShutdowns) {
+  wlan::brcmfmac::SdioDevice::Create(root_.get());
 
-  zx_device_t* child = parent->GetLatestChild();
+  zx_device_t* child = root_->GetLatestChild();
 
   // Suspend the device twice, it should not crash. Parameters shouldn't matter as the device
   // doesn't care.
@@ -783,7 +789,7 @@ TEST(Sdio, SdioDeviceMultipleShutdowns) {
   child->ReleaseOp();
 }
 
-TEST(Sdio, ResetClearsTxGlom) {
+TEST_F(SdioTest, ResetClearsTxGlom) {
   MinimalBrcmfSdio b(BRCMF_SDIOD_DATA, ZX_MSEC(1), "brcmf_wq/reset_clears_txglom",
                      [](WorkItem*) {});
   b.bus.txglom = true;
