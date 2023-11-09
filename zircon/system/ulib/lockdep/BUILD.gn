@@ -14,6 +14,7 @@ zx_library("lockdep") {
     "lockdep/lock_class.h",
     "lockdep/lock_class_state.h",
     "lockdep/lock_dependency_set.h",
+    "lockdep/lock_name_helper.h",
     "lockdep/lock_policy.h",
     "lockdep/lock_traits.h",
     "lockdep/lockdep.h",
@@ -22,13 +23,17 @@ zx_library("lockdep") {
   ]
 
   sources = []
-  public_deps = [ "//zircon/system/ulib/fbl:headers" ]
+  public_deps = [
+    "//src/performance/lib/fxt:headers",
+    "//zircon/system/ulib/fbl:headers",
+  ]
   if (is_kernel) {
     # Anything using libc++ headers in the kernel needs this.
     public_deps += [ "//zircon/kernel/lib/ktl:headers" ]
   } else {
     sources += [ "lock_dep.cc" ]
     deps = [
+      "//src/performance/lib/fxt",
       "//zircon/system/ulib/fbl",
       "//zircon/system/ulib/zx",
     ]

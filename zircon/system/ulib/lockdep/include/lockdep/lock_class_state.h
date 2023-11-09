@@ -5,6 +5,7 @@
 #ifndef LOCKDEP_LOCK_CLASS_STATE_H_
 #define LOCKDEP_LOCK_CLASS_STATE_H_
 
+#include <lib/fxt/interned_string.h>
 #include <stdint.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
@@ -31,7 +32,7 @@ class LockClassState {
  public:
   // Constructs an instance of LockClassState.
   constexpr LockClassState() = default;
-  constexpr LockClassState(const char* name, LockFlags flags) {}
+  constexpr LockClassState(fxt::InternedString& name, LockFlags flags) {}
 
   // Disable copy construction / assignment.
   LockClassState(const LockClassState&) = delete;
@@ -52,7 +53,8 @@ class LockClassState {
 class MetadataLockClassState : public LockClassState {
  public:
   // Constructs an instance of MetadataLockClassState.
-  constexpr MetadataLockClassState(const char* const name, LockFlags flags) : name_{name} {}
+  constexpr MetadataLockClassState(const fxt::InternedString& name, LockFlags flags)
+      : name_{name} {}
 
   // Disable copy construction / assignment.
   MetadataLockClassState(const MetadataLockClassState&) = delete;
@@ -70,11 +72,12 @@ class MetadataLockClassState : public LockClassState {
   static const char* GetName(LockClassId id) { return Get(id)->name(); }
 
   // Returns the name of this lock class.
-  const char* name() const { return name_; }
+  const char* name() const { return name_.string; }
+  const fxt::InternedString& interned_name() { return name_; }
 
  private:
   // The name of the lock class type.
-  const char* const name_;
+  const fxt::InternedString& name_;
 };
 
 // A derivative of MetadataLockClassState that provides full state necessary for
@@ -83,7 +86,7 @@ class MetadataLockClassState : public LockClassState {
 class ValidatorLockClassState : public MetadataLockClassState {
  public:
   // Constructs an instance of ValidatorLockClassState.
-  ValidatorLockClassState(const char* const name, LockFlags flags)
+  ValidatorLockClassState(const fxt::InternedString& name, LockFlags flags)
       : MetadataLockClassState{name, flags}, flags_{flags} {}
 
   // Disable copy construction / assignment.
