@@ -52,5 +52,7 @@ toc:
 - title: "Driver-specifc guides"
   section:
   - include: /docs/development/drivers/driver_guides/_toc.yaml
-- title: "Deleting drivers"
-  path: /docs/development/drivers/best_practices/deleting.md
+- title: "Others"
+  section:
+  - title: "Deleting drivers"
+    path: /docs/development/drivers/best_practices/deleting.md
