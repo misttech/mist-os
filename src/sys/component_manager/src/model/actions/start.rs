@@ -8,8 +8,8 @@ use {
     crate::model::{
         actions::{Action, ActionKey},
         component::{
-            ComponentInstance, ExecutionState, InstanceState, Package, ResolvedInstanceState,
-            Runtime, SandboxDispatcher, StartReason, WeakComponentInstance,
+            ComponentInstance, ExecutionState, InstanceState, Package, Runtime, SandboxDispatcher,
+            StartReason, WeakComponentInstance,
         },
         error::{StartActionError, StructuredConfigError},
         hooks::{Event, EventPayload, RuntimeInfo},
@@ -112,13 +112,19 @@ async fn do_start(
 
     // Find the runner to use.
     let runner = {
+        // Obtain the runner declaration under a short lock, as `open_runner` may lock the
+        // resolved state re-entrantly.
         let resolved_state = component.lock_resolved_state().await.map_err(|err| {
             StartActionError::ResolveActionError { moniker: component.moniker.clone(), err }
         })?;
-        resolve_runner(component, &*resolved_state).await.map_err(|err| {
+        resolved_state.decl().get_runner()
+    };
+    let runner = match runner {
+        Some(runner) => open_runner(component, runner).await.map_err(|err| {
             warn!(moniker = %component.moniker, %err, "Failed to resolve runner.");
             err
-        })?
+        })?,
+        None => None,
     };
 
     // Generate the Runtime which will be set in the Execution.
@@ -199,9 +205,11 @@ async fn start_component(
     let StartContext { runner, start_info, diagnostics_sender } = start_context;
     if let Some(runner) = runner {
         pending_runtime.set_program(
-            Program::start(&runner, start_info, diagnostics_sender).map_err(|err| {
-                StartActionError::StartProgramError { moniker: component.moniker.clone(), err }
-            })?,
+            Program::start(component.moniker.clone(), &runner, start_info, diagnostics_sender)
+                .map_err(|err| StartActionError::StartProgramError {
+                    moniker: component.moniker.clone(),
+                    err,
+                })?,
             component.as_weak(),
         );
     }
@@ -236,14 +244,10 @@ pub fn should_return_early(
 /// Returns a RemoteRunner routed to the component's runner, if it specifies one.
 ///
 /// Returns None if the component's decl does not specify a runner.
-async fn resolve_runner(
+async fn open_runner(
     component: &Arc<ComponentInstance>,
-    resolved_state: &ResolvedInstanceState,
+    runner: cm_rust::UseRunnerDecl,
 ) -> Result<Option<RemoteRunner>, StartActionError> {
-    let Some(runner) = resolved_state.decl().get_runner() else {
-        return Ok(None);
-    };
-
     // Open up a channel to the runner.
     let (client, server) = create_proxy::<fcrunner::ComponentRunnerMarker>().unwrap();
     let mut server_channel = server.into_channel();

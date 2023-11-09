@@ -15,8 +15,10 @@ use fuchsia_async as fasync;
 use fuchsia_async::Task;
 use fuchsia_zircon as zx;
 use futures::{channel::oneshot, future::BoxFuture};
+use lazy_static::lazy_static;
+use moniker::Moniker;
 use serve_processargs::{BuildNamespaceError, NamespaceBuilder};
-use std::sync::Mutex;
+use std::{collections::HashMap, sync::Mutex};
 use thiserror::Error;
 use zx::{AsHandleRef, Koid};
 
@@ -30,9 +32,7 @@ use component_controller::ComponentController;
 pub struct Program {
     controller: ComponentController,
 
-    // Only used by tests. Internally, it is always the KOID of the controller
-    // server endpoint. But we are free to evolve that.
-    #[allow(dead_code)]
+    // The KOID of the controller server endpoint.
     koid: Koid,
 
     // Only here to keep the diagnostics task alive. Never read.
@@ -59,6 +59,7 @@ impl Program {
     /// TODO(fxbug.dev/122024): Since diagnostic information is only available once,
     /// the framework should be the one that get it. That's another reason to limit this API.
     pub fn start(
+        moniker: Moniker,
         runner: &RemoteRunner,
         start_info: StartInfo,
         diagnostics_sender: oneshot::Sender<fdiagnostics::ComponentDiagnostics>,
@@ -71,6 +72,7 @@ impl Program {
             .basic_info()
             .expect("basic info should not require any rights")
             .koid;
+        MONIKER_LOOKUP.add(koid, moniker);
 
         let (start_info, fut) = start_info.into_fidl()?;
 
@@ -136,6 +138,47 @@ impl Program {
             namespace_task: Mutex::new(None),
         }
     }
+}
+
+impl Drop for Program {
+    fn drop(&mut self) {
+        MONIKER_LOOKUP.remove(self.koid);
+    }
+}
+
+struct MonikerLookup {
+    koid_to_moniker: Mutex<HashMap<Koid, Moniker>>,
+}
+
+impl MonikerLookup {
+    fn new() -> Self {
+        Self { koid_to_moniker: Mutex::new(HashMap::new()) }
+    }
+
+    fn add(&self, koid: Koid, moniker: Moniker) {
+        self.koid_to_moniker.lock().unwrap().insert(koid, moniker);
+    }
+
+    fn get(&self, koid: Koid) -> Option<Moniker> {
+        self.koid_to_moniker.lock().unwrap().get(&koid).cloned()
+    }
+
+    fn remove(&self, koid: Koid) {
+        self.koid_to_moniker.lock().unwrap().remove(&koid);
+    }
+}
+
+lazy_static! {
+    static ref MONIKER_LOOKUP: MonikerLookup = MonikerLookup::new();
+}
+
+/// Looks up the moniker of a component based on the KOID of the `ComponentController`
+/// server endpoint given to its runner.
+///
+/// If this method returns `None`, then the `ComponentController` server endpoint is
+/// not minted by component_manager as part of starting a component.
+pub fn moniker_from_controller_koid(koid: Koid) -> Option<Moniker> {
+    MONIKER_LOOKUP.get(koid)
 }
 
 #[derive(Error, Debug, Clone)]

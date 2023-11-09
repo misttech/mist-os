@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 pub mod arguments;
+pub mod builtin_runner;
 pub mod capability;
 pub mod cpu_resource;
 pub mod crash_introspect;
