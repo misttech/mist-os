@@ -3,16 +3,13 @@
 // found in the LICENSE file.
 
 #include <lib/ddk/debug.h>
+#include <lib/hdmi-dw/color-param.h>
 #include <lib/hdmi-dw/hdmi-dw.h>
 #include <lib/hdmi-dw/regs.h>
 
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 
 namespace hdmi_dw {
-
-using fuchsia_hardware_hdmi::wire::ColorDepth;
-using fuchsia_hardware_hdmi::wire::ColorFormat;
-using fuchsia_hardware_hdmi::wire::ModeFlag;
 
 void HdmiDw::ScdcWrite(uint8_t addr, uint8_t val) {
   WriteReg(HDMITX_DWC_I2CM_SLAVE, 0x54);
@@ -63,8 +60,8 @@ zx_status_t HdmiDw::InitHw() {
   return ZX_OK;
 }
 
-void HdmiDw::ConfigHdmitx(const fuchsia_hardware_hdmi::wire::ColorParam& color_param,
-                          const display::DisplayTiming& mode, const hdmi_param_tx& p) {
+void HdmiDw::ConfigHdmitx(const ColorParam& color_param, const display::DisplayTiming& mode,
+                          const hdmi_param_tx& p) {
   // setup video input mapping
   uint32_t hdmi_data = 0;
   if (color_param.input_color_format == ColorFormat::kCfRgb) {
@@ -344,7 +341,7 @@ void HdmiDw::SetFcScramblerCtrl(bool is4k) {
   }
 }
 
-void HdmiDw::ConfigCsc(const fuchsia_hardware_hdmi::wire::ColorParam& color_param) {
+void HdmiDw::ConfigCsc(const ColorParam& color_param) {
   uint8_t csc_coef_a1_msb;
   uint8_t csc_coef_a1_lsb;
   uint8_t csc_coef_a2_msb;

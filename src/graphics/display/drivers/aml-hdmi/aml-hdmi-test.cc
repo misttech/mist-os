@@ -22,8 +22,6 @@ namespace aml_hdmi {
 namespace {
 
 using HdmiClient = fidl::WireSyncClient<fuchsia_hardware_hdmi::Hdmi>;
-using fuchsia_hardware_hdmi::wire::ColorDepth;
-using fuchsia_hardware_hdmi::wire::ColorFormat;
 
 enum class HdmiDwFn {
   kConfigHdmitx,
@@ -40,8 +38,8 @@ class FakeHdmiDw : public hdmi_dw::HdmiDw {
  public:
   explicit FakeHdmiDw(HdmiIpBase* base, AmlHdmiTest* test) : HdmiDw(base), test_(test) {}
 
-  void ConfigHdmitx(const fuchsia_hardware_hdmi::wire::ColorParam& color_param,
-                    const display::DisplayTiming& mode, const hdmi_dw::hdmi_param_tx& p) override;
+  void ConfigHdmitx(const hdmi_dw::ColorParam& color_param, const display::DisplayTiming& mode,
+                    const hdmi_dw::hdmi_param_tx& p) override;
   void SetupInterrupts() override;
   void Reset() override;
   void SetupScdc(bool is4k) override;
@@ -129,7 +127,7 @@ class AmlHdmiTest : public testing::Test {
   std::queue<HdmiDwFn> expected_dw_calls_;
 };
 
-void FakeHdmiDw::ConfigHdmitx(const fuchsia_hardware_hdmi::wire::ColorParam& color_param,
+void FakeHdmiDw::ConfigHdmitx(const hdmi_dw::ColorParam& color_param,
                               const display::DisplayTiming& mode, const hdmi_dw::hdmi_param_tx& p) {
   test_->HdmiDwCall(HdmiDwFn::kConfigHdmitx);
 }
@@ -213,9 +211,9 @@ TEST_F(AmlHdmiTest, ModeSetTest) {
       .flags = 0,
   };
   fuchsia_hardware_hdmi::wire::ColorParam color{
-      .input_color_format = ColorFormat::kCfRgb,
-      .output_color_format = ColorFormat::kCfRgb,
-      .color_depth = ColorDepth::kCd24B,
+      .input_color_format = fuchsia_hardware_hdmi::wire::ColorFormat::kCfRgb,
+      .output_color_format = fuchsia_hardware_hdmi::wire::ColorFormat::kCfRgb,
+      .color_depth = fuchsia_hardware_hdmi::wire::ColorDepth::kCd24B,
   };
   fuchsia_hardware_hdmi::wire::DisplayMode mode(allocator);
   mode.set_mode(allocator, standard_display_mode);

@@ -5,7 +5,10 @@
 import("//build/cpp/library_headers.gni")
 
 library_headers("hdmi-dw-headers") {
-  headers = [ "lib/hdmi-dw/hdmi-dw.h" ]
+  headers = [
+    "lib/hdmi-dw/hdmi-dw.h",
+    "lib/hdmi-dw/color-param.h",
+  ]
   public_deps = [ "//src/graphics/display/lib/api-types-cpp" ]
 }
 

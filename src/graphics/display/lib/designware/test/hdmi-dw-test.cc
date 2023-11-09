@@ -165,17 +165,12 @@ constexpr int kI2cmSdaHoldOffset = 0x7e13;
 constexpr int kI2cmScdcReadUpdateOffset = 0x7e14;
 constexpr int kI2cmReadBuff0Offset = 0x7e20;
 
-using fuchsia_hardware_hdmi::wire::ColorDepth;
-using fuchsia_hardware_hdmi::wire::ColorFormat;
-using fuchsia_hardware_hdmi::wire::ColorParam;
-using fuchsia_hardware_hdmi::wire::StandardDisplayMode;
-
 class FakeHdmiIpBase : public HdmiIpBase {
  public:
   explicit FakeHdmiIpBase(fdf::MmioBuffer mmio) : HdmiIpBase(), mmio_(std::move(mmio)) {}
 
-  void WriteIpReg(uint32_t addr, uint8_t data) { mmio_.Write8(data, addr); }
-  uint8_t ReadIpReg(uint32_t addr) { return mmio_.Read8(addr); }
+  void WriteIpReg(uint32_t addr, uint8_t data) override { mmio_.Write8(data, addr); }
+  uint8_t ReadIpReg(uint32_t addr) override { return mmio_.Read8(addr); }
 
  private:
   fdf::MmioBuffer mmio_;

@@ -8,6 +8,7 @@
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/fidl/epitaph.h>
+#include <lib/hdmi-dw/color-param.h>
 #include <lib/zx/resource.h>
 #include <zircon/assert.h>
 #include <zircon/status.h>
@@ -196,6 +197,7 @@ void AmlHdmiDevice::ModeSet(ModeSetRequestView request, ModeSetCompleter::Sync& 
   ZX_DEBUG_ASSERT(request->mode.has_color());
   ZX_DEBUG_ASSERT(request->mode.has_mode());
   const display::DisplayTiming display_timing = display::ToDisplayTiming(request->mode.mode());
+  const hdmi_dw::ColorParam color_param = hdmi_dw::ToColorParam(request->mode.color());
 
   hdmi_dw::hdmi_param_tx p;
   CalculateTxParam(display_timing, &p);
@@ -205,7 +207,7 @@ void AmlHdmiDevice::ModeSet(ModeSetRequestView request, ModeSetCompleter::Sync& 
 
   // Configure HDMI TX IP
   fbl::AutoLock lock(&dw_lock_);
-  hdmi_dw_->ConfigHdmitx(request->mode.color(), display_timing, p);
+  hdmi_dw_->ConfigHdmitx(color_param, display_timing, p);
 
   // Initialize HDCP 1.4.
   //
