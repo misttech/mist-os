@@ -2,13 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <stdint.h>
+#ifndef SRC_UI_INPUT_LIB_HID_PARSER_TEST_HID_REPORT_DATA_H_
+#define SRC_UI_INPUT_LIB_HID_PARSER_TEST_HID_REPORT_DATA_H_
+
+#include <lib/stdcompat/span.h>
+
+#include <cstdint>
 
 // The following are actual report descriptors, either from the standard
 // documentation or captured from real devices.
 
 // Genuine HP USB 2-Button Optical Mouse P/N: 672652-001.
-extern "C" const uint8_t hp_mouse_r_desc[46] = {
+constexpr uint8_t kHpMouseDescriptorArray[] = {
     0x05, 0x01,  // Usage Page (Generic Desktop Ctrls)
     0x09, 0x02,  // Usage (Mouse)
     0xA1, 0x01,  // Collection (Application)
@@ -34,9 +39,10 @@ extern "C" const uint8_t hp_mouse_r_desc[46] = {
     0xC0,        //   End Collection
     0xC0,        // End Collection
 };
+constexpr cpp20::span<const uint8_t> kHpMouseDescriptor(kHpMouseDescriptorArray);
 
 // Composite device by Adafruit.
-extern "C" const uint8_t trinket_r_desc[173] = {
+constexpr uint8_t kAdafruitTrinketDescriptorArray[] = {
     0x05, 0x01,  // Usage Page (Generic Desktop Ctrls)
     0x09, 0x02,  // Usage (Mouse)
     0xA1, 0x01,  // Collection (Application)
@@ -128,9 +134,10 @@ extern "C" const uint8_t trinket_r_desc[173] = {
     0x81, 0x03,  //   Input (Const,Var,Abs,No Wrap,Linear,No Null Position)
     0xC0,        // End Collection
 };
+constexpr cpp20::span<const uint8_t> kAdafruitTrinketDescriptor(kAdafruitTrinketDescriptorArray);
 
 // Playstation controller 3 descriptor
-extern "C" const uint8_t ps3_ds_r_desc[148] = {
+constexpr uint8_t kPlayStation3DualshockDescriptorArray[] = {
     0x05, 0x01,        // Usage Page (Generic Desktop Ctrls)
     0x09, 0x04,        // Usage (Joystick)
     0xA1, 0x01,        // Collection (Application)
@@ -210,9 +217,11 @@ extern "C" const uint8_t ps3_ds_r_desc[148] = {
     0xC0,        //   End Collection
     0xC0,        // End Collection
 };
+constexpr cpp20::span<const uint8_t> kPlayStation3DualshockDescriptor(
+    kPlayStation3DualshockDescriptorArray);
 
 // Touchpad acer12 switch.
-extern "C" const uint8_t acer12_touch_r_desc[660] = {
+constexpr uint8_t kAcer12TouchDescriptorArray[] = {
     0x05, 0x0D,                    // Usage Page (Digitizer)
     0x09, 0x04,                    // Usage (Touch Screen)
     0xA1, 0x01,                    // Collection (Application)
@@ -541,9 +550,10 @@ extern "C" const uint8_t acer12_touch_r_desc[660] = {
     0x81, 0x02,        //   Input (Data,Var,Abs,No Wrap,Linear,No Null Position)
     0xC0,              // End Collection
 };
+constexpr cpp20::span<const uint8_t> kAcer12TouchDescriptor(kAcer12TouchDescriptorArray);
 
 // Syntetic descriptor for ACPI sensor device.
-extern "C" const uint8_t eve_tablet_r_desc[28] = {
+constexpr uint8_t kEveTabletDescriptorArray[] = {
     0x05, 0x01,                    // Usage Page (Generic Desktop Ctrls)
     0x09, 0x80,                    // Usage (Sys Control)
     0xA1, 0x01,                    // Collection (Application)
@@ -558,9 +568,10 @@ extern "C" const uint8_t eve_tablet_r_desc[28] = {
     0x81, 0x03,  //   Input (Const,Var,Abs,No Wrap,Linear,Preferred State,No Null Position)
     0xC0,        // End Collection
 };
+constexpr cpp20::span<const uint8_t> kEveTabletDescriptor(kEveTabletDescriptorArray);
 
 // Touch screen on Asus VT168H monitor.
-extern "C" const uint8_t asus_touch_desc[945] = {
+constexpr uint8_t kAsusTouchDescriptorArray[] = {
     0x05, 0x0D,        // Usage Page (Digitizer)
     0x09, 0x04,        // Usage (Touch Screen)
     0xA1, 0x01,        // Collection (Application)
@@ -1024,8 +1035,9 @@ extern "C" const uint8_t asus_touch_desc[945] = {
     0x81, 0x02,        //   Input (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position)
     0xC0,              // End Collection
 };
+constexpr cpp20::span<const uint8_t> kAsusTouchDescriptor(kAsusTouchDescriptorArray);
 
-extern "C" const uint8_t eve_touchpad_v2_r_desc[560] = {
+constexpr uint8_t kEveTouchpadV2DescriptorArray[] = {
     0x05, 0x0D,        // Usage Page (Digitizer)
     0x09, 0x05,        // Usage (Touch Pad)
     0xA1, 0x01,        // Collection (Application)
@@ -1287,6 +1299,7 @@ extern "C" const uint8_t eve_touchpad_v2_r_desc[560] = {
 
     // 560 bytes
 };
+constexpr cpp20::span<const uint8_t> kEveTouchpadV2Descriptor(kEveTouchpadV2DescriptorArray);
 
 // The HID descriptor extracted from the touch interface (ifc-000) of the
 // Wingcool S838F I2C-USB converter chip, with firmware of version
@@ -1295,7 +1308,7 @@ extern "C" const uint8_t eve_touchpad_v2_r_desc[560] = {
 // The descriptor doesn't fully comply with the USB-HID standards. Its third
 // top-level collection has a collection type of "Logical" instead of
 // "Application" required by the USB-HID standards.
-extern "C" const uint8_t kWingcoolS838FTouchInterfaceDescriptor[454] = {
+constexpr uint8_t kWingcoolS838FTouchInterfaceDescriptorArray[] = {
     0x05, 0x0D,        // Usage Page (Digitizer)
     0x09, 0x04,        // Usage (Touch Screen)
     0xA1, 0x01,        // Collection (Application)
@@ -1516,3 +1529,7 @@ extern "C" const uint8_t kWingcoolS838FTouchInterfaceDescriptor[454] = {
 
     // 454 bytes
 };
+constexpr cpp20::span<const uint8_t> kWingcoolS838FTouchInterfaceDescriptor(
+    kWingcoolS838FTouchInterfaceDescriptorArray);
+
+#endif  // SRC_UI_INPUT_LIB_HID_PARSER_TEST_HID_REPORT_DATA_H_

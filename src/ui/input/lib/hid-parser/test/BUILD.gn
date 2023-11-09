@@ -20,7 +20,7 @@ test("hid-parser") {
     "hid-descriptor-test.cc",
     "hid-helper-test.cc",
     "hid-parser-test.cc",
-    "hid-report-data.cc",
+    "hid-report-data.h",
     "hid-units-test.cc",
     "hid-utest-data.cc",
     "util.h",

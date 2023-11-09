@@ -14,19 +14,8 @@
 
 #include <gtest/gtest.h>
 
+#include "src/ui/input/lib/hid-parser/test/hid-report-data.h"
 #include "src/ui/input/lib/hid-parser/test/util.h"
-
-// See hid-report-data.cpp for the definitions of the test data.
-// TODO(fxbug.dev/136147): These descriptors are used only in the tests. We can
-// replace them with constexpr definitions in a header.
-extern "C" const uint8_t hp_mouse_r_desc[46];
-extern "C" const uint8_t trinket_r_desc[173];
-extern "C" const uint8_t ps3_ds_r_desc[148];
-extern "C" const uint8_t acer12_touch_r_desc[660];
-extern "C" const uint8_t eve_tablet_r_desc[28];
-extern "C" const uint8_t asus_touch_desc[945];
-extern "C" const uint8_t eve_touchpad_v2_r_desc[560];
-extern "C" const uint8_t kWingcoolS838FTouchInterfaceDescriptor[454];
 
 namespace {
 struct Stats {
@@ -60,8 +49,8 @@ size_t ItemizeHIDReportDesc(const uint8_t* rpt_desc, size_t desc_len, Stats* sta
 
 TEST(HidHelperTest, ItemizeAcer12Rpt1) {
   Stats stats = {};
-  auto len = sizeof(acer12_touch_r_desc);
-  auto consumed = ItemizeHIDReportDesc(acer12_touch_r_desc, len, &stats);
+  size_t len = kAcer12TouchDescriptor.size();
+  size_t consumed = ItemizeHIDReportDesc(kAcer12TouchDescriptor.data(), len, &stats);
 
   ASSERT_EQ(consumed, len);
   ASSERT_EQ(stats.input_count, 45);
@@ -71,8 +60,8 @@ TEST(HidHelperTest, ItemizeAcer12Rpt1) {
 
 TEST(HidHelperTest, ItemizeEveTabletRpt) {
   Stats stats = {};
-  auto len = sizeof(eve_tablet_r_desc);
-  auto consumed = ItemizeHIDReportDesc(eve_tablet_r_desc, len, &stats);
+  size_t len = kEveTabletDescriptor.size();
+  size_t consumed = ItemizeHIDReportDesc(kEveTabletDescriptor.data(), len, &stats);
 
   ASSERT_EQ(consumed, len);
   ASSERT_EQ(stats.input_count, 2);
@@ -84,7 +73,7 @@ TEST(HidHelperTest, ParseBootMouse) {
   hid::DeviceDescriptor* dev = nullptr;
   size_t len;
   const uint8_t* report_desc = get_boot_mouse_report_desc(&len);
-  auto res = hid::ParseReportDescriptor(report_desc, len, &dev);
+  hid::ParseResult res = hid::ParseReportDescriptor(report_desc, len, &dev);
 
   ASSERT_EQ(res, hid::ParseResult::kParseOk);
 
@@ -172,7 +161,8 @@ TEST(HidHelperTest, ParseBootMouse) {
 
 TEST(HidHelperTest, ParseHpMouse) {
   hid::DeviceDescriptor* dev = nullptr;
-  auto res = hid::ParseReportDescriptor(hp_mouse_r_desc, sizeof(hp_mouse_r_desc), &dev);
+  hid::ParseResult res =
+      hid::ParseReportDescriptor(kHpMouseDescriptor.data(), kHpMouseDescriptor.size(), &dev);
 
   ASSERT_EQ(res, hid::ParseResult::kParseOk);
 
@@ -258,7 +248,8 @@ TEST(HidHelperTest, ParseHpMouse) {
 
 TEST(HidHelperTest, ParseAdafTrinket) {
   hid::DeviceDescriptor* dev = nullptr;
-  auto res = hid::ParseReportDescriptor(trinket_r_desc, sizeof(trinket_r_desc), &dev);
+  hid::ParseResult res = hid::ParseReportDescriptor(kAdafruitTrinketDescriptor.data(),
+                                                    kAdafruitTrinketDescriptor.size(), &dev);
 
   ASSERT_EQ(res, hid::ParseResult::kParseOk);
 
@@ -483,7 +474,8 @@ TEST(HidHelperTest, ParseAdafTrinket) {
 
 TEST(HidHelperTest, ParsePs3Controller) {
   hid::DeviceDescriptor* dev = nullptr;
-  auto res = hid::ParseReportDescriptor(ps3_ds_r_desc, sizeof(ps3_ds_r_desc), &dev);
+  hid::ParseResult res = hid::ParseReportDescriptor(kPlayStation3DualshockDescriptor.data(),
+                                                    kPlayStation3DualshockDescriptor.size(), &dev);
 
   ASSERT_EQ(res, hid::ParseResult::kParseOk);
   // Four different reports
@@ -722,7 +714,8 @@ TEST(HidHelperTest, ParsePs3Controller) {
 
 TEST(HidHelperTest, ParseAcer12Touch) {
   hid::DeviceDescriptor* dd = nullptr;
-  auto res = hid::ParseReportDescriptor(acer12_touch_r_desc, sizeof(acer12_touch_r_desc), &dd);
+  hid::ParseResult res =
+      hid::ParseReportDescriptor(kAcer12TouchDescriptor.data(), kAcer12TouchDescriptor.size(), &dd);
 
   EXPECT_EQ(res, hid::ParseResult::kParseOk);
 
@@ -731,7 +724,8 @@ TEST(HidHelperTest, ParseAcer12Touch) {
 
 TEST(HidHelperTest, ParseEveTablet) {
   hid::DeviceDescriptor* dev = nullptr;
-  auto res = hid::ParseReportDescriptor(eve_tablet_r_desc, sizeof(eve_tablet_r_desc), &dev);
+  hid::ParseResult res =
+      hid::ParseReportDescriptor(kEveTabletDescriptor.data(), kEveTabletDescriptor.size(), &dev);
 
   EXPECT_EQ(res, hid::ParseResult::kParseOk);
 
@@ -770,15 +764,16 @@ TEST(HidHelperTest, ParseEveTablet) {
 
 TEST(HidHelperTest, ParseAsusTouch) {
   hid::DeviceDescriptor* dev = nullptr;
-  auto res = hid::ParseReportDescriptor(asus_touch_desc, sizeof(asus_touch_desc), &dev);
+  hid::ParseResult res =
+      hid::ParseReportDescriptor(kAsusTouchDescriptor.data(), kAsusTouchDescriptor.size(), &dev);
   ASSERT_EQ(res, hid::ParseResult::kParseOk);
   hid::FreeDeviceDescriptor(dev);
 }
 
 TEST(HidHelperTest, ParseEveTouchpadV2) {
   hid::DeviceDescriptor* dev = nullptr;
-  auto res =
-      hid::ParseReportDescriptor(eve_touchpad_v2_r_desc, sizeof(eve_touchpad_v2_r_desc), &dev);
+  hid::ParseResult res = hid::ParseReportDescriptor(kEveTouchpadV2Descriptor.data(),
+                                                    kEveTouchpadV2Descriptor.size(), &dev);
   ASSERT_EQ(res, hid::ParseResult::kParseOk);
   // Check that we have one main collection.
   EXPECT_EQ(dev->rep_count, 1u);
@@ -888,8 +883,9 @@ TEST(HidHelperTest, ParseEveTouchpadV2) {
 // still parse the descriptor despite the incompliance.
 TEST(HidHelperTest, ParseWingcoolS838FTouchInterface) {
   hid::DeviceDescriptor* dev = nullptr;
-  auto res = hid::ParseReportDescriptor(kWingcoolS838FTouchInterfaceDescriptor,
-                                        sizeof(kWingcoolS838FTouchInterfaceDescriptor), &dev);
+  hid::ParseResult res =
+      hid::ParseReportDescriptor(kWingcoolS838FTouchInterfaceDescriptor.data(),
+                                 kWingcoolS838FTouchInterfaceDescriptor.size(), &dev);
   ASSERT_EQ(res, hid::ParseResult::kParseOk);
 
   // The touch interface has totally 5 report IDs.
