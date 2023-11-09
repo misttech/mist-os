@@ -1038,7 +1038,8 @@ pub fn sys_ptrace(
 ) -> Result<(), Errno> {
     match request {
         PTRACE_TRACEME => ptrace_traceme(current_task),
-        PTRACE_ATTACH => ptrace_attach(current_task, pid),
+        PTRACE_ATTACH => ptrace_attach(current_task, pid, PtraceAttachType::Attach),
+        PTRACE_SEIZE => ptrace_attach(current_task, pid, PtraceAttachType::Seize),
         _ => ptrace_dispatch(current_task, request, pid, addr, data),
     }
 }

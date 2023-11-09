@@ -48,7 +48,11 @@
                 "__cxa_demangle.DISABLED_cxa_demangle_fuzz_167977068",
 
                 // Ptrace
-                "PtraceResumptionTest.*",
+                "PtraceResumptionTest.smoke",
+                "PtraceResumptionTest.seize_interrupt",
+                "PtraceResumptionTest.seize_interrupt_cont",
+                "PtraceResumptionTest.zombie_seize_interrupt",
+                "PtraceResumptionTest.zombie_seize_interrupt_cont",
 
                 // Our test runner doesn't understand DISABLED
                 "android_mallopt.DISABLED_multiple_enable_gwp_asan",
