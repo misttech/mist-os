@@ -13,6 +13,7 @@
 #include <lib/device-protocol/display-panel.h>
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
+#include <zircon/syscalls/smc.h>
 
 #include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
@@ -68,6 +69,16 @@ static const std::vector<fpbus::Mmio> display_mmios{
         .base = A311D_GPIO_BASE,
         .length = A311D_GPIO_LENGTH,
     }},
+    {{
+        // HDMITX (HDMI transmitter) Controller IP registers
+        .base = A311D_HDMITX_CONTROLLER_IP_BASE,
+        .length = A311D_HDMITX_CONTROLLER_IP_LENGTH,
+    }},
+    {{
+        // HDMITX (HDMI transmitter) Top-level registers
+        .base = A311D_HDMITX_TOP_LEVEL_BASE,
+        .length = A311D_HDMITX_TOP_LEVEL_LENGTH,
+    }},
 };
 
 static const std::vector<fpbus::Irq> display_irqs{
@@ -89,6 +100,14 @@ static const std::vector<fpbus::Bti> display_btis{
     {{
         .iommu_index = 0,
         .bti_id = BTI_DISPLAY,
+    }},
+};
+
+static const std::vector<fpbus::Smc> kDisplaySmcs{
+    {{
+        .service_call_num_base = ARM_SMC_SERVICE_CALL_NUM_SIP_SERVICE_BASE,
+        .count = 1,
+        .exclusive = false,
     }},
 };
 
@@ -122,6 +141,7 @@ zx_status_t Vim3::DisplayInit() {
     dev.mmio() = display_mmios;
     dev.irq() = display_irqs;
     dev.bti() = display_btis;
+    dev.smc() = kDisplaySmcs;
     return dev;
   }();
 

@@ -38,6 +38,7 @@ enum {
   MMIO_AOBUS,     // RTI / AO_RTI / AOBUS_RTI
   MMIO_RESET,     // RESET
   MMIO_GPIO_MUX,  // PERIPHS_REGS (GPIO Multiplexing)
+  MMIO_HDMITX,    // HDMITX (HDMI Transmitter)
 };
 
 // Should match display_gpios table in board driver
