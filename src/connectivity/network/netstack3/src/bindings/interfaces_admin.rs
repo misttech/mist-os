@@ -58,7 +58,8 @@ use netstack3_core::{
 };
 
 use crate::bindings::{
-    devices, netdevice_worker, routes,
+    devices, netdevice_worker,
+    routes::{self, admin::RouteSet},
     util::{IntoCore as _, TryIntoCore as _},
     BindingId, Ctx, DeviceIdExt as _, Netstack, StackTime,
 };

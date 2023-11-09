@@ -1040,6 +1040,8 @@ pub(crate) enum Service {
     RoutesStateV6(fidl_fuchsia_net_routes::StateV6RequestStream),
     RoutesAdminV4(fidl_fuchsia_net_routes_admin::SetProviderV4RequestStream),
     RoutesAdminV6(fidl_fuchsia_net_routes_admin::SetProviderV6RequestStream),
+    RootRoutesV4(fidl_fuchsia_net_root::RoutesV4RequestStream),
+    RootRoutesV6(fidl_fuchsia_net_root::RoutesV6RequestStream),
     Socket(fidl_fuchsia_posix_socket::ProviderRequestStream),
     Stack(fidl_fuchsia_net_stack::StackRequestStream),
     Verifier(fidl_fuchsia_update_verify::NetstackVerifierRequestStream),
@@ -1313,6 +1315,30 @@ impl NetstackSeed {
                             tracing::error!(
                                 "error serving {}: {e:?}",
                                 fidl_fuchsia_net_routes_admin::SetProviderV6Marker::DEBUG_NAME
+                            );
+                        }),
+                        Service::RootRoutesV4(rs) => root_fidl_worker::serve_routes_v4(
+                            rs,
+                            route_set_spawner.clone(),
+                            &netstack.ctx,
+                        )
+                        .await
+                        .unwrap_or_else(|e| {
+                            tracing::error!(
+                                "error serving {}: {e:?}",
+                                fidl_fuchsia_net_root::RoutesV4Marker::DEBUG_NAME
+                            );
+                        }),
+                        Service::RootRoutesV6(rs) => root_fidl_worker::serve_routes_v6(
+                            rs,
+                            route_set_spawner.clone(),
+                            &netstack.ctx,
+                        )
+                        .await
+                        .unwrap_or_else(|e| {
+                            tracing::error!(
+                                "error serving {}: {e:?}",
+                                fidl_fuchsia_net_root::RoutesV6Marker::DEBUG_NAME
                             );
                         }),
                         Service::Interfaces(interfaces) => {

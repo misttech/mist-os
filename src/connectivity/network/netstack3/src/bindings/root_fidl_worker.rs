@@ -10,12 +10,14 @@ use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fidl_fuchsia_net_root as fnet_root;
 use fuchsia_zircon as zx;
 use futures::TryStreamExt as _;
+use net_types::ip::{Ipv4, Ipv6};
 use tracing::{debug, error};
 
 use crate::bindings::{
     devices::{BindingId, DeviceSpecificInfo, LOOPBACK_MAC},
     interfaces_admin,
-    util::IntoFidl as _,
+    routes::admin::{serve_route_set, GlobalRouteSet},
+    util::{IntoFidl as _, TaskWaitGroupSpawner},
     DeviceIdExt as _, Netstack,
 };
 
@@ -82,4 +84,44 @@ fn handle_get_mac(ns: &Netstack, interface_id: u64) -> fnet_root::InterfacesGetM
             };
             Some(Box::new(mac.into_fidl()))
         })
+}
+
+pub(crate) async fn serve_routes_v4(
+    mut rs: fnet_root::RoutesV4RequestStream,
+    spawner: TaskWaitGroupSpawner,
+    ctx: &crate::bindings::Ctx,
+) -> Result<(), fidl::Error> {
+    while let Some(req) = rs.try_next().await? {
+        match req {
+            fnet_root::RoutesV4Request::GlobalRouteSet { route_set, control_handle: _ } => {
+                let stream = route_set.into_stream()?;
+                let ctx = ctx.clone();
+                spawner.spawn(async {
+                    serve_route_set::<Ipv4, _, _>(stream, GlobalRouteSet::new(ctx)).await;
+                });
+            }
+        }
+    }
+
+    Ok(())
+}
+
+pub(crate) async fn serve_routes_v6(
+    mut rs: fnet_root::RoutesV6RequestStream,
+    spawner: TaskWaitGroupSpawner,
+    ctx: &crate::bindings::Ctx,
+) -> Result<(), fidl::Error> {
+    while let Some(req) = rs.try_next().await? {
+        match req {
+            fnet_root::RoutesV6Request::GlobalRouteSet { route_set, control_handle: _ } => {
+                let stream = route_set.into_stream()?;
+                let ctx = ctx.clone();
+                spawner.spawn(async {
+                    serve_route_set::<Ipv6, _, _>(stream, GlobalRouteSet::new(ctx)).await;
+                });
+            }
+        }
+    }
+
+    Ok(())
 }

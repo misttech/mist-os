@@ -70,7 +70,7 @@ impl FidlRouteAdminIpExt for Ipv6 {
 }
 
 /// Abstracts over AddRoute and RemoveRoute RouteSet method responders.
-pub trait Responder: fidl::endpoints::Responder + Debug {
+pub trait Responder: fidl::endpoints::Responder + Debug + Send {
     /// The payload of the response.
     type Payload;
 

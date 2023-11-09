@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use std::borrow::Borrow;
+
+use async_trait::async_trait;
 use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
 use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
 use fnet_routes_ext::{
@@ -18,16 +21,29 @@ use crate::bindings::{
     BindingsNonSyncCtxImpl,
 };
 
-async fn serve_route_set<I: Ip + FidlRouteAdminIpExt + FidlRouteIpExt>(
+async fn serve_user_route_set<I: Ip + FidlRouteAdminIpExt + FidlRouteIpExt>(
     ctx: crate::bindings::Ctx,
     stream: I::RouteSetRequestStream,
+) {
+    let route_set = UserRouteSet::new(ctx);
+
+    serve_route_set::<I, UserRouteSet, _>(stream, &route_set).await;
+
+    route_set.close().await;
+}
+
+pub(crate) async fn serve_route_set<
+    I: Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
+    R: RouteSet,
+    B: Borrow<R>,
+>(
+    stream: I::RouteSetRequestStream,
+    route_set: B,
 ) {
     let debug_name = match I::VERSION {
         IpVersion::V4 => "RouteSetV4",
         IpVersion::V6 => "RouteSetV6",
     };
-
-    let route_set = UserRouteSet::new(ctx);
 
     #[derive(GenericOverIp)]
     #[generic_over_ip(I, Ip)]
@@ -37,7 +53,7 @@ async fn serve_route_set<I: Ip + FidlRouteAdminIpExt + FidlRouteIpExt>(
 
     stream
         .try_for_each(|request| {
-            let route_set = &route_set;
+            let route_set = route_set.borrow();
             async move {
                 let request = net_types::map_ip_twice!(I, In(request), |In(request)| {
                     fnet_routes_ext::admin::RouteSetRequest::<I>::from(request)
@@ -57,8 +73,6 @@ async fn serve_route_set<I: Ip + FidlRouteAdminIpExt + FidlRouteIpExt>(
                 tracing::error!("error serving {debug_name}: {e:?}");
             }
         });
-
-    route_set.close().await;
 }
 
 pub(crate) async fn serve_provider_v4(
@@ -75,7 +89,7 @@ pub(crate) async fn serve_provider_v4(
                 control_handle: _,
             } => {
                 let set_request_stream = route_set.into_stream()?;
-                spawner.spawn(serve_route_set::<Ipv4>(ctx.clone(), set_request_stream));
+                spawner.spawn(serve_user_route_set::<Ipv4>(ctx.clone(), set_request_stream));
             }
         };
     }
@@ -97,7 +111,7 @@ pub(crate) async fn serve_provider_v6(
                 control_handle: _,
             } => {
                 let set_request_stream = route_set.into_stream()?;
-                spawner.spawn(serve_route_set::<Ipv6>(ctx.clone(), set_request_stream));
+                spawner.spawn(serve_user_route_set::<Ipv6>(ctx.clone(), set_request_stream));
             }
         };
     }
@@ -136,7 +150,7 @@ impl UserRouteSet {
         Self { ctx, set: Some(set) }
     }
 
-    fn set(&self) -> netstack3_core::sync::WeakRc<UserRouteSetId> {
+    fn weak_set_id(&self) -> netstack3_core::sync::WeakRc<UserRouteSetId> {
         netstack3_core::sync::PrimaryRc::downgrade(
             self.set.as_ref().expect("close() can't have been called because it takes ownership"),
         )
@@ -169,13 +183,13 @@ impl UserRouteSet {
         consume_outcome(
             self.ctx
                 .non_sync_ctx()
-                .apply_route_change::<Ipv4>(routes::Change::RemoveSet(self.set()))
+                .apply_route_change::<Ipv4>(routes::Change::RemoveSet(self.weak_set_id()))
                 .await,
         );
         consume_outcome(
             self.ctx
                 .non_sync_ctx()
-                .apply_route_change::<Ipv6>(routes::Change::RemoveSet(self.set()))
+                .apply_route_change::<Ipv6>(routes::Change::RemoveSet(self.weak_set_id()))
                 .await,
         );
 
@@ -185,6 +199,45 @@ impl UserRouteSet {
                 set.take().expect("close() can't be called twice"),
             );
     }
+}
+
+impl RouteSet for UserRouteSet {
+    fn set(&self) -> routes::SetMembership<netstack3_core::sync::WeakRc<UserRouteSetId>> {
+        routes::SetMembership::User(self.weak_set_id())
+    }
+
+    fn ctx(&self) -> &crate::bindings::Ctx {
+        &self.ctx
+    }
+}
+
+pub(crate) struct GlobalRouteSet {
+    ctx: crate::bindings::Ctx,
+}
+
+impl GlobalRouteSet {
+    #[cfg_attr(feature = "instrumented", track_caller)]
+    pub(crate) fn new(ctx: crate::bindings::Ctx) -> Self {
+        Self { ctx }
+    }
+}
+
+impl RouteSet for GlobalRouteSet {
+    fn set(
+        &self,
+    ) -> routes::SetMembership<netstack3_core::sync::WeakRc<routes::admin::UserRouteSetId>> {
+        routes::SetMembership::Global
+    }
+
+    fn ctx(&self) -> &crate::bindings::Ctx {
+        &self.ctx
+    }
+}
+
+#[async_trait]
+pub(crate) trait RouteSet: Send + Sync {
+    fn set(&self) -> routes::SetMembership<netstack3_core::sync::WeakRc<UserRouteSetId>>;
+    fn ctx(&self) -> &crate::bindings::Ctx;
 
     async fn handle_request<I: Ip + FidlRouteAdminIpExt + fnet_routes_ext::FidlRouteIpExt>(
         &self,
@@ -226,24 +279,21 @@ impl UserRouteSet {
         }
     }
 
-    pub(crate) async fn apply_route_op<A: IpAddress>(
+    async fn apply_route_op<A: IpAddress>(
         &self,
         op: routes::RouteOp<A>,
     ) -> Result<routes::ChangeOutcome, routes::Error> {
-        self.ctx
+        self.ctx()
             .non_sync_ctx()
-            .apply_route_change::<A::Version>(routes::Change::RouteOp(
-                op,
-                routes::SetMembership::User(self.set()),
-            ))
+            .apply_route_change::<A::Version>(routes::Change::RouteOp(op, self.set()))
             .await
     }
 
-    pub(crate) async fn add_fidl_route<I: Ip>(
+    async fn add_fidl_route<I: Ip>(
         &self,
         route: fnet_routes_ext::Route<I>,
     ) -> Result<bool, fnet_routes_admin::RouteSetError> {
-        let addable_entry = try_to_addable_entry::<I>(self.ctx.non_sync_ctx(), route)?
+        let addable_entry = try_to_addable_entry::<I>(self.ctx().non_sync_ctx(), route)?
             .map_device_id(|d| d.downgrade());
 
         let result = self.apply_route_op::<I::Addr>(routes::RouteOp::Add(addable_entry)).await;
@@ -255,7 +305,7 @@ impl UserRouteSet {
             },
             Err(err) => match err {
                 routes::Error::DeviceRemoved => Err(
-                    fnet_routes_admin::RouteSetError::PreviouslyAuthenticatedInterfaceNoLongerExists
+                    fnet_routes_admin::RouteSetError::PreviouslyAuthenticatedInterfaceNoLongerExists,
                 ),
                 routes::Error::ShuttingDown => panic!("routes change worker is shutting down"),
                 routes::Error::SetRemoved => unreachable!(
@@ -266,12 +316,12 @@ impl UserRouteSet {
         }
     }
 
-    pub(crate) async fn remove_fidl_route<I: Ip>(
+    async fn remove_fidl_route<I: Ip>(
         &self,
         route: fnet_routes_ext::Route<I>,
     ) -> Result<bool, fnet_routes_admin::RouteSetError> {
         let AddableEntry { subnet, device, gateway, metric } =
-            try_to_addable_entry::<I>(self.ctx.non_sync_ctx(), route)?
+            try_to_addable_entry::<I>(self.ctx().non_sync_ctx(), route)?
                 .map_device_id(|d| d.downgrade());
 
         let result = self
@@ -290,7 +340,7 @@ impl UserRouteSet {
             },
             Err(err) => match err {
                 routes::Error::DeviceRemoved => Err(
-                    fnet_routes_admin::RouteSetError::PreviouslyAuthenticatedInterfaceNoLongerExists
+                    fnet_routes_admin::RouteSetError::PreviouslyAuthenticatedInterfaceNoLongerExists,
                 ),
                 routes::Error::ShuttingDown => panic!("routes change worker is shutting down"),
                 routes::Error::SetRemoved => unreachable!(
