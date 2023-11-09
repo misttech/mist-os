@@ -4,7 +4,7 @@
 
 use {
     event_queue::Event, fidl_fuchsia_update as fidl, proptest::prelude::*,
-    proptest_derive::Arbitrary, std::convert::TryFrom, thiserror::Error,
+    proptest_derive::Arbitrary, std::convert::TryFrom, std::fmt, thiserror::Error,
     typed_builder::TypedBuilder,
 };
 
@@ -49,6 +49,37 @@ impl State {
             | State::InstallationDeferredByPolicy(_)
             | State::WaitingForReboot(_) => true,
         }
+    }
+}
+
+impl fmt::Display for State {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            State::CheckingForUpdates => write!(f, "Checking for updates...")?,
+            State::ErrorCheckingForUpdate => write!(f, "Error checking for update!")?,
+            State::InstallationError(_) => write!(f, "Installation error: {self:?}")?,
+            State::NoUpdateAvailable => write!(f, "No update available.")?,
+            State::InstallationDeferredByPolicy(InstallationDeferredData {
+                deferral_reason,
+                ..
+            }) => {
+                write!(f, "Installation deferred by policy: {deferral_reason:?}")?;
+            }
+            State::InstallingUpdate(InstallingData { update, installation_progress }) => {
+                if let Some(UpdateInfo { version_available: Some(version), .. }) = update {
+                    write!(f, "Installing {version}")?;
+                } else {
+                    write!(f, "Installing update")?;
+                }
+                if let Some(InstallationProgress { fraction_completed: Some(fraction) }) =
+                    installation_progress
+                {
+                    write!(f, " ({:.2}%)", fraction * 100.0)?;
+                }
+            }
+            State::WaitingForReboot(_) => write!(f, "Waiting for reboot...")?,
+        }
+        Ok(())
     }
 }
 

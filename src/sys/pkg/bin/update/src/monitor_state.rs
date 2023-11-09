@@ -6,10 +6,19 @@ use {
     fidl_fuchsia_update::{MonitorRequest, MonitorRequestStream},
     fidl_fuchsia_update_ext::State,
     futures::prelude::*,
+    std::io::Write,
 };
 
 fn print_state(state: &State) {
-    println!("State: {state:?}");
+    if termion::is_tty(&std::io::stdout()) {
+        print!("\r{}\x1b[K", state);
+        if state.is_terminal() {
+            println!();
+        }
+    } else {
+        println!("State: {state:?}")
+    }
+    std::io::stdout().flush().unwrap();
 }
 
 pub async fn monitor_state(mut stream: MonitorRequestStream) -> Result<(), anyhow::Error> {

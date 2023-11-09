@@ -28,6 +28,7 @@ rustc_library("lib") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:termion",
   ]
 
   test_deps = [

@@ -98,12 +98,20 @@ async fn monitor_state<W: std::io::Write>(
                 responder.send()?;
 
                 let state = State::from(state);
-
+                // Use escape sequences to make this line overwrite the current terminal line.
+                // \r: send cursor to start of line
+                // \x1b[K: clear to end of line
+                if termion::is_tty(&std::io::stdout()) {
+                    write!(writer, "\r{}\x1b[K", state)?;
+                    if state.is_terminal() {
+                        write!(writer, "\n")?;
+                    }
+                } else {
+                    writeln!(writer, "State: {state:?}")?;
+                }
                 // Exit if we encounter an error during an update.
                 if state.is_error() {
                     anyhow::bail!("Update failed: {:?}", state)
-                } else {
-                    writeln!(writer, "State: {:?}", state)?;
                 }
             }
         }
