@@ -67,3 +67,17 @@ python_mobly_test("tracing_test") {
     "//src/developer/ffx/lib/fuchsia-controller/tests:fuchsia_controller_test_data",
   ]
 }
+
+python_mobly_test("multi_device_test") {
+  main_source = "multi_device_test.py"
+  libraries = [
+    "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
+    "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly/mobly_controller",
+  ]
+  multi_fuchsia_device = true
+  deps = [
+    ":tracing_runtime_deps",
+    "//sdk/fidl/fuchsia.bluetooth.sys:fuchsia.bluetooth.sys_host_test_data",
+    "//src/developer/ffx/lib/fuchsia-controller/tests:fuchsia_controller_test_data",
+  ]
+}
