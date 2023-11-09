@@ -242,6 +242,7 @@ DriverRunner::DriverRunner(fidl::ClientEnd<fcomponent::Realm> realm,
       composite_node_spec_manager_(this),
       bind_manager_(this, this, dispatcher),
       runner_(dispatcher, fidl::WireClient(std::move(realm), dispatcher)),
+      removal_tracker_(dispatcher),
       enable_test_shutdown_delays_(enable_test_shutdown_delays) {
   if (enable_test_shutdown_delays_) {
     // TODO(fxb/134783): Allow the seed to be set from the configuration.

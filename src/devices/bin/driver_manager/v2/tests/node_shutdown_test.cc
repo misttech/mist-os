@@ -141,7 +141,8 @@ class NodeShutdownTest : public DriverManagerTestBase {
     node_manager = std::make_unique<FakeNodeManager>(
         fidl::WireClient<fuchsia_component::Realm>(std::move(client.value()), dispatcher()));
 
-    removal_tracker_.set_all_callback([this]() { remove_all_callback_invoked_ = true; });
+    removal_tracker_ = std::make_unique<NodeRemovalTracker>(dispatcher());
+    removal_tracker_->set_all_callback([this]() { remove_all_callback_invoked_ = true; });
 
     nodes_["root"] = root();
   }
@@ -236,8 +237,8 @@ class NodeShutdownTest : public DriverManagerTestBase {
   void InvokeRemoveNode(std::string node_name) {
     auto node = nodes_[node_name].lock();
     ASSERT_TRUE(node);
-    node->Remove(RemovalSet::kAll, &removal_tracker_);
-    removal_tracker_.FinishEnumeration();
+    node->Remove(RemovalSet::kAll, removal_tracker_.get());
+    removal_tracker_->FinishEnumeration();
     RunLoopUntilIdle();
   }
 
@@ -274,7 +275,7 @@ class NodeShutdownTest : public DriverManagerTestBase {
   std::unique_ptr<FakeNodeManager> node_manager;
 
  private:
-  NodeRemovalTracker removal_tracker_;
+  std::unique_ptr<NodeRemovalTracker> removal_tracker_;
 
   bool remove_all_callback_invoked_ = false;
 

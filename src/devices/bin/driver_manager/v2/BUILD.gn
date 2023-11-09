@@ -200,6 +200,7 @@ executable("node_removal_tracker_test") {
   deps = [
     ":driver_runner",
     "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/loop_fixture",
     "//zircon/system/ulib/zircon-internal",
   ]
 }

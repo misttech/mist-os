@@ -6,6 +6,8 @@
 
 #include <gtest/gtest.h>
 
+#include "src/lib/testing/loop_fixture/test_loop_fixture.h"
+
 struct NodeBank {
   NodeBank(dfv2::NodeRemovalTracker *tracker) : tracker_(tracker) {}
   void AddNode(dfv2::Collection collection, dfv2::NodeState state) {
@@ -26,8 +28,10 @@ struct NodeBank {
   dfv2::NodeRemovalTracker *tracker_;
 };
 
-TEST(NodeRemovalTracker, RegisterOneNode) {
-  dfv2::NodeRemovalTracker tracker;
+class NodeRemovalTrackerTest : public gtest::TestLoopFixture {};
+
+TEST_F(NodeRemovalTrackerTest, RegisterOneNode) {
+  dfv2::NodeRemovalTracker tracker(dispatcher());
   dfv2::NodeId id = tracker.RegisterNode(dfv2::NodeRemovalTracker::Node{
       .name = "node",
       .collection = dfv2::Collection::kBoot,
@@ -44,8 +48,8 @@ TEST(NodeRemovalTracker, RegisterOneNode) {
   EXPECT_EQ(all_callbacks, 1);
 }
 
-TEST(NodeRemovalTracker, RegisterManyNodes) {
-  dfv2::NodeRemovalTracker tracker;
+TEST_F(NodeRemovalTrackerTest, RegisterManyNodes) {
+  dfv2::NodeRemovalTracker tracker(dispatcher());
   NodeBank node_bank(&tracker);
   node_bank.AddNode(dfv2::Collection::kBoot, dfv2::NodeState::kRunning);
   node_bank.AddNode(dfv2::Collection::kBoot, dfv2::NodeState::kRunning);
@@ -66,8 +70,8 @@ TEST(NodeRemovalTracker, RegisterManyNodes) {
 
 // Make sure package callback is only called when package drivers stop
 // and all callback is only called when all drivers stop
-TEST(NodeRemovalTracker, CallbacksCallOrder) {
-  dfv2::NodeRemovalTracker tracker;
+TEST_F(NodeRemovalTrackerTest, CallbacksCallOrder) {
+  dfv2::NodeRemovalTracker tracker(dispatcher());
   NodeBank boot_node_bank(&tracker), package_node_bank(&tracker);
   boot_node_bank.AddNode(dfv2::Collection::kBoot, dfv2::NodeState::kRunning);
   boot_node_bank.AddNode(dfv2::Collection::kBoot, dfv2::NodeState::kRunning);
@@ -94,8 +98,8 @@ TEST(NodeRemovalTracker, CallbacksCallOrder) {
 
 // This tests verifies that set_all_callback can be called
 // during the pkg_callback without causing a deadlock.
-TEST(NodeRemovalTracker, CallbackDeadlock) {
-  dfv2::NodeRemovalTracker tracker;
+TEST_F(NodeRemovalTrackerTest, CallbackDeadlock) {
+  dfv2::NodeRemovalTracker tracker(dispatcher());
   dfv2::NodeId id = tracker.RegisterNode(dfv2::NodeRemovalTracker::Node{
       .name = "node",
       .collection = dfv2::Collection::kBoot,
@@ -115,8 +119,8 @@ TEST(NodeRemovalTracker, CallbackDeadlock) {
 }
 
 // Make sure callbacks are not called until FinishEnumeration is called
-TEST(NodeRemovalTracker, FinishEnumeration) {
-  dfv2::NodeRemovalTracker tracker;
+TEST_F(NodeRemovalTrackerTest, FinishEnumeration) {
+  dfv2::NodeRemovalTracker tracker(dispatcher());
   NodeBank node_bank(&tracker);
   node_bank.AddNode(dfv2::Collection::kBoot, dfv2::NodeState::kRunning);
   node_bank.AddNode(dfv2::Collection::kBoot, dfv2::NodeState::kRunning);

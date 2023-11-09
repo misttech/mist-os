@@ -11,6 +11,12 @@
 
 namespace dfv2 {
 
+namespace {
+
+zx::duration kRemovalTimeoutDuration = zx::sec(30);
+
+}
+
 NodeId NodeRemovalTracker::RegisterNode(Node node) {
   if (node.collection == Collection::kPackage) {
     remaining_pkg_nodes_.emplace(next_node_id_);
@@ -28,6 +34,12 @@ void NodeRemovalTracker::Notify(NodeId id, NodeState state) {
     return;
   }
   itr->second.state = state;
+
+  if (handle_timeout_task_.is_pending()) {
+    handle_timeout_task_.Cancel();
+    handle_timeout_task_.PostDelayed(dispatcher_, kRemovalTimeoutDuration);
+  }
+
   if (state != NodeState::kStopped) {
     return;
   }
@@ -40,25 +52,35 @@ void NodeRemovalTracker::Notify(NodeId id, NodeState state) {
   CheckRemovalDone();
 }
 
+void NodeRemovalTracker::OnRemovalTimeout() {
+  LOGF(INFO, "Node removal hanging: %zu pkg %zu all remaining", remaining_pkg_node_count(),
+       remaining_node_count());
+  for (auto& [id, node] : nodes_) {
+    if (node.state == NodeState::kStopped) {
+      continue;
+    }
+    LOGF(INFO, "  Node '%s' waiting on %s", node.name.c_str(),
+         node.state == NodeState::kWaitingOnDriver     ? "driver"
+         : node.state == NodeState::kWaitingOnChildren ? "children"
+                                                       : "nothing");
+  }
+}
+
 void NodeRemovalTracker::CheckRemovalDone() {
   if (fully_enumerated_ == false) {
     return;
   };
 
-  size_t pkg_count = remaining_pkg_nodes_.size();
-  size_t all_count = pkg_count + remaining_non_pkg_nodes_.size();
-
-  // TODO(fxb/130850): Remove logs or lower their severity once the ASAN issue is resolved.
-  LOGF(INFO, "NodeRemovalTracker: %zu pkg %zu all remaining", pkg_count, all_count);
-  if (pkg_callback_ && pkg_count == 0) {
+  if (pkg_callback_ && remaining_pkg_node_count() == 0) {
     LOGF(INFO, "NodeRemovalTracker: package removal completed");
     pkg_callback_();
     pkg_callback_ = nullptr;
   }
-  if (all_callback_ && all_count == 0) {
+  if (all_callback_ && remaining_node_count() == 0) {
     LOGF(INFO, "NodeRemovalTracker: all nodes removed");
     all_callback_();
     all_callback_ = nullptr;
+    handle_timeout_task_.Cancel();
     nodes_.clear();
   }
 }
@@ -72,6 +94,7 @@ void NodeRemovalTracker::set_all_callback(fit::callback<void()> callback) {
 
 void NodeRemovalTracker::FinishEnumeration() {
   fully_enumerated_ = true;
+  handle_timeout_task_.PostDelayed(dispatcher_, kRemovalTimeoutDuration);
   CheckRemovalDone();
 }
 
