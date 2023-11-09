@@ -18,7 +18,6 @@ const WIP_STATUS = 'Socialization';
 const DEFAULT_STATUS = 'Draft';
 const ABANDONED_STATUS = 'Withdrawn';
 
-const BASE_URL = 'https://fuchsia-review.googlesource.com';
 const RFCS_DIR = 'docs/contribute/governance/rfcs';
 const SUBJECT_TAG = '[rfc]';
 
@@ -61,10 +60,11 @@ function _fetchRfcs(tableId) {
 
 // Returns an Array of change_ids.
 function _fetchOpenRfcsCls() {
-  const data = _doGerritRequest(BASE_URL + '/changes/?q='
+  const data = parseGerritResponse(UrlFetchApp.fetch(
+    GERRIT_API_URL + '/changes/?q='
     + 'dir:' + encodeURIComponent(RFCS_DIR)
     + '+is:open'
-    + '&n=100');
+    + '&n=100'));
 
   const changeIds = [];
 
@@ -107,20 +107,6 @@ function _getExistingRfcs(tableId) {
   return rfcs;
 }
 
-// Takes the URL for a gerrit REST API request, does the RPC, and returns a
-// parsed JSON object with the result.
-//
-// See https://gerrit-review.googlesource.com/Documentation/rest-api-changes.html for documentation.
-function _doGerritRequest(url) {
-  console.log('Gerrit RPC: ', url);
-  const response = UrlFetchApp.fetch(url);
-  const rawJson = response.getContentText().substring(5);
-
-  console.log('Gerrit Response: ', rawJson);
-
-  return JSON.parse(rawJson);
-}
-
 // Apply any programmatic updates we might want to make to the given row.
 // Specifically, fetch the latest state from gerrit and update the row to
 // match.
@@ -132,9 +118,10 @@ function syncRow(tableId, rowId) {
 
   const changeId = row.values[CHANGE_ID_COL];
 
-  const cl = _doGerritRequest(
-    BASE_URL + `/changes/${changeId}?o=DETAILED_ACCOUNTS` //  include _account_id, email and username fields when referencing accounts.
-  );
+  const cl = parseGerritResponse(UrlFetchApp.fetch(
+    // include _account_id, email and username fields when referencing accounts.
+    GERRIT_API_URL + `/changes/${changeId}?o=DETAILED_ACCOUNTS`
+  ));
 
   // Remove subject prefix tags (e.g. '[rfc][docs]')
   const title = cl.subject.replace(/^(\S+]\s)/i, '');
