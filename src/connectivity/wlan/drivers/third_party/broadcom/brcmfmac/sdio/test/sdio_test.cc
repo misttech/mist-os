@@ -36,7 +36,6 @@
 #include <zxtest/zxtest.h>
 
 #include "sdk/lib/driver/testing/cpp/driver_runtime.h"
-
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/bus.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/common.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/device.h"
@@ -185,8 +184,8 @@ class FakeSdioBus {
 
 class SdioTest : public zxtest::Test {
  protected:
-   fdf_testing::DriverRuntime* runtime() { return fdf_testing::DriverRuntime::GetInstance(); }
-   std::shared_ptr<MockDevice> root_{MockDevice::FakeRootParent()};
+  fdf_testing::DriverRuntime* runtime() { return fdf_testing::DriverRuntime::GetInstance(); }
+  std::shared_ptr<MockDevice> root_{MockDevice::FakeRootParent()};
 };
 
 TEST_F(SdioTest, IntrRegisterStartup) {

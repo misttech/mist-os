@@ -94,7 +94,6 @@ test("aml-securemem-test-bin") {
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/bus/testing/fake-pdev",
     "//src/devices/lib/driver:driver_runtime",
-    "//src/devices/testing/driver-runtime-main:zxtest",
     "//src/devices/testing/mock-ddk",
     "//src/security/lib/tee/tee-client-api:tee-client-api-static",
     "//zircon/system/ulib/async:async-cpp",
