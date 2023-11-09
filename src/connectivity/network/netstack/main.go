@@ -874,6 +874,36 @@ func Main() {
 	}
 
 	{
+		stub := root.RoutesV4WithCtxStub{Impl: &rootRoutesV4Impl{ns: ns}}
+		componentCtx.OutgoingService.AddService(
+			root.RoutesV4Name,
+			func(ctx context.Context, c zx.Channel) error {
+				go component.Serve(ctx, &stub, c, component.ServeOptions{
+					OnError: func(err error) {
+						_ = syslog.WarnTf(root.RoutesV4Name, "%s", err)
+					},
+				})
+				return nil
+			},
+		)
+	}
+
+	{
+		stub := root.RoutesV6WithCtxStub{Impl: &rootRoutesV6Impl{ns: ns}}
+		componentCtx.OutgoingService.AddService(
+			root.RoutesV6Name,
+			func(ctx context.Context, c zx.Channel) error {
+				go component.Serve(ctx, &stub, c, component.ServeOptions{
+					OnError: func(err error) {
+						_ = syslog.WarnTf(root.RoutesV6Name, "%s", err)
+					},
+				})
+				return nil
+			},
+		)
+	}
+
+	{
 		stub := debug.DiagnosticsWithCtxStub{Impl: &debugDiagnosticsImpl{}}
 		componentCtx.OutgoingService.AddService(
 			debug.DiagnosticsName,

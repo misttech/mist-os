@@ -13,15 +13,18 @@ import (
 	"syscall/zx"
 	"syscall/zx/fidl"
 
+	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/fidlconv"
+	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/routetypes"
 	"go.fuchsia.dev/fuchsia/src/lib/component"
 	syslog "go.fuchsia.dev/fuchsia/src/lib/syslog/go"
 
-	"fidl/fuchsia/net/interfaces/admin"
+	fuchsianet "fidl/fuchsia/net"
+	interfacesadmin "fidl/fuchsia/net/interfaces/admin"
 	"fidl/fuchsia/net/root"
+	routesadmin "fidl/fuchsia/net/routes/admin"
 
 	"gvisor.dev/gvisor/pkg/tcpip"
 )
-import "go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/fidlconv"
 
 var _ root.InterfacesWithCtx = (*rootInterfacesImpl)(nil)
 
@@ -29,7 +32,7 @@ type rootInterfacesImpl struct {
 	ns *Netstack
 }
 
-func (ci *rootInterfacesImpl) GetAdmin(_ fidl.Context, nicid uint64, request admin.ControlWithCtxInterfaceRequest) error {
+func (ci *rootInterfacesImpl) GetAdmin(_ fidl.Context, nicid uint64, request interfacesadmin.ControlWithCtxInterfaceRequest) error {
 	{
 		nicid := tcpip.NICID(nicid)
 		nicInfo, ok := ci.ns.stack.NICInfo()[nicid]
@@ -56,4 +59,24 @@ func (ci *rootInterfacesImpl) GetMac(_ fidl.Context, nicid uint64) (root.Interfa
 		return root.InterfacesGetMacResultWithResponse(response), nil
 	}
 	return root.InterfacesGetMacResultWithErr(root.InterfacesGetMacErrorNotFound), nil
+}
+
+var _ root.RoutesV4WithCtx = (*rootRoutesV4Impl)(nil)
+
+type rootRoutesV4Impl struct {
+	ns *Netstack
+}
+
+func (r *rootRoutesV4Impl) GlobalRouteSet(ctx_ fidl.Context, request routesadmin.RouteSetV4WithCtxInterfaceRequest) error {
+	return bindV4RouteSet(request.Channel, routeSet[fuchsianet.Ipv4Address]{ns: r.ns, id: routetypes.GlobalRouteSet()})
+}
+
+var _ root.RoutesV6WithCtx = (*rootRoutesV6Impl)(nil)
+
+type rootRoutesV6Impl struct {
+	ns *Netstack
+}
+
+func (r *rootRoutesV6Impl) GlobalRouteSet(ctx_ fidl.Context, request routesadmin.RouteSetV6WithCtxInterfaceRequest) error {
+	return bindV6RouteSet(request.Channel, routeSet[fuchsianet.Ipv6Address]{ns: r.ns, id: nil})
 }

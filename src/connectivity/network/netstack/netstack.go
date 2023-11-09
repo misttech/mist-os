@@ -528,8 +528,15 @@ func (ns *Netstack) DelRouteExactMatch(r tcpip.Route, metric *routetypes.Metric,
 }
 
 // DelRouteSet deletes a route set, decrementing the reference count for every
-// route in the set.
+// route in the set.  If the route set is global, then no changes are made.
 func (ns *Netstack) DelRouteSet(set *routetypes.RouteSetId) {
+	// There is a check for IsGlobal in (*RouteTable.DelRouteSetLocked) to
+	// prevent accidentally deleting all routes.  This is just to prevent
+	// useless work from being done.
+	if set.IsGlobal() {
+		return
+	}
+
 	ns.mu.Lock()
 	defer ns.mu.Unlock()
 

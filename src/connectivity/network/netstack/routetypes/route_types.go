@@ -137,7 +137,11 @@ type SendRoutingTableChangeCb func(RoutingTableChange)
 
 // RouteSetId as a value means nothing, but pointers to RouteSetId are used as
 // unique identifiers of route sets.
-type RouteSetId struct{}
+//
+// The byte is there to make RouteSetId non-zero sized. As per the Go spec,
+// pointers to empty structs are not guaranteed to be unique.  See:
+// https://go.dev/ref/spec#Size_and_alignment_guarantees.
+type RouteSetId struct{ byte }
 
 func (id *RouteSetId) IsGlobal() bool {
 	return id == nil
