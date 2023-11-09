@@ -5,21 +5,16 @@
 #include <fuchsia/ui/composition/cpp/fidl.h>
 #include <fuchsia/ui/focus/cpp/fidl.h>
 #include <fuchsia/ui/observation/scope/cpp/fidl.h>
-#include <fuchsia/ui/scenic/cpp/fidl.h>
 #include <lib/async-loop/testing/cpp/real_loop.h>
 #include <lib/fidl/cpp/binding.h>
 #include <lib/fidl/cpp/interface_handle.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/syslog/cpp/macros.h>
-#include <lib/ui/scenic/cpp/resources.h>
-#include <lib/ui/scenic/cpp/session.h>
 #include <lib/ui/scenic/cpp/view_creation_tokens.h>
 #include <lib/ui/scenic/cpp/view_identity.h>
 #include <lib/ui/scenic/cpp/view_ref_pair.h>
 #include <zircon/status.h>
 
-#include <map>
-#include <string>
 #include <vector>
 
 #include <zxtest/zxtest.h>
@@ -92,33 +87,11 @@ using fuog_ViewDescriptor = fuchsia::ui::observation::geometry::ViewDescriptor;
 using fuog_ViewTreeSnapshot = fuchsia::ui::observation::geometry::ViewTreeSnapshot;
 using fuos_Registry = fuchsia::ui::observation::scope::Registry;
 using fuos_RegistryPtr = fuchsia::ui::observation::scope::RegistryPtr;
-using fus_Event = fuchsia::ui::scenic::Event;
-using fus_Scenic = fuchsia::ui::scenic::Scenic;
-using fus_ScenicPtr = fuchsia::ui::scenic::ScenicPtr;
-using fus_SessionEndpoints = fuchsia::ui::scenic::SessionEndpoints;
-using fus_SessionListenerHandle = fuchsia::ui::scenic::SessionListenerHandle;
-using fus_SessionPtr = fuchsia::ui::scenic::SessionPtr;
 using fuv_FocuserPtr = fuchsia::ui::views::FocuserPtr;
 using fuv_ViewRef = fuchsia::ui::views::ViewRef;
 using fuv_ViewRefFocusedPtr = fuchsia::ui::views::ViewRefFocusedPtr;
 using fuv_ViewportCreationToken = fuchsia::ui::views::ViewportCreationToken;
 using RealmRoot = component_testing::RealmRoot;
-
-scenic::Session CreateSession(fus_Scenic* scenic, fus_SessionEndpoints endpoints) {
-  FX_DCHECK(scenic);
-  FX_DCHECK(!endpoints.has_session());
-  FX_DCHECK(!endpoints.has_session_listener());
-
-  fus_SessionPtr session_ptr;
-  fus_SessionListenerHandle listener_handle;
-  auto listener_request = listener_handle.NewRequest();
-
-  endpoints.set_session(session_ptr.NewRequest());
-  endpoints.set_session_listener(std::move(listener_handle));
-  scenic->CreateSessionT(std::move(endpoints), [] {});
-
-  return scenic::Session(std::move(session_ptr), std::move(listener_request));
-}
 
 struct DisplayDimensions {
   float width = 0.f, height = 0.f;

@@ -30,8 +30,6 @@
 #include <lib/sys/component/cpp/testing/realm_builder_types.h>
 #include <lib/sys/cpp/component_context.h>
 #include <lib/syslog/cpp/macros.h>
-#include <lib/ui/scenic/cpp/resources.h>
-#include <lib/ui/scenic/cpp/session.h>
 #include <lib/ui/scenic/cpp/view_token_pair.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/time.h>
@@ -686,8 +684,7 @@ class WebEngineTest : public TouchInputBase<> {
   // TODO(fxbug.dev/58322): Improve synchronization when we move to Flatland.
   void TryInject() {
     InjectInput(TapLocation::kTopLeft);
-    async::PostDelayedTask(
-        dispatcher(), [this] { TryInject(); }, kTapRetryInterval);
+    async::PostDelayedTask(dispatcher(), [this] { TryInject(); }, kTapRetryInterval);
   }
 
   // Routes needed to setup Chromium client.

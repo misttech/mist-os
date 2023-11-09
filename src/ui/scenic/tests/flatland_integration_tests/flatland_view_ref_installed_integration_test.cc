@@ -8,7 +8,6 @@
 #include <lib/fidl/cpp/interface_handle.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/syslog/cpp/macros.h>
-#include <lib/ui/scenic/cpp/resources.h>
 #include <lib/ui/scenic/cpp/view_creation_tokens.h>
 #include <lib/ui/scenic/cpp/view_identity.h>
 #include <lib/zx/time.h>
@@ -111,7 +110,6 @@ class FlatlandViewRefInstalledIntegrationTest : public zxtest::Test, public Logg
  private:
   uint32_t display_width_ = 0;
   uint32_t display_height_ = 0;
-  fuchsia::ui::scenic::ScenicPtr scenic_;
   fuc::FlatlandDisplayPtr flatland_display_;
 };
 

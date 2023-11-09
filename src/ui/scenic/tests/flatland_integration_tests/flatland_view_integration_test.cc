@@ -10,7 +10,6 @@
 #include <lib/fidl/cpp/interface_ptr.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/syslog/cpp/macros.h>
-#include <lib/ui/scenic/cpp/resources.h>
 #include <lib/ui/scenic/cpp/view_creation_tokens.h>
 #include <lib/ui/scenic/cpp/view_identity.h>
 #include <lib/zx/time.h>

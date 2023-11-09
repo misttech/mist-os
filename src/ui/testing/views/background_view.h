@@ -6,8 +6,6 @@
 #define SRC_UI_TESTING_VIEWS_BACKGROUND_VIEW_H_
 
 #include <fuchsia/ui/scenic/cpp/fidl.h>
-#include <lib/ui/scenic/cpp/resources.h>
-#include <lib/ui/scenic/cpp/session.h>
 
 #include "src/lib/ui/base_view/base_view.h"
 #include "src/ui/testing/views/color.h"

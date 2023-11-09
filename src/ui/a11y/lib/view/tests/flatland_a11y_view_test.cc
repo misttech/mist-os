@@ -3,15 +3,12 @@
 // found in the LICENSE file.
 
 #include <fuchsia/accessibility/scene/cpp/fidl.h>
-#include <fuchsia/logger/cpp/fidl.h>
 #include <fuchsia/tracing/provider/cpp/fidl.h>
-#include <fuchsia/ui/scenic/cpp/fidl.h>
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/sys/component/cpp/testing/realm_builder_types.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/ui/scenic/cpp/view_creation_tokens.h>
-#include <lib/ui/scenic/cpp/view_identity.h>
 #include <zircon/status.h>
 
 #include <memory>
@@ -62,8 +59,7 @@ class FlatlandAccessibilityViewTest : public gtest::RealLoopFixture {
 
   void SetUp() override {
     ui_testing::UITestRealm::Config config;
-    config.ui_to_client_services = {fuchsia::ui::scenic::Scenic::Name_,
-                                    fuchsia::ui::composition::Flatland::Name_};
+    config.ui_to_client_services = {fuchsia::ui::composition::Flatland::Name_};
     config.exposed_client_services = {fuchsia::accessibility::scene::Provider::Name_,
                                       fuchsia::ui::app::ViewProvider::Name_};
     ui_test_manager_.emplace(std::move(config));
