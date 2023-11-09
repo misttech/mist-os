@@ -19,9 +19,14 @@ namespace fpbus = fuchsia_hardware_platform_bus;
 
 static const std::vector<fpbus::Mmio> hdmi_mmios{
     {{
-        // HDMITX
-        .base = A311D_HDMITX_BASE,
-        .length = A311D_HDMITX_LENGTH,
+        // HDMITX Controller IP registers
+        .base = A311D_HDMITX_CONTROLLER_IP_BASE,
+        .length = A311D_HDMITX_CONTROLLER_IP_LENGTH,
+    }},
+    {{
+        // HDMITX Top-level registers
+        .base = A311D_HDMITX_TOP_LEVEL_BASE,
+        .length = A311D_HDMITX_TOP_LEVEL_LENGTH,
     }},
 };
 

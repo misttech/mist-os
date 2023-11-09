@@ -34,34 +34,23 @@
 
 namespace aml_hdmi {
 
-void AmlHdmiDevice::WriteReg(uint32_t reg, uint32_t val) {
-  // determine if we are writing to HDMI TOP (AMLOGIC Wrapper) or HDMI IP
-  uint32_t offset = (reg & DWC_OFFSET_MASK) >> 24;
-  reg = reg & 0xffff;
-
-  if (offset) {
-    WriteIpReg(reg, val & 0xFF);
-  } else {
-    fbl::AutoLock lock(&register_lock_);
-    hdmitx_mmio_->Write32(val, (reg << 2) + 0x8000);
-  }
-
-#ifdef LOG_HDMITX
-  zxlogf(INFO, "%s wr[0x%x] 0x%x\n", offset ? "DWC" : "TOP", reg, val);
-#endif
+void AmlHdmiDevice::WriteIpReg(uint32_t addr, uint8_t data) {
+  fbl::AutoLock lock(&register_lock_);
+  hdmitx_controller_ip_mmio_->Write8(data, addr);
+}
+uint8_t AmlHdmiDevice::ReadIpReg(uint32_t addr) {
+  fbl::AutoLock lock(&register_lock_);
+  return hdmitx_controller_ip_mmio_->Read8(addr);
 }
 
-uint32_t AmlHdmiDevice::ReadReg(uint32_t reg) {
-  // determine if we are writing to HDMI TOP (AMLOGIC Wrapper) or HDMI IP
-  uint32_t offset = (reg & DWC_OFFSET_MASK) >> 24;
-  reg = reg & 0xffff;
-
-  if (offset) {
-    return ReadIpReg(reg);
-  }
-
+void AmlHdmiDevice::WriteTopLevelReg(uint32_t addr, uint32_t val) {
   fbl::AutoLock lock(&register_lock_);
-  return hdmitx_mmio_->Read32((reg << 2) + 0x8000);
+  hdmitx_top_level_mmio_->Write32(val, addr);
+}
+
+uint32_t AmlHdmiDevice::ReadTopLevelReg(uint32_t addr) {
+  fbl::AutoLock lock(&register_lock_);
+  return hdmitx_top_level_mmio_->Read32(addr);
 }
 
 zx_status_t AmlHdmiDevice::Bind() {
@@ -71,9 +60,19 @@ zx_status_t AmlHdmiDevice::Bind() {
   }
 
   // Map registers
-  auto status = pdev_.MapMmio(MMIO_HDMI, &hdmitx_mmio_);
+  static constexpr uint32_t kHdmitxControllerIpIndex = 0;
+  zx_status_t status = pdev_.MapMmio(kHdmitxControllerIpIndex, &hdmitx_controller_ip_mmio_);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Could not map MMIO registers: %s", zx_status_get_string(status));
+    zxlogf(ERROR, "Could not map MMIO HDMITX Controller IP registers: %s",
+           zx_status_get_string(status));
+    return status;
+  }
+
+  static constexpr uint32_t kHdmitxTopLevelIndex = 1;
+  status = pdev_.MapMmio(kHdmitxTopLevelIndex, &hdmitx_top_level_mmio_);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Could not map MMIO HDMITX top-level registers: %s",
+           zx_status_get_string(status));
     return status;
   }
 
@@ -149,9 +148,9 @@ void AmlHdmiDevice::Reset(ResetRequestView request, ResetCompleter::Sync& comple
   // }
 
   // Bring HDMI out of reset
-  WriteReg(HDMITX_TOP_SW_RESET, 0);
+  WriteTopLevelReg(HDMITX_TOP_SW_RESET, 0);
   usleep(200);
-  WriteReg(HDMITX_TOP_CLK_CNTL, 0x000000ff);
+  WriteTopLevelReg(HDMITX_TOP_CLK_CNTL, 0x000000ff);
 
   fbl::AutoLock lock(&dw_lock_);
   auto status = hdmi_dw_->InitHw();
@@ -203,7 +202,7 @@ void AmlHdmiDevice::ModeSet(ModeSetRequestView request, ModeSetCompleter::Sync& 
   CalculateTxParam(display_timing, &p);
 
   // Output normal TMDS Data
-  WriteReg(HDMITX_TOP_BIST_CNTL, 1 << 12);
+  WriteTopLevelReg(HDMITX_TOP_BIST_CNTL, 1 << 12);
 
   // Configure HDMI TX IP
   fbl::AutoLock lock(&dw_lock_);
@@ -231,24 +230,24 @@ void AmlHdmiDevice::ModeSet(ModeSetRequestView request, ModeSetCompleter::Sync& 
            "Skipping initializing HDCP 1.4.");
   }
 
-  WriteReg(HDMITX_TOP_INTR_STAT_CLR, 0x0000001f);
+  WriteTopLevelReg(HDMITX_TOP_INTR_STAT_CLR, 0x0000001f);
   hdmi_dw_->SetupInterrupts();
-  WriteReg(HDMITX_TOP_INTR_MASKN, 0x9f);
+  WriteTopLevelReg(HDMITX_TOP_INTR_MASKN, 0x9f);
   hdmi_dw_->Reset();
 
   if (p.is4K) {
     // Setup TMDS Clocks (taken from recommended test pattern in DVI spec)
-    WriteReg(HDMITX_TOP_TMDS_CLK_PTTN_01, 0);
-    WriteReg(HDMITX_TOP_TMDS_CLK_PTTN_23, 0x03ff03ff);
+    WriteTopLevelReg(HDMITX_TOP_TMDS_CLK_PTTN_01, 0);
+    WriteTopLevelReg(HDMITX_TOP_TMDS_CLK_PTTN_23, 0x03ff03ff);
   } else {
-    WriteReg(HDMITX_TOP_TMDS_CLK_PTTN_01, 0x001f001f);
-    WriteReg(HDMITX_TOP_TMDS_CLK_PTTN_23, 0x001f001f);
+    WriteTopLevelReg(HDMITX_TOP_TMDS_CLK_PTTN_01, 0x001f001f);
+    WriteTopLevelReg(HDMITX_TOP_TMDS_CLK_PTTN_23, 0x001f001f);
   }
   hdmi_dw_->SetFcScramblerCtrl(p.is4K);
 
-  WriteReg(HDMITX_TOP_TMDS_CLK_PTTN_CNTL, 0x1);
+  WriteTopLevelReg(HDMITX_TOP_TMDS_CLK_PTTN_CNTL, 0x1);
   usleep(2);
-  WriteReg(HDMITX_TOP_TMDS_CLK_PTTN_CNTL, 0x2);
+  WriteTopLevelReg(HDMITX_TOP_TMDS_CLK_PTTN_CNTL, 0x2);
 
   hdmi_dw_->SetupScdc(p.is4K);
   hdmi_dw_->ResetFc();
@@ -347,7 +346,7 @@ void AmlHdmiDevice::EdidTransfer(EdidTransferRequestView request,
 
 void AmlHdmiDevice::PrintRegister(const char* register_name, uint32_t register_address) {
   zxlogf(INFO, "%s (0x%04" PRIx32 "): %" PRIu32, register_name, register_address,
-         ReadReg(register_address));
+         ReadTopLevelReg(register_address));
 }
 
 void AmlHdmiDevice::PrintHdmiRegisters(PrintHdmiRegistersCompleter::Sync& completer) {
@@ -388,13 +387,15 @@ AmlHdmiDevice::AmlHdmiDevice(zx_device_t* parent)
       hdmi_dw_(std::make_unique<hdmi_dw::HdmiDw>(this)),
       loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {}
 
-AmlHdmiDevice::AmlHdmiDevice(zx_device_t* parent, fdf::MmioBuffer hdmitx_mmio,
+AmlHdmiDevice::AmlHdmiDevice(zx_device_t* parent, fdf::MmioBuffer hdmitx_controller_ip_mmio,
+                             fdf::MmioBuffer hdmitx_top_level_mmio,
                              std::unique_ptr<hdmi_dw::HdmiDw> hdmi_dw, zx::resource smc)
     : DeviceType(parent),
       pdev_(parent),
       hdmi_dw_(std::move(hdmi_dw)),
       smc_(std::move(smc)),
-      hdmitx_mmio_(std::move(hdmitx_mmio)),
+      hdmitx_controller_ip_mmio_(std::move(hdmitx_controller_ip_mmio)),
+      hdmitx_top_level_mmio_(std::move(hdmitx_top_level_mmio)),
       loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {
   ZX_DEBUG_ASSERT(hdmi_dw_);
 }

@@ -38,12 +38,21 @@ class AmlHdmiDevice : public DeviceType, public HdmiIpBase, public fbl::RefCount
 
   explicit AmlHdmiDevice(zx_device_t* parent);
 
-  // For unit testing
+  // Creates a AmlHdmiDevice with resources injected for unit testing.
   //
-  // `mmio` is the region documented as HDMITX in Section 8.1 "Memory Map" of
+  // `hdmitx_controller_ip_mmio` is the Controller IP register sub-region
+  // of the HDMITX MMIO register region.
+  //
+  // `hdmitx_top_level_mmio` is the top-level register sub-region of the
+  // HDMITX MMIO register region.
+  //
+  // The HDMITX register region is defined in Section 8.1 "Memory Map" of
+  // the AMLogic A311D datasheet. Both sub-regions are defined in Section
+  // 10.2.3.43 "HDMITX Top-Level and HDMI TX Contoller IP Register Access" of
   // the AMLogic A311D datasheet.
-  AmlHdmiDevice(zx_device_t* parent, fdf::MmioBuffer hdmitx_mmio,
-                std::unique_ptr<hdmi_dw::HdmiDw> hdmi_dw, zx::resource smc);
+  AmlHdmiDevice(zx_device_t* parent, fdf::MmioBuffer hdmitx_controller_ip_mmio,
+                fdf::MmioBuffer hdmitx_top_level_mmio, std::unique_ptr<hdmi_dw::HdmiDw> hdmi_dw,
+                zx::resource smc);
 
   AmlHdmiDevice(const AmlHdmiDevice&) = delete;
   AmlHdmiDevice(AmlHdmiDevice&&) = delete;
@@ -79,12 +88,10 @@ class AmlHdmiDevice : public DeviceType, public HdmiIpBase, public fbl::RefCount
   void EdidTransfer(EdidTransferRequestView request,
                     EdidTransferCompleter::Sync& completer) override;
   void WriteReg(WriteRegRequestView request, WriteRegCompleter::Sync& completer) override {
-    WriteReg(request->reg, request->val);
-    completer.Reply();
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
   }
   void ReadReg(ReadRegRequestView request, ReadRegCompleter::Sync& completer) override {
-    auto val = ReadReg(request->reg);
-    completer.Reply(val);
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
   }
   void EnableBist(EnableBistRequestView request, EnableBistCompleter::Sync& completer) override {
     ZX_DEBUG_ASSERT(request->display_id == 1);  // only supports 1 display for now
@@ -93,25 +100,15 @@ class AmlHdmiDevice : public DeviceType, public HdmiIpBase, public fbl::RefCount
   void PrintHdmiRegisters(PrintHdmiRegistersCompleter::Sync& completer) override;
 
  private:
-  enum {
-    MMIO_HDMI,
-  };
-
   // Issues a secure monitor call (SMC) to ask the secure monitor to initialize
   // HDCP 1.4 engine.
   // The secure monitor call resource `smc_` must be valid.
   zx_status_t InitializeHdcp14();
 
-  void WriteIpReg(uint32_t addr, uint8_t data) override {
-    fbl::AutoLock lock(&register_lock_);
-    hdmitx_mmio_->Write8(data, addr);
-  }
-  uint8_t ReadIpReg(uint32_t addr) override {
-    fbl::AutoLock lock(&register_lock_);
-    return hdmitx_mmio_->Read8(addr);
-  }
-  void WriteReg(uint32_t reg, uint32_t val);
-  uint32_t ReadReg(uint32_t reg);
+  void WriteIpReg(uint32_t addr, uint8_t data) override;
+  uint8_t ReadIpReg(uint32_t addr) override;
+  void WriteTopLevelReg(uint32_t addr, uint32_t val);
+  uint32_t ReadTopLevelReg(uint32_t addr);
 
   void PrintRegister(const char* register_name, uint32_t register_address);
 
@@ -121,7 +118,8 @@ class AmlHdmiDevice : public DeviceType, public HdmiIpBase, public fbl::RefCount
   zx::resource smc_;
 
   fbl::Mutex register_lock_;
-  std::optional<fdf::MmioBuffer> hdmitx_mmio_ TA_GUARDED(register_lock_);
+  std::optional<fdf::MmioBuffer> hdmitx_controller_ip_mmio_ TA_GUARDED(register_lock_);
+  std::optional<fdf::MmioBuffer> hdmitx_top_level_mmio_ TA_GUARDED(register_lock_);
 
   bool is_powered_up_ = false;
 

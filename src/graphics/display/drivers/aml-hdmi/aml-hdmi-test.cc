@@ -62,14 +62,18 @@ class StubHdmiIpBase : public HdmiIpBase {
 
 class FakeAmlHdmiDevice : public AmlHdmiDevice {
  public:
-  static std::unique_ptr<FakeAmlHdmiDevice> Create(AmlHdmiTest* test, fdf::MmioBuffer mmio,
+  static std::unique_ptr<FakeAmlHdmiDevice> Create(AmlHdmiTest* test,
+                                                   fdf::MmioBuffer controller_ip_mmio,
+                                                   fdf::MmioBuffer top_level_mmio,
                                                    zx::resource smc) {
-    auto device = std::make_unique<FakeAmlHdmiDevice>(test, std::move(mmio), std::move(smc));
+    auto device = std::make_unique<FakeAmlHdmiDevice>(test, std::move(controller_ip_mmio),
+                                                      std::move(top_level_mmio), std::move(smc));
     return device;
   }
 
-  explicit FakeAmlHdmiDevice(AmlHdmiTest* test, fdf::MmioBuffer mmio, zx::resource smc)
-      : AmlHdmiDevice(nullptr, std::move(mmio),
+  explicit FakeAmlHdmiDevice(AmlHdmiTest* test, fdf::MmioBuffer controller_ip_mmio,
+                             fdf::MmioBuffer top_level_mmio, zx::resource smc)
+      : AmlHdmiDevice(nullptr, std::move(controller_ip_mmio), std::move(top_level_mmio),
                       std::make_unique<FakeHdmiDw>(&stub_hdmi_ip_base_, test), std::move(smc)) {
     loop_.StartThread("fake-aml-hdmi-test-thread");
   }
@@ -91,7 +95,8 @@ class AmlHdmiTest : public testing::Test {
   void SetUp() override {
     // TODO(fxbug.dev/123426): Use a fake SMC resource, when the
     // implementation lands.
-    dut_ = FakeAmlHdmiDevice::Create(this, mmio_range_.GetMmioBuffer(), /*smc=*/zx::resource{});
+    dut_ = FakeAmlHdmiDevice::Create(this, controller_ip_mmio_range_.GetMmioBuffer(),
+                                     top_level_mmio_range_.GetMmioBuffer(), /*smc=*/zx::resource{});
     ASSERT_TRUE(dut_);
 
     auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_hdmi::Hdmi>();
@@ -102,7 +107,8 @@ class AmlHdmiTest : public testing::Test {
 
   void TearDown() override {
     ASSERT_EQ(expected_dw_calls_.size(), 0u);
-    mmio_range_.CheckAllAccessesReplayed();
+    controller_ip_mmio_range_.CheckAllAccessesReplayed();
+    top_level_mmio_range_.CheckAllAccessesReplayed();
   }
 
   void HdmiDwCall(HdmiDwFn func) {
@@ -118,8 +124,12 @@ class AmlHdmiTest : public testing::Test {
   void ExpectHdmiDwSetFcScramblerCtrl() { expected_dw_calls_.push(HdmiDwFn::kSetFcScramblerCtrl); }
 
  protected:
-  constexpr static int kMmioRangeSize = 0x10000;
-  ddk_mock::MockMmioRange mmio_range_{kMmioRangeSize, ddk_mock::MockMmioRange::Size::k32};
+  constexpr static int kControllerIpMmioRangeSize = 0x8000;
+  ddk_mock::MockMmioRange controller_ip_mmio_range_{kControllerIpMmioRangeSize,
+                                                    ddk_mock::MockMmioRange::Size::k32};
+  constexpr static int kTopLevelMmioRangeSize = 0x8000;
+  ddk_mock::MockMmioRange top_level_mmio_range_{kTopLevelMmioRangeSize,
+                                                ddk_mock::MockMmioRange::Size::k32};
 
   std::unique_ptr<FakeAmlHdmiDevice> dut_;
   HdmiClient hdmi_client_;
@@ -142,53 +152,19 @@ void FakeHdmiDw::ResetFc() { test_->HdmiDwCall(HdmiDwFn::kResetFc); }
 
 void FakeHdmiDw::SetFcScramblerCtrl(bool is4k) { test_->HdmiDwCall(HdmiDwFn::kSetFcScramblerCtrl); }
 
-TEST_F(AmlHdmiTest, ReadAmlogicRegister) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
-      {.address = 0x12 * 4 + 0x8000, .value = 0x1234},
-  }));
-  auto pval_aml = hdmi_client_->ReadReg(0x12);
-  ASSERT_OK(pval_aml.status());
-  EXPECT_EQ(pval_aml.value().val, 0x1234u);
-}
-
-TEST_F(AmlHdmiTest, ReadDesignwareRegister) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
-      {.address = 0x03, .value = 0x21, .size = ddk_mock::MockMmioRange::Size::k8},
-  }));
-  auto pval_dwc = hdmi_client_->ReadReg((0x10UL << 24) + 0x03);
-  ASSERT_OK(pval_dwc.status());
-  EXPECT_EQ(pval_dwc.value().val, 0x21u);
-}
-
-TEST_F(AmlHdmiTest, WriteAmlogicRegister) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
-      {.address = 0x05 * 4 + 0x8000, .value = 0x4321, .write = true},
-  }));
-  auto pres_aml = hdmi_client_->WriteReg(0x05, 0x4321);
-  ASSERT_OK(pres_aml.status());
-}
-
-TEST_F(AmlHdmiTest, WriteDesignwareRegister) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
-      {.address = 0x420, .value = 0x15, .write = true, .size = ddk_mock::MockMmioRange::Size::k8},
-  }));
-  auto pres_dwc = hdmi_client_->WriteReg((0x10UL << 24) + 0x420, 0x2415);
-  ASSERT_OK(pres_dwc.status());
-}
-
 // Register addresses from the A311D datasheet section 10.2.3.44 "HDCP2.2 IP
 // Register Access".
-constexpr int kHdmiTxTopSwResetOffset = 0x00 * 4 + 0x8000;
-constexpr int kHdmiTxTopClkCntlOffset = 0x01 * 4 + 0x8000;
-constexpr int kHdmiTxTopIntrMaskn = 0x03 * 4 + 0x8000;
-constexpr int kHdmiTxTopIntrStatClr = 0x05 * 4 + 0x8000;
-constexpr int kHdmiTxTopBistCntl = 0x06 * 4 + 0x8000;
-constexpr int kHdmiTxTopTmdsClkPttn01 = 0x0a * 4 + 0x8000;
-constexpr int kHdmiTxTopTmdsClkPttn23 = 0x0b * 4 + 0x8000;
-constexpr int kHdmiTxTopTmdsClkPttnCntl = 0x0c * 4 + 0x8000;
+constexpr int kHdmiTxTopSwResetOffset = 0x00 * 4;
+constexpr int kHdmiTxTopClkCntlOffset = 0x01 * 4;
+constexpr int kHdmiTxTopIntrMaskn = 0x03 * 4;
+constexpr int kHdmiTxTopIntrStatClr = 0x05 * 4;
+constexpr int kHdmiTxTopBistCntl = 0x06 * 4;
+constexpr int kHdmiTxTopTmdsClkPttn01 = 0x0a * 4;
+constexpr int kHdmiTxTopTmdsClkPttn23 = 0x0b * 4;
+constexpr int kHdmiTxTopTmdsClkPttnCntl = 0x0c * 4;
 
 TEST_F(AmlHdmiTest, ResetTest) {
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  top_level_mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kHdmiTxTopSwResetOffset, .value = 0, .write = true},
       {.address = kHdmiTxTopClkCntlOffset, .value = 0xff, .write = true},
   }));
@@ -198,6 +174,7 @@ TEST_F(AmlHdmiTest, ResetTest) {
 
 TEST_F(AmlHdmiTest, ModeSetTest) {
   fidl::Arena allocator;
+  // TODO(fxbug.dev/136159): Use valid synthetic values for timings.
   fuchsia_hardware_hdmi::wire::StandardDisplayMode standard_display_mode{
       .pixel_clock_khz = 0,
       .h_addressable = 0,
@@ -219,7 +196,7 @@ TEST_F(AmlHdmiTest, ModeSetTest) {
   mode.set_mode(allocator, standard_display_mode);
   mode.set_color(color);
 
-  mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
+  top_level_mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kHdmiTxTopBistCntl, .value = 1 << 12, .write = true},
       {.address = kHdmiTxTopIntrStatClr, .value = 0x1f, .write = true},
       {.address = kHdmiTxTopIntrMaskn, .value = 0x9f, .write = true},
