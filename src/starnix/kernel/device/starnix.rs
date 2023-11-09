@@ -10,7 +10,7 @@ use crate::{
         FileOps, FsNode,
     },
     task::{CurrentTask, Kernel},
-    types::*,
+    types::{DeviceType, Errno, OpenFlags},
 };
 
 use std::sync::Arc;

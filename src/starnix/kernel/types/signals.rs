@@ -9,7 +9,7 @@ use std::{
     ops::{BitAnd, BitOr, Not},
 };
 
-use crate::types::*;
+use crate::types::{errno, error, sigset_t, uapi, Errno};
 use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
 pub const UNBLOCKABLE_SIGNALS: SigSet = SigSet(SIGKILL.mask() | SIGSTOP.mask());

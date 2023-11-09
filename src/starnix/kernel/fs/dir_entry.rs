@@ -10,7 +10,18 @@ use std::{
     sync::{Arc, Weak},
 };
 
-use crate::{auth::FsCred, fs::*, task::CurrentTask, types::*};
+use crate::{
+    auth::FsCred,
+    fs::{
+        FileHandle, FileObject, FsNodeHandle, FsNodeLinkBehavior, FsStr, FsString, InotifyMask,
+        MountInfo, NamespaceNode, UnlinkKind,
+    },
+    task::CurrentTask,
+    types::{
+        errno, error, Access, Errno, FileMode, OpenFlags, ENOENT, NAME_MAX, RENAME_EXCHANGE,
+        RENAME_NOREPLACE, RENAME_WHITEOUT,
+    },
+};
 
 bitflags! {
     pub struct RenameFlags: u32 {
@@ -295,8 +306,8 @@ impl DirEntry {
                 current_task,
                 mount,
                 name,
-                mode!(IFDIR, 0o777),
-                DeviceType::NONE,
+                crate::types::mode!(IFDIR, 0o777),
+                crate::types::DeviceType::NONE,
                 FsCred::root(),
             )
         })

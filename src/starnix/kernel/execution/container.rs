@@ -28,12 +28,21 @@ use std::{collections::BTreeMap, ffi::CString, sync::Arc};
 use crate::{
     auth::Credentials,
     device::{init_common_devices, parse_features, run_container_features},
-    execution::*,
-    fs::{layeredfs::LayeredFs, tmpfs::TmpFs, *},
-    logging::*,
-    task::*,
+    execution::{
+        create_filesystem_from_spec, create_remotefs_filesystem, execute_task, expose_root,
+        serve_component_runner, serve_container_controller, serve_graphical_presenter,
+    },
+    fs::{
+        layeredfs::LayeredFs, tmpfs::TmpFs, FileSystemOptions, FsContext, LookupContext,
+        WhatToMount,
+    },
+    logging::{log_error, log_info, log_warn},
+    task::{CurrentTask, ExitStatus, Kernel, Task},
     time::utc::update_utc_clock,
-    types::*,
+    types::{
+        errno, release_on_error, rlimit, MountFlags, OpenFlags, ReleasableByRef, Resource,
+        SourceContext, ENOENT,
+    },
 };
 
 /// A temporary wrapper struct that contains both a `Config` for the container, as well as optional

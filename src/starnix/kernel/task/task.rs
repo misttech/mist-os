@@ -26,19 +26,37 @@ use crate::{
         registers::RegisterState,
         task::{decode_page_fault_exception_report, get_signal_for_general_exception},
     },
-    auth::*,
-    execution::*,
+    auth::{Credentials, FsCred},
+    execution::{create_zircon_process, TaskInfo},
     fs::{
         FdFlags, FdNumber, FdTable, FileHandle, FsContext, FsStr, FsString, LookupContext,
         NamespaceNode, SymlinkMode, SymlinkTarget,
     },
-    loader::*,
-    logging::*,
+    loader::{load_executable, resolve_executable, ResolvedElf},
+    logging::{log_error, log_warn, not_implemented, set_zx_name},
     mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt, MemoryManager},
-    signals::{send_signal, types::*, SignalInfo},
+    signals::{send_signal, RunState, SignalActions, SignalDetail, SignalInfo, SignalState},
     syscalls::{decls::Syscall, SyscallResult},
-    task::*,
-    types::*,
+    task::{
+        AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, Kernel, ProcessEntryRef,
+        ProcessGroup, PtraceState, PtraceStatus, SchedulerPolicy, SeccompFilter,
+        SeccompFilterContainer, SeccompNotifierHandle, SeccompState, SeccompStateValue,
+        ThreadGroup, UtsNamespaceHandle, Waiter,
+    },
+    types::{
+        errno, error, from_status_like_fdio, pid_t, release_on_error, robust_list_head,
+        sock_filter, sock_fprog, ucred, Access, DeviceType, Errno, FileMode, OpenFlags,
+        OwnedRefByRef, PtraceAccessMode, ReleasableByRef, SigSet, Signal, TaskTimeStats, TempRef,
+        UncheckedSignal, UserAddress, UserRef, WeakRef, BPF_MAXINSNS, CAP_KILL, CAP_SYS_ADMIN,
+        CAP_SYS_PTRACE, CLD_CONTINUED, CLD_DUMPED, CLD_EXITED, CLD_KILLED, CLD_STOPPED,
+        CLONE_CHILD_CLEARTID, CLONE_CHILD_SETTID, CLONE_FILES, CLONE_FS, CLONE_INTO_CGROUP,
+        CLONE_NEWUTS, CLONE_PARENT_SETTID, CLONE_SETTLS, CLONE_SIGHAND, CLONE_SYSVSEM,
+        CLONE_THREAD, CLONE_VFORK, CLONE_VM, FUTEX_BITSET_MATCH_ANY, FUTEX_OWNER_DIED,
+        FUTEX_TID_MASK, PTRACE_EVENT_STOP, PTRACE_MODE_FSCREDS, PTRACE_MODE_REALCREDS,
+        ROBUST_LIST_LIMIT, SECCOMP_FILTER_FLAG_LOG, SECCOMP_FILTER_FLAG_NEW_LISTENER,
+        SECCOMP_FILTER_FLAG_TSYNC, SECCOMP_FILTER_FLAG_TSYNC_ESRCH, SIGBUS, SIGCONT, SIGILL,
+        SIGSEGV, SIGTRAP, SI_KERNEL,
+    },
 };
 
 /// The task object associated with the currently executing thread.
@@ -2545,7 +2563,10 @@ impl From<&Task> for FsCred {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::testing::*;
+    use crate::{
+        testing::*,
+        types::{rlimit, Resource, SIGCHLD},
+    };
 
     #[::fuchsia::test]
     async fn test_tid_allocation() {

@@ -4,7 +4,7 @@
 
 use std::ops;
 
-use crate::types::{uapi, *};
+use crate::types::{errno, error, uapi, Errno, OpenFlags};
 
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
 pub struct FileMode(u32);

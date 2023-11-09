@@ -13,12 +13,16 @@ use crate::{
     auth::FsCred,
     fs::{
         buffers::{InputBuffer, OutputBuffer},
-        devpts::*,
-        *,
+        devpts::{get_device_type_for_pts, DEVPTS_COUNT},
+        FdEvents,
     },
-    mutable_state::*,
-    task::*,
-    types::*,
+    mutable_state::{state_accessor, state_implementation},
+    task::{CurrentTask, EventHandler, ProcessGroup, Session, WaitCanceler, WaitQueue, Waiter},
+    types::{
+        cc_t, error, pid_t, tcflag_t, uapi, DeviceType, Errno, Signal, ECHO, ECHOCTL, ECHONL,
+        ICANON, ICRNL, IEXTEN, IGNCR, INLCR, ISIG, IUTF8, OCRNL, ONLCR, ONLRET, ONOCR, OPOST,
+        SIGINT, SIGQUIT, SIGSTOP, TABDLY, VEOF, VEOL, VEOL2, VERASE, VINTR, VQUIT, VSUSP, XTABS,
+    },
 };
 
 // CANON_MAX_BYTES is the number of bytes that fit into a single line of

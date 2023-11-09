@@ -16,15 +16,26 @@ use std::{
 
 use crate::{
     auth::Credentials,
-    device::terminal::*,
+    device::terminal::{ControllingSession, Terminal},
     drop_notifier::DropNotifier,
     logging::{log_error, not_implemented},
-    mutable_state::*,
+    mutable_state::{state_accessor, state_implementation},
     selinux::fs::SeLinuxThreadGroupState,
-    signals::{syscalls::WaitingOptions, *},
-    task::{interval_timer::IntervalTimerHandle, *},
+    signals::{send_signal, syscalls::WaitingOptions, SignalActions, SignalDetail, SignalInfo},
+    task::{
+        interval_timer::IntervalTimerHandle, ptrace_detach, AtomicStopState, ClockId,
+        ControllingTerminal, CurrentTask, ExitStatus, Kernel, PidTable, ProcessGroup, PtraceStatus,
+        Session, StopState, Task, TaskMutableState, TaskPersistentInfo, TaskPersistentInfoState,
+        TimerId, TimerTable, WaitQueue,
+    },
     time::utc,
-    types::*,
+    types::{
+        duration_from_timeval, errno, error, itimerval, pid_t, rlimit, timeval_from_duration,
+        uid_t, Errno, OwnedRef, PersonalityFlags, Releasable, Resource, ResourceLimits, Signal,
+        TaskTimeStats, TempRef, UncheckedSignal, UserAddress, WeakRef, CAP_SYS_ADMIN,
+        CAP_SYS_RESOURCE, CLOCK_REALTIME, ITIMER_PROF, ITIMER_REAL, ITIMER_VIRTUAL,
+        PTRACE_EVENT_STOP, SIGCHLD, SIGCONT, SIGHUP, SIGKILL, SIGTTOU, SIG_IGN,
+    },
 };
 
 /// The mutable state of the ThreadGroup.

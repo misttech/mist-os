@@ -7,16 +7,38 @@
 use fidl_fuchsia_sysmem as fsysmem;
 use fidl_fuchsia_ui_composition as fuicomp;
 use fuchsia_component::client::connect_to_protocol_sync;
-use fuchsia_image_format::*;
-use fuchsia_vulkan::*;
+use fuchsia_image_format::{
+    constraints_to_format, drm_format_to_sysmem_format, drm_format_to_vulkan_format,
+    drm_modifier_to_sysmem_modifier, get_plane_row_bytes, image_format_plane_byte_offset,
+    sysmem_modifier_to_drm_modifier, DRM_FORMAT_MOD_INVALID,
+};
+use fuchsia_vulkan::{
+    BufferCollectionConstraintsInfoFUCHSIA, ImageConstraintsInfoFUCHSIA,
+    ImageFormatConstraintsInfoFUCHSIA, SysmemColorSpaceFUCHSIA,
+    STRUCTURE_TYPE_BUFFER_COLLECTION_CONSTRAINTS_INFO_FUCHSIA,
+    STRUCTURE_TYPE_IMAGE_CONSTRAINTS_INFO_FUCHSIA,
+    STRUCTURE_TYPE_IMAGE_FORMAT_CONSTRAINTS_INFO_FUCHSIA,
+    STRUCTURE_TYPE_SYSMEM_COLOR_SPACE_FUCHSIA,
+};
 use fuchsia_zircon as zx;
-use magma::*;
+use magma::{
+    magma_handle_t, magma_image_create_info_t, magma_image_info_t, magma_poll_item__bindgen_ty_1,
+    magma_poll_item_t, magma_semaphore_t, magma_status_t, virtio_magma_ctrl_hdr_t,
+    virtio_magma_ctrl_type, virtmagma_ioctl_args_magma_command, MAGMA_COHERENCY_DOMAIN_CPU,
+    MAGMA_COHERENCY_DOMAIN_INACCESSIBLE, MAGMA_COHERENCY_DOMAIN_RAM,
+    MAGMA_IMAGE_CREATE_FLAGS_PRESENTABLE, MAGMA_IMAGE_CREATE_FLAGS_VULKAN_USAGE,
+    MAGMA_MAX_IMAGE_PLANES, MAGMA_POLL_TYPE_SEMAPHORE, MAGMA_STATUS_INTERNAL_ERROR,
+    MAGMA_STATUS_INVALID_ARGS,
+};
 use vk_sys as vk;
 use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
 use crate::{
-    device::wayland::vulkan::*, logging::log_warn, mm::MemoryAccessorExt, task::CurrentTask,
-    types::*,
+    device::wayland::vulkan::{BufferCollectionTokens, Loader},
+    logging::log_warn,
+    mm::MemoryAccessorExt,
+    task::CurrentTask,
+    types::{errno, Errno, UserAddress, UserRef},
 };
 
 /// Reads a magma command and its type from user space.

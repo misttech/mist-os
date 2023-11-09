@@ -17,20 +17,33 @@ use std::{collections::BTreeMap, ops::Bound, sync::Arc};
 use zerocopy::{AsBytes, FromBytes};
 
 use crate::{
-    auth::*,
+    auth::FsCred,
     fs::{
         buffers::{InputBuffer, OutputBuffer},
-        *,
+        fileops_impl_nonseekable, fs_node_impl_not_dir, fs_node_impl_xattr_delegate, Anon,
+        CacheMode, FdFlags, FdNumber, FileObject, FileOps, FileSystem, FileSystemHandle,
+        FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
+        FsString, LookupContext, MemoryDirectoryFile, MemoryXattrStorage, NamespaceNode, XattrOp,
     },
-    lock_ordering::*,
+    lock_ordering::Unlocked,
     mm::{MemoryAccessor, MemoryAccessorExt},
-    syscalls::*,
+    syscalls::{log_trace, not_implemented, CurrentTask, Locked, SyscallResult, SUCCESS},
     task::Kernel,
-    types::{as_any::AsAny, *},
+    types::{
+        as_any::AsAny, bpf_attr__bindgen_ty_1, bpf_attr__bindgen_ty_10, bpf_attr__bindgen_ty_12,
+        bpf_attr__bindgen_ty_2, bpf_attr__bindgen_ty_4, bpf_attr__bindgen_ty_5,
+        bpf_attr__bindgen_ty_9, bpf_cmd, bpf_cmd_BPF_BTF_LOAD, bpf_cmd_BPF_MAP_CREATE,
+        bpf_cmd_BPF_MAP_GET_NEXT_KEY, bpf_cmd_BPF_MAP_UPDATE_ELEM, bpf_cmd_BPF_OBJ_GET,
+        bpf_cmd_BPF_OBJ_GET_INFO_BY_FD, bpf_cmd_BPF_OBJ_PIN, bpf_cmd_BPF_PROG_ATTACH,
+        bpf_cmd_BPF_PROG_LOAD, bpf_cmd_BPF_PROG_QUERY, bpf_map_info, bpf_map_type,
+        bpf_map_type_BPF_MAP_TYPE_DEVMAP, bpf_map_type_BPF_MAP_TYPE_DEVMAP_HASH, bpf_prog_info,
+        errno, error, mode, statfs, DeviceType, Errno, FileMode, OpenFlags, UserAddress,
+        UserCString, BPF_FS_MAGIC, BPF_F_RDONLY_PROG, PATH_MAX,
+    },
 };
 
 declare_lock_levels![BpfMapEntries: OrderedMutex<BTreeMap<Vec<u8>, Vec<u8>>>];
-use self::lock_levels::*;
+use self::lock_levels::BpfMapEntries;
 
 /// The default selinux context to use for each BPF object.
 const DEFAULT_BPF_SELINUX_CONTEXT: &FsStr = b"u:object_r:fs_bpf:s0";

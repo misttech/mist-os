@@ -4,7 +4,7 @@
 
 #![allow(non_camel_case_types)]
 
-use crate::types::errno::*;
+use crate::types::errno::{error, Errno};
 use crate::types::uapi;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]

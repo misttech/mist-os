@@ -4,7 +4,15 @@
 
 use fuchsia_zircon as zx;
 
-use crate::{arch::registers::RegisterState, signals::*, task::*, types::*};
+use crate::{
+    arch::registers::RegisterState,
+    signals::{SignalInfo, SignalState},
+    task::{CurrentTask, Task},
+    types::{
+        ErrnoCode, SigSet, __NR_restart_syscall, _fpstate_64, sigaction_t, sigaltstack, sigcontext,
+        siginfo_t, sigset_t, ucontext, ERESTART_RESTARTBLOCK,
+    },
+};
 
 /// The size of the red zone.
 ///
@@ -175,7 +183,13 @@ mod tests {
         fs::FileWriteGuardRef,
         mm::{DesiredAddress, MappingName, MappingOptions, ProtectionFlags},
         signals::testing::dequeue_signal_for_test,
+        signals::{restore_from_signal_handler, SignalDetail},
+        task::Kernel,
         testing::*,
+        types::{
+            __NR_rt_sigreturn, sigaction_t, UserAddress, EINTR, ERESTARTSYS, SA_RESTART,
+            SA_RESTORER, SA_SIGINFO, SIGUSR1, SIGUSR2, SI_USER,
+        },
     };
 
     const SYSCALL_INSTRUCTION_ADDRESS: UserAddress = UserAddress::const_from(100);
@@ -220,7 +234,11 @@ mod tests {
         current_task.registers.rip = (SYSCALL_INSTRUCTION_ADDRESS + 2u64).ptr() as u64;
 
         // Queue the signal that interrupted the syscall.
-        current_task.write().signals.enqueue(SignalInfo::new(SIGUSR1, SI_USER as i32, SignalDetail::None));
+        current_task.write().signals.enqueue(SignalInfo::new(
+            SIGUSR1,
+            SI_USER as i32,
+            SignalDetail::None,
+        ));
 
         // Process the signal.
         dequeue_signal_for_test(&mut current_task);
@@ -293,7 +311,11 @@ mod tests {
         current_task.registers.rip = (SYSCALL_INSTRUCTION_ADDRESS + 2u64).ptr() as u64;
 
         // Queue the signal that interrupted the syscall.
-        current_task.write().signals.enqueue(SignalInfo::new(SIGUSR1, SI_USER as i32, SignalDetail::None));
+        current_task.write().signals.enqueue(SignalInfo::new(
+            SIGUSR1,
+            SI_USER as i32,
+            SignalDetail::None,
+        ));
 
         // Process the signal.
         dequeue_signal_for_test(&mut current_task);
@@ -318,7 +340,11 @@ mod tests {
         current_task.registers.rip = (SYSCALL2_INSTRUCTION_ADDRESS + 2u64).ptr() as u64;
 
         // Queue the signal that interrupted the syscall.
-        current_task.write().signals.enqueue(SignalInfo::new(SIGUSR2, SI_USER as i32, SignalDetail::None));
+        current_task.write().signals.enqueue(SignalInfo::new(
+            SIGUSR2,
+            SI_USER as i32,
+            SignalDetail::None,
+        ));
 
         // Process the signal.
         dequeue_signal_for_test(&mut current_task);
@@ -401,7 +427,11 @@ mod tests {
         current_task.registers.rip = (SYSCALL_INSTRUCTION_ADDRESS + 2u64).ptr() as u64;
 
         // Queue the signal that interrupted the syscall.
-        current_task.write().signals.enqueue(SignalInfo::new(SIGUSR1, SI_USER as i32, SignalDetail::None));
+        current_task.write().signals.enqueue(SignalInfo::new(
+            SIGUSR1,
+            SI_USER as i32,
+            SignalDetail::None,
+        ));
 
         // Process the signal.
         dequeue_signal_for_test(&mut current_task);

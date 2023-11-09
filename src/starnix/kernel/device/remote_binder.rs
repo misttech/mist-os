@@ -11,7 +11,7 @@ use crate::{
     },
     logging::{log_error, log_warn},
     mm::{DesiredAddress, MappedVmo, MappingOptions, MemoryAccessorExt, ProtectionFlags},
-    syscalls::*,
+    syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::{CurrentTask, Kernel, ThreadGroup, WaitQueue, Waiter},
     types::{
         errno,

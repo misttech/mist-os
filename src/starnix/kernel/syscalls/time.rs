@@ -9,9 +9,17 @@ use starnix_sync::{InterruptibleEvent, WakeReason};
 use crate::{
     mm::MemoryAccessorExt,
     signals::{RunState, SignalEvent},
-    syscalls::*,
-    task::*,
-    time::utc::*,
+    syscalls::{
+        duration_from_timespec, duration_to_scheduler_clock, errno, error, from_status_like_fdio,
+        itimerspec, itimerval, log_trace, not_implemented, pid_t, sigevent, time_from_timespec,
+        timespec, timespec_from_duration, timespec_is_zero, timeval, timeval_from_time, timezone,
+        tms, uapi, Errno, UserRef, CLOCK_BOOTTIME, CLOCK_BOOTTIME_ALARM, CLOCK_MONOTONIC,
+        CLOCK_MONOTONIC_COARSE, CLOCK_MONOTONIC_RAW, CLOCK_PROCESS_CPUTIME_ID, CLOCK_REALTIME,
+        CLOCK_REALTIME_ALARM, CLOCK_REALTIME_COARSE, CLOCK_TAI, CLOCK_THREAD_CPUTIME_ID, EINTR,
+        MAX_CLOCKS, NANOS_PER_SECOND, TIMER_ABSTIME,
+    },
+    task::{ClockId, CurrentTask, TimerId},
+    time::utc::utc_now,
 };
 
 pub fn sys_clock_getres(
@@ -463,7 +471,12 @@ pub fn sys_times(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{mm::PAGE_SIZE, testing::*};
+    use crate::{
+        mm::PAGE_SIZE,
+        testing::*,
+        time::utc::UtcClockOverrideGuard,
+        types::{signals, TempRef, UserAddress},
+    };
     use fuchsia_zircon::HandleBased;
     use test_util::{assert_geq, assert_leq};
 

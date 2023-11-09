@@ -12,7 +12,12 @@ use std::{
     sync::{Arc, Weak},
 };
 
-use crate::{logging::impossible_error, mm::ProtectionFlags, task::*, types::*};
+use crate::{
+    logging::impossible_error,
+    mm::ProtectionFlags,
+    task::{CurrentTask, Task},
+    types::{error, Errno, UserAddress, FUTEX_BITSET_MATCH_ANY},
+};
 
 /// A table of futexes.
 ///
