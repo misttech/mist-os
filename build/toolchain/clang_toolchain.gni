@@ -976,6 +976,8 @@ template("clang_toolchain") {
       _remote_strip_prefix = ""
 
       # If remotely linking, also remotely strip.
+      # TODO(http://fxbug.dev/133103): disable remote stripping when
+      # config includes //build/config:no_remote_link.
       if (use_strip && _link_rbe_enable) {
         _remote_strip_prefix = _link_common.remote_strip_prefix
       }

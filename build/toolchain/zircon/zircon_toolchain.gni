@@ -533,8 +533,10 @@ template("zircon_toolchain") {
         } else {
           strip_tool = "$dir_prefix${tc.tool_prefix}strip"
         }
+
         _remote_strip_list = []
         if (_link_rbe_enable) {
+          # TODO(http://fxbug.dev/133103): disable remote stripping when config includes //build/config:no_remote_link.
           _remote_strip_list += [
             rebase_path(python_exe_src, root_build_dir),
             "-S",
