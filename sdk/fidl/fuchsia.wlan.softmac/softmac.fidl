@@ -489,6 +489,11 @@ closed protocol WlanSoftmacBridge {
         assoc_cfg WlanAssociationConfig;
     }) -> () error zx.Status;
 
+    /// Disables hardware beaconing.
+    @available(added=HEAD)
+    @selector("fuchsia.wlan.softmac/WlanSoftmac.DisableBeaconing")
+    strict DisableBeaconing() -> () error zx.Status;
+
     /// Notifies MAC and PHY that the peer has been de-associated.
     @selector("fuchsia.wlan.softmac/WlanSoftmac.ClearAssociation")
     @available(added=HEAD)
@@ -706,7 +711,7 @@ closed protocol WlanSoftmac {
     }) -> () error zx.Status;
 
     /// Disables hardware beaconing.
-    @available(added=15)
+    @available(added=15, removed=HEAD)
     strict DisableBeaconing() -> () error zx.Status;
 
     /// Install a key for encryption when transmitting or receiving protected

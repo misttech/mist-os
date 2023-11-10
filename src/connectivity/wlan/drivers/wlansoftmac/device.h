@@ -84,7 +84,6 @@ class Device : public DeviceInterface,
   zx_status_t SetEthernetStatus(uint32_t status) final __TA_EXCLUDES(ethernet_proxy_lock_);
   zx_status_t JoinBss(join_bss_request_t* cfg) final;
   zx_status_t EnableBeaconing(wlan_softmac_enable_beaconing_request_t* request) final;
-  zx_status_t DisableBeaconing() final;
   zx_status_t InstallKey(wlan_key_configuration_t* key_config) final;
   fbl::RefPtr<DeviceState> GetState() final;
   const discovery_support_t& GetDiscoverySupport() const final;

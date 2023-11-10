@@ -171,6 +171,25 @@ class WlanSoftmacBridgeImpl : public fidl::WireServer<fuchsia_wlan_softmac::Wlan
     DispatchAndComplete(__func__, dispatcher, completer);
   }
 
+  void DisableBeaconing(DisableBeaconingCompleter::Sync& completer) override {
+    auto arena = fdf::Arena::Create(0, 0);
+    if (arena.is_error()) {
+      lerror("Arena creation failed: %s", arena.status_string());
+      return completer.ReplyError(ZX_ERR_INTERNAL);
+    }
+
+    auto result = client_.sync().buffer(*std::move(arena))->DisableBeaconing();
+    if (!result.ok()) {
+      lerror("DisableBeaconing failed (FIDL error %s)", result.status_string());
+      return completer.ReplyError(result.status());
+    }
+    if (result->is_error()) {
+      lerror("DisableBeaconing failed (status %s)", zx_status_get_string(result->error_value()));
+      return completer.ReplyError(result->error_value());
+    }
+    return completer.ReplySuccess();
+  }
+
   static void BindSelfManagedServer(
       async_dispatcher_t* dispatcher,
       fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac> client,
@@ -304,9 +323,6 @@ zx_status_t WlanSoftmacHandle::Init(
             .beacon_interval = beacon_interval,
         };
         return DEVICE(device)->EnableBeaconing(&request);
-      },
-      .disable_beaconing = [](void* device) -> zx_status_t {
-        return DEVICE(device)->DisableBeaconing();
       },
   };
 
@@ -781,26 +797,6 @@ zx_status_t Device::EnableBeaconing(wlan_softmac_enable_beaconing_request_t* req
   }
   if (result->is_error()) {
     lerror("EnableBeaconing failed (status %s)", zx_status_get_string(result->error_value()));
-    return result->error_value();
-  }
-  return ZX_OK;
-}
-
-zx_status_t Device::DisableBeaconing() {
-  auto arena = fdf::Arena::Create(0, 0);
-  if (arena.is_error()) {
-    lerror("Arena creation failed: %s", arena.status_string());
-    return ZX_ERR_INTERNAL;
-  }
-
-  auto result = client_.sync().buffer(*std::move(arena))->DisableBeaconing();
-
-  if (!result.ok()) {
-    lerror("DisableBeaconing failed (FIDL error %s)", result.status_string());
-    return result.status();
-  }
-  if (result->is_error()) {
-    lerror("DisableBeaconing failed (status %s)", zx_status_get_string(result->error_value()));
     return result->error_value();
   }
   return ZX_OK;

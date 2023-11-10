@@ -109,10 +109,6 @@ typedef struct {
    */
   int32_t (*enable_beaconing)(void *device, wlansoftmac_out_buf_t buf, uintptr_t tim_ele_offset,
                               uint16_t beacon_interval);
-  /**
-   * Disable beaconing on the device.
-   */
-  int32_t (*disable_beaconing)(void *device);
 } rust_device_interface_t;
 
 /**

@@ -48,7 +48,6 @@ class DeviceInterface {
   virtual zx_status_t SetEthernetStatus(uint32_t status) = 0;
   virtual zx_status_t JoinBss(join_bss_request_t* cfg) = 0;
   virtual zx_status_t EnableBeaconing(wlan_softmac_enable_beaconing_request_t* request) = 0;
-  virtual zx_status_t DisableBeaconing() = 0;
   virtual zx_status_t InstallKey(wlan_key_configuration_t* key_config) = 0;
 
   virtual fbl::RefPtr<DeviceState> GetState() = 0;

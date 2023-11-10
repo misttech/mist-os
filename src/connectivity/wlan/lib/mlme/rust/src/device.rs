@@ -348,7 +348,13 @@ impl DeviceOps for Device {
     }
 
     fn disable_beaconing(&mut self) -> Result<(), zx::Status> {
-        zx::ok((self.raw_device.disable_beaconing)(self.raw_device.device))
+        self.wlan_softmac_bridge_proxy
+            .disable_beaconing(zx::Time::INFINITE)
+            .map_err(|error| {
+                error!("DisableBeaconing failed with FIDL error: {:?}", error);
+                zx::Status::INTERNAL
+            })?
+            .map_err(zx::Status::from_raw)
     }
 
     fn clear_association(
@@ -528,8 +534,6 @@ pub struct DeviceInterface {
         tim_ele_offset: usize,
         beacon_interval: u16,
     ) -> i32,
-    /// Disable beaconing on the device.
-    disable_beaconing: extern "C" fn(device: *mut c_void) -> i32,
 }
 
 pub mod test_utils {
