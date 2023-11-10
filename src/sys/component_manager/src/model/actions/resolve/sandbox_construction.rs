@@ -3,7 +3,12 @@
 // found in the LICENSE file.
 
 use {
-    crate::sandbox_util::Sandbox,
+    crate::{
+        capability::CapabilitySource,
+        model::component::WeakComponentInstance,
+        sandbox_util::{Message, Sandbox},
+    },
+    ::routing::capability_source::{ComponentCapability, InternalCapability},
     cm_rust::{self, Availability, OfferDeclCommon, SourceName, UseDeclCommon},
     cm_types::Name,
     sandbox::Receiver,
@@ -11,24 +16,37 @@ use {
     tracing::{debug, warn},
 };
 
+pub struct CapabilitySourceFactory {
+    factory_fn: Box<dyn FnOnce(WeakComponentInstance) -> CapabilitySource + Send + 'static>,
+}
+
+impl CapabilitySourceFactory {
+    fn new<F>(factory_fn: F) -> Self
+    where
+        F: FnOnce(WeakComponentInstance) -> CapabilitySource + Send + 'static,
+    {
+        Self { factory_fn: Box::new(factory_fn) }
+    }
+
+    pub fn run(self, component: WeakComponentInstance) -> CapabilitySource {
+        (self.factory_fn)(component)
+    }
+}
+
 /// The sandboxes a component holds once it has been resolved.
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct ComponentSandboxes {
     pub sandbox_from_parent: Sandbox,
     pub program_sandbox: Sandbox,
     /// Initial sandboxes for children and collections
     pub child_sandboxes: HashMap<Name, Sandbox>,
     pub collection_sandboxes: HashMap<Name, Sandbox>,
+    pub sources_and_receivers: Vec<(CapabilitySourceFactory, Receiver<Message>)>,
 }
 
 impl ComponentSandboxes {
     fn new(sandbox_from_parent: Sandbox) -> Self {
-        Self {
-            sandbox_from_parent,
-            program_sandbox: Sandbox::new(),
-            child_sandboxes: HashMap::new(),
-            collection_sandboxes: HashMap::new(),
-        }
+        Self { sandbox_from_parent, ..Self::default() }
     }
 }
 
@@ -96,6 +114,36 @@ pub async fn build_component_sandboxes(
                     }
                 }
             }
+            cm_rust::UseSource::Framework => {
+                let receiver = Receiver::new();
+                output
+                    .program_sandbox
+                    .get_or_insert_protocol(source_name.clone())
+                    .insert_sender(receiver.new_sender());
+                let source_name = source_name.clone();
+                output.sources_and_receivers.push((
+                    CapabilitySourceFactory::new(move |component| CapabilitySource::Framework {
+                        capability: InternalCapability::Protocol(source_name.clone()),
+                        component,
+                    }),
+                    receiver,
+                ));
+            }
+            cm_rust::UseSource::Capability(_) => {
+                let receiver = Receiver::new();
+                output
+                    .program_sandbox
+                    .get_or_insert_protocol(source_name.clone())
+                    .insert_sender(receiver.new_sender());
+                let use_ = use_.clone();
+                output.sources_and_receivers.push((
+                    CapabilitySourceFactory::new(move |component| CapabilitySource::Capability {
+                        source_capability: ComponentCapability::Use(use_.clone()),
+                        component,
+                    }),
+                    receiver,
+                ));
+            }
             _ => (), // unsupported
         }
     }
@@ -110,13 +158,10 @@ pub async fn build_component_sandboxes(
             cm_rust::OfferTarget::Child(child_ref) => {
                 assert!(child_ref.collection.is_none(), "unexpected dynamic offer target");
                 let child_name = Name::new(&child_ref.name).unwrap();
-                let dict = output.child_sandboxes.entry(child_name).or_insert(Sandbox::new());
-                dict
+                output.child_sandboxes.entry(child_name).or_insert(Sandbox::new())
             }
             cm_rust::OfferTarget::Collection(name) => {
-                let dict =
-                    output.collection_sandboxes.entry(name.clone()).or_insert(Sandbox::new());
-                dict
+                output.collection_sandboxes.entry(name.clone()).or_insert(Sandbox::new())
             }
             cm_rust::OfferTarget::Capability(_name) => {
                 // TODO(fxbug.dev/301674053): Support dictionary routing.
@@ -128,6 +173,7 @@ pub async fn build_component_sandboxes(
             &output.program_sandbox,
             offer,
             target_sandbox,
+            &mut output.sources_and_receivers,
         );
     }
 
@@ -141,10 +187,18 @@ pub fn extend_dict_with_offers(
     program_sandbox: &Sandbox,
     dynamic_offers: &Vec<cm_rust::OfferDecl>,
     target_sandbox: &mut Sandbox,
-) {
+) -> Vec<(CapabilitySourceFactory, Receiver<Message>)> {
+    let mut sources_and_receivers = vec![];
     for offer in dynamic_offers {
-        extend_dict_with_offer(sandbox_from_parent, program_sandbox, offer, target_sandbox);
+        extend_dict_with_offer(
+            sandbox_from_parent,
+            program_sandbox,
+            offer,
+            target_sandbox,
+            &mut sources_and_receivers,
+        );
     }
+    sources_and_receivers
 }
 
 fn extend_dict_with_offer(
@@ -152,6 +206,7 @@ fn extend_dict_with_offer(
     program_sandbox: &Sandbox,
     offer: &cm_rust::OfferDecl,
     target_sandbox: &mut Sandbox,
+    sources_and_receivers: &mut Vec<(CapabilitySourceFactory, Receiver<Message>)>,
 ) {
     // We only support protocol capabilities right now
     match &offer {
@@ -197,7 +252,7 @@ fn extend_dict_with_offer(
                 .and_then(|c| c.get_receiver().map(|r| r.new_sender()))
             {
                 let mut target_cap_sandbox =
-                    target_sandbox.get_or_insert_protocol(source_name.clone());
+                    target_sandbox.get_or_insert_protocol(target_name.clone());
                 target_cap_sandbox.insert_sender(sender);
                 target_cap_sandbox.insert_availability(
                     offer
@@ -207,13 +262,43 @@ fn extend_dict_with_offer(
                 );
             }
         }
-        cm_rust::OfferSource::Void => {
-            // Intentionally do nothing, because we've been explicitly instructed to NOT grant
-            // access to the target.
-
-            // TODO: We want to signify to the child that we've intentionally not given it the
-            // capability. Setting something in the sandbox to this effect makes sense. What
-            // exactly though?
+        cm_rust::OfferSource::Framework => {
+            let receiver = Receiver::new();
+            let mut target_cap_sandbox = target_sandbox.get_or_insert_protocol(target_name.clone());
+            target_cap_sandbox.insert_sender(receiver.new_sender());
+            target_cap_sandbox.insert_availability(
+                offer
+                    .availability()
+                    .expect("availability should always be set for protocols")
+                    .clone(),
+            );
+            let source_name = source_name.clone();
+            sources_and_receivers.push((
+                CapabilitySourceFactory::new(move |component| CapabilitySource::Framework {
+                    capability: InternalCapability::Protocol(source_name.clone()),
+                    component,
+                }),
+                receiver,
+            ));
+        }
+        cm_rust::OfferSource::Capability(_) => {
+            let receiver = Receiver::new();
+            let mut target_cap_sandbox = target_sandbox.get_or_insert_protocol(target_name.clone());
+            target_cap_sandbox.insert_sender(receiver.new_sender());
+            target_cap_sandbox.insert_availability(
+                offer
+                    .availability()
+                    .expect("availability should always be set for protocols")
+                    .clone(),
+            );
+            let offer = offer.clone();
+            sources_and_receivers.push((
+                CapabilitySourceFactory::new(move |component| CapabilitySource::Capability {
+                    source_capability: ComponentCapability::Offer(offer.clone()),
+                    component,
+                }),
+                receiver,
+            ));
         }
         _ => (), // unsupported
     }

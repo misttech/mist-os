@@ -4,10 +4,13 @@
 
 use {
     crate::bedrock::program::{self, Program},
+    crate::capability::CapabilitySource,
     crate::framework::controller,
     crate::model::{
         actions::{
-            resolve::sandbox_construction::{extend_dict_with_offers, ComponentSandboxes},
+            resolve::sandbox_construction::{
+                extend_dict_with_offers, CapabilitySourceFactory, ComponentSandboxes,
+            },
             shutdown, start, ActionSet, DestroyChildAction, DiscoverAction, ResolveAction,
             ShutdownAction, StartAction, StopAction, UnresolveAction,
         },
@@ -27,12 +30,10 @@ use {
             service::{AnonymizedAggregateServiceDir, AnonymizedServiceRoute},
         },
     },
-    crate::sandbox_util::{Sandbox, SandboxWaiter},
+    crate::sandbox_util::{LaunchTaskOnReceive, Message, Sandbox, SandboxWaiter},
     ::namespace::Entry as NamespaceEntry,
     ::routing::{
-        capability_source::{
-            BuiltinCapabilities, CapabilitySource, ComponentCapability, NamespaceCapabilities,
-        },
+        capability_source::{BuiltinCapabilities, ComponentCapability, NamespaceCapabilities},
         component_instance::{
             ComponentInstanceInterface, ExtendedInstanceInterface, ResolvedInstanceInterface,
             ResolvedInstanceInterfaceExt, TopInstanceInterface, WeakComponentInstanceInterface,
@@ -68,12 +69,13 @@ use {
     fidl_fuchsia_hardware_power_statecontrol as fstatecontrol, fidl_fuchsia_io as fio,
     fidl_fuchsia_process as fprocess, fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
     fuchsia_component::client,
-    fuchsia_zircon as zx,
+    fuchsia_zircon::{self as zx, AsHandleRef, HandleBased},
     futures::{
         future::{join_all, BoxFuture, Either, FutureExt},
         lock::{MappedMutexGuard, Mutex, MutexGuard},
     },
     moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
+    sandbox::Receiver,
     std::iter::Iterator,
     std::{
         boxed::Box,
@@ -82,6 +84,7 @@ use {
         convert::TryFrom,
         fmt,
         ops::DerefMut,
+        path::PathBuf,
         sync::{Arc, Weak},
         time::Duration,
     },
@@ -1361,12 +1364,13 @@ impl ResolvedInstanceState {
             address,
             anonymized_services: HashMap::new(),
             sandbox_from_parent: component_sandboxes.sandbox_from_parent,
-            program_sandbox: component_sandboxes.program_sandbox.clone(),
+            program_sandbox: component_sandboxes.program_sandbox,
             collection_sandboxes: component_sandboxes.collection_sandboxes,
             sandbox_waiter: None,
         };
         state.add_static_children(component, component_sandboxes.child_sandboxes).await?;
         state.wait_on_program_sandbox(component);
+        state.dispatch_receivers_to_hooks(component, component_sandboxes.sources_and_receivers);
         Ok(state)
     }
 
@@ -1400,6 +1404,69 @@ impl ResolvedInstanceState {
                 }
                 .boxed()
             }));
+    }
+
+    // TODO(fxbug.dev/308939186): don't execute framework capabilities through the hooks system
+    fn dispatch_receivers_to_hooks(
+        &self,
+        component: &Arc<ComponentInstance>,
+        sources_and_receivers: Vec<(CapabilitySourceFactory, Receiver<Message>)>,
+    ) {
+        for (cap_source_factory, receiver) in sources_and_receivers {
+            let weak_component = WeakComponentInstance::new(component);
+            let capability_source = cap_source_factory.run(weak_component.clone());
+            self.execution_scope.spawn(
+                LaunchTaskOnReceive::new(
+                    component.nonblocking_task_group().as_weak(),
+                    "framework hook dispatcher",
+                    receiver,
+                    Some((component.context.policy().clone(), capability_source.clone())),
+                    Arc::new(move |message| {
+                        let weak_component = weak_component.clone();
+                        let capability_source = capability_source.clone();
+                        async move {
+                            if message.handle.basic_info().unwrap().object_type
+                                != zx::ObjectType::CHANNEL
+                            {
+                                return Ok(());
+                            }
+                            let mut chan = Channel::from_handle(message.handle);
+                            if let Ok(target) = message.target.upgrade() {
+                                let mutexed_provider = Arc::new(Mutex::new(None));
+                                let event = Event::new(
+                                    &target,
+                                    EventPayload::CapabilityRouted {
+                                        source: capability_source,
+                                        capability_provider: mutexed_provider.clone(),
+                                    },
+                                );
+                                target.hooks.dispatch(&event).await;
+                                if let Some(capability_provider) =
+                                    mutexed_provider.lock().await.take()
+                                {
+                                    if let Ok(component) = weak_component.upgrade() {
+                                        capability_provider
+                                            .open(
+                                                component.nonblocking_task_group(),
+                                                message.flags,
+                                                PathBuf::from(""),
+                                                &mut chan,
+                                            )
+                                            .await?;
+                                        return Ok(());
+                                    }
+                                }
+
+                                let _ = chan.close_with_epitaph(zx::Status::UNAVAILABLE);
+                            }
+                            Ok(())
+                        }
+                        .boxed()
+                    }),
+                )
+                .run(),
+            );
+        }
     }
 
     // Causes this component to stop watching the receivers in our program sandbox.
@@ -1622,12 +1689,13 @@ impl ResolvedInstanceState {
         let child_moniker =
             ChildName::try_new(child.name.as_str(), collection.map(|c| c.name.as_str()))?;
 
-        extend_dict_with_offers(
+        let sources_and_receivers = extend_dict_with_offers(
             &self.sandbox_from_parent,
             &self.program_sandbox,
             &dynamic_offers,
             &mut child_sandbox,
         );
+        self.dispatch_receivers_to_hooks(component, sources_and_receivers);
 
         if self.get_child(&child_moniker).is_some() {
             return Err(AddChildError::InstanceAlreadyExists {
