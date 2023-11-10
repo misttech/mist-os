@@ -14,9 +14,10 @@ use crate::{
     logging::not_implemented,
     mm::MemoryAccessorExt,
     task::{CurrentTask, EventHandler, Task, WaitCanceler, Waiter},
+    types::user_buffer::UserBuffer,
     types::{
         c_int, errno, errno_from_code, errno_from_zxio_code, error, from_status_like_fdio, uapi,
-        ucred, Errno, UserBuffer, MSG_DONTWAIT, MSG_WAITALL, SOL_SOCKET, SO_ATTACH_FILTER,
+        ucred, Errno, MSG_DONTWAIT, MSG_WAITALL, SOL_SOCKET, SO_ATTACH_FILTER,
     },
 };
 

@@ -6,7 +6,7 @@ use fuchsia_zircon::sys::zx_vaddr_t;
 use std::{fmt, marker::PhantomData, mem, ops};
 use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
-use super::UserBuffer;
+use super::user_buffer::UserBuffer;
 use crate::{
     mm::vmo::round_up_to_increment,
     types::{error, uapi, Errno},

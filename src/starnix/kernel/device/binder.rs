@@ -26,6 +26,7 @@ use crate::{
     task::{
         CurrentTask, EventHandler, Kernel, SimpleWaiter, Task, WaitCanceler, WaitQueue, Waiter,
     },
+    types::user_buffer::UserBuffer,
     types::{
         binder_buffer_object, binder_driver_command_protocol,
         binder_driver_command_protocol_BC_ACQUIRE, binder_driver_command_protocol_BC_ACQUIRE_DONE,
@@ -57,7 +58,7 @@ use crate::{
         flat_binder_object, mode, pid_t, release_after, release_on_error, statfs,
         struct_with_union_into_bytes, transaction_flags_TF_ONE_WAY, uapi, ArcKey, DeviceType,
         Errno, OpenFlags, OwnedRef, Releasable, ReleaseGuard, TempRef, TempRefKey, UserAddress,
-        UserBuffer, UserRef, WeakRef, BINDERFS_SUPER_MAGIC, BINDER_BUFFER_FLAG_HAS_PARENT,
+        UserRef, WeakRef, BINDERFS_SUPER_MAGIC, BINDER_BUFFER_FLAG_HAS_PARENT,
         BINDER_CURRENT_PROTOCOL_VERSION, BINDER_TYPE_BINDER, BINDER_TYPE_FD, BINDER_TYPE_FDA,
         BINDER_TYPE_HANDLE, BINDER_TYPE_PTR, EINTR,
     },

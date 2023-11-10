@@ -13,7 +13,6 @@ mod seal_flags;
 mod stats;
 mod union;
 mod user_address;
-mod user_buffer;
 
 pub mod as_any;
 pub mod device_type;
@@ -24,6 +23,7 @@ pub mod range_ext;
 pub mod signals;
 pub mod time;
 pub mod uapi;
+pub mod user_buffer;
 
 pub(crate) use union::struct_with_union_into_bytes;
 
@@ -47,7 +47,6 @@ pub use seal_flags::SealFlags;
 pub use stats::TaskTimeStats;
 pub use uapi::*;
 pub use user_address::*;
-pub use user_buffer::*;
 
 // Manually export names that are ambiguous between the name below and the one defined in uapi.
 pub use auth::{

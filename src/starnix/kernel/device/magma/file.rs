@@ -154,7 +154,8 @@ use crate::{
     mm::{MemoryAccessorExt, ProtectionFlags},
     syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::CurrentTask,
-    types::{errno, error, DeviceType, Errno, OpenFlags, UserAddress, UserBuffer, UserRef},
+    types::user_buffer::UserBuffer,
+    types::{errno, error, DeviceType, Errno, OpenFlags, UserAddress, UserRef},
 };
 
 #[derive(Clone)]

@@ -11,7 +11,8 @@ use crate::{
     logging::{log_warn, not_implemented},
     mm::{MemoryAccessorExt, PAGE_SIZE},
     task::CurrentTask,
-    types::{error, off_t, uapi, Errno, OpenFlags, UserAddress, UserRef, MAX_RW_COUNT},
+    types::user_buffer::MAX_RW_COUNT,
+    types::{error, off_t, uapi, Errno, OpenFlags, UserAddress, UserRef},
 };
 use starnix_lock::{ordered_lock, MutexGuard};
 use std::{cmp::Ordering, sync::Arc, usize};
