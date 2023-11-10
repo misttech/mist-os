@@ -13,9 +13,12 @@ use crate::{
     },
     logging::not_implemented,
     task::{CurrentTask, Kernel, Task},
-    types::{error, mode, statfs, DeviceType, Errno, OpenFlags, TempRef, WeakRef, SELINUX_MAGIC},
+    types::{
+        errno, error, mode, statfs, DeviceType, Errno, OpenFlags, TempRef, WeakRef, SELINUX_MAGIC,
+    },
 };
 use derivative::Derivative;
+use selinux::security_server::SecurityServer;
 use starnix_lock::Mutex;
 use std::{borrow::Cow, collections::BTreeMap, sync::Arc};
 use zerocopy::AsBytes;
@@ -35,10 +38,21 @@ impl FileSystemOps for SeLinuxFs {
     }
 }
 
+/// Implements the /sys/fs/selinux filesystem, as documented in the SELinux
+/// Notebook at
+/// https://github.com/SELinuxProject/selinux-notebook/blob/main/src/lsm_selinux.md#selinux-filesystem
 impl SeLinuxFs {
     fn new_fs(kernel: &Arc<Kernel>, options: FileSystemOptions) -> Result<FileSystemHandle, Errno> {
         let fs = FileSystem::new(kernel, CacheMode::Permanent, SeLinuxFs, options);
         let mut dir = StaticDirectoryBuilder::new(&fs);
+
+        // There should always be a SecurityServer if SeLinuxFs is active.
+        let security_server = match kernel.security_server.as_ref() {
+            Some(security_server) => security_server.clone(),
+            None => {
+                return error!(EINVAL);
+            }
+        };
 
         // Read-only files & directories, exposing SELinux internal state.
         dir.entry(b"checkreqprot", BytesFile::new_node(SeCheckReqProt), mode!(IFREG, 0o644));
@@ -57,6 +71,11 @@ impl SeLinuxFs {
             );
         });
         dir.entry(b"mls", BytesFile::new_node(b"1".to_vec()), mode!(IFREG, 0o444));
+        dir.entry(
+            b"policy",
+            BytesFile::new_node(SePolicy { security_server: security_server.clone() }),
+            mode!(IFREG, 0o600),
+        );
         dir.entry(b"policyvers", BytesFile::new_node(b"33".to_vec()), mode!(IFREG, 0o444));
         dir.entry(
             b"status",
@@ -75,7 +94,11 @@ impl SeLinuxFs {
         dir.entry(b"access", AccessFileNode::new(), mode!(IFREG, 0o666));
         dir.entry(b"context", BytesFile::new_node(SeContext), mode!(IFREG, 0o666));
         dir.entry(b"create", SeCreate::new_node(), mode!(IFREG, 0o644));
-        dir.entry(b"load", BytesFile::new_node(SeLoad), mode!(IFREG, 0o600));
+        dir.entry(
+            b"load",
+            BytesFile::new_node(SeLoad { security_server: security_server.clone() }),
+            mode!(IFREG, 0o600),
+        );
 
         // Allows the SELinux enforcing mode to be queried, or changed.
         dir.entry(
@@ -112,17 +135,31 @@ struct selinux_status_t {
     deny_unknown: u32,
 }
 
-struct SeLoad;
+struct SeLoad {
+    security_server: Arc<SecurityServer>,
+}
+
 impl BytesFileOps for SeLoad {
     fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
         not_implemented!("got selinux policy, length {}, ignoring", data.len());
-        Ok(())
+        self.security_server.load_policy(data).map_err(|_| errno!(EINVAL))
+    }
+}
+
+struct SePolicy {
+    security_server: Arc<SecurityServer>,
+}
+
+impl BytesFileOps for SePolicy {
+    fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
+        Ok(self.security_server.get_binary_policy().into())
     }
 }
 
 struct SeEnforce {
     enforce: Mutex<bool>,
 }
+
 impl BytesFileOps for SeEnforce {
     fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
         let enforce_data = parse_unsigned_file::<u32>(&data)?;
@@ -213,7 +250,6 @@ impl FileOps for AccessFile {
 }
 
 struct DeviceFileNode;
-
 impl FsNodeOps for DeviceFileNode {
     fs_node_impl_not_dir!();
 
@@ -358,6 +394,7 @@ struct AttrNode {
     attr: SeLinuxContextAttr,
     task: WeakRef<Task>,
 }
+
 impl BytesFileOps for AttrNode {
     fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
         self.attr.access_on_task(Task::from_weak(&self.task)?.as_ref(), |attr| *attr = data);
@@ -372,6 +409,9 @@ impl BytesFileOps for AttrNode {
     }
 }
 
+/// # Panics
+///
+/// Will panic if the supplied `kern` is not configured with SELinux enabled.
 pub fn selinux_fs(kern: &Arc<Kernel>, options: FileSystemOptions) -> &FileSystemHandle {
     kern.selinux_fs
         .get_or_init(|| SeLinuxFs::new_fs(kern, options).expect("failed to construct selinuxfs"))

@@ -14,10 +14,19 @@ pub enum Mode {
     Fake,
 }
 
+/// Errors that may be returned when attempting to load a new policy.
+#[derive(Copy, Clone, Debug)]
+pub enum PolicyError {
+    Invalid,
+}
+
 pub struct SecurityServerState {
     // TODO(http://b/308175643): reference count SIDs, so that when the last SELinux object
     // referencing a SID gets destroyed, the entry is removed from the map.
     sids: HashMap<SecurityId, SecurityContext>,
+
+    // TODO(https://b/304734769): Replace this with the parsed policy state.
+    binary_policy: Vec<u8>,
 }
 
 pub struct SecurityServer {
@@ -32,7 +41,8 @@ pub struct SecurityServer {
 impl SecurityServer {
     pub fn new(mode: Mode) -> Arc<SecurityServer> {
         // TODO(http://b/304732283): initialize the access vector cache.
-        let state = Mutex::new(SecurityServerState { sids: HashMap::new() });
+        let state =
+            Mutex::new(SecurityServerState { sids: HashMap::new(), binary_policy: Vec::new() });
         Arc::new(SecurityServer { mode, state })
     }
 
@@ -56,6 +66,20 @@ impl SecurityServer {
     /// Returns the security context mapped to `sid`.
     pub fn sid_to_security_context(&self, sid: &SecurityId) -> Option<SecurityContext> {
         self.state.lock().sids.get(sid).map(Clone::clone)
+    }
+
+    /// Applies the supplied policy to the security server.
+    pub fn load_policy(&self, binary_policy: Vec<u8>) -> Result<(), PolicyError> {
+        // TODO(https://b/304734769): Parse the supplied policy, including
+        // creating any newly-required SID mappings, and stash the resulting
+        // structure instead.
+        self.state.lock().binary_policy = binary_policy;
+        Ok(())
+    }
+
+    /// Returns the active policy in binary form.
+    pub fn get_binary_policy(&self) -> Vec<u8> {
+        self.state.lock().binary_policy.clone()
     }
 
     pub fn compute_access_vector(
@@ -135,5 +159,13 @@ mod tests {
 
         let fake_security_server = SecurityServer::new(Mode::Fake);
         assert_eq!(fake_security_server.is_fake(), true);
+    }
+
+    #[fuchsia::test]
+    fn loaded_policy_can_be_retrieved() {
+        let not_really_a_policy = "not a real policy".as_bytes().to_vec();
+        let security_server = SecurityServer::new(Mode::Enable);
+        assert!(security_server.load_policy(not_really_a_policy.clone()).is_ok());
+        assert_eq!(security_server.get_binary_policy(), not_really_a_policy);
     }
 }
