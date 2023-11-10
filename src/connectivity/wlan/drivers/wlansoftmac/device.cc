@@ -33,8 +33,6 @@
 
 #include <wlan/common/channel.h>
 #include <wlan/drivers/log.h>
-#include <wlan/mlme/validate_frame.h>
-#include <wlan/mlme/wlan.h>
 
 #include "convert.h"
 #include "device_interface.h"
@@ -804,11 +802,6 @@ static constexpr size_t kWlanSoftmacEnableBeaconingRequestBufferSize =
                            fidl::MessageDirection::kSending>();
 
 zx_status_t Device::EnableBeaconing(wlan_softmac_enable_beaconing_request_t* request) {
-  ZX_DEBUG_ASSERT(
-      ValidateFrame("Malformed beacon template",
-                    {reinterpret_cast<const uint8_t*>(request->packet_template.mac_frame_buffer),
-                     request->packet_template.mac_frame_size}));
-
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     lerror("Arena creation failed: %s", arena.status_string());

@@ -17,7 +17,6 @@
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
 #include <wlan/common/macaddr.h>
-#include <wlan/mlme/mac_frame.h>
 
 #include "src/connectivity/wlan/drivers/wlansoftmac/rust_driver/c-binding/bindings.h"
 
