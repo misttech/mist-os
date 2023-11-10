@@ -2,26 +2,29 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::collections::VecDeque;
-use std::ffi::CString;
-use std::sync::{Arc, Mutex};
-
+use crate::{
+    fs::{
+        buffers::{VecInputBuffer, VecOutputBuffer},
+        socket::{resolve_unix_socket_address, syscalls::sys_socket, SocketPeer},
+        FdEvents, FileHandle,
+    },
+    logging::log_error,
+    task::{CurrentTask, EventHandler, Kernel, Task, Waiter},
+    types::{errno, Errno, AF_UNIX, SOCK_STREAM},
+};
 use lock_sequence::{Locked, Unlocked};
 use perfetto_consumer_proto::perfetto::protos::{
-    ipc_frame, trace_config::buffer_config::FillPolicy, trace_config::BufferConfig,
-    trace_config::DataSource, DataSourceConfig, DisableTracingRequest, EnableTracingRequest,
-    FreeBuffersRequest, FtraceConfig, IpcFrame, ReadBuffersRequest, ReadBuffersResponse,
-    TraceConfig,
+    ipc_frame,
+    trace_config::{buffer_config::FillPolicy, BufferConfig, DataSource},
+    DataSourceConfig, DisableTracingRequest, EnableTracingRequest, FreeBuffersRequest,
+    FtraceConfig, IpcFrame, ReadBuffersRequest, ReadBuffersResponse, TraceConfig,
 };
 use prost::Message;
-
-use crate::fs::buffers::{VecInputBuffer, VecOutputBuffer};
-use crate::fs::socket::syscalls::sys_socket;
-use crate::fs::socket::{resolve_unix_socket_address, SocketPeer};
-use crate::fs::{FdEvents, FileHandle};
-use crate::logging::log_error;
-use crate::task::{CurrentTask, EventHandler, Kernel, Task, Waiter};
-use crate::types::{errno, Errno, AF_UNIX, SOCK_STREAM};
+use std::{
+    collections::VecDeque,
+    ffi::CString,
+    sync::{Arc, Mutex},
+};
 
 use fuchsia_trace::{category_enabled, trace_state, ProlongedContext, TraceState};
 
@@ -519,7 +522,7 @@ pub fn start_perfetto_consumer_thread(
         kernel,
         CString::new("perfetto_consumer".to_string()).unwrap(),
         // Perfetto consumer runs in a separate thread, not in the init task proper.
-        Some(init_task.fs().fork()),
+        init_task.fs().fork(),
     )?;
     let callback_state = CallbackState {
         prev_state: TraceState::Stopped,

@@ -314,14 +314,13 @@ async fn create_container(
     let kernel =
         Kernel::new(kernel_cmdline, features, svc_dir, data_dir, node.create_child("kernel"))
             .with_source_context(|| format!("creating Kernel: {}", &config.name))?;
-
-    let mut init_task = create_init_task(&kernel, config)
+    let fs_context =
+        create_fs_context(&kernel, config, &pkg_dir_proxy).source_context("creating FsContext")?;
+    let mut init_task = create_init_task(&kernel, Arc::clone(&fs_context), config)
         .with_source_context(|| format!("creating init task: {:?}", &config.init))?;
     release_on_error!(init_task, (), {
-        let fs_context = create_fs_context(&init_task, config, &pkg_dir_proxy)
-            .source_context("creating FsContext")?;
-        init_task.set_fs(fs_context.clone());
         kernel.kthreads.init(&kernel, fs_context).source_context("initializing kthreads")?;
+
         let system_task = kernel.kthreads.system_task();
 
         // Register common devices and add them in sysfs and devtmpfs.
@@ -367,7 +366,7 @@ async fn create_container(
 }
 
 fn create_fs_context(
-    current_task: &CurrentTask,
+    kernel: &Arc<Kernel>,
     config: &ConfigWrapper,
     pkg_dir_proxy: &fio::DirectorySynchronousProxy,
 ) -> Result<Arc<FsContext>, Error> {
@@ -376,7 +375,7 @@ fn create_fs_context(
     // applied on top of it.
     let mut mounts_iter = config.mounts.iter();
     let (root_point, root_fs) = create_filesystem_from_spec(
-        current_task.kernel(),
+        kernel,
         pkg_dir_proxy,
         mounts_iter.next().ok_or_else(|| anyhow!("Mounts list is empty"))?,
     )?;
@@ -388,7 +387,6 @@ fn create_fs_context(
     // /container will mount the container pkg
     // /container/component will be a tmpfs where component using the starnix kernel will have their
     // package mounted.
-    let kernel = current_task.kernel();
     let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
     let container_fs = LayeredFs::new_fs(
         kernel,
@@ -402,10 +400,10 @@ fn create_fs_context(
     );
     let mut mappings =
         vec![(b"container".to_vec(), container_fs), (b"data".to_vec(), TmpFs::new_fs(kernel))];
-    if current_task.kernel().features.custom_artifacts {
+    if kernel.features.custom_artifacts {
         mappings.push((b"custom_artifacts".to_vec(), TmpFs::new_fs(kernel)));
     }
-    if current_task.kernel().features.test_data {
+    if kernel.features.test_data {
         mappings.push((b"test_data".to_vec(), TmpFs::new_fs(kernel)));
     }
     let root_fs = LayeredFs::new_fs(kernel, root_fs, mappings.into_iter().collect());
@@ -436,14 +434,18 @@ pub fn set_rlimits(current_task: &CurrentTask, rlimits: &[String]) -> Result<(),
     Ok(())
 }
 
-fn create_init_task(kernel: &Arc<Kernel>, config: &ConfigWrapper) -> Result<CurrentTask, Error> {
+fn create_init_task(
+    kernel: &Arc<Kernel>,
+    fs_context: Arc<FsContext>,
+    config: &ConfigWrapper,
+) -> Result<CurrentTask, Error> {
     let credentials = Credentials::root();
     let initial_name = if config.init.is_empty() {
         CString::default()
     } else {
         CString::new(config.init[0].clone())?
     };
-    let task = Task::create_process_without_parent(kernel, initial_name, None)?;
+    let task = Task::create_process_without_parent(kernel, initial_name, fs_context)?;
     release_on_error!(task, (), {
         task.set_creds(credentials);
         set_rlimits(&task, &config.rlimits)?;

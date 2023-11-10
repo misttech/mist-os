@@ -7,7 +7,6 @@ use extended_pstate::ExtendedPstateState;
 use fuchsia_zircon::{
     self as zx, sys::zx_thread_state_general_regs_t, AsHandleRef, Signals, Task as _,
 };
-use once_cell::sync::OnceCell;
 use starnix_lock::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use starnix_sync::{EventWaitGuard, WakeReason};
 use std::{
@@ -637,9 +636,7 @@ pub struct Task {
     pub mm: Arc<MemoryManager>,
 
     /// The file system for this task.
-    ///
-    /// The only case when this is not set is for the initial task while the FsContext is built.
-    fs: OnceCell<Arc<FsContext>>,
+    fs: Arc<FsContext>,
 
     /// The namespace for abstract AF_UNIX sockets for this task.
     pub abstract_socket_namespace: Arc<AbstractUnixSocketNamespace>,
@@ -799,7 +796,7 @@ impl Task {
         mm: Arc<MemoryManager>,
         // The only case where fs should be None if when building the initial task that is the
         // used to build the initial FsContext.
-        fs: Option<Arc<FsContext>>,
+        fs: Arc<FsContext>,
         creds: Credentials,
         abstract_socket_namespace: Arc<AbstractUnixSocketNamespace>,
         abstract_vsock_namespace: Arc<AbstractVsockSocketNamespace>,
@@ -814,13 +811,6 @@ impl Task {
         robust_list_head: UserRef<robust_list_head>,
         timerslack_ns: u64,
     ) -> Self {
-        let fs = {
-            let result = OnceCell::new();
-            if let Some(fs) = fs {
-                result.get_or_init(|| fs);
-            }
-            result
-        };
         let pid = thread_group.leader;
         let task = Task {
             id,
@@ -887,11 +877,7 @@ impl Task {
     }
 
     pub fn fs(&self) -> &Arc<FsContext> {
-        self.fs.get().unwrap()
-    }
-
-    pub fn set_fs(&self, fs: Arc<FsContext>) {
-        self.fs.set(fs).map_err(|_| "Cannot set fs multiple times").unwrap();
+        &self.fs
     }
 
     // See "Ptrace access mode checking" in https://man7.org/linux/man-pages/man2/ptrace.2.html
@@ -977,7 +963,7 @@ impl Task {
         let task = Self::create_process_without_parent(
             kernel,
             binary_path.clone(),
-            Some(init_task.fs().fork()),
+            init_task.fs().fork(),
         )?;
         {
             let mut init_writer = init_task.thread_group.write();
@@ -1002,7 +988,7 @@ impl Task {
     pub fn create_process_without_parent(
         kernel: &Arc<Kernel>,
         initial_name: CString,
-        fs: Option<Arc<FsContext>>,
+        fs: Arc<FsContext>,
     ) -> Result<CurrentTask, Errno> {
         let initial_name_bytes = initial_name.as_bytes().to_owned();
         Self::create_task(kernel, initial_name, fs, |pid, process_group| {
@@ -1025,7 +1011,7 @@ impl Task {
         initial_name: CString,
         fs: Arc<FsContext>,
     ) -> Result<CurrentTask, Errno> {
-        Self::create_task(kernel, initial_name, Some(fs), |pid, process_group| {
+        Self::create_task(kernel, initial_name, fs, |pid, process_group| {
             let process = zx::Process::from(zx::Handle::invalid());
             let memory_manager = Arc::new(MemoryManager::new_empty());
             let thread_group = ThreadGroup::new(
@@ -1043,7 +1029,7 @@ impl Task {
     fn create_task<F>(
         kernel: &Arc<Kernel>,
         initial_name: CString,
-        root_fs: Option<Arc<FsContext>>,
+        root_fs: Arc<FsContext>,
         task_info_factory: F,
     ) -> Result<CurrentTask, Errno>
     where
@@ -1125,7 +1111,7 @@ impl Task {
             None,
             FdTable::default(),
             Arc::clone(&system_task.mm),
-            Some(Arc::clone(system_task.fs())),
+            Arc::clone(system_task.fs()),
             system_task.creds(),
             Arc::clone(&system_task.abstract_socket_namespace),
             Arc::clone(&system_task.abstract_vsock_namespace),
@@ -1313,7 +1299,7 @@ impl Task {
             thread,
             files,
             memory_manager,
-            Some(fs),
+            fs,
             creds,
             self.abstract_socket_namespace.clone(),
             self.abstract_vsock_namespace.clone(),

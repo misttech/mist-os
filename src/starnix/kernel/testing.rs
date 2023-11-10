@@ -72,7 +72,7 @@ fn create_kernel_task_and_unlocked_with_fs<'l>(
     let task = Task::create_process_without_parent(
         &kernel,
         CString::new("test-task").unwrap(),
-        Some(fs.clone()),
+        fs.clone(),
     )
     .expect("failed to create first task");
     kernel.kthreads.init(&kernel, fs).expect("failed to initialize kthreads");
@@ -96,7 +96,7 @@ pub fn create_task(kernel: &Arc<Kernel>, task_name: &str) -> AutoReleasableTask 
     let task = Task::create_process_without_parent(
         kernel,
         CString::new(task_name).unwrap(),
-        Some(FsContext::new(create_pkgfs(kernel))),
+        FsContext::new(create_pkgfs(kernel)),
     )
     .expect("failed to create second task");
 
