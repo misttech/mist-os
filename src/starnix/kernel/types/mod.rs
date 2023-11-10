@@ -11,7 +11,6 @@ mod personality;
 mod resource_limits;
 mod seal_flags;
 mod stats;
-mod time;
 mod union;
 mod user_address;
 mod user_buffer;
@@ -23,6 +22,7 @@ pub mod kcmp;
 pub mod ownership;
 pub mod range_ext;
 pub mod signals;
+pub mod time;
 pub mod uapi;
 
 pub(crate) use union::struct_with_union_into_bytes;
@@ -45,12 +45,6 @@ pub use personality::PersonalityFlags;
 pub use resource_limits::{Resource, ResourceLimits};
 pub use seal_flags::SealFlags;
 pub use stats::TaskTimeStats;
-pub use time::{
-    duration_from_poll_timeout, duration_from_timespec, duration_from_timeval,
-    duration_to_scheduler_clock, itimerspec_from_deadline_interval, time_from_timespec,
-    timespec_from_duration, timespec_from_time, timespec_is_zero, timeval_from_duration,
-    timeval_from_time, NANOS_PER_SECOND, SCHEDULER_CLOCK_HZ,
-};
 pub use uapi::*;
 pub use user_address::*;
 pub use user_buffer::*;

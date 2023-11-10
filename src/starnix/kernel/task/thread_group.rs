@@ -29,12 +29,12 @@ use crate::{
         TimerTable, WaitQueue,
     },
     time::utc,
+    types::time::{duration_from_timeval, timeval_from_duration},
     types::{
-        duration_from_timeval, errno, error, itimerval, pid_t, rlimit, timeval_from_duration,
-        uid_t, Errno, OwnedRef, PersonalityFlags, Releasable, Resource, ResourceLimits, Signal,
-        TaskTimeStats, TempRef, UncheckedSignal, UserAddress, WeakRef, CAP_SYS_ADMIN,
-        CAP_SYS_RESOURCE, CLOCK_REALTIME, ITIMER_PROF, ITIMER_REAL, ITIMER_VIRTUAL, SIGCHLD,
-        SIGCONT, SIGHUP, SIGKILL, SIGTTOU, SIG_IGN,
+        errno, error, itimerval, pid_t, rlimit, uid_t, Errno, OwnedRef, PersonalityFlags,
+        Releasable, Resource, ResourceLimits, Signal, TaskTimeStats, TempRef, UncheckedSignal,
+        UserAddress, WeakRef, CAP_SYS_ADMIN, CAP_SYS_RESOURCE, CLOCK_REALTIME, ITIMER_PROF,
+        ITIMER_REAL, ITIMER_VIRTUAL, SIGCHLD, SIGCONT, SIGHUP, SIGKILL, SIGTTOU, SIG_IGN,
     },
 };
 

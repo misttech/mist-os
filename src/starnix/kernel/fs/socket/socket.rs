@@ -35,15 +35,15 @@ use crate::{
     logging::log_warn,
     mm::MemoryAccessorExt,
     syscalls::{
-        c_char, duration_from_timeval, errno, error, ifreq, in_addr, mode, sockaddr, sockaddr_in,
-        struct_with_union_into_bytes, timeval_from_duration, ucred, Errno, ErrnoCode, OpenFlags,
-        SyscallArg, SyscallResult, UserAddress, UserBuffer, UserRef, AF_INET, CAP_NET_RAW,
-        SIOCGIFADDR, SIOCGIFFLAGS, SIOCGIFHWADDR, SIOCGIFINDEX, SIOCGIFMTU, SIOCSIFADDR,
-        SIOCSIFFLAGS, SOL_SOCKET, SO_DOMAIN, SO_MARK, SO_PROTOCOL, SO_RCVTIMEO, SO_SNDTIMEO,
-        SO_TYPE, SUCCESS,
+        c_char, errno, error, ifreq, in_addr, mode, sockaddr, sockaddr_in,
+        struct_with_union_into_bytes, ucred, Errno, ErrnoCode, OpenFlags, SyscallArg,
+        SyscallResult, UserAddress, UserBuffer, UserRef, AF_INET, CAP_NET_RAW, SIOCGIFADDR,
+        SIOCGIFFLAGS, SIOCGIFHWADDR, SIOCGIFINDEX, SIOCGIFMTU, SIOCSIFADDR, SIOCSIFFLAGS,
+        SOL_SOCKET, SO_DOMAIN, SO_MARK, SO_PROTOCOL, SO_RCVTIMEO, SO_SNDTIMEO, SO_TYPE, SUCCESS,
     },
     task::{CurrentTask, EventHandler, Task, WaitCanceler, Waiter},
     types::as_any::AsAny,
+    types::time::{duration_from_timeval, timeval_from_duration},
 };
 
 use std::sync::Arc;

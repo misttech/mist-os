@@ -12,10 +12,8 @@ use crate::{
         CurrentTask,
     },
     time::utc,
-    types::{
-        Errno, __kernel_timer_t, duration_from_timespec, error, itimerspec, time_from_timespec,
-        uapi, SIGALRM, TIMER_ABSTIME,
-    },
+    types::time::{duration_from_timespec, time_from_timespec},
+    types::{Errno, __kernel_timer_t, error, itimerspec, uapi, SIGALRM, TIMER_ABSTIME},
 };
 
 // Table for POSIX timers from timer_create() that deliver timers via signals (not new-style

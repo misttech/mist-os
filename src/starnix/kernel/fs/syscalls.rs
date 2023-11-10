@@ -27,11 +27,14 @@ use crate::{
     mm::{MemoryAccessor, MemoryAccessorExt},
     syscalls::{Locked, SyscallArg, SyscallResult, Unlocked, SUCCESS},
     task::{CurrentTask, EnqueueEventHandler, EventHandler, ReadyItem, ReadyItemKey, Task, Waiter},
+    types::time::{
+        duration_from_poll_timeout, duration_from_timespec, time_from_timespec,
+        timespec_from_duration,
+    },
     types::{
         PersonalityFlags, Resource, SealFlags, SigSet, UserAddress, UserCString, UserRef,
-        __kernel_fd_set, duration_from_poll_timeout, duration_from_timespec, errno, error,
-        f_owner_ex, itimerspec, off_t, pid_t, pollfd, pselect6_sigmask, sigset_t, statfs, statx,
-        time_from_timespec, timespec, timespec_from_duration, uapi, uid_t, Access, DeviceType,
+        __kernel_fd_set, errno, error, f_owner_ex, itimerspec, off_t, pid_t, pollfd,
+        pselect6_sigmask, sigset_t, statfs, statx, timespec, uapi, uid_t, Access, DeviceType,
         Errno, ErrnoResultExt, FileMode, MountFlags, OpenFlags, AT_EACCESS, AT_EMPTY_PATH,
         AT_NO_AUTOMOUNT, AT_REMOVEDIR, AT_SYMLINK_FOLLOW, AT_SYMLINK_NOFOLLOW, CAP_DAC_READ_SEARCH,
         CAP_SYS_ADMIN, CAP_WAKE_ALARM, CLOCK_BOOTTIME, CLOCK_BOOTTIME_ALARM, CLOCK_MONOTONIC,
@@ -1923,7 +1926,7 @@ pub fn sys_select(
         zx::Time::INFINITE
     } else {
         let timeval = current_task.read_object(timeout_addr)?;
-        start_time + crate::types::duration_from_timeval(timeval)?
+        start_time + crate::types::time::duration_from_timeval(timeval)?
     };
 
     let num_fds = select(
@@ -1941,7 +1944,8 @@ pub fn sys_select(
     {
         let now = zx::Time::get_monotonic();
         let remaining = std::cmp::max(deadline - now, zx::Duration::from_seconds(0));
-        current_task.write_object(timeout_addr, &crate::types::timeval_from_duration(remaining))?;
+        current_task
+            .write_object(timeout_addr, &crate::types::time::timeval_from_duration(remaining))?;
     }
 
     Ok(num_fds)

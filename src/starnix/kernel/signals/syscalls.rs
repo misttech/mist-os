@@ -21,13 +21,14 @@ use crate::{
         CurrentTask, ProcessEntryRef, ProcessSelector, Task, TaskMutableState, ThreadGroup,
         WaitResult, Waiter,
     },
+    types::time::{duration_from_timespec, timeval_from_duration},
     types::{
-        duration_from_timespec, errno, error, pid_t, rusage, sigaction_t, sigaltstack_t, timespec,
-        timeval_from_duration, Errno, ErrnoResultExt, OpenFlags, SigSet, Signal, TempRef,
-        UncheckedSignal, UserAddress, UserRef, WeakRef, ETIMEDOUT, MINSIGSTKSZ, P_ALL, P_PGID,
-        P_PID, P_PIDFD, SFD_CLOEXEC, SFD_NONBLOCK, SIG_BLOCK, SIG_SETMASK, SIG_UNBLOCK,
-        SI_MAX_SIZE, SI_TKILL, SI_USER, SS_AUTODISARM, SS_DISABLE, SS_ONSTACK, UNBLOCKABLE_SIGNALS,
-        WCONTINUED, WEXITED, WNOHANG, WNOWAIT, WSTOPPED, WUNTRACED, __WALL, __WCLONE,
+        errno, error, pid_t, rusage, sigaction_t, sigaltstack_t, timespec, Errno, ErrnoResultExt,
+        OpenFlags, SigSet, Signal, TempRef, UncheckedSignal, UserAddress, UserRef, WeakRef,
+        ETIMEDOUT, MINSIGSTKSZ, P_ALL, P_PGID, P_PID, P_PIDFD, SFD_CLOEXEC, SFD_NONBLOCK,
+        SIG_BLOCK, SIG_SETMASK, SIG_UNBLOCK, SI_MAX_SIZE, SI_TKILL, SI_USER, SS_AUTODISARM,
+        SS_DISABLE, SS_ONSTACK, UNBLOCKABLE_SIGNALS, WCONTINUED, WEXITED, WNOHANG, WNOWAIT,
+        WSTOPPED, WUNTRACED, __WALL, __WCLONE,
     },
 };
 

@@ -15,11 +15,11 @@ use crate::{
         fileops_impl_nonseekable, Anon, FdEvents, FileHandle, FileObject, FileOps,
     },
     task::{CurrentTask, EventHandler, SignalHandler, SignalHandlerInner, WaitCanceler, Waiter},
-    types::{
-        duration_from_timespec, error, from_status_like_fdio, itimerspec,
-        itimerspec_from_deadline_interval, time_from_timespec, timespec_from_duration,
-        timespec_is_zero, Errno, OpenFlags, TFD_TIMER_ABSTIME,
+    types::time::{
+        duration_from_timespec, itimerspec_from_deadline_interval, time_from_timespec,
+        timespec_from_duration, timespec_is_zero,
     },
+    types::{error, from_status_like_fdio, itimerspec, Errno, OpenFlags, TFD_TIMER_ABSTIME},
 };
 
 /// Clock types supported by TimerFiles.

@@ -10,7 +10,8 @@ use crate::{
         ThreadGroup,
     },
     time::utc,
-    types::{itimerspec, timespec_from_duration, TempRef, SI_TIMER},
+    types::time::timespec_from_duration,
+    types::{itimerspec, TempRef, SI_TIMER},
 };
 
 use fuchsia_async as fasync;
