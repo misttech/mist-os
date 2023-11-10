@@ -637,6 +637,8 @@ impl IntoErrno for ConnectError {
             Self::Zone(err) => err.into_errno(),
             Self::CouldNotAllocateLocalPort => Errno::Eaddrnotavail,
             Self::SockAddrConflict => Errno::Eaddrinuse,
+            Self::RemoteUnexpectedlyMapped => Errno::Enetunreach,
+            Self::RemoteUnexpectedlyNonMapped => Errno::Eafnosupport,
         }
     }
 }

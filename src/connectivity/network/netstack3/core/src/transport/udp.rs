@@ -6843,6 +6843,10 @@ mod tests {
     const V4_LOCAL_IP: Ipv4Addr = ip_v4!("192.168.1.10");
     const V4_LOCAL_IP_MAPPED: Ipv6Addr = net_ip_v6!("::ffff:192.168.1.10");
     const V6_LOCAL_IP: Ipv6Addr = net_ip_v6!("2201::1");
+    const V6_REMOTE_IP: SpecifiedAddr<Ipv6Addr> =
+        unsafe { SpecifiedAddr::new_unchecked(net_ip_v6!("2001:db8::1")) };
+    const V4_REMOTE_IP_MAPPED: SpecifiedAddr<Ipv6Addr> =
+        unsafe { SpecifiedAddr::new_unchecked(net_ip_v6!("::FFFF:192.0.2.1")) };
 
     /// Enables dual stack operations on the given unbound socket.
     ///
@@ -7234,22 +7238,119 @@ mod tests {
         bind_listener();
     }
 
-    // TODO(https://fxbug.dev/135204): Expand the test cases once dual-stack
-    // connect is supported.
-    #[test_case(true; "connect to this stack with dual stack enabled")]
-    #[test_case(false; "connect to this stack with dual stack disabled")]
-    fn dual_stack_connect(enable_dual_stack: bool) {
-        let FakeCtxWithSyncCtx { mut sync_ctx, mut non_sync_ctx } =
-            FakeCtxWithSyncCtx::with_sync_ctx(FakeUdpSyncCtx::with_local_remote_ip_addrs(
-                vec![Ipv6::FAKE_CONFIG.local_ip],
-                vec![Ipv6::FAKE_CONFIG.remote_ip],
-            ));
+    // Helper function to ensure the Fake UDP SyncCtx and NonSyncCtx are
+    // Setup with remote/local IPs that support a connection to the given
+    // remote_ip.
+    fn setup_fake_udp_ctx_with_dualstack_conn_addrs<
+        TimerId,
+        Event: Debug,
+        NonSyncCtxState: Default,
+    >(
+        local_ip: Ipv6Addr,
+        remote_ip: SpecifiedAddr<Ipv6Addr>,
+    ) -> FakeCtxWithSyncCtx<FakeUdpSyncCtx<FakeDeviceId>, TimerId, Event, NonSyncCtxState> {
+        // A conversion helper to unmap ipv4-mapped-ipv6 addresses.
+        fn unmap_ip(addr: IpAddr) -> IpAddr {
+            match addr {
+                IpAddr::V4(v4) => IpAddr::V4(v4),
+                IpAddr::V6(v6) => match v6.to_ipv4_mapped() {
+                    Some(v4) => IpAddr::V4(v4),
+                    None => IpAddr::V6(v6),
+                },
+            }
+        }
 
-        let connected = SocketHandler::<Ipv6, _>::create_udp(&mut sync_ctx);
+        // Convert the local/remote IPs into `IpAddr` in their non-mapped form.
+        let local_ip = unmap_ip(local_ip.to_ip_addr());
+        let remote_ip = unmap_ip(remote_ip.to_ip_addr());
+        // If the given local_ip is unspecified, use the default from
+        // `FAKE_CONFIG`. This ensures we always instantiate the
+        // FakeDeviceConfig below with at least one local_ip, which is
+        // required for connect operations to succeed.
+        let local_ip = SpecifiedAddr::new(local_ip).unwrap_or_else(|| match remote_ip {
+            IpAddr::V4(_) => Ipv4::FAKE_CONFIG.local_ip.into(),
+            IpAddr::V6(_) => Ipv6::FAKE_CONFIG.local_ip.into(),
+        });
+        // If the given remote_ip is unspecified, we won't be able to
+        // connect; abort the test.
+        let remote_ip = SpecifiedAddr::new(remote_ip).expect("remote-ip should be specified");
+        FakeCtxWithSyncCtx::with_sync_ctx(FakeUdpSyncCtx::with_local_remote_ip_addrs(
+            vec![local_ip],
+            vec![remote_ip],
+        ))
+    }
+
+    #[test_case(V6_REMOTE_IP, true; "This stack with dualstack enabled")]
+    #[test_case(V6_REMOTE_IP, false; "This stack with dualstack disabled")]
+    #[test_case(V4_REMOTE_IP_MAPPED, true; "other stack with dualstack enabled")]
+    fn dualstack_remove_connected(remote_ip: SpecifiedAddr<Ipv6Addr>, enable_dual_stack: bool) {
+        // Ensure that when a socket is removed, it doesn't leave behind state
+        // in the demultiplexing maps. Do this by binding a new socket at the
+        // same address and asserting success.
+        let FakeCtxWithSyncCtx { mut sync_ctx, mut non_sync_ctx } =
+            setup_fake_udp_ctx_with_dualstack_conn_addrs(Ipv6::UNSPECIFIED_ADDRESS, remote_ip);
+
+        let mut bind_connected = || {
+            let socket = SocketHandler::<Ipv6, _>::create_udp(&mut sync_ctx);
+            SocketHandler::<Ipv6, _>::set_dual_stack_enabled(
+                &mut sync_ctx,
+                &mut non_sync_ctx,
+                socket,
+                enable_dual_stack,
+            )
+            .expect("can set dual-stack enabled");
+            assert_eq!(
+                SocketHandler::<Ipv6, _>::connect(
+                    &mut sync_ctx,
+                    &mut non_sync_ctx,
+                    socket,
+                    Some(ZonedAddr::Unzoned(remote_ip).into()),
+                    REMOTE_PORT,
+                ),
+                Ok(())
+            );
+
+            assert_matches!(
+                SocketHandler::<Ipv6, _>::close(&mut sync_ctx, &mut non_sync_ctx, socket),
+                SocketInfo::Connected(ConnInfo{
+                    local_ip: _,
+                    local_port: _,
+                    remote_ip: found_remote_ip,
+                    remote_port: found_remote_port,
+                }) if found_remote_ip.into_inner().addr() == remote_ip &&
+                    found_remote_port == REMOTE_PORT
+            );
+        };
+
+        // The first time should succeed because the state is empty.
+        bind_connected();
+        // The second time should succeed because the first removal didn't
+        // leave any state behind.
+        bind_connected();
+    }
+
+    #[test_case(false, V6_REMOTE_IP, Ok(());
+        "connect to this stack with dualstack disabled")]
+    #[test_case(true, V6_REMOTE_IP, Ok(());
+        "connect to this stack with dualstack enabled")]
+    #[test_case(false, V4_REMOTE_IP_MAPPED, Err(ConnectError::RemoteUnexpectedlyMapped);
+        "connect to other stack with dualstack disabled")]
+    #[test_case(true, V4_REMOTE_IP_MAPPED, Ok(());
+        "connect to other stack with dualstack enabled")]
+    fn dualstack_connect_unbound(
+        enable_dual_stack: bool,
+        remote_ip: SpecifiedAddr<Ipv6Addr>,
+        expected_outcome: Result<(), ConnectError>,
+    ) {
+        let FakeCtxWithSyncCtx { mut sync_ctx, mut non_sync_ctx } =
+            setup_fake_udp_ctx_with_dualstack_conn_addrs(Ipv6::UNSPECIFIED_ADDRESS, remote_ip);
+
+        let socket = SocketHandler::<Ipv6, _>::create_udp(&mut sync_ctx);
+
         SocketHandler::<Ipv6, _>::set_dual_stack_enabled(
             &mut sync_ctx,
             &mut non_sync_ctx,
-            connected,
+            socket,
             enable_dual_stack,
         )
         .expect("can set dual-stack enabled");
@@ -7258,11 +7359,164 @@ mod tests {
             SocketHandler::connect(
                 &mut sync_ctx,
                 &mut non_sync_ctx,
-                connected,
-                Some(ZonedAddr::Unzoned(Ipv6::FAKE_CONFIG.remote_ip).into()),
+                socket,
+                Some(ZonedAddr::Unzoned(remote_ip).into()),
                 REMOTE_PORT,
             ),
+            expected_outcome
+        );
+
+        if expected_outcome.is_ok() {
+            assert_matches!(
+                SocketHandler::get_udp_info(&mut sync_ctx, &mut non_sync_ctx, socket),
+                SocketInfo::Connected(ConnInfo{
+                    local_ip: _,
+                    local_port: _,
+                    remote_ip: found_remote_ip,
+                    remote_port: found_remote_port,
+                }) if found_remote_ip.into_inner().addr() == remote_ip &&
+                    found_remote_port == REMOTE_PORT
+            );
+        } else {
+            // Verify the original state is preserved.
+            assert_eq!(
+                SocketHandler::get_udp_info(&mut sync_ctx, &mut non_sync_ctx, socket),
+                SocketInfo::Unbound
+            );
+        }
+    }
+
+    #[test_case(V6_LOCAL_IP, V6_REMOTE_IP, Ok(());
+        "listener in this stack connected in this stack")]
+    #[test_case(V6_LOCAL_IP, V4_REMOTE_IP_MAPPED, Err(ConnectError::RemoteUnexpectedlyMapped);
+        "listener in this stack connected in other stack")]
+    #[test_case(Ipv6::UNSPECIFIED_ADDRESS, V6_REMOTE_IP, Ok(());
+        "listener in both stacks connected in this stack")]
+    #[test_case(Ipv6::UNSPECIFIED_ADDRESS, V4_REMOTE_IP_MAPPED, Ok(());
+        "listener in both stacks connected in other stack")]
+    #[test_case(V4_LOCAL_IP_MAPPED, V6_REMOTE_IP,
+        Err(ConnectError::RemoteUnexpectedlyNonMapped);
+        "listener in other stack connected in this stack")]
+    #[test_case(V4_LOCAL_IP_MAPPED, V4_REMOTE_IP_MAPPED, Ok(());
+        "listener in other stack connected in other stack")]
+    fn dualstack_connect_listener(
+        local_ip: Ipv6Addr,
+        remote_ip: SpecifiedAddr<Ipv6Addr>,
+        expected_outcome: Result<(), ConnectError>,
+    ) {
+        let FakeCtxWithSyncCtx { mut sync_ctx, mut non_sync_ctx } =
+            setup_fake_udp_ctx_with_dualstack_conn_addrs(local_ip, remote_ip);
+
+        let socket = SocketHandler::<Ipv6, _>::create_udp(&mut sync_ctx);
+        enable_dual_stack_for_test(&mut sync_ctx, &mut non_sync_ctx, socket);
+
+        assert_eq!(
+            SocketHandler::listen_udp(
+                &mut sync_ctx,
+                &mut non_sync_ctx,
+                socket,
+                SpecifiedAddr::new(local_ip).map(|local_ip| ZonedAddr::Unzoned(local_ip).into()),
+                Some(LOCAL_PORT),
+            ),
             Ok(())
+        );
+
+        assert_eq!(
+            SocketHandler::connect(
+                &mut sync_ctx,
+                &mut non_sync_ctx,
+                socket,
+                Some(ZonedAddr::Unzoned(remote_ip).into()),
+                REMOTE_PORT,
+            ),
+            expected_outcome
+        );
+
+        if expected_outcome.is_ok() {
+            assert_matches!(
+                SocketHandler::get_udp_info(&mut sync_ctx, &mut non_sync_ctx, socket),
+                SocketInfo::Connected(ConnInfo{
+                    local_ip: _,
+                    local_port: _,
+                    remote_ip: found_remote_ip,
+                    remote_port: found_remote_port,
+                }) if found_remote_ip.into_inner().addr() == remote_ip &&
+                    found_remote_port == REMOTE_PORT
+            );
+        } else {
+            // Verify the original state is preserved.
+            assert_matches!(
+                SocketHandler::get_udp_info(&mut sync_ctx, &mut non_sync_ctx, socket),
+                SocketInfo::Listener(_)
+            );
+        }
+    }
+
+    #[test_case(V6_REMOTE_IP, V6_REMOTE_IP, Ok(());
+        "connected in this stack reconnected in this stack")]
+    #[test_case(V6_REMOTE_IP, V4_REMOTE_IP_MAPPED, Err(ConnectError::RemoteUnexpectedlyMapped);
+        "connected in this stack reconnected in other stack")]
+    #[test_case(V4_REMOTE_IP_MAPPED, V6_REMOTE_IP,
+        Err(ConnectError::RemoteUnexpectedlyNonMapped);
+        "connected in other stack reconnected in this stack")]
+    #[test_case(V4_REMOTE_IP_MAPPED, V4_REMOTE_IP_MAPPED, Ok(());
+        "connected in other stack reconnected in other stack")]
+    fn dualstack_connect_connected(
+        original_remote_ip: SpecifiedAddr<Ipv6Addr>,
+        new_remote_ip: SpecifiedAddr<Ipv6Addr>,
+        expected_outcome: Result<(), ConnectError>,
+    ) {
+        // Use different remote ports to verify that the reconnect was applied.
+        const ORIGINAL_REMOTE_PORT: NonZeroU16 = REMOTE_PORT;
+        const NEW_REMOTE_PORT: NonZeroU16 =
+            const_unwrap_option(ORIGINAL_REMOTE_PORT.checked_add(1));
+
+        let FakeCtxWithSyncCtx { mut sync_ctx, mut non_sync_ctx } =
+            setup_fake_udp_ctx_with_dualstack_conn_addrs(
+                Ipv6::UNSPECIFIED_ADDRESS,
+                original_remote_ip,
+            );
+
+        let socket = SocketHandler::<Ipv6, _>::create_udp(&mut sync_ctx);
+        enable_dual_stack_for_test(&mut sync_ctx, &mut non_sync_ctx, socket);
+
+        assert_eq!(
+            SocketHandler::connect(
+                &mut sync_ctx,
+                &mut non_sync_ctx,
+                socket,
+                Some(ZonedAddr::Unzoned(original_remote_ip).into()),
+                ORIGINAL_REMOTE_PORT,
+            ),
+            Ok(())
+        );
+
+        assert_eq!(
+            SocketHandler::connect(
+                &mut sync_ctx,
+                &mut non_sync_ctx,
+                socket,
+                Some(ZonedAddr::Unzoned(new_remote_ip).into()),
+                NEW_REMOTE_PORT,
+            ),
+            expected_outcome
+        );
+
+        let (expected_remote_ip, expected_remote_port) = if expected_outcome.is_ok() {
+            (new_remote_ip, NEW_REMOTE_PORT)
+        } else {
+            // Verify the original state is preserved.
+            (original_remote_ip, ORIGINAL_REMOTE_PORT)
+        };
+        assert_matches!(
+            SocketHandler::get_udp_info(&mut sync_ctx, &mut non_sync_ctx, socket),
+            SocketInfo::Connected(ConnInfo{
+                local_ip: _,
+                local_port: _,
+                remote_ip: found_remote_ip,
+                remote_port: found_remote_port,
+            }) if found_remote_ip.into_inner().addr() == expected_remote_ip &&
+                found_remote_port == expected_remote_port
         );
     }
 

@@ -104,6 +104,13 @@ impl<A: IpAddress> SocketIpAddr<A> {
         SocketIpAddr(NonMappedAddr::new_unchecked(SpecifiedAddr::new_unchecked(addr)))
     }
 
+    /// Callers must ensure that the addr is `NonMapped`.
+    pub(crate) const unsafe fn new_from_specified_unchecked(
+        addr: SpecifiedAddr<A>,
+    ) -> SocketIpAddr<A> {
+        SocketIpAddr(NonMappedAddr::new_unchecked(addr))
+    }
+
     pub(crate) fn addr(self) -> A {
         let SocketIpAddr(addr) = self;
         **addr

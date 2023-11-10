@@ -102,6 +102,35 @@ pub(crate) enum SendOneShotIpPacketError<O, E> {
     SerializeError(E),
 }
 
+/// Extension trait for `Ip` providing socket-specific functionality.
+pub(crate) trait SocketIpExt: Ip + IpExt {
+    /// `Self::LOOPBACK_ADDRESS`, but wrapped in the `SocketIpAddr` type.
+    const LOOPBACK_ADDRESS_AS_SOCKET_IP_ADDR: SocketIpAddr<Self::Addr> = unsafe {
+        // SAFETY: The loopback address is a valid SocketIpAddr, as verified
+        // in the `loopback_addr_is_valid_socket_addr` test.
+        SocketIpAddr::new_from_specified_unchecked(Self::LOOPBACK_ADDRESS)
+    };
+}
+
+impl<I: Ip + IpExt> SocketIpExt for I {}
+
+#[cfg(test)]
+mod socket_ip_ext_test {
+    use super::*;
+    use ip_test_macro::ip_test;
+    use net_types::ip::{Ipv4, Ipv6};
+
+    #[ip_test]
+    fn loopback_addr_is_valid_socket_addr<I: Ip + SocketIpExt>() {
+        // `LOOPBACK_ADDRESS_AS_SOCKET_IP_ADDR is defined with the "unchecked"
+        // constructor (which supports const construction). Verify here that the
+        // addr actually satisfies all the requirements (protecting against far
+        // away changes)
+        let _addr = SocketIpAddr::new(I::LOOPBACK_ADDRESS_AS_SOCKET_IP_ADDR.addr())
+            .expect("loopback address should be a valid SocketIpAddr");
+    }
+}
+
 /// An extension of [`IpSocketHandler`] adding the ability to send packets on an
 /// IP socket.
 pub(crate) trait BufferIpSocketHandler<I: IpExt, C, B: BufferMut>:

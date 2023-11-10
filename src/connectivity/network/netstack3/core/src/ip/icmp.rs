@@ -4176,9 +4176,8 @@ mod tests {
             path_mtu::testutil::FakePmtuState,
             receive_ip_packet,
             socket::testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx},
-            socket::IpSockCreationError,
             testutil::DualStackSendIpPacketMeta,
-            IpCounters, ResolveRouteError, SendIpPacketMeta,
+            IpCounters, SendIpPacketMeta,
         },
         testutil::{
             assert_empty, handle_queued_rx_packets, Ctx, TestIpExt, DEFAULT_INTERFACE_METRIC,
@@ -6329,9 +6328,7 @@ mod tests {
                 ))),
                 REMOTE_ID,
             ),
-            Err(datagram::ConnectError::Ip(IpSockCreationError::Route(
-                ResolveRouteError::Unreachable,
-            )))
+            Err(datagram::ConnectError::RemoteUnexpectedlyMapped)
         );
     }
 

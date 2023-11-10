@@ -25,8 +25,9 @@ use crate::{
     },
     device,
     error::{ExistsError, NotFoundError},
+    ip::socket::SocketIpExt,
     socket::address::{
-        AddrVecIter, ConnAddr, ConnIpAddr, ListenerAddr, ListenerIpAddr, SocketZonedIpAddr,
+        AddrVecIter, ConnAddr, ConnIpAddr, ListenerAddr, ListenerIpAddr, SocketIpAddr,
     },
 };
 
@@ -95,10 +96,10 @@ pub(crate) fn try_into_null_zoned<A: IpAddress>(
 /// Concretely, this method is called during `connect()` and `send_to()` socket
 /// operations to transform an unspecified remote IP address to the loopback
 /// address. This ensures conformance with Linux and BSD.
-pub(crate) fn specify_unspecified_remote<I: Ip, Z>(
-    addr: Option<SocketZonedIpAddr<I::Addr, Z>>,
-) -> SocketZonedIpAddr<I::Addr, Z> {
-    addr.unwrap_or_else(|| ZonedAddr::Unzoned(I::LOOPBACK_ADDRESS).into())
+pub(crate) fn specify_unspecified_remote<I: SocketIpExt, A: From<SocketIpAddr<I::Addr>>, Z>(
+    addr: Option<ZonedAddr<A, Z>>,
+) -> ZonedAddr<A, Z> {
+    addr.unwrap_or_else(|| ZonedAddr::Unzoned(I::LOOPBACK_ADDRESS_AS_SOCKET_IP_ADDR.into()))
 }
 
 /// Specification for the identifiers in an [`AddrVec`].

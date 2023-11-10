@@ -1710,10 +1710,12 @@ impl<I: IpLayerIpExt, C: NonSyncContext<I, SC::WeakDeviceId>, SC: SyncContext<I,
                         MaybeListener::Listener(_) => return Err(ConnectError::Listener),
                     },
                 };
-                let remote_ip = crate::socket::specify_unspecified_remote::<I, _>(remote_ip);
+                let remote_ip = crate::socket::specify_unspecified_remote::<I, _, _>(
+                    remote_ip.map(SocketZonedIpAddr::into_inner)
+                );
                 let (remote_ip, device) =
                     crate::transport::resolve_addr_with_device::<I::Addr, _, _, _>(
-                        remote_ip.into_inner(),
+                        remote_ip,
                         bound_device,
                     )?;
                 // TODO(https://fxbug.dev/21198): Support dual-stack connect.

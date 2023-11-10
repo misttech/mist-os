@@ -39,7 +39,7 @@ use crate::{
             IpSockSendError, IpSocketHandler, SendOneShotIpPacketError, SendOptions,
         },
         BufferTransportIpContext, EitherDeviceId, HopLimits, MulticastMembershipHandler,
-        ResolveRouteError, TransportIpContext,
+        TransportIpContext,
     },
     socket::{
         self,
@@ -646,6 +646,18 @@ impl<I: DualStackIpExt, DS: GenericOverIp<I>, NDS: GenericOverIp<I>> GenericOver
     for MaybeDualStack<DS, NDS>
 {
     type Type = MaybeDualStack<<DS as GenericOverIp<I>>::Type, <NDS as GenericOverIp<I>>::Type>;
+}
+
+/// State belonging to either IP stack.
+///
+/// Like `[either::Either]`, but with more helpful variant names.
+///
+/// Note that this type is not optimally type-safe, because `T` and `O` are not
+/// bound by `IP` and `IP::OtherVersion`, respectively. In many cases it may be
+/// more appropriate to define a one-off enum parameterized over `I: Ip`.
+pub(crate) enum EitherStack<T, O> {
+    ThisStack(T),
+    OtherStack(O),
 }
 
 impl<'a, DS, NDS> MaybeDualStack<&'a mut DS, &'a mut NDS> {
@@ -1565,7 +1577,7 @@ pub(crate) fn close<
             }
             SocketState::Bound(state) => match sync_ctx.dual_stack_context() {
                 MaybeDualStack::DualStack(dual_stack) => {
-                    let op = DualStackRemoveOperation::parse_from_state(dual_stack, id, &state);
+                    let op = DualStackRemoveOperation::new_from_state(dual_stack, id, &state);
                     dual_stack
                         .with_both_bound_sockets_mut(
                             |_sync_ctx, sockets, other_sockets, _alloc, _other_alloc| {
@@ -1575,8 +1587,7 @@ pub(crate) fn close<
                         .into_options_and_info()
                 }
                 MaybeDualStack::NotDualStack(not_dual_stack) => {
-                    let op =
-                        SingleStackRemoveOperation::parse_from_state(not_dual_stack, id, &state);
+                    let op = SingleStackRemoveOperation::new_from_state(not_dual_stack, id, &state);
                     sync_ctx
                         .with_bound_sockets_mut(|_sync_ctx, sockets, _allocator| op.apply(sockets))
                         .into_options_and_info()
@@ -1630,8 +1641,8 @@ struct SingleStackRemoveOperation<I: IpExt, D: WeakId, S: DatagramSocketSpec>(
 );
 
 impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> SingleStackRemoveOperation<I, D, S> {
-    /// Parse the existing socket state, constructing the removal operation.
-    fn parse_from_state<C, SC: NonDualStackDatagramBoundStateContext<I, C, S, WeakDeviceId = D>>(
+    /// Constructs the remove operation from existing socket state.
+    fn new_from_state<C, SC: NonDualStackDatagramBoundStateContext<I, C, S, WeakDeviceId = D>>(
         sync_ctx: &mut SC,
         socket_id: S::SocketId<I>,
         state: &BoundSocketState<I, D, S>,
@@ -1820,8 +1831,26 @@ enum DualStackRemove<I: IpExt, D: WeakId, S: DatagramSocketSpec> {
             S::AddrSpec,
         >>::BoundSocketId,
     },
-    // TODO(https://fxbug.dev/135204): Support removing connected sockets in the
-    // other stack.
+    ConnectedOtherStack {
+        // The socket's address, stored as a concrete `ConnIpAddr`.
+        concrete_addr: ConnAddr<
+            ConnIpAddr<
+                <I::OtherVersion as Ip>::Addr,
+                <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
+                <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
+            >,
+            D,
+        >,
+        // The socket's address, stored as an associated `S::ConnIpAddr`.
+        associated_addr: ConnAddr<S::ConnIpAddr<I>, D>,
+        ip_options: IpOptions<I, D, S>,
+        sharing: S::SharingState,
+        socket_id: <S::SocketMapSpec<I::OtherVersion, D> as DatagramSocketMapSpec<
+            I::OtherVersion,
+            D,
+            S::AddrSpec,
+        >>::BoundSocketId,
+    },
 }
 
 struct DualStackRemoveOperation<I: IpExt, D: WeakId, S: DatagramSocketSpec>(
@@ -1829,8 +1858,8 @@ struct DualStackRemoveOperation<I: IpExt, D: WeakId, S: DatagramSocketSpec>(
 );
 
 impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> DualStackRemoveOperation<I, D, S> {
-    /// Parse the existing socket state, constructing the removal operation.
-    fn parse_from_state<C, SC: DualStackDatagramBoundStateContext<I, C, S, WeakDeviceId = D>>(
+    /// Constructs the removal operation from existing socket state.
+    fn new_from_state<C, SC: DualStackDatagramBoundStateContext<I, C, S, WeakDeviceId = D>>(
         sync_ctx: &mut SC,
         socket_id: S::SocketId<I>,
         state: &BoundSocketState<I, D, S>,
@@ -1902,7 +1931,24 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> DualStackRemoveOperation<I, D, 
                     }
                     DualStackConnState::OtherStack(state) => {
                         sync_ctx.assert_dual_stack_enabled(&state);
-                        todo!("https://fxbug.dev/135204: Support removing dual-stack connected")
+                        let ConnState {
+                            addr,
+                            socket,
+                            clear_device_on_disconnect: _,
+                            shutdown: _,
+                            extra: _,
+                        } = state;
+                        let ConnAddr { ip, device } = addr.clone();
+                        let ip = DualStackConnIpAddr::OtherStack(ip);
+                        let associated_addr =
+                            ConnAddr { ip: sync_ctx.converter().convert_back(ip), device };
+                        DualStackRemove::ConnectedOtherStack {
+                            concrete_addr: addr.clone(),
+                            associated_addr,
+                            ip_options: socket.options().clone(),
+                            sharing: sharing.clone(),
+                            socket_id: sync_ctx.to_other_bound_socket_id(socket_id),
+                        }
                     }
                 }
             }
@@ -1986,6 +2032,25 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> DualStackRemoveOperation<I, D, 
                     other_socket_id,
                 })
             }
+            DualStackRemove::ConnectedOtherStack {
+                concrete_addr,
+                associated_addr,
+                ip_options,
+                sharing,
+                socket_id,
+            } => {
+                other_sockets
+                    .conns_mut()
+                    .remove(&socket_id, &concrete_addr)
+                    .expect("UDP connection not found");
+                DualStackRemoveInfo(DualStackRemove::ConnectedOtherStack {
+                    concrete_addr,
+                    associated_addr,
+                    ip_options,
+                    sharing,
+                    socket_id,
+                })
+            }
         }
     }
 }
@@ -2015,6 +2080,13 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> DualStackRemoveInfo<I, D, S> {
                 socket_id: _,
                 other_socket_id: _,
             } => (ip_options, SocketInfo::Listener(associated_addr)),
+            DualStackRemove::ConnectedOtherStack {
+                concrete_addr: _,
+                associated_addr,
+                ip_options,
+                sharing: _,
+                socket_id: _,
+            } => (ip_options, SocketInfo::Connected(associated_addr)),
         }
     }
 
@@ -2693,6 +2765,41 @@ fn listen_inner<
     Ok(())
 }
 
+/// A remote IP address that's either in the current stack or the other stack.
+enum DualStackRemoteIp<I: DualStackIpExt, D> {
+    ThisStack(ZonedAddr<SocketIpAddr<I::Addr>, D>),
+    OtherStack(ZonedAddr<SocketIpAddr<<I::OtherVersion as Ip>::Addr>, D>),
+}
+
+/// Returns the [`DualStackRemoteIp`] for the given remote_ip.
+///
+/// An IPv4-mapped-IPv6 address will be unmapped to the inner IPv4 address, and
+/// an unspecified address will be populated with
+/// [`crate::socket::specify_unspecified_remote()`].
+fn dual_stack_remote_ip<I: DualStackIpExt, D>(
+    remote_ip: Option<SocketZonedIpAddr<I::Addr, D>>,
+) -> DualStackRemoteIp<I, D> {
+    let remote_ip = crate::socket::specify_unspecified_remote::<I, _, _>(
+        remote_ip.map(SocketZonedIpAddr::into_inner),
+    );
+    match try_unmap(remote_ip.into()) {
+        TryUnmapResult::CannotBeUnmapped(remote_ip) => {
+            DualStackRemoteIp::<I, _>::ThisStack(remote_ip)
+        }
+        TryUnmapResult::Mapped(remote_ip) => {
+            // NB: Even though we ensured the address was specified above by
+            // calling `specify_unspecified_remote`, it's possible that
+            // unmapping the address made it unspecified (e.g. `::FFFF:0.0.0.0`
+            // is a specified IPv6 addr but an unspecified IPv4 addr). Call
+            // `specify_unspecified_remote` again to ensure the unmapped address
+            // is specified.
+            let remote_ip =
+                crate::socket::specify_unspecified_remote::<I::OtherVersion, _, _>(remote_ip);
+            DualStackRemoteIp::OtherStack(remote_ip)
+        }
+    }
+}
+
 /// An error when attempting to create a datagram socket.
 #[derive(Error, Copy, Clone, Debug, Eq, PartialEq)]
 pub enum ConnectError {
@@ -2709,6 +2816,621 @@ pub enum ConnectError {
     /// There was a problem with the provided address relating to its zone.
     #[error("{}", _0)]
     Zone(#[from] ZonedAddressError),
+    /// The remote address is mapped (i.e. an ipv4-mapped-ipv6 address), but the
+    /// socket is not dual-stack enabled.
+    #[error("IPv4-mapped-IPv6 addresses are not supported by this socket")]
+    RemoteUnexpectedlyMapped,
+    /// The remote address is non-mapped (i.e not an ipv4-mapped-ipv6 address),
+    /// but the socket is dual stack enabled and bound to a mapped address.
+    #[error("non IPv4-mapped-Ipv6 addresses are not supported by this socket")]
+    RemoteUnexpectedlyNonMapped,
+}
+
+/// Parameters required to connect a socket.
+struct ConnectParameters<I: IpExt, D: WeakId, S: DatagramSocketSpec, O> {
+    local_ip: Option<SocketIpAddr<I::Addr>>,
+    local_port: Option<<S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier>,
+    remote_ip: ZonedAddr<SocketIpAddr<I::Addr>, D::Strong>,
+    remote_port: <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
+    device: Option<D>,
+    sharing: S::SharingState,
+    ip_options: O,
+    socket_id: <S::SocketMapSpec<I, D> as DatagramSocketMapSpec<I, D, S::AddrSpec>>::BoundSocketId,
+    extra: S::ConnStateExtra,
+}
+
+/// Inserts a connected socket into the bound socket map.
+///
+/// It accepts two closures that capture the logic required to remove and
+/// reinsert the original state from/into the bound_socket_map. The original
+/// state will only be reinserted if an error is encountered during connect.
+/// The output of `remove_original` is fed into `reinsert_original`.
+fn connect_inner<
+    I: IpExt,
+    D: WeakId,
+    S: DatagramSocketSpec,
+    O,
+    R,
+    C,
+    SC: IpSocketHandler<I, C, WeakDeviceId = D, DeviceId = D::Strong>,
+    A: LocalIdentifierAllocator<I, D, S::AddrSpec, C, S::SocketMapSpec<I, D>>,
+>(
+    connect_params: ConnectParameters<I, D, S, O>,
+    sync_ctx: &mut SC,
+    ctx: &mut C,
+    sockets: &mut BoundSocketMap<I, D, S::AddrSpec, S::SocketMapSpec<I, D>>,
+    allocator: &mut A,
+    remove_original: impl FnOnce(&mut BoundSocketMap<I, D, S::AddrSpec, S::SocketMapSpec<I, D>>) -> R,
+    reinsert_original: impl FnOnce(&mut BoundSocketMap<I, D, S::AddrSpec, S::SocketMapSpec<I, D>>, R),
+) -> Result<ConnState<I, D, S, O>, ConnectError> {
+    let ConnectParameters {
+        local_ip,
+        local_port,
+        remote_ip,
+        remote_port,
+        device,
+        sharing,
+        ip_options,
+        socket_id,
+        extra,
+    } = connect_params;
+
+    let (remote_ip, socket_device) =
+        crate::transport::resolve_addr_with_device::<I::Addr, _, _, _>(remote_ip, device.clone())?;
+
+    let clear_device_on_disconnect = device.is_none() && socket_device.is_some();
+
+    let ip_sock = IpSocketHandler::<I, _>::new_ip_socket(
+        sync_ctx,
+        ctx,
+        socket_device.as_ref().map(|d| d.as_ref()),
+        local_ip.map(SocketIpAddr::into),
+        remote_ip,
+        S::ip_proto::<I>(),
+        ip_options,
+    )
+    .map_err(|(e, _ip_options)| e)?;
+
+    let local_port = match local_port {
+        Some(id) => id.clone(),
+        None => allocator
+            .try_alloc_local_id(
+                sockets,
+                ctx,
+                DatagramFlowId {
+                    local_ip: *ip_sock.local_ip(),
+                    remote_ip: *ip_sock.remote_ip(),
+                    remote_id: remote_port.clone(),
+                },
+            )
+            .ok_or(ConnectError::CouldNotAllocateLocalPort)?,
+    };
+    let conn_addr = ConnAddr {
+        ip: ConnIpAddr {
+            local: (*ip_sock.local_ip(), local_port),
+            remote: (*ip_sock.remote_ip(), remote_port),
+        },
+        device: ip_sock.device().cloned(),
+    };
+    // Now that all the other checks have been done, actually remove the
+    // original state from the socket map.
+    let reinsert_op = remove_original(sockets);
+    // Try to insert the new connection, restoring the original state on
+    // failure.
+    let bound_addr = match sockets.conns_mut().try_insert(conn_addr, sharing, socket_id) {
+        Ok(bound_entry) => bound_entry.get_addr().clone(),
+        Err((
+            InsertError::Exists
+            | InsertError::IndirectConflict
+            | InsertError::ShadowerExists
+            | InsertError::ShadowAddrExists,
+            _sharing,
+        )) => {
+            reinsert_original(sockets, reinsert_op);
+            return Err(ConnectError::SockAddrConflict);
+        }
+    };
+    Ok(ConnState {
+        socket: ip_sock,
+        clear_device_on_disconnect,
+        shutdown: Shutdown::default(),
+        addr: bound_addr,
+        extra,
+    })
+}
+
+/// State required to perform single-stack connection of a socket.
+struct SingleStackConnectOperation<I: IpExt, D: WeakId, S: DatagramSocketSpec> {
+    params: ConnectParameters<I, D, S, IpOptions<I, D, S>>,
+    remove_op: Option<SingleStackRemoveOperation<I, D, S>>,
+    sharing: S::SharingState,
+}
+
+impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> SingleStackConnectOperation<I, D, S> {
+    /// Constructs the connect operation from existing socket state.
+    fn new_from_state<
+        C,
+        SC: NonDualStackDatagramBoundStateContext<I, C, S, WeakDeviceId = D, DeviceId = D::Strong>,
+    >(
+        sync_ctx: &mut SC,
+        socket_id: S::SocketId<I>,
+        state: &SocketState<I, D, S>,
+        remote_ip: ZonedAddr<SocketIpAddr<I::Addr>, D::Strong>,
+        remote_port: <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
+        extra: S::ConnStateExtra,
+    ) -> Self {
+        match state {
+            SocketState::Unbound(UnboundSocketState { device, sharing, ip_options }) => {
+                SingleStackConnectOperation {
+                    params: ConnectParameters {
+                        local_ip: None,
+                        local_port: None,
+                        remote_ip,
+                        remote_port,
+                        device: device.clone(),
+                        sharing: sharing.clone(),
+                        ip_options: ip_options.clone(),
+                        socket_id: S::make_bound_socket_map_id(socket_id),
+                        extra,
+                    },
+                    sharing: sharing.clone(),
+                    remove_op: None,
+                }
+            }
+            SocketState::Bound(state) => {
+                let remove_op =
+                    SingleStackRemoveOperation::new_from_state(sync_ctx, socket_id, state);
+                // For convenience, parse the connect operation from
+                // `remove_op`, because it's already extracted all relevant
+                // fields from `state`.
+                let SingleStackRemoveOperation(remove_info) = &remove_op;
+                match &remove_info {
+                    SingleStackRemove::Listener {
+                        concrete_addr:
+                            ListenerAddr { ip: ListenerIpAddr { addr, identifier }, device },
+                        associated_addr: _,
+                        ip_options,
+                        sharing,
+                        socket_id,
+                    } => SingleStackConnectOperation {
+                        params: ConnectParameters {
+                            local_ip: addr.clone(),
+                            local_port: Some(*identifier),
+                            remote_ip,
+                            remote_port,
+                            device: device.clone(),
+                            sharing: sharing.clone(),
+                            ip_options: ip_options.clone(),
+                            socket_id: socket_id.clone(),
+                            extra,
+                        },
+                        sharing: sharing.clone(),
+                        remove_op: Some(remove_op),
+                    },
+                    SingleStackRemove::Connected {
+                        concrete_addr:
+                            ConnAddr {
+                                ip: ConnIpAddr { local: (local_ip, local_id), remote: _ },
+                                device,
+                            },
+                        associated_addr: _,
+                        ip_options,
+                        sharing,
+                        socket_id,
+                    } => SingleStackConnectOperation {
+                        params: ConnectParameters {
+                            local_ip: Some(local_ip.clone()),
+                            local_port: Some(*local_id),
+                            remote_ip,
+                            remote_port,
+                            device: device.clone(),
+                            sharing: sharing.clone(),
+                            ip_options: ip_options.clone(),
+                            socket_id: socket_id.clone(),
+                            extra,
+                        },
+                        sharing: sharing.clone(),
+                        remove_op: Some(remove_op),
+                    },
+                }
+            }
+        }
+    }
+
+    /// Performs this operation and connects the socket.
+    ///
+    /// This is primarily a wrapper around `connect_inner` that establishes the
+    /// remove/reinsert closures for single stack removal.
+    ///
+    /// Returns a tuple containing the state, and sharing state for the new
+    /// connection.
+    fn apply<
+        C,
+        SC: IpSocketHandler<I, C, WeakDeviceId = D, DeviceId = D::Strong>,
+        A: LocalIdentifierAllocator<I, D, S::AddrSpec, C, S::SocketMapSpec<I, D>>,
+    >(
+        self,
+        sync_ctx: &mut SC,
+        ctx: &mut C,
+        socket_map: &mut BoundSocketMap<I, D, S::AddrSpec, S::SocketMapSpec<I, D>>,
+        allocator: &mut A,
+    ) -> Result<(ConnState<I, D, S, IpOptions<I, D, S>>, S::SharingState), ConnectError> {
+        let SingleStackConnectOperation { params, remove_op, sharing } = self;
+        let remove_fn =
+            |sockets: &mut BoundSocketMap<I, D, S::AddrSpec, S::SocketMapSpec<I, D>>| {
+                remove_op.map(|remove_op| remove_op.apply(sockets))
+            };
+        let reinsert_fn =
+            |sockets: &mut BoundSocketMap<I, D, S::AddrSpec, S::SocketMapSpec<I, D>>,
+             remove_info: Option<SingleStackRemoveInfo<I, D, S>>| {
+                if let Some(remove_info) = remove_info {
+                    remove_info.reinsert(sockets)
+                }
+            };
+        let conn_state =
+            connect_inner(params, sync_ctx, ctx, socket_map, allocator, remove_fn, reinsert_fn)?;
+        Ok((conn_state, sharing))
+    }
+}
+
+/// State required to perform dual-stack connection of a socket.
+struct DualStackConnectOperation<I: DualStackIpExt, D: WeakId, S: DatagramSocketSpec> {
+    params: EitherStack<
+        ConnectParameters<I, D, S, IpOptions<I, D, S>>,
+        ConnectParameters<I::OtherVersion, D, S, IpOptions<I, D, S>>,
+    >,
+    remove_op: Option<DualStackRemoveOperation<I, D, S>>,
+    sharing: S::SharingState,
+}
+
+impl<I: DualStackIpExt, D: WeakId, S: DatagramSocketSpec> DualStackConnectOperation<I, D, S> {
+    /// Constructs the connect operation from existing socket state.
+    fn new_from_state<
+        C,
+        SC: DualStackDatagramBoundStateContext<I, C, S, WeakDeviceId = D, DeviceId = D::Strong>,
+    >(
+        sync_ctx: &mut SC,
+        socket_id: S::SocketId<I>,
+        state: &SocketState<I, D, S>,
+        remote_ip: DualStackRemoteIp<I, D::Strong>,
+        remote_port: <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
+        extra: S::ConnStateExtra,
+    ) -> Result<Self, ConnectError> {
+        match state {
+            SocketState::Unbound(UnboundSocketState { device, sharing, ip_options }) => {
+                // Unbound sockets don't have a predisposition of which stack to
+                // connect in. Instead, it's dictated entirely by the remote.
+                let params = match remote_ip {
+                    DualStackRemoteIp::ThisStack(remote_ip) => {
+                        EitherStack::ThisStack(ConnectParameters {
+                            local_ip: None,
+                            local_port: None,
+                            remote_ip,
+                            remote_port,
+                            device: device.clone(),
+                            sharing: sharing.clone(),
+                            ip_options: ip_options.clone(),
+                            socket_id: S::make_bound_socket_map_id(socket_id),
+                            extra,
+                        })
+                    }
+                    DualStackRemoteIp::OtherStack(remote_ip) => {
+                        if !sync_ctx.dual_stack_enabled(ip_options) {
+                            return Err(ConnectError::RemoteUnexpectedlyMapped);
+                        }
+                        EitherStack::OtherStack(ConnectParameters {
+                            local_ip: None,
+                            local_port: None,
+                            remote_ip,
+                            remote_port,
+                            device: device.clone(),
+                            sharing: sharing.clone(),
+                            ip_options: ip_options.clone(),
+                            socket_id: sync_ctx.to_other_bound_socket_id(socket_id),
+                            extra,
+                        })
+                    }
+                };
+                Ok(DualStackConnectOperation { params, remove_op: None, sharing: sharing.clone() })
+            }
+            SocketState::Bound(state) => {
+                let remove_op =
+                    DualStackRemoveOperation::new_from_state(sync_ctx, socket_id, state);
+                // For convenience, parse the connect operation from
+                // `remove_op`, because it's already extracted all relevant
+                // fields from `state`.
+                let DualStackRemoveOperation(remove_info) = &remove_op;
+                match (remote_ip, remove_info) {
+                    // Disallow connecting to the other stack because the
+                    // existing socket state is in this stack.
+                    (DualStackRemoteIp::OtherStack(_), DualStackRemove::CurrentStack(_)) => {
+                        Err(ConnectError::RemoteUnexpectedlyMapped)
+                    }
+                    // Disallow connecting to this stack because the existing
+                    // socket state is in the other stack.
+                    (
+                        DualStackRemoteIp::ThisStack(_),
+                        DualStackRemove::ListenerOtherStack { .. }
+                        | DualStackRemove::ConnectedOtherStack { .. },
+                    ) => Err(ConnectError::RemoteUnexpectedlyNonMapped),
+                    // Connect in this stack.
+                    (
+                        DualStackRemoteIp::ThisStack(remote_ip),
+                        DualStackRemove::CurrentStack(single_stack_remove),
+                    ) => match single_stack_remove {
+                        SingleStackRemove::Listener {
+                            concrete_addr:
+                                ListenerAddr { ip: ListenerIpAddr { addr, identifier }, device },
+                            associated_addr: _,
+                            ip_options,
+                            sharing,
+                            socket_id,
+                        } => Ok(DualStackConnectOperation {
+                            params: EitherStack::ThisStack(ConnectParameters {
+                                local_ip: addr.clone(),
+                                local_port: Some(*identifier),
+                                remote_ip,
+                                remote_port,
+                                device: device.clone(),
+                                sharing: sharing.clone(),
+                                ip_options: ip_options.clone(),
+                                socket_id: socket_id.clone(),
+                                extra,
+                            }),
+                            sharing: sharing.clone(),
+                            remove_op: Some(remove_op),
+                        }),
+                        SingleStackRemove::Connected {
+                            concrete_addr:
+                                ConnAddr {
+                                    ip: ConnIpAddr { local: (local_ip, local_id), remote: _ },
+                                    device,
+                                },
+                            associated_addr: _,
+                            ip_options,
+                            sharing,
+                            socket_id,
+                        } => Ok(DualStackConnectOperation {
+                            params: EitherStack::ThisStack(ConnectParameters {
+                                local_ip: Some(local_ip.clone()),
+                                local_port: Some(*local_id),
+                                remote_ip,
+                                remote_port,
+                                device: device.clone(),
+                                sharing: sharing.clone(),
+                                ip_options: ip_options.clone(),
+                                socket_id: socket_id.clone(),
+                                extra,
+                            }),
+                            sharing: sharing.clone(),
+                            remove_op: Some(remove_op),
+                        }),
+                    },
+                    // Listeners in "both stacks" can connect to either stack.
+                    // Connect in this stack as specified by the remote.
+                    (
+                        DualStackRemoteIp::ThisStack(remote_ip),
+                        DualStackRemove::ListenerBothStacks {
+                            identifier,
+                            device,
+                            associated_addr: _,
+                            ip_options,
+                            sharing,
+                            socket_id,
+                            other_socket_id: _,
+                        },
+                    ) => Ok(DualStackConnectOperation {
+                        params: EitherStack::ThisStack(ConnectParameters {
+                            local_ip: None,
+                            local_port: Some(*identifier),
+                            remote_ip,
+                            remote_port,
+                            device: device.clone(),
+                            sharing: sharing.clone(),
+                            ip_options: ip_options.clone(),
+                            socket_id: socket_id.clone(),
+                            extra,
+                        }),
+                        sharing: sharing.clone(),
+                        remove_op: Some(remove_op),
+                    }),
+                    // Listeners in "both stacks" can connect to either stack.
+                    // Connect in the other stack as specified by the remote.
+                    (
+                        DualStackRemoteIp::OtherStack(remote_ip),
+                        DualStackRemove::ListenerBothStacks {
+                            identifier,
+                            device,
+                            associated_addr: _,
+                            ip_options,
+                            sharing,
+                            socket_id: _,
+                            other_socket_id,
+                        },
+                    ) => Ok(DualStackConnectOperation {
+                        params: EitherStack::OtherStack(ConnectParameters {
+                            local_ip: None,
+                            local_port: Some(*identifier),
+                            remote_ip,
+                            remote_port,
+                            device: device.clone(),
+                            sharing: sharing.clone(),
+                            ip_options: ip_options.clone(),
+                            socket_id: other_socket_id.clone(),
+                            extra,
+                        }),
+                        sharing: sharing.clone(),
+                        remove_op: Some(remove_op),
+                    }),
+                    // Connect a listener in the other stack
+                    (
+                        DualStackRemoteIp::OtherStack(remote_ip),
+                        DualStackRemove::ListenerOtherStack {
+                            concrete_addr:
+                                ListenerAddr { ip: ListenerIpAddr { addr, identifier }, device },
+                            associated_addr: _,
+                            ip_options,
+                            sharing,
+                            socket_id,
+                        },
+                    ) => Ok(DualStackConnectOperation {
+                        params: EitherStack::OtherStack(ConnectParameters {
+                            local_ip: addr.clone(),
+                            local_port: Some(*identifier),
+                            remote_ip,
+                            remote_port,
+                            device: device.clone(),
+                            sharing: sharing.clone(),
+                            ip_options: ip_options.clone(),
+                            socket_id: socket_id.clone(),
+                            extra,
+                        }),
+                        sharing: sharing.clone(),
+                        remove_op: Some(remove_op),
+                    }),
+                    // Re-connect in the other stack.
+                    (
+                        DualStackRemoteIp::OtherStack(remote_ip),
+                        DualStackRemove::ConnectedOtherStack {
+                            concrete_addr:
+                                ConnAddr {
+                                    ip: ConnIpAddr { local: (local_ip, local_id), remote: _ },
+                                    device,
+                                },
+                            associated_addr: _,
+                            ip_options,
+                            sharing,
+                            socket_id,
+                        },
+                    ) => Ok(DualStackConnectOperation {
+                        params: EitherStack::OtherStack(ConnectParameters {
+                            local_ip: Some(local_ip.clone()),
+                            local_port: Some(*local_id),
+                            remote_ip,
+                            remote_port,
+                            device: device.clone(),
+                            sharing: sharing.clone(),
+                            ip_options: ip_options.clone(),
+                            socket_id: socket_id.clone(),
+                            extra,
+                        }),
+                        sharing: sharing.clone(),
+                        remove_op: Some(remove_op),
+                    }),
+                }
+            }
+        }
+    }
+
+    /// Performs this operation and connects the socket.
+    ///
+    /// This is primarily a wrapper around [`connect_inner`] that establishes the
+    /// remove/reinsert closures for dual stack removal.
+    ///
+    /// Returns a tuple containing the state, and sharing state for the new
+    /// connection.
+    fn apply<
+        C,
+        SC: IpSocketHandler<I, C, WeakDeviceId = D, DeviceId = D::Strong>
+            + IpSocketHandler<I::OtherVersion, C, WeakDeviceId = D, DeviceId = D::Strong>,
+        A: LocalIdentifierAllocator<I, D, S::AddrSpec, C, S::SocketMapSpec<I, D>>,
+        OA: LocalIdentifierAllocator<
+            I::OtherVersion,
+            D,
+            S::AddrSpec,
+            C,
+            S::SocketMapSpec<I::OtherVersion, D>,
+        >,
+    >(
+        self,
+        sync_ctx: &mut SC,
+        ctx: &mut C,
+        socket_map: &mut BoundSocketMap<I, D, S::AddrSpec, S::SocketMapSpec<I, D>>,
+        other_socket_map: &mut BoundSocketMap<
+            I::OtherVersion,
+            D,
+            S::AddrSpec,
+            S::SocketMapSpec<I::OtherVersion, D>,
+        >,
+        allocator: &mut A,
+        other_allocator: &mut OA,
+    ) -> Result<(DualStackConnState<I, D, S>, S::SharingState), ConnectError> {
+        let DualStackConnectOperation { params, remove_op, sharing } = self;
+        let conn_state = match params {
+            EitherStack::ThisStack(params) => {
+                // NB: Because we're connecting in this stack, we receive this
+                // stack's sockets as an argument to `remove_fn` and
+                // `reinsert_fn`. Thus we need to capture + pass through the
+                // other stack's sockets.
+                let remove_fn =
+                    |sockets: &mut BoundSocketMap<I, D, S::AddrSpec, S::SocketMapSpec<I, D>>| {
+                        remove_op.map(|remove_op| {
+                            let remove_info = remove_op.apply(sockets, other_socket_map);
+                            (remove_info, other_socket_map)
+                        })
+                    };
+                let reinsert_fn =
+                    |sockets: &mut BoundSocketMap<I, D, S::AddrSpec, S::SocketMapSpec<I, D>>,
+                     remove_info: Option<(
+                        DualStackRemoveInfo<I, D, S>,
+                        &mut BoundSocketMap<
+                            I::OtherVersion,
+                            D,
+                            S::AddrSpec,
+                            S::SocketMapSpec<I::OtherVersion, D>,
+                        >,
+                    )>| {
+                        if let Some((remove_info, other_sockets)) = remove_info {
+                            remove_info.reinsert(sockets, other_sockets)
+                        }
+                    };
+                connect_inner(params, sync_ctx, ctx, socket_map, allocator, remove_fn, reinsert_fn)
+                    .map(DualStackConnState::ThisStack)
+            }
+            EitherStack::OtherStack(params) => {
+                // NB: Because we're connecting in the other stack, we receive
+                // the other stack's sockets as an argument to `remove_fn` and
+                // `reinsert_fn`. Thus we need to capture + pass through this
+                // stack's sockets.
+                let remove_fn = |other_sockets: &mut BoundSocketMap<
+                    I::OtherVersion,
+                    D,
+                    S::AddrSpec,
+                    S::SocketMapSpec<I::OtherVersion, D>,
+                >| {
+                    remove_op.map(|remove_op| {
+                        let remove_info = remove_op.apply(socket_map, other_sockets);
+                        (remove_info, socket_map)
+                    })
+                };
+                let reinsert_fn = |other_sockets: &mut BoundSocketMap<
+                    I::OtherVersion,
+                    D,
+                    S::AddrSpec,
+                    S::SocketMapSpec<I::OtherVersion, D>,
+                >,
+                                   remove_info: Option<(
+                    DualStackRemoveInfo<I, D, S>,
+                    &mut BoundSocketMap<I, D, S::AddrSpec, S::SocketMapSpec<I, D>>,
+                )>| {
+                    if let Some((remove_info, sockets)) = remove_info {
+                        remove_info.reinsert(sockets, other_sockets)
+                    }
+                };
+                connect_inner(
+                    params,
+                    sync_ctx,
+                    ctx,
+                    other_socket_map,
+                    other_allocator,
+                    remove_fn,
+                    reinsert_fn,
+                )
+                .map(DualStackConnState::OtherStack)
+            }
+        }?;
+        Ok((conn_state, sharing))
+    }
 }
 
 pub(crate) fn connect<
@@ -2730,262 +3452,49 @@ pub(crate) fn connect<
             DenseMapEntry::Occupied(o) => o,
         };
 
-        let (local_ip, local_id, sharing, device, ip_options) = match entry.get() {
-            SocketState::Unbound(state) => {
-                let UnboundSocketState { device, sharing: unbound_sharing, ip_options } = state;
-                (None, None, unbound_sharing.clone(), device.as_ref(), ip_options)
+        let (conn_state, sharing) = match (
+            sync_ctx.dual_stack_context(),
+            dual_stack_remote_ip::<I, _>(remote_ip.clone()),
+        ) {
+            (MaybeDualStack::DualStack(ds), remote_ip) => {
+                let connect_op = DualStackConnectOperation::new_from_state(
+                    ds,
+                    id,
+                    entry.get(),
+                    remote_ip,
+                    remote_id,
+                    extra,
+                )?;
+                let converter = ds.converter();
+                let (conn_state, sharing) = ds.with_both_bound_sockets_mut(
+                    |sync_ctx, bound, other_bound, alloc, other_alloc| {
+                        connect_op.apply(sync_ctx, ctx, bound, other_bound, alloc, other_alloc)
+                    },
+                )?;
+                Ok((converter.convert_back(conn_state), sharing))
             }
-            SocketState::Bound(state) => match state {
-                BoundSocketState::Listener { state, sharing: listener_sharing } => {
-                    let ListenerState { ip_options, addr: ListenerAddr { device, ip } } = state;
-                    let ip = match sync_ctx.dual_stack_context() {
-                        MaybeDualStack::DualStack(dual_stack) => {
-                            match dual_stack.converter().convert(ip.clone()) {
-                                DualStackListenerIpAddr::OtherStack(_)  => {
-                                    dual_stack.assert_dual_stack_enabled(state);
-                                    todo!("https://fxbug.dev/21198: connecting dual-stack sockets")
-                                }
-                                DualStackListenerIpAddr::BothStacks(identifier)=> {
-                                    // TODO(https://fxbug.dev/135204): Use the
-                                    // `remote_ip` to dictate which stack to
-                                    // connect to.
-                                    dual_stack.assert_dual_stack_enabled(state);
-                                    ListenerIpAddr{addr: None, identifier}
-                                }
-                                DualStackListenerIpAddr::ThisStack(addr) => addr,
-                            }
-                        }
-                        MaybeDualStack::NotDualStack(single_stack) => {
-                            single_stack.converter().convert(ip.clone())
-                        }
-                    };
-                    let ListenerIpAddr { addr, identifier } = ip;
-                    (
-                        addr,
-                        Some(identifier),
-                        listener_sharing.clone(),
-                        device.as_ref(),
-                        ip_options,
-                    )
-                }
-                BoundSocketState::Connected { state, sharing: conn_sharing } => {
-                    let ConnState {
-                        socket,
-                        clear_device_on_disconnect,
-                        shutdown: _,
-                        addr: ConnAddr {
-                                ip: ConnIpAddr { local: (ip, identifier), remote: _ },
-                                device,
-                            },
-                        extra: _,
-                    } = match sync_ctx.dual_stack_context() {
-                        MaybeDualStack::DualStack(dual_stack) => {
-                            match dual_stack.converter().convert(state) {
-                                DualStackConnState::ThisStack(state) => state,
-                                DualStackConnState::OtherStack(state) => {
-                                    dual_stack.assert_dual_stack_enabled(state);
-                                    todo!("https://fxbug.dev/21198: Support dual-stack connect");
-                                }
-                            }
-                        }
-                        MaybeDualStack::NotDualStack(not_dual_stack) => {
-                            not_dual_stack.converter().convert(state)
-                        }
-                    };
-                    (
-                        Some(*ip),
-                        Some(*identifier),
-                        conn_sharing.clone(),
-                        device.as_ref().and_then(|d| (!clear_device_on_disconnect).then_some(d)),
-                        socket.options(),
-                    )
-                }
-            },
-        };
-        let remote_ip = crate::socket::specify_unspecified_remote::<I, _>(remote_ip);
-        let (remote_ip, socket_device) =
-            crate::transport::resolve_addr_with_device::<I::Addr, _, _, _>(
-                remote_ip.into_inner(),
-                device.cloned(),
-            )?;
-
-        // TODO(https://fxbug.dev/21198): Support dual-stack connect.
-        let remote_ip = match remote_ip.try_into() {
-            Ok(ip) => ip,
-            Err(AddrIsMappedError {}) => {
-                return Err(ConnectError::Ip(IpSockCreationError::Route(
-                    ResolveRouteError::Unreachable,
-                )));
+            (MaybeDualStack::NotDualStack(nds), DualStackRemoteIp::ThisStack(remote_ip)) => {
+                let connect_op = SingleStackConnectOperation::new_from_state(
+                    nds,
+                    id,
+                    entry.get(),
+                    remote_ip,
+                    remote_id,
+                    extra,
+                );
+                let converter = nds.converter();
+                let (conn_state, sharing) =
+                    sync_ctx.with_bound_sockets_mut(|sync_ctx, bound, alloc| {
+                        connect_op.apply(sync_ctx, ctx, bound, alloc)
+                    })?;
+                Ok((converter.convert_back(conn_state), sharing))
             }
-        };
-
-        let clear_device_on_disconnect = device.is_none() && socket_device.is_some();
-
-        let (mut ip_sock, bound_addr) = match sync_ctx.dual_stack_context() {
-            // TODO(https://fxbug.dev/135204): Support dual-stack connect and
-            // deduplicate these two match arms.
-            MaybeDualStack::DualStack(ds) => {
-                let remove_original_socket_op = match entry.get() {
-                    SocketState::Unbound(_) => None,
-                    SocketState::Bound(state) => Some(
-                        DualStackRemoveOperation::parse_from_state(ds, id.clone(), state)
-                    )
-                };
-                ds.with_both_bound_sockets_mut(
-                    |sync_ctx, bound, other_bound, alloc, _other_alloc| {
-                        let ip_sock = IpSocketHandler::<I, _>::new_ip_socket(
-                            sync_ctx,
-                            ctx,
-                            socket_device.as_ref().map(|d| d.as_ref()),
-                            local_ip.map(SocketIpAddr::into),
-                            remote_ip,
-                            S::ip_proto::<I>(),
-                            Default::default(),
-                        )
-                        .map_err(|(e, _ip_options)| e)?;
-                        let local_id = match local_id {
-                            Some(id) => id.clone(),
-                            None => alloc
-                                .try_alloc_local_id(
-                                    bound,
-                                    ctx,
-                                    DatagramFlowId {
-                                        local_ip: *ip_sock.local_ip(),
-                                        remote_ip: *ip_sock.remote_ip(),
-                                        remote_id: remote_id.clone(),
-                                    },
-                                )
-                                .ok_or(ConnectError::CouldNotAllocateLocalPort)?,
-                        };
-                        let conn_addr = ConnAddr {
-                            ip: ConnIpAddr {
-                                local: (*ip_sock.local_ip(), local_id),
-                                remote: (*ip_sock.remote_ip(), remote_id),
-                            },
-                            device: ip_sock.device().cloned(),
-                        };
-                        // Now that all the other checks have been done,
-                        // actually remove the ID from the socket map.
-                        let removed_bound_socket = remove_original_socket_op.map(
-                            |op| op.apply(bound, other_bound));
-                        // Try to insert the new connection, restoring the
-                        // original state on failure.
-                        let bound_addr = match bound.conns_mut().try_insert(
-                            conn_addr,
-                            sharing.clone(),
-                            S::make_bound_socket_map_id(id.clone()),
-                        ) {
-                            Ok(bound_entry) => bound_entry.get_addr().clone(),
-                            Err((
-                                InsertError::Exists
-                                | InsertError::IndirectConflict
-                                | InsertError::ShadowerExists
-                                | InsertError::ShadowAddrExists,
-                                _sharing,
-                            )) => {
-                                if let Some(removed_bound_socket) = removed_bound_socket {
-                                    removed_bound_socket.reinsert(bound, other_bound);
-                                }
-                                return Err(ConnectError::SockAddrConflict)
-                            }
-                        };
-                        Ok((ip_sock, bound_addr))
-                    }
-                )?
+            (MaybeDualStack::NotDualStack(_), DualStackRemoteIp::OtherStack(_)) => {
+                Err(ConnectError::RemoteUnexpectedlyMapped)
             }
-            MaybeDualStack::NotDualStack(nds) => {
-                let remove_original_socket_op = match entry.get() {
-                    SocketState::Unbound(_) => None,
-                    SocketState::Bound(state) => Some(
-                        SingleStackRemoveOperation::parse_from_state(nds, id.clone(), state)
-                    )
-                };
-                DatagramBoundStateContext::<I, _, _>::with_bound_sockets_mut(
-                    sync_ctx,
-                    |sync_ctx, bound, alloc| {
-                        let ip_sock = IpSocketHandler::<I, _>::new_ip_socket(
-                            sync_ctx,
-                            ctx,
-                            socket_device.as_ref().map(|d| d.as_ref()),
-                            local_ip.map(SocketIpAddr::into),
-                            remote_ip,
-                            S::ip_proto::<I>(),
-                            Default::default(),
-                        )
-                        .map_err(|(e, _ip_options)| e)?;
-                        let local_id = match local_id {
-                            Some(id) => id.clone(),
-                            None => alloc
-                                .try_alloc_local_id(
-                                    bound,
-                                    ctx,
-                                    DatagramFlowId {
-                                        local_ip: *ip_sock.local_ip(),
-                                        remote_ip: *ip_sock.remote_ip(),
-                                        remote_id: remote_id.clone(),
-                                    },
-                                )
-                                .ok_or(ConnectError::CouldNotAllocateLocalPort)?,
-                        };
-                        let conn_addr = ConnAddr {
-                            ip: ConnIpAddr {
-                                local: (*ip_sock.local_ip(), local_id),
-                                remote: (*ip_sock.remote_ip(), remote_id),
-                            },
-                            device: ip_sock.device().cloned(),
-                        };
-                        // Now that all the other checks have been done,
-                        // actually remove the ID from the socket map.
-                        let removed_bound_socket = remove_original_socket_op.map(
-                            |op| op.apply(bound));
-                        // Try to insert the new connection, restoring the
-                        // original state on failure.
-                        let bound_addr = match bound.conns_mut().try_insert(
-                            conn_addr,
-                            sharing.clone(),
-                            S::make_bound_socket_map_id(id.clone()),
-                        ) {
-                            Ok(bound_entry) => bound_entry.get_addr().clone(),
-                            Err((
-                                InsertError::Exists
-                                | InsertError::IndirectConflict
-                                | InsertError::ShadowerExists
-                                | InsertError::ShadowAddrExists,
-                                _sharing,
-                            )) => {
-                                if let Some(removed_bound_socket) = removed_bound_socket {
-                                    removed_bound_socket.reinsert(bound);
-                                }
-                                return Err(ConnectError::SockAddrConflict)
-                            }
-                        };
-                        Ok((ip_sock, bound_addr))
-                    }
-                )?
-            }
-        };
-
-        // Update the bound state after there's no further path for errors.
-        // TODO(https://fxbug.dev/131970): Remove this clone.
-        *ip_sock.options_mut() = ip_options.clone();
-        let conn_state = ConnState {
-            socket: ip_sock,
-            clear_device_on_disconnect,
-            shutdown: Shutdown::default(),
-            addr: bound_addr,
-            extra,
-        };
-        *entry.get_mut() = SocketState::Bound(BoundSocketState::Connected {
-            state: match sync_ctx.dual_stack_context() {
-                MaybeDualStack::DualStack(dual_stack) => {
-                    dual_stack.converter().convert_back(DualStackConnState::ThisStack(conn_state))
-                }
-                MaybeDualStack::NotDualStack(not_dual_stack) => {
-                    not_dual_stack.converter().convert_back(conn_state)
-                }
-            },
-            sharing,
-        });
+        }?;
+        *entry.get_mut() =
+            SocketState::Bound(BoundSocketState::Connected { state: conn_state, sharing });
         Ok(())
     })
 }
@@ -3382,7 +3891,9 @@ pub(crate) fn send_to<
             }
         };
 
-        let remote_ip = crate::socket::specify_unspecified_remote::<I, _>(remote_ip);
+        let remote_ip = crate::socket::specify_unspecified_remote::<I, _, _>(
+            remote_ip.map(SocketZonedIpAddr::into_inner),
+        );
 
         // TODO(https://fxbug.dev/21198): For now, short circuit when asked to
         // send to a mapped remote address, which prevents panics further in the
@@ -3390,7 +3901,7 @@ pub(crate) fn send_to<
         //
         // This should eventually translate the remote to its non-mapped form,
         // or fail if the socket doesn't support dual-stack operations.
-        match NonMappedAddr::new(remote_ip.deref().addr()) {
+        match NonMappedAddr::new(remote_ip.addr()) {
             Some(_addr) => {}
             None => {
                 // Prevent sending to ipv4-mapped-ipv6 addrs for now.
@@ -3404,7 +3915,7 @@ pub(crate) fn send_to<
                     sync_ctx,
                     ctx,
                     local,
-                    remote_ip,
+                    remote_ip.into(),
                     remote_identifier,
                     device,
                     ip_options,
