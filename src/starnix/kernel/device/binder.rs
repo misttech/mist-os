@@ -2761,7 +2761,7 @@ impl ResourceAccessor for CurrentTask {
     }
 
     fn kernel(&self) -> &Arc<Kernel> {
-        &(self as &CurrentTask).kernel()
+        (self as &Task).kernel()
     }
 
     fn as_memory_accessor(&self) -> &dyn MemoryAccessor {
@@ -2785,7 +2785,7 @@ impl ResourceAccessor for Task {
     }
 
     fn kernel(&self) -> &Arc<Kernel> {
-        &self.thread_group.kernel
+        (self as &Task).kernel()
     }
 
     fn as_memory_accessor(&self) -> &dyn MemoryAccessor {

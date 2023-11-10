@@ -62,7 +62,7 @@ impl SignalStackFrame {
             ..Default::default()
         };
 
-        let vdso_sigreturn_offset = task.thread_group.kernel.vdso.sigreturn_offset;
+        let vdso_sigreturn_offset = task.kernel().vdso.sigreturn_offset;
         let sigreturn_addr = task.mm.state.read().vdso_base.ptr() as u64 + vdso_sigreturn_offset;
         registers.lr = sigreturn_addr;
 

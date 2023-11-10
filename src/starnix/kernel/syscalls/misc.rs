@@ -72,7 +72,7 @@ pub fn sys_sysinfo(
 ) -> Result<(), Errno> {
     let page_size = zx::system_get_page_size();
     let total_ram_pages = zx::system_get_physmem() / (page_size as u64);
-    let num_procs = current_task.thread_group.kernel.pids.read().len();
+    let num_procs = current_task.kernel().pids.read().len();
     let result = uapi::sysinfo {
         uptime: (zx::Time::get_monotonic() - zx::Time::ZERO).into_seconds(),
 

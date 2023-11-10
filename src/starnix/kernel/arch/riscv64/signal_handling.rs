@@ -4,11 +4,9 @@
 
 use fuchsia_zircon as zx;
 
-use crate::arch::registers::RegisterState;
-use crate::mm::vmo::round_up_to_increment;
-use crate::signals::*;
-use crate::task::*;
-use crate::types::*;
+use crate::{
+    arch::registers::RegisterState, mm::vmo::round_up_to_increment, signals::*, task::*, types::*,
+};
 
 /// The size of the red zone.
 // TODO(fxbug.dev/121659): Determine whether or not this is the correct red zone size for riscv64.
@@ -59,7 +57,7 @@ impl SignalStackFrame {
             ..Default::default()
         };
 
-        let vdso_sigreturn_offset = task.thread_group.kernel.vdso.sigreturn_offset;
+        let vdso_sigreturn_offset = task.kernel().vdso.sigreturn_offset;
         let sigreturn_addr = task.mm.state.read().vdso_base.ptr() as u64 + vdso_sigreturn_offset;
         registers.ra = sigreturn_addr;
 

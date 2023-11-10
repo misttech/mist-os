@@ -666,6 +666,10 @@ pub struct PageFaultExceptionReport {
 }
 
 impl Task {
+    pub fn kernel(&self) -> &Arc<Kernel> {
+        &self.thread_group.kernel
+    }
+
     pub fn has_same_address_space(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.mm, &other.mm)
     }
@@ -1080,7 +1084,7 @@ impl Task {
     ///
     /// There is no underlying Zircon thread to host the task.
     pub fn create_kernel_thread(
-        system_task: &CurrentTask,
+        system_task: &Task,
         initial_name: CString,
     ) -> Result<CurrentTask, Errno> {
         let mut pids = system_task.kernel().pids.write();
@@ -1208,7 +1212,7 @@ impl Task {
         let files =
             if flags & (CLONE_FILES as u64) != 0 { self.files.clone() } else { self.files.fork() };
 
-        let kernel = &self.thread_group.kernel;
+        let kernel = self.kernel();
         let mut pids = kernel.pids.write();
 
         let pid;
@@ -1414,7 +1418,7 @@ impl Task {
         if !user_tid.is_null() {
             let zero: pid_t = 0;
             self.mm.write_object(user_tid, &zero)?;
-            self.thread_group.kernel.shared_futexes.wake(
+            self.kernel().shared_futexes.wake(
                 self,
                 user_tid.addr(),
                 usize::MAX,
@@ -1426,7 +1430,7 @@ impl Task {
     }
 
     pub fn get_task(&self, pid: pid_t) -> WeakRef<Task> {
-        self.thread_group.kernel.pids.read().get_task(pid)
+        self.kernel().pids.read().get_task(pid)
     }
 
     pub fn get_pid(&self) -> pid_t {
@@ -1631,7 +1635,7 @@ impl ReleasableByRef for Task {
         let ptracer_pid = self.read().ptrace.as_ref().map_or(None, |ptrace| Some(ptrace.pid));
         if let Some(ptracer_pid) = ptracer_pid {
             if let Some(ProcessEntryRef::Process(tg)) =
-                self.thread_group.kernel.pids.read().get_process(ptracer_pid)
+                self.kernel().pids.read().get_process(ptracer_pid)
             {
                 let pid = self.get_pid();
                 tg.ptracees.lock().remove(&pid);
@@ -1656,10 +1660,6 @@ impl CurrentTask {
             extended_pstate: ExtendedPstateState::default(),
             syscall_restart_func: None,
         }
-    }
-
-    pub fn kernel(&self) -> &Arc<Kernel> {
-        &self.thread_group.kernel
     }
 
     pub fn weak_task(&self) -> WeakRef<Task> {

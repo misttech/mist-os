@@ -307,7 +307,7 @@ pub fn sys_kill(
     pid: pid_t,
     unchecked_signal: UncheckedSignal,
 ) -> Result<(), Errno> {
-    let pids = current_task.thread_group.kernel.pids.read();
+    let pids = current_task.kernel().pids.read();
     match pid {
         pid if pid > 0 => {
             // "If pid is positive, then signal sig is sent to the process with
