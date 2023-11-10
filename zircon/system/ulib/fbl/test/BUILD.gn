@@ -88,6 +88,12 @@ test("fbl") {
       "//zircon/system/ulib/zx",
     ]
   }
+
+  _is_lto = select_variant + [ "lto" ] - [ "lto" ] != select_variant
+  if (_is_lto) {
+    # OOM on RBE workers
+    configs += [ "//build/config:no_remote_link" ]
+  }
 }
 
 # These tests test compatibility with GMock. As such, they must use the GTest
