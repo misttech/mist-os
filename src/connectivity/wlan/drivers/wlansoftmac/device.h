@@ -16,6 +16,7 @@
 #include <lib/fdf/cpp/channel_read.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/inspect/cpp/inspect.h>
+#include <lib/operation/ethernet.h>
 #include <lib/zx/channel.h>
 #include <zircon/compiler.h>
 
@@ -23,17 +24,14 @@
 #include <mutex>
 
 #include <ddktl/device.h>
-#include <fbl/intrusive_double_list.h>
 #include <fbl/ref_ptr.h>
-#include <fbl/slab_allocator.h>
 #include <wlan/common/macaddr.h>
-#include <wlan/mlme/mlme.h>
-#include <wlan/mlme/packet.h>
 
+#include "buffer_allocator.h"
 #include "device_interface.h"
 #include "src/connectivity/wlan/drivers/wlansoftmac/rust_driver/c-binding/bindings.h"
 
-namespace wlan {
+namespace wlan::drivers {
 
 #define PRE_ALLOC_RECV_BUFFER_SIZE 2000
 
@@ -44,7 +42,7 @@ class WlanSoftmacHandle {
 
   zx_status_t Init(fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac> client);
   zx_status_t StopMainLoop();
-  zx_status_t QueueEthFrameTx(std::unique_ptr<Packet> pkt);
+  void QueueEthFrameTx(eth::BorrowedOperation<> op);
 
  private:
   DeviceInterface* device_;
@@ -82,7 +80,7 @@ class Device : public DeviceInterface,
                     zx::channel* out_sme_channel) final;
   zx_status_t DeliverEthernet(cpp20::span<const uint8_t> eth_frame) final
       __TA_EXCLUDES(ethernet_proxy_lock_);
-  zx_status_t QueueTx(std::unique_ptr<Packet> packet, wlan_tx_info_t tx_info) final;
+  zx_status_t QueueTx(UsedBuffer used_buffer, wlan_tx_info_t tx_info) final;
   zx_status_t SetEthernetStatus(uint32_t status) final __TA_EXCLUDES(ethernet_proxy_lock_);
   zx_status_t JoinBss(join_bss_request_t* cfg) final;
   zx_status_t EnableBeaconing(wlan_softmac_enable_beaconing_request_t* request) final;
@@ -109,17 +107,6 @@ class Device : public DeviceInterface,
   };
 
   zx_status_t AddEthDevice();
-
-  static std::unique_ptr<Packet> PreparePacket(const void* data, size_t length, Packet::Peer peer);
-  template <typename T>
-  std::unique_ptr<Packet> PreparePacket(const void* data, size_t length, Packet::Peer peer,
-                                        const T& ctrl_data) {
-    auto packet = PreparePacket(data, length, peer);
-    if (packet != nullptr) {
-      packet->CopyCtrlFrom(ctrl_data);
-    }
-    return packet;
-  }
 
   // Informs the message loop to shut down. Calling this function more than once
   // has no effect.
@@ -167,6 +154,6 @@ class Device : public DeviceInterface,
   std::mutex rx_lock_;
 };
 
-}  // namespace wlan
+}  // namespace wlan::drivers
 
 #endif  // SRC_CONNECTIVITY_WLAN_DRIVERS_WLANSOFTMAC_DEVICE_H_

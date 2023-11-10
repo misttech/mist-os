@@ -13,6 +13,7 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/ddk/device.h>
 #include <lib/fit/result.h>
+#include <lib/operation/ethernet.h>
 #include <lib/zx/result.h>
 #include <lib/zx/thread.h>
 #include <lib/zx/time.h>
@@ -31,40 +32,33 @@
 #include <memory>
 #include <utility>
 
+#include <fbl/ref_ptr.h>
 #include <wlan/common/channel.h>
 #include <wlan/drivers/log.h>
 
+#include "buffer_allocator.h"
 #include "convert.h"
 #include "device_interface.h"
 
-namespace wlan {
+namespace wlan::drivers {
 
-wlansoftmac_in_buf_t IntoRustInBuf(std::unique_ptr<Packet> packet) {
-  auto* pkt = packet.release();
+wlansoftmac_in_buf_t IntoRustInBuf(std::unique_ptr<Buffer> owned_buffer) {
+  auto* buffer = owned_buffer.release();
   return wlansoftmac_in_buf_t{
-      .free_buffer = [](void* raw) { std::unique_ptr<Packet>(static_cast<Packet*>(raw)).reset(); },
-      .raw = pkt,
-      .data = pkt->data(),
-      .len = pkt->len(),
+      .free_buffer = [](void* raw) { std::unique_ptr<Buffer>(static_cast<Buffer*>(raw)).reset(); },
+      .raw = buffer,
+      .data = buffer->data(),
+      .len = buffer->capacity(),
   };
-}
-
-std::unique_ptr<Packet> FromRustOutBuf(wlansoftmac_out_buf_t buf) {
-  if (!buf.raw) {
-    return {};
-  }
-  auto pkt = std::unique_ptr<Packet>(static_cast<Packet*>(buf.raw));
-  pkt->set_len(buf.written_bytes);
-  return pkt;
 }
 
 wlansoftmac_buffer_provider_ops_t rust_buffer_provider{
     .get_buffer = [](size_t min_len) -> wlansoftmac_in_buf_t {
       // Note: Once Rust MLME supports more than sending WLAN frames this needs
       // to change.
-      auto pkt = GetWlanPacket(min_len);
-      ZX_DEBUG_ASSERT(pkt != nullptr);
-      return IntoRustInBuf(std::move(pkt));
+      auto buffer = GetBuffer(min_len);
+      ZX_DEBUG_ASSERT(buffer != nullptr);
+      return IntoRustInBuf(std::move(buffer));
     },
 };
 
@@ -274,8 +268,7 @@ zx_status_t WlanSoftmacHandle::Init(
       },
       .queue_tx = [](void* device, uint32_t options, wlansoftmac_out_buf_t buf,
                      wlan_tx_info_t tx_info) -> zx_status_t {
-        auto pkt = FromRustOutBuf(buf);
-        return DEVICE(device)->QueueTx(std::move(pkt), tx_info);
+        return DEVICE(device)->QueueTx(UsedBuffer::FromOutBuf(buf), tx_info);
       },
       .set_ethernet_status = [](void* device, uint32_t status) -> zx_status_t {
         return DEVICE(device)->SetEthernetStatus(status);
@@ -300,12 +293,12 @@ zx_status_t WlanSoftmacHandle::Init(
       },
       .enable_beaconing = [](void* device, wlansoftmac_out_buf_t buf, size_t tim_ele_offset,
                              uint16_t beacon_interval) -> zx_status_t {
-        auto pkt = FromRustOutBuf(buf);
+        auto used_buffer = UsedBuffer::FromOutBuf(buf);
         wlan_softmac_enable_beaconing_request_t request = {
             .packet_template =
                 {
-                    .mac_frame_buffer = pkt->data(),
-                    .mac_frame_size = pkt->size(),
+                    .mac_frame_buffer = used_buffer.data(),
+                    .mac_frame_size = used_buffer.size(),
                 },
             .tim_ele_offset = tim_ele_offset,
             .beacon_interval = beacon_interval,
@@ -336,13 +329,14 @@ zx_status_t WlanSoftmacHandle::StopMainLoop() {
   return ZX_OK;
 }
 
-zx_status_t WlanSoftmacHandle::QueueEthFrameTx(std::unique_ptr<Packet> pkt) {
+void WlanSoftmacHandle::QueueEthFrameTx(eth::BorrowedOperation<> op) {
   if (inner_handle_ == nullptr) {
-    return ZX_ERR_BAD_STATE;
+    op.Complete(ZX_ERR_BAD_STATE);
+    return;
   }
-  wlan_span_t span{.data = pkt->data(), .size = pkt->len()};
-  sta_queue_eth_frame_tx(inner_handle_, span);
-  return ZX_OK;
+
+  wlan_span_t span{.data = op.operation()->data_buffer, .size = op.operation()->data_size};
+  op.Complete(sta_queue_eth_frame_tx(inner_handle_, span));
 }
 
 Device::Device(zx_device_t* device) : parent_(device) {
@@ -521,23 +515,6 @@ zx_status_t Device::AddEthDevice() {
   return device_add(parent_, &args, &ethdev_);
 }
 
-std::unique_ptr<Packet> Device::PreparePacket(const void* data, size_t length, Packet::Peer peer) {
-  std::unique_ptr<Buffer> buffer = GetBuffer(length);
-  if (buffer == nullptr) {
-    lerror("could not get buffer for packet of length %zu", length);
-    return nullptr;
-  }
-
-  auto packet = std::make_unique<Packet>(std::move(buffer), length);
-  packet->set_peer(peer);
-  zx_status_t status = packet->CopyFrom(data, length, 0);
-  if (status != ZX_OK) {
-    lerror("could not copy to packet: %d", status);
-    return nullptr;
-  }
-  return packet;
-}
-
 void Device::ShutdownMainLoop() {
   if (main_loop_dead_) {
     lerror("ShutdownMainLoop called while main loop was not running");
@@ -637,22 +614,7 @@ void Device::EthernetImplStop() {
 void Device::EthernetImplQueueTx(uint32_t options, ethernet_netbuf_t* netbuf,
                                  ethernet_impl_queue_tx_callback completion_cb, void* cookie) {
   eth::BorrowedOperation<> op(netbuf, completion_cb, cookie, sizeof(ethernet_netbuf_t));
-  // Do not log "Entering" because it's too noisy.
-  auto packet = PreparePacket(op.operation()->data_buffer, op.operation()->data_size,
-                              Packet::Peer::kEthernet);
-  if (packet == nullptr) {
-    lwarn("could not prepare Ethernet packet with len %zu", netbuf->data_size);
-    op.Complete(ZX_ERR_NO_RESOURCES);
-    return;
-  }
-
-  // Forward the packet straight into Rust MLME.
-  auto status = softmac_handle_->QueueEthFrameTx(std::move(packet));
-  if (status != ZX_OK) {
-    lwarn("could not queue Ethernet packet err=%s", zx_status_get_string(status));
-    ZX_DEBUG_ASSERT(status != ZX_ERR_SHOULD_WAIT);
-  }
-  op.Complete(status);
+  softmac_handle_->QueueEthFrameTx(std::move(op));
 }
 
 zx_status_t Device::EthernetImplSetParam(uint32_t param, int32_t value, const void* data,
@@ -730,8 +692,8 @@ zx_status_t Device::DeliverEthernet(cpp20::span<const uint8_t> eth_frame) {
   return ZX_OK;
 }
 
-zx_status_t Device::QueueTx(std::unique_ptr<Packet> packet, wlan_tx_info_t tx_info) {
-  ZX_DEBUG_ASSERT(packet->len() <= std::numeric_limits<uint16_t>::max());
+zx_status_t Device::QueueTx(UsedBuffer used_buffer, wlan_tx_info_t tx_info) {
+  ZX_DEBUG_ASSERT(used_buffer.size() <= std::numeric_limits<uint16_t>::max());
 
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
@@ -741,7 +703,7 @@ zx_status_t Device::QueueTx(std::unique_ptr<Packet> packet, wlan_tx_info_t tx_in
 
   fuchsia_wlan_softmac::wire::WlanTxPacket fidl_tx_packet;
   zx_status_t status = status =
-      ConvertTxPacket(packet->data(), packet->len(), tx_info, &fidl_tx_packet);
+      ConvertTxPacket(used_buffer.data(), used_buffer.size(), tx_info, &fidl_tx_packet);
   if (status != ZX_OK) {
     lerror("WlanTxPacket conversion failed: %s", zx_status_get_string(status));
     return status;
@@ -937,4 +899,4 @@ const security_support_t& Device::GetSecuritySupport() const { return security_s
 const spectrum_management_support_t& Device::GetSpectrumManagementSupport() const {
   return spectrum_management_support_;
 }
-}  // namespace wlan
+}  // namespace wlan::drivers

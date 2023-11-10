@@ -26,11 +26,12 @@ wlansoftmac_convert_sources = [
 wlansoftmac_convert_deps = [
   "//sdk/banjo/fuchsia.hardware.ethernet:fuchsia.hardware.ethernet_banjo_cpp",
   "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_banjo_c",
+  "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_cpp",
   "//sdk/fidl/fuchsia.wlan.internal:fuchsia.wlan.internal_banjo_c",
+  "//sdk/fidl/fuchsia.wlan.internal:fuchsia.wlan.internal_cpp",
   "//sdk/fidl/fuchsia.wlan.softmac:fuchsia.wlan.softmac_banjo_c",
   "//sdk/fidl/fuchsia.wlan.softmac:fuchsia.wlan.softmac_cpp",
   "//src/connectivity/wlan/drivers/lib/log/cpp",
-  "//src/connectivity/wlan/lib/mlme/cpp:mlme",
   "//src/lib/ddk",
   "//zircon/system/ulib/fbl",
   "//zircon/system/ulib/zx",
@@ -41,30 +42,39 @@ source_set("wlansoftmac_convert") {
   public_deps = wlansoftmac_convert_deps
 }
 
-fuchsia_driver("wlansoftmac_driver-driver") {
-  output_name = "wlansoftmac"
+source_set("source_set") {
   sources = [
+    "buffer_allocator.cc",
+    "buffer_allocator.h",
     "device.cc",
     "device.h",
     "device_interface.cc",
     "device_interface.h",
     "driver.cc",
   ]
-  deps = [
+
+  public_deps = [
     ":wlansoftmac_bind",
     ":wlansoftmac_convert",
     "//sdk/fidl/fuchsia.wlan.softmac:fuchsia.wlan.softmac_cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//src/connectivity/wlan/drivers/lib/log/cpp",
     "//src/connectivity/wlan/drivers/wlansoftmac/rust_driver/c-binding:wlansoftmac-c",
+    "//src/connectivity/wlan/lib/common/cpp:common",
     "//src/devices/lib/dev-operation",
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddk",
     "//src/lib/ddktl",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/inspect",
   ]
+}
+
+fuchsia_driver("wlansoftmac_driver-driver") {
+  output_name = "wlansoftmac"
+  deps = [ ":source_set" ]
   configs += [ "//build/config/fuchsia:enable_zircon_asserts" ]
 
   # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
@@ -83,10 +93,25 @@ fuchsia_driver_package("wlansoftmac") {
   driver_components = [ ":wlansoftmac_driver" ]
 }
 
-test("wlansoftmac_convert_unittest") {
+test("wlansoftmac_tests") {
+  sources = [ "tests/buffer_allocator_test.cc" ]
+
+  deps = [
+    ":source_set",
+    "//src/connectivity/wlan/drivers/lib/log/cpp/test:log_overrides",
+    "//src/lib/fxl/test:gtest_main",
+  ]
+}
+
+fuchsia_unittest_package("wlansoftmac-tests") {
+  deps = [ ":wlansoftmac_tests" ]
+}
+
+# TODO(fxbug.dev/124830): This test target will be removed after wlansoftmac
+#                         no longer uses Banjo types.
+test("wlansoftmac_convert_tests") {
   testonly = true
-  output_name = "wlansoftmac_convert_unittest"
-  sources = wlansoftmac_convert_sources + [ "tests/convert_unittest.cc" ]
+  sources = wlansoftmac_convert_sources + [ "tests/convert_test.cc" ]
 
   deps = wlansoftmac_convert_deps + [
            "//src/connectivity/wlan/drivers/lib/log/cpp/test:log_overrides",
@@ -98,18 +123,15 @@ test("wlansoftmac_convert_unittest") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-fuchsia_unittest_component("wlansoftmac_convert_unittest_component") {
-  deps = [ ":wlansoftmac_convert_unittest" ]
-}
-
-fuchsia_test_package("wlansoftmac_unittests") {
-  test_components = [ ":wlansoftmac_convert_unittest_component" ]
+fuchsia_unittest_package("wlansoftmac-convert-tests") {
+  deps = [ ":wlansoftmac_convert_tests" ]
 }
 
 group("tests") {
   testonly = true
   deps = [
+    ":wlansoftmac-convert-tests",
+    ":wlansoftmac-tests",
     ":wlansoftmac_bind_test",
-    ":wlansoftmac_unittests",
   ]
 }

@@ -170,6 +170,6 @@ extern "C" void stop_sta(wlansoftmac_handle_t *softmac);
  */
 extern "C" void delete_sta(wlansoftmac_handle_t *softmac);
 
-extern "C" void sta_queue_eth_frame_tx(wlansoftmac_handle_t *softmac, wlan_span_t frame);
+extern "C" zx_status_t sta_queue_eth_frame_tx(wlansoftmac_handle_t *softmac, wlan_span_t frame);
 
 #endif  // SRC_CONNECTIVITY_WLAN_DRIVERS_WLANSOFTMAC_RUST_DRIVER_C_BINDING_BINDINGS_H_

@@ -54,10 +54,11 @@ impl WlanSoftmacHandle {
         }
     }
 
-    pub fn queue_eth_frame_tx(&mut self, bytes: Vec<u8>) -> Result<(), anyhow::Error> {
-        self.driver_event_sink
-            .unbounded_send(DriverEvent::EthFrameTx { bytes })
-            .map_err(|e| e.into())
+    pub fn queue_eth_frame_tx(&mut self, bytes: Vec<u8>) -> Result<(), zx::Status> {
+        self.driver_event_sink.unbounded_send(DriverEvent::EthFrameTx { bytes }).map_err(|e| {
+            error!("Failed to queue ethernet frame: {:?}", e);
+            zx::Status::INTERNAL
+        })
     }
 }
 

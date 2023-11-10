@@ -4,8 +4,7 @@
 
 #include "convert.h"
 
-#include <fuchsia/wlan/ieee80211/cpp/fidl.h>
-#include <fuchsia/wlan/stats/cpp/fidl.h>
+#include <fidl/fuchsia.wlan.ieee80211/cpp/fidl.h>
 #include <zircon/status.h>
 
 #include <wlan/drivers/log.h>

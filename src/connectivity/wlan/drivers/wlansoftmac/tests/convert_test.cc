@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/wlan/ieee80211/cpp/fidl.h>
-#include <fuchsia/wlan/stats/cpp/fidl.h>
+#include <fidl/fuchsia.wlan.ieee80211/cpp/fidl.h>
+#include <fidl/fuchsia.wlan.softmac/cpp/fidl.h>
 
 #include <gtest/gtest.h>
 #include <src/connectivity/wlan/drivers/wlansoftmac/convert.h>
 #include <wlan/drivers/log_instance.h>
 #include <wlan/drivers/test/log_overrides.h>
 
-#include "fidl/fuchsia.wlan.ieee80211/cpp/wire_types.h"
-#include "fidl/fuchsia.wlan.softmac/cpp/wire_types.h"
 #include "fuchsia/wlan/softmac/c/banjo.h"
 
 namespace wlan::drivers {

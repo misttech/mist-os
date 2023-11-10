@@ -7,7 +7,6 @@
 
 #include <fidl/fuchsia.wlan.softmac/cpp/fidl.h>
 #include <fuchsia/wlan/common/c/banjo.h>
-#include <fuchsia/wlan/minstrel/cpp/fidl.h>
 #include <zircon/types.h>
 
 #include <cstdint>
@@ -15,12 +14,12 @@
 #include <memory>
 
 #include <fbl/ref_counted.h>
-#include <fbl/ref_ptr.h>
 #include <wlan/common/macaddr.h>
 
+#include "buffer_allocator.h"
 #include "src/connectivity/wlan/drivers/wlansoftmac/rust_driver/c-binding/bindings.h"
 
-namespace wlan {
+namespace wlan::drivers {
 
 class Packet;
 
@@ -45,7 +44,7 @@ class DeviceInterface {
                             zx::channel* out_sme_channel) = 0;
 
   virtual zx_status_t DeliverEthernet(cpp20::span<const uint8_t> eth_frame) = 0;
-  virtual zx_status_t QueueTx(std::unique_ptr<Packet> packet, wlan_tx_info_t tx_info) = 0;
+  virtual zx_status_t QueueTx(UsedBuffer used_buffer, wlan_tx_info_t tx_info) = 0;
 
   virtual zx_status_t SetEthernetStatus(uint32_t status) = 0;
   virtual zx_status_t JoinBss(join_bss_request_t* cfg) = 0;
@@ -60,6 +59,6 @@ class DeviceInterface {
   virtual const spectrum_management_support_t& GetSpectrumManagementSupport() const = 0;
 };
 
-}  // namespace wlan
+}  // namespace wlan::drivers
 
 #endif  // SRC_CONNECTIVITY_WLAN_DRIVERS_WLANSOFTMAC_DEVICE_INTERFACE_H_
