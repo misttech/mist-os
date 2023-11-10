@@ -69,6 +69,8 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
                 EventPayload::CapabilityRequested {
                     source_moniker: source.moniker.clone(),
                     name: self.name.to_string(),
+                    flags: flags,
+                    relative_path: relative_path.clone(),
                     capability: capability.clone(),
                 },
             );

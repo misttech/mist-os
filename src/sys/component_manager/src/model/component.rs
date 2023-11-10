@@ -2077,6 +2077,8 @@ impl SandboxDispatcher {
                         name.to_string(),
                         message.handle,
                         message.target,
+                        message.flags,
+                        "".into(),
                     )
                     .await
                     {
@@ -2126,6 +2128,8 @@ impl SandboxDispatcher {
         name: String,
         handle: zx::Handle,
         target_component: WeakComponentInstance,
+        flags: fio::OpenFlags,
+        relative_path: PathBuf,
     ) -> Option<zx::Channel> {
         let capability = Arc::new(Mutex::new(Some(Channel::from(handle))));
         let source_component = match source_component.upgrade() {
@@ -2149,6 +2153,8 @@ impl SandboxDispatcher {
                 source_moniker: source_component.moniker.clone(),
                 name,
                 capability: capability.clone(),
+                flags,
+                relative_path,
             },
         );
         source_component.hooks.dispatch(&event).await;

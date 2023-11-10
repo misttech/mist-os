@@ -9,6 +9,7 @@ use crate::model::{
 use async_trait::async_trait;
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_inspect::InspectSinkMarker;
+use fidl_fuchsia_io as fio;
 use fuchsia_async::TaskGroup;
 use fuchsia_inspect::component;
 use futures::lock::Mutex;
@@ -61,6 +62,8 @@ impl EventSynthesisProvider for InspectSinkProvider {
                 source_moniker,
                 name: InspectSinkMarker::PROTOCOL_NAME.into(),
                 capability: Arc::new(Mutex::new(Some(server.into_channel()))),
+                flags: fio::OpenFlags::empty(),
+                relative_path: "".into(),
             })]
         } else {
             vec![]

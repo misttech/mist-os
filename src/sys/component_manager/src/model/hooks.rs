@@ -23,6 +23,7 @@ use {
         collections::HashMap,
         convert::TryFrom,
         fmt,
+        path::PathBuf,
         sync::{Arc, Weak},
     },
     tracing::warn,
@@ -217,6 +218,8 @@ pub enum EventPayload {
     CapabilityRequested {
         source_moniker: Moniker,
         name: String,
+        flags: fio::OpenFlags,
+        relative_path: PathBuf,
         capability: Arc<Mutex<Option<zx::Channel>>>,
     },
     CapabilityRouted {
@@ -383,11 +386,19 @@ impl Event {
 impl TransferEvent for EventPayload {
     async fn transfer(&self) -> Self {
         match self {
-            EventPayload::CapabilityRequested { source_moniker, name, capability } => {
+            EventPayload::CapabilityRequested {
+                source_moniker,
+                name,
+                capability,
+                flags,
+                relative_path,
+            } => {
                 let capability = capability.lock().await.take();
                 EventPayload::CapabilityRequested {
                     source_moniker: source_moniker.clone(),
                     name: name.to_string(),
+                    flags: *flags,
+                    relative_path: relative_path.clone(),
                     capability: Arc::new(Mutex::new(capability)),
                 }
             }
@@ -519,6 +530,8 @@ mod tests {
                 source_moniker: Moniker::root(),
                 name: "foo".to_string(),
                 capability: capability_server_end,
+                flags: fio::OpenFlags::empty(),
+                relative_path: "".into(),
             },
         );
 

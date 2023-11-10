@@ -420,7 +420,7 @@ mod tests {
         },
         assert_matches::assert_matches,
         cm_rust::{Availability, UseSource},
-        fuchsia_zircon as zx,
+        fidl_fuchsia_io as fio, fuchsia_zircon as zx,
         futures::StreamExt,
         moniker::Moniker,
         std::str::FromStr,
@@ -436,6 +436,8 @@ mod tests {
                 source_moniker: Moniker::root(),
                 name: "foo".to_string(),
                 capability: capability_server_end,
+                flags: fio::OpenFlags::empty(),
+                relative_path: "".into(),
             },
         );
         registry.dispatch(&event).await;

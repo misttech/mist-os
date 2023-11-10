@@ -4,14 +4,13 @@
 use assert_matches::assert_matches;
 use fidl_fuchsia_io as fio;
 use fuchsia_async as fasync;
-use fuchsia_async::TimeoutExt;
 use fuchsia_fs::node::OpenError;
 use fuchsia_zircon_status as zx_status;
 use futures::StreamExt;
 
 #[fasync::run_singlethreaded(test)]
 async fn component_manager_namespace() {
-    let working_nodes = [
+    let nodes = [
         "/svc/fuchsia.component.Binder",
         "/svc/fuchsia.component.Namespace",
         "/svc/fuchsia.component.Realm",
@@ -40,8 +39,9 @@ async fn component_manager_namespace() {
         "/svc/fuchsia.kernel.VmexResource",
         "/svc/fuchsia.process.Launcher",
         "/svc/fuchsia.sys2.CrashIntrospect",
+        "/svc/fuchsia.logger.LogSink",
     ];
-    let working_opens = working_nodes.iter().map(|node_path| async move {
+    let opens = nodes.iter().map(|node_path| async move {
         assert_matches!(
             validate_open_with_node_reference_and_describe(node_path).await,
             Ok(()),
@@ -50,25 +50,7 @@ async fn component_manager_namespace() {
         );
     });
 
-    let () = futures::future::join_all(working_opens).await.into_iter().collect();
-
-    let hanging_nodes = ["/svc/fuchsia.logger.LogSink"];
-    let hanging_opens = hanging_nodes.iter().map(|node_path| async move {
-        let hanging_err = validate_open_with_node_reference_and_describe(node_path)
-            .on_timeout(std::time::Duration::from_secs(2), || {
-                Err(OpenError::OpenError(zx_status::Status::TIMED_OUT))
-            })
-            .await;
-
-        assert_matches!(
-            hanging_err,
-            Err(OpenError::OpenError(zx_status::Status::TIMED_OUT)),
-            "Opening capability: {} with DESCRIBE|NODE_REFERENCE did not timeout.",
-            node_path
-        );
-    });
-
-    let () = futures::future::join_all(hanging_opens).await.into_iter().collect();
+    let () = futures::future::join_all(opens).await.into_iter().collect();
 }
 
 async fn validate_open_with_node_reference_and_describe(path: &str) -> Result<(), OpenError> {
