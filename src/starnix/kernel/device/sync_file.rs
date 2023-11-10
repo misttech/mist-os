@@ -2,20 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::fs::buffers::{InputBuffer, OutputBuffer};
-use crate::fs::*;
-use crate::logging::{impossible_error, log_warn};
-use crate::mm::MemoryAccessorExt;
-use crate::syscalls::*;
-use crate::task::*;
-use crate::types::*;
+use crate::{
+    fs::{
+        buffers::{InputBuffer, OutputBuffer},
+        *,
+    },
+    logging::{impossible_error, log_warn},
+    mm::MemoryAccessorExt,
+    syscalls::*,
+    task::*,
+    types::*,
+};
 use fidl::HandleBased;
 use fuchsia_zircon as zx;
 use fuchsia_zircon::AsHandleRef;
-use std::collections::HashSet;
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc,
+use std::{
+    collections::HashSet,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
 };
 
 // Implementation of the sync framework described at:
@@ -101,7 +107,7 @@ impl FileOps for SyncFile {
 
     fn to_handle(
         &self,
-        _file: &FileHandle,
+        _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<Option<zx::Handle>, Errno> {
         assert!(self.fence.sync_points.len() == 1);

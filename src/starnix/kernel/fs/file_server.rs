@@ -5,8 +5,8 @@
 use crate::{
     fs::{
         buffers::{VecInputBuffer, VecOutputBuffer},
-        DirectoryEntryType, DirentSink, FileHandle, FsStr, LookupContext, NamespaceNode,
-        RenameFlags, SeekTarget, UnlinkKind,
+        DirectoryEntryType, DirentSink, FileHandle, FileObject, FsStr, LookupContext,
+        NamespaceNode, RenameFlags, SeekTarget, UnlinkKind,
     },
     mm::ProtectionFlags,
     task::CurrentTask,
@@ -25,7 +25,7 @@ use vfs::{attributes, directory, execution_scope, file, path, ToObjectRequest};
 /// Returns a handle implementing a fuchsia.io.Node delegating to the given `file`.
 pub fn serve_file(
     current_task: &CurrentTask,
-    file: &FileHandle,
+    file: &FileObject,
 ) -> Result<ClientEnd<fio::NodeMarker>, Errno> {
     let (client_end, server_end) = fidl::endpoints::create_endpoints::<fio::NodeMarker>();
     serve_file_at(server_end, current_task, file)?;
@@ -35,7 +35,7 @@ pub fn serve_file(
 pub fn serve_file_at(
     server_end: ServerEnd<fio::NodeMarker>,
     current_task: &CurrentTask,
-    file: &FileHandle,
+    file: &FileObject,
 ) -> Result<(), Errno> {
     // Reopen file object to not share state with the given FileObject.
     let file = file.name.open(current_task, file.flags(), false)?;

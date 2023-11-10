@@ -33,10 +33,9 @@ use crate::{
     mm::ProtectionFlags,
     syscalls::{SyscallArg, SyscallResult},
     task::{CurrentTask, EventHandler, Kernel, WaitCanceler, Waiter},
-    types::errno::errno,
     types::{
-        error, from_status_like_fdio, fsverity_descriptor, ino_t, off_t, statfs, DeviceType, Errno,
-        FileMode, MountFlags, OpenFlags,
+        errno::errno, error, from_status_like_fdio, fsverity_descriptor, ino_t, off_t, statfs,
+        DeviceType, Errno, FileMode, MountFlags, OpenFlags,
     },
     vmex_resource::VMEX_RESOURCE,
 };
@@ -1221,7 +1220,7 @@ impl FileOps for RemoteDirectoryObject {
 
     fn to_handle(
         &self,
-        _file: &FileHandle,
+        _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<Option<zx::Handle>, Errno> {
         self.zxio
@@ -1312,7 +1311,7 @@ impl FileOps for RemoteFileObject {
 
     fn to_handle(
         &self,
-        _file: &FileHandle,
+        _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<Option<zx::Handle>, Errno> {
         self.zxio
@@ -1408,7 +1407,7 @@ impl FileOps for RemotePipeObject {
 
     fn to_handle(
         &self,
-        _file: &FileHandle,
+        _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<Option<zx::Handle>, Errno> {
         self.zxio

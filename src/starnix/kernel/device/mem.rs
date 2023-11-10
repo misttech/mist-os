@@ -73,7 +73,7 @@ impl FileOps for DevNull {
 
     fn to_handle(
         &self,
-        _file: &FileHandle,
+        _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<Option<zx::Handle>, Errno> {
         Ok(None)

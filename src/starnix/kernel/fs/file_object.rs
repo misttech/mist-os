@@ -329,7 +329,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     /// If None is returned, the file will act as if it was a fd to `/dev/null`.
     fn to_handle(
         &self,
-        file: &FileHandle,
+        file: &FileObject,
         current_task: &CurrentTask,
     ) -> Result<Option<zx::Handle>, Errno> {
         serve_file(current_task, file).map(|c| Some(c.into_handle()))
@@ -1308,10 +1308,7 @@ impl FileObject {
         self.node().fallocate(current_task, mode, offset, length)
     }
 
-    pub fn to_handle(
-        self: &Arc<Self>,
-        current_task: &CurrentTask,
-    ) -> Result<Option<zx::Handle>, Errno> {
+    pub fn to_handle(&self, current_task: &CurrentTask) -> Result<Option<zx::Handle>, Errno> {
         self.ops().to_handle(self, current_task)
     }
 
