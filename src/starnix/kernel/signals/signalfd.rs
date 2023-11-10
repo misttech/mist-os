@@ -9,7 +9,8 @@ use crate::{
     },
     signals::SignalDetail,
     task::{CurrentTask, EventHandler, WaitCanceler, Waiter},
-    types::{errno, error, signalfd_siginfo, Errno, OpenFlags, SigSet, SFD_NONBLOCK},
+    types::signals::SigSet,
+    types::{errno, error, signalfd_siginfo, Errno, OpenFlags, SFD_NONBLOCK},
 };
 use starnix_lock::Mutex;
 use std::convert::TryInto;
@@ -65,7 +66,7 @@ impl FileOps for SignalFd {
                 // fields into the signalfd_siginfo.
                 match signal.detail {
                     SignalDetail::None => {}
-                    SignalDetail::SigChld { pid, uid, status } => {
+                    SignalDetail::SIGCHLD { pid, uid, status } => {
                         siginfo.ssi_pid = pid as u32;
                         siginfo.ssi_uid = uid;
                         siginfo.ssi_status = status;
@@ -73,7 +74,7 @@ impl FileOps for SignalFd {
                     SignalDetail::SigFault { addr } => {
                         siginfo.ssi_addr = addr;
                     }
-                    SignalDetail::SigSys { call_addr, syscall, arch } => {
+                    SignalDetail::SIGSYS { call_addr, syscall, arch } => {
                         siginfo.ssi_call_addr = call_addr.into();
                         siginfo.ssi_syscall = syscall;
                         siginfo.ssi_arch = arch;

@@ -4,7 +4,8 @@
 
 use crate::{
     fs::{FdNumber, WdNumber},
-    types::{DeviceType, FileMode, UncheckedSignal, UserAddress, UserCString, UserRef},
+    types::signals::UncheckedSignal,
+    types::{DeviceType, FileMode, UserAddress, UserCString, UserRef},
 };
 
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]

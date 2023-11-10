@@ -16,6 +16,7 @@ use crate::{
     signals::{send_signal, SignalInfo},
     task::{CurrentTask, Kernel, WaitQueue, Waiter},
     time::utc,
+    types::signals::SIGXFSZ,
     types::time::{timespec_from_time, NANOS_PER_SECOND},
     types::{
         __kernel_ulong_t, as_any::AsAny, errno, error, fsverity_descriptor, gid_t, ino_t, mode,
@@ -23,10 +24,9 @@ use crate::{
         OpenFlags, Resource, CAP_CHOWN, CAP_DAC_OVERRIDE, CAP_FOWNER, CAP_FSETID, CAP_MKNOD,
         CAP_SYS_ADMIN, EACCES, ENOSYS, FALLOC_FL_COLLAPSE_RANGE, FALLOC_FL_INSERT_RANGE,
         FALLOC_FL_KEEP_SIZE, FALLOC_FL_PUNCH_HOLE, FALLOC_FL_UNSHARE_RANGE, FALLOC_FL_ZERO_RANGE,
-        LOCK_EX, LOCK_NB, LOCK_SH, LOCK_UN, SIGXFSZ, STATX_ATIME, STATX_ATTR_VERITY,
-        STATX_BASIC_STATS, STATX_BLOCKS, STATX_CTIME, STATX_GID, STATX_INO, STATX_MTIME,
-        STATX_NLINK, STATX_SIZE, STATX_UID, STATX__RESERVED, XATTR_TRUSTED_PREFIX,
-        XATTR_USER_PREFIX,
+        LOCK_EX, LOCK_NB, LOCK_SH, LOCK_UN, STATX_ATIME, STATX_ATTR_VERITY, STATX_BASIC_STATS,
+        STATX_BLOCKS, STATX_CTIME, STATX_GID, STATX_INO, STATX_MTIME, STATX_NLINK, STATX_SIZE,
+        STATX_UID, STATX__RESERVED, XATTR_TRUSTED_PREFIX, XATTR_USER_PREFIX,
     },
 };
 use bitflags::bitflags;

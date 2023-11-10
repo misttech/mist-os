@@ -12,7 +12,8 @@ use crate::{
     mutable_state::{state_accessor, state_implementation},
     signals::{send_signal, SignalInfo},
     task::{Session, ThreadGroup},
-    types::{pid_t, Signal, TempRef, UncheckedSignal, SIGCONT, SIGHUP},
+    types::signals::{Signal, UncheckedSignal, SIGCONT, SIGHUP},
+    types::{pid_t, TempRef},
 };
 
 #[derive(Debug)]

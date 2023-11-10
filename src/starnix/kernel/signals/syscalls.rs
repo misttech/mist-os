@@ -21,14 +21,14 @@ use crate::{
         CurrentTask, ProcessEntryRef, ProcessSelector, Task, TaskMutableState, ThreadGroup,
         WaitResult, Waiter,
     },
+    types::signals::{SigSet, Signal, UncheckedSignal, UNBLOCKABLE_SIGNALS},
     types::time::{duration_from_timespec, timeval_from_duration},
     types::{
         errno, error, pid_t, rusage, sigaction_t, sigaltstack_t, timespec, Errno, ErrnoResultExt,
-        OpenFlags, SigSet, Signal, TempRef, UncheckedSignal, UserAddress, UserRef, WeakRef,
-        ETIMEDOUT, MINSIGSTKSZ, P_ALL, P_PGID, P_PID, P_PIDFD, SFD_CLOEXEC, SFD_NONBLOCK,
-        SIG_BLOCK, SIG_SETMASK, SIG_UNBLOCK, SI_MAX_SIZE, SI_TKILL, SI_USER, SS_AUTODISARM,
-        SS_DISABLE, SS_ONSTACK, UNBLOCKABLE_SIGNALS, WCONTINUED, WEXITED, WNOHANG, WNOWAIT,
-        WSTOPPED, WUNTRACED, __WALL, __WCLONE,
+        OpenFlags, TempRef, UserAddress, UserRef, WeakRef, ETIMEDOUT, MINSIGSTKSZ, P_ALL, P_PGID,
+        P_PID, P_PIDFD, SFD_CLOEXEC, SFD_NONBLOCK, SIG_BLOCK, SIG_SETMASK, SIG_UNBLOCK,
+        SI_MAX_SIZE, SI_TKILL, SI_USER, SS_AUTODISARM, SS_DISABLE, SS_ONSTACK, WCONTINUED, WEXITED,
+        WNOHANG, WNOWAIT, WSTOPPED, WUNTRACED, __WALL, __WCLONE,
     },
 };
 
@@ -859,10 +859,11 @@ mod tests {
         signals::testing::dequeue_signal_for_test,
         task::{ExitStatus, ProcessExitInfo},
         testing::*,
-        types::{
-            uid_t, ERESTARTSYS, SIGCHLD, SIGHUP, SIGINT, SIGIO, SIGKILL, SIGRTMIN, SIGSEGV,
-            SIGSTOP, SIGTERM, SIGTRAP, SIGUSR1, SI_QUEUE,
+        types::signals::{
+            SIGCHLD, SIGHUP, SIGINT, SIGIO, SIGKILL, SIGRTMIN, SIGSEGV, SIGSTOP, SIGTERM, SIGTRAP,
+            SIGUSR1,
         },
+        types::{uid_t, ERESTARTSYS, SI_QUEUE},
     };
     use std::convert::TryInto;
     use zerocopy::AsBytes;
@@ -1850,7 +1851,7 @@ mod tests {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let mut child = current_task.clone_task_for_test(0, Some(SIGCHLD));
 
-        // Send SigKill to the child. As kill is handled immediately, no need to dequeue signals.
+        // Send SIGKILL to the child. As kill is handled immediately, no need to dequeue signals.
         send_signal(&child, SignalInfo::default(SIGKILL));
         dequeue_signal_for_test(&mut child);
         std::mem::drop(child);

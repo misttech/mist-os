@@ -498,7 +498,12 @@ async fn wait_for_init_file(
 #[cfg(test)]
 mod test {
     use super::wait_for_init_file;
-    use crate::{fs::FdNumber, testing::create_kernel_and_task, types::*};
+    use crate::{
+        fs::FdNumber,
+        testing::create_kernel_and_task,
+        types::signals::SIGCHLD,
+        types::{FileMode, OpenFlags, CLONE_FS},
+    };
     use fuchsia_async as fasync;
     use futures::{SinkExt, StreamExt};
 

@@ -8,8 +8,9 @@ use crate::{
     arch::registers::RegisterState,
     signals::{SignalInfo, SignalState},
     task::{CurrentTask, Task},
+    types::signals::SigSet,
     types::{
-        ErrnoCode, SigSet, __NR_restart_syscall, _fpstate_64, sigaction_t, sigaltstack, sigcontext,
+        ErrnoCode, __NR_restart_syscall, _fpstate_64, sigaction_t, sigaltstack, sigcontext,
         siginfo_t, sigset_t, ucontext, ERESTART_RESTARTBLOCK,
     },
 };
@@ -186,9 +187,10 @@ mod tests {
         signals::{restore_from_signal_handler, SignalDetail},
         task::Kernel,
         testing::*,
+        types::signals::{SIGUSR1, SIGUSR2},
         types::{
             __NR_rt_sigreturn, sigaction_t, UserAddress, EINTR, ERESTARTSYS, SA_RESTART,
-            SA_RESTORER, SA_SIGINFO, SIGUSR1, SIGUSR2, SI_USER,
+            SA_RESTORER, SA_SIGINFO, SI_USER,
         },
     };
 

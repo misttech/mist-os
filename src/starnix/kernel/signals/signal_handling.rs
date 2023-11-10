@@ -15,12 +15,15 @@ use crate::{
     signals::{SignalDetail, SignalInfo, SignalState},
     syscalls::SyscallResult,
     task::{CurrentTask, ExitStatus, StopState, Task, TaskFlags, TaskMutableState},
+    types::signals::{
+        SigSet, SIGABRT, SIGALRM, SIGBUS, SIGCHLD, SIGCONT, SIGFPE, SIGHUP, SIGILL, SIGINT, SIGIO,
+        SIGKILL, SIGPIPE, SIGPROF, SIGPWR, SIGQUIT, SIGSEGV, SIGSTKFLT, SIGSTOP, SIGSYS, SIGTERM,
+        SIGTRAP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG, SIGUSR1, SIGUSR2, SIGVTALRM, SIGWINCH, SIGXCPU,
+        SIGXFSZ,
+    },
     types::{
-        errno, error, sigaction_t, Errno, ErrnoCode, SigSet, UserAddress, EINTR, ERESTARTNOHAND,
+        errno, error, sigaction_t, Errno, ErrnoCode, UserAddress, EINTR, ERESTARTNOHAND,
         ERESTARTNOINTR, ERESTARTSYS, ERESTART_RESTARTBLOCK, SA_ONSTACK, SA_RESTART, SA_SIGINFO,
-        SIGABRT, SIGALRM, SIGBUS, SIGCHLD, SIGCONT, SIGFPE, SIGHUP, SIGILL, SIGINT, SIGIO, SIGKILL,
-        SIGPIPE, SIGPROF, SIGPWR, SIGQUIT, SIGSEGV, SIGSTKFLT, SIGSTOP, SIGSYS, SIGTERM, SIGTRAP,
-        SIGTSTP, SIGTTIN, SIGTTOU, SIGURG, SIGUSR1, SIGUSR2, SIGVTALRM, SIGWINCH, SIGXCPU, SIGXFSZ,
         SIG_DFL, SIG_IGN,
     },
 };

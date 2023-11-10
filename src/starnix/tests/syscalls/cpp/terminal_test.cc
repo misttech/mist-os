@@ -123,7 +123,7 @@ class Pty : public testing::Test {
   }
 };
 
-TEST_F(Pty, SigWinch) {
+TEST_F(Pty, SIGWINCH) {
   test_helper::ForkHelper helper;
 
   helper.RunInForkedProcess([&] {

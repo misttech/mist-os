@@ -18,14 +18,15 @@ use crate::{
     syscalls::{
         __user_cap_data_struct, __user_cap_header_struct, c_int, clone_args, errno, error,
         not_implemented, release_on_error, sched_param, uid_t, Capabilities, Errno, FileMode,
-        Locked, OpenFlags, Resource, Signal, SyscallResult, UncheckedSignal, Unlocked, UserAddress,
-        UserCString, UserRef, WeakRef,
+        Locked, OpenFlags, Resource, SyscallResult, Unlocked, UserAddress, UserCString, UserRef,
+        WeakRef,
     },
     task::{
         max_priority_for_sched_policy, min_priority_for_sched_policy, ptrace_attach,
         ptrace_dispatch, ptrace_traceme, CurrentTask, ExitStatus, SchedulerPolicy, SeccompAction,
         SeccompStateValue, Task,
     },
+    types::signals::{Signal, UncheckedSignal},
     types::time::timeval_from_duration,
     types::{
         gid_t, kcmp::KcmpResource, ownership::ReleasableByRef, pid_t, rlimit, rusage,

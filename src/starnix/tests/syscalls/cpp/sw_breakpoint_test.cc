@@ -4,7 +4,7 @@
 
 #include "src/starnix/tests/syscalls/cpp/test_helper.h"
 
-TEST(SwBreakpointTest, Int3CompactGeneratesSigTrap) {
+TEST(SwBreakpointTest, Int3CompactGeneratesSIGTRAP) {
   test_helper::ForkHelper helper;
   helper.RunInForkedProcess([] {
     struct sigaction segv_act;

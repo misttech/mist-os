@@ -23,13 +23,13 @@ use crate::{
         CurrentTask, EventHandler, ExitStatus, Kernel, Task, TaskFlags, WaitCanceler, WaitQueue,
         Waiter,
     },
+    types::signals::{SIGKILL, SIGSYS},
     types::{
         __NR_exit, __NR_read, __NR_write, errno, errno_from_code, error, seccomp_data,
         seccomp_notif, seccomp_notif_resp, sock_filter, Errno, OpenFlags, UserAddress, UserRef,
         BPF_ABS, BPF_LD, BPF_ST, SECCOMP_IOCTL_NOTIF_ADDFD, SECCOMP_IOCTL_NOTIF_ID_VALID,
         SECCOMP_IOCTL_NOTIF_RECV, SECCOMP_IOCTL_NOTIF_SEND, SECCOMP_RET_ACTION_FULL,
-        SECCOMP_RET_ALLOW, SECCOMP_RET_DATA, SECCOMP_USER_NOTIF_FLAG_CONTINUE, SIGKILL, SIGSYS,
-        SYS_SECCOMP,
+        SECCOMP_RET_ALLOW, SECCOMP_RET_DATA, SECCOMP_USER_NOTIF_FLAG_CONTINUE, SYS_SECCOMP,
     },
 };
 
@@ -439,7 +439,7 @@ impl SeccompState {
                     signal: SIGSYS,
                     errno: errno as i32,
                     code: SYS_SECCOMP as i32,
-                    detail: SignalDetail::SigSys {
+                    detail: SignalDetail::SIGSYS {
                         call_addr: current_task.registers.instruction_pointer_register().into(),
                         syscall: syscall.decl.number as i32,
                         arch: arch_val,

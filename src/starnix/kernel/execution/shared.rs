@@ -274,7 +274,7 @@ mod tests {
     use crate::{
         signals::SignalInfo,
         testing::*,
-        types::{SIGCONT, SIGSTOP},
+        types::signals::{SIGCONT, SIGSTOP},
     };
 
     #[::fuchsia::test]

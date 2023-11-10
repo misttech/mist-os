@@ -10,7 +10,7 @@ use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
 use crate::{
     mm::PAGE_SIZE,
-    types::{SigSet, UserAddress},
+    types::{signals::SigSet, UserAddress},
 };
 
 use linux_uapi as uapi;

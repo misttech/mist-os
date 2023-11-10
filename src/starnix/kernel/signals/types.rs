@@ -9,12 +9,12 @@ use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
 use crate::{
     task::{IntervalTimerHandle, ThreadGroupReadGuard, WaitQueue, WaiterRef},
+    types::signals::{SigSet, Signal, UncheckedSignal, UNBLOCKABLE_SIGNALS},
     types::{
-        Errno, SigSet, Signal, UncheckedSignal, UserAddress, __sifields__bindgen_ty_2,
-        __sifields__bindgen_ty_4, __sifields__bindgen_ty_7, c_int, c_uint, error, pid_t,
-        sigaction_t, sigaltstack_t, sigevent, siginfo_t, sigval_t, struct_with_union_into_bytes,
-        uapi, uid_t, SIGEV_NONE, SIGEV_SIGNAL, SIGEV_THREAD, SIGEV_THREAD_ID, SIG_DFL, SIG_IGN,
-        SI_KERNEL, SI_MAX_SIZE, UNBLOCKABLE_SIGNALS,
+        Errno, UserAddress, __sifields__bindgen_ty_2, __sifields__bindgen_ty_4,
+        __sifields__bindgen_ty_7, c_int, c_uint, error, pid_t, sigaction_t, sigaltstack_t,
+        sigevent, siginfo_t, sigval_t, struct_with_union_into_bytes, uapi, uid_t, SIGEV_NONE,
+        SIGEV_SIGNAL, SIGEV_THREAD, SIGEV_THREAD_ID, SIG_DFL, SIG_IGN, SI_KERNEL, SI_MAX_SIZE,
     },
 };
 
@@ -289,7 +289,7 @@ impl SignalInfo {
 
         match self.detail {
             SignalDetail::None => make_siginfo!(self),
-            SignalDetail::SigChld { pid, uid, status } => make_siginfo!(
+            SignalDetail::SIGCHLD { pid, uid, status } => make_siginfo!(
                 self,
                 _sigchld,
                 __sifields__bindgen_ty_4 {
@@ -302,7 +302,7 @@ impl SignalInfo {
             SignalDetail::SigFault { addr } => {
                 make_siginfo!(self, _sigfault._addr, linux_uapi::uaddr { addr })
             }
-            SignalDetail::SigSys { call_addr, syscall, arch } => make_siginfo!(
+            SignalDetail::SIGSYS { call_addr, syscall, arch } => make_siginfo!(
                 self,
                 _sigsys,
                 __sifields__bindgen_ty_7 {
@@ -348,7 +348,7 @@ impl SignalInfo {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SignalDetail {
     None,
-    SigChld {
+    SIGCHLD {
         pid: pid_t,
         uid: uid_t,
         status: i32,
@@ -356,7 +356,7 @@ pub enum SignalDetail {
     SigFault {
         addr: u64,
     },
-    SigSys {
+    SIGSYS {
         call_addr: UserAddress,
         syscall: i32,
         arch: u32,
@@ -485,7 +485,8 @@ impl From<SignalEventValue> for sigval_t {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::types::{CLD_EXITED, SIGCHLD, SIGPWR};
+    use crate::types::signals::{SIGCHLD, SIGPWR};
+    use crate::types::CLD_EXITED;
     use std::convert::TryFrom;
 
     #[::fuchsia::test]
@@ -514,7 +515,7 @@ mod test {
             &SignalInfo::new(
                 SIGCHLD,
                 CLD_EXITED as i32,
-                SignalDetail::SigChld { pid: 123, uid: 456, status: 2 }
+                SignalDetail::SIGCHLD { pid: 123, uid: 456, status: 2 }
             )
             .as_siginfo_bytes(),
             sigchld_bytes.as_slice()

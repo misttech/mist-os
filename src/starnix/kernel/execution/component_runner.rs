@@ -27,9 +27,10 @@ use crate::{
     logging::{log_error, log_info},
     signals,
     task::{ExitStatus, Task},
+    types::signals::{SIGINT, SIGKILL},
     types::{
         mode, release_on_error, Capabilities, DeviceType, Errno, MountFlags, OpenFlags,
-        ReleasableByRef, WeakRef, EEXIST, ENOTDIR, SIGINT, SIGKILL, SI_KERNEL,
+        ReleasableByRef, WeakRef, EEXIST, ENOTDIR, SI_KERNEL,
     },
 };
 

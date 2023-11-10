@@ -18,10 +18,11 @@ use crate::{
     },
     mutable_state::{state_accessor, state_implementation},
     task::{CurrentTask, EventHandler, ProcessGroup, Session, WaitCanceler, WaitQueue, Waiter},
+    types::signals::{Signal, SIGINT, SIGQUIT, SIGSTOP},
     types::{
-        cc_t, error, pid_t, tcflag_t, uapi, DeviceType, Errno, Signal, ECHO, ECHOCTL, ECHONL,
-        ICANON, ICRNL, IEXTEN, IGNCR, INLCR, ISIG, IUTF8, OCRNL, ONLCR, ONLRET, ONOCR, OPOST,
-        SIGINT, SIGQUIT, SIGSTOP, TABDLY, VEOF, VEOL, VEOL2, VERASE, VINTR, VQUIT, VSUSP, XTABS,
+        cc_t, error, pid_t, tcflag_t, uapi, DeviceType, Errno, ECHO, ECHOCTL, ECHONL, ICANON,
+        ICRNL, IEXTEN, IGNCR, INLCR, ISIG, IUTF8, OCRNL, ONLCR, ONLRET, ONOCR, OPOST, TABDLY, VEOF,
+        VEOL, VEOL2, VERASE, VINTR, VQUIT, VSUSP, XTABS,
     },
 };
 
