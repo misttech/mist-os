@@ -48,6 +48,9 @@ void riscv64_init_percpu() {
   riscv64_csr_write(RISCV64_CSR_SCOUNTEREN, RISCV64_CSR_SCOUNTEREN_CY | RISCV64_CSR_SCOUNTEREN_TM |
                                                 RISCV64_CSR_SCOUNTEREN_IR);
 
+  // disable all cache instructions and FIOM bit for user space (for now)
+  riscv64_csr_write(RISCV64_CSR_SENVCFG, 0);
+
   // Zero out the fpu state and set to initial
   riscv64_fpu_zero();
 }

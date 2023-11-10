@@ -11,7 +11,12 @@
 #include <stdint.h>
 
 // RISC-V features
+extern bool riscv_feature_cboz;
+extern bool riscv_feature_cbom;
 extern bool riscv_feature_svpbmt;
+
+extern uint32_t riscv_cboz_size;
+extern uint32_t riscv_cbom_size;
 
 void riscv64_feature_early_init();
 void riscv64_feature_init();

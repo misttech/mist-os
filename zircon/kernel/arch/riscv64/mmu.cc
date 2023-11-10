@@ -1602,22 +1602,38 @@ uint32_t arch_address_tagging_features() { return 0; }
 
 void arch_zero_page(void* _ptr) {
   const uintptr_t end_address = reinterpret_cast<uintptr_t>(_ptr) + PAGE_SIZE;
-  asm volatile(
-      R"""(
-    .balign 4
-    0:
-      sd    zero,0(%0)
-      sd    zero,8(%0)
-      sd    zero,16(%0)
-      sd    zero,24(%0)
-      sd    zero,32(%0)
-      sd    zero,40(%0)
-      sd    zero,48(%0)
-      sd    zero,56(%0)
-      addi  %0,%0,64
-      bne   %0,%1,0b
-      )"""
-      : "+r"(_ptr)
-      : "r"(end_address)
-      : "memory");
+
+  if (riscv_feature_cboz) {
+    asm volatile(
+        R"""(
+      .balign 4
+      0:
+        cbo.zero 0(%0)
+        add  %0,%0,%2
+        bne  %0,%1,0b
+        )"""
+        : "+r"(_ptr)
+        : "r"(end_address), "r"(riscv_cboz_size)
+        : "memory");
+
+  } else {
+    asm volatile(
+        R"""(
+      .balign 4
+      0:
+        sd    zero,0(%0)
+        sd    zero,8(%0)
+        sd    zero,16(%0)
+        sd    zero,24(%0)
+        sd    zero,32(%0)
+        sd    zero,40(%0)
+        sd    zero,48(%0)
+        sd    zero,56(%0)
+        addi  %0,%0,64
+        bne   %0,%1,0b
+        )"""
+        : "+r"(_ptr)
+        : "r"(end_address)
+        : "memory");
+  }
 }
