@@ -27,7 +27,7 @@ pub struct LookupCommand {
 
     /// where to look for product bundles manifest.
     #[argh(option)]
-    pub base_url: String,
+    pub base_url: Option<String>,
 
     /// filter on products with <name>.
     #[argh(positional)]

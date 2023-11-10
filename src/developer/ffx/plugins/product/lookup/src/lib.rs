@@ -5,119 +5,87 @@
 //! A tool to:
 //! - lookup product bundle description information to find the transfer URL.
 
-use ::gcs::client::{Client, ProgressResponse};
-use anyhow::{Context, Result};
-use errors::ffx_bail;
+use anyhow::Result;
 use ffx_core::ffx_plugin;
+use ffx_product_list::{pb_list_impl, ProductBundle};
 use ffx_product_lookup_args::LookupCommand;
-use pbms::string_from_url;
+use ffx_writer::Writer;
 use pbms::AuthFlowChoice;
-use serde::{Deserialize, Serialize};
-use serde_json;
-use std::io::{stderr, stdin, stdout};
-use structured_ui;
-
-const PB_MANIFEST_NAME: &'static str = "product_bundles.json";
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-struct ProductBundle {
-    name: String,
-    product_version: String,
-    transfer_manifest_url: String,
-}
-
-type ProductManifest = Vec<ProductBundle>;
+use std::io::{stderr, stdin, stdout, Write};
 
 /// `ffx product lookup` sub-command.
 #[ffx_plugin()]
-pub async fn pb_lookup(cmd: LookupCommand) -> Result<()> {
+pub async fn pb_lookup(
+    cmd: LookupCommand,
+    #[ffx(machine = ProductBundle)] mut writer: Writer,
+) -> Result<()> {
     let mut input = stdin();
-    let mut output = stdout();
+    // Emit machine progress info to stderr so users can redirect it to /dev/null.
+    let mut output = if writer.is_machine() {
+        Box::new(stderr()) as Box<dyn Write + Send + Sync>
+    } else {
+        Box::new(stdout())
+    };
     let mut err_out = stderr();
     let ui = structured_ui::TextUi::new(&mut input, &mut output, &mut err_out);
-    pb_lookup_impl(&cmd.auth, &cmd.base_url, &cmd.name, &cmd.version, &ui).await?;
+    let product = pb_lookup_impl(&cmd.auth, cmd.base_url, &cmd.name, &cmd.version, &ui).await?;
+    // Don't emit progress information if we're writing a machine
+    // representation.
+    if writer.is_machine() {
+        writer.machine(&product)?;
+    } else {
+        writeln!(writer, "{}", product.transfer_manifest_url)?;
+    }
     Ok(())
 }
 
 pub async fn pb_lookup_impl<I>(
     auth: &AuthFlowChoice,
-    base_url: &str,
+    override_base_url: Option<String>,
     name: &str,
     version: &str,
     ui: &I,
-) -> Result<String>
+) -> Result<ProductBundle>
 where
     I: structured_ui::Interface + Sync,
 {
     let start = std::time::Instant::now();
     tracing::info!("---------------------- Lookup Begin ----------------------------");
-    let client = Client::initial()?;
-    let products = pb_gather_from_url(base_url, auth, ui, &client).await?;
+
+    let products = pb_list_impl(auth, override_base_url, version, ui).await?;
 
     tracing::debug!("Looking for product bundle {}, version {}", name, version);
-    let products = products
+    let mut products = products
         .iter()
         .filter(|x| x.name == name)
         .filter(|x| x.product_version == version)
-        .map(|x| x.to_owned())
-        .collect::<Vec<ProductBundle>>();
-    if products.is_empty() {
+        .map(|x| x.to_owned());
+
+    let Some(product) = products.next() else {
         tracing::debug!("products {:?}", products);
-        println!("Error: No product matching name {}, version {} found.", name, version);
+        eprintln!("Error: No product matching name {}, version {} found.", name, version);
         std::process::exit(1);
-    } else if products.len() > 1 {
+    };
+
+    if products.next().is_some() {
         tracing::debug!("products {:?}", products);
-        println!("More than one matching product found. The base-url may have poorly formed data.");
+        eprintln!(
+            "More than one matching product found. The base-url may have poorly formed data."
+        );
         std::process::exit(1);
-    } else {
-        println!("{}", products[0].transfer_manifest_url.to_owned());
     }
+
     tracing::debug!("Total ffx product lookup runtime {} seconds.", start.elapsed().as_secs_f32());
     tracing::debug!("End");
-    Ok(products[0].transfer_manifest_url.to_owned())
-}
 
-/// Fetch product bundle descriptions from a base URL.
-async fn pb_gather_from_url<I>(
-    base_url: &str,
-    auth_flow: &AuthFlowChoice,
-    ui: &I,
-    client: &Client,
-) -> Result<Vec<ProductBundle>>
-where
-    I: structured_ui::Interface + Sync,
-{
-    tracing::debug!("transfer_manifest_url Url::parse");
-    let mut manifest_url = match url::Url::parse(&base_url) {
-        Ok(p) => p,
-        _ => ffx_bail!("The lookup location must be a URL, failed to parse {:?}", base_url),
-    };
-    gcs::gs_url::extend_url_path(&mut manifest_url, PB_MANIFEST_NAME)
-        .with_context(|| format!("joining URL {:?} with file name", manifest_url))?;
-
-    let pm = string_from_url(
-        &manifest_url,
-        auth_flow,
-        &|state| {
-            let mut progress = structured_ui::Progress::builder();
-            progress.title("Getting product descriptions");
-            progress.entry(&state.name, state.at, state.of, state.units);
-            ui.present(&structured_ui::Presentation::Progress(progress))?;
-            Ok(ProgressResponse::Continue)
-        },
-        ui,
-        client,
-    )
-    .await
-    .with_context(|| format!("string from gcs: {:?}", manifest_url))?;
-
-    Ok(serde_json::from_str::<ProductManifest>(&pm)
-        .with_context(|| format!("Parsing json {:?}", pm))?)
+    Ok(product)
 }
 
 #[cfg(test)]
 mod test {
-    use {super::*, std::io::Write, temp_test_env::TempTestEnv};
+    use {super::*, ffx_writer::Format, std::io::Write, temp_test_env::TempTestEnv};
+
+    const PB_MANIFEST_NAME: &'static str = "product_bundles.json";
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_pb_lookup_impl() {
@@ -135,15 +103,62 @@ mod test {
         .expect("write_all");
 
         let ui = structured_ui::MockUi::new();
-        let url = pb_lookup_impl(
+        let product = pb_lookup_impl(
             &AuthFlowChoice::Default,
-            &format!("file:{}", test_env.home.display()),
+            Some(format!("file:{}", test_env.home.display())),
             "fake_name",
             "fake_version",
             &ui,
         )
         .await
         .expect("testing lookup");
-        assert_eq!(url, "fake_url");
+
+        assert_eq!(
+            product,
+            ProductBundle {
+                name: "fake_name".into(),
+                product_version: "fake_version".into(),
+                transfer_manifest_url: "fake_url".into(),
+            },
+        );
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_bp_lookup_machine_mode() {
+        let test_env = TempTestEnv::new().expect("test_env");
+        let mut f =
+            std::fs::File::create(test_env.home.join(PB_MANIFEST_NAME)).expect("file create");
+        f.write_all(
+            r#"[{
+            "name": "fake_name",
+            "product_version": "fake_version",
+            "transfer_manifest_url": "fake_url"
+            }]"#
+            .as_bytes(),
+        )
+        .expect("write_all");
+
+        let writer = Writer::new_test(Some(Format::Json));
+        let () = pb_lookup(
+            LookupCommand {
+                auth: AuthFlowChoice::Default,
+                base_url: Some(format!("file:{}", test_env.home.display())),
+                name: "fake_name".into(),
+                version: "fake_version".into(),
+            },
+            writer.clone(),
+        )
+        .await
+        .expect("testing lookup");
+
+        let product: ProductBundle = serde_json::from_str(&writer.test_output().unwrap()).unwrap();
+        assert_eq!(
+            product,
+            ProductBundle {
+                name: "fake_name".into(),
+                product_version: "fake_version".into(),
+                transfer_manifest_url: "fake_url".into(),
+            },
+        );
     }
 }

@@ -114,14 +114,16 @@ async fn pb_get_impl<I: structured_ui::Interface + Sync>(
 
         tracing::debug!("pb_lookup_impl {} {} {}", bucket, name, version);
         println!("pb_lookup_impl {} {} {}", bucket, name, version);
-        pb_lookup_impl(
+        let product = pb_lookup_impl(
             &auth,
-            &format!("gs://{}/development/{}", bucket, version),
+            Some(format!("gs://{}/development/{}", bucket, version)),
             name,
             &version,
             ui,
         )
-        .await?
+        .await?;
+
+        product.transfer_manifest_url
     };
 
     println!("pb_download_impl {}", transfer_url);

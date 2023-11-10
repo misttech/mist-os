@@ -31,7 +31,7 @@
           "arg_name": "base-url"
         }
       },
-      "optionality": "required",
+      "optionality": "optional",
       "long": "--base-url",
       "short": null,
       "description": "where to look for product bundles manifest.",
