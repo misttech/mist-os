@@ -48,7 +48,6 @@ source_set("source_set") {
     "buffer_allocator.h",
     "device.cc",
     "device.h",
-    "device_interface.cc",
     "device_interface.h",
     "driver.cc",
   ]

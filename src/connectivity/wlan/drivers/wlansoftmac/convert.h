@@ -31,7 +31,7 @@ zx_status_t ConvertTxStatus(const fuchsia_wlan_common::wire::WlanTxResult& in,
 
 // banjo to FIDL conversions.
 zx_status_t ConvertMacRole(const wlan_mac_role_t& in, fuchsia_wlan_common::wire::WlanMacRole* out);
-zx_status_t ConvertTxPacket(const uint8_t* data_in, const size_t data_len_in,
+zx_status_t ConvertTxPacket(const uint8_t* data_in, size_t data_len_in,
                             const wlan_tx_info_t& info_in,
                             fuchsia_wlan_softmac::wire::WlanTxPacket* out);
 zx_status_t ConvertChannel(const wlan_channel_t& in, fuchsia_wlan_common::wire::WlanChannel* out);

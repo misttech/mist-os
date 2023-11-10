@@ -11,7 +11,6 @@
 
 #include <cstdint>
 #include <cstring>
-#include <memory>
 
 #include <fbl/ref_counted.h>
 #include <wlan/common/macaddr.h>
@@ -27,7 +26,7 @@ class Packet;
 // interacting with external systems.
 class DeviceState : public fbl::RefCounted<DeviceState> {
  public:
-  bool online() { return online_; }
+  bool online() const { return online_; }
   void set_online(bool online) { online_ = online; }
 
  private:
@@ -38,7 +37,7 @@ class DeviceState : public fbl::RefCounted<DeviceState> {
 // systems.
 class DeviceInterface {
  public:
-  virtual ~DeviceInterface() {}
+  virtual ~DeviceInterface() = default;
 
   virtual zx_status_t Start(const rust_wlan_softmac_ifc_protocol_copy_t* ifc,
                             zx::channel* out_sme_channel) = 0;
