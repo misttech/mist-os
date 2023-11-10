@@ -224,6 +224,7 @@ group("sdk_partner_libs") {
 # these libraries.
 _sdk_partner_internal_fidl_libraries = [
   "fuchsia.audio.controller",
+  "fuchsia.dash",
   "fuchsia.debugdata",
   "fuchsia.debugger",
   "fuchsia.diagnostics.host",
