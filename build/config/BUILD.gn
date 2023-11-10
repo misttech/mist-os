@@ -739,6 +739,7 @@ config("Wno-vla-cxx-extension") {
     "//src/connectivity/network/tests/benchmarks/udp-serde:*",
     "//src/connectivity/network/tests/external_network:*",
     "//src/connectivity/network/tests/socket:*",
+    "//src/connectivity/telephony/drivers/qmi-usb-transport:*",
     "//src/connectivity/wlan/drivers/lib/log/cpp/test:*",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:*",
     "//src/connectivity/wlan/lib/mlme/cpp:*",

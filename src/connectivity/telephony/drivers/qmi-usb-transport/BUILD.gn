@@ -61,6 +61,11 @@ source_set("qmi_driver_src") {
     "//zircon/system/ulib/zx",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-conversion" ]
+  configs += [
+    # TODO(https://fxbug.dev/58162): delete below and fix conversion warnings.
+    "//build/config:Wno-conversion",
+
+    # TODO(https://fxbug.dev/135694): delete below and fix VLA warnings.
+    "//build/config:Wno-vla-cxx-extension",
+  ]
 }
