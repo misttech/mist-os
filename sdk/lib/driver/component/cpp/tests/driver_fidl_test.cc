@@ -32,6 +32,7 @@ class ZirconProtocolServer
   fidl::ServerBindingGroup<fuchsia_driver_component_test::ZirconProtocol> bindings_;
 };
 
+// [START provide_handler]
 class DriverProtocolServer : public fdf::WireServer<fuchsia_driver_component_test::DriverProtocol> {
  public:
   fuchsia_driver_component_test::DriverService::InstanceHandler GetInstanceHandler() {
@@ -50,6 +51,7 @@ class DriverProtocolServer : public fdf::WireServer<fuchsia_driver_component_tes
 
   fdf::ServerBindingGroup<fuchsia_driver_component_test::DriverProtocol> bindings_;
 };
+// [END provide_handler]
 
 // Sets up the environment to have both Zircon and Driver transport services.
 class TestIncomingAndOutgoingFidlsBase : public ::testing::Test {
@@ -62,17 +64,22 @@ class TestIncomingAndOutgoingFidlsBase : public ::testing::Test {
     driver_outgoing_ = std::move(start_args->outgoing_directory_client);
 
     // Start the test environment
+    // [START initialize_test_environment]
     zx::result init_result =
         test_environment_.SyncCall(&fdf_testing::TestEnvironment::Initialize,
                                    std::move(start_args->incoming_directory_server));
     ASSERT_EQ(ZX_OK, init_result.status_value());
+    // [END initialize_test_environment]
 
     // Add the services to the environment.
+    // [START get_server_handlers]
     fuchsia_driver_component_test::ZirconService::InstanceHandler zircon_proto_handler =
         zircon_proto_server_.SyncCall(&ZirconProtocolServer::GetInstanceHandler);
     fuchsia_driver_component_test::DriverService::InstanceHandler driver_proto_handler =
         driver_proto_server_.SyncCall(&DriverProtocolServer::GetInstanceHandler);
+    // [END get_server_handlers]
 
+    // [START move_server_handlers]
     test_environment_.SyncCall([zircon_proto_handler = std::move(zircon_proto_handler),
                                 driver_proto_handler = std::move(driver_proto_handler)](
                                    fdf_testing::TestEnvironment* env) mutable {
@@ -85,6 +92,7 @@ class TestIncomingAndOutgoingFidlsBase : public ::testing::Test {
           std::move(driver_proto_handler));
       ASSERT_EQ(ZX_OK, result.status_value());
     });
+    // [END move_server_handlers]
 
     // Store the start_args for the subclasses to use to start the driver.
     start_args_ = std::move(start_args->start_args);
@@ -97,9 +105,11 @@ class TestIncomingAndOutgoingFidlsBase : public ::testing::Test {
     auto svc_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     EXPECT_EQ(ZX_OK, svc_endpoints.status_value());
 
+    // [START set_up_outgoing_directory_channel]
     zx_status_t status = fdio_open_at(driver_outgoing_.handle()->get(), "/svc",
                                       static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
                                       svc_endpoints->server.TakeChannel().release());
+    // [END set_up_outgoing_directory_channel]
     EXPECT_EQ(ZX_OK, status);
     return std::move(svc_endpoints->client);
   }
@@ -118,10 +128,12 @@ class TestIncomingAndOutgoingFidlsBase : public ::testing::Test {
   fdf::UnownedSynchronizedDispatcher env_dispatcher_ = runtime_.StartBackgroundDispatcher();
 
   // Servers for the incoming FIDLs to the driver.
+  // [START custom_server_classes]
   async_patterns::TestDispatcherBound<ZirconProtocolServer> zircon_proto_server_{env_dispatcher(),
                                                                                  std::in_place};
   async_patterns::TestDispatcherBound<DriverProtocolServer> driver_proto_server_{env_dispatcher(),
                                                                                  std::in_place};
+  // [END custom_server_classes]
 
   // Serves the fdf::Node protocol to the driver.
   async_patterns::TestDispatcherBound<fdf_testing::TestNode> node_server_{
