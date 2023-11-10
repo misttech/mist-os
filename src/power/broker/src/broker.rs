@@ -8,6 +8,7 @@ use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use std::collections::HashMap;
 use uuid::Uuid;
 
+use crate::credentials::*;
 use crate::topology::*;
 
 pub struct Broker {
@@ -185,8 +186,13 @@ impl Broker {
         claims_to_drop
     }
 
-    pub fn add_element(&mut self, name: &str, _dependencies: Vec<Dependency>) -> ElementID {
-        self.catalog.topology.add_element(name)
+    pub fn add_element(
+        &mut self,
+        name: &str,
+        dependencies: Vec<Dependency>,
+        credentials_to_register: Vec<CredentialToRegister>,
+    ) -> Result<ElementID, AddElementError> {
+        self.catalog.topology.add_element(name, dependencies, credentials_to_register)
     }
 
     pub fn remove_element(&mut self, element: &ElementID) -> Result<(), RemoveElementError> {
@@ -202,6 +208,22 @@ impl Broker {
         dependency: &Dependency,
     ) -> Result<(), RemoveDependencyError> {
         self.catalog.topology.remove_direct_dep(dependency)
+    }
+
+    pub fn register_credentials(
+        &mut self,
+        token: Token,
+        credentials_to_register: Vec<CredentialToRegister>,
+    ) -> Result<(), RegisterCredentialsError> {
+        self.catalog.topology.register_credentials(token, credentials_to_register)
+    }
+
+    pub fn unregister_credentials(
+        &mut self,
+        token: Token,
+        tokens_to_unregister: Vec<Token>,
+    ) -> Result<(), UnregisterCredentialsError> {
+        self.catalog.topology.unregister_credentials(token, tokens_to_unregister)
     }
 }
 
@@ -577,9 +599,12 @@ mod tests {
         // Create a topology of a child element with two direct dependencies.
         // P1 <- C -> P2
         let mut catalog = Catalog::new();
-        let child: ElementID = catalog.topology.add_element("C");
-        let parent1: ElementID = catalog.topology.add_element("P1");
-        let parent2: ElementID = catalog.topology.add_element("P2");
+        let child: ElementID =
+            catalog.topology.add_element("C", Vec::new(), Vec::new()).expect("add_element failed");
+        let parent1: ElementID =
+            catalog.topology.add_element("P1", Vec::new(), Vec::new()).expect("add_element failed");
+        let parent2: ElementID =
+            catalog.topology.add_element("P2", Vec::new(), Vec::new()).expect("add_element failed");
         catalog
             .topology
             .add_direct_dep(&Dependency {
@@ -647,9 +672,12 @@ mod tests {
         // dependencies.
         // C -> P -> GP
         let mut catalog = Catalog::new();
-        let child: ElementID = catalog.topology.add_element("C");
-        let parent: ElementID = catalog.topology.add_element("P");
-        let grandparent: ElementID = catalog.topology.add_element("GP");
+        let child: ElementID =
+            catalog.topology.add_element("C", Vec::new(), Vec::new()).expect("add_element failed");
+        let parent: ElementID =
+            catalog.topology.add_element("P", Vec::new(), Vec::new()).expect("add_element failed");
+        let grandparent: ElementID =
+            catalog.topology.add_element("GP", Vec::new(), Vec::new()).expect("add_element failed");
         catalog
             .topology
             .add_direct_dep(&Dependency {
@@ -729,10 +757,14 @@ mod tests {
         //     > P -> GP
         // C2 /
         let mut catalog = Catalog::new();
-        let child1: ElementID = catalog.topology.add_element("C1");
-        let child2: ElementID = catalog.topology.add_element("C2");
-        let parent: ElementID = catalog.topology.add_element("P");
-        let grandparent: ElementID = catalog.topology.add_element("GP");
+        let child1: ElementID =
+            catalog.topology.add_element("C1", Vec::new(), Vec::new()).expect("add_element failed");
+        let child2: ElementID =
+            catalog.topology.add_element("C2", Vec::new(), Vec::new()).expect("add_element failed");
+        let parent: ElementID =
+            catalog.topology.add_element("P", Vec::new(), Vec::new()).expect("add_element failed");
+        let grandparent: ElementID =
+            catalog.topology.add_element("GP", Vec::new(), Vec::new()).expect("add_element failed");
         catalog
             .topology
             .add_direct_dep(&Dependency {
@@ -868,9 +900,12 @@ mod tests {
         // Create a topology of a child element with two direct dependencies.
         // P1 <- C -> P2
         let mut broker = Broker::new();
-        let child: ElementID = broker.add_element("C", Vec::new());
-        let parent1: ElementID = broker.add_element("P1", Vec::new());
-        let parent2: ElementID = broker.add_element("P2", Vec::new());
+        let child: ElementID =
+            broker.add_element("C", Vec::new(), Vec::new()).expect("add_element failed");
+        let parent1: ElementID =
+            broker.add_element("P1", Vec::new(), Vec::new()).expect("add_element failed");
+        let parent2: ElementID =
+            broker.add_element("P2", Vec::new(), Vec::new()).expect("add_element failed");
         broker
             .add_dependency(&Dependency {
                 level: ElementLevel {
@@ -946,9 +981,12 @@ mod tests {
         // dependencies.
         // C -> P -> GP
         let mut broker = Broker::new();
-        let child: ElementID = broker.add_element("C", Vec::new());
-        let parent: ElementID = broker.add_element("P", Vec::new());
-        let grandparent: ElementID = broker.add_element("GP", Vec::new());
+        let child: ElementID =
+            broker.add_element("C", Vec::new(), Vec::new()).expect("add_element failed");
+        let parent: ElementID =
+            broker.add_element("P", Vec::new(), Vec::new()).expect("add_element failed");
+        let grandparent: ElementID =
+            broker.add_element("GP", Vec::new(), Vec::new()).expect("add_element failed");
         broker
             .add_dependency(&Dependency {
                 level: ElementLevel {
@@ -1053,10 +1091,14 @@ mod tests {
         //     > P -> GP
         // C2 /
         let mut broker = Broker::new();
-        let child1: ElementID = broker.add_element("C1", Vec::new());
-        let child2: ElementID = broker.add_element("C2", Vec::new());
-        let parent: ElementID = broker.add_element("P", Vec::new());
-        let grandparent: ElementID = broker.add_element("GP", Vec::new());
+        let child1: ElementID =
+            broker.add_element("C1", Vec::new(), Vec::new()).expect("add_element failed");
+        let child2: ElementID =
+            broker.add_element("C2", Vec::new(), Vec::new()).expect("add_element failed");
+        let parent: ElementID =
+            broker.add_element("P", Vec::new(), Vec::new()).expect("add_element failed");
+        let grandparent: ElementID =
+            broker.add_element("GP", Vec::new(), Vec::new()).expect("add_element failed");
         broker
             .add_dependency(&Dependency {
                 level: ElementLevel {

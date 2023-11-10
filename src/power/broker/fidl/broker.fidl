@@ -8,6 +8,8 @@
 @available(added=HEAD)
 library fuchsia.power.broker;
 
+using zx;
+
 /// Used to describe the power level of an element.
 /// Could extend this further to support additional types of power
 /// levels, such as ACPI.
@@ -111,6 +113,10 @@ open protocol Status {
     }) error PowerLevelError;
 };
 
+type AddElementError = flexible enum {
+    INTERNAL = 0;
+};
+
 type RemoveElementError = flexible enum {
     NOT_FOUND = 0;
 };
@@ -123,6 +129,15 @@ type AddDependencyError = flexible enum {
 
 type RemoveDependencyError = flexible enum {
     NOT_FOUND = 0;
+};
+
+type RegisterCredentialsError = flexible enum {
+    INTERNAL = 0;
+    NOT_AUTHORIZED = 1;
+};
+
+type UnregisterCredentialsError = flexible enum {
+    NOT_AUTHORIZED = 0;
 };
 
 type ElementLevel = resource struct {
@@ -149,10 +164,13 @@ open protocol Topology {
         /// List of dependencies for this element.
         /// Empty ElementIds will be treated as referring to this Element.
         dependencies vector<Dependency>:128;
+        /// List of initial credentials to register for this element.
+        /// You may not register credentials for other elements here.
+        credentials_to_register vector<Credential>:128;
     }) -> (resource struct {
-        /// Unique ID for this element (and access tokens).
+        /// Unique ID for this element, assigned by Power Broker.
         element ElementId;
-    });
+    }) error AddElementError;
 
     /// Made by a Power Element owner to remove their Power Element.
     /// Removing a Power Element also removes all associated Dependencies.
@@ -170,4 +188,51 @@ open protocol Topology {
     flexible RemoveDependency(resource struct {
         dependency Dependency;
     }) -> () error RemoveDependencyError;
+
+    /// Made by a Power Element owner to register credentials for an existing Power
+    /// Element.
+    flexible RegisterCredentials(resource struct {
+        /// Must supply a pair token to a previously registered Credential with
+        /// Permissions.MODIFY_CREDENTIAL and all permissions included by
+        /// credentials_to_register for this element.
+        token zx.Handle:EVENTPAIR;
+        /// All credentials must match the Element of the above credential.
+        credentials_to_register vector<Credential>:128;
+    }) -> () error RegisterCredentialsError;
+
+    /// Made by a Power Element owner to unregister credentials from a Power
+    /// Element. This will remove all authorization for these credentials.
+    flexible UnregisterCredentials(resource struct {
+        /// Must supply a pair token to a previously registered Credential with
+        /// Permissions.MODIFY_CREDENTIAL for this element.
+        token zx.Handle:EVENTPAIR;
+        /// Pair tokens of the credentials to unregister.
+        tokens_to_unregister vector<zx.Handle:EVENTPAIR>:128;
+    }) -> () error UnregisterCredentialsError;
+};
+
+/// Element Permissions
+type Permissions = strict bits : uint32 {
+    READ_POWER_LEVEL = 0x00000001;
+    MODIFY_POWER_LEVEL = 0x00000002;
+    MODIFY_DEPENDENT = 0x00000004;
+    MODIFY_DEPENDENCY = 0x00000008;
+    MODIFY_CREDENTIAL = 0x00000010;
+    REMOVE_ELEMENT = 0x00000020;
+};
+
+/// A Credential associates an EventPair to a set of Permissions that
+/// authorize actions that can be taken for a specific Power Element.
+/// When registering a Credential, one end of the EventPair should be
+/// passed to Power Broker, which will retain it. The other end of the
+/// EventPair should be used by the Power Element owner or passed to
+/// clients to authorize future operations on this Element.
+type Credential = resource struct {
+    /// The end of an EventPair that Power Broker will retain. The other
+    /// end should be kept by the caller to use for future authentication.
+    broker_token zx.Handle:EVENTPAIR;
+    /// The Power Element these permissions apply to.
+    element ElementId;
+    /// Bitmask using Element Permissions defined above.
+    permissions Permissions;
 };

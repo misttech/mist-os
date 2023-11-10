@@ -7,6 +7,8 @@ use fidl_fuchsia_power_broker::{self as fpb, PowerLevel};
 use std::collections::HashMap;
 use uuid::Uuid;
 
+use crate::credentials::*;
+
 // This may be a token later, but using a String for now for simplicity.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialOrd, PartialEq)]
 pub struct ElementID {
@@ -64,10 +66,17 @@ pub struct Element {
     name: String,
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct Topology {
-    elements: HashMap<ElementID, Element>,
-    source_to_targets_dependencies: HashMap<ElementLevel, Vec<ElementLevel>>,
+#[derive(Debug)]
+pub enum AddElementError {
+    Internal,
+}
+
+impl Into<fpb::AddElementError> for AddElementError {
+    fn into(self) -> fpb::AddElementError {
+        match self {
+            AddElementError::Internal => fpb::AddElementError::Internal,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -115,21 +124,57 @@ impl Into<fpb::RemoveDependencyError> for RemoveDependencyError {
     }
 }
 
+#[derive(Debug)]
+pub struct Topology {
+    elements: HashMap<ElementID, Element>,
+    credentials: Registry,
+    source_to_targets_dependencies: HashMap<ElementLevel, Vec<ElementLevel>>,
+}
+
 impl Topology {
     pub fn new() -> Self {
-        Topology { elements: HashMap::new(), source_to_targets_dependencies: HashMap::new() }
+        Topology {
+            elements: HashMap::new(),
+            credentials: Registry::new(),
+            source_to_targets_dependencies: HashMap::new(),
+        }
     }
 
-    pub fn add_element(&mut self, name: &str) -> ElementID {
+    pub fn add_element(
+        &mut self,
+        name: &str,
+        _dependencies: Vec<Dependency>,
+        credentials_to_register: Vec<CredentialToRegister>,
+    ) -> Result<ElementID, AddElementError> {
         let id = ElementID::from(Uuid::new_v4().as_simple().to_string());
         self.elements.insert(id.clone(), Element { id: id.clone(), name: name.into() });
-        return id;
+        for credential_to_register in credentials_to_register {
+            if let Err(err) = self.credentials.register(credential_to_register) {
+                match err {
+                    RegisterCredentialsError::Internal => {
+                        tracing::error!(
+                            "credentials.register returned an Internal error: {:?}",
+                            id
+                        );
+                        return Err(AddElementError::Internal);
+                    }
+                    // Owner should be authorized for all credentials on its
+                    // own element, so this is an Internal error:
+                    RegisterCredentialsError::NotAuthorized => {
+                        tracing::error!("credentials.register unexpectedly returned NotAuthorized in add_element: {:?}", id);
+                        return Err(AddElementError::Internal);
+                    }
+                }
+            }
+        }
+        Ok(id)
     }
 
     pub fn remove_element(&mut self, id: &ElementID) -> Result<(), RemoveElementError> {
         if self.elements.remove(id).is_none() {
             return Err(RemoveElementError::NotFound(id.clone()));
         }
+        self.credentials.unregister_all_for_element(id);
         Ok(())
     }
 
@@ -195,6 +240,35 @@ impl Topology {
         targets.retain(|el| el != &dep.requires);
         Ok(())
     }
+
+    pub fn register_credentials(
+        &mut self,
+        _token: Token,
+        credentials_to_register: Vec<CredentialToRegister>,
+    ) -> Result<(), RegisterCredentialsError> {
+        // TODO(b/308199278): Validate token against credentials_to_register
+        for credential_to_register in credentials_to_register {
+            if let Err(err) = self.credentials.register(credential_to_register) {
+                return Err(err);
+            }
+        }
+        Ok(())
+    }
+
+    pub fn unregister_credentials(
+        &mut self,
+        _token: Token,
+        tokens_to_unregister: Vec<Token>,
+    ) -> Result<(), UnregisterCredentialsError> {
+        // TODO(b/308199278): Validate token against tokens_to_unregister
+        for token in tokens_to_unregister {
+            let Some(credential) = self.credentials.lookup(token) else {
+                continue;
+            };
+            self.credentials.unregister(&credential);
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -205,10 +279,10 @@ mod tests {
     #[fuchsia::test]
     fn test_add_remove_elements() {
         let mut t = Topology::new();
-        let water = t.add_element("Water");
-        let earth = t.add_element("Earth");
-        let fire = t.add_element("Fire");
-        let air = t.add_element("Air");
+        let water = t.add_element("Water", Vec::new(), Vec::new()).expect("add_element failed");
+        let earth = t.add_element("Earth", Vec::new(), Vec::new()).expect("add_element failed");
+        let fire = t.add_element("Fire", Vec::new(), Vec::new()).expect("add_element failed");
+        let air = t.add_element("Air", Vec::new(), Vec::new()).expect("add_element failed");
 
         t.add_direct_dep(&Dependency {
             level: ElementLevel {
@@ -292,10 +366,10 @@ mod tests {
     #[fuchsia::test]
     fn test_add_remove_direct_deps() {
         let mut t = Topology::new();
-        let a = t.add_element("A");
-        let b = t.add_element("B");
-        let c = t.add_element("C");
-        let d = t.add_element("D");
+        let a = t.add_element("A", Vec::new(), Vec::new()).expect("add_element failed");
+        let b = t.add_element("B", Vec::new(), Vec::new()).expect("add_element failed");
+        let c = t.add_element("C", Vec::new(), Vec::new()).expect("add_element failed");
+        let d = t.add_element("D", Vec::new(), Vec::new()).expect("add_element failed");
         // A <- B <- C -> D
         let ba = Dependency {
             level: ElementLevel {
@@ -358,10 +432,10 @@ mod tests {
     #[fuchsia::test]
     fn test_get_all_deps() {
         let mut t = Topology::new();
-        let a = t.add_element("A");
-        let b = t.add_element("B");
-        let c = t.add_element("C");
-        let d = t.add_element("D");
+        let a = t.add_element("A", Vec::new(), Vec::new()).expect("add_element failed");
+        let b = t.add_element("B", Vec::new(), Vec::new()).expect("add_element failed");
+        let c = t.add_element("C", Vec::new(), Vec::new()).expect("add_element failed");
+        let d = t.add_element("D", Vec::new(), Vec::new()).expect("add_element failed");
         // A <- B <- C -> D
         let ba = Dependency {
             level: ElementLevel {

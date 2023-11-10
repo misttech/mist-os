@@ -16,6 +16,7 @@ use std::sync::{Arc, Mutex};
 use crate::broker::Broker;
 
 mod broker;
+mod credentials;
 mod topology;
 
 /// Wraps all hosted protocols into a single type that can be matched against
@@ -175,15 +176,27 @@ impl BrokerSvc {
             .map(|result| result.context("failed request"))
             .try_for_each(|request| async move {
                 match request {
-                    TopologyRequest::AddElement { element_name, dependencies, responder } => {
+                    TopologyRequest::AddElement {
+                        element_name,
+                        dependencies,
+                        credentials_to_register,
+                        responder,
+                    } => {
                         tracing::debug!("AddElement({:?}, {:?})", &element_name, &dependencies);
                         let mut broker: std::sync::MutexGuard<'_, Broker> =
                             self.broker.lock().unwrap();
                         let deps = dependencies.into_iter().map(|d| d.into()).collect();
-                        let element_id = broker.add_element(&element_name, deps);
-                        let element_id_str: String = element_id.into();
-                        tracing::debug!("AddElement responder.send({:?})", &element_id_str);
-                        responder.send(&element_id_str).context("send failed")
+                        let credentials =
+                            credentials_to_register.into_iter().map(|d| d.into()).collect();
+                        let res = broker.add_element(&element_name, deps, credentials);
+                        tracing::debug!("AddElement add_element = {:?}", res);
+                        match res {
+                            Ok(element_id) => {
+                                let element_id_str: String = element_id.into();
+                                responder.send(Ok(&element_id_str)).context("send failed")
+                            }
+                            Err(err) => responder.send(Err(err.into())).context("send failed"),
+                        }
                     }
                     TopologyRequest::RemoveElement { element, responder } => {
                         tracing::debug!("RemoveElement({:?})", &element);
@@ -215,6 +228,42 @@ impl BrokerSvc {
                             self.broker.lock().unwrap();
                         let res = broker.remove_dependency(&dependency.into());
                         tracing::debug!("RemoveDependency remove_dependency = ({:?})", &res);
+                        if let Err(err) = res {
+                            responder.send(Err(err.into())).context("send failed")
+                        } else {
+                            responder.send(Ok(())).context("send failed")
+                        }
+                    }
+                    TopologyRequest::RegisterCredentials {
+                        token,
+                        credentials_to_register,
+                        responder,
+                    } => {
+                        let mut broker: std::sync::MutexGuard<'_, Broker> =
+                            self.broker.lock().unwrap();
+                        let res = broker.register_credentials(
+                            token.into(),
+                            credentials_to_register.into_iter().map(|c| c.into()).collect(),
+                        );
+                        tracing::debug!("RegisterCredentials register_credentials = ({:?})", &res);
+                        if let Err(err) = res {
+                            responder.send(Err(err.into())).context("send failed")
+                        } else {
+                            responder.send(Ok(())).context("send failed")
+                        }
+                    }
+                    TopologyRequest::UnregisterCredentials {
+                        token,
+                        tokens_to_unregister,
+                        responder,
+                    } => {
+                        let mut broker: std::sync::MutexGuard<'_, Broker> =
+                            self.broker.lock().unwrap();
+                        let res = broker.unregister_credentials(
+                            token.into(),
+                            tokens_to_unregister.into_iter().map(|c| c.into()).collect(),
+                        );
+                        tracing::debug!("RegisterCredentials register_credentials = ({:?})", &res);
                         if let Err(err) = res {
                             responder.send(Err(err.into())).context("send failed")
                         } else {

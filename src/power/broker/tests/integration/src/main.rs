@@ -5,9 +5,10 @@
 use anyhow::{Error, Result};
 use fidl_fuchsia_power_broker::{
     self as fpb, BinaryPowerLevel, Dependency, ElementLevel, LessorMarker, LevelControlMarker,
-    LevelControlProxy, PowerLevel, StatusMarker, TopologyMarker,
+    LevelControlProxy, Permissions, PowerLevel, StatusMarker, TopologyMarker,
 };
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
+use fuchsia_zircon::{self as zx, HandleBased};
 
 async fn build_power_broker_realm() -> Result<RealmInstance, Error> {
     let builder = RealmBuilder::new().await?;
@@ -57,8 +58,10 @@ async fn test_direct() -> Result<()> {
     // Create a topology with only two elements and a single dependency:
     // P <- C
     let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
-    let child = topology.add_element("C", Vec::new()).await.expect("add_element failed");
-    let parent = topology.add_element("P", Vec::new()).await.expect("add_element failed");
+    let child =
+        topology.add_element("C", Vec::new(), Vec::new()).await?.expect("add_element failed");
+    let parent =
+        topology.add_element("P", Vec::new(), Vec::new()).await?.expect("add_element failed");
     topology
         .add_dependency(Dependency {
             level: ElementLevel {
@@ -125,10 +128,14 @@ async fn test_transitive() -> Result<()> {
     // D has no dependencies or dependents.
     // A <- B <- C   D
     let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
-    let element_a = topology.add_element("A", Vec::new()).await.expect("add_element failed");
-    let element_b = topology.add_element("B", Vec::new()).await.expect("add_element failed");
-    let element_c = topology.add_element("C", Vec::new()).await.expect("add_element failed");
-    let element_d = topology.add_element("D", Vec::new()).await.expect("add_element failed");
+    let element_a =
+        topology.add_element("A", Vec::new(), Vec::new()).await?.expect("add_element failed");
+    let element_b =
+        topology.add_element("B", Vec::new(), Vec::new()).await?.expect("add_element failed");
+    let element_c =
+        topology.add_element("C", Vec::new(), Vec::new()).await?.expect("add_element failed");
+    let element_d =
+        topology.add_element("D", Vec::new(), Vec::new()).await?.expect("add_element failed");
     topology
         .add_dependency(Dependency {
             level: ElementLevel {
@@ -268,10 +275,14 @@ async fn test_shared() -> Result<()> {
     //     > P -> GP
     // C2 /
     let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
-    let child1 = topology.add_element("C1", Vec::new()).await.expect("add_element failed");
-    let child2 = topology.add_element("C2", Vec::new()).await.expect("add_element failed");
-    let parent = topology.add_element("P", Vec::new()).await.expect("add_element failed");
-    let grandparent = topology.add_element("GP", Vec::new()).await.expect("add_element failed");
+    let child1 =
+        topology.add_element("C1", Vec::new(), Vec::new()).await?.expect("add_element failed");
+    let child2 =
+        topology.add_element("C2", Vec::new(), Vec::new()).await?.expect("add_element failed");
+    let parent =
+        topology.add_element("P", Vec::new(), Vec::new()).await?.expect("add_element failed");
+    let grandparent =
+        topology.add_element("GP", Vec::new(), Vec::new()).await?.expect("add_element failed");
     topology
         .add_dependency(Dependency {
             level: ElementLevel {
@@ -429,10 +440,14 @@ async fn test_topology() -> Result<()> {
     // D has no dependencies or dependents.
     // A <- B <- C   D
     let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
-    let water = topology.add_element("Water", Vec::new()).await.expect("add_element failed");
-    let earth = topology.add_element("Earth", Vec::new()).await.expect("add_element failed");
-    let fire = topology.add_element("Fire", Vec::new()).await.expect("add_element failed");
-    let air = topology.add_element("Air", Vec::new()).await.expect("add_element failed");
+    let water =
+        topology.add_element("Water", Vec::new(), Vec::new()).await?.expect("add_element failed");
+    let earth =
+        topology.add_element("Earth", Vec::new(), Vec::new()).await?.expect("add_element failed");
+    let fire =
+        topology.add_element("Fire", Vec::new(), Vec::new()).await?.expect("add_element failed");
+    let air =
+        topology.add_element("Air", Vec::new(), Vec::new()).await?.expect("add_element failed");
     topology
         .add_dependency(Dependency {
             level: ElementLevel {
@@ -522,6 +537,52 @@ async fn test_topology() -> Result<()> {
         req_element_not_found_res,
         Err(fpb::AddDependencyError::RequiredElementNotFound { .. })
     ));
+
+    Ok(())
+}
+
+#[fuchsia::test]
+async fn test_register_unregister_credentials() -> Result<()> {
+    let realm = build_power_broker_realm().await?;
+
+    let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
+    let (token_element_owner, token_element_broker) = zx::EventPair::create();
+    let broker_credential = fpb::Credential {
+        broker_token: token_element_broker.into(),
+        element: "".into(),
+        permissions: Permissions::READ_POWER_LEVEL
+            | Permissions::MODIFY_POWER_LEVEL
+            | Permissions::MODIFY_DEPENDENT
+            | Permissions::MODIFY_DEPENDENCY
+            | Permissions::MODIFY_CREDENTIAL
+            | Permissions::REMOVE_ELEMENT,
+    };
+    let element = topology
+        .add_element("element", Vec::new(), vec![broker_credential])
+        .await?
+        .expect("add_element failed");
+    let (token_new_owner, token_new_broker) = zx::EventPair::create();
+    let credential_to_register = fpb::Credential {
+        broker_token: token_new_broker.into(),
+        element: element.clone(),
+        permissions: Permissions::READ_POWER_LEVEL
+            | Permissions::MODIFY_POWER_LEVEL
+            | Permissions::MODIFY_CREDENTIAL,
+    };
+    topology
+        .register_credentials(
+            token_element_owner
+                .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                .expect("duplicate_handle failed"),
+            vec![credential_to_register],
+        )
+        .await?
+        .expect("register_credentials failed");
+
+    topology
+        .unregister_credentials(token_element_owner, vec![token_new_owner])
+        .await?
+        .expect("register_credentials failed");
 
     Ok(())
 }
