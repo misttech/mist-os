@@ -119,7 +119,7 @@ zx_status_t AmlGpu::Gp0Init() {
   gp0_pll_dev_ = std::make_unique<aml_pll_dev_t>();
 
   // HIU Init.
-  zx_status_t status = s905d2_hiu_init(get_mmio_resource(parent()), &*hiu_dev_);
+  zx_status_t status = s905d2_hiu_init_etc(&*hiu_dev_, hiu_buffer_->View(0));
   if (status != ZX_OK) {
     zxlogf(ERROR, "aml_gp0_init: hiu_init failed: %d", status);
     return status;
