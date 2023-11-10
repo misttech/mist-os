@@ -292,7 +292,7 @@ impl QueuedResolver {
                     }
                     Ok(None) => {
                         let fidl_err = tuf_err.to_resolve_error();
-                        error!(
+                        warn!(
                             "failed to resolve {} as {} with TUF: {:#}",
                             pkg_url,
                             rewritten_url,
