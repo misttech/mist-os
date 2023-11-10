@@ -18,7 +18,10 @@ if (is_host) {
 
     deps = [ "//src/tests/end_to_end/connectivity/bluetooth:bluetooth_utils" ]
     params_source = "params.yaml"
-    environments = [ sherlock_env ]
+    environments = [
+      sherlock_env,
+      vim3_env,
+    ]
   }
 }
 
