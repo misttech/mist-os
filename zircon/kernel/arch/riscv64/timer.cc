@@ -18,18 +18,12 @@
 #include <arch/riscv64/sbi.h>
 #include <ktl/atomic.h>
 #include <ktl/limits.h>
-#include <lk/init.h>
+#include <pdev/timer.h>
 #include <platform/timer.h>
 
 #define LOCAL_TRACE 0
 
-// Setup by start.S
-arch::EarlyTicks kernel_entry_ticks;
-arch::EarlyTicks kernel_virtual_entry_ticks;
-
 namespace {
-
-uint64_t raw_ticks_to_ticks_offset{0};
 
 template <bool AllowDebugPrint = false>
 inline affine::Ratio riscv_generic_timer_compute_conversion_factors(uint32_t cntfrq) {
@@ -48,19 +42,9 @@ void riscv64_timer_exception() {
   timer_tick(current_time());
 }
 
-zx_ticks_t platform_current_ticks() { return riscv64_csr_read(RISCV64_CSR_TIME); }
+zx_ticks_t riscv_sbi_current_ticks() { return riscv64_csr_read(RISCV64_CSR_TIME); }
 
-zx_ticks_t platform_get_raw_ticks_to_ticks_offset() {
-  // TODO(fxb/91701): consider the memory order semantics of this load when the
-  // time comes.
-  return raw_ticks_to_ticks_offset;
-}
-
-zx_ticks_t platform_convert_early_ticks(arch::EarlyTicks sample) {
-  return sample.time + raw_ticks_to_ticks_offset;
-}
-
-zx_status_t platform_set_oneshot_timer(zx_time_t deadline) {
+zx_status_t riscv_sbi_set_oneshot_timer(zx_time_t deadline) {
   DEBUG_ASSERT(arch_ints_disabled());
 
   if (deadline < 0) {
@@ -78,16 +62,33 @@ zx_status_t platform_set_oneshot_timer(zx_time_t deadline) {
   return ZX_OK;
 }
 
-void platform_stop_timer() { riscv64_csr_clear(RISCV64_CSR_SIE, RISCV64_CSR_SIE_TIE); }
+zx_status_t riscv_sbi_timer_stop() {
+  riscv64_csr_clear(RISCV64_CSR_SIE, RISCV64_CSR_SIE_TIE);
 
-void platform_shutdown_timer() {
+  return ZX_OK;
+}
+
+zx_status_t riscv_sbi_timer_shutdown() {
   DEBUG_ASSERT(arch_ints_disabled());
   riscv64_csr_clear(RISCV64_CSR_SIE, RISCV64_CSR_SIE_TIE);
+
+  return ZX_OK;
 }
 
 bool platform_usermode_can_access_tick_registers() { return false; }
 
-void riscv_generic_timer_init_early(const zbi_dcfg_riscv_generic_timer_driver_t& config) {
+const pdev_timer_ops riscv_sbi_timer_ops = {
+    .current_ticks = riscv_sbi_current_ticks,
+    .set_oneshot_timer = riscv_sbi_set_oneshot_timer,
+    .stop = riscv_sbi_timer_stop,
+    .shutdown = riscv_sbi_timer_shutdown,
+};
+
+void riscv_generic_timer_init_early(const zbi_dcfg_riscv_generic_timer_driver_t &config) {
   platform_set_ticks_to_time_ratio(
       riscv_generic_timer_compute_conversion_factors<true>(config.freq_hz));
+
+  // register with pdev layer
+  dprintf(INFO, "TIMER: registering SBI timer\n");
+  pdev_register_timer(&riscv_sbi_timer_ops);
 }

@@ -103,6 +103,7 @@ if (toolchain_base_environment == "kernel") {
       "//sdk/lib/zbi-format",
       "//zircon/kernel/dev/iommu/dummy",
       "//zircon/kernel/dev/pdev/power",
+      "//zircon/kernel/dev/pdev/timer",
       "//zircon/kernel/lib/arch",
       "//zircon/kernel/lib/boot-options",
       "//zircon/kernel/lib/console",
