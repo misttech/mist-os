@@ -69,7 +69,6 @@ source_set("lib") {
     "//sdk/lib/syslog/cpp",
     "//src/cobalt/bin/utils:clock",
     "//src/cobalt/bin/utils:fuchsia_http_client",
-    "//src/connectivity/wlan/lib/mlme/cpp:mlme",
     "//src/lib/backoff",
     "//src/lib/fostr/fidl/fuchsia.settings",
     "//src/lib/fsl",
