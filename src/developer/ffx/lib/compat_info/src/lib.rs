@@ -35,26 +35,30 @@ impl std::str::FromStr for CompatibilityState {
         })
     }
 }
-impl From<fidl_fuchsia_developer_ffx::CompatibilityState> for CompatibilityState {
-    fn from(value: fidl_fuchsia_developer_ffx::CompatibilityState) -> Self {
+impl From<fidl_fuchsia_developer_remotecontrol::CompatibilityState> for CompatibilityState {
+    fn from(value: fidl_fuchsia_developer_remotecontrol::CompatibilityState) -> Self {
         match value {
-            fidl_fuchsia_developer_ffx::CompatibilityState::Error => Self::Error,
-            fidl_fuchsia_developer_ffx::CompatibilityState::Absent => Self::Absent,
-            fidl_fuchsia_developer_ffx::CompatibilityState::Unknown => Self::Unknown,
-            fidl_fuchsia_developer_ffx::CompatibilityState::Unsupported => Self::Unsupported,
-            fidl_fuchsia_developer_ffx::CompatibilityState::Supported => Self::Supported,
+            fidl_fuchsia_developer_remotecontrol::CompatibilityState::Error => Self::Error,
+            fidl_fuchsia_developer_remotecontrol::CompatibilityState::Absent => Self::Absent,
+            fidl_fuchsia_developer_remotecontrol::CompatibilityState::Unknown => Self::Unknown,
+            fidl_fuchsia_developer_remotecontrol::CompatibilityState::Unsupported => {
+                Self::Unsupported
+            }
+            fidl_fuchsia_developer_remotecontrol::CompatibilityState::Supported => Self::Supported,
             _ => CompatibilityState::Error,
         }
     }
 }
-impl Into<fidl_fuchsia_developer_ffx::CompatibilityState> for CompatibilityState {
-    fn into(self) -> fidl_fuchsia_developer_ffx::CompatibilityState {
+impl Into<fidl_fuchsia_developer_remotecontrol::CompatibilityState> for CompatibilityState {
+    fn into(self) -> fidl_fuchsia_developer_remotecontrol::CompatibilityState {
         match self {
-            Self::Error => fidl_fuchsia_developer_ffx::CompatibilityState::Error,
-            Self::Absent => fidl_fuchsia_developer_ffx::CompatibilityState::Absent,
-            Self::Unknown => fidl_fuchsia_developer_ffx::CompatibilityState::Unknown,
-            Self::Unsupported => fidl_fuchsia_developer_ffx::CompatibilityState::Unsupported,
-            Self::Supported => fidl_fuchsia_developer_ffx::CompatibilityState::Supported,
+            Self::Error => fidl_fuchsia_developer_remotecontrol::CompatibilityState::Error,
+            Self::Absent => fidl_fuchsia_developer_remotecontrol::CompatibilityState::Absent,
+            Self::Unknown => fidl_fuchsia_developer_remotecontrol::CompatibilityState::Unknown,
+            Self::Unsupported => {
+                fidl_fuchsia_developer_remotecontrol::CompatibilityState::Unsupported
+            }
+            Self::Supported => fidl_fuchsia_developer_remotecontrol::CompatibilityState::Supported,
         }
     }
 }
@@ -81,8 +85,8 @@ pub struct ConnectionInfo {
     pub ssh_connection: String,
     pub compatibility: CompatibilityInfo,
 }
-impl From<fidl_fuchsia_developer_ffx::CompatibilityInfo> for CompatibilityInfo {
-    fn from(value: fidl_fuchsia_developer_ffx::CompatibilityInfo) -> Self {
+impl From<fidl_fuchsia_developer_remotecontrol::CompatibilityInfo> for CompatibilityInfo {
+    fn from(value: fidl_fuchsia_developer_remotecontrol::CompatibilityInfo) -> Self {
         CompatibilityInfo {
             status: value.state.into(),
             platform_abi: value.platform_abi,
@@ -90,9 +94,9 @@ impl From<fidl_fuchsia_developer_ffx::CompatibilityInfo> for CompatibilityInfo {
         }
     }
 }
-impl Into<fidl_fuchsia_developer_ffx::CompatibilityInfo> for CompatibilityInfo {
-    fn into(self) -> fidl_fuchsia_developer_ffx::CompatibilityInfo {
-        fidl_fuchsia_developer_ffx::CompatibilityInfo {
+impl Into<fidl_fuchsia_developer_remotecontrol::CompatibilityInfo> for CompatibilityInfo {
+    fn into(self) -> fidl_fuchsia_developer_remotecontrol::CompatibilityInfo {
+        fidl_fuchsia_developer_remotecontrol::CompatibilityInfo {
             state: self.status.into(),
             platform_abi: self.platform_abi,
             message: self.message,
