@@ -88,12 +88,18 @@ pub async fn list(
             if let Some(name) = driver.name {
                 writeln!(writer, "{0: <10}: {1}", "Name", name)?;
             }
-            if let Some(url) = driver.url {
+            if let Some(url) = driver.url.as_ref() {
                 writeln!(writer, "{0: <10}: {1}", "URL", url)?;
-                if let Some(devices) = driver_to_devices.get(&url) {
-                    writeln!(writer, "{0: <10}:\n  {1}", "Devices", devices.join("\n  "))?;
-                }
             }
+
+            // If the version isn't set, the value is assumed to be 1.
+            writeln!(
+                writer,
+                "{0: <10}: {1}",
+                "DF Version",
+                driver.driver_framework_version.unwrap_or(1)
+            )?;
+
             if let Some(device_categories) = driver.device_categories {
                 write!(writer, "Device Categories: [")?;
 
@@ -116,23 +122,22 @@ pub async fn list(
                 }
                 writeln!(writer, "]")?;
             }
-            // TODO(b/303084353): Once the merkle_root is available, write it here.
-            match driver.bind_rules_bytecode {
-                Some(bytecode) => {
-                    writeln!(writer, "{0: <10}: {1}", "Bytecode Version", 2)?;
-                    writeln!(writer, "{0: <10}({1} bytes): ", "Bytecode:", bytecode.len())?;
-                    match dump_bind_rules(bytecode.clone()) {
-                        Ok(bytecode_dump) => writeln!(writer, "{}", bytecode_dump)?,
-                        Err(err) => {
-                            writeln!(
-                                writer,
-                                "  Issue parsing bytecode \"{}\": {:?}",
-                                err, bytecode
-                            )?;
-                        }
-                    }
+
+            if let Some(url) = driver.url {
+                if let Some(devices) = driver_to_devices.get(&url) {
+                    writeln!(writer, "{0: <10}:\n  {1}", "Devices", devices.join("\n  "))?;
                 }
-                _ => writeln!(writer, "{0: <10}: {1}", "Bytecode Version", "Unknown")?,
+            }
+
+            // TODO(b/303084353): Once the merkle_root is available, write it here.
+            let bind_rules =
+                driver.bind_rules_bytecode.map(|bytecode| dump_bind_rules(bytecode).ok()).flatten();
+            match bind_rules {
+                Some(bind_rules) => {
+                    writeln!(writer, "{0: <10}: ", "Bind rules bytecode")?;
+                    writeln!(writer, "{}", bind_rules)?;
+                }
+                _ => writeln!(writer, "Issue parsing the bind rules bytecode")?,
             }
             writeln!(writer)?;
         }
@@ -293,14 +298,17 @@ mod tests {
         .await
         .unwrap();
 
+        println!("{}", output);
+
         assert_eq!(
             output,
             r#"Name      : foo
 URL       : fuchsia-pkg://fuchsia.com/foo-package#meta/foo.cm
+DF Version: 1
+Device Categories: [connectivity::ethernet, usb]
 Devices   :
   dev.sys.foo
-Device Categories: [connectivity::ethernet, usb]
-Bytecode Version: Unknown
+Issue parsing the bind rules bytecode
 
 "#
         );
