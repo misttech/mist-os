@@ -340,7 +340,7 @@ group("default-images") {
     deps += [ "//build/images/installer" ]
   }
 
-  if (bazel_product_bundle_target != "") {
+  if (!use_bringup_assembly && bazel_product_bundle_target != "") {
     deps += [ bazel_product_bundle_target ]
     deps += extra_bazel_assembly_targets
   }
