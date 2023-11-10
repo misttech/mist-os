@@ -43,5 +43,12 @@
             to: "#audio_ffx_daemon",
             subdir: "audio-output",
         },
+        {
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-audio-composite",
+            to: "#audio_ffx_daemon",
+            subdir: "audio-composite",
+        },
     ],
 }

@@ -15,10 +15,10 @@ use {
     error::ControllerError,
     fidl_fuchsia_audio_controller::{
         CapturerConfig, DeviceControlGetDeviceInfoResponse, DeviceControlListDevicesResponse,
-        DeviceControlRequest, DeviceControlRequestStream, Error::ArgumentsMissing, GainSettings,
-        PlayDestination, PlayerPlayRequest, PlayerPlayResponse, PlayerRequest, PlayerRequestStream,
-        RecordCancelerMarker, RecordSource, RecorderRecordRequest, RecorderRecordResponse,
-        RecorderRequest, RecorderRequestStream, RendererConfig,
+        DeviceControlRequest, DeviceControlRequestStream, DeviceSelector, Error::ArgumentsMissing,
+        GainSettings, PlayDestination, PlayerPlayRequest, PlayerPlayResponse, PlayerRequest,
+        PlayerRequestStream, RecordCancelerMarker, RecordSource, RecorderRecordRequest,
+        RecorderRecordResponse, RecorderRequest, RecorderRequestStream, RendererConfig,
     },
     fidl_fuchsia_hardware_audio::DeviceType,
     fidl_fuchsia_media::{AudioCapturerProxy, AudioRendererProxy, AudioStreamType},
@@ -705,24 +705,24 @@ impl AudioDaemon {
             let request_name = request.method_name();
             let request_result = match request {
                 DeviceControlRequest::ListDevices { responder } => {
-                    let mut input_entries = device::get_entries(
-                        "/dev/class/audio-input/",
-                        DeviceType::StreamConfig,
-                        true,
-                    )
-                    .await?;
-                    let mut output_entries = device::get_entries(
-                        "/dev/class/audio-output/",
-                        DeviceType::StreamConfig,
-                        false,
-                    )
-                    .await?;
+                    let mut entries = Vec::<DeviceSelector>::new();
+                    let devfs_devices = [
+                        (DeviceType::StreamConfig, "/dev/class/audio-input/", Some(true)),
+                        (DeviceType::StreamConfig, "/dev/class/audio-output/", Some(false)),
+                        (DeviceType::Composite, "/dev/class/audio-composite/", None),
+                    ];
 
-                    // TODO(fxbug.dev/126775): Generalize to DAI & Codec types.
-                    input_entries.append(&mut output_entries);
+                    for (device_type, path, is_input) in devfs_devices {
+                        match device::get_entries(path, device_type, is_input).await {
+                            Ok(mut device_entries) => entries.append(&mut device_entries),
+                            Err(e) => {
+                                println!("Failed to get {device_type:?} entries: {e}")
+                            }
+                        }
+                    }
 
                     let response = DeviceControlListDevicesResponse {
-                        devices: Some(input_entries),
+                        devices: Some(entries),
                         ..Default::default()
                     };
                     responder

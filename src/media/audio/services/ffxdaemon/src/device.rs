@@ -418,7 +418,7 @@ impl Device {
 pub async fn get_entries(
     path: &str,
     device_type: fidl_fuchsia_hardware_audio::DeviceType,
-    is_input: bool,
+    is_input: Option<bool>,
 ) -> Result<Vec<DeviceSelector>, Error> {
     let (control_client, control_server) = zx::Channel::create();
 
@@ -441,6 +441,7 @@ pub async fn get_entries(
     }
 
     let entry_names = fuchsia_fs::directory::parse_dir_entries(&buf);
+
     let full_paths = entry_names.into_iter().filter_map(|s| match s {
         Ok(entry) => match entry.kind {
             fio::DirentType::Directory => {
@@ -457,7 +458,7 @@ pub async fn get_entries(
 
     let device_selectors = full_paths
         .map(|path| DeviceSelector {
-            is_input: Some(is_input),
+            is_input: is_input,
             id: format_utils::device_id_for_path(std::path::Path::new(&path)).ok(),
             device_type: Some(device_type),
             ..Default::default()
