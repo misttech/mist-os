@@ -7,7 +7,7 @@
 import argparse
 import json
 import sys
-from typing import Sequence, Dict, AbstractSet
+from typing import Sequence, Dict, AbstractSet, Any
 from pathlib import Path
 
 
@@ -24,19 +24,28 @@ class Package:
             merkle = blob["merkle"]
             # Special case the meta/ blob
             if path == "meta/":
-                self.meta_merkle = merkle
+                self.meta_merkle = blob
             elif path not in ignored_blobs:
-                self.blobs[path] = merkle
+                self.blobs[path] = blob
 
     def blob_paths(self) -> AbstractSet[str]:
         return set(self.blobs.keys())
 
     def blob_merkle(self, path) -> str:
-        return self.blobs.get(path, "")
+        if path in self.blobs:
+            return self.blobs[path]["merkle"]
+        else:
+            return {}
+
+    def blob_size(self, path) -> int:
+        if path in self.blobs:
+            return self.blobs[path]["size"]
+        else:
+            return 0
 
 
 def calculate_diff(
-    gn_package: Package, bazel_package: Package
+    gn_package: Package, bazel_package: Package, size_check_blobs: Sequence[str]
 ) -> Sequence[str]:
     # If the blobs have the same merkle for their meta/ directory then they can
     # be considered the same and we will return no findings. However, if they
@@ -65,16 +74,27 @@ def calculate_diff(
     gn_blobs: AbstractSet[str] = gn_package.blob_paths()
     common_blobs: AbstractSet[str] = gn_blobs.intersection(bazel_blobs)
 
-    def compare_blobs(path, left, right):
-        if left != right:
+    def compare_blob_merkles(path):
+        gn_merkle: int = gn_package.blob_merkle(path)
+        bazel_merkle: int = bazel_package.blob_merkle(path)
+        if gn_merkle != bazel_merkle:
             findings.append(
-                f"Blobs at '{path}' have different merkle roots '{left}' != '{right}'"
+                f"Blobs at '{path}' have different merkle roots '{gn_merkle}' != '{bazel_merkle}'"
+            )
+
+    def compare_blob_size(path):
+        gn_size: int = gn_package.blob_size(path)
+        bazel_size: int = bazel_package.blob_size(path)
+        if gn_size != bazel_size:
+            findings.append(
+                f"Blobs at '{path}' have different sizes '{gn_size}' != '{bazel_size}'"
             )
 
     for blob in common_blobs:
-        compare_blobs(
-            blob, gn_package.blob_merkle(blob), bazel_package.blob_merkle(blob)
-        )
+        if blob in size_check_blobs:
+            compare_blob_size(blob)
+        else:
+            compare_blob_merkles(blob)
 
     for blob in gn_blobs.difference(common_blobs):
         findings.append(f"Blob at '{blob}' only exists in gn package")
@@ -101,6 +121,13 @@ def main(argv: Sequence[str]):
         help="List of blob install paths to ignore.",
         required=False,
     )
+    parser.add_argument(
+        "--size-check-blobs",
+        nargs="*",
+        default=[],
+        help="List of blob install paths to ignore.",
+        required=False,
+    )
     args = parser.parse_args(argv)
 
     gn_package = Package(
@@ -110,7 +137,7 @@ def main(argv: Sequence[str]):
         args.bazel_package_manifest, ignored_blobs=args.blobs_to_ignore
     )
 
-    findings = calculate_diff(gn_package, bazel_package)
+    findings = calculate_diff(gn_package, bazel_package, args.size_check_blobs)
 
     if len(findings) > 0:
         args.output.write("\n".join(findings) + "\n")
