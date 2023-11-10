@@ -8,7 +8,6 @@ group("drivers") {
     "drivers/ahci",
     "drivers/aml-sdmmc:aml-sdmmc-dfv1",
     "drivers/aml-sdmmc:aml-sdmmc-dfv2",
-    "drivers/as370-sdhci",
     "drivers/block-verity",
     "drivers/bootpart",
     "drivers/core",

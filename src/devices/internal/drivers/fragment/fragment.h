@@ -17,7 +17,6 @@
 #include <fuchsia/hardware/powerimpl/cpp/banjo.h>
 #include <fuchsia/hardware/scpi/cpp/banjo.h>
 #include <fuchsia/hardware/sdio/cpp/banjo.h>
-#include <fuchsia/hardware/shareddma/cpp/banjo.h>
 #include <fuchsia/hardware/spi/cpp/banjo.h>
 #include <fuchsia/hardware/sysmem/cpp/banjo.h>
 #include <fuchsia/hardware/thermal/cpp/banjo.h>
@@ -64,7 +63,6 @@ class Fragment : public FragmentBase {
         sdio_client_(parent, ZX_PROTOCOL_SDIO),
         thermal_client_(parent, ZX_PROTOCOL_THERMAL),
         isp_client_(parent, ZX_PROTOCOL_ISP),
-        shared_dma_client_(parent, ZX_PROTOCOL_SHARED_DMA),
         usb_phy_client_(parent, ZX_PROTOCOL_USB_PHY),
         mipi_csi_client_(parent, ZX_PROTOCOL_MIPI_CSI),
         camera_sensor2_client_(parent, ZX_PROTOCOL_CAMERA_SENSOR2),
@@ -119,7 +117,6 @@ class Fragment : public FragmentBase {
   ProtocolClient<ddk::SdioProtocolClient, sdio_protocol_t> sdio_client_;
   ProtocolClient<ddk::ThermalProtocolClient, thermal_protocol_t> thermal_client_;
   ProtocolClient<ddk::IspProtocolClient, isp_protocol_t> isp_client_;
-  ProtocolClient<ddk::SharedDmaProtocolClient, shared_dma_protocol_t> shared_dma_client_;
   ProtocolClient<ddk::UsbPhyProtocolClient, usb_phy_protocol_t> usb_phy_client_;
   ProtocolClient<ddk::MipiCsiProtocolClient, mipi_csi_protocol_t> mipi_csi_client_;
   ProtocolClient<ddk::CameraSensor2ProtocolClient, camera_sensor2_protocol_t>

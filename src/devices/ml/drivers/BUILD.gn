@@ -7,7 +7,6 @@ group("tests") {
 
   deps = [
     "aml-nna:tests",
-    "as370-nna:tests",
     "usb-harriet:tests",
   ]
 }

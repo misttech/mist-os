@@ -932,8 +932,8 @@ However, background dispatchers can also be created through this object. You
 can grab the instance using the `fdf_testing::DriverRuntime::GetInstance()`
 method.
 
-For an example, see this [unit test][as370-thermal-test-cc] that mocks
-the clock and power FIDL protocols for a DFv1 driver.
+For an example, see this [unit test][aml-power-test-cc] that mocks
+the PWM and vreg FIDL protocols for a DFv1 driver.
 
 Also, the following library may be helpful for writing driver unit tests:
 
@@ -1016,7 +1016,7 @@ All the **documentation pages** mentioned in this section:
 [softmac-fidl-200]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.wlan.softmac/softmac.fidl;l=200
 [throttle-events]: /docs/development/api/fidl.md#throttle-events-using-acknowledgements
 [ft-device-test-cc]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/ui/input/drivers/focaltech/ft_device_test.cc;l=277
-[as370-thermal-test-cc]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/devices/thermal/drivers/as370-thermal/as370-thermal-test.cc
+[aml-power-test-cc]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/devices/power/drivers/aml-meson-power/aml-power-test.cc
 [fake-pdev-h]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/devices/bus/testing/fake-pdev/fake-pdev.h
 [gc-wlan-device-cc]: https://fuchsia-review.git.corp.google.com/c/fuchsia/+/660030/109
 [gc-wlanphy-device-test-cc]: https://fuchsia-review.git.corp.google.com/c/fuchsia/+/655947/75

@@ -9,6 +9,5 @@ group("tests") {
     "aml-thermal:tests",
     "aml-thermal-s905d2g-legacy:tests",
     "aml-thermistor:tests",
-    "as370-thermal:tests",
   ]
 }

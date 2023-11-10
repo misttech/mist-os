@@ -25,7 +25,6 @@ fuchsia_driver("nandpart-driver") {
     "bad-block.cc",
     "nandpart-utils.cc",
     "nandpart.cc",
-    "synaptics-bad-block.cc",
   ]
   deps = [
     ":nandpart-bind",
@@ -57,10 +56,8 @@ test("nandpart-test-bin") {
     "aml-bad-block.cc",
     "bad-block.cc",
     "nandpart-utils.cc",
-    "synaptics-bad-block.cc",
     "test/aml-bad-block-test.cc",
     "test/nandpart-utils-test.cc",
-    "test/synaptics-bad-block-test.cc",
   ]
   include_dirs = [ "." ]
   deps = [

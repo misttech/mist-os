@@ -428,3 +428,63 @@
   available_in_git: '7fb565c3701f38fefce51b8f16787ee94e118c55'
   areas: ['I2C']
   path: '/src/devices/i2c/drivers/dw-i2c/'
+- short_description: 'Synaptics AS370 SDHCI driver'
+  deletion_reason: 'Hardware is not actively supported'
+  gerrit_change_id: '943919'
+  available_in_git: '0fea9a0da49070d15516d16cc630978ec02fbbd6'
+  areas: ['Block']
+  path: '/src/devices/block/drivers/as370-sdhci'
+- short_description: 'Synaptics AS370 clock driver'
+  deletion_reason: 'Hardware is not actively supported'
+  gerrit_change_id: '943919'
+  available_in_git: '0fea9a0da49070d15516d16cc630978ec02fbbd6'
+  areas: ['Clock']
+  path: '/src/devices/clock/drivers/as370-clk'
+- short_description: 'Synaptics AS370 NNA driver'
+  deletion_reason: 'Hardware is not actively supported'
+  gerrit_change_id: '943919'
+  available_in_git: '0fea9a0da49070d15516d16cc630978ec02fbbd6'
+  areas: ['ML']
+  path: '/src/devices/ml/drivers/as370-nna'
+- short_description: 'Cadence HPNFC NAND driver'
+  deletion_reason: 'Hardware is not actively supported'
+  gerrit_change_id: '943919'
+  available_in_git: '0fea9a0da49070d15516d16cc630978ec02fbbd6'
+  areas: ['NAND']
+  path: '/src/devices/nand/drivers/cadence-hpnfc'
+- short_description: 'Synaptics AS370 power driver'
+  deletion_reason: 'Hardware is not actively supported'
+  gerrit_change_id: '943919'
+  available_in_git: '0fea9a0da49070d15516d16cc630978ec02fbbd6'
+  areas: ['Power']
+  path: '/src/devices/power/drivers/as370-power'
+- short_description: 'Synaptics shared DMA driver'
+  deletion_reason: 'Hardware is not actively supported'
+  gerrit_change_id: '943919'
+  available_in_git: '0fea9a0da49070d15516d16cc630978ec02fbbd6'
+  areas: ['Misc']
+  path: '/src/devices/shareddma/drivers/syn-dma'
+- short_description: 'Synaptics AS370 thermal driver'
+  deletion_reason: 'Hardware is not actively supported'
+  gerrit_change_id: '943919'
+  available_in_git: '0fea9a0da49070d15516d16cc630978ec02fbbd6'
+  areas: ['Thermal']
+  path: '/src/devices/thermal/drivers/as370-thermal'
+- short_description: 'Synaptics AS370 thermal driver'
+  deletion_reason: 'Hardware is not actively supported'
+  gerrit_change_id: '943919'
+  available_in_git: '0fea9a0da49070d15516d16cc630978ec02fbbd6'
+  areas: ['Thermal']
+  path: '/src/devices/thermal/drivers/as370-thermal'
+- short_description: 'Synaptics AS370 USB phy driver'
+  deletion_reason: 'Hardware is not actively supported'
+  gerrit_change_id: '943919'
+  available_in_git: '0fea9a0da49070d15516d16cc630978ec02fbbd6'
+  areas: ['USB']
+  path: '/src/devices/usb/drivers/as370-usb-phy'
+- short_description: 'TI LP50xx LED driver'
+  deletion_reason: 'Hardware is not actively supported'
+  gerrit_change_id: '943919'
+  available_in_git: '0fea9a0da49070d15516d16cc630978ec02fbbd6'
+  areas: ['Light']
+  path: '/src/ui/light/drivers/lp50xx-light'

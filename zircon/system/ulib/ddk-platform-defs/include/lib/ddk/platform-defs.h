@@ -348,27 +348,27 @@
 // PDEV_DID_QUALCOMM_AR8031 is 0x07
 
 // Synaptics
-#define PDEV_VID_SYNAPTICS          0x14
-#define PDEV_PID_SYNAPTICS_AS370    0x01
-#define PDEV_PID_SYNAPTICS_VS680    0x02
-#define PDEV_DID_SYNAPTICS_GPIO     0x01
-#define PDEV_DID_AS370_USB_PHY      0x02
-#define PDEV_DID_AS370_AUDIO_OUT    0x03
-#define PDEV_DID_AS370_AUDIO_IN     0x04
-#define PDEV_DID_AS370_CLOCK        0x05
-#define PDEV_DID_AS370_DHUB         0x06
-#define PDEV_DID_AS370_POWER        0x07
-#define PDEV_DID_AS370_THERMAL      0x08
-#define PDEV_DID_AS370_TOUCH        0x09
-#define PDEV_DID_AS370_SDHCI0       0x0A
-#define PDEV_DID_VS680_SDHCI0       0x0B
-#define PDEV_DID_VS680_SDHCI1       0x0C
-#define PDEV_DID_VS680_USB_PHY      0x0D
-#define PDEV_DID_VS680_CLOCK        0x0E
-#define PDEV_DID_VS680_THERMAL      0x0F
-#define PDEV_DID_VS680_POWER        0x10
-#define PDEV_DID_AS370_SDHCI1       0x11
-#define PDEV_DID_AS370_NNA          0x12
+// PDEV_VID_SYNAPTICS          was 0x14
+// PDEV_PID_SYNAPTICS_AS370    was 0x01
+// PDEV_PID_SYNAPTICS_VS680    was 0x02
+// PDEV_DID_SYNAPTICS_GPIO     was 0x01
+// PDEV_DID_AS370_USB_PHY      was 0x02
+// PDEV_DID_AS370_AUDIO_OUT    was 0x03
+// PDEV_DID_AS370_AUDIO_IN     was 0x04
+// PDEV_DID_AS370_CLOCK        was 0x05
+// PDEV_DID_AS370_DHUB         was 0x06
+// PDEV_DID_AS370_POWER        was 0x07
+// PDEV_DID_AS370_THERMAL      was 0x08
+// PDEV_DID_AS370_TOUCH        was 0x09
+// PDEV_DID_AS370_SDHCI0       was 0x0A
+// PDEV_DID_VS680_SDHCI0       was 0x0B
+// PDEV_DID_VS680_SDHCI1       was 0x0C
+// PDEV_DID_VS680_USB_PHY      was 0x0D
+// PDEV_DID_VS680_CLOCK        was 0x0E
+// PDEV_DID_VS680_THERMAL      was 0x0F
+// PDEV_DID_VS680_POWER        was 0x10
+// PDEV_DID_AS370_SDHCI1       was 0x11
+// PDEV_DID_AS370_NNA          was 0x12
 
 // Maxim
 #define PDEV_VID_MAXIM              0x15

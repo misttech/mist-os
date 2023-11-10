@@ -18,11 +18,9 @@ extend uint fuchsia.BIND_PLATFORM_DEV_PID {
   VISALIA = 0x08,
   C18 = 0x09,
   NELSON = 0x0A,
-  VS680_EVK = 0x0B,
   LUIS = 0x0C,
   GOLDFISH = 0x0D,
   MOTMOT = 0x0E,
-  PINECREST = 0x10,
   CLOVER = 0x11,
   VIOLET = 0x12,
 };

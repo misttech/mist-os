@@ -104,7 +104,7 @@ DDK_PROTOCOL_DEF(PDEV,                    85,   "platform-dev", 0)
 DDK_PROTOCOL_DEF(I2C_HID,                 86,   "i2c-hid", 0)
 DDK_PROTOCOL_DEF(SERIAL,                  87,   "serial", 0)
 DDK_PROTOCOL_DEF(SERIAL_IMPL,             88,   "serial-impl", 0)
-DDK_PROTOCOL_DEF(SHARED_DMA,              89,   "shared-dma", 0)
+// 89 was SHARED_DMA
 DDK_PROTOCOL_DEF(CLOCK,                   90,   "clock", PF_NOPUB)
 DDK_PROTOCOL_DEF(CLOCK_IMPL,              91,   "clock-impl", 0)
 DDK_PROTOCOL_DEF(INTEL_GPU_CORE,          92,   "intel-gpu-core", 0)

@@ -81,7 +81,6 @@
 //src/devices/block/drivers/ahci:ahci-driver
 //src/devices/block/drivers/aml-sdmmc:aml-sdmmc-driver-dfv1
 //src/devices/block/drivers/aml-sdmmc:aml-sdmmc-driver-dfv2
-//src/devices/block/drivers/as370-sdhci:as370-sdhci-driver
 //src/devices/block/drivers/block-verity:block-verity-driver
 //src/devices/block/drivers/bootpart:bootpart-driver
 //src/devices/block/drivers/core:core-driver
@@ -131,7 +130,6 @@
 //src/devices/bus/drivers/platform:platform-bus-driver
 //src/devices/bus/drivers/platform:platform-bus.proxy-driver
 //src/devices/clock/drivers/amlogic-clk:amlogic-clk-driver
-//src/devices/clock/drivers/as370-clk:as370-clk-driver
 //src/devices/clock/drivers/clock:clock-driver
 //src/devices/cpu/drivers/aml-cpu-legacy:aml-cpu-legacy-driver
 //src/devices/cpu/drivers/aml-cpu:aml-cpu-driver
@@ -161,12 +159,10 @@
 //src/devices/misc/drivers/virtio-rng:virtio_rng-driver
 //src/devices/misc/drivers/virtio-socket:virtio_socket-driver
 //src/devices/ml/drivers/aml-nna:aml-nna-driver
-//src/devices/ml/drivers/as370-nna:as370-nna-driver
 //src/devices/ml/drivers/usb-harriet:usb-harriet-driver
 //src/devices/nand/drivers/aml-rawnand:aml-rawnand-driver
 //src/devices/nand/drivers/aml-spinand:aml-spinand-driver
 //src/devices/nand/drivers/broker:nand-broker-driver
-//src/devices/nand/drivers/cadence-hpnfc:cadence-hpnfc-driver
 //src/devices/nand/drivers/intel-spi-flash:fuchsia_driver
 //src/devices/nand/drivers/nand:nand-driver
 //src/devices/nand/drivers/nandpart:nandpart-driver
@@ -174,7 +170,6 @@
 //src/devices/nand/drivers/skip-block:skip-block-driver
 //src/devices/power/drivers/aml-meson-power:aml-meson-power-driver
 //src/devices/power/drivers/aml-pwm-regulator:aml-pwm-regulator-driver
-//src/devices/power/drivers/as370-power:as370-power-driver
 //src/devices/power/drivers/fusb302:fusb302-driver
 //src/devices/power/drivers/nelson-brownout-protection:nelson-brownout-protection-driver
 //src/devices/power/drivers/power:power-driver
@@ -196,7 +191,6 @@
 //src/devices/serial/drivers/usb-cdc-acm:fake-usb-cdc-acm-driver
 //src/devices/serial/drivers/usb-cdc-acm:usb-cdc-acm-driver
 //src/devices/serial/drivers/virtio-console:virtio_console-driver
-//src/devices/shareddma/drivers/syn-dma:syn-dma-driver
 //src/devices/spi/drivers/aml-spi:aml-spi-driver
 //src/devices/spi/drivers/intel-gspi:fuchsia_driver
 //src/devices/spi/drivers/spi:spi-driver
@@ -288,14 +282,12 @@
 //src/devices/thermal/drivers/aml-thermal-s905d2g-legacy:aml-thermal-s905d2g-legacy-driver
 //src/devices/thermal/drivers/aml-thermal:aml-thermal-driver
 //src/devices/thermal/drivers/aml-thermistor:aml-thermistor-driver
-//src/devices/thermal/drivers/as370-thermal:as370-thermal-driver
 //src/devices/tpm/drivers/cr50-spi:fuchsia_driver
 //src/devices/tpm/drivers/tpm-lpc:fuchsia_driver
 //src/devices/tpm/drivers/tpm:fuchsia_driver
 //src/devices/usb/drivers/a1-usb-phy:a1-usb-phy-driver
 //src/devices/usb/drivers/aml-usb-crg-phy-v2:aml-usb-crg-phy-v2-driver
 //src/devices/usb/drivers/aml-usb-phy-v2:aml-usb-phy-v2-driver
-//src/devices/usb/drivers/as370-usb-phy:as370-usb-phy-driver
 //src/devices/usb/drivers/crg-udc:crg-udc-driver
 //src/devices/usb/drivers/dwc2:dwc2-driver
 //src/devices/usb/drivers/dwc3:dwc3-driver
@@ -393,6 +385,5 @@
 //src/ui/input/drivers/usb-hid:usb-two-endpoint-hid-fake-usb-driver
 //src/ui/input/drivers/virtio:virtio_input-driver
 //src/ui/light/drivers/aml-light:aml-light-driver
-//src/ui/light/drivers/lp50xx-light:lp50xx-light-driver
 //tools/create/goldens/my-driver-cpp:driver
 //zircon/third_party/dev/ethernet/e1000:e1000-driver

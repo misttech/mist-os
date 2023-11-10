@@ -8,7 +8,6 @@ group("drivers") {
     "drivers/a1-usb-phy",
     "drivers/aml-usb-crg-phy-v2",
     "drivers/aml-usb-phy-v2",
-    "drivers/as370-usb-phy",
     "drivers/crg-udc",
     "drivers/dwc2",
     "drivers/dwc3",

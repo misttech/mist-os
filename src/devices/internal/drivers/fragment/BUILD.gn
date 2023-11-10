@@ -32,7 +32,6 @@ fuchsia_driver("fragment-driver") {
     "//sdk/banjo/fuchsia.hardware.powerimpl:fuchsia.hardware.powerimpl_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.scpi:fuchsia.hardware.scpi_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.sdio:fuchsia.hardware.sdio_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.shareddma:fuchsia.hardware.shareddma_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.spi:fuchsia.hardware.spi_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.thermal:fuchsia.hardware.thermal_banjo_cpp",

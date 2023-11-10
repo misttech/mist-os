@@ -468,13 +468,6 @@ zx_status_t Fragment::DdkGetProtocol(uint32_t proto_id, void* out_protocol) {
       isp_client_.proto_client().GetProto(static_cast<isp_protocol_t*>(out_protocol));
       return ZX_OK;
     }
-    case ZX_PROTOCOL_SHARED_DMA: {
-      if (!shared_dma_client_.proto_client().is_valid()) {
-        return ZX_ERR_NOT_SUPPORTED;
-      }
-      shared_dma_client_.proto_client().GetProto(static_cast<shared_dma_protocol_t*>(out_protocol));
-      return ZX_OK;
-    }
 
     case ZX_PROTOCOL_USB_PHY: {
       if (!usb_phy_client_.proto_client().is_valid()) {
