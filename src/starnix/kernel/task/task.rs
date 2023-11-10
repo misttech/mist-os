@@ -256,14 +256,6 @@ pub enum StopState {
     SignalDeliveryStopping,
     /// Same as the last one, but has stopped.
     SignalDeliveryStopped,
-    /// Stop for a ptrace event: a variety of events defined by ptrace and
-    /// enabled with the use of various ptrace features, such as the
-    /// PTRACE_O_TRACE_* options.  The parameter indicates the type of
-    /// event. Examples include PTRACE_EVENT_FORK (the event is a fork),
-    /// PTRACE_EVENT_EXEC (the event is exec), and other similar events.
-    PtraceEventStopping,
-    /// Same as the last one, but has stopped
-    PtraceEventStopped,
     // TODO: Other states.
 }
 
@@ -275,22 +267,12 @@ impl StopState {
 
     /// This means a stop is in progress.  Refers to any stop state ending in "ing".
     pub fn is_stopping(&self) -> bool {
-        match *self {
-            StopState::GroupStopping
-            | StopState::SignalDeliveryStopping
-            | StopState::PtraceEventStopping => true,
-            _ => false,
-        }
+        *self == StopState::GroupStopping || *self == StopState::SignalDeliveryStopping
     }
 
     /// This means task is stopped.
     pub fn is_stopped(&self) -> bool {
-        match *self {
-            StopState::GroupStopped
-            | StopState::SignalDeliveryStopped
-            | StopState::PtraceEventStopped => true,
-            _ => false,
-        }
+        *self == StopState::GroupStopped || *self == StopState::SignalDeliveryStopped
     }
 
     /// Returns the "ed" version of this StopState, if it is "ing".
@@ -298,7 +280,6 @@ impl StopState {
         match *self {
             StopState::GroupStopping => Ok(StopState::GroupStopped),
             StopState::SignalDeliveryStopping => Ok(StopState::SignalDeliveryStopped),
-            StopState::PtraceEventStopping => Ok(StopState::PtraceEventStopped),
             StopState::Waking => Ok(StopState::Awake),
             StopState::ForceWaking => Ok(StopState::ForceAwake),
             _ => Err(()),
@@ -309,7 +290,6 @@ impl StopState {
         match *self {
             StopState::GroupStopped => *new_state == StopState::GroupStopping,
             StopState::SignalDeliveryStopped => *new_state == StopState::SignalDeliveryStopping,
-            StopState::PtraceEventStopped => *new_state == StopState::PtraceEventStopped,
             StopState::Awake => *new_state == StopState::Waking,
             _ => false,
         }
@@ -329,7 +309,6 @@ impl StopState {
             || *self == StopState::ForceWaking
             || *self == StopState::GroupStopping
             || *self == StopState::SignalDeliveryStopping
-            || *self == StopState::PtraceEventStopping
     }
 
     pub fn ptrace_only(&self) -> bool {
@@ -343,10 +322,6 @@ impl StopState {
             || (*self == StopState::ForceWaking && new_state != StopState::ForceAwake)
             || new_state == *self
             || self.is_downgrade(&new_state)
-    }
-
-    pub fn is_force(&self) -> bool {
-        *self == StopState::ForceAwake || *self == StopState::ForceWaking
     }
 }
 
@@ -472,20 +447,20 @@ impl TaskMutableState {
         }
     }
 
-    pub fn set_ptrace(&mut self, tracer: Option<PtraceState>) -> Result<(), Errno> {
-        if tracer.is_some() && self.ptrace.is_some() {
-            return Err(errno!(EPERM));
+    pub fn set_ptrace(&mut self, tracer: Option<pid_t>) -> Result<(), Errno> {
+        if let Some(tracer) = tracer {
+            if self.ptrace.is_some() {
+                return Err(errno!(EPERM));
+            }
+            self.ptrace = Some(PtraceState::new(tracer));
+        } else {
+            self.ptrace = None;
         }
-        self.ptrace = tracer;
         Ok(())
     }
 
     pub fn is_ptraced(&self) -> bool {
         self.ptrace.is_some()
-    }
-
-    pub fn is_ptrace_listening(&self) -> bool {
-        self.ptrace.as_ref().map_or(false, |ptrace| ptrace.stop_status == PtraceStatus::Listening)
     }
 
     pub fn ptrace_on_signal_consume(&mut self) -> bool {
@@ -797,12 +772,6 @@ impl Task {
         if !stopped.is_in_progress() {
             guard.notify_ptracers();
         }
-    }
-
-    pub fn can_accept_ptrace_commands(&self, guard: &TaskMutableState) -> bool {
-        !self.load_stopped().is_waking_or_awake()
-            && guard.is_ptraced()
-            && !guard.is_ptrace_listening()
     }
 
     /// Upgrade a Reference to a Task, returning a ESRCH errno if the reference cannot be borrowed.
@@ -1622,9 +1591,8 @@ impl Task {
         if self.thread_group.set_stopped(StopState::GroupStopped, None, true)
             == StopState::GroupStopped
         {
-            let signal = self.thread_group.read().last_signal.clone();
             // stopping because the thread group has stopped
-            self.set_stopped(&mut *self.write(), StopState::GroupStopped, signal);
+            self.set_stopped(&mut *self.write(), StopState::GroupStopped, None);
             return true;
         }
 
@@ -1644,19 +1612,13 @@ impl Task {
     /// wait until woken.  Returns true if woken.
     pub fn wake_or_wait_until_unstopped_async(&self, waiter: &Waiter) -> bool {
         let group_state = self.thread_group.read();
-        let mut task_state = self.write();
+        let task_state = self.write();
 
-        // Wake up if
-        //   a) we should wake up, meaning:
-        //      i) we're in group stop, and the thread group has exited group stop, or
-        //      ii) we're waking up,
-        //   b) and ptrace isn't stopping us from waking up, but
-        //   c) always wake up if we got a SIGKILL.
+        // If we've woken up, return.
         let task_stop_state = self.load_stopped();
         let group_stop_state = self.thread_group.load_stopped();
-        if ((task_stop_state == StopState::GroupStopped && group_stop_state.is_waking_or_awake())
-            || task_stop_state.is_waking_or_awake())
-            && (!task_state.is_ptrace_listening() || task_stop_state.is_force())
+        if (task_stop_state == StopState::GroupStopped && group_stop_state.is_waking_or_awake())
+            || task_stop_state.is_waking_or_awake()
         {
             let new_state = if task_stop_state.is_waking_or_awake() {
                 task_stop_state.finalize()
@@ -1671,25 +1633,9 @@ impl Task {
                 return true;
             }
         }
-
-        // We will wait.
-        if self.thread_group.load_stopped().is_stopped() || task_stop_state.is_stopped() {
-            // If we've stopped or PTRACE_LISTEN has been sent, wait for a
-            // signal or instructions from the tracer.
+        if group_stop_state.is_stopped() || task_stop_state.is_stopped() {
             group_state.stopped_waiters.wait_async(&waiter);
             task_state.wait_on_ptracer(&waiter);
-        } else if self.can_accept_ptrace_commands(&task_state) {
-            // If we're stopped because a tracer has seen the stop and not taken
-            // further action, wait for further instructions from the tracer.
-            task_state.wait_on_ptracer(&waiter);
-        } else if task_state.is_ptrace_listening() {
-            // A PTRACE_LISTEN is a state where we can get signals and notify a
-            // ptracer, but otherwise remain blocked.
-            if let Some(ref mut ptrace) = &mut task_state.ptrace {
-                ptrace.set_last_signal(Some(SignalInfo::default(SIGTRAP)));
-            }
-            task_state.wait_on_ptracer(&waiter);
-            task_state.notify_ptracers();
         }
         false
     }
@@ -1776,7 +1722,7 @@ impl CurrentTask {
     /// When the callback is done, the run_state is restored to `RunState::Running`.
     ///
     /// This function is typically used just before blocking the current task on some operation.
-    /// The given `run_state` registers the mechanism for interrupting the blocking operation with
+    /// The given `run_state` registers the mechasim for interrupting the blocking operation with
     /// the task and the given `callback` actually blocks the task.
     ///
     /// This function can only be called in the `RunState::Running` state and cannot set the
@@ -1790,9 +1736,7 @@ impl CurrentTask {
         {
             let mut state = self.write();
             assert!(!state.signals.run_state.is_blocked());
-            // A note on PTRACE_LISTEN - the thread cannot be scheduled
-            // regardless of pending signals.
-            if state.signals.is_any_pending() && !state.is_ptrace_listening() {
+            if state.signals.is_any_pending() {
                 return error!(EINTR);
             }
             state.signals.run_state = run_state.clone();

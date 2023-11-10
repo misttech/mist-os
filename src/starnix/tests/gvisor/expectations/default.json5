@@ -479,6 +479,7 @@
                 "ProcFilesystems.ReadCapLastCap",
                 "Proc.GetdentsEnoent",
                 "Proc.PidTidIOAccounting",
+                "ProcPidMem.DifferentUserAttached",
 
                 // proc_isolated_test
                 "ProcDefaults.PresenceOfSem",
@@ -562,8 +563,10 @@
                 "PtraceTest.ExitWhenParentIsNotTracer_Syscall_TraceVfork_TraceVforkDone",
                 "PtraceTest.GetRegSet",
                 "PtraceTest.Int3",
+                "PtraceTest.Interrupt_Listen_RequireSeize",
                 "PtraceTest.PrctlSetPtracerInvalidPID",
                 "PtraceTest.SeizeSetOptions",
+                "PtraceTest.Seize_Interrupt_Listen",
                 "PtraceTest.Sysemu_PokeUser",
                 "TraceExec/PtraceExecveTest.Execve_GetRegs_PeekUser_SIGKILL_TraceClone_TraceExit/0",
                 "TraceExec/PtraceExecveTest.Execve_GetRegs_PeekUser_SIGKILL_TraceClone_TraceExit/1",

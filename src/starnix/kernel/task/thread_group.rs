@@ -83,10 +83,10 @@ pub struct ThreadGroupMutableState {
     /// Wait queue for updates to `stopped`.
     pub stopped_waiters: WaitQueue,
 
-    /// A signal that indicates whether the process is going to become waitable
-    /// via waitid and waitpid for either WSTOPPED or WCONTINUED, depending on
-    /// the value of `stopped`. If not None, contains the SignalInfo to return.
-    pub last_signal: Option<SignalInfo>,
+    /// Whether the process is currently waitable via waitid and waitpid for either WSTOPPED or
+    /// WCONTINUED, depending on the value of `stopped`. If not None, contains the SignalInfo to
+    /// return.
+    pub waitable: Option<SignalInfo>,
 
     pub leader_exit_info: Option<ProcessExitInfo>,
 
@@ -314,7 +314,7 @@ impl ThreadGroup {
                 timers,
                 did_exec: false,
                 stopped_waiters: WaitQueue::default(),
-                last_signal: None,
+                waitable: None,
                 leader_exit_info: None,
                 terminating: false,
                 selinux: Default::default(),
@@ -695,7 +695,7 @@ impl ThreadGroup {
                 // because of a sigkill.  They will get woken when the
                 // process dies.
                 if signal.signal != SIGKILL {
-                    state.last_signal = siginfo;
+                    state.waitable = siginfo;
                 }
             }
             if new_stopped == StopState::Waking || new_stopped == StopState::ForceWaking {
@@ -959,10 +959,7 @@ impl ThreadGroup {
         }
     }
 
-    /// Returns a tracee whose state has changed, so that waitpid can report on
-    /// it. If this returns a value, and the pid is being traced, the tracer
-    /// thread is deemed to have seen the tracee ptrace-stop for the purposes of
-    /// PTRACE_LISTEN.
+    /// Returns a tracee whose state has changed, so that waitpid can report on it.
     pub fn get_waitable_ptracee(
         &self,
         selector: ProcessSelector,
@@ -984,7 +981,7 @@ impl ThreadGroup {
                 .ptrace
                 .as_ref()
                 .map_or(false, |ptrace| ptrace.is_waitable(task_ref.load_stopped(), options))
-                || process_state.is_waitable()
+                || process_state.waitable.is_some()
             {
                 // We've identified a potential target.  Need to return either
                 // the process's information (if we are in group-stop) or the
@@ -1000,69 +997,48 @@ impl ThreadGroup {
                     process_state.base.time_stats() + process_state.children_time_stats;
                 let task_stopped = task_ref.load_stopped();
 
-                if process_state.is_waitable() {
-                    let ptrace = &mut task_state.ptrace;
+                if process_state.waitable.is_some() {
                     // The information for processes, if we were in group stop.
                     let mut exit_status_fn: Option<&dyn Fn(SignalInfo) -> ExitStatus> = None;
                     let process_stopped = process_state.base.load_stopped();
                     if process_stopped == StopState::Awake && options.wait_for_continued {
                         exit_status_fn = Some(&ExitStatus::Continue);
                     }
-                    // Tasks that are ptrace'd always get stop notifications.
-                    if process_stopped == StopState::GroupStopped
-                        && (options.wait_for_stopped || ptrace.is_some())
-                    {
+                    if process_stopped == StopState::GroupStopped && options.wait_for_stopped {
                         exit_status_fn = Some(&ExitStatus::Stop);
                     }
                     if let Some(mut exit_status_fn) = exit_status_fn {
                         let siginfo = if options.keep_waitable_state {
-                            process_state.last_signal.clone()
+                            process_state.waitable.clone()
                         } else {
-                            process_state.last_signal.take()
+                            process_state.waitable.take()
                         };
-                        if let Some(mut siginfo) = siginfo {
-                            if task_ref.thread_group.load_stopped() == StopState::GroupStopped
-                                && ptrace.as_ref().map_or(false, |ptrace| ptrace.is_seized())
-                            {
-                                siginfo.code |= (PTRACE_EVENT_STOP as i32) << 8;
-                            }
+                        if let Some(siginfo) = siginfo {
                             if siginfo.signal == SIGKILL {
                                 exit_status_fn = &ExitStatus::Kill
                             }
+
                             exit_status = Some(exit_status_fn(siginfo));
                         }
-                        // Clear the wait status of the ptrace, because we're
-                        // using the tg status instead.
-                        ptrace
-                            .as_mut()
-                            .map(|ptrace| ptrace.get_last_signal(options.keep_waitable_state));
                     }
                     pid = process_state.base.leader;
-                }
-                if exit_status == None {
-                    if let Some(ptrace) = task_state.ptrace.as_mut() {
-                        // The information for the task, if we were in a non-group stop.
-                        let mut exit_status_fn: Option<&dyn Fn(SignalInfo) -> ExitStatus> = None;
-                        if task_stopped == StopState::Awake {
-                            exit_status_fn = Some(&ExitStatus::Continue);
-                        }
-                        if task_stopped.is_stopping_or_stopped()
-                            || ptrace.stop_status == PtraceStatus::Listening
-                        {
-                            exit_status_fn = Some(&ExitStatus::Stop);
-                        }
-                        if let Some(mut exit_status_fn) = exit_status_fn {
-                            if let Some(siginfo) =
-                                ptrace.get_last_signal(options.keep_waitable_state)
-                            {
-                                if siginfo.signal == SIGKILL {
-                                    exit_status_fn = &ExitStatus::Kill
-                                }
-                                exit_status = Some(exit_status_fn(siginfo));
-                            }
-                        }
-                        pid = task_ref.get_tid();
+                } else if let Some(ptrace) = task_state.ptrace.as_mut() {
+                    // The information for the task, if we were in a non-group stop.
+                    let mut exit_status_fn: Option<&dyn Fn(SignalInfo) -> ExitStatus> = None;
+                    if task_stopped == StopState::Awake {
+                        exit_status_fn = Some(&ExitStatus::Continue);
                     }
+                    if task_stopped.is_stopping_or_stopped() {
+                        exit_status_fn = Some(&ExitStatus::Stop);
+                    }
+                    if let Some(mut exit_status_fn) = exit_status_fn {
+                        let siginfo = ptrace.get_last_signal(options.keep_waitable_state);
+                        if siginfo.signal == SIGKILL {
+                            exit_status_fn = &ExitStatus::Kill
+                        }
+                        exit_status = Some(exit_status_fn(siginfo));
+                    }
+                    pid = task_ref.get_tid();
                 }
                 if let Some(exit_status) = exit_status {
                     return Some(WaitResult {
@@ -1134,12 +1110,6 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
             self.process_group.session.write().remove(self.process_group.leader);
             pids.remove_process_group(self.process_group.leader);
         }
-    }
-
-    /// Indicates whether the thread group is waitable via waitid and waitpid for
-    /// either WSTOPPED or WCONTINUED.
-    pub fn is_waitable(&self) -> bool {
-        return self.last_signal.is_some() && !self.base.load_stopped().is_in_progress();
     }
 
     fn get_waitable_zombie(
@@ -1251,14 +1221,14 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
         }
         for child in selected_children {
             let child = child.write();
-            if child.last_signal.is_some() {
+            if child.waitable.is_some() {
                 let build_wait_result = |mut child: ThreadGroupWriteGuard<'_>,
                                          exit_status: &dyn Fn(SignalInfo) -> ExitStatus|
                  -> WaitResult {
                     let siginfo = if options.keep_waitable_state {
-                        child.last_signal.clone().unwrap()
+                        child.waitable.clone().unwrap()
                     } else {
-                        child.last_signal.take().unwrap()
+                        child.waitable.take().unwrap()
                     };
                     let exit_status = if siginfo.signal == SIGKILL {
                         // This overrides the stop/continue choice.

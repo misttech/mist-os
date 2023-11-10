@@ -34,22 +34,6 @@ pub enum PtraceStatus {
     Default,
     /// Resuming after a ptrace_cont with a signal, so do not stop for signal-delivery-stop
     Continuing,
-    /// "The state of the tracee after PTRACE_LISTEN is somewhat of a
-    /// gray area: it is not in any ptrace-stop (ptrace commands won't work on it,
-    /// and it will deliver waitpid(2) notifications), but it also may be considered
-    /// "stopped" because it is not executing instructions (is not scheduled), and
-    /// if it was in group-stop before PTRACE_LISTEN, it will not respond to signals
-    /// until SIGCONT is received."
-    Listening,
-}
-
-/// Indicates the way that ptrace attached to the task.
-#[derive(Copy, Clone, PartialEq)]
-pub enum PtraceAttachType {
-    /// Attached with PTRACE_ATTACH
-    Attach,
-    /// Attached with PTRACE_SEIZE
-    Seize,
 }
 
 /// Per-task ptrace-related state
@@ -73,37 +57,24 @@ pub struct PtraceState {
     /// can't be used for that, because that needs to be saved for GETSIGINFO.
     pub last_signal_waitable: bool,
 
-    /// Whether the attach was a seize or an attach.  There are a few subtle
-    /// differences in behavior of the different attach types - see ptrace(2).
-    pub attach_type: PtraceAttachType,
-
     /// Indicates whether the last ptrace call put this thread into a state with
     /// special semantics for stopping behavior.
     pub stop_status: PtraceStatus,
 }
 
 impl PtraceState {
-    pub fn new(pid: pid_t, attach_type: PtraceAttachType) -> Self {
+    pub fn new(pid: pid_t) -> Self {
         PtraceState {
             pid,
             tracee_waiters: WaitQueue::default(),
             tracer_waiters: WaitQueue::default(),
             last_signal: None,
             last_signal_waitable: false,
-            attach_type,
             stop_status: PtraceStatus::default(),
         }
     }
 
-    pub fn is_seized(&self) -> bool {
-        self.attach_type == PtraceAttachType::Seize
-    }
-
     pub fn is_waitable(&self, stop: StopState, options: &WaitingOptions) -> bool {
-        if self.stop_status == PtraceStatus::Listening {
-            // Waiting for any change of state
-            return self.last_signal_waitable;
-        }
         if !options.wait_for_continued && !stop.is_stopping_or_stopped() {
             // Only waiting for stops, but is not stopped.
             return false;
@@ -118,17 +89,14 @@ impl PtraceState {
             if siginfo.signal == SIGKILL {
                 return;
             }
-            if self.is_seized() {
-                siginfo.code |= (PTRACE_EVENT_STOP << 8) as i32;
-            }
             self.last_signal_waitable = true;
             self.last_signal = signal;
         }
     }
 
-    pub fn get_last_signal(&mut self, keep_signal_waitable: bool) -> Option<SignalInfo> {
+    pub fn get_last_signal(&mut self, keep_signal_waitable: bool) -> SignalInfo {
         self.last_signal_waitable = keep_signal_waitable;
-        self.last_signal.clone()
+        self.last_signal.clone().unwrap()
     }
 }
 
@@ -153,17 +121,11 @@ fn ptrace_cont(tracee: &Task, data: &UserAddress, detach: bool) -> Result<(), Er
     };
 
     let mut state = tracee.write();
-    let is_listen = state.is_ptrace_listening();
-
-    if tracee.load_stopped().is_waking_or_awake() && !is_listen {
+    if tracee.load_stopped().is_waking_or_awake() {
         if detach {
             state.set_ptrace(None)?;
         }
         return error!(EIO);
-    }
-
-    if !tracee.can_accept_ptrace_commands(&state) && !detach {
-        return error!(ESRCH);
     }
 
     if let Some(ref mut ptrace) = &mut state.ptrace {
@@ -178,13 +140,9 @@ fn ptrace_cont(tracee: &Task, data: &UserAddress, detach: bool) -> Result<(), Er
             }
         } else {
             new_state = PtraceStatus::Default;
-            ptrace.last_signal = None;
         }
         ptrace.stop_status = new_state;
-
-        if is_listen {
-            state.notify_ptracees();
-        }
+        ptrace.last_signal = None;
     }
 
     tracee.set_stopped(&mut *state, StopState::Waking, None);
@@ -199,48 +157,6 @@ fn ptrace_cont(tracee: &Task, data: &UserAddress, detach: bool) -> Result<(), Er
         // siginfo is replacing the signal that caused the ptrace-stop we're currently
         // in, so has to go first.
         send_signal_first(&tracee, siginfo);
-    }
-    Ok(())
-}
-
-fn ptrace_interrupt(tracee: &Task) -> Result<(), Errno> {
-    let mut state = tracee.write();
-    if let Some(ref mut ptrace) = &mut state.ptrace {
-        if !ptrace.is_seized() {
-            return error!(EIO);
-        }
-        let status = ptrace.stop_status.clone();
-        ptrace.stop_status = PtraceStatus::Default;
-        if status == PtraceStatus::Listening {
-            let signal = ptrace.last_signal.clone();
-            // "If the tracee was already stopped by a signal and PTRACE_LISTEN
-            // was sent to it, the tracee stops with PTRACE_EVENT_STOP and
-            // WSTOPSIG(status) returns the stop signal"
-            tracee.set_stopped(&mut state, StopState::PtraceEventStopped, signal);
-        } else {
-            tracee.set_stopped(
-                &mut state,
-                StopState::PtraceEventStopping,
-                Some(SignalInfo::default(SIGTRAP)),
-            );
-        }
-    }
-    Ok(())
-}
-
-fn ptrace_listen(tracee: &Task) -> Result<(), Errno> {
-    let mut state = tracee.write();
-    if let Some(ref mut ptrace) = &mut state.ptrace {
-        if !ptrace.is_seized()
-            || (ptrace.last_signal_waitable
-                && ptrace
-                    .last_signal
-                    .as_ref()
-                    .map_or(false, |ls| ls.code >> 8 != PTRACE_EVENT_STOP as i32))
-        {
-            return error!(EIO);
-        }
-        ptrace.stop_status = PtraceStatus::Listening;
     }
     Ok(())
 }
@@ -284,12 +200,8 @@ pub fn ptrace_dispatch(
             return Ok(());
         }
         PTRACE_INTERRUPT => {
-            ptrace_interrupt(tracee.as_ref())?;
-            return Ok(());
-        }
-        PTRACE_LISTEN => {
-            ptrace_listen(&tracee)?;
-            return Ok(());
+            not_implemented!("ptrace interrupt not implemented");
+            return error!(ENOSYS);
         }
         PTRACE_CONT => {
             ptrace_cont(&tracee, &data, false)?;
@@ -303,7 +215,7 @@ pub fn ptrace_dispatch(
 
     // The remaining requests (to be added) require the thread to be stopped.
     let mut state = tracee.write();
-    if !tracee.can_accept_ptrace_commands(&state) {
+    if tracee.load_stopped().is_waking_or_awake() {
         return error!(ESRCH);
     }
 
@@ -393,14 +305,10 @@ pub fn ptrace_dispatch(
     }
 }
 
-fn do_attach(
-    thread_group: &ThreadGroup,
-    task: WeakRef<Task>,
-    attach_type: PtraceAttachType,
-) -> Result<(), Errno> {
+fn do_attach(thread_group: &ThreadGroup, task: WeakRef<Task>) -> Result<(), Errno> {
     if let Some(task_ref) = task.upgrade() {
         thread_group.ptracees.lock().insert(task_ref.get_tid(), (&task_ref).into());
-        task_ref.write().set_ptrace(Some(PtraceState::new(thread_group.leader, attach_type)))?;
+        task_ref.write().set_ptrace(Some(thread_group.leader))?;
         return Ok(());
     }
     // The tracee is either the current thread, or there is a live ref to it outside
@@ -427,17 +335,13 @@ pub fn ptrace_traceme(current_task: &mut CurrentTask) -> Result<(), Errno> {
     let parent = current_task.thread_group.read().parent.clone();
     if let Some(parent) = parent {
         let task_ref = OwnedRefByRef::temp(&current_task.task);
-        do_attach(&parent, (&task_ref).into(), PtraceAttachType::Attach)
+        do_attach(&parent, (&task_ref).into())
     } else {
         error!(EPERM)
     }
 }
 
-pub fn ptrace_attach(
-    current_task: &mut CurrentTask,
-    pid: pid_t,
-    attach_type: PtraceAttachType,
-) -> Result<(), Errno> {
+pub fn ptrace_attach(current_task: &mut CurrentTask, pid: pid_t) -> Result<(), Errno> {
     let ptrace_scope = current_task.kernel().ptrace_scope.load(Ordering::Relaxed);
     check_caps_for_attach(ptrace_scope, current_task)?;
 
@@ -472,10 +376,8 @@ pub fn ptrace_attach(
     }
 
     current_task.check_ptrace_access_mode(PTRACE_MODE_ATTACH_REALCREDS, &tracee)?;
-    do_attach(&current_task.thread_group, weak_task.clone(), attach_type)?;
-    if attach_type == PtraceAttachType::Attach {
-        send_signal(&tracee, SignalInfo::default(SIGSTOP));
-    }
+    do_attach(&current_task.thread_group, weak_task.clone())?;
+    send_signal(&tracee, SignalInfo::default(SIGSTOP));
     Ok(())
 }
 

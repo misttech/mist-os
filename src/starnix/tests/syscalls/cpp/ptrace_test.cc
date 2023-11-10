@@ -4,7 +4,6 @@
 
 #include <signal.h>
 #include <sys/ptrace.h>
-#include <time.h>
 
 #include <gtest/gtest.h>
 
@@ -55,63 +54,4 @@ TEST(PtraceTest, SetSigInfo) {
   siginfo.si_errno = kInjectedErrno;
   ASSERT_EQ(ptrace(PTRACE_SETSIGINFO, child_pid, 0, &siginfo), 0);
   ASSERT_EQ(ptrace(PTRACE_DETACH, child_pid, 0, kInjectedSigno), 0);
-}
-
-#ifndef PTRACE_EVENT_STOP  // Not defined in every libc
-#define PTRACE_EVENT_STOP 128
-#endif
-
-TEST(PtraceTest, InterruptAfterListen) {
-  volatile int child_should_spin = 1;
-  test_helper::ForkHelper helper;
-  helper.OnlyWaitForForkedChildren();
-  pid_t child_pid = helper.RunInForkedProcess([&child_should_spin] {
-    const struct timespec req = {.tv_sec = 0, .tv_nsec = 1000};
-    while (child_should_spin) {
-      nanosleep(&req, nullptr);
-    }
-    _exit(0);
-  });
-
-  // In parent process.
-  ASSERT_NE(child_pid, 0);
-
-  ASSERT_EQ(ptrace(PTRACE_SEIZE, child_pid, 0, 0), 0);
-  int status;
-  EXPECT_EQ(waitpid(child_pid, &status, WNOHANG), 0);
-
-  // Stop the child with PTRACE_INTERRUPT.
-  ASSERT_EQ(ptrace(PTRACE_INTERRUPT, child_pid, 0, 0), 0);
-  ASSERT_EQ(waitpid(child_pid, &status, 0), child_pid);
-  EXPECT_EQ(SIGTRAP | (PTRACE_EVENT_STOP << 8), status >> 8);
-
-  ASSERT_EQ(ptrace(PTRACE_POKEDATA, child_pid, &child_should_spin, 0), 0) << strerror(errno);
-
-  // Send SIGSTOP to the child, then resume it, allowing it to proceed to
-  // signal-delivery-stop.
-  ASSERT_EQ(kill(child_pid, SIGSTOP), 0);
-  ASSERT_EQ(ptrace(PTRACE_CONT, child_pid, 0, 0), 0);
-  ASSERT_EQ(waitpid(child_pid, &status, 0), child_pid);
-  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP) << " status " << status;
-
-  // Move out of signal-delivery-stop and deliver the SIGSTOP.
-  ASSERT_EQ(ptrace(PTRACE_CONT, child_pid, 0, SIGSTOP), 0);
-  ASSERT_EQ(waitpid(child_pid, &status, 0), child_pid);
-  EXPECT_EQ(SIGSTOP | (PTRACE_EVENT_STOP << 8), status >> 8);
-
-  // Restart the child, but don't let it execute. Child continues to deliver
-  // notifications of when it gets stop / continue signals.  This allows a
-  // normal SIGCONT signal to be sent to a child to restart it, rather than
-  // having the tracer restart it.  The tracer can then detect the SIGCONT.
-  ASSERT_EQ(ptrace(PTRACE_LISTEN, child_pid, 0, 0), 0);
-
-  // "If the tracee was already stopped by a signal and PTRACE_LISTEN was sent
-  // to it, the tracee stops with PTRACE_EVENT_STOP and WSTOPSIG(status) returns
-  // the stop signal."
-  ASSERT_EQ(ptrace(PTRACE_INTERRUPT, child_pid, 0, 0), 0);
-  ASSERT_EQ(waitpid(child_pid, &status, 0), child_pid);
-  EXPECT_EQ(SIGSTOP | (PTRACE_EVENT_STOP << 8), status >> 8);
-
-  // Allow the tracer to proceed normally.
-  EXPECT_EQ(ptrace(PTRACE_CONT, child_pid, 0, 0), 0) << strerror(errno);
 }
