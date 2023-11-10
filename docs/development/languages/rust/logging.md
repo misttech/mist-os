@@ -114,6 +114,11 @@ fn main() {
 }
 ```
 
+Note: While we provide our own `FX_` prefixed logging macros in
+C++, we have aligned on the [`tracing`][trc] crate as the logging
+interface for Rust. See their [documentation][trc] for guidance on
+how to format your logs.
+
 ## Standard streams
 
 Rust macros such as `println!`, `eprintln!` etc. map to standard out (`stdout`)
