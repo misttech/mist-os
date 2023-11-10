@@ -6,39 +6,14 @@ environment on your machine.
 
 The steps are:
 
-1. [Perform a preflight check](#perform-a-preflight-check).
-2. [Install prerequisite packages](#install-prerequisite-packages).
+1. [Install prerequisite packages](#install-prerequisite-packages).
+2. [Perform a preflight check](#perform-a-preflight-check).
 3. [Download the Fuchsia source code](#download-the-fuchsia-source-code).
 4. [Set up environment variables](#set-up-environment-variables).
 5. [Configure firewall rules (Optional)](#configure-firewall-rules).
 
 
-## 1. Perform a preflight check {#perform-a-preflight-check}
-
-Fuchsia provides a preflight check tool
-([`ffx platform preflight`][ffx-platform-preflight])
-that examines your machine and informs you of any issues that may
-affect building Fuchsia from source on the machine.
-
-Note: The preflight tool only works for the x64 architecture. Fuchsia
-is currently not guaranteed to build successfully on other host
-architectures, such as Windows and ARM64.
-
-Run the following command:
-
-* {Linux}
-
-  ```posix-terminal
-  curl -sO https://storage.googleapis.com/fuchsia-ffx/ffx-linux-x64 && chmod +x ffx-linux-x64 && ./ffx-linux-x64 platform preflight
-  ```
-
-* {macOS}
-
-  ```posix-terminal
-  curl -sO https://storage.googleapis.com/fuchsia-ffx/ffx-macos-x64 && chmod +x ffx-macos-x64 && ./ffx-macos-x64 platform preflight
-  ```
-
-## 2. Install prerequisite packages {#install-prerequisite-packages}
+## 1. Install prerequisite packages {#install-prerequisite-packages}
 
 Fuchsia requires `curl`, `file`, `unzip`, and `git` to be up to date. The version
 of `git` needs to be 2.28 or higher.
@@ -61,6 +36,30 @@ of `git` needs to be 2.28 or higher.
   ```posix-terminal
   xcode-select --install
   ```
+
+## 2. Perform a preflight check {#perform-a-preflight-check}
+
+Fuchsia provides a preflight check tool
+([`ffx platform preflight`][ffx-platform-preflight])
+that examines your machine and informs you of any issues that may
+affect building Fuchsia from source on the machine.
+
+Note: The preflight tool only works for the x64 architecture.
+
+Run the following command:
+
+* {Linux}
+
+  ```posix-terminal
+  curl -sO https://storage.googleapis.com/fuchsia-ffx/ffx-linux-x64 && chmod +x ffx-linux-x64 && ./ffx-linux-x64 platform preflight
+  ```
+
+* {macOS}
+
+  ```posix-terminal
+  curl -sO https://storage.googleapis.com/fuchsia-ffx/ffx-macos-x64 && chmod +x ffx-macos-x64 && ./ffx-macos-x64 platform preflight
+  ```
+
 
 ## 3. Download the Fuchsia source code {#download-the-fuchsia-source-code}
 
