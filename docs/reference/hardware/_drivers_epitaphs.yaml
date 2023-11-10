@@ -422,3 +422,9 @@
   available_in_git: 'bb05e1f62b8802e8e55a54bcf5f5aa70c5c7ab84'
   areas: ['Block']
   path: '/src/devices/block/drivers/imx8m-sdmmc'
+- short_description: 'Synaptics AS370 I2C driver'
+  deletion_reason: 'Hardware is not actively supported'
+  gerrit_change_id: '942984'
+  available_in_git: '7fb565c3701f38fefce51b8f16787ee94e118c55'
+  areas: ['I2C']
+  path: '/src/devices/i2c/drivers/dw-i2c/'

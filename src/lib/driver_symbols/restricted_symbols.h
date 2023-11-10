@@ -78,7 +78,6 @@ const std::set<std::string> kCreateThreadSymbolsDriversAllowlist = {
     "#meta/display-coordinator.cm",
     "#meta/dwc2.cm",
     "#meta/dwc3.cm",
-    "#meta/dw-i2c.cm",
     "#meta/dwmac.cm",
     "#meta/e1000.cm",
     "#meta/fake-ot-radio.cm",
