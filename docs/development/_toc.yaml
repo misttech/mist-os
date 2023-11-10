@@ -9,16 +9,22 @@ toc:
 - title: "Overview"
   path: /docs/development/README.md
 - heading: "Quickstart"
-- include: /docs/get-started/_toc.yaml
+- title: "Get started with Fuchsia"
+  section:
+  - include: /docs/get-started/_toc.yaml
 - heading: "Set up devices"
 - title: "Fuchsia hardware"
   section:
   - include: /docs/development/hardware/_toc.yaml
+- title: "Fuchsia emulator"
+  section:
+  - title: "Fuchsia emulator"
+    path: /docs/development/build/emulator.md
 - heading: "Build and run"
-- title: "Build"
+- title: "Build Fuchsia"
   section:
   - include: /docs/development/build/_toc.yaml
-- title: "Run"
+- title: "Run components"
   section:
   - include: /docs/development/run/_toc.yaml
 - heading: "Write code"
