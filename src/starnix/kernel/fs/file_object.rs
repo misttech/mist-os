@@ -870,6 +870,10 @@ impl FileObjectId {
 /// that is specific to this sessions whereas the underlying FsNode contains
 /// the state that is shared between all the sessions.
 pub struct FileObject {
+    /// Weak reference to the `FileHandle` of this `FileObject`. This allows to retrieve the
+    /// `FileHandle` from a `FileObject`.
+    pub weak_handle: WeakFileHandle,
+
     ops: Box<dyn FileOps>,
 
     /// The NamespaceNode associated with this FileObject.
@@ -924,7 +928,8 @@ impl FileObject {
             None
         };
         let fs = name.entry.node.fs();
-        let file = Self {
+        let file = FileHandle::new_cyclic(|weak_handle| Self {
+            weak_handle: weak_handle.clone(),
             name,
             fs,
             ops,
@@ -932,9 +937,9 @@ impl FileObject {
             flags: Mutex::new(flags - OpenFlags::CREAT),
             async_owner: Default::default(),
             _file_write_guard: file_write_guard,
-        };
+        });
         file.notify(InotifyMask::OPEN);
-        Ok(Arc::new(file))
+        Ok(file)
     }
 
     /// A unique identifier for this file object.

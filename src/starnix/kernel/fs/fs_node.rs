@@ -8,9 +8,9 @@ use crate::{
     device::DeviceMode,
     fs::{
         fsverity::FsVerityState, inotify, pipe::Pipe, rw_queue::RwQueue, socket::SocketHandle,
-        FileHandle, FileObject, FileOps, FileSystem, FileSystemHandle, FileWriteGuard,
-        FileWriteGuardMode, FileWriteGuardState, FsStr, FsString, MountInfo, NamespaceNode,
-        OPathOps, RecordLockCommand, RecordLockOwner, RecordLocks, WeakFileHandle,
+        FileObject, FileOps, FileSystem, FileSystemHandle, FileWriteGuard, FileWriteGuardMode,
+        FileWriteGuardState, FsStr, FsString, MountInfo, NamespaceNode, OPathOps,
+        RecordLockCommand, RecordLockOwner, RecordLocks, WeakFileHandle,
     },
     logging::log_error,
     signals::{send_signal, SignalInfo},
@@ -216,12 +216,12 @@ impl FlockInfo {
     /// this empties the list, unlocks the node and notifies all waiting processes.
     pub fn retain<F>(&mut self, predicate: F)
     where
-        F: Fn(FileHandle) -> bool,
+        F: Fn(&FileObject) -> bool,
     {
         if !self.locking_handles.is_empty() {
             self.locking_handles.retain(|w| {
                 if let Some(fh) = w.upgrade() {
-                    predicate(fh)
+                    predicate(&fh)
                 } else {
                     false
                 }
@@ -270,7 +270,7 @@ impl FileObject {
     ///
     /// See flock(2).
     pub fn flock(
-        self: &Arc<Self>,
+        &self,
         current_task: &CurrentTask,
         operation: FlockOperation,
     ) -> Result<(), Errno> {
@@ -280,14 +280,14 @@ impl FileObject {
         loop {
             let mut flock_info = self.name.entry.node.flock_info.lock();
             if operation.is_unlock() {
-                flock_info.retain(|fh| !Arc::ptr_eq(&fh, self));
+                flock_info.retain(|fh| !std::ptr::eq(fh, self));
                 return Ok(());
             }
             // Operation is a locking operation.
             // 1. File is not locked
             if flock_info.locked_exclusive.is_none() {
                 flock_info.locked_exclusive = Some(operation.is_lock_exclusive());
-                flock_info.locking_handles.push(Arc::downgrade(self));
+                flock_info.locking_handles.push(self.weak_handle.clone());
                 return Ok(());
             }
 
@@ -296,7 +296,13 @@ impl FileObject {
                 .locking_handles
                 .iter()
                 .find_map(|w| {
-                    w.upgrade().and_then(|fh| if Arc::ptr_eq(&fh, self) { Some(()) } else { None })
+                    w.upgrade().and_then(|fh| {
+                        if std::ptr::eq(&fh as &FileObject, self) {
+                            Some(())
+                        } else {
+                            None
+                        }
+                    })
                 })
                 .is_some();
 
@@ -308,7 +314,7 @@ impl FileObject {
                 } else {
                     // Incorrect lock is held. Release the lock and loop back to try to reacquire
                     // it. flock doesn't guarantee atomic lock type switching.
-                    flock_info.retain(|fh| !Arc::ptr_eq(&fh, self));
+                    flock_info.retain(|fh| !std::ptr::eq(fh, self));
                     continue;
                 }
             }
@@ -316,7 +322,7 @@ impl FileObject {
             // 3. File is locked, and fd doesn't have a lock.
             if !file_lock_is_exclusive && !operation.is_lock_exclusive() {
                 // The lock is not exclusive, let's grab it.
-                flock_info.locking_handles.push(Arc::downgrade(self));
+                flock_info.locking_handles.push(self.weak_handle.clone());
                 return Ok(());
             }
 
