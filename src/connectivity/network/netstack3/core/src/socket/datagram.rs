@@ -1773,12 +1773,13 @@ impl<WireI: IpExt, SocketI: IpExt, D: WeakId, S: DatagramSocketSpec>
         }
     }
 
-    /// Undo this removal by reinserting the socket into the `BoundSocketMap`.
+    /// Undo this removal by reinserting the socket into the [`BoundSocketMap`].
     ///
     /// # Panics
     ///
     /// Panics if the socket can not be inserted into the given map (i.e. if it
-    /// already exists.)
+    /// already exists). This is not expected to happen, provided the
+    /// [`BoundSocketMap`] lock has been held across removal and reinsertion.
     fn reinsert(
         self,
         sockets: &mut BoundSocketMap<WireI, D, S::AddrSpec, S::SocketMapSpec<WireI, D>>,
@@ -1832,13 +1833,7 @@ enum DualStackRemove<I: IpExt, D: WeakId, S: DatagramSocketSpec> {
         associated_addr: ListenerAddr<S::ListenerIpAddr<I>, D>,
         ip_options: IpOptions<I, D, S>,
         sharing: S::SharingState,
-        socket_id:
-            <S::SocketMapSpec<I, D> as DatagramSocketMapSpec<I, D, S::AddrSpec>>::BoundSocketId,
-        other_socket_id: <S::SocketMapSpec<I::OtherVersion, D> as DatagramSocketMapSpec<
-            I::OtherVersion,
-            D,
-            S::AddrSpec,
-        >>::BoundSocketId,
+        socket_ids: PairedBoundSocketIds<I, D, S>,
     },
 }
 
@@ -1867,8 +1862,10 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> DualStackRemoveOperation<I, D, 
                             associated_addr: associated_addr.clone(),
                             ip_options: ip_options.clone(),
                             sharing: sharing.clone(),
-                            socket_id: S::make_bound_socket_map_id(socket_id.clone()),
-                            other_socket_id: sync_ctx.to_other_bound_socket_id(socket_id),
+                            socket_ids: PairedBoundSocketIds {
+                                this: S::make_bound_socket_map_id(socket_id.clone()),
+                                other: sync_ctx.to_other_bound_socket_id(socket_id),
+                            },
                         }
                     }
                     // Bound in this stack, with/without dual-stack enabled.
@@ -1977,28 +1974,17 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> DualStackRemoveOperation<I, D, 
                 associated_addr,
                 ip_options,
                 sharing,
-                socket_id,
-                other_socket_id,
+                socket_ids,
             } => {
-                let paired_bound_socket_ids =
-                    PairedBoundSocketIds { this: socket_id, other: other_socket_id };
                 PairedSocketMapMut::<_, _, S> { bound: sockets, other_bound: other_sockets }
-                    .remove_listener(
-                        &DualStackUnspecifiedAddr,
-                        identifier,
-                        &device,
-                        &paired_bound_socket_ids,
-                    );
-                let PairedBoundSocketIds { this: socket_id, other: other_socket_id } =
-                    paired_bound_socket_ids;
+                    .remove_listener(&DualStackUnspecifiedAddr, identifier, &device, &socket_ids);
                 DualStackRemoveInfo(DualStackRemove::ListenerBothStacks {
                     identifier,
                     device,
                     associated_addr,
                     ip_options,
                     sharing,
-                    socket_id,
-                    other_socket_id,
+                    socket_ids,
                 })
             }
         }
@@ -2020,22 +2006,22 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> DualStackRemoveInfo<I, D, S> {
                 associated_addr,
                 ip_options,
                 sharing: _,
-                socket_id: _,
-                other_socket_id: _,
+                socket_ids: _,
             } => (ip_options, SocketInfo::Listener(associated_addr)),
         }
     }
 
-    /// Undo this removal by reinserting the socket into the `BoundSocketMap`s.
+    /// Undo this removal by reinserting the socket into the [`BoundSocketMap`].
     ///
     /// # Panics
     ///
     /// Panics if the socket can not be inserted into the given maps (i.e. if it
-    /// already exists.)
+    /// already exists). This is not expected to happen, provided the
+    /// [`BoundSocketMap`] lock has been held across removal and reinsertion.
     fn reinsert(
         self,
         sockets: &mut BoundSocketMap<I, D, S::AddrSpec, S::SocketMapSpec<I, D>>,
-        _other_sockets: &mut BoundSocketMap<
+        other_sockets: &mut BoundSocketMap<
             I::OtherVersion,
             D,
             S::AddrSpec,
@@ -2047,7 +2033,29 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> DualStackRemoveInfo<I, D, S> {
             DualStackRemove::CurrentStack(remove) => {
                 RemoveInfo(remove).reinsert(sockets);
             }
-            _ => todo!("https://fxbug.dev/135204: Support dual-stack reinsertion"),
+            DualStackRemove::OtherStack(remove) => {
+                RemoveInfo(remove).reinsert(other_sockets);
+            }
+            DualStackRemove::ListenerBothStacks {
+                identifier,
+                device,
+                associated_addr: _,
+                ip_options: _,
+                sharing,
+                socket_ids,
+            } => {
+                let mut socket_maps_pair =
+                    PairedSocketMapMut { bound: sockets, other_bound: other_sockets };
+                BoundStateHandler::<_, S, _>::try_insert_listener(
+                    &mut socket_maps_pair,
+                    DualStackUnspecifiedAddr,
+                    identifier,
+                    device,
+                    sharing,
+                    socket_ids,
+                )
+                .expect("reinserting just-removed listener failed")
+            }
         }
     }
 }
@@ -3203,8 +3211,7 @@ impl<I: DualStackIpExt, D: WeakId, S: DatagramSocketSpec> DualStackConnectOperat
                             associated_addr: _,
                             ip_options,
                             sharing,
-                            socket_id,
-                            other_socket_id: _,
+                            socket_ids: PairedBoundSocketIds { this: socket_id, other: _ },
                         },
                     ) => Ok(DualStackConnectOperation {
                         params: EitherStack::ThisStack(ConnectParameters {
@@ -3231,8 +3238,7 @@ impl<I: DualStackIpExt, D: WeakId, S: DatagramSocketSpec> DualStackConnectOperat
                             associated_addr: _,
                             ip_options,
                             sharing,
-                            socket_id: _,
-                            other_socket_id,
+                            socket_ids: PairedBoundSocketIds { this: _, other: other_socket_id },
                         },
                     ) => Ok(DualStackConnectOperation {
                         params: EitherStack::OtherStack(ConnectParameters {
@@ -4546,7 +4552,11 @@ mod test {
     use const_unwrap::const_unwrap_option;
     use derivative::Derivative;
     use ip_test_macro::ip_test;
-    use net_types::ip::{Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
+    use net_declare::{net_ip_v4, net_ip_v6};
+    use net_types::{
+        ip::{Ip, IpAddr, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
+        Witness,
+    };
     use packet::Buf;
     use packet_formats::ip::{Ipv4Proto, Ipv6Proto};
     use test_case::test_case;
@@ -5525,19 +5535,73 @@ mod test {
     #[test_case(OriginalSocketState::Unbound; "reinsert_unbound")]
     #[test_case(OriginalSocketState::Listener; "reinsert_listener")]
     #[test_case(OriginalSocketState::Connected; "reinsert_connected")]
-    fn connect_reinserts_on_failure<I: Ip + DatagramIpExt + IpLayerIpExt>(
+    fn connect_reinserts_on_failure_single_stack<I: Ip + DatagramIpExt + IpLayerIpExt>(
         original: OriginalSocketState,
     ) {
-        let mut sync_ctx = FakeSyncCtx::<I, _> {
-            outer: FakeSocketsState::default(),
-            inner: WrappedFakeSyncCtx::with_inner_and_outer_state(
-                FakeDualStackIpSocketCtx::new([FakeDeviceConfig::<_, SpecifiedAddr<I::Addr>> {
-                    device: FakeDeviceId,
-                    local_ips: vec![I::FAKE_CONFIG.local_ip],
-                    remote_ips: vec![I::FAKE_CONFIG.remote_ip],
-                }]),
-                Default::default(),
-            ),
+        connect_reinserts_on_failure_inner::<I>(
+            original,
+            I::FAKE_CONFIG.local_ip.get(),
+            I::FAKE_CONFIG.remote_ip,
+        );
+    }
+
+    #[test_case(OriginalSocketState::Listener, net_ip_v6!("::FFFF:192.0.2.1"),
+        net_ip_v4!("192.0.2.2"); "reinsert_listener_other_stack")]
+    #[test_case(OriginalSocketState::Listener, net_ip_v6!("::"),
+        net_ip_v4!("192.0.2.2"); "reinsert_listener_both_stacks")]
+    #[test_case(OriginalSocketState::Connected, net_ip_v6!("::FFFF:192.0.2.1"),
+        net_ip_v4!("192.0.2.2"); "reinsert_connected_other_stack")]
+    fn connect_reinserts_on_failure_dual_stack(
+        original: OriginalSocketState,
+        local_ip: Ipv6Addr,
+        remote_ip: Ipv4Addr,
+    ) {
+        // Safe to unwrap as ipv4-mapped-ipv6 addresses are always specified.
+        let remote_ip = SpecifiedAddr::new(remote_ip.to_ipv6_mapped()).unwrap();
+        connect_reinserts_on_failure_inner::<Ipv6>(original, local_ip, remote_ip);
+    }
+
+    // A conversion helper to unmap ipv4-mapped-ipv6 addresses.
+    fn unmap_ip(addr: IpAddr) -> IpAddr {
+        match addr {
+            IpAddr::V4(v4) => IpAddr::V4(v4),
+            IpAddr::V6(v6) => match v6.to_ipv4_mapped() {
+                Some(v4) => IpAddr::V4(v4),
+                None => IpAddr::V6(v6),
+            },
+        }
+    }
+
+    fn connect_reinserts_on_failure_inner<I: Ip + DatagramIpExt + IpLayerIpExt>(
+        original: OriginalSocketState,
+        local_ip: I::Addr,
+        remote_ip: SpecifiedAddr<I::Addr>,
+    ) {
+        let mut sync_ctx = {
+            let local_ip = unmap_ip(local_ip.to_ip_addr());
+            let remote_ip = unmap_ip(remote_ip.get().to_ip_addr());
+            // If the given local_ip is unspecified, use the default from
+            // `FAKE_CONFIG`. This ensures we always instantiate the
+            // FakeDeviceConfig below with at least one local_ip, which is
+            // required for connect operations to succeed.
+            let local_ip = SpecifiedAddr::new(local_ip).unwrap_or_else(|| match remote_ip {
+                IpAddr::V4(_) => Ipv4::FAKE_CONFIG.local_ip.into(),
+                IpAddr::V6(_) => Ipv6::FAKE_CONFIG.local_ip.into(),
+            });
+            // If the given remote_ip is unspecified, we won't be able to
+            // connect; abort the test.
+            let remote_ip = SpecifiedAddr::new(remote_ip).expect("remote-ip should be specified");
+            FakeSyncCtx::<I, _> {
+                outer: FakeSocketsState::default(),
+                inner: WrappedFakeSyncCtx::with_inner_and_outer_state(
+                    FakeDualStackIpSocketCtx::new([FakeDeviceConfig::<_, SpecifiedAddr<IpAddr>> {
+                        device: FakeDeviceId,
+                        local_ips: vec![local_ip],
+                        remote_ips: vec![remote_ip],
+                    }]),
+                    Default::default(),
+                ),
+            }
         };
         let mut non_sync_ctx = FakeNonSyncCtx::default();
 
@@ -5553,7 +5617,7 @@ mod test {
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 socket,
-                Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()),
+                SpecifiedAddr::new(local_ip).map(|a| ZonedAddr::Unzoned(a).into()),
                 Some(LOCAL_PORT),
             )
             .expect("listen should succeed"),
@@ -5561,7 +5625,7 @@ mod test {
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 socket,
-                Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into()),
+                Some(ZonedAddr::Unzoned(remote_ip).into()),
                 ORIGINAL_REMOTE_PORT,
                 Default::default(),
             )
@@ -5586,7 +5650,7 @@ mod test {
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 socket,
-                Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into()),
+                Some(ZonedAddr::Unzoned(remote_ip).into()),
                 NEW_REMOTE_PORT,
                 Default::default(),
             ),
@@ -5604,9 +5668,11 @@ mod test {
                     MaybeDualStack::DualStack(DualStackListenerIpAddr::ThisStack(
                         ListenerIpAddr { addr: _, identifier },
                     )) => identifier,
-                    MaybeDualStack::DualStack(DualStackListenerIpAddr::OtherStack(_))
-                    | MaybeDualStack::DualStack(DualStackListenerIpAddr::BothStacks(_)) => {
-                        panic!("socket unexpectedly bound in other stack")
+                    MaybeDualStack::DualStack(DualStackListenerIpAddr::OtherStack(
+                        ListenerIpAddr { addr: _, identifier },
+                    ))
+                    | MaybeDualStack::DualStack(DualStackListenerIpAddr::BothStacks(identifier)) => {
+                        identifier
                     }
                     MaybeDualStack::NotDualStack(ListenerIpAddr { addr: _, identifier }) => {
                         identifier
@@ -5623,9 +5689,10 @@ mod test {
                             local: _,
                             remote: (_addr, identifier),
                         }) => identifier,
-                        DualStackConnIpAddr::OtherStack(_addr) => {
-                            panic!("socket unexpectedly bound in other stack")
-                        }
+                        DualStackConnIpAddr::OtherStack(ConnIpAddr {
+                            local: _,
+                            remote: (_addr, identifier),
+                        }) => identifier,
                     },
                     MaybeDualStack::NotDualStack(ConnIpAddr {
                         local: _,
