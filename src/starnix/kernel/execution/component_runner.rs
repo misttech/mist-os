@@ -23,14 +23,11 @@ use crate::{
     execution::{
         container::Container, create_filesystem_from_spec, execute_task, parse_numbered_handles,
     },
-    fs::{fuchsia::RemoteFs, FileSystemOptions, LookupContext, NamespaceNode, WhatToMount},
+    fs::{fuchsia::RemoteFs, *},
     logging::{log_error, log_info},
     signals,
-    task::{ExitStatus, Task},
-    types::{
-        mode, release_on_error, Capabilities, DeviceType, Errno, MountFlags, OpenFlags,
-        ReleasableByRef, WeakRef, EEXIST, ENOTDIR, SIGINT, SIGKILL, SI_KERNEL,
-    },
+    task::*,
+    types::*,
 };
 
 /// Component controller epitaph value used as the base value to pass non-zero error

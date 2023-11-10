@@ -11,39 +11,13 @@ use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
 use crate::{
     auth::{Credentials, SecureBits},
-    execution::execute_task,
-    fs::{FdNumber, FileHandle, MountNamespaceFile},
+    execution::*,
+    fs::*,
     logging::{log_error, log_trace},
-    mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt, MemoryManager, PAGE_SIZE},
-    syscalls::{
-        __user_cap_data_struct, __user_cap_header_struct, c_int, clone_args, errno, error,
-        not_implemented, release_on_error, sched_param, timeval_from_duration, uid_t, Capabilities,
-        Errno, FileMode, Locked, OpenFlags, Resource, Signal, SyscallResult, UncheckedSignal,
-        Unlocked, UserAddress, UserCString, UserRef, WeakRef,
-    },
-    task::{
-        max_priority_for_sched_policy, min_priority_for_sched_policy, ptrace_attach,
-        ptrace_dispatch, ptrace_traceme, CurrentTask, ExitStatus, PtraceAttachType,
-        SchedulerPolicy, SeccompAction, SeccompStateValue, Task,
-    },
-    types::{
-        gid_t, kcmp::KcmpResource, ownership::ReleasableByRef, pid_t, rlimit, rusage,
-        AT_EMPTY_PATH, AT_SYMLINK_NOFOLLOW, CAP_SETGID, CAP_SETPCAP, CAP_SETUID, CAP_SYS_ADMIN,
-        CAP_SYS_NICE, CAP_SYS_PTRACE, CLONE_ARGS_SIZE_VER0, CLONE_ARGS_SIZE_VER1,
-        CLONE_ARGS_SIZE_VER2, CLONE_FILES, CLONE_NEWNS, CLONE_NEWUTS, CLONE_SETTLS, CLONE_VFORK,
-        NGROUPS_MAX, PATH_MAX, PRIO_PROCESS, PR_CAPBSET_DROP, PR_CAPBSET_READ, PR_CAP_AMBIENT,
-        PR_CAP_AMBIENT_CLEAR_ALL, PR_CAP_AMBIENT_IS_SET, PR_CAP_AMBIENT_LOWER,
-        PR_CAP_AMBIENT_RAISE, PR_GET_CHILD_SUBREAPER, PR_GET_DUMPABLE, PR_GET_KEEPCAPS,
-        PR_GET_NAME, PR_GET_NO_NEW_PRIVS, PR_GET_SECCOMP, PR_GET_SECUREBITS,
-        PR_SET_CHILD_SUBREAPER, PR_SET_DUMPABLE, PR_SET_KEEPCAPS, PR_SET_NAME, PR_SET_NO_NEW_PRIVS,
-        PR_SET_PDEATHSIG, PR_SET_PTRACER, PR_SET_SECCOMP, PR_SET_SECUREBITS, PR_SET_TIMERSLACK,
-        PR_SET_VMA, PR_SET_VMA_ANON_NAME, PTRACE_ATTACH, PTRACE_SEIZE, PTRACE_TRACEME,
-        RUSAGE_CHILDREN, SECCOMP_FILTER_FLAG_LOG, SECCOMP_FILTER_FLAG_NEW_LISTENER,
-        SECCOMP_FILTER_FLAG_SPEC_ALLOW, SECCOMP_FILTER_FLAG_TSYNC, SECCOMP_FILTER_FLAG_TSYNC_ESRCH,
-        SECCOMP_GET_ACTION_AVAIL, SECCOMP_GET_NOTIF_SIZES, SECCOMP_MODE_FILTER,
-        SECCOMP_MODE_STRICT, SECCOMP_SET_MODE_FILTER, SECCOMP_SET_MODE_STRICT,
-        _LINUX_CAPABILITY_VERSION_1, _LINUX_CAPABILITY_VERSION_2, _LINUX_CAPABILITY_VERSION_3,
-    },
+    mm::*,
+    syscalls::*,
+    task::*,
+    types::kcmp::*,
 };
 
 pub fn do_clone(current_task: &CurrentTask, args: &clone_args) -> Result<pid_t, Errno> {
@@ -1605,12 +1579,7 @@ pub fn sys_kcmp(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        mm::syscalls::sys_munmap,
-        syscalls::SUCCESS,
-        testing::*,
-        types::{SCHED_FIFO, SCHED_NORMAL},
-    };
+    use crate::{mm::syscalls::sys_munmap, testing::*};
     use std::{mem, u64};
 
     #[::fuchsia::test]

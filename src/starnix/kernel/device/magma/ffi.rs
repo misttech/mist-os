@@ -5,40 +5,7 @@
 use std::sync::Arc;
 
 use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
-use magma::{
-    magma_buffer_export, magma_buffer_get_handle, magma_buffer_id_t, magma_buffer_t,
-    magma_command_descriptor, magma_connection_execute_command,
-    magma_connection_execute_immediate_commands, magma_connection_flush,
-    magma_connection_import_buffer, magma_connection_import_semaphore2,
-    magma_connection_read_notification_channel, magma_connection_t, magma_device_create_connection,
-    magma_device_import, magma_device_query, magma_device_t, magma_exec_command_buffer,
-    magma_exec_resource, magma_handle_t, magma_inline_command_buffer, magma_status_t,
-    virtio_magma_buffer_export_ctrl_t, virtio_magma_buffer_export_resp_t,
-    virtio_magma_buffer_get_handle_ctrl_t, virtio_magma_buffer_get_handle_resp_t,
-    virtio_magma_connection_execute_command_ctrl_t,
-    virtio_magma_connection_execute_immediate_commands_ctrl_t,
-    virtio_magma_connection_flush_ctrl_t, virtio_magma_connection_flush_resp_t,
-    virtio_magma_connection_read_notification_channel_ctrl_t,
-    virtio_magma_connection_read_notification_channel_resp_t,
-    virtio_magma_connection_release_ctrl_t, virtio_magma_connection_release_resp_t,
-    virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_BUFFER_EXPORT,
-    virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_BUFFER_GET_HANDLE,
-    virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_FLUSH,
-    virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_READ_NOTIFICATION_CHANNEL,
-    virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_RELEASE,
-    virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_DEVICE_CREATE_CONNECTION,
-    virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_DEVICE_IMPORT,
-    virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_DEVICE_RELEASE,
-    virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_VIRT_CONNECTION_CREATE_IMAGE,
-    virtio_magma_device_create_connection_ctrl, virtio_magma_device_create_connection_resp_t,
-    virtio_magma_device_import_ctrl_t, virtio_magma_device_import_resp_t,
-    virtio_magma_device_query_ctrl_t, virtio_magma_device_query_resp_t,
-    virtio_magma_device_release_ctrl_t, virtio_magma_device_release_resp_t,
-    virtio_magma_virt_connection_create_image_ctrl_t,
-    virtio_magma_virt_connection_create_image_resp_t, virtmagma_command_descriptor,
-    MAGMA_QUERY_VENDOR_ID, MAGMA_STATUS_INVALID_ARGS, MAGMA_STATUS_OK, MAGMA_VENDOR_ID_INTEL,
-    MAGMA_VENDOR_ID_MALI,
-};
+use magma::*;
 use std::mem::ManuallyDrop;
 use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
@@ -56,7 +23,7 @@ use crate::{
     fs::{Anon, FdFlags, FsNodeInfo, VmoFileObject},
     mm::{MemoryAccessor, MemoryAccessorExt},
     task::CurrentTask,
-    types::{errno, Errno, FileMode, OpenFlags, UserAddress, UserBuffer, UserRef},
+    types::*,
 };
 
 /// Reads a sequence of objects starting at `addr`, ensuring at least one element is in the returned

@@ -15,7 +15,7 @@ use std::{convert::TryFrom, sync::Arc};
 use crate::{
     fs::{
         fuchsia::{create_file_from_handle, RemoteBundle, RemoteFs, SyslogFile},
-        FdNumber, FdTable, FileSystemHandle, FileSystemOptions,
+        *,
     },
     logging::log_trace,
     mm::MemoryManager,
@@ -25,11 +25,8 @@ use crate::{
         table::dispatch_syscall,
         SyscallResult,
     },
-    task::{
-        CurrentTask, ExitStatus, Kernel, SeccompStateValue, StopState, TaskFlags, ThreadGroup,
-        Waiter,
-    },
-    types::{errno, Errno, MountFlags},
+    task::*,
+    types::*,
 };
 
 /// Contains context to track the most recently failing system call.
@@ -271,11 +268,7 @@ fn block_while_stopped(current_task: &mut CurrentTask) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        signals::SignalInfo,
-        testing::*,
-        types::{SIGCONT, SIGSTOP},
-    };
+    use crate::{signals::*, testing::*};
 
     #[::fuchsia::test]
     async fn test_block_while_stopped_stop_and_continue() {

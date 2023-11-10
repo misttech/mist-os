@@ -3,11 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
-    fs::{
-        kobject::{KObject, KObjectHandle, KType, UEventAction, UEventContext},
-        sysfs::SysFsDirectory,
-        FileOps, FsNode,
-    },
+    fs::{kobject::*, sysfs::SysFsDirectory, FileOps, FsNode},
     logging::log_error,
     task::CurrentTask,
     types::{errno, error, DeviceType, Errno, OpenFlags, DYN_MAJOR},

@@ -7,25 +7,17 @@ use bitflags::bitflags;
 use fuchsia_inspect_contrib::ProfileDuration;
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use once_cell::sync::{Lazy, OnceCell};
-use range_map::RangeMap;
+use range_map::*;
 use starnix_lock::{Mutex, RwLock};
 use std::{collections::HashMap, convert::TryInto, ffi::CStr, ops::Range, sync::Arc};
 use zerocopy::{AsBytes, FromBytes};
 
 use crate::{
-    fs::{
-        DynamicFile, DynamicFileBuf, FileWriteGuardRef, FsNodeOps, FsString, NamespaceNode,
-        SequenceFileSource,
-    },
-    logging::{impossible_error, log_warn, not_implemented, not_implemented_log_once, set_zx_name},
+    fs::*,
+    logging::*,
     mm::{vmo::round_up_to_system_page_size, FutexTable, PrivateFutexKey},
-    task::{CurrentTask, Task},
-    types::{
-        errno, error, range_ext::RangeExt, Errno, Resource, UserAddress, UserBuffer, UserCString,
-        UserRef, WeakRef, MADV_DOFORK, MADV_DONTFORK, MADV_DONTNEED, MADV_KEEPONFORK,
-        MADV_NOHUGEPAGE, MADV_NORMAL, MADV_WILLNEED, MADV_WIPEONFORK, MREMAP_DONTUNMAP,
-        MREMAP_FIXED, MREMAP_MAYMOVE, PROT_EXEC, PROT_READ, PROT_WRITE, UIO_MAXIOV,
-    },
+    task::*,
+    types::{range_ext::RangeExt, *},
     vmex_resource::VMEX_RESOURCE,
 };
 
@@ -2610,16 +2602,7 @@ pub fn create_anonymous_mapping_vmo(size: u64) -> Result<Arc<zx::Vmo>, Errno> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        fs::FdNumber,
-        mm::syscalls::do_mmap,
-        task::syscalls::sys_prctl,
-        testing::*,
-        types::{
-            MAP_ANONYMOUS, MAP_FIXED, MAP_GROWSDOWN, MAP_PRIVATE, PROT_NONE, PR_SET_VMA,
-            PR_SET_VMA_ANON_NAME,
-        },
-    };
+    use crate::{mm::syscalls::do_mmap, task::syscalls::sys_prctl, testing::*};
     use assert_matches::assert_matches;
     use itertools::assert_equal;
     use std::ffi::CString;

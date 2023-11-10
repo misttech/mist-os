@@ -5,18 +5,18 @@
 use fidl_fuchsia_ui_composition as fuicomp;
 use fuchsia_zircon as zx;
 use fuchsia_zircon::{AsHandleRef, HandleBased};
-use magma::magma_image_info_t;
+use magma::*;
 
 use std::sync::Arc;
 
 use crate::{
     fs::{
         buffers::{InputBuffer, OutputBuffer},
-        fileops_impl_seekable, Anon, FileHandle, FileObject, FileOps, FsNodeInfo, VmoFileObject,
+        *,
     },
     mm::ProtectionFlags,
     task::CurrentTask,
-    types::{Errno, FileMode, OpenFlags},
+    types::*,
 };
 
 pub struct ImageInfo {

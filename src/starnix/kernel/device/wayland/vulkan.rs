@@ -5,15 +5,8 @@
 use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_sysmem as fsysmem;
 use fidl_fuchsia_ui_composition as fuicomp;
-use fuchsia_image_format::{
-    BUFFER_COLLECTION_CONSTRAINTS_DEFAULT, BUFFER_MEMORY_CONSTRAINTS_DEFAULT, BUFFER_USAGE_DEFAULT,
-    IMAGE_FORMAT_CONSTRAINTS_DEFAULT,
-};
-use fuchsia_vulkan::{
-    device_pointers, entry_points, instance_pointers, BufferCollectionCreateInfoFUCHSIA,
-    BufferCollectionFUCHSIA, FuchsiaExtensionPointers, ImageConstraintsInfoFUCHSIA,
-    STRUCTURE_TYPE_BUFFER_COLLECTION_CREATE_INFO_FUCHSIA,
-};
+use fuchsia_image_format::*;
+use fuchsia_vulkan::*;
 use fuchsia_zircon as zx;
 use fuchsia_zircon::AsHandleRef;
 use std::mem;

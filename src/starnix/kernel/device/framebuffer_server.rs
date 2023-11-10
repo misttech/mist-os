@@ -30,10 +30,7 @@ use starnix_lock::Mutex;
 use std::ops::DerefMut;
 use std::sync::{mpsc::channel, Arc};
 
-use crate::{
-    logging::log_warn,
-    types::{errno, Errno},
-};
+use crate::{logging::log_warn, types::*};
 
 /// The offset at which the framebuffer will be placed.
 pub const TRANSLATION_X: i32 = 0;

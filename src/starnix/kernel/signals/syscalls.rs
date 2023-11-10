@@ -5,31 +5,18 @@
 use fuchsia_zircon as zx;
 use static_assertions::const_assert_eq;
 use std::{convert::TryFrom, sync::Arc};
-use zerocopy::FromBytes;
 
-use super::signalfd::SignalFd;
+use super::signalfd::*;
 use crate::{
-    fs::{FdFlags, FdNumber},
+    fs::*,
     logging::not_implemented,
     mm::{MemoryAccessor, MemoryAccessorExt},
-    signals::{
-        restore_from_signal_handler, send_signal, SignalDetail, SignalInfo, SignalInfoHeader,
-        SI_HEADER_SIZE,
-    },
-    syscalls::{Locked, SyscallResult, Unlocked},
-    task::{
-        CurrentTask, ProcessEntryRef, ProcessSelector, Task, TaskMutableState, ThreadGroup,
-        WaitResult, Waiter,
-    },
-    types::{
-        duration_from_timespec, errno, error, pid_t, rusage, sigaction_t, sigaltstack_t, timespec,
-        timeval_from_duration, Errno, ErrnoResultExt, OpenFlags, SigSet, Signal, TempRef,
-        UncheckedSignal, UserAddress, UserRef, WeakRef, ETIMEDOUT, MINSIGSTKSZ, P_ALL, P_PGID,
-        P_PID, P_PIDFD, SFD_CLOEXEC, SFD_NONBLOCK, SIG_BLOCK, SIG_SETMASK, SIG_UNBLOCK,
-        SI_MAX_SIZE, SI_TKILL, SI_USER, SS_AUTODISARM, SS_DISABLE, SS_ONSTACK, UNBLOCKABLE_SIGNALS,
-        WCONTINUED, WEXITED, WNOHANG, WNOWAIT, WSTOPPED, WUNTRACED, __WALL, __WCLONE,
-    },
+    signals::{restore_from_signal_handler, *},
+    syscalls::*,
+    task::*,
+    types::*,
 };
+use zerocopy::FromBytes;
 
 pub use super::signal_handling::sys_restart_syscall;
 
@@ -856,12 +843,8 @@ mod tests {
         auth::Credentials,
         mm::{vmo::round_up_to_system_page_size, PAGE_SIZE},
         signals::testing::dequeue_signal_for_test,
-        task::{ExitStatus, ProcessExitInfo},
         testing::*,
-        types::{
-            uid_t, ERESTARTSYS, SIGCHLD, SIGHUP, SIGINT, SIGIO, SIGKILL, SIGRTMIN, SIGSEGV,
-            SIGSTOP, SIGTERM, SIGTRAP, SIGUSR1, SI_QUEUE,
-        },
+        types::signals::SIGRTMIN,
     };
     use std::convert::TryInto;
     use zerocopy::AsBytes;
@@ -1585,7 +1568,7 @@ mod tests {
             .write_memory(addr, &[0u8; std::mem::size_of::<SigSet>() * 2])
             .expect("failed to clear struct");
 
-        let new_mask = SigSet::from(crate::types::signals::SIGRTMIN);
+        let new_mask = SigSet::from(SIGRTMIN);
         let set = UserRef::<SigSet>::new(addr);
         current_task.write_object(set, &new_mask).expect("failed to set mask");
 
@@ -1601,11 +1584,11 @@ mod tests {
             Ok(())
         );
         assert_eq!(sys_kill(&mut locked, &current_task, current_task.id, SIGRTMIN.into()), Ok(()));
-        assert_eq!(current_task.read().signals.queued_count(crate::types::signals::SIGRTMIN), 1);
+        assert_eq!(current_task.read().signals.queued_count(SIGRTMIN), 1);
 
         // A second signal should increment the number of pending signals.
         assert_eq!(sys_kill(&mut locked, &current_task, current_task.id, SIGRTMIN.into()), Ok(()));
-        assert_eq!(current_task.read().signals.queued_count(crate::types::signals::SIGRTMIN), 2);
+        assert_eq!(current_task.read().signals.queued_count(SIGRTMIN), 2);
     }
 
     #[::fuchsia::test]

@@ -18,8 +18,8 @@ use syncio::{zxio::zxio_signals_t, Zxio, ZxioSignals};
 use crate::{
     fs::{FdEvents, FdNumber},
     signals::RunState,
-    task::CurrentTask,
-    types::{debug_assert_no_local_temp_ref, error, Errno, EINTR},
+    task::*,
+    types::{Errno, *},
 };
 
 #[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
@@ -1020,7 +1020,6 @@ mod tests {
             FdEvents,
         },
         testing::*,
-        types::OpenFlags,
     };
     use std::sync::atomic::AtomicU64;
 

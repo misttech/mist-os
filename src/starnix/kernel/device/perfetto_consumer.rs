@@ -15,13 +15,13 @@ use perfetto_consumer_proto::perfetto::protos::{
 };
 use prost::Message;
 
-use crate::fs::buffers::{VecInputBuffer, VecOutputBuffer};
-use crate::fs::socket::syscalls::sys_socket;
+use crate::fs::buffers::*;
+use crate::fs::socket::syscalls::*;
 use crate::fs::socket::{resolve_unix_socket_address, SocketPeer};
-use crate::fs::{FdEvents, FileHandle};
+use crate::fs::*;
 use crate::logging::log_error;
 use crate::task::{CurrentTask, EventHandler, Kernel, Task, Waiter};
-use crate::types::{errno, Errno, AF_UNIX, SOCK_STREAM};
+use crate::types::*;
 
 use fuchsia_trace::{category_enabled, trace_state, ProlongedContext, TraceState};
 

@@ -17,7 +17,7 @@ use zerocopy::{AsBytes, FromBytes};
 
 use crate::{
     auth::FsCred,
-    device::sync_file::{SyncFence, SyncFile, SyncPoint, Timeline},
+    device::sync_file::*,
     fs::{
         buffers::{InputBuffer, OutputBuffer},
         default_ioctl, default_seek, fileops_impl_directory, fileops_impl_nonseekable,

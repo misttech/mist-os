@@ -7,10 +7,7 @@ use std::{
     sync::{Arc, Weak},
 };
 
-use crate::{
-    task::{ProcessGroup, Task, ThreadGroup, ZombieProcess},
-    types::{pid_t, TempRef, WeakRef},
-};
+use crate::{task::*, types::*};
 
 #[derive(Default)]
 enum ProcessEntry {

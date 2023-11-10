@@ -12,8 +12,8 @@ use crate::{
         kobject::{KObjectDeviceAttribute, KType},
         sysfs::SysFsDirectory,
     },
-    task::Kernel,
-    types::DeviceType,
+    task::*,
+    types::*,
 };
 
 use std::sync::Arc;

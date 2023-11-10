@@ -23,26 +23,8 @@ use crate::{
         CurrentTask, EventHandler, ExitStatus, Kernel, Task, TaskFlags, WaitCanceler, WaitQueue,
         Waiter,
     },
-    types::{
-        __NR_exit, __NR_read, __NR_write, errno, errno_from_code, error, seccomp_data,
-        seccomp_notif, seccomp_notif_resp, sock_filter, Errno, OpenFlags, UserAddress, UserRef,
-        BPF_ABS, BPF_LD, BPF_ST, SECCOMP_IOCTL_NOTIF_ADDFD, SECCOMP_IOCTL_NOTIF_ID_VALID,
-        SECCOMP_IOCTL_NOTIF_RECV, SECCOMP_IOCTL_NOTIF_SEND, SECCOMP_RET_ACTION_FULL,
-        SECCOMP_RET_ALLOW, SECCOMP_RET_DATA, SECCOMP_USER_NOTIF_FLAG_CONTINUE, SIGKILL, SIGSYS,
-        SYS_SECCOMP,
-    },
+    types::*,
 };
-
-#[cfg(target_arch = "aarch64")]
-use crate::types::{__NR_clock_getres, __NR_clock_gettime, __NR_gettimeofday, AUDIT_ARCH_AARCH64};
-
-#[cfg(target_arch = "x86_64")]
-use crate::types::{
-    __NR_clock_gettime, __NR_getcpu, __NR_gettimeofday, __NR_time, AUDIT_ARCH_X86_64,
-};
-
-#[cfg(target_arch = "riscv64")]
-use crate::types::AUDIT_ARCH_RISCV64;
 
 pub struct SeccompFilter {
     /// The BPF program associated with this filter.

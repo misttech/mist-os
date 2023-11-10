@@ -16,19 +16,15 @@ use std::{ffi::CString, sync::Arc};
 use crate::{
     execution::{execute_task, Container},
     fs::{
-        buffers::{VecInputBuffer, VecOutputBuffer},
-        devpts::create_main_and_replica,
-        file_server::serve_file_at,
-        fuchsia::create_fuchsia_pipe,
-        socket::VsockSocket,
-        FdFlags, FileHandle,
+        buffers::*, devpts::create_main_and_replica, file_server::serve_file_at,
+        fuchsia::create_fuchsia_pipe, socket::VsockSocket, *,
     },
     logging::log_error,
-    task::{CurrentTask, ExitStatus, Kernel, Task},
-    types::{async_release_after, release_on_error, uapi, Errno, OpenFlags, ReleasableByRef},
+    task::*,
+    types::*,
 };
 
-use super::start_component;
+use super::*;
 
 pub fn expose_root(
     container: &Container,
