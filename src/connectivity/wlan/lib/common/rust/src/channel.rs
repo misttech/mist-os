@@ -357,7 +357,7 @@ pub fn derive_channel(
         .or(dsss_channel)
         .unwrap_or(rx_primary_channel);
 
-    let ht_op_cbw = ht_op.map(|ht_op| { ht_op.ht_op_info_head }.sta_chan_width());
+    let ht_op_cbw = ht_op.map(|ht_op| ht_op.ht_op_info.sta_chan_width());
     let vht_cbw_and_segs =
         vht_op.map(|vht_op| (vht_op.vht_cbw, vht_op.center_freq_seg0, vht_op.center_freq_seg1));
 
@@ -365,7 +365,7 @@ pub fn derive_channel(
         // Inspect vht/ht op parameters to determine the channel width.
         Some(ie::StaChanWidth::ANY) => {
             // Safe to unwrap `ht_op` because `ht_op_cbw` is only Some(_) if `ht_op` has a value.
-            let sec_chan_offset = { ht_op.unwrap().ht_op_info_head }.secondary_chan_offset();
+            let sec_chan_offset = ht_op.unwrap().ht_op_info.secondary_chan_offset();
             derive_wide_channel_bandwidth(vht_cbw_and_segs, sec_chan_offset)
         }
         // Default to Cbw20 if HT CBW field is set to 0 or not present.
@@ -745,19 +745,13 @@ mod tests {
     }
 
     fn ht_op(
-        primary: u8,
+        primary_channel: u8,
         chan_width: ie::StaChanWidth,
         offset: ie::SecChanOffset,
     ) -> ie::HtOperation {
-        let mut info_head = ie::HtOpInfoHead(0);
-        info_head.set_sta_chan_width(chan_width);
-        info_head.set_secondary_chan_offset(offset);
-        ie::HtOperation {
-            primary_channel: primary,
-            ht_op_info_head: info_head,
-            ht_op_info_tail: ie::HtOpInfoTail(0),
-            basic_ht_mcs_set: ie::SupportedMcsSet(0),
-        }
+        let ht_op_info =
+            ie::HtOpInfo::new().with_sta_chan_width(chan_width).with_secondary_chan_offset(offset);
+        ie::HtOperation { primary_channel, ht_op_info, basic_ht_mcs_set: ie::SupportedMcsSet(0) }
     }
 
     fn vht_op(vht_cbw: ie::VhtChannelBandwidth, seg0: u8, seg1: u8) -> ie::VhtOperation {

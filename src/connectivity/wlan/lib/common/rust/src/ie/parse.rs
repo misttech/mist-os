@@ -711,24 +711,21 @@ mod tests {
         // HtOperation element without Element Id and length
         #[rustfmt::skip]
         let raw_body = [
-            99, // primary_channel(u8)
-            0xff, // ht_op_info_head(HtOpInfoHead(u8))
-            0xfe, 0xff, 0xff, 0xff, // ht_op_info_tail(HtOpInfoTail(u8),
+            99, // primary_channel
+            0xff, 0xfe, 0xff, 0xff, 0xff, // ht_op_info
+            // basic_ht_mcs_set
             0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0xab, 0xcd, 0x00, 0x00, 0x00, 0x00,
-            // basic_ht_mcs_set(SupportedMcsSet(u128))
         ];
         let ht_op = parse_ht_operation(&raw_body[..]).expect("valid frame should result in OK");
 
         assert_eq!(ht_op.primary_channel, 99);
 
-        let ht_op_info_head = ht_op.ht_op_info_head;
-        assert_eq!(ht_op_info_head.secondary_chan_offset(), SecChanOffset::SECONDARY_BELOW);
-        assert_eq!(ht_op_info_head.sta_chan_width(), StaChanWidth::ANY);
-        assert_eq!(ht_op_info_head.ht_protection(), HtProtection::TWENTY_MHZ);
-
-        let ht_op_info_tail = ht_op.ht_op_info_tail;
-        assert_eq!(ht_op_info_tail.pco_phase(), PcoPhase::FORTY_MHZ);
+        let ht_op_info = ht_op.ht_op_info;
+        assert_eq!(ht_op_info.secondary_chan_offset(), SecChanOffset::SECONDARY_BELOW);
+        assert_eq!(ht_op_info.sta_chan_width(), StaChanWidth::ANY);
+        assert_eq!(ht_op_info.ht_protection(), HtProtection::TWENTY_MHZ);
+        assert_eq!(ht_op_info.pco_phase(), PcoPhase::FORTY_MHZ);
 
         let basic_mcs_set = ht_op.basic_ht_mcs_set;
         assert_eq!(basic_mcs_set.0, 0x00000000_cdab0000_00000000_000000ff);
@@ -738,20 +735,16 @@ mod tests {
     fn rm_enabled_capabilities_ok() {
         #[rustfmt::skip]
         let raw_body = [
-            0x03, 0x00, 0x00, 0x00, // rm_enabled_capabilities_head(RmEnabledCapabilitiesHead(u32))
-            0x02,                   // rm_enabled_capabilities_tail(RmEnabledCapabilitiesTail(u8))
+            0x03, 0x00, 0x00, 0x00, 0x02, // rm_enabled_capabilities
         ];
 
-        let rm_enabled_caps =
+        let caps =
             parse_rm_enabled_capabilities(&raw_body[..]).expect("valid frame should result in OK");
-        let head = rm_enabled_caps.rm_enabled_caps_head;
-        assert!(head.link_measurement_enabled());
-        assert!(head.neighbor_report_enabled());
-        assert!(!head.lci_azimuth_enabled());
-
-        let tail = rm_enabled_caps.rm_enabled_caps_tail;
-        assert!(tail.antenna_enabled());
-        assert!(!tail.ftm_range_report_enabled());
+        assert!(caps.link_measurement_enabled());
+        assert!(caps.neighbor_report_enabled());
+        assert!(!caps.lci_azimuth_enabled());
+        assert!(caps.antenna_enabled());
+        assert!(!caps.ftm_range_report_enabled());
     }
 
     #[test]

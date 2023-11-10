@@ -2836,8 +2836,7 @@ impl StatsLogger {
         }
 
         if let Some(rm_enabled_cap) = ap_state.original().rm_enabled_cap() {
-            let rm_enabled_cap_head = rm_enabled_cap.rm_enabled_caps_head;
-            if rm_enabled_cap_head.link_measurement_enabled() {
+            if rm_enabled_cap.link_measurement_enabled() {
                 metric_events.push(MetricEvent {
                     metric_id:
                         metrics::DEVICE_CONNECTED_TO_AP_THAT_SUPPORTS_LINK_MEASUREMENT_METRIC_ID,
@@ -2845,7 +2844,7 @@ impl StatsLogger {
                     payload: MetricEventPayload::Count(1),
                 });
             }
-            if rm_enabled_cap_head.neighbor_report_enabled() {
+            if rm_enabled_cap.neighbor_report_enabled() {
                 metric_events.push(MetricEvent {
                     metric_id:
                         metrics::DEVICE_CONNECTED_TO_AP_THAT_SUPPORTS_NEIGHBOR_REPORT_METRIC_ID,

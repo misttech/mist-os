@@ -32,7 +32,6 @@ source_set("mlme") {
 
   sources = [
     "ap/tim.cc",
-    "ht.cc",
     "mac_frame.cc",
     "packet.cc",
     "rate_limiter.cc",

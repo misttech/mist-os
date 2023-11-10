@@ -25,9 +25,7 @@ pub fn fake_ht_cap_chanwidth(chanwidth: ChanWidthSet) -> HtCapabilities {
 
 pub fn fake_ht_op_sec_offset(secondary_offset: SecChanOffset) -> HtOperation {
     let mut ht_op = fake_ht_operation();
-    let mut ht_op_info_head = ht_op.ht_op_info_head;
-    ht_op_info_head.set_secondary_chan_offset(secondary_offset);
-    ht_op.ht_op_info_head = ht_op_info_head;
+    ht_op.ht_op_info.set_secondary_chan_offset(secondary_offset);
     ht_op
 }
 
@@ -67,7 +65,7 @@ pub fn fake_ht_capabilities() -> HtCapabilities {
 pub fn fake_ht_operation() -> HtOperation {
     HtOperation {
         primary_channel: 36,
-        ht_op_info_head: HtOpInfoHead(0)
+        ht_op_info: HtOpInfo::new()
             .with_secondary_chan_offset(SecChanOffset::SECONDARY_ABOVE)
             .with_sta_chan_width(StaChanWidth::ANY)
             .with_rifs_mode_permitted(false)
@@ -76,8 +74,7 @@ pub fn fake_ht_operation() -> HtOperation {
             .with_obss_non_ht_stas_present(true)
             .with_center_freq_seg2(0)
             .with_dual_beacon(false)
-            .with_dual_cts_protection(false),
-        ht_op_info_tail: HtOpInfoTail(0)
+            .with_dual_cts_protection(false)
             .with_stbc_beacon(false)
             .with_lsig_txop_protection(false)
             .with_pco_active(false)

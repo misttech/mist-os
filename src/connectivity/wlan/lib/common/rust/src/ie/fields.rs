@@ -537,10 +537,7 @@ pub struct AselCapability(pub u8);
 #[derive(PartialEq, Eq, Hash, AsBytes, FromZeroes, FromBytes, Unaligned, Clone, Copy, Debug)]
 pub struct HtOperation {
     pub primary_channel: u8, // Primary 20 MHz channel.
-    // HT Operation Information is 40-bit field so it has to be split
-    // TODO(fxbug.dev/82503): This is a bit awkward, see if we can represent these as byte array
-    pub ht_op_info_head: HtOpInfoHead,     // u32
-    pub ht_op_info_tail: HtOpInfoTail,     // u8
+    pub ht_op_info: HtOpInfo,
     pub basic_ht_mcs_set: SupportedMcsSet, // u128
 }
 
@@ -552,7 +549,6 @@ impl From<HtOperation> for fidl_ieee80211::HtOperation {
     }
 }
 
-// TODO(fxbug.dev/43257): Move bits 8-32 into tail.
 // IEEE Std 802.11-2016, Figure 9-339
 #[bitfield(
     0..=1 secondary_chan_offset as SecChanOffset(u8),
@@ -572,10 +568,20 @@ impl From<HtOperation> for fidl_ieee80211::HtOperation {
     24..=29 _,                                  // reserved
     30      dual_beacon,                        // whether an STBC beacon is transmitted by the AP
     31      dual_cts_protection,                // whether CTS protection is required
+    32      stbc_beacon,                        // 0 indicates primary beacon, 1 STBC beacon
+    33      lsig_txop_protection,               // only true if all HT STAs in the BSS support this
+    34      pco_active,
+    35..=35 pco_phase as PcoPhase(u8),
+    36..=39 _,                                  // reserved
 )]
 #[repr(C)]
 #[derive(PartialEq, Eq, Hash, AsBytes, FromZeroes, FromBytes, Clone, Copy)]
-pub struct HtOpInfoHead(pub u32);
+pub struct HtOpInfo(pub [u8; 5]);
+impl HtOpInfo {
+    pub fn new() -> HtOpInfo {
+        HtOpInfo([0u8; 5])
+    }
+}
 
 #[repr(C, packed)]
 #[derive(
@@ -596,20 +602,6 @@ impl StaChanWidth {
     pub_const!(ANY, 1); // Any in the Supported Channel Width set
 }
 
-// TODO(fxbug.dev/43257): Move bits 8-32 from head into here.
-// IEEE Std 802.11-2016, Figure 9-339, continued
-#[bitfield(
-    // bit offset in this struct starts from bit 32 in the IEEE HtOperationInformation field.
-    0     stbc_beacon,                        // 0 indicates primary beacon, 1 STBC beacon
-    1     lsig_txop_protection,               // only true if all HT STAs in the BSS support this
-    2     pco_active,
-    3..=3 pco_phase as PcoPhase(u8),
-    4..=7 _,                                  // reserved
-)]
-#[repr(C)]
-#[derive(PartialEq, Eq, Hash, AsBytes, FromZeroes, FromBytes, Clone, Copy)]
-pub struct HtOpInfoTail(pub u8);
-
 #[derive(Debug, PartialOrd, PartialEq, Eq, Clone, Copy)]
 pub struct HtProtection(pub u8);
 impl HtProtection {
@@ -620,15 +612,6 @@ impl HtProtection {
 }
 
 // IEEE Std 802.11-2016, 9.4.2.45
-#[repr(C, packed)]
-#[derive(PartialEq, Eq, Hash, AsBytes, FromZeroes, FromBytes, Unaligned, Clone, Copy, Debug)]
-pub struct RmEnabledCapabilities {
-    // Rm Enabled Capabilities is 40-bit field so it has to be split
-    // TODO(fxbug.dev/82503): This is a bit awkward, see if we can represent these as byte array
-    pub rm_enabled_caps_head: RmEnabledCapabilitiesHead, // u32
-    pub rm_enabled_caps_tail: RmEnabledCapabilitiesTail, // u8
-}
-
 #[bitfield(
     0       link_measurement_enabled,
     1       neighbor_report_enabled,
@@ -656,21 +639,15 @@ pub struct RmEnabledCapabilities {
     29      rcpi_measurement_enabled,
     30      rsni_measurement_enabled,
     31      bss_average_access_delay_enabled,
+    32      bss_available_admission_capacity_enabled,
+    33      antenna_enabled,
+    34      ftm_range_report_enabled,
+    35      civic_location_measurement_enabled,
+    36..=39 _,
 )]
 #[repr(C)]
 #[derive(PartialEq, Eq, Hash, AsBytes, FromZeroes, FromBytes, Clone, Copy)]
-pub struct RmEnabledCapabilitiesHead(pub u32);
-
-#[bitfield(
-    0       bss_available_admission_capacity_enabled,
-    1       antenna_enabled,
-    2       ftm_range_report_enabled,
-    3       civic_location_measurement_enabled,
-    4..=7   _,
-)]
-#[repr(C)]
-#[derive(PartialEq, Eq, Hash, AsBytes, FromZeroes, FromBytes, Clone, Copy)]
-pub struct RmEnabledCapabilitiesTail(pub u8);
+pub struct RmEnabledCapabilities(pub [u8; 5]);
 
 #[derive(Debug, PartialOrd, PartialEq, Eq, Clone, Copy)]
 pub struct PcoPhase(pub u8);

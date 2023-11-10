@@ -508,93 +508,6 @@ struct HtCapabilities {
 
 } __PACKED;
 
-// IEEE Std 802.11-2016, 9.4.2.57
-// Note this is a field within HtOperation element.
-class HtOpInfoHead : public common::BitField<uint32_t> {
- public:
-  constexpr explicit HtOpInfoHead(uint32_t op_info) : common::BitField<uint32_t>(op_info) {}
-  constexpr HtOpInfoHead() = default;
-
-  WLAN_BIT_FIELD(secondary_chan_offset, 0, 2)
-  WLAN_BIT_FIELD(sta_chan_width, 2, 1)
-  WLAN_BIT_FIELD(rifs_mode, 3, 1)
-  WLAN_BIT_FIELD(reserved1, 4,
-                 4)  // Note 802.11n D1.10 implementaions use these.
-
-  WLAN_BIT_FIELD(ht_protect, 8, 2)
-  WLAN_BIT_FIELD(nongreenfield_present, 10,
-                 1)  // Nongreenfield HT STAs present.
-
-  WLAN_BIT_FIELD(reserved2, 11,
-                 1)                   // Note 802.11n D1.10 implementations use these.
-  WLAN_BIT_FIELD(obss_non_ht, 12, 1)  // OBSS Non-HT STAs present.
-  // IEEE 802.11-2016 Figure 9-339 has an incosistency so this is Fuchsia
-  // interpretation: The channel number for the second segment in a 80+80 Mhz
-  // channel
-  WLAN_BIT_FIELD(center_freq_seg2, 13, 8)  // VHT
-  WLAN_BIT_FIELD(reserved3, 21, 3)
-
-  WLAN_BIT_FIELD(reserved4, 24, 6)
-  WLAN_BIT_FIELD(dual_beacon, 30, 1)
-  WLAN_BIT_FIELD(dual_cts_protect, 31, 1)
-
-  enum SecChanOffset {
-    SECONDARY_NONE = 0,   // No secondary channel
-    SECONDARY_ABOVE = 1,  // Secondary channel is above the primary channel
-    RESERVED = 2,
-    SECONDARY_BELOW = 3,  // Secondary channel is below the primary channel
-  };
-
-  enum StaChanWidth {
-    TWENTY = 0,  // MHz
-    ANY = 1,     // Any in the Supported Channel Width set
-  };
-
-  enum HtProtect {
-    NONE = 0,
-    NONMEMBER = 1,
-    TWENTY_MHZ = 2,
-    NON_HT_MIXED = 3,
-  };
-} __PACKED;
-
-class HtOpInfoTail : public common::BitField<uint8_t> {
- public:
-  constexpr explicit HtOpInfoTail(uint8_t val) : common::BitField<uint8_t>(val) {}
-  constexpr HtOpInfoTail() = default;
-
-  WLAN_BIT_FIELD(stbc_beacon, 0, 1)  // Add 32 for the original bit location.
-  WLAN_BIT_FIELD(lsig_txop_protect, 1, 1)
-  WLAN_BIT_FIELD(pco_active, 2, 1)
-  WLAN_BIT_FIELD(pco_phase, 3, 1)
-  WLAN_BIT_FIELD(reserved5, 4, 4)
-} __PACKED;
-
-// IEEE Std 802.11-2016, 9.4.2.57
-struct HtOperation {
-  uint8_t primary_channel;  // Primary 20 MHz channel.
-
-  // Implementation hack to support 40bits bitmap.
-  HtOpInfoHead head;
-  HtOpInfoTail tail;
-  SupportedMcsSet basic_mcs_set;
-
-  static HtOperation FromDdk(const ht_operation_t& ddk) {
-    HtOperation dst{};
-    static_assert(sizeof(dst) == sizeof(ddk.bytes));
-    memcpy(&dst, ddk.bytes, sizeof(ddk.bytes));
-    return dst;
-  }
-
-  ht_operation_t ToDdk() const {
-    ht_operation_t dst{};
-    static_assert(sizeof(dst.bytes) == sizeof(*this));
-    memcpy(&dst.bytes, this, sizeof(dst.bytes));
-    return dst;
-  }
-
-} __PACKED;
-
 // IEEE Std 802.11-2016, 9.4.2.158.2
 // Note this is a field of VhtCapabilities element
 struct VhtCapabilitiesInfo : public common::LittleEndianBitField<4> {
@@ -800,39 +713,6 @@ struct BasicVhtMcsNss : public common::BitField<uint16_t> {
     set_val(static_cast<uint16_t>(val() | mcs_val));
   }
 };
-
-// IEEE Std 802.11-2016, 9.4.2.159
-struct VhtOperation {
-  uint8_t vht_cbw;
-  uint8_t center_freq_seg0;
-  uint8_t center_freq_seg1;
-
-  BasicVhtMcsNss basic_mcs;
-
-  enum VhtChannelBandwidth {
-    VHT_CBW_20_40 = 0,
-    VHT_CBW_80_160_80P80 = 1,
-    VHT_CBW_160 = 2,    // Deprecated
-    VHT_CBW_80P80 = 3,  // Deprecated
-
-    // 4 - 255 reserved
-  };
-
-  static VhtOperation FromDdk(const vht_operation_t& ddk) {
-    VhtOperation dst{};
-    static_assert(sizeof(dst) == sizeof(ddk.bytes));
-    memcpy(&dst, ddk.bytes, sizeof(ddk.bytes));
-    return dst;
-  }
-
-  vht_operation_t ToDdk() const {
-    vht_operation_t dst{};
-    static_assert(sizeof(dst.bytes) == sizeof(*this));
-    memcpy(&dst.bytes, this, sizeof(dst.bytes));
-    return dst;
-  }
-
-} __PACKED;
 
 // IEEE Std 802.11-2016, 9.4.2.102
 // The fixed part of the Mesh Peering Management header

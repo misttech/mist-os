@@ -66,27 +66,6 @@ TEST(HtCapabilities, DdkConversion) {
   }
 }
 
-TEST(HtOperation, DdkConversion) {
-  ht_operation_t ddk{.bytes = {
-                         123,                     // primary channel
-                         0x04, 0x03, 0x02, 0x01,  // head
-                         0x05,                    // tail
-                         0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0xff,
-                         0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00  // mcs_set
-                     }};
-
-  auto ieee = HtOperation::FromDdk(ddk);
-  EXPECT_EQ(123U, ieee.primary_channel);
-  EXPECT_EQ(0x01020304U, ieee.head.val());
-  EXPECT_EQ(0x05U, ieee.tail.val());
-  std::array<uint8_t, 16> expected_mcs_set = {0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0xff,
-                                              0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-  EXPECT_EQ(expected_mcs_set, ieee.basic_mcs_set.val());
-
-  auto ddk2 = ieee.ToDdk();
-  EXPECT_EQ(0, memcmp(ddk.bytes, ddk2.bytes, sizeof(ddk.bytes)));
-}
-
 TEST(VhtCapabilities, DdkConversion) {
   vht_capabilities_t ddk{
       .bytes =
@@ -99,23 +78,6 @@ TEST(VhtCapabilities, DdkConversion) {
   auto ieee = VhtCapabilities::FromDdk(ddk);
   EXPECT_EQ(0xaabbccddU, ieee.vht_cap_info.as_uint32());
   EXPECT_EQ(0x0011223344556677U, ieee.vht_mcs_nss.as_uint64());
-
-  auto ddk2 = ieee.ToDdk();
-  EXPECT_EQ(0, memcmp(ddk.bytes, ddk2.bytes, sizeof(ddk.bytes)));
-}
-
-TEST(VhtOperation, DdkConversion) {
-  vht_operation_t ddk{.bytes = {
-                          0x01,        // cbw
-                          42,          // center_freq_seg0
-                          106,         // center freq seg1
-                          0x22, 0x11,  // basic_mcs
-                      }};
-  auto ieee = VhtOperation::FromDdk(ddk);
-  EXPECT_EQ(0x01U, ieee.vht_cbw);
-  EXPECT_EQ(42U, ieee.center_freq_seg0);
-  EXPECT_EQ(106U, ieee.center_freq_seg1);
-  EXPECT_EQ(0x1122U, ieee.basic_mcs.val());
 
   auto ddk2 = ieee.ToDdk();
   EXPECT_EQ(0, memcmp(ddk.bytes, ddk2.bytes, sizeof(ddk.bytes)));
