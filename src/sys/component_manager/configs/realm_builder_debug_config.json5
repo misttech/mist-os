@@ -20,9 +20,6 @@
             ],
         },
         {
-            runner: "builtin",
-        },
-        {
             runner: "elf",
         },
         {

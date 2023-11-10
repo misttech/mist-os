@@ -30,11 +30,6 @@ pub struct Arguments {
     /// userboot when loading the root component manager to avoid hardcoding component manager
     /// specific logic in userboot.
     pub boot: bool,
-
-    /// Whether the builtin runner will be added to the root environment.
-    ///
-    /// TODO(fxbug.dev/305862055): Remove this feature gate.
-    pub add_builtin_runner: bool,
 }
 
 impl Arguments {
@@ -75,10 +70,7 @@ impl Arguments {
                     config: BOOT_CONFIG.to_string(),
                     host_bootfs: true,
                     boot: true,
-                    add_builtin_runner: false,
                 };
-            } else if arg == "--add_builtin_runner" {
-                args.add_builtin_runner = true;
             } else if arg.starts_with("--") {
                 return Err(format_err!("Unrecognized flag: {}", arg));
             } else {
@@ -124,8 +116,6 @@ mod tests {
         static ref CONFIG_FILENAME: fn() -> String = || String::from("foo");
         static ref CONFIG_FLAG: fn() -> String = || String::from("--config");
         static ref BOOT_FLAG: fn() -> String = || String::from("--boot");
-        static ref ADD_BUILTIN_RUNNER_FLAG: fn() -> String =
-            || String::from("--add_builtin_runner");
         static ref DUMMY_URL: fn() -> Url =
             || Url::new("fuchsia-pkg://fuchsia.com/pkg#meta/component.cm".to_owned()).unwrap();
         static ref DUMMY_URL_AS_STR: fn() -> String = || DUMMY_URL().as_str().to_owned();
@@ -195,25 +185,12 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn parse_add_builtin_runner() {
-        let expected_arguments =
-            Arguments { config: CONFIG_FILENAME(), add_builtin_runner: true, ..Default::default() };
-
-        assert_eq!(
-            Arguments::new(vec![CONFIG_FLAG(), CONFIG_FILENAME(), ADD_BUILTIN_RUNNER_FLAG()])
-                .unwrap(),
-            expected_arguments
-        );
-    }
-
-    #[fuchsia::test]
     fn boot_argument_sets_defaults() {
         let expected_arguments = Arguments {
             root_component_url: Some(Url::new(BOOT_ROOT_COMPONENT_URL.to_string()).unwrap()),
             config: BOOT_CONFIG.to_string(),
             host_bootfs: true,
             boot: true,
-            add_builtin_runner: false,
         };
 
         assert_eq!(

@@ -492,14 +492,6 @@ impl ScopedElfRunner {
         })
         .detach();
     }
-
-    pub async fn start(
-        &self,
-        start_info: fcrunner::ComponentStartInfo,
-        server_end: ServerEnd<fcrunner::ComponentControllerMarker>,
-    ) {
-        start(&self.runner, self.checker.clone(), start_info, server_end).await
-    }
 }
 
 /// Starts a component by creating a new Job and Process for the component.
@@ -619,6 +611,17 @@ async fn start(
         runner::component::Controller::new(elf_component, server_stream).serve(epitaph_fn).await;
     })
     .detach();
+}
+
+#[cfg(test)]
+impl ScopedElfRunner {
+    async fn start(
+        &self,
+        start_info: fcrunner::ComponentStartInfo,
+        server_end: ServerEnd<fcrunner::ComponentControllerMarker>,
+    ) {
+        start(&self.runner, self.checker.clone(), start_info, server_end).await
+    }
 }
 
 #[cfg(test)]

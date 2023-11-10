@@ -112,7 +112,6 @@ pub static SHUTDOWN_TIMEOUT: std::time::Duration = std::time::Duration::from_sec
 pub struct BuiltinEnvironmentBuilder {
     // TODO(60804): Make component manager's namespace injectable here.
     runtime_config: Option<RuntimeConfig>,
-    top_instance: Option<Arc<ComponentManagerInstance>>,
     bootfs_svc: Option<BootfsSvc>,
     runners: Vec<(Name, Arc<dyn BuiltinRunnerFactory>)>,
     elf_runner: Option<Arc<ElfRunner>>,
@@ -127,7 +126,6 @@ impl Default for BuiltinEnvironmentBuilder {
     fn default() -> Self {
         Self {
             runtime_config: None,
-            top_instance: None,
             bootfs_svc: None,
             runners: vec![],
             elf_runner: None,
@@ -146,18 +144,12 @@ impl BuiltinEnvironmentBuilder {
     }
 
     pub fn set_runtime_config(mut self, runtime_config: RuntimeConfig) -> Self {
-        assert!(self.runtime_config.is_none());
-        let top_instance = Arc::new(ComponentManagerInstance::new(
-            runtime_config.namespace_capabilities.clone(),
-            runtime_config.builtin_capabilities.clone(),
-        ));
         self.runtime_config = Some(runtime_config);
-        self.top_instance = Some(top_instance);
         self
     }
 
-    pub fn set_bootfs_svc(mut self, bootfs_svc: BootfsSvc) -> Self {
-        self.bootfs_svc = Some(bootfs_svc);
+    pub fn set_bootfs_svc(mut self, bootfs_svc: Option<BootfsSvc>) -> Self {
+        self.bootfs_svc = bootfs_svc;
         self
     }
 
@@ -184,7 +176,6 @@ impl BuiltinEnvironmentBuilder {
         Ok(self)
     }
 
-    /// TODO(fxbug.dev/305862055): Remove the builtin elf runner capability.
     pub fn add_elf_runner(mut self) -> Result<Self, Error> {
         let runtime_config = self
             .runtime_config
@@ -205,33 +196,6 @@ impl BuiltinEnvironmentBuilder {
         ));
         self.elf_runner = Some(runner.clone());
         Ok(self.add_runner("elf".parse().unwrap(), runner))
-    }
-
-    pub fn add_builtin_runner(self) -> Result<Self, Error> {
-        use crate::builtin::builtin_runner::BuiltinRunner;
-        use crate::builtin::builtin_runner::ElfRunnerResources;
-
-        let runtime_config = self
-            .runtime_config
-            .as_ref()
-            .ok_or(format_err!("Runtime config should be set to add builtin runner."))?;
-
-        let launcher_connector: fn() -> elf_runner::process_launcher::Connector =
-            if runtime_config.use_builtin_process_launcher {
-                || Box::new(elf_runner::process_launcher::BuiltInConnector {})
-            } else {
-                || Box::new(elf_runner::process_launcher::NamespaceConnector {})
-            };
-        let runner = Arc::new(BuiltinRunner::new(
-            self.top_instance.clone().unwrap().task_group(),
-            ElfRunnerResources {
-                security_policy: runtime_config.security_policy.clone(),
-                launcher_connector,
-                utc_clock: self.utc_clock.clone(),
-                crash_records: self.crash_records.clone(),
-            },
-        ));
-        Ok(self.add_runner("builtin".parse().unwrap(), runner))
     }
 
     pub fn add_runner(mut self, name: Name, runner: Arc<dyn BuiltinRunnerFactory>) -> Self {
@@ -343,8 +307,11 @@ impl BuiltinEnvironmentBuilder {
             .collect();
 
         let runtime_config = Arc::new(runtime_config);
+        let top_instance = Arc::new(ComponentManagerInstance::new(
+            runtime_config.namespace_capabilities.clone(),
+            runtime_config.builtin_capabilities.clone(),
+        ));
 
-        let top_instance = self.top_instance.unwrap().clone();
         let params = ModelParams {
             root_component_url: root_component_url.as_str().to_owned(),
             root_environment: Environment::new_root(
