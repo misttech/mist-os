@@ -5,12 +5,12 @@
 #include "mod.h"
 
 // Defined in fuchsia_controller_py.cc
-extern struct PyModuleDef fuchsia_controller_py;
+extern struct PyModuleDef fuchsia_controller_internal;
 
 namespace mod {
 
 FuchsiaControllerState *get_module_state() {
-  auto mod = PyState_FindModule(&fuchsia_controller_py);
+  auto mod = PyState_FindModule(&fuchsia_controller_internal);
   return reinterpret_cast<FuchsiaControllerState *>(PyModule_GetState(mod));
 }
 

@@ -79,24 +79,16 @@ python_c_extension("fidl_codec") {
   ]
 }
 
-python_c_extension("fuchsia_controller_py") {
+python_c_extension("fuchsia_controller_internal") {
   sources = [
-    "cpp/abi/channel.cc",
-    "cpp/abi/channel.h",
     "cpp/abi/convert.h",
     "cpp/abi/error.cc",
     "cpp/abi/error.h",
     "cpp/abi/fuchsia_controller.h",
     "cpp/abi/fuchsia_controller_py.cc",
-    "cpp/abi/handle.cc",
-    "cpp/abi/handle.h",
-    "cpp/abi/isolate_directory.cc",
-    "cpp/abi/isolate_directory.h",
     "cpp/abi/macros.h",
     "cpp/abi/mod.cc",
     "cpp/abi/mod.h",
-    "cpp/abi/socket.cc",
-    "cpp/abi/socket.h",
     "cpp/python/py_header.h",
     "cpp/raii/py_wrapper.h",
   ]
@@ -114,6 +106,16 @@ python_c_extension("fuchsia_controller_py") {
 
   # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-vla-cxx-extension" ]
+}
+
+python_library("fuchsia_controller_py") {
+  library_name = "fuchsia_controller_py"
+  source_root = "python/fuchsia_controller_py"
+  library_deps = [
+    ":fidl_codec",
+    ":fuchsia_controller_internal",
+  ]
+  sources = [ "__init__.py" ]
 }
 
 python_library("fidl_bindings") {
