@@ -14,6 +14,7 @@ static_library("aml-dsp") {
   sources = [
     "dsp.cc",
     "dsp.h",
+    "meson_mhu_common.h",
   ]
   deps = [
     "//sdk/fidl/fuchsia.hardware.dsp:fuchsia.hardware.dsp_cpp",

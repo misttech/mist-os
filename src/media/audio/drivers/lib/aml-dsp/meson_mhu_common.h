@@ -1,9 +1,9 @@
-// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_MAILBOX_DRIVERS_AML_FIFO_MAILBOX_MESON_MHU_COMMON_H_
-#define SRC_DEVICES_MAILBOX_DRIVERS_AML_FIFO_MAILBOX_MESON_MHU_COMMON_H_
+#ifndef SRC_MEDIA_AUDIO_DRIVERS_LIB_AML_DSP_MESON_MHU_COMMON_H_
+#define SRC_MEDIA_AUDIO_DRIVERS_LIB_AML_DSP_MESON_MHU_COMMON_H_
 
 constexpr uint8_t kMboxMax = 4;
 constexpr uint8_t kMhuIrq32 = 2;
@@ -51,7 +51,7 @@ struct AddrInfo {
 } __attribute__((packed));
 
 /* Message composition with module(6bits), function(10bits) */
-#define MBX_COMPOSE_MSG(mod, func) (((mod) << 10) | ((func)&0x3FF))
+#define MBX_COMPOSE_MSG(mod, func) (((mod) << 10) | ((func) & 0x3FF))
 
 /* Define module type here, 6bits valid */
 constexpr uint8_t kMbxSystem = 0x0;
@@ -68,4 +68,4 @@ constexpr uint16_t kCmdDataThreadPosition = 0xf;
 #define MBX_CMD_DATA_THREAD_STOP MBX_COMPOSE_MSG(kMbxSystem, kCmdDataThreadStop)
 #define MBX_CMD_DATA_THREAD_POSITION MBX_COMPOSE_MSG(kMbxSystem, kCmdDataThreadPosition)
 
-#endif  // SRC_DEVICES_MAILBOX_DRIVERS_AML_FIFO_MAILBOX_MESON_MHU_COMMON_H_
+#endif  // SRC_MEDIA_AUDIO_DRIVERS_LIB_AML_DSP_MESON_MHU_COMMON_H_

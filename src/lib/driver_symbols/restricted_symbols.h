@@ -31,7 +31,6 @@ namespace driver_symbols {
 const std::set<std::string> kCreateThreadSymbolsDriversAllowlist = {
     "#meta/acpi-arm64.cm",
     "#meta/ahci.cm",
-    "#meta/aml-fifo-mailbox.cm",
     "#meta/aml-g12-pdm-dsp.cm",
     "#meta/aml-g12-pdm.cm",
     "#meta/aml-g12-tdm-dai.cm",
@@ -43,7 +42,6 @@ const std::set<std::string> kCreateThreadSymbolsDriversAllowlist = {
     "#meta/amlogic_h264_encoder_driver.cm",
     "#meta/amlogic_hevc_encoder_driver.cm",
     "#meta/amlogic_video_decoder.cm",
-    "#meta/aml-pl-mailbox.cm",
     "#meta/aml-ram.cm",
     "#meta/aml-securemem.cm",
     "#meta/aml-thermal-s905d2g-legacy.cm",

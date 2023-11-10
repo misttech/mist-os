@@ -24,7 +24,7 @@
 
 #include <soc/aml-common/aml-power-domain.h>
 
-#include "src/devices/mailbox/drivers/aml-fifo-mailbox/meson_mhu_common.h"
+#include "src/media/audio/drivers/lib/aml-dsp/meson_mhu_common.h"
 
 namespace {
 

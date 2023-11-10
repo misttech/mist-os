@@ -8,7 +8,7 @@
 #include <fidl/fuchsia.hardware.dsp/cpp/wire.h>
 #include <fidl/fuchsia.hardware.mailbox/cpp/wire.h>
 
-#include "src/devices/mailbox/drivers/aml-fifo-mailbox/meson_mhu_common.h"
+#include "src/media/audio/drivers/lib/aml-dsp/meson_mhu_common.h"
 
 using MailboxClient = fidl::WireSyncClient<fuchsia_hardware_mailbox::Device>;
 using DspClient = fidl::WireSyncClient<fuchsia_hardware_dsp::DspDevice>;

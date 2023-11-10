@@ -488,3 +488,15 @@
   available_in_git: '0fea9a0da49070d15516d16cc630978ec02fbbd6'
   areas: ['Light']
   path: '/src/ui/light/drivers/lp50xx-light'
+- short_description: 'AMLogic MailBox driver'
+  deletion_reason: 'Hardware is not actively supported'
+  gerrit_change_id: '943597'
+  available_in_git: '7fb565c3701f38fefce51b8f16787ee94e118c55'
+  areas: ['Misc']
+  path: '/src/devices/mailbox/drivers/aml-pl-mailbox'
+- short_description: 'AMLogic MailBox driver(Fifo)'
+  deletion_reason: 'Hardware is not actively supported'
+  gerrit_change_id: '943597'
+  available_in_git: '7fb565c3701f38fefce51b8f16787ee94e118c55'
+  areas: ['Misc']
+  path: '/src/devices/mailbox/drivers/aml-fifo-mailbox'

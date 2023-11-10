@@ -227,8 +227,6 @@ sdk_static_library("ddk") {
     "//src/devices/lib/iommu:*",
     "//src/devices/lib/nxp:*",
     "//src/devices/light-sensor/drivers/ams-light:*",
-    "//src/devices/mailbox/drivers/aml-fifo-mailbox:*",
-    "//src/devices/mailbox/drivers/aml-pl-mailbox:*",
     "//src/devices/mcu/drivers/vim3-mcu:*",
     "//src/devices/misc/drivers/compat:*",
     "//src/devices/misc/drivers/test:*",

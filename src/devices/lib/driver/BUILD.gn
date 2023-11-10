@@ -131,8 +131,6 @@ group("driver") {
     "//src/devices/lib/acpi:*",
     "//src/devices/lib/acpi/mock:*",
     "//src/devices/light-sensor/drivers/ams-light:*",
-    "//src/devices/mailbox/drivers/aml-fifo-mailbox:*",
-    "//src/devices/mailbox/drivers/aml-pl-mailbox:*",
     "//src/devices/mcu/drivers/chromiumos-ec-core:*",
     "//src/devices/mcu/drivers/chromiumos-ec-lpc:*",
     "//src/devices/mcu/drivers/vim3-mcu:*",
