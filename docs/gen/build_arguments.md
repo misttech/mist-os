@@ -1451,7 +1451,7 @@ Controls whether to promote warnings to errors.
 
 **Current value (from the default):** `true`
 
-From //build/config/BUILD.gn:35
+From //build/config/BUILD.gn:36
 
 ### dev_bootfs_labels
 
@@ -2690,7 +2690,7 @@ remove this option when the issues are addressed.
 
 **Current value (from the default):** `false`
 
-From //build/config/BUILD.gn:31
+From //build/config/BUILD.gn:32
 
 ### enable_grpc_ares
 
@@ -3037,17 +3037,6 @@ instead use the `fuchsia_cxx_version` variable.
 **Current value (from the default):** `17`
 
 From //build/config/fuchsia_cxx_version.gni:10
-
-### experimental_wlan_client_mlme
-
-Selects the SoftMAC client implementation to use. Choices:
-  false (default) - C++ Client MLME implementation
-  true - Rust Client MLME implementation
-This argument is temporary until Rust MLME is ready to be used.
-
-**Current value (from the default):** `false`
-
-From //src/connectivity/wlan/lib/mlme/cpp/BUILD.gn:10
 
 ### extra_bazel_assembly_targets
 
