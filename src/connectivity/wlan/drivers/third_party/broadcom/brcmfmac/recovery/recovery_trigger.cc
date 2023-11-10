@@ -17,7 +17,8 @@ namespace wlan::brcmfmac {
 
 RecoveryTrigger::RecoveryTrigger(std::shared_ptr<std::function<zx_status_t()>> callback)
     : firmware_crash_(kFirmwareCrashThreshold, callback),
-      sdio_timeout_(kSdioTimeoutThreshold, callback) {}
+      sdio_timeout_(kSdioTimeoutThreshold, callback),
+      ctrl_frame_response_timeout_(kCtrlFrameResponseTimeoutThreshold, callback) {}
 
 RecoveryTrigger::~RecoveryTrigger() = default;
 
@@ -25,6 +26,7 @@ void RecoveryTrigger::ClearStatistics() {
   BRCMF_INFO("The recovery process has been triggered, clearing all counters");
   firmware_crash_.Clear();
   sdio_timeout_.Clear();
+  ctrl_frame_response_timeout_.Clear();
 }
 
 }  // namespace wlan::brcmfmac
