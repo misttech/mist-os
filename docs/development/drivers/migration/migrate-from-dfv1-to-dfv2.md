@@ -228,14 +228,11 @@ includes most of the essential utilities for DFv2 drivers:
 //sdk/lib/driver/component/cpp:cpp
 ```
 
-In header files, you likely need the following libraries for the
-new DFv2 driver interfaces:
+In header files, include the following library for the new DFv2 driver
+interfaces:
 
 ```cpp
 #include <lib/driver/component/cpp/driver_base.h>
-#include <lib/driver/component/cpp/outgoing_directory.h>
-#include <fidl/fuchsia.driver.framework/cpp/fidl.h>
-#include <lib/driver/component/cpp/service_client.h>
 ```
 
 Note: After updating dependencies from DDK to DFv2, your driver won't
