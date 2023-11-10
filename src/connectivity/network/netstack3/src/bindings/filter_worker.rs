@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_net_filter as fnet_filter;
+use fidl_fuchsia_net_filter_deprecated as fnet_filter;
 use futures::TryStreamExt;
 use tracing::error;
 
@@ -16,21 +16,21 @@ pub(crate) async fn serve(stream: fnet_filter::FilterRequestStream) -> Result<()
             match request {
                 FilterRequest::DisableInterface { responder, .. } => {
                     error!(
-                        "fuchsia.net.filter.Filter is not implemented \
+                        "fuchsia.net.filter.deprecated.Filter is not implemented \
                            (https://fxbug.dev/106604); ignoring DisableInterface"
                     );
                     responder.send(Ok(())).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
                 }
                 FilterRequest::EnableInterface { responder, .. } => {
                     error!(
-                        "fuchsia.net.filter.Filter is not implemented \
+                        "fuchsia.net.filter.deprecated.Filter is not implemented \
                            (https://fxbug.dev/106604); ignoring EnableInterface"
                     );
                     responder.send(Ok(())).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
                 }
                 FilterRequest::GetRules { responder } => {
                     error!(
-                        "fuchsia.net.filter.Filter is not implemented \
+                        "fuchsia.net.filter.deprecated.Filter is not implemented \
                            (https://fxbug.dev/106604); ignoring GetRules"
                     );
                     responder
@@ -39,7 +39,7 @@ pub(crate) async fn serve(stream: fnet_filter::FilterRequestStream) -> Result<()
                 }
                 FilterRequest::UpdateRules { rules, generation, responder } => {
                     error!(
-                        "fuchsia.net.filter.Filter is not implemented \
+                        "fuchsia.net.filter.deprecated.Filter is not implemented \
                             (https://fxbug.dev/106604); ignoring UpdateRules \
                             {{ generation: {:?}, rules: {:?} }}",
                         generation, rules

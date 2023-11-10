@@ -13,7 +13,7 @@ use fidl_fuchsia_developer_remotecontrol as fremotecontrol;
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_net_debug as fdebug;
 use fidl_fuchsia_net_dhcp as fdhcp;
-use fidl_fuchsia_net_filter as ffilter;
+use fidl_fuchsia_net_filter_deprecated as ffilter;
 use fidl_fuchsia_net_interfaces as finterfaces;
 use fidl_fuchsia_net_name as fname;
 use fidl_fuchsia_net_neighbor as fneighbor;

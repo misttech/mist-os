@@ -9,7 +9,7 @@ rustc_library("common") {
   edition = "2021"
   deps = [
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
-    "//sdk/fidl/fuchsia.net.filter:fuchsia.net.filter_rust",
+    "//sdk/fidl/fuchsia.net.filter.deprecated:fuchsia.net.filter.deprecated_rust",
     "//src/connectivity/lib/net-declare",
     "//src/connectivity/network/lib/netfilter",
     "//src/connectivity/network/testing/netemul/rust:lib",

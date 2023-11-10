@@ -11,7 +11,7 @@ use fidl_fuchsia_component as fcomponent;
 use fidl_fuchsia_net_debug as fnet_debug;
 use fidl_fuchsia_net_dhcp as fnet_dhcp;
 use fidl_fuchsia_net_dhcpv6 as fnet_dhcpv6;
-use fidl_fuchsia_net_filter as fnet_filter;
+use fidl_fuchsia_net_filter_deprecated as fnet_filter;
 use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;

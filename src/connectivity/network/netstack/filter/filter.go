@@ -13,7 +13,7 @@ import (
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/fidlconv"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/sync"
 
-	"fidl/fuchsia/net/filter"
+	filter "fidl/fuchsia/net/filter/deprecated"
 
 	"gvisor.dev/gvisor/pkg/tcpip"
 	"gvisor.dev/gvisor/pkg/tcpip/header"

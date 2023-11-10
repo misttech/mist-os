@@ -7,7 +7,7 @@ use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_debug as fdebug;
 use fidl_fuchsia_net_dhcp as fdhcp;
 use fidl_fuchsia_net_ext as fnet_ext;
-use fidl_fuchsia_net_filter as ffilter;
+use fidl_fuchsia_net_filter_deprecated as ffilter;
 use fidl_fuchsia_net_interfaces as finterfaces;
 use fidl_fuchsia_net_interfaces_admin as finterfaces_admin;
 use fidl_fuchsia_net_interfaces_ext as finterfaces_ext;

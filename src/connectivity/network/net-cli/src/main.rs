@@ -7,7 +7,7 @@ use component_debug::dirs::{connect_to_instance_protocol_at_dir_root, OpenDirTyp
 use fidl::endpoints::ProtocolMarker;
 use fidl_fuchsia_net_debug as fdebug;
 use fidl_fuchsia_net_dhcp as fdhcp;
-use fidl_fuchsia_net_filter as ffilter;
+use fidl_fuchsia_net_filter_deprecated as ffilter;
 use fidl_fuchsia_net_interfaces as finterfaces;
 use fidl_fuchsia_net_name as fname;
 use fidl_fuchsia_net_neighbor as fneighbor;

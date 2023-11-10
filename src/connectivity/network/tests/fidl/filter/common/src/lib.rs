@@ -4,7 +4,7 @@
 
 use anyhow::Context as _;
 use fidl_fuchsia_net as fnet;
-use fidl_fuchsia_net_filter as fnetfilter;
+use fidl_fuchsia_net_filter_deprecated as fnetfilter;
 use fuchsia_async::{DurationExt as _, TimeoutExt as _};
 use futures::{
     io::AsyncReadExt as _, io::AsyncWriteExt as _, FutureExt as _, StreamExt, TryFutureExt as _,

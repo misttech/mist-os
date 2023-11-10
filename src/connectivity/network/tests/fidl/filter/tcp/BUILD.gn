@@ -8,7 +8,7 @@ rustc_test("tcp") {
   edition = "2021"
   output_name = "tcp_filter_fidl_test"
   deps = [
-    "//sdk/fidl/fuchsia.net.filter:fuchsia.net.filter_rust",
+    "//sdk/fidl/fuchsia.net.filter.deprecated:fuchsia.net.filter.deprecated_rust",
     "//src/connectivity/network/tests/fidl/filter/common",
     "//src/connectivity/network/tests/integration/common:netstack_testing_common",
     "//src/connectivity/network/tests/integration/macros:netstack_testing_macros",

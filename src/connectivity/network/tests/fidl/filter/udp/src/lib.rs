@@ -4,7 +4,7 @@
 
 #![cfg(test)]
 
-use fidl_fuchsia_net_filter as fnetfilter;
+use fidl_fuchsia_net_filter_deprecated as fnetfilter;
 use netstack_testing_common::realms::Netstack;
 use netstack_testing_macros::netstack_test;
 

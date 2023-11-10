@@ -1027,7 +1027,7 @@ pub(crate) enum Service {
     DnsServerWatcher(fidl_fuchsia_net_name::DnsServerWatcherRequestStream),
     DebugDiagnostics(fidl::endpoints::ServerEnd<fidl_fuchsia_net_debug::DiagnosticsMarker>),
     DebugInterfaces(fidl_fuchsia_net_debug::InterfacesRequestStream),
-    Filter(fidl_fuchsia_net_filter::FilterRequestStream),
+    Filter(fidl_fuchsia_net_filter_deprecated::FilterRequestStream),
     Interfaces(fidl_fuchsia_net_interfaces::StateRequestStream),
     InterfacesAdmin(fidl_fuchsia_net_interfaces_admin::InstallerRequestStream),
     NeighborController(fidl_fuchsia_net_neighbor::ControllerRequestStream),

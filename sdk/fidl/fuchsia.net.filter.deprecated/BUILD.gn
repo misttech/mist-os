@@ -4,7 +4,7 @@
 
 import("//build/fidl/fidl.gni")
 
-fidl("fuchsia.net.filter") {
+fidl("fuchsia.net.filter.deprecated") {
   sources = [
     "commands.fidl",
     "ruleset.fidl",

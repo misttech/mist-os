@@ -14,7 +14,7 @@ import (
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/util"
 
 	"fidl/fuchsia/net"
-	"fidl/fuchsia/net/filter"
+	filter "fidl/fuchsia/net/filter/deprecated"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"

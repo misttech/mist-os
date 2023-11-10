@@ -14,7 +14,7 @@ import (
 	"go.fuchsia.dev/fuchsia/src/lib/component"
 	syslog "go.fuchsia.dev/fuchsia/src/lib/syslog/go"
 
-	"fidl/fuchsia/net/filter"
+	filter "fidl/fuchsia/net/filter/deprecated"
 
 	"gvisor.dev/gvisor/pkg/tcpip"
 )

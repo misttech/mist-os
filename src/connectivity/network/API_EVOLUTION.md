@@ -100,7 +100,7 @@ At present, these are the libraries considered in this document:
   + not planned for SDK inclusion
 -  fuchsia.net.dhcpv6
    + not planned for SDK inclusion
-- `fuchsia.net.filter`
+- `fuchsia.net.filter.deprecated`
    + not planned for SDK inclusion
    + contains only protocol `Filter`
    + needs rework in consideration of `NETLINK_NETFILTER` (undocumented?)

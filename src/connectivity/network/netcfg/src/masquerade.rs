@@ -7,7 +7,7 @@ use std::{collections::HashMap, num::NonZeroU64};
 use derivative::Derivative;
 use fidl::endpoints::ControlHandle;
 use fidl_fuchsia_net::Subnet;
-use fidl_fuchsia_net_filter as fnet_filter;
+use fidl_fuchsia_net_filter_deprecated as fnet_filter;
 use fidl_fuchsia_net_masquerade as fnet_masquerade;
 use fnet_masquerade::Error;
 use fuchsia_async::DurationExt as _;

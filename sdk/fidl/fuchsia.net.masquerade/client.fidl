@@ -25,8 +25,8 @@ type Error = enum {
     /// rules.
     ALREADY_EXISTS = 3;
 
-    /// The call to `fuchsia.net.filter.Filter::UpdateNatRules` returned
-    /// `BadRule`
+    /// The call to `fuchsia.net.filter.deprecated.Filter::UpdateNatRules`
+    /// returned `BadRule`.
     BAD_RULE = 4;
 
     /// The attempt to update the Nat rules failed with `GenerationMismatch` too

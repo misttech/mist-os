@@ -8,7 +8,7 @@ use std::{borrow::Cow, convert::TryFrom as _};
 
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_ext as fnet_ext;
-use fidl_fuchsia_net_filter as fnetfilter;
+use fidl_fuchsia_net_filter_deprecated as fnetfilter;
 use fidl_fuchsia_net_interfaces_admin as finterfaces_admin;
 use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
 use fidl_fuchsia_net_root as fnet_root;

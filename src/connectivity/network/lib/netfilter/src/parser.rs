@@ -7,7 +7,7 @@ use pest::Parser;
 use pest_derive::Parser;
 
 use fidl_fuchsia_net as net;
-use fidl_fuchsia_net_filter as filter;
+use fidl_fuchsia_net_filter_deprecated as filter;
 
 #[derive(Parser)]
 #[grammar_inline = r#"
