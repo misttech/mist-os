@@ -8,12 +8,12 @@ are subject to change without notice.
 
 ## Developing software with the Fuchsia SDK
 
-The Fuchsia SDK is a set of build rules, API headers, code libraries, and
-[host tools][host-tools] put together to enable a Fuchsia software development
-environment. With the Fuchsia SDK, developers can create, build, run, test, and debug
-[Fuchsia components][fuchsia-components] and drivers (that is, Fuchsia software)
-without needing to set up a [Fuchsia source checkout][fuchsia-platform]
-(`fuchsia.git`) on the host machine.
+The Fuchsia SDK is a set of build rules, API headers, prebuilt and source code
+libraries, and [host tools][host-tools] put together to enable a Fuchsia software
+development environment. With the Fuchsia SDK, developers can create, build, run,
+test, and debug [Fuchsia components][fuchsia-components] and drivers (that is,
+Fuchsia software) without needing to set up a
+[Fuchsia source checkout][fuchsia-platform] (`fuchsia.git`) on the host machine.
 
 ## Build system support
 
