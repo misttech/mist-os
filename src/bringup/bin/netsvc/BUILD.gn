@@ -209,8 +209,8 @@ fuchsia_test_package("netsvc-tests-package") {
     }
   }
   if (current_cpu == "riscv64") {
-    # TODO(fxbug.dev/297071481): This test runs extremely slowly on RISC-V and
-    # times out in CI/CQ.
+    # TODO(b/310244232): This test runs extremely slowly on RISC-V QEMU and
+    # times out in CI/CQ. Reenable once it can be run on real RISC-V hardware.
     test_components -= [ ":netsvc-stress-test-component" ]
   }
 }
