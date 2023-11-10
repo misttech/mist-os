@@ -8464,6 +8464,15 @@ for details and documentation for each field.
 
 From //build/config/BUILDCONFIG.gn:107
 
+### truncate_build_info_commit_date
+
+Truncate the date in the build_info to midnight UTC, and replace the commit
+hash with one that's synthesized from that date.
+
+**Current value (from the default):** `false`
+
+From //build/info/BUILD.gn:15
+
 ### tsan_default_options
 
 Default [ThreadSanitizer](https://clang.llvm.org/docs/ThreadSanitizer.html)
