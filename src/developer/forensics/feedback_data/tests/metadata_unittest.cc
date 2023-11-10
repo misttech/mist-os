@@ -16,6 +16,7 @@
 #include <gtest/gtest.h>
 
 #include "src/developer/forensics/feedback/attachments/types.h"
+#include "src/developer/forensics/feedback/constants.h"
 #include "src/developer/forensics/feedback_data/constants.h"
 #include "src/developer/forensics/feedback_data/metadata_schema.h"
 #include "src/developer/forensics/testing/stubs/utc_clock_ready_watcher.h"
@@ -434,7 +435,7 @@ TEST_F(MetadataTest, Check_UtcMonotonicDifference) {
       kAttachmentInspect,
       kAttachmentLogKernel,
       kAttachmentLogSystem,
-      kPreviousLogsFilePath,
+      feedback::kPreviousLogsFilePath,
   };
 
   const feedback::Annotations annotations = {
@@ -510,7 +511,7 @@ TEST_F(MetadataTest, Check_NoUtcMonotonicDifferenceMissingFile) {
       kAttachmentInspect,
       kAttachmentLogKernel,
       kAttachmentLogSystem,
-      kPreviousLogsFilePath,
+      feedback::kPreviousLogsFilePath,
   };
 
   const feedback::Annotations annotations = {
