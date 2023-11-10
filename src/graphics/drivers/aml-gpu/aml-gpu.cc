@@ -286,17 +286,6 @@ void AmlGpu::FinishExitProtectedMode(fdf::Arena& arena,
   }
 }
 
-void AmlGpu::SetFrequencySource(SetFrequencySourceRequestView request,
-                                SetFrequencySourceCompleter::Sync& completer) {
-  if (request->source >= kMaxGpuClkFreq) {
-    zxlogf(ERROR, "Invalid clock freq source index\n");
-    completer.Reply(ZX_ERR_NOT_SUPPORTED);
-    return;
-  }
-  SetClkFreqSource(request->source);
-  completer.Reply(ZX_OK);
-}
-
 zx_status_t AmlGpu::ProcessMetadata(
     std::vector<uint8_t> raw_metadata,
     fidl::WireTableBuilder<fuchsia_hardware_gpu_mali::wire::MaliProperties>& builder) {

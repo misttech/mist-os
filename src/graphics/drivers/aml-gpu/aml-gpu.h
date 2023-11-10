@@ -4,7 +4,6 @@
 #ifndef SRC_GRAPHICS_DRIVERS_AML_GPU_AML_GPU_H_
 #define SRC_GRAPHICS_DRIVERS_AML_GPU_AML_GPU_H_
 
-#include <fidl/fuchsia.hardware.gpu.clock/cpp/wire.h>
 #include <fidl/fuchsia.hardware.gpu.mali/cpp/driver/wire.h>
 #include <fidl/fuchsia.hardware.registers/cpp/wire.h>
 #include <lib/device-protocol/pdev-fidl.h>
@@ -60,8 +59,7 @@ namespace aml_gpu {
 class TestAmlGpu;
 
 class AmlGpu;
-using DdkDeviceType =
-    ddk::Device<AmlGpu, ddk::Messageable<fuchsia_hardware_gpu_clock::Clock>::Mixin>;
+using DdkDeviceType = ddk::Device<AmlGpu>;
 
 class AmlGpu final : public DdkDeviceType,
                      public fdf::WireServer<fuchsia_hardware_gpu_mali::ArmMali>,
@@ -81,9 +79,6 @@ class AmlGpu final : public DdkDeviceType,
                               StartExitProtectedModeCompleter::Sync& completer) override;
   void FinishExitProtectedMode(fdf::Arena& arena,
                                FinishExitProtectedModeCompleter::Sync& completer) override;
-
-  void SetFrequencySource(SetFrequencySourceRequestView request,
-                          SetFrequencySourceCompleter::Sync& completer) override;
 
  private:
   friend class TestAmlGpu;
