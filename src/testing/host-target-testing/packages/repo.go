@@ -140,7 +140,7 @@ func NewRepositoryFromTar(ctx context.Context, dst string, src string, ffx *ffx.
 func (r *Repository) CloneIntoDir(ctx context.Context, path string) (*Repository, error) {
 	logger.Infof(ctx, "Cloning repository %s into %s", r.metadataDir, path)
 
-	if err := osmisc.CopyDir(r.rootDir, path); err != nil {
+	if _, err := osmisc.CopyDir(r.rootDir, path, osmisc.RaiseError); err != nil {
 		return nil, err
 	}
 

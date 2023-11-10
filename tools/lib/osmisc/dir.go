@@ -11,6 +11,15 @@ import (
 	"path/filepath"
 )
 
+// UnknownFilesMode is a mode that describes how to deal with
+// unknown file types.
+type UnknownFilesMode int
+
+const (
+	RaiseError UnknownFilesMode = iota
+	SkipUnknownFiles
+)
+
 // IsDir determines whether a given path exists *and* is a directory. It will
 // return false (with no error) if the path does not exist. It will return true
 // if the path exists, even if the user doesn't have permission to enter and
@@ -38,8 +47,9 @@ func DirIsEmpty(dir string) (bool, error) {
 }
 
 // CopyDir copies the src directory into the target directory, preserving file
-// and directory modes.
-func CopyDir(srcDir, dstDir string) error {
+// and directory modes. If skipUnknown is true, it returns the list of skipped files.
+func CopyDir(srcDir, dstDir string, unknownFilesMode UnknownFilesMode) ([]string, error) {
+	var skippedFiles []string
 	err := filepath.Walk(srcDir, func(srcPath string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -73,11 +83,16 @@ func CopyDir(srcDir, dstDir string) error {
 			}
 
 		default:
-			return fmt.Errorf("unknown file type for %s", srcPath)
+			switch unknownFilesMode {
+			case RaiseError:
+				return fmt.Errorf("unknown file type for %s", srcPath)
+			case SkipUnknownFiles:
+				skippedFiles = append(skippedFiles, srcPath)
+			}
 		}
 
 		return nil
 	})
 
-	return err
+	return skippedFiles, err
 }

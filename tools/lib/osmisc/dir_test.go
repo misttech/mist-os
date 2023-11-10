@@ -136,8 +136,10 @@ func TestCopyDir(t *testing.T) {
 	}
 	srcPaths["c"] = "a"
 
-	if err := CopyDir(srcDir, dstDir); err != nil {
+	if skippedFiles, err := CopyDir(srcDir, dstDir, SkipUnknownFiles); err != nil {
 		t.Fatalf("failed to copy directory: %v", err)
+	} else if len(skippedFiles) > 0 {
+		t.Fatalf("unexpected skipped files: %v", skippedFiles)
 	}
 
 	err := filepath.Walk(dstDir, func(dstPath string, dstInfo os.FileInfo, err error) error {

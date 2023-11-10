@@ -699,7 +699,7 @@ func (r *RunCommand) Execute(ctx context.Context, f *flag.FlagSet, _ ...interfac
 			return subcommands.ExitFailure
 		}
 		defer func() {
-			if err := osmisc.CopyDir(tmpOutDir, testOutDir); err != nil {
+			if skippedFiles, err := osmisc.CopyDir(tmpOutDir, testOutDir, osmisc.SkipUnknownFiles); err != nil {
 				logger.Errorf(ctx, "failed to copy outputs to %s: %s", testOutDir, err)
 				// TODO(fxbug.dev/128608): If we fail to copy outputs, at least copy
 				// the ffx logs over so we can debug. Remove when attached bug is
@@ -707,12 +707,18 @@ func (r *RunCommand) Execute(ctx context.Context, f *flag.FlagSet, _ ...interfac
 				if r.ffxPath != "" {
 					ffxLogsDir := filepath.Join("ffx_outputs", "ffx_logs")
 					if _, err := os.Stat(filepath.Join(testOutDir, ffxLogsDir)); os.IsNotExist(err) {
-						if err := osmisc.CopyDir(filepath.Join(tmpOutDir, ffxLogsDir), filepath.Join(testOutDir, ffxLogsDir)); err != nil {
+						if _, err := osmisc.CopyDir(filepath.Join(tmpOutDir, ffxLogsDir), filepath.Join(testOutDir, ffxLogsDir), osmisc.RaiseError); err != nil {
 							logger.Errorf(ctx, "failed to copy ffx logs to %s: %s", filepath.Join(testOutDir, ffxLogsDir), err)
 						}
 					}
 				}
+			} else if len(skippedFiles) > 0 {
+				skippedFilesTxt := filepath.Join(testOutDir, "skipped_files.txt")
+				if err := os.WriteFile(skippedFilesTxt, []byte(strings.Join(skippedFiles, "\n")), os.ModePerm); err != nil {
+					logger.Errorf(ctx, "failed to write %s: %s\nskipped files: %s", skippedFilesTxt, err, skippedFiles)
+				}
 			}
+
 			if err := os.Setenv(testrunnerconstants.TestOutDirEnvKey, testOutDir); err != nil {
 				logger.Errorf(ctx, "failed to reset %s to %s: %s", testrunnerconstants.TestOutDirEnvKey, testOutDir, err)
 			}
