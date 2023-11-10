@@ -487,9 +487,19 @@ pub enum SecAssocStatus {
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
+pub enum AuthRejectedReason {
+    /// Unable to generate a PMK with the peer.
+    AuthFailed,
+    /// The peer never responded or sent too many invalid responses.
+    TooManyRetries,
+    /// Association took too long, and the PMKSA has expired.
+    PmksaExpired,
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum AuthStatus {
     Success,
-    Rejected,
+    Rejected(AuthRejectedReason),
     InternalError,
 }
 

@@ -362,6 +362,18 @@ impl ConnectFailure {
                 bss_protection: BssProtection::Wep,
                 code: fidl_ieee80211::StatusCode::RefusedUnauthenticatedAccessNotSupported,
             }) => true,
+
+            // For WPA3, the AP will not respond to SAE authentication frames
+            // if it detects an invalid credential, so we expect the connection
+            // attempt to time out.
+            ConnectFailure::AssociationFailure(AssociationFailure {
+                bss_protection: BssProtection::Wpa3Personal,
+                code: fidl_ieee80211::StatusCode::RejectedSequenceTimeout,
+            })
+            | ConnectFailure::AssociationFailure(AssociationFailure {
+                bss_protection: BssProtection::Wpa2Wpa3Personal,
+                code: fidl_ieee80211::StatusCode::RejectedSequenceTimeout,
+            }) => true,
             _ => false,
         }
     }

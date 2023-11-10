@@ -7,7 +7,7 @@ pub mod psk;
 use {
     crate::{
         key::exchange::Key,
-        rsna::{AuthStatus, Dot11VerifiedKeyFrame, SecAssocUpdate, UpdateSink},
+        rsna::{AuthRejectedReason, AuthStatus, Dot11VerifiedKeyFrame, SecAssocUpdate, UpdateSink},
         Error,
     },
     anyhow,
@@ -224,7 +224,19 @@ fn process_sae_updates(
             }
             sae::SaeUpdate::Reject(reason) => {
                 warn!("SAE handshake rejected: {:?}", reason);
-                assoc_update_sink.push(SecAssocUpdate::SaeAuthStatus(AuthStatus::Rejected));
+                let status = match reason {
+                    sae::RejectReason::AuthFailed => {
+                        AuthStatus::Rejected(AuthRejectedReason::AuthFailed)
+                    }
+                    sae::RejectReason::KeyExpiration => {
+                        AuthStatus::Rejected(AuthRejectedReason::PmksaExpired)
+                    }
+                    sae::RejectReason::TooManyRetries => {
+                        AuthStatus::Rejected(AuthRejectedReason::TooManyRetries)
+                    }
+                    sae::RejectReason::InternalError(_) => AuthStatus::InternalError,
+                };
+                assoc_update_sink.push(SecAssocUpdate::SaeAuthStatus(status));
             }
             sae::SaeUpdate::ResetTimeout(timer) => {
                 match timer {

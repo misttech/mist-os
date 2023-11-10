@@ -36,7 +36,7 @@ use {
     },
     wlan_rsn::{
         auth,
-        rsna::{AuthStatus, SecAssocUpdate, UpdateSink},
+        rsna::{AuthRejectedReason, AuthStatus, SecAssocUpdate, UpdateSink},
     },
     wlan_statemachine::*,
 };
@@ -1146,9 +1146,14 @@ fn process_sae_updates(updates: UpdateSink, peer_sta_address: MacAddr, context: 
                     peer_sta_address: peer_sta_address.to_array(),
                     status_code: match status {
                         AuthStatus::Success => fidl_ieee80211::StatusCode::Success,
-                        AuthStatus::Rejected => {
-                            fidl_ieee80211::StatusCode::RefusedReasonUnspecified
-                        }
+                        AuthStatus::Rejected(reason) => match reason {
+                            AuthRejectedReason::TooManyRetries => {
+                                fidl_ieee80211::StatusCode::RejectedSequenceTimeout
+                            }
+                            AuthRejectedReason::PmksaExpired | AuthRejectedReason::AuthFailed => {
+                                fidl_ieee80211::StatusCode::RefusedReasonUnspecified
+                            }
+                        },
                         AuthStatus::InternalError => {
                             fidl_ieee80211::StatusCode::RefusedReasonUnspecified
                         }
