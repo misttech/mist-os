@@ -32,6 +32,9 @@ def fuchsia_cc_driver(name, srcs = [], output_name = None, deps = [], **kwargs):
     if len(srcs) == 0:
         fail(_MISSING_SRCS_FAIL_MESSAGE)
 
+    # Ensure that our binary is named with a .so at the end
+    bin_name = (output_name or "lib{}".format(name)).rstrip(".so") + ".so"
+
     # Grab the user supplied linkopts and add our specific opts that are required
     # for all drivers
     linkopts = kwargs.pop("linkopts", [])
@@ -41,6 +44,9 @@ def fuchsia_cc_driver(name, srcs = [], output_name = None, deps = [], **kwargs):
         "-Wl,--undefined-version",
         "-Wl,--version-script",
         "$(location @fuchsia_sdk//fuchsia/private:driver.ld)",
+
+        # Include the name of the shared object.
+        "-Wl,-soname={}".format(bin_name),
     ])
 
     # Remove this value because we want to set it on our own. If we don't
@@ -74,12 +80,10 @@ def fuchsia_cc_driver(name, srcs = [], output_name = None, deps = [], **kwargs):
         **kwargs
     )
 
-    bin_name = output_name or "lib{}".format(name)
-
     fuchsia_wrap_cc_binary(
         name = name,
         # Ensure that our bin_name ends in .so
-        bin_name = bin_name.rstrip(".so") + ".so",
+        bin_name = bin_name,
         install_root = "driver/",
         cc_binary = ":{}_cc_binary".format(name),
         exact_cc_binary_deps = deps,

@@ -171,7 +171,6 @@ _flag_groups = struct(
             "-Wthread-safety",
         ],
     ),
-    # -D_LIBCPP_ENABLE_THREAD_SAFETY_ANNOTATIONS=1
     werror = _make_flag_group_struct(
         cflags = [
             "-Werror",
@@ -473,6 +472,14 @@ _static_cpp_standard_library_feature = feature(
     ],
 )
 
+# This feature adds an RPATH entry into the final binary. We do not want this
+# because it is not valid for fuchsia since we install all of our libraries
+# in /lib of our package. Enabling this just adds size to our binaries.
+_no_runtime_library_search_directories_feature = feature(
+    name = "runtime_library_search_directories",
+    enabled = False,
+)
+
 features = struct(
     default_compile_flags = _default_compile_flags_feature,
     default_link_flags = _default_link_flags_feature,
@@ -484,6 +491,7 @@ features = struct(
     coverage = _coverage_feature,
     ml_inliner = _ml_inliner_feature,
     static_cpp_standard_library = _static_cpp_standard_library_feature,
+    no_runtime_library_search_directories = _no_runtime_library_search_directories_feature,
 )
 
 sanitizer_features = [

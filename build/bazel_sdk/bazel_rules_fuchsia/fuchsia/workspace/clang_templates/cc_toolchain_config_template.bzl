@@ -107,6 +107,7 @@ def _cc_toolchain_config_impl(ctx):
             features.coverage,
             features.ml_inliner,
             features.static_cpp_standard_library,
+            features.no_runtime_library_search_directories,
         ] + sanitizer_features,
     )
 
