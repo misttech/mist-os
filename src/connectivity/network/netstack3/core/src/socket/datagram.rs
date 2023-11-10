@@ -1601,58 +1601,117 @@ pub(crate) fn close<
     })
 }
 
-/// State associated with removing a single-stack socket.
-enum SingleStackRemove<I: IpExt, D: WeakId, S: DatagramSocketSpec> {
+/// State associated with removing a socket.
+///
+/// Note that this type is generic over two `IpExt` parameters: `WireI` and
+/// `SocketI`. This allows it to be used for both single-stack remove operations
+/// (where `WireI` and `SocketI` are the same), as well as dual-stack remove
+/// operations (where `WireI`, and `SocketI` may be different).
+enum Remove<WireI: IpExt, SocketI: IpExt, D: WeakId, S: DatagramSocketSpec> {
     Listener {
         // The socket's address, stored as a concrete `ListenerIpAddr`.
         concrete_addr: ListenerAddr<
-            ListenerIpAddr<I::Addr, <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier>,
+            ListenerIpAddr<WireI::Addr, <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier>,
             D,
         >,
         // The socket's address, stored as an associated `S::ListenerIpAddr`.
-        associated_addr: ListenerAddr<S::ListenerIpAddr<I>, D>,
-        ip_options: IpOptions<I, D, S>,
+        associated_addr: ListenerAddr<S::ListenerIpAddr<SocketI>, D>,
+        ip_options: IpOptions<SocketI, D, S>,
         sharing: S::SharingState,
         socket_id:
-            <S::SocketMapSpec<I, D> as DatagramSocketMapSpec<I, D, S::AddrSpec>>::BoundSocketId,
+            <S::SocketMapSpec<WireI, D> as DatagramSocketMapSpec<WireI, D, S::AddrSpec>>::BoundSocketId,
     },
     Connected {
         // The socket's address, stored as a concrete `ConnIpAddr`.
         concrete_addr: ConnAddr<
             ConnIpAddr<
-                I::Addr,
+                WireI::Addr,
                 <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
                 <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
             >,
             D,
         >,
         // The socket's address, stored as an associated `S:ConnIpAddr`.
-        associated_addr: ConnAddr<S::ConnIpAddr<I>, D>,
-        ip_options: IpOptions<I, D, S>,
+        associated_addr: ConnAddr<S::ConnIpAddr<SocketI>, D>,
+        ip_options: IpOptions<SocketI, D, S>,
         sharing: S::SharingState,
         socket_id:
-            <S::SocketMapSpec<I, D> as DatagramSocketMapSpec<I, D, S::AddrSpec>>::BoundSocketId,
+            <S::SocketMapSpec<WireI, D> as DatagramSocketMapSpec<WireI, D, S::AddrSpec>>::BoundSocketId,
     },
 }
 
-/// The yet-to-be-performed removal of a single-stack socket.
-struct SingleStackRemoveOperation<I: IpExt, D: WeakId, S: DatagramSocketSpec>(
-    SingleStackRemove<I, D, S>,
+/// The yet-to-be-performed removal of a socket.
+///
+/// Like [`Remove`], this type takes two generic `IpExt` parameters so that
+/// it can be used from single-stack and dual-stack remove operations.
+struct RemoveOperation<WireI: IpExt, SocketI: IpExt, D: WeakId, S: DatagramSocketSpec>(
+    Remove<WireI, SocketI, D, S>,
 );
 
-impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> SingleStackRemoveOperation<I, D, S> {
+impl<WireI: IpExt, SocketI: IpExt, D: WeakId, S: DatagramSocketSpec>
+    RemoveOperation<WireI, SocketI, D, S>
+{
+    /// Apply this remove operation to the given `BoundSocketMap`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the given socket map does not contain the socket specified by
+    /// this removal operation.
+    fn apply(
+        self,
+        sockets: &mut BoundSocketMap<WireI, D, S::AddrSpec, S::SocketMapSpec<WireI, D>>,
+    ) -> RemoveInfo<WireI, SocketI, D, S> {
+        let RemoveOperation(remove) = self;
+        match &remove {
+            Remove::Listener {
+                concrete_addr,
+                associated_addr: _,
+                ip_options: _,
+                sharing: _,
+                socket_id,
+            } => {
+                let ListenerAddr { ip: ListenerIpAddr { addr, identifier }, device } =
+                    concrete_addr;
+                BoundStateHandler::<_, S, _>::remove_listener(
+                    sockets,
+                    addr,
+                    *identifier,
+                    device,
+                    socket_id,
+                );
+            }
+            Remove::Connected {
+                concrete_addr,
+                associated_addr: _,
+                ip_options: _,
+                sharing: _,
+                socket_id,
+            } => {
+                sockets
+                    .conns_mut()
+                    .remove(socket_id, concrete_addr)
+                    .expect("UDP connection not found");
+            }
+        }
+        RemoveInfo(remove)
+    }
+}
+
+// A single stack implementation of `RemoveOperation` (e.g. where `WireI` and
+// `SocketI` are the same type).
+impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> RemoveOperation<I, I, D, S> {
     /// Constructs the remove operation from existing socket state.
     fn new_from_state<C, SC: NonDualStackDatagramBoundStateContext<I, C, S, WeakDeviceId = D>>(
         sync_ctx: &mut SC,
         socket_id: S::SocketId<I>,
         state: &BoundSocketState<I, D, S>,
     ) -> Self {
-        SingleStackRemoveOperation(match state {
+        RemoveOperation(match state {
             BoundSocketState::Listener { state, sharing } => {
                 let ListenerState { addr: associated_addr, ip_options } = state;
                 let ListenerAddr { ip, device } = associated_addr.clone();
                 let concrete_addr = ListenerAddr { ip: sync_ctx.converter().convert(ip), device };
-                SingleStackRemove::Listener {
+                Remove::Listener {
                     concrete_addr,
                     associated_addr: associated_addr.clone(),
                     ip_options: ip_options.clone(),
@@ -1671,7 +1730,7 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> SingleStackRemoveOperation<I, D
                 let ConnAddr { ip, device } = addr.clone();
                 let associated_addr =
                     ConnAddr { ip: sync_ctx.converter().convert_back(ip), device };
-                SingleStackRemove::Connected {
+                Remove::Connected {
                     concrete_addr: addr.clone(),
                     associated_addr,
                     ip_options: socket.options().clone(),
@@ -1681,70 +1740,30 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> SingleStackRemoveOperation<I, D
             }
         })
     }
-
-    /// Apply this remove operation to the given `BoundSocketMap`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the given socket map does not contain the socket specified by
-    /// this removal operation.
-    fn apply(
-        self,
-        sockets: &mut BoundSocketMap<I, D, S::AddrSpec, S::SocketMapSpec<I, D>>,
-    ) -> SingleStackRemoveInfo<I, D, S> {
-        let SingleStackRemoveOperation(single_stack_remove) = self;
-        match &single_stack_remove {
-            SingleStackRemove::Listener {
-                concrete_addr,
-                associated_addr: _,
-                ip_options: _,
-                sharing: _,
-                socket_id,
-            } => {
-                let ListenerAddr { ip: ListenerIpAddr { addr, identifier }, device } =
-                    concrete_addr;
-                BoundStateHandler::<_, S, _>::remove_listener(
-                    sockets,
-                    addr,
-                    *identifier,
-                    device,
-                    socket_id,
-                );
-            }
-            SingleStackRemove::Connected {
-                concrete_addr,
-                associated_addr: _,
-                ip_options: _,
-                sharing: _,
-                socket_id,
-            } => {
-                sockets
-                    .conns_mut()
-                    .remove(socket_id, concrete_addr)
-                    .expect("UDP connection not found");
-            }
-        }
-        SingleStackRemoveInfo(single_stack_remove)
-    }
 }
 
 /// Information for a recently-removed single-stack socket.
-struct SingleStackRemoveInfo<I: IpExt, D: WeakId, S: DatagramSocketSpec>(
-    SingleStackRemove<I, D, S>,
+///
+/// Like [`Remove`], this type takes two generic `IpExt` parameters so that
+/// it can be used from single-stack and dual-stack remove operations.
+struct RemoveInfo<WireI: IpExt, SocketI: IpExt, D: WeakId, S: DatagramSocketSpec>(
+    Remove<WireI, SocketI, D, S>,
 );
 
-impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> SingleStackRemoveInfo<I, D, S> {
-    fn into_options_and_info(self) -> (IpOptions<I, D, S>, SocketInfo<I, D, S>) {
-        let SingleStackRemoveInfo(single_stack_remove) = self;
-        match single_stack_remove {
-            SingleStackRemove::Listener {
+impl<WireI: IpExt, SocketI: IpExt, D: WeakId, S: DatagramSocketSpec>
+    RemoveInfo<WireI, SocketI, D, S>
+{
+    fn into_options_and_info(self) -> (IpOptions<SocketI, D, S>, SocketInfo<SocketI, D, S>) {
+        let RemoveInfo(remove) = self;
+        match remove {
+            Remove::Listener {
                 concrete_addr: _,
                 associated_addr,
                 ip_options,
                 sharing: _,
                 socket_id: _,
             } => (ip_options, SocketInfo::Listener(associated_addr)),
-            SingleStackRemove::Connected {
+            Remove::Connected {
                 concrete_addr: _,
                 associated_addr,
                 ip_options,
@@ -1760,10 +1779,13 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> SingleStackRemoveInfo<I, D, S> 
     ///
     /// Panics if the socket can not be inserted into the given map (i.e. if it
     /// already exists.)
-    fn reinsert(self, sockets: &mut BoundSocketMap<I, D, S::AddrSpec, S::SocketMapSpec<I, D>>) {
-        let SingleStackRemoveInfo(single_stack_remove) = self;
-        match single_stack_remove {
-            SingleStackRemove::Listener {
+    fn reinsert(
+        self,
+        sockets: &mut BoundSocketMap<WireI, D, S::AddrSpec, S::SocketMapSpec<WireI, D>>,
+    ) {
+        let RemoveInfo(remove) = self;
+        match remove {
+            Remove::Listener {
                 concrete_addr: ListenerAddr { ip: ListenerIpAddr { addr, identifier }, device },
                 associated_addr: _,
                 ip_options: _,
@@ -1775,7 +1797,7 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> SingleStackRemoveInfo<I, D, S> 
                 )
                 .expect("reinserting just-removed listener failed");
             }
-            SingleStackRemove::Connected {
+            Remove::Connected {
                 concrete_addr,
                 associated_addr: _,
                 ip_options: _,
@@ -1791,29 +1813,16 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> SingleStackRemoveInfo<I, D, S> 
     }
 }
 
+/// The yet-to-be-performed removal of a single-stack socket.
+type SingleStackRemoveOperation<I, D, S> = RemoveOperation<I, I, D, S>;
+
+/// Information for a recently-removed single-stack socket.
+type SingleStackRemoveInfo<I, D, S> = RemoveInfo<I, I, D, S>;
+
 /// State associated with removing a dual-stack socket.
 enum DualStackRemove<I: IpExt, D: WeakId, S: DatagramSocketSpec> {
-    // A socket bound in the current stack is a single-stack removal.
-    CurrentStack(SingleStackRemove<I, D, S>),
-    ListenerOtherStack {
-        // The socket's address, stored as a concrete `ListenerIpAddr`.
-        concrete_addr: ListenerAddr<
-            ListenerIpAddr<
-                <I::OtherVersion as Ip>::Addr,
-                <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
-            >,
-            D,
-        >,
-        // The socket's address, stored as an associated `S::ListenerIpAddr`.
-        associated_addr: ListenerAddr<S::ListenerIpAddr<I>, D>,
-        ip_options: IpOptions<I, D, S>,
-        sharing: S::SharingState,
-        socket_id: <S::SocketMapSpec<I::OtherVersion, D> as DatagramSocketMapSpec<
-            I::OtherVersion,
-            D,
-            S::AddrSpec,
-        >>::BoundSocketId,
-    },
+    CurrentStack(Remove<I, I, D, S>),
+    OtherStack(Remove<I::OtherVersion, I, D, S>),
     ListenerBothStacks {
         identifier: <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
         device: Option<D>,
@@ -1831,28 +1840,9 @@ enum DualStackRemove<I: IpExt, D: WeakId, S: DatagramSocketSpec> {
             S::AddrSpec,
         >>::BoundSocketId,
     },
-    ConnectedOtherStack {
-        // The socket's address, stored as a concrete `ConnIpAddr`.
-        concrete_addr: ConnAddr<
-            ConnIpAddr<
-                <I::OtherVersion as Ip>::Addr,
-                <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
-                <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
-            >,
-            D,
-        >,
-        // The socket's address, stored as an associated `S::ConnIpAddr`.
-        associated_addr: ConnAddr<S::ConnIpAddr<I>, D>,
-        ip_options: IpOptions<I, D, S>,
-        sharing: S::SharingState,
-        socket_id: <S::SocketMapSpec<I::OtherVersion, D> as DatagramSocketMapSpec<
-            I::OtherVersion,
-            D,
-            S::AddrSpec,
-        >>::BoundSocketId,
-    },
 }
 
+/// The yet-to-be-performed removal of a single-stack socket.
 struct DualStackRemoveOperation<I: IpExt, D: WeakId, S: DatagramSocketSpec>(
     DualStackRemove<I, D, S>,
 );
@@ -1883,7 +1873,7 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> DualStackRemoveOperation<I, D, 
                     }
                     // Bound in this stack, with/without dual-stack enabled.
                     (DualStackListenerIpAddr::ThisStack(addr), true | false) => {
-                        DualStackRemove::CurrentStack(SingleStackRemove::Listener {
+                        DualStackRemove::CurrentStack(Remove::Listener {
                             concrete_addr: ListenerAddr { ip: addr, device },
                             associated_addr: associated_addr.clone(),
                             ip_options: ip_options.clone(),
@@ -1893,13 +1883,13 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> DualStackRemoveOperation<I, D, 
                     }
                     // Dual-stack enabled, bound only in the other stack.
                     (DualStackListenerIpAddr::OtherStack(addr), true) => {
-                        DualStackRemove::ListenerOtherStack {
+                        DualStackRemove::OtherStack(Remove::Listener {
                             concrete_addr: ListenerAddr { ip: addr, device },
                             associated_addr: associated_addr.clone(),
                             ip_options: ip_options.clone(),
                             sharing: sharing.clone(),
                             socket_id: sync_ctx.to_other_bound_socket_id(socket_id),
-                        }
+                        })
                     }
                     (DualStackListenerIpAddr::OtherStack(_), false)
                     | (DualStackListenerIpAddr::BothStacks(_), false) => {
@@ -1921,7 +1911,7 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> DualStackRemoveOperation<I, D, 
                         let ip = DualStackConnIpAddr::ThisStack(ip);
                         let associated_addr =
                             ConnAddr { ip: sync_ctx.converter().convert_back(ip), device };
-                        DualStackRemove::CurrentStack(SingleStackRemove::Connected {
+                        DualStackRemove::CurrentStack(Remove::Connected {
                             concrete_addr: addr.clone(),
                             associated_addr,
                             ip_options: socket.options().clone(),
@@ -1942,13 +1932,13 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> DualStackRemoveOperation<I, D, 
                         let ip = DualStackConnIpAddr::OtherStack(ip);
                         let associated_addr =
                             ConnAddr { ip: sync_ctx.converter().convert_back(ip), device };
-                        DualStackRemove::ConnectedOtherStack {
+                        DualStackRemove::OtherStack(Remove::Connected {
                             concrete_addr: addr.clone(),
                             associated_addr,
                             ip_options: socket.options().clone(),
                             sharing: sharing.clone(),
                             socket_id: sync_ctx.to_other_bound_socket_id(socket_id),
-                        }
+                        })
                     }
                 }
             }
@@ -1973,34 +1963,13 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> DualStackRemoveOperation<I, D, 
     ) -> DualStackRemoveInfo<I, D, S> {
         let DualStackRemoveOperation(dual_stack_remove) = self;
         match dual_stack_remove {
-            DualStackRemove::CurrentStack(single_stack_remove) => {
-                let SingleStackRemoveInfo(single_stack_remove) =
-                    SingleStackRemoveOperation(single_stack_remove).apply(sockets);
-                DualStackRemoveInfo(DualStackRemove::CurrentStack(single_stack_remove))
+            DualStackRemove::CurrentStack(remove) => {
+                let RemoveInfo(remove) = RemoveOperation(remove).apply(sockets);
+                DualStackRemoveInfo(DualStackRemove::CurrentStack(remove))
             }
-            DualStackRemove::ListenerOtherStack {
-                concrete_addr,
-                associated_addr,
-                ip_options,
-                sharing,
-                socket_id,
-            } => {
-                let ListenerAddr { ip: ListenerIpAddr { addr: inner_addr, identifier }, device } =
-                    &concrete_addr;
-                BoundStateHandler::<_, S, _>::remove_listener(
-                    other_sockets,
-                    inner_addr,
-                    *identifier,
-                    device,
-                    &socket_id,
-                );
-                DualStackRemoveInfo(DualStackRemove::ListenerOtherStack {
-                    concrete_addr,
-                    associated_addr,
-                    ip_options,
-                    sharing,
-                    socket_id,
-                })
+            DualStackRemove::OtherStack(remove) => {
+                let RemoveInfo(remove) = RemoveOperation(remove).apply(other_sockets);
+                DualStackRemoveInfo(DualStackRemove::OtherStack(remove))
             }
             DualStackRemove::ListenerBothStacks {
                 identifier,
@@ -2032,45 +2001,19 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> DualStackRemoveOperation<I, D, 
                     other_socket_id,
                 })
             }
-            DualStackRemove::ConnectedOtherStack {
-                concrete_addr,
-                associated_addr,
-                ip_options,
-                sharing,
-                socket_id,
-            } => {
-                other_sockets
-                    .conns_mut()
-                    .remove(&socket_id, &concrete_addr)
-                    .expect("UDP connection not found");
-                DualStackRemoveInfo(DualStackRemove::ConnectedOtherStack {
-                    concrete_addr,
-                    associated_addr,
-                    ip_options,
-                    sharing,
-                    socket_id,
-                })
-            }
         }
     }
 }
 
+/// Information for a recently-removed single-stack socket.
 struct DualStackRemoveInfo<I: IpExt, D: WeakId, S: DatagramSocketSpec>(DualStackRemove<I, D, S>);
 
 impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> DualStackRemoveInfo<I, D, S> {
     fn into_options_and_info(self) -> (IpOptions<I, D, S>, SocketInfo<I, D, S>) {
         let DualStackRemoveInfo(dual_stack_remove) = self;
         match dual_stack_remove {
-            DualStackRemove::CurrentStack(single_stack_remove) => {
-                SingleStackRemoveInfo(single_stack_remove).into_options_and_info()
-            }
-            DualStackRemove::ListenerOtherStack {
-                concrete_addr: _,
-                associated_addr,
-                ip_options,
-                sharing: _,
-                socket_id: _,
-            } => (ip_options, SocketInfo::Listener(associated_addr)),
+            DualStackRemove::CurrentStack(remove) => RemoveInfo(remove).into_options_and_info(),
+            DualStackRemove::OtherStack(remove) => RemoveInfo(remove).into_options_and_info(),
             DualStackRemove::ListenerBothStacks {
                 identifier: _,
                 device: _,
@@ -2080,13 +2023,6 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> DualStackRemoveInfo<I, D, S> {
                 socket_id: _,
                 other_socket_id: _,
             } => (ip_options, SocketInfo::Listener(associated_addr)),
-            DualStackRemove::ConnectedOtherStack {
-                concrete_addr: _,
-                associated_addr,
-                ip_options,
-                sharing: _,
-                socket_id: _,
-            } => (ip_options, SocketInfo::Connected(associated_addr)),
         }
     }
 
@@ -2108,8 +2044,8 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> DualStackRemoveInfo<I, D, S> {
     ) {
         let DualStackRemoveInfo(dual_stack_remove) = self;
         match dual_stack_remove {
-            DualStackRemove::CurrentStack(single_stack_remove) => {
-                SingleStackRemoveInfo(single_stack_remove).reinsert(sockets);
+            DualStackRemove::CurrentStack(remove) => {
+                RemoveInfo(remove).reinsert(sockets);
             }
             _ => todo!("https://fxbug.dev/135204: Support dual-stack reinsertion"),
         }
@@ -2983,9 +2919,9 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> SingleStackConnectOperation<I, 
                 // For convenience, parse the connect operation from
                 // `remove_op`, because it's already extracted all relevant
                 // fields from `state`.
-                let SingleStackRemoveOperation(remove_info) = &remove_op;
-                match &remove_info {
-                    SingleStackRemove::Listener {
+                let RemoveOperation(remove) = &remove_op;
+                match &remove {
+                    Remove::Listener {
                         concrete_addr:
                             ListenerAddr { ip: ListenerIpAddr { addr, identifier }, device },
                         associated_addr: _,
@@ -3007,7 +2943,7 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> SingleStackConnectOperation<I, 
                         sharing: sharing.clone(),
                         remove_op: Some(remove_op),
                     },
-                    SingleStackRemove::Connected {
+                    Remove::Connected {
                         concrete_addr:
                             ConnAddr {
                                 ip: ConnIpAddr { local: (local_ip, local_id), remote: _ },
@@ -3139,8 +3075,8 @@ impl<I: DualStackIpExt, D: WeakId, S: DatagramSocketSpec> DualStackConnectOperat
                 // For convenience, parse the connect operation from
                 // `remove_op`, because it's already extracted all relevant
                 // fields from `state`.
-                let DualStackRemoveOperation(remove_info) = &remove_op;
-                match (remote_ip, remove_info) {
+                let DualStackRemoveOperation(ds_remove) = &remove_op;
+                match (remote_ip, ds_remove) {
                     // Disallow connecting to the other stack because the
                     // existing socket state is in this stack.
                     (DualStackRemoteIp::OtherStack(_), DualStackRemove::CurrentStack(_)) => {
@@ -3148,17 +3084,15 @@ impl<I: DualStackIpExt, D: WeakId, S: DatagramSocketSpec> DualStackConnectOperat
                     }
                     // Disallow connecting to this stack because the existing
                     // socket state is in the other stack.
-                    (
-                        DualStackRemoteIp::ThisStack(_),
-                        DualStackRemove::ListenerOtherStack { .. }
-                        | DualStackRemove::ConnectedOtherStack { .. },
-                    ) => Err(ConnectError::RemoteUnexpectedlyNonMapped),
+                    (DualStackRemoteIp::ThisStack(_), DualStackRemove::OtherStack(_)) => {
+                        Err(ConnectError::RemoteUnexpectedlyNonMapped)
+                    }
                     // Connect in this stack.
                     (
                         DualStackRemoteIp::ThisStack(remote_ip),
-                        DualStackRemove::CurrentStack(single_stack_remove),
-                    ) => match single_stack_remove {
-                        SingleStackRemove::Listener {
+                        DualStackRemove::CurrentStack(remove),
+                    ) => match remove {
+                        Remove::Listener {
                             concrete_addr:
                                 ListenerAddr { ip: ListenerIpAddr { addr, identifier }, device },
                             associated_addr: _,
@@ -3180,7 +3114,7 @@ impl<I: DualStackIpExt, D: WeakId, S: DatagramSocketSpec> DualStackConnectOperat
                             sharing: sharing.clone(),
                             remove_op: Some(remove_op),
                         }),
-                        SingleStackRemove::Connected {
+                        Remove::Connected {
                             concrete_addr:
                                 ConnAddr {
                                     ip: ConnIpAddr { local: (local_ip, local_id), remote: _ },
@@ -3192,6 +3126,59 @@ impl<I: DualStackIpExt, D: WeakId, S: DatagramSocketSpec> DualStackConnectOperat
                             socket_id,
                         } => Ok(DualStackConnectOperation {
                             params: EitherStack::ThisStack(ConnectParameters {
+                                local_ip: Some(local_ip.clone()),
+                                local_port: Some(*local_id),
+                                remote_ip,
+                                remote_port,
+                                device: device.clone(),
+                                sharing: sharing.clone(),
+                                ip_options: ip_options.clone(),
+                                socket_id: socket_id.clone(),
+                                extra,
+                            }),
+                            sharing: sharing.clone(),
+                            remove_op: Some(remove_op),
+                        }),
+                    },
+                    // Connect in the other stack
+                    (
+                        DualStackRemoteIp::OtherStack(remote_ip),
+                        DualStackRemove::OtherStack(remove),
+                    ) => match remove {
+                        Remove::Listener {
+                            concrete_addr:
+                                ListenerAddr { ip: ListenerIpAddr { addr, identifier }, device },
+                            associated_addr: _,
+                            ip_options,
+                            sharing,
+                            socket_id,
+                        } => Ok(DualStackConnectOperation {
+                            params: EitherStack::OtherStack(ConnectParameters {
+                                local_ip: addr.clone(),
+                                local_port: Some(*identifier),
+                                remote_ip,
+                                remote_port,
+                                device: device.clone(),
+                                sharing: sharing.clone(),
+                                ip_options: ip_options.clone(),
+                                socket_id: socket_id.clone(),
+                                extra,
+                            }),
+                            sharing: sharing.clone(),
+                            remove_op: Some(remove_op),
+                        }),
+                        Remove::Connected {
+                            concrete_addr:
+                                ConnAddr {
+                                    ip: ConnIpAddr { local: (local_ip, local_id), remote: _ },
+                                    device,
+                                },
+                            associated_addr: _,
+                            ip_options,
+                            sharing,
+                            socket_id,
+                        } => Ok(DualStackConnectOperation {
+                            params: EitherStack::OtherStack(ConnectParameters {
                                 local_ip: Some(local_ip.clone()),
                                 local_port: Some(*local_id),
                                 remote_ip,
@@ -3257,61 +3244,6 @@ impl<I: DualStackIpExt, D: WeakId, S: DatagramSocketSpec> DualStackConnectOperat
                             sharing: sharing.clone(),
                             ip_options: ip_options.clone(),
                             socket_id: other_socket_id.clone(),
-                            extra,
-                        }),
-                        sharing: sharing.clone(),
-                        remove_op: Some(remove_op),
-                    }),
-                    // Connect a listener in the other stack
-                    (
-                        DualStackRemoteIp::OtherStack(remote_ip),
-                        DualStackRemove::ListenerOtherStack {
-                            concrete_addr:
-                                ListenerAddr { ip: ListenerIpAddr { addr, identifier }, device },
-                            associated_addr: _,
-                            ip_options,
-                            sharing,
-                            socket_id,
-                        },
-                    ) => Ok(DualStackConnectOperation {
-                        params: EitherStack::OtherStack(ConnectParameters {
-                            local_ip: addr.clone(),
-                            local_port: Some(*identifier),
-                            remote_ip,
-                            remote_port,
-                            device: device.clone(),
-                            sharing: sharing.clone(),
-                            ip_options: ip_options.clone(),
-                            socket_id: socket_id.clone(),
-                            extra,
-                        }),
-                        sharing: sharing.clone(),
-                        remove_op: Some(remove_op),
-                    }),
-                    // Re-connect in the other stack.
-                    (
-                        DualStackRemoteIp::OtherStack(remote_ip),
-                        DualStackRemove::ConnectedOtherStack {
-                            concrete_addr:
-                                ConnAddr {
-                                    ip: ConnIpAddr { local: (local_ip, local_id), remote: _ },
-                                    device,
-                                },
-                            associated_addr: _,
-                            ip_options,
-                            sharing,
-                            socket_id,
-                        },
-                    ) => Ok(DualStackConnectOperation {
-                        params: EitherStack::OtherStack(ConnectParameters {
-                            local_ip: Some(local_ip.clone()),
-                            local_port: Some(*local_id),
-                            remote_ip,
-                            remote_port,
-                            device: device.clone(),
-                            sharing: sharing.clone(),
-                            ip_options: ip_options.clone(),
-                            socket_id: socket_id.clone(),
                             extra,
                         }),
                         sharing: sharing.clone(),
