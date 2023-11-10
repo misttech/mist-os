@@ -305,7 +305,11 @@ fn get_channels_to_scan(
         operating_channels.extend(&band.operating_channels);
     }
 
-    SUPPORTED_20_MHZ_CHANNELS
+    let requested_channels = match scan_request {
+        fidl_sme::ScanRequest::Active(options) => &options.channels[..],
+        _ => &[],
+    };
+    let channels: Vec<u8> = SUPPORTED_20_MHZ_CHANNELS
         .iter()
         .filter(|channel| operating_channels.contains(channel))
         .filter(|channel| {
@@ -320,15 +324,23 @@ fn get_channels_to_scan(
         .filter(|chan| {
             // If this is an active scan and there are any channels specified by the caller,
             // only include those channels.
-            if let &fidl_sme::ScanRequest::Active(ref options) = scan_request {
-                if !options.channels.is_empty() {
-                    return options.channels.contains(chan);
-                }
+            if !requested_channels.is_empty() {
+                return requested_channels.contains(chan);
             }
             true
         })
         .map(|chan| *chan)
-        .collect()
+        .collect();
+
+    if channels.is_empty() {
+        if !requested_channels.is_empty() {
+            warn!("All channels are filtered out. Requested channels: {:?}", requested_channels);
+        } else {
+            warn!("All channels are filtered out.");
+        };
+    }
+
+    channels
 }
 
 // TODO(65792): Evaluate options for where and how we select what channels to scan.
@@ -910,7 +922,11 @@ mod tests {
 
     fn sme_inspect() -> (Inspector, Arc<inspect::SmeTree>) {
         let inspector = Inspector::default();
-        let sme_inspect = Arc::new(inspect::SmeTree::new(inspector.root().create_child("sme")));
+        let sme_inspect = Arc::new(inspect::SmeTree::new(
+            inspector.root().create_child("usme"),
+            &test_utils::fake_device_info([1u8; 6].into()),
+            &fake_spectrum_management_support_empty(),
+        ));
         (inspector, sme_inspect)
     }
 }

@@ -1353,7 +1353,10 @@ mod tests {
                 rsn::rsne::Rsne,
             },
             test_utils::{
-                fake_features::{fake_mac_sublayer_support, fake_security_support},
+                fake_features::{
+                    fake_mac_sublayer_support, fake_security_support,
+                    fake_spectrum_management_support_empty,
+                },
                 fake_stas::IesOverrides,
             },
             timer,
@@ -3694,7 +3697,11 @@ mod tests {
                 mlme_sink: MlmeSink::new(mlme_sink),
                 timer,
                 att_id: 0,
-                inspect: Arc::new(inspect::SmeTree::new(inspector.root().create_child("usme"))),
+                inspect: Arc::new(inspect::SmeTree::new(
+                    inspector.root().create_child("usme"),
+                    &test_utils::fake_device_info([1u8; 6].into()),
+                    &fake_spectrum_management_support_empty(),
+                )),
                 mac_sublayer_support: fake_mac_sublayer_support(),
                 security_support: fake_security_support(),
             };

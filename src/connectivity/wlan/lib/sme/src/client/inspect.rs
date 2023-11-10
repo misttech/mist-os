@@ -4,11 +4,15 @@
 
 use {
     crate::client::{ClientSmeStatus, ServingApInfo},
-    fidl_fuchsia_wlan_common as fidl_common,
+    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_mlme as fidl_mlme,
     fuchsia_inspect::{
         BoolProperty, BytesProperty, IntProperty, Node, Property, StringProperty, UintProperty,
     },
-    fuchsia_inspect_contrib::nodes::{BoundedListNode, NodeExt, TimeProperty},
+    fuchsia_inspect_contrib::{
+        inspect_insert,
+        log::{InspectListClosure, InspectUintArray},
+        nodes::{BoundedListNode, NodeExt, TimeProperty},
+    },
     fuchsia_zircon as zx,
     ieee80211::Ssid,
     parking_lot::Mutex,
@@ -56,7 +60,11 @@ pub struct SmeTree {
 }
 
 impl SmeTree {
-    pub fn new(node: Node) -> Self {
+    pub fn new(
+        node: Node,
+        device_info: &fidl_mlme::DeviceInfo,
+        spectrum_management_support: &fidl_common::SpectrumManagementSupport,
+    ) -> Self {
         let state_events =
             BoundedListNode::new(node.create_child("state_events"), STATE_EVENTS_LIMIT);
         let rsn_events = BoundedListNode::new(node.create_child("rsn_events"), RSN_EVENTS_LIMIT);
@@ -65,6 +73,25 @@ impl SmeTree {
         let pulse = PulseNode::new(node.create_child("last_pulse"));
         let scan_discard_fidl_bss = node.create_uint("scan_discard_fidl_bss", 0);
         let scan_merge_ie_failures = node.create_uint("scan_merge_ie_failures", 0);
+        inspect_insert!(node, device_support: {
+            device_info: {
+                bands: InspectListClosure(&device_info.bands, |node, key, band| {
+                    inspect_insert!(node, var key: {
+                        band: match band.band {
+                            fidl_common::WlanBand::TwoGhz => "2.4Ghz",
+                            fidl_common::WlanBand::FiveGhz => "5Ghz",
+                            _ => "Unknown",
+                        },
+                        operating_channels: InspectUintArray::new(&band.operating_channels),
+                    });
+                }),
+            },
+            spectrum_management_support: {
+                dfs: {
+                    supported: spectrum_management_support.dfs.supported,
+                }
+            }
+        });
         Self {
             root_node: node,
             state_events: Mutex::new(state_events),

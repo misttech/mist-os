@@ -504,7 +504,11 @@ impl ClientSme {
         let device_info = Arc::new(info);
         let (mlme_sink, mlme_stream) = mpsc::unbounded();
         let (mut timer, time_stream) = timer::create_timer();
-        let inspect = Arc::new(inspect::SmeTree::new(inspect_node));
+        let inspect = Arc::new(inspect::SmeTree::new(
+            inspect_node,
+            &device_info,
+            &spectrum_management_support,
+        ));
         let _ = timer.schedule(event::InspectPulseCheck);
         let _ = timer.schedule(event::InspectPulsePersist);
         let mut auto_persist_last_pulse =
