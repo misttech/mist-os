@@ -10,7 +10,7 @@ use crate::{
         fsverity::FsVerityState, inotify, pipe::Pipe, rw_queue::RwQueue, socket::SocketHandle,
         FileHandle, FileObject, FileOps, FileSystem, FileSystemHandle, FileWriteGuard,
         FileWriteGuardMode, FileWriteGuardState, FsStr, FsString, MountInfo, NamespaceNode,
-        OPathOps, RecordLockCommand, RecordLockOwner, RecordLocks,
+        OPathOps, RecordLockCommand, RecordLockOwner, RecordLocks, WeakFileHandle,
     },
     logging::log_error,
     signals::{send_signal, SignalInfo},
@@ -206,7 +206,7 @@ struct FlockInfo {
     /// - `Some(true)`: The node is locked exclusively.
     locked_exclusive: Option<bool>,
     /// The FileObject that hold the lock.
-    locking_handles: Vec<Weak<FileObject>>,
+    locking_handles: Vec<WeakFileHandle>,
     /// The queue to notify process waiting on the lock.
     wait_queue: WaitQueue,
 }
@@ -1052,7 +1052,7 @@ impl FsNode {
     pub fn on_file_closed(&self, file: &FileObject) {
         {
             let mut flock_info = self.flock_info.lock();
-            // This function will drop the flock from `file` because the `Weak<FileObject>` for
+            // This function will drop the flock from `file` because the `WeakFileHandle` for
             // `file` will no longer upgrade to an `FileHandle`.
             flock_info.retain(|_| true);
         }

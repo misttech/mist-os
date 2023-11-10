@@ -2,19 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon as zx;
-use itertools::Itertools;
-use starnix_lock::Mutex;
-use std::{
-    collections::{hash_map::Entry, HashMap, VecDeque},
-    sync::{Arc, Weak},
-};
-
 use crate::{
     arch::uapi::epoll_event,
     fs::{
         buffers::{InputBuffer, OutputBuffer},
-        fileops_impl_nonseekable, Anon, FdEvents, FileHandle, FileObject, FileOps,
+        fileops_impl_nonseekable, Anon, FdEvents, FileHandle, FileObject, FileOps, WeakFileHandle,
     },
     logging::log_warn,
     task::{
@@ -22,6 +14,13 @@ use crate::{
         WaitQueue, Waiter,
     },
     types::{errno, error, Errno, OpenFlags, EBADF, EINTR, EPOLLET, EPOLLONESHOT, ETIMEDOUT},
+};
+use fuchsia_zircon as zx;
+use itertools::Itertools;
+use starnix_lock::Mutex;
+use std::{
+    collections::{hash_map::Entry, HashMap, VecDeque},
+    sync::Arc,
 };
 
 /// Maximum depth of epoll instances monitoring one another.
@@ -34,7 +33,7 @@ const MAX_NESTED_DEPTH: u32 = 5;
 /// to store a pointer to the data that needs to be processed
 /// after an event.
 struct WaitObject {
-    target: Weak<FileObject>,
+    target: WeakFileHandle,
     events: FdEvents,
     data: u64,
     wait_canceler: Option<WaitCanceler>,

@@ -2,11 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl::HandleBased;
-use fuchsia_zircon as zx;
-use starnix_lock::Mutex;
-use std::{fmt, sync::Arc};
-
 use crate::{
     fs::{
         buffers::{InputBuffer, OutputBuffer},
@@ -29,6 +24,13 @@ use crate::{
         FS_IOC_READ_VERITY_METADATA, FS_IOC_SETFLAGS, FS_VERITY_FL, SEEK_CUR, SEEK_DATA, SEEK_END,
         SEEK_HOLE, SEEK_SET, TCGETS,
     },
+};
+use fidl::HandleBased;
+use fuchsia_zircon as zx;
+use starnix_lock::Mutex;
+use std::{
+    fmt,
+    sync::{Arc, Weak},
 };
 
 pub const MAX_LFS_FILESIZE: usize = 0x7fff_ffff_ffff_ffff;
@@ -887,6 +889,7 @@ pub struct FileObject {
 }
 
 pub type FileHandle = Arc<FileObject>;
+pub type WeakFileHandle = Weak<FileObject>;
 
 impl FileObject {
     /// Create a FileObject that is not mounted in a namespace.
