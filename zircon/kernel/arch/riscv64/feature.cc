@@ -6,10 +6,11 @@
 
 #include "arch/riscv64/feature.h"
 
-#include <debug.h>
-#include <stdint.h>
-#include <pow2.h>
 #include <assert.h>
+#include <debug.h>
+#include <pow2.h>
+#include <stdint.h>
+
 #include <arch/defines.h>
 
 // Detected CPU features

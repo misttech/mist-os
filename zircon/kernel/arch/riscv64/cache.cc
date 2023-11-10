@@ -4,9 +4,9 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
+#include <align.h>
 #include <lib/arch/cache.h>
 #include <trace.h>
-#include <align.h>
 
 #include <arch/interrupt.h>
 #include <arch/ops.h>
