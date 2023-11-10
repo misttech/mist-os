@@ -2,16 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    fs::{
-        buffers::{InputBuffer, OutputBuffer},
-        *,
-    },
-    logging::{impossible_error, log_warn},
-    mm::MemoryAccessorExt,
-    syscalls::*,
-    task::*,
-    types::*,
+use crate::fs::buffers::{InputBuffer, OutputBuffer};
+use crate::fs::{fileops_impl_nonseekable, Anon, FdEvents, FdFlags, FdNumber, FileObject, FileOps};
+use crate::logging::{impossible_error, log_warn};
+use crate::mm::MemoryAccessorExt;
+use crate::syscalls::{SyscallArg, SyscallResult, SUCCESS};
+use crate::task::{
+    CurrentTask, EventHandler, ManyZxHandleSignalHandler, SignalHandler, SignalHandlerInner,
+    WaitCanceler, WaitCancelerOneVmo, Waiter,
+};
+use crate::types::{
+    c_char, error, sync_fence_info, sync_file_info, sync_merge_data, Errno, OpenFlags, UserAddress,
+    UserRef, SYNC_IOC_MAGIC,
 };
 use fidl::HandleBased;
 use fuchsia_zircon as zx;

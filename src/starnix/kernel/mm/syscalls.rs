@@ -9,13 +9,29 @@ use crate::{
     execution::notify_debugger_of_module_list,
     fs::{
         buffers::{OutputBuffer, UserBuffersInputBuffer, UserBuffersOutputBuffer},
-        *,
+        FdNumber, FileWriteGuardRef,
     },
-    logging::*,
-    mm::*,
-    syscalls::*,
+    logging::{log_trace, not_implemented, not_implemented_log_once},
+    mm::{
+        create_anonymous_mapping_vmo, DesiredAddress, FutexKey, FutexTable, MappedVmo, MappingName,
+        MappingOptions, MemoryAccessorExt, MremapFlags, ProtectionFlags, PAGE_SIZE,
+    },
+    syscalls::{
+        duration_from_timespec, errno, error, robust_list_head, time_from_timespec, timespec, uapi,
+        CurrentTask, Errno, Locked, Unlocked, UserAddress, UserRef,
+    },
     task::Task,
+    types::{
+        pid_t, CAP_SYS_PTRACE, FUTEX_BITSET_MATCH_ANY, FUTEX_CLOCK_REALTIME, FUTEX_CMD_MASK,
+        FUTEX_PRIVATE_FLAG, FUTEX_REQUEUE, FUTEX_WAIT, FUTEX_WAIT_BITSET, FUTEX_WAKE,
+        FUTEX_WAKE_BITSET, MAP_ANONYMOUS, MAP_DENYWRITE, MAP_FIXED, MAP_FIXED_NOREPLACE,
+        MAP_GROWSDOWN, MAP_NORESERVE, MAP_POPULATE, MAP_PRIVATE, MAP_SHARED, MAP_STACK, PROT_EXEC,
+        PROT_WRITE, PTRACE_MODE_ATTACH_REALCREDS,
+    },
 };
+
+#[cfg(target_arch = "x86_64")]
+use crate::types::MAP_32BIT;
 
 // Returns any platform-specific mmap flags. This is a separate function because as of this writing
 // "attributes on expressions are experimental."
@@ -483,7 +499,10 @@ pub fn sys_set_robust_list(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::testing::*;
+    use crate::{
+        testing::*,
+        types::{EEXIST, MREMAP_FIXED, MREMAP_MAYMOVE, PROT_READ},
+    };
 
     #[::fuchsia::test]
     async fn test_mmap_with_colliding_hint() {

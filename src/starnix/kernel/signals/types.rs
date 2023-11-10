@@ -9,7 +9,13 @@ use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
 use crate::{
     task::{IntervalTimerHandle, ThreadGroupReadGuard, WaitQueue, WaiterRef},
-    types::*,
+    types::{
+        Errno, SigSet, Signal, UncheckedSignal, UserAddress, __sifields__bindgen_ty_2,
+        __sifields__bindgen_ty_4, __sifields__bindgen_ty_7, c_int, c_uint, error, pid_t,
+        sigaction_t, sigaltstack_t, sigevent, siginfo_t, sigval_t, struct_with_union_into_bytes,
+        uapi, uid_t, SIGEV_NONE, SIGEV_SIGNAL, SIGEV_THREAD, SIGEV_THREAD_ID, SIG_DFL, SIG_IGN,
+        SI_KERNEL, SI_MAX_SIZE, UNBLOCKABLE_SIGNALS,
+    },
 };
 
 /// `SignalActions` contains a `sigaction_t` for each valid signal.
@@ -479,6 +485,7 @@ impl From<SignalEventValue> for sigval_t {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::types::{CLD_EXITED, SIGCHLD, SIGPWR};
     use std::convert::TryFrom;
 
     #[::fuchsia::test]

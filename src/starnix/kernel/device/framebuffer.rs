@@ -7,15 +7,20 @@ use crate::{
     device::{features::AspectRatio, DeviceMode, DeviceOps},
     fs::{
         buffers::{InputBuffer, OutputBuffer},
+        fileops_impl_seekable,
         kobject::{KObjectDeviceAttribute, KType},
         sysfs::SysFsDirectory,
-        *,
+        FileObject, FileOps, FsNode, VmoFileObject,
     },
-    logging::*,
+    logging::{impossible_error, log_warn},
     mm::{MemoryAccessorExt, ProtectionFlags},
-    syscalls::*,
+    syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::{CurrentTask, Kernel},
-    types::*,
+    types::{
+        errno, error, fb_bitfield, fb_fix_screeninfo, fb_var_screeninfo, DeviceType, Errno,
+        OpenFlags, UserAddress, UserRef, FBIOGET_FSCREENINFO, FBIOGET_VSCREENINFO,
+        FBIOPUT_VSCREENINFO, FB_TYPE_PACKED_PIXELS, FB_VISUAL_TRUECOLOR,
+    },
 };
 
 use fidl_fuchsia_math as fmath;

@@ -7,14 +7,18 @@ use crate::{
     device::{simple_device_ops, DeviceMode},
     fs::{
         buffers::{InputBuffer, OutputBuffer},
+        fileops_impl_seekless,
         kobject::{KObjectDeviceAttribute, KType},
         sysfs::SysFsDirectory,
-        *,
+        Anon, FileHandle, FileObject, FileOps, FileWriteGuardRef, FsNodeInfo, NamespaceNode,
     },
-    logging::*,
-    mm::*,
-    task::*,
-    types::*,
+    logging::{log, log_info},
+    mm::{
+        create_anonymous_mapping_vmo, DesiredAddress, MappedVmo, MappingName, MappingOptions,
+        ProtectionFlags,
+    },
+    task::{CurrentTask, Kernel},
+    types::{error, DeviceType, Errno, FileMode, OpenFlags},
 };
 
 use fuchsia_zircon::{self as zx, cprng_draw};

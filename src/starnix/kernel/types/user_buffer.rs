@@ -4,7 +4,10 @@
 
 use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
-use crate::{mm::PAGE_SIZE, types::*};
+use crate::{
+    mm::PAGE_SIZE,
+    types::{errno, error, Errno, UserAddress},
+};
 use once_cell::sync::Lazy;
 
 /// Matches iovec_t.

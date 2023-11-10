@@ -4,7 +4,11 @@
 
 use std::collections::HashMap;
 
-use crate::types::*;
+use crate::types::{
+    error, rlimit, uapi, Errno, RLIMIT_AS, RLIMIT_CORE, RLIMIT_CPU, RLIMIT_DATA, RLIMIT_FSIZE,
+    RLIMIT_LOCKS, RLIMIT_MEMLOCK, RLIMIT_MSGQUEUE, RLIMIT_NICE, RLIMIT_NOFILE, RLIMIT_NPROC,
+    RLIMIT_RSS, RLIMIT_RTPRIO, RLIMIT_RTTIME, RLIMIT_SIGPENDING, RLIMIT_STACK, RLIM_INFINITY,
+};
 
 /// A description of a resource.
 pub struct ResourceDesc {

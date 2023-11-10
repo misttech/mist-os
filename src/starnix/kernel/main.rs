@@ -6,6 +6,7 @@
 #![allow(clippy::too_many_arguments)]
 // TODO(fxbug.dev/122028): Remove this allow once the lint is fixed.
 #![allow(unknown_lints, clippy::extra_unused_type_parameters)]
+#![warn(clippy::wildcard_imports)]
 
 #[macro_use]
 extern crate fuchsia_inspect_contrib;
@@ -14,7 +15,7 @@ extern crate macro_rules_attribute;
 
 use crate::{
     execution::{Container, ContainerServiceConfig},
-    logging::*,
+    logging::{impossible_error, log_debug, log_error, log_warn, not_implemented},
 };
 use anyhow::Error;
 use fidl::endpoints::ControlHandle;

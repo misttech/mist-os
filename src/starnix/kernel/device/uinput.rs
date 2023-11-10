@@ -2,7 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{fs::*, logging::*, syscalls::*, task::*, types};
+use crate::{
+    fs::{
+        default_ioctl, fileops_impl_dataless, fileops_impl_seekless, FileObject, FileOps, FsNode,
+    },
+    logging::log_warn,
+    syscalls::{uapi, Errno, OpenFlags, SyscallArg, SyscallResult, SUCCESS},
+    task::CurrentTask,
+    types,
+};
 use bit_vec::BitVec;
 use starnix_lock::Mutex;
 use std::sync::Arc;
@@ -80,9 +88,11 @@ impl FileOps for Arc<UinputDevice> {
 mod test {
     use super::*;
     use crate::{
+        fs::FileHandle,
         mm::MemoryAccessorExt,
         task::Kernel,
         testing::{create_kernel_and_task, map_memory, AutoReleasableTask},
+        types::UserAddress,
     };
     use test_case::test_case;
 

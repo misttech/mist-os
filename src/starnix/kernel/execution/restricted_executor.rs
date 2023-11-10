@@ -15,7 +15,7 @@ use crate::{
         CurrentTask, ExceptionResult, ExitStatus, Kernel, ProcessGroup, TaskFlags, ThreadGroup,
         ThreadGroupWriteGuard,
     },
-    types::*,
+    types::{from_status_like_fdio, pid_t, Errno, ReleasableByRef, SIGKILL},
 };
 use anyhow::{format_err, Error};
 use fuchsia_inspect_contrib::ProfileDuration;
