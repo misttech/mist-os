@@ -146,6 +146,7 @@ inline void Scheduler::TraceThreadQueueEvent(const fxt::InternedString& name,
   // arg1[20..27] : Number of runnable tasks on this CPU after the queue event.
   // arg1[28..28] : 1 == fair, 0 == deadline
   // arg1[29..29] : 1 == eligible, 0 == ineligible
+  // arg1[30..30] : 1 == idle thread, 0 == normal thread
   //
   if constexpr (SCHEDULER_QUEUE_TRACING_ENABLED) {
     const zx_time_t now = current_time();  // TODO(johngro): plumb this in from above
@@ -154,12 +155,12 @@ inline void Scheduler::TraceThreadQueueEvent(const fxt::InternedString& name,
     const size_t cnt = fair_run_queue_.size() + deadline_run_queue_.size() +
                        ((active_thread_ && !active_thread_->IsIdle()) ? 1 : 0);
 
-    const uint64_t arg0 = thread->IsIdle() ? 0 : thread->tid();
+    const uint64_t arg0 = thread->tid();
     const uint64_t arg1 =
         (thread->scheduler_state().GetEffectiveCpuMask(mp_get_active_mask()) & 0xFFFF) |
         (ktl::clamp<uint64_t>(this_cpu_, 0, 0xF) << 16) |
         (ktl::clamp<uint64_t>(cnt, 0, 0xFF) << 20) | ((fair ? 1 : 0) << 28) |
-        ((eligible ? 1 : 0) << 29);
+        ((eligible ? 1 : 0) << 29) | ((thread->IsIdle() ? 1 : 0) << 30);
 
     ktrace_probe(TraceAlways, TraceContext::Cpu, name, arg0, arg1);
   }
