@@ -5,7 +5,6 @@ library fuchsia.wlan.mlme;
 
 using fuchsia.wlan.common;
 using fuchsia.wlan.ieee80211 as ieee80211;
-using fuchsia.wlan.mesh;
 using fuchsia.wlan.internal as internal;
 using zx;
 
@@ -417,54 +416,6 @@ type EapolConfirm = struct {
     dst_addr ieee80211.MacAddr;
 };
 
-// IEEE Std 802.11-2016, 9.4.2.98
-type MeshConfiguration = struct {
-    active_path_sel_proto_id uint8;
-    active_path_sel_metric_id uint8;
-    congest_ctrl_method_id uint8;
-    sync_method_id uint8;
-    auth_proto_id uint8;
-    mesh_formation_info uint8;
-    mesh_capability uint8;
-};
-
-// Fields that are common between the MPM Open and Confirm actions
-type MeshPeeringCommon = struct {
-    peer_sta_address ieee80211.MacAddr;
-    protocol_id uint16;
-    local_link_id uint16;
-    mesh_id vector<uint8>:32;
-    rates vector<uint8>:MAX;
-    mesh_config MeshConfiguration;
-    ht_cap box<ieee80211.HtCapabilities>;
-    ht_op box<ieee80211.HtOperation>;
-    vht_cap box<ieee80211.VhtCapabilities>;
-    vht_op box<ieee80211.VhtOperation>;
-};
-
-// IEEE Std 802.11-2016, 9.6.16.2.2
-type MeshPeeringOpenAction = struct {
-    common MeshPeeringCommon;
-};
-
-// IEEE Std 802.11-2016, 9.6.16.3.2
-type MeshPeeringConfirmAction = struct {
-    common MeshPeeringCommon;
-    aid uint16;
-    peer_link_id uint16;
-};
-
-type MeshPeeringParams = struct {
-    peer_sta_address ieee80211.MacAddr;
-    local_aid uint16;
-    rates vector<uint8>:MAX;
-    // TODO(gbonik): HT/VHT caps
-};
-
-type GetMeshPathTableRequest = struct {
-    dummy uint8;
-};
-
 // Because these methods rely on an external entity to provide a response, events are used instead
 // of return values.
 closed protocol MLME {
@@ -590,29 +541,6 @@ closed protocol MLME {
     });
 
     // The following are extensions to the 802.11 MLME SAP interface.
-
-    strict -> IncomingMpOpenAction(struct {
-        action MeshPeeringOpenAction;
-    });
-    strict SendMpOpenAction(struct {
-        action MeshPeeringOpenAction;
-    });
-    strict -> IncomingMpConfirmAction(struct {
-        action MeshPeeringConfirmAction;
-    });
-    strict SendMpConfirmAction(struct {
-        action MeshPeeringConfirmAction;
-    });
-
-    strict MeshPeeringEstablished(struct {
-        peering MeshPeeringParams;
-    });
-
-    strict GetMeshPathTableReq(struct {
-        req GetMeshPathTableRequest;
-    }) -> (struct {
-        table fuchsia.wlan.mesh.MeshPathTable;
-    });
 
     strict -> SignalReport(struct {
         ind internal.SignalReportIndication;

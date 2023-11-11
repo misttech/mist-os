@@ -4,7 +4,6 @@
 
 pub mod ap;
 pub mod client;
-pub mod mesh;
 
 use {
     crate::{MlmeEventStream, MlmeStream, Station},
@@ -26,13 +25,11 @@ use {
 
 pub type ClientSmeServer = mpsc::UnboundedSender<client::Endpoint>;
 pub type ApSmeServer = mpsc::UnboundedSender<ap::Endpoint>;
-pub type MeshSmeServer = mpsc::UnboundedSender<mesh::Endpoint>;
 
 #[derive(Clone)]
 pub enum SmeServer {
     Client(ClientSmeServer),
     Ap(ApSmeServer),
-    Mesh(MeshSmeServer),
 }
 
 async fn serve_generic_sme(
@@ -174,16 +171,7 @@ pub fn create_sme(
             )
         }
         fidl_common::WlanMacRole::Mesh => {
-            let (sender, receiver) = mpsc::unbounded();
-            let (mlme_req_sink, mlme_req_stream, fut) =
-                mesh::serve(device_info, mlme_event_stream, receiver);
-            (
-                SmeServer::Mesh(sender),
-                mlme_req_sink,
-                mlme_req_stream,
-                None,
-                FutureObj::new(Box::new(fut)),
-            )
+            return Err(format_err!("Mesh mode is unsupported"));
         }
         fidl_common::WlanMacRoleUnknown!() => {
             return Err(format_err!("Unknown WlanMacRole type: {:?}", device_info.role));

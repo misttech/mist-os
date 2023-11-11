@@ -22,7 +22,6 @@ fidl("fuchsia.wlan.mlme") {
     "//sdk/fidl/fuchsia.wlan.common",
     "//sdk/fidl/fuchsia.wlan.ieee80211",
     "//sdk/fidl/fuchsia.wlan.internal",
-    "//sdk/fidl/fuchsia.wlan.mesh",
     "//sdk/fidl/fuchsia.wlan.minstrel",
     "//sdk/fidl/fuchsia.wlan.stats",
     "//zircon/vdso/zx",

@@ -382,9 +382,6 @@ impl FullmacMlme {
             SetKeys(req) => self.handle_mlme_set_keys_request(req),
             DeleteKeys(req) => self.device.del_keys_req(convert_delete_keys_request(&req)),
             Eapol(req) => self.device.eapol_tx(&mut convert_eapol_request(&req)),
-            SendMpOpenAction(..) => info!("SendMpOpenAction is unsupported"),
-            SendMpConfirmAction(..) => info!("SendMpConfirmAction is unsupported"),
-            MeshPeeringEstablished(..) => info!("MeshPeeringEstablished is unsupported"),
             SetCtrlPort(req) => self.device.set_link_state(req.state),
             QueryDeviceInfo(responder) => {
                 let info = self.device.query_device_info();

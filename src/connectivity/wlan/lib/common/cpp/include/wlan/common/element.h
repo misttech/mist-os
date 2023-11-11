@@ -71,87 +71,6 @@ static_assert(sizeof(Country) == Country::kCountryLen);
 
 const uint16_t kEapolProtocolId = 0x888E;
 
-// IEEE Std 802.11-2016, 9.4.2.98
-struct MeshConfiguration {
-  enum PathSelProtoId : uint8_t {
-    kHwmp = 1u,
-  };
-
-  enum PathSelMetricId : uint8_t {
-    kAirtime = 1u,
-  };
-
-  enum CongestCtrlModeId : uint8_t {
-    kCongestCtrlInactive = 0u,
-    kCongestCtrlSignaling = 1u,
-  };
-
-  enum SyncMethodId : uint8_t {
-    kNeighborOffsetSync = 1u,
-  };
-
-  enum AuthProtoId : uint8_t {
-    kNoAuth = 0u,
-    kSae = 1u,
-    kIeee8021X = 2u,
-  };
-
-  struct MeshFormationInfo : public common::BitField<uint8_t> {
-    MeshFormationInfo() = default;
-    explicit MeshFormationInfo(uint8_t raw) : BitField(raw) {}
-
-    WLAN_BIT_FIELD(connected_to_mesh_gate, 0, 1)
-    WLAN_BIT_FIELD(num_peerings, 1, 6)
-    WLAN_BIT_FIELD(connected_to_as, 7, 1)
-  } __PACKED;
-
-  ::fuchsia::wlan::mlme::MeshConfiguration ToFidl() const {
-    ::fuchsia::wlan::mlme::MeshConfiguration ret;
-    ret.active_path_sel_proto_id = static_cast<uint8_t>(active_path_sel_proto_id);
-    ret.active_path_sel_metric_id = static_cast<uint8_t>(active_path_sel_metric_id);
-    ret.congest_ctrl_method_id = static_cast<uint8_t>(congest_ctrl_method_id);
-    ret.sync_method_id = static_cast<uint8_t>(sync_method_id);
-    ret.auth_proto_id = static_cast<uint8_t>(auth_proto_id);
-    ret.mesh_formation_info = mesh_formation_info.val();
-    ret.mesh_capability = mesh_capability.val();
-    return ret;
-  }
-
-  static MeshConfiguration FromFidl(const ::fuchsia::wlan::mlme::MeshConfiguration& f) {
-    return MeshConfiguration{
-        .active_path_sel_proto_id = static_cast<PathSelProtoId>(f.active_path_sel_proto_id),
-        .active_path_sel_metric_id = static_cast<PathSelMetricId>(f.active_path_sel_metric_id),
-        .congest_ctrl_method_id = static_cast<CongestCtrlModeId>(f.congest_ctrl_method_id),
-        .sync_method_id = static_cast<SyncMethodId>(f.sync_method_id),
-        .auth_proto_id = static_cast<AuthProtoId>(f.auth_proto_id),
-        .mesh_formation_info = MeshFormationInfo(f.mesh_formation_info),
-        .mesh_capability = MeshCapability(f.mesh_capability),
-    };
-  }
-
-  struct MeshCapability : public common::BitField<uint8_t> {
-    MeshCapability() = default;
-    explicit MeshCapability(uint8_t raw) : BitField(raw) {}
-
-    WLAN_BIT_FIELD(accepting_additional_peerings, 0, 1)
-    WLAN_BIT_FIELD(mcca_supported, 1, 1)
-    WLAN_BIT_FIELD(mcca_enabled, 2, 1)
-    WLAN_BIT_FIELD(forwarding, 3, 1)
-    WLAN_BIT_FIELD(mbca_enabled, 4, 1)
-    WLAN_BIT_FIELD(tbtt_adjusting, 5, 1)
-    WLAN_BIT_FIELD(power_save_level, 6, 1)
-    // bit 7 is reserved
-  } __PACKED;
-
-  PathSelProtoId active_path_sel_proto_id;
-  PathSelMetricId active_path_sel_metric_id;
-  CongestCtrlModeId congest_ctrl_method_id;
-  SyncMethodId sync_method_id;
-  AuthProtoId auth_proto_id;
-  MeshFormationInfo mesh_formation_info;
-  MeshCapability mesh_capability;
-} __PACKED;
-
 // IEEE Std 802.11-2016, 9.4.1.17
 class QosInfo : public common::BitField<uint8_t> {
  public:
@@ -713,25 +632,6 @@ struct BasicVhtMcsNss : public common::BitField<uint16_t> {
     set_val(static_cast<uint16_t>(val() | mcs_val));
   }
 };
-
-// IEEE Std 802.11-2016, 9.4.2.102
-// The fixed part of the Mesh Peering Management header
-struct MpmHeader {
-  // IEEE Std 802.11-2016, table 9-222
-  enum Protocol : uint16_t {
-    MPM = 0,
-    AMPE = 1,
-  };
-
-  Protocol protocol;
-  uint16_t local_link_id;
-} __PACKED;
-
-// IEEE Std 802.11-2016, 9.4.2.102
-// The optional "PMK" part of the MPM element
-struct MpmPmk {
-  uint8_t data[16];
-} __PACKED;
 
 SupportedMcsSet IntersectMcs(const SupportedMcsSet& lhs, const SupportedMcsSet& rhs);
 HtCapabilities IntersectHtCap(const HtCapabilities& lhs, const HtCapabilities& rhs);
