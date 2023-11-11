@@ -1871,6 +1871,7 @@ assembly_input_bundle("fshost_fvm_minfs_migration") {
       ]
     },
   ]
+  bootfs_files_labels = [ "//src/storage/fshost:assembly_bundle_fshost_fxfs" ]
 }
 
 # AIB containing fshost support for f2fs
