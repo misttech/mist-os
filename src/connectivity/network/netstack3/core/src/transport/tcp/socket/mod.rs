@@ -1764,55 +1764,61 @@ impl<I: IpLayerIpExt, C: NonSyncContext<I, SC::WeakDeviceId>, SC: SyncContext<I,
     }
 
     fn close(&mut self, ctx: &mut C, id: TcpSocketId<I, Self::WeakDeviceId, C>) {
-        let destroy =
-            self.with_socket_mut_transport_demux(
-                &id,
-                |sync_ctx, socket_state| match socket_state {
-                    TcpSocketState::Unbound(_) => true,
-                    TcpSocketState::Bound(BoundSocketState::Listener((
-                        MaybeListener::Bound(_),
-                        _sharing,
-                        addr,
-                    ))) => {
+        let (destroy, pending) = self.with_socket_mut_transport_demux(
+            &id,
+            |sync_ctx, socket_state| match socket_state {
+                TcpSocketState::Unbound(_) => (true, None),
+                TcpSocketState::Bound(BoundSocketState::Listener((
+                    MaybeListener::Bound(_),
+                    _sharing,
+                    addr,
+                ))) => {
+                    sync_ctx.with_demux_mut(|DemuxState { socketmap, .. }| {
+                        assert_matches!(socketmap.listeners_mut().remove(&id, &addr), Ok(()));
+                    });
+                    (true, None)
+                }
+                TcpSocketState::Bound(BoundSocketState::Listener((
+                    MaybeListener::Listener(Listener {
+                        accept_queue,
+                        backlog: _,
+                        buffer_sizes: _,
+                        socket_options: _,
+                    }),
+                    _sharing,
+                    addr,
+                ))) => {
+                    sync_ctx.with_demux_mut(|DemuxState { socketmap, .. }| {
+                        assert_matches!(socketmap.listeners_mut().remove(&id, &addr), Ok(()));
+                    });
+
+                    let (pending, _socket_extra) = accept_queue.close();
+                    (true, Some(pending))
+                }
+                TcpSocketState::Bound(BoundSocketState::Connected((conn, _sharing, addr))) => {
+                    conn.defunct = true;
+                    let already_closed = match conn
+                        .state
+                        .close(CloseReason::Close { now: ctx.now() }, &conn.socket_options)
+                    {
+                        Err(CloseError::NoConnection) => true,
+                        Err(CloseError::Closing) => false,
+                        Ok(()) => matches!(conn.state, State::Closed(_)),
+                    };
+                    if already_closed {
                         sync_ctx.with_demux_mut(|DemuxState { socketmap, .. }| {
-                            assert_matches!(socketmap.listeners_mut().remove(&id, &addr), Ok(()));
+                            assert_matches!(socketmap.conns_mut().remove(&id, &addr), Ok(()));
                         });
-                        true
-                    }
-                    TcpSocketState::Bound(BoundSocketState::Listener((
-                        MaybeListener::Listener(_),
-                        _sharing,
-                        _addr,
-                    ))) => {
-                        // TODO(https://fxbug.dev/133874: This isn't really
-                        // unreachable and is only being protected by a prior
-                        // shutdown call in bindings. Move the shutdown here and
-                        // remove the panic opportunity.
-                        unreachable!("should not call close directly on a listener");
-                    }
-                    TcpSocketState::Bound(BoundSocketState::Connected((conn, _sharing, addr))) => {
-                        conn.defunct = true;
-                        let already_closed = match conn
-                            .state
-                            .close(CloseReason::Close { now: ctx.now() }, &conn.socket_options)
-                        {
-                            Err(CloseError::NoConnection) => true,
-                            Err(CloseError::Closing) => false,
-                            Ok(()) => matches!(conn.state, State::Closed(_)),
-                        };
-                        if already_closed {
-                            sync_ctx.with_demux_mut(|DemuxState { socketmap, .. }| {
-                                assert_matches!(socketmap.conns_mut().remove(&id, &addr), Ok(()));
-                            });
-                            let _: Option<_> = ctx.cancel_timer(id.downgrade());
-                            true
-                        } else {
-                            do_send_inner(&id, conn, &addr, sync_ctx, ctx);
-                            false
-                        }
-                    }
-                },
-            );
+                        let _: Option<_> = ctx.cancel_timer(id.downgrade());
+                    } else {
+                        do_send_inner(&id, conn, &addr, sync_ctx, ctx);
+                    };
+                    (already_closed, None)
+                }
+            },
+        );
+
+        close_pending_sockets(self, ctx, pending.into_iter().flatten());
 
         if destroy {
             destroy_socket(self, ctx, id);
@@ -1896,32 +1902,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext<I, SC::WeakDeviceId>, SC: SyncContext<I,
             },
         )?;
 
-        for conn_id in pending.into_iter().flatten() {
-            let _: Option<C::Instant> = ctx.cancel_timer(conn_id.downgrade());
-            self.with_socket_mut_transport_demux(&conn_id, |sync_ctx, socket_state| {
-                let (conn, _sharing, conn_addr) = assert_matches!(
-                    socket_state,
-                    TcpSocketState::Bound(BoundSocketState::Connected(conn)) => conn
-                );
-                sync_ctx.with_demux_mut(|DemuxState { socketmap, .. }| {
-                    assert_matches!(socketmap.conns_mut().remove(&conn_id, &conn_addr), Ok(()));
-                });
-
-                if let Some(reset) = conn.state.abort() {
-                    let ConnAddr { ip, device: _ } = conn_addr;
-                    let ser = tcp_serialize_segment(reset, *ip);
-                    sync_ctx.send_ip_packet(ctx, &conn.ip_sock, ser, None).unwrap_or_else(
-                        |(body, err)| {
-                            debug!(
-                                "failed to reset connection to {:?}, body: {:?}, err: {:?}",
-                                ip, body, err
-                            )
-                        },
-                    );
-                }
-            });
-            destroy_socket(self, ctx, conn_id);
-        }
+        close_pending_sockets(self, ctx, pending.into_iter().flatten());
 
         Ok(result)
     }
@@ -2473,6 +2454,47 @@ fn get_reuseaddr<I: IpLayerIpExt, C: NonSyncContext<I, SC::WeakDeviceId>, SC: Sy
     })
 }
 
+/// Closes all sockets in `pending`.
+///
+/// Used to cleanup all pending sockets in the accept queue when a listener
+/// socket is shutdown or closed.
+fn close_pending_sockets<I, SC, C>(
+    sync_ctx: &mut SC,
+    ctx: &mut C,
+    pending: impl Iterator<Item = TcpSocketId<I, SC::WeakDeviceId, C>>,
+) where
+    I: IpLayerIpExt,
+    C: NonSyncContext<I, SC::WeakDeviceId>,
+    SC: SyncContext<I, C>,
+{
+    for conn_id in pending {
+        let _: Option<C::Instant> = ctx.cancel_timer(conn_id.downgrade());
+        sync_ctx.with_socket_mut_transport_demux(&conn_id, |sync_ctx, socket_state| {
+            let (conn, _sharing, conn_addr) = assert_matches!(
+                socket_state,
+                TcpSocketState::Bound(BoundSocketState::Connected(conn)) => conn
+            );
+            sync_ctx.with_demux_mut(|DemuxState { socketmap, .. }| {
+                assert_matches!(socketmap.conns_mut().remove(&conn_id, &conn_addr), Ok(()));
+            });
+
+            if let Some(reset) = conn.state.abort() {
+                let ConnAddr { ip, device: _ } = conn_addr;
+                let ser = tcp_serialize_segment(reset, *ip);
+                sync_ctx.send_ip_packet(ctx, &conn.ip_sock, ser, None).unwrap_or_else(
+                    |(body, err)| {
+                        debug!(
+                            "failed to reset connection to {:?}, body: {:?}, err: {:?}",
+                            ip, body, err
+                        )
+                    },
+                );
+            }
+        });
+        destroy_socket(sync_ctx, ctx, conn_id);
+    }
+}
+
 fn do_send_inner<I, SC, C>(
     conn_id: &TcpSocketId<I, SC::WeakDeviceId, C>,
     conn: &mut Connection<I, SC::WeakDeviceId, C>,
@@ -2992,7 +3014,7 @@ where
 pub fn shutdown<I, C>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
-    id: &mut TcpSocketId<I, WeakDeviceId<C>, C>,
+    id: &TcpSocketId<I, WeakDeviceId<C>, C>,
     shutdown: Shutdown,
 ) -> Result<bool, NoConnection>
 where

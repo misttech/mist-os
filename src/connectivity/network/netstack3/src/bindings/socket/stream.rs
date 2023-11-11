@@ -536,22 +536,7 @@ where
         sync_ctx: &SyncCtx<BindingsNonSyncCtxImpl>,
         non_sync_ctx: &mut BindingsNonSyncCtxImpl,
     ) {
-        let Self { mut id, peer, local_socket_and_watcher: _, send_task_abort } = self;
-        match shutdown::<I, _>(
-            &sync_ctx,
-            non_sync_ctx,
-            &mut id,
-            Shutdown { send: true, receive: true },
-        ) {
-            Ok(true) => {
-                peer.set_disposition(
-                    Some(zx::SocketWriteDisposition::Disabled),
-                    Some(zx::SocketWriteDisposition::Disabled),
-                )
-                .expect("failed to set socket disposition");
-            }
-            Ok(false) | Err(NoConnection) => {}
-        }
+        let Self { id, peer: _, local_socket_and_watcher: _, send_task_abort } = self;
         close::<I, _>(sync_ctx, non_sync_ctx, id);
         if let Some(send_task_abort) = send_task_abort {
             // Signal the task to stop but drop the canceled error. The data
