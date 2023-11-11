@@ -54,10 +54,6 @@ use {
 
 pub use scanner::ScanError;
 
-/// Maximum size of EAPOL frames forwarded to SME.
-/// TODO(fxbug.dev/34845): Evaluate whether EAPOL size restriction is needed.
-const MAX_EAPOL_FRAME_LEN: usize = 255;
-
 #[derive(Debug, Clone, PartialEq)]
 pub enum TimedEvent {
     /// Connecting to AP timed out.
@@ -916,12 +912,6 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
         dst_addr: MacAddr,
         eapol_frame: &[u8],
     ) -> Result<(), Error> {
-        if eapol_frame.len() > MAX_EAPOL_FRAME_LEN {
-            return Err(Error::Internal(format_err!(
-                "EAPOL frame too large: {}",
-                eapol_frame.len()
-            )));
-        }
         self.ctx
             .device
             .send_mlme_event(fidl_mlme::MlmeEvent::EapolInd {
@@ -2222,23 +2212,6 @@ mod tests {
                 data: EAPOL_PDU.to_vec()
             }
         );
-    }
-
-    #[test]
-    fn send_eapol_ind_too_large() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
-        let mut me = m.make_mlme();
-        me.make_client_station();
-        let mut client = me.get_bound_client().expect("client should be present");
-        client
-            .send_eapol_indication([1; 6].into(), [2; 6].into(), &[5; 256])
-            .expect_err("sending too large EAPOL frame should fail");
-        m.fake_device_state
-            .lock()
-            .unwrap()
-            .next_mlme_msg::<fidl_mlme::EapolIndication>()
-            .expect_err("expected empty channel");
     }
 
     #[test]
