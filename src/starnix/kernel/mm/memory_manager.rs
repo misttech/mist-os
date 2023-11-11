@@ -9,6 +9,7 @@ use fuchsia_zircon::{self as zx, AsHandleRef};
 use once_cell::sync::{Lazy, OnceCell};
 use range_map::RangeMap;
 use starnix_lock::{Mutex, RwLock};
+use static_assertions::const_assert_eq;
 use std::{collections::HashMap, convert::TryInto, ffi::CStr, ops::Range, sync::Arc};
 use zerocopy::{AsBytes, FromBytes};
 
@@ -103,6 +104,37 @@ impl ProtectionFlags {
 }
 
 bitflags! {
+    #[rustfmt::skip]  // Preserve column alignment.
+    struct MappingFlags: u32 {
+        const READ        = 1 <<  0;  // PROT_READ
+        const WRITE       = 1 <<  1;  // PROT_WRITE
+        const EXEC        = 1 <<  2;  // PROT_EXEC
+        const SHARED      = 1 <<  3;
+        const ANONYMOUS   = 1 <<  4;
+        const LOWER_32BIT = 1 <<  5;
+        const GROWSDOWN   = 1 <<  6;
+        const ELF_BINARY  = 1 <<  7;
+        const DONTFORK    = 1 <<  8;
+        const WIPEONFORK  = 1 <<  9;
+        const DONT_SPLIT  = 1 << 10;
+    }
+}
+
+const_assert_eq!(MappingFlags::READ.bits(), PROT_READ);
+const_assert_eq!(MappingFlags::WRITE.bits(), PROT_WRITE);
+const_assert_eq!(MappingFlags::EXEC.bits(), PROT_EXEC);
+
+impl MappingFlags {
+    fn prot_flags(&self) -> ProtectionFlags {
+        ProtectionFlags::from_bits_truncate(self.bits())
+    }
+
+    fn from_prot_flags_and_options(prot_flags: ProtectionFlags, options: MappingOptions) -> Self {
+        Self::from_bits_truncate(prot_flags.bits()) | Self::from_bits_truncate(options.bits() << 3)
+    }
+}
+
+bitflags! {
     pub struct MremapFlags: u32 {
         const MAYMOVE = MREMAP_MAYMOVE;
         const FIXED = MREMAP_FIXED;
@@ -152,11 +184,8 @@ struct Mapping {
     /// The offset in the VMO that corresponds to the base address.
     vmo_offset: u64,
 
-    /// The protection flags used by the mapping.
-    prot_flags: ProtectionFlags,
-
-    /// The flags for this mapping.
-    options: MappingOptions,
+    /// The flags used by the mapping, including protection.
+    flags: MappingFlags,
 
     /// The name for this mapping.
     ///
@@ -177,24 +206,42 @@ impl Mapping {
         base: UserAddress,
         vmo: Arc<zx::Vmo>,
         vmo_offset: u64,
-        prot_flags: ProtectionFlags,
-        options: MappingOptions,
+        flags: MappingFlags,
         file_write_guard: FileWriteGuardRef,
     ) -> Mapping {
-        Mapping {
-            base,
-            vmo,
-            vmo_offset,
-            prot_flags,
-            options,
-            name: MappingName::None,
-            file_write_guard,
-        }
+        Self::with_name(base, vmo, vmo_offset, flags, MappingName::None, file_write_guard)
+    }
+
+    fn with_name(
+        base: UserAddress,
+        vmo: Arc<zx::Vmo>,
+        vmo_offset: u64,
+        flags: MappingFlags,
+        name: MappingName,
+        file_write_guard: FileWriteGuardRef,
+    ) -> Mapping {
+        Mapping { base, vmo, vmo_offset, flags, name, file_write_guard }
     }
 
     /// Converts a `UserAddress` to an offset in this mapping's VMO.
     fn address_to_offset(&self, addr: UserAddress) -> u64 {
         (addr.ptr() - self.base.ptr()) as u64 + self.vmo_offset
+    }
+
+    fn can_read(&self) -> bool {
+        self.flags.contains(MappingFlags::READ)
+    }
+
+    fn can_write(&self) -> bool {
+        self.flags.contains(MappingFlags::WRITE)
+    }
+
+    fn can_exec(&self) -> bool {
+        self.flags.contains(MappingFlags::EXEC)
+    }
+
+    fn private_anonymous(&self) -> bool {
+        !self.flags.contains(MappingFlags::SHARED) && self.flags.contains(MappingFlags::ANONYMOUS)
     }
 
     /// Reads exactly `bytes.len()` bytes of memory from `addr`.
@@ -204,7 +251,7 @@ impl Mapping {
     /// - `bytes`: The byte array to read into.
     fn read_memory(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
         profile_duration!("MappingReadMemory");
-        if !self.prot_flags.contains(ProtectionFlags::READ) {
+        if !self.can_read() {
             return error!(EFAULT);
         }
         self.vmo.read(bytes, self.address_to_offset(addr)).map_err(|e| {
@@ -220,7 +267,7 @@ impl Mapping {
     /// - `bytes`: The bytes to write to the VMO.
     fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<(), Errno> {
         profile_duration!("MappingWriteMemory");
-        if !self.prot_flags.contains(ProtectionFlags::WRITE) {
+        if !self.can_write() {
             return error!(EFAULT);
         }
         self.vmo.write(bytes, self.address_to_offset(addr)).map_err(|_| errno!(EFAULT))
@@ -228,7 +275,7 @@ impl Mapping {
 
     fn zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
         profile_duration!("MappingZeroMemory");
-        if !self.prot_flags.contains(ProtectionFlags::WRITE) {
+        if !self.can_write() {
             return error!(EFAULT);
         }
 
@@ -327,15 +374,14 @@ fn map_in_vmar(
     vmo: &zx::Vmo,
     vmo_offset: u64,
     length: usize,
-    prot_flags: ProtectionFlags,
-    options: MappingOptions,
+    flags: MappingFlags,
 ) -> Result<UserAddress, Errno> {
     profile_duration!("MapInVmar");
     let mut profile = ProfileDuration::enter("MapInVmarArgs");
 
     let base_addr = UserAddress::from_ptr(vmar_info.base);
     let (vmar_offset, vmar_extra_flags) = match addr {
-        DesiredAddress::Any if options.contains(MappingOptions::LOWER_32BIT) => {
+        DesiredAddress::Any if flags.contains(MappingFlags::LOWER_32BIT) => {
             // MAP_32BIT specifies that the memory allocated will
             // be within the first 2 GB of the process address space.
             (0x80000000 - base_addr.ptr(), zx::VmarFlags::OFFSET_IS_UPPER_LIMIT)
@@ -352,7 +398,8 @@ fn map_in_vmar(
         }
     };
 
-    let vmar_flags = prot_flags.to_vmar_flags() | zx::VmarFlags::ALLOW_FAULTS | vmar_extra_flags;
+    let vmar_flags =
+        flags.prot_flags().to_vmar_flags() | zx::VmarFlags::ALLOW_FAULTS | vmar_extra_flags;
 
     profile.pivot("VmarMapSyscall");
     let mut map_result = vmar.map(vmar_offset, vmo, vmo_offset, length, vmar_flags);
@@ -378,19 +425,9 @@ impl MemoryManagerState {
         vmo: &zx::Vmo,
         vmo_offset: u64,
         length: usize,
-        prot_flags: ProtectionFlags,
-        options: MappingOptions,
+        flags: MappingFlags,
     ) -> Result<UserAddress, Errno> {
-        map_in_vmar(
-            &self.user_vmar,
-            &self.user_vmar_info,
-            addr,
-            vmo,
-            vmo_offset,
-            length,
-            prot_flags,
-            options,
-        )
+        map_in_vmar(&self.user_vmar, &self.user_vmar_info, addr, vmo, vmo_offset, length, flags)
     }
 
     fn map(
@@ -399,8 +436,7 @@ impl MemoryManagerState {
         vmo: Arc<zx::Vmo>,
         vmo_offset: u64,
         length: usize,
-        prot_flags: ProtectionFlags,
-        options: MappingOptions,
+        flags: MappingFlags,
         name: MappingName,
         file_write_guard: FileWriteGuardRef,
         released_mappings: &mut Vec<Mapping>,
@@ -415,7 +451,7 @@ impl MemoryManagerState {
             }
         }
 
-        let mapped_addr = self.map_internal(addr, &vmo, vmo_offset, length, prot_flags, options)?;
+        let mapped_addr = self.map_internal(addr, &vmo, vmo_offset, length, flags)?;
 
         #[cfg(any(test, debug_assertions))]
         {
@@ -434,8 +470,7 @@ impl MemoryManagerState {
             self.update_after_unmap(addr, end - addr, released_mappings)?;
         }
 
-        let mut mapping =
-            Mapping::new(mapped_addr, vmo, vmo_offset, prot_flags, options, file_write_guard);
+        let mut mapping = Mapping::new(mapped_addr, vmo, vmo_offset, flags, file_write_guard);
         mapping.name = name;
         self.mappings.insert(mapped_addr..end, mapping);
 
@@ -558,9 +593,7 @@ impl MemoryManagerState {
         // Compute the new length of the entire mapping once it has grown.
         let final_length = (original_range.end - original_range.start) + (new_length - old_length);
 
-        if original_mapping.options.contains(MappingOptions::ANONYMOUS)
-            && !original_mapping.options.contains(MappingOptions::SHARED)
-        {
+        if original_mapping.private_anonymous() {
             // As a special case for private, anonymous mappings, allocate more space in the
             // VMO. FD-backed mappings have their backing memory handled by the file system.
             let new_vmo_size = original_mapping
@@ -581,16 +614,13 @@ impl MemoryManagerState {
             );
         }
 
-        let prot_flags = original_mapping.prot_flags;
-
         // Re-map the original range, which may include pages before the requested range.
         Ok(Some(self.map(
             DesiredAddress::FixedOverwrite(original_range.start),
             original_mapping.vmo,
             original_mapping.vmo_offset,
             final_length,
-            prot_flags,
-            original_mapping.options,
+            original_mapping.flags,
             original_mapping.name,
             original_mapping.file_write_guard,
             released_mappings,
@@ -612,7 +642,7 @@ impl MemoryManagerState {
         let original_range = original_range.clone();
         let src_mapping = src_mapping.clone();
 
-        if src_length == 0 && !src_mapping.options.contains(MappingOptions::SHARED) {
+        if src_length == 0 && !src_mapping.flags.contains(MappingFlags::SHARED) {
             // src_length == 0 means that the mapping is to be copied. This behavior is only valid
             // with MAP_SHARED mappings.
             return error!(EINVAL);
@@ -652,9 +682,7 @@ impl MemoryManagerState {
         let offset_into_original_range = (src_addr - original_range.start) as u64;
         let mut dst_vmo_offset = src_mapping.vmo_offset + offset_into_original_range;
 
-        let vmo = if src_mapping.options.contains(MappingOptions::ANONYMOUS)
-            && !src_mapping.options.contains(MappingOptions::SHARED)
-        {
+        let vmo = if src_mapping.private_anonymous() {
             // This mapping is a private, anonymous mapping. Create a COW child VMO that covers
             // the pages being moved and map that into the destination.
             let child_vmo = src_mapping
@@ -691,8 +719,7 @@ impl MemoryManagerState {
             vmo,
             dst_vmo_offset,
             dst_length,
-            src_mapping.prot_flags,
-            src_mapping.options,
+            src_mapping.flags,
             src_mapping.name,
             src_mapping.file_write_guard,
             released_mappings,
@@ -721,7 +748,7 @@ impl MemoryManagerState {
         let check_if_mapping_has_unauthorized_split =
             |mapping: Option<(&Range<UserAddress>, &Mapping)>| {
                 mapping.map_or(false, |(range, mapping)| {
-                    mapping.options.contains(MappingOptions::DONT_SPLIT)
+                    mapping.flags.contains(MappingFlags::DONT_SPLIT)
                         && (range.start < target_mapping.start || target_mapping.end < range.end)
                 })
             };
@@ -797,11 +824,7 @@ impl MemoryManagerState {
 
         // Find the private, anonymous mapping that will get its tail cut off by this unmap call.
         let truncated_head = match self.mappings.get(&addr) {
-            Some((range, mapping))
-                if range.start != addr
-                    && mapping.options.contains(MappingOptions::ANONYMOUS)
-                    && !mapping.options.contains(MappingOptions::SHARED) =>
-            {
+            Some((range, mapping)) if range.start != addr && mapping.private_anonymous() => {
                 Some((range.start..addr, mapping.clone()))
             }
             _ => None,
@@ -809,11 +832,7 @@ impl MemoryManagerState {
 
         // Find the private, anonymous mapping that will get its head cut off by this unmap call.
         let truncated_tail = match self.mappings.get(&end_addr) {
-            Some((range, mapping))
-                if range.end != end_addr
-                    && mapping.options.contains(MappingOptions::ANONYMOUS)
-                    && !mapping.options.contains(MappingOptions::SHARED) =>
-            {
+            Some((range, mapping)) if range.end != end_addr && mapping.private_anonymous() => {
                 Some((end_addr..range.end, mapping.clone()))
             }
             _ => None,
@@ -850,8 +869,7 @@ impl MemoryManagerState {
                 &mapping.vmo,
                 0,
                 child_length,
-                mapping.prot_flags,
-                mapping.options,
+                mapping.flags,
             )?;
 
             // Replace the mapping with a new one that contains updated VMO handle.
@@ -901,7 +919,10 @@ impl MemoryManagerState {
         for (range, mapping) in self.mappings.intersection(addr..end) {
             let range = range.intersect(&prot_range);
             let mut mapping = mapping.clone();
-            mapping.prot_flags = prot_flags;
+            let new_flags = mapping.flags
+                & (MappingFlags::READ | MappingFlags::WRITE | MappingFlags::EXEC).complement()
+                | MappingFlags::from_bits_truncate(prot_flags.bits());
+            mapping.flags = new_flags;
             updates.push((range, mapping));
         }
         // Use a separate loop to avoid mutating the mappings structure while iterating over it.
@@ -951,35 +972,31 @@ impl MemoryManagerState {
                 // KEEPONFORK can be specified on ranges that cover other sorts of mappings. It should
                 // have no effect on mappings that are not private and anonymous as such mappings cannot
                 // have the WIPEONFORK option set.
-                if advice == MADV_WIPEONFORK
-                    && (!mapping.options.contains(MappingOptions::ANONYMOUS)
-                        || mapping.options.contains(MappingOptions::SHARED))
-                {
+                if advice == MADV_WIPEONFORK && !mapping.private_anonymous() {
                     return error!(EINVAL);
                 }
-                let new_options = match advice {
-                    MADV_DONTFORK => mapping.options | MappingOptions::DONTFORK,
-                    MADV_DOFORK => mapping.options & MappingOptions::DONTFORK.complement(),
-                    MADV_WIPEONFORK => mapping.options | MappingOptions::WIPEONFORK,
-                    MADV_KEEPONFORK => mapping.options & MappingOptions::WIPEONFORK.complement(),
-                    _ => MappingOptions::empty(),
+                let new_flags = match advice {
+                    MADV_DONTFORK => mapping.flags | MappingFlags::DONTFORK,
+                    MADV_DOFORK => mapping.flags & MappingFlags::DONTFORK.complement(),
+                    MADV_WIPEONFORK => mapping.flags | MappingFlags::WIPEONFORK,
+                    MADV_KEEPONFORK => mapping.flags & MappingFlags::WIPEONFORK.complement(),
+                    _ => mapping.flags,
                 };
-                let new_mapping = Mapping {
-                    base: range_to_zero.start,
-                    vmo: mapping.vmo.clone(),
-                    vmo_offset: mapping.vmo_offset + start,
-                    prot_flags: mapping.prot_flags,
-                    options: new_options,
-                    name: mapping.name.clone(),
-                    file_write_guard: mapping.file_write_guard.clone(),
-                };
+                let new_mapping = Mapping::with_name(
+                    range_to_zero.start,
+                    mapping.vmo.clone(),
+                    mapping.vmo_offset + start,
+                    new_flags,
+                    mapping.name.clone(),
+                    mapping.file_write_guard.clone(),
+                );
                 updates.push((range_to_zero, new_mapping));
             } else {
-                if mapping.options.contains(MappingOptions::SHARED) {
+                if mapping.flags.contains(MappingFlags::SHARED) {
                     continue;
                 }
                 let op = match advice {
-                    MADV_DONTNEED if !mapping.options.contains(MappingOptions::ANONYMOUS) => {
+                    MADV_DONTNEED if !mapping.flags.contains(MappingFlags::ANONYMOUS) => {
                         // Note, we cannot simply implemented MADV_DONTNEED with
                         // zx::VmoOp::DONT_NEED because they have different
                         // semantics.
@@ -1098,14 +1115,14 @@ impl MemoryManagerState {
                     // |addr| is already contained within a mapping, nothing to grow.
                     return Ok(false);
                 }
-                if !mapping.options.contains(MappingOptions::GROWSDOWN) {
+                if !mapping.flags.contains(MappingFlags::GROWSDOWN) {
                     return Ok(false);
                 }
                 (mapping, range.start)
             }
             None => return Ok(false),
         };
-        if is_write && !mapping_to_grow.prot_flags.contains(ProtectionFlags::WRITE) {
+        if is_write && !mapping_to_grow.can_write() {
             // Don't grow a read-only GROWSDOWN mapping for a write fault, it won't work.
             return Ok(false);
         }
@@ -1125,15 +1142,10 @@ impl MemoryManagerState {
             }
             _ => anyhow!("Unexpected error creating VMO: {s}"),
         })?);
-        let vmar_flags = mapping_to_grow.prot_flags.to_vmar_flags() | zx::VmarFlags::SPECIFIC;
-        let mapping = Mapping::new(
-            low_addr,
-            vmo.clone(),
-            0,
-            mapping_to_grow.prot_flags,
-            mapping_to_grow.options,
-            FileWriteGuardRef(None),
-        );
+        let vmar_flags =
+            mapping_to_grow.flags.prot_flags().to_vmar_flags() | zx::VmarFlags::SPECIFIC;
+        let mapping =
+            Mapping::new(low_addr, vmo.clone(), 0, mapping_to_grow.flags, FileWriteGuardRef(None));
         let vmar_offset = self
             .user_address_to_vmar_offset(low_addr)
             .map_err(|_| anyhow!("Address outside of user range"))?;
@@ -1767,14 +1779,13 @@ impl MemoryManager {
                 let vmo = zx::Vmo::create(PROGRAM_BREAK_LIMIT).map_err(|_| errno!(ENOMEM))?;
                 set_zx_name(&vmo, b"starnix-brk");
                 let length = *PAGE_SIZE as usize;
-                let prot_flags = ProtectionFlags::READ | ProtectionFlags::WRITE;
+                let flags = MappingFlags::READ | MappingFlags::WRITE;
                 let addr = state.map(
                     DesiredAddress::Any,
                     Arc::new(vmo),
                     0,
                     length,
-                    prot_flags,
-                    MappingOptions::empty(),
+                    flags,
                     MappingName::Heap,
                     FileWriteGuardRef(None),
                     &mut released_mappings,
@@ -1917,15 +1928,15 @@ impl MemoryManager {
         let mut replaced_vmos = HashMap::<zx::Koid, Arc<zx::Vmo>>::new();
 
         for (range, mapping) in state.mappings.iter_mut() {
-            if mapping.options.contains(MappingOptions::DONTFORK) {
+            if mapping.flags.contains(MappingFlags::DONTFORK) {
                 continue;
             }
             let vmo_offset = mapping.vmo_offset + (range.start - mapping.base) as u64;
             let length = range.end - range.start;
 
-            let target_vmo = if mapping.options.contains(MappingOptions::SHARED) {
+            let target_vmo = if mapping.flags.contains(MappingFlags::SHARED) {
                 mapping.vmo.clone()
-            } else if mapping.options.contains(MappingOptions::WIPEONFORK) {
+            } else if mapping.flags.contains(MappingFlags::WIPEONFORK) {
                 create_anonymous_mapping_vmo(length as u64)?
             } else {
                 let basic_info = mapping.vmo.basic_info().map_err(impossible_error)?;
@@ -1945,8 +1956,7 @@ impl MemoryManager {
                         replaced_vmo,
                         vmo_offset,
                         length,
-                        mapping.prot_flags,
-                        mapping.options,
+                        mapping.flags,
                     )?;
 
                     mapping.vmo = replaced_vmo.clone();
@@ -1960,8 +1970,7 @@ impl MemoryManager {
                 target_vmo,
                 vmo_offset,
                 length,
-                mapping.prot_flags,
-                mapping.options,
+                mapping.flags,
                 mapping.name.clone(),
                 FileWriteGuardRef(None),
                 &mut released_mappings,
@@ -2021,6 +2030,8 @@ impl MemoryManager {
         name: MappingName,
         file_write_guard: FileWriteGuardRef,
     ) -> Result<UserAddress, Errno> {
+        let flags = MappingFlags::from_prot_flags_and_options(prot_flags, options);
+
         // Unmapped mappings must be released after the state is unlocked.
         let mut released_mappings = vec![];
         let mut state = self.state.write();
@@ -2029,8 +2040,7 @@ impl MemoryManager {
             vmo,
             vmo_offset,
             length,
-            prot_flags,
-            options,
+            flags,
             name,
             file_write_guard,
             &mut released_mappings,
@@ -2153,8 +2163,7 @@ impl MemoryManager {
                     range.start,
                     mapping.vmo.clone(),
                     mapping.vmo_offset,
-                    mapping.prot_flags,
-                    mapping.options,
+                    mapping.flags,
                     mapping.file_write_guard.clone(),
                 );
                 state.mappings.insert(start_split_range, start_split_mapping);
@@ -2187,8 +2196,7 @@ impl MemoryManager {
                     end,
                     mapping.vmo.clone(),
                     mapping.vmo_offset + tail_offset as u64,
-                    mapping.prot_flags,
-                    mapping.options,
+                    mapping.flags,
                     mapping.file_write_guard.clone(),
                 );
                 state.mappings.insert(tail_range, tail_mapping);
@@ -2251,7 +2259,7 @@ impl MemoryManager {
     ) -> Result<(Arc<zx::Vmo>, u64), Errno> {
         let state = self.state.read();
         let (_, mapping) = state.mappings.get(&addr).ok_or_else(|| errno!(EFAULT))?;
-        if !mapping.prot_flags.contains(perms) {
+        if !mapping.flags.prot_flags().contains(perms) {
             return error!(EACCES);
         }
         Ok((Arc::clone(&mapping.vmo), mapping.address_to_offset(addr)))
@@ -2338,8 +2346,8 @@ impl MemoryManager {
             let committed_bytes = vmo_info.committed_bytes as usize;
             result.vm_rss += committed_bytes;
 
-            if mapping.options.contains(MappingOptions::ANONYMOUS)
-                && !mapping.options.contains(MappingOptions::SHARED)
+            if mapping.flags.contains(MappingFlags::ANONYMOUS)
+                && !mapping.flags.contains(MappingFlags::SHARED)
             {
                 result.rss_anonymous += committed_bytes;
             }
@@ -2352,14 +2360,14 @@ impl MemoryManager {
                 result.rss_file += committed_bytes;
             }
 
-            if mapping.options.contains(MappingOptions::ELF_BINARY)
-                && mapping.prot_flags.contains(ProtectionFlags::WRITE)
+            if mapping.flags.contains(MappingFlags::ELF_BINARY)
+                && mapping.flags.contains(MappingFlags::WRITE)
             {
                 result.vm_data += size;
             }
 
-            if mapping.options.contains(MappingOptions::ELF_BINARY)
-                && mapping.prot_flags.contains(ProtectionFlags::EXEC)
+            if mapping.flags.contains(MappingFlags::ELF_BINARY)
+                && mapping.flags.contains(MappingFlags::EXEC)
             {
                 result.vm_exe += size;
             }
@@ -2409,10 +2417,10 @@ fn write_map(
         "{:08x}-{:08x} {}{}{}{} {:08x} 00:00 {} ",
         range.start.ptr(),
         range.end.ptr(),
-        if map.prot_flags.contains(ProtectionFlags::READ) { 'r' } else { '-' },
-        if map.prot_flags.contains(ProtectionFlags::WRITE) { 'w' } else { '-' },
-        if map.prot_flags.contains(ProtectionFlags::EXEC) { 'x' } else { '-' },
-        if map.options.contains(MappingOptions::SHARED) { 's' } else { 'p' },
+        if map.can_read() { 'r' } else { '-' },
+        if map.can_write() { 'w' } else { '-' },
+        if map.can_exec() { 'x' } else { '-' },
+        if map.flags.contains(MappingFlags::SHARED) { 's' } else { 'p' },
         map.vmo_offset,
         if let MappingName::File(filename) = &map.name {
             filename.entry.node.info().ino
@@ -2428,8 +2436,8 @@ fn write_map(
     };
     match &map.name {
         MappingName::None => {
-            if map.options.contains(MappingOptions::SHARED)
-                && map.options.contains(MappingOptions::ANONYMOUS)
+            if map.flags.contains(MappingFlags::SHARED)
+                && map.flags.contains(MappingFlags::ANONYMOUS)
             {
                 // See proc(5), "/proc/[pid]/map_files/"
                 fill_to_name(sink);
@@ -2553,7 +2561,7 @@ impl SequenceFileSource for ProcSmapsFile {
             writeln!(
                 sink,
                 "Pss:\t{} kB",
-                if map.options.contains(MappingOptions::SHARED) {
+                if map.flags.contains(MappingFlags::SHARED) {
                     rss_kb / vmo_info.share_count as u64
                 } else {
                     rss_kb
@@ -2573,9 +2581,7 @@ impl SequenceFileSource for ProcSmapsFile {
             writeln!(sink, "Private_Clean:\t{} kB", private_clean_kb)?;
             writeln!(sink, "Private_Dirty:\t{} kB", private_dirty_kb)?;
 
-            let is_anonymous = map.options.contains(MappingOptions::ANONYMOUS)
-                && !map.options.contains(MappingOptions::SHARED);
-            let anonymous_kb = if is_anonymous { rss_kb } else { 0 };
+            let anonymous_kb = if map.private_anonymous() { rss_kb } else { 0 };
             writeln!(sink, "Anonymous:\t{anonymous_kb} kB")?;
             writeln!(sink, "KernelPageSize:\t{page_size_kb} kB")?;
             writeln!(sink, "MMUPageSize:\t{page_size_kb} kB")?;
