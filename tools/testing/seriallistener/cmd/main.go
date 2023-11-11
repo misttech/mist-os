@@ -124,15 +124,13 @@ func main() {
 	// to a file for debugging purposes.
 	stdout := io.Discard
 	if outDir := os.Getenv(testrunnerconstants.TestOutDirEnvKey); outDir != "" {
-		// TODO(fxbug.dev/135386): These lines are for debugging purposes to see
-		// at which step the test is hanging. Try fmt.Println() and logger.Debugf()
-		// to see if the issue has something to do with the context.
-		fmt.Println("creating serial outputs")
-		logger.Debugf(ctx, "creating serial outputs")
 		if serialOutput, err := osmisc.CreateFile(filepath.Join(outDir, "serial_output")); err != nil {
 			logger.Errorf(ctx, "%s", err)
 		} else {
-			stdout = serialOutput
+			// TODO(fxbug.dev/135386): Temporarily write to stdout while
+			// emulator serial output has been temporarily disabled from
+			// being written to stdout.
+			stdout = io.MultiWriter(os.Stdout, serialOutput)
 			// Have the logger write to the file as well to get a
 			// better sense of how much is read from the socket before
 			// the socket io or ticker timeouts are reached.
