@@ -46,17 +46,13 @@ impl Directory {
     /// * `open_flags` - The flags that will be used to open a new connection from the [Open]
     ///   capability.
     ///
-    /// * `path` - The path that will be used to open a new connection from the [Open]
-    ///   capability.
-    ///
-    pub fn from_open(open: Open, open_flags: fio::OpenFlags, path: crate::router::Path) -> Self {
+    pub fn from_open(open: Open, open_flags: fio::OpenFlags) -> Self {
         let scope = ExecutionScope::new();
         let (client_end, server_end) = create_endpoints::<fio::DirectoryMarker>();
         // If this future is dropped, stop serving the connection.
         let guard = scopeguard::guard(scope.clone(), move |scope| {
             scope.shutdown();
         });
-        let path = path.fuchsia_io_path();
         let fut = async move {
             let _guard = guard;
             // Wait for the client endpoint to be written or closed. These are the only two
@@ -69,7 +65,12 @@ impl Directory {
             );
             let signals = on_signal_fut.await.unwrap();
             if signals & zx::Signals::CHANNEL_READABLE != zx::Signals::NONE {
-                open.open(scope.clone(), open_flags, path, server_end.into_zx_channel().into());
+                open.open(
+                    scope.clone(),
+                    open_flags,
+                    vfs::path::Path::dot(),
+                    server_end.into_zx_channel().into(),
+                );
             }
             scope.wait().await;
         }

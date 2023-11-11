@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 use {
     crate::{
-        AnyCast, AsRouter, Capability, CloneError, Completer, ConversionError, Directory, Request,
-        Router,
+        AnyCapability, AnyCast, AsRouter, Capability, CloneError, Completer, ConversionError,
+        Directory, Request, Router,
     },
     core::fmt,
     fidl::endpoints::{create_endpoints, ClientEnd, ServerEnd},
@@ -13,7 +13,7 @@ use {
     futures::future::BoxFuture,
     futures::FutureExt,
     futures::TryStreamExt,
-    std::sync::Arc,
+    std::sync::{Arc, OnceLock},
     vfs::{common::send_on_open_with_error, execution_scope::ExecutionScope, path::Path},
 };
 
@@ -89,7 +89,7 @@ impl Open {
     /// Converts the [Open] capability into a [Directory] capability such that it will be
     /// opened with `open_flags` during [Capability::to_zx_handle].
     pub fn into_directory(self, open_flags: fio::OpenFlags) -> Directory {
-        Directory::from_open(self, open_flags, crate::router::Path::default())
+        Directory::from_open(self, open_flags)
     }
 
     /// Opens the corresponding entry.
@@ -113,26 +113,45 @@ impl Open {
         }
     }
 
-    /// Returns a capability which will open with rights downscoped to
-    /// `rights` if specified, and open paths relative to
-    /// `request.relative_path` if non-empty, from the base [`Open`] object.
-    pub fn downscoped(
-        self,
-        rights: Option<fio::OpenFlags>,
-        path: crate::router::Path,
-    ) -> Directory {
-        // Downscoping to just a subdir without also downscoping rights is not something
-        // that is directly supported in `fuchsia.io` v1, because there is no way to open
-        // and inherit the parent rights. This flag combination is the closest thing.
-        //
-        // TODO(fxbug.dev/293947862): when we migrate to v2 of `fuchsia.io`, the custom
-        // flags here can be replaced by opening and inheriting the parent rights.
-        let rights = rights.unwrap_or(
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::POSIX_WRITABLE
-                | fio::OpenFlags::POSIX_EXECUTABLE,
-        );
-        Directory::from_open(self, rights, path)
+    /// Returns an [`Open`] capability which will open with rights downscoped to
+    /// `rights`, from the base [`Open`] object.
+    ///
+    /// The base capability is lazily exercised when the returned capability is exercised.
+    pub fn downscope_rights(self, rights: fio::OpenFlags) -> Open {
+        let downscoped: OnceLock<Open> = OnceLock::new();
+        let entry_type = self.entry_type;
+        Open::new(
+            move |scope: ExecutionScope,
+                  flags: fio::OpenFlags,
+                  path: Path,
+                  server_end: zx::Channel| {
+                let open = downscoped.get_or_init(|| {
+                    let (downscoped_client_end, downscoped_server_end) = zx::Channel::create();
+                    self.open(scope.clone(), rights, Path::dot(), downscoped_server_end);
+                    let openable: ClientEnd<fio::OpenableMarker> = downscoped_client_end.into();
+                    Open::from(openable)
+                });
+                open.open(scope, flags, path, server_end);
+            },
+            entry_type,
+        )
+    }
+
+    /// Returns an [`Open`] capability which will open paths relative to
+    /// `relative_path` if non-empty, from the base [`Open`] object.
+    ///
+    /// The base capability is lazily exercised when the returned capability is exercised.
+    pub fn downscope_path(self, relative_path: crate::router::Path) -> Open {
+        Open::new(
+            move |scope: ExecutionScope,
+                  flags: fio::OpenFlags,
+                  new_path: Path,
+                  server_end: zx::Channel| {
+                let path = join_path(&relative_path, new_path);
+                self.open(scope, flags, path.as_str(), server_end);
+            },
+            fio::DirentType::Unknown,
+        )
     }
 
     /// Turn the [Open] into a remote VFS node.
@@ -184,10 +203,18 @@ impl ValidatePath for &str {
     }
 }
 
-impl From<ClientEnd<fio::DirectoryMarker>> for Open {
-    fn from(value: ClientEnd<fio::DirectoryMarker>) -> Self {
+fn join_path(base: &crate::Path, mut relative: vfs::path::Path) -> String {
+    let mut base = base.clone();
+    while let Some(segment) = relative.next() {
+        base.append(segment.to_owned());
+    }
+    base.fuchsia_io_path()
+}
+
+impl From<ClientEnd<fio::OpenableMarker>> for Open {
+    fn from(value: ClientEnd<fio::OpenableMarker>) -> Self {
         // Open is one-way so a synchronous proxy is not going to block.
-        let proxy = fio::DirectorySynchronousProxy::new(value.into_channel());
+        let proxy = fio::OpenableSynchronousProxy::new(value.into_channel());
         Open::new(
             move |_scope: ExecutionScope,
                   flags: fio::OpenFlags,
@@ -202,6 +229,13 @@ impl From<ClientEnd<fio::DirectoryMarker>> for Open {
             },
             fio::DirentType::Directory,
         )
+    }
+}
+
+impl From<ClientEnd<fio::DirectoryMarker>> for Open {
+    fn from(value: ClientEnd<fio::DirectoryMarker>) -> Self {
+        let openable: ClientEnd<fio::OpenableMarker> = value.into_channel().into();
+        openable.into()
     }
 }
 
@@ -246,16 +280,19 @@ impl Capability for Open {
     }
 }
 
-/// [`Open`] can vend out routers. Each request from the router will yield a [`Directory`] object
-/// which will with rights downscoped to `request.rights` and open paths relative to
+/// [`Open`] can vend out routers. Each request from the router will yield a [`Directory`] or
+/// an [`Open`] which will with rights downscoped to `request.rights` and open paths relative to
 /// `request.relative_path` from the base [`Open`] object.
 impl AsRouter for Open {
     fn as_router(&self) -> Router {
         let open = self.clone();
         let route_fn = move |request: Request, completer: Completer| {
-            completer.complete(Ok(Box::new(
-                open.clone().downscoped(request.rights, request.relative_path),
-            )));
+            let open = open.clone().downscope_path(request.relative_path);
+            completer.complete(Ok(Box::new(if let Some(rights) = request.rights {
+                open.downscope_rights(rights)
+            } else {
+                open
+            }) as AnyCapability));
         };
         Router::new(route_fn)
     }
@@ -413,9 +450,9 @@ mod tests {
         assert_eq!(flags, fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
 
         // Downscope the rights to read-only.
-        let directory = open
-            .clone()
-            .downscoped(Some(fio::OpenFlags::RIGHT_READABLE), crate::router::Path::default());
+        let open = open.downscope_rights(fio::OpenFlags::RIGHT_READABLE);
+        let directory =
+            open.into_directory(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::POSIX_WRITABLE);
 
         // Verify that the connection is read-only.
         let (_, status, flags) = get_connection_rights(directory).await.unwrap();
@@ -446,7 +483,8 @@ mod tests {
         assert_eq!(entries, vec!["foo".to_owned()]);
 
         // Downscope the path to `foo`.
-        let directory = open.clone().downscoped(None, crate::router::Path::new("foo"));
+        let open = open.clone().downscope_path(crate::router::Path::new("foo"));
+        let directory = Directory::from_open(open, fio::OpenFlags::RIGHT_READABLE);
 
         // Verify that the connection does not have anymore children, since `foo` has no children.
         let (_, entries) = get_entries(directory).await.unwrap();
@@ -487,5 +525,13 @@ mod tests {
             fidl::Error::ClientChannelClosed { status, .. }
             if status == zx::Status::INVALID_ARGS
         );
+    }
+
+    #[fuchsia::test]
+    fn join_path_test() {
+        assert_eq!(join_path(&crate::Path::default(), ".".try_into().unwrap()), ".");
+        assert_eq!(join_path(&crate::Path::default(), "abc".try_into().unwrap()), "abc");
+        assert_eq!(join_path(&crate::Path::new("abc"), ".".try_into().unwrap()), "abc");
+        assert_eq!(join_path(&crate::Path::new("abc"), "def".try_into().unwrap()), "abc/def");
     }
 }

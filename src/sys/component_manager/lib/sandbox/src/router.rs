@@ -49,6 +49,7 @@ pub struct Request {
     pub availability: Availability,
 }
 
+/// A path type that supports efficient prepending and appending.
 #[derive(Default, Debug, Clone)]
 pub struct Path {
     pub segments: VecDeque<String>,
@@ -71,6 +72,11 @@ impl Path {
         self.segments.push_front(segment);
     }
 
+    pub fn append(&mut self, segment: String) {
+        self.segments.push_back(segment);
+    }
+
+    /// Returns a path that will be valid for using in a `fuchsia.io/Directory.Open` operation.
     pub fn fuchsia_io_path(&self) -> String {
         if self.is_empty() {
             ".".to_owned()
