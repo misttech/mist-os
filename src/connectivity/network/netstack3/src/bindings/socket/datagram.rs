@@ -26,7 +26,7 @@ use fidl::endpoints::RequestStream as _;
 use fuchsia_zircon::{self as zx, prelude::HandleBased as _, Peered as _};
 use net_types::{
     ip::{Ip, IpVersion, Ipv4, Ipv6},
-    MulticastAddr, SpecifiedAddr, ZonedAddr,
+    MulticastAddr, SpecifiedAddr, Witness as _, ZonedAddr,
 };
 use netstack3_core::{
     device::{DeviceId, WeakDeviceId},
@@ -1663,8 +1663,25 @@ where
         trace!("connect sockaddr: {:?}", sockaddr);
         let (remote_addr, remote_port) =
             sockaddr.try_into_core_with_ctx(&non_sync_ctx).map_err(IntoErrno::into_errno)?;
-        let remote_port =
-            T::RemoteIdentifier::from_u16(remote_port).ok_or(fposix::Errno::Econnrefused)?;
+
+        let remote_port = match T::RemoteIdentifier::from_u16(remote_port) {
+            Some(p) => p,
+            None => {
+                // TODO(https://fxbug.dev/136207): Appropriately handle connecting to port 0.
+                // For now, just check that a route exists to the destination address.
+                let remote_addr = remote_addr
+                    .map(|a: SocketZonedIpAddr<I::Addr, _>| a.into_inner().addr().get())
+                    .unwrap_or(I::UNSPECIFIED_ADDRESS);
+                return match netstack3_core::ip::resolve_route::<I, _>(sync_ctx, remote_addr) {
+                    Ok(route) => {
+                        // We don't care about the route, just that there exists one.
+                        let _ = route;
+                        Ok(())
+                    }
+                    Err(err) => Err(err.into_errno()),
+                };
+            }
+        };
 
         T::connect(sync_ctx, non_sync_ctx, id, remote_addr, remote_port)
             .map_err(IntoErrno::into_errno)?;
@@ -2364,10 +2381,7 @@ mod tests {
         },
         util::IntoFidl,
     };
-    use net_types::{
-        ip::{IpAddr, IpAddress},
-        Witness as _,
-    };
+    use net_types::ip::{IpAddr, IpAddress};
 
     async fn prepare_test<A: TestSockAddr>(
         proto: fposix_socket::DatagramSocketProtocol,
@@ -2476,16 +2490,9 @@ mod tests {
             .expect_err("connect fails");
         assert_eq!(res, fposix::Errno::Eafnosupport);
 
-        // Pass a zero port. UDP disallows it, ICMP allows it.
+        // Pass a zero port. UDP and ICMP both allow it.
         let res = proxy.connect(&A::create(A::LOCAL_ADDR, 0)).await.unwrap();
-        match proto {
-            fposix_socket::DatagramSocketProtocol::Udp => {
-                assert_eq!(res, Err(fposix::Errno::Econnrefused));
-            }
-            fposix_socket::DatagramSocketProtocol::IcmpEcho => {
-                assert_eq!(res, Ok(()))
-            }
-        };
+        assert_eq!(res, Ok(()));
 
         // Pass an unreachable address (tests error forwarding from `create_connection`).
         let res = proxy

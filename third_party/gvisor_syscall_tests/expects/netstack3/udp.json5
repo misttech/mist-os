@@ -47,9 +47,10 @@
         {
             type: "expect_failure",
             matchers: [
-                "AllInetTests/UdpSocketTest.ConnectToZeroPortBound/*",
+                // TODO(https://fxbug.dev/136207): Handle connecting to port 0 correctly.
                 "AllInetTests/UdpSocketTest.ConnectToZeroPortConnected/*",
-                "AllInetTests/UdpSocketTest.ConnectToZeroPortUnbound/*",
+
+                // Comment to keep this block separated from the above one.
                 "AllInetTests/UdpSocketTest.DisconnectAfterBindToAny/*",
                 "AllInetTests/UdpSocketTest.DisconnectAfterBindToUnspecAndConnect/*",
                 "AllInetTests/UdpSocketTest.DisconnectAfterConnectAnyWithPort/*",
