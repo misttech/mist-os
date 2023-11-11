@@ -7,11 +7,11 @@
 use {
     crate::client::{EventId, TimedEvent, TimedEventClass},
     std::collections::HashMap,
-    wlan_common::timer::TimeStream,
+    wlan_common::timer,
 };
 
 pub fn drain_timeouts(
-    time_stream: &mut TimeStream<TimedEvent>,
+    time_stream: &mut timer::EventStream<TimedEvent>,
 ) -> HashMap<TimedEventClass, Vec<(TimedEvent, EventId)>> {
     let mut timeouts = HashMap::new();
     loop {

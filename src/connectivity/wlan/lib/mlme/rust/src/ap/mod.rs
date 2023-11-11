@@ -518,7 +518,7 @@ mod tests {
 
     fn make_ap(
         exec: &fasync::TestExecutor,
-    ) -> (Ap<FakeDevice>, Arc<Mutex<FakeDeviceState>>, timer::TimeStream<TimedEvent>) {
+    ) -> (Ap<FakeDevice>, Arc<Mutex<FakeDeviceState>>, timer::EventStream<TimedEvent>) {
         let (timer, time_stream) = timer::create_timer();
         let (fake_device, fake_device_state) = FakeDevice::new_with_config(
             &exec,

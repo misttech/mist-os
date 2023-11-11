@@ -8,23 +8,22 @@ use futures::{channel::mpsc, FutureExt, Stream, StreamExt};
 
 use crate::sink::UnboundedSink;
 
-// TODO(fxbug.dev/85248): Change these names to something less visually similar.
-pub type TimeEntry<E> = (zx::Time, TimedEvent<E>);
-pub type TimeSender<E> = UnboundedSink<TimeEntry<E>>;
-pub type TimeStream<E> = mpsc::UnboundedReceiver<TimeEntry<E>>;
+pub type ScheduledEvent<E> = (zx::Time, Event<E>);
+pub type EventSender<E> = UnboundedSink<ScheduledEvent<E>>;
+pub type EventStream<E> = mpsc::UnboundedReceiver<ScheduledEvent<E>>;
 pub type EventId = u64;
 
-// The returned timer will send scheduled timeouts to the returned TimeStream.
+// The returned timer will send scheduled timeouts to the returned EventStream.
 // Note that this will not actually have any timed behavior unless events are pulled off
-// the TimeStream and handled asynchronously.
-pub fn create_timer<E>() -> (Timer<E>, TimeStream<E>) {
+// the EventStream and handled asynchronously.
+pub fn create_timer<E>() -> (Timer<E>, EventStream<E>) {
     let (timer_sink, time_stream) = mpsc::unbounded();
     (Timer::new(UnboundedSink::new(timer_sink)), time_stream)
 }
 
 pub fn make_async_timed_event_stream<E>(
-    time_stream: impl Stream<Item = TimeEntry<E>>,
-) -> impl Stream<Item = TimedEvent<E>> {
+    time_stream: impl Stream<Item = ScheduledEvent<E>>,
+) -> impl Stream<Item = Event<E>> {
     time_stream
         .map(|(deadline, timed_event)| {
             fasync::Timer::new(fasync::Time::from_zx(deadline)).map(|_| timed_event)
@@ -33,25 +32,25 @@ pub fn make_async_timed_event_stream<E>(
 }
 
 #[derive(Debug)]
-pub struct TimedEvent<E> {
+pub struct Event<E> {
     pub id: EventId,
     pub event: E,
 }
 
-impl<E: Clone> Clone for TimedEvent<E> {
+impl<E: Clone> Clone for Event<E> {
     fn clone(&self) -> Self {
-        TimedEvent { id: self.id, event: self.event.clone() }
+        Event { id: self.id, event: self.event.clone() }
     }
 }
 
 #[derive(Debug)]
 pub struct Timer<E> {
-    sender: TimeSender<E>,
+    sender: EventSender<E>,
     next_id: EventId,
 }
 
 impl<E> Timer<E> {
-    pub fn new(sender: TimeSender<E>) -> Self {
+    pub fn new(sender: EventSender<E>) -> Self {
         Timer { sender, next_id: 0 }
     }
 
@@ -62,7 +61,7 @@ impl<E> Timer<E> {
 
     pub fn schedule_at(&mut self, deadline: zx::Time, event: E) -> EventId {
         let id = self.next_id;
-        self.sender.send((deadline, TimedEvent { id, event }));
+        self.sender.send((deadline, Event { id, event }));
         self.next_id += 1;
         id
     }
@@ -95,8 +94,8 @@ mod tests {
         std::task::Poll,
     };
 
-    type Event = u32;
-    impl TimeoutDuration for Event {
+    type TestEvent = u32;
+    impl TimeoutDuration for TestEvent {
         fn timeout_duration(&self) -> zx::Duration {
             10.seconds()
         }
@@ -105,7 +104,7 @@ mod tests {
     #[test]
     fn test_timer_schedule_at() {
         let _exec = fasync::TestExecutor::new();
-        let (mut timer, mut time_stream) = create_timer::<Event>();
+        let (mut timer, mut time_stream) = create_timer::<TestEvent>();
         let timeout1 = zx::Time::after(5.seconds());
         let timeout2 = zx::Time::after(10.seconds());
         assert_eq!(timer.schedule_at(timeout1, 7), 0);
@@ -129,7 +128,7 @@ mod tests {
     #[test]
     fn test_timer_schedule_after() {
         let _exec = fasync::TestExecutor::new();
-        let (mut timer, mut time_stream) = create_timer::<Event>();
+        let (mut timer, mut time_stream) = create_timer::<TestEvent>();
         let timeout1 = 1000.seconds();
         let timeout2 = 5.seconds();
         assert_eq!(timer.schedule_after(timeout1, 7), 0);
@@ -155,7 +154,7 @@ mod tests {
     #[test]
     fn test_timer_schedule() {
         let _exec = fasync::TestExecutor::new();
-        let (mut timer, mut time_stream) = create_timer::<Event>();
+        let (mut timer, mut time_stream) = create_timer::<TestEvent>();
         let start = zx::Time::after(0.millis());
 
         assert_eq!(timer.schedule(5u32), 0);
@@ -170,7 +169,7 @@ mod tests {
     fn test_timer_stream() {
         let mut exec = fasync::TestExecutor::new();
         let fut = async {
-            let (timer, time_stream) = mpsc::unbounded::<TimeEntry<Event>>();
+            let (timer, time_stream) = mpsc::unbounded::<ScheduledEvent<TestEvent>>();
             let mut timeout_stream = make_async_timed_event_stream(time_stream);
             let now = zx::Time::get_monotonic();
             schedule(&timer, now + 40.millis(), 0);
@@ -196,8 +195,12 @@ mod tests {
         );
     }
 
-    fn schedule(timer: &UnboundedSender<TimeEntry<Event>>, deadline: zx::Time, event: Event) {
-        let entry = (deadline, TimedEvent { id: 0, event });
+    fn schedule(
+        timer: &UnboundedSender<ScheduledEvent<TestEvent>>,
+        deadline: zx::Time,
+        event: TestEvent,
+    ) {
+        let entry = (deadline, Event { id: 0, event });
         timer.unbounded_send(entry).expect("expect send successful");
     }
 }

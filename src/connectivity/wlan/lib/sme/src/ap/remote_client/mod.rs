@@ -215,7 +215,7 @@ impl RemoteClient {
 mod tests {
     use {
         super::*,
-        crate::{ap::TimeStream, test_utils, MlmeSink, MlmeStream},
+        crate::{test_utils, MlmeSink, MlmeStream},
         futures::channel::mpsc,
         lazy_static::lazy_static,
         wlan_common::{
@@ -232,7 +232,7 @@ mod tests {
         RemoteClient::new(*CLIENT_ADDR)
     }
 
-    fn make_env() -> (Context, MlmeStream, TimeStream) {
+    fn make_env() -> (Context, MlmeStream, timer::EventStream<Event>) {
         let device_info = test_utils::fake_device_info(*AP_ADDR);
         let mac_sublayer_support = fake_mac_sublayer_support();
         let (mlme_sink, mlme_stream) = mpsc::unbounded();

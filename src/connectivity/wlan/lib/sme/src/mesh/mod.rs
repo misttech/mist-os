@@ -13,7 +13,7 @@ use {
         capabilities::get_device_band_cap,
         channel::{Cbw, Channel},
         mac::Aid,
-        timer::TimedEvent,
+        timer,
     },
 };
 
@@ -282,7 +282,7 @@ impl super::Station for MeshSme {
         });
     }
 
-    fn on_timeout(&mut self, _timed_event: TimedEvent<()>) {
+    fn on_timeout(&mut self, _timed_event: timer::Event<()>) {
         unimplemented!();
     }
 }

@@ -21,7 +21,7 @@ use {
         sync::{Arc, Mutex},
     },
     tracing::{error, info, warn},
-    wlan_common::timer::{self, TimeEntry},
+    wlan_common::timer::{self, ScheduledEvent},
 };
 
 pub type ClientSmeServer = mpsc::UnboundedSender<client::Endpoint>;
@@ -250,7 +250,7 @@ async fn serve_mlme_sme<STA, TS>(
 ) -> Result<(), anyhow::Error>
 where
     STA: Station,
-    TS: Stream<Item = TimeEntry<<STA as crate::Station>::Event>> + Unpin,
+    TS: Stream<Item = ScheduledEvent<<STA as crate::Station>::Event>> + Unpin,
 {
     let mut timeout_stream = timer::make_async_timed_event_stream(time_stream).fuse();
 

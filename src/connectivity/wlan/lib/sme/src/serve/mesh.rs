@@ -20,7 +20,7 @@ use {
         task::Poll,
     },
     tracing::error,
-    wlan_common::timer::TimeEntry,
+    wlan_common::timer::ScheduledEvent,
 };
 
 pub type Endpoint = fidl::endpoints::ServerEnd<fidl_sme::MeshSmeMarker>;
@@ -34,7 +34,7 @@ pub fn serve(
     let (sme, mlme_sink, mlme_stream) = Sme::new(device_info);
     let fut = async move {
         let sme = Arc::new(Mutex::new(sme));
-        let time_stream = stream::poll_fn::<TimeEntry<()>, _>(|_| Poll::Pending);
+        let time_stream = stream::poll_fn::<ScheduledEvent<()>, _>(|_| Poll::Pending);
         let mlme_sme = super::serve_mlme_sme(event_stream, Arc::clone(&sme), time_stream);
         let sme_fidl = serve_fidl(&sme, new_fidl_clients);
         pin_mut!(mlme_sme);

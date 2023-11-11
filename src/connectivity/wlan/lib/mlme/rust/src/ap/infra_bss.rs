@@ -621,7 +621,7 @@ mod tests {
             big_endian::BigEndianU16,
             mac::CapabilityInfo,
             test_utils::fake_frames::fake_wpa2_rsne,
-            timer::{create_timer, TimeStream},
+            timer::{self, create_timer},
         },
     };
 
@@ -632,7 +632,9 @@ mod tests {
         static ref REMOTE_ADDR: MacAddr = [123u8; 6].into();
     }
 
-    fn make_context(fake_device: FakeDevice) -> (Context<FakeDevice>, TimeStream<TimedEvent>) {
+    fn make_context(
+        fake_device: FakeDevice,
+    ) -> (Context<FakeDevice>, timer::EventStream<TimedEvent>) {
         let (timer, time_stream) = create_timer();
         (Context::new(fake_device, FakeBufferProvider::new(), timer, *BSSID), time_stream)
     }

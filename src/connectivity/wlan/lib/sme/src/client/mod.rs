@@ -43,7 +43,7 @@ use {
         scan::{Compatibility, ScanResult},
         security::{SecurityAuthenticator, SecurityDescriptor},
         sink::UnboundedSink,
-        timer::{self, TimedEvent},
+        timer,
     },
     wlan_rsn::auth,
 };
@@ -75,8 +75,6 @@ mod internal {
 }
 
 use self::internal::*;
-
-pub type TimeStream = timer::TimeStream<Event>;
 
 // An automatically increasing sequence number that uniquely identifies a logical
 // connection attempt. For example, a new connection attempt can be triggered
@@ -512,7 +510,7 @@ impl ClientSme {
         mac_sublayer_support: fidl_common::MacSublayerSupport,
         security_support: fidl_common::SecuritySupport,
         spectrum_management_support: fidl_common::SpectrumManagementSupport,
-    ) -> (Self, MlmeSink, MlmeStream, TimeStream) {
+    ) -> (Self, MlmeSink, MlmeStream, timer::EventStream<Event>) {
         let device_info = Arc::new(info);
         let (mlme_sink, mlme_stream) = mpsc::unbounded();
         let (mut timer, time_stream) = timer::create_timer();
@@ -761,7 +759,7 @@ impl super::Station for ClientSme {
         self.context.inspect.update_pulse(self.status());
     }
 
-    fn on_timeout(&mut self, timed_event: TimedEvent<Event>) {
+    fn on_timeout(&mut self, timed_event: timer::Event<Event>) {
         self.state = self.state.take().map(|state| match timed_event.event {
             event @ Event::RsnaCompletionTimeout(..)
             | event @ Event::RsnaResponseTimeout(..)
@@ -1788,7 +1786,9 @@ mod tests {
 
     // The unused _exec parameter ensures that an executor exists for the lifetime of the SME.
     // Our internal timer implementation relies on the existence of a local executor.
-    fn create_sme(_exec: &fasync::TestExecutor) -> (ClientSme, MlmeStream, TimeStream) {
+    fn create_sme(
+        _exec: &fasync::TestExecutor,
+    ) -> (ClientSme, MlmeStream, timer::EventStream<Event>) {
         let inspector = finspect::Inspector::default();
         let sme_root_node = inspector.root().create_child("sme");
         let (persistence_req_sender, _persistence_receiver) =

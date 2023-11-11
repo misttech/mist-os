@@ -1108,7 +1108,7 @@ mod tests {
             assert_variant,
             mac::CapabilityInfo,
             test_utils::fake_frames::*,
-            timer::{create_timer, TimeStream},
+            timer::{self, create_timer},
         },
     };
 
@@ -1121,7 +1121,9 @@ mod tests {
         RemoteClient::new(*CLIENT_ADDR)
     }
 
-    fn make_context(fake_device: FakeDevice) -> (Context<FakeDevice>, TimeStream<TimedEvent>) {
+    fn make_context(
+        fake_device: FakeDevice,
+    ) -> (Context<FakeDevice>, timer::EventStream<TimedEvent>) {
         let (timer, time_stream) = create_timer();
         (Context::new(fake_device, FakeBufferProvider::new(), timer, *AP_ADDR), time_stream)
     }

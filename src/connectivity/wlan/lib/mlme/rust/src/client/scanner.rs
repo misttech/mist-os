@@ -545,7 +545,7 @@ mod tests {
         wlan_common::{
             assert_variant,
             sequence::SequenceManager,
-            timer::{create_timer, TimeStream, Timer},
+            timer::{self, create_timer, Timer},
         },
     };
 
@@ -1176,7 +1176,7 @@ mod tests {
     struct MockObjects {
         fake_device: FakeDevice,
         fake_device_state: Arc<Mutex<FakeDeviceState>>,
-        _time_stream: TimeStream<TimedEvent>,
+        _time_stream: timer::EventStream<TimedEvent>,
         timer: Option<Timer<TimedEvent>>,
     }
 

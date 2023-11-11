@@ -1406,7 +1406,7 @@ mod tests {
                 fake_capabilities::fake_client_capabilities, fake_frames::*,
                 fake_stas::IesOverrides,
             },
-            timer::{create_timer, TimeStream, Timer},
+            timer::{self, create_timer, Timer},
         },
         wlan_frame_writer::write_frame_with_dynamic_buf,
         wlan_statemachine as statemachine,
@@ -1421,7 +1421,7 @@ mod tests {
         fake_device: FakeDevice,
         fake_device_state: Arc<Mutex<FakeDeviceState>>,
         timer: Option<Timer<TimedEvent>>,
-        time_stream: TimeStream<TimedEvent>,
+        time_stream: timer::EventStream<TimedEvent>,
         scanner: Scanner,
         channel_state: ChannelState,
     }

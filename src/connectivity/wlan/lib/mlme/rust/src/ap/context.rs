@@ -528,7 +528,7 @@ mod test {
         std::convert::TryFrom,
         wlan_common::{
             assert_variant, mac,
-            timer::{create_timer, TimeStream},
+            timer::{self, create_timer},
         },
     };
 
@@ -538,7 +538,9 @@ mod test {
         static ref CLIENT_ADDR2: MacAddr = [3u8; 6].into();
     }
 
-    fn make_context(fake_device: FakeDevice) -> (Context<FakeDevice>, TimeStream<TimedEvent>) {
+    fn make_context(
+        fake_device: FakeDevice,
+    ) -> (Context<FakeDevice>, timer::EventStream<TimedEvent>) {
         let (timer, time_stream) = create_timer();
         (Context::new(fake_device, FakeBufferProvider::new(), timer, *BSSID), time_stream)
     }

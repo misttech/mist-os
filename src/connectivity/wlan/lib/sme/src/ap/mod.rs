@@ -31,7 +31,7 @@ use {
             ChanWidthSet, SupportedRate,
         },
         mac,
-        timer::{self, EventId, TimedEvent, Timer},
+        timer::{self, EventId, Timer},
         RadioConfig,
     },
     wlan_rsn::{self, psk},
@@ -53,8 +53,6 @@ pub struct OpRadioConfig {
     phy: fidl_common::WlanPhyType,
     channel: Channel,
 }
-
-pub type TimeStream = timer::TimeStream<Event>;
 
 enum State {
     Idle {
@@ -125,7 +123,7 @@ impl ApSme {
     pub fn new(
         device_info: DeviceInfo,
         mac_sublayer_support: fidl_common::MacSublayerSupport,
-    ) -> (Self, crate::MlmeSink, crate::MlmeStream, TimeStream) {
+    ) -> (Self, crate::MlmeSink, crate::MlmeStream, timer::EventStream<Event>) {
         let (mlme_sink, mlme_stream) = mpsc::unbounded();
         let (timer, time_stream) = timer::create_timer();
         let sme = ApSme {
@@ -414,7 +412,7 @@ impl super::Station for ApSme {
         });
     }
 
-    fn on_timeout(&mut self, timed_event: TimedEvent<Event>) {
+    fn on_timeout(&mut self, timed_event: timer::Event<Event>) {
         self.state = self.state.take().map(|mut state| match state {
             State::Idle { .. } => state,
             State::Starting {
@@ -763,7 +761,7 @@ impl InfraBss {
         }
     }
 
-    fn handle_timeout(&mut self, timed_event: TimedEvent<Event>) {
+    fn handle_timeout(&mut self, timed_event: timer::Event<Event>) {
         match timed_event.event {
             Event::Sme { .. } => (),
             Event::Client { addr, event } => {
@@ -1615,18 +1613,22 @@ mod tests {
         }
     }
 
-    fn start_protected_ap(exec: &fasync::TestExecutor) -> (ApSme, crate::MlmeStream, TimeStream) {
+    fn start_protected_ap(
+        exec: &fasync::TestExecutor,
+    ) -> (ApSme, crate::MlmeStream, timer::EventStream<Event>) {
         start_ap(true, exec)
     }
 
-    fn start_unprotected_ap(exec: &fasync::TestExecutor) -> (ApSme, crate::MlmeStream, TimeStream) {
+    fn start_unprotected_ap(
+        exec: &fasync::TestExecutor,
+    ) -> (ApSme, crate::MlmeStream, timer::EventStream<Event>) {
         start_ap(false, exec)
     }
 
     fn start_ap(
         protected: bool,
         exec: &fasync::TestExecutor,
-    ) -> (ApSme, crate::MlmeStream, TimeStream) {
+    ) -> (ApSme, crate::MlmeStream, timer::EventStream<Event>) {
         let (mut sme, mut mlme_stream, mut time_stream) = create_sme(exec);
         let config = if protected { protected_config() } else { unprotected_config() };
         let mut receiver = sme.on_start_command(config);
@@ -1640,7 +1642,7 @@ mod tests {
         (sme, mlme_stream, time_stream)
     }
 
-    fn create_sme(_exec: &fasync::TestExecutor) -> (ApSme, MlmeStream, TimeStream) {
+    fn create_sme(_exec: &fasync::TestExecutor) -> (ApSme, MlmeStream, timer::EventStream<Event>) {
         let (ap_sme, _mlme_sink, mlme_stream, time_stream) =
             ApSme::new(fake_device_info(*AP_ADDR), fake_mac_sublayer_support());
         (ap_sme, mlme_stream, time_stream)

@@ -222,8 +222,8 @@ async fn main_loop_impl<T: MlmeImpl>(
     // A stream of events initiated by C++ device drivers and then buffered here
     // by our MlmeHandle.
     mut driver_event_stream: mpsc::UnboundedReceiver<DriverEvent>,
-    time_stream: common::timer::TimeStream<T::TimerEvent>,
-    minstrel_time_stream: common::timer::TimeStream<()>,
+    time_stream: common::timer::EventStream<T::TimerEvent>,
+    minstrel_time_stream: common::timer::EventStream<()>,
 ) -> Result<(), Error> {
     let mut timer_stream = common::timer::make_async_timed_event_stream(time_stream).fuse();
     let mut minstrel_timer_stream =

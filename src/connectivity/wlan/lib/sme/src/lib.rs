@@ -14,7 +14,7 @@ use {
     fidl_fuchsia_wlan_mlme::{self as fidl_mlme, MlmeEvent},
     futures::channel::mpsc,
     thiserror::Error,
-    wlan_common::{sink::UnboundedSink, timer::TimedEvent},
+    wlan_common::{sink::UnboundedSink, timer},
 };
 
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq, Ord, PartialOrd)]
@@ -113,7 +113,7 @@ pub trait Station {
     type Event;
 
     fn on_mlme_event(&mut self, event: fidl_mlme::MlmeEvent);
-    fn on_timeout(&mut self, timed_event: TimedEvent<Self::Event>);
+    fn on_timeout(&mut self, timed_event: timer::Event<Self::Event>);
 }
 
 pub type MlmeStream = mpsc::UnboundedReceiver<MlmeRequest>;

@@ -1291,7 +1291,7 @@ mod tests {
             fake_bss_description, fake_fidl_bss_description, ie,
             stats::SignalStrengthAverage,
             test_utils::{fake_capabilities::fake_client_capabilities, fake_frames::*},
-            timer::{create_timer, TimeStream},
+            timer::{self, create_timer},
         },
         wlan_sme::responder::Responder,
         wlan_statemachine::*,
@@ -1336,7 +1336,7 @@ mod tests {
         fake_device: FakeDevice,
         fake_device_state: Arc<Mutex<FakeDeviceState>>,
         timer: Option<Timer<super::TimedEvent>>,
-        time_stream: TimeStream<super::TimedEvent>,
+        time_stream: timer::EventStream<super::TimedEvent>,
     }
 
     impl MockObjects {
@@ -1550,10 +1550,11 @@ mod tests {
         assert!(!client.sta.eapol_required());
     }
 
-    /// Consumes `TimedEvent` values from the `TimeStream` held by `mock_objects` and handles
-    /// each `TimedEvent` value with `mlme`. This function makes the following assertions:
+    /// Consumes `TimedEvent` values from the `timer::EventStream` held by `mock_objects` and
+    /// handles each `TimedEvent` value with `mlme`. This function makes the following assertions:
     ///
-    ///   - The `TimeStream` held by `mock_objects` starts with one `StatusCheckTimeout` pending.
+    ///   - The `timer::EventStream` held by `mock_objects` starts with one `StatusCheckTimeout`
+    ///     pending.
     ///   - For the `beacon_count` specified, `mlme` will consume the current `StatusCheckTimeout`
     ///     and schedule the next.
     ///   - `mlme` produces a `fidl_mlme::SignalReportIndication` for each StatusCheckTimeout

@@ -823,7 +823,7 @@ mod tests {
     use {
         super::*,
         crate::{
-            ap::{aid, create_rsn_cfg, test_utils::MockAuthenticator, TimeStream},
+            ap::{aid, create_rsn_cfg, test_utils::MockAuthenticator},
             test_utils, MlmeRequest, MlmeSink, MlmeStream,
         },
         futures::channel::mpsc,
@@ -852,7 +852,7 @@ mod tests {
         RemoteClient::new(*CLIENT_ADDR)
     }
 
-    fn make_env() -> (Context, MlmeStream, TimeStream) {
+    fn make_env() -> (Context, MlmeStream, timer::EventStream<Event>) {
         let device_info = test_utils::fake_device_info(*AP_ADDR);
         let mac_sublayer_support = fake_mac_sublayer_support();
         let (mlme_sink, mlme_stream) = mpsc::unbounded();

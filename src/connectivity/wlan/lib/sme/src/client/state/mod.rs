@@ -1383,7 +1383,7 @@ mod tests {
                 create_connect_conf, create_on_wmm_status_resp, expect_stream_empty,
                 fake_wmm_param, mock_psk_supplicant, MockSupplicant, MockSupplicantController,
             },
-            ConnectTransactionStream, TimeStream,
+            ConnectTransactionStream,
         },
         test_utils::{self, make_wpa1_ie},
         MlmeStream,
@@ -2137,9 +2137,9 @@ mod tests {
 
     fn expect_next_event_at_deadline<E: std::fmt::Debug>(
         executor: &mut fuchsia_async::TestExecutor,
-        mut timed_event_stream: impl Stream<Item = timer::TimedEvent<E>> + std::marker::Unpin,
+        mut timed_event_stream: impl Stream<Item = timer::Event<E>> + std::marker::Unpin,
         deadline: fuchsia_async::Time,
-    ) -> timer::TimedEvent<E> {
+    ) -> timer::Event<E> {
         assert_variant!(executor.run_until_stalled(&mut timed_event_stream.next()), Poll::Pending);
         assert_eq!(deadline, executor.wake_next_timer().expect("expected pending timer"));
         executor.set_fake_time(deadline);
@@ -3677,7 +3677,7 @@ mod tests {
     // Helper functions and data structures for tests
     struct TestHelper {
         mlme_stream: MlmeStream,
-        time_stream: TimeStream,
+        time_stream: timer::EventStream<Event>,
         context: Context,
         // Inspector is kept so that root node doesn't automatically get removed from VMO
         inspector: Inspector,
