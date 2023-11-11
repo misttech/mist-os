@@ -546,12 +546,12 @@ func NewFFXTester(ctx context.Context, ffx FFXInstance, sshTester Tester, localO
 	}, nil
 }
 
-func (t *FFXTester) EnabledForTest(test testsharder.Test) bool {
+func (t *FFXTester) EnabledForTesting() bool {
 	return t.experimentLevel >= 2
 }
 
 func (t *FFXTester) Test(ctx context.Context, test testsharder.Test, stdout, stderr io.Writer, outDir string) (*TestResult, error) {
-	if t.EnabledForTest(test) {
+	if t.EnabledForTesting() {
 		finalTestResult := BaseTestResultFromTest(test)
 		testResult, err := t.testWithFile(ctx, test, stdout, stderr, outDir)
 		if err != nil {

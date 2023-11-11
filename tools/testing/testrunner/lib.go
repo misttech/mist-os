@@ -219,6 +219,11 @@ func execute(
 					logger.Debugf(ctx, "%s", err)
 				}
 			}()
+			// Prefetching packages may possibly interfere with test execution and cause tests
+			// to time out or fail, so disable when using `ffx test`.
+			if ffxTester.EnabledForTesting() {
+				opts.PrefetchPackages = false
+			}
 			fuchsiaTester = ffxTester
 		}
 

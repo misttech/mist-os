@@ -451,7 +451,7 @@ func TestFFXTester(t *testing.T) {
 				t.Errorf("tester.Test got result: %s, want result: %s", testResult.Result, c.expectedResult)
 			}
 
-			if tester.EnabledForTest(test) {
+			if tester.EnabledForTesting() {
 				testArgs := []string{}
 				if c.experimentLevel == 3 {
 					testArgs = append(testArgs, "--experimental-parallel-execution", "8")
@@ -488,7 +488,7 @@ func TestFFXTester(t *testing.T) {
 				t.Errorf("Run() called wrong number of times. Got: %d, Want: %d", client.runCalls, wantSSHRunCalls)
 			}
 
-			if tester.EnabledForTest(test) {
+			if tester.EnabledForTesting() {
 				// Call EnsureSinks() for v2 tests to set the copier.remoteDir to the data output dir for v2 tests.
 				// v1 tests will already have set the appropriate remoteDir value within Test().
 				outputs := &TestOutputs{OutDir: t.TempDir()}

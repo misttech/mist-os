@@ -645,13 +645,8 @@ func (r *RunCommand) runAgainstTarget(ctx context.Context, t targets.FuchsiaTarg
 	}
 	if t.UseFFX() {
 		setEnviron(t.FFXEnv())
-		// TODO(fxbug.dev/113992): testrunner's use of ffx involves calls to a `ssh` host binary
-		// which may not be available on the host. Put behind an experiment level until
-		// the bug is fixed.
-		if t.UseFFXExperimental(2) {
-			r.testrunnerOptions.FFX = t.GetFFX().FFXInstance
-			r.testrunnerOptions.FFXExperimentLevel = r.ffxExperimentLevel
-		}
+		r.testrunnerOptions.FFX = t.GetFFX().FFXInstance
+		r.testrunnerOptions.FFXExperimentLevel = r.ffxExperimentLevel
 	}
 
 	if err := testrunner.SetupAndExecute(ctx, r.testrunnerOptions, testsPath); err != nil {
