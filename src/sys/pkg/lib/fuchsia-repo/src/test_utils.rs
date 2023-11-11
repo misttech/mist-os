@@ -3,12 +3,8 @@
 // found in the LICENSE file.
 
 use {
-    crate::{
-        repo_client::RepoClient,
-        repo_keys::RepoKeys,
-        repository::{FileSystemRepository, PmRepository, RepoProvider},
-    },
-    anyhow::{anyhow, Context, Result},
+    crate::{repo_keys::RepoKeys, repository::PmRepository},
+    anyhow::{Context, Result},
     camino::{Utf8Path, Utf8PathBuf},
     fidl_fuchsia_pkg_ext::RepositoryKey,
     fuchsia_hash::Hash,
@@ -32,64 +28,86 @@ use {
     walkdir::WalkDir,
 };
 
+#[cfg(not(target_os = "fuchsia"))]
+use crate::repo_client::RepoClient;
+#[cfg(not(target_os = "fuchsia"))]
+use crate::repository::{FileSystemRepository, RepoProvider};
+#[cfg(not(target_os = "fuchsia"))]
+use anyhow::anyhow;
+
 const EMPTY_REPO_PATH: &str = "host_x64/test_data/ffx_lib_pkg/empty-repo";
 
+#[cfg(not(target_os = "fuchsia"))]
 #[cfg(test)]
 pub(crate) const PKG1_HASH: &str =
     "2881455493b5870aaea36537d70a2adc635f516ac2092598f4b6056dabc6b25d";
 
+#[cfg(not(target_os = "fuchsia"))]
 #[cfg(test)]
 pub(crate) const PKG2_HASH: &str =
     "050907f009ff634f9aa57bff541fb9e9c2c62b587c23578e77637cda3bd69458";
 
+#[cfg(not(target_os = "fuchsia"))]
 #[cfg(test)]
 pub(crate) const PKG1_BIN_HASH: &str =
     "72e1e7a504f32edf4f23e7e8a3542c1d77d12541142261cfe272decfa75f542d";
 
+#[cfg(not(target_os = "fuchsia"))]
 #[cfg(test)]
 pub(crate) const PKG1_LIB_HASH: &str =
     "8a8a5f07f935a4e8e1fd1a1eda39da09bb2438ec0adfb149679ddd6e7e1fbb4f";
 
+#[cfg(not(target_os = "fuchsia"))]
 #[cfg(test)]
 pub(crate) const PKG2_BIN_HASH: &str =
     "548981eb310ddc4098fb5c63692e19ac4ae287b13d0e911fbd9f7819ac22491c";
 
+#[cfg(not(target_os = "fuchsia"))]
 #[cfg(test)]
 pub(crate) const PKG2_LIB_HASH: &str =
     "ecc11f7f4b763c5a21be2b4159c9818bbe22ca7e6d8100a72f6a41d3d7b827a9";
 
+#[cfg(not(target_os = "fuchsia"))]
 #[cfg(test)]
 pub(crate) const ANONSUBPKG_HASH: &str =
     "1d20cc5163f35cd977cf414d54f8d5b53bcb33944cff0b9560b0627a6bba7441";
 
+#[cfg(not(target_os = "fuchsia"))]
 #[cfg(test)]
 pub(crate) const ANONSUBPKG_BIN_HASH: &str =
     "7fb2c78b2ae5ce6b591c4b017b382e5d4f1dc2a6f3e6977cac735632bbffec1f";
 
+#[cfg(not(target_os = "fuchsia"))]
 #[cfg(test)]
 pub(crate) const ANONSUBPKG_LIB_HASH: &str =
     "8dda14b0bc837a825c71a8534e402b5c7d4dfbb7348f429c017e57d547be80df";
 
+#[cfg(not(target_os = "fuchsia"))]
 #[cfg(test)]
 pub(crate) const NAMEDSUBPKG_HASH: &str =
     "1e67965c0601afbe00e43eb5c50509813400f1ae0ec838b44dfa018a8afcdeac";
 
+#[cfg(not(target_os = "fuchsia"))]
 #[cfg(test)]
 pub(crate) const NAMEDSUBPKG_BIN_HASH: &str =
     "5c8e2b5f4f5be036f9694842767a226c776c89e21bf6705e89d03ab4543fea2e";
 
+#[cfg(not(target_os = "fuchsia"))]
 #[cfg(test)]
 pub(crate) const NAMEDSUBPKG_LIB_HASH: &str =
     "208995a7397ea03e5b567a966690336d3c2cbbbf03bea95a4ee95724ac42f2e6";
 
+#[cfg(not(target_os = "fuchsia"))]
 #[cfg(test)]
 pub(crate) const SUPERPKG_HASH: &str =
     "cb174413bb34d960976f6b82ef6e6d3d3a36ddccdec142faf3d79f76c4baa676";
 
+#[cfg(not(target_os = "fuchsia"))]
 #[cfg(test)]
 pub(crate) const SUPERPKG_BIN_HASH: &str =
     "5ece8a1e67d2f16b861ad282667760cda93684b5ab5c80c4be6b9be47395b2b1";
 
+#[cfg(not(target_os = "fuchsia"))]
 #[cfg(test)]
 pub(crate) const SUPERPKG_LIB_HASH: &str =
     "b54bb3adf0fc9492d5e12cce9cf0b3dc501075397e8eedb77991503139c1ad40";
@@ -156,6 +174,7 @@ pub fn make_empty_pm_repo_dir(root: &Utf8Path) {
     copy_dir(&src, root.as_std_path()).unwrap();
 }
 
+#[cfg(not(target_os = "fuchsia"))]
 pub async fn make_readonly_empty_repository() -> Result<RepoClient<Box<dyn RepoProvider>>> {
     let backend = PmRepository::new(Utf8PathBuf::from(EMPTY_REPO_PATH));
     let mut client = RepoClient::from_trusted_remote(Box::new(backend) as Box<_>)
@@ -165,6 +184,7 @@ pub async fn make_readonly_empty_repository() -> Result<RepoClient<Box<dyn RepoP
     Ok(client)
 }
 
+#[cfg(not(target_os = "fuchsia"))]
 pub async fn make_writable_empty_repository(
     root: Utf8PathBuf,
 ) -> Result<RepoClient<Box<dyn RepoProvider>>> {
@@ -362,6 +382,7 @@ pub async fn make_pm_repository(dir: impl Into<Utf8PathBuf>) -> PmRepository {
     PmRepository::new(dir)
 }
 
+#[cfg(not(target_os = "fuchsia"))]
 pub async fn make_file_system_repository(
     metadata_dir: impl Into<Utf8PathBuf>,
     blobs_dir: impl Into<Utf8PathBuf>,

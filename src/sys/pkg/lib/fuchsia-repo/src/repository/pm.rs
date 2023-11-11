@@ -8,7 +8,7 @@ use {
         repo_keys,
         repository::{
             CopyMode, Error, FileSystemRepository, FileSystemRepositoryBuilder, RepoProvider,
-            RepoStorage, RepositorySpec,
+            RepoStorage,
         },
         resource::Resource,
     },
@@ -26,6 +26,9 @@ use {
         },
     },
 };
+
+#[cfg(not(target_os = "fuchsia"))]
+use crate::repository::RepositorySpec;
 
 pub struct PmRepositoryBuilder {
     pm_repo_path: Utf8PathBuf,
@@ -108,6 +111,7 @@ impl PmRepository {
 }
 
 impl RepoProvider for PmRepository {
+    #[cfg(not(target_os = "fuchsia"))]
     fn spec(&self) -> RepositorySpec {
         RepositorySpec::Pm { path: self.pm_repo_path.clone(), aliases: self.repo.aliases().clone() }
     }

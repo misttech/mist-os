@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::{repo_client::RepoClient, repo_keys::RepoKeys, repository::RepoStorageProvider},
+    crate::{repo_keys::RepoKeys, repository::RepoStorageProvider},
     anyhow::{anyhow, Context, Result},
     camino::{Utf8Path, Utf8PathBuf},
     chrono::{DateTime, Duration, Utc},
@@ -23,6 +23,9 @@ use {
         repo_builder::RepoBuilder as TufRepoBuilder, Database,
     },
 };
+
+#[cfg(not(target_os = "fuchsia"))]
+use crate::repo_client::RepoClient;
 
 /// Number of days from now before the root metadata is expired.
 const DEFAULT_ROOT_EXPIRATION: i64 = 365;
@@ -95,6 +98,7 @@ pub struct RepoBuilder<'a, R: RepoStorageProvider> {
     deps: HashSet<Utf8PathBuf>,
 }
 
+#[cfg(not(target_os = "fuchsia"))]
 impl<'a, R> RepoBuilder<'a, &'a R>
 where
     R: RepoStorageProvider,
@@ -805,6 +809,7 @@ fn check_manifests_are_equivalent(
     Err(anyhow!(msg.join("\n")))
 }
 
+#[cfg(not(target_os = "fuchsia"))]
 #[cfg(test)]
 mod tests {
     use {

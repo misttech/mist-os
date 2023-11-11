@@ -62,6 +62,7 @@ impl RepositoryManager {
     }
 }
 
+#[cfg(not(target_os = "fuchsia"))]
 #[cfg(test)]
 mod test {
     use {super::*, crate::test_utils::make_readonly_empty_repository};

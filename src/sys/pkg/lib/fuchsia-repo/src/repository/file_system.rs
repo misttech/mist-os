@@ -11,7 +11,6 @@ use {
     anyhow::{anyhow, Context as _, Result},
     camino::{Utf8Component, Utf8Path, Utf8PathBuf},
     delivery_blob::DeliveryBlobType,
-    fidl_fuchsia_developer_ffx_ext::RepositorySpec,
     fuchsia_async as fasync,
     fuchsia_merkle::Hash,
     futures::{future::BoxFuture, AsyncRead, FutureExt as _},
@@ -37,6 +36,7 @@ use {
 
 #[cfg(not(target_os = "fuchsia"))]
 use {
+    fidl_fuchsia_developer_ffx_ext::RepositorySpec,
     futures::{stream::BoxStream, Stream, StreamExt as _},
     notify::{recommended_watcher, RecursiveMode, Watcher as _},
     std::{
@@ -237,6 +237,7 @@ impl FileSystemRepository {
 }
 
 impl RepoProvider for FileSystemRepository {
+    #[cfg(not(target_os = "fuchsia"))]
     fn spec(&self) -> RepositorySpec {
         RepositorySpec::FileSystem {
             metadata_repo_path: self.metadata_repo_path.clone(),

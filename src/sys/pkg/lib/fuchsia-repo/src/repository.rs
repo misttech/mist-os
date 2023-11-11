@@ -6,7 +6,6 @@ use {
     crate::{range::Range, resource::Resource},
     anyhow::Result,
     camino::{Utf8Path, Utf8PathBuf},
-    fidl_fuchsia_developer_ffx_ext::RepositorySpec,
     fuchsia_merkle::Hash,
     futures::{future::BoxFuture, stream::BoxStream},
     std::{collections::BTreeSet, fmt::Debug, io, sync::Arc, time::SystemTime},
@@ -16,6 +15,9 @@ use {
     },
     url::ParseError,
 };
+
+#[cfg(not(target_os = "fuchsia"))]
+use fidl_fuchsia_developer_ffx_ext::RepositorySpec;
 
 mod file_system;
 mod pm;
@@ -77,6 +79,7 @@ impl From<ParseError> for Error {
 }
 
 pub trait RepoProvider: TufRepositoryProvider<Pouf1> + Debug + Send + Sync {
+    #[cfg(not(target_os = "fuchsia"))]
     /// Get a [RepositorySpec] for this [Repository]
     fn spec(&self) -> RepositorySpec;
 
@@ -135,6 +138,7 @@ macro_rules! impl_provider {
         <$($desc:tt)+
     ) => {
         impl <$($desc)+ {
+            #[cfg(not(target_os = "fuchsia"))]
             fn spec(&self) -> RepositorySpec {
                 (**self).spec()
             }

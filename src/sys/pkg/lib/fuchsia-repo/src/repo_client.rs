@@ -11,7 +11,6 @@ use {
     anyhow::{anyhow, Context as _, Result},
     chrono::{DateTime, Utc},
     fidl_fuchsia_developer_ffx::{ListFields, PackageEntry, RepositoryPackage},
-    fidl_fuchsia_developer_ffx_ext::RepositorySpec,
     fidl_fuchsia_pkg_ext::{
         MirrorConfigBuilder, RepositoryConfig, RepositoryConfigBuilder, RepositoryKey,
         RepositoryStorageType,
@@ -46,6 +45,9 @@ use {
         Database,
     },
 };
+
+#[cfg(not(target_os = "fuchsia"))]
+use fidl_fuchsia_developer_ffx_ext::RepositorySpec;
 
 const LIST_PACKAGE_CONCURRENCY: usize = 5;
 
@@ -119,6 +121,7 @@ where
     }
 
     /// Get a [RepositorySpec] for this [Repository].
+    #[cfg(not(target_os = "fuchsia"))]
     pub fn spec(&self) -> RepositorySpec {
         self.tuf_client.remote_repo().spec()
     }
