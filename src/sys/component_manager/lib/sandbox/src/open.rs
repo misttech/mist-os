@@ -8,14 +8,13 @@ use {
     },
     core::fmt,
     fidl::endpoints::{create_endpoints, ClientEnd, ServerEnd},
-    fidl::epitaph::ChannelEpitaphExt,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     fuchsia_zircon::HandleBased,
     futures::future::BoxFuture,
     futures::FutureExt,
     futures::TryStreamExt,
     std::sync::Arc,
-    vfs::{execution_scope::ExecutionScope, path::Path},
+    vfs::{common::send_on_open_with_error, execution_scope::ExecutionScope, path::Path},
 };
 
 /// An [Open] capability lets the holder obtain other capabilities by pipelining
@@ -93,18 +92,23 @@ impl Open {
         Directory::from_open(self, open_flags, crate::router::Path::default())
     }
 
-    /// Validates that `path` is a valid `fuchsia.io` path and opens the corresponding entry.
+    /// Opens the corresponding entry.
+    ///
+    /// If `path` fails validation, the `server_end` will be closed with a corresponding
+    /// epitaph and optionally an event.
     pub fn open(
         &self,
         scope: ExecutionScope,
         flags: fio::OpenFlags,
-        path: String,
+        path: impl ValidatePath,
         server_end: zx::Channel,
     ) {
-        match Path::validate_and_split(path) {
+        let path = path.validate();
+        match path {
             Ok(path) => (self.open_fn)(scope.clone(), flags, path, server_end.into()),
-            Err(status) => {
-                let _ = server_end.close_with_epitaph(status);
+            Err(error) => {
+                let describe = flags.intersects(fio::OpenFlags::DESCRIBE);
+                send_on_open_with_error(describe, server_end.into(), error);
             }
         }
     }
@@ -155,6 +159,28 @@ impl Open {
             ),
             self.entry_type,
         )
+    }
+}
+
+pub trait ValidatePath {
+    fn validate(self) -> Result<Path, zx::Status>;
+}
+
+impl ValidatePath for Path {
+    fn validate(self) -> Result<Path, zx::Status> {
+        Ok(self)
+    }
+}
+
+impl ValidatePath for String {
+    fn validate(self) -> Result<Path, zx::Status> {
+        Path::validate_and_split(self)
+    }
+}
+
+impl ValidatePath for &str {
+    fn validate(self) -> Result<Path, zx::Status> {
+        Path::validate_and_split(self)
     }
 }
 
@@ -239,6 +265,7 @@ impl AsRouter for Open {
 mod tests {
     use {
         super::*,
+        assert_matches::assert_matches,
         fuchsia_async as fasync, fuchsia_zircon as zx,
         lazy_static::lazy_static,
         test_util::Counter,
@@ -424,5 +451,41 @@ mod tests {
         // Verify that the connection does not have anymore children, since `foo` has no children.
         let (_, entries) = get_entries(directory).await.unwrap();
         assert_eq!(entries, vec![] as Vec<String>);
+    }
+
+    #[fuchsia::test]
+    async fn invalid_path() {
+        let open = Open::new(
+            move |_scope: ExecutionScope,
+                  _flags: fio::OpenFlags,
+                  _relative_path: Path,
+                  _server_end: zx::Channel| {
+                panic!("should not reach here");
+            },
+            fio::DirentType::Directory,
+        );
+
+        let (client_end, fut) = open.to_zx_handle();
+        if let Some(fut) = fut {
+            fasync::Task::spawn(fut).detach();
+        }
+        let openable: ClientEnd<fio::OpenableMarker> = client_end.into();
+        let openable = openable.into_proxy().unwrap();
+        let (client_end, server_end) = fidl::endpoints::create_endpoints();
+        openable.open(fio::OpenFlags::DESCRIBE, fio::ModeType::empty(), "..", server_end).unwrap();
+        let proxy = client_end.into_proxy().unwrap();
+        let mut event_stream = proxy.take_event_stream();
+
+        let event = event_stream.try_next().await.unwrap().unwrap();
+        let on_open = event.into_on_open_().unwrap();
+        assert_eq!(on_open.0, zx::Status::INVALID_ARGS.into_raw());
+
+        let event = event_stream.try_next().await;
+        let error = event.unwrap_err();
+        assert_matches!(
+            error,
+            fidl::Error::ClientChannelClosed { status, .. }
+            if status == zx::Status::INVALID_ARGS
+        );
     }
 }
