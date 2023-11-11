@@ -55,6 +55,9 @@ fragment of the composite.
 If the `colocate` field is not specified, its value defaults to the string
 `false`.
 
+`colocate` is mutually exclusive to the [`host_restart_on_crash`](#host-restart-on-crash) field.
+Only one of them can be true for a driver.
+
 ### Default dispatcher options
 
 The `default_dispatcher_opts` field provides the options which are used when
@@ -122,6 +125,40 @@ that the driver controls, for example:
 This metadata is used to determine the tests that the driver will undergo during
 its certification process. See the full list of device categories and
 subcategories in the [FHCP schema][fhcp-schema].
+
+### Host restart on crash {:#host-restart-on-crash}
+
+The `host_restart_on_crash` field tells the driver framework that it should restart the
+driver host for the node that the driver binds to should the driver go down unexpectedly.
+
+This includes if:
+
+ - The driver host crashes.
+ - The driver closes its client end to the `fuchsia.driver.framework/Node` protocol while running.
+
+Because this affects the driver host, it can only be set by the root driver of the host.
+The root driver is the driver for which the host was created. This is the case if and only if
+the `colocate` field is set to `false`.
+
+Therefore `host_restart_on_crash` and [`colocate`](#colocation) are mutually exclusive. Only
+one of them can be `true` for a driver.
+
+```json5 {:.devsite-disable-click-to-copy}
+{
+    program: {
+        runner: "driver",
+        binary: "driver/example.so",
+        bind: "meta/bind/example.bindbc",
+        {{ '<strong>' }}host_restart_on_crash: "true"{{ '</strong>' }}
+    }
+}
+```
+
+If the `host_restart_on_crash` field is not specified, its value defaults to the string
+`false`.
+
+When `host_restart_on_crash` is `false`, the node is removed from the driver framework's
+node topology if the driver goes down unexpectedly.
 
 ## Further reading
 

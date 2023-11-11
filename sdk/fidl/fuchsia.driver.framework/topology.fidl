@@ -156,6 +156,12 @@ type NodeError = flexible enum {
 };
 
 /// Protocol through which a driver manages a node that it is bound to.
+/// Drivers should maintain their client connection to the node. Dropping
+/// the client connection while the driver is running will cause the
+/// driver framework to remove the driver and node from the topology.
+/// If the driver has set `host_restart_on_crash` to "true" in their
+/// component manifest, dropping the connection will initiate a restart of
+/// the driver host and driver.
 open protocol Node {
     /// Adds a child node to this node.
     ///
