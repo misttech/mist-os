@@ -7,6 +7,7 @@
 
 #include <lib/vfs/cpp/internal/directory.h>
 #include <lib/vfs/cpp/internal/node.h>
+#include <zircon/availability.h>
 #include <zircon/types.h>
 
 #include <string_view>
@@ -32,6 +33,8 @@ namespace vfs {
 // async_dispatcher_t for the background thread is stopped or suspended, and
 // (c) async_dispatcher_t for the background thread is stopped or suspended
 // prior to destroying the directory.
+//
+// TODO(b/309685624): Remove LazyDir once all out-of-tree users have been migrated.
 class LazyDir : public vfs::internal::Directory {
  public:
   // Structure storing a single entry in the directory.
@@ -72,7 +75,7 @@ class LazyDir : public vfs::internal::Directory {
 
  private:
   static constexpr uint64_t kDotId = 1u;
-};
+} ZX_DEPRECATED_SINCE(1, 16, "Use PseudoDir or RemoteDir instead.");
 
 }  // namespace vfs
 

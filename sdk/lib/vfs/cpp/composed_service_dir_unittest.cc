@@ -60,7 +60,10 @@ class ComposedServiceDirectorySimpleTest : public vfs_tests::DirConnection {
 
  protected:
   vfs::PseudoDir backing_dir_;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
   vfs::ComposedServiceDir dir_;
+#pragma clang diagnostic pop
   std::vector<std::unique_ptr<EchoImpl>> echo_impls_;
   fidl::BindingSet<test::placeholders::Echo> bindings_;
   async::Loop loop_;

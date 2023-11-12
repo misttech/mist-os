@@ -1,5 +1,5 @@
 {
-  "pkg/vfs_cpp/include/lib/vfs/cpp/composed_service_dir.h": "e075d5aeca3423899a6e2b8094677702",
+  "pkg/vfs_cpp/include/lib/vfs/cpp/composed_service_dir.h": "f7a403fe08427f1f1e951e406ab4a014",
   "pkg/vfs_cpp/include/lib/vfs/cpp/flags.h": "f4a6059da5b27d3e5f32a3c93b91a171",
   "pkg/vfs_cpp/include/lib/vfs/cpp/internal/connection.h": "a2be773389fab801281bbc4fe3dafe2e",
   "pkg/vfs_cpp/include/lib/vfs/cpp/internal/directory.h": "6b93ea835fdb8ca6c4be1ad73f6cbe94",
@@ -9,7 +9,7 @@
   "pkg/vfs_cpp/include/lib/vfs/cpp/internal/file_connection.h": "76e66f56ab4c2b450e2a97663bf6530a",
   "pkg/vfs_cpp/include/lib/vfs/cpp/internal/node.h": "18c04eaf6e4a19ad1f698c29ac7dd951",
   "pkg/vfs_cpp/include/lib/vfs/cpp/internal/node_connection.h": "86c49a0414b9df7a2d60305925b11fda",
-  "pkg/vfs_cpp/include/lib/vfs/cpp/lazy_dir.h": "e8f79da217113614a939a50adb213380",
+  "pkg/vfs_cpp/include/lib/vfs/cpp/lazy_dir.h": "c59e6f61fc2702460c441bc3189ff6df",
   "pkg/vfs_cpp/include/lib/vfs/cpp/pseudo_dir.h": "71d3ac19e8e9bb9f9f5d3a1f63e3f140",
   "pkg/vfs_cpp/include/lib/vfs/cpp/pseudo_file.h": "c31cf86a0ca2b7419b11a713af9cd1bf",
   "pkg/vfs_cpp/include/lib/vfs/cpp/remote_dir.h": "54d606baaec4ccd6dbc4044eeacba60e",

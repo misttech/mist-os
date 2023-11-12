@@ -9,6 +9,7 @@
 #include <lib/vfs/cpp/internal/node.h>
 #include <lib/vfs/cpp/pseudo_dir.h>
 #include <lib/vfs/cpp/service.h>
+#include <zircon/availability.h>
 #include <zircon/types.h>
 
 #include <functional>
@@ -22,6 +23,8 @@ namespace vfs {
 // A directory-like object which created a composed PseudoDir on top of
 // |fallback_dir|.It can be used to connect to services in |fallback_dir| but it
 // will not enumerate them.
+//
+// TODO(b/309685624): Remove when all callers have migrated.
 class ComposedServiceDir : public vfs::internal::Directory {
  public:
   ComposedServiceDir();
@@ -56,7 +59,9 @@ class ComposedServiceDir : public vfs::internal::Directory {
   // Disallow copy and assignment.
   ComposedServiceDir(const ComposedServiceDir&) = delete;
   ComposedServiceDir& operator=(const ComposedServiceDir&) = delete;
-};
+} ZX_DEPRECATED_SINCE(
+    1, 16,
+    "Create and serve a custom outgoing directory with //sdk/lib/component or //sdk/lib/svc.");
 
 }  // namespace vfs
 

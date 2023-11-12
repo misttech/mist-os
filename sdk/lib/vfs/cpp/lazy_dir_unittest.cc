@@ -18,7 +18,10 @@ namespace {
 
 using vfs_tests::Dirent;
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
 class TestLazyDir : public vfs::LazyDir {
+#pragma clang diagnostic pop
  public:
   struct TestContent {
    public:
