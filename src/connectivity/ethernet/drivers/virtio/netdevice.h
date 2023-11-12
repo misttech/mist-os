@@ -153,8 +153,10 @@ class NetworkDevice : public Device,
     size_t rd_ = 0;
     size_t count_ = 0;
   };
-  FifoQueue tx_in_flight_ __TA_GUARDED(tx_lock_);
   FifoQueue rx_in_flight_ __TA_GUARDED(rx_lock_);
+
+  std::array<uint32_t, kMaxDepth> tx_in_flight_buffer_ids_ __TA_GUARDED(tx_lock_);
+  std::bitset<kMaxDepth> tx_in_flight_active_ __TA_GUARDED(tx_lock_);
 
   // Whether the status field in virtio_net_config is supported.
   bool is_status_supported_;

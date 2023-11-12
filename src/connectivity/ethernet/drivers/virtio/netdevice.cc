@@ -208,10 +208,9 @@ bool NetworkDevice::IrqRingUpdateInternal() {
     tx_.IrqRingUpdate([this, &tx_it](vring_used_elem* used_elem) {
       []() __TA_ASSERT(tx_lock_) {}();
       uint16_t id = static_cast<uint16_t>(used_elem->id & 0xffff);
-      Descriptor desc = tx_in_flight_.Pop();
-      ZX_ASSERT_MSG(desc.ring_id == id, "tx ring and FIFO id mismatch (%d != %d for buffer %d)",
-                    desc.ring_id, id, desc.buffer_id);
-      *tx_it++ = {.id = desc.buffer_id, .status = ZX_OK};
+      ZX_ASSERT_MSG(id < kMaxDepth && tx_in_flight_active_[id], "%d is not active", id);
+      *tx_it++ = {.id = tx_in_flight_buffer_ids_[id], .status = ZX_OK};
+      tx_in_flight_active_[id] = false;
       tx_.FreeDesc(id);
     });
     more_work |= tx_.ClearNoInterruptCheckHasWork();
@@ -374,12 +373,14 @@ void NetworkDevice::NetworkDeviceImplStop(network_device_impl_stop_callback call
       auto iter = tx_return.begin();
       {
         std::lock_guard lock(tx_lock_);
-        while (!tx_in_flight_.Empty()) {
-          Descriptor d = tx_in_flight_.Pop();
-          *iter++ = {
-              .id = d.buffer_id,
-              .status = ZX_ERR_BAD_STATE,
-          };
+        for (int i = 0; i < kMaxDepth; ++i) {
+          if (tx_in_flight_active_[i]) {
+            *iter++ = {
+                .id = tx_in_flight_buffer_ids_[i],
+                .status = ZX_ERR_BAD_STATE,
+            };
+            tx_in_flight_active_[i] = false;
+          }
         }
       }
       if (iter != tx_return.begin()) {
@@ -495,10 +496,8 @@ void NetworkDevice::NetworkDeviceImplQueueTx(const tx_buffer_t* buf_list, size_t
         .addr = region.phys_addr,
         .len = static_cast<uint32_t>(data.length),
     };
-    tx_in_flight_.Push({
-        .buffer_id = buffer.id,
-        .ring_id = id,
-    });
+    tx_in_flight_buffer_ids_[id] = buffer.id;
+    tx_in_flight_active_[id] = true;
     // Submit the descriptor and notify the back-end.
     if (zxlog_level_enabled(TRACE)) {
       virtio_dump_desc(desc);
