@@ -2607,7 +2607,7 @@ flag platform_enable_user_pci in //src/devices/bus/drivers/pci/pci.gni.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:81
+From //zircon/kernel/params.gni:85
 
 ### discoverable_package_labels
 
@@ -2725,7 +2725,7 @@ disabled.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:143
+From //zircon/kernel/params.gni:147
 
 ### enable_mdns_trace
 
@@ -2987,7 +2987,7 @@ memory usage overheads, but will not exhaust due to fragmentation.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:105
+From //zircon/kernel/params.gni:109
 
 ### escher_test_for_glsl_spirv_mismatch
 
@@ -3413,7 +3413,7 @@ Enables kernel tracing of futex interactions
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:63
+From //zircon/kernel/params.gni:67
 
 ### fvm_partition
 
@@ -4061,25 +4061,25 @@ value regardless of whether persistent tracing is enabled or not.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:122
+From //zircon/kernel/params.gni:126
 
 ### jtrace_last_entry_storage
 
 **Current value (from the default):** `0`
 
-From //zircon/kernel/params.gni:123
+From //zircon/kernel/params.gni:127
 
 ### jtrace_target_buffer_size
 
 **Current value (from the default):** `"auto"`
 
-From //zircon/kernel/params.gni:124
+From //zircon/kernel/params.gni:128
 
 ### jtrace_use_large_entries
 
 **Current value (from the default):** `"auto"`
 
-From //zircon/kernel/params.gni:125
+From //zircon/kernel/params.gni:129
 
 ### kernel_base
 
@@ -4094,7 +4094,7 @@ on ProcessDispatcher creation.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:129
+From //zircon/kernel/params.gni:133
 
 ### kernel_debug_level
 
@@ -4107,7 +4107,7 @@ the two and set kernel_debug_level independently.
 
 **Current value (from the default):** `2`
 
-From //zircon/kernel/params.gni:93
+From //zircon/kernel/params.gni:97
 
 ### kernel_debug_print_level
 
@@ -4119,7 +4119,7 @@ the more dprintf messages emitted. Valid values are 0-2 (inclusive):
 
 **Current value (from the default):** `2`
 
-From //zircon/kernel/params.gni:100
+From //zircon/kernel/params.gni:104
 
 ### kernel_extra_defines
 
@@ -4128,7 +4128,7 @@ Extra macro definitions for kernel code, e.g. "DISABLE_KASLR",
 
 **Current value (from the default):** `[]`
 
-From //zircon/kernel/params.gni:85
+From //zircon/kernel/params.gni:89
 
 ### kernel_extra_deps
 
@@ -4147,7 +4147,7 @@ Build a kernel with no user-space support, for development only.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:132
+From //zircon/kernel/params.gni:136
 
 ### kernel_version_string
 
@@ -5460,7 +5460,7 @@ cacheline size of the target architecture.
 
 **Current value (from the default):** `128`
 
-From //zircon/kernel/params.gni:112
+From //zircon/kernel/params.gni:116
 
 ### platform_enable_user_pci
 
@@ -7694,6 +7694,15 @@ debugging changes to the scheduler's behavior.
 
 From //zircon/kernel/params.gni:60
 
+### scheduler_lock_spin_tracing_enabled
+
+Enables scheduler lock-spinning trace events for trace-based scheduler
+performance analysis.
+
+**Current value (from the default):** `false`
+
+From //zircon/kernel/params.gni:64
+
 ### scheduler_queue_tracing_enabled
 
 Enables scheduler queue tracing for trace-based scheduler performance
@@ -8670,7 +8679,7 @@ Build an ELF kernel rather than a ZBI image kernel.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:135
+From //zircon/kernel/params.gni:139
 
 ### use_gigaboot
 
@@ -9015,7 +9024,7 @@ zero add increasing details at the cost of increased trace buffer use.
 
 **Current value (from the default):** `0`
 
-From //zircon/kernel/params.gni:77
+From //zircon/kernel/params.gni:81
 
 ### vulkan_host_runtime_dir
 
@@ -9054,7 +9063,7 @@ frequently the change depth.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:68
+From //zircon/kernel/params.gni:72
 
 ### warn_on_sdk_changes
 
@@ -9180,7 +9189,7 @@ From //build/images/args.gni:106
 
 **Current value (from the default):** `false`
 
-From //build/config/fuchsia/BUILD.gn:173
+From //build/config/fuchsia/BUILD.gn:181
 
 ### zircon_b_partition
 
