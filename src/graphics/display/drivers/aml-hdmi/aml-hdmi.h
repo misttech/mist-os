@@ -11,7 +11,6 @@
 #include <lib/async-loop/default.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/device-protocol/pdev-fidl.h>
-#include <lib/hdmi-dw/hdmi-dw.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zircon-internal/thread_annotations.h>
 
@@ -23,6 +22,8 @@
 #include <ddktl/fidl.h>
 #include <fbl/auto_lock.h>
 #include <fbl/ref_counted.h>
+
+#include "src/graphics/display/lib/designware/hdmi-dw.h"
 
 namespace aml_hdmi {
 

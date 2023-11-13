@@ -8,8 +8,6 @@
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/fidl/epitaph.h>
-#include <lib/hdmi-dw/color-param.h>
-#include <lib/hdmi-dw/hdmi-dw.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/zx/resource.h>
 #include <zircon/assert.h>
@@ -24,6 +22,8 @@
 
 #include "src/graphics/display/drivers/aml-hdmi/top-regs.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
+#include "src/graphics/display/lib/designware/color-param.h"
+#include "src/graphics/display/lib/designware/hdmi-dw.h"
 
 #define HDMI_ASPECT_RATIO_NONE 0
 #define HDMI_ASPECT_RATIO_4x3 1

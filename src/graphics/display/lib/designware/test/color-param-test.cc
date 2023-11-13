@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "src/graphics/display/lib/designware/color-param.h"
+
 #include <fidl/fuchsia.hardware.hdmi/cpp/wire.h>
-#include <lib/hdmi-dw/color-param.h>
 
 #include <gtest/gtest.h>
 

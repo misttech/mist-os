@@ -4,24 +4,20 @@
 
 import("//build/cpp/library_headers.gni")
 
-library_headers("hdmi-dw-headers") {
-  headers = [
-    "lib/hdmi-dw/hdmi-dw.h",
-    "lib/hdmi-dw/color-param.h",
-  ]
-  public_deps = [ "//src/graphics/display/lib/api-types-cpp" ]
-}
-
 source_set("hdmi-dw") {
-  sources = [ "hdmi-dw.cc" ]
-  public_deps = [ ":hdmi-dw-headers" ]
-  deps = [
+  sources = [
+    "color-param.h",
+    "hdmi-dw.cc",
+    "hdmi-dw.h",
+    "regs.h",
+  ]
+  public_deps = [
     "//sdk/banjo/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.hdmi:fuchsia.hardware.hdmi_cpp",
     "//src/devices/lib/mmio",
     "//src/graphics/display/lib/api-types-cpp",
-    "//src/lib/ddk",
   ]
+  deps = [ "//src/lib/ddk" ]
 
   # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]

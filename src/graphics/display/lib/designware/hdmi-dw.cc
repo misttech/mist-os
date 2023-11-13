@@ -2,12 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "src/graphics/display/lib/designware/hdmi-dw.h"
+
 #include <lib/ddk/debug.h>
-#include <lib/hdmi-dw/color-param.h>
-#include <lib/hdmi-dw/hdmi-dw.h>
-#include <lib/hdmi-dw/regs.h>
 
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
+#include "src/graphics/display/lib/designware/color-param.h"
+#include "src/graphics/display/lib/designware/regs.h"
 
 namespace hdmi_dw {
 

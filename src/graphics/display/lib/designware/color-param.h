@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_LIB_DESIGNWARE_INCLUDE_LIB_HDMI_DW_COLOR_PARAM_H_
-#define SRC_GRAPHICS_DISPLAY_LIB_DESIGNWARE_INCLUDE_LIB_HDMI_DW_COLOR_PARAM_H_
+#ifndef SRC_GRAPHICS_DISPLAY_LIB_DESIGNWARE_COLOR_PARAM_H_
+#define SRC_GRAPHICS_DISPLAY_LIB_DESIGNWARE_COLOR_PARAM_H_
 
 #include <fidl/fuchsia.hardware.hdmi/cpp/wire.h>
 #include <zircon/assert.h>
@@ -78,4 +78,4 @@ constexpr ColorParam ToColorParam(fuchsia_hardware_hdmi::wire::ColorParam fidl_c
 
 }  // namespace hdmi_dw
 
-#endif  // SRC_GRAPHICS_DISPLAY_LIB_DESIGNWARE_INCLUDE_LIB_HDMI_DW_COLOR_PARAM_H_
+#endif  // SRC_GRAPHICS_DISPLAY_LIB_DESIGNWARE_COLOR_PARAM_H_
