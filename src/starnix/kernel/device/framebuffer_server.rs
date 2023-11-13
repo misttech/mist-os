@@ -28,7 +28,11 @@ use fuchsia_zircon as zx;
 use futures::{StreamExt, TryStreamExt};
 use starnix_lock::Mutex;
 use std::ops::DerefMut;
-use std::sync::{mpsc::channel, Arc};
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    mpsc::channel,
+    Arc,
+};
 
 use crate::{
     logging::log_warn,
@@ -43,9 +47,6 @@ const ROOT_TRANSFORM_ID: fuicomposition::TransformId = fuicomposition::Transform
 
 /// The Flatland identifier for the framebuffer image.
 const FB_IMAGE_ID: fuicomposition::ContentId = fuicomposition::ContentId { value: 1 };
-
-/// The Flatland identifier for the viewport.
-const VIEWPORT_ID: fuicomposition::ContentId = fuicomposition::ContentId { value: 2 };
 
 /// The protocols that are exposed by the framebuffer server.
 enum ExposedProtocols {
@@ -75,6 +76,9 @@ pub struct FramebufferServer {
 
     /// Keeps track if this class is serving FB or a Viewport.
     scene_state: Arc<Mutex<SceneState>>,
+
+    /// Keeps track of the Flatland viewport ID.
+    viewport_id: AtomicU64,
 }
 
 impl FramebufferServer {
@@ -96,6 +100,7 @@ impl FramebufferServer {
             image_width: width,
             image_height: height,
             scene_state: Arc::new(Mutex::new(SceneState::Fb)),
+            viewport_id: (FB_IMAGE_ID.value + 1).into(),
         })
     }
 
@@ -215,17 +220,15 @@ pub fn init_viewport_scene(
     let mut scene_state = server.scene_state.lock();
     let scene_state = scene_state.deref_mut();
     // This handles multiple calls to init_viewport_scene and cleans fb resources.
-    // TODO(fxbug.dev/117507): Break the present loop if already started. Note that we still need to
+    // TODO(b/282895335): Break the present loop if already started. Note that we still need to
     // present once, taking into account the present credits
     match scene_state {
         SceneState::Fb => {
             server.flatland.release_image(&FB_IMAGE_ID).expect("failed to release image");
         }
         SceneState::Viewport => {
-            server
-                .flatland
-                .release_viewport(&VIEWPORT_ID, zx::Time::INFINITE)
-                .expect("failed to release viewport");
+            // TODO(b/282895335): Release viewport depends on a concurrent Present to return.
+            // Refactor the present loop to handle.
         }
     }
 
@@ -235,16 +238,18 @@ pub fn init_viewport_scene(
         logical_size: Some(fmath::SizeU { width: server.image_width, height: server.image_height }),
         ..Default::default()
     };
+    let new_viewport =
+        fuicomposition::ContentId { value: server.viewport_id.fetch_add(1, Ordering::SeqCst) };
     server
         .flatland
         .create_viewport(
-            &VIEWPORT_ID,
+            &new_viewport,
             viewport_token,
             &viewport_properties,
             child_view_watcher_request,
         )
         .expect("failed to create child viewport");
-    server.flatland.set_content(&ROOT_TRANSFORM_ID, &VIEWPORT_ID).expect("error setting content");
+    server.flatland.set_content(&ROOT_TRANSFORM_ID, &new_viewport).expect("error setting content");
 
     *scene_state = SceneState::Viewport;
 }
