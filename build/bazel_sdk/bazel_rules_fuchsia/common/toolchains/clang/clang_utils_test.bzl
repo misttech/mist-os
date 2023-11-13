@@ -22,6 +22,7 @@ If @clang_repo//BUILD.bazel contains something like:
 """
 
 load("@bazel_skylib//lib:unittest.bzl", "asserts", "unittest")
+load("//platforms:utils_test.bzl", "platforms_utils_test")
 load(
     "//:toolchains/clang/clang_utils.bzl",
     "process_clang_builtins_output",
@@ -72,5 +73,6 @@ process_clang_builtins_output_test = unittest.make(_process_clang_builtins_outpu
 def include_clang_utils_test_suite(name):
     unittest.suite(
         name,
+        platforms_utils_test,
         process_clang_builtins_output_test,
     )

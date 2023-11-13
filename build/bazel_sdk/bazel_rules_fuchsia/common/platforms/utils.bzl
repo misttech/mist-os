@@ -1,0 +1,180 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+"""Common utilities for both repository and regular rules."""
+
+_TO_FUCHSIA_OS_MAP = {
+    "macos": "mac",
+    "osx": "mac",
+    "windows": "win",
+}
+
+_TO_FUCHSIA_CPU_MAP = {
+    "k8": "x64",
+    "x86_64": "x64",
+    "aarch64": "arm64",
+}
+
+_FUCHSIA_OS_TO_BAZEL_OS = {
+    "mac": "macos",
+    "osx": "macos",  # bazel -> bazel
+    "win": "windows",
+}
+
+_TO_BAZEL_CPU_MAP = {
+    "arm64": "aarch64",
+    "x64": "x86_64",
+    "k8": "x86_64",
+}
+
+def to_bazel_os_name(target_os):
+    """Convert a Bazel or Fuchsia OS name into a canonical Bazel OS name."""
+    return _FUCHSIA_OS_TO_BAZEL_OS.get(target_os, target_os)
+
+def to_bazel_cpu_name(target_cpu):
+    """Convert Fuchsia or Bazel CPU architecture name to Bazel canonical one.
+
+    Args:
+        target_cpu: A Bazel- or Fuchsia-compatible cpu name (e.g. "x64").
+    Returns:
+        A canonical Bazel compatible cpu name, e.g. "x86_64", so that
+        @platforms//cpu:<result> is a valid label.
+    """
+    return _TO_BAZEL_CPU_MAP.get(target_cpu, target_cpu)
+
+def to_fuchsia_os_name(target_os):
+    """Convert Bazel OS name to Fuchsia cpu compatibel one.
+
+    Args:
+        bazel_os: A Fuchsia- or Bazel-compatible operating system name,
+    Returns:
+        A Fuchsia compatible operating system name string (e.g. "mac")
+    """
+    return _TO_FUCHSIA_OS_MAP.get(target_os, target_os)
+
+def to_fuchsia_cpu_name(target_cpu):
+    """Convert Bazel or Fuchsia cpu name to Fuchsia cpu architecture name.
+
+    Args:
+        target_cpu: A Fuchsia- or Bazel-compatible cpu name.
+    Returns:
+        The corresponding Fuchsia cpu name (e.g. 'x64'), same as input
+        if this was already a valid Fuchsia name.
+    """
+    return _TO_FUCHSIA_CPU_MAP.get(target_cpu, target_cpu)
+
+def to_platform_os_constraint(target_os):
+    """Return a Bazel platform constraint matching a given target OS.
+
+    Args:
+        target_os: Operating system name, using either Fuchsia or Bazel
+           conventions.
+    Returns:
+        A label string (e.g. "@platforms//os:linux").
+    """
+    return "@platforms//os:" + to_bazel_os_name(target_os)
+
+def to_platform_cpu_constraint(target_arch):
+    """Return a Bazel platform constraint matching a given target architecture..
+
+    Args:
+        target_arch: CPU architecture name, using either Fuchsia or Bazel
+           conventions.
+    Returns:
+        A label string (e.g. "@platforms//cpu:x86_64").
+    """
+    return "@platforms//cpu:" + to_bazel_cpu_name(target_arch)
+
+# The list of all supported target tags
+all_target_tags = [
+    "linux-x64",
+    "linux-arm64",
+    "fuchsia-x64",
+    "fuchsia-arm64",
+    "fuchsia-riscv64",
+    "mac-x64",
+    "mac-arm64",
+]
+
+def to_target_os_cpu_pair(target_tag):
+    """Convert a target tag string to (target_os, target_cpu) pair."""
+    target_os, sep, target_cpu = target_tag.replace("_", "-").partition("-")
+    if sep != "-":
+        fail("Invalid target tag value (<os>-<cpu> expected): " + target_tag)
+    return target_os, target_cpu
+
+def config_setting_label_for_target_os_cpu(target_os, target_cpu):
+    """Return label of a config setting holding True for a specific (os, cpu) pair.
+
+    Args:
+        target_os: An OS name, using either Bazel or Fuchsia conventions.
+        target_cpu: A CPU name, using either Bazel or Fuchsia conventions.
+    Returns:
+        A label string pointing to a config_setting() value which will hold
+        true when the current build configuration corresponds to
+        (target_os, target_cpu).
+    """
+    return "@fuchsia_sdk_common//platforms:is_%s_%s" % (
+        to_fuchsia_os_name(target_os),
+        to_fuchsia_cpu_name(target_cpu),
+    )
+
+def config_setting_label_for_target_tag(target_tag):
+    """Return label of a config setting holding True for a specific "os-cpu" pair.
+
+    Args:
+        target_os_cpu: A single string containing an OS name and a CPU name,
+           separated by either a dash or underscore, following either
+           Bazel or Fuchsia conventions (e.g. "mac-x64" or "macos_aarch64").
+    Returns:
+        A label string pointing to a config_setting() value which will hold
+        true when the current build configuration corresponds to
+        target_os_cpu.
+    """
+    target_os, target_cpu = to_target_os_cpu_pair(target_tag)
+    return config_setting_label_for_target_os_cpu(target_os, target_cpu)
+
+def target_tag_dict_to_select_keys(input_dict, add_default = None):
+    """Convert a { target_tag -> value } dictionary into a select() dictionary.
+
+    Args:
+        input_dict: A dictionary whose keys are target tag strings,
+          and whose values are select()-compatible values (e.g. label lists
+          or glob() call expressions).
+        add_default: If not None, add a //conditions:default clause matching
+          this value.
+
+    Return:
+        A dictionary whose keys are config setting labels matching the
+        target_tag keys from the input, associated with the corresponding
+        input values.
+
+    Example:
+       For the following input dictionary:
+
+          {
+            "linux-x64": [ "//package;name1" ],
+            "macos-aarch64": [ "//package:name2" ],
+          }
+
+       target_tag_dict_to_select_keys(input_dict, []) returns
+
+          {
+            "@fuchsia_sdk_common//platforms:is_linux_x64": [
+                "//package:name1"
+            ],
+            "@fuchsia_sdk_common//platforms:is_mac_arm64": [
+                "//package:name2",
+            ],
+            "//conditions:default": [],
+          }
+    """
+    result_dict = {
+        config_setting_label_for_target_tag(target_tag): value
+        for target_tag, value in input_dict.items()
+    }
+    if add_default != None:
+        result_dict["//conditions:default"] = add_default
+
+    return result_dict

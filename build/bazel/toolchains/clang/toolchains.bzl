@@ -11,7 +11,7 @@ load(
     "@fuchsia_sdk_common//:toolchains/clang/toolchain_utils.bzl",
     "generate_clang_cc_toolchain",
 )
-load("@//build/bazel/platforms:utils.bzl", "to_bazel_cpu_name", "to_bazel_os_name")
+load("@fuchsia_sdk_common//platforms:utils.bzl", "to_bazel_cpu_name", "to_bazel_os_name")
 
 def define_host_prebuilt_clang_cc_toolchains(name, host_os, host_arch):
     """Define host C++ toolchains that target both x64 and arm64 using a prebuilt Clang installation.
