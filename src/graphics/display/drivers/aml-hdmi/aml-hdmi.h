@@ -12,7 +12,6 @@
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/hdmi-dw/hdmi-dw.h>
-#include <lib/hdmi/base.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zircon-internal/thread_annotations.h>
 
@@ -31,7 +30,7 @@ class AmlHdmiDevice;
 using DeviceType = ddk::Device<AmlHdmiDevice, ddk::Messageable<fuchsia_hardware_hdmi::Hdmi>::Mixin,
                                ddk::Unbindable>;
 
-class AmlHdmiDevice : public DeviceType, public HdmiIpBase, public fbl::RefCounted<AmlHdmiDevice> {
+class AmlHdmiDevice : public DeviceType, public fbl::RefCounted<AmlHdmiDevice> {
  public:
   // Factory function called by the device manager binding code.
   static zx_status_t Create(zx_device_t* parent);
@@ -40,19 +39,15 @@ class AmlHdmiDevice : public DeviceType, public HdmiIpBase, public fbl::RefCount
 
   // Creates a AmlHdmiDevice with resources injected for unit testing.
   //
-  // `hdmitx_controller_ip_mmio` is the Controller IP register sub-region
-  // of the HDMITX MMIO register region.
-  //
   // `hdmitx_top_level_mmio` is the top-level register sub-region of the
   // HDMITX MMIO register region.
   //
   // The HDMITX register region is defined in Section 8.1 "Memory Map" of
-  // the AMLogic A311D datasheet. Both sub-regions are defined in Section
+  // the AMLogic A311D datasheet. The sub-region is defined in Section
   // 10.2.3.43 "HDMITX Top-Level and HDMI TX Contoller IP Register Access" of
   // the AMLogic A311D datasheet.
-  AmlHdmiDevice(zx_device_t* parent, fdf::MmioBuffer hdmitx_controller_ip_mmio,
-                fdf::MmioBuffer hdmitx_top_level_mmio, std::unique_ptr<hdmi_dw::HdmiDw> hdmi_dw,
-                zx::resource smc);
+  AmlHdmiDevice(zx_device_t* parent, fdf::MmioBuffer hdmitx_top_level_mmio,
+                std::unique_ptr<hdmi_dw::HdmiDw> hdmi_dw, zx::resource smc);
 
   AmlHdmiDevice(const AmlHdmiDevice&) = delete;
   AmlHdmiDevice(AmlHdmiDevice&&) = delete;
@@ -105,8 +100,6 @@ class AmlHdmiDevice : public DeviceType, public HdmiIpBase, public fbl::RefCount
   // The secure monitor call resource `smc_` must be valid.
   zx_status_t InitializeHdcp14();
 
-  void WriteIpReg(uint32_t addr, uint8_t data) override;
-  uint8_t ReadIpReg(uint32_t addr) override;
   void WriteTopLevelReg(uint32_t addr, uint32_t val);
   uint32_t ReadTopLevelReg(uint32_t addr);
 
@@ -117,9 +110,7 @@ class AmlHdmiDevice : public DeviceType, public HdmiIpBase, public fbl::RefCount
   std::unique_ptr<hdmi_dw::HdmiDw> hdmi_dw_ TA_GUARDED(dw_lock_);
   zx::resource smc_;
 
-  fbl::Mutex register_lock_;
-  std::optional<fdf::MmioBuffer> hdmitx_controller_ip_mmio_ TA_GUARDED(register_lock_);
-  std::optional<fdf::MmioBuffer> hdmitx_top_level_mmio_ TA_GUARDED(register_lock_);
+  std::optional<fdf::MmioBuffer> hdmitx_top_level_mmio_;
 
   bool is_powered_up_ = false;
 

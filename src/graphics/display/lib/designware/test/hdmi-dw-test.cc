@@ -165,32 +165,9 @@ constexpr int kI2cmSdaHoldOffset = 0x7e13;
 constexpr int kI2cmScdcReadUpdateOffset = 0x7e14;
 constexpr int kI2cmReadBuff0Offset = 0x7e20;
 
-class FakeHdmiIpBase : public HdmiIpBase {
- public:
-  explicit FakeHdmiIpBase(fdf::MmioBuffer mmio) : HdmiIpBase(), mmio_(std::move(mmio)) {}
-
-  void WriteIpReg(uint32_t addr, uint8_t data) override { mmio_.Write8(data, addr); }
-  uint8_t ReadIpReg(uint32_t addr) override { return mmio_.Read8(addr); }
-
- private:
-  fdf::MmioBuffer mmio_;
-};
-
-class FakeHdmiDw : public HdmiDw {
- public:
-  static std::unique_ptr<FakeHdmiDw> Create(fdf::MmioBuffer mmio) {
-    return std::make_unique<FakeHdmiDw>(std::move(mmio));
-  }
-
-  explicit FakeHdmiDw(fdf::MmioBuffer mmio) : HdmiDw(&base_), base_(std::move(mmio)) {}
-
- private:
-  FakeHdmiIpBase base_;
-};
-
 class HdmiDwTest : public testing::Test {
  public:
-  void SetUp() override { hdmi_dw_ = FakeHdmiDw::Create(mmio_range_.GetMmioBuffer()); }
+  void SetUp() override { hdmi_dw_ = std::make_unique<HdmiDw>(mmio_range_.GetMmioBuffer()); }
 
   void TearDown() override { mmio_range_.CheckAllAccessesReplayed(); }
 
@@ -213,10 +190,10 @@ class HdmiDwTest : public testing::Test {
   }
 
  protected:
-  constexpr static int kMmioRangeSize = 0x10000;
+  constexpr static int kMmioRangeSize = 0x8000;
   ddk_mock::MockMmioRange mmio_range_{kMmioRangeSize, ddk_mock::MockMmioRange::Size::k8};
 
-  std::unique_ptr<FakeHdmiDw> hdmi_dw_;
+  std::unique_ptr<HdmiDw> hdmi_dw_;
 };
 
 TEST_F(HdmiDwTest, InitHwTest) {

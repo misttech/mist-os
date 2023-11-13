@@ -8,7 +8,7 @@
 #include <fidl/fuchsia.hardware.hdmi/cpp/wire.h>
 #include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
 #include <lib/hdmi-dw/color-param.h>
-#include <lib/hdmi/base.h>
+#include <lib/mmio/mmio-buffer.h>
 
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 
@@ -23,7 +23,7 @@ struct hdmi_param_tx {
 
 class HdmiDw {
  public:
-  explicit HdmiDw(HdmiIpBase* base) : base_(base) {}
+  explicit HdmiDw(fdf::MmioBuffer controller_mmio) : controller_mmio_(std::move(controller_mmio)) {}
   virtual ~HdmiDw() = default;
 
   zx_status_t InitHw();
@@ -40,8 +40,8 @@ class HdmiDw {
   void PrintRegisters();
 
  private:
-  void WriteReg(uint32_t addr, uint8_t data) { base_->WriteIpReg(addr, data); }
-  uint8_t ReadReg(uint32_t addr) { return base_->ReadIpReg(addr); }
+  void WriteReg(uint32_t addr, uint8_t data) { controller_mmio_.Write8(data, addr); }
+  uint8_t ReadReg(uint32_t addr) { return controller_mmio_.Read8(addr); }
 
   void PrintReg(std::string name, uint8_t reg);
 
@@ -50,7 +50,10 @@ class HdmiDw {
 
   void ConfigCsc(const ColorParam& color_param);
 
-  HdmiIpBase* base_;
+  // MMIO region for the HDMI Transmitter Controller registers, as defined in
+  // Section 6 "Register Descriptions" (pages 185-508) of Synopsys DesignWare
+  // Cores HDMI Transmitter Controller Databook, v2.12a, dated April 2016.
+  fdf::MmioBuffer controller_mmio_;
 };
 
 }  // namespace hdmi_dw

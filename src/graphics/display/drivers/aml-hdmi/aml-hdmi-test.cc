@@ -5,7 +5,6 @@
 #include "src/graphics/display/drivers/aml-hdmi/aml-hdmi.h"
 
 #include <lib/async-loop/cpp/loop.h>
-#include <lib/hdmi/base.h>
 
 #include <queue>
 
@@ -14,6 +13,7 @@
 #include <gtest/gtest.h>
 #include <mock-mmio-range/mock-mmio-range.h>
 
+#include "src/devices/testing/fake-mmio-reg/include/fake-mmio-reg/fake-mmio-reg.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 #include "src/lib/testing/predicates/status.h"
 
@@ -36,7 +36,8 @@ class AmlHdmiTest;
 
 class FakeHdmiDw : public hdmi_dw::HdmiDw {
  public:
-  explicit FakeHdmiDw(HdmiIpBase* base, AmlHdmiTest* test) : HdmiDw(base), test_(test) {}
+  explicit FakeHdmiDw(AmlHdmiTest* test, fdf::MmioBuffer controller_mmio)
+      : HdmiDw(std::move(controller_mmio)), test_(test) {}
 
   void ConfigHdmitx(const hdmi_dw::ColorParam& color_param, const display::DisplayTiming& mode,
                     const hdmi_dw::hdmi_param_tx& p) override;
@@ -48,16 +49,6 @@ class FakeHdmiDw : public hdmi_dw::HdmiDw {
 
  private:
   AmlHdmiTest* test_;
-};
-
-// Stubbed implementation that drops all register I/O.
-class StubHdmiIpBase : public HdmiIpBase {
- public:
-  StubHdmiIpBase() = default;
-  ~StubHdmiIpBase() override = default;
-
-  void WriteIpReg(uint32_t addr, uint8_t data) override {}
-  uint8_t ReadIpReg(uint32_t addr) override { return 0; }
 };
 
 class FakeAmlHdmiDevice : public AmlHdmiDevice {
@@ -73,8 +64,9 @@ class FakeAmlHdmiDevice : public AmlHdmiDevice {
 
   explicit FakeAmlHdmiDevice(AmlHdmiTest* test, fdf::MmioBuffer controller_ip_mmio,
                              fdf::MmioBuffer top_level_mmio, zx::resource smc)
-      : AmlHdmiDevice(nullptr, std::move(controller_ip_mmio), std::move(top_level_mmio),
-                      std::make_unique<FakeHdmiDw>(&stub_hdmi_ip_base_, test), std::move(smc)) {
+      : AmlHdmiDevice(nullptr, std::move(top_level_mmio),
+                      std::make_unique<FakeHdmiDw>(test, std::move(controller_ip_mmio)),
+                      std::move(smc)) {
     loop_.StartThread("fake-aml-hdmi-test-thread");
   }
 
@@ -83,9 +75,6 @@ class FakeAmlHdmiDevice : public AmlHdmiDevice {
   }
 
  private:
-  // Absorbs all register
-  StubHdmiIpBase stub_hdmi_ip_base_;
-
   async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
   std::optional<fidl::ServerBindingRef<fuchsia_hardware_hdmi::Hdmi>> binding_;
 };
@@ -107,7 +96,6 @@ class AmlHdmiTest : public testing::Test {
 
   void TearDown() override {
     ASSERT_EQ(expected_dw_calls_.size(), 0u);
-    controller_ip_mmio_range_.CheckAllAccessesReplayed();
     top_level_mmio_range_.CheckAllAccessesReplayed();
   }
 
@@ -124,9 +112,12 @@ class AmlHdmiTest : public testing::Test {
   void ExpectHdmiDwSetFcScramblerCtrl() { expected_dw_calls_.push(HdmiDwFn::kSetFcScramblerCtrl); }
 
  protected:
-  constexpr static int kControllerIpMmioRangeSize = 0x8000;
-  ddk_mock::MockMmioRange controller_ip_mmio_range_{kControllerIpMmioRangeSize,
-                                                    ddk_mock::MockMmioRange::Size::k32};
+  // This test doesn't check the register read / write operations on the
+  // Controller IP region (which should be covered by hdmi-dw tests); so we
+  // use a `FakeMmioRegRegion` for this region.
+  constexpr static size_t kControllerIpMmioRegCount = 0x8000;
+  ddk_fake::FakeMmioRegRegion controller_ip_mmio_range_{/*reg_size=*/1, kControllerIpMmioRegCount};
+
   constexpr static int kTopLevelMmioRangeSize = 0x8000;
   ddk_mock::MockMmioRange top_level_mmio_range_{kTopLevelMmioRangeSize,
                                                 ddk_mock::MockMmioRange::Size::k32};

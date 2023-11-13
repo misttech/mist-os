@@ -9,6 +9,8 @@
 #include <lib/ddk/platform-defs.h>
 #include <lib/fidl/epitaph.h>
 #include <lib/hdmi-dw/color-param.h>
+#include <lib/hdmi-dw/hdmi-dw.h>
+#include <lib/mmio/mmio-buffer.h>
 #include <lib/zx/resource.h>
 #include <zircon/assert.h>
 #include <zircon/status.h>
@@ -34,26 +36,19 @@
 
 namespace aml_hdmi {
 
-void AmlHdmiDevice::WriteIpReg(uint32_t addr, uint8_t data) {
-  fbl::AutoLock lock(&register_lock_);
-  hdmitx_controller_ip_mmio_->Write8(data, addr);
-}
-uint8_t AmlHdmiDevice::ReadIpReg(uint32_t addr) {
-  fbl::AutoLock lock(&register_lock_);
-  return hdmitx_controller_ip_mmio_->Read8(addr);
-}
-
 void AmlHdmiDevice::WriteTopLevelReg(uint32_t addr, uint32_t val) {
-  fbl::AutoLock lock(&register_lock_);
   hdmitx_top_level_mmio_->Write32(val, addr);
 }
 
 uint32_t AmlHdmiDevice::ReadTopLevelReg(uint32_t addr) {
-  fbl::AutoLock lock(&register_lock_);
   return hdmitx_top_level_mmio_->Read32(addr);
 }
 
 zx_status_t AmlHdmiDevice::Bind() {
+  // TODO(fxbug.dev/132267): Use the builder / factory pattern instead
+  // of multiple stateful steps (such as Create() and Bind()) when
+  // initializing the device.
+
   if (!pdev_.is_valid()) {
     zxlogf(ERROR, "Could not get ZX_PROTOCOL_PDEV protocol");
     return ZX_ERR_NO_RESOURCES;
@@ -61,11 +56,16 @@ zx_status_t AmlHdmiDevice::Bind() {
 
   // Map registers
   static constexpr uint32_t kHdmitxControllerIpIndex = 0;
-  zx_status_t status = pdev_.MapMmio(kHdmitxControllerIpIndex, &hdmitx_controller_ip_mmio_);
+  std::optional<fdf::MmioBuffer> hdmitx_controller_ip_mmio;
+  zx_status_t status = pdev_.MapMmio(kHdmitxControllerIpIndex, &hdmitx_controller_ip_mmio);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Could not map MMIO HDMITX Controller IP registers: %s",
            zx_status_get_string(status));
     return status;
+  }
+  {
+    fbl::AutoLock dw_lock(&dw_lock_);
+    hdmi_dw_ = std::make_unique<hdmi_dw::HdmiDw>(std::move(*hdmitx_controller_ip_mmio));
   }
 
   static constexpr uint32_t kHdmitxTopLevelIndex = 1;
@@ -382,19 +382,14 @@ zx_status_t AmlHdmiDevice::Create(zx_device_t* parent) {
 }
 
 AmlHdmiDevice::AmlHdmiDevice(zx_device_t* parent)
-    : DeviceType(parent),
-      pdev_(parent),
-      hdmi_dw_(std::make_unique<hdmi_dw::HdmiDw>(this)),
-      loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {}
+    : DeviceType(parent), pdev_(parent), loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {}
 
-AmlHdmiDevice::AmlHdmiDevice(zx_device_t* parent, fdf::MmioBuffer hdmitx_controller_ip_mmio,
-                             fdf::MmioBuffer hdmitx_top_level_mmio,
+AmlHdmiDevice::AmlHdmiDevice(zx_device_t* parent, fdf::MmioBuffer hdmitx_top_level_mmio,
                              std::unique_ptr<hdmi_dw::HdmiDw> hdmi_dw, zx::resource smc)
     : DeviceType(parent),
       pdev_(parent),
       hdmi_dw_(std::move(hdmi_dw)),
       smc_(std::move(smc)),
-      hdmitx_controller_ip_mmio_(std::move(hdmitx_controller_ip_mmio)),
       hdmitx_top_level_mmio_(std::move(hdmitx_top_level_mmio)),
       loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {
   ZX_DEBUG_ASSERT(hdmi_dw_);

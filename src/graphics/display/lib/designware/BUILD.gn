@@ -18,8 +18,8 @@ source_set("hdmi-dw") {
   deps = [
     "//sdk/banjo/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.hdmi:fuchsia.hardware.hdmi_cpp",
+    "//src/devices/lib/mmio",
     "//src/graphics/display/lib/api-types-cpp",
-    "//src/graphics/display/lib/hdmi",
     "//src/lib/ddk",
   ]
 
