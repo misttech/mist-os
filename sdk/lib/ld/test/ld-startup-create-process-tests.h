@@ -8,6 +8,7 @@
 #include <lib/elfldltl/layout.h>
 #include <lib/elfldltl/testing/loader.h>
 #include <lib/ld/testing/test-processargs.h>
+#include <lib/ld/testing/test-vmo.h>
 #include <lib/zx/thread.h>
 #include <lib/zx/vmar.h>
 #include <lib/zx/vmo.h>
@@ -36,8 +37,6 @@ class LdStartupCreateProcessTestsBase : public LdLoadZirconProcessTestsBase {
   TestProcessArgs& bootstrap() { return procargs_; }
 
  protected:
-  static zx::unowned_vmo GetVdsoVmo();
-
   const zx::vmar& root_vmar() { return root_vmar_; }
 
   void set_entry(uintptr_t entry) { entry_ = entry; }

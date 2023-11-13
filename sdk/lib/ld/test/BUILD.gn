@@ -98,6 +98,7 @@ source_set("load-tests") {
       "ld-startup-spawn-process-tests-zircon.h",
     ]
     deps += [
+      "..:ld-stub.basic",
       "../testing",
       "//sdk/lib/fdio",
       "//zircon/system/ulib/zx",

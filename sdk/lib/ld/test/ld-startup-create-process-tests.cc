@@ -6,16 +6,10 @@
 
 #include <lib/zx/job.h>
 #include <zircon/process.h>
-#include <zircon/processargs.h>
 
 #include <gtest/gtest.h>
 
 namespace ld::testing {
-
-zx::unowned_vmo LdStartupCreateProcessTestsBase::GetVdsoVmo() {
-  static const zx::vmo vdso{zx_take_startup_handle(PA_HND(PA_VMO_VDSO, 0))};
-  return vdso.borrow();
-}
 
 void LdStartupCreateProcessTestsBase::Init(std::initializer_list<std::string_view> args) {
   std::string_view name = process_name();

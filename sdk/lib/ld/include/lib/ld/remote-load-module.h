@@ -64,16 +64,16 @@ struct RemoteLoadModule : public RemoteLoadModuleBase,
   // loading. Return a `DecodeResult` containing information about this
   // module's dependencies.
   template <class Diagnostics>
-  DecodeResult Decode(Diagnostics& diag, zx::vmo vmo) {
+  std::optional<DecodeResult> Decode(Diagnostics& diag, zx::vmo vmo) {
     if (!InitMappedVmo(diag, std::move(vmo))) [[unlikely]] {
-      return {};
+      return std::nullopt;
     }
 
     // Read the file header and program headers into stack buffers.
     auto headers = elfldltl::LoadHeadersFromFile<elfldltl::Elf<>>(
         diag, mapped_vmo_, elfldltl::NoArrayFromFile<Phdr>{});
     if (!headers) [[unlikely]] {
-      return {};
+      return std::nullopt;
     }
 
     // Decode phdrs to fill LoadInfo, BuildId, etc.
@@ -87,7 +87,7 @@ struct RemoteLoadModule : public RemoteLoadModuleBase,
                               elfldltl::Elf<>{}, mapped_vmo_, elfldltl::NoArrayFromFile<Phdr>{},
                               elfldltl::ObserveBuildIdNote(build_id, true)));
     if (!result) [[unlikely]] {
-      return {};
+      return std::nullopt;
     }
 
     auto [dyn_phdr, tls_phdr, stack_size] = *result;
@@ -107,15 +107,38 @@ struct RemoteLoadModule : public RemoteLoadModuleBase,
 
     auto needed = DecodeDynamic(diag, dyn_phdr);
     if (!needed) {
-      return {};
+      return std::nullopt;
     }
 
     return DecodeResult{
-        .needed = std::move(*needed), .relative_entry = ehdr.entry, .stack_size = stack_size};
+        .needed = std::move(*needed),
+        .relative_entry = ehdr.entry,
+        .stack_size = stack_size,
+    };
+  }
+
+  template <class Diagnostics, typename GetDepVmo>
+  static List LinkModules(Diagnostics& diag, std::unique_ptr<RemoteLoadModule> main_executable,
+                          std::vector<Soname> executable_needed, GetDepVmo&& get_dep_vmo) {
+    main_executable->module().symbols_visible = true;
+
+    List modules;
+    modules.push_back(std::move(main_executable));
+
+    if (!DecodeDeps(diag, modules, executable_needed, std::forward<GetDepVmo>(get_dep_vmo)))
+        [[unlikely]] {
+      diag.FormatError("remote dynamic linking failed with ", diag.errors(), " errors and ",
+                       diag.warnings(), " warnings");
+      return {};
+    }
+
+    // TODO(fxbug.dev/134320): Populate ABI.
+
+    return modules;
   }
 
  private:
-  // Decode dynamic sections and store the metadata scanned by observers.
+  // Decode dynamic sections and store the metadata collected from observers.
   // A vector of each DT_NEEDED entry string name is returned.
   template <class Diagnostics>
   std::optional<std::vector<Soname>> DecodeDynamic(
@@ -158,6 +181,51 @@ struct RemoteLoadModule : public RemoteLoadModuleBase,
     return needed_names;
   }
 
+  static void EnqueueDeps(List& modules, const std::vector<Soname>& needed) {
+    for (auto soname : needed) {
+      if (std::find(modules.begin(), modules.end(), soname) == modules.end()) {
+        modules.push_back(std::make_unique<RemoteLoadModule>(soname));
+      }
+    }
+  }
+
+  // `get_dep_vmo` takes a `string_view` and should return a `zx::vmo`.
+  template <class Diagnostics, typename GetDepVmo>
+  static bool DecodeDeps(Diagnostics& diag, List& modules, std::vector<Soname>& needed,
+                         GetDepVmo&& get_dep_vmo) {
+    // Note, this assumes that ModuleList iterators are not invalidated after
+    // push_back(), done by `EnqueueDeps`. This is true of Lists. No assumptions
+    // are made on the validity of the end() iterator, so it is checked at every
+    // iteration.
+    for (auto it = modules.begin(); it != modules.end(); it++) {
+      if (it->HasModule()) {
+        // Only the main executable should already be decoded before this loop
+        // reaches it.
+        assert(it == modules.begin());
+      } else {
+        auto vmo = get_dep_vmo(it->name());
+        if (!vmo) [[unlikely]] {
+          // If the dep is not found, report the missing dependency, and defer
+          // to the diagnostics policy on whether to continue processing.
+          if (!diag.MissingDependency(it->name().str())) {
+            return false;
+          }
+          continue;
+        }
+        auto result = it->Decode(diag, std::move(vmo));
+        if (!result) [[unlikely]] {
+          return false;
+        }
+        needed = result->needed;
+      }
+
+      it->EnqueueDeps(modules, needed);
+
+      // TODO(fxbug.dev/134320): Add to Passive ABI.
+    }
+    return true;
+  }
+
   // Create and return a memory-adaptor object that serves as a wrapper
   // around this module's LoadInfo and MappedVmoFile. This is used to
   // translate vaddrs into file-relative offsets in order to read from the VMO.
@@ -174,7 +242,6 @@ struct RemoteLoadModule : public RemoteLoadModuleBase,
     return true;
   }
 
-  Loader loader_;
   elfldltl::MappedVmoFile mapped_vmo_;
   zx::vmo vmo_;
 };

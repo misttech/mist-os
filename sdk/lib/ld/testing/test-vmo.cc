@@ -1,0 +1,17 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+#include "lib/ld/testing/test-vmo.h"
+
+#include <lib/zx/process.h>
+#include <zircon/processargs.h>
+
+namespace ld::testing {
+
+zx::unowned_vmo GetVdsoVmo() {
+  static const zx::vmo vdso{zx_take_startup_handle(PA_HND(PA_VMO_VDSO, 0))};
+  return vdso.borrow();
+}
+
+}  // namespace ld::testing

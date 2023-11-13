@@ -96,7 +96,7 @@ class LoadModule {
     return name == name_ || (module_ && name == module_->soname);
   }
 
-  constexpr bool HasModule() const { return module_; }
+  constexpr bool HasModule() const { return static_cast<bool>(module_); }
 
   // This should be used only after EmplaceModule or (successful) NewModule.
   constexpr Module& module() {

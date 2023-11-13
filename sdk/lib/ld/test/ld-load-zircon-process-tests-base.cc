@@ -5,6 +5,7 @@
 #include "ld-load-zircon-process-tests-base.h"
 
 #include <lib/elfldltl/machine.h>
+#include <zircon/processargs.h>
 
 #include <gtest/gtest.h>
 
