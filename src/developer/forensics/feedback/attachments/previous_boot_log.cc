@@ -22,7 +22,6 @@ PreviousBootLog::PreviousBootLog(async_dispatcher_t* dispatcher, timekeeper::Clo
       is_file_deleted_(false),
       path_(std::move(path)) {
   if (!delete_previous_boot_log_at.has_value()) {
-    is_file_deleted_ = true;
     return;
   }
 

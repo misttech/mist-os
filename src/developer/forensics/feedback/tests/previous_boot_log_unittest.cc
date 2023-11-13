@@ -8,6 +8,7 @@
 
 #include "src/developer/forensics/feedback/attachments/types.h"
 #include "src/developer/forensics/testing/gmatchers.h"
+#include "src/developer/forensics/testing/gpretty_printers.h"
 #include "src/developer/forensics/testing/unit_test_fixture.h"
 #include "src/developer/forensics/utils/errors.h"
 #include "src/lib/files/directory.h"
@@ -55,9 +56,16 @@ TEST_F(PreviousBootLogTest, PreviousBootLogDeletedAfterDeviceUptimeThresholdReac
   EXPECT_TRUE(files::IsFile(path));
 
   PreviousBootLog previous_boot_log_(dispatcher(), Clock(), zx::sec(5), path);
-  previous_boot_log_.Get(kTicket);
+  EXPECT_TRUE(files::IsFile(path));
 
   RunLoopFor(zx::sec(5));
+
+  GetExecutor().schedule_task(previous_boot_log_.Get(kTicket)
+                                  .and_then([](const AttachmentValue& result) {
+                                    ASSERT_TRUE(result.HasError());
+                                    EXPECT_EQ(result.Error(), Error::kCustom);
+                                  })
+                                  .or_else([] { FX_LOGS(FATAL) << "Logic error"; }));
 
   // Check that the file is deleted after 5 seconds.
   EXPECT_FALSE(files::IsFile(path));
@@ -90,7 +98,12 @@ TEST_F(PreviousBootLogTest, NoPreviousBootLog) {
 
   PreviousBootLog previous_boot_log_(dispatcher(), Clock(),
                                      /*delete_previous_boot_log_at=*/std::nullopt, path);
-  previous_boot_log_.Get(kTicket);
+  GetExecutor().schedule_task(previous_boot_log_.Get(kTicket)
+                                  .and_then([](const AttachmentValue& result) {
+                                    ASSERT_TRUE(result.HasError());
+                                    EXPECT_EQ(result.Error(), Error::kMissingValue);
+                                  })
+                                  .or_else([] { FX_LOGS(FATAL) << "Logic error"; }));
 
   // Arbitrarily run for 25 hours.
   RunLoopFor(zx::hour(25));
