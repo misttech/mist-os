@@ -53,8 +53,14 @@ namespace {
 constexpr auto kOpenFlags = fio::wire::OpenFlags::kRightReadable |
                             fio::wire::OpenFlags::kRightExecutable |
                             fio::wire::OpenFlags::kNotDirectory;
-constexpr auto kVmoFlags = fio::wire::VmoFlags::kRead | fio::wire::VmoFlags::kExecute;
+constexpr auto kVmoFlags =
+    fio::wire::VmoFlags::kRead | fio::wire::VmoFlags::kExecute | fio::wire::VmoFlags::kPrivateClone;
 constexpr auto kLibDriverPath = "/pkg/driver/compat.so";
+
+std::string_view GetFilename(std::string_view path) {
+  size_t index = path.rfind('/');
+  return index == std::string_view::npos ? path : path.substr(index + 1);
+}
 
 zx::result<zx::vmo> LoadVmo(fdf::Namespace& ns, const char* path,
                             fuchsia_io::wire::OpenFlags flags) {
@@ -339,6 +345,15 @@ void Driver::Start(fdf::StartCompleter completer) {
     FDF_LOGL(ERROR, *logger_, "Failed to open driver vmo: %s", driver_vmo.status_string());
     completer(loader_vmo.take_error());
     return;
+  }
+
+  // Give the driver's VMO a name.
+  std::string_view vmo_name = GetFilename(driver_path_);
+  if (zx_status_t status = driver_vmo->set_property(ZX_PROP_NAME, vmo_name.data(), vmo_name.size());
+      status != ZX_OK) {
+    LOGF(ERROR, "Failed to name driver's DFv1 vmo '%s': %s", std::string(vmo_name).c_str(),
+         zx_status_get_string(status));
+    // We don't need to exit on this error, there will just be less debugging information.
   }
 
   if (zx::result result = LoadDriver(std::move(loader_vmo.value()), std::move(driver_vmo.value()));
