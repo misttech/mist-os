@@ -1,6 +1,6 @@
 # Driver unit testing tutorial
 
-This guide provides a detailed understanding of the testing libraries and how
+This guide provides a detailed understanding of the Driver Framework v2 testing libraries and how
 to use them including the
 [DriverRuntime](/docs/development/sdk/driver-testing/driver-testing-reference.md#driverruntime),
 [TestNode](/docs/development/sdk/driver-testing/driver-testing-reference.md#testnode),
