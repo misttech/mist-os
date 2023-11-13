@@ -8,9 +8,16 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/component/cpp/composite_node_spec.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zx/time.h>
 
+#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/platform/cpp/bind.h>
+#include <bind/fuchsia/register/cpp/bind.h>
 #include <fbl/algorithm.h>
 #include <soc/aml-common/aml-registers.h>
 #include <soc/aml-common/aml-spi.h>
@@ -19,8 +26,6 @@
 
 #include "nelson-gpios.h"
 #include "nelson.h"
-#include "src/devices/board/drivers/nelson/spi_0_bind.h"
-#include "src/devices/board/drivers/nelson/spi_1_bind.h"
 #include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 #include "src/devices/lib/fidl-metadata/spi.h"
 
@@ -34,9 +39,47 @@
 #define spicc1_clk_en (1 << 22)
 #define spicc1_clk_div(x) (((x)-1) << 16)
 
+namespace fdf {
+using namespace fuchsia_driver_framework;
+}  // namespace fdf
+
 namespace nelson {
 namespace fpbus = fuchsia_hardware_platform_bus;
 using spi_channel_t = fidl_metadata::spi::Channel;
+
+fdf::wire::CompositeNodeSpec MakeSpiCompositeNodeSpec(fidl::AnyArena& fidl_arena, std::string name,
+                                                      uint32_t gpio_pin, std::string gpio_function,
+                                                      uint32_t register_id) {
+  const std::vector kGpioSpiRules = {
+      fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                              bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, gpio_pin),
+  };
+
+  const std::vector kGpioSpiProperties = {
+      fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+      fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, gpio_function),
+  };
+
+  const std::vector kResetRegisterRules = {
+      fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                              bind_fuchsia_register::BIND_FIDL_PROTOCOL_DEVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia::REGISTER_ID, register_id),
+  };
+
+  const std::vector kResetRegisterProperties = {
+      fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                        bind_fuchsia_register::BIND_FIDL_PROTOCOL_DEVICE),
+      fdf::MakeProperty(bind_fuchsia::REGISTER_ID, register_id),
+  };
+
+  const std::vector<fdf::ParentSpec> parents = {
+      {kGpioSpiRules, kGpioSpiProperties},
+      {kResetRegisterRules, kResetRegisterProperties},
+  };
+
+  return fidl::ToWire(fidl_arena, fdf::CompositeNodeSpec{{.name = name, .parents = parents}});
+}
 
 zx_status_t Nelson::SpiInit() {
   constexpr uint32_t kSpiccClkValue =
@@ -107,9 +150,9 @@ zx_status_t Nelson::Spi0Init() {
 
   fpbus::Node spi_0_dev;
   spi_0_dev.name() = "spi-0";
-  spi_0_dev.vid() = PDEV_VID_AMLOGIC;
-  spi_0_dev.pid() = PDEV_PID_GENERIC;
-  spi_0_dev.did() = PDEV_DID_AMLOGIC_SPI;
+  spi_0_dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
+  spi_0_dev.pid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC;
+  spi_0_dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_SPI;
   spi_0_dev.instance_id() = 0;
   spi_0_dev.mmio() = spi_0_mmios;
   spi_0_dev.irq() = spi_0_irqs;
@@ -157,18 +200,19 @@ zx_status_t Nelson::Spi0Init() {
 
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('SPI0');
-  auto result = pbus_.buffer(arena)->AddComposite(
+  auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, spi_0_dev),
-      platform_bus_composite::MakeFidlFragment(fidl_arena, spi_0_fragments,
-                                               std::size(spi_0_fragments)),
-      "gpio-cs-0");
+      MakeSpiCompositeNodeSpec(
+          fidl_arena, "spi_0", /* gpio_pin */ GPIO_SOC_SPI_A_SS0,
+          /* gpio_function */ bind_fuchsia_gpio::FUNCTION_SPICC0_SS0,
+          /* register_id */ bind_fuchsia_amlogic_platform::BIND_REGISTER_ID_SPICC0_RESET));
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddComposite Spi0(spi_0_dev) request failed: %s", __func__,
+    zxlogf(ERROR, "AddCompositeNodeSpec Spi0(spi_0_dev) request failed: %s",
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddComposite Spi0(spi_0_dev) failed: %s", __func__,
+    zxlogf(ERROR, "AddCompositeNodeSpec Spi0(spi_0_dev) failed: %s",
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }
@@ -225,9 +269,9 @@ zx_status_t Nelson::Spi1Init() {
 
   fpbus::Node spi_1_dev;
   spi_1_dev.name() = "spi-1";
-  spi_1_dev.vid() = PDEV_VID_AMLOGIC;
-  spi_1_dev.pid() = PDEV_PID_GENERIC;
-  spi_1_dev.did() = PDEV_DID_AMLOGIC_SPI;
+  spi_1_dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
+  spi_1_dev.pid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC;
+  spi_1_dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_SPI;
   spi_1_dev.instance_id() = 1;
   spi_1_dev.mmio() = spi_1_mmios;
   spi_1_dev.irq() = spi_1_irqs;
@@ -274,18 +318,19 @@ zx_status_t Nelson::Spi1Init() {
 
   fdf::Arena arena('SPI1');
   fidl::Arena<> fidl_arena;
-  auto result = pbus_.buffer(arena)->AddComposite(
+  auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, spi_1_dev),
-      platform_bus_composite::MakeFidlFragment(fidl_arena, spi_1_fragments,
-                                               std::size(spi_1_fragments)),
-      "gpio-cs-0");
+      MakeSpiCompositeNodeSpec(
+          fidl_arena, "spi_1", /* gpio_pin */ GPIO_SOC_SPI_B_SS0,
+          /* gpio_function */ bind_fuchsia_gpio::FUNCTION_SPICC1_SS0,
+          /* register_id */ bind_fuchsia_amlogic_platform::BIND_REGISTER_ID_SPICC1_RESET));
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddComposite Spi0(spi_1_dev) request failed: %s", __func__,
+    zxlogf(ERROR, "AddCompositeNodeSpec Spi1(spi_1_dev) request failed: %s",
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddComposite Spi0(spi_1_dev) failed: %s", __func__,
+    zxlogf(ERROR, "AddCompositeNodeSpec Spi1(spi_1_dev) failed: %s",
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }

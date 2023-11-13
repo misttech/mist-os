@@ -8,8 +8,15 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/component/cpp/composite_node_spec.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/mmio/mmio.h>
 
+#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/platform/cpp/bind.h>
+#include <bind/fuchsia/register/cpp/bind.h>
 #include <fbl/algorithm.h>
 #include <soc/aml-common/aml-registers.h>
 #include <soc/aml-common/aml-spi.h>
@@ -17,7 +24,6 @@
 
 #include "sherlock-gpios.h"
 #include "sherlock.h"
-#include "src/devices/board/drivers/sherlock/sherlock-spi-bind.h"
 #include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 #include "src/devices/lib/fidl-metadata/spi.h"
 
@@ -25,6 +31,10 @@
 #define spicc_0_clk_sel_fclk_div3 (3 << 7)
 #define spicc_0_clk_en (1 << 6)
 #define spicc_0_clk_div(x) ((x)-1)
+
+namespace fdf {
+using namespace fuchsia_driver_framework;
+}  // namespace fdf
 
 namespace sherlock {
 namespace fpbus = fuchsia_hardware_platform_bus;
@@ -63,6 +73,31 @@ static const amlogic_spi::amlspi_config_t spi_config = {
     .use_enhanced_clock_mode = true,
 };
 
+const std::vector kGpioSpiRules = {
+    fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                            bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+    fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(GPIO_SPICC0_SS0)),
+};
+
+const std::vector kGpioSpiProperties = {
+    fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+    fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_SPICC0_SS0),
+};
+
+const std::vector kResetRegisterRules = {
+    fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                            bind_fuchsia_register::BIND_FIDL_PROTOCOL_DEVICE),
+    fdf::MakeAcceptBindRule(bind_fuchsia::REGISTER_ID,
+                            bind_fuchsia_amlogic_platform::BIND_REGISTER_ID_SPICC0_RESET),
+};
+
+const std::vector kResetRegisterProperties = {
+    fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                      bind_fuchsia_register::BIND_FIDL_PROTOCOL_DEVICE),
+    fdf::MakeProperty(bind_fuchsia::REGISTER_ID,
+                      bind_fuchsia_amlogic_platform::BIND_REGISTER_ID_SPICC0_RESET),
+};
+
 zx_status_t Sherlock::SpiInit() {
   // setup pinmux for the SPI bus
   // SPI_A
@@ -98,9 +133,9 @@ zx_status_t Sherlock::SpiInit() {
 
   fpbus::Node spi_dev;
   spi_dev.name() = "spi-0";
-  spi_dev.vid() = PDEV_VID_AMLOGIC;
-  spi_dev.pid() = PDEV_PID_GENERIC;
-  spi_dev.did() = PDEV_DID_AMLOGIC_SPI;
+  spi_dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
+  spi_dev.pid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC;
+  spi_dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_SPI;
   spi_dev.mmio() = spi_mmios;
   spi_dev.irq() = spi_irqs;
 
@@ -128,20 +163,23 @@ zx_status_t Sherlock::SpiInit() {
                  HHI_SPICC_CLK_CNTL);
   }
 
+  auto parents = std::vector<fdf::ParentSpec>{
+      {kGpioSpiRules, kGpioSpiProperties},
+      {kResetRegisterRules, kResetRegisterProperties},
+  };
+
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('SPI_');
-  auto result = pbus_.buffer(arena)->AddComposite(
+  auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, spi_dev),
-      platform_bus_composite::MakeFidlFragment(fidl_arena, spi_0_fragments,
-                                               std::size(spi_0_fragments)),
-      "gpio-cs-0");
+      fidl::ToWire(fidl_arena, fdf::CompositeNodeSpec{{.name = "spi_0", .parents = parents}}));
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddComposite Spi(spi_dev) request failed: %s", __func__,
+    zxlogf(ERROR, "AddCompositeNodeSpec Spi(spi_dev) request failed: %s",
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddComposite Spi(spi_dev) failed: %s", __func__,
+    zxlogf(ERROR, "AddCompositeNodeSpec Spi(spi_dev) failed: %s",
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }
