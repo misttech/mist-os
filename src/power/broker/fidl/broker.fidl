@@ -96,7 +96,8 @@ open protocol Lessor {
 };
 
 type PowerLevelError = flexible enum {
-    NOT_FOUND = 0;
+    NOT_AUTHORIZED = 0;
+    NOT_FOUND = 1;
 };
 
 /// Offered by the Power Broker to components (including drivers).
@@ -104,7 +105,9 @@ type PowerLevelError = flexible enum {
 open protocol Status {
     /// Made by a component to get the current power level of an element.
     flexible GetPowerLevel(resource struct {
-        element ElementId;
+        /// Must supply a token to a previously registered Credential with
+        /// Permissions.READ_POWER_LEVEL.
+        token zx.Handle:EVENTPAIR;
     }) -> (resource struct {
         cur_level PowerLevel;
     }) error PowerLevelError;
@@ -113,7 +116,9 @@ open protocol Status {
     /// Request is made as a hanging GET which only returns if the new level
     /// has changed from the previous cur_level.
     flexible WatchPowerLevel(resource struct {
-        element ElementId;
+        /// Must supply a token to a previously registered Credential with
+        /// Permissions.READ_POWER_LEVEL.
+        token zx.Handle:EVENTPAIR;
         last_level PowerLevel;
     }) -> (resource struct {
         new_level PowerLevel;

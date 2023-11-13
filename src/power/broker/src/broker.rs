@@ -3,9 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Error};
-use fidl_fuchsia_power_broker::{
-    self as fpb, BinaryPowerLevel, Permissions, PowerLevel, PowerLevelError,
-};
+use fidl_fuchsia_power_broker::{self as fpb, BinaryPowerLevel, Permissions, PowerLevel};
 use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -30,11 +28,17 @@ impl Broker {
         self.catalog.topology.lookup_credentials(token)
     }
 
-    pub fn get_current_level(&self, id: &ElementID) -> Result<PowerLevel, PowerLevelError> {
-        if let Some(level) = self.current.get(id) {
+    pub fn get_current_level(&self, token: Token) -> Result<PowerLevel, fpb::PowerLevelError> {
+        let Some(credential) = self.lookup_credentials(token) else {
+            return Err(fpb::PowerLevelError::NotAuthorized);
+        };
+        if !credential.contains(Permissions::READ_POWER_LEVEL) {
+            return Err(fpb::PowerLevelError::NotAuthorized);
+        }
+        if let Some(level) = self.current.get(credential.get_element()) {
             Ok(level)
         } else {
-            Err(PowerLevelError::NotFound)
+            Err(fpb::PowerLevelError::NotFound)
         }
     }
 
@@ -85,11 +89,17 @@ impl Broker {
         Ok(())
     }
 
-    pub fn subscribe_current_level(
+    pub fn watch_current_level(
         &mut self,
-        id: &ElementID,
-    ) -> UnboundedReceiver<Option<PowerLevel>> {
-        self.current.subscribe(id)
+        token: Token,
+    ) -> Result<UnboundedReceiver<Option<PowerLevel>>, fpb::PowerLevelError> {
+        let Some(credential) = self.lookup_credentials(token) else {
+            return Err(fpb::PowerLevelError::NotAuthorized);
+        };
+        if !credential.contains(Permissions::READ_POWER_LEVEL) {
+            return Err(fpb::PowerLevelError::NotAuthorized);
+        }
+        Ok(self.current.subscribe(credential.get_element()))
     }
 
     #[allow(dead_code)]
@@ -153,23 +163,21 @@ impl Broker {
                 .topology
                 .get_direct_deps(&claim.dependency.requires)
                 .into_iter()
-                .try_for_each(|dep: Dependency| {
-                    match self.get_current_level(&dep.requires.element) {
-                        Ok(current) => {
-                            if !current.satisfies(&dep.requires.level) {
-                                Err(anyhow!(
-                                    "element {:?} at {:?}, requires {:?}",
-                                    &dep.requires.element,
-                                    &current,
-                                    &dep.requires.level
-                                ))
-                            } else {
-                                tracing::debug!("dep {:?} satisfied", dep);
-                                Ok(())
-                            }
+                .try_for_each(|dep: Dependency| match self.current.get(&dep.requires.element) {
+                    Some(current) => {
+                        if !current.satisfies(&dep.requires.level) {
+                            Err(anyhow!(
+                                "element {:?} at {:?}, requires {:?}",
+                                &dep.requires.element,
+                                &current,
+                                &dep.requires.level
+                            ))
+                        } else {
+                            tracing::debug!("dep {:?} satisfied", dep);
+                            Ok(())
                         }
-                        Err(err) => Err(anyhow!(": {:?}", err)),
                     }
+                    None => Err(anyhow!("no current level for element")),
                 });
             // If there were any errors, some dependencies are not satisfied,
             // so we can't activate this claim.
@@ -1363,5 +1371,98 @@ mod tests {
             missing_permissions_res,
             Err(fpb::UpdateCurrentPowerLevelError::NotAuthorized { .. })
         ));
+    }
+
+    #[fuchsia::test]
+    fn test_get_current_level_credentials() {
+        let mut broker = Broker::new();
+        let (dilithium_modify_only_token, dilithium_modify_only_broker_token) =
+            zx::EventPair::create();
+        let dilithium_modify_only_cred = CredentialToRegister {
+            broker_token: dilithium_modify_only_broker_token.into(),
+            permissions: Permissions::MODIFY_POWER_LEVEL,
+        };
+        let (dilithium_read_only_token, dilithium_broker_read_only_token) = zx::EventPair::create();
+        let dilithium_read_only_cred = CredentialToRegister {
+            broker_token: dilithium_broker_read_only_token.into(),
+            permissions: Permissions::READ_POWER_LEVEL,
+        };
+        broker
+            .add_element("Dilithium", vec![dilithium_modify_only_cred, dilithium_read_only_cred])
+            .expect("add_element failed");
+
+        // Set the current level so it can be read.
+        broker
+            .update_current_level(
+                dilithium_modify_only_token
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                &PowerLevel::Binary(BinaryPowerLevel::On),
+            )
+            .expect("update_current_level failed");
+
+        assert_eq!(
+            broker
+                .get_current_level(dilithium_read_only_token.into())
+                .expect("get_current_level failed"),
+            PowerLevel::Binary(BinaryPowerLevel::On)
+        );
+
+        let (missing_token, _) = zx::EventPair::create();
+        let missing_token_res = broker.get_current_level(missing_token.into());
+        assert!(matches!(missing_token_res, Err(fpb::PowerLevelError::NotAuthorized { .. })));
+
+        let missing_permissions_res = broker.get_current_level(dilithium_modify_only_token.into());
+        assert!(matches!(missing_permissions_res, Err(fpb::PowerLevelError::NotAuthorized { .. })));
+    }
+
+    #[fuchsia::test]
+    async fn test_watch_current_level_credentials() {
+        let mut broker = Broker::new();
+        let (dilithium_modify_only_token, dilithium_modify_only_broker_token) =
+            zx::EventPair::create();
+        let dilithium_modify_only_cred = CredentialToRegister {
+            broker_token: dilithium_modify_only_broker_token.into(),
+            permissions: Permissions::MODIFY_POWER_LEVEL,
+        };
+        let (dilithium_read_only_token, dilithium_broker_read_only_token) = zx::EventPair::create();
+        let dilithium_read_only_cred = CredentialToRegister {
+            broker_token: dilithium_broker_read_only_token.into(),
+            permissions: Permissions::READ_POWER_LEVEL,
+        };
+        broker
+            .add_element("Dilithium", vec![dilithium_modify_only_cred, dilithium_read_only_cred])
+            .expect("add_element failed");
+
+        // Set the current level so it can be read.
+        broker
+            .update_current_level(
+                dilithium_modify_only_token
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                &PowerLevel::Binary(BinaryPowerLevel::On),
+            )
+            .expect("update_current_level failed");
+
+        use futures::StreamExt;
+        assert_eq!(
+            broker
+                .watch_current_level(dilithium_read_only_token.into())
+                .expect("watch_current_level failed")
+                .next()
+                .await
+                .unwrap(),
+            Some(PowerLevel::Binary(BinaryPowerLevel::On))
+        );
+
+        let (missing_token, _) = zx::EventPair::create();
+        let missing_token_res = broker.watch_current_level(missing_token.into());
+        assert!(matches!(missing_token_res, Err(fpb::PowerLevelError::NotAuthorized { .. })));
+
+        let missing_permissions_res =
+            broker.watch_current_level(dilithium_modify_only_token.into());
+        assert!(matches!(missing_permissions_res, Err(fpb::PowerLevelError::NotAuthorized { .. })));
     }
 }

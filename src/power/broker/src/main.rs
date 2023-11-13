@@ -38,26 +38,31 @@ impl BrokerSvc {
             .map(|result| result.context("failed request"))
             .try_for_each(|request| async move {
                 match request {
-                    StatusRequest::GetPowerLevel { element, responder } => {
-                        tracing::debug!("GetPowerLevel({:?})", &element);
+                    StatusRequest::GetPowerLevel { token, responder } => {
+                        tracing::debug!("GetPowerLevel({:?})", &token);
                         let broker: std::sync::MutexGuard<'_, Broker> = self.broker.lock().unwrap();
-                        let result = broker.get_current_level(&element.clone().into());
-                        tracing::debug!("get_current_level({:?}) = {:?}", &element, &result);
+                        let result = broker.get_current_level(token.into());
+                        tracing::debug!("get_current_level = {:?}", &result);
                         if let Ok(power_level) = result {
                             tracing::debug!("GetPowerLevel responder.send({:?})", &power_level);
                             responder.send(Ok(&power_level)).context("response failed")
                         } else {
                             tracing::debug!("GetPowerLevel responder.send err({:?})", &result);
-                            responder.send(Err(result.err().unwrap())).context("response failed")
+                            responder.send(Err(result.unwrap_err())).context("response failed")
                         }
                     }
-                    StatusRequest::WatchPowerLevel { element, last_level, responder } => {
-                        tracing::debug!("WatchPowerLevel({:?}, {:?})", &element, last_level);
-                        let mut receiver = {
+                    StatusRequest::WatchPowerLevel { token, last_level, responder } => {
+                        tracing::debug!("WatchPowerLevel({:?}, {:?})", &token, last_level);
+                        let watch_res = {
                             let mut broker: std::sync::MutexGuard<'_, Broker> =
                                 self.broker.lock().unwrap();
-                            tracing::debug!("subscribe_current_level({:?})", &element);
-                            broker.subscribe_current_level(&element.into())
+                            tracing::debug!("subscribe_current_level({:?})", &token);
+                            broker.watch_current_level(token.into())
+                        };
+                        let Ok(mut receiver) = watch_res else {
+                            return responder
+                                .send(Err(watch_res.unwrap_err()))
+                                .context("send failed");
                         };
                         while let Some(Some(power_level)) = receiver.next().await {
                             tracing::debug!(
@@ -123,10 +128,9 @@ impl BrokerSvc {
                                 self.broker.lock().unwrap();
                             broker.watch_required_level(token.into())
                         };
-                        if let Err(err) = watch_res {
-                            return responder.send(Err(err)).context("send failed");
-                        }
-                        let mut receiver = watch_res.unwrap();
+                        let Ok(mut receiver) = watch_res else {
+                            return responder.send(Err(watch_res.unwrap_err())).context("send failed");
+                        };
                         while let Some(next) = receiver.next().await {
                             tracing::debug!(
                                 "receiver.next = {:?}, last_required_level = {:?}",

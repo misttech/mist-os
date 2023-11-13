@@ -67,9 +67,11 @@ async fn test_direct() -> Result<()> {
     let (parent_token, parent_broker_token) = zx::EventPair::create();
     let parent_cred = Credential {
         broker_token: parent_broker_token,
-        permissions: Permissions::MODIFY_POWER_LEVEL | Permissions::MODIFY_DEPENDENT,
+        permissions: Permissions::READ_POWER_LEVEL
+            | Permissions::MODIFY_POWER_LEVEL
+            | Permissions::MODIFY_DEPENDENT,
     };
-    let parent = topology.add_element("P", vec![parent_cred]).await?.expect("add_element failed");
+    topology.add_element("P", vec![parent_cred]).await?.expect("add_element failed");
     topology
         .add_dependency(Dependency {
             dependent: ElementLevel {
@@ -107,7 +109,12 @@ async fn test_direct() -> Result<()> {
         )
         .await?
         .expect("update_current_power_level failed");
-    let power_level = status.get_power_level(&parent).await?.expect("get_power_level failed");
+    let power_level = status
+        .get_power_level(
+            parent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
+        )
+        .await?
+        .expect("get_power_level failed");
     assert_eq!(power_level, PowerLevel::Binary(BinaryPowerLevel::Off));
 
     // Acquire lease for C, P should now have required level ON
@@ -161,19 +168,20 @@ async fn test_transitive() -> Result<()> {
     let (element_a_token, element_a_broker_token) = zx::EventPair::create();
     let element_a_cred = Credential {
         broker_token: element_a_broker_token,
-        permissions: Permissions::MODIFY_POWER_LEVEL | Permissions::MODIFY_DEPENDENT,
+        permissions: Permissions::READ_POWER_LEVEL
+            | Permissions::MODIFY_POWER_LEVEL
+            | Permissions::MODIFY_DEPENDENT,
     };
-    let element_a =
-        topology.add_element("A", vec![element_a_cred]).await?.expect("add_element failed");
+    topology.add_element("A", vec![element_a_cred]).await?.expect("add_element failed");
     let (element_b_token, element_b_broker_token) = zx::EventPair::create();
     let element_b_cred = Credential {
         broker_token: element_b_broker_token,
-        permissions: Permissions::MODIFY_POWER_LEVEL
+        permissions: Permissions::READ_POWER_LEVEL
+            | Permissions::MODIFY_POWER_LEVEL
             | Permissions::MODIFY_DEPENDENCY
             | Permissions::MODIFY_DEPENDENT,
     };
-    let element_b =
-        topology.add_element("B", vec![element_b_cred]).await?.expect("add_element failed");
+    topology.add_element("B", vec![element_b_cred]).await?.expect("add_element failed");
     let (element_c_token, element_c_broker_token) = zx::EventPair::create();
     let element_c_cred = Credential {
         broker_token: element_c_broker_token,
@@ -184,10 +192,9 @@ async fn test_transitive() -> Result<()> {
     let (element_d_token, element_d_broker_token) = zx::EventPair::create();
     let element_d_cred = Credential {
         broker_token: element_d_broker_token,
-        permissions: Permissions::MODIFY_POWER_LEVEL,
+        permissions: Permissions::READ_POWER_LEVEL | Permissions::MODIFY_POWER_LEVEL,
     };
-    let element_d =
-        topology.add_element("D", vec![element_d_cred]).await?.expect("add_element failed");
+    topology.add_element("D", vec![element_d_cred]).await?.expect("add_element failed");
     topology
         .add_dependency(Dependency {
             dependent: ElementLevel {
@@ -231,11 +238,7 @@ async fn test_transitive() -> Result<()> {
 
     // Initial required level for each element should be OFF.
     // Update managed elements' current level to OFF with PowerBroker.
-    for (token, element_id) in [
-        (&element_a_token, &element_a),
-        (&element_b_token, &element_b),
-        (&element_d_token, &element_d),
-    ] {
+    for token in [&element_a_token, &element_b_token, &element_d_token] {
         let req_level = level_control
             .watch_required_level(
                 token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
@@ -251,8 +254,10 @@ async fn test_transitive() -> Result<()> {
             )
             .await?
             .expect("update_current_power_level failed");
-        let power_level =
-            status.get_power_level(&element_id).await?.expect("get_power_level failed");
+        let power_level = status
+            .get_power_level(token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"))
+            .await?
+            .expect("get_power_level failed");
         assert_eq!(power_level, PowerLevel::Binary(BinaryPowerLevel::Off));
     }
 
@@ -454,18 +459,20 @@ async fn test_shared() -> Result<()> {
     let (parent_token, parent_broker_token) = zx::EventPair::create();
     let parent_cred = Credential {
         broker_token: parent_broker_token,
-        permissions: Permissions::MODIFY_POWER_LEVEL
+        permissions: Permissions::READ_POWER_LEVEL
+            | Permissions::MODIFY_POWER_LEVEL
             | Permissions::MODIFY_DEPENDENCY
             | Permissions::MODIFY_DEPENDENT,
     };
-    let parent = topology.add_element("P", vec![parent_cred]).await?.expect("add_element failed");
+    topology.add_element("P", vec![parent_cred]).await?.expect("add_element failed");
     let (grandparent_token, grandparent_broker_token) = zx::EventPair::create();
     let grandparent_cred = Credential {
         broker_token: grandparent_broker_token,
-        permissions: Permissions::MODIFY_POWER_LEVEL | Permissions::MODIFY_DEPENDENT,
+        permissions: Permissions::READ_POWER_LEVEL
+            | Permissions::MODIFY_POWER_LEVEL
+            | Permissions::MODIFY_DEPENDENT,
     };
-    let grandparent =
-        topology.add_element("GP", vec![grandparent_cred]).await?.expect("add_element failed");
+    topology.add_element("GP", vec![grandparent_cred]).await?.expect("add_element failed");
     topology
         .add_dependency(Dependency {
             dependent: ElementLevel {
@@ -516,7 +523,7 @@ async fn test_shared() -> Result<()> {
 
     // Initial required level for each element should be OFF.
     // Update all elements' current level to OFF with PowerBroker.
-    for (token, element_id) in [(&parent_token, &parent), (&grandparent_token, &grandparent)] {
+    for token in [&parent_token, &grandparent_token] {
         let req_level = level_control
             .watch_required_level(
                 token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
@@ -532,8 +539,10 @@ async fn test_shared() -> Result<()> {
             )
             .await?
             .expect("update_current_power_level failed");
-        let power_level =
-            status.get_power_level(&element_id).await?.expect("get_power_level failed");
+        let power_level = status
+            .get_power_level(token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"))
+            .await?
+            .expect("get_power_level failed");
         assert_eq!(power_level, PowerLevel::Binary(BinaryPowerLevel::Off));
     }
 
