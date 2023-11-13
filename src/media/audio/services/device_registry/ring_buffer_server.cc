@@ -131,8 +131,9 @@ void RingBufferServer::SetActiveChannels(SetActiveChannelsRequest& request,
           << "active_channels_completer_ gone by the time the StartRingBuffer callback ran";
       return;
     }
+
     auto completer = std::move(active_channels_completer_);
-    active_channels_completer_ = std::nullopt;
+    active_channels_completer_.reset();
 
     if (result.is_error()) {
       completer->Reply(
@@ -176,8 +177,9 @@ void RingBufferServer::Start(StartRequest& request, StartCompleter::Sync& comple
       ADR_WARN_OBJECT() << "start_completer_ gone by the time the StartRingBuffer callback ran";
       return;
     }
+
     auto completer = std::move(start_completer_);
-    start_completer_ = std::nullopt;
+    start_completer_.reset();
     if (result.is_error()) {
       completer->Reply(fit::error(fuchsia_audio_device::RingBufferStartError::kDeviceError));
     }
@@ -218,8 +220,9 @@ void RingBufferServer::Stop(StopRequest& request, StopCompleter::Sync& completer
       ADR_WARN_OBJECT() << "stop_completer_ gone by the time the StopRingBuffer callback ran";
       return;
     }
+
     auto completer = std::move(stop_completer_);
-    stop_completer_ = std::nullopt;
+    stop_completer_.reset();
     if (status != ZX_OK) {
       completer->Reply(fit::error(fuchsia_audio_device::RingBufferStopError::kDeviceError));
       return;
@@ -249,7 +252,8 @@ void RingBufferServer::WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) 
     completer.Reply(fit::success(fuchsia_audio_device::RingBufferWatchDelayInfoResponse{{
         .delay_info = *delay_info_update_,
     }}));
-    delay_info_update_ = std::nullopt;
+
+    delay_info_update_.reset();
     return;
   }
 
@@ -268,7 +272,7 @@ void RingBufferServer::DelayInfoChanged(const fuchsia_audio_device::DelayInfo& d
   delay_info_completer_->Reply(fit::success(fuchsia_audio_device::RingBufferWatchDelayInfoResponse{{
       .delay_info = delay_info,
   }}));
-  delay_info_completer_ = std::nullopt;
+  delay_info_completer_.reset();
 }
 
 }  // namespace media_audio

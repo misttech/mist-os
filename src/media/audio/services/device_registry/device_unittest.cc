@@ -223,7 +223,7 @@ TEST_F(DeviceTest, DynamicGainUpdate) {
   EXPECT_EQ(*notify_->gain_state()->gain_db(), 0.0f);
   EXPECT_FALSE(notify_->gain_state()->muted().value_or(false));
   EXPECT_FALSE(notify_->gain_state()->agc_enabled().value_or(false));
-  notify_->gain_state() = std::nullopt;
+  notify_->gain_state().reset();
 
   constexpr float kNewGainDb = -2.0f;
   fake_driver_->InjectGainChange({{
@@ -259,7 +259,7 @@ TEST_F(DeviceTest, DynamicPlugUpdate) {
   ASSERT_TRUE(notify_->plug_state());
   EXPECT_EQ(notify_->plug_state()->first, fuchsia_audio_device::PlugState::kPlugged);
   EXPECT_EQ(notify_->plug_state()->second, zx::time(0));
-  notify_->plug_state() = std::nullopt;
+  notify_->plug_state().reset();
 
   auto unplug_time = zx::clock::get_monotonic();
   fake_driver_->InjectPlugChange(false, unplug_time);
@@ -300,7 +300,7 @@ TEST_F(DeviceTest, SetGain) {
   EXPECT_EQ(*notify_->gain_state()->gain_db(), 0.0f);
   EXPECT_FALSE(notify_->gain_state()->muted().value_or(false));
   EXPECT_FALSE(notify_->gain_state()->agc_enabled().value_or(false));
-  notify_->gain_state() = std::nullopt;
+  notify_->gain_state().reset();
 
   constexpr float kNewGainDb = -2.0f;
   EXPECT_TRUE(SetDeviceGain({{
@@ -472,7 +472,7 @@ TEST_F(DeviceTest, DynamicDelayInfo) {
   ASSERT_TRUE(notify_->delay_info()->internal_delay());
   EXPECT_FALSE(notify_->delay_info()->external_delay());
   EXPECT_EQ(*notify_->delay_info()->internal_delay(), 0);
-  notify_->delay_info() = std::nullopt;
+  notify_->delay_info().reset();
 
   RunLoopUntilIdle();
   EXPECT_FALSE(notify_->delay_info());

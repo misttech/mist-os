@@ -60,7 +60,7 @@ void ControlServer::OnShutdown(fidl::UnbindInfo info) {
 
   if (auto ring_buffer = GetRingBufferServer(); ring_buffer) {
     ring_buffer->ClientDroppedControl();
-    ring_buffer_server_ = std::nullopt;
+    ring_buffer_server_.reset();
   }
 }
 
@@ -70,7 +70,7 @@ void ControlServer::DeviceDroppedRingBuffer() {
 
   if (auto ring_buffer = GetRingBufferServer(); ring_buffer) {
     ring_buffer->DeviceDroppedRingBuffer();
-    ring_buffer_server_ = std::nullopt;
+    ring_buffer_server_.reset();
   }
 }
 
@@ -87,7 +87,7 @@ void ControlServer::DeviceIsRemoved() {
 
   if (auto ring_buffer = GetRingBufferServer(); ring_buffer) {
     ring_buffer->ClientDroppedControl();
-    ring_buffer_server_ = std::nullopt;
+    ring_buffer_server_.reset();
 
     // We don't explicitly clear our shared_ptr<Device> reference, to ensure we destruct first.
   }
@@ -100,7 +100,7 @@ std::shared_ptr<RingBufferServer> ControlServer::GetRingBufferServer() {
     if (auto sh_ptr_ring_buffer_server = ring_buffer_server_->lock(); sh_ptr_ring_buffer_server) {
       return sh_ptr_ring_buffer_server;
     }
-    ring_buffer_server_ = std::nullopt;
+    ring_buffer_server_.reset();
   }
   return nullptr;
 }
@@ -173,7 +173,7 @@ void ControlServer::GetCurrentlyPermittedFormats(
         }
 
         auto completer = std::move(currently_permitted_formats_completer_);
-        currently_permitted_formats_completer_ = std::nullopt;
+        currently_permitted_formats_completer_.reset();
         if (device_has_error_) {
           ADR_WARN_OBJECT() << "device has an error";
           completer->Reply(fit::error(
@@ -249,13 +249,13 @@ void ControlServer::CreateRingBuffer(CreateRingBufferRequest& request,
         // If we have no async completer, maybe we're shutting down. Just exit.
         if (!create_ring_buffer_completer_) {
           if (auto ring_buffer_server = GetRingBufferServer(); ring_buffer_server) {
-            ring_buffer_server_ = std::nullopt;
+            ring_buffer_server_.reset();
           }
           return;
         }
 
         auto completer = std::move(*create_ring_buffer_completer_);
-        create_ring_buffer_completer_ = std::nullopt;
+        create_ring_buffer_completer_.reset();
 
         completer.Reply(fit::success(fuchsia_audio_device::ControlCreateRingBufferResponse{{
             .properties = info.properties,
@@ -265,7 +265,7 @@ void ControlServer::CreateRingBuffer(CreateRingBufferRequest& request,
 
   if (!created) {
     ADR_WARN_OBJECT() << "device cannot create a ring buffer with the specified options";
-    ring_buffer_server_ = std::nullopt;
+    ring_buffer_server_.reset();
     create_ring_buffer_completer_->Reply(
         fidl::Response<fuchsia_audio_device::Control::CreateRingBuffer>(
             fit::error(fuchsia_audio_device::ControlCreateRingBufferError::kBadRingBufferOption)));

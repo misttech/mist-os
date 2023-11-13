@@ -20,7 +20,6 @@
 #include <cstring>
 #include <optional>
 #include <string_view>
-#include <typeinfo>
 #include <vector>
 
 #include "src/media/audio/services/device_registry/basic_types.h"
@@ -45,9 +44,9 @@ class FakeAudioDriver : public fuchsia::hardware::audio::StreamConfig,
 
   void set_stream_unique_id(std::optional<UniqueId> uid) {
     if (uid) {
-      std::memcpy(uid_->data(), uid->data(), sizeof(uid));
+      std::memcpy(uid_->data(), uid->data(), sizeof(*uid));
     } else {
-      uid = std::nullopt;
+      uid_.reset();
     }
   }
   void set_is_input(std::optional<bool> is_input) { is_input_ = is_input; }

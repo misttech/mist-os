@@ -360,7 +360,7 @@ void FakeAudioDriver::PositionNotification() {
     // Clear both prerequisites for sending this notification
     position_notification_values_are_set_ = false;
     auto callback = *std::move(position_notify_callback_);
-    position_notify_callback_ = std::nullopt;
+    position_notify_callback_.reset();
 
     fuchsia::hardware::audio::RingBufferPositionInfo info{
         .timestamp = position_notify_timestamp_mono_.get(),
@@ -418,7 +418,7 @@ void FakeAudioDriver::Stop(fuchsia::hardware::audio::RingBuffer::StopCallback ca
   EXPECT_TRUE(is_running_);
   is_running_ = false;
 
-  position_notify_callback_ = std::nullopt;
+  position_notify_callback_.reset();
   position_notification_values_are_set_ = false;
 
   callback();

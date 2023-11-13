@@ -243,7 +243,7 @@ bool Device::DropControl() {
     return false;
   }
 
-  control_notify_ = std::nullopt;
+  control_notify_.reset();
   // We don't remove our ControlNotify from the observer list: we wait for it to self-invalidate.
 
   SetState(State::DeviceInitialized);
@@ -310,13 +310,13 @@ void Device::DropRingBuffer() {
     SetState(State::DeviceInitialized);
   }
 
-  start_time_ = std::nullopt;  // We are not started.
+  start_time_.reset();  // We are not started.
 
-  delay_info_ = std::nullopt;  // We are not paused.
-  num_ring_buffer_frames_ = std::nullopt;
-  ring_buffer_properties_ = std::nullopt;
+  delay_info_.reset();  // We are not paused.
+  num_ring_buffer_frames_.reset();
+  ring_buffer_properties_.reset();
 
-  driver_format_ = std::nullopt;  // We are not configured.
+  driver_format_.reset();  // We are not configured.
 
   // Clear our FIDL connection to the driver RingBuffer.
   ring_buffer_client_ = fidl::Client<fuchsia_hardware_audio::RingBuffer>();
@@ -825,7 +825,7 @@ std::shared_ptr<ControlNotify> Device::GetControlNotify() {
 
   auto sh_ptr_control = control_notify_->lock();
   if (!sh_ptr_control) {
-    control_notify_ = std::nullopt;
+    control_notify_.reset();
     LogObjectCounts();
   }
 
@@ -1138,7 +1138,7 @@ void Device::StopRingBuffer(fit::callback<void(zx_status_t)> stop_callback) {
         }
         ADR_LOG_OBJECT(kLogRingBufferFidlResponses) << "RingBuffer/Stop: success";
 
-        start_time_ = std::nullopt;
+        start_time_.reset();
         callback(ZX_OK);
         SetState(State::RingBufferStopped);
       });
