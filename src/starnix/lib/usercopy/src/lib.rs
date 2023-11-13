@@ -24,6 +24,9 @@ pub struct Usercopy {
     // Pointer to the hermetic_copy routine loaded into memory.
     hermetic_copy_fn: HermeticCopyFn,
 
+    // Pointer to the hermetic_copy_until_null_byte routine loaded into memory.
+    hermetic_copy_until_null_byte_fn: HermeticCopyFn,
+
     // This is an event used to signal the exception handling thread to shut down.
     shutdown_event: zx::Event,
 
@@ -34,6 +37,62 @@ pub struct Usercopy {
     restricted_address_range: Range<usize>,
 }
 
+fn get_hermetic_copy_bin(path: &str) -> Result<Range<usize>, zx::Status> {
+    let blob =
+        fdio::open_fd(path, fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE)?;
+    let exec_vmo = fdio::get_vmo_exec_from_file(&blob)?;
+    let copy_size = exec_vmo.get_size()?;
+    let mapped_addr = fuchsia_runtime::vmar_root_self().map(
+        0,
+        &exec_vmo,
+        0,
+        copy_size as usize,
+        zx::VmarFlags::PERM_READ_IF_XOM_UNSUPPORTED | zx::VmarFlags::PERM_EXECUTE,
+    )?;
+    Ok(mapped_addr..mapped_addr + copy_size as usize)
+}
+
+/// Copies bytes from the source address to the destination address using the
+/// provided copy function.
+///
+/// # Safety
+///
+/// Only one of `source`/`dest` may be an address to a buffer owned by user/restricted-mode.
+/// The other must be a valid Starnix/normal-mode buffer that will never cause a fault
+/// when the first `count` bytes are read/written.
+unsafe fn do_hermetic_copy(
+    f: HermeticCopyFn,
+    source: usize,
+    dest: usize,
+    count: usize,
+    ret_dest: bool,
+) -> Result<(), usize> {
+    let unread_address = unsafe { f(dest as *mut u8, source as *const u8, count, ret_dest) };
+
+    let ret_base = if ret_dest { dest } else { source };
+
+    debug_assert!(
+        unread_address >= ret_base,
+        "unread_address={:#x}, ret_base={:#x}",
+        unread_address,
+        ret_base,
+    );
+    let copied = unread_address - ret_base;
+    debug_assert!(
+        copied <= count,
+        "copied={}, count={}; unread_address={:#x}, ret_base={:#x}",
+        copied,
+        count,
+        unread_address,
+        ret_base,
+    );
+    if copied == count {
+        Ok(())
+    } else {
+        Err(copied)
+    }
+}
+
 impl Usercopy {
     /// Returns a new instance of `Usercopy` if unified address spaces is
     /// supported on the target architecture.
@@ -42,22 +101,14 @@ impl Usercopy {
             return Ok(None);
         }
 
-        let hermetic_copy_blob = fdio::open_fd(
-            "/pkg/hermetic_copy.bin",
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-        )?;
+        let hermetic_copy_addr_range = get_hermetic_copy_bin("/pkg/hermetic_copy.bin")?;
+        let hermetic_copy_fn: HermeticCopyFn =
+            unsafe { std::mem::transmute(hermetic_copy_addr_range.start) };
 
-        let hermetic_copy_exec_vmo = fdio::get_vmo_exec_from_file(&hermetic_copy_blob)?;
-
-        let hermetic_copy_size = hermetic_copy_exec_vmo.get_size()?;
-
-        let hermetic_copy_mapped_addr = fuchsia_runtime::vmar_root_self().map(
-            0,
-            &hermetic_copy_exec_vmo,
-            0,
-            hermetic_copy_size as usize,
-            zx::VmarFlags::PERM_READ_IF_XOM_UNSUPPORTED | zx::VmarFlags::PERM_EXECUTE,
-        )?;
+        let hermetic_copy_until_null_byte_addr_range =
+            get_hermetic_copy_bin("/pkg/hermetic_copy_until_null_byte.bin")?;
+        let hermetic_copy_until_null_byte_fn: HermeticCopyFn =
+            unsafe { std::mem::transmute(hermetic_copy_until_null_byte_addr_range.start) };
 
         let (tx, rx) = std::sync::mpsc::channel::<zx::Status>();
 
@@ -117,9 +168,8 @@ impl Usercopy {
                     let mut regs = thread.read_state_general_regs().unwrap();
 
                     let pc = regs.rip as usize;
-                    if !(hermetic_copy_mapped_addr
-                        ..hermetic_copy_mapped_addr + hermetic_copy_size as usize)
-                        .contains(&pc)
+                    if !hermetic_copy_addr_range.contains(&pc)
+                        && !hermetic_copy_until_null_byte_addr_range.contains(&pc)
                     {
                         continue;
                     }
@@ -151,57 +201,13 @@ impl Usercopy {
             }
         };
 
-        let ptr = hermetic_copy_mapped_addr as *const ();
-        let hermetic_copy_fn: HermeticCopyFn = unsafe { std::mem::transmute(ptr) };
         Ok(Some(Self {
             hermetic_copy_fn,
+            hermetic_copy_until_null_byte_fn,
             shutdown_event,
             join_handle: Some(join_handle),
             restricted_address_range,
         }))
-    }
-
-    /// Copies bytes from the source address to the destination address.
-    ///
-    /// # Safety
-    ///
-    /// Only one of `source`/`dest` may be an address to a buffer owned by user/restricted-mode.
-    /// The other must be a valid Starnix/normal-mode buffer that will never cause a fault
-    /// when the first `count` bytes are read/written.
-    #[inline]
-    unsafe fn copy(
-        &self,
-        source: usize,
-        dest: usize,
-        count: usize,
-        ret_dest: bool,
-    ) -> Result<(), usize> {
-        let unread_address = unsafe {
-            (self.hermetic_copy_fn)(dest as *mut u8, source as *const u8, count, ret_dest)
-        };
-
-        let ret_base = if ret_dest { dest } else { source };
-
-        debug_assert!(
-            unread_address >= ret_base,
-            "unread_address={:#x}, ret_base={:#x}",
-            unread_address,
-            ret_base,
-        );
-        let copied = unread_address - ret_base;
-        debug_assert!(
-            copied <= count,
-            "copied={}, count={}; unread_address={:#x}, ret_base={:#x}",
-            copied,
-            count,
-            unread_address,
-            ret_base,
-        );
-        if copied == count {
-            Ok(())
-        } else {
-            Err(copied)
-        }
     }
 
     // Copies data from |source| to the restricted address |dest_addr|.
@@ -217,7 +223,15 @@ impl Usercopy {
 
         // SAFETY: `source` is a valid Starnix-owned buffer and `dest_addr` is the user-mode
         // buffer.
-        unsafe { self.copy(source.as_ptr() as usize, dest_addr, source.len(), true) }
+        unsafe {
+            do_hermetic_copy(
+                self.hermetic_copy_fn,
+                source.as_ptr() as usize,
+                dest_addr,
+                source.len(),
+                true,
+            )
+        }
     }
 
     // Copies data from the restricted address |source_addr| to |dest|
@@ -233,7 +247,36 @@ impl Usercopy {
 
         // SAFETY: `dest` is a valid Starnix-owned buffer and `source_addr` is the user-mode
         // buffer.
-        unsafe { self.copy(source_addr, dest.as_ptr() as usize, dest.len(), false) }
+        unsafe {
+            do_hermetic_copy(
+                self.hermetic_copy_fn,
+                source_addr,
+                dest.as_ptr() as usize,
+                dest.len(),
+                false,
+            )
+        }
+    }
+
+    pub fn copyin_until_null_byte(&self, source_addr: usize, dest: &mut [u8]) -> Result<(), usize> {
+        // Assumption: The address 0 is invalid and cannot be mapped.  The error encoding scheme has
+        // a collision on the value 0 - it could mean that there was a fault at the address 0 or
+        // that there was no fault. We want to treat an attempt to copy from 0 as a fault always.
+        if source_addr == 0 || !self.restricted_address_range.contains(&source_addr) {
+            return Err(0);
+        }
+
+        // SAFETY: `dest` is a valid Starnix-owned buffer and `source_addr` is the user-mode
+        // buffer.
+        unsafe {
+            do_hermetic_copy(
+                self.hermetic_copy_until_null_byte_fn,
+                source_addr,
+                dest.as_ptr() as usize,
+                dest.len(),
+                false,
+            )
+        }
     }
 }
 
@@ -428,6 +471,139 @@ mod test {
 
         assert_eq!(&dest[0..offset], &vec!['a' as u8; offset]);
         assert_eq!(&dest[offset..], &vec![0 as u8; buf_len - offset]);
+    }
+
+    #[::fuchsia::test]
+    fn copyin_until_null_byte_no_fault() {
+        let page_size = zx::system_get_page_size() as usize;
+
+        let mut dest = vec![0u8; 128];
+
+        let source_vmo = zx::Vmo::create(page_size as u64).unwrap();
+
+        let root_vmar = fuchsia_runtime::vmar_root_self();
+
+        let mapped_addr = root_vmar
+            .map(0, &source_vmo, 0, page_size, zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE)
+            .unwrap();
+
+        unsafe { std::slice::from_raw_parts_mut(mapped_addr as *mut u8, 128) }.fill('a' as u8);
+
+        let usercopy = new_usercopy_for_test!(Usercopy::new(mapped_addr..mapped_addr + page_size));
+
+        let result = usercopy.copyin_until_null_byte(mapped_addr, &mut dest);
+
+        assert_eq!(result, Ok(()));
+
+        assert_eq!(dest, &['a' as u8; 128]);
+    }
+
+    #[test_case(1, 2)]
+    #[test_case(1, 4)]
+    #[test_case(1, 8)]
+    #[test_case(1, 16)]
+    #[test_case(1, 32)]
+    #[test_case(1, 64)]
+    #[test_case(1, 128)]
+    #[test_case(1, 256)]
+    #[test_case(1, 512)]
+    #[test_case(1, 1024)]
+    #[test_case(32, 64)]
+    #[test_case(32, 128)]
+    #[test_case(32, 256)]
+    #[test_case(32, 512)]
+    #[test_case(32, 1024)]
+    #[::fuchsia::test]
+    fn copyin_until_null_byte_fault(offset: usize, buf_len: usize) {
+        let page_size = zx::system_get_page_size() as usize;
+
+        let mut dest = vec![0u8; buf_len];
+
+        let source_vmo = zx::Vmo::create(page_size as u64).unwrap();
+
+        let root_vmar = fuchsia_runtime::vmar_root_self();
+
+        let mapped_addr = root_vmar
+            .map(
+                0,
+                &source_vmo,
+                0,
+                page_size * 2,
+                zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE,
+            )
+            .unwrap();
+
+        let source_addr = mapped_addr + page_size - offset;
+
+        unsafe { std::slice::from_raw_parts_mut(source_addr as *mut u8, offset) }.fill('a' as u8);
+
+        let usercopy =
+            new_usercopy_for_test!(Usercopy::new(mapped_addr..mapped_addr + page_size * 2));
+
+        let result = usercopy.copyin_until_null_byte(source_addr, &mut dest);
+
+        assert_eq!(result, Err(offset));
+
+        assert_eq!(&dest[0..offset], &vec!['a' as u8; offset]);
+        assert_eq!(&dest[offset..], &vec![0 as u8; buf_len - offset]);
+    }
+
+    #[test_case(0)]
+    #[test_case(1)]
+    #[test_case(2)]
+    #[test_case(126)]
+    #[test_case(127)]
+    #[::fuchsia::test]
+    fn copyin_until_null_byte_no_fault_with_zero(zero_idx: usize) {
+        let page_size = zx::system_get_page_size() as usize;
+
+        let mut dest = vec![0u8; 128];
+        dest.fill('b' as u8);
+
+        let source_vmo = zx::Vmo::create(page_size as u64).unwrap();
+
+        let root_vmar = fuchsia_runtime::vmar_root_self();
+
+        let mapped_addr = root_vmar
+            .map(0, &source_vmo, 0, page_size, zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE)
+            .unwrap();
+
+        {
+            let slice =
+                unsafe { std::slice::from_raw_parts_mut(mapped_addr as *mut u8, dest.len()) };
+            slice.fill('a' as u8);
+            slice[zero_idx] = 0;
+        };
+
+        let usercopy = new_usercopy_for_test!(Usercopy::new(mapped_addr..mapped_addr + page_size));
+
+        let result = usercopy.copyin_until_null_byte(mapped_addr, &mut dest);
+
+        assert_eq!(result, if (zero_idx + 1) == dest.len() { Ok(()) } else { Err(zero_idx + 1) });
+
+        assert_eq!(&dest[..zero_idx], &vec!['a' as u8; zero_idx]);
+        assert_eq!(dest[zero_idx], 0);
+        assert_eq!(&dest[zero_idx + 1..], &vec!['b' as u8; dest.len() - zero_idx - 1]);
+    }
+
+    #[test_case(0..1, 0)]
+    #[test_case(0..1, 1)]
+    #[test_case(0..1, 2)]
+    #[test_case(5..10, 0)]
+    #[test_case(5..10, 1)]
+    #[test_case(5..10, 2)]
+    #[test_case(5..10, 5)]
+    #[test_case(5..10, 7)]
+    #[test_case(5..10, 10)]
+    #[::fuchsia::test]
+    fn starting_fault_address_copyin_until_null_byte(range: Range<usize>, addr: usize) {
+        let usercopy = new_usercopy_for_test!(Usercopy::new(range));
+
+        let mut dest = vec![0u8];
+
+        let result = usercopy.copyin_until_null_byte(addr, &mut dest);
+
+        assert_eq!(result, Err(0));
     }
 
     #[test_case(0..1, 0)]
