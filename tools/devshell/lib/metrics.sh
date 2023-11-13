@@ -29,6 +29,7 @@ _METRICS_TRACK_REGEX=(
 # We collect metrics when these operations happen without capturing all of
 # their args.
 _METRICS_TRACK_COMMAND_OPS=(
+    "publish cache"
     "shell activity"
     "shell basename"
     "shell bssl"
