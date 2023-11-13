@@ -6,7 +6,7 @@
 
 void Reader(zx_ticks_t* shared_value, zx_ticks_t* read_value) {
   *read_value = *shared_value;
-  // Issue a __builtin_trap() to kick this thread out of restricted mode if the preceding read
+  // Issue a __builtin_debugtrap() to kick this thread out of restricted mode if the preceding read
   // succeeds.
-  __builtin_trap();
+  __builtin_debugtrap();
 }

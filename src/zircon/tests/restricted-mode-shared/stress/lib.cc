@@ -89,6 +89,8 @@ zx_status_t RunRestricted(const zx::vmo& vmo, zx_vaddr_t cs_addr, zx_vaddr_t sta
     return status;
   }
   if (exception_state.exception.header.type != expected_exception) {
+    printf("unexpected exception type; got 0x%x, want 0x%x\n",
+           exception_state.exception.header.type, expected_exception);
     return ZX_ERR_INTERNAL;
   }
   return ZX_OK;
@@ -106,9 +108,9 @@ void RestrictedReader(zx_vaddr_t cs_addr, zx_vaddr_t stack_addr, zx_status_t* st
   if (*status != ZX_OK) {
     return;
   }
-  // Enter restricted mode and expect it to exit with a undefined instruction exception.
+  // Enter restricted mode and expect it to exit with a software breakpoint.
   *status = RunRestricted(restricted, cs_addr, stack_addr, shared_value, read_value,
-                          ZX_EXCP_UNDEFINED_INSTRUCTION);
+                          ZX_EXCP_SW_BREAKPOINT);
   if (*status != ZX_OK) {
     return;
   }
