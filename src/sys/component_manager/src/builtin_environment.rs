@@ -41,13 +41,18 @@ use {
             time::{create_utc_clock, UtcTimeMaintainer},
             vmex_resource::VmexResource,
         },
+        capability::{DerivedCapability, FrameworkCapability},
         diagnostics::{startup::ComponentEarlyStartupTimeStats, task_metrics::ComponentTreeStats},
         directory_ready_notifier::DirectoryReadyNotifier,
         framework::{
-            binder::BinderCapabilityHost, factory::FactoryCapabilityHost,
-            lifecycle_controller::LifecycleController, namespace::NamespaceCapabilityHost,
-            pkg_dir::PkgDirectory, realm::RealmCapabilityHost, realm_query::RealmQuery,
-            route_validator::RouteValidator,
+            binder::BinderFrameworkCapability,
+            factory::FactoryFrameworkCapability,
+            lifecycle_controller::{LifecycleController, LifecycleControllerFrameworkCapability},
+            namespace::NamespaceFrameworkCapability,
+            pkg_dir::PkgDirectoryFrameworkCapability,
+            realm::RealmFrameworkCapability,
+            realm_query::{RealmQuery, RealmQueryFrameworkCapability},
+            route_validator::RouteValidatorFrameworkCapability,
         },
         inspect_sink_provider::InspectSinkProvider,
         model::events::registry::EventSubscription,
@@ -62,7 +67,7 @@ use {
             hooks::EventType,
             model::{Model, ModelParams},
             resolver::{box_arc_resolver, ResolverRegistry},
-            storage::admin_protocol::StorageAdmin,
+            storage::admin_protocol::StorageAdminDerivedCapability,
         },
         root_stop_notifier::RootStopNotifier,
         sandbox_util::{LaunchTaskOnReceive, Sandbox},
@@ -467,15 +472,8 @@ impl BuiltinSandboxBuilder {
 pub struct BuiltinEnvironment {
     pub model: Arc<Model>,
 
-    pub binder_capability_host: Arc<BinderCapabilityHost>,
-    pub realm_capability_host: Arc<RealmCapabilityHost>,
-    pub namespace_capability_host: Arc<NamespaceCapabilityHost>,
-    pub factory_capability_host: Arc<FactoryCapabilityHost>,
-    pub storage_admin_capability_host: Arc<StorageAdmin>,
     pub realm_query: Option<Arc<RealmQuery>>,
     pub lifecycle_controller: Option<Arc<LifecycleController>>,
-    pub route_validator: Option<Arc<RouteValidator>>,
-    pub pkg_directory: Arc<PkgDirectory>,
     pub builtin_runners: Vec<Arc<BuiltinRunner>>,
     pub event_registry: Arc<EventRegistry>,
     pub event_source_factory: Arc<EventSourceFactory>,
@@ -490,6 +488,7 @@ pub struct BuiltinEnvironment {
     pub inspector: Inspector,
     pub realm_builder_resolver: Option<Arc<RealmBuilderResolver>>,
     pub sandbox: Sandbox,
+
     _builtin_receivers_task_group: TaskGroup,
     _service_fs_task: Option<fasync::Task<()>>,
 }
@@ -892,24 +891,15 @@ impl BuiltinEnvironment {
             },
         );
 
-        // Set up the realm service.
-        let realm_capability_host =
-            Arc::new(RealmCapabilityHost::new(Arc::downgrade(&model), runtime_config.clone()));
-        model.root().hooks.install(realm_capability_host.hooks()).await;
-
-        let namespace_capability_host = Arc::new(NamespaceCapabilityHost::new());
-        model.root().hooks.install(namespace_capability_host.hooks()).await;
-
-        let factory_capability_host = Arc::new(FactoryCapabilityHost::new());
-        model.root().hooks.install(factory_capability_host.hooks()).await;
-
-        // Set up the binder service.
-        let binder_capability_host = Arc::new(BinderCapabilityHost::new(Arc::downgrade(&model)));
-        model.root().hooks.install(binder_capability_host.hooks()).await;
-
-        // Set up the storage admin protocol
-        let storage_admin_capability_host = Arc::new(StorageAdmin::new(Arc::downgrade(&model)));
-        model.root().hooks.install(storage_admin_capability_host.hooks()).await;
+        let mut framework_capabilities: Vec<Box<dyn FrameworkCapability>> = vec![
+            Box::new(RealmFrameworkCapability::new(Arc::downgrade(&model), runtime_config.clone())),
+            Box::new(BinderFrameworkCapability::new()),
+            Box::new(FactoryFrameworkCapability::new()),
+            Box::new(NamespaceFrameworkCapability::new()),
+            Box::new(PkgDirectoryFrameworkCapability::new()),
+        ];
+        let derived_capabilities: Vec<Box<dyn DerivedCapability>> =
+            vec![Box::new(StorageAdminDerivedCapability::new(Arc::downgrade(&model)))];
 
         // Set up the builtin runners.
         for runner in &builtin_runners {
@@ -926,32 +916,29 @@ impl BuiltinEnvironment {
         model.root().hooks.install(stop_notifier.hooks()).await;
 
         let realm_query = if runtime_config.enable_introspection {
-            let realm_query = Arc::new(RealmQuery::new(model.clone()));
-            model.root().hooks.install(realm_query.hooks()).await;
-            Some(realm_query)
+            let host = RealmQuery::new(Arc::downgrade(&model));
+            framework_capabilities.push(Box::new(RealmQueryFrameworkCapability::new(host.clone())));
+            Some(host)
         } else {
             None
         };
 
         let lifecycle_controller = if runtime_config.enable_introspection {
-            let realm_control = Arc::new(LifecycleController::new(model.clone()));
-            model.root().hooks.install(realm_control.hooks()).await;
-            Some(realm_control)
+            let host = LifecycleController::new(Arc::downgrade(&model));
+            framework_capabilities
+                .push(Box::new(LifecycleControllerFrameworkCapability::new(host.clone())));
+            Some(host)
         } else {
             None
         };
 
-        let route_validator = if runtime_config.enable_introspection {
-            let route_validator = Arc::new(RouteValidator::new(model.clone()));
-            model.root().hooks.install(route_validator.hooks()).await;
-            Some(route_validator)
-        } else {
-            None
-        };
+        if runtime_config.enable_introspection {
+            framework_capabilities
+                .push(Box::new(RouteValidatorFrameworkCapability::new(Arc::downgrade(&model))));
+        }
 
-        // Set up the handler for routes involving the "pkg" directory
-        let pkg_directory = Arc::new(PkgDirectory {});
-        model.root().hooks.install(pkg_directory.hooks()).await;
+        model.context().init_framework_capabilities(framework_capabilities).await;
+        model.context().init_derived_capabilities(derived_capabilities).await;
 
         // Set up the Component Tree Diagnostics runtime statistics.
         let component_tree_stats =
@@ -1017,15 +1004,8 @@ impl BuiltinEnvironment {
 
         Ok(BuiltinEnvironment {
             model,
-            binder_capability_host,
-            realm_capability_host,
-            namespace_capability_host,
-            factory_capability_host,
-            storage_admin_capability_host,
             realm_query,
             lifecycle_controller,
-            route_validator,
-            pkg_directory,
             builtin_runners,
             event_registry,
             event_source_factory,

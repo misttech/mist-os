@@ -4,17 +4,16 @@
 
 use {
     crate::{
-        capability::{CapabilityProvider, CapabilitySource, FrameworkCapabilityProvider},
+        capability::{CapabilityProvider, FrameworkCapability, FrameworkCapabilityProvider},
         model::{
-            component::{ComponentInstance, InstanceState},
-            error::ModelError,
-            hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
+            component::{ComponentInstance, InstanceState, WeakComponentInstance},
             model::Model,
             namespace::create_namespace,
             resolver::Resolver,
             storage::admin_protocol::StorageAdmin,
         },
     },
+    ::routing::capability_source::InternalCapability,
     async_trait::async_trait,
     cm_rust::NativeIntoFidl,
     cm_types::Name,
@@ -25,7 +24,6 @@ use {
     fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
     fuchsia_zircon::sys::ZX_CHANNEL_MAX_MSG_BYTES,
-    futures::lock::Mutex,
     futures::StreamExt,
     lazy_static::lazy_static,
     measure_tape_for_instance::Measurable,
@@ -43,8 +41,7 @@ use {
 };
 
 lazy_static! {
-    pub static ref REALM_QUERY_CAPABILITY_NAME: Name =
-        fsys::RealmQueryMarker::PROTOCOL_NAME.parse().unwrap();
+    static ref CAPABILITY_NAME: Name = fsys::RealmQueryMarker::PROTOCOL_NAME.parse().unwrap();
 }
 
 // Number of bytes the header of a vector occupies in a fidl message.
@@ -62,43 +59,12 @@ const FIDL_MANIFEST_MAX_MSG_BYTES: usize =
 
 // Serves the fuchsia.sys2.RealmQuery protocol.
 pub struct RealmQuery {
-    model: Arc<Model>,
+    model: Weak<Model>,
 }
 
 impl RealmQuery {
-    pub fn new(model: Arc<Model>) -> Self {
-        Self { model }
-    }
-
-    pub fn hooks(self: &Arc<Self>) -> Vec<HooksRegistration> {
-        vec![HooksRegistration::new(
-            "RealmQuery",
-            vec![EventType::CapabilityRouted],
-            Arc::downgrade(self) as Weak<dyn Hook>,
-        )]
-    }
-
-    /// Given a `CapabilitySource`, determine if it is a framework-provided
-    /// RealmQuery capability. If so, serve the capability.
-    async fn on_capability_routed_async(
-        self: Arc<Self>,
-        source: CapabilitySource,
-        capability_provider: Arc<Mutex<Option<Box<dyn CapabilityProvider>>>>,
-    ) -> Result<(), ModelError> {
-        // If this is a scoped framework directory capability, then check the source path
-        if let CapabilitySource::Framework { capability, component } = source {
-            if capability.matches_protocol(&REALM_QUERY_CAPABILITY_NAME) {
-                // Set the capability provider, if not already set.
-                let mut capability_provider = capability_provider.lock().await;
-                if capability_provider.is_none() {
-                    *capability_provider = Some(Box::new(RealmQueryCapabilityProvider::query(
-                        self,
-                        component.moniker.clone(),
-                    )));
-                }
-            }
-        }
-        Ok(())
+    pub fn new(model: Weak<Model>) -> Arc<Self> {
+        Arc::new(Self { model })
     }
 
     /// Serve the fuchsia.sys2.RealmQuery protocol for a given scope on a given stream
@@ -116,19 +82,20 @@ impl RealmQuery {
                 }
                 None => break,
             };
+            let Some(model) = self.model.upgrade() else {
+                break;
+            };
             let result = match request {
                 fsys::RealmQueryRequest::GetInstance { moniker, responder } => {
-                    let result = get_instance(&self.model, &scope_moniker, &moniker).await;
+                    let result = get_instance(&model, &scope_moniker, &moniker).await;
                     responder.send(result.as_ref().map_err(|e| *e))
                 }
                 fsys::RealmQueryRequest::GetManifest { moniker, responder } => {
-                    let result =
-                        get_resolved_declaration(&self.model, &scope_moniker, &moniker).await;
+                    let result = get_resolved_declaration(&model, &scope_moniker, &moniker).await;
                     responder.send(result)
                 }
                 fsys::RealmQueryRequest::GetResolvedDeclaration { moniker, responder } => {
-                    let result =
-                        get_resolved_declaration(&self.model, &scope_moniker, &moniker).await;
+                    let result = get_resolved_declaration(&model, &scope_moniker, &moniker).await;
                     responder.send(result)
                 }
                 fsys::RealmQueryRequest::ResolveDeclaration {
@@ -137,26 +104,21 @@ impl RealmQuery {
                     url,
                     responder,
                 } => {
-                    let result = resolve_declaration(
-                        &self.model,
-                        &scope_moniker,
-                        &parent,
-                        &child_location,
-                        &url,
-                    )
-                    .await;
+                    let result =
+                        resolve_declaration(&model, &scope_moniker, &parent, &child_location, &url)
+                            .await;
                     responder.send(result)
                 }
                 fsys::RealmQueryRequest::GetStructuredConfig { moniker, responder } => {
-                    let result = get_structured_config(&self.model, &scope_moniker, &moniker).await;
+                    let result = get_structured_config(&model, &scope_moniker, &moniker).await;
                     responder.send(result.as_ref().map_err(|e| *e))
                 }
                 fsys::RealmQueryRequest::GetAllInstances { responder } => {
-                    let result = get_all_instances(&self.model, &scope_moniker).await;
+                    let result = get_all_instances(&model, &scope_moniker).await;
                     responder.send(result)
                 }
                 fsys::RealmQueryRequest::ConstructNamespace { moniker, responder } => {
-                    let result = construct_namespace(&self.model, &scope_moniker, &moniker).await;
+                    let result = construct_namespace(&model, &scope_moniker, &moniker).await;
                     responder.send(result)
                 }
                 fsys::RealmQueryRequest::Open {
@@ -169,7 +131,7 @@ impl RealmQuery {
                     responder,
                 } => {
                     let result = open(
-                        &self.model,
+                        &model,
                         &scope_moniker,
                         &moniker,
                         dir_type,
@@ -188,7 +150,7 @@ impl RealmQuery {
                     responder,
                 } => {
                     let result = connect_to_storage_admin(
-                        &self.model,
+                        &model,
                         &scope_moniker,
                         &moniker,
                         storage_name,
@@ -206,17 +168,27 @@ impl RealmQuery {
     }
 }
 
-#[async_trait]
-impl Hook for RealmQuery {
-    async fn on(self: Arc<Self>, event: &Event) -> Result<(), ModelError> {
-        match &event.payload {
-            EventPayload::CapabilityRouted { source, capability_provider } => {
-                self.on_capability_routed_async(source.clone(), capability_provider.clone())
-                    .await?;
-            }
-            _ => {}
-        }
-        Ok(())
+pub struct RealmQueryFrameworkCapability {
+    host: Arc<RealmQuery>,
+}
+
+impl RealmQueryFrameworkCapability {
+    pub fn new(host: Arc<RealmQuery>) -> Self {
+        Self { host }
+    }
+}
+
+impl FrameworkCapability for RealmQueryFrameworkCapability {
+    fn matches(&self, capability: &InternalCapability) -> bool {
+        capability.matches_protocol(&CAPABILITY_NAME)
+    }
+
+    fn new_provider(
+        &self,
+        scope: WeakComponentInstance,
+        _target: WeakComponentInstance,
+    ) -> Box<dyn CapabilityProvider> {
+        Box::new(RealmQueryCapabilityProvider::new(self.host.clone(), scope.moniker.clone()))
     }
 }
 
@@ -226,7 +198,7 @@ pub struct RealmQueryCapabilityProvider {
 }
 
 impl RealmQueryCapabilityProvider {
-    pub fn query(query: Arc<RealmQuery>, scope_moniker: Moniker) -> Self {
+    fn new(query: Arc<RealmQuery>, scope_moniker: Moniker) -> Self {
         Self { query, scope_moniker }
     }
 }
@@ -584,7 +556,7 @@ async fn connect_to_storage_admin(
     };
 
     task_group.spawn(async move {
-        if let Err(error) = Arc::new(storage_admin)
+        if let Err(error) = storage_admin
             .serve(storage_decl, instance.as_weak(), server_end.into_stream().unwrap())
             .await
         {

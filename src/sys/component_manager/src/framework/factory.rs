@@ -4,11 +4,8 @@
 
 use {
     crate::{
-        capability::{CapabilityProvider, CapabilitySource, FrameworkCapabilityProvider},
-        model::{
-            error::ModelError,
-            hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
-        },
+        capability::{CapabilityProvider, FrameworkCapability, FrameworkCapabilityProvider},
+        model::component::WeakComponentInstance,
     },
     ::routing::capability_source::InternalCapability,
     async_trait::async_trait,
@@ -18,22 +15,21 @@ use {
     fidl_fuchsia_component_sandbox as fsandbox,
     futures::prelude::*,
     lazy_static::lazy_static,
-    moniker::Moniker,
     sandbox::{Dict, Handle, Receiver},
-    std::sync::{Arc, Weak},
+    std::sync::Arc,
     tracing::warn,
 };
 
 lazy_static! {
-    pub static ref CAPABILITY_NAME: Name = fsandbox::FactoryMarker::PROTOCOL_NAME.parse().unwrap();
+    static ref CAPABILITY_NAME: Name = fsandbox::FactoryMarker::PROTOCOL_NAME.parse().unwrap();
 }
 
-pub struct FactoryCapabilityProvider {
+struct FactoryCapabilityProvider {
     host: Arc<FactoryCapabilityHost>,
 }
 
 impl FactoryCapabilityProvider {
-    pub fn new(host: Arc<FactoryCapabilityHost>) -> Self {
+    fn new(host: Arc<FactoryCapabilityHost>) -> Self {
         Self { host }
     }
 }
@@ -52,21 +48,13 @@ impl FrameworkCapabilityProvider for FactoryCapabilityProvider {
     }
 }
 
-pub struct FactoryCapabilityHost {
+struct FactoryCapabilityHost {
     tasks: TaskGroup,
 }
 
 impl FactoryCapabilityHost {
     pub fn new() -> Self {
         Self { tasks: TaskGroup::new() }
-    }
-
-    pub fn hooks(self: &Arc<Self>) -> Vec<HooksRegistration> {
-        vec![HooksRegistration::new(
-            "FactoryCapabilityHost",
-            vec![EventType::CapabilityRouted],
-            Arc::downgrade(self) as Weak<dyn Hook>,
-        )]
     }
 
     pub async fn serve(
@@ -136,42 +124,29 @@ impl FactoryCapabilityHost {
         });
         Ok(())
     }
+}
 
-    async fn on_framework_capability_routed<'a>(
-        self: Arc<Self>,
-        _scope_moniker: Moniker,
-        capability: &'a InternalCapability,
-        capability_provider: Option<Box<dyn CapabilityProvider>>,
-    ) -> Result<Option<Box<dyn CapabilityProvider>>, ModelError> {
-        // If some other capability has already been installed, then there's nothing to
-        // do here.
-        if capability_provider.is_none() && capability.matches_protocol(&CAPABILITY_NAME) {
-            return Ok(Some(Box::new(FactoryCapabilityProvider::new(self.clone()))
-                as Box<dyn CapabilityProvider>));
-        }
+pub struct FactoryFrameworkCapability {
+    host: Arc<FactoryCapabilityHost>,
+}
 
-        Ok(capability_provider)
+impl FactoryFrameworkCapability {
+    pub fn new() -> Self {
+        Self { host: Arc::new(FactoryCapabilityHost::new()) }
     }
 }
 
-#[async_trait]
-impl Hook for FactoryCapabilityHost {
-    async fn on(self: Arc<Self>, event: &Event) -> Result<(), ModelError> {
-        if let EventPayload::CapabilityRouted {
-            source: CapabilitySource::Framework { capability, component },
-            capability_provider,
-        } = &event.payload
-        {
-            let mut capability_provider = capability_provider.lock().await;
-            *capability_provider = self
-                .on_framework_capability_routed(
-                    component.moniker.clone(),
-                    &capability,
-                    capability_provider.take(),
-                )
-                .await?;
-        }
-        Ok(())
+impl FrameworkCapability for FactoryFrameworkCapability {
+    fn matches(&self, capability: &InternalCapability) -> bool {
+        capability.matches_protocol(&CAPABILITY_NAME)
+    }
+
+    fn new_provider(
+        &self,
+        _scope: WeakComponentInstance,
+        _target: WeakComponentInstance,
+    ) -> Box<dyn CapabilityProvider> {
+        Box::new(FactoryCapabilityProvider::new(self.host.clone()))
     }
 }
 

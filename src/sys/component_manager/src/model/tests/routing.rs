@@ -15,7 +15,6 @@
 use {
     crate::{
         capability::{CapabilityProvider, CapabilitySource},
-        framework::realm::REALM_SERVICE,
         model::{
             actions::{ActionSet, DestroyAction, DestroyChildAction, ShutdownAction},
             component::StartReason,
@@ -29,24 +28,22 @@ use {
         },
     },
     ::routing::{
-        capability_source::{AggregateCapability, ComponentCapability, InternalCapability},
+        capability_source::{AggregateCapability, ComponentCapability},
         error::ComponentInstanceError,
         resolving::ResolverError,
     },
-    anyhow::Error,
     assert_matches::assert_matches,
     async_trait::async_trait,
     cm_rust::*,
     cm_rust_testing::*,
     cm_util::channel,
     cm_util::TaskGroup,
-    fidl::endpoints::ServerEnd,
     fidl_fidl_examples_routing_echo::{self as echo},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem, fuchsia_async as fasync,
     fuchsia_zircon as zx,
-    futures::{channel::oneshot, join, lock::Mutex, StreamExt, TryStreamExt},
+    futures::{channel::oneshot, join, StreamExt},
     maplit::btreemap,
     moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
     routing_test_helpers::{
@@ -63,160 +60,6 @@ use {
 };
 
 instantiate_common_routing_tests! { RoutingTestBuilder }
-
-///   a
-///    \
-///     b
-///
-/// b: uses framework service /svc/fuchsia.component.Realm
-#[fuchsia::test]
-async fn use_framework_service() {
-    pub struct MockRealmCapabilityProvider {
-        scope_moniker: Moniker,
-        host: MockRealmCapabilityHost,
-    }
-
-    impl MockRealmCapabilityProvider {
-        pub fn new(scope_moniker: Moniker, host: MockRealmCapabilityHost) -> Self {
-            Self { scope_moniker, host }
-        }
-    }
-
-    #[async_trait]
-    impl CapabilityProvider for MockRealmCapabilityProvider {
-        async fn open(
-            self: Box<Self>,
-            task_group: TaskGroup,
-            _flags: fio::OpenFlags,
-            _relative_path: PathBuf,
-            server_end: &mut zx::Channel,
-        ) -> Result<(), CapabilityProviderError> {
-            let server_end = channel::take_channel(server_end);
-            let stream = ServerEnd::<fcomponent::RealmMarker>::new(server_end)
-                .into_stream()
-                .expect("could not convert channel into stream");
-            let scope_moniker = self.scope_moniker.clone();
-            let host = self.host.clone();
-            task_group.spawn(async move {
-                if let Err(e) = host.serve(scope_moniker, stream).await {
-                    // TODO: Set an epitaph to indicate this was an unexpected error.
-                    warn!("serve_realm failed: {}", e);
-                }
-            });
-            Ok(())
-        }
-    }
-
-    #[async_trait]
-    impl Hook for MockRealmCapabilityHost {
-        async fn on(self: Arc<Self>, event: &Event) -> Result<(), ModelError> {
-            if let EventPayload::CapabilityRouted {
-                source: CapabilitySource::Framework { capability, component },
-                capability_provider,
-            } = &event.payload
-            {
-                let mut capability_provider = capability_provider.lock().await;
-                *capability_provider = self
-                    .on_scoped_framework_capability_routed_async(
-                        component.moniker.clone(),
-                        &capability,
-                        capability_provider.take(),
-                    )
-                    .await?;
-            }
-            Ok(())
-        }
-    }
-
-    #[derive(Clone)]
-    pub struct MockRealmCapabilityHost {
-        /// List of calls to `OpenExposedDir` with component's moniker.
-        open_calls: Arc<Mutex<Vec<String>>>,
-    }
-
-    impl MockRealmCapabilityHost {
-        pub fn new() -> Self {
-            Self { open_calls: Arc::new(Mutex::new(vec![])) }
-        }
-
-        pub fn open_calls(&self) -> Arc<Mutex<Vec<String>>> {
-            self.open_calls.clone()
-        }
-
-        async fn serve(
-            &self,
-            scope_moniker: Moniker,
-            mut stream: fcomponent::RealmRequestStream,
-        ) -> Result<(), Error> {
-            while let Some(request) = stream.try_next().await? {
-                match request {
-                    fcomponent::RealmRequest::OpenExposedDir { responder, .. } => {
-                        self.open_calls.lock().await.push(
-                            scope_moniker
-                                .path()
-                                .last()
-                                .expect("did not expect root component")
-                                .name()
-                                .to_string(),
-                        );
-                        responder.send(Ok(()))?;
-                    }
-                    _ => {}
-                }
-            }
-            Ok(())
-        }
-
-        pub async fn on_scoped_framework_capability_routed_async<'a>(
-            &'a self,
-            scope_moniker: Moniker,
-            capability: &'a InternalCapability,
-            capability_provider: Option<Box<dyn CapabilityProvider>>,
-        ) -> Result<Option<Box<dyn CapabilityProvider>>, ModelError> {
-            // If some other capability has already been installed, then there's nothing to
-            // do here.
-            if capability.matches_protocol(&REALM_SERVICE) {
-                Ok(Some(Box::new(MockRealmCapabilityProvider::new(
-                    scope_moniker.clone(),
-                    self.clone(),
-                )) as Box<dyn CapabilityProvider>))
-            } else {
-                Ok(capability_provider)
-            }
-        }
-    }
-
-    let components = vec![
-        ("a", ComponentDeclBuilder::new().add_lazy_child("b").build()),
-        (
-            "b",
-            ComponentDeclBuilder::new()
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Framework,
-                    source_name: "fuchsia.component.Realm".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
-                .build(),
-        ),
-    ];
-    let test = RoutingTest::new("a", components).await;
-    // RoutingTest installs the real RealmCapabilityHost. Installing the
-    // MockRealmCapabilityHost here overrides the previously installed one.
-    let realm_service_host = Arc::new(MockRealmCapabilityHost::new());
-    test.model
-        .root()
-        .hooks
-        .install(vec![HooksRegistration::new(
-            "MockRealmCapabilityHost",
-            vec![EventType::CapabilityRouted],
-            Arc::downgrade(&realm_service_host) as Weak<dyn Hook>,
-        )])
-        .await;
-    test.check_use_realm(vec!["b"].try_into().unwrap(), realm_service_host.open_calls()).await;
-}
 
 ///   a
 ///    \

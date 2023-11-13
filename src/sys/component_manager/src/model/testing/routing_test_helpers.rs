@@ -41,7 +41,6 @@ use {
     fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
     fuchsia_component::client::connect_to_named_protocol_at_dir_root,
     fuchsia_inspect as inspect, fuchsia_zircon as zx,
-    futures::lock::Mutex,
     futures::{channel::oneshot, prelude::*},
     moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
     std::{
@@ -495,23 +494,6 @@ impl RoutingTest {
         expected_paths.sort_unstable();
         actual_paths.sort_unstable();
         assert_eq!(expected_paths, actual_paths);
-    }
-
-    /// Checks a `use /svc/fuchsia.component.Realm` declaration at `moniker` by calling
-    /// `BindChild`.
-    pub async fn check_use_realm(&self, moniker: Moniker, bind_calls: Arc<Mutex<Vec<String>>>) {
-        let component_name =
-            self.start_instance_and_wait_start(&moniker).await.expect("bind instance failed");
-        let component_resolved_url = Self::resolved_url(&component_name);
-        let path = "/svc/fuchsia.component.Realm".parse().unwrap();
-        Self::check_namespace(component_name, &self.mock_runner, self.components.clone()).await;
-        capability_util::call_realm_svc(
-            path,
-            &component_resolved_url,
-            &self.mock_runner.get_namespace(&component_resolved_url).unwrap(),
-            bind_calls.clone(),
-        )
-        .await;
     }
 
     /// Build an outgoing directory for the given component.
@@ -1434,31 +1416,6 @@ pub mod capability_util {
             .map(|e| e.name)
             .collect();
         entries
-    }
-
-    /// Looks up `resolved_url` in the namespace, and attempts to use `path`. Expects the service
-    /// to be fuchsia.component.Realm.
-    pub async fn call_realm_svc(
-        path: cm_types::Path,
-        resolved_url: &str,
-        namespace: &ManagedNamespace,
-        bind_calls: Arc<Mutex<Vec<String>>>,
-    ) {
-        let dir_proxy = take_dir_from_namespace(namespace, path.dirname()).await;
-        let realm_proxy = connect_to_named_protocol_at_dir_root::<fcomponent::RealmMarker>(
-            &dir_proxy,
-            path.basename(),
-        )
-        .expect("failed to open realm service");
-        let child_ref = fdecl::ChildRef { name: "my_child".to_string(), collection: None };
-
-        let (_, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-        let res = realm_proxy.open_exposed_dir(&child_ref, server_end).await;
-        // Check for side effects: realm service should have received the `open_exposed_dir` call.
-        res.expect("failed to send fidl message").expect("failed to use realm service");
-        let bind_url =
-            format!("test:///{}_resolved", bind_calls.lock().await.last().expect("no bind call"));
-        assert_eq!(bind_url, resolved_url);
     }
 
     /// Call `fuchsia.component.Realm.CreateChild` to create a dynamic child.

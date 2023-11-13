@@ -1370,7 +1370,7 @@ impl ResolvedInstanceState {
         };
         state.add_static_children(component, component_sandboxes.child_sandboxes).await?;
         state.wait_on_program_sandbox(component);
-        state.dispatch_receivers_to_hooks(component, component_sandboxes.sources_and_receivers);
+        state.dispatch_receivers_to_providers(component, component_sandboxes.sources_and_receivers);
         Ok(state)
     }
 
@@ -1406,8 +1406,7 @@ impl ResolvedInstanceState {
             }));
     }
 
-    // TODO(fxbug.dev/308939186): don't execute framework capabilities through the hooks system
-    fn dispatch_receivers_to_hooks(
+    fn dispatch_receivers_to_providers(
         &self,
         component: &Arc<ComponentInstance>,
         sources_and_receivers: Vec<(CapabilitySourceFactory, Receiver<Message>)>,
@@ -1432,20 +1431,16 @@ impl ResolvedInstanceState {
                             }
                             let mut chan = Channel::from_handle(message.handle);
                             if let Ok(target) = message.target.upgrade() {
-                                let mutexed_provider = Arc::new(Mutex::new(None));
-                                let event = Event::new(
-                                    &target,
-                                    EventPayload::CapabilityRouted {
-                                        source: capability_source,
-                                        capability_provider: mutexed_provider.clone(),
-                                    },
-                                );
-                                target.hooks.dispatch(&event).await;
-                                if let Some(capability_provider) =
-                                    mutexed_provider.lock().await.take()
-                                {
-                                    if let Ok(component) = weak_component.upgrade() {
-                                        capability_provider
+                                if let Ok(component) = weak_component.upgrade() {
+                                    if let Some(provider) = target
+                                        .context
+                                        .find_internal_provider(
+                                            &capability_source,
+                                            target.as_weak(),
+                                        )
+                                        .await
+                                    {
+                                        provider
                                             .open(
                                                 component.nonblocking_task_group(),
                                                 message.flags,
@@ -1695,7 +1690,7 @@ impl ResolvedInstanceState {
             &dynamic_offers,
             &mut child_sandbox,
         );
-        self.dispatch_receivers_to_hooks(component, sources_and_receivers);
+        self.dispatch_receivers_to_providers(component, sources_and_receivers);
 
         if self.get_child(&child_moniker).is_some() {
             return Err(AddChildError::InstanceAlreadyExists {

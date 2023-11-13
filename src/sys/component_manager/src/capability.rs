@@ -3,7 +3,11 @@
 // found in the LICENSE file.
 
 use {
-    crate::model::{component::ComponentInstance, error::CapabilityProviderError},
+    crate::model::{
+        component::{ComponentInstance, WeakComponentInstance},
+        error::CapabilityProviderError,
+    },
+    ::routing::capability_source::{ComponentCapability, InternalCapability},
     async_trait::async_trait,
     cm_util::channel,
     cm_util::TaskGroup,
@@ -77,4 +81,31 @@ impl<T: FrameworkCapabilityProvider + 'static> CapabilityProvider for T {
         service.open(ExecutionScope::new(), flags, relative_path, server_end.into());
         Ok(())
     }
+}
+
+/// Framework capabilities implement this trait to register themselves with component manager's
+/// builtin environment.
+pub trait FrameworkCapability: Send + Sync {
+    /// Returns true if `capability` matches this framework capability.
+    fn matches(&self, capability: &InternalCapability) -> bool;
+
+    /// Returns a [CapabilityProvider] that serves this framework capability with `scope`
+    /// and was requested by `target`.
+    fn new_provider(
+        &self,
+        scope: WeakComponentInstance,
+        target: WeakComponentInstance,
+    ) -> Box<dyn CapabilityProvider>;
+}
+
+/// This trait is implemented by capabilities that are derived from other capabilities.
+#[async_trait]
+pub trait DerivedCapability: Send + Sync {
+    /// Returns a [CapabilityProvider] that serves this derived capability with `scope`
+    /// if `source_capability` matches, or `None` otherwise.
+    async fn maybe_new_provider(
+        &self,
+        source_capability: &ComponentCapability,
+        scope: WeakComponentInstance,
+    ) -> Option<Box<dyn CapabilityProvider>>;
 }

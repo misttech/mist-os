@@ -12,11 +12,10 @@
 
 use {
     crate::{
-        capability::{CapabilityProvider, CapabilitySource, FrameworkCapabilityProvider},
+        capability::{CapabilityProvider, CapabilitySource, DerivedCapability, FrameworkCapabilityProvider},
         model::{
             component::{ComponentInstance, WeakComponentInstance},
             error::ModelError,
-            hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
             model::Model,
             routing::{Route, RouteSource},
             storage::{self, BackingDirectoryInfo},
@@ -173,25 +172,16 @@ impl FrameworkCapabilityProvider for StorageAdminProtocolProvider {
     }
 }
 
-pub struct StorageAdmin {
-    model: Weak<Model>,
+pub struct StorageAdminDerivedCapability {
+    host: Arc<StorageAdmin>,
 }
 
-// `StorageAdmin` is a `Hook` that serves the `StorageAdmin` FIDL protocol.
-impl StorageAdmin {
+impl StorageAdminDerivedCapability {
     pub fn new(model: Weak<Model>) -> Self {
-        Self { model }
+        Self { host: StorageAdmin::new(model) }
     }
 
-    pub fn hooks(self: &Arc<Self>) -> Vec<HooksRegistration> {
-        vec![HooksRegistration::new(
-            "StorageAdmin",
-            vec![EventType::CapabilityRouted],
-            Arc::downgrade(self) as Weak<dyn Hook>,
-        )]
-    }
-
-    pub async fn extract_storage_decl(
+    async fn extract_storage_decl(
         source_capability: &ComponentCapability,
         component: WeakComponentInstance,
     ) -> Result<Option<StorageDecl>, ModelError> {
@@ -215,42 +205,36 @@ impl StorageAdmin {
         let decl = source_component_state.decl();
         Ok(decl.find_storage_source(source_capability_name.unwrap()).cloned())
     }
+}
 
-    /// If `capability_provider` is `None` this attempts to create a provider
-    /// based on the declaration represented by `source_capability` evaluated
-    /// in the context of `component`. If `source_capability` contains a valid
-    /// capability declaration this function returns the provider, otherwise an
-    /// error.
-    ///
-    /// # Arguments
-    /// * `source_capability`: The capability that represents the storage.
-    /// * `component`: The component that defined the storage capability.
-    /// * `capability_provider`: The provider of the capability, if any.
-    ///   Normally we expect this to be `None` because component_manager is
-    ///   usually the provider.
-    async fn on_scoped_framework_capability_routed_async<'a>(
-        self: Arc<Self>,
-        source_capability: &'a ComponentCapability,
-        component: WeakComponentInstance,
-        capability_provider: Option<Box<dyn CapabilityProvider>>,
-    ) -> Result<Option<Box<dyn CapabilityProvider>>, ModelError> {
-        // If some other capability has already been installed, then there's nothing to
-        // do here.
-        if capability_provider.is_some() {
-            return Ok(capability_provider);
-        }
-        // Find the storage decl, if it exists we're good to go
-        let storage_decl = Self::extract_storage_decl(source_capability, component.clone()).await?;
-        if let Some(storage_decl) = storage_decl {
-            return Ok(Some(Box::new(StorageAdminProtocolProvider::new(
+#[async_trait]
+impl DerivedCapability for StorageAdminDerivedCapability {
+    async fn maybe_new_provider(
+        &self,
+        source_capability: &ComponentCapability,
+        scope: WeakComponentInstance,
+    ) -> Option<Box<dyn CapabilityProvider>> {
+        let storage_decl = Self::extract_storage_decl(source_capability, scope.clone()).await;
+        if let Ok(Some(storage_decl)) = storage_decl {
+            return Some(Box::new(StorageAdminProtocolProvider::new(
                 storage_decl,
-                component,
-                self.clone(),
-            )) as Box<dyn CapabilityProvider>));
+                scope,
+                self.host.clone(),
+            )) as Box<dyn CapabilityProvider>);
         }
         // The declaration referenced either a nonexistent capability, or a capability that isn't a
         // storage capability. We can't be the provider for this.
-        Ok(None)
+        None
+    }
+}
+
+pub struct StorageAdmin {
+    model: Weak<Model>,
+}
+
+impl StorageAdmin {
+    pub fn new(model: Weak<Model>) -> Arc<Self> {
+        Arc::new(Self { model })
     }
 
     /// Serves the `fuchsia.sys2/StorageAdmin` protocol over the provided
@@ -796,29 +780,6 @@ impl StorageAdmin {
             responder.send(&monikers)?;
         }
         Ok(())
-    }
-}
-
-#[async_trait]
-impl Hook for StorageAdmin {
-    async fn on(self: Arc<Self>, event: &Event) -> Result<(), ModelError> {
-        match &event.payload {
-            EventPayload::CapabilityRouted {
-                source: CapabilitySource::Capability { source_capability, component },
-                capability_provider,
-            } => {
-                let mut capability_provider = capability_provider.lock().await;
-                *capability_provider = self
-                    .on_scoped_framework_capability_routed_async(
-                        source_capability,
-                        component.clone(),
-                        capability_provider.take(),
-                    )
-                    .await?;
-                Ok(())
-            }
-            _ => Ok(()),
-        }
     }
 }
 

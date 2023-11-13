@@ -74,6 +74,10 @@ impl Model {
         &self.root
     }
 
+    pub fn context(&self) -> &ModelContext {
+        &self.context
+    }
+
     pub fn component_id_index(&self) -> &component_id_index::Index {
         self.context.component_id_index()
     }

@@ -4,11 +4,8 @@
 
 use {
     crate::{
-        capability::{CapabilityProvider, CapabilitySource, FrameworkCapabilityProvider},
-        model::{
-            error::ModelError,
-            hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
-        },
+        capability::{CapabilityProvider, FrameworkCapability, FrameworkCapabilityProvider},
+        model::component::WeakComponentInstance,
     },
     ::routing::capability_source::InternalCapability,
     async_trait::async_trait,
@@ -21,20 +18,18 @@ use {
         prelude::*,
     },
     lazy_static::lazy_static,
-    moniker::Moniker,
     namespace::{self, NamespaceError},
     sandbox::AnyCapability,
     serve_processargs::{BuildNamespaceError, NamespaceBuilder},
-    std::sync::{Arc, Weak},
+    std::sync::Arc,
     tracing::warn,
 };
 
 lazy_static! {
-    pub static ref CAPABILITY_NAME: Name =
-        fcomponent::NamespaceMarker::PROTOCOL_NAME.parse().unwrap();
+    static ref CAPABILITY_NAME: Name = fcomponent::NamespaceMarker::PROTOCOL_NAME.parse().unwrap();
 }
 
-pub struct NamespaceCapabilityProvider {
+struct NamespaceCapabilityProvider {
     host: Arc<NamespaceCapabilityHost>,
 }
 
@@ -64,14 +59,6 @@ pub struct NamespaceCapabilityHost {
 impl NamespaceCapabilityHost {
     pub fn new() -> Self {
         Self { namespace_tasks: TaskGroup::new() }
-    }
-
-    pub fn hooks(self: &Arc<Self>) -> Vec<HooksRegistration> {
-        vec![HooksRegistration::new(
-            "NamespaceCapabilityHost",
-            vec![EventType::CapabilityRouted],
-            Arc::downgrade(self) as Weak<dyn Hook>,
-        )]
     }
 
     pub async fn serve(
@@ -150,42 +137,29 @@ impl NamespaceCapabilityHost {
         let (sender, _receiver) = unbounded();
         sender
     }
+}
 
-    async fn on_framework_capability_routed<'a>(
-        self: Arc<Self>,
-        _scope_moniker: Moniker,
-        capability: &'a InternalCapability,
-        capability_provider: Option<Box<dyn CapabilityProvider>>,
-    ) -> Result<Option<Box<dyn CapabilityProvider>>, ModelError> {
-        // If some other capability has already been installed, then there's nothing to
-        // do here.
-        if capability_provider.is_none() && capability.matches_protocol(&CAPABILITY_NAME) {
-            return Ok(Some(Box::new(NamespaceCapabilityProvider::new(self.clone()))
-                as Box<dyn CapabilityProvider>));
-        }
+pub struct NamespaceFrameworkCapability {
+    host: Arc<NamespaceCapabilityHost>,
+}
 
-        Ok(capability_provider)
+impl NamespaceFrameworkCapability {
+    pub fn new() -> Self {
+        Self { host: Arc::new(NamespaceCapabilityHost::new()) }
     }
 }
 
-#[async_trait]
-impl Hook for NamespaceCapabilityHost {
-    async fn on(self: Arc<Self>, event: &Event) -> Result<(), ModelError> {
-        if let EventPayload::CapabilityRouted {
-            source: CapabilitySource::Framework { capability, component },
-            capability_provider,
-        } = &event.payload
-        {
-            let mut capability_provider = capability_provider.lock().await;
-            *capability_provider = self
-                .on_framework_capability_routed(
-                    component.moniker.clone(),
-                    &capability,
-                    capability_provider.take(),
-                )
-                .await?;
-        }
-        Ok(())
+impl FrameworkCapability for NamespaceFrameworkCapability {
+    fn matches(&self, capability: &InternalCapability) -> bool {
+        capability.matches_protocol(&CAPABILITY_NAME)
+    }
+
+    fn new_provider(
+        &self,
+        _scope: WeakComponentInstance,
+        _target: WeakComponentInstance,
+    ) -> Box<dyn CapabilityProvider> {
+        Box::new(NamespaceCapabilityProvider::new(self.host.clone()))
     }
 }
 

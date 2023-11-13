@@ -3,9 +3,16 @@
 // found in the LICENSE file.
 
 use {
-    crate::model::error::ModelError,
+    crate::{
+        capability::{
+            CapabilityProvider, CapabilitySource, DerivedCapability, FrameworkCapability,
+        },
+        model::component::WeakComponentInstance,
+        model::error::ModelError,
+    },
     ::routing::policy::GlobalPolicyChecker,
     cm_config::{AbiRevisionPolicy, RuntimeConfig},
+    futures::lock::Mutex,
     std::sync::Arc,
 };
 
@@ -16,6 +23,8 @@ pub struct ModelContext {
     component_id_index: component_id_index::Index,
     policy_checker: GlobalPolicyChecker,
     runtime_config: Arc<RuntimeConfig>,
+    framework_capabilities: Mutex<Option<Vec<Box<dyn FrameworkCapability>>>>,
+    derived_capabilities: Mutex<Option<Vec<Box<dyn DerivedCapability>>>>,
 }
 
 impl ModelContext {
@@ -28,6 +37,8 @@ impl ModelContext {
             },
             policy_checker: GlobalPolicyChecker::new(runtime_config.security_policy.clone()),
             runtime_config,
+            framework_capabilities: Mutex::new(None),
+            derived_capabilities: Mutex::new(None),
         })
     }
 
@@ -52,5 +63,47 @@ impl ModelContext {
 
     pub fn abi_revision_policy(&self) -> &AbiRevisionPolicy {
         &self.runtime_config.abi_revision_policy
+    }
+
+    pub async fn init_framework_capabilities(&self, v: Vec<Box<dyn FrameworkCapability>>) {
+        let mut framework_capabilities = self.framework_capabilities.lock().await;
+        assert!(framework_capabilities.is_none(), "already initialized");
+        *framework_capabilities = Some(v);
+    }
+
+    pub async fn init_derived_capabilities(&self, v: Vec<Box<dyn DerivedCapability>>) {
+        let mut derived_capabilities = self.derived_capabilities.lock().await;
+        assert!(derived_capabilities.is_none(), "already initialized");
+        *derived_capabilities = Some(v);
+    }
+
+    pub async fn find_internal_provider(
+        &self,
+        source: &CapabilitySource,
+        target: WeakComponentInstance,
+    ) -> Option<Box<dyn CapabilityProvider>> {
+        match source {
+            CapabilitySource::Framework { capability, component } => {
+                let framework_capabilities = self.framework_capabilities.lock().await;
+                for c in framework_capabilities.as_ref().expect("not initialized") {
+                    if c.matches(capability) {
+                        return Some(c.new_provider(component.clone(), target));
+                    }
+                }
+                None
+            }
+            CapabilitySource::Capability { source_capability, component } => {
+                let derived_capabilities = self.derived_capabilities.lock().await;
+                for c in derived_capabilities.as_ref().expect("not initialized") {
+                    if let Some(provider) =
+                        c.maybe_new_provider(source_capability, component.clone()).await
+                    {
+                        return Some(provider);
+                    }
+                }
+                None
+            }
+            _ => None,
+        }
     }
 }

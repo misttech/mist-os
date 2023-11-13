@@ -109,21 +109,27 @@ impl<'a> OpenRequest<'a> {
             provider
         } else {
             // Dispatch a CapabilityRouted event to get a capability provider
-            let mutexed_provider = Arc::new(Mutex::new(None));
 
-            let event = Event::new(
-                &target,
-                EventPayload::CapabilityRouted {
-                    source: source.clone(),
-                    capability_provider: mutexed_provider.clone(),
-                },
-            );
+            if let Some(provider) =
+                target.context.find_internal_provider(&source, target.as_weak()).await
+            {
+                provider
+            } else {
+                let mutexed_provider = Arc::new(Mutex::new(None));
+                let event = Event::new(
+                    &target,
+                    EventPayload::CapabilityRouted {
+                        source: source.clone(),
+                        capability_provider: mutexed_provider.clone(),
+                    },
+                );
 
-            // Get a capability provider from the tree
-            target.hooks.dispatch(&event).await;
+                // Get a capability provider from the tree
+                target.hooks.dispatch(&event).await;
 
-            let provider = mutexed_provider.lock().await.take();
-            provider.ok_or(OpenError::CapabilityProviderNotFound)?
+                let provider = mutexed_provider.lock().await.take();
+                provider.ok_or(OpenError::CapabilityProviderNotFound)?
+            }
         };
 
         let OpenOptions { flags, relative_path, mut server_chan } = open_options;

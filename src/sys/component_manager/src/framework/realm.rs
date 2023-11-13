@@ -4,11 +4,10 @@
 
 use {
     crate::{
-        capability::{CapabilityProvider, CapabilitySource, FrameworkCapabilityProvider},
+        capability::{CapabilityProvider, FrameworkCapability, FrameworkCapabilityProvider},
         model::{
             component::{ComponentInstance, WeakComponentInstance},
-            error::{ModelError, OpenExposedDirError},
-            hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
+            error::OpenExposedDirError,
             model::Model,
         },
     },
@@ -33,10 +32,10 @@ use {
 };
 
 lazy_static! {
-    pub static ref REALM_SERVICE: Name = "fuchsia.component.Realm".parse().unwrap();
+    static ref REALM_SERVICE: Name = "fuchsia.component.Realm".parse().unwrap();
 }
 
-pub struct RealmCapabilityProvider {
+struct RealmCapabilityProvider {
     scope_moniker: Moniker,
     host: Arc<RealmCapabilityHost>,
 }
@@ -68,24 +67,44 @@ impl FrameworkCapabilityProvider for RealmCapabilityProvider {
     }
 }
 
-#[derive(Clone)]
+pub struct RealmFrameworkCapability {
+    host: Arc<RealmCapabilityHost>,
+}
+
 pub struct RealmCapabilityHost {
     model: Weak<Model>,
     config: Arc<RuntimeConfig>,
 }
 
+impl RealmFrameworkCapability {
+    pub fn new(model: Weak<Model>, config: Arc<RuntimeConfig>) -> Self {
+        Self { host: Arc::new(RealmCapabilityHost::new(model, config)) }
+    }
+}
+
+impl FrameworkCapability for RealmFrameworkCapability {
+    fn matches(&self, capability: &InternalCapability) -> bool {
+        capability.matches_protocol(&REALM_SERVICE)
+    }
+
+    fn new_provider(
+        &self,
+        scope: WeakComponentInstance,
+        _target: WeakComponentInstance,
+    ) -> Box<dyn CapabilityProvider> {
+        Box::new(RealmCapabilityProvider::new(scope.moniker.clone(), self.host.clone()))
+    }
+}
+
 // `RealmCapabilityHost` is a `Hook` that serves the `Realm` FIDL protocol.
 impl RealmCapabilityHost {
-    pub fn new(model: Weak<Model>, config: Arc<RuntimeConfig>) -> Self {
+    fn new(model: Weak<Model>, config: Arc<RuntimeConfig>) -> Self {
         Self { model, config }
     }
 
-    pub fn hooks(self: &Arc<Self>) -> Vec<HooksRegistration> {
-        vec![HooksRegistration::new(
-            "RealmCapabilityHost",
-            vec![EventType::CapabilityRouted],
-            Arc::downgrade(self) as Weak<dyn Hook>,
-        )]
+    #[cfg(test)]
+    pub fn new_for_test(model: Weak<Model>, config: Arc<RuntimeConfig>) -> Self {
+        Self::new(model, config)
     }
 
     pub async fn serve(
@@ -210,22 +229,6 @@ impl RealmCapabilityHost {
         Ok(())
     }
 
-    async fn on_scoped_framework_capability_routed_async<'a>(
-        self: Arc<Self>,
-        scope_moniker: Moniker,
-        capability: &'a InternalCapability,
-        capability_provider: Option<Box<dyn CapabilityProvider>>,
-    ) -> Result<Option<Box<dyn CapabilityProvider>>, ModelError> {
-        // If some other capability has already been installed, then there's nothing to
-        // do here.
-        if capability_provider.is_none() && capability.matches_protocol(&REALM_SERVICE) {
-            return Ok(Some(Box::new(RealmCapabilityProvider::new(scope_moniker, self.clone()))
-                as Box<dyn CapabilityProvider>));
-        }
-
-        Ok(capability_provider)
-    }
-
     async fn get_child(
         parent: &WeakComponentInstance,
         child: fdecl::ChildRef,
@@ -308,27 +311,6 @@ impl RealmCapabilityHost {
     }
 }
 
-#[async_trait]
-impl Hook for RealmCapabilityHost {
-    async fn on(self: Arc<Self>, event: &Event) -> Result<(), ModelError> {
-        if let EventPayload::CapabilityRouted {
-            source: CapabilitySource::Framework { capability, component },
-            capability_provider,
-        } = &event.payload
-        {
-            let mut capability_provider = capability_provider.lock().await;
-            *capability_provider = self
-                .on_scoped_framework_capability_routed_async(
-                    component.moniker.clone(),
-                    &capability,
-                    capability_provider.take(),
-                )
-                .await?;
-        }
-        Ok(())
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use {
@@ -338,6 +320,7 @@ mod tests {
             model::{
                 component::{ComponentInstance, StartReason},
                 events::{source::EventSource, stream::EventStream},
+                hooks::EventType,
                 testing::{mocks::*, out_dir::OutDir, test_helpers::*, test_hook::*},
             },
         },
@@ -373,8 +356,8 @@ mod tests {
             let config = RuntimeConfig { list_children_batch_size: 2, ..Default::default() };
             let TestModelResult { model, builtin_environment, mock_runner, .. } =
                 TestEnvironmentBuilder::new()
-                    .set_components(components)
                     .set_runtime_config(config)
+                    .set_components(components)
                     .build()
                     .await;
 
@@ -395,8 +378,10 @@ mod tests {
                 endpoints::create_proxy_and_stream::<fcomponent::RealmMarker>().unwrap();
             {
                 let component = WeakComponentInstance::from(&component);
-                let realm_capability_host =
-                    builtin_environment.lock().await.realm_capability_host.clone();
+                let realm_capability_host = RealmCapabilityHost::new(
+                    Arc::downgrade(&model),
+                    model.context().runtime_config().clone(),
+                );
                 fasync::Task::spawn(async move {
                     realm_capability_host
                         .serve(component, stream)

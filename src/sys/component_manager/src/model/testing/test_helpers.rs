@@ -5,6 +5,7 @@
 use {
     crate::{
         builtin_environment::{BuiltinEnvironment, BuiltinEnvironmentBuilder},
+        framework::realm::RealmCapabilityHost,
         model::{
             component::{ComponentInstance, InstanceState, StartReason, WeakComponentInstance},
             events::{registry::EventSubscription, source::EventSource, stream::EventStream},
@@ -349,7 +350,6 @@ impl TestEnvironmentBuilder {
         model.root().hooks.install(self.hooks).await;
 
         // Host framework service for `moniker`, if requested.
-        let builtin_environment_inner = builtin_environment.clone();
         let realm_proxy = if let Some(moniker) = self.realm_moniker {
             let (realm_proxy, stream) =
                 endpoints::create_proxy_and_stream::<fcomponent::RealmMarker>().unwrap();
@@ -359,11 +359,12 @@ impl TestEnvironmentBuilder {
                     .await
                     .unwrap_or_else(|e| panic!("could not look up {}: {:?}", moniker, e)),
             );
+            let realm_capability_host = RealmCapabilityHost::new_for_test(
+                Arc::downgrade(&model),
+                model.context().runtime_config().clone(),
+            );
             fasync::Task::spawn(async move {
-                builtin_environment_inner
-                    .lock()
-                    .await
-                    .realm_capability_host
+                realm_capability_host
                     .serve(component, stream)
                     .await
                     .expect("failed serving realm service");

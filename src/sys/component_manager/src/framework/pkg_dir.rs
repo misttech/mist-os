@@ -7,35 +7,28 @@
 
 use {
     crate::{
-        capability::{CapabilityProvider, CapabilitySource},
+        capability::{CapabilityProvider, FrameworkCapability},
         model::{
-            component::Package,
-            error::{CapabilityProviderError, ModelError, PkgDirError},
-            hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
+            component::WeakComponentInstance,
+            error::{CapabilityProviderError, PkgDirError},
         },
     },
-    ::routing::capability_source::InternalCapability,
+    ::routing::{capability_source::InternalCapability, error::ComponentInstanceError},
     async_trait::async_trait,
     cm_util::channel,
     cm_util::TaskGroup,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    futures::lock::Mutex,
-    moniker::Moniker,
-    std::{
-        path::PathBuf,
-        sync::{Arc, Weak},
-    },
+    std::path::PathBuf,
 };
 
 struct PkgDirectoryProvider {
-    _moniker: Moniker,
-    package: Option<Package>,
+    scope: WeakComponentInstance,
 }
 
 impl PkgDirectoryProvider {
-    pub fn new(moniker: Moniker, package: Option<Package>) -> Self {
-        PkgDirectoryProvider { _moniker: moniker, package }
+    pub fn new(scope: WeakComponentInstance) -> Self {
+        PkgDirectoryProvider { scope }
     }
 }
 
@@ -48,10 +41,22 @@ impl CapabilityProvider for PkgDirectoryProvider {
         relative_path: PathBuf,
         server_end: &mut zx::Channel,
     ) -> Result<(), CapabilityProviderError> {
+        let component = self.scope.upgrade().map_err(|_| {
+            ComponentInstanceError::InstanceNotFound { moniker: self.scope.moniker.clone() }
+        })?;
+        let resolved_state = component.lock_resolved_state().await.map_err(|err| {
+            let err: anyhow::Error = err.into();
+            ComponentInstanceError::ResolveFailed {
+                moniker: self.scope.moniker.clone(),
+                err: err.into(),
+            }
+        })?;
+        let package = resolved_state.package().cloned();
+
         let relative_path =
             relative_path.to_str().ok_or(CapabilityProviderError::BadPath)?.to_string();
         let server_end = ServerEnd::new(channel::take_channel(server_end));
-        if let Some(package) = &self.package {
+        if let Some(package) = package {
             if relative_path.is_empty() {
                 package
                     .package_dir
@@ -70,59 +75,24 @@ impl CapabilityProvider for PkgDirectoryProvider {
     }
 }
 
-pub struct PkgDirectory;
+pub struct PkgDirectoryFrameworkCapability;
 
-impl PkgDirectory {
-    pub fn hooks(self: &Arc<Self>) -> Vec<HooksRegistration> {
-        vec![HooksRegistration::new(
-            "PkgDirectory",
-            vec![EventType::CapabilityRouted],
-            Arc::downgrade(self) as Weak<dyn Hook>,
-        )]
-    }
-
-    /// Given a `CapabilitySource`, determine if it is a framework-provided
-    /// pkg capability. If so, update the given `capability_provider` to
-    /// provide a pkg directory.
-    async fn on_capability_routed_async(
-        self: Arc<Self>,
-        source: CapabilitySource,
-        capability_provider: Arc<Mutex<Option<Box<dyn CapabilityProvider>>>>,
-    ) -> Result<(), ModelError> {
-        // If this is a scoped framework directory capability, then check the source path
-        if let CapabilitySource::Framework {
-            capability: InternalCapability::Directory(source_name),
-            component,
-        } = source
-        {
-            if source_name.as_str() != "pkg" {
-                return Ok(());
-            }
-
-            // Set the capability provider, if not already set.
-            let mut capability_provider = capability_provider.lock().await;
-            if capability_provider.is_none() {
-                let component = component.upgrade()?;
-                let resolved_state = component.lock_resolved_state().await?;
-                let moniker = component.moniker.clone();
-                let package = resolved_state.package().cloned();
-                *capability_provider = Some(Box::new(PkgDirectoryProvider::new(moniker, package)))
-            }
-        }
-        Ok(())
+impl PkgDirectoryFrameworkCapability {
+    pub fn new() -> Self {
+        Self {}
     }
 }
 
-#[async_trait]
-impl Hook for PkgDirectory {
-    async fn on(self: Arc<Self>, event: &Event) -> Result<(), ModelError> {
-        match &event.payload {
-            EventPayload::CapabilityRouted { source, capability_provider } => {
-                self.on_capability_routed_async(source.clone(), capability_provider.clone())
-                    .await?;
-            }
-            _ => {}
-        };
-        Ok(())
+impl FrameworkCapability for PkgDirectoryFrameworkCapability {
+    fn matches(&self, capability: &InternalCapability) -> bool {
+        matches!(capability, InternalCapability::Directory(n) if n.as_str() == "pkg")
+    }
+
+    fn new_provider(
+        &self,
+        scope: WeakComponentInstance,
+        _target: WeakComponentInstance,
+    ) -> Box<dyn CapabilityProvider> {
+        Box::new(PkgDirectoryProvider::new(scope))
     }
 }

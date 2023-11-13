@@ -36,8 +36,6 @@ pub enum ModelError {
     },
     #[error("expected a component instance moniker")]
     UnexpectedComponentManagerMoniker,
-    #[error("The model is not available")]
-    ModelNotAvailable,
     #[error("Routing error: {}", err)]
     RoutingError {
         #[from]
@@ -515,6 +513,11 @@ pub enum CapabilityProviderError {
     StreamCreationError,
     #[error("bad path")]
     BadPath,
+    #[error("component instance")]
+    ComponentInstanceError {
+        #[from]
+        err: ComponentInstanceError,
+    },
     #[error("error in pkg dir capability provider: {err}")]
     PkgDirError {
         #[from]
@@ -542,6 +545,7 @@ impl CapabilityProviderError {
         match self {
             Self::StreamCreationError => zx::Status::BAD_HANDLE,
             Self::BadPath => zx::Status::INVALID_ARGS,
+            Self::ComponentInstanceError { err } => err.as_zx_status(),
             Self::PkgDirError { err } => err.as_zx_status(),
             Self::EventSourceError { err } => err.as_zx_status(),
             Self::ComponentProviderError { err } => err.as_zx_status(),
