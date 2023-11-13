@@ -24,9 +24,9 @@ use crate::{
     signals::{send_signal, syscalls::WaitingOptions, SignalActions, SignalDetail, SignalInfo},
     task::{
         interval_timer::IntervalTimerHandle, ptrace_detach, AtomicStopState, ClockId,
-        ControllingTerminal, CurrentTask, ExitStatus, Kernel, PidTable, ProcessGroup, Session,
-        StopState, Task, TaskMutableState, TaskPersistentInfo, TaskPersistentInfoState, TimerId,
-        TimerTable, WaitQueue,
+        ControllingTerminal, CurrentTask, ExitStatus, Kernel, PidTable, ProcessGroup,
+        PtraceAllowedPtracers, Session, StopState, Task, TaskMutableState, TaskPersistentInfo,
+        TaskPersistentInfoState, TimerId, TimerTable, WaitQueue,
     },
     time::utc,
     types::errno::{errno, error, Errno},
@@ -100,8 +100,11 @@ pub struct ThreadGroupMutableState {
     /// Time statistics accumulated from the children.
     pub children_time_stats: TaskTimeStats,
 
-    // Personality flags set with `sys_personality()`.
+    /// Personality flags set with `sys_personality()`.
     pub personality: PersonalityFlags,
+
+    /// Thread groups allowed to trace tasks in this this thread group.
+    pub allowed_ptracers: PtraceAllowedPtracers,
 }
 
 /// A collection of `Task` objects that roughly correspond to a "process".
@@ -171,10 +174,10 @@ pub struct ThreadGroup {
     /// seccomp filters are also inherited across clone.
     pub next_seccomp_filter_id: AtomicU64,
 
-    // Timer id of ITIMER_REAL.
+    /// Timer id of ITIMER_REAL.
     itimer_real_id: TimerId,
 
-    // Tasks ptraced by this process
+    /// Tasks ptraced by this process
     pub ptracees: Mutex<BTreeMap<pid_t, TaskContainer>>,
 }
 
@@ -323,6 +326,7 @@ impl ThreadGroup {
                 selinux: Default::default(),
                 children_time_stats: Default::default(),
                 personality: parent.as_ref().map(|p| p.personality).unwrap_or(Default::default()),
+                allowed_ptracers: PtraceAllowedPtracers::None,
             }),
         });
 

@@ -110,6 +110,20 @@ const ADMIN_ONLY_SCOPE: u8 = 2;
 /// 3 means no process can attach.
 const NO_ATTACH_SCOPE: u8 = 3;
 
+// PR_SET_PTRACER_ANY is defined as ((unsigned long) -1),
+// which is not understood by bindgen.
+pub const PR_SET_PTRACER_ANY: i32 = -1;
+
+/// Indicates processes specifically allowed to trace a given process if using
+/// RESTRICTED_SCOPE.  Used by prctl(PR_SET_PTRACER).
+#[derive(Copy, Clone, Default, PartialEq)]
+pub enum PtraceAllowedPtracers {
+    #[default]
+    None,
+    Some(pid_t),
+    Any,
+}
+
 /// Continues the target thread, optionally detaching from it.
 fn ptrace_cont(tracee: &Task, data: &UserAddress, detach: bool) -> Result<(), Errno> {
     let data = data.ptr() as u64;
@@ -358,21 +372,28 @@ pub fn ptrace_attach(current_task: &mut CurrentTask, pid: pid_t) -> Result<(), E
     }
 
     if ptrace_scope == RESTRICTED_SCOPE {
-        // By default, this only allows us to attach to descendants.  It also
-        // allows the tracee to call PR_SET_PTRACER, but we defer that for
-        // the moment.
+        // This only allows us to attach to descendants and tasks that have
+        // explicitly allowlisted us with PR_SET_PTRACER.
         let mut ttg = tracee.thread_group.read().parent.clone();
-        let mut found = false;
+        let mut is_parent = false;
         let my_pid = current_task.thread_group.leader;
         while let Some(target) = ttg {
             if target.as_ref().leader == my_pid {
-                found = true;
+                is_parent = true;
                 break;
             }
             ttg = target.read().parent.clone();
         }
-        if !found {
-            return error!(EPERM);
+        if !is_parent {
+            match tracee.thread_group.read().allowed_ptracers {
+                PtraceAllowedPtracers::None => return error!(EPERM),
+                PtraceAllowedPtracers::Some(pid) => {
+                    if my_pid != pid {
+                        return error!(EPERM);
+                    }
+                }
+                PtraceAllowedPtracers::Any => {}
+            }
         }
     }
 
@@ -411,4 +432,69 @@ pub fn ptrace_get_scope(kernel: &Arc<Kernel>) -> Vec<u8> {
     let mut scope = kernel.ptrace_scope.load(Ordering::Relaxed).to_string();
     scope.push('\n');
     scope.into_bytes()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        task::syscalls::sys_prctl,
+        testing::{create_kernel_task_and_unlocked, create_task},
+        types::PR_SET_PTRACER,
+    };
+
+    #[::fuchsia::test]
+    async fn test_set_ptracer() {
+        let (kernel, mut tracee, mut locked) = create_kernel_task_and_unlocked();
+        let mut tracer = create_task(&kernel, "tracer");
+        kernel.ptrace_scope.store(RESTRICTED_SCOPE, Ordering::Relaxed);
+        assert_eq!(
+            sys_prctl(&mut locked, &mut tracee, PR_SET_PTRACER, 0xFFF, 0, 0, 0),
+            error!(EINVAL)
+        );
+
+        assert_eq!(ptrace_attach(&mut tracer, tracee.as_ref().task.id), error!(EPERM));
+
+        assert!(sys_prctl(
+            &mut locked,
+            &mut tracee,
+            PR_SET_PTRACER,
+            tracer.thread_group.leader as u64,
+            0,
+            0,
+            0
+        )
+        .is_ok());
+
+        let mut not_tracer = create_task(&kernel, "not-tracer");
+        assert_eq!(ptrace_attach(&mut not_tracer, tracee.as_ref().task.id), error!(EPERM));
+
+        assert!(ptrace_attach(&mut tracer, tracee.as_ref().task.id).is_ok());
+    }
+
+    #[::fuchsia::test]
+    async fn test_set_ptracer_any() {
+        let (kernel, mut tracee, mut locked) = create_kernel_task_and_unlocked();
+        let mut tracer = create_task(&kernel, "tracer");
+        kernel.ptrace_scope.store(RESTRICTED_SCOPE, Ordering::Relaxed);
+        assert_eq!(
+            sys_prctl(&mut locked, &mut tracee, PR_SET_PTRACER, 0xFFF, 0, 0, 0),
+            error!(EINVAL)
+        );
+
+        assert_eq!(ptrace_attach(&mut tracer, tracee.as_ref().task.id), error!(EPERM));
+
+        assert!(sys_prctl(
+            &mut locked,
+            &mut tracee,
+            PR_SET_PTRACER,
+            PR_SET_PTRACER_ANY as u64,
+            0,
+            0,
+            0
+        )
+        .is_ok());
+
+        assert!(ptrace_attach(&mut tracer, tracee.as_ref().task.id).is_ok());
+    }
 }

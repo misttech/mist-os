@@ -564,7 +564,6 @@
                 "PtraceTest.GetRegSet",
                 "PtraceTest.Int3",
                 "PtraceTest.Interrupt_Listen_RequireSeize",
-                "PtraceTest.PrctlSetPtracerInvalidPID",
                 "PtraceTest.SeizeSetOptions",
                 "PtraceTest.Seize_Interrupt_Listen",
                 "PtraceTest.Sysemu_PokeUser",

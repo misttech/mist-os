@@ -22,8 +22,8 @@ use crate::{
     },
     task::{
         max_priority_for_sched_policy, min_priority_for_sched_policy, ptrace_attach,
-        ptrace_dispatch, ptrace_traceme, CurrentTask, ExitStatus, SchedulerPolicy, SeccompAction,
-        SeccompStateValue, Task,
+        ptrace_dispatch, ptrace_traceme, CurrentTask, ExitStatus, PtraceAllowedPtracers,
+        SchedulerPolicy, SeccompAction, SeccompStateValue, Task, PR_SET_PTRACER_ANY,
     },
     types::errno::{errno, error, Errno},
     types::signals::{Signal, UncheckedSignal},
@@ -893,14 +893,17 @@ pub fn sys_prctl(
             Ok(().into())
         }
         PR_SET_PTRACER => {
-            // PR_SET_PTRACER_ANY is defined as ((unsigned long) -1),
-            // which is not understood by bindgen.
-            if arg2 == u64::MAX {
-                // Callers (especially debuggerd) expect EINVAL if the
-                // kernel does not support PTRACER_ANY.
-                return error!(EINVAL);
-            }
-            not_implemented!("prctl(PR_SET_PTRACER, {})", arg2);
+            let allowed_ptracers = if arg2 == PR_SET_PTRACER_ANY as u64 {
+                PtraceAllowedPtracers::Any
+            } else if arg2 == 0 {
+                PtraceAllowedPtracers::None
+            } else {
+                if current_task.kernel().pids.read().get_task(arg2 as i32).upgrade().is_none() {
+                    return error!(EINVAL);
+                }
+                PtraceAllowedPtracers::Some(arg2 as pid_t)
+            };
+            current_task.thread_group.write().allowed_ptracers = allowed_ptracers;
             Ok(().into())
         }
         PR_GET_KEEPCAPS => {
