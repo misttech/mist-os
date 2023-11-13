@@ -9,6 +9,7 @@ package fidlconv
 import (
 	"fmt"
 	stdnet "net"
+	"net/netip"
 	"syscall/zx"
 	"time"
 
@@ -52,6 +53,17 @@ func ToTCPIPAddressAndProtocolNumber(addr net.IpAddress) (tcpip.Address, tcpip.N
 func ToTCPIPAddress(addr net.IpAddress) tcpip.Address {
 	a, _ := ToTCPIPAddressAndProtocolNumber(addr)
 	return a
+}
+
+func ToStdAddr(addr net.IpAddress) netip.Addr {
+	switch tag := addr.Which(); tag {
+	case net.IpAddressIpv4:
+		return netip.AddrFrom4(addr.Ipv4.Addr)
+	case net.IpAddressIpv6:
+		return netip.AddrFrom16(addr.Ipv6.Addr)
+	default:
+		panic(fmt.Sprintf("invalid fuchsia.net/IpAddress tag %d", tag))
+	}
 }
 
 func ToNetIpAddress(addr tcpip.Address) net.IpAddress {

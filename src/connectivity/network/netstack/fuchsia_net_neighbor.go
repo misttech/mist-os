@@ -10,6 +10,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/netip"
 	"strings"
 	"syscall/zx"
 	"syscall/zx/fidl"
@@ -337,10 +338,18 @@ func (n *neighborImpl) GetUnreachabilityConfig(_ fidl.Context, interfaceID uint6
 	}), nil
 }
 
+func isValidNeighborAddr(addr netip.Addr) bool {
+	limitedBroadcastAddr := netip.AddrFrom4([4]byte{255, 255, 255, 255})
+	return !(addr.IsLoopback() || addr.IsMulticast() || addr.IsUnspecified() || addr == limitedBroadcastAddr || addr.Is4In6())
+}
+
 var _ neighbor.ControllerWithCtx = (*neighborImpl)(nil)
 
 func (n *neighborImpl) AddEntry(_ fidl.Context, interfaceID uint64, neighborIP net.IpAddress, mac net.MacAddress) (neighbor.ControllerAddEntryResult, error) {
 	address, network := fidlconv.ToTCPIPAddressAndProtocolNumber(neighborIP)
+	if !isValidNeighborAddr(fidlconv.ToStdAddr(neighborIP)) {
+		return neighbor.ControllerAddEntryResultWithErr(int32(zx.ErrInvalidArgs)), nil
+	}
 	if err := n.stack.AddStaticNeighbor(tcpip.NICID(interfaceID), network, address, fidlconv.ToTCPIPLinkAddress(mac)); err != nil {
 		return neighbor.ControllerAddEntryResultWithErr(int32(WrapTcpIpError(err).ToZxStatus())), nil
 	}
@@ -349,6 +358,9 @@ func (n *neighborImpl) AddEntry(_ fidl.Context, interfaceID uint64, neighborIP n
 
 func (n *neighborImpl) RemoveEntry(_ fidl.Context, interfaceID uint64, neighborIP net.IpAddress) (neighbor.ControllerRemoveEntryResult, error) {
 	address, network := fidlconv.ToTCPIPAddressAndProtocolNumber(neighborIP)
+	if !isValidNeighborAddr(fidlconv.ToStdAddr(neighborIP)) {
+		return neighbor.ControllerRemoveEntryResultWithErr(int32(zx.ErrInvalidArgs)), nil
+	}
 	if err := n.stack.RemoveNeighbor(tcpip.NICID(interfaceID), network, address); err != nil {
 		var zxErr zx.Status
 		switch err.(type) {
