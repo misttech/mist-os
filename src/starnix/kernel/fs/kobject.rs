@@ -21,10 +21,11 @@ use crate::{
     types::{DeviceType, OpenFlags},
 };
 
-#[derive(Debug, PartialEq, Clone)]
+/// ktype is the type of object that embeds a `kobject`.
+#[derive(Debug, PartialEq)]
 pub enum KType {
-    /// Root of the kobject tree.
-    Root,
+    /// A collection of kobjects.
+    Collection,
     /// A bus which devices can be attached to.
     Bus,
     /// A group of devices that have a smilar behavior.
@@ -53,9 +54,7 @@ impl DeviceMetadata {
 #[derive(Clone, Debug)]
 pub struct KObjectDeviceAttribute {
     /// Class kobject that the device belongs to.
-    ///
-    /// `None` when it's a Block device.
-    pub class: Option<KObjectHandle>,
+    pub class: KObjectHandle,
     /// Name in /sys.
     pub name: FsString,
     pub device: DeviceMetadata,
@@ -63,16 +62,12 @@ pub struct KObjectDeviceAttribute {
 
 impl KObjectDeviceAttribute {
     pub fn new(
-        class: Option<KObjectHandle>,
+        class: KObjectHandle,
         kobject_name: &FsStr,
         device_name: &FsStr,
         device_type: DeviceType,
         mode: DeviceMode,
     ) -> Self {
-        assert!(
-            mode != DeviceMode::Block || class.is_none(),
-            "class should be None if it is a Block device"
-        );
         Self {
             class,
             name: kobject_name.to_vec(),
@@ -81,6 +76,11 @@ impl KObjectDeviceAttribute {
     }
 }
 
+/// A kobject is the fundamental unit of the sysfs /devices subsystem. Each kobject represents a
+/// sysfs object.
+///
+/// A kobject has a name, a `ktype`, pointers to its children, and a pointer to its
+/// parent, which allows it to be organized into hierarchies.
 pub struct KObject {
     /// The name that will appear in sysfs.
     ///
@@ -115,7 +115,7 @@ impl KObject {
             name: Default::default(),
             parent: None,
             children: Default::default(),
-            ktype: KType::Root,
+            ktype: KType::Collection,
             create_fs_node_ops: Box::new(|kobject| Box::new(SysFsDirectory::new(kobject))),
         })
     }
@@ -152,8 +152,8 @@ impl KObject {
     }
 
     /// The type of object that embeds a kobject.
-    pub fn ktype(&self) -> KType {
-        self.ktype.clone()
+    pub fn ktype(&self) -> &KType {
+        &self.ktype
     }
 
     /// Returns the associated `FsNodeOps`.
@@ -208,9 +208,17 @@ impl KObject {
         }
     }
 
+    pub fn insert_child(self: &KObjectHandle, child: KObjectHandle) {
+        self.children.lock().insert(child.name(), child);
+    }
+
     /// Collects all children names.
     pub fn get_children_names(&self) -> Vec<FsString> {
         self.children.lock().keys().cloned().collect()
+    }
+
+    pub fn get_children_kobjects(&self) -> Vec<KObjectHandle> {
+        self.children.lock().values().cloned().collect::<Vec<KObjectHandle>>()
     }
 }
 

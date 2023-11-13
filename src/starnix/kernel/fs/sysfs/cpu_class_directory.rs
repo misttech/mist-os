@@ -31,7 +31,7 @@ impl CpuClassDirectory {
 
 impl SysFsOps for CpuClassDirectory {
     fn kobject(&self) -> KObjectHandle {
-        self.kobject.clone().upgrade().expect("Weak references to kobject must always be valid")
+        self.kobject.upgrade().expect("Weak references to kobject must always be valid")
     }
 }
 

@@ -17,23 +17,23 @@ use crate::{
 
 use std::sync::Weak;
 
-pub struct SysFsDirectory {
+pub struct ClassCollectionDirectory {
     kobject: Weak<KObject>,
 }
 
-impl SysFsDirectory {
+impl ClassCollectionDirectory {
     pub fn new(kobject: Weak<KObject>) -> Self {
         Self { kobject }
     }
 }
 
-impl SysFsOps for SysFsDirectory {
+impl SysFsOps for ClassCollectionDirectory {
     fn kobject(&self) -> KObjectHandle {
         self.kobject.upgrade().expect("Weak references to kobject must always be valid")
     }
 }
 
-impl FsNodeOps for SysFsDirectory {
+impl FsNodeOps for ClassCollectionDirectory {
     fs_node_impl_dir_readonly!();
 
     fn create_file_ops(
@@ -47,7 +47,7 @@ impl FsNodeOps for SysFsDirectory {
                 .get_children_names()
                 .into_iter()
                 .map(|name| VecDirectoryEntry {
-                    entry_type: DirectoryEntryType::DIR,
+                    entry_type: DirectoryEntryType::LNK,
                     name,
                     inode: None,
                 })
@@ -64,7 +64,7 @@ impl FsNodeOps for SysFsDirectory {
         match self.kobject().get_child(name) {
             Some(child_kobject) => Ok(node.fs().create_node(
                 child_kobject.ops(),
-                FsNodeInfo::new_factory(mode!(IFDIR, 0o755), FsCred::root()),
+                FsNodeInfo::new_factory(mode!(IFDIR, 0o777), FsCred::root()),
             )),
             None => error!(ENOENT),
         }

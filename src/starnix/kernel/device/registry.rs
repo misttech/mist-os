@@ -4,9 +4,11 @@
 
 use crate::{
     fs::{
-        kobject::{KObject, KObjectHandle, KType, UEventAction, UEventContext},
-        sysfs::SysFsDirectory,
-        FileOps, FsNode,
+        kobject::{
+            KObject, KObjectDeviceAttribute, KObjectHandle, KType, UEventAction, UEventContext,
+        },
+        sysfs::{BlockDeviceDirectory, ClassCollectionDirectory, DeviceDirectory, SysFsDirectory},
+        FileOps, FsNode, FsStr,
     },
     logging::log_error,
     task::CurrentTask,
@@ -161,6 +163,7 @@ impl MajorDevices {
 /// The kernel's registry of drivers.
 pub struct DeviceRegistry {
     root_kobject: KObjectHandle,
+    class_subsystem_kobject: KObjectHandle,
     state: Mutex<DeviceRegistryState>,
 }
 
@@ -184,9 +187,52 @@ impl DeviceRegistry {
         self.root_kobject.clone()
     }
 
+    pub fn class_subsystem_kobject(&self) -> KObjectHandle {
+        self.class_subsystem_kobject.clone()
+    }
+
+    pub fn block_collection(&self) -> KObjectHandle {
+        self.class_subsystem_kobject.get_or_create_child(
+            b"block",
+            KType::Collection,
+            ClassCollectionDirectory::new,
+        )
+    }
+
     /// Returns the virtual bus kobject where all virtual and pseudo devices are stored.
     pub fn virtual_bus(&self) -> KObjectHandle {
         self.root_kobject.get_or_create_child(b"virtual", KType::Bus, SysFsDirectory::new)
+    }
+
+    pub fn add_class(&self, name: &FsStr, bus: KObjectHandle) -> KObjectHandle {
+        let class = bus.get_or_create_child(name, KType::Class, SysFsDirectory::new);
+        self.class_subsystem_kobject.get_or_create_child(
+            name,
+            KType::Collection,
+            ClassCollectionDirectory::new,
+        );
+        class
+    }
+
+    pub fn add_device(&self, dev_attr: KObjectDeviceAttribute) -> KObjectHandle {
+        let kobj_device = match dev_attr.device.mode {
+            DeviceMode::Char => dev_attr.class.get_or_create_child(
+                &dev_attr.name,
+                KType::Device(dev_attr.device.clone()),
+                DeviceDirectory::new,
+            ),
+            DeviceMode::Block => dev_attr.class.get_or_create_child(
+                &dev_attr.name,
+                KType::Device(dev_attr.device.clone()),
+                BlockDeviceDirectory::new,
+            ),
+        };
+        self.class_subsystem_kobject
+            .get_child(&dev_attr.class.name())
+            .expect("no associated collection exists")
+            .insert_child(kobj_device.clone());
+        self.dispatch_uevent(UEventAction::Add, kobj_device.clone());
+        kobj_device
     }
 
     pub fn register_chrdev(
@@ -294,7 +340,11 @@ impl Default for DeviceRegistry {
             .char_devices
             .register_major(DYN_MAJOR, Arc::clone(&state.dyn_devices))
             .expect("Failed to register DYN_MAJOR");
-        Self { root_kobject: KObject::new_root(), state: Mutex::new(state) }
+        Self {
+            root_kobject: KObject::new_root(),
+            class_subsystem_kobject: KObject::new_root(),
+            state: Mutex::new(state),
+        }
     }
 }
 
@@ -335,7 +385,12 @@ impl DeviceOps for Arc<RwLock<DynRegistry>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{device::mem::DevNull, fs::*, testing::*, types::device_type::MEM_MAJOR};
+    use crate::{
+        device::mem::DevNull,
+        fs::*,
+        testing::*,
+        types::device_type::{INPUT_MAJOR, MEM_MAJOR},
+    };
 
     #[::fuchsia::test]
     fn registry_fails_to_add_duplicate_device() {
@@ -417,5 +472,26 @@ mod tests {
         let _ = registry
             .open_device(&current_task, &node, OpenFlags::RDONLY, device_type, DeviceMode::Char)
             .expect("opens device");
+    }
+
+    #[::fuchsia::test]
+    async fn test_add_class() {
+        let registry = DeviceRegistry::default();
+
+        let input_class = registry.add_class(b"input", registry.virtual_bus());
+        registry.add_device(KObjectDeviceAttribute::new(
+            input_class,
+            b"mice",
+            b"mice",
+            DeviceType::new(INPUT_MAJOR, 0),
+            DeviceMode::Char,
+        ));
+
+        assert!(registry.class_subsystem_kobject().has_child(b"input"));
+        assert!(registry
+            .class_subsystem_kobject()
+            .get_child(b"input")
+            .and_then(|collection| collection.get_child(b"mice"))
+            .is_some());
     }
 }

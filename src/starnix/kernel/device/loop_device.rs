@@ -127,8 +127,10 @@ struct LoopDevice {
 impl LoopDevice {
     fn new(kernel: &Arc<Kernel>, minor: u32) -> Arc<Self> {
         let loop_device_name = format!("loop{minor}");
+        let virtual_block_class =
+            kernel.device_registry.add_class(b"block", kernel.device_registry.virtual_bus());
         kernel.add_device(KObjectDeviceAttribute::new(
-            None,
+            virtual_block_class,
             loop_device_name.as_bytes(),
             loop_device_name.as_bytes(),
             DeviceType::new(LOOP_MAJOR, minor),

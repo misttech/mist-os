@@ -14,8 +14,7 @@ use crate::{
         buffers::{InputBuffer, OutputBuffer},
         devtmpfs::{devtmpfs_create_symlink, devtmpfs_mkdir, devtmpfs_remove_child},
         fileops_impl_nonseekable, fs_node_impl_dir_readonly,
-        kobject::{KObjectDeviceAttribute, KType},
-        sysfs::SysFsDirectory,
+        kobject::KObjectDeviceAttribute,
         CacheMode, DirEntryHandle, DirectoryEntryType, FdEvents, FileHandle, FileObject, FileOps,
         FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle,
         FsNodeInfo, FsNodeOps, FsStr, SpecialNode, VecDirectory, VecDirectoryEntry,
@@ -103,20 +102,16 @@ fn init_devpts(kernel: &Arc<Kernel>, options: FileSystemOptions) -> FileSystemHa
 }
 
 pub fn tty_device_init(kernel: &Arc<Kernel>) {
-    let tty_class = kernel.device_registry.virtual_bus().get_or_create_child(
-        b"tty",
-        KType::Class,
-        SysFsDirectory::new,
-    );
+    let tty_class = kernel.device_registry.add_class(b"tty", kernel.device_registry.virtual_bus());
     let tty = KObjectDeviceAttribute::new(
-        Some(tty_class.clone()),
+        tty_class.clone(),
         b"tty",
         b"tty",
         DeviceType::TTY,
         DeviceMode::Char,
     );
     let ptmx = KObjectDeviceAttribute::new(
-        Some(tty_class),
+        tty_class,
         b"ptmx",
         b"ptmx",
         DeviceType::PTMX,

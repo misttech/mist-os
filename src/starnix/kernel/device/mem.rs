@@ -8,8 +8,7 @@ use crate::{
     fs::{
         buffers::{InputBuffer, OutputBuffer},
         fileops_impl_seekless,
-        kobject::{KObjectDeviceAttribute, KType},
-        sysfs::SysFsDirectory,
+        kobject::KObjectDeviceAttribute,
         Anon, FileHandle, FileObject, FileOps, FileWriteGuardRef, FsNodeInfo, NamespaceNode,
     },
     logging::{log, log_info},
@@ -244,14 +243,10 @@ impl FileOps for DevKmsg {
 }
 
 pub fn mem_device_init(kernel: &Arc<Kernel>) {
-    let mem_class = kernel.device_registry.virtual_bus().get_or_create_child(
-        b"mem",
-        KType::Class,
-        SysFsDirectory::new,
-    );
+    let mem_class = kernel.device_registry.add_class(b"mem", kernel.device_registry.virtual_bus());
     kernel.add_and_register_device(
         KObjectDeviceAttribute::new(
-            Some(mem_class.clone()),
+            mem_class.clone(),
             b"null",
             b"null",
             DeviceType::NULL,
@@ -261,7 +256,7 @@ pub fn mem_device_init(kernel: &Arc<Kernel>) {
     );
     kernel.add_and_register_device(
         KObjectDeviceAttribute::new(
-            Some(mem_class.clone()),
+            mem_class.clone(),
             b"zero",
             b"zero",
             DeviceType::ZERO,
@@ -271,7 +266,7 @@ pub fn mem_device_init(kernel: &Arc<Kernel>) {
     );
     kernel.add_and_register_device(
         KObjectDeviceAttribute::new(
-            Some(mem_class.clone()),
+            mem_class.clone(),
             b"full",
             b"full",
             DeviceType::FULL,
@@ -281,7 +276,7 @@ pub fn mem_device_init(kernel: &Arc<Kernel>) {
     );
     kernel.add_and_register_device(
         KObjectDeviceAttribute::new(
-            Some(mem_class.clone()),
+            mem_class.clone(),
             b"random",
             b"random",
             DeviceType::RANDOM,
@@ -291,7 +286,7 @@ pub fn mem_device_init(kernel: &Arc<Kernel>) {
     );
     kernel.add_and_register_device(
         KObjectDeviceAttribute::new(
-            Some(mem_class.clone()),
+            mem_class.clone(),
             b"urandom",
             b"urandom",
             DeviceType::URANDOM,
@@ -301,7 +296,7 @@ pub fn mem_device_init(kernel: &Arc<Kernel>) {
     );
     kernel.add_and_register_device(
         KObjectDeviceAttribute::new(
-            Some(mem_class),
+            mem_class,
             b"kmsg",
             b"kmsg",
             DeviceType::KMSG,

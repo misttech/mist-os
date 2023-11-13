@@ -8,8 +8,7 @@ use crate::{
     fs::{
         buffers::{InputBuffer, OutputBuffer},
         fileops_impl_seekable,
-        kobject::{KObjectDeviceAttribute, KType},
-        sysfs::SysFsDirectory,
+        kobject::KObjectDeviceAttribute,
         FileObject, FileOps, FsNode, VmoFileObject,
     },
     logging::{impossible_error, log_warn},
@@ -232,13 +231,10 @@ impl FileOps for Arc<Framebuffer> {
 }
 
 pub fn fb_device_init(kernel: &Arc<Kernel>) {
-    let graphics_class = kernel.device_registry.virtual_bus().get_or_create_child(
-        b"graphics",
-        KType::Class,
-        SysFsDirectory::new,
-    );
+    let graphics_class =
+        kernel.device_registry.add_class(b"graphics", kernel.device_registry.virtual_bus());
     let fb_attr = KObjectDeviceAttribute::new(
-        Some(graphics_class),
+        graphics_class,
         b"fb0",
         b"fb0",
         DeviceType::FB0,

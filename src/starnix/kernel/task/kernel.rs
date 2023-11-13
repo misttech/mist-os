@@ -32,12 +32,11 @@ use crate::{
     fs::{
         devtmpfs::devtmpfs_create_device,
         inotify::InotifyLimits,
-        kobject::{KObjectDeviceAttribute, KType, UEventAction},
+        kobject::KObjectDeviceAttribute,
         socket::{
             GenericMessage, GenericNetlink, NetlinkSenderReceiverProvider, NetlinkToClientSender,
             SocketAddress,
         },
-        sysfs::{BlockDeviceDirectory, DeviceDirectory, SysFsDirectory},
         FileOps, FileSystemHandle, FsNode,
     },
     logging::log_error,
@@ -325,29 +324,7 @@ impl Kernel {
     ///
     /// If it's a Block device, the device will be added under "block" class.
     pub fn add_device(self: &Arc<Self>, dev_attr: KObjectDeviceAttribute) {
-        let kobj_device = match dev_attr.device.mode {
-            DeviceMode::Char => {
-                assert!(dev_attr.class.is_some(), "no class is associated with the device.");
-                dev_attr.class.unwrap().get_or_create_child(
-                    &dev_attr.name,
-                    KType::Device(dev_attr.device.clone()),
-                    DeviceDirectory::new,
-                )
-            }
-            DeviceMode::Block => {
-                let block_class = self.device_registry.virtual_bus().get_or_create_child(
-                    b"block",
-                    KType::Class,
-                    SysFsDirectory::new,
-                );
-                block_class.get_or_create_child(
-                    &dev_attr.name,
-                    KType::Device(dev_attr.device.clone()),
-                    BlockDeviceDirectory::new,
-                )
-            }
-        };
-        self.device_registry.dispatch_uevent(UEventAction::Add, kobj_device);
+        self.device_registry.add_device(dev_attr.clone());
         match devtmpfs_create_device(self, dev_attr.device.clone()) {
             Ok(_) => (),
             Err(err) => {

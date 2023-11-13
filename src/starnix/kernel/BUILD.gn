@@ -317,6 +317,7 @@ rustc_binary("starnix_kernel_bin") {
     "fs/static_directory.rs",
     "fs/symlink_node.rs",
     "fs/syscalls.rs",
+    "fs/sysfs/class_collection_directory.rs",
     "fs/sysfs/cpu_class_directory.rs",
     "fs/sysfs/device_directory.rs",
     "fs/sysfs/fs.rs",

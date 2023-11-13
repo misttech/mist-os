@@ -48,25 +48,20 @@ impl SysFs {
             dir.subdir(b"tracing", 0o755, |_| ());
         });
 
-        // TODO(https://fxbug.dev/130408) include concrete block devices
-        let virtual_block_class = {
-            kernel.device_registry.virtual_bus().get_or_create_child(
-                b"block",
-                KType::Class,
-                SysFsDirectory::new,
-            )
-        };
-        dir.entry(b"block", SysFsDirectory::new(Arc::downgrade(&virtual_block_class)), dir_mode);
-
         dir.entry(
             b"devices",
             SysFsDirectory::new(Arc::downgrade(&kernel.device_registry.root_kobject())),
             dir_mode,
         );
+        dir.entry(b"block", kernel.device_registry.block_collection().ops(), dir_mode);
+        dir.entry(b"class", kernel.device_registry.class_subsystem_kobject().ops(), dir_mode);
 
-        dir.subdir(b"class", 0o755, |dir| {
-            dir.entry(b"net", NetstackDevicesDirectory::new_sys_class_net(), dir_mode);
-        });
+        // TODO(b/297438880): Remove this workaround after net devices are registered correctly.
+        kernel.device_registry.class_subsystem_kobject().get_or_create_child(
+            b"net",
+            KType::Collection,
+            |_| NetstackDevicesDirectory::new_sys_class_net(),
+        );
 
         sysfs_power_directory(&mut dir, &fs, Arc::downgrade(kernel));
 

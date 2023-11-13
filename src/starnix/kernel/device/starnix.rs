@@ -4,11 +4,7 @@
 
 use crate::{
     device::{magma::MagmaFile, DeviceMode},
-    fs::{
-        kobject::{KObjectDeviceAttribute, KType},
-        sysfs::SysFsDirectory,
-        FileOps, FsNode,
-    },
+    fs::{kobject::KObjectDeviceAttribute, FileOps, FsNode},
     task::{CurrentTask, Kernel},
     types::errno::Errno,
     types::{DeviceType, OpenFlags},
@@ -26,11 +22,8 @@ fn create_magma_device(
 }
 
 pub fn magma_device_init(kernel: &Arc<Kernel>) {
-    let starnix_class = kernel.device_registry.virtual_bus().get_or_create_child(
-        b"starnix",
-        KType::Class,
-        SysFsDirectory::new,
-    );
+    let starnix_class =
+        kernel.device_registry.add_class(b"starnix", kernel.device_registry.virtual_bus());
 
     let magma_type: DeviceType = kernel
         .device_registry
@@ -38,7 +31,7 @@ pub fn magma_device_init(kernel: &Arc<Kernel>) {
         .expect("magma device register failed.");
 
     kernel.add_device(KObjectDeviceAttribute::new(
-        Some(starnix_class),
+        starnix_class,
         b"magma0",
         b"magma0",
         magma_type,

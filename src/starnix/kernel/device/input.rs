@@ -7,8 +7,7 @@ use crate::{
     fs::{
         buffers::{InputBuffer, OutputBuffer},
         fileops_impl_nonseekable,
-        kobject::{KObjectDeviceAttribute, KType},
-        sysfs::SysFsDirectory,
+        kobject::KObjectDeviceAttribute,
         FdEvents, FileObject, FileOps, FsNode,
     },
     logging::{log_info, log_warn, not_implemented},
@@ -854,13 +853,10 @@ fn phase_change_from_fidl_phase(fidl_phase: &FidlEventPhase) -> Option<PhaseChan
 }
 
 pub fn init_input_devices(kernel: &Arc<Kernel>) {
-    let input_class = kernel.device_registry.virtual_bus().get_or_create_child(
-        b"input",
-        KType::Class,
-        SysFsDirectory::new,
-    );
+    let input_class =
+        kernel.device_registry.add_class(b"input", kernel.device_registry.virtual_bus());
     let touch_attr = KObjectDeviceAttribute::new(
-        Some(input_class.clone()),
+        input_class.clone(),
         b"event0",
         b"input/event0",
         DeviceType::new(INPUT_MAJOR, TOUCH_INPUT_MINOR),
@@ -869,7 +865,7 @@ pub fn init_input_devices(kernel: &Arc<Kernel>) {
     kernel.add_and_register_device(touch_attr, create_touch_device);
 
     let keyboard_attr = KObjectDeviceAttribute::new(
-        Some(input_class.clone()),
+        input_class,
         b"event1",
         b"input/event1",
         DeviceType::new(INPUT_MAJOR, KEYBOARD_INPUT_MINOR),

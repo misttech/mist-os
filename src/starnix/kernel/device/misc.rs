@@ -7,11 +7,7 @@ use crate::{
         create_unknown_device, loop_device::create_loop_control_device, mem::DevRandom,
         simple_device_ops, uinput::create_uinput_device, DeviceMode,
     },
-    fs::{
-        fuse::DevFuse,
-        kobject::{KObjectDeviceAttribute, KType},
-        sysfs::SysFsDirectory,
-    },
+    fs::{fuse::DevFuse, kobject::KObjectDeviceAttribute},
     task::Kernel,
     types::DeviceType,
 };
@@ -19,14 +15,11 @@ use crate::{
 use std::sync::Arc;
 
 pub fn misc_device_init(kernel: &Arc<Kernel>) {
-    let misc_class = kernel.device_registry.virtual_bus().get_or_create_child(
-        b"misc",
-        KType::Class,
-        SysFsDirectory::new,
-    );
+    let misc_class =
+        kernel.device_registry.add_class(b"misc", kernel.device_registry.virtual_bus());
     kernel.add_and_register_device(
         KObjectDeviceAttribute::new(
-            Some(misc_class.clone()),
+            misc_class.clone(),
             b"hwrng",
             b"hwrng",
             DeviceType::HW_RANDOM,
@@ -36,7 +29,7 @@ pub fn misc_device_init(kernel: &Arc<Kernel>) {
     );
     kernel.add_and_register_device(
         KObjectDeviceAttribute::new(
-            Some(misc_class.clone()),
+            misc_class.clone(),
             b"fuse",
             b"fuse",
             DeviceType::FUSE,
@@ -46,7 +39,7 @@ pub fn misc_device_init(kernel: &Arc<Kernel>) {
     );
     kernel.add_and_register_device(
         KObjectDeviceAttribute::new(
-            Some(misc_class.clone()),
+            misc_class.clone(),
             b"device-mapper",
             b"mapper/control",
             DeviceType::DEVICE_MAPPER,
@@ -56,7 +49,7 @@ pub fn misc_device_init(kernel: &Arc<Kernel>) {
     );
     kernel.add_and_register_device(
         KObjectDeviceAttribute::new(
-            Some(misc_class.clone()),
+            misc_class.clone(),
             b"loop-control",
             b"loop-control",
             DeviceType::LOOP_CONTROL,
@@ -66,7 +59,7 @@ pub fn misc_device_init(kernel: &Arc<Kernel>) {
     );
     kernel.add_and_register_device(
         KObjectDeviceAttribute::new(
-            Some(misc_class.clone()),
+            misc_class,
             b"uinput",
             b"uinput",
             DeviceType::UINPUT,
