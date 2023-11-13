@@ -24,9 +24,7 @@ impl AvailabilityState {
         &mut self,
         offer: &dyn OfferDeclCommon,
     ) -> Result<(), AvailabilityRoutingError> {
-        let next_availability = offer
-            .availability()
-            .expect("tried to check availability on an offer that doesn't have that field");
+        let next_availability = offer.availability();
         if offer.source() == &OfferSource::Void {
             match self.advance(next_availability) {
                 // Nb: Although an error is returned here, this specific error is ignored during validation

@@ -363,8 +363,8 @@ fn offer_decl_common_derive_impl(input: syn::DeriveInput) -> TokenStream {
                 &self.target
             }
 
-            fn availability(&self) -> Option<&Availability> {
-                Some(&self.availability)
+            fn availability(&self) -> &Availability {
+                &self.availability
             }
         }
     }
@@ -377,7 +377,7 @@ pub fn offer_decl_common_derive(input: proc_macro::TokenStream) -> proc_macro::T
     offer_decl_common_derive_impl(parse_macro_input!(input)).into()
 }
 
-fn offer_decl_common_derive_no_availability_impl(input: syn::DeriveInput) -> TokenStream {
+fn offer_decl_common_derive_availability_required_impl(input: syn::DeriveInput) -> TokenStream {
     let struct_ident = match DeclCommonOpts::from_derive_input(&input) {
         Ok(opts) => opts.ident,
         Err(e) => return e.write_errors(),
@@ -403,8 +403,8 @@ fn offer_decl_common_derive_no_availability_impl(input: syn::DeriveInput) -> Tok
                 &self.target
             }
 
-            fn availability(&self) -> Option<&Availability> {
-                None
+            fn availability(&self) -> &Availability {
+                &Availability::Required
             }
         }
     }
@@ -413,10 +413,10 @@ fn offer_decl_common_derive_no_availability_impl(input: syn::DeriveInput) -> Tok
 /// A derive-macro that generates an implementation of `OfferDeclCommon`. Use this for
 /// the inner structs of each variant of `OfferDecl` that do not have an `availability` field.
 #[proc_macro_derive(OfferDeclCommonNoAvailability)]
-pub fn offer_decl_common_derive_no_availability(
+pub fn offer_decl_common_derive_availability_required(
     input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-    offer_decl_common_derive_no_availability_impl(parse_macro_input!(input)).into()
+    offer_decl_common_derive_availability_required_impl(parse_macro_input!(input)).into()
 }
 
 fn expose_decl_common_derive_impl(input: syn::DeriveInput) -> TokenStream {

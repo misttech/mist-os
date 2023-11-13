@@ -615,7 +615,7 @@ impl OfferDeclCommon for OfferDecl {
         }
     }
 
-    fn availability(&self) -> Option<&Availability> {
+    fn availability(&self) -> &Availability {
         match &self {
             OfferDecl::Service(o) => o.availability(),
             OfferDecl::Protocol(o) => o.availability(),
@@ -648,8 +648,8 @@ impl OfferDeclCommon for OfferRunnerDecl {
         &self.source
     }
 
-    fn availability(&self) -> Option<&Availability> {
-        Some(&Availability::Required)
+    fn availability(&self) -> &Availability {
+        &Availability::Required
     }
 }
 
@@ -1632,7 +1632,7 @@ pub trait OfferDeclCommon: SourceName + fmt::Debug + Send + Sync {
     fn target_name(&self) -> &Name;
     fn target(&self) -> &OfferTarget;
     fn source(&self) -> &OfferSource;
-    fn availability(&self) -> Option<&Availability>;
+    fn availability(&self) -> &Availability;
 }
 
 /// The common properties of an [Expose](fdecl::Expose) declaration.

@@ -232,9 +232,7 @@ fn extend_dict_with_offer(
                     let old_availability = source_cap_sandbox
                         .get_availability()
                         .expect("protocol dictionary is missing availability");
-                    let new_availability = offer
-                        .availability()
-                        .expect("availability should always be set for protocols");
+                    let new_availability = offer.availability();
                     if let Some(new_availability) =
                         get_next_availability(*old_availability, *new_availability)
                     {
@@ -254,24 +252,14 @@ fn extend_dict_with_offer(
                 let mut target_cap_sandbox =
                     target_sandbox.get_or_insert_protocol(target_name.clone());
                 target_cap_sandbox.insert_sender(sender);
-                target_cap_sandbox.insert_availability(
-                    offer
-                        .availability()
-                        .expect("availability should always be set for protocols")
-                        .clone(),
-                );
+                target_cap_sandbox.insert_availability(offer.availability().clone());
             }
         }
         cm_rust::OfferSource::Framework => {
             let receiver = Receiver::new();
             let mut target_cap_sandbox = target_sandbox.get_or_insert_protocol(target_name.clone());
             target_cap_sandbox.insert_sender(receiver.new_sender());
-            target_cap_sandbox.insert_availability(
-                offer
-                    .availability()
-                    .expect("availability should always be set for protocols")
-                    .clone(),
-            );
+            target_cap_sandbox.insert_availability(offer.availability().clone());
             let source_name = source_name.clone();
             sources_and_receivers.push((
                 CapabilitySourceFactory::new(move |component| CapabilitySource::Framework {
@@ -285,12 +273,7 @@ fn extend_dict_with_offer(
             let receiver = Receiver::new();
             let mut target_cap_sandbox = target_sandbox.get_or_insert_protocol(target_name.clone());
             target_cap_sandbox.insert_sender(receiver.new_sender());
-            target_cap_sandbox.insert_availability(
-                offer
-                    .availability()
-                    .expect("availability should always be set for protocols")
-                    .clone(),
-            );
+            target_cap_sandbox.insert_availability(offer.availability().clone());
             let offer = offer.clone();
             sources_and_receivers.push((
                 CapabilitySourceFactory::new(move |component| CapabilitySource::Capability {
