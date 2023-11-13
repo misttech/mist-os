@@ -197,7 +197,7 @@ zx_status_t ClockDevice::Create(void* ctx, zx_device_t* parent) {
 }
 
 void ClockInitDevice::Create(zx_device_t* parent, const ClockImplProxy& clock) {
-  auto decoded = ddk::GetEncodedMetadata<fuchsia_hardware_clock::wire::InitMetadata>(
+  auto decoded = ddk::GetEncodedMetadata<fuchsia_hardware_clockimpl::wire::InitMetadata>(
       parent, DEVICE_METADATA_CLOCK_INIT);
   if (!decoded.is_ok()) {
     if (decoded.status_value() == ZX_ERR_NOT_FOUND) {
@@ -231,7 +231,7 @@ void ClockInitDevice::Create(zx_device_t* parent, const ClockImplProxy& clock) {
 }
 
 zx_status_t ClockInitDevice::ConfigureClocks(
-    const fuchsia_hardware_clock::wire::InitMetadata& metadata, const ClockImplProxy& clock) {
+    const fuchsia_hardware_clockimpl::wire::InitMetadata& metadata, const ClockImplProxy& clock) {
   // Stop processing the list if any call returns an error so that clocks are not accidentally
   // enabled in an unknown state.
   for (const auto& step : metadata.steps) {

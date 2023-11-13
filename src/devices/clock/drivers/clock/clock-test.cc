@@ -157,25 +157,28 @@ TEST(ClockTest, ConfigureClocks) {
   fake_parent->AddProtocol(ZX_PROTOCOL_CLOCK_IMPL, clock_impl.ops(), &clock_impl);
   fake_parent->SetMetadata(DEVICE_METADATA_CLOCK_IDS, nullptr, 0);
 
-  fuchsia_hardware_clock::wire::InitMetadata metadata;
-  metadata.steps = fidl::VectorView<fuchsia_hardware_clock::wire::InitStep>(arena, 12);
+  fuchsia_hardware_clockimpl::wire::InitMetadata metadata;
+  metadata.steps = fidl::VectorView<fuchsia_hardware_clockimpl::wire::InitStep>(arena, 12);
 
-  metadata.steps[0] = {3, fuchsia_hardware_clock::wire::InitCall::WithEnable({})};
-  metadata.steps[1] = {3, fuchsia_hardware_clock::wire::InitCall::WithInputIdx(100)};
-  metadata.steps[2] = {3, fuchsia_hardware_clock::wire::InitCall::WithRateHz(arena, 500'000'000)};
+  metadata.steps[0] = {3, fuchsia_hardware_clockimpl::wire::InitCall::WithEnable({})};
+  metadata.steps[1] = {3, fuchsia_hardware_clockimpl::wire::InitCall::WithInputIdx(100)};
+  metadata.steps[2] = {3,
+                       fuchsia_hardware_clockimpl::wire::InitCall::WithRateHz(arena, 500'000'000)};
 
-  metadata.steps[3] = {1, fuchsia_hardware_clock::wire::InitCall::WithEnable({})};
-  metadata.steps[4] = {1, fuchsia_hardware_clock::wire::InitCall::WithInputIdx(99)};
-  metadata.steps[5] = {1, fuchsia_hardware_clock::wire::InitCall::WithRateHz(arena, 400'000'000)};
+  metadata.steps[3] = {1, fuchsia_hardware_clockimpl::wire::InitCall::WithEnable({})};
+  metadata.steps[4] = {1, fuchsia_hardware_clockimpl::wire::InitCall::WithInputIdx(99)};
+  metadata.steps[5] = {1,
+                       fuchsia_hardware_clockimpl::wire::InitCall::WithRateHz(arena, 400'000'000)};
 
-  metadata.steps[6] = {1, fuchsia_hardware_clock::wire::InitCall::WithDisable({})};
-  metadata.steps[7] = {1, fuchsia_hardware_clock::wire::InitCall::WithInputIdx(101)};
-  metadata.steps[8] = {1, fuchsia_hardware_clock::wire::InitCall::WithRateHz(arena, 600'000'000)};
+  metadata.steps[6] = {1, fuchsia_hardware_clockimpl::wire::InitCall::WithDisable({})};
+  metadata.steps[7] = {1, fuchsia_hardware_clockimpl::wire::InitCall::WithInputIdx(101)};
+  metadata.steps[8] = {1,
+                       fuchsia_hardware_clockimpl::wire::InitCall::WithRateHz(arena, 600'000'000)};
 
-  metadata.steps[9] = {2, fuchsia_hardware_clock::wire::InitCall::WithDisable({})};
-  metadata.steps[10] = {2, fuchsia_hardware_clock::wire::InitCall::WithInputIdx(1)};
+  metadata.steps[9] = {2, fuchsia_hardware_clockimpl::wire::InitCall::WithDisable({})};
+  metadata.steps[10] = {2, fuchsia_hardware_clockimpl::wire::InitCall::WithInputIdx(1)};
 
-  metadata.steps[11] = {4, fuchsia_hardware_clock::wire::InitCall::WithRateHz(arena, 100'000)};
+  metadata.steps[11] = {4, fuchsia_hardware_clockimpl::wire::InitCall::WithRateHz(arena, 100'000)};
 
   const fit::result encoded = fidl::Persist(metadata);
   ASSERT_TRUE(encoded.is_ok());
@@ -238,24 +241,26 @@ TEST(ClockTest, ConfigureClocksError) {
   fake_parent->AddProtocol(ZX_PROTOCOL_CLOCK_IMPL, clock_impl.ops(), &clock_impl);
   fake_parent->SetMetadata(DEVICE_METADATA_CLOCK_IDS, nullptr, 0);
 
-  fuchsia_hardware_clock::wire::InitMetadata metadata;
-  metadata.steps = fidl::VectorView<fuchsia_hardware_clock::wire::InitStep>(arena, 9);
+  fuchsia_hardware_clockimpl::wire::InitMetadata metadata;
+  metadata.steps = fidl::VectorView<fuchsia_hardware_clockimpl::wire::InitStep>(arena, 9);
 
-  metadata.steps[0] = {3, fuchsia_hardware_clock::wire::InitCall::WithEnable({})};
-  metadata.steps[1] = {3, fuchsia_hardware_clock::wire::InitCall::WithInputIdx(100)};
-  metadata.steps[2] = {3, fuchsia_hardware_clock::wire::InitCall::WithRateHz(arena, 500'000'000)};
+  metadata.steps[0] = {3, fuchsia_hardware_clockimpl::wire::InitCall::WithEnable({})};
+  metadata.steps[1] = {3, fuchsia_hardware_clockimpl::wire::InitCall::WithInputIdx(100)};
+  metadata.steps[2] = {3,
+                       fuchsia_hardware_clockimpl::wire::InitCall::WithRateHz(arena, 500'000'000)};
 
-  metadata.steps[3] = {1, fuchsia_hardware_clock::wire::InitCall::WithEnable({})};
+  metadata.steps[3] = {1, fuchsia_hardware_clockimpl::wire::InitCall::WithEnable({})};
 
   // This step should return an error due to the clock index being out of range.
-  metadata.steps[4] = {10, fuchsia_hardware_clock::wire::InitCall::WithInputIdx(99)};
+  metadata.steps[4] = {10, fuchsia_hardware_clockimpl::wire::InitCall::WithInputIdx(99)};
 
-  metadata.steps[5] = {1, fuchsia_hardware_clock::wire::InitCall::WithRateHz(arena, 400'000'000)};
+  metadata.steps[5] = {1,
+                       fuchsia_hardware_clockimpl::wire::InitCall::WithRateHz(arena, 400'000'000)};
 
-  metadata.steps[6] = {2, fuchsia_hardware_clock::wire::InitCall::WithDisable({})};
-  metadata.steps[7] = {2, fuchsia_hardware_clock::wire::InitCall::WithInputIdx(1)};
+  metadata.steps[6] = {2, fuchsia_hardware_clockimpl::wire::InitCall::WithDisable({})};
+  metadata.steps[7] = {2, fuchsia_hardware_clockimpl::wire::InitCall::WithInputIdx(1)};
 
-  metadata.steps[8] = {4, fuchsia_hardware_clock::wire::InitCall::WithRateHz(arena, 100'000)};
+  metadata.steps[8] = {4, fuchsia_hardware_clockimpl::wire::InitCall::WithRateHz(arena, 100'000)};
 
   const fit::result encoded = fidl::Persist(metadata);
   ASSERT_TRUE(encoded.is_ok());

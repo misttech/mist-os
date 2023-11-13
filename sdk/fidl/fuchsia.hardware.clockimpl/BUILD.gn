@@ -5,7 +5,10 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.clockimpl") {
-  sources = [ "clock-impl.fidl" ]
+  sources = [
+    "clock-impl.fidl",
+    "init.fidl",
+  ]
   contains_drivers = true
   public_deps = [ "//zircon/vdso/zx" ]
 }

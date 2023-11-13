@@ -82,7 +82,7 @@ class ClockInitDevice : public ClockInitDeviceType {
   void DdkRelease() { delete this; }
 
  private:
-  static zx_status_t ConfigureClocks(const fuchsia_hardware_clock::wire::InitMetadata& metadata,
+  static zx_status_t ConfigureClocks(const fuchsia_hardware_clockimpl::wire::InitMetadata& metadata,
                                      const ClockImplProxy& clock);
 };
 
