@@ -7,7 +7,7 @@ you to develop in a remote workflow from your remote host.
 ## Usage
 
 ```
-Usage: funnel -h <host> [-t <target-name>] [-r <repository-port>] [-p <additional-port-forwards...>]
+Usage: funnel -h <host> [-t <target-name>] [-r <repository-port>] [-l <log-level>] [-p <additional-port-forwards...>] [-w <wait-for-target-time>]
 
 ffx Remote forwarding.
 
@@ -16,9 +16,12 @@ Options:
   -t, --target-name the name of the target to forward
   -r, --repository-port
                     the repository port to forward to the remote host
+  -l, --log-level   the level to log at.
   -p, --additional-port-forwards
                     additional ports to forward from the remote host to the
                     target
+  -w, --wait-for-target-time
+                    time to wait to discover targets.
   --help            display usage information
 ```
 
