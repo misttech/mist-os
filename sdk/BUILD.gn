@@ -149,31 +149,49 @@ sdk_collection("core") {
 sdk_molecule("fuchsia_idk_atoms") {
   visibility += [ "//vendor/*" ]
 
-  # Prebulilt libraries and packages must be built and included for all API
-  # levels they support. The sysroot includes prebuilt libraries.
+  deps = [ ":fuchsia_idk_atoms_for_each_api_level" ]
+
+  if (!sdk_inside_supported_api_sub_build) {
+    deps += [
+      # Do not add to this list. Instead, add new items to
+      # fuchsia_idk_atoms_independent_of_api_level, which verifies there are no
+      # API level dependencies.
+      ":fuchsia_idk_atoms_independent_of_api_level",
+
+      # There are very limited exceptions that do depend on API level but are
+      # only built at head.
+      ":fuchsia_idk_atoms_built_at_head",
+    ]
+  }
+
+  if (!sdk_no_host_tools) {
+    deps += [ ":fuchsia_idk_atoms_host_tools_sdk" ]
+  }
+}
+
+# Prebulilt libraries and packages must be built and included for all API
+# levels they support. The sysroot includes prebuilt libraries.
+sdk_molecule("fuchsia_idk_atoms_for_each_api_level") {
   deps = [
     ":core_cc_prebuilt_libraries",
     ":core_loadable_modules",
     ":core_sysroot",
   ]
+}
 
-  if (!sdk_inside_supported_api_sub_build) {
-    # TODO(fxbug.dev/300271055): assert_no_deps that these targets do not
-    # depend on API level core_cc_source_libraries would be an exception.
-
-    deps += [
-      ":core_bindlib",
-
+if (!sdk_inside_supported_api_sub_build) {
+  # Do not add dependencies to this target without a really good reason.
+  # Most dependencies should be built at every API level (add to
+  # :fuchsia_idk_atoms_for_each_api_level) or be verifiably independent of the
+  # API level (add to :fuchsia_idk_atoms_independent_of_api_level).
+  sdk_molecule("fuchsia_idk_atoms_built_at_head") {
+    deps = [
       # The C++ source libraries must be buildable at each supported API level
       # but are only built once.
       ":core_cc_source_libraries",
-      ":core_dart_library",
-      ":core_data",
-      ":core_documentation",
-      ":core_licenses",
-      ":version_history",
-      "//sdk/devices",
-      "//sdk/docs",
+
+      # This target compiles the FIDL files, but the output used in the SDK is
+      # not specific to any API level.
       "//sdk/fidl",
 
       # TODO(b/309679524): Move this to the `deps` section of
@@ -183,8 +201,37 @@ sdk_molecule("fuchsia_idk_atoms") {
     ]
   }
 
-  if (!sdk_no_host_tools) {
-    deps += [
+  # IDK atoms that are independent of a specific API level.
+  # This is enforced by an assert_no_deps.
+  sdk_molecule("fuchsia_idk_atoms_independent_of_api_level") {
+    # The following serve as a proxy for the building of FIDL files. A
+    # dependency on these suggests that there is a dependency on FIDL
+    # interface(s), which would likely mean that the code must be built at each
+    # API level and should be in a different molecule..
+    assert_no_deps = [
+      "//tools/fidl/fidl_api_diff:host",
+      "//tools/fidl/fidl_api_summarize:fidl_api_summarize($host_toolchain)",
+      "//tools/fidl/fidlc:fidl-lint.host",
+    ]
+
+    deps = [
+      ":core_bindlib",
+      ":core_dart_library",
+      ":core_data",
+      ":core_documentation",
+      ":core_licenses",
+      ":version_history",
+      "//sdk/devices",
+      "//sdk/docs",
+    ]
+  }
+}
+
+if (!sdk_no_host_tools) {
+  # IDK atoms that are host tools. These may rely on an API level because they
+  # are not shipped to devices.
+  sdk_molecule("fuchsia_idk_atoms_host_tools_sdk") {
+    deps = [
       ":host_tools",
       "//tools/docsgen:ref_docs_sdk",
     ]
