@@ -4,7 +4,6 @@ ffx/product/download.golden
 ffx/product/get-artifacts.golden
 ffx/product/get-image-path.golden
 ffx/product/get-repository.golden
-ffx/product/get.golden
 ffx/product/list.golden
 ffx/product/lookup.golden
 ffx/product/show.golden
