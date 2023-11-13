@@ -8,6 +8,11 @@ const LAST_CALL_COMMENT = 'This RFC is now in Last Call! Reviewers, please \
 post any remaining comments in the next 7 days. Note that the RFC will only \
 be accepted once all the comment threads have come to conclusion.';
 
+const CONGRATULATIONS = [
+  'Congratulations!', 'Huzzah!', 'Woot!', 'Mazel tov!', 'Felicitations!',
+  'Great job!', 'Well done!', 'Nailed it!', 'Nice!', 'GG!', '👏👏👏', '🎉🎉🎉', '🙌',
+  'Sweet!', 'Fantastic!'];
+
 // Post `message` as a top-level comment to the current revision of `changeId`.
 function _postComment(changeId, message) {
   const accessToken = ScriptApp.getOAuthToken();
@@ -32,4 +37,27 @@ function _postComment(changeId, message) {
 // everyone that the RFC is now in last call.
 function postLastCallComment(changeId) {
   _postComment(changeId, LAST_CALL_COMMENT);
+}
+
+// Post a top-level comment to the current revision of `changeId`, telling
+// everyone that the RFC was accepted and given the designation `rfcNumber`,
+// which should look like "RFC-0123".
+function postAcceptedComment(changeId, rfcNumber) {
+  const congrats = CONGRATULATIONS[
+    Math.floor(Math.random() * CONGRATULATIONS.length)];
+
+  _postComment(changeId, `This has been accepted as ${rfcNumber}! ${congrats}`);
+}
+
+// Post a top-level comment to the current revision of `changeId`, telling
+// everyone that the RFC has been put on hold. `facilitator` should be the email
+// address of the RFC's current facilitator.
+function postOnHoldComment(changeId, facilitator) {
+  const message = `This RFC has not been updated for multiple weeks, and is \
+now On Hold. This means the RFC will not be actively facilitated by the \
+Fuchsia Eng Council (FEC). If you wish to move forward with this RFC, please \
+let your facilitator (${facilitator}) or the FEC (eng-council@fuchsia.dev) \
+know and we'll be happy to re-engage. Thanks!`;
+
+  _postComment(changeId, message);
 }
