@@ -16,8 +16,6 @@ __LOCAL extern const struct FidlCodedUnion test_nullable_SimpleUnionTable;
 __LOCAL extern const struct FidlCodedUnion test_nullable_SimpleUnionNullableRefTable;
 __LOCAL extern const struct FidlCodedStruct test_nullable_SimpleProtocolAddResponseTable;
 __LOCAL extern const struct FidlCodedStruct test_nullable_SimpleProtocolAddRequestTable;
-__LOCAL extern const struct FidlCodedStruct test_nullable_SimpleProtocolAddRequestMessageTable;
-__LOCAL extern const struct FidlCodedStruct test_nullable_SimpleProtocolAddResponseMessageTable;
 __LOCAL extern const struct FidlCodedStruct test_nullable_Int32WrapperTable;
 
 static const struct FidlCodedStructPointer Pointer26test_nullable_Int32WrapperTable = {.tag=kFidlTypeStructPointer, .struct_type=&test_nullable_Int32WrapperTable};
@@ -81,10 +79,6 @@ const struct FidlCodedUnion test_nullable_SimpleUnionNullableRefTable = {.tag=kF
 const struct FidlCodedStruct test_nullable_SimpleProtocolAddResponseTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=4u, .name="test.nullable/SimpleProtocolAddResponse"};
 
 const struct FidlCodedStruct test_nullable_SimpleProtocolAddRequestTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=8u, .name="test.nullable/SimpleProtocolAddRequest"};
-
-const struct FidlCodedStruct test_nullable_SimpleProtocolAddRequestMessageTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=8u, .name="test.nullable/SimpleProtocolAddRequestMessage"};
-
-const struct FidlCodedStruct test_nullable_SimpleProtocolAddResponseMessageTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=4u, .name="test.nullable/SimpleProtocolAddResponseMessage"};
 
 const struct FidlCodedStruct test_nullable_Int32WrapperTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=4u, .name="test.nullable/Int32Wrapper"};
 

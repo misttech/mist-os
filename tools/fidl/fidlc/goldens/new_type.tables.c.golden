@@ -10,8 +10,6 @@ __LOCAL extern const struct FidlCodedStruct test_newtype_StructTable;
 __LOCAL extern const struct FidlCodedEnum test_newtype_EnumTable;
 __LOCAL extern const struct FidlCodedStruct test_newtype_CalculatorAddResponseTable;
 __LOCAL extern const struct FidlCodedStruct test_newtype_CalculatorAddRequestTable;
-__LOCAL extern const struct FidlCodedStruct test_newtype_CalculatorAddRequestMessageTable;
-__LOCAL extern const struct FidlCodedStruct test_newtype_CalculatorAddResponseMessageTable;
 __LOCAL extern const struct FidlCodedBits test_newtype_BitsTable;
 
 static const struct FidlCodedStructPointer Pointer19test_newtype_StructTable = {.tag=kFidlTypeStructPointer, .struct_type=&test_newtype_StructTable};
@@ -47,10 +45,6 @@ const struct FidlCodedEnum test_newtype_EnumTable = {.tag=kFidlTypeEnum, .underl
 const struct FidlCodedStruct test_newtype_CalculatorAddResponseTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=4u, .name="test.newtype/CalculatorAddResponse"};
 
 const struct FidlCodedStruct test_newtype_CalculatorAddRequestTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=8u, .name="test.newtype/CalculatorAddRequest"};
-
-const struct FidlCodedStruct test_newtype_CalculatorAddRequestMessageTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=8u, .name="test.newtype/CalculatorAddRequestMessage"};
-
-const struct FidlCodedStruct test_newtype_CalculatorAddResponseMessageTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=4u, .name="test.newtype/CalculatorAddResponseMessage"};
 
 const struct FidlCodedBits test_newtype_BitsTable = {.tag=kFidlTypeBits, .underlying_type=kFidlCodedPrimitiveSubtype_Uint32, .strictness=kFidlStrictness_Flexible, .mask=1ul, .name="test.newtype/Bits"};
 

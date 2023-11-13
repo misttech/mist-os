@@ -334,68 +334,6 @@ const coded::Type* CodedTypesGenerator::CompileType(const flat::Type* type,
 
 void CodedTypesGenerator::CompileFields(const flat::Decl* decl) {
   switch (decl->kind) {
-    case flat::Decl::Kind::kProtocol: {
-      auto protocol_decl = static_cast<const flat::Protocol*>(decl);
-      coded::ProtocolType* coded_protocol =
-          static_cast<coded::ProtocolType*>(named_coded_types_[decl->name].get());
-      size_t i = 0;
-      for (const auto& method_with_info : protocol_decl->all_methods) {
-        ZX_ASSERT(method_with_info.method != nullptr);
-        const auto& method = *method_with_info.method;
-        auto CompileMessage = [&](const std::unique_ptr<flat::TypeConstructor>& payload) -> void {
-          if (payload && payload->layout.IsSynthetic()) {
-            auto id = static_cast<const flat::IdentifierType*>(payload->type);
-            std::unique_ptr<coded::Type>& coded_message =
-                coded_protocol->messages_during_compile[i++];
-            bool is_noop = true;
-
-            switch (id->type_decl->kind) {
-              case flat::Decl::Kind::kStruct: {
-                auto coded_struct = static_cast<coded::StructType*>(coded_message.get());
-                auto struct_decl = static_cast<const flat::Struct*>(id->type_decl);
-                ZX_ASSERT_MSG(!struct_decl->members.empty(),
-                              "cannot process empty message payloads");
-                CompileStructFields(struct_decl, coded_struct);
-                break;
-              }
-              case flat::Decl::Kind::kTable: {
-                auto coded_table = static_cast<coded::TableType*>(coded_message.get());
-                auto table_decl = static_cast<const flat::Table*>(id->type_decl);
-                CompileTableFields(table_decl, coded_table);
-                is_noop = false;
-                break;
-              }
-              case flat::Decl::Kind::kUnion: {
-                auto coded_union = static_cast<coded::UnionType*>(coded_message.get());
-                auto union_decl = static_cast<const flat::Union*>(id->type_decl);
-                CompileUnionFields(union_decl, coded_union);
-                is_noop = false;
-                break;
-              }
-              default: {
-                ZX_PANIC("only structs, tables, and unions may be used as message payloads");
-              }
-            }
-
-            coded_message->is_noop = is_noop;
-            // We move the coded_message to coded_types_ so that we'll generate tables for the
-            // message in the proper order.
-            coded_types_.push_back(std::move(coded_message));
-            // We also keep back pointers to reference to these messages via the
-            // coded_protocol.
-            coded_protocol->messages_after_compile.push_back(
-                static_cast<const coded::Type*>(coded_types_.back().get()));
-          }
-        };
-        if (method.has_request) {
-          CompileMessage(method.maybe_request);
-        }
-        if (method.has_response) {
-          CompileMessage(method.maybe_response);
-        }
-      }
-      break;
-    }
     case flat::Decl::Kind::kStruct: {
       auto struct_decl = static_cast<const flat::Struct*>(decl);
       coded::StructType* coded_struct =
@@ -544,60 +482,7 @@ void CodedTypesGenerator::CompileDecl(const flat::Decl* decl) {
       break;
     }
     case flat::Decl::Kind::kProtocol: {
-      auto protocol_decl = static_cast<const flat::Protocol*>(decl);
-      std::string protocol_name = NameCodedName(protocol_decl->name);
-      std::string protocol_qname = NameFlatName(protocol_decl->name);
-      std::vector<std::unique_ptr<coded::Type>> protocol_messages;
-      for (const auto& method_with_info : protocol_decl->all_methods) {
-        ZX_ASSERT(method_with_info.method != nullptr);
-        const auto& method = *method_with_info.method;
-        std::string method_name = NameMethod(protocol_name, method);
-        std::string method_qname = NameMethod(protocol_qname, method);
-        auto CreateMessage = [&](const std::unique_ptr<flat::TypeConstructor>& payload,
-                                 types::MessageKind kind) -> void {
-          if (payload && payload->layout.IsSynthetic()) {
-            std::string message_name = NameMessage(method_name, kind);
-            std::string message_qname = NameMessage(method_qname, kind);
-            auto id = static_cast<const flat::IdentifierType*>(payload->type);
-            switch (id->type_decl->kind) {
-              case flat::Decl::Kind::kStruct: {
-                auto struct_decl = static_cast<const flat::Struct*>(id->type_decl);
-                ZX_ASSERT_MSG(!struct_decl->members.empty(),
-                              "cannot process empty message payloads");
-                protocol_messages.push_back(
-                    CompileStructDecl(struct_decl, message_name, message_qname));
-                break;
-              }
-              case flat::Decl::Kind::kTable: {
-                auto table_decl = static_cast<const flat::Table*>(id->type_decl);
-                protocol_messages.push_back(std::make_unique<coded::TableType>(
-                    std::move(message_name), std::vector<coded::TableField>(),
-                    std::move(message_qname), table_decl->resourceness));
-                break;
-              }
-              case flat::Decl::Kind::kUnion: {
-                auto union_decl = static_cast<const flat::Union*>(id->type_decl);
-                protocol_messages.push_back(CompileUnionDecl(
-                    union_decl, message_name, message_qname, types::Nullability::kNonnullable));
-                break;
-              }
-              default: {
-                ZX_PANIC("only structs, tables, and unions may be used as message payloads");
-              }
-            }
-          }
-        };
-        if (method.has_request) {
-          CreateMessage(method.maybe_request, types::MessageKind::kRequest);
-        }
-        if (method.has_response) {
-          auto kind =
-              method.has_request ? types::MessageKind::kResponse : types::MessageKind::kEvent;
-          CreateMessage(method.maybe_response, kind);
-        }
-      }
-      named_coded_types_.emplace(
-          decl->name, std::make_unique<coded::ProtocolType>(std::move(protocol_messages)));
+      named_coded_types_.emplace(decl->name, std::make_unique<coded::ProtocolType>());
       break;
     }
     case flat::Decl::Kind::kTable: {

@@ -7,7 +7,6 @@ __LOCAL extern const struct FidlCodedBits zx_RightsTable;
 __LOCAL extern const struct FidlCodedEnum zx_ObjTypeTable;
 __LOCAL extern const struct FidlCodedTable test_driverhandle_TTable;
 __LOCAL extern const struct FidlCodedStruct test_driverhandle_HandlesInProtocolSendHandlesRequestTable;
-__LOCAL extern const struct FidlCodedStruct test_driverhandle_HandlesInProtocolSendHandlesRequestMessageTable;
 __LOCAL extern const struct FidlCodedStruct test_driverhandle_ServerEndWrapperTable;
 __LOCAL extern const struct FidlCodedStruct test_driverhandle_ClientEndWrapperTable;
 
@@ -29,11 +28,6 @@ static const struct FidlStructElement Fields53test_driverhandle_HandlesInProtoco
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_driverhandle_TTable)}}
 };
 const struct FidlCodedStruct test_driverhandle_HandlesInProtocolSendHandlesRequestTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields53test_driverhandle_HandlesInProtocolSendHandlesRequest, .element_count=1u, .size_v2=16u, .name="test.driverhandle/HandlesInProtocolSendHandlesRequest"};
-
-static const struct FidlStructElement Fields60test_driverhandle_HandlesInProtocolSendHandlesRequestMessage[] = {
-    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=0u, .field_type=(fidl_type_t*)(&test_driverhandle_TTable)}}
-};
-const struct FidlCodedStruct test_driverhandle_HandlesInProtocolSendHandlesRequestMessageTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields60test_driverhandle_HandlesInProtocolSendHandlesRequestMessage, .element_count=1u, .size_v2=16u, .name="test.driverhandle/HandlesInProtocolSendHandlesRequestMessage"};
 
 static const struct FidlStructElement Fields34test_driverhandle_ServerEndWrapper[] = {
     /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=0u, .field_type=(fidl_type_t*)(&Request32test_driverhandle_DriverProtocolnonnullableTable)}}

@@ -558,29 +558,6 @@ void TablesGenerator::Produce(CodedTypesGenerator* coded_types_generator) {
           GenerateForward(*union_type.maybe_reference_type);
         break;
       }
-      case coded::Type::Kind::kProtocol: {
-        const auto* protocol_coded_type = static_cast<const coded::ProtocolType*>(coded_type);
-        for (const auto* message : protocol_coded_type->messages_after_compile) {
-          switch (message->kind) {
-            case coded::Type::Kind::kStruct: {
-              GenerateForward(*static_cast<const coded::StructType*>(message));
-              break;
-            }
-            case coded::Type::Kind::kTable: {
-              GenerateForward(*static_cast<const coded::TableType*>(message));
-              break;
-            }
-            case coded::Type::Kind::kUnion: {
-              GenerateForward(*static_cast<const coded::UnionType*>(message));
-              break;
-            }
-            default: {
-              ZX_PANIC("only structs, tables, and unions may be used as message payloads");
-            }
-          }
-        }
-        break;
-      }
       default:
         break;
     }
@@ -633,8 +610,7 @@ void TablesGenerator::Produce(CodedTypesGenerator* coded_types_generator) {
         // These are generated in the next phase.
         break;
       case coded::Type::Kind::kProtocol:
-        // Nothing to generate for protocols. We've already moved the
-        // messages from the protocol into coded_types_ directly.
+        // Nothing to generate for protocols.
         break;
       case coded::Type::Kind::kHandle:
         Generate(*static_cast<const coded::HandleType*>(coded_type.get()));
@@ -693,29 +669,6 @@ void TablesGenerator::Produce(CodedTypesGenerator* coded_types_generator) {
         if (union_type.maybe_reference_type)
           Generate(*union_type.maybe_reference_type);
 
-        break;
-      }
-      case coded::Type::Kind::kProtocol: {
-        const auto* protocol_coded_type = static_cast<const coded::ProtocolType*>(coded_type);
-        for (const auto* message : protocol_coded_type->messages_after_compile) {
-          switch (message->kind) {
-            case coded::Type::Kind::kStruct: {
-              Generate(*static_cast<const coded::StructType*>(message));
-              break;
-            }
-            case coded::Type::Kind::kTable: {
-              Generate(*static_cast<const coded::TableType*>(message));
-              break;
-            }
-            case coded::Type::Kind::kUnion: {
-              Generate(*static_cast<const coded::UnionType*>(message));
-              break;
-            }
-            default: {
-              ZX_PANIC("only structs, tables, and unions may be used as message payloads");
-            }
-          }
-        }
         break;
       }
       default:

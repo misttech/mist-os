@@ -42,15 +42,6 @@ __LOCAL extern const struct FidlCodedUnion test_typesinprotocols_Protocol_ErrorA
 __LOCAL extern const struct FidlCodedStruct test_typesinprotocols_ArrayBasicTable;
 __LOCAL extern const struct FidlCodedUnion test_typesinprotocols_Protocol_ErrorArrayBasic_ResultTable;
 __LOCAL extern const struct FidlCodedUnion test_typesinprotocols_Protocol_ErrorArrayBasic_ResultNullableRefTable;
-__LOCAL extern const struct FidlCodedUnion test_typesinprotocols_ProtocolErrorBasicResponseMessageTable;
-__LOCAL extern const struct FidlCodedUnion test_typesinprotocols_ProtocolErrorCompoundResponseMessageTable;
-__LOCAL extern const struct FidlCodedUnion test_typesinprotocols_ProtocolErrorArrayBasicResponseMessageTable;
-__LOCAL extern const struct FidlCodedUnion test_typesinprotocols_ProtocolErrorArrayCompoundResponseMessageTable;
-__LOCAL extern const struct FidlCodedUnion test_typesinprotocols_ProtocolErrorVectorBasicResponseMessageTable;
-__LOCAL extern const struct FidlCodedUnion test_typesinprotocols_ProtocolErrorVectorCompoundResponseMessageTable;
-__LOCAL extern const struct FidlCodedUnion test_typesinprotocols_ProtocolErrorVectorOptionalResponseMessageTable;
-__LOCAL extern const struct FidlCodedUnion test_typesinprotocols_ProtocolErrorArrayVectorNestedResponseMessageTable;
-__LOCAL extern const struct FidlCodedUnion test_typesinprotocols_ProtocolErrorResourceResponseMessageTable;
 
 static const struct FidlCodedStructPointer Pointer28test_typesinprotocols_StructTable = {.tag=kFidlTypeStructPointer, .struct_type=&test_typesinprotocols_StructTable};
 static const struct FidlCodedStructPointer Pointer36test_typesinprotocols_ResourceStructTable = {.tag=kFidlTypeStructPointer, .struct_type=&test_typesinprotocols_ResourceStructTable};
@@ -430,48 +421,3 @@ static const struct FidlUnionField Fields64test_typesinprotocols_Protocol_ErrorA
     /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
 };
 const struct FidlCodedUnion test_typesinprotocols_Protocol_ErrorArrayBasic_ResultNullableRefTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields64test_typesinprotocols_Protocol_ErrorArrayBasic_ResultNullableRef, .nullable=kFidlNullability_Nullable, .name="test.typesinprotocols/Protocol_ErrorArrayBasic_Result", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlUnionField Fields55test_typesinprotocols_ProtocolErrorBasicResponseMessage[] = {
-    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_typesinprotocols_BasicTable)},
-    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
-};
-const struct FidlCodedUnion test_typesinprotocols_ProtocolErrorBasicResponseMessageTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields55test_typesinprotocols_ProtocolErrorBasicResponseMessage, .nullable=kFidlNullability_Nonnullable, .name="test.typesinprotocols/ProtocolErrorBasicResponseMessage", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlUnionField Fields58test_typesinprotocols_ProtocolErrorCompoundResponseMessage[] = {
-    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_typesinprotocols_CompoundTable)},
-    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
-};
-const struct FidlCodedUnion test_typesinprotocols_ProtocolErrorCompoundResponseMessageTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields58test_typesinprotocols_ProtocolErrorCompoundResponseMessage, .nullable=kFidlNullability_Nonnullable, .name="test.typesinprotocols/ProtocolErrorCompoundResponseMessage", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlUnionField Fields60test_typesinprotocols_ProtocolErrorArrayBasicResponseMessage[] = {
-    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_typesinprotocols_ArrayBasicTable)},
-    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
-};
-const struct FidlCodedUnion test_typesinprotocols_ProtocolErrorArrayBasicResponseMessageTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields60test_typesinprotocols_ProtocolErrorArrayBasicResponseMessage, .nullable=kFidlNullability_Nonnullable, .name="test.typesinprotocols/ProtocolErrorArrayBasicResponseMessage", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlUnionField Fields63test_typesinprotocols_ProtocolErrorArrayCompoundResponseMessage[] = {
-    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_typesinprotocols_ArrayCompoundTable)},
-    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
-};
-const struct FidlCodedUnion test_typesinprotocols_ProtocolErrorArrayCompoundResponseMessageTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields63test_typesinprotocols_ProtocolErrorArrayCompoundResponseMessage, .nullable=kFidlNullability_Nonnullable, .name="test.typesinprotocols/ProtocolErrorArrayCompoundResponseMessage", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlUnionField Fields61test_typesinprotocols_ProtocolErrorVectorBasicResponseMessage[] = {
-    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_typesinprotocols_VectorBasicTable)},
-    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
-};
-const struct FidlCodedUnion test_typesinprotocols_ProtocolErrorVectorBasicResponseMessageTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields61test_typesinprotocols_ProtocolErrorVectorBasicResponseMessage, .nullable=kFidlNullability_Nonnullable, .name="test.typesinprotocols/ProtocolErrorVectorBasicResponseMessage", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlUnionField Fields64test_typesinprotocols_ProtocolErrorVectorCompoundResponseMessage[] = {
-    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_typesinprotocols_VectorCompoundTable)},
-    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
-};
-const struct FidlCodedUnion test_typesinprotocols_ProtocolErrorVectorCompoundResponseMessageTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields64test_typesinprotocols_ProtocolErrorVectorCompoundResponseMessage, .nullable=kFidlNullability_Nonnullable, .name="test.typesinprotocols/ProtocolErrorVectorCompoundResponseMessage", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlUnionField Fields64test_typesinprotocols_ProtocolErrorVectorOptionalResponseMessage[] = {
-    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_typesinprotocols_VectorOptionalTable)},
-    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
-};
-const struct FidlCodedUnion test_typesinprotocols_ProtocolErrorVectorOptionalResponseMessageTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields64test_typesinprotocols_ProtocolErrorVectorOptionalResponseMessage, .nullable=kFidlNullability_Nonnullable, .name="test.typesinprotocols/ProtocolErrorVectorOptionalResponseMessage", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlUnionField Fields67test_typesinprotocols_ProtocolErrorArrayVectorNestedResponseMessage[] = {
-    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_typesinprotocols_ArrayVectorNestedTable)},
-    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
-};
-const struct FidlCodedUnion test_typesinprotocols_ProtocolErrorArrayVectorNestedResponseMessageTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields67test_typesinprotocols_ProtocolErrorArrayVectorNestedResponseMessage, .nullable=kFidlNullability_Nonnullable, .name="test.typesinprotocols/ProtocolErrorArrayVectorNestedResponseMessage", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_NotResource};
-static const struct FidlUnionField Fields58test_typesinprotocols_ProtocolErrorResourceResponseMessage[] = {
-    /*FidlUnionField*/{.type=(fidl_type_t*)(&test_typesinprotocols_ResourceTable)},
-    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kUint32Table)}
-};
-const struct FidlCodedUnion test_typesinprotocols_ProtocolErrorResourceResponseMessageTable = {.tag=kFidlTypeUnion, .field_count=2u, .fields=Fields58test_typesinprotocols_ProtocolErrorResourceResponseMessage, .nullable=kFidlNullability_Nonnullable, .name="test.typesinprotocols/ProtocolErrorResourceResponseMessage", .strictness=kFidlStrictness_Strict, .is_resource=kFidlIsResource_Resource};

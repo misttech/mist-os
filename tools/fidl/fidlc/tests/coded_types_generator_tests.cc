@@ -216,7 +216,7 @@ protocol UseOfProtocol {
   fidl::CodedTypesGenerator gen(library.compilation());
   gen.CompileCodedTypes();
 
-  ASSERT_EQ(3, gen.coded_types().size());
+  ASSERT_EQ(2, gen.coded_types().size());
 
   auto type0 = gen.coded_types().at(0).get();
   EXPECT_STREQ("Protocol20example_SomeProtocolnonnullable", type0->coded_name.c_str());
@@ -234,16 +234,18 @@ protocol UseOfProtocol {
   auto type1_ihandle = static_cast<const fidl::coded::RequestHandleType*>(type1);
   ASSERT_EQ(fidl::types::Nullability::kNonnullable, type1_ihandle->nullability);
 
-  auto type2 = gen.coded_types().at(2).get();
-  EXPECT_STREQ("example_UseOfProtocolCallRequestMessage", type2->coded_name.c_str());
-  EXPECT_TRUE(type2->is_coding_needed);
-  EXPECT_EQ(4, type2->size_v2);
-  ASSERT_EQ(fidl::coded::Type::Kind::kStruct, type2->kind);
-  auto type2_message = static_cast<const fidl::coded::StructType*>(type2);
-  EXPECT_STREQ("example/UseOfProtocolCallRequestMessage", type2_message->qname.c_str());
-  EXPECT_EQ(1, type2_message->elements.size());
-  EXPECT_EQ(0, field(type2_message->elements.at(0)).offset_v2);
-  EXPECT_EQ(type0, field(type2_message->elements.at(0)).type);
+  auto anon_payload_name =
+      fidl::flat::Name::Key(library.LookupLibrary("example"), "UseOfProtocolCallRequest");
+  auto typed_anon_payload = gen.CodedTypeFor(anon_payload_name);
+  EXPECT_STREQ("example_UseOfProtocolCallRequest", typed_anon_payload->coded_name.c_str());
+  EXPECT_TRUE(typed_anon_payload->is_coding_needed);
+  EXPECT_EQ(4, typed_anon_payload->size_v2);
+  ASSERT_EQ(fidl::coded::Type::Kind::kStruct, typed_anon_payload->kind);
+  auto anon_payload_message = static_cast<const fidl::coded::StructType*>(typed_anon_payload);
+  EXPECT_STREQ("example/UseOfProtocolCallRequest", anon_payload_message->qname.c_str());
+  EXPECT_EQ(1, anon_payload_message->elements.size());
+  EXPECT_EQ(0, field(anon_payload_message->elements.at(0)).offset_v2);
+  EXPECT_EQ(type0, field(anon_payload_message->elements.at(0)).type);
 
   auto named_payload_name =
       fidl::flat::Name::Key(library.LookupLibrary("example"), "OnReceivePayload");
@@ -277,7 +279,7 @@ protocol UseOfProtocol {
   fidl::CodedTypesGenerator gen(library.compilation());
   gen.CompileCodedTypes();
 
-  ASSERT_EQ(4, gen.coded_types().size());
+  ASSERT_EQ(3, gen.coded_types().size());
 
   auto type0 = gen.coded_types().at(0).get();
   EXPECT_STREQ("example_UseOfProtocol_Method_ResultNullableRef", type0->coded_name.c_str());
@@ -303,14 +305,16 @@ protocol UseOfProtocol {
   auto type3 = gen.coded_types().at(2).get();
   EXPECT_STREQ("uint32", type3->coded_name.c_str());
 
-  auto type5 = gen.coded_types().at(3).get();
-  EXPECT_STREQ("example_UseOfProtocolMethodResponseMessage", type5->coded_name.c_str());
-  EXPECT_TRUE(type5->is_coding_needed);
-  EXPECT_EQ(16, type5->size_v2);
-  ASSERT_EQ(fidl::coded::Type::Kind::kUnion, type5->kind);
-  auto type5_message = static_cast<const fidl::coded::UnionType*>(type5);
-  EXPECT_STREQ("example/UseOfProtocolMethodResponseMessage", type5_message->qname.c_str());
-  EXPECT_EQ(2, type5_message->fields.size());
+  auto result_union_name =
+      fidl::flat::Name::Key(library.LookupLibrary("example"), "UseOfProtocol_Method_Result");
+  auto typed_result_union = gen.CodedTypeFor(result_union_name);
+  EXPECT_STREQ("example_UseOfProtocol_Method_Result", typed_result_union->coded_name.c_str());
+  EXPECT_TRUE(typed_result_union->is_coding_needed);
+  EXPECT_EQ(16, typed_result_union->size_v2);
+  ASSERT_EQ(fidl::coded::Type::Kind::kUnion, typed_result_union->kind);
+  auto result_union_message = static_cast<const fidl::coded::UnionType*>(typed_result_union);
+  EXPECT_STREQ("example/UseOfProtocol_Method_Result", result_union_message->qname.c_str());
+  EXPECT_EQ(2, result_union_message->fields.size());
 
   auto anon_payload_name =
       fidl::flat::Name::Key(library.LookupLibrary("example"), "UseOfProtocol_Method_Response");
@@ -340,7 +344,7 @@ protocol ErrorSyntaxProtocol {
   fidl::CodedTypesGenerator gen(library.compilation());
   gen.CompileCodedTypes();
 
-  ASSERT_EQ(3, gen.coded_types().size());
+  ASSERT_EQ(2, gen.coded_types().size());
 
   auto type0 = gen.coded_types().at(0).get();
   EXPECT_STREQ("example_ErrorSyntaxProtocol_ErrorSyntaxMethod_ResultNullableRef",
@@ -349,11 +353,6 @@ protocol ErrorSyntaxProtocol {
 
   auto type1 = gen.coded_types().at(1).get();
   EXPECT_STREQ("uint32", type1->coded_name.c_str());
-
-  auto type2 = gen.coded_types().at(2).get();
-  EXPECT_STREQ("example_ErrorSyntaxProtocolErrorSyntaxMethodResponseMessage",
-               type2->coded_name.c_str());
-  EXPECT_EQ(16, type2->size_v2);
 }
 
 TEST(CodedTypesGeneratorTests, GoodCodedTypesOfProtocolEnds) {
@@ -378,7 +377,7 @@ protocol UseOfProtocolEnds {
   fidl::CodedTypesGenerator gen(library.compilation());
   gen.CompileCodedTypes();
 
-  ASSERT_EQ(8, gen.coded_types().size());
+  ASSERT_EQ(4, gen.coded_types().size());
 
   // ClientEnd request payload
   auto type0 = gen.coded_types().at(3).get();
@@ -389,80 +388,32 @@ protocol UseOfProtocolEnds {
   auto type0_ihandle = static_cast<const fidl::coded::ProtocolHandleType*>(type0);
   EXPECT_EQ(fidl::types::Nullability::kNonnullable, type0_ihandle->nullability);
 
-  // ClientEnd request message
-  auto type1 = gen.coded_types().at(4).get();
-  EXPECT_STREQ("example_UseOfProtocolEndsClientEndsRequestMessage", type1->coded_name.c_str());
+  // ClientEnd response payload
+  auto type1 = gen.coded_types().at(2).get();
+  EXPECT_STREQ("Protocol20example_SomeProtocolnullable", type1->coded_name.c_str());
   EXPECT_TRUE(type1->is_coding_needed);
   EXPECT_EQ(4, type1->size_v2);
-  ASSERT_EQ(fidl::coded::Type::Kind::kStruct, type1->kind);
-  auto type1_message = static_cast<const fidl::coded::StructType*>(type1);
-  EXPECT_STREQ("example/UseOfProtocolEndsClientEndsRequestMessage", type1_message->qname.c_str());
-  EXPECT_EQ(1, type1_message->elements.size());
-  EXPECT_EQ(0, field(type1_message->elements.at(0)).offset_v2);
-  EXPECT_EQ(type0, field(type1_message->elements.at(0)).type);
-
-  // ClientEnd response payload
-  auto type2 = gen.coded_types().at(2).get();
-  EXPECT_STREQ("Protocol20example_SomeProtocolnullable", type2->coded_name.c_str());
-  EXPECT_TRUE(type2->is_coding_needed);
-  EXPECT_EQ(4, type2->size_v2);
-  ASSERT_EQ(fidl::coded::Type::Kind::kProtocolHandle, type2->kind);
-  auto type2_ihandle = static_cast<const fidl::coded::ProtocolHandleType*>(type2);
+  ASSERT_EQ(fidl::coded::Type::Kind::kProtocolHandle, type1->kind);
+  auto type2_ihandle = static_cast<const fidl::coded::ProtocolHandleType*>(type1);
   EXPECT_EQ(fidl::types::Nullability::kNullable, type2_ihandle->nullability);
 
-  // ClientEnd response message
-  auto type3 = gen.coded_types().at(5).get();
-  EXPECT_STREQ("example_UseOfProtocolEndsClientEndsResponseMessage", type3->coded_name.c_str());
-  EXPECT_TRUE(type3->is_coding_needed);
-  EXPECT_EQ(4, type3->size_v2);
-  ASSERT_EQ(fidl::coded::Type::Kind::kStruct, type3->kind);
-  auto type3_message = static_cast<const fidl::coded::StructType*>(type3);
-  EXPECT_STREQ("example/UseOfProtocolEndsClientEndsResponseMessage", type3_message->qname.c_str());
-  EXPECT_EQ(1, type3_message->elements.size());
-  EXPECT_EQ(0, field(type3_message->elements.at(0)).offset_v2);
-  EXPECT_EQ(type2, field(type3_message->elements.at(0)).type);
-
   // ServerEnd request payload
-  auto type4 = gen.coded_types().at(1).get();
-  EXPECT_STREQ("Request20example_SomeProtocolnullable", type4->coded_name.c_str());
-  EXPECT_TRUE(type4->is_coding_needed);
-  EXPECT_EQ(4, type4->size_v2);
-  ASSERT_EQ(fidl::coded::Type::Kind::kRequestHandle, type4->kind);
-  auto type4_ihandle = static_cast<const fidl::coded::RequestHandleType*>(type4);
+  auto type2 = gen.coded_types().at(1).get();
+  EXPECT_STREQ("Request20example_SomeProtocolnullable", type2->coded_name.c_str());
+  EXPECT_TRUE(type2->is_coding_needed);
+  EXPECT_EQ(4, type2->size_v2);
+  ASSERT_EQ(fidl::coded::Type::Kind::kRequestHandle, type2->kind);
+  auto type4_ihandle = static_cast<const fidl::coded::RequestHandleType*>(type2);
   EXPECT_EQ(fidl::types::Nullability::kNullable, type4_ihandle->nullability);
 
-  // ServerEnd request message
-  auto type5 = gen.coded_types().at(6).get();
-  EXPECT_STREQ("example_UseOfProtocolEndsServerEndsRequestMessage", type5->coded_name.c_str());
-  EXPECT_TRUE(type5->is_coding_needed);
-  EXPECT_EQ(4, type5->size_v2);
-  ASSERT_EQ(fidl::coded::Type::Kind::kStruct, type5->kind);
-  auto type5_message = static_cast<const fidl::coded::StructType*>(type5);
-  EXPECT_STREQ("example/UseOfProtocolEndsServerEndsRequestMessage", type5_message->qname.c_str());
-  EXPECT_EQ(1, type5_message->elements.size());
-  EXPECT_EQ(0, field(type5_message->elements.at(0)).offset_v2);
-  EXPECT_EQ(type4, field(type5_message->elements.at(0)).type);
-
   // ServerEnd response payload
-  auto type6 = gen.coded_types().at(0).get();
-  EXPECT_STREQ("Request20example_SomeProtocolnonnullable", type6->coded_name.c_str());
-  EXPECT_TRUE(type6->is_coding_needed);
-  EXPECT_EQ(4, type6->size_v2);
-  ASSERT_EQ(fidl::coded::Type::Kind::kRequestHandle, type6->kind);
-  auto type6_ihandle = static_cast<const fidl::coded::RequestHandleType*>(type6);
+  auto type3 = gen.coded_types().at(0).get();
+  EXPECT_STREQ("Request20example_SomeProtocolnonnullable", type3->coded_name.c_str());
+  EXPECT_TRUE(type3->is_coding_needed);
+  EXPECT_EQ(4, type3->size_v2);
+  ASSERT_EQ(fidl::coded::Type::Kind::kRequestHandle, type3->kind);
+  auto type6_ihandle = static_cast<const fidl::coded::RequestHandleType*>(type3);
   EXPECT_EQ(fidl::types::Nullability::kNonnullable, type6_ihandle->nullability);
-
-  // ServerEnd response message
-  auto type7 = gen.coded_types().at(7).get();
-  EXPECT_STREQ("example_UseOfProtocolEndsServerEndsResponseMessage", type7->coded_name.c_str());
-  EXPECT_TRUE(type7->is_coding_needed);
-  EXPECT_EQ(4, type7->size_v2);
-  ASSERT_EQ(fidl::coded::Type::Kind::kStruct, type7->kind);
-  auto type7_message = static_cast<const fidl::coded::StructType*>(type7);
-  EXPECT_STREQ("example/UseOfProtocolEndsServerEndsResponseMessage", type7_message->qname.c_str());
-  EXPECT_EQ(1, type7_message->elements.size());
-  EXPECT_EQ(0, field(type7_message->elements.at(0)).offset_v2);
-  EXPECT_EQ(type6, field(type7_message->elements.at(0)).type);
 }
 
 // The code between |CodedTypesOfUnions| and |CodedTypesOfNullableUnions| is now very similar
@@ -1336,20 +1287,23 @@ protocol UseOfProtocol {
   fidl::CodedTypesGenerator gen(library.compilation());
   gen.CompileCodedTypes();
 
-  ASSERT_EQ(2, gen.coded_types().size());
+  ASSERT_EQ(1, gen.coded_types().size());
 
   auto type0 = gen.coded_types().at(0).get();
   EXPECT_STREQ("bool", type0->coded_name.c_str());
 
-  auto anon_payload = gen.coded_types().at(1).get();
-  EXPECT_STREQ("example_UseOfProtocolCallRequestMessage", anon_payload->coded_name.c_str());
-  EXPECT_TRUE(anon_payload->is_coding_needed);
-  EXPECT_EQ(2, anon_payload->size_v2);
-  ASSERT_EQ(fidl::coded::Type::Kind::kStruct, anon_payload->kind);
-  auto anon_payload_message = static_cast<const fidl::coded::StructType*>(anon_payload);
+  auto anon_payload_name =
+      fidl::flat::Name::Key(library.LookupLibrary("example"), "UseOfProtocolCallRequest");
+  auto typed_anon_payload = gen.CodedTypeFor(anon_payload_name);
+  ASSERT_NOT_NULL(typed_anon_payload);
+  EXPECT_STREQ("example_UseOfProtocolCallRequest", typed_anon_payload->coded_name.c_str());
+  EXPECT_TRUE(typed_anon_payload->is_coding_needed);
+  EXPECT_EQ(2, typed_anon_payload->size_v2);
+  ASSERT_EQ(fidl::coded::Type::Kind::kStruct, typed_anon_payload->kind);
+  auto anon_payload_message = static_cast<const fidl::coded::StructType*>(typed_anon_payload);
   ASSERT_FALSE(anon_payload_message->is_empty);
   EXPECT_NULL(anon_payload_message->maybe_reference_type);
-  EXPECT_STREQ("example/UseOfProtocolCallRequestMessage", anon_payload_message->qname.c_str());
+  EXPECT_STREQ("example/UseOfProtocolCallRequest", anon_payload_message->qname.c_str());
   ASSERT_EQ(2, anon_payload_message->elements.size());
   EXPECT_EQ(0, field(anon_payload_message->elements.at(0)).offset_v2);
   EXPECT_EQ(1, field(anon_payload_message->elements.at(1)).offset_v2);
@@ -1384,7 +1338,7 @@ protocol UseOfProtocol {
   fidl::CodedTypesGenerator gen(library.compilation());
   gen.CompileCodedTypes();
 
-  ASSERT_EQ(4, gen.coded_types().size());
+  ASSERT_EQ(3, gen.coded_types().size());
 
   auto type0 = gen.coded_types().at(0).get();
   EXPECT_STREQ("example_UseOfProtocol_Method_ResultNullableRef", type0->coded_name.c_str());
@@ -1405,15 +1359,16 @@ protocol UseOfProtocol {
   auto type3 = gen.coded_types().at(2).get();
   EXPECT_STREQ("uint32", type3->coded_name.c_str());
 
-  auto type4 = gen.coded_types().at(3).get();
-  EXPECT_STREQ("example_UseOfProtocolMethodResponseMessage", type4->coded_name.c_str());
-  EXPECT_TRUE(type4->is_coding_needed);
-  EXPECT_EQ(16, type4->size_v2);
-  ASSERT_EQ(fidl::coded::Type::Kind::kUnion, type4->kind);
-  auto type4_message = static_cast<const fidl::coded::UnionType*>(type4);
-  EXPECT_NULL(type4_message->maybe_reference_type);
-  EXPECT_STREQ("example/UseOfProtocolMethodResponseMessage", type4_message->qname.c_str());
-  ASSERT_EQ(2, type4_message->fields.size());
+  auto result_union_name =
+      fidl::flat::Name::Key(library.LookupLibrary("example"), "UseOfProtocol_Method_Result");
+  auto typed_result_union = gen.CodedTypeFor(result_union_name);
+  EXPECT_STREQ("example_UseOfProtocol_Method_Result", typed_result_union->coded_name.c_str());
+  EXPECT_TRUE(typed_result_union->is_coding_needed);
+  EXPECT_EQ(16, typed_result_union->size_v2);
+  ASSERT_EQ(fidl::coded::Type::Kind::kUnion, typed_result_union->kind);
+  auto result_union_message = static_cast<const fidl::coded::UnionType*>(typed_result_union);
+  EXPECT_STREQ("example/UseOfProtocol_Method_Result", result_union_message->qname.c_str());
+  ASSERT_EQ(2, result_union_message->fields.size());
 
   auto anon_payload_name =
       fidl::flat::Name::Key(library.LookupLibrary("example"), "UseOfProtocol_Method_Response");
@@ -1451,19 +1406,22 @@ protocol UseOfProtocol {
   fidl::CodedTypesGenerator gen(library.compilation());
   gen.CompileCodedTypes();
 
-  ASSERT_EQ(2, gen.coded_types().size());
+  ASSERT_EQ(1, gen.coded_types().size());
 
   auto type0 = gen.coded_types().at(0).get();
   EXPECT_STREQ("bool", type0->coded_name.c_str());
 
-  auto anon_payload = gen.coded_types().at(1).get();
-  EXPECT_STREQ("example_UseOfProtocolCallRequestMessage", anon_payload->coded_name.c_str());
-  EXPECT_TRUE(anon_payload->is_coding_needed);
-  EXPECT_EQ(16, anon_payload->size_v2);
-  ASSERT_EQ(fidl::coded::Type::Kind::kTable, anon_payload->kind);
-  auto anon_payload_message = static_cast<const fidl::coded::TableType*>(anon_payload);
+  auto anon_payload_name =
+      fidl::flat::Name::Key(library.LookupLibrary("example"), "UseOfProtocolCallRequest");
+  auto typed_anon_payload = gen.CodedTypeFor(anon_payload_name);
+  ASSERT_NOT_NULL(typed_anon_payload);
+  EXPECT_STREQ("example_UseOfProtocolCallRequest", typed_anon_payload->coded_name.c_str());
+  EXPECT_TRUE(typed_anon_payload->is_coding_needed);
+  EXPECT_EQ(16, typed_anon_payload->size_v2);
+  ASSERT_EQ(fidl::coded::Type::Kind::kTable, typed_anon_payload->kind);
+  auto anon_payload_message = static_cast<const fidl::coded::TableType*>(typed_anon_payload);
   EXPECT_EQ(fidl::types::Resourceness::kValue, anon_payload_message->resourceness);
-  EXPECT_STREQ("example/UseOfProtocolCallRequestMessage", anon_payload_message->qname.c_str());
+  EXPECT_STREQ("example/UseOfProtocolCallRequest", anon_payload_message->qname.c_str());
   ASSERT_EQ(2, anon_payload_message->fields.size());
   EXPECT_EQ(1, anon_payload_message->fields.at(0).type->size_v2);
   EXPECT_EQ(1, anon_payload_message->fields.at(1).type->size_v2);
@@ -1497,7 +1455,7 @@ protocol UseOfProtocol {
   fidl::CodedTypesGenerator gen(library.compilation());
   gen.CompileCodedTypes();
 
-  ASSERT_EQ(4, gen.coded_types().size());
+  ASSERT_EQ(3, gen.coded_types().size());
 
   auto type0 = gen.coded_types().at(0).get();
   EXPECT_STREQ("example_UseOfProtocol_Method_ResultNullableRef", type0->coded_name.c_str());
@@ -1517,15 +1475,6 @@ protocol UseOfProtocol {
 
   auto type3 = gen.coded_types().at(2).get();
   EXPECT_STREQ("uint32", type3->coded_name.c_str());
-
-  auto type4 = gen.coded_types().at(3).get();
-  EXPECT_STREQ("example_UseOfProtocolMethodResponseMessage", type4->coded_name.c_str());
-  EXPECT_TRUE(type4->is_coding_needed);
-  EXPECT_EQ(16, type4->size_v2);
-  ASSERT_EQ(fidl::coded::Type::Kind::kUnion, type4->kind);
-  auto type4_message = static_cast<const fidl::coded::UnionType*>(type4);
-  EXPECT_STREQ("example/UseOfProtocolMethodResponseMessage", type4_message->qname.c_str());
-  ASSERT_EQ(2, type4_message->fields.size());
 
   auto anon_payload_name =
       fidl::flat::Name::Key(library.LookupLibrary("example"), "UseOfProtocol_Method_Response");
@@ -1562,20 +1511,22 @@ protocol UseOfProtocol {
   fidl::CodedTypesGenerator gen(library.compilation());
   gen.CompileCodedTypes();
 
-  ASSERT_EQ(4, gen.coded_types().size());
+  ASSERT_EQ(3, gen.coded_types().size());
 
   auto type2 = gen.coded_types().at(2).get();
   EXPECT_STREQ("bool", type2->coded_name.c_str());
 
-  auto anon_payload = gen.coded_types().at(3).get();
-  EXPECT_STREQ("example_UseOfProtocolCallRequestMessage", anon_payload->coded_name.c_str());
-  EXPECT_TRUE(anon_payload->is_coding_needed);
-  EXPECT_EQ(16, anon_payload->size_v2);
-  ASSERT_EQ(fidl::coded::Type::Kind::kUnion, anon_payload->kind);
-  auto anon_payload_message = static_cast<const fidl::coded::UnionType*>(anon_payload);
+  auto anon_payload_name =
+      fidl::flat::Name::Key(library.LookupLibrary("example"), "UseOfProtocolCallRequest");
+  auto typed_anon_payload = gen.CodedTypeFor(anon_payload_name);
+  EXPECT_STREQ("example_UseOfProtocolCallRequest", typed_anon_payload->coded_name.c_str());
+  EXPECT_TRUE(typed_anon_payload->is_coding_needed);
+  EXPECT_EQ(16, typed_anon_payload->size_v2);
+  ASSERT_EQ(fidl::coded::Type::Kind::kUnion, typed_anon_payload->kind);
+  auto anon_payload_message = static_cast<const fidl::coded::UnionType*>(typed_anon_payload);
   EXPECT_EQ(fidl::types::Nullability::kNonnullable, anon_payload_message->nullability);
   EXPECT_EQ(fidl::types::Resourceness::kValue, anon_payload_message->resourceness);
-  EXPECT_STREQ("example/UseOfProtocolCallRequestMessage", anon_payload_message->qname.c_str());
+  EXPECT_STREQ("example/UseOfProtocolCallRequest", anon_payload_message->qname.c_str());
   ASSERT_EQ(2, anon_payload_message->fields.size());
   EXPECT_EQ(1, anon_payload_message->fields.at(0).type->size_v2);
   EXPECT_EQ(1, anon_payload_message->fields.at(1).type->size_v2);
@@ -1610,7 +1561,7 @@ protocol UseOfProtocol {
   fidl::CodedTypesGenerator gen(library.compilation());
   gen.CompileCodedTypes();
 
-  ASSERT_EQ(5, gen.coded_types().size());
+  ASSERT_EQ(4, gen.coded_types().size());
 
   auto type1 = gen.coded_types().at(1).get();
   EXPECT_STREQ("example_UseOfProtocol_Method_ResultNullableRef", type1->coded_name.c_str());
@@ -1631,14 +1582,16 @@ protocol UseOfProtocol {
   auto type5 = gen.coded_types().at(3).get();
   EXPECT_STREQ("uint32", type5->coded_name.c_str());
 
-  auto type6 = gen.coded_types().at(4).get();
-  EXPECT_STREQ("example_UseOfProtocolMethodResponseMessage", type6->coded_name.c_str());
-  EXPECT_TRUE(type6->is_coding_needed);
-  EXPECT_EQ(16, type6->size_v2);
-  ASSERT_EQ(fidl::coded::Type::Kind::kUnion, type6->kind);
-  auto type6_message = static_cast<const fidl::coded::UnionType*>(type6);
-  EXPECT_STREQ("example/UseOfProtocolMethodResponseMessage", type6_message->qname.c_str());
-  ASSERT_EQ(2, type6_message->fields.size());
+  auto result_union_name =
+      fidl::flat::Name::Key(library.LookupLibrary("example"), "UseOfProtocol_Method_Result");
+  auto typed_result_union = gen.CodedTypeFor(result_union_name);
+  EXPECT_STREQ("example_UseOfProtocol_Method_Result", typed_result_union->coded_name.c_str());
+  EXPECT_TRUE(typed_result_union->is_coding_needed);
+  EXPECT_EQ(16, typed_result_union->size_v2);
+  ASSERT_EQ(fidl::coded::Type::Kind::kUnion, typed_result_union->kind);
+  auto result_union_message = static_cast<const fidl::coded::UnionType*>(typed_result_union);
+  EXPECT_STREQ("example/UseOfProtocol_Method_Result", result_union_message->qname.c_str());
+  ASSERT_EQ(2, result_union_message->fields.size());
 
   auto anon_payload_name =
       fidl::flat::Name::Key(library.LookupLibrary("example"), "UseOfProtocol_Method_Response");

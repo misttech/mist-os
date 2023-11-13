@@ -5,13 +5,10 @@
 
 __LOCAL extern const struct FidlCodedStruct test_driveroneway_PayloadTable;
 __LOCAL extern const struct FidlCodedStruct test_driveroneway_OneWaySendRequestTable;
-__LOCAL extern const struct FidlCodedStruct test_driveroneway_OneWaySendRequestMessageTable;
 
 
 
 const struct FidlCodedStruct test_driveroneway_PayloadTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=4u, .name="test.driveroneway/Payload"};
 
 const struct FidlCodedStruct test_driveroneway_OneWaySendRequestTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=4u, .name="test.driveroneway/OneWaySendRequest"};
-
-const struct FidlCodedStruct test_driveroneway_OneWaySendRequestMessageTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=4u, .name="test.driveroneway/OneWaySendRequestMessage"};
 

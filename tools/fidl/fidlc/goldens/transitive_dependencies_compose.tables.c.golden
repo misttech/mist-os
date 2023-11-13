@@ -5,9 +5,6 @@
 
 __LOCAL extern const struct FidlCodedStruct test_bottom_FooTable;
 __LOCAL extern const struct FidlCodedStruct test_bottom_BottomGetFooResponseTable;
-__LOCAL extern const struct FidlCodedStruct test_transitivedependenciescompose_TopGetFooResponseMessageTable;
 
 
-
-const struct FidlCodedStruct test_transitivedependenciescompose_TopGetFooResponseMessageTable = {.tag=kFidlTypeStruct, .is_empty=kFidlEmpty_IsNotEmpty, .elements=NULL, .element_count=0u, .size_v2=4u, .name="test.transitivedependenciescompose/TopGetFooResponseMessage"};
 
