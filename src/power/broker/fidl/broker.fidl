@@ -118,17 +118,20 @@ type AddElementError = flexible enum {
 };
 
 type RemoveElementError = flexible enum {
-    NOT_FOUND = 0;
+    NOT_AUTHORIZED = 0;
+    NOT_FOUND = 1;
 };
 
 type AddDependencyError = flexible enum {
     ALREADY_EXISTS = 0;
     ELEMENT_NOT_FOUND = 1;
-    REQUIRED_ELEMENT_NOT_FOUND = 2;
+    NOT_AUTHORIZED = 2;
+    REQUIRED_ELEMENT_NOT_FOUND = 3;
 };
 
 type RemoveDependencyError = flexible enum {
-    NOT_FOUND = 0;
+    NOT_AUTHORIZED = 0;
+    NOT_FOUND = 1;
 };
 
 type RegisterCredentialsError = flexible enum {
@@ -141,15 +144,17 @@ type UnregisterCredentialsError = flexible enum {
 };
 
 type ElementLevel = resource struct {
-    element ElementId;
+    /// A token to a Credential previously registered on the element
+    /// with the relevant Permissions for the action requested.
+    token zx.Handle:EVENTPAIR;
     level PowerLevel;
 };
 
 /// Power dependency from one element's PowerLevel to another.
-/// The Element and PowerLevel specified by `level` depends on
+/// The Element and PowerLevel specified by `dependent` depends on
 /// the Element and PowerLevel specified by `requires`.
 type Dependency = resource struct {
-    level ElementLevel;
+    dependent ElementLevel;
     requires ElementLevel;
 };
 
@@ -161,9 +166,6 @@ open protocol Topology {
     flexible AddElement(resource struct {
         /// Human-readable name for logging and debug purposes.
         element_name string:1024;
-        /// List of dependencies for this element.
-        /// Empty ElementIds will be treated as referring to this Element.
-        dependencies vector<Dependency>:128;
         /// List of initial credentials to register for this element.
         /// You may not register credentials for other elements here.
         credentials_to_register vector<Credential>:128;
@@ -175,35 +177,43 @@ open protocol Topology {
     /// Made by a Power Element owner to remove their Power Element.
     /// Removing a Power Element also removes all associated Dependencies.
     flexible RemoveElement(resource struct {
-        element ElementId;
+        /// Must supply a token to a previously registered Credential with
+        /// Permissions.REMOVE_ELEMENT for the element to be removed.
+        token zx.Handle:EVENTPAIR;
     }) -> () error RemoveElementError;
 
     /// Made by a Power Element owner to register a dependency on or for an
     /// existing Power Element.
     flexible AddDependency(resource struct {
+        /// Must supply two tokens to previously registered Credentials:
+        /// dependency.dependent.token must have Permissions.MODIFY_DEPENDENCY and
+        /// dependency.requires.token must have Permissions.MODIFY_DEPENDENT
         dependency Dependency;
     }) -> () error AddDependencyError;
 
     /// Made by a Power Element owner to remove a dependency from a Power Element.
     flexible RemoveDependency(resource struct {
+        /// Must supply two tokens to previously registered Credentials:
+        /// dependency.dependent.token must have Permissions.MODIFY_DEPENDENCY and
+        /// dependency.requires.token must have Permissions.MODIFY_DEPENDENT
         dependency Dependency;
     }) -> () error RemoveDependencyError;
 
     /// Made by a Power Element owner to register credentials for an existing Power
     /// Element.
     flexible RegisterCredentials(resource struct {
-        /// Must supply a pair token to a previously registered Credential with
+        /// Must supply a token to a previously registered Credential with
         /// Permissions.MODIFY_CREDENTIAL and all permissions included by
-        /// credentials_to_register for this element.
+        /// credentials_to_register.
         token zx.Handle:EVENTPAIR;
-        /// All credentials must match the Element of the above credential.
+        /// Credentials to be registered for the Element of the above token.
         credentials_to_register vector<Credential>:128;
     }) -> () error RegisterCredentialsError;
 
     /// Made by a Power Element owner to unregister credentials from a Power
     /// Element. This will remove all authorization for these credentials.
     flexible UnregisterCredentials(resource struct {
-        /// Must supply a pair token to a previously registered Credential with
+        /// Must supply a token to a previously registered Credential with
         /// Permissions.MODIFY_CREDENTIAL for this element.
         token zx.Handle:EVENTPAIR;
         /// Pair tokens of the credentials to unregister.
@@ -231,8 +241,6 @@ type Credential = resource struct {
     /// The end of an EventPair that Power Broker will retain. The other
     /// end should be kept by the caller to use for future authentication.
     broker_token zx.Handle:EVENTPAIR;
-    /// The Power Element these permissions apply to.
-    element ElementId;
     /// Bitmask using Element Permissions defined above.
     permissions Permissions;
 };

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 /// Manages the Power Element Topology, keeping track of element dependencies.
-use fidl_fuchsia_power_broker::{self as fpb, PowerLevel};
+use fidl_fuchsia_power_broker::{self as fpb, Permissions, PowerLevel};
 use std::collections::HashMap;
 use uuid::Uuid;
 
@@ -39,25 +39,13 @@ pub struct ElementLevel {
     pub level: PowerLevel,
 }
 
-impl From<fpb::ElementLevel> for ElementLevel {
-    fn from(el: fpb::ElementLevel) -> Self {
-        ElementLevel { element: el.element.into(), level: el.level.into() }
-    }
-}
-
 /// Power dependency from one element's PowerLevel to another.
 /// The Element and PowerLevel specified by `level` depends on
 /// the Element and PowerLevel specified by `requires`.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialOrd, PartialEq)]
 pub struct Dependency {
-    pub level: ElementLevel,
+    pub dependent: ElementLevel,
     pub requires: ElementLevel,
-}
-
-impl From<fpb::Dependency> for Dependency {
-    fn from(d: fpb::Dependency) -> Self {
-        Dependency { level: d.level.into(), requires: d.requires.into() }
-    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -82,28 +70,32 @@ impl Into<fpb::AddElementError> for AddElementError {
 #[derive(Debug)]
 pub enum RemoveElementError {
     NotFound(ElementID),
+    NotAuthorized,
 }
 
 impl Into<fpb::RemoveElementError> for RemoveElementError {
     fn into(self) -> fpb::RemoveElementError {
         match self {
             RemoveElementError::NotFound(_) => fpb::RemoveElementError::NotFound,
+            RemoveElementError::NotAuthorized => fpb::RemoveElementError::NotAuthorized,
         }
     }
 }
 
 #[derive(Debug)]
 pub enum AddDependencyError {
-    AlreadyExists(),
+    AlreadyExists,
     ElementNotFound(ElementID),
+    NotAuthorized,
     RequiredElementNotFound(ElementID),
 }
 
 impl Into<fpb::AddDependencyError> for AddDependencyError {
     fn into(self) -> fpb::AddDependencyError {
         match self {
-            AddDependencyError::AlreadyExists() => fpb::AddDependencyError::AlreadyExists,
+            AddDependencyError::AlreadyExists => fpb::AddDependencyError::AlreadyExists,
             AddDependencyError::ElementNotFound(_) => fpb::AddDependencyError::ElementNotFound,
+            AddDependencyError::NotAuthorized => fpb::AddDependencyError::NotAuthorized,
             AddDependencyError::RequiredElementNotFound(_) => {
                 fpb::AddDependencyError::RequiredElementNotFound
             }
@@ -113,12 +105,14 @@ impl Into<fpb::AddDependencyError> for AddDependencyError {
 
 #[derive(Debug)]
 pub enum RemoveDependencyError {
+    NotAuthorized,
     NotFound(Dependency),
 }
 
 impl Into<fpb::RemoveDependencyError> for RemoveDependencyError {
     fn into(self) -> fpb::RemoveDependencyError {
         match self {
+            RemoveDependencyError::NotAuthorized => fpb::RemoveDependencyError::NotAuthorized,
             RemoveDependencyError::NotFound(_) => fpb::RemoveDependencyError::NotFound,
         }
     }
@@ -143,13 +137,12 @@ impl Topology {
     pub fn add_element(
         &mut self,
         name: &str,
-        _dependencies: Vec<Dependency>,
         credentials_to_register: Vec<CredentialToRegister>,
     ) -> Result<ElementID, AddElementError> {
         let id = ElementID::from(Uuid::new_v4().as_simple().to_string());
         self.elements.insert(id.clone(), Element { id: id.clone(), name: name.into() });
         for credential_to_register in credentials_to_register {
-            if let Err(err) = self.credentials.register(credential_to_register) {
+            if let Err(err) = self.credentials.register(&id, credential_to_register) {
                 match err {
                     RegisterCredentialsError::Internal => {
                         tracing::error!(
@@ -170,11 +163,21 @@ impl Topology {
         Ok(id)
     }
 
-    pub fn remove_element(&mut self, id: &ElementID) -> Result<(), RemoveElementError> {
-        if self.elements.remove(id).is_none() {
-            return Err(RemoveElementError::NotFound(id.clone()));
+    pub fn remove_element(&mut self, token: Token) -> Result<(), RemoveElementError> {
+        let Some(credential) = self.credentials.lookup(token) else {
+            return Err(RemoveElementError::NotAuthorized);
+        };
+        if !credential.contains(Permissions::REMOVE_ELEMENT) {
+            return Err(RemoveElementError::NotAuthorized);
         }
-        self.credentials.unregister_all_for_element(id);
+        self.internal_remove_element(credential.get_element())
+    }
+
+    fn internal_remove_element(&mut self, element: &ElementID) -> Result<(), RemoveElementError> {
+        if self.elements.remove(element).is_none() {
+            return Err(RemoveElementError::NotFound(element.clone()));
+        }
+        self.credentials.unregister_all_for_element(element);
         Ok(())
     }
 
@@ -187,7 +190,7 @@ impl Topology {
             .clone();
         targets
             .iter()
-            .map(|target| Dependency { level: element_level.clone(), requires: target.clone() })
+            .map(|target| Dependency { dependent: element_level.clone(), requires: target.clone() })
             .collect()
     }
 
@@ -208,17 +211,17 @@ impl Topology {
 
     /// Adds a direct dependency to the Topology.
     pub fn add_direct_dep(&mut self, dep: &Dependency) -> Result<(), AddDependencyError> {
-        if !self.elements.contains_key(&dep.level.element) {
-            return Err(AddDependencyError::ElementNotFound(dep.level.element.clone()));
+        if !self.elements.contains_key(&dep.dependent.element) {
+            return Err(AddDependencyError::ElementNotFound(dep.dependent.element.clone()));
         }
         if !self.elements.contains_key(&dep.requires.element) {
             return Err(AddDependencyError::RequiredElementNotFound(dep.requires.element.clone()));
         }
         // TODO(b/299463665): Add Dependency validation here, or in Dependency construction.
         let targets =
-            self.source_to_targets_dependencies.entry(dep.level.clone()).or_insert(Vec::new());
+            self.source_to_targets_dependencies.entry(dep.dependent.clone()).or_insert(Vec::new());
         if targets.contains(&dep.requires) {
-            return Err(AddDependencyError::AlreadyExists());
+            return Err(AddDependencyError::AlreadyExists);
         }
         targets.push(dep.requires.clone());
         Ok(())
@@ -226,14 +229,14 @@ impl Topology {
 
     /// Removes a direct dependency from the Topology.
     pub fn remove_direct_dep(&mut self, dep: &Dependency) -> Result<(), RemoveDependencyError> {
-        if !self.elements.contains_key(&dep.level.element) {
+        if !self.elements.contains_key(&dep.dependent.element) {
             return Err(RemoveDependencyError::NotFound(dep.clone()));
         }
         if !self.elements.contains_key(&dep.requires.element) {
             return Err(RemoveDependencyError::NotFound(dep.clone()));
         }
         let targets =
-            self.source_to_targets_dependencies.entry(dep.level.clone()).or_insert(Vec::new());
+            self.source_to_targets_dependencies.entry(dep.dependent.clone()).or_insert(Vec::new());
         if !targets.contains(&dep.requires) {
             return Err(RemoveDependencyError::NotFound(dep.clone()));
         }
@@ -243,12 +246,24 @@ impl Topology {
 
     pub fn register_credentials(
         &mut self,
-        _token: Token,
+        token: Token,
         credentials_to_register: Vec<CredentialToRegister>,
     ) -> Result<(), RegisterCredentialsError> {
-        // TODO(b/308199278): Validate token against credentials_to_register
+        let Some(credential) = self.credentials.lookup(token) else {
+            tracing::debug!("register_credentials: no credential found matching token");
+            return Err(RegisterCredentialsError::NotAuthorized);
+        };
+        if !credential.contains(Permissions::MODIFY_CREDENTIAL) {
+            tracing::debug!(
+                "register_credentials: credential missing MODIFY_CREDENTIAL: {:?}",
+                &credential
+            );
+            return Err(RegisterCredentialsError::NotAuthorized);
+        }
         for credential_to_register in credentials_to_register {
-            if let Err(err) = self.credentials.register(credential_to_register) {
+            if let Err(err) =
+                self.credentials.register(&credential.get_element(), credential_to_register)
+            {
                 return Err(err);
             }
         }
@@ -257,17 +272,29 @@ impl Topology {
 
     pub fn unregister_credentials(
         &mut self,
-        _token: Token,
+        token: Token,
         tokens_to_unregister: Vec<Token>,
     ) -> Result<(), UnregisterCredentialsError> {
-        // TODO(b/308199278): Validate token against tokens_to_unregister
+        let Some(credential) = self.credentials.lookup(token) else {
+            tracing::debug!("unregister_credentials: no credential found matching token");
+            return Err(UnregisterCredentialsError::NotAuthorized);
+        };
         for token in tokens_to_unregister {
-            let Some(credential) = self.credentials.lookup(token) else {
+            let Some(credential_to_unregister) = self.credentials.lookup(token) else {
                 continue;
             };
-            self.credentials.unregister(&credential);
+            if !credential
+                .authorizes(credential_to_unregister.get_element(), &Permissions::MODIFY_CREDENTIAL)
+            {
+                return Err(UnregisterCredentialsError::NotAuthorized);
+            }
+            self.credentials.unregister(&credential_to_unregister);
         }
         Ok(())
+    }
+
+    pub fn lookup_credentials(&self, token: Token) -> Option<Credential> {
+        self.credentials.lookup(token)
     }
 }
 
@@ -275,17 +302,18 @@ impl Topology {
 mod tests {
     use super::*;
     use fidl_fuchsia_power_broker::{BinaryPowerLevel, PowerLevel};
+    use fuchsia_zircon::{self as zx, HandleBased};
 
     #[fuchsia::test]
     fn test_add_remove_elements() {
         let mut t = Topology::new();
-        let water = t.add_element("Water", Vec::new(), Vec::new()).expect("add_element failed");
-        let earth = t.add_element("Earth", Vec::new(), Vec::new()).expect("add_element failed");
-        let fire = t.add_element("Fire", Vec::new(), Vec::new()).expect("add_element failed");
-        let air = t.add_element("Air", Vec::new(), Vec::new()).expect("add_element failed");
+        let water = t.add_element("Water", Vec::new()).expect("add_element failed");
+        let earth = t.add_element("Earth", Vec::new()).expect("add_element failed");
+        let fire = t.add_element("Fire", Vec::new()).expect("add_element failed");
+        let air = t.add_element("Air", Vec::new()).expect("add_element failed");
 
         t.add_direct_dep(&Dependency {
-            level: ElementLevel {
+            dependent: ElementLevel {
                 element: water.clone(),
                 level: PowerLevel::Binary(BinaryPowerLevel::On),
             },
@@ -297,7 +325,7 @@ mod tests {
         .expect("add_direct_dep failed");
 
         let extra_add_dep_res = t.add_direct_dep(&Dependency {
-            level: ElementLevel {
+            dependent: ElementLevel {
                 element: water.clone(),
                 level: PowerLevel::Binary(BinaryPowerLevel::On),
             },
@@ -309,7 +337,7 @@ mod tests {
         assert!(matches!(extra_add_dep_res, Err(AddDependencyError::AlreadyExists { .. })));
 
         t.remove_direct_dep(&Dependency {
-            level: ElementLevel {
+            dependent: ElementLevel {
                 element: water.clone(),
                 level: PowerLevel::Binary(BinaryPowerLevel::On),
             },
@@ -321,7 +349,7 @@ mod tests {
         .expect("add_direct_dep failed");
 
         let extra_remove_dep_res = t.remove_direct_dep(&Dependency {
-            level: ElementLevel {
+            dependent: ElementLevel {
                 element: water.clone(),
                 level: PowerLevel::Binary(BinaryPowerLevel::On),
             },
@@ -332,11 +360,11 @@ mod tests {
         });
         assert!(matches!(extra_remove_dep_res, Err(RemoveDependencyError::NotFound { .. })));
 
-        t.remove_element(&fire).expect("remove_element failed");
-        t.remove_element(&air).expect("remove_element failed");
+        t.internal_remove_element(&fire).expect("remove_element failed");
+        t.internal_remove_element(&air).expect("remove_element failed");
 
         let element_not_found_res = t.add_direct_dep(&Dependency {
-            level: ElementLevel {
+            dependent: ElementLevel {
                 element: air.clone(),
                 level: PowerLevel::Binary(BinaryPowerLevel::On),
             },
@@ -348,7 +376,7 @@ mod tests {
         assert!(matches!(element_not_found_res, Err(AddDependencyError::ElementNotFound { .. })));
 
         let req_element_not_found_res = t.add_direct_dep(&Dependency {
-            level: ElementLevel {
+            dependent: ElementLevel {
                 element: earth.clone(),
                 level: PowerLevel::Binary(BinaryPowerLevel::On),
             },
@@ -366,13 +394,13 @@ mod tests {
     #[fuchsia::test]
     fn test_add_remove_direct_deps() {
         let mut t = Topology::new();
-        let a = t.add_element("A", Vec::new(), Vec::new()).expect("add_element failed");
-        let b = t.add_element("B", Vec::new(), Vec::new()).expect("add_element failed");
-        let c = t.add_element("C", Vec::new(), Vec::new()).expect("add_element failed");
-        let d = t.add_element("D", Vec::new(), Vec::new()).expect("add_element failed");
+        let a = t.add_element("A", Vec::new()).expect("add_element failed");
+        let b = t.add_element("B", Vec::new()).expect("add_element failed");
+        let c = t.add_element("C", Vec::new()).expect("add_element failed");
+        let d = t.add_element("D", Vec::new()).expect("add_element failed");
         // A <- B <- C -> D
         let ba = Dependency {
-            level: ElementLevel {
+            dependent: ElementLevel {
                 element: b.clone(),
                 level: PowerLevel::Binary(BinaryPowerLevel::On),
             },
@@ -383,7 +411,7 @@ mod tests {
         };
         t.add_direct_dep(&ba).expect("add_direct_dep failed");
         let cb = Dependency {
-            level: ElementLevel {
+            dependent: ElementLevel {
                 element: c.clone(),
                 level: PowerLevel::Binary(BinaryPowerLevel::On),
             },
@@ -394,7 +422,7 @@ mod tests {
         };
         t.add_direct_dep(&cb).expect("add_direct_dep failed");
         let cd = Dependency {
-            level: ElementLevel {
+            dependent: ElementLevel {
                 element: c.clone(),
                 level: PowerLevel::Binary(BinaryPowerLevel::On),
             },
@@ -432,13 +460,13 @@ mod tests {
     #[fuchsia::test]
     fn test_get_all_deps() {
         let mut t = Topology::new();
-        let a = t.add_element("A", Vec::new(), Vec::new()).expect("add_element failed");
-        let b = t.add_element("B", Vec::new(), Vec::new()).expect("add_element failed");
-        let c = t.add_element("C", Vec::new(), Vec::new()).expect("add_element failed");
-        let d = t.add_element("D", Vec::new(), Vec::new()).expect("add_element failed");
+        let a = t.add_element("A", Vec::new()).expect("add_element failed");
+        let b = t.add_element("B", Vec::new()).expect("add_element failed");
+        let c = t.add_element("C", Vec::new()).expect("add_element failed");
+        let d = t.add_element("D", Vec::new()).expect("add_element failed");
         // A <- B <- C -> D
         let ba = Dependency {
-            level: ElementLevel {
+            dependent: ElementLevel {
                 element: b.clone(),
                 level: PowerLevel::Binary(BinaryPowerLevel::On),
             },
@@ -449,7 +477,7 @@ mod tests {
         };
         t.add_direct_dep(&ba).expect("add_direct_dep failed");
         let cb = Dependency {
-            level: ElementLevel {
+            dependent: ElementLevel {
                 element: c.clone(),
                 level: PowerLevel::Binary(BinaryPowerLevel::On),
             },
@@ -460,7 +488,7 @@ mod tests {
         };
         t.add_direct_dep(&cb).expect("add_direct_dep failed");
         let cd = Dependency {
-            level: ElementLevel {
+            dependent: ElementLevel {
                 element: c.clone(),
                 level: PowerLevel::Binary(BinaryPowerLevel::On),
             },
@@ -503,5 +531,80 @@ mod tests {
         c_deps.sort();
         want_c_deps.sort();
         assert_eq!(c_deps, want_c_deps);
+    }
+
+    #[fuchsia::test]
+    fn test_remove_element() {
+        let mut t = Topology::new();
+        let (token_all, token_all_broker) = zx::EventPair::create();
+        let credential_all = CredentialToRegister {
+            broker_token: token_all_broker.into(),
+            permissions: Permissions::all(),
+        };
+        let (token_none, token_none_broker) = zx::EventPair::create();
+        let credential_none = CredentialToRegister {
+            broker_token: token_none_broker.into(),
+            permissions: Permissions::empty(),
+        };
+        t.add_element("Unobtainium", vec![credential_all, credential_none])
+            .expect("add_element failed");
+        let remove_element_not_authorized_res = t.remove_element(
+            token_none.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
+        );
+        assert!(matches!(
+            remove_element_not_authorized_res,
+            Err(RemoveElementError::NotAuthorized)
+        ));
+
+        t.remove_element(
+            token_all.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
+        )
+        .expect("remove_element failed");
+    }
+
+    #[fuchsia::test]
+    async fn test_register_unregister_credentials() {
+        let mut t = Topology::new();
+        let (token_element_owner, token_element_broker) = zx::EventPair::create();
+        let broker_credential = CredentialToRegister {
+            broker_token: token_element_broker.into(),
+            permissions: Permissions::READ_POWER_LEVEL
+                | Permissions::MODIFY_POWER_LEVEL
+                | Permissions::MODIFY_DEPENDENT
+                | Permissions::MODIFY_DEPENDENCY
+                | Permissions::MODIFY_CREDENTIAL
+                | Permissions::REMOVE_ELEMENT,
+        };
+        t.add_element("element", vec![broker_credential]).expect("add_element failed");
+        let (token_new_owner, token_new_broker) = zx::EventPair::create();
+        let credential_to_register = CredentialToRegister {
+            broker_token: token_new_broker.into(),
+            permissions: Permissions::READ_POWER_LEVEL | Permissions::MODIFY_POWER_LEVEL,
+        };
+        t.register_credentials(
+            token_element_owner
+                .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                .expect("duplicate_handle failed")
+                .into(),
+            vec![credential_to_register],
+        )
+        .expect("register_credentials failed");
+
+        let (_, token_not_authorized_broker) = zx::EventPair::create();
+        let credential_not_authorized = CredentialToRegister {
+            broker_token: token_not_authorized_broker.into(),
+            permissions: Permissions::READ_POWER_LEVEL | Permissions::MODIFY_POWER_LEVEL,
+        };
+        let res_not_authorized = t.register_credentials(
+            token_new_owner
+                .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                .expect("duplicate_handle failed")
+                .into(),
+            vec![credential_not_authorized],
+        );
+        assert!(matches!(res_not_authorized, Err(RegisterCredentialsError::NotAuthorized)));
+
+        t.unregister_credentials(token_element_owner.into(), vec![token_new_owner.into()])
+            .expect("unregister_credentials failed");
     }
 }

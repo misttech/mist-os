@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Error};
-use fidl_fuchsia_power_broker::{BinaryPowerLevel, PowerLevel, PowerLevelError};
+use fidl_fuchsia_power_broker::{BinaryPowerLevel, Permissions, PowerLevel, PowerLevelError};
 use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -22,6 +22,10 @@ pub struct Broker {
 impl Broker {
     pub fn new() -> Self {
         Broker { catalog: Catalog::new(), current: Levels::new(), required: Levels::new() }
+    }
+
+    pub fn lookup_credentials(&self, token: Token) -> Option<Credential> {
+        self.catalog.topology.lookup_credentials(token)
     }
 
     pub fn get_current_level(&self, id: &ElementID) -> Result<PowerLevel, PowerLevelError> {
@@ -48,11 +52,13 @@ impl Broker {
             // Look for pending claims that were (at least partially) blocked
             // by a claim on this element level that is now satisfied.
             // (They may still have other blockers, though.)
-            let pending_claims =
-                self.catalog.pending_claims.for_required_element(&claim.dependency.level.element);
+            let pending_claims = self
+                .catalog
+                .pending_claims
+                .for_required_element(&claim.dependency.dependent.element);
             tracing::debug!(
                 "pending_claims.for_required_element({:?}) = {:?})",
-                &claim.dependency.level.element,
+                &claim.dependency.dependent.element,
                 &pending_claims
             );
             let claims_activated = self.check_claims_to_activate(&pending_claims);
@@ -169,7 +175,7 @@ impl Broker {
             let mut has_dependents = false;
             // Only claims belonging to the same lease can be a dependent.
             for related_claim in self.catalog.active_claims.for_lease(&claim_to_check.lease_id) {
-                if related_claim.dependency.requires == claim_to_check.dependency.level {
+                if related_claim.dependency.requires == claim_to_check.dependency.dependent {
                     has_dependents = true;
                     break;
                 }
@@ -189,25 +195,77 @@ impl Broker {
     pub fn add_element(
         &mut self,
         name: &str,
-        dependencies: Vec<Dependency>,
         credentials_to_register: Vec<CredentialToRegister>,
     ) -> Result<ElementID, AddElementError> {
-        self.catalog.topology.add_element(name, dependencies, credentials_to_register)
+        self.catalog.topology.add_element(name, credentials_to_register)
     }
 
-    pub fn remove_element(&mut self, element: &ElementID) -> Result<(), RemoveElementError> {
-        self.catalog.topology.remove_element(element)
+    pub fn remove_element(&mut self, token: Token) -> Result<(), RemoveElementError> {
+        self.catalog.topology.remove_element(token)
     }
 
-    pub fn add_dependency(&mut self, dependency: &Dependency) -> Result<(), AddDependencyError> {
-        self.catalog.topology.add_direct_dep(dependency)
+    /// Checks authorization from tokens, and if valid, adds a dependency to the Topology.
+    pub fn add_dependency(
+        &mut self,
+        dependent_token: Token,
+        dependent_level: PowerLevel,
+        requires_token: Token,
+        requires_level: PowerLevel,
+    ) -> Result<(), AddDependencyError> {
+        let Some(dependent_cred) = self.lookup_credentials(dependent_token) else {
+            return Err(AddDependencyError::NotAuthorized);
+        };
+        if !dependent_cred.contains(Permissions::MODIFY_DEPENDENCY) {
+            return Err(AddDependencyError::NotAuthorized);
+        }
+        let Some(requires_cred) = self.lookup_credentials(requires_token) else {
+            return Err(AddDependencyError::NotAuthorized);
+        };
+        if !requires_cred.contains(Permissions::MODIFY_DEPENDENT) {
+            return Err(AddDependencyError::NotAuthorized);
+        }
+        self.catalog.topology.add_direct_dep(&Dependency {
+            dependent: ElementLevel {
+                element: dependent_cred.get_element().clone(),
+                level: dependent_level,
+            },
+            requires: ElementLevel {
+                element: requires_cred.get_element().clone(),
+                level: requires_level,
+            },
+        })
     }
 
+    /// Checks authorization from tokens, and if valid, removes a dependency from the Topology.
     pub fn remove_dependency(
         &mut self,
-        dependency: &Dependency,
+        dependent_token: Token,
+        dependent_level: PowerLevel,
+        requires_token: Token,
+        requires_level: PowerLevel,
     ) -> Result<(), RemoveDependencyError> {
-        self.catalog.topology.remove_direct_dep(dependency)
+        let Some(dependent_cred) = self.lookup_credentials(dependent_token) else {
+            return Err(RemoveDependencyError::NotAuthorized);
+        };
+        if !dependent_cred.contains(Permissions::MODIFY_DEPENDENCY) {
+            return Err(RemoveDependencyError::NotAuthorized);
+        }
+        let Some(requires_cred) = self.lookup_credentials(requires_token) else {
+            return Err(RemoveDependencyError::NotAuthorized);
+        };
+        if !requires_cred.contains(Permissions::MODIFY_DEPENDENT) {
+            return Err(RemoveDependencyError::NotAuthorized);
+        }
+        self.catalog.topology.remove_direct_dep(&Dependency {
+            dependent: ElementLevel {
+                element: dependent_cred.get_element().clone(),
+                level: dependent_level,
+            },
+            requires: ElementLevel {
+                element: requires_cred.get_element().clone(),
+                level: requires_level,
+            },
+        })
     }
 
     pub fn register_credentials(
@@ -417,11 +475,11 @@ impl ClaimTracker {
             }
         }
         if let Some(claim_ids) =
-            self.claims_to_drop_by_element.get_mut(&claim.dependency.level.element)
+            self.claims_to_drop_by_element.get_mut(&claim.dependency.dependent.element)
         {
             claim_ids.retain(|x| x != id);
             if claim_ids.is_empty() {
-                self.claims_to_drop_by_element.remove(&claim.dependency.level.element);
+                self.claims_to_drop_by_element.remove(&claim.dependency.dependent.element);
             }
         }
         Some(claim)
@@ -435,7 +493,7 @@ impl ClaimTracker {
         let claims_marked = self.for_lease(lease_id);
         for claim in &claims_marked {
             self.claims_to_drop_by_element
-                .entry(claim.dependency.level.element.clone())
+                .entry(claim.dependency.dependent.element.clone())
                 .or_insert(Vec::new())
                 .push(claim.id.clone());
         }
@@ -543,7 +601,8 @@ impl SatisfyPowerLevel for PowerLevel {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fidl_fuchsia_power_broker::{BinaryPowerLevel, PowerLevel};
+    use fidl_fuchsia_power_broker::{BinaryPowerLevel, Permissions, PowerLevel};
+    use fuchsia_zircon::{self as zx, HandleBased};
 
     #[fuchsia::test]
     fn test_levels() {
@@ -595,340 +654,46 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_catalog_acquire_drop_direct() {
-        // Create a topology of a child element with two direct dependencies.
-        // P1 <- C -> P2
-        let mut catalog = Catalog::new();
-        let child: ElementID =
-            catalog.topology.add_element("C", Vec::new(), Vec::new()).expect("add_element failed");
-        let parent1: ElementID =
-            catalog.topology.add_element("P1", Vec::new(), Vec::new()).expect("add_element failed");
-        let parent2: ElementID =
-            catalog.topology.add_element("P2", Vec::new(), Vec::new()).expect("add_element failed");
-        catalog
-            .topology
-            .add_direct_dep(&Dependency {
-                level: ElementLevel {
-                    element: child.clone(),
-                    level: PowerLevel::Binary(BinaryPowerLevel::On),
-                },
-                requires: ElementLevel {
-                    element: parent1.clone(),
-                    level: PowerLevel::Binary(BinaryPowerLevel::On),
-                },
-            })
-            .expect("add_direct_dep failed");
-        catalog
-            .topology
-            .add_direct_dep(&Dependency {
-                level: ElementLevel {
-                    element: child.clone(),
-                    level: PowerLevel::Binary(BinaryPowerLevel::On),
-                },
-                requires: ElementLevel {
-                    element: parent2.clone(),
-                    level: PowerLevel::Binary(BinaryPowerLevel::On),
-                },
-            })
-            .expect("add_direct_dep failed");
-
-        // Acquire the lease, which should result in two claims, one
-        // for each dependency.
-        let (lease, claims) = catalog
-            .create_lease_and_claims(&child, &PowerLevel::Binary(BinaryPowerLevel::On))
-            .expect("acquire failed");
-        assert_eq!(claims.len(), 2);
-        assert_ne!(lease.id, "");
-        assert_eq!(lease.element, child.clone());
-        assert_eq!(lease.level, PowerLevel::Binary(BinaryPowerLevel::On));
-        let claims_by_required_element: HashMap<ElementID, Claim> =
-            claims.into_iter().map(|c| (c.dependency.requires.element.clone(), c)).collect();
-        for parent in [&parent1, &parent2] {
-            let claim = claims_by_required_element
-                .get(&parent)
-                .unwrap_or_else(|| panic!("missing claim for {:?}", parent));
-            assert_ne!(claim.id, "");
-            assert_eq!(claim.lease_id, lease.id);
-            assert_eq!(claim.dependency.level.element, child.clone());
-            assert_eq!(claim.dependency.level.level, PowerLevel::Binary(BinaryPowerLevel::On));
-            assert_eq!(claim.dependency.requires.element, parent.clone());
-            assert_eq!(claim.dependency.requires.level, PowerLevel::Binary(BinaryPowerLevel::On));
-        }
-
-        // Now drop the lease.
-        let (dropped, _) = catalog.drop(&lease.id).expect("drop failed");
-        assert_eq!(dropped.id, lease.id);
-        assert_eq!(dropped.element, lease.element);
-        assert_eq!(dropped.level, lease.level);
-
-        // Try dropping the lease one more time, which should result in an error.
-        let extra_drop = catalog.drop(&lease.id);
-        assert!(extra_drop.is_err());
-    }
-
-    #[fuchsia::test]
-    fn test_catalog_acquire_drop_transitive() {
-        // Create a topology of a child element with two chained transitive
-        // dependencies.
-        // C -> P -> GP
-        let mut catalog = Catalog::new();
-        let child: ElementID =
-            catalog.topology.add_element("C", Vec::new(), Vec::new()).expect("add_element failed");
-        let parent: ElementID =
-            catalog.topology.add_element("P", Vec::new(), Vec::new()).expect("add_element failed");
-        let grandparent: ElementID =
-            catalog.topology.add_element("GP", Vec::new(), Vec::new()).expect("add_element failed");
-        catalog
-            .topology
-            .add_direct_dep(&Dependency {
-                level: ElementLevel {
-                    element: child.clone(),
-                    level: PowerLevel::Binary(BinaryPowerLevel::On),
-                },
-                requires: ElementLevel {
-                    element: parent.clone(),
-                    level: PowerLevel::Binary(BinaryPowerLevel::On),
-                },
-            })
-            .expect("add_direct_dep failed");
-        catalog
-            .topology
-            .add_direct_dep(&Dependency {
-                level: ElementLevel {
-                    element: parent.clone(),
-                    level: PowerLevel::Binary(BinaryPowerLevel::On),
-                },
-                requires: ElementLevel {
-                    element: grandparent.clone(),
-                    level: PowerLevel::Binary(BinaryPowerLevel::On),
-                },
-            })
-            .expect("add_direct_dep failed");
-
-        // Acquire the lease, which should result in two claims, one
-        // for the direct parent dependency, and one for the transitive
-        // grandparent dependency.
-        let (lease, claims) = catalog
-            .create_lease_and_claims(&child.clone(), &PowerLevel::Binary(BinaryPowerLevel::On))
-            .expect("acquire failed");
-        assert_eq!(claims.len(), 2);
-        let claims_by_required_element: HashMap<ElementID, Claim> =
-            claims.into_iter().map(|c| (c.dependency.requires.element.clone(), c)).collect();
-        let parent_claim = claims_by_required_element
-            .get(&parent)
-            .unwrap_or_else(|| panic!("missing claim for {:?}", parent));
-        assert_ne!(parent_claim.id, "");
-        assert_eq!(parent_claim.lease_id, lease.id);
-        assert_eq!(parent_claim.dependency.level.element, child.clone());
-        assert_eq!(parent_claim.dependency.level.level, PowerLevel::Binary(BinaryPowerLevel::On));
-        assert_eq!(parent_claim.dependency.requires.element, parent.clone());
-        assert_eq!(
-            parent_claim.dependency.requires.level,
-            PowerLevel::Binary(BinaryPowerLevel::On)
-        );
-        let grandparent_claim = claims_by_required_element
-            .get(&grandparent)
-            .unwrap_or_else(|| panic!("missing claim for {:?}", grandparent));
-        assert_ne!(grandparent_claim.id, "");
-        assert_eq!(grandparent_claim.lease_id, lease.id);
-        assert_eq!(grandparent_claim.dependency.level.element, parent.clone());
-        assert_eq!(
-            grandparent_claim.dependency.level.level,
-            PowerLevel::Binary(BinaryPowerLevel::On)
-        );
-        assert_eq!(grandparent_claim.dependency.requires.element, grandparent.clone());
-        assert_eq!(
-            grandparent_claim.dependency.requires.level,
-            PowerLevel::Binary(BinaryPowerLevel::On)
-        );
-
-        // Now drop the lease.
-        let (dropped, _) = catalog.drop(&lease.id).expect("drop failed");
-        assert_eq!(dropped.id, lease.id);
-        assert_eq!(dropped.element, lease.element);
-        assert_eq!(dropped.level, lease.level);
-    }
-
-    #[fuchsia::test]
-    fn test_catalog_acquire_drop_shared() {
-        // Create a topology of two child elements with a shared
-        // parent and grandparent
-        // C1 \
-        //     > P -> GP
-        // C2 /
-        let mut catalog = Catalog::new();
-        let child1: ElementID =
-            catalog.topology.add_element("C1", Vec::new(), Vec::new()).expect("add_element failed");
-        let child2: ElementID =
-            catalog.topology.add_element("C2", Vec::new(), Vec::new()).expect("add_element failed");
-        let parent: ElementID =
-            catalog.topology.add_element("P", Vec::new(), Vec::new()).expect("add_element failed");
-        let grandparent: ElementID =
-            catalog.topology.add_element("GP", Vec::new(), Vec::new()).expect("add_element failed");
-        catalog
-            .topology
-            .add_direct_dep(&Dependency {
-                level: ElementLevel {
-                    element: child1.clone(),
-                    level: PowerLevel::Binary(BinaryPowerLevel::On),
-                },
-                requires: ElementLevel {
-                    element: parent.clone(),
-                    level: PowerLevel::Binary(BinaryPowerLevel::On),
-                },
-            })
-            .expect("add_direct_dep failed");
-        catalog
-            .topology
-            .add_direct_dep(&Dependency {
-                level: ElementLevel {
-                    element: child2.clone(),
-                    level: PowerLevel::Binary(BinaryPowerLevel::On),
-                },
-                requires: ElementLevel {
-                    element: parent.clone(),
-                    level: PowerLevel::Binary(BinaryPowerLevel::On),
-                },
-            })
-            .expect("add_direct_dep failed");
-        catalog
-            .topology
-            .add_direct_dep(&Dependency {
-                level: ElementLevel {
-                    element: parent.clone(),
-                    level: PowerLevel::Binary(BinaryPowerLevel::On),
-                },
-                requires: ElementLevel {
-                    element: grandparent.clone(),
-                    level: PowerLevel::Binary(BinaryPowerLevel::On),
-                },
-            })
-            .expect("add_direct_dep failed");
-
-        // Acquire a lease for the first child.
-        let (lease1, claims1) = catalog
-            .create_lease_and_claims(&child1, &PowerLevel::Binary(BinaryPowerLevel::On))
-            .expect("acquire failed");
-        assert_eq!(claims1.len(), 2);
-        assert_ne!(lease1.id, "");
-        assert_eq!(lease1.element, child1.clone());
-        assert_eq!(lease1.level, PowerLevel::Binary(BinaryPowerLevel::On));
-
-        let claims1_by_required_element: HashMap<ElementID, &Claim> =
-            claims1.iter().map(|c| (c.dependency.requires.element.clone(), c)).collect();
-        let parent_claim1 = claims1_by_required_element
-            .get(&parent)
-            .unwrap_or_else(|| panic!("missing claim for {:?}", parent));
-        assert_ne!(parent_claim1.id, "");
-        assert_eq!(parent_claim1.lease_id, lease1.id);
-        assert_eq!(parent_claim1.dependency.level.element, child1.clone());
-        assert_eq!(parent_claim1.dependency.level.level, PowerLevel::Binary(BinaryPowerLevel::On));
-        assert_eq!(parent_claim1.dependency.requires.element, parent.clone());
-        assert_eq!(
-            parent_claim1.dependency.requires.level,
-            PowerLevel::Binary(BinaryPowerLevel::On)
-        );
-        let grandparent_claim1 = claims1_by_required_element
-            .get(&parent)
-            .unwrap_or_else(|| panic!("missing claim for {:?}", parent));
-        assert_ne!(grandparent_claim1.id, "");
-        assert_eq!(grandparent_claim1.lease_id, lease1.id);
-        assert_eq!(grandparent_claim1.dependency.level.element, child1.clone());
-        assert_eq!(
-            grandparent_claim1.dependency.level.level,
-            PowerLevel::Binary(BinaryPowerLevel::On)
-        );
-        assert_eq!(grandparent_claim1.dependency.requires.element, parent.clone());
-        assert_eq!(
-            grandparent_claim1.dependency.requires.level,
-            PowerLevel::Binary(BinaryPowerLevel::On)
-        );
-
-        // Acquire a lease for the second child.
-        let (lease2, claims2) = catalog
-            .create_lease_and_claims(&child2, &PowerLevel::Binary(BinaryPowerLevel::On))
-            .expect("acquire failed");
-        assert_eq!(claims2.len(), 2);
-        assert_ne!(lease2.id, "");
-        assert_eq!(lease2.element, child2.clone());
-        assert_eq!(lease2.level, PowerLevel::Binary(BinaryPowerLevel::On));
-        let claims2_by_required_element: HashMap<ElementID, &Claim> =
-            claims2.iter().map(|c| (c.dependency.requires.element.clone(), c)).collect();
-        let parent_claim2 = claims2_by_required_element
-            .get(&parent)
-            .unwrap_or_else(|| panic!("missing claim for {:?}", parent));
-        assert_ne!(parent_claim2.id, "");
-        assert_eq!(parent_claim2.lease_id, lease2.id);
-        assert_eq!(parent_claim2.dependency.level.element, child2.clone());
-        assert_eq!(parent_claim2.dependency.level.level, PowerLevel::Binary(BinaryPowerLevel::On));
-        assert_eq!(parent_claim2.dependency.requires.element, parent.clone());
-        assert_eq!(
-            parent_claim2.dependency.requires.level,
-            PowerLevel::Binary(BinaryPowerLevel::On)
-        );
-        let grandparent_claim2 = claims2_by_required_element
-            .get(&parent)
-            .unwrap_or_else(|| panic!("missing claim for {:?}", parent));
-        assert_ne!(grandparent_claim2.id, "");
-        assert_eq!(grandparent_claim2.lease_id, lease2.id);
-        assert_eq!(grandparent_claim2.dependency.level.element, child2.clone());
-        assert_eq!(
-            grandparent_claim2.dependency.level.level,
-            PowerLevel::Binary(BinaryPowerLevel::On)
-        );
-        assert_eq!(grandparent_claim2.dependency.requires.element, parent.clone());
-        assert_eq!(
-            grandparent_claim2.dependency.requires.level,
-            PowerLevel::Binary(BinaryPowerLevel::On)
-        );
-
-        // Now drop the first lease.
-        let (dropped1, _) = catalog.drop(&lease1.id).expect("drop failed");
-        assert_eq!(dropped1.id, lease1.id);
-        assert_eq!(dropped1.element, lease1.element);
-        assert_eq!(dropped1.level, lease1.level);
-
-        // Now drop the second lease.
-        let (dropped2, _) = catalog.drop(&lease2.id).expect("drop failed");
-        assert_eq!(dropped2.id, lease2.id);
-        assert_eq!(dropped2.element, lease2.element);
-        assert_eq!(dropped2.level, lease2.level);
-    }
-
-    #[fuchsia::test]
     fn test_broker_lease_direct() {
         // Create a topology of a child element with two direct dependencies.
         // P1 <- C -> P2
         let mut broker = Broker::new();
+        let (child_token, child_broker_token) = zx::EventPair::create();
+        let child_cred = CredentialToRegister {
+            broker_token: child_broker_token.into(),
+            permissions: Permissions::MODIFY_DEPENDENCY,
+        };
         let child: ElementID =
-            broker.add_element("C", Vec::new(), Vec::new()).expect("add_element failed");
+            broker.add_element("C", vec![child_cred]).expect("add_element failed");
+        let (parent1_token, parent1_broker_token) = zx::EventPair::create();
+        let parent1_cred = CredentialToRegister {
+            broker_token: parent1_broker_token.into(),
+            permissions: Permissions::MODIFY_DEPENDENCY | Permissions::MODIFY_DEPENDENT,
+        };
         let parent1: ElementID =
-            broker.add_element("P1", Vec::new(), Vec::new()).expect("add_element failed");
+            broker.add_element("P1", vec![parent1_cred]).expect("add_element failed");
+        let (parent2_token, parent2_broker_token) = zx::EventPair::create();
+        let parent2_cred = CredentialToRegister {
+            broker_token: parent2_broker_token.into(),
+            permissions: Permissions::MODIFY_DEPENDENT,
+        };
         let parent2: ElementID =
-            broker.add_element("P2", Vec::new(), Vec::new()).expect("add_element failed");
+            broker.add_element("P2", vec![parent2_cred]).expect("add_element failed");
         broker
-            .add_dependency(&Dependency {
-                level: ElementLevel {
-                    element: child.clone(),
-                    level: PowerLevel::Binary(BinaryPowerLevel::On),
-                },
-                requires: ElementLevel {
-                    element: parent1.clone(),
-                    level: PowerLevel::Binary(BinaryPowerLevel::On),
-                },
-            })
+            .add_dependency(
+                child_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
+                PowerLevel::Binary(BinaryPowerLevel::On),
+                parent1_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
+                PowerLevel::Binary(BinaryPowerLevel::On),
+            )
             .expect("add_direct_dep failed");
         broker
-            .add_dependency(&Dependency {
-                level: ElementLevel {
-                    element: child.clone(),
-                    level: PowerLevel::Binary(BinaryPowerLevel::On),
-                },
-                requires: ElementLevel {
-                    element: parent2.clone(),
-                    level: PowerLevel::Binary(BinaryPowerLevel::On),
-                },
-            })
+            .add_dependency(
+                child_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
+                PowerLevel::Binary(BinaryPowerLevel::On),
+                parent2_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
+                PowerLevel::Binary(BinaryPowerLevel::On),
+            )
             .expect("add_direct_dep failed");
         assert_eq!(
             broker.catalog.calc_min_level(&parent1.clone()),
@@ -981,35 +746,45 @@ mod tests {
         // dependencies.
         // C -> P -> GP
         let mut broker = Broker::new();
+        let (child_token, child_broker_token) = zx::EventPair::create();
+        let child_cred = CredentialToRegister {
+            broker_token: child_broker_token.into(),
+            permissions: Permissions::MODIFY_DEPENDENCY,
+        };
         let child: ElementID =
-            broker.add_element("C", Vec::new(), Vec::new()).expect("add_element failed");
+            broker.add_element("C", vec![child_cred]).expect("add_element failed");
+        let (parent_token, parent_broker_token) = zx::EventPair::create();
+        let parent_cred = CredentialToRegister {
+            broker_token: parent_broker_token.into(),
+            permissions: Permissions::MODIFY_DEPENDENCY | Permissions::MODIFY_DEPENDENT,
+        };
         let parent: ElementID =
-            broker.add_element("P", Vec::new(), Vec::new()).expect("add_element failed");
+            broker.add_element("P", vec![parent_cred]).expect("add_element failed");
+        let (grandparent_token, grandparent_broker_token) = zx::EventPair::create();
+        let grandparent_cred = CredentialToRegister {
+            broker_token: grandparent_broker_token.into(),
+            permissions: Permissions::MODIFY_DEPENDENT,
+        };
         let grandparent: ElementID =
-            broker.add_element("GP", Vec::new(), Vec::new()).expect("add_element failed");
+            broker.add_element("GP", vec![grandparent_cred]).expect("add_element failed");
         broker
-            .add_dependency(&Dependency {
-                level: ElementLevel {
-                    element: child.clone(),
-                    level: PowerLevel::Binary(BinaryPowerLevel::On),
-                },
-                requires: ElementLevel {
-                    element: parent.clone(),
-                    level: PowerLevel::Binary(BinaryPowerLevel::On),
-                },
-            })
+            .add_dependency(
+                child_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
+                PowerLevel::Binary(BinaryPowerLevel::On),
+                parent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
+                PowerLevel::Binary(BinaryPowerLevel::On),
+            )
             .expect("add_direct_dep failed");
         broker
-            .add_dependency(&Dependency {
-                level: ElementLevel {
-                    element: parent.clone(),
-                    level: PowerLevel::Binary(BinaryPowerLevel::On),
-                },
-                requires: ElementLevel {
-                    element: grandparent.clone(),
-                    level: PowerLevel::Binary(BinaryPowerLevel::On),
-                },
-            })
+            .add_dependency(
+                parent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
+                PowerLevel::Binary(BinaryPowerLevel::On),
+                grandparent_token
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                PowerLevel::Binary(BinaryPowerLevel::On),
+            )
             .expect("add_direct_dep failed");
         assert_eq!(
             broker.catalog.calc_min_level(&parent.clone()),
@@ -1091,49 +866,60 @@ mod tests {
         //     > P -> GP
         // C2 /
         let mut broker = Broker::new();
+        let (child1_token, child1_broker_token) = zx::EventPair::create();
+        let child1_cred = CredentialToRegister {
+            broker_token: child1_broker_token.into(),
+            permissions: Permissions::MODIFY_DEPENDENCY,
+        };
         let child1: ElementID =
-            broker.add_element("C1", Vec::new(), Vec::new()).expect("add_element failed");
+            broker.add_element("C1", vec![child1_cred]).expect("add_element failed");
+        let (child2_token, child2_broker_token) = zx::EventPair::create();
+        let child2_cred = CredentialToRegister {
+            broker_token: child2_broker_token.into(),
+            permissions: Permissions::MODIFY_DEPENDENCY,
+        };
         let child2: ElementID =
-            broker.add_element("C2", Vec::new(), Vec::new()).expect("add_element failed");
+            broker.add_element("C2", vec![child2_cred]).expect("add_element failed");
+        let (parent_token, parent_broker_token) = zx::EventPair::create();
+        let parent_cred = CredentialToRegister {
+            broker_token: parent_broker_token.into(),
+            permissions: Permissions::MODIFY_DEPENDENCY | Permissions::MODIFY_DEPENDENT,
+        };
         let parent: ElementID =
-            broker.add_element("P", Vec::new(), Vec::new()).expect("add_element failed");
+            broker.add_element("P", vec![parent_cred]).expect("add_element failed");
+        let (grandparent_token, grandparent_broker_token) = zx::EventPair::create();
+        let grandparent_cred = CredentialToRegister {
+            broker_token: grandparent_broker_token.into(),
+            permissions: Permissions::MODIFY_DEPENDENT,
+        };
         let grandparent: ElementID =
-            broker.add_element("GP", Vec::new(), Vec::new()).expect("add_element failed");
+            broker.add_element("GP", vec![grandparent_cred]).expect("add_element failed");
         broker
-            .add_dependency(&Dependency {
-                level: ElementLevel {
-                    element: child1.clone(),
-                    level: PowerLevel::Binary(BinaryPowerLevel::On),
-                },
-                requires: ElementLevel {
-                    element: parent.clone(),
-                    level: PowerLevel::Binary(BinaryPowerLevel::On),
-                },
-            })
+            .add_dependency(
+                child1_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
+                PowerLevel::Binary(BinaryPowerLevel::On),
+                parent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
+                PowerLevel::Binary(BinaryPowerLevel::On),
+            )
             .expect("add_direct_dep failed");
         broker
-            .add_dependency(&Dependency {
-                level: ElementLevel {
-                    element: child2.clone(),
-                    level: PowerLevel::Binary(BinaryPowerLevel::On),
-                },
-                requires: ElementLevel {
-                    element: parent.clone(),
-                    level: PowerLevel::Binary(BinaryPowerLevel::On),
-                },
-            })
+            .add_dependency(
+                child2_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
+                PowerLevel::Binary(BinaryPowerLevel::On),
+                parent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
+                PowerLevel::Binary(BinaryPowerLevel::On),
+            )
             .expect("add_direct_dep failed");
         broker
-            .add_dependency(&Dependency {
-                level: ElementLevel {
-                    element: parent.clone(),
-                    level: PowerLevel::Binary(BinaryPowerLevel::On),
-                },
-                requires: ElementLevel {
-                    element: grandparent.clone(),
-                    level: PowerLevel::Binary(BinaryPowerLevel::On),
-                },
-            })
+            .add_dependency(
+                parent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
+                PowerLevel::Binary(BinaryPowerLevel::On),
+                grandparent_token
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                PowerLevel::Binary(BinaryPowerLevel::On),
+            )
             .expect("add_direct_dep failed");
         assert_eq!(
             broker.catalog.calc_min_level(&parent.clone()),
@@ -1221,7 +1007,6 @@ mod tests {
         // Lower Parent power level to OFF, now Grandparent claim should be
         // dropped and should have min level OFF.
         broker.update_current_level(&parent.clone(), &PowerLevel::Binary(BinaryPowerLevel::Off));
-        tracing::info!("catalog after update_current_level: {:?}", &broker.catalog);
         assert_eq!(
             broker.catalog.calc_min_level(&parent.clone()),
             PowerLevel::Binary(BinaryPowerLevel::Off),
@@ -1232,5 +1017,218 @@ mod tests {
             PowerLevel::Binary(BinaryPowerLevel::Off),
             "Grandparent should now have min level OFF"
         );
+    }
+
+    #[fuchsia::test]
+    fn test_add_remove_dependency() {
+        let mut broker = Broker::new();
+        let (token_adamantium_all, token_adamantium_all_broker) = zx::EventPair::create();
+        let credential_adamantium_all = CredentialToRegister {
+            broker_token: token_adamantium_all_broker.into(),
+            permissions: Permissions::all(),
+        };
+        let (token_vibranium_all, token_vibranium_all_broker) = zx::EventPair::create();
+        let credential_vibranium_all = CredentialToRegister {
+            broker_token: token_vibranium_all_broker.into(),
+            permissions: Permissions::all(),
+        };
+        broker
+            .add_element("Adamantium", vec![credential_adamantium_all])
+            .expect("add_element failed");
+        broker
+            .add_element("Vibranium", vec![credential_vibranium_all])
+            .expect("add_element failed");
+
+        // Only MODIFY_DEPENDENCY and MODIFY_DEPENDENT for the respective
+        // elements should be required to add and remove a dependency:
+        let (token_adamantium_mod_dependency_only, token_adamantium_mod_dependency_only_broker) =
+            zx::EventPair::create();
+        let credential_adamantium_mod_dependency_only = CredentialToRegister {
+            broker_token: token_adamantium_mod_dependency_only_broker.into(),
+            permissions: Permissions::MODIFY_DEPENDENCY,
+        };
+        broker
+            .register_credentials(
+                token_adamantium_all
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("duplicate_handle failed")
+                    .into(),
+                vec![credential_adamantium_mod_dependency_only],
+            )
+            .expect("register_credentials failed");
+        let (token_vibranium_mod_dependent_only, token_vibranium_mod_dependent_only_broker) =
+            zx::EventPair::create();
+        let credential_vibranium_mod_dependent_only = CredentialToRegister {
+            broker_token: token_vibranium_mod_dependent_only_broker.into(),
+            permissions: Permissions::MODIFY_DEPENDENT,
+        };
+        broker
+            .register_credentials(
+                token_vibranium_all
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("duplicate_handle failed")
+                    .into(),
+                vec![credential_vibranium_mod_dependent_only],
+            )
+            .expect("register_credentials failed");
+        broker
+            .add_dependency(
+                token_adamantium_mod_dependency_only
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                PowerLevel::Binary(BinaryPowerLevel::On),
+                token_vibranium_mod_dependent_only
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                PowerLevel::Binary(BinaryPowerLevel::On),
+            )
+            .expect("add_dependency failed");
+
+        broker
+            .remove_dependency(
+                token_adamantium_mod_dependency_only
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                PowerLevel::Binary(BinaryPowerLevel::On),
+                token_vibranium_mod_dependent_only
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                PowerLevel::Binary(BinaryPowerLevel::On),
+            )
+            .expect("remove_dependency failed");
+
+        // Adding should return NotAuthorized if missing MODIFY_DEPENDENCY for
+        // dependency.level
+        let (token_adamantium_none, token_adamantium_none_broker) = zx::EventPair::create();
+        let credential_adamantium_none = CredentialToRegister {
+            broker_token: token_adamantium_none_broker.into(),
+            permissions: Permissions::empty(),
+        };
+        broker
+            .register_credentials(
+                token_adamantium_all
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("duplicate_handle failed")
+                    .into(),
+                vec![credential_adamantium_none],
+            )
+            .expect("register_credentials failed");
+        let res_add_missing_mod_dependency = broker.add_dependency(
+            token_adamantium_none
+                .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                .expect("dup failed")
+                .into(),
+            PowerLevel::Binary(BinaryPowerLevel::On),
+            token_vibranium_mod_dependent_only
+                .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                .expect("dup failed")
+                .into(),
+            PowerLevel::Binary(BinaryPowerLevel::On),
+        );
+        assert!(matches!(res_add_missing_mod_dependency, Err(AddDependencyError::NotAuthorized)));
+
+        // Adding should return NotAuthorized if missing MODIFY_DEPENDENT for
+        // dependency.requires
+        let (token_vibranium_none, token_vibranium_none_broker) = zx::EventPair::create();
+        let credential_vibranium_none = CredentialToRegister {
+            broker_token: token_vibranium_none_broker.into(),
+            permissions: Permissions::empty(),
+        };
+        broker
+            .register_credentials(
+                token_vibranium_all
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("duplicate_handle failed")
+                    .into(),
+                vec![credential_vibranium_none],
+            )
+            .expect("register_credentials failed");
+        let res_add_missing_mod_dependent = broker.add_dependency(
+            token_adamantium_mod_dependency_only
+                .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                .expect("dup failed")
+                .into(),
+            PowerLevel::Binary(BinaryPowerLevel::On),
+            token_vibranium_none
+                .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                .expect("dup failed")
+                .into(),
+            PowerLevel::Binary(BinaryPowerLevel::On),
+        );
+        assert!(matches!(res_add_missing_mod_dependent, Err(AddDependencyError::NotAuthorized)));
+
+        // Adding with extra permissions should work.
+        broker
+            .add_dependency(
+                token_adamantium_all
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                PowerLevel::Binary(BinaryPowerLevel::On),
+                token_vibranium_all
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                PowerLevel::Binary(BinaryPowerLevel::On),
+            )
+            .expect("add_dependency with extra permissions failed");
+
+        // Removing should return NotAuthorized if missing MODIFY_DEPENDENCY for
+        // dependency.level
+        let res_remove_missing_mod_dependency = broker.remove_dependency(
+            token_adamantium_none
+                .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                .expect("dup failed")
+                .into(),
+            PowerLevel::Binary(BinaryPowerLevel::On),
+            token_vibranium_mod_dependent_only
+                .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                .expect("dup failed")
+                .into(),
+            PowerLevel::Binary(BinaryPowerLevel::On),
+        );
+        assert!(matches!(
+            res_remove_missing_mod_dependency,
+            Err(RemoveDependencyError::NotAuthorized)
+        ));
+
+        // Removing should return NotAuthorized if missing MODIFY_DEPENDENT for
+        // dependency.requires
+        let res_remove_missing_mod_dependent = broker.remove_dependency(
+            token_adamantium_mod_dependency_only
+                .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                .expect("dup failed")
+                .into(),
+            PowerLevel::Binary(BinaryPowerLevel::On),
+            token_vibranium_none
+                .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                .expect("dup failed")
+                .into(),
+            PowerLevel::Binary(BinaryPowerLevel::On),
+        );
+        assert!(matches!(
+            res_remove_missing_mod_dependent,
+            Err(RemoveDependencyError::NotAuthorized)
+        ));
+
+        // Removing with extra permissions should work.
+        broker
+            .remove_dependency(
+                token_adamantium_all
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                PowerLevel::Binary(BinaryPowerLevel::On),
+                token_vibranium_all
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                PowerLevel::Binary(BinaryPowerLevel::On),
+            )
+            .expect("remove_dependency with extra permissions failed");
     }
 }

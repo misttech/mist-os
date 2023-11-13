@@ -1,8 +1,6 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-// TODO(b/308199278): Remove once credentials are used
-#![allow(dead_code)]
 use fidl_fuchsia_power_broker::{self as fpb, Permissions};
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use std::collections::HashMap;
@@ -20,6 +18,21 @@ pub struct Credential {
     id: CredentialID,
     element: ElementID,
     permissions: Permissions,
+}
+
+impl Credential {
+    pub fn get_element(&self) -> &ElementID {
+        &self.element
+    }
+
+    pub fn contains(&self, permissions: Permissions) -> bool {
+        self.permissions.contains(permissions)
+    }
+
+    /// Returns true iff self includes these permissions for the given element.
+    pub fn authorizes(&self, element: &ElementID, permissions: &Permissions) -> bool {
+        self.element == *element && self.permissions.contains(*permissions)
+    }
 }
 
 #[derive(Debug)]
@@ -52,19 +65,15 @@ impl Token {
 /// CredentialToRegister holds the necessary information for a Credential
 /// to be created and registered. It is meant for clients to use to specify
 /// new Credentials to be registered.
+#[derive(Debug)]
 pub struct CredentialToRegister {
-    broker_token: Token,
-    element: ElementID,
-    permissions: Permissions,
+    pub broker_token: Token,
+    pub permissions: Permissions,
 }
 
 impl From<fpb::Credential> for CredentialToRegister {
     fn from(c: fpb::Credential) -> Self {
-        Self {
-            broker_token: c.broker_token.into(),
-            element: c.element.into(),
-            permissions: c.permissions.into(),
-        }
+        Self { broker_token: c.broker_token.into(), permissions: c.permissions.into() }
     }
 }
 
@@ -98,6 +107,7 @@ impl Registry {
 
     pub fn register(
         &mut self,
+        element: &ElementID,
         credential_to_register: CredentialToRegister,
     ) -> Result<CredentialID, RegisterCredentialsError> {
         let Some(id) = credential_to_register.broker_token.koid() else {
@@ -105,18 +115,14 @@ impl Registry {
             return Err(RegisterCredentialsError::Internal);
         };
         self.tokens.insert(id, credential_to_register.broker_token);
-        self.credential_ids_by_element
-            .entry(credential_to_register.element.clone())
-            .or_insert(Vec::new())
-            .push(id);
-        self.credentials.insert(
-            id,
-            Credential {
-                id: id,
-                element: credential_to_register.element,
-                permissions: credential_to_register.permissions,
-            },
-        );
+        self.credential_ids_by_element.entry(element.clone()).or_insert(Vec::new()).push(id);
+        let credential = Credential {
+            id: id,
+            element: element.clone(),
+            permissions: credential_to_register.permissions,
+        };
+        tracing::debug!("registered credential: {:?}", &credential);
+        self.credentials.insert(id, credential);
         Ok(id)
     }
 
@@ -231,13 +237,47 @@ mod tests {
     }
 
     #[fuchsia::test]
+    fn test_credential_authorizes() {
+        let gold_credential = Credential {
+            element: "Gold".into(),
+            id: zx::Event::create().get_koid().expect("get_koid failed"),
+            permissions: Permissions::READ_POWER_LEVEL
+                | Permissions::MODIFY_DEPENDENT
+                | Permissions::REMOVE_ELEMENT,
+        };
+        assert_eq!(
+            gold_credential.authorizes(&"Gold".into(), &Permissions::READ_POWER_LEVEL),
+            true
+        );
+        assert_eq!(
+            gold_credential.authorizes(&"Gold".into(), &Permissions::MODIFY_POWER_LEVEL),
+            false
+        );
+        assert_eq!(
+            gold_credential.authorizes(&"Gold".into(), &Permissions::MODIFY_DEPENDENT),
+            true
+        );
+        assert_eq!(
+            gold_credential.authorizes(&"Gold".into(), &Permissions::MODIFY_DEPENDENCY),
+            false
+        );
+        assert_eq!(
+            gold_credential.authorizes(&"Gold".into(), &Permissions::MODIFY_CREDENTIAL),
+            false
+        );
+        assert_eq!(gold_credential.authorizes(&"Gold".into(), &Permissions::REMOVE_ELEMENT), true);
+        assert_eq!(
+            gold_credential.authorizes(&"Platinum".into(), &Permissions::READ_POWER_LEVEL),
+            false
+        );
+    }
+
+    #[fuchsia::test]
     fn test_convert_fidl_credential_to_register() {
         let (broker_token, _) = zx::EventPair::create();
-        let element: ElementID = "Unobtanium".into();
         let want_koid = broker_token.basic_info().expect("basic_info failed").koid;
         let fidl_credential = fpb::Credential {
             broker_token,
-            element: element.clone().into(),
             permissions: Permissions::READ_POWER_LEVEL
                 | Permissions::MODIFY_DEPENDENT
                 | Permissions::REMOVE_ELEMENT,
@@ -247,7 +287,6 @@ mod tests {
             ctr.broker_token.event_pair.basic_info().expect("basic_info failed").koid,
             want_koid
         );
-        assert_eq!(ctr.element, element);
         assert_eq!(ctr.permissions.contains(Permissions::READ_POWER_LEVEL), true);
         assert_eq!(ctr.permissions.contains(Permissions::MODIFY_POWER_LEVEL), false);
         assert_eq!(ctr.permissions.contains(Permissions::MODIFY_DEPENDENT), true);
@@ -263,12 +302,11 @@ mod tests {
         let element_kryptonite: ElementID = "Kryptonite".into();
         let credential_to_register = CredentialToRegister {
             broker_token: token_red_kryptonite.into(),
-            element: element_kryptonite.clone(),
             permissions: Permissions::READ_POWER_LEVEL
                 | Permissions::MODIFY_POWER_LEVEL
                 | Permissions::MODIFY_CREDENTIAL,
         };
-        registry.register(credential_to_register).expect("register failed");
+        registry.register(&element_kryptonite, credential_to_register).expect("register failed");
         use fuchsia_zircon::HandleBased;
         let token_green_kryptonite_dup = token_green_kryptonite
             .duplicate_handle(zx::Rights::SAME_RIGHTS)

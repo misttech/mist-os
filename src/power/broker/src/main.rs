@@ -178,17 +178,19 @@ impl BrokerSvc {
                 match request {
                     TopologyRequest::AddElement {
                         element_name,
-                        dependencies,
                         credentials_to_register,
                         responder,
                     } => {
-                        tracing::debug!("AddElement({:?}, {:?})", &element_name, &dependencies);
+                        tracing::debug!(
+                            "AddElement({:?}, {:?})",
+                            &element_name,
+                            &credentials_to_register
+                        );
                         let mut broker: std::sync::MutexGuard<'_, Broker> =
                             self.broker.lock().unwrap();
-                        let deps = dependencies.into_iter().map(|d| d.into()).collect();
                         let credentials =
                             credentials_to_register.into_iter().map(|d| d.into()).collect();
-                        let res = broker.add_element(&element_name, deps, credentials);
+                        let res = broker.add_element(&element_name, credentials);
                         tracing::debug!("AddElement add_element = {:?}", res);
                         match res {
                             Ok(element_id) => {
@@ -198,11 +200,11 @@ impl BrokerSvc {
                             Err(err) => responder.send(Err(err.into())).context("send failed"),
                         }
                     }
-                    TopologyRequest::RemoveElement { element, responder } => {
-                        tracing::debug!("RemoveElement({:?})", &element);
+                    TopologyRequest::RemoveElement { token, responder } => {
+                        tracing::debug!("RemoveElement({:?})", &token);
                         let mut broker: std::sync::MutexGuard<'_, Broker> =
                             self.broker.lock().unwrap();
-                        let res = broker.remove_element(&element.into());
+                        let res = broker.remove_element(token.into());
                         tracing::debug!("RemoveElement remove_element = {:?}", &res);
                         if let Err(err) = res {
                             responder.send(Err(err.into())).context("send failed")
@@ -214,7 +216,12 @@ impl BrokerSvc {
                         tracing::debug!("AddDependency({:?})", &dependency);
                         let mut broker: std::sync::MutexGuard<'_, Broker> =
                             self.broker.lock().unwrap();
-                        let res = broker.add_dependency(&dependency.into());
+                        let res = broker.add_dependency(
+                            dependency.dependent.token.into(),
+                            dependency.dependent.level,
+                            dependency.requires.token.into(),
+                            dependency.requires.level,
+                        );
                         tracing::debug!("AddDependency add_dependency = ({:?})", &res);
                         if let Err(err) = res {
                             responder.send(Err(err.into())).context("send failed")
@@ -226,7 +233,12 @@ impl BrokerSvc {
                         tracing::debug!("RemoveDependency({:?})", &dependency);
                         let mut broker: std::sync::MutexGuard<'_, Broker> =
                             self.broker.lock().unwrap();
-                        let res = broker.remove_dependency(&dependency.into());
+                        let res = broker.remove_dependency(
+                            dependency.dependent.token.into(),
+                            dependency.dependent.level,
+                            dependency.requires.token.into(),
+                            dependency.requires.level,
+                        );
                         tracing::debug!("RemoveDependency remove_dependency = ({:?})", &res);
                         if let Err(err) = res {
                             responder.send(Err(err.into())).context("send failed")
@@ -239,6 +251,11 @@ impl BrokerSvc {
                         credentials_to_register,
                         responder,
                     } => {
+                        tracing::debug!(
+                            "RegisterCredentials({:?}, {:?})",
+                            &token,
+                            &credentials_to_register
+                        );
                         let mut broker: std::sync::MutexGuard<'_, Broker> =
                             self.broker.lock().unwrap();
                         let res = broker.register_credentials(
@@ -257,6 +274,11 @@ impl BrokerSvc {
                         tokens_to_unregister,
                         responder,
                     } => {
+                        tracing::debug!(
+                            "UnregisterCredentials({:?}, {:?})",
+                            &token,
+                            &tokens_to_unregister
+                        );
                         let mut broker: std::sync::MutexGuard<'_, Broker> =
                             self.broker.lock().unwrap();
                         let res = broker.unregister_credentials(
