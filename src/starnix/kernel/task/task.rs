@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::task::PidTable;
 use bitflags::bitflags;
 use extended_pstate::ExtendedPstateState;
 use fuchsia_zircon::{
@@ -42,9 +43,9 @@ use crate::{
         SeccompFilterContainer, SeccompNotifierHandle, SeccompState, SeccompStateValue,
         ThreadGroup, UtsNamespaceHandle, Waiter,
     },
-    types::signals::{SigSet, Signal, UncheckedSignal, SIGBUS, SIGCONT, SIGILL, SIGSEGV, SIGTRAP},
     types::{
         errno, error, from_status_like_fdio, pid_t, release_on_error, robust_list_head,
+        signals::{SigSet, Signal, UncheckedSignal, SIGBUS, SIGCONT, SIGILL, SIGSEGV, SIGTRAP},
         sock_filter, sock_fprog, ucred, Access, DeviceType, Errno, FileMode, OpenFlags,
         OwnedRefByRef, PtraceAccessMode, ReleasableByRef, TaskTimeStats, TempRef, UserAddress,
         UserRef, WeakRef, BPF_MAXINSNS, CAP_KILL, CAP_SYS_ADMIN, CAP_SYS_PTRACE, CLD_CONTINUED,
@@ -1003,6 +1004,26 @@ impl Task {
         })
     }
 
+    pub fn create_init_process(
+        kernel: &Arc<Kernel>,
+        pid: pid_t,
+        initial_name: CString,
+        fs: Arc<FsContext>,
+    ) -> Result<CurrentTask, Errno> {
+        let initial_name_bytes = initial_name.as_bytes().to_owned();
+        let pids = kernel.pids.write();
+        Self::create_task_with_pid(kernel, pids, pid, initial_name, fs, |pid, process_group| {
+            create_zircon_process(
+                kernel,
+                None,
+                pid,
+                process_group,
+                SignalActions::default(),
+                &initial_name_bytes,
+            )
+        })
+    }
+
     /// Create a task that runs inside the kernel.
     ///
     /// There is no underlying Zircon process to host the task.
@@ -1037,6 +1058,21 @@ impl Task {
     {
         let mut pids = kernel.pids.write();
         let pid = pids.allocate_pid();
+        Self::create_task_with_pid(kernel, pids, pid, initial_name, root_fs, task_info_factory)
+    }
+
+    fn create_task_with_pid<F>(
+        kernel: &Arc<Kernel>,
+        mut pids: RwLockWriteGuard<'_, PidTable>,
+        pid: pid_t,
+        initial_name: CString,
+        root_fs: Arc<FsContext>,
+        task_info_factory: F,
+    ) -> Result<CurrentTask, Errno>
+    where
+        F: FnOnce(i32, Arc<ProcessGroup>) -> Result<TaskInfo, Errno>,
+    {
+        debug_assert!(pids.get_task(pid).upgrade().is_none());
 
         let process_group = ProcessGroup::new(pid, None);
         pids.add_process_group(&process_group);
@@ -2499,8 +2535,7 @@ mod test {
     use super::*;
     use crate::{
         testing::*,
-        types::signals::SIGCHLD,
-        types::{rlimit, Resource},
+        types::{rlimit, signals::SIGCHLD, Resource},
     };
 
     #[::fuchsia::test]

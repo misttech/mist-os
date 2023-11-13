@@ -69,24 +69,28 @@ fn create_kernel_task_and_unlocked_with_fs<'l>(
             .expect("failed to create kernel");
 
     let fs = FsContext::new(create_fs(&kernel));
-    let task = Task::create_process_without_parent(
+    let init_task = Task::create_process_without_parent(
         &kernel,
         CString::new("test-task").unwrap(),
         fs.clone(),
     )
     .expect("failed to create first task");
-    kernel.kthreads.init(&kernel, fs).expect("failed to initialize kthreads");
+    let system_task = OwnedRefByRef::new(
+        Task::create_kernel_task(&kernel, CString::new("[kthreadd]").unwrap(), fs)
+            .expect("create system task"),
+    );
+    kernel.kthreads.init(system_task).expect("failed to initialize kthreads");
 
     init_common_devices(&kernel);
 
     // Take the lock on thread group and task in the correct order to ensure any wrong ordering
     // will trigger the tracing-mutex at the right call site.
     {
-        let _l1 = task.thread_group.read();
-        let _l2 = task.read();
+        let _l1 = init_task.thread_group.read();
+        let _l2 = init_task.read();
     }
 
-    (kernel, task.into(), unlocked)
+    (kernel, init_task.into(), unlocked)
 }
 
 /// Creates a new `Task` in the provided kernel.

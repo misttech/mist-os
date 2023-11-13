@@ -2,17 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::{
+    dynamic_thread_spawner::DynamicThreadSpawner,
+    task::{CurrentTask, Task},
+    types::{errno, Errno, OwnedRefByRef, ReleasableByRef, WeakRef},
+};
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
 use once_cell::sync::OnceCell;
-use std::{ffi::CString, sync::Arc};
-
-use crate::{
-    dynamic_thread_spawner::DynamicThreadSpawner,
-    fs::FsContext,
-    task::{CurrentTask, Kernel, Task},
-    types::{errno, Errno, OwnedRefByRef, ReleasableByRef, WeakRef},
-};
+use std::ffi::CString;
 
 /// The threads that the kernel runs internally.
 ///
@@ -58,14 +56,8 @@ impl Drop for KernelThreads {
 }
 
 impl KernelThreads {
-    pub fn init(&self, kernel: &Arc<Kernel>, fs: Arc<FsContext>) -> Result<(), Errno> {
-        self.system_task
-            .set(OwnedRefByRef::new(Task::create_kernel_task(
-                kernel,
-                CString::new("[kthreadd]").unwrap(),
-                fs,
-            )?))
-            .map_err(|_| errno!(EEXIST))?;
+    pub fn init(&self, system_task: OwnedRefByRef<CurrentTask>) -> Result<(), Errno> {
+        self.system_task.set(system_task).map_err(|_| errno!(EEXIST))?;
         Ok(())
     }
 

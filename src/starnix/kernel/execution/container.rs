@@ -2,6 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::{
+    auth::Credentials,
+    device::{init_common_devices, parse_features, run_container_features},
+    execution::{
+        create_filesystem_from_spec, create_remotefs_filesystem, execute_task, expose_root,
+        serve_component_runner, serve_container_controller, serve_graphical_presenter,
+    },
+    fs::{
+        layeredfs::LayeredFs, tmpfs::TmpFs, FileSystemOptions, FsContext, LookupContext,
+        WhatToMount,
+    },
+    logging::{log_error, log_info, log_warn},
+    task::{CurrentTask, ExitStatus, Kernel, Task},
+    time::utc::update_utc_clock,
+    types::{
+        errno, pid_t, release_on_error, rlimit, MountFlags, OpenFlags, OwnedRefByRef,
+        ReleasableByRef, Resource, SourceContext, ENOENT,
+    },
+};
 use anyhow::{anyhow, bail, Error};
 use bstr::BString;
 use fidl::{
@@ -24,26 +43,6 @@ use futures::{channel::oneshot, FutureExt, StreamExt, TryStreamExt};
 use runner::{get_program_string, get_program_strvec};
 use starnix_kernel_config::Config;
 use std::{collections::BTreeMap, ffi::CString, sync::Arc};
-
-use crate::{
-    auth::Credentials,
-    device::{init_common_devices, parse_features, run_container_features},
-    execution::{
-        create_filesystem_from_spec, create_remotefs_filesystem, execute_task, expose_root,
-        serve_component_runner, serve_container_controller, serve_graphical_presenter,
-    },
-    fs::{
-        layeredfs::LayeredFs, tmpfs::TmpFs, FileSystemOptions, FsContext, LookupContext,
-        WhatToMount,
-    },
-    logging::{log_error, log_info, log_warn},
-    task::{CurrentTask, ExitStatus, Kernel, Task},
-    time::utc::update_utc_clock,
-    types::{
-        errno, release_on_error, rlimit, MountFlags, OpenFlags, ReleasableByRef, Resource,
-        SourceContext, ENOENT,
-    },
-};
 
 /// A temporary wrapper struct that contains both a `Config` for the container, as well as optional
 /// handles for the container's component controller and `/pkg` directory.
@@ -324,38 +323,47 @@ async fn create_container(
             .with_source_context(|| format!("creating Kernel: {}", &config.name))?;
     let fs_context =
         create_fs_context(&kernel, config, &pkg_dir_proxy).source_context("creating FsContext")?;
-    let mut init_task = create_init_task(&kernel, Arc::clone(&fs_context), config)
+    let init_pid = kernel.pids.write().allocate_pid();
+    debug_assert!(init_pid == 1);
+
+    let system_task = OwnedRefByRef::new(
+        Task::create_kernel_task(
+            &kernel,
+            CString::new("[kthreadd]").unwrap(),
+            Arc::clone(&fs_context),
+        )
+        .source_context("create system task")?,
+    );
+
+    kernel.kthreads.init(system_task).source_context("initializing kthreads")?;
+    let system_task = kernel.kthreads.system_task();
+
+    // Register common devices and add them in sysfs and devtmpfs.
+    init_common_devices(&kernel);
+
+    mount_filesystems(system_task, config, &pkg_dir_proxy)
+        .source_context("mounting filesystems")?;
+
+    // Run all common features that were specified in the .cml.
+    run_container_features(&kernel)?;
+
+    // If there is an init binary path, run it, optionally waiting for the
+    // startup_file_path to be created. The task struct is still used
+    // to initialize the system up until this point, regardless of whether
+    // or not there is an actual init to be run.
+    let argv =
+        if config.init.is_empty() { vec![DEFAULT_INIT.to_string()] } else { config.init.clone() }
+            .iter()
+            .map(|s| to_cstr(s))
+            .collect::<Vec<_>>();
+
+    let executable = system_task
+        .open_file(argv[0].as_bytes(), OpenFlags::RDONLY)
+        .with_source_context(|| format!("opening init: {:?}", &argv[0]))?;
+
+    let mut init_task = create_init_task(&kernel, init_pid, Arc::clone(&fs_context), config)
         .with_source_context(|| format!("creating init task: {:?}", &config.init))?;
     release_on_error!(init_task, (), {
-        kernel.kthreads.init(&kernel, fs_context).source_context("initializing kthreads")?;
-
-        let system_task = kernel.kthreads.system_task();
-
-        // Register common devices and add them in sysfs and devtmpfs.
-        init_common_devices(&kernel);
-
-        mount_filesystems(system_task, config, &pkg_dir_proxy)
-            .source_context("mounting filesystems")?;
-
-        // Run all common features that were specified in the .cml.
-        run_container_features(&kernel)?;
-
-        // If there is an init binary path, run it, optionally waiting for the
-        // startup_file_path to be created. The task struct is still used
-        // to initialize the system up until this point, regardless of whether
-        // or not there is an actual init to be run.
-        let argv = if config.init.is_empty() {
-            vec![DEFAULT_INIT.to_string()]
-        } else {
-            config.init.clone()
-        }
-        .iter()
-        .map(|s| to_cstr(s))
-        .collect::<Vec<_>>();
-
-        let executable = init_task
-            .open_file(argv[0].as_bytes(), OpenFlags::RDONLY)
-            .with_source_context(|| format!("opening init: {:?}", &argv[0]))?;
         init_task
             .exec(executable, argv[0].clone(), argv.clone(), vec![])
             .with_source_context(|| format!("executing init: {:?}", &argv))?;
@@ -444,6 +452,7 @@ pub fn set_rlimits(current_task: &CurrentTask, rlimits: &[String]) -> Result<(),
 
 fn create_init_task(
     kernel: &Arc<Kernel>,
+    pid: pid_t,
     fs_context: Arc<FsContext>,
     config: &ConfigWrapper,
 ) -> Result<CurrentTask, Error> {
@@ -453,7 +462,7 @@ fn create_init_task(
     } else {
         CString::new(config.init[0].clone())?
     };
-    let task = Task::create_process_without_parent(kernel, initial_name, fs_context)?;
+    let task = Task::create_init_process(kernel, pid, initial_name, fs_context)?;
     release_on_error!(task, (), {
         task.set_creds(credentials);
         set_rlimits(&task, &config.rlimits)?;
