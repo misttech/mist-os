@@ -166,45 +166,34 @@ zx::result<Tcs3400InputReport> Tcs3400Device::ReadInputRpt() {
     // Use memcpy here because i.out is a misaligned pointer and dereferencing a
     // misaligned pointer is UB. This ends up getting lowered to a 16-bit store.
     memcpy(i.out, &out, sizeof(out));
-    saturatedReading |= (out == 65'535);
 
     zxlogf(DEBUG, "raw: 0x%04X  again: %u  atime: %u", out, again_, atime_);
   }
-  if (saturatedReading) {
-    // Saturated, ignoring the IR channel because we only looked at RGBC.
-    // Return very bright value so that consumers can adjust screens etc accordingly.
+
+  uint8_t status_val;
+  zx_status_t status;
+  status = ReadReg(TCS_I2C_STATUS, status_val);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "i2c_write_read_sync failed: %d", status);
+    return zx::error(status);
+  }
+  if ((status_val & TCS_I2C_STATUS_ASAT) == TCS_I2C_STATUS_ASAT) {
+    status = WriteReg(TCS_I2C_CICLEAR, 0x00);
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "Unable to clear saturation status");
+    }
+
     report.red = kMaxSaturationRed;
     report.green = kMaxSaturationGreen;
     report.blue = kMaxSaturationBlue;
     report.illuminance = kMaxSaturationClear;
-    // log one message when saturation starts and then
+    saturatedReading = true;
     if (!isSaturated_ || zx::clock::get_monotonic() - lastSaturatedLog_ >= kSaturatedLogTimeSecs) {
-      zxlogf(INFO, "sensor is saturated");
+      zxlogf(INFO, "sensor is saturated via status register");
       lastSaturatedLog_ = zx::clock::get_monotonic();
     }
-  } else {
-    uint8_t status_val;
-    zx_status_t status;
-    status = ReadReg(TCS_I2C_STATUS, status_val);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "i2c_write_read_sync failed: %d", status);
-      return zx::error(status);
-    }
-    if ((status_val & TCS_I2C_STATUS_ASAT) == TCS_I2C_STATUS_ASAT) {
-      report.red = kMaxSaturationRed;
-      report.green = kMaxSaturationGreen;
-      report.blue = kMaxSaturationBlue;
-      report.illuminance = kMaxSaturationClear;
-      saturatedReading = true;
-      if (!isSaturated_ ||
-          zx::clock::get_monotonic() - lastSaturatedLog_ >= kSaturatedLogTimeSecs) {
-        zxlogf(INFO, "sensor is saturated via status register");
-        lastSaturatedLog_ = zx::clock::get_monotonic();
-      }
-    }
-    if (isSaturated_) {
-      zxlogf(INFO, "sensor is no longer saturated");
-    }
+  } else if (isSaturated_) {
+    zxlogf(INFO, "sensor is no longer saturated");
   }
   isSaturated_ = saturatedReading;
 

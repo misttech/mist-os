@@ -602,56 +602,6 @@ TEST_F(Tcs3400Test, GetInputReportsMultipleReaders) {
   }
 }
 
-TEST_F(Tcs3400Test, InputReportSaturated) {
-  fidl::WireSyncClient<fuchsia_input_report::InputDevice> client(FidlClient());
-  ASSERT_TRUE(client.client_end().is_valid());
-
-  constexpr Tcs3400FeatureReport kEnableThresholdEvents = {
-      .report_interval_us = 0,
-      .reporting_state = fuchsia_input_report::wire::SensorReportingState::kReportAllEvents,
-      .sensitivity = 16,
-      .threshold_high = 0x8000,
-      .threshold_low = 0x1000,
-      .integration_time_us = 615'000,
-  };
-
-  {
-    const auto response = SetFeatureReport(client, kEnableThresholdEvents);
-    ASSERT_TRUE(response.ok());
-    EXPECT_FALSE(response->is_error());
-  }
-
-  auto endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputReportsReader>();
-  ASSERT_OK(endpoints);
-  fidl::WireSyncClient reader(std::move(endpoints->client));
-  auto result = client->GetInputReportsReader(std::move(endpoints->server));
-  ASSERT_OK(result.status());
-  device_->WaitForNextReader();
-
-  // Set the clear channel to 0xffff to indicate saturation.
-  SetLightDataRegisters(0xffff, 0xabcd, 0x5566, 0x7788);
-
-  EXPECT_OK(gpio_interrupt_.trigger(0, zx::clock::get_monotonic()));
-
-  WaitForLightDataRead();
-
-  const auto response = reader->ReadInputReports();
-  ASSERT_TRUE(response.ok());
-  ASSERT_TRUE(response->is_ok());
-
-  const auto& reports = response->value()->reports;
-
-  ASSERT_EQ(reports.count(), 1);
-  ASSERT_TRUE(reports[0].has_sensor());
-  ASSERT_TRUE(reports[0].sensor().has_values());
-  ASSERT_EQ(reports[0].sensor().values().count(), 4);
-
-  EXPECT_EQ(reports[0].sensor().values()[0], 65085);
-  EXPECT_EQ(reports[0].sensor().values()[1], 21067);
-  EXPECT_EQ(reports[0].sensor().values()[2], 20395);
-  EXPECT_EQ(reports[0].sensor().values()[3], 20939);
-}
-
 TEST_F(Tcs3400Test, InputReportSaturatedSensor) {
   fidl::WireSyncClient<fuchsia_input_report::InputDevice> client(FidlClient());
   ASSERT_TRUE(client.client_end().is_valid());
@@ -703,6 +653,10 @@ TEST_F(Tcs3400Test, InputReportSaturatedSensor) {
   EXPECT_EQ(reports[0].sensor().values()[1], 21067);
   EXPECT_EQ(reports[0].sensor().values()[2], 20395);
   EXPECT_EQ(reports[0].sensor().values()[3], 20939);
+
+  incoming_.SyncCall([&](IncomingNamespace* incoming) {
+    EXPECT_EQ(incoming->fake_i2c_.GetRegisterLastWrite(TCS_I2C_CICLEAR), 0x00);
+  });
 }
 
 TEST_F(Tcs3400Test, GetDescriptor) {
