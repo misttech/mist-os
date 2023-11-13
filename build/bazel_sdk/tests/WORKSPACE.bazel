@@ -32,7 +32,6 @@ local_repository(
 
 load(
     "@fuchsia_workspace//fuchsia:deps.bzl",
-    "fuchsia_clang_repository",
     "fuchsia_sdk_repository",
     "rules_fuchsia_deps",
 )
@@ -53,6 +52,10 @@ fuchsia_build_config_repository(
     fuchsia_source_dir = "../../..",
 )
 
+load(
+    "@fuchsia_sdk//fuchsia:clang.bzl",
+    "fuchsia_clang_repository",
+)
 load("@fuchsia_build_config//:defs.bzl", "build_config")
 
 fuchsia_clang_repository(

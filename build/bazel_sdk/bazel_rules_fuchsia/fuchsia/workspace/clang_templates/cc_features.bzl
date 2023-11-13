@@ -10,6 +10,7 @@ load(
     "with_feature_set",
 )
 load("@bazel_tools//tools/build_defs/cc:action_names.bzl", "ACTION_NAMES")
+load("@fuchsia_sdk_common//:toolchains/clang/sanitizer.bzl", _sanitizer_features = "sanitizer_features")
 
 _all_actions = [
     ACTION_NAMES.assemble,
@@ -494,31 +495,5 @@ features = struct(
     no_runtime_library_search_directories = _no_runtime_library_search_directories_feature,
 )
 
-sanitizer_features = [
-    feature(
-        name = "sanitizer",
-        flag_sets = [
-            flag_set(
-                actions = [
-                    ACTION_NAMES.c_compile,
-                    ACTION_NAMES.cpp_compile,
-                    ACTION_NAMES.cpp_module_compile,
-                ],
-                flag_groups = [
-                    flag_group(
-                        flags = [
-                            "-fno-omit-frame-pointer",
-                            "-g3",
-                            "-O1",
-                        ],
-                    ),
-                ],
-            ),
-        ],
-    ),
-    _sanitizer_feature("asan", "address"),
-    _sanitizer_feature("lsan", "leak"),
-    _sanitizer_feature("msan", "memory"),
-    _sanitizer_feature("tsan", "thread"),
-    _sanitizer_feature("ubsan", "undefined"),
-]
+# Redefine the features here so that we can share with the in-tree definitions.
+sanitizer_features = _sanitizer_features

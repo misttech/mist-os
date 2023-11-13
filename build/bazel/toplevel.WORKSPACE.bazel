@@ -199,7 +199,6 @@ bazel_inputs_repository(
 # buildifier: disable=load-on-top
 load(
     "@fuchsia_workspace//fuchsia:deps.bzl",
-    "fuchsia_clang_repository",
     "fuchsia_sdk_repository",
     "rules_fuchsia_deps",
 )
@@ -227,6 +226,12 @@ fuchsia_sdk_repository(
 )
 
 register_toolchains("@fuchsia_sdk//:fuchsia_toolchain_sdk")
+
+# buildifier: disable=load-on-top
+load(
+    "@fuchsia_workspace//fuchsia:clang.bzl",
+    "fuchsia_clang_repository",
+)
 
 fuchsia_clang_repository(
     name = "fuchsia_clang",
