@@ -7,7 +7,6 @@ mod auth;
 mod file_mode;
 mod mount_flags;
 mod open_flags;
-mod personality;
 mod resource_limits;
 mod seal_flags;
 mod stats;
@@ -19,6 +18,7 @@ pub mod device_type;
 pub mod errno;
 pub mod kcmp;
 pub mod ownership;
+pub mod personality;
 pub mod range_ext;
 pub mod signals;
 pub mod time;
@@ -41,7 +41,6 @@ pub use ownership::{
     debug_assert_no_local_temp_ref, OwnedRef, OwnedRefByRef, Releasable, ReleasableByRef,
     ReleaseGuard, TempRef, TempRefKey, WeakRef,
 };
-pub use personality::PersonalityFlags;
 pub use resource_limits::{Resource, ResourceLimits};
 pub use seal_flags::SealFlags;
 pub use stats::TaskTimeStats;
