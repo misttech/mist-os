@@ -61,9 +61,11 @@ async fn test_direct() -> Result<()> {
     let (child_token, child_broker_token) = zx::EventPair::create();
     let child_cred = Credential {
         broker_token: child_broker_token,
-        permissions: Permissions::MODIFY_POWER_LEVEL | Permissions::MODIFY_DEPENDENCY,
+        permissions: Permissions::MODIFY_POWER_LEVEL
+            | Permissions::MODIFY_DEPENDENCY
+            | Permissions::ACQUIRE_LEASE,
     };
-    let child = topology.add_element("C", vec![child_cred]).await?.expect("add_element failed");
+    topology.add_element("C", vec![child_cred]).await?.expect("add_element failed");
     let (parent_token, parent_broker_token) = zx::EventPair::create();
     let parent_cred = Credential {
         broker_token: parent_broker_token,
@@ -119,8 +121,11 @@ async fn test_direct() -> Result<()> {
 
     // Acquire lease for C, P should now have required level ON
     let lease_id = lessor
-        .lease(&child, &PowerLevel::Binary(BinaryPowerLevel::On))
-        .await
+        .lease(
+            child_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
+            &PowerLevel::Binary(BinaryPowerLevel::On),
+        )
+        .await?
         .expect("Lease response not ok");
     let parent_req_level = level_control
         .watch_required_level(
@@ -185,10 +190,9 @@ async fn test_transitive() -> Result<()> {
     let (element_c_token, element_c_broker_token) = zx::EventPair::create();
     let element_c_cred = Credential {
         broker_token: element_c_broker_token,
-        permissions: Permissions::MODIFY_DEPENDENCY,
+        permissions: Permissions::MODIFY_DEPENDENCY | Permissions::ACQUIRE_LEASE,
     };
-    let element_c =
-        topology.add_element("C", vec![element_c_cred]).await?.expect("add_element failed");
+    topology.add_element("C", vec![element_c_cred]).await?.expect("add_element failed");
     let (element_d_token, element_d_broker_token) = zx::EventPair::create();
     let element_d_cred = Credential {
         broker_token: element_d_broker_token,
@@ -266,8 +270,11 @@ async fn test_transitive() -> Result<()> {
     // and B has a dependency on A.
     // D should still have required level OFF.
     let lease_id = lessor
-        .lease(&element_c, &PowerLevel::Binary(BinaryPowerLevel::On))
-        .await
+        .lease(
+            element_c_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
+            &PowerLevel::Binary(BinaryPowerLevel::On),
+        )
+        .await?
         .expect("Lease response not ok");
     let a_req_level = level_control
         .watch_required_level(
@@ -447,15 +454,15 @@ async fn test_shared() -> Result<()> {
     let (child1_token, child1_broker_token) = zx::EventPair::create();
     let child1_cred = Credential {
         broker_token: child1_broker_token,
-        permissions: Permissions::MODIFY_DEPENDENCY,
+        permissions: Permissions::MODIFY_DEPENDENCY | Permissions::ACQUIRE_LEASE,
     };
-    let child1 = topology.add_element("C1", vec![child1_cred]).await?.expect("add_element failed");
+    topology.add_element("C1", vec![child1_cred]).await?.expect("add_element failed");
     let (child2_token, child2_broker_token) = zx::EventPair::create();
     let child2_cred = Credential {
         broker_token: child2_broker_token,
-        permissions: Permissions::MODIFY_DEPENDENCY,
+        permissions: Permissions::MODIFY_DEPENDENCY | Permissions::ACQUIRE_LEASE,
     };
-    let child2 = topology.add_element("C2", vec![child2_cred]).await?.expect("add_element failed");
+    topology.add_element("C2", vec![child2_cred]).await?.expect("add_element failed");
     let (parent_token, parent_broker_token) = zx::EventPair::create();
     let parent_cred = Credential {
         broker_token: parent_broker_token,
@@ -551,8 +558,11 @@ async fn test_shared() -> Result<()> {
     // and P has a dependency on GP. GP has no dependencies so it should be
     // turned on first.
     let lease_child_1 = lessor
-        .lease(&child1, &PowerLevel::Binary(BinaryPowerLevel::On))
-        .await
+        .lease(
+            child1_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
+            &PowerLevel::Binary(BinaryPowerLevel::On),
+        )
+        .await?
         .expect("Lease response not ok");
     let grandparent_req_level = level_control
         .watch_required_level(
@@ -628,8 +638,11 @@ async fn test_shared() -> Result<()> {
 
     // Acquire lease for C2, P and GP should still have required_level ON.
     let lease_child_2 = lessor
-        .lease(&child2, &PowerLevel::Binary(BinaryPowerLevel::On))
-        .await
+        .lease(
+            child2_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
+            &PowerLevel::Binary(BinaryPowerLevel::On),
+        )
+        .await?
         .expect("Lease response not ok");
     let grandparent_req_level = level_control
         .watch_required_level(

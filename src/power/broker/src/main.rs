@@ -88,13 +88,17 @@ impl BrokerSvc {
             .map(|result| result.context("failed request"))
             .try_for_each(|request| async move {
                 match request {
-                    LessorRequest::Lease { element, level, responder } => {
-                        tracing::debug!("Lease({:?}, {:?})", &element, &level);
+                    LessorRequest::Lease { token, level, responder } => {
+                        tracing::debug!("Lease({:?}, {:?})", &token, &level);
                         let mut broker = self.broker.lock().unwrap();
-                        let resp = broker.acquire_lease(&element.into(), &level);
-                        let lease = resp.expect("acquire_lease failed");
-                        tracing::debug!("responder.send({:?})", &lease);
-                        responder.send(&lease.id).context("send failed")
+                        let resp = broker.acquire_lease(token.into(), &level);
+                        match resp {
+                            Ok(lease) => {
+                                tracing::debug!("responder.send({:?})", &lease);
+                                responder.send(Ok(&lease.id)).context("send failed")
+                            }
+                            Err(err) => responder.send(Err(err.into())).context("send failed"),
+                        }
                     }
                     LessorRequest::DropLease { lease_id, .. } => {
                         tracing::debug!("DropLease({:?})", &lease_id);
@@ -204,10 +208,7 @@ impl BrokerSvc {
                         let res = broker.add_element(&element_name, credentials);
                         tracing::debug!("AddElement add_element = {:?}", res);
                         match res {
-                            Ok(element_id) => {
-                                let element_id_str: String = element_id.into();
-                                responder.send(Ok(&element_id_str)).context("send failed")
-                            }
+                            Ok(_) => responder.send(Ok(())).context("send failed"),
                             Err(err) => responder.send(Err(err.into())).context("send failed"),
                         }
                     }

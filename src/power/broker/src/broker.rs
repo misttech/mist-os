@@ -123,10 +123,17 @@ impl Broker {
 
     pub fn acquire_lease(
         &mut self,
-        element: &ElementID,
+        token: Token,
         level: &PowerLevel,
-    ) -> Result<Lease, Error> {
-        let (original_lease, claims) = self.catalog.create_lease_and_claims(element, level)?;
+    ) -> Result<Lease, fpb::LeaseError> {
+        let Some(credential) = self.lookup_credentials(token) else {
+            return Err(fpb::LeaseError::NotAuthorized);
+        };
+        if !credential.contains(Permissions::ACQUIRE_LEASE) {
+            return Err(fpb::LeaseError::NotAuthorized);
+        }
+        let (original_lease, claims) =
+            self.catalog.create_lease_and_claims(credential.get_element(), level);
         let activated_claims = self.check_claims_to_activate(&claims);
         self.update_required_levels(&activated_claims);
         Ok(original_lease)
@@ -397,7 +404,7 @@ impl Catalog {
         &mut self,
         element: &ElementID,
         level: &PowerLevel,
-    ) -> Result<(Lease, Vec<Claim>), Error> {
+    ) -> (Lease, Vec<Claim>) {
         tracing::debug!("acquire({:?}, {:?})", &element, &level);
         // TODO: Add lease validation and control.
         let lease = Lease::new(&element, level);
@@ -414,7 +421,7 @@ impl Catalog {
             tracing::debug!("adding pending claim: {:?}", &claim);
             self.pending_claims.add(claim.clone());
         }
-        Ok((lease, claims))
+        (lease, claims)
     }
 
     /// Drops an existing lease, and initiates process of releasing all
@@ -686,13 +693,19 @@ mod tests {
         // Create a topology of a child element with two direct dependencies.
         // P1 <- C -> P2
         let mut broker = Broker::new();
-        let (child_token, child_broker_token) = zx::EventPair::create();
-        let child_cred = CredentialToRegister {
-            broker_token: child_broker_token.into(),
-            permissions: Permissions::MODIFY_DEPENDENCY,
+        let (child_no_lease_token, child_no_lease_broker_token) = zx::EventPair::create();
+        let child_no_lease_cred = CredentialToRegister {
+            broker_token: child_no_lease_broker_token.into(),
+            permissions: Permissions::all() - Permissions::ACQUIRE_LEASE,
         };
-        let child: ElementID =
-            broker.add_element("C", vec![child_cred]).expect("add_element failed");
+        let (child_lease_token, child_lease_broker_token) = zx::EventPair::create();
+        let child_lease_cred = CredentialToRegister {
+            broker_token: child_lease_broker_token.into(),
+            permissions: Permissions::ACQUIRE_LEASE,
+        };
+        broker
+            .add_element("C", vec![child_no_lease_cred, child_lease_cred])
+            .expect("add_element failed");
         let (parent1_token, parent1_broker_token) = zx::EventPair::create();
         let parent1_cred = CredentialToRegister {
             broker_token: parent1_broker_token.into(),
@@ -709,7 +722,10 @@ mod tests {
             broker.add_element("P2", vec![parent2_cred]).expect("add_element failed");
         broker
             .add_dependency(
-                child_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
+                child_no_lease_token
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
                 PowerLevel::Binary(BinaryPowerLevel::On),
                 parent1_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
                 PowerLevel::Binary(BinaryPowerLevel::On),
@@ -717,7 +733,10 @@ mod tests {
             .expect("add_direct_dep failed");
         broker
             .add_dependency(
-                child_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
+                child_no_lease_token
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
                 PowerLevel::Binary(BinaryPowerLevel::On),
                 parent2_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
                 PowerLevel::Binary(BinaryPowerLevel::On),
@@ -737,7 +756,13 @@ mod tests {
         // Acquire the lease, which should result in two claims, one
         // for each dependency.
         let lease = broker
-            .acquire_lease(&child, &PowerLevel::Binary(BinaryPowerLevel::On))
+            .acquire_lease(
+                child_lease_token
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                &PowerLevel::Binary(BinaryPowerLevel::On),
+            )
             .expect("acquire failed");
         assert_eq!(
             broker.catalog.calc_min_level(&parent1.clone()),
@@ -766,6 +791,16 @@ mod tests {
         // Try dropping the lease one more time, which should result in an error.
         let extra_drop = broker.drop_lease(&lease.id);
         assert!(extra_drop.is_err());
+
+        // Acquire with an unregistered token should return NotAuthorized.
+        let (missing_token, _) = zx::EventPair::create();
+        let missing_token_res =
+            broker.acquire_lease(missing_token.into(), &PowerLevel::Binary(BinaryPowerLevel::On));
+        assert!(matches!(missing_token_res, Err(fpb::LeaseError::NotAuthorized)));
+
+        let missing_permissions_res = broker
+            .acquire_lease(child_no_lease_token.into(), &PowerLevel::Binary(BinaryPowerLevel::On));
+        assert!(matches!(missing_permissions_res, Err(fpb::LeaseError::NotAuthorized)));
     }
 
     #[fuchsia::test]
@@ -777,10 +812,9 @@ mod tests {
         let (child_token, child_broker_token) = zx::EventPair::create();
         let child_cred = CredentialToRegister {
             broker_token: child_broker_token.into(),
-            permissions: Permissions::MODIFY_DEPENDENCY,
+            permissions: Permissions::MODIFY_DEPENDENCY | Permissions::ACQUIRE_LEASE,
         };
-        let child: ElementID =
-            broker.add_element("C", vec![child_cred]).expect("add_element failed");
+        broker.add_element("C", vec![child_cred]).expect("add_element failed");
         let (parent_token, parent_broker_token) = zx::EventPair::create();
         let parent_cred = CredentialToRegister {
             broker_token: parent_broker_token.into(),
@@ -831,7 +865,10 @@ mod tests {
         // for the direct parent dependency, and one for the transitive
         // grandparent dependency.
         let lease = broker
-            .acquire_lease(&child.clone(), &PowerLevel::Binary(BinaryPowerLevel::On))
+            .acquire_lease(
+                child_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
+                &PowerLevel::Binary(BinaryPowerLevel::On),
+            )
             .expect("acquire failed");
         assert_eq!(
             broker.catalog.calc_min_level(&parent.clone()),
@@ -911,17 +948,15 @@ mod tests {
         let (child1_token, child1_broker_token) = zx::EventPair::create();
         let child1_cred = CredentialToRegister {
             broker_token: child1_broker_token.into(),
-            permissions: Permissions::MODIFY_DEPENDENCY,
+            permissions: Permissions::MODIFY_DEPENDENCY | Permissions::ACQUIRE_LEASE,
         };
-        let child1: ElementID =
-            broker.add_element("C1", vec![child1_cred]).expect("add_element failed");
+        broker.add_element("C1", vec![child1_cred]).expect("add_element failed");
         let (child2_token, child2_broker_token) = zx::EventPair::create();
         let child2_cred = CredentialToRegister {
             broker_token: child2_broker_token.into(),
-            permissions: Permissions::MODIFY_DEPENDENCY,
+            permissions: Permissions::MODIFY_DEPENDENCY | Permissions::ACQUIRE_LEASE,
         };
-        let child2: ElementID =
-            broker.add_element("C2", vec![child2_cred]).expect("add_element failed");
+        broker.add_element("C2", vec![child2_cred]).expect("add_element failed");
         let (parent_token, parent_broker_token) = zx::EventPair::create();
         let parent_cred = CredentialToRegister {
             broker_token: parent_broker_token.into(),
@@ -978,7 +1013,10 @@ mod tests {
 
         // Acquire a lease for the first child.
         let lease1 = broker
-            .acquire_lease(&child1, &PowerLevel::Binary(BinaryPowerLevel::On))
+            .acquire_lease(
+                child1_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
+                &PowerLevel::Binary(BinaryPowerLevel::On),
+            )
             .expect("acquire failed");
         assert_eq!(
             broker.catalog.calc_min_level(&parent.clone()),
@@ -1014,7 +1052,10 @@ mod tests {
 
         // Acquire a lease for the second child.
         let lease2 = broker
-            .acquire_lease(&child2, &PowerLevel::Binary(BinaryPowerLevel::On))
+            .acquire_lease(
+                child2_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
+                &PowerLevel::Binary(BinaryPowerLevel::On),
+            )
             .expect("acquire failed");
         assert_eq!(
             broker.catalog.calc_min_level(&parent.clone()),

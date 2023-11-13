@@ -24,10 +24,6 @@ type BinaryPowerLevel = strict enum : uint32 {
 
 // Unique ID provided by Power Broker (currently a UUID but subject to change).
 alias LeaseId = string:64;
-// Unique ID, provided by Power Broker. Could be a zx.Handle?
-// TODO(b/297543815): Temporary placeholder until a formal system of tokens
-// or paths is determined.
-alias ElementId = string:1024;
 
 type WatchRequiredLevelError = flexible enum {
     NOT_AUTHORIZED = 0;
@@ -68,6 +64,10 @@ open protocol LevelControl {
     }) -> () error UpdateCurrentPowerLevelError;
 };
 
+type LeaseError = flexible enum {
+    NOT_AUTHORIZED = 0;
+};
+
 /// Offered by the Power Broker to consumer Power Element owners (elements
 /// that initiate leases).
 @discoverable
@@ -76,18 +76,14 @@ open protocol Lessor {
     /// to the given power level and wants to have its direct and transitive
     /// power dependencies satisfied.
     flexible Lease(resource struct {
-        // TODO(b/297543815): Replace these. The method by which clients
-        // identify their power elements and the elements they intend to use
-        // is still TBD. We will need something beyond handles to express
-        // these links generically (i.e. not runtime handles), either in the
-        // component manifest as capabilities or some other method linked to
-        // the topology definition, which is also TBD.
-        /// ID and PowerLevel of the element requesting the lease
-        element ElementId;
+        /// Must supply a token to a previously registered Credential for
+        /// the element with Permissions.ACQUIRE_LEASE.
+        token zx.Handle:EVENTPAIR;
+        /// Power level of this element to be raised to.
         level PowerLevel;
     }) -> (resource struct {
         lease_id LeaseId;
-    });
+    }) error LeaseError;
 
     /// Request made to drop a previously acquired lease.
     flexible DropLease(resource struct {
@@ -181,10 +177,7 @@ open protocol Topology {
         /// List of initial credentials to register for this element.
         /// You may not register credentials for other elements here.
         credentials_to_register vector<Credential>:128;
-    }) -> (resource struct {
-        /// Unique ID for this element, assigned by Power Broker.
-        element ElementId;
-    }) error AddElementError;
+    }) -> () error AddElementError;
 
     /// Made by a Power Element owner to remove their Power Element.
     /// Removing a Power Element also removes all associated Dependencies.
@@ -241,6 +234,7 @@ type Permissions = strict bits : uint32 {
     MODIFY_DEPENDENCY = 0x00000008;
     MODIFY_CREDENTIAL = 0x00000010;
     REMOVE_ELEMENT = 0x00000020;
+    ACQUIRE_LEASE = 0x00000040;
 };
 
 /// A Credential associates an EventPair to a set of Permissions that
