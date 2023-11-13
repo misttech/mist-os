@@ -32,10 +32,12 @@ namespace {
 
 static constexpr std::string_view kCompatDriverRelativePath = "driver/compat.so";
 
-std::string_view GetManifest(std::string_view url) {
-  auto index = url.rfind('/');
-  return index == std::string_view::npos ? url : url.substr(index + 1);
+std::string_view GetFilename(std::string_view path) {
+  size_t index = path.rfind('/');
+  return index == std::string_view::npos ? path : path.substr(index + 1);
 }
+
+std::string_view GetManifest(std::string_view url) { return GetFilename(url); }
 
 class FileEventHandler : public fidl::AsyncEventHandler<fio::File> {
  public:
@@ -78,13 +80,12 @@ zx::result<fidl::ClientEnd<fio::File>> OpenDriverFile(const fdf::DriverStartArgs
 
 zx::result<fbl::RefPtr<Driver>> Driver::Load(std::string url, zx::vmo vmo,
                                              std::string_view relative_binary_path) {
-  // Give the driver's VMO a name. We can't fit the entire URL in the name, so
-  // use the name of the manifest from the URL.
-  auto manifest = GetManifest(url);
-  zx_status_t status = vmo.set_property(ZX_PROP_NAME, manifest.data(), manifest.size());
+  // Give the driver's VMO a name.
+  std::string_view vmo_name = GetFilename(relative_binary_path);
+  zx_status_t status = vmo.set_property(ZX_PROP_NAME, vmo_name.data(), vmo_name.size());
   if (status != ZX_OK) {
-    LOGF(ERROR, "Failed to start driver '%s',, could not name library VMO: %s", url.c_str(),
-         zx_status_get_string(status));
+    LOGF(ERROR, "Failed to start driver '%s', could not name library VMO '%s': %s", url.c_str(),
+         std::string(vmo_name).c_str(), zx_status_get_string(status));
     return zx::error(status);
   }
 
