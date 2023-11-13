@@ -68,7 +68,7 @@ rustc_binary("starnix_kernel_bin") {
   deps = [
     ":perfetto_consumer_proto",
     ":starnix_kernel_config",
-    ":vdso-data($target_linux_toolchain)",
+    ":vdso-data($bionic_linux_toolchain)",
     "//sdk/fidl/fuchsia.buildinfo:fuchsia.buildinfo_rust",
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
     "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_rust",
