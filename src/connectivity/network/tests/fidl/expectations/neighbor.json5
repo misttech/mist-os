@@ -23,9 +23,6 @@
                 "neigh_unreachable_entries_ns3",
                 "neighbor_with_many_addresses_disconnects_ns3",
                 "remove_device_clears_neighbors_ns3",
-
-                // TODO(https://fxbug.dev/135498): Validate addresses in NS2.
-                "neigh_add_entry_invalid_mac_ns2*",
             ],
         },
     ],

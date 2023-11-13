@@ -347,10 +347,11 @@ var _ neighbor.ControllerWithCtx = (*neighborImpl)(nil)
 
 func (n *neighborImpl) AddEntry(_ fidl.Context, interfaceID uint64, neighborIP net.IpAddress, mac net.MacAddress) (neighbor.ControllerAddEntryResult, error) {
 	address, network := fidlconv.ToTCPIPAddressAndProtocolNumber(neighborIP)
-	if !isValidNeighborAddr(fidlconv.ToStdAddr(neighborIP)) {
+	linkAddr := fidlconv.ToTCPIPLinkAddress(mac)
+	if !isValidNeighborAddr(fidlconv.ToStdAddr(neighborIP)) || !header.IsValidUnicastEthernetAddress(linkAddr) {
 		return neighbor.ControllerAddEntryResultWithErr(int32(zx.ErrInvalidArgs)), nil
 	}
-	if err := n.stack.AddStaticNeighbor(tcpip.NICID(interfaceID), network, address, fidlconv.ToTCPIPLinkAddress(mac)); err != nil {
+	if err := n.stack.AddStaticNeighbor(tcpip.NICID(interfaceID), network, address, linkAddr); err != nil {
 		return neighbor.ControllerAddEntryResultWithErr(int32(WrapTcpIpError(err).ToZxStatus())), nil
 	}
 	return neighbor.ControllerAddEntryResultWithResponse(neighbor.ControllerAddEntryResponse{}), nil
