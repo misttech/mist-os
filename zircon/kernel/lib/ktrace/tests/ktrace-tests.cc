@@ -52,7 +52,7 @@ class TestKTraceState : public ::internal::KTraceState {
       TestKTraceState state;
       ASSERT_TRUE(state.Init(kDefaultBufferSize, 0));
       {
-        Guard<SpinLock, IrqSave> guard{&state.write_lock_};
+        Guard<TraceDisabledSpinLock, IrqSave> guard{&state.write_lock_};
         EXPECT_NULL(state.buffer_);
         EXPECT_EQ(0u, state.bufsize_);
         EXPECT_EQ(kDefaultBufferSize, state.target_bufsize_);
@@ -70,7 +70,7 @@ class TestKTraceState : public ::internal::KTraceState {
       // before thread)
       ASSERT_OK(state.Start(kAllGroups, StartMode::Saturate));
       {
-        Guard<SpinLock, IrqSave> guard{&state.write_lock_};
+        Guard<TraceDisabledSpinLock, IrqSave> guard{&state.write_lock_};
         EXPECT_NONNULL(state.buffer_);
         EXPECT_GT(state.bufsize_, 0u);
         EXPECT_LE(state.bufsize_, state.target_bufsize_);
@@ -89,7 +89,7 @@ class TestKTraceState : public ::internal::KTraceState {
       ASSERT_TRUE(state.Init(kDefaultBufferSize, kAllGroups));
 
       {
-        Guard<SpinLock, IrqSave> guard{&state.write_lock_};
+        Guard<TraceDisabledSpinLock, IrqSave> guard{&state.write_lock_};
         EXPECT_NONNULL(state.buffer_);
         EXPECT_GT(state.bufsize_, 0u);
         EXPECT_LE(state.bufsize_, state.target_bufsize_);
@@ -716,7 +716,7 @@ class TestKTraceState : public ::internal::KTraceState {
 
     // Make sure that the buffer size we requested was allocated exactly.
     {
-      Guard<SpinLock, IrqSave> guard{&write_lock_};
+      Guard<TraceDisabledSpinLock, IrqSave> guard{&write_lock_};
       ASSERT_GE(target_bufsize, bufsize_);
     }
 
@@ -744,9 +744,9 @@ class TestKTraceState : public ::internal::KTraceState {
       TA_EXCL(write_lock_) {
     BEGIN_TEST;
 
-    Guard<SpinLock, IrqSave> guard{&write_lock_};
+    Guard<TraceDisabledSpinLock, IrqSave> guard{&write_lock_};
     switch (op) {
-      // clang-format off
+        // clang-format off
       case CheckOp::LT: EXPECT_LT(expected, wr_); break;
       case CheckOp::LE: EXPECT_LE(expected, wr_); break;
       case CheckOp::EQ: EXPECT_EQ(expected, wr_); break;

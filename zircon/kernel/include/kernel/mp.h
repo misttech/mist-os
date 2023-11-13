@@ -8,6 +8,7 @@
 #ifndef ZIRCON_KERNEL_INCLUDE_KERNEL_MP_H_
 #define ZIRCON_KERNEL_INCLUDE_KERNEL_MP_H_
 
+#include <lib/ktrace.h>
 #include <limits.h>
 #include <stdint.h>
 #include <zircon/compiler.h>
@@ -83,13 +84,13 @@ struct mp_state {
   // cpus that are currently idle.
   ktl::atomic<cpu_mask_t> idle_cpus;
 
-  SpinLock ipi_task_lock;
+  SpinLock ipi_task_lock{"mp_state:ipi_task_lock"_intern};
   // list of outstanding tasks for CPUs to execute.  Should only be
   // accessed with the ipi_task_lock held
   fbl::DoublyLinkedList<mp_ipi_task*> ipi_task_list[SMP_MAX_CPUS] TA_GUARDED(ipi_task_lock);
 
   // lock for serializing CPU hotplug/unplug operations
-  DECLARE_LOCK(mp_state, Mutex) hotplug_lock;
+  DECLARE_MUTEX(mp_state) hotplug_lock;
 };
 
 extern struct mp_state mp;

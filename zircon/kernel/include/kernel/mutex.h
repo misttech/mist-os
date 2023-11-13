@@ -11,6 +11,7 @@
 
 #include <assert.h>
 #include <debug.h>
+#include <lib/fxt/interned_string.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <stdint.h>
 #include <zircon/compiler.h>
@@ -21,14 +22,20 @@
 #include <kernel/lock_validation_guard.h>
 #include <kernel/lockdep.h>
 #include <kernel/owned_wait_queue.h>
+#include <kernel/spin_tracing_storage.h>
 #include <kernel/thread.h>
 #include <ktl/atomic.h>
 
 // Kernel mutex support.
 //
-class TA_CAP("mutex") Mutex {
+class TA_CAP("mutex") Mutex
+    : public spin_tracing::LockNameStorage<spin_tracing::LockType::kMutex,
+                                           kSchedulerLockSpinTracingEnabled> {
  public:
   constexpr Mutex() = default;
+  explicit Mutex(const fxt::InternedString& name_stringref)
+      : LockNameStorage(name_stringref.GetId()) {}
+
   ~Mutex();
 
   // No moving or copying allowed.
@@ -196,6 +203,7 @@ class TA_CAP("mutex") CriticalMutex : private Mutex {
  public:
   CriticalMutex() = default;
   ~CriticalMutex() = default;
+  explicit CriticalMutex(const fxt::InternedString& name_stringref) : Mutex(name_stringref) {}
 
   CriticalMutex(const CriticalMutex&) = delete;
   CriticalMutex& operator=(const CriticalMutex&) = delete;
@@ -247,6 +255,12 @@ class TA_CAP("mutex") CriticalMutex : private Mutex {
 
   // See |Mutex::IsContested|.
   bool IsContested() const { return Mutex::IsContested(); }
+
+  // We inherited privately from Mutex, which hides the SetLockClassId method
+  // from lockdep.  Explicitly pass the call it makes to SetLockClassId to the
+  // underlying implementation so we get named locked when we are collecting
+  // lock contention trace data.
+  void SetLockClassId(lockdep::LockClassId lcid) { Mutex::SetLockClassId(lcid); }
 
  private:
   // This field must not be accessed concurrently.  Be sure to only access it

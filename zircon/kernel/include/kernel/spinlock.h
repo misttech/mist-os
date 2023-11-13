@@ -8,6 +8,7 @@
 #ifndef ZIRCON_KERNEL_INCLUDE_KERNEL_SPINLOCK_H_
 #define ZIRCON_KERNEL_INCLUDE_KERNEL_SPINLOCK_H_
 
+#include <lib/fxt/interned_string.h>
 #include <lib/lockup_detector.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <zircon/compiler.h>
@@ -17,6 +18,8 @@
 #include <arch/spinlock.h>
 #include <fbl/enum_bits.h>
 #include <kernel/lockdep.h>
+#include <kernel/spin_tracing_config.h>
+#include <kernel/spin_tracing_storage.h>
 
 enum class SpinLockOptions : uint32_t {
   None = 0,
@@ -25,13 +28,18 @@ enum class SpinLockOptions : uint32_t {
   //
   // See //zircon/kernel/lib/lockup_detector/README.md.
   Monitored = (1 << 0),
+  TraceDisabled = (1 << 1),
 };
 FBL_ENABLE_ENUM_BITS(SpinLockOptions)
 
 template <SpinLockOptions Options>
-class TA_CAP("mutex") SpinLockBase {
+class TA_CAP("mutex") SpinLockBase
+    : public spin_tracing::LockNameStorage<spin_tracing::LockType::kSpinlock,
+                                           kSchedulerLockSpinTracingEnabled> {
  public:
   constexpr SpinLockBase() = default;
+  explicit SpinLockBase(const fxt::InternedString& lock_name_string_ref)
+      : LockNameStorage{lock_name_string_ref.GetId()} {}
 
   // Acquire the spinlock.
   //
@@ -40,7 +48,12 @@ class TA_CAP("mutex") SpinLockBase {
     static_assert(!kIsMonitored, "spinlock is monitored, use Acquire(const char* name) instead");
     DEBUG_ASSERT(arch_ints_disabled());
     DEBUG_ASSERT(!arch_spin_lock_held(&spinlock_));
-    arch_spin_lock(&spinlock_);
+
+    if constexpr (kIsTraceDisabled) {
+      arch_spin_lock_non_instrumented(&spinlock_);
+    } else {
+      arch_spin_lock_trace_instrumented(&spinlock_, this->encoded_lock_id());
+    }
   }
   // See |Acquire| above.
   //
@@ -51,7 +64,11 @@ class TA_CAP("mutex") SpinLockBase {
     DEBUG_ASSERT(arch_ints_disabled());
     DEBUG_ASSERT(!arch_spin_lock_held(&spinlock_));
     LOCKUP_BEGIN(name);
-    arch_spin_lock(&spinlock_);
+    if constexpr (kIsTraceDisabled) {
+      arch_spin_lock_non_instrumented(&spinlock_);
+    } else {
+      arch_spin_lock_trace_instrumented(&spinlock_, this->encoded_lock_id());
+    }
   }
 
   // Attempt to acquire the spinlock without waiting.
@@ -128,6 +145,11 @@ class TA_CAP("mutex") SpinLockBase {
  private:
   static constexpr bool kIsMonitored =
       (Options & SpinLockOptions::Monitored) != SpinLockOptions::None;
+
+  static constexpr bool kIsTraceDisabled =
+      !kSchedulerLockSpinTracingEnabled ||
+      (Options & SpinLockOptions::TraceDisabled) != SpinLockOptions::None;
+
   arch_spin_lock_t spinlock_ = ARCH_SPIN_LOCK_INITIAL_VALUE;
 };
 
@@ -148,6 +170,7 @@ using SpinLock = SpinLockBase<SpinLockOptions::None>;
 // }
 //
 using MonitoredSpinLock = SpinLockBase<SpinLockOptions::Monitored>;
+using TraceDisabledSpinLock = SpinLockBase<SpinLockOptions::TraceDisabled>;
 
 // Declares a member of type |spinlock_type| in the struct or class |containing_type| with
 // instrumentation for runtime lock validation.
@@ -160,6 +183,7 @@ using MonitoredSpinLock = SpinLockBase<SpinLockOptions::Monitored>;
 //
 #define DECLARE_SPINLOCK_WITH_TYPE(containing_type, spinlock_type, ...) \
   LOCK_DEP_INSTRUMENT(containing_type, spinlock_type, ##__VA_ARGS__)
+
 // Just like |DECLARE_SPINLOCK_WITH_TYPE| except the type SpinLock is implied.
 #define DECLARE_SPINLOCK(containing_type, ...) \
   DECLARE_SPINLOCK_WITH_TYPE(containing_type, SpinLock, ##__VA_ARGS__)
@@ -172,6 +196,7 @@ using MonitoredSpinLock = SpinLockBase<SpinLockOptions::Monitored>;
 //
 #define DECLARE_SINGLETON_SPINLOCK_WITH_TYPE(name, spinlock_type, ...) \
   LOCK_DEP_SINGLETON_LOCK(name, spinlock_type, ##__VA_ARGS__)
+
 // Just like |DECLARE_SINGLETON_SPINLOCK_WITH_TYPE| except the type SpinLock is implied.
 #define DECLARE_SINGLETON_SPINLOCK(name, ...) \
   DECLARE_SINGLETON_SPINLOCK_WITH_TYPE(name, SpinLock, ##__VA_ARGS__)
@@ -183,6 +208,7 @@ using MonitoredSpinLock = SpinLockBase<SpinLockOptions::Monitored>;
 // Configure lockdep to check irq-safety rules.
 LOCK_DEP_TRAITS(SpinLock, lockdep::LockFlagsIrqSafe);
 LOCK_DEP_TRAITS(MonitoredSpinLock, lockdep::LockFlagsIrqSafe);
+LOCK_DEP_TRAITS(TraceDisabledSpinLock, lockdep::LockFlagsIrqSafe);
 
 // Option tag for acquiring a SpinLock WITHOUT saving irq state.
 struct NoIrqSave {};
@@ -194,6 +220,7 @@ struct IrqSave {};
 struct TryLockNoIrqSave {};
 
 // Lock policy for acquiring a SpinLock WITHOUT saving irq state.
+template <typename LockType>
 struct NoIrqSavePolicy {
   // No extra state required when not saving irq state.
   struct State {};
@@ -201,18 +228,19 @@ struct NoIrqSavePolicy {
   // The lock list and validation is made atomic by interrupt disable before locking.
   using ValidationGuard = lockdep::NullValidationGuard;
 
-  static void PreValidate(SpinLock* lock, State*) {}
-  static bool Acquire(SpinLock* lock, State*) TA_ACQ(lock) {
+  static void PreValidate(LockType* lock, State*) {}
+  static bool Acquire(LockType* lock, State*) TA_ACQ(lock) {
     lock->Acquire();
     return true;
   }
-  static void Release(SpinLock* lock, State*) TA_REL(lock) { lock->Release(); }
-  static void AssertHeld(const SpinLock& lock) TA_ASSERT(lock) { lock.AssertHeld(); }
+  static void Release(LockType* lock, State*) TA_REL(lock) { lock->Release(); }
+  static void AssertHeld(const LockType& lock) TA_ASSERT(lock) { lock.AssertHeld(); }
 };
 
 // Configure Guard<SpinLock, NoIrqSave> to use the above policy to acquire and
 // release a SpinLock.
-LOCK_DEP_POLICY_OPTION(SpinLock, NoIrqSave, NoIrqSavePolicy);
+LOCK_DEP_POLICY_OPTION(SpinLock, NoIrqSave, NoIrqSavePolicy<SpinLock>);
+LOCK_DEP_POLICY_OPTION(TraceDisabledSpinLock, NoIrqSave, NoIrqSavePolicy<TraceDisabledSpinLock>);
 
 // Lock policy for acquiring a MonitoredSpinLock WITHOUT saving irq state.
 struct NoIrqSaveMonitoredPolicy {
@@ -240,6 +268,7 @@ struct NoIrqSaveMonitoredPolicy {
 LOCK_DEP_POLICY_OPTION(MonitoredSpinLock, NoIrqSave, NoIrqSaveMonitoredPolicy);
 
 // Lock policy for acquiring a SpinLock WITH saving irq state.
+template <typename LockType>
 struct IrqSavePolicy {
   // State and flags required to save irq state.
   struct State {
@@ -249,26 +278,27 @@ struct IrqSavePolicy {
   // The lock list and validation is made atomic by interrupt disable in pre-validation.
   using ValidationGuard = lockdep::NullValidationGuard;
 
-  static void PreValidate(SpinLock* lock, State* state) {
+  static void PreValidate(LockType* lock, State* state) {
     state->interrupt_state = arch_interrupt_save();
   }
 
-  static bool Acquire(SpinLock* lock, State*) TA_ACQ(lock) {
+  static bool Acquire(LockType* lock, State*) TA_ACQ(lock) {
     lock->Acquire();
     return true;
   }
 
-  static void Release(SpinLock* lock, State* state) TA_REL(lock) {
+  static void Release(LockType* lock, State* state) TA_REL(lock) {
     lock->Release();
     arch_interrupt_restore(state->interrupt_state);
   }
 
-  static void AssertHeld(const SpinLock& lock) TA_ASSERT(lock) { lock.AssertHeld(); }
+  static void AssertHeld(const LockType& lock) TA_ASSERT(lock) { lock.AssertHeld(); }
 };
 
 // Configure Guard<SpinLock, IrqSave> to use the above policy to acquire and
 // release a SpinLock.
-LOCK_DEP_POLICY_OPTION(SpinLock, IrqSave, IrqSavePolicy);
+LOCK_DEP_POLICY_OPTION(SpinLock, IrqSave, IrqSavePolicy<SpinLock>);
+LOCK_DEP_POLICY_OPTION(TraceDisabledSpinLock, IrqSave, IrqSavePolicy<TraceDisabledSpinLock>);
 
 // Lock policy for acquiring a MonitoredSpinLock WITH saving irq state.
 struct IrqSaveMonitoredPolicy {

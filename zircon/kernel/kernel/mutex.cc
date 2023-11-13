@@ -34,6 +34,7 @@
 #include <kernel/auto_preempt_disabler.h>
 #include <kernel/lock_trace.h>
 #include <kernel/scheduler.h>
+#include <kernel/spin_tracing.h>
 #include <kernel/task_runtime_timers.h>
 #include <kernel/thread.h>
 #include <kernel/thread_lock.h>
@@ -117,7 +118,6 @@ class KTracer<Level, ktl::enable_if_t<(Level == KernelMutexTracingLevel::Contest
 
   const uint64_t ts_;
 };
-
 }  // namespace
 
 Mutex::~Mutex() {
@@ -252,6 +252,7 @@ __NO_INLINE bool Mutex::AcquireContendedMutex(
 
   // Remember the last call to current_ticks.
   zx_ticks_t now_ticks = current_ticks();
+  spin_tracing::Tracer<kSchedulerLockSpinTracingEnabled> spin_tracer{now_ticks};
 
   const affine::Ratio time_to_ticks = platform_get_ticks_to_time_ratio().Inverse();
   const zx_ticks_t spin_until_ticks =
@@ -266,6 +267,7 @@ __NO_INLINE bool Mutex::AcquireContendedMutex(
     //
     if (likely(val_.compare_exchange_weak(old_mutex_state, new_mutex_state,
                                           ktl::memory_order_acquire, ktl::memory_order_relaxed))) {
+      spin_tracer.Finish(spin_tracing::FinishType::kLockAcquired, this->encoded_lock_id());
       RecordInitialAssignedCpu();
 
       // Same as above in the fastest path: leave accounting to later contending
@@ -311,6 +313,8 @@ __NO_INLINE bool Mutex::AcquireContendedMutex(
     arch::Yield();
     now_ticks = current_ticks();
   } while (now_ticks < spin_until_ticks);
+
+  spin_tracer.Finish(spin_tracing::FinishType::kBlocked, this->encoded_lock_id());
 
   if ((LK_DEBUGLEVEL > 0) && unlikely(this->IsHeld())) {
     panic("Mutex::Acquire: thread %p (%s) tried to acquire mutex %p it already owns.\n",

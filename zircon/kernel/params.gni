@@ -59,6 +59,10 @@ declare_args() {
   # debugging changes to the scheduler's behavior.
   scheduler_extra_invariant_validation = false
 
+  # Enables scheduler lock-spinning trace events for trace-based scheduler
+  # performance analysis.
+  scheduler_lock_spin_tracing_enabled = false
+
   # Enables kernel tracing of futex interactions
   futex_tracing_enabled = false
 

@@ -399,7 +399,7 @@ class KTraceState {
   // out so that the record to be written may exist contiguously in the trace
   // buffer.
   //
-  DECLARE_SPINLOCK(KTraceState) write_lock_;
+  DECLARE_SPINLOCK_WITH_TYPE(KTraceState, TraceDisabledSpinLock) write_lock_;
   uint64_t rd_ TA_GUARDED(write_lock_){0};
   uint64_t wr_ TA_GUARDED(write_lock_){0};
   uint32_t circular_size_ TA_GUARDED(write_lock_){0};

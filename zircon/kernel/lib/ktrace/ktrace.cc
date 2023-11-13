@@ -168,7 +168,7 @@ zx_status_t KTraceState::Start(uint32_t groups, StartMode mode) {
   // re-start a ktrace buffer in saturating mode which had been operating in
   // circular mode.
   if (mode == StartMode::Saturate) {
-    Guard<SpinLock, IrqSave> write_guard{&write_lock_};
+    Guard<TraceDisabledSpinLock, IrqSave> write_guard{&write_lock_};
     if (circular_size_ != 0) {
       return ZX_ERR_BAD_STATE;
     }
@@ -186,7 +186,7 @@ zx_status_t KTraceState::Start(uint32_t groups, StartMode mode) {
   // If we are changing from saturating mode, to circular mode, we need to
   // update our circular bookkeeping.
   {
-    Guard<SpinLock, IrqSave> write_guard{&write_lock_};
+    Guard<TraceDisabledSpinLock, IrqSave> write_guard{&write_lock_};
     if ((mode == StartMode::Circular) && (circular_size_ == 0)) {
       // Mark the point at which the static data ends and the circular
       // portion of the buffer starts (the "wrap offset").
@@ -254,7 +254,7 @@ zx_status_t KTraceState::RewindLocked() {
                    observed);
 
   {
-    Guard<SpinLock, IrqSave> write_guard{&write_lock_};
+    Guard<TraceDisabledSpinLock, IrqSave> write_guard{&write_lock_};
     // 1 magic bytes record: 8 bytes
     // 1 Initialization/tickrate record: 16 bytes
     const size_t fxt_metadata_size = 24;
@@ -330,7 +330,7 @@ ssize_t KTraceState::ReadUser(user_out_ptr<void> ptr, uint32_t off, size_t len) 
     size_t avail{0};
     Region regions[3];
   } to_copy = [this, &off, &len]() -> ToCopy {
-    Guard<SpinLock, IrqSave> write_guard{&write_lock_};
+    Guard<TraceDisabledSpinLock, IrqSave> write_guard{&write_lock_};
 
     // The amount of data we have to exfiltrate is equal to the distance between
     // the read and the write pointers, plus the non-circular region of the buffer
@@ -468,7 +468,7 @@ zx_status_t KTraceState::AllocBuffer() {
   // The buffer is allocated once, then never deleted.  If it has already been
   // allocated, then we are done.
   {
-    Guard<SpinLock, IrqSave> write_guard{&write_lock_};
+    Guard<TraceDisabledSpinLock, IrqSave> write_guard{&write_lock_};
     if (buffer_) {
       return ZX_OK;
     }
@@ -498,7 +498,7 @@ zx_status_t KTraceState::AllocBuffer() {
   }
 
   {
-    Guard<SpinLock, IrqSave> write_guard{&write_lock_};
+    Guard<TraceDisabledSpinLock, IrqSave> write_guard{&write_lock_};
     buffer_ = static_cast<uint8_t*>(ptr);
     bufsize_ = target_bufsize_;
   }
@@ -522,7 +522,7 @@ uint64_t* KTraceState::ReserveRaw(uint32_t num_words) {
     ktl::atomic_ref(*ptr).store(tag, ktl::memory_order_release);
   };
 
-  Guard<SpinLock, IrqSave> write_guard{&write_lock_};
+  Guard<TraceDisabledSpinLock, IrqSave> write_guard{&write_lock_};
   if (!bufsize_) {
     return nullptr;
   }

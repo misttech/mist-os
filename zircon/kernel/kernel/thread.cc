@@ -22,6 +22,7 @@
 #include <lib/arch/intrin.h>
 #include <lib/counters.h>
 #include <lib/fit/defer.h>
+#include <lib/fxt/interned_string.h>
 #include <lib/heap.h>
 #include <lib/ktrace.h>
 #include <lib/lazy_init/lazy_init.h>
@@ -95,7 +96,7 @@ static lazy_init::LazyInit<Thread::List> thread_list;
 Thread::MigrateList Thread::migrate_list_;
 
 // master thread spinlock
-MonitoredSpinLock thread_lock __CPU_ALIGN_EXCLUSIVE;
+MonitoredSpinLock thread_lock __CPU_ALIGN_EXCLUSIVE{"thread_lock"_intern};
 
 // The global preempt disabled token singleton
 PreemptDisabledToken preempt_disabled_token;

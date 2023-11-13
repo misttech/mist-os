@@ -63,7 +63,33 @@ KCOUNTER(timer_canceled_counter, "timer.canceled")
 
 namespace {
 
-MonitoredSpinLock timer_lock __CPU_ALIGN_EXCLUSIVE;
+using fxt::operator""_intern;
+
+// Note that we need to manually name the timer_lock because it is one of and
+// extremely small number of "wrapped" locks in the system, and cannot easily
+// use lockdep in order to generate its name.
+//
+// The vast majority of locks in the system are directly instrumented using
+// lockdep. This causes the instance of the actual lock to become a member of a
+// generated lock dep class, which is used to access the underlying lock.  In
+// these cases, lockdep itself controls the construction sequencing of the lock,
+// allowing it to configure the internal lock's metadata immediately after
+// construction has completed.
+//
+// Wrapped locks, OTOH, are a bit different.  The lock instance is declared
+// outside of the lockdep generated class, which holds a reference to the lock
+// instead of encapsulating the lock itself.  This leads to a global ctor race:
+// Who is constructed first, the lock itself, or the lock wrapper who holds a
+// pointer/reference to the lock?
+//
+// In situations like this, it is not safe for lock wrapper to be interacting
+// with the lock whose reference it holds, since that lock may not have been
+// constructed yet.
+//
+// So instead, we simply manually name the lock, and the lockdep wrapper never
+// makes any attempt to name the lock because of the ordering issues.
+//
+MonitoredSpinLock timer_lock __CPU_ALIGN_EXCLUSIVE{"timer_lock"_intern};
 DECLARE_SINGLETON_LOCK_WRAPPER(TimerLock, timer_lock);
 
 affine::Ratio gTicksToTime;
