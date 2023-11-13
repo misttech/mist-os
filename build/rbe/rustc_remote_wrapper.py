@@ -101,7 +101,16 @@ def _main_arg_parser() -> argparse.ArgumentParser:
         argument_default=[],
     )
     remote_action.inherit_main_arg_parser_flags(parser)
-    # There are no Rust-specific options yet.
+
+    # There could be multiple variants of the standard C++ library to choose
+    # from.  Use the one that corresponds to the compiler options.
+    parser.add_argument(
+        "--cxx-stdlibdir",
+        type=Path,
+        default=None,
+        help="Where to find libc++ (from clang)",
+    )
+
     return parser
 
 
@@ -256,6 +265,10 @@ class RustRemoteAction(object):
         if self._main_args.miscomparison_export_dir:
             return self.working_dir / self._main_args.miscomparison_export_dir
         return None
+
+    @property
+    def clang_cxx_stdlibdir(self) -> Optional[Path]:
+        return self._main_args.cxx_stdlibdir
 
     @property
     def local_only(self) -> bool:
@@ -754,9 +767,12 @@ class RustRemoteAction(object):
                 )
 
     def _remote_libcxx(self, clang_lib_triple: str) -> Iterable[Path]:
-        libcxx_remote = fuchsia.clang_libcxx_static(
-            self.remote_clang_toolchain_dir, clang_lib_triple
-        )
+        if self.clang_cxx_stdlibdir:  # override, selecting for variant
+            libcxx_remote = self.clang_cxx_stdlibdir / "libc++.a"
+        else:
+            libcxx_remote = fuchsia.clang_libcxx_static(
+                self.remote_clang_toolchain_dir, clang_lib_triple
+            )
         if _libcxx_isfile(libcxx_remote):
             yield self.value_verbose("remote libc++", libcxx_remote)
 
