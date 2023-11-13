@@ -2,9 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-composite aml_tdm;
+composite aml_tdm_composite;
 
 using fuchsia.amlogic.platform;
+using fuchsia.gpio;
+using fuchsia.clock;
 using fuchsia.platform;
 
 primary node "pdev" {
@@ -14,4 +16,19 @@ primary node "pdev" {
   accept fuchsia.BIND_PLATFORM_DEV_PID {
     fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.A311D,
   }
+}
+
+
+optional node "clock-gate" {
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.clock.BIND_FIDL_PROTOCOL.SERVICE;
+  fuchsia.clock.FUNCTION == fuchsia.clock.FUNCTION.AUDIO_GATE;
+}
+
+optional node "clock-pll" {
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.clock.BIND_FIDL_PROTOCOL.SERVICE;
+  fuchsia.clock.FUNCTION == fuchsia.clock.FUNCTION.AUDIO_PLL;
+}
+
+optional node "gpio-init" {
+  fuchsia.BIND_INIT_STEP == fuchsia.gpio.BIND_INIT_STEP.GPIO;
 }

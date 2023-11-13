@@ -126,7 +126,7 @@ fuchsia_driver_component("aml-g12-tdm-dai") {
   manifest = "meta/aml-g12-tdm-dai.cml"
 }
 
-# Composite driver.
+# Composite driver (DFv2).
 
 driver_bind_rules("aml-g12-composite-bind") {
   rules = "aml_composite.bind"
@@ -135,6 +135,7 @@ driver_bind_rules("aml-g12-composite-bind") {
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.clock",
+    "//src/devices/bind/fuchsia.gpio",
     "//src/devices/bind/fuchsia.platform",
   ]
 }
@@ -143,20 +144,23 @@ fuchsia_driver("aml-g12-composite-driver") {
   output_name = "aml-g12-composite"
   sources = [
     "aml-tdm-config-device.cc",
+    "composite-server.cc",
+    "composite-server.h",
     "composite.cc",
+    "composite.h",
   ]
 
   deps = [
     ":aml-g12-composite-bind",
-    "//sdk/banjo/fuchsia.hardware.audio:fuchsia.hardware.audio_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_cpp",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/component/cpp",
+    "//sdk/lib/driver/devfs/cpp",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/amlogic",
-    "//src/devices/lib/driver",
-    "//src/devices/lib/mmio",
+    "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddktl",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/zx",
   ]
 }
 
