@@ -7238,48 +7238,6 @@ mod tests {
         bind_listener();
     }
 
-    // Helper function to ensure the Fake UDP SyncCtx and NonSyncCtx are
-    // Setup with remote/local IPs that support a connection to the given
-    // remote_ip.
-    fn setup_fake_udp_ctx_with_dualstack_conn_addrs<
-        TimerId,
-        Event: Debug,
-        NonSyncCtxState: Default,
-    >(
-        local_ip: Ipv6Addr,
-        remote_ip: SpecifiedAddr<Ipv6Addr>,
-    ) -> FakeCtxWithSyncCtx<FakeUdpSyncCtx<FakeDeviceId>, TimerId, Event, NonSyncCtxState> {
-        // A conversion helper to unmap ipv4-mapped-ipv6 addresses.
-        fn unmap_ip(addr: IpAddr) -> IpAddr {
-            match addr {
-                IpAddr::V4(v4) => IpAddr::V4(v4),
-                IpAddr::V6(v6) => match v6.to_ipv4_mapped() {
-                    Some(v4) => IpAddr::V4(v4),
-                    None => IpAddr::V6(v6),
-                },
-            }
-        }
-
-        // Convert the local/remote IPs into `IpAddr` in their non-mapped form.
-        let local_ip = unmap_ip(local_ip.to_ip_addr());
-        let remote_ip = unmap_ip(remote_ip.to_ip_addr());
-        // If the given local_ip is unspecified, use the default from
-        // `FAKE_CONFIG`. This ensures we always instantiate the
-        // FakeDeviceConfig below with at least one local_ip, which is
-        // required for connect operations to succeed.
-        let local_ip = SpecifiedAddr::new(local_ip).unwrap_or_else(|| match remote_ip {
-            IpAddr::V4(_) => Ipv4::FAKE_CONFIG.local_ip.into(),
-            IpAddr::V6(_) => Ipv6::FAKE_CONFIG.local_ip.into(),
-        });
-        // If the given remote_ip is unspecified, we won't be able to
-        // connect; abort the test.
-        let remote_ip = SpecifiedAddr::new(remote_ip).expect("remote-ip should be specified");
-        FakeCtxWithSyncCtx::with_sync_ctx(FakeUdpSyncCtx::with_local_remote_ip_addrs(
-            vec![local_ip],
-            vec![remote_ip],
-        ))
-    }
-
     #[test_case(V6_REMOTE_IP, true; "This stack with dualstack enabled")]
     #[test_case(V6_REMOTE_IP, false; "This stack with dualstack disabled")]
     #[test_case(V4_REMOTE_IP_MAPPED, true; "other stack with dualstack enabled")]
@@ -7288,7 +7246,13 @@ mod tests {
         // in the demultiplexing maps. Do this by binding a new socket at the
         // same address and asserting success.
         let FakeCtxWithSyncCtx { mut sync_ctx, mut non_sync_ctx } =
-            setup_fake_udp_ctx_with_dualstack_conn_addrs(Ipv6::UNSPECIFIED_ADDRESS, remote_ip);
+            datagram::testutil::setup_fake_ctx_with_dualstack_conn_addrs(
+                Ipv6::UNSPECIFIED_ADDRESS.to_ip_addr(),
+                remote_ip.into(),
+                |device_config| {
+                    FakeUdpSyncCtx::with_state(FakeDualStackIpSocketCtx::new([device_config]))
+                },
+            );
 
         let mut bind_connected = || {
             let socket = SocketHandler::<Ipv6, _>::create_udp(&mut sync_ctx);
@@ -7343,7 +7307,13 @@ mod tests {
         expected_outcome: Result<(), ConnectError>,
     ) {
         let FakeCtxWithSyncCtx { mut sync_ctx, mut non_sync_ctx } =
-            setup_fake_udp_ctx_with_dualstack_conn_addrs(Ipv6::UNSPECIFIED_ADDRESS, remote_ip);
+            datagram::testutil::setup_fake_ctx_with_dualstack_conn_addrs(
+                Ipv6::UNSPECIFIED_ADDRESS.to_ip_addr(),
+                remote_ip.into(),
+                |device_config| {
+                    FakeUdpSyncCtx::with_state(FakeDualStackIpSocketCtx::new([device_config]))
+                },
+            );
 
         let socket = SocketHandler::<Ipv6, _>::create_udp(&mut sync_ctx);
 
@@ -7405,7 +7375,13 @@ mod tests {
         expected_outcome: Result<(), ConnectError>,
     ) {
         let FakeCtxWithSyncCtx { mut sync_ctx, mut non_sync_ctx } =
-            setup_fake_udp_ctx_with_dualstack_conn_addrs(local_ip, remote_ip);
+            datagram::testutil::setup_fake_ctx_with_dualstack_conn_addrs(
+                local_ip.to_ip_addr(),
+                remote_ip.into(),
+                |device_config| {
+                    FakeUdpSyncCtx::with_state(FakeDualStackIpSocketCtx::new([device_config]))
+                },
+            );
 
         let socket = SocketHandler::<Ipv6, _>::create_udp(&mut sync_ctx);
         enable_dual_stack_for_test(&mut sync_ctx, &mut non_sync_ctx, socket);
@@ -7472,9 +7448,12 @@ mod tests {
             const_unwrap_option(ORIGINAL_REMOTE_PORT.checked_add(1));
 
         let FakeCtxWithSyncCtx { mut sync_ctx, mut non_sync_ctx } =
-            setup_fake_udp_ctx_with_dualstack_conn_addrs(
-                Ipv6::UNSPECIFIED_ADDRESS,
-                original_remote_ip,
+            datagram::testutil::setup_fake_ctx_with_dualstack_conn_addrs(
+                Ipv6::UNSPECIFIED_ADDRESS.to_ip_addr(),
+                original_remote_ip.into(),
+                |device_config| {
+                    FakeUdpSyncCtx::with_state(FakeDualStackIpSocketCtx::new([device_config]))
+                },
             );
 
         let socket = SocketHandler::<Ipv6, _>::create_udp(&mut sync_ctx);

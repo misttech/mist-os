@@ -4544,6 +4544,67 @@ pub(crate) fn get_ip_transparent<
 }
 
 #[cfg(test)]
+pub(crate) mod testutil {
+    use super::*;
+
+    use alloc::vec;
+    use net_types::{
+        ip::{IpAddr, Ipv4, Ipv6},
+        SpecifiedAddr, Witness,
+    };
+
+    use crate::{
+        context::testutil::FakeCtxWithSyncCtx, device::testutil::FakeDeviceId,
+        ip::socket::testutil::FakeDeviceConfig, testutil::TestIpExt,
+    };
+
+    // Helper function to ensure the Fake SyncCtx and NonSyncCtx are
+    // Setup with remote/local IPs that support a connection to the given
+    // remote_ip.
+    pub(crate) fn setup_fake_ctx_with_dualstack_conn_addrs<
+        TimerId,
+        Event: Debug,
+        NonSyncCtxState: Default,
+        SC,
+    >(
+        local_ip: IpAddr,
+        remote_ip: SpecifiedAddr<IpAddr>,
+        sync_ctx_builder: impl FnOnce(FakeDeviceConfig<FakeDeviceId, SpecifiedAddr<IpAddr>>) -> SC,
+    ) -> FakeCtxWithSyncCtx<SC, TimerId, Event, NonSyncCtxState> {
+        // A conversion helper to unmap ipv4-mapped-ipv6 addresses.
+        fn unmap_ip(addr: IpAddr) -> IpAddr {
+            match addr {
+                IpAddr::V4(v4) => IpAddr::V4(v4),
+                IpAddr::V6(v6) => match v6.to_ipv4_mapped() {
+                    Some(v4) => IpAddr::V4(v4),
+                    None => IpAddr::V6(v6),
+                },
+            }
+        }
+
+        // Convert the local/remote IPs into `IpAddr` in their non-mapped form.
+        let local_ip = unmap_ip(local_ip);
+        let remote_ip = unmap_ip(remote_ip.get());
+        // If the given local_ip is unspecified, use the default from
+        // `FAKE_CONFIG`. This ensures we always instantiate the
+        // FakeDeviceConfig below with at least one local_ip, which is
+        // required for connect operations to succeed.
+        let local_ip = SpecifiedAddr::new(local_ip).unwrap_or_else(|| match remote_ip {
+            IpAddr::V4(_) => Ipv4::FAKE_CONFIG.local_ip.into(),
+            IpAddr::V6(_) => Ipv6::FAKE_CONFIG.local_ip.into(),
+        });
+        // If the given remote_ip is unspecified, we won't be able to
+        // connect; abort the test.
+        let remote_ip = SpecifiedAddr::new(remote_ip).expect("remote-ip should be specified");
+        FakeCtxWithSyncCtx::with_sync_ctx(sync_ctx_builder(FakeDeviceConfig {
+            device: FakeDeviceId,
+            local_ips: vec![local_ip],
+            remote_ips: vec![remote_ip],
+        }))
+    }
+}
+
+#[cfg(test)]
 mod test {
     use core::{convert::Infallible as Never, ops::DerefMut as _};
 
@@ -4554,7 +4615,7 @@ mod test {
     use ip_test_macro::ip_test;
     use net_declare::{net_ip_v4, net_ip_v6};
     use net_types::{
-        ip::{Ip, IpAddr, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
+        ip::{Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
         Witness,
     };
     use packet::Buf;
@@ -4562,7 +4623,7 @@ mod test {
     use test_case::test_case;
 
     use crate::{
-        context::testutil::{FakeNonSyncCtx, Wrapped, WrappedFakeSyncCtx},
+        context::testutil::{FakeCtxWithSyncCtx, FakeNonSyncCtx, Wrapped, WrappedFakeSyncCtx},
         data_structures::socketmap::SocketMap,
         device::testutil::{FakeDeviceId, FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId},
         ip::{
@@ -5561,49 +5622,23 @@ mod test {
         connect_reinserts_on_failure_inner::<Ipv6>(original, local_ip, remote_ip);
     }
 
-    // A conversion helper to unmap ipv4-mapped-ipv6 addresses.
-    fn unmap_ip(addr: IpAddr) -> IpAddr {
-        match addr {
-            IpAddr::V4(v4) => IpAddr::V4(v4),
-            IpAddr::V6(v6) => match v6.to_ipv4_mapped() {
-                Some(v4) => IpAddr::V4(v4),
-                None => IpAddr::V6(v6),
-            },
-        }
-    }
-
     fn connect_reinserts_on_failure_inner<I: Ip + DatagramIpExt + IpLayerIpExt>(
         original: OriginalSocketState,
         local_ip: I::Addr,
         remote_ip: SpecifiedAddr<I::Addr>,
     ) {
-        let mut sync_ctx = {
-            let local_ip = unmap_ip(local_ip.to_ip_addr());
-            let remote_ip = unmap_ip(remote_ip.get().to_ip_addr());
-            // If the given local_ip is unspecified, use the default from
-            // `FAKE_CONFIG`. This ensures we always instantiate the
-            // FakeDeviceConfig below with at least one local_ip, which is
-            // required for connect operations to succeed.
-            let local_ip = SpecifiedAddr::new(local_ip).unwrap_or_else(|| match remote_ip {
-                IpAddr::V4(_) => Ipv4::FAKE_CONFIG.local_ip.into(),
-                IpAddr::V6(_) => Ipv6::FAKE_CONFIG.local_ip.into(),
-            });
-            // If the given remote_ip is unspecified, we won't be able to
-            // connect; abort the test.
-            let remote_ip = SpecifiedAddr::new(remote_ip).expect("remote-ip should be specified");
-            FakeSyncCtx::<I, _> {
-                outer: FakeSocketsState::default(),
-                inner: WrappedFakeSyncCtx::with_inner_and_outer_state(
-                    FakeDualStackIpSocketCtx::new([FakeDeviceConfig::<_, SpecifiedAddr<IpAddr>> {
-                        device: FakeDeviceId,
-                        local_ips: vec![local_ip],
-                        remote_ips: vec![remote_ip],
-                    }]),
-                    Default::default(),
-                ),
-            }
-        };
-        let mut non_sync_ctx = FakeNonSyncCtx::default();
+        let FakeCtxWithSyncCtx { mut sync_ctx, mut non_sync_ctx } =
+            testutil::setup_fake_ctx_with_dualstack_conn_addrs(
+                local_ip.to_ip_addr(),
+                remote_ip.into(),
+                |device_config| FakeSyncCtx::<I, _> {
+                    outer: FakeSocketsState::default(),
+                    inner: WrappedFakeSyncCtx::with_inner_and_outer_state(
+                        FakeDualStackIpSocketCtx::new([device_config]),
+                        Default::default(),
+                    ),
+                },
+            );
 
         let socket = create(&mut sync_ctx);
         const LOCAL_PORT: u8 = 10;
