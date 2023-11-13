@@ -34,13 +34,14 @@ enum class HdmiDwFn {
 
 class AmlHdmiTest;
 
-class FakeHdmiDw : public hdmi_dw::HdmiDw {
+class FakeHdmiDw : public designware_hdmi::HdmiDw {
  public:
   explicit FakeHdmiDw(AmlHdmiTest* test, fdf::MmioBuffer controller_mmio)
       : HdmiDw(std::move(controller_mmio)), test_(test) {}
 
-  void ConfigHdmitx(const hdmi_dw::ColorParam& color_param, const display::DisplayTiming& mode,
-                    const hdmi_dw::hdmi_param_tx& p) override;
+  void ConfigHdmitx(const designware_hdmi::ColorParam& color_param,
+                    const display::DisplayTiming& mode,
+                    const designware_hdmi::hdmi_param_tx& p) override;
   void SetupInterrupts() override;
   void Reset() override;
   void SetupScdc(bool is4k) override;
@@ -128,8 +129,9 @@ class AmlHdmiTest : public testing::Test {
   std::queue<HdmiDwFn> expected_dw_calls_;
 };
 
-void FakeHdmiDw::ConfigHdmitx(const hdmi_dw::ColorParam& color_param,
-                              const display::DisplayTiming& mode, const hdmi_dw::hdmi_param_tx& p) {
+void FakeHdmiDw::ConfigHdmitx(const designware_hdmi::ColorParam& color_param,
+                              const display::DisplayTiming& mode,
+                              const designware_hdmi::hdmi_param_tx& p) {
   test_->HdmiDwCall(HdmiDwFn::kConfigHdmitx);
 }
 

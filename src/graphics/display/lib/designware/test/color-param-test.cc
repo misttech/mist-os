@@ -8,7 +8,7 @@
 
 #include <gtest/gtest.h>
 
-namespace hdmi_dw {
+namespace designware_hdmi {
 
 namespace {
 
@@ -38,4 +38,4 @@ TEST(ColorParam, FidlConversion) {
 
 }  // namespace
 
-}  // namespace hdmi_dw
+}  // namespace designware_hdmi

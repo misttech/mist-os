@@ -10,7 +10,7 @@
 #include "src/graphics/display/lib/designware/color-param.h"
 #include "src/graphics/display/lib/designware/regs.h"
 
-namespace hdmi_dw {
+namespace designware_hdmi {
 
 void HdmiDw::ScdcWrite(uint8_t addr, uint8_t val) {
   WriteReg(HDMITX_DWC_I2CM_SLAVE, 0x54);
@@ -726,4 +726,4 @@ void HdmiDw::PrintRegisters() {
 }
 #undef PRINT_REG
 
-}  // namespace hdmi_dw
+}  // namespace designware_hdmi

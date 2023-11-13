@@ -12,7 +12,7 @@
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 #include "src/graphics/display/lib/designware/color-param.h"
 
-namespace hdmi_dw {
+namespace designware_hdmi {
 
 struct hdmi_param_tx {
   uint16_t vic;
@@ -56,6 +56,6 @@ class HdmiDw {
   fdf::MmioBuffer controller_mmio_;
 };
 
-}  // namespace hdmi_dw
+}  // namespace designware_hdmi
 
 #endif  // SRC_GRAPHICS_DISPLAY_LIB_DESIGNWARE_HDMI_DW_H_

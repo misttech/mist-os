@@ -10,7 +10,7 @@
 
 #include <cinttypes>
 
-namespace hdmi_dw {
+namespace designware_hdmi {
 
 // Equivalent to the FIDL type [`fuchsia.hardware.hdmi/ColorFormat`].
 //
@@ -76,6 +76,6 @@ constexpr ColorParam ToColorParam(fuchsia_hardware_hdmi::wire::ColorParam fidl_c
   };
 }
 
-}  // namespace hdmi_dw
+}  // namespace designware_hdmi
 
 #endif  // SRC_GRAPHICS_DISPLAY_LIB_DESIGNWARE_COLOR_PARAM_H_

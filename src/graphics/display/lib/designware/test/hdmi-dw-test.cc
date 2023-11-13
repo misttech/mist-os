@@ -17,7 +17,7 @@
 //
 // dwchdmi is version 2.12a, dated April 2016
 
-namespace hdmi_dw {
+namespace designware_hdmi {
 
 namespace {
 
@@ -508,4 +508,4 @@ TEST_F(HdmiDwTest, SetFcScramblerCtrlTest) {
 
 }  // namespace
 
-}  // namespace hdmi_dw
+}  // namespace designware_hdmi

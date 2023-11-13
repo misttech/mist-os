@@ -65,7 +65,7 @@ zx_status_t AmlHdmiDevice::Bind() {
   }
   {
     fbl::AutoLock dw_lock(&dw_lock_);
-    hdmi_dw_ = std::make_unique<hdmi_dw::HdmiDw>(std::move(*hdmitx_controller_ip_mmio));
+    hdmi_dw_ = std::make_unique<designware_hdmi::HdmiDw>(std::move(*hdmitx_controller_ip_mmio));
   }
 
   static constexpr uint32_t kHdmitxTopLevelIndex = 1;
@@ -161,7 +161,8 @@ void AmlHdmiDevice::Reset(ResetRequestView request, ResetCompleter::Sync& comple
   }
 }
 
-void CalculateTxParam(const display::DisplayTiming& display_timing, hdmi_dw::hdmi_param_tx* p) {
+void CalculateTxParam(const display::DisplayTiming& display_timing,
+                      designware_hdmi::hdmi_param_tx* p) {
   p->is4K = display_timing.pixel_clock_frequency_khz > 500'000;
 
   if (display_timing.horizontal_active_px * 3 == display_timing.vertical_active_lines * 4) {
@@ -196,9 +197,10 @@ void AmlHdmiDevice::ModeSet(ModeSetRequestView request, ModeSetCompleter::Sync& 
   ZX_DEBUG_ASSERT(request->mode.has_color());
   ZX_DEBUG_ASSERT(request->mode.has_mode());
   const display::DisplayTiming display_timing = display::ToDisplayTiming(request->mode.mode());
-  const hdmi_dw::ColorParam color_param = hdmi_dw::ToColorParam(request->mode.color());
+  const designware_hdmi::ColorParam color_param =
+      designware_hdmi::ToColorParam(request->mode.color());
 
-  hdmi_dw::hdmi_param_tx p;
+  designware_hdmi::hdmi_param_tx p;
   CalculateTxParam(display_timing, &p);
 
   // Output normal TMDS Data
@@ -385,7 +387,7 @@ AmlHdmiDevice::AmlHdmiDevice(zx_device_t* parent)
     : DeviceType(parent), pdev_(parent), loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {}
 
 AmlHdmiDevice::AmlHdmiDevice(zx_device_t* parent, fdf::MmioBuffer hdmitx_top_level_mmio,
-                             std::unique_ptr<hdmi_dw::HdmiDw> hdmi_dw, zx::resource smc)
+                             std::unique_ptr<designware_hdmi::HdmiDw> hdmi_dw, zx::resource smc)
     : DeviceType(parent),
       pdev_(parent),
       hdmi_dw_(std::move(hdmi_dw)),
