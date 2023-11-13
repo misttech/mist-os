@@ -10,7 +10,7 @@ use crate::{
         fileops_impl_nonseekable, FdEvents, FileObject, FileOps, FsNode, NamespaceNode,
     },
     logging::{log_error, log_warn},
-    mm::{DesiredAddress, MappedVmo, MappingOptions, MemoryAccessorExt, ProtectionFlags},
+    mm::{DesiredAddress, MappingOptions, MemoryAccessorExt, ProtectionFlags},
     syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::{CurrentTask, Kernel, ThreadGroup, WaitQueue, Waiter},
     types::user_address::{UserAddress, UserCString, UserRef},
@@ -150,7 +150,7 @@ impl FileOps for RemoteBinderFileOps {
         _prot_flags: ProtectionFlags,
         _mapping_options: MappingOptions,
         _filename: NamespaceNode,
-    ) -> Result<MappedVmo, Errno> {
+    ) -> Result<UserAddress, Errno> {
         error!(EOPNOTSUPP)
     }
 

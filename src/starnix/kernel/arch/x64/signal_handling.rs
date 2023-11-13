@@ -470,7 +470,7 @@ mod tests {
         let prot_flags = ProtectionFlags::READ | ProtectionFlags::WRITE;
         let stack_base = current_task
             .mm
-            .map(
+            .map_vmo(
                 DesiredAddress::Any,
                 Arc::new(zx::Vmo::create(STACK_SIZE as u64).expect("failed to create stack VMO")),
                 0,

@@ -18,8 +18,8 @@ use crate::{
     },
     logging::{log_error, log_trace, log_warn, not_implemented},
     mm::{
-        vmo::round_up_to_increment, DesiredAddress, MappedVmo, MappingName, MappingOptions,
-        MemoryAccessor, MemoryAccessorExt, ProtectionFlags,
+        vmo::round_up_to_increment, DesiredAddress, MappingName, MappingOptions, MemoryAccessor,
+        MemoryAccessorExt, ProtectionFlags,
     },
     mutable_state::Guard,
     syscalls::{SyscallArg, SyscallResult, SUCCESS},
@@ -279,7 +279,7 @@ impl FileOps for BinderConnection {
         prot_flags: ProtectionFlags,
         mapping_options: MappingOptions,
         filename: NamespaceNode,
-    ) -> Result<MappedVmo, Errno> {
+    ) -> Result<UserAddress, Errno> {
         let binder_process = self.proc(current_task)?;
         release_after!(binder_process, (), {
             self.driver.mmap(
@@ -3814,7 +3814,7 @@ impl BinderDriver {
         prot_flags: ProtectionFlags,
         mapping_options: MappingOptions,
         filename: NamespaceNode,
-    ) -> Result<MappedVmo, Errno> {
+    ) -> Result<UserAddress, Errno> {
         profile_duration!("BinderMmap");
 
         // Do not support mapping shared memory more than once.
@@ -3827,7 +3827,7 @@ impl BinderDriver {
         let vmo = Arc::new(zx::Vmo::create(length as u64).map_err(|_| errno!(ENOMEM))?);
 
         // Map the VMO into the binder process' address space.
-        let user_address = current_task.mm.map(
+        let user_address = current_task.mm.map_vmo(
             addr,
             vmo.clone(),
             0,
@@ -3842,7 +3842,7 @@ impl BinderDriver {
         match SharedMemory::map(&vmo, user_address, length) {
             Ok(mem) => {
                 *shared_memory = Some(mem);
-                Ok(MappedVmo::new(vmo, user_address))
+                Ok(user_address)
             }
             Err(err) => {
                 // Try to cleanup by unmapping from userspace, but ignore any errors. We

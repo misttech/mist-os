@@ -64,6 +64,7 @@ bitflags! {
       const DONTFORK = 32;
       const WIPEONFORK = 64;
       const DONT_SPLIT = 128;
+      const POPULATE = 256;
     }
 }
 
@@ -377,6 +378,7 @@ fn map_in_vmar(
     vmo_offset: u64,
     length: usize,
     flags: MappingFlags,
+    populate: bool,
 ) -> Result<UserAddress, Errno> {
     profile_duration!("MapInVmar");
     let mut profile = ProfileDuration::enter("MapInVmarArgs");
@@ -416,6 +418,23 @@ fn map_in_vmar(
     }
 
     let mapped_addr = map_result.map_err(MemoryManager::get_errno_for_map_err)?;
+
+    if populate {
+        profile_duration!("MmapPopulate");
+        let op = if flags.contains(MappingFlags::WRITE) {
+            // Requires ZX_RIGHT_WRITEABLE which we should expect when the mapping is writeable.
+            zx::VmoOp::COMMIT
+        } else {
+            // When we don't expect to have ZX_RIGHT_WRITEABLE, fall back to a VMO op that doesn't
+            // need it.
+            // TODO(https://fxbug.dev/132494) use a gentler signal when available
+            zx::VmoOp::ALWAYS_NEED
+        };
+        trace_duration!(trace_category_starnix_mm!(), "MmapCommitPages");
+        let _ = vmo.op_range(op, vmo_offset, length as u64);
+        // "The mmap() call doesn't fail if the mapping cannot be populated."
+    }
+
     Ok(UserAddress::from_ptr(mapped_addr))
 }
 
@@ -428,17 +447,28 @@ impl MemoryManagerState {
         vmo_offset: u64,
         length: usize,
         flags: MappingFlags,
+        populate: bool,
     ) -> Result<UserAddress, Errno> {
-        map_in_vmar(&self.user_vmar, &self.user_vmar_info, addr, vmo, vmo_offset, length, flags)
+        map_in_vmar(
+            &self.user_vmar,
+            &self.user_vmar_info,
+            addr,
+            vmo,
+            vmo_offset,
+            length,
+            flags,
+            populate,
+        )
     }
 
-    fn map(
+    fn map_vmo(
         &mut self,
         addr: DesiredAddress,
         vmo: Arc<zx::Vmo>,
         vmo_offset: u64,
         length: usize,
         flags: MappingFlags,
+        populate: bool,
         name: MappingName,
         file_write_guard: FileWriteGuardRef,
         released_mappings: &mut Vec<Mapping>,
@@ -453,7 +483,7 @@ impl MemoryManagerState {
             }
         }
 
-        let mapped_addr = self.map_internal(addr, &vmo, vmo_offset, length, flags)?;
+        let mapped_addr = self.map_internal(addr, &vmo, vmo_offset, length, flags, populate)?;
 
         #[cfg(any(test, debug_assertions))]
         {
@@ -480,6 +510,30 @@ impl MemoryManagerState {
         // in |options|.
 
         Ok(mapped_addr)
+    }
+
+    fn map_anonymous(
+        &mut self,
+        addr: DesiredAddress,
+        length: usize,
+        prot_flags: ProtectionFlags,
+        options: MappingOptions,
+        name: MappingName,
+        released_mappings: &mut Vec<Mapping>,
+    ) -> Result<UserAddress, Errno> {
+        let vmo = create_anonymous_mapping_vmo(length as u64)?;
+        let flags = MappingFlags::from_prot_flags_and_options(prot_flags, options);
+        self.map_vmo(
+            addr,
+            vmo,
+            0,
+            length,
+            flags,
+            options.contains(MappingOptions::POPULATE),
+            name,
+            FileWriteGuardRef(None),
+            released_mappings,
+        )
     }
 
     fn remap(
@@ -617,12 +671,13 @@ impl MemoryManagerState {
         }
 
         // Re-map the original range, which may include pages before the requested range.
-        Ok(Some(self.map(
+        Ok(Some(self.map_vmo(
             DesiredAddress::FixedOverwrite(original_range.start),
             original_mapping.vmo,
             original_mapping.vmo_offset,
             final_length,
             original_mapping.flags,
+            false,
             original_mapping.name,
             original_mapping.file_write_guard,
             released_mappings,
@@ -716,12 +771,13 @@ impl MemoryManagerState {
             src_mapping.vmo
         };
 
-        let new_address = self.map(
+        let new_address = self.map_vmo(
             dst_addr_for_map,
             vmo,
             dst_vmo_offset,
             dst_length,
             src_mapping.flags,
+            false,
             src_mapping.name,
             src_mapping.file_write_guard,
             released_mappings,
@@ -872,6 +928,7 @@ impl MemoryManagerState {
                 0,
                 child_length,
                 mapping.flags,
+                false,
             )?;
 
             // Replace the mapping with a new one that contains updated VMO handle.
@@ -1782,12 +1839,13 @@ impl MemoryManager {
                 set_zx_name(&vmo, b"starnix-brk");
                 let length = *PAGE_SIZE as usize;
                 let flags = MappingFlags::READ | MappingFlags::WRITE;
-                let addr = state.map(
+                let addr = state.map_vmo(
                     DesiredAddress::Any,
                     Arc::new(vmo),
                     0,
                     length,
                     flags,
+                    false,
                     MappingName::Heap,
                     FileWriteGuardRef(None),
                     &mut released_mappings,
@@ -1959,6 +2017,7 @@ impl MemoryManager {
                         vmo_offset,
                         length,
                         mapping.flags,
+                        false,
                     )?;
 
                     mapping.vmo = replaced_vmo.clone();
@@ -1967,12 +2026,13 @@ impl MemoryManager {
             };
 
             let mut released_mappings = vec![];
-            target_state.map(
+            target_state.map_vmo(
                 DesiredAddress::Fixed(range.start),
                 target_vmo,
                 vmo_offset,
                 length,
                 mapping.flags,
+                false,
                 mapping.name.clone(),
                 FileWriteGuardRef(None),
                 &mut released_mappings,
@@ -2021,7 +2081,7 @@ impl MemoryManager {
         }
     }
 
-    pub fn map(
+    pub fn map_vmo(
         &self,
         addr: DesiredAddress,
         vmo: Arc<zx::Vmo>,
@@ -2037,12 +2097,13 @@ impl MemoryManager {
         // Unmapped mappings must be released after the state is unlocked.
         let mut released_mappings = vec![];
         let mut state = self.state.write();
-        let result = state.map(
+        let result = state.map_vmo(
             addr,
             vmo,
             vmo_offset,
             length,
             flags,
+            options.contains(MappingOptions::POPULATE),
             name,
             file_write_guard,
             &mut released_mappings,
@@ -2051,6 +2112,27 @@ impl MemoryManager {
         // Drop the state before the unmapped mappings, since dropping a mapping may acquire a lock
         // in `DirEntry`'s `drop`.
         profile_duration!("DropReleasedMappings");
+        std::mem::drop(state);
+        std::mem::drop(released_mappings);
+
+        result
+    }
+
+    pub fn map_anonymous(
+        &self,
+        addr: DesiredAddress,
+        length: usize,
+        prot_flags: ProtectionFlags,
+        options: MappingOptions,
+        name: MappingName,
+    ) -> Result<UserAddress, Errno> {
+        let mut released_mappings = vec![];
+        let mut state = self.state.write();
+        let result =
+            state.map_anonymous(addr, length, prot_flags, options, name, &mut released_mappings);
+
+        // Drop the state before the unmapped mappings, since dropping a mapping may acquire a lock
+        // in `DirEntry`'s `drop`.
         std::mem::drop(state);
         std::mem::drop(released_mappings);
 
@@ -2376,19 +2458,6 @@ impl MemoryManager {
         }
         result.vm_stack = state.stack_size;
         Ok(result)
-    }
-}
-
-/// A VMO and the userspace address at which it was mapped.
-#[derive(Debug, Clone)]
-pub struct MappedVmo {
-    pub vmo: Arc<zx::Vmo>,
-    pub user_address: UserAddress,
-}
-
-impl MappedVmo {
-    pub fn new(vmo: Arc<zx::Vmo>, user_address: UserAddress) -> Self {
-        Self { vmo, user_address }
     }
 }
 
@@ -3445,7 +3514,7 @@ mod tests {
 
         let prot_flags = ProtectionFlags::READ | ProtectionFlags::WRITE;
         let addr = mm
-            .map(
+            .map_vmo(
                 DesiredAddress::Any,
                 child_vmo,
                 0,

@@ -12,7 +12,7 @@ use crate::{
     },
     logging::{impossible_error, not_implemented},
     mm::{
-        vmo::round_up_to_system_page_size, DesiredAddress, MappedVmo, MappingName, MappingOptions,
+        vmo::round_up_to_system_page_size, DesiredAddress, MappingName, MappingOptions,
         MemoryAccessorExt, ProtectionFlags,
     },
     syscalls::{SyscallArg, SyscallResult, SUCCESS},
@@ -190,7 +190,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
         prot_flags: ProtectionFlags,
         options: MappingOptions,
         filename: NamespaceNode,
-    ) -> Result<MappedVmo, Errno> {
+    ) -> Result<UserAddress, Errno> {
         profile_duration!("FileOpsDefaultMmap");
         trace_duration!(trace_category_starnix_mm!(), "FileOpsDefaultMmap");
         let min_vmo_size = (vmo_offset as usize)
@@ -247,17 +247,16 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
             FileWriteGuardRef(None)
         };
 
-        let addr = current_task.mm.map(
+        current_task.mm.map_vmo(
             addr,
-            vmo.clone(),
+            vmo,
             vmo_offset,
             length,
             prot_flags,
             options,
             MappingName::File(filename),
             file_write_guard,
-        )?;
-        Ok(MappedVmo::new(vmo, addr))
+        )
     }
 
     /// Respond to a `getdents` or `getdents64` calls.
@@ -769,7 +768,7 @@ impl FileOps for ProxyFileOps {
             prot_flags: ProtectionFlags,
             options: MappingOptions,
             filename: NamespaceNode,
-        ) -> Result<MappedVmo, Errno>;
+        ) -> Result<UserAddress, Errno>;
         fn readdir(
             &self,
             _file: &FileObject,
@@ -1232,7 +1231,7 @@ impl FileObject {
         prot_flags: ProtectionFlags,
         options: MappingOptions,
         filename: NamespaceNode,
-    ) -> Result<MappedVmo, Errno> {
+    ) -> Result<UserAddress, Errno> {
         if prot_flags.intersects(ProtectionFlags::READ | ProtectionFlags::WRITE) && !self.can_read()
         {
             return error!(EACCES);

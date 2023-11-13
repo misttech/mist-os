@@ -13,11 +13,11 @@ use crate::{
     },
     logging::{log, log_info},
     mm::{
-        create_anonymous_mapping_vmo, DesiredAddress, MappedVmo, MappingName, MappingOptions,
-        ProtectionFlags,
+        create_anonymous_mapping_vmo, DesiredAddress, MappingName, MappingOptions, ProtectionFlags,
     },
     task::{CurrentTask, Kernel},
     types::errno::{error, Errno},
+    types::user_address::UserAddress,
     types::{DeviceType, FileMode, OpenFlags},
 };
 
@@ -99,7 +99,7 @@ impl FileOps for DevZero {
         prot_flags: ProtectionFlags,
         mut options: MappingOptions,
         filename: NamespaceNode,
-    ) -> Result<MappedVmo, Errno> {
+    ) -> Result<UserAddress, Errno> {
         // All /dev/zero mappings behave as anonymous mappings.
         //
         // This means that we always create a new zero-filled VMO for this mmap request.
@@ -113,7 +113,7 @@ impl FileOps for DevZero {
 
         options |= MappingOptions::ANONYMOUS;
 
-        let addr = current_task.mm.map(
+        current_task.mm.map_vmo(
             addr,
             vmo.clone(),
             vmo_offset,
@@ -126,8 +126,7 @@ impl FileOps for DevZero {
             // file-based.
             MappingName::File(filename),
             FileWriteGuardRef(None),
-        )?;
-        Ok(MappedVmo::new(vmo, addr))
+        )
     }
 
     fn write(

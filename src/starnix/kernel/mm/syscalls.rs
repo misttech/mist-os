@@ -9,12 +9,12 @@ use crate::{
     execution::notify_debugger_of_module_list,
     fs::{
         buffers::{OutputBuffer, UserBuffersInputBuffer, UserBuffersOutputBuffer},
-        FdNumber, FileWriteGuardRef,
+        FdNumber,
     },
     logging::{log_trace, not_implemented, not_implemented_log_once},
     mm::{
-        create_anonymous_mapping_vmo, DesiredAddress, FutexKey, FutexTable, MappedVmo, MappingName,
-        MappingOptions, MemoryAccessorExt, MremapFlags, ProtectionFlags, PAGE_SIZE,
+        DesiredAddress, FutexKey, FutexTable, MappingName, MappingOptions, MemoryAccessorExt,
+        MremapFlags, ProtectionFlags, PAGE_SIZE,
     },
     syscalls::{robust_list_head, timespec, uapi, CurrentTask, Locked, Unlocked},
     task::Task,
@@ -26,7 +26,7 @@ use crate::{
         FUTEX_PRIVATE_FLAG, FUTEX_REQUEUE, FUTEX_WAIT, FUTEX_WAIT_BITSET, FUTEX_WAKE,
         FUTEX_WAKE_BITSET, MAP_ANONYMOUS, MAP_DENYWRITE, MAP_FIXED, MAP_FIXED_NOREPLACE,
         MAP_GROWSDOWN, MAP_NORESERVE, MAP_POPULATE, MAP_PRIVATE, MAP_SHARED, MAP_STACK, PROT_EXEC,
-        PROT_WRITE, PTRACE_MODE_ATTACH_REALCREDS,
+        PTRACE_MODE_ATTACH_REALCREDS,
     },
 };
 
@@ -133,48 +133,21 @@ pub fn do_mmap(
     if flags & MAP_GROWSDOWN != 0 {
         options |= MappingOptions::GROWSDOWN;
     }
+    if flags & MAP_POPULATE != 0 {
+        options |= MappingOptions::POPULATE;
+    }
 
-    let MappedVmo { vmo, user_address } = if flags & MAP_ANONYMOUS != 0 {
+    if flags & MAP_ANONYMOUS != 0 {
         trace_duration!(trace_category_starnix_mm!(), "AnonymousMmap");
         profile_duration!("AnonymousMmap");
-        let vmo = create_anonymous_mapping_vmo(length as u64)?;
-        profile_duration!("MapAnonVmo");
-        let user_address = current_task.mm.map(
-            addr,
-            vmo.clone(),
-            vmo_offset,
-            length,
-            prot_flags,
-            options,
-            MappingName::None,
-            FileWriteGuardRef(None),
-        )?;
-        MappedVmo::new(vmo, user_address)
+        current_task.mm.map_anonymous(addr, length, prot_flags, options, MappingName::None)
     } else {
         trace_duration!(trace_category_starnix_mm!(), "FileBackedMmap");
         profile_duration!("FileBackedMmap");
         // TODO(tbodt): maximize protection flags so that mprotect works
         let file = current_task.files.get(fd)?;
-        file.mmap(current_task, addr, vmo_offset, length, prot_flags, options, file.name.clone())?
-    };
-
-    if flags & MAP_POPULATE != 0 {
-        profile_duration!("MmapPopulate");
-        let op = if prot & PROT_WRITE != 0 {
-            // Requires ZX_RIGHT_WRITEABLE which we should expect when the mapping is writeable.
-            zx::VmoOp::COMMIT
-        } else {
-            // When we don't expect to have ZX_RIGHT_WRITEABLE, fall back to a VMO op that doesn't
-            // need it.
-            // TODO(https://fxbug.dev/132494) use a gentler signal when available
-            zx::VmoOp::ALWAYS_NEED
-        };
-        trace_duration!(trace_category_starnix_mm!(), "MmapCommitPages");
-        let _result = vmo.op_range(op, vmo_offset, length as u64);
-        // "The mmap() call doesn't fail if the mapping cannot be populated."
+        file.mmap(current_task, addr, vmo_offset, length, prot_flags, options, file.name.clone())
     }
-
-    Ok(user_address)
 }
 
 pub fn sys_mprotect(
@@ -999,6 +972,8 @@ mod tests {
     #[cfg(target_arch = "x86_64")]
     #[::fuchsia::test]
     async fn test_map_32_bit() {
+        use crate::types::PROT_WRITE;
+
         let (_kernel, current_task, _) = create_kernel_task_and_unlocked();
         let page_size = *PAGE_SIZE;
 

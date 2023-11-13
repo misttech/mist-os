@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
+use fuchsia_zircon::{self as zx, HandleBased};
 use process_builder::{elf_load, elf_parse};
 use std::{
     ffi::{CStr, CString},
@@ -12,10 +12,10 @@ use std::{
 
 use crate::{
     fs::{FileHandle, FileWriteGuardMode, FileWriteGuardRef},
-    logging::{impossible_error, log_error, log_warn},
+    logging::{log_error, log_warn},
     mm::{
         vmo::round_up_to_system_page_size, DesiredAddress, MappingName, MappingOptions,
-        MemoryManager, ProtectionFlags, PAGE_SIZE,
+        MemoryAccessor, MemoryManager, ProtectionFlags, PAGE_SIZE,
     },
     task::CurrentTask,
     types::errno::{errno, error, from_status_like_fdio, Errno},
@@ -56,20 +56,15 @@ fn get_initial_stack_size(
 }
 
 fn populate_initial_stack(
-    stack_vmo: &zx::Vmo,
+    ma: &impl MemoryAccessor,
     path: &CStr,
     argv: &Vec<CString>,
     environ: &Vec<CString>,
     mut auxv: Vec<(u32, u64)>,
-    stack_base: UserAddress,
     original_stack_start_addr: UserAddress,
 ) -> Result<StackResult, Errno> {
     let mut stack_pointer = original_stack_start_addr;
-    let write_stack = |data: &[u8], addr: UserAddress| {
-        stack_vmo
-            .write(data, (addr - stack_base) as u64)
-            .map_err(|status| from_status_like_fdio!(status))
-    };
+    let write_stack = |data: &[u8], addr: UserAddress| ma.vmo_write_memory(addr, data);
 
     let argv_end = stack_pointer;
     for arg in argv.iter().rev() {
@@ -184,7 +179,7 @@ impl elf_load::Mapper for Mapper<'_> {
     ) -> Result<usize, zx::Status> {
         let vmo = Arc::new(vmo.duplicate_handle(zx::Rights::SAME_RIGHTS)?);
         self.mm
-            .map(
+            .map_vmo(
                 DesiredAddress::Fixed(self.mm.base_addr.checked_add(vmar_offset).ok_or_else(
                     || {
                         log_error!(
@@ -463,7 +458,7 @@ pub fn load_executable(
         .map_err(|status| from_status_like_fdio!(status))?;
 
     // Memory map the vvar vmo, mapping a space the size of (size of vvar + size of vDSO)
-    let vvar_map_result = current_task.mm.map(
+    let vvar_map_result = current_task.mm.map_vmo(
         DesiredAddress::Any,
         vvar_vmo,
         0,
@@ -475,7 +470,7 @@ pub fn load_executable(
     )?;
 
     // Overwrite the second part of the vvar mapping to contain the vDSO clone
-    let vdso_base = current_task.mm.map(
+    let vdso_base = current_task.mm.map_vmo(
         DesiredAddress::FixedOverwrite(vvar_map_result + vvar_size),
         Arc::new(vdso_executable),
         0,
@@ -515,31 +510,25 @@ pub fn load_executable(
             + 0xf0000,
     )
     .expect("stack is too big");
-    let stack_vmo = Arc::new(zx::Vmo::create(stack_size as u64).map_err(|_| errno!(ENOMEM))?);
-    stack_vmo
-        .as_ref()
-        .set_name(CStr::from_bytes_with_nul(b"[stack]\0").unwrap())
-        .map_err(impossible_error)?;
+
     let prot_flags = ProtectionFlags::READ | ProtectionFlags::WRITE;
-    let stack_base = current_task.mm.map(
+
+    let stack_base = current_task.mm.map_anonymous(
         DesiredAddress::Any,
-        Arc::clone(&stack_vmo),
-        0,
         stack_size,
         prot_flags,
-        MappingOptions::empty(),
+        MappingOptions::ANONYMOUS,
         MappingName::Stack,
-        FileWriteGuardRef(None),
     )?;
+
     let stack = stack_base + (stack_size - 8);
 
     let stack = populate_initial_stack(
-        &stack_vmo,
+        &*current_task.mm,
         original_path,
         &resolved_elf.argv,
         &resolved_elf.environ,
         auxv,
-        stack_base,
         stack,
     )?;
 
@@ -565,11 +554,75 @@ mod tests {
     use crate::testing::*;
     use assert_matches::assert_matches;
 
+    const TEST_STACK_ADDR: UserAddress = UserAddress::const_from(0x3000_0000);
+
+    struct StackVmo(zx::Vmo);
+
+    impl StackVmo {
+        fn address_to_offset(&self, addr: UserAddress) -> u64 {
+            (addr - TEST_STACK_ADDR) as u64
+        }
+    }
+
+    impl MemoryAccessor for StackVmo {
+        fn read_memory_to_slice(&self, _addr: UserAddress, _bytes: &mut [u8]) -> Result<(), Errno> {
+            todo!()
+        }
+
+        fn vmo_read_memory_to_slice(
+            &self,
+            _addr: UserAddress,
+            _bytes: &mut [u8],
+        ) -> Result<(), Errno> {
+            todo!()
+        }
+
+        fn read_memory_partial_to_slice(
+            &self,
+            _addr: UserAddress,
+            _bytes: &mut [u8],
+        ) -> Result<usize, Errno> {
+            todo!()
+        }
+
+        fn vmo_read_memory_partial_to_slice(
+            &self,
+            _addr: UserAddress,
+            _bytes: &mut [u8],
+        ) -> Result<usize, Errno> {
+            todo!()
+        }
+
+        fn write_memory(&self, _addr: UserAddress, _bytes: &[u8]) -> Result<usize, Errno> {
+            todo!()
+        }
+
+        fn vmo_write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
+            self.0.write(bytes, self.address_to_offset(addr)).map_err(|_| errno!(EFAULT))?;
+            Ok(bytes.len())
+        }
+
+        fn write_memory_partial(&self, _addr: UserAddress, _bytes: &[u8]) -> Result<usize, Errno> {
+            todo!()
+        }
+
+        fn vmo_write_memory_partial(
+            &self,
+            _addr: UserAddress,
+            _bytes: &[u8],
+        ) -> Result<usize, Errno> {
+            todo!()
+        }
+
+        fn zero(&self, _addr: UserAddress, _length: usize) -> Result<usize, Errno> {
+            todo!()
+        }
+    }
+
     #[::fuchsia::test]
     fn test_trivial_initial_stack() {
-        let stack_vmo = zx::Vmo::create(0x4000).expect("VMO creation should succeed.");
-        let stack_base = UserAddress::from_ptr(0x3000_0000);
-        let original_stack_start_addr = UserAddress::from_ptr(0x3000_1000);
+        let stack_vmo = StackVmo(zx::Vmo::create(0x4000).expect("VMO creation should succeed."));
+        let original_stack_start_addr = TEST_STACK_ADDR + 0x1000u64;
 
         let path = CString::new(&b""[..]).unwrap();
         let argv = &vec![];
@@ -581,7 +634,6 @@ mod tests {
             argv,
             environ,
             vec![],
-            stack_base,
             original_stack_start_addr,
         )
         .expect("Populate initial stack should succeed.")
