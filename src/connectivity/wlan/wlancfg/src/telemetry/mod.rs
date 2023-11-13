@@ -38,7 +38,7 @@ use {
     futures::{
         channel::{mpsc, oneshot},
         future::BoxFuture,
-        select, Future, FutureExt, StreamExt, TryFutureExt,
+        select, Future, FutureExt, StreamExt,
     },
     ieee80211::OuiFmt,
     num_traits::SaturatingAdd,
@@ -700,11 +700,12 @@ fn inspect_record_external_data(
                         )),
                 });
 
-                // TODO(fxbug.dev/90121): This timeout is no longer needed once diagnostics
-                //                        has a timeout on reading LazyNode.
                 if let Some(proxy) = telemetry_proxy {
-                    match proxy.get_histogram_stats().map_err(|_e| ())
-                        .on_timeout(GET_IFACE_STATS_TIMEOUT, || Err(()))
+                    match proxy.get_histogram_stats()
+                        .on_timeout(GET_IFACE_STATS_TIMEOUT, || {
+                            warn!("Timed out waiting for histogram stats");
+                            Ok(Err(zx::Status::TIMED_OUT.into_raw()))
+                        })
                         .await {
                             Ok(Ok(stats)) => {
                                 let mut histograms = HistogramsNode::new(
@@ -724,7 +725,9 @@ fn inspect_record_external_data(
 
                                 inspector.root().record(histograms);
                             }
-                            _ => (),
+                            error => {
+                                info!("Error reading histogram stats: {:?}", error);
+                            },
                         }
                 }
             }
@@ -969,8 +972,10 @@ impl Telemetry {
                 if let Some(proxy) = &state.telemetry_proxy {
                     match proxy
                         .get_counter_stats()
-                        .map_err(|_e| ())
-                        .on_timeout(GET_IFACE_STATS_TIMEOUT, || Err(()))
+                        .on_timeout(GET_IFACE_STATS_TIMEOUT, || {
+                            warn!("Timed out waiting for counter stats");
+                            Ok(Err(zx::Status::TIMED_OUT.into_raw()))
+                        })
                         .await
                     {
                         Ok(Ok(stats)) => {
@@ -986,7 +991,8 @@ impl Telemetry {
                             }
                             let _prev = state.prev_counters.replace(stats);
                         }
-                        _ => {
+                        error => {
+                            info!("Failed to get interface stats: {:?}", error);
                             self.get_iface_stats_fail_count.add(1);
                             *state.num_consecutive_get_counter_stats_failures.get_mut() += 1;
                             // Safe to unwrap: If we've exceeded 63 bits of consecutive failures,
