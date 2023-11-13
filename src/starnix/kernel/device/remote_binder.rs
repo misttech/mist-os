@@ -15,9 +15,8 @@ use crate::{
     task::{CurrentTask, Kernel, ThreadGroup, WaitQueue, Waiter},
     types::user_address::{UserAddress, UserCString, UserRef},
     types::{
-        errno,
-        errno::{EAGAIN, EINTR},
-        errno_from_code, error, pid_t, uapi, DeviceType, Errno, ErrnoCode, OpenFlags, PATH_MAX,
+        errno::{errno, errno_from_code, error, Errno, ErrnoCode, EAGAIN, EINTR},
+        pid_t, uapi, DeviceType, OpenFlags, PATH_MAX,
     },
 };
 use anyhow::{Context, Error};

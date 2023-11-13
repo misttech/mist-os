@@ -5,7 +5,8 @@
 use crate::{
     dynamic_thread_spawner::DynamicThreadSpawner,
     task::{CurrentTask, Task},
-    types::{errno, Errno, OwnedRefByRef, ReleasableByRef, WeakRef},
+    types::errno::{errno, Errno},
+    types::{OwnedRefByRef, ReleasableByRef, WeakRef},
 };
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;

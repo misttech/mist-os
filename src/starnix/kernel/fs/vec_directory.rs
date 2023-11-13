@@ -8,7 +8,8 @@ use crate::{
         FileObject, FileOps, FsString, SeekTarget,
     },
     task::CurrentTask,
-    types::{ino_t, off_t, Errno},
+    types::errno::Errno,
+    types::{ino_t, off_t},
 };
 
 /// A directory entry used for [`VecDirectory`].

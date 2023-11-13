@@ -8,7 +8,8 @@ use crate::{
         FsString, SeekTarget,
     },
     task::CurrentTask,
-    types::{error, off_t, Errno},
+    types::errno::{error, Errno},
+    types::off_t,
 };
 use starnix_lock::Mutex;
 use std::ops::Bound;

@@ -25,11 +25,11 @@ use crate::{
     logging::{log_error, log_info},
     signals,
     task::{ExitStatus, Task},
+    types::errno::{Errno, EEXIST, ENOTDIR},
+    types::signals::{SIGINT, SIGKILL},
     types::{
-        mode, release_on_error,
-        signals::{SIGINT, SIGKILL},
-        Capabilities, DeviceType, Errno, MountFlags, OpenFlags, ReleasableByRef, WeakRef, EEXIST,
-        ENOTDIR, SI_KERNEL,
+        mode, release_on_error, Capabilities, DeviceType, MountFlags, OpenFlags, ReleasableByRef,
+        WeakRef, SI_KERNEL,
     },
 };
 

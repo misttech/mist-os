@@ -19,7 +19,8 @@ use crate::{
     fs::{FdEvents, FdNumber},
     signals::RunState,
     task::CurrentTask,
-    types::{debug_assert_no_local_temp_ref, error, Errno, EINTR},
+    types::debug_assert_no_local_temp_ref,
+    types::errno::{error, Errno, EINTR},
 };
 
 #[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]

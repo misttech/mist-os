@@ -12,7 +12,8 @@ use crate::{
         VecDirectoryEntry,
     },
     task::CurrentTask,
-    types::{error, mode, Errno, OpenFlags},
+    types::errno::{error, Errno},
+    types::{mode, OpenFlags},
 };
 
 use fuchsia_zircon as zx;

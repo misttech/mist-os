@@ -21,11 +21,12 @@ use crate::{
     mm::{MemoryAccessor, MemoryAccessorExt, ProcMapsFile, ProcSmapsFile, PAGE_SIZE},
     selinux::fs::selinux_proc_attrs,
     task::{CurrentTask, Task, TaskPersistentInfo, TaskStateCode, ThreadGroup},
+    types::errno::{errno, error, Errno},
     types::time::duration_to_scheduler_clock,
     types::user_address::UserAddress,
     types::{
-        errno, error, mode, off_t, pid_t, uapi, Errno, OpenFlags, Resource, TempRef, WeakRef,
-        CAP_SYS_RESOURCE, OOM_ADJUST_MIN, OOM_DISABLE, OOM_SCORE_ADJ_MIN, RLIM_INFINITY,
+        mode, off_t, pid_t, uapi, OpenFlags, Resource, TempRef, WeakRef, CAP_SYS_RESOURCE,
+        OOM_ADJUST_MIN, OOM_DISABLE, OOM_SCORE_ADJ_MIN, RLIM_INFINITY,
     },
 };
 

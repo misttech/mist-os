@@ -8,7 +8,7 @@ use crate::fs::{
     FileObject, FileOps, FsNodeOps, SimpleFileNode,
 };
 use crate::task::CurrentTask;
-use crate::types::Errno;
+use crate::types::errno::Errno;
 
 use std::collections::HashMap;
 use std::sync::Mutex;

@@ -10,7 +10,8 @@ use crate::{
         fileops_impl_nonseekable, Anon, FdEvents, FileHandle, FileObject, FileOps,
     },
     task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter},
-    types::{error, Errno, OpenFlags},
+    types::errno::{error, Errno},
+    types::OpenFlags,
 };
 
 const DATA_SIZE: usize = 8;

@@ -9,7 +9,8 @@ use crate::{
         SeekTarget, SimpleFileNode,
     },
     task::CurrentTask,
-    types::{errno, error, off_t, Errno},
+    types::errno::{errno, error, Errno},
+    types::off_t,
 };
 use starnix_lock::Mutex;
 use std::collections::VecDeque;
@@ -329,7 +330,8 @@ mod tests {
                 Anon, DynamicFile, DynamicFileBuf, DynamicFileSource, FileHandle, SeekTarget,
                 SequenceFileSource, VecOutputBuffer,
             },
-            types::{Errno, OpenFlags},
+            types::errno::Errno,
+            types::OpenFlags,
         },
     };
     use starnix_lock::Mutex;

@@ -10,7 +10,8 @@ use crate::{
         FsStr, FsString, SeekTarget, StaticDirectoryBuilder,
     },
     task::CurrentTask,
-    types::{errno, off_t, Errno, OpenFlags},
+    types::errno::{errno, Errno},
+    types::{off_t, OpenFlags},
 };
 use starnix_lock::Mutex;
 use std::{collections::HashMap, sync::Arc};

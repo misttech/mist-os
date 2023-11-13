@@ -7,7 +7,7 @@ use paste::paste;
 use crate::{
     arch::syscalls::sys_clone,
     syscalls::{decls::Syscall, CurrentTask, Locked, SyscallResult, Unlocked},
-    types::Errno,
+    types::errno::Errno,
 };
 
 macro_rules! syscall_match {

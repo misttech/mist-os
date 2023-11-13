@@ -8,10 +8,10 @@ use std::collections::BTreeSet;
 use crate::{
     fs::{FdTableId, FileObject, FileObjectId},
     task::{CurrentTask, WaitQueue, Waiter},
+    types::errno::{errno, error, Errno, EAGAIN},
     types::{
-        Errno, __kernel_off_t, c_short, errno, error, pid_t, uapi, EAGAIN, F_GETLK, F_OFD_GETLK,
-        F_OFD_SETLK, F_OFD_SETLKW, F_RDLCK, F_SETLK, F_SETLKW, F_UNLCK, F_WRLCK, SEEK_CUR,
-        SEEK_END, SEEK_SET,
+        __kernel_off_t, c_short, pid_t, uapi, F_GETLK, F_OFD_GETLK, F_OFD_SETLK, F_OFD_SETLKW,
+        F_RDLCK, F_SETLK, F_SETLKW, F_UNLCK, F_WRLCK, SEEK_CUR, SEEK_END, SEEK_SET,
     },
 };
 

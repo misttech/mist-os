@@ -11,7 +11,7 @@ use crate::{
         socket::SocketAddress,
         FdEvents,
     },
-    types::{error, Errno},
+    types::errno::{error, Errno},
 };
 
 #[derive(Debug, Default, Clone)]

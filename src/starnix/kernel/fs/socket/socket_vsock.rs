@@ -13,7 +13,8 @@ use crate::{
         FdEvents, FileHandle,
     },
     task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter},
-    types::{errno, error, ucred, Errno, OpenFlags},
+    types::errno::{errno, error, Errno},
+    types::{ucred, OpenFlags},
 };
 use starnix_lock::Mutex;
 

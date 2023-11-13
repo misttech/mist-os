@@ -16,10 +16,8 @@ use crate::{
     logging::not_implemented,
     mm::PAGE_SIZE,
     task::{CurrentTask, Kernel},
-    types::{
-        error, gid_t, mode, statfs, uid_t, DeviceType, Errno, FileMode, OpenFlags, SealFlags,
-        TMPFS_MAGIC,
-    },
+    types::errno::{error, Errno},
+    types::{gid_t, mode, statfs, uid_t, DeviceType, FileMode, OpenFlags, SealFlags, TMPFS_MAGIC},
 };
 
 pub struct TmpFs(());
@@ -343,7 +341,8 @@ mod test {
             FdNumber, UnlinkKind,
         },
         testing::*,
-        types::{errno, MountFlags},
+        types::errno::errno,
+        types::MountFlags,
     };
     use zerocopy::AsBytes;
 

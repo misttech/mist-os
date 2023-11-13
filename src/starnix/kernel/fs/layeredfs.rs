@@ -11,7 +11,8 @@ use crate::{
         FileSystemHandle, FileSystemOps, FsNode, FsNodeOps, FsStr, FsString, MountInfo, SeekTarget,
     },
     task::{CurrentTask, Kernel},
-    types::{errno, ino_t, off_t, statfs, Errno, OpenFlags},
+    types::errno::{errno, Errno},
+    types::{ino_t, off_t, statfs, OpenFlags},
 };
 
 /// A filesystem that will delegate most operation to a base one, but have a number of top level

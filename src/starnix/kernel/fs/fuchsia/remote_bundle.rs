@@ -16,10 +16,8 @@ use crate::{
     logging::log_warn,
     mm::ProtectionFlags,
     task::{CurrentTask, EventHandler, Kernel, WaitCanceler, Waiter},
-    types::{
-        errno, error, from_status_like_fdio, ino_t, off_t, statfs, Errno, FileMode, MountFlags,
-        OpenFlags, SourceContext,
-    },
+    types::errno::{errno, error, from_status_like_fdio, Errno, SourceContext},
+    types::{ino_t, off_t, statfs, FileMode, MountFlags, OpenFlags},
     vmex_resource::VMEX_RESOURCE,
 };
 use anyhow::{anyhow, ensure, Error};
@@ -498,7 +496,8 @@ mod test {
             LookupContext, Namespace, SymlinkMode, SymlinkTarget,
         },
         testing::create_kernel_and_task,
-        types::{ino_t, off_t, Errno, FileMode, OpenFlags},
+        types::errno::Errno,
+        types::{ino_t, off_t, FileMode, OpenFlags},
     };
     use fidl_fuchsia_io as fio;
     use fuchsia_zircon as zx;

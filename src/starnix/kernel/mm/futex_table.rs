@@ -16,8 +16,9 @@ use crate::{
     logging::impossible_error,
     mm::ProtectionFlags,
     task::{CurrentTask, Task},
+    types::errno::{error, Errno},
     types::user_address::UserAddress,
-    types::{error, Errno, FUTEX_BITSET_MATCH_ANY},
+    types::FUTEX_BITSET_MATCH_ANY,
 };
 
 /// A table of futexes.

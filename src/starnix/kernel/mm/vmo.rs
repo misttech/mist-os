@@ -4,7 +4,7 @@
 
 use crate::{
     mm::PAGE_SIZE,
-    types::{errno, Errno},
+    types::errno::{errno, Errno},
 };
 
 // TODO: Move this function to somewhere more generic. It doesn't really have

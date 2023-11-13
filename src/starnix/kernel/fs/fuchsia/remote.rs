@@ -33,9 +33,9 @@ use crate::{
     mm::ProtectionFlags,
     syscalls::{SyscallArg, SyscallResult},
     task::{CurrentTask, EventHandler, Kernel, WaitCanceler, Waiter},
+    types::errno::{errno, error, from_status_like_fdio, Errno},
     types::{
-        errno::errno, error, from_status_like_fdio, fsverity_descriptor, ino_t, off_t, statfs,
-        DeviceType, Errno, FileMode, MountFlags, OpenFlags,
+        fsverity_descriptor, ino_t, off_t, statfs, DeviceType, FileMode, MountFlags, OpenFlags,
     },
     vmex_resource::VMEX_RESOURCE,
 };
@@ -1507,7 +1507,8 @@ mod test {
         },
         mm::PAGE_SIZE,
         testing::*,
-        types::{errno::EINVAL, mode},
+        types::errno::EINVAL,
+        types::mode,
     };
     use assert_matches::assert_matches;
     use fidl::endpoints::Proxy;

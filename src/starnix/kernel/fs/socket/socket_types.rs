@@ -7,9 +7,10 @@ use zerocopy::{AsBytes, FromBytes};
 
 use crate::{
     fs::FsString,
+    types::errno::{error, Errno},
     types::{
-        error, sockaddr_in, sockaddr_in6, sockaddr_ll, sockaddr_nl, sockaddr_un, sockaddr_vm, uapi,
-        Errno, AF_INET, AF_INET6, AF_NETLINK, AF_PACKET, AF_UNIX, AF_UNSPEC, AF_VSOCK, MSG_BATCH,
+        sockaddr_in, sockaddr_in6, sockaddr_ll, sockaddr_nl, sockaddr_un, sockaddr_vm, uapi,
+        AF_INET, AF_INET6, AF_NETLINK, AF_PACKET, AF_UNIX, AF_UNSPEC, AF_VSOCK, MSG_BATCH,
         MSG_CMSG_CLOEXEC, MSG_CONFIRM, MSG_CTRUNC, MSG_DONTROUTE, MSG_DONTWAIT, MSG_EOR,
         MSG_ERRQUEUE, MSG_FASTOPEN, MSG_FIN, MSG_MORE, MSG_NOSIGNAL, MSG_PEEK, MSG_PROXY, MSG_RST,
         MSG_SYN, MSG_TRUNC, MSG_TRYHARD, MSG_WAITALL, MSG_WAITFORONE, SOCK_DCCP, SOCK_DGRAM,

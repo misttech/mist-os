@@ -17,7 +17,8 @@ use crate::{
         FileObject, FileOps, FsNode, FsNodeOps, FsStr, FsString,
     },
     task::CurrentTask,
-    types::{error, DeviceType, Errno, OpenFlags},
+    types::errno::{error, Errno},
+    types::{DeviceType, OpenFlags},
 };
 
 #[derive(Debug, PartialEq, Clone)]

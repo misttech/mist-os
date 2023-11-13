@@ -8,10 +8,11 @@ use crate::{
     arch::registers::RegisterState,
     signals::{SignalInfo, SignalState},
     task::{CurrentTask, Task},
+    types::errno::{ErrnoCode, ERESTART_RESTARTBLOCK},
     types::signals::SigSet,
     types::{
-        ErrnoCode, __NR_restart_syscall, _fpstate_64, sigaction_t, sigaltstack, sigcontext,
-        siginfo_t, sigset_t, ucontext, ERESTART_RESTARTBLOCK,
+        __NR_restart_syscall, _fpstate_64, sigaction_t, sigaltstack, sigcontext, siginfo_t,
+        sigset_t, ucontext,
     },
 };
 
@@ -187,12 +188,10 @@ mod tests {
         signals::{restore_from_signal_handler, SignalDetail},
         task::Kernel,
         testing::*,
+        types::errno::{EINTR, ERESTARTSYS},
         types::signals::{SIGUSR1, SIGUSR2},
         types::user_address::UserAddress,
-        types::{
-            __NR_rt_sigreturn, sigaction_t, EINTR, ERESTARTSYS, SA_RESTART, SA_RESTORER,
-            SA_SIGINFO, SI_USER,
-        },
+        types::{__NR_rt_sigreturn, sigaction_t, SA_RESTART, SA_RESTORER, SA_SIGINFO, SI_USER},
     };
 
     const SYSCALL_INSTRUCTION_ADDRESS: UserAddress = UserAddress::const_from(100);

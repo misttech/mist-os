@@ -8,7 +8,8 @@ use crate::{
         fileops_impl_seekable, fs_node_impl_not_dir, FileObject, FileOps, FsNode, FsNodeOps,
     },
     task::CurrentTask,
-    types::{as_any::AsAny, errno, error, Errno, OpenFlags},
+    types::errno::{errno, error, Errno},
+    types::{as_any::AsAny, OpenFlags},
 };
 use std::{borrow::Cow, sync::Arc};
 

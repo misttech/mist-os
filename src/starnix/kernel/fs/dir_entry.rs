@@ -17,9 +17,9 @@ use crate::{
         MountInfo, NamespaceNode, UnlinkKind,
     },
     task::CurrentTask,
+    types::errno::{errno, error, Errno, ENOENT},
     types::{
-        errno, error, Access, Errno, FileMode, OpenFlags, ENOENT, NAME_MAX, RENAME_EXCHANGE,
-        RENAME_NOREPLACE, RENAME_WHITEOUT,
+        Access, FileMode, OpenFlags, NAME_MAX, RENAME_EXCHANGE, RENAME_NOREPLACE, RENAME_WHITEOUT,
     },
 };
 

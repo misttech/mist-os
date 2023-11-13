@@ -7,7 +7,7 @@ use crate::{
     task::{
         EventHandler, SignalHandler, SignalHandlerInner, WaitCanceler, Waiter, ZxioSignalHandler,
     },
-    types::{error, Errno},
+    types::errno::{error, Errno},
 };
 
 use fuchsia_zircon as zx;

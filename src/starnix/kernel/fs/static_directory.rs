@@ -10,7 +10,8 @@ use crate::{
         FsNodeInfo, FsNodeOps, FsStr, SeekTarget,
     },
     task::CurrentTask,
-    types::{errno, mode, off_t, DeviceType, Errno, FileMode, OpenFlags},
+    types::errno::{errno, Errno},
+    types::{mode, off_t, DeviceType, FileMode, OpenFlags},
 };
 use std::{collections::BTreeMap, sync::Arc};
 

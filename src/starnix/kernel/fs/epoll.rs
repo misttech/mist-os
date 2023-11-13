@@ -13,7 +13,9 @@ use crate::{
         CurrentTask, EnqueueEventHandler, EventHandler, ReadyItem, ReadyItemKey, WaitCanceler,
         WaitQueue, Waiter,
     },
-    types::{errno, error, Errno, OpenFlags, EBADF, EINTR, EPOLLET, EPOLLONESHOT, ETIMEDOUT},
+    types::errno::{errno, error, Errno, EBADF, EINTR, ETIMEDOUT},
+    types::OpenFlags,
+    types::{EPOLLET, EPOLLONESHOT},
 };
 use fuchsia_zircon as zx;
 use itertools::Itertools;

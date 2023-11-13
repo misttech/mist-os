@@ -23,13 +23,14 @@ use crate::{
         CurrentTask, EventHandler, ExitStatus, Kernel, Task, TaskFlags, WaitCanceler, WaitQueue,
         Waiter,
     },
+    types::errno::{errno, errno_from_code, error, Errno},
     types::signals::{SIGKILL, SIGSYS},
     types::user_address::{UserAddress, UserRef},
     types::{
-        __NR_exit, __NR_read, __NR_write, errno, errno_from_code, error, seccomp_data,
-        seccomp_notif, seccomp_notif_resp, sock_filter, Errno, OpenFlags, BPF_ABS, BPF_LD, BPF_ST,
-        SECCOMP_IOCTL_NOTIF_ADDFD, SECCOMP_IOCTL_NOTIF_ID_VALID, SECCOMP_IOCTL_NOTIF_RECV,
-        SECCOMP_IOCTL_NOTIF_SEND, SECCOMP_RET_ACTION_FULL, SECCOMP_RET_ALLOW, SECCOMP_RET_DATA,
+        __NR_exit, __NR_read, __NR_write, seccomp_data, seccomp_notif, seccomp_notif_resp,
+        sock_filter, OpenFlags, BPF_ABS, BPF_LD, BPF_ST, SECCOMP_IOCTL_NOTIF_ADDFD,
+        SECCOMP_IOCTL_NOTIF_ID_VALID, SECCOMP_IOCTL_NOTIF_RECV, SECCOMP_IOCTL_NOTIF_SEND,
+        SECCOMP_RET_ACTION_FULL, SECCOMP_RET_ALLOW, SECCOMP_RET_DATA,
         SECCOMP_USER_NOTIF_FLAG_CONTINUE, SYS_SECCOMP,
     },
 };

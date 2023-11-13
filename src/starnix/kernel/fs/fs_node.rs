@@ -16,17 +16,18 @@ use crate::{
     signals::{send_signal, SignalInfo},
     task::{CurrentTask, Kernel, WaitQueue, Waiter},
     time::utc,
+    types::errno::{errno, error, Errno, EACCES, ENOSYS},
     types::signals::SIGXFSZ,
     types::time::{timespec_from_time, NANOS_PER_SECOND},
     types::{
-        __kernel_ulong_t, as_any::AsAny, errno, error, fsverity_descriptor, gid_t, ino_t, mode,
-        statx, statx_timestamp, timespec, uapi, uid_t, Access, DeviceType, Errno, FileMode,
-        OpenFlags, Resource, CAP_CHOWN, CAP_DAC_OVERRIDE, CAP_FOWNER, CAP_FSETID, CAP_MKNOD,
-        CAP_SYS_ADMIN, EACCES, ENOSYS, FALLOC_FL_COLLAPSE_RANGE, FALLOC_FL_INSERT_RANGE,
-        FALLOC_FL_KEEP_SIZE, FALLOC_FL_PUNCH_HOLE, FALLOC_FL_UNSHARE_RANGE, FALLOC_FL_ZERO_RANGE,
-        LOCK_EX, LOCK_NB, LOCK_SH, LOCK_UN, STATX_ATIME, STATX_ATTR_VERITY, STATX_BASIC_STATS,
-        STATX_BLOCKS, STATX_CTIME, STATX_GID, STATX_INO, STATX_MTIME, STATX_NLINK, STATX_SIZE,
-        STATX_UID, STATX__RESERVED, XATTR_TRUSTED_PREFIX, XATTR_USER_PREFIX,
+        __kernel_ulong_t, as_any::AsAny, fsverity_descriptor, gid_t, ino_t, mode, statx,
+        statx_timestamp, timespec, uapi, uid_t, Access, DeviceType, FileMode, OpenFlags, Resource,
+        CAP_CHOWN, CAP_DAC_OVERRIDE, CAP_FOWNER, CAP_FSETID, CAP_MKNOD, CAP_SYS_ADMIN,
+        FALLOC_FL_COLLAPSE_RANGE, FALLOC_FL_INSERT_RANGE, FALLOC_FL_KEEP_SIZE,
+        FALLOC_FL_PUNCH_HOLE, FALLOC_FL_UNSHARE_RANGE, FALLOC_FL_ZERO_RANGE, LOCK_EX, LOCK_NB,
+        LOCK_SH, LOCK_UN, STATX_ATIME, STATX_ATTR_VERITY, STATX_BASIC_STATS, STATX_BLOCKS,
+        STATX_CTIME, STATX_GID, STATX_INO, STATX_MTIME, STATX_NLINK, STATX_SIZE, STATX_UID,
+        STATX__RESERVED, XATTR_TRUSTED_PREFIX, XATTR_USER_PREFIX,
     },
 };
 use bitflags::bitflags;
@@ -756,7 +757,7 @@ macro_rules! fs_node_impl_symlink {
             _node: &crate::fs::FsNode,
             _current_task: &CurrentTask,
             _flags: crate::types::OpenFlags,
-        ) -> Result<Box<dyn crate::fs::FileOps>, crate::types::Errno> {
+        ) -> Result<Box<dyn crate::fs::FileOps>, crate::types::errno::Errno> {
             unreachable!("Symlink nodes cannot be opened.");
         }
     };
@@ -771,8 +772,8 @@ macro_rules! fs_node_impl_dir_readonly {
             _name: &crate::fs::FsStr,
             _mode: crate::types::FileMode,
             _owner: crate::auth::FsCred,
-        ) -> Result<crate::fs::FsNodeHandle, Errno> {
-            crate::types::error!(EROFS)
+        ) -> Result<crate::fs::FsNodeHandle, crate::types::errno::Errno> {
+            crate::types::errno::error!(EROFS)
         }
 
         fn mknod(
@@ -783,8 +784,8 @@ macro_rules! fs_node_impl_dir_readonly {
             _mode: crate::types::FileMode,
             _dev: crate::types::DeviceType,
             _owner: crate::auth::FsCred,
-        ) -> Result<crate::fs::FsNodeHandle, Errno> {
-            crate::types::error!(EROFS)
+        ) -> Result<crate::fs::FsNodeHandle, crate::types::errno::Errno> {
+            crate::types::errno::error!(EROFS)
         }
 
         fn create_symlink(
@@ -794,8 +795,8 @@ macro_rules! fs_node_impl_dir_readonly {
             _name: &crate::fs::FsStr,
             _target: &crate::fs::FsStr,
             _owner: crate::auth::FsCred,
-        ) -> Result<crate::fs::FsNodeHandle, Errno> {
-            crate::types::error!(EROFS)
+        ) -> Result<crate::fs::FsNodeHandle, crate::types::errno::Errno> {
+            crate::types::errno::error!(EROFS)
         }
 
         fn link(
@@ -804,8 +805,8 @@ macro_rules! fs_node_impl_dir_readonly {
             _current_task: &crate::task::CurrentTask,
             _name: &crate::fs::FsStr,
             _child: &crate::fs::FsNodeHandle,
-        ) -> Result<(), Errno> {
-            crate::types::error!(EROFS)
+        ) -> Result<(), crate::types::errno::Errno> {
+            crate::types::errno::error!(EROFS)
         }
 
         fn unlink(
@@ -814,8 +815,8 @@ macro_rules! fs_node_impl_dir_readonly {
             _current_task: &crate::task::CurrentTask,
             _name: &crate::fs::FsStr,
             _child: &crate::fs::FsNodeHandle,
-        ) -> Result<(), Errno> {
-            crate::types::error!(EROFS)
+        ) -> Result<(), crate::types::errno::Errno> {
+            crate::types::errno::error!(EROFS)
         }
     };
 }
@@ -830,7 +831,7 @@ macro_rules! fs_node_impl_xattr_delegate {
             _current_task: &CurrentTask,
             name: &crate::fs::FsStr,
             _size: usize,
-        ) -> Result<crate::fs::ValueOrSize<crate::fs::FsString>, crate::types::Errno> {
+        ) -> Result<crate::fs::ValueOrSize<crate::fs::FsString>, crate::types::errno::Errno> {
             Ok($delegate.get_xattr(name)?.into())
         }
 
@@ -841,7 +842,7 @@ macro_rules! fs_node_impl_xattr_delegate {
             name: &crate::fs::FsStr,
             value: &crate::fs::FsStr,
             op: crate::fs::XattrOp,
-        ) -> Result<(), crate::types::Errno> {
+        ) -> Result<(), crate::types::errno::Errno> {
             $delegate.set_xattr(name, value, op)
         }
 
@@ -850,7 +851,7 @@ macro_rules! fs_node_impl_xattr_delegate {
             _node: &FsNode,
             _current_task: &CurrentTask,
             name: &crate::fs::FsStr,
-        ) -> Result<(), crate::types::Errno> {
+        ) -> Result<(), crate::types::errno::Errno> {
             $delegate.remove_xattr(name)
         }
 
@@ -859,7 +860,7 @@ macro_rules! fs_node_impl_xattr_delegate {
             _node: &FsNode,
             _current_task: &CurrentTask,
             _size: usize,
-        ) -> Result<crate::fs::ValueOrSize<Vec<crate::fs::FsString>>, crate::types::Errno> {
+        ) -> Result<crate::fs::ValueOrSize<Vec<crate::fs::FsString>>, crate::types::errno::Errno> {
             Ok($delegate.list_xattrs()?.into())
         }
     };
@@ -874,8 +875,8 @@ macro_rules! fs_node_impl_not_dir {
             _node: &crate::fs::FsNode,
             _current_task: &crate::task::CurrentTask,
             _name: &crate::fs::FsStr,
-        ) -> Result<crate::fs::FsNodeHandle, crate::types::Errno> {
-            error!(ENOTDIR)
+        ) -> Result<crate::fs::FsNodeHandle, crate::types::errno::Errno> {
+            crate::types::errno::error!(ENOTDIR)
         }
 
         fn mknod(
@@ -886,8 +887,8 @@ macro_rules! fs_node_impl_not_dir {
             _mode: crate::types::FileMode,
             _dev: crate::types::DeviceType,
             _owner: crate::auth::FsCred,
-        ) -> Result<crate::fs::FsNodeHandle, crate::types::Errno> {
-            error!(ENOTDIR)
+        ) -> Result<crate::fs::FsNodeHandle, crate::types::errno::Errno> {
+            crate::types::errno::error!(ENOTDIR)
         }
 
         fn mkdir(
@@ -897,8 +898,8 @@ macro_rules! fs_node_impl_not_dir {
             _name: &crate::fs::FsStr,
             _mode: crate::types::FileMode,
             _owner: crate::auth::FsCred,
-        ) -> Result<crate::fs::FsNodeHandle, crate::types::Errno> {
-            error!(ENOTDIR)
+        ) -> Result<crate::fs::FsNodeHandle, crate::types::errno::Errno> {
+            crate::types::errno::error!(ENOTDIR)
         }
 
         fn create_symlink(
@@ -908,8 +909,8 @@ macro_rules! fs_node_impl_not_dir {
             _name: &crate::fs::FsStr,
             _target: &crate::fs::FsStr,
             _owner: crate::auth::FsCred,
-        ) -> Result<crate::fs::FsNodeHandle, crate::types::Errno> {
-            error!(ENOTDIR)
+        ) -> Result<crate::fs::FsNodeHandle, crate::types::errno::Errno> {
+            crate::types::errno::error!(ENOTDIR)
         }
 
         fn unlink(
@@ -918,8 +919,8 @@ macro_rules! fs_node_impl_not_dir {
             _current_task: &crate::task::CurrentTask,
             _name: &crate::fs::FsStr,
             _child: &crate::fs::FsNodeHandle,
-        ) -> Result<(), crate::types::Errno> {
-            error!(ENOTDIR)
+        ) -> Result<(), crate::types::errno::Errno> {
+            crate::types::errno::error!(ENOTDIR)
         }
     };
 }

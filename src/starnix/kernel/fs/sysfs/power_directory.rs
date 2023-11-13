@@ -10,7 +10,8 @@ use {
         fs::{BytesFile, BytesFileOps, FileSystem, FsNode, FsNodeInfo, StaticDirectoryBuilder},
         power::{PowerStateFile, PowerWakeupCountFile},
         task::{CurrentTask, Kernel},
-        types::{error, mode, Errno},
+        types::errno::{error, Errno},
+        types::mode,
     },
     std::{
         borrow::Cow,

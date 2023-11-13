@@ -6,7 +6,8 @@ use std::sync::Arc;
 
 use crate::{
     fs::fs_node::FsNodeHandle,
-    types::{errno, error, Errno, SealFlags},
+    types::errno::{errno, error, Errno},
+    types::SealFlags,
 };
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]

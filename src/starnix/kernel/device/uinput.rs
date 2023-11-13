@@ -7,9 +7,10 @@ use crate::{
         default_ioctl, fileops_impl_dataless, fileops_impl_seekless, FileObject, FileOps, FsNode,
     },
     logging::log_warn,
-    syscalls::{uapi, Errno, OpenFlags, SyscallArg, SyscallResult, SUCCESS},
+    syscalls::{uapi, OpenFlags, SyscallArg, SyscallResult, SUCCESS},
     task::CurrentTask,
     types,
+    types::errno::Errno,
 };
 use bit_vec::BitVec;
 use starnix_lock::Mutex;
@@ -51,7 +52,7 @@ impl UinputDevice {
             }
             _ => {
                 log_warn!("UI_SET_EVBIT with unsupported evbit {}", evbit);
-                Err(types::errno!(EPERM))
+                Err(types::errno::errno!(EPERM))
             }
         }
     }
@@ -115,7 +116,7 @@ mod test {
 
     #[test_case(uapi::EV_KEY, vec![uapi::EV_KEY as usize] => Ok(SUCCESS))]
     #[test_case(uapi::EV_ABS, vec![uapi::EV_ABS as usize] => Ok(SUCCESS))]
-    #[test_case(uapi::EV_REL, vec![] => Err(types::errno!(EPERM)))]
+    #[test_case(uapi::EV_REL, vec![] => Err(types::errno::errno!(EPERM)))]
     #[::fuchsia::test]
     async fn ui_set_evbit(bit: u32, expected_evbits: Vec<usize>) -> Result<SyscallResult, Errno> {
         let dev = UinputDevice::new();

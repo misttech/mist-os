@@ -7,9 +7,10 @@ use {
         logging::not_implemented,
         mm::MemoryAccessorExt,
         syscalls::{
-            errno, error, fsverity_descriptor, fsverity_enable_arg, fsverity_read_metadata_arg,
-            CurrentTask, Errno, FS_VERITY_HASH_ALG_SHA256, FS_VERITY_HASH_ALG_SHA512,
+            fsverity_descriptor, fsverity_enable_arg, fsverity_read_metadata_arg, CurrentTask,
+            FS_VERITY_HASH_ALG_SHA256, FS_VERITY_HASH_ALG_SHA512,
         },
+        types::errno::{errno, error, Errno},
         types::user_address::UserAddress,
     },
     mundane::hash::{Digest, Hasher, Sha256, Sha512},
@@ -153,8 +154,8 @@ pub mod ioctl {
         mm::{MemoryAccessor, MemoryAccessorExt},
         syscalls::{SyscallResult, SUCCESS},
         task::CurrentTask,
+        types::errno::{errno, error, Errno},
         types::user_address::{UserAddress, UserRef},
-        types::{errno, error, Errno},
     };
     use num_traits::FromPrimitive;
     use zerocopy::AsBytes;

@@ -6,7 +6,8 @@ use crate::{
     arch::vdso::{raw_ticks, VDSO_SIGRETURN_NAME},
     mm::PAGE_SIZE,
     time::utc::update_utc_clock,
-    types::{errno, from_status_like_fdio, uapi, Errno},
+    types::errno::{errno, from_status_like_fdio, Errno},
+    types::uapi,
 };
 use fidl::AsHandleRef;
 use fuchsia_zircon::{self as zx, ClockTransformation, HandleBased};

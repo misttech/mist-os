@@ -9,7 +9,8 @@ use zerocopy::{AsBytes, FromBytes, FromZeroes};
 use super::user_buffer::UserBuffer;
 use crate::{
     mm::vmo::round_up_to_increment,
-    types::{error, uapi, Errno},
+    types::errno::{error, Errno},
+    types::uapi,
 };
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd, AsBytes, FromZeroes, FromBytes)]

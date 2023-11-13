@@ -10,7 +10,7 @@ use crate::{
         SimpleFileNode,
     },
     task::CurrentTask,
-    types::{errno, error, Errno},
+    types::errno::{errno, error, Errno},
 };
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]

@@ -18,7 +18,8 @@ use crate::{
         ProtectionFlags,
     },
     task::{CurrentTask, Kernel},
-    types::{error, DeviceType, Errno, FileMode, OpenFlags},
+    types::errno::{error, Errno},
+    types::{DeviceType, FileMode, OpenFlags},
 };
 
 use fuchsia_zircon::{self as zx, cprng_draw};

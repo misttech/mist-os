@@ -9,9 +9,8 @@ use std::ops::DerefMut;
 use crate::{
     fs::{FdNumber, FileHandle, RecordLockOwner},
     task::{CurrentTask, Task},
-    types::{
-        errno, error, Errno, OpenFlags, OwnedRef, Releasable, ReleasableByRef, Resource, FD_CLOEXEC,
-    },
+    types::errno::{errno, error, Errno},
+    types::{OpenFlags, OwnedRef, Releasable, ReleasableByRef, Resource, FD_CLOEXEC},
 };
 
 bitflags! {

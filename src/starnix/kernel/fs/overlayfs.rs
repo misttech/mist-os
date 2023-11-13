@@ -14,9 +14,8 @@ use crate::{
     },
     logging::{log_error, log_warn, not_implemented},
     task::CurrentTask,
-    types::{
-        errno, error, ino_t, off_t, statfs, DeviceType, Errno, FileMode, OpenFlags, EEXIST, ENOENT,
-    },
+    types::errno::{errno, error, Errno, EEXIST, ENOENT},
+    types::{ino_t, off_t, statfs, DeviceType, FileMode, OpenFlags},
 };
 use once_cell::sync::OnceCell;
 use rand::Rng;

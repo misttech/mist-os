@@ -25,7 +25,8 @@ use crate::{
     },
     logging::log_error,
     task::{CurrentTask, ExitStatus, Kernel, Task},
-    types::{async_release_after, release_on_error, uapi, Errno, OpenFlags, ReleasableByRef},
+    types::errno::Errno,
+    types::{async_release_after, release_on_error, uapi, OpenFlags, ReleasableByRef},
 };
 
 use super::start_component;

@@ -47,7 +47,8 @@ use crate::{
         AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask, IpTables,
         KernelThreads, NetstackDevices, PidTable, StopState, UtsNamespace, UtsNamespaceHandle,
     },
-    types::{errno, from_status_like_fdio, DeviceType, Errno, OpenFlags},
+    types::errno::{errno, from_status_like_fdio, Errno},
+    types::{DeviceType, OpenFlags},
     vdso::vdso_loader::Vdso,
 };
 

@@ -7,7 +7,8 @@ use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
 use crate::{
     fs::FsStr,
-    types::{errno, Errno, AT_FDCWD},
+    types::errno::{errno, Errno},
+    types::AT_FDCWD,
 };
 
 // NB: We believe deriving Default (i.e., have a default FdNumber of 0) will be error-prone.

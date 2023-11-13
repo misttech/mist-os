@@ -6,7 +6,8 @@ use super::proc_directory::ProcDirectory;
 use crate::{
     fs::{CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsStr},
     task::{CurrentTask, Kernel},
-    types::{statfs, Errno, PROC_SUPER_MAGIC},
+    types::errno::Errno,
+    types::{statfs, PROC_SUPER_MAGIC},
 };
 
 use std::sync::Arc;

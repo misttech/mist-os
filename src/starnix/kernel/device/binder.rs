@@ -26,6 +26,7 @@ use crate::{
     task::{
         CurrentTask, EventHandler, Kernel, SimpleWaiter, Task, WaitCanceler, WaitQueue, Waiter,
     },
+    types::errno::{errno, errno_from_code, error, Errno, EINTR},
     types::user_address::{UserAddress, UserRef},
     types::user_buffer::UserBuffer,
     types::{
@@ -54,14 +55,12 @@ use crate::{
         binder_driver_return_protocol_BR_TRANSACTION_SEC_CTX, binder_fd_array_object,
         binder_object_header, binder_transaction_data,
         binder_transaction_data__bindgen_ty_2__bindgen_ty_1, binder_transaction_data_sg,
-        binder_uintptr_t, binder_version, binder_write_read,
-        errno::{errno, errno_from_code, error},
-        flat_binder_object, mode, pid_t, release_after, release_on_error, statfs,
-        struct_with_union_into_bytes, transaction_flags_TF_ONE_WAY, uapi, ArcKey, DeviceType,
-        Errno, OpenFlags, OwnedRef, Releasable, ReleaseGuard, TempRef, TempRefKey, WeakRef,
-        BINDERFS_SUPER_MAGIC, BINDER_BUFFER_FLAG_HAS_PARENT, BINDER_CURRENT_PROTOCOL_VERSION,
-        BINDER_TYPE_BINDER, BINDER_TYPE_FD, BINDER_TYPE_FDA, BINDER_TYPE_HANDLE, BINDER_TYPE_PTR,
-        EINTR,
+        binder_uintptr_t, binder_version, binder_write_read, flat_binder_object, mode, pid_t,
+        release_after, release_on_error, statfs, struct_with_union_into_bytes,
+        transaction_flags_TF_ONE_WAY, uapi, ArcKey, DeviceType, OpenFlags, OwnedRef, Releasable,
+        ReleaseGuard, TempRef, TempRefKey, WeakRef, BINDERFS_SUPER_MAGIC,
+        BINDER_BUFFER_FLAG_HAS_PARENT, BINDER_CURRENT_PROTOCOL_VERSION, BINDER_TYPE_BINDER,
+        BINDER_TYPE_FD, BINDER_TYPE_FDA, BINDER_TYPE_HANDLE, BINDER_TYPE_PTR,
     },
 };
 use derivative::Derivative;

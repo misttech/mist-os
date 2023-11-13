@@ -9,7 +9,8 @@ use crate::fs::{
     FsNodeInfo, FsStr, StaticDirectoryBuilder,
 };
 use crate::task::{CurrentTask, Kernel};
-use crate::types::{mode, statfs, Errno, TRACEFS_MAGIC};
+use crate::types::errno::Errno;
+use crate::types::{mode, statfs, TRACEFS_MAGIC};
 
 use std::sync::Arc;
 

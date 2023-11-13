@@ -10,7 +10,8 @@ use crate::{
     },
     logging::log_error,
     task::{CurrentTask, EventHandler, Kernel, Task, Waiter},
-    types::{errno, Errno, AF_UNIX, SOCK_STREAM},
+    types::errno::{errno, Errno},
+    types::{AF_UNIX, SOCK_STREAM},
 };
 use lock_sequence::{Locked, Unlocked};
 use perfetto_consumer_proto::perfetto::protos::{

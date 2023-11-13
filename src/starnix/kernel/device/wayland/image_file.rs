@@ -16,7 +16,8 @@ use crate::{
     },
     mm::ProtectionFlags,
     task::CurrentTask,
-    types::{Errno, FileMode, OpenFlags},
+    types::errno::Errno,
+    types::{FileMode, OpenFlags},
 };
 
 pub struct ImageInfo {

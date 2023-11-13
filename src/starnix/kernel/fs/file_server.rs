@@ -10,7 +10,8 @@ use crate::{
     },
     mm::ProtectionFlags,
     task::CurrentTask,
-    types::{errno, error, ino_t, off_t, DeviceType, Errno, FileMode, OpenFlags, TempRef, WeakRef},
+    types::errno::{errno, error, Errno},
+    types::{ino_t, off_t, DeviceType, FileMode, OpenFlags, TempRef, WeakRef},
 };
 use async_trait::async_trait;
 use fidl::{

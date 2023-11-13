@@ -8,7 +8,7 @@ use crate::{
         perfetto_consumer::start_perfetto_consumer_thread, starnix::magma_device_init,
     },
     task::Kernel,
-    types::{error, Errno},
+    types::errno::{error, Errno},
 };
 use anyhow::{anyhow, Context, Error};
 use bstr::BString;

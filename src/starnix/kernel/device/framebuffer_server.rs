@@ -32,7 +32,7 @@ use std::sync::{mpsc::channel, Arc};
 
 use crate::{
     logging::log_warn,
-    types::{errno, Errno},
+    types::errno::{errno, Errno},
 };
 
 /// The offset at which the framebuffer will be placed.

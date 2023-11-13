@@ -9,8 +9,9 @@ use crate::{
     },
     signals::SignalDetail,
     task::{CurrentTask, EventHandler, WaitCanceler, Waiter},
+    types::errno::{errno, error, Errno},
     types::signals::SigSet,
-    types::{errno, error, signalfd_siginfo, Errno, OpenFlags, SFD_NONBLOCK},
+    types::{signalfd_siginfo, OpenFlags, SFD_NONBLOCK},
 };
 use starnix_lock::Mutex;
 use std::convert::TryInto;

@@ -4,7 +4,8 @@
 
 use fuchsia_zircon as zx;
 
-use crate::types::{error, itimerspec, timespec, timeval, Errno};
+use crate::types::errno::{error, Errno};
+use crate::types::{itimerspec, timespec, timeval};
 use static_assertions::const_assert_eq;
 
 const MICROS_PER_SECOND: i64 = 1000 * 1000;

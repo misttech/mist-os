@@ -3,8 +3,10 @@
 // found in the LICENSE file.
 
 use crate::task::{syscalls::do_clone, CurrentTask};
+use crate::types::errno::Errno;
 use crate::types::user_address::{UserAddress, UserRef};
-use crate::types::{clone_args, pid_t, Errno, CSIGNAL};
+use crate::types::{clone_args, pid_t, CSIGNAL};
+
 use lock_sequence::{Locked, Unlocked};
 
 /// The parameter order for `clone` varies by architecture.

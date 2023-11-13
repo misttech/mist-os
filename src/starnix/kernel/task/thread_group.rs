@@ -29,14 +29,15 @@ use crate::{
         TimerTable, WaitQueue,
     },
     time::utc,
+    types::errno::{errno, error, Errno},
     types::personality::PersonalityFlags,
     types::signals::{Signal, UncheckedSignal, SIGCHLD, SIGCONT, SIGHUP, SIGKILL, SIGTTOU},
     types::time::{duration_from_timeval, timeval_from_duration},
     types::user_address::UserAddress,
     types::{
-        errno, error, itimerval, pid_t, rlimit, uid_t, Errno, OwnedRef, Releasable, Resource,
-        ResourceLimits, TaskTimeStats, TempRef, WeakRef, CAP_SYS_ADMIN, CAP_SYS_RESOURCE,
-        CLOCK_REALTIME, ITIMER_PROF, ITIMER_REAL, ITIMER_VIRTUAL, SIG_IGN,
+        itimerval, pid_t, rlimit, uid_t, OwnedRef, Releasable, Resource, ResourceLimits,
+        TaskTimeStats, TempRef, WeakRef, CAP_SYS_ADMIN, CAP_SYS_RESOURCE, CLOCK_REALTIME,
+        ITIMER_PROF, ITIMER_REAL, ITIMER_VIRTUAL, SIG_IGN,
     },
 };
 

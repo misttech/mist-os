@@ -16,10 +16,9 @@ use crate::{
         create_anonymous_mapping_vmo, DesiredAddress, FutexKey, FutexTable, MappedVmo, MappingName,
         MappingOptions, MemoryAccessorExt, MremapFlags, ProtectionFlags, PAGE_SIZE,
     },
-    syscalls::{
-        errno, error, robust_list_head, timespec, uapi, CurrentTask, Errno, Locked, Unlocked,
-    },
+    syscalls::{robust_list_head, timespec, uapi, CurrentTask, Locked, Unlocked},
     task::Task,
+    types::errno::{errno, error, Errno},
     types::time::{duration_from_timespec, time_from_timespec},
     types::user_address::{UserAddress, UserRef},
     types::{
@@ -502,7 +501,8 @@ mod tests {
     use super::*;
     use crate::{
         testing::*,
-        types::{EEXIST, MREMAP_FIXED, MREMAP_MAYMOVE, PROT_READ},
+        types::errno::EEXIST,
+        types::{MREMAP_FIXED, MREMAP_MAYMOVE, PROT_READ},
     };
 
     #[::fuchsia::test]

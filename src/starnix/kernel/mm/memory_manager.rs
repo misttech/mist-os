@@ -21,13 +21,14 @@ use crate::{
     logging::{impossible_error, log_warn, not_implemented, not_implemented_log_once, set_zx_name},
     mm::{vmo::round_up_to_system_page_size, FutexTable, PrivateFutexKey},
     task::{CurrentTask, Task},
+    types::errno::{errno, error, Errno},
     types::user_address::{UserAddress, UserCString, UserRef},
     types::user_buffer::UserBuffer,
     types::{
-        errno, error, range_ext::RangeExt, Errno, Resource, WeakRef, MADV_DOFORK, MADV_DONTFORK,
-        MADV_DONTNEED, MADV_KEEPONFORK, MADV_NOHUGEPAGE, MADV_NORMAL, MADV_WILLNEED,
-        MADV_WIPEONFORK, MREMAP_DONTUNMAP, MREMAP_FIXED, MREMAP_MAYMOVE, PROT_EXEC, PROT_READ,
-        PROT_WRITE, UIO_MAXIOV,
+        range_ext::RangeExt, Resource, WeakRef, MADV_DOFORK, MADV_DONTFORK, MADV_DONTNEED,
+        MADV_KEEPONFORK, MADV_NOHUGEPAGE, MADV_NORMAL, MADV_WILLNEED, MADV_WIPEONFORK,
+        MREMAP_DONTUNMAP, MREMAP_FIXED, MREMAP_MAYMOVE, PROT_EXEC, PROT_READ, PROT_WRITE,
+        UIO_MAXIOV,
     },
     vmex_resource::VMEX_RESOURCE,
 };

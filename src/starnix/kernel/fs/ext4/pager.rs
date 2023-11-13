@@ -10,7 +10,7 @@ use crate::{
     fs::FsStr,
     log_debug, log_error, log_warn,
     task::CurrentTask,
-    types::{errno, error, Errno},
+    types::errno::{errno, error, Errno},
 };
 use fidl::AsHandleRef;
 use fuchsia_zircon::{

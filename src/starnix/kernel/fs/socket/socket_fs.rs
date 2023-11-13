@@ -5,7 +5,8 @@
 use crate::{
     fs::{CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsStr},
     task::{CurrentTask, Kernel},
-    types::{statfs, Errno, SOCKFS_MAGIC},
+    types::errno::Errno,
+    types::{statfs, SOCKFS_MAGIC},
 };
 use std::sync::Arc;
 

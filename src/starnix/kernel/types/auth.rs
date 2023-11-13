@@ -7,7 +7,8 @@
 use bitflags::bitflags;
 use std::ops;
 
-use crate::types::{error, uapi, Errno};
+use crate::types::errno::{error, Errno};
+use crate::types::uapi;
 
 // We don't use bitflags for this because capability sets can have bits set that don't have defined
 // meaning as capabilities. init has all 64 bits set, even though only 40 of them are valid.

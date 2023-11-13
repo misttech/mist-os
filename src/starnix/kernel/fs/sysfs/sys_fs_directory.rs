@@ -11,7 +11,8 @@ use crate::{
         VecDirectory, VecDirectoryEntry,
     },
     task::CurrentTask,
-    types::{error, mode, Errno, OpenFlags},
+    types::errno::{error, Errno},
+    types::{mode, OpenFlags},
 };
 
 use std::sync::Weak;

@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::types::errno::{error, Errno};
 use crate::types::{
-    error, sched_param, Errno, SCHED_BATCH, SCHED_DEADLINE, SCHED_FIFO, SCHED_IDLE, SCHED_NORMAL,
-    SCHED_RR,
+    sched_param, SCHED_BATCH, SCHED_DEADLINE, SCHED_FIFO, SCHED_IDLE, SCHED_NORMAL, SCHED_RR,
 };
 
 // In user space, priority (niceness) is an integer from -20..19 (inclusive)

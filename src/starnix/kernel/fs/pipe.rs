@@ -17,10 +17,11 @@ use crate::{
     mm::{MemoryAccessorExt, PAGE_SIZE},
     signals::{send_signal, SignalInfo},
     syscalls::{
-        errno, error, mode, statfs, uapi, Errno, OpenFlags, SyscallArg, SyscallResult, FIONREAD,
-        F_GETPIPE_SZ, F_SETPIPE_SZ, PIPEFS_MAGIC, SUCCESS,
+        mode, statfs, uapi, OpenFlags, SyscallArg, SyscallResult, FIONREAD, F_GETPIPE_SZ,
+        F_SETPIPE_SZ, PIPEFS_MAGIC, SUCCESS,
     },
     task::{CurrentTask, EventHandler, Kernel, WaitCanceler, WaitQueue, Waiter},
+    types::errno::{errno, error, Errno},
     types::signals::SIGPIPE,
     types::user_address::{UserAddress, UserRef},
 };

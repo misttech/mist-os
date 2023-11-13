@@ -7,7 +7,7 @@ use std::collections::{hash_map::Entry, HashMap};
 
 use crate::{
     fs::{FsStr, FsString, XattrOp},
-    types::{errno, error, Errno},
+    types::errno::{errno, error, Errno},
 };
 
 #[derive(Default)]

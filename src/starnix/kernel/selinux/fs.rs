@@ -13,9 +13,8 @@ use crate::{
     },
     logging::not_implemented,
     task::{CurrentTask, Kernel, Task},
-    types::{
-        errno, error, mode, statfs, DeviceType, Errno, OpenFlags, TempRef, WeakRef, SELINUX_MAGIC,
-    },
+    types::errno::{errno, error, Errno},
+    types::{mode, statfs, DeviceType, OpenFlags, TempRef, WeakRef, SELINUX_MAGIC},
 };
 use derivative::Derivative;
 use selinux::security_server::SecurityServer;

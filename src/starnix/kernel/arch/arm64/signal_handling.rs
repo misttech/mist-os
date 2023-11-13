@@ -9,10 +9,10 @@ use crate::{
     mm::vmo::round_up_to_increment,
     signals::{SignalInfo, SignalState},
     task::{CurrentTask, Task},
+    types::errno::{ErrnoCode, ERESTART_RESTARTBLOCK},
     types::signals::SigSet,
     types::{
-        ErrnoCode, __NR_restart_syscall, sigaction_t, sigaltstack, sigcontext, siginfo_t, sigset_t,
-        ucontext, ERESTART_RESTARTBLOCK,
+        __NR_restart_syscall, sigaction_t, sigaltstack, sigcontext, siginfo_t, sigset_t, ucontext,
     },
 };
 

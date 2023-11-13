@@ -8,7 +8,7 @@ use crate::{
         MemoryXattrStorage, SymlinkTarget,
     },
     task::CurrentTask,
-    types::{error, Errno},
+    types::errno::Errno,
 };
 
 /// A node that represents a symlink to another node.

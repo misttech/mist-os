@@ -27,7 +27,7 @@ use std::{
 
 use crate::{
     logging::{log_error, log_info, log_warn},
-    types::{errno, Errno},
+    types::errno::{error, Errno},
 };
 
 mod messages;
@@ -430,7 +430,7 @@ impl<S> GenericNetlinkClientHandle<S> {
             memberships.insert(self.client_id);
             Ok(())
         } else {
-            errno::error!(EINVAL)
+            error!(EINVAL)
         }
     }
 }

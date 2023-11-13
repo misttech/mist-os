@@ -20,9 +20,8 @@ use crate::fs::{
 use crate::logging::log_warn;
 use crate::mm::ProtectionFlags;
 use crate::task::{CurrentTask, Kernel};
-use crate::types::{
-    errno, error, ino_t, off_t, statfs, Errno, FileMode, MountFlags, OpenFlags, EXT4_SUPER_MAGIC,
-};
+use crate::types::errno::{errno, error, Errno};
+use crate::types::{ino_t, off_t, statfs, FileMode, MountFlags, OpenFlags, EXT4_SUPER_MAGIC};
 
 mod pager;
 

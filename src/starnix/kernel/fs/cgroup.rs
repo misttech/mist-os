@@ -18,7 +18,8 @@ use crate::{
         FsNodeInfo, FsNodeOps, FsStr, MemoryDirectoryFile,
     },
     task::{CurrentTask, Task},
-    types::{errno, error, pid_t, DeviceType, Errno, FileMode, OpenFlags, WeakRef},
+    types::errno::{errno, error, Errno},
+    types::{pid_t, DeviceType, FileMode, OpenFlags, WeakRef},
 };
 
 type ControlGroupHandle = Arc<Mutex<ControlGroup>>;

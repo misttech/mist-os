@@ -349,7 +349,7 @@ macro_rules! errno {
 ///
 /// Use `errno!` instead if you want an unwrapped, but still tagged, `Errno`.
 macro_rules! error {
-    ($($args:tt)*) => { Err(crate::types::errno!($($args)*)) };
+    ($($args:tt)*) => { Err(crate::types::errno::errno!($($args)*)) };
 }
 
 /// `errno_from_code` returns a `Err` containing an `Errno` struct with the given error code and is
@@ -381,40 +381,42 @@ macro_rules! from_status_like_fdio {
     ($status:ident, $context:expr) => {{
         use fuchsia_zircon as zx;
         match $status {
-            zx::Status::NOT_FOUND => crate::types::errno!(ENOENT, $context),
-            zx::Status::NO_MEMORY => crate::types::errno!(ENOMEM, $context),
-            zx::Status::INVALID_ARGS => crate::types::errno!(EINVAL, $context),
-            zx::Status::BUFFER_TOO_SMALL => crate::types::errno!(EINVAL, $context),
-            zx::Status::TIMED_OUT => crate::types::errno!(ETIMEDOUT, $context),
-            zx::Status::UNAVAILABLE => crate::types::errno!(EBUSY, $context),
-            zx::Status::ALREADY_EXISTS => crate::types::errno!(EEXIST, $context),
-            zx::Status::PEER_CLOSED => crate::types::errno!(EPIPE, $context),
-            zx::Status::BAD_STATE => crate::types::errno!(EPIPE, $context),
-            zx::Status::BAD_PATH => crate::types::errno!(ENAMETOOLONG, $context),
-            zx::Status::IO => crate::types::errno!(EIO, $context),
-            zx::Status::NOT_FILE => crate::types::errno!(EISDIR, $context),
-            zx::Status::NOT_DIR => crate::types::errno!(ENOTDIR, $context),
-            zx::Status::NOT_SUPPORTED => crate::types::errno!(EOPNOTSUPP, $context),
-            zx::Status::WRONG_TYPE => crate::types::errno!(EOPNOTSUPP, $context),
-            zx::Status::OUT_OF_RANGE => crate::types::errno!(EINVAL, $context),
-            zx::Status::NO_RESOURCES => crate::types::errno!(ENOMEM, $context),
-            zx::Status::BAD_HANDLE => crate::types::errno!(EBADF, $context),
-            zx::Status::ACCESS_DENIED => crate::types::errno!(EACCES, $context),
-            zx::Status::SHOULD_WAIT => crate::types::errno!(EAGAIN, $context),
-            zx::Status::FILE_BIG => crate::types::errno!(EFBIG, $context),
-            zx::Status::NO_SPACE => crate::types::errno!(ENOSPC, $context),
-            zx::Status::NOT_EMPTY => crate::types::errno!(ENOTEMPTY, $context),
-            zx::Status::IO_REFUSED => crate::types::errno!(ECONNREFUSED, $context),
-            zx::Status::IO_INVALID => crate::types::errno!(EIO, $context),
-            zx::Status::CANCELED => crate::types::errno!(EBADF, $context),
-            zx::Status::PROTOCOL_NOT_SUPPORTED => crate::types::errno!(EPROTONOSUPPORT, $context),
-            zx::Status::ADDRESS_UNREACHABLE => crate::types::errno!(ENETUNREACH, $context),
-            zx::Status::ADDRESS_IN_USE => crate::types::errno!(EADDRINUSE, $context),
-            zx::Status::NOT_CONNECTED => crate::types::errno!(ENOTCONN, $context),
-            zx::Status::CONNECTION_REFUSED => crate::types::errno!(ECONNREFUSED, $context),
-            zx::Status::CONNECTION_RESET => crate::types::errno!(ECONNRESET, $context),
-            zx::Status::CONNECTION_ABORTED => crate::types::errno!(ECONNABORTED, $context),
-            _ => crate::types::errno!(EIO, $context),
+            zx::Status::NOT_FOUND => crate::types::errno::errno!(ENOENT, $context),
+            zx::Status::NO_MEMORY => crate::types::errno::errno!(ENOMEM, $context),
+            zx::Status::INVALID_ARGS => crate::types::errno::errno!(EINVAL, $context),
+            zx::Status::BUFFER_TOO_SMALL => crate::types::errno::errno!(EINVAL, $context),
+            zx::Status::TIMED_OUT => crate::types::errno::errno!(ETIMEDOUT, $context),
+            zx::Status::UNAVAILABLE => crate::types::errno::errno!(EBUSY, $context),
+            zx::Status::ALREADY_EXISTS => crate::types::errno::errno!(EEXIST, $context),
+            zx::Status::PEER_CLOSED => crate::types::errno::errno!(EPIPE, $context),
+            zx::Status::BAD_STATE => crate::types::errno::errno!(EPIPE, $context),
+            zx::Status::BAD_PATH => crate::types::errno::errno!(ENAMETOOLONG, $context),
+            zx::Status::IO => crate::types::errno::errno!(EIO, $context),
+            zx::Status::NOT_FILE => crate::types::errno::errno!(EISDIR, $context),
+            zx::Status::NOT_DIR => crate::types::errno::errno!(ENOTDIR, $context),
+            zx::Status::NOT_SUPPORTED => crate::types::errno::errno!(EOPNOTSUPP, $context),
+            zx::Status::WRONG_TYPE => crate::types::errno::errno!(EOPNOTSUPP, $context),
+            zx::Status::OUT_OF_RANGE => crate::types::errno::errno!(EINVAL, $context),
+            zx::Status::NO_RESOURCES => crate::types::errno::errno!(ENOMEM, $context),
+            zx::Status::BAD_HANDLE => crate::types::errno::errno!(EBADF, $context),
+            zx::Status::ACCESS_DENIED => crate::types::errno::errno!(EACCES, $context),
+            zx::Status::SHOULD_WAIT => crate::types::errno::errno!(EAGAIN, $context),
+            zx::Status::FILE_BIG => crate::types::errno::errno!(EFBIG, $context),
+            zx::Status::NO_SPACE => crate::types::errno::errno!(ENOSPC, $context),
+            zx::Status::NOT_EMPTY => crate::types::errno::errno!(ENOTEMPTY, $context),
+            zx::Status::IO_REFUSED => crate::types::errno::errno!(ECONNREFUSED, $context),
+            zx::Status::IO_INVALID => crate::types::errno::errno!(EIO, $context),
+            zx::Status::CANCELED => crate::types::errno::errno!(EBADF, $context),
+            zx::Status::PROTOCOL_NOT_SUPPORTED => {
+                crate::types::errno::errno!(EPROTONOSUPPORT, $context)
+            }
+            zx::Status::ADDRESS_UNREACHABLE => crate::types::errno::errno!(ENETUNREACH, $context),
+            zx::Status::ADDRESS_IN_USE => crate::types::errno::errno!(EADDRINUSE, $context),
+            zx::Status::NOT_CONNECTED => crate::types::errno::errno!(ENOTCONN, $context),
+            zx::Status::CONNECTION_REFUSED => crate::types::errno::errno!(ECONNREFUSED, $context),
+            zx::Status::CONNECTION_RESET => crate::types::errno::errno!(ECONNRESET, $context),
+            zx::Status::CONNECTION_ABORTED => crate::types::errno::errno!(ECONNABORTED, $context),
+            _ => crate::types::errno::errno!(EIO, $context),
         }
     }};
 }

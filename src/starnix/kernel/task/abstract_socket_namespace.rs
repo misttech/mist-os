@@ -11,7 +11,7 @@ use std::{
 use crate::{
     fs::socket::{Socket, SocketAddress, SocketHandle},
     task::CurrentTask,
-    types::{errno, error, Errno},
+    types::errno::{errno, error, Errno},
 };
 
 /// A registry of abstract sockets.

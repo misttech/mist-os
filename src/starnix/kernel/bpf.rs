@@ -29,6 +29,7 @@ use crate::{
     mm::{MemoryAccessor, MemoryAccessorExt},
     syscalls::{log_trace, not_implemented, CurrentTask, Locked, SyscallResult, SUCCESS},
     task::Kernel,
+    types::errno::{errno, error, Errno},
     types::user_address::{UserAddress, UserCString},
     types::{
         as_any::AsAny, bpf_attr__bindgen_ty_1, bpf_attr__bindgen_ty_10, bpf_attr__bindgen_ty_12,
@@ -38,8 +39,7 @@ use crate::{
         bpf_cmd_BPF_OBJ_GET_INFO_BY_FD, bpf_cmd_BPF_OBJ_PIN, bpf_cmd_BPF_PROG_ATTACH,
         bpf_cmd_BPF_PROG_LOAD, bpf_cmd_BPF_PROG_QUERY, bpf_map_info, bpf_map_type,
         bpf_map_type_BPF_MAP_TYPE_DEVMAP, bpf_map_type_BPF_MAP_TYPE_DEVMAP_HASH, bpf_prog_info,
-        errno, error, mode, statfs, DeviceType, Errno, FileMode, OpenFlags, BPF_FS_MAGIC,
-        BPF_F_RDONLY_PROG, PATH_MAX,
+        mode, statfs, DeviceType, FileMode, OpenFlags, BPF_FS_MAGIC, BPF_F_RDONLY_PROG, PATH_MAX,
     },
 };
 

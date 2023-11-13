@@ -14,8 +14,9 @@ use crate::{
         },
         FdEvents, FileHandle, FileObject, FileOps,
     },
-    syscalls::{error, CurrentTask, Errno, OpenFlags, SyscallArg, SyscallResult},
+    syscalls::{CurrentTask, OpenFlags, SyscallArg, SyscallResult},
     task::{EventHandler, WaitCanceler, Waiter},
+    types::errno::{error, Errno},
 };
 
 pub fn new_socket_file(

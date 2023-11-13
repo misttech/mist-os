@@ -4,7 +4,7 @@
 
 use crate::{
     fs::FsStr,
-    types::{errno, Errno},
+    types::errno::{errno, Errno},
 };
 use std::collections::HashMap;
 

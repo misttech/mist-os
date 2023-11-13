@@ -54,12 +54,3 @@ pub use auth::{
     CAP_SYS_NICE, CAP_SYS_PTRACE, CAP_SYS_RESOURCE, CAP_WAKE_ALARM, PTRACE_MODE_ATTACH_REALCREDS,
     PTRACE_MODE_FSCREDS, PTRACE_MODE_REALCREDS,
 };
-
-pub(crate) use crate::types::errno::{
-    errno, errno_from_code, errno_from_zxio_code, error, from_status_like_fdio,
-};
-pub use errno::{
-    Errno, ErrnoCode, ErrnoResultExt, SourceContext, EACCES, EAGAIN, EBADF, EEXIST, EINPROGRESS,
-    EINTR, ENAMETOOLONG, ENOENT, ENOSPC, ENOSYS, ENOTDIR, EPERM, ERESTARTNOHAND, ERESTARTNOINTR,
-    ERESTARTSYS, ERESTART_RESTARTBLOCK, ETIMEDOUT,
-};

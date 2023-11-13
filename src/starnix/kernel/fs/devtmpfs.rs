@@ -9,7 +9,8 @@ use crate::{
         kobject::DeviceMetadata, tmpfs::TmpFs, DirEntryHandle, FileSystemHandle, FsStr, MountInfo,
     },
     task::Kernel,
-    types::{mode, DeviceType, Errno},
+    types::errno::Errno,
+    types::{mode, DeviceType},
 };
 use std::sync::Arc;
 

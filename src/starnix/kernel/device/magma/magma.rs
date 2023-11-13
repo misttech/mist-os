@@ -38,8 +38,8 @@ use crate::{
     logging::log_warn,
     mm::MemoryAccessorExt,
     task::CurrentTask,
+    types::errno::{errno, Errno},
     types::user_address::{UserAddress, UserRef},
-    types::{errno, Errno},
 };
 
 /// Reads a magma command and its type from user space.

@@ -14,11 +14,11 @@ use crate::{
         FdFlags, FdNumber, FileHandle, FsString,
     },
     task::CurrentTask,
+    types::errno::{errno, error, Errno},
     types::{
-        c_int, cmsghdr, errno, error, in6_addr, in6_addr__bindgen_ty_1, in6_pktinfo, timespec,
-        timeval, ucred, Errno, IPV6_HOPLIMIT, IPV6_PKTINFO, IPV6_TCLASS, IP_TOS, IP_TTL,
-        SCM_CREDENTIALS, SCM_RIGHTS, SCM_SECURITY, SOL_IP, SOL_IPV6, SOL_SOCKET, SO_TIMESTAMP,
-        SO_TIMESTAMPNS,
+        c_int, cmsghdr, in6_addr, in6_addr__bindgen_ty_1, in6_pktinfo, timespec, timeval, ucred,
+        IPV6_HOPLIMIT, IPV6_PKTINFO, IPV6_TCLASS, IP_TOS, IP_TTL, SCM_CREDENTIALS, SCM_RIGHTS,
+        SCM_SECURITY, SOL_IP, SOL_IPV6, SOL_SOCKET, SO_TIMESTAMP, SO_TIMESTAMPNS,
     },
 };
 use syncio;
