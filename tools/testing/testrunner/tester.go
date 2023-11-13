@@ -770,6 +770,9 @@ func (t *FFXTester) Close() error {
 }
 
 func (t *FFXTester) EnsureSinks(ctx context.Context, sinks []runtests.DataSinkReference, outputs *TestOutputs) error {
+	if !t.EnabledForTesting() {
+		return t.sshTester.EnsureSinks(ctx, sinks, outputs)
+	}
 	sinksPerTest := make(map[string]runtests.DataSinkReference)
 	for _, testOutDir := range t.testOutDirs {
 		runResult, err := ffxutil.GetRunResult(testOutDir)
