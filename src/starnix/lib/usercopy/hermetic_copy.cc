@@ -19,7 +19,7 @@ constexpr size_t kWordSizeMask = kWordSize - 1;
 // and https://g-issues.fuchsia.dev/issues/309108366 for more details.
 [[gnu::section(".text.entry")]] uintptr_t hermetic_copy(volatile uint8_t* dest,
                                                         const volatile uint8_t* source,
-                                                        size_t count) {
+                                                        size_t count, bool ret_dest) {
   if ((reinterpret_cast<uintptr_t>(dest) | reinterpret_cast<uintptr_t>(source)) & kWordSizeMask) {
     size_t len;
     // src and/or dest do not align on word boundary
@@ -45,5 +45,5 @@ constexpr size_t kWordSizeMask = kWordSize - 1;
     *dest++ = *source++;
   }
 
-  return 0;
+  return ret_dest ? reinterpret_cast<uintptr_t>(dest) : reinterpret_cast<uintptr_t>(source);
 }

@@ -17,7 +17,8 @@ extern "C" {
     fn hermetic_copy_error();
 }
 
-type HermeticCopyFn = unsafe extern "C" fn(dest: *mut u8, source: *const u8, len: usize) -> usize;
+type HermeticCopyFn =
+    unsafe extern "C" fn(dest: *mut u8, source: *const u8, len: usize, ret_dest: bool) -> usize;
 
 pub struct Usercopy {
     // Pointer to the hermetic_copy routine loaded into memory.
@@ -160,6 +161,49 @@ impl Usercopy {
         }))
     }
 
+    /// Copies bytes from the source address to the destination address.
+    ///
+    /// # Safety
+    ///
+    /// Only one of `source`/`dest` may be an address to a buffer owned by user/restricted-mode.
+    /// The other must be a valid Starnix/normal-mode buffer that will never cause a fault
+    /// when the first `count` bytes are read/written.
+    #[inline]
+    unsafe fn copy(
+        &self,
+        source: usize,
+        dest: usize,
+        count: usize,
+        ret_dest: bool,
+    ) -> Result<(), usize> {
+        let unread_address = unsafe {
+            (self.hermetic_copy_fn)(dest as *mut u8, source as *const u8, count, ret_dest)
+        };
+
+        let ret_base = if ret_dest { dest } else { source };
+
+        debug_assert!(
+            unread_address >= ret_base,
+            "unread_address={:#x}, ret_base={:#x}",
+            unread_address,
+            ret_base,
+        );
+        let copied = unread_address - ret_base;
+        debug_assert!(
+            copied <= count,
+            "copied={}, count={}; unread_address={:#x}, ret_base={:#x}",
+            copied,
+            count,
+            unread_address,
+            ret_base,
+        );
+        if copied == count {
+            Ok(())
+        } else {
+            Err(copied)
+        }
+    }
+
     // Copies data from |source| to the restricted address |dest_addr|.
     // Returns Ok(()) if all bytes were copied without an error.
     // Returns Err(num_bytes) with the number of bytes copied if a fault was encountered.
@@ -171,19 +215,9 @@ impl Usercopy {
             return Err(0);
         }
 
-        let ret = unsafe {
-            (self.hermetic_copy_fn)(
-                dest_addr as *mut u8,
-                source.as_ptr() as *const u8,
-                source.len(),
-            )
-        };
-        if ret == 0 {
-            Ok(())
-        } else {
-            let fault_address = ret;
-            Err(fault_address - dest_addr)
-        }
+        // SAFETY: `source` is a valid Starnix-owned buffer and `dest_addr` is the user-mode
+        // buffer.
+        unsafe { self.copy(source.as_ptr() as usize, dest_addr, source.len(), true) }
     }
 
     // Copies data from the restricted address |source_addr| to |dest|
@@ -197,15 +231,9 @@ impl Usercopy {
             return Err(0);
         }
 
-        let ret = unsafe {
-            (self.hermetic_copy_fn)(dest.as_ptr() as *mut u8, source_addr as *const u8, dest.len())
-        };
-        if ret == 0 {
-            Ok(())
-        } else {
-            let fault_address = ret;
-            Err(fault_address - source_addr)
-        }
+        // SAFETY: `dest` is a valid Starnix-owned buffer and `source_addr` is the user-mode
+        // buffer.
+        unsafe { self.copy(source_addr, dest.as_ptr() as usize, dest.len(), false) }
     }
 }
 
