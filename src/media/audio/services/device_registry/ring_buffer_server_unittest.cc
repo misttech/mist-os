@@ -294,9 +294,11 @@ TEST_F(RingBufferServerTest, DriverDoesNotSupportSetActiveChannels) {
       [&received_callback](fidl::Result<RingBuffer::SetActiveChannels>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_error()) << result.error_value().FormatDescription();
-        ASSERT_TRUE(result.error_value().is_domain_error());
+        ASSERT_TRUE(result.error_value().is_domain_error())
+            << result.error_value().FormatDescription();
         EXPECT_EQ(result.error_value().domain_error(),
-                  fuchsia_audio_device::RingBufferSetActiveChannelsError::kMethodNotSupported);
+                  fuchsia_audio_device::RingBufferSetActiveChannelsError::kMethodNotSupported)
+            << result.error_value().FormatDescription();
       });
 
   RunLoopUntilIdle();
@@ -328,7 +330,7 @@ TEST_F(RingBufferServerTest, StartAndStop) {
               fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(std::move(ring_buffer_server_end)),
       }})
       .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
-        EXPECT_TRUE(result.is_ok());
+        EXPECT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
         received_callback = true;
       });
   RunLoopUntilIdle();

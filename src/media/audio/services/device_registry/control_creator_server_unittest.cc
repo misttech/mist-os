@@ -59,7 +59,7 @@ TEST_F(ControlCreatorServerTest, CreateControl) {
       .Then([&received_callback](
                 fidl::Result<fuchsia_audio_device::ControlCreator::Create>& result) mutable {
         received_callback = true;
-        EXPECT_TRUE(result.is_ok());
+        EXPECT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
       });
 
   RunLoopUntilIdle();

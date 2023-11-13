@@ -107,9 +107,11 @@ TEST_F(RegistryServerWarningTest, CreateObserverMissingToken) {
       }})
       .Then([&received_callback](
                 fidl::Result<fuchsia_audio_device::Registry::CreateObserver>& result) {
-        EXPECT_TRUE(result.is_error() && result.error_value().is_domain_error());
+        EXPECT_TRUE(result.is_error() && result.error_value().is_domain_error())
+            << result.error_value().FormatDescription();
         EXPECT_EQ(result.error_value().domain_error(),
-                  fuchsia_audio_device::RegistryCreateObserverError::kInvalidTokenId);
+                  fuchsia_audio_device::RegistryCreateObserverError::kInvalidTokenId)
+            << result.error_value().FormatDescription();
         received_callback = true;
       });
   RunLoopUntilIdle();
@@ -135,9 +137,11 @@ TEST_F(RegistryServerWarningTest, CreateObserverBadToken) {
       }})
       .Then([&received_callback](
                 fidl::Result<fuchsia_audio_device::Registry::CreateObserver>& result) {
-        EXPECT_TRUE(result.is_error() && result.error_value().is_domain_error());
+        EXPECT_TRUE(result.is_error() && result.error_value().is_domain_error())
+            << result.error_value().FormatDescription();
         EXPECT_EQ(result.error_value().domain_error(),
-                  fuchsia_audio_device::RegistryCreateObserverError::kDeviceNotFound);
+                  fuchsia_audio_device::RegistryCreateObserverError::kDeviceNotFound)
+            << result.error_value().FormatDescription();
         received_callback = true;
       });
   RunLoopUntilIdle();
@@ -159,7 +163,7 @@ TEST_F(RegistryServerWarningTest, CreateObserverMissingObserver) {
   std::optional<TokenId> id;
   registry->client()->WatchDevicesAdded().Then(
       [&id](fidl::Result<fuchsia_audio_device::Registry::WatchDevicesAdded>& result) mutable {
-        ASSERT_TRUE(result.is_ok());
+        ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
         ASSERT_TRUE(result->devices());
         ASSERT_EQ(result->devices()->size(), 1u);
         ASSERT_TRUE(result->devices()->at(0).token_id());
@@ -180,9 +184,11 @@ TEST_F(RegistryServerWarningTest, CreateObserverMissingObserver) {
       }})
       .Then([&received_callback](
                 fidl::Result<fuchsia_audio_device::Registry::CreateObserver>& result) {
-        EXPECT_TRUE(result.is_error() && result.error_value().is_domain_error());
+        EXPECT_TRUE(result.is_error() && result.error_value().is_domain_error())
+            << result.error_value().FormatDescription();
         EXPECT_EQ(result.error_value().domain_error(),
-                  fuchsia_audio_device::RegistryCreateObserverError::kInvalidObserver);
+                  fuchsia_audio_device::RegistryCreateObserverError::kInvalidObserver)
+            << result.error_value().FormatDescription();
         received_callback = true;
       });
   RunLoopUntilIdle();
@@ -204,7 +210,7 @@ TEST_F(RegistryServerWarningTest, CreateObserverBadObserver) {
   std::optional<TokenId> id;
   registry->client()->WatchDevicesAdded().Then(
       [&id](fidl::Result<fuchsia_audio_device::Registry::WatchDevicesAdded>& result) mutable {
-        ASSERT_TRUE(result.is_ok());
+        ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
         ASSERT_TRUE(result->devices());
         ASSERT_EQ(result->devices()->size(), 1u);
         ASSERT_TRUE(result->devices()->at(0).token_id());
@@ -226,8 +232,10 @@ TEST_F(RegistryServerWarningTest, CreateObserverBadObserver) {
       }})
       .Then([&received_callback](
                 fidl::Result<fuchsia_audio_device::Registry::CreateObserver>& result) {
-        EXPECT_TRUE(result.is_error() && result.error_value().is_framework_error());
-        EXPECT_EQ(result.error_value().framework_error().status(), ZX_ERR_INVALID_ARGS);
+        EXPECT_TRUE(result.is_error() && result.error_value().is_framework_error())
+            << result.error_value().FormatDescription();
+        EXPECT_EQ(result.error_value().framework_error().status(), ZX_ERR_INVALID_ARGS)
+            << result.error_value().FormatDescription();
         received_callback = true;
       });
   RunLoopUntilIdle();

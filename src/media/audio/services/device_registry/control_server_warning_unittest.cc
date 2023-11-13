@@ -47,7 +47,7 @@ class ControlServerWarningTest : public AudioDeviceRegistryServerTestBase,
     registry_client->WatchDevicesAdded().Then(
         [&added_device_id](
             fidl::Result<fuchsia_audio_device::Registry::WatchDevicesAdded>& result) mutable {
-          ASSERT_TRUE(result.is_ok());
+          ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
           ASSERT_TRUE(result->devices());
           ASSERT_EQ(result->devices()->size(), 1u);
           ASSERT_TRUE(result->devices()->at(0).token_id());
@@ -75,7 +75,7 @@ class ControlServerWarningTest : public AudioDeviceRegistryServerTestBase,
         }})
         .Then([&received_callback](
                   fidl::Result<fuchsia_audio_device::ControlCreator::Create>& result) {
-          ASSERT_TRUE(result.is_ok());
+          ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
           received_callback = true;
         });
     RunLoopUntilIdle();
@@ -484,7 +484,8 @@ TEST_F(ControlServerWarningTest, CreateRingBufferMissingRingBufferServerEnd) {
         ASSERT_TRUE(result.error_value().is_domain_error())
             << result.error_value().FormatDescription();
         EXPECT_EQ(result.error_value().domain_error(),
-                  fuchsia_audio_device::ControlCreateRingBufferError::kInvalidRingBuffer);
+                  fuchsia_audio_device::ControlCreateRingBufferError::kInvalidRingBuffer)
+            << result.error_value().FormatDescription();
         received_callback = true;
       });
 
@@ -521,7 +522,8 @@ TEST_F(ControlServerWarningTest, CreateRingBufferBadRingBufferServerEnd) {
         ASSERT_TRUE(result.is_error());
         ASSERT_TRUE(result.error_value().is_framework_error())
             << result.error_value().FormatDescription();
-        EXPECT_EQ(result.error_value().framework_error().status(), ZX_ERR_INVALID_ARGS);
+        EXPECT_EQ(result.error_value().framework_error().status(), ZX_ERR_INVALID_ARGS)
+            << result.error_value().FormatDescription();
         received_callback = true;
       });
 

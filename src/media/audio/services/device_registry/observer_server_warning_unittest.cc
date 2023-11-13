@@ -40,7 +40,7 @@ class ObserverServerWarningTest : public AudioDeviceRegistryServerTestBase,
     registry_client->WatchDevicesAdded().Then(
         [&added_device_id](
             fidl::Result<fuchsia_audio_device::Registry::WatchDevicesAdded>& result) mutable {
-          ASSERT_TRUE(result.is_ok());
+          ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
           ASSERT_TRUE(result->devices());
           ASSERT_EQ(result->devices()->size(), 1u);
           ASSERT_TRUE(result->devices()->at(0).token_id());
@@ -71,7 +71,7 @@ TEST_F(ObserverServerWarningTest, WatchGainStateWhileAlreadyWatching) {
       [&received_initial_callback](
           fidl::Result<fuchsia_audio_device::Observer::WatchGainState>& result) mutable {
         received_initial_callback = true;
-        ASSERT_TRUE(result.is_ok());
+        ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
       });
   RunLoopUntilIdle();
   EXPECT_TRUE(received_initial_callback);
@@ -128,7 +128,7 @@ TEST_F(ObserverServerWarningTest, WatchPlugStateWhileAlreadyWatching) {
       [&received_initial_callback](
           fidl::Result<fuchsia_audio_device::Observer::WatchPlugState>& result) mutable {
         received_initial_callback = true;
-        ASSERT_TRUE(result.is_ok());
+        ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
       });
   RunLoopUntilIdle();
   EXPECT_TRUE(received_initial_callback);
@@ -153,9 +153,11 @@ TEST_F(ObserverServerWarningTest, WatchPlugStateWhileAlreadyWatching) {
              fuchsia_audio_device::ObserverWatchPlugStateError::kWatchAlreadyPending);
 
         ASSERT_TRUE(result.is_error());
-        ASSERT_TRUE(result.error_value().is_domain_error());
+        ASSERT_TRUE(result.error_value().is_domain_error())
+            << result.error_value().FormatDescription();
         EXPECT_EQ(result.error_value().domain_error(),
-                  fuchsia_audio_device::ObserverWatchPlugStateError::kWatchAlreadyPending);
+                  fuchsia_audio_device::ObserverWatchPlugStateError::kWatchAlreadyPending)
+            << result.error_value().FormatDescription();
       });
   RunLoopUntilIdle();
   EXPECT_TRUE(received_expected_error_callback);

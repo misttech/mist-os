@@ -235,7 +235,7 @@ class DeviceTestBase : public gtest::TestLoopFixture {
 
     const auto now = zx::clock::get_monotonic();
     device_->SetActiveChannels(expected_bitmask, [this](zx::result<zx::time> result) {
-      EXPECT_TRUE(result.is_ok());
+      EXPECT_TRUE(result.is_ok()) << result.status_string();
       ASSERT_TRUE(device_->active_channels_set_time_);
       EXPECT_EQ(result.value(), *device_->active_channels_set_time_);
     });
@@ -260,7 +260,7 @@ class DeviceTestBase : public gtest::TestLoopFixture {
 
     const auto now = zx::clock::get_monotonic().get();
     device_->StartRingBuffer([this](zx::result<zx::time> result) {
-      EXPECT_TRUE(result.is_ok());
+      EXPECT_TRUE(result.is_ok()) << result.status_string();
       ASSERT_TRUE(device_->start_time_);
       EXPECT_EQ(result.value(), *device_->start_time_);
     });

@@ -35,9 +35,11 @@ TEST_F(ProviderServerWarningTest, MissingDeviceName) {
       .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_error());
-        ASSERT_TRUE(result.error_value().is_domain_error());
+        ASSERT_TRUE(result.error_value().is_domain_error())
+            << result.error_value().FormatDescription();
         EXPECT_EQ(result.error_value().domain_error(),
-                  fuchsia_audio_device::ProviderAddDeviceError::kInvalidName);
+                  fuchsia_audio_device::ProviderAddDeviceError::kInvalidName)
+            << result.error_value().FormatDescription();
       });
 
   RunLoopUntilIdle();
@@ -64,9 +66,11 @@ TEST_F(ProviderServerWarningTest, EmptyDeviceName) {
       .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_error());
-        ASSERT_TRUE(result.error_value().is_domain_error());
+        ASSERT_TRUE(result.error_value().is_domain_error())
+            << result.error_value().FormatDescription();
         EXPECT_EQ(result.error_value().domain_error(),
-                  fuchsia_audio_device::ProviderAddDeviceError::kInvalidName);
+                  fuchsia_audio_device::ProviderAddDeviceError::kInvalidName)
+            << result.error_value().FormatDescription();
       });
 
   RunLoopUntilIdle();
@@ -92,9 +96,11 @@ TEST_F(ProviderServerWarningTest, MissingDeviceType) {
       .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_error());
-        ASSERT_TRUE(result.error_value().is_domain_error());
+        ASSERT_TRUE(result.error_value().is_domain_error())
+            << result.error_value().FormatDescription();
         EXPECT_EQ(result.error_value().domain_error(),
-                  fuchsia_audio_device::ProviderAddDeviceError::kInvalidType);
+                  fuchsia_audio_device::ProviderAddDeviceError::kInvalidType)
+            << result.error_value().FormatDescription();
       });
 
   RunLoopUntilIdle();
@@ -116,9 +122,11 @@ TEST_F(ProviderServerWarningTest, MissingStreamConfig) {
       .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_error());
-        ASSERT_TRUE(result.error_value().is_domain_error());
+        ASSERT_TRUE(result.error_value().is_domain_error())
+            << result.error_value().FormatDescription();
         EXPECT_EQ(result.error_value().domain_error(),
-                  fuchsia_audio_device::ProviderAddDeviceError::kInvalidStreamConfig);
+                  fuchsia_audio_device::ProviderAddDeviceError::kInvalidStreamConfig)
+            << result.error_value().FormatDescription();
       });
 
   RunLoopUntilIdle();
@@ -141,8 +149,10 @@ TEST_F(ProviderServerWarningTest, InvalidStreamConfig) {
       .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_error());
-        ASSERT_TRUE(result.error_value().is_framework_error());
-        EXPECT_EQ(result.error_value().framework_error().status(), ZX_ERR_INVALID_ARGS);
+        ASSERT_TRUE(result.error_value().is_framework_error())
+            << result.error_value().FormatDescription();
+        EXPECT_EQ(result.error_value().framework_error().status(), ZX_ERR_INVALID_ARGS)
+            << result.error_value().FormatDescription();
       });
 
   RunLoopUntilIdle();

@@ -65,7 +65,7 @@ std::optional<TokenId> ObserverServerTest::WaitForAddedDeviceTokenId(
   std::optional<TokenId> added_device_id;
   registry_client->WatchDevicesAdded().Then(
       [&added_device_id](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
-        ASSERT_TRUE(result.is_ok());
+        ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
         ASSERT_TRUE(result->devices());
         ASSERT_EQ(result->devices()->size(), 1u);
         ASSERT_TRUE(result->devices()->at(0).token_id());
@@ -80,7 +80,7 @@ std::optional<TokenId> ObserverServerTest::WaitForRemovedDeviceTokenId(
   std::optional<TokenId> removed_device_id;
   registry_client->WatchDeviceRemoved().Then(
       [&removed_device_id](fidl::Result<Registry::WatchDeviceRemoved>& result) mutable {
-        ASSERT_TRUE(result.is_ok());
+        ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
         ASSERT_TRUE(result->token_id());
         removed_device_id = *result->token_id();
       });
@@ -114,7 +114,7 @@ fidl::Client<fuchsia_audio_device::Observer> ObserverServerTest::ConnectToObserv
               fidl::ServerEnd<fuchsia_audio_device::Observer>(std::move(observer_server_end)),
       }})
       .Then([&received_callback](fidl::Result<Registry::CreateObserver>& result) {
-        ASSERT_TRUE(result.is_ok());
+        ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
         received_callback = true;
       });
   RunLoopUntilIdle();
@@ -167,7 +167,7 @@ TEST_F(ObserverServerTest, Creation) {
               fidl::ServerEnd<fuchsia_audio_device::Observer>(std::move(observer_server_end)),
       }})
       .Then([&received_callback](fidl::Result<Registry::CreateObserver>& result) {
-        ASSERT_TRUE(result.is_ok());
+        ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
         received_callback = true;
       });
   RunLoopUntilIdle();
@@ -236,7 +236,7 @@ TEST_F(ObserverServerTest, InitialGainState) {
   observer->client()->WatchGainState().Then(
       [&received_callback, kGainDb](fidl::Result<Observer::WatchGainState>& result) {
         received_callback = true;
-        ASSERT_TRUE(result.is_ok());
+        ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
         ASSERT_TRUE(result->state());
         ASSERT_TRUE(result->state()->gain_db());
         EXPECT_EQ(*result->state()->gain_db(), kGainDb);
@@ -268,7 +268,7 @@ TEST_F(ObserverServerTest, GainChange) {
   observer->client()->WatchGainState().Then(
       [&received_callback](fidl::Result<Observer::WatchGainState>& result) {
         received_callback = true;
-        ASSERT_TRUE(result.is_ok());
+        ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
         ASSERT_TRUE(result->state());
         ASSERT_TRUE(result->state()->gain_db());
         EXPECT_EQ(*result->state()->gain_db(), 0.0f);
@@ -283,7 +283,7 @@ TEST_F(ObserverServerTest, GainChange) {
   observer->client()->WatchGainState().Then(
       [&received_callback, kGainDb](fidl::Result<Observer::WatchGainState>& result) {
         received_callback = true;
-        ASSERT_TRUE(result.is_ok());
+        ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
         ASSERT_TRUE(result->state());
         ASSERT_TRUE(result->state()->gain_db());
         EXPECT_EQ(*result->state()->gain_db(), kGainDb);
@@ -332,7 +332,7 @@ TEST_F(ObserverServerTest, InitialPlugState) {
   observer->client()->WatchPlugState().Then(
       [&received_callback, initial_plug_time](fidl::Result<Observer::WatchPlugState>& result) {
         received_callback = true;
-        ASSERT_TRUE(result.is_ok());
+        ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
         ASSERT_TRUE(result->state());
         EXPECT_EQ(*result->state(), fuchsia_audio_device::PlugState::kUnplugged);
         ASSERT_TRUE(result->plug_time());
@@ -365,7 +365,7 @@ TEST_F(ObserverServerTest, PlugChange) {
       [&received_callback, time_of_plug_change](fidl::Result<Observer::WatchPlugState>& result) {
         FX_LOGS(DEBUG) << "Received callback 1";
         received_callback = true;
-        ASSERT_TRUE(result.is_ok());
+        ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
         ASSERT_TRUE(result->state());
         EXPECT_EQ(*result->state(), fuchsia_audio_device::PlugState::kPlugged);
         ASSERT_TRUE(result->plug_time());
@@ -379,7 +379,7 @@ TEST_F(ObserverServerTest, PlugChange) {
       [&received_callback, time_of_plug_change](fidl::Result<Observer::WatchPlugState>& result) {
         FX_LOGS(DEBUG) << "Received callback 2";
         received_callback = true;
-        ASSERT_TRUE(result.is_ok());
+        ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
         ASSERT_TRUE(result->state());
         EXPECT_EQ(*result->state(), fuchsia_audio_device::PlugState::kUnplugged);
         ASSERT_TRUE(result->plug_time());
@@ -413,7 +413,7 @@ TEST_F(ObserverServerTest, GetReferenceClock) {
   observer->client()->GetReferenceClock().Then(
       [&received_callback](fidl::Result<Observer::GetReferenceClock>& result) {
         received_callback = true;
-        ASSERT_TRUE(result.is_ok());
+        ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
         ASSERT_TRUE(result->reference_clock());
         zx::clock clock = std::move(*result->reference_clock());
         EXPECT_TRUE(clock.is_valid());

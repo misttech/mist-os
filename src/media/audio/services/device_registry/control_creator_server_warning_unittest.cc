@@ -36,9 +36,11 @@ TEST_F(ControlCreatorServerWarningTest, MissingId) {
       .Then([&received_callback](fidl::Result<ControlCreator::Create>& result) mutable {
         received_callback = true;
         ASSERT_TRUE(result.is_error());
-        ASSERT_TRUE(result.error_value().is_domain_error());
+        ASSERT_TRUE(result.error_value().is_domain_error())
+            << result.error_value().FormatDescription();
         EXPECT_EQ(result.error_value().domain_error(),
-                  fuchsia_audio_device::ControlCreatorError::kInvalidTokenId);
+                  fuchsia_audio_device::ControlCreatorError::kInvalidTokenId)
+            << result.error_value().FormatDescription();
       });
 
   RunLoopUntilIdle();
@@ -63,7 +65,7 @@ TEST_F(ControlCreatorServerWarningTest, BadId) {
   std::optional<TokenId> added_device_id;
   registry->client()->WatchDevicesAdded().Then(
       [&added_device_id](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
-        ASSERT_TRUE(result.is_ok());
+        ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
         ASSERT_TRUE(result->devices());
         ASSERT_EQ(result->devices()->size(), 1u);
         ASSERT_TRUE(result->devices()->at(0).token_id());
@@ -86,9 +88,11 @@ TEST_F(ControlCreatorServerWarningTest, BadId) {
       .Then([&received_callback](fidl::Result<ControlCreator::Create>& result) mutable {
         received_callback = true;
         ASSERT_TRUE(result.is_error());
-        ASSERT_TRUE(result.error_value().is_domain_error());
+        ASSERT_TRUE(result.error_value().is_domain_error())
+            << result.error_value().FormatDescription();
         EXPECT_EQ(result.error_value().domain_error(),
-                  fuchsia_audio_device::ControlCreatorError::kDeviceNotFound);
+                  fuchsia_audio_device::ControlCreatorError::kDeviceNotFound)
+            << result.error_value().FormatDescription();
       });
 
   RunLoopUntilIdle();
@@ -113,7 +117,7 @@ TEST_F(ControlCreatorServerWarningTest, MissingServerEnd) {
   std::optional<TokenId> added_device_id;
   registry->client()->WatchDevicesAdded().Then(
       [&added_device_id](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
-        ASSERT_TRUE(result.is_ok());
+        ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
         ASSERT_TRUE(result->devices());
         ASSERT_EQ(result->devices()->size(), 1u);
         ASSERT_TRUE(result->devices()->at(0).token_id());
@@ -136,9 +140,11 @@ TEST_F(ControlCreatorServerWarningTest, MissingServerEnd) {
       .Then([&received_callback](fidl::Result<ControlCreator::Create>& result) mutable {
         received_callback = true;
         ASSERT_TRUE(result.is_error());
-        ASSERT_TRUE(result.error_value().is_domain_error());
+        ASSERT_TRUE(result.error_value().is_domain_error())
+            << result.error_value().FormatDescription();
         EXPECT_EQ(result.error_value().domain_error(),
-                  fuchsia_audio_device::ControlCreatorError::kInvalidControl);
+                  fuchsia_audio_device::ControlCreatorError::kInvalidControl)
+            << result.error_value().FormatDescription();
       });
 
   RunLoopUntilIdle();
@@ -164,7 +170,7 @@ TEST_F(ControlCreatorServerWarningTest, BadServerEnd) {
 
     registry->client()->WatchDevicesAdded().Then(
         [&added_device_id](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
-          ASSERT_TRUE(result.is_ok());
+          ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
           ASSERT_TRUE(result->devices());
           ASSERT_EQ(result->devices()->size(), 1u);
           ASSERT_TRUE(result->devices()->at(0).token_id());
@@ -188,8 +194,10 @@ TEST_F(ControlCreatorServerWarningTest, BadServerEnd) {
       .Then([&received_callback](fidl::Result<ControlCreator::Create>& result) mutable {
         received_callback = true;
         ASSERT_TRUE(result.is_error());
-        ASSERT_TRUE(result.error_value().is_framework_error());
-        EXPECT_EQ(result.error_value().framework_error().status(), ZX_ERR_INVALID_ARGS);
+        ASSERT_TRUE(result.error_value().is_framework_error())
+            << result.error_value().FormatDescription();
+        EXPECT_EQ(result.error_value().framework_error().status(), ZX_ERR_INVALID_ARGS)
+            << result.error_value().FormatDescription();
       });
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
@@ -214,7 +222,7 @@ TEST_F(ControlCreatorServerWarningTest, IdAlreadyControlled) {
 
     registry->client()->WatchDevicesAdded().Then(
         [&added_device_id](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
-          ASSERT_TRUE(result.is_ok());
+          ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
           ASSERT_TRUE(result->devices());
           ASSERT_EQ(result->devices()->size(), 1u);
           ASSERT_TRUE(result->devices()->at(0).token_id());
@@ -237,7 +245,7 @@ TEST_F(ControlCreatorServerWarningTest, IdAlreadyControlled) {
       }})
       .Then([&received_callback](fidl::Result<ControlCreator::Create>& result) mutable {
         received_callback = true;
-        ASSERT_TRUE(result.is_ok());
+        ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
       });
   RunLoopUntilIdle();
   ASSERT_TRUE(received_callback);
@@ -256,9 +264,11 @@ TEST_F(ControlCreatorServerWarningTest, IdAlreadyControlled) {
       .Then([&received_callback](fidl::Result<ControlCreator::Create>& result) mutable {
         received_callback = true;
         ASSERT_TRUE(result.is_error());
-        ASSERT_TRUE(result.error_value().is_domain_error());
+        ASSERT_TRUE(result.error_value().is_domain_error())
+            << result.error_value().FormatDescription();
         EXPECT_EQ(result.error_value().domain_error(),
-                  fuchsia_audio_device::ControlCreatorError::kDeviceAlreadyAllocated);
+                  fuchsia_audio_device::ControlCreatorError::kDeviceAlreadyAllocated)
+            << result.error_value().FormatDescription();
       });
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);

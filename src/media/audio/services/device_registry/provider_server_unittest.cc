@@ -49,7 +49,7 @@ TEST_F(ProviderServerTest, AddDeviceThatOutlivesProvider) {
           .stream_config_client = std::move(stream_config_client_end),
       }})
       .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
-        EXPECT_TRUE(result.is_ok());
+        EXPECT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
         received_callback = true;
       });
 
@@ -80,7 +80,7 @@ TEST_F(ProviderServerTest, ProviderCanOutliveDevice) {
           .stream_config_client = std::move(stream_config_client_end),
       }})
       .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
-        EXPECT_TRUE(result.is_ok());
+        EXPECT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
         received_callback = true;
       });
 
@@ -116,7 +116,7 @@ TEST_F(ProviderServerTest, ProviderAddThenWatch) {
           .stream_config_client = std::move(stream_config_client_end),
       }})
       .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
-        EXPECT_TRUE(result.is_ok());
+        EXPECT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
         received_callback = true;
       });
 
@@ -128,7 +128,7 @@ TEST_F(ProviderServerTest, ProviderAddThenWatch) {
   std::optional<TokenId> added_device;
   registry_wrapper->client()->WatchDevicesAdded().Then(
       [&added_device](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
-        ASSERT_TRUE(result.is_ok());
+        ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
         ASSERT_TRUE(result->devices());
         ASSERT_EQ(result->devices()->size(), 1u);
         ASSERT_TRUE(result->devices()->at(0).token_id());
@@ -146,7 +146,7 @@ TEST_F(ProviderServerTest, WatchThenProviderAdd) {
   std::optional<TokenId> added_device;
   registry_wrapper->client()->WatchDevicesAdded().Then(
       [&added_device](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
-        ASSERT_TRUE(result.is_ok());
+        ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
         ASSERT_TRUE(result->devices());
         ASSERT_EQ(result->devices()->size(), 1u);
         ASSERT_TRUE(result->devices()->at(0).token_id());
@@ -171,7 +171,7 @@ TEST_F(ProviderServerTest, WatchThenProviderAdd) {
           .stream_config_client = std::move(stream_config_client_end),
       }})
       .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
-        EXPECT_TRUE(result.is_ok());
+        EXPECT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
         received_callback = true;
       });
 
