@@ -34,11 +34,18 @@ impl From<zx::EventPair> for Token {
 }
 
 impl Token {
-    fn get_koid_and_related_koid(&self) -> (Option<zx::Koid>, Option<zx::Koid>) {
+    fn koid(&self) -> Option<zx::Koid> {
         let Ok(info) = self.event_pair.basic_info() else {
-            return (None, None);
+            return None;
         };
-        (Some(info.koid), Some(info.related_koid))
+        Some(info.koid)
+    }
+
+    fn related_koid(&self) -> Option<zx::Koid> {
+        let Ok(info) = self.event_pair.basic_info() else {
+            return None;
+        };
+        Some(info.related_koid)
     }
 }
 
@@ -65,7 +72,6 @@ impl From<fpb::Credential> for CredentialToRegister {
 pub struct Registry {
     credentials: HashMap<CredentialID, Credential>,
     tokens: HashMap<CredentialID, Token>,
-    credential_ids_by_related_koids: HashMap<zx::Koid, CredentialID>,
     credential_ids_by_element: HashMap<ElementID, Vec<CredentialID>>,
 }
 
@@ -74,38 +80,30 @@ impl Registry {
         Registry {
             credentials: HashMap::new(),
             tokens: HashMap::new(),
-            credential_ids_by_related_koids: HashMap::new(),
             credential_ids_by_element: HashMap::new(),
         }
     }
 
-    pub fn lookup(&mut self, token: Token) -> Option<Credential> {
-        let (Some(koid), _) = token.get_koid_and_related_koid() else {
-            tracing::debug!("could not get koid for {:?}", token);
+    pub fn get_credential_by_koid(&self, koid: &zx::Koid) -> Option<Credential> {
+        self.credentials.get(koid).cloned()
+    }
+
+    pub fn lookup(&self, token: Token) -> Option<Credential> {
+        let Some(related_koid) = token.related_koid() else {
+            tracing::debug!("could not get related koid for {:?}", token);
             return None;
         };
-        let Some(id) = self.credential_ids_by_related_koids.get(&koid) else {
-            tracing::debug!(
-                "credential_ids_by_related_koids missing {:?} from token {:?}",
-                koid,
-                token
-            );
-            return None;
-        };
-        self.credentials.get(id).cloned()
+        self.get_credential_by_koid(&related_koid)
     }
 
     pub fn register(
         &mut self,
         credential_to_register: CredentialToRegister,
     ) -> Result<CredentialID, RegisterCredentialsError> {
-        let (Some(id), Some(related_koid)) =
-            credential_to_register.broker_token.get_koid_and_related_koid()
-        else {
-            tracing::error!("could not get koids for {:?}", credential_to_register.broker_token);
+        let Some(id) = credential_to_register.broker_token.koid() else {
+            tracing::error!("could not get koid for {:?}", credential_to_register.broker_token);
             return Err(RegisterCredentialsError::Internal);
         };
-        self.credential_ids_by_related_koids.insert(related_koid, id);
         self.tokens.insert(id, credential_to_register.broker_token);
         self.credential_ids_by_element
             .entry(credential_to_register.element.clone())
@@ -144,13 +142,7 @@ impl Registry {
                 None
             }
         };
-        if let Some(token) = self.tokens.remove(id) {
-            if let (_, Some(related_koid)) = token.get_koid_and_related_koid() {
-                self.credential_ids_by_related_koids.remove(&related_koid);
-            } else {
-                tracing::error!("could not get related_koid for {:?}", token);
-            };
-        };
+        self.tokens.remove(id);
         cred
     }
 
