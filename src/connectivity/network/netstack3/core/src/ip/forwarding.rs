@@ -143,9 +143,9 @@ pub trait RoutesVisitor<'a, C: DeviceLayerTypes + 'a> {
     /// The result of [`RoutesVisitor::visit`].
     type VisitResult;
 
-    /// Consumes `self` and an Entry iterator to produce a `VisitResult`.
+    /// Consumes an Entry iterator to produce a `VisitResult`.
     fn visit<'b, I: Ip>(
-        self,
+        &mut self,
         stats: impl Iterator<Item = &'b Entry<I::Addr, DeviceId<C>>> + 'b,
     ) -> Self::VisitResult
     where
@@ -153,7 +153,7 @@ pub trait RoutesVisitor<'a, C: DeviceLayerTypes + 'a> {
 }
 
 /// Provides access to the state of the route table via a visitor.
-pub fn with_routes<'a, I, C, V>(sync_ctx: &SyncCtx<C>, cb: V) -> V::VisitResult
+pub fn with_routes<'a, I, C, V>(sync_ctx: &SyncCtx<C>, cb: &mut V) -> V::VisitResult
 where
     I: IpExt,
     C: NonSyncContext + 'a,

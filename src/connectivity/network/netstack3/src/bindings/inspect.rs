@@ -25,21 +25,50 @@ use netstack3_core::{
 };
 use std::{fmt, string::ToString as _};
 
+/// A visitor for diagnostics data that has distinct Ipv4 and Ipv6 variants.
+struct DualIpVisitor {
+    inspector: fuchsia_inspect::Inspector,
+    count: usize,
+}
+
+impl DualIpVisitor {
+    fn new() -> Self {
+        Self {
+            inspector: fuchsia_inspect::Inspector::new(fuchsia_inspect::InspectorConfig::default()),
+            count: 0,
+        }
+    }
+
+    /// Records a child Inspect node with an incrementing id that is unique
+    /// across IP versions.
+    fn record_unique_child<F>(&mut self, f: F)
+    where
+        F: FnOnce(&fuchsia_inspect::types::Node),
+    {
+        let Self { inspector, count } = self;
+        let id = core::mem::replace(count, *count + 1);
+        inspector.root().record_child(format!("{id}"), f)
+    }
+}
+
+/// A visitor for diagnostics data.
+struct Visitor(fuchsia_inspect::Inspector);
+
+impl Visitor {
+    fn new() -> Self {
+        Self(fuchsia_inspect::Inspector::new(fuchsia_inspect::InspectorConfig::default()))
+    }
+}
+
 /// Publishes netstack3 socket diagnostics data to Inspect.
 pub(crate) fn sockets(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
-    struct Visitor {
-        inspector: fuchsia_inspect::Inspector,
-        count: usize,
-    }
-    impl<I: Ip> tcp::socket::InfoVisitor<I, WeakDeviceId<BindingsNonSyncCtxImpl>> for Visitor {
+    impl<I: Ip> tcp::socket::InfoVisitor<I, WeakDeviceId<BindingsNonSyncCtxImpl>> for DualIpVisitor {
         fn visit(
             &mut self,
             socket: tcp::socket::SocketStats<I, WeakDeviceId<BindingsNonSyncCtxImpl>>,
         ) {
-            let Self { inspector, count } = self;
-            let id = core::mem::replace(count, *count + 1);
             let tcp::socket::SocketStats { local, remote } = socket;
-            inspector.root().record_child(format!("{id}"), |node| {
+            self.record_unique_child(|node| {
                 node.record_string("TransportProtocol", "TCP");
                 node.record_string(
                     "NetworkProtocol",
@@ -64,10 +93,7 @@ pub(crate) fn sockets(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
         }
     }
     let sync_ctx = ctx.sync_ctx();
-    let mut visitor = Visitor {
-        inspector: fuchsia_inspect::Inspector::new(fuchsia_inspect::InspectorConfig::default()),
-        count: 0,
-    };
+    let mut visitor = DualIpVisitor::new();
     tcp::socket::with_info::<Ipv4, _, _>(sync_ctx, &mut visitor);
     tcp::socket::with_info::<Ipv6, _, _>(sync_ctx, &mut visitor);
 
@@ -76,20 +102,18 @@ pub(crate) fn sockets(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
 
 /// Publishes netstack3 routing table diagnostics data to Inspect.
 pub(crate) fn routes(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
-    struct Visitor(fuchsia_inspect::Inspector);
-    impl<'a> ip::forwarding::RoutesVisitor<'a, BindingsNonSyncCtxImpl> for &'_ mut Visitor {
+    impl<'a> ip::forwarding::RoutesVisitor<'a, BindingsNonSyncCtxImpl> for DualIpVisitor {
         type VisitResult = ();
         fn visit<'b, I: Ip>(
-            self,
+            &mut self,
             per_route: impl Iterator<Item = &'b ip::types::Entry<I::Addr, DeviceId<BindingsNonSyncCtxImpl>>>
                 + 'b,
         ) -> Self::VisitResult
         where
             'a: 'b,
         {
-            let Visitor(inspector) = self;
-            for (i, route) in per_route.enumerate() {
-                inspector.root().record_child(format!("{}", i), |node| {
+            for route in per_route {
+                self.record_unique_child(|node| {
                     let ip::types::Entry { subnet, device, gateway, metric } = route;
                     node.record_string("Destination", format!("{}", subnet));
                     node.record_uint("InterfaceId", device.bindings_id().id.into());
@@ -116,16 +140,13 @@ pub(crate) fn routes(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
         }
     }
     let sync_ctx = ctx.sync_ctx();
-    let mut visitor =
-        Visitor(fuchsia_inspect::Inspector::new(fuchsia_inspect::InspectorConfig::default()));
+    let mut visitor = DualIpVisitor::new();
     ip::forwarding::with_routes::<Ipv4, BindingsNonSyncCtxImpl, _>(sync_ctx, &mut visitor);
     ip::forwarding::with_routes::<Ipv6, BindingsNonSyncCtxImpl, _>(sync_ctx, &mut visitor);
-    let Visitor(inspector) = visitor;
-    inspector
+    visitor.inspector
 }
 
 pub(crate) fn devices(ctx: &Ctx) -> fuchsia_inspect::Inspector {
-    struct Visitor(fuchsia_inspect::Inspector);
     impl device::DevicesVisitor<BindingsNonSyncCtxImpl> for Visitor {
         fn visit_devices(
             &self,
@@ -184,15 +205,13 @@ pub(crate) fn devices(ctx: &Ctx) -> fuchsia_inspect::Inspector {
         }
     }
     let sync_ctx = ctx.sync_ctx();
-    let visitor =
-        Visitor(fuchsia_inspect::Inspector::new(fuchsia_inspect::InspectorConfig::default()));
+    let visitor = Visitor::new();
     device::inspect_devices::<BindingsNonSyncCtxImpl, _>(sync_ctx, &visitor);
     let Visitor(inspector) = visitor;
     inspector
 }
 
 pub(crate) fn neighbors(ctx: &Ctx) -> fuchsia_inspect::Inspector {
-    struct Visitor(fuchsia_inspect::Inspector);
     impl device::NeighborVisitor<BindingsNonSyncCtxImpl, StackTime> for Visitor {
         fn visit_neighbors<LinkAddress: fmt::Debug>(
             &self,
@@ -226,15 +245,13 @@ pub(crate) fn neighbors(ctx: &Ctx) -> fuchsia_inspect::Inspector {
         }
     }
     let sync_ctx = ctx.sync_ctx();
-    let visitor =
-        Visitor(fuchsia_inspect::Inspector::new(fuchsia_inspect::InspectorConfig::default()));
+    let visitor = Visitor::new();
     device::inspect_neighbors::<BindingsNonSyncCtxImpl, _>(sync_ctx, &visitor);
     let Visitor(inspector) = visitor;
     inspector
 }
 
 pub(crate) fn counters(ctx: &Ctx) -> fuchsia_inspect::Inspector {
-    struct Visitor(fuchsia_inspect::Inspector);
     impl netstack3_core::CounterVisitor for Visitor {
         fn visit_counters(&self, counters: netstack3_core::StackCounters<'_>) {
             let Self(inspector) = self;
@@ -371,8 +388,7 @@ pub(crate) fn counters(ctx: &Ctx) -> fuchsia_inspect::Inspector {
         }
     }
     let sync_ctx = ctx.sync_ctx();
-    let visitor =
-        Visitor(fuchsia_inspect::Inspector::new(fuchsia_inspect::InspectorConfig::default()));
+    let visitor = Visitor::new();
     netstack3_core::inspect_counters::<_, _>(sync_ctx, &visitor);
     let Visitor(inspector) = visitor;
     inspector

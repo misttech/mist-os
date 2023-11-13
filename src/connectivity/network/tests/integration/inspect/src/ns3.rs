@@ -138,6 +138,20 @@ async fn inspect_routes(name: &str) {
                 Metric: 100u64,
                 MetricTracksInterface: true,
             },
+            "3": {
+                Destination: "::1/128",
+                InterfaceId: loopback_id,
+                Gateway: "[NONE]",
+                Metric: 100u64,
+                MetricTracksInterface: true,
+            },
+            "4": {
+                Destination: "ff00::/8",
+                InterfaceId: loopback_id,
+                Gateway: "[NONE]",
+                Metric: 100u64,
+                MetricTracksInterface: true,
+            },
         }
     })
 }
