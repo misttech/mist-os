@@ -124,10 +124,10 @@ class TestBase : public media::audio::test::TestFixture {
   void SetUp() override;
   void TearDown() override;
 
-  void ConnectToStreamConfigDevice(const DeviceEntry& device_entry);
-  void ConnectToDaiDevice(const DeviceEntry& device_entry);
-  void ConnectToCodecDevice(const DeviceEntry& device_entry);
-  void ConnectToCompositeDevice(const DeviceEntry& device_entry);
+  template <typename DeviceType, typename ConnectorType = void>
+  fidl::InterfaceHandle<DeviceType> ConnectWithTrampoline(const DeviceEntry& device_entry);
+  template <typename DeviceType>
+  DeviceType Connect(const DeviceEntry& device_entry);
   void ConnectToBluetoothDevice();
   void CreateStreamConfigFromChannel(
       fidl::InterfaceHandle<fuchsia::hardware::audio::StreamConfig> channel);

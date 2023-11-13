@@ -34,6 +34,7 @@ using component_testing::RealmRoot;
 using component_testing::Route;
 
 // Device discovery is done once at binary open; a fresh FIDL channel is used for each test.
+// TODO(b/301003578): When virtual audio is DFv2, remove DFv1-specific trampoline support.
 void TestBase::SetUp() {
   media::audio::test::TestFixture::SetUp();
 
@@ -45,16 +46,34 @@ void TestBase::SetUp() {
       case DriverType::StreamConfigInput:
         [[fallthrough]];
       case DriverType::StreamConfigOutput:
-        ConnectToStreamConfigDevice(device_entry());
+        CreateStreamConfigFromChannel(
+            ConnectWithTrampoline<fuchsia::hardware::audio::StreamConfig,
+                                  fuchsia::hardware::audio::StreamConfigConnectorPtr>(
+                device_entry()));
+
         break;
       case DriverType::Dai:
-        ConnectToDaiDevice(device_entry());
+        CreateDaiFromChannel(
+            ConnectWithTrampoline<fuchsia::hardware::audio::Dai,
+                                  fuchsia::hardware::audio::DaiConnectorPtr>(device_entry()));
         break;
       case DriverType::Codec:
-        ConnectToCodecDevice(device_entry());
+        CreateCodecFromChannel(
+            ConnectWithTrampoline<fuchsia::hardware::audio::Codec,
+                                  fuchsia::hardware::audio::CodecConnectorPtr>(device_entry()));
         break;
       case DriverType::Composite:
-        ConnectToCompositeDevice(device_entry());
+        // Use DFv1-specific trampoline Connector API for the virtual composite driver (DFv1),
+        // for all other non-virtual composite drivers (DFv2) do not use the trampoline.
+        if (entry.device_type == DeviceType::Virtual) {
+          CreateCompositeFromChannel(
+              ConnectWithTrampoline<fuchsia::hardware::audio::Composite,
+                                    fuchsia::hardware::audio::CompositeConnectorPtr>(
+                  device_entry()));
+        } else {
+          CreateCompositeFromChannel(
+              Connect<fuchsia::hardware::audio::CompositePtr>(device_entry()));
+        }
         break;
     }
   }
@@ -127,98 +146,31 @@ void TestBase::ConnectToBluetoothDevice() {
   CreateStreamConfigFromChannel(audio_device_enumerator_impl_ptr->TakeChannel());
 }
 
-// Given this device_entry, use its channel to open the StreamConfig device.
-void TestBase::ConnectToStreamConfigDevice(const DeviceEntry& device_entry) {
-  fuchsia::hardware::audio::StreamConfigConnectorPtr device;
-  ASSERT_EQ(device_entry.dir.index(), 1u);
-  ASSERT_EQ(fdio_service_connect_at(std::get<1>(device_entry.dir).channel()->get(),
-                                    device_entry.filename.c_str(),
-                                    device.NewRequest().TakeChannel().release()),
-            ZX_OK);
+// Given this device_entry, use its channel to open the device.
+template <typename DeviceType, typename ConnectorType>
+fidl::InterfaceHandle<DeviceType> TestBase::ConnectWithTrampoline(const DeviceEntry& device_entry) {
+  auto connector = Connect<ConnectorType>(device_entry);
+  fidl::InterfaceHandle<DeviceType> client;
+  fidl::InterfaceRequest<DeviceType> server = client.NewRequest();
+  connector->Connect(std::move(server));
 
-  device.set_error_handler([this](zx_status_t status) {
-    FAIL() << status << "Err " << status << ", failed to open channel to audio " << driver_type();
-  });
-  fidl::InterfaceHandle<fuchsia::hardware::audio::StreamConfig> stream_config_client;
-  fidl::InterfaceRequest<fuchsia::hardware::audio::StreamConfig> stream_config_server =
-      stream_config_client.NewRequest();
-  device->Connect(std::move(stream_config_server));
-
-  auto channel = stream_config_client.TakeChannel();
+  auto channel = client.TakeChannel();
   FX_LOGS(TRACE) << "Successfully opened devnode '" << device_entry.filename << "' for audio "
                  << driver_type();
-
-  CreateStreamConfigFromChannel(
-      fidl::InterfaceHandle<fuchsia::hardware::audio::StreamConfig>(std::move(channel)));
+  return fidl::InterfaceHandle<DeviceType>(std::move(channel));
 }
 
-// Given this device_entry, use its channel to open the Dai device.
-void TestBase::ConnectToDaiDevice(const DeviceEntry& device_entry) {
-  fuchsia::hardware::audio::DaiConnectorPtr device;
-  ASSERT_EQ(device_entry.dir.index(), 1u);
-  ASSERT_EQ(fdio_service_connect_at(std::get<1>(device_entry.dir).channel()->get(),
+template <typename DeviceType>
+DeviceType TestBase::Connect(const DeviceEntry& device_entry) {
+  DeviceType device;
+  ZX_ASSERT(device_entry.dir.index() == 1u);
+  ZX_ASSERT(fdio_service_connect_at(std::get<1>(device_entry.dir).channel()->get(),
                                     device_entry.filename.c_str(),
-                                    device.NewRequest().TakeChannel().release()),
-            ZX_OK);
-
-  device.set_error_handler([](zx_status_t status) {
-    FAIL() << status << "Err " << status << ", failed to open channel to audio DAI";
+                                    device.NewRequest().TakeChannel().release()) == ZX_OK);
+  device.set_error_handler([this](zx_status_t status) {
+    FAIL() << status << "Err " << status << ", failed to open channel for audio " << driver_type();
   });
-  fidl::InterfaceHandle<fuchsia::hardware::audio::Dai> dai_client;
-  fidl::InterfaceRequest<fuchsia::hardware::audio::Dai> dai_server = dai_client.NewRequest();
-  device->Connect(std::move(dai_server));
-
-  auto channel = dai_client.TakeChannel();
-  FX_LOGS(TRACE) << "Successfully opened devnode '" << device_entry.filename << "' for audio DAI";
-
-  CreateDaiFromChannel(fidl::InterfaceHandle<fuchsia::hardware::audio::Dai>(std::move(channel)));
-}
-
-// Given this device_entry, use its channel to open the Codec device.
-void TestBase::ConnectToCodecDevice(const DeviceEntry& device_entry) {
-  fuchsia::hardware::audio::CodecConnectorPtr device;
-  ASSERT_EQ(device_entry.dir.index(), 1u);
-  ASSERT_EQ(fdio_service_connect_at(std::get<1>(device_entry.dir).channel()->get(),
-                                    device_entry.filename.c_str(),
-                                    device.NewRequest().TakeChannel().release()),
-            ZX_OK);
-
-  device.set_error_handler([](zx_status_t status) {
-    FAIL() << status << "Err " << status << ", failed to open channel to audio Codec";
-  });
-  fidl::InterfaceHandle<fuchsia::hardware::audio::Codec> codec_client;
-  fidl::InterfaceRequest<fuchsia::hardware::audio::Codec> codec_server = codec_client.NewRequest();
-  device->Connect(std::move(codec_server));
-
-  auto channel = codec_client.TakeChannel();
-  FX_LOGS(TRACE) << "Successfully opened devnode '" << device_entry.filename << "' for audio codec";
-
-  CreateCodecFromChannel(
-      fidl::InterfaceHandle<fuchsia::hardware::audio::Codec>(std::move(channel)));
-}
-
-void TestBase::ConnectToCompositeDevice(const DeviceEntry& device_entry) {
-  fuchsia::hardware::audio::CompositeConnectorPtr device;
-  ASSERT_EQ(device_entry.dir.index(), 1u);
-  ASSERT_EQ(fdio_service_connect_at(std::get<1>(device_entry.dir).channel()->get(),
-                                    device_entry.filename.c_str(),
-                                    device.NewRequest().TakeChannel().release()),
-            ZX_OK);
-
-  device.set_error_handler([](zx_status_t status) {
-    FAIL() << status << "Err " << status << ", failed to open channel to audio composite";
-  });
-  fidl::InterfaceHandle<fuchsia::hardware::audio::Composite> composite_client;
-  fidl::InterfaceRequest<fuchsia::hardware::audio::Composite> composite_server =
-      composite_client.NewRequest();
-  device->Connect(std::move(composite_server));
-
-  auto channel = composite_client.TakeChannel();
-  FX_LOGS(TRACE) << "Successfully opened devnode '" << device_entry.filename
-                 << "' for composite audio driver";
-
-  CreateCompositeFromChannel(
-      fidl::InterfaceHandle<fuchsia::hardware::audio::Composite>(std::move(channel)));
+  return std::move(device);
 }
 
 void TestBase::CreateStreamConfigFromChannel(
