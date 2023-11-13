@@ -109,24 +109,27 @@ impl BrokerSvc {
             .try_for_each(|request| async move {
                 match request {
                     LevelControlRequest::WatchRequiredLevel {
-                        element,
+                        token,
                         last_required_level,
                         responder,
                     } => {
                         tracing::debug!(
                             "WatchRequiredLevel({:?}, {:?})",
-                            &element,
+                            &token,
                             &last_required_level
                         );
-                        let mut receiver = {
+                        let watch_res = {
                             let mut broker: std::sync::MutexGuard<'_, Broker> =
                                 self.broker.lock().unwrap();
-                            broker.subscribe_required_level(&element.clone().into())
+                            broker.watch_required_level(token.into())
                         };
+                        if let Err(err) = watch_res {
+                            return responder.send(Err(err)).context("send failed");
+                        }
+                        let mut receiver = watch_res.unwrap();
                         while let Some(next) = receiver.next().await {
                             tracing::debug!(
-                                "receiver.next({:?}) = {:?}, last_required_level = {:?}",
-                                &element,
+                                "receiver.next = {:?}, last_required_level = {:?}",
                                 &next,
                                 last_required_level
                             );
@@ -134,36 +137,40 @@ impl BrokerSvc {
                             let required_level = next.unwrap_or(PowerLevel::Binary(BinaryPowerLevel::Off));
                             if last_required_level.is_some() && last_required_level.clone().unwrap().as_ref() == &required_level {
                                 tracing::debug!(
-                                    "WatchRequiredLevel({:?}), level has not changed, watching for next update...",
-                                    &element,
+                                    "WatchRequiredLevel: level has not changed, watching for next update...",
                                 );
                                 continue;
                             } else {
                                 tracing::debug!(
-                                    "WatchRequiredLevel({:?}), sending new level: {:?}",
-                                    &element,
-                                    &required_level,
+                                    "WatchRequiredLevel: sending new level: {:?}", &required_level,
                                 );
-                                return responder.send(&required_level).context("send failed");
+                                return responder.send(Ok(&required_level)).context("send failed");
                             }
                         }
                         Err(anyhow::anyhow!("receiver closed unexpectedly"))
                     }
                     LevelControlRequest::UpdateCurrentPowerLevel {
-                        element,
+                        token,
                         current_level,
                         responder,
                     } => {
                         tracing::debug!(
                             "UpdateCurrentPowerLevel({:?}, {:?})",
-                            &element,
+                            &token,
                             &current_level
                         );
                         let mut broker: std::sync::MutexGuard<'_, Broker> =
                             self.broker.lock().unwrap();
-                        broker.update_current_level(&element.clone().into(), &current_level);
-                        tracing::debug!("UpdateCurrentPowerLevel: responder.send(Ok(()))");
-                        return responder.send(Ok(())).context("send failed");
+                        let res = broker.update_current_level(token.into(), &current_level);
+                        match res {
+                            Ok(_) => {
+                                responder.send(Ok(())).context("send failed")
+                            },
+                            Err(err) => {
+                                tracing::debug!("UpdateCurrentPowerLevel Err: {:?}", &err);
+                                responder.send(Err(err.into())).context("send failed")
+                            },
+                        }
                     }
                     LevelControlRequest::_UnknownMethod { .. } => todo!(),
                 }

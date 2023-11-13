@@ -29,8 +29,12 @@ alias LeaseId = string:64;
 // or paths is determined.
 alias ElementId = string:1024;
 
+type WatchRequiredLevelError = flexible enum {
+    NOT_AUTHORIZED = 0;
+};
+
 type UpdateCurrentPowerLevelError = flexible enum {
-    NOT_FOUND = 0;
+    NOT_AUTHORIZED = 0;
 };
 
 /// Offered by the Power Broker to managed Power Element owners to receive
@@ -44,19 +48,22 @@ open protocol LevelControl {
     /// If last_required_level matches the current level, the call will
     /// hang until the required level changes.
     flexible WatchRequiredLevel(resource struct {
-        // TODO(b/297543815): See note on PowerLessor.Lease below.
-        element ElementId;
+        /// Must supply a token to a previously registered Credential with
+        /// Permissions.MODIFY_POWER_LEVEL.
+        token zx.Handle:EVENTPAIR;
         /// Provided by the client with the last level received, or None if
         /// this is the first call.
         last_required_level PowerLevel:optional;
     }) -> (resource struct {
         required_level PowerLevel;
-    });
+    }) error WatchRequiredLevelError;
 
     /// Sent by the element on initial startup and whenever there is a change
     /// in power level.
     flexible UpdateCurrentPowerLevel(resource struct {
-        element ElementId;
+        /// Must supply a token to a previously registered Credential with
+        /// Permissions.MODIFY_POWER_LEVEL.
+        token zx.Handle:EVENTPAIR;
         current_level PowerLevel;
     }) -> () error UpdateCurrentPowerLevelError;
 };

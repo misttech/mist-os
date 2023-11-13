@@ -3,7 +3,9 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Error};
-use fidl_fuchsia_power_broker::{BinaryPowerLevel, Permissions, PowerLevel, PowerLevelError};
+use fidl_fuchsia_power_broker::{
+    self as fpb, BinaryPowerLevel, Permissions, PowerLevel, PowerLevelError,
+};
 use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -36,7 +38,18 @@ impl Broker {
         }
     }
 
-    pub fn update_current_level(&mut self, id: &ElementID, level: &PowerLevel) {
+    pub fn update_current_level(
+        &mut self,
+        token: Token,
+        level: &PowerLevel,
+    ) -> Result<(), fpb::UpdateCurrentPowerLevelError> {
+        let Some(credential) = self.lookup_credentials(token) else {
+            return Err(fpb::UpdateCurrentPowerLevelError::NotAuthorized);
+        };
+        if !credential.contains(Permissions::MODIFY_POWER_LEVEL) {
+            return Err(fpb::UpdateCurrentPowerLevelError::NotAuthorized);
+        }
+        let id = credential.get_element();
         tracing::debug!("update_current_level({:?}, {:?})", id, level);
         self.current.update(id, level);
         // Some previously pending claims may now be ready to be activated:
@@ -69,6 +82,7 @@ impl Broker {
         let claims_to_drop_for_element = self.catalog.active_claims.to_drop_for_element(id);
         let claims_dropped = self.check_claims_to_drop(&claims_to_drop_for_element);
         self.update_required_levels(&claims_dropped);
+        Ok(())
     }
 
     pub fn subscribe_current_level(
@@ -84,11 +98,17 @@ impl Broker {
         self.required.get(id).unwrap_or(PowerLevel::Binary(BinaryPowerLevel::Off))
     }
 
-    pub fn subscribe_required_level(
+    pub fn watch_required_level(
         &mut self,
-        id: &ElementID,
-    ) -> UnboundedReceiver<Option<PowerLevel>> {
-        self.required.subscribe(id)
+        token: Token,
+    ) -> Result<UnboundedReceiver<Option<PowerLevel>>, fpb::WatchRequiredLevelError> {
+        let Some(credential) = self.lookup_credentials(token) else {
+            return Err(fpb::WatchRequiredLevelError::NotAuthorized);
+        };
+        if !credential.contains(Permissions::MODIFY_POWER_LEVEL) {
+            return Err(fpb::WatchRequiredLevelError::NotAuthorized);
+        }
+        Ok(self.required.subscribe(credential.get_element()))
     }
 
     pub fn acquire_lease(
@@ -756,14 +776,16 @@ mod tests {
         let (parent_token, parent_broker_token) = zx::EventPair::create();
         let parent_cred = CredentialToRegister {
             broker_token: parent_broker_token.into(),
-            permissions: Permissions::MODIFY_DEPENDENCY | Permissions::MODIFY_DEPENDENT,
+            permissions: Permissions::MODIFY_POWER_LEVEL
+                | Permissions::MODIFY_DEPENDENCY
+                | Permissions::MODIFY_DEPENDENT,
         };
         let parent: ElementID =
             broker.add_element("P", vec![parent_cred]).expect("add_element failed");
         let (grandparent_token, grandparent_broker_token) = zx::EventPair::create();
         let grandparent_cred = CredentialToRegister {
             broker_token: grandparent_broker_token.into(),
-            permissions: Permissions::MODIFY_DEPENDENT,
+            permissions: Permissions::MODIFY_POWER_LEVEL | Permissions::MODIFY_DEPENDENT,
         };
         let grandparent: ElementID =
             broker.add_element("GP", vec![grandparent_cred]).expect("add_element failed");
@@ -816,7 +838,14 @@ mod tests {
 
         // Raise Grandparent power level to ON, now Parent claim should be active.
         broker
-            .update_current_level(&grandparent.clone(), &PowerLevel::Binary(BinaryPowerLevel::On));
+            .update_current_level(
+                grandparent_token
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                &PowerLevel::Binary(BinaryPowerLevel::On),
+            )
+            .expect("update_current_level failed");
         assert_eq!(
             broker.catalog.calc_min_level(&parent.clone()),
             PowerLevel::Binary(BinaryPowerLevel::On),
@@ -844,7 +873,12 @@ mod tests {
 
         // Lower Parent power level to OFF, now Grandparent claim should be
         // dropped and should have min level OFF.
-        broker.update_current_level(&parent.clone(), &PowerLevel::Binary(BinaryPowerLevel::Off));
+        broker
+            .update_current_level(
+                parent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
+                &PowerLevel::Binary(BinaryPowerLevel::Off),
+            )
+            .expect("update_current_level failed");
         tracing::info!("catalog after update_current_level: {:?}", &broker.catalog);
         assert_eq!(
             broker.catalog.calc_min_level(&parent.clone()),
@@ -883,14 +917,16 @@ mod tests {
         let (parent_token, parent_broker_token) = zx::EventPair::create();
         let parent_cred = CredentialToRegister {
             broker_token: parent_broker_token.into(),
-            permissions: Permissions::MODIFY_DEPENDENCY | Permissions::MODIFY_DEPENDENT,
+            permissions: Permissions::MODIFY_POWER_LEVEL
+                | Permissions::MODIFY_DEPENDENCY
+                | Permissions::MODIFY_DEPENDENT,
         };
         let parent: ElementID =
             broker.add_element("P", vec![parent_cred]).expect("add_element failed");
         let (grandparent_token, grandparent_broker_token) = zx::EventPair::create();
         let grandparent_cred = CredentialToRegister {
             broker_token: grandparent_broker_token.into(),
-            permissions: Permissions::MODIFY_DEPENDENT,
+            permissions: Permissions::MODIFY_POWER_LEVEL | Permissions::MODIFY_DEPENDENT,
         };
         let grandparent: ElementID =
             broker.add_element("GP", vec![grandparent_cred]).expect("add_element failed");
@@ -949,7 +985,14 @@ mod tests {
 
         // Raise Grandparent power level to ON, now Parent claim should be active.
         broker
-            .update_current_level(&grandparent.clone(), &PowerLevel::Binary(BinaryPowerLevel::On));
+            .update_current_level(
+                grandparent_token
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                &PowerLevel::Binary(BinaryPowerLevel::On),
+            )
+            .expect("update_current_level failed");
         assert_eq!(
             broker.catalog.calc_min_level(&parent.clone()),
             PowerLevel::Binary(BinaryPowerLevel::On),
@@ -1006,7 +1049,12 @@ mod tests {
 
         // Lower Parent power level to OFF, now Grandparent claim should be
         // dropped and should have min level OFF.
-        broker.update_current_level(&parent.clone(), &PowerLevel::Binary(BinaryPowerLevel::Off));
+        broker
+            .update_current_level(
+                parent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
+                &PowerLevel::Binary(BinaryPowerLevel::Off),
+            )
+            .expect("update_current_level failed");
         assert_eq!(
             broker.catalog.calc_min_level(&parent.clone()),
             PowerLevel::Binary(BinaryPowerLevel::Off),
@@ -1230,5 +1278,90 @@ mod tests {
                 PowerLevel::Binary(BinaryPowerLevel::On),
             )
             .expect("remove_dependency with extra permissions failed");
+    }
+
+    #[fuchsia::test]
+    fn test_watch_required_level_credentials() {
+        let mut broker = Broker::new();
+        let (dilithium_token, dilithium_broker_token) = zx::EventPair::create();
+        let dilithium_cred = CredentialToRegister {
+            broker_token: dilithium_broker_token.into(),
+            permissions: Permissions::MODIFY_POWER_LEVEL,
+        };
+        let (
+            dilithium_missing_modify_power_level_token,
+            dilithium_broker_missing_modify_power_level_token,
+        ) = zx::EventPair::create();
+        let dilithium_missing_modify_power_level_cred = CredentialToRegister {
+            broker_token: dilithium_broker_missing_modify_power_level_token.into(),
+            permissions: Permissions::all() - Permissions::MODIFY_POWER_LEVEL,
+        };
+        broker
+            .add_element(
+                "Dilithium",
+                vec![dilithium_cred, dilithium_missing_modify_power_level_cred],
+            )
+            .expect("add_element failed");
+
+        broker.watch_required_level(dilithium_token.into()).expect("watch_required_level failed");
+
+        let (missing_token, _) = zx::EventPair::create();
+        let missing_token_res = broker.watch_required_level(missing_token.into());
+        assert!(matches!(
+            missing_token_res,
+            Err(fpb::WatchRequiredLevelError::NotAuthorized { .. })
+        ));
+
+        let missing_permissions_res =
+            broker.watch_required_level(dilithium_missing_modify_power_level_token.into());
+        assert!(matches!(
+            missing_permissions_res,
+            Err(fpb::WatchRequiredLevelError::NotAuthorized { .. })
+        ));
+    }
+
+    #[fuchsia::test]
+    fn test_update_current_level_credentials() {
+        let mut broker = Broker::new();
+        let (dilithium_token, dilithium_broker_token) = zx::EventPair::create();
+        let dilithium_cred = CredentialToRegister {
+            broker_token: dilithium_broker_token.into(),
+            permissions: Permissions::MODIFY_POWER_LEVEL,
+        };
+        let (
+            dilithium_missing_modify_power_level_token,
+            dilithium_broker_missing_modify_power_level_token,
+        ) = zx::EventPair::create();
+        let dilithium_missing_modify_power_level_cred = CredentialToRegister {
+            broker_token: dilithium_broker_missing_modify_power_level_token.into(),
+            permissions: Permissions::all() - Permissions::MODIFY_POWER_LEVEL,
+        };
+        broker
+            .add_element(
+                "Dilithium",
+                vec![dilithium_cred, dilithium_missing_modify_power_level_cred],
+            )
+            .expect("add_element failed");
+
+        broker
+            .update_current_level(dilithium_token.into(), &PowerLevel::Binary(BinaryPowerLevel::On))
+            .expect("update_current_level failed");
+
+        let (missing_token, _) = zx::EventPair::create();
+        let missing_token_res = broker
+            .update_current_level(missing_token.into(), &PowerLevel::Binary(BinaryPowerLevel::On));
+        assert!(matches!(
+            missing_token_res,
+            Err(fpb::UpdateCurrentPowerLevelError::NotAuthorized { .. })
+        ));
+
+        let missing_permissions_res = broker.update_current_level(
+            dilithium_missing_modify_power_level_token.into(),
+            &PowerLevel::Binary(BinaryPowerLevel::On),
+        );
+        assert!(matches!(
+            missing_permissions_res,
+            Err(fpb::UpdateCurrentPowerLevelError::NotAuthorized { .. })
+        ));
     }
 }
