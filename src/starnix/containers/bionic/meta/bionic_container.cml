@@ -6,7 +6,7 @@
     program: {
         runner: "starnix",
         features: [
-            "mock_selinux",
+            "selinux:fake",
             "test_data",
         ],
         init: [ "/system/bin/init" ],

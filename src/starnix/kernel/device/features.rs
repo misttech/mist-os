@@ -80,10 +80,6 @@ pub fn parse_features(entries: &Vec<String>) -> Result<Features, Error> {
             ("custom_artifacts", _) => features.custom_artifacts = true,
             ("framebuffer", _) => features.framebuffer = true,
             ("magma", _) => features.magma = true,
-
-            // TODO(b/304518554): Remove this old synonym.
-            ("mock_selinux", _) => features.selinux = Some(security_server::Mode::Fake),
-
             ("perfetto", Some(socket_path)) => {
                 features.perfetto = Some(socket_path.to_string());
             }
@@ -99,10 +95,6 @@ pub fn parse_features(entries: &Vec<String>) -> Result<Features, Error> {
                 },
                 None => Some(security_server::Mode::Enable),
             },
-
-            // TODO(b/304518554): Remove this old synonym.
-            ("selinux_enabled", _) => features.selinux = Some(security_server::Mode::Fake),
-
             ("test_data", _) => features.test_data = true,
             (f, _) => {
                 return Err(anyhow!("Unsupported feature: {}", f));
