@@ -174,12 +174,12 @@ async fn main() -> Result<(), Error> {
                 }
             }
             KernelServices::ComponentRunner(stream) => {
-                execution::serve_component_runner(stream, container.wait().await)
+                execution::serve_component_runner(stream, container.wait().await.system_task())
                     .await
                     .expect("failed to start component runner");
             }
             KernelServices::ContainerController(stream) => {
-                execution::serve_container_controller(stream, container.wait().await)
+                execution::serve_container_controller(stream, container.wait().await.system_task())
                     .await
                     .expect("failed to start container controller");
             }

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::device::run_component_features;
+use crate::{device::run_component_features, task::CurrentTask};
 use ::runner::{get_program_string, get_program_strvec, StartInfoProgramError};
 use anyhow::{anyhow, bail, Error};
 use fidl::endpoints::{ControlHandle, RequestStream, ServerEnd};
@@ -20,17 +20,16 @@ use std::{ffi::CString, os::unix::ffi::OsStrExt, path::Path};
 
 use crate::{
     auth::Credentials,
-    execution::{
-        container::Container, create_filesystem_from_spec, execute_task, parse_numbered_handles,
-    },
+    execution::{create_filesystem_from_spec, execute_task, parse_numbered_handles},
     fs::{fuchsia::RemoteFs, FileSystemOptions, LookupContext, NamespaceNode, WhatToMount},
     logging::{log_error, log_info},
     signals,
     task::{ExitStatus, Task},
-    types::signals::{SIGINT, SIGKILL},
     types::{
-        mode, release_on_error, Capabilities, DeviceType, Errno, MountFlags, OpenFlags,
-        ReleasableByRef, WeakRef, EEXIST, ENOTDIR, SI_KERNEL,
+        mode, release_on_error,
+        signals::{SIGINT, SIGKILL},
+        Capabilities, DeviceType, Errno, MountFlags, OpenFlags, ReleasableByRef, WeakRef, EEXIST,
+        ENOTDIR, SI_KERNEL,
     },
 };
 
@@ -53,13 +52,13 @@ const COMPONENT_EXIT_CODE_BASE: i32 = 1024;
 pub async fn start_component(
     mut start_info: ComponentStartInfo,
     controller: ServerEnd<ComponentControllerMarker>,
-    container: &Container,
+    system_task: &CurrentTask,
 ) -> Result<(), Error> {
     let url = start_info.resolved_url.clone().unwrap_or_else(|| "<unknown>".to_string());
     log_info!("start_component: {}", url);
 
     // TODO(fxbug.dev/125782): We leak the directory created by this function.
-    let component_path = generate_component_path(container)?;
+    let component_path = generate_component_path(system_task)?;
 
     let mut mount_record = MountRecord::default();
 
@@ -74,12 +73,12 @@ pub async fn start_component(
                     // Mount custom_artifacts and test_data directory at root of container
                     // We may want to transition to have these directories unique per component
                     let dir_proxy = fio::DirectorySynchronousProxy::new(dir_handle.into_channel());
-                    mount_record.mount_remote(container, &dir_proxy, &dir_path)?;
+                    mount_record.mount_remote(system_task, &dir_proxy, &dir_path)?;
                 }
                 _ => {
                     let dir_proxy = fio::DirectorySynchronousProxy::new(dir_handle.into_channel());
                     mount_record.mount_remote(
-                        container,
+                        system_task,
                         &dir_proxy,
                         &format!("{component_path}/{dir_path}"),
                     )?;
@@ -119,7 +118,7 @@ pub async fn start_component(
     let binary_path = CString::new(binary_path.to_owned())?;
 
     let (task_complete_sender, task_complete) = oneshot::channel::<TaskResult>();
-    let mut current_task = Task::create_init_child_process(&container.kernel, &binary_path)?;
+    let mut current_task = Task::create_init_child_process(system_task.kernel(), &binary_path)?;
     release_on_error!(current_task, (), {
         let cwd_path = get_program_string(&start_info, "cwd").unwrap_or(&pkg_path);
         let cwd = current_task
@@ -166,7 +165,7 @@ pub async fn start_component(
 
         run_component_features(
             &component_features,
-            &container.kernel,
+            system_task.kernel(),
             &mut start_info.outgoing_dir,
         )
         .unwrap_or_else(|e| {
@@ -274,8 +273,7 @@ async fn serve_component_controller(
 }
 
 /// Returns /container/component/{random} that doesn't already exist
-fn generate_component_path(container: &Container) -> Result<String, Error> {
-    let system_task = container.kernel.kthreads.system_task();
+fn generate_component_path(system_task: &CurrentTask) -> Result<String, Error> {
     // Checking container directory already exists
     let mount_point = system_task.lookup_path_from_root(b"/container/component/")?;
 
@@ -324,11 +322,10 @@ impl MountRecord {
 
     fn mount_remote(
         &mut self,
-        container: &Container,
+        system_task: &CurrentTask,
         directory: &fio::DirectorySynchronousProxy,
         path: &str,
     ) -> Result<(), Error> {
-        let system_task = container.kernel.kthreads.system_task();
         // The incoming dir_path might not be top level, e.g. it could be /foo/bar.
         // Iterate through each component directory starting from the parent and
         // create it if it doesn't exist.
@@ -364,7 +361,7 @@ impl MountRecord {
         directory.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, ServerEnd::new(server_end))?;
 
         let fs = RemoteFs::new_fs(
-            &container.kernel,
+            system_task.kernel(),
             client_end,
             FileSystemOptions { source: path.as_bytes().to_vec(), ..Default::default() },
             rights,

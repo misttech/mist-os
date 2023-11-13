@@ -141,9 +141,17 @@ pub struct Container {
 
     /// Inspect node holding information about the state of the container.
     _node: inspect::Node,
+
+    /// Until negative trait bound are implemented, using `*mut u8` to prevent transferring
+    /// Container across threads.
+    _thread_bound: std::marker::PhantomData<*mut u8>,
 }
 
 impl Container {
+    pub fn system_task(&self) -> &CurrentTask {
+        self.kernel.kthreads.system_task()
+    }
+
     async fn serve_outgoing_directory(
         &self,
         outgoing_dir: Option<zx::Channel>,
@@ -160,14 +168,14 @@ impl Container {
             // Expose the root of the container's filesystem.
             let (fs_root, fs_root_server_end) = fidl::endpoints::create_proxy()?;
             fs.add_remote("fs_root", fs_root);
-            expose_root(self, fs_root_server_end)?;
+            expose_root(self.system_task(), fs_root_server_end)?;
 
             fs.serve_connection(outgoing_dir.into()).map_err(|_| errno!(EINVAL))?;
 
             fs.for_each_concurrent(None, |request_stream| async {
                 match request_stream {
                     ExposedServices::ComponentRunner(request_stream) => {
-                        match serve_component_runner(request_stream, self).await {
+                        match serve_component_runner(request_stream, self.system_task()).await {
                             Ok(_) => {}
                             Err(e) => {
                                 log_error!("Error serving component runner: {:?}", e);
@@ -175,12 +183,12 @@ impl Container {
                         }
                     }
                     ExposedServices::ContainerController(request_stream) => {
-                        serve_container_controller(request_stream, self)
+                        serve_container_controller(request_stream, self.system_task())
                             .await
                             .expect("failed to start container.")
                     }
                     ExposedServices::GrahicalPresenter(request_stream) => {
-                        serve_graphical_presenter(request_stream, self)
+                        serve_graphical_presenter(request_stream, &self.kernel)
                             .await
                             .expect("failed to start GrahicalPresenter.")
                     }
@@ -362,7 +370,7 @@ async fn create_container(
         wait_for_init_file(&config.startup_file_path, kernel.kthreads.system_task()).await?;
     };
 
-    Ok(Container { kernel, _node: node })
+    Ok(Container { kernel, _node: node, _thread_bound: Default::default() })
 }
 
 fn create_fs_context(
@@ -501,8 +509,7 @@ mod test {
     use crate::{
         fs::FdNumber,
         testing::create_kernel_and_task,
-        types::signals::SIGCHLD,
-        types::{FileMode, OpenFlags, CLONE_FS},
+        types::{signals::SIGCHLD, FileMode, OpenFlags, CLONE_FS},
     };
     use fuchsia_async as fasync;
     use futures::{SinkExt, StreamExt};

@@ -14,7 +14,7 @@ use futures::{AsyncReadExt, AsyncWriteExt, TryStreamExt};
 use std::{ffi::CString, sync::Arc};
 
 use crate::{
-    execution::{execute_task, Container},
+    execution::execute_task,
     fs::{
         buffers::{VecInputBuffer, VecOutputBuffer},
         devpts::create_main_and_replica,
@@ -31,10 +31,9 @@ use crate::{
 use super::start_component;
 
 pub fn expose_root(
-    container: &Container,
+    system_task: &CurrentTask,
     server_end: ServerEnd<fio::DirectoryMarker>,
 ) -> Result<(), Error> {
-    let system_task = container.kernel.kthreads.system_task();
     let root_file = system_task.open_file(b"/", OpenFlags::RDONLY)?;
     serve_file_at(server_end.into_channel().into(), system_task, &root_file)?;
     Ok(())
@@ -42,13 +41,13 @@ pub fn expose_root(
 
 pub async fn serve_component_runner(
     request_stream: frunner::ComponentRunnerRequestStream,
-    container: &Container,
+    system_task: &CurrentTask,
 ) -> Result<(), Error> {
     request_stream
         .try_for_each_concurrent(None, |event| async {
             match event {
                 frunner::ComponentRunnerRequest::Start { start_info, controller, .. } => {
-                    if let Err(e) = start_component(start_info, controller, container).await {
+                    if let Err(e) = start_component(start_info, controller, system_task).await {
                         log_error!("failed to start component: {:?}", e);
                     }
                 }
@@ -72,14 +71,14 @@ fn to_winsize(window_size: Option<fstarcontainer::ConsoleWindowSize>) -> uapi::w
 
 pub async fn serve_container_controller(
     request_stream: fstarcontainer::ControllerRequestStream,
-    container: &Container,
+    system_task: &CurrentTask,
 ) -> Result<(), Error> {
     request_stream
         .map_err(Error::from)
         .try_for_each_concurrent(None, |event| async {
             match event {
                 fstarcontainer::ControllerRequest::VsockConnect { port, bridge_socket, .. } => {
-                    connect_to_vsock(port, bridge_socket, container).await.unwrap_or_else(|e| {
+                    connect_to_vsock(port, bridge_socket, system_task).await.unwrap_or_else(|e| {
                         log_error!("failed to connect to vsock {:?}", e);
                     });
                 }
@@ -101,7 +100,7 @@ pub async fn serve_container_controller(
                             .map(CString::new)
                             .collect::<Result<Vec<_>, _>>()?;
                         match create_task_with_pty(
-                            &container.kernel,
+                            system_task.kernel(),
                             binary_path,
                             argv,
                             environ,
@@ -116,10 +115,15 @@ pub async fn serve_container_controller(
                                         _ => responder.send(Err(zx::Status::CANCELED.into_raw())),
                                     };
                                 });
-                                let _ = forward_to_pty(container, console_in, console_out, pty)
-                                    .map_err(|e| {
-                                        log_error!("failed to forward to terminal {:?}", e);
-                                    });
+                                let _ = forward_to_pty(
+                                    system_task.kernel(),
+                                    console_in,
+                                    console_out,
+                                    pty,
+                                )
+                                .map_err(|e| {
+                                    log_error!("failed to forward to terminal {:?}", e);
+                                });
                             }
                             Err(errno) => {
                                 log_error!("failed to create task with pty {:?}", errno);
@@ -140,16 +144,15 @@ pub async fn serve_container_controller(
 async fn connect_to_vsock(
     port: u32,
     bridge_socket: fidl::Socket,
-    container: &Container,
+    system_task: &CurrentTask,
 ) -> Result<(), Error> {
     let socket = loop {
-        if let Ok(socket) = container.kernel.default_abstract_vsock_namespace.lookup(&port) {
+        if let Ok(socket) = system_task.kernel().default_abstract_vsock_namespace.lookup(&port) {
             break socket;
         };
         fasync::Timer::new(fasync::Duration::from_millis(100).after_now()).await;
     };
 
-    let system_task = container.kernel.kthreads.system_task();
     let pipe =
         create_fuchsia_pipe(system_task, bridge_socket, OpenFlags::RDWR | OpenFlags::NONBLOCK)?;
     socket.downcast_socket::<VsockSocket>().unwrap().remote_connection(
@@ -183,7 +186,7 @@ fn create_task_with_pty(
 }
 
 fn forward_to_pty(
-    container: &Container,
+    kernel: &Kernel,
     console_in: fidl::Socket,
     console_out: fidl::Socket,
     pty: FileHandle,
@@ -193,10 +196,9 @@ fn forward_to_pty(
 
     let mut rx = fuchsia_async::Socket::from_socket(console_in)?;
     let mut tx = fuchsia_async::Socket::from_socket(console_out)?;
-    let kernel = &container.kernel;
     let pty_sink = pty.clone();
     kernel.kthreads.spawner.spawn({
-        let read_task = container.kernel.kthreads.new_system_thread()?;
+        let read_task = kernel.kthreads.new_system_thread()?;
         move || {
             let _result = fasync::LocalExecutor::new().run_singlethreaded(async {
                 async_release_after!(read_task, (), || -> Result<(), Error> {
@@ -215,7 +217,7 @@ fn forward_to_pty(
 
     let pty_source = pty;
     kernel.kthreads.spawner.spawn({
-        let write_task = container.kernel.kthreads.new_system_thread()?;
+        let write_task = kernel.kthreads.new_system_thread()?;
         move || {
             let _result = fasync::LocalExecutor::new().run_singlethreaded(async {
                 async_release_after!(write_task, (), || -> Result<(), Error> {
@@ -238,7 +240,7 @@ fn forward_to_pty(
 
 pub async fn serve_graphical_presenter(
     request_stream: felement::GraphicalPresenterRequestStream,
-    container: &Container,
+    kernel: &Kernel,
 ) -> Result<(), Error> {
     request_stream
         .try_for_each_concurrent(None, |event| async {
@@ -250,7 +252,7 @@ pub async fn serve_graphical_presenter(
                     responder,
                 } => match view_spec.viewport_creation_token {
                     Some(token) => {
-                        container.kernel.framebuffer.present_view(token);
+                        kernel.framebuffer.present_view(token);
                         let _ = responder.send(Ok(()));
                     }
                     None => {
