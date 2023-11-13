@@ -176,7 +176,7 @@ sdk_molecule("fuchsia_idk_atoms") {
       "//sdk/docs",
       "//sdk/fidl",
 
-      # TODO(fxbug.dev/133231): Move this to the `deps` section of
+      # TODO(b/309679524): Move this to the `deps` section of
       # `fuchsia_idk_atoms` once we can actually build the packages at
       # individual API levels.
       ":core_packages",
@@ -598,14 +598,19 @@ group("idk_build_tools") {
   ]
 
   deps = [
+    "//build/tools/json_merge($host_toolchain)",
+    "//src/developer/ffx/plugins/package:ffx_package_tool($host_toolchain)",
+    "//src/sys/pkg/bin/far:host($host_toolchain)",
     "//src/sys/pkg/bin/package-tool($host_toolchain)",
     "//tools/bindc:bin($host_toolchain)",
     "//tools/cmc:cmc($host_toolchain)",
+    "//tools/fidl/fidl_api_diff($host_toolchain)",
     "//tools/fidl/fidl_api_summarize($host_toolchain)",
     "//tools/fidl/fidlc:fidl-format($host_toolchain)",
     "//tools/fidl/fidlc:fidl-lint($host_toolchain)",
     "//tools/fidl/fidlc($host_toolchain)",
     "//tools/fidl/fidlgen_cpp($host_toolchain)",
+    "//tools/fidl/fidlgen_hlcpp($host_toolchain)",
     "//tools/fidl/fidlgen_rust($host_toolchain)",
     "//zircon/tools/zither($host_toolchain)",
   ]

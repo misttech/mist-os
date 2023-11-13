@@ -46,10 +46,16 @@ import("//tools/cmc/build/expect_includes.gni")
 #     See //build/sdk/sdk_atom.gni for more.
 #     Type: string.
 #
-#   api_level (optional)
+#   api_level_added
 #     API level at which the package was added to the SDK. API level defined at:
 #     https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0002_platform_versioning#sdk
-#     Default is current development API level.
+#     Type: unsigned integer.
+#
+#   api_level_removed (optional)
+#     API level at which the package was removed from the SDK. If unspecified,
+#     we assume the package is available at all API levels after
+#     `api_level_added`. API level defined at:
+#     https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0002_platform_versioning#sdk
 #     Type: unsigned integer.
 #
 #   expected_files_exact (optional)
@@ -74,23 +80,27 @@ import("//tools/cmc/build/expect_includes.gni")
 #     Type: list of relative package paths.
 #
 template("sdk_fuchsia_package") {
-  if (defined(invoker.api_level)) {
-    assert(invoker.api_level == platform_version.in_development_api_level,
-           "Only the current development API level is supported.")
-    api_level = invoker.api_level
-  } else {
-    api_level = platform_version.in_development_api_level
+  assert(defined(invoker.api_level_added),
+         "Must specify the API level at which the package was added")
+
+  # Build the package for supported API levels.
+  package_in_target_api_level =
+      invoker.api_level_added <= override_target_api_level
+
+  if (defined(invoker.api_level_removed)) {
+    package_in_target_api_level =
+        package_in_target_api_level &&
+        override_target_api_level < invoker.api_level_removed
   }
 
-  # Determine whether this package can be built for the current API level.
-  if (override_target_api_level != -1) {
-    current_api_level = override_target_api_level
-  } else {
-    current_api_level = platform_version.in_development_api_level
+  # Also build it in non-per-API-level contexts, for now.
+  #
+  # TODO(fxbug.dev/310006516): Delete API-level-agnostic packages from the IDK.
+  if (override_target_api_level == -1) {
+    package_in_target_api_level = true
   }
-  current_api_level_supported = current_api_level >= api_level
 
-  if (current_api_level_supported && current_toolchain == target_toolchain) {
+  if (package_in_target_api_level && current_toolchain == target_toolchain) {
     assert(defined(invoker.package_label),
            "Must define a package to distribute.")
     assert(defined(invoker.distribution_name),
@@ -148,12 +158,23 @@ template("sdk_fuchsia_package") {
     _content_checklist_depfile =
         "${target_gen_dir}/${_content_checklist_target}.d"
 
+    _tool_deps = []
     _ffx_package_bin = "${host_out_dir}/ffx-package_unversioned"
-    _ffx_package_dep =
-        "//src/developer/ffx/plugins/package:ffx_package_tool($host_toolchain)"
-
-    _far_tool_dep = "//src/sys/pkg/bin/far:host"
     _far_tool_bin = "$root_build_dir/host-tools/far"
+
+    if (use_prebuilt_host_tools_from_build_dir == "") {
+      _tool_deps += [
+        "//src/developer/ffx/plugins/package:ffx_package_tool($host_toolchain)",
+        "//src/sys/pkg/bin/far:host($host_toolchain)",
+      ]
+    } else {
+      _host_tool_dir =
+          "${root_build_dir}/${use_prebuilt_host_tools_from_build_dir}"
+      _ffx_package_bin =
+          _host_tool_dir + "/" + rebase_path(_ffx_package_bin, root_build_dir)
+      _far_tool_bin =
+          _host_tool_dir + "/" + rebase_path(_far_tool_bin, root_build_dir)
+    }
 
     # Generates content checklist file using input package manifest, and runs checks
     # against golden. See
@@ -169,11 +190,7 @@ template("sdk_fuchsia_package") {
         _far_tool_bin,
       ]
       outputs = [ computed_content_checklist_file ]
-      deps = [
-        _far_tool_dep,
-        _ffx_package_dep,
-        _full_package_label,
-      ]
+      deps = [ _full_package_label ] + _tool_deps
       depfile = _content_checklist_depfile
 
       args = [
@@ -245,8 +262,27 @@ template("sdk_fuchsia_package") {
         rebase_path(computed_content_checklist_file, root_build_dir),
         "--output",
         rebase_path(_sdk_package_dir, root_build_dir),
+
+        # In the API-level-agnostic builds, the value of this flag is a bit
+        # strange, and means we say in `meta.json` that the API level is -1.
+        # This is... neither correct nor incorrect.
+        #
+        # It's honestly rather moot, because none of the SDKs actually allow
+        # users to use these packages, yet. Hopefully we'll be able to add
+        # support for API-level-aware package prebuilts right off the bat,
+        # rather than first building support for including an API-level-agnostic
+        # subpackage, and then going back and fixing it.
+        #
+        # Arguably the right thing to do would be to _not_ build the packages in
+        # the API-level-agnostic builds, but then we wouldn't be building them
+        # anywhere, and we'd be in more danger of bitrot on the "packages in the
+        # IDK" work. So for now, we'll continue building them with this strange
+        # metadata quirk.
+        #
+        # TODO(fxbug.dev/310006516): Delete this comment once API-level-agnostic
+        # packages are no longer in the IDK.
         "--api-level",
-        "${api_level}",
+        "${override_target_api_level}",
         "--target-cpu",
         "${target_cpu}",
         "--depfile",
@@ -278,7 +314,7 @@ template("sdk_fuchsia_package") {
         package_barrier = []
       }
     }
-  } else if (!current_api_level_supported) {
+  } else if (!package_in_target_api_level) {
     # Current API level is not supported, so create an empty atom.
     sdk_noop_atom(target_name) {
       forward_variables_from(invoker, [ "testonly" ])
