@@ -62,6 +62,11 @@ template("_hermetic_code_blob") {
         toolchain_variant.tags) {
       ldflags = [ "-Wl,-mllvm,-relocation-model=pic" ]
     }
+
+    # In this target, we always want frame pointers even on leaf functions to make unwinding on
+    # exceptions easier. The default_frame_pointers config may specify -momit-leaf-frame-pointer so
+    # we specify -mno-omit-leaf-frame-pointer to override it.
+    cflags_cc = [ "-mno-omit-leaf-frame-pointer" ]
   }
 
   _target_name = ":${target_name}"
