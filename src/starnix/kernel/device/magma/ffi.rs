@@ -56,8 +56,9 @@ use crate::{
     fs::{Anon, FdFlags, FsNodeInfo, VmoFileObject},
     mm::{MemoryAccessor, MemoryAccessorExt},
     task::CurrentTask,
+    types::user_address::{UserAddress, UserRef},
     types::user_buffer::UserBuffer,
-    types::{errno, Errno, FileMode, OpenFlags, UserAddress, UserRef},
+    types::{errno, Errno, FileMode, OpenFlags},
 };
 
 /// Reads a sequence of objects starting at `addr`, ensuring at least one element is in the returned

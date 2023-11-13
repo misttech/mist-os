@@ -23,12 +23,13 @@ use crate::{
     },
     types::signals::{SigSet, Signal, UncheckedSignal, UNBLOCKABLE_SIGNALS},
     types::time::{duration_from_timespec, timeval_from_duration},
+    types::user_address::{UserAddress, UserRef},
     types::{
         errno, error, pid_t, rusage, sigaction_t, sigaltstack_t, timespec, Errno, ErrnoResultExt,
-        OpenFlags, TempRef, UserAddress, UserRef, WeakRef, ETIMEDOUT, MINSIGSTKSZ, P_ALL, P_PGID,
-        P_PID, P_PIDFD, SFD_CLOEXEC, SFD_NONBLOCK, SIG_BLOCK, SIG_SETMASK, SIG_UNBLOCK,
-        SI_MAX_SIZE, SI_TKILL, SI_USER, SS_AUTODISARM, SS_DISABLE, SS_ONSTACK, WCONTINUED, WEXITED,
-        WNOHANG, WNOWAIT, WSTOPPED, WUNTRACED, __WALL, __WCLONE,
+        OpenFlags, TempRef, WeakRef, ETIMEDOUT, MINSIGSTKSZ, P_ALL, P_PGID, P_PID, P_PIDFD,
+        SFD_CLOEXEC, SFD_NONBLOCK, SIG_BLOCK, SIG_SETMASK, SIG_UNBLOCK, SI_MAX_SIZE, SI_TKILL,
+        SI_USER, SS_AUTODISARM, SS_DISABLE, SS_ONSTACK, WCONTINUED, WEXITED, WNOHANG, WNOWAIT,
+        WSTOPPED, WUNTRACED, __WALL, __WCLONE,
     },
 };
 

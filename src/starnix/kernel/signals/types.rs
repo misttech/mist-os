@@ -10,11 +10,12 @@ use zerocopy::{AsBytes, FromBytes, FromZeroes};
 use crate::{
     task::{IntervalTimerHandle, ThreadGroupReadGuard, WaitQueue, WaiterRef},
     types::signals::{SigSet, Signal, UncheckedSignal, UNBLOCKABLE_SIGNALS},
+    types::user_address::UserAddress,
     types::{
-        Errno, UserAddress, __sifields__bindgen_ty_2, __sifields__bindgen_ty_4,
-        __sifields__bindgen_ty_7, c_int, c_uint, error, pid_t, sigaction_t, sigaltstack_t,
-        sigevent, siginfo_t, sigval_t, struct_with_union_into_bytes, uapi, uid_t, SIGEV_NONE,
-        SIGEV_SIGNAL, SIGEV_THREAD, SIGEV_THREAD_ID, SIG_DFL, SIG_IGN, SI_KERNEL, SI_MAX_SIZE,
+        Errno, __sifields__bindgen_ty_2, __sifields__bindgen_ty_4, __sifields__bindgen_ty_7, c_int,
+        c_uint, error, pid_t, sigaction_t, sigaltstack_t, sigevent, siginfo_t, sigval_t,
+        struct_with_union_into_bytes, uapi, uid_t, SIGEV_NONE, SIGEV_SIGNAL, SIGEV_THREAD,
+        SIGEV_THREAD_ID, SIG_DFL, SIG_IGN, SI_KERNEL, SI_MAX_SIZE,
     },
 };
 

@@ -37,13 +37,14 @@ use crate::{
     syscalls::{
         c_char, errno, error, ifreq, in_addr, mode, sockaddr, sockaddr_in,
         struct_with_union_into_bytes, ucred, Errno, ErrnoCode, OpenFlags, SyscallArg,
-        SyscallResult, UserAddress, UserRef, AF_INET, CAP_NET_RAW, SIOCGIFADDR, SIOCGIFFLAGS,
-        SIOCGIFHWADDR, SIOCGIFINDEX, SIOCGIFMTU, SIOCSIFADDR, SIOCSIFFLAGS, SOL_SOCKET, SO_DOMAIN,
-        SO_MARK, SO_PROTOCOL, SO_RCVTIMEO, SO_SNDTIMEO, SO_TYPE, SUCCESS,
+        SyscallResult, AF_INET, CAP_NET_RAW, SIOCGIFADDR, SIOCGIFFLAGS, SIOCGIFHWADDR,
+        SIOCGIFINDEX, SIOCGIFMTU, SIOCSIFADDR, SIOCSIFFLAGS, SOL_SOCKET, SO_DOMAIN, SO_MARK,
+        SO_PROTOCOL, SO_RCVTIMEO, SO_SNDTIMEO, SO_TYPE, SUCCESS,
     },
     task::{CurrentTask, EventHandler, Task, WaitCanceler, Waiter},
     types::as_any::AsAny,
     types::time::{duration_from_timeval, timeval_from_duration},
+    types::user_address::{UserAddress, UserRef},
     types::user_buffer::UserBuffer,
 };
 

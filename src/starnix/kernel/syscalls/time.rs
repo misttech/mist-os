@@ -11,7 +11,7 @@ use crate::{
     signals::{RunState, SignalEvent},
     syscalls::{
         errno, error, from_status_like_fdio, itimerspec, itimerval, log_trace, not_implemented,
-        pid_t, sigevent, timespec, timeval, timezone, tms, uapi, Errno, UserRef, CLOCK_BOOTTIME,
+        pid_t, sigevent, timespec, timeval, timezone, tms, uapi, Errno, CLOCK_BOOTTIME,
         CLOCK_BOOTTIME_ALARM, CLOCK_MONOTONIC, CLOCK_MONOTONIC_COARSE, CLOCK_MONOTONIC_RAW,
         CLOCK_PROCESS_CPUTIME_ID, CLOCK_REALTIME, CLOCK_REALTIME_ALARM, CLOCK_REALTIME_COARSE,
         CLOCK_TAI, CLOCK_THREAD_CPUTIME_ID, EINTR, MAX_CLOCKS, TIMER_ABSTIME,
@@ -22,6 +22,7 @@ use crate::{
         duration_from_timespec, duration_to_scheduler_clock, time_from_timespec,
         timespec_from_duration, timespec_is_zero, timeval_from_time, NANOS_PER_SECOND,
     },
+    types::user_address::UserRef,
 };
 
 pub fn sys_clock_getres(
@@ -477,7 +478,8 @@ mod test {
         mm::PAGE_SIZE,
         testing::*,
         time::utc::UtcClockOverrideGuard,
-        types::{signals, TempRef, UserAddress},
+        types::user_address::UserAddress,
+        types::{signals, TempRef},
     };
     use fuchsia_zircon::HandleBased;
     use test_util::{assert_geq, assert_leq};

@@ -4,8 +4,9 @@
 
 use crate::{
     mm::{MemoryAccessor, MemoryAccessorExt, MemoryManager},
+    types::user_address::UserAddress,
     types::user_buffer::UserBuffer,
-    types::{errno, error, Errno, UserAddress},
+    types::{errno, error, Errno},
 };
 use zerocopy::FromBytes;
 

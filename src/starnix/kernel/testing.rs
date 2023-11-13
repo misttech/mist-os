@@ -21,6 +21,7 @@ use crate::{
     },
     syscalls::*,
     task::*,
+    types::user_address::UserAddress,
 };
 
 /// Create a FileSystemHandle for use in testing.

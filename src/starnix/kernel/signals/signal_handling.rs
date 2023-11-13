@@ -21,10 +21,10 @@ use crate::{
         SIGTRAP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG, SIGUSR1, SIGUSR2, SIGVTALRM, SIGWINCH, SIGXCPU,
         SIGXFSZ,
     },
+    types::user_address::UserAddress,
     types::{
-        errno, error, sigaction_t, Errno, ErrnoCode, UserAddress, EINTR, ERESTARTNOHAND,
-        ERESTARTNOINTR, ERESTARTSYS, ERESTART_RESTARTBLOCK, SA_ONSTACK, SA_RESTART, SA_SIGINFO,
-        SIG_DFL, SIG_IGN,
+        errno, error, sigaction_t, Errno, ErrnoCode, EINTR, ERESTARTNOHAND, ERESTARTNOINTR,
+        ERESTARTSYS, ERESTART_RESTARTBLOCK, SA_ONSTACK, SA_RESTART, SA_SIGINFO, SIG_DFL, SIG_IGN,
     },
 };
 use lock_sequence::{Locked, Unlocked};

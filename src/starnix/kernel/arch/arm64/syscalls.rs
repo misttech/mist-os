@@ -5,7 +5,8 @@
 use crate::{
     fs::{syscalls::sys_renameat2, FdNumber},
     task::{syscalls::do_clone, CurrentTask},
-    types::{clone_args, pid_t, Errno, UserAddress, UserCString, UserRef, CSIGNAL},
+    types::user_address::{UserAddress, UserCString, UserRef},
+    types::{clone_args, pid_t, Errno, CSIGNAL},
 };
 use lock_sequence::{Locked, Unlocked};
 

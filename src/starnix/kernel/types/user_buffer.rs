@@ -6,7 +6,8 @@ use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
 use crate::{
     mm::PAGE_SIZE,
-    types::{errno, error, Errno, UserAddress},
+    types::user_address::UserAddress,
+    types::{errno, error, Errno},
 };
 use once_cell::sync::Lazy;
 

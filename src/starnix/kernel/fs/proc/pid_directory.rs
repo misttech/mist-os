@@ -22,9 +22,10 @@ use crate::{
     selinux::fs::selinux_proc_attrs,
     task::{CurrentTask, Task, TaskPersistentInfo, TaskStateCode, ThreadGroup},
     types::time::duration_to_scheduler_clock,
+    types::user_address::UserAddress,
     types::{
-        errno, error, mode, off_t, pid_t, uapi, Errno, OpenFlags, Resource, TempRef, UserAddress,
-        WeakRef, CAP_SYS_RESOURCE, OOM_ADJUST_MIN, OOM_DISABLE, OOM_SCORE_ADJ_MIN, RLIM_INFINITY,
+        errno, error, mode, off_t, pid_t, uapi, Errno, OpenFlags, Resource, TempRef, WeakRef,
+        CAP_SYS_RESOURCE, OOM_ADJUST_MIN, OOM_DISABLE, OOM_SCORE_ADJ_MIN, RLIM_INFINITY,
     },
 };
 

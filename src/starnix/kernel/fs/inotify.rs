@@ -21,9 +21,9 @@ use crate::{
     mm::{vmo::round_up_to_increment, MemoryAccessorExt},
     syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::{CurrentTask, EventHandler, Kernel, WaitCanceler, WaitQueue, Waiter},
+    types::user_address::{UserAddress, UserRef},
     types::{
-        errno, error, inotify_event, Errno, FileMode, OpenFlags, UserAddress, UserRef, WeakKey,
-        CAP_SYS_ADMIN, FIONREAD,
+        errno, error, inotify_event, Errno, FileMode, OpenFlags, WeakKey, CAP_SYS_ADMIN, FIONREAD,
     },
 };
 

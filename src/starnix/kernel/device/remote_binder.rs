@@ -13,11 +13,11 @@ use crate::{
     mm::{DesiredAddress, MappedVmo, MappingOptions, MemoryAccessorExt, ProtectionFlags},
     syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::{CurrentTask, Kernel, ThreadGroup, WaitQueue, Waiter},
+    types::user_address::{UserAddress, UserCString, UserRef},
     types::{
         errno,
         errno::{EAGAIN, EINTR},
-        errno_from_code, error, pid_t, uapi, DeviceType, Errno, ErrnoCode, OpenFlags, UserAddress,
-        UserCString, UserRef, PATH_MAX,
+        errno_from_code, error, pid_t, uapi, DeviceType, Errno, ErrnoCode, OpenFlags, PATH_MAX,
     },
 };
 use anyhow::{Context, Error};

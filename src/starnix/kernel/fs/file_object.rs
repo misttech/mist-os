@@ -17,12 +17,12 @@ use crate::{
     },
     syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::{CurrentTask, EventHandler, Task, WaitCallback, WaitCanceler, Waiter},
+    types::user_address::UserAddress,
     types::{
         as_any::AsAny, errno, error, fsxattr, off_t, pid_t, uapi, Errno, OpenFlags, Resource,
-        SealFlags, UserAddress, EAGAIN, ETIMEDOUT, FIONBIO, FIONREAD, FS_IOC_ENABLE_VERITY,
-        FS_IOC_FSGETXATTR, FS_IOC_FSSETXATTR, FS_IOC_GETFLAGS, FS_IOC_MEASURE_VERITY,
-        FS_IOC_READ_VERITY_METADATA, FS_IOC_SETFLAGS, FS_VERITY_FL, SEEK_CUR, SEEK_DATA, SEEK_END,
-        SEEK_HOLE, SEEK_SET, TCGETS,
+        SealFlags, EAGAIN, ETIMEDOUT, FIONBIO, FIONREAD, FS_IOC_ENABLE_VERITY, FS_IOC_FSGETXATTR,
+        FS_IOC_FSSETXATTR, FS_IOC_GETFLAGS, FS_IOC_MEASURE_VERITY, FS_IOC_READ_VERITY_METADATA,
+        FS_IOC_SETFLAGS, FS_VERITY_FL, SEEK_CUR, SEEK_DATA, SEEK_END, SEEK_HOLE, SEEK_SET, TCGETS,
     },
 };
 use fidl::HandleBased;

@@ -26,6 +26,7 @@ use crate::{
     task::{
         CurrentTask, EventHandler, Kernel, SimpleWaiter, Task, WaitCanceler, WaitQueue, Waiter,
     },
+    types::user_address::{UserAddress, UserRef},
     types::user_buffer::UserBuffer,
     types::{
         binder_buffer_object, binder_driver_command_protocol,
@@ -57,10 +58,10 @@ use crate::{
         errno::{errno, errno_from_code, error},
         flat_binder_object, mode, pid_t, release_after, release_on_error, statfs,
         struct_with_union_into_bytes, transaction_flags_TF_ONE_WAY, uapi, ArcKey, DeviceType,
-        Errno, OpenFlags, OwnedRef, Releasable, ReleaseGuard, TempRef, TempRefKey, UserAddress,
-        UserRef, WeakRef, BINDERFS_SUPER_MAGIC, BINDER_BUFFER_FLAG_HAS_PARENT,
-        BINDER_CURRENT_PROTOCOL_VERSION, BINDER_TYPE_BINDER, BINDER_TYPE_FD, BINDER_TYPE_FDA,
-        BINDER_TYPE_HANDLE, BINDER_TYPE_PTR, EINTR,
+        Errno, OpenFlags, OwnedRef, Releasable, ReleaseGuard, TempRef, TempRefKey, WeakRef,
+        BINDERFS_SUPER_MAGIC, BINDER_BUFFER_FLAG_HAS_PARENT, BINDER_CURRENT_PROTOCOL_VERSION,
+        BINDER_TYPE_BINDER, BINDER_TYPE_FD, BINDER_TYPE_FDA, BINDER_TYPE_HANDLE, BINDER_TYPE_PTR,
+        EINTR,
     },
 };
 use derivative::Derivative;

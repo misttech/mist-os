@@ -18,10 +18,10 @@ use crate::{
     },
     syscalls::{
         errno, error, robust_list_head, timespec, uapi, CurrentTask, Errno, Locked, Unlocked,
-        UserAddress, UserRef,
     },
     task::Task,
     types::time::{duration_from_timespec, time_from_timespec},
+    types::user_address::{UserAddress, UserRef},
     types::{
         pid_t, CAP_SYS_PTRACE, FUTEX_BITSET_MATCH_ANY, FUTEX_CLOCK_REALTIME, FUTEX_CMD_MASK,
         FUTEX_PRIVATE_FLAG, FUTEX_REQUEUE, FUTEX_WAIT, FUTEX_WAIT_BITSET, FUTEX_WAKE,

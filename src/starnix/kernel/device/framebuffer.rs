@@ -16,10 +16,11 @@ use crate::{
     mm::{MemoryAccessorExt, ProtectionFlags},
     syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::{CurrentTask, Kernel},
+    types::user_address::{UserAddress, UserRef},
     types::{
         errno, error, fb_bitfield, fb_fix_screeninfo, fb_var_screeninfo, DeviceType, Errno,
-        OpenFlags, UserAddress, UserRef, FBIOGET_FSCREENINFO, FBIOGET_VSCREENINFO,
-        FBIOPUT_VSCREENINFO, FB_TYPE_PACKED_PIXELS, FB_VISUAL_TRUECOLOR,
+        OpenFlags, FBIOGET_FSCREENINFO, FBIOGET_VSCREENINFO, FBIOPUT_VSCREENINFO,
+        FB_TYPE_PACKED_PIXELS, FB_VISUAL_TRUECOLOR,
     },
 };
 

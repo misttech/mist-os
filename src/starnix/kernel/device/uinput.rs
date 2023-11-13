@@ -92,7 +92,7 @@ mod test {
         mm::MemoryAccessorExt,
         task::Kernel,
         testing::{create_kernel_and_task, map_memory, AutoReleasableTask},
-        types::UserAddress,
+        types::user_address::UserAddress,
     };
     use test_case::test_case;
 

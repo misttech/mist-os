@@ -13,14 +13,15 @@ use crate::{
     mm::{MemoryAccessor, MemoryAccessorExt},
     syscalls::{
         decls::SyscallDecl, errno, error, from_status_like_fdio, not_implemented, uapi, utsname_t,
-        CurrentTask, Errno, Locked, SyscallResult, Unlocked, UserAddress, UserCString, UserRef,
-        CAP_SYS_ADMIN, CAP_SYS_BOOT, GRND_NONBLOCK, GRND_RANDOM, LINUX_REBOOT_CMD_CAD_OFF,
-        LINUX_REBOOT_CMD_CAD_ON, LINUX_REBOOT_CMD_HALT, LINUX_REBOOT_CMD_KEXEC,
-        LINUX_REBOOT_CMD_RESTART, LINUX_REBOOT_CMD_RESTART2, LINUX_REBOOT_CMD_SW_SUSPEND,
-        LINUX_REBOOT_MAGIC1, LINUX_REBOOT_MAGIC2, LINUX_REBOOT_MAGIC2A, LINUX_REBOOT_MAGIC2B,
-        LINUX_REBOOT_MAGIC2C, SUCCESS,
+        CurrentTask, Errno, Locked, SyscallResult, Unlocked, CAP_SYS_ADMIN, CAP_SYS_BOOT,
+        GRND_NONBLOCK, GRND_RANDOM, LINUX_REBOOT_CMD_CAD_OFF, LINUX_REBOOT_CMD_CAD_ON,
+        LINUX_REBOOT_CMD_HALT, LINUX_REBOOT_CMD_KEXEC, LINUX_REBOOT_CMD_RESTART,
+        LINUX_REBOOT_CMD_RESTART2, LINUX_REBOOT_CMD_SW_SUSPEND, LINUX_REBOOT_MAGIC1,
+        LINUX_REBOOT_MAGIC2, LINUX_REBOOT_MAGIC2A, LINUX_REBOOT_MAGIC2B, LINUX_REBOOT_MAGIC2C,
+        SUCCESS,
     },
     types::personality::PersonalityFlags,
+    types::user_address::{UserAddress, UserCString, UserRef},
 };
 
 pub fn sys_uname(

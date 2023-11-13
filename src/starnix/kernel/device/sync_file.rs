@@ -11,9 +11,10 @@ use crate::task::{
     CurrentTask, EventHandler, ManyZxHandleSignalHandler, SignalHandler, SignalHandlerInner,
     WaitCanceler, WaitCancelerOneVmo, Waiter,
 };
+use crate::types::user_address::{UserAddress, UserRef};
 use crate::types::{
-    c_char, error, sync_fence_info, sync_file_info, sync_merge_data, Errno, OpenFlags, UserAddress,
-    UserRef, SYNC_IOC_MAGIC,
+    c_char, error, sync_fence_info, sync_file_info, sync_merge_data, Errno, OpenFlags,
+    SYNC_IOC_MAGIC,
 };
 use fidl::HandleBased;
 use fuchsia_zircon as zx;

@@ -188,9 +188,10 @@ mod tests {
         task::Kernel,
         testing::*,
         types::signals::{SIGUSR1, SIGUSR2},
+        types::user_address::UserAddress,
         types::{
-            __NR_rt_sigreturn, sigaction_t, UserAddress, EINTR, ERESTARTSYS, SA_RESTART,
-            SA_RESTORER, SA_SIGINFO, SI_USER,
+            __NR_rt_sigreturn, sigaction_t, EINTR, ERESTARTSYS, SA_RESTART, SA_RESTORER,
+            SA_SIGINFO, SI_USER,
         },
     };
 

@@ -5,7 +5,8 @@
 use crate::{
     fs::{FdFlags, FdNumber, WdNumber},
     types::signals::Signal,
-    types::{FileMode, OpenFlags, SealFlags, UserAddress},
+    types::user_address::UserAddress,
+    types::{FileMode, OpenFlags, SealFlags},
 };
 
 #[derive(Eq, PartialEq, Debug)]

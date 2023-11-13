@@ -14,12 +14,13 @@ use crate::{
     mm::{MemoryAccessorExt, ProtectionFlags, PAGE_SIZE},
     syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::{CurrentTask, Kernel},
+    types::user_address::UserRef,
     types::{
-        OpenFlags, UserRef, __kernel_old_dev_t, errno, error, loop_info, loop_info64, uapi,
-        DeviceType, Errno, BLKFLSBUF, BLKGETSIZE, BLKGETSIZE64, LOOP_CHANGE_FD, LOOP_CLR_FD,
-        LOOP_CONFIGURE, LOOP_CTL_ADD, LOOP_CTL_GET_FREE, LOOP_CTL_REMOVE, LOOP_GET_STATUS,
-        LOOP_GET_STATUS64, LOOP_MAJOR, LOOP_SET_BLOCK_SIZE, LOOP_SET_CAPACITY, LOOP_SET_DIRECT_IO,
-        LOOP_SET_FD, LOOP_SET_STATUS, LOOP_SET_STATUS64, LO_FLAGS_AUTOCLEAR, LO_FLAGS_DIRECT_IO,
+        OpenFlags, __kernel_old_dev_t, errno, error, loop_info, loop_info64, uapi, DeviceType,
+        Errno, BLKFLSBUF, BLKGETSIZE, BLKGETSIZE64, LOOP_CHANGE_FD, LOOP_CLR_FD, LOOP_CONFIGURE,
+        LOOP_CTL_ADD, LOOP_CTL_GET_FREE, LOOP_CTL_REMOVE, LOOP_GET_STATUS, LOOP_GET_STATUS64,
+        LOOP_MAJOR, LOOP_SET_BLOCK_SIZE, LOOP_SET_CAPACITY, LOOP_SET_DIRECT_IO, LOOP_SET_FD,
+        LOOP_SET_STATUS, LOOP_SET_STATUS64, LO_FLAGS_AUTOCLEAR, LO_FLAGS_DIRECT_IO,
         LO_FLAGS_PARTSCAN, LO_FLAGS_READ_ONLY, LO_KEY_SIZE,
     },
 };
