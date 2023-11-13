@@ -108,6 +108,7 @@ if (is_host) {
       "src/blobfs.rs",
       "src/blobfs_export.rs",
       "src/bootfs.rs",
+      "src/build_checks.rs",
       "src/fs.rs",
       "src/fvm.rs",
       "src/golden.rs",
