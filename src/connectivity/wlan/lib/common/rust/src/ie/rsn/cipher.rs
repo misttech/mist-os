@@ -120,7 +120,7 @@ impl Cipher {
         }
     }
 
-    pub fn tk_bytes(&self) -> Option<usize> {
+    pub fn tk_bytes(&self) -> Option<u8> {
         return_none_if_unknown_usage!(self);
 
         // IEEE 802.11-2016, 12.7.2, Table 12-4
@@ -133,18 +133,8 @@ impl Cipher {
         }
     }
 
-    #[deprecated(note = "use `tk_bytes` instead")]
     pub fn tk_bits(&self) -> Option<u16> {
-        return_none_if_unknown_usage!(self);
-
-        // IEEE 802.11-2016, 12.7.2, Table 12-4
-        match self.suite_type {
-            1 => Some(40),
-            5 => Some(104),
-            4 | 6 | 8 | 11 => Some(128),
-            2 | 9 | 10 | 12 | 13 => Some(256),
-            _ => None,
-        }
+        self.tk_bytes().map(|x| 8 * u16::from(x))
     }
 }
 

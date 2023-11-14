@@ -65,7 +65,7 @@ pub fn ptk() -> Ptk {
     // that if our code, for example, mistakenly uses KCK instead of TK, test would fail.
     ptk_bytes.extend(vec![0xAAu8; akm().kck_bytes().unwrap() as usize]);
     ptk_bytes.extend(vec![0xBBu8; akm().kek_bytes().unwrap() as usize]);
-    ptk_bytes.extend(vec![0xCCu8; cipher().tk_bytes().unwrap()]);
+    ptk_bytes.extend(vec![0xCCu8; cipher().tk_bytes().unwrap() as usize]);
     Ptk::from_ptk(ptk_bytes, &akm(), cipher()).expect("expect valid ptk")
 }
 
@@ -77,7 +77,7 @@ pub fn wpa1_ptk() -> Ptk {
     let cipher = wpa1_cipher();
     ptk_bytes.extend(vec![0xAAu8; akm.kck_bytes().unwrap() as usize]);
     ptk_bytes.extend(vec![0xBBu8; akm.kek_bytes().unwrap() as usize]);
-    ptk_bytes.extend(vec![0xCCu8; cipher.tk_bytes().unwrap()]);
+    ptk_bytes.extend(vec![0xCCu8; cipher.tk_bytes().unwrap() as usize]);
     Ptk::from_ptk(ptk_bytes, &akm, cipher).expect("expect valid ptk")
 }
 

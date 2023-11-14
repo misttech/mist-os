@@ -345,22 +345,26 @@ impl<B: ByteSlice> Dot11VerifiedKeyFrame<B> {
                 // To improve interoperability, a value of 0 or the pairwise temporal key length is
                 // allowed for frames sent by the Supplicant.
                 Role::Supplicant if frame.key_frame_fields.key_len.to_native() != 0 => {
-                    let tk_bits =
-                        protection.pairwise.tk_bits().ok_or(Error::UnsupportedCipherSuite)?;
-                    let tk_len = tk_bits / 8;
+                    let tk_len =
+                        protection.pairwise.tk_bytes().ok_or(Error::UnsupportedCipherSuite)?;
                     rsn_ensure!(
-                        frame.key_frame_fields.key_len.to_native() == tk_len,
-                        Error::InvalidKeyLength(frame.key_frame_fields.key_len.to_native(), tk_len)
+                        frame.key_frame_fields.key_len.to_native() == tk_len.into(),
+                        Error::InvalidKeyLength(
+                            frame.key_frame_fields.key_len.to_native().into(),
+                            tk_len.into()
+                        )
                     );
                 }
                 // Authenticator must use the pairwise cipher's key length.
                 Role::Authenticator => {
-                    let tk_bits =
-                        protection.pairwise.tk_bits().ok_or(Error::UnsupportedCipherSuite)?;
-                    let tk_len = tk_bits / 8;
+                    let tk_len: usize =
+                        protection.pairwise.tk_bytes().ok_or(Error::UnsupportedCipherSuite)?.into();
                     rsn_ensure!(
-                        frame.key_frame_fields.key_len.to_native() == tk_len,
-                        Error::InvalidKeyLength(frame.key_frame_fields.key_len.to_native(), tk_len)
+                        usize::from(frame.key_frame_fields.key_len.to_native()) == tk_len,
+                        Error::InvalidKeyLength(
+                            frame.key_frame_fields.key_len.to_native().into(),
+                            tk_len
+                        )
                     );
                 }
                 _ => {}

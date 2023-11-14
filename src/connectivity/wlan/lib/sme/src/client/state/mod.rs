@@ -3814,7 +3814,7 @@ mod tests {
         assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::SetKeys(set_keys_req))) => {
             assert_eq!(set_keys_req.keylist.len(), 1);
             let k = set_keys_req.keylist.get(0).expect("expect key descriptor");
-            assert_eq!(k.key, vec![0xCCu8; test_utils::cipher().tk_bytes().unwrap()]);
+            assert_eq!(k.key, vec![0xCCu8; test_utils::cipher().tk_bytes().unwrap() as usize]);
             assert_eq!(k.key_id, 0);
             assert_eq!(k.key_type, fidl_mlme::KeyType::Pairwise);
             assert_eq!(&k.address, bssid.as_array());
@@ -3842,7 +3842,7 @@ mod tests {
         assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::SetKeys(set_keys_req))) => {
             assert_eq!(set_keys_req.keylist.len(), 1);
             let k = set_keys_req.keylist.get(0).expect("expect key descriptor");
-            assert_eq!(k.key, vec![0xCCu8; test_utils::wpa1_cipher().tk_bytes().unwrap()]);
+            assert_eq!(k.key, vec![0xCCu8; test_utils::wpa1_cipher().tk_bytes().unwrap() as usize]);
             assert_eq!(k.key_id, 0);
             assert_eq!(k.key_type, fidl_mlme::KeyType::Pairwise);
             assert_eq!(&k.address, bssid.as_array());

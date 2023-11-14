@@ -471,7 +471,7 @@ pub enum Error {
     #[error("encrypted_key_data bit requires MIC bit to be set")]
     InvalidMicBitForEncryptedKeyData,
     #[error("invalid key length {:?}; expected {:?}", _0, _1)]
-    InvalidKeyLength(u16, u16),
+    InvalidKeyLength(usize, usize),
     #[error("unsupported cipher suite")]
     UnsupportedCipherSuite,
     #[error("unsupported AKM suite")]

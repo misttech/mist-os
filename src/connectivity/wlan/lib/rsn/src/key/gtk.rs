@@ -25,8 +25,9 @@ fn generate_random_gtk(len: usize) -> Box<[u8]> {
 
 impl GtkProvider {
     pub fn new(cipher: Cipher) -> Result<GtkProvider, anyhow::Error> {
-        let tk_bytes = cipher.tk_bytes().ok_or(Error::GtkHierarchyUnsupportedCipherError)?;
-        Ok(GtkProvider { cipher, key: generate_random_gtk(tk_bytes) })
+        let tk_len: usize =
+            cipher.tk_bytes().ok_or(Error::GtkHierarchyUnsupportedCipherError)?.into();
+        Ok(GtkProvider { cipher, key: generate_random_gtk(tk_len) })
     }
 
     pub fn get_gtk(&self) -> Result<Gtk, Error> {
@@ -84,16 +85,18 @@ impl Gtk {
         gnonce: &[u8; 32],
         cipher: Cipher,
         rsc: u64,
-    ) -> Result<Gtk, anyhow::Error> {
-        let tk_bits = cipher.tk_bits().ok_or(Error::GtkHierarchyUnsupportedCipherError)?;
+    ) -> Result<Gtk, Error> {
+        let tk_len: usize =
+            cipher.tk_bytes().ok_or(Error::GtkHierarchyUnsupportedCipherError)?.into();
 
         // data length = 6 (aa) + 32 (gnonce)
         let mut data: [u8; 38] = [0; 38];
         data[0..6].copy_from_slice(&aa[..]);
         data[6..].copy_from_slice(&gnonce[..]);
 
-        let gtk_bytes = prf::prf(gmk, "Group key expansion", &data, tk_bits as usize)?;
-        Ok(Gtk { gtk: gtk_bytes, key_id, tk_len: (tk_bits / 8) as usize, cipher, rsc })
+        let gtk_bytes = prf::prf(gmk, "Group key expansion", &data, tk_len * 8)
+            .map_err(|e| Error::GenericError(e.to_string()))?;
+        Ok(Gtk { tk_len, gtk: gtk_bytes, key_id, rsc, cipher })
     }
 
     pub fn key_id(&self) -> u8 {

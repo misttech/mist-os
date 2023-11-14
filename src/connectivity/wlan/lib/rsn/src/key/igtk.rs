@@ -26,7 +26,8 @@ fn generate_random_igtk(len: usize) -> Box<[u8]> {
 
 impl IgtkProvider {
     pub fn new(cipher: Cipher) -> Result<IgtkProvider, anyhow::Error> {
-        let tk_bytes = cipher.tk_bytes().ok_or(Error::IgtkHierarchyUnsupportedCipherError)?;
+        let tk_bytes: usize =
+            cipher.tk_bytes().ok_or(Error::IgtkHierarchyUnsupportedCipherError)?.into();
         Ok(IgtkProvider { key: generate_random_igtk(tk_bytes), cipher, tk_bytes })
     }
 
