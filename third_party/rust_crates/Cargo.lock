@@ -4430,12 +4430,13 @@ checksum = "cda74da7e1a664f795bb1f8a87ec406fb89a02522cf6e50620d016add6dbbf5c"
 
 [[package]]
 name = "tokio"
-version = "1.20.5"
+version = "1.25.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "911e05833b3ac1ae6117148d56d6e318dcb209581f3ef5bb4cd370c958ed0010"
+checksum = "54875d2a04a2b9808a07d51405a7ef769b4afb483fa34b496d776c767698b395"
 dependencies = [
  "autocfg 1.1.0",
  "pin-project-lite",
+ "windows-sys 0.42.0",
 ]
 
 [[package]]

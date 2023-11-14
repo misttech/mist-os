@@ -964,13 +964,13 @@ if (!(current_os == "fuchsia")) {
 
 if (!(current_os == "fuchsia")) {
   group("tokio") {
-    public_deps = [ ":tokio-v1_20_5" ]
+    public_deps = [ ":tokio-v1_25_2" ]
   }
 }
 
 if (current_os == "fuchsia") {
   group("tokio") {
-    public_deps = [ ":tokio-v1_20_5" ]
+    public_deps = [ ":tokio-v1_25_2" ]
   }
 }
 
@@ -5428,7 +5428,7 @@ rust_library("fuse3-v0_6_1") {
   deps += [ ":nix-v0_26_2" ]
   deps += [ ":serde-v1_0_147" ]
   deps += [ ":slab-v0_4_7" ]
-  deps += [ ":tokio-v1_20_5" ]
+  deps += [ ":tokio-v1_25_2" ]
   deps += [ ":tracing-v0_1_37" ]
   deps += [ ":which-v4_0_2" ]
 
@@ -6676,7 +6676,7 @@ rust_library("hyper-v0_14_19") {
   deps += [ ":httpdate-v1_0_2" ]
   deps += [ ":itoa-v1_0_5" ]
   deps += [ ":pin-project-lite-v0_2_9" ]
-  deps += [ ":tokio-v1_20_5" ]
+  deps += [ ":tokio-v1_25_2" ]
   deps += [ ":tower-service-v0_3_0" ]
   deps += [ ":tracing-v0_1_37" ]
   deps += [ ":want-v0_3_0" ]
@@ -6721,7 +6721,7 @@ rust_library("hyper-rustls-v0_22_1") {
   deps += [ ":log-v0_4_20" ]
   deps += [ ":rustls-v0_19_1" ]
   deps += [ ":rustls-native-certs-v0_5_0" ]
-  deps += [ ":tokio-v1_20_5" ]
+  deps += [ ":tokio-v1_25_2" ]
   deps += [ ":tokio-rustls-v0_22_0" ]
   deps += [ ":webpki-v0_21_0" ]
 
@@ -15278,19 +15278,22 @@ rust_library("tinyvec_macros-v0_1_0") {
   applicable_licenses = [ ":tinyvec_macros-v0_1_0.license" ]
 }
 
-license("tokio-v1_20_5.license") {
+license("tokio-v1_25_2.license") {
   public_package_name = "tokio"
-  license_files = [ "//third_party/rust_crates/vendor/tokio-1.20.5/LICENSE" ]
+  license_files = [ "//third_party/rust_crates/vendor/tokio-1.25.2/LICENSE" ]
 }
 
-rust_library("tokio-v1_20_5") {
+rust_library("tokio-v1_25_2") {
   crate_name = "tokio"
-  crate_root = "//third_party/rust_crates/vendor/tokio-1.20.5/src/lib.rs"
-  output_name = "tokio-288da0d98ed68b86"
+  crate_root = "//third_party/rust_crates/vendor/tokio-1.25.2/src/lib.rs"
+  output_name = "tokio-838d0fb9e953004a"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
   deps += [ ":pin-project-lite-v0_2_9" ]
+  if (false) {
+    deps += [ ":windows-sys-v0_42_0" ]
+  }
   if (!(current_os == "fuchsia")) {
     deps += [ ":bytes-v1_0_1" ]
     deps += [ ":libc-v0_2_149" ]
@@ -15306,8 +15309,8 @@ rust_library("tokio-v1_20_5") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=288da0d98ed68b86",
-    "-Cextra-filename=-288da0d98ed68b86",
+    "-Cmetadata=838d0fb9e953004a",
+    "-Cextra-filename=-838d0fb9e953004a",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"sync\"",
     "--cfg=feature=\"time\"",
@@ -15335,7 +15338,7 @@ rust_library("tokio-v1_20_5") {
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":tokio-v1_20_5.license" ]
+  applicable_licenses = [ ":tokio-v1_25_2.license" ]
 }
 
 license("tokio-rustls-v0_22_0.license") {
@@ -15354,7 +15357,7 @@ rust_library("tokio-rustls-v0_22_0") {
 
   deps = []
   deps += [ ":rustls-v0_19_1" ]
-  deps += [ ":tokio-v1_20_5" ]
+  deps += [ ":tokio-v1_25_2" ]
   deps += [ ":webpki-v0_21_0" ]
 
   rustenv = []
@@ -15386,7 +15389,7 @@ rust_library("tokio-stream-v0_1_14") {
   deps = []
   deps += [ ":futures-core-v0_3_19" ]
   deps += [ ":pin-project-lite-v0_2_9" ]
-  deps += [ ":tokio-v1_20_5" ]
+  deps += [ ":tokio-v1_25_2" ]
 
   rustenv = []
 
@@ -17600,6 +17603,7 @@ rust_library("windows-sys-v0_42_0") {
     "--cfg=feature=\"Win32_Foundation\"",
     "--cfg=feature=\"Win32_Networking_WinSock\"",
     "--cfg=feature=\"Win32_Security\"",
+    "--cfg=feature=\"Win32_Security_Authorization\"",
     "--cfg=feature=\"Win32_Storage_FileSystem\"",
     "--cfg=feature=\"Win32_System_IO\"",
     "--cfg=feature=\"Win32_System_LibraryLoader\"",

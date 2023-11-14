@@ -265,7 +265,7 @@ rust_icu_uenum = { version = "4.2.3", default-features = false, features = ["ren
 rust_icu_uloc = { version = "4.2.3", default-features = false, features = ["renaming", "icu_version_in_env", "icu_version_67_plus"] }
 rust_icu_unorm2 = { version = "4.2.3", default-features = false, features = ["renaming", "icu_version_in_env", "icu_version_67_plus"] }
 rust_icu_ustring = { version = "4.2.3", default-features = false, features = ["renaming", "icu_version_in_env"] }
-tokio = { version = "=1.20.5", default-features = false }
+tokio = { version = "=1.25.2", default-features = false }
 trust-dns-proto = { version = "0.22.0", default-features = false, features = ["testing"] }
 trust-dns-resolver = { version = "0.22.0", default-features = false, features = ["testing"] }
 ttf-parser = "0.10.1"
@@ -310,7 +310,7 @@ termios = "0.3.2"
 tinyjson = "2.5.0"
 # TODO(fxbug.dev/106164) Enable the "rt" and "net" features here once gnaw
 # supports target-specific feature resolution
-tokio = { version = "=1.20.5", default-features = false }
+tokio = { version = "=1.25.2", default-features = false }
 tokio-stream = "0.1.14"
 zip = { version = "0.5.5", default-features = false, features = ["deflate"] }
 
@@ -689,7 +689,7 @@ group_visibility = { import = "//third_party/rust_crates/private_visibility.gni"
 # TODO(fxbug.dev/106164) This manual configuration enables the "rt", "net"
 # "fs" and "sync" features on non-Fuchsia targets. It should be removed
 # once gnaw supports target-specific features.
-[gn.package.tokio."1.20.5".platform."cfg(not(target_os = \"fuchsia\"))"]
+[gn.package.tokio."1.25.2".platform."cfg(not(target_os = \"fuchsia\"))"]
 deps = [
   ":bytes-v1_0_1",
   ":libc-v0_2_149",
