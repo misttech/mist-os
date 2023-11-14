@@ -16,6 +16,7 @@ zx_library("counters") {
   visibility = [
     "//src/zircon/bin/kcounter:*",
     "//src/zircon/tests/kcounter:*",
+    "//vendor/google/*",
     "//zircon/kernel/*",
     "//zircon/system/ulib/*",
     "//zircon/system/ulib/kcounter/*",
