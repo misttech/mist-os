@@ -6,6 +6,7 @@
 
 load(":toolchains/clang/clang_utils.bzl", "process_clang_builtins_output")
 load(":toolchains/clang/providers.bzl", "ClangInfo")
+load(":toolchains/clang/toolchain_utils.bzl", "define_clang_runtime_filegroups")
 
 def prepare_clang_repository(repo_ctx, clang_install_dir):
     """Prepare a repository directory for a clang toolchain creation.
@@ -157,6 +158,8 @@ def setup_clang_repository(constants):
         long_version = constants.long_version,
         builtin_include_paths = constants.builtin_include_paths,
     )
+
+    define_clang_runtime_filegroups(constants)
 
     # The following filegroups are referenced from toolchain definitions
     # created by the generate_clang_cc_toolchain() function from

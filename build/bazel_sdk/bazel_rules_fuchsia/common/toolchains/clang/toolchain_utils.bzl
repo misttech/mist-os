@@ -13,7 +13,11 @@ load(
     "tool_path",
     "with_feature_set",
 )
-load("//:toolchains/clang/clang_utils.bzl", "to_clang_target_tuple")
+load(
+    "//:toolchains/clang/clang_utils.bzl",
+    "format_labels_list_to_target_tag_native_glob_select",
+    "to_clang_target_tuple",
+)
 load("//:toolchains/clang/providers.bzl", "ClangInfo")
 load("//:toolchains/clang/sanitizer.bzl", "sanitizer_features")
 
@@ -143,47 +147,42 @@ def compute_clang_features():
     return features
 
 # buildifier: disable=unnamed-macro
-def _generate_clang_runtime_filegroups(clang_constants, os, arch):
+def define_clang_runtime_filegroups(clang_constants):
     """Generate filegroups for Clang runtime headers and libraries.
 
     Args:
       clang_constants: A struct containing Clang configuration information.
-      os: Target os for the toolchain.
-      arch: Target cpu for the toolchain.
 
     Returns:
       A struct giving the names of the filegroups for the headers and runtime
       libraries for libc++ and other Clang runtimes.
     """
-    clang_target_tuple = to_clang_target_tuple(os, arch)
 
-    prefix = clang_target_tuple
-
-    names = struct(
-        headers = prefix + "_runtime_headers",
-        runtime_libs = prefix + "_runtime_libs",
+    # There is one arch-specific libc++ header file, access it through a select()
+    # statement that resolves to the right location based on the build
+    # configuration's target platform.
+    __config_site_sources = format_labels_list_to_target_tag_native_glob_select(
+        ["include/{clang_target_tuple}/c++/v1/__config_site"],
     )
 
     native.filegroup(
-        name = names.headers,
+        name = "libcxx_headers",
         srcs = native.glob([
             # built-in headers, e.g. <builtins.h> or <xmmintrin.h>
             "%s/include/**" % clang_constants.lib_clang_internal_dir,
 
             # libc++ headers
             "include/c++/v1/**",
-
-            # arch-specific libc++ headers.
-            "include/%s/c++/v1/**" % clang_target_tuple,
-        ]),
+        ]) + __config_site_sources,
     )
 
     native.filegroup(
-        name = names.runtime_libs,
-        srcs = native.glob([
+        name = "libcxx_runtime_libs",
+        srcs =
             # This contains the C++ runtime libraries, including libunwind,
-            # and all their variants. TODO(digit): Restrict this to only
-            # what is needed to speed up C++ link operations. E.g.:
+            # and all their variants. Because individual targets can select
+            # a different sanitizer mode than the default for the curent build
+            # operation, all of them must be exposed at link time.
             #
             #   libc++.a
             #   libc++abi.so --> libc++abi.so.1
@@ -206,11 +205,13 @@ def _generate_clang_runtime_filegroups(clang_constants, os, arch):
             #   noexcept/
             #     ...
             #
-            "lib/%s/**" % clang_target_tuple,
-        ]) + native.glob([
+            format_labels_list_to_target_tag_native_glob_select([
+                "lib/{clang_target_tuple}/**",
+            ]) +
             # This contains the Clang runtime libraries, including all
-            # their variants. TODO(digit): Restrict this to only what is
-            # needed to speed up C++ link operations. E.g.:
+            # their variants. Because individual targets can select a different
+            # sanitizer mode than the default for the current build operation,
+            # all of them must be exposed at link time. E.g.:
             #
             #  libclang_rt.asan.a
             #  libclang_rt.asan_cxx.a
@@ -231,11 +232,15 @@ def _generate_clang_runtime_filegroups(clang_constants, os, arch):
             #  libclang_rt.hwasan.so
             #  ...
             #
-            "%s/lib/%s/**" % (clang_constants.lib_clang_internal_dir, clang_target_tuple),
-        ]),
+            format_labels_list_to_target_tag_native_glob_select(
+                [
+                    "{internal_dir}/lib/{clang_target_tuple}/**",
+                ],
+                extra_dict = {
+                    "internal_dir": clang_constants.lib_clang_internal_dir,
+                },
+            ),
     )
-
-    return names
 
 def _prebuilt_clang_cc_toolchain_config_impl(ctx):
     # See CppConfiguration.java class in Bazel sources for the list of
@@ -305,6 +310,7 @@ def generate_clang_cc_toolchain(
         target_os,
         target_arch,
         clang_constants,
+        clang_info = "//:clang_info",
         sysroot_files = [],
         sysroot_path = ""):
     """Define C++ toolchain related targets for a prebuilt Clang installation.
@@ -324,6 +330,10 @@ def generate_clang_cc_toolchain(
 
        clang_constants: TBW
 
+       clang_info: (optional) Label to a target providing a ClangInfo provider
+           value. Default to //:clang_info.
+           See setup_clang_repository() in repository_utils.bzl.
+
        sysroot_files: (optiona) A target list for the sysroot files to be used.
 
        sysroot_path: (optional) Path to the sysroot directory to be used.
@@ -333,19 +343,17 @@ def generate_clang_cc_toolchain(
         target_os = target_os,
         target_arch = target_arch,
         sysroot = sysroot_path,
-        clang_info = "//:clang_info",
+        clang_info = clang_info,
     )
-
-    libcxx = _generate_clang_runtime_filegroups(clang_constants, target_os, target_arch)
 
     common_compiler_files = [
         ":clang_compiler_binaries",
-        ":" + libcxx.headers,
+        ":libcxx_headers",
     ]
 
     common_linker_files = [
         ":clang_linker_binaries",
-        ":" + libcxx.runtime_libs,
+        ":libcxx_runtime_libs",
     ]
 
     compiler_files = name + "_compiler_files"
@@ -377,8 +385,9 @@ def generate_clang_cc_toolchain(
         objcopy_files = ":clang_objcopy_binaries",
         strip_files = ":clang_strip_binaries",
         # `supports_param_files = 1` means that the toolchain supports
-        # reading arguments from a responsde file (e.g. `@arguments.rsp`)
-        supports_param_files = 1,
+        # reading arguments from a response file (e.g. `@arguments.rsp`)
+        # but this is set here to 0 to help debug toolchain-related issues.
+        supports_param_files = 0,
         toolchain_config = name + "_cc_toolchain_config",
         toolchain_identifier = "prebuilt_clang",
     )
