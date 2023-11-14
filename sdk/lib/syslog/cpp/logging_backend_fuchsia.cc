@@ -28,11 +28,6 @@
 
 namespace syslog_backend {
 
-// Returns true if we are running in the DDK.
-// This is used to customize logging behavior for drivers
-// and related driver functionality.
-bool fx_log_compat_no_interest_listener();
-
 bool HasStructuredBackend() { return true; }
 
 using log_word_t = uint64_t;
@@ -240,14 +235,6 @@ void LogState::ConnectAsync() {
 }
 
 void LogState::Connect() {
-  // Always disable the interest listener for the DDK.
-  // Once structured logging is available in the SDK
-  // this may unblock support for this.
-  // For now -- we have no way to properly support
-  // this functionality for drivers.
-  if (fx_log_compat_no_interest_listener()) {
-    serve_interest_listener_ = false;
-  }
   if (serve_interest_listener_) {
     if (!interest_listener_dispatcher_) {
       loop_.StartThread("log-interest-listener-thread");
