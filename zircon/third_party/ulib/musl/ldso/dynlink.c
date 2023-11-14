@@ -208,24 +208,6 @@ NO_ASAN LIBC_NO_SAFESTACK static int dl_strcmp(const char* l, const char* r) {
 // the breakpoint instruction, not just a function containing it.
 void debug_break(void);
 
-__asm__(
-    ".pushsection .text.debug_break, \"ax\", @progbits\n"
-    "debug_break:\n"
-    ".cfi_startproc\n"
-#if defined(__x86_64__)
-    "int3\n"
-#elif defined(__aarch64__)
-    "brk #0\n"
-#elif defined(__riscv)
-    // Use explicit c.ebreak to ensure it's a known 2-byte instruction.
-    "c.ebreak\n"
-#else
-#error "what machine?"
-#endif
-    "ret\n"
-    ".cfi_endproc\n"
-    ".popsection\n");
-
 LIBC_NO_SAFESTACK static bool should_break_on_load(void) {
   intptr_t dyn_break_on_load = 0;
   zx_status_t status = _zx_object_get_property(__zircon_process_self, ZX_PROP_PROCESS_BREAK_ON_LOAD,
