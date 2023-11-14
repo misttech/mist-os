@@ -76,6 +76,7 @@ impl FileOps for Arc<UinputDevice> {
             // is invalid.
             uapi::UI_SET_KEYBIT
             | uapi::UI_SET_ABSBIT
+            | uapi::UI_SET_PHYS
             | uapi::UI_SET_PROPBIT
             | uapi::UI_DEV_SETUP => Ok(SUCCESS),
             // default_ioctl() handles file system related requests and reject
@@ -90,7 +91,7 @@ mod test {
     use super::*;
     use crate::{
         fs::FileHandle,
-        mm::MemoryAccessorExt,
+        mm::{MemoryAccessor, MemoryAccessorExt},
         task::Kernel,
         testing::{create_kernel_and_task, map_memory, AutoReleasableTask},
         types::user_address::UserAddress,
@@ -218,6 +219,23 @@ mod test {
             uapi::UI_SET_PROPBIT,
             SyscallArg::from(uapi::INPUT_PROP_DIRECT as u64),
         );
+        assert_eq!(r, Ok(SUCCESS));
+    }
+
+    #[::fuchsia::test]
+    async fn ui_set_phys() {
+        let dev = UinputDevice::new();
+        let (_kernel, current_task, file_object) = make_kernel_objects(dev.clone());
+        let phys_name = b"mouse0\0";
+        let phys_name_address =
+            map_memory(&current_task, UserAddress::default(), phys_name.len() as u64);
+        current_task.mm.write_memory(phys_name_address, phys_name).expect("write_memory");
+        let r = dev.ioctl(&file_object, &current_task, uapi::UI_SET_PHYS, phys_name_address.into());
+        assert_eq!(r, Ok(SUCCESS));
+
+        // also test call multi times with invalid argument.
+        let r =
+            dev.ioctl(&file_object, &current_task, uapi::UI_SET_PHYS, SyscallArg::from(0 as u64));
         assert_eq!(r, Ok(SUCCESS));
     }
 

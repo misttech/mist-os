@@ -69,6 +69,12 @@ TEST_F(UinputTest, UiSetAbsbit) {
   EXPECT_EQ(res, 0);
 }
 
+TEST_F(UinputTest, UiSetPhys) {
+  char name[] = "mouse0";
+  int res = ioctl(uinput_fd_.get(), UI_SET_PHYS, &name);
+  EXPECT_EQ(res, 0);
+}
+
 TEST_F(UinputTest, UiDevSetup) {
   struct uinput_setup usetup;
   memset(&usetup, 0, sizeof(usetup));
