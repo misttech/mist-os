@@ -13,10 +13,11 @@ use crate::{
     mm::{DesiredAddress, MappingOptions, MemoryAccessorExt, ProtectionFlags},
     syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::{CurrentTask, Kernel, ThreadGroup, WaitQueue, Waiter},
-    types::user_address::{UserAddress, UserCString, UserRef},
     types::{
         errno::{errno, errno_from_code, error, Errno, ErrnoCode, EAGAIN, EINTR},
-        pid_t, uapi, DeviceType, OpenFlags, PATH_MAX,
+        pid_t, uapi,
+        user_address::{UserAddress, UserCString, UserRef},
+        DeviceType, OpenFlags, PATH_MAX,
     },
 };
 use anyhow::{Context, Error};
@@ -919,7 +920,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
             })
             .map_err(|_| errno!(EINVAL))?;
         let handle = self.clone();
-        current_task.kernel().kthreads.spawner.spawn(move || {
+        current_task.kernel().kthreads.spawner().spawn(move |_| {
             let mut executor = fasync::LocalExecutor::new();
             let result = executor.run_singlethreaded({
                 let handle = handle.clone();

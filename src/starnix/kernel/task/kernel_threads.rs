@@ -5,13 +5,15 @@
 use crate::{
     dynamic_thread_spawner::DynamicThreadSpawner,
     task::{CurrentTask, Task},
-    types::errno::{errno, Errno},
-    types::{OwnedRefByRef, ReleasableByRef, WeakRef},
+    types::{
+        errno::{errno, Errno},
+        OwnedRefByRef, ReleasableByRef, WeakRef,
+    },
 };
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
 use once_cell::sync::OnceCell;
-use std::ffi::CString;
+use std::{ffi::CString, sync::Arc};
 
 /// The threads that the kernel runs internally.
 ///
@@ -29,7 +31,7 @@ pub struct KernelThreads {
     pub ehandle: fasync::EHandle,
 
     /// The thread pool to spawn blocking calls to.
-    pub spawner: DynamicThreadSpawner,
+    spawner: OnceCell<DynamicThreadSpawner>,
 
     /// A task object for the kernel threads.
     system_task: OnceCell<OwnedRefByRef<CurrentTask>>,
@@ -42,7 +44,7 @@ impl Default for KernelThreads {
                 .duplicate(zx::Rights::SAME_RIGHTS)
                 .expect("Failed to duplicate process self"),
             ehandle: fasync::EHandle::local(),
-            spawner: DynamicThreadSpawner::new(2),
+            spawner: OnceCell::new(),
             system_task: OnceCell::new(),
         }
     }
@@ -58,8 +60,17 @@ impl Drop for KernelThreads {
 
 impl KernelThreads {
     pub fn init(&self, system_task: OwnedRefByRef<CurrentTask>) -> Result<(), Errno> {
+        let kernel = Arc::downgrade(system_task.kernel());
+        let fs_context = Arc::clone(system_task.fs());
         self.system_task.set(system_task).map_err(|_| errno!(EEXIST))?;
+        self.spawner
+            .set(DynamicThreadSpawner::new(2, kernel, fs_context))
+            .map_err(|_| errno!(EEXIST))?;
         Ok(())
+    }
+
+    pub fn spawner(&self) -> &DynamicThreadSpawner {
+        self.spawner.get().as_ref().unwrap()
     }
 
     pub fn system_task(&self) -> &CurrentTask {
@@ -87,8 +98,8 @@ impl KernelThreads {
 
     pub fn spawn<F>(&self, f: F)
     where
-        F: FnOnce() + Send + 'static,
+        F: FnOnce(&CurrentTask) + Send + 'static,
     {
-        self.spawner.spawn(f)
+        self.spawner().spawn(f)
     }
 }

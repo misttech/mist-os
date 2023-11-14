@@ -64,7 +64,7 @@ impl Pager {
     pub fn start_pager_threads(self: &Arc<Self>, current_task: &CurrentTask) {
         for _ in 0..PAGER_THREADS {
             let this = self.clone();
-            current_task.kernel().kthreads.spawner.spawn(move || {
+            current_task.kernel().kthreads.spawn(move |_| {
                 this.run_pager_thread();
             });
         }
@@ -434,12 +434,10 @@ impl<'a> SupplyHelper<'a> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{Pager, PagerExtent},
-        crate::testing::*,
-        fuchsia_zircon as zx,
-        std::{sync::Arc, time::Duration},
-    };
+    use super::{Pager, PagerExtent};
+    use crate::testing::*;
+    use fuchsia_zircon as zx;
+    use std::{sync::Arc, time::Duration};
 
     #[::fuchsia::test]
     async fn test_pager() {

@@ -36,11 +36,12 @@ pub(crate) use file_mode::mode;
 pub use file_mode::{Access, FileMode};
 pub use mount_flags::MountFlags;
 pub use open_flags::OpenFlags;
-pub(crate) use ownership::{async_release_after, release_after, release_on_error};
 pub use ownership::{
     debug_assert_no_local_temp_ref, OwnedRef, OwnedRefByRef, Releasable, ReleasableByRef,
     ReleaseGuard, TempRef, TempRefKey, WeakRef,
 };
+pub(crate) use ownership::{release_after, release_on_error};
+pub use personality::PersonalityFlags;
 pub use resource_limits::{Resource, ResourceLimits};
 pub use seal_flags::SealFlags;
 pub use stats::TaskTimeStats;

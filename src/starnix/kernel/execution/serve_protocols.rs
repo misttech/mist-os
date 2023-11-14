@@ -25,8 +25,7 @@ use crate::{
     },
     logging::log_error,
     task::{CurrentTask, ExitStatus, Kernel, Task},
-    types::errno::Errno,
-    types::{async_release_after, release_on_error, uapi, OpenFlags, ReleasableByRef},
+    types::{errno::Errno, release_on_error, uapi, OpenFlags, ReleasableByRef},
 };
 
 use super::start_component;
@@ -198,41 +197,37 @@ fn forward_to_pty(
     let mut rx = fuchsia_async::Socket::from_socket(console_in)?;
     let mut tx = fuchsia_async::Socket::from_socket(console_out)?;
     let pty_sink = pty.clone();
-    kernel.kthreads.spawner.spawn({
-        let read_task = kernel.kthreads.new_system_thread()?;
-        move || {
-            let _result = fasync::LocalExecutor::new().run_singlethreaded(async {
-                async_release_after!(read_task, (), || -> Result<(), Error> {
+    kernel.kthreads.spawn({
+        move |current_task| {
+            let _result: Result<(), Error> =
+                fasync::LocalExecutor::new().run_singlethreaded(async {
                     let mut buffer = vec![0u8; BUFFER_CAPACITY];
                     loop {
                         let bytes = rx.read(&mut buffer[..]).await?;
                         if bytes == 0 {
                             return Ok(());
                         }
-                        pty_sink.write(&read_task, &mut VecInputBuffer::new(&buffer[..bytes]))?;
+                        pty_sink.write(current_task, &mut VecInputBuffer::new(&buffer[..bytes]))?;
                     }
-                })
-            });
+                });
         }
     });
 
     let pty_source = pty;
-    kernel.kthreads.spawner.spawn({
-        let write_task = kernel.kthreads.new_system_thread()?;
-        move || {
-            let _result = fasync::LocalExecutor::new().run_singlethreaded(async {
-                async_release_after!(write_task, (), || -> Result<(), Error> {
+    kernel.kthreads.spawn({
+        move |current_task| {
+            let _result: Result<(), Error> =
+                fasync::LocalExecutor::new().run_singlethreaded(async {
                     let mut buffer = VecOutputBuffer::new(BUFFER_CAPACITY);
                     loop {
                         buffer.reset();
-                        let bytes = pty_source.read(&write_task, &mut buffer)?;
+                        let bytes = pty_source.read(current_task, &mut buffer)?;
                         if bytes == 0 {
                             return Ok(());
                         }
                         tx.write_all(buffer.data()).await?;
                     }
-                })
-            });
+                });
         }
     });
 

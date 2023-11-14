@@ -46,8 +46,10 @@ use crate::{
         AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask, IpTables,
         KernelThreads, NetstackDevices, PidTable, StopState, UtsNamespace, UtsNamespaceHandle,
     },
-    types::errno::{errno, from_status_like_fdio, Errno},
-    types::{DeviceType, OpenFlags},
+    types::{
+        errno::{errno, from_status_like_fdio, Errno},
+        DeviceType, OpenFlags,
+    },
     vdso::vdso_loader::Vdso,
 };
 
@@ -378,7 +380,7 @@ impl Kernel {
     pub(crate) fn generic_netlink(&self) -> &GenericNetlink<NetlinkToClientSender<GenericMessage>> {
         self.generic_netlink.get_or_init(|| {
             let (generic_netlink, generic_netlink_fut) = GenericNetlink::new();
-            self.kthreads.spawner.spawn(move || {
+            self.kthreads.spawn(move |_| {
                 fasync::LocalExecutor::new().run_singlethreaded(generic_netlink_fut);
                 log_error!("Generic Netlink future unexpectedly exited");
             });
@@ -396,7 +398,7 @@ impl Kernel {
         self.network_netlink.get_or_init(|| {
             let (network_netlink, network_netlink_async_worker) =
                 Netlink::new(InterfacesHandlerImpl(Arc::downgrade(self)));
-            self.kthreads.spawn(move || {
+            self.kthreads.spawn(move |_| {
                 fasync::LocalExecutor::new().run_singlethreaded(network_netlink_async_worker);
                 log_error!(tag = NETLINK_LOG_TAG, "Netlink async worker unexpectedly exited");
             });

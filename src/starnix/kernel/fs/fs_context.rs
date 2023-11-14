@@ -2,22 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use starnix_lock::RwLock;
-use std::sync::Arc;
-
 use crate::{
     fs::{FileSystemHandle, Namespace, NamespaceNode},
     logging::log_trace,
     task::CurrentTask,
-    types::auth::CAP_SYS_CHROOT,
-    types::errno::{errno, error, Errno},
-    types::{Access, FileMode},
+    types::{
+        auth::CAP_SYS_CHROOT,
+        errno::{errno, error, Errno},
+        Access, FileMode,
+    },
 };
+use starnix_lock::RwLock;
+use std::sync::Arc;
 
 /// The mutable state for an FsContext.
 ///
 /// This state is cloned in FsContext::fork.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 struct FsContextState {
     /// The namespace tree for this FsContext.
     ///
@@ -57,6 +58,7 @@ impl FsContextState {
 ///
 /// File system operations, such as opening a file or mounting a directory, are
 /// performed using this context.
+#[derive(Debug)]
 pub struct FsContext {
     /// The mutable state for this FsContext.
     state: RwLock<FsContextState>,

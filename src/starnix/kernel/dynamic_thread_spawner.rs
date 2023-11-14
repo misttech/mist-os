@@ -2,25 +2,39 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::types::errno::{errno, Errno};
+use crate::{
+    fs::FsContext,
+    log_error,
+    task::{CurrentTask, Kernel, Task},
+    types::{
+        errno::{errno, Errno},
+        ownership::ReleasableByRef,
+        release_after,
+    },
+};
 use futures::{channel::oneshot, TryFutureExt};
 use starnix_lock::Mutex;
 use std::{
+    ffi::CString,
     future::Future,
     sync::{
         mpsc::{sync_channel, SendError, SyncSender, TrySendError},
-        Arc,
+        Arc, Weak,
     },
     thread::JoinHandle,
 };
 
-type BoxedClosure = Box<dyn FnOnce() + Send + 'static>;
+type BoxedClosure = Box<dyn FnOnce(&CurrentTask) + Send + 'static>;
 
 /// A thread pool that immediately execute any new work sent to it and keep a maximum number of
 /// idle threads.
 #[derive(Debug)]
 pub struct DynamicThreadSpawner {
     state: Arc<Mutex<DynamicThreadSpawnerState>>,
+    /// The `kernel` to create the kernel task associated with each thread.
+    kernel: Weak<Kernel>,
+    /// The `FsContext` to create the kernel task associated with each thread.
+    fs_context: Arc<FsContext>,
     /// A persistent thread that is used to create new thread. This ensures that threads are
     /// created from the initial starnix process and are not tied to a specific task.
     persistent_thread: RunningThread,
@@ -34,13 +48,17 @@ struct DynamicThreadSpawnerState {
 }
 
 impl DynamicThreadSpawner {
-    pub fn new(max_idle_threads: u8) -> Self {
+    pub fn new(max_idle_threads: u8, kernel: Weak<Kernel>, fs_context: Arc<FsContext>) -> Self {
+        let persistent_thread =
+            RunningThread::new_persistent(kernel.clone(), Arc::clone(&fs_context));
         Self {
             state: Arc::new(Mutex::new(DynamicThreadSpawnerState {
                 max_idle_threads,
                 ..Default::default()
             })),
-            persistent_thread: RunningThread::new_persistent(),
+            kernel,
+            fs_context,
+            persistent_thread,
         }
     }
 
@@ -53,11 +71,11 @@ impl DynamicThreadSpawner {
     pub fn spawn_and_get_result<R, F>(&self, f: F) -> impl Future<Output = Result<R, Errno>>
     where
         R: Send + 'static,
-        F: FnOnce() -> R + Send + 'static,
+        F: FnOnce(&CurrentTask) -> R + Send + 'static,
     {
         let (sender, receiver) = oneshot::channel::<R>();
-        self.spawn(move || {
-            let _ = sender.send(f());
+        self.spawn(move |current_task| {
+            let _ = sender.send(f(current_task));
         });
         receiver.map_err(|_| errno!(EINTR))
     }
@@ -69,7 +87,7 @@ impl DynamicThreadSpawner {
     /// responsible to start running the closure.
     pub fn spawn<F>(&self, f: F)
     where
-        F: FnOnce() + Send + 'static,
+        F: FnOnce(&CurrentTask) + Send + 'static,
     {
         // Check whether a thread already exists to handle the request.
         let mut function: BoxedClosure = Box::new(f);
@@ -104,11 +122,15 @@ impl DynamicThreadSpawner {
 
         // A new thread must be created. It needs to be done from the persistent thread.
         let (sender, receiver) = sync_channel::<RunningThread>(0);
-        let self_state = self.state.clone();
-        let dispatch_function: BoxedClosure = Box::new(move || {
-            sender
-                .send(RunningThread::new(self_state, function))
-                .expect("receiver must not be dropped");
+        let dispatch_function: BoxedClosure = Box::new({
+            let state = self.state.clone();
+            let kernel = self.kernel.clone();
+            let fs_context = Arc::clone(&self.fs_context);
+            move |_| {
+                sender
+                    .send(RunningThread::new(state, kernel, fs_context, function))
+                    .expect("receiver must not be dropped");
+            }
         });
         self.persistent_thread
             .dispatch(dispatch_function)
@@ -124,24 +146,48 @@ struct RunningThread {
 }
 
 impl RunningThread {
-    fn new(state: Arc<Mutex<DynamicThreadSpawnerState>>, f: BoxedClosure) -> Self {
+    fn new(
+        state: Arc<Mutex<DynamicThreadSpawnerState>>,
+        kernel: Weak<Kernel>,
+        fs_context: Arc<FsContext>,
+        f: BoxedClosure,
+    ) -> Self {
         let (sender, receiver) = sync_channel::<BoxedClosure>(0);
         let thread = Some(
             std::thread::Builder::new()
                 .name("kthread-dynamic-worker".to_string())
                 .spawn(move || {
-                    while let Ok(f) = receiver.recv() {
-                        f();
-                        let mut state = state.lock();
-                        state.idle_threads += 1;
-                        if state.idle_threads > state.max_idle_threads {
-                            // If the number of idle thread is greater than the max, the thread terminates.
-                            // This disconnects the receiver, which will ensure that the thread will be
-                            // joined and remove from the list of available threads the next time the
-                            // pool tries to use it.
+                    let current_task = {
+                        let Some(kernel) = kernel.upgrade() else {
+                            log_error!("Unable to upgrade kernel.");
                             return;
+                        };
+                        match Task::create_kernel_task(
+                            &kernel,
+                            CString::new("[kthreadd]").unwrap(),
+                            fs_context,
+                        ) {
+                            Ok(task) => task,
+                            Err(e) => {
+                                log_error!("Unable to create a kernel task: {e:?}");
+                                return;
+                            }
                         }
-                    }
+                    };
+                    release_after!(current_task, (), {
+                        while let Ok(f) = receiver.recv() {
+                            f(&current_task);
+                            let mut state = state.lock();
+                            state.idle_threads += 1;
+                            if state.idle_threads > state.max_idle_threads {
+                                // If the number of idle thread is greater than the max, the thread terminates.
+                                // This disconnects the receiver, which will ensure that the thread will be
+                                // joined and remove from the list of available threads the next time the
+                                // pool tries to use it.
+                                return;
+                            }
+                        }
+                    });
                 })
                 .expect("able to create threads"),
         );
@@ -157,16 +203,35 @@ impl RunningThread {
         result
     }
 
-    fn new_persistent() -> Self {
+    fn new_persistent(kernel: Weak<Kernel>, fs_context: Arc<FsContext>) -> Self {
         // The persistent thread doesn't need to do any rendez-vous when received task.
         let (sender, receiver) = sync_channel::<BoxedClosure>(20);
         let thread = Some(
             std::thread::Builder::new()
                 .name("kthread-persistent-worker".to_string())
                 .spawn(move || {
-                    while let Ok(f) = receiver.recv() {
-                        f();
-                    }
+                    let current_task = {
+                        let Some(kernel) = kernel.upgrade() else {
+                            log_error!("Unable to upgrade kernel.");
+                            return;
+                        };
+                        match Task::create_kernel_task(
+                            &kernel,
+                            CString::new("[kthreadd]").unwrap(),
+                            fs_context,
+                        ) {
+                            Ok(task) => task,
+                            Err(e) => {
+                                log_error!("Unable to create a kernel task: {e:?}");
+                                return;
+                            }
+                        }
+                    };
+                    release_after!(current_task, (), {
+                        while let Ok(f) = receiver.recv() {
+                            f(&current_task);
+                        }
+                    });
                 })
                 .expect("able to create threads"),
         );
@@ -195,29 +260,40 @@ impl Drop for RunningThread {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::testing::create_kernel_and_task;
 
-    #[fuchsia::test]
-    fn run_simple_task() {
-        let spawner = DynamicThreadSpawner::new(2);
-        spawner.spawn(|| {});
+    fn build_spawner(max_idle_threads: u8) -> (Arc<Kernel>, DynamicThreadSpawner) {
+        let (kernel, task) = create_kernel_and_task();
+        let spawner = DynamicThreadSpawner::new(
+            max_idle_threads,
+            Arc::downgrade(&kernel),
+            Arc::clone(task.fs()),
+        );
+        (kernel, spawner)
     }
 
     #[fuchsia::test]
-    fn run_10_tasks() {
-        let spawner = DynamicThreadSpawner::new(2);
+    async fn run_simple_task() {
+        let (_kernel, spawner) = build_spawner(2);
+        spawner.spawn(|_| {});
+    }
+
+    #[fuchsia::test]
+    async fn run_10_tasks() {
+        let (_kernel, spawner) = build_spawner(2);
         for _ in 0..10 {
-            spawner.spawn(|| {});
+            spawner.spawn(|_| {});
         }
     }
 
     #[fuchsia::test]
-    fn blocking_task_do_not_prevent_further_processing() {
-        let spawner = DynamicThreadSpawner::new(1);
+    async fn blocking_task_do_not_prevent_further_processing() {
+        let (_kernel, spawner) = build_spawner(1);
 
         let pair = Arc::new((std::sync::Mutex::new(false), std::sync::Condvar::new()));
         for _ in 0..10 {
             let pair2 = Arc::clone(&pair);
-            spawner.spawn(move || {
+            spawner.spawn(move |_| {
                 let (lock, cvar) = &*pair2;
                 let mut cont = lock.lock().unwrap();
                 while !*cont {
@@ -228,7 +304,7 @@ mod tests {
 
         let executed = Arc::new(Mutex::new(false));
         let executed_clone = executed.clone();
-        spawner.spawn(move || {
+        spawner.spawn(move |_| {
             {
                 let (lock, cvar) = &*pair;
                 let mut cont = lock.lock().unwrap();
@@ -242,8 +318,8 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_millis(10));
         // Post a couple of new tasks. As the maximum number of idle threads is 1, it should
         // ensures that finished threads will be cleaned up from the pool.
-        spawner.spawn(move || {});
-        spawner.spawn(move || {});
+        spawner.spawn(move |_| {});
+        spawner.spawn(move |_| {});
 
         // Drop the spawner. This will wait for all thread to finish.
         std::mem::drop(spawner);
@@ -252,7 +328,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn run_spawn_and_get_result() {
-        let spawner = DynamicThreadSpawner::new(2);
-        assert_eq!(spawner.spawn_and_get_result(|| 3).await, Ok(3));
+        let (_kernel, spawner) = build_spawner(2);
+        assert_eq!(spawner.spawn_and_get_result(|_| 3).await, Ok(3));
     }
 }

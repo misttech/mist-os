@@ -10,8 +10,10 @@ use crate::{
     },
     mm::ProtectionFlags,
     task::CurrentTask,
-    types::errno::{errno, error, Errno},
-    types::{ino_t, off_t, DeviceType, FileMode, OpenFlags, TempRef, WeakRef},
+    types::{
+        errno::{errno, error, Errno},
+        ino_t, off_t, DeviceType, FileMode, OpenFlags, TempRef, WeakRef,
+    },
 };
 use async_trait::async_trait;
 use fidl::{
@@ -526,64 +528,56 @@ impl file::File for StarnixNodeConnection {
 #[async_trait]
 impl file::RawFileIoConnection for StarnixNodeConnection {
     async fn read(&self, count: u64) -> Result<Vec<u8>, zx::Status> {
-        let task = self.task.clone();
         let file = self.file.clone();
         let kernel = self.task()?.kernel().clone();
         Ok(kernel
             .kthreads
-            .spawner
-            .spawn_and_get_result(move || -> Result<Vec<u8>, Errno> {
-                let task = task.upgrade().ok_or_else(|| errno!(ESRCH))?;
+            .spawner()
+            .spawn_and_get_result(move |current_task| -> Result<Vec<u8>, Errno> {
                 let mut data = VecOutputBuffer::new(count as usize);
-                file.read(&task, &mut data)?;
+                file.read(current_task, &mut data)?;
                 Ok(data.into())
             })
             .await??)
     }
 
     async fn read_at(&self, offset: u64, count: u64) -> Result<Vec<u8>, zx::Status> {
-        let task = self.task.clone();
         let file = self.file.clone();
         let kernel = self.task()?.kernel().clone();
         Ok(kernel
             .kthreads
-            .spawner
-            .spawn_and_get_result(move || -> Result<Vec<u8>, Errno> {
-                let task = task.upgrade().ok_or_else(|| errno!(ESRCH))?;
+            .spawner()
+            .spawn_and_get_result(move |current_task| -> Result<Vec<u8>, Errno> {
                 let mut data = VecOutputBuffer::new(count as usize);
-                file.read_at(&task, offset as usize, &mut data)?;
+                file.read_at(current_task, offset as usize, &mut data)?;
                 Ok(data.into())
             })
             .await??)
     }
 
     async fn write(&self, content: &[u8]) -> Result<u64, zx::Status> {
-        let task = self.task.clone();
         let file = self.file.clone();
         let kernel = self.task()?.kernel().clone();
         let mut data = VecInputBuffer::new(content);
         let written = kernel
             .kthreads
-            .spawner
-            .spawn_and_get_result(move || -> Result<usize, Errno> {
-                let task = task.upgrade().ok_or_else(|| errno!(ESRCH))?;
-                file.write(&task, &mut data)
+            .spawner()
+            .spawn_and_get_result(move |current_task| -> Result<usize, Errno> {
+                file.write(current_task, &mut data)
             })
             .await??;
         Ok(written as u64)
     }
 
     async fn write_at(&self, offset: u64, content: &[u8]) -> Result<u64, zx::Status> {
-        let task = self.task.clone();
         let file = self.file.clone();
         let kernel = self.task()?.kernel().clone();
         let mut data = VecInputBuffer::new(content);
         let written = kernel
             .kthreads
-            .spawner
-            .spawn_and_get_result(move || -> Result<usize, Errno> {
-                let task = task.upgrade().ok_or_else(|| errno!(ESRCH))?;
-                file.write_at(&task, offset as usize, &mut data)
+            .spawner()
+            .spawn_and_get_result(move |current_task| -> Result<usize, Errno> {
+                file.write_at(current_task, offset as usize, &mut data)
             })
             .await??;
         Ok(written as u64)

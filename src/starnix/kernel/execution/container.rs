@@ -16,8 +16,8 @@ use crate::{
     logging::{log_error, log_info, log_warn},
     task::{CurrentTask, ExitStatus, Kernel, Task},
     time::utc::update_utc_clock,
-    types::errno::{errno, SourceContext, ENOENT},
     types::{
+        errno::{errno, SourceContext, ENOENT},
         pid_t, release_on_error, rlimit, MountFlags, OpenFlags, OwnedRefByRef, ReleasableByRef,
         Resource,
     },
@@ -271,7 +271,7 @@ pub async fn create_component_from_stream(
                 let service_config = ContainerServiceConfig { config, request_stream, receiver };
                 let kernel = &container.kernel;
                 let vvar = kernel.vdso.vvar_writeable.clone();
-                kernel.kthreads.spawner.spawn(move || loop {
+                kernel.kthreads.spawner().spawn(move |_| loop {
                     // TODO(fxb/129367): Replace polling for the clock transformation with having
                     // some sort of a wait for a clock transform update notification.
                     std::thread::sleep(std::time::Duration::from_millis(500));

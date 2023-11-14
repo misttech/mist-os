@@ -765,6 +765,7 @@ pub mod internal {
 
 /// Macro that ensure the releasable is released with the given context after the block terminates,
 /// whether there is an error or not.
+#[allow(unused_macros)]
 macro_rules! async_release_after {
     ($releasable_name:ident, $context:expr, $(|| -> $output_type:ty)? $body:block ) => {{
         let result =
@@ -774,7 +775,6 @@ macro_rules! async_release_after {
     }};
 }
 
-pub(crate) use async_release_after;
 pub(crate) use release_after;
 pub(crate) use release_on_error;
 

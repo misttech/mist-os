@@ -43,22 +43,23 @@ use crate::{
         SeccompFilterContainer, SeccompNotifierHandle, SeccompState, SeccompStateValue,
         ThreadGroup, UtsNamespaceHandle, Waiter,
     },
-    types::auth::{
-        PtraceAccessMode, CAP_KILL, CAP_SYS_ADMIN, CAP_SYS_PTRACE, PTRACE_MODE_FSCREDS,
-        PTRACE_MODE_REALCREDS,
-    },
-    types::errno::{errno, error, from_status_like_fdio, Errno},
-    types::signals::{SigSet, Signal, UncheckedSignal, SIGBUS, SIGCONT, SIGILL, SIGSEGV, SIGTRAP},
-    types::user_address::{UserAddress, UserRef},
     types::{
-        pid_t, release_on_error, robust_list_head, sock_filter, sock_fprog, ucred, Access,
-        DeviceType, FileMode, OpenFlags, OwnedRefByRef, ReleasableByRef, TaskTimeStats, TempRef,
-        WeakRef, BPF_MAXINSNS, CLD_CONTINUED, CLD_DUMPED, CLD_EXITED, CLD_KILLED, CLD_STOPPED,
-        CLONE_CHILD_CLEARTID, CLONE_CHILD_SETTID, CLONE_FILES, CLONE_FS, CLONE_INTO_CGROUP,
-        CLONE_NEWUTS, CLONE_PARENT_SETTID, CLONE_SETTLS, CLONE_SIGHAND, CLONE_SYSVSEM,
-        CLONE_THREAD, CLONE_VFORK, CLONE_VM, FUTEX_BITSET_MATCH_ANY, FUTEX_OWNER_DIED,
-        FUTEX_TID_MASK, PTRACE_EVENT_STOP, ROBUST_LIST_LIMIT, SECCOMP_FILTER_FLAG_LOG,
-        SECCOMP_FILTER_FLAG_NEW_LISTENER, SECCOMP_FILTER_FLAG_TSYNC,
+        auth::{
+            PtraceAccessMode, CAP_KILL, CAP_SYS_ADMIN, CAP_SYS_PTRACE, PTRACE_MODE_FSCREDS,
+            PTRACE_MODE_REALCREDS,
+        },
+        errno::{errno, error, from_status_like_fdio, Errno},
+        pid_t, release_on_error, robust_list_head,
+        signals::{SigSet, Signal, UncheckedSignal, SIGBUS, SIGCONT, SIGILL, SIGSEGV, SIGTRAP},
+        sock_filter, sock_fprog, ucred,
+        user_address::{UserAddress, UserRef},
+        Access, DeviceType, FileMode, OpenFlags, OwnedRefByRef, ReleasableByRef, TaskTimeStats,
+        TempRef, WeakRef, BPF_MAXINSNS, CLD_CONTINUED, CLD_DUMPED, CLD_EXITED, CLD_KILLED,
+        CLD_STOPPED, CLONE_CHILD_CLEARTID, CLONE_CHILD_SETTID, CLONE_FILES, CLONE_FS,
+        CLONE_INTO_CGROUP, CLONE_NEWUTS, CLONE_PARENT_SETTID, CLONE_SETTLS, CLONE_SIGHAND,
+        CLONE_SYSVSEM, CLONE_THREAD, CLONE_VFORK, CLONE_VM, FUTEX_BITSET_MATCH_ANY,
+        FUTEX_OWNER_DIED, FUTEX_TID_MASK, PTRACE_EVENT_STOP, ROBUST_LIST_LIMIT,
+        SECCOMP_FILTER_FLAG_LOG, SECCOMP_FILTER_FLAG_NEW_LISTENER, SECCOMP_FILTER_FLAG_TSYNC,
         SECCOMP_FILTER_FLAG_TSYNC_ESRCH, SI_KERNEL,
     },
 };
@@ -987,9 +988,6 @@ impl Task {
     ///
     /// This function creates an underlying Zircon process to host the new
     /// task.
-    ///
-    /// `fs` should only be None for the init task, and set_fs should be called as soon as the
-    /// FsContext is build.
     pub fn create_process_without_parent(
         kernel: &Arc<Kernel>,
         initial_name: CString,
@@ -2549,14 +2547,13 @@ mod test {
 
         assert_eq!(current_task.get_tid(), 1);
         let another_current = create_task(&kernel, "another-task");
-        // tid 2 gets assigned to kthreadd.
-        assert_eq!(another_current.get_tid(), 3);
+        let another_tid = another_current.get_tid();
+        assert!(another_tid >= 2);
 
         let pids = kernel.pids.read();
         assert_eq!(pids.get_task(1).upgrade().unwrap().get_tid(), 1);
-        assert_eq!(pids.get_task(2).upgrade().unwrap().get_tid(), 2);
-        assert_eq!(pids.get_task(3).upgrade().unwrap().get_tid(), 3);
-        assert!(pids.get_task(4).upgrade().is_none());
+        assert_eq!(pids.get_task(another_tid).upgrade().unwrap().get_tid(), another_tid);
+        assert!(pids.get_task(another_tid + 1).upgrade().is_none());
     }
 
     #[::fuchsia::test]

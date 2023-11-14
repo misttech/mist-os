@@ -46,10 +46,9 @@ async fn main() {
         let mut expected_idx = expected_min_idx;
         for coredump in observed_coredumps {
             assert_eq!(coredump.idx, expected_idx);
-            assert_eq!(
-                coredump.pid,
-                expected_idx as i64 + 3,
-                "init is pid 1, kthread gets pid 2, coredumps start at 3, nothing else runs here",
+            assert!(
+                coredump.pid >= expected_idx as i64 + 3,
+                "coredumps starts at pid greater or equals to 3, nothing else runs here",
             );
             assert_eq!(
                 coredump.argv,
