@@ -21,6 +21,13 @@ namespace ld::testing {
 // called (unless the test is bailing out anyway).
 class LdLoadTestsBase {
  public:
+  // An indicator to GTEST of whether the test fixture supports the following
+  // features so that it may skip related tests if not supported.
+  static constexpr bool kHasPassiveAbi = true;
+  static constexpr bool kHasRelro = true;
+  static constexpr bool kHasTls = true;
+  static constexpr bool kIsStartupDynamicLinker = true;
+
   void InitLog(fbl::unique_fd& log_fd);
 
   void ExpectLog(std::string_view expected_log);
