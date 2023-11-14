@@ -85,7 +85,12 @@ float GetOrientationAngle(fuchsia::ui::composition::Orientation orientation);
 
 uint32_t GetBytesPerPixel(const fuchsia::sysmem::SingleBufferSettings& settings);
 
+uint32_t GetBytesPerPixel(const fuchsia::sysmem::ImageFormatConstraints& image_format_constraints);
+
 uint32_t GetBytesPerRow(const fuchsia::sysmem::SingleBufferSettings& settings,
+                        uint32_t image_width);
+
+uint32_t GetBytesPerRow(const fuchsia::sysmem::ImageFormatConstraints& image_format_constraints,
                         uint32_t image_width);
 
 uint32_t GetPixelsPerRow(const fuchsia::sysmem::SingleBufferSettings& settings,

@@ -78,8 +78,9 @@ class CpuRenderer final : public Renderer {
       FXL_GUARDED_BY(lock_);
   std::unordered_map<allocation::GlobalBufferCollectionId, BufferCollectionInfo> readback_map_
       FXL_GUARDED_BY(lock_);
-  std::unordered_map<allocation::GlobalImageId, fuchsia::sysmem::ImageFormatConstraints> image_map_
-      FXL_GUARDED_BY(lock_);
+  std::unordered_map<allocation::GlobalImageId,
+                     std::pair<zx::vmo, fuchsia::sysmem::ImageFormatConstraints>>
+      image_map_ FXL_GUARDED_BY(lock_);
 };
 
 }  // namespace flatland

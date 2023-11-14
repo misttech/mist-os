@@ -75,6 +75,14 @@ void MapHostPointer(const fuchsia::sysmem::BufferCollectionInfo_2& collection_in
                     uint32_t vmo_idx, HostPointerAccessMode host_pointer_access_mode,
                     std::function<void(uint8_t* mapped_ptr, uint32_t num_bytes)> callback);
 
+// Maps a given vmo's bytes into host memory that can be accessed via a callback function. The
+// callback provides the caller with a raw pointer to the vmo memory as well as an int for the
+// number of bytes. Once the callback function returns, the host
+// pointer is unmapped and so cannot continue to be used outside of the scope of the callback.
+void MapHostPointer(const zx::vmo& vmo, HostPointerAccessMode host_pointer_access_mode,
+                    std::function<void(uint8_t* mapped_ptr, uint32_t num_bytes)> callback,
+                    uint64_t vmo_bytes = 0);
+
 }  // namespace flatland
 
 #endif  // SRC_UI_SCENIC_LIB_FLATLAND_BUFFERS_UTIL_H_

@@ -8,6 +8,8 @@
 #include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/sys/component/cpp/testing/realm_builder_types.h>
 
+#include <cstdint>
+
 namespace integration_tests {
 
 using ProtocolName = std::string;
@@ -24,6 +26,7 @@ struct ViewProviderConfig {
 struct RealmBuilderArgs {
   std::optional<ViewProviderConfig> view_provider_config;
   std::optional<std::string> renderer_type_config;
+  std::optional<uint64_t> display_rotation;
 };
 
 // Helper class for building a scenic realm. The scenic realm consists of three

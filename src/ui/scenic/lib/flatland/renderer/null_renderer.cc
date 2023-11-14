@@ -9,8 +9,6 @@
 #include <memory>
 #include <optional>
 
-#include "fidl/fuchsia.images2/cpp/wire_types.h"
-
 namespace flatland {
 
 bool NullRenderer::ImportBufferCollection(
@@ -39,8 +37,9 @@ bool NullRenderer::ImportBufferCollection(
     image_constraints->required_max_coded_width = size->width;
     image_constraints->required_max_coded_height = size->height;
   }
-  auto result =
-      BufferCollectionInfo::New(sysmem_allocator, std::move(token), std::move(image_constraints));
+  auto result = BufferCollectionInfo::New(
+      sysmem_allocator, std::move(token), image_constraints,
+      fuchsia::sysmem::BufferUsage{.none = fuchsia::sysmem::noneUsage}, usage);
   if (result.is_error()) {
     FX_LOGS(ERROR) << "Unable to register collection.";
     return false;

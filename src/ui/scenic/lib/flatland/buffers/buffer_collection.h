@@ -9,7 +9,8 @@
 #include <lib/fit/result.h>
 #include <lib/syslog/cpp/macros.h>
 
-#include <memory>
+#include "fuchsia/sysmem/cpp/fidl.h"
+#include "src/ui/scenic/lib/allocation/buffer_collection_importer.h"
 
 namespace flatland {
 
@@ -28,7 +29,10 @@ class BufferCollectionInfo {
       fuchsia::sysmem::Allocator_Sync* sysmem_allocator,
       BufferCollectionHandle buffer_collection_token,
       std::optional<fuchsia::sysmem::ImageFormatConstraints> image_format_constraints =
-          std::nullopt);
+          std::nullopt,
+      fuchsia::sysmem::BufferUsage buffer_usage =
+          fuchsia::sysmem::BufferUsage{.none = fuchsia::sysmem::noneUsage},
+      allocation::BufferCollectionUsage usage = allocation::BufferCollectionUsage::kClientImage);
 
   // Creates a non-initialized instance of this class. Fully initialized instances must
   // be created via a call to |New|.

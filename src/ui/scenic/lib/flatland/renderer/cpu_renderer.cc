@@ -6,10 +6,13 @@
 
 #include <lib/syslog/cpp/macros.h>
 
-#include <memory>
+#include <cstdint>
 #include <optional>
 
-#include "fidl/fuchsia.images2/cpp/wire_types.h"
+#include "fuchsia/ui/composition/cpp/fidl.h"
+#include "src/ui/scenic/lib/flatland/buffers/util.h"
+#include "src/ui/scenic/lib/flatland/flatland_types.h"
+#include "src/ui/scenic/lib/utils/helpers.h"
 
 namespace flatland {
 
@@ -28,6 +31,7 @@ bool CpuRenderer::ImportBufferCollection(
     return false;
   }
   std::optional<fuchsia::sysmem::ImageFormatConstraints> image_constraints;
+  image_constraints->pixel_format.format_modifier.value = fuchsia::sysmem::FORMAT_MODIFIER_LINEAR;
   if (size.has_value()) {
     image_constraints = std::make_optional<fuchsia::sysmem::ImageFormatConstraints>();
     image_constraints->pixel_format.type = fuchsia::sysmem::PixelFormatType::BGRA32;
@@ -39,8 +43,9 @@ bool CpuRenderer::ImportBufferCollection(
     image_constraints->required_max_coded_width = size->width;
     image_constraints->required_max_coded_height = size->height;
   }
-  auto result =
-      BufferCollectionInfo::New(sysmem_allocator, std::move(token), std::move(image_constraints));
+  auto result = BufferCollectionInfo::New(
+      sysmem_allocator, std::move(token), image_constraints,
+      fuchsia::sysmem::BufferUsage{.cpu = fuchsia::sysmem::cpuUsageRead}, usage);
   if (result.is_error()) {
     FX_LOGS(ERROR) << "Unable to register collection.";
     return false;
@@ -128,9 +133,12 @@ bool CpuRenderer::ImportBufferImage(const allocation::ImageMetadata& metadata,
     return false;
   }
 
-  if (usage == BufferCollectionUsage::kClientImage) {
-    image_map_[metadata.identifier] = image_constraints;
-  }
+  const zx::vmo& vmo = sysmem_info.buffers[0].vmo;
+  zx::vmo dup;
+  zx_status_t status = vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup);
+  FX_DCHECK(status == ZX_OK);
+  image_map_[metadata.identifier] = std::make_pair(std::move(dup), image_constraints);
+
   return true;
 }
 
@@ -144,25 +152,62 @@ void CpuRenderer::SetColorConversionValues(const std::array<float, 9>& coefficie
                                            const std::array<float, 3>& preoffsets,
                                            const std::array<float, 3>& postoffsets) {}
 
-// Check that the buffer collections for each of the images passed in have been validated.
-// DCHECK if they have not.
 void CpuRenderer::Render(const allocation::ImageMetadata& render_target,
                          const std::vector<ImageRect>& rectangles,
                          const std::vector<allocation::ImageMetadata>& images,
                          const std::vector<zx::event>& release_fences = {},
                          bool apply_color_conversion = false) {
   std::scoped_lock lock(lock_);
-  for (const auto& image : images) {
+  FX_DCHECK(images.size() == rectangles.size());
+  if (images.size() == 1) {
+    // TODO(b/304596608): Handle the most basic case first (images[0]).
+    // This should be extended to other cases later.
+    auto image = images[0];
     auto image_id = image.identifier;
     FX_DCHECK(image_id != allocation::kInvalidId);
 
     const auto& image_map_itr_ = image_map_.find(image_id);
     FX_DCHECK(image_map_itr_ != image_map_.end());
-    auto image_constraints = image_map_itr_->second;
+    auto image_constraints = image_map_itr_->second.second;
 
     // Make sure the image conforms to the constraints of the collection.
     FX_DCHECK(image.width <= image_constraints.max_coded_width);
     FX_DCHECK(image.height <= image_constraints.max_coded_height);
+
+    auto render_target_id = render_target.identifier;
+    FX_DCHECK(render_target_id != allocation::kInvalidId);
+    const auto& render_target_map_itr_ = image_map_.find(render_target_id);
+    FX_DCHECK(render_target_map_itr_ != image_map_.end());
+    auto render_target_constraints = render_target_map_itr_->second.second;
+
+    // The image and render_target should have the same format.
+    ImageRect rectangle = rectangles[0];
+    FX_DCHECK(image_constraints.pixel_format.type == render_target_constraints.pixel_format.type);
+
+    // The rectangle, image, and render_target should be compatible, e.g. same
+    // dimensions.
+    FX_DCHECK(rectangle.orientation == fuchsia::ui::composition::Orientation::CCW_0_DEGREES);
+    uint32_t rectangle_width = static_cast<uint32_t>(rectangle.extent.x);
+    uint32_t rectangle_height = static_cast<uint32_t>(rectangle.extent.y);
+    FX_DCHECK(rectangle_width == render_target.width);
+    FX_DCHECK(rectangle_height == render_target.height);
+    FX_DCHECK(rectangle_width == image.width);
+    FX_DCHECK(rectangle_height == image.height);
+    FX_DCHECK(rectangle.origin.x == 0);
+    FX_DCHECK(rectangle.origin.y == 0);
+    FX_DCHECK(utils::GetBytesPerRow(image_constraints, image.width) ==
+              utils::GetBytesPerRow(render_target_constraints, render_target.width));
+
+    // Copy the image vmo into the render_target vmo.
+    MapHostPointer(render_target_map_itr_->second.first, HostPointerAccessMode::kWriteOnly,
+                   [&image_map_itr_](uint8_t* render_target_ptr, uint32_t render_target_num_bytes) {
+                     MapHostPointer(image_map_itr_->second.first, HostPointerAccessMode::kReadOnly,
+                                    [render_target_ptr, render_target_num_bytes](
+                                        uint8_t* image_ptr, uint32_t image_num_bytes) {
+                                      FX_DCHECK(image_num_bytes <= render_target_num_bytes);
+                                      memcpy(render_target_ptr, image_ptr, image_num_bytes);
+                                    });
+                   });
   }
 
   // Fire all of the release fences.

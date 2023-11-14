@@ -162,9 +162,25 @@ void MapHostPointer(const fuchsia::sysmem::BufferCollectionInfo_2& collection_in
     return;
   }
 
-  const zx::vmo& vmo = collection_info.buffers[vmo_idx].vmo;
   auto vmo_bytes = collection_info.settings.buffer_settings.size_bytes;
   FX_DCHECK(vmo_bytes > 0);
+
+  MapHostPointer(collection_info.buffers[vmo_idx].vmo, host_pointer_access_mode, callback,
+                 vmo_bytes);
+}
+
+void MapHostPointer(const zx::vmo& vmo, HostPointerAccessMode host_pointer_access_mode,
+                    std::function<void(uint8_t* mapped_ptr, uint32_t num_bytes)> callback,
+                    uint64_t vmo_bytes) {
+  if (vmo_bytes == 0) {
+    auto status = vmo.get_prop_content_size(&vmo_bytes);
+    // The content size is not always set, so when it's not available,
+    // use the full VMO size.
+    if (status != ZX_OK || vmo_bytes == 0) {
+      vmo.get_size(&vmo_bytes);
+    }
+    FX_DCHECK(vmo_bytes > 0);
+  }
 
   uint8_t* vmo_host = nullptr;
   const uint32_t vmo_options = HostPointerAccessModeToVmoOptions(host_pointer_access_mode);
@@ -179,7 +195,7 @@ void MapHostPointer(const fuchsia::sysmem::BufferCollectionInfo_2& collection_in
     FX_DCHECK(status == ZX_OK);
   }
 
-  callback(vmo_host, vmo_bytes);
+  callback(vmo_host, static_cast<uint32_t>(vmo_bytes));
 
   if (host_pointer_access_mode == HostPointerAccessMode::kWriteOnly ||
       host_pointer_access_mode == HostPointerAccessMode::kReadWrite) {

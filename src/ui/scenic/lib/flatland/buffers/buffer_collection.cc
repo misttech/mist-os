@@ -35,7 +35,9 @@ BufferCollectionInfo::BufferCollectionInfo(BufferCollectionInfo&& other) noexcep
 fit::result<fit::failed, BufferCollectionInfo> BufferCollectionInfo::New(
     fuchsia::sysmem::Allocator_Sync* sysmem_allocator,
     BufferCollectionHandle buffer_collection_token,
-    std::optional<fuchsia::sysmem::ImageFormatConstraints> image_format_constraints) {
+    std::optional<fuchsia::sysmem::ImageFormatConstraints> image_format_constraints,
+    fuchsia::sysmem::BufferUsage buffer_usage,
+    allocation::BufferCollectionUsage buffer_collection_usage) {
   FX_DCHECK(sysmem_allocator);
 
   if (!buffer_collection_token.is_valid()) {
@@ -66,8 +68,22 @@ fit::result<fit::failed, BufferCollectionInfo> BufferCollectionInfo::New(
   // can be allocated.
   fuchsia::sysmem::BufferCollectionConstraints constraints;
   constraints.min_buffer_count = 1;
-  constraints.usage.vulkan =
-      fuchsia::sysmem::vulkanUsageSampled | fuchsia::sysmem::vulkanUsageTransferSrc;
+
+  if (buffer_usage.cpu) {
+    if (buffer_collection_usage == allocation::BufferCollectionUsage::kRenderTarget) {
+      constraints.usage.cpu = fuchsia::sysmem::cpuUsageWrite;
+    } else {
+      constraints.usage.cpu = fuchsia::sysmem::cpuUsageRead;
+    }
+  } else if (buffer_usage.none) {
+    // This should actually be the following, once we've fixed tests:
+    // constraints.usage.none = fuchsia::sysmem::noneUsage;
+    constraints.usage.vulkan =
+        fuchsia::sysmem::vulkanUsageSampled | fuchsia::sysmem::vulkanUsageTransferSrc;
+  } else if (buffer_usage.vulkan) {
+    constraints.usage.vulkan =
+        fuchsia::sysmem::vulkanUsageSampled | fuchsia::sysmem::vulkanUsageTransferSrc;
+  }
 
   if (image_format_constraints.has_value()) {
     constraints.image_format_constraints_count = 1;
@@ -76,8 +92,8 @@ fit::result<fit::failed, BufferCollectionInfo> BufferCollectionInfo::New(
   status = buffer_collection->SetConstraints(true /* has_constraints */, constraints);
 
   // From this point on, if we fail, we DCHECK, because we should have already caught errors
-  // pertaining to both invalid tokens and wrong/malicious tokens/channels above, meaning that if a
-  // failure occurs now, then that is some underlying issue unrelated to user input.
+  // pertaining to both invalid tokens and wrong/malicious tokens/channels above, meaning that if
+  // a failure occurs now, then there is some underlying issue unrelated to user input.
   FX_DCHECK(status == ZX_OK) << "Could not set constraints on buffer collection.";
 
   return fit::ok(BufferCollectionInfo(std::move(buffer_collection)));

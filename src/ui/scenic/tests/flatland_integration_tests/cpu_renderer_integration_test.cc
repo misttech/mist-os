@@ -9,11 +9,10 @@
 #include <lib/ui/scenic/cpp/view_creation_tokens.h>
 #include <lib/ui/scenic/cpp/view_identity.h>
 
-#include <iostream>
-
 #include <gtest/gtest.h>
 
 #include "src/ui/scenic/lib/allocation/buffer_collection_import_export_tokens.h"
+#include "src/ui/scenic/lib/flatland/buffers/util.h"
 #include "src/ui/scenic/lib/utils/helpers.h"
 #include "src/ui/scenic/tests/utils/blocking_present.h"
 #include "src/ui/scenic/tests/utils/logging_event_loop.h"
@@ -28,12 +27,13 @@ using fuchsia::ui::composition::ContentId;
 using fuchsia::ui::composition::FlatlandPtr;
 using fuchsia::ui::composition::ParentViewportWatcher;
 using fuchsia::ui::composition::TransformId;
-using ui_testing::Screenshot;
+
+constexpr auto kBytesPerPixel = 4;
 
 class CpuRendererIntegrationTest : public LoggingEventLoop, public ::testing::Test {
  public:
   CpuRendererIntegrationTest()
-      : realm_(ScenicRealmBuilder({.renderer_type_config = "cpu"})
+      : realm_(ScenicRealmBuilder({.renderer_type_config = "cpu", .display_rotation = 0})
                    .AddRealmProtocol(fuchsia::ui::composition::Flatland::Name_)
                    .AddRealmProtocol(fuchsia::ui::composition::FlatlandDisplay::Name_)
                    .AddRealmProtocol(fuchsia::ui::composition::Allocator::Name_)
@@ -73,13 +73,14 @@ class CpuRendererIntegrationTest : public LoggingEventLoop, public ::testing::Te
   }
 
  protected:
-  void SetConstraintsAndAllocateBuffer(fuchsia::sysmem::BufferCollectionTokenSyncPtr token) {
+  fuchsia::sysmem::BufferCollectionInfo_2 SetConstraintsAndAllocateBuffer(
+      fuchsia::sysmem::BufferCollectionTokenSyncPtr token) {
     fuchsia::sysmem::BufferCollectionSyncPtr buffer_collection;
     auto status =
         sysmem_allocator_->BindSharedCollection(std::move(token), buffer_collection.NewRequest());
-    ASSERT_EQ(status, ZX_OK);
+    FX_CHECK(status == ZX_OK);
     fuchsia::sysmem::BufferCollectionConstraints constraints;
-    constraints.usage.none = fuchsia::sysmem::noneUsage;
+    constraints.usage.cpu = fuchsia::sysmem::cpuUsageWrite;
     constraints.min_buffer_count = 1;
     constraints.image_format_constraints_count = 1;
     auto& image_constraints = constraints.image_format_constraints[0];
@@ -92,15 +93,16 @@ class CpuRendererIntegrationTest : public LoggingEventLoop, public ::testing::Te
     image_constraints.required_max_coded_width = display_width_;
     image_constraints.required_max_coded_height = display_height_;
     status = buffer_collection->SetConstraints(true, constraints);
-    ASSERT_EQ(status, ZX_OK);
+    FX_CHECK(status == ZX_OK);
     zx_status_t allocation_status = ZX_OK;
     fuchsia::sysmem::BufferCollectionInfo_2 buffer_collection_info{};
     status =
         buffer_collection->WaitForBuffersAllocated(&allocation_status, &buffer_collection_info);
-    ASSERT_EQ(ZX_OK, status);
-    ASSERT_EQ(ZX_OK, allocation_status);
+    FX_CHECK(status == ZX_OK);
+    FX_CHECK(allocation_status == ZX_OK);
     EXPECT_EQ(constraints.min_buffer_count, buffer_collection_info.buffer_count);
-    ASSERT_EQ(ZX_OK, buffer_collection->Close());
+    FX_CHECK(buffer_collection->Close() == ZX_OK);
+    return buffer_collection_info;
   }
 
   const TransformId kRootTransform{.value = 1};
@@ -117,7 +119,7 @@ class CpuRendererIntegrationTest : public LoggingEventLoop, public ::testing::Te
   fuchsia::ui::composition::FlatlandDisplayPtr flatland_display_;
 };
 
-TEST_F(CpuRendererIntegrationTest, RendersContent) {
+TEST_F(CpuRendererIntegrationTest, RenderSmokeTest) {
   auto [local_token, scenic_token] = utils::CreateSysmemTokens(sysmem_allocator_.get());
 
   // Send one token to Flatland Allocator.
@@ -157,7 +159,7 @@ TEST_F(CpuRendererIntegrationTest, RendersContent) {
   EXPECT_TRUE(utils::IsEventSignalled(release_fence_copy, ZX_EVENT_SIGNALED));
 }
 
-TEST_F(CpuRendererIntegrationTest, ScreenshotIsAllZeroes) {
+TEST_F(CpuRendererIntegrationTest, Renders) {
   auto [local_token, scenic_token] = utils::CreateSysmemTokens(sysmem_allocator_.get());
 
   // Send one token to Flatland Allocator.
@@ -171,15 +173,43 @@ TEST_F(CpuRendererIntegrationTest, ScreenshotIsAllZeroes) {
   ASSERT_FALSE(result.is_err());
 
   // Use the local token to allocate a protected buffer.
-  SetConstraintsAndAllocateBuffer(std::move(local_token));
+  auto info = SetConstraintsAndAllocateBuffer(std::move(local_token));
+
+  // Write the pixel values to the VMO.
+  const uint32_t num_pixels = display_width_ * display_height_;
+
+  const ui_testing::Pixel color = ui_testing::Screenshot::kBlue;
+  flatland::MapHostPointer(
+      info.buffers[0].vmo, flatland::HostPointerAccessMode::kWriteOnly,
+      [&num_pixels, &color, &info](uint8_t* vmo_ptr, uint32_t num_bytes) {
+        ASSERT_EQ(num_bytes, num_pixels * kBytesPerPixel);
+        ASSERT_EQ(num_bytes, info.settings.buffer_settings.size_bytes);
+
+        ASSERT_EQ(info.settings.image_format_constraints.pixel_format.type,
+                  fuchsia::sysmem::PixelFormatType::BGRA32);
+        for (uint32_t i = 0; i < num_bytes; i += kBytesPerPixel) {
+          // For BGRA32 pixel format, the first and the third byte in the pixel
+          // corresponds to the blue and the red channel respectively.
+          vmo_ptr[i] = color.blue;
+          vmo_ptr[i + 1] = color.green;
+          vmo_ptr[i + 2] = color.red;
+          vmo_ptr[i + 3] = color.alpha;
+        }
+
+        if (info.settings.buffer_settings.coherency_domain ==
+            fuchsia::sysmem::CoherencyDomain::RAM) {
+          EXPECT_EQ(ZX_OK,
+                    info.buffers[0].vmo.op_range(ZX_VMO_OP_CACHE_CLEAN, 0, num_bytes, nullptr, 0));
+        }
+      });
 
   // Create the image in the Flatland instance.
   fuchsia::ui::composition::ImageProperties image_properties = {};
   image_properties.set_size({display_width_, display_height_});
-  const ContentId kImageContentId{.value = 1};
-  root_flatland_->CreateImage(kImageContentId, std::move(bc_tokens.import_token),
-                              /*buffer_collection_index=*/0, std::move(image_properties));
-  BlockingPresent(this, root_flatland_);
+  const fuchsia::ui::composition::ContentId kImageContentId{.value = 1};
+
+  root_flatland_->CreateImage(kImageContentId, std::move(bc_tokens.import_token), 0,
+                              std::move(image_properties));
 
   // Present the created Image.
   root_flatland_->CreateTransform(kRootTransform);
@@ -187,10 +217,10 @@ TEST_F(CpuRendererIntegrationTest, ScreenshotIsAllZeroes) {
   root_flatland_->SetContent(kRootTransform, kImageContentId);
   BlockingPresent(this, root_flatland_);
 
-  // Verify that screenshot works and is all zeroes.
   auto screenshot = TakeScreenshot(screenshotter_, display_width_, display_height_);
-  EXPECT_EQ(screenshot.Histogram()[ui_testing::Pixel(0, 0, 0, 0)],
-            screenshot.width() * screenshot.height());
+  auto histogram = screenshot.Histogram();
+
+  EXPECT_EQ(histogram[color], num_pixels);
 }
 
 }  // namespace integration_tests

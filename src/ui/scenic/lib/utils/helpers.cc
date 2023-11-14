@@ -14,6 +14,7 @@
 
 #include <fbl/algorithm.h>
 
+#include "fuchsia/sysmem/cpp/fidl.h"
 #include "src/lib/fsl/handles/object_info.h"
 
 #include <glm/gtc/constants.hpp>
@@ -194,10 +195,10 @@ float GetOrientationAngle(fuchsia::ui::composition::Orientation orientation) {
 
 namespace {
 
-uint32_t GetBytesPerRow(const fuchsia::sysmem::SingleBufferSettings& settings, uint32_t image_width,
-                        uint32_t bytes_per_pixel) {
-  uint32_t bytes_per_row_divisor = settings.image_format_constraints.bytes_per_row_divisor;
-  uint32_t min_bytes_per_row = settings.image_format_constraints.min_bytes_per_row;
+uint32_t GetBytesPerRow(const fuchsia::sysmem::ImageFormatConstraints& image_format_constraints,
+                        uint32_t image_width, uint32_t bytes_per_pixel) {
+  uint32_t bytes_per_row_divisor = image_format_constraints.bytes_per_row_divisor;
+  uint32_t min_bytes_per_row = image_format_constraints.min_bytes_per_row;
   uint32_t bytes_per_row = fbl::round_up(std::max(image_width * bytes_per_pixel, min_bytes_per_row),
                                          bytes_per_row_divisor);
   return bytes_per_row;
@@ -206,7 +207,11 @@ uint32_t GetBytesPerRow(const fuchsia::sysmem::SingleBufferSettings& settings, u
 }  // namespace
 
 uint32_t GetBytesPerPixel(const fuchsia::sysmem::SingleBufferSettings& settings) {
-  auto hlcpp_pixel_format = settings.image_format_constraints.pixel_format;
+  return GetBytesPerPixel(settings.image_format_constraints);
+}
+
+uint32_t GetBytesPerPixel(const fuchsia::sysmem::ImageFormatConstraints& image_format_constraints) {
+  auto hlcpp_pixel_format = image_format_constraints.pixel_format;
   fidl::Arena arena;
   auto wire_pixel_format = fidl::ToWire(arena, fidl::HLCPPToNatural(hlcpp_pixel_format));
   return ImageFormatStrideBytesPerWidthPixel(wire_pixel_format);
@@ -215,13 +220,20 @@ uint32_t GetBytesPerPixel(const fuchsia::sysmem::SingleBufferSettings& settings)
 uint32_t GetBytesPerRow(const fuchsia::sysmem::SingleBufferSettings& settings,
                         uint32_t image_width) {
   uint32_t bytes_per_pixel = GetBytesPerPixel(settings);
-  return GetBytesPerRow(settings, image_width, bytes_per_pixel);
+  return GetBytesPerRow(settings.image_format_constraints, image_width, bytes_per_pixel);
+}
+
+uint32_t GetBytesPerRow(const fuchsia::sysmem::ImageFormatConstraints& image_format_constraints,
+                        uint32_t image_width) {
+  uint32_t bytes_per_pixel = GetBytesPerPixel(image_format_constraints);
+  return GetBytesPerRow(image_format_constraints, image_width, bytes_per_pixel);
 }
 
 uint32_t GetPixelsPerRow(const fuchsia::sysmem::SingleBufferSettings& settings,
                          uint32_t image_width) {
   uint32_t bytes_per_pixel = GetBytesPerPixel(settings);
-  return GetBytesPerRow(settings, image_width, bytes_per_pixel) / bytes_per_pixel;
+  return GetBytesPerRow(settings.image_format_constraints, image_width, bytes_per_pixel) /
+         bytes_per_pixel;
 }
 
 }  // namespace utils

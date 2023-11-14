@@ -63,11 +63,17 @@ ScenicRealmBuilder& ScenicRealmBuilder::Init(RealmBuilderArgs args) {
                                   .targets = {ChildRef{config.name}}});
   }
 
+  realm_builder_.InitMutableConfigFromPackage(kScenic);
+
   // Configure the renderer type for Scenic.
   if (args.renderer_type_config.has_value()) {
-    realm_builder_.InitMutableConfigFromPackage(kScenic);
     realm_builder_.SetConfigValue(kScenic, "renderer",
                                   ConfigValue(args.renderer_type_config.value()));
+  }
+
+  if (args.display_rotation.has_value()) {
+    realm_builder_.SetConfigValue(kScenic, "display_rotation",
+                                  ConfigValue::Uint64(args.display_rotation.value()));
   }
 
   return *this;

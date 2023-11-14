@@ -14,6 +14,8 @@
 namespace flatland {
 namespace test {
 
+const uint32_t kCpuUsageWriteOften = fuchsia::sysmem::cpuUsageWriteOften;
+
 // Common testing base class to be used across different unittests that
 // require Vulkan and a SysmemAllocator.
 class BufferCollectionTest : public ::testing::Test {
@@ -52,8 +54,11 @@ TEST_F(BufferCollectionTest, CreateCollectionTest) {
 // out the dummy token inside the call to WaitUntilAllocated() that this is enough to ensure
 // that we can still allocate the buffer collection.
 TEST_F(BufferCollectionTest, AllocationWithoutExtraConstraints) {
+  fuchsia::sysmem::BufferUsage buffer_usage =
+      fuchsia::sysmem::BufferUsage{.cpu = kCpuUsageWriteOften};
   auto tokens = SysmemTokens::Create(sysmem_allocator_.get());
-  auto result = BufferCollectionInfo::New(sysmem_allocator_.get(), std::move(tokens.dup_token));
+  auto result = BufferCollectionInfo::New(sysmem_allocator_.get(), std::move(tokens.dup_token),
+                                          std::nullopt, buffer_usage);
   EXPECT_TRUE(result.is_ok());
 
   auto collection = std::move(result.value());
@@ -73,7 +78,7 @@ TEST_F(BufferCollectionTest, AllocationWithoutExtraConstraints) {
     constraints.has_buffer_memory_constraints = true;
     constraints.buffer_memory_constraints.cpu_domain_supported = true;
     constraints.buffer_memory_constraints.ram_domain_supported = true;
-    constraints.usage.cpu = fuchsia::sysmem::cpuUsageWriteOften;
+    constraints.usage.cpu = kCpuUsageWriteOften;
     constraints.min_buffer_count = 1;
 
     constraints.image_format_constraints_count = 1;
@@ -164,7 +169,7 @@ TEST_F(BufferCollectionTest, IncompatibleConstraintsTest) {
     constraints.has_buffer_memory_constraints = true;
     constraints.buffer_memory_constraints.cpu_domain_supported = true;
     constraints.buffer_memory_constraints.ram_domain_supported = true;
-    constraints.usage.cpu = fuchsia::sysmem::cpuUsageWriteOften;
+    constraints.usage.cpu = kCpuUsageWriteOften;
 
     // Need at least one buffer normally.
     constraints.min_buffer_count = 0;
