@@ -67,7 +67,7 @@ class GpioDevice : public GpioDeviceType, public ddk::GpioProtocol<GpioDevice, d
 
   static zx_status_t Create(void* ctx, zx_device_t* parent);
 
-  zx_status_t InitAddDevice();
+  zx_status_t InitAddDevice(uint32_t controller_id);
 
   void DdkUnbind(ddk::UnbindTxn txn);
   void DdkRelease();
@@ -202,7 +202,7 @@ using GpioInitDeviceType = ddk::Device<GpioInitDevice>;
 
 class GpioInitDevice : public GpioInitDeviceType {
  public:
-  static void Create(zx_device_t* parent, GpioImplProxy gpio);
+  static void Create(zx_device_t* parent, GpioImplProxy gpio, uint32_t controller_id);
 
   explicit GpioInitDevice(zx_device_t* parent) : GpioInitDeviceType(parent) {}
 

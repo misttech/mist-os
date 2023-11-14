@@ -9,6 +9,9 @@
 #include <lib/async-loop/default.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
+#include <lib/driver/outgoing/cpp/outgoing_directory.h>
+
+#include <optional>
 
 #include <ddk/metadata/gpio.h>
 #include <fbl/alloc_checker.h>
@@ -41,6 +44,36 @@ class GpioDeviceWrapper {
 
 class MockGpioImplFidl : public fdf::WireServer<fuchsia_hardware_gpioimpl::GpioImpl>,
                          public ddk::MockGpioImpl {
+ public:
+  MockGpioImplFidl() : MockGpioImplFidl(0) {}
+  explicit MockGpioImplFidl(uint32_t controller) : controller_(controller) {}
+
+  // Helper method to make this easier to use from a DispatcherBound.
+  zx::result<fidl::ClientEnd<fuchsia_io::Directory>> CreateOutgoingAndServe() {
+    fdf::Unowned dispatcher = fdf::Dispatcher::GetCurrent();
+
+    outgoing_.emplace(fdf::OutgoingDirectory::Create(dispatcher->get()));
+
+    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    if (endpoints.is_error()) {
+      return endpoints.take_error();
+    }
+
+    auto service = outgoing_->AddService<fuchsia_hardware_gpioimpl::Service>(
+        fuchsia_hardware_gpioimpl::Service::InstanceHandler({
+            .device = bind_handler(dispatcher->get()),
+        }));
+    if (service.is_error()) {
+      return service.take_error();
+    }
+
+    if (auto result = outgoing_->Serve(std::move(endpoints->server)); result.is_error()) {
+      return result.take_error();
+    }
+
+    return zx::ok(std::move(endpoints->client));
+  }
+
  private:
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_hardware_gpioimpl::GpioImpl> metadata,
@@ -77,7 +110,12 @@ class MockGpioImplFidl : public fdf::WireServer<fuchsia_hardware_gpioimpl::GpioI
                         fdf::Arena& arena, ReleaseInterruptCompleter::Sync& completer) override {}
   void GetPins(fdf::Arena& arena, GetPinsCompleter::Sync& completer) override {}
   void GetInitSteps(fdf::Arena& arena, GetInitStepsCompleter::Sync& completer) override {}
-  void GetControllerId(fdf::Arena& arena, GetControllerIdCompleter::Sync& completer) override {}
+  void GetControllerId(fdf::Arena& arena, GetControllerIdCompleter::Sync& completer) override {
+    completer.buffer(arena).Reply(controller_);
+  }
+
+  const uint32_t controller_;
+  std::optional<fdf::OutgoingDirectory> outgoing_;
 };
 
 class GpioTest : public zxtest::Test {
@@ -485,6 +523,59 @@ TEST(GpioTest, FallBackToFidl) {
 
   EXPECT_OK(result.get());
   EXPECT_NO_FAILURES(gpioimpl_fidl.VerifyAndClear());
+}
+
+TEST(GpioTest, ControllerId) {
+  constexpr uint32_t kController = 5;
+
+  constexpr gpio_pin_t pins[] = {
+      DECL_GPIO_PIN(0),
+      DECL_GPIO_PIN(1),
+      DECL_GPIO_PIN(2),
+  };
+
+  std::shared_ptr runtime = mock_ddk::GetDriverRuntime();
+  fdf::UnownedSynchronizedDispatcher background_dispatcher = runtime->StartBackgroundDispatcher();
+
+  auto parent = MockDevice::FakeRootParent();
+  parent->SetMetadata(DEVICE_METADATA_GPIO_PINS, pins, std::size(pins) * sizeof(gpio_pin_t));
+
+  async_patterns::TestDispatcherBound<MockGpioImplFidl> gpioimpl_fidl(
+      background_dispatcher->async_dispatcher(), std::in_place, kController);
+
+  {
+    auto outgoing_client = gpioimpl_fidl.SyncCall(&MockGpioImplFidl::CreateOutgoingAndServe);
+    ASSERT_TRUE(outgoing_client.is_ok());
+
+    parent->AddFidlService(fuchsia_hardware_gpioimpl::Service::Name, std::move(*outgoing_client));
+  }
+
+  gpioimpl_fidl.SyncCall([](MockGpioImplFidl* gpio) {
+    gpio->ExpectWrite(ZX_OK, 0, uint8_t{0})
+        .ExpectWrite(ZX_OK, 1, uint8_t{0})
+        .ExpectWrite(ZX_OK, 2, uint8_t{0});
+  });
+
+  ASSERT_OK(GpioDevice::Create(nullptr, parent.get()));
+
+  ASSERT_EQ(parent->child_count(), 3);
+
+  for (const auto& child : parent->children()) {
+    const cpp20::span properties = child->GetProperties();
+    ASSERT_EQ(properties.size(), 2);
+
+    EXPECT_EQ(properties[0].id, BIND_GPIO_PIN);
+    EXPECT_GE(properties[0].value, 0);
+    EXPECT_LE(properties[0].value, 2);
+
+    EXPECT_EQ(properties[1].id, BIND_GPIO_CONTROLLER);
+    EXPECT_EQ(properties[1].value, kController);
+
+    // Make a call that results in a synchronous FIDL call to the mock GPIO. Without this, it is
+    // possible that server binding has not completed by the time the driver runtime goes out of
+    // scope.
+    child->GetDeviceContext<GpioDevice>()->GpioWrite(0);
+  }
 }
 
 }  // namespace

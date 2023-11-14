@@ -313,7 +313,7 @@ void TiTca6408a::GetPins(GetPinsCompleter::Sync& completer) {}
 
 void TiTca6408a::GetInitSteps(GetInitStepsCompleter::Sync& completer) {}
 
-void TiTca6408a::GetControllerId(GetControllerIdCompleter::Sync& completer) {}
+void TiTca6408a::GetControllerId(GetControllerIdCompleter::Sync& completer) { completer.Reply(0); }
 
 zx::result<uint8_t> TiTca6408a::ReadBit(Register reg, uint32_t index) {
   const auto bit = static_cast<uint8_t>(1 << (index - pin_index_offset_));

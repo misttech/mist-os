@@ -69,12 +69,13 @@ zx_status_t GpioDevice::GpioSetDriveStrength(uint64_t ds_ua, uint64_t* out_actua
   return gpio_.SetDriveStrength(pin_, ds_ua, out_actual_ds_ua);
 }
 
-zx_status_t GpioDevice::InitAddDevice() {
+zx_status_t GpioDevice::InitAddDevice(const uint32_t controller_id) {
   char name[20];
   snprintf(name, sizeof(name), "gpio-%u", pin_);
 
   zx_device_prop_t props[] = {
       {BIND_GPIO_PIN, 0, pin_},
+      {BIND_GPIO_CONTROLLER, 0, controller_id},
   };
 
   async_dispatcher_t* dispatcher =
@@ -129,6 +130,7 @@ zx_status_t GpioDevice::Create(void* ctx, zx_device_t* parent) {
     zxlogf(INFO, "Using Banjo gpioimpl protocol");
   }
 
+  uint32_t controller_id = 0;
   {
     fdf::WireSyncClient<fuchsia_hardware_gpioimpl::GpioImpl> gpio_fidl;
     if (!gpio_banjo.is_valid()) {
@@ -141,10 +143,18 @@ zx_status_t GpioDevice::Create(void* ctx, zx_device_t* parent) {
         zxlogf(ERROR, "Failed to get Banjo or FIDL gpioimpl protocol");
         return ZX_ERR_NO_RESOURCES;
       }
+
+      fdf::Arena arena('GPIO');
+      if (const auto result = gpio_fidl.buffer(arena)->GetControllerId(); result.ok()) {
+        controller_id = result->controller_id;
+      } else {
+        zxlogf(ERROR, "Failed to get controller ID: %s", result.status_string());
+        return result.status();
+      }
     }
 
     // Process init metadata while we are still the exclusive owner of the GPIO client.
-    GpioInitDevice::Create(parent, {gpio_banjo, std::move(gpio_fidl)});
+    GpioInitDevice::Create(parent, {gpio_banjo, std::move(gpio_fidl)}, controller_id);
   }
 
   auto pins = ddk::GetMetadataArray<gpio_pin_t>(parent, DEVICE_METADATA_GPIO_PINS);
@@ -182,7 +192,7 @@ zx_status_t GpioDevice::Create(void* ctx, zx_device_t* parent) {
       return ZX_ERR_NO_MEMORY;
     }
 
-    zx_status_t status = dev->InitAddDevice();
+    zx_status_t status = dev->InitAddDevice(controller_id);
     if (status != ZX_OK) {
       zxlogf(ERROR, "Failed to add device: %s", zx_status_get_string(status));
       return status;
@@ -195,7 +205,7 @@ zx_status_t GpioDevice::Create(void* ctx, zx_device_t* parent) {
   return ZX_OK;
 }
 
-void GpioInitDevice::Create(zx_device_t* parent, GpioImplProxy gpio) {
+void GpioInitDevice::Create(zx_device_t* parent, GpioImplProxy gpio, const uint32_t controller_id) {
   // Don't add the init device if anything goes wrong here, as the hardware may be in a state that
   // child devices don't expect.
   auto decoded = ddk::GetEncodedMetadata<fuchsia_hardware_gpioimpl::wire::InitMetadata>(
@@ -219,6 +229,7 @@ void GpioInitDevice::Create(zx_device_t* parent, GpioImplProxy gpio) {
 
   zx_device_prop_t props[] = {
       {BIND_INIT_STEP, 0, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO},
+      {BIND_GPIO_CONTROLLER, 0, controller_id},
   };
 
   zx_status_t status = device->DdkAdd(
