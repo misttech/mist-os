@@ -52,7 +52,7 @@ void RegistryServer::WatchDevicesAdded(WatchDevicesAddedCompleter::Sync& complet
   if (watch_devices_added_completer_) {
     ADR_WARN_OBJECT() << "previous `WatchDevicesAdded` request has not yet completed";
     completer.Reply(fit::error<fuchsia_audio_device::RegistryWatchDevicesAddedError>(
-        fuchsia_audio_device::RegistryWatchDevicesAddedError::kWatchAlreadyPending));
+        fuchsia_audio_device::RegistryWatchDevicesAddedError::kAlreadyPending));
     return;
   }
 
@@ -107,7 +107,7 @@ void RegistryServer::WatchDeviceRemoved(WatchDeviceRemovedCompleter::Sync& compl
   if (watch_device_removed_completer_) {
     ADR_WARN_OBJECT() << "previous `WatchDeviceRemoved` request has not yet completed";
     completer.Reply(fit::error<fuchsia_audio_device::RegistryWatchDeviceRemovedError>(
-        fuchsia_audio_device::RegistryWatchDeviceRemovedError::kWatchAlreadyPending));
+        fuchsia_audio_device::RegistryWatchDeviceRemovedError::kAlreadyPending));
     return;
   }
 

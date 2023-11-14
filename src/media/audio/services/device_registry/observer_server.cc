@@ -84,7 +84,7 @@ void ObserverServer::WatchGainState(WatchGainStateCompleter::Sync& completer) {
   if (watch_gain_state_completer_) {
     ADR_WARN_OBJECT() << "previous `WatchGainState` request has not yet completed";
     completer.Reply(fit::error<fuchsia_audio_device::ObserverWatchGainStateError>(
-        fuchsia_audio_device::ObserverWatchGainStateError::kWatchAlreadyPending));
+        fuchsia_audio_device::ObserverWatchGainStateError::kAlreadyPending));
     return;
   }
 
@@ -130,7 +130,7 @@ void ObserverServer::WatchPlugState(WatchPlugStateCompleter::Sync& completer) {
   if (watch_plug_state_completer_) {
     ADR_WARN_OBJECT() << "previous `WatchPlugState` request has not yet completed";
     completer.Reply(fit::error<fuchsia_audio_device::ObserverWatchPlugStateError>(
-        fuchsia_audio_device::ObserverWatchPlugStateError::kWatchAlreadyPending));
+        fuchsia_audio_device::ObserverWatchPlugStateError::kAlreadyPending));
     return;
   }
 

@@ -36,7 +36,7 @@ class StubRegistryServer
       FX_LOGS(WARNING) << kClassName << "::" << __FUNCTION__
                        << ": previous request has not yet completed";
       completer.Reply(fit::error<fuchsia_audio_device::RegistryWatchDevicesAddedError>(
-          fuchsia_audio_device::RegistryWatchDevicesAddedError::kWatchAlreadyPending));
+          fuchsia_audio_device::RegistryWatchDevicesAddedError::kAlreadyPending));
       return;
     }
     FX_LOGS(INFO) << kClassName << "::" << __FUNCTION__;
@@ -48,7 +48,7 @@ class StubRegistryServer
       FX_LOGS(WARNING) << kClassName << "::" << __FUNCTION__
                        << ": previous request has not yet completed";
       completer.Reply(fit::error<fuchsia_audio_device::RegistryWatchDeviceRemovedError>(
-          fuchsia_audio_device::RegistryWatchDeviceRemovedError::kWatchAlreadyPending));
+          fuchsia_audio_device::RegistryWatchDeviceRemovedError::kAlreadyPending));
       return;
     }
     FX_LOGS(INFO) << kClassName << "::" << __FUNCTION__;

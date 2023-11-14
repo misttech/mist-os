@@ -31,11 +31,11 @@ closed protocol Provider {
 /// Errors returned by the `Provider` protocol.
 type ProviderAddDeviceError = flexible enum {
     /// The required `device_name` is incorrectly formed, empty or missing.
-    INVALID_NAME = 2;
+    INVALID_NAME = 1;
 
     /// The required `device_type` is missing.
-    INVALID_TYPE = 3;
+    INVALID_TYPE = 2;
 
     /// The required `stream_config_client` is invalid or missing.
-    INVALID_STREAM_CONFIG = 5;
+    INVALID_STREAM_CONFIG = 3;
 };

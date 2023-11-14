@@ -84,7 +84,7 @@ TEST_F(ObserverServerWarningTest, WatchGainStateWhileAlreadyWatching) {
       });
   RunLoopUntilIdle();
 
-  // The third `WatchGainState` call should fail immediately (domain error WATCH_ALREADY_PENDING)
+  // The third `WatchGainState` call should fail immediately (domain error ALREADY_PENDING)
   // since the second call has not yet completed.
   bool received_callback = false;
   observer->client()->WatchGainState().Then(
@@ -94,7 +94,7 @@ TEST_F(ObserverServerWarningTest, WatchGainStateWhileAlreadyWatching) {
         ASSERT_TRUE(result.error_value().is_domain_error())
             << result.error_value().FormatDescription();
         EXPECT_EQ(result.error_value().domain_error(),
-                  fuchsia_audio_device::ObserverWatchGainStateError::kWatchAlreadyPending)
+                  fuchsia_audio_device::ObserverWatchGainStateError::kAlreadyPending)
             << result.error_value().FormatDescription();
         received_callback = true;
       });
@@ -135,7 +135,7 @@ TEST_F(ObserverServerWarningTest, WatchPlugStateWhilePending) {
       });
   RunLoopUntilIdle();
 
-  // The third `WatchPlugState` call should fail immediately (domain error WATCH_ALREADY_PENDING)
+  // The third `WatchPlugState` call should fail immediately (domain error ALREADY_PENDING)
   // since the second call has not yet completed.
   bool received_callback = false;
   observer->client()->WatchPlugState().Then(
@@ -145,7 +145,7 @@ TEST_F(ObserverServerWarningTest, WatchPlugStateWhilePending) {
         ASSERT_TRUE(result.error_value().is_domain_error())
             << result.error_value().FormatDescription();
         EXPECT_EQ(result.error_value().domain_error(),
-                  fuchsia_audio_device::ObserverWatchPlugStateError::kWatchAlreadyPending)
+                  fuchsia_audio_device::ObserverWatchPlugStateError::kAlreadyPending)
             << result.error_value().FormatDescription();
         received_callback = true;
       });

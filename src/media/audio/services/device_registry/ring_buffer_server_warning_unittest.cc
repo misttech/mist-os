@@ -364,7 +364,7 @@ TEST_F(RingBufferServerWarningTest, StopAfterStopped) {
   ring_buffer_client = fidl::Client<fuchsia_audio_device::RingBuffer>();
 }
 
-// Test WatchDelayInfo when already watching - should fail with kWatchAlreadyPending.
+// Test WatchDelayInfo when already watching - should fail with kAlreadyPending.
 TEST_F(RingBufferServerWarningTest, WatchDelayInfoWhileAlreadyWatching) {
   auto fake_driver = CreateFakeDriverWithDefaults();
   fake_driver->AllocateRingBuffer(8192);
@@ -422,7 +422,7 @@ TEST_F(RingBufferServerWarningTest, WatchDelayInfoWhileAlreadyWatching) {
     ASSERT_TRUE(result.is_error());
     ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value().FormatDescription();
     EXPECT_EQ(result.error_value().domain_error(),
-              fuchsia_audio_device::RingBufferWatchDelayInfoError::kWatchAlreadyPending)
+              fuchsia_audio_device::RingBufferWatchDelayInfoError::kAlreadyPending)
         << result.error_value().FormatDescription();
     received_callback = true;
   });

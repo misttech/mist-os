@@ -267,7 +267,7 @@ TEST_F(ControlCreatorServerWarningTest, IdAlreadyControlled) {
         ASSERT_TRUE(result.error_value().is_domain_error())
             << result.error_value().FormatDescription();
         EXPECT_EQ(result.error_value().domain_error(),
-                  fuchsia_audio_device::ControlCreatorError::kDeviceAlreadyAllocated)
+                  fuchsia_audio_device::ControlCreatorError::kAlreadyAllocated)
             << result.error_value().FormatDescription();
         received_callback = true;
       });

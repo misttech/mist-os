@@ -97,7 +97,7 @@ type ControlCreatorError = flexible enum {
 
     /// A `Control` associated with `token_id` already exists. This device is
     /// already being actively controlled.
-    DEVICE_ALREADY_ALLOCATED = 5;
+    ALREADY_ALLOCATED = 5;
 };
 
 /// A `Control` instance is used to change the settings or state of an audio
@@ -152,11 +152,11 @@ closed protocol Control {
 
 /// Errors returned by `Control/SetGain`.
 type ControlSetGainError = flexible enum {
-    /// The required `target_state` is missing.
-    INVALID_GAIN_STATE = 1;
-
     /// This device has encountered an error and can no longer be controlled.
-    DEVICE_ERROR = 2;
+    DEVICE_ERROR = 1;
+
+    /// The required `target_state` is missing.
+    INVALID_GAIN_STATE = 2;
 
     /// The required `target_state.gain_db` is missing.
     INVALID_GAIN_DB = 3;
@@ -175,33 +175,39 @@ type ControlSetGainError = flexible enum {
 type ControlGetCurrentlyPermittedFormatsError = flexible enum {
     /// This device has encountered an error and can no longer be queried.
     DEVICE_ERROR = 1;
+
+    /// The previous `GetCurrentlyPermittedFormats` call has not yet completed.
+    ALREADY_PENDING = 2;
 };
 
 /// Errors returned by `Control/CreateRingBuffer`.
 type ControlCreateRingBufferError = flexible enum {
+    /// This device has encountered an error and can no longer be controlled.
+    DEVICE_ERROR = 1;
+
+    /// The previous `CreateRingBuffer` call has not yet completed.
+    ALREADY_PENDING = 2;
+
     /// The required `options` is missing.
-    INVALID_OPTIONS = 1;
+    INVALID_OPTIONS = 3;
 
     /// The required `options.format` is missing.
-    INVALID_FORMAT = 2;
+    INVALID_FORMAT = 4;
 
     /// The required `options.ring_buffer_min_bytes` is missing.
-    INVALID_MIN_BYTES = 3;
+    INVALID_MIN_BYTES = 5;
 
     /// The required `ring_buffer_server` is missing.
-    INVALID_RING_BUFFER = 4;
-
-    /// This device has encountered an error and can no longer be controlled.
-    DEVICE_ERROR = 5;
-
-    /// The device does not support the specified format.
-    FORMAT_MISMATCH = 6;
-
-    /// The device cannot create a ring buffer with the specified options.
-    BAD_RING_BUFFER_OPTION = 7;
+    INVALID_RING_BUFFER = 6;
 
     /// An active `RingBuffer` instance already exists for this `Control`.
-    RING_BUFFER_ALREADY_ALLOCATED = 8;
+    ALREADY_ALLOCATED = 7;
+
+    /// The device does not support the specified format.
+    FORMAT_MISMATCH = 8;
+
+    /// The device cannot create a ring buffer with the specified options.
+    BAD_RING_BUFFER_OPTION = 9;
 };
 
 /// A `RingBuffer` instance controls data flow for the associated audio stream.
@@ -259,19 +265,22 @@ closed protocol RingBuffer {
 
 /// Errors returned by `RingBuffer/SetActiveChannels`.
 type RingBufferSetActiveChannelsError = flexible enum {
-    /// The required `channel_bitmask` is missing.
-    INVALID_CHANNEL_BITMASK = 1;
-
     /// This device has encountered an error and can no longer be controlled.
-    DEVICE_ERROR = 2;
+    DEVICE_ERROR = 1;
+
+    /// The previous `SetActiveChannels` call has not yet completed.
+    ALREADY_PENDING = 2;
 
     /// The device does not support `SetActiveChannels`. Individual channels
     /// cannot be deactivated (all channels are always active).
     METHOD_NOT_SUPPORTED = 3;
 
+    /// The required `channel_bitmask` is missing.
+    INVALID_CHANNEL_BITMASK = 4;
+
     /// The passed `channel_bitmask` specifies channels that are beyond the
     /// range of channels currently configured for this ring buffer.
-    CHANNEL_OUT_OF_RANGE = 4;
+    CHANNEL_OUT_OF_RANGE = 5;
 };
 
 /// Errors returned by `RingBuffer/Start`.
@@ -279,8 +288,11 @@ type RingBufferStartError = flexible enum {
     /// This device has encountered an error and can no longer be controlled.
     DEVICE_ERROR = 1;
 
+    /// The previous `Start` call has not yet completed.
+    ALREADY_PENDING = 2;
+
     /// `Start` was called on a ring buffer that is already started.
-    ALREADY_STARTED = 2;
+    ALREADY_STARTED = 3;
 };
 
 /// Errors returned by `RingBuffer/Stop`.
@@ -288,15 +300,18 @@ type RingBufferStopError = flexible enum {
     /// This device has encountered an error and can no longer be controlled.
     DEVICE_ERROR = 1;
 
+    /// The previous `Stop` call has not yet completed.
+    ALREADY_PENDING = 2;
+
     /// `Stop` was called on a ring buffer that is already stopped.
-    ALREADY_STOPPED = 2;
+    ALREADY_STOPPED = 3;
 };
 
 /// Errors returned by `RingBuffer/WatchDelayInfo`.
 type RingBufferWatchDelayInfoError = flexible enum {
-    /// The previous `WatchDelayInfo` call has not yet completed.
-    WATCH_ALREADY_PENDING = 1;
-
     /// This device has encountered an error and can no longer be observed.
-    DEVICE_ERROR = 2;
+    DEVICE_ERROR = 1;
+
+    /// The previous `WatchDelayInfo` call has not yet completed.
+    ALREADY_PENDING = 2;
 };

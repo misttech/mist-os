@@ -57,7 +57,6 @@ void ControlCreatorServer::Create(CreateRequest& request, CreateCompleter::Sync&
   }
 
   auto [status, device] = parent_->FindDeviceByTokenId(*request.token_id());
-  // We could break these out into separate error codes if needed.
   if (status == AudioDeviceRegistry::DevicePresence::Unknown) {
     completer.Reply(fit::error(fuchsia_audio_device::ControlCreatorError::kDeviceNotFound));
     return;
@@ -73,7 +72,7 @@ void ControlCreatorServer::Create(CreateRequest& request, CreateCompleter::Sync&
   auto control = parent_->CreateControlServer(std::move(*request.control_server()), device);
 
   if (!control) {
-    completer.Reply(fit::error(fuchsia_audio_device::ControlCreatorError::kDeviceAlreadyAllocated));
+    completer.Reply(fit::error(fuchsia_audio_device::ControlCreatorError::kAlreadyAllocated));
     return;
   }
 

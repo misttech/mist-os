@@ -30,7 +30,7 @@ TEST_F(RegistryServerWarningTest, WatchDevicesAddedWhileAlreadyWatching) {
   RunLoopUntilIdle();
 
   // The second `WatchDevicesAdded` call should fail immediately with domain error
-  // WATCH_ALREADY_PENDING, since the first call has not yet completed.
+  // ALREADY_PENDING, since the first call has not yet completed.
   bool received_callback = false;
   registry->client()->WatchDevicesAdded().Then(
       [&received_callback](
@@ -39,7 +39,7 @@ TEST_F(RegistryServerWarningTest, WatchDevicesAddedWhileAlreadyWatching) {
         ASSERT_TRUE(result.error_value().is_domain_error())
             << result.error_value().FormatDescription();
         EXPECT_EQ(result.error_value().domain_error(),
-                  fuchsia_audio_device::RegistryWatchDevicesAddedError::kWatchAlreadyPending)
+                  fuchsia_audio_device::RegistryWatchDevicesAddedError::kAlreadyPending)
             << result.error_value().FormatDescription();
         received_callback = true;
       });
@@ -63,7 +63,7 @@ TEST_F(RegistryServerWarningTest, WatchDeviceRemovedWhileAlreadyWatching) {
   RunLoopUntilIdle();
 
   // The second `WatchDeviceRemoved` call should fail immediately with domain error
-  // WATCH_ALREADY_PENDING, since the first call has not yet completed.
+  // ALREADY_PENDING, since the first call has not yet completed.
   registry->client()->WatchDeviceRemoved().Then(
       [&received_callback_2](
           fidl::Result<fuchsia_audio_device::Registry::WatchDeviceRemoved>& result) mutable {
@@ -71,7 +71,7 @@ TEST_F(RegistryServerWarningTest, WatchDeviceRemovedWhileAlreadyWatching) {
         ASSERT_TRUE(result.error_value().is_domain_error())
             << result.error_value().FormatDescription();
         EXPECT_EQ(result.error_value().domain_error(),
-                  fuchsia_audio_device::RegistryWatchDeviceRemovedError::kWatchAlreadyPending)
+                  fuchsia_audio_device::RegistryWatchDeviceRemovedError::kAlreadyPending)
             << result.error_value().FormatDescription();
         received_callback_2 = true;
       });

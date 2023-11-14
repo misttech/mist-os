@@ -236,8 +236,8 @@ void ControlServer::CreateRingBuffer(CreateRingBufferRequest& request,
   }
   if (GetRingBufferServer()) {
     ADR_WARN_OBJECT() << "device RingBuffer already exists";
-    completer.Reply(fit::error(
-        fuchsia_audio_device::wire::ControlCreateRingBufferError::kRingBufferAlreadyAllocated));
+    completer.Reply(
+        fit::error(fuchsia_audio_device::wire::ControlCreateRingBufferError::kAlreadyAllocated));
   }
 
   auto driver_format = device_->SupportedDriverFormatForClientFormat(*request.options()->format());

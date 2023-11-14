@@ -244,7 +244,7 @@ void RingBufferServer::WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) 
   if (delay_info_completer_) {
     ADR_WARN_OBJECT() << "previous `WatchDelayInfo` request has not yet completed";
     completer.Reply(
-        fit::error(fuchsia_audio_device::RingBufferWatchDelayInfoError::kWatchAlreadyPending));
+        fit::error(fuchsia_audio_device::RingBufferWatchDelayInfoError::kAlreadyPending));
     return;
   }
 

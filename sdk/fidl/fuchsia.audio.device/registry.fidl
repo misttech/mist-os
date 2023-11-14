@@ -284,13 +284,13 @@ closed protocol Registry {
 /// Errors returned by `Registry/WatchDevicesAdded`.
 type RegistryWatchDevicesAddedError = flexible enum {
     /// The previous `WatchDevicesAdded` call has not yet completed.
-    WATCH_ALREADY_PENDING = 1;
+    ALREADY_PENDING = 1;
 };
 
 /// Errors returned by `Registry/WatchDeviceRemoved`.
 type RegistryWatchDeviceRemovedError = flexible enum {
     /// The previous `WatchDeviceRemoved` call has not yet completed.
-    WATCH_ALREADY_PENDING = 1;
+    ALREADY_PENDING = 1;
 };
 
 /// Errors returned by `Registry/CreateObserver`.
@@ -353,20 +353,20 @@ closed protocol Observer {
 
 /// Errors returned by `Observer/WatchGainState`.
 type ObserverWatchGainStateError = flexible enum {
-    /// The previous `WatchGainState` call has not yet completed.
-    WATCH_ALREADY_PENDING = 1;
-
     /// This device has encountered an error and can no longer be observed.
-    DEVICE_ERROR = 2;
+    DEVICE_ERROR = 1;
+
+    /// The previous `WatchGainState` call has not yet completed.
+    ALREADY_PENDING = 2;
 };
 
 /// Errors returned by `Observer/WatchPlugState`.
 type ObserverWatchPlugStateError = flexible enum {
-    /// The previous `WatchPlugState` call has not yet completed.
-    WATCH_ALREADY_PENDING = 1;
-
     /// This device has encountered an error and can no longer be observed.
-    DEVICE_ERROR = 2;
+    DEVICE_ERROR = 1;
+
+    /// The previous `WatchPlugState` call has not yet completed.
+    ALREADY_PENDING = 2;
 };
 
 /// Errors returned by `Observer/GetReferenceClock`.
