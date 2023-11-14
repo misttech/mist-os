@@ -858,6 +858,28 @@
         {
             type: "skip",
             matchers: [
+                // fxbug.dev/136301
+                "NonStreamSocketPairTest.MsgTruncNotFull*",
+                "NonStreamSocketPairTest.MsgTruncSameSize*",
+                "MsgTruncTruncationRecvmsgMsghdrFlagMsgTrunc*",
+
+                // fxbug.dev/136308
+                "PreadvTest.MMConcurrencyStress*",
+                "PreadvTest.PreadvWithOpath*",
+
+                // fxbug.dev/136280
+                "AbstractUnixSockets/UnixSocketPairTest.BindToBadFamily*",
+                "AbstractUnixSockets/UnixSocketPairTest.BindToBadName*",
+                "AbstractUnixSockets/UnixSocketPairTest.InvalidGetSockOpt*",
+                "UnixSocketPairTest.RecvmmsgTimeoutAfterRecv*",
+                "AbstractUnixSockets/UnixSocketPairTest.TIOCINQSucceeds*",
+
+                // fxbug.dev/135777
+                "Waiters/WaitSpecificChildTest.ForkBlock*",
+
+                // fxbug.dev/136093
+                "TcpSocketTest.ClosedReadBlockingSocket*",
+
                 // These tests hang.
                 "Syscall32Bit.Sysenter",
                 "Syscall32Bit.Int80",
