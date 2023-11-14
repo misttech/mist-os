@@ -6,7 +6,6 @@
 #define SRC_STARNIX_KERNEL_VDSO_VDSO_CALCULATE_TIME_H_
 
 #include <stdint.h>
-#include <zircon/compiler.h>
 
 #include "vvar-data.h"
 
@@ -35,7 +34,7 @@ constexpr int64_t kUtcInvalid = 0;
 // https://cs.android.com/android/platform/superproject/main/+/main:system/core/init/main.cpp;drc=813871767921010aaccae39f4bbaaf78d21211e6
 // [2]: https://gist.github.com/ghananigans/a642ec3b7854f54c3694c55db22de2fe
 // [3]: https://clang.llvm.org/docs/ClangCommandLineReference.html#cmdoption-clang-fvisibility
-__LOCAL extern "C" vvar_data vvar;
+__attribute__((__visibility__("hidden"))) extern "C" vvar_data vvar;
 
 // Returns monotonic time in nanoseconds.
 // This should be equivalent to calling zx_clock_get_monotonic, however the result may

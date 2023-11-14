@@ -6,8 +6,8 @@
 #include <sys/time.h>
 #include <zircon/compiler.h>
 
-#include "vdso-common.h"
-#include "vdso-platform.h"
+#include "src/starnix/kernel/vdso/vdso-common.h"
+#include "src/starnix/kernel/vdso/vdso-platform.h"
 
 uint64_t get_raw_ticks() { return __rdtsc(); }
 
