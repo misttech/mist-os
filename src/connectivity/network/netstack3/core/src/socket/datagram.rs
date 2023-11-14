@@ -116,15 +116,42 @@ impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> AsRef<IpOptions<I, D, S
     }
 }
 
+/// State associated with a Bound Socket.
 #[derive(Derivative)]
 #[derivative(Debug(bound = "D: Debug"))]
-pub(crate) enum BoundSocketState<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> {
+pub(crate) struct BoundSocketState<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> {
+    // The type of bound socket (e.g. Listener vs. Connected), and any
+    // type-specific state.
+    pub(crate) socket_type: BoundSocketStateType<I, D, S>,
+    // The original bound address of the socket, as requested by the caller.
+    // `None` if:
+    //   * the socket was connected from unbound, or
+    //   * listen was called without providing a local port.
+    pub(crate) original_bound_addr: Option<S::ListenerIpAddr<I>>,
+}
+
+impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> AsRef<IpOptions<I, D, S>>
+    for BoundSocketState<I, D, S>
+{
+    fn as_ref(&self) -> &IpOptions<I, D, S> {
+        let BoundSocketState { socket_type, original_bound_addr: _ } = self;
+        match socket_type {
+            BoundSocketStateType::Listener { state, sharing: _ } => state.as_ref(),
+            BoundSocketStateType::Connected { state, sharing: _ } => state.as_ref(),
+        }
+    }
+}
+
+// State for the sub-types of bound socket (e.g. Listener or Connected).
+#[derive(Derivative)]
+#[derivative(Debug(bound = "D: Debug"))]
+pub(crate) enum BoundSocketStateType<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> {
     Listener { state: ListenerState<I, D, S>, sharing: S::SharingState },
     Connected { state: S::ConnState<I, D>, sharing: S::SharingState },
 }
 
 impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> AsRef<IpOptions<I, D, S>>
-    for BoundSocketState<I, D, S>
+    for BoundSocketStateType<I, D, S>
 {
     fn as_ref(&self) -> &IpOptions<I, D, S> {
         match self {
@@ -1707,8 +1734,9 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> RemoveOperation<I, I, D, S> {
         socket_id: S::SocketId<I>,
         state: &BoundSocketState<I, D, S>,
     ) -> Self {
+        let BoundSocketState { socket_type: state, original_bound_addr: _ } = state;
         RemoveOperation(match state {
-            BoundSocketState::Listener { state, sharing } => {
+            BoundSocketStateType::Listener { state, sharing } => {
                 let ListenerState { addr: associated_addr, ip_options } = state;
                 let ListenerAddr { ip, device } = associated_addr.clone();
                 let concrete_addr = ListenerAddr { ip: sync_ctx.converter().convert(ip), device };
@@ -1720,7 +1748,7 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> RemoveOperation<I, I, D, S> {
                     socket_id: S::make_bound_socket_map_id(socket_id),
                 }
             }
-            BoundSocketState::Connected { state, sharing } => {
+            BoundSocketStateType::Connected { state, sharing } => {
                 let ConnState {
                     addr,
                     socket,
@@ -1771,6 +1799,28 @@ impl<WireI: IpExt, SocketI: IpExt, D: WeakId, S: DatagramSocketSpec>
                 sharing: _,
                 socket_id: _,
             } => (ip_options, SocketInfo::Connected(associated_addr)),
+        }
+    }
+
+    fn into_options_sharing_and_device(
+        self,
+    ) -> (IpOptions<SocketI, D, S>, S::SharingState, Option<D>) {
+        let RemoveInfo(remove) = self;
+        match remove {
+            Remove::Listener {
+                concrete_addr: ListenerAddr { ip: _, device },
+                associated_addr: _,
+                ip_options,
+                sharing,
+                socket_id: _,
+            } => (ip_options, sharing, device),
+            Remove::Connected {
+                concrete_addr: ConnAddr { ip: _, device },
+                associated_addr: _,
+                ip_options,
+                sharing,
+                socket_id: _,
+            } => (ip_options, sharing, device),
         }
     }
 
@@ -1850,8 +1900,9 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> DualStackRemoveOperation<I, D, 
         socket_id: S::SocketId<I>,
         state: &BoundSocketState<I, D, S>,
     ) -> Self {
+        let BoundSocketState { socket_type: state, original_bound_addr: _ } = state;
         DualStackRemoveOperation(match state {
-            BoundSocketState::Listener { state, sharing } => {
+            BoundSocketStateType::Listener { state, sharing } => {
                 let ListenerState { addr: associated_addr, ip_options } = state;
                 let ListenerAddr { ip, device } = associated_addr.clone();
                 match (sync_ctx.converter().convert(ip), sync_ctx.dual_stack_enabled(&ip_options)) {
@@ -1895,7 +1946,7 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> DualStackRemoveOperation<I, D, 
                     }
                 }
             }
-            BoundSocketState::Connected { state, sharing } => {
+            BoundSocketStateType::Connected { state, sharing } => {
                 match sync_ctx.converter().convert(state) {
                     DualStackConnState::ThisStack(state) => {
                         let ConnState {
@@ -2012,6 +2063,26 @@ impl<I: IpExt, D: WeakId, S: DatagramSocketSpec> DualStackRemoveInfo<I, D, S> {
         }
     }
 
+    fn into_options_sharing_and_device(self) -> (IpOptions<I, D, S>, S::SharingState, Option<D>) {
+        let DualStackRemoveInfo(dual_stack_remove) = self;
+        match dual_stack_remove {
+            DualStackRemove::CurrentStack(remove) => {
+                RemoveInfo(remove).into_options_sharing_and_device()
+            }
+            DualStackRemove::OtherStack(remove) => {
+                RemoveInfo(remove).into_options_sharing_and_device()
+            }
+            DualStackRemove::ListenerBothStacks {
+                identifier: _,
+                device,
+                associated_addr: _,
+                ip_options,
+                sharing,
+                socket_ids: _,
+            } => (ip_options, sharing, device),
+        }
+    }
+
     /// Undo this removal by reinserting the socket into the [`BoundSocketMap`].
     ///
     /// # Panics
@@ -2074,12 +2145,16 @@ pub(crate) fn get_info<
     sync_ctx.with_sockets_state(|_sync_ctx, state| {
         match state.get(id.get_key_index()).expect("invalid socket ID") {
             SocketState::Unbound(_) => SocketInfo::Unbound,
-            SocketState::Bound(BoundSocketState::Listener { state, sharing: _ }) => {
-                let ListenerState { addr, ip_options: _ } = state;
-                SocketInfo::Listener(addr.clone())
-            }
-            SocketState::Bound(BoundSocketState::Connected { state, sharing: _ }) => {
-                SocketInfo::Connected(S::conn_addr_from_state(state))
+            SocketState::Bound(BoundSocketState { socket_type, original_bound_addr: _ }) => {
+                match socket_type {
+                    BoundSocketStateType::Listener { state, sharing: _ } => {
+                        let ListenerState { addr, ip_options: _ } = state;
+                        SocketInfo::Listener(addr.clone())
+                    }
+                    BoundSocketStateType::Connected { state, sharing: _ } => {
+                        SocketInfo::Connected(S::conn_addr_from_state(state))
+                    }
+                }
             }
         }
     })
@@ -2696,16 +2771,25 @@ fn listen_inner<
         }
     }
     .map_err(Either::Right)?;
+    // Match Linux behavior by only storing the original bound addr when the
+    // local_id was provided by the caller.
+    let original_bound_addr = local_id.map(|_id| {
+        let ListenerAddr { ip, device: _ } = &bound_addr;
+        ip.clone()
+    });
 
     // Replace the unbound state only after we're sure the
     // insertion has succeeded.
-    *entry.get_mut() = SocketState::Bound(BoundSocketState::Listener {
-        state: ListenerState {
-            // TODO(https://fxbug.dev/131970): Remove this clone().
-            ip_options: ip_options.clone(),
-            addr: bound_addr,
+    *entry.get_mut() = SocketState::Bound(BoundSocketState {
+        socket_type: BoundSocketStateType::Listener {
+            state: ListenerState {
+                // TODO(https://fxbug.dev/131970): Remove this clone().
+                ip_options: ip_options.clone(),
+                addr: bound_addr,
+            },
+            sharing: sharing.clone(),
         },
-        sharing: sharing.clone(),
+        original_bound_addr,
     });
     Ok(())
 }
@@ -3432,8 +3516,16 @@ pub(crate) fn connect<
                 Err(ConnectError::RemoteUnexpectedlyMapped)
             }
         }?;
-        *entry.get_mut() =
-            SocketState::Bound(BoundSocketState::Connected { state: conn_state, sharing });
+        let original_bound_addr = match entry.get() {
+            SocketState::Unbound(_) => None,
+            SocketState::Bound(BoundSocketState { socket_type: _, original_bound_addr }) => {
+                original_bound_addr.clone()
+            }
+        };
+        *entry.get_mut() = SocketState::Bound(BoundSocketState {
+            socket_type: BoundSocketStateType::Connected { state: conn_state, sharing },
+            original_bound_addr,
+        });
         Ok(())
     })
 }
@@ -3463,12 +3555,16 @@ pub(crate) fn disconnect_connected<
             DenseMapEntry::Vacant(_) => panic!("unbound ID {:?} is invalid", id),
             DenseMapEntry::Occupied(o) => o,
         };
-        let (conn_state, sharing) = match entry.get_mut() {
-            SocketState::Unbound(_)
-            | SocketState::Bound(BoundSocketState::Listener { state: _, sharing: _ }) => {
+        let state = match entry.get_mut() {
+            SocketState::Unbound(_) => return Err(ExpectedConnError),
+            SocketState::Bound(state) => state,
+        };
+        let BoundSocketState { socket_type, original_bound_addr } = state;
+        let (conn_state, sharing) = match socket_type {
+            BoundSocketStateType::Listener { state: _, sharing: _ } => {
                 return Err(ExpectedConnError)
             }
-            SocketState::Bound(BoundSocketState::Connected { state, sharing }) => (state, sharing),
+            BoundSocketStateType::Connected { state, sharing } => (state, sharing),
         };
 
         let ConnState { socket, clear_device_on_disconnect, shutdown: _, addr, extra: _ } =
@@ -3488,68 +3584,96 @@ pub(crate) fn disconnect_connected<
                     not_dual_stack.converter().convert(conn_state)
                 }
             };
-        let dual_stack_context = sync_ctx.dual_stack_context();
-        let make_listener_ip = match dual_stack_context {
-            MaybeDualStack::DualStack(dual_stack) => {
-                // TODO(https://fxbug.dev/21198): If the connection was in the
-                // other stack, construct a DualStackListenerIpAddr.
-                warn!(
-                    "dualstack disconnect not supported; restoring socket {:?} to a listener in \
-                        this stack",
-                    id
-                );
-                let converter = dual_stack.converter();
-                MaybeDualStack::DualStack(move |ListenerIpAddr { addr, identifier }| {
-                    converter.convert_back(DualStackListenerIpAddr::ThisStack(ListenerIpAddr {
-                        addr,
-                        identifier,
-                    }))
-                })
-            }
-            MaybeDualStack::NotDualStack(non_dual) => {
-                let converter = non_dual.converter();
-                MaybeDualStack::NotDualStack(move |ip| converter.convert_back(ip))
+
+        let original_bound_addr = match original_bound_addr.clone() {
+            Some(bound_addr) => bound_addr,
+            None => {
+                let clear_device_on_disconnect = *clear_device_on_disconnect;
+                // Return the socket to unbound state.
+                let (ip_options, sharing, mut device) = match sync_ctx.dual_stack_context() {
+                    MaybeDualStack::NotDualStack(nds) => {
+                        let remove_op = SingleStackRemoveOperation::new_from_state(nds, id, state);
+                        let info =
+                            sync_ctx.with_bound_sockets_mut(|_sync_ctx, bound, _allocator| {
+                                remove_op.apply(bound)
+                            });
+                        info.into_options_sharing_and_device()
+                    }
+                    MaybeDualStack::DualStack(ds) => {
+                        let remove_op = DualStackRemoveOperation::new_from_state(ds, id, state);
+                        let info = ds.with_both_bound_sockets_mut(
+                            |_sync_ctx, bound, other_bound, _allocator, _other_allocator| {
+                                remove_op.apply(bound, other_bound)
+                            },
+                        );
+                        info.into_options_sharing_and_device()
+                    }
+                };
+                if clear_device_on_disconnect {
+                    device = None
+                }
+                *entry.get_mut() =
+                    SocketState::Unbound(UnboundSocketState { device, sharing, ip_options });
+                return Ok(());
             }
         };
 
-        let id = S::make_bound_socket_map_id(id);
-        let bound_addr = DatagramBoundStateContext::<I, _, _>::with_bound_sockets_mut(
-            sync_ctx,
-            |_sync_ctx, bound, _allocator| {
-                let _bound_addr =
-                    bound.conns_mut().remove(&id, &addr).expect("connection not found");
-
-                let ConnAddr {
-                    ip: ConnIpAddr { local: (local_ip, identifier), remote: _ },
-                    mut device,
-                } = addr.clone();
-                if *clear_device_on_disconnect {
-                    device = None
+        let original_listener_ip = match sync_ctx.dual_stack_context() {
+            MaybeDualStack::NotDualStack(nds) => {
+                nds.converter().convert(&original_bound_addr).clone()
+            }
+            MaybeDualStack::DualStack(ds) => match ds.converter().convert(&original_bound_addr) {
+                DualStackListenerIpAddr::ThisStack(addr) => addr.clone(),
+                DualStackListenerIpAddr::BothStacks(identifier) => {
+                    // TODO(https://fxbug.dev/135952): Support dualstack
+                    // disconnect. When the original listener was `BothStacks`,
+                    // we need to rebind in `BothStacks`.
+                    ListenerIpAddr { addr: None, identifier: *identifier }
                 }
-
-                let addr = ListenerAddr {
-                    ip: ListenerIpAddr { addr: Some(local_ip), identifier },
-                    device,
-                };
-
-                let bound_entry = bound
-                    .listeners_mut()
-                    .try_insert(addr, sharing.clone(), id)
-                    .expect("inserting listener for disconnected socket failed");
-                let ListenerAddr { ip, device } = bound_entry.get_addr().clone();
-                let ip = match make_listener_ip {
-                    MaybeDualStack::DualStack(f) => f(ip),
-                    MaybeDualStack::NotDualStack(f) => f(ip),
-                };
-                ListenerAddr { ip, device }
+                DualStackListenerIpAddr::OtherStack(_) => {
+                    todo!("https://fxbug.dev/21198: Support dual-stack disconnect connected")
+                }
             },
-        );
+        };
+
+        let id = S::make_bound_socket_map_id(id);
+        let ListenerAddr { ip, device } =
+            DatagramBoundStateContext::<I, _, _>::with_bound_sockets_mut(
+                sync_ctx,
+                |_sync_ctx, bound, _allocator| {
+                    let _bound_addr =
+                        bound.conns_mut().remove(&id, &addr).expect("connection not found");
+
+                    let ConnAddr { ip: _, mut device } = addr.clone();
+                    if *clear_device_on_disconnect {
+                        device = None
+                    }
+                    let addr = ListenerAddr { ip: original_listener_ip, device };
+
+                    let bound_entry = bound
+                        .listeners_mut()
+                        .try_insert(addr, sharing.clone(), id)
+                        .expect("inserting listener for disconnected socket failed");
+                    bound_entry.get_addr().clone()
+                },
+            );
+        let ip = match sync_ctx.dual_stack_context() {
+            MaybeDualStack::DualStack(ds) => {
+                // TODO(https://fxbug.dev/135952): Support dualstack disconnect.
+                ds.converter().convert_back(DualStackListenerIpAddr::ThisStack(ip))
+            }
+            MaybeDualStack::NotDualStack(nds) => nds.converter().convert_back(ip),
+        };
+        let bound_addr = ListenerAddr { ip, device };
 
         // TODO(https://fxbug.dev/131970): Remove this clone.
         let ip_options = socket.options().clone();
-        *entry.get_mut() = SocketState::Bound(BoundSocketState::Listener {
-            state: ListenerState { ip_options, addr: bound_addr },
-            sharing: sharing.clone(),
+        *entry.get_mut() = SocketState::Bound(BoundSocketState {
+            socket_type: BoundSocketStateType::Listener {
+                state: ListenerState { ip_options, addr: bound_addr },
+                sharing: sharing.clone(),
+            },
+            original_bound_addr: Some(original_bound_addr),
         });
         Ok(())
     })
@@ -3580,11 +3704,15 @@ pub(crate) fn shutdown_connected<
 ) -> Result<(), ExpectedConnError> {
     sync_ctx.with_sockets_state_mut(|sync_ctx, state| {
         let state = match state.get_mut(id.get_key_index()).expect("invalid socket ID") {
-            SocketState::Unbound(_)
-            | SocketState::Bound(BoundSocketState::Listener { state: _, sharing: _ }) => {
-                return Err(ExpectedConnError)
+            SocketState::Unbound(_) => return Err(ExpectedConnError),
+            SocketState::Bound(BoundSocketState { socket_type, original_bound_addr: _ }) => {
+                match socket_type {
+                    BoundSocketStateType::Listener { state: _, sharing: _ } => {
+                        return Err(ExpectedConnError)
+                    }
+                    BoundSocketStateType::Connected { state, sharing: _ } => state,
+                }
             }
-            SocketState::Bound(BoundSocketState::Connected { state, sharing: _ }) => state,
         };
         let ConnState { socket: _, clear_device_on_disconnect: _, shutdown, addr: _, extra: _ } =
             match sync_ctx.dual_stack_context() {
@@ -3631,11 +3759,13 @@ pub(crate) fn get_shutdown_connected<
 ) -> Result<Option<ShutdownType>, DualStackNotImplementedError> {
     sync_ctx.with_sockets_state(|sync_ctx, state| {
         let state = match state.get(id.get_key_index()).expect("invalid socket ID") {
-            SocketState::Unbound(_)
-            | SocketState::Bound(BoundSocketState::Listener { state: _, sharing: _ }) => {
-                return Ok(None)
+            SocketState::Unbound(_) => return Ok(None),
+            SocketState::Bound(BoundSocketState { socket_type, original_bound_addr: _ }) => {
+                match socket_type {
+                    BoundSocketStateType::Listener { state: _, sharing: _ } => return Ok(None),
+                    BoundSocketStateType::Connected { state, sharing: _ } => state,
+                }
             }
-            SocketState::Bound(BoundSocketState::Connected { state, sharing: _ }) => state,
         };
 
         let ConnState { socket: _, clear_device_on_disconnect: _, shutdown, addr: _, extra: _ } =
@@ -3696,11 +3826,15 @@ pub(crate) fn send_conn<
 ) -> Result<(), SendError<S::SerializeError>> {
     sync_ctx.with_sockets_state_buf(|sync_ctx, state| {
         let state = match state.get(id.get_key_index()).expect("invalid socket ID") {
-            SocketState::Unbound(_)
-            | SocketState::Bound(BoundSocketState::Listener { state: _, sharing: _ }) => {
-                return Err(SendError::NotConnected)
+            SocketState::Unbound(_) => return Err(SendError::NotConnected),
+            SocketState::Bound(BoundSocketState { socket_type, original_bound_addr: _ }) => {
+                match socket_type {
+                    BoundSocketStateType::Listener { state: _, sharing: _ } => {
+                        return Err(SendError::NotConnected)
+                    }
+                    BoundSocketStateType::Connected { state, sharing: _ } => state,
+                }
             }
-            SocketState::Bound(BoundSocketState::Connected { state, sharing: _ }) => state,
         };
 
         let ConnState {
@@ -3778,10 +3912,12 @@ pub(crate) fn send_to<
         };
         let state = match state.get(id.get_key_index()).expect("no such socket") {
             SocketState::Unbound(_) => panic!("expected bound socket"),
-            SocketState::Bound(state) => state,
+            SocketState::Bound(BoundSocketState { socket_type: state, original_bound_addr: _ }) => {
+                state
+            }
         };
         let (local, device, ip_options) = match state {
-            BoundSocketState::Connected { state, sharing: _ } => {
+            BoundSocketStateType::Connected { state, sharing: _ } => {
                 let ConnState {
                     socket,
                     clear_device_on_disconnect: _,
@@ -3814,7 +3950,7 @@ pub(crate) fn send_to<
 
                 ((Some(*local_ip), local_id.clone()), device, socket.options())
             }
-            BoundSocketState::Listener { state, sharing: _ } => {
+            BoundSocketStateType::Listener { state, sharing: _ } => {
                 let ListenerState { ip_options, addr: ListenerAddr { ip, device } } = state;
 
                 let (local_ip, local_port) = match sync_ctx.dual_stack_context() {
@@ -3960,171 +4096,183 @@ pub(crate) fn set_device<
                 *device = new_device.map(|d| sync_ctx.downgrade_device_id(d));
                 Ok(())
             }
-            SocketState::Bound(state) => match state {
-                BoundSocketState::Listener { state, sharing: _ } => {
-                    // Don't allow changing the device if one of the IP addresses in the socket
-                    // address vector requires a zone (scope ID).
-                    let ListenerState { ip_options, addr } = state;
-                    let ListenerAddr { device: old_device, ip } = addr;
-                    let ip = match sync_ctx.dual_stack_context() {
-                        MaybeDualStack::DualStack(dual_stack) => {
-                            match dual_stack.converter().convert(ip.clone()) {
-                                DualStackListenerIpAddr::ThisStack(addr) => addr,
-                                DualStackListenerIpAddr::OtherStack(_)
-                                | DualStackListenerIpAddr::BothStacks(_) => {
-                                    dual_stack.assert_dual_stack_enabled(ip_options);
-                                    todo!(
+            SocketState::Bound(BoundSocketState { socket_type, original_bound_addr: _ }) => {
+                match socket_type {
+                    BoundSocketStateType::Listener { state, sharing: _ } => {
+                        // Don't allow changing the device if one of the IP addresses in the socket
+                        // address vector requires a zone (scope ID).
+                        let ListenerState { ip_options, addr } = state;
+                        let ListenerAddr { device: old_device, ip } = addr;
+                        let ip = match sync_ctx.dual_stack_context() {
+                            MaybeDualStack::DualStack(dual_stack) => {
+                                match dual_stack.converter().convert(ip.clone()) {
+                                    DualStackListenerIpAddr::ThisStack(addr) => addr,
+                                    DualStackListenerIpAddr::OtherStack(_)
+                                    | DualStackListenerIpAddr::BothStacks(_) => {
+                                        dual_stack.assert_dual_stack_enabled(ip_options);
+                                        todo!(
                                         "https://fxbug.dev/21198: implement dual-stack set_device"
                                     )
+                                    }
                                 }
                             }
-                        }
-                        MaybeDualStack::NotDualStack(single_stack) => {
-                            single_stack.converter().convert(ip.clone())
-                        }
-                    };
-
-                    let ListenerIpAddr { addr: ip_addr, identifier: _ } = &ip;
-                    // TODO(https://fxbug.dev/21198): Use the real
-                    // possibly-dual-stack addr.
-                    let bound_addr = ListenerAddr { ip: ip.clone(), device: old_device.clone() };
-
-                    if !socket::can_device_change(
-                        ip_addr.as_ref().map(|a| a.as_ref()), /* local_ip */
-                        None,                                 /* remote_ip */
-                        old_device.as_ref(),
-                        new_device,
-                    ) {
-                        return Err(SocketError::Local(LocalAddressError::Zone(
-                            ZonedAddressError::DeviceZoneMismatch,
-                        )));
-                    }
-
-                    let new_addr = DatagramBoundStateContext::<I, _, _>::with_bound_sockets_mut(
-                        sync_ctx,
-                        |sync_ctx, bound, _allocator| {
-                            let entry = bound
-                                .listeners_mut()
-                                .entry(&S::make_bound_socket_map_id(id.clone()), &bound_addr)
-                                .unwrap_or_else(|| panic!("invalid listener ID {:?}", id));
-                            let new_addr = ListenerAddr {
-                                device: new_device.map(|d| sync_ctx.downgrade_device_id(d)),
-                                ..bound_addr.clone()
-                            };
-                            let new_entry = entry.try_update_addr(new_addr).map_err(
-                                |(ExistsError {}, _entry)| LocalAddressError::AddressInUse,
-                            )?;
-                            Ok::<_, LocalAddressError>(new_entry.get_addr().clone())
-                        },
-                    )?;
-
-                    let new_addr = {
-                        let ListenerAddr { device, ip } = new_addr;
-
-                        let new_ip = match sync_ctx.dual_stack_context().to_converter() {
-                            MaybeDualStack::DualStack(converter) => {
-                                let ListenerIpAddr { addr, identifier } = ip;
-                                converter.convert_back(DualStackListenerIpAddr::ThisStack(
-                                    ListenerIpAddr { addr, identifier },
-                                ))
+                            MaybeDualStack::NotDualStack(single_stack) => {
+                                single_stack.converter().convert(ip.clone())
                             }
-                            MaybeDualStack::NotDualStack(converter) => converter.convert_back(ip),
                         };
 
-                        ListenerAddr { ip: new_ip, device }
-                    };
+                        let ListenerIpAddr { addr: ip_addr, identifier: _ } = &ip;
+                        // TODO(https://fxbug.dev/21198): Use the real
+                        // possibly-dual-stack addr.
+                        let bound_addr =
+                            ListenerAddr { ip: ip.clone(), device: old_device.clone() };
 
-                    *addr = new_addr;
-                    Ok(())
-                }
-                BoundSocketState::Connected { state, sharing: _ } => {
-                    let ConnState {
-                        socket,
-                        clear_device_on_disconnect,
-                        shutdown: _,
-                        addr,
-                        extra: _,
-                    } = match sync_ctx.dual_stack_context() {
-                        MaybeDualStack::DualStack(dual_stack) => {
-                            match dual_stack.converter().convert(state) {
-                                DualStackConnState::ThisStack(state) => state,
-                                DualStackConnState::OtherStack(state) => {
-                                    dual_stack.assert_dual_stack_enabled(state);
-                                    todo!(
+                        if !socket::can_device_change(
+                            ip_addr.as_ref().map(|a| a.as_ref()), /* local_ip */
+                            None,                                 /* remote_ip */
+                            old_device.as_ref(),
+                            new_device,
+                        ) {
+                            return Err(SocketError::Local(LocalAddressError::Zone(
+                                ZonedAddressError::DeviceZoneMismatch,
+                            )));
+                        }
+
+                        let new_addr =
+                            DatagramBoundStateContext::<I, _, _>::with_bound_sockets_mut(
+                                sync_ctx,
+                                |sync_ctx, bound, _allocator| {
+                                    let entry = bound
+                                        .listeners_mut()
+                                        .entry(
+                                            &S::make_bound_socket_map_id(id.clone()),
+                                            &bound_addr,
+                                        )
+                                        .unwrap_or_else(|| panic!("invalid listener ID {:?}", id));
+                                    let new_addr = ListenerAddr {
+                                        device: new_device.map(|d| sync_ctx.downgrade_device_id(d)),
+                                        ..bound_addr.clone()
+                                    };
+                                    let new_entry = entry.try_update_addr(new_addr).map_err(
+                                        |(ExistsError {}, _entry)| LocalAddressError::AddressInUse,
+                                    )?;
+                                    Ok::<_, LocalAddressError>(new_entry.get_addr().clone())
+                                },
+                            )?;
+
+                        let new_addr = {
+                            let ListenerAddr { device, ip } = new_addr;
+
+                            let new_ip = match sync_ctx.dual_stack_context().to_converter() {
+                                MaybeDualStack::DualStack(converter) => {
+                                    let ListenerIpAddr { addr, identifier } = ip;
+                                    converter.convert_back(DualStackListenerIpAddr::ThisStack(
+                                        ListenerIpAddr { addr, identifier },
+                                    ))
+                                }
+                                MaybeDualStack::NotDualStack(converter) => {
+                                    converter.convert_back(ip)
+                                }
+                            };
+
+                            ListenerAddr { ip: new_ip, device }
+                        };
+
+                        *addr = new_addr;
+                        Ok(())
+                    }
+                    BoundSocketStateType::Connected { state, sharing: _ } => {
+                        let ConnState {
+                            socket,
+                            clear_device_on_disconnect,
+                            shutdown: _,
+                            addr,
+                            extra: _,
+                        } = match sync_ctx.dual_stack_context() {
+                            MaybeDualStack::DualStack(dual_stack) => {
+                                match dual_stack.converter().convert(state) {
+                                    DualStackConnState::ThisStack(state) => state,
+                                    DualStackConnState::OtherStack(state) => {
+                                        dual_stack.assert_dual_stack_enabled(state);
+                                        todo!(
                                         "https://fxbug.dev/21198: Support dual-stack connected \
                                             set_device"
                                     );
+                                    }
                                 }
                             }
+                            MaybeDualStack::NotDualStack(not_dual_stack) => {
+                                not_dual_stack.converter().convert(state)
+                            }
+                        };
+                        let ConnAddr { device: old_device, ip } = addr;
+                        let ConnIpAddr { local: (local_ip, _), remote: (remote_ip, _) } = *ip;
+                        if !socket::can_device_change(
+                            Some(local_ip.as_ref()),
+                            Some(remote_ip.as_ref()),
+                            old_device.as_ref(),
+                            new_device,
+                        ) {
+                            return Err(SocketError::Local(LocalAddressError::Zone(
+                                ZonedAddressError::DeviceZoneMismatch,
+                            )));
                         }
-                        MaybeDualStack::NotDualStack(not_dual_stack) => {
-                            not_dual_stack.converter().convert(state)
+
+                        let (new_addr, mut new_socket) =
+                            DatagramBoundStateContext::<I, _, _>::with_bound_sockets_mut(
+                                sync_ctx,
+                                |sync_ctx, bound, _allocator| {
+                                    let new_socket = sync_ctx
+                                        .new_ip_socket(
+                                            ctx,
+                                            new_device.map(EitherDeviceId::Strong),
+                                            Some(local_ip),
+                                            remote_ip,
+                                            socket.proto(),
+                                            Default::default(),
+                                        )
+                                        .map_err(
+                                            |_: (IpSockCreationError, IpOptions<_, _, _>)| {
+                                                SocketError::Remote(RemoteAddressError::NoRoute)
+                                            },
+                                        )?;
+
+                                    let entry = bound
+                                        .conns_mut()
+                                        .entry(&S::make_bound_socket_map_id(id.clone()), addr)
+                                        .unwrap_or_else(|| panic!("invalid conn ID {:?}", id));
+                                    let new_addr = ConnAddr {
+                                        device: new_socket.device().cloned(),
+                                        ..addr.clone()
+                                    };
+
+                                    let entry = match entry.try_update_addr(new_addr) {
+                                        Err((ExistsError, _entry)) => {
+                                            return Err(SocketError::Local(
+                                                LocalAddressError::AddressInUse,
+                                            ))
+                                        }
+                                        Ok(entry) => entry,
+                                    };
+                                    Ok((entry.get_addr().clone(), new_socket))
+                                },
+                            )?;
+                        // Since the move was successful, replace the old socket with
+                        // the new one but move the options over.
+                        let _: IpOptions<_, _, _> =
+                            new_socket.replace_options(socket.take_options());
+                        *socket = new_socket;
+                        *addr = new_addr;
+
+                        // If this operation explicitly sets the device for the socket, it
+                        // should no longer be cleared on disconnect.
+                        if new_device.is_some() {
+                            *clear_device_on_disconnect = false;
                         }
-                    };
-                    let ConnAddr { device: old_device, ip } = addr;
-                    let ConnIpAddr { local: (local_ip, _), remote: (remote_ip, _) } = *ip;
-                    if !socket::can_device_change(
-                        Some(local_ip.as_ref()),
-                        Some(remote_ip.as_ref()),
-                        old_device.as_ref(),
-                        new_device,
-                    ) {
-                        return Err(SocketError::Local(LocalAddressError::Zone(
-                            ZonedAddressError::DeviceZoneMismatch,
-                        )));
+                        Ok(())
                     }
-
-                    let (new_addr, mut new_socket) =
-                        DatagramBoundStateContext::<I, _, _>::with_bound_sockets_mut(
-                            sync_ctx,
-                            |sync_ctx, bound, _allocator| {
-                                let new_socket = sync_ctx
-                                    .new_ip_socket(
-                                        ctx,
-                                        new_device.map(EitherDeviceId::Strong),
-                                        Some(local_ip),
-                                        remote_ip,
-                                        socket.proto(),
-                                        Default::default(),
-                                    )
-                                    .map_err(|_: (IpSockCreationError, IpOptions<_, _, _>)| {
-                                        SocketError::Remote(RemoteAddressError::NoRoute)
-                                    })?;
-
-                                let entry = bound
-                                    .conns_mut()
-                                    .entry(&S::make_bound_socket_map_id(id.clone()), addr)
-                                    .unwrap_or_else(|| panic!("invalid conn ID {:?}", id));
-                                let new_addr = ConnAddr {
-                                    device: new_socket.device().cloned(),
-                                    ..addr.clone()
-                                };
-
-                                let entry = match entry.try_update_addr(new_addr) {
-                                    Err((ExistsError, _entry)) => {
-                                        return Err(SocketError::Local(
-                                            LocalAddressError::AddressInUse,
-                                        ))
-                                    }
-                                    Ok(entry) => entry,
-                                };
-                                Ok((entry.get_addr().clone(), new_socket))
-                            },
-                        )?;
-                    // Since the move was successful, replace the old socket with
-                    // the new one but move the options over.
-                    let _: IpOptions<_, _, _> = new_socket.replace_options(socket.take_options());
-                    *socket = new_socket;
-                    *addr = new_addr;
-
-                    // If this operation explicitly sets the device for the socket, it
-                    // should no longer be cleared on disconnect.
-                    if new_device.is_some() {
-                        *clear_device_on_disconnect = false;
-                    }
-                    Ok(())
                 }
-            },
+            }
         }
     })
 }
@@ -4347,25 +4495,31 @@ pub(crate) fn get_options_device<
             let UnboundSocketState { ip_options, device, sharing: _ } = state;
             (ip_options, device)
         }
-        SocketState::Bound(BoundSocketState::Listener { state, sharing: _ }) => {
-            let ListenerState { ip_options, addr: ListenerAddr { device, ip: _ } } = state;
-            (ip_options, device)
-        }
-        SocketState::Bound(BoundSocketState::Connected { state, sharing: _ }) => {
-            match sync_ctx.dual_stack_context() {
-                MaybeDualStack::DualStack(dual_stack) => {
-                    match dual_stack.converter().convert(state) {
-                        DualStackConnState::ThisStack(state) => {
-                            get_options_device_from_conn_state(state)
+        SocketState::Bound(BoundSocketState { socket_type, original_bound_addr: _ }) => {
+            match socket_type {
+                BoundSocketStateType::Listener { state, sharing: _ } => {
+                    let ListenerState { ip_options, addr: ListenerAddr { device, ip: _ } } = state;
+                    (ip_options, device)
+                }
+                BoundSocketStateType::Connected { state, sharing: _ } => {
+                    match sync_ctx.dual_stack_context() {
+                        MaybeDualStack::DualStack(dual_stack) => {
+                            match dual_stack.converter().convert(state) {
+                                DualStackConnState::ThisStack(state) => {
+                                    get_options_device_from_conn_state(state)
+                                }
+                                DualStackConnState::OtherStack(state) => {
+                                    dual_stack.assert_dual_stack_enabled(state);
+                                    get_options_device_from_conn_state(state)
+                                }
+                            }
                         }
-                        DualStackConnState::OtherStack(state) => {
-                            dual_stack.assert_dual_stack_enabled(state);
-                            get_options_device_from_conn_state(state)
+                        MaybeDualStack::NotDualStack(not_dual_stack) => {
+                            get_options_device_from_conn_state(
+                                not_dual_stack.converter().convert(state),
+                            )
                         }
                     }
-                }
-                MaybeDualStack::NotDualStack(not_dual_stack) => {
-                    get_options_device_from_conn_state(not_dual_stack.converter().convert(state))
                 }
             }
         }
@@ -4385,23 +4539,27 @@ where
             let UnboundSocketState { ip_options, device: _, sharing: _ } = state;
             ip_options
         }
-        SocketState::Bound(BoundSocketState::Listener { state, sharing: _ }) => {
-            let ListenerState { ip_options, addr: _ } = state;
-            ip_options
-        }
-        SocketState::Bound(BoundSocketState::Connected { state, sharing: _ }) => {
-            match sync_ctx.dual_stack_context() {
-                MaybeDualStack::DualStack(dual_stack) => {
-                    match dual_stack.converter().convert(state) {
-                        DualStackConnState::ThisStack(state) => state.as_mut(),
-                        DualStackConnState::OtherStack(state) => {
-                            dual_stack.assert_dual_stack_enabled(state);
-                            state.as_mut()
+        SocketState::Bound(BoundSocketState { socket_type, original_bound_addr: _ }) => {
+            match socket_type {
+                BoundSocketStateType::Listener { state, sharing: _ } => {
+                    let ListenerState { ip_options, addr: _ } = state;
+                    ip_options
+                }
+                BoundSocketStateType::Connected { state, sharing: _ } => {
+                    match sync_ctx.dual_stack_context() {
+                        MaybeDualStack::DualStack(dual_stack) => {
+                            match dual_stack.converter().convert(state) {
+                                DualStackConnState::ThisStack(state) => state.as_mut(),
+                                DualStackConnState::OtherStack(state) => {
+                                    dual_stack.assert_dual_stack_enabled(state);
+                                    state.as_mut()
+                                }
+                            }
+                        }
+                        MaybeDualStack::NotDualStack(not_dual_stack) => {
+                            not_dual_stack.converter().convert(state).as_mut()
                         }
                     }
-                }
-                MaybeDualStack::NotDualStack(not_dual_stack) => {
-                    not_dual_stack.converter().convert(state).as_mut()
                 }
             }
         }
@@ -4526,10 +4684,12 @@ pub(crate) fn get_sharing<
                 let UnboundSocketState { device: _, sharing, ip_options: _ } = state;
                 sharing
             }
-            SocketState::Bound(state) => match state {
-                BoundSocketState::Listener { state: _, sharing } => sharing,
-                BoundSocketState::Connected { state: _, sharing } => sharing,
-            },
+            SocketState::Bound(BoundSocketState { socket_type, original_bound_addr: _ }) => {
+                match socket_type {
+                    BoundSocketStateType::Listener { state: _, sharing } => sharing,
+                    BoundSocketStateType::Connected { state: _, sharing } => sharing,
+                }
+            }
         }
         .clone()
     })
@@ -5696,8 +5856,12 @@ mod test {
                 SocketState::Unbound(UnboundSocketState { device: _, sharing, ip_options: _ }) => {
                     sharing
                 }
-                SocketState::Bound(BoundSocketState::Connected { state: _, sharing }) => sharing,
-                SocketState::Bound(BoundSocketState::Listener { state: _, sharing }) => sharing,
+                SocketState::Bound(BoundSocketState { socket_type, original_bound_addr: _ }) => {
+                    match socket_type {
+                        BoundSocketStateType::Connected { state: _, sharing } => sharing,
+                        BoundSocketStateType::Listener { state: _, sharing } => sharing,
+                    }
+                }
             };
             *sharing = Sharing::ConnectionConflicts { remote_port: NEW_REMOTE_PORT };
         });

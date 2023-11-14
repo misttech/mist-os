@@ -55,6 +55,7 @@ use crate::{
         },
         datagram::{
             self, AddrEntry, BoundSocketState as DatagramBoundSocketState,
+            BoundSocketStateType as DatagramBoundSocketStateType,
             BoundSockets as DatagramBoundSockets, ConnectError, DatagramBoundStateContext,
             DatagramFlowId, DatagramSocketMapSpec, DatagramSocketSpec, DatagramStateContext,
             DualStackConnState, DualStackDatagramBoundStateContext, DualStackIpExt,
@@ -1405,33 +1406,31 @@ fn try_deliver<
 ) -> bool {
     sync_ctx.with_sockets_state(|sync_ctx, state| {
         let should_deliver = match state.get_socket_state(&id).expect("socket ID is valid") {
-            DatagramSocketState::Bound(DatagramBoundSocketState::Connected {
-                state,
-                sharing: _,
-            }) => {
-                let state = match transport::udp::BoundStateContext::dual_stack_context(sync_ctx) {
-                    MaybeDualStack::DualStack(dual_stack) => {
-                        match dual_stack.converter().convert(state) {
-                            DualStackConnState::ThisStack(state) => state,
-                            DualStackConnState::OtherStack(state) => {
-                                dual_stack.assert_dual_stack_enabled(state);
-                                todo!(
-                                    "https://fxbug.dev/21198: Support dual-stack udp try_deliver"
-                                );
+            DatagramSocketState::Bound(
+                DatagramBoundSocketState{socket_type, original_bound_addr: _}
+            ) => match socket_type {
+                DatagramBoundSocketStateType::Connected { state, sharing: _ } => {
+                    let state = match transport::udp::BoundStateContext::dual_stack_context(sync_ctx) {
+                        MaybeDualStack::DualStack(dual_stack) => {
+                            match dual_stack.converter().convert(state) {
+                                DualStackConnState::ThisStack(state) => state,
+                                DualStackConnState::OtherStack(state) => {
+                                    dual_stack.assert_dual_stack_enabled(state);
+                                    todo!(
+                                        "https://fxbug.dev/21198: Support dual-stack udp try_deliver"
+                                    );
+                                }
                             }
                         }
-                    }
-                    MaybeDualStack::NotDualStack(not_dual_stack) => {
-                        not_dual_stack.converter().convert(state)
-                    }
-                };
-                state.should_receive()
+                        MaybeDualStack::NotDualStack(not_dual_stack) => {
+                            not_dual_stack.converter().convert(state)
+                        }
+                    };
+                    state.should_receive()
+                }
+                DatagramBoundSocketStateType::Listener { state: _, sharing: _ } => true,
             }
-            DatagramSocketState::Bound(DatagramBoundSocketState::Listener {
-                state: _,
-                sharing: _,
-            })
-            | DatagramSocketState::Unbound(_) => true,
+            DatagramSocketState::Unbound(_) => true,
         };
         if should_deliver {
             ctx.receive_udp(id, device, (dst_ip, dst_port), (src_ip, src_port), buffer);

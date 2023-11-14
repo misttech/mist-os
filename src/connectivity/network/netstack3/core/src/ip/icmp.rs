@@ -3661,39 +3661,43 @@ impl<I: datagram::IpExt, C: IcmpNonSyncCtx<I>, SC: StateContext<I, C> + IcmpStat
         self.with_sockets_state(|_sync_ctx, state| {
             match state.get(id.get_key_index()).expect("invalid socket ID") {
                 datagram::SocketState::Unbound(_) => SocketInfo::Unbound,
-                datagram::SocketState::Bound(datagram::BoundSocketState::Listener {
-                    state,
-                    sharing: _,
-                }) => {
-                    let datagram::ListenerState {
-                        addr: ListenerAddr { ip: ListenerIpAddr { addr, identifier }, device },
-                        ip_options: _,
-                    } = state;
-                    SocketInfo::Bound {
-                        local_ip: addr.map(Into::into),
-                        id: *identifier,
-                        device: device.clone(),
+                datagram::SocketState::Bound(
+                    datagram::BoundSocketState{socket_type, original_bound_addr: _}
+                ) => match socket_type {
+                    datagram::BoundSocketStateType::Listener {
+                        state,
+                        sharing: _,
+                    } => {
+                        let datagram::ListenerState {
+                            addr: ListenerAddr { ip: ListenerIpAddr { addr, identifier }, device },
+                            ip_options: _,
+                        } = state;
+                        SocketInfo::Bound {
+                            local_ip: addr.map(Into::into),
+                            id: *identifier,
+                            device: device.clone(),
+                        }
                     }
-                }
-                datagram::SocketState::Bound(datagram::BoundSocketState::Connected {
-                    state,
-                    sharing: _,
-                }) => {
-                    let datagram::ConnState {
-                        addr:
-                            ConnAddr {
-                                ip: ConnIpAddr { local: (local_ip, id), remote: (remote_ip, ()) },
-                                device,
-                            },
-                        extra: remote_id,
-                        ..
-                    } = state;
-                    SocketInfo::Connected {
-                        remote_ip: (*remote_ip).into(),
-                        local_ip: (*local_ip).into(),
-                        id: *id,
-                        device: device.clone(),
-                        remote_id: *remote_id,
+                    datagram::BoundSocketStateType::Connected {
+                        state,
+                        sharing: _,
+                    } => {
+                        let datagram::ConnState {
+                            addr:
+                                ConnAddr {
+                                    ip: ConnIpAddr { local: (local_ip, id), remote: (remote_ip, ()) },
+                                    device,
+                                },
+                            extra: remote_id,
+                            ..
+                        } = state;
+                        SocketInfo::Connected {
+                            remote_ip: (*remote_ip).into(),
+                            local_ip: (*local_ip).into(),
+                            id: *id,
+                            device: device.clone(),
+                            remote_id: *remote_id,
+                        }
                     }
                 }
             }

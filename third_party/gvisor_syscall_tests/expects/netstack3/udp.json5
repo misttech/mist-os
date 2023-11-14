@@ -49,11 +49,11 @@
                 // TODO(https://fxbug.dev/136207): Handle connecting to port 0 correctly.
                 "AllInetTests/UdpSocketTest.ConnectToZeroPortConnected/*",
 
-                // Comment to keep this block separated from the above one.
-                "AllInetTests/UdpSocketTest.DisconnectAfterBindToAny/*",
+                // Fails because ZXIO disallows binding to an address with
+                // family `AF_UNSPEC`.
                 "AllInetTests/UdpSocketTest.DisconnectAfterBindToUnspecAndConnect/*",
-                "AllInetTests/UdpSocketTest.DisconnectAfterConnectAnyWithPort/*",
-                "AllInetTests/UdpSocketTest.DisconnectAfterConnectWithoutBind/*",
+
+                // Comment to keep this block separated from the above one.
                 "AllInetTests/UdpSocketTest.FIONREADShutdown/*",
                 "AllInetTests/UdpSocketTest.FIONREADWriteShutdown/*",
                 "AllInetTests/UdpSocketTest.FIONREADZeroLengthPacket/*",
