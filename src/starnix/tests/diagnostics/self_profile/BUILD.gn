@@ -14,9 +14,11 @@ group("self_profile") {
   # These tests assert on the relative timing of operations which are difficult to predict outside
   # of non-instrumented release builds. Losing coverage there is acceptable because profiling data
   # is not likely to be relevant in those contexts.
-  if (!is_debug && !is_asan) {
-    deps += [ ":starnix_self_profile_test" ]
-  }
+  #
+  # fxbug.dev/136276: This test is flaky on other bots too.
+  # if (!is_debug && !is_asan) {
+  #  deps += [ ":starnix_self_profile_test" ]
+  #}
 }
 
 rustc_binary("bin") {
