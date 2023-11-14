@@ -132,7 +132,8 @@ Prior to building a custom Rust toolchain for Fuchsia, you need to do the follow
 
    # Copy and paste the following subshell to build and install Rust, as needed.
    # The subshell avoids polluting your environment with fuchsia-specific rust settings.
-   ( source fuchsia-env.sh && ./x.py install --config fuchsia-config.toml ) && \
+   ( source fuchsia-env.sh && ./x.py install --config fuchsia-config.toml \
+     --skip-stage0-validation ) && \
    rm -rf install/fuchsia-rust/lib/.build-id && \
    $DEV_ROOT/infra/fuchsia/prebuilt/tools/vpython3 \
      $DEV_ROOT/infra/fuchsia/recipes/recipes/rust_toolchain.resources/generate_config.py \
@@ -152,7 +153,8 @@ If you want to skip the install step, for instance during development of Rust
 itself, you can do so with the following command.
 
 ```posix-terminal
-( source fuchsia-env.sh && ./x.py build --config fuchsia-config.toml )
+( source fuchsia-env.sh && ./x.py build --config fuchsia-config.toml \
+  --skip-stage0-validation )
 ```
 
 ### Troubleshooting
