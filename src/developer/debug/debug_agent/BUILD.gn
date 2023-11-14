@@ -157,6 +157,11 @@ static_library("lib") {
     } else {
       assert(false, "Un-supported CPU: ${current_cpu}")
     }
+  } else if (is_linux) {
+    sources += [
+      "linux_utils.cc",
+      "linux_utils.h",
+    ]
   }
 
   # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
@@ -325,6 +330,8 @@ test("unit_tests") {
       "//src/developer/debug/ipc:tests",
       "//src/developer/debug/shared:tests",
     ]
+  } else if (is_linux) {
+    sources += [ "linux_utils_unittest.cc" ]
   }
 
   # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
