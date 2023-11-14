@@ -503,15 +503,15 @@ impl EssSa {
                 if let Role::Authenticator = self.role {
                     for update in &updates {
                         if let SecAssocUpdate::TxEapolKeyFrame { frame, .. } = update {
-                            let krc =
+                            let key_replay_counter =
                                 frame.keyframe().key_frame_fields.key_replay_counter.to_native();
 
-                            if krc <= self.key_replay_counter {
+                            if key_replay_counter <= self.key_replay_counter {
                                 error!("tx EAPOL Key frame uses invalid key replay counter: {:?} ({:?})",
-                                       krc,
+                                       key_replay_counter,
                                           self.key_replay_counter);
                             }
-                            self.key_replay_counter = krc;
+                            self.key_replay_counter = key_replay_counter;
                         }
                     }
                 }

@@ -678,14 +678,14 @@ pub struct FourwayTestEnv {
 pub fn send_msg_to_fourway<B: ByteSlice + std::fmt::Debug>(
     fourway: &mut Fourway,
     msg: eapol::KeyFrameRx<B>,
-    krc: u64,
+    key_replay_counter: u64,
     protection: &NegotiatedProtection,
 ) -> UpdateSink {
     let role = match &fourway {
         Fourway::Authenticator(_) => Role::Authenticator,
         Fourway::Supplicant(_) => Role::Supplicant,
     };
-    let verified_msg = make_verified(msg, role, krc, &protection);
+    let verified_msg = make_verified(msg, role, key_replay_counter, &protection);
 
     let mut update_sink = UpdateSink::default();
     let result = fourway.on_eapol_key_frame(&mut update_sink, 0, verified_msg);
@@ -701,10 +701,10 @@ impl FourwayTestEnv {
         }
     }
 
-    pub fn initiate<'a>(&mut self, krc: u64) -> eapol::KeyFrameBuf {
+    pub fn initiate<'a>(&mut self, key_replay_counter: u64) -> eapol::KeyFrameBuf {
         // Initiate 4-Way Handshake. The Authenticator will send message #1 of the handshake.
         let mut a_update_sink = vec![];
-        let result = self.authenticator.initiate(&mut a_update_sink, krc);
+        let result = self.authenticator.initiate(&mut a_update_sink, key_replay_counter);
         assert!(result.is_ok(), "Authenticator failed initiating: {}", result.unwrap_err());
         assert_eq!(a_update_sink.len(), 1);
 
@@ -715,13 +715,17 @@ impl FourwayTestEnv {
     pub fn send_msg1_to_supplicant<'a, B: ByteSlice + std::fmt::Debug>(
         &mut self,
         msg1: eapol::KeyFrameRx<B>,
-        krc: u64,
+        key_replay_counter: u64,
     ) -> (eapol::KeyFrameBuf, Ptk) {
         let anonce = msg1.key_frame_fields.key_nonce;
 
         // Send message #1 to Supplicant and extract responses.
-        let s_update_sink =
-            send_msg_to_fourway(&mut self.supplicant, msg1, krc, &get_rsne_protection());
+        let s_update_sink = send_msg_to_fourway(
+            &mut self.supplicant,
+            msg1,
+            key_replay_counter,
+            &get_rsne_protection(),
+        );
         let msg2 = expect_eapol_resp(&s_update_sink[..]);
         let keyframe = msg2.keyframe();
         let ptk = get_ptk(&anonce[..], &keyframe.key_frame_fields.key_nonce[..]);
@@ -732,9 +736,10 @@ impl FourwayTestEnv {
     pub fn send_msg1_to_supplicant_expect_err<B: ByteSlice + std::fmt::Debug>(
         &mut self,
         msg1: eapol::KeyFrameRx<B>,
-        krc: u64,
+        key_replay_counter: u64,
     ) {
-        let verified_msg1 = make_verified(msg1, Role::Supplicant, krc, &get_rsne_protection());
+        let verified_msg1 =
+            make_verified(msg1, Role::Supplicant, key_replay_counter, &get_rsne_protection());
 
         // Send message #1 to Supplicant and extract responses.
         let mut s_update_sink = vec![];
@@ -745,16 +750,23 @@ impl FourwayTestEnv {
     pub fn send_msg2_to_authenticator<'a, B: ByteSlice + std::fmt::Debug>(
         &mut self,
         msg2: eapol::KeyFrameRx<B>,
-        expected_krc: u64,
-        next_krc: u64,
+        expected_key_replay_counter: u64,
+        next_key_replay_counter: u64,
     ) -> eapol::KeyFrameBuf {
-        let verified_msg2 =
-            make_verified(msg2, Role::Authenticator, expected_krc, &get_rsne_protection());
+        let verified_msg2 = make_verified(
+            msg2,
+            Role::Authenticator,
+            expected_key_replay_counter,
+            &get_rsne_protection(),
+        );
 
         // Send message #2 to Authenticator and extract responses.
         let mut a_update_sink = vec![];
-        let result =
-            self.authenticator.on_eapol_key_frame(&mut a_update_sink, next_krc, verified_msg2);
+        let result = self.authenticator.on_eapol_key_frame(
+            &mut a_update_sink,
+            next_key_replay_counter,
+            verified_msg2,
+        );
         assert!(result.is_ok(), "Authenticator failed processing msg #2: {}", result.unwrap_err());
         expect_eapol_resp(&a_update_sink[..])
     }
@@ -762,11 +774,15 @@ impl FourwayTestEnv {
     pub fn send_msg3_to_supplicant<'a, B: ByteSlice + std::fmt::Debug>(
         &mut self,
         msg3: eapol::KeyFrameRx<B>,
-        krc: u64,
+        key_replay_counter: u64,
     ) -> (eapol::KeyFrameBuf, Ptk, Gtk) {
         // Send message #3 to Supplicant and extract responses.
-        let s_update_sink =
-            send_msg_to_fourway(&mut self.supplicant, msg3, krc, &get_rsne_protection());
+        let s_update_sink = send_msg_to_fourway(
+            &mut self.supplicant,
+            msg3,
+            key_replay_counter,
+            &get_rsne_protection(),
+        );
         let msg4 = expect_eapol_resp(&s_update_sink[..]);
         let s_ptk = expect_reported_ptk(&s_update_sink[..]);
         let s_gtk = expect_reported_gtk(&s_update_sink[..]);
@@ -777,10 +793,11 @@ impl FourwayTestEnv {
     pub fn send_msg3_to_supplicant_capture_updates<B: ByteSlice + std::fmt::Debug>(
         &mut self,
         msg3: eapol::KeyFrameRx<B>,
-        krc: u64,
+        key_replay_counter: u64,
         mut update_sink: &mut UpdateSink,
     ) {
-        let verified_msg3 = make_verified(msg3, Role::Supplicant, krc, &get_rsne_protection());
+        let verified_msg3 =
+            make_verified(msg3, Role::Supplicant, key_replay_counter, &get_rsne_protection());
 
         // Send message #3 to Supplicant and extract responses.
         let result = self.supplicant.on_eapol_key_frame(&mut update_sink, 0, verified_msg3);
@@ -790,9 +807,10 @@ impl FourwayTestEnv {
     pub fn send_msg3_to_supplicant_expect_err<B: ByteSlice + std::fmt::Debug>(
         &mut self,
         msg3: eapol::KeyFrameRx<B>,
-        krc: u64,
+        key_replay_counter: u64,
     ) {
-        let verified_msg3 = make_verified(msg3, Role::Supplicant, krc, &get_rsne_protection());
+        let verified_msg3 =
+            make_verified(msg3, Role::Supplicant, key_replay_counter, &get_rsne_protection());
 
         // Send message #3 to Supplicant and extract responses.
         let mut s_update_sink = vec![];
@@ -803,13 +821,13 @@ impl FourwayTestEnv {
     pub fn send_msg4_to_authenticator<B: ByteSlice + std::fmt::Debug>(
         &mut self,
         msg4: eapol::KeyFrameRx<B>,
-        expected_krc: u64,
+        key_replay_counter: u64,
     ) -> (Ptk, Gtk) {
         // Send message #4 to Authenticator and extract responses.
         let a_update_sink = send_msg_to_fourway(
             &mut self.authenticator,
             msg4,
-            expected_krc,
+            key_replay_counter,
             &get_rsne_protection(),
         );
         let a_ptk = expect_reported_ptk(&a_update_sink[..]);
