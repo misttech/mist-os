@@ -132,7 +132,10 @@ class Device : public ddk::Device<Device, ddk::Unbindable>,
 
   bool device_online_ = false;
   // The FIDL Client to communicate with WlanIf device
-  fdf::WireSyncClient<fuchsia_wlan_fullmac::WlanFullmacImpl> client_;
+  fdf::WireSharedClient<fuchsia_wlan_fullmac::WlanFullmacImpl> client_;
+
+  // Dispatcher for making requests to the vendor driver over WlanFullmacImpl.
+  fdf::Dispatcher client_dispatcher_;
 
   // Dispatcher for being a FIDL server firing replies to WlanIf device
   fdf::Dispatcher server_dispatcher_;

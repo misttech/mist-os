@@ -39,22 +39,33 @@ namespace wlan_stats = ::fuchsia::wlan::stats;
 Device::Device(zx_device_t* device) : ddk::Device<Device, ddk::Unbindable>(device) {
   ltrace_fn();
 
-  // Create a dispatcher to wait on the runtime channel
-  auto dispatcher =
-      fdf::SynchronizedDispatcher::Create(fdf::SynchronizedDispatcher::Options::kAllowSyncCalls,
-                                          "wlan_fullmac_ifc_server", [&](fdf_dispatcher_t*) {
-                                            if (unbind_txn_) {
-                                              unbind_txn_->Reply();
-                                              unbind_txn_.reset();
-                                            }
-                                          });
+  {
+    // Create a dispatcher to wait on the runtime channel
+    auto dispatcher = fdf::SynchronizedDispatcher::Create(
+        fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "wlan_fullmac_ifc_server",
+        [&](fdf_dispatcher_t*) { client_dispatcher_.ShutdownAsync(); });
 
-  if (dispatcher.is_error()) {
-    lerror("Creating server dispatcher error : %s\n",
-           zx_status_get_string(dispatcher.status_value()));
+    ZX_ASSERT_MSG(!dispatcher.is_error(), "Creating server dispatcher error : %s",
+                  zx_status_get_string(dispatcher.status_value()));
+
+    server_dispatcher_ = *std::move(dispatcher);
   }
+  {
+    // This dispatcher is used to make requests to the vendor driver over WlanFullmacImpl on the
+    // driver transport.
+    auto dispatcher =
+        fdf::SynchronizedDispatcher::Create(fdf::SynchronizedDispatcher::Options::kAllowSyncCalls,
+                                            "wlan_fullmac_impl_client", [&](fdf_dispatcher_t*) {
+                                              if (unbind_txn_) {
+                                                unbind_txn_->Reply();
+                                                unbind_txn_.reset();
+                                              }
+                                            });
+    ZX_ASSERT_MSG(!dispatcher.is_error(), "Creating client dispatcher error : %s",
+                  zx_status_get_string(dispatcher.status_value()));
 
-  server_dispatcher_ = *std::move(dispatcher);
+    client_dispatcher_ = *std::move(dispatcher);
+  }
 
   // Establish the connection among histogram data lists, assuming each histogram list only contains
   // one histogram for now, will assert it in GetIfaceHistogramStats();
@@ -67,24 +78,38 @@ Device::Device(zx_device_t* device) : ddk::Device<Device, ddk::Unbindable>(devic
 // Reserve this version of constructor for testing purpose.
 Device::Device(zx_device_t* device, fdf::ClientEnd<fuchsia_wlan_fullmac::WlanFullmacImpl> client)
     : ddk::Device<Device, ddk::Unbindable>(device) {
-  // Create a dispatcher to wait on the runtime channel
-  auto dispatcher = fdf::SynchronizedDispatcher::Create(
-      fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "wlan_fullmac_ifc_server",
-      [&](fdf_dispatcher_t*) {
-        if (unbind_txn_) {
-          unbind_txn_->Reply();
-        } else {
-          lerror("No unbind_txn_ found, this should never happen.");
-        }
-      });
+  {
+    // Create a dispatcher to wait on the runtime channel
+    auto dispatcher = fdf::SynchronizedDispatcher::Create(
+        fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "wlan_fullmac_ifc_server",
+        [&](fdf_dispatcher_t*) { client_dispatcher_.ShutdownAsync(); });
 
-  if (dispatcher.is_error()) {
-    lerror("Creating server dispatcher error : %s\n",
-           zx_status_get_string(dispatcher.status_value()));
+    ZX_ASSERT_MSG(!dispatcher.is_error(), "Creating server dispatcher error : %s",
+                  zx_status_get_string(dispatcher.status_value()));
+
+    server_dispatcher_ = *std::move(dispatcher);
+  }
+  {
+    // This dispatcher is used to make requests to the vendor driver over WlanFullmacImpl on the
+    // driver transport.
+    auto dispatcher = fdf::SynchronizedDispatcher::Create(
+        fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "wlan_fullmac_impl_client",
+        [&](fdf_dispatcher_t*) {
+          if (unbind_txn_) {
+            unbind_txn_->Reply();
+          } else {
+            lerror("No unbind_txn_ found, this should never happen.");
+          }
+        });
+
+    ZX_ASSERT_MSG(!dispatcher.is_error(), "Creating client dispatcher error : %s",
+                  zx_status_get_string(dispatcher.status_value()));
+
+    client_dispatcher_ = *std::move(dispatcher);
   }
 
-  server_dispatcher_ = *std::move(dispatcher);
-  client_ = fdf::WireSyncClient<fuchsia_wlan_fullmac::WlanFullmacImpl>(std::move(client));
+  client_ = fdf::WireSharedClient<fuchsia_wlan_fullmac::WlanFullmacImpl>(std::move(client),
+                                                                         client_dispatcher_.get());
 
   // Establish the connection among histogram data lists, assuming each histogram list only contains
   // one histogram for now, will assert it in GetIfaceHistogramStats();
@@ -118,7 +143,7 @@ zx_status_t Device::Bind() {
     return ZX_ERR_INTERNAL;
   }
 
-  auto mac_sublayer_result = client_.buffer(*mac_sublayer_arena)->QueryMacSublayerSupport();
+  auto mac_sublayer_result = client_.sync().buffer(*mac_sublayer_arena)->QueryMacSublayerSupport();
 
   if (!mac_sublayer_result.ok()) {
     lerror("QueryMacSublayerSupport failed  FIDL error: %s", mac_sublayer_result.status_string());
@@ -153,7 +178,8 @@ zx_status_t Device::ConnectToWlanFullmacImpl() {
     lerror("DDdkConnectRuntimeProtocol failed: %s", client_end.status_string());
     return client_end.status_value();
   }
-  client_ = fdf::WireSyncClient(*std::move(client_end));
+
+  client_ = fdf::WireSharedClient(*std::move(client_end), client_dispatcher_.get());
   return ZX_OK;
 }
 
@@ -163,6 +189,11 @@ void Device::DdkUnbind(::ddk::UnbindTxn txn) {
   if (mlme_) {
     mlme_->StopMainLoop();
   }
+
+  // Rather than shutting down both the server and client dispatchers at the same time here, we
+  // chain them. When the server dispatcher is fully shutdown, it calls
+  // client_dispatcher_.ShutdownAsync() in its shutdown callback. We do this so that we can can
+  // reply to unbind_txn_ after both dispatchers are fully shut down.
   server_dispatcher_.ShutdownAsync();
 }
 
@@ -216,7 +247,7 @@ zx_status_t Device::Start(const rust_wlan_fullmac_ifc_protocol_copy_t* ifc,
 
   fdf::BindServer(server_dispatcher_.get(), std::move(endpoints->server), this);
 
-  auto start_result = client_.buffer(*arena)->Start(std::move(endpoints->client));
+  auto start_result = client_.sync().buffer(*arena)->Start(std::move(endpoints->client));
 
   if (!start_result.ok()) {
     lerror("Start failed, FIDL error: %s", start_result.status_string());
@@ -241,7 +272,7 @@ void Device::StartScan(const wlan_fullmac_impl_start_scan_request_t* req) {
   fuchsia_wlan_fullmac::wire::WlanFullmacImplStartScanRequest scan_req;
   ConvertScanReq(*req, &scan_req, *arena);
 
-  auto result = client_.buffer(*arena)->StartScan(scan_req);
+  auto result = client_.sync().buffer(*arena)->StartScan(scan_req);
 
   if (!result.ok()) {
     lerror("StartScan failed, FIDL error: %s", result.status_string());
@@ -260,7 +291,7 @@ void Device::Connect(const wlan_fullmac_impl_connect_request_t* req) {
   fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectRequest connect_req;
   ConvertConnectReq(*req, &connect_req, *arena);
 
-  auto result = client_.buffer(*arena)->Connect(connect_req);
+  auto result = client_.sync().buffer(*arena)->Connect(connect_req);
 
   if (!result.ok()) {
     lerror("ConnectReq failed FIDL error: %s", result.status_string());
@@ -280,7 +311,7 @@ void Device::Reconnect(const wlan_fullmac_impl_reconnect_request_t* req) {
   std::memcpy(peer_sta_address.data(), req->peer_sta_address, ETH_ALEN);
   builder.peer_sta_address(peer_sta_address);
 
-  auto result = client_.buffer(*arena)->Reconnect(builder.Build());
+  auto result = client_.sync().buffer(*arena)->Reconnect(builder.Build());
 
   if (!result.ok()) {
     lerror("ReconnectReq failed FIDL error: %s", result.status_string());
@@ -304,7 +335,7 @@ void Device::AuthenticateResp(const wlan_fullmac_impl_auth_resp_request_t* resp)
   // result_code
   builder.result_code(ConvertAuthResult(resp->result_code));
 
-  auto result = client_.buffer(*arena)->AuthResp(builder.Build());
+  auto result = client_.sync().buffer(*arena)->AuthResp(builder.Build());
 
   if (!result.ok()) {
     lerror("AuthResp failed FIDL error: %s", result.status_string());
@@ -326,7 +357,7 @@ void Device::Deauthenticate(const wlan_fullmac_impl_deauth_request_t* req) {
   builder.peer_sta_address(peer_sta_address);
   builder.reason_code(fuchsia_wlan_ieee80211::ReasonCode(req->reason_code));
 
-  auto result = client_.buffer(*arena)->Deauth(builder.Build());
+  auto result = client_.sync().buffer(*arena)->Deauth(builder.Build());
 
   if (!result.ok()) {
     lerror("DeauthReq failed FIDL error: %s", result.status_string());
@@ -347,7 +378,7 @@ void Device::AssociateResp(const wlan_fullmac_impl_assoc_resp_request_t* resp) {
   builder.result_code(ConvertAssocResult(resp->result_code));
   builder.association_id(resp->association_id);
 
-  auto result = client_.buffer(*arena)->AssocResp(builder.Build());
+  auto result = client_.sync().buffer(*arena)->AssocResp(builder.Build());
 
   if (!result.ok()) {
     lerror("AssocResp failed FIDL error: %s", result.status_string());
@@ -369,7 +400,7 @@ void Device::Disassociate(const wlan_fullmac_impl_disassoc_request_t* req) {
   builder.peer_sta_address(peer_sta_address);
   builder.reason_code(static_cast<fuchsia_wlan_ieee80211::wire::ReasonCode>(req->reason_code));
 
-  auto result = client_.buffer(*arena)->Disassoc(builder.Build());
+  auto result = client_.sync().buffer(*arena)->Disassoc(builder.Build());
 
   if (!result.ok()) {
     lerror("DisassocReq failed FIDL error: %s", result.status_string());
@@ -392,7 +423,7 @@ void Device::Reset(const wlan_fullmac_impl_reset_request_t* req) {
   builder.sta_address(sta_address);
   builder.set_default_mib(req->set_default_mib);
 
-  auto result = client_.buffer(*arena)->Reset(builder.Build());
+  auto result = client_.sync().buffer(*arena)->Reset(builder.Build());
   if (!result.ok()) {
     lerror("ResetReq failed FIDL error: %s", result.status_string());
     return;
@@ -421,7 +452,7 @@ void Device::StartBss(const wlan_fullmac_impl_start_bss_request_t* req) {
       std::vector<uint8_t>(req->vendor_ie_list, req->vendor_ie_list + req->vendor_ie_count);
   builder.vendor_ie(fidl::VectorView<uint8_t>(*arena, vendor_ie));
 
-  auto result = client_.buffer(*arena)->StartBss(builder.Build());
+  auto result = client_.sync().buffer(*arena)->StartBss(builder.Build());
 
   if (!result.ok()) {
     lerror("StartBss failed FIDL error: %s", result.status_string());
@@ -440,7 +471,7 @@ void Device::StopBss(const wlan_fullmac_impl_stop_bss_request_t* req) {
   ConvertCSsid(req->ssid, &ssid);
   builder.ssid(ssid);
 
-  auto result = client_.buffer(*arena)->StopBss(builder.Build());
+  auto result = client_.sync().buffer(*arena)->StopBss(builder.Build());
 
   if (!result.ok()) {
     lerror("StopBss failed FIDL error: %s", result.status_string());
@@ -475,7 +506,7 @@ void Device::SetKeysReq(const wlan_fullmac_set_keys_req_t* req,
     set_keys_req.keylist[desc_ndx] = ConvertWlanKeyConfig(req->keylist[desc_ndx], *arena);
   }
 
-  auto result = client_.buffer(*arena)->SetKeysReq(set_keys_req);
+  auto result = client_.sync().buffer(*arena)->SetKeysReq(set_keys_req);
 
   if (!result.ok()) {
     lerror("SetKeyReq failed FIDL error: %s", result.status_string());
@@ -516,7 +547,7 @@ void Device::DeleteKeysReq(const wlan_fullmac_del_keys_req_t* req) {
       return;
     }
 
-    auto result = client_.buffer(*arena)->DelKeysReq(delete_key_req);
+    auto result = client_.sync().buffer(*arena)->DelKeysReq(delete_key_req);
 
     if (!result.ok()) {
       lerror("DelKeysReq failed FIDL error: %s", result.status_string());
@@ -546,7 +577,7 @@ void Device::EapolTx(const wlan_fullmac_impl_eapol_tx_request_t* req) {
                        .data(data)
                        .Build();
 
-  auto result = client_.buffer(*arena)->EapolTx(eapol_req);
+  auto result = client_.sync().buffer(*arena)->EapolTx(eapol_req);
 
   if (!result.ok()) {
     lerror("EapolTx failed FIDL error: %s", result.status_string());
@@ -561,7 +592,7 @@ void Device::QueryDeviceInfo(wlan_fullmac_query_info_t* out_resp) {
     return;
   }
 
-  auto result = client_.buffer(*arena)->Query();
+  auto result = client_.sync().buffer(*arena)->Query();
 
   if (!result.ok()) {
     lerror("Query failed FIDL error: %s", result.status_string());
@@ -583,7 +614,7 @@ void Device::QueryMacSublayerSupport(mac_sublayer_support_t* out_resp) {
     return;
   }
 
-  auto result = client_.buffer(*arena)->QueryMacSublayerSupport();
+  auto result = client_.sync().buffer(*arena)->QueryMacSublayerSupport();
 
   if (!result.ok()) {
     lerror("Query failed FIDL error: %s", result.status_string());
@@ -604,7 +635,7 @@ void Device::QuerySecuritySupport(security_support_t* out_resp) {
     return;
   }
 
-  auto result = client_.buffer(*arena)->QuerySecuritySupport();
+  auto result = client_.sync().buffer(*arena)->QuerySecuritySupport();
 
   if (!result.ok()) {
     lerror("QuerySecuritySupport failed FIDL error: %s", result.status_string());
@@ -626,7 +657,7 @@ void Device::QuerySpectrumManagementSupport(spectrum_management_support_t* out_r
     return;
   }
 
-  auto result = client_.buffer(*arena)->QuerySpectrumManagementSupport();
+  auto result = client_.sync().buffer(*arena)->QuerySpectrumManagementSupport();
 
   if (!result.ok()) {
     lerror("QuerySpectrumManagementSupport failed FIDL error: %s", result.status_string());
@@ -649,7 +680,7 @@ zx_status_t Device::GetIfaceCounterStats(wlan_fullmac_iface_counter_stats_t* out
     return arena.status_value();
   }
 
-  auto result = client_.buffer(*arena)->GetIfaceCounterStats();
+  auto result = client_.sync().buffer(*arena)->GetIfaceCounterStats();
 
   if (!result.ok()) {
     lerror("GetIfaceCounterStats failed FIDL error: %s", result.status_string());
@@ -673,7 +704,7 @@ zx_status_t Device::GetIfaceHistogramStats(wlan_fullmac_iface_histogram_stats_t*
     return arena.status_value();
   }
 
-  auto result = client_.buffer(*arena)->GetIfaceHistogramStats();
+  auto result = client_.sync().buffer(*arena)->GetIfaceHistogramStats();
 
   if (!result.ok()) {
     lerror("GetIfaceHistogramStats failed FIDL error: %s", result.status_string());
@@ -720,7 +751,7 @@ void Device::OnLinkStateChanged(bool online) {
   // TODO(fxbug.dev/51009): Let SME handle these changes.
   if (online != device_online_) {
     device_online_ = online;
-    auto result = client_.buffer(*arena)->OnLinkStateChanged(online);
+    auto result = client_.sync().buffer(*arena)->OnLinkStateChanged(online);
 
     if (!result.ok()) {
       lerror("OnLinkStateChanged failed FIDL error: %s", result.status_string());
@@ -740,7 +771,7 @@ void Device::SaeHandshakeResp(const wlan_fullmac_sae_handshake_resp_t* resp) {
     return;
   }
 
-  auto result = client_.buffer(*arena)->SaeHandshakeResp(handshake_resp);
+  auto result = client_.sync().buffer(*arena)->SaeHandshakeResp(handshake_resp);
 
   if (!result.ok()) {
     lerror("SaeHandshakeResp failed FIDL error: %s", result.status_string());
@@ -758,7 +789,7 @@ void Device::SaeFrameTx(const wlan_fullmac_sae_frame_t* frame) {
 
   ConvertSaeFrame(*frame, &sae_frame, *arena);
 
-  auto result = client_.buffer(*arena)->SaeFrameTx(sae_frame);
+  auto result = client_.sync().buffer(*arena)->SaeFrameTx(sae_frame);
 
   if (!result.ok()) {
     lerror("SaeFrameTx failed FIDL error: %s", result.status_string());
@@ -773,7 +804,7 @@ void Device::WmmStatusReq() {
     return;
   }
 
-  auto result = client_.buffer(*arena)->WmmStatusReq();
+  auto result = client_.sync().buffer(*arena)->WmmStatusReq();
 
   if (!result.ok()) {
     lerror("WmmStatusReq failed FIDL error: %s", result.status_string());
