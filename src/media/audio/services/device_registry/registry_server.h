@@ -15,7 +15,6 @@
 
 #include "src/media/audio/services/common/base_fidl_server.h"
 #include "src/media/audio/services/device_registry/device.h"
-#include "src/media/audio/services/device_registry/logging.h"
 
 namespace media_audio {
 

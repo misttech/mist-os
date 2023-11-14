@@ -10,9 +10,10 @@
 
 #include "src/media/audio/services/common/fidl_thread.h"
 #include "src/media/audio/services/device_registry/audio_device_registry.h"
+#include "src/media/audio/services/device_registry/logging.h"
 
 int main(int argc, const char** argv) {
-  FX_LOGS(INFO) << "AudioDeviceRegistry is starting up";
+  ADR_LOG(media_audio::kLogMain) << "AudioDeviceRegistry is starting up";
 
   // Create a loop, and use it to create our AudioDeviceRegistry singleton...
   auto loop = std::make_shared<async::Loop>(&kAsyncLoopConfigAttachToCurrentThread);
@@ -34,6 +35,6 @@ int main(int argc, const char** argv) {
   // ...then run our loop here in main(), so AudioDeviceRegistry doesn't have to deal with it.
   loop->Run();
 
-  FX_LOGS(INFO) << "Exiting AudioDeviceRegistry main()";
+  ADR_LOG(media_audio::kLogMain) << "Exiting AudioDeviceRegistry main()";
   return 0;
 }

@@ -29,10 +29,12 @@ namespace media_audio {
 
 #define ADR_WARN_OBJECT() FX_LOGS(WARNING) << kClassName << "(" << this << ")::" << __func__ << ": "
 
+inline constexpr bool kLogMain = true;
+
 inline constexpr bool kLogDeviceDetection = false;
 inline constexpr bool kLogDeviceInitializationProgress = false;
 inline constexpr bool kLogAudioDeviceRegistryMethods = false;
-inline constexpr bool kLogSummaryFinalDeviceInfoOnly = true;
+inline constexpr bool kLogSummaryFinalDeviceInfo = true;
 inline constexpr bool kLogDetailedFinalDeviceInfo = false;
 
 inline constexpr bool kLogDeviceMethods = false;

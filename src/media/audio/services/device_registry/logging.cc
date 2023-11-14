@@ -225,7 +225,7 @@ void LogPlugState(const fuchsia_hardware_audio::PlugState& plug_state) {
 }
 
 void LogDeviceInfo(const fuchsia_audio_device::Info& device_info) {
-  if constexpr (kLogSummaryFinalDeviceInfoOnly) {
+  if constexpr (kLogSummaryFinalDeviceInfo) {
     FX_LOGS(INFO) << "Detected " << device_info.device_type() << " device "
                   << (device_info.device_name()
                           ? std::string("'") + *device_info.device_name() + "'"
@@ -233,8 +233,6 @@ void LogDeviceInfo(const fuchsia_audio_device::Info& device_info) {
                   << ", assigned token_id "
                   << (device_info.token_id() ? std::to_string(*device_info.token_id())
                                              : "NONE (non-compliant)");
-
-    return;
   }
   if constexpr (!kLogDetailedFinalDeviceInfo) {
     return;

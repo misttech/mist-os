@@ -8,8 +8,6 @@
 #include <fidl/fuchsia.audio.device/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 
-#include "src/media/audio/services/device_registry/logging.h"
-
 namespace media_audio {
 
 // Utility functions to validate direct responses from audio drivers.

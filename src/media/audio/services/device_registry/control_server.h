@@ -17,7 +17,6 @@
 #include "src/media/audio/services/device_registry/audio_device_registry.h"
 #include "src/media/audio/services/device_registry/control_notify.h"
 #include "src/media/audio/services/device_registry/device.h"
-#include "src/media/audio/services/device_registry/logging.h"
 
 namespace media_audio {
 
