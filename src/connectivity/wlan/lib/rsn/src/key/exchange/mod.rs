@@ -5,7 +5,7 @@
 pub mod handshake;
 
 use self::handshake::{
-    fourway::{self, Fourway, SupplicantKeyReplayCounter},
+    fourway::{self, Fourway},
     group_key::{self, GroupKey},
 };
 use crate::key::{gtk::Gtk, igtk::Igtk, ptk::Ptk};
@@ -55,18 +55,6 @@ impl Method {
         match self {
             Method::FourWayHandshake(hs) => hs.on_eapol_key_frame(update_sink, frame),
             Method::GroupKeyHandshake(hs) => hs.on_eapol_key_frame(update_sink, frame),
-        }
-    }
-
-    pub fn initiate(
-        &mut self,
-        update_sink: &mut UpdateSink,
-        key_replay_counter: SupplicantKeyReplayCounter,
-    ) -> Result<(), Error> {
-        match self {
-            Method::FourWayHandshake(hs) => hs.initiate(update_sink, key_replay_counter),
-            // Only 4-Way Handshake supports initiation so far.
-            _ => Ok(()),
         }
     }
 

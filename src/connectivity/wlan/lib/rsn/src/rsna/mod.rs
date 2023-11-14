@@ -587,7 +587,7 @@ mod tests {
     fn test_supplicant_sends_zeroed_and_non_zeroed_key_length() {
         let protection = NegotiatedProtection::from_rsne(&fake_wpa2_s_rsne())
             .expect("could not derive negotiated RSNE");
-        let mut env = test_util::FourwayTestEnv::new();
+        let mut env = test_util::FourwayTestEnv::new(test_util::HandshakeKind::Wpa2);
 
         // Use arbitrarily chosen key_replay_counter.
         let msg1 = env.initiate(11.into());
@@ -597,7 +597,7 @@ mod tests {
         let mut buf = vec![];
         let mut msg2 = msg2_base.copy_keyframe_mut(&mut buf);
         msg2.key_frame_fields.key_len.set_from_native(0);
-        test_util::finalize_key_frame(&mut msg2, Some(ptk.kck()));
+        env.finalize_key_frame(&mut msg2, Some(ptk.kck()));
         let result = Dot11VerifiedKeyFrame::from_frame(msg2, &Role::Authenticator, &protection, 12);
         assert!(result.is_ok(), "failed verifying message: {}", result.unwrap_err());
 
@@ -606,7 +606,7 @@ mod tests {
         let mut buf = vec![];
         let mut msg2 = msg2_base.copy_keyframe_mut(&mut buf);
         msg2.key_frame_fields.key_len.set_from_native(16);
-        test_util::finalize_key_frame(&mut msg2, Some(ptk.kck()));
+        env.finalize_key_frame(&mut msg2, Some(ptk.kck()));
         let result = Dot11VerifiedKeyFrame::from_frame(msg2, &Role::Authenticator, &protection, 12);
         assert!(result.is_ok(), "failed verifying message: {}", result.unwrap_err());
     }
@@ -615,7 +615,7 @@ mod tests {
     // the PTK's length.
     #[test]
     fn test_supplicant_sends_random_key_length() {
-        let mut env = test_util::FourwayTestEnv::new();
+        let mut env = test_util::FourwayTestEnv::new(test_util::HandshakeKind::Wpa2);
 
         // Use arbitrarily chosen key_replay_counter.
         let msg1 = env.initiate(12.into());
@@ -624,7 +624,7 @@ mod tests {
         let mut msg2 = msg2.copy_keyframe_mut(&mut buf);
 
         msg2.key_frame_fields.key_len.set_from_native(29);
-        test_util::finalize_key_frame(&mut msg2, Some(ptk.kck()));
+        env.finalize_key_frame(&mut msg2, Some(ptk.kck()));
 
         let protection = NegotiatedProtection::from_rsne(&fake_wpa2_s_rsne())
             .expect("could not derive negotiated RSNE");

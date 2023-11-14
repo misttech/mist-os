@@ -61,6 +61,17 @@ impl<S> StateMachine<S> {
         self
     }
 
+    /// Replaces the current state with one lazily constructed by `map`.
+    pub fn try_replace_state<F, E>(&mut self, map: F) -> Result<&mut Self, E>
+    where
+        F: FnOnce(S) -> Result<S, E>,
+        S: Debug,
+    {
+        // Safe to unwrap: `state` can never be None.
+        self.state = Some(map(self.state.take().unwrap())?);
+        Ok(self)
+    }
+
     /// Replaces the current state with `new_state`.
     pub fn replace_state_with(&mut self, new_state: S) -> &mut Self {
         self.state = Some(new_state);
@@ -311,6 +322,38 @@ mod tests {
             States::B(State { data: B(SharedStateData { foo: 0 }), .. }) => (),
             _ => panic!("unexpected state"),
         }
+    }
+
+    #[test]
+    fn statemachine_succeeds_try_replace_state() {
+        #[derive(Debug)]
+        struct Error;
+
+        let mut statemachine = StateMachine::new(States2::A2(State::new(A2)));
+        statemachine
+            .try_replace_state(|state| match state {
+                States2::A2(state) => Ok(state.transition_to(B2).into()),
+                _ => Err(Error),
+            })
+            .expect("Failed to transition to B2");
+
+        match statemachine.into_state() {
+            States2::B2(_) => (),
+            _ => panic!("unexpected state"),
+        }
+    }
+    #[test]
+    fn statemachine_fails_try_replace_state() {
+        #[derive(Debug)]
+        struct Error;
+
+        let mut statemachine = StateMachine::new(States2::A2(State::new(A2)));
+
+        statemachine
+            .try_replace_state(|state| match state {
+                _ => Err(Error),
+            })
+            .expect_err("try_replace_state() unexpectedly succeeded");
     }
 
     #[test]

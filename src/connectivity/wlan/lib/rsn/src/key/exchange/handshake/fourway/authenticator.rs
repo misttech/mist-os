@@ -18,6 +18,7 @@ use crate::rsna::{
 };
 use crate::Error;
 use anyhow::{ensure, format_err};
+use std::fmt;
 use tracing::{error, warn};
 use zerocopy::ByteSlice;
 
@@ -41,9 +42,28 @@ pub enum State {
         cfg: Config,
         key_replay_counter: AuthenticatorKeyReplayCounter,
     },
-    Completed {
+    KeysInstalled {
+        pmk: Vec<u8>,
+        ptk: Ptk,
+        gtk: Gtk,
+        igtk: Option<Igtk>,
         cfg: Config,
     },
+}
+
+impl fmt::Display for State {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                State::Idle { .. } => "Idle",
+                State::AwaitingMsg2 { .. } => "AwaitingMsg2",
+                State::AwaitingMsg4 { .. } => "AwaitingMsg4",
+                State::KeysInstalled { .. } => "KeysInstalled",
+            }
+        )
+    }
 }
 
 pub fn new(cfg: Config, pmk: Vec<u8>) -> State {
@@ -53,25 +73,25 @@ pub fn new(cfg: Config, pmk: Vec<u8>) -> State {
 impl State {
     /// If [`self`] is in [`State::Idle`], then this function will push a
     /// [`SecAssocUpdate::TxEapolKeyFrame`] into [`update_sink`] and result [`self`]. Otherwise,
-    /// this function is a no-op.
+    /// [`self`] is dropped and an [`Error`] is returned.
     pub fn initiate(
         self,
         update_sink: &mut UpdateSink,
         s_key_replay_counter: SupplicantKeyReplayCounter,
-    ) -> Self {
+    ) -> Result<Self, Error> {
         let key_replay_counter = AuthenticatorKeyReplayCounter::next_after(*s_key_replay_counter);
         match self {
             State::Idle { cfg, pmk } => {
                 let anonce = cfg.nonce_rdr.next();
                 match initiate_internal(update_sink, &cfg, key_replay_counter, &anonce[..]) {
-                    Ok(()) => State::AwaitingMsg2 { anonce, cfg, pmk, key_replay_counter },
-                    Err(e) => {
-                        error!("error: {}", e);
-                        State::Idle { cfg, pmk }
-                    }
+                    Ok(()) => Ok(State::AwaitingMsg2 { anonce, cfg, pmk, key_replay_counter }),
+                    Err(e) => Err(Error::GenericError(format!("{}", e))),
                 }
             }
-            other_state => other_state,
+            other_state => Err(Error::GenericError(format!(
+                "Failed to initiate Authenticator, currently in {} state",
+                other_state
+            ))),
         }
     }
 
@@ -125,7 +145,7 @@ impl State {
                     key_replay_counter,
                     frame,
                 ) {
-                    Ok(()) => State::Completed { cfg },
+                    Ok(()) => State::KeysInstalled { pmk, ptk, gtk, igtk, cfg },
                     Err(e) => {
                         error!("error: {}", e);
                         State::AwaitingMsg4 { pmk, ptk, gtk, igtk, cfg, key_replay_counter }
@@ -150,21 +170,21 @@ impl State {
 
     pub fn ptk(&self) -> Option<Ptk> {
         match self {
-            State::AwaitingMsg4 { ptk, .. } => Some(ptk.clone()),
+            State::AwaitingMsg4 { ptk, .. } | State::KeysInstalled { ptk, .. } => Some(ptk.clone()),
             _ => None,
         }
     }
 
     pub fn gtk(&self) -> Option<Gtk> {
         match self {
-            State::AwaitingMsg4 { gtk, .. } => Some(gtk.clone()),
+            State::AwaitingMsg4 { gtk, .. } | State::KeysInstalled { gtk, .. } => Some(gtk.clone()),
             _ => None,
         }
     }
 
     pub fn igtk(&self) -> Option<Igtk> {
         match self {
-            State::AwaitingMsg4 { igtk, .. } => igtk.clone(),
+            State::AwaitingMsg4 { igtk, .. } | State::KeysInstalled { igtk, .. } => igtk.clone(),
             _ => None,
         }
     }
@@ -174,7 +194,7 @@ impl State {
             State::Idle { cfg, .. } => cfg,
             State::AwaitingMsg2 { cfg, .. } => cfg,
             State::AwaitingMsg4 { cfg, .. } => cfg,
-            State::Completed { cfg } => cfg,
+            State::KeysInstalled { cfg, .. } => cfg,
         }
     }
 }

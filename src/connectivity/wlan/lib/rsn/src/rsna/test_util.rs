@@ -45,6 +45,10 @@ use zerocopy::ByteSlice;
 lazy_static! {
     static ref S_ADDR: MacAddr = MacAddr::from([0x81, 0x76, 0x61, 0x14, 0xDF, 0xC9]);
     static ref A_ADDR: MacAddr = MacAddr::from([0x1D, 0xE3, 0xFD, 0xDF, 0xCB, 0xD3]);
+    static ref PMK: Box<[u8]> =
+        Vec::from_hex("0dc0d6eb90555ed6419756b9a15ec3e3209b63df707dd508d14581f8982721af")
+            .expect("error reading PMK from hex")
+            .into_boxed_slice();
 }
 
 pub fn get_rsne_protection() -> NegotiatedProtection {
@@ -142,8 +146,7 @@ pub fn get_ptk(anonce: &[u8], snonce: &[u8]) -> Ptk {
         .pairwise_cipher_suites
         .get(0)
         .expect("Supplicant's RSNE holds no Pairwise Cipher suite");
-    let pmk = get_pmk();
-    Ptk::new(&pmk[..], &A_ADDR, &S_ADDR, anonce, snonce, &akm, cipher.clone())
+    Ptk::new(&PMK[..], &A_ADDR, &S_ADDR, anonce, snonce, &akm, cipher.clone())
         .expect("error deriving PTK")
 }
 
@@ -154,8 +157,7 @@ pub fn get_wpa3_ptk(anonce: &[u8], snonce: &[u8]) -> Ptk {
         .pairwise_cipher_suites
         .get(0)
         .expect("Supplicant's RSNE holds no Pairwise Cipher suite");
-    let pmk = get_pmk();
-    Ptk::new(&pmk[..], &A_ADDR, &S_ADDR, anonce, snonce, &akm, cipher.clone())
+    Ptk::new(&PMK[..], &A_ADDR, &S_ADDR, anonce, snonce, &akm, cipher.clone())
         .expect("error deriving PTK")
 }
 
@@ -163,8 +165,7 @@ pub fn get_wpa1_ptk(anonce: &[u8], snonce: &[u8]) -> Ptk {
     let wpa = fake_wpa_ie();
     let akm = wpa.akm_list.get(0).expect("WPA1 IE holds no AKM");
     let cipher = wpa.unicast_cipher_list.get(0).expect("WPA1 IE holds no unicast cipher");
-    let pmk = get_pmk();
-    Ptk::new(&pmk[..], &A_ADDR, &S_ADDR, anonce, snonce, &akm, cipher.clone())
+    Ptk::new(&PMK[..], &A_ADDR, &S_ADDR, anonce, snonce, &akm, cipher.clone())
         .expect("error deriving PTK")
 }
 
@@ -224,8 +225,7 @@ pub fn get_wpa1_4whs_msg3(ptk: &Ptk, anonce: &[u8]) -> eapol::KeyFrameBuf {
 }
 
 pub fn get_pmk() -> Vec<u8> {
-    Vec::from_hex("0dc0d6eb90555ed6419756b9a15ec3e3209b63df707dd508d14581f8982721af")
-        .expect("error reading PMK from hex")
+    PMK.clone().into_vec()
 }
 
 pub fn encrypt_key_data(kek: &[u8], protection: &NegotiatedProtection, key_data: &[u8]) -> Vec<u8> {
@@ -485,34 +485,19 @@ pub fn make_wpa1_fourway_cfg() -> fourway::Config {
     make_fourway_cfg(Role::Supplicant, cipher, s_protection, a_protection)
 }
 
-pub fn make_handshake(role: Role) -> Fourway {
-    let pmk = test_util::get_pmk();
-    Fourway::new(make_wpa2_fourway_cfg(role), pmk).expect("error while creating 4-Way Handshake")
+#[derive(Clone, Copy)]
+pub enum HandshakeKind {
+    Wpa2,
+    Wpa3,
 }
 
-pub fn make_wpa3_handshake(role: Role) -> Fourway {
-    let pmk = test_util::get_pmk();
-    Fourway::new(make_wpa3_fourway_cfg(role), pmk)
-        .expect("error while creating WPA3 4-Way Handshake")
-}
-
-pub fn finalize_key_frame(frame: &mut eapol::KeyFrameRx<&mut [u8]>, kck: Option<&[u8]>) {
-    if let Some(kck) = kck {
-        let mic = compute_mic(kck, &get_rsne_protection(), &frame).expect("failed to compute mic");
-        frame.key_mic.copy_from_slice(&mic[..]);
+pub fn make_handshake(handshake_kind: HandshakeKind, role: Role) -> Fourway {
+    match handshake_kind {
+        HandshakeKind::Wpa2 => Fourway::new(make_wpa2_fourway_cfg(role), PMK.clone().into_vec())
+            .expect("error while creating WPA2 4-Way Handshake"),
+        HandshakeKind::Wpa3 => Fourway::new(make_wpa3_fourway_cfg(role), PMK.clone().into_vec())
+            .expect("error while creating WPA3 4-Way Handshake"),
     }
-}
-
-fn make_verified<B: ByteSlice + std::fmt::Debug>(
-    frame: eapol::KeyFrameRx<B>,
-    role: Role,
-    s_key_replay_counter: SupplicantKeyReplayCounter,
-    protection: &NegotiatedProtection,
-) -> Dot11VerifiedKeyFrame<B> {
-    let result =
-        Dot11VerifiedKeyFrame::from_frame(frame, &role, &protection, *s_key_replay_counter);
-    assert!(result.is_ok(), "failed verifying message sent to {:?}: {}", role, result.unwrap_err());
-    result.unwrap()
 }
 
 // TODO(fxbug.dev/70332): The expect_* functions that follow should be refactored with a macro.
@@ -672,20 +657,24 @@ pub fn expect_reported_status(
 }
 
 pub struct FourwayTestEnv {
-    supplicant: Fourway,
-    authenticator: Fourway,
+    pub supplicant: Fourway,
+    pub authenticator: Fourway,
 }
 
+// TODO(b/310961096): We should prefer to use the FourwayTestEnv in tests to avoid inconsistent
+// test behavior and construction.
 pub fn send_msg_to_fourway<B: ByteSlice + std::fmt::Debug>(
     fourway: &mut Fourway,
     msg: eapol::KeyFrameRx<B>,
     s_key_replay_counter: SupplicantKeyReplayCounter,
-    protection: &NegotiatedProtection,
 ) -> UpdateSink {
     let role = match &fourway {
         Fourway::Authenticator(_) => Role::Authenticator,
         Fourway::Supplicant(_) => Role::Supplicant,
     };
+    // We always derive NegotiatedProtection from the Supplicant's ProtectionInfo
+    let protection =
+        NegotiatedProtection::from_protection(&fourway.get_config().s_protection).unwrap();
     let verified_msg = make_verified(msg, role, s_key_replay_counter, &protection);
 
     let mut update_sink = UpdateSink::default();
@@ -694,11 +683,23 @@ pub fn send_msg_to_fourway<B: ByteSlice + std::fmt::Debug>(
     update_sink
 }
 
+fn make_verified<B: ByteSlice + std::fmt::Debug>(
+    frame: eapol::KeyFrameRx<B>,
+    role: Role,
+    s_key_replay_counter: SupplicantKeyReplayCounter,
+    protection: &NegotiatedProtection,
+) -> Dot11VerifiedKeyFrame<B> {
+    let result =
+        Dot11VerifiedKeyFrame::from_frame(frame, &role, &protection, *s_key_replay_counter);
+    assert!(result.is_ok(), "failed verifying message sent to {:?}: {}", role, result.unwrap_err());
+    result.unwrap()
+}
+
 impl FourwayTestEnv {
-    pub fn new() -> FourwayTestEnv {
+    pub fn new(handshake_kind: HandshakeKind) -> FourwayTestEnv {
         FourwayTestEnv {
-            supplicant: make_handshake(Role::Supplicant),
-            authenticator: make_handshake(Role::Authenticator),
+            supplicant: make_handshake(handshake_kind, Role::Supplicant),
+            authenticator: make_handshake(handshake_kind, Role::Authenticator),
         }
     }
 
@@ -708,12 +709,90 @@ impl FourwayTestEnv {
     ) -> eapol::KeyFrameBuf {
         // Initiate 4-Way Handshake. The Authenticator will send message #1 of the handshake.
         let mut a_update_sink = vec![];
-        let result = self.authenticator.initiate(&mut a_update_sink, s_key_replay_counter);
-        assert!(result.is_ok(), "Authenticator failed initiating: {}", result.unwrap_err());
+        match &mut self.authenticator {
+            Fourway::Authenticator(state_machine) => state_machine
+                .try_replace_state(|state| state.initiate(&mut a_update_sink, s_key_replay_counter))
+                .map(|_state_machine| ())
+                .expect("Failed to initiate() Fourway::Authenticator"),
+            _ => panic!("self.authenticator is not a Fourway::Authenticator"),
+        }
         assert_eq!(a_update_sink.len(), 1);
 
         // Verify Authenticator sent message #1.
         expect_eapol_resp(&a_update_sink[..])
+    }
+
+    fn get_negotiated_protection(&self) -> NegotiatedProtection {
+        // We always derive NegotiatedProtection from the Supplicant's ProtectionInfo.
+        NegotiatedProtection::from_protection(&self.supplicant.get_config().s_protection).unwrap()
+    }
+
+    fn get_ptk(&self, anonce: &[u8], snonce: &[u8]) -> Ptk {
+        let config = self.supplicant.get_config();
+        let protection = self.get_negotiated_protection();
+        Ptk::new(
+            &PMK[..],
+            &config.a_addr,
+            &config.s_addr,
+            anonce,
+            snonce,
+            &protection.akm,
+            protection.pairwise,
+        )
+        .expect("error deriving PTK")
+    }
+
+    fn make_verified<B: ByteSlice + std::fmt::Debug>(
+        &self,
+        frame: eapol::KeyFrameRx<B>,
+        role: Role,
+        s_key_replay_counter: SupplicantKeyReplayCounter,
+    ) -> Dot11VerifiedKeyFrame<B> {
+        let protection = self.get_negotiated_protection();
+        let result =
+            Dot11VerifiedKeyFrame::from_frame(frame, &role, &protection, *s_key_replay_counter);
+        assert!(
+            result.is_ok(),
+            "failed verifying message sent to {:?}: {}",
+            role,
+            result.unwrap_err()
+        );
+        result.unwrap()
+    }
+
+    pub fn finalize_key_frame(&self, frame: &mut eapol::KeyFrameRx<&mut [u8]>, kck: Option<&[u8]>) {
+        if let Some(kck) = kck {
+            let mic = compute_mic(kck, &self.get_negotiated_protection(), &frame)
+                .expect("failed to compute mic");
+            frame.key_mic.copy_from_slice(&mic[..]);
+        }
+    }
+
+    pub fn send_msg_to_authenticator<B: ByteSlice + std::fmt::Debug>(
+        &mut self,
+        msg: eapol::KeyFrameRx<B>,
+        s_key_replay_counter: SupplicantKeyReplayCounter,
+    ) -> UpdateSink {
+        let verified_msg = self.make_verified(msg, Role::Authenticator, s_key_replay_counter);
+
+        let mut update_sink = UpdateSink::default();
+        let result = self.authenticator.on_eapol_key_frame(&mut update_sink, verified_msg);
+        assert!(result.is_ok(), "Authenticator failed processing msg: {}", result.unwrap_err());
+        update_sink
+    }
+
+    pub fn send_msg_to_supplicant<B: ByteSlice + std::fmt::Debug>(
+        &mut self,
+        msg: eapol::KeyFrameRx<B>,
+        s_key_replay_counter: SupplicantKeyReplayCounter,
+    ) -> UpdateSink {
+        // We always derive NegotiatedProtection from the Supplicant's ProtectionInfo.
+        let verified_msg = self.make_verified(msg, Role::Supplicant, s_key_replay_counter);
+
+        let mut update_sink = UpdateSink::default();
+        let result = self.supplicant.on_eapol_key_frame(&mut update_sink, verified_msg);
+        assert!(result.is_ok(), "Supplicant failed processing msg: {}", result.unwrap_err());
+        update_sink
     }
 
     pub fn send_msg1_to_supplicant<'a, B: ByteSlice + std::fmt::Debug>(
@@ -724,15 +803,10 @@ impl FourwayTestEnv {
         let anonce = msg1.key_frame_fields.key_nonce;
 
         // Send message #1 to Supplicant and extract responses.
-        let s_update_sink = send_msg_to_fourway(
-            &mut self.supplicant,
-            msg1,
-            s_key_replay_counter,
-            &get_rsne_protection(),
-        );
+        let s_update_sink = self.send_msg_to_supplicant(msg1, s_key_replay_counter);
         let msg2 = expect_eapol_resp(&s_update_sink[..]);
         let keyframe = msg2.keyframe();
-        let ptk = get_ptk(&anonce[..], &keyframe.key_frame_fields.key_nonce[..]);
+        let ptk = self.get_ptk(&anonce[..], &keyframe.key_frame_fields.key_nonce[..]);
 
         (msg2, ptk)
     }
@@ -742,8 +816,7 @@ impl FourwayTestEnv {
         msg1: eapol::KeyFrameRx<B>,
         s_key_replay_counter: SupplicantKeyReplayCounter,
     ) {
-        let verified_msg1 =
-            make_verified(msg1, Role::Supplicant, s_key_replay_counter, &get_rsne_protection());
+        let verified_msg1 = self.make_verified(msg1, Role::Supplicant, s_key_replay_counter);
 
         // Send message #1 to Supplicant and extract responses.
         let mut s_update_sink = vec![];
@@ -756,8 +829,7 @@ impl FourwayTestEnv {
         msg2: eapol::KeyFrameRx<B>,
         s_key_replay_counter: SupplicantKeyReplayCounter,
     ) -> eapol::KeyFrameBuf {
-        let verified_msg2 =
-            make_verified(msg2, Role::Authenticator, s_key_replay_counter, &get_rsne_protection());
+        let verified_msg2 = self.make_verified(msg2, Role::Authenticator, s_key_replay_counter);
 
         // Send message #2 to Authenticator and extract responses.
         let mut a_update_sink = vec![];
@@ -772,12 +844,7 @@ impl FourwayTestEnv {
         s_key_replay_counter: SupplicantKeyReplayCounter,
     ) -> (eapol::KeyFrameBuf, Ptk, Gtk) {
         // Send message #3 to Supplicant and extract responses.
-        let s_update_sink = send_msg_to_fourway(
-            &mut self.supplicant,
-            msg3,
-            s_key_replay_counter,
-            &get_rsne_protection(),
-        );
+        let s_update_sink = self.send_msg_to_supplicant(msg3, s_key_replay_counter);
         let msg4 = expect_eapol_resp(&s_update_sink[..]);
         let s_ptk = expect_reported_ptk(&s_update_sink[..]);
         let s_gtk = expect_reported_gtk(&s_update_sink[..]);
@@ -791,8 +858,7 @@ impl FourwayTestEnv {
         s_key_replay_counter: SupplicantKeyReplayCounter,
         mut update_sink: &mut UpdateSink,
     ) {
-        let verified_msg3 =
-            make_verified(msg3, Role::Supplicant, s_key_replay_counter, &get_rsne_protection());
+        let verified_msg3 = self.make_verified(msg3, Role::Supplicant, s_key_replay_counter);
 
         // Send message #3 to Supplicant and extract responses.
         let result = self.supplicant.on_eapol_key_frame(&mut update_sink, verified_msg3);
@@ -804,8 +870,7 @@ impl FourwayTestEnv {
         msg3: eapol::KeyFrameRx<B>,
         s_key_replay_counter: SupplicantKeyReplayCounter,
     ) {
-        let verified_msg3 =
-            make_verified(msg3, Role::Supplicant, s_key_replay_counter, &get_rsne_protection());
+        let verified_msg3 = self.make_verified(msg3, Role::Supplicant, s_key_replay_counter);
 
         // Send message #3 to Supplicant and extract responses.
         let mut s_update_sink = vec![];
@@ -819,12 +884,7 @@ impl FourwayTestEnv {
         s_key_replay_counter: SupplicantKeyReplayCounter,
     ) -> (Ptk, Gtk) {
         // Send message #4 to Authenticator and extract responses.
-        let a_update_sink = send_msg_to_fourway(
-            &mut self.authenticator,
-            msg4,
-            s_key_replay_counter,
-            &get_rsne_protection(),
-        );
+        let a_update_sink = self.send_msg_to_authenticator(msg4, s_key_replay_counter);
         let a_ptk = expect_reported_ptk(&a_update_sink[..]);
         let a_gtk = expect_reported_gtk(&a_update_sink[..]);
 

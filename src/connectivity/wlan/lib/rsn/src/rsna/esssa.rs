@@ -4,7 +4,6 @@
 
 use {
     crate::{
-        format_rsn_err,
         key::{
             exchange::{
                 self,
@@ -279,10 +278,20 @@ impl EssSa {
                 });
 
                 self.ptksa.replace_state(|state| state.initialize(pmk));
-                if let Ptksa::Initialized { method } = self.ptksa.as_mut() {
-                    method.initiate(update_sink, self.key_replay_counter.into())?;
-                } else {
-                    return Err(format_rsn_err!("PTKSA not initialized"));
+                if let Ptksa::Initialized {
+                    method:
+                        exchange::Method::FourWayHandshake(Fourway::Authenticator(
+                            authenticator_state_machine,
+                        )),
+                } = self.ptksa.as_mut()
+                {
+                    authenticator_state_machine
+                        .try_replace_state(|state| {
+                            state.initiate(update_sink, self.key_replay_counter.into())
+                        })
+                        // Discard the mutable reference to the state machine since
+                        // this scope already has one.
+                        .map(|_state_machine| ())?;
                 }
             }
             Key::Ptk(ptk) => {
