@@ -109,8 +109,6 @@ impl RootDir for BlobDirectory {
         while let Ok(Some(request)) = requests.try_next().await {
             match request {
                 BlobCreatorRequest::Create { responder, hash, .. } => {
-                    // TODO(fxbug.dev/129357): Figure out how we handle concurrent writes to the
-                    // same blob.
                     responder.send(self.create_blob(Hash::from(hash)).await).unwrap_or_else(
                         |error| {
                             tracing::error!(?error, "failed to send Create response");
