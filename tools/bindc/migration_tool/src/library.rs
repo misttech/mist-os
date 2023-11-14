@@ -253,6 +253,7 @@ pub fn rename_and_add<'a>(libraries: &mut HashSet<Library>, original: &'a str) -
 
         "BIND_CLOCK_ID" => "fuchsia.BIND_CLOCK_ID",
         "BIND_GPIO_PIN" => "fuchsia.BIND_GPIO_PIN",
+        "BIND_GPIO_CONTROLLER" => "fuchsia.BIND_GPIO_CONTROLLER",
         "BIND_PWM_ID" => "fuchsia.BIND_PWM_ID",
 
         "BIND_PLATFORM_DEV_PID" => "fuchsia.BIND_PLATFORM_DEV_PID",

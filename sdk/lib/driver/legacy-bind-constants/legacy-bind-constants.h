@@ -75,6 +75,7 @@
 
 // GPIO binding variables at 0x0A1X
 #define BIND_GPIO_PIN 0x0A10
+#define BIND_GPIO_CONTROLLER 0x0A11
 
 // POWER binding variables at 0x0A2X
 #define BIND_POWER_DOMAIN 0x0A20

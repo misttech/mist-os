@@ -77,6 +77,7 @@ uint BIND_I2C_DID;
 
 // GPIO bind properties.
 uint BIND_GPIO_PIN;
+uint BIND_GPIO_CONTROLLER;
 
 // POWER bind properties.
 uint BIND_POWER_DOMAIN;

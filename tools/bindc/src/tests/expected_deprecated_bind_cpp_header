@@ -100,6 +100,8 @@ static const std::string I2C_DID = "fuchsia.BIND_I2C_DID";
 
 static const std::string GPIO_PIN = "fuchsia.BIND_GPIO_PIN";
 
+static const std::string GPIO_CONTROLLER = "fuchsia.BIND_GPIO_CONTROLLER";
+
 static const std::string POWER_DOMAIN = "fuchsia.BIND_POWER_DOMAIN";
 
 static const std::string POWER_DOMAIN_COMPOSITE = "fuchsia.BIND_POWER_DOMAIN_COMPOSITE";

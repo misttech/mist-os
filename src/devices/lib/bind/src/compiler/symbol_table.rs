@@ -305,6 +305,7 @@ fn deprecated_keys() -> Vec<(String, u32)> {
 
     // GPIO binding variables at 0x0A1X
     keys.push(("BIND_GPIO_PIN".to_string(), 0x0A10));
+    keys.push(("BIND_GPIO_CONTROLLER".to_string(), 0x0A11));
 
     // POWER binding variables at 0x0A2X
     keys.push(("BIND_POWER_DOMAIN".to_string(), 0x0A20));
