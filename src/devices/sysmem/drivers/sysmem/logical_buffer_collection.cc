@@ -1596,6 +1596,17 @@ LogicalBufferCollection::TryAllocate(std::vector<NodeProperties*> nodes) {
     ZX_DEBUG_ASSERT(result.error() != ZX_ERR_NOT_SUPPORTED);
     return result;
   }
+
+  if (is_verbose_logging()) {
+    const auto& bci = result.value();
+    IndentTracker indent_tracker(0);
+    auto indent = indent_tracker.Current();
+    LogInfo(FROM_HERE, "%*sBufferCollectionInfo:", indent.num_spaces(), "");
+    {  // mirror indent level
+      LogBufferCollectionInfo(indent_tracker, bci);
+    }
+  }
+
   ZX_DEBUG_ASSERT(result.is_ok());
   return result;
 }
@@ -2252,8 +2263,10 @@ LogicalBufferCollection::CombineConstraints(ConstraintsList* constraints_list) {
     return fpromise::error();
   }
 
-  LogInfo(FROM_HERE, "After combining constraints:");
-  LogConstraints(FROM_HERE, nullptr, acc);
+  if (is_verbose_logging()) {
+    LogInfo(FROM_HERE, "After combining constraints:");
+    LogConstraints(FROM_HERE, nullptr, acc);
+  }
 
   return fpromise::ok(std::move(acc));
 }
@@ -4139,129 +4152,177 @@ std::optional<NodeProperties*> LogicalBufferCollection::FindNodePropertiesByNode
   return iter->second;
 }
 
-#define LOG_UINT32_FIELD(location, prefix, field_name)                                        \
-  do {                                                                                        \
-    if (!(prefix).field_name().has_value()) {                                                 \
-      LogClientInfo(location, node_properties, "!%s.%s().has_value()", #prefix, #field_name); \
-    } else {                                                                                  \
-      LogClientInfo(location, node_properties, "*%s.%s(): %u", #prefix, #field_name,          \
-                    sysmem::fidl_underlying_cast(*(prefix).field_name()));                    \
-    }                                                                                         \
+#define LOG_UINT32_FIELD(location, indent, prefix, field_name)                                   \
+  do {                                                                                           \
+    if ((prefix).field_name().has_value()) {                                                     \
+      LogClientInfo(location, node_properties, "%*s*%s.%s(): %u", indent.num_spaces(), "",       \
+                    #prefix, #field_name, sysmem::fidl_underlying_cast(*(prefix).field_name())); \
+    }                                                                                            \
   } while (0)
 
-#define LOG_UINT64_FIELD(location, prefix, field_name)                                        \
-  do {                                                                                        \
-    if (!(prefix).field_name().has_value()) {                                                 \
-      LogClientInfo(location, node_properties, "!%s.%s().has_value()", #prefix, #field_name); \
-    } else {                                                                                  \
-      LogClientInfo(location, node_properties, "*%s.%s(): %" PRIx64, #prefix, #field_name,    \
-                    sysmem::fidl_underlying_cast(*(prefix).field_name()));                    \
-    }                                                                                         \
+#define LOG_UINT64_FIELD(location, indent, prefix, field_name)                                     \
+  do {                                                                                             \
+    if ((prefix).field_name().has_value()) {                                                       \
+      LogClientInfo(location, node_properties, "%*s*%s.%s(): 0x%" PRIx64, indent.num_spaces(), "", \
+                    #prefix, #field_name, sysmem::fidl_underlying_cast(*(prefix).field_name()));   \
+    }                                                                                              \
   } while (0)
 
-#define LOG_BOOL_FIELD(location, prefix, field_name)                                          \
-  do {                                                                                        \
-    if (!(prefix).field_name().has_value()) {                                                 \
-      LogClientInfo(location, node_properties, "!%s.%s().has_value()", #prefix, #field_name); \
-    } else {                                                                                  \
-      LogClientInfo(location, node_properties, "*%s.%s(): %u", #prefix, #field_name,          \
-                    *(prefix).field_name());                                                  \
-    }                                                                                         \
+#define LOG_BOOL_FIELD(location, indent, prefix, field_name)                               \
+  do {                                                                                     \
+    if ((prefix).field_name().has_value()) {                                               \
+      LogClientInfo(location, node_properties, "%*s*%s.%s(): %u", indent.num_spaces(), "", \
+                    #prefix, #field_name, *(prefix).field_name());                         \
+    }                                                                                      \
+  } while (0)
+
+#define LOG_SIZEU_FIELD(location, indent, prefix, field_name)                                      \
+  do {                                                                                             \
+    if ((prefix).field_name().has_value()) {                                                       \
+      LogClientInfo(location, node_properties, "%*s%s.%s()->width(): %u", indent.num_spaces(), "", \
+                    #prefix, #field_name, prefix.field_name()->width());                           \
+      LogClientInfo(location, node_properties, "%*s%s.%s()->height(): %u", indent.num_spaces(),    \
+                    "", #prefix, #field_name, prefix.field_name()->height());                      \
+    }                                                                                              \
   } while (0)
 
 void LogicalBufferCollection::LogConstraints(
     Location location, NodeProperties* node_properties,
     const fuchsia_sysmem2::BufferCollectionConstraints& constraints) const {
+  ZX_DEBUG_ASSERT(is_verbose_logging());
+  IndentTracker indent_tracker(0);
+  auto indent = indent_tracker.Current();
+
   if (!node_properties) {
-    LogInfo(FROM_HERE, "Constraints (aggregated / previously chosen):");
+    LogInfo(FROM_HERE, "%*sConstraints (aggregated / previously chosen):", indent.num_spaces(), "");
   } else {
-    LogInfo(FROM_HERE, "Constraints - NodeProperties: %p", node_properties);
+    LogInfo(FROM_HERE, "%*sConstraints - NodeProperties: %p", indent.num_spaces(), "",
+            node_properties);
   }
 
-  const fuchsia_sysmem2::BufferCollectionConstraints& c = constraints;
+  {  // scope indent
+    auto indent = indent_tracker.Nested();
 
-  LOG_UINT32_FIELD(FROM_HERE, c, min_buffer_count);
-  LOG_UINT32_FIELD(FROM_HERE, c, min_buffer_count_for_camping);
-  LOG_UINT32_FIELD(FROM_HERE, c, min_buffer_count_for_dedicated_slack);
-  LOG_UINT32_FIELD(FROM_HERE, c, min_buffer_count_for_shared_slack);
+    const fuchsia_sysmem2::BufferCollectionConstraints& c = constraints;
 
-  if (!c.buffer_memory_constraints().has_value()) {
-    LogInfo(FROM_HERE, "!c.has_buffer_memory_constraints()");
-  } else {
-    const fuchsia_sysmem2::BufferMemoryConstraints& bmc = *c.buffer_memory_constraints();
-    LOG_UINT64_FIELD(FROM_HERE, bmc, min_size_bytes);
-    LOG_UINT64_FIELD(FROM_HERE, bmc, max_size_bytes);
-    LOG_BOOL_FIELD(FROM_HERE, bmc, physically_contiguous_required);
-    LOG_BOOL_FIELD(FROM_HERE, bmc, secure_required);
-    LOG_BOOL_FIELD(FROM_HERE, bmc, cpu_domain_supported);
-    LOG_BOOL_FIELD(FROM_HERE, bmc, ram_domain_supported);
-    LOG_BOOL_FIELD(FROM_HERE, bmc, inaccessible_domain_supported);
-  }
+    LOG_UINT32_FIELD(FROM_HERE, indent, c, min_buffer_count);
+    LOG_UINT32_FIELD(FROM_HERE, indent, c, max_buffer_count);
+    LOG_UINT32_FIELD(FROM_HERE, indent, c, min_buffer_count_for_camping);
+    LOG_UINT32_FIELD(FROM_HERE, indent, c, min_buffer_count_for_dedicated_slack);
+    LOG_UINT32_FIELD(FROM_HERE, indent, c, min_buffer_count_for_shared_slack);
 
-  uint32_t image_format_constraints_count =
-      c.image_format_constraints().has_value()
-          ? safe_cast<uint32_t>(c.image_format_constraints()->size())
-          : 0;
-  LogInfo(FROM_HERE, "image_format_constraints.count() %u", image_format_constraints_count);
-  for (uint32_t i = 0; i < image_format_constraints_count; ++i) {
-    LogInfo(FROM_HERE, "image_format_constraints[%u] (ifc):", i);
-    const fuchsia_sysmem2::ImageFormatConstraints& ifc = c.image_format_constraints()->at(i);
-
-    if (!ifc.pixel_format().has_value()) {
-      LogInfo(FROM_HERE, "!ifc.has_pixel_format()");
+    if (!c.buffer_memory_constraints().has_value()) {
+      LogInfo(FROM_HERE, "%*s!c.buffer_memory_constraints().has_value()", indent.num_spaces(), "");
     } else {
-      LOG_UINT32_FIELD(FROM_HERE, ifc, pixel_format);
+      LogInfo(FROM_HERE, "%*sc.buffer_memory_constraints():", indent.num_spaces(), "");
+      auto indent = indent_tracker.Nested();
+      const fuchsia_sysmem2::BufferMemoryConstraints& bmc = *c.buffer_memory_constraints();
+      LOG_UINT64_FIELD(FROM_HERE, indent, bmc, min_size_bytes);
+      LOG_UINT64_FIELD(FROM_HERE, indent, bmc, max_size_bytes);
+      LOG_BOOL_FIELD(FROM_HERE, indent, bmc, physically_contiguous_required);
+      LOG_BOOL_FIELD(FROM_HERE, indent, bmc, secure_required);
+      LOG_BOOL_FIELD(FROM_HERE, indent, bmc, cpu_domain_supported);
+      LOG_BOOL_FIELD(FROM_HERE, indent, bmc, ram_domain_supported);
+      LOG_BOOL_FIELD(FROM_HERE, indent, bmc, inaccessible_domain_supported);
     }
 
-    if (!ifc.pixel_format_modifier().has_value()) {
-      LogInfo(FROM_HERE, "!ifc.has_pixel_format_modifier()");
-    } else {
-      LOG_UINT64_FIELD(FROM_HERE, ifc, pixel_format_modifier);
+    uint32_t image_format_constraints_count =
+        c.image_format_constraints().has_value()
+            ? safe_cast<uint32_t>(c.image_format_constraints()->size())
+            : 0;
+    LogInfo(FROM_HERE, "%*simage_format_constraints.count() %u", indent.num_spaces(), "",
+            image_format_constraints_count);
+    {  // scope indent
+      auto indent = indent_tracker.Nested();
+      for (uint32_t i = 0; i < image_format_constraints_count; ++i) {
+        LogInfo(FROM_HERE, "%*simage_format_constraints[%u] (ifc):", indent.num_spaces(), "", i);
+        const fuchsia_sysmem2::ImageFormatConstraints& ifc = c.image_format_constraints()->at(i);
+        LogImageFormatConstraints(indent_tracker, node_properties, ifc);
+      }
     }
-
-    LogInfo(FROM_HERE, "min_size.width: %u", ifc.min_size()->width());
-    LogInfo(FROM_HERE, "min_size.height: %u", ifc.min_size()->height());
-
-    LogInfo(FROM_HERE, "max_size.width: %u", ifc.max_size()->width());
-    LogInfo(FROM_HERE, "max_size.height: %u", ifc.max_size()->height());
-
-    LOG_UINT32_FIELD(FROM_HERE, ifc, min_bytes_per_row);
-    LOG_UINT32_FIELD(FROM_HERE, ifc, max_bytes_per_row);
-
-    LOG_UINT64_FIELD(FROM_HERE, ifc, max_surface_width_times_surface_height);
-
-    LogInfo(FROM_HERE, "size_alignment.width: %u", ifc.size_alignment()->width());
-    LogInfo(FROM_HERE, "size_alignment.height: %u", ifc.size_alignment()->height());
-
-    LogInfo(FROM_HERE, "display_rect_alignment.width: %u", ifc.display_rect_alignment()->width());
-    LogInfo(FROM_HERE, "display_rect_alignment.height: %u", ifc.display_rect_alignment()->height());
-
-    LogInfo(FROM_HERE, "required_min_size.width: %u", ifc.required_min_size()->width());
-    LogInfo(FROM_HERE, "required_min_size.height: %u", ifc.required_min_size()->height());
-
-    LogInfo(FROM_HERE, "required_max_size.width: %u", ifc.required_max_size()->width());
-    LogInfo(FROM_HERE, "required_max_size.height: %u", ifc.required_max_size()->height());
-
-    LOG_UINT32_FIELD(FROM_HERE, ifc, bytes_per_row_divisor);
-
-    LOG_UINT32_FIELD(FROM_HERE, ifc, start_offset_divisor);
   }
 }
 
-void LogicalBufferCollection::LogPrunedSubTree(NodeProperties* subtree) {
+void LogicalBufferCollection::LogBufferCollectionInfo(
+    IndentTracker& indent_tracker, const fuchsia_sysmem2::BufferCollectionInfo& bci) const {
+  ZX_DEBUG_ASSERT(is_verbose_logging());
+  auto indent = indent_tracker.Nested();
+  NodeProperties* node_properties = nullptr;
+
+  LOG_UINT64_FIELD(FROM_HERE, indent, bci, buffer_collection_id);
+  LogInfo(FROM_HERE, "%*ssettings:", indent.num_spaces(), "");
+  {  // scope indent
+    auto indent = indent_tracker.Nested();
+    const auto& sbs = *bci.settings();
+    LogInfo(FROM_HERE, "%*sbuffer_settings:", indent.num_spaces(), "");
+    {  // scope indent
+      auto indent = indent_tracker.Nested();
+      const auto& bms = *sbs.buffer_settings();
+      LOG_UINT64_FIELD(FROM_HERE, indent, bms, size_bytes);
+      LOG_BOOL_FIELD(FROM_HERE, indent, bms, is_physically_contiguous);
+      LOG_BOOL_FIELD(FROM_HERE, indent, bms, is_secure);
+      LogInfo(FROM_HERE, "%*scoherency_domain: %u", indent.num_spaces(), "",
+              *bms.coherency_domain());
+      LogInfo(FROM_HERE, "%*sheap: %" PRIx64, indent.num_spaces(), "", *bms.heap());
+    }
+    LogInfo(FROM_HERE, "%*simage_format_constraints:", indent.num_spaces(), "");
+    {  // scope ifc, and to have indent level mirror output indent level
+      const auto& ifc = *sbs.image_format_constraints();
+      LogImageFormatConstraints(indent_tracker, nullptr, ifc);
+    }
+  }
+  LogInfo(FROM_HERE, "%*sbuffers.size(): %zu", indent.num_spaces(), "", bci.buffers()->size());
+  // For now we don't log per-buffer info.
+}
+
+void LogicalBufferCollection::LogImageFormatConstraints(
+    IndentTracker& indent_tracker, NodeProperties* node_properties,
+    const fuchsia_sysmem2::ImageFormatConstraints& ifc) const {
+  auto indent = indent_tracker.Nested();
+
+  LOG_UINT32_FIELD(FROM_HERE, indent, ifc, pixel_format);
+  LOG_UINT64_FIELD(FROM_HERE, indent, ifc, pixel_format_modifier);
+
+  LOG_SIZEU_FIELD(FROM_HERE, indent, ifc, min_size);
+  LOG_SIZEU_FIELD(FROM_HERE, indent, ifc, max_size);
+
+  LOG_UINT32_FIELD(FROM_HERE, indent, ifc, min_bytes_per_row);
+  LOG_UINT32_FIELD(FROM_HERE, indent, ifc, max_bytes_per_row);
+
+  LOG_UINT64_FIELD(FROM_HERE, indent, ifc, max_surface_width_times_surface_height);
+
+  LOG_SIZEU_FIELD(FROM_HERE, indent, ifc, size_alignment);
+  LOG_SIZEU_FIELD(FROM_HERE, indent, ifc, display_rect_alignment);
+  LOG_SIZEU_FIELD(FROM_HERE, indent, ifc, required_min_size);
+  LOG_SIZEU_FIELD(FROM_HERE, indent, ifc, required_max_size);
+
+  LOG_UINT32_FIELD(FROM_HERE, indent, ifc, bytes_per_row_divisor);
+
+  LOG_UINT32_FIELD(FROM_HERE, indent, ifc, start_offset_divisor);
+}
+
+void LogicalBufferCollection::LogPrunedSubTree(NodeProperties* subtree) const {
+  ZX_DEBUG_ASSERT(is_verbose_logging());
   ignore_result(subtree->DepthFirstPreOrder(
       PrunedSubtreeFilter(*subtree, [this, subtree](const NodeProperties& node_properties) {
         uint32_t depth = 0;
         for (auto iter = &node_properties; iter != subtree; iter = iter->parent()) {
           ++depth;
         }
-        std::string indent;
-        for (uint32_t i = 0; i < depth; ++i) {
-          indent += "  ";
+
+        const char* logical_type_name = "?";
+        if (node_properties.is_token()) {
+          logical_type_name = "token";
+        } else if (node_properties.is_token_group()) {
+          logical_type_name = "group";
+        } else if (node_properties.is_collection()) {
+          logical_type_name = "collection";
         }
-        LogInfo(FROM_HERE, "%sNodeProperties: %p (%s) has_constraints: %u ready: %u name: %s",
-                indent.c_str(), &node_properties, node_properties.node_type_name(),
-                node_properties.has_constraints(), node_properties.node()->ReadyForAllocation(),
+
+        LogInfo(FROM_HERE, "%*sNodeProperties: %p (%s;%s) has_constraints: %u ready: %u name: %s",
+                2 * depth, "", &node_properties, node_properties.node_type_name(),
+                logical_type_name, node_properties.has_constraints(),
+                node_properties.node()->ReadyForAllocation(),
                 node_properties.client_debug_info().name.c_str());
         // No need to keep the nodes in a list; we've alread done what we need to do during the
         // visit.
@@ -4269,7 +4330,8 @@ void LogicalBufferCollection::LogPrunedSubTree(NodeProperties* subtree) {
       })));
 }
 
-void LogicalBufferCollection::LogNodeConstraints(std::vector<NodeProperties*> nodes) {
+void LogicalBufferCollection::LogNodeConstraints(std::vector<NodeProperties*> nodes) const {
+  ZX_DEBUG_ASSERT(is_verbose_logging());
   for (auto node : nodes) {
     LogInfo(FROM_HERE, "Constraints for NodeProperties: %p (%s)", node, node->node_type_name());
     if (!node->buffer_collection_constraints()) {

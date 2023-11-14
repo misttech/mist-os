@@ -36,6 +36,7 @@ source_set("sysmem_common_srcs") {
     "device.cc",
     "driver.cc",
     "external_memory_allocator.cc",
+    "indent.cc",
     "koid_util.cc",
     "logging.cc",
     "logical_buffer_collection.cc",

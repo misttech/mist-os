@@ -175,8 +175,10 @@ void BufferCollection::V1::SetConstraints(SetConstraintsRequest& request,
     parent_.node_properties().SetBufferCollectionConstraints(result.take_value());
   }  // ~result
 
-  parent_.node_properties().LogInfo(FROM_HERE, "BufferCollection::V1::SetConstraints()");
-  parent_.node_properties().LogConstraints(FROM_HERE);
+  if (parent_.logical_buffer_collection().is_verbose_logging()) {
+    parent_.node_properties().LogInfo(FROM_HERE, "BufferCollection::V1::SetConstraints()");
+    parent_.node_properties().LogConstraints(FROM_HERE);
+  }
 
   // LogicalBufferCollection will ask for constraints when it needs them,
   // possibly during this call if this is the last participant to report
@@ -209,8 +211,10 @@ void BufferCollection::V2::SetConstraints(SetConstraintsRequest& request,
 
   parent_.node_properties().SetBufferCollectionConstraints(std::move(local_constraints));
 
-  parent_.node_properties().LogInfo(FROM_HERE, "BufferCollection::V2::SetConstraints()");
-  parent_.node_properties().LogConstraints(FROM_HERE);
+  if (parent_.logical_buffer_collection().is_verbose_logging()) {
+    parent_.node_properties().LogInfo(FROM_HERE, "BufferCollection::V2::SetConstraints()");
+    parent_.node_properties().LogConstraints(FROM_HERE);
+  }
 
   // LogicalBufferCollection will ask for constraints when it needs them,
   // possibly during this call if this is the last participant to report

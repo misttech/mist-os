@@ -23,12 +23,13 @@
 #include <fbl/ref_ptr.h>
 #include <fbl/string_printf.h>
 
-#include "allocation_result.h"
-#include "device.h"
-#include "logging.h"
-#include "node_properties.h"
-#include "utils.h"
-#include "versions.h"
+#include "src/devices/sysmem/drivers/sysmem/allocation_result.h"
+#include "src/devices/sysmem/drivers/sysmem/device.h"
+#include "src/devices/sysmem/drivers/sysmem/indent.h"
+#include "src/devices/sysmem/drivers/sysmem/logging.h"
+#include "src/devices/sysmem/drivers/sysmem/node_properties.h"
+#include "src/devices/sysmem/drivers/sysmem/utils.h"
+#include "src/devices/sysmem/drivers/sysmem/versions.h"
 
 namespace sysmem_driver {
 
@@ -765,8 +766,12 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
 
   void LogConstraints(Location location, NodeProperties* node_properties,
                       const fuchsia_sysmem2::BufferCollectionConstraints& constraints) const;
-  void LogPrunedSubTree(NodeProperties* subtree);
-  void LogNodeConstraints(std::vector<NodeProperties*> nodes);
+  void LogBufferCollectionInfo(IndentTracker& indent_tracker,
+                               const fuchsia_sysmem2::BufferCollectionInfo& bci) const;
+  void LogImageFormatConstraints(IndentTracker& indent_tracker, NodeProperties* node_properties,
+                                 const fuchsia_sysmem2::ImageFormatConstraints& ifc) const;
+  void LogPrunedSubTree(NodeProperties* subtree) const;
+  void LogNodeConstraints(std::vector<NodeProperties*> nodes) const;
 
   // subtree must remain alive >= returned filter
   fit::function<NodeFilterResult(const NodeProperties&)> PrunedSubtreeFilter(
