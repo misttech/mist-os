@@ -1379,6 +1379,17 @@ pub trait MemoryAccessor {
     /// Useful when the address may not be mapped in the current address space.
     fn vmo_read_memory_to_slice(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno>;
 
+    /// Reads bytes starting at `addr`, continuing until either a null byte is read, `bytes.len()`
+    /// bytes have been read or no more bytes can be read from the target.
+    ///
+    /// This is used, for example, to read null-terminated strings where the exact length is not
+    /// known, only the maximum length is.
+    fn read_memory_partial_to_slice_until_null_byte(
+        &self,
+        addr: UserAddress,
+        bytes: &mut [u8],
+    ) -> Result<usize, Errno>;
+
     /// Reads bytes starting at `addr`, continuing until either `bytes.len()` bytes have been read
     /// or no more bytes can be read from the target.
     ///
@@ -1592,7 +1603,8 @@ pub trait MemoryAccessorExt: MemoryAccessor {
         loop {
             // This operation should never overflow: we should fail to read before that.
             let addr = string.addr().checked_add(index).ok_or(errno!(EFAULT))?;
-            let read = self.read_memory_partial_to_slice(addr, &mut buf[index..])?;
+            let read =
+                self.read_memory_partial_to_slice_until_null_byte(addr, &mut buf[index..])?;
 
             if let Some(nul_index) = memchr::memchr(b'\0', &buf[index..index + read]) {
                 buf.resize(index + nul_index, 0u8);
@@ -1653,7 +1665,7 @@ pub trait MemoryAccessorExt: MemoryAccessor {
         string: UserCString,
         buffer: &'a mut [u8],
     ) -> Result<&'a [u8], Errno> {
-        let actual = self.read_memory_partial_to_slice(string.addr(), buffer)?;
+        let actual = self.read_memory_partial_to_slice_until_null_byte(string.addr(), buffer)?;
         let buffer = &mut buffer[..actual];
         let null_index = memchr::memchr(b'\0', buffer).ok_or_else(|| errno!(ENAMETOOLONG))?;
         Ok(&buffer[..null_index])
@@ -1692,6 +1704,27 @@ impl MemoryAccessor for MemoryManager {
 
     fn vmo_read_memory_to_slice(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
         self.state.read().read_memory_to_slice(addr, bytes)
+    }
+
+    fn read_memory_partial_to_slice_until_null_byte(
+        &self,
+        addr: UserAddress,
+        bytes: &mut [u8],
+    ) -> Result<usize, Errno> {
+        if let Some(usercopy) = usercopy(self).as_ref() {
+            match usercopy.copyin_until_null_byte(addr.ptr(), bytes) {
+                Ok(()) => Ok(bytes.len()),
+                Err(n) => {
+                    if !bytes.is_empty() && n == 0 {
+                        error!(EFAULT)
+                    } else {
+                        Ok(n)
+                    }
+                }
+            }
+        } else {
+            self.vmo_read_memory_partial_to_slice(addr, bytes)
+        }
     }
 
     fn read_memory_partial_to_slice(

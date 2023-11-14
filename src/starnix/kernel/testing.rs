@@ -403,6 +403,13 @@ impl MemoryAccessor for AutoReleasableTask {
     fn vmo_read_memory_to_slice(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
         (**self).vmo_read_memory_to_slice(addr, bytes)
     }
+    fn read_memory_partial_to_slice_until_null_byte(
+        &self,
+        addr: UserAddress,
+        bytes: &mut [u8],
+    ) -> Result<usize, Errno> {
+        (**self).read_memory_partial_to_slice_until_null_byte(addr, bytes)
+    }
     fn read_memory_partial_to_slice(
         &self,
         addr: UserAddress,

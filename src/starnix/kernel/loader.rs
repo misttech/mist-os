@@ -569,6 +569,14 @@ mod tests {
             todo!()
         }
 
+        fn read_memory_partial_to_slice_until_null_byte(
+            &self,
+            _addr: UserAddress,
+            _bytes: &mut [u8],
+        ) -> Result<usize, Errno> {
+            todo!()
+        }
+
         fn vmo_read_memory_to_slice(
             &self,
             _addr: UserAddress,
