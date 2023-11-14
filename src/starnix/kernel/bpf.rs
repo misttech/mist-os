@@ -12,6 +12,7 @@
 // TODO(https://github.com/rust-lang/rust/issues/39371): remove
 #![allow(non_upper_case_globals)]
 
+use lock_sequence::{Locked, Unlocked};
 use starnix_lock::{declare_lock_levels, OrderedMutex};
 use std::{collections::BTreeMap, ops::Bound, sync::Arc};
 use zerocopy::{AsBytes, FromBytes};
@@ -25,9 +26,10 @@ use crate::{
         FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
         FsString, LookupContext, MemoryDirectoryFile, MemoryXattrStorage, NamespaceNode, XattrOp,
     },
-    lock_ordering::Unlocked,
+    logging::{log_trace, not_implemented},
     mm::{MemoryAccessor, MemoryAccessorExt},
-    syscalls::{log_trace, not_implemented, CurrentTask, Locked, SyscallResult, SUCCESS},
+    syscalls::{SyscallResult, SUCCESS},
+    task::CurrentTask,
     task::Kernel,
     types::errno::{errno, error, Errno},
     types::user_address::{UserAddress, UserCString},

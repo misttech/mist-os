@@ -7,7 +7,6 @@ mod syscall_arg;
 mod syscall_result;
 pub mod table;
 
-pub use lock_sequence::{Locked, Unlocked};
 pub use syscall_arg::*;
 pub use syscall_result::*;
 

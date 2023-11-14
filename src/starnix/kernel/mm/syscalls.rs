@@ -4,6 +4,7 @@
 
 use fuchsia_runtime::duplicate_utc_clock_handle;
 use fuchsia_zircon as zx;
+use lock_sequence::{Locked, Unlocked};
 
 use crate::{
     execution::notify_debugger_of_module_list,
@@ -16,7 +17,7 @@ use crate::{
         DesiredAddress, FutexKey, FutexTable, MappingName, MappingOptions, MemoryAccessorExt,
         MremapFlags, ProtectionFlags, PAGE_SIZE,
     },
-    syscalls::{robust_list_head, timespec, uapi, CurrentTask, Locked, Unlocked},
+    syscalls::{robust_list_head, timespec, uapi, CurrentTask},
     task::Task,
     types::auth::{CAP_SYS_PTRACE, PTRACE_MODE_ATTACH_REALCREDS},
     types::errno::{errno, error, Errno},

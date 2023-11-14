@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use fuchsia_zircon as zx;
+use lock_sequence::{Locked, Unlocked};
 use static_assertions::const_assert_eq;
 use std::{convert::TryFrom, sync::Arc};
 use zerocopy::FromBytes;
@@ -16,7 +17,7 @@ use crate::{
         restore_from_signal_handler, send_signal, SignalDetail, SignalInfo, SignalInfoHeader,
         SI_HEADER_SIZE,
     },
-    syscalls::{Locked, SyscallResult, Unlocked},
+    syscalls::SyscallResult,
     task::{
         CurrentTask, ProcessEntryRef, ProcessSelector, Task, TaskMutableState, ThreadGroup,
         WaitResult, Waiter,

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use lock_sequence::{Locked, Unlocked};
 use starnix_lock::Mutex;
 use std::{
     cmp::Ordering, collections::VecDeque, convert::TryInto, marker::PhantomData, sync::Arc, usize,
@@ -25,7 +26,7 @@ use crate::{
     },
     logging::{log_trace, not_implemented, not_implemented_log_once},
     mm::{MemoryAccessor, MemoryAccessorExt},
-    syscalls::{Locked, SyscallArg, SyscallResult, Unlocked, SUCCESS},
+    syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::{CurrentTask, EnqueueEventHandler, EventHandler, ReadyItem, ReadyItemKey, Task, Waiter},
     types::auth::{
         CAP_DAC_READ_SEARCH, CAP_SYS_ADMIN, CAP_WAKE_ALARM, PTRACE_MODE_ATTACH_REALCREDS,

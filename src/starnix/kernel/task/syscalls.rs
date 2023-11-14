@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use fuchsia_zircon as zx;
+use lock_sequence::{Locked, Unlocked};
 use once_cell::sync::Lazy;
 use starnix_lock::RwLock;
 use static_assertions::const_assert;
@@ -17,8 +18,8 @@ use crate::{
     mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt, MemoryManager, PAGE_SIZE},
     syscalls::{
         __user_cap_data_struct, __user_cap_header_struct, c_int, clone_args, not_implemented,
-        release_on_error, sched_param, uid_t, FileMode, Locked, OpenFlags, Resource, SyscallResult,
-        Unlocked, WeakRef,
+        release_on_error, sched_param, uid_t, FileMode, OpenFlags, Resource, SyscallResult,
+        WeakRef,
     },
     task::{
         max_priority_for_sched_policy, min_priority_for_sched_policy, ptrace_attach,

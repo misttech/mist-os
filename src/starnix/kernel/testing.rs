@@ -4,6 +4,7 @@
 
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon as zx;
+use lock_sequence::{Locked, Unlocked};
 use std::{ffi::CString, sync::Arc};
 use zerocopy::AsBytes;
 

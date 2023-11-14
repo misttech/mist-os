@@ -2,11 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use lock_sequence::{Locked, Unlocked};
 use paste::paste;
 
 use crate::{
     arch::syscalls::sys_clone,
-    syscalls::{decls::Syscall, CurrentTask, Locked, SyscallResult, Unlocked},
+    syscalls::{decls::Syscall, CurrentTask, SyscallResult},
     types::errno::Errno,
 };
 
