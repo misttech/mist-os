@@ -26,11 +26,11 @@ type BinaryPowerLevel = strict enum : uint32 {
 alias LeaseId = string:64;
 
 type WatchRequiredLevelError = flexible enum {
-    NOT_AUTHORIZED = 0;
+    NOT_AUTHORIZED = 1;
 };
 
 type UpdateCurrentPowerLevelError = flexible enum {
-    NOT_AUTHORIZED = 0;
+    NOT_AUTHORIZED = 1;
 };
 
 /// Offered by the Power Broker to managed Power Element owners to receive
@@ -65,7 +65,7 @@ open protocol LevelControl {
 };
 
 type LeaseError = flexible enum {
-    NOT_AUTHORIZED = 0;
+    NOT_AUTHORIZED = 1;
 };
 
 /// Offered by the Power Broker to consumer Power Element owners (elements
@@ -92,8 +92,8 @@ open protocol Lessor {
 };
 
 type PowerLevelError = flexible enum {
-    NOT_AUTHORIZED = 0;
-    NOT_FOUND = 1;
+    NOT_AUTHORIZED = 1;
+    NOT_FOUND = 2;
 };
 
 /// Offered by the Power Broker to components (including drivers).
@@ -122,33 +122,33 @@ open protocol Status {
 };
 
 type AddElementError = flexible enum {
-    INTERNAL = 0;
+    INTERNAL = 1;
 };
 
 type RemoveElementError = flexible enum {
-    NOT_AUTHORIZED = 0;
-    NOT_FOUND = 1;
+    NOT_AUTHORIZED = 1;
+    NOT_FOUND = 2;
 };
 
 type AddDependencyError = flexible enum {
-    ALREADY_EXISTS = 0;
-    ELEMENT_NOT_FOUND = 1;
-    NOT_AUTHORIZED = 2;
-    REQUIRED_ELEMENT_NOT_FOUND = 3;
+    ALREADY_EXISTS = 1;
+    ELEMENT_NOT_FOUND = 2;
+    NOT_AUTHORIZED = 3;
+    REQUIRED_ELEMENT_NOT_FOUND = 4;
 };
 
 type RemoveDependencyError = flexible enum {
-    NOT_AUTHORIZED = 0;
-    NOT_FOUND = 1;
+    NOT_AUTHORIZED = 1;
+    NOT_FOUND = 2;
 };
 
 type RegisterCredentialsError = flexible enum {
-    INTERNAL = 0;
-    NOT_AUTHORIZED = 1;
+    INTERNAL = 1;
+    NOT_AUTHORIZED = 2;
 };
 
 type UnregisterCredentialsError = flexible enum {
-    NOT_AUTHORIZED = 0;
+    NOT_AUTHORIZED = 1;
 };
 
 type ElementLevel = resource struct {
