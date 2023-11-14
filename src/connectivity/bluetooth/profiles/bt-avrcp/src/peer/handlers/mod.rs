@@ -7,7 +7,6 @@ use fidl_fuchsia_bluetooth_avrcp::{
     AddressedPlayerId, AvcPanelCommand, Notification, TargetPassthroughError,
 };
 use fuchsia_async as fasync;
-use fuchsia_bluetooth::types::PeerId;
 use fuchsia_zircon::Duration;
 use futures::{future::Either, pin_mut, Future, FutureExt};
 use parking_lot::Mutex;
@@ -71,9 +70,6 @@ pub struct ControlChannelHandler {
 
 #[derive(Debug)]
 struct ControlChannelHandlerInner {
-    // TODO(fxbug.dev/84729)
-    #[allow(unused)]
-    peer_id: PeerId,
     target_delegate: Arc<TargetDelegate>,
 
     // Remaining continuations are stored as list of packet buffs keyed off the PduId that was
@@ -129,10 +125,9 @@ impl Continuations {
 }
 
 impl ControlChannelHandler {
-    pub fn new(peer_id: &PeerId, target_delegate: Arc<TargetDelegate>) -> Self {
+    pub fn new(target_delegate: Arc<TargetDelegate>) -> Self {
         Self {
             inner: Arc::new(ControlChannelHandlerInner {
-                peer_id: peer_id.clone(),
                 target_delegate,
                 continuations: Arc::new(Continuations::new()),
             }),
@@ -1069,7 +1064,7 @@ mod test {
                 .expect("unable to set absolute_volume proxy");
         }
 
-        let cmd_handler = ControlChannelHandler::new(&PeerId(1), target_delegate);
+        let cmd_handler = ControlChannelHandler::new(target_delegate);
         cmd_handler
     }
 

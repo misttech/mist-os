@@ -88,7 +88,7 @@ root:
       control = (connected / connecting / disconnected)
       target_info
       controller_info
-      last_connected_time
+      last_connected
   metrics:
     distinct_peers
     control_connections

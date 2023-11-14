@@ -126,7 +126,6 @@ impl<T> Inspect for &mut PeerChannel<T> {
 #[derive(Copy, Clone, Debug)]
 pub enum AVCTPConnectionType {
     Control,
-    #[allow(dead_code)]
     Browse,
 }
 
@@ -312,7 +311,7 @@ impl RemotePeer {
             browse_channel: PeerChannel::default(),
             controller_listeners: Vec::new(),
             profile_proxy,
-            control_command_handler: ControlChannelHandler::new(&peer_id, target_delegate.clone()),
+            control_command_handler: ControlChannelHandler::new(target_delegate.clone()),
             browse_command_handler: BrowseChannelHandler::new(target_delegate),
             state_change_listener: StateChangeListener::new(),
             attempt_control_connection: true,
