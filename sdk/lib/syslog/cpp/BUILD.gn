@@ -129,7 +129,6 @@ sdk_source_set("backend_fuchsia_lib") {
   deps = [
     ":backend_fuchsia_globals",
     ":cpp",
-    "//sdk/fidl/fuchsia.diagnostics.stream:fuchsia.diagnostics.stream_hlcpp",
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_hlcpp",
     "//sdk/lib/fdio",
     "//sdk/lib/stdcompat",
@@ -161,7 +160,6 @@ sdk_source_set("backend_fuchsia_compat") {
   deps = [
     ":backend_fuchsia_globals",
     ":cpp-macros",
-    "//sdk/fidl/fuchsia.diagnostics.stream:fuchsia.diagnostics.stream_hlcpp",
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_hlcpp",
     "//sdk/lib/fdio",
     "//sdk/lib/fit-promise",
