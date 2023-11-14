@@ -750,7 +750,7 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
             renamed_rules.get(target).copied(),
             true,
         )
-        .context(format!("writing rule for: {} {}", target.name(), target.version()))?;
+        .with_context(|| format!("writing rule for: {} {}", target.name(), target.version()))?;
 
         if targets_with_tests.contains(target) {
             gn::write_rule(
@@ -765,11 +765,7 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
                 renamed_rules.get(&target).copied(),
                 true,
             )
-            .context(format!(
-                "writing rule for: {} {}",
-                target.name(),
-                target.version()
-            ))?;
+            .with_context(|| format!("writing rule for: {} {}", target.name(), target.version()))?;
         }
     }
 
