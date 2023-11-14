@@ -526,6 +526,18 @@ function _add-to-analytics-batch {
   fi
 }
 
+# The following list of allowed ninja persistent modes comes from
+# https://fuchsia.googlesource.com/third_party/github.com/ninja-build/ninja/+/2005473679afc095025bd6db7d461590f8701e65/src/persistent_mode.cc#338
+_ALLOWED_NINJA_PERSISTENT_MODE=( "" "0" "1" "on" "off" "client" "server" )
+function _get_ninja_persistent_mode {
+  if __is_in "${NINJA_PERSISTENT_MODE}" \
+  "${_ALLOWED_NINJA_PERSISTENT_MODE[@]}"; then
+    echo "${NINJA_PERSISTENT_MODE}"
+  else
+    echo unsupported
+  fi
+}
+
 # Sends the current batch of hits to the Analytics server. As a side effect, clears
 # the hit count and batch data.
 function _send-analytics-batch {
@@ -538,7 +550,8 @@ function _send-analytics-batch {
   \"arch\":{\"value\":\"$(uname -m)\"},\
   \"shell\":{\"value\":\"$(_app_name)\"},\
   \"shell_version\":{\"value\":\"$(_app_version)\"},\
-  \"kernel_release\":{\"value\":\"$(uname -rs)\"}\
+  \"kernel_release\":{\"value\":\"$(uname -rs)\"},\
+  \"ninja_persistent\":{\"value\":\"$(_get_ninja_persistent_mode)\"}\
   }"
   local events_json=$(fx-command-run jq -n -c '$ARGS.positional' \
     --jsonargs "${events[@]}")
