@@ -527,7 +527,8 @@ static bool vmaspace_unified_accessed_test() {
   vmm_set_active_aspace(unified_aspace.get());
   auto reset_old_aspace = fit::defer([&old_aspace]() { vmm_set_active_aspace(old_aspace); });
 
-  // Touch the the shared and restricted regions via the unified aspace.
+  // Touch the the shared and restricted regions via the unified aspace. This will guarantee that
+  // the accessed bits are set.
   shared_mem->put<char>(42, kMiddleOffset);
   restricted_mem->put<char>(42, kMiddleOffset);
 
@@ -537,7 +538,17 @@ static bool vmaspace_unified_accessed_test() {
   EXPECT_EQ(ZX_ERR_ALREADY_EXISTS, shared_mem->CommitAndMap(PAGE_SIZE, kMiddleOffset));
   EXPECT_EQ(ZX_ERR_ALREADY_EXISTS, restricted_mem->CommitAndMap(PAGE_SIZE, kMiddleOffset));
 
-  // Harvest the accessed bits again. This time, the pages should be unmapped.
+  // Touch the memory again so that the accessed bits are guaranteed to be set.
+  // We must do this because `CommitAndMap` does not set the accessed flag on x86.
+  // On ARM and RISC-V, this is redundant, as `CommitAndMap` does set the accessed flag.
+  shared_mem->put<char>(43, kMiddleOffset);
+  restricted_mem->put<char>(43, kMiddleOffset);
+
+  // Harvest the accessed information, then attempt to do it again so that it gets unmapped.
+  // The first `harvest_access_bits` call will clear the accessed bits, and the second will unmap
+  // the memory.
+  harvest_access_bits(VmAspace::NonTerminalAction::FreeUnaccessed,
+                      VmAspace::TerminalAction::UpdateAgeAndHarvest);
   harvest_access_bits(VmAspace::NonTerminalAction::FreeUnaccessed,
                       VmAspace::TerminalAction::UpdateAgeAndHarvest);
   EXPECT_OK(shared_mem->CommitAndMap(PAGE_SIZE, kMiddleOffset));
