@@ -13,6 +13,7 @@ use crate::topology::*;
 
 pub struct Broker {
     catalog: Catalog,
+    credentials: Registry,
     // The current level for each element, as reported to the broker.
     current: Levels,
     // The level for each element required by the topology.
@@ -21,11 +22,91 @@ pub struct Broker {
 
 impl Broker {
     pub fn new() -> Self {
-        Broker { catalog: Catalog::new(), current: Levels::new(), required: Levels::new() }
+        Broker {
+            catalog: Catalog::new(),
+            credentials: Registry::new(),
+            current: Levels::new(),
+            required: Levels::new(),
+        }
     }
 
-    pub fn lookup_credentials(&self, token: Token) -> Option<Credential> {
-        self.catalog.topology.lookup_credentials(token)
+    fn lookup_credentials(&self, token: Token) -> Option<Credential> {
+        self.credentials.lookup(token)
+    }
+
+    fn unregister_all_credentials_for_element(&mut self, element: &ElementID) {
+        self.credentials.unregister_all_for_element(element)
+    }
+
+    fn register_credential(
+        &mut self,
+        element: &ElementID,
+        credential_to_register: CredentialToRegister,
+    ) -> Result<(), RegisterCredentialsError> {
+        self.credentials.register(element, credential_to_register)?;
+        Ok(())
+    }
+
+    fn unregister_credential(&mut self, credential: &Credential) -> Option<Credential> {
+        self.credentials.unregister(credential)
+    }
+
+    pub fn register_credentials(
+        &mut self,
+        token: Token,
+        credentials_to_register: Vec<CredentialToRegister>,
+    ) -> Result<(), RegisterCredentialsError> {
+        let Some(credential) = self.lookup_credentials(token) else {
+            tracing::debug!("register_credentials: no credential found matching token");
+            return Err(RegisterCredentialsError::NotAuthorized);
+        };
+        if !credential.contains(Permissions::MODIFY_CREDENTIAL) {
+            tracing::debug!(
+                "register_credentials: credential missing MODIFY_CREDENTIAL: {:?}",
+                &credential
+            );
+            return Err(RegisterCredentialsError::NotAuthorized);
+        }
+        for credential_to_register in credentials_to_register {
+            if let Err(err) =
+                self.register_credential(&credential.get_element(), credential_to_register)
+            {
+                tracing::debug!(
+                    "register_credentials: register_credential({:?}) failed",
+                    &credential.get_element(),
+                );
+                return Err(err);
+            }
+        }
+        Ok(())
+    }
+
+    pub fn unregister_credentials(
+        &mut self,
+        token: Token,
+        tokens_to_unregister: Vec<Token>,
+    ) -> Result<(), UnregisterCredentialsError> {
+        let Some(credential) = self.lookup_credentials(token) else {
+            tracing::debug!("unregister_credentials: no credential found matching token");
+            return Err(UnregisterCredentialsError::NotAuthorized);
+        };
+        for token in tokens_to_unregister {
+            let Some(credential_to_unregister) = self.lookup_credentials(token) else {
+                continue;
+            };
+            if !credential
+                .authorizes(credential_to_unregister.get_element(), &Permissions::MODIFY_CREDENTIAL)
+            {
+                tracing::debug!(
+                    "unregister_credentials: credential({:?}) missing MODIFY_CREDENTIAL: {:?}",
+                    &credential,
+                    &credential_to_unregister,
+                );
+                return Err(UnregisterCredentialsError::NotAuthorized);
+            }
+            self.unregister_credential(&credential_to_unregister);
+        }
+        Ok(())
     }
 
     pub fn get_current_level(&self, token: Token) -> Result<PowerLevel, fpb::PowerLevelError> {
@@ -232,11 +313,39 @@ impl Broker {
         name: &str,
         credentials_to_register: Vec<CredentialToRegister>,
     ) -> Result<ElementID, AddElementError> {
-        self.catalog.topology.add_element(name, credentials_to_register)
+        let id = self.catalog.topology.add_element(name)?;
+        for credential_to_register in credentials_to_register {
+            if let Err(err) = self.register_credential(&id, credential_to_register) {
+                match err {
+                    RegisterCredentialsError::Internal => {
+                        tracing::error!(
+                            "credentials.register returned an Internal error: {:?}",
+                            id
+                        );
+                        return Err(AddElementError::Internal);
+                    }
+                    // Owner should be authorized for all credentials on its
+                    // own element, so this is an Internal error:
+                    RegisterCredentialsError::NotAuthorized => {
+                        tracing::error!("credentials.register unexpectedly returned NotAuthorized in add_element: {:?}", id);
+                        return Err(AddElementError::Internal);
+                    }
+                }
+            }
+        }
+        Ok(id)
     }
 
     pub fn remove_element(&mut self, token: Token) -> Result<(), RemoveElementError> {
-        self.catalog.topology.remove_element(token)
+        let Some(credential) = self.lookup_credentials(token) else {
+            return Err(RemoveElementError::NotAuthorized);
+        };
+        if !credential.contains(Permissions::REMOVE_ELEMENT) {
+            return Err(RemoveElementError::NotAuthorized);
+        }
+        self.catalog.topology.remove_element(credential.get_element())?;
+        self.unregister_all_credentials_for_element(credential.get_element());
+        Ok(())
     }
 
     /// Checks authorization from tokens, and if valid, adds a dependency to the Topology.
@@ -301,22 +410,6 @@ impl Broker {
                 level: requires_level,
             },
         })
-    }
-
-    pub fn register_credentials(
-        &mut self,
-        token: Token,
-        credentials_to_register: Vec<CredentialToRegister>,
-    ) -> Result<(), RegisterCredentialsError> {
-        self.catalog.topology.register_credentials(token, credentials_to_register)
-    }
-
-    pub fn unregister_credentials(
-        &mut self,
-        token: Token,
-        tokens_to_unregister: Vec<Token>,
-    ) -> Result<(), UnregisterCredentialsError> {
-        self.catalog.topology.unregister_credentials(token, tokens_to_unregister)
     }
 }
 
@@ -686,6 +779,85 @@ mod tests {
             received_b.push(level)
         }
         assert_eq!(received_b, vec![None, Some(PowerLevel::Binary(BinaryPowerLevel::On))]);
+    }
+
+    #[fuchsia::test]
+    fn test_remove_element() {
+        let mut broker = Broker::new();
+        let (token_all, token_all_broker) = zx::EventPair::create();
+        let credential_all = CredentialToRegister {
+            broker_token: token_all_broker.into(),
+            permissions: Permissions::all(),
+        };
+        let (token_none, token_none_broker) = zx::EventPair::create();
+        let credential_none = CredentialToRegister {
+            broker_token: token_none_broker.into(),
+            permissions: Permissions::empty(),
+        };
+        broker
+            .add_element("Unobtainium", vec![credential_all, credential_none])
+            .expect("add_element failed");
+        let remove_element_not_authorized_res = broker.remove_element(
+            token_none.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
+        );
+        assert!(matches!(
+            remove_element_not_authorized_res,
+            Err(RemoveElementError::NotAuthorized)
+        ));
+
+        broker
+            .remove_element(
+                token_all.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
+            )
+            .expect("remove_element failed");
+    }
+
+    #[fuchsia::test]
+    async fn test_register_unregister_credentials() {
+        let mut broker = Broker::new();
+        let (token_element_owner, token_element_broker) = zx::EventPair::create();
+        let broker_credential = CredentialToRegister {
+            broker_token: token_element_broker.into(),
+            permissions: Permissions::READ_POWER_LEVEL
+                | Permissions::MODIFY_POWER_LEVEL
+                | Permissions::MODIFY_DEPENDENT
+                | Permissions::MODIFY_DEPENDENCY
+                | Permissions::MODIFY_CREDENTIAL
+                | Permissions::REMOVE_ELEMENT,
+        };
+        broker.add_element("element", vec![broker_credential]).expect("add_element failed");
+        let (token_new_owner, token_new_broker) = zx::EventPair::create();
+        let credential_to_register = CredentialToRegister {
+            broker_token: token_new_broker.into(),
+            permissions: Permissions::READ_POWER_LEVEL | Permissions::MODIFY_POWER_LEVEL,
+        };
+        broker
+            .register_credentials(
+                token_element_owner
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("duplicate_handle failed")
+                    .into(),
+                vec![credential_to_register],
+            )
+            .expect("register_credentials failed");
+
+        let (_, token_not_authorized_broker) = zx::EventPair::create();
+        let credential_not_authorized = CredentialToRegister {
+            broker_token: token_not_authorized_broker.into(),
+            permissions: Permissions::READ_POWER_LEVEL | Permissions::MODIFY_POWER_LEVEL,
+        };
+        let res_not_authorized = broker.register_credentials(
+            token_new_owner
+                .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                .expect("duplicate_handle failed")
+                .into(),
+            vec![credential_not_authorized],
+        );
+        assert!(matches!(res_not_authorized, Err(RegisterCredentialsError::NotAuthorized)));
+
+        broker
+            .unregister_credentials(token_element_owner.into(), vec![token_new_owner.into()])
+            .expect("unregister_credentials failed");
     }
 
     #[fuchsia::test]

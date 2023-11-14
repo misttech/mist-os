@@ -3,11 +3,9 @@
 // found in the LICENSE file.
 
 /// Manages the Power Element Topology, keeping track of element dependencies.
-use fidl_fuchsia_power_broker::{self as fpb, Permissions, PowerLevel};
+use fidl_fuchsia_power_broker::{self as fpb, PowerLevel};
 use std::collections::HashMap;
 use uuid::Uuid;
-
-use crate::credentials::*;
 
 // This may be a token later, but using a String for now for simplicity.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialOrd, PartialEq)]
@@ -121,63 +119,24 @@ impl Into<fpb::RemoveDependencyError> for RemoveDependencyError {
 #[derive(Debug)]
 pub struct Topology {
     elements: HashMap<ElementID, Element>,
-    credentials: Registry,
     source_to_targets_dependencies: HashMap<ElementLevel, Vec<ElementLevel>>,
 }
 
 impl Topology {
     pub fn new() -> Self {
-        Topology {
-            elements: HashMap::new(),
-            credentials: Registry::new(),
-            source_to_targets_dependencies: HashMap::new(),
-        }
+        Topology { elements: HashMap::new(), source_to_targets_dependencies: HashMap::new() }
     }
 
-    pub fn add_element(
-        &mut self,
-        name: &str,
-        credentials_to_register: Vec<CredentialToRegister>,
-    ) -> Result<ElementID, AddElementError> {
+    pub fn add_element(&mut self, name: &str) -> Result<ElementID, AddElementError> {
         let id = ElementID::from(Uuid::new_v4().as_simple().to_string());
         self.elements.insert(id.clone(), Element { id: id.clone(), name: name.into() });
-        for credential_to_register in credentials_to_register {
-            if let Err(err) = self.credentials.register(&id, credential_to_register) {
-                match err {
-                    RegisterCredentialsError::Internal => {
-                        tracing::error!(
-                            "credentials.register returned an Internal error: {:?}",
-                            id
-                        );
-                        return Err(AddElementError::Internal);
-                    }
-                    // Owner should be authorized for all credentials on its
-                    // own element, so this is an Internal error:
-                    RegisterCredentialsError::NotAuthorized => {
-                        tracing::error!("credentials.register unexpectedly returned NotAuthorized in add_element: {:?}", id);
-                        return Err(AddElementError::Internal);
-                    }
-                }
-            }
-        }
         Ok(id)
     }
 
-    pub fn remove_element(&mut self, token: Token) -> Result<(), RemoveElementError> {
-        let Some(credential) = self.credentials.lookup(token) else {
-            return Err(RemoveElementError::NotAuthorized);
-        };
-        if !credential.contains(Permissions::REMOVE_ELEMENT) {
-            return Err(RemoveElementError::NotAuthorized);
-        }
-        self.internal_remove_element(credential.get_element())
-    }
-
-    fn internal_remove_element(&mut self, element: &ElementID) -> Result<(), RemoveElementError> {
+    pub fn remove_element(&mut self, element: &ElementID) -> Result<(), RemoveElementError> {
         if self.elements.remove(element).is_none() {
             return Err(RemoveElementError::NotFound(element.clone()));
         }
-        self.credentials.unregister_all_for_element(element);
         Ok(())
     }
 
@@ -243,74 +202,20 @@ impl Topology {
         targets.retain(|el| el != &dep.requires);
         Ok(())
     }
-
-    pub fn register_credentials(
-        &mut self,
-        token: Token,
-        credentials_to_register: Vec<CredentialToRegister>,
-    ) -> Result<(), RegisterCredentialsError> {
-        let Some(credential) = self.credentials.lookup(token) else {
-            tracing::debug!("register_credentials: no credential found matching token");
-            return Err(RegisterCredentialsError::NotAuthorized);
-        };
-        if !credential.contains(Permissions::MODIFY_CREDENTIAL) {
-            tracing::debug!(
-                "register_credentials: credential missing MODIFY_CREDENTIAL: {:?}",
-                &credential
-            );
-            return Err(RegisterCredentialsError::NotAuthorized);
-        }
-        for credential_to_register in credentials_to_register {
-            if let Err(err) =
-                self.credentials.register(&credential.get_element(), credential_to_register)
-            {
-                return Err(err);
-            }
-        }
-        Ok(())
-    }
-
-    pub fn unregister_credentials(
-        &mut self,
-        token: Token,
-        tokens_to_unregister: Vec<Token>,
-    ) -> Result<(), UnregisterCredentialsError> {
-        let Some(credential) = self.credentials.lookup(token) else {
-            tracing::debug!("unregister_credentials: no credential found matching token");
-            return Err(UnregisterCredentialsError::NotAuthorized);
-        };
-        for token in tokens_to_unregister {
-            let Some(credential_to_unregister) = self.credentials.lookup(token) else {
-                continue;
-            };
-            if !credential
-                .authorizes(credential_to_unregister.get_element(), &Permissions::MODIFY_CREDENTIAL)
-            {
-                return Err(UnregisterCredentialsError::NotAuthorized);
-            }
-            self.credentials.unregister(&credential_to_unregister);
-        }
-        Ok(())
-    }
-
-    pub fn lookup_credentials(&self, token: Token) -> Option<Credential> {
-        self.credentials.lookup(token)
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use fidl_fuchsia_power_broker::{BinaryPowerLevel, PowerLevel};
-    use fuchsia_zircon::{self as zx, HandleBased};
 
     #[fuchsia::test]
     fn test_add_remove_elements() {
         let mut t = Topology::new();
-        let water = t.add_element("Water", Vec::new()).expect("add_element failed");
-        let earth = t.add_element("Earth", Vec::new()).expect("add_element failed");
-        let fire = t.add_element("Fire", Vec::new()).expect("add_element failed");
-        let air = t.add_element("Air", Vec::new()).expect("add_element failed");
+        let water = t.add_element("Water").expect("add_element failed");
+        let earth = t.add_element("Earth").expect("add_element failed");
+        let fire = t.add_element("Fire").expect("add_element failed");
+        let air = t.add_element("Air").expect("add_element failed");
 
         t.add_direct_dep(&Dependency {
             dependent: ElementLevel {
@@ -360,8 +265,8 @@ mod tests {
         });
         assert!(matches!(extra_remove_dep_res, Err(RemoveDependencyError::NotFound { .. })));
 
-        t.internal_remove_element(&fire).expect("remove_element failed");
-        t.internal_remove_element(&air).expect("remove_element failed");
+        t.remove_element(&fire).expect("remove_element failed");
+        t.remove_element(&air).expect("remove_element failed");
 
         let element_not_found_res = t.add_direct_dep(&Dependency {
             dependent: ElementLevel {
@@ -394,10 +299,10 @@ mod tests {
     #[fuchsia::test]
     fn test_add_remove_direct_deps() {
         let mut t = Topology::new();
-        let a = t.add_element("A", Vec::new()).expect("add_element failed");
-        let b = t.add_element("B", Vec::new()).expect("add_element failed");
-        let c = t.add_element("C", Vec::new()).expect("add_element failed");
-        let d = t.add_element("D", Vec::new()).expect("add_element failed");
+        let a = t.add_element("A").expect("add_element failed");
+        let b = t.add_element("B").expect("add_element failed");
+        let c = t.add_element("C").expect("add_element failed");
+        let d = t.add_element("D").expect("add_element failed");
         // A <- B <- C -> D
         let ba = Dependency {
             dependent: ElementLevel {
@@ -460,10 +365,10 @@ mod tests {
     #[fuchsia::test]
     fn test_get_all_deps() {
         let mut t = Topology::new();
-        let a = t.add_element("A", Vec::new()).expect("add_element failed");
-        let b = t.add_element("B", Vec::new()).expect("add_element failed");
-        let c = t.add_element("C", Vec::new()).expect("add_element failed");
-        let d = t.add_element("D", Vec::new()).expect("add_element failed");
+        let a = t.add_element("A").expect("add_element failed");
+        let b = t.add_element("B").expect("add_element failed");
+        let c = t.add_element("C").expect("add_element failed");
+        let d = t.add_element("D").expect("add_element failed");
         // A <- B <- C -> D
         let ba = Dependency {
             dependent: ElementLevel {
@@ -531,80 +436,5 @@ mod tests {
         c_deps.sort();
         want_c_deps.sort();
         assert_eq!(c_deps, want_c_deps);
-    }
-
-    #[fuchsia::test]
-    fn test_remove_element() {
-        let mut t = Topology::new();
-        let (token_all, token_all_broker) = zx::EventPair::create();
-        let credential_all = CredentialToRegister {
-            broker_token: token_all_broker.into(),
-            permissions: Permissions::all(),
-        };
-        let (token_none, token_none_broker) = zx::EventPair::create();
-        let credential_none = CredentialToRegister {
-            broker_token: token_none_broker.into(),
-            permissions: Permissions::empty(),
-        };
-        t.add_element("Unobtainium", vec![credential_all, credential_none])
-            .expect("add_element failed");
-        let remove_element_not_authorized_res = t.remove_element(
-            token_none.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
-        );
-        assert!(matches!(
-            remove_element_not_authorized_res,
-            Err(RemoveElementError::NotAuthorized)
-        ));
-
-        t.remove_element(
-            token_all.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
-        )
-        .expect("remove_element failed");
-    }
-
-    #[fuchsia::test]
-    async fn test_register_unregister_credentials() {
-        let mut t = Topology::new();
-        let (token_element_owner, token_element_broker) = zx::EventPair::create();
-        let broker_credential = CredentialToRegister {
-            broker_token: token_element_broker.into(),
-            permissions: Permissions::READ_POWER_LEVEL
-                | Permissions::MODIFY_POWER_LEVEL
-                | Permissions::MODIFY_DEPENDENT
-                | Permissions::MODIFY_DEPENDENCY
-                | Permissions::MODIFY_CREDENTIAL
-                | Permissions::REMOVE_ELEMENT,
-        };
-        t.add_element("element", vec![broker_credential]).expect("add_element failed");
-        let (token_new_owner, token_new_broker) = zx::EventPair::create();
-        let credential_to_register = CredentialToRegister {
-            broker_token: token_new_broker.into(),
-            permissions: Permissions::READ_POWER_LEVEL | Permissions::MODIFY_POWER_LEVEL,
-        };
-        t.register_credentials(
-            token_element_owner
-                .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                .expect("duplicate_handle failed")
-                .into(),
-            vec![credential_to_register],
-        )
-        .expect("register_credentials failed");
-
-        let (_, token_not_authorized_broker) = zx::EventPair::create();
-        let credential_not_authorized = CredentialToRegister {
-            broker_token: token_not_authorized_broker.into(),
-            permissions: Permissions::READ_POWER_LEVEL | Permissions::MODIFY_POWER_LEVEL,
-        };
-        let res_not_authorized = t.register_credentials(
-            token_new_owner
-                .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                .expect("duplicate_handle failed")
-                .into(),
-            vec![credential_not_authorized],
-        );
-        assert!(matches!(res_not_authorized, Err(RegisterCredentialsError::NotAuthorized)));
-
-        t.unregister_credentials(token_element_owner.into(), vec![token_new_owner.into()])
-            .expect("unregister_credentials failed");
     }
 }
