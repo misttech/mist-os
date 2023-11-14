@@ -4,7 +4,7 @@
 
 #include "src/media/audio/services/device_registry/control_server.h"
 
-#include <fidl/fuchsia.audio.device/cpp/fidl.h>
+#include <fidl/fuchsia.audio.device/cpp/natural_types.h>
 #include <fidl/fuchsia.audio/cpp/common_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <fidl/fuchsia.mem/cpp/natural_types.h>
@@ -109,15 +109,15 @@ std::shared_ptr<RingBufferServer> ControlServer::GetRingBufferServer() {
 void ControlServer::SetGain(SetGainRequest& request, SetGainCompleter::Sync& completer) {
   ADR_LOG_OBJECT(kLogControlServerMethods);
 
-  if (!request.target_state()) {
-    ADR_WARN_OBJECT() << "required field 'target_state' is missing";
-    completer.Reply(fit::error(fuchsia_audio_device::ControlSetGainError::kInvalidGainState));
-    return;
-  }
-
   if (device_has_error_) {
     ADR_WARN_OBJECT() << "device has an error";
     completer.Reply(fit::error(fuchsia_audio_device::ControlSetGainError::kDeviceError));
+    return;
+  }
+
+  if (!request.target_state()) {
+    ADR_WARN_OBJECT() << "required field 'target_state' is missing";
+    completer.Reply(fit::error(fuchsia_audio_device::ControlSetGainError::kInvalidGainState));
     return;
   }
 
@@ -164,6 +164,14 @@ void ControlServer::GetCurrentlyPermittedFormats(
     GetCurrentlyPermittedFormatsCompleter::Sync& completer) {
   ADR_LOG_OBJECT(kLogControlServerMethods);
 
+  // Fail if device has error.
+  if (device_has_error_) {
+    ADR_WARN_OBJECT() << "device has an error";
+    completer.Reply(
+        fit::error(fuchsia_audio_device::ControlGetCurrentlyPermittedFormatsError::kDeviceError));
+    return;
+  }
+
   currently_permitted_formats_completer_ = completer.ToAsync();
   device_->GetCurrentlyPermittedFormats(
       [this](std::vector<fuchsia_audio_device::PcmFormatSet> formats) {
@@ -175,7 +183,7 @@ void ControlServer::GetCurrentlyPermittedFormats(
         auto completer = std::move(currently_permitted_formats_completer_);
         currently_permitted_formats_completer_.reset();
         if (device_has_error_) {
-          ADR_WARN_OBJECT() << "device has an error";
+          ADR_WARN_OBJECT() << "GetCurrentlyPermittedFormats callback: device has an error";
           completer->Reply(fit::error(
               fuchsia_audio_device::ControlGetCurrentlyPermittedFormatsError::kDeviceError));
           return;
@@ -192,6 +200,13 @@ void ControlServer::GetCurrentlyPermittedFormats(
 void ControlServer::CreateRingBuffer(CreateRingBufferRequest& request,
                                      CreateRingBufferCompleter::Sync& completer) {
   ADR_LOG_OBJECT(kLogControlServerMethods);
+
+  // Fail if device has error.
+  if (device_has_error_) {
+    ADR_WARN_OBJECT() << "device has an error";
+    completer.Reply(fit::error(fuchsia_audio_device::ControlCreateRingBufferError::kDeviceError));
+    return;
+  }
 
   // Fail on missing parameters.
   if (!request.options()) {
@@ -219,13 +234,6 @@ void ControlServer::CreateRingBuffer(CreateRingBufferRequest& request,
         fit::error(fuchsia_audio_device::ControlCreateRingBufferError::kInvalidRingBuffer));
     return;
   }
-  // Fail if device has error.
-  if (device_has_error_) {
-    ADR_WARN_OBJECT() << "device has an error";
-    completer.Reply(fit::error(fuchsia_audio_device::ControlCreateRingBufferError::kDeviceError));
-    return;
-  }
-
   if (GetRingBufferServer()) {
     ADR_WARN_OBJECT() << "device RingBuffer already exists";
     completer.Reply(fit::error(
