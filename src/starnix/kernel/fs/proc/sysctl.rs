@@ -12,8 +12,9 @@ use crate::{
         ptrace_get_scope, ptrace_set_scope, CurrentTask, Kernel, NetstackDevicesDirectory,
         SeccompAction,
     },
+    types::auth::CAP_SYS_ADMIN,
     types::errno::{error, Errno},
-    types::{mode, CAP_SYS_ADMIN},
+    types::mode,
 };
 use starnix_lock::Mutex;
 use std::{borrow::Cow, sync::Arc};

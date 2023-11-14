@@ -25,12 +25,10 @@ use crate::{
     logging::{log_error, log_info},
     signals,
     task::{ExitStatus, Task},
+    types::auth::Capabilities,
     types::errno::{Errno, EEXIST, ENOTDIR},
     types::signals::{SIGINT, SIGKILL},
-    types::{
-        mode, release_on_error, Capabilities, DeviceType, MountFlags, OpenFlags, ReleasableByRef,
-        WeakRef,
-    },
+    types::{mode, release_on_error, DeviceType, MountFlags, OpenFlags, ReleasableByRef, WeakRef},
 };
 
 /// Component controller epitaph value used as the base value to pass non-zero error

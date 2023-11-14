@@ -21,9 +21,10 @@ use crate::{
     mm::{vmo::round_up_to_increment, MemoryAccessorExt},
     syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::{CurrentTask, EventHandler, Kernel, WaitCanceler, WaitQueue, Waiter},
+    types::auth::CAP_SYS_ADMIN,
     types::errno::{errno, error, Errno},
     types::user_address::{UserAddress, UserRef},
-    types::{inotify_event, FileMode, OpenFlags, WeakKey, CAP_SYS_ADMIN, FIONREAD},
+    types::{inotify_event, FileMode, OpenFlags, WeakKey, FIONREAD},
 };
 
 const DATA_SIZE: usize = size_of::<inotify_event>();

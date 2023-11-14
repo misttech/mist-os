@@ -32,6 +32,7 @@ use crate::{
         TaskPersistentInfoState, TimerId, TimerTable, WaitQueue,
     },
     time::utc,
+    types::auth::{CAP_SYS_ADMIN, CAP_SYS_RESOURCE},
     types::errno::{errno, error, Errno},
     types::personality::PersonalityFlags,
     types::signals::{Signal, UncheckedSignal, SIGCHLD, SIGCONT, SIGHUP, SIGKILL, SIGTTOU},
@@ -39,8 +40,8 @@ use crate::{
     types::user_address::UserAddress,
     types::{
         itimerval, pid_t, rlimit, uid_t, OwnedRef, Releasable, Resource, ResourceLimits,
-        TaskTimeStats, TempRef, WeakRef, CAP_SYS_ADMIN, CAP_SYS_RESOURCE, CLOCK_REALTIME,
-        ITIMER_PROF, ITIMER_REAL, ITIMER_VIRTUAL, SIG_IGN,
+        TaskTimeStats, TempRef, WeakRef, CLOCK_REALTIME, ITIMER_PROF, ITIMER_REAL, ITIMER_VIRTUAL,
+        SIG_IGN,
     },
 };
 

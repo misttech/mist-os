@@ -12,14 +12,14 @@ use crate::{
         SignalInfoHeader, SI_HEADER_SIZE,
     },
     task::{waiter::WaitQueue, CurrentTask, Kernel, StopState, Task, ThreadGroup},
+    types::auth::{CAP_SYS_PTRACE, PTRACE_MODE_ATTACH_REALCREDS},
     types::errno::{errno, error, Errno},
     types::signals::{SigSet, Signal, UncheckedSignal, SIGKILL, SIGSTOP},
     types::user_address::{UserAddress, UserRef},
     types::{
-        pid_t, OwnedRefByRef, WeakRef, CAP_SYS_PTRACE, PTRACE_CONT, PTRACE_DETACH,
-        PTRACE_GETSIGINFO, PTRACE_GETSIGMASK, PTRACE_INTERRUPT, PTRACE_KILL,
-        PTRACE_MODE_ATTACH_REALCREDS, PTRACE_PEEKDATA, PTRACE_PEEKTEXT, PTRACE_POKEDATA,
-        PTRACE_POKETEXT, PTRACE_SETSIGINFO, PTRACE_SETSIGMASK, SI_MAX_SIZE,
+        pid_t, OwnedRefByRef, WeakRef, PTRACE_CONT, PTRACE_DETACH, PTRACE_GETSIGINFO,
+        PTRACE_GETSIGMASK, PTRACE_INTERRUPT, PTRACE_KILL, PTRACE_PEEKDATA, PTRACE_PEEKTEXT,
+        PTRACE_POKEDATA, PTRACE_POKETEXT, PTRACE_SETSIGINFO, PTRACE_SETSIGMASK, SI_MAX_SIZE,
     },
 };
 

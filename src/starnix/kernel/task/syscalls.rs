@@ -17,13 +17,17 @@ use crate::{
     mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt, MemoryManager, PAGE_SIZE},
     syscalls::{
         __user_cap_data_struct, __user_cap_header_struct, c_int, clone_args, not_implemented,
-        release_on_error, sched_param, uid_t, Capabilities, FileMode, Locked, OpenFlags, Resource,
-        SyscallResult, Unlocked, WeakRef,
+        release_on_error, sched_param, uid_t, FileMode, Locked, OpenFlags, Resource, SyscallResult,
+        Unlocked, WeakRef,
     },
     task::{
         max_priority_for_sched_policy, min_priority_for_sched_policy, ptrace_attach,
         ptrace_dispatch, ptrace_traceme, CurrentTask, ExitStatus, PtraceAllowedPtracers,
         SchedulerPolicy, SeccompAction, SeccompStateValue, Task, PR_SET_PTRACER_ANY,
+    },
+    types::auth::{
+        Capabilities, CAP_SETGID, CAP_SETPCAP, CAP_SETUID, CAP_SYS_ADMIN, CAP_SYS_NICE,
+        CAP_SYS_PTRACE,
     },
     types::errno::{errno, error, Errno},
     types::signals::{Signal, UncheckedSignal},
@@ -31,8 +35,7 @@ use crate::{
     types::user_address::{UserAddress, UserCString, UserRef},
     types::{
         gid_t, kcmp::KcmpResource, ownership::ReleasableByRef, pid_t, rlimit, rusage,
-        AT_EMPTY_PATH, AT_SYMLINK_NOFOLLOW, CAP_SETGID, CAP_SETPCAP, CAP_SETUID, CAP_SYS_ADMIN,
-        CAP_SYS_NICE, CAP_SYS_PTRACE, CLONE_ARGS_SIZE_VER0, CLONE_ARGS_SIZE_VER1,
+        AT_EMPTY_PATH, AT_SYMLINK_NOFOLLOW, CLONE_ARGS_SIZE_VER0, CLONE_ARGS_SIZE_VER1,
         CLONE_ARGS_SIZE_VER2, CLONE_FILES, CLONE_NEWNS, CLONE_NEWUTS, CLONE_SETTLS, CLONE_VFORK,
         NGROUPS_MAX, PATH_MAX, PRIO_PROCESS, PR_CAPBSET_DROP, PR_CAPBSET_READ, PR_CAP_AMBIENT,
         PR_CAP_AMBIENT_CLEAR_ALL, PR_CAP_AMBIENT_IS_SET, PR_CAP_AMBIENT_LOWER,

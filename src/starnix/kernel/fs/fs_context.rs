@@ -9,8 +9,9 @@ use crate::{
     fs::{FileSystemHandle, Namespace, NamespaceNode},
     logging::log_trace,
     task::CurrentTask,
+    types::auth::CAP_SYS_CHROOT,
     types::errno::{errno, error, Errno},
-    types::{Access, FileMode, CAP_SYS_CHROOT},
+    types::{Access, FileMode},
 };
 
 /// The mutable state for an FsContext.

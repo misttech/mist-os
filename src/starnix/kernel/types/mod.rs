@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 mod arc_key;
-mod auth;
 mod file_mode;
 mod mount_flags;
 mod open_flags;
@@ -13,6 +12,7 @@ mod stats;
 mod union;
 
 pub mod as_any;
+pub mod auth;
 pub mod device_type;
 pub mod errno;
 pub mod kcmp;
@@ -45,12 +45,3 @@ pub use resource_limits::{Resource, ResourceLimits};
 pub use seal_flags::SealFlags;
 pub use stats::TaskTimeStats;
 pub use uapi::*;
-
-// Manually export names that are ambiguous between the name below and the one defined in uapi.
-pub use auth::{
-    Capabilities, PtraceAccessMode, CAP_CHOWN, CAP_DAC_OVERRIDE, CAP_DAC_READ_SEARCH, CAP_FOWNER,
-    CAP_FSETID, CAP_KILL, CAP_LINUX_IMMUTABLE, CAP_MAC_OVERRIDE, CAP_MKNOD, CAP_NET_ADMIN,
-    CAP_NET_RAW, CAP_SETGID, CAP_SETPCAP, CAP_SETUID, CAP_SYS_ADMIN, CAP_SYS_BOOT, CAP_SYS_CHROOT,
-    CAP_SYS_NICE, CAP_SYS_PTRACE, CAP_SYS_RESOURCE, CAP_WAKE_ALARM, PTRACE_MODE_ATTACH_REALCREDS,
-    PTRACE_MODE_FSCREDS, PTRACE_MODE_REALCREDS,
-};
