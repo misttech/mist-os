@@ -22,7 +22,13 @@ pub async fn open_file_data(
     match file
         .get_backing_memory(fio::VmoFlags::READ)
         .await
-        .map_err(FileError::GetBufferError)?
+        .map_err(|e| {
+            // Don't swallow the root cause of the error without a trace. It may
+            // be impossible to correlate resulting error to its root cause
+            // otherwise.
+            tracing::debug!("error for path={}: {}:", path, e);
+            FileError::GetBufferError(e)
+        })?
         .map_err(zxs::Status::from_raw)
     {
         Ok(vmo) => {
